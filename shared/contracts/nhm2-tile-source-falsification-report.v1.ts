@@ -1,5 +1,8 @@
 import type { Nhm2LayerStackReceiptSurfaceId } from "./nhm2-layer-stack-full-apparatus-receipt-loop.v1";
-import type { Nhm2TileSourceEvidenceGapRoadmapV1 } from "./nhm2-tile-source-evidence-gap-roadmap.v1";
+import type {
+  Nhm2TileSourceEvidenceGapRoadmapItemV1,
+  Nhm2TileSourceEvidenceGapRoadmapV1,
+} from "./nhm2-tile-source-evidence-gap-roadmap.v1";
 import type {
   Nhm2TileSourceMaterialEvidenceReceiptsV1,
   Nhm2TileSourceReceiptStatus,
@@ -89,7 +92,11 @@ export type Nhm2TileSourceFrontierResolutionItemV1 = {
   marginInterpretation: "below_one_fails" | "boolean_or_missing" | "not_numeric";
   evidenceTarget: string;
   requiredChange: string;
+  nextEvidenceArtifact: string;
+  measurementTargetSummary: string;
+  falsificationRule: string;
   requiredCorrections: Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1>;
+  decisiveMeasurements: Nhm2TileSourceEvidenceGapRoadmapItemV1["decisiveMeasurements"];
   prevents: string[];
   evidenceRefs: string[];
   blocksCampaignPass: true;
@@ -398,6 +405,92 @@ const evidenceTargetFromDomain = (
   }
 };
 
+const nextEvidenceArtifactFromDomain = (
+  domain: Nhm2TileSourceExperimentalCampaignDomainV1,
+  firstBlocker: string,
+  evidenceState: Nhm2TileSourceCampaignDecisionV1["evidenceState"],
+): string => {
+  const missingReceipt = evidenceState === "missing_receipt";
+  switch (domain) {
+    case "material_coupon_behavior":
+      return !missingReceipt && (firstBlocker.includes("fracture") || firstBlocker.includes("yield"))
+        ? "receipt://material_coupon/fracture_yield_margin_v1"
+        : "receipt://material_coupon/provenance_v1";
+    case "force_gap_pull_in":
+      return !missingReceipt && firstBlocker.includes("force_gradient")
+        ? "receipt://force_gap_pull_in/force_gradient_8nm_v1"
+        : "receipt://force_gap_pull_in/provenance_v1";
+    case "roughness_patch_potential":
+      return !missingReceipt && firstBlocker.includes("roughness")
+        ? "receipt://roughness_patch_metrology/roughness_rms_v1"
+        : "receipt://roughness_patch_metrology/provenance_v1";
+    case "active_control_energy_noise_heat_timing":
+      return "receipt://active_control/provenance_v1";
+    case "fatigue_layer_scaling":
+      return !missingReceipt && firstBlocker.includes("cycle")
+        ? "receipt://fatigue_layer_scaling/cycle_margin_v1"
+        : "receipt://fatigue_layer_scaling/provenance_v1";
+    case "full_apparatus_tensor":
+      return !missingReceipt &&
+        (firstBlocker.includes("T0") ||
+          firstBlocker.includes("T1") ||
+          firstBlocker.includes("T2") ||
+          firstBlocker.includes("T3"))
+        ? "receipt://full_apparatus_tensor/component_detail_refs_v1"
+        : "receipt://full_apparatus_tensor/provenance_v1";
+    case "downstream_residual_conservation_qei_observer":
+      return "artifact://nhm2/downstream-gates/frozen-chain-rerun-v1";
+    case "campaign_coordination":
+      return "artifact://nhm2/campaign/reference-capsule-congruence-v1";
+  }
+};
+
+const measurementTargetSummaryFromDomain = (
+  domain: Nhm2TileSourceExperimentalCampaignDomainV1,
+): string => {
+  switch (domain) {
+    case "material_coupon_behavior":
+      return "TiN/candidate-stack coupon must supply measured/validated stress, fracture/yield, fatigue, cryogenic, conductivity, dielectric, roughness, and fabrication tolerance evidence; fracture/yield target is at least 2x the 545.707 MPa support-stress baseline.";
+    case "force_gap_pull_in":
+      return "8 nm gap receipt must supply F(g), dF/dg, stiffness model, pull-in margin > 1, stiction margin > 1, and active gap-control authority at least 1.2x the 447-layer force.";
+    case "roughness_patch_potential":
+      return "Paired-surface metrology must keep RMS roughness <= 1e-10 m, asperity tails below the 8 nm clearance envelope, patch voltage <= 0.01 V RMS, and residual electrostatic force <= 5% of the Casimir load.";
+    case "active_control_energy_noise_heat_timing":
+      return "Active-control evidence must include energy waveform, actuator authority, gap sensor calibration, >= 30 GHz bandwidth for 15 GHz switching, noise spectrum, heat-load/sink traces, timing/phase noise, lock acquisition, and failure modes.";
+    case "fatigue_layer_scaling":
+      return "Fatigue/layer-scaling evidence must cover cycle lifetime, thermal cycling, creep, delamination, adhesion, 447-layer scaling efficiency >= 0.9, nonadditivity <= 0.1, active area retention >= 0.6, and source-tensor retention >= 0.9.";
+    case "full_apparatus_tensor":
+      return "Full apparatus source tensor must provide nhm2_tile_source_full_apparatus_tensor_values/v1 with 10 component refs, 9 stress-energy term refs, wall/hull/exterior supports, same chart/basis/units, and no metric-target echo.";
+    case "downstream_residual_conservation_qei_observer":
+      return "Downstream chain must rerun regional residual closure, wall T00, covariant conservation, QEI worldline dossier, observer-family WEC/NEC/SEC/DEC, material credibility, and coupled closure against the same source tensor.";
+    case "campaign_coordination":
+      return "Campaign evidence must pin one frozen profile/run, artifact refs, source tensor values, receipt surfaces, source-authority handoff, and downstream gates without stale aliases or profile mismatches.";
+  }
+};
+
+const falsificationRuleFromDomain = (
+  domain: Nhm2TileSourceExperimentalCampaignDomainV1,
+): string => {
+  switch (domain) {
+    case "material_coupon_behavior":
+      return "If measured/validated coupon strength, cryogenic/material response, roughness, or fabrication margins do not meet the frozen candidate requirements, the 447-layer TiN stack remains review or is falsified.";
+    case "force_gap_pull_in":
+      return "If the 8 nm force-gradient, pull-in, stiction, or active-authority margins are below threshold, the frozen stack is mechanically inadmissible for source authority.";
+    case "roughness_patch_potential":
+      return "If asperity tails or patch-potential residuals consume the 8 nm gap margin or exceed electrostatic correction limits, the stack cannot be treated as a clean Casimir source.";
+    case "active_control_energy_noise_heat_timing":
+      return "If active control cannot hold the gap with required bandwidth, noise, heat, timing, and fail-safe margins, time-dependent source operation remains inadmissible.";
+    case "fatigue_layer_scaling":
+      return "If cycling lifetime, layer additivity, active-area retention, or source-tensor retention fail, the 447-layer architecture is not a credible scalable source candidate.";
+    case "full_apparatus_tensor":
+      return "If the apparatus tensor is missing T0i/off-diagonal Tij, support/control/electrostatic/thermal/material terms, regional supports, or anti-echo provenance, it cannot be consumed as source-side same-basis T_munu.";
+    case "downstream_residual_conservation_qei_observer":
+      return "If residual closure, conservation, QEI, observer-family checks, material credibility, and coupled closure do not pass together, the campaign remains non-physical and non-promotional.";
+    case "campaign_coordination":
+      return "If the frozen reference capsule cannot prove same-run/profile/atlas/artifact congruence, downstream pass signals remain stale or inadmissible.";
+  }
+};
+
 const annotateRow = (
   row: Nhm2TileSourceFalsificationReportRowV1,
 ): Nhm2TileSourceFalsificationReportRowV1 => {
@@ -607,9 +700,22 @@ const correctionValuesForRows = (
   return values;
 };
 
+const roadmapItemDomain = (
+  item: Nhm2TileSourceEvidenceGapRoadmapItemV1,
+): Nhm2TileSourceExperimentalCampaignDomainV1 => domainFromSurface(item.itemId);
+
+const decisiveMeasurementsFromRoadmap = (
+  roadmap: Nhm2TileSourceEvidenceGapRoadmapV1,
+  campaignDomain: Nhm2TileSourceExperimentalCampaignDomainV1,
+): Nhm2TileSourceEvidenceGapRoadmapItemV1["decisiveMeasurements"] =>
+  roadmap.roadmapItems
+    .filter((item) => roadmapItemDomain(item) === campaignDomain)
+    .flatMap((item) => item.decisiveMeasurements);
+
 const buildFrontierResolutionQueue = (
   rows: Nhm2TileSourceFalsificationReportRowV1[],
   matrix: Nhm2TileSourceCampaignDecisionV1[],
+  roadmap: Nhm2TileSourceEvidenceGapRoadmapV1,
 ): Nhm2TileSourceFrontierResolutionItemV1[] =>
   matrix
     .filter((entry) => entry.blocksCampaignPass)
@@ -627,7 +733,15 @@ const buildFrontierResolutionQueue = (
         marginInterpretation: marginInterpretation(domainRows, entry.minimumNumericalMargin),
         evidenceTarget: entry.evidenceTarget,
         requiredChange: entry.nextRequiredChange,
+        nextEvidenceArtifact: nextEvidenceArtifactFromDomain(
+          entry.campaignDomain,
+          entry.firstBlocker,
+          entry.evidenceState,
+        ),
+        measurementTargetSummary: measurementTargetSummaryFromDomain(entry.campaignDomain),
+        falsificationRule: falsificationRuleFromDomain(entry.campaignDomain),
         requiredCorrections: correctionValuesForRows(domainRows),
+        decisiveMeasurements: decisiveMeasurementsFromRoadmap(roadmap, entry.campaignDomain),
         prevents: entry.prevents,
         evidenceRefs: entry.evidenceRefs,
         blocksCampaignPass: true,
@@ -849,7 +963,7 @@ export const buildNhm2TileSourceFalsificationReport = (
   const allRequiredCorrections = buildCorrectionSummary(rows);
   const campaignDomainSummary = buildCampaignDomainSummary(rows);
   const goNoGoMatrix = buildGoNoGoMatrix(rows, campaignDomainSummary);
-  const frontierResolutionQueue = buildFrontierResolutionQueue(rows, goNoGoMatrix);
+  const frontierResolutionQueue = buildFrontierResolutionQueue(rows, goNoGoMatrix, roadmap);
   const nextRoadmapItem = roadmap.roadmapItems.find(
     (item) => item.itemId === roadmap.summary.nextBestItemId,
   );
@@ -958,6 +1072,38 @@ const isCorrectionRecord = (
       typeof entry === "boolean" ||
       (typeof entry === "number" && Number.isFinite(entry)) ||
       (Array.isArray(entry) && entry.every((item) => typeof item === "string")),
+  );
+
+const isDecisiveMeasurementList = (
+  value: unknown,
+): value is Nhm2TileSourceEvidenceGapRoadmapItemV1["decisiveMeasurements"] =>
+  Array.isArray(value) &&
+  value.length > 0 &&
+  value.every(
+    (measurement) =>
+      isRecord(measurement) &&
+      typeof measurement.measurementId === "string" &&
+      typeof measurement.quantity === "string" &&
+      typeof measurement.target === "string" &&
+      (measurement.unit === null || typeof measurement.unit === "string") &&
+      typeof measurement.evidenceArtifact === "string" &&
+      (measurement.marginKey === null || typeof measurement.marginKey === "string") &&
+      (measurement.currentMargin === null ||
+        typeof measurement.currentMargin === "boolean" ||
+        (typeof measurement.currentMargin === "number" &&
+          Number.isFinite(measurement.currentMargin))) &&
+      (measurement.requiredCorrectionKey === null ||
+        typeof measurement.requiredCorrectionKey === "string") &&
+      (measurement.requiredCorrectionValue === null ||
+        typeof measurement.requiredCorrectionValue === "string" ||
+        typeof measurement.requiredCorrectionValue === "boolean" ||
+        (typeof measurement.requiredCorrectionValue === "number" &&
+          Number.isFinite(measurement.requiredCorrectionValue)) ||
+        (Array.isArray(measurement.requiredCorrectionValue) &&
+          measurement.requiredCorrectionValue.every((entry) => typeof entry === "string"))) &&
+      typeof measurement.goCriterion === "string" &&
+      typeof measurement.noGoCriterion === "string" &&
+      typeof measurement.falsificationConsequence === "string",
   );
 
 export const isNhm2TileSourceFalsificationReport = (
@@ -1125,7 +1271,11 @@ export const isNhm2TileSourceFalsificationReport = (
         ) &&
         typeof entry.evidenceTarget === "string" &&
         typeof entry.requiredChange === "string" &&
+        typeof entry.nextEvidenceArtifact === "string" &&
+        typeof entry.measurementTargetSummary === "string" &&
+        typeof entry.falsificationRule === "string" &&
         isCorrectionRecord(entry.requiredCorrections) &&
+        isDecisiveMeasurementList(entry.decisiveMeasurements) &&
         Array.isArray(entry.prevents) &&
         entry.prevents.every((item) => typeof item === "string") &&
         Array.isArray(entry.evidenceRefs) &&

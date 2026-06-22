@@ -537,7 +537,10 @@ const capabilityFromArtifacts = (artifacts: RecordLike[]): string | null => {
   if (/live_env[-_.:]resume_workstation_loop|resume_workstation_loop|resume_loop/.test(haystack)) {
     return "live_env.resume_workstation_loop";
   }
-  if (/live_env[-_.:]set_workstation_loop_state|set_workstation_loop_state|repair_loop/.test(haystack)) {
+  if (/live_env[-_.:]repair_loop|repair_loop|repair_workstation_loop/.test(haystack)) {
+    return "live_env.repair_loop";
+  }
+  if (/live_env[-_.:]set_workstation_loop_state|set_workstation_loop_state/.test(haystack)) {
     return "live_env.set_workstation_loop_state";
   }
   if (/live_env[-_.:]repair_workstation_source|repair_workstation_source|repair_source|source_repair/.test(haystack)) {

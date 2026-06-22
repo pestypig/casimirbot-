@@ -62,6 +62,48 @@ const makeTileSourceAuthorityHandoff = (args: {
   const firstBlocker = args.ready ? "none" : args.firstBlocker ?? "material_coupon_receipt_missing";
   const gateStatus = args.ready ? "pass" : "missing";
   const firstRequiredCorrections = args.ready ? {} : { missingReceiptSurface: firstBlocker };
+  const frontierResolutionQueue: Nhm2TileSourceAuthorityHandoffV1["frontierResolutionQueue"] =
+    args.ready
+      ? []
+      : [
+          {
+            rank: 1,
+            campaignDomain: firstBlocker.includes("full_apparatus")
+              ? "full_apparatus_tensor"
+              : "material_coupon_behavior",
+            decision: "review",
+            evidenceState: firstBlocker.includes("operating_budget")
+              ? "operating_budget_blocked"
+              : "missing_receipt",
+            resolutionMode: firstBlocker.includes("full_apparatus")
+              ? "supply_same_basis_full_apparatus_tensor"
+              : "supply_experimental_receipt",
+            firstBlocker,
+            blockerIds: [firstBlocker],
+            numericalMargin: null,
+            marginInterpretation: "not_numeric",
+            evidenceTarget: "Supply material-source evidence before same-basis authority.",
+            requiredChange: "Supply material-source evidence before same-basis authority.",
+            nextEvidenceArtifact: firstBlocker.includes("full_apparatus")
+              ? "receipt://full_apparatus_tensor/component_detail_refs_v1"
+              : "receipt://material_coupon/provenance_v1",
+            measurementTargetSummary: firstBlocker.includes("full_apparatus")
+              ? "Full apparatus source tensor must provide 10 component refs, 9 stress-energy term refs, same chart/basis/units, regional supports, and no metric-target echo."
+              : "Material coupon evidence must supply measured/validated stress, fracture/yield, fatigue, cryogenic, conductivity, dielectric, roughness, and fabrication tolerance evidence.",
+            falsificationRule: firstBlocker.includes("full_apparatus")
+              ? "Missing full-apparatus tensor evidence blocks source-side same-basis T_munu authority."
+              : "Missing material coupon evidence keeps the frozen candidate in review before source authority.",
+            requiredCorrections: firstRequiredCorrections,
+            prevents: ["source_side_same_basis_authority"],
+            evidenceRefs: ["artifact://tile-source/falsification-report"],
+            blocksCampaignPass: true,
+            claimBoundary: {
+              diagnosticOnly: true,
+              resolutionQueueDoesNotSupplyEvidence: true,
+              resolvingItemRequiresNewReceiptOrArtifact: true,
+            },
+          },
+        ];
   return {
     contractVersion: "nhm2_tile_source_authority_handoff/v1",
     generatedAt: "2026-06-11T00:00:00.000Z",
@@ -131,6 +173,7 @@ const makeTileSourceAuthorityHandoff = (args: {
               }
             : firstRequiredCorrections,
     })),
+    frontierResolutionQueue,
     summary: {
       handoffStatus: args.ready ? "handoff_ready" : "blocked",
       handoffReadyForSameBasisAuthority: args.ready,
@@ -144,6 +187,9 @@ const makeTileSourceAuthorityHandoff = (args: {
       physicalValidationStillRequired: true,
       firstBlocker,
       firstRequiredCorrections,
+      firstFrontierResolutionMode: frontierResolutionQueue[0]?.resolutionMode ?? "none",
+      firstFrontierCampaignDomain: frontierResolutionQueue[0]?.campaignDomain ?? "none",
+      frontierResolutionItemCount: frontierResolutionQueue.length,
       physicalViabilityClaimAllowed: false,
       transportClaimAllowed: false,
       propulsionClaimAllowed: false,
@@ -155,6 +201,7 @@ const makeTileSourceAuthorityHandoff = (args: {
       handoffDoesNotRunDownstreamGates: true,
       operatingBudgetReadinessDoesNotValidateMaterialSource: true,
       handoffReadyIsNotPhysicalCredibility: true,
+      handoffCarriesFrontierQueueOnly: true,
       idealScalarCasimirIsNotMaterialEvidence: true,
       physicalViabilityClaimAllowed: false,
       transportClaimAllowed: false,
@@ -438,7 +485,20 @@ describe("nhm2 source-side same-basis tensor authority receipt", () => {
 
     expect(isNhm2SourceSideSameBasisTensorAuthorityArtifact(receipt)).toBe(true);
     expect(receipt.tileSourceAuthorityHandoffStatus).toBe("blocked");
+    expect(receipt.tileSourceAuthorityHandoffFrontierResolutionQueue?.[0]).toMatchObject({
+      campaignDomain: "material_coupon_behavior",
+      resolutionMode: "supply_experimental_receipt",
+      firstBlocker: "thermal_cycle_drift_above_0p01_operating_budget",
+      blocksCampaignPass: true,
+    });
     expect(receipt.summary.tileSourceHandoffReady).toBe(false);
+    expect(receipt.summary.tileSourceHandoffFirstFrontierResolutionMode).toBe(
+      "supply_experimental_receipt",
+    );
+    expect(receipt.summary.tileSourceHandoffFirstFrontierCampaignDomain).toBe(
+      "material_coupon_behavior",
+    );
+    expect(receipt.summary.tileSourceHandoffFrontierResolutionItemCount).toBe(1);
     expect(receipt.summary.tileSourceHandoffRequiredCorrections).toMatchObject({
       missingReceiptSurface: "thermal_cycle_drift_above_0p01_operating_budget",
       "material_receipts.missingReceiptSurface":
@@ -465,6 +525,7 @@ describe("nhm2 source-side same-basis tensor authority receipt", () => {
     expect(receipt.regions[0]?.warnings).toContain(
       "tile_source_handoff_admission_gate_blocks_source_authority",
     );
+    expect(receipt.claimBoundary.handoffFrontierQueueIsDiagnosticOnly).toBe(true);
   });
 
   it("uses a ready tile-source handoff only as blocked evidence intake when tensor values are absent", () => {
@@ -481,7 +542,11 @@ describe("nhm2 source-side same-basis tensor authority receipt", () => {
     expect(isNhm2SourceSideSameBasisTensorAuthorityArtifact(receipt)).toBe(true);
     expect(receipt.tileSourceAuthorityHandoffRef).toBe("artifact://tile-source/handoff-ready");
     expect(receipt.tileSourceAuthorityHandoffStatus).toBe("handoff_ready");
+    expect(receipt.tileSourceAuthorityHandoffFrontierResolutionQueue).toEqual([]);
     expect(receipt.summary.tileSourceHandoffReady).toBe(true);
+    expect(receipt.summary.tileSourceHandoffFirstFrontierResolutionMode).toBe("none");
+    expect(receipt.summary.tileSourceHandoffFirstFrontierCampaignDomain).toBe("none");
+    expect(receipt.summary.tileSourceHandoffFrontierResolutionItemCount).toBe(0);
     expect(receipt.summary.hasWallAuthority).toBe(false);
     expect(receipt.summary.allRequiredRegionsAuthoritative).toBe(false);
     expect(receipt.regions[0]).toMatchObject({
@@ -520,7 +585,19 @@ describe("nhm2 source-side same-basis tensor authority receipt", () => {
     });
 
     expect(receipt.tileSourceAuthorityHandoffStatus).toBe("blocked");
+    expect(receipt.tileSourceAuthorityHandoffFrontierResolutionQueue?.[0]).toMatchObject({
+      campaignDomain: "full_apparatus_tensor",
+      resolutionMode: "supply_same_basis_full_apparatus_tensor",
+      firstBlocker: "full_apparatus_T01_ref_missing_for_operating_budget",
+    });
     expect(receipt.summary.tileSourceHandoffReady).toBe(false);
+    expect(receipt.summary.tileSourceHandoffFirstFrontierResolutionMode).toBe(
+      "supply_same_basis_full_apparatus_tensor",
+    );
+    expect(receipt.summary.tileSourceHandoffFirstFrontierCampaignDomain).toBe(
+      "full_apparatus_tensor",
+    );
+    expect(receipt.summary.tileSourceHandoffFrontierResolutionItemCount).toBe(1);
     expect(receipt.summary.tileSourceHandoffRequiredCorrections).toMatchObject({
       missingReceiptSurface: "full_apparatus_T01_ref_missing_for_operating_budget",
       "component_detail_refs.tensorComponentRefMissingCount": 1,

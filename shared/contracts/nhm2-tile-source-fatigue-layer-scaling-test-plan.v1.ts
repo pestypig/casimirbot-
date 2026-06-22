@@ -25,12 +25,27 @@ export type Nhm2FatigueLayerScalingTestId =
 
 export type Nhm2FatigueLayerScalingTestStatus = "satisfied" | "open" | "falsifying";
 
+export type Nhm2FatigueLayerScalingBlockedCampaignDomain =
+  | "material_coupon_behavior"
+  | "force_gap_pull_in"
+  | "roughness_patch_potential"
+  | "active_control_energy_noise_heat_timing"
+  | "full_apparatus_tensor"
+  | "material_credibility_gate"
+  | "covariant_conservation"
+  | "time_dependent_source_campaign";
+
+export type Nhm2FatigueLayerScalingTargetValue = string | number | boolean | null;
+
 export type Nhm2FatigueLayerScalingTestPlanItemV1 = {
   testId: Nhm2FatigueLayerScalingTestId;
   status: Nhm2FatigueLayerScalingTestStatus;
   blockerIds: string[];
+  measurementTargets: Record<string, Nhm2FatigueLayerScalingTargetValue>;
   requiredMeasurement: string;
   acceptanceCriterion: string;
+  falsificationRule: string;
+  blocksCampaignDomains: Nhm2FatigueLayerScalingBlockedCampaignDomain[];
   artifactToProduce: string;
 };
 
@@ -66,6 +81,9 @@ export type Nhm2TileSourceFatigueLayerScalingTestPlanV1 = {
     layerScalingReceiptStatus: Nhm2TileSourceReceiptStatus;
     combinedReceiptStatus: Nhm2TileSourceReceiptStatus;
     nextRequiredTestId: Nhm2FatigueLayerScalingTestId | "none";
+    nextRequiredArtifactToProduce: string | null;
+    nextRequiredFalsificationRule: string | null;
+    nextBlockedCampaignDomains: Nhm2FatigueLayerScalingBlockedCampaignDomain[];
     openTestCount: number;
     falsifyingTestCount: number;
     satisfiedTestCount: number;
@@ -98,12 +116,49 @@ export type BuildNhm2TileSourceFatigueLayerScalingTestPlanInput = {
   materialEvidenceReceiptsRef?: string | null;
 };
 
+const LAYER_COUNT = 447;
+const CYCLE_MARGIN_MIN = 1;
+const LAYER_SCALING_EFFICIENCY_MIN = 0.9;
+const PER_LAYER_VARIATION_FRACTION_MAX = 0.05;
+const LAYER_NONADDITIVITY_FRACTION_MAX = 0.1;
+const ACTIVE_AREA_RETENTION_MIN = 0.6;
+const SUPPORT_COUPLING_FRACTION_MAX = 0.1;
+const ELECTROMAGNETIC_COUPLING_FRACTION_MAX = 0.1;
+const MECHANICAL_COUPLING_FRACTION_MAX = 0.1;
+const SOURCE_TENSOR_RETENTION_FRACTION_MIN = 0.9;
+const THERMAL_CYCLE_DRIFT_FRACTION_MAX = 0.01;
+const CREEP_DRIFT_FRACTION_MAX = 0.01;
+const DELAMINATION_MARGIN_MIN = 1;
+const INTERLAYER_ADHESION_MARGIN_MIN = 1;
+const REQUIRED_FATIGUE_PROVENANCE_REF_COUNT = 8;
+const REQUIRED_LAYER_SCALING_PROVENANCE_REF_COUNT = 9;
+const EFFECTIVE_ACTIVE_LAYER_COUNT_MIN =
+  LAYER_COUNT *
+  LAYER_SCALING_EFFICIENCY_MIN *
+  (1 - LAYER_NONADDITIVITY_FRACTION_MAX) *
+  ACTIVE_AREA_RETENTION_MIN;
+const EFFECTIVE_SOURCE_TENSOR_LAYER_COUNT_MIN =
+  LAYER_COUNT * SOURCE_TENSOR_RETENTION_FRACTION_MIN;
+
+const DEFAULT_BLOCKED_DOMAINS: Nhm2FatigueLayerScalingBlockedCampaignDomain[] = [
+  "material_coupon_behavior",
+  "force_gap_pull_in",
+  "roughness_patch_potential",
+  "active_control_energy_noise_heat_timing",
+  "full_apparatus_tensor",
+  "material_credibility_gate",
+  "covariant_conservation",
+  "time_dependent_source_campaign",
+];
+
 const TEST_POLICY: Record<
   Nhm2FatigueLayerScalingTestId,
   {
     blockers: string[];
     requiredMeasurement: string;
     acceptanceCriterion: string;
+    falsificationRule: string;
+    blocksCampaignDomains: Nhm2FatigueLayerScalingBlockedCampaignDomain[];
     artifactToProduce: string;
   }
 > = {
@@ -134,6 +189,9 @@ const TEST_POLICY: Record<
       "Measured or validated-simulation fatigue and layer-scaling receipt with load spectrum, cryogenic fatigue, cycle protocol, fatigue curve, thermal-cycle, creep/drift, delamination, adhesion, layer map, variation map, nonadditivity, support/electromagnetic/mechanical coupling, active-area, source-retention, and multiphysics provenance.",
     acceptanceCriterion:
       "Evidence tier is measured or validated_simulation and all fatigue/layer-scaling provenance refs are present.",
+    falsificationRule:
+      "If fatigue and layer-scaling provenance cannot identify load spectrum, cycle protocol, cryogenic fatigue, drift, delamination, adhesion, layer maps, coupling maps, active-area maps, and source-retention maps, the 447-layer candidate cannot enter material credibility or full-apparatus tensor evidence.",
+    blocksCampaignDomains: DEFAULT_BLOCKED_DOMAINS,
     artifactToProduce: "receipt://fatigue_layer_scaling/provenance_v1",
   },
   cycle_count_to_failure: {
@@ -141,6 +199,9 @@ const TEST_POLICY: Record<
     requiredMeasurement:
       "Cycle count to failure and fatigue curve for the selected 447-layer operating protocol.",
     acceptanceCriterion: "Finite cycle count to failure is supplied with fatigue-curve provenance.",
+    falsificationRule:
+      "If cycle count to failure is missing or non-finite, the campaign cannot establish whether the 447-layer stack survives the required switching/cycling protocol.",
+    blocksCampaignDomains: ["full_apparatus_tensor", "material_credibility_gate", "time_dependent_source_campaign"],
     artifactToProduce: "receipt://fatigue_layer_scaling/cycle_count_to_failure_v1",
   },
   required_cycle_count: {
@@ -148,12 +209,18 @@ const TEST_POLICY: Record<
     requiredMeasurement:
       "Required cycle count and cycle protocol for the selected campaign duty, switching cadence, and operating duration.",
     acceptanceCriterion: "Finite required cycle count is supplied with protocol provenance.",
+    falsificationRule:
+      "If required cycle count or cycle protocol is missing, fatigue margin cannot be admitted and the time-dependent campaign remains unbounded.",
+    blocksCampaignDomains: ["active_control_energy_noise_heat_timing", "full_apparatus_tensor", "material_credibility_gate", "time_dependent_source_campaign"],
     artifactToProduce: "receipt://fatigue_layer_scaling/required_cycle_count_v1",
   },
   cycle_margin: {
     blockers: ["fatigue_cycle_margin_missing", "fatigue_cycle_margin_below_required"],
     requiredMeasurement: "Fatigue margin from cycle count to failure divided by required cycle count.",
     acceptanceCriterion: "Fatigue cycle margin is at least 1.",
+    falsificationRule:
+      "If cycle count to failure divided by required cycle count is below 1, the frozen 447-layer candidate is fatigue-falsified unless the load spectrum, duty, material, or stack architecture changes.",
+    blocksCampaignDomains: ["full_apparatus_tensor", "material_credibility_gate", "time_dependent_source_campaign"],
     artifactToProduce: "receipt://fatigue_layer_scaling/cycle_margin_v1",
   },
   thermal_cycle_drift: {
@@ -166,6 +233,9 @@ const TEST_POLICY: Record<
       "Thermal-cycle drift fraction for the selected 447-layer stack across the declared duty and temperature protocol.",
     acceptanceCriterion:
       "Thermal-cycle drift fraction is finite, positive, no greater than 0.01, and traceable to thermal-cycle evidence.",
+    falsificationRule:
+      "If thermal-cycle drift exceeds 1% or lacks thermal-cycle provenance, layer registration and source tensor retention remain inadmissible.",
+    blocksCampaignDomains: ["roughness_patch_potential", "full_apparatus_tensor", "material_credibility_gate", "time_dependent_source_campaign"],
     artifactToProduce: "receipt://fatigue_layer_scaling/thermal_cycle_drift_v1",
   },
   creep_drift: {
@@ -178,6 +248,9 @@ const TEST_POLICY: Record<
       "Creep/drift fraction for the selected 447-layer stack under campaign stress, timing, and temperature conditions.",
     acceptanceCriterion:
       "Creep/drift fraction is finite, positive, no greater than 0.01, and traceable to creep/drift evidence.",
+    falsificationRule:
+      "If creep/drift exceeds 1% or lacks provenance, the stack cannot preserve the 8 nm operating geometry through the campaign.",
+    blocksCampaignDomains: ["force_gap_pull_in", "roughness_patch_potential", "full_apparatus_tensor", "material_credibility_gate"],
     artifactToProduce: "receipt://fatigue_layer_scaling/creep_drift_v1",
   },
   delamination_and_adhesion: {
@@ -193,6 +266,9 @@ const TEST_POLICY: Record<
       "Delamination and interlayer adhesion margins for the 447-layer stack under cryogenic cycling and campaign load spectrum.",
     acceptanceCriterion:
       "Delamination and interlayer adhesion margins are both at least 1 with protocol provenance.",
+    falsificationRule:
+      "If delamination or interlayer adhesion margin is below 1, the multilayer stack is mechanically falsified unless interface process, supports, or load path changes.",
+    blocksCampaignDomains: ["force_gap_pull_in", "active_control_energy_noise_heat_timing", "full_apparatus_tensor", "material_credibility_gate"],
     artifactToProduce: "receipt://fatigue_layer_scaling/delamination_adhesion_margin_v1",
   },
   layer_scaling_efficiency: {
@@ -206,6 +282,9 @@ const TEST_POLICY: Record<
       "447-layer scaling efficiency map including mechanical and electromagnetic coupling losses.",
     acceptanceCriterion:
       "Layer scaling efficiency is at least 0.9 and traceable to a layer map plus multiphysics coupling receipt.",
+    falsificationRule:
+      "If 447-layer scaling efficiency is below 0.9 or lacks map/provenance, the layer-count amplification cannot be admitted as a source tensor input.",
+    blocksCampaignDomains: ["full_apparatus_tensor", "material_credibility_gate", "covariant_conservation", "time_dependent_source_campaign"],
     artifactToProduce: "receipt://fatigue_layer_scaling/scaling_efficiency_v1",
   },
   per_layer_variation: {
@@ -218,6 +297,9 @@ const TEST_POLICY: Record<
       "Per-layer source variation map for the 447-layer stack.",
     acceptanceCriterion:
       "Per-layer variation fraction is finite and no greater than 0.05 with map provenance.",
+    falsificationRule:
+      "If per-layer variation exceeds 5% or lacks a variation map, regional source uniformity and tensor aggregation remain inadmissible.",
+    blocksCampaignDomains: ["full_apparatus_tensor", "material_credibility_gate", "covariant_conservation"],
     artifactToProduce: "receipt://fatigue_layer_scaling/per_layer_variation_v1",
   },
   nonadditivity_fraction: {
@@ -228,6 +310,9 @@ const TEST_POLICY: Record<
     ],
     requiredMeasurement: "Layer nonadditivity fraction for the 447-layer stack.",
     acceptanceCriterion: "Layer nonadditivity fraction is no greater than 0.1.",
+    falsificationRule:
+      "If layer nonadditivity exceeds 10% or lacks a model receipt, simple layer-count multiplication is inadmissible for source closure.",
+    blocksCampaignDomains: ["full_apparatus_tensor", "material_credibility_gate", "covariant_conservation"],
     artifactToProduce: "receipt://fatigue_layer_scaling/nonadditivity_fraction_v1",
   },
   active_area_retention: {
@@ -235,6 +320,9 @@ const TEST_POLICY: Record<
     requiredMeasurement:
       "Active Casimir area map retained after supports, controls, routing, and layer spacing.",
     acceptanceCriterion: "Active-area retention is at least 0.6 and traceable to an active-area map.",
+    falsificationRule:
+      "If active-area retention is below 0.6 or lacks an active-area map, supports/controls consume too much source area for the frozen candidate.",
+    blocksCampaignDomains: ["full_apparatus_tensor", "material_credibility_gate", "covariant_conservation"],
     artifactToProduce: "receipt://fatigue_layer_scaling/active_area_retention_v1",
   },
   support_coupling: {
@@ -246,6 +334,9 @@ const TEST_POLICY: Record<
     requiredMeasurement:
       "Support-coupling map and multiphysics receipt for mechanical, thermal, and electromagnetic cross-coupling across layers.",
     acceptanceCriterion: "Support-coupling status is pass with map and multiphysics provenance.",
+    falsificationRule:
+      "If support coupling status is not pass or lacks map/multiphysics provenance, support/control coupling must be modeled as a blocker in the full apparatus tensor.",
+    blocksCampaignDomains: ["full_apparatus_tensor", "material_credibility_gate", "covariant_conservation", "time_dependent_source_campaign"],
     artifactToProduce: "receipt://fatigue_layer_scaling/support_coupling_v1",
   },
   coupling_loss_budget: {
@@ -264,6 +355,9 @@ const TEST_POLICY: Record<
       "Support, electromagnetic, and mechanical coupling-loss budget across the 447-layer stack.",
     acceptanceCriterion:
       "Each coupling-loss fraction is finite and no greater than 0.1 with map and multiphysics provenance.",
+    falsificationRule:
+      "If support, electromagnetic, or mechanical coupling loss exceeds 10% or lacks maps, cross-layer nonadditivity cannot be treated as bounded.",
+    blocksCampaignDomains: ["full_apparatus_tensor", "material_credibility_gate", "covariant_conservation", "time_dependent_source_campaign"],
     artifactToProduce: "receipt://fatigue_layer_scaling/coupling_loss_budget_v1",
   },
   source_tensor_retention: {
@@ -276,6 +370,9 @@ const TEST_POLICY: Record<
       "Source tensor retention fraction after fatigue damage, active-area loss, layer variation, nonadditivity, and coupling cross-terms.",
     acceptanceCriterion:
       "Source tensor retention fraction is at least 0.9 and traceable to a source-retention map.",
+    falsificationRule:
+      "If source tensor retention is below 0.9 or lacks a retention map, the 447-layer stack cannot be admitted as preserving the source-side tensor target.",
+    blocksCampaignDomains: ["full_apparatus_tensor", "material_credibility_gate", "covariant_conservation", "time_dependent_source_campaign"],
     artifactToProduce: "receipt://fatigue_layer_scaling/source_tensor_retention_v1",
   },
 };
@@ -315,6 +412,95 @@ const itemStatus = (
   return relevantSurfaces.some((surface) => surface.status === "fail") ? "falsifying" : "open";
 };
 
+const measurementTargetsForTest = (
+  testId: Nhm2FatigueLayerScalingTestId,
+): Record<string, Nhm2FatigueLayerScalingTargetValue> => {
+  switch (testId) {
+    case "fatigue_scaling_provenance":
+      return {
+        requiredEvidenceTier: "measured_or_validated_simulation",
+        requiredFatigueProvenanceRefCount: REQUIRED_FATIGUE_PROVENANCE_REF_COUNT,
+        requiredLayerScalingProvenanceRefCount: REQUIRED_LAYER_SCALING_PROVENANCE_REF_COUNT,
+        layerCount: LAYER_COUNT,
+      };
+    case "cycle_count_to_failure":
+      return {
+        finiteCycleCountToFailureRequired: true,
+        fatigueCurveRefRequired: true,
+        layerCount: LAYER_COUNT,
+      };
+    case "required_cycle_count":
+      return {
+        finiteRequiredCycleCountRequired: true,
+        cycleProtocolRefRequired: true,
+        timeDependentCampaignProtocolRequired: true,
+      };
+    case "cycle_margin":
+      return {
+        cycleMarginMin: CYCLE_MARGIN_MIN,
+        cycleMarginFormula: "cycleCountToFailure / requiredCycleCount",
+      };
+    case "thermal_cycle_drift":
+      return {
+        thermalCycleDriftFractionMax: THERMAL_CYCLE_DRIFT_FRACTION_MAX,
+        thermalCycleRefRequired: true,
+      };
+    case "creep_drift":
+      return {
+        creepDriftFractionMax: CREEP_DRIFT_FRACTION_MAX,
+        creepDriftRefRequired: true,
+      };
+    case "delamination_and_adhesion":
+      return {
+        delaminationMarginMin: DELAMINATION_MARGIN_MIN,
+        interlayerAdhesionMarginMin: INTERLAYER_ADHESION_MARGIN_MIN,
+        delaminationProtocolRefRequired: true,
+        interlayerAdhesionRefRequired: true,
+      };
+    case "layer_scaling_efficiency":
+      return {
+        layerCount: LAYER_COUNT,
+        layerScalingEfficiencyMin: LAYER_SCALING_EFFICIENCY_MIN,
+        layerScalingMapRefRequired: true,
+        multiphysicsCouplingRefRequired: true,
+      };
+    case "per_layer_variation":
+      return {
+        perLayerVariationFractionMax: PER_LAYER_VARIATION_FRACTION_MAX,
+        perLayerVariationMapRefRequired: true,
+      };
+    case "nonadditivity_fraction":
+      return {
+        layerNonadditivityFractionMax: LAYER_NONADDITIVITY_FRACTION_MAX,
+        layerNonadditivityModelRefRequired: true,
+      };
+    case "active_area_retention":
+      return {
+        activeAreaRetentionMin: ACTIVE_AREA_RETENTION_MIN,
+        activeAreaMapRefRequired: true,
+        effectiveActiveLayerCountMin: EFFECTIVE_ACTIVE_LAYER_COUNT_MIN,
+      };
+    case "support_coupling":
+      return {
+        supportCouplingStatusRequired: "pass",
+        supportCouplingMapRefRequired: true,
+        multiphysicsCouplingRefRequired: true,
+      };
+    case "coupling_loss_budget":
+      return {
+        supportCouplingFractionMax: SUPPORT_COUPLING_FRACTION_MAX,
+        electromagneticCouplingFractionMax: ELECTROMAGNETIC_COUPLING_FRACTION_MAX,
+        mechanicalCouplingFractionMax: MECHANICAL_COUPLING_FRACTION_MAX,
+      };
+    case "source_tensor_retention":
+      return {
+        sourceTensorRetentionFractionMin: SOURCE_TENSOR_RETENTION_FRACTION_MIN,
+        sourceTensorRetentionMapRefRequired: true,
+        effectiveSourceTensorLayerCountMin: EFFECTIVE_SOURCE_TENSOR_LAYER_COUNT_MIN,
+      };
+  }
+};
+
 export const buildNhm2TileSourceFatigueLayerScalingTestPlan = (
   input: BuildNhm2TileSourceFatigueLayerScalingTestPlanInput,
 ): Nhm2TileSourceFatigueLayerScalingTestPlanV1 => {
@@ -332,8 +518,11 @@ export const buildNhm2TileSourceFatigueLayerScalingTestPlan = (
         testId,
         status: itemStatus(surfaces, policy.blockers),
         blockerIds,
+        measurementTargets: measurementTargetsForTest(testId),
         requiredMeasurement: policy.requiredMeasurement,
         acceptanceCriterion: policy.acceptanceCriterion,
+        falsificationRule: policy.falsificationRule,
+        blocksCampaignDomains: policy.blocksCampaignDomains,
         artifactToProduce: policy.artifactToProduce,
       };
     },
@@ -374,6 +563,9 @@ export const buildNhm2TileSourceFatigueLayerScalingTestPlan = (
       layerScalingReceiptStatus: scaling.status,
       combinedReceiptStatus: combinedStatus(fatigue, scaling),
       nextRequiredTestId: nextItem?.testId ?? "none",
+      nextRequiredArtifactToProduce: nextItem?.artifactToProduce ?? null,
+      nextRequiredFalsificationRule: nextItem?.falsificationRule ?? null,
+      nextBlockedCampaignDomains: nextItem?.blocksCampaignDomains ?? [],
       openTestCount: openItems.length,
       falsifyingTestCount: falsifyingItems.length,
       satisfiedTestCount: satisfiedItems.length,
@@ -444,8 +636,19 @@ export const isNhm2TileSourceFatigueLayerScalingTestPlan = (
         typeof item.testId === "string" &&
         ["satisfied", "open", "falsifying"].includes(String(item.status)) &&
         Array.isArray(item.blockerIds) &&
+        isRecord(item.measurementTargets) &&
+        Object.values(item.measurementTargets).every(
+          (entry) =>
+            entry === null ||
+            typeof entry === "string" ||
+            typeof entry === "number" ||
+            typeof entry === "boolean",
+        ) &&
         typeof item.requiredMeasurement === "string" &&
         typeof item.acceptanceCriterion === "string" &&
+        typeof item.falsificationRule === "string" &&
+        Array.isArray(item.blocksCampaignDomains) &&
+        item.blocksCampaignDomains.every((domain) => typeof domain === "string") &&
         typeof item.artifactToProduce === "string",
     ) &&
     summary != null &&
@@ -453,6 +656,12 @@ export const isNhm2TileSourceFatigueLayerScalingTestPlan = (
     typeof summary.layerScalingReceiptStatus === "string" &&
     typeof summary.combinedReceiptStatus === "string" &&
     typeof summary.nextRequiredTestId === "string" &&
+    (summary.nextRequiredArtifactToProduce === null ||
+      typeof summary.nextRequiredArtifactToProduce === "string") &&
+    (summary.nextRequiredFalsificationRule === null ||
+      typeof summary.nextRequiredFalsificationRule === "string") &&
+    Array.isArray(summary.nextBlockedCampaignDomains) &&
+    summary.nextBlockedCampaignDomains.every((domain) => typeof domain === "string") &&
     typeof summary.openTestCount === "number" &&
     typeof summary.falsifyingTestCount === "number" &&
     typeof summary.satisfiedTestCount === "number" &&

@@ -90,6 +90,7 @@ export type Nhm2SourceSideSameBasisTensorAuthorityArtifactV1 = {
   counterpartArtifactRef?: string;
   tileSourceAuthorityHandoffRef?: string;
   tileSourceAuthorityHandoffStatus?: string;
+  tileSourceAuthorityHandoffFrontierResolutionQueue?: Nhm2TileSourceAuthorityHandoffV1["frontierResolutionQueue"];
   regions: Nhm2SourceSideSameBasisTensorAuthorityRegionV1[];
   summary: {
     hasWallAuthority: boolean;
@@ -103,6 +104,9 @@ export type Nhm2SourceSideSameBasisTensorAuthorityArtifactV1 = {
       string,
       Nhm2TileSourceOperatingBudgetCorrectionValueV1
     >;
+    tileSourceHandoffFirstFrontierResolutionMode?: Nhm2TileSourceAuthorityHandoffV1["summary"]["firstFrontierResolutionMode"];
+    tileSourceHandoffFirstFrontierCampaignDomain?: Nhm2TileSourceAuthorityHandoffV1["summary"]["firstFrontierCampaignDomain"];
+    tileSourceHandoffFrontierResolutionItemCount?: number;
     blockerCount: number;
   };
   claimBoundary: {
@@ -110,6 +114,7 @@ export type Nhm2SourceSideSameBasisTensorAuthorityArtifactV1 = {
     doesNotValidatePhysicalSource: true;
     metricEchoForbidden: true;
     wallT00ClosureRequiresWallAuthority: true;
+    handoffFrontierQueueIsDiagnosticOnly?: true;
   };
 };
 
@@ -194,6 +199,41 @@ const isCorrectionValue = (
   typeof value === "boolean" ||
   isFiniteNumber(value) ||
   (Array.isArray(value) && value.every((entry) => typeof entry === "string"));
+
+const isHandoffFrontierResolutionItem = (value: unknown): boolean => {
+  if (!isRecord(value)) return false;
+  const boundary = isRecord(value.claimBoundary) ? value.claimBoundary : null;
+  return (
+    typeof value.rank === "number" &&
+    Number.isInteger(value.rank) &&
+    value.rank > 0 &&
+    toText(value.campaignDomain) != null &&
+    ["go", "review", "no_go"].includes(String(value.decision)) &&
+    toText(value.evidenceState) != null &&
+    toText(value.resolutionMode) != null &&
+    toText(value.firstBlocker) != null &&
+    Array.isArray(value.blockerIds) &&
+    value.blockerIds.every((entry) => toText(entry) != null) &&
+    (value.numericalMargin === null ||
+      (typeof value.numericalMargin === "number" && Number.isFinite(value.numericalMargin))) &&
+    toText(value.marginInterpretation) != null &&
+    toText(value.evidenceTarget) != null &&
+    toText(value.requiredChange) != null &&
+    toText(value.nextEvidenceArtifact) != null &&
+    toText(value.measurementTargetSummary) != null &&
+    toText(value.falsificationRule) != null &&
+    isRecord(value.requiredCorrections) &&
+    Object.values(value.requiredCorrections).every(isCorrectionValue) &&
+    Array.isArray(value.prevents) &&
+    value.prevents.every((entry) => toText(entry) != null) &&
+    Array.isArray(value.evidenceRefs) &&
+    value.evidenceRefs.every((entry) => toText(entry) != null) &&
+    value.blocksCampaignPass === true &&
+    boundary?.diagnosticOnly === true &&
+    boundary?.resolutionQueueDoesNotSupplyEvidence === true &&
+    boundary?.resolvingItemRequiresNewReceiptOrArtifact === true
+  );
+};
 
 const correctionRecord = (
   value: unknown,
@@ -754,6 +794,8 @@ export const buildNhm2SourceSideSameBasisTensorAuthorityArtifact = (
     regions.reduce((sum, region) => sum + region.blockers.length, 0);
   const tileSourceHandoffRequiredCorrections =
     tileSourceAuthorityHandoff == null ? {} : handoffRequiredCorrections(tileSourceAuthorityHandoff);
+  const tileSourceHandoffFrontierResolutionQueue =
+    tileSourceAuthorityHandoff?.frontierResolutionQueue ?? [];
 
   return {
     contractVersion: NHM2_SOURCE_SIDE_SAME_BASIS_TENSOR_AUTHORITY_CONTRACT_VERSION,
@@ -777,6 +819,9 @@ export const buildNhm2SourceSideSameBasisTensorAuthorityArtifact = (
     ...(tileSourceAuthorityHandoff != null
       ? { tileSourceAuthorityHandoffStatus: tileSourceAuthorityHandoff.summary.handoffStatus }
       : {}),
+    ...(tileSourceAuthorityHandoff != null
+      ? { tileSourceAuthorityHandoffFrontierResolutionQueue: tileSourceHandoffFrontierResolutionQueue }
+      : {}),
     regions,
     summary: {
       hasWallAuthority,
@@ -790,6 +835,16 @@ export const buildNhm2SourceSideSameBasisTensorAuthorityArtifact = (
       anyMissingCounterpart,
       missingRegionIds,
       tileSourceHandoffRequiredCorrections,
+      ...(tileSourceAuthorityHandoff != null
+        ? {
+            tileSourceHandoffFirstFrontierResolutionMode:
+              tileSourceAuthorityHandoff.summary.firstFrontierResolutionMode,
+            tileSourceHandoffFirstFrontierCampaignDomain:
+              tileSourceAuthorityHandoff.summary.firstFrontierCampaignDomain,
+            tileSourceHandoffFrontierResolutionItemCount:
+              tileSourceHandoffFrontierResolutionQueue.length,
+          }
+        : {}),
       blockerCount,
     },
     claimBoundary: {
@@ -797,6 +852,9 @@ export const buildNhm2SourceSideSameBasisTensorAuthorityArtifact = (
       doesNotValidatePhysicalSource: true,
       metricEchoForbidden: true,
       wallT00ClosureRequiresWallAuthority: true,
+      ...(tileSourceAuthorityHandoff != null
+        ? { handoffFrontierQueueIsDiagnosticOnly: true as const }
+        : {}),
     },
   };
 };
@@ -823,6 +881,11 @@ export const isNhm2SourceSideSameBasisTensorAuthorityArtifact = (
       toText(value.tileSourceAuthorityHandoffRef) != null) &&
     (value.tileSourceAuthorityHandoffStatus === undefined ||
       toText(value.tileSourceAuthorityHandoffStatus) != null) &&
+    (value.tileSourceAuthorityHandoffFrontierResolutionQueue === undefined ||
+      (Array.isArray(value.tileSourceAuthorityHandoffFrontierResolutionQueue) &&
+        value.tileSourceAuthorityHandoffFrontierResolutionQueue.every((entry) =>
+          isHandoffFrontierResolutionItem(entry),
+        ))) &&
     Array.isArray(value.regions) &&
     value.regions.every((entry) => {
       const region = isRecord(entry) ? entry : null;
@@ -868,11 +931,20 @@ export const isNhm2SourceSideSameBasisTensorAuthorityArtifact = (
     summary.missingRegionIds.every((entry) => toText(entry) != null) &&
     isRecord(summary.tileSourceHandoffRequiredCorrections) &&
     Object.values(summary.tileSourceHandoffRequiredCorrections).every(isCorrectionValue) &&
+    (summary.tileSourceHandoffFirstFrontierResolutionMode === undefined ||
+      toText(summary.tileSourceHandoffFirstFrontierResolutionMode) != null) &&
+    (summary.tileSourceHandoffFirstFrontierCampaignDomain === undefined ||
+      toText(summary.tileSourceHandoffFirstFrontierCampaignDomain) != null) &&
+    (summary.tileSourceHandoffFrontierResolutionItemCount === undefined ||
+      (typeof summary.tileSourceHandoffFrontierResolutionItemCount === "number" &&
+        Number.isFinite(summary.tileSourceHandoffFrontierResolutionItemCount))) &&
     typeof summary.blockerCount === "number" &&
     Number.isFinite(summary.blockerCount) &&
     claimBoundary?.diagnosticOnly === true &&
     claimBoundary?.doesNotValidatePhysicalSource === true &&
     claimBoundary?.metricEchoForbidden === true &&
-    claimBoundary?.wallT00ClosureRequiresWallAuthority === true
+    claimBoundary?.wallT00ClosureRequiresWallAuthority === true &&
+    (claimBoundary.handoffFrontierQueueIsDiagnosticOnly === undefined ||
+      claimBoundary.handoffFrontierQueueIsDiagnosticOnly === true)
   );
 };

@@ -1828,7 +1828,79 @@ describe("Helix Ask workstation tool planner", () => {
     });
   });
 
+  it("fills Live Answer visual and audio control refs from attached workspace context", () => {
+    const workspaceSnapshot = {
+      activePanel: "situation-room-sources",
+      hasSituationRoomContext: true,
+      situationRoomContext: {
+        focused_panel: "live-answer-environment",
+        live_answer_environment: true,
+        source_modalities: ["visual_capture", "audio_capture"],
+      },
+    };
+    const cases = [
+      {
+        prompt: "Set the visual preset to frog classification.",
+        turnId: "turn:live-answer-visual-defaults",
+        toolId: "live_env.set_visual_preset",
+        stepId: "set_visual_preset",
+        args: {
+          target_ref: "source:visual:active",
+          preset_id: "preset:frog-classifier",
+        },
+      },
+      {
+        prompt: "Set the audio preset to translation for the earbuds.",
+        turnId: "turn:live-answer-audio-defaults",
+        toolId: "live_env.set_audio_preset",
+        stepId: "set_audio_preset",
+        args: {
+          target_ref: "source:audio:active",
+          preset_id: "preset:earbud-translation",
+        },
+      },
+      {
+        prompt: "Bind the visual source to Live Answer.",
+        turnId: "turn:live-answer-bind-defaults",
+        toolId: "live_env.bind_workstation_source",
+        stepId: "bind_workstation_source",
+        args: {
+          source_ref: "source:visual:active",
+          target_ref: "live-answer:visual",
+        },
+      },
+    ];
+
+    for (const testCase of cases) {
+      const plan = planWorkstationToolUse(testCase.prompt, {
+        threadId: "thread:live-answer-defaults",
+        turnId: testCase.turnId,
+        workspaceSnapshot,
+      });
+
+      expect(plan.intent).toBe("workstation_control");
+      expect(plan.should_use_tool).toBe(true);
+      expect(plan.missing_required_args).toEqual([]);
+      expect(plan.tool_plan?.steps[0]).toMatchObject({
+        step_id: testCase.stepId,
+        kind: "run_ask_tool",
+        tool_id: testCase.toolId,
+        args: expect.objectContaining(testCase.args),
+        required: true,
+      });
+    }
+  });
+
   it("does not execute contextual, negated, or hypothetical workstation control mentions", () => {
+    const liveAnswerWorkspaceSnapshot = {
+      activePanel: "situation-room-sources",
+      hasSituationRoomContext: true,
+      situationRoomContext: {
+        focused_panel: "live-answer-environment",
+        live_answer_environment: true,
+        source_modalities: ["visual_capture", "audio_capture"],
+      },
+    };
     for (const prompt of [
       "Do not change workstation preset; explain how presets work.",
       'The UI label says "live_env.focus_process_graph"; summarize it.',
@@ -1843,8 +1915,12 @@ describe("Helix Ask workstation tool planner", () => {
       'The UI label says "live_env.repair_workstation_source"; summarize it.',
       'The UI label says "live_env.repair_loop"; summarize it.',
       "The screen shows a button labeled Apply preset; describe the screen text.",
+      "If we later set the visual preset to frog classification, what target_ref should we gather?",
     ]) {
-      const plan = planWorkstationToolUse(prompt, { threadId: "thread:workstation-control-negative" });
+      const plan = planWorkstationToolUse(prompt, {
+        threadId: "thread:workstation-control-negative",
+        workspaceSnapshot: liveAnswerWorkspaceSnapshot,
+      });
       expect(plan.intent).toBe("direct_answer");
       expect(plan.should_use_tool).toBe(false);
       expect(plan.action).toBeNull();

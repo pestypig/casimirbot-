@@ -176,6 +176,9 @@ const isFrontierResolutionItem = (
     ) &&
     typeof value.evidenceTarget === "string" &&
     typeof value.requiredChange === "string" &&
+    typeof value.nextEvidenceArtifact === "string" &&
+    typeof value.measurementTargetSummary === "string" &&
+    typeof value.falsificationRule === "string" &&
     isRecord(value.requiredCorrections) &&
     Object.values(value.requiredCorrections).every(isCorrectionValue) &&
     Array.isArray(value.prevents) &&

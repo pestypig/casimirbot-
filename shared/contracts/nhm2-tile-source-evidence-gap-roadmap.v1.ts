@@ -30,6 +30,20 @@ export type Nhm2TileSourceEvidenceGapRoadmapItemV1 = {
   operatingBudgetFirstBlocker: string | null;
   operatingBudgetNumericalMargins: Record<string, number | boolean | null>;
   requiredCorrections: Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1>;
+  decisiveMeasurements: Array<{
+    measurementId: string;
+    quantity: string;
+    target: string;
+    unit: string | null;
+    evidenceArtifact: string;
+    marginKey: string | null;
+    currentMargin: number | boolean | null;
+    requiredCorrectionKey: string | null;
+    requiredCorrectionValue: Nhm2TileSourceOperatingBudgetCorrectionValueV1 | null;
+    goCriterion: string;
+    noGoCriterion: string;
+    falsificationConsequence: string;
+  }>;
   unlocks: string[];
   artifactToProduce: string;
 };
@@ -89,6 +103,18 @@ const ROADMAP_POLICY: Record<
     requiredEvidence: string[];
     goCriteria: string[];
     noGoCriteria: string[];
+    decisiveMeasurements: Array<{
+      measurementId: string;
+      quantity: string;
+      target: string;
+      unit: string | null;
+      evidenceArtifact: string;
+      marginKey: string | null;
+      requiredCorrectionKey: string | null;
+      goCriterion: string;
+      noGoCriterion: string;
+      falsificationConsequence: string;
+    }>;
     unlocks: string[];
     artifactToProduce: string;
   }
@@ -120,6 +146,44 @@ const ROADMAP_POLICY: Record<
       "coupon fatigue cycling fails the required campaign cycle count",
       "roughness or fabrication tolerance cannot support the 8 nm stack",
     ],
+    decisiveMeasurements: [
+      {
+        measurementId: "coupon_fracture_yield_margin",
+        quantity: "fracture or yield stress margin against 2x support stress",
+        target: "fracture/yield stress >= 1.09141417572e9 Pa",
+        unit: "dimensionless margin",
+        evidenceArtifact: "receipt://material_coupon/fracture_yield_margin_v1",
+        marginKey: "fractureOrYieldStressMargin",
+        requiredCorrectionKey: "fractureOrYieldStressShortfallPa",
+        goCriterion: "margin >= 1 with curve provenance tied to 4 K / 447-layer load case",
+        noGoCriterion: "margin < 1 or fracture/yield curve missing",
+        falsificationConsequence: "447-layer TiN support stack is mechanically inadmissible",
+      },
+      {
+        measurementId: "coupon_fatigue_cycle_margin",
+        quantity: "coupon fatigue cycles under cryogenic campaign load",
+        target: "cycle count >= 1e9",
+        unit: "dimensionless margin",
+        evidenceArtifact: "receipt://material_coupon/fatigue_cycle_margin_v1",
+        marginKey: "couponFatigueCycleMargin",
+        requiredCorrectionKey: "couponCycleCountShortfall",
+        goCriterion: "cycle margin >= 1 with fatigue curve provenance",
+        noGoCriterion: "cycle margin < 1 or fatigue curve missing",
+        falsificationConsequence: "candidate cannot survive the required switching/campaign lifetime",
+      },
+      {
+        measurementId: "coupon_material_response",
+        quantity: "dielectric and conductivity response at 15 GHz and 4 K",
+        target: "numeric dielectric and conductivity values with refs at 15 GHz / 4 K",
+        unit: null,
+        evidenceArtifact: "receipt://material_coupon/material_response_15ghz_4k_v1",
+        marginKey: "materialResponseValuesAvailable",
+        requiredCorrectionKey: "materialResponseNumericValuesAvailable",
+        goCriterion: "dielectric and conductivity response refs include numeric values at target frequency/temperature",
+        noGoCriterion: "material response missing or not tied to 15 GHz / 4 K",
+        falsificationConsequence: "material receipt cannot support Lifshitz/source-tensor credibility",
+      },
+    ],
     unlocks: ["material_credibility", "full_apparatus_tensor"],
     artifactToProduce: "receipt://material_coupon/tin_447_layer_cryogenic_v1",
   },
@@ -150,6 +214,44 @@ const ROADMAP_POLICY: Record<
       "stiction margin below 1",
       "active authority below 1.2x absolute Casimir force",
     ],
+    decisiveMeasurements: [
+      {
+        measurementId: "force_curve_brackets_8nm",
+        quantity: "measured/simulated F(g) curve brackets the 8 nm operating point",
+        target: "force curve domain includes 8e-9 m",
+        unit: null,
+        evidenceArtifact: "receipt://force_gap_pull_in/force_gap_curve_8nm_v1",
+        marginKey: "curveBracketsOperatingGap",
+        requiredCorrectionKey: null,
+        goCriterion: "curve brackets 8 nm and includes force/gradient provenance",
+        noGoCriterion: "8 nm lies outside the supplied force-gap curve",
+        falsificationConsequence: "pull-in and force authority cannot be evaluated for the frozen gap",
+      },
+      {
+        measurementId: "pull_in_margin",
+        quantity: "spring stiffness margin against Casimir force gradient",
+        target: "pull-in margin >= 1",
+        unit: "dimensionless margin",
+        evidenceArtifact: "receipt://force_gap_pull_in/pull_in_margin_8nm_v1",
+        marginKey: "pullInMarginToIdealGradient",
+        requiredCorrectionKey: "springConstantShortfallNPerM",
+        goCriterion: "effective stiffness exceeds force gradient at 8 nm",
+        noGoCriterion: "pull-in margin < 1",
+        falsificationConsequence: "447-layer gap collapses or cannot be operated statically",
+      },
+      {
+        measurementId: "active_gap_authority",
+        quantity: "active gap-control authority against 447-layer load",
+        target: "active authority >= 1.2x absolute stack load",
+        unit: "dimensionless margin",
+        evidenceArtifact: "receipt://force_gap_pull_in/active_authority_447_layer_v1",
+        marginKey: "activeAuthorityMarginToIdealLoad",
+        requiredCorrectionKey: "activeGapControlAuthorityShortfallN",
+        goCriterion: "authority margin >= 1.2",
+        noGoCriterion: "authority margin < 1.2 or actuator authority missing",
+        falsificationConsequence: "active-control campaign cannot hold the 8 nm layered stack",
+      },
+    ],
     unlocks: ["active_control_energy", "covariant_conservation"],
     artifactToProduce: "receipt://force_gap_pull_in/8nm_447_layer_v1",
   },
@@ -173,6 +275,44 @@ const ROADMAP_POLICY: Record<
       "asperity tail exceeds half gap",
       "patch/electrostatic correction dominates the Casimir row",
       "roughness correction cannot be bounded",
+    ],
+    decisiveMeasurements: [
+      {
+        measurementId: "roughness_rms_margin",
+        quantity: "paired-surface RMS roughness",
+        target: "roughness RMS <= 1e-10 m",
+        unit: "dimensionless margin",
+        evidenceArtifact: "receipt://roughness_patch_metrology/roughness_rms_map_v1",
+        marginKey: "roughnessRmsMargin",
+        requiredCorrectionKey: "roughnessRmsReductionMeters",
+        goCriterion: "RMS roughness margin >= 1 with map provenance",
+        noGoCriterion: "RMS roughness exceeds 0.1 nm or map missing",
+        falsificationConsequence: "8 nm Casimir gap is not a clean controllable surface pair",
+      },
+      {
+        measurementId: "asperity_tail_clearance",
+        quantity: "asperity max clearance against 8 nm gap",
+        target: "asperity max leaves required minimum gap clearance",
+        unit: "m",
+        evidenceArtifact: "receipt://roughness_patch_metrology/asperity_tail_map_v1",
+        marginKey: "minimumGapClearanceMeters",
+        requiredCorrectionKey: "gapClearanceShortfallMeters",
+        goCriterion: "minimum clearance remains positive with tail-map provenance",
+        noGoCriterion: "asperity tail consumes the required clearance",
+        falsificationConsequence: "surface contact/stiction invalidates 8 nm stack operation",
+      },
+      {
+        measurementId: "patch_potential_force_fraction",
+        quantity: "patch-potential electrostatic force fraction",
+        target: "residual electrostatic force <= 5% of Casimir load",
+        unit: "dimensionless margin",
+        evidenceArtifact: "receipt://roughness_patch_metrology/patch_potential_force_v1",
+        marginKey: "residualElectrostaticMargin",
+        requiredCorrectionKey: "residualElectrostaticForceFractionReduction",
+        goCriterion: "residual electrostatic margin >= 1",
+        noGoCriterion: "patch/electrostatic correction exceeds 5% or is unbounded",
+        falsificationConsequence: "source row is contaminated by electrostatic stress-energy",
+      },
     ],
     unlocks: ["force_gap_pull_in", "full_apparatus_tensor"],
     artifactToProduce: "receipt://roughness_patch_metrology/8nm_surface_map_v1",
@@ -212,6 +352,44 @@ const ROADMAP_POLICY: Record<
       "phase noise exceeds 0.05 cycle",
       "control heat or field energy overwhelms source tensor",
     ],
+    decisiveMeasurements: [
+      {
+        measurementId: "active_control_bandwidth",
+        quantity: "gap-control bandwidth",
+        target: "bandwidth >= 30 GHz for 15 GHz switching",
+        unit: "dimensionless margin",
+        evidenceArtifact: "receipt://active_control/bandwidth_15ghz_switching_v1",
+        marginKey: "bandwidthMargin",
+        requiredCorrectionKey: "bandwidthShortfallHz",
+        goCriterion: "bandwidth margin >= 1",
+        noGoCriterion: "bandwidth below 30 GHz or trace missing",
+        falsificationConsequence: "time-dependent source cannot be synchronized to the campaign",
+      },
+      {
+        measurementId: "gap_noise_margin",
+        quantity: "RMS gap noise",
+        target: "gap noise RMS <= 8e-11 m",
+        unit: "dimensionless margin",
+        evidenceArtifact: "receipt://active_control/gap_noise_spectrum_v1",
+        marginKey: "noiseMargin",
+        requiredCorrectionKey: "gapNoiseRmsReductionMeters",
+        goCriterion: "noise margin >= 1 with spectrum provenance",
+        noGoCriterion: "gap noise exceeds 1% of the 8 nm gap",
+        falsificationConsequence: "source modulation loses gap-defined tensor authority",
+      },
+      {
+        measurementId: "thermal_sink_capacity",
+        quantity: "active-control heat sink capacity",
+        target: "thermal sink capacity >= 1.2x active-control heat load",
+        unit: "dimensionless margin",
+        evidenceArtifact: "receipt://active_control/heat_load_sink_capacity_v1",
+        marginKey: "thermalSinkCapacityMargin",
+        requiredCorrectionKey: "heatSinkCapacityShortfallW",
+        goCriterion: "thermal sink margin >= 1.2",
+        noGoCriterion: "heat load cannot be removed or overwhelms the source tensor",
+        falsificationConsequence: "thermal apparatus term invalidates the tile-source tensor candidate",
+      },
+    ],
     unlocks: ["full_apparatus_tensor", "covariant_conservation"],
     artifactToProduce: "receipt://active_control/gap_lock_energy_noise_heat_v1",
   },
@@ -238,6 +416,44 @@ const ROADMAP_POLICY: Record<
       "cycle-count margin below 1",
       "drift changes the 8 nm operating gap",
       "delamination or interlayer adhesion margin below 1",
+    ],
+    decisiveMeasurements: [
+      {
+        measurementId: "fatigue_cycle_margin",
+        quantity: "cycle-count margin under load spectrum",
+        target: "cycle margin >= 1",
+        unit: "dimensionless margin",
+        evidenceArtifact: "receipt://fatigue_lifetime/cycle_count_margin_v1",
+        marginKey: "cycleMargin",
+        requiredCorrectionKey: "cycleCountShortfall",
+        goCriterion: "cycle margin >= 1 with load-spectrum provenance",
+        noGoCriterion: "cycle margin < 1 or fatigue curve missing",
+        falsificationConsequence: "device cannot survive the campaign duty history",
+      },
+      {
+        measurementId: "thermal_creep_drift",
+        quantity: "thermal-cycle and creep/drift fraction",
+        target: "thermal and creep drift <= 0.01",
+        unit: "dimensionless margin",
+        evidenceArtifact: "receipt://fatigue_lifetime/thermal_creep_drift_v1",
+        marginKey: "thermalCycleDriftMargin",
+        requiredCorrectionKey: "thermalCycleDriftReduction",
+        goCriterion: "thermal-cycle and creep margins >= 1",
+        noGoCriterion: "drift changes the 8 nm operating gap beyond tolerance",
+        falsificationConsequence: "layered gap geometry cannot remain frozen over campaign operation",
+      },
+      {
+        measurementId: "delamination_adhesion_margin",
+        quantity: "delamination and interlayer adhesion margins",
+        target: "each margin >= 1",
+        unit: "dimensionless margin",
+        evidenceArtifact: "receipt://fatigue_lifetime/delamination_adhesion_v1",
+        marginKey: "delaminationMargin",
+        requiredCorrectionKey: "delaminationMarginShortfall",
+        goCriterion: "delamination and adhesion margins clear threshold",
+        noGoCriterion: "delamination or adhesion margin below 1",
+        falsificationConsequence: "447-layer stack cannot be treated as a mechanically coherent source",
+      },
     ],
     unlocks: ["layer_scaling", "material_credibility"],
     artifactToProduce: "receipt://fatigue_lifetime/447_layer_cycle_life_v1",
@@ -273,6 +489,44 @@ const ROADMAP_POLICY: Record<
       "source tensor retention below 90%",
       "support coupling fails",
     ],
+    decisiveMeasurements: [
+      {
+        measurementId: "layer_scaling_efficiency",
+        quantity: "447-layer scaling efficiency",
+        target: "scaling efficiency >= 0.9",
+        unit: "dimensionless margin",
+        evidenceArtifact: "receipt://layer_scaling/scaling_efficiency_v1",
+        marginKey: "scalingMargin",
+        requiredCorrectionKey: "layerScalingEfficiencyShortfall",
+        goCriterion: "scaling margin >= 1",
+        noGoCriterion: "layer scaling efficiency below 0.9",
+        falsificationConsequence: "layer count cannot be converted into source strength",
+      },
+      {
+        measurementId: "active_area_retention",
+        quantity: "active Casimir area retained after supports/control routing",
+        target: "active area retention >= 0.6",
+        unit: "dimensionless margin",
+        evidenceArtifact: "receipt://layer_scaling/active_area_retention_v1",
+        marginKey: "activeAreaMargin",
+        requiredCorrectionKey: "activeAreaRetentionShortfall",
+        goCriterion: "active-area margin >= 1",
+        noGoCriterion: "active area retention below 0.6",
+        falsificationConsequence: "architecture cannot preserve enough active source area",
+      },
+      {
+        measurementId: "source_tensor_retention",
+        quantity: "source tensor retention after layer/support coupling",
+        target: "source tensor retention >= 0.9",
+        unit: "dimensionless margin",
+        evidenceArtifact: "receipt://layer_scaling/source_tensor_retention_v1",
+        marginKey: "sourceTensorRetentionMargin",
+        requiredCorrectionKey: "sourceTensorRetentionFractionShortfall",
+        goCriterion: "source-tensor retention margin >= 1",
+        noGoCriterion: "source tensor retention below 0.9",
+        falsificationConsequence: "full apparatus tensor cannot inherit the scalar layer budget",
+      },
+    ],
     unlocks: ["regional_residual_closure", "full_apparatus_tensor"],
     artifactToProduce: "receipt://layer_scaling/447_layer_nonadditivity_v1",
   },
@@ -297,6 +551,44 @@ const ROADMAP_POLICY: Record<
       "missing T0i or off-diagonal Tij",
       "support/control/electrostatic/thermal terms hidden",
       "metric-target echo detected or not checked",
+    ],
+    decisiveMeasurements: [
+      {
+        measurementId: "tensor_component_coverage",
+        quantity: "source-side full tensor component coverage",
+        target: "10 component refs covering T00, T0i, diagonal Tij, off-diagonal Tij",
+        unit: "coverage fraction",
+        evidenceArtifact: "receipt://full_apparatus_tensor/component_detail_refs_v1",
+        marginKey: "componentCoverageFraction",
+        requiredCorrectionKey: "tensorComponentRefMissingCount",
+        goCriterion: "component coverage fraction = 1",
+        noGoCriterion: "any required component missing, scalar-proxy, or silently zeroed",
+        falsificationConsequence: "source-side same-basis tensor authority cannot pass",
+      },
+      {
+        measurementId: "apparatus_stress_energy_terms",
+        quantity: "apparatus stress-energy term coverage",
+        target: "9 term refs: Casimir, support, spacer, electrostatic, active-control, thermal, strain, fatigue, layer-scaling",
+        unit: "coverage fraction",
+        evidenceArtifact: "receipt://full_apparatus_tensor/stress_energy_terms_v1",
+        marginKey: "termCoverageFraction",
+        requiredCorrectionKey: "stressEnergyTermRefMissingCount",
+        goCriterion: "term coverage fraction = 1",
+        noGoCriterion: "support/control/electrostatic/thermal/material terms hidden",
+        falsificationConsequence: "apparatus tensor is incomplete and cannot represent the real tile source",
+      },
+      {
+        measurementId: "regional_support_coverage",
+        quantity: "wall/hull/exterior regional tensor support coverage",
+        target: "wall, hull, and exterior_shell support refs complete",
+        unit: "coverage fraction",
+        evidenceArtifact: "receipt://full_apparatus_tensor/regional_supports_v1",
+        marginKey: "regionalCoverageFraction",
+        requiredCorrectionKey: "regionalSupportRefMissingCount",
+        goCriterion: "regional coverage fraction = 1 with same atlas/support basis",
+        noGoCriterion: "regional supports missing or not same-basis",
+        falsificationConsequence: "regional residual closure cannot consume the source tensor",
+      },
     ],
     unlocks: [
       "source_side_same_basis_authority",
@@ -352,6 +644,30 @@ const roadmapStatus = (
   return receiptStatus;
 };
 
+const decisiveMeasurementsForItem = (
+  policy: (typeof ROADMAP_POLICY)[Nhm2LayerStackReceiptSurfaceId],
+  surface: Nhm2TileSourceReceiptSurfaceStatusV1,
+  budgetStatus:
+    | NonNullable<Nhm2TileSourceOperatingBudgetReadinessV1["budgetStatuses"][number]>
+    | null,
+): Nhm2TileSourceEvidenceGapRoadmapItemV1["decisiveMeasurements"] =>
+  policy.decisiveMeasurements.map((measurement) => {
+    const currentMargin =
+      (measurement.marginKey == null
+        ? null
+        : budgetStatus?.numericalMargins[measurement.marginKey] ??
+          surface.numericalMargins[measurement.marginKey]) ?? null;
+    const requiredCorrectionValue =
+      (measurement.requiredCorrectionKey == null
+        ? null
+        : budgetStatus?.requiredCorrections[measurement.requiredCorrectionKey]) ?? null;
+    return {
+      ...measurement,
+      currentMargin,
+      requiredCorrectionValue,
+    };
+  });
+
 export const buildNhm2TileSourceEvidenceGapRoadmap = (
   input: BuildNhm2TileSourceEvidenceGapRoadmapInput,
 ): Nhm2TileSourceEvidenceGapRoadmapV1 => {
@@ -382,6 +698,7 @@ export const buildNhm2TileSourceEvidenceGapRoadmap = (
         operatingBudgetFirstBlocker: budgetStatus?.firstBlocker ?? null,
         operatingBudgetNumericalMargins: budgetStatus?.numericalMargins ?? {},
         requiredCorrections: budgetStatus?.requiredCorrections ?? {},
+        decisiveMeasurements: decisiveMeasurementsForItem(policy, surface, budgetStatus),
         unlocks: policy.unlocks,
         artifactToProduce: policy.artifactToProduce,
       };
@@ -479,6 +796,34 @@ export const isNhm2TileSourceEvidenceGapRoadmap = (
             typeof entry === "boolean" ||
             (typeof entry === "number" && Number.isFinite(entry)) ||
             (Array.isArray(entry) && entry.every((value) => typeof value === "string")),
+        ) &&
+        Array.isArray(item.decisiveMeasurements) &&
+        item.decisiveMeasurements.length > 0 &&
+        item.decisiveMeasurements.every(
+          (measurement) =>
+            isRecord(measurement) &&
+            typeof measurement.measurementId === "string" &&
+            typeof measurement.quantity === "string" &&
+            typeof measurement.target === "string" &&
+            (measurement.unit === null || typeof measurement.unit === "string") &&
+            typeof measurement.evidenceArtifact === "string" &&
+            (measurement.marginKey === null || typeof measurement.marginKey === "string") &&
+            (measurement.currentMargin === null ||
+              typeof measurement.currentMargin === "boolean" ||
+              (typeof measurement.currentMargin === "number" &&
+                Number.isFinite(measurement.currentMargin))) &&
+            (measurement.requiredCorrectionKey === null ||
+              typeof measurement.requiredCorrectionKey === "string") &&
+            (measurement.requiredCorrectionValue === null ||
+              typeof measurement.requiredCorrectionValue === "string" ||
+              typeof measurement.requiredCorrectionValue === "boolean" ||
+              (typeof measurement.requiredCorrectionValue === "number" &&
+                Number.isFinite(measurement.requiredCorrectionValue)) ||
+              (Array.isArray(measurement.requiredCorrectionValue) &&
+                measurement.requiredCorrectionValue.every((value) => typeof value === "string"))) &&
+            typeof measurement.goCriterion === "string" &&
+            typeof measurement.noGoCriterion === "string" &&
+            typeof measurement.falsificationConsequence === "string",
         ) &&
         Array.isArray(item.unlocks) &&
         typeof item.artifactToProduce === "string",

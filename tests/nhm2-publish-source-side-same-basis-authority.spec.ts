@@ -276,6 +276,7 @@ const handoffReady = (): Nhm2TileSourceAuthorityHandoffV1 => ({
     requiredChange: "No change required for fixture handoff.",
     requiredCorrections: {},
   })),
+  frontierResolutionQueue: [],
   summary: {
     handoffStatus: "handoff_ready",
     handoffReadyForSameBasisAuthority: true,
@@ -289,6 +290,9 @@ const handoffReady = (): Nhm2TileSourceAuthorityHandoffV1 => ({
     physicalValidationStillRequired: true,
     firstBlocker: "none",
     firstRequiredCorrections: {},
+    firstFrontierResolutionMode: "none",
+    firstFrontierCampaignDomain: "none",
+    frontierResolutionItemCount: 0,
     physicalViabilityClaimAllowed: false,
     transportClaimAllowed: false,
     propulsionClaimAllowed: false,
@@ -300,6 +304,7 @@ const handoffReady = (): Nhm2TileSourceAuthorityHandoffV1 => ({
     handoffDoesNotRunDownstreamGates: true,
     operatingBudgetReadinessDoesNotValidateMaterialSource: true,
     handoffReadyIsNotPhysicalCredibility: true,
+    handoffCarriesFrontierQueueOnly: true,
     idealScalarCasimirIsNotMaterialEvidence: true,
     physicalViabilityClaimAllowed: false,
     transportClaimAllowed: false,
@@ -385,6 +390,10 @@ describe("publish source-side same-basis tensor authority", () => {
       expect(artifact.summary.hasWallAuthority).toBe(true);
       expect(artifact.summary.allRequiredRegionsAuthoritative).toBe(true);
       expect(artifact.summary.tileSourceHandoffReady).toBe(true);
+      expect(artifact.tileSourceAuthorityHandoffFrontierResolutionQueue).toEqual([]);
+      expect(artifact.summary.tileSourceHandoffFirstFrontierResolutionMode).toBe("none");
+      expect(artifact.summary.tileSourceHandoffFirstFrontierCampaignDomain).toBe("none");
+      expect(artifact.summary.tileSourceHandoffFrontierResolutionItemCount).toBe(0);
       expect(wall?.status).toBe("authoritative_same_basis");
       expect(wall?.comparisonRole).toBe("tile_source_full_apparatus_tensor_values");
       expect(wall?.tensorAuthorityMode).toBe("symmetric_full_tensor");
@@ -453,7 +462,11 @@ describe("publish source-side same-basis tensor authority", () => {
 
       expect(artifact.tileSourceAuthorityHandoffRef).toBe("handoff.json");
       expect(artifact.tileSourceAuthorityHandoffStatus).toBe("handoff_ready");
+      expect(artifact.tileSourceAuthorityHandoffFrontierResolutionQueue).toEqual([]);
       expect(artifact.summary.tileSourceHandoffReady).toBe(true);
+      expect(artifact.summary.tileSourceHandoffFirstFrontierResolutionMode).toBe("none");
+      expect(artifact.summary.tileSourceHandoffFirstFrontierCampaignDomain).toBe("none");
+      expect(artifact.summary.tileSourceHandoffFrontierResolutionItemCount).toBe(0);
       expect(artifact.summary.hasWallAuthority).toBe(false);
       expect(artifact.summary.anyProxy).toBe(true);
       expect(artifact.regions.find((entry) => entry.regionId === "wall")?.status).toBe(

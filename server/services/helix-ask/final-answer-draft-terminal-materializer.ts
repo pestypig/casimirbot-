@@ -689,6 +689,29 @@ const persistDocEvidenceSynthesisAnswerArtifact = (input: {
   input.payload.current_turn_artifact_ledger = input.artifactLedger;
 };
 
+const persistTheoryContextReflectionAnswerArtifact = (input: {
+  turnId: string;
+  payload: Record<string, unknown>;
+  artifactLedger: ArtifactLike[];
+  answer: Record<string, unknown>;
+}): void => {
+  const artifactIdRef = readString(input.answer.artifact_id);
+  if (!artifactIdRef) return;
+  const alreadyPresent = input.artifactLedger.some((artifact) => artifactId(artifact) === artifactIdRef);
+  if (alreadyPresent) return;
+  const artifact: ArtifactLike & Record<string, unknown> = {
+    artifact_id: artifactIdRef,
+    turn_id: input.turnId,
+    producer_item_id: "theory_context_reflection_materializer",
+    kind: "theory_context_reflection_answer",
+    created_at_ms: Date.now(),
+    source_scope: "current_turn",
+    payload: input.answer,
+  };
+  input.artifactLedger.push(artifact);
+  input.payload.current_turn_artifact_ledger = input.artifactLedger;
+};
+
 export function materializeFinalAnswerDraftTerminal(input: {
   turnId: string;
   payload: Record<string, unknown>;
@@ -796,6 +819,9 @@ export function materializeFinalAnswerDraftTerminal(input: {
           ? "internet_search_support_refs_missing"
         : qualityGate.violations.includes("missing_support_refs_for_source_route")
           ? "source_support_refs_missing"
+        : qualityGate.violations.includes("generic_answer_for_compound_prompt") ||
+            qualityGate.violations.includes("missing_required_prompt_parts")
+          ? "draft_missing_required_prompt_parts"
           : "unsupported_route_terminal_kind";
     return {
       schema: "helix.final_answer_draft_terminal_materializer_result.v1",
@@ -1168,7 +1194,7 @@ export function materializeFinalAnswerDraftTerminal(input: {
     const supportRefsForTerminal = compoundTerminalSupport.supportRefs.length > 0
       ? compoundTerminalSupport.supportRefs
       : supportRefs;
-    input.payload.theory_context_reflection_answer = {
+    const theoryContextReflectionAnswer = {
       schema: "helix.theory_context_reflection_answer.v1",
       artifact_id: theoryAnswerRef,
       turn_id: input.turnId,
@@ -1187,6 +1213,13 @@ export function materializeFinalAnswerDraftTerminal(input: {
       assistant_answer: false,
       raw_content_included: false,
     };
+    input.payload.theory_context_reflection_answer = theoryContextReflectionAnswer;
+    persistTheoryContextReflectionAnswerArtifact({
+      turnId: input.turnId,
+      payload: input.payload,
+      artifactLedger,
+      answer: theoryContextReflectionAnswer,
+    });
     return {
       schema: "helix.final_answer_draft_terminal_materializer_result.v1",
       turn_id: input.turnId,

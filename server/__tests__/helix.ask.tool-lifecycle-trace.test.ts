@@ -2747,6 +2747,12 @@ describe("Helix Ask tool lifecycle trace", () => {
         capability: "live_env.focus_process_graph",
         prompt: "Focus the process graph on the visual packet trace.",
       },
+      {
+        requiredActuator: "repair_loop",
+        controlKind: "repair_loop",
+        capability: "live_env.repair_loop",
+        prompt: "Repair the deterministic visual capture loop.",
+      },
     ] as const;
 
     for (const testCase of cases) {

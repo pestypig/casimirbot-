@@ -4,7 +4,11 @@ import {
   type Nhm2LayerStackFullApparatusReceiptRowV1,
 } from "./nhm2-layer-stack-full-apparatus-receipt-loop.v1";
 import type { Nhm2TileSourceMaterialEvidenceReceiptsV1 } from "./nhm2-tile-source-material-evidence-receipts.v1";
-import type { Nhm2TileSourceOperatingBudgetReadinessV1 } from "./nhm2-tile-source-operating-budget-readiness.v1";
+import type {
+  Nhm2TileSourceOperatingBudgetCorrectionValueV1,
+  Nhm2TileSourceOperatingBudgetReadinessV1,
+  Nhm2TileSourceOperatingBudgetSurfaceIdV1,
+} from "./nhm2-tile-source-operating-budget-readiness.v1";
 
 export const NHM2_TILE_SOURCE_PHYSICAL_VALIDATION_PLAN_CONTRACT_VERSION =
   "nhm2_tile_source_physical_validation_plan/v1";
@@ -80,6 +84,56 @@ export type Nhm2TileSourceFalsificationItemV1 = {
   falsifiesCurrentCandidate: boolean;
 };
 
+export type Nhm2TileSourcePhysicalValidationCampaignDomainV1 =
+  | "material_coupon_behavior"
+  | "force_gap_pull_in"
+  | "roughness_patch_potential"
+  | "active_control_energy_noise_heat_timing"
+  | "fatigue_layer_scaling"
+  | "full_apparatus_tensor"
+  | "downstream_residual_conservation_qei_observer"
+  | "campaign_coordination";
+
+export type Nhm2TileSourcePhysicalValidationResolutionModeV1 =
+  | "supply_experimental_receipt"
+  | "supply_operating_budget_receipt"
+  | "supply_same_basis_full_apparatus_tensor"
+  | "rerun_downstream_gate"
+  | "revise_architecture_or_operating_margin";
+
+export type Nhm2TileSourcePhysicalValidationFrontierItemV1 = {
+  rank: number;
+  campaignDomain: Nhm2TileSourcePhysicalValidationCampaignDomainV1;
+  resolutionMode: Nhm2TileSourcePhysicalValidationResolutionModeV1;
+  source:
+    | "receipt_target"
+    | "operating_budget_readiness"
+    | "tensor_authority_gate"
+    | "downstream_gate";
+  targetId: Nhm2TileSourceReceiptTargetV1["targetId"] | null;
+  operatingBudgetSurfaceId: Nhm2TileSourceOperatingBudgetSurfaceIdV1 | null;
+  downstreamGateId: Nhm2TileSourceDownstreamGateV1["gateId"] | null;
+  status: Nhm2TileSourceGateStatus | "blocked";
+  firstBlocker: string;
+  blockerIds: string[];
+  numericalMargin: number | null;
+  marginUnit: string | null;
+  evidenceTarget: string;
+  requiredChange: string;
+  nextEvidenceArtifact: string;
+  measurementTargetSummary: string;
+  falsificationRule: string;
+  requiredCorrections: Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1>;
+  prevents: string[];
+  evidenceRefs: string[];
+  blocksPhysicallyCredibleSourceCandidate: true;
+  claimBoundary: {
+    diagnosticOnly: true;
+    frontierQueueDoesNotSupplyEvidence: true;
+    resolvingItemRequiresNewReceiptOrArtifact: true;
+  };
+};
+
 export type Nhm2TileSourcePhysicalValidationPlanV1 = {
   contractVersion: typeof NHM2_TILE_SOURCE_PHYSICAL_VALIDATION_PLAN_CONTRACT_VERSION;
   generatedAt: string;
@@ -100,9 +154,13 @@ export type Nhm2TileSourcePhysicalValidationPlanV1 = {
   tensorAuthorityGate: Nhm2TileSourceTensorAuthorityGateV1;
   downstreamGates: Nhm2TileSourceDownstreamGateV1[];
   falsificationMap: Nhm2TileSourceFalsificationItemV1[];
+  frontierResolutionQueue: Nhm2TileSourcePhysicalValidationFrontierItemV1[];
   summary: {
     sourceCandidateStatus: Nhm2TileSourceValidationStatus;
     firstBlocker: string;
+    firstFrontierCampaignDomain: Nhm2TileSourcePhysicalValidationCampaignDomainV1 | "none";
+    firstFrontierResolutionMode: Nhm2TileSourcePhysicalValidationResolutionModeV1 | "none";
+    frontierResolutionItemCount: number;
     allReceiptsPresent: boolean;
     operatingBudgetsReady: boolean;
     operatingBudgetsFalsifyCurrentCandidate: boolean;
@@ -220,6 +278,369 @@ const admittedStatus = (args: {
     return args.requestedStatus;
   }
   return args.falsifies ? "fail" : "review";
+};
+
+const campaignDomainFromReceiptTarget = (
+  targetId: Nhm2TileSourceReceiptTargetV1["targetId"],
+): Nhm2TileSourcePhysicalValidationCampaignDomainV1 => {
+  switch (targetId) {
+    case "material_coupon":
+      return "material_coupon_behavior";
+    case "force_gap_pull_in":
+      return "force_gap_pull_in";
+    case "roughness_patch_metrology":
+      return "roughness_patch_potential";
+    case "active_control_energy":
+      return "active_control_energy_noise_heat_timing";
+    case "fatigue_lifetime":
+    case "layer_scaling":
+      return "fatigue_layer_scaling";
+    case "full_apparatus_tensor":
+      return "full_apparatus_tensor";
+  }
+};
+
+const campaignDomainFromOperatingBudget = (
+  surfaceId: Nhm2TileSourceOperatingBudgetSurfaceIdV1,
+): Nhm2TileSourcePhysicalValidationCampaignDomainV1 => {
+  switch (surfaceId) {
+    case "material_coupon":
+      return "material_coupon_behavior";
+    case "force_gap_load":
+      return "force_gap_pull_in";
+    case "roughness_patch":
+      return "roughness_patch_potential";
+    case "active_control":
+      return "active_control_energy_noise_heat_timing";
+    case "fatigue_layer_scaling":
+      return "fatigue_layer_scaling";
+    case "full_apparatus_tensor":
+      return "full_apparatus_tensor";
+  }
+};
+
+const evidenceTargetFromDomain = (
+  domain: Nhm2TileSourcePhysicalValidationCampaignDomainV1,
+): string => {
+  switch (domain) {
+    case "material_coupon_behavior":
+      return "Measured or validated ultra-high-stress TiN/candidate-stack coupon behavior: stress, fracture/yield, fatigue, cryogenic state, conductivity, dielectric response, roughness, and fabrication tolerance.";
+    case "force_gap_pull_in":
+      return "8 nm force-gap receipt: F(g), dF/dg, effective stiffness, pull-in margin, stiction margin, and active gap-control authority.";
+    case "roughness_patch_potential":
+      return "Roughness/asperity/patch receipt: RMS roughness, asperity-tail distribution versus 8 nm gap, patch-voltage map, and residual electrostatic correction.";
+    case "active_control_energy_noise_heat_timing":
+      return "Active-control receipt: energy per cycle, bandwidth, gap-noise spectrum, heat load, timing synchronization, and failure-mode coverage.";
+    case "fatigue_layer_scaling":
+      return "Fatigue/layer-scaling receipt: lifetime under cycling, layer nonadditivity, support coupling, active-area retention, and multiphysics coupling.";
+    case "full_apparatus_tensor":
+      return "Full apparatus source tensor receipt: source-side T00, T0i, diagonal Tij, and off-diagonal Tij including supports, spacers, controls, electrostatic, thermal, elastic, Casimir, fatigue, and layer-scaling terms.";
+    case "downstream_residual_conservation_qei_observer":
+      return "Downstream gate receipt: regional residual closure, covariant conservation, QEI worldline dossier, observer-family energy conditions, material credibility, and coupled closure in one frozen chain.";
+    case "campaign_coordination":
+      return "Campaign coordination receipt: coherent refs, operating-budget evidence, and non-stale artifact handoff.";
+  }
+};
+
+const nextEvidenceArtifactFromDomain = (
+  domain: Nhm2TileSourcePhysicalValidationCampaignDomainV1,
+  firstBlocker: string,
+  status: Nhm2TileSourceGateStatus | "blocked",
+): string => {
+  const missingLike = status === "review" || status === "not_run" || status === "blocked";
+  switch (domain) {
+    case "material_coupon_behavior":
+      return !missingLike && (firstBlocker.includes("fracture") || firstBlocker.includes("yield"))
+        ? "receipt://material_coupon/fracture_yield_margin_v1"
+        : "receipt://material_coupon/provenance_v1";
+    case "force_gap_pull_in":
+      return !missingLike && firstBlocker.includes("force_gradient")
+        ? "receipt://force_gap_pull_in/force_gradient_8nm_v1"
+        : "receipt://force_gap_pull_in/provenance_v1";
+    case "roughness_patch_potential":
+      return !missingLike && firstBlocker.includes("roughness")
+        ? "receipt://roughness_patch_metrology/roughness_rms_v1"
+        : "receipt://roughness_patch_metrology/provenance_v1";
+    case "active_control_energy_noise_heat_timing":
+      return "receipt://active_control/provenance_v1";
+    case "fatigue_layer_scaling":
+      return !missingLike && firstBlocker.includes("cycle")
+        ? "receipt://fatigue_layer_scaling/cycle_margin_v1"
+        : "receipt://fatigue_layer_scaling/provenance_v1";
+    case "full_apparatus_tensor":
+      return !missingLike &&
+        (firstBlocker.includes("T0") ||
+          firstBlocker.includes("T1") ||
+          firstBlocker.includes("T2") ||
+          firstBlocker.includes("T3"))
+        ? "receipt://full_apparatus_tensor/component_detail_refs_v1"
+        : "receipt://full_apparatus_tensor/provenance_v1";
+    case "downstream_residual_conservation_qei_observer":
+      return "artifact://nhm2/downstream-gates/frozen-chain-rerun-v1";
+    case "campaign_coordination":
+      return "artifact://nhm2/campaign/reference-capsule-congruence-v1";
+  }
+};
+
+const measurementTargetSummaryFromDomain = (
+  domain: Nhm2TileSourcePhysicalValidationCampaignDomainV1,
+): string => {
+  switch (domain) {
+    case "material_coupon_behavior":
+      return "TiN/candidate-stack coupon must supply measured/validated stress, fracture/yield, fatigue, cryogenic, conductivity, dielectric, roughness, and fabrication tolerance evidence; fracture/yield target is at least 2x the 545.707 MPa support-stress baseline.";
+    case "force_gap_pull_in":
+      return "8 nm gap receipt must supply F(g), dF/dg, stiffness model, pull-in margin > 1, stiction margin > 1, and active gap-control authority at least 1.2x the 447-layer force.";
+    case "roughness_patch_potential":
+      return "Paired-surface metrology must keep RMS roughness <= 1e-10 m, asperity tails below the 8 nm clearance envelope, patch voltage <= 0.01 V RMS, and residual electrostatic force <= 5% of the Casimir load.";
+    case "active_control_energy_noise_heat_timing":
+      return "Active-control evidence must include energy waveform, actuator authority, gap sensor calibration, >= 30 GHz bandwidth for 15 GHz switching, noise spectrum, heat-load/sink traces, timing/phase noise, lock acquisition, and failure modes.";
+    case "fatigue_layer_scaling":
+      return "Fatigue/layer-scaling evidence must cover cycle lifetime, thermal cycling, creep, delamination, adhesion, 447-layer scaling efficiency >= 0.9, nonadditivity <= 0.1, active area retention >= 0.6, and source-tensor retention >= 0.9.";
+    case "full_apparatus_tensor":
+      return "Full apparatus source tensor must provide nhm2_tile_source_full_apparatus_tensor_values/v1 with 10 component refs, 9 stress-energy term refs, wall/hull/exterior supports, same chart/basis/units, and no metric-target echo.";
+    case "downstream_residual_conservation_qei_observer":
+      return "Downstream chain must rerun regional residual closure, wall T00, covariant conservation, QEI worldline dossier, observer-family WEC/NEC/SEC/DEC, material credibility, and coupled closure against the same source tensor.";
+    case "campaign_coordination":
+      return "Campaign evidence must pin one frozen profile/run, artifact refs, source tensor values, receipt surfaces, source-authority handoff, and downstream gates without stale aliases or profile mismatches.";
+  }
+};
+
+const falsificationRuleFromDomain = (
+  domain: Nhm2TileSourcePhysicalValidationCampaignDomainV1,
+): string => {
+  switch (domain) {
+    case "material_coupon_behavior":
+      return "If measured/validated coupon strength, cryogenic/material response, roughness, or fabrication margins do not meet the frozen candidate requirements, the 447-layer TiN stack remains review or is falsified.";
+    case "force_gap_pull_in":
+      return "If the 8 nm force-gradient, pull-in, stiction, or active-authority margins are below threshold, the frozen stack is mechanically inadmissible for source authority.";
+    case "roughness_patch_potential":
+      return "If asperity tails or patch-potential residuals consume the 8 nm gap margin or exceed electrostatic correction limits, the stack cannot be treated as a clean Casimir source.";
+    case "active_control_energy_noise_heat_timing":
+      return "If active control cannot hold the gap with required bandwidth, noise, heat, timing, and fail-safe margins, time-dependent source operation remains inadmissible.";
+    case "fatigue_layer_scaling":
+      return "If cycling lifetime, layer additivity, active-area retention, or source-tensor retention fail, the 447-layer architecture is not a credible scalable source candidate.";
+    case "full_apparatus_tensor":
+      return "If the apparatus tensor is missing T0i/off-diagonal Tij, support/control/electrostatic/thermal/material terms, regional supports, or anti-echo provenance, it cannot be consumed as source-side same-basis T_munu.";
+    case "downstream_residual_conservation_qei_observer":
+      return "If residual closure, conservation, QEI, observer-family checks, material credibility, and coupled closure do not pass together, the campaign remains non-physical and non-promotional.";
+    case "campaign_coordination":
+      return "If the frozen reference capsule cannot prove same-run/profile/atlas/artifact congruence, downstream pass signals remain stale or inadmissible.";
+  }
+};
+
+const preventsFromDomain = (
+  domain: Nhm2TileSourcePhysicalValidationCampaignDomainV1,
+): string[] => {
+  switch (domain) {
+    case "material_coupon_behavior":
+      return [
+        "force_gap_pull_in",
+        "roughness_patch_potential",
+        "fatigue_layer_scaling",
+        "full_apparatus_tensor",
+        "material_credibility_gate",
+      ];
+    case "force_gap_pull_in":
+      return ["active_control_energy_noise_heat_timing", "full_apparatus_tensor", "covariant_conservation"];
+    case "roughness_patch_potential":
+      return ["force_gap_pull_in", "full_apparatus_tensor", "material_credibility_gate"];
+    case "active_control_energy_noise_heat_timing":
+      return ["time_dependent_source_campaign", "covariant_conservation", "full_apparatus_tensor"];
+    case "fatigue_layer_scaling":
+      return ["full_apparatus_tensor", "material_credibility_gate"];
+    case "full_apparatus_tensor":
+      return [
+        "source_side_same_basis_authority",
+        "regional_residual_closure",
+        "qei_worldline_dossier",
+        "observer_robustness",
+      ];
+    case "downstream_residual_conservation_qei_observer":
+      return ["coupled_closure", "claim_admission"];
+    case "campaign_coordination":
+      return ["frozen_reference_capsule", "same_run_artifact_congruence"];
+  }
+};
+
+const resolutionModeForDomain = (
+  domain: Nhm2TileSourcePhysicalValidationCampaignDomainV1,
+): Nhm2TileSourcePhysicalValidationResolutionModeV1 =>
+  domain === "full_apparatus_tensor"
+    ? "supply_same_basis_full_apparatus_tensor"
+    : domain === "downstream_residual_conservation_qei_observer"
+      ? "rerun_downstream_gate"
+      : domain === "campaign_coordination"
+        ? "supply_operating_budget_receipt"
+        : "supply_experimental_receipt";
+
+const minimumTargetMargin = (
+  target: Nhm2TileSourceReceiptTargetV1,
+): number | null => {
+  const values = Object.values(target.targetValues).filter(
+    (value): value is number => typeof value === "number" && Number.isFinite(value),
+  );
+  return values.length === 0 ? null : Math.min(...values);
+};
+
+const firstNonNullMargin = (
+  margins: Record<string, number | boolean | null>,
+): number | null => {
+  const values = Object.values(margins).filter(
+    (value): value is number => typeof value === "number" && Number.isFinite(value),
+  );
+  return values.length === 0 ? null : Math.min(...values);
+};
+
+const frontierItem = (args: {
+  rank: number;
+  campaignDomain: Nhm2TileSourcePhysicalValidationCampaignDomainV1;
+  resolutionMode?: Nhm2TileSourcePhysicalValidationResolutionModeV1;
+  source: Nhm2TileSourcePhysicalValidationFrontierItemV1["source"];
+  targetId?: Nhm2TileSourceReceiptTargetV1["targetId"] | null;
+  operatingBudgetSurfaceId?: Nhm2TileSourceOperatingBudgetSurfaceIdV1 | null;
+  downstreamGateId?: Nhm2TileSourceDownstreamGateV1["gateId"] | null;
+  status: Nhm2TileSourceGateStatus | "blocked";
+  blockers: string[];
+  numericalMargin: number | null;
+  marginUnit: string | null;
+  requiredChange: string;
+  requiredCorrections?: Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1>;
+  evidenceRefs?: string[];
+}): Nhm2TileSourcePhysicalValidationFrontierItemV1 => ({
+  rank: args.rank,
+  campaignDomain: args.campaignDomain,
+  resolutionMode: args.resolutionMode ?? resolutionModeForDomain(args.campaignDomain),
+  source: args.source,
+  targetId: args.targetId ?? null,
+  operatingBudgetSurfaceId: args.operatingBudgetSurfaceId ?? null,
+  downstreamGateId: args.downstreamGateId ?? null,
+  status: args.status,
+  firstBlocker: args.blockers[0] ?? "none",
+  blockerIds: args.blockers,
+  numericalMargin: args.numericalMargin,
+  marginUnit: args.marginUnit,
+  evidenceTarget: evidenceTargetFromDomain(args.campaignDomain),
+  requiredChange: args.requiredChange,
+  nextEvidenceArtifact: nextEvidenceArtifactFromDomain(
+    args.campaignDomain,
+    args.blockers[0] ?? "none",
+    args.status,
+  ),
+  measurementTargetSummary: measurementTargetSummaryFromDomain(args.campaignDomain),
+  falsificationRule: falsificationRuleFromDomain(args.campaignDomain),
+  requiredCorrections: args.requiredCorrections ?? {},
+  prevents: preventsFromDomain(args.campaignDomain),
+  evidenceRefs: args.evidenceRefs ?? [],
+  blocksPhysicallyCredibleSourceCandidate: true,
+  claimBoundary: {
+    diagnosticOnly: true,
+    frontierQueueDoesNotSupplyEvidence: true,
+    resolvingItemRequiresNewReceiptOrArtifact: true,
+  },
+});
+
+const buildFrontierResolutionQueue = (args: {
+  receiptTargets: Nhm2TileSourceReceiptTargetV1[];
+  operatingBudgetReadiness: Nhm2TileSourceOperatingBudgetReadinessV1 | null;
+  tensorAuthorityGate: Nhm2TileSourceTensorAuthorityGateV1;
+  downstreamGates: Nhm2TileSourceDownstreamGateV1[];
+}): Nhm2TileSourcePhysicalValidationFrontierItemV1[] => {
+  const items: Omit<Nhm2TileSourcePhysicalValidationFrontierItemV1, "rank">[] = [
+    ...args.receiptTargets
+      .filter((target) => target.status !== "pass")
+      .map((target) =>
+        frontierItem({
+          rank: 1,
+          campaignDomain: campaignDomainFromReceiptTarget(target.targetId),
+          source: "receipt_target",
+          targetId: target.targetId,
+          status: target.status,
+          blockers: target.blockers,
+          numericalMargin: minimumTargetMargin(target),
+          marginUnit:
+            target.targetId === "material_coupon"
+              ? "target-value lower-bound"
+              : target.targetId === "force_gap_pull_in"
+                ? "pull-in margin"
+                : null,
+          requiredChange: target.requiredChange,
+          evidenceRefs: target.evidenceRef == null ? [] : [target.evidenceRef],
+        }),
+      ),
+    ...(
+      args.operatingBudgetReadiness == null
+        ? [
+            frontierItem({
+              rank: 1,
+              campaignDomain: "campaign_coordination",
+              resolutionMode: "supply_operating_budget_receipt",
+              source: "operating_budget_readiness",
+              status: "review",
+              blockers: ["operating_budget_readiness_missing"],
+              numericalMargin: null,
+              marginUnit: null,
+              requiredChange:
+                "Build nhm2_tile_source_operating_budget_readiness/v1 over material coupon, force-gap, roughness/patch, active-control, fatigue/layer-scaling, and full-apparatus tensor budgets.",
+            }),
+          ]
+        : args.operatingBudgetReadiness.budgetStatuses
+            .filter((status) => !status.ready)
+            .map((status) =>
+              frontierItem({
+                rank: 1,
+                campaignDomain: campaignDomainFromOperatingBudget(status.surfaceId),
+                resolutionMode: status.falsifiesCurrentCandidate
+                  ? "revise_architecture_or_operating_margin"
+                  : "supply_operating_budget_receipt",
+                source: "operating_budget_readiness",
+                operatingBudgetSurfaceId: status.surfaceId,
+                status: status.falsifiesCurrentCandidate ? "fail" : "review",
+                blockers: status.blockers,
+                numericalMargin: firstNonNullMargin(status.numericalMargins),
+                marginUnit: "dimensionless operating-budget margin",
+                requiredChange:
+                  "Clear operating-budget readiness for material coupon, force-gap, roughness/patch, active-control, fatigue/layer-scaling, and full-apparatus tensor evidence.",
+                requiredCorrections: status.requiredCorrections,
+                evidenceRefs: status.artifactRef == null ? [] : [status.artifactRef],
+              }),
+            )
+    ),
+    ...(
+      args.tensorAuthorityGate.sourceTensorAuthorityCandidateAllowed
+        ? []
+        : [
+            frontierItem({
+              rank: 1,
+              campaignDomain: "full_apparatus_tensor",
+              source: "tensor_authority_gate",
+              status: "review",
+              blockers: args.tensorAuthorityGate.blockers,
+              numericalMargin: null,
+              marginUnit: null,
+              requiredChange:
+                "Supply same-chart, same-basis, same-unit full apparatus T_munu with T00, T0i, diagonal Tij, off-diagonal Tij, no metric-target echo, and regional wall/hull/exterior compatibility.",
+            }),
+          ]
+    ),
+    ...args.downstreamGates
+      .filter((gate) => gate.status !== "pass")
+      .map((gate) =>
+        frontierItem({
+          rank: 1,
+          campaignDomain: "downstream_residual_conservation_qei_observer",
+          source: "downstream_gate",
+          downstreamGateId: gate.gateId,
+          status: gate.status,
+          blockers: gate.blockers,
+          numericalMargin: null,
+          marginUnit: null,
+          requiredChange: gate.requiredChange,
+          evidenceRefs: gate.artifactRef == null ? [] : [gate.artifactRef],
+        }),
+      ),
+  ].map(({ rank: _rank, ...item }) => item);
+
+  return items.map((item, index) => ({ rank: index + 1, ...item }));
 };
 
 export const buildNhm2TileSourcePhysicalValidationPlan = (
@@ -555,6 +976,13 @@ export const buildNhm2TileSourcePhysicalValidationPlan = (
           })),
     ),
   ];
+  const frontierResolutionQueue = buildFrontierResolutionQueue({
+    receiptTargets,
+    operatingBudgetReadiness,
+    tensorAuthorityGate,
+    downstreamGates,
+  });
+  const firstFrontierItem = frontierResolutionQueue[0] ?? null;
   return {
     contractVersion: NHM2_TILE_SOURCE_PHYSICAL_VALIDATION_PLAN_CONTRACT_VERSION,
     generatedAt: receiptLoop.generatedAt,
@@ -575,9 +1003,13 @@ export const buildNhm2TileSourcePhysicalValidationPlan = (
     tensorAuthorityGate,
     downstreamGates,
     falsificationMap,
+    frontierResolutionQueue,
     summary: {
       sourceCandidateStatus,
       firstBlocker,
+      firstFrontierCampaignDomain: firstFrontierItem?.campaignDomain ?? "none",
+      firstFrontierResolutionMode: firstFrontierItem?.resolutionMode ?? "none",
+      frontierResolutionItemCount: frontierResolutionQueue.length,
       allReceiptsPresent,
       operatingBudgetsReady,
       operatingBudgetsFalsifyCurrentCandidate,
@@ -628,6 +1060,9 @@ export const isNhm2TileSourcePhysicalValidationPlan = (
   const tensorAuthorityGate = isRecord(value.tensorAuthorityGate) ? value.tensorAuthorityGate : null;
   const downstreamGates = Array.isArray(value.downstreamGates) ? value.downstreamGates : null;
   const falsificationMap = Array.isArray(value.falsificationMap) ? value.falsificationMap : null;
+  const frontierResolutionQueue = Array.isArray(value.frontierResolutionQueue)
+    ? value.frontierResolutionQueue
+    : null;
   const summary = isRecord(value.summary) ? value.summary : null;
   const boundary = isRecord(value.claimBoundary) ? value.claimBoundary : null;
   return (
@@ -680,9 +1115,65 @@ export const isNhm2TileSourcePhysicalValidationPlan = (
         typeof item.requiredChange === "string" &&
         typeof item.falsifiesCurrentCandidate === "boolean",
     ) &&
+    frontierResolutionQueue != null &&
+    frontierResolutionQueue.every(
+      (item) =>
+        isRecord(item) &&
+        typeof item.rank === "number" &&
+        Number.isInteger(item.rank) &&
+        item.rank > 0 &&
+        typeof item.campaignDomain === "string" &&
+        [
+          "material_coupon_behavior",
+          "force_gap_pull_in",
+          "roughness_patch_potential",
+          "active_control_energy_noise_heat_timing",
+          "fatigue_layer_scaling",
+          "full_apparatus_tensor",
+          "downstream_residual_conservation_qei_observer",
+          "campaign_coordination",
+        ].includes(item.campaignDomain) &&
+        typeof item.resolutionMode === "string" &&
+        [
+          "supply_experimental_receipt",
+          "supply_operating_budget_receipt",
+          "supply_same_basis_full_apparatus_tensor",
+          "rerun_downstream_gate",
+          "revise_architecture_or_operating_margin",
+        ].includes(item.resolutionMode) &&
+        typeof item.source === "string" &&
+        (item.targetId === null || typeof item.targetId === "string") &&
+        (item.operatingBudgetSurfaceId === null ||
+          typeof item.operatingBudgetSurfaceId === "string") &&
+        (item.downstreamGateId === null || typeof item.downstreamGateId === "string") &&
+        typeof item.status === "string" &&
+        typeof item.firstBlocker === "string" &&
+        Array.isArray(item.blockerIds) &&
+        item.blockerIds.every((blocker) => typeof blocker === "string") &&
+        (item.numericalMargin === null || typeof item.numericalMargin === "number") &&
+        (item.marginUnit === null || typeof item.marginUnit === "string") &&
+        typeof item.evidenceTarget === "string" &&
+        typeof item.requiredChange === "string" &&
+        typeof item.nextEvidenceArtifact === "string" &&
+        typeof item.measurementTargetSummary === "string" &&
+        typeof item.falsificationRule === "string" &&
+        isRecord(item.requiredCorrections) &&
+        Array.isArray(item.prevents) &&
+        item.prevents.every((entry) => typeof entry === "string") &&
+        Array.isArray(item.evidenceRefs) &&
+        item.evidenceRefs.every((entry) => typeof entry === "string") &&
+        item.blocksPhysicallyCredibleSourceCandidate === true &&
+        isRecord(item.claimBoundary) &&
+        item.claimBoundary.diagnosticOnly === true &&
+        item.claimBoundary.frontierQueueDoesNotSupplyEvidence === true &&
+        item.claimBoundary.resolvingItemRequiresNewReceiptOrArtifact === true,
+    ) &&
     summary != null &&
     typeof summary.sourceCandidateStatus === "string" &&
     typeof summary.firstBlocker === "string" &&
+    typeof summary.firstFrontierCampaignDomain === "string" &&
+    typeof summary.firstFrontierResolutionMode === "string" &&
+    typeof summary.frontierResolutionItemCount === "number" &&
     typeof summary.allReceiptsPresent === "boolean" &&
     typeof summary.operatingBudgetsReady === "boolean" &&
     typeof summary.operatingBudgetsFalsifyCurrentCandidate === "boolean" &&

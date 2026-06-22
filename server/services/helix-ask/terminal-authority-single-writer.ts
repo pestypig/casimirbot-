@@ -1362,6 +1362,206 @@ const artifactText = (artifact: ArtifactLike): string | null => {
   );
 };
 
+const observationArtifactForRef = (
+  artifacts: ArtifactLike[],
+  ref: string | null | undefined,
+): ArtifactLike | null => {
+  if (!ref) return null;
+  return artifacts.find((artifact) => artifactId(artifact) === ref) ?? null;
+};
+
+const firstObservationText = (...values: unknown[]): string | null => {
+  for (const value of values) {
+    const text = readString(value);
+    if (text) return text;
+  }
+  return null;
+};
+
+const summarizeCompoundObservation = (
+  artifact: ArtifactLike | null,
+  fallbackRef: string,
+): string => {
+  if (!artifact) return `Observation ${fallbackRef} is present.`;
+  const payload = artifactPayload(artifact);
+  const kind = artifactKind(artifact);
+  if (/calculator_receipt|calculator_result|workstation_tool_evaluation/i.test(kind)) {
+    const result = readRecord(payload?.result);
+    const expression = firstObservationText(
+      payload?.expression,
+      payload?.input,
+      payload?.expr,
+      readRecord(payload?.args)?.expression,
+    );
+    const value = firstObservationText(
+      payload?.result,
+      payload?.value,
+      payload?.result_value,
+      payload?.result_text,
+      result?.value,
+      result?.result,
+      result?.text,
+    );
+    if (expression && value) {
+      return `Calculator observation: expression ${expression} evaluated to ${value}.`;
+    }
+    if (value) return `Calculator observation: result ${value}.`;
+    return `Calculator observation from ${firstObservationText(payload?.capability_key, payload?.tool_name) ?? kind}.`;
+  }
+  if (/doc_location_matches|doc_evidence_location|docs_viewer/i.test(kind)) {
+    const firstMatch = readArray(payload?.matches).map(readRecord).find(Boolean);
+    const path = firstObservationText(
+      firstMatch?.path,
+      firstMatch?.doc_path,
+      firstMatch?.file_path,
+      payload?.path,
+      payload?.doc_path,
+      payload?.file_path,
+    );
+    const line = firstObservationText(
+      firstMatch?.line,
+      firstMatch?.line_number,
+      firstMatch?.line_start,
+      firstMatch?.start_line,
+      payload?.line,
+      payload?.line_number,
+      payload?.line_start,
+      payload?.start_line,
+    );
+    const snippet = firstObservationText(
+      firstMatch?.snippet,
+      firstMatch?.text,
+      firstMatch?.summary,
+      payload?.snippet,
+      payload?.text,
+      payload?.summary,
+    );
+    const location = [path, line ? `line ${line}` : null].filter(Boolean).join(" ");
+    return [
+      `Document evidence${location ? ` located at ${location}` : ""}.`,
+      snippet ? `Relevant excerpt: ${snippet}` : null,
+    ].filter(Boolean).join(" ");
+  }
+  if (/capability_registry|workspace_os_status|workspace_status/i.test(kind)) {
+    const count = firstObservationText(payload?.capability_count, payload?.record_count, payload?.total);
+    const text = artifactText(artifact);
+    return count
+      ? `${kind} observation contains ${count} records.`
+      : `${kind} observation${text ? `: ${text}` : " is present."}`;
+  }
+  const text = artifactText(artifact);
+  return `${kind} observation${text ? `: ${text}` : ` ${fallbackRef} is present.`}`;
+};
+
+const ensureLedgerBackedCompoundFinalAnswerDraft = (input: {
+  turnId: string;
+  payload: Record<string, unknown>;
+  artifacts: ArtifactLike[];
+  readiness: Record<string, unknown> | null;
+}): { artifact: ArtifactLike; ref: string; text: string } | null => {
+  if (!input.readiness?.applies || input.readiness.complete !== true) return null;
+  if (input.readiness.has_materialized_terminal_artifact === true) return null;
+  if (findLatestFinalAnswerDraftCandidate(input.artifacts)) return null;
+  const railRows = readCompoundSubgoalRailStatuses(input.payload)
+    .filter(compoundSubgoalRailHasSatisfiedObservation);
+  if (railRows.length < 2) return null;
+  const observationRefs = uniqueStrings(
+    railRows.map((entry) => readString(entry.observation_ref)),
+  );
+  if (observationRefs.length < 2) return null;
+  const supportRefs = uniqueStrings([
+    ...readArray(input.readiness.support_refs).map(readString),
+    ...observationRefs,
+  ]);
+  const sourceFamilies = uniqueStrings(
+    railRows.map((entry) =>
+      readString(entry.capability_family) ??
+      readString(entry.plan_family) ??
+      readString(entry.route_family)
+    ),
+  );
+  const summaries = railRows.map((entry, index) => {
+    const observationRef = readString(entry.observation_ref);
+    const capability =
+      readString(entry.requested_capability) ??
+      readString(entry.executed_capability) ??
+      readString(entry.selected_capability) ??
+      `subgoal ${index + 1}`;
+    const summary = summarizeCompoundObservation(
+      observationArtifactForRef(input.artifacts, observationRef),
+      observationRef ?? capability,
+    );
+    return `${index + 1}. ${capability}: ${summary}`;
+  });
+  const hasDoc = summaries.some((summary) => /doc(?:s|-viewer)?|document evidence|citation|located/i.test(summary));
+  const hasCalculator = summaries.some((summary) => /calculator|calculation|expression|evaluated|result/i.test(summary));
+  const connection = hasDoc && hasCalculator
+    ? "Connection: the document evidence supplies the policy or claim context, and the calculator observation supplies the numeric result used to check or illustrate that context."
+    : "Connection: the final answer is synthesized only from the satisfied subgoal observations listed above.";
+  const text = [
+    "The compound tool turn completed all mandatory subgoals.",
+    ...summaries,
+    connection,
+  ].join("\n");
+  const targetKind =
+    readString(input.readiness.synthesis_terminal_kind) ??
+    readString(input.readiness.required_terminal_kind) ??
+    "compound_evidence_synthesis_answer";
+  const draftRef = `${input.turnId}:final_answer_draft:ledger_backed_compound_synthesis`;
+  const draftPayload = {
+    schema: "helix.final_answer_draft.v1",
+    artifact_id: draftRef,
+    turn_id: input.turnId,
+    text,
+    answer_text: text,
+    authority: "ledger_backed_compound_synthesis",
+    model_step_capability: "model.synthesize_from_compound_subgoal_observations",
+    goal_kind: readString(input.readiness.goal_kind) ?? "compound_evidence_synthesis",
+    required_terminal_kind: targetKind,
+    support_refs: supportRefs,
+    artifact_refs: supportRefs,
+    evidence_refs: supportRefs,
+    grounded_in_observation_refs: observationRefs,
+    subgoal_observation_refs: observationRefs,
+    source_families: sourceFamilies,
+    generated_from_current_turn_ledger: true,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  const artifact: ArtifactLike & Record<string, unknown> = {
+    artifact_id: draftRef,
+    turn_id: input.turnId,
+    producer_item_id: "ledger_backed_compound_synthesis",
+    kind: "final_answer_draft",
+    created_at_ms: Date.now(),
+    source_scope: "current_turn",
+    payload: draftPayload,
+  };
+  input.artifacts.push(artifact);
+  const payloadLedger = readArray(input.payload.current_turn_artifact_ledger);
+  if (!payloadLedger.some((entry) => readString(readRecord(entry)?.artifact_id) === draftRef)) {
+    input.payload.current_turn_artifact_ledger = [...payloadLedger, artifact];
+  }
+  input.payload.final_answer_draft = draftPayload;
+  input.payload.ledger_backed_compound_final_answer_draft = {
+    schema: "helix.ledger_backed_compound_final_answer_draft.v1",
+    turn_id: input.turnId,
+    final_answer_draft_ref: draftRef,
+    support_refs: supportRefs,
+    subgoal_observation_refs: observationRefs,
+    terminal_artifact_kind: targetKind,
+    reason: "compound_subgoals_satisfied_without_final_answer_draft",
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  const debug = readRecord(input.payload.debug);
+  if (debug) {
+    debug.ledger_backed_compound_final_answer_draft =
+      input.payload.ledger_backed_compound_final_answer_draft;
+  }
+  return { artifact, ref: draftRef, text };
+};
+
 const CONTRACT_AUTHORIZED_RECEIPT_TERMINAL_KINDS = new Set([
   "workspace_action_receipt",
   "doc_open_receipt",
@@ -2562,20 +2762,28 @@ const findGoalSatisfyingCapabilityHelpArtifact = (
       utility.length ? `Utility examples: ${utility.slice(0, 4).join("; ")}.` : null,
     ].filter((line): line is string => Boolean(line));
     const text = lines.join("\n");
-    const ref = `${artifactId(registryArtifact) ?? "capability_registry"}:capability_help_summary`;
+    const registryRef = artifactId(registryArtifact) ?? "capability_registry";
+    const ref = `${registryRef}:capability_help_summary`;
+    const terminalPayload = {
+      schema: "helix.capability_help_summary.v1",
+      kind: "capability_help_summary",
+      text,
+      capability_catalog_ref: registryRef,
+      support_refs: [registryRef],
+      support_refs_count: 1,
+      subgoal_observation_refs: [registryRef],
+      subgoal_observation_refs_count: 1,
+      source_families: ["capability_catalog"],
+      assistant_answer: false,
+      terminal_eligible: true,
+      raw_content_included: false,
+    };
+    payload.capability_help_summary = terminalPayload;
     return {
       artifact: {
         artifact_id: ref,
         kind: "capability_help_summary",
-        payload: {
-          schema: "helix.capability_help_summary.v1",
-          kind: "capability_help_summary",
-          text,
-          capability_catalog_ref: artifactId(registryArtifact),
-          assistant_answer: false,
-          terminal_eligible: true,
-          raw_content_included: false,
-        },
+        payload: terminalPayload,
       },
       kind: "capability_help_summary",
       text,
@@ -2651,6 +2859,12 @@ const findGoalSatisfyingTheoryContextReflectionArtifact = (
   if (
     readString(goal?.goal_kind) !== "theory_context_reflection" &&
     readString(goal?.required_terminal_kind) !== "theory_context_reflection_answer"
+  ) {
+    return null;
+  }
+  if (
+    readRecord(payload.final_answer_draft) ||
+    artifacts.some((artifact) => artifactKind(artifact) === "final_answer_draft")
   ) {
     return null;
   }
@@ -3030,6 +3244,29 @@ export function applyHelixTerminalAuthoritySingleWriter(
   const compoundCoverageGate = readRecord(input.payload.compound_prompt_coverage_gate);
   const compoundCoverageFailedClosed =
     readString(compoundCoverageGate?.decision) === "FAIL_CLOSED";
+  const rawMissingItineraryFamilies = attachItineraryExecutionState(input.payload, artifacts);
+  const preDraftCompoundSynthesisReadiness = resolveCompoundCapabilitySynthesisReadiness({
+    payload: input.payload,
+    artifacts,
+  });
+  if (preDraftCompoundSynthesisReadiness.applies) {
+    input.payload.compound_capability_synthesis_readiness = preDraftCompoundSynthesisReadiness;
+    const debug = readRecord(input.payload.debug);
+    if (debug) {
+      debug.compound_capability_synthesis_readiness = preDraftCompoundSynthesisReadiness;
+    }
+  }
+  const ledgerBackedCompoundDraft = compoundCoverageFailedClosed
+    ? null
+    : ensureLedgerBackedCompoundFinalAnswerDraft({
+        turnId: input.turnId,
+        payload: input.payload,
+        artifacts,
+        readiness: preDraftCompoundSynthesisReadiness as unknown as Record<string, unknown>,
+      });
+  if (ledgerBackedCompoundDraft) {
+    input.payload.ledger_backed_compound_final_answer_draft_applied = true;
+  }
   const compoundPreferredDraftCandidate = compoundCoverageFailedClosed
     ? null
     : findCompoundSupportedFinalAnswerDraftCandidate(input.payload, artifacts);
@@ -3042,7 +3279,6 @@ export function applyHelixTerminalAuthoritySingleWriter(
         routeProductContract: readRecord(input.payload.route_product_contract),
         finalAnswerDraftRef: compoundPreferredDraftCandidate?.ref ?? undefined,
       });
-  const rawMissingItineraryFamilies = attachItineraryExecutionState(input.payload, artifacts);
   const compoundSynthesisReadiness = resolveCompoundCapabilitySynthesisReadiness({
     payload: input.payload,
     artifacts,
@@ -4794,6 +5030,8 @@ export function applyHelixTerminalAuthoritySingleWriter(
     debug.legacy_terminal_candidates = legacyCandidates;
     debug.terminal_artifact_kind = input.payload.terminal_artifact_kind;
     debug.final_answer_source = input.payload.final_answer_source;
+    debug.terminal_error_code = input.payload.terminal_error_code;
+    debug.terminal_failure_text = input.payload.terminal_failure_text;
     debug.selected_final_answer = input.payload.selected_final_answer;
     debug.answer = input.payload.answer;
     debug.text = input.payload.text;

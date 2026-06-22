@@ -120,6 +120,31 @@ describe("NHM2 tile source physical validation plan", () => {
 
     expect(plan.summary.sourceCandidateStatus).toBe("review");
     expect(plan.summary.firstBlocker).toBe("material_coupon_receipt_missing");
+    expect(plan.summary.firstFrontierCampaignDomain).toBe("material_coupon_behavior");
+    expect(plan.summary.firstFrontierResolutionMode).toBe("supply_experimental_receipt");
+    expect(plan.summary.frontierResolutionItemCount).toBeGreaterThan(0);
+    expect(plan.frontierResolutionQueue[0]).toMatchObject({
+      rank: 1,
+      campaignDomain: "material_coupon_behavior",
+      resolutionMode: "supply_experimental_receipt",
+      source: "receipt_target",
+      targetId: "material_coupon",
+      firstBlocker: "material_coupon_receipt_missing",
+      blocksPhysicallyCredibleSourceCandidate: true,
+    });
+    expect(plan.frontierResolutionQueue[0].evidenceTarget).toContain("ultra-high-stress TiN");
+    expect(plan.frontierResolutionQueue[0].nextEvidenceArtifact).toBe(
+      "receipt://material_coupon/provenance_v1",
+    );
+    expect(plan.frontierResolutionQueue[0].measurementTargetSummary).toContain(
+      "fracture/yield target is at least 2x",
+    );
+    expect(plan.frontierResolutionQueue[0].falsificationRule).toContain(
+      "447-layer TiN stack",
+    );
+    expect(plan.frontierResolutionQueue[0].prevents).toEqual(
+      expect.arrayContaining(["force_gap_pull_in", "full_apparatus_tensor"]),
+    );
     expect(plan.summary.allReceiptsPresent).toBe(false);
     expect(plan.summary.physicallyCredibleSourceCandidate).toBe(false);
     expect(plan.receiptTargets.map((target) => target.targetId)).toEqual([
@@ -148,6 +173,20 @@ describe("NHM2 tile source physical validation plan", () => {
     expect(plan.summary.fullApparatusTensorCoverageComplete).toBe(true);
     expect(plan.tensorAuthorityGate.sourceTensorAuthorityCandidateAllowed).toBe(false);
     expect(plan.summary.firstBlocker).toBe("same_chart_full_apparatus_tensor_missing");
+    expect(plan.summary.firstFrontierCampaignDomain).toBe("full_apparatus_tensor");
+    expect(plan.summary.firstFrontierResolutionMode).toBe(
+      "supply_same_basis_full_apparatus_tensor",
+    );
+    expect(plan.frontierResolutionQueue[0]).toMatchObject({
+      source: "tensor_authority_gate",
+      campaignDomain: "full_apparatus_tensor",
+      firstBlocker: "same_chart_full_apparatus_tensor_missing",
+      nextEvidenceArtifact: "receipt://full_apparatus_tensor/provenance_v1",
+      measurementTargetSummary: expect.stringContaining(
+        "nhm2_tile_source_full_apparatus_tensor_values/v1",
+      ),
+      falsificationRule: expect.stringContaining("source-side same-basis T_munu"),
+    });
     expect(plan.summary.sourceCandidateStatus).toBe("review");
   });
 
@@ -163,6 +202,18 @@ describe("NHM2 tile source physical validation plan", () => {
     expect(plan.tensorAuthorityGate.sourceTensorAuthorityCandidateAllowed).toBe(true);
     expect(plan.summary.downstreamGatesPass).toBe(false);
     expect(plan.summary.firstBlocker).toBe("regional_residual_closure_not_run");
+    expect(plan.summary.firstFrontierCampaignDomain).toBe(
+      "downstream_residual_conservation_qei_observer",
+    );
+    expect(plan.summary.firstFrontierResolutionMode).toBe("rerun_downstream_gate");
+    expect(plan.frontierResolutionQueue[0]).toMatchObject({
+      source: "downstream_gate",
+      downstreamGateId: "regional_residual_closure",
+      firstBlocker: "regional_residual_closure_not_run",
+      nextEvidenceArtifact: "artifact://nhm2/downstream-gates/frozen-chain-rerun-v1",
+      measurementTargetSummary: expect.stringContaining("observer-family WEC/NEC/SEC/DEC"),
+      falsificationRule: expect.stringContaining("do not pass together"),
+    });
     expect(plan.downstreamGates.every((gate) => gate.status === "not_run")).toBe(true);
     expect(plan.summary.sourceCandidateStatus).toBe("review");
   });
@@ -181,6 +232,16 @@ describe("NHM2 tile source physical validation plan", () => {
     expect(plan.summary.operatingBudgetsFalsifyCurrentCandidate).toBe(false);
     expect(plan.summary.downstreamGatesPass).toBe(false);
     expect(plan.summary.firstBlocker).toBe("operating_budget_readiness_missing");
+    expect(plan.summary.firstFrontierCampaignDomain).toBe("campaign_coordination");
+    expect(plan.summary.firstFrontierResolutionMode).toBe("supply_operating_budget_receipt");
+    expect(plan.frontierResolutionQueue[0]).toMatchObject({
+      source: "operating_budget_readiness",
+      campaignDomain: "campaign_coordination",
+      firstBlocker: "operating_budget_readiness_missing",
+      nextEvidenceArtifact: "artifact://nhm2/campaign/reference-capsule-congruence-v1",
+      measurementTargetSummary: expect.stringContaining("one frozen profile/run"),
+      falsificationRule: expect.stringContaining("stale or inadmissible"),
+    });
     expect(plan.summary.physicallyCredibleSourceCandidate).toBe(false);
     expect(plan.summary.sourceCandidateStatus).toBe("review");
     expect(plan.downstreamGates.find((gate) => gate.gateId === "material_credibility"))
@@ -222,6 +283,10 @@ describe("NHM2 tile source physical validation plan", () => {
     expect(plan.summary.sourceCandidateStatus).toBe("physically_credible_source_candidate");
     expect(plan.summary.physicallyCredibleSourceCandidate).toBe(true);
     expect(plan.summary.firstBlocker).toBe("none");
+    expect(plan.summary.firstFrontierCampaignDomain).toBe("none");
+    expect(plan.summary.firstFrontierResolutionMode).toBe("none");
+    expect(plan.summary.frontierResolutionItemCount).toBe(0);
+    expect(plan.frontierResolutionQueue).toEqual([]);
     expect(plan.summary.physicalViabilityClaimAllowed).toBe(false);
     expect(plan.summary.transportClaimAllowed).toBe(false);
     expect(plan.claimBoundary.physicallyCredibleSourceCandidateIsNotPhysicalViability).toBe(true);

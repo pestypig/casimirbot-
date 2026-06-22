@@ -17,12 +17,25 @@ export type Nhm2RoughnessPatchTestId =
 
 export type Nhm2RoughnessPatchTestStatus = "satisfied" | "open" | "falsifying";
 
+export type Nhm2RoughnessPatchBlockedCampaignDomain =
+  | "force_gap_pull_in"
+  | "active_control_energy_noise_heat_timing"
+  | "fatigue_layer_scaling"
+  | "full_apparatus_tensor"
+  | "material_credibility_gate"
+  | "covariant_conservation";
+
+export type Nhm2RoughnessPatchTargetValue = string | number | boolean | null;
+
 export type Nhm2RoughnessPatchTestPlanItemV1 = {
   testId: Nhm2RoughnessPatchTestId;
   status: Nhm2RoughnessPatchTestStatus;
   blockerIds: string[];
+  measurementTargets: Record<string, Nhm2RoughnessPatchTargetValue>;
   requiredMeasurement: string;
   acceptanceCriterion: string;
+  falsificationRule: string;
+  blocksCampaignDomains: Nhm2RoughnessPatchBlockedCampaignDomain[];
   artifactToProduce: string;
 };
 
@@ -51,6 +64,9 @@ export type Nhm2TileSourceRoughnessPatchTestPlanV1 = {
   summary: {
     roughnessPatchReceiptStatus: "pass" | "review" | "fail" | "missing";
     nextRequiredTestId: Nhm2RoughnessPatchTestId | "none";
+    nextRequiredArtifactToProduce: string | null;
+    nextRequiredFalsificationRule: string | null;
+    nextBlockedCampaignDomains: Nhm2RoughnessPatchBlockedCampaignDomain[];
     openTestCount: number;
     falsifyingTestCount: number;
     satisfiedTestCount: number;
@@ -81,12 +97,34 @@ export type BuildNhm2TileSourceRoughnessPatchTestPlanInput = {
   materialEvidenceReceiptsRef?: string | null;
 };
 
+const OPERATING_GAP_METERS = 8e-9;
+const ROUGHNESS_RMS_MAX_METERS = 1e-10;
+const ROUGHNESS_MAP_LATERAL_RESOLUTION_MAX_METERS = 5e-10;
+const ROUGHNESS_SCAN_AREA_FRACTION_MIN = 0.95;
+const ASPERITY_P99_MAX_METERS = 2e-9;
+const ASPERITY_P999_MAX_METERS = 3e-9;
+const ASPERITY_MAX_METERS = 4e-9;
+const PATCH_VOLTAGE_RMS_MAX_VOLTS = 0.01;
+const PATCH_VOLTAGE_CORRELATION_LENGTH_POSITIVE = true;
+const RESIDUAL_ELECTROSTATIC_FORCE_FRACTION_MAX = 0.05;
+const RESIDUAL_ELECTROSTATIC_FORCE_MAX_N = 709.419214214;
+
+const DEFAULT_BLOCKED_DOMAINS: Nhm2RoughnessPatchBlockedCampaignDomain[] = [
+  "force_gap_pull_in",
+  "active_control_energy_noise_heat_timing",
+  "full_apparatus_tensor",
+  "material_credibility_gate",
+  "covariant_conservation",
+];
+
 const TEST_POLICY: Record<
   Nhm2RoughnessPatchTestId,
   {
     blockers: string[];
     requiredMeasurement: string;
     acceptanceCriterion: string;
+    falsificationRule: string;
+    blocksCampaignDomains: Nhm2RoughnessPatchBlockedCampaignDomain[];
     artifactToProduce: string;
   }
 > = {
@@ -106,6 +144,9 @@ const TEST_POLICY: Record<
     requiredMeasurement:
       "Measured or validated-simulation paired-surface 8 nm gap metrology, roughness, asperity-tail, patch-voltage, and residual electrostatic maps with provenance.",
     acceptanceCriterion: "Evidence tier is measured or validated_simulation, not declared_model or missing.",
+    falsificationRule:
+      "If roughness/patch provenance cannot identify paired 8 nm surfaces, roughness maps, asperity-tail fits, patch-voltage maps, calibration, and residual electrostatic model refs, the candidate cannot enter force-gap correction or full-apparatus tensor evidence.",
+    blocksCampaignDomains: DEFAULT_BLOCKED_DOMAINS,
     artifactToProduce: "receipt://roughness_patch_metrology/provenance_v1",
   },
   roughness_rms: {
@@ -120,12 +161,18 @@ const TEST_POLICY: Record<
       "Registered RMS roughness metrology for the paired 8 nm operating-gap surfaces.",
     acceptanceCriterion:
       "Map lateral resolution is at most 0.5 nm, scan coverage is at least 95%, and RMS roughness is supplied and no greater than 0.1 nm.",
+    falsificationRule:
+      "If roughness RMS exceeds 0.1 nm, map lateral resolution exceeds 0.5 nm, or scan coverage is below 95%, the 8 nm surface front remains inadmissible until surface process or metrology changes.",
+    blocksCampaignDomains: DEFAULT_BLOCKED_DOMAINS,
     artifactToProduce: "receipt://roughness_patch_metrology/roughness_rms_v1",
   },
   asperity_p99: {
     blockers: ["asperity_p99_missing", "asperity_p99_above_2nm"],
     requiredMeasurement: "Asperity p99 map for the 8 nm operating-gap surfaces.",
     acceptanceCriterion: "Asperity p99 is supplied with surface-map provenance and is no greater than 2 nm.",
+    falsificationRule:
+      "If p99 asperity height exceeds 2 nm, the candidate must revise polishing/coating/process control before preserving the 8 nm gap can be admitted.",
+    blocksCampaignDomains: ["force_gap_pull_in", "full_apparatus_tensor", "material_credibility_gate"],
     artifactToProduce: "receipt://roughness_patch_metrology/asperity_p99_v1",
   },
   asperity_tail: {
@@ -137,6 +184,9 @@ const TEST_POLICY: Record<
     ],
     requiredMeasurement: "Maximum asperity-tail map for the 8 nm operating-gap surfaces.",
     acceptanceCriterion: "Asperity p999 is no greater than 3 nm and maximum asperity remains below half the 8 nm gap.",
+    falsificationRule:
+      "If asperity p999 exceeds 3 nm or the maximum asperity exceeds half the 8 nm gap, the current surface pair is a pull-in/stiction and gap-closure falsifier.",
+    blocksCampaignDomains: ["force_gap_pull_in", "active_control_energy_noise_heat_timing", "full_apparatus_tensor", "material_credibility_gate"],
     artifactToProduce: "receipt://roughness_patch_metrology/asperity_tail_v1",
   },
   patch_voltage_rms: {
@@ -147,18 +197,27 @@ const TEST_POLICY: Record<
     requiredMeasurement: "Patch-voltage RMS map for the selected material stack.",
     acceptanceCriterion:
       "Patch voltage RMS is supplied and no greater than 10 mV with a correlation-length receipt.",
+    falsificationRule:
+      "If patch-voltage RMS exceeds 10 mV or lacks correlation-length provenance, electrostatic contamination cannot be bounded for the source tensor.",
+    blocksCampaignDomains: ["force_gap_pull_in", "active_control_energy_noise_heat_timing", "full_apparatus_tensor", "material_credibility_gate", "covariant_conservation"],
     artifactToProduce: "receipt://roughness_patch_metrology/patch_voltage_rms_v1",
   },
   residual_electrostatic_force: {
     blockers: ["residual_electrostatic_force_correction_above_5pct_or_missing"],
     requiredMeasurement: "Residual electrostatic force correction after roughness and patch treatment.",
     acceptanceCriterion: "Residual electrostatic force fraction is supplied and no greater than 5%.",
+    falsificationRule:
+      "If residual electrostatic correction exceeds 5% of the frozen ideal stack load, patch/electrostatic terms dominate the material-source evidence and must enter full apparatus T_munu before admission.",
+    blocksCampaignDomains: ["force_gap_pull_in", "active_control_energy_noise_heat_timing", "full_apparatus_tensor", "material_credibility_gate", "covariant_conservation"],
     artifactToProduce: "receipt://roughness_patch_metrology/residual_electrostatic_force_v1",
   },
   roughness_patch_correction: {
     blockers: ["roughness_patch_correction_ref_missing"],
     requiredMeasurement: "Correction model tying roughness and patch potentials into the source tensor budget.",
     acceptanceCriterion: "Roughness/patch correction reference is present.",
+    falsificationRule:
+      "If the roughness/patch correction model is missing, scalar surface measurements cannot be promoted into force-gap or full-apparatus tensor corrections.",
+    blocksCampaignDomains: ["force_gap_pull_in", "full_apparatus_tensor", "material_credibility_gate", "covariant_conservation"],
     artifactToProduce: "receipt://roughness_patch_metrology/correction_model_v1",
   },
 };
@@ -184,6 +243,54 @@ const itemStatus = (
   return surface.status === "fail" ? "falsifying" : "open";
 };
 
+const measurementTargetsForTest = (
+  testId: Nhm2RoughnessPatchTestId,
+): Record<string, Nhm2RoughnessPatchTargetValue> => {
+  switch (testId) {
+    case "roughness_patch_provenance":
+      return {
+        requiredEvidenceTier: "measured_or_validated_simulation",
+        requiredMapAndModelRefCount: 8,
+        operatingGapMeters: OPERATING_GAP_METERS,
+        pairedSurfaceRegistrationRequired: true,
+      };
+    case "roughness_rms":
+      return {
+        roughnessRmsMaxMeters: ROUGHNESS_RMS_MAX_METERS,
+        roughnessMapLateralResolutionMaxMeters: ROUGHNESS_MAP_LATERAL_RESOLUTION_MAX_METERS,
+        roughnessScanAreaFractionMin: ROUGHNESS_SCAN_AREA_FRACTION_MIN,
+        operatingGapMeters: OPERATING_GAP_METERS,
+      };
+    case "asperity_p99":
+      return {
+        asperityP99MaxMeters: ASPERITY_P99_MAX_METERS,
+        operatingGapMeters: OPERATING_GAP_METERS,
+      };
+    case "asperity_tail":
+      return {
+        asperityP999MaxMeters: ASPERITY_P999_MAX_METERS,
+        asperityMaxMeters: ASPERITY_MAX_METERS,
+        minimumGapClearanceRequiredMeters: OPERATING_GAP_METERS - ASPERITY_MAX_METERS,
+        operatingGapMeters: OPERATING_GAP_METERS,
+      };
+    case "patch_voltage_rms":
+      return {
+        patchVoltageRmsMaxVolts: PATCH_VOLTAGE_RMS_MAX_VOLTS,
+        patchVoltageCorrelationLengthPositive: PATCH_VOLTAGE_CORRELATION_LENGTH_POSITIVE,
+      };
+    case "residual_electrostatic_force":
+      return {
+        residualElectrostaticForceFractionMax: RESIDUAL_ELECTROSTATIC_FORCE_FRACTION_MAX,
+        residualElectrostaticForceMaxN: RESIDUAL_ELECTROSTATIC_FORCE_MAX_N,
+      };
+    case "roughness_patch_correction":
+      return {
+        correctionModelRefRequired: true,
+        patchElectrostaticTermsMustEnterFullTensor: true,
+      };
+  }
+};
+
 export const buildNhm2TileSourceRoughnessPatchTestPlan = (
   input: BuildNhm2TileSourceRoughnessPatchTestPlanInput,
 ): Nhm2TileSourceRoughnessPatchTestPlanV1 => {
@@ -196,8 +303,11 @@ export const buildNhm2TileSourceRoughnessPatchTestPlan = (
       testId,
       status: itemStatus(surface, policy.blockers),
       blockerIds,
+      measurementTargets: measurementTargetsForTest(testId),
       requiredMeasurement: policy.requiredMeasurement,
       acceptanceCriterion: policy.acceptanceCriterion,
+      falsificationRule: policy.falsificationRule,
+      blocksCampaignDomains: policy.blocksCampaignDomains,
       artifactToProduce: policy.artifactToProduce,
     };
   });
@@ -215,21 +325,24 @@ export const buildNhm2TileSourceRoughnessPatchTestPlan = (
       materialEvidenceReceiptsRef: input.materialEvidenceReceiptsRef ?? null,
     },
     roughnessPatchTarget: {
-      operatingGapMeters: 8e-9,
-      roughnessRmsMaxMeters: 1e-10,
-      roughnessMapLateralResolutionMaxMeters: 5e-10,
-      roughnessScanAreaFractionMin: 0.95,
-      asperityP99MaxMeters: 2e-9,
-      asperityP999MaxMeters: 3e-9,
-      asperityMaxMeters: 4e-9,
-      patchVoltageRmsMaxVolts: 0.01,
-      residualElectrostaticForceFractionMax: 0.05,
+      operatingGapMeters: OPERATING_GAP_METERS,
+      roughnessRmsMaxMeters: ROUGHNESS_RMS_MAX_METERS,
+      roughnessMapLateralResolutionMaxMeters: ROUGHNESS_MAP_LATERAL_RESOLUTION_MAX_METERS,
+      roughnessScanAreaFractionMin: ROUGHNESS_SCAN_AREA_FRACTION_MIN,
+      asperityP99MaxMeters: ASPERITY_P99_MAX_METERS,
+      asperityP999MaxMeters: ASPERITY_P999_MAX_METERS,
+      asperityMaxMeters: ASPERITY_MAX_METERS,
+      patchVoltageRmsMaxVolts: PATCH_VOLTAGE_RMS_MAX_VOLTS,
+      residualElectrostaticForceFractionMax: RESIDUAL_ELECTROSTATIC_FORCE_FRACTION_MAX,
       evidenceTierRequired: "measured_or_validated_simulation",
     },
     testItems,
     summary: {
       roughnessPatchReceiptStatus: surface.status,
       nextRequiredTestId: nextItem?.testId ?? "none",
+      nextRequiredArtifactToProduce: nextItem?.artifactToProduce ?? null,
+      nextRequiredFalsificationRule: nextItem?.falsificationRule ?? null,
+      nextBlockedCampaignDomains: nextItem?.blocksCampaignDomains ?? [],
       openTestCount: openItems.length,
       falsifyingTestCount: falsifyingItems.length,
       satisfiedTestCount: satisfiedItems.length,
@@ -290,13 +403,30 @@ export const isNhm2TileSourceRoughnessPatchTestPlan = (
         typeof item.testId === "string" &&
         ["satisfied", "open", "falsifying"].includes(String(item.status)) &&
         Array.isArray(item.blockerIds) &&
+        isRecord(item.measurementTargets) &&
+        Object.values(item.measurementTargets).every(
+          (targetValue) =>
+            targetValue === null ||
+            typeof targetValue === "string" ||
+            typeof targetValue === "number" ||
+            typeof targetValue === "boolean",
+        ) &&
         typeof item.requiredMeasurement === "string" &&
         typeof item.acceptanceCriterion === "string" &&
+        typeof item.falsificationRule === "string" &&
+        Array.isArray(item.blocksCampaignDomains) &&
+        item.blocksCampaignDomains.every((domain) => typeof domain === "string") &&
         typeof item.artifactToProduce === "string",
     ) &&
     summary != null &&
     typeof summary.roughnessPatchReceiptStatus === "string" &&
     typeof summary.nextRequiredTestId === "string" &&
+    (summary.nextRequiredArtifactToProduce === null ||
+      typeof summary.nextRequiredArtifactToProduce === "string") &&
+    (summary.nextRequiredFalsificationRule === null ||
+      typeof summary.nextRequiredFalsificationRule === "string") &&
+    Array.isArray(summary.nextBlockedCampaignDomains) &&
+    summary.nextBlockedCampaignDomains.every((domain) => typeof domain === "string") &&
     typeof summary.openTestCount === "number" &&
     typeof summary.falsifyingTestCount === "number" &&
     typeof summary.satisfiedTestCount === "number" &&

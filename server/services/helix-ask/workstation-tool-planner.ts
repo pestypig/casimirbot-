@@ -95,10 +95,73 @@ export type PlanWorkstationToolUseOptions = {
   threadId?: string | null;
   turnId?: string | null;
   now?: Date;
+  workspaceSnapshot?: Record<string, unknown> | null;
 };
 
 function makePlanId(intent: string): string {
   return `workstation-plan:${intent}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function readPlannerRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function readPlannerString(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+}
+
+function readPlannerStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => readPlannerString(entry))
+    .filter((entry): entry is string => Boolean(entry));
+}
+
+function plannerSituationRoomContext(options: PlanWorkstationToolUseOptions): Record<string, unknown> | null {
+  return readPlannerRecord(readPlannerRecord(options.workspaceSnapshot)?.situationRoomContext);
+}
+
+function readPlannerContextString(context: Record<string, unknown> | null, keys: string[]): string | null {
+  if (!context) return null;
+  for (const key of keys) {
+    const value = readPlannerString(context[key]);
+    if (value) return value;
+  }
+  return null;
+}
+
+function readPlannerContextBoolean(context: Record<string, unknown> | null, keys: string[]): boolean {
+  if (!context) return false;
+  return keys.some((key) => context[key] === true || context[key] === "true");
+}
+
+function hasLiveAnswerWorkspaceContext(options: PlanWorkstationToolUseOptions): boolean {
+  const snapshot = readPlannerRecord(options.workspaceSnapshot);
+  const context = plannerSituationRoomContext(options);
+  const focusedPanel =
+    readPlannerContextString(context, ["focused_panel", "focusedPanel", "panel_id", "panelId", "active_panel", "activePanel"]) ??
+    readPlannerString(snapshot?.activePanel);
+  const openPanels = [
+    ...readPlannerStringArray(context?.open_panels),
+    ...readPlannerStringArray(context?.openPanels),
+  ];
+  const sourceModalities = [
+    ...readPlannerStringArray(context?.source_modalities),
+    ...readPlannerStringArray(context?.sourceModalities),
+  ];
+  return (
+    focusedPanel === "live-answer-environment" ||
+    openPanels.includes("live-answer-environment") ||
+    readPlannerContextBoolean(context, ["live_answer_environment", "liveAnswerEnvironment"]) ||
+    sourceModalities.some((modality) => /\b(?:visual|audio|live[-_\s]?answer)\b/i.test(modality)) ||
+    Boolean(readPlannerContextString(context, ["visual_source_ref", "visualSourceRef", "audio_source_ref", "audioSourceRef"]))
+  );
+}
+
+function isWeakNaturalLanguageArg(value: string | null): boolean {
+  return !value || /^(?:to|for|with|as|on|in|into|from|the|a|an)$/i.test(value.trim());
 }
 
 function normalizePrompt(prompt: string): string {
@@ -1277,6 +1340,86 @@ type WorkstationControlTool =
   | "live_env.update_live_answer_projection"
   | "live_env.focus_process_graph";
 
+function promptPrefersAudioSource(prompt: string, toolId?: WorkstationControlTool | null): boolean {
+  return (
+    toolId === "live_env.set_audio_preset" ||
+    /\b(?:audio|earbud|earbuds|transcript|translation|translate|speech|mic|microphone|narrator|voice)\b/i.test(prompt)
+  );
+}
+
+function promptPrefersVisualSource(prompt: string, toolId?: WorkstationControlTool | null): boolean {
+  return (
+    toolId === "live_env.set_visual_preset" ||
+    /\b(?:visual|screen|image|lens|camera|frame|capture|frog|classification|classifier|shade)\b/i.test(prompt)
+  );
+}
+
+function inferLiveAnswerSourceRef(
+  prompt: string,
+  toolId: WorkstationControlTool | null,
+  options: PlanWorkstationToolUseOptions,
+): string | null {
+  if (!hasLiveAnswerWorkspaceContext(options)) return null;
+  const context = plannerSituationRoomContext(options);
+  const explicitGeneric = readPlannerContextString(context, ["source_ref", "sourceRef", "source_id", "sourceId"]);
+  if (promptPrefersAudioSource(prompt, toolId)) {
+    return readPlannerContextString(context, ["audio_source_ref", "audioSourceRef", "audio_source_id", "audioSourceId"]) ??
+      explicitGeneric ??
+      "source:audio:active";
+  }
+  if (promptPrefersVisualSource(prompt, toolId)) {
+    return readPlannerContextString(context, ["visual_source_ref", "visualSourceRef", "visual_source_id", "visualSourceId"]) ??
+      explicitGeneric ??
+      "source:visual:active";
+  }
+  return explicitGeneric ?? "source:live-answer:active";
+}
+
+function inferLiveAnswerTargetRef(
+  prompt: string,
+  toolId: WorkstationControlTool,
+  options: PlanWorkstationToolUseOptions,
+): string | null {
+  if (!hasLiveAnswerWorkspaceContext(options)) return null;
+  const context = plannerSituationRoomContext(options);
+  const explicitGeneric = readPlannerContextString(context, ["target_ref", "targetRef", "target_id", "targetId"]);
+  if (
+    toolId === "live_env.change_workstation_preset" ||
+    toolId === "live_env.set_visual_preset" ||
+    toolId === "live_env.set_audio_preset"
+  ) {
+    return explicitGeneric ?? inferLiveAnswerSourceRef(prompt, toolId, options);
+  }
+  if (toolId === "live_env.bind_workstation_source") {
+    if (promptPrefersAudioSource(prompt, toolId)) {
+      return readPlannerContextString(context, ["audio_target_ref", "audioTargetRef"]) ?? explicitGeneric ?? "live-answer:audio";
+    }
+    if (promptPrefersVisualSource(prompt, toolId)) {
+      return readPlannerContextString(context, ["visual_target_ref", "visualTargetRef"]) ?? explicitGeneric ?? "live-answer:visual";
+    }
+    return explicitGeneric ?? "live-answer:desktop";
+  }
+  return explicitGeneric;
+}
+
+function inferLiveAnswerPresetId(
+  prompt: string,
+  toolId: WorkstationControlTool,
+  options: PlanWorkstationToolUseOptions,
+): string | null {
+  if (!hasLiveAnswerWorkspaceContext(options)) return null;
+  const context = plannerSituationRoomContext(options);
+  if (toolId === "live_env.set_audio_preset" || promptPrefersAudioSource(prompt, toolId)) {
+    return readPlannerContextString(context, ["audio_preset_id", "audioPresetId", "preset_id", "presetId"]) ??
+      (/\b(?:translation|translate|earbud|earbuds)\b/i.test(prompt) ? "preset:earbud-translation" : null);
+  }
+  if (toolId === "live_env.set_visual_preset" || promptPrefersVisualSource(prompt, toolId)) {
+    return readPlannerContextString(context, ["visual_preset_id", "visualPresetId", "preset_id", "presetId"]) ??
+      (/\b(?:frog|classifier|classification|scientific)\b/i.test(prompt) ? "preset:frog-classifier" : null);
+  }
+  return readPlannerContextString(context, ["preset_id", "presetId"]);
+}
+
 function hasContextualWorkstationGoalContextCue(prompt: string): boolean {
   const object = GOAL_CONTEXT_OBJECT_PATTERN;
   return (
@@ -1385,11 +1528,24 @@ function workstationControlMissingRequirements(toolId: WorkstationControlTool, a
   return [];
 }
 
-function buildWorkstationControlArgs(prompt: string, toolId: WorkstationControlTool): Record<string, unknown> {
+function buildWorkstationControlArgs(
+  prompt: string,
+  toolId: WorkstationControlTool,
+  options: PlanWorkstationToolUseOptions,
+): Record<string, unknown> {
   const goalId = extractNamedArg(prompt, ["goal_id", "goal id"]);
-  const targetRef = extractNamedArg(prompt, ["target_ref", "target ref", "target_id", "target id", "panel_id", "panel id"]);
-  const sourceRef = extractNamedArg(prompt, ["source_ref", "source ref", "source_id", "source id"]);
-  const presetId = extractNamedArg(prompt, ["preset_id", "preset id", "preset"]);
+  const explicitTargetRef = extractNamedArg(prompt, ["target_ref", "target ref", "target_id", "target id", "panel_id", "panel id"]);
+  const explicitSourceRef = extractNamedArg(prompt, ["source_ref", "source ref", "source_id", "source id"]);
+  const explicitPresetId = extractNamedArg(prompt, ["preset_id", "preset id", "preset"]);
+  const targetRef = isWeakNaturalLanguageArg(explicitTargetRef)
+    ? inferLiveAnswerTargetRef(prompt, toolId, options)
+    : explicitTargetRef;
+  const sourceRef = isWeakNaturalLanguageArg(explicitSourceRef)
+    ? inferLiveAnswerSourceRef(prompt, toolId, options)
+    : explicitSourceRef;
+  const presetId = isWeakNaturalLanguageArg(explicitPresetId)
+    ? inferLiveAnswerPresetId(prompt, toolId, options)
+    : explicitPresetId;
   const loopRef = extractNamedArg(prompt, ["loop_ref", "loop ref", "loop_id", "loop id"]);
   const lineKey = extractNamedArg(prompt, ["line_key", "line key", "live_answer_line_key", "live answer line key"]);
   const panelId = extractNamedArg(prompt, ["panel_id", "panel id"]);
@@ -1428,7 +1584,7 @@ function buildWorkstationControlPlan(
       missing_required_args: [],
     };
   }
-  const args = buildWorkstationControlArgs(normalized, toolId);
+  const args = buildWorkstationControlArgs(normalized, toolId, options);
   const missing = workstationControlMissingRequirements(toolId, args);
   const stepId = toolId.replace(/^live_env\./, "");
   scores.push({
@@ -1847,7 +2003,10 @@ function buildWorkstationGoalContextPlan(
   const feedTool = !startSession && !traceMemory && !hasSessionFilters ? selectWorkstationContextFeedTool(normalized) : null;
   const threadId = options.threadId ?? "helix-ask:desktop";
   const objective = extractGoalContextObjective(normalized);
-  const sourceId = extractNamedArg(normalized, ["source_id", "source id", "source_ref", "source ref"]);
+  const explicitSourceId = extractNamedArg(normalized, ["source_id", "source id", "source_ref", "source ref"]);
+  const sourceId = isWeakNaturalLanguageArg(explicitSourceId)
+    ? inferLiveAnswerSourceRef(normalized, null, options)
+    : explicitSourceId;
   const freshnessStatus = extractGoalContextFreshnessStatus(normalized);
   const goalId =
     extractNamedArg(normalized, ["goal_id", "goal id"]) ??
@@ -1875,25 +2034,37 @@ function buildWorkstationGoalContextPlan(
   const postSessionControlSteps: HelixWorkstationToolPlanStep[] = [];
   const postSessionControlStepIds: string[] = [];
   if (startSession) {
-    const targetRef = extractNamedArg(normalized, ["target_ref", "target ref", "target_id", "target id"]);
-    const presetId = extractNamedArg(normalized, ["preset_id", "preset id", "preset"]);
-    const bindSourceRef = extractNamedArg(normalized, ["bind_source_ref", "bind source ref", "source_ref", "source ref", "source_id", "source id"]);
-    const bindTargetRef = extractNamedArg(normalized, ["bind_target_ref", "bind target ref", "target_ref", "target ref", "target_id", "target id"]);
+    const presetToolId = /\b(?:audio|earbud|transcript|translation|speech|mic|microphone)\b/i.test(normalized)
+      ? "live_env.set_audio_preset" as const
+      : /\b(?:visual|screen|image|lens|camera|frame|capture|frog|classifier|classification|shade)\b/i.test(normalized)
+        ? "live_env.set_visual_preset" as const
+        : "live_env.change_workstation_preset" as const;
+    const explicitTargetRef = extractNamedArg(normalized, ["target_ref", "target ref", "target_id", "target id"]);
+    const explicitPresetId = extractNamedArg(normalized, ["preset_id", "preset id", "preset"]);
+    const targetRef = isWeakNaturalLanguageArg(explicitTargetRef)
+      ? inferLiveAnswerTargetRef(normalized, presetToolId, options)
+      : explicitTargetRef;
+    const presetId = isWeakNaturalLanguageArg(explicitPresetId)
+      ? inferLiveAnswerPresetId(normalized, presetToolId, options)
+      : explicitPresetId;
+    const explicitBindSourceRef = extractNamedArg(normalized, ["bind_source_ref", "bind source ref", "source_ref", "source ref", "source_id", "source id"]);
+    const explicitBindTargetRef = extractNamedArg(normalized, ["bind_target_ref", "bind target ref", "target_ref", "target ref", "target_id", "target id"]);
+    const bindSourceRef = isWeakNaturalLanguageArg(explicitBindSourceRef)
+      ? inferLiveAnswerSourceRef(normalized, "live_env.bind_workstation_source", options)
+      : explicitBindSourceRef;
+    const bindTargetRef = isWeakNaturalLanguageArg(explicitBindTargetRef)
+      ? inferLiveAnswerTargetRef(normalized, "live_env.bind_workstation_source", options)
+      : explicitBindTargetRef;
     const lineKey = extractNamedArg(normalized, ["line_key", "line key", "live_answer_line_key", "live answer line key"]);
     const loopRef = extractNamedArg(normalized, ["loop_ref", "loop ref", "loop_id", "loop id"]);
     const requestedLoopState = inferLoopState(normalized);
     if (targetRef && presetId && /\b(?:preset|shade|classifier|deck)\b/i.test(normalized)) {
-      const toolId = /\b(?:audio|earbud|transcript|translation|speech|mic|microphone)\b/i.test(normalized)
-        ? "live_env.set_audio_preset" as const
-        : /\b(?:visual|screen|image|lens|camera|frame|capture)\b/i.test(normalized)
-          ? "live_env.set_visual_preset" as const
-          : "live_env.change_workstation_preset" as const;
       pushGoalSessionSetupControlStep({
         steps: postSessionControlSteps,
         stepIds: postSessionControlStepIds,
         scores,
-        stepId: toolId.replace(/^live_env\./, ""),
-        toolId,
+        stepId: presetToolId.replace(/^live_env\./, ""),
+        toolId: presetToolId,
         args: {
           goal_id: goalId,
           target_ref: targetRef,

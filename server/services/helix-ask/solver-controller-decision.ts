@@ -117,6 +117,47 @@ const resolveAuthoritativeCapabilityHelpTerminal = (
     : null;
 };
 
+const resolveAuthoritativeTheoryContextReflectionTerminal = (
+  payload: RecordLike,
+): { terminalArtifactKind: "theory_context_reflection_answer"; finalAnswerSource: "final_answer_draft" } | null => {
+  const canonicalGoal = readRecord(payload.canonical_goal_frame);
+  const goalSatisfaction = readRecord(payload.goal_satisfaction_evaluation);
+  const terminalContract = readRecord(goalSatisfaction?.terminal_contract);
+  const terminalWriter = readRecord(payload.terminal_authority_single_writer);
+  const terminalAuthority = readRecord(payload.terminal_answer_authority);
+  const requiredTerminalKind =
+    readString(canonicalGoal?.required_terminal_kind) ??
+    readString(goalSatisfaction?.required_terminal_kind) ??
+    readStringArray(terminalContract?.required_terminal_kinds)[0] ??
+    null;
+  const goalKind =
+    readString(canonicalGoal?.goal_kind) ??
+    readString(goalSatisfaction?.canonical_goal_kind) ??
+    readString(terminalContract?.goal_kind);
+  const writerKind =
+    readString(terminalWriter?.selected_terminal_artifact_kind) ??
+    readString(terminalWriter?.selectedArtifactKind);
+  const authorityKind = readString(terminalAuthority?.terminal_artifact_kind);
+  const goalAllowsTerminal =
+    readString(goalSatisfaction?.satisfaction) === "satisfied" ||
+    readString(goalSatisfaction?.next_decision) === "allow_terminal";
+  const theoryTerminalObserved =
+    hasCurrentTurnArtifactKind(payload, "theory_context_reflection_answer") ||
+    Boolean(readRecord(payload.theory_context_reflection_answer));
+  return (
+    goalKind === "theory_context_reflection" &&
+    requiredTerminalKind === "theory_context_reflection_answer" &&
+    goalAllowsTerminal &&
+    theoryTerminalObserved &&
+    (writerKind === "theory_context_reflection_answer" || authorityKind === "theory_context_reflection_answer")
+  )
+    ? {
+        terminalArtifactKind: "theory_context_reflection_answer",
+        finalAnswerSource: "final_answer_draft",
+      }
+    : null;
+};
+
 type AuthoritativeDocumentLocationTerminalKind =
   | "doc_location_matches"
   | "doc_evidence_location"
@@ -194,6 +235,7 @@ export const normalizeHelixRouteBase = (route: string | null | undefined): strin
 
 const isNonAnswerTerminal = (payload: RecordLike): boolean => {
   if (resolveAuthoritativeCapabilityHelpTerminal(payload)) return false;
+  if (resolveAuthoritativeTheoryContextReflectionTerminal(payload)) return false;
   if (resolveAuthoritativeDocumentLocationTerminal(payload)) return false;
   const terminalAuthority = readRecord(payload.terminal_answer_authority);
   const terminalArtifactKind =
@@ -411,6 +453,31 @@ const hasSatisfiedDocumentTerminal = (payload: RecordLike, terminalArtifactKind:
         readString(artifactPayload?.answer_text) ||
         readArray(artifactPayload?.matches).length > 0,
     );
+  });
+};
+
+const hasSatisfiedTheoryContextReflectionAnswer = (
+  payload: RecordLike,
+  terminalArtifactKind: string | null,
+): boolean => {
+  if (terminalArtifactKind !== "theory_context_reflection_answer") return false;
+  const goalSatisfaction = readRecord(payload.goal_satisfaction_evaluation);
+  if (
+    readString(goalSatisfaction?.satisfaction) !== "satisfied" ||
+    readString(goalSatisfaction?.next_decision) !== "allow_terminal"
+  ) {
+    return false;
+  }
+  const terminalContract = readRecord(goalSatisfaction?.terminal_contract);
+  const requiredTerminalKinds = readStringArray(terminalContract?.required_terminal_kinds);
+  if (requiredTerminalKinds.length > 0 && !requiredTerminalKinds.includes("theory_context_reflection_answer")) {
+    return false;
+  }
+  return readArray(payload.current_turn_artifact_ledger).some((entry) => {
+    const artifact = readRecord(entry);
+    if (readString(artifact?.kind) !== "theory_context_reflection_answer") return false;
+    const artifactPayload = readRecord(artifact?.payload);
+    return Boolean(readString(artifactPayload?.answer_text) ?? readString(artifactPayload?.text));
   });
 };
 
@@ -689,6 +756,7 @@ const isCapabilityLifecycleComplete = (payload: RecordLike, terminalArtifactKind
   if (hasSatisfiedDocOpenReceipt(payload, terminalArtifactKind)) return true;
   if (hasSatisfiedDocSummary(payload, terminalArtifactKind)) return true;
   if (hasSatisfiedDocumentTerminal(payload, terminalArtifactKind)) return true;
+  if (hasSatisfiedTheoryContextReflectionAnswer(payload, terminalArtifactKind)) return true;
   const plan = readRecord(payload.capability_plan);
   const result = readRecord(payload.capability_result);
   const ledger = readRecord(payload.capability_lifecycle_ledger);
@@ -857,6 +925,7 @@ export function buildSolverControllerDecision(input: {
   const liveSourceIdentity = readRecord(payload.live_source_identity_audit ?? solverTrace?.live_source_identity_audit);
   const authoritativeWorkstationTerminal = resolveAuthoritativeWorkstationToolTerminal(payload);
   const authoritativeCapabilityHelpTerminal = resolveAuthoritativeCapabilityHelpTerminal(payload);
+  const authoritativeTheoryContextReflectionTerminal = resolveAuthoritativeTheoryContextReflectionTerminal(payload);
   const authoritativeDocumentLocationTerminal = resolveAuthoritativeDocumentLocationTerminal(payload);
   if (authoritativeWorkstationTerminal) {
     payload.terminal_artifact_kind = authoritativeWorkstationTerminal.terminalArtifactKind;
@@ -864,6 +933,9 @@ export function buildSolverControllerDecision(input: {
   } else if (authoritativeCapabilityHelpTerminal) {
     payload.terminal_artifact_kind = authoritativeCapabilityHelpTerminal.terminalArtifactKind;
     payload.final_answer_source = authoritativeCapabilityHelpTerminal.finalAnswerSource;
+  } else if (authoritativeTheoryContextReflectionTerminal) {
+    payload.terminal_artifact_kind = authoritativeTheoryContextReflectionTerminal.terminalArtifactKind;
+    payload.final_answer_source = authoritativeTheoryContextReflectionTerminal.finalAnswerSource;
   } else if (authoritativeDocumentLocationTerminal) {
     payload.terminal_artifact_kind = authoritativeDocumentLocationTerminal.terminalArtifactKind;
     payload.final_answer_source = authoritativeDocumentLocationTerminal.finalAnswerSource;
@@ -871,20 +943,26 @@ export function buildSolverControllerDecision(input: {
   const terminalArtifactKind =
     authoritativeWorkstationTerminal?.terminalArtifactKind ??
     authoritativeCapabilityHelpTerminal?.terminalArtifactKind ??
+    authoritativeTheoryContextReflectionTerminal?.terminalArtifactKind ??
     authoritativeDocumentLocationTerminal?.terminalArtifactKind ??
     readString(payload.terminal_artifact_kind);
   const rawRequiredTerminalKind =
     authoritativeWorkstationTerminal?.terminalArtifactKind ??
     authoritativeCapabilityHelpTerminal?.terminalArtifactKind ??
+    authoritativeTheoryContextReflectionTerminal?.terminalArtifactKind ??
     authoritativeDocumentLocationTerminal?.terminalArtifactKind ??
     committedRoute?.canonical_goal.required_terminal_kind ??
     readString(canonicalGoal?.required_terminal_kind);
   const requiredTerminalKindsFromContract = readStringArray(terminalContract?.required_terminal_kinds);
   const rawRequiredTerminalKinds =
-    authoritativeWorkstationTerminal || authoritativeCapabilityHelpTerminal || authoritativeDocumentLocationTerminal
+    authoritativeWorkstationTerminal ||
+    authoritativeCapabilityHelpTerminal ||
+    authoritativeTheoryContextReflectionTerminal ||
+    authoritativeDocumentLocationTerminal
       ? [
           authoritativeWorkstationTerminal?.terminalArtifactKind ??
           authoritativeCapabilityHelpTerminal?.terminalArtifactKind ??
+          authoritativeTheoryContextReflectionTerminal?.terminalArtifactKind ??
           authoritativeDocumentLocationTerminal!.terminalArtifactKind,
         ]
       : committedRoute?.canonical_goal.allowed_terminal_artifact_kinds.length

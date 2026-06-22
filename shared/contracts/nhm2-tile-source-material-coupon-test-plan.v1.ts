@@ -21,12 +21,25 @@ export type Nhm2MaterialCouponTestId =
 
 export type Nhm2MaterialCouponTestStatus = "satisfied" | "open" | "falsifying";
 
+export type Nhm2MaterialCouponBlockedCampaignDomain =
+  | "force_gap_pull_in"
+  | "roughness_patch_potential"
+  | "active_control_energy_noise_heat_timing"
+  | "fatigue_layer_scaling"
+  | "full_apparatus_tensor"
+  | "material_credibility_gate";
+
+export type Nhm2MaterialCouponTargetValue = string | number | boolean | null;
+
 export type Nhm2MaterialCouponTestPlanItemV1 = {
   testId: Nhm2MaterialCouponTestId;
   status: Nhm2MaterialCouponTestStatus;
   blockerIds: string[];
+  measurementTargets: Record<string, Nhm2MaterialCouponTargetValue>;
   requiredMeasurement: string;
   acceptanceCriterion: string;
+  falsificationRule: string;
+  blocksCampaignDomains: Nhm2MaterialCouponBlockedCampaignDomain[];
   artifactToProduce: string;
 };
 
@@ -56,6 +69,9 @@ export type Nhm2TileSourceMaterialCouponTestPlanV1 = {
   summary: {
     materialCouponReceiptStatus: "pass" | "review" | "fail" | "missing";
     nextRequiredTestId: Nhm2MaterialCouponTestId | "none";
+    nextRequiredArtifactToProduce: string | null;
+    nextRequiredFalsificationRule: string | null;
+    nextBlockedCampaignDomains: Nhm2MaterialCouponBlockedCampaignDomain[];
     openTestCount: number;
     falsifyingTestCount: number;
     satisfiedTestCount: number;
@@ -84,6 +100,20 @@ export type BuildNhm2TileSourceMaterialCouponTestPlanInput = {
 
 const SUPPORT_STRESS_PA = 5.45707087858e8;
 const MATERIAL_SAFETY_FACTOR = 2;
+const REQUIRED_GAP_METERS = 8e-9;
+const OPERATING_TEMPERATURE_K = 4;
+const MATERIAL_RESPONSE_FREQUENCY_HZ = 15e9;
+const ROUGHNESS_RMS_MAX_METERS = 1e-10;
+const FABRICATION_TOLERANCE_MAX_METERS = 5e-10;
+const COUPON_REQUIRED_CYCLE_COUNT = 1e9;
+
+const DEFAULT_BLOCKED_DOMAINS: Nhm2MaterialCouponBlockedCampaignDomain[] = [
+  "force_gap_pull_in",
+  "roughness_patch_potential",
+  "fatigue_layer_scaling",
+  "full_apparatus_tensor",
+  "material_credibility_gate",
+];
 
 const TEST_POLICY: Record<
   Nhm2MaterialCouponTestId,
@@ -91,6 +121,8 @@ const TEST_POLICY: Record<
     blockers: string[];
     requiredMeasurement: string;
     acceptanceCriterion: string;
+    falsificationRule: string;
+    blocksCampaignDomains: Nhm2MaterialCouponBlockedCampaignDomain[];
     artifactToProduce: string;
   }
 > = {
@@ -112,6 +144,9 @@ const TEST_POLICY: Record<
       "Measured or validated-simulation coupon receipt with apparatus, specimen, temperature, stress-curve, cryogenic-state, roughness-map, and fabrication-map provenance.",
     acceptanceCriterion:
       "Evidence tier is measured or validated_simulation and all required coupon curve/map provenance refs are present.",
+    falsificationRule:
+      "If measured or validated coupon provenance cannot identify the specimen, frozen load case, curve/map refs, and coupon apparatus, the coupon cannot support material credibility for this candidate.",
+    blocksCampaignDomains: DEFAULT_BLOCKED_DOMAINS,
     artifactToProduce: "receipt://material_coupon/provenance_v1",
   },
   candidate_stack_load_case: {
@@ -123,12 +158,18 @@ const TEST_POLICY: Record<
       "Load-case and layer-stack compatibility receipt tying the coupon specimen to the frozen 447-layer TiN candidate at 8 nm, 4 K, and 15 GHz.",
     acceptanceCriterion:
       "Coupon evidence includes both the campaign load-case reference and the selected 447-layer stack compatibility reference.",
+    falsificationRule:
+      "If the coupon is not traceable to the frozen 447-layer, 8 nm, 4 K, 15 GHz load case, it cannot stand in for this tile-source architecture.",
+    blocksCampaignDomains: DEFAULT_BLOCKED_DOMAINS,
     artifactToProduce: "receipt://material_coupon/447_layer_load_case_compatibility_v1",
   },
   candidate_material_identity: {
     blockers: ["candidate_material_mismatch"],
     requiredMeasurement: "Material identity receipt for the selected ultra-high-stress TiN candidate stack.",
     acceptanceCriterion: "Coupon material is ultra_high_stress_tin.",
+    falsificationRule:
+      "If the material identity is not ultra_high_stress_tin or an explicitly admitted candidate replacement, this frozen candidate is falsified at the coupon front.",
+    blocksCampaignDomains: DEFAULT_BLOCKED_DOMAINS,
     artifactToProduce: "receipt://material_coupon/tin_identity_v1",
   },
   tensile_stress: {
@@ -136,6 +177,9 @@ const TEST_POLICY: Record<
     requiredMeasurement: "Cryogenic thin-film tensile stress curve for the coupon stack.",
     acceptanceCriterion:
       "Measured tensile stress is supplied and traceable to a tensile stress curve at the 4 K operating state.",
+    falsificationRule:
+      "If measured tensile stress is below the selected support stress under the frozen load case, revise the material/architecture or falsify the candidate.",
+    blocksCampaignDomains: ["fatigue_layer_scaling", "full_apparatus_tensor", "material_credibility_gate"],
     artifactToProduce: "receipt://material_coupon/tensile_stress_4k_v1",
   },
   fracture_yield_margin: {
@@ -146,6 +190,9 @@ const TEST_POLICY: Record<
     ],
     requiredMeasurement: "Fracture or yield stress measurement for the coupon stack.",
     acceptanceCriterion: "Fracture/yield stress is at least 2x the selected support stress.",
+    falsificationRule:
+      "If fracture/yield stress is below 2x the selected support stress, the 447-layer TiN load path is not admitted.",
+    blocksCampaignDomains: ["fatigue_layer_scaling", "full_apparatus_tensor", "material_credibility_gate"],
     artifactToProduce: "receipt://material_coupon/fracture_yield_margin_v1",
   },
   coupon_fatigue_cycling: {
@@ -159,12 +206,18 @@ const TEST_POLICY: Record<
       "Coupon-level fatigue/cycling curve for the selected TiN stack under the frozen campaign load case and cryogenic cycling protocol.",
     acceptanceCriterion:
       "Coupon cycle count to failure is at least the required campaign cycle count, with fatigue and cryogenic-cycle provenance refs.",
+    falsificationRule:
+      "If coupon cycles to failure are below the required campaign cycle count, the frozen candidate fails the lifetime front unless architecture or duty is revised.",
+    blocksCampaignDomains: ["fatigue_layer_scaling", "full_apparatus_tensor", "material_credibility_gate"],
     artifactToProduce: "receipt://material_coupon/fatigue_cycling_447_layer_v1",
   },
   cryogenic_state: {
     blockers: ["cryogenic_4k_coupon_receipt_missing", "cryogenic_state_ref_missing"],
     requiredMeasurement: "Cryogenic material-state receipt at or below 4 K.",
     acceptanceCriterion: "Coupon behavior is characterized at the 4 K operating state.",
+    falsificationRule:
+      "If the coupon cannot operate or be characterized at 4 K, the frozen material receipt cannot support the current campaign load case.",
+    blocksCampaignDomains: DEFAULT_BLOCKED_DOMAINS,
     artifactToProduce: "receipt://material_coupon/cryogenic_4k_state_v1",
   },
   dielectric_response: {
@@ -180,6 +233,9 @@ const TEST_POLICY: Record<
       "Dielectric response reference plus numeric loss tangent for the selected TiN stack at 15 GHz and 4 K.",
     acceptanceCriterion:
       "Dielectric response is traceable to the coupon material and includes finite non-negative loss tangent at the operating frequency and temperature.",
+    falsificationRule:
+      "If dielectric response is absent, not at 15 GHz/4 K, or lacks finite numeric loss tangent, material credibility and full-apparatus tensor terms remain inadmissible.",
+    blocksCampaignDomains: ["full_apparatus_tensor", "material_credibility_gate"],
     artifactToProduce: "receipt://material_coupon/dielectric_response_v1",
   },
   conductivity: {
@@ -195,12 +251,18 @@ const TEST_POLICY: Record<
       "Conductivity reference plus numeric conductivity for the selected TiN stack at 15 GHz and 4 K.",
     acceptanceCriterion:
       "Conductivity response is traceable to the coupon material and includes finite positive conductivity at the operating frequency and temperature.",
+    falsificationRule:
+      "If conductivity is absent, not at 15 GHz/4 K, or non-positive, source-side material response terms remain inadmissible.",
+    blocksCampaignDomains: ["full_apparatus_tensor", "material_credibility_gate"],
     artifactToProduce: "receipt://material_coupon/conductivity_v1",
   },
   roughness_metrology: {
     blockers: ["coupon_roughness_rms_above_0p1nm_or_missing", "coupon_roughness_map_ref_missing"],
     requiredMeasurement: "Coupon roughness RMS metrology and surface-height map.",
     acceptanceCriterion: "RMS roughness is supplied from a traceable map and no greater than 0.1 nm.",
+    falsificationRule:
+      "If coupon roughness RMS exceeds 0.1 nm or lacks a traceable map, the 8 nm roughness/asperity front remains blocked.",
+    blocksCampaignDomains: ["roughness_patch_potential", "force_gap_pull_in", "material_credibility_gate"],
     artifactToProduce: "receipt://material_coupon/roughness_rms_v1",
   },
   fabrication_tolerance: {
@@ -208,6 +270,9 @@ const TEST_POLICY: Record<
     requiredMeasurement: "Fabrication tolerance receipt and spatial tolerance map for the coupon and layer stack.",
     acceptanceCriterion:
       "Fabrication tolerance is supplied from a traceable map for the 8 nm operating-gap stack.",
+    falsificationRule:
+      "If fabrication tolerance cannot stay within the 0.5 nm coupon target, the architecture must be revised before force-gap or full-apparatus tensor admission.",
+    blocksCampaignDomains: ["force_gap_pull_in", "full_apparatus_tensor", "material_credibility_gate"],
     artifactToProduce: "receipt://material_coupon/fabrication_tolerance_v1",
   },
 };
@@ -233,11 +298,92 @@ const itemStatus = (
   return surface.status === "fail" ? "falsifying" : "open";
 };
 
+const measurementTargetsForTest = (
+  testId: Nhm2MaterialCouponTestId,
+  supportStressPa: number,
+  requiredFractureOrYieldStressPa: number,
+  couponRequiredCycleCount: number,
+): Record<string, Nhm2MaterialCouponTargetValue> => {
+  switch (testId) {
+    case "coupon_provenance":
+      return {
+        requiredEvidenceTier: "measured_or_validated_simulation",
+        requiredCurveAndMapRefCount: 7,
+        requiredCampaignCompatibilityRefCount: 2,
+        requiredMaterialResponseRefCount: 2,
+      };
+    case "candidate_stack_load_case":
+      return {
+        layerCount: 447,
+        gapMeters: REQUIRED_GAP_METERS,
+        operatingTemperatureK: OPERATING_TEMPERATURE_K,
+        materialResponseFrequencyHz: MATERIAL_RESPONSE_FREQUENCY_HZ,
+      };
+    case "candidate_material_identity":
+      return {
+        material: "ultra_high_stress_tin",
+      };
+    case "tensile_stress":
+      return {
+        tensileStressMinPa: supportStressPa,
+        supportStressPa,
+        operatingTemperatureK: OPERATING_TEMPERATURE_K,
+      };
+    case "fracture_yield_margin":
+      return {
+        fractureOrYieldStressMinPa: requiredFractureOrYieldStressPa,
+        supportStressPa,
+        materialSafetyFactor: MATERIAL_SAFETY_FACTOR,
+      };
+    case "coupon_fatigue_cycling":
+      return {
+        couponRequiredCycleCount,
+        operatingTemperatureK: OPERATING_TEMPERATURE_K,
+      };
+    case "cryogenic_state":
+      return {
+        operatingTemperatureK: OPERATING_TEMPERATURE_K,
+        maximumCouponTemperatureK: OPERATING_TEMPERATURE_K,
+      };
+    case "dielectric_response":
+      return {
+        materialResponseFrequencyHz: MATERIAL_RESPONSE_FREQUENCY_HZ,
+        materialResponseTemperatureK: OPERATING_TEMPERATURE_K,
+        dielectricLossTangentFiniteNonNegative: true,
+      };
+    case "conductivity":
+      return {
+        materialResponseFrequencyHz: MATERIAL_RESPONSE_FREQUENCY_HZ,
+        materialResponseTemperatureK: OPERATING_TEMPERATURE_K,
+        conductivitySiemensPerMeterPositive: true,
+      };
+    case "roughness_metrology":
+      return {
+        roughnessRmsMaxMeters: ROUGHNESS_RMS_MAX_METERS,
+        traceableRoughnessMapRequired: true,
+      };
+    case "fabrication_tolerance":
+      return {
+        fabricationToleranceMaxMeters: FABRICATION_TOLERANCE_MAX_METERS,
+        traceableFabricationToleranceMapRequired: true,
+      };
+  }
+};
+
 export const buildNhm2TileSourceMaterialCouponTestPlan = (
   input: BuildNhm2TileSourceMaterialCouponTestPlanInput,
 ): Nhm2TileSourceMaterialCouponTestPlanV1 => {
   const receipts = input.materialEvidenceReceipts;
   const surface = materialCouponSurface(receipts);
+  const supportStressPa =
+    surface.numericalMargins.requiredStressPa == null
+      ? SUPPORT_STRESS_PA
+      : surface.numericalMargins.requiredStressPa / MATERIAL_SAFETY_FACTOR;
+  const requiredFractureOrYieldStressPa = supportStressPa * MATERIAL_SAFETY_FACTOR;
+  const couponRequiredCycleCount =
+    surface.numericalMargins.couponRequiredCycleCount == null
+      ? COUPON_REQUIRED_CYCLE_COUNT
+      : surface.numericalMargins.couponRequiredCycleCount;
   const testItems = (Object.keys(TEST_POLICY) as Nhm2MaterialCouponTestId[]).map((testId) => {
     const policy = TEST_POLICY[testId];
     const blockerIds = surface.blockers.filter((blocker) => policy.blockers.includes(blocker));
@@ -245,8 +391,16 @@ export const buildNhm2TileSourceMaterialCouponTestPlan = (
       testId,
       status: itemStatus(surface, policy.blockers),
       blockerIds,
+      measurementTargets: measurementTargetsForTest(
+        testId,
+        supportStressPa,
+        requiredFractureOrYieldStressPa,
+        couponRequiredCycleCount,
+      ),
       requiredMeasurement: policy.requiredMeasurement,
       acceptanceCriterion: policy.acceptanceCriterion,
+      falsificationRule: policy.falsificationRule,
+      blocksCampaignDomains: policy.blocksCampaignDomains,
       artifactToProduce: policy.artifactToProduce,
     };
   });
@@ -254,10 +408,6 @@ export const buildNhm2TileSourceMaterialCouponTestPlan = (
   const falsifyingItems = testItems.filter((item) => item.status === "falsifying");
   const satisfiedItems = testItems.filter((item) => item.status === "satisfied");
   const nextItem = falsifyingItems[0] ?? openItems[0] ?? null;
-  const supportStressPa =
-    surface.numericalMargins.requiredStressPa == null
-      ? SUPPORT_STRESS_PA
-      : surface.numericalMargins.requiredStressPa / MATERIAL_SAFETY_FACTOR;
   return {
     contractVersion: NHM2_TILE_SOURCE_MATERIAL_COUPON_TEST_PLAN_CONTRACT_VERSION,
     generatedAt: receipts.generatedAt,
@@ -270,23 +420,23 @@ export const buildNhm2TileSourceMaterialCouponTestPlan = (
     couponTarget: {
       material: "ultra_high_stress_tin",
       layerCount: 447,
-      operatingTemperatureK: 4,
+      operatingTemperatureK: OPERATING_TEMPERATURE_K,
       campaignLoadCaseRequired: true,
       supportStressPa,
       materialSafetyFactor: MATERIAL_SAFETY_FACTOR,
-      requiredFractureOrYieldStressPa: supportStressPa * MATERIAL_SAFETY_FACTOR,
-      couponRequiredCycleCount:
-        surface.numericalMargins.couponRequiredCycleCount == null
-          ? 1e9
-          : surface.numericalMargins.couponRequiredCycleCount,
-      roughnessRmsMaxMeters: 1e-10,
-      materialResponseFrequencyHz: 15e9,
+      requiredFractureOrYieldStressPa,
+      couponRequiredCycleCount,
+      roughnessRmsMaxMeters: ROUGHNESS_RMS_MAX_METERS,
+      materialResponseFrequencyHz: MATERIAL_RESPONSE_FREQUENCY_HZ,
       evidenceTierRequired: "measured_or_validated_simulation",
     },
     testItems,
     summary: {
       materialCouponReceiptStatus: surface.status,
       nextRequiredTestId: nextItem?.testId ?? "none",
+      nextRequiredArtifactToProduce: nextItem?.artifactToProduce ?? null,
+      nextRequiredFalsificationRule: nextItem?.falsificationRule ?? null,
+      nextBlockedCampaignDomains: nextItem?.blocksCampaignDomains ?? [],
       openTestCount: openItems.length,
       falsifyingTestCount: falsifyingItems.length,
       satisfiedTestCount: satisfiedItems.length,
@@ -343,13 +493,30 @@ export const isNhm2TileSourceMaterialCouponTestPlan = (
         typeof item.testId === "string" &&
         ["satisfied", "open", "falsifying"].includes(String(item.status)) &&
         Array.isArray(item.blockerIds) &&
+        isRecord(item.measurementTargets) &&
+        Object.values(item.measurementTargets).every(
+          (targetValue) =>
+            targetValue === null ||
+            typeof targetValue === "string" ||
+            typeof targetValue === "number" ||
+            typeof targetValue === "boolean",
+        ) &&
         typeof item.requiredMeasurement === "string" &&
         typeof item.acceptanceCriterion === "string" &&
+        typeof item.falsificationRule === "string" &&
+        Array.isArray(item.blocksCampaignDomains) &&
+        item.blocksCampaignDomains.every((domain) => typeof domain === "string") &&
         typeof item.artifactToProduce === "string",
     ) &&
     summary != null &&
     typeof summary.materialCouponReceiptStatus === "string" &&
     typeof summary.nextRequiredTestId === "string" &&
+    (summary.nextRequiredArtifactToProduce === null ||
+      typeof summary.nextRequiredArtifactToProduce === "string") &&
+    (summary.nextRequiredFalsificationRule === null ||
+      typeof summary.nextRequiredFalsificationRule === "string") &&
+    Array.isArray(summary.nextBlockedCampaignDomains) &&
+    summary.nextBlockedCampaignDomains.every((domain) => typeof domain === "string") &&
     typeof summary.openTestCount === "number" &&
     typeof summary.falsifyingTestCount === "number" &&
     typeof summary.satisfiedTestCount === "number" &&

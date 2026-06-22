@@ -652,8 +652,10 @@ export const publishNhm2TileSourceMaterialEvidenceReceipts = (args: {
   const evidenceGapRoadmap = buildNhm2TileSourceEvidenceGapRoadmap({
     materialEvidenceReceipts,
     physicalValidationPlan,
+    operatingBudgetReadiness,
     materialEvidenceReceiptsRef: outputRefs.materialEvidenceReceipts,
     physicalValidationPlanRef: outputRefs.physicalValidationPlan,
+    operatingBudgetReadinessRef: outputRefs.operatingBudgetReadiness,
   });
   if (!isNhm2TileSourceEvidenceGapRoadmap(evidenceGapRoadmap)) {
     throw new Error("built artifact failed nhm2_tile_source_evidence_gap_roadmap/v1 validation");

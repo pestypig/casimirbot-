@@ -31,6 +31,19 @@ export type Nhm2FullApparatusTensorTestId =
 
 export type Nhm2FullApparatusTensorTestStatus = "satisfied" | "open" | "falsifying";
 
+export type Nhm2FullApparatusTensorBlockedCampaignDomain =
+  | "source_side_same_basis_authority"
+  | "regional_residual_closure"
+  | "wall_t00_closure"
+  | "covariant_conservation"
+  | "qei_worldline_dossier"
+  | "observer_family_energy_conditions"
+  | "material_credibility_gate"
+  | "coupled_closure"
+  | "time_dependent_source_campaign";
+
+export type Nhm2FullApparatusTensorTargetValue = string | number | boolean | null;
+
 export type Nhm2FullApparatusTensorTestPlanItemV1 = {
   testId: Nhm2FullApparatusTensorTestId;
   status: Nhm2FullApparatusTensorTestStatus;
@@ -38,6 +51,9 @@ export type Nhm2FullApparatusTensorTestPlanItemV1 = {
   requiredMeasurement: string;
   acceptanceCriterion: string;
   artifactToProduce: string;
+  measurementTargets: Record<string, Nhm2FullApparatusTensorTargetValue>;
+  falsificationRule: string;
+  blocksCampaignDomains: Nhm2FullApparatusTensorBlockedCampaignDomain[];
 };
 
 export type Nhm2TileSourceFullApparatusTensorTestPlanV1 = {
@@ -69,6 +85,9 @@ export type Nhm2TileSourceFullApparatusTensorTestPlanV1 = {
     termCoverageFraction: number | null;
     fullApparatusTensorEvidenceReady: boolean;
     falsifiesCurrentCandidate: boolean;
+    nextRequiredArtifactToProduce: string | null;
+    nextRequiredFalsificationRule: string | null;
+    nextBlockedCampaignDomains: Nhm2FullApparatusTensorBlockedCampaignDomain[];
     physicalViabilityClaimAllowed: false;
     transportClaimAllowed: false;
     propulsionClaimAllowed: false;
@@ -89,6 +108,24 @@ export type BuildNhm2TileSourceFullApparatusTensorTestPlanInput = {
   materialEvidenceReceipts: Nhm2TileSourceMaterialEvidenceReceiptsV1;
   materialEvidenceReceiptsRef?: string | null;
 };
+
+const REQUIRED_TENSOR_VALUE_ARTIFACT_CONTRACT =
+  "nhm2_tile_source_full_apparatus_tensor_values/v1";
+const REQUIRED_TENSOR_COMPONENT_COUNT = 10;
+const REQUIRED_STRESS_ENERGY_TERM_COUNT = 9;
+const REQUIRED_REGION_COUNT = 3;
+
+const DEFAULT_BLOCKED_DOMAINS: Nhm2FullApparatusTensorBlockedCampaignDomain[] = [
+  "source_side_same_basis_authority",
+  "regional_residual_closure",
+  "wall_t00_closure",
+  "covariant_conservation",
+  "qei_worldline_dossier",
+  "observer_family_energy_conditions",
+  "material_credibility_gate",
+  "coupled_closure",
+  "time_dependent_source_campaign",
+];
 
 const TEST_POLICY: Record<
   Nhm2FullApparatusTensorTestId,
@@ -246,6 +283,145 @@ const TEST_POLICY: Record<
   },
 };
 
+const termIdByTestId: Partial<Record<Nhm2FullApparatusTensorTestId, string>> = {
+  support_structure_stress_energy: "supportStructureStressEnergy",
+  spacer_contact_stress_energy: "spacerContactStressEnergy",
+  active_control_field_energy: "activeControlFieldEnergy",
+  thermal_load_stress_energy: "thermalLoadStressEnergy",
+  patch_potential_electrostatic_stress: "patchPotentialElectrostaticStress",
+  fatigue_damage_evolution: "fatigueDamageEvolution",
+  layer_scaling_cross_terms: "layerScalingCrossTerms",
+  casimir_interaction_stress_energy: "casimirInteractionStressEnergy",
+  material_strain_energy: "materialStrainEnergy",
+};
+
+const regionIdByTestId: Partial<Record<Nhm2FullApparatusTensorTestId, string>> = {
+  regional_wall_coverage: "wall",
+  regional_hull_coverage: "hull",
+  regional_exterior_shell_coverage: "exterior_shell",
+};
+
+const measurementTargetsForTest = (
+  testId: Nhm2FullApparatusTensorTestId,
+): Record<string, Nhm2FullApparatusTensorTargetValue> => {
+  if (testId === "full_apparatus_tensor_provenance") {
+    return {
+      requiredEvidenceTier: "measured_or_validated_simulation",
+      requiredTensorValueArtifactContract: REQUIRED_TENSOR_VALUE_ARTIFACT_CONTRACT,
+      requiredTensorComponentCount: REQUIRED_TENSOR_COMPONENT_COUNT,
+      requiredTermCount: REQUIRED_STRESS_ENERGY_TERM_COUNT,
+      requiredRegionCount: REQUIRED_REGION_COUNT,
+      sourceSideOnly: true,
+      targetEchoForbidden: true,
+    };
+  }
+  if (testId === "same_chart") {
+    return { sameChartRequired: true, chartMustMatchSourceAuthority: true };
+  }
+  if (testId === "same_basis") {
+    return { sameBasisRequired: true, basisMustMatchSourceAuthority: true };
+  }
+  if (testId === "same_units") {
+    return { sameUnitsRequired: true, unitsMustMatchClosureEvidence: true };
+  }
+  if (testId === "no_metric_target_echo") {
+    return { noMetricTargetEchoRequired: true, targetDerivedFieldsForbidden: true };
+  }
+  if (testId === "T00_component") {
+    return {
+      componentGroup: "T00",
+      requiredComponentRefs: 1,
+      requiredDetailComponents: "T00",
+      silentlyZeroForbidden: true,
+    };
+  }
+  if (testId === "T0i_components") {
+    return {
+      componentGroup: "T0i",
+      requiredComponentRefs: 1,
+      requiredDetailComponents: "T01,T02,T03",
+      requiredTensorComponentCount: 3,
+      silentlyZeroForbidden: true,
+    };
+  }
+  if (testId === "diagonal_Tij_components") {
+    return {
+      componentGroup: "diagonalTij",
+      requiredComponentRefs: 1,
+      requiredDetailComponents: "T11,T22,T33",
+      requiredTensorComponentCount: 3,
+      silentlyZeroForbidden: true,
+    };
+  }
+  if (testId === "off_diagonal_Tij_components") {
+    return {
+      componentGroup: "offDiagonalTij",
+      requiredComponentRefs: 1,
+      requiredDetailComponents: "T12,T13,T23",
+      requiredTensorComponentCount: 3,
+      silentlyZeroForbidden: true,
+    };
+  }
+  const termId = termIdByTestId[testId];
+  if (termId != null) {
+    return {
+      termId,
+      requiredStressEnergyTermCount: REQUIRED_STRESS_ENERGY_TERM_COUNT,
+      termRefRequired: true,
+      termMustEnterTensorValueArtifact: true,
+    };
+  }
+  const regionId = regionIdByTestId[testId];
+  if (regionId != null) {
+    return {
+      requiredRegionCount: REQUIRED_REGION_COUNT,
+      regionId,
+      regionalSupportRefRequired: true,
+      canonicalSupportRequired: true,
+    };
+  }
+  return {};
+};
+
+const falsificationRuleForTest = (testId: Nhm2FullApparatusTensorTestId): string => {
+  if (testId === "full_apparatus_tensor_provenance") {
+    return "Missing measured-or-validated source-side full-apparatus tensor value artifact keeps the campaign inadmissible for source authority and downstream closure gates.";
+  }
+  if (testId === "same_chart") {
+    return "A chart mismatch means the source tensor is not comparable to the metric-required tensor in the same run.";
+  }
+  if (testId === "same_basis") {
+    return "A same-basis mismatch means regional residuals, conservation, QEI, and observer checks cannot consume the source tensor as authoritative.";
+  }
+  if (testId === "same_units") {
+    return "Unit mismatch invalidates regional source closure and downstream tensor comparisons.";
+  }
+  if (testId === "no_metric_target_echo") {
+    return "Metric-target copying, fitting, or unchecked echo invalidates source-side material authority.";
+  }
+  if (testId === "T00_component") {
+    return "Missing source-side T00 blocks wall T00 and regional source residual closure.";
+  }
+  if (testId === "T0i_components") {
+    return "Missing or zero-filled T01/T02/T03 blocks momentum density, conservation, and observer-family energy-condition checks.";
+  }
+  if (testId === "diagonal_Tij_components") {
+    return "Missing or zero-filled T11/T22/T33 blocks spatial-stress closure, conservation, and observer-family checks.";
+  }
+  if (testId === "off_diagonal_Tij_components") {
+    return "Missing or zero-filled T12/T13/T23 blocks shear/off-diagonal stress closure, conservation, and observer-family checks.";
+  }
+  const termId = termIdByTestId[testId];
+  if (termId != null) {
+    return `Missing ${termId} keeps the apparatus tensor scalar/proxy-incomplete and blocks material credibility plus downstream conservation, QEI, observer, and coupled-closure gates.`;
+  }
+  const regionId = regionIdByTestId[testId];
+  if (regionId != null) {
+    return `Missing canonical ${regionId} regional support prevents same-atlas regional residual closure and downstream gate coverage.`;
+  }
+  return "Missing full-apparatus tensor evidence keeps the candidate in diagnostic review.";
+};
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value != null && typeof value === "object" && !Array.isArray(value);
 
@@ -283,6 +459,9 @@ export const buildNhm2TileSourceFullApparatusTensorTestPlan = (
         requiredMeasurement: policy.requiredMeasurement,
         acceptanceCriterion: policy.acceptanceCriterion,
         artifactToProduce: policy.artifactToProduce,
+        measurementTargets: measurementTargetsForTest(testId),
+        falsificationRule: falsificationRuleForTest(testId),
+        blocksCampaignDomains: [...DEFAULT_BLOCKED_DOMAINS],
       };
     },
   );
@@ -319,6 +498,9 @@ export const buildNhm2TileSourceFullApparatusTensorTestPlan = (
       termCoverageFraction: surface.numericalMargins.termCoverageFraction ?? null,
       fullApparatusTensorEvidenceReady: surface.status === "pass",
       falsifiesCurrentCandidate: surface.status === "fail",
+      nextRequiredArtifactToProduce: nextItem?.artifactToProduce ?? null,
+      nextRequiredFalsificationRule: nextItem?.falsificationRule ?? null,
+      nextBlockedCampaignDomains: nextItem != null ? [...nextItem.blocksCampaignDomains] : [],
       physicalViabilityClaimAllowed: false,
       transportClaimAllowed: false,
       propulsionClaimAllowed: false,
@@ -372,7 +554,11 @@ export const isNhm2TileSourceFullApparatusTensorTestPlan = (
         Array.isArray(item.blockerIds) &&
         typeof item.requiredMeasurement === "string" &&
         typeof item.acceptanceCriterion === "string" &&
-        typeof item.artifactToProduce === "string",
+        typeof item.artifactToProduce === "string" &&
+        isRecord(item.measurementTargets) &&
+        typeof item.falsificationRule === "string" &&
+        Array.isArray(item.blocksCampaignDomains) &&
+        item.blocksCampaignDomains.every((domain) => typeof domain === "string"),
     ) &&
     summary != null &&
     typeof summary.fullApparatusTensorReceiptStatus === "string" &&
@@ -385,6 +571,11 @@ export const isNhm2TileSourceFullApparatusTensorTestPlan = (
     (summary.termCoverageFraction === null || typeof summary.termCoverageFraction === "number") &&
     typeof summary.fullApparatusTensorEvidenceReady === "boolean" &&
     typeof summary.falsifiesCurrentCandidate === "boolean" &&
+    (summary.nextRequiredArtifactToProduce === null ||
+      typeof summary.nextRequiredArtifactToProduce === "string") &&
+    (summary.nextRequiredFalsificationRule === null ||
+      typeof summary.nextRequiredFalsificationRule === "string") &&
+    Array.isArray(summary.nextBlockedCampaignDomains) &&
     summary.physicalViabilityClaimAllowed === false &&
     summary.transportClaimAllowed === false &&
     summary.propulsionClaimAllowed === false &&

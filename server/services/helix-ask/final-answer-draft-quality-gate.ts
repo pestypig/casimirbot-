@@ -405,6 +405,50 @@ const compoundComparisonCovered = (text: string): boolean =>
   textIncludesAny(text, [/\b(?:nucleus|atomic number|element identity|identity of the element)\b/i]) &&
   textIncludesAny(text, [/\b(?:consequence|therefore|because|this means|practical)\b/i]);
 
+const compoundLedgerEntries = (
+  payload?: Record<string, unknown> | null,
+  artifactLedger?: ArtifactLike[] | null,
+): Record<string, unknown>[] => {
+  const executionState =
+    readRecord(payload?.capability_itinerary_execution_state) ??
+    artifactPayloadByKind(artifactLedger, "capability_itinerary_execution_state");
+  return readArray(executionState?.compound_subgoal_ledger)
+    .map(readRecord)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+};
+
+const compoundLedgerText = (entries: Record<string, unknown>[]): string =>
+  entries
+    .map((entry) => [
+      readString(entry.requested_capability),
+      readString(entry.runtime_capability),
+      readString(entry.selected_capability),
+      readString(entry.executed_capability),
+      readString(entry.capability_family),
+      readString(entry.observation_kind),
+    ].filter(Boolean).join(" "))
+    .join(" ");
+
+const hasDocsCalculatorCompound = (
+  payload?: Record<string, unknown> | null,
+  artifactLedger?: ArtifactLike[] | null,
+): boolean => {
+  const entries = compoundLedgerEntries(payload, artifactLedger);
+  if (entries.length < 2 || !entries.every(compoundLedgerEntryHasSatisfiedObservation)) return false;
+  const text = compoundLedgerText(entries);
+  return /docs-viewer\.(?:locate_in_doc|doc_equation_context|search_docs|summarize_doc)|docs_viewer|doc_location|doc_evidence/i.test(text) &&
+    /scientific-calculator\.solve_expression|calculator|calculator_receipt/i.test(text);
+};
+
+const promptRequestsConnectionExplanation = (prompt: string): boolean =>
+  /\b(?:explain|show|describe|summari[sz]e)\b.{0,80}\b(?:connection|relation|relationship|how\s+.+(?:connects?|relates?)|why\s+.+matters)\b/i.test(prompt) ||
+  /\b(?:connect|relate|tie)\b.{0,80}\b(?:doc|evidence|citation|claim|calculator|calculation|result)\b/i.test(prompt);
+
+const docsCalculatorConnectionCovered = (text: string): boolean =>
+  textIncludesAny(text, [/\b(?:doc(?:ument)?|evidence|citation|claim|source|located|line|anchor)\b/i]) &&
+  textIncludesAny(text, [/\b(?:calculator|calculation|expression|computed|evaluated|result)\b/i]) &&
+  textIncludesAny(text, [/\b(?:because|therefore|connection|connect(?:s|ed)?|relates?|grounds?|shows?|uses?|used|means|link(?:s|ed)?)\b/i]);
+
 const sourceBackedModelSynthesisRouteFamilies = new Set<FinalAnswerDraftRouteFamily>([
   "capability_catalog",
   "context_reflection",
@@ -446,6 +490,13 @@ export function evaluateFinalAnswerDraftQualityGate(input: {
   const prompt = input.promptText ?? readString(input.payload?.active_prompt) ?? "";
   if (routeFamily === "model_only" && isCompoundComparisonPrompt(prompt) && !compoundComparisonCovered(text)) {
     violations.push("missing_required_prompt_parts");
+  }
+  if (
+    promptRequestsConnectionExplanation(prompt) &&
+    hasDocsCalculatorCompound(input.payload, input.artifactLedger) &&
+    !docsCalculatorConnectionCovered(text)
+  ) {
+    violations.push("generic_answer_for_compound_prompt");
   }
   if (routeFamily === "repo_evidence" || routeFamily === "scholarly_research" || routeFamily === "internet_search") {
     if (collectFinalAnswerDraftSupportRefs({

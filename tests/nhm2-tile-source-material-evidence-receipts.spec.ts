@@ -594,7 +594,11 @@ describe("NHM2 tile source material evidence receipts", () => {
       ) as { contractVersion?: string; summary?: { sourceCandidateStatus?: string } };
       const roadmapJson = JSON.parse(
         readFileSync(result.outputRefs.evidenceGapRoadmap, "utf8"),
-      ) as { contractVersion?: string; summary?: { nextBestItemId?: string } };
+      ) as {
+        contractVersion?: string;
+        sourceRefs?: { operatingBudgetReadinessRef?: string | null };
+        summary?: { nextBestItemId?: string; operatingBudgetsReady?: boolean | null };
+      };
       const falsificationReportJson = JSON.parse(
         readFileSync(result.outputRefs.falsificationReport, "utf8"),
       ) as { contractVersion?: string; disposition?: { reportStatus?: string } };
@@ -650,6 +654,10 @@ describe("NHM2 tile source material evidence receipts", () => {
       expect(planJson.summary?.sourceCandidateStatus).toBe("physically_credible_source_candidate");
       expect(roadmapJson.contractVersion).toBe("nhm2_tile_source_evidence_gap_roadmap/v1");
       expect(roadmapJson.summary?.nextBestItemId).toBe("none");
+      expect(roadmapJson.summary?.operatingBudgetsReady).toBe(true);
+      expect(roadmapJson.sourceRefs?.operatingBudgetReadinessRef).toBe(
+        result.outputRefs.operatingBudgetReadiness,
+      );
       expect(falsificationReportJson.contractVersion).toBe("nhm2_tile_source_falsification_report/v1");
       expect(falsificationReportJson.disposition?.reportStatus).toBe("candidate_evidence_complete");
       expect(authorityHandoffJson.contractVersion).toBe("nhm2_tile_source_authority_handoff/v1");
@@ -967,12 +975,24 @@ describe("NHM2 tile source material evidence receipts", () => {
       blocksCampaignPass: true,
     });
     expect(firstResolutionItem?.requiredChange).toContain("Supply measured or validated coupon data");
+    expect(firstResolutionItem?.nextEvidenceArtifact).toBe(
+      "receipt://material_coupon/provenance_v1",
+    );
+    expect(firstResolutionItem?.measurementTargetSummary).toContain(
+      "fracture/yield target is at least 2x",
+    );
+    expect(firstResolutionItem?.falsificationRule).toContain("447-layer TiN stack");
     expect(firstResolutionItem?.claimBoundary.resolutionQueueDoesNotSupplyEvidence).toBe(true);
     expect(tensorResolutionItem).toMatchObject({
       campaignDomain: "full_apparatus_tensor",
       resolutionMode: "supply_experimental_receipt",
       prevents: expect.arrayContaining(["source_side_same_basis_authority"]),
     });
+    expect(tensorResolutionItem?.nextEvidenceArtifact).toBe(
+      "receipt://full_apparatus_tensor/provenance_v1",
+    );
+    expect(tensorResolutionItem?.measurementTargetSummary).toContain("10 component refs");
+    expect(tensorResolutionItem?.falsificationRule).toContain("T0i/off-diagonal Tij");
     expect(report.readiness.materialEvidenceReady).toBe(false);
     expect(report.readiness.operatingBudgetsReady).toBe(false);
     expect(report.readiness.physicallyCredibleSourceCandidate).toBe(false);
@@ -1036,6 +1056,25 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(roadmap.summary.nextBestItemId).toBe("material_coupon");
     expect(roadmap.roadmapItems[0]?.operatingBudgetSurfaceId).toBe("material_coupon");
     expect(roadmap.roadmapItems[0]?.operatingBudgetReady).toBe(false);
+    expect(roadmap.roadmapItems[0]?.decisiveMeasurements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          measurementId: "coupon_fracture_yield_margin",
+          evidenceArtifact: "receipt://material_coupon/fracture_yield_margin_v1",
+          marginKey: "fractureOrYieldStressMargin",
+          requiredCorrectionKey: "fractureOrYieldStressShortfallPa",
+          currentMargin: null,
+          target: expect.stringContaining("1.09141417572e9 Pa"),
+          falsificationConsequence: expect.stringContaining("mechanically inadmissible"),
+        }),
+        expect.objectContaining({
+          measurementId: "coupon_material_response",
+          evidenceArtifact: "receipt://material_coupon/material_response_15ghz_4k_v1",
+          currentMargin: false,
+          requiredCorrectionValue: false,
+        }),
+      ]),
+    );
     expect(roadmap.roadmapItems[0]?.requiredCorrections).toMatchObject({
       missingCurveAndMapRefCount: 7,
       missingMaterialResponseRefCount: 2,
@@ -1074,6 +1113,9 @@ describe("NHM2 tile source material evidence receipts", () => {
       campaignDomain: "material_coupon_behavior",
       evidenceState: "missing_receipt",
       resolutionMode: "supply_experimental_receipt",
+      nextEvidenceArtifact: "receipt://material_coupon/provenance_v1",
+      measurementTargetSummary: expect.stringContaining("TiN/candidate-stack coupon"),
+      falsificationRule: expect.stringContaining("447-layer TiN stack"),
       requiredCorrections: expect.objectContaining({
         "material_coupon.missingCurveAndMapRefCount": 7,
         "material_coupon.missingMaterialResponseRefCount": 2,
@@ -1082,6 +1124,81 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(report.readiness.materialEvidenceReady).toBe(true);
     expect(report.readiness.operatingBudgetsReady).toBe(false);
     expect(report.summary.physicalViabilityClaimAllowed).toBe(false);
+  });
+
+  it("emits decisive go/no-go measurement rows for force-gap and full apparatus roadmap items", () => {
+    const receipts = buildNhm2TileSourceMaterialEvidenceReceipts();
+    const operatingBudgetReadiness = buildNhm2TileSourceOperatingBudgetReadiness({
+      materialCouponOperatingBudget: buildNhm2TileSourceMaterialCouponOperatingBudget({
+        generatedAt,
+      }),
+      forceGapLoadBudget: buildNhm2TileSourceForceGapLoadBudget({
+        generatedAt,
+      }),
+      roughnessPatchOperatingBudget: buildNhm2TileSourceRoughnessPatchOperatingBudget({
+        generatedAt,
+      }),
+      activeControlOperatingBudget: buildNhm2TileSourceActiveControlOperatingBudget({
+        generatedAt,
+      }),
+      fatigueLayerScalingOperatingBudget: buildNhm2TileSourceFatigueLayerScalingOperatingBudget({
+        generatedAt,
+      }),
+      fullApparatusTensorOperatingBudget: buildNhm2TileSourceFullApparatusTensorOperatingBudget({
+        generatedAt,
+      }),
+    });
+    const plan = buildNhm2TileSourcePhysicalValidationPlan({
+      generatedAt,
+      materialEvidenceReceipts: receipts,
+      operatingBudgetReadiness,
+    });
+    const roadmap = buildNhm2TileSourceEvidenceGapRoadmap({
+      materialEvidenceReceipts: receipts,
+      physicalValidationPlan: plan,
+      operatingBudgetReadiness,
+    });
+
+    const forceGap = roadmap.roadmapItems.find((item) => item.itemId === "force_gap_pull_in");
+    const fullTensor = roadmap.roadmapItems.find(
+      (item) => item.itemId === "full_apparatus_tensor",
+    );
+
+    expect(forceGap?.decisiveMeasurements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          measurementId: "pull_in_margin",
+          evidenceArtifact: "receipt://force_gap_pull_in/pull_in_margin_8nm_v1",
+          target: "pull-in margin >= 1",
+          noGoCriterion: "pull-in margin < 1",
+          falsificationConsequence: expect.stringContaining("gap collapses"),
+        }),
+        expect.objectContaining({
+          measurementId: "active_gap_authority",
+          requiredCorrectionKey: "activeGapControlAuthorityShortfallN",
+          target: "active authority >= 1.2x absolute stack load",
+        }),
+      ]),
+    );
+    expect(fullTensor?.decisiveMeasurements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          measurementId: "tensor_component_coverage",
+          currentMargin: 0,
+          requiredCorrectionValue: 10,
+          evidenceArtifact: "receipt://full_apparatus_tensor/component_detail_refs_v1",
+          falsificationConsequence: expect.stringContaining(
+            "source-side same-basis tensor authority cannot pass",
+          ),
+        }),
+        expect.objectContaining({
+          measurementId: "apparatus_stress_energy_terms",
+          requiredCorrectionKey: "stressEnergyTermRefMissingCount",
+          target: expect.stringContaining("9 term refs"),
+        }),
+      ]),
+    );
+    expect(roadmap.summary.physicalViabilityClaimAllowed).toBe(false);
   });
 
   it("adds same-basis source authority blockers to the full-apparatus falsification map", () => {
@@ -1162,6 +1279,11 @@ describe("NHM2 tile source material evidence receipts", () => {
       resolutionMode: "supply_same_basis_full_apparatus_tensor",
       firstBlocker: "wall:T12:full_apparatus_term_missing",
       blockerIds: expect.arrayContaining(["wall:T12:full_apparatus_term_missing"]),
+      nextEvidenceArtifact: "receipt://full_apparatus_tensor/component_detail_refs_v1",
+      measurementTargetSummary: expect.stringContaining(
+        "nhm2_tile_source_full_apparatus_tensor_values/v1",
+      ),
+      falsificationRule: expect.stringContaining("source-side same-basis T_munu"),
       requiredCorrections: expect.objectContaining({
         "full_apparatus_tensor.missingFullApparatusTensorComponentRefs": ["wall:T12"],
       }),
@@ -1302,6 +1424,9 @@ describe("NHM2 tile source material evidence receipts", () => {
       evidenceState: "failing_margin",
       resolutionMode: "revise_architecture_or_operating_margin",
       marginInterpretation: "below_one_fails",
+      nextEvidenceArtifact: "receipt://force_gap_pull_in/force_gradient_8nm_v1",
+      measurementTargetSummary: expect.stringContaining("pull-in margin > 1"),
+      falsificationRule: expect.stringContaining("mechanically inadmissible"),
       requiredCorrections: expect.objectContaining({
         "force_gap_load.pullInMarginDefinition":
           "effectiveSpringConstantNPerM / idealForceGradientNPerM",
@@ -1326,6 +1451,9 @@ describe("NHM2 tile source material evidence receipts", () => {
       evidenceState: "downstream_blocked",
       resolutionMode: "rerun_downstream_gate",
       firstBlocker: "regional_residual_closure_incomplete",
+      nextEvidenceArtifact: "artifact://nhm2/downstream-gates/frozen-chain-rerun-v1",
+      measurementTargetSummary: expect.stringContaining("observer-family WEC/NEC/SEC/DEC"),
+      falsificationRule: expect.stringContaining("do not pass together"),
       blocksCampaignPass: true,
     });
     expect(pullIn?.surfaceId).toBe("force_gap_pull_in");
@@ -1668,9 +1796,33 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(plan.couponTarget.requiredFractureOrYieldStressPa).toBeCloseTo(1.091414175716e9);
     expect(plan.summary.materialCouponReceiptStatus).toBe("missing");
     expect(plan.summary.nextRequiredTestId).toBe("coupon_provenance");
+    expect(plan.summary.nextRequiredArtifactToProduce).toBe(
+      "receipt://material_coupon/provenance_v1",
+    );
+    expect(plan.summary.nextRequiredFalsificationRule).toContain(
+      "cannot support material credibility",
+    );
+    expect(plan.summary.nextBlockedCampaignDomains).toEqual(
+      expect.arrayContaining([
+        "force_gap_pull_in",
+        "full_apparatus_tensor",
+        "material_credibility_gate",
+      ]),
+    );
     expect(plan.summary.couponEvidenceReady).toBe(false);
     expect(fractureYield?.status).toBe("open");
     expect(fractureYield?.blockerIds).toContain("fracture_or_yield_margin_missing");
+    expect(fractureYield?.measurementTargets).toMatchObject({
+      supportStressPa: 5.45707087858e8,
+      materialSafetyFactor: 2,
+    });
+    expect(fractureYield?.measurementTargets.fractureOrYieldStressMinPa).toBeCloseTo(
+      1.091414175716e9,
+    );
+    expect(fractureYield?.falsificationRule).toContain("below 2x");
+    expect(fractureYield?.blocksCampaignDomains).toEqual(
+      expect.arrayContaining(["fatigue_layer_scaling", "full_apparatus_tensor"]),
+    );
     expect(plan.claimBoundary.measuredCouponIsNotFullApparatusTensor).toBe(true);
     expect(plan.summary.physicalViabilityClaimAllowed).toBe(false);
   });
@@ -1684,6 +1836,15 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(plan.summary.nextRequiredTestId).toBe("coupon_provenance");
     expect(provenance?.status).toBe("open");
     expect(provenance?.blockerIds).toContain("material_coupon_receipt_missing");
+    expect(provenance?.measurementTargets).toMatchObject({
+      requiredEvidenceTier: "measured_or_validated_simulation",
+      requiredCurveAndMapRefCount: 7,
+      requiredCampaignCompatibilityRefCount: 2,
+      requiredMaterialResponseRefCount: 2,
+    });
+    expect(provenance?.blocksCampaignDomains).toEqual(
+      expect.arrayContaining(["roughness_patch_potential", "material_credibility_gate"]),
+    );
     expect(plan.summary.couponEvidenceReady).toBe(false);
   });
 
@@ -1726,9 +1887,17 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(receipts.summary.candidateDisposition).toBe("falsified");
     expect(plan.summary.materialCouponReceiptStatus).toBe("fail");
     expect(plan.summary.nextRequiredTestId).toBe("fracture_yield_margin");
+    expect(plan.summary.nextRequiredArtifactToProduce).toBe(
+      "receipt://material_coupon/fracture_yield_margin_v1",
+    );
+    expect(plan.summary.nextRequiredFalsificationRule).toContain("447-layer TiN load path");
+    expect(plan.summary.nextBlockedCampaignDomains).toContain("full_apparatus_tensor");
     expect(plan.summary.falsifiesCurrentCandidate).toBe(true);
     expect(fractureYield?.status).toBe("falsifying");
     expect(fractureYield?.blockerIds).toContain("fracture_or_yield_margin_below_2x_support_stress");
+    expect(fractureYield?.measurementTargets.fractureOrYieldStressMinPa).toBeCloseTo(
+      1.091414175716e9,
+    );
     expect(plan.summary.transportClaimAllowed).toBe(false);
   });
 
@@ -1977,8 +2146,30 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(plan.forceGapTarget.forceGradientConsistencyMin).toBe(0.75);
     expect(plan.summary.forceGapReceiptStatus).toBe("missing");
     expect(plan.summary.nextRequiredTestId).toBe("force_gap_provenance");
+    expect(plan.summary.nextRequiredArtifactToProduce).toBe(
+      "receipt://force_gap_pull_in/provenance_v1",
+    );
+    expect(plan.summary.nextRequiredFalsificationRule).toContain(
+      "cannot identify the apparatus",
+    );
+    expect(plan.summary.nextBlockedCampaignDomains).toEqual(
+      expect.arrayContaining([
+        "roughness_patch_potential",
+        "active_control_energy_noise_heat_timing",
+        "full_apparatus_tensor",
+        "material_credibility_gate",
+        "covariant_conservation",
+      ]),
+    );
     expect(provenance?.status).toBe("open");
     expect(provenance?.blockerIds).toContain("force_gap_curve_and_pull_in_margin_at_8nm_missing");
+    expect(provenance?.measurementTargets).toMatchObject({
+      requiredEvidenceTier: "measured_or_validated_simulation",
+      requiredCurveAndModelRefCount: 7,
+      operatingGapMeters: 8e-9,
+      layerCount: 447,
+    });
+    expect(provenance?.artifactToProduce).toBe("receipt://force_gap_pull_in/provenance_v1");
     expect(plan.summary.forceGapEvidenceReady).toBe(false);
     expect(plan.claimBoundary.forceGapPassIsNotFullApparatusTensor).toBe(true);
   });
@@ -2015,13 +2206,39 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(plan.summary.pullInMargin).toBeLessThan(1);
     expect(plan.summary.stictionMargin).toBeLessThan(1);
     expect(plan.summary.activeAuthorityMargin).toBeLessThan(1);
+    expect(plan.summary.nextRequiredArtifactToProduce).toBe(
+      "receipt://force_gap_pull_in/force_gradient_8nm_v1",
+    );
+    expect(plan.summary.nextRequiredFalsificationRule).toContain("pull-in analysis");
+    expect(plan.summary.nextBlockedCampaignDomains).toContain("covariant_conservation");
     expect(plan.summary.falsifiesCurrentCandidate).toBe(true);
     expect(forceGradient?.status).toBe("falsifying");
     expect(forceGradient?.blockerIds).toContain("force_gradient_inconsistent_with_force_curve_at_8nm");
+    expect(forceGradient?.measurementTargets).toMatchObject({
+      operatingGapMeters: 8e-9,
+      idealForceGradientNPerM: expect.closeTo(7.094192142140448e12, 3),
+      forceGradientConsistencyMin: 0.75,
+      gradientConsistencyFormula: "symmetric_ratio(dFdg, 4*abs(F)/g)",
+    });
     expect(pullIn?.status).toBe("falsifying");
+    expect(pullIn?.measurementTargets).toMatchObject({
+      pullInMarginMin: 1,
+      pullInMarginFormula: "effectiveSpringConstantNPerM / forceGradientNPerM",
+      idealGradientReferenceNPerM: expect.closeTo(7.094192142140448e12, 3),
+    });
     expect(stiction?.status).toBe("falsifying");
+    expect(stiction?.measurementTargets).toMatchObject({
+      stictionMarginMin: 1,
+      stictionProtocolRefRequired: true,
+    });
     expect(activeAuthority?.status).toBe("falsifying");
     expect(activeAuthority?.blockerIds).toContain("active_gap_control_authority_below_1p2x_force");
+    expect(activeAuthority?.measurementTargets).toMatchObject({
+      activeControlAuthorityFactorMin: 1.2,
+      ideal447LayerStackForceAbsN: expect.closeTo(14188.384284280897, 3),
+      activeGapControlAuthorityMinN: expect.closeTo(17026.061141137077, 3),
+    });
+    expect(activeAuthority?.falsificationRule).toContain("below 1.2x");
     expect(plan.summary.transportClaimAllowed).toBe(false);
   });
 
@@ -2175,8 +2392,32 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(plan.roughnessPatchTarget.asperityMaxMeters).toBe(4e-9);
     expect(plan.summary.roughnessPatchReceiptStatus).toBe("missing");
     expect(plan.summary.nextRequiredTestId).toBe("roughness_patch_provenance");
+    expect(plan.summary.nextRequiredArtifactToProduce).toBe(
+      "receipt://roughness_patch_metrology/provenance_v1",
+    );
+    expect(plan.summary.nextRequiredFalsificationRule).toContain(
+      "paired 8 nm surfaces",
+    );
+    expect(plan.summary.nextBlockedCampaignDomains).toEqual(
+      expect.arrayContaining([
+        "force_gap_pull_in",
+        "active_control_energy_noise_heat_timing",
+        "full_apparatus_tensor",
+        "material_credibility_gate",
+        "covariant_conservation",
+      ]),
+    );
     expect(provenance?.status).toBe("open");
     expect(provenance?.blockerIds).toContain("roughness_asperity_tail_and_patch_potential_map_missing");
+    expect(provenance?.measurementTargets).toMatchObject({
+      requiredEvidenceTier: "measured_or_validated_simulation",
+      requiredMapAndModelRefCount: 8,
+      operatingGapMeters: 8e-9,
+      pairedSurfaceRegistrationRequired: true,
+    });
+    expect(provenance?.artifactToProduce).toBe(
+      "receipt://roughness_patch_metrology/provenance_v1",
+    );
     expect(plan.summary.roughnessPatchEvidenceReady).toBe(false);
     expect(plan.claimBoundary.roughnessPatchPassIsNotFullApparatusTensor).toBe(true);
   });
@@ -2213,12 +2454,45 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(plan.summary.asperityMaxMargin).toBeLessThan(1);
     expect(plan.summary.patchVoltageRmsVolts).toBe(0.02);
     expect(plan.summary.residualElectrostaticForceFraction).toBe(0.08);
+    expect(plan.summary.nextRequiredArtifactToProduce).toBe(
+      "receipt://roughness_patch_metrology/roughness_rms_v1",
+    );
+    expect(plan.summary.nextRequiredFalsificationRule).toContain("surface process");
+    expect(plan.summary.nextBlockedCampaignDomains).toEqual(
+      expect.arrayContaining([
+        "force_gap_pull_in",
+        "active_control_energy_noise_heat_timing",
+        "full_apparatus_tensor",
+        "material_credibility_gate",
+      ]),
+    );
     expect(plan.summary.falsifiesCurrentCandidate).toBe(true);
     expect(roughness?.status).toBe("falsifying");
+    expect(roughness?.measurementTargets).toMatchObject({
+      roughnessRmsMaxMeters: 1e-10,
+      roughnessMapLateralResolutionMaxMeters: 5e-10,
+      roughnessScanAreaFractionMin: 0.95,
+      operatingGapMeters: 8e-9,
+    });
     expect(asperityTail?.status).toBe("falsifying");
+    expect(asperityTail?.measurementTargets).toMatchObject({
+      asperityP999MaxMeters: 3e-9,
+      asperityMaxMeters: 4e-9,
+      minimumGapClearanceRequiredMeters: 4e-9,
+      operatingGapMeters: 8e-9,
+    });
     expect(patchVoltage?.status).toBe("falsifying");
+    expect(patchVoltage?.measurementTargets).toMatchObject({
+      patchVoltageRmsMaxVolts: 0.01,
+      patchVoltageCorrelationLengthPositive: true,
+    });
     expect(residual?.status).toBe("falsifying");
     expect(residual?.blockerIds).toContain("residual_electrostatic_force_correction_above_5pct_or_missing");
+    expect(residual?.measurementTargets).toMatchObject({
+      residualElectrostaticForceFractionMax: 0.05,
+      residualElectrostaticForceMaxN: expect.closeTo(709.419214214, 3),
+    });
+    expect(residual?.falsificationRule).toContain("exceeds 5%");
     expect(plan.summary.transportClaimAllowed).toBe(false);
   });
 
@@ -2456,8 +2730,27 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(plan.activeControlTarget.gapNoiseRmsMaxMeters).toBeCloseTo(8e-11);
     expect(plan.summary.activeControlReceiptStatus).toBe("missing");
     expect(plan.summary.nextRequiredTestId).toBe("active_control_provenance");
+    expect(plan.summary.nextRequiredArtifactToProduce).toBe(
+      "receipt://active_control/provenance_v1",
+    );
+    expect(plan.summary.nextRequiredFalsificationRule).toContain("active-control trace");
+    expect(plan.summary.nextBlockedCampaignDomains).toEqual(
+      expect.arrayContaining([
+        "full_apparatus_tensor",
+        "material_credibility_gate",
+        "covariant_conservation",
+        "time_dependent_source_campaign",
+      ]),
+    );
     expect(provenance?.status).toBe("open");
     expect(provenance?.blockerIds).toContain("active_gap_control_energy_and_noise_missing");
+    expect(provenance?.measurementTargets).toMatchObject({
+      requiredEvidenceTier: "measured_or_validated_simulation",
+      requiredTraceRefCount: 14,
+      requiredFailureModeCount: 5,
+      switchingRateHz: 15e9,
+    });
+    expect(provenance?.blocksCampaignDomains).toContain("time_dependent_source_campaign");
     expect(plan.summary.activeControlEvidenceReady).toBe(false);
     expect(plan.claimBoundary.activeControlPassIsNotFullApparatusTensor).toBe(true);
     expect(plan.summary.physicalViabilityClaimAllowed).toBe(false);
@@ -2496,6 +2789,10 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(receipts.summary.candidateDisposition).toBe("falsified");
     expect(plan.summary.activeControlReceiptStatus).toBe("fail");
     expect(plan.summary.nextRequiredTestId).toBe("active_control_provenance");
+    expect(plan.summary.nextRequiredArtifactToProduce).toBe(
+      "receipt://active_control/provenance_v1",
+    );
+    expect(plan.summary.nextBlockedCampaignDomains).toContain("time_dependent_source_campaign");
     expect(plan.summary.bandwidthMargin).toBeLessThan(1);
     expect(plan.summary.noiseMargin).toBeLessThan(1);
     expect(plan.summary.timingMargin).toBeLessThan(1);
@@ -2508,12 +2805,42 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(timingJitter?.status).toBe("falsifying");
     expect(failureMode?.status).toBe("falsifying");
     expect(controlBandwidth?.blockerIds).toContain("gap_lock_bandwidth_below_2x_switching_rate");
+    expect(controlBandwidth?.measurementTargets).toMatchObject({
+      switchingRateHz: 15e9,
+      bandwidthMinHz: 30e9,
+      controllerPhaseMarginMinDegrees: 45,
+      controllerGainMarginMinDb: 6,
+    });
+    expect(controlBandwidth?.falsificationRule).toContain("30 GHz");
     expect(gapNoise?.blockerIds).toContain("gap_noise_above_1pct_gap");
     expect(gapNoise?.blockerIds).toContain("active_control_noise_spectrum_ref_missing");
+    expect(gapNoise?.measurementTargets).toMatchObject({
+      operatingGapMeters: 8e-9,
+      gapNoiseRmsMaxMeters: 8e-11,
+      noiseSpectrumRefRequired: true,
+    });
     expect(timingJitter?.blockerIds).toContain("timing_jitter_above_0p1_cycle");
+    expect(timingJitter?.measurementTargets.timingJitterMaxSeconds).toBeCloseTo(
+      6.666666666666667e-12,
+      18,
+    );
+    expect(timingJitter?.measurementTargets.phaseNoiseMaxSeconds).toBeCloseTo(
+      3.3333333333333333e-12,
+      18,
+    );
     expect(heatLoad?.blockerIds).toContain("active_control_heat_load_missing");
+    expect(heatLoad?.measurementTargets).toMatchObject({
+      thermalSinkCapacityFactorMin: 1.2,
+      heatLoadTraceRefRequired: true,
+      thermalModelRefRequired: true,
+    });
     expect(failureMode?.blockerIds).toContain("active_control_failure_mode_ref_missing");
     expect(failureMode?.blockerIds).toContain("active_control_loss_of_lock_failure_mode_missing");
+    expect(failureMode?.measurementTargets).toMatchObject({
+      requiredFailureModeCount: 5,
+      failSafeShutdownCoverageRequired: true,
+    });
+    expect(failureMode?.falsificationRule).toContain("fail-safe");
     expect(plan.summary.transportClaimAllowed).toBe(false);
   });
 
@@ -2814,6 +3141,11 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(activeSurface?.numericalMargins.activeControlProvenanceRefsAvailable).toBe(0);
     expect(plan.summary.nextRequiredTestId).toBe("active_control_provenance");
     expect(provenance?.status).toBe("falsifying");
+    expect(provenance?.measurementTargets.requiredTraceRefCount).toBe(14);
+    expect(provenance?.falsificationRule).toContain("trace");
+    expect(plan.summary.nextRequiredArtifactToProduce).toBe(
+      "receipt://active_control/provenance_v1",
+    );
     expect(budget.summary.activeControlEvidenceReady).toBe(false);
     expect(budget.derivedOperatingBudget.activeControlTraceRefsAvailable).toBe(false);
     expect(budget.blockers).toEqual(
@@ -2874,6 +3206,20 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(plan.fatigueLayerScalingTarget.interlayerAdhesionMarginMin).toBe(1);
     expect(plan.summary.combinedReceiptStatus).toBe("missing");
     expect(plan.summary.nextRequiredTestId).toBe("fatigue_scaling_provenance");
+    expect(plan.summary.nextRequiredArtifactToProduce).toBe(
+      "receipt://fatigue_layer_scaling/provenance_v1",
+    );
+    expect(plan.summary.nextRequiredFalsificationRule).toContain("source-retention maps");
+    expect(plan.summary.nextBlockedCampaignDomains).toEqual(
+      expect.arrayContaining([
+        "material_coupon_behavior",
+        "active_control_energy_noise_heat_timing",
+        "full_apparatus_tensor",
+        "material_credibility_gate",
+        "covariant_conservation",
+        "time_dependent_source_campaign",
+      ]),
+    );
     expect(provenance?.status).toBe("open");
     expect(provenance?.blockerIds).toEqual(
       expect.arrayContaining([
@@ -2881,6 +3227,13 @@ describe("NHM2 tile source material evidence receipts", () => {
         "layer_scaling_nonadditivity_measurement_missing",
       ]),
     );
+    expect(provenance?.measurementTargets).toMatchObject({
+      requiredEvidenceTier: "measured_or_validated_simulation",
+      requiredFatigueProvenanceRefCount: 8,
+      requiredLayerScalingProvenanceRefCount: 9,
+      layerCount: 447,
+    });
+    expect(provenance?.blocksCampaignDomains).toContain("time_dependent_source_campaign");
     expect(plan.summary.fatigueLayerScalingEvidenceReady).toBe(false);
     expect(plan.claimBoundary.fatigueLayerScalingPassIsNotFullApparatusTensor).toBe(true);
     expect(plan.summary.physicalViabilityClaimAllowed).toBe(false);
@@ -2949,6 +3302,17 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(plan.summary.layerScalingReceiptStatus).toBe("fail");
     expect(plan.summary.combinedReceiptStatus).toBe("fail");
     expect(plan.summary.nextRequiredTestId).toBe("cycle_margin");
+    expect(plan.summary.nextRequiredArtifactToProduce).toBe(
+      "receipt://fatigue_layer_scaling/cycle_margin_v1",
+    );
+    expect(plan.summary.nextRequiredFalsificationRule).toContain("fatigue-falsified");
+    expect(plan.summary.nextBlockedCampaignDomains).toEqual(
+      expect.arrayContaining([
+        "full_apparatus_tensor",
+        "material_credibility_gate",
+        "time_dependent_source_campaign",
+      ]),
+    );
     expect(plan.summary.cycleMargin).toBeLessThan(1);
     expect(plan.summary.thermalCycleDriftMargin).toBeLessThan(1);
     expect(plan.summary.creepDriftMargin).toBeLessThan(1);
@@ -2965,13 +3329,45 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(supportCoupling?.status).toBe("falsifying");
     expect(sourceTensorRetention?.status).toBe("falsifying");
     expect(cycleMargin?.blockerIds).toContain("fatigue_cycle_margin_below_required");
+    expect(cycleMargin?.measurementTargets).toMatchObject({
+      cycleMarginMin: 1,
+      cycleMarginFormula: "cycleCountToFailure / requiredCycleCount",
+    });
     expect(thermalCycleDrift?.blockerIds).toContain("thermal_cycle_drift_above_0p01");
+    expect(thermalCycleDrift?.measurementTargets).toMatchObject({
+      thermalCycleDriftFractionMax: 0.01,
+      thermalCycleRefRequired: true,
+    });
     expect(creepDrift?.blockerIds).toContain("creep_drift_above_0p01");
     expect(scalingEfficiency?.blockerIds).toContain("layer_scaling_efficiency_below_0p9");
+    expect(scalingEfficiency?.measurementTargets).toMatchObject({
+      layerCount: 447,
+      layerScalingEfficiencyMin: 0.9,
+      layerScalingMapRefRequired: true,
+      multiphysicsCouplingRefRequired: true,
+    });
     expect(nonadditivity?.blockerIds).toContain("layer_nonadditivity_above_0p1");
+    expect(nonadditivity?.measurementTargets).toMatchObject({
+      layerNonadditivityFractionMax: 0.1,
+      layerNonadditivityModelRefRequired: true,
+    });
     expect(activeArea?.blockerIds).toContain("active_area_retention_below_0p6");
+    expect(activeArea?.measurementTargets.activeAreaRetentionMin).toBe(0.6);
+    expect(activeArea?.measurementTargets.effectiveActiveLayerCountMin).toBeCloseTo(
+      217.242,
+      3,
+    );
     expect(supportCoupling?.blockerIds).toContain("support_coupling_status_not_pass");
+    expect(supportCoupling?.falsificationRule).toContain("support coupling");
     expect(sourceTensorRetention?.blockerIds).toContain("source_tensor_retention_below_0p9");
+    expect(sourceTensorRetention?.measurementTargets).toMatchObject({
+      sourceTensorRetentionFractionMin: 0.9,
+      sourceTensorRetentionMapRefRequired: true,
+    });
+    expect(sourceTensorRetention?.measurementTargets.effectiveSourceTensorLayerCountMin).toBeCloseTo(
+      402.3,
+      3,
+    );
     expect(plan.summary.transportClaimAllowed).toBe(false);
   });
 
@@ -3248,6 +3644,12 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(scalingSurface?.numericalMargins.layerScalingProvenanceRefsAvailable).toBe(0);
     expect(plan.summary.nextRequiredTestId).toBe("fatigue_scaling_provenance");
     expect(provenance?.status).toBe("falsifying");
+    expect(provenance?.measurementTargets.requiredFatigueProvenanceRefCount).toBe(8);
+    expect(provenance?.measurementTargets.requiredLayerScalingProvenanceRefCount).toBe(9);
+    expect(provenance?.falsificationRule).toContain("source-retention maps");
+    expect(plan.summary.nextRequiredArtifactToProduce).toBe(
+      "receipt://fatigue_layer_scaling/provenance_v1",
+    );
     expect(budget.summary.fatigueLayerScalingEvidenceReady).toBe(false);
     expect(budget.derivedOperatingBudget.fatigueProvenanceRefsAvailable).toBe(false);
     expect(budget.derivedOperatingBudget.layerScalingProvenanceRefsAvailable).toBe(false);
@@ -3328,8 +3730,38 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(plan.fullApparatusTensorTarget.targetEchoForbidden).toBe(true);
     expect(plan.summary.fullApparatusTensorReceiptStatus).toBe("missing");
     expect(plan.summary.nextRequiredTestId).toBe("full_apparatus_tensor_provenance");
+    expect(plan.summary.nextRequiredArtifactToProduce).toBe(
+      "receipt://full_apparatus_tensor/provenance_v1",
+    );
+    expect(plan.summary.nextRequiredFalsificationRule).toContain(
+      "full-apparatus tensor value artifact",
+    );
+    expect(plan.summary.nextBlockedCampaignDomains).toEqual(
+      expect.arrayContaining([
+        "source_side_same_basis_authority",
+        "regional_residual_closure",
+        "wall_t00_closure",
+        "covariant_conservation",
+        "qei_worldline_dossier",
+        "observer_family_energy_conditions",
+        "material_credibility_gate",
+        "coupled_closure",
+        "time_dependent_source_campaign",
+      ]),
+    );
     expect(provenance?.status).toBe("open");
     expect(provenance?.blockerIds).toContain("support_drive_terms_in_full_apparatus_Tmunu_missing");
+    expect(provenance?.measurementTargets).toMatchObject({
+      requiredEvidenceTier: "measured_or_validated_simulation",
+      requiredTensorValueArtifactContract: "nhm2_tile_source_full_apparatus_tensor_values/v1",
+      requiredTensorComponentCount: 10,
+      requiredTermCount: 9,
+      requiredRegionCount: 3,
+      sourceSideOnly: true,
+      targetEchoForbidden: true,
+    });
+    expect(provenance?.falsificationRule).toContain("source-side full-apparatus tensor");
+    expect(provenance?.blocksCampaignDomains).toContain("coupled_closure");
     expect(plan.summary.fullApparatusTensorEvidenceReady).toBe(false);
     expect(plan.claimBoundary.scalarCasimirT00IsNotFullApparatusTensor).toBe(true);
     expect(plan.summary.physicalViabilityClaimAllowed).toBe(false);
@@ -3392,17 +3824,48 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(receipts.summary.candidateDisposition).toBe("falsified");
     expect(plan.summary.fullApparatusTensorReceiptStatus).toBe("fail");
     expect(plan.summary.nextRequiredTestId).toBe("same_basis");
+    expect(plan.summary.nextRequiredArtifactToProduce).toBe(
+      "receipt://full_apparatus_tensor/same_basis_v1",
+    );
+    expect(plan.summary.nextRequiredFalsificationRule).toContain("same-basis mismatch");
     expect(plan.summary.componentCoverageFraction).toBe(0.5);
     expect(plan.summary.termCoverageFraction).toBeCloseTo(1 / 9);
     expect(plan.summary.falsifiesCurrentCandidate).toBe(true);
     expect(sameBasis?.status).toBe("falsifying");
+    expect(sameBasis?.measurementTargets).toMatchObject({
+      sameBasisRequired: true,
+      basisMustMatchSourceAuthority: true,
+    });
     expect(noEcho?.status).toBe("falsifying");
+    expect(noEcho?.measurementTargets.noMetricTargetEchoRequired).toBe(true);
     expect(t0i?.status).toBe("falsifying");
+    expect(t0i?.measurementTargets).toMatchObject({
+      componentGroup: "T0i",
+      requiredTensorComponentCount: 3,
+      silentlyZeroForbidden: true,
+    });
+    expect(t0i?.falsificationRule).toContain("T01/T02/T03");
     expect(offDiagonal?.status).toBe("falsifying");
+    expect(offDiagonal?.measurementTargets).toMatchObject({
+      componentGroup: "offDiagonalTij",
+      requiredTensorComponentCount: 3,
+      silentlyZeroForbidden: true,
+    });
+    expect(offDiagonal?.falsificationRule).toContain("T12/T13/T23");
     expect(support?.status).toBe("falsifying");
     expect(activeControl?.status).toBe("falsifying");
+    expect(activeControl?.measurementTargets).toMatchObject({
+      termId: "activeControlFieldEnergy",
+      termRefRequired: true,
+      termMustEnterTensorValueArtifact: true,
+    });
     expect(casimir?.status).toBe("satisfied");
     expect(hull?.status).toBe("falsifying");
+    expect(hull?.measurementTargets).toMatchObject({
+      regionId: "hull",
+      regionalSupportRefRequired: true,
+      canonicalSupportRequired: true,
+    });
     expect(t0i?.blockerIds).toContain("full_apparatus_T0i_missing");
     expect(offDiagonal?.blockerIds).toContain("full_apparatus_off_diagonal_Tij_missing");
     expect(support?.blockerIds).toContain("full_apparatus_support_structure_stress_energy_missing");

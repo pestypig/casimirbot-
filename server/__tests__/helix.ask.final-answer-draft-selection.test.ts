@@ -64,6 +64,20 @@ const liveSourceMailContract = (turnId: string) => ({
   raw_content_included: false,
 });
 
+const docsEvidenceContract = (turnId: string) => ({
+  schema: "helix.route_product_contract.v1",
+  turn_id: turnId,
+  thread_id: "thread:test",
+  source_target: "docs_viewer",
+  allowed_terminal_artifact_kinds: ["doc_evidence_synthesis_answer", "typed_failure", "request_user_input"],
+  forbidden_terminal_artifact_kinds: ["direct_answer_text", "model_synthesized_answer", "tool_receipt"],
+  side_artifact_kinds_allowed: ["doc_location_matches", "calculator_receipt", "final_answer_draft"],
+  required_artifact_refs: [],
+  precedence_reason: "test",
+  assistant_answer: false,
+  raw_content_included: false,
+});
+
 const addModelOnlyRuntimeProof = (payload: Record<string, unknown>): void => {
   payload.agent_runtime_loop = {
     iterations: [
@@ -210,6 +224,292 @@ const addCalculatorRuntimeProof = (
 };
 
 describe("final_answer_draft terminal selection", () => {
+  it("materializes capability help summary from a runtime capability registry observation", () => {
+    const turnId = "ask:test:catalog-observation-materializes-help";
+    const registryRef = `${turnId}:capability_registry`;
+    const artifacts = [
+      {
+        artifact_id: registryRef,
+        kind: "capability_registry",
+        payload: {
+          schema: "helix.capability_registry.v1",
+          capability_catalog_observation: {
+            active_dynamic_tool_count: 4,
+            retired_dynamic_tool_count: 1,
+            information_reflection: [
+              "docs-viewer.locate_in_doc",
+              "repo-code.search_concept",
+              "helix_ask.reflect_theory_context",
+            ],
+            utility: ["workspace_os.status", "scientific-calculator.solve_expression"],
+          },
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      active_prompt: "What tools are available for Helix Ask to use?",
+      route_product_contract: {
+        ...modelOnlyContract(turnId),
+        source_target: "capability_catalog",
+        allowed_terminal_artifact_kinds: ["capability_help_summary", "typed_failure", "request_user_input"],
+        forbidden_terminal_artifact_kinds: ["debug_evidence_diagnosis", "repo_code_evidence_answer", "direct_answer_text"],
+        side_artifact_kinds_allowed: ["capability_registry"],
+      },
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "capability_help",
+        required_terminal_kind: "capability_help_summary",
+      },
+      goal_satisfaction_evaluation: {
+        schema: "helix.goal_satisfaction_evaluation.v1",
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+        required_evidence: [
+          { kind: "capability_registry", satisfied: true, evidence_ref: registryRef },
+        ],
+      },
+      agent_runtime_loop: {
+        schema: "helix.agent_runtime_loop.v1",
+        iterations: [
+          {
+            iteration: 1,
+            decision_id: `${turnId}:decision:catalog`,
+            next_step: "tool",
+            decision_authority: "llm",
+            chosen_capability: "helix_ask.inspect_capability_catalog",
+            observed_artifact_refs: [registryRef],
+          },
+          {
+            iteration: 2,
+            decision_id: `${turnId}:decision:answer`,
+            next_step: "answer",
+            decision_timing: "post_observation_terminal_review",
+            decision_authority: "llm",
+            chosen_capability: "model.synthesize_from_capability_registry",
+            observed_artifact_refs: [registryRef],
+            observation_role: "terminal_decision",
+          },
+        ],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      current_turn_artifact_ledger: artifacts,
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      selected_final_answer: "I could not complete that turn.",
+      debug: {
+        terminal_artifact_kind: "typed_failure",
+        final_answer_source: "typed_failure",
+      },
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("capability_help_summary");
+    expect(result.source).toBe("capability_help_summary");
+    expect(result.visible_text).toContain("Helix Ask capability catalog");
+    expect(result.visible_text).toContain("docs-viewer.locate_in_doc");
+    expect(payload.capability_help_summary).toMatchObject({
+      schema: "helix.capability_help_summary.v1",
+      capability_catalog_ref: registryRef,
+      support_refs: [registryRef],
+      support_refs_count: 1,
+      subgoal_observation_refs: [registryRef],
+      subgoal_observation_refs_count: 1,
+      source_families: ["capability_catalog"],
+    });
+    expect(payload.terminal_artifact_kind).toBe("capability_help_summary");
+    expect(payload.final_answer_source).toBe("capability_help_summary");
+    expect(payload.selected_terminal_support_refs).toEqual([registryRef]);
+    expect(payload.terminal_synthesis_support_refs).toEqual([registryRef]);
+    expect((payload.debug as Record<string, unknown>).terminal_artifact_kind).toBe("capability_help_summary");
+    expect((payload.debug as Record<string, unknown>).selected_terminal_support_refs).toEqual([registryRef]);
+  });
+
+  it("materializes theory reflection answer from receipt and evaluation when no final draft exists", () => {
+    const turnId = "ask:test:theory-reflection-receipt-materializes-answer";
+    const receiptRef = `${turnId}:theory_context_reflection_tool_receipt`;
+    const evaluationRef = `${turnId}:workstation_tool_evaluation`;
+    const artifacts = [
+      {
+        artifact_id: receiptRef,
+        kind: "helix_theory_context_reflection_tool_receipt",
+        payload: {
+          schema: "helix.theory_context_reflection_tool_receipt.v1",
+          capability: "helix_ask.reflect_theory_context",
+          tool_id: "helix_ask.reflect_theory_context",
+          text: "Theory graph reflection found Needle Hull Mark 2 near hull geometry and Casimir cavity badges.",
+          assistant_answer: false,
+          terminal_eligible: false,
+        },
+      },
+      {
+        artifact_id: evaluationRef,
+        kind: "workstation_tool_evaluation",
+        payload: {
+          schema: "helix.workstation_tool_evaluation.v1",
+          evaluation_id: evaluationRef,
+          result: "supports_subgoal",
+          supports_goal: true,
+          summary:
+            "Theory reflection located Needle Hull Mark 2 near hull geometry, Casimir cavity coupling, stability checks, scalar cuts, and terminal solver policy.",
+          answer_text: "I located this discussion in the Theory Badge Graph.",
+          evidence_refs: [receiptRef],
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      active_prompt: "Use helix_ask.reflect_theory_context. What are the main components of Needle Hull Mark 2?",
+      route_product_contract: {
+        ...modelOnlyContract(turnId),
+        source_target: "theory_locator",
+        allowed_terminal_artifact_kinds: ["theory_context_reflection_answer", "typed_failure", "request_user_input"],
+        forbidden_terminal_artifact_kinds: ["workstation_tool_evaluation", "tool_receipt", "direct_answer_text"],
+        side_artifact_kinds_allowed: ["helix_theory_context_reflection_tool_receipt", "workstation_tool_evaluation"],
+      },
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "theory_context_reflection",
+        required_terminal_kind: "theory_context_reflection_answer",
+      },
+      goal_satisfaction_evaluation: {
+        schema: "helix.goal_satisfaction_evaluation.v1",
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+        required_evidence: [
+          { kind: "helix_theory_context_reflection_tool_receipt", satisfied: true, evidence_ref: receiptRef },
+          { kind: "workstation_tool_evaluation", satisfied: true, evidence_ref: evaluationRef },
+        ],
+      },
+      agent_runtime_loop: {
+        schema: "helix.agent_runtime_loop.v1",
+        iterations: [
+          {
+            iteration: 1,
+            decision_id: `${turnId}:decision:reflect`,
+            next_step: "tool",
+            decision_authority: "llm",
+            chosen_capability: "helix_ask.reflect_theory_context",
+            observed_artifact_refs: [receiptRef, evaluationRef],
+          },
+          {
+            iteration: 2,
+            decision_id: `${turnId}:decision:answer`,
+            next_step: "answer",
+            decision_timing: "post_observation_terminal_review",
+            decision_authority: "llm",
+            chosen_capability: "model.synthesize_from_theory_context_reflection",
+            observed_artifact_refs: [receiptRef, evaluationRef],
+            observation_role: "terminal_decision",
+          },
+        ],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      current_turn_artifact_ledger: artifacts,
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      selected_final_answer: "I could not complete that turn.",
+      debug: {
+        terminal_artifact_kind: "typed_failure",
+        final_answer_source: "typed_failure",
+      },
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("theory_context_reflection_answer");
+    expect(result.source).toBe("theory_context_reflection_answer");
+    expect(result.visible_text).toContain("Main components:");
+    expect(result.visible_text).toContain("Casimir cavity");
+    expect(payload.theory_context_reflection_answer).toMatchObject({
+      schema: "helix.theory_context_reflection_answer.v1",
+      support_refs: [receiptRef, evaluationRef],
+      support_refs_count: 2,
+    });
+    expect(payload.terminal_artifact_kind).toBe("theory_context_reflection_answer");
+    expect(payload.final_answer_source).toBe("theory_context_reflection_answer");
+    expect((payload.debug as Record<string, unknown>).terminal_artifact_kind).toBe("theory_context_reflection_answer");
+  });
+
+  it("does not materialize a theory reflection answer from a thin receipt without evaluation support", () => {
+    const turnId = "ask:test:thin-theory-reflection-does-not-materialize";
+    const receiptRef = `${turnId}:theory_context_reflection_tool_receipt`;
+    const artifacts = [
+      {
+        artifact_id: receiptRef,
+        kind: "helix_theory_context_reflection_tool_receipt",
+        payload: {
+          schema: "helix.theory_context_reflection_tool_receipt.v1",
+          capability: "helix_ask.reflect_theory_context",
+          tool_id: "helix_ask.reflect_theory_context",
+          text: "Theory graph reflection observed a related badge.",
+          assistant_answer: false,
+          terminal_eligible: false,
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      active_prompt: "Use helix_ask.reflect_theory_context. Explain the main components.",
+      route_product_contract: {
+        ...modelOnlyContract(turnId),
+        source_target: "theory_locator",
+        allowed_terminal_artifact_kinds: ["theory_context_reflection_answer", "typed_failure", "request_user_input"],
+        forbidden_terminal_artifact_kinds: ["workstation_tool_evaluation", "tool_receipt", "direct_answer_text"],
+        side_artifact_kinds_allowed: ["helix_theory_context_reflection_tool_receipt"],
+      },
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "theory_context_reflection",
+        required_terminal_kind: "theory_context_reflection_answer",
+      },
+      goal_satisfaction_evaluation: {
+        schema: "helix.goal_satisfaction_evaluation.v1",
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+        required_evidence: [
+          { kind: "helix_theory_context_reflection_tool_receipt", satisfied: true, evidence_ref: receiptRef },
+        ],
+      },
+      current_turn_artifact_ledger: artifacts,
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      selected_final_answer: "I could not complete that turn.",
+      debug: {
+        terminal_artifact_kind: "typed_failure",
+        final_answer_source: "typed_failure",
+      },
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.theory_context_reflection_answer).toBeUndefined();
+    expect(payload.terminal_artifact_kind).toBe("typed_failure");
+  });
+
   it("selects a later complete final draft over an earlier weak direct answer", () => {
     const turnId = "ask:test:later-draft-over-direct";
     const draftText = [
@@ -757,6 +1057,226 @@ describe("final_answer_draft terminal selection", () => {
     expect(payload.model_synthesized_answer).toBeUndefined();
   });
 
+  it("blocks result-only docs plus calculator drafts when the prompt asks to explain the connection", () => {
+    const turnId = "ask:test:docs-calculator-result-only-connection";
+    const docRef = `${turnId}:doc_location_matches`;
+    const calculatorRef = `${turnId}:calculator_receipt`;
+    const draftRef = `${turnId}:draft`;
+    const prompt =
+      "Use docs-viewer.locate_in_doc to cite the claim, then call scientific-calculator.solve_expression with expression 19+23, and explain the connection.";
+    const artifacts = [
+      {
+        artifact_id: `${turnId}:execution_state`,
+        kind: "capability_itinerary_execution_state",
+        payload: {
+          schema: "helix.capability_itinerary_execution_state.v1",
+          complete: true,
+          compound_subgoal_ledger: [
+            {
+              requested_capability: "docs-viewer.locate_in_doc",
+              executed_capability: "docs-viewer.locate_in_doc",
+              capability_family: "docs_viewer",
+              observation_kind: "doc_location_matches",
+              observation_ref: docRef,
+              satisfaction: "satisfied",
+              rail_status: "complete",
+            },
+            {
+              requested_capability: "scientific-calculator.solve_expression",
+              executed_capability: "scientific-calculator.solve_expression",
+              capability_family: "calculator",
+              observation_kind: "calculator_receipt",
+              observation_ref: calculatorRef,
+              satisfaction: "satisfied",
+              rail_status: "complete",
+            },
+          ],
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+      {
+        artifact_id: docRef,
+        kind: "doc_location_matches",
+        payload: {
+          schema: "helix.doc_location_matches.v1",
+          matches: [
+            {
+              path: "/docs/helix-ask-codex-loop-discipline.md",
+              line_start: 196,
+              line_end: 203,
+              heading: "Rule of thumb",
+            },
+          ],
+        },
+      },
+      {
+        artifact_id: calculatorRef,
+        kind: "calculator_receipt",
+        payload: {
+          schema: "helix.calculator_receipt.v1",
+          expression: "19+23",
+          result: "42",
+        },
+      },
+      {
+        artifact_id: draftRef,
+        kind: "final_answer_draft",
+        payload: {
+          schema: "helix.final_answer_draft.v1",
+          text: "Result: 42.",
+          prompt,
+          authority: "llm_post_observation_compound_synthesis",
+          model_step_capability: "model.synthesize_from_compound_subgoal_observations",
+          support_refs: [docRef, calculatorRef],
+          artifact_refs: [docRef, calculatorRef],
+          grounded_in_observation_refs: [docRef, calculatorRef],
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      active_prompt: prompt,
+      route_product_contract: docsEvidenceContract(turnId),
+      canonical_goal_frame: {
+        goal_kind: "doc_evidence_synthesis",
+        required_terminal_kind: "doc_evidence_synthesis_answer",
+      },
+      capability_itinerary_execution_state: artifacts[0]?.payload,
+      current_turn_artifact_ledger: artifacts,
+      selected_final_answer: "Result: 42.",
+      final_answer_source: "final_answer_draft",
+      terminal_artifact_kind: "model_synthesized_answer",
+    };
+
+    const gate = evaluateFinalAnswerDraftQualityGate({
+      turnId,
+      finalAnswerDraftRef: draftRef,
+      draftText: "Result: 42.",
+      draftPayload: artifacts[3]?.payload,
+      promptText: prompt,
+      routeProductContract: docsEvidenceContract(turnId),
+      payload,
+      artifactLedger: artifacts,
+    });
+    expect(gate.violations).toContain("generic_answer_for_compound_prompt");
+
+    const materialized = materializeFinalAnswerDraftTerminal({
+      turnId,
+      payload,
+      artifactLedger: artifacts,
+      routeProductContract: docsEvidenceContract(turnId),
+    });
+
+    expect(materialized?.ok).toBe(false);
+    expect(materialized?.blocked_reason).toBe("draft_missing_required_prompt_parts");
+    expect(payload.doc_evidence_synthesis_answer).toBeUndefined();
+  });
+
+  it("allows docs plus calculator connection drafts that explain both evidence and calculation", () => {
+    const turnId = "ask:test:docs-calculator-connection-covered";
+    const docRef = `${turnId}:doc_location_matches`;
+    const calculatorRef = `${turnId}:calculator_receipt`;
+    const prompt =
+      "Use docs-viewer.locate_in_doc to cite the claim, then call scientific-calculator.solve_expression with expression 19+23, and explain the connection.";
+    const draftText =
+      "The document evidence locates the rule-of-thumb claim, and the calculator expression 19+23 evaluates to 42. The connection is that the cited rule provides the policy context while the calculation gives the numeric check used in the explanation.";
+    const artifacts = [
+      {
+        artifact_id: `${turnId}:execution_state`,
+        kind: "capability_itinerary_execution_state",
+        payload: {
+          schema: "helix.capability_itinerary_execution_state.v1",
+          complete: true,
+          compound_subgoal_ledger: [
+            {
+              requested_capability: "docs-viewer.locate_in_doc",
+              executed_capability: "docs-viewer.locate_in_doc",
+              capability_family: "docs_viewer",
+              observation_kind: "doc_location_matches",
+              observation_ref: docRef,
+              satisfaction: "satisfied",
+              rail_status: "complete",
+            },
+            {
+              requested_capability: "scientific-calculator.solve_expression",
+              executed_capability: "scientific-calculator.solve_expression",
+              capability_family: "calculator",
+              observation_kind: "calculator_receipt",
+              observation_ref: calculatorRef,
+              satisfaction: "satisfied",
+              rail_status: "complete",
+            },
+          ],
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+      {
+        artifact_id: docRef,
+        kind: "doc_location_matches",
+        payload: {
+          schema: "helix.doc_location_matches.v1",
+          matches: [
+            {
+              path: "/docs/helix-ask-codex-loop-discipline.md",
+              line_start: 196,
+              line_end: 203,
+              heading: "Rule of thumb",
+            },
+          ],
+        },
+      },
+      {
+        artifact_id: calculatorRef,
+        kind: "calculator_receipt",
+        payload: {
+          schema: "helix.calculator_receipt.v1",
+          expression: "19+23",
+          result: "42",
+        },
+      },
+      {
+        artifact_id: `${turnId}:draft`,
+        kind: "final_answer_draft",
+        payload: {
+          schema: "helix.final_answer_draft.v1",
+          text: draftText,
+          prompt,
+          authority: "llm_post_observation_compound_synthesis",
+          model_step_capability: "model.synthesize_from_compound_subgoal_observations",
+          support_refs: [docRef, calculatorRef],
+          artifact_refs: [docRef, calculatorRef],
+          grounded_in_observation_refs: [docRef, calculatorRef],
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    ];
+    const gate = evaluateFinalAnswerDraftQualityGate({
+      turnId,
+      finalAnswerDraftRef: `${turnId}:draft`,
+      draftText,
+      draftPayload: artifacts[3]?.payload,
+      promptText: prompt,
+      routeProductContract: docsEvidenceContract(turnId),
+      payload: {
+        turn_id: turnId,
+        active_prompt: prompt,
+        route_product_contract: docsEvidenceContract(turnId),
+        capability_itinerary_execution_state: artifacts[0]?.payload,
+        current_turn_artifact_ledger: artifacts,
+      },
+      artifactLedger: artifacts,
+    });
+
+    expect(gate.ok).toBe(true);
+    expect(gate.violations).not.toContain("generic_answer_for_compound_prompt");
+  });
+
   it("materializes a supported repo draft into repo_code_evidence_answer", () => {
     const turnId = "ask:test:repo-draft-materialized";
     const draftText = "Helix Ask treats receipts as observations, while final answers must be model-authored synthesis selected by terminal authority.";
@@ -967,6 +1487,13 @@ describe("final_answer_draft terminal selection", () => {
       selected_final_answer: draftText,
       final_answer_source: "final_answer_draft",
       terminal_artifact_kind: "model_synthesized_answer",
+      compound_subgoal_missing_summary: {
+        schema: "helix.compound_subgoal_missing_summary.v1",
+        missing_required_capabilities: ["scholarly_research"],
+        missing_compound_subgoal_ids: [],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
       goal_satisfaction_evaluation: {
         satisfaction: "satisfied",
         next_decision: "allow_terminal",
@@ -1128,6 +1655,12 @@ describe("final_answer_draft terminal selection", () => {
 
     expect(result.selected_terminal_artifact_kind).toBe("compound_evidence_synthesis_answer");
     expect(result.selected_terminal_support_refs).toEqual([workspaceObservationRef, calculatorObservationRef]);
+    expect(payload.route_terminal_materialization).toMatchObject({
+      materialization_ok: true,
+      capability_itinerary_observation_missing_families: [],
+      raw_capability_itinerary_observation_missing_families: expect.any(Array),
+      compound_synthesis_readiness_complete: true,
+    });
     expect(result.selected_terminal_subgoal_observation_refs).toEqual([workspaceObservationRef, calculatorObservationRef]);
     expect(result.selected_terminal_source_families).toEqual(["workspace_diagnostic", "calculator"]);
     expect(payload.selected_terminal_support_refs).toEqual([workspaceObservationRef, calculatorObservationRef]);
@@ -1146,6 +1679,307 @@ describe("final_answer_draft terminal selection", () => {
       support_refs: [workspaceObservationRef, calculatorObservationRef],
       subgoal_observation_refs: [workspaceObservationRef, calculatorObservationRef],
     });
+  });
+
+  it("materializes a ledger-backed compound terminal when completed subgoals lack a final draft", () => {
+    const turnId = "ask:test:compound-ledger-backed-no-draft";
+    const docsSubgoalId = `${turnId}:subgoal:docs`;
+    const calculatorSubgoalId = `${turnId}:subgoal:calculator`;
+    const docObservationRef = `${turnId}:doc_location_matches`;
+    const calculatorObservationRef = `${turnId}:calculator_receipt`;
+    const artifacts = [
+      {
+        artifact_id: `${turnId}:compound_contract`,
+        kind: "compound_capability_contract",
+        payload: {
+          schema: "helix.compound_capability_contract.v1",
+          turn_id: turnId,
+          prompt_shape: "compound_capability",
+          requires_all_subgoals: true,
+          terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+          subgoals: [
+            {
+              subgoal_id: docsSubgoalId,
+              order: 1,
+              requested_capability: "docs-viewer.locate_in_doc",
+              runtime_capability: "docs-viewer.locate_in_doc",
+              capability_family: "docs_viewer",
+              required_observation_kinds: ["doc_location_matches"],
+              required_terminal_kind: "doc_location_matches",
+              mandatory: true,
+            },
+            {
+              subgoal_id: calculatorSubgoalId,
+              order: 2,
+              requested_capability: "scientific-calculator.solve_expression",
+              runtime_capability: "scientific-calculator.solve_expression",
+              capability_family: "calculator",
+              required_observation_kinds: ["calculator_receipt", "workstation_tool_evaluation"],
+              required_terminal_kind: "workstation_tool_evaluation",
+              mandatory: true,
+            },
+          ],
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+      {
+        artifact_id: `${turnId}:execution_state`,
+        kind: "capability_itinerary_execution_state",
+        payload: {
+          schema: "helix.capability_itinerary_execution_state.v1",
+          turn_id: turnId,
+          applies: true,
+          complete: true,
+          required_observation_families: ["docs_viewer", "calculator"],
+          missing_observation_families: [],
+          missing_compound_subgoal_ids: [],
+          missing_required_capabilities: [],
+          compound_subgoal_ledger: [
+            {
+              subgoal_id: docsSubgoalId,
+              order: 1,
+              requested_capability: "docs-viewer.locate_in_doc",
+              runtime_capability: "docs-viewer.locate_in_doc",
+              selected_capability: "docs-viewer.locate_in_doc",
+              executed_capability: "docs-viewer.locate_in_doc",
+              capability_family: "docs_viewer",
+              observation_kind: "doc_location_matches",
+              observation_ref: docObservationRef,
+              satisfaction: "satisfied",
+              rail_status: "complete",
+            },
+            {
+              subgoal_id: calculatorSubgoalId,
+              order: 2,
+              requested_capability: "scientific-calculator.solve_expression",
+              runtime_capability: "scientific-calculator.solve_expression",
+              selected_capability: "scientific-calculator.solve_expression",
+              executed_capability: "scientific-calculator.solve_expression",
+              capability_family: "calculator",
+              observation_kind: "calculator_receipt",
+              observation_ref: calculatorObservationRef,
+              satisfaction: "satisfied",
+              rail_status: "complete",
+            },
+          ],
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+      {
+        artifact_id: docObservationRef,
+        kind: "doc_location_matches",
+        payload: {
+          schema: "helix.doc_location_matches.v1",
+          matches: [
+            {
+              path: "docs/audits/research/helix-ask-codex-parity-model-turn-fidelity-audit-2026-06-12.md",
+              line_start: 196,
+              snippet: "Only the completed solver path may answer. The visible answer must project the same terminal artifact selected by terminal authority.",
+            },
+          ],
+        },
+      },
+      {
+        artifact_id: calculatorObservationRef,
+        kind: "calculator_receipt",
+        payload: {
+          schema: "helix.calculator_receipt.v1",
+          expression: "((sqrt(81)+ln(e^3))*7-5^2)/2",
+          result: "29.5",
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      canonical_goal_frame: {
+        goal_kind: "locate_in_doc",
+        required_terminal_kind: "doc_location_matches",
+      },
+      current_turn_artifact_ledger: artifacts,
+      selected_final_answer: "I could not produce a terminal answer for this turn.",
+      final_answer_source: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      terminal_error_code: "pending_request_missing",
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      tool_rail_failure_triage: {
+        rail_status: "broken",
+        rail_failure_code: "terminal_not_materialized",
+        first_broken_rail: "terminal_materialization",
+        repair_target: "terminal_materializer",
+      },
+      debug: {},
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(payload.ledger_backed_compound_final_answer_draft_applied).toBe(true);
+    expect(["doc_evidence_synthesis_answer", "compound_evidence_synthesis_answer"]).toContain(
+      result.selected_terminal_artifact_kind,
+    );
+    expect(result.source).toBe("final_answer_draft");
+    expect(result.visible_text).toContain("Document evidence");
+    expect(result.visible_text).toContain("Calculator observation");
+    expect(result.visible_text).toContain("Connection:");
+    expect(payload.terminal_error_code).toBeUndefined();
+    expect(payload.selected_terminal_support_refs).toEqual(
+      expect.arrayContaining([docObservationRef, calculatorObservationRef]),
+    );
+    expect(payload.selected_terminal_subgoal_observation_refs).toEqual(
+      expect.arrayContaining([docObservationRef, calculatorObservationRef]),
+    );
+  });
+
+  it("fails compound synthesis when draft support refs omit a mandatory subgoal observation", () => {
+    const turnId = "ask:test:compound-support-missing-fails-typed";
+    const workspaceSubgoalId = `${turnId}:subgoal:workspace`;
+    const calculatorSubgoalId = `${turnId}:subgoal:calculator`;
+    const workspaceObservationRef = "obs:workspace-status";
+    const calculatorObservationRef = "obs:calculator";
+    const draftText = "The workspace status is available, and a calculation was requested.";
+    const artifacts = [
+      {
+        artifact_id: `${turnId}:compound_contract`,
+        kind: "compound_capability_contract",
+        payload: {
+          schema: "helix.compound_capability_contract.v1",
+          turn_id: turnId,
+          terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+          subgoals: [
+            {
+              subgoal_id: workspaceSubgoalId,
+              order: 1,
+              requested_capability: "workspace_os.status",
+              runtime_capability: "workspace_os.status",
+              capability_family: "workspace_diagnostic",
+              mandatory: true,
+            },
+            {
+              subgoal_id: calculatorSubgoalId,
+              order: 2,
+              requested_capability: "scientific-calculator.solve_expression",
+              runtime_capability: "scientific-calculator.solve_expression",
+              capability_family: "calculator",
+              mandatory: true,
+            },
+          ],
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+      {
+        artifact_id: `${turnId}:execution_state`,
+        kind: "capability_itinerary_execution_state",
+        payload: {
+          schema: "helix.capability_itinerary_execution_state.v1",
+          turn_id: turnId,
+          applies: true,
+          complete: true,
+          compound_subgoal_ledger: [
+            {
+              subgoal_id: workspaceSubgoalId,
+              requested_capability: "workspace_os.status",
+              executed_capability: "workspace_os.status",
+              capability_family: "workspace_diagnostic",
+              observation_kind: "workspace_os_status_observation",
+              observation_ref: workspaceObservationRef,
+              satisfaction: "satisfied",
+              rail_status: "complete",
+            },
+            {
+              subgoal_id: calculatorSubgoalId,
+              requested_capability: "scientific-calculator.solve_expression",
+              executed_capability: "scientific-calculator.solve_expression",
+              capability_family: "calculator",
+              observation_kind: "calculator_receipt",
+              observation_ref: calculatorObservationRef,
+              satisfaction: "satisfied",
+              rail_status: "complete",
+            },
+          ],
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+      {
+        artifact_id: workspaceObservationRef,
+        kind: "workspace_os_status_observation",
+        payload: { schema: "helix.workspace_os_status_observation.v1" },
+      },
+      {
+        artifact_id: calculatorObservationRef,
+        kind: "calculator_receipt",
+        payload: { schema: "helix.calculator_receipt.v1", result: "45" },
+      },
+      {
+        artifact_id: `${turnId}:draft`,
+        kind: "final_answer_draft",
+        payload: {
+          schema: "helix.final_answer_draft.v1",
+          turn_id: turnId,
+          text: draftText,
+          answer_text: draftText,
+          authority: "llm_post_observation_compound_synthesis",
+          model_step_capability: "model.synthesize_from_compound_subgoal_observations",
+          support_refs: [workspaceObservationRef],
+          artifact_refs: [workspaceObservationRef],
+          grounded_in_observation_refs: [workspaceObservationRef],
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      route_product_contract: modelOnlyContract(turnId),
+      canonical_goal_frame: {
+        goal_kind: "compound_tool",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      current_turn_artifact_ledger: artifacts,
+      selected_final_answer: draftText,
+      final_answer_source: "final_answer_draft",
+      terminal_artifact_kind: "model_synthesized_answer",
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      debug: {
+        terminal_artifact_kind: "model_synthesized_answer",
+      },
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.terminal_error_code).toBe("compound_subgoal_support_refs_missing");
+    expect(payload.terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.final_answer_source).toBe("typed_failure");
+    expect(payload.selected_terminal_support_refs).toEqual([]);
+    expect(payload.terminal_synthesis_support_refs).toEqual([]);
+    expect(payload.compound_subgoal_draft_support_coverage).toMatchObject({
+      ok: false,
+      required_observation_refs: [workspaceObservationRef, calculatorObservationRef],
+      draft_support_refs: [workspaceObservationRef],
+      missing_observation_refs: [calculatorObservationRef],
+    });
+    const debug = payload.debug as Record<string, unknown>;
+    expect(debug.terminal_artifact_kind).toBe("typed_failure");
+    expect(debug.terminal_error_code).toBe("compound_subgoal_support_refs_missing");
   });
 
   it("clears selected synthesis support mirrors when terminal authority fail-closes", () => {
