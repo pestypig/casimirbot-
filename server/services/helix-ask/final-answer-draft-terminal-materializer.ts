@@ -16,6 +16,7 @@ import {
   materializeDocEvidenceSynthesisAnswer,
 } from "./doc-evidence-synthesis";
 import { buildHelixCapabilityItineraryExecutionState } from "./capability-itinerary-execution";
+import { resolveCompoundCapabilitySynthesisReadiness } from "./compound-capability-synthesis";
 import { readCompoundTerminalPolicy } from "./compound-terminal-policy";
 
 export type FinalAnswerDraftTerminalMaterializerResult = {
@@ -407,6 +408,16 @@ const compoundTerminalReadinessBlockedReason = (
   artifactLedger: ArtifactLike[] = [],
 ): "compound_subgoal_incomplete" | null => {
   if (!compoundTerminalPolicyActive(payload)) return null;
+  const synthesizedReadiness = resolveCompoundCapabilitySynthesisReadiness({
+    payload,
+    artifacts: artifactLedger,
+  });
+  payload.compound_capability_synthesis_readiness = synthesizedReadiness;
+  if (synthesizedReadiness.applies === true) {
+    if (synthesizedReadiness.has_failed_subgoal === true) return "compound_subgoal_incomplete";
+    if (synthesizedReadiness.complete === true) return null;
+    return "compound_subgoal_incomplete";
+  }
   const contract = readCompoundContract(payload, artifactLedger);
   const executionState = readCompoundExecutionState(payload, artifactLedger);
   const readiness = readRecord(payload.compound_capability_synthesis_readiness);
