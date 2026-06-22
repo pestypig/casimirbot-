@@ -3227,6 +3227,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
   const selectedReceiptTerminal = compoundReceiptTerminalBlocked ? null : rawSelectedReceiptTerminal;
   const selectedGoalArtifact =
     findGoalSatisfyingCapabilityHelpArtifact(input.payload, artifacts) ??
+    findGoalSatisfyingTheoryContextReflectionArtifact(input.payload, artifacts) ??
     findGoalSatisfyingWorkspaceDirectoryResolutionArtifact(input.payload, artifacts) ??
     findGoalSatisfyingDocumentArtifact(input.payload, artifacts) ??
     findGoalSatisfyingVisualSituationArtifact(input.payload, artifacts);
@@ -3595,6 +3596,21 @@ export function applyHelixTerminalAuthoritySingleWriter(
         rawTerminalBlockingToolRailFailure.repairTarget === "presenter_boundary"
       ),
     );
+  const theoryGoalArtifactSupersedesToolRailFailure =
+    Boolean(
+      selectedGoalArtifact?.kind === "theory_context_reflection_answer" &&
+      goalAllowsTerminal &&
+      rawTerminalBlockingToolRailFailure &&
+      (
+        rawTerminalBlockingToolRailFailure.railFailureCode === "terminal_not_materialized" ||
+        rawTerminalBlockingToolRailFailure.firstBrokenRail === "terminal_materialization" ||
+        rawTerminalBlockingToolRailFailure.firstBrokenRail === "terminal_authority" ||
+        rawTerminalBlockingToolRailFailure.firstBrokenRail === "visible_projection" ||
+        rawTerminalBlockingToolRailFailure.repairTarget === "terminal_materializer" ||
+        rawTerminalBlockingToolRailFailure.repairTarget === "terminal_authority" ||
+        rawTerminalBlockingToolRailFailure.repairTarget === "presenter_boundary"
+      ),
+    );
   const terminalBlockingToolRailFailure =
     noteMutationDraftSupersedesToolRailFailure ||
     repoDraftSupersedesToolRailFailure ||
@@ -3602,7 +3618,8 @@ export function applyHelixTerminalAuthoritySingleWriter(
     workstationTerminalSupersedesToolRailFailure ||
     receiptTerminalSupersedesToolRailFailure ||
     visualGoalArtifactSupersedesToolRailFailure ||
-    capabilityHelpGoalArtifactSupersedesToolRailFailure
+    capabilityHelpGoalArtifactSupersedesToolRailFailure ||
+    theoryGoalArtifactSupersedesToolRailFailure
       ? null
       : rawTerminalBlockingToolRailFailure?.railFailureCode === "terminal_projection_mismatch" &&
     (
