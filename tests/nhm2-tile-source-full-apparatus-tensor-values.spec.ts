@@ -130,6 +130,8 @@ describe("NHM2 tile-source full-apparatus tensor values", () => {
     expect(built.contractVersion).toBe("nhm2_tile_source_full_apparatus_tensor_values/v1");
     expect(built.summary.valueArtifactReadyForReceipt).toBe(true);
     expect(built.summary.firstBlocker).toBe("none");
+    expect(built.summary.sourceRefsComplete).toBe(true);
+    expect(built.summary.missingSourceRefs).toEqual([]);
     expect(built.summary.allRequiredRegionsPresent).toBe(true);
     expect(built.summary.allRequiredRegionsFullTensor).toBe(true);
     expect(built.summary.allRequiredRegionsTermComplete).toBe(true);
@@ -138,6 +140,37 @@ describe("NHM2 tile-source full-apparatus tensor values", () => {
     );
     expect(built.claimBoundary.valueArtifactDoesNotValidateMaterialMechanism).toBe(true);
     expect(built.claimBoundary.physicalViabilityClaimAllowed).toBe(false);
+  });
+
+  it("blocks tensor-value artifacts without stable artifact and source refs", () => {
+    const built = artifact({
+      artifactRef: null,
+      sourceRefs: {
+        materialEvidenceReceiptsRef: null,
+        fullApparatusTensorEvidenceRef: null,
+        apparatusModelRef: null,
+        atlasRef: null,
+      },
+    });
+    const evidence = buildFullApparatusTensorEvidenceFromTensorValues({
+      artifact: built,
+      evidenceTier: "validated_simulation",
+      subsystemReceiptRefs,
+    });
+
+    expect(built.summary.valueArtifactReadyForReceipt).toBe(false);
+    expect(built.summary.sourceRefsComplete).toBe(false);
+    expect(built.summary.missingSourceRefs).toEqual([
+      "artifact_ref_missing",
+      "source_refs:material_evidence_receipts_ref_missing",
+      "source_refs:full_apparatus_tensor_evidence_ref_missing",
+      "source_refs:apparatus_model_ref_missing",
+      "source_refs:atlas_ref_missing",
+    ]);
+    expect(built.summary.firstBlocker).toBe("artifact_ref_missing");
+    expect(evidence.tensorValueArtifactRef).toBeNull();
+    expect(evidence.components.T00).toBe(false);
+    expect(evidence.termCoverage.casimirInteractionStressEnergy).toBe(false);
   });
 
   it("blocks missing momentum and off-diagonal tensor values instead of zero-filling", () => {
@@ -188,6 +221,65 @@ describe("NHM2 tile-source full-apparatus tensor values", () => {
     expect(built.summary.anyMetricEchoComponent).toBe(true);
     expect(built.summary.anyScalarProxyComponent).toBe(true);
     expect(built.summary.firstBlocker).toBe("wall:T00:metric_echo_forbidden");
+  });
+
+  it("blocks finite tensor values that lack authoritative component provenance", () => {
+    const built = artifact({
+      regions: [
+        region("global", 1.0e9),
+        region("hull", 1.1e9),
+        region("wall", 1.6995e9, {
+          componentAuthority: {
+            ...completeAuthority,
+            T01: "missing",
+          },
+        }),
+        region("exterior_shell", 9.5e8),
+      ],
+    });
+    const evidence = buildFullApparatusTensorEvidenceFromTensorValues({
+      artifact: built,
+      evidenceTier: "validated_simulation",
+      subsystemReceiptRefs,
+    });
+
+    expect(built.summary.valueArtifactReadyForReceipt).toBe(false);
+    expect(built.summary.anyInadmissibleAuthorityComponent).toBe(true);
+    expect(built.summary.inadmissibleAuthorityRefs).toContain("wall:T01");
+    expect(built.summary.firstBlocker).toBe(
+      "wall:T01:component_authority_missing_or_inadmissible",
+    );
+    expect(evidence.components.T0i).toBe(false);
+    expect(evidence.componentDetailRefs?.T01).toBeNull();
+  });
+
+  it("blocks proxy component statuses even when tensor values are finite", () => {
+    const built = artifact({
+      regions: [
+        region("global", 1.0e9),
+        region("hull", 1.1e9),
+        region("wall", 1.6995e9, {
+          componentStatus: {
+            ...completeStatus,
+            T12: "proxy",
+          },
+        }),
+        region("exterior_shell", 9.5e8),
+      ],
+    });
+    const evidence = buildFullApparatusTensorEvidenceFromTensorValues({
+      artifact: built,
+      evidenceTier: "validated_simulation",
+      subsystemReceiptRefs,
+    });
+
+    expect(built.summary.valueArtifactReadyForReceipt).toBe(false);
+    expect(built.summary.anyProxyStatusComponent).toBe(true);
+    expect(built.summary.proxyStatusComponentRefs).toContain("wall:T12");
+    expect(built.summary.missingComponentRefs).toContain("wall:T12");
+    expect(built.summary.firstBlocker).toBe("wall:T12:component_value_missing");
+    expect(evidence.components.offDiagonalTij).toBe(false);
+    expect(evidence.componentDetailRefs?.T12).toBeNull();
   });
 
   it("blocks aggregate tensor values that do not balance against apparatus term sums", () => {
@@ -266,7 +358,7 @@ describe("NHM2 tile-source full-apparatus tensor values", () => {
     );
   });
 
-  it("feeds a ready tensor-values artifact into receipt and operating-budget gates", () => {
+  it("keeps tensor-values evidence out of material receipts until subsystem receipts are backed", () => {
     const values = artifact();
     const evidence = buildFullApparatusTensorEvidenceFromTensorValues({
       artifact: values,
@@ -288,15 +380,25 @@ describe("NHM2 tile-source full-apparatus tensor values", () => {
     expect(evidence.tensorValueArtifactContract).toBe(
       "nhm2_tile_source_full_apparatus_tensor_values/v1",
     );
-    expect(tensorSurface?.status).toBe("pass");
+    expect(tensorSurface?.status).toBe("fail");
     expect(tensorSurface?.numericalMargins.tensorValueArtifactAvailable).toBe(1);
-    expect(receipts.summary.fullApparatusTensorReady).toBe(true);
+    expect(tensorSurface?.numericalMargins.subsystemReceiptRefsBacked).toBe(0);
+    expect(tensorSurface?.blockers).toEqual(
+      expect.arrayContaining([
+        "full_apparatus_material_coupon_receipt_ref_not_backed_by_passed_surface",
+        "full_apparatus_force_gap_receipt_ref_not_backed_by_passed_surface",
+        "full_apparatus_roughness_patch_receipt_ref_not_backed_by_passed_surface",
+        "full_apparatus_active_control_receipt_ref_not_backed_by_passed_surface",
+        "full_apparatus_fatigue_layer_scaling_receipt_ref_not_backed_by_passed_surface",
+      ]),
+    );
+    expect(receipts.summary.fullApparatusTensorReady).toBe(false);
     expect(budget.summary.fullApparatusTensorEvidenceReady).toBe(true);
     expect(budget.derivedOperatingBudget.tensorValueArtifactAvailable).toBe(true);
     expect(budget.summary.transportClaimAllowed).toBe(false);
   });
 
-  it("lets the material-evidence publisher persist and consume a tensor-values artifact", () => {
+  it("lets the publisher persist tensor-values while keeping material receipts blocked without subsystem receipt surfaces", () => {
     const tempRoot = mkdtempSync(join(tmpdir(), "nhm2-tensor-values-publisher-"));
     try {
       const evidencePath = join(tempRoot, "evidence.json");
@@ -339,9 +441,52 @@ describe("NHM2 tile-source full-apparatus tensor values", () => {
         "nhm2_tile_source_full_apparatus_tensor_values/v1",
       );
       expect(result.fullApparatusTensorValues?.summary.valueArtifactReadyForReceipt).toBe(true);
-      expect(fullTensorSurface?.status).toBe("pass");
+      expect(fullTensorSurface?.status).toBe("fail");
+      expect(fullTensorSurface?.numericalMargins.subsystemReceiptRefsBacked).toBe(0);
+      expect(result.materialEvidenceReceipts.summary.fullApparatusTensorReady).toBe(false);
       expect(result.fullApparatusTensorOperatingBudget.summary.firstBlocker).toBe("none");
       expect(result.operatingBudgetReadiness.summary.physicalViabilityClaimAllowed).toBe(false);
+    } finally {
+      rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects tensor-values artifacts from a different selected profile", () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "nhm2-tensor-values-profile-mismatch-"));
+    try {
+      const evidencePath = join(tempRoot, "evidence.json");
+      const outDir = join(tempRoot, "out");
+      const values = artifact({
+        selectedProfileId: "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+        artifactRef: "artifact://full-apparatus-tmunu/values/profile-mismatch",
+      });
+      writeFileSync(
+        evidencePath,
+        `${JSON.stringify(
+          {
+            generatedAt,
+            selectedProfileId: "stage1_centerline_alpha_0p995_v1",
+            candidateId: "nhm2_447_layer_topology_optimized_lattice_tin_v1",
+            fullApparatusTensorValues: values,
+            fullApparatusTensor: {
+              subsystemReceiptRefs,
+            },
+          },
+          null,
+          2,
+        )}\n`,
+        "utf8",
+      );
+
+      expect(() =>
+        publishNhm2TileSourceMaterialEvidenceReceipts({
+          repoRoot: tempRoot,
+          evidencePath,
+          outDir,
+          generatedAt,
+          selectedProfileId: "stage1_centerline_alpha_0p995_v1",
+        }),
+      ).toThrow(/full apparatus tensor values profile mismatch/);
     } finally {
       rmSync(tempRoot, { recursive: true, force: true });
     }

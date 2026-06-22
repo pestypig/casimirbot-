@@ -221,6 +221,7 @@ export type BuildNhm2TileSourcePhysicalValidationPlanInput =
   BuildNhm2LayerStackFullApparatusReceiptLoopInput & {
     tensorAuthorityEvidenceSupplied?: boolean | null;
     downstreamGateStatuses?: Partial<Record<Nhm2TileSourceDownstreamGateV1["gateId"], Nhm2TileSourceGateStatus>> | null;
+    downstreamGateArtifactRefs?: Partial<Record<Nhm2TileSourceDownstreamGateV1["gateId"], string | null>> | null;
     materialEvidenceReceipts?: Nhm2TileSourceMaterialEvidenceReceiptsV1 | null;
     operatingBudgetReadiness?: Nhm2TileSourceOperatingBudgetReadinessV1 | null;
   };
@@ -271,15 +272,24 @@ const receiptTarget = (
 
 const downstreamGate = (
   gateId: Nhm2TileSourceDownstreamGateV1["gateId"],
-  status: Nhm2TileSourceGateStatus,
+  requestedStatus: Nhm2TileSourceGateStatus,
   requiredChange: string,
   blockers?: string[],
+  artifactRef?: string | null,
 ): Nhm2TileSourceDownstreamGateV1 => ({
   gateId,
-  status,
-  artifactRef: status === "pass" ? `artifact://${gateId}/candidate/topology_optimized_lattice_tin` : null,
+  status:
+    requestedStatus === "pass" && artifactRef == null
+      ? "review"
+      : requestedStatus,
+  artifactRef: artifactRef ?? null,
   requiredChange,
-  blockers: status === "pass" ? [] : blockers ?? [`${gateId}_${status === "not_run" ? "not_run" : "incomplete"}`],
+  blockers:
+    requestedStatus === "pass" && artifactRef == null
+      ? [`${gateId}_artifact_ref_missing_for_pass`]
+      : requestedStatus === "pass"
+        ? []
+        : blockers ?? [`${gateId}_${requestedStatus === "not_run" ? "not_run" : "incomplete"}`],
 });
 
 const allPass = (statuses: Nhm2TileSourceGateStatus[]): boolean =>
@@ -1217,6 +1227,7 @@ export const buildNhm2TileSourcePhysicalValidationPlan = (
         ],
   };
   const downstreamStatuses = input.downstreamGateStatuses ?? {};
+  const downstreamArtifactRefs = input.downstreamGateArtifactRefs ?? {};
   const allReceiptsPresent = receiptTargets.every((target) => target.status === "pass");
   const operatingBudgetsReady =
     operatingBudgetReadiness?.summary.allOperatingBudgetsReady === true;
@@ -1250,26 +1261,36 @@ export const buildNhm2TileSourcePhysicalValidationPlan = (
       "regional_residual_closure",
       downstreamStatuses.regional_residual_closure ?? "not_run",
       "Run regional wall/hull/exterior residual closure against the candidate apparatus tensor.",
+      undefined,
+      downstreamArtifactRefs.regional_residual_closure ?? null,
     ),
     downstreamGate(
       "wall_t00_closure",
       downstreamStatuses.wall_t00_closure ?? "not_run",
       "Run wall T00 closure without treating T00-only closure as broad wall closure.",
+      undefined,
+      downstreamArtifactRefs.wall_t00_closure ?? null,
     ),
     downstreamGate(
       "covariant_conservation",
       downstreamStatuses.covariant_conservation ?? "not_run",
       "Run covariant conservation with support/control/electrostatic/thermal terms included.",
+      undefined,
+      downstreamArtifactRefs.covariant_conservation ?? null,
     ),
     downstreamGate(
       "qei_worldline_dossier",
       downstreamStatuses.qei_worldline_dossier ?? "not_run",
       "Run QEI worldline dossier against the candidate apparatus tensor.",
+      undefined,
+      downstreamArtifactRefs.qei_worldline_dossier ?? null,
     ),
     downstreamGate(
       "observer_family_energy_conditions",
       downstreamStatuses.observer_family_energy_conditions ?? "not_run",
       "Run observer-family WEC/NEC/SEC/DEC diagnostics against the candidate apparatus tensor.",
+      undefined,
+      downstreamArtifactRefs.observer_family_energy_conditions ?? null,
     ),
     downstreamGate(
       "material_credibility",
@@ -1278,6 +1299,7 @@ export const buildNhm2TileSourcePhysicalValidationPlan = (
       materialCredibilityAdmissionBlockers.length > 0
         ? materialCredibilityAdmissionBlockers
         : undefined,
+      downstreamArtifactRefs.material_credibility ?? null,
     ),
   ];
   const requestedCoupledClosureStatus = downstreamStatuses.coupled_closure ?? "not_run";
@@ -1311,6 +1333,7 @@ export const buildNhm2TileSourcePhysicalValidationPlan = (
       coupledClosureAdmissionBlockers.length > 0
         ? coupledClosureAdmissionBlockers
         : undefined,
+      downstreamArtifactRefs.coupled_closure ?? null,
     ),
   ];
   const downstreamGatesPass = allPass(downstreamGates.map((gate) => gate.status));

@@ -35,6 +35,16 @@ const downstreamPass = {
   coupled_closure: "pass",
 } as const;
 
+const downstreamArtifactRefs = {
+  regional_residual_closure: "artifact://downstream/regional-residual-closure-v1",
+  wall_t00_closure: "artifact://downstream/wall-t00-closure-v1",
+  covariant_conservation: "artifact://downstream/covariant-conservation-v1",
+  qei_worldline_dossier: "artifact://downstream/qei-worldline-dossier-v1",
+  observer_family_energy_conditions: "artifact://downstream/observer-family-energy-conditions-v1",
+  material_credibility: "artifact://downstream/material-credibility-v1",
+  coupled_closure: "artifact://downstream/coupled-closure-v1",
+} as const;
+
 const forbiddenPhrase = (...parts: string[]): RegExp => new RegExp(parts.join(""), "i");
 
 const readyOperatingBudgetReadiness = (
@@ -329,6 +339,7 @@ describe("NHM2 tile source physical validation plan", () => {
       tensorTermCoverage: fullTensorCoverage,
       tensorAuthorityEvidenceSupplied: true,
       downstreamGateStatuses: downstreamPass,
+      downstreamGateArtifactRefs: downstreamArtifactRefs,
     });
 
     expect(plan.summary.allReceiptsPresent).toBe(true);
@@ -380,6 +391,31 @@ describe("NHM2 tile source physical validation plan", () => {
     );
   });
 
+  it("does not admit pass-status downstream gates without explicit artifact refs", () => {
+    const plan = buildNhm2TileSourcePhysicalValidationPlan({
+      generatedAt,
+      suppliedReceiptSurfaces: allReceipts,
+      tensorTermCoverage: fullTensorCoverage,
+      tensorAuthorityEvidenceSupplied: true,
+      downstreamGateStatuses: downstreamPass,
+      operatingBudgetReadiness: readyOperatingBudgetReadiness(generatedAt),
+    });
+    const residualGate = plan.downstreamGates.find(
+      (gate) => gate.gateId === "regional_residual_closure",
+    );
+
+    expect(residualGate).toMatchObject({
+      status: "review",
+      artifactRef: null,
+      blockers: ["regional_residual_closure_artifact_ref_missing_for_pass"],
+    });
+    expect(plan.summary.downstreamGatesPass).toBe(false);
+    expect(plan.summary.physicallyCredibleSourceCandidate).toBe(false);
+    expect(plan.summary.firstBlocker).toBe(
+      "regional_residual_closure_artifact_ref_missing_for_pass",
+    );
+  });
+
   it("carries operating-budget margins into decisive measurement rows", () => {
     const plan = buildNhm2TileSourcePhysicalValidationPlan({
       generatedAt,
@@ -420,6 +456,7 @@ describe("NHM2 tile source physical validation plan", () => {
       tensorTermCoverage: fullTensorCoverage,
       tensorAuthorityEvidenceSupplied: true,
       downstreamGateStatuses: downstreamPass,
+      downstreamGateArtifactRefs: downstreamArtifactRefs,
       operatingBudgetReadiness: readyOperatingBudgetReadiness(generatedAt),
     });
 
@@ -442,6 +479,7 @@ describe("NHM2 tile source physical validation plan", () => {
       tensorTermCoverage: fullTensorCoverage,
       tensorAuthorityEvidenceSupplied: true,
       downstreamGateStatuses: downstreamPass,
+      downstreamGateArtifactRefs: downstreamArtifactRefs,
       operatingBudgetReadiness: readyOperatingBudgetReadiness(generatedAt),
     });
     const text = JSON.stringify(plan);

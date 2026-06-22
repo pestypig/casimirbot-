@@ -1203,6 +1203,7 @@ const fatigueLayerScalingSurfaces = (
 
 const fullApparatusTensorSurface = (
   evidence: Nhm2TileSourceFullApparatusTensorEvidenceV1 | null | undefined,
+  subsystemSurfaces: Nhm2TileSourceReceiptSurfaceStatusV1[] = [],
 ): Nhm2TileSourceReceiptSurfaceStatusV1 => {
   const requiredChange =
     "Supply source-side full apparatus T_munu with a tensor-value artifact, refs for T00, T01, T02, T03, T11, T12, T13, T22, T23, T33, support/control/thermal/electrostatic/material terms, regional coverage, and no metric-target echo.";
@@ -1310,6 +1311,49 @@ const fullApparatusTensorSurface = (
       ? ["full_apparatus_fatigue_layer_scaling_receipt_ref_missing"]
       : []),
   ];
+  const subsystemReceiptBackingBlockers = (() => {
+    if (evidence.subsystemReceiptRefs == null) return [];
+    const surfaceById = new Map(subsystemSurfaces.map((surface) => [surface.surfaceId, surface]));
+    const checks = [
+      {
+        ref: evidence.subsystemReceiptRefs.materialCoupon,
+        blockerPrefix: "material_coupon",
+        surfaceIds: ["material_coupon"],
+      },
+      {
+        ref: evidence.subsystemReceiptRefs.forceGapPullIn,
+        blockerPrefix: "force_gap",
+        surfaceIds: ["force_gap_pull_in"],
+      },
+      {
+        ref: evidence.subsystemReceiptRefs.roughnessPatch,
+        blockerPrefix: "roughness_patch",
+        surfaceIds: ["roughness_patch_metrology"],
+      },
+      {
+        ref: evidence.subsystemReceiptRefs.activeControl,
+        blockerPrefix: "active_control",
+        surfaceIds: ["active_control_energy"],
+      },
+      {
+        ref: evidence.subsystemReceiptRefs.fatigueLayerScaling,
+        blockerPrefix: "fatigue_layer_scaling",
+        surfaceIds: ["fatigue_lifetime", "layer_scaling"],
+      },
+    ] as const;
+    return checks.flatMap((check) => {
+      if (check.ref == null) return [];
+      return check.surfaceIds.flatMap((surfaceId) => {
+        const surface = surfaceById.get(surfaceId);
+        if (surface?.status !== "pass") {
+          return [`full_apparatus_${check.blockerPrefix}_receipt_ref_not_backed_by_passed_surface`];
+        }
+        return surface.evidenceRef === check.ref
+          ? []
+          : [`full_apparatus_${check.blockerPrefix}_receipt_ref_mismatch`];
+      });
+    });
+  })();
   const regionalRefBlockers = [
     ...(evidence.regionalCoverage.wall && evidence.regionalSupportRefs?.wall == null
       ? ["full_apparatus_wall_region_support_ref_missing"]
@@ -1375,6 +1419,7 @@ const fullApparatusTensorSurface = (
     ...(missingTermBlockers.length > 0 ? ["full_apparatus_tensor_term_coverage_incomplete"] : []),
     ...termRefBlockers,
     ...subsystemReceiptRefBlockers,
+    ...subsystemReceiptBackingBlockers,
     ...(!evidence.regionalCoverage.wall ? ["full_apparatus_wall_region_missing"] : []),
     ...(!evidence.regionalCoverage.hull ? ["full_apparatus_hull_region_missing"] : []),
     ...(!evidence.regionalCoverage.exteriorShell ? ["full_apparatus_exterior_shell_region_missing"] : []),
@@ -1403,6 +1448,7 @@ const fullApparatusTensorSurface = (
           : 0,
       termRefsAvailable: termRefBlockers.length === 0 ? 1 : 0,
       subsystemReceiptRefsAvailable: subsystemReceiptRefBlockers.length === 0 ? 1 : 0,
+      subsystemReceiptRefsBacked: subsystemReceiptBackingBlockers.length === 0 ? 1 : 0,
       regionalSupportRefsAvailable: regionalRefBlockers.length === 0 ? 1 : 0,
     },
     requiredChange,
@@ -1415,14 +1461,17 @@ export const buildNhm2TileSourceMaterialEvidenceReceipts = (
   const [fatigueSurface, layerScalingSurface] = fatigueLayerScalingSurfaces(
     input.fatigueLayerScaling,
   );
-  const receiptSurfaces = [
+  const prerequisiteSurfaces = [
     materialCouponSurface(input.materialCoupon),
     forceGapSurface(input.forceGapPullIn),
     roughnessPatchSurface(input.roughnessPatch),
     activeControlSurface(input.activeControl),
     fatigueSurface,
     layerScalingSurface,
-    fullApparatusTensorSurface(input.fullApparatusTensor),
+  ];
+  const receiptSurfaces = [
+    ...prerequisiteSurfaces,
+    fullApparatusTensorSurface(input.fullApparatusTensor, prerequisiteSurfaces),
   ];
   const suppliedReceiptSurfaces = Object.fromEntries(
     receiptSurfaces.map((surface) => [surface.surfaceId, surface.status === "pass"]),

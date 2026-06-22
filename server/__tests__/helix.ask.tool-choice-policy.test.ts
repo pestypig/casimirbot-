@@ -53,6 +53,77 @@ describe("Helix Ask tool-choice policy", () => {
     expect(agiPlanSource).toContain("Creates a governed source-repair control receipt");
   });
 
+  it("keeps context-resume memory from repairing failed stream terminal authority", () => {
+    const agiPlanSource = readFileSync(resolve(__dirname, "../routes/agi.plan.ts"), "utf8");
+
+    expect(agiPlanSource).toContain("const shouldAttemptContextResumeStreamFailureAnswerRepair = (): boolean => false;");
+    expect(agiPlanSource).toContain("streamSolverFailureRequiresTypedFailure && shouldAttemptContextResumeStreamFailureAnswerRepair()");
+    expect(agiPlanSource).toContain("const recoveryRecall = shouldAttemptContextResumeStreamFailureAnswerRepair()");
+    expect(agiPlanSource).toContain("stream_terminal_repair_suppressed_by_solver_authority");
+    expect(agiPlanSource).toContain("context_resume_memory_must_not_repair_solver_path_incomplete_before_terminal");
+  });
+
+  it("requires solver permission before stream projection promotes a model draft to terminal authority", () => {
+    const agiPlanSource = readFileSync(resolve(__dirname, "../routes/agi.plan.ts"), "utf8");
+
+    expect(agiPlanSource).toContain("const streamTerminalProjectionAllowedBySolver =");
+    expect(agiPlanSource).toContain("const streamCanProjectSelectedAnswer =");
+    expect(agiPlanSource).toContain("stream_projection_without_solver_authority");
+    expect(agiPlanSource).toMatch(
+      /const modelDraftIsTerminalAuthority =[\s\S]*!isWorkstationToolTerminalAuthority &&[\s\S]*streamTerminalProjectionAllowedBySolver &&[\s\S]*streamFinalAnswerSource === "final_answer_draft"/,
+    );
+    expect(agiPlanSource).toMatch(
+      /const selectedStreamAnswerCandidate =[\s\S]*terminalPresentationConciseText[\s\S]*bodySelectedFinalAnswer/,
+    );
+    expect(agiPlanSource).toMatch(
+      /let selectedStreamAnswer = streamCanProjectSelectedAnswer \? selectedStreamAnswerCandidate : "";/,
+    );
+  });
+
+  it("requires solver permission before response-boundary presentation text becomes terminal authority", () => {
+    const agiPlanSource = readFileSync(resolve(__dirname, "../routes/agi.plan.ts"), "utf8");
+
+    expect(agiPlanSource).toContain("const canProjectAskTurnTerminalAtResponseBoundary =");
+    expect(agiPlanSource).toContain("const canPromoteAskTurnTerminalKindAtResponseBoundary =");
+    expect(agiPlanSource).toContain("const responseBoundaryCanProjectTerminalPresentation =");
+    expect(agiPlanSource).toContain("terminal_presentation_requires_solver_or_terminal_authority");
+    expect(agiPlanSource).toContain("const responseBoundaryCanProjectTerminalAuthority =");
+    expect(agiPlanSource).toContain("response_projection_without_solver_authority");
+    expect(agiPlanSource).toContain("response_boundary_projection_suppressed_by_solver_authority");
+    expect(agiPlanSource).toMatch(
+      /if \(responseBoundaryCanProjectTerminalPresentation\) \{[\s\S]*payload\.selected_final_answer = terminalPresentationBundle\.presentation\.concise_text;/,
+    );
+    expect(agiPlanSource).toMatch(
+      /if \(authorityTerminalText && !responseBoundaryCanProjectTerminalAuthority\) \{[\s\S]*final_answer_source: "typed_failure"[\s\S]*terminal_artifact_kind: "typed_failure"/,
+    );
+  });
+
+  it("requires solver permission before response-boundary repo evidence repair promotes typed failure to success", () => {
+    const agiPlanSource = readFileSync(resolve(__dirname, "../routes/agi.plan.ts"), "utf8");
+
+    expect(agiPlanSource).toContain("const responseBoundaryCanPromoteRepoEvidenceAnswer =");
+    expect(agiPlanSource).toContain("repo_evidence_answer_requires_solver_or_terminal_authority");
+    expect(agiPlanSource).toContain("response_boundary_repo_evidence_projection_suppressed");
+    expect(agiPlanSource).toMatch(
+      /repoAnswerTextForResponseBoundary &&[\s\S]*routeProductContractForPresentation\.source_target === "repo_code" &&[\s\S]*responseBoundaryCanPromoteRepoEvidenceAnswer &&[\s\S]*payload\.terminal_artifact_kind = "repo_code_evidence_answer"/,
+    );
+  });
+
+  it("requires solver permission before the top-level Ask wrapper mints terminal authority", () => {
+    const agiPlanSource = readFileSync(resolve(__dirname, "../routes/agi.plan.ts"), "utf8");
+
+    expect(agiPlanSource).toContain("const askWrapperCanProjectTerminalAuthority =");
+    expect(agiPlanSource).toContain("canProjectAskTurnTerminalAtResponseBoundary(typedPayload, typedDebug)");
+    expect(agiPlanSource).toContain("ask_wrapper_projection_without_solver_authority");
+    expect(agiPlanSource).toContain("ask_wrapper_projection_suppressed_by_solver_authority");
+    expect(agiPlanSource).toMatch(
+      /if \(poisonTerminalText && !askWrapperCanProjectTerminalAuthority\) \{[\s\S]*final_answer_source: "typed_failure"[\s\S]*terminal_artifact_kind: "typed_failure"/,
+    );
+    expect(agiPlanSource).toMatch(
+      /const terminalAuthorityRecord = recordHelixTurnTerminalAuthority\(\{[\s\S]*terminal_text: poisonTerminalText/,
+    );
+  });
+
   it("keeps goal sessions, goal context, packet traces, route evidence, and automation policies exposed in the top-level Ask live_env capability surface", () => {
     const agiPlanSource = readFileSync(resolve(__dirname, "../routes/agi.plan.ts"), "utf8");
     const capabilities = [

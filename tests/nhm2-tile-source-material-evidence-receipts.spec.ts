@@ -297,7 +297,7 @@ const passingEvidence: BuildNhm2TileSourceMaterialEvidenceReceiptsInput = {
       materialStrainEnergy: "receipt://full-apparatus-tmunu/terms/material-strain-v1",
     },
     subsystemReceiptRefs: {
-      materialCoupon: "receipt://material-coupon/tin/v1",
+      materialCoupon: "receipt://coupon/tin/cryogenic-4k-v1",
       forceGapPullIn: "receipt://force-gap/8nm/v1",
       roughnessPatch: "receipt://roughness-patch/tin/v1",
       activeControl: "receipt://active-control/gap-lock-v1",
@@ -324,6 +324,16 @@ const allDownstreamPass = {
   observer_family_energy_conditions: "pass",
   material_credibility: "pass",
   coupled_closure: "pass",
+} as const;
+
+const allDownstreamArtifactRefs = {
+  regional_residual_closure: "artifact://downstream/regional-residual-closure-v1",
+  wall_t00_closure: "artifact://downstream/wall-t00-closure-v1",
+  covariant_conservation: "artifact://downstream/covariant-conservation-v1",
+  qei_worldline_dossier: "artifact://downstream/qei-worldline-dossier-v1",
+  observer_family_energy_conditions: "artifact://downstream/observer-family-energy-conditions-v1",
+  material_credibility: "artifact://downstream/material-credibility-v1",
+  coupled_closure: "artifact://downstream/coupled-closure-v1",
 } as const;
 
 const forbiddenPhrase = (...parts: string[]): RegExp => new RegExp(parts.join(""), "i");
@@ -502,6 +512,32 @@ describe("NHM2 tile source material evidence receipts", () => {
     ).toBe(true);
   });
 
+  it("does not admit full apparatus tensor receipts whose subsystem refs are not backed by the same receipt bundle", () => {
+    const receipts = buildNhm2TileSourceMaterialEvidenceReceipts({
+      ...passingEvidence,
+      fullApparatusTensor: {
+        ...passingEvidence.fullApparatusTensor!,
+        subsystemReceiptRefs: {
+          ...passingEvidence.fullApparatusTensor!.subsystemReceiptRefs!,
+          materialCoupon: "receipt://coupon/tin/different-coupon-v1",
+        },
+      },
+    });
+    const tensorSurface = receipts.receiptSurfaces.find(
+      (surface) => surface.surfaceId === "full_apparatus_tensor",
+    );
+
+    expect(receipts.summary.candidateDisposition).toBe("falsified");
+    expect(receipts.summary.materialEvidenceReady).toBe(true);
+    expect(receipts.summary.fullApparatusTensorReady).toBe(false);
+    expect(receipts.summary.sourceAuthorityEvidenceReady).toBe(false);
+    expect(tensorSurface?.status).toBe("fail");
+    expect(tensorSurface?.blockers).toContain(
+      "full_apparatus_material_coupon_receipt_ref_mismatch",
+    );
+    expect(tensorSurface?.numericalMargins.subsystemReceiptRefsBacked).toBe(0);
+  });
+
   it("blocks measured or validated receipt surfaces that lack a top-level evidence ref", () => {
     const receipts = buildNhm2TileSourceMaterialEvidenceReceipts({
       ...passingEvidence,
@@ -559,6 +595,7 @@ describe("NHM2 tile source material evidence receipts", () => {
       materialEvidenceReceipts: receipts,
       operatingBudgetReadiness: buildPassingOperatingBudgetReadiness(receipts),
       downstreamGateStatuses: allDownstreamPass,
+      downstreamGateArtifactRefs: allDownstreamArtifactRefs,
     });
 
     expect(plan.summary.allReceiptsPresent).toBe(true);
@@ -590,7 +627,15 @@ describe("NHM2 tile source material evidence receipts", () => {
       const outDir = join(tempRoot, "out");
       writeFileSync(
         evidencePath,
-        `${JSON.stringify({ ...passingEvidence, downstreamGateStatuses: allDownstreamPass }, null, 2)}\n`,
+        `${JSON.stringify(
+          {
+            ...passingEvidence,
+            downstreamGateStatuses: allDownstreamPass,
+            downstreamGateArtifactRefs: allDownstreamArtifactRefs,
+          },
+          null,
+          2,
+        )}\n`,
         "utf8",
       );
 
@@ -1936,6 +1981,7 @@ describe("NHM2 tile source material evidence receipts", () => {
       materialEvidenceReceipts: receipts,
       operatingBudgetReadiness,
       downstreamGateStatuses: allDownstreamPass,
+      downstreamGateArtifactRefs: allDownstreamArtifactRefs,
     });
     const evidenceGapRoadmap = buildNhm2TileSourceEvidenceGapRoadmap({
       materialEvidenceReceipts: receipts,
@@ -2958,6 +3004,7 @@ describe("NHM2 tile source material evidence receipts", () => {
       materialEvidenceReceipts: receipts,
       operatingBudgetReadiness,
       downstreamGateStatuses: allDownstreamPass,
+      downstreamGateArtifactRefs: allDownstreamArtifactRefs,
     });
     const roadmap = buildNhm2TileSourceEvidenceGapRoadmap({
       materialEvidenceReceipts: receipts,
@@ -3062,6 +3109,7 @@ describe("NHM2 tile source material evidence receipts", () => {
       materialEvidenceReceipts: receipts,
       operatingBudgetReadiness,
       downstreamGateStatuses: allDownstreamPass,
+      downstreamGateArtifactRefs: allDownstreamArtifactRefs,
     });
     const roadmap = buildNhm2TileSourceEvidenceGapRoadmap({
       materialEvidenceReceipts: receipts,
@@ -5075,6 +5123,7 @@ describe("NHM2 tile source material evidence receipts", () => {
     ]);
     expect(plan.fullApparatusTensorTarget.requiredTensorComponentCount).toBe(10);
     expect(plan.fullApparatusTensorTarget.requiredTermCount).toBe(9);
+    expect(plan.fullApparatusTensorTarget.requiredSubsystemReceiptCount).toBe(5);
     expect(plan.fullApparatusTensorTarget.requiredRegions).toEqual([
       "wall",
       "hull",
@@ -5170,6 +5219,21 @@ describe("NHM2 tile source material evidence receipts", () => {
     const activeControl = plan.testItems.find(
       (item) => item.testId === "active_control_field_energy",
     );
+    const materialCouponReceiptRef = plan.testItems.find(
+      (item) => item.testId === "material_coupon_receipt_ref",
+    );
+    const forceGapReceiptRef = plan.testItems.find(
+      (item) => item.testId === "force_gap_receipt_ref",
+    );
+    const roughnessPatchReceiptRef = plan.testItems.find(
+      (item) => item.testId === "roughness_patch_receipt_ref",
+    );
+    const activeControlReceiptRef = plan.testItems.find(
+      (item) => item.testId === "active_control_receipt_ref",
+    );
+    const fatigueLayerScalingReceiptRef = plan.testItems.find(
+      (item) => item.testId === "fatigue_layer_scaling_receipt_ref",
+    );
     const casimir = plan.testItems.find(
       (item) => item.testId === "casimir_interaction_stress_energy",
     );
@@ -5213,6 +5277,32 @@ describe("NHM2 tile source material evidence receipts", () => {
       termRefRequired: true,
       termMustEnterTensorValueArtifact: true,
     });
+    expect(materialCouponReceiptRef?.status).toBe("falsifying");
+    expect(materialCouponReceiptRef?.blockerIds).toContain(
+      "full_apparatus_material_coupon_receipt_ref_missing",
+    );
+    expect(materialCouponReceiptRef?.measurementTargets).toMatchObject({
+      subsystemReceiptId: "materialCoupon",
+      requiredSubsystemReceiptCount: 5,
+      subsystemReceiptRefRequired: true,
+      mustTieToTensorTerms: true,
+    });
+    expect(forceGapReceiptRef?.status).toBe("falsifying");
+    expect(forceGapReceiptRef?.blockerIds).toContain(
+      "full_apparatus_force_gap_receipt_ref_missing",
+    );
+    expect(roughnessPatchReceiptRef?.status).toBe("falsifying");
+    expect(roughnessPatchReceiptRef?.blockerIds).toContain(
+      "full_apparatus_roughness_patch_receipt_ref_missing",
+    );
+    expect(activeControlReceiptRef?.status).toBe("falsifying");
+    expect(activeControlReceiptRef?.blockerIds).toContain(
+      "full_apparatus_active_control_receipt_ref_missing",
+    );
+    expect(fatigueLayerScalingReceiptRef?.status).toBe("falsifying");
+    expect(fatigueLayerScalingReceiptRef?.blockerIds).toContain(
+      "full_apparatus_fatigue_layer_scaling_receipt_ref_missing",
+    );
     expect(casimir?.status).toBe("satisfied");
     expect(hull?.status).toBe("falsifying");
     expect(hull?.measurementTargets).toMatchObject({

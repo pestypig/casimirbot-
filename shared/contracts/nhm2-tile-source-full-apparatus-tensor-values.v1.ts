@@ -106,11 +106,17 @@ export type Nhm2TileSourceFullApparatusTensorValuesV1 = {
     allRequiredRegionsTermComplete: boolean;
     allRequiredRegionsSameBasis: boolean;
     allRequiredRegionsHaveValueReceipts: boolean;
+    sourceRefsComplete: boolean;
     anyMetricEchoComponent: boolean;
     anyScalarProxyComponent: boolean;
+    anyProxyStatusComponent: boolean;
+    anyInadmissibleAuthorityComponent: boolean;
     anyMissingComponent: boolean;
     missingRegionIds: Nhm2RegionalSourceClosureRegionId[];
+    missingSourceRefs: string[];
     missingComponentRefs: string[];
+    proxyStatusComponentRefs: string[];
+    inadmissibleAuthorityRefs: string[];
     missingTermRefs: string[];
     missingTermComponentRefs: string[];
     termBalanceMaxAbsResidualSI: number | null;
@@ -149,6 +155,22 @@ const isNullableText = (value: unknown): value is string | null =>
 const isNullableNumber = (value: unknown): value is number | null =>
   value === null || (typeof value === "number" && Number.isFinite(value));
 
+const sourceRefBlockers = (
+  input: BuildNhm2TileSourceFullApparatusTensorValuesInput,
+): string[] => [
+  ...(isText(input.artifactRef) ? [] : ["artifact_ref_missing"]),
+  ...(isText(input.sourceRefs.materialEvidenceReceiptsRef)
+    ? []
+    : ["source_refs:material_evidence_receipts_ref_missing"]),
+  ...(isText(input.sourceRefs.fullApparatusTensorEvidenceRef)
+    ? []
+    : ["source_refs:full_apparatus_tensor_evidence_ref_missing"]),
+  ...(isText(input.sourceRefs.apparatusModelRef)
+    ? []
+    : ["source_refs:apparatus_model_ref_missing"]),
+  ...(isText(input.sourceRefs.atlasRef) ? [] : ["source_refs:atlas_ref_missing"]),
+];
+
 const isRegionId = (value: unknown): value is Nhm2RegionalSourceClosureRegionId =>
   NHM2_REGIONAL_SOURCE_CLOSURE_REQUIRED_REGIONS.includes(
     value as Nhm2RegionalSourceClosureRegionId,
@@ -163,6 +185,20 @@ const finiteTensorValue = (
 };
 
 const TERM_BALANCE_RELATIVE_TOLERANCE = 1e-9;
+
+const AUTHORITATIVE_COMPONENT_AUTHORITIES = [
+  "source_model",
+  "constitutive_model",
+  "measured_or_simulated",
+] as const satisfies readonly Nhm2FullApparatusComponentAuthority[];
+
+const hasAuthoritativeComponentAuthority = (
+  authority: Nhm2FullApparatusComponentAuthority | undefined,
+): boolean =>
+  authority != null &&
+  AUTHORITATIVE_COMPONENT_AUTHORITIES.includes(
+    authority as (typeof AUTHORITATIVE_COMPONENT_AUTHORITIES)[number],
+  );
 
 const termComponentSum = (
   region: Nhm2FullApparatusTensorValueRegionV1,
@@ -186,9 +222,22 @@ const missingComponents = (region: Nhm2FullApparatusTensorValueRegionV1): string
       finiteTensorValue(region.tensor, componentId) == null ||
       status == null ||
       status === "missing" ||
-      status === "blocked"
+      status === "blocked" ||
+      status === "proxy"
     );
   }).map((componentId) => `${region.regionId}:${componentId}`);
+
+const proxyStatusComponents = (region: Nhm2FullApparatusTensorValueRegionV1): string[] =>
+  NHM2_FULL_APPARATUS_SYMMETRIC_TENSOR_COMPONENTS.filter(
+    (componentId) => region.componentStatus[componentId] === "proxy",
+  ).map((componentId) => `${region.regionId}:${componentId}`);
+
+const inadmissibleAuthorityComponents = (
+  region: Nhm2FullApparatusTensorValueRegionV1,
+): string[] =>
+  NHM2_FULL_APPARATUS_SYMMETRIC_TENSOR_COMPONENTS.filter(
+    (componentId) => !hasAuthoritativeComponentAuthority(region.componentAuthority[componentId]),
+  ).map((componentId) => `${region.regionId}:${componentId}`);
 
 const missingTerms = (region: Nhm2FullApparatusTensorValueRegionV1): string[] =>
   NHM2_FULL_APPARATUS_REQUIRED_TERM_IDS.filter((termId) => {
@@ -251,6 +300,8 @@ const regionBlockers = (region: Nhm2FullApparatusTensorValueRegionV1): string[] 
   const scalarProxy = NHM2_FULL_APPARATUS_SYMMETRIC_TENSOR_COMPONENTS.filter(
     (componentId) => region.componentAuthority[componentId] === "scalar_proxy",
   );
+  const proxyStatus = proxyStatusComponents(region);
+  const inadmissibleAuthority = inadmissibleAuthorityComponents(region);
   return [
     ...region.blockers,
     ...(region.regionSupportRef == null ? [`${region.regionId}:region_support_ref_missing`] : []),
@@ -269,8 +320,12 @@ const regionBlockers = (region: Nhm2FullApparatusTensorValueRegionV1): string[] 
       (termComponentRef) => `${termComponentRef}:term_component_value_missing`,
     ),
     ...termBalanceBlockers(region),
+    ...proxyStatus.map((componentRef) => `${componentRef}:component_status_proxy_forbidden`),
     ...metricEcho.map((componentId) => `${region.regionId}:${componentId}:metric_echo_forbidden`),
     ...scalarProxy.map((componentId) => `${region.regionId}:${componentId}:scalar_proxy_forbidden`),
+    ...inadmissibleAuthority.map(
+      (componentRef) => `${componentRef}:component_authority_missing_or_inadmissible`,
+    ),
   ];
 };
 
@@ -283,8 +338,11 @@ export const buildNhm2TileSourceFullApparatusTensorValues = (
   );
   const regionBlockerRows = input.regions.flatMap(regionBlockers);
   const missingComponentRefs = input.regions.flatMap(missingComponents);
+  const proxyStatusComponentRefs = input.regions.flatMap(proxyStatusComponents);
+  const inadmissibleAuthorityRefs = input.regions.flatMap(inadmissibleAuthorityComponents);
   const missingTermRefs = input.regions.flatMap(missingTerms);
   const missingTermComponentRefs = input.regions.flatMap(missingTermComponents);
+  const missingSourceRefs = sourceRefBlockers(input);
   const balanceResiduals = input.regions.flatMap(termBalanceResiduals);
   const termBalanceMaxAbsResidualSI =
     balanceResiduals.length === 0
@@ -307,12 +365,15 @@ export const buildNhm2TileSourceFullApparatusTensorValues = (
   const allRequiredRegionsHaveValueReceipts = input.regions.every(
     (region) => region.valueReceiptRef != null && region.regionSupportRef != null,
   );
+  const sourceRefsComplete = missingSourceRefs.length === 0;
   const anyMetricEchoComponent = input.regions.some((region) =>
     Object.values(region.componentAuthority).includes("metric_echo"),
   );
   const anyScalarProxyComponent = input.regions.some((region) =>
     Object.values(region.componentAuthority).includes("scalar_proxy"),
   );
+  const anyProxyStatusComponent = proxyStatusComponentRefs.length > 0;
+  const anyInadmissibleAuthorityComponent = inadmissibleAuthorityRefs.length > 0;
   const anyMissingComponent = missingComponentRefs.length > 0;
   const topLevelBlockers = [
     ...(input.sourceSideOnly !== true ? ["source_side_only_not_asserted"] : []),
@@ -324,6 +385,7 @@ export const buildNhm2TileSourceFullApparatusTensorValues = (
     ...(input.chartId !== "comoving_cartesian" ? ["artifact_chart_mismatch"] : []),
     ...(input.basisRef !== "same_basis" ? ["artifact_basis_mismatch"] : []),
     ...(input.unitsRef !== "J/m^3" ? ["artifact_units_mismatch"] : []),
+    ...missingSourceRefs,
     ...missingRegionIds.map((regionId) => `${regionId}:region_missing`),
     ...regionBlockerRows,
   ];
@@ -340,11 +402,17 @@ export const buildNhm2TileSourceFullApparatusTensorValues = (
       allRequiredRegionsTermComplete,
       allRequiredRegionsSameBasis,
       allRequiredRegionsHaveValueReceipts,
+      sourceRefsComplete,
       anyMetricEchoComponent,
       anyScalarProxyComponent,
+      anyProxyStatusComponent,
+      anyInadmissibleAuthorityComponent,
       anyMissingComponent,
       missingRegionIds,
+      missingSourceRefs,
       missingComponentRefs,
+      proxyStatusComponentRefs,
+      inadmissibleAuthorityRefs,
       missingTermRefs,
       missingTermComponentRefs,
       termBalanceMaxAbsResidualSI,
@@ -382,8 +450,10 @@ export const buildFullApparatusTensorEvidenceFromTensorValues = (args: {
           finiteTensorValue(region.tensor, componentId) != null &&
           region.componentStatus[componentId] !== "missing" &&
           region.componentStatus[componentId] !== "blocked" &&
+          region.componentStatus[componentId] !== "proxy" &&
           region.componentAuthority[componentId] !== "metric_echo" &&
-          region.componentAuthority[componentId] !== "scalar_proxy",
+          region.componentAuthority[componentId] !== "scalar_proxy" &&
+          hasAuthoritativeComponentAuthority(region.componentAuthority[componentId]),
       ),
     );
   const termAvailable = (termId: Nhm2FullApparatusTensorTermId): boolean =>
@@ -590,13 +660,22 @@ export const isNhm2TileSourceFullApparatusTensorValues = (
     typeof summary.allRequiredRegionsTermComplete === "boolean" &&
     typeof summary.allRequiredRegionsSameBasis === "boolean" &&
     typeof summary.allRequiredRegionsHaveValueReceipts === "boolean" &&
+    typeof summary.sourceRefsComplete === "boolean" &&
     typeof summary.anyMetricEchoComponent === "boolean" &&
     typeof summary.anyScalarProxyComponent === "boolean" &&
+    typeof summary.anyProxyStatusComponent === "boolean" &&
+    typeof summary.anyInadmissibleAuthorityComponent === "boolean" &&
     typeof summary.anyMissingComponent === "boolean" &&
     Array.isArray(summary.missingRegionIds) &&
     summary.missingRegionIds.every(isRegionId) &&
+    Array.isArray(summary.missingSourceRefs) &&
+    summary.missingSourceRefs.every((entry) => typeof entry === "string") &&
     Array.isArray(summary.missingComponentRefs) &&
     summary.missingComponentRefs.every((entry) => typeof entry === "string") &&
+    Array.isArray(summary.proxyStatusComponentRefs) &&
+    summary.proxyStatusComponentRefs.every((entry) => typeof entry === "string") &&
+    Array.isArray(summary.inadmissibleAuthorityRefs) &&
+    summary.inadmissibleAuthorityRefs.every((entry) => typeof entry === "string") &&
     Array.isArray(summary.missingTermRefs) &&
     summary.missingTermRefs.every((entry) => typeof entry === "string") &&
     Array.isArray(summary.missingTermComponentRefs) &&

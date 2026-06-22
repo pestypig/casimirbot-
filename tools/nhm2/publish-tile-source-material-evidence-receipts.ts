@@ -147,6 +147,7 @@ type EvidenceInput = BuildNhm2TileSourceMaterialEvidenceReceiptsInput & {
   downstreamGateStatuses?: Partial<
     Record<Nhm2TileSourceDownstreamGateV1["gateId"], "pass" | "review" | "fail" | "not_run">
   > | null;
+  downstreamGateArtifactRefs?: Partial<Record<Nhm2TileSourceDownstreamGateV1["gateId"], string | null>> | null;
 };
 
 export type Nhm2TileSourceMaterialEvidenceTemplateV1 = EvidenceInput & {
@@ -449,6 +450,15 @@ export const buildNhm2TileSourceMaterialEvidenceTemplate = (args: {
     material_credibility: "not_run",
     coupled_closure: "not_run",
   },
+  downstreamGateArtifactRefs: {
+    regional_residual_closure: null,
+    wall_t00_closure: null,
+    covariant_conservation: null,
+    qei_worldline_dossier: null,
+    observer_family_energy_conditions: null,
+    material_credibility: null,
+    coupled_closure: null,
+  },
 });
 
 export const publishNhm2TileSourceMaterialEvidenceReceipts = (args: {
@@ -498,6 +508,16 @@ export const publishNhm2TileSourceMaterialEvidenceReceipts = (args: {
     !isNhm2TileSourceFullApparatusTensorValues(fullApparatusTensorValues)
   ) {
     throw new Error("evidence input failed nhm2_tile_source_full_apparatus_tensor_values/v1 validation");
+  }
+  const requestedSelectedProfileId =
+    args.selectedProfileId ?? evidence.selectedProfileId ?? DEFAULT_SELECTED_PROFILE_ID;
+  if (
+    fullApparatusTensorValues != null &&
+    fullApparatusTensorValues.selectedProfileId !== requestedSelectedProfileId
+  ) {
+    throw new Error(
+      `full apparatus tensor values profile mismatch: tensor=${fullApparatusTensorValues.selectedProfileId} requested=${requestedSelectedProfileId}`,
+    );
   }
   const normalizedEvidence: EvidenceInput =
     fullApparatusTensorValues == null
@@ -656,6 +676,7 @@ export const publishNhm2TileSourceMaterialEvidenceReceipts = (args: {
     materialEvidenceReceipts,
     operatingBudgetReadiness,
     downstreamGateStatuses: normalizedEvidence.downstreamGateStatuses ?? null,
+    downstreamGateArtifactRefs: normalizedEvidence.downstreamGateArtifactRefs ?? null,
   });
   if (!isNhm2TileSourcePhysicalValidationPlan(physicalValidationPlan)) {
     throw new Error("built artifact failed nhm2_tile_source_physical_validation_plan/v1 validation");

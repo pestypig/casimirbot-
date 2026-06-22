@@ -5063,14 +5063,26 @@ export function applyHelixTerminalAuthoritySingleWriter(
   });
   const terminalAuthorityForEnvelopeMirror = readRecord(input.payload.terminal_answer_authority);
   const terminalPresentationForEnvelopeMirror = readRecord(input.payload.terminal_presentation);
-  const workstationEnvelopeSelectionKind =
-    appliedEnvelope.terminal_artifact_kind === "workstation_tool_evaluation" &&
-    appliedEnvelope.final_answer_source === "workstation_tool_evaluation" &&
+  const appliedEnvelopeTerminalKind = readString(appliedEnvelope.terminal_artifact_kind);
+  const appliedEnvelopeFinalAnswerSource = readString(appliedEnvelope.final_answer_source);
+  const authorityEnvelopeTerminalKind = readString(terminalAuthorityForEnvelopeMirror?.terminal_artifact_kind);
+  const presentationEnvelopeTerminalKind = readString(terminalPresentationForEnvelopeMirror?.terminal_artifact_kind);
+  const envelopeMirrorFailureSelected =
+    selectedArtifactKind === "typed_failure" ||
+    selectedSource === "typed_failure" ||
+    Boolean(readString(input.payload.terminal_error_code)) ||
+    readString(input.payload.final_status) === "final_failure" ||
+    readString(input.payload.response_type) === "final_failure";
+  const authorityEnvelopeSelectionKind =
+    !envelopeMirrorFailureSelected &&
+    appliedEnvelopeTerminalKind &&
+    appliedEnvelopeTerminalKind !== "tool_receipt" &&
+    appliedEnvelopeTerminalKind !== "typed_failure" &&
     (
-      readString(terminalAuthorityForEnvelopeMirror?.terminal_artifact_kind) === "workstation_tool_evaluation" ||
-      readString(terminalPresentationForEnvelopeMirror?.terminal_artifact_kind) === "workstation_tool_evaluation"
+      authorityEnvelopeTerminalKind === appliedEnvelopeTerminalKind ||
+      presentationEnvelopeTerminalKind === appliedEnvelopeTerminalKind
     )
-      ? "workstation_tool_evaluation" as const
+      ? appliedEnvelopeTerminalKind as Exclude<HelixTerminalAuthoritySingleWriterResult["selected_terminal_artifact_kind"], null>
       : null;
   const envelopeTerminalKind =
     appliedEnvelope.terminal_artifact_kind === "typed_failure" ||
@@ -5079,8 +5091,8 @@ export function applyHelixTerminalAuthoritySingleWriter(
     appliedEnvelope.terminal_artifact_kind === "direct_answer_text" ||
     appliedEnvelope.terminal_artifact_kind === "repo_code_evidence_answer"
       ? appliedEnvelope.terminal_artifact_kind
-      : workstationEnvelopeSelectionKind
-        ? workstationEnvelopeSelectionKind
+      : authorityEnvelopeSelectionKind
+        ? authorityEnvelopeSelectionKind
       : null;
   const selectedTerminalArtifactKind = envelopeTerminalKind ?? selectedArtifactKind ?? null;
   const resultSource =
@@ -5093,8 +5105,10 @@ export function applyHelixTerminalAuthoritySingleWriter(
         ? "direct_answer_text"
       : appliedEnvelope.terminal_artifact_kind === "repo_code_evidence_answer"
         ? "repo_code_evidence_answer"
-        : workstationEnvelopeSelectionKind
-          ? "workstation_tool_evaluation"
+        : authorityEnvelopeSelectionKind
+          ? readString(terminalAuthorityForEnvelopeMirror?.final_answer_source) ??
+            appliedEnvelopeFinalAnswerSource ??
+            authorityEnvelopeSelectionKind
           : selectedSource === "terminal_authority_repair_failure"
             ? selectedSource
           : selectedSource;
@@ -5108,10 +5122,11 @@ export function applyHelixTerminalAuthoritySingleWriter(
     appliedEnvelope.terminal_artifact_kind === "repo_code_evidence_answer"
       ? readString(input.payload.terminal_artifact_id) ??
         readString(readRecord(input.payload.repo_code_evidence_answer)?.artifact_id)
-      : workstationEnvelopeSelectionKind
+      : authorityEnvelopeSelectionKind
         ? readString(input.payload.terminal_artifact_id) ??
-          readString(readRecord(input.payload.workstation_tool_evaluation)?.evaluation_id) ??
-          readString(terminalAuthorityForEnvelopeMirror?.terminal_artifact_id)
+          readString(terminalAuthorityForEnvelopeMirror?.terminal_artifact_ref) ??
+          readString(terminalAuthorityForEnvelopeMirror?.terminal_artifact_id) ??
+          readString(readRecord(input.payload.workstation_tool_evaluation)?.evaluation_id)
       : null;
   const selectedArtifactRefForResult =
     envelopeSelectedArtifactRef ??

@@ -25,6 +25,11 @@ export type Nhm2FullApparatusTensorTestId =
   | "layer_scaling_cross_terms"
   | "casimir_interaction_stress_energy"
   | "material_strain_energy"
+  | "material_coupon_receipt_ref"
+  | "force_gap_receipt_ref"
+  | "roughness_patch_receipt_ref"
+  | "active_control_receipt_ref"
+  | "fatigue_layer_scaling_receipt_ref"
   | "regional_wall_coverage"
   | "regional_hull_coverage"
   | "regional_exterior_shell_coverage";
@@ -69,6 +74,7 @@ export type Nhm2TileSourceFullApparatusTensorTestPlanV1 = {
     requiredComponents: ["T00", "T0i", "diagonalTij", "offDiagonalTij"];
     requiredTensorComponentCount: 10;
     requiredTermCount: 9;
+    requiredSubsystemReceiptCount: 5;
     requiredRegions: ["wall", "hull", "exterior_shell"];
     sourceSideOnly: true;
     targetEchoForbidden: true;
@@ -113,6 +119,7 @@ const REQUIRED_TENSOR_VALUE_ARTIFACT_CONTRACT =
   "nhm2_tile_source_full_apparatus_tensor_values/v1";
 const REQUIRED_TENSOR_COMPONENT_COUNT = 10;
 const REQUIRED_STRESS_ENERGY_TERM_COUNT = 9;
+const REQUIRED_SUBSYSTEM_RECEIPT_COUNT = 5;
 const REQUIRED_REGION_COUNT = 3;
 
 const DEFAULT_BLOCKED_DOMAINS: Nhm2FullApparatusTensorBlockedCampaignDomain[] = [
@@ -263,6 +270,36 @@ const TEST_POLICY: Record<
     acceptanceCriterion: "Material strain-energy term is included.",
     artifactToProduce: "receipt://full_apparatus_tensor/material_strain_energy_v1",
   },
+  material_coupon_receipt_ref: {
+    blockers: ["full_apparatus_material_coupon_receipt_ref_missing"],
+    requiredMeasurement: "Upstream material-coupon receipt ref tied to the apparatus tensor material/strain terms.",
+    acceptanceCriterion: "Material coupon receipt ref is present and tied to the tensor-value evidence.",
+    artifactToProduce: "receipt://full_apparatus_tensor/material_coupon_receipt_ref_v1",
+  },
+  force_gap_receipt_ref: {
+    blockers: ["full_apparatus_force_gap_receipt_ref_missing"],
+    requiredMeasurement: "Upstream 8 nm force-gap and pull-in receipt ref tied to the apparatus tensor force terms.",
+    acceptanceCriterion: "Force-gap/pull-in receipt ref is present and tied to the tensor-value evidence.",
+    artifactToProduce: "receipt://full_apparatus_tensor/force_gap_receipt_ref_v1",
+  },
+  roughness_patch_receipt_ref: {
+    blockers: ["full_apparatus_roughness_patch_receipt_ref_missing"],
+    requiredMeasurement: "Upstream roughness/asperity and patch-potential receipt ref tied to electrostatic and geometry terms.",
+    acceptanceCriterion: "Roughness/patch receipt ref is present and tied to the tensor-value evidence.",
+    artifactToProduce: "receipt://full_apparatus_tensor/roughness_patch_receipt_ref_v1",
+  },
+  active_control_receipt_ref: {
+    blockers: ["full_apparatus_active_control_receipt_ref_missing"],
+    requiredMeasurement: "Upstream active-control energy/noise/heat/timing receipt ref tied to control-field terms.",
+    acceptanceCriterion: "Active-control receipt ref is present and tied to the tensor-value evidence.",
+    artifactToProduce: "receipt://full_apparatus_tensor/active_control_receipt_ref_v1",
+  },
+  fatigue_layer_scaling_receipt_ref: {
+    blockers: ["full_apparatus_fatigue_layer_scaling_receipt_ref_missing"],
+    requiredMeasurement: "Upstream fatigue and layer-scaling receipt ref tied to fatigue/scaling tensor terms.",
+    acceptanceCriterion: "Fatigue/layer-scaling receipt ref is present and tied to the tensor-value evidence.",
+    artifactToProduce: "receipt://full_apparatus_tensor/fatigue_layer_scaling_receipt_ref_v1",
+  },
   regional_wall_coverage: {
     blockers: ["full_apparatus_wall_region_missing"],
     requiredMeasurement: "Wall-region tensor coverage using the canonical regional support.",
@@ -301,6 +338,14 @@ const regionIdByTestId: Partial<Record<Nhm2FullApparatusTensorTestId, string>> =
   regional_exterior_shell_coverage: "exterior_shell",
 };
 
+const subsystemReceiptIdByTestId: Partial<Record<Nhm2FullApparatusTensorTestId, string>> = {
+  material_coupon_receipt_ref: "materialCoupon",
+  force_gap_receipt_ref: "forceGapPullIn",
+  roughness_patch_receipt_ref: "roughnessPatch",
+  active_control_receipt_ref: "activeControl",
+  fatigue_layer_scaling_receipt_ref: "fatigueLayerScaling",
+};
+
 const measurementTargetsForTest = (
   testId: Nhm2FullApparatusTensorTestId,
 ): Record<string, Nhm2FullApparatusTensorTargetValue> => {
@@ -310,6 +355,7 @@ const measurementTargetsForTest = (
       requiredTensorValueArtifactContract: REQUIRED_TENSOR_VALUE_ARTIFACT_CONTRACT,
       requiredTensorComponentCount: REQUIRED_TENSOR_COMPONENT_COUNT,
       requiredTermCount: REQUIRED_STRESS_ENERGY_TERM_COUNT,
+      requiredSubsystemReceiptCount: REQUIRED_SUBSYSTEM_RECEIPT_COUNT,
       requiredRegionCount: REQUIRED_REGION_COUNT,
       sourceSideOnly: true,
       targetEchoForbidden: true,
@@ -371,6 +417,15 @@ const measurementTargetsForTest = (
       termMustEnterTensorValueArtifact: true,
     };
   }
+  const subsystemReceiptId = subsystemReceiptIdByTestId[testId];
+  if (subsystemReceiptId != null) {
+    return {
+      subsystemReceiptId,
+      requiredSubsystemReceiptCount: REQUIRED_SUBSYSTEM_RECEIPT_COUNT,
+      subsystemReceiptRefRequired: true,
+      mustTieToTensorTerms: true,
+    };
+  }
   const regionId = regionIdByTestId[testId];
   if (regionId != null) {
     return {
@@ -414,6 +469,10 @@ const falsificationRuleForTest = (testId: Nhm2FullApparatusTensorTestId): string
   const termId = termIdByTestId[testId];
   if (termId != null) {
     return `Missing ${termId} keeps the apparatus tensor scalar/proxy-incomplete and blocks material credibility plus downstream conservation, QEI, observer, and coupled-closure gates.`;
+  }
+  const subsystemReceiptId = subsystemReceiptIdByTestId[testId];
+  if (subsystemReceiptId != null) {
+    return `Missing upstream ${subsystemReceiptId} receipt traceability means the apparatus tensor is not experimentally tied to its subsystem evidence and cannot pass material-source authority.`;
   }
   const regionId = regionIdByTestId[testId];
   if (regionId != null) {
@@ -482,6 +541,7 @@ export const buildNhm2TileSourceFullApparatusTensorTestPlan = (
       requiredComponents: ["T00", "T0i", "diagonalTij", "offDiagonalTij"],
       requiredTensorComponentCount: 10,
       requiredTermCount: 9,
+      requiredSubsystemReceiptCount: 5,
       requiredRegions: ["wall", "hull", "exterior_shell"],
       sourceSideOnly: true,
       targetEchoForbidden: true,
@@ -539,13 +599,14 @@ export const isNhm2TileSourceFullApparatusTensorTestPlan = (
     target.requiredComponents.length === 4 &&
     target.requiredTensorComponentCount === 10 &&
     target.requiredTermCount === 9 &&
+    target.requiredSubsystemReceiptCount === 5 &&
     Array.isArray(target.requiredRegions) &&
     target.requiredRegions.length === 3 &&
     target.sourceSideOnly === true &&
     target.targetEchoForbidden === true &&
     target.evidenceTierRequired === "measured_or_validated_simulation" &&
     Array.isArray(value.testItems) &&
-    value.testItems.length === 21 &&
+    value.testItems.length === 26 &&
     value.testItems.every(
       (item) =>
         isRecord(item) &&
