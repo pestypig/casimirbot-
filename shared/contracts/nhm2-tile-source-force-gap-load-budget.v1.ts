@@ -35,20 +35,28 @@ export type Nhm2TileSourceForceGapLoadBudgetV1 = {
     forceGradientNPerM: number;
     requiredSpringConstantNPerM: number;
     requiredActiveGapControlAuthorityN: number;
+    forceGradientConsistencyMin: 0.75;
     activeControlAuthorityFactorMin: 1.2;
   };
   suppliedForceGapEvidence: {
     evidenceTier: string;
     evidenceRef: string | null;
+    forceGapCurveRef: string | null;
+    forceGradientCurveRef: string | null;
+    stiffnessModelRef: string | null;
     casimirForceN: number | null;
     forceGradientNPerM: number | null;
     effectiveSpringConstantNPerM: number | null;
+    stictionMargin: number | null;
     activeGapControlAuthorityN: number | null;
   };
   margins: {
+    curveModelRefsAvailable: boolean;
     suppliedForceToIdealStackForce: number | null;
     suppliedGradientToIdealGradient: number | null;
+    suppliedGradientConsistencyWithForceCurve: number | null;
     pullInMarginToIdealGradient: number | null;
+    stictionMarginToMinimum: number | null;
     activeAuthorityMarginToIdealLoad: number | null;
   };
   blockers: string[];
@@ -83,6 +91,7 @@ export type BuildNhm2TileSourceForceGapLoadBudgetInput = {
 };
 
 const AUTHORITY_FACTOR = 1.2;
+const FORCE_GRADIENT_CONSISTENCY_MIN = 0.75;
 
 const round = (value: number, digits = 12): number => Number(value.toPrecision(digits));
 
@@ -96,6 +105,12 @@ const safeRatio = (numerator: number | null, denominator: number | null): number
   numerator == null || denominator == null || denominator === 0
     ? null
     : round(numerator / denominator);
+
+const symmetricRatioMargin = (actual: number | null, expected: number | null): number | null => {
+  if (actual == null || expected == null || actual <= 0 || expected <= 0) return null;
+  const ratio = actual / expected;
+  return round(Math.min(ratio, 1 / ratio));
+};
 
 export const buildNhm2TileSourceForceGapLoadBudget = (
   input: BuildNhm2TileSourceForceGapLoadBudgetInput = {},
@@ -120,8 +135,20 @@ export const buildNhm2TileSourceForceGapLoadBudget = (
   const suppliedForce = forceGapEvidence?.casimirForceN ?? null;
   const suppliedGradient = forceGapEvidence?.forceGradientNPerM ?? null;
   const suppliedSpring = forceGapEvidence?.effectiveSpringConstantNPerM ?? null;
+  const suppliedStictionMargin = forceGapEvidence?.stictionMargin ?? null;
   const suppliedAuthority = forceGapEvidence?.activeGapControlAuthorityN ?? null;
+  const curveModelRefsAvailable =
+    forceGapEvidence?.forceGapCurveRef != null &&
+    forceGapEvidence.forceGradientCurveRef != null &&
+    forceGapEvidence.stiffnessModelRef != null;
   const pullInMarginToIdealGradient = safeRatio(suppliedSpring, idealGradient);
+  const expectedGradientFromSuppliedForce =
+    suppliedForce == null ? null : round((4 * Math.abs(suppliedForce)) / gapMeters);
+  const suppliedGradientConsistencyWithForceCurve = symmetricRatioMargin(
+    suppliedGradient,
+    expectedGradientFromSuppliedForce,
+  );
+  const stictionMarginToMinimum = safeRatio(suppliedStictionMargin, 1);
   const activeAuthorityMarginToIdealLoad = safeRatio(suppliedAuthority, requiredActiveAuthority);
   const blockers = [
     ...(forceGapEvidence == null || forceGapEvidence.evidenceTier === "missing"
@@ -131,12 +158,31 @@ export const buildNhm2TileSourceForceGapLoadBudget = (
     forceGapEvidence?.evidenceTier !== "validated_simulation"
       ? ["force_gap_load_budget_tier_not_measured_or_validated"]
       : []),
+    ...(forceGapEvidence?.forceGapCurveRef == null
+      ? ["force_gap_curve_ref_missing_for_load_budget"]
+      : []),
+    ...(forceGapEvidence?.forceGradientCurveRef == null
+      ? ["force_gradient_curve_ref_missing_for_load_budget"]
+      : []),
+    ...(forceGapEvidence?.stiffnessModelRef == null
+      ? ["force_gap_stiffness_model_ref_missing_for_load_budget"]
+      : []),
     ...(suppliedForce == null ? ["force_gap_casimir_force_missing_for_447_layer_budget"] : []),
     ...(suppliedGradient == null ? ["force_gap_gradient_missing_for_447_layer_budget"] : []),
+    ...(suppliedGradientConsistencyWithForceCurve == null
+      ? ["force_gap_gradient_consistency_with_force_curve_missing_for_load_budget"]
+      : suppliedGradientConsistencyWithForceCurve < FORCE_GRADIENT_CONSISTENCY_MIN
+        ? ["force_gap_gradient_inconsistent_with_force_curve_for_load_budget"]
+        : []),
     ...(pullInMarginToIdealGradient == null
       ? ["ideal_load_pull_in_margin_missing"]
       : pullInMarginToIdealGradient < 1
         ? ["ideal_load_pull_in_margin_below_one"]
+        : []),
+    ...(stictionMarginToMinimum == null
+      ? ["force_gap_stiction_margin_missing_for_load_budget"]
+      : stictionMarginToMinimum < 1
+        ? ["force_gap_stiction_margin_below_one_for_load_budget"]
         : []),
     ...(activeAuthorityMarginToIdealLoad == null
       ? ["ideal_load_active_control_authority_missing"]
@@ -151,6 +197,8 @@ export const buildNhm2TileSourceForceGapLoadBudget = (
       ? blockers.some((blocker) =>
           [
             "ideal_load_pull_in_margin_below_one",
+            "force_gap_gradient_inconsistent_with_force_curve_for_load_budget",
+            "force_gap_stiction_margin_below_one_for_load_budget",
             "ideal_load_active_control_authority_below_1p2x_stack_force",
           ].includes(blocker),
         )
@@ -179,23 +227,31 @@ export const buildNhm2TileSourceForceGapLoadBudget = (
       forceGradientNPerM: idealGradient ?? 0,
       requiredSpringConstantNPerM: idealGradient ?? 0,
       requiredActiveGapControlAuthorityN: requiredActiveAuthority ?? 0,
+      forceGradientConsistencyMin: FORCE_GRADIENT_CONSISTENCY_MIN,
       activeControlAuthorityFactorMin: AUTHORITY_FACTOR,
     },
     suppliedForceGapEvidence: {
       evidenceTier: forceGapEvidence?.evidenceTier ?? "missing",
       evidenceRef: forceGapEvidence?.evidenceRef ?? null,
+      forceGapCurveRef: forceGapEvidence?.forceGapCurveRef ?? null,
+      forceGradientCurveRef: forceGapEvidence?.forceGradientCurveRef ?? null,
+      stiffnessModelRef: forceGapEvidence?.stiffnessModelRef ?? null,
       casimirForceN: finiteOrNull(suppliedForce),
       forceGradientNPerM: finiteOrNull(suppliedGradient),
       effectiveSpringConstantNPerM: finiteOrNull(suppliedSpring),
+      stictionMargin: finiteOrNull(suppliedStictionMargin),
       activeGapControlAuthorityN: finiteOrNull(suppliedAuthority),
     },
     margins: {
+      curveModelRefsAvailable,
       suppliedForceToIdealStackForce: safeRatio(
         suppliedForce == null ? null : Math.abs(suppliedForce),
         idealStackForceN == null ? null : Math.abs(idealStackForceN),
       ),
       suppliedGradientToIdealGradient: safeRatio(suppliedGradient, idealGradient),
+      suppliedGradientConsistencyWithForceCurve,
       pullInMarginToIdealGradient,
+      stictionMarginToMinimum,
       activeAuthorityMarginToIdealLoad,
     },
     blockers,
@@ -252,10 +308,16 @@ export const isNhm2TileSourceForceGapLoadBudget = (
     typeof idealLoadBudget.forceGradientNPerM === "number" &&
     typeof idealLoadBudget.requiredSpringConstantNPerM === "number" &&
     typeof idealLoadBudget.requiredActiveGapControlAuthorityN === "number" &&
+    idealLoadBudget.forceGradientConsistencyMin === 0.75 &&
     idealLoadBudget.activeControlAuthorityFactorMin === 1.2 &&
     supplied != null &&
     typeof supplied.evidenceTier === "string" &&
+    (supplied.forceGapCurveRef === null || typeof supplied.forceGapCurveRef === "string") &&
+    (supplied.forceGradientCurveRef === null ||
+      typeof supplied.forceGradientCurveRef === "string") &&
+    (supplied.stiffnessModelRef === null || typeof supplied.stiffnessModelRef === "string") &&
     margins != null &&
+    typeof margins.curveModelRefsAvailable === "boolean" &&
     Array.isArray(value.blockers) &&
     value.blockers.every((entry) => typeof entry === "string") &&
     summary != null &&

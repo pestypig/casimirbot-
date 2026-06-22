@@ -5,11 +5,18 @@ import { describe, expect, it } from "vitest";
 
 import { buildNhm2ReferenceRunArtifact } from "../shared/contracts/nhm2-reference-run.v1";
 import {
+  buildNhm2TileSourceFullApparatusTensorValues,
+  NHM2_FULL_APPARATUS_REQUIRED_TERM_IDS,
+  NHM2_FULL_APPARATUS_SYMMETRIC_TENSOR_COMPONENTS,
+  type Nhm2FullApparatusTensorValueRegionV1,
+} from "../shared/contracts/nhm2-tile-source-full-apparatus-tensor-values.v1";
+import {
   buildNhm2TileEffectiveCounterpartArtifact,
   type Nhm2TileEffectiveCounterpartComparisonRole,
   type Nhm2TileEffectiveCounterpartRegion,
   type Nhm2TileEffectiveCounterpartTensorAuthorityMode,
 } from "../shared/contracts/nhm2-tile-effective-counterpart.v1";
+import type { Nhm2TileSourceAuthorityHandoffV1 } from "../shared/contracts/nhm2-tile-source-authority-handoff.v1";
 import { publishSourceSideSameBasisTensorAuthority } from "../tools/nhm2/publish-source-side-same-basis-authority";
 
 const profile = "stage1_centerline_alpha_0p995_v1";
@@ -145,6 +152,159 @@ const counterpart = (
     literatureRefs: ["fixture"],
   });
 
+const symmetricValueTensor = (value: number) => ({
+  T00: -value,
+  T01: value * 0.001,
+  T02: value * 0.002,
+  T03: value * 0.003,
+  T11: value * 0.02,
+  T12: value * 0.0004,
+  T13: value * 0.0005,
+  T22: value * 0.021,
+  T23: value * 0.0006,
+  T33: value * 0.022,
+});
+
+const fullApparatusTensorValueRegion = (
+  regionId: (typeof regionIds)[number],
+): Nhm2FullApparatusTensorValueRegionV1 => ({
+  regionId,
+  status: "computed",
+  tensor: symmetricValueTensor(10),
+  componentStatus: Object.fromEntries(
+    NHM2_FULL_APPARATUS_SYMMETRIC_TENSOR_COMPONENTS.map((componentId) => [
+      componentId,
+      "validated_simulation",
+    ]),
+  ),
+  componentAuthority: Object.fromEntries(
+    NHM2_FULL_APPARATUS_SYMMETRIC_TENSOR_COMPONENTS.map((componentId) => [
+      componentId,
+      "constitutive_model",
+    ]),
+  ),
+  termContributions: Object.fromEntries(
+    NHM2_FULL_APPARATUS_REQUIRED_TERM_IDS.map((termId) => [
+      termId,
+      symmetricValueTensor(0.1),
+    ]),
+  ),
+  chartRef: "comoving_cartesian",
+  basisRef: "same_basis",
+  unitsRef: "J/m^3",
+  regionSupportRef: `support.${regionId}`,
+  aggregationMode: "support_weighted",
+  normalizationBasis: "volume",
+  sampleCount: 16,
+  valueReceiptRef: `value.${regionId}`,
+  blockers: [],
+  warnings: [],
+});
+
+const fullApparatusTensorValues = () =>
+  buildNhm2TileSourceFullApparatusTensorValues({
+    generatedAt: "2026-06-12T00:00:00.000Z",
+    laneId: "nhm2_shift_lapse",
+    selectedProfileId: profile,
+    frozenCandidateId: "nhm2_447_layer_topology_optimized_lattice_tin_v1",
+    artifactRef: "full-apparatus-values.json",
+    sourceRefs: {
+      materialEvidenceReceiptsRef: "material-evidence.json",
+      fullApparatusTensorEvidenceRef: "full-apparatus-evidence.json",
+      apparatusModelRef: "apparatus-model.json",
+      atlasRef: "atlas.json",
+    },
+    sourceSideOnly: true,
+    notDerivedFromMetricRequiredTensor: true,
+    targetEchoForbidden: true,
+    targetDerivedFieldsUsed: false,
+    chartId: "comoving_cartesian",
+    basisRef: "same_basis",
+    unitsRef: "J/m^3",
+    regions: regionIds.map((regionId) => fullApparatusTensorValueRegion(regionId)),
+  });
+
+const handoffReady = (): Nhm2TileSourceAuthorityHandoffV1 => ({
+  contractVersion: "nhm2_tile_source_authority_handoff/v1",
+  generatedAt: "2026-06-12T00:00:00.000Z",
+  laneId: "nhm2_shift_lapse",
+  selectedProfileId: profile,
+  frozenCandidateId: "nhm2_447_layer_topology_optimized_lattice_tin_v1",
+  sourceRefs: {
+    materialEvidenceReceiptsRef: "material-evidence.json",
+    physicalValidationPlanRef: "validation-plan.json",
+    falsificationReportRef: "falsification-report.json",
+    operatingBudgetReadinessRef: "operating-budget-readiness.json",
+    fullApparatusTensorOperatingBudgetRef: "full-apparatus-tensor-operating-budget.json",
+    targetAuthorityContractRef: "nhm2_source_side_same_basis_tensor_authority/v1",
+  },
+  handoffTarget: {
+    targetContractVersion: "nhm2_source_side_same_basis_tensor_authority/v1",
+    requiresSameChart: true,
+    requiresSameBasis: true,
+    requiresSameUnits: true,
+    requiresFullComponents: ["T00", "T0i", "diagonalTij", "offDiagonalTij"],
+    requiresTensorComponents: [
+      "T00",
+      "T01",
+      "T02",
+      "T03",
+      "T11",
+      "T12",
+      "T13",
+      "T22",
+      "T23",
+      "T33",
+    ],
+    requiresRegions: ["wall", "hull", "exterior_shell"],
+    metricTargetEchoForbidden: true,
+  },
+  gates: [
+    "material_receipts",
+    "full_apparatus_tensor",
+    "source_authority_metadata",
+    "component_coverage",
+    "component_detail_refs",
+    "regional_coverage",
+    "no_metric_target_echo",
+    "operating_budget_readiness",
+    "falsification_report",
+  ].map((gateId) => ({
+    gateId: gateId as Nhm2TileSourceAuthorityHandoffV1["gates"][number]["gateId"],
+    status: "pass",
+    blockers: [],
+    requiredChange: "No change required for fixture handoff.",
+  })),
+  summary: {
+    handoffStatus: "handoff_ready",
+    handoffReadyForSameBasisAuthority: true,
+    materialEvidenceReady: true,
+    fullApparatusTensorReady: true,
+    fullApparatusComponentDetailRefsReady: true,
+    sourceAuthorityEvidenceReady: true,
+    allReceiptsPresent: true,
+    operatingBudgetsReady: true,
+    operatingBudgetsFalsifyCurrentCandidate: false,
+    physicalValidationStillRequired: true,
+    firstBlocker: "none",
+    physicalViabilityClaimAllowed: false,
+    transportClaimAllowed: false,
+    propulsionClaimAllowed: false,
+  },
+  claimBoundary: {
+    diagnosticOnly: true,
+    handoffOnly: true,
+    handoffDoesNotRunSameBasisAuthority: true,
+    handoffDoesNotRunDownstreamGates: true,
+    operatingBudgetReadinessDoesNotValidateMaterialSource: true,
+    handoffReadyIsNotPhysicalCredibility: true,
+    idealScalarCasimirIsNotMaterialEvidence: true,
+    physicalViabilityClaimAllowed: false,
+    transportClaimAllowed: false,
+    propulsionClaimAllowed: false,
+  },
+});
+
 const withTemp = (fn: (root: string) => void) => {
   const root = mkdtempSync(join(tmpdir(), "nhm2-source-authority-"));
   try {
@@ -196,6 +356,43 @@ describe("publish source-side same-basis tensor authority", () => {
       );
     }));
 
+  it("uses full-apparatus tensor values as same-basis source authority", () =>
+    withTemp((root) => {
+      writeFileSync(
+        join(root, "tile.json"),
+        JSON.stringify(counterpart("tile_effective_counterpart", "diagonal_reduced_order")),
+        "utf8",
+      );
+      writeFileSync(join(root, "handoff.json"), JSON.stringify(handoffReady()), "utf8");
+      writeFileSync(
+        join(root, "full-apparatus-values.json"),
+        JSON.stringify(fullApparatusTensorValues()),
+        "utf8",
+      );
+
+      const artifact = publishSourceSideSameBasisTensorAuthority({
+        repoRoot: root,
+        referenceRunPath: "reference.json",
+        tileEffectiveCounterpartPath: "tile.json",
+        tileSourceAuthorityHandoffPath: "handoff.json",
+        fullApparatusTensorValuesPath: "full-apparatus-values.json",
+        outPath: "authority.json",
+      });
+      const wall = artifact.regions.find((entry) => entry.regionId === "wall");
+
+      expect(artifact.summary.hasWallAuthority).toBe(true);
+      expect(artifact.summary.allRequiredRegionsAuthoritative).toBe(true);
+      expect(artifact.summary.tileSourceHandoffReady).toBe(true);
+      expect(wall?.status).toBe("authoritative_same_basis");
+      expect(wall?.comparisonRole).toBe("tile_source_full_apparatus_tensor_values");
+      expect(wall?.tensorAuthorityMode).toBe("symmetric_full_tensor");
+      expect(wall?.sourceTensorRef).toBe("value.wall");
+      expect(wall?.blockers).toEqual([]);
+      expect(wall?.warnings).not.toContain(
+        "tile_source_handoff_is_evidence_intake_not_tensor_authority",
+      );
+    }));
+
   it("forbids metric echoes as source-side authority", () =>
     withTemp((root) => {
       writeFileSync(
@@ -233,5 +430,32 @@ describe("publish source-side same-basis tensor authority", () => {
       expect(artifact.summary.hasWallAuthority).toBe(true);
       expect(artifact.summary.allRequiredRegionsAuthoritative).toBe(true);
       expect(artifact.claimBoundary.doesNotValidatePhysicalSource).toBe(true);
+    }));
+
+  it("passes tile-source handoff metadata through without making it tensor authority", () =>
+    withTemp((root) => {
+      writeFileSync(
+        join(root, "tile.json"),
+        JSON.stringify(counterpart("tile_effective_counterpart", "diagonal_reduced_order")),
+        "utf8",
+      );
+      writeFileSync(join(root, "handoff.json"), JSON.stringify(handoffReady()), "utf8");
+
+      const artifact = publishSourceSideSameBasisTensorAuthority({
+        repoRoot: root,
+        referenceRunPath: "reference.json",
+        tileEffectiveCounterpartPath: "tile.json",
+        tileSourceAuthorityHandoffPath: "handoff.json",
+        outPath: "authority.json",
+      });
+
+      expect(artifact.tileSourceAuthorityHandoffRef).toBe("handoff.json");
+      expect(artifact.tileSourceAuthorityHandoffStatus).toBe("handoff_ready");
+      expect(artifact.summary.tileSourceHandoffReady).toBe(true);
+      expect(artifact.summary.hasWallAuthority).toBe(false);
+      expect(artifact.summary.anyProxy).toBe(true);
+      expect(artifact.regions.find((entry) => entry.regionId === "wall")?.status).toBe(
+        "proxy_limited",
+      );
     }));
 });

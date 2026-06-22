@@ -42,14 +42,26 @@ const liveSourceMailboxRequiresModelSynthesizedAnswer = (payload: Record<string,
 };
 
 export type LiveSourceTerminalFailureRepair = {
-  code: "post_tool_model_step_missing";
+  code: "post_tool_model_step_missing" | "fresh_source_unbound";
   text: string;
+};
+
+const liveSourceIdentityFailure = (payload: Record<string, unknown>): LiveSourceTerminalFailureRepair | null => {
+  const audit = readRecord(payload.live_source_identity_audit);
+  const diagnosis = readString(audit?.diagnosis);
+  if (audit?.identity_ok !== false || diagnosis !== "fresh_source_unbound") return null;
+  return {
+    code: "fresh_source_unbound",
+    text: "I could not complete this visual-source turn because the freshest visual source is not bound to the active SituationRun. Cause: fresh_source_unbound.",
+  };
 };
 
 export const liveSourceModelSynthesisMissingFailure = (
   payload: Record<string, unknown>,
   candidateText: string,
 ): LiveSourceTerminalFailureRepair | null => {
+  const identityFailure = liveSourceIdentityFailure(payload);
+  if (identityFailure) return identityFailure;
   if (!isProcessedLiveSourceMailSummaryText(candidateText)) return null;
   if (!liveSourceMailboxRequiresModelSynthesizedAnswer(payload)) return null;
   return {

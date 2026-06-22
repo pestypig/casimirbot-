@@ -2404,6 +2404,10 @@ const workstationToolEvaluationText = (artifact: ArtifactLike): string | null =>
   const payload = artifactPayload(artifact);
   return (
     artifactText(artifact) ??
+    readString((artifact as Record<string, unknown>).text_preview) ??
+    readString((artifact as Record<string, unknown>).terminal_text_preview) ??
+    readString(payload?.text_preview) ??
+    readString(payload?.terminal_text_preview) ??
     readString(payload?.summary) ??
     readString(payload?.result_summary) ??
     readString(payload?.result_text) ??

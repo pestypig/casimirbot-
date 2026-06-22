@@ -145,6 +145,12 @@ export const runNhm2TimeDependentSourceCampaign = (args: {
   natarioInvariantAuditPath?: string | null;
   regionalSupportAtlasPath?: string | null;
   casimirMaterialReceiptPath?: string | null;
+  tileSourceMaterialEvidenceReceiptsPath?: string | null;
+  tileSourcePhysicalValidationPlanPath?: string | null;
+  tileSourceEvidenceGapRoadmapPath?: string | null;
+  tileSourceFalsificationReportPath?: string | null;
+  tileSourceAuthorityHandoffPath?: string | null;
+  tileSourceOperatingBudgetReadinessPath?: string | null;
   coupledClosurePassCandidatePath?: string | null;
   regionalTensorPassPathHarnessPath?: string | null;
   frequencyConvergencePath?: string | null;
@@ -315,6 +321,15 @@ export const runNhm2TimeDependentSourceCampaign = (args: {
       natarioInvariantAudit: args.natarioInvariantAuditPath ?? null,
       regionalSupportFunctionAtlas: args.regionalSupportAtlasPath ?? null,
       casimirMaterialReceipt: args.casimirMaterialReceiptPath ?? null,
+      tileSourceMaterialEvidenceReceipts:
+        args.tileSourceMaterialEvidenceReceiptsPath ?? null,
+      tileSourcePhysicalValidationPlan:
+        args.tileSourcePhysicalValidationPlanPath ?? null,
+      tileSourceEvidenceGapRoadmap: args.tileSourceEvidenceGapRoadmapPath ?? null,
+      tileSourceFalsificationReport: args.tileSourceFalsificationReportPath ?? null,
+      tileSourceAuthorityHandoff: args.tileSourceAuthorityHandoffPath ?? null,
+      tileSourceOperatingBudgetReadiness:
+        args.tileSourceOperatingBudgetReadinessPath ?? null,
       coupledClosurePassCandidate: args.coupledClosurePassCandidatePath ?? null,
       regionalTensorPassPathHarness: args.regionalTensorPassPathHarnessPath ?? null,
       sourceModelRef: args.sourceModelRef ?? null,
@@ -403,6 +418,22 @@ if (normalize(process.argv[1] ?? "") === normalize(fileURLToPath(import.meta.url
     natarioInvariantAuditPath: asString(args["natario-invariant-audit"]),
     regionalSupportAtlasPath: asString(args["regional-support-atlas"]),
     casimirMaterialReceiptPath: asString(args["casimir-material-receipt"]),
+    tileSourceMaterialEvidenceReceiptsPath: asString(
+      args["tile-source-material-evidence-receipts"],
+    ),
+    tileSourcePhysicalValidationPlanPath: asString(
+      args["tile-source-physical-validation-plan"],
+    ),
+    tileSourceEvidenceGapRoadmapPath: asString(
+      args["tile-source-evidence-gap-roadmap"],
+    ),
+    tileSourceFalsificationReportPath: asString(
+      args["tile-source-falsification-report"],
+    ),
+    tileSourceAuthorityHandoffPath: asString(args["tile-source-authority-handoff"]),
+    tileSourceOperatingBudgetReadinessPath: asString(
+      args["tile-source-operating-budget-readiness"],
+    ),
     coupledClosurePassCandidatePath: asString(args["coupled-closure-pass-candidate"]),
     regionalTensorPassPathHarnessPath: asString(
       args["regional-tensor-pass-path-harness"],

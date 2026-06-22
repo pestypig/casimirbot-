@@ -197,20 +197,30 @@ const evidenceFileNames: Record<Nhm2CampaignProfileRunEvidenceId, string> = {
   tile_source_authority_handoff: "nhm2-tile-source-authority-handoff.json",
   tile_source_material_coupon_test_plan:
     "nhm2-tile-source-material-coupon-test-plan.json",
+  tile_source_material_coupon_operating_budget:
+    "nhm2-tile-source-material-coupon-operating-budget.json",
   tile_source_force_gap_pull_in_test_plan:
     "nhm2-tile-source-force-gap-pull-in-test-plan.json",
   tile_source_force_gap_load_budget:
     "nhm2-tile-source-force-gap-load-budget.json",
   tile_source_roughness_patch_test_plan:
     "nhm2-tile-source-roughness-patch-test-plan.json",
+  tile_source_roughness_patch_operating_budget:
+    "nhm2-tile-source-roughness-patch-operating-budget.json",
   tile_source_active_control_test_plan:
     "nhm2-tile-source-active-control-test-plan.json",
   tile_source_active_control_operating_budget:
     "nhm2-tile-source-active-control-operating-budget.json",
   tile_source_fatigue_layer_scaling_test_plan:
     "nhm2-tile-source-fatigue-layer-scaling-test-plan.json",
+  tile_source_fatigue_layer_scaling_operating_budget:
+    "nhm2-tile-source-fatigue-layer-scaling-operating-budget.json",
   tile_source_full_apparatus_tensor_test_plan:
     "nhm2-tile-source-full-apparatus-tensor-test-plan.json",
+  tile_source_full_apparatus_tensor_operating_budget:
+    "nhm2-tile-source-full-apparatus-tensor-operating-budget.json",
+  tile_source_operating_budget_readiness:
+    "nhm2-tile-source-operating-budget-readiness.json",
 };
 
 const parseArgs = (argv: string[]): Record<string, string | boolean> => {

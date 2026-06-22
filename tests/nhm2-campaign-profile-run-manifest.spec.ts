@@ -139,13 +139,18 @@ describe("nhm2_campaign_profile_run_manifest/v1", () => {
       "tile_source_falsification_report",
       "tile_source_authority_handoff",
       "tile_source_material_coupon_test_plan",
+      "tile_source_material_coupon_operating_budget",
       "tile_source_force_gap_pull_in_test_plan",
       "tile_source_force_gap_load_budget",
       "tile_source_roughness_patch_test_plan",
+      "tile_source_roughness_patch_operating_budget",
       "tile_source_active_control_test_plan",
       "tile_source_active_control_operating_budget",
       "tile_source_fatigue_layer_scaling_test_plan",
+      "tile_source_fatigue_layer_scaling_operating_budget",
       "tile_source_full_apparatus_tensor_test_plan",
+      "tile_source_full_apparatus_tensor_operating_budget",
+      "tile_source_operating_budget_readiness",
     ]);
     expect(manifest.summary).toMatchObject({
       candidateCount: 2,
@@ -368,11 +373,26 @@ describe("nhm2_campaign_profile_run_manifest/v1", () => {
     const activeControlBudget = manifest.candidates[0]?.requiredEvidence.find(
       (entry) => entry.evidenceId === "tile_source_active_control_operating_budget",
     );
+    const materialCouponBudget = manifest.candidates[0]?.requiredEvidence.find(
+      (entry) => entry.evidenceId === "tile_source_material_coupon_operating_budget",
+    );
     const forceGapLoadBudget = manifest.candidates[0]?.requiredEvidence.find(
       (entry) => entry.evidenceId === "tile_source_force_gap_load_budget",
     );
+    const roughnessPatchBudget = manifest.candidates[0]?.requiredEvidence.find(
+      (entry) => entry.evidenceId === "tile_source_roughness_patch_operating_budget",
+    );
+    const fatigueLayerScalingBudget = manifest.candidates[0]?.requiredEvidence.find(
+      (entry) => entry.evidenceId === "tile_source_fatigue_layer_scaling_operating_budget",
+    );
     const fullApparatusPlan = manifest.candidates[0]?.requiredEvidence.find(
       (entry) => entry.evidenceId === "tile_source_full_apparatus_tensor_test_plan",
+    );
+    const fullApparatusBudget = manifest.candidates[0]?.requiredEvidence.find(
+      (entry) => entry.evidenceId === "tile_source_full_apparatus_tensor_operating_budget",
+    );
+    const operatingBudgetReadiness = manifest.candidates[0]?.requiredEvidence.find(
+      (entry) => entry.evidenceId === "tile_source_operating_budget_readiness",
     );
 
     expect(material).toMatchObject({
@@ -419,6 +439,17 @@ describe("nhm2_campaign_profile_run_manifest/v1", () => {
     expect(activeControlBudget?.blockers).toEqual(
       expect.arrayContaining(["active_control_receipt_missing_for_operating_budget"]),
     );
+    expect(materialCouponBudget).toMatchObject({
+      status: "provided_blocked",
+      artifactRef: join(
+        "runs",
+        candidateId,
+        "nhm2-tile-source-material-coupon-operating-budget.json",
+      ),
+    });
+    expect(materialCouponBudget?.blockers).toEqual(
+      expect.arrayContaining(["material_coupon_receipt_missing_for_operating_budget"]),
+    );
     expect(forceGapLoadBudget).toMatchObject({
       status: "provided_blocked",
       artifactRef: join("runs", candidateId, "nhm2-tile-source-force-gap-load-budget.json"),
@@ -426,12 +457,61 @@ describe("nhm2_campaign_profile_run_manifest/v1", () => {
     expect(forceGapLoadBudget?.blockers).toEqual(
       expect.arrayContaining(["force_gap_receipt_missing_for_load_budget"]),
     );
+    expect(roughnessPatchBudget).toMatchObject({
+      status: "provided_blocked",
+      artifactRef: join(
+        "runs",
+        candidateId,
+        "nhm2-tile-source-roughness-patch-operating-budget.json",
+      ),
+    });
+    expect(roughnessPatchBudget?.blockers).toEqual(
+      expect.arrayContaining(["roughness_patch_receipt_missing_for_operating_budget"]),
+    );
+    expect(fatigueLayerScalingBudget).toMatchObject({
+      status: "provided_blocked",
+      artifactRef: join(
+        "runs",
+        candidateId,
+        "nhm2-tile-source-fatigue-layer-scaling-operating-budget.json",
+      ),
+    });
+    expect(fatigueLayerScalingBudget?.blockers).toEqual(
+      expect.arrayContaining([
+        "fatigue_layer_scaling_receipt_missing_for_operating_budget",
+      ]),
+    );
     expect(activeControlPlan?.blockers.some((blocker) => blocker.endsWith("_required"))).toBe(true);
     expect(fullApparatusPlan).toMatchObject({
       status: "provided_blocked",
       artifactRef: join("runs", candidateId, "nhm2-tile-source-full-apparatus-tensor-test-plan.json"),
     });
     expect(fullApparatusPlan?.blockers.some((blocker) => blocker.endsWith("_required"))).toBe(true);
+    expect(fullApparatusBudget).toMatchObject({
+      status: "provided_blocked",
+      artifactRef: join(
+        "runs",
+        candidateId,
+        "nhm2-tile-source-full-apparatus-tensor-operating-budget.json",
+      ),
+    });
+    expect(fullApparatusBudget?.blockers).toEqual(
+      expect.arrayContaining(["full_apparatus_tensor_receipt_missing_for_operating_budget"]),
+    );
+    expect(operatingBudgetReadiness).toMatchObject({
+      status: "provided_blocked",
+      artifactRef: join(
+        "runs",
+        candidateId,
+        "nhm2-tile-source-operating-budget-readiness.json",
+      ),
+    });
+    expect(operatingBudgetReadiness?.blockers).toEqual(
+      expect.arrayContaining([
+        "material_coupon:material_coupon_receipt_missing_for_operating_budget",
+        "full_apparatus_tensor:full_apparatus_tensor_receipt_missing_for_operating_budget",
+      ]),
+    );
   });
 
   it("marks observer evidence as blocked when observer-family violations are present", () => {

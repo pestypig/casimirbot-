@@ -3,6 +3,7 @@ import {
   buildNhm2TileSourcePhysicalValidationPlan,
   isNhm2TileSourcePhysicalValidationPlan,
 } from "../shared/contracts/nhm2-tile-source-physical-validation-plan.v1";
+import type { Nhm2TileSourceOperatingBudgetReadinessV1 } from "../shared/contracts/nhm2-tile-source-operating-budget-readiness.v1";
 
 const allReceipts = {
   material_coupon: true,
@@ -35,6 +36,65 @@ const downstreamPass = {
 } as const;
 
 const forbiddenPhrase = (...parts: string[]): RegExp => new RegExp(parts.join(""), "i");
+
+const readyOperatingBudgetReadiness = (
+  generatedAt: string,
+): Nhm2TileSourceOperatingBudgetReadinessV1 => ({
+  contractVersion: "nhm2_tile_source_operating_budget_readiness/v1",
+  generatedAt,
+  laneId: "nhm2_shift_lapse",
+  selectedProfileId:
+    "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+  frozenCandidateId: "nhm2_447_layer_topology_optimized_lattice_tin_v1",
+  sourceRefs: {
+    material_coupon: "artifact://material-coupon-budget",
+    force_gap_load: "artifact://force-gap-load-budget",
+    roughness_patch: "artifact://roughness-patch-budget",
+    active_control: "artifact://active-control-budget",
+    fatigue_layer_scaling: "artifact://fatigue-layer-scaling-budget",
+    full_apparatus_tensor: "artifact://full-apparatus-tensor-budget",
+  },
+  budgetStatuses: [
+    "material_coupon",
+    "force_gap_load",
+    "roughness_patch",
+    "active_control",
+    "fatigue_layer_scaling",
+    "full_apparatus_tensor",
+  ].map((surfaceId) => ({
+    surfaceId: surfaceId as Nhm2TileSourceOperatingBudgetReadinessV1["budgetStatuses"][number]["surfaceId"],
+    contractVersion: `nhm2_tile_source_${surfaceId}_operating_budget/v1`,
+    artifactRef: `artifact://${surfaceId}-budget`,
+    ready: true,
+    falsifiesCurrentCandidate: false,
+    firstBlocker: "none",
+    blockerCount: 0,
+    blockers: [],
+    numericalMargins: {},
+  })),
+  summary: {
+    allOperatingBudgetsReady: true,
+    anyOperatingBudgetFalsifies: false,
+    firstBlocker: "none",
+    blockerCount: 0,
+    falsifyingBudgetCount: 0,
+    reviewBudgetCount: 0,
+    physicalViabilityClaimAllowed: false,
+    transportClaimAllowed: false,
+    propulsionClaimAllowed: false,
+  },
+  blockers: [],
+  claimBoundary: {
+    diagnosticOnly: true,
+    operatingBudgetReadinessOnly: true,
+    budgetsDoNotSupplyExperimentalReceipts: true,
+    budgetsDoNotSupplyFullTensorValues: true,
+    fullSolveRequiresDownstreamGateClosure: true,
+    physicalViabilityClaimAllowed: false,
+    transportClaimAllowed: false,
+    propulsionClaimAllowed: false,
+  },
+});
 
 describe("NHM2 tile source physical validation plan", () => {
   const generatedAt = "2026-06-22T00:00:00.000Z";
@@ -81,6 +141,7 @@ describe("NHM2 tile source physical validation plan", () => {
       generatedAt,
       suppliedReceiptSurfaces: allReceipts,
       tensorTermCoverage: fullTensorCoverage,
+      operatingBudgetReadiness: readyOperatingBudgetReadiness(generatedAt),
     });
 
     expect(plan.summary.allReceiptsPresent).toBe(true);
@@ -96,6 +157,7 @@ describe("NHM2 tile source physical validation plan", () => {
       suppliedReceiptSurfaces: allReceipts,
       tensorTermCoverage: fullTensorCoverage,
       tensorAuthorityEvidenceSupplied: true,
+      operatingBudgetReadiness: readyOperatingBudgetReadiness(generatedAt),
     });
 
     expect(plan.tensorAuthorityGate.sourceTensorAuthorityCandidateAllowed).toBe(true);
@@ -105,6 +167,48 @@ describe("NHM2 tile source physical validation plan", () => {
     expect(plan.summary.sourceCandidateStatus).toBe("review");
   });
 
+  it("blocks otherwise complete validation when operating-budget readiness is missing", () => {
+    const plan = buildNhm2TileSourcePhysicalValidationPlan({
+      generatedAt,
+      suppliedReceiptSurfaces: allReceipts,
+      tensorTermCoverage: fullTensorCoverage,
+      tensorAuthorityEvidenceSupplied: true,
+      downstreamGateStatuses: downstreamPass,
+    });
+
+    expect(plan.summary.allReceiptsPresent).toBe(true);
+    expect(plan.summary.operatingBudgetsReady).toBe(false);
+    expect(plan.summary.operatingBudgetsFalsifyCurrentCandidate).toBe(false);
+    expect(plan.summary.downstreamGatesPass).toBe(false);
+    expect(plan.summary.firstBlocker).toBe("operating_budget_readiness_missing");
+    expect(plan.summary.physicallyCredibleSourceCandidate).toBe(false);
+    expect(plan.summary.sourceCandidateStatus).toBe("review");
+    expect(plan.downstreamGates.find((gate) => gate.gateId === "material_credibility"))
+      .toMatchObject({
+        status: "review",
+        blockers: expect.arrayContaining([
+          "material_credibility_operating_budgets_not_ready",
+        ]),
+      });
+    expect(plan.downstreamGates.find((gate) => gate.gateId === "coupled_closure"))
+      .toMatchObject({
+        status: "review",
+        blockers: expect.arrayContaining([
+          "coupled_closure_operating_budgets_not_ready",
+          "material_credibility_not_pass_for_coupled_closure",
+        ]),
+      });
+    expect(plan.falsificationMap.map((item) => item.blocker)).toContain(
+      "operating_budget_readiness_missing",
+    );
+    expect(plan.falsificationMap.map((item) => item.blocker)).toEqual(
+      expect.arrayContaining([
+        "material_credibility_operating_budgets_not_ready",
+        "coupled_closure_operating_budgets_not_ready",
+      ]),
+    );
+  });
+
   it("admits a physically credible source candidate only when receipts, tensor authority, and downstream gates all pass", () => {
     const plan = buildNhm2TileSourcePhysicalValidationPlan({
       generatedAt,
@@ -112,6 +216,7 @@ describe("NHM2 tile source physical validation plan", () => {
       tensorTermCoverage: fullTensorCoverage,
       tensorAuthorityEvidenceSupplied: true,
       downstreamGateStatuses: downstreamPass,
+      operatingBudgetReadiness: readyOperatingBudgetReadiness(generatedAt),
     });
 
     expect(plan.summary.sourceCandidateStatus).toBe("physically_credible_source_candidate");
@@ -129,6 +234,7 @@ describe("NHM2 tile source physical validation plan", () => {
       tensorTermCoverage: fullTensorCoverage,
       tensorAuthorityEvidenceSupplied: true,
       downstreamGateStatuses: downstreamPass,
+      operatingBudgetReadiness: readyOperatingBudgetReadiness(generatedAt),
     });
     const text = JSON.stringify(plan);
 

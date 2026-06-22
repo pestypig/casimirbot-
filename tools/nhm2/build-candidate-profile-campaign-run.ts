@@ -28,6 +28,7 @@ import { runNhm2FrequencyConvergenceEvidence } from "./build-frequency-convergen
 import { runNhm2CandidateDynamicEffectiveGeometryAgreement } from "./build-candidate-dynamic-effective-geometry-agreement";
 import { buildAtlasBoundObserverRobustEnergyConditions } from "./build-atlas-bound-observer-robust-energy-conditions";
 import { publishNhm2CampaignStabilityEvidence } from "./build-campaign-stability-evidence";
+import { publishNhm2TileSourceMaterialEvidenceReceipts } from "./publish-tile-source-material-evidence-receipts";
 import {
   runNhm2TimeDependentSourceCampaign,
   type Nhm2TimeDependentSourceCampaignArtifactV1,
@@ -106,6 +107,7 @@ export const runNhm2CandidateProfileCampaignRun = (args: {
   runRootBase?: string | null;
   coordinateTimeSeconds?: number | null;
   toleranceRelLInf?: number | null;
+  tileSourceMaterialEvidencePath?: string | null;
   auditOnly?: boolean;
 }): Nhm2TimeDependentSourceCampaignArtifactV1 => {
   const runRoot = refJoin(
@@ -145,6 +147,12 @@ export const runNhm2CandidateProfileCampaignRun = (args: {
   const campaignPath = path("nhm2-time-dependent-source-campaign.json");
 
   mkdirSync(runRoot, { recursive: true });
+  const tileSourceMaterialEvidence = publishNhm2TileSourceMaterialEvidenceReceipts({
+    repoRoot: args.repoRoot,
+    evidencePath: args.tileSourceMaterialEvidencePath ?? null,
+    outDir: runRoot,
+    selectedProfileId: args.candidateProfileId,
+  });
   freezeNhm2ReferenceRun({
     repoRoot: args.repoRoot,
     profile: args.candidateProfileId,
@@ -411,6 +419,18 @@ export const runNhm2CandidateProfileCampaignRun = (args: {
     switchingConservationPath: switchingPath,
     dynamicEffectiveGeometryPath: dynamicPath,
     campaignStabilityPath: stabilityPath,
+    tileSourceMaterialEvidenceReceiptsPath:
+      tileSourceMaterialEvidence.outputRefs.materialEvidenceReceipts,
+    tileSourcePhysicalValidationPlanPath:
+      tileSourceMaterialEvidence.outputRefs.physicalValidationPlan,
+    tileSourceEvidenceGapRoadmapPath:
+      tileSourceMaterialEvidence.outputRefs.evidenceGapRoadmap,
+    tileSourceFalsificationReportPath:
+      tileSourceMaterialEvidence.outputRefs.falsificationReport,
+    tileSourceAuthorityHandoffPath:
+      tileSourceMaterialEvidence.outputRefs.authorityHandoff,
+    tileSourceOperatingBudgetReadinessPath:
+      tileSourceMaterialEvidence.outputRefs.operatingBudgetReadiness,
     sourceModelRef: sourcePath,
     metricRequiredTensorRef: metricRequiredPath,
     dynamicGeometryRef: path("nhm2-dynamic-geometry-samples.json"),
@@ -440,6 +460,7 @@ const main = (): void => {
     runRootBase: asString(args["run-root-base"]),
     coordinateTimeSeconds: asNumber(args["coordinate-time-seconds"]),
     toleranceRelLInf: asNumber(args["tolerance"]),
+    tileSourceMaterialEvidencePath: asString(args["tile-source-material-evidence"]),
     auditOnly: args["audit-only"] === true,
   });
   process.stdout.write(`${JSON.stringify(artifact, null, 2)}\n`);

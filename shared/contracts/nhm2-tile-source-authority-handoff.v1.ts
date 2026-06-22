@@ -1,5 +1,6 @@
 import type { Nhm2TileSourceFalsificationReportV1 } from "./nhm2-tile-source-falsification-report.v1";
 import type { Nhm2TileSourceMaterialEvidenceReceiptsV1 } from "./nhm2-tile-source-material-evidence-receipts.v1";
+import type { Nhm2TileSourceOperatingBudgetReadinessV1 } from "./nhm2-tile-source-operating-budget-readiness.v1";
 import type { Nhm2TileSourcePhysicalValidationPlanV1 } from "./nhm2-tile-source-physical-validation-plan.v1";
 
 export const NHM2_TILE_SOURCE_AUTHORITY_HANDOFF_CONTRACT_VERSION =
@@ -17,8 +18,10 @@ export type Nhm2TileSourceAuthorityHandoffGateV1 = {
     | "full_apparatus_tensor"
     | "source_authority_metadata"
     | "component_coverage"
+    | "component_detail_refs"
     | "regional_coverage"
     | "no_metric_target_echo"
+    | "operating_budget_readiness"
     | "falsification_report";
   status: "pass" | "review" | "fail" | "missing";
   blockers: string[];
@@ -35,6 +38,8 @@ export type Nhm2TileSourceAuthorityHandoffV1 = {
     materialEvidenceReceiptsRef: string | null;
     physicalValidationPlanRef: string | null;
     falsificationReportRef: string | null;
+    operatingBudgetReadinessRef: string | null;
+    fullApparatusTensorOperatingBudgetRef: string | null;
     targetAuthorityContractRef: "nhm2_source_side_same_basis_tensor_authority/v1";
   };
   handoffTarget: {
@@ -43,6 +48,18 @@ export type Nhm2TileSourceAuthorityHandoffV1 = {
     requiresSameBasis: true;
     requiresSameUnits: true;
     requiresFullComponents: ["T00", "T0i", "diagonalTij", "offDiagonalTij"];
+    requiresTensorComponents: [
+      "T00",
+      "T01",
+      "T02",
+      "T03",
+      "T11",
+      "T12",
+      "T13",
+      "T22",
+      "T23",
+      "T33"
+    ];
     requiresRegions: ["wall", "hull", "exterior_shell"];
     metricTargetEchoForbidden: true;
   };
@@ -52,8 +69,11 @@ export type Nhm2TileSourceAuthorityHandoffV1 = {
     handoffReadyForSameBasisAuthority: boolean;
     materialEvidenceReady: boolean;
     fullApparatusTensorReady: boolean;
+    fullApparatusComponentDetailRefsReady: boolean;
     sourceAuthorityEvidenceReady: boolean;
     allReceiptsPresent: boolean;
+    operatingBudgetsReady: boolean;
+    operatingBudgetsFalsifyCurrentCandidate: boolean;
     physicalValidationStillRequired: boolean;
     firstBlocker: string;
     physicalViabilityClaimAllowed: false;
@@ -65,6 +85,7 @@ export type Nhm2TileSourceAuthorityHandoffV1 = {
     handoffOnly: true;
     handoffDoesNotRunSameBasisAuthority: true;
     handoffDoesNotRunDownstreamGates: true;
+    operatingBudgetReadinessDoesNotValidateMaterialSource: true;
     handoffReadyIsNotPhysicalCredibility: true;
     idealScalarCasimirIsNotMaterialEvidence: true;
     physicalViabilityClaimAllowed: false;
@@ -77,9 +98,11 @@ export type BuildNhm2TileSourceAuthorityHandoffInput = {
   materialEvidenceReceipts: Nhm2TileSourceMaterialEvidenceReceiptsV1;
   physicalValidationPlan: Nhm2TileSourcePhysicalValidationPlanV1;
   falsificationReport: Nhm2TileSourceFalsificationReportV1;
+  operatingBudgetReadiness?: Nhm2TileSourceOperatingBudgetReadinessV1 | null;
   materialEvidenceReceiptsRef?: string | null;
   physicalValidationPlanRef?: string | null;
   falsificationReportRef?: string | null;
+  operatingBudgetReadinessRef?: string | null;
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -116,12 +139,20 @@ const tensorAuthority = (
   plan: Nhm2TileSourcePhysicalValidationPlanV1,
 ): Nhm2TileSourcePhysicalValidationPlanV1["tensorAuthorityGate"] => plan.tensorAuthorityGate;
 
+const fullApparatusOperatingStatus = (
+  operatingBudgetReadiness: Nhm2TileSourceOperatingBudgetReadinessV1 | null,
+) =>
+  operatingBudgetReadiness?.budgetStatuses.find(
+    (status) => status.surfaceId === "full_apparatus_tensor",
+  ) ?? null;
+
 export const buildNhm2TileSourceAuthorityHandoff = (
   input: BuildNhm2TileSourceAuthorityHandoffInput,
 ): Nhm2TileSourceAuthorityHandoffV1 => {
   const receipts = input.materialEvidenceReceipts;
   const plan = input.physicalValidationPlan;
   const report = input.falsificationReport;
+  const operatingBudgetReadiness = input.operatingBudgetReadiness ?? null;
   const tensorGate = tensorAuthority(plan);
   const authorityBlockers = unique(tensorGate.blockers);
   const materialReceiptBlockers = receipts.receiptSurfaces
@@ -131,6 +162,25 @@ export const buildNhm2TileSourceAuthorityHandoff = (
   const sourceAuthorityEvidenceReady =
     receipts.summary.sourceAuthorityEvidenceReady &&
     tensorGate.sourceTensorAuthorityCandidateAllowed;
+  const operatingBudgetBlockers =
+    operatingBudgetReadiness == null
+      ? ["operating_budget_readiness_missing"]
+      : operatingBudgetReadiness.blockers;
+  const operatingBudgetsReady =
+    operatingBudgetReadiness?.summary.allOperatingBudgetsReady === true;
+  const fullApparatusBudgetStatus = fullApparatusOperatingStatus(operatingBudgetReadiness);
+  const fullApparatusComponentDetailRefsReady =
+    fullApparatusBudgetStatus?.numericalMargins.componentDetailRefsComplete === true;
+  const componentDetailRefBlockers =
+    fullApparatusBudgetStatus == null
+      ? ["full_apparatus_tensor_operating_budget_missing_for_component_detail_handoff"]
+      : fullApparatusBudgetStatus.blockers.filter(
+          (blocker) =>
+            blocker.includes("_ref_missing_for_operating_budget") &&
+            /full_apparatus_T(00_detail|0[1-3]|1[1-3]|2[23]|33)_ref_missing_for_operating_budget/.test(
+              blocker,
+            ),
+        );
   const gates: Nhm2TileSourceAuthorityHandoffGateV1[] = [
     gate({
       gateId: "material_receipts",
@@ -194,6 +244,20 @@ export const buildNhm2TileSourceAuthorityHandoff = (
         "Supply source-side T00, T0i, diagonal Tij, and off-diagonal Tij without zero-filling missing components.",
     }),
     gate({
+      gateId: "component_detail_refs",
+      pass: fullApparatusComponentDetailRefsReady,
+      fail: fullApparatusBudgetStatus?.falsifiesCurrentCandidate === true,
+      missing: fullApparatusBudgetStatus == null,
+      blockers:
+        componentDetailRefBlockers.length > 0
+          ? componentDetailRefBlockers
+          : fullApparatusComponentDetailRefsReady
+            ? []
+            : ["full_apparatus_component_detail_refs_incomplete"],
+      requiredChange:
+        "Supply component-level full-apparatus tensor refs for T00, T01, T02, T03, T11, T12, T13, T22, T23, and T33 before same-basis authority handoff.",
+    }),
+    gate({
       gateId: "regional_coverage",
       pass:
         tensorGate.regionalCompatibility.wall === "pass" &&
@@ -219,6 +283,15 @@ export const buildNhm2TileSourceAuthorityHandoff = (
       ]),
       requiredChange:
         "Supply anti-target-echo provenance proving the source tensor was not copied or fitted from the metric-required tensor.",
+    }),
+    gate({
+      gateId: "operating_budget_readiness",
+      pass: operatingBudgetsReady,
+      fail: operatingBudgetReadiness?.summary.anyOperatingBudgetFalsifies === true,
+      missing: operatingBudgetReadiness == null,
+      blockers: operatingBudgetBlockers,
+      requiredChange:
+        "Supply ready material coupon, force-gap, roughness/patch, active-control, fatigue/layer-scaling, and full-apparatus tensor operating budgets.",
     }),
     gate({
       gateId: "falsification_report",
@@ -250,6 +323,9 @@ export const buildNhm2TileSourceAuthorityHandoff = (
       materialEvidenceReceiptsRef: input.materialEvidenceReceiptsRef ?? null,
       physicalValidationPlanRef: input.physicalValidationPlanRef ?? null,
       falsificationReportRef: input.falsificationReportRef ?? null,
+      operatingBudgetReadinessRef: input.operatingBudgetReadinessRef ?? null,
+      fullApparatusTensorOperatingBudgetRef:
+        operatingBudgetReadiness?.sourceRefs.full_apparatus_tensor ?? null,
       targetAuthorityContractRef: "nhm2_source_side_same_basis_tensor_authority/v1",
     },
     handoffTarget: {
@@ -258,6 +334,18 @@ export const buildNhm2TileSourceAuthorityHandoff = (
       requiresSameBasis: true,
       requiresSameUnits: true,
       requiresFullComponents: ["T00", "T0i", "diagonalTij", "offDiagonalTij"],
+      requiresTensorComponents: [
+        "T00",
+        "T01",
+        "T02",
+        "T03",
+        "T11",
+        "T12",
+        "T13",
+        "T22",
+        "T23",
+        "T33",
+      ],
       requiresRegions: ["wall", "hull", "exterior_shell"],
       metricTargetEchoForbidden: true,
     },
@@ -267,8 +355,12 @@ export const buildNhm2TileSourceAuthorityHandoff = (
       handoffReadyForSameBasisAuthority: handoffReady,
       materialEvidenceReady: receipts.summary.materialEvidenceReady,
       fullApparatusTensorReady: receipts.summary.fullApparatusTensorReady,
+      fullApparatusComponentDetailRefsReady,
       sourceAuthorityEvidenceReady,
       allReceiptsPresent: plan.summary.allReceiptsPresent,
+      operatingBudgetsReady,
+      operatingBudgetsFalsifyCurrentCandidate:
+        operatingBudgetReadiness?.summary.anyOperatingBudgetFalsifies ?? false,
       physicalValidationStillRequired: true,
       firstBlocker: firstFailedGate?.blockers[0] ?? firstFailedGate?.gateId ?? "none",
       physicalViabilityClaimAllowed: false,
@@ -280,6 +372,7 @@ export const buildNhm2TileSourceAuthorityHandoff = (
       handoffOnly: true,
       handoffDoesNotRunSameBasisAuthority: true,
       handoffDoesNotRunDownstreamGates: true,
+      operatingBudgetReadinessDoesNotValidateMaterialSource: true,
       handoffReadyIsNotPhysicalCredibility: true,
       idealScalarCasimirIsNotMaterialEvidence: true,
       physicalViabilityClaimAllowed: false,
@@ -310,11 +403,13 @@ export const isNhm2TileSourceAuthorityHandoff = (
     target.requiresSameUnits === true &&
     Array.isArray(target.requiresFullComponents) &&
     target.requiresFullComponents.length === 4 &&
+    Array.isArray(target.requiresTensorComponents) &&
+    target.requiresTensorComponents.length === 10 &&
     Array.isArray(target.requiresRegions) &&
     target.requiresRegions.length === 3 &&
     target.metricTargetEchoForbidden === true &&
     Array.isArray(value.gates) &&
-    value.gates.length === 7 &&
+    value.gates.length === 9 &&
     value.gates.every(
       (entry) =>
         isRecord(entry) &&
@@ -328,8 +423,11 @@ export const isNhm2TileSourceAuthorityHandoff = (
     typeof summary.handoffReadyForSameBasisAuthority === "boolean" &&
     typeof summary.materialEvidenceReady === "boolean" &&
     typeof summary.fullApparatusTensorReady === "boolean" &&
+    typeof summary.fullApparatusComponentDetailRefsReady === "boolean" &&
     typeof summary.sourceAuthorityEvidenceReady === "boolean" &&
     typeof summary.allReceiptsPresent === "boolean" &&
+    typeof summary.operatingBudgetsReady === "boolean" &&
+    typeof summary.operatingBudgetsFalsifyCurrentCandidate === "boolean" &&
     summary.physicalValidationStillRequired === true &&
     typeof summary.firstBlocker === "string" &&
     summary.physicalViabilityClaimAllowed === false &&
@@ -340,6 +438,7 @@ export const isNhm2TileSourceAuthorityHandoff = (
     boundary.handoffOnly === true &&
     boundary.handoffDoesNotRunSameBasisAuthority === true &&
     boundary.handoffDoesNotRunDownstreamGates === true &&
+    boundary.operatingBudgetReadinessDoesNotValidateMaterialSource === true &&
     boundary.handoffReadyIsNotPhysicalCredibility === true &&
     boundary.idealScalarCasimirIsNotMaterialEvidence === true &&
     boundary.physicalViabilityClaimAllowed === false &&

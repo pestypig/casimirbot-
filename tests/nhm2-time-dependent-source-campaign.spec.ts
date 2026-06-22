@@ -755,6 +755,36 @@ const stabilityEvidence = (): Nhm2CampaignStabilityEvidenceV1 => ({
 });
 
 describe("NHM2 time-dependent source campaign", () => {
+  it("carries tile-source material evidence refs without making a campaign pass", () => {
+    const artifact = buildNhm2TimeDependentSourceCampaign({
+      artifactRefs: {
+        tileSourceMaterialEvidenceReceipts:
+          "runs/candidate/nhm2-tile-source-material-evidence-receipts.json",
+        tileSourcePhysicalValidationPlan:
+          "runs/candidate/nhm2-tile-source-physical-validation-plan.json",
+        tileSourceEvidenceGapRoadmap:
+          "runs/candidate/nhm2-tile-source-evidence-gap-roadmap.json",
+        tileSourceFalsificationReport:
+          "runs/candidate/nhm2-tile-source-falsification-report.json",
+        tileSourceAuthorityHandoff:
+          "runs/candidate/nhm2-tile-source-authority-handoff.json",
+        tileSourceOperatingBudgetReadiness:
+          "runs/candidate/nhm2-tile-source-operating-budget-readiness.json",
+      },
+    });
+
+    expect(artifact.artifactRefs.tileSourceMaterialEvidenceReceipts).toBe(
+      "runs/candidate/nhm2-tile-source-material-evidence-receipts.json",
+    );
+    expect(artifact.artifactRefs.tileSourceAuthorityHandoff).toBe(
+      "runs/candidate/nhm2-tile-source-authority-handoff.json",
+    );
+    expect(artifact.summary.campaignPass).toBe(false);
+    expect(artifact.claimBoundary.physicalViabilityClaimAllowed).toBe(false);
+    expect(artifact.claimBoundary.transportClaimAllowed).toBe(false);
+    expect(isNhm2TimeDependentSourceCampaignArtifact(artifact)).toBe(true);
+  });
+
   it("builds switching conservation evidence that fails closed without dynamic terms", () => {
     const evidence = buildNhm2SwitchingConservationEvidence({
       staticCovariantConservationRef: "static-conservation.json",

@@ -45,22 +45,24 @@ live_source_identity_missing_environment_source
 live_source_identity_no_situation_run
 live_source_identity_no_field_evaluations
 live_source_identity_stale_interpretation
+live_source_identity_fresh_unbound
+screen_text_start_button
+historical_tool_mention
 ```
 
 Disabled follow-up scenarios:
 
 ```txt
-screen_text_start_button
-historical_tool_mention
-live_source_identity_fresh_unbound
+none
 ```
 
-`screen_text_start_button` currently needs an input-integrity policy split for screen text that names UI controls. `historical_tool_mention` needs a prior-debug-export seed.
-`live_source_identity_fresh_unbound` is present as a frontier scenario, but the
-current explicit visual route auto-binds that topology before final audit
-capture. The raw audit invariant is covered by
-`server/__tests__/helix.ask.live-source-identity-audit.test.ts` until the route
-stops mutating the topology ahead of audit capture.
+`screen_text_start_button` is now enabled as visual evidence, not a workstation
+or live-pipeline operator command. `historical_tool_mention` is now enabled as
+runtime evidence; it may fail closed without prior debug materialization, but it
+must not replay the named tool call. `live_source_identity_fresh_unbound` is now
+enabled as a fail-closed identity diagnosis: explicit visual capture prompts may
+bootstrap missing visual context, but they must not silently bind and replay a
+fresh source into an existing SituationRun before terminal authority.
 
 The live-source identity group checks:
 

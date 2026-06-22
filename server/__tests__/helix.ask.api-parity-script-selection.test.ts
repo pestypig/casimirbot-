@@ -40,10 +40,18 @@ describe("Helix Ask API parity script scenario selection", () => {
 
   it("can include disabled scenarios when requested by operator config", () => {
     const disabledScenario = API_PARITY_SCENARIOS.find((scenario) => !scenario.enabled);
-    expect(disabledScenario).toBeTruthy();
-
     const defaultSelection = selectApiParityScenarios([]);
     const inclusiveSelection = selectApiParityScenarios([], true);
+
+    if (!disabledScenario) {
+      expect(defaultSelection.scenarios.map((scenario) => scenario.id)).toEqual(
+        API_PARITY_SCENARIOS.map((scenario) => scenario.id),
+      );
+      expect(inclusiveSelection.scenarios.map((scenario) => scenario.id)).toEqual(
+        defaultSelection.scenarios.map((scenario) => scenario.id),
+      );
+      return;
+    }
 
     expect(defaultSelection.scenarios.map((scenario) => scenario.id)).not.toContain(disabledScenario!.id);
     expect(defaultSelection.availableIds).toContain(disabledScenario!.id);

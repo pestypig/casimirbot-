@@ -107,6 +107,7 @@ export const planReferenceValidationChain = (
   const inputTileLocalSourceElements = asOptionalString(args, "tile-local-source-elements");
   const buildTileLocalSourceElements = args["build-tile-local-source-elements"] === true;
   const casimirMaterialReceipt = asOptionalString(args, "casimir-material-receipt");
+  const tileSourceAuthorityHandoff = asOptionalString(args, "tile-source-authority-handoff");
   const regionalSourceClosureEvidence = asOptionalString(
     args,
     "regional-source-closure-evidence",
@@ -609,6 +610,12 @@ export const planReferenceValidationChain = (
     tileCounterpart,
     "--source-closure",
     sourceClosure,
+    ...(casimirMaterialReceipt == null
+      ? []
+      : ["--casimir-material-receipt", casimirMaterialReceipt]),
+    ...(tileSourceAuthorityHandoff == null
+      ? []
+      : ["--tile-source-authority-handoff", tileSourceAuthorityHandoff]),
     "--out",
     sourceAuthority,
     ...auditOnly,
@@ -937,6 +944,9 @@ export const planReferenceValidationChain = (
     ...(tileLocalSourceElements == null
       ? []
       : ["--tile-local-source-elements", tileLocalSourceElements]),
+    ...(tileSourceAuthorityHandoff == null
+      ? []
+      : ["--tile-source-authority-handoff", tileSourceAuthorityHandoff]),
     "--source-side-authority",
     sourceAuthority,
     "--regional-source-closure-evidence",

@@ -277,6 +277,7 @@ export const buildReferenceValidationChainLatestCommandArgs = (
     ...forwardBooleanArg("build-regional-source-transition-kernel"),
     ...forwardBooleanArg("build-regional-support-function-atlas"),
     ...forwardStringArg("casimir-material-receipt"),
+    ...forwardStringArg("tile-source-authority-handoff"),
     ...forwardStringArg("wall-material-source-tensor-model"),
     ...forwardStringArg("wall-source-component-model"),
     ...forwardStringArg("regional-material-source-tensor-model"),

@@ -15,6 +15,7 @@ import {
 import { buildNhm2RegionalSupportFunctionAtlas } from "../shared/contracts/nhm2-regional-support-function-atlas.v1";
 import { buildNhm2SourceComponentAuthorityLedger } from "../shared/contracts/nhm2-source-component-authority-ledger.v1";
 import { buildNhm2SourceSideSameBasisTensorAuthorityArtifact } from "../shared/contracts/nhm2-source-side-same-basis-tensor-authority.v1";
+import type { Nhm2TileSourceAuthorityHandoffV1 } from "../shared/contracts/nhm2-tile-source-authority-handoff.v1";
 import {
   buildNhm2TileCounterpartConservationArtifact,
   type Nhm2TileCounterpartConservationArtifact,
@@ -183,6 +184,87 @@ const materialReceipt = () =>
     },
   });
 
+const tileSourceAuthorityHandoff = (): Nhm2TileSourceAuthorityHandoffV1 => ({
+  contractVersion: "nhm2_tile_source_authority_handoff/v1",
+  generatedAt: "2026-06-12T00:00:00.000Z",
+  laneId: "nhm2_shift_lapse",
+  selectedProfileId: profile,
+  frozenCandidateId: "nhm2_447_layer_topology_optimized_lattice_tin_v1",
+  sourceRefs: {
+    materialEvidenceReceiptsRef: "material-evidence.json",
+    physicalValidationPlanRef: "validation-plan.json",
+    falsificationReportRef: "falsification-report.json",
+    operatingBudgetReadinessRef: "operating-budget-readiness.json",
+    fullApparatusTensorOperatingBudgetRef: "full-apparatus-tensor-operating-budget.json",
+    targetAuthorityContractRef: "nhm2_source_side_same_basis_tensor_authority/v1",
+  },
+  handoffTarget: {
+    targetContractVersion: "nhm2_source_side_same_basis_tensor_authority/v1",
+    requiresSameChart: true,
+    requiresSameBasis: true,
+    requiresSameUnits: true,
+    requiresFullComponents: ["T00", "T0i", "diagonalTij", "offDiagonalTij"],
+    requiresTensorComponents: [
+      "T00",
+      "T01",
+      "T02",
+      "T03",
+      "T11",
+      "T12",
+      "T13",
+      "T22",
+      "T23",
+      "T33",
+    ],
+    requiresRegions: ["wall", "hull", "exterior_shell"],
+    metricTargetEchoForbidden: true,
+  },
+  gates: [
+    "material_receipts",
+    "full_apparatus_tensor",
+    "source_authority_metadata",
+    "component_coverage",
+    "component_detail_refs",
+    "regional_coverage",
+    "no_metric_target_echo",
+    "operating_budget_readiness",
+    "falsification_report",
+  ].map((gateId) => ({
+    gateId: gateId as Nhm2TileSourceAuthorityHandoffV1["gates"][number]["gateId"],
+    status: "pass",
+    blockers: [],
+    requiredChange: "No change required for coupled-closure fixture.",
+  })),
+  summary: {
+    handoffStatus: "handoff_ready",
+    handoffReadyForSameBasisAuthority: true,
+    materialEvidenceReady: true,
+    fullApparatusTensorReady: true,
+    fullApparatusComponentDetailRefsReady: true,
+    sourceAuthorityEvidenceReady: true,
+    allReceiptsPresent: true,
+    operatingBudgetsReady: true,
+    operatingBudgetsFalsifyCurrentCandidate: false,
+    physicalValidationStillRequired: true,
+    firstBlocker: "none",
+    physicalViabilityClaimAllowed: false,
+    transportClaimAllowed: false,
+    propulsionClaimAllowed: false,
+  },
+  claimBoundary: {
+    diagnosticOnly: true,
+    handoffOnly: true,
+    handoffDoesNotRunSameBasisAuthority: true,
+    handoffDoesNotRunDownstreamGates: true,
+    operatingBudgetReadinessDoesNotValidateMaterialSource: true,
+    handoffReadyIsNotPhysicalCredibility: true,
+    idealScalarCasimirIsNotMaterialEvidence: true,
+    physicalViabilityClaimAllowed: false,
+    transportClaimAllowed: false,
+    propulsionClaimAllowed: false,
+  },
+});
+
 const tileRegion = (
   regionId: Nhm2RegionalSourceClosureRegionId,
 ): Nhm2TileEffectiveCounterpartRegion => ({
@@ -293,7 +375,7 @@ const regionalEvidence = (relLInf = 0) =>
     literatureRefs: ["natario_2001_zero_expansion"],
   });
 
-const sourceAuthority = () =>
+const sourceAuthority = (args: { includeHandoff?: boolean } = {}) =>
   buildNhm2SourceSideSameBasisTensorAuthorityArtifact({
     generatedAt: "2026-06-12T00:00:00.000Z",
     laneId: "nhm2_shift_lapse",
@@ -301,6 +383,12 @@ const sourceAuthority = () =>
     chartId: "comoving_cartesian",
     sourceModelId: "regional_material_source_tensor_model",
     counterpartArtifactRef: "tile.json",
+    ...(args.includeHandoff === false
+      ? {}
+      : {
+          tileSourceAuthorityHandoffRef: "tile-source-authority-handoff.json",
+          tileSourceAuthorityHandoff: tileSourceAuthorityHandoff(),
+        }),
     counterpartArtifact: tileCounterpart(),
     casimirMaterialReceipt: materialReceipt(),
   });
@@ -436,6 +524,7 @@ const allPassingArtifact = () =>
     artifactRefs: {
       regionalSupportFunctionAtlas: atlasRef,
       sourceSideSameBasisTensorAuthority: "authority.json",
+      tileSourceAuthorityHandoff: "tile-source-authority-handoff.json",
       sourceComponentAuthorityLedger: "component-ledger.json",
       regionalSourceClosureEvidence: "regional.json",
       sourceClosurePassReadiness: "readiness.json",
@@ -609,6 +698,32 @@ describe("NHM2 coupled closure pass-candidate artifact", () => {
     ).toContain("source_component_authority_ledger_missing");
   });
 
+  it("does not pass without the tile-source authority handoff intake receipt", () => {
+    const artifact = buildNhm2CoupledClosurePassCandidate({
+      regionalSupportFunctionAtlas: atlas(),
+      sourceAuthority: sourceAuthority({ includeHandoff: false }),
+      sourceComponentAuthorityLedger: sourceComponentAuthorityLedger(),
+      sourceClosurePassReadiness: readiness(),
+      regionalEvidence: regionalEvidence(),
+      conservation: conservation(),
+      qeiWorldlineDossier: qeiWorldlineDossier(),
+      observerRobustEnergyConditions: robustObserver(),
+      casimirMaterialReceipt: materialReceipt(),
+    });
+    const handoffGate = artifact.gates.find(
+      (gate) => gate.gateId === "tile_source_authority_handoff",
+    );
+
+    expect(artifact.summary.passCandidate).toBe(false);
+    expect(artifact.summary.tileSourceHandoffReady).toBe(false);
+    expect(artifact.summary.tileSourceHandoffStatus).toBeNull();
+    expect(artifact.summary.firstBlocker).toBe("tile_source_authority_handoff_missing");
+    expect(handoffGate?.status).toBe("missing");
+    expect(handoffGate?.warnings).toContain(
+      "tile_source_handoff_is_required_for_material_evidence_campaign",
+    );
+  });
+
   it("does not use stale source authority fallback without a complete component ledger", () => {
     const artifact = buildNhm2CoupledClosurePassCandidate({
       regionalSupportFunctionAtlas: atlas(),
@@ -660,6 +775,8 @@ describe("NHM2 coupled closure pass-candidate artifact", () => {
     expect(artifact.summary.wallAuthorityPresent).toBe(true);
     expect(artifact.summary.sourceClosurePassSignalAllowed).toBe(true);
     expect(artifact.summary.passCandidate).toBe(true);
+    expect(artifact.summary.tileSourceHandoffReady).toBe(true);
+    expect(artifact.summary.tileSourceHandoffStatus).toBe("handoff_ready");
     expect(artifact.claimBoundary.physicalViabilityClaimAllowed).toBe(false);
   });
 
@@ -669,6 +786,7 @@ describe("NHM2 coupled closure pass-candidate artifact", () => {
     expect(isNhm2CoupledClosurePassCandidateArtifact(artifact)).toBe(true);
     expect(artifact.gates.every((gate) => gate.status === "pass")).toBe(true);
     expect(artifact.summary.passCandidate).toBe(true);
+    expect(artifact.summary.tileSourceHandoffReady).toBe(true);
     expect(artifact.summary.blockerCount).toBe(0);
     expect(artifact.claimBoundary.physicalViabilityClaimAllowed).toBe(false);
     expect(artifact.claimBoundary.transportClaimAllowed).toBe(false);

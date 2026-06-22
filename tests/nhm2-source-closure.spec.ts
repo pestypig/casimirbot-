@@ -15,6 +15,7 @@ import {
   buildNhm2SourceSideSameBasisTensorAuthorityArtifact,
   isNhm2SourceSideSameBasisTensorAuthorityArtifact,
 } from "../shared/contracts/nhm2-source-side-same-basis-tensor-authority.v1";
+import type { Nhm2TileSourceAuthorityHandoffV1 } from "../shared/contracts/nhm2-tile-source-authority-handoff.v1";
 import { buildNhm2SameChartFullTensorArtifact } from "../shared/contracts/nhm2-same-chart-full-tensor.v1";
 import {
   buildNhm2WallSourceClosureArtifact,
@@ -50,6 +51,106 @@ const makeMaterialReceiptedCasimirReceipt = () =>
       geometry: 0.91,
     },
   });
+
+const makeTileSourceAuthorityHandoff = (args: {
+  ready: boolean;
+  fullApparatusComponentDetailRefsReady?: boolean;
+  firstBlocker?: string;
+}): Nhm2TileSourceAuthorityHandoffV1 => {
+  const fullApparatusComponentDetailRefsReady =
+    args.fullApparatusComponentDetailRefsReady ?? args.ready;
+  const firstBlocker = args.ready ? "none" : args.firstBlocker ?? "material_coupon_receipt_missing";
+  const gateStatus = args.ready ? "pass" : "missing";
+  return {
+    contractVersion: "nhm2_tile_source_authority_handoff/v1",
+    generatedAt: "2026-06-11T00:00:00.000Z",
+    laneId: "nhm2_shift_lapse",
+    selectedProfileId: "stage1_centerline_alpha_0p995_v1",
+    frozenCandidateId: "nhm2_447_layer_topology_optimized_lattice_tin_v1",
+    sourceRefs: {
+      materialEvidenceReceiptsRef: "artifact://tile-source/material-evidence",
+      physicalValidationPlanRef: "artifact://tile-source/validation-plan",
+      falsificationReportRef: "artifact://tile-source/falsification-report",
+      operatingBudgetReadinessRef: "artifact://tile-source/operating-budget-readiness",
+      fullApparatusTensorOperatingBudgetRef:
+        "artifact://tile-source/full-apparatus-tensor-operating-budget",
+      targetAuthorityContractRef: "nhm2_source_side_same_basis_tensor_authority/v1",
+    },
+    handoffTarget: {
+      targetContractVersion: "nhm2_source_side_same_basis_tensor_authority/v1",
+      requiresSameChart: true,
+      requiresSameBasis: true,
+      requiresSameUnits: true,
+      requiresFullComponents: ["T00", "T0i", "diagonalTij", "offDiagonalTij"],
+      requiresTensorComponents: [
+        "T00",
+        "T01",
+        "T02",
+        "T03",
+        "T11",
+        "T12",
+        "T13",
+        "T22",
+        "T23",
+        "T33",
+      ],
+      requiresRegions: ["wall", "hull", "exterior_shell"],
+      metricTargetEchoForbidden: true,
+    },
+    gates: [
+      "material_receipts",
+      "full_apparatus_tensor",
+      "source_authority_metadata",
+      "component_coverage",
+      "component_detail_refs",
+      "regional_coverage",
+      "no_metric_target_echo",
+      "operating_budget_readiness",
+      "falsification_report",
+    ].map((gateId) => ({
+      gateId: gateId as Nhm2TileSourceAuthorityHandoffV1["gates"][number]["gateId"],
+      status:
+        gateId === "component_detail_refs" && !fullApparatusComponentDetailRefsReady
+          ? "missing"
+          : gateStatus,
+      blockers:
+        gateId === "component_detail_refs" && !fullApparatusComponentDetailRefsReady
+          ? ["full_apparatus_T01_ref_missing_for_operating_budget"]
+          : args.ready
+            ? []
+            : [firstBlocker],
+      requiredChange: "Supply material-source evidence before same-basis authority.",
+    })),
+    summary: {
+      handoffStatus: args.ready ? "handoff_ready" : "blocked",
+      handoffReadyForSameBasisAuthority: args.ready,
+      materialEvidenceReady: args.ready,
+      fullApparatusTensorReady: args.ready,
+      fullApparatusComponentDetailRefsReady,
+      sourceAuthorityEvidenceReady: args.ready,
+      allReceiptsPresent: args.ready,
+      operatingBudgetsReady: args.ready,
+      operatingBudgetsFalsifyCurrentCandidate: false,
+      physicalValidationStillRequired: true,
+      firstBlocker,
+      physicalViabilityClaimAllowed: false,
+      transportClaimAllowed: false,
+      propulsionClaimAllowed: false,
+    },
+    claimBoundary: {
+      diagnosticOnly: true,
+      handoffOnly: true,
+      handoffDoesNotRunSameBasisAuthority: true,
+      handoffDoesNotRunDownstreamGates: true,
+      operatingBudgetReadinessDoesNotValidateMaterialSource: true,
+      handoffReadyIsNotPhysicalCredibility: true,
+      idealScalarCasimirIsNotMaterialEvidence: true,
+      physicalViabilityClaimAllowed: false,
+      transportClaimAllowed: false,
+      propulsionClaimAllowed: false,
+    },
+  };
+};
 
 describe("nhm2 source closure artifact", () => {
   it("represents matched tensors honestly", () => {
@@ -283,6 +384,135 @@ describe("nhm2 source-side same-basis tensor authority receipt", () => {
     expect(receipt.regions[0]?.blockers).toEqual([]);
     expect(receipt.claimBoundary.diagnosticOnly).toBe(true);
     expect(receipt.claimBoundary.doesNotValidatePhysicalSource).toBe(true);
+  });
+
+  it("blocks otherwise authoritative tensor regions when supplied tile-source handoff is not ready", () => {
+    const receipt = buildNhm2SourceSideSameBasisTensorAuthorityArtifact({
+      generatedAt: "2026-06-11T00:00:00.000Z",
+      laneId: "nhm2_shift_lapse",
+      selectedProfileId: "stage1_centerline_alpha_0p995_v1",
+      chartId: "comoving_cartesian",
+      requiredRegionIds: ["wall"],
+      tileSourceAuthorityHandoffRef: "artifact://tile-source/handoff-blocked",
+      tileSourceAuthorityHandoff: makeTileSourceAuthorityHandoff({
+        ready: false,
+        firstBlocker: "thermal_cycle_drift_above_0p01_operating_budget",
+      }),
+      sourceClosureRegions: [
+        {
+          regionId: "wall",
+          comparisonBasisStatus: "same_basis",
+          comparisonBasisAuthorityStatus: "authoritative_same_basis",
+          regionalComparisonContractStatus: "same_basis_counterpart_available",
+          resolvedTileCounterpartRef: "artifact://tile-wall/full-tensor",
+          tileTensorRef: "artifact://tile-wall/full-tensor",
+          sourceSideSameBasisAuthorityStatus: "authoritative_same_basis",
+          sourceSideAuthorityRef: "artifact://tile-wall/full-tensor",
+          sourceSideFullTensorMissingComponentIds: [],
+          tileEffectiveTensor: { T00: -100, T11: 100, T22: 100, T33: 100 },
+          tileT00Diagnostics: {
+            sourceRef: "artifact://tile-wall/full-tensor",
+            trace: {
+              valueRef: "artifact://tile-wall/full-tensor",
+              pathFacts: {
+                comparisonRole: "tile_effective_counterpart",
+                expectedCounterpartRole: "metric_required_reference",
+                semanticEquivalenceExpected: true,
+              },
+            },
+          },
+        },
+      ],
+    });
+
+    expect(isNhm2SourceSideSameBasisTensorAuthorityArtifact(receipt)).toBe(true);
+    expect(receipt.tileSourceAuthorityHandoffStatus).toBe("blocked");
+    expect(receipt.summary.tileSourceHandoffReady).toBe(false);
+    expect(receipt.summary.hasWallAuthority).toBe(false);
+    expect(receipt.summary.allRequiredRegionsAuthoritative).toBe(false);
+    expect(receipt.regions[0]).toMatchObject({
+      regionId: "wall",
+      status: "blocked",
+      sourceTensorRef: "artifact://tile-wall/full-tensor",
+      hasFullTensorComponents: true,
+      notDerivedFromMetricRequiredTensor: true,
+    });
+    expect(receipt.regions[0]?.blockers).toEqual(
+      expect.arrayContaining([
+        "tile_source_authority_handoff_not_ready",
+        "thermal_cycle_drift_above_0p01_operating_budget",
+      ]),
+    );
+    expect(receipt.regions[0]?.warnings).toContain(
+      "tile_source_handoff_admission_gate_blocks_source_authority",
+    );
+  });
+
+  it("uses a ready tile-source handoff only as blocked evidence intake when tensor values are absent", () => {
+    const receipt = buildNhm2SourceSideSameBasisTensorAuthorityArtifact({
+      generatedAt: "2026-06-11T00:00:00.000Z",
+      laneId: "nhm2_shift_lapse",
+      selectedProfileId: "stage1_centerline_alpha_0p995_v1",
+      chartId: "comoving_cartesian",
+      requiredRegionIds: ["wall"],
+      tileSourceAuthorityHandoffRef: "artifact://tile-source/handoff-ready",
+      tileSourceAuthorityHandoff: makeTileSourceAuthorityHandoff({ ready: true }),
+    });
+
+    expect(isNhm2SourceSideSameBasisTensorAuthorityArtifact(receipt)).toBe(true);
+    expect(receipt.tileSourceAuthorityHandoffRef).toBe("artifact://tile-source/handoff-ready");
+    expect(receipt.tileSourceAuthorityHandoffStatus).toBe("handoff_ready");
+    expect(receipt.summary.tileSourceHandoffReady).toBe(true);
+    expect(receipt.summary.hasWallAuthority).toBe(false);
+    expect(receipt.summary.allRequiredRegionsAuthoritative).toBe(false);
+    expect(receipt.regions[0]).toMatchObject({
+      regionId: "wall",
+      status: "blocked",
+      sourceTensorRef: null,
+      comparisonRole: "tile_source_material_evidence_handoff",
+      derivationMode: "tile_source_material_evidence_handoff",
+      notDerivedFromMetricRequiredTensor: true,
+      hasFullTensorComponents: false,
+    });
+    expect(receipt.regions[0]?.missingComponentIds).toEqual(
+      expect.arrayContaining(["T00", "T01", "T02", "T03", "T11", "T12", "T13", "T22", "T23", "T33"]),
+    );
+    expect(receipt.regions[0]?.blockers).toContain(
+      "tile_source_handoff_does_not_supply_tensor_values",
+    );
+    expect(receipt.regions[0]?.warnings).toContain(
+      "tile_source_handoff_is_evidence_intake_not_tensor_authority",
+    );
+  });
+
+  it("propagates not-ready tile-source handoff blockers into same-basis authority without promotion", () => {
+    const receipt = buildNhm2SourceSideSameBasisTensorAuthorityArtifact({
+      generatedAt: "2026-06-11T00:00:00.000Z",
+      laneId: "nhm2_shift_lapse",
+      selectedProfileId: "stage1_centerline_alpha_0p995_v1",
+      chartId: "comoving_cartesian",
+      requiredRegionIds: ["wall"],
+      tileSourceAuthorityHandoffRef: "artifact://tile-source/handoff-blocked",
+      tileSourceAuthorityHandoff: makeTileSourceAuthorityHandoff({
+        ready: false,
+        fullApparatusComponentDetailRefsReady: false,
+        firstBlocker: "full_apparatus_T01_ref_missing_for_operating_budget",
+      }),
+    });
+
+    expect(receipt.tileSourceAuthorityHandoffStatus).toBe("blocked");
+    expect(receipt.summary.tileSourceHandoffReady).toBe(false);
+    expect(receipt.summary.hasWallAuthority).toBe(false);
+    expect(receipt.regions[0]?.status).toBe("blocked");
+    expect(receipt.regions[0]?.notDerivedFromMetricRequiredTensor).toBeNull();
+    expect(receipt.regions[0]?.blockers).toEqual(
+      expect.arrayContaining([
+        "tile_source_authority_handoff_not_ready",
+        "tile_source_handoff_does_not_supply_tensor_values",
+        "full_apparatus_component_detail_refs_incomplete",
+        "full_apparatus_T01_ref_missing_for_operating_budget",
+      ]),
+    );
   });
 });
 

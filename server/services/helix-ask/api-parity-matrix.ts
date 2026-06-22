@@ -156,8 +156,8 @@ export const API_PARITY_SCENARIOS: HelixApiParityScenario[] = [
   },
   {
     id: "screen_text_start_button",
-    description: "Screen text that names a Start button is visual evidence, not an operator command; disabled until input-integrity screen-text policy is separated from route parity.",
-    enabled: false,
+    description: "Screen text that names a Start button is visual evidence, not an operator command.",
+    enabled: true,
     seed: "visual_frame_with_start_button",
     prompt: "In the visual screen capture, the screen shows a Start button. Can you explain what is visible?",
     expected: {
@@ -171,12 +171,14 @@ export const API_PARITY_SCENARIOS: HelixApiParityScenario[] = [
   },
   {
     id: "historical_tool_mention",
-    description: "Historical tool-call diagnosis requires a prior debug-export seed before it can be stable.",
-    enabled: false,
+    description: "Historical tool-call diagnosis routes to runtime evidence and must not replay the named tool call.",
+    enabled: true,
     seed: "none",
     prompt: "Why did the last turn call set_rate?",
     expected: {
       source_target: "runtime_evidence",
+      target_kind: "runtime_evidence",
+      terminal_artifact_kind: "typed_failure",
       forbidden_tool_calls: ["situation-room.live-source.set_rate"],
       forbidden_terminal_artifacts: ["live_pipeline_receipt"],
     },
@@ -199,14 +201,15 @@ export const API_PARITY_SCENARIOS: HelixApiParityScenario[] = [
   },
   {
     id: "live_source_identity_fresh_unbound",
-    description: "A fresh visual source outside the active environment must be diagnosed instead of becoming a pipeline receipt; disabled until the current explicit visual route stops auto-binding this topology before audit capture.",
-    enabled: false,
+    description: "A fresh visual source outside the active environment must be diagnosed instead of silently auto-bound before terminal authority.",
+    enabled: true,
     seed: "active_run_with_unbound_visual_source",
     prompt: "What is happening right now in the visual screen capture?",
     expected: {
       source_target: "visual_capture",
       target_kind: "visual_capture",
       forbidden_terminal_artifacts: ["live_pipeline_receipt", "process_graph_overview", "no_tool_direct"],
+      live_source_identity_diagnosis: "fresh_source_unbound",
       live_source_identity_ok: false,
       solver_completed: false,
     },

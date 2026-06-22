@@ -30,16 +30,35 @@ export type Nhm2TileSourceActiveControlOperatingBudgetV1 = {
   };
   suppliedActiveControlEvidence: {
     evidenceTier: string;
+    energyWaveformRef: string | null;
+    controlTransferFunctionRef: string | null;
+    gapNoiseTraceRef: string | null;
+    thermalModelRef: string | null;
+    heatLoadTraceRef: string | null;
+    timingSyncTraceRef: string | null;
     energyPerCycleJ: number | null;
     bandwidthHz: number | null;
     switchingRateHz: number | null;
     gapNoiseRmsMeters: number | null;
+    noiseSpectrumRef: string | null;
     heatLoadW: number | null;
     timingJitterSeconds: number | null;
     failureModeRef: string | null;
+    failureModeCoverage: {
+      lossOfLock: boolean;
+      thermalRunaway: boolean;
+      noiseRunaway: boolean;
+      timingDesynchronization: boolean;
+      failSafeShutdown: boolean;
+    } | null;
   };
   derivedOperatingBudget: {
     controlPowerW: number | null;
+    gapControlAuthorityMargin: number | null;
+    activeControlTraceRefsAvailable: boolean;
+    noiseSpectrumAvailable: boolean;
+    failureModeCoverageComplete: boolean;
+    switchingRateMargin: number | null;
     bandwidthMargin: number | null;
     noiseMargin: number | null;
     timingMargin: number | null;
@@ -86,10 +105,16 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const finiteOrNull = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
 
+const stringOrNull = (value: unknown): string | null =>
+  typeof value === "string" && value.trim().length > 0 ? value : null;
+
 const safeRatio = (numerator: number | null, denominator: number | null): number | null =>
   numerator == null || denominator == null || denominator === 0
     ? null
     : round(numerator / denominator);
+
+const switchingRateMatchesTarget = (rateHz: number | null): boolean =>
+  rateHz != null && Math.abs(rateHz - SWITCHING_RATE_HZ) <= SWITCHING_RATE_HZ * 1e-9;
 
 export const buildNhm2TileSourceActiveControlOperatingBudget = (
   input: BuildNhm2TileSourceActiveControlOperatingBudgetInput = {},
@@ -101,11 +126,17 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
     throw new Error("force gap load budget must be nhm2_tile_source_force_gap_load_budget/v1");
   }
   const evidence = input.activeControlEvidence ?? null;
+  const gapControlAuthorityMargin =
+    forceGapLoadBudget.margins.activeAuthorityMarginToIdealLoad;
   const evidenceSwitchingRate = evidence?.switchingRateHz ?? null;
   const controlPowerW =
     evidence?.energyPerCycleJ == null || evidenceSwitchingRate == null
       ? null
       : round(evidence.energyPerCycleJ * evidenceSwitchingRate);
+  const switchingRateMargin =
+    evidenceSwitchingRate == null
+      ? null
+      : round(Math.min(evidenceSwitchingRate, SWITCHING_RATE_HZ) / SWITCHING_RATE_HZ);
   const bandwidthMargin = safeRatio(evidence?.bandwidthHz ?? null, BANDWIDTH_MIN_HZ);
   const noiseMargin = safeRatio(
     GAP_NOISE_MAX_METERS,
@@ -116,6 +147,13 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
     evidence?.timingJitterSeconds ?? null,
   );
   const thermalAccountingMargin = safeRatio(evidence?.heatLoadW ?? null, controlPowerW);
+  const failureModeCoverage = evidence?.failureModeCoverage ?? null;
+  const failureModeCoverageComplete =
+    failureModeCoverage?.lossOfLock === true &&
+    failureModeCoverage.thermalRunaway === true &&
+    failureModeCoverage.noiseRunaway === true &&
+    failureModeCoverage.timingDesynchronization === true &&
+    failureModeCoverage.failSafeShutdown === true;
   const blockers = [
     ...(evidence == null || evidence.evidenceTier === "missing"
       ? ["active_control_receipt_missing_for_operating_budget"]
@@ -125,17 +163,39 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
       ? ["active_control_operating_budget_tier_not_measured_or_validated"]
       : []),
     ...(evidence?.energyPerCycleJ == null ? ["active_control_energy_per_cycle_missing_for_power_budget"] : []),
+    ...(evidence?.energyWaveformRef == null
+      ? ["active_control_energy_waveform_ref_missing_for_operating_budget"]
+      : []),
+    ...(evidenceSwitchingRate == null
+      ? ["active_control_switching_rate_missing_for_operating_budget"]
+      : switchingRateMatchesTarget(evidenceSwitchingRate)
+        ? []
+        : ["active_control_switching_rate_not_15ghz"]),
     ...(controlPowerW == null ? ["active_control_power_budget_missing"] : []),
+    ...(gapControlAuthorityMargin == null
+      ? ["active_control_gap_authority_margin_missing_for_447_layer_load"]
+      : gapControlAuthorityMargin < 1
+        ? ["active_control_gap_authority_below_447_layer_load"]
+        : []),
     ...(bandwidthMargin == null
       ? ["active_control_bandwidth_missing_for_operating_budget"]
       : bandwidthMargin < 1
         ? ["active_control_bandwidth_below_30ghz"]
         : []),
+    ...(evidence?.controlTransferFunctionRef == null
+      ? ["active_control_transfer_function_ref_missing_for_operating_budget"]
+      : []),
     ...(noiseMargin == null
       ? ["active_control_gap_noise_missing_for_operating_budget"]
       : noiseMargin < 1
         ? ["active_control_gap_noise_above_80pm"]
         : []),
+    ...(evidence?.gapNoiseTraceRef == null
+      ? ["active_control_gap_noise_trace_ref_missing_for_operating_budget"]
+      : []),
+    ...(evidence?.noiseSpectrumRef == null
+      ? ["active_control_noise_spectrum_ref_missing_for_operating_budget"]
+      : []),
     ...(timingMargin == null
       ? ["active_control_timing_jitter_missing_for_operating_budget"]
       : timingMargin < 1
@@ -146,7 +206,31 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
       : thermalAccountingMargin < 1
         ? ["active_control_heat_load_below_computed_control_power"]
         : []),
+    ...(evidence?.thermalModelRef == null
+      ? ["active_control_thermal_model_ref_missing_for_operating_budget"]
+      : []),
+    ...(evidence?.heatLoadTraceRef == null
+      ? ["active_control_heat_load_trace_ref_missing_for_operating_budget"]
+      : []),
+    ...(evidence?.timingSyncTraceRef == null
+      ? ["active_control_timing_sync_trace_ref_missing_for_operating_budget"]
+      : []),
     ...(evidence?.failureModeRef == null ? ["active_control_failure_mode_ref_missing_for_operating_budget"] : []),
+    ...(failureModeCoverage?.lossOfLock === true
+      ? []
+      : ["active_control_loss_of_lock_failure_mode_missing_for_operating_budget"]),
+    ...(failureModeCoverage?.thermalRunaway === true
+      ? []
+      : ["active_control_thermal_runaway_failure_mode_missing_for_operating_budget"]),
+    ...(failureModeCoverage?.noiseRunaway === true
+      ? []
+      : ["active_control_noise_runaway_failure_mode_missing_for_operating_budget"]),
+    ...(failureModeCoverage?.timingDesynchronization === true
+      ? []
+      : ["active_control_timing_desynchronization_failure_mode_missing_for_operating_budget"]),
+    ...(failureModeCoverage?.failSafeShutdown === true
+      ? []
+      : ["active_control_fail_safe_shutdown_missing_for_operating_budget"]),
   ];
   const falsifiesCurrentCandidate =
     evidence?.evidenceTier === "measured" ||
@@ -154,6 +238,8 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
       ? blockers.some((blocker) =>
           [
             "active_control_bandwidth_below_30ghz",
+            "active_control_switching_rate_not_15ghz",
+            "active_control_gap_authority_below_447_layer_load",
             "active_control_gap_noise_above_80pm",
             "active_control_timing_jitter_above_0p1_cycle",
             "active_control_heat_load_below_computed_control_power",
@@ -181,16 +267,46 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
     },
     suppliedActiveControlEvidence: {
       evidenceTier: evidence?.evidenceTier ?? "missing",
+      energyWaveformRef: stringOrNull(evidence?.energyWaveformRef),
+      controlTransferFunctionRef: stringOrNull(evidence?.controlTransferFunctionRef),
+      gapNoiseTraceRef: stringOrNull(evidence?.gapNoiseTraceRef),
+      thermalModelRef: stringOrNull(evidence?.thermalModelRef),
+      heatLoadTraceRef: stringOrNull(evidence?.heatLoadTraceRef),
+      timingSyncTraceRef: stringOrNull(evidence?.timingSyncTraceRef),
       energyPerCycleJ: finiteOrNull(evidence?.energyPerCycleJ),
       bandwidthHz: finiteOrNull(evidence?.bandwidthHz),
       switchingRateHz: finiteOrNull(evidence?.switchingRateHz),
       gapNoiseRmsMeters: finiteOrNull(evidence?.gapNoiseRmsMeters),
+      noiseSpectrumRef: evidence?.noiseSpectrumRef ?? null,
       heatLoadW: finiteOrNull(evidence?.heatLoadW),
       timingJitterSeconds: finiteOrNull(evidence?.timingJitterSeconds),
       failureModeRef: evidence?.failureModeRef ?? null,
+      failureModeCoverage:
+        failureModeCoverage == null
+          ? null
+          : {
+              lossOfLock: failureModeCoverage.lossOfLock === true,
+              thermalRunaway: failureModeCoverage.thermalRunaway === true,
+              noiseRunaway: failureModeCoverage.noiseRunaway === true,
+              timingDesynchronization: failureModeCoverage.timingDesynchronization === true,
+              failSafeShutdown: failureModeCoverage.failSafeShutdown === true,
+            },
     },
     derivedOperatingBudget: {
       controlPowerW,
+      gapControlAuthorityMargin,
+      activeControlTraceRefsAvailable:
+        evidence?.energyWaveformRef != null &&
+        evidence.controlTransferFunctionRef != null &&
+        evidence.gapNoiseTraceRef != null &&
+        evidence.noiseSpectrumRef != null &&
+        evidence.thermalModelRef != null &&
+        evidence.heatLoadTraceRef != null &&
+        evidence.timingSyncTraceRef != null &&
+        evidence.failureModeRef != null,
+      noiseSpectrumAvailable: evidence?.noiseSpectrumRef != null,
+      failureModeCoverageComplete,
+      switchingRateMargin,
       bandwidthMargin,
       noiseMargin,
       timingMargin,
@@ -248,6 +364,11 @@ export const isNhm2TileSourceActiveControlOperatingBudget = (
     supplied != null &&
     typeof supplied.evidenceTier === "string" &&
     budget != null &&
+    (budget.gapControlAuthorityMargin === null ||
+      typeof budget.gapControlAuthorityMargin === "number") &&
+    typeof budget.noiseSpectrumAvailable === "boolean" &&
+    typeof budget.failureModeCoverageComplete === "boolean" &&
+    (budget.switchingRateMargin === null || typeof budget.switchingRateMargin === "number") &&
     Array.isArray(value.blockers) &&
     value.blockers.every((entry) => typeof entry === "string") &&
     summary != null &&

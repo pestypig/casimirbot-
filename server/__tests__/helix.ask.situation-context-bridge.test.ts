@@ -1393,7 +1393,7 @@ describe("thread-bound situation context bridge", () => {
     expect(route.answer_text).not.toContain("Details are saved in the procedure log");
   });
 
-  it("auto-accepts a fresh visual capture repair into an existing SituationRun", () => {
+  it("does not auto-accept a fresh visual capture repair into an existing SituationRun", () => {
     seedVisualSituationRun();
     const now = new Date().toISOString();
     upsertLiveSourceProducer({
@@ -1434,10 +1434,15 @@ describe("thread-bound situation context bridge", () => {
     expect(route.active_situation_context.status).toBe("active");
     expect(route.active_situation_context.situation_run_id).toMatch(/^live_situation_run:/);
     expect(route.situation_evidence_selection.answerable).toBe(true);
-    expect(route.situation_evidence_selection.selected_source_refs).toContain("visual_source:chrome-current");
-    expect(route.situation_evidence_selection.rejected_unbound_source_refs).not.toContain("visual_source:chrome-current");
+    expect(route.binding_repair).toMatchObject({
+      status: "candidate_created",
+      source_id: "visual_source:chrome-current",
+      proposed_replay_policy: "future_only",
+    });
+    expect(route.situation_evidence_selection.selected_source_refs).not.toContain("visual_source:chrome-current");
+    expect(JSON.stringify(route.situation_evidence_selection.rejected_unbound_source_refs)).toContain("source_binding_status:");
     expect(route.situation_evidence_selection.selected_observation_refs.length).toBeGreaterThan(0);
-    expect(route.answer_text).toContain("Helix Ask test UI");
+    expect(route.answer_text).not.toContain("Helix Ask test UI");
     expect(route.answer_text).toContain("I'm seeing");
     expect(route.answer_text).not.toContain("Source refs:");
     expect(route.answer_text).not.toContain("Details are saved in the procedure log");

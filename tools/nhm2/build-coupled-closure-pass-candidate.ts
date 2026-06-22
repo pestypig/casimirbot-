@@ -95,6 +95,7 @@ export const runNhm2CoupledClosurePassCandidate = (args: {
   regionalMaterialSourceTensorModelPath?: string | null;
   tileLocalSourceElementsPath?: string | null;
   tileEffectiveCounterpartPath?: string | null;
+  tileSourceAuthorityHandoffPath?: string | null;
   sourceComponentAuthorityLedgerPath?: string | null;
   sourceSideAuthorityPath?: string | null;
   regionalSourceClosureEvidencePath?: string | null;
@@ -168,6 +169,7 @@ export const runNhm2CoupledClosurePassCandidate = (args: {
         args.regionalMaterialSourceTensorModelPath ?? null,
       tileLocalSourceElements: args.tileLocalSourceElementsPath ?? null,
       tileEffectiveCounterpart: args.tileEffectiveCounterpartPath ?? null,
+      tileSourceAuthorityHandoff: args.tileSourceAuthorityHandoffPath ?? null,
       sourceComponentAuthorityLedger:
         args.sourceComponentAuthorityLedgerPath ?? null,
       sourceSideSameBasisTensorAuthority: args.sourceSideAuthorityPath ?? null,
@@ -215,6 +217,7 @@ if (normalize(process.argv[1] ?? "") === normalize(fileURLToPath(import.meta.url
     ),
     tileLocalSourceElementsPath: asString(args["tile-local-source-elements"]),
     tileEffectiveCounterpartPath: asString(args["tile-effective-counterpart"]),
+    tileSourceAuthorityHandoffPath: asString(args["tile-source-authority-handoff"]),
     sourceComponentAuthorityLedgerPath: asString(
       args["source-component-authority-ledger"],
     ),

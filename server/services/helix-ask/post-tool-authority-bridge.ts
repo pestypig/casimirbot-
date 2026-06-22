@@ -176,6 +176,7 @@ const collectLiveSourceProcessedPackets = (payload: RecordLike): RecordLike[] =>
       ...readArray(directPayload?.packets),
       ...readArray(observation?.packets),
     ].map(readRecord).filter((entry): entry is RecordLike => {
+      if (!entry) return false;
       const marker = [
         readString(entry.artifactId),
         readString(entry.artifact_id),

@@ -85,6 +85,8 @@ describe("NHM2 reference validation chain planner", () => {
       ...baseArgs(),
       "build-tile-local-source-elements": true,
       "casimir-material-receipt": "artifacts/reference/casimir-material-receipt.json",
+      "tile-source-authority-handoff":
+        "artifacts/reference/nhm2-tile-source-authority-handoff.json",
       "qei-worldline-dossier": "artifacts/reference/nhm2-qei-worldline-dossier.json",
       "observer-robust-energy-conditions":
         "artifacts/reference/nhm2-observer-robust-energy-conditions.json",
@@ -130,6 +132,21 @@ describe("NHM2 reference validation chain planner", () => {
     expect(coupled.args).toContain("--qei-worldline-dossier");
     expect(coupled.args).toContain("--observer-robust-energy-conditions");
     expect(coupled.args).toContain("--casimir-material-receipt");
+    expect(coupled.args).toContain("--tile-source-authority-handoff");
+    expect(coupled.args).toContain(
+      "artifacts/reference/nhm2-tile-source-authority-handoff.json",
+    );
+
+    const sourceAuthority = findCommand(
+      plan,
+      "nhm2:publish-source-side-same-basis-authority",
+    );
+    expect(sourceAuthority.args).toContain("--casimir-material-receipt");
+    expect(sourceAuthority.args).toContain("artifacts/reference/casimir-material-receipt.json");
+    expect(sourceAuthority.args).toContain("--tile-source-authority-handoff");
+    expect(sourceAuthority.args).toContain(
+      "artifacts/reference/nhm2-tile-source-authority-handoff.json",
+    );
 
     const targets = findCommand(plan, "nhm2:build-regional-source-tensor-targets");
     expect(scripts.indexOf("nhm2:publish-regional-source-closure-evidence")).toBeLessThan(

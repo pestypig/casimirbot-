@@ -71,6 +71,8 @@ describe("NHM2 latest reference validation chain wrapper", () => {
           "fixtures/nhm2/regional-full-tensor-template.json",
         "metric-required-full-tensor-source":
           "fixtures/nhm2/metric-required-full-tensor-source.json",
+        "tile-source-authority-handoff":
+          "artifacts/reference/nhm2-tile-source-authority-handoff.json",
       },
       resolvedInputs(),
     );
@@ -81,6 +83,8 @@ describe("NHM2 latest reference validation chain wrapper", () => {
     expect(commandArgs).toContain("--regional-support-atlas");
     expect(commandArgs).toContain("--regional-source-full-tensor-template");
     expect(commandArgs).toContain("--metric-required-full-tensor-source");
+    expect(commandArgs).toContain("--tile-source-authority-handoff");
+    expect(commandArgs).toContain("artifacts/reference/nhm2-tile-source-authority-handoff.json");
   });
 
   it("forwards QEI bound, tau, and applicability inputs to the full-solve chain", () => {

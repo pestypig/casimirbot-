@@ -45,6 +45,7 @@ export type Nhm2TileSourceMaterialCouponTestPlanV1 = {
     materialSafetyFactor: 2;
     requiredFractureOrYieldStressPa: number;
     roughnessRmsMaxMeters: 1e-10;
+    materialResponseFrequencyHz: 15e9;
     evidenceTierRequired: "measured_or_validated_simulation";
   };
   testItems: Nhm2MaterialCouponTestPlanItemV1[];
@@ -90,10 +91,19 @@ const TEST_POLICY: Record<
   }
 > = {
   coupon_provenance: {
-    blockers: ["material_coupon_receipt_missing", "material_coupon_tier_not_measured_or_validated"],
+    blockers: [
+      "material_coupon_receipt_missing",
+      "material_coupon_tier_not_measured_or_validated",
+      "tensile_stress_curve_ref_missing",
+      "fracture_yield_curve_ref_missing",
+      "cryogenic_state_ref_missing",
+      "coupon_roughness_map_ref_missing",
+      "fabrication_tolerance_map_ref_missing",
+    ],
     requiredMeasurement:
-      "Measured or validated-simulation coupon receipt with apparatus, specimen, temperature, and data provenance.",
-    acceptanceCriterion: "Evidence tier is measured or validated_simulation, not declared_model or missing.",
+      "Measured or validated-simulation coupon receipt with apparatus, specimen, temperature, stress-curve, cryogenic-state, roughness-map, and fabrication-map provenance.",
+    acceptanceCriterion:
+      "Evidence tier is measured or validated_simulation and all required coupon curve/map provenance refs are present.",
     artifactToProduce: "receipt://material_coupon/provenance_v1",
   },
   candidate_material_identity: {
@@ -103,13 +113,15 @@ const TEST_POLICY: Record<
     artifactToProduce: "receipt://material_coupon/tin_identity_v1",
   },
   tensile_stress: {
-    blockers: ["measured_tensile_stress_missing"],
+    blockers: ["measured_tensile_stress_missing", "tensile_stress_curve_ref_missing"],
     requiredMeasurement: "Cryogenic thin-film tensile stress curve for the coupon stack.",
-    acceptanceCriterion: "Measured tensile stress is supplied and finite at the 4 K operating state.",
+    acceptanceCriterion:
+      "Measured tensile stress is supplied and traceable to a tensile stress curve at the 4 K operating state.",
     artifactToProduce: "receipt://material_coupon/tensile_stress_4k_v1",
   },
   fracture_yield_margin: {
     blockers: [
+      "fracture_yield_curve_ref_missing",
       "fracture_or_yield_margin_missing",
       "fracture_or_yield_margin_below_2x_support_stress",
     ],
@@ -118,33 +130,52 @@ const TEST_POLICY: Record<
     artifactToProduce: "receipt://material_coupon/fracture_yield_margin_v1",
   },
   cryogenic_state: {
-    blockers: ["cryogenic_4k_coupon_receipt_missing"],
+    blockers: ["cryogenic_4k_coupon_receipt_missing", "cryogenic_state_ref_missing"],
     requiredMeasurement: "Cryogenic material-state receipt at or below 4 K.",
     acceptanceCriterion: "Coupon behavior is characterized at the 4 K operating state.",
     artifactToProduce: "receipt://material_coupon/cryogenic_4k_state_v1",
   },
   dielectric_response: {
-    blockers: ["dielectric_response_ref_missing"],
-    requiredMeasurement: "Dielectric response reference for the selected TiN stack.",
-    acceptanceCriterion: "Dielectric response reference is present and traceable to the coupon material.",
+    blockers: [
+      "dielectric_response_ref_missing",
+      "material_response_frequency_missing",
+      "material_response_frequency_not_15ghz",
+      "dielectric_response_temperature_missing",
+      "dielectric_response_temperature_above_4k",
+      "material_response_numeric_values_missing",
+    ],
+    requiredMeasurement:
+      "Dielectric response reference plus numeric loss tangent for the selected TiN stack at 15 GHz and 4 K.",
+    acceptanceCriterion:
+      "Dielectric response is traceable to the coupon material and includes finite non-negative loss tangent at the operating frequency and temperature.",
     artifactToProduce: "receipt://material_coupon/dielectric_response_v1",
   },
   conductivity: {
-    blockers: ["conductivity_ref_missing"],
-    requiredMeasurement: "Conductivity reference for the selected TiN stack.",
-    acceptanceCriterion: "Conductivity reference is present and traceable to the coupon material.",
+    blockers: [
+      "conductivity_ref_missing",
+      "material_response_frequency_missing",
+      "material_response_frequency_not_15ghz",
+      "conductivity_temperature_missing",
+      "conductivity_temperature_above_4k",
+      "material_response_numeric_values_missing",
+    ],
+    requiredMeasurement:
+      "Conductivity reference plus numeric conductivity for the selected TiN stack at 15 GHz and 4 K.",
+    acceptanceCriterion:
+      "Conductivity response is traceable to the coupon material and includes finite positive conductivity at the operating frequency and temperature.",
     artifactToProduce: "receipt://material_coupon/conductivity_v1",
   },
   roughness_metrology: {
-    blockers: ["coupon_roughness_rms_above_0p1nm_or_missing"],
-    requiredMeasurement: "Coupon roughness RMS metrology.",
-    acceptanceCriterion: "RMS roughness is supplied and no greater than 0.1 nm.",
+    blockers: ["coupon_roughness_rms_above_0p1nm_or_missing", "coupon_roughness_map_ref_missing"],
+    requiredMeasurement: "Coupon roughness RMS metrology and surface-height map.",
+    acceptanceCriterion: "RMS roughness is supplied from a traceable map and no greater than 0.1 nm.",
     artifactToProduce: "receipt://material_coupon/roughness_rms_v1",
   },
   fabrication_tolerance: {
-    blockers: ["fabrication_tolerance_receipt_missing"],
-    requiredMeasurement: "Fabrication tolerance receipt for the coupon and layer stack.",
-    acceptanceCriterion: "Fabrication tolerance is supplied for the 8 nm operating-gap stack.",
+    blockers: ["fabrication_tolerance_receipt_missing", "fabrication_tolerance_map_ref_missing"],
+    requiredMeasurement: "Fabrication tolerance receipt and spatial tolerance map for the coupon and layer stack.",
+    acceptanceCriterion:
+      "Fabrication tolerance is supplied from a traceable map for the 8 nm operating-gap stack.",
     artifactToProduce: "receipt://material_coupon/fabrication_tolerance_v1",
   },
 };
@@ -212,6 +243,7 @@ export const buildNhm2TileSourceMaterialCouponTestPlan = (
       materialSafetyFactor: MATERIAL_SAFETY_FACTOR,
       requiredFractureOrYieldStressPa: supportStressPa * MATERIAL_SAFETY_FACTOR,
       roughnessRmsMaxMeters: 1e-10,
+      materialResponseFrequencyHz: 15e9,
       evidenceTierRequired: "measured_or_validated_simulation",
     },
     testItems,
@@ -262,6 +294,7 @@ export const isNhm2TileSourceMaterialCouponTestPlan = (
     target.materialSafetyFactor === 2 &&
     typeof target.requiredFractureOrYieldStressPa === "number" &&
     target.roughnessRmsMaxMeters === 1e-10 &&
+    target.materialResponseFrequencyHz === 15e9 &&
     target.evidenceTierRequired === "measured_or_validated_simulation" &&
     Array.isArray(value.testItems) &&
     value.testItems.length === 9 &&

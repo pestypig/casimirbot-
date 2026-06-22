@@ -12,6 +12,8 @@ export type Nhm2FatigueLayerScalingTestId =
   | "cycle_count_to_failure"
   | "required_cycle_count"
   | "cycle_margin"
+  | "thermal_cycle_drift"
+  | "creep_drift"
   | "layer_scaling_efficiency"
   | "nonadditivity_fraction"
   | "active_area_retention"
@@ -42,6 +44,8 @@ export type Nhm2TileSourceFatigueLayerScalingTestPlanV1 = {
     layerScalingEfficiencyMin: 0.9;
     layerNonadditivityFractionMax: 0.1;
     activeAreaRetentionMin: 0.6;
+    thermalCycleDriftFractionMax: 0.01;
+    creepDriftFractionMax: 0.01;
     supportCouplingStatusRequired: "pass";
     evidenceTierRequired: "measured_or_validated_simulation";
   };
@@ -55,6 +59,8 @@ export type Nhm2TileSourceFatigueLayerScalingTestPlanV1 = {
     falsifyingTestCount: number;
     satisfiedTestCount: number;
     cycleMargin: number | null;
+    thermalCycleDriftMargin: number | null;
+    creepDriftMargin: number | null;
     scalingMargin: number | null;
     nonadditivityMargin: number | null;
     activeAreaMargin: number | null;
@@ -95,22 +101,34 @@ const TEST_POLICY: Record<
       "fatigue_lifetime_receipt_missing",
       "layer_scaling_nonadditivity_measurement_missing",
       "fatigue_layer_scaling_tier_not_measured_or_validated",
+      "fatigue_cycle_protocol_ref_missing",
+      "fatigue_curve_ref_missing",
+      "thermal_cycle_ref_missing",
+      "creep_drift_ref_missing",
+      "layer_scaling_map_ref_missing",
+      "layer_nonadditivity_model_ref_missing",
+      "active_area_map_ref_missing",
+      "support_coupling_map_ref_missing",
+      "multiphysics_coupling_ref_missing",
     ],
     requiredMeasurement:
-      "Measured or validated-simulation fatigue and layer-scaling receipt with cycle protocol, layer count, support coupling, and active-area provenance.",
-    acceptanceCriterion: "Evidence tier is measured or validated_simulation, not declared_model or missing.",
+      "Measured or validated-simulation fatigue and layer-scaling receipt with cycle protocol, fatigue curve, thermal-cycle, creep/drift, layer map, nonadditivity model, support-coupling map, active-area map, and multiphysics coupling provenance.",
+    acceptanceCriterion:
+      "Evidence tier is measured or validated_simulation and all fatigue/layer-scaling provenance refs are present.",
     artifactToProduce: "receipt://fatigue_layer_scaling/provenance_v1",
   },
   cycle_count_to_failure: {
-    blockers: ["fatigue_cycle_margin_missing"],
-    requiredMeasurement: "Cycle count to failure for the selected 447-layer operating protocol.",
-    acceptanceCriterion: "Finite cycle count to failure is supplied with provenance.",
+    blockers: ["fatigue_cycle_margin_missing", "fatigue_curve_ref_missing"],
+    requiredMeasurement:
+      "Cycle count to failure and fatigue curve for the selected 447-layer operating protocol.",
+    acceptanceCriterion: "Finite cycle count to failure is supplied with fatigue-curve provenance.",
     artifactToProduce: "receipt://fatigue_layer_scaling/cycle_count_to_failure_v1",
   },
   required_cycle_count: {
-    blockers: ["fatigue_cycle_margin_missing"],
-    requiredMeasurement: "Required cycle count for the selected campaign duty, switching cadence, and operating duration.",
-    acceptanceCriterion: "Finite required cycle count is supplied with provenance.",
+    blockers: ["fatigue_cycle_margin_missing", "fatigue_cycle_protocol_ref_missing"],
+    requiredMeasurement:
+      "Required cycle count and cycle protocol for the selected campaign duty, switching cadence, and operating duration.",
+    acceptanceCriterion: "Finite required cycle count is supplied with protocol provenance.",
     artifactToProduce: "receipt://fatigue_layer_scaling/required_cycle_count_v1",
   },
   cycle_margin: {
@@ -119,28 +137,69 @@ const TEST_POLICY: Record<
     acceptanceCriterion: "Fatigue cycle margin is at least 1.",
     artifactToProduce: "receipt://fatigue_layer_scaling/cycle_margin_v1",
   },
+  thermal_cycle_drift: {
+    blockers: [
+      "thermal_cycle_drift_fraction_missing",
+      "thermal_cycle_drift_above_0p01",
+      "thermal_cycle_ref_missing",
+    ],
+    requiredMeasurement:
+      "Thermal-cycle drift fraction for the selected 447-layer stack across the declared duty and temperature protocol.",
+    acceptanceCriterion:
+      "Thermal-cycle drift fraction is finite, positive, no greater than 0.01, and traceable to thermal-cycle evidence.",
+    artifactToProduce: "receipt://fatigue_layer_scaling/thermal_cycle_drift_v1",
+  },
+  creep_drift: {
+    blockers: [
+      "creep_drift_fraction_missing",
+      "creep_drift_above_0p01",
+      "creep_drift_ref_missing",
+    ],
+    requiredMeasurement:
+      "Creep/drift fraction for the selected 447-layer stack under campaign stress, timing, and temperature conditions.",
+    acceptanceCriterion:
+      "Creep/drift fraction is finite, positive, no greater than 0.01, and traceable to creep/drift evidence.",
+    artifactToProduce: "receipt://fatigue_layer_scaling/creep_drift_v1",
+  },
   layer_scaling_efficiency: {
-    blockers: ["layer_scaling_efficiency_missing", "layer_scaling_efficiency_below_0p9"],
-    requiredMeasurement: "447-layer scaling efficiency including mechanical and electromagnetic coupling losses.",
-    acceptanceCriterion: "Layer scaling efficiency is at least 0.9.",
+    blockers: [
+      "layer_scaling_efficiency_missing",
+      "layer_scaling_efficiency_below_0p9",
+      "layer_scaling_map_ref_missing",
+      "multiphysics_coupling_ref_missing",
+    ],
+    requiredMeasurement:
+      "447-layer scaling efficiency map including mechanical and electromagnetic coupling losses.",
+    acceptanceCriterion:
+      "Layer scaling efficiency is at least 0.9 and traceable to a layer map plus multiphysics coupling receipt.",
     artifactToProduce: "receipt://fatigue_layer_scaling/scaling_efficiency_v1",
   },
   nonadditivity_fraction: {
-    blockers: ["layer_nonadditivity_fraction_missing", "layer_nonadditivity_above_0p1"],
+    blockers: [
+      "layer_nonadditivity_fraction_missing",
+      "layer_nonadditivity_above_0p1",
+      "layer_nonadditivity_model_ref_missing",
+    ],
     requiredMeasurement: "Layer nonadditivity fraction for the 447-layer stack.",
     acceptanceCriterion: "Layer nonadditivity fraction is no greater than 0.1.",
     artifactToProduce: "receipt://fatigue_layer_scaling/nonadditivity_fraction_v1",
   },
   active_area_retention: {
-    blockers: ["active_area_retention_missing", "active_area_retention_below_0p6"],
-    requiredMeasurement: "Active Casimir area retained after supports, controls, routing, and layer spacing.",
-    acceptanceCriterion: "Active-area retention is at least 0.6.",
+    blockers: ["active_area_retention_missing", "active_area_retention_below_0p6", "active_area_map_ref_missing"],
+    requiredMeasurement:
+      "Active Casimir area map retained after supports, controls, routing, and layer spacing.",
+    acceptanceCriterion: "Active-area retention is at least 0.6 and traceable to an active-area map.",
     artifactToProduce: "receipt://fatigue_layer_scaling/active_area_retention_v1",
   },
   support_coupling: {
-    blockers: ["support_coupling_status_not_pass"],
-    requiredMeasurement: "Support-coupling receipt for mechanical, thermal, and electromagnetic cross-coupling across layers.",
-    acceptanceCriterion: "Support-coupling status is pass.",
+    blockers: [
+      "support_coupling_status_not_pass",
+      "support_coupling_map_ref_missing",
+      "multiphysics_coupling_ref_missing",
+    ],
+    requiredMeasurement:
+      "Support-coupling map and multiphysics receipt for mechanical, thermal, and electromagnetic cross-coupling across layers.",
+    acceptanceCriterion: "Support-coupling status is pass with map and multiphysics provenance.",
     artifactToProduce: "receipt://fatigue_layer_scaling/support_coupling_v1",
   },
 };
@@ -221,6 +280,8 @@ export const buildNhm2TileSourceFatigueLayerScalingTestPlan = (
       layerScalingEfficiencyMin: 0.9,
       layerNonadditivityFractionMax: 0.1,
       activeAreaRetentionMin: 0.6,
+      thermalCycleDriftFractionMax: 0.01,
+      creepDriftFractionMax: 0.01,
       supportCouplingStatusRequired: "pass",
       evidenceTierRequired: "measured_or_validated_simulation",
     },
@@ -234,6 +295,9 @@ export const buildNhm2TileSourceFatigueLayerScalingTestPlan = (
       falsifyingTestCount: falsifyingItems.length,
       satisfiedTestCount: satisfiedItems.length,
       cycleMargin: fatigue.numericalMargins.cycleMargin ?? null,
+      thermalCycleDriftMargin:
+        fatigue.numericalMargins.thermalCycleDriftMargin ?? null,
+      creepDriftMargin: fatigue.numericalMargins.creepDriftMargin ?? null,
       scalingMargin: scaling.numericalMargins.scalingMargin ?? null,
       nonadditivityMargin: scaling.numericalMargins.nonadditivityMargin ?? null,
       activeAreaMargin: scaling.numericalMargins.activeAreaMargin ?? null,
@@ -278,10 +342,12 @@ export const isNhm2TileSourceFatigueLayerScalingTestPlan = (
     target.layerScalingEfficiencyMin === 0.9 &&
     target.layerNonadditivityFractionMax === 0.1 &&
     target.activeAreaRetentionMin === 0.6 &&
+    target.thermalCycleDriftFractionMax === 0.01 &&
+    target.creepDriftFractionMax === 0.01 &&
     target.supportCouplingStatusRequired === "pass" &&
     target.evidenceTierRequired === "measured_or_validated_simulation" &&
     Array.isArray(value.testItems) &&
-    value.testItems.length === 8 &&
+    value.testItems.length === 10 &&
     value.testItems.every(
       (item) =>
         isRecord(item) &&
@@ -301,6 +367,10 @@ export const isNhm2TileSourceFatigueLayerScalingTestPlan = (
     typeof summary.falsifyingTestCount === "number" &&
     typeof summary.satisfiedTestCount === "number" &&
     (summary.cycleMargin === null || typeof summary.cycleMargin === "number") &&
+    (summary.thermalCycleDriftMargin === null ||
+      typeof summary.thermalCycleDriftMargin === "number") &&
+    (summary.creepDriftMargin === null ||
+      typeof summary.creepDriftMargin === "number") &&
     (summary.scalingMargin === null || typeof summary.scalingMargin === "number") &&
     (summary.nonadditivityMargin === null ||
       typeof summary.nonadditivityMargin === "number") &&

@@ -14,6 +14,12 @@ import {
   type CasimirMaterialReceiptStatus,
   type CasimirMaterialReceiptV1,
 } from "./casimir-material-receipt.v1";
+import type { Nhm2TileSourceAuthorityHandoffV1 } from "./nhm2-tile-source-authority-handoff.v1";
+import {
+  NHM2_FULL_APPARATUS_REQUIRED_TERM_IDS,
+  NHM2_FULL_APPARATUS_SYMMETRIC_TENSOR_COMPONENTS,
+  type Nhm2TileSourceFullApparatusTensorValuesV1,
+} from "./nhm2-tile-source-full-apparatus-tensor-values.v1";
 
 export const NHM2_SOURCE_SIDE_SAME_BASIS_TENSOR_AUTHORITY_CONTRACT_VERSION =
   "nhm2_source_side_same_basis_tensor_authority/v1";
@@ -80,10 +86,13 @@ export type Nhm2SourceSideSameBasisTensorAuthorityArtifactV1 = {
   sourceModelId: string | null;
   sourceTensorArtifactRef?: string;
   counterpartArtifactRef?: string;
+  tileSourceAuthorityHandoffRef?: string;
+  tileSourceAuthorityHandoffStatus?: string;
   regions: Nhm2SourceSideSameBasisTensorAuthorityRegionV1[];
   summary: {
     hasWallAuthority: boolean;
     allRequiredRegionsAuthoritative: boolean;
+    tileSourceHandoffReady: boolean;
     anyMetricEcho: boolean;
     anyProxy: boolean;
     anyMissingCounterpart: boolean;
@@ -140,6 +149,9 @@ export type BuildNhm2SourceSideSameBasisTensorAuthorityInput = {
   sourceModelId?: string | null;
   sourceTensorArtifactRef?: string | null;
   counterpartArtifactRef?: string | null;
+  tileSourceAuthorityHandoffRef?: string | null;
+  tileSourceAuthorityHandoff?: Nhm2TileSourceAuthorityHandoffV1 | null;
+  fullApparatusTensorValues?: Nhm2TileSourceFullApparatusTensorValuesV1 | null;
   counterpartArtifact?: Nhm2TileEffectiveCounterpartArtifact | null;
   sourceClosureRegions?: SourceClosureRegionLike[] | null;
   requiredRegionIds?: string[] | null;
@@ -220,12 +232,94 @@ const statusFromBlockers = (args: {
   }
   if (args.blockers.size > 0) return "blocked";
   if (
-    args.comparisonRole === "tile_effective_counterpart" &&
+    (args.comparisonRole === "tile_effective_counterpart" ||
+      args.comparisonRole === "tile_source_full_apparatus_tensor_values") &&
     tensorModeHasFullAuthority(args.tensorAuthorityMode)
   ) {
     return "authoritative_same_basis";
   }
   return "diagnostic_only";
+};
+
+const buildRegionFromFullApparatusTensorValues = (args: {
+  artifact: Nhm2TileSourceFullApparatusTensorValuesV1;
+  region: Nhm2TileSourceFullApparatusTensorValuesV1["regions"][number];
+  materialReceipt: CasimirMaterialReceiptV1 | null;
+  warnings: string[];
+}): Nhm2SourceSideSameBasisTensorAuthorityRegionV1 => {
+  const missingComponentIds = NHM2_FULL_APPARATUS_SYMMETRIC_TENSOR_COMPONENTS.filter(
+    (componentId) =>
+      args.region.tensor[componentId] == null ||
+      args.region.componentStatus[componentId] === "missing" ||
+      args.region.componentStatus[componentId] === "blocked",
+  );
+  const blockers = new Set(args.region.blockers);
+  if (!args.artifact.sourceSideOnly) blockers.add("source_side_only_not_asserted");
+  if (!args.artifact.notDerivedFromMetricRequiredTensor) {
+    blockers.add("metric_required_derivation_not_allowed");
+  }
+  if (!args.artifact.targetEchoForbidden || args.artifact.targetDerivedFieldsUsed) {
+    blockers.add("metric_echo_not_source_tensor");
+  }
+  if (args.region.chartRef !== "comoving_cartesian") blockers.add("chart_mismatch");
+  if (args.region.basisRef !== "same_basis") blockers.add("same_basis_contract_misaligned");
+  if (args.region.unitsRef !== "J/m^3") blockers.add("unit_mismatch");
+  if (args.region.regionSupportRef == null) blockers.add("region_mask_ref_missing");
+  if (args.region.aggregationMode === "unknown") blockers.add("aggregation_mode_unknown");
+  if (args.region.normalizationBasis === "unknown") blockers.add("normalization_basis_unknown");
+  if (args.region.sampleCount == null) blockers.add("sample_count_missing");
+  if (args.region.valueReceiptRef == null) blockers.add("tensor_value_receipt_ref_missing");
+  if (missingComponentIds.length > 0) blockers.add("source_side_full_tensor_components_missing");
+
+  for (const componentId of NHM2_FULL_APPARATUS_SYMMETRIC_TENSOR_COMPONENTS) {
+    const authority = args.region.componentAuthority[componentId];
+    if (authority === "metric_echo") blockers.add("metric_echo_not_source_tensor");
+    if (authority === "scalar_proxy") blockers.add("source_side_full_tensor_authority_missing");
+    if (authority === "missing") blockers.add("source_side_full_tensor_components_missing");
+  }
+  for (const termId of NHM2_FULL_APPARATUS_REQUIRED_TERM_IDS) {
+    const contribution = args.region.termContributions[termId];
+    if (contribution == null) {
+      blockers.add(`full_apparatus_${termId}_term_missing`);
+    }
+  }
+
+  const receiptStatus = materialReceiptStatus(args.materialReceipt);
+  const warnings = normalizeList(args.warnings);
+  if (receiptStatus == null || receiptStatus === "missing") {
+    warnings.push("material_receipt_not_attached_to_source_authority");
+  } else if (receiptStatus !== "material_receipted") {
+    warnings.push(`material_receipt_status_${receiptStatus}`);
+  }
+
+  return {
+    regionId: args.region.regionId,
+    status: statusFromBlockers({
+      blockers,
+      comparisonRole: "tile_source_full_apparatus_tensor_values",
+      tensorAuthorityMode: "symmetric_full_tensor",
+      derivationMode: "full_apparatus_tensor_values",
+    }),
+    sourceTensorRef: args.region.valueReceiptRef ?? args.artifact.artifactRef,
+    expectedMetricCounterpartRole: "tile_effective_counterpart",
+    comparisonRole: "tile_source_full_apparatus_tensor_values",
+    chartId: args.region.chartRef,
+    basisRef: args.region.basisRef,
+    units: args.region.unitsRef,
+    regionMaskRef: args.region.regionSupportRef,
+    aggregationMode: args.region.aggregationMode,
+    normalizationBasis: args.region.normalizationBasis,
+    tensorAuthorityMode: "symmetric_full_tensor",
+    derivationMode: "full_apparatus_tensor_values",
+    notDerivedFromMetricRequiredTensor:
+      args.artifact.notDerivedFromMetricRequiredTensor &&
+      !args.artifact.targetDerivedFieldsUsed,
+    hasFullTensorComponents: missingComponentIds.length === 0,
+    missingComponentIds,
+    ...(receiptStatus != null ? { materialReceiptStatus: receiptStatus } : {}),
+    blockers: normalizeList(Array.from(blockers)),
+    warnings,
+  };
 };
 
 const buildRegionFromCounterpart = (args: {
@@ -319,8 +413,7 @@ const buildRegionFromSourceClosure = (args: {
     toText(args.region.tileTensorRef);
   const tensorAuthorityMode = "diagonal_reduced_order";
   const missingComponentIds =
-    Array.isArray(args.region.sourceSideFullTensorMissingComponentIds) &&
-    args.region.sourceSideFullTensorMissingComponentIds.length > 0
+    Array.isArray(args.region.sourceSideFullTensorMissingComponentIds)
       ? normalizeList(args.region.sourceSideFullTensorMissingComponentIds)
       : missingComponentsForTensor(args.region.tileEffectiveTensor, tensorAuthorityMode);
   const blockers = new Set<string>();
@@ -393,12 +486,98 @@ const buildRegionFromSourceClosure = (args: {
 const normalizeRegionId = (value: string): string =>
   value.trim().toLowerCase().replace(/-/g, "_");
 
+const buildRegionFromTileSourceHandoff = (args: {
+  regionId: string;
+  handoff: Nhm2TileSourceAuthorityHandoffV1;
+  warnings: string[];
+}): Nhm2SourceSideSameBasisTensorAuthorityRegionV1 => {
+  const blockers = new Set<string>();
+  if (!args.handoff.summary.handoffReadyForSameBasisAuthority) {
+    blockers.add("tile_source_authority_handoff_not_ready");
+    const firstBlocker = toText(args.handoff.summary.firstBlocker);
+    if (firstBlocker != null && firstBlocker !== "none") blockers.add(firstBlocker);
+  }
+  blockers.add("tile_source_handoff_does_not_supply_tensor_values");
+  if (!args.handoff.summary.fullApparatusComponentDetailRefsReady) {
+    blockers.add("full_apparatus_component_detail_refs_incomplete");
+  }
+
+  return {
+    regionId: args.regionId,
+    status: "blocked",
+    sourceTensorRef: null,
+    expectedMetricCounterpartRole: "tile_effective_counterpart",
+    comparisonRole: "tile_source_material_evidence_handoff",
+    chartId: null,
+    basisRef: null,
+    units: null,
+    regionMaskRef: null,
+    aggregationMode: null,
+    normalizationBasis: null,
+    tensorAuthorityMode: null,
+    derivationMode: "tile_source_material_evidence_handoff",
+    notDerivedFromMetricRequiredTensor:
+      args.handoff.summary.handoffReadyForSameBasisAuthority ? true : null,
+    hasFullTensorComponents: false,
+    missingComponentIds: [...NHM2_SOURCE_SIDE_SAME_BASIS_FULL_TENSOR_COMPONENTS],
+    blockers: normalizeList(Array.from(blockers)),
+    warnings: normalizeList([
+      ...args.warnings,
+      "tile_source_handoff_is_evidence_intake_not_tensor_authority",
+      ...(args.handoff.sourceRefs.fullApparatusTensorOperatingBudgetRef != null
+        ? [`full_apparatus_tensor_operating_budget_ref:${args.handoff.sourceRefs.fullApparatusTensorOperatingBudgetRef}`]
+        : []),
+    ]),
+  };
+};
+
+const handoffAdmissionBlockers = (
+  handoff: Nhm2TileSourceAuthorityHandoffV1,
+): string[] => {
+  if (handoff.summary.handoffReadyForSameBasisAuthority) return [];
+  return normalizeList([
+    "tile_source_authority_handoff_not_ready",
+    toText(handoff.summary.firstBlocker),
+    ...handoff.gates.flatMap((gate) => gate.blockers),
+  ]);
+};
+
+const applyHandoffAdmissionGate = (
+  region: Nhm2SourceSideSameBasisTensorAuthorityRegionV1,
+  handoff: Nhm2TileSourceAuthorityHandoffV1 | null,
+): Nhm2SourceSideSameBasisTensorAuthorityRegionV1 => {
+  if (handoff == null || handoff.summary.handoffReadyForSameBasisAuthority) {
+    return region;
+  }
+  const blockers = normalizeList([
+    ...region.blockers,
+    ...handoffAdmissionBlockers(handoff),
+  ]);
+  const warnings = normalizeList([
+    ...region.warnings,
+    "tile_source_handoff_admission_gate_blocks_source_authority",
+  ]);
+  const status: Nhm2SourceSideSameBasisTensorAuthorityStatus =
+    region.status === "metric_echo_forbidden" || region.status === "proxy_limited"
+      ? region.status
+      : "blocked";
+  return {
+    ...region,
+    status,
+    notDerivedFromMetricRequiredTensor:
+      region.notDerivedFromMetricRequiredTensor === true ? true : null,
+    blockers,
+    warnings,
+  };
+};
+
 export const buildNhm2SourceSideSameBasisTensorAuthorityArtifact = (
   input: BuildNhm2SourceSideSameBasisTensorAuthorityInput,
 ): Nhm2SourceSideSameBasisTensorAuthorityArtifactV1 => {
   const materialReceipt = isCasimirMaterialReceipt(input.casimirMaterialReceipt)
     ? input.casimirMaterialReceipt
     : null;
+  const tileSourceAuthorityHandoff = input.tileSourceAuthorityHandoff ?? null;
   const regionMap = new Map<string, Nhm2SourceSideSameBasisTensorAuthorityRegionV1>();
 
   for (const region of input.counterpartArtifact?.regions ?? []) {
@@ -423,6 +602,45 @@ export const buildNhm2SourceSideSameBasisTensorAuthorityArtifact = (
       warnings: input.warnings ?? [],
     });
     regionMap.set(key, built);
+  }
+
+  if (input.fullApparatusTensorValues != null) {
+    for (const region of input.fullApparatusTensorValues.regions) {
+      const key = normalizeRegionId(region.regionId);
+      regionMap.set(
+        key,
+        buildRegionFromFullApparatusTensorValues({
+          artifact: input.fullApparatusTensorValues,
+          region,
+          materialReceipt,
+          warnings: input.warnings ?? [],
+        }),
+      );
+    }
+  }
+
+  if (tileSourceAuthorityHandoff != null) {
+    const requiredRegionIds = normalizeList(
+      input.requiredRegionIds ?? [...NHM2_REGIONAL_SOURCE_CLOSURE_REQUIRED_REGIONS],
+    );
+    for (const regionId of requiredRegionIds) {
+      const key = normalizeRegionId(regionId);
+      if (regionMap.has(key)) continue;
+      regionMap.set(
+        key,
+        buildRegionFromTileSourceHandoff({
+          regionId,
+          handoff: tileSourceAuthorityHandoff,
+          warnings: input.warnings ?? [],
+        }),
+      );
+    }
+  }
+
+  if (tileSourceAuthorityHandoff != null) {
+    for (const [key, region] of regionMap.entries()) {
+      regionMap.set(key, applyHandoffAdmissionGate(region, tileSourceAuthorityHandoff));
+    }
   }
 
   const requiredRegionIds = normalizeList(
@@ -459,6 +677,8 @@ export const buildNhm2SourceSideSameBasisTensorAuthorityArtifact = (
     .filter((region): region is Nhm2SourceSideSameBasisTensorAuthorityRegionV1 => region != null);
   const hasWallAuthority =
     regionMap.get("wall")?.status === "authoritative_same_basis";
+  const tileSourceHandoffReady =
+    tileSourceAuthorityHandoff?.summary.handoffReadyForSameBasisAuthority === true;
   const anyMetricEcho = regions.some((region) => region.status === "metric_echo_forbidden");
   const anyProxy = regions.some((region) => region.status === "proxy_limited");
   const anyMissingCounterpart = regions.some(
@@ -484,12 +704,20 @@ export const buildNhm2SourceSideSameBasisTensorAuthorityArtifact = (
     ...(toText(input.counterpartArtifactRef) != null
       ? { counterpartArtifactRef: toText(input.counterpartArtifactRef) as string }
       : {}),
+    ...(toText(input.tileSourceAuthorityHandoffRef) != null
+      ? { tileSourceAuthorityHandoffRef: toText(input.tileSourceAuthorityHandoffRef) as string }
+      : {}),
+    ...(tileSourceAuthorityHandoff != null
+      ? { tileSourceAuthorityHandoffStatus: tileSourceAuthorityHandoff.summary.handoffStatus }
+      : {}),
     regions,
     summary: {
       hasWallAuthority,
       allRequiredRegionsAuthoritative:
         requiredRegions.length === requiredRegionIds.length &&
-        requiredRegions.every((region) => region.status === "authoritative_same_basis"),
+        requiredRegions.every((region) => region.status === "authoritative_same_basis") &&
+        (tileSourceAuthorityHandoff == null || tileSourceHandoffReady),
+      tileSourceHandoffReady,
       anyMetricEcho,
       anyProxy,
       anyMissingCounterpart,
@@ -523,6 +751,10 @@ export const isNhm2SourceSideSameBasisTensorAuthorityArtifact = (
       toText(value.sourceTensorArtifactRef) != null) &&
     (value.counterpartArtifactRef === undefined ||
       toText(value.counterpartArtifactRef) != null) &&
+    (value.tileSourceAuthorityHandoffRef === undefined ||
+      toText(value.tileSourceAuthorityHandoffRef) != null) &&
+    (value.tileSourceAuthorityHandoffStatus === undefined ||
+      toText(value.tileSourceAuthorityHandoffStatus) != null) &&
     Array.isArray(value.regions) &&
     value.regions.every((entry) => {
       const region = isRecord(entry) ? entry : null;
@@ -557,6 +789,7 @@ export const isNhm2SourceSideSameBasisTensorAuthorityArtifact = (
     summary != null &&
     typeof summary.hasWallAuthority === "boolean" &&
     typeof summary.allRequiredRegionsAuthoritative === "boolean" &&
+    typeof summary.tileSourceHandoffReady === "boolean" &&
     typeof summary.anyMetricEcho === "boolean" &&
     typeof summary.anyProxy === "boolean" &&
     typeof summary.anyMissingCounterpart === "boolean" &&

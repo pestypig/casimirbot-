@@ -3011,7 +3011,7 @@ export const DOC_FILE_METADATA: Record<string, DocFileMetadata> = {
   "docs/HELIX_E749_E764_NATIVE_ATTACHMENT_COMMIT_GUARD.md": {"mtimeMs":1778806113469,"mtimeIso":"2026-05-15T00:48:33.469Z","sizeBytes":10051},
   "docs/helix-ask-agent-policy.md": {"mtimeMs":1779117528253,"mtimeIso":"2026-05-18T15:18:48.253Z","sizeBytes":5972},
   "docs/helix-ask-agentic-loop-current-overview.md": {"mtimeMs":1779838067464,"mtimeIso":"2026-05-26T23:27:47.464Z","sizeBytes":13529},
-  "docs/helix-ask-api-parity-matrix.md": {"mtimeMs":1781808049684,"mtimeIso":"2026-06-18T18:40:49.684Z","sizeBytes":8846},
+  "docs/helix-ask-api-parity-matrix.md": {"mtimeMs":1782106029874,"mtimeIso":"2026-06-22T05:27:09.874Z","sizeBytes":8876},
   "docs/helix-ask-atomic-system-overview.md": {"mtimeMs":1771269164097,"mtimeIso":"2026-02-16T19:12:44.097Z","sizeBytes":21626},
   "docs/helix-ask-audited-reasoning-example.md": {"mtimeMs":1774373658219,"mtimeIso":"2026-03-24T17:34:18.219Z","sizeBytes":9380},
   "docs/helix-ask-audited-reasoning-first-principles.md": {"mtimeMs":1774337889486,"mtimeIso":"2026-03-24T07:38:09.486Z","sizeBytes":2854},

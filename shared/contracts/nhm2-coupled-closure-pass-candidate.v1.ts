@@ -20,6 +20,7 @@ export const NHM2_COUPLED_CLOSURE_PASS_CANDIDATE_CONTRACT_VERSION =
 export const NHM2_COUPLED_CLOSURE_GATE_IDS = [
   "regional_support_function_atlas",
   "regional_source_tensor_authority",
+  "tile_source_authority_handoff",
   "source_component_authority_ledger",
   "source_closure_readiness",
   "regional_residuals",
@@ -56,6 +57,7 @@ export type Nhm2CoupledClosurePassCandidateArtifactRefsV1 = {
   regionalMaterialSourceTensorModel: string | null;
   tileLocalSourceElements: string | null;
   tileEffectiveCounterpart: string | null;
+  tileSourceAuthorityHandoff: string | null;
   sourceComponentAuthorityLedger: string | null;
   sourceSideSameBasisTensorAuthority: string | null;
   regionalSourceClosureEvidence: string | null;
@@ -79,6 +81,8 @@ export type Nhm2CoupledClosurePassCandidateArtifactV1 = {
   summary: {
     passCandidate: boolean;
     sourceClosurePassSignalAllowed: boolean;
+    tileSourceHandoffReady: boolean;
+    tileSourceHandoffStatus: string | null;
     allRequiredRegionsAuthoritative: boolean;
     sourceComponentAuthorityComplete: boolean;
     wallAuthorityPresent: boolean;
@@ -353,6 +357,57 @@ const sourceAuthorityGate = (
   });
 };
 
+const tileSourceAuthorityHandoffGate = (
+  artifact: Nhm2SourceSideSameBasisTensorAuthorityArtifactV1 | null | undefined,
+): Nhm2CoupledClosureGateV1 => {
+  if (artifact == null) {
+    return gate({
+      gateId: "tile_source_authority_handoff",
+      status: "missing",
+      blockers: ["source_side_same_basis_tensor_authority_missing"],
+    });
+  }
+  if (artifact.tileSourceAuthorityHandoffRef == null) {
+    return gate({
+      gateId: "tile_source_authority_handoff",
+      status: "missing",
+      blockers: ["tile_source_authority_handoff_missing"],
+      warnings: ["tile_source_handoff_is_required_for_material_evidence_campaign"],
+      primaryMetric: "tileSourceHandoffReady=false",
+    });
+  }
+  if (artifact.summary.tileSourceHandoffReady) {
+    return gate({
+      gateId: "tile_source_authority_handoff",
+      status: "pass",
+      warnings: ["tile_source_handoff_ready_is_not_tensor_authority"],
+      primaryMetric: `handoffStatus=${artifact.tileSourceAuthorityHandoffStatus ?? "unknown"}`,
+    });
+  }
+  const status = artifact.tileSourceAuthorityHandoffStatus ?? "unknown";
+  return gate({
+    gateId: "tile_source_authority_handoff",
+    status:
+      status === "falsified"
+        ? "fail"
+        : status === "blocked"
+          ? "blocked"
+          : status === "review"
+            ? "review"
+            : "missing",
+    blockers: uniqueText([
+      `tile_source_authority_handoff_status_${status}`,
+      ...artifact.regions.flatMap((region) =>
+        region.blockers
+          .filter((blocker) => blocker.includes("tile_source") || blocker.includes("full_apparatus"))
+          .map((blocker) => `${region.regionId}:${blocker}`),
+      ),
+    ]),
+    warnings: ["tile_source_handoff_does_not_run_downstream_gates"],
+    primaryMetric: `handoffStatus=${status}`,
+  });
+};
+
 const sourceComponentLedgerGate = (
   artifact: Nhm2SourceComponentAuthorityLedgerArtifactV1 | null | undefined,
 ): Nhm2CoupledClosureGateV1 => {
@@ -615,6 +670,7 @@ const defaultRefs = (
   regionalMaterialSourceTensorModel: refs?.regionalMaterialSourceTensorModel ?? null,
   tileLocalSourceElements: refs?.tileLocalSourceElements ?? null,
   tileEffectiveCounterpart: refs?.tileEffectiveCounterpart ?? null,
+  tileSourceAuthorityHandoff: refs?.tileSourceAuthorityHandoff ?? null,
   sourceComponentAuthorityLedger: refs?.sourceComponentAuthorityLedger ?? null,
   sourceSideSameBasisTensorAuthority: refs?.sourceSideSameBasisTensorAuthority ?? null,
   regionalSourceClosureEvidence: refs?.regionalSourceClosureEvidence ?? null,
@@ -651,6 +707,7 @@ export const buildNhm2CoupledClosurePassCandidate = (
   const gates = [
     atlasGate(input.regionalSupportFunctionAtlas, input),
     sourceAuthorityGate(input.sourceAuthority, input.sourceComponentAuthorityLedger),
+    tileSourceAuthorityHandoffGate(input.sourceAuthority),
     sourceComponentLedgerGate(input.sourceComponentAuthorityLedger),
     sourceClosureGate(
       input.sourceClosurePassReadiness,
@@ -697,6 +754,9 @@ export const buildNhm2CoupledClosurePassCandidate = (
       sourceClosurePassSignalAllowed:
         gates.find((entry) => entry.gateId === "source_closure_readiness")
           ?.pass === true,
+      tileSourceHandoffReady: sourceAuthority?.tileSourceHandoffReady === true,
+      tileSourceHandoffStatus:
+        input.sourceAuthority?.tileSourceAuthorityHandoffStatus ?? null,
       allRequiredRegionsAuthoritative:
         sourceAuthority?.allRequiredRegionsAuthoritative === true ||
         componentLedgerRequiredAuthority,
@@ -788,6 +848,7 @@ export const isNhm2CoupledClosurePassCandidateArtifact = (
     !isNullableText(refs.regionalMaterialSourceTensorModel) ||
     !isNullableText(refs.tileLocalSourceElements) ||
     !isNullableText(refs.tileEffectiveCounterpart) ||
+    !isNullableText(refs.tileSourceAuthorityHandoff) ||
     !isNullableText(refs.sourceComponentAuthorityLedger) ||
     !isNullableText(refs.sourceSideSameBasisTensorAuthority) ||
     !isNullableText(refs.regionalSourceClosureEvidence) ||
@@ -801,6 +862,8 @@ export const isNhm2CoupledClosurePassCandidateArtifact = (
     summary == null ||
     typeof summary.passCandidate !== "boolean" ||
     typeof summary.sourceClosurePassSignalAllowed !== "boolean" ||
+    typeof summary.tileSourceHandoffReady !== "boolean" ||
+    !(summary.tileSourceHandoffStatus === null || asText(summary.tileSourceHandoffStatus) != null) ||
     typeof summary.allRequiredRegionsAuthoritative !== "boolean" ||
     typeof summary.sourceComponentAuthorityComplete !== "boolean" ||
     typeof summary.wallAuthorityPresent !== "boolean" ||

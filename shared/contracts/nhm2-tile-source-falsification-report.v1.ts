@@ -9,6 +9,10 @@ import type {
   Nhm2TileSourceGateStatus,
   Nhm2TileSourcePhysicalValidationPlanV1,
 } from "./nhm2-tile-source-physical-validation-plan.v1";
+import type {
+  Nhm2TileSourceOperatingBudgetReadinessV1,
+  Nhm2TileSourceOperatingBudgetSurfaceIdV1,
+} from "./nhm2-tile-source-operating-budget-readiness.v1";
 
 export const NHM2_TILE_SOURCE_FALSIFICATION_REPORT_CONTRACT_VERSION =
   "nhm2_tile_source_falsification_report/v1";
@@ -19,11 +23,31 @@ export type Nhm2TileSourceFalsificationReportRowV1 = {
     | "material_evidence_receipts"
     | "physical_validation_plan"
     | "downstream_gate"
-    | "evidence_gap_roadmap";
+    | "evidence_gap_roadmap"
+    | "operating_budget_readiness";
   surfaceId: Nhm2LayerStackReceiptSurfaceId | null;
+  operatingBudgetSurfaceId: Nhm2TileSourceOperatingBudgetSurfaceIdV1 | null;
   downstreamGateId: Nhm2TileSourceDownstreamGateV1["gateId"] | null;
   status: Nhm2TileSourceReceiptStatus | Nhm2TileSourceGateStatus | "open" | "falsifying" | "satisfied";
   numericalMargin: number | null;
+  numericalMargins: Record<string, number | boolean | null>;
+  marginUnit: string | null;
+  requiredChange: string;
+  falsifiesCurrentCandidate: boolean;
+  evidenceRef: string | null;
+};
+
+export type Nhm2TileSourceFalsificationCurrentBlockerV1 = {
+  blockerId: string;
+  source: Nhm2TileSourceFalsificationReportRowV1["source"] | "none";
+  surfaceId: Nhm2LayerStackReceiptSurfaceId | null;
+  operatingBudgetSurfaceId: Nhm2TileSourceOperatingBudgetSurfaceIdV1 | null;
+  downstreamGateId: Nhm2TileSourceDownstreamGateV1["gateId"] | null;
+  status:
+    | Nhm2TileSourceFalsificationReportRowV1["status"]
+    | "none";
+  numericalMargin: number | null;
+  numericalMargins: Record<string, number | boolean | null>;
   marginUnit: string | null;
   requiredChange: string;
   falsifiesCurrentCandidate: boolean;
@@ -40,6 +64,7 @@ export type Nhm2TileSourceFalsificationReportV1 = {
     materialEvidenceReceiptsRef: string | null;
     physicalValidationPlanRef: string | null;
     evidenceGapRoadmapRef: string | null;
+    operatingBudgetReadinessRef: string | null;
   };
   disposition: {
     materialEvidenceDisposition: "receipt_ready" | "review" | "falsified";
@@ -47,12 +72,15 @@ export type Nhm2TileSourceFalsificationReportV1 = {
     reportStatus: "review" | "falsified" | "receipt_ready_pending_downstream" | "candidate_evidence_complete";
     firstBlocker: string;
   };
+  currentBlocker: Nhm2TileSourceFalsificationCurrentBlockerV1;
   blockerRows: Nhm2TileSourceFalsificationReportRowV1[];
   readiness: {
     materialEvidenceReady: boolean;
     fullApparatusTensorReady: boolean;
     sourceAuthorityEvidenceReady: boolean;
     allReceiptsPresent: boolean;
+    operatingBudgetsReady: boolean;
+    operatingBudgetsFalsifyCurrentCandidate: boolean;
     downstreamGatesPass: boolean;
     physicallyCredibleSourceCandidate: boolean;
   };
@@ -62,6 +90,8 @@ export type Nhm2TileSourceFalsificationReportV1 = {
     reviewBlockerCount: number;
     missingReceiptCount: number;
     failingReceiptCount: number;
+    operatingBudgetBlockerCount: number;
+    falsifyingOperatingBudgetCount: number;
     failingDownstreamGateCount: number;
     nextRequiredSurfaceId: Nhm2LayerStackReceiptSurfaceId | "none";
     nextRequiredChange: string;
@@ -90,9 +120,11 @@ export type BuildNhm2TileSourceFalsificationReportInput = {
   materialEvidenceReceipts: Nhm2TileSourceMaterialEvidenceReceiptsV1;
   physicalValidationPlan: Nhm2TileSourcePhysicalValidationPlanV1;
   evidenceGapRoadmap: Nhm2TileSourceEvidenceGapRoadmapV1;
+  operatingBudgetReadiness?: Nhm2TileSourceOperatingBudgetReadinessV1 | null;
   materialEvidenceReceiptsRef?: string | null;
   physicalValidationPlanRef?: string | null;
   evidenceGapRoadmapRef?: string | null;
+  operatingBudgetReadinessRef?: string | null;
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -109,9 +141,11 @@ const receiptRows = (
       blockerId: entry.blocker,
       source: "material_evidence_receipts",
       surfaceId: entry.surfaceId,
+      operatingBudgetSurfaceId: null,
       downstreamGateId: null,
       status: surface?.status ?? "review",
       numericalMargin: entry.numericalMargin,
+      numericalMargins: {},
       marginUnit: entry.marginUnit,
       requiredChange: entry.requiredChange,
       falsifiesCurrentCandidate: entry.falsifiesCurrentCandidate,
@@ -123,19 +157,24 @@ const validationRows = (
   plan: Nhm2TileSourcePhysicalValidationPlanV1,
   receiptBlockerIds: Set<string>,
   downstreamBlockerIds: Set<string>,
+  operatingBudgetBlockerIds: Set<string>,
 ): Nhm2TileSourceFalsificationReportRowV1[] =>
   plan.falsificationMap
     .filter(
       (entry) =>
-        !receiptBlockerIds.has(entry.blocker) && !downstreamBlockerIds.has(entry.blocker),
+        !receiptBlockerIds.has(entry.blocker) &&
+        !downstreamBlockerIds.has(entry.blocker) &&
+        !operatingBudgetBlockerIds.has(entry.blocker),
     )
     .map((entry) => ({
       blockerId: entry.blocker,
       source: "physical_validation_plan",
       surfaceId: null,
+      operatingBudgetSurfaceId: null,
       downstreamGateId: null,
       status: entry.falsifiesCurrentCandidate ? "fail" : "review",
       numericalMargin: entry.numericalMargin,
+      numericalMargins: {},
       marginUnit: entry.marginUnit,
       requiredChange: entry.requiredChange,
       falsifiesCurrentCandidate: entry.falsifiesCurrentCandidate,
@@ -152,15 +191,90 @@ const downstreamRows = (
           blockerId: blocker,
           source: "downstream_gate" as const,
           surfaceId: null,
+          operatingBudgetSurfaceId: null,
           downstreamGateId: gate.gateId,
           status: gate.status,
           numericalMargin: null,
+          numericalMargins: {},
           marginUnit: null,
           requiredChange: gate.requiredChange,
           falsifiesCurrentCandidate: gate.status === "fail",
           evidenceRef: gate.artifactRef,
         })),
   );
+
+const marginSummary = (margins: Record<string, number | boolean | null>): string => {
+  const entries = Object.entries(margins).filter(([, value]) => value !== null);
+  return entries.length === 0
+    ? "no finite margin supplied"
+    : entries.map(([key, value]) => `${key}=${String(value)}`).join(", ");
+};
+
+const minimumNumericalMargin = (
+  margins: Record<string, number | boolean | null>,
+): number | null => {
+  const values = Object.values(margins).filter(
+    (value): value is number => typeof value === "number" && Number.isFinite(value),
+  );
+  return values.length === 0 ? null : Math.min(...values);
+};
+
+const operatingBudgetRows = (
+  readiness: Nhm2TileSourceOperatingBudgetReadinessV1 | null | undefined,
+): Nhm2TileSourceFalsificationReportRowV1[] =>
+  readiness?.budgetStatuses.flatMap((status) =>
+    status.ready
+      ? []
+      : status.blockers.map((blocker) => ({
+          blockerId: `${status.surfaceId}:${blocker}`,
+          source: "operating_budget_readiness" as const,
+          surfaceId: null,
+          operatingBudgetSurfaceId: status.surfaceId,
+          downstreamGateId: null,
+          status: status.falsifiesCurrentCandidate ? "falsifying" : "review",
+          numericalMargin: minimumNumericalMargin(status.numericalMargins),
+          numericalMargins: status.numericalMargins,
+          marginUnit: "ratio_or_boolean_margin",
+          requiredChange: `supply or revise ${status.surfaceId} operating evidence; ${marginSummary(
+            status.numericalMargins,
+          )}`,
+          falsifiesCurrentCandidate: status.falsifiesCurrentCandidate,
+          evidenceRef: status.artifactRef,
+        })),
+  ) ?? [];
+
+const currentBlockerFromRow = (
+  row: Nhm2TileSourceFalsificationReportRowV1 | null,
+): Nhm2TileSourceFalsificationCurrentBlockerV1 =>
+  row == null
+    ? {
+        blockerId: "none",
+        source: "none",
+        surfaceId: null,
+        operatingBudgetSurfaceId: null,
+        downstreamGateId: null,
+        status: "none",
+        numericalMargin: null,
+        numericalMargins: {},
+        marginUnit: null,
+        requiredChange: "none",
+        falsifiesCurrentCandidate: false,
+        evidenceRef: null,
+      }
+    : {
+        blockerId: row.blockerId,
+        source: row.source,
+        surfaceId: row.surfaceId,
+        operatingBudgetSurfaceId: row.operatingBudgetSurfaceId,
+        downstreamGateId: row.downstreamGateId,
+        status: row.status,
+        numericalMargin: row.numericalMargin,
+        numericalMargins: row.numericalMargins,
+        marginUnit: row.marginUnit,
+        requiredChange: row.requiredChange,
+        falsifiesCurrentCandidate: row.falsifiesCurrentCandidate,
+        evidenceRef: row.evidenceRef,
+      };
 
 const reportStatus = (args: {
   materialDisposition: "receipt_ready" | "review" | "falsified";
@@ -186,17 +300,22 @@ export const buildNhm2TileSourceFalsificationReport = (
   const receipts = input.materialEvidenceReceipts;
   const plan = input.physicalValidationPlan;
   const roadmap = input.evidenceGapRoadmap;
+  const budgetReadiness = input.operatingBudgetReadiness ?? null;
   const receiptBlockers = receiptRows(receipts);
   const receiptBlockerIds = new Set(receiptBlockers.map((row) => row.blockerId));
   const downstreamBlockerIds = new Set(
     plan.downstreamGates.flatMap((gate) => gate.blockers),
   );
+  const budgetBlockers = operatingBudgetRows(budgetReadiness);
+  const budgetBlockerIds = new Set(budgetBlockers.map((row) => row.blockerId));
   const rows = [
     ...receiptBlockers,
-    ...validationRows(plan, receiptBlockerIds, downstreamBlockerIds),
+    ...validationRows(plan, receiptBlockerIds, downstreamBlockerIds, budgetBlockerIds),
+    ...budgetBlockers,
     ...downstreamRows(plan),
   ];
   const firstRow = rows[0] ?? null;
+  const currentBlocker = currentBlockerFromRow(firstRow);
   const nextRoadmapItem = roadmap.roadmapItems.find(
     (item) => item.itemId === roadmap.summary.nextBestItemId,
   );
@@ -206,6 +325,8 @@ export const buildNhm2TileSourceFalsificationReport = (
   const failingReceiptCount = receipts.receiptSurfaces.filter(
     (surface) => surface.status === "fail",
   ).length;
+  const operatingBudgetBlockerCount = budgetBlockers.length;
+  const falsifyingOperatingBudgetCount = budgetReadiness?.summary.falsifyingBudgetCount ?? 0;
   const failingDownstreamGateCount = plan.downstreamGates.filter(
     (gate) => gate.status === "fail",
   ).length;
@@ -225,6 +346,7 @@ export const buildNhm2TileSourceFalsificationReport = (
       materialEvidenceReceiptsRef: input.materialEvidenceReceiptsRef ?? null,
       physicalValidationPlanRef: input.physicalValidationPlanRef ?? null,
       evidenceGapRoadmapRef: input.evidenceGapRoadmapRef ?? null,
+      operatingBudgetReadinessRef: input.operatingBudgetReadinessRef ?? null,
     },
     disposition: {
       materialEvidenceDisposition: receipts.summary.candidateDisposition,
@@ -232,12 +354,16 @@ export const buildNhm2TileSourceFalsificationReport = (
       reportStatus: finalReportStatus,
       firstBlocker: firstRow?.blockerId ?? "none",
     },
+    currentBlocker,
     blockerRows: rows,
     readiness: {
       materialEvidenceReady: receipts.summary.materialEvidenceReady,
       fullApparatusTensorReady: receipts.summary.fullApparatusTensorReady,
       sourceAuthorityEvidenceReady: receipts.summary.sourceAuthorityEvidenceReady,
       allReceiptsPresent: plan.summary.allReceiptsPresent,
+      operatingBudgetsReady: budgetReadiness?.summary.allOperatingBudgetsReady ?? false,
+      operatingBudgetsFalsifyCurrentCandidate:
+        budgetReadiness?.summary.anyOperatingBudgetFalsifies ?? false,
       downstreamGatesPass: plan.summary.downstreamGatesPass,
       physicallyCredibleSourceCandidate: plan.summary.physicallyCredibleSourceCandidate,
     },
@@ -247,6 +373,8 @@ export const buildNhm2TileSourceFalsificationReport = (
       reviewBlockerCount: rows.filter((row) => !row.falsifiesCurrentCandidate).length,
       missingReceiptCount,
       failingReceiptCount,
+      operatingBudgetBlockerCount,
+      falsifyingOperatingBudgetCount,
       failingDownstreamGateCount,
       nextRequiredSurfaceId: roadmap.summary.nextBestItemId,
       nextRequiredChange: nextRoadmapItem?.decisionQuestion ?? "none",
@@ -277,6 +405,7 @@ export const isNhm2TileSourceFalsificationReport = (
 ): value is Nhm2TileSourceFalsificationReportV1 => {
   if (!isRecord(value)) return false;
   const disposition = isRecord(value.disposition) ? value.disposition : null;
+  const currentBlocker = isRecord(value.currentBlocker) ? value.currentBlocker : null;
   const readiness = isRecord(value.readiness) ? value.readiness : null;
   const summary = isRecord(value.summary) ? value.summary : null;
   const boundary = isRecord(value.claimBoundary) ? value.claimBoundary : null;
@@ -292,6 +421,28 @@ export const isNhm2TileSourceFalsificationReport = (
     typeof disposition.validationStatus === "string" &&
     typeof disposition.reportStatus === "string" &&
     typeof disposition.firstBlocker === "string" &&
+    currentBlocker != null &&
+    typeof currentBlocker.blockerId === "string" &&
+    typeof currentBlocker.source === "string" &&
+    (currentBlocker.surfaceId === null || typeof currentBlocker.surfaceId === "string") &&
+    (currentBlocker.operatingBudgetSurfaceId === null ||
+      typeof currentBlocker.operatingBudgetSurfaceId === "string") &&
+    (currentBlocker.downstreamGateId === null ||
+      typeof currentBlocker.downstreamGateId === "string") &&
+    typeof currentBlocker.status === "string" &&
+    (currentBlocker.numericalMargin === null ||
+      typeof currentBlocker.numericalMargin === "number") &&
+    isRecord(currentBlocker.numericalMargins) &&
+    Object.values(currentBlocker.numericalMargins).every(
+      (entry) =>
+        entry === null ||
+        typeof entry === "boolean" ||
+        (typeof entry === "number" && Number.isFinite(entry)),
+    ) &&
+    (currentBlocker.marginUnit === null || typeof currentBlocker.marginUnit === "string") &&
+    typeof currentBlocker.requiredChange === "string" &&
+    typeof currentBlocker.falsifiesCurrentCandidate === "boolean" &&
+    (currentBlocker.evidenceRef === null || typeof currentBlocker.evidenceRef === "string") &&
     Array.isArray(value.blockerRows) &&
     value.blockerRows.every(
       (row) =>
@@ -299,9 +450,18 @@ export const isNhm2TileSourceFalsificationReport = (
         typeof row.blockerId === "string" &&
         typeof row.source === "string" &&
         (row.surfaceId === null || typeof row.surfaceId === "string") &&
+        (row.operatingBudgetSurfaceId === null ||
+          typeof row.operatingBudgetSurfaceId === "string") &&
         (row.downstreamGateId === null || typeof row.downstreamGateId === "string") &&
         typeof row.status === "string" &&
         (row.numericalMargin === null || typeof row.numericalMargin === "number") &&
+        isRecord(row.numericalMargins) &&
+        Object.values(row.numericalMargins).every(
+          (value) =>
+            value === null ||
+            typeof value === "boolean" ||
+            (typeof value === "number" && Number.isFinite(value)),
+        ) &&
         (row.marginUnit === null || typeof row.marginUnit === "string") &&
         typeof row.requiredChange === "string" &&
         typeof row.falsifiesCurrentCandidate === "boolean" &&
@@ -312,6 +472,8 @@ export const isNhm2TileSourceFalsificationReport = (
     typeof readiness.fullApparatusTensorReady === "boolean" &&
     typeof readiness.sourceAuthorityEvidenceReady === "boolean" &&
     typeof readiness.allReceiptsPresent === "boolean" &&
+    typeof readiness.operatingBudgetsReady === "boolean" &&
+    typeof readiness.operatingBudgetsFalsifyCurrentCandidate === "boolean" &&
     typeof readiness.downstreamGatesPass === "boolean" &&
     typeof readiness.physicallyCredibleSourceCandidate === "boolean" &&
     summary != null &&
@@ -320,6 +482,8 @@ export const isNhm2TileSourceFalsificationReport = (
     typeof summary.reviewBlockerCount === "number" &&
     typeof summary.missingReceiptCount === "number" &&
     typeof summary.failingReceiptCount === "number" &&
+    typeof summary.operatingBudgetBlockerCount === "number" &&
+    typeof summary.falsifyingOperatingBudgetCount === "number" &&
     typeof summary.failingDownstreamGateCount === "number" &&
     typeof summary.nextRequiredSurfaceId === "string" &&
     typeof summary.nextRequiredChange === "string" &&

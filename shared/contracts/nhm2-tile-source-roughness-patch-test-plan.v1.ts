@@ -90,6 +90,9 @@ const TEST_POLICY: Record<
     blockers: [
       "roughness_asperity_tail_and_patch_potential_map_missing",
       "roughness_patch_tier_not_measured_or_validated",
+      "roughness_map_ref_missing",
+      "asperity_tail_distribution_ref_missing",
+      "patch_voltage_map_ref_missing",
     ],
     requiredMeasurement:
       "Measured or validated-simulation roughness, asperity-tail, patch-voltage, and residual electrostatic map with provenance.",

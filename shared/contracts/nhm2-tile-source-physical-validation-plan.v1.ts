@@ -4,6 +4,7 @@ import {
   type Nhm2LayerStackFullApparatusReceiptRowV1,
 } from "./nhm2-layer-stack-full-apparatus-receipt-loop.v1";
 import type { Nhm2TileSourceMaterialEvidenceReceiptsV1 } from "./nhm2-tile-source-material-evidence-receipts.v1";
+import type { Nhm2TileSourceOperatingBudgetReadinessV1 } from "./nhm2-tile-source-operating-budget-readiness.v1";
 
 export const NHM2_TILE_SOURCE_PHYSICAL_VALIDATION_PLAN_CONTRACT_VERSION =
   "nhm2_tile_source_physical_validation_plan/v1";
@@ -103,6 +104,8 @@ export type Nhm2TileSourcePhysicalValidationPlanV1 = {
     sourceCandidateStatus: Nhm2TileSourceValidationStatus;
     firstBlocker: string;
     allReceiptsPresent: boolean;
+    operatingBudgetsReady: boolean;
+    operatingBudgetsFalsifyCurrentCandidate: boolean;
     fullApparatusTensorCoverageComplete: boolean;
     downstreamGatesPass: boolean;
     decisiveFalsificationMapAvailable: boolean;
@@ -131,6 +134,7 @@ export type Nhm2TileSourcePhysicalValidationPlanV1 = {
     idealScalarCasimirIsNotMaterialEvidence: true;
     sourceTensorMustNotCopyMetricTarget: true;
     fullSolveRequiresDownstreamGateClosure: true;
+    operatingBudgetReadinessRequired: true;
     physicalViabilityClaimAllowed: false;
     transportClaimAllowed: false;
     routeEtaClaimAllowed: false;
@@ -144,6 +148,7 @@ export type BuildNhm2TileSourcePhysicalValidationPlanInput =
     tensorAuthorityEvidenceSupplied?: boolean | null;
     downstreamGateStatuses?: Partial<Record<Nhm2TileSourceDownstreamGateV1["gateId"], Nhm2TileSourceGateStatus>> | null;
     materialEvidenceReceipts?: Nhm2TileSourceMaterialEvidenceReceiptsV1 | null;
+    operatingBudgetReadiness?: Nhm2TileSourceOperatingBudgetReadinessV1 | null;
   };
 
 const TARGET_CANDIDATE_ID = "topology_optimized_lattice_tin";
@@ -194,21 +199,34 @@ const downstreamGate = (
   gateId: Nhm2TileSourceDownstreamGateV1["gateId"],
   status: Nhm2TileSourceGateStatus,
   requiredChange: string,
+  blockers?: string[],
 ): Nhm2TileSourceDownstreamGateV1 => ({
   gateId,
   status,
   artifactRef: status === "pass" ? `artifact://${gateId}/candidate/topology_optimized_lattice_tin` : null,
   requiredChange,
-  blockers: status === "pass" ? [] : [`${gateId}_${status === "not_run" ? "not_run" : "incomplete"}`],
+  blockers: status === "pass" ? [] : blockers ?? [`${gateId}_${status === "not_run" ? "not_run" : "incomplete"}`],
 });
 
 const allPass = (statuses: Nhm2TileSourceGateStatus[]): boolean =>
   statuses.every((status) => status === "pass");
 
+const admittedStatus = (args: {
+  requestedStatus: Nhm2TileSourceGateStatus;
+  blockers: string[];
+  falsifies: boolean;
+}): Nhm2TileSourceGateStatus => {
+  if (args.requestedStatus !== "pass" || args.blockers.length === 0) {
+    return args.requestedStatus;
+  }
+  return args.falsifies ? "fail" : "review";
+};
+
 export const buildNhm2TileSourcePhysicalValidationPlan = (
   input: BuildNhm2TileSourcePhysicalValidationPlanInput = {},
 ): Nhm2TileSourcePhysicalValidationPlanV1 => {
   const materialEvidence = input.materialEvidenceReceipts ?? null;
+  const operatingBudgetReadiness = input.operatingBudgetReadiness ?? null;
   const receiptLoopInput: BuildNhm2LayerStackFullApparatusReceiptLoopInput = {
     ...input,
     suppliedReceiptSurfaces:
@@ -348,7 +366,35 @@ export const buildNhm2TileSourcePhysicalValidationPlan = (
         ],
   };
   const downstreamStatuses = input.downstreamGateStatuses ?? {};
-  const downstreamGates = [
+  const allReceiptsPresent = receiptTargets.every((target) => target.status === "pass");
+  const operatingBudgetsReady =
+    operatingBudgetReadiness?.summary.allOperatingBudgetsReady === true;
+  const operatingBudgetsFalsifyCurrentCandidate =
+    operatingBudgetReadiness?.summary.anyOperatingBudgetFalsifies === true;
+  const fullApparatusTensorCoverageComplete = row.receiptSurfaces
+    .find((surface) => surface.surfaceId === "full_apparatus_tensor")
+    ?.status === "receipted";
+  const tensorAuthorityPass = tensorAuthorityGate.sourceTensorAuthorityCandidateAllowed;
+  const requestedMaterialCredibilityStatus =
+    downstreamStatuses.material_credibility ?? "not_run";
+  const materialCredibilityAdmissionBlockers =
+    requestedMaterialCredibilityStatus === "pass"
+      ? [
+          ...(!allReceiptsPresent ? ["material_credibility_receipts_incomplete"] : []),
+          ...(!operatingBudgetsReady
+            ? ["material_credibility_operating_budgets_not_ready"]
+            : []),
+          ...(operatingBudgetsFalsifyCurrentCandidate
+            ? ["material_credibility_operating_budget_falsifies_candidate"]
+            : []),
+        ]
+      : [];
+  const materialCredibilityStatus = admittedStatus({
+    requestedStatus: requestedMaterialCredibilityStatus,
+    blockers: materialCredibilityAdmissionBlockers,
+    falsifies: operatingBudgetsFalsifyCurrentCandidate,
+  });
+  const upstreamDownstreamGates = [
     downstreamGate(
       "regional_residual_closure",
       downstreamStatuses.regional_residual_closure ?? "not_run",
@@ -376,33 +422,73 @@ export const buildNhm2TileSourcePhysicalValidationPlan = (
     ),
     downstreamGate(
       "material_credibility",
-      downstreamStatuses.material_credibility ?? "not_run",
+      materialCredibilityStatus,
       "Run material credibility admission over coupon, force-gap, roughness, patch, control, fatigue, and scaling receipts.",
-    ),
-    downstreamGate(
-      "coupled_closure",
-      downstreamStatuses.coupled_closure ?? "not_run",
-      "Run coupled closure after source authority, residuals, conservation, QEI, observer, and material gates complete.",
+      materialCredibilityAdmissionBlockers.length > 0
+        ? materialCredibilityAdmissionBlockers
+        : undefined,
     ),
   ];
-  const allReceiptsPresent = receiptTargets.every((target) => target.status === "pass");
-  const fullApparatusTensorCoverageComplete = row.receiptSurfaces
-    .find((surface) => surface.surfaceId === "full_apparatus_tensor")
-    ?.status === "receipted";
+  const requestedCoupledClosureStatus = downstreamStatuses.coupled_closure ?? "not_run";
+  const coupledClosureAdmissionBlockers =
+    requestedCoupledClosureStatus === "pass"
+      ? [
+          ...(!allReceiptsPresent ? ["coupled_closure_material_receipts_incomplete"] : []),
+          ...(!operatingBudgetsReady ? ["coupled_closure_operating_budgets_not_ready"] : []),
+          ...(!fullApparatusTensorCoverageComplete
+            ? ["coupled_closure_full_apparatus_tensor_receipt_incomplete"]
+            : []),
+          ...(!tensorAuthorityPass ? ["coupled_closure_source_tensor_authority_not_admitted"] : []),
+          ...upstreamDownstreamGates
+            .filter((gate) => gate.status !== "pass")
+            .map((gate) => `${gate.gateId}_not_pass_for_coupled_closure`),
+        ]
+      : [];
+  const coupledClosureStatus = admittedStatus({
+    requestedStatus: requestedCoupledClosureStatus,
+    blockers: coupledClosureAdmissionBlockers,
+    falsifies:
+      operatingBudgetsFalsifyCurrentCandidate ||
+      upstreamDownstreamGates.some((gate) => gate.status === "fail"),
+  });
+  const downstreamGates = [
+    ...upstreamDownstreamGates,
+    downstreamGate(
+      "coupled_closure",
+      coupledClosureStatus,
+      "Run coupled closure after source authority, residuals, conservation, QEI, observer, and material gates complete.",
+      coupledClosureAdmissionBlockers.length > 0
+        ? coupledClosureAdmissionBlockers
+        : undefined,
+    ),
+  ];
   const downstreamGatesPass = allPass(downstreamGates.map((gate) => gate.status));
-  const tensorAuthorityPass = tensorAuthorityGate.sourceTensorAuthorityCandidateAllowed;
   const physicallyCredibleSourceCandidate =
-    allReceiptsPresent && fullApparatusTensorCoverageComplete && downstreamGatesPass && tensorAuthorityPass;
+    allReceiptsPresent &&
+    operatingBudgetsReady &&
+    fullApparatusTensorCoverageComplete &&
+    downstreamGatesPass &&
+    tensorAuthorityPass;
   const firstReceiptBlocker =
     receiptTargets.find((target) => target.status !== "pass")?.blockers[0] ?? null;
+  const firstOperatingBudgetBlocker =
+    operatingBudgetReadiness == null
+      ? "operating_budget_readiness_missing"
+      : operatingBudgetReadiness.summary.firstBlocker !== "none"
+        ? operatingBudgetReadiness.summary.firstBlocker
+        : null;
   const firstTensorBlocker = tensorAuthorityGate.blockers[0] ?? null;
   const firstDownstreamBlocker =
     downstreamGates.find((gate) => gate.status !== "pass")?.blockers[0] ?? null;
   const firstBlocker =
-    firstReceiptBlocker ?? firstTensorBlocker ?? firstDownstreamBlocker ?? "none";
+    firstReceiptBlocker ??
+    firstOperatingBudgetBlocker ??
+    firstTensorBlocker ??
+    firstDownstreamBlocker ??
+    "none";
   const sourceCandidateStatus: Nhm2TileSourceValidationStatus = physicallyCredibleSourceCandidate
     ? "physically_credible_source_candidate"
-    : row.architectureBaseStatus === "fail"
+    : row.architectureBaseStatus === "fail" || operatingBudgetsFalsifyCurrentCandidate
       ? "falsified"
       : "review";
   const falsificationMap: Nhm2TileSourceFalsificationItemV1[] = [
@@ -435,6 +521,28 @@ export const buildNhm2TileSourcePhysicalValidationPlan = (
         "Supply same-chart, same-basis, same-unit full apparatus T_munu with T00, T0i, diagonal Tij, off-diagonal Tij, no metric-target echo, and regional wall/hull/exterior compatibility.",
       falsifiesCurrentCandidate: false,
     })),
+    ...(
+      operatingBudgetReadiness == null
+        ? [
+            {
+              blocker: "operating_budget_readiness_missing",
+              numericalMargin: null,
+              marginUnit: null,
+              requiredChange:
+                "Build nhm2_tile_source_operating_budget_readiness/v1 over material coupon, force-gap, roughness/patch, active-control, fatigue/layer-scaling, and full-apparatus tensor budgets.",
+              falsifiesCurrentCandidate: false,
+            },
+          ]
+        : operatingBudgetReadiness.blockers.map((blocker) => ({
+            blocker,
+            numericalMargin: null,
+            marginUnit: null,
+            requiredChange:
+              "Clear operating-budget readiness for material coupon, force-gap, roughness/patch, active-control, fatigue/layer-scaling, and full-apparatus tensor evidence.",
+            falsifiesCurrentCandidate:
+              operatingBudgetReadiness.summary.anyOperatingBudgetFalsifies,
+          }))
+    ),
     ...downstreamGates.flatMap((gate) =>
       gate.status === "pass"
         ? []
@@ -471,6 +579,8 @@ export const buildNhm2TileSourcePhysicalValidationPlan = (
       sourceCandidateStatus,
       firstBlocker,
       allReceiptsPresent,
+      operatingBudgetsReady,
+      operatingBudgetsFalsifyCurrentCandidate,
       fullApparatusTensorCoverageComplete,
       downstreamGatesPass,
       decisiveFalsificationMapAvailable: falsificationMap.length > 0,
@@ -499,6 +609,7 @@ export const buildNhm2TileSourcePhysicalValidationPlan = (
       idealScalarCasimirIsNotMaterialEvidence: true,
       sourceTensorMustNotCopyMetricTarget: true,
       fullSolveRequiresDownstreamGateClosure: true,
+      operatingBudgetReadinessRequired: true,
       physicalViabilityClaimAllowed: false,
       transportClaimAllowed: false,
       routeEtaClaimAllowed: false,
@@ -573,6 +684,8 @@ export const isNhm2TileSourcePhysicalValidationPlan = (
     typeof summary.sourceCandidateStatus === "string" &&
     typeof summary.firstBlocker === "string" &&
     typeof summary.allReceiptsPresent === "boolean" &&
+    typeof summary.operatingBudgetsReady === "boolean" &&
+    typeof summary.operatingBudgetsFalsifyCurrentCandidate === "boolean" &&
     typeof summary.fullApparatusTensorCoverageComplete === "boolean" &&
     typeof summary.downstreamGatesPass === "boolean" &&
     typeof summary.decisiveFalsificationMapAvailable === "boolean" &&
@@ -590,6 +703,7 @@ export const isNhm2TileSourcePhysicalValidationPlan = (
     boundary.idealScalarCasimirIsNotMaterialEvidence === true &&
     boundary.sourceTensorMustNotCopyMetricTarget === true &&
     boundary.fullSolveRequiresDownstreamGateClosure === true &&
+    boundary.operatingBudgetReadinessRequired === true &&
     boundary.physicalViabilityClaimAllowed === false &&
     boundary.transportClaimAllowed === false &&
     boundary.routeEtaClaimAllowed === false &&

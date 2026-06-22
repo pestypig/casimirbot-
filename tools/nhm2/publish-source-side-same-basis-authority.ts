@@ -14,6 +14,12 @@ import {
   isNhm2TileEffectiveCounterpartArtifact,
   type Nhm2TileEffectiveCounterpartArtifact,
 } from "../../shared/contracts/nhm2-tile-effective-counterpart.v1";
+import {
+  isNhm2TileSourceAuthorityHandoff,
+} from "../../shared/contracts/nhm2-tile-source-authority-handoff.v1";
+import {
+  isNhm2TileSourceFullApparatusTensorValues,
+} from "../../shared/contracts/nhm2-tile-source-full-apparatus-tensor-values.v1";
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value != null && typeof value === "object" && !Array.isArray(value)
@@ -72,6 +78,8 @@ export const publishSourceSideSameBasisTensorAuthority = (args: {
   outPath: string;
   sourceClosurePath?: string | null;
   casimirMaterialReceiptPath?: string | null;
+  tileSourceAuthorityHandoffPath?: string | null;
+  fullApparatusTensorValuesPath?: string | null;
   auditOnly?: boolean;
 }): Nhm2SourceSideSameBasisTensorAuthorityArtifactV1 => {
   const paths = [
@@ -79,6 +87,8 @@ export const publishSourceSideSameBasisTensorAuthority = (args: {
     args.tileEffectiveCounterpartPath,
     args.sourceClosurePath,
     args.casimirMaterialReceiptPath,
+    args.tileSourceAuthorityHandoffPath,
+    args.fullApparatusTensorValuesPath,
   ];
   if (!args.auditOnly && paths.some(pathUsesLatestAlias)) {
     throw new Error("latest aliases are forbidden unless --audit-only is passed");
@@ -118,6 +128,23 @@ export const publishSourceSideSameBasisTensorAuthority = (args: {
   if (materialReceipt != null && !isCasimirMaterialReceipt(materialReceipt)) {
     throw new Error("Casimir material receipt must be casimir_material_receipt/v1");
   }
+  const tileSourceAuthorityHandoff =
+    args.tileSourceAuthorityHandoffPath == null
+      ? null
+      : readJson(resolvePath(args.repoRoot, args.tileSourceAuthorityHandoffPath));
+  if (tileSourceAuthorityHandoff != null && !isNhm2TileSourceAuthorityHandoff(tileSourceAuthorityHandoff)) {
+    throw new Error("tile-source authority handoff must be nhm2_tile_source_authority_handoff/v1");
+  }
+  const fullApparatusTensorValues =
+    args.fullApparatusTensorValuesPath == null
+      ? null
+      : readJson(resolvePath(args.repoRoot, args.fullApparatusTensorValuesPath));
+  if (
+    fullApparatusTensorValues != null &&
+    !isNhm2TileSourceFullApparatusTensorValues(fullApparatusTensorValues)
+  ) {
+    throw new Error("full apparatus tensor values must be nhm2_tile_source_full_apparatus_tensor_values/v1");
+  }
 
   const artifact = buildNhm2SourceSideSameBasisTensorAuthorityArtifact({
     generatedAt: new Date().toISOString(),
@@ -127,6 +154,13 @@ export const publishSourceSideSameBasisTensorAuthority = (args: {
     sourceModelId: asString(counterpart.sourceAuthorityMode),
     sourceTensorArtifactRef: counterpart.sourceTensorArtifactRef ?? null,
     counterpartArtifactRef: args.tileEffectiveCounterpartPath,
+    tileSourceAuthorityHandoffRef: args.tileSourceAuthorityHandoffPath ?? null,
+    tileSourceAuthorityHandoff: isNhm2TileSourceAuthorityHandoff(tileSourceAuthorityHandoff)
+      ? tileSourceAuthorityHandoff
+      : null,
+    fullApparatusTensorValues: isNhm2TileSourceFullApparatusTensorValues(fullApparatusTensorValues)
+      ? fullApparatusTensorValues
+      : null,
     counterpartArtifact: counterpart,
     sourceClosureRegions: sourceClosureRegions(sourceClosure),
     casimirMaterialReceipt: isCasimirMaterialReceipt(materialReceipt)
@@ -156,6 +190,8 @@ const main = (): void => {
     tileEffectiveCounterpartPath,
     sourceClosurePath: asString(args["source-closure"]),
     casimirMaterialReceiptPath: asString(args["casimir-material-receipt"]),
+    tileSourceAuthorityHandoffPath: asString(args["tile-source-authority-handoff"]),
+    fullApparatusTensorValuesPath: asString(args["full-apparatus-tensor-values"]),
     outPath,
     auditOnly: args["audit-only"] === true,
   });

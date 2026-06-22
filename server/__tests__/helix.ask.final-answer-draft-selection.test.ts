@@ -981,9 +981,9 @@ describe("final_answer_draft terminal selection", () => {
     });
 
     expect(materialized?.ok).toBe(true);
-    expect(materialized?.materialized_terminal_artifact_kind).toBe("model_synthesized_answer");
-    expect(payload.model_synthesized_answer).toMatchObject({
-      schema: "helix.model_synthesized_answer.v1",
+    expect(materialized?.materialized_terminal_artifact_kind).toBe("compound_evidence_synthesis_answer");
+    expect(payload.compound_evidence_synthesis_answer).toMatchObject({
+      schema: "helix.compound_evidence_synthesis_answer.v1",
       answer_text: draftText,
       subgoal_observation_refs: [workspaceObservationRef, calculatorObservationRef],
       subgoal_observation_refs_count: 2,
@@ -1981,6 +1981,132 @@ describe("final_answer_draft terminal selection", () => {
     expect(payload.stale_pending_server_request).toEqual(
       expect.objectContaining({ reason: "stale_continuation" }),
     );
+  });
+
+  it("materializes theory workstation evaluation from ledger preview text", () => {
+    const turnId = "ask:test:theory-workstation-preview-terminal";
+    const terminalText = [
+      "I located this discussion in the Theory Badge Graph, then built a first-principles explanation route from that reflection.",
+      "The graph route suggests the Needle Hull Mark 2 full solve is organized around hull geometry, Casimir cavity coupling, stability checks, and terminal solver policy.",
+    ].join("\n");
+    const artifacts = [
+      {
+        artifact_id: `${turnId}:theory_context_reflection_tool_receipt`,
+        kind: "helix_theory_context_reflection_tool_receipt",
+        payload: {
+          schema: "helix.theory_context_reflection_tool_receipt.v1",
+          capability: "helix_ask.reflect_theory_context",
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+      },
+      {
+        artifact_id: `${turnId}:workstation_tool_evaluation`,
+        kind: "workstation_tool_evaluation",
+        text_preview: terminalText,
+        supports_goal: true,
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      active_prompt: "Tell me about the Needle Hull Mark 2 full solve in the badge graph. What are its main components ??",
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "theory_context_reflection",
+        required_terminal_kind: "workstation_tool_evaluation",
+      },
+      route_product_contract: {
+        ...modelOnlyContract(turnId),
+        source_target: "theory_context_reflection",
+        allowed_terminal_artifact_kinds: ["workstation_tool_evaluation", "model_synthesized_answer", "typed_failure"],
+        required_terminal_kinds: ["workstation_tool_evaluation"],
+        required_evidence: ["helix_theory_context_reflection_tool_receipt", "workstation_tool_evaluation"],
+      },
+      goal_satisfaction_evaluation: {
+        schema: "helix.goal_satisfaction_evaluation.v1",
+        canonical_goal_kind: "theory_context_reflection",
+        required_terminal_kind: "workstation_tool_evaluation",
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+        observed_results: [
+          {
+            ref: `${turnId}:theory_context_reflection_tool_receipt`,
+            kind: "helix_theory_context_reflection_tool_receipt",
+            status: "observed",
+            supports_goal: true,
+          },
+          {
+            ref: `${turnId}:workstation_tool_evaluation`,
+            kind: "workstation_tool_evaluation",
+            status: "observed",
+            supports_goal: true,
+          },
+        ],
+      },
+      agent_runtime_loop: {
+        schema: "helix.agent_runtime_loop.v1",
+        iterations: [
+          {
+            decision_id: `${turnId}:agent_runtime_loop:decision:1`,
+            chosen_capability: "helix_ask.reflect_theory_context",
+            executed_action_key: "helix_ask.reflect_theory_context",
+            next_step: "tool",
+            runtime_tool_call: {
+              capability_key: "helix_ask.reflect_theory_context",
+            },
+            observed_artifact_refs: [
+              `${turnId}:theory_context_reflection_tool_receipt`,
+              `${turnId}:workstation_tool_evaluation`,
+            ],
+            tool_observation: {
+              status: "completed",
+              ok: true,
+              kind: "helix_theory_context_reflection_tool_receipt",
+              capability: "helix_ask.reflect_theory_context",
+            },
+          },
+        ],
+      },
+      agent_step_decision: {
+        schema: "helix.agent_step_decision.v1",
+        decision_id: `${turnId}:agent_step_decision:answer`,
+        decision_timing: "post_observation_terminal_review",
+        decision_authority: "deterministic_policy_fallback",
+        next_step: "answer",
+        chosen_capability: "model.direct_answer",
+      },
+      solver_continuation_observation: {
+        schema: "helix.solver_continuation_observation.v1",
+        required_next_step: "answer",
+      },
+      current_turn_artifact_ledger: artifacts,
+      selected_final_answer: "I could not complete this Ask turn because solver authority failed (solver_path_incomplete_before_terminal).",
+      final_answer_source: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      terminal_error_code: "solver_path_incomplete_before_terminal",
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(result.source).toBe("workstation_tool_evaluation");
+    expect(result.visible_text).toBe(terminalText);
+    expect(result.rejected_candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          reason: "stale_solver_continuation_superseded_by_workstation_terminal",
+        }),
+      ]),
+    );
+    expect(payload.terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(payload.final_answer_source).toBe("workstation_tool_evaluation");
+    expect(payload.selected_final_answer).toBe(terminalText);
+    expect(payload.terminal_error_code).toBeUndefined();
   });
 
   it("keeps calculator receipts as side artifacts when a final draft explains the result", () => {

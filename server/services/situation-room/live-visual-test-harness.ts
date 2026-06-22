@@ -49,7 +49,7 @@ export type BackendLiveVisualSourceSwitchReceipt = {
   unbound_chunk_id: string;
   unbound_analysis_job_id: string;
   unbound_observation_ref: string;
-  expected_repair: "explicit_visual_capture_prompt_should_bind_and_replay";
+  expected_repair: "explicit_visual_capture_prompt_should_diagnose_unbound_source";
   assistant_answer: false;
   raw_content_included: false;
   context_policy: "compact_context_pack_only";
@@ -274,7 +274,7 @@ export function seedBackendLiveVisualSourceSwitchForAskTest(body: Record<string,
     unbound_chunk_id: chunkResult.chunk.chunk_id,
     unbound_analysis_job_id: analysisJob.job_id,
     unbound_observation_ref: observation.observation_id,
-    expected_repair: "explicit_visual_capture_prompt_should_bind_and_replay",
+    expected_repair: "explicit_visual_capture_prompt_should_diagnose_unbound_source",
     assistant_answer: false,
     raw_content_included: false,
     context_policy: "compact_context_pack_only",

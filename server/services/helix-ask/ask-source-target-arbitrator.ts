@@ -210,6 +210,19 @@ const isLiveAnswerEnvironmentStatePrompt = (prompt: string): boolean => {
   );
 };
 
+const isHistoricalRuntimeEvidencePrompt = (prompt: string): boolean => {
+  const historicalTurnCue =
+    /\b(?:last|previous|prior|earlier|past|before)\s+(?:ask\s+)?(?:turn|response|run|iteration|tool\s+call|call)\b/i.test(prompt) ||
+    /\b(?:what|why)\b[\s\S]{0,80}\b(?:last|previous|prior|earlier)\b[\s\S]{0,80}\b(?:turn|tool\s+call|capability|route)\b/i.test(prompt);
+  const diagnosticCue =
+    /\b(?:why\s+did|why\s+was|what\s+(?:called|route|tool|capability)|diagnos(?:e|is)|explain|inspect|review)\b/i.test(prompt);
+  const runtimeEvidenceCue =
+    /\b(?:tool\s*calls?|capabilit(?:y|ies)|route|runtime|agent\s+loop|debug\s+(?:export|trace|payload)|terminal_error_code|goal_satisfaction|set_rate|live[-_.]?source|[a-z][\w-]*(?:[._-][a-z][\w-]*){1,})\b/i.test(
+      prompt,
+    );
+  return historicalTurnCue && diagnosticCue && runtimeEvidenceCue;
+};
+
 const isGenericSceneEpochPhrase = (prompt: string): boolean =>
   /\b(?:scene\s+epoch|visual\s+epoch|screen\s+epoch|live\s+epoch|last\s+(?:seen\s+|situation\s+|scene\s+|visual\s+|screen\s+|live\s+)?epoch|previous\s+(?:scene|frame|visual|screen|capture)|last\s+(?:scene|frame|visual|screen|capture))\b/i.test(prompt);
 
@@ -585,6 +598,29 @@ export function arbitrateAskSourceTarget(input: {
   const selectedEvidenceCandidate = evidenceTargetArbitration.evidence_target_candidates.find(
     (candidate) => candidate.candidate_id === evidenceTargetArbitration.selected_candidate_id,
   );
+  if (isHistoricalRuntimeEvidencePrompt(prompt)) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "runtime_evidence",
+      targetKind: "runtime_evidence",
+      strength: "hard",
+      explicitCues: ["historical_runtime_evidence", "historical_tool_call_diagnosis"],
+      reasons: ["historical_runtime_evidence_source_target", "previous_turn_tool_call_question"],
+      requestedOutputs: ["route_trace", "tool_call_eligibility", "terminal_contract", "typed_failure"],
+      suppressedRoutes: [
+        "live_pipeline_control",
+        "visual_frame_evidence",
+        "situation_context_question",
+        "model_only_concept",
+        "no_tool_direct",
+      ],
+      precedenceReason: "historical_runtime_evidence_source_target",
+      confidence: 0.92,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
   if (isDeicticDocsIdentityPrompt(prompt)) {
     const activeWorkspaceResolution = input.activeWorkspaceSourceResolution as Record<string, unknown> | null | undefined;
     const sourceBound =

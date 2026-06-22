@@ -39,6 +39,7 @@ export type Nhm2TileSourceForceGapPullInTestPlanV1 = {
   forceGapTarget: {
     operatingGapMeters: 8e-9;
     activeControlAuthorityFactorMin: 1.2;
+    forceGradientConsistencyMin: 0.75;
     pullInMarginMin: 1;
     stictionMarginMin: 1;
     evidenceTierRequired: "measured_or_validated_simulation";
@@ -89,9 +90,12 @@ const TEST_POLICY: Record<
     blockers: [
       "force_gap_curve_and_pull_in_margin_at_8nm_missing",
       "force_gap_tier_not_measured_or_validated",
+      "force_gap_curve_ref_missing",
+      "force_gradient_curve_ref_missing",
+      "force_gap_stiffness_model_ref_missing",
     ],
     requiredMeasurement:
-      "Measured or validated-simulation force-gap receipt with apparatus, gap sweep, stiffness model, and data provenance.",
+      "Measured or validated-simulation force-gap receipt with apparatus, F(g) curve, dF/dg curve, stiffness model, and data provenance.",
     acceptanceCriterion: "Evidence tier is measured or validated_simulation, not declared_model or missing.",
     artifactToProduce: "receipt://force_gap_pull_in/provenance_v1",
   },
@@ -108,9 +112,15 @@ const TEST_POLICY: Record<
     artifactToProduce: "receipt://force_gap_pull_in/casimir_force_8nm_v1",
   },
   force_gradient: {
-    blockers: ["pull_in_margin_missing"],
-    requiredMeasurement: "dF/dg force-gradient curve at the 8 nm operating gap.",
-    acceptanceCriterion: "Finite force gradient is supplied for pull-in comparison.",
+    blockers: [
+      "pull_in_margin_missing",
+      "force_gradient_consistency_with_force_curve_missing",
+      "force_gradient_inconsistent_with_force_curve_at_8nm",
+    ],
+    requiredMeasurement:
+      "dF/dg force-gradient curve at the 8 nm operating gap, tied to the same F(g) curve used for Casimir force.",
+    acceptanceCriterion:
+      "Finite force gradient is supplied for pull-in comparison and remains consistent with 4|F|/g to at least 0.75 symmetric-ratio margin.",
     artifactToProduce: "receipt://force_gap_pull_in/force_gradient_8nm_v1",
   },
   effective_spring_constant: {
@@ -196,6 +206,7 @@ export const buildNhm2TileSourceForceGapPullInTestPlan = (
     forceGapTarget: {
       operatingGapMeters: 8e-9,
       activeControlAuthorityFactorMin: 1.2,
+      forceGradientConsistencyMin: 0.75,
       pullInMarginMin: 1,
       stictionMarginMin: 1,
       evidenceTierRequired: "measured_or_validated_simulation",
@@ -246,6 +257,7 @@ export const isNhm2TileSourceForceGapPullInTestPlan = (
     target != null &&
     target.operatingGapMeters === 8e-9 &&
     target.activeControlAuthorityFactorMin === 1.2 &&
+    target.forceGradientConsistencyMin === 0.75 &&
     target.pullInMarginMin === 1 &&
     target.stictionMarginMin === 1 &&
     target.evidenceTierRequired === "measured_or_validated_simulation" &&

@@ -149,6 +149,12 @@ export type Nhm2TimeDependentSourceCampaignArtifactRefsV1 = {
   natarioInvariantAudit: string | null;
   regionalSupportFunctionAtlas: string | null;
   casimirMaterialReceipt: string | null;
+  tileSourceMaterialEvidenceReceipts: string | null;
+  tileSourcePhysicalValidationPlan: string | null;
+  tileSourceEvidenceGapRoadmap: string | null;
+  tileSourceFalsificationReport: string | null;
+  tileSourceAuthorityHandoff: string | null;
+  tileSourceOperatingBudgetReadiness: string | null;
   coupledClosurePassCandidate: string | null;
   regionalTensorPassPathHarness: string | null;
   sourceModelRef: string | null;
@@ -540,6 +546,15 @@ const refs = (
   natarioInvariantAudit: input?.natarioInvariantAudit ?? null,
   regionalSupportFunctionAtlas: input?.regionalSupportFunctionAtlas ?? null,
   casimirMaterialReceipt: input?.casimirMaterialReceipt ?? null,
+  tileSourceMaterialEvidenceReceipts:
+    input?.tileSourceMaterialEvidenceReceipts ?? null,
+  tileSourcePhysicalValidationPlan:
+    input?.tileSourcePhysicalValidationPlan ?? null,
+  tileSourceEvidenceGapRoadmap: input?.tileSourceEvidenceGapRoadmap ?? null,
+  tileSourceFalsificationReport: input?.tileSourceFalsificationReport ?? null,
+  tileSourceAuthorityHandoff: input?.tileSourceAuthorityHandoff ?? null,
+  tileSourceOperatingBudgetReadiness:
+    input?.tileSourceOperatingBudgetReadiness ?? null,
   coupledClosurePassCandidate: input?.coupledClosurePassCandidate ?? null,
   regionalTensorPassPathHarness: input?.regionalTensorPassPathHarness ?? null,
   sourceModelRef: input?.sourceModelRef ?? null,
@@ -1164,6 +1179,12 @@ const isArtifactRefs = (
     isNullableText(record.natarioInvariantAudit) &&
     isNullableText(record.regionalSupportFunctionAtlas) &&
     isNullableText(record.casimirMaterialReceipt) &&
+    isNullableText(record.tileSourceMaterialEvidenceReceipts) &&
+    isNullableText(record.tileSourcePhysicalValidationPlan) &&
+    isNullableText(record.tileSourceEvidenceGapRoadmap) &&
+    isNullableText(record.tileSourceFalsificationReport) &&
+    isNullableText(record.tileSourceAuthorityHandoff) &&
+    isNullableText(record.tileSourceOperatingBudgetReadiness) &&
     isNullableText(record.coupledClosurePassCandidate) &&
     isNullableText(record.regionalTensorPassPathHarness) &&
     isNullableText(record.sourceModelRef) &&

@@ -51,6 +51,7 @@ export type Nhm2TileSourceFullApparatusTensorTestPlanV1 = {
   };
   fullApparatusTensorTarget: {
     requiredComponents: ["T00", "T0i", "diagonalTij", "offDiagonalTij"];
+    requiredTensorComponentCount: 10;
     requiredTermCount: 9;
     requiredRegions: ["wall", "hull", "exterior_shell"];
     sourceSideOnly: true;
@@ -133,27 +134,42 @@ const TEST_POLICY: Record<
     artifactToProduce: "receipt://full_apparatus_tensor/no_metric_target_echo_v1",
   },
   T00_component: {
-    blockers: ["full_apparatus_T00_missing"],
+    blockers: ["full_apparatus_T00_missing", "full_apparatus_T00_detail_ref_missing"],
     requiredMeasurement: "Source-side T00 component for the full apparatus.",
-    acceptanceCriterion: "T00 is present and source-side authoritative.",
+    acceptanceCriterion: "T00 is present with a component-level source-side receipt ref.",
     artifactToProduce: "receipt://full_apparatus_tensor/T00_v1",
   },
   T0i_components: {
-    blockers: ["full_apparatus_T0i_missing"],
+    blockers: [
+      "full_apparatus_T0i_missing",
+      "full_apparatus_T01_ref_missing",
+      "full_apparatus_T02_ref_missing",
+      "full_apparatus_T03_ref_missing",
+    ],
     requiredMeasurement: "Source-side momentum-density components T0i for the full apparatus.",
-    acceptanceCriterion: "T0i components are present and not zero-filled.",
+    acceptanceCriterion: "T01, T02, and T03 are present with component-level source-side receipt refs and are not zero-filled.",
     artifactToProduce: "receipt://full_apparatus_tensor/T0i_v1",
   },
   diagonal_Tij_components: {
-    blockers: ["full_apparatus_diagonal_Tij_missing"],
+    blockers: [
+      "full_apparatus_diagonal_Tij_missing",
+      "full_apparatus_T11_ref_missing",
+      "full_apparatus_T22_ref_missing",
+      "full_apparatus_T33_ref_missing",
+    ],
     requiredMeasurement: "Source-side diagonal spatial stress components Tij for the full apparatus.",
-    acceptanceCriterion: "Diagonal Tij components are present.",
+    acceptanceCriterion: "T11, T22, and T33 are present with component-level source-side receipt refs.",
     artifactToProduce: "receipt://full_apparatus_tensor/diagonal_Tij_v1",
   },
   off_diagonal_Tij_components: {
-    blockers: ["full_apparatus_off_diagonal_Tij_missing"],
+    blockers: [
+      "full_apparatus_off_diagonal_Tij_missing",
+      "full_apparatus_T12_ref_missing",
+      "full_apparatus_T13_ref_missing",
+      "full_apparatus_T23_ref_missing",
+    ],
     requiredMeasurement: "Source-side off-diagonal spatial stress components Tij for the full apparatus.",
-    acceptanceCriterion: "Off-diagonal Tij components are present and not zero-filled.",
+    acceptanceCriterion: "T12, T13, and T23 are present with component-level source-side receipt refs and are not zero-filled.",
     artifactToProduce: "receipt://full_apparatus_tensor/off_diagonal_Tij_v1",
   },
   support_structure_stress_energy: {
@@ -285,6 +301,7 @@ export const buildNhm2TileSourceFullApparatusTensorTestPlan = (
     },
     fullApparatusTensorTarget: {
       requiredComponents: ["T00", "T0i", "diagonalTij", "offDiagonalTij"],
+      requiredTensorComponentCount: 10,
       requiredTermCount: 9,
       requiredRegions: ["wall", "hull", "exterior_shell"],
       sourceSideOnly: true,
@@ -338,6 +355,7 @@ export const isNhm2TileSourceFullApparatusTensorTestPlan = (
     target != null &&
     Array.isArray(target.requiredComponents) &&
     target.requiredComponents.length === 4 &&
+    target.requiredTensorComponentCount === 10 &&
     target.requiredTermCount === 9 &&
     Array.isArray(target.requiredRegions) &&
     target.requiredRegions.length === 3 &&

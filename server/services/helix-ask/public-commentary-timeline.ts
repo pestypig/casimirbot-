@@ -163,6 +163,21 @@ const finalReadyText = (prompt: string, failed: boolean): string => {
   return "I have enough to answer, and the terminal checks allow the final response.";
 };
 
+const terminalAuthoritySelectedAnswer = (value: unknown): boolean => {
+  const authority = asRecord(value);
+  if (!authority) return false;
+  const terminalKind =
+    readString(authority.terminal_artifact_kind) ??
+    readString(authority.selected_terminal_artifact_kind) ??
+    readString(authority.terminal_kind);
+  const terminalError =
+    readString(authority.terminal_error_code) ??
+    readString(authority.error_code) ??
+    readString(authority.failure_code);
+  if (terminalError) return false;
+  return Boolean(terminalKind && terminalKind !== "typed_failure" && terminalKind !== "failure");
+};
+
 const makeEvent = (input: {
   turnId: string;
   traceId: string;
@@ -239,7 +254,7 @@ export const buildHelixAskPublicCommentaryTimeline = (input: {
     asRecord(input.initialAgentStepDecision),
     asRecord(input.agentStepDecision),
   ].filter(Boolean) as RecordLike[];
-  const terminalFailed = input.finalStatus === "final_failure";
+  const terminalFailed = input.finalStatus === "final_failure" && !terminalAuthoritySelectedAnswer(input.terminalAuthority);
   const timeline: HelixAskPublicCommentaryEventV1[] = [
     makeEvent({
       turnId: input.turnId,

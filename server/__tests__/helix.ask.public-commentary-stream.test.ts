@@ -3,6 +3,7 @@ import request from "supertest";
 import { describe, expect, it } from "vitest";
 
 import { planRouter } from "../routes/agi.plan";
+import { buildHelixAskPublicCommentaryTimeline } from "../services/helix-ask/public-commentary-timeline";
 
 const createApp = (): express.Express => {
   const app = express();
@@ -69,6 +70,38 @@ const parseSseEvents = (text: string): Array<{ event: string; data: any }> =>
     .filter(Boolean) as Array<{ event: string; data: any }>;
 
 describe("helix ask public commentary stream", () => {
+  it("does not keep stale fail-closed commentary after terminal authority selects a successful answer", () => {
+    const timeline = buildHelixAskPublicCommentaryTimeline({
+      turnId: "ask:public-commentary-terminal-success",
+      traceId: "ask:public-commentary-terminal-success",
+      prompt:
+        "Use helix_ask.reflect_theory_context to reflect on how the Alcubierre metric connects to terminal authority.",
+      turnEvents: [
+        {
+          type: "observation_recorded",
+          actual_artifacts: ["helix_theory_context_reflection_tool_receipt"],
+        },
+      ],
+      terminalAuthority: {
+        terminal_artifact_kind: "model_synthesized_answer",
+        final_answer_source: "final_answer_draft",
+        server_authoritative: true,
+      },
+      goalSatisfactionEvaluation: {
+        status: "satisfied",
+      },
+      finalStatus: "final_failure",
+    });
+
+    const timelineText = timeline.map((event) => `${event.timing} ${event.status} ${event.text}`).join("\n");
+
+    expect(timeline.at(-1)).toMatchObject({
+      timing: "final_ready",
+      status: "done",
+    });
+    expect(timelineText).not.toMatch(/fail_closed|cannot safely present|typed failure path|solver_path_incomplete/i);
+  });
+
   it("projects natural public commentary before terminal output for model-only physics turns", async () => {
     const app = createApp();
     const response = await request(app)

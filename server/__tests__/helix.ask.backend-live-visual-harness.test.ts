@@ -216,7 +216,7 @@ describe("helix ask backend live visual test harness", () => {
     expect(intent.target_source).not.toBe("repo_code");
   });
 
-  it("reproduces the UI source-switch topology from a backend-only top-level Ask turn", async () => {
+  it("diagnoses the UI source-switch topology from a backend-only top-level Ask turn", async () => {
     const app = createApp();
     const seed = await request(app)
       .post("/api/agi/situation/test-harness/live-visual-source")
@@ -235,7 +235,7 @@ describe("helix ask backend live visual test harness", () => {
       schema: "helix.backend_live_visual_source_switch_receipt.v1",
       ok: true,
       unbound_source_id: "visual_source:backend-fresh-chrome",
-      expected_repair: "explicit_visual_capture_prompt_should_bind_and_replay",
+      expected_repair: "explicit_visual_capture_prompt_should_diagnose_unbound_source",
       assistant_answer: false,
       raw_content_included: false,
     });
@@ -250,8 +250,11 @@ describe("helix ask backend live visual test harness", () => {
       })
       .expect(200);
 
+    expect(ask.body?.final_answer_source).toBe("typed_failure");
+    expect(ask.body?.terminal_artifact_kind).toBe("typed_failure");
+    expect(String(ask.body?.selected_final_answer ?? ask.body?.answer ?? "")).toContain("fresh_source_unbound");
     expect(ask.body?.active_situation_context).toMatchObject({
-      status: "active",
+      status: "stale",
       situation_run_id: seed.body.bound_seed.situation_run_id,
       environment_id: seed.body.bound_seed.environment_id,
     });
@@ -259,18 +262,35 @@ describe("helix ask backend live visual test harness", () => {
       answerable: true,
       situation_run_id: seed.body.bound_seed.situation_run_id,
     });
-    expect(ask.body?.situation_evidence_selection?.selected_source_refs).toContain("visual_source:backend-fresh-chrome");
-    expect(ask.body?.situation_evidence_selection?.selected_observation_refs?.length).toBeGreaterThan(0);
-    expect(JSON.stringify(ask.body?.situation_evidence_selection?.rejected_unbound_source_refs ?? [])).not.toContain("backend-fresh-chrome");
-    expect(String(ask.body?.selected_final_answer ?? ask.body?.answer ?? "")).toContain("Helix Ask UI");
+    expect(ask.body?.live_source_identity_audit).toMatchObject({
+      identity_ok: false,
+      diagnosis: "fresh_source_unbound",
+      repair_candidate: {
+        action: "bind_fresh_visual_source",
+        mutating: false,
+      },
+    });
+    expect(ask.body?.situation_evidence_selection?.selected_source_refs ?? []).not.toContain("visual_source:backend-fresh-chrome");
+    expect(ask.body?.situation_evidence_selection?.rejected_unbound_source_refs?.length ?? 0).toBeGreaterThan(0);
+    expect(JSON.stringify(ask.body?.source_binding_status_ledger ?? [])).toContain("backend-fresh-chrome");
 
     const debug = await request(app)
       .get(`/api/agi/ask/turn/${encodeURIComponent(ask.body.turn_id)}/debug-export`)
       .expect(200);
     const payload = debug.body?.payload;
     expect(payload?.ask_turn_preflight_context?.situation_evidence_selection?.answerable).toBe(true);
-    expect(payload?.ask_turn_preflight_context?.situation_evidence_selection?.selected_source_refs).toContain("visual_source:backend-fresh-chrome");
-    expect(payload?.ask_turn_preflight_context?.situation_evidence_selection?.selected_observation_refs?.length).toBeGreaterThan(0);
-    expect(payload?.poison_audit?.ok).toBe(true);
+    expect(payload?.ask_turn_preflight_context?.situation_evidence_selection?.selected_source_refs ?? []).not.toContain(
+      "visual_source:backend-fresh-chrome",
+    );
+    expect(payload?.live_source_identity_audit).toMatchObject({
+      identity_ok: false,
+      diagnosis: "fresh_source_unbound",
+      repair_candidate: {
+        action: "bind_fresh_visual_source",
+        mutating: false,
+      },
+    });
+    expect(payload?.terminal_artifact_kind).toBe("typed_failure");
+    expect(payload?.final_answer_source).toBe("typed_failure");
   }, 60_000);
 });

@@ -29,6 +29,11 @@ import {
   type Nhm2TileSourceMaterialCouponTestPlanV1,
 } from "../../shared/contracts/nhm2-tile-source-material-coupon-test-plan.v1";
 import {
+  buildNhm2TileSourceMaterialCouponOperatingBudget,
+  isNhm2TileSourceMaterialCouponOperatingBudget,
+  type Nhm2TileSourceMaterialCouponOperatingBudgetV1,
+} from "../../shared/contracts/nhm2-tile-source-material-coupon-operating-budget.v1";
+import {
   buildNhm2TileSourceForceGapPullInTestPlan,
   isNhm2TileSourceForceGapPullInTestPlan,
   type Nhm2TileSourceForceGapPullInTestPlanV1,
@@ -43,6 +48,11 @@ import {
   isNhm2TileSourceRoughnessPatchTestPlan,
   type Nhm2TileSourceRoughnessPatchTestPlanV1,
 } from "../../shared/contracts/nhm2-tile-source-roughness-patch-test-plan.v1";
+import {
+  buildNhm2TileSourceRoughnessPatchOperatingBudget,
+  isNhm2TileSourceRoughnessPatchOperatingBudget,
+  type Nhm2TileSourceRoughnessPatchOperatingBudgetV1,
+} from "../../shared/contracts/nhm2-tile-source-roughness-patch-operating-budget.v1";
 import {
   buildNhm2TileSourceActiveControlTestPlan,
   isNhm2TileSourceActiveControlTestPlan,
@@ -59,10 +69,30 @@ import {
   type Nhm2TileSourceFatigueLayerScalingTestPlanV1,
 } from "../../shared/contracts/nhm2-tile-source-fatigue-layer-scaling-test-plan.v1";
 import {
+  buildNhm2TileSourceFatigueLayerScalingOperatingBudget,
+  isNhm2TileSourceFatigueLayerScalingOperatingBudget,
+  type Nhm2TileSourceFatigueLayerScalingOperatingBudgetV1,
+} from "../../shared/contracts/nhm2-tile-source-fatigue-layer-scaling-operating-budget.v1";
+import {
   buildNhm2TileSourceFullApparatusTensorTestPlan,
   isNhm2TileSourceFullApparatusTensorTestPlan,
   type Nhm2TileSourceFullApparatusTensorTestPlanV1,
 } from "../../shared/contracts/nhm2-tile-source-full-apparatus-tensor-test-plan.v1";
+import {
+  buildNhm2TileSourceFullApparatusTensorOperatingBudget,
+  isNhm2TileSourceFullApparatusTensorOperatingBudget,
+  type Nhm2TileSourceFullApparatusTensorOperatingBudgetV1,
+} from "../../shared/contracts/nhm2-tile-source-full-apparatus-tensor-operating-budget.v1";
+import {
+  buildFullApparatusTensorEvidenceFromTensorValues,
+  isNhm2TileSourceFullApparatusTensorValues,
+  type Nhm2TileSourceFullApparatusTensorValuesV1,
+} from "../../shared/contracts/nhm2-tile-source-full-apparatus-tensor-values.v1";
+import {
+  buildNhm2TileSourceOperatingBudgetReadiness,
+  isNhm2TileSourceOperatingBudgetReadiness,
+  type Nhm2TileSourceOperatingBudgetReadinessV1,
+} from "../../shared/contracts/nhm2-tile-source-operating-budget-readiness.v1";
 import {
   buildNhm2TileSourcePhysicalValidationPlan,
   isNhm2TileSourcePhysicalValidationPlan,
@@ -82,18 +112,31 @@ const EVIDENCE_GAP_ROADMAP_FILE = "nhm2-tile-source-evidence-gap-roadmap.json";
 const FALSIFICATION_REPORT_FILE = "nhm2-tile-source-falsification-report.json";
 const AUTHORITY_HANDOFF_FILE = "nhm2-tile-source-authority-handoff.json";
 const MATERIAL_COUPON_TEST_PLAN_FILE = "nhm2-tile-source-material-coupon-test-plan.json";
+const MATERIAL_COUPON_OPERATING_BUDGET_FILE =
+  "nhm2-tile-source-material-coupon-operating-budget.json";
 const FORCE_GAP_PULL_IN_TEST_PLAN_FILE = "nhm2-tile-source-force-gap-pull-in-test-plan.json";
 const FORCE_GAP_LOAD_BUDGET_FILE = "nhm2-tile-source-force-gap-load-budget.json";
 const ROUGHNESS_PATCH_TEST_PLAN_FILE = "nhm2-tile-source-roughness-patch-test-plan.json";
+const ROUGHNESS_PATCH_OPERATING_BUDGET_FILE =
+  "nhm2-tile-source-roughness-patch-operating-budget.json";
 const ACTIVE_CONTROL_TEST_PLAN_FILE = "nhm2-tile-source-active-control-test-plan.json";
 const ACTIVE_CONTROL_OPERATING_BUDGET_FILE =
   "nhm2-tile-source-active-control-operating-budget.json";
 const FATIGUE_LAYER_SCALING_TEST_PLAN_FILE =
   "nhm2-tile-source-fatigue-layer-scaling-test-plan.json";
+const FATIGUE_LAYER_SCALING_OPERATING_BUDGET_FILE =
+  "nhm2-tile-source-fatigue-layer-scaling-operating-budget.json";
 const FULL_APPARATUS_TENSOR_TEST_PLAN_FILE =
   "nhm2-tile-source-full-apparatus-tensor-test-plan.json";
+const FULL_APPARATUS_TENSOR_OPERATING_BUDGET_FILE =
+  "nhm2-tile-source-full-apparatus-tensor-operating-budget.json";
+const FULL_APPARATUS_TENSOR_VALUES_FILE =
+  "nhm2-tile-source-full-apparatus-tensor-values.json";
+const OPERATING_BUDGET_READINESS_FILE =
+  "nhm2-tile-source-operating-budget-readiness.json";
 
 type EvidenceInput = BuildNhm2TileSourceMaterialEvidenceReceiptsInput & {
+  fullApparatusTensorValues?: Nhm2TileSourceFullApparatusTensorValuesV1 | null;
   downstreamGateStatuses?: Partial<
     Record<Nhm2TileSourceDownstreamGateV1["gateId"], "pass" | "review" | "fail" | "not_run">
   > | null;
@@ -115,13 +158,19 @@ export type PublishNhm2TileSourceMaterialEvidenceResult = {
   falsificationReport: Nhm2TileSourceFalsificationReportV1;
   authorityHandoff: Nhm2TileSourceAuthorityHandoffV1;
   materialCouponTestPlan: Nhm2TileSourceMaterialCouponTestPlanV1;
+  materialCouponOperatingBudget: Nhm2TileSourceMaterialCouponOperatingBudgetV1;
   forceGapPullInTestPlan: Nhm2TileSourceForceGapPullInTestPlanV1;
   forceGapLoadBudget: Nhm2TileSourceForceGapLoadBudgetV1;
   roughnessPatchTestPlan: Nhm2TileSourceRoughnessPatchTestPlanV1;
+  roughnessPatchOperatingBudget: Nhm2TileSourceRoughnessPatchOperatingBudgetV1;
   activeControlTestPlan: Nhm2TileSourceActiveControlTestPlanV1;
   activeControlOperatingBudget: Nhm2TileSourceActiveControlOperatingBudgetV1;
   fatigueLayerScalingTestPlan: Nhm2TileSourceFatigueLayerScalingTestPlanV1;
+  fatigueLayerScalingOperatingBudget: Nhm2TileSourceFatigueLayerScalingOperatingBudgetV1;
   fullApparatusTensorTestPlan: Nhm2TileSourceFullApparatusTensorTestPlanV1;
+  fullApparatusTensorOperatingBudget: Nhm2TileSourceFullApparatusTensorOperatingBudgetV1;
+  fullApparatusTensorValues: Nhm2TileSourceFullApparatusTensorValuesV1 | null;
+  operatingBudgetReadiness: Nhm2TileSourceOperatingBudgetReadinessV1;
   outputRefs: {
     materialEvidenceReceipts: string;
     physicalValidationPlan: string;
@@ -129,13 +178,19 @@ export type PublishNhm2TileSourceMaterialEvidenceResult = {
     falsificationReport: string;
     authorityHandoff: string;
     materialCouponTestPlan: string;
+    materialCouponOperatingBudget: string;
     forceGapPullInTestPlan: string;
     forceGapLoadBudget: string;
     roughnessPatchTestPlan: string;
+    roughnessPatchOperatingBudget: string;
     activeControlTestPlan: string;
     activeControlOperatingBudget: string;
     fatigueLayerScalingTestPlan: string;
+    fatigueLayerScalingOperatingBudget: string;
     fullApparatusTensorTestPlan: string;
+    fullApparatusTensorOperatingBudget: string;
+    fullApparatusTensorValues: string | null;
+    operatingBudgetReadiness: string;
   };
 };
 
@@ -203,6 +258,11 @@ export const buildNhm2TileSourceMaterialEvidenceTemplate = (args: {
   materialCoupon: {
     evidenceTier: "missing",
     evidenceRef: null,
+    tensileStressCurveRef: null,
+    fractureYieldCurveRef: null,
+    cryogenicStateRef: null,
+    roughnessMapRef: null,
+    fabricationToleranceMapRef: null,
     material: "ultra_high_stress_tin",
     measuredTensileStressPa: null,
     fractureOrYieldStressPa: null,
@@ -216,6 +276,9 @@ export const buildNhm2TileSourceMaterialEvidenceTemplate = (args: {
   forceGapPullIn: {
     evidenceTier: "missing",
     evidenceRef: null,
+    forceGapCurveRef: null,
+    forceGradientCurveRef: null,
+    stiffnessModelRef: null,
     gapMeters: 8e-9,
     casimirForceN: null,
     forceGradientNPerM: null,
@@ -226,6 +289,9 @@ export const buildNhm2TileSourceMaterialEvidenceTemplate = (args: {
   roughnessPatch: {
     evidenceTier: "missing",
     evidenceRef: null,
+    roughnessMapRef: null,
+    asperityDistributionRef: null,
+    patchVoltageMapRef: null,
     roughnessRmsMeters: null,
     asperityP99Meters: null,
     asperityMaxMeters: null,
@@ -236,10 +302,17 @@ export const buildNhm2TileSourceMaterialEvidenceTemplate = (args: {
   activeControl: {
     evidenceTier: "missing",
     evidenceRef: null,
+    energyWaveformRef: null,
+    controlTransferFunctionRef: null,
+    gapNoiseTraceRef: null,
+    thermalModelRef: null,
+    heatLoadTraceRef: null,
+    timingSyncTraceRef: null,
     energyPerCycleJ: null,
     bandwidthHz: null,
     switchingRateHz: 15e9,
     gapNoiseRmsMeters: null,
+    noiseSpectrumRef: null,
     heatLoadW: null,
     timingJitterSeconds: null,
     failureModeRef: null,
@@ -247,6 +320,15 @@ export const buildNhm2TileSourceMaterialEvidenceTemplate = (args: {
   fatigueLayerScaling: {
     evidenceTier: "missing",
     evidenceRef: null,
+    cycleProtocolRef: null,
+    fatigueCurveRef: null,
+    thermalCycleRef: null,
+    creepDriftRef: null,
+    layerScalingMapRef: null,
+    nonadditivityModelRef: null,
+    activeAreaMapRef: null,
+    supportCouplingMapRef: null,
+    multiphysicsCouplingRef: null,
     cycleCountToFailure: null,
     requiredCycleCount: null,
     layerScalingEfficiency: null,
@@ -257,6 +339,8 @@ export const buildNhm2TileSourceMaterialEvidenceTemplate = (args: {
   fullApparatusTensor: {
     evidenceTier: "missing",
     evidenceRef: null,
+    tensorValueArtifactRef: null,
+    tensorValueArtifactContract: null,
     sameChart: false,
     sameBasis: false,
     sameUnits: false,
@@ -266,6 +350,24 @@ export const buildNhm2TileSourceMaterialEvidenceTemplate = (args: {
       T0i: false,
       diagonalTij: false,
       offDiagonalTij: false,
+    },
+    componentRefs: {
+      T00: null,
+      T0i: null,
+      diagonalTij: null,
+      offDiagonalTij: null,
+    },
+    componentDetailRefs: {
+      T00: null,
+      T01: null,
+      T02: null,
+      T03: null,
+      T11: null,
+      T12: null,
+      T13: null,
+      T22: null,
+      T23: null,
+      T33: null,
     },
     termCoverage: {
       supportStructureStressEnergy: false,
@@ -278,10 +380,26 @@ export const buildNhm2TileSourceMaterialEvidenceTemplate = (args: {
       casimirInteractionStressEnergy: false,
       materialStrainEnergy: false,
     },
+    termRefs: {
+      supportStructureStressEnergy: null,
+      spacerContactStressEnergy: null,
+      activeControlFieldEnergy: null,
+      thermalLoadStressEnergy: null,
+      patchPotentialElectrostaticStress: null,
+      fatigueDamageEvolution: null,
+      layerScalingCrossTerms: null,
+      casimirInteractionStressEnergy: null,
+      materialStrainEnergy: null,
+    },
     regionalCoverage: {
       wall: false,
       hull: false,
       exteriorShell: false,
+    },
+    regionalSupportRefs: {
+      wall: null,
+      hull: null,
+      exteriorShell: null,
     },
   },
   downstreamGateStatuses: {
@@ -303,23 +421,6 @@ export const publishNhm2TileSourceMaterialEvidenceReceipts = (args: {
   selectedProfileId?: string | null;
 }): PublishNhm2TileSourceMaterialEvidenceResult => {
   const evidence = parseEvidenceInput(readJson(args.repoRoot, args.evidencePath ?? null));
-  const materialEvidenceReceipts = buildNhm2TileSourceMaterialEvidenceReceipts({
-    ...evidence,
-    generatedAt: args.generatedAt ?? evidence.generatedAt ?? null,
-    selectedProfileId: args.selectedProfileId ?? evidence.selectedProfileId ?? null,
-  });
-  if (!isNhm2TileSourceMaterialEvidenceReceipts(materialEvidenceReceipts)) {
-    throw new Error("built artifact failed nhm2_tile_source_material_evidence_receipts/v1 validation");
-  }
-  const physicalValidationPlan = buildNhm2TileSourcePhysicalValidationPlan({
-    generatedAt: materialEvidenceReceipts.generatedAt,
-    selectedProfileId: materialEvidenceReceipts.selectedProfileId,
-    materialEvidenceReceipts,
-    downstreamGateStatuses: evidence.downstreamGateStatuses ?? null,
-  });
-  if (!isNhm2TileSourcePhysicalValidationPlan(physicalValidationPlan)) {
-    throw new Error("built artifact failed nhm2_tile_source_physical_validation_plan/v1 validation");
-  }
   const outDir = args.outDir ?? DEFAULT_RUN_ROOT;
   const outputRefs = {
     materialEvidenceReceipts: join(outDir, MATERIAL_RECEIPTS_FILE),
@@ -328,44 +429,58 @@ export const publishNhm2TileSourceMaterialEvidenceReceipts = (args: {
     falsificationReport: join(outDir, FALSIFICATION_REPORT_FILE),
     authorityHandoff: join(outDir, AUTHORITY_HANDOFF_FILE),
     materialCouponTestPlan: join(outDir, MATERIAL_COUPON_TEST_PLAN_FILE),
+    materialCouponOperatingBudget: join(outDir, MATERIAL_COUPON_OPERATING_BUDGET_FILE),
     forceGapPullInTestPlan: join(outDir, FORCE_GAP_PULL_IN_TEST_PLAN_FILE),
     forceGapLoadBudget: join(outDir, FORCE_GAP_LOAD_BUDGET_FILE),
     roughnessPatchTestPlan: join(outDir, ROUGHNESS_PATCH_TEST_PLAN_FILE),
+    roughnessPatchOperatingBudget: join(outDir, ROUGHNESS_PATCH_OPERATING_BUDGET_FILE),
     activeControlTestPlan: join(outDir, ACTIVE_CONTROL_TEST_PLAN_FILE),
     activeControlOperatingBudget: join(outDir, ACTIVE_CONTROL_OPERATING_BUDGET_FILE),
     fatigueLayerScalingTestPlan: join(outDir, FATIGUE_LAYER_SCALING_TEST_PLAN_FILE),
+    fatigueLayerScalingOperatingBudget: join(
+      outDir,
+      FATIGUE_LAYER_SCALING_OPERATING_BUDGET_FILE,
+    ),
     fullApparatusTensorTestPlan: join(outDir, FULL_APPARATUS_TENSOR_TEST_PLAN_FILE),
+    fullApparatusTensorOperatingBudget: join(
+      outDir,
+      FULL_APPARATUS_TENSOR_OPERATING_BUDGET_FILE,
+    ),
+    fullApparatusTensorValues:
+      evidence.fullApparatusTensorValues == null
+        ? null
+        : join(outDir, FULL_APPARATUS_TENSOR_VALUES_FILE),
+    operatingBudgetReadiness: join(outDir, OPERATING_BUDGET_READINESS_FILE),
   };
-  const evidenceGapRoadmap = buildNhm2TileSourceEvidenceGapRoadmap({
-    materialEvidenceReceipts,
-    physicalValidationPlan,
-    materialEvidenceReceiptsRef: outputRefs.materialEvidenceReceipts,
-    physicalValidationPlanRef: outputRefs.physicalValidationPlan,
-  });
-  if (!isNhm2TileSourceEvidenceGapRoadmap(evidenceGapRoadmap)) {
-    throw new Error("built artifact failed nhm2_tile_source_evidence_gap_roadmap/v1 validation");
+  const fullApparatusTensorValues =
+    evidence.fullApparatusTensorValues == null ? null : evidence.fullApparatusTensorValues;
+  if (
+    fullApparatusTensorValues != null &&
+    !isNhm2TileSourceFullApparatusTensorValues(fullApparatusTensorValues)
+  ) {
+    throw new Error("evidence input failed nhm2_tile_source_full_apparatus_tensor_values/v1 validation");
   }
-  const falsificationReport = buildNhm2TileSourceFalsificationReport({
-    materialEvidenceReceipts,
-    physicalValidationPlan,
-    evidenceGapRoadmap,
-    materialEvidenceReceiptsRef: outputRefs.materialEvidenceReceipts,
-    physicalValidationPlanRef: outputRefs.physicalValidationPlan,
-    evidenceGapRoadmapRef: outputRefs.evidenceGapRoadmap,
+  const normalizedEvidence: EvidenceInput =
+    fullApparatusTensorValues == null
+      ? evidence
+      : {
+          ...evidence,
+          fullApparatusTensor: buildFullApparatusTensorEvidenceFromTensorValues({
+            artifact: fullApparatusTensorValues,
+            evidenceTier: "validated_simulation",
+            evidenceRef:
+              fullApparatusTensorValues.artifactRef ??
+              outputRefs.fullApparatusTensorValues ??
+              null,
+          }),
+        };
+  const materialEvidenceReceipts = buildNhm2TileSourceMaterialEvidenceReceipts({
+    ...normalizedEvidence,
+    generatedAt: args.generatedAt ?? normalizedEvidence.generatedAt ?? null,
+    selectedProfileId: args.selectedProfileId ?? normalizedEvidence.selectedProfileId ?? null,
   });
-  if (!isNhm2TileSourceFalsificationReport(falsificationReport)) {
-    throw new Error("built artifact failed nhm2_tile_source_falsification_report/v1 validation");
-  }
-  const authorityHandoff = buildNhm2TileSourceAuthorityHandoff({
-    materialEvidenceReceipts,
-    physicalValidationPlan,
-    falsificationReport,
-    materialEvidenceReceiptsRef: outputRefs.materialEvidenceReceipts,
-    physicalValidationPlanRef: outputRefs.physicalValidationPlan,
-    falsificationReportRef: outputRefs.falsificationReport,
-  });
-  if (!isNhm2TileSourceAuthorityHandoff(authorityHandoff)) {
-    throw new Error("built artifact failed nhm2_tile_source_authority_handoff/v1 validation");
+  if (!isNhm2TileSourceMaterialEvidenceReceipts(materialEvidenceReceipts)) {
+    throw new Error("built artifact failed nhm2_tile_source_material_evidence_receipts/v1 validation");
   }
   const materialCouponTestPlan = buildNhm2TileSourceMaterialCouponTestPlan({
     materialEvidenceReceipts,
@@ -373,6 +488,16 @@ export const publishNhm2TileSourceMaterialEvidenceReceipts = (args: {
   });
   if (!isNhm2TileSourceMaterialCouponTestPlan(materialCouponTestPlan)) {
     throw new Error("built artifact failed nhm2_tile_source_material_coupon_test_plan/v1 validation");
+  }
+  const materialCouponOperatingBudget = buildNhm2TileSourceMaterialCouponOperatingBudget({
+    generatedAt: materialEvidenceReceipts.generatedAt,
+    selectedProfileId: materialEvidenceReceipts.selectedProfileId,
+    materialCouponEvidence: normalizedEvidence.materialCoupon ?? null,
+  });
+  if (!isNhm2TileSourceMaterialCouponOperatingBudget(materialCouponOperatingBudget)) {
+    throw new Error(
+      "built artifact failed nhm2_tile_source_material_coupon_operating_budget/v1 validation",
+    );
   }
   const forceGapPullInTestPlan = buildNhm2TileSourceForceGapPullInTestPlan({
     materialEvidenceReceipts,
@@ -385,7 +510,7 @@ export const publishNhm2TileSourceMaterialEvidenceReceipts = (args: {
     generatedAt: materialEvidenceReceipts.generatedAt,
     materialEvidenceReceipts,
     materialEvidenceReceiptsRef: outputRefs.materialEvidenceReceipts,
-    forceGapPullInEvidence: evidence.forceGapPullIn ?? null,
+    forceGapPullInEvidence: normalizedEvidence.forceGapPullIn ?? null,
   });
   if (!isNhm2TileSourceForceGapLoadBudget(forceGapLoadBudget)) {
     throw new Error("built artifact failed nhm2_tile_source_force_gap_load_budget/v1 validation");
@@ -397,6 +522,16 @@ export const publishNhm2TileSourceMaterialEvidenceReceipts = (args: {
   if (!isNhm2TileSourceRoughnessPatchTestPlan(roughnessPatchTestPlan)) {
     throw new Error("built artifact failed nhm2_tile_source_roughness_patch_test_plan/v1 validation");
   }
+  const roughnessPatchOperatingBudget = buildNhm2TileSourceRoughnessPatchOperatingBudget({
+    forceGapLoadBudget,
+    forceGapLoadBudgetRef: outputRefs.forceGapLoadBudget,
+    roughnessPatchEvidence: normalizedEvidence.roughnessPatch ?? null,
+  });
+  if (!isNhm2TileSourceRoughnessPatchOperatingBudget(roughnessPatchOperatingBudget)) {
+    throw new Error(
+      "built artifact failed nhm2_tile_source_roughness_patch_operating_budget/v1 validation",
+    );
+  }
   const activeControlTestPlan = buildNhm2TileSourceActiveControlTestPlan({
     materialEvidenceReceipts,
     materialEvidenceReceiptsRef: outputRefs.materialEvidenceReceipts,
@@ -407,7 +542,7 @@ export const publishNhm2TileSourceMaterialEvidenceReceipts = (args: {
   const activeControlOperatingBudget = buildNhm2TileSourceActiveControlOperatingBudget({
     forceGapLoadBudget,
     forceGapLoadBudgetRef: outputRefs.forceGapLoadBudget,
-    activeControlEvidence: evidence.activeControl ?? null,
+    activeControlEvidence: normalizedEvidence.activeControl ?? null,
   });
   if (!isNhm2TileSourceActiveControlOperatingBudget(activeControlOperatingBudget)) {
     throw new Error(
@@ -423,6 +558,17 @@ export const publishNhm2TileSourceMaterialEvidenceReceipts = (args: {
       "built artifact failed nhm2_tile_source_fatigue_layer_scaling_test_plan/v1 validation",
     );
   }
+  const fatigueLayerScalingOperatingBudget =
+    buildNhm2TileSourceFatigueLayerScalingOperatingBudget({
+      generatedAt: materialEvidenceReceipts.generatedAt,
+      selectedProfileId: materialEvidenceReceipts.selectedProfileId,
+      fatigueLayerScalingEvidence: normalizedEvidence.fatigueLayerScaling ?? null,
+    });
+  if (!isNhm2TileSourceFatigueLayerScalingOperatingBudget(fatigueLayerScalingOperatingBudget)) {
+    throw new Error(
+      "built artifact failed nhm2_tile_source_fatigue_layer_scaling_operating_budget/v1 validation",
+    );
+  }
   const fullApparatusTensorTestPlan = buildNhm2TileSourceFullApparatusTensorTestPlan({
     materialEvidenceReceipts,
     materialEvidenceReceiptsRef: outputRefs.materialEvidenceReceipts,
@@ -432,15 +578,94 @@ export const publishNhm2TileSourceMaterialEvidenceReceipts = (args: {
       "built artifact failed nhm2_tile_source_full_apparatus_tensor_test_plan/v1 validation",
     );
   }
+  const fullApparatusTensorOperatingBudget =
+    buildNhm2TileSourceFullApparatusTensorOperatingBudget({
+      generatedAt: materialEvidenceReceipts.generatedAt,
+      selectedProfileId: materialEvidenceReceipts.selectedProfileId,
+      fullApparatusTensorEvidence: normalizedEvidence.fullApparatusTensor ?? null,
+    });
+  if (!isNhm2TileSourceFullApparatusTensorOperatingBudget(fullApparatusTensorOperatingBudget)) {
+    throw new Error(
+      "built artifact failed nhm2_tile_source_full_apparatus_tensor_operating_budget/v1 validation",
+    );
+  }
+  const operatingBudgetReadiness = buildNhm2TileSourceOperatingBudgetReadiness({
+    generatedAt: materialEvidenceReceipts.generatedAt,
+    selectedProfileId: materialEvidenceReceipts.selectedProfileId,
+    materialCouponOperatingBudget,
+    materialCouponOperatingBudgetRef: outputRefs.materialCouponOperatingBudget,
+    forceGapLoadBudget,
+    forceGapLoadBudgetRef: outputRefs.forceGapLoadBudget,
+    roughnessPatchOperatingBudget,
+    roughnessPatchOperatingBudgetRef: outputRefs.roughnessPatchOperatingBudget,
+    activeControlOperatingBudget,
+    activeControlOperatingBudgetRef: outputRefs.activeControlOperatingBudget,
+    fatigueLayerScalingOperatingBudget,
+    fatigueLayerScalingOperatingBudgetRef: outputRefs.fatigueLayerScalingOperatingBudget,
+    fullApparatusTensorOperatingBudget,
+    fullApparatusTensorOperatingBudgetRef: outputRefs.fullApparatusTensorOperatingBudget,
+  });
+  if (!isNhm2TileSourceOperatingBudgetReadiness(operatingBudgetReadiness)) {
+    throw new Error(
+      "built artifact failed nhm2_tile_source_operating_budget_readiness/v1 validation",
+    );
+  }
+  const physicalValidationPlan = buildNhm2TileSourcePhysicalValidationPlan({
+    generatedAt: materialEvidenceReceipts.generatedAt,
+    selectedProfileId: materialEvidenceReceipts.selectedProfileId,
+    materialEvidenceReceipts,
+    operatingBudgetReadiness,
+    downstreamGateStatuses: normalizedEvidence.downstreamGateStatuses ?? null,
+  });
+  if (!isNhm2TileSourcePhysicalValidationPlan(physicalValidationPlan)) {
+    throw new Error("built artifact failed nhm2_tile_source_physical_validation_plan/v1 validation");
+  }
+  const evidenceGapRoadmap = buildNhm2TileSourceEvidenceGapRoadmap({
+    materialEvidenceReceipts,
+    physicalValidationPlan,
+    materialEvidenceReceiptsRef: outputRefs.materialEvidenceReceipts,
+    physicalValidationPlanRef: outputRefs.physicalValidationPlan,
+  });
+  if (!isNhm2TileSourceEvidenceGapRoadmap(evidenceGapRoadmap)) {
+    throw new Error("built artifact failed nhm2_tile_source_evidence_gap_roadmap/v1 validation");
+  }
+  const falsificationReport = buildNhm2TileSourceFalsificationReport({
+    materialEvidenceReceipts,
+    physicalValidationPlan,
+    evidenceGapRoadmap,
+    operatingBudgetReadiness,
+    materialEvidenceReceiptsRef: outputRefs.materialEvidenceReceipts,
+    physicalValidationPlanRef: outputRefs.physicalValidationPlan,
+    evidenceGapRoadmapRef: outputRefs.evidenceGapRoadmap,
+    operatingBudgetReadinessRef: outputRefs.operatingBudgetReadiness,
+  });
+  if (!isNhm2TileSourceFalsificationReport(falsificationReport)) {
+    throw new Error("built artifact failed nhm2_tile_source_falsification_report/v1 validation");
+  }
+  const authorityHandoff = buildNhm2TileSourceAuthorityHandoff({
+    materialEvidenceReceipts,
+    physicalValidationPlan,
+    falsificationReport,
+    operatingBudgetReadiness,
+    materialEvidenceReceiptsRef: outputRefs.materialEvidenceReceipts,
+    physicalValidationPlanRef: outputRefs.physicalValidationPlan,
+    falsificationReportRef: outputRefs.falsificationReport,
+    operatingBudgetReadinessRef: outputRefs.operatingBudgetReadiness,
+  });
+  if (!isNhm2TileSourceAuthorityHandoff(authorityHandoff)) {
+    throw new Error("built artifact failed nhm2_tile_source_authority_handoff/v1 validation");
+  }
   writeJson(args.repoRoot, outputRefs.materialEvidenceReceipts, materialEvidenceReceipts);
   writeJson(args.repoRoot, outputRefs.physicalValidationPlan, physicalValidationPlan);
   writeJson(args.repoRoot, outputRefs.evidenceGapRoadmap, evidenceGapRoadmap);
   writeJson(args.repoRoot, outputRefs.falsificationReport, falsificationReport);
   writeJson(args.repoRoot, outputRefs.authorityHandoff, authorityHandoff);
   writeJson(args.repoRoot, outputRefs.materialCouponTestPlan, materialCouponTestPlan);
+  writeJson(args.repoRoot, outputRefs.materialCouponOperatingBudget, materialCouponOperatingBudget);
   writeJson(args.repoRoot, outputRefs.forceGapPullInTestPlan, forceGapPullInTestPlan);
   writeJson(args.repoRoot, outputRefs.forceGapLoadBudget, forceGapLoadBudget);
   writeJson(args.repoRoot, outputRefs.roughnessPatchTestPlan, roughnessPatchTestPlan);
+  writeJson(args.repoRoot, outputRefs.roughnessPatchOperatingBudget, roughnessPatchOperatingBudget);
   writeJson(args.repoRoot, outputRefs.activeControlTestPlan, activeControlTestPlan);
   writeJson(args.repoRoot, outputRefs.activeControlOperatingBudget, activeControlOperatingBudget);
   writeJson(
@@ -450,9 +675,23 @@ export const publishNhm2TileSourceMaterialEvidenceReceipts = (args: {
   );
   writeJson(
     args.repoRoot,
+    outputRefs.fatigueLayerScalingOperatingBudget,
+    fatigueLayerScalingOperatingBudget,
+  );
+  writeJson(
+    args.repoRoot,
     outputRefs.fullApparatusTensorTestPlan,
     fullApparatusTensorTestPlan,
   );
+  writeJson(
+    args.repoRoot,
+    outputRefs.fullApparatusTensorOperatingBudget,
+    fullApparatusTensorOperatingBudget,
+  );
+  if (fullApparatusTensorValues != null && outputRefs.fullApparatusTensorValues != null) {
+    writeJson(args.repoRoot, outputRefs.fullApparatusTensorValues, fullApparatusTensorValues);
+  }
+  writeJson(args.repoRoot, outputRefs.operatingBudgetReadiness, operatingBudgetReadiness);
   return {
     materialEvidenceReceipts,
     physicalValidationPlan,
@@ -460,13 +699,19 @@ export const publishNhm2TileSourceMaterialEvidenceReceipts = (args: {
     falsificationReport,
     authorityHandoff,
     materialCouponTestPlan,
+    materialCouponOperatingBudget,
     forceGapPullInTestPlan,
     forceGapLoadBudget,
     roughnessPatchTestPlan,
+    roughnessPatchOperatingBudget,
     activeControlTestPlan,
     activeControlOperatingBudget,
     fatigueLayerScalingTestPlan,
+    fatigueLayerScalingOperatingBudget,
     fullApparatusTensorTestPlan,
+    fullApparatusTensorOperatingBudget,
+    fullApparatusTensorValues,
+    operatingBudgetReadiness,
     outputRefs,
   };
 };

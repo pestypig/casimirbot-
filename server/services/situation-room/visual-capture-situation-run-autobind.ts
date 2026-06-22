@@ -58,6 +58,7 @@ export function autoBindExplicitVisualCaptureSituationRun(input: {
   const sourceId = unboundStatus?.source_id ?? producerFallback?.source_id ?? null;
   const modality = unboundStatus?.modality ?? producerFallback?.modality ?? null;
   if (!sourceId || modality !== "visual_frame") return null;
+  if (input.activeContext.situation_run_id && unboundStatus) return null;
 
   const existingEnvironment = input.activeContext.environment_id
     ? getLiveAnswerEnvironment(input.activeContext.environment_id)

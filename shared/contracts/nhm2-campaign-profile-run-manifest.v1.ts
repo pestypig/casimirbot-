@@ -26,13 +26,18 @@ export const NHM2_CAMPAIGN_PROFILE_RUN_EVIDENCE_IDS = [
   "tile_source_falsification_report",
   "tile_source_authority_handoff",
   "tile_source_material_coupon_test_plan",
+  "tile_source_material_coupon_operating_budget",
   "tile_source_force_gap_pull_in_test_plan",
   "tile_source_force_gap_load_budget",
   "tile_source_roughness_patch_test_plan",
+  "tile_source_roughness_patch_operating_budget",
   "tile_source_active_control_test_plan",
   "tile_source_active_control_operating_budget",
   "tile_source_fatigue_layer_scaling_test_plan",
+  "tile_source_fatigue_layer_scaling_operating_budget",
   "tile_source_full_apparatus_tensor_test_plan",
+  "tile_source_full_apparatus_tensor_operating_budget",
+  "tile_source_operating_budget_readiness",
 ] as const;
 
 export type Nhm2CampaignProfileRunEvidenceId =

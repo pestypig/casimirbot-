@@ -97,46 +97,85 @@ const TEST_POLICY: Record<
     blockers: [
       "active_gap_control_energy_and_noise_missing",
       "active_control_tier_not_measured_or_validated",
+      "active_control_energy_waveform_ref_missing",
+      "active_control_transfer_function_ref_missing",
+      "active_control_gap_noise_trace_ref_missing",
+      "active_control_noise_spectrum_ref_missing",
+      "active_control_thermal_model_ref_missing",
+      "active_control_heat_load_trace_ref_missing",
+      "active_control_timing_sync_trace_ref_missing",
+      "active_control_failure_mode_ref_missing",
     ],
     requiredMeasurement:
-      "Measured or validated-simulation active-control receipt with apparatus, controller, timing, thermal, and noise provenance.",
-    acceptanceCriterion: "Evidence tier is measured or validated_simulation, not declared_model or missing.",
+      "Measured or validated-simulation active-control receipt with apparatus, controller transfer function, energy waveform, noise trace/spectrum, thermal model, heat trace, timing trace, and failure-mode provenance.",
+    acceptanceCriterion:
+      "Evidence tier is measured or validated_simulation and all required active-control trace/model refs are present.",
     artifactToProduce: "receipt://active_control/provenance_v1",
   },
   energy_per_cycle: {
-    blockers: ["active_control_energy_per_cycle_missing"],
-    requiredMeasurement: "Active-control energy per cycle for the selected 447-layer operating mode.",
-    acceptanceCriterion: "Finite energy per cycle is supplied with provenance.",
+    blockers: ["active_control_energy_per_cycle_missing", "active_control_energy_waveform_ref_missing"],
+    requiredMeasurement:
+      "Active-control energy per cycle and waveform trace for the selected 447-layer operating mode.",
+    acceptanceCriterion: "Finite energy per cycle is supplied with waveform provenance.",
     artifactToProduce: "receipt://active_control/energy_per_cycle_v1",
   },
   control_bandwidth: {
-    blockers: ["gap_lock_bandwidth_missing", "gap_lock_bandwidth_below_2x_switching_rate"],
-    requiredMeasurement: "Closed-loop gap-lock bandwidth at the selected switching rate.",
-    acceptanceCriterion: "Control bandwidth is at least 2x the 15 GHz switching rate.",
+    blockers: [
+      "gap_lock_bandwidth_missing",
+      "gap_lock_bandwidth_below_2x_switching_rate",
+      "active_control_transfer_function_ref_missing",
+    ],
+    requiredMeasurement:
+      "Closed-loop gap-lock bandwidth and controller transfer function at the selected switching rate.",
+    acceptanceCriterion:
+      "Control bandwidth is at least 2x the 15 GHz switching rate and traceable to a transfer-function receipt.",
     artifactToProduce: "receipt://active_control/gap_lock_bandwidth_v1",
   },
   gap_noise: {
-    blockers: ["gap_noise_receipt_missing", "gap_noise_above_1pct_gap"],
-    requiredMeasurement: "Gap-noise RMS spectrum for the 8 nm operating gap.",
-    acceptanceCriterion: "Gap-noise RMS is no greater than 1% of the 8 nm operating gap.",
+    blockers: [
+      "gap_noise_receipt_missing",
+      "gap_noise_above_1pct_gap",
+      "active_control_gap_noise_trace_ref_missing",
+      "active_control_noise_spectrum_ref_missing",
+    ],
+    requiredMeasurement: "Gap-noise RMS trace and spectrum for the 8 nm operating gap.",
+    acceptanceCriterion:
+      "Gap-noise RMS is no greater than 1% of the 8 nm operating gap and traceable to time/frequency evidence.",
     artifactToProduce: "receipt://active_control/gap_noise_spectrum_v1",
   },
   heat_load: {
-    blockers: ["active_control_heat_load_missing"],
-    requiredMeasurement: "Thermal load from active control at operating cadence.",
-    acceptanceCriterion: "Finite heat load is supplied with provenance.",
+    blockers: [
+      "active_control_heat_load_missing",
+      "active_control_thermal_model_ref_missing",
+      "active_control_heat_load_trace_ref_missing",
+    ],
+    requiredMeasurement: "Thermal model and heat-load trace from active control at operating cadence.",
+    acceptanceCriterion: "Finite heat load is supplied with thermal model and heat trace provenance.",
     artifactToProduce: "receipt://active_control/heat_load_v1",
   },
   timing_jitter: {
-    blockers: ["timing_jitter_receipt_missing", "timing_jitter_above_0p1_cycle"],
-    requiredMeasurement: "Timing-jitter receipt for control action relative to switching cycle.",
-    acceptanceCriterion: "Timing jitter is no greater than 0.1 cycle at 15 GHz.",
+    blockers: [
+      "timing_jitter_receipt_missing",
+      "timing_jitter_above_0p1_cycle",
+      "active_control_timing_sync_trace_ref_missing",
+    ],
+    requiredMeasurement: "Timing-jitter and synchronization trace for control action relative to switching cycle.",
+    acceptanceCriterion: "Timing jitter is no greater than 0.1 cycle at 15 GHz with trace provenance.",
     artifactToProduce: "receipt://active_control/timing_jitter_v1",
   },
   failure_mode: {
-    blockers: ["active_control_failure_mode_ref_missing"],
-    requiredMeasurement: "Failure-mode receipt covering loss of lock, thermal runaway, noise runaway, and timing desynchronization.",
-    acceptanceCriterion: "Failure-mode reference is present.",
+    blockers: [
+      "active_control_failure_mode_ref_missing",
+      "active_control_loss_of_lock_failure_mode_missing",
+      "active_control_thermal_runaway_failure_mode_missing",
+      "active_control_noise_runaway_failure_mode_missing",
+      "active_control_timing_desynchronization_failure_mode_missing",
+      "active_control_fail_safe_shutdown_missing",
+    ],
+    requiredMeasurement:
+      "Failure-mode receipt covering loss of lock, thermal runaway, noise runaway, timing desynchronization, and fail-safe shutdown.",
+    acceptanceCriterion:
+      "Failure-mode reference is present and explicitly covers all required active-control hazard classes.",
     artifactToProduce: "receipt://active_control/failure_modes_v1",
   },
 };

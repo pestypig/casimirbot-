@@ -331,7 +331,7 @@ export const buildNhm2LayerStackFullApparatusReceiptLoop = (
       receiptSurfaces,
       tensorTermCoverage,
       evidenceReadinessScore: receiptReadinessScore(receiptSurfaces, tensorTermCoverage),
-      sourceTensorAuthorityAllowed: false,
+      sourceTensorAuthorityAllowed: false as const,
       engineeringCandidateStatus,
       firstBlocker,
       blockers: Array.from(new Set(blockers)),
