@@ -321,6 +321,21 @@ export function resolveCompoundCapabilitySynthesisReadiness(input: {
   const contractSubgoals = subgoals
     .map(readRecord)
     .filter((entry: RecordLike | null): entry is RecordLike => Boolean(entry));
+  const contractRequestedCapabilities = new Set(
+    contractSubgoals
+      .flatMap((subgoal) => [
+        readString(subgoal.requested_capability),
+        readString(subgoal.runtime_capability),
+        readString(subgoal.selected_capability),
+        readString(subgoal.capability_family),
+        readString(subgoal.plan_family),
+      ])
+      .filter((entry): entry is string => Boolean(entry)),
+  );
+  const effectiveMissingSummaryCapabilities =
+    contractSubgoals.length > 1
+      ? missingSummaryCapabilities.filter((capability) => contractRequestedCapabilities.has(capability))
+      : missingSummaryCapabilities;
   const compoundPolicy = readCompoundTerminalPolicy({
     ...input.payload,
     ...(itinerary ? { capability_itinerary: itinerary } : {}),
@@ -379,7 +394,7 @@ export function resolveCompoundCapabilitySynthesisReadiness(input: {
     ...missingContractSubgoalIds,
   ]);
   const missingRequiredCapabilities = unique([
-    ...missingSummaryCapabilities,
+    ...effectiveMissingSummaryCapabilities,
     ...missingContractCapabilities,
   ]);
   const incompleteCompoundSubgoalIds = unique([
