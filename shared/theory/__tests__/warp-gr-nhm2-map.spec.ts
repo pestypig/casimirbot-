@@ -51,6 +51,8 @@ describe("Warp / GR / NHM2 map", () => {
         "nhm2.experimental.layer_stack_mechanical_receipt",
         "nhm2.experimental.layer_stack_support_fraction_sweep",
         "nhm2.experimental.layer_stack_architecture_loop",
+        "nhm2.experimental.full_apparatus_receipt_loop",
+        "nhm2.experimental.tile_source_physical_validation_plan",
         "nhm2.experimental.prediction_freeze",
         "nhm2.experimental.tile_force_receipt",
         "nhm2.experimental.tile_cycle_energy_balance",
@@ -80,6 +82,8 @@ describe("Warp / GR / NHM2 map", () => {
       expect(ref.badgeId).not.toBe("nhm2.experimental.layer_stack_mechanical_receipt");
       expect(ref.badgeId).not.toBe("nhm2.experimental.layer_stack_support_fraction_sweep");
       expect(ref.badgeId).not.toBe("nhm2.experimental.layer_stack_architecture_loop");
+      expect(ref.badgeId).not.toBe("nhm2.experimental.full_apparatus_receipt_loop");
+      expect(ref.badgeId).not.toBe("nhm2.experimental.tile_source_physical_validation_plan");
       expect(ref.badgeId).not.toBe("nhm2.experimental.vacuum_weight");
       expect(ref.badgeId).not.toBe("nhm2.experimental.invariant_metric_response");
       expect(ref.badgeId).not.toBe("nhm2.experimental.geodesic_response");

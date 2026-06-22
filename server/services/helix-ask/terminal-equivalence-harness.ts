@@ -85,18 +85,44 @@ const visibleText = (value: RecordLike | null): string | null =>
     terminalPresentationText(value),
   );
 
-const authorityText = (value: RecordLike | null): string | null =>
-  firstText(readRecord(value?.terminal_answer_authority)?.terminal_text_preview);
-
-const authorityHash = (value: RecordLike | null): string | null =>
-  firstText(readRecord(value?.terminal_answer_authority)?.terminal_text_hash);
-
 const terminalKind = (value: RecordLike | null): string | null =>
   firstText(
     value?.terminal_artifact_kind,
+    readRecord(value?.terminal_authority_single_writer)?.selected_terminal_artifact_kind,
+    readRecord(value?.terminal_presentation)?.terminal_artifact_kind,
     readRecord(value?.terminal_answer_authority)?.terminal_artifact_kind,
     readRecord(value?.resolved_turn_summary)?.terminal_artifact_kind,
   );
+
+const authorityText = (value: RecordLike | null): string | null => {
+  const selectedKind = terminalKind(value);
+  const terminalAuthority = readRecord(value?.terminal_answer_authority);
+  const writer = readRecord(value?.terminal_authority_single_writer);
+  const presentation = readRecord(value?.terminal_presentation);
+  const terminalAuthorityKind = firstText(terminalAuthority?.terminal_artifact_kind);
+  const writerKind = firstText(writer?.selected_terminal_artifact_kind);
+  const presentationKind = firstText(presentation?.terminal_artifact_kind);
+  const terminalAuthorityText = firstText(terminalAuthority?.terminal_text_preview);
+  const writerText = firstText(writer?.visible_text);
+  const presentationText = firstText(presentation?.concise_text);
+  if (selectedKind && terminalAuthorityKind === selectedKind && terminalAuthorityText) return terminalAuthorityText;
+  if (selectedKind && writerKind === selectedKind && writerText) return writerText;
+  if (selectedKind && presentationKind === selectedKind && presentationText) return presentationText;
+  return firstText(terminalAuthorityText, writerText, presentationText);
+};
+
+const authorityHash = (value: RecordLike | null): string | null => {
+  const selectedKind = terminalKind(value);
+  const terminalAuthority = readRecord(value?.terminal_answer_authority);
+  const terminalAuthorityKind = firstText(terminalAuthority?.terminal_artifact_kind);
+  const terminalAuthorityText = firstText(terminalAuthority?.terminal_text_preview);
+  const terminalAuthorityHash = firstText(terminalAuthority?.terminal_text_hash);
+  const selectedText = authorityText(value);
+  if (selectedKind && terminalAuthorityKind === selectedKind && terminalAuthorityText === selectedText) {
+    return terminalAuthorityHash ?? (selectedText ? hashHelixTerminalText(selectedText) : null);
+  }
+  return selectedText ? hashHelixTerminalText(selectedText) : null;
+};
 
 const finalAnswerSource = (value: RecordLike | null): string | null =>
   firstText(value?.final_answer_source, readRecord(value?.terminal_answer_authority)?.final_answer_source);

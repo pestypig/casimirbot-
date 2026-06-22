@@ -20,6 +20,7 @@ import type { Nhm2MetricRequiredMomentumDemandAuditV1 } from "../shared/contract
 import type { Nhm2ObserverRobustEnergyConditionArtifactV1 } from "../shared/contracts/nhm2-observer-robust-energy-conditions.v1";
 import type { Nhm2QeiWorldlineDossierV1 } from "../shared/contracts/nhm2-qei-worldline-dossier.v1";
 import { publishNhm2CampaignProfileRunManifest } from "../tools/nhm2/build-campaign-profile-run-manifest";
+import { publishNhm2TileSourceMaterialEvidenceReceipts } from "../tools/nhm2/publish-tile-source-material-evidence-receipts";
 
 const demandAudit = (): Nhm2MetricRequiredMomentumDemandAuditV1 =>
   ({
@@ -132,6 +133,19 @@ describe("nhm2_campaign_profile_run_manifest/v1", () => {
       "observer_family_energy_conditions",
       "horizon_blueshift_particle_stability",
       "time_dependent_source_campaign",
+      "tile_source_material_evidence_receipts",
+      "tile_source_physical_validation_plan",
+      "tile_source_evidence_gap_roadmap",
+      "tile_source_falsification_report",
+      "tile_source_authority_handoff",
+      "tile_source_material_coupon_test_plan",
+      "tile_source_force_gap_pull_in_test_plan",
+      "tile_source_force_gap_load_budget",
+      "tile_source_roughness_patch_test_plan",
+      "tile_source_active_control_test_plan",
+      "tile_source_active_control_operating_budget",
+      "tile_source_fatigue_layer_scaling_test_plan",
+      "tile_source_full_apparatus_tensor_test_plan",
     ]);
     expect(manifest.summary).toMatchObject({
       candidateCount: 2,
@@ -290,6 +304,134 @@ describe("nhm2_campaign_profile_run_manifest/v1", () => {
     });
     expect(manifest.claimBoundary.transportClaimAllowed).toBe(false);
     expect(isNhm2CampaignProfileRunManifest(manifest)).toBe(true);
+  });
+
+  it("discovers tile-source material evidence artifacts and preserves their blockers", () => {
+    const targets = buildNhm2MetricMomentumRemediationTargets({
+      generatedAt: "2026-06-19T00:00:00.000Z",
+      metricRequiredMomentumDemandAudit: demandAudit(),
+      metricRequiredMomentumDemandAuditRef: "demand-audit.json",
+    });
+    const search = buildNhm2CampaignProfileSearch({
+      generatedAt: "2026-06-19T00:00:00.000Z",
+      metricMomentumRemediationTargets: targets,
+      candidateSpecs: [
+        {
+          alphaCenterline: 0.9,
+          proposalKind: "combined_metric_redesign",
+          projectedT0iSuppressionFactor: 20,
+        },
+      ],
+    });
+    const dir = mkdtempSync(join(tmpdir(), "nhm2-run-manifest-material-"));
+    const candidateId =
+      "stage1_centerline_alpha_0p9000_combined_metric_redesign_campaign_screen_v1";
+    const runRoot = join(dir, "runs", candidateId);
+    mkdirSync(runRoot, { recursive: true });
+    writeFileSync(
+      join(dir, "profile-search.json"),
+      `${JSON.stringify(search, null, 2)}\n`,
+      "utf8",
+    );
+    publishNhm2TileSourceMaterialEvidenceReceipts({
+      repoRoot: dir,
+      outDir: join("runs", candidateId),
+      generatedAt: "2026-06-19T00:00:00.000Z",
+      selectedProfileId: candidateId,
+    });
+
+    const manifest = publishNhm2CampaignProfileRunManifest({
+      repoRoot: dir,
+      profileSearchPath: "profile-search.json",
+      outPath: "manifest.json",
+      runRootBase: "runs",
+      auditOnly: true,
+    });
+    const material = manifest.candidates[0]?.requiredEvidence.find(
+      (entry) => entry.evidenceId === "tile_source_material_evidence_receipts",
+    );
+    const validationPlan = manifest.candidates[0]?.requiredEvidence.find(
+      (entry) => entry.evidenceId === "tile_source_physical_validation_plan",
+    );
+    const gapRoadmap = manifest.candidates[0]?.requiredEvidence.find(
+      (entry) => entry.evidenceId === "tile_source_evidence_gap_roadmap",
+    );
+    const falsificationReport = manifest.candidates[0]?.requiredEvidence.find(
+      (entry) => entry.evidenceId === "tile_source_falsification_report",
+    );
+    const authorityHandoff = manifest.candidates[0]?.requiredEvidence.find(
+      (entry) => entry.evidenceId === "tile_source_authority_handoff",
+    );
+    const activeControlPlan = manifest.candidates[0]?.requiredEvidence.find(
+      (entry) => entry.evidenceId === "tile_source_active_control_test_plan",
+    );
+    const activeControlBudget = manifest.candidates[0]?.requiredEvidence.find(
+      (entry) => entry.evidenceId === "tile_source_active_control_operating_budget",
+    );
+    const forceGapLoadBudget = manifest.candidates[0]?.requiredEvidence.find(
+      (entry) => entry.evidenceId === "tile_source_force_gap_load_budget",
+    );
+    const fullApparatusPlan = manifest.candidates[0]?.requiredEvidence.find(
+      (entry) => entry.evidenceId === "tile_source_full_apparatus_tensor_test_plan",
+    );
+
+    expect(material).toMatchObject({
+      status: "provided_blocked",
+      artifactRef: join("runs", candidateId, "nhm2-tile-source-material-evidence-receipts.json"),
+      blockers: ["material_coupon_receipt_missing"],
+    });
+    expect(validationPlan).toMatchObject({
+      status: "provided_blocked",
+      artifactRef: join("runs", candidateId, "nhm2-tile-source-physical-validation-plan.json"),
+      blockers: ["material_coupon_receipt_missing"],
+    });
+    expect(gapRoadmap).toMatchObject({
+      status: "provided_blocked",
+      artifactRef: join("runs", candidateId, "nhm2-tile-source-evidence-gap-roadmap.json"),
+    });
+    expect(gapRoadmap?.blockers.some((blocker) => blocker.endsWith("_evidence_gap_open"))).toBe(true);
+    expect(falsificationReport).toMatchObject({
+      status: "provided_blocked",
+      artifactRef: join("runs", candidateId, "nhm2-tile-source-falsification-report.json"),
+    });
+    expect(falsificationReport?.blockers).toEqual(
+      expect.arrayContaining(["tile_source_falsification_report_review"]),
+    );
+    expect(authorityHandoff).toMatchObject({
+      status: "provided_blocked",
+      artifactRef: join("runs", candidateId, "nhm2-tile-source-authority-handoff.json"),
+    });
+    expect(authorityHandoff?.blockers).toEqual(
+      expect.arrayContaining(["tile_source_authority_handoff_blocked"]),
+    );
+    expect(activeControlPlan).toMatchObject({
+      status: "provided_blocked",
+      artifactRef: join("runs", candidateId, "nhm2-tile-source-active-control-test-plan.json"),
+    });
+    expect(activeControlBudget).toMatchObject({
+      status: "provided_blocked",
+      artifactRef: join(
+        "runs",
+        candidateId,
+        "nhm2-tile-source-active-control-operating-budget.json",
+      ),
+    });
+    expect(activeControlBudget?.blockers).toEqual(
+      expect.arrayContaining(["active_control_receipt_missing_for_operating_budget"]),
+    );
+    expect(forceGapLoadBudget).toMatchObject({
+      status: "provided_blocked",
+      artifactRef: join("runs", candidateId, "nhm2-tile-source-force-gap-load-budget.json"),
+    });
+    expect(forceGapLoadBudget?.blockers).toEqual(
+      expect.arrayContaining(["force_gap_receipt_missing_for_load_budget"]),
+    );
+    expect(activeControlPlan?.blockers.some((blocker) => blocker.endsWith("_required"))).toBe(true);
+    expect(fullApparatusPlan).toMatchObject({
+      status: "provided_blocked",
+      artifactRef: join("runs", candidateId, "nhm2-tile-source-full-apparatus-tensor-test-plan.json"),
+    });
+    expect(fullApparatusPlan?.blockers.some((blocker) => blocker.endsWith("_required"))).toBe(true);
   });
 
   it("marks observer evidence as blocked when observer-family violations are present", () => {

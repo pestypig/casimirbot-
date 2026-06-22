@@ -187,8 +187,13 @@ const supportRefsFromArtifacts = (artifacts: ArtifactLike[]): string[] =>
     const evidenceLikeKind = /(?:observation|evidence|result|context|reflection|validation|trace|packet|resolution|registry|summary)/i.test(
       [kind, schema].join(" "),
     );
+    const terminalLikeKind = /^(?:direct_answer_text|final_answer_draft|model_synthesized_answer|compound_evidence_synthesis_answer|compound_research_locator_answer|doc_evidence_synthesis_answer|doc_summary|doc_location_matches|repo_code_evidence_answer|scholarly_research_answer|internet_search_answer|capability_help_summary|workspace_status_answer|workstation_tool_evaluation|typed_failure)$/i.test(
+      kind,
+    );
     if (
       !kind ||
+      terminalLikeKind ||
+      !evidenceLikeKind ||
       (/(?:^|_)(?:receipt|receipts)$/i.test(kind) && !evidenceLikeKind) ||
       [
         "agent_step_decision",

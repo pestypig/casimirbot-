@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { WORKSTATION_AGENT_GOAL_CONTEXT_FEED_QUERY_ACTUATORS } from "@shared/contracts/workstation-goal-context.v1";
+import {
+  HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+  HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+} from "@shared/helix-scholarly-research-observation";
 import { explicitCapabilityContractForCapability } from "../services/helix-ask/explicit-capability-contract";
 import {
   TOOL_FAMILY_CONTRACTS,
@@ -13,6 +17,27 @@ import {
   isWorkstationObservationTerminalKind,
 } from "../services/helix-ask/tool-family-terminal-policy";
 import { WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS } from "../services/helix-ask/workstation-context-feed-query-tool-contracts";
+
+const activeParityToolFamilies: ToolFamily[] = [
+  "calculator",
+  "internet_search",
+  "scholarly_research",
+  "repo_code",
+  "docs_viewer",
+  "workspace_directory",
+  "workspace_diagnostic",
+  "workstation",
+  "visual_capture",
+  "live_environment",
+  "live_source_mail",
+  "live_source_decision",
+  "voice_delivery",
+  "zen_graph_reflection",
+  "theory_locator",
+  "context_reflection",
+  "civilization_bounds",
+  "capability_catalog",
+];
 
 const routeContract = (allowed: string[], forbidden: string[] = []) => ({
   schema: "helix.route_product_contract.v1",
@@ -29,22 +54,9 @@ const routeContract = (allowed: string[], forbidden: string[] = []) => ({
 
 describe("Helix Ask tool-family contract registry", () => {
   it("has a concrete default contract for every shared tool family", () => {
-    const families: ToolFamily[] = [
-      "calculator",
-      "internet_search",
-      "repo_code",
-      "docs_viewer",
-      "workstation",
-      "live_source_mail",
-      "live_source_decision",
-      "voice_delivery",
-      "zen_graph_reflection",
-      "context_reflection",
-      "civilization_bounds",
-      "capability_catalog",
-    ];
+    expect(Object.keys(TOOL_FAMILY_DEFAULT_CONTRACTS).sort()).toEqual([...activeParityToolFamilies].sort());
 
-    for (const family of families) {
+    for (const family of activeParityToolFamilies) {
       expect(TOOL_FAMILY_DEFAULT_CONTRACTS[family]).toMatchObject({
         toolFamily: family,
         defaultAssistantAnswer: false,
@@ -99,8 +111,19 @@ describe("Helix Ask tool-family contract registry", () => {
       ["repo-code.search_concept", "repo_code", "evidence_only"],
       ["docs-viewer.open", "docs_viewer", "control_receipt"],
       ["docs-viewer.locate_in_doc", "docs_viewer", "evidence_only"],
+      ["docs-viewer.doc_equation_context", "docs_viewer", "evidence_only"],
+      ["workspace-directory.resolve", "workspace_directory", "evidence_only"],
+      ["workspace_os.status", "workspace_diagnostic", "evidence_only"],
       ["workstation-notes.append_to_note", "workstation", "control_receipt"],
       ["internet_search.web_research", "internet_search", "evidence_only"],
+      [HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY, "scholarly_research", "evidence_only"],
+      [HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY, "scholarly_research", "evidence_only"],
+      ["image_lens.inspect", "visual_capture", "evidence_only"],
+      ["situation-room.describe_visual_capture", "visual_capture", "evidence_only"],
+      ["helix_ask.reflect_theory_context", "theory_locator", "evidence_only"],
+      ["helix.theory.frontierVectorFieldTrace", "theory_locator", "evidence_only"],
+      ["helix_ask.reflect_ideology_context", "zen_graph_reflection", "evidence_only"],
+      ["helix_ask.bridge_theory_ideology_context", "zen_graph_reflection", "evidence_only"],
       ["helix_ask.build_civilization_scenario_frame", "civilization_bounds", "evidence_only"],
       ["helix_ask.reflect_civilization_bounds", "civilization_bounds", "evidence_only"],
       ["helix_civilization_bounds_tool_result", "civilization_bounds", "evidence_only"],

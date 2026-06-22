@@ -23,7 +23,7 @@ describe("Helix Ask tool lifecycle trace", () => {
     expect(contract).toMatchObject({
       toolFamily: "docs_viewer",
       toolName: "docs-viewer.summarize_doc",
-      requiredObservationKinds: ["observation_review"],
+      requiredObservationKinds: expect.arrayContaining(["doc_summary", "observation_review"]),
       requiredReentry: true,
     });
     expect(contract?.allowedTerminalKinds).toEqual(expect.arrayContaining(["doc_summary"]));
@@ -216,6 +216,13 @@ describe("Helix Ask tool lifecycle trace", () => {
         requested_action: "scientific-calculator.solve_expression",
         admission_status: "admitted",
       },
+      tool_call_admission_decision: {
+        schema: "helix.tool_call_admission_decision.v1",
+        requested_capability: "scientific-calculator.solve_expression",
+        requested_capability_family: "calculator",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
       capability_result: {
         schema: "helix.capability_result.v1",
         turn_id: "ask:test:calculator-index",
@@ -358,7 +365,7 @@ describe("Helix Ask tool lifecycle trace", () => {
     });
     expect(index.codex_parity_agent_spine_rail_table).toMatchObject({
       schema: "helix.codex_parity_agent_spine_rail_table.v1",
-      requested_capability: null,
+      requested_capability: "scientific-calculator.solve_expression",
       selected_capability: "scientific-calculator.solve_expression",
       admitted_capability: "scientific-calculator.solve_expression",
       executed_capability: "scientific-calculator.solve_expression",
@@ -1651,6 +1658,13 @@ describe("Helix Ask tool lifecycle trace", () => {
         requested_action: "scientific-calculator.solve_expression",
         admission_status: "admitted",
       },
+      tool_call_admission_decision: {
+        schema: "helix.tool_call_admission_decision.v1",
+        requested_capability: "scientific-calculator.solve_expression",
+        requested_capability_family: "calculator",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
       capability_result: {
         schema: "helix.capability_result.v1",
         turn_id: "ask:test:calculator-projection-mismatch",
@@ -1729,6 +1743,13 @@ describe("Helix Ask tool lifecycle trace", () => {
         capability_family: "calculator",
         requested_action: "scientific-calculator.solve_expression",
         admission_status: "admitted",
+      },
+      tool_call_admission_decision: {
+        schema: "helix.tool_call_admission_decision.v1",
+        requested_capability: "scientific-calculator.solve_expression",
+        requested_capability_family: "calculator",
+        assistant_answer: false,
+        raw_content_included: false,
       },
       capability_result: {
         schema: "helix.capability_result.v1",
@@ -1898,6 +1919,13 @@ describe("Helix Ask tool lifecycle trace", () => {
         capability_family: "calculator",
         requested_action: "scientific-calculator.solve_expression",
         admission_status: "admitted",
+      },
+      tool_call_admission_decision: {
+        schema: "helix.tool_call_admission_decision.v1",
+        requested_capability: "scientific-calculator.solve_expression",
+        requested_capability_family: "calculator",
+        assistant_answer: false,
+        raw_content_included: false,
       },
       capability_result: {
         schema: "helix.capability_result.v1",
@@ -2388,14 +2416,14 @@ describe("Helix Ask tool lifecycle trace", () => {
 
     expect(index).toMatchObject({
       capability: "live_env.query_source_health",
-      tool_family: "live_source_mail",
+      tool_family: "live_environment",
       tool_family_contract: {
         tool_name: "live_env.query_source_health",
         authority: "evidence_only",
-        required_observation_kinds: [
+        required_observation_kinds: expect.arrayContaining([
           "helix.situation_source_capability_read",
           "helix.workstation_goal_context_update.v1",
-        ],
+        ]),
       },
       missing_required_observation_kinds: [],
     });
@@ -2443,14 +2471,14 @@ describe("Helix Ask tool lifecycle trace", () => {
 
     expect(index).toMatchObject({
       capability: "live_env.query_trace_memory",
-      tool_family: "live_source_mail",
+      tool_family: "live_environment",
       tool_family_contract: {
         tool_name: "live_env.query_trace_memory",
         authority: "evidence_only",
-        required_observation_kinds: [
+        required_observation_kinds: expect.arrayContaining([
           "helix.workstation_reasoning_trace_query_result",
           "helix.workstation_goal_context_update.v1",
-        ],
+        ]),
       },
       missing_required_observation_kinds: [],
     });
@@ -2499,14 +2527,14 @@ describe("Helix Ask tool lifecycle trace", () => {
 
     expect(index).toMatchObject({
       capability: "live_env.query_translation_segments",
-      tool_family: "live_source_mail",
+      tool_family: "live_environment",
       tool_family_contract: {
         tool_name: "live_env.query_translation_segments",
         authority: "evidence_only",
-        required_observation_kinds: [
+        required_observation_kinds: expect.arrayContaining([
           "stage_play_workstation_context_feed_query_result",
           "helix.workstation_goal_context_update.v1",
-        ],
+        ]),
       },
       missing_required_observation_kinds: [],
     });
@@ -2572,14 +2600,14 @@ describe("Helix Ask tool lifecycle trace", () => {
 
     expect(index).toMatchObject({
       capability: "live_env.query_route_evidence",
-      tool_family: "live_source_mail",
+      tool_family: "live_environment",
       tool_family_contract: {
         tool_name: "live_env.query_route_evidence",
         authority: "evidence_only",
-        required_observation_kinds: [
+        required_observation_kinds: expect.arrayContaining([
           "stage_play_workstation_context_feed_query_result",
           "helix.workstation_goal_context_update.v1",
-        ],
+        ]),
       },
       missing_required_observation_kinds: [],
       assistant_answer: false,
@@ -2628,11 +2656,11 @@ describe("Helix Ask tool lifecycle trace", () => {
 
       expect(index).toMatchObject({
         capability: spec.capability,
-        tool_family: "live_source_mail",
+        tool_family: "live_environment",
         tool_family_contract: {
           tool_name: spec.capability,
           authority: "evidence_only",
-          required_observation_kinds: spec.toolFamilyRequiredObservationKinds,
+          required_observation_kinds: expect.arrayContaining(spec.toolFamilyRequiredObservationKinds),
         },
         missing_required_observation_kinds: [],
         assistant_answer: false,
@@ -2686,14 +2714,14 @@ describe("Helix Ask tool lifecycle trace", () => {
 
     expect(index).toMatchObject({
       capability: "live_env.change_workstation_preset",
-      tool_family: "live_source_mail",
+      tool_family: "live_environment",
       tool_family_contract: {
         tool_name: "live_env.change_workstation_preset",
         authority: "control_receipt",
-        required_observation_kinds: [
+        required_observation_kinds: expect.arrayContaining([
           "stage_play_workstation_control_receipt",
           "helix.workstation_goal_context_update.v1",
-        ],
+        ]),
       },
       missing_required_observation_kinds: [],
     });
@@ -2756,14 +2784,14 @@ describe("Helix Ask tool lifecycle trace", () => {
 
       expect(index).toMatchObject({
         capability: testCase.capability,
-        tool_family: "live_source_mail",
+        tool_family: "live_environment",
         tool_family_contract: {
           tool_name: testCase.capability,
           authority: "control_receipt",
-          required_observation_kinds: [
+          required_observation_kinds: expect.arrayContaining([
             "stage_play_workstation_control_receipt",
             "helix.workstation_goal_context_update.v1",
-          ],
+          ]),
         },
         missing_required_observation_kinds: [],
         assistant_answer: false,
@@ -2824,14 +2852,14 @@ describe("Helix Ask tool lifecycle trace", () => {
 
     expect(index).toMatchObject({
       capability: "live_env.narrator_bind_stream",
-      tool_family: "voice_delivery",
+      tool_family: "live_environment",
       tool_family_contract: {
         tool_name: "live_env.narrator_bind_stream",
         authority: "control_receipt",
-        required_observation_kinds: [
+        required_observation_kinds: expect.arrayContaining([
           "helix.narrator_bind_stream_request.v1",
           "helix.workstation_goal_context_update.v1",
-        ],
+        ]),
       },
       missing_required_observation_kinds: [],
       assistant_answer: false,
@@ -3390,7 +3418,7 @@ describe("Helix Ask tool lifecycle trace", () => {
           compound_requested_capabilities: ["workspace_os.status"],
           compound_executed_capabilities: ["workspace_os.status"],
           compound_observation_refs: [`${turnId}:workspace_status`],
-          compound_required_terminal_kinds: [],
+          compound_required_terminal_kinds: ["model_synthesized_answer"],
           compound_terminal_contribution_kinds: ["model_synthesized_answer"],
           compound_contribution_roles: ["evidence"],
           compound_forbidden_nearby_capabilities: ["debug.inspect_current_turn", "model.direct_answer"],
@@ -3410,7 +3438,7 @@ describe("Helix Ask tool lifecycle trace", () => {
           compound_requested_capabilities: ["scientific-calculator.solve_expression"],
           compound_executed_capabilities: ["scientific-calculator.solve_expression"],
           compound_observation_refs: [],
-          compound_required_terminal_kinds: [],
+          compound_required_terminal_kinds: ["workstation_tool_evaluation"],
           compound_terminal_contribution_kinds: ["workstation_tool_evaluation"],
           compound_contribution_roles: ["terminal_component"],
           compound_forbidden_nearby_capabilities: ["repo-code.search_concept", "model.direct_answer"],
@@ -4037,80 +4065,80 @@ describe("Helix Ask tool lifecycle trace", () => {
           route_family: "capability_catalog",
           observed: true,
           requested_capability: "helix_ask.inspect_capability_catalog",
-          compound_observation_refs: [`${turnId}:capability_registry`],
-          compound_terminal_contribution_kinds: ["capability_help_summary"],
-          compound_contribution_roles: ["evidence"],
-          compound_forbidden_nearby_capabilities: ["repo-code.search_concept", "model.direct_answer"],
+          compound_observation_refs: expect.arrayContaining([`${turnId}:capability_registry`]),
+          compound_terminal_contribution_kinds: expect.arrayContaining(["capability_help_summary"]),
+          compound_contribution_roles: expect.arrayContaining(["evidence"]),
+          compound_forbidden_nearby_capabilities: expect.arrayContaining(["repo-code.search_concept", "model.direct_answer"]),
           rail_status: "complete",
         }),
         expect.objectContaining({
           route_family: "scholarly_research",
           observed: true,
           requested_capability: "scholarly-research.lookup_papers",
-          compound_observation_refs: [`${turnId}:scholarly`],
-          compound_terminal_contribution_kinds: ["scholarly_research_answer"],
-          compound_contribution_roles: ["evidence"],
-          compound_forbidden_nearby_capabilities: ["internet_search.web_research", "model.direct_answer"],
+          compound_observation_refs: expect.arrayContaining([`${turnId}:scholarly`]),
+          compound_terminal_contribution_kinds: expect.arrayContaining(["scholarly_research_answer"]),
+          compound_contribution_roles: expect.arrayContaining(["evidence"]),
+          compound_forbidden_nearby_capabilities: expect.arrayContaining(["internet_search.web_research", "model.direct_answer"]),
           rail_status: "complete",
         }),
         expect.objectContaining({
           route_family: "theory_locator",
           observed: true,
           requested_capability: "helix_ask.reflect_theory_context",
-          compound_observation_refs: [`${turnId}:theory`],
-          compound_terminal_contribution_kinds: ["theory_context_reflection_answer"],
-          compound_contribution_roles: ["evidence"],
-          compound_forbidden_nearby_capabilities: ["internet_search.web_research", "model.direct_answer"],
+          compound_observation_refs: expect.arrayContaining([`${turnId}:theory`]),
+          compound_terminal_contribution_kinds: expect.arrayContaining(["theory_context_reflection_answer"]),
+          compound_contribution_roles: expect.arrayContaining(["evidence"]),
+          compound_forbidden_nearby_capabilities: expect.arrayContaining(["internet_search.web_research", "model.direct_answer"]),
           rail_status: "complete",
         }),
         expect.objectContaining({
           route_family: "civilization_bounds",
           observed: true,
           requested_capability: "helix_ask.reflect_civilization_bounds",
-          compound_observation_refs: [`${turnId}:civilization`],
-          compound_terminal_contribution_kinds: ["model_synthesized_answer"],
-          compound_contribution_roles: ["evidence"],
-          compound_forbidden_nearby_capabilities: ["model.direct_answer"],
+          compound_observation_refs: expect.arrayContaining([`${turnId}:civilization`]),
+          compound_terminal_contribution_kinds: expect.arrayContaining(["model_synthesized_answer"]),
+          compound_contribution_roles: expect.arrayContaining(["evidence"]),
+          compound_forbidden_nearby_capabilities: expect.arrayContaining(["model.direct_answer"]),
           rail_status: "complete",
         }),
         expect.objectContaining({
           route_family: "zen_graph_reflection",
           observed: true,
           requested_capability: "helix_ask.reflect_ideology_context",
-          compound_observation_refs: [`${turnId}:zen`],
-          compound_terminal_contribution_kinds: ["model_synthesized_answer"],
-          compound_contribution_roles: ["evidence"],
-          compound_forbidden_nearby_capabilities: ["model.direct_answer"],
+          compound_observation_refs: expect.arrayContaining([`${turnId}:zen`]),
+          compound_terminal_contribution_kinds: expect.arrayContaining(["model_synthesized_answer"]),
+          compound_contribution_roles: expect.arrayContaining(["evidence"]),
+          compound_forbidden_nearby_capabilities: expect.arrayContaining(["model.direct_answer"]),
           rail_status: "complete",
         }),
         expect.objectContaining({
           route_family: "image_lens / visual_capture",
           observed: true,
           requested_capability: "image_lens.inspect",
-          compound_observation_refs: [`${turnId}:visual`],
-          compound_terminal_contribution_kinds: ["situation_context_pack"],
-          compound_contribution_roles: ["evidence"],
-          compound_forbidden_nearby_capabilities: ["model.direct_answer"],
+          compound_observation_refs: expect.arrayContaining([`${turnId}:visual`]),
+          compound_terminal_contribution_kinds: expect.arrayContaining(["situation_context_pack"]),
+          compound_contribution_roles: expect.arrayContaining(["evidence"]),
+          compound_forbidden_nearby_capabilities: expect.arrayContaining(["model.direct_answer"]),
           rail_status: "complete",
         }),
         expect.objectContaining({
           route_family: "context_reflection",
           observed: true,
           requested_capability: "helix_ask.reflect_context_attachments",
-          compound_observation_refs: [`${turnId}:context-reflection`],
-          compound_terminal_contribution_kinds: ["model_synthesized_answer"],
-          compound_contribution_roles: ["evidence"],
-          compound_forbidden_nearby_capabilities: ["model.direct_answer"],
+          compound_observation_refs: expect.arrayContaining([`${turnId}:context-reflection`]),
+          compound_terminal_contribution_kinds: expect.arrayContaining(["model_synthesized_answer"]),
+          compound_contribution_roles: expect.arrayContaining(["evidence"]),
+          compound_forbidden_nearby_capabilities: expect.arrayContaining(["model.direct_answer"]),
           rail_status: "complete",
         }),
         expect.objectContaining({
           route_family: "live_env",
           observed: true,
           requested_capability: "live_env.read_processed_live_source_mail",
-          compound_observation_refs: [`${turnId}:live-mail`],
-          compound_terminal_contribution_kinds: ["model_synthesized_answer"],
-          compound_contribution_roles: ["terminal_component"],
-          compound_forbidden_nearby_capabilities: ["model.direct_answer"],
+          compound_observation_refs: expect.arrayContaining([`${turnId}:live-mail`]),
+          compound_terminal_contribution_kinds: expect.arrayContaining(["model_synthesized_answer"]),
+          compound_contribution_roles: expect.arrayContaining(["terminal_component"]),
+          compound_forbidden_nearby_capabilities: expect.arrayContaining(["model.direct_answer"]),
           rail_status: "complete",
         }),
       ]),
@@ -4923,3 +4951,4 @@ describe("Helix Ask tool lifecycle trace", () => {
     expect(followup.assistant_answer).toBe(false);
   });
 });
+

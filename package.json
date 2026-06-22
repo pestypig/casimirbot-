@@ -264,6 +264,7 @@
     "nhm2:build-regional-support-function-atlas": "tsx tools/nhm2/build-regional-support-function-atlas.ts",
     "nhm2:build-layered-wall-full-tensor-source-audit": "tsx tools/nhm2/build-layered-wall-full-tensor-source-audit.ts",
     "nhm2:build-layered-wall-source-tensor-candidate": "tsx tools/nhm2/build-layered-wall-source-tensor-candidate.ts",
+    "nhm2:publish-tile-source-material-evidence-receipts": "tsx tools/nhm2/publish-tile-source-material-evidence-receipts.ts",
     "nhm2:source-closure-pass-readiness": "tsx tools/nhm2/source-closure-pass-readiness.ts",
     "nhm2:build-coupled-closure-pass-candidate": "tsx tools/nhm2/build-coupled-closure-pass-candidate.ts",
     "nhm2:build-regional-tensor-pass-path-harness": "tsx tools/nhm2/build-regional-tensor-pass-path-harness.ts",

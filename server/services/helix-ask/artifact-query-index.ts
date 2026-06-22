@@ -1507,7 +1507,8 @@ const buildToolTurnChainFamilyMatrix = (
     const compoundEntries = compoundSubgoalRailStatuses.filter((entry) =>
       matrixFamilyForCompoundSubgoal(entry) === matrixFamily
     );
-    const observed = primaryObserved || compoundEntries.length > 0;
+    const compoundObserved = compoundEntries.length > 0;
+    const observed = primaryObserved || compoundObserved;
     const authority = readString(audit.terminal_authority_kind);
     const visible = readString(audit.visible_terminal_kind);
     const compoundRequestedCapabilities = unique(compoundEntries
@@ -1518,6 +1519,9 @@ const buildToolTurnChainFamilyMatrix = (
       .filter((entry): entry is string => Boolean(entry)));
     const compoundObservationRefs = unique(compoundEntries
       .map((entry) => readString(entry.observation_ref))
+      .filter((entry): entry is string => Boolean(entry)));
+    const compoundObservationKinds = unique(compoundEntries
+      .map((entry) => readString(entry.observation_kind))
       .filter((entry): entry is string => Boolean(entry)));
     const compoundRequiredTerminalKinds = unique(compoundEntries
       .map((entry) => readString(entry.required_terminal_kind))
@@ -1538,39 +1542,67 @@ const buildToolTurnChainFamilyMatrix = (
     return {
       route_family: matrixFamily,
       observed,
-      requested_capability: primaryObserved ? audit.requested_capability ?? null : compoundRequestedCapabilities[0] ?? null,
-      requested_selected_match: primaryObserved ? audit.requested_selected_match ?? null : null,
-      selected_executed_match: primaryObserved ? audit.selected_executed_match ?? null : null,
+      requested_capability: compoundObserved
+        ? compoundRequestedCapabilities[0] ?? null
+        : primaryObserved
+          ? audit.requested_capability ?? null
+          : null,
+      requested_selected_match: compoundObserved ? null : primaryObserved ? audit.requested_selected_match ?? null : null,
+      selected_executed_match: compoundObserved ? null : primaryObserved ? audit.selected_executed_match ?? null : null,
       did_tool_run: observed
-        ? primaryObserved
+        ? compoundObserved
+          ? compoundExecutedCapabilities.length > 0
+          : primaryObserved
           ? Boolean(readString(audit.executed_capability))
-          : compoundExecutedCapabilities.length > 0
+          : null
         : null,
       artifact_produced: observed
-        ? primaryObserved
+        ? compoundObserved
+          ? compoundObservationRefs.length > 0
+          : primaryObserved
           ? Boolean(readString(audit.observation_ref))
-          : compoundObservationRefs.length > 0
+          : null
         : null,
-      observation_artifact_kind: primaryObserved ? audit.observation_artifact_kind ?? null : null,
-      observation_ref: primaryObserved ? audit.observation_ref ?? null : compoundObservationRefs[0] ?? null,
+      observation_artifact_kind: compoundObserved
+        ? compoundObservationKinds[0] ?? null
+        : primaryObserved
+          ? audit.observation_artifact_kind ?? null
+          : null,
+      observation_ref: compoundObserved
+        ? compoundObservationRefs[0] ?? null
+        : primaryObserved
+          ? audit.observation_ref ?? null
+          : null,
       artifact_reentered: observed
-        ? primaryObserved
-          ? audit.reentry_executed === true
-          : compoundEntries.every((entry) =>
+        ? compoundObserved
+          ? compoundEntries.every((entry) =>
               compoundSubgoalHasSatisfiedObservation(entry)
             )
+          : primaryObserved
+          ? audit.reentry_executed === true
+          : null
         : null,
-      required_terminal_kind: primaryObserved ? audit.required_terminal_kind ?? null : compoundRequiredTerminalKinds[0] ?? null,
+      required_terminal_kind: compoundObserved
+        ? compoundRequiredTerminalKinds[0] ?? null
+        : primaryObserved
+          ? audit.required_terminal_kind ?? null
+          : null,
       materialized: observed ? Boolean(readString(audit.materialized_terminal_artifact_kind)) : null,
       materialized_terminal_artifact_kind: observed ? audit.materialized_terminal_artifact_kind ?? null : null,
       terminal_authority_selected: observed ? Boolean(authority) : null,
       visible_projection_matches: observed && authority && visible ? normalizedEqual(authority, visible) : observed ? null : null,
       rail_status: observed
-        ? primaryObserved
+        ? compoundObserved
+          ? compoundStatus ?? "broken"
+          : primaryObserved
           ? audit.rail_status ?? "broken"
-          : compoundStatus ?? "broken"
+          : "broken"
         : "not_applicable",
-      rail_failure_code: primaryObserved ? audit.rail_failure_code ?? null : compoundRailFailureCodes[0] ?? null,
+      rail_failure_code: compoundObserved
+        ? compoundRailFailureCodes[0] ?? null
+        : primaryObserved
+          ? audit.rail_failure_code ?? null
+          : null,
       compound_subgoal_count: compoundEntries.length,
       compound_requested_capabilities: compoundRequestedCapabilities,
       compound_executed_capabilities: compoundExecutedCapabilities,
@@ -2047,7 +2079,6 @@ const codexParityClassFromAudit = (input: {
   const repairTarget = readString(input.triage.repair_target);
   if (!failureCode && railStatus === "complete") return "complete";
   if (failureCode === "config_missing") return "provider_config_missing";
-  if (requestedCapability && input.visibleSurface.length === 0) return "tool_surface_missing";
   if (failureCode === "explicit_capability_not_selected" || failureCode === "wrong_capability_executed") {
     return "explicit_capability_demoted";
   }
@@ -2058,15 +2089,6 @@ const codexParityClassFromAudit = (input: {
   ) {
     return "tool_admission_rejected";
   }
-  if (selectedCapability && !executedCapability) return "selected_not_executed";
-  if (failureCode === "observation_missing" || failureCode === "required_observation_missing") return "observation_missing";
-  if (
-    failureCode === "observation_not_reentered" ||
-    failureCode === "reentry_step_not_executed" ||
-    failureCode === "weak_evidence_repair_loop"
-  ) {
-    return "observation_not_reentered";
-  }
   if (failureCode === "terminal_product_mismatch") return "terminal_product_not_allowed";
   if (failureCode === "terminal_not_materialized" || failureCode === "support_refs_missing") {
     return "goal_contract_mismatch";
@@ -2076,6 +2098,16 @@ const codexParityClassFromAudit = (input: {
   if (failureCode === "debug_mirror_stale") return "debug_mirror_stale";
   if (failureCode === "terminal_projection_mismatch" || firstBrokenRail === "visible_projection") {
     return "visible_projection_mismatch";
+  }
+  if (requestedCapability && input.visibleSurface.length === 0) return "tool_surface_missing";
+  if (selectedCapability && !executedCapability) return "selected_not_executed";
+  if (failureCode === "observation_missing" || failureCode === "required_observation_missing") return "observation_missing";
+  if (
+    failureCode === "observation_not_reentered" ||
+    failureCode === "reentry_step_not_executed" ||
+    failureCode === "weak_evidence_repair_loop"
+  ) {
+    return "observation_not_reentered";
   }
   return "goal_contract_mismatch";
 };
@@ -2299,6 +2331,38 @@ export const buildArtifactQueryIndex = (input: {
   const compoundContractSubgoals = readArray(compoundCapabilityContract?.subgoals)
     .map((entry) => readRecord(entry))
     .filter((entry): entry is RecordLike => Boolean(entry));
+  const compoundContractSubgoalForLedgerEntry = (entry: RecordLike): RecordLike | null => {
+    const subgoalId = readNullableString(entry.subgoal_id);
+    if (subgoalId) {
+      const byId = compoundContractSubgoals.find((subgoal) => readNullableString(subgoal.subgoal_id) === subgoalId);
+      if (byId) return byId;
+    }
+    const requested = readNullableString(entry.requested_capability);
+    const runtime = readNullableString(entry.runtime_capability);
+    const order = readNumber(entry.order);
+    return compoundContractSubgoals.find((subgoal) => {
+      const sameOrder = order === null || readNumber(subgoal.order) === order;
+      return sameOrder && (
+        (requested && (
+          readNullableString(subgoal.requested_capability) === requested ||
+          readNullableString(subgoal.runtime_capability) === requested
+        )) ||
+        (runtime && (
+          readNullableString(subgoal.requested_capability) === runtime ||
+          readNullableString(subgoal.runtime_capability) === runtime
+        ))
+      );
+    }) ?? null;
+  };
+  const inferredCompoundContributionRole = (
+    effectiveCapability: string | null,
+    terminalContributionKind: string | null,
+  ): string | null => {
+    if (!terminalContributionKind) return null;
+    const explicitContract = explicitCapabilityContractForCapability(effectiveCapability);
+    if (explicitContract?.capability_family === "calculator") return "terminal_component";
+    return "evidence";
+  };
   const subgoalObservationCoverageSatisfied = (
     capability: string | null,
     requiredObservationKinds: string[],
@@ -2316,7 +2380,28 @@ export const buildArtifactQueryIndex = (input: {
     const requestedCapability = readNullableString(entry.requested_capability);
     const runtimeCapability = readNullableString(entry.runtime_capability);
     const effectiveCapability = runtimeCapability ?? requestedCapability;
-    const requiredObservationKinds = readStringArray(entry.required_observation_kinds);
+    const contractSubgoal = compoundContractSubgoalForLedgerEntry(entry);
+    const explicitContract = explicitCapabilityContractForCapability(effectiveCapability);
+    const requiredObservationKinds = unique([
+      ...readStringArray(entry.required_observation_kinds),
+      ...readStringArray(contractSubgoal?.required_observation_kinds),
+      ...(explicitContract?.required_observation_kinds ?? []),
+    ]);
+    const requiredTerminalKind = firstString(
+      readNullableString(entry.required_terminal_kind),
+      readNullableString(contractSubgoal?.required_terminal_kind),
+      explicitContract?.required_terminal_kind,
+    );
+    const terminalContributionKind = firstString(
+      readNullableString(entry.terminal_contribution_kind),
+      readNullableString(contractSubgoal?.terminal_contribution_kind),
+      requiredTerminalKind,
+    );
+    const contributionRole = firstString(
+      readNullableString(entry.contribution_role),
+      readNullableString(contractSubgoal?.contribution_role),
+      inferredCompoundContributionRole(effectiveCapability, terminalContributionKind),
+    );
     const existingObservationRef = readNullableString(entry.observation_ref);
     const observationArtifact =
       (existingObservationRef
@@ -2364,16 +2449,32 @@ export const buildArtifactQueryIndex = (input: {
       runtime_capability: runtimeCapability,
       selected_capability: selectedCapability,
       executed_capability: executedCapability,
-      args: readRecord(entry.args),
+      args: readRecord(entry.args) ?? readRecord(contractSubgoal?.args_hint),
       args_source: readNullableString(entry.args_source),
-      planned_args: readRecord(entry.planned_args),
+      planned_args: readRecord(entry.planned_args) ?? readRecord(contractSubgoal?.args_hint),
       selected_args: readRecord(entry.selected_args),
-      required_args: readStringArray(entry.required_args),
-      optional_args: readStringArray(entry.optional_args),
+      required_args: unique([
+        ...readStringArray(entry.required_args),
+        ...readStringArray(contractSubgoal?.required_args),
+        ...(explicitContract?.required_args ?? []),
+      ]),
+      optional_args: unique([
+        ...readStringArray(entry.optional_args),
+        ...readStringArray(contractSubgoal?.optional_args),
+        ...(explicitContract?.optional_args ?? []),
+      ]),
       required_observation_kinds: requiredObservationKinds,
-      required_terminal_kind: readNullableString(entry.required_terminal_kind),
-      allowed_substitutions: readStringArray(entry.allowed_substitutions),
-      forbidden_nearby_capabilities: readStringArray(entry.forbidden_nearby_capabilities),
+      required_terminal_kind: requiredTerminalKind,
+      allowed_substitutions: unique([
+        ...readStringArray(entry.allowed_substitutions),
+        ...readStringArray(contractSubgoal?.allowed_substitutions),
+        ...(explicitContract?.allowed_substitutions ?? []),
+      ]),
+      forbidden_nearby_capabilities: unique([
+        ...readStringArray(entry.forbidden_nearby_capabilities),
+        ...readStringArray(contractSubgoal?.forbidden_nearby_capabilities),
+        ...(explicitContract?.forbidden_nearby_capabilities ?? []),
+      ]),
       input_bindings: readArray(entry.input_bindings)
         .map((binding) => readRecord(binding))
         .filter((binding): binding is RecordLike => Boolean(binding)),
@@ -2390,8 +2491,8 @@ export const buildArtifactQueryIndex = (input: {
         .map((binding) => readRecord(binding))
         .filter((binding): binding is RecordLike => Boolean(binding)),
       satisfaction: canReconcileFromArtifacts ? "satisfied" : readNullableString(entry.satisfaction),
-      contribution_role: readNullableString(entry.contribution_role),
-      terminal_contribution_kind: readNullableString(entry.terminal_contribution_kind),
+      contribution_role: contributionRole,
+      terminal_contribution_kind: terminalContributionKind,
       rail_status: railStatus,
       first_broken_rail: railStatus === "complete" ? null : readNullableString(entry.first_broken_rail),
       rail_failure_code: railStatus === "complete" ? null : readNullableString(entry.rail_failure_code),
@@ -2563,6 +2664,8 @@ export const buildArtifactQueryIndex = (input: {
     ? "any"
     : requestedCapabilityContract
     ? explicitObservationCoverageMode(requestedCapabilityContract.capability)
+    : contract?.requiredObservationKinds.includes("live_environment_tool_observation")
+    ? "any"
     : "all";
   const requiredObservationCoverage = requiredObservationKinds.map((kind) => {
     const matches = artifacts.filter((artifact) => observationKindMatches(artifact, kind)).map(artifactRef);

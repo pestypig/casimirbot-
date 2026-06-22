@@ -20,6 +20,19 @@ export const NHM2_CAMPAIGN_PROFILE_RUN_EVIDENCE_IDS = [
   "observer_family_energy_conditions",
   "horizon_blueshift_particle_stability",
   "time_dependent_source_campaign",
+  "tile_source_material_evidence_receipts",
+  "tile_source_physical_validation_plan",
+  "tile_source_evidence_gap_roadmap",
+  "tile_source_falsification_report",
+  "tile_source_authority_handoff",
+  "tile_source_material_coupon_test_plan",
+  "tile_source_force_gap_pull_in_test_plan",
+  "tile_source_force_gap_load_budget",
+  "tile_source_roughness_patch_test_plan",
+  "tile_source_active_control_test_plan",
+  "tile_source_active_control_operating_budget",
+  "tile_source_fatigue_layer_scaling_test_plan",
+  "tile_source_full_apparatus_tensor_test_plan",
 ] as const;
 
 export type Nhm2CampaignProfileRunEvidenceId =

@@ -689,7 +689,7 @@ export function materializeFinalAnswerDraftTerminal(input: {
     payload: input.payload,
     artifactLedger: input.artifactLedger,
   });
-  const draft = input.finalAnswerDraftRef
+  let draft = input.finalAnswerDraftRef
     ? findLatestFinalAnswerDraftCandidate(
         artifactLedger.filter((artifact) => artifactId(artifact) === input.finalAnswerDraftRef),
       )
@@ -697,11 +697,11 @@ export function materializeFinalAnswerDraftTerminal(input: {
   if (!draft) return null;
   if (input.finalAnswerDraftRef && input.finalAnswerDraftRef !== draft.ref) return null;
 
-  const draftPayload = artifactPayload(draft.artifact);
   const contract = input.routeProductContract ?? readRecord(input.payload.route_product_contract);
   const routeAllowed = effectiveAllowedKinds(input.payload, contract);
-  const docsPrompt = resolveDocsSynthesisPromptText({ payload: input.payload, draftPayload });
-  const qualityGate = evaluateFinalAnswerDraftQualityGate({
+  let draftPayload = artifactPayload(draft.artifact);
+  let docsPrompt = resolveDocsSynthesisPromptText({ payload: input.payload, draftPayload });
+  let qualityGate = evaluateFinalAnswerDraftQualityGate({
     turnId: input.turnId,
     finalAnswerDraftRef: draft.ref,
     draftText: draft.text,
@@ -711,6 +711,41 @@ export function materializeFinalAnswerDraftTerminal(input: {
     payload: input.payload,
     artifactLedger,
   });
+  if (!input.finalAnswerDraftRef && compoundTerminalPolicyActive(input.payload) && !qualityGate.ok) {
+    for (let index = draft.sequence - 1; index >= 0; index -= 1) {
+      const candidateArtifact = artifactLedger[index];
+      if (!candidateArtifact || !isFinalAnswerDraftArtifact(candidateArtifact)) continue;
+      const candidateText = artifactText(candidateArtifact);
+      const candidateRef = artifactId(candidateArtifact);
+      if (!candidateText || !candidateRef) continue;
+      const candidatePayload = artifactPayload(candidateArtifact);
+      const candidateDocsPrompt = resolveDocsSynthesisPromptText({
+        payload: input.payload,
+        draftPayload: candidatePayload,
+      });
+      const candidateQualityGate = evaluateFinalAnswerDraftQualityGate({
+        turnId: input.turnId,
+        finalAnswerDraftRef: candidateRef,
+        draftText: candidateText,
+        draftPayload: candidatePayload,
+        promptText: candidateDocsPrompt.text || readString(input.payload.active_prompt),
+        routeProductContract: contract,
+        payload: input.payload,
+        artifactLedger,
+      });
+      if (!candidateQualityGate.ok) continue;
+      draft = {
+        artifact: candidateArtifact,
+        sequence: index,
+        text: candidateText,
+        ref: candidateRef,
+      };
+      draftPayload = candidatePayload;
+      docsPrompt = candidateDocsPrompt;
+      qualityGate = candidateQualityGate;
+      break;
+    }
+  }
   input.payload.final_answer_draft_quality_gate = qualityGate;
   const draftAuthority =
     artifactAuthority(draft.artifact) ??

@@ -128,6 +128,14 @@ const NHM2_LAYER_STACK_ENGINEERING_ARCHITECTURE_LOOP =
   `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-layer-stack-engineering-architecture-loop.json`;
 const NHM2_LAYER_STACK_ENGINEERING_ARCHITECTURE_LOOP_CONTRACT =
   "shared/contracts/nhm2-layer-stack-engineering-architecture-loop.v1.ts";
+const NHM2_LAYER_STACK_FULL_APPARATUS_RECEIPT_LOOP =
+  `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-layer-stack-full-apparatus-receipt-loop.json`;
+const NHM2_LAYER_STACK_FULL_APPARATUS_RECEIPT_LOOP_CONTRACT =
+  "shared/contracts/nhm2-layer-stack-full-apparatus-receipt-loop.v1.ts";
+const NHM2_TILE_SOURCE_PHYSICAL_VALIDATION_PLAN =
+  `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-tile-source-physical-validation-plan.json`;
+const NHM2_TILE_SOURCE_PHYSICAL_VALIDATION_PLAN_CONTRACT =
+  "shared/contracts/nhm2-tile-source-physical-validation-plan.v1.ts";
 const NHM2_RESEARCH_DYNAMICAL_CASIMIR_NATURE_2011 =
   "https://www.nature.com/articles/nature10561";
 const NHM2_RESEARCH_CASIMIR_GRAVITATIONAL_MASS = "https://arxiv.org/abs/0710.3841";
@@ -145,6 +153,8 @@ const NHM2_RESEARCH_ADVANCED_LIGO_PHYSREVD_93_112004 =
   "https://journals.aps.org/prd/abstract/10.1103/PhysRevD.93.112004";
 const NHM2_RESEARCH_SILICON_CASIMIR_CHIP = "https://www.nature.com/articles/ncomms2842";
 const NHM2_RESEARCH_PATCH_POTENTIALS = "https://arxiv.org/abs/1409.5012";
+const NHM2_RESEARCH_PATCH_POTENTIAL_MEASUREMENT =
+  "https://link.aps.org/doi/10.1103/PhysRevResearch.2.023355";
 const NHM2_RESEARCH_MILLIMETRE_GRAVITY =
   "https://www.nature.com/articles/s41586-021-03250-7";
 const NHM2_RESEARCH_PFENNING_FORD_QI = "https://arxiv.org/abs/gr-qc/9702026";
@@ -157,6 +167,10 @@ const NHM2_RESEARCH_HIGH_STRESS_NANOMECHANICAL_RESONATORS =
   "https://link.aps.org/doi/10.1103/PhysRevApplied.15.034063";
 const NHM2_RESEARCH_ALN_CMOS_MEMS_REVIEW =
   "https://www.tandfonline.com/doi/full/10.1080/10408436.2024.2406247";
+const NHM2_RESEARCH_ALN_PIEZO_MEMS_REVIEW =
+  "https://pmc.ncbi.nlm.nih.gov/articles/PMC12479902/";
+const NHM2_RESEARCH_ALN_ALSCN_MEMS_MIRROR_REVIEW =
+  "https://www.nature.com/articles/s41378-025-01053-8";
 const NHM2_RESEARCH_TIN_MEMBRANE_RESONATORS =
   "https://pubs.aip.org/aip/apl/article/127/22/222202/3373788/High-Q-membrane-resonators-using-ultra-high-stress";
 const NHM2_RESEARCH_CASIMIR_MEMS_REVIEW = "https://pmc.ncbi.nlm.nih.gov/articles/PMC11278474/";
@@ -3186,6 +3200,267 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     },
   }),
   nhm2FullSolveBadge({
+    id: "nhm2.experimental.full_apparatus_receipt_loop",
+    title: "Full Apparatus Receipt Loop",
+    plainMeaning:
+      "Checks whether a 447-layer architecture has material, force-gap, pull-in, roughness, patch-potential, active-control, fatigue, layer-scaling, and full-apparatus tensor receipts.",
+    whyItMatters:
+      "The architecture loop can expose review windows, but a row cannot become a receipted engineering candidate until every receipt surface and every support/spacer/control tensor term is accounted for.",
+    subjects: ["nhm2", "casimir", "layer_stack", "receipt_loop", "full_apparatus_tensor"],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "casimir"],
+    equationFamilies: ["layer_stack_receipt_loop", "full_apparatus_tensor"],
+    tags: [
+      "experimental_ladder",
+      "receipt_loop",
+      "material_coupon",
+      "pull_in",
+      "roughness_patch",
+      "active_control",
+      "fatigue",
+      "layer_scaling",
+      "full_apparatus_tensor",
+      "runtime_reference",
+      "noncomputable_reference",
+      "claim_boundary",
+    ],
+    equations: [
+      {
+        id: "receipt_surface_conjunction",
+        role: "noncomputable_reference",
+        displayLatex:
+          "\\mathrm{Candidate}_{eng}=M_{coupon}\\land F(g)\\land R_{rough/patch}\\land C_{active}\\land L_{fatigue}\\land S_{layers}\\land T^{apparatus}_{\\mu\\nu}",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: [
+          "M_coupon",
+          "F(g)",
+          "R_rough_patch",
+          "C_active",
+          "L_fatigue",
+          "S_layers",
+          "T_apparatus_mu_nu",
+        ],
+        outputSymbols: ["Candidate_eng"],
+      },
+    ],
+    units: [
+      { symbol: "F(g)", unit: "N", quantity: "force-gap receipt", dimensionSignature: "M L T^-2" },
+      { symbol: "T_apparatus_mu_nu", unit: "J/m^3", quantity: "apparatus stress-energy tensor", dimensionSignature: "M L^-1 T^-2" },
+    ],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "All receipt surfaces are required before an architecture row can be a receipted engineering candidate.",
+      "Declared models and ideal scalar Casimir formulas are review context, not material receipts.",
+      "Support, spacer, active-control, thermal, electrostatic, fatigue, and layer-scaling tensor terms are required before source tensor authority can evaluate the apparatus.",
+      "A receipted engineering candidate still does not unlock physical, transport, propulsion, route, or speed claims.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      repoRef(
+        NHM2_LAYER_STACK_FULL_APPARATUS_RECEIPT_LOOP_CONTRACT,
+        "nhm2_layer_stack_full_apparatus_receipt_loop/v1",
+        "Typed receipt loop for material, pull-in, metrology, control, fatigue, layer scaling, and full apparatus tensor evidence.",
+      ),
+      artifactRef(
+        NHM2_LAYER_STACK_FULL_APPARATUS_RECEIPT_LOOP,
+        "layer-stack-full-apparatus-receipt-loop-target",
+        "Expected runtime artifact target for receipted engineering candidate rows and blockers.",
+      ),
+      repoRef(
+        NHM2_LAYER_STACK_ENGINEERING_ARCHITECTURE_LOOP_CONTRACT,
+        "nhm2_layer_stack_engineering_architecture_loop/v1",
+        "Architecture review loop consumed by the receipt loop.",
+      ),
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "full-apparatus-receipt-loop",
+        "Whitepaper receipt ladder for 447-layer architecture candidates.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_CASIMIR_MEMS_REVIEW,
+        "pmc_2024_casimir_mems_review",
+        "Casimir/MEMS pull-in, stiction, materials, geometries, and metrology context.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_ROUGHNESS_PULL_IN,
+        "physrevb_72_115426_roughness_pull_in",
+        "Roughness and pull-in comparator.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_ROUGHNESS_MEMS_ACTUATION,
+        "physrevb_87_125413_roughness_mems_actuation",
+        "Roughness and Casimir/electrostatic effects in MEMS actuation.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_PATCH_POTENTIAL_MEASUREMENT,
+        "physrevresearch_2_023355_patch_potential_measurement",
+        "Patch-potential measurement comparator.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_SURFACE_POTENTIAL_NANOMEMBRANE,
+        "arxiv_1207_4429_surface_potential_nanomebrane",
+        "Nanomembrane Casimir force and in-situ surface-potential measurement comparator.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_CASIMIR_PULL_IN_FRAMEWORK,
+        "rspa_2020_0311_casimir_pull_in_framework",
+        "Casimir pull-in framework comparator.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_HIGH_STRESS_NANOMECHANICAL_RESONATORS,
+        "physrevapplied_15_034063_high_stress_sin",
+        "High-stress SiN comparator.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_ALN_PIEZO_MEMS_REVIEW,
+        "pmc_2025_aln_piezo_mems_review",
+        "Recent AlN MEMS review comparator.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_TIN_MEMBRANE_RESONATORS,
+        "apl_127_222202_high_stress_tin",
+        "Ultra-high-stress TiN comparator.",
+      ),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "casimir", "layer_stack", "receipt_loop", "full_apparatus_tensor"],
+      symbols: ["M_coupon", "F(g)", "R_rough_patch", "C_active", "T_apparatus_mu_nu"],
+      unitSignatures: ["N", "Pa", "J/m^3", "1"],
+      repoPaths: [
+        NHM2_LAYER_STACK_FULL_APPARATUS_RECEIPT_LOOP_CONTRACT,
+        NHM2_LAYER_STACK_FULL_APPARATUS_RECEIPT_LOOP,
+        NHM2_LAYER_STACK_ENGINEERING_ARCHITECTURE_LOOP_CONTRACT,
+        NHM2_FULL_SOLVE_WHITEPAPER,
+      ],
+      equationFamilies: ["layer_stack_receipt_loop", "full_apparatus_tensor"],
+      simulationOwners: ["NHM2", "casimir"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.experimental.tile_source_physical_validation_plan",
+    title: "Tile Source Physical Validation Plan",
+    plainMeaning:
+      "Freezes the most promising 447-layer tile-source architecture candidate and lists the receipts needed before it can become a physically credible source-side stress-energy candidate.",
+    whyItMatters:
+      "The full solve can only become physically meaningful if the tile/material apparatus supplies an independently receipted full T_mu_nu, with material, pull-in, roughness, control, fatigue, layer-scaling, conservation, QEI, observer, and coupled-closure evidence all passing together.",
+    subjects: ["nhm2", "casimir", "tile_source", "physical_validation_plan", "full_apparatus_tensor"],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "casimir", "general_relativity"],
+    equationFamilies: ["tile_source_physical_validation_plan", "full_apparatus_tensor", "physical_viability_campaign"],
+    tags: [
+      "experimental_ladder",
+      "tile_source",
+      "physical_validation_plan",
+      "full_apparatus_tensor",
+      "source_authority",
+      "runtime_reference",
+      "noncomputable_reference",
+      "claim_boundary",
+    ],
+    equations: [
+      {
+        id: "tile_source_candidate_conjunction",
+        role: "noncomputable_reference",
+        displayLatex:
+          "\\mathrm{Candidate}_{source}=R_{receipts}\\land T^{apparatus}_{\\mu\\nu}\\land R_{closure}\\land \\nabla_{\\mu}T^{\\mu\\nu}\\land QEI\\land EC_{obs}\\land M_{cred}\\land C_{coupled}",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: [
+          "R_receipts",
+          "T_apparatus_mu_nu",
+          "R_closure",
+          "nabla_mu_T_mu_nu",
+          "QEI",
+          "EC_obs",
+          "M_cred",
+          "C_coupled",
+        ],
+        outputSymbols: ["Candidate_source"],
+      },
+    ],
+    units: [
+      { symbol: "T_apparatus_mu_nu", unit: "J/m^3", quantity: "full apparatus source tensor", dimensionSignature: "M L^-1 T^-2" },
+      { symbol: "R_closure", unit: "1", quantity: "regional closure residual", dimensionSignature: "1" },
+    ],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "The selected topology-optimized TiN lattice candidate is a validation-plan target, not a physical source result.",
+      "Material coupon, force-gap and pull-in, roughness and patch-potential, active-control, fatigue, layer-scaling, and full-apparatus tensor receipts are all required.",
+      "A source-side apparatus tensor must include T00, momentum density T0i, diagonal Tij, off-diagonal Tij, support/spacer/control terms, and no metric-target echo.",
+      "A physically credible source candidate still requires downstream regional residual, conservation, QEI, observer-family, material-credibility, and coupled-closure gates to pass together.",
+      "Ideal scalar Casimir formulas and diagnostic architecture rows cannot substitute for material evidence or transport claims.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      repoRef(
+        NHM2_TILE_SOURCE_PHYSICAL_VALIDATION_PLAN_CONTRACT,
+        "nhm2_tile_source_physical_validation_plan/v1",
+        "Typed validation plan freezing the 447-layer candidate and enumerating receipts, tensor authority, downstream gates, and falsification blockers.",
+      ),
+      artifactRef(
+        NHM2_TILE_SOURCE_PHYSICAL_VALIDATION_PLAN,
+        "tile-source-physical-validation-plan-target",
+        "Expected runtime artifact target for the physical tile-source validation plan.",
+      ),
+      repoRef(
+        NHM2_LAYER_STACK_FULL_APPARATUS_RECEIPT_LOOP_CONTRACT,
+        "nhm2_layer_stack_full_apparatus_receipt_loop/v1",
+        "Upstream receipt loop consumed by the physical source validation plan.",
+      ),
+      artifactRef(
+        NHM2_LAYER_STACK_FULL_APPARATUS_RECEIPT_LOOP,
+        "layer-stack-full-apparatus-receipt-loop-target",
+        "Upstream 447-layer full-apparatus receipt loop artifact target.",
+      ),
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "tile-source-physical-validation-plan",
+        "Whitepaper section defining the tile-source validation plan and current blockers.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_CASIMIR_MEMS_REVIEW,
+        "pmc_2024_casimir_mems_review",
+        "Casimir/MEMS metrology, pull-in, and stiction context.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_ROUGHNESS_MEMS_ACTUATION,
+        "physrevb_87_125413_roughness_mems_actuation",
+        "Roughness and electrostatic/Casimir MEMS actuation context.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_PATCH_POTENTIAL_MEASUREMENT,
+        "physrevresearch_2_023355_patch_potential_measurement",
+        "Patch-potential measurement comparator for residual electrostatic corrections.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_ALN_ALSCN_MEMS_MIRROR_REVIEW,
+        "nature_2025_aln_alscn_mems_mirror_review",
+        "AlN/AlScN MEMS mirror engineering comparator.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_TIN_MEMBRANE_RESONATORS,
+        "apl_127_222202_high_stress_tin",
+        "Ultra-high-stress TiN membrane comparator for the frozen candidate.",
+      ),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "casimir", "tile_source", "physical_validation_plan", "full_apparatus_tensor"],
+      symbols: ["Candidate_source", "T_apparatus_mu_nu", "R_closure", "QEI", "EC_obs"],
+      unitSignatures: ["J/m^3", "Pa", "N", "1"],
+      repoPaths: [
+        NHM2_TILE_SOURCE_PHYSICAL_VALIDATION_PLAN_CONTRACT,
+        NHM2_TILE_SOURCE_PHYSICAL_VALIDATION_PLAN,
+        NHM2_LAYER_STACK_FULL_APPARATUS_RECEIPT_LOOP_CONTRACT,
+        NHM2_FULL_SOLVE_WHITEPAPER,
+      ],
+      equationFamilies: ["tile_source_physical_validation_plan", "full_apparatus_tensor"],
+      simulationOwners: ["NHM2", "casimir", "general_relativity"],
+    },
+  }),
+  nhm2FullSolveBadge({
     id: "nhm2.experimental.prediction_freeze",
     title: "Experimental Prediction Freeze",
     plainMeaning:
@@ -5576,6 +5851,70 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     claimBoundaryNote: "Architecture review windows still require measured or simulated receipts before promotion.",
   },
   {
+    id: "architecture_loop_feeds_full_apparatus_receipt_loop",
+    from: "nhm2.experimental.layer_stack_architecture_loop",
+    to: "nhm2.experimental.full_apparatus_receipt_loop",
+    relation: "requires",
+    label: "Architecture review rows must be converted into material, pull-in, metrology, control, fatigue, layer-scaling, and tensor receipt rows.",
+    claimBoundaryNote: "Receipt rows remain diagnostic and cannot become material-source authority by themselves.",
+  },
+  {
+    id: "full_apparatus_receipt_loop_feeds_array_scaling",
+    from: "nhm2.experimental.full_apparatus_receipt_loop",
+    to: "nhm2.experimental.array_scaling",
+    relation: "requires",
+    label: "Array scaling review requires receipts for the selected architecture before treating the 447-layer route as an engineering candidate.",
+    claimBoundaryNote: "Engineering receipt readiness is not physical validation.",
+  },
+  {
+    id: "full_apparatus_receipt_loop_feeds_full_tensor",
+    from: "nhm2.experimental.full_apparatus_receipt_loop",
+    to: "nhm2.experimental.full_apparatus_tensor",
+    relation: "requires",
+    label: "The receipt loop enumerates support, spacer, active-control, thermal, electrostatic, fatigue, and layer-scaling terms that must enter the apparatus tensor.",
+    claimBoundaryNote: "Tensor term coverage is required before source-side tensor authority can judge the apparatus.",
+  },
+  {
+    id: "full_apparatus_receipt_loop_feeds_tile_source_validation_plan",
+    from: "nhm2.experimental.full_apparatus_receipt_loop",
+    to: "nhm2.experimental.tile_source_physical_validation_plan",
+    relation: "requires",
+    label: "The tile-source validation plan freezes the strongest 447-layer candidate only after enumerating material, pull-in, metrology, control, fatigue, layer-scaling, and full-apparatus tensor receipt targets.",
+    claimBoundaryNote: "A validation plan is evidence planning and blocker localization, not physical validation.",
+  },
+  {
+    id: "tile_source_validation_plan_requires_full_apparatus_tensor",
+    from: "nhm2.experimental.tile_source_physical_validation_plan",
+    to: "nhm2.experimental.full_apparatus_tensor",
+    relation: "requires",
+    label: "The plan requires a full apparatus tensor before source-side tensor authority can treat the tile stack as a source candidate.",
+    claimBoundaryNote: "A frozen candidate without T00, T0i, diagonal Tij, and off-diagonal Tij remains review-level.",
+  },
+  {
+    id: "tile_source_validation_plan_feeds_same_basis_authority",
+    from: "nhm2.experimental.tile_source_physical_validation_plan",
+    to: "nhm2.source.same_basis_tensor_authority",
+    relation: "requires",
+    label: "A physically credible source candidate must feed the same-chart, same-basis, no-target-echo source authority gate.",
+    claimBoundaryNote: "Source authority is a prerequisite for closure review and cannot become a physical mechanism claim by itself.",
+  },
+  {
+    id: "tile_source_validation_plan_feeds_coupled_closure",
+    from: "nhm2.experimental.tile_source_physical_validation_plan",
+    to: "nhm2.closure.coupled_pass_candidate",
+    relation: "requires",
+    label: "The plan only becomes useful to the full solve when regional residual, conservation, QEI, observer, material, and coupled-closure gates pass together.",
+    claimBoundaryNote: "Coupled diagnostic closure remains separate from physical viability or transport claims.",
+  },
+  {
+    id: "tile_source_validation_plan_blocks_physical_lock",
+    from: "nhm2.experimental.tile_source_physical_validation_plan",
+    to: "nhm2.claim_boundary.physical_viability_locked",
+    relation: "blocks",
+    label: "Missing tile-source physical validation receipts keep physical viability locked even when a diagnostic campaign profile passes.",
+    claimBoundaryNote: "Physical, route, speed, transport, and propulsion claims remain forbidden until external physical validation exists.",
+  },
+  {
     id: "architecture_loop_feeds_full_apparatus_tensor",
     from: "nhm2.experimental.layer_stack_architecture_loop",
     to: "nhm2.experimental.full_apparatus_tensor",
@@ -5590,6 +5929,14 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     relation: "blocks",
     label: "Missing material, pull-in, roughness, patch, active-control, or tensor receipts keep the 447-layer architecture at diagnostic review.",
     claimBoundaryNote: "Engineering review cannot unlock physical, route, speed, transport, or propulsion claims.",
+  },
+  {
+    id: "full_apparatus_receipt_loop_blocks_physical_lock",
+    from: "nhm2.experimental.full_apparatus_receipt_loop",
+    to: "nhm2.claim_boundary.physical_viability_locked",
+    relation: "blocks",
+    label: "Missing full-apparatus receipts keep the 447-layer architecture from becoming physical evidence.",
+    claimBoundaryNote: "Receipt-loop candidate rows cannot unlock physical, route, speed, transport, or propulsion claims.",
   },
   {
     id: "support_fraction_sweep_blocks_physical_lock",

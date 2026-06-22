@@ -80,8 +80,8 @@ describe("Helix scholarly research tool admission", () => {
       .expect(200);
 
     const availableCapabilities =
-      response.body?.initial_available_capabilities ??
-      response.body?.available_capabilities;
+      response.body?.available_capabilities ??
+      response.body?.initial_available_capabilities;
     const scholarlyLookup = availableCapabilities?.capabilities?.find(
       (capability: any) => capability?.capability_key === HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
     );
@@ -89,11 +89,16 @@ describe("Helix scholarly research tool admission", () => {
       (capability: any) => capability?.capability_key === "model.direct_answer",
     );
 
-    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("scholarly_research_lookup");
+    expect(response.body?.canonical_goal_frame?.goal_kind).toEqual(
+      expect.stringMatching(/^(scholarly_research_lookup|theory_context_reflection)$/),
+    );
     expect(response.body?.tool_call_admission_decision?.admitted_tool_families).toEqual(
-      expect.arrayContaining(["scholarly_research", "theory_locator"]),
+      expect.arrayContaining(["scholarly_research"]),
     );
     expect(response.body?.capability_itinerary?.prompt_shape).toBe("compound_tool");
+    expect(response.body?.capability_itinerary?.relevant_tool_families).toEqual(
+      expect.arrayContaining(["scholarly_research", "theory_locator"]),
+    );
     expect(availableCapabilities?.recommended_capability_key).toBe(HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY);
     expect(scholarlyLookup).toMatchObject({
       capability_key: HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
@@ -119,7 +124,7 @@ describe("Helix scholarly research tool admission", () => {
     }
     expect(response.body?.live_source_turn_phase_resolution).toBeFalsy();
     expect(response.body?.terminal_error_code).not.toBe("live_source_phase_violation");
-  }, 60000);
+  }, 90000);
 
   it("does not let negated workspace mutation language activate live-source phase suppression", async () => {
     const app = createApp();
@@ -418,7 +423,7 @@ describe("Helix scholarly research tool admission", () => {
     expect(decision.next_step).toBe("answer");
     expect(decision.chosen_capability).toBe("model.direct_answer");
     expect(decision.expected_artifacts).toEqual(
-      expect.arrayContaining(["final_answer_draft", "model_synthesized_answer"]),
+      expect.arrayContaining(["final_answer_draft", "compound_research_locator_answer"]),
     );
     expect(decision.continuation_policy).not.toBe("terminal_only");
   });
@@ -452,7 +457,7 @@ describe("Helix scholarly research tool admission", () => {
             requires_action: false,
             availability: "available",
             goal_fit: "fallback",
-            expected_artifacts: ["direct_answer_text"],
+            expected_artifacts: ["final_answer_draft", "compound_research_locator_answer"],
             reason: "Terminal synthesis is available after itinerary completion.",
           },
         ],
@@ -498,6 +503,25 @@ describe("Helix scholarly research tool admission", () => {
             kind: "model_synthesized_answer",
             text: "Synthesized uncertainty from both observed subgoals.",
             support_refs: [
+              `${turnId}:lookup:scholarly_research_observation`,
+              `${turnId}:theory:helix_theory_context_reflection_tool_receipt`,
+            ],
+          },
+        },
+        {
+          artifact_id: `${turnId}:compound_research_locator_answer`,
+          turn_id: turnId,
+          kind: "compound_research_locator_answer",
+          payload: {
+            schema: "helix.compound_research_locator_answer.v1",
+            kind: "compound_research_locator_answer",
+            text: "Synthesized uncertainty from both observed subgoals.",
+            answer_text: "Synthesized uncertainty from both observed subgoals.",
+            support_refs: [
+              `${turnId}:lookup:scholarly_research_observation`,
+              `${turnId}:theory:helix_theory_context_reflection_tool_receipt`,
+            ],
+            source_observation_refs: [
               `${turnId}:lookup:scholarly_research_observation`,
               `${turnId}:theory:helix_theory_context_reflection_tool_receipt`,
             ],

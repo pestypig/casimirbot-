@@ -355,7 +355,7 @@ export const collectFinalAnswerDraftSupportRefs = (input: {
 };
 
 const isFallbackLike = (text: string): boolean =>
-  /\b(?:I could not produce a terminal answer|I couldn['’]?t produce a final answer|could not produce a final answer|No final answer returned|terminal answer unavailable|Please retry once|missing_allowed_terminal_artifact)\b/i.test(text);
+  /\b(?:I could not produce a terminal answer|I couldn['’]?t produce a final answer|could not produce a final answer|No final answer returned|terminal answer unavailable|Please retry once|missing_allowed_terminal_artifact|missing required artifacts|missing requirements|was not satisfied|not satisfied due to missing|required artifacts were missing)\b/i.test(text);
 
 const isReceiptLike = (text: string): boolean =>
   /^(?:Opening panel|Opened panel|Workspace action|Action receipt|Receipt:|Successfully executed)\b/i.test(text.trim()) ||

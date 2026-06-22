@@ -4177,6 +4177,26 @@ export function applyHelixTerminalAuthoritySingleWriter(
         readString(input.payload.answer) ??
         readString(input.payload.text)
       : null;
+  const materializedAuthorityEnvelopeText =
+    selectedArtifactKind === "compound_evidence_synthesis_answer"
+      ? readString(readRecord(input.payload.compound_evidence_synthesis_answer)?.answer_text) ??
+        readString(readRecord(input.payload.compound_evidence_synthesis_answer)?.text)
+    : selectedArtifactKind === "compound_research_locator_answer"
+      ? readString(readRecord(input.payload.compound_research_locator_answer)?.answer_text) ??
+        readString(readRecord(input.payload.compound_research_locator_answer)?.text)
+    : selectedArtifactKind === "doc_evidence_synthesis_answer"
+      ? readString(readRecord(input.payload.doc_evidence_synthesis_answer)?.answer_text) ??
+        readString(readRecord(input.payload.doc_evidence_synthesis_answer)?.text)
+    : selectedArtifactKind === "scholarly_research_answer"
+      ? readString(readRecord(input.payload.scholarly_research_answer)?.answer_text) ??
+        readString(readRecord(input.payload.scholarly_research_answer)?.text)
+    : selectedArtifactKind === "internet_search_answer"
+      ? readString(readRecord(input.payload.internet_search_answer)?.answer_text) ??
+        readString(readRecord(input.payload.internet_search_answer)?.text)
+    : selectedArtifactKind === "theory_context_reflection_answer"
+      ? readString(readRecord(input.payload.theory_context_reflection_answer)?.answer_text) ??
+        readString(readRecord(input.payload.theory_context_reflection_answer)?.text)
+      : null;
   let envelope = resolveTerminalAnswerEnvelope(input.payload, {
     threadId: input.threadId,
     turnId: input.turnId,
@@ -4190,6 +4210,27 @@ export function applyHelixTerminalAuthoritySingleWriter(
       terminal_text_hash: hashHelixTerminalText(workstationAuthorityEnvelopeText),
       terminal_kind: "tool_evaluation",
       authority_origin: "workstation_tool_evaluation",
+    };
+  } else if (
+    selectedSource === "final_answer_draft" &&
+    materializedAuthorityEnvelopeText &&
+    (
+      selectedArtifactKind === "compound_evidence_synthesis_answer" ||
+      selectedArtifactKind === "compound_research_locator_answer" ||
+      selectedArtifactKind === "doc_evidence_synthesis_answer" ||
+      selectedArtifactKind === "scholarly_research_answer" ||
+      selectedArtifactKind === "internet_search_answer" ||
+      selectedArtifactKind === "theory_context_reflection_answer"
+    )
+  ) {
+    envelope = {
+      ...envelope,
+      terminal_artifact_kind: selectedArtifactKind,
+      final_answer_source: "final_answer_draft",
+      terminal_text: materializedAuthorityEnvelopeText,
+      terminal_text_hash: hashHelixTerminalText(materializedAuthorityEnvelopeText),
+      terminal_kind: "answer",
+      authority_origin: "selected_final_answer",
     };
   }
   const appliedEnvelope = applyTerminalAnswerEnvelope(input.payload, envelope);

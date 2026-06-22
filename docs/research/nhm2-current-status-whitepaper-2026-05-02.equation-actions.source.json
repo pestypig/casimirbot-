@@ -666,6 +666,86 @@
       ]
     },
     {
+      "equationId": "nhm2-layer-stack-full-apparatus-receipt-loop",
+      "label": "NHM2 layer-stack full-apparatus receipt loop",
+      "aliases": [
+        "Candidate_eng = M_coupon and F(g) and R_rough_patch and C_active and L_fatigue and S_layers and T_apparatus_munu",
+        "nhm2_layer_stack_full_apparatus_receipt_loop/v1",
+        "full apparatus receipt ladder"
+      ],
+      "actions": [
+        {
+          "actionId": "open-layer-stack-full-apparatus-receipt-loop",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open full-apparatus receipt loop",
+          "badgeIds": [
+            "nhm2.experimental.parameter_targets",
+            "nhm2.experimental.research_gap_ledger",
+            "nhm2.experimental.layer_stack_mechanical_receipt",
+            "nhm2.experimental.layer_stack_support_fraction_sweep",
+            "nhm2.experimental.layer_stack_architecture_loop",
+            "nhm2.experimental.full_apparatus_receipt_loop",
+            "nhm2.experimental.array_scaling",
+            "nhm2.experimental.full_apparatus_tensor",
+            "nhm2.claim_boundary.physical_viability_locked",
+            "nhm2.claim_boundary.transport_locked"
+          ],
+          "preferredBadgeId": "nhm2.experimental.full_apparatus_receipt_loop",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "warp_gr_nhm2",
+          "atlasGroupId": "warp.nhm2.diagnostic_path",
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
+          "alsoIngestLatex": true,
+          "claimBoundaryNote": "The full-apparatus receipt loop is an engineering evidence-admission ladder; it cannot substitute for physical viability, wall closure, transport, route, speed, or propulsion claims."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "All receipt surfaces are required before a row can become a receipted engineering candidate.",
+        "Ideal scalar Casimir formulas do not count as material coupon receipts.",
+        "Support, spacer, active-control, thermal, electrostatic, fatigue, and layer-scaling tensor terms must be represented before source tensor authority can judge the apparatus."
+      ]
+    },
+    {
+      "equationId": "nhm2-tile-source-physical-validation-plan",
+      "label": "NHM2 tile-source physical validation plan",
+      "aliases": [
+        "Candidate_source = R_receipts and T_apparatus_munu and R_closure and nabla_mu_T_munu and QEI and EC_obs and M_cred and C_coupled",
+        "nhm2_tile_source_physical_validation_plan/v1",
+        "physically credible source candidate receipt plan"
+      ],
+      "actions": [
+        {
+          "actionId": "open-tile-source-physical-validation-plan",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open tile-source validation plan",
+          "badgeIds": [
+            "nhm2.experimental.full_apparatus_receipt_loop",
+            "nhm2.experimental.tile_source_physical_validation_plan",
+            "nhm2.experimental.full_apparatus_tensor",
+            "nhm2.source.same_basis_tensor_authority",
+            "nhm2.closure.coupled_pass_candidate",
+            "nhm2.qei.worldline_dossier",
+            "nhm2.energy_condition.observer_robust_gate",
+            "nhm2.claim_boundary.physical_viability_locked",
+            "nhm2.claim_boundary.transport_locked"
+          ],
+          "preferredBadgeId": "nhm2.experimental.tile_source_physical_validation_plan",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "warp_gr_nhm2",
+          "atlasGroupId": "warp.nhm2.diagnostic_path",
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
+          "alsoIngestLatex": true,
+          "claimBoundaryNote": "The tile-source validation plan can localize physical-source blockers, but it cannot substitute for material receipts, full apparatus tensor authority, downstream gate closure, or physical transport validation."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "The frozen topology-optimized TiN lattice candidate is a validation target, not a physical source result.",
+        "Ideal scalar Casimir formulas do not count as material evidence.",
+        "A source tensor must include T00, T0i, diagonal Tij, off-diagonal Tij, support, spacer, active-control, electrostatic, thermal, and elastic terms.",
+        "Physical, route, speed, transport, and propulsion claim locks remain closed."
+      ]
+    },
+    {
       "equationId": "nhm2-physical-evidence-campaign-ladder",
       "label": "NHM2 physical evidence campaign ladder",
       "aliases": [

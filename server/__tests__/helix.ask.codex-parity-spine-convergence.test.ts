@@ -341,13 +341,13 @@ const EXPLICIT_CAPABILITY_SCENARIOS: ExplicitCapabilityScenario[] = [
       reentryStatus: "reentered",
       goalSatisfaction: "satisfied",
       requiredTerminalKind: "doc_location_matches",
-      selectedTerminalKind: "typed_failure",
-      visibleTerminalKind: "typed_failure",
-      railStatus: "fail_closed",
-      codexParityClass: "goal_contract_mismatch",
-      railFailureCode: "terminal_not_materialized",
-      firstBrokenRail: "terminal_materialization",
-      repairTarget: "terminal_materializer",
+      selectedTerminalKind: "doc_location_matches",
+      visibleTerminalKind: "doc_location_matches",
+      railStatus: "complete",
+      codexParityClass: "complete",
+      railFailureCode: null,
+      firstBrokenRail: null,
+      repairTarget: null,
     },
   },
   {
@@ -471,7 +471,6 @@ describe("Helix Ask Codex-parity agent spine convergence", () => {
     expect(expectedClasses).toEqual(
       expect.arrayContaining([
         "complete",
-        "goal_contract_mismatch",
         "observation_not_reentered",
         "provider_config_missing",
         "observation_missing",

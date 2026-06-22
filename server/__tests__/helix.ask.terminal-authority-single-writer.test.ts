@@ -2604,10 +2604,10 @@ describe("Helix terminal authority single writer", () => {
       artifactLedger: artifacts,
     });
 
-    expect(result.selected_terminal_artifact_kind).toBe("model_synthesized_answer");
+    expect(result.selected_terminal_artifact_kind).toBe("compound_evidence_synthesis_answer");
     expect(result.source).toBe("final_answer_draft");
-    expect(payload.model_synthesized_answer).toMatchObject({
-      schema: "helix.model_synthesized_answer.v1",
+    expect(payload.compound_evidence_synthesis_answer).toMatchObject({
+      schema: "helix.compound_evidence_synthesis_answer.v1",
       support_refs: expect.arrayContaining([workspaceObservationRef, calculatorReceiptRef]),
       subgoal_observation_refs: [workspaceObservationRef, workstationEvaluationRef],
       subgoal_observation_refs_count: 2,
@@ -2903,24 +2903,24 @@ describe("Helix terminal authority single writer", () => {
       artifactLedger: artifacts,
     });
 
-    expect(result.selected_terminal_artifact_kind).toBe("model_synthesized_answer");
+    expect(result.selected_terminal_artifact_kind).toBe("compound_evidence_synthesis_answer");
     expect(result.source).toBe("final_answer_draft");
     expect(result.visible_text).toBe(goodDraftText);
     expect(result.visible_text).not.toBe(staleFailureDraftText);
     expect(result.integrity.compound_materialized_draft_can_satisfy_terminal).toBe(true);
-    expect(payload.model_synthesized_answer).toMatchObject({
-      schema: "helix.model_synthesized_answer.v1",
+    expect(payload.compound_evidence_synthesis_answer).toMatchObject({
+      schema: "helix.compound_evidence_synthesis_answer.v1",
       text: goodDraftText,
       final_answer_draft_ref: goodDraftRef,
       support_refs: [catalogObservationRef, workspaceObservationRef],
       subgoal_observation_refs: [catalogObservationRef, workspaceObservationRef],
     });
     expect(payload.final_answer_source).toBe("final_answer_draft");
-    expect(payload.terminal_artifact_kind).toBe("model_synthesized_answer");
+    expect(payload.terminal_artifact_kind).toBe("compound_evidence_synthesis_answer");
     expect(payload.terminal_error_code).toBeUndefined();
     expect(payload.final_answer_draft_selection).toMatchObject({
       selected_final_answer_draft_ref: goodDraftRef,
-      materialized_terminal_artifact_kind: "model_synthesized_answer",
+      materialized_terminal_artifact_kind: "compound_evidence_synthesis_answer",
     });
   });
 });

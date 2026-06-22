@@ -117,6 +117,74 @@ const resolveAuthoritativeCapabilityHelpTerminal = (
     : null;
 };
 
+type AuthoritativeDocumentLocationTerminalKind =
+  | "doc_location_matches"
+  | "doc_evidence_location"
+  | "doc_location_result";
+
+const isDocumentLocationTerminalKind = (
+  value: string | null,
+): value is AuthoritativeDocumentLocationTerminalKind =>
+  value === "doc_location_matches" ||
+  value === "doc_evidence_location" ||
+  value === "doc_location_result";
+
+const documentLocationTerminalCompatible = (
+  selectedKind: AuthoritativeDocumentLocationTerminalKind,
+  requiredKind: string | null,
+): boolean => {
+  if (!requiredKind || requiredKind === selectedKind) return true;
+  return (
+    (requiredKind === "doc_location_result" || requiredKind === "doc_evidence_location") &&
+    (selectedKind === "doc_location_matches" || selectedKind === "doc_evidence_location" || selectedKind === "doc_location_result")
+  );
+};
+
+const resolveAuthoritativeDocumentLocationTerminal = (
+  payload: RecordLike,
+): { terminalArtifactKind: AuthoritativeDocumentLocationTerminalKind; finalAnswerSource: AuthoritativeDocumentLocationTerminalKind } | null => {
+  const canonicalGoal = readRecord(payload.canonical_goal_frame);
+  const goalSatisfaction = readRecord(payload.goal_satisfaction_evaluation);
+  const terminalContract = readRecord(goalSatisfaction?.terminal_contract);
+  const terminalWriter = readRecord(payload.terminal_authority_single_writer);
+  const requiredTerminalKind =
+    readString(canonicalGoal?.required_terminal_kind) ??
+    readString(goalSatisfaction?.required_terminal_kind) ??
+    readStringArray(terminalContract?.required_terminal_kinds)[0] ??
+    null;
+  const goalKind =
+    readString(canonicalGoal?.goal_kind) ??
+    readString(goalSatisfaction?.canonical_goal_kind) ??
+    readString(terminalContract?.goal_kind);
+  const writerKind =
+    readString(terminalWriter?.selected_terminal_artifact_kind) ??
+    readString(terminalWriter?.selectedArtifactKind);
+  if (!isDocumentLocationTerminalKind(writerKind)) return null;
+  if (
+    goalKind !== "locate_in_doc" &&
+    goalKind !== "doc_evidence_location" &&
+    goalKind !== "doc_location_result"
+  ) {
+    return null;
+  }
+  if (!documentLocationTerminalCompatible(writerKind, requiredTerminalKind)) return null;
+  const goalAllowsTerminal =
+    readString(goalSatisfaction?.satisfaction) === "satisfied" ||
+    readString(goalSatisfaction?.next_decision) === "allow_terminal";
+  if (!goalAllowsTerminal) return null;
+  const locationObserved =
+    hasCurrentTurnArtifactKind(payload, writerKind) ||
+    hasCurrentTurnArtifactKind(payload, "doc_location_matches") ||
+    hasCurrentTurnArtifactKind(payload, "doc_evidence_location") ||
+    hasSatisfiedRequiredEvidenceKind(goalSatisfaction, "line_backed_locations");
+  return locationObserved
+    ? {
+        terminalArtifactKind: writerKind,
+        finalAnswerSource: writerKind,
+      }
+    : null;
+};
+
 export const normalizeHelixRouteBase = (route: string | null | undefined): string | null => {
   const trimmed = readString(route);
   if (!trimmed) return null;
@@ -126,6 +194,7 @@ export const normalizeHelixRouteBase = (route: string | null | undefined): strin
 
 const isNonAnswerTerminal = (payload: RecordLike): boolean => {
   if (resolveAuthoritativeCapabilityHelpTerminal(payload)) return false;
+  if (resolveAuthoritativeDocumentLocationTerminal(payload)) return false;
   const terminalAuthority = readRecord(payload.terminal_answer_authority);
   const terminalArtifactKind =
     readString(payload.terminal_artifact_kind) ??
@@ -788,26 +857,36 @@ export function buildSolverControllerDecision(input: {
   const liveSourceIdentity = readRecord(payload.live_source_identity_audit ?? solverTrace?.live_source_identity_audit);
   const authoritativeWorkstationTerminal = resolveAuthoritativeWorkstationToolTerminal(payload);
   const authoritativeCapabilityHelpTerminal = resolveAuthoritativeCapabilityHelpTerminal(payload);
+  const authoritativeDocumentLocationTerminal = resolveAuthoritativeDocumentLocationTerminal(payload);
   if (authoritativeWorkstationTerminal) {
     payload.terminal_artifact_kind = authoritativeWorkstationTerminal.terminalArtifactKind;
     payload.final_answer_source = authoritativeWorkstationTerminal.finalAnswerSource;
   } else if (authoritativeCapabilityHelpTerminal) {
     payload.terminal_artifact_kind = authoritativeCapabilityHelpTerminal.terminalArtifactKind;
     payload.final_answer_source = authoritativeCapabilityHelpTerminal.finalAnswerSource;
+  } else if (authoritativeDocumentLocationTerminal) {
+    payload.terminal_artifact_kind = authoritativeDocumentLocationTerminal.terminalArtifactKind;
+    payload.final_answer_source = authoritativeDocumentLocationTerminal.finalAnswerSource;
   }
   const terminalArtifactKind =
     authoritativeWorkstationTerminal?.terminalArtifactKind ??
     authoritativeCapabilityHelpTerminal?.terminalArtifactKind ??
+    authoritativeDocumentLocationTerminal?.terminalArtifactKind ??
     readString(payload.terminal_artifact_kind);
   const rawRequiredTerminalKind =
     authoritativeWorkstationTerminal?.terminalArtifactKind ??
     authoritativeCapabilityHelpTerminal?.terminalArtifactKind ??
+    authoritativeDocumentLocationTerminal?.terminalArtifactKind ??
     committedRoute?.canonical_goal.required_terminal_kind ??
     readString(canonicalGoal?.required_terminal_kind);
   const requiredTerminalKindsFromContract = readStringArray(terminalContract?.required_terminal_kinds);
   const rawRequiredTerminalKinds =
-    authoritativeWorkstationTerminal || authoritativeCapabilityHelpTerminal
-      ? [authoritativeWorkstationTerminal?.terminalArtifactKind ?? authoritativeCapabilityHelpTerminal!.terminalArtifactKind]
+    authoritativeWorkstationTerminal || authoritativeCapabilityHelpTerminal || authoritativeDocumentLocationTerminal
+      ? [
+          authoritativeWorkstationTerminal?.terminalArtifactKind ??
+          authoritativeCapabilityHelpTerminal?.terminalArtifactKind ??
+          authoritativeDocumentLocationTerminal!.terminalArtifactKind,
+        ]
       : committedRoute?.canonical_goal.allowed_terminal_artifact_kinds.length
       ? committedRoute.canonical_goal.allowed_terminal_artifact_kinds
       : requiredTerminalKindsFromContract.length > 0
@@ -1007,6 +1086,8 @@ export function buildSolverControllerDecision(input: {
     const committedRouteAllowsTerminal = committedRoute
       ? authoritativeWorkstationTerminal
         ? true
+        : authoritativeDocumentLocationTerminal
+          ? true
         : compoundTerminalPolicy.policy.active
           ? Boolean(
               terminalArtifactKind &&
@@ -1045,9 +1126,14 @@ export function buildSolverControllerDecision(input: {
     if (terminalArtifactKind && forbiddenTerminalKinds.includes(normalizeCommittedRouteTerminalKind(terminalArtifactKind))) {
       pushUnique(blockingReasons, "terminal_kind_not_required");
     }
-    if (!terminalEquivalence) {
+    if (!terminalEquivalence && !authoritativeDocumentLocationTerminal) {
       pushUnique(blockingReasons, "terminal_equivalence_missing");
-    } else if (!interimVoiceCalloutStatusTerminal && !liveSourceSetupReceiptTerminal && readBoolean(terminalEquivalence.ok) !== true) {
+    } else if (
+      !authoritativeDocumentLocationTerminal &&
+      !interimVoiceCalloutStatusTerminal &&
+      !liveSourceSetupReceiptTerminal &&
+      readBoolean(terminalEquivalence?.ok) !== true
+    ) {
       pushUnique(blockingReasons, "terminal_equivalence_failed");
     }
     if (capabilityGuardRequired && !isCapabilityLifecycleComplete(payload, terminalArtifactKind)) {

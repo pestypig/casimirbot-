@@ -50,6 +50,46 @@ const evidenceBlockersFromArtifact = (artifact: unknown): string[] => {
   const summary = asRecord(record?.summary);
   const campaignReadiness = asRecord(record?.campaignReadiness);
   const executableGeometry = asRecord(record?.executableGeometry);
+  const disposition = asRecord(record?.disposition);
+  if (
+    typeof record?.contractVersion === "string" &&
+    record.contractVersion.startsWith("nhm2_tile_source_") &&
+    record.contractVersion.endsWith("_test_plan/v1")
+  ) {
+    const nextRequiredTestId = asString(summary?.nextRequiredTestId);
+    if (nextRequiredTestId != null && nextRequiredTestId !== "none") {
+      blockers.add(`${nextRequiredTestId}_required`);
+    }
+    const openTestCount =
+      typeof summary?.openTestCount === "number" && Number.isFinite(summary.openTestCount)
+        ? summary.openTestCount
+        : null;
+    if (openTestCount != null && openTestCount > 0) {
+      blockers.add(`tile_source_test_plan_open_tests_${openTestCount}`);
+    }
+  }
+  if (record?.contractVersion === "nhm2_tile_source_evidence_gap_roadmap/v1") {
+    const nextBestItemId = asString(summary?.nextBestItemId);
+    if (nextBestItemId != null && nextBestItemId !== "none") {
+      blockers.add(`${nextBestItemId}_evidence_gap_open`);
+    }
+  }
+  if (record?.contractVersion === "nhm2_tile_source_falsification_report/v1") {
+    const reportStatus = asString(disposition?.reportStatus);
+    if (reportStatus != null && reportStatus !== "candidate_evidence_complete") {
+      blockers.add(`tile_source_falsification_report_${reportStatus}`);
+    }
+    const nextRequiredSurfaceId = asString(summary?.nextRequiredSurfaceId);
+    if (nextRequiredSurfaceId != null && nextRequiredSurfaceId !== "none") {
+      blockers.add(`${nextRequiredSurfaceId}_surface_required`);
+    }
+  }
+  if (record?.contractVersion === "nhm2_tile_source_authority_handoff/v1") {
+    const handoffStatus = asString(summary?.handoffStatus);
+    if (handoffStatus != null && handoffStatus !== "handoff_ready") {
+      blockers.add(`tile_source_authority_handoff_${handoffStatus}`);
+    }
+  }
   if (record?.contractVersion === "nhm2_observer_robust_energy_conditions/v1") {
     const observerCompleteWithoutViolation =
       summary?.robustCheckComplete === true && summary?.anyViolation !== true;
@@ -149,6 +189,28 @@ const evidenceFileNames: Record<Nhm2CampaignProfileRunEvidenceId, string> = {
     "nhm2-observer-robust-energy-conditions.json",
   horizon_blueshift_particle_stability: "nhm2-campaign-stability-evidence.json",
   time_dependent_source_campaign: "nhm2-time-dependent-source-campaign.json",
+  tile_source_material_evidence_receipts:
+    "nhm2-tile-source-material-evidence-receipts.json",
+  tile_source_physical_validation_plan: "nhm2-tile-source-physical-validation-plan.json",
+  tile_source_evidence_gap_roadmap: "nhm2-tile-source-evidence-gap-roadmap.json",
+  tile_source_falsification_report: "nhm2-tile-source-falsification-report.json",
+  tile_source_authority_handoff: "nhm2-tile-source-authority-handoff.json",
+  tile_source_material_coupon_test_plan:
+    "nhm2-tile-source-material-coupon-test-plan.json",
+  tile_source_force_gap_pull_in_test_plan:
+    "nhm2-tile-source-force-gap-pull-in-test-plan.json",
+  tile_source_force_gap_load_budget:
+    "nhm2-tile-source-force-gap-load-budget.json",
+  tile_source_roughness_patch_test_plan:
+    "nhm2-tile-source-roughness-patch-test-plan.json",
+  tile_source_active_control_test_plan:
+    "nhm2-tile-source-active-control-test-plan.json",
+  tile_source_active_control_operating_budget:
+    "nhm2-tile-source-active-control-operating-budget.json",
+  tile_source_fatigue_layer_scaling_test_plan:
+    "nhm2-tile-source-fatigue-layer-scaling-test-plan.json",
+  tile_source_full_apparatus_tensor_test_plan:
+    "nhm2-tile-source-full-apparatus-tensor-test-plan.json",
 };
 
 const parseArgs = (argv: string[]): Record<string, string | boolean> => {

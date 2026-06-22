@@ -43,6 +43,8 @@ describe("NHM2 full-solve theory badges", () => {
     "nhm2.experimental.layer_stack_mechanical_receipt",
     "nhm2.experimental.layer_stack_support_fraction_sweep",
     "nhm2.experimental.layer_stack_architecture_loop",
+    "nhm2.experimental.full_apparatus_receipt_loop",
+    "nhm2.experimental.tile_source_physical_validation_plan",
     "nhm2.experimental.prediction_freeze",
     "nhm2.experimental.tile_force_receipt",
     "nhm2.experimental.tile_cycle_energy_balance",
@@ -351,6 +353,8 @@ describe("NHM2 full-solve theory badges", () => {
       "nhm2.experimental.layer_stack_mechanical_receipt",
       "nhm2.experimental.layer_stack_support_fraction_sweep",
       "nhm2.experimental.layer_stack_architecture_loop",
+      "nhm2.experimental.full_apparatus_receipt_loop",
+      "nhm2.experimental.tile_source_physical_validation_plan",
       "nhm2.experimental.prediction_freeze",
       "nhm2.experimental.tile_force_receipt",
       "nhm2.experimental.full_apparatus_tensor",
@@ -493,6 +497,24 @@ describe("NHM2 full-solve theory badges", () => {
     expect(JSON.stringify(architectureLoop)).toMatch(/pull-in, roughness, patch, material, active-control, and tensor blockers/i);
     expect(JSON.stringify(architectureLoop)).toMatch(/not material-source evidence/i);
 
+    const receiptLoop = byId.get("nhm2.experimental.full_apparatus_receipt_loop");
+    expect(receiptLoop?.calculatorPayloads).toEqual([]);
+    expect(JSON.stringify(receiptLoop?.sourceRefs)).toMatch(
+      /nhm2-layer-stack-full-apparatus-receipt-loop\.v1\.ts/,
+    );
+    expect(JSON.stringify(receiptLoop)).toMatch(/material, force-gap, pull-in, roughness, patch-potential, active-control, fatigue, layer-scaling/i);
+    expect(JSON.stringify(receiptLoop)).toMatch(/not material receipts/i);
+    expect(JSON.stringify(receiptLoop)).toMatch(/does not unlock physical, transport, propulsion, route, or speed claims/i);
+
+    const validationPlan = byId.get("nhm2.experimental.tile_source_physical_validation_plan");
+    expect(validationPlan?.calculatorPayloads).toEqual([]);
+    expect(JSON.stringify(validationPlan?.sourceRefs)).toMatch(
+      /nhm2-tile-source-physical-validation-plan\.v1\.ts/,
+    );
+    expect(JSON.stringify(validationPlan)).toMatch(/physically credible source candidate still requires downstream/i);
+    expect(JSON.stringify(validationPlan)).toMatch(/Ideal scalar Casimir formulas/i);
+    expect(JSON.stringify(validationPlan)).toMatch(/cannot substitute for material evidence or transport claims/i);
+
     expect(byId.get("nhm2.experimental.tile_cycle_energy_balance")?.calculatorPayloads.map(
       (payload) => payload.expression,
     )).toEqual(["delta_m = DeltaE/c^2", "delta_F = g*DeltaE/c^2"]);
@@ -614,9 +636,11 @@ describe("NHM2 full-solve theory badges", () => {
         "nhm2.experimental.parameter_targets",
         "nhm2.experimental.research_gap_ledger",
         "nhm2.experimental.layer_stack_mechanical_receipt",
-        "nhm2.experimental.layer_stack_support_fraction_sweep",
-        "nhm2.experimental.layer_stack_architecture_loop",
-        "nhm2.experimental.prediction_freeze",
+      "nhm2.experimental.layer_stack_support_fraction_sweep",
+      "nhm2.experimental.layer_stack_architecture_loop",
+      "nhm2.experimental.full_apparatus_receipt_loop",
+      "nhm2.experimental.tile_source_physical_validation_plan",
+      "nhm2.experimental.prediction_freeze",
         "nhm2.experimental.tile_force_receipt",
         "nhm2.experimental.tile_cycle_energy_balance",
         "nhm2.experimental.array_scaling",
@@ -901,6 +925,41 @@ describe("NHM2 full-solve theory badges", () => {
           from: "nhm2.experimental.layer_stack_architecture_loop",
           to: "nhm2.experimental.array_scaling",
           relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "nhm2.experimental.layer_stack_architecture_loop",
+          to: "nhm2.experimental.full_apparatus_receipt_loop",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "nhm2.experimental.full_apparatus_receipt_loop",
+          to: "nhm2.experimental.array_scaling",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "nhm2.experimental.full_apparatus_receipt_loop",
+          to: "nhm2.experimental.full_apparatus_tensor",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "nhm2.experimental.full_apparatus_receipt_loop",
+          to: "nhm2.experimental.tile_source_physical_validation_plan",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "nhm2.experimental.tile_source_physical_validation_plan",
+          to: "nhm2.source.same_basis_tensor_authority",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "nhm2.experimental.tile_source_physical_validation_plan",
+          to: "nhm2.closure.coupled_pass_candidate",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "nhm2.experimental.tile_source_physical_validation_plan",
+          to: "nhm2.claim_boundary.physical_viability_locked",
+          relation: "blocks",
         }),
         expect.objectContaining({
           from: "nhm2.experimental.layer_stack_architecture_loop",

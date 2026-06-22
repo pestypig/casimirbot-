@@ -1280,6 +1280,30 @@ M_{pull-in}=\frac{k_{eff}}{SF\,\partial F_{Casimir}/\partial g}.
 
 Here `f_load` is the effective load-bearing fraction, `f_lost` is the active-area loss fraction, `k_eff` is a reduced stiffness proxy, and `SF` is the safety factor. This is a research-loop map, not a material receipt. A promising row can prioritize a device geometry, but it still needs force-gap curves, pull-in data at `8 nm`, roughness and asperity-tail metrology, patch-potential mapping, active-control energy/noise receipts, fatigue testing, layer-scaling evidence, and support/spacer/control terms in the full apparatus `T_mu_nu`.
 
+### 9.15 Full-apparatus receipt loop
+
+The architecture loop can only become useful to source-side closure if each candidate is admitted through a full-apparatus receipt ladder. The receipt loop treats a row as review-level until the selected architecture supplies material coupon, force-gap and pull-in, roughness and patch-potential metrology, active-control energy, fatigue, layer-scaling, and tensor-term coverage:
+
+<!-- helix-doc-equation-action/v1 id=nhm2-layer-stack-full-apparatus-receipt-loop -->
+
+\[
+\mathrm{Candidate}_{eng}=M_{coupon}\land F(g)\land R_{rough/patch}\land C_{active}\land L_{fatigue}\land S_{layers}\land T^{apparatus}_{\mu\nu}.
+\]
+
+This conjunction is an evidence-admission test, not a physical pass. The ideal Casimir scalar row cannot satisfy `M_coupon`, and an architecture row cannot supply source-side tensor authority until support, spacer, active-control, thermal, electrostatic, fatigue, and layer-scaling terms are represented in `T^{apparatus}_{\mu\nu}`. Missing receipts keep the row at review or fail; complete receipts can at most create a receipted engineering candidate for downstream source-tensor and conservation gates.
+
+### 9.16 Tile-source physical validation plan
+
+The larger tile-source validation goal now sits above the full-apparatus receipt loop. It freezes the strongest current 447-layer architecture target, `nhm2_447_layer_topology_optimized_lattice_tin_v1`, and asks whether that target can become a physically credible source-side stress-energy candidate without using the metric-required tensor as a template. The default state remains review because the material coupon, force-gap/pull-in curve at `8 nm`, roughness and patch-potential metrology, active-control energy/noise, fatigue lifetime, layer-scaling, and full-apparatus tensor receipts are still missing.
+
+<!-- helix-doc-equation-action/v1 id=nhm2-tile-source-physical-validation-plan -->
+
+\[
+\mathrm{Candidate}_{source}=R_{receipts}\land T^{apparatus}_{\mu\nu}\land R_{closure}\land \nabla_{\mu}T^{\mu\nu}\land QEI\land EC_{obs}\land M_{cred}\land C_{coupled}.
+\]
+
+This row is a falsification and evidence-planning surface, not an experimental validation. `R_{receipts}` covers material coupon, pull-in, roughness/patch, active-control, fatigue, and layer-scaling receipts. `T^{apparatus}_{\mu\nu}` must include source-side `T00`, momentum density `T0i`, diagonal `Tij`, off-diagonal `Tij`, supports, spacers, active control, electrostatic, thermal, and elastic terms on the same chart, basis, units, and regional supports as the NHM2 comparison. The source tensor must pass a no-metric-target-echo check. Even then, the candidate cannot become a physical claim unless regional residuals, wall `T00`, covariant conservation, QEI worldline dossier, observer-family energy-condition checks, material credibility, and coupled closure pass together. If any surface fails, the artifact should emit the exact blocker, numerical margin when available, and required change rather than promoting the architecture.
+
 ## Appendix A. Repository artifact status and claim-tier table
 
 The detailed implementation state belongs in an appendix because it is evidence metadata, not the scientific argument itself.
@@ -1315,6 +1339,7 @@ The detailed implementation state belongs in an appendix because it is evidence 
 | source component authority ledger | implemented as `nhm2_source_component_authority_ledger/v1` | anti-proxy component ledger; can retire stale source-component blockers but cannot override residual, conservation, QEI, observer, material, reproducibility, or claim gates |
 | source-side same-basis tensor authority | implemented as `nhm2_source_side_same_basis_tensor_authority/v1` | gate that distinguishes authoritative regional source tensors from proxy, diagonal-only, contract-misaligned, or metric-echo source rows |
 | tile counterpart conservation artifact | implemented as `nhm2_tile_counterpart_conservation/v1` | diagnostic conservation surface; missing/failing conservation remains a blocker |
+| tile-source physical validation plan | implemented as `nhm2_tile_source_physical_validation_plan/v1` | freezes the strongest 447-layer candidate and emits receipt, tensor-authority, downstream-gate, and falsification blockers; not physical validation |
 | same-chart full tensor ledger | implemented as `nhm2_same_chart_full_tensor/v1` | records `T00`, `T0i`, diagonal `Tij`, and off-diagonal `Tij`; missing components are blockers, not zeros |
 | wall source closure | implemented as `nhm2_wall_source_closure/v1` | wall `T00` residual is the front-door source-closure blocker; global residual cannot override wall failure |
 | observer-robust energy conditions | implemented as `nhm2_observer_robust_energy_conditions/v1` | Eulerian-only checks are labeled restricted and do not become observer-robust passes |
