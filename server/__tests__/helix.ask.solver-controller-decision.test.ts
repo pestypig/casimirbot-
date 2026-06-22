@@ -137,6 +137,81 @@ const runtimeLoopOk = (turnId: string, capability: string, artifactKind: string)
 });
 
 describe("helix ask solver controller decision", () => {
+  it("allows capability help when the single writer supersedes a stale typed-failure mirror", () => {
+    const payload = {
+      canonical_goal_frame: {
+        turn_id: "ask:capability-help",
+        goal_kind: "capability_help",
+        required_terminal_kind: "capability_help_summary",
+      },
+      route_reason_code: "capability_help",
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      selected_final_answer: "The tools available for Helix Ask include 59 active dynamic workstation actions.",
+      terminal_authority_single_writer: {
+        schema: "helix.terminal_authority_single_writer_result.v1",
+        selected_terminal_artifact_kind: "capability_help_summary",
+        selected_terminal_artifact_ref: "ask:capability-help:capability_help_summary",
+        source: "capability_help_summary",
+        visible_text: "The tools available for Helix Ask include 59 active dynamic workstation actions.",
+      },
+      poison_audit: { schema: "helix.turn_poison_audit.v1", ok: true, violations: [] },
+      route_authority_audit: { schema: "helix.route_authority_audit.v1", route_authority_ok: true },
+      ask_turn_solver_trace: { schema: "helix.ask_turn_solver_trace.v1", turn_id: "ask:capability-help", completed_solver_path: true },
+      goal_satisfaction_evaluation: {
+        ...satisfiedGoal("capability_help", "capability_help_summary"),
+        required_evidence: [
+          {
+            kind: "capability_help_summary",
+            required: true,
+            satisfied: true,
+            evidence_ref: "ask:capability-help:capability_help_summary",
+          },
+        ],
+      },
+      terminal_equivalence_harness_result: terminalEquivalenceOk,
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "ask:capability-help:capability_registry",
+          turn_id: "ask:capability-help",
+          kind: "capability_registry",
+          payload: { kind: "capability_registry" },
+        },
+        {
+          artifact_id: "ask:capability-help:capability_help_summary",
+          turn_id: "ask:capability-help",
+          kind: "capability_help_summary",
+          payload: {
+            schema: "helix.capability_help_summary.v1",
+            kind: "capability_help_summary",
+            text: "The tools available for Helix Ask include 59 active dynamic workstation actions.",
+          },
+        },
+      ],
+    };
+
+    const routeReconciliation = buildFinalRouteReconciliation({
+      turnId: "ask:capability-help",
+      finalRoute: "capability_help",
+      payload,
+    });
+    const decision = buildSolverControllerDecision({
+      turnId: "ask:capability-help",
+      finalRoute: "capability_help",
+      payload,
+      turnIdIntegrityAudit: buildTurnIdIntegrityAudit({
+        turnId: "ask:capability-help",
+        payload,
+      }),
+      finalRouteReconciliation: routeReconciliation,
+    });
+
+    expect(decision.decision).toBe("allow_terminal");
+    expect(decision.selected_terminal_artifact_kind).toBe("capability_help_summary");
+    expect(decision.blocking_reasons).not.toContain("terminal_kind_not_required");
+    expect(decision.blocking_reasons).not.toContain("committed_route_terminal_product_mismatch");
+  });
+
   it("blocks stale terminal authority routes before normal terminal answers", () => {
     const payload = {
       canonical_goal_frame: {

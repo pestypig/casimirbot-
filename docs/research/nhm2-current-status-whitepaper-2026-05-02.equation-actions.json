@@ -683,6 +683,93 @@
       ]
     },
     {
+      "equationId": "nhm2-layer-stack-support-fraction-sweep",
+      "label": "NHM2 layer-stack support-fraction sweep",
+      "sectionAnchor": "913-support-fraction-gono-go-map",
+      "latex": "\\sigma_{support}=\\frac{F_{stack}}{A f_s},\\qquad R_{source}=(1-f_s)C_{material}\\eta_{layer}.",
+      "aliases": [
+        "sigma_support = F_stack/(A f_s); R_source = (1-f_s) C_material eta_layer",
+        "nhm2_layer_stack_support_fraction_sweep/v1",
+        "support fraction go/no-go map"
+      ],
+      "actions": [
+        {
+          "actionId": "open-layer-stack-support-fraction-sweep",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open support-fraction go/no-go map",
+          "badgeIds": [
+            "nhm2.experimental.parameter_targets",
+            "nhm2.experimental.research_gap_ledger",
+            "nhm2.experimental.layer_stack_mechanical_receipt",
+            "nhm2.experimental.layer_stack_support_fraction_sweep",
+            "nhm2.experimental.array_scaling",
+            "nhm2.experimental.full_apparatus_tensor",
+            "nhm2.claim_boundary.physical_viability_locked",
+            "nhm2.claim_boundary.transport_locked"
+          ],
+          "preferredBadgeId": "nhm2.experimental.layer_stack_support_fraction_sweep",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "warp_gr_nhm2",
+          "atlasGroupId": "warp.nhm2.diagnostic_path",
+          "openPanels": [
+            "theory-badge-graph",
+            "scientific-calculator"
+          ],
+          "alsoIngestLatex": true,
+          "claimBoundaryNote": "The support-fraction sweep is a reduced-order go/no-go map; it cannot substitute for pull-in, material, active-control, full-tensor, or metric-response receipts."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Support stress improves as support fraction rises, while source retention worsens.",
+        "A candidate window still needs support and drive tensor terms.",
+        "The sweep does not unlock physical, propulsion, route, speed, or transport claims."
+      ]
+    },
+    {
+      "equationId": "nhm2-layer-stack-architecture-loop",
+      "label": "NHM2 layer-stack engineering architecture loop",
+      "sectionAnchor": "914-architecture-loop-for-decoupled-load-paths",
+      "latex": "\\sigma_{support}=\\frac{F_{stack}}{A f_{load}},\\qquad R_{source}=(1-f_{lost})C_{material}\\eta_{layer},\\qquad M_{pull-in}=\\frac{k_{eff}}{SF\\,\\partial F_{Casimir}/\\partial g}.",
+      "aliases": [
+        "sigma_support = F_stack/(A f_load); R_source = (1-f_lost) C_material eta_layer; M_pull-in = k_eff/(SF dF_Casimir/dg)",
+        "nhm2_layer_stack_engineering_architecture_loop/v1",
+        "decoupled load path architecture loop"
+      ],
+      "actions": [
+        {
+          "actionId": "open-layer-stack-architecture-loop",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open architecture-loop go/no-go map",
+          "badgeIds": [
+            "nhm2.experimental.parameter_targets",
+            "nhm2.experimental.research_gap_ledger",
+            "nhm2.experimental.layer_stack_mechanical_receipt",
+            "nhm2.experimental.layer_stack_support_fraction_sweep",
+            "nhm2.experimental.layer_stack_architecture_loop",
+            "nhm2.experimental.array_scaling",
+            "nhm2.experimental.full_apparatus_tensor",
+            "nhm2.claim_boundary.physical_viability_locked",
+            "nhm2.claim_boundary.transport_locked"
+          ],
+          "preferredBadgeId": "nhm2.experimental.layer_stack_architecture_loop",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "warp_gr_nhm2",
+          "atlasGroupId": "warp.nhm2.diagnostic_path",
+          "openPanels": [
+            "theory-badge-graph",
+            "scientific-calculator"
+          ],
+          "alsoIngestLatex": true,
+          "claimBoundaryNote": "The architecture loop is a diagnostic engineering research map; it cannot substitute for material coupons, pull-in tests, roughness and patch metrology, active-control receipts, or full-apparatus tensor terms."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Load-bearing fraction and active-area loss are tracked separately.",
+        "Review windows prioritize engineering tests; they do not become material-source evidence.",
+        "Support, spacer, active-control, thermal, and electrostatic terms still have to enter the full apparatus tensor."
+      ]
+    },
+    {
       "equationId": "nhm2-physical-evidence-campaign-ladder",
       "label": "NHM2 physical evidence campaign ladder",
       "sectionAnchor": "57-workstation-equation-anchors",

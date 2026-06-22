@@ -572,7 +572,7 @@ Pinned local artifact hashes for the smoke-chain rows are:
 | Campaign profile frontier | The current local generated `nhm2_profile_campaign_frontier/v1` sidecar records `fastestCampaignAdmissibleProfileId = stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1`, `fastestAdmissibleAlpha = 0.7`, `admissibleDiagnosticCandidateCount = 2`, `firstBlocker = null`, and `profileCampaignFrontierComplete = true`. Its generated artifact hash is `43903d50ad8173a1f54f6297b298d203da056ed2ec9d41cc8b504282d4a919bc`. | This is a diagnostic campaign frontier, not a physical viability, route ETA, transport, propulsion, or speed-authority claim. |
 | Candidate metric profile spec | The current campaign-admissible profile spec is `stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1`. It records `alphaCenterline = 0.7`, `tau = alpha_centerline * T_coordinate`, `shipProperTimeSeconds = 96429176.14189999`, `clockSavingSeconds = 41326789.77510001`, `subjectiveEfficiencyProxy = 1.4285714285714286`, `admRouteReady = true`, and no executable-geometry blockers. Its generated artifact hash is `e8d9e213930e6b722cd25f64d95745b89d892221d5758e7c4db44ec64d056c46`. | Profile-definition and clocking governance only. The clocking row is not a route ETA, speed, transport, propulsion, or physical viability claim. |
 | Campaign profile run manifest | The current `nhm2_campaign_profile_run_manifest/v1` sidecar records the generated campaign evidence set used by the frontier. Its hash is `642cb883932437f96805c82f91612bf9c39c1684c28c3fc44d08a27b46e87348`. | Evidence governance only; generated local rows must still be distinguished from externally reproduced validation. |
-| Time-dependent source campaign | The current `nhm2_time_dependent_source_campaign/v1` artifact for `stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1` records `campaignPass = true`, `firstBlocker = none`, and pass-level campaign rows for source independence, switching conservation, frequency convergence, dynamic/effective geometry agreement, full regional tensor closure, observer-family checks, QEI receipts, and stability. Its generated artifact hash is `daec9e3f7f7f43d0c248dab5b80ef39e92947269b2a3abf2d9cb90a8d3cbd283`. | Diagnostic campaign pass only. It does not grant physical viability, transport validation, propulsion proof, route ETA, material-source proof, or speed authority. |
+| Time-dependent source campaign | The current `nhm2_time_dependent_source_campaign/v1` artifact for `stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1` records `campaignPass = true`, `firstBlocker = none`, and pass-level campaign rows for source independence, switching conservation, frequency convergence, dynamic/effective geometry agreement, full regional tensor closure, observer-family checks, QEI receipts, and stability. Its generated artifact hash is `daec9e3f7f7f43d0c248dab5b80ef39e92947269b2a3abf2d9cb90a8d3cbd283`. | Diagnostic campaign pass only. It does not grant physical viability, transport validation, propulsion evidence, route ETA, material-source evidence, or speed authority. |
 | Observer robustness | The campaign artifact records the observer-family row pass-level for the `0p7000_observer_compatible_source` campaign. Broader observer-optimizer and publication-grade robustness remain separate review surfaces. | Observer campaign pass is diagnostic and profile-scoped; it is not a universal energy-condition proof. |
 | Coupled closure | Older smoke artifacts with `passCandidate = false` remain historical, but the current campaign frontier should be read through the campaign artifact and profile-frontier sidecar above. | A diagnostic campaign pass is not a physical or transport claim. |
 | Regional tensor pass-path harness | Older harness rows with `numericalPassPathReady = false` describe earlier pass-path wiring. The current profile-frontier artifact records `profileCampaignFrontierComplete = true` for the campaign-admissible `0p7000_observer_compatible_source` profile. | The harness/frontier distinction should stay visible: campaign admissibility is diagnostic and does not replace external physical validation. |
@@ -1252,6 +1252,33 @@ F_{stack}=N_{layer}P_{ideal}A.
 \]
 
 This is not thrust. It is an internal load that the tile stack, spacers, supports, active gap control, and material films must survive while still preserving the source tensor. The required receipt is therefore not just "high pressure exists." It must include force-gap curves, pull-in margin, support fraction, roughness and patch-potential bounds, thermal load, fatigue margin, active-control energy, and a linear/nonlinear stack-scaling disposition. A failed support, pull-in, or nonadditivity result would falsify the `447`-layer route even if the scalar wall `T00` arithmetic remains attractive.
+
+### 9.13 Support-fraction go/no-go map
+
+The next reduced-order engineering question is whether supports can carry the `14.2 kN` internal load without removing so much active Casimir area that the wall-source target disappears. The support-fraction sweep is:
+
+<!-- helix-doc-equation-action/v1 id=nhm2-layer-stack-support-fraction-sweep -->
+
+\[
+\sigma_{support}=\frac{F_{stack}}{A f_s},\qquad
+R_{source}=(1-f_s)C_{material}\eta_{layer}.
+\]
+
+Here `f_s` is the support fraction, `1-f_s` is the active area fraction, `C_material` is the material correction, and `eta_layer` is the layer-scaling efficiency. Increasing `f_s` reduces support stress, but it also reduces active source area. With the current conservative default assumptions, the first blocker is the absence of overlap between the stress-safe window and the source-retention window. Even if a future parameter set exposes a candidate window, support and active-control tensor terms still have to enter the full apparatus `T_mu_nu`; otherwise the row remains review-level.
+
+### 9.14 Architecture loop for decoupled load paths
+
+The support-fraction result points to a more specific engineering question: can the load path be decoupled from the active Casimir aperture? A perimeter frame, rib lattice, spacer-post array, suspended membrane, topology-optimized lattice, segmented microcell, multilayer load-sharing scaffold, or active gap-control cell may carry load with a different geometric fraction than the area removed from the active source. The reduced-order architecture loop therefore tracks:
+
+<!-- helix-doc-equation-action/v1 id=nhm2-layer-stack-architecture-loop -->
+
+\[
+\sigma_{support}=\frac{F_{stack}}{A f_{load}},\qquad
+R_{source}=(1-f_{lost})C_{material}\eta_{layer},\qquad
+M_{pull-in}=\frac{k_{eff}}{SF\,\partial F_{Casimir}/\partial g}.
+\]
+
+Here `f_load` is the effective load-bearing fraction, `f_lost` is the active-area loss fraction, `k_eff` is a reduced stiffness proxy, and `SF` is the safety factor. This is a research-loop map, not a material receipt. A promising row can prioritize a device geometry, but it still needs force-gap curves, pull-in data at `8 nm`, roughness and asperity-tail metrology, patch-potential mapping, active-control energy/noise receipts, fatigue testing, layer-scaling evidence, and support/spacer/control terms in the full apparatus `T_mu_nu`.
 
 ## Appendix A. Repository artifact status and claim-tier table
 

@@ -41,6 +41,8 @@ describe("NHM2 full-solve theory badges", () => {
     "nhm2.experimental.parameter_targets",
     "nhm2.experimental.research_gap_ledger",
     "nhm2.experimental.layer_stack_mechanical_receipt",
+    "nhm2.experimental.layer_stack_support_fraction_sweep",
+    "nhm2.experimental.layer_stack_architecture_loop",
     "nhm2.experimental.prediction_freeze",
     "nhm2.experimental.tile_force_receipt",
     "nhm2.experimental.tile_cycle_energy_balance",
@@ -347,6 +349,8 @@ describe("NHM2 full-solve theory badges", () => {
       "nhm2.experimental.parameter_targets",
       "nhm2.experimental.research_gap_ledger",
       "nhm2.experimental.layer_stack_mechanical_receipt",
+      "nhm2.experimental.layer_stack_support_fraction_sweep",
+      "nhm2.experimental.layer_stack_architecture_loop",
       "nhm2.experimental.prediction_freeze",
       "nhm2.experimental.tile_force_receipt",
       "nhm2.experimental.full_apparatus_tensor",
@@ -472,6 +476,23 @@ describe("NHM2 full-solve theory badges", () => {
     expect(JSON.stringify(layerStackMechanicalReceipt)).toMatch(/14\.2 kN internal normal attraction/i);
     expect(JSON.stringify(layerStackMechanicalReceipt)).toMatch(/not thrust/i);
 
+    const supportFractionSweep = byId.get("nhm2.experimental.layer_stack_support_fraction_sweep");
+    expect(supportFractionSweep?.calculatorPayloads).toEqual([]);
+    expect(JSON.stringify(supportFractionSweep?.sourceRefs)).toMatch(
+      /nhm2-layer-stack-support-fraction-sweep\.v1\.ts/,
+    );
+    expect(JSON.stringify(supportFractionSweep)).toMatch(/stress limits and wall-source retention/i);
+    expect(JSON.stringify(supportFractionSweep)).toMatch(/not material evidence/i);
+
+    const architectureLoop = byId.get("nhm2.experimental.layer_stack_architecture_loop");
+    expect(architectureLoop?.calculatorPayloads).toEqual([]);
+    expect(JSON.stringify(architectureLoop?.sourceRefs)).toMatch(
+      /nhm2-layer-stack-engineering-architecture-loop\.v1\.ts/,
+    );
+    expect(JSON.stringify(architectureLoop)).toMatch(/decouple load support from active Casimir area/i);
+    expect(JSON.stringify(architectureLoop)).toMatch(/pull-in, roughness, patch, material, active-control, and tensor blockers/i);
+    expect(JSON.stringify(architectureLoop)).toMatch(/not material-source evidence/i);
+
     expect(byId.get("nhm2.experimental.tile_cycle_energy_balance")?.calculatorPayloads.map(
       (payload) => payload.expression,
     )).toEqual(["delta_m = DeltaE/c^2", "delta_F = g*DeltaE/c^2"]);
@@ -593,6 +614,8 @@ describe("NHM2 full-solve theory badges", () => {
         "nhm2.experimental.parameter_targets",
         "nhm2.experimental.research_gap_ledger",
         "nhm2.experimental.layer_stack_mechanical_receipt",
+        "nhm2.experimental.layer_stack_support_fraction_sweep",
+        "nhm2.experimental.layer_stack_architecture_loop",
         "nhm2.experimental.prediction_freeze",
         "nhm2.experimental.tile_force_receipt",
         "nhm2.experimental.tile_cycle_energy_balance",
@@ -846,12 +869,42 @@ describe("NHM2 full-solve theory badges", () => {
         }),
         expect.objectContaining({
           from: "nhm2.experimental.research_gap_ledger",
+          to: "nhm2.experimental.layer_stack_support_fraction_sweep",
+          relation: "documents",
+        }),
+        expect.objectContaining({
+          from: "nhm2.experimental.research_gap_ledger",
           to: "nhm2.claim_boundary.physical_viability_locked",
           relation: "blocks",
         }),
         expect.objectContaining({
           from: "nhm2.experimental.layer_stack_mechanical_receipt",
           to: "nhm2.experimental.array_scaling",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "nhm2.experimental.layer_stack_mechanical_receipt",
+          to: "nhm2.experimental.layer_stack_support_fraction_sweep",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "nhm2.experimental.layer_stack_support_fraction_sweep",
+          to: "nhm2.experimental.array_scaling",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "nhm2.experimental.layer_stack_support_fraction_sweep",
+          to: "nhm2.experimental.layer_stack_architecture_loop",
+          relation: "documents",
+        }),
+        expect.objectContaining({
+          from: "nhm2.experimental.layer_stack_architecture_loop",
+          to: "nhm2.experimental.array_scaling",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "nhm2.experimental.layer_stack_architecture_loop",
+          to: "nhm2.experimental.full_apparatus_tensor",
           relation: "requires",
         }),
         expect.objectContaining({

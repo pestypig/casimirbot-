@@ -80,6 +80,43 @@ const resolveAuthoritativeWorkstationToolTerminal = (
     : null;
 };
 
+const resolveAuthoritativeCapabilityHelpTerminal = (
+  payload: RecordLike,
+): { terminalArtifactKind: "capability_help_summary"; finalAnswerSource: "capability_help_summary" } | null => {
+  const canonicalGoal = readRecord(payload.canonical_goal_frame);
+  const goalSatisfaction = readRecord(payload.goal_satisfaction_evaluation);
+  const terminalWriter = readRecord(payload.terminal_authority_single_writer);
+  const terminalAuthority = readRecord(payload.terminal_answer_authority);
+  const requiredTerminalKind =
+    readString(canonicalGoal?.required_terminal_kind) ??
+    readString(goalSatisfaction?.required_terminal_kind);
+  const goalKind =
+    readString(canonicalGoal?.goal_kind) ??
+    readString(goalSatisfaction?.canonical_goal_kind);
+  const writerKind =
+    readString(terminalWriter?.selected_terminal_artifact_kind) ??
+    readString(terminalWriter?.selectedArtifactKind);
+  const authorityKind = readString(terminalAuthority?.terminal_artifact_kind);
+  const goalAllowsTerminal =
+    readString(goalSatisfaction?.satisfaction) === "satisfied" ||
+    readString(goalSatisfaction?.next_decision) === "allow_terminal";
+  const capabilityHelpObserved =
+    hasCurrentTurnArtifactKind(payload, "capability_help_summary") ||
+    hasSatisfiedRequiredEvidenceKind(goalSatisfaction, "capability_help_summary");
+  return (
+    goalKind === "capability_help" &&
+    requiredTerminalKind === "capability_help_summary" &&
+    goalAllowsTerminal &&
+    capabilityHelpObserved &&
+    (writerKind === "capability_help_summary" || authorityKind === "capability_help_summary")
+  )
+    ? {
+        terminalArtifactKind: "capability_help_summary",
+        finalAnswerSource: "capability_help_summary",
+      }
+    : null;
+};
+
 export const normalizeHelixRouteBase = (route: string | null | undefined): string | null => {
   const trimmed = readString(route);
   if (!trimmed) return null;
@@ -88,6 +125,7 @@ export const normalizeHelixRouteBase = (route: string | null | undefined): strin
 };
 
 const isNonAnswerTerminal = (payload: RecordLike): boolean => {
+  if (resolveAuthoritativeCapabilityHelpTerminal(payload)) return false;
   const terminalAuthority = readRecord(payload.terminal_answer_authority);
   const terminalArtifactKind =
     readString(payload.terminal_artifact_kind) ??
@@ -749,21 +787,27 @@ export function buildSolverControllerDecision(input: {
   const terminalEquivalence = readRecord(payload.terminal_equivalence_harness_result);
   const liveSourceIdentity = readRecord(payload.live_source_identity_audit ?? solverTrace?.live_source_identity_audit);
   const authoritativeWorkstationTerminal = resolveAuthoritativeWorkstationToolTerminal(payload);
+  const authoritativeCapabilityHelpTerminal = resolveAuthoritativeCapabilityHelpTerminal(payload);
   if (authoritativeWorkstationTerminal) {
     payload.terminal_artifact_kind = authoritativeWorkstationTerminal.terminalArtifactKind;
     payload.final_answer_source = authoritativeWorkstationTerminal.finalAnswerSource;
+  } else if (authoritativeCapabilityHelpTerminal) {
+    payload.terminal_artifact_kind = authoritativeCapabilityHelpTerminal.terminalArtifactKind;
+    payload.final_answer_source = authoritativeCapabilityHelpTerminal.finalAnswerSource;
   }
   const terminalArtifactKind =
     authoritativeWorkstationTerminal?.terminalArtifactKind ??
+    authoritativeCapabilityHelpTerminal?.terminalArtifactKind ??
     readString(payload.terminal_artifact_kind);
   const rawRequiredTerminalKind =
     authoritativeWorkstationTerminal?.terminalArtifactKind ??
+    authoritativeCapabilityHelpTerminal?.terminalArtifactKind ??
     committedRoute?.canonical_goal.required_terminal_kind ??
     readString(canonicalGoal?.required_terminal_kind);
   const requiredTerminalKindsFromContract = readStringArray(terminalContract?.required_terminal_kinds);
   const rawRequiredTerminalKinds =
-    authoritativeWorkstationTerminal
-      ? [authoritativeWorkstationTerminal.terminalArtifactKind]
+    authoritativeWorkstationTerminal || authoritativeCapabilityHelpTerminal
+      ? [authoritativeWorkstationTerminal?.terminalArtifactKind ?? authoritativeCapabilityHelpTerminal!.terminalArtifactKind]
       : committedRoute?.canonical_goal.allowed_terminal_artifact_kinds.length
       ? committedRoute.canonical_goal.allowed_terminal_artifact_kinds
       : requiredTerminalKindsFromContract.length > 0

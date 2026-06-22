@@ -170,6 +170,8 @@ export const WARP_GR_NHM2_GROUPS: WarpGrNhm2Group[] = [
       "nhm2.experimental.parameter_targets",
       "nhm2.experimental.research_gap_ledger",
       "nhm2.experimental.layer_stack_mechanical_receipt",
+      "nhm2.experimental.layer_stack_support_fraction_sweep",
+      "nhm2.experimental.layer_stack_architecture_loop",
       "nhm2.experimental.prediction_freeze",
       "nhm2.experimental.tile_force_receipt",
       "nhm2.experimental.tile_cycle_energy_balance",

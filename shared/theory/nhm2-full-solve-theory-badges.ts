@@ -120,6 +120,14 @@ const NHM2_LAYER_STACK_MECHANICAL_RECEIPT =
   `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-layer-stack-mechanical-receipt.json`;
 const NHM2_LAYER_STACK_MECHANICAL_RECEIPT_CONTRACT =
   "shared/contracts/nhm2-layer-stack-mechanical-receipt.v1.ts";
+const NHM2_LAYER_STACK_SUPPORT_FRACTION_SWEEP =
+  `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-layer-stack-support-fraction-sweep.json`;
+const NHM2_LAYER_STACK_SUPPORT_FRACTION_SWEEP_CONTRACT =
+  "shared/contracts/nhm2-layer-stack-support-fraction-sweep.v1.ts";
+const NHM2_LAYER_STACK_ENGINEERING_ARCHITECTURE_LOOP =
+  `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-layer-stack-engineering-architecture-loop.json`;
+const NHM2_LAYER_STACK_ENGINEERING_ARCHITECTURE_LOOP_CONTRACT =
+  "shared/contracts/nhm2-layer-stack-engineering-architecture-loop.v1.ts";
 const NHM2_RESEARCH_DYNAMICAL_CASIMIR_NATURE_2011 =
   "https://www.nature.com/articles/nature10561";
 const NHM2_RESEARCH_CASIMIR_GRAVITATIONAL_MASS = "https://arxiv.org/abs/0710.3841";
@@ -152,9 +160,13 @@ const NHM2_RESEARCH_ALN_CMOS_MEMS_REVIEW =
 const NHM2_RESEARCH_TIN_MEMBRANE_RESONATORS =
   "https://pubs.aip.org/aip/apl/article/127/22/222202/3373788/High-Q-membrane-resonators-using-ultra-high-stress";
 const NHM2_RESEARCH_CASIMIR_MEMS_REVIEW = "https://pmc.ncbi.nlm.nih.gov/articles/PMC11278474/";
+const NHM2_RESEARCH_ROUGHNESS_PULL_IN =
+  "https://link.aps.org/doi/10.1103/PhysRevB.72.115426";
 const NHM2_RESEARCH_ROUGHNESS_MEMS_ACTUATION =
   "https://link.aps.org/doi/10.1103/PhysRevB.87.125413";
 const NHM2_RESEARCH_SURFACE_POTENTIAL_NANOMEMBRANE = "https://arxiv.org/abs/1207.4429";
+const NHM2_RESEARCH_CASIMIR_PULL_IN_FRAMEWORK =
+  "https://royalsocietypublishing.org/doi/10.1098/rspa.2020.0311";
 
 const NHM2_FULL_SOLVE_BOUNDARY: TheoryBadgeClaimBoundaryV1 = {
   diagnosticOnly: true,
@@ -2935,6 +2947,245 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     },
   }),
   nhm2FullSolveBadge({
+    id: "nhm2.experimental.layer_stack_support_fraction_sweep",
+    title: "Layer Stack Support Fraction Sweep",
+    plainMeaning:
+      "Sweeps support area against active Casimir area for the 447-layer stack to find whether mechanical stress limits and wall-source retention can overlap.",
+    whyItMatters:
+      "Increasing support fraction lowers local support stress but removes active Casimir area; this badge exposes that engineering tradeoff before the stack can be treated as a source candidate.",
+    subjects: ["nhm2", "casimir", "layer_stack", "support_fraction", "go_no_go"],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "casimir"],
+    equationFamilies: ["layer_stack_support_fraction_sweep", "layer_stack_mechanical_receipt"],
+    tags: [
+      "experimental_ladder",
+      "support_fraction",
+      "mechanical_receipt",
+      "go_no_go",
+      "runtime_reference",
+      "noncomputable_reference",
+      "claim_boundary",
+    ],
+    equations: [
+      {
+        id: "support_fraction_tradeoff",
+        role: "noncomputable_reference",
+        displayLatex:
+          "\\sigma_{support}=F_{stack}/(A f_s),\\quad R_{source}=(1-f_s)C_{mat}\\eta_{layer}",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["F_stack", "A", "f_s", "C_mat", "eta_layer"],
+        outputSymbols: ["sigma_support", "R_source"],
+      },
+    ],
+    units: [
+      { symbol: "sigma_support", unit: "Pa", quantity: "support stress", dimensionSignature: "M L^-1 T^-2" },
+      { symbol: "R_source", unit: null, quantity: "retained source fraction", dimensionSignature: "1" },
+    ],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "Support stress decreases as support fraction increases.",
+      "Active area and retained wall-source fraction decrease as support fraction increases.",
+      "The default sweep reports no pass when stress and source-retention constraints do not overlap.",
+      "Support and active-control tensor terms must be supplied before any candidate window can count beyond reduced-order review.",
+      "The sweep is a go/no-go planning map, not material evidence or physical viability.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      repoRef(
+        NHM2_LAYER_STACK_SUPPORT_FRACTION_SWEEP_CONTRACT,
+        "nhm2_layer_stack_support_fraction_sweep/v1",
+        "Typed support-fraction go/no-go sweep for the 447-layer scalar candidate.",
+      ),
+      artifactRef(
+        NHM2_LAYER_STACK_SUPPORT_FRACTION_SWEEP,
+        "layer-stack-support-fraction-sweep-target",
+        "Expected runtime artifact target for support stress, active-area retention, and go/no-go rows.",
+      ),
+      repoRef(
+        NHM2_LAYER_STACK_MECHANICAL_RECEIPT_CONTRACT,
+        "nhm2_layer_stack_mechanical_receipt/v1",
+        "Mechanical receipt supplying the ideal 447-layer stack force.",
+      ),
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "support-fraction-go-no-go-map",
+        "Whitepaper support-fraction go/no-go map.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_CASIMIR_MEMS_REVIEW,
+        "pmc_2024_casimir_mems_review",
+        "Casimir/MEMS pull-in, stiction, and metrology context.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_ROUGHNESS_MEMS_ACTUATION,
+        "physrevb_87_125413_roughness_mems_actuation",
+        "Roughness and Casimir/electrostatic effects in MEMS actuation.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_SURFACE_POTENTIAL_NANOMEMBRANE,
+        "arxiv_1207_4429_surface_potential_nanomebrane",
+        "Surface-potential and nanomembrane Casimir measurement comparator.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_REAL_MATERIAL_CASIMIR,
+        "revmodphys_81_1827_real_material_casimir",
+        "Real-material Lifshitz/Casimir correction context.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_HIGH_STRESS_NANOMECHANICAL_RESONATORS,
+        "physrevapplied_15_034063_high_stress_sin",
+        "High-stress SiN comparator for allowable stress.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_TIN_MEMBRANE_RESONATORS,
+        "apl_127_222202_high_stress_tin",
+        "Ultra-high-stress TiN comparator.",
+      ),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "casimir", "layer_stack", "support_fraction", "go_no_go"],
+      symbols: ["f_s", "sigma_support", "R_source", "C_mat", "eta_layer"],
+      unitSignatures: ["Pa", "N", "1"],
+      repoPaths: [
+        NHM2_LAYER_STACK_SUPPORT_FRACTION_SWEEP_CONTRACT,
+        NHM2_LAYER_STACK_SUPPORT_FRACTION_SWEEP,
+        NHM2_LAYER_STACK_MECHANICAL_RECEIPT_CONTRACT,
+        NHM2_FULL_SOLVE_WHITEPAPER,
+      ],
+      equationFamilies: ["layer_stack_support_fraction_sweep", "layer_stack_mechanical_receipt"],
+      simulationOwners: ["NHM2", "casimir"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.experimental.layer_stack_architecture_loop",
+    title: "Layer Stack Architecture Loop",
+    plainMeaning:
+      "Tests whether frames, ribs, spacer posts, membranes, lattices, segmented cells, load-sharing stacks, or active gap control can decouple load support from active Casimir area.",
+    whyItMatters:
+      "The support-fraction sweep fails when support area and active source area compete directly; this loop asks whether an engineering architecture can create a review window while recording pull-in, roughness, patch, material, active-control, and tensor blockers.",
+    subjects: ["nhm2", "casimir", "layer_stack", "architecture", "engineering_gate"],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "casimir"],
+    equationFamilies: ["layer_stack_architecture_loop", "layer_stack_support_fraction_sweep"],
+    tags: [
+      "experimental_ladder",
+      "architecture_loop",
+      "pull_in",
+      "support_fraction",
+      "active_area_retention",
+      "runtime_reference",
+      "noncomputable_reference",
+      "claim_boundary",
+    ],
+    equations: [
+      {
+        id: "decoupled_load_path_retention",
+        role: "noncomputable_reference",
+        displayLatex:
+          "\\sigma_{support}=F_{stack}/(A f_{load}),\\quad R_{source}=(1-f_{lost})C_{mat}\\eta_{layer}",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["F_stack", "A", "f_load", "f_lost", "C_mat", "eta_layer"],
+        outputSymbols: ["sigma_support", "R_source"],
+      },
+      {
+        id: "pull_in_margin_proxy",
+        role: "noncomputable_reference",
+        displayLatex: "M_{pull-in}=k_{eff}/(SF\\,\\partial F_{Casimir}/\\partial g)",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["k_eff", "SF", "partial_F_Casimir_partial_g"],
+        outputSymbols: ["M_pull-in"],
+      },
+    ],
+    units: [
+      { symbol: "sigma_support", unit: "Pa", quantity: "support stress", dimensionSignature: "M L^-1 T^-2" },
+      { symbol: "R_source", unit: null, quantity: "retained source fraction", dimensionSignature: "1" },
+      { symbol: "M_pull-in", unit: null, quantity: "pull-in margin", dimensionSignature: "1" },
+    ],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "Architecture rows separate load-bearing fraction from active-area loss.",
+      "A review window is not material-source evidence; it only prioritizes which device geometry deserves receipts.",
+      "Pull-in, roughness, patch-potential, active-control, fatigue, and full-apparatus tensor terms remain explicit blockers.",
+      "Support and drive terms must enter the source-side apparatus tensor before wall-source authority can use the architecture.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      repoRef(
+        NHM2_LAYER_STACK_ENGINEERING_ARCHITECTURE_LOOP_CONTRACT,
+        "nhm2_layer_stack_engineering_architecture_loop/v1",
+        "Typed engineering architecture loop for load-path and active-area decoupling candidates.",
+      ),
+      artifactRef(
+        NHM2_LAYER_STACK_ENGINEERING_ARCHITECTURE_LOOP,
+        "layer-stack-engineering-architecture-loop-target",
+        "Expected runtime artifact target for architecture rows, pull-in margins, research gaps, and tensor blockers.",
+      ),
+      repoRef(
+        NHM2_LAYER_STACK_SUPPORT_FRACTION_SWEEP_CONTRACT,
+        "nhm2_layer_stack_support_fraction_sweep/v1",
+        "Support-fraction blocker that motivates decoupled architecture search.",
+      ),
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "architecture-loop-for-decoupled-load-paths",
+        "Whitepaper architecture loop for decoupled support and active area.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_CASIMIR_MEMS_REVIEW,
+        "pmc_2024_casimir_mems_review",
+        "Casimir/MEMS pull-in, stiction, materials, geometries, and metrology context.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_ROUGHNESS_PULL_IN,
+        "physrevb_72_115426_roughness_pull_in",
+        "Self-affine roughness and pull-in comparator.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_ROUGHNESS_MEMS_ACTUATION,
+        "physrevb_87_125413_roughness_mems_actuation",
+        "Roughness and Casimir/electrostatic effects in MEMS actuation.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_SURFACE_POTENTIAL_NANOMEMBRANE,
+        "arxiv_1207_4429_surface_potential_nanomebrane",
+        "Nanomembrane Casimir force and in-situ surface-potential measurement comparator.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_CASIMIR_PULL_IN_FRAMEWORK,
+        "rspa_2020_0311_casimir_pull_in_framework",
+        "Casimir pull-in framework comparator.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_HIGH_STRESS_NANOMECHANICAL_RESONATORS,
+        "physrevapplied_15_034063_high_stress_sin",
+        "High-stress SiN comparator.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_TIN_MEMBRANE_RESONATORS,
+        "apl_127_222202_high_stress_tin",
+        "Ultra-high-stress TiN comparator.",
+      ),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "casimir", "layer_stack", "architecture", "engineering_gate"],
+      symbols: ["f_load", "f_lost", "sigma_support", "R_source", "M_pull-in"],
+      unitSignatures: ["Pa", "N/m", "1"],
+      repoPaths: [
+        NHM2_LAYER_STACK_ENGINEERING_ARCHITECTURE_LOOP_CONTRACT,
+        NHM2_LAYER_STACK_ENGINEERING_ARCHITECTURE_LOOP,
+        NHM2_LAYER_STACK_SUPPORT_FRACTION_SWEEP_CONTRACT,
+        NHM2_FULL_SOLVE_WHITEPAPER,
+      ],
+      equationFamilies: ["layer_stack_architecture_loop", "layer_stack_support_fraction_sweep"],
+      simulationOwners: ["NHM2", "casimir"],
+    },
+  }),
+  nhm2FullSolveBadge({
     id: "nhm2.experimental.prediction_freeze",
     title: "Experimental Prediction Freeze",
     plainMeaning:
@@ -5165,6 +5416,14 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     claimBoundaryNote: "A mechanical receipt target is not a material source tensor or physical pass.",
   },
   {
+    id: "research_gap_ledger_prioritizes_support_fraction_sweep",
+    from: "nhm2.experimental.research_gap_ledger",
+    to: "nhm2.experimental.layer_stack_support_fraction_sweep",
+    relation: "documents",
+    label: "The research-gap ledger motivates a support-fraction sweep to test whether stress limits and active-source retention overlap.",
+    claimBoundaryNote: "A support-fraction sweep is a go/no-go planning map, not material evidence.",
+  },
+  {
     id: "research_gap_ledger_prioritizes_metric_upper_bound",
     from: "nhm2.experimental.research_gap_ledger",
     to: "nhm2.experimental.metric_upper_bound",
@@ -5221,6 +5480,14 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     claimBoundaryNote: "Scalar load computation cannot substitute for pull-in, support, fatigue, thermal, or material receipts.",
   },
   {
+    id: "parameter_targets_feed_layer_stack_support_fraction_sweep",
+    from: "nhm2.experimental.parameter_targets",
+    to: "nhm2.experimental.layer_stack_support_fraction_sweep",
+    relation: "documents",
+    label: "Parameter targets provide the area, force, and layer count used to sweep support fraction versus source retention.",
+    claimBoundaryNote: "Support-fraction arithmetic cannot substitute for tensor or material receipts.",
+  },
+  {
     id: "parameter_targets_feed_metric_response",
     from: "nhm2.experimental.parameter_targets",
     to: "nhm2.experimental.invariant_metric_response",
@@ -5275,6 +5542,62 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     relation: "requires",
     label: "Array scaling review requires the 447-layer stack to survive pull-in, support, thermal, fatigue, and active-control constraints.",
     claimBoundaryNote: "Mechanical survivability does not establish source tensor authority.",
+  },
+  {
+    id: "layer_stack_mechanical_receipt_feeds_support_fraction_sweep",
+    from: "nhm2.experimental.layer_stack_mechanical_receipt",
+    to: "nhm2.experimental.layer_stack_support_fraction_sweep",
+    relation: "requires",
+    label: "The support-fraction sweep consumes the mechanical receipt's ideal stack load and stress scale.",
+    claimBoundaryNote: "The consumed load remains ideal scalar context until material receipts exist.",
+  },
+  {
+    id: "support_fraction_sweep_feeds_array_scaling",
+    from: "nhm2.experimental.layer_stack_support_fraction_sweep",
+    to: "nhm2.experimental.array_scaling",
+    relation: "requires",
+    label: "Array scaling requires a support fraction that can carry load while preserving active Casimir area.",
+    claimBoundaryNote: "A candidate window still requires support/drive tensor terms and material receipts.",
+  },
+  {
+    id: "support_fraction_sweep_motivates_architecture_loop",
+    from: "nhm2.experimental.layer_stack_support_fraction_sweep",
+    to: "nhm2.experimental.layer_stack_architecture_loop",
+    relation: "documents",
+    label: "The no-overlap support-fraction blocker motivates architectures that decouple load bearing from active area loss.",
+    claimBoundaryNote: "Architecture search prioritizes engineering receipts; it is not material-source evidence.",
+  },
+  {
+    id: "architecture_loop_feeds_array_scaling",
+    from: "nhm2.experimental.layer_stack_architecture_loop",
+    to: "nhm2.experimental.array_scaling",
+    relation: "requires",
+    label: "Array scaling must consume a load-path architecture that preserves active source area and pull-in margin.",
+    claimBoundaryNote: "Architecture review windows still require measured or simulated receipts before promotion.",
+  },
+  {
+    id: "architecture_loop_feeds_full_apparatus_tensor",
+    from: "nhm2.experimental.layer_stack_architecture_loop",
+    to: "nhm2.experimental.full_apparatus_tensor",
+    relation: "requires",
+    label: "Support, spacer, drive, thermal, and electrostatic terms identified by the architecture loop must enter the full apparatus tensor.",
+    claimBoundaryNote: "A support architecture cannot be treated as source tensor authority by itself.",
+  },
+  {
+    id: "architecture_loop_blocks_physical_lock",
+    from: "nhm2.experimental.layer_stack_architecture_loop",
+    to: "nhm2.claim_boundary.physical_viability_locked",
+    relation: "blocks",
+    label: "Missing material, pull-in, roughness, patch, active-control, or tensor receipts keep the 447-layer architecture at diagnostic review.",
+    claimBoundaryNote: "Engineering review cannot unlock physical, route, speed, transport, or propulsion claims.",
+  },
+  {
+    id: "support_fraction_sweep_blocks_physical_lock",
+    from: "nhm2.experimental.layer_stack_support_fraction_sweep",
+    to: "nhm2.claim_boundary.physical_viability_locked",
+    relation: "blocks",
+    label: "If stress and source-retention windows do not overlap, the 447-layer route remains blocked before physical review.",
+    claimBoundaryNote: "Go/no-go planning cannot unlock physical viability or transport claims.",
   },
   {
     id: "layer_stack_mechanical_receipt_blocks_physical_lock",
