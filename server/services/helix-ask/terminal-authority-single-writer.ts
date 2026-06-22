@@ -72,7 +72,12 @@ const syncTerminalAnswerAuthorityFromSingleWriterResult = (
   if (!selectedArtifactKind) return;
 
   const visibleText = readString(result.visible_text);
-  const finalAnswerSource = readString(result.source) ?? selectedArtifactKind;
+  const payloadFinalAnswerSource = readString(payload.final_answer_source);
+  const finalAnswerSource =
+    selectedArtifactKind === "tool_receipt" &&
+    payloadFinalAnswerSource === "deterministic_receipt_fallback"
+      ? "deterministic_receipt_fallback"
+      : readString(result.source) ?? selectedArtifactKind;
   const selectedArtifactRef = readString(result.selected_terminal_artifact_ref);
   const terminalKind = terminalKindForSelectedArtifact(selectedArtifactKind);
   const authority = readRecord(payload.terminal_answer_authority);
@@ -1759,6 +1764,37 @@ const artifactMatchesObservationKind = (artifact: ArtifactLike, pattern: RegExp)
   return values.some((value) => pattern.test(value));
 };
 
+const artifactIsStagePlayReflectionObservation = (artifact: ArtifactLike): boolean => {
+  if (artifactKind(artifact) !== "live_environment_tool_observation") return false;
+  const payload = artifactPayload(artifact);
+  const observation = readRecord(payload?.observation);
+  if (readString(payload?.tool_name) === "live_env.reflect_stage_play_context") return true;
+  if (readString(payload?.toolName) === "live_env.reflect_stage_play_context") return true;
+  if (
+    readString(observation?.schema) === "stage_play_reflection_result/v1" ||
+    readString(observation?.tool_name) === "live_env.reflect_stage_play_context" ||
+    readString(observation?.toolName) === "live_env.reflect_stage_play_context"
+  ) {
+    return true;
+  }
+  const serialized = JSON.stringify(payload ?? {});
+  return /(?:live_env\.reflect_stage_play_context|stage_play_reflection_result\/v1)/i.test(serialized);
+};
+
+const hasStagePlayReflectionObservation = (artifacts: ArtifactLike[]): boolean =>
+  artifacts.some(artifactIsStagePlayReflectionObservation);
+
+const runtimeLoopExecutedStagePlayReflection = (payload: Record<string, unknown>): boolean => {
+  const runtimeLoop = readRecord(payload.agent_runtime_loop);
+  return readArray(runtimeLoop?.iterations)
+    .map(readRecord)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+    .some((iteration) =>
+      readString(iteration.chosen_capability) === "live_env.reflect_stage_play_context" ||
+      readString(iteration.executed_action_key) === "live_env.reflect_stage_play_context"
+    );
+};
+
 const normalizeSingleWriterAuditRejectionReason = (
   reason: HelixTerminalAuthoritySingleWriterResult["rejected_candidates"][number]["reason"],
 ): TerminalAuthoritySingleWriterAuditRejectionReason => {
@@ -1930,7 +1966,7 @@ const stagePlayReceiptTextForDraft = (artifact: ArtifactLike): string => {
       ? text!
     : /^Stage Play/i.test(text ?? "")
       ? stagePlayReceiptPendingText
-      : text && !/\b(?:I could not|could not produce|terminal answer|typed_failure|selected terminal product)\b/i.test(text)
+      : text && !/\b(?:I could not|I couldn.?t|could not produce|couldn.?t produce|terminal answer|typed_failure|selected terminal product)\b/i.test(text)
         ? text
         : stagePlayReceiptPendingText;
 };
@@ -3530,9 +3566,13 @@ export function applyHelixTerminalAuthoritySingleWriter(
       /clarify:missing_args|request_user_input|pending_server_request/i.test(readString(input.payload.route_reason_code) ?? "")
     );
   const earlyDeterministicReceiptFallbackDraft = findDeterministicReceiptFallbackDraftAfterRequiredObservation(artifacts);
+  const stagePlayReflectionObservationObserved =
+    hasStagePlayReflectionObservation(artifacts) ||
+    runtimeLoopExecutedStagePlayReflection(input.payload);
   const earlyDeterministicReceiptFallbackCanSurface =
     Boolean(earlyDeterministicReceiptFallbackDraft) &&
     (
+      stagePlayReflectionObservationObserved ||
       isStagePlayPostObservationSynthesisText(artifactText(earlyDeterministicReceiptFallbackDraft!.artifact)) ||
       readString(canonicalGoal?.goal_kind) === "live_environment_review" ||
       readString(capabilityPlan?.requested_action) === "live_env.reflect_stage_play_context" ||
@@ -4947,7 +4987,50 @@ export function applyHelixTerminalAuthoritySingleWriter(
       authority_origin: "selected_final_answer",
     };
   }
+  if (
+    (
+      deterministicReceiptFallbackCanSurface &&
+      deterministicReceiptFallbackDraft
+    ) ||
+    (
+      readString(input.payload.terminal_artifact_kind) === "tool_receipt" &&
+      readString(input.payload.final_answer_source) === "deterministic_receipt_fallback"
+    )
+  ) {
+    const receiptText = deterministicReceiptFallbackDraft
+      ? stagePlayReceiptTextForDraft(deterministicReceiptFallbackDraft.artifact)
+      : readString(input.payload.receipt_status_text) ??
+        readString(readRecord(input.payload.terminal_presentation)?.concise_text) ??
+        readString(input.payload.answer) ??
+        readString(input.payload.text) ??
+        stagePlayReceiptPendingText;
+    envelope = {
+      ...envelope,
+      terminal_artifact_kind: "tool_receipt",
+      final_answer_source: "deterministic_receipt_fallback",
+      terminal_text: receiptText,
+      terminal_text_hash: hashHelixTerminalText(receiptText),
+      terminal_kind: "tool_receipt",
+      authority_origin: "tool_receipt",
+    };
+    selectedArtifactKind = "tool_receipt";
+    selectedSource = "tool_receipt";
+    selectedArtifactRef = deterministicReceiptFallbackDraft
+      ? artifactId(deterministicReceiptFallbackDraft.artifact)
+      : readString(input.payload.terminal_artifact_id);
+  }
   const appliedEnvelope = applyTerminalAnswerEnvelope(input.payload, envelope);
+  if (deterministicReceiptFallbackCanSurface && deterministicReceiptFallbackDraft) {
+    input.payload.final_answer_source = "deterministic_receipt_fallback";
+    const terminalAuthority = readRecord(input.payload.terminal_answer_authority);
+    if (terminalAuthority) {
+      terminalAuthority.final_answer_source = "deterministic_receipt_fallback";
+    }
+    const terminalEnvelope = readRecord(input.payload.terminal_answer_envelope);
+    if (terminalEnvelope) {
+      terminalEnvelope.final_answer_source = "deterministic_receipt_fallback";
+    }
+  }
   const visibleText = appliedEnvelope.terminal_text;
   const latestDraftForIntegrity =
     materializedDraftCandidate ?? findLatestFinalAnswerDraftCandidate(artifacts);
@@ -4978,7 +5061,6 @@ export function applyHelixTerminalAuthoritySingleWriter(
     const text = artifactText(artifact);
     return Boolean(text && text === visibleText);
   });
-  const wroteVisibleFields = [...VISIBLE_ANSWER_FIELDS];
   const terminalAuthorityForEnvelopeMirror = readRecord(input.payload.terminal_answer_authority);
   const terminalPresentationForEnvelopeMirror = readRecord(input.payload.terminal_presentation);
   const workstationEnvelopeSelectionKind =
@@ -5015,7 +5097,13 @@ export function applyHelixTerminalAuthoritySingleWriter(
           ? "workstation_tool_evaluation"
           : selectedSource === "terminal_authority_repair_failure"
             ? selectedSource
-            : selectedSource;
+          : selectedSource;
+  const nonAuthoritativeReceiptStatusResult =
+    selectedTerminalArtifactKind === "tool_receipt" &&
+    resultSource === "tool_receipt";
+  const wroteVisibleFields = VISIBLE_ANSWER_FIELDS.filter((field) =>
+    !(nonAuthoritativeReceiptStatusResult && field === "payload.selected_final_answer")
+  );
   const envelopeSelectedArtifactRef =
     appliedEnvelope.terminal_artifact_kind === "repo_code_evidence_answer"
       ? readString(input.payload.terminal_artifact_id) ??
@@ -5104,6 +5192,10 @@ export function applyHelixTerminalAuthoritySingleWriter(
       compound_materialized_draft_can_satisfy_terminal: compoundMaterializedDraftCanSatisfyTerminal,
       docs_draft_materialization_matches_required_goal: docsDraftMaterializationMatchesRequiredGoal,
       repo_draft_materialization_matches_required_goal: repoDraftMaterializationMatchesRequiredGoal,
+      deterministic_receipt_fallback_draft_found: Boolean(deterministicReceiptFallbackDraft),
+      deterministic_receipt_fallback_can_surface: deterministicReceiptFallbackCanSurface,
+      stage_play_reflection_observation_observed: stagePlayReflectionObservationObserved,
+      early_deterministic_receipt_fallback_can_surface: earlyDeterministicReceiptFallbackCanSurface,
     },
   };
   result = applyTerminalProjectionKindGuard(input.payload, result);

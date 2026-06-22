@@ -176,6 +176,8 @@ const passingEvidence: BuildNhm2TileSourceMaterialEvidenceReceiptsInput = {
     thermalModelRef: "receipt://active-control/thermal-model-v1",
     heatSinkCapacityTraceRef: "receipt://active-control/heat-sink-capacity-trace-v1",
     heatLoadTraceRef: "receipt://active-control/heat-load-trace-v1",
+    sourceTensorContaminationRef:
+      "receipt://active-control/source-tensor-contamination-v1",
     timingSyncTraceRef: "receipt://active-control/timing-sync-trace-v1",
     phaseNoiseSpectrumRef: "receipt://active-control/phase-noise-spectrum-v1",
     lockAcquisitionTraceRef: "receipt://active-control/lock-acquisition-trace-v1",
@@ -187,6 +189,7 @@ const passingEvidence: BuildNhm2TileSourceMaterialEvidenceReceiptsInput = {
     noiseSpectrumRef: "receipt://active-control/gap-noise-spectrum-v1",
     heatLoadW: 20,
     heatSinkCapacityW: 30,
+    sourceTensorContaminationFraction: 0.01,
     timingJitterSeconds: 1e-12,
     phaseNoiseRmsSeconds: 1e-12,
     controllerPhaseMarginDegrees: 60,
@@ -292,6 +295,13 @@ const passingEvidence: BuildNhm2TileSourceMaterialEvidenceReceiptsInput = {
       layerScalingCrossTerms: "receipt://full-apparatus-tmunu/terms/layer-cross-terms-v1",
       casimirInteractionStressEnergy: "receipt://full-apparatus-tmunu/terms/casimir-v1",
       materialStrainEnergy: "receipt://full-apparatus-tmunu/terms/material-strain-v1",
+    },
+    subsystemReceiptRefs: {
+      materialCoupon: "receipt://material-coupon/tin/v1",
+      forceGapPullIn: "receipt://force-gap/8nm/v1",
+      roughnessPatch: "receipt://roughness-patch/tin/v1",
+      activeControl: "receipt://active-control/gap-lock-v1",
+      fatigueLayerScaling: "receipt://fatigue-layer-scaling/v1",
     },
     regionalCoverage: {
       wall: true,
@@ -832,9 +842,9 @@ describe("NHM2 tile source material evidence receipts", () => {
       expect(result.experimentalCampaignPackage.summary.measurementDocketCount).toBeGreaterThan(
         result.experimentalCampaignPackage.summary.measurementCount,
       );
-      expect(result.experimentalCampaignPackage.summary.measurementCount).toBe(73);
-      expect(result.experimentalCampaignPackage.summary.measurementDocketCount).toBe(74);
-      expect(result.experimentalCampaignPackage.summary.requiredTargetAvailableCount).toBe(64);
+      expect(result.experimentalCampaignPackage.summary.measurementCount).toBe(76);
+      expect(result.experimentalCampaignPackage.summary.measurementDocketCount).toBe(77);
+      expect(result.experimentalCampaignPackage.summary.requiredTargetAvailableCount).toBe(67);
       expect(result.experimentalCampaignPackage.summary.requiredTargetPendingCount).toBe(0);
       expect(result.experimentalCampaignPackage.summary.requiredTargetNotApplicableCount).toBe(10);
       expect(result.experimentalCampaignPackage.summary.requiredTargetNotDeclaredCount).toBe(0);
@@ -844,7 +854,7 @@ describe("NHM2 tile source material evidence receipts", () => {
       expect(result.experimentalCampaignPackage.summary.objectiveCoverageCount).toBe(9);
       expect(result.experimentalCampaignPackage.summary.campaignDomainLedgerCount).toBe(8);
       expect(result.experimentalCampaignPackage.summary.receiptAcquisitionDomainCount).toBe(8);
-      expect(result.experimentalCampaignPackage.summary.receiptArtifactRequirementCount).toBe(74);
+      expect(result.experimentalCampaignPackage.summary.receiptArtifactRequirementCount).toBe(77);
       expect(result.experimentalCampaignPackage.summary.domainsWithPendingDerivedTargetsCount).toBe(
         0,
       );
@@ -941,6 +951,7 @@ describe("NHM2 tile source material evidence receipts", () => {
               "receipt://roughness_patch_metrology/asperity_p999_tail_v1",
               "receipt://roughness_patch_metrology/asperity_tail_map_v1",
               "receipt://roughness_patch_metrology/patch_voltage_rms_v1",
+              "receipt://roughness_patch_metrology/patch_voltage_correlation_length_v1",
               "receipt://roughness_patch_metrology/patch_derived_electrostatic_fraction_v1",
               "receipt://roughness_patch_metrology/patch_potential_force_v1",
             ]),
@@ -953,10 +964,11 @@ describe("NHM2 tile source material evidence receipts", () => {
               "asperity_p999_tail",
               "asperity_tail_clearance",
               "patch_voltage_rms",
+              "patch_voltage_correlation_length",
               "patch_derived_electrostatic_fraction",
               "patch_potential_force_fraction",
             ]),
-            requiredTargetAvailableCount: 9,
+            requiredTargetAvailableCount: 10,
             requiredTargetPendingCount: 0,
             pendingTargetGaps: [],
           }),
@@ -973,6 +985,7 @@ describe("NHM2 tile source material evidence receipts", () => {
               "receipt://active_control/controller_phase_margin_v1",
               "receipt://active_control/controller_gain_margin_v1",
               "receipt://active_control/heat_load_v1",
+              "receipt://active_control/source_tensor_contamination_v1",
               "receipt://active_control/heat_load_sink_capacity_v1",
               "receipt://active_control/energy_per_cycle_heat_limit_v1",
               "receipt://active_control/failure_mode_coverage_v1",
@@ -988,11 +1001,12 @@ describe("NHM2 tile source material evidence receipts", () => {
               "controller_phase_margin",
               "controller_gain_margin",
               "active_control_heat_load",
+              "active_control_source_tensor_contamination",
               "thermal_sink_capacity",
               "energy_per_cycle_heat_limit",
               "failure_mode_coverage",
             ]),
-            requiredTargetAvailableCount: 13,
+            requiredTargetAvailableCount: 14,
             requiredTargetPendingCount: 0,
             pendingTargetGaps: [],
           }),
@@ -1052,6 +1066,7 @@ describe("NHM2 tile source material evidence receipts", () => {
               "receipt://full_apparatus_tensor/component_detail_refs_v1",
               "receipt://full_apparatus_tensor/stress_energy_term_coverage_v1",
               "receipt://full_apparatus_tensor/stress_energy_terms_v1",
+              "receipt://full_apparatus_tensor/subsystem_receipt_traceability_v1",
               "receipt://full_apparatus_tensor/regional_coverage_v1",
               "receipt://full_apparatus_tensor/regional_supports_v1",
             ]),
@@ -1063,10 +1078,11 @@ describe("NHM2 tile source material evidence receipts", () => {
               "tensor_component_detail_refs",
               "apparatus_stress_energy_term_coverage",
               "apparatus_stress_energy_term_refs",
+              "subsystem_receipt_traceability",
               "regional_tensor_coverage",
               "regional_support_refs",
             ]),
-            requiredTargetAvailableCount: 9,
+            requiredTargetAvailableCount: 10,
             requiredTargetPendingCount: 0,
             pendingTargetGaps: [],
           }),
@@ -1292,6 +1308,16 @@ describe("NHM2 tile source material evidence receipts", () => {
           }),
           expect.objectContaining({
             campaignDomain: "roughness_patch_potential",
+            measurementId: "patch_voltage_correlation_length",
+            evidenceArtifact: "receipt://roughness_patch_metrology/patch_voltage_correlation_length_v1",
+            requiredCorrectionKey: "patchVoltageCorrelationLengthAvailable",
+            requiredCorrectionValue: false,
+            requiredTargetKey: "patchVoltageCorrelationLengthRequired",
+            requiredTargetValue: true,
+            requiredTargetStatus: "available",
+          }),
+          expect.objectContaining({
+            campaignDomain: "roughness_patch_potential",
             measurementId: "patch_derived_electrostatic_fraction",
             requiredCorrectionKey: "patchVoltageDerivedElectrostaticFractionReduction",
             requiredTargetKey: "patchVoltageDerivedElectrostaticFractionMax",
@@ -1311,7 +1337,7 @@ describe("NHM2 tile source material evidence receipts", () => {
             measurementId: "active_control_trace_refs",
             requiredCorrectionKey: "missingTraceRefCount",
             requiredTargetKey: "requiredTraceRefCount",
-            requiredTargetValue: 14,
+            requiredTargetValue: 15,
             requiredTargetStatus: "available",
           }),
           expect.objectContaining({
@@ -1396,6 +1422,14 @@ describe("NHM2 tile source material evidence receipts", () => {
               "heatSinkCapacityW >= 1.2 * max(heatLoadW, energyPerCycleJ * switchingRateHz)",
             requiredTargetStatus: "available",
             requiredTargetGapReason: null,
+          }),
+          expect.objectContaining({
+            campaignDomain: "active_control_energy_noise_heat_timing",
+            measurementId: "active_control_source_tensor_contamination",
+            requiredCorrectionKey: "sourceTensorContaminationFractionReduction",
+            requiredTargetKey: "sourceTensorContaminationFractionMax",
+            requiredTargetValue: 0.05,
+            requiredTargetStatus: "available",
           }),
           expect.objectContaining({
             campaignDomain: "active_control_energy_noise_heat_timing",
@@ -1615,6 +1649,16 @@ describe("NHM2 tile source material evidence receipts", () => {
             requiredTargetValue: 9,
             requiredTargetStatus: "available",
             noGoCriterion: expect.stringContaining("support/control/electrostatic/thermal"),
+          }),
+          expect.objectContaining({
+            campaignDomain: "full_apparatus_tensor",
+            measurementId: "subsystem_receipt_traceability",
+            requiredCorrectionKey: "subsystemReceiptRefMissingCount",
+            requiredCorrectionValue: 5,
+            requiredTargetKey: "requiredSubsystemReceiptCount",
+            requiredTargetValue: 5,
+            requiredTargetStatus: "available",
+            noGoCriterion: expect.stringContaining("upstream experimental receipt refs"),
           }),
           expect.objectContaining({
             campaignDomain: "full_apparatus_tensor",
@@ -2456,6 +2500,11 @@ describe("NHM2 tile source material evidence receipts", () => {
           measurementId: "apparatus_stress_energy_term_refs",
           requiredCorrectionKey: "stressEnergyTermRefMissingCount",
           target: expect.stringContaining("9 term refs"),
+        }),
+        expect.objectContaining({
+          measurementId: "subsystem_receipt_traceability",
+          requiredCorrectionKey: "subsystemReceiptRefMissingCount",
+          target: expect.stringContaining("material coupon"),
         }),
       ]),
     );
@@ -4038,7 +4087,7 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(provenance?.blockerIds).toContain("active_gap_control_energy_and_noise_missing");
     expect(provenance?.measurementTargets).toMatchObject({
       requiredEvidenceTier: "measured_or_validated_simulation",
-      requiredTraceRefCount: 14,
+      requiredTraceRefCount: 15,
       requiredFailureModeCount: 5,
       switchingRateHz: 15e9,
     });
@@ -4148,6 +4197,7 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.operatingTargets.controllerPhaseMarginMinDegrees).toBe(45);
     expect(budget.operatingTargets.controllerGainMarginMinDb).toBe(6);
     expect(budget.operatingTargets.thermalSinkCapacityFactorMin).toBe(1.2);
+    expect(budget.operatingTargets.sourceTensorContaminationFractionMax).toBe(0.05);
     expect(budget.operatingTargets.requiredGapControlAuthorityN).toBeCloseTo(17026.06, 2);
     expect(budget.derivedOperatingBudget.gapControlAuthorityMargin).toBeNull();
     expect(budget.requiredCorrections.switchingRateTargetHz).toBe(15e9);
@@ -4167,8 +4217,10 @@ describe("NHM2 tile source material evidence receipts", () => {
       "heatSinkCapacityW >= 1.2 * max(heatLoadW, energyPerCycleJ * switchingRateHz)",
     );
     expect(budget.requiredCorrections.heatSinkCapacityMinW).toBeNull();
-    expect(budget.requiredCorrections.requiredTraceRefCount).toBe(14);
-    expect(budget.requiredCorrections.missingTraceRefCount).toBe(14);
+    expect(budget.requiredCorrections.sourceTensorContaminationFractionMax).toBe(0.05);
+    expect(budget.requiredCorrections.sourceTensorContaminationFractionReduction).toBeNull();
+    expect(budget.requiredCorrections.requiredTraceRefCount).toBe(15);
+    expect(budget.requiredCorrections.missingTraceRefCount).toBe(15);
     expect(budget.requiredCorrections.requiredFailureModeCount).toBe(5);
     expect(budget.requiredCorrections.missingFailureModeCount).toBe(5);
     expect(budget.summary.firstBlocker).toBe("active_control_receipt_missing_for_operating_budget");
@@ -4212,6 +4264,7 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.derivedOperatingBudget.controllerGainMargin).toBeGreaterThan(1);
     expect(budget.derivedOperatingBudget.thermalAccountingMargin).toBeGreaterThan(1);
     expect(budget.derivedOperatingBudget.thermalSinkCapacityMargin).toBeGreaterThan(1);
+    expect(budget.derivedOperatingBudget.sourceTensorContaminationMargin).toBeGreaterThan(1);
     expect(budget.requiredCorrections.switchingRateAbsDeltaHz).toBe(0);
     expect(budget.requiredCorrections.bandwidthShortfallHz).toBe(0);
     expect(budget.requiredCorrections.gapControlAuthorityShortfallN).toBe(0);
@@ -4227,6 +4280,7 @@ describe("NHM2 tile source material evidence receipts", () => {
     );
     expect(budget.requiredCorrections.heatSinkCapacityShortfallW).toBe(0);
     expect(budget.requiredCorrections.energyPerCycleReductionJ).toBe(0);
+    expect(budget.requiredCorrections.sourceTensorContaminationFractionReduction).toBe(0);
     expect(budget.requiredCorrections.missingTraceRefCount).toBe(0);
     expect(budget.requiredCorrections.missingFailureModeCount).toBe(0);
     expect(budget.summary.physicalViabilityClaimAllowed).toBe(false);
@@ -4367,7 +4421,7 @@ describe("NHM2 tile source material evidence receipts", () => {
       18,
     );
     expect(budget.requiredCorrections.energyPerCycleReductionJ).toBeGreaterThan(0);
-    expect(budget.requiredCorrections.missingTraceRefCount).toBe(2);
+    expect(budget.requiredCorrections.missingTraceRefCount).toBe(3);
     expect(budget.requiredCorrections.missingFailureModeCount).toBe(5);
     expect(budget.summary.transportClaimAllowed).toBe(false);
   });
@@ -4440,7 +4494,7 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(activeSurface?.numericalMargins.activeControlProvenanceRefsAvailable).toBe(0);
     expect(plan.summary.nextRequiredTestId).toBe("active_control_provenance");
     expect(provenance?.status).toBe("falsifying");
-    expect(provenance?.measurementTargets.requiredTraceRefCount).toBe(14);
+    expect(provenance?.measurementTargets.requiredTraceRefCount).toBe(15);
     expect(provenance?.falsificationRule).toContain("trace");
     expect(plan.summary.nextRequiredArtifactToProduce).toBe(
       "receipt://active_control/provenance_v1",
@@ -4476,7 +4530,7 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.requiredCorrections.timingJitterReductionSeconds).toBe(0);
     expect(budget.requiredCorrections.heatLoadShortfallW).toBe(0);
     expect(budget.requiredCorrections.energyPerCycleReductionJ).toBe(0);
-    expect(budget.requiredCorrections.missingTraceRefCount).toBe(12);
+    expect(budget.requiredCorrections.missingTraceRefCount).toBe(13);
     expect(budget.requiredCorrections.missingFailureModeCount).toBe(5);
     expect(budget.summary.physicalViabilityClaimAllowed).toBe(false);
   });

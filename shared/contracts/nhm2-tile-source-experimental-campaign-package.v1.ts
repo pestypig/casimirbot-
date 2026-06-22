@@ -395,6 +395,7 @@ const REQUIRED_TARGET_KEY_BY_CORRECTION_KEY: Record<string, string> = {
   missingTraceRefCount: "requiredTraceRefCount",
   patchVoltageDerivedElectrostaticFractionReduction:
     "patchVoltageDerivedElectrostaticFractionMax",
+  patchVoltageCorrelationLengthAvailable: "patchVoltageCorrelationLengthRequired",
   patchVoltageReductionVolts: "patchVoltageRmsMaxVolts",
   perLayerVariationReduction: "perLayerVariationFractionMax",
   phaseNoiseReductionSeconds: "phaseNoiseMaxSeconds",
@@ -408,9 +409,12 @@ const REQUIRED_TARGET_KEY_BY_CORRECTION_KEY: Record<string, string> = {
   roughnessScanAreaFractionShortfall: "roughnessScanAreaFractionMin",
   springConstantShortfallNPerM: "springConstantMinNPerM",
   stictionMarginShortfall: "stictionMarginMin",
+  sourceTensorContaminationFractionReduction:
+    "sourceTensorContaminationFractionMax",
   sourceTensorRetentionFractionShortfall: "sourceTensorRetentionFractionMin",
   stressEnergyTermMissingCount: "requiredStressEnergyTermCount",
   stressEnergyTermRefMissingCount: "requiredStressEnergyTermCount",
+  subsystemReceiptRefMissingCount: "requiredSubsystemReceiptCount",
   suppliedForceDeltaFromIdealStackForceN: "suppliedForceAbsTargetN",
   supportCouplingFractionReduction: "supportCouplingFractionMax",
   supportCouplingStatusSatisfied: "supportCouplingStatusRequired",

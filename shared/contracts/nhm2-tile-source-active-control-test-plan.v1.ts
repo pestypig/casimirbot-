@@ -12,6 +12,7 @@ export type Nhm2ActiveControlTestId =
   | "control_bandwidth"
   | "gap_noise"
   | "heat_load"
+  | "source_tensor_contamination"
   | "timing_jitter"
   | "failure_mode";
 
@@ -59,6 +60,7 @@ export type Nhm2TileSourceActiveControlTestPlanV1 = {
     controllerPhaseMarginMinDegrees: 45;
     controllerGainMarginMinDb: 6;
     thermalSinkCapacityFactorMin: 1.2;
+    sourceTensorContaminationFractionMax: 0.05;
     evidenceTierRequired: "measured_or_validated_simulation";
   };
   testItems: Nhm2ActiveControlTestPlanItemV1[];
@@ -112,8 +114,9 @@ const GAP_NOISE_RMS_MAX_METERS = 8e-11;
 const TIMING_JITTER_MAX_SECONDS = TIMING_JITTER_CYCLE_FRACTION_MAX / SWITCHING_RATE_HZ;
 const PHASE_NOISE_MAX_SECONDS = PHASE_NOISE_CYCLE_FRACTION_MAX / SWITCHING_RATE_HZ;
 const REQUIRED_GAP_CONTROL_AUTHORITY_N = 17026.061141137077;
-const REQUIRED_TRACE_REF_COUNT = 14;
+const REQUIRED_TRACE_REF_COUNT = 15;
 const REQUIRED_FAILURE_MODE_COUNT = 5;
+const SOURCE_TENSOR_CONTAMINATION_FRACTION_MAX = 0.05;
 
 const DEFAULT_BLOCKED_DOMAINS: Nhm2ActiveControlBlockedCampaignDomain[] = [
   "force_gap_pull_in",
@@ -149,6 +152,7 @@ const TEST_POLICY: Record<
       "active_control_thermal_model_ref_missing",
       "active_control_heat_sink_capacity_trace_ref_missing",
       "active_control_heat_load_trace_ref_missing",
+      "active_control_source_tensor_contamination_ref_missing",
       "active_control_timing_sync_trace_ref_missing",
       "active_control_phase_noise_spectrum_ref_missing",
       "active_control_lock_acquisition_trace_ref_missing",
@@ -229,6 +233,21 @@ const TEST_POLICY: Record<
       "If heat load is missing, below computed control power, or heat-sink capacity is below 1.2x heat load, active-control operation cannot be admitted into material or time-dependent source evidence.",
     blocksCampaignDomains: ["fatigue_layer_scaling", "full_apparatus_tensor", "material_credibility_gate", "covariant_conservation", "time_dependent_source_campaign"],
     artifactToProduce: "receipt://active_control/heat_load_v1",
+  },
+  source_tensor_contamination: {
+    blockers: [
+      "active_control_source_tensor_contamination_receipt_missing",
+      "active_control_source_tensor_contamination_above_5pct",
+      "active_control_source_tensor_contamination_ref_missing",
+    ],
+    requiredMeasurement:
+      "Active-control source-tensor contamination receipt converting actuator fields, gap noise, and heat/timing sidebands into a fractional full-apparatus T_mu_nu contribution.",
+    acceptanceCriterion:
+      "Active-control contamination is no more than 5% of the intended source tensor and is backed by a contamination-model receipt.",
+    falsificationRule:
+      "If active-control fields, noise, or timing sidebands contaminate more than 5% of the apparatus source tensor, controller lock cannot be admitted as source-side T_mu_nu evidence.",
+    blocksCampaignDomains: ["full_apparatus_tensor", "material_credibility_gate", "covariant_conservation", "time_dependent_source_campaign"],
+    artifactToProduce: "receipt://active_control/source_tensor_contamination_v1",
   },
   timing_jitter: {
     blockers: [
@@ -326,6 +345,13 @@ const measurementTargetsForTest = (
         heatLoadTraceRefRequired: true,
         thermalModelRefRequired: true,
       };
+    case "source_tensor_contamination":
+      return {
+        sourceTensorContaminationFractionMax:
+          SOURCE_TENSOR_CONTAMINATION_FRACTION_MAX,
+        sourceTensorContaminationRefRequired: true,
+        activeControlFieldEnergyTermRequired: true,
+      };
     case "timing_jitter":
       return {
         switchingRateHz: SWITCHING_RATE_HZ,
@@ -388,6 +414,7 @@ export const buildNhm2TileSourceActiveControlTestPlan = (
       controllerPhaseMarginMinDegrees: CONTROLLER_PHASE_MARGIN_MIN_DEGREES,
       controllerGainMarginMinDb: CONTROLLER_GAIN_MARGIN_MIN_DB,
       thermalSinkCapacityFactorMin: THERMAL_SINK_CAPACITY_FACTOR_MIN,
+      sourceTensorContaminationFractionMax: SOURCE_TENSOR_CONTAMINATION_FRACTION_MAX,
       evidenceTierRequired: "measured_or_validated_simulation",
     },
     testItems,
@@ -448,9 +475,10 @@ export const isNhm2TileSourceActiveControlTestPlan = (
     target.controllerPhaseMarginMinDegrees === 45 &&
     target.controllerGainMarginMinDb === 6 &&
     target.thermalSinkCapacityFactorMin === 1.2 &&
+    target.sourceTensorContaminationFractionMax === 0.05 &&
     target.evidenceTierRequired === "measured_or_validated_simulation" &&
     Array.isArray(value.testItems) &&
-    value.testItems.length === 7 &&
+    value.testItems.length === 8 &&
     value.testItems.every(
       (item) =>
         isRecord(item) &&

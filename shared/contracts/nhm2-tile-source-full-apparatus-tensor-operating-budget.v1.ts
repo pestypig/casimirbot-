@@ -21,6 +21,7 @@ export type Nhm2TileSourceFullApparatusTensorOperatingBudgetV1 = {
     requiredTensorComponentCount: 10;
     requiredTermCount: 9;
     requiredRegionCount: 3;
+    requiredSubsystemReceiptCount: 5;
     requiredAuthorityMetadataCount: 4;
     requiredRegions: ["wall", "hull", "exterior_shell"];
     sourceSideOnly: true;
@@ -82,6 +83,13 @@ export type Nhm2TileSourceFullApparatusTensorOperatingBudgetV1 = {
       casimirInteractionStressEnergy: string | null;
       materialStrainEnergy: string | null;
     };
+    subsystemReceiptRefs: {
+      materialCoupon: string | null;
+      forceGapPullIn: string | null;
+      roughnessPatch: string | null;
+      activeControl: string | null;
+      fatigueLayerScaling: string | null;
+    };
     regionalCoverage: {
       wall: boolean;
       hull: boolean;
@@ -102,6 +110,7 @@ export type Nhm2TileSourceFullApparatusTensorOperatingBudgetV1 = {
     componentDetailRefsComplete: boolean;
     tensorValueArtifactAvailable: boolean;
     termRefsComplete: boolean;
+    subsystemReceiptRefsComplete: boolean;
     regionalSupportRefsComplete: boolean;
     fullTensorCoverageComplete: boolean;
     requiredStressEnergyTermsComplete: boolean;
@@ -122,6 +131,9 @@ export type Nhm2TileSourceFullApparatusTensorOperatingBudgetV1 = {
     missingStressEnergyTermIds: string[];
     stressEnergyTermRefMissingCount: number;
     missingStressEnergyTermRefIds: string[];
+    requiredSubsystemReceiptCount: 5;
+    subsystemReceiptRefMissingCount: number;
+    missingSubsystemReceiptRefIds: string[];
     requiredRegionCount: 3;
     regionCoverageMissingCount: number;
     missingRegionIds: string[];
@@ -198,6 +210,13 @@ const STRESS_ENERGY_TERM_IDS = [
   "layerScalingCrossTerms",
   "casimirInteractionStressEnergy",
   "materialStrainEnergy",
+] as const;
+const SUBSYSTEM_RECEIPT_IDS = [
+  "materialCoupon",
+  "forceGapPullIn",
+  "roughnessPatch",
+  "activeControl",
+  "fatigueLayerScaling",
 ] as const;
 const REGION_IDS = ["wall", "hull", "exteriorShell"] as const;
 const AUTHORITY_METADATA_IDS = [
@@ -289,6 +308,12 @@ export const buildNhm2TileSourceFullApparatusTensorOperatingBudget = (
     evidence.termRefs.layerScalingCrossTerms != null &&
     evidence.termRefs.casimirInteractionStressEnergy != null &&
     evidence.termRefs.materialStrainEnergy != null;
+  const subsystemReceiptRefsComplete =
+    evidence.subsystemReceiptRefs?.materialCoupon != null &&
+    evidence.subsystemReceiptRefs.forceGapPullIn != null &&
+    evidence.subsystemReceiptRefs.roughnessPatch != null &&
+    evidence.subsystemReceiptRefs.activeControl != null &&
+    evidence.subsystemReceiptRefs.fatigueLayerScaling != null;
   const regionalSupportRefsComplete =
     evidence.regionalSupportRefs?.wall != null &&
     evidence.regionalSupportRefs.hull != null &&
@@ -318,6 +343,9 @@ export const buildNhm2TileSourceFullApparatusTensorOperatingBudget = (
   );
   const missingStressEnergyTermRefIds = STRESS_ENERGY_TERM_IDS.filter(
     (termId) => evidence.termRefs?.[termId] == null,
+  );
+  const missingSubsystemReceiptRefIds = SUBSYSTEM_RECEIPT_IDS.filter(
+    (subsystemId) => evidence.subsystemReceiptRefs?.[subsystemId] == null,
   );
   const missingRegionIds = REGION_IDS.filter((regionId) => !evidence.regionalCoverage[regionId]);
   const missingRegionalSupportRefIds = REGION_IDS.filter(
@@ -452,6 +480,21 @@ export const buildNhm2TileSourceFullApparatusTensorOperatingBudget = (
     ...(evidence.termRefs?.materialStrainEnergy == null
       ? ["full_apparatus_material_strain_energy_ref_missing_for_operating_budget"]
       : []),
+    ...(evidence.subsystemReceiptRefs?.materialCoupon == null
+      ? ["full_apparatus_material_coupon_receipt_ref_missing_for_operating_budget"]
+      : []),
+    ...(evidence.subsystemReceiptRefs?.forceGapPullIn == null
+      ? ["full_apparatus_force_gap_receipt_ref_missing_for_operating_budget"]
+      : []),
+    ...(evidence.subsystemReceiptRefs?.roughnessPatch == null
+      ? ["full_apparatus_roughness_patch_receipt_ref_missing_for_operating_budget"]
+      : []),
+    ...(evidence.subsystemReceiptRefs?.activeControl == null
+      ? ["full_apparatus_active_control_receipt_ref_missing_for_operating_budget"]
+      : []),
+    ...(evidence.subsystemReceiptRefs?.fatigueLayerScaling == null
+      ? ["full_apparatus_fatigue_layer_scaling_receipt_ref_missing_for_operating_budget"]
+      : []),
     ...(!evidence.regionalCoverage.wall
       ? ["full_apparatus_wall_region_missing_for_operating_budget"]
       : []),
@@ -491,6 +534,7 @@ export const buildNhm2TileSourceFullApparatusTensorOperatingBudget = (
       requiredTensorComponentCount: 10,
       requiredTermCount: 9,
       requiredRegionCount: 3,
+      requiredSubsystemReceiptCount: 5,
       requiredAuthorityMetadataCount: 4,
       requiredRegions: ["wall", "hull", "exterior_shell"],
       sourceSideOnly: true,
@@ -538,6 +582,13 @@ export const buildNhm2TileSourceFullApparatusTensorOperatingBudget = (
         casimirInteractionStressEnergy: evidence.termRefs?.casimirInteractionStressEnergy ?? null,
         materialStrainEnergy: evidence.termRefs?.materialStrainEnergy ?? null,
       },
+      subsystemReceiptRefs: {
+        materialCoupon: evidence.subsystemReceiptRefs?.materialCoupon ?? null,
+        forceGapPullIn: evidence.subsystemReceiptRefs?.forceGapPullIn ?? null,
+        roughnessPatch: evidence.subsystemReceiptRefs?.roughnessPatch ?? null,
+        activeControl: evidence.subsystemReceiptRefs?.activeControl ?? null,
+        fatigueLayerScaling: evidence.subsystemReceiptRefs?.fatigueLayerScaling ?? null,
+      },
       regionalCoverage: { ...evidence.regionalCoverage },
       regionalSupportRefs: {
         wall: evidence.regionalSupportRefs?.wall ?? null,
@@ -554,6 +605,7 @@ export const buildNhm2TileSourceFullApparatusTensorOperatingBudget = (
       componentDetailRefsComplete,
       tensorValueArtifactAvailable,
       termRefsComplete,
+      subsystemReceiptRefsComplete,
       regionalSupportRefsComplete,
       fullTensorCoverageComplete,
       requiredStressEnergyTermsComplete,
@@ -574,6 +626,9 @@ export const buildNhm2TileSourceFullApparatusTensorOperatingBudget = (
       missingStressEnergyTermIds,
       stressEnergyTermRefMissingCount: missingStressEnergyTermRefIds.length,
       missingStressEnergyTermRefIds,
+      requiredSubsystemReceiptCount: 5,
+      subsystemReceiptRefMissingCount: missingSubsystemReceiptRefIds.length,
+      missingSubsystemReceiptRefIds,
       requiredRegionCount: 3,
       regionCoverageMissingCount: missingRegionIds.length,
       missingRegionIds,
@@ -644,6 +699,7 @@ export const isNhm2TileSourceFullApparatusTensorOperatingBudget = (
     targets.requiredTensorComponentCount === 10 &&
     targets.requiredTermCount === 9 &&
     targets.requiredRegionCount === 3 &&
+    targets.requiredSubsystemReceiptCount === 5 &&
     targets.requiredAuthorityMetadataCount === 4 &&
     Array.isArray(targets.requiredRegions) &&
     targets.requiredRegions.length === 3 &&
@@ -662,6 +718,7 @@ export const isNhm2TileSourceFullApparatusTensorOperatingBudget = (
     typeof budget.componentDetailRefsComplete === "boolean" &&
     typeof budget.tensorValueArtifactAvailable === "boolean" &&
     typeof budget.termRefsComplete === "boolean" &&
+    typeof budget.subsystemReceiptRefsComplete === "boolean" &&
     typeof budget.regionalSupportRefsComplete === "boolean" &&
     typeof budget.fullTensorCoverageComplete === "boolean" &&
     typeof budget.requiredStressEnergyTermsComplete === "boolean" &&
@@ -681,6 +738,9 @@ export const isNhm2TileSourceFullApparatusTensorOperatingBudget = (
     Array.isArray(requiredCorrections.missingStressEnergyTermIds) &&
     typeof requiredCorrections.stressEnergyTermRefMissingCount === "number" &&
     Array.isArray(requiredCorrections.missingStressEnergyTermRefIds) &&
+    requiredCorrections.requiredSubsystemReceiptCount === 5 &&
+    typeof requiredCorrections.subsystemReceiptRefMissingCount === "number" &&
+    Array.isArray(requiredCorrections.missingSubsystemReceiptRefIds) &&
     requiredCorrections.requiredRegionCount === 3 &&
     typeof requiredCorrections.regionCoverageMissingCount === "number" &&
     Array.isArray(requiredCorrections.missingRegionIds) &&

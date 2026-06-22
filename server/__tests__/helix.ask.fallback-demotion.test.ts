@@ -202,5 +202,7 @@ describe("Helix Ask deterministic fallback demotion", () => {
       assistant_answer: false,
     });
     expect(result.selected_terminal_artifact_kind).toBe("tool_receipt");
+    expect(result.wroteVisibleFields).not.toContain("payload.selected_final_answer");
+    expect(result.audit?.wroteVisibleFields).not.toContain("payload.selected_final_answer");
   });
 });

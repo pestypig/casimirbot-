@@ -846,7 +846,11 @@ export function resolveTerminalAnswerEnvelope(
   } else if (terminalArtifactKind === "tool_receipt" || finalAnswerSource === "deterministic_receipt_fallback") {
     terminalArtifactKind = "tool_receipt";
     finalAnswerSource = "deterministic_receipt_fallback";
-    terminalText = readString(payload.selected_final_answer) ?? readTerminalPresentationText(payload) ?? readFinalAnswerDraftText(payload);
+    terminalText =
+      readString(payload.receipt_status_text) ??
+      readTerminalPresentationText(payload) ??
+      readString(payload.selected_final_answer) ??
+      readFinalAnswerDraftText(payload);
     authorityOrigin = "tool_receipt";
   } else if (terminalArtifactKind === "repo_code_evidence_answer") {
     terminalText = readValidRepoEvidenceAnswerText(payload) ?? readTerminalPresentationText(payload);
@@ -1399,11 +1403,20 @@ export function applyTerminalAnswerEnvelope(
     payload.finalAnswer = envelope.terminal_text;
     payload.content = envelope.terminal_text;
   } else {
-    payload.selected_final_answer = envelope.terminal_text;
+    if (isNonAuthoritativeToolReceiptEnvelope(envelope)) {
+      payload.receipt_status_text = envelope.terminal_text;
+      delete payload.selected_final_answer;
+    } else {
+      payload.selected_final_answer = envelope.terminal_text;
+    }
     payload.assistant_answer = isNonAuthoritativeToolReceiptEnvelope(envelope) ? false : envelope.terminal_text;
     payload.answer = envelope.terminal_text;
     payload.text = envelope.terminal_text;
-    payload.finalAnswer = envelope.terminal_text;
+    if (isNonAuthoritativeToolReceiptEnvelope(envelope)) {
+      delete payload.finalAnswer;
+    } else {
+      payload.finalAnswer = envelope.terminal_text;
+    }
     payload.content = envelope.terminal_text;
   }
   payload.terminal_artifact_kind = envelope.terminal_artifact_kind;
@@ -1496,6 +1509,14 @@ export function applyTerminalAnswerEnvelope(
       debug.pending_request = payload.pending_request;
       debug.request_user_input = payload.request_user_input;
       debug.request_user_input_preview = payload.request_user_input_preview;
+    } else if (isNonAuthoritativeToolReceiptEnvelope(envelope)) {
+      debug.receipt_status_text = envelope.terminal_text;
+      delete debug.selected_final_answer;
+      debug.assistant_answer = false;
+      debug.answer = envelope.terminal_text;
+      debug.text = envelope.terminal_text;
+      delete debug.finalAnswer;
+      debug.content = envelope.terminal_text;
     } else {
       debug.selected_final_answer = envelope.terminal_text;
       debug.answer = envelope.terminal_text;

@@ -413,7 +413,7 @@ const measurementTargetSummaryFromDomain = (
     case "fatigue_layer_scaling":
       return "Fatigue/layer-scaling evidence must cover cycle lifetime, thermal cycling, creep, delamination, adhesion, 447-layer scaling efficiency >= 0.9, nonadditivity <= 0.1, active area retention >= 0.6, and source-tensor retention >= 0.9.";
     case "full_apparatus_tensor":
-      return "Full apparatus source tensor must provide nhm2_tile_source_full_apparatus_tensor_values/v1 with 10 component refs, 9 stress-energy term refs, wall/hull/exterior supports, same chart/basis/units, and no metric-target echo.";
+      return "Full apparatus source tensor must provide nhm2_tile_source_full_apparatus_tensor_values/v1 with 10 component refs, 9 stress-energy term refs, upstream subsystem receipt refs, wall/hull/exterior supports, same chart/basis/units, and no metric-target echo.";
     case "downstream_residual_conservation_qei_observer":
       return "Downstream chain must rerun regional residual closure, wall T00, covariant conservation, QEI worldline dossier, observer-family WEC/NEC/SEC/DEC, material credibility, and coupled closure against the same source tensor.";
     case "campaign_coordination":
@@ -507,6 +507,18 @@ const DECISIVE_MEASUREMENT_TEMPLATES: Record<
   ],
   roughness_patch_potential: [
     {
+      measurementId: "patch_voltage_correlation_length",
+      quantity: "patch-voltage spatial correlation length",
+      target: "positive patch-potential correlation length tied to the voltage map",
+      unit: "m",
+      evidenceArtifact: "receipt://roughness_patch_metrology/patch_voltage_correlation_length_v1",
+      marginKey: "patchVoltageCorrelationLengthAvailable",
+      requiredCorrectionKey: "patchVoltageCorrelationLengthAvailable",
+      goCriterion: "patch correlation length is positive and registered to the voltage/roughness maps",
+      noGoCriterion: "patch correlation length is missing or not registered to the surface maps",
+      falsificationConsequence: "patch-potential electrostatic force cannot be bounded from RMS voltage alone",
+    },
+    {
       measurementId: "patch_potential_force_fraction",
       quantity: "patch-potential electrostatic force fraction",
       target: "residual electrostatic force <= 5% of Casimir load",
@@ -531,6 +543,19 @@ const DECISIVE_MEASUREMENT_TEMPLATES: Record<
       goCriterion: "bandwidth margin >= 1",
       noGoCriterion: "bandwidth below 30 GHz or trace missing",
       falsificationConsequence: "time-dependent source cannot be synchronized to the campaign",
+    },
+    {
+      measurementId: "active_control_source_tensor_contamination",
+      quantity: "active-control source-tensor contamination fraction",
+      target: "active-control fields/noise/sidebands contribute <= 5% of apparatus source tensor",
+      unit: "dimensionless margin",
+      evidenceArtifact: "receipt://active_control/source_tensor_contamination_v1",
+      marginKey: "sourceTensorContaminationMargin",
+      requiredCorrectionKey: "sourceTensorContaminationFractionReduction",
+      goCriterion: "active-control source-tensor contamination margin >= 1 with model provenance",
+      noGoCriterion: "active-control field/noise/thermal/timing sidebands exceed 5% or are unbounded",
+      falsificationConsequence:
+        "controller lock cannot be admitted into full-apparatus T_mu_nu without quantifying active-control stress-energy contamination",
     },
   ],
   fatigue_layer_scaling: [
@@ -679,6 +704,20 @@ const DECISIVE_MEASUREMENT_TEMPLATES: Record<
       goCriterion: "term coverage fraction = 1",
       noGoCriterion: "support/control/electrostatic/thermal/material terms hidden",
       falsificationConsequence: "apparatus tensor is incomplete and cannot represent the real tile source",
+    },
+    {
+      measurementId: "subsystem_receipt_traceability",
+      quantity: "upstream subsystem receipt refs for full-apparatus tensor terms",
+      target:
+        "material coupon, force-gap, roughness/patch, active-control, and fatigue/layer-scaling refs complete",
+      unit: "ref count",
+      evidenceArtifact: "receipt://full_apparatus_tensor/subsystem_receipt_traceability_v1",
+      marginKey: "subsystemReceiptRefsComplete",
+      requiredCorrectionKey: "subsystemReceiptRefMissingCount",
+      goCriterion: "all five upstream subsystem receipt refs are present and tied to the tensor terms",
+      noGoCriterion: "full-apparatus tensor terms are asserted without upstream experimental receipt refs",
+      falsificationConsequence:
+        "full-apparatus tensor cannot be admitted as material-source evidence independent of its subsystem receipts",
     },
     {
       measurementId: "regional_support_refs",

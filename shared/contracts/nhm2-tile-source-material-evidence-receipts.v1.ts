@@ -120,6 +120,8 @@ export type Nhm2TileSourceActiveControlEvidenceV1 = {
   noiseSpectrumRef?: string | null;
   heatLoadW: number | null;
   heatSinkCapacityW?: number | null;
+  sourceTensorContaminationRef?: string | null;
+  sourceTensorContaminationFraction?: number | null;
   timingJitterSeconds: number | null;
   phaseNoiseRmsSeconds?: number | null;
   controllerPhaseMarginDegrees?: number | null;
@@ -221,6 +223,13 @@ export type Nhm2TileSourceFullApparatusTensorEvidenceV1 = {
     layerScalingCrossTerms?: string | null;
     casimirInteractionStressEnergy?: string | null;
     materialStrainEnergy?: string | null;
+  };
+  subsystemReceiptRefs?: {
+    materialCoupon?: string | null;
+    forceGapPullIn?: string | null;
+    roughnessPatch?: string | null;
+    activeControl?: string | null;
+    fatigueLayerScaling?: string | null;
   };
   regionalCoverage: {
     wall: boolean;
@@ -350,6 +359,7 @@ const PHASE_NOISE_CYCLE_FRACTION_MAX = 0.05;
 const CONTROLLER_PHASE_MARGIN_MIN_DEGREES = 45;
 const CONTROLLER_GAIN_MARGIN_MIN_DB = 6;
 const THERMAL_SINK_CAPACITY_FACTOR_MIN = 1.2;
+const ACTIVE_CONTROL_SOURCE_TENSOR_CONTAMINATION_FRACTION_MAX = 0.05;
 const SWITCHING_RATE_HZ = 15e9;
 const LAYER_SCALING_EFFICIENCY_MIN = 0.9;
 const PER_LAYER_VARIATION_FRACTION_MAX = 0.05;
@@ -810,6 +820,14 @@ const activeControlSurface = (
     evidence.heatLoadW <= 0
       ? null
       : round(evidence.heatSinkCapacityW / (evidence.heatLoadW * THERMAL_SINK_CAPACITY_FACTOR_MIN));
+  const sourceTensorContaminationMargin =
+    evidence.sourceTensorContaminationFraction == null ||
+    evidence.sourceTensorContaminationFraction <= 0
+      ? null
+      : round(
+          ACTIVE_CONTROL_SOURCE_TENSOR_CONTAMINATION_FRACTION_MAX /
+            evidence.sourceTensorContaminationFraction,
+        );
   const switchingRateMargin =
     evidence.switchingRateHz == null
       ? null
@@ -864,6 +882,14 @@ const activeControlSurface = (
     ...(noiseMargin == null ? ["gap_noise_receipt_missing"] : noiseMargin < 1 ? ["gap_noise_above_1pct_gap"] : []),
     ...(evidence.noiseSpectrumRef == null ? ["active_control_noise_spectrum_ref_missing"] : []),
     ...(evidence.heatLoadW == null || !Number.isFinite(evidence.heatLoadW) ? ["active_control_heat_load_missing"] : []),
+    ...(sourceTensorContaminationMargin == null
+      ? ["active_control_source_tensor_contamination_receipt_missing"]
+      : sourceTensorContaminationMargin < 1
+        ? ["active_control_source_tensor_contamination_above_5pct"]
+        : []),
+    ...(evidence.sourceTensorContaminationRef == null
+      ? ["active_control_source_tensor_contamination_ref_missing"]
+      : []),
     ...(thermalSinkMargin == null
       ? ["active_control_heat_sink_capacity_missing"]
       : thermalSinkMargin < 1
@@ -925,6 +951,8 @@ const activeControlSurface = (
       actuatorAuthorityN: evidence.actuatorAuthorityN ?? null,
       heatLoadW: evidence.heatLoadW,
       heatSinkCapacityW: evidence.heatSinkCapacityW ?? null,
+      sourceTensorContaminationFraction: evidence.sourceTensorContaminationFraction ?? null,
+      sourceTensorContaminationMargin,
       phaseNoiseRmsSeconds: evidence.phaseNoiseRmsSeconds ?? null,
       lockAcquisitionTimeSeconds: evidence.lockAcquisitionTimeSeconds ?? null,
       failureModeCoverageComplete: failureModeCoverageComplete ? 1 : 0,
@@ -939,6 +967,7 @@ const activeControlSurface = (
         evidence.thermalModelRef != null &&
         evidence.heatSinkCapacityTraceRef != null &&
         evidence.heatLoadTraceRef != null &&
+        evidence.sourceTensorContaminationRef != null &&
         evidence.timingSyncTraceRef != null &&
         evidence.phaseNoiseSpectrumRef != null &&
         evidence.lockAcquisitionTraceRef != null &&
@@ -1264,6 +1293,23 @@ const fullApparatusTensorSurface = (
       ? ["full_apparatus_material_strain_energy_ref_missing"]
       : []),
   ];
+  const subsystemReceiptRefBlockers = [
+    ...(evidence.subsystemReceiptRefs?.materialCoupon == null
+      ? ["full_apparatus_material_coupon_receipt_ref_missing"]
+      : []),
+    ...(evidence.subsystemReceiptRefs?.forceGapPullIn == null
+      ? ["full_apparatus_force_gap_receipt_ref_missing"]
+      : []),
+    ...(evidence.subsystemReceiptRefs?.roughnessPatch == null
+      ? ["full_apparatus_roughness_patch_receipt_ref_missing"]
+      : []),
+    ...(evidence.subsystemReceiptRefs?.activeControl == null
+      ? ["full_apparatus_active_control_receipt_ref_missing"]
+      : []),
+    ...(evidence.subsystemReceiptRefs?.fatigueLayerScaling == null
+      ? ["full_apparatus_fatigue_layer_scaling_receipt_ref_missing"]
+      : []),
+  ];
   const regionalRefBlockers = [
     ...(evidence.regionalCoverage.wall && evidence.regionalSupportRefs?.wall == null
       ? ["full_apparatus_wall_region_support_ref_missing"]
@@ -1328,6 +1374,7 @@ const fullApparatusTensorSurface = (
     ...missingTermBlockers,
     ...(missingTermBlockers.length > 0 ? ["full_apparatus_tensor_term_coverage_incomplete"] : []),
     ...termRefBlockers,
+    ...subsystemReceiptRefBlockers,
     ...(!evidence.regionalCoverage.wall ? ["full_apparatus_wall_region_missing"] : []),
     ...(!evidence.regionalCoverage.hull ? ["full_apparatus_hull_region_missing"] : []),
     ...(!evidence.regionalCoverage.exteriorShell ? ["full_apparatus_exterior_shell_region_missing"] : []),
@@ -1355,6 +1402,7 @@ const fullApparatusTensorSurface = (
           ? 1
           : 0,
       termRefsAvailable: termRefBlockers.length === 0 ? 1 : 0,
+      subsystemReceiptRefsAvailable: subsystemReceiptRefBlockers.length === 0 ? 1 : 0,
       regionalSupportRefsAvailable: regionalRefBlockers.length === 0 ? 1 : 0,
     },
     requiredChange,

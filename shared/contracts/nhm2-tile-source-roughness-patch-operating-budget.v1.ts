@@ -30,6 +30,7 @@ export type Nhm2TileSourceRoughnessPatchOperatingBudgetV1 = {
     asperityP999MaxMeters: 3e-9;
     asperityMaxMeters: 4e-9;
     patchVoltageRmsMaxVolts: 0.01;
+    patchVoltageCorrelationLengthRequired: true;
     patchVoltageDerivedElectrostaticFractionMax: 0.05;
     residualElectrostaticForceFractionMax: 0.05;
     residualElectrostaticForceMaxN: number;
@@ -89,6 +90,8 @@ export type Nhm2TileSourceRoughnessPatchOperatingBudgetV1 = {
     gapClearanceShortfallMeters: number | null;
     patchVoltageRmsMaxVolts: 0.01;
     patchVoltageReductionVolts: number | null;
+    patchVoltageCorrelationLengthRequired: true;
+    patchVoltageCorrelationLengthAvailable: boolean;
     patchVoltageDerivedElectrostaticFractionMax: 0.05;
     patchVoltageDerivedElectrostaticFractionReduction: number | null;
     residualElectrostaticForceFractionMax: 0.05;
@@ -211,6 +214,10 @@ export const buildNhm2TileSourceRoughnessPatchOperatingBudget = (
     RESIDUAL_ELECTROSTATIC_FORCE_FRACTION_MAX,
     patchVoltageDerivedElectrostaticForceFraction,
   );
+  const patchVoltageCorrelationLengthAvailable =
+    evidence?.patchVoltageCorrelationLengthMeters != null &&
+    Number.isFinite(evidence.patchVoltageCorrelationLengthMeters) &&
+    evidence.patchVoltageCorrelationLengthMeters > 0;
   const residualElectrostaticMargin = safeRatio(
     RESIDUAL_ELECTROSTATIC_FORCE_FRACTION_MAX,
     evidence?.residualElectrostaticForceFraction ?? null,
@@ -288,8 +295,7 @@ export const buildNhm2TileSourceRoughnessPatchOperatingBudget = (
       : patchVoltageMargin < 1
         ? ["patch_voltage_above_10mv_operating_budget"]
         : []),
-    ...(evidence?.patchVoltageCorrelationLengthMeters == null ||
-    evidence.patchVoltageCorrelationLengthMeters <= 0
+    ...(!patchVoltageCorrelationLengthAvailable
       ? ["patch_voltage_correlation_length_missing_for_operating_budget"]
       : []),
     ...(patchVoltageDerivedElectrostaticMargin == null
@@ -344,6 +350,7 @@ export const buildNhm2TileSourceRoughnessPatchOperatingBudget = (
       asperityP999MaxMeters: ASPERITY_P999_MAX_METERS,
       asperityMaxMeters: ASPERITY_MAX_METERS,
       patchVoltageRmsMaxVolts: PATCH_VOLTAGE_RMS_MAX_VOLTS,
+      patchVoltageCorrelationLengthRequired: true,
       patchVoltageDerivedElectrostaticFractionMax:
         RESIDUAL_ELECTROSTATIC_FORCE_FRACTION_MAX,
       residualElectrostaticForceFractionMax: RESIDUAL_ELECTROSTATIC_FORCE_FRACTION_MAX,
@@ -427,6 +434,8 @@ export const buildNhm2TileSourceRoughnessPatchOperatingBudget = (
         evidence?.patchVoltageRmsVolts,
         PATCH_VOLTAGE_RMS_MAX_VOLTS,
       ),
+      patchVoltageCorrelationLengthRequired: true,
+      patchVoltageCorrelationLengthAvailable,
       patchVoltageDerivedElectrostaticFractionMax:
         RESIDUAL_ELECTROSTATIC_FORCE_FRACTION_MAX,
       patchVoltageDerivedElectrostaticFractionReduction: reductionToLimit(
@@ -499,6 +508,7 @@ export const isNhm2TileSourceRoughnessPatchOperatingBudget = (
     targets.asperityP999MaxMeters === 3e-9 &&
     targets.asperityMaxMeters === 4e-9 &&
     targets.patchVoltageRmsMaxVolts === 0.01 &&
+    targets.patchVoltageCorrelationLengthRequired === true &&
     targets.patchVoltageDerivedElectrostaticFractionMax === 0.05 &&
     targets.residualElectrostaticForceFractionMax === 0.05 &&
     typeof targets.residualElectrostaticForceMaxN === "number" &&
@@ -537,6 +547,8 @@ export const isNhm2TileSourceRoughnessPatchOperatingBudget = (
     isNumberOrNull(requiredCorrections.gapClearanceShortfallMeters) &&
     requiredCorrections.patchVoltageRmsMaxVolts === 0.01 &&
     isNumberOrNull(requiredCorrections.patchVoltageReductionVolts) &&
+    requiredCorrections.patchVoltageCorrelationLengthRequired === true &&
+    typeof requiredCorrections.patchVoltageCorrelationLengthAvailable === "boolean" &&
     requiredCorrections.patchVoltageDerivedElectrostaticFractionMax === 0.05 &&
     isNumberOrNull(requiredCorrections.patchVoltageDerivedElectrostaticFractionReduction) &&
     requiredCorrections.residualElectrostaticForceFractionMax === 0.05 &&

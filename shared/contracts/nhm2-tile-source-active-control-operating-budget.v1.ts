@@ -30,6 +30,7 @@ export type Nhm2TileSourceActiveControlOperatingBudgetV1 = {
     controllerPhaseMarginMinDegrees: 45;
     controllerGainMarginMinDb: 6;
     thermalSinkCapacityFactorMin: 1.2;
+    sourceTensorContaminationFractionMax: 0.05;
     requiredGapControlAuthorityN: number;
   };
   suppliedActiveControlEvidence: {
@@ -43,6 +44,7 @@ export type Nhm2TileSourceActiveControlOperatingBudgetV1 = {
     thermalModelRef: string | null;
     heatSinkCapacityTraceRef: string | null;
     heatLoadTraceRef: string | null;
+    sourceTensorContaminationRef: string | null;
     timingSyncTraceRef: string | null;
     phaseNoiseSpectrumRef: string | null;
     lockAcquisitionTraceRef: string | null;
@@ -54,6 +56,7 @@ export type Nhm2TileSourceActiveControlOperatingBudgetV1 = {
     noiseSpectrumRef: string | null;
     heatLoadW: number | null;
     heatSinkCapacityW: number | null;
+    sourceTensorContaminationFraction: number | null;
     timingJitterSeconds: number | null;
     phaseNoiseRmsSeconds: number | null;
     controllerPhaseMarginDegrees: number | null;
@@ -85,6 +88,7 @@ export type Nhm2TileSourceActiveControlOperatingBudgetV1 = {
     controllerGainMargin: number | null;
     thermalAccountingMargin: number | null;
     thermalSinkCapacityMargin: number | null;
+    sourceTensorContaminationMargin: number | null;
   };
   requiredCorrections: {
     switchingRateTargetHz: 15e9;
@@ -114,7 +118,9 @@ export type Nhm2TileSourceActiveControlOperatingBudgetV1 = {
     heatSinkCapacityShortfallW: number | null;
     energyPerCycleHeatLimitedMaxJ: number | null;
     energyPerCycleReductionJ: number | null;
-    requiredTraceRefCount: 14;
+    sourceTensorContaminationFractionMax: 0.05;
+    sourceTensorContaminationFractionReduction: number | null;
+    requiredTraceRefCount: 15;
     missingTraceRefCount: number;
     requiredFailureModeCount: 5;
     missingFailureModeCount: number;
@@ -155,6 +161,7 @@ const PHASE_NOISE_MAX_SECONDS = 0.05 / SWITCHING_RATE_HZ;
 const CONTROLLER_PHASE_MARGIN_MIN_DEGREES = 45;
 const CONTROLLER_GAIN_MARGIN_MIN_DB = 6;
 const THERMAL_SINK_CAPACITY_FACTOR_MIN = 1.2;
+const SOURCE_TENSOR_CONTAMINATION_FRACTION_MAX = 0.05;
 const HEAT_SINK_CAPACITY_CRITERION =
   "heatSinkCapacityW >= 1.2 * max(heatLoadW, energyPerCycleJ * switchingRateHz)";
 
@@ -250,6 +257,10 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
     evidence?.heatSinkCapacityW ?? null,
     heatSinkCapacityMinW,
   );
+  const sourceTensorContaminationMargin = safeRatio(
+    SOURCE_TENSOR_CONTAMINATION_FRACTION_MAX,
+    evidence?.sourceTensorContaminationFraction ?? null,
+  );
   const energyPerCycleHeatLimitedMaxJ =
     evidence?.heatLoadW == null || evidenceSwitchingRate == null || evidenceSwitchingRate === 0
       ? null
@@ -265,6 +276,7 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
     evidence?.thermalModelRef,
     evidence?.heatSinkCapacityTraceRef,
     evidence?.heatLoadTraceRef,
+    evidence?.sourceTensorContaminationRef,
     evidence?.timingSyncTraceRef,
     evidence?.phaseNoiseSpectrumRef,
     evidence?.lockAcquisitionTraceRef,
@@ -374,6 +386,14 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
     ...(evidence?.heatLoadTraceRef == null
       ? ["active_control_heat_load_trace_ref_missing_for_operating_budget"]
       : []),
+    ...(sourceTensorContaminationMargin == null
+      ? ["active_control_source_tensor_contamination_missing_for_operating_budget"]
+      : sourceTensorContaminationMargin < 1
+        ? ["active_control_source_tensor_contamination_above_5pct"]
+        : []),
+    ...(evidence?.sourceTensorContaminationRef == null
+      ? ["active_control_source_tensor_contamination_ref_missing_for_operating_budget"]
+      : []),
     ...(evidence?.timingSyncTraceRef == null
       ? ["active_control_timing_sync_trace_ref_missing_for_operating_budget"]
       : []),
@@ -425,6 +445,7 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
             "active_control_controller_gain_margin_below_6db",
             "active_control_heat_load_below_computed_control_power",
             "active_control_heat_sink_capacity_below_1p2x_heat_load",
+            "active_control_source_tensor_contamination_above_5pct",
           ].includes(blocker),
         )
       : false;
@@ -448,6 +469,7 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
       controllerPhaseMarginMinDegrees: CONTROLLER_PHASE_MARGIN_MIN_DEGREES,
       controllerGainMarginMinDb: CONTROLLER_GAIN_MARGIN_MIN_DB,
       thermalSinkCapacityFactorMin: THERMAL_SINK_CAPACITY_FACTOR_MIN,
+      sourceTensorContaminationFractionMax: SOURCE_TENSOR_CONTAMINATION_FRACTION_MAX,
       requiredGapControlAuthorityN,
     },
     suppliedActiveControlEvidence: {
@@ -461,6 +483,7 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
       thermalModelRef: stringOrNull(evidence?.thermalModelRef),
       heatSinkCapacityTraceRef: stringOrNull(evidence?.heatSinkCapacityTraceRef),
       heatLoadTraceRef: stringOrNull(evidence?.heatLoadTraceRef),
+      sourceTensorContaminationRef: stringOrNull(evidence?.sourceTensorContaminationRef),
       timingSyncTraceRef: stringOrNull(evidence?.timingSyncTraceRef),
       phaseNoiseSpectrumRef: stringOrNull(evidence?.phaseNoiseSpectrumRef),
       lockAcquisitionTraceRef: stringOrNull(evidence?.lockAcquisitionTraceRef),
@@ -472,6 +495,9 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
       noiseSpectrumRef: evidence?.noiseSpectrumRef ?? null,
       heatLoadW: finiteOrNull(evidence?.heatLoadW),
       heatSinkCapacityW: finiteOrNull(evidence?.heatSinkCapacityW),
+      sourceTensorContaminationFraction: finiteOrNull(
+        evidence?.sourceTensorContaminationFraction,
+      ),
       timingJitterSeconds: finiteOrNull(evidence?.timingJitterSeconds),
       phaseNoiseRmsSeconds: finiteOrNull(evidence?.phaseNoiseRmsSeconds),
       controllerPhaseMarginDegrees: finiteOrNull(evidence?.controllerPhaseMarginDegrees),
@@ -504,6 +530,7 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
         evidence.thermalModelRef != null &&
         evidence.heatSinkCapacityTraceRef != null &&
         evidence.heatLoadTraceRef != null &&
+        evidence.sourceTensorContaminationRef != null &&
         evidence.timingSyncTraceRef != null &&
         evidence.phaseNoiseSpectrumRef != null &&
         evidence.lockAcquisitionTraceRef != null &&
@@ -525,6 +552,7 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
       controllerGainMargin,
       thermalAccountingMargin,
       thermalSinkCapacityMargin,
+      sourceTensorContaminationMargin,
     },
     requiredCorrections: {
       switchingRateTargetHz: SWITCHING_RATE_HZ,
@@ -587,7 +615,12 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
         evidence?.energyPerCycleJ == null || energyPerCycleHeatLimitedMaxJ == null
           ? null
           : round(Math.max(0, evidence.energyPerCycleJ - energyPerCycleHeatLimitedMaxJ)),
-      requiredTraceRefCount: 14,
+      sourceTensorContaminationFractionMax: SOURCE_TENSOR_CONTAMINATION_FRACTION_MAX,
+      sourceTensorContaminationFractionReduction: reductionToMaximum(
+        evidence?.sourceTensorContaminationFraction,
+        SOURCE_TENSOR_CONTAMINATION_FRACTION_MAX,
+      ),
+      requiredTraceRefCount: 15,
       missingTraceRefCount,
       requiredFailureModeCount: 5,
       missingFailureModeCount,
@@ -647,6 +680,7 @@ export const isNhm2TileSourceActiveControlOperatingBudget = (
     targets.controllerPhaseMarginMinDegrees === 45 &&
     targets.controllerGainMarginMinDb === 6 &&
     targets.thermalSinkCapacityFactorMin === 1.2 &&
+    targets.sourceTensorContaminationFractionMax === 0.05 &&
     typeof targets.requiredGapControlAuthorityN === "number" &&
     supplied != null &&
     typeof supplied.evidenceTier === "string" &&
@@ -687,7 +721,9 @@ export const isNhm2TileSourceActiveControlOperatingBudget = (
     isNumberOrNull(requiredCorrections.heatSinkCapacityShortfallW) &&
     isNumberOrNull(requiredCorrections.energyPerCycleHeatLimitedMaxJ) &&
     isNumberOrNull(requiredCorrections.energyPerCycleReductionJ) &&
-    requiredCorrections.requiredTraceRefCount === 14 &&
+    requiredCorrections.sourceTensorContaminationFractionMax === 0.05 &&
+    isNumberOrNull(requiredCorrections.sourceTensorContaminationFractionReduction) &&
+    requiredCorrections.requiredTraceRefCount === 15 &&
     typeof requiredCorrections.missingTraceRefCount === "number" &&
     requiredCorrections.requiredFailureModeCount === 5 &&
     typeof requiredCorrections.missingFailureModeCount === "number" &&
