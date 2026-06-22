@@ -64,6 +64,28 @@ export type Nhm2TileSourceActiveControlOperatingBudgetV1 = {
     timingMargin: number | null;
     thermalAccountingMargin: number | null;
   };
+  requiredCorrections: {
+    switchingRateTargetHz: 15e9;
+    switchingRateAbsDeltaHz: number | null;
+    bandwidthMinHz: 30e9;
+    bandwidthShortfallHz: number | null;
+    gapControlAuthorityMinN: number;
+    suppliedGapControlAuthorityN: number | null;
+    gapControlAuthorityShortfallN: number | null;
+    gapNoiseRmsMaxMeters: 8e-11;
+    gapNoiseRmsReductionMeters: number | null;
+    timingJitterMaxSeconds: number;
+    timingJitterReductionSeconds: number | null;
+    controlPowerW: number | null;
+    heatLoadMinW: number | null;
+    heatLoadShortfallW: number | null;
+    energyPerCycleHeatLimitedMaxJ: number | null;
+    energyPerCycleReductionJ: number | null;
+    requiredTraceRefCount: 8;
+    missingTraceRefCount: number;
+    requiredFailureModeCount: 5;
+    missingFailureModeCount: number;
+  };
   blockers: string[];
   summary: {
     operatingBudgetComputed: boolean;
@@ -105,6 +127,9 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const finiteOrNull = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
 
+const isNumberOrNull = (value: unknown): value is number | null =>
+  value === null || (typeof value === "number" && Number.isFinite(value));
+
 const stringOrNull = (value: unknown): string | null =>
   typeof value === "string" && value.trim().length > 0 ? value : null;
 
@@ -115,6 +140,12 @@ const safeRatio = (numerator: number | null, denominator: number | null): number
 
 const switchingRateMatchesTarget = (rateHz: number | null): boolean =>
   rateHz != null && Math.abs(rateHz - SWITCHING_RATE_HZ) <= SWITCHING_RATE_HZ * 1e-9;
+
+const shortfallToMinimum = (value: number | null | undefined, minimum: number): number | null =>
+  value == null ? null : round(Math.max(0, minimum - value));
+
+const reductionToMaximum = (value: number | null | undefined, maximum: number): number | null =>
+  value == null ? null : round(Math.max(0, value - maximum));
 
 export const buildNhm2TileSourceActiveControlOperatingBudget = (
   input: BuildNhm2TileSourceActiveControlOperatingBudgetInput = {},
@@ -148,6 +179,35 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
   );
   const thermalAccountingMargin = safeRatio(evidence?.heatLoadW ?? null, controlPowerW);
   const failureModeCoverage = evidence?.failureModeCoverage ?? null;
+  const requiredGapControlAuthorityN =
+    forceGapLoadBudget.idealLoadBudget.requiredActiveGapControlAuthorityN;
+  const suppliedGapControlAuthorityN =
+    gapControlAuthorityMargin == null
+      ? null
+      : round(gapControlAuthorityMargin * requiredGapControlAuthorityN);
+  const heatLoadMinW = controlPowerW;
+  const energyPerCycleHeatLimitedMaxJ =
+    evidence?.heatLoadW == null || evidenceSwitchingRate == null || evidenceSwitchingRate === 0
+      ? null
+      : round(evidence.heatLoadW / evidenceSwitchingRate);
+  const traceRefs = [
+    evidence?.energyWaveformRef,
+    evidence?.controlTransferFunctionRef,
+    evidence?.gapNoiseTraceRef,
+    evidence?.noiseSpectrumRef,
+    evidence?.thermalModelRef,
+    evidence?.heatLoadTraceRef,
+    evidence?.timingSyncTraceRef,
+    evidence?.failureModeRef,
+  ];
+  const missingTraceRefCount = traceRefs.filter((ref) => ref == null).length;
+  const missingFailureModeCount = [
+    failureModeCoverage?.lossOfLock === true,
+    failureModeCoverage?.thermalRunaway === true,
+    failureModeCoverage?.noiseRunaway === true,
+    failureModeCoverage?.timingDesynchronization === true,
+    failureModeCoverage?.failSafeShutdown === true,
+  ].filter((covered) => !covered).length;
   const failureModeCoverageComplete =
     failureModeCoverage?.lossOfLock === true &&
     failureModeCoverage.thermalRunaway === true &&
@@ -262,8 +322,7 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
       bandwidthMinHz: BANDWIDTH_MIN_HZ,
       gapNoiseRmsMaxMeters: GAP_NOISE_MAX_METERS,
       timingJitterMaxSeconds: TIMING_JITTER_MAX_SECONDS,
-      requiredGapControlAuthorityN:
-        forceGapLoadBudget.idealLoadBudget.requiredActiveGapControlAuthorityN,
+      requiredGapControlAuthorityN,
     },
     suppliedActiveControlEvidence: {
       evidenceTier: evidence?.evidenceTier ?? "missing",
@@ -312,6 +371,46 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
       timingMargin,
       thermalAccountingMargin,
     },
+    requiredCorrections: {
+      switchingRateTargetHz: SWITCHING_RATE_HZ,
+      switchingRateAbsDeltaHz:
+        evidenceSwitchingRate == null
+          ? null
+          : round(Math.abs(evidenceSwitchingRate - SWITCHING_RATE_HZ)),
+      bandwidthMinHz: BANDWIDTH_MIN_HZ,
+      bandwidthShortfallHz: shortfallToMinimum(evidence?.bandwidthHz, BANDWIDTH_MIN_HZ),
+      gapControlAuthorityMinN: requiredGapControlAuthorityN,
+      suppliedGapControlAuthorityN,
+      gapControlAuthorityShortfallN: shortfallToMinimum(
+        suppliedGapControlAuthorityN,
+        requiredGapControlAuthorityN,
+      ),
+      gapNoiseRmsMaxMeters: GAP_NOISE_MAX_METERS,
+      gapNoiseRmsReductionMeters: reductionToMaximum(
+        evidence?.gapNoiseRmsMeters,
+        GAP_NOISE_MAX_METERS,
+      ),
+      timingJitterMaxSeconds: TIMING_JITTER_MAX_SECONDS,
+      timingJitterReductionSeconds: reductionToMaximum(
+        evidence?.timingJitterSeconds,
+        TIMING_JITTER_MAX_SECONDS,
+      ),
+      controlPowerW,
+      heatLoadMinW,
+      heatLoadShortfallW:
+        heatLoadMinW == null || evidence?.heatLoadW == null
+          ? null
+          : round(Math.max(0, heatLoadMinW - evidence.heatLoadW)),
+      energyPerCycleHeatLimitedMaxJ,
+      energyPerCycleReductionJ:
+        evidence?.energyPerCycleJ == null || energyPerCycleHeatLimitedMaxJ == null
+          ? null
+          : round(Math.max(0, evidence.energyPerCycleJ - energyPerCycleHeatLimitedMaxJ)),
+      requiredTraceRefCount: 8,
+      missingTraceRefCount,
+      requiredFailureModeCount: 5,
+      missingFailureModeCount,
+    },
     blockers,
     summary: {
       operatingBudgetComputed: true,
@@ -345,6 +444,9 @@ export const isNhm2TileSourceActiveControlOperatingBudget = (
   const budget = isRecord(value.derivedOperatingBudget)
     ? value.derivedOperatingBudget
     : null;
+  const requiredCorrections = isRecord(value.requiredCorrections)
+    ? value.requiredCorrections
+    : null;
   const summary = isRecord(value.summary) ? value.summary : null;
   const boundary = isRecord(value.claimBoundary) ? value.claimBoundary : null;
   return (
@@ -369,6 +471,27 @@ export const isNhm2TileSourceActiveControlOperatingBudget = (
     typeof budget.noiseSpectrumAvailable === "boolean" &&
     typeof budget.failureModeCoverageComplete === "boolean" &&
     (budget.switchingRateMargin === null || typeof budget.switchingRateMargin === "number") &&
+    requiredCorrections != null &&
+    requiredCorrections.switchingRateTargetHz === 15e9 &&
+    isNumberOrNull(requiredCorrections.switchingRateAbsDeltaHz) &&
+    requiredCorrections.bandwidthMinHz === 30e9 &&
+    isNumberOrNull(requiredCorrections.bandwidthShortfallHz) &&
+    typeof requiredCorrections.gapControlAuthorityMinN === "number" &&
+    isNumberOrNull(requiredCorrections.suppliedGapControlAuthorityN) &&
+    isNumberOrNull(requiredCorrections.gapControlAuthorityShortfallN) &&
+    requiredCorrections.gapNoiseRmsMaxMeters === 8e-11 &&
+    isNumberOrNull(requiredCorrections.gapNoiseRmsReductionMeters) &&
+    typeof requiredCorrections.timingJitterMaxSeconds === "number" &&
+    isNumberOrNull(requiredCorrections.timingJitterReductionSeconds) &&
+    isNumberOrNull(requiredCorrections.controlPowerW) &&
+    isNumberOrNull(requiredCorrections.heatLoadMinW) &&
+    isNumberOrNull(requiredCorrections.heatLoadShortfallW) &&
+    isNumberOrNull(requiredCorrections.energyPerCycleHeatLimitedMaxJ) &&
+    isNumberOrNull(requiredCorrections.energyPerCycleReductionJ) &&
+    requiredCorrections.requiredTraceRefCount === 8 &&
+    typeof requiredCorrections.missingTraceRefCount === "number" &&
+    requiredCorrections.requiredFailureModeCount === 5 &&
+    typeof requiredCorrections.missingFailureModeCount === "number" &&
     Array.isArray(value.blockers) &&
     value.blockers.every((entry) => typeof entry === "string") &&
     summary != null &&

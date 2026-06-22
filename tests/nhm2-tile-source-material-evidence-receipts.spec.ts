@@ -776,6 +776,12 @@ describe("NHM2 tile source material evidence receipts", () => {
         row.blockerId ===
         "material_coupon:material_coupon_receipt_missing_for_operating_budget",
     );
+    const materialDomain = report.campaignDomainSummary.find(
+      (entry) => entry.campaignDomain === "material_coupon_behavior",
+    );
+    const forceGapDomain = report.campaignDomainSummary.find(
+      (entry) => entry.campaignDomain === "force_gap_pull_in",
+    );
 
     expect(isNhm2TileSourceFalsificationReport(report)).toBe(true);
     expect(report.disposition.reportStatus).toBe("review");
@@ -786,6 +792,8 @@ describe("NHM2 tile source material evidence receipts", () => {
       surfaceId: "material_coupon",
       operatingBudgetSurfaceId: null,
       downstreamGateId: null,
+      campaignDomain: "material_coupon_behavior",
+      evidenceTarget: expect.stringContaining("ultra-high-stress TiN"),
       requiredChange: expect.stringContaining("Supply measured or validated coupon data"),
       falsifiesCurrentCandidate: false,
     });
@@ -794,12 +802,26 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(report.summary.operatingBudgetBlockerCount).toBeGreaterThan(0);
     expect(report.summary.nextRequiredSurfaceId).toBe("material_coupon");
     expect(report.summary.nextRequiredChange).toContain("ultra-high-stress TiN");
+    expect(report.campaignDomainSummary.length).toBeGreaterThanOrEqual(8);
+    expect(materialDomain).toMatchObject({
+      blockerCount: expect.any(Number),
+      firstBlocker: "material_coupon_receipt_missing",
+      evidenceTarget: expect.stringContaining("candidate-stack coupon behavior"),
+    });
+    expect(materialDomain?.blockerCount).toBeGreaterThan(0);
+    expect(materialDomain?.reviewBlockerCount).toBeGreaterThan(0);
+    expect(forceGapDomain?.firstBlocker).toBe(
+      "force_gap_curve_and_pull_in_margin_at_8nm_missing",
+    );
+    expect(forceGapDomain?.evidenceTarget).toContain("8 nm force-gap receipt");
     expect(report.readiness.materialEvidenceReady).toBe(false);
     expect(report.readiness.operatingBudgetsReady).toBe(false);
     expect(report.readiness.physicallyCredibleSourceCandidate).toBe(false);
     expect(report.blockerRows.some((row) => row.blockerId === "material_coupon_receipt_missing")).toBe(true);
     expect(operatingBudgetRow?.source).toBe("operating_budget_readiness");
     expect(operatingBudgetRow?.operatingBudgetSurfaceId).toBe("material_coupon");
+    expect(operatingBudgetRow?.campaignDomain).toBe("material_coupon_behavior");
+    expect(operatingBudgetRow?.evidenceTarget).toContain("candidate-stack coupon behavior");
     expect(operatingBudgetRow?.numericalMargins).toMatchObject({
       tensileStressMargin: null,
       fractureOrYieldStressMargin: null,
@@ -839,6 +861,7 @@ describe("NHM2 tile source material evidence receipts", () => {
     const roadmap = buildNhm2TileSourceEvidenceGapRoadmap({
       materialEvidenceReceipts: receipts,
       physicalValidationPlan: plan,
+      operatingBudgetReadiness,
     });
     const report = buildNhm2TileSourceFalsificationReport({
       materialEvidenceReceipts: receipts,
@@ -848,7 +871,16 @@ describe("NHM2 tile source material evidence receipts", () => {
     });
 
     expect(isNhm2TileSourceFalsificationReport(report)).toBe(true);
-    expect(report.summary.nextRequiredSurfaceId).toBe("none");
+    expect(report.summary.nextRequiredSurfaceId).toBe("material_coupon");
+    expect(report.summary.nextRequiredChange).toContain("447-layer support stress");
+    expect(roadmap.summary.operatingBudgetsReady).toBe(false);
+    expect(roadmap.summary.nextBestItemId).toBe("material_coupon");
+    expect(roadmap.roadmapItems[0]?.operatingBudgetSurfaceId).toBe("material_coupon");
+    expect(roadmap.roadmapItems[0]?.operatingBudgetReady).toBe(false);
+    expect(roadmap.roadmapItems[0]?.requiredCorrections).toMatchObject({
+      missingCurveAndMapRefCount: 5,
+      missingMaterialResponseRefCount: 2,
+    });
     expect(report.currentBlocker).toMatchObject({
       blockerId: "material_coupon:material_coupon_receipt_missing_for_operating_budget",
       source: "operating_budget_readiness",
@@ -863,6 +895,17 @@ describe("NHM2 tile source material evidence receipts", () => {
       fractureOrYieldStressMargin: null,
       roughnessRmsMargin: null,
     });
+    expect(report.currentBlocker.requiredCorrections).toMatchObject({
+      materialMismatch: true,
+      tensileStressShortfallPa: null,
+      requiredCurveAndMapRefCount: 5,
+      missingCurveAndMapRefCount: 5,
+      requiredMaterialResponseRefCount: 2,
+      missingMaterialResponseRefCount: 2,
+      materialResponseNumericValuesAvailable: false,
+    });
+    expect(report.currentBlocker.requiredChange).toContain("corrections:");
+    expect(report.currentBlocker.requiredChange).toContain("missingCurveAndMapRefCount=5");
     expect(report.readiness.materialEvidenceReady).toBe(true);
     expect(report.readiness.operatingBudgetsReady).toBe(false);
     expect(report.summary.physicalViabilityClaimAllowed).toBe(false);
@@ -937,6 +980,12 @@ describe("NHM2 tile source material evidence receipts", () => {
     const downstream = report.blockerRows.find(
       (row) => row.blockerId === "regional_residual_closure_incomplete",
     );
+    const forceGapDomain = report.campaignDomainSummary.find(
+      (entry) => entry.campaignDomain === "force_gap_pull_in",
+    );
+    const downstreamDomain = report.campaignDomainSummary.find(
+      (entry) => entry.campaignDomain === "downstream_residual_conservation_qei_observer",
+    );
 
     expect(isNhm2TileSourceFalsificationReport(report)).toBe(true);
     expect(report.disposition.reportStatus).toBe("falsified");
@@ -944,6 +993,8 @@ describe("NHM2 tile source material evidence receipts", () => {
       blockerId: "force_gradient_inconsistent_with_force_curve_at_8nm",
       source: "material_evidence_receipts",
       surfaceId: "force_gap_pull_in",
+      campaignDomain: "force_gap_pull_in",
+      evidenceTarget: expect.stringContaining("8 nm force-gap receipt"),
       falsifiesCurrentCandidate: true,
     });
     expect(report.currentBlocker.numericalMargin).toBeLessThan(1);
@@ -951,17 +1002,40 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(report.summary.failingDownstreamGateCount).toBe(1);
     expect(report.summary.falsifyingBlockerCount).toBeGreaterThan(0);
     expect(report.summary.nextRequiredSurfaceId).toBe("force_gap_pull_in");
+    expect(forceGapDomain).toMatchObject({
+      firstBlocker: "force_gradient_inconsistent_with_force_curve_at_8nm",
+      evidenceTarget: expect.stringContaining("8 nm force-gap receipt"),
+      evidenceRefs: expect.arrayContaining(["receipt://force-gap/failing-8nm-v1"]),
+    });
+    expect(forceGapDomain?.falsifyingBlockerCount).toBeGreaterThan(0);
+    expect(forceGapDomain?.minimumNumericalMargin).toBeLessThan(1);
+    expect(downstreamDomain).toMatchObject({
+      firstBlocker: "regional_residual_closure_incomplete",
+      evidenceTarget: expect.stringContaining("Downstream gate receipt"),
+    });
     expect(pullIn?.surfaceId).toBe("force_gap_pull_in");
+    expect(pullIn?.campaignDomain).toBe("force_gap_pull_in");
     expect(pullIn?.numericalMargin).toBeLessThan(1);
     expect(pullIn?.falsifiesCurrentCandidate).toBe(true);
     expect(operatingPullIn?.source).toBe("operating_budget_readiness");
     expect(operatingPullIn?.operatingBudgetSurfaceId).toBe("force_gap_load");
+    expect(operatingPullIn?.campaignDomain).toBe("force_gap_pull_in");
     expect(operatingPullIn?.numericalMargin).toBeLessThan(1);
     expect(operatingPullIn?.numericalMargins.pullInMarginToIdealGradient).toBeLessThan(1);
     expect(operatingPullIn?.numericalMargins.stictionMarginToMinimum).toBeLessThan(1);
     expect(operatingPullIn?.numericalMargins.activeAuthorityMarginToIdealLoad).toBeLessThan(1);
     expect(operatingPullIn?.requiredChange).toContain("pullInMarginToIdealGradient=");
+    expect(operatingPullIn?.requiredCorrections).toMatchObject({
+      pullInMarginDefinition: "effectiveSpringConstantNPerM / idealForceGradientNPerM",
+      stictionMarginShortfall: expect.any(Number),
+      activeGapControlAuthorityShortfallN: expect.any(Number),
+      forceGradientConsistencyShortfall: expect.any(Number),
+    });
+    expect(operatingPullIn?.requiredChange).toContain("corrections:");
+    expect(operatingPullIn?.requiredChange).toContain("stictionMarginShortfall=");
     expect(downstream?.downstreamGateId).toBe("regional_residual_closure");
+    expect(downstream?.campaignDomain).toBe("downstream_residual_conservation_qei_observer");
+    expect(downstream?.evidenceTarget).toContain("regional residual closure");
     expect(downstream?.falsifiesCurrentCandidate).toBe(true);
     expect(report.summary.transportClaimAllowed).toBe(false);
   });
@@ -1032,12 +1106,24 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(operatingBudgetGate?.blockers).toContain(
       "material_coupon:material_coupon_receipt_missing_for_operating_budget",
     );
+    expect(operatingBudgetGate?.requiredCorrections).toMatchObject({
+      "material_coupon.missingCurveAndMapRefCount": 5,
+      "material_coupon.missingMaterialResponseRefCount": 2,
+      "full_apparatus_tensor.tensorComponentRefMissingCount": 10,
+    });
     expect(componentDetailGate?.status).toBe("review");
     expect(componentDetailGate?.blockers).toContain(
       "full_apparatus_T01_ref_missing_for_operating_budget",
     );
+    expect(componentDetailGate?.requiredCorrections).toMatchObject({
+      tensorComponentRefMissingCount: 10,
+      missingTensorComponentIds: expect.arrayContaining(["T01", "T12", "T33"]),
+    });
     expect(handoff.summary.operatingBudgetsReady).toBe(false);
     expect(handoff.summary.fullApparatusComponentDetailRefsReady).toBe(false);
+    expect(handoff.summary.firstRequiredCorrections).toMatchObject({
+      "material_coupon.missingCurveAndMapRefCount": 5,
+    });
     expect(handoff.claimBoundary.handoffDoesNotRunSameBasisAuthority).toBe(true);
     expect(handoff.claimBoundary.operatingBudgetReadinessDoesNotValidateMaterialSource).toBe(true);
     expect(handoff.summary.physicalViabilityClaimAllowed).toBe(false);
@@ -1079,6 +1165,10 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(handoff.summary.operatingBudgetsReady).toBe(true);
     expect(handoff.summary.physicalValidationStillRequired).toBe(true);
     expect(handoff.gates.every((gate) => gate.status === "pass")).toBe(true);
+    expect(handoff.gates.every((gate) => Object.keys(gate.requiredCorrections).length === 0)).toBe(
+      true,
+    );
+    expect(handoff.summary.firstRequiredCorrections).toEqual({});
     expect(handoff.handoffTarget.targetContractVersion).toBe(
       "nhm2_source_side_same_basis_tensor_authority/v1",
     );
@@ -1183,6 +1273,11 @@ describe("NHM2 tile source material evidence receipts", () => {
         "full_apparatus_T33_ref_missing_for_operating_budget",
       ]),
     );
+    expect(componentDetailGate?.requiredCorrections).toMatchObject({
+      tensorComponentRefMissingCount: 10,
+      missingTensorComponentIds: expect.arrayContaining(["T01", "T12", "T33"]),
+      requiredTensorComponentCount: 10,
+    });
     expect(handoff.sourceRefs.fullApparatusTensorOperatingBudgetRef).toBe(
       "artifact://grouped-only-full-apparatus-budget",
     );
@@ -1285,6 +1380,20 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.operatingTargets.requiredFractureOrYieldStressPa).toBeCloseTo(1.091414175716e9);
     expect(budget.operatingTargets.fabricationToleranceMaxMeters).toBe(5e-10);
     expect(budget.operatingTargets.materialResponseFrequencyHz).toBe(15e9);
+    expect(budget.requiredCorrections.materialMismatch).toBe(true);
+    expect(budget.requiredCorrections.supportStressPa).toBe(5.45707087858e8);
+    expect(budget.requiredCorrections.tensileStressShortfallPa).toBeNull();
+    expect(budget.requiredCorrections.requiredFractureOrYieldStressPa).toBeCloseTo(
+      1.091414175716e9,
+    );
+    expect(budget.requiredCorrections.fractureOrYieldStressShortfallPa).toBeNull();
+    expect(budget.requiredCorrections.cryogenicTemperatureReductionK).toBeNull();
+    expect(budget.requiredCorrections.materialResponseFrequencyAbsDeltaHz).toBeNull();
+    expect(budget.requiredCorrections.roughnessRmsReductionMeters).toBeNull();
+    expect(budget.requiredCorrections.fabricationToleranceReductionMeters).toBeNull();
+    expect(budget.requiredCorrections.missingCurveAndMapRefCount).toBe(5);
+    expect(budget.requiredCorrections.missingMaterialResponseRefCount).toBe(2);
+    expect(budget.requiredCorrections.materialResponseNumericValuesAvailable).toBe(false);
     expect(budget.summary.firstBlocker).toBe("material_coupon_receipt_missing_for_operating_budget");
     expect(budget.claimBoundary.materialResponseRefsDoNotSubstituteForFullTensor).toBe(true);
   });
@@ -1312,6 +1421,18 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.suppliedMaterialCouponEvidence.conductivitySiemensPerMeter).toBe(1.2e6);
     expect(budget.derivedOperatingBudget.roughnessRmsMargin).toBeGreaterThan(1);
     expect(budget.derivedOperatingBudget.fabricationToleranceMargin).toBe(1);
+    expect(budget.requiredCorrections.materialMismatch).toBe(false);
+    expect(budget.requiredCorrections.tensileStressShortfallPa).toBe(0);
+    expect(budget.requiredCorrections.fractureOrYieldStressShortfallPa).toBe(0);
+    expect(budget.requiredCorrections.cryogenicTemperatureReductionK).toBe(0);
+    expect(budget.requiredCorrections.materialResponseFrequencyAbsDeltaHz).toBe(0);
+    expect(budget.requiredCorrections.dielectricTemperatureReductionK).toBe(0);
+    expect(budget.requiredCorrections.conductivityTemperatureReductionK).toBe(0);
+    expect(budget.requiredCorrections.roughnessRmsReductionMeters).toBe(0);
+    expect(budget.requiredCorrections.fabricationToleranceReductionMeters).toBe(0);
+    expect(budget.requiredCorrections.missingCurveAndMapRefCount).toBe(0);
+    expect(budget.requiredCorrections.missingMaterialResponseRefCount).toBe(0);
+    expect(budget.requiredCorrections.materialResponseNumericValuesAvailable).toBe(true);
     expect(budget.summary.physicalViabilityClaimAllowed).toBe(false);
   });
 
@@ -1362,6 +1483,20 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.derivedOperatingBudget.tensileStressMargin).toBeLessThan(1);
     expect(budget.derivedOperatingBudget.fractureOrYieldStressMargin).toBeLessThan(1);
     expect(budget.derivedOperatingBudget.roughnessRmsMargin).toBeLessThan(1);
+    expect(budget.requiredCorrections.materialMismatch).toBe(false);
+    expect(budget.requiredCorrections.tensileStressShortfallPa).toBeCloseTo(1.45707087858e8);
+    expect(budget.requiredCorrections.fractureOrYieldStressShortfallPa).toBeCloseTo(
+      2.91414175716e8,
+    );
+    expect(budget.requiredCorrections.cryogenicTemperatureReductionK).toBe(2);
+    expect(budget.requiredCorrections.materialResponseFrequencyAbsDeltaHz).toBe(7.5e9);
+    expect(budget.requiredCorrections.dielectricTemperatureReductionK).toBe(2);
+    expect(budget.requiredCorrections.conductivityTemperatureReductionK).toBe(2);
+    expect(budget.requiredCorrections.roughnessRmsReductionMeters).toBeCloseTo(1e-10, 15);
+    expect(budget.requiredCorrections.fabricationToleranceReductionMeters).toBeCloseTo(5e-10, 15);
+    expect(budget.requiredCorrections.missingCurveAndMapRefCount).toBe(0);
+    expect(budget.requiredCorrections.missingMaterialResponseRefCount).toBe(2);
+    expect(budget.requiredCorrections.materialResponseNumericValuesAvailable).toBe(false);
     expect(budget.summary.transportClaimAllowed).toBe(false);
   });
 
@@ -1420,6 +1555,12 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(provenance?.status).toBe("falsifying");
     expect(budget.summary.materialCouponEvidenceReady).toBe(false);
     expect(budget.derivedOperatingBudget.curveAndMapRefsAvailable).toBe(false);
+    expect(budget.requiredCorrections.materialMismatch).toBe(false);
+    expect(budget.requiredCorrections.tensileStressShortfallPa).toBe(0);
+    expect(budget.requiredCorrections.fractureOrYieldStressShortfallPa).toBe(0);
+    expect(budget.requiredCorrections.missingCurveAndMapRefCount).toBe(5);
+    expect(budget.requiredCorrections.missingMaterialResponseRefCount).toBe(0);
+    expect(budget.requiredCorrections.materialResponseNumericValuesAvailable).toBe(false);
     expect(budget.blockers).toEqual(
       expect.arrayContaining([
         "tensile_stress_curve_ref_missing_for_operating_budget",
@@ -1548,6 +1689,18 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.idealLoadBudget.forceGradientConsistencyMin).toBe(0.75);
     expect(budget.suppliedForceGapEvidence.stictionMargin).toBeNull();
     expect(budget.margins.stictionMarginToMinimum).toBeNull();
+    expect(budget.requiredCorrections.pullInMarginDefinition).toBe(
+      "effectiveSpringConstantNPerM / idealForceGradientNPerM",
+    );
+    expect(budget.requiredCorrections.springConstantMinNPerM).toBe(
+      budget.idealLoadBudget.forceGradientNPerM,
+    );
+    expect(budget.requiredCorrections.springConstantShortfallNPerM).toBeNull();
+    expect(budget.requiredCorrections.activeGapControlAuthorityMinN).toBe(
+      budget.idealLoadBudget.requiredActiveGapControlAuthorityN,
+    );
+    expect(budget.requiredCorrections.activeGapControlAuthorityShortfallN).toBeNull();
+    expect(budget.requiredCorrections.suppliedForceAbsTargetN).toBeCloseTo(14188.38, 2);
     expect(budget.summary.firstBlocker).toBe("force_gap_receipt_missing_for_load_budget");
     expect(budget.claimBoundary.internalLoadIsNotThrust).toBe(true);
   });
@@ -1567,6 +1720,10 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.margins.pullInMarginToIdealGradient).toBeGreaterThan(1);
     expect(budget.margins.stictionMarginToMinimum).toBeGreaterThan(1);
     expect(budget.margins.activeAuthorityMarginToIdealLoad).toBeGreaterThan(1);
+    expect(budget.requiredCorrections.springConstantShortfallNPerM).toBe(0);
+    expect(budget.requiredCorrections.stictionMarginShortfall).toBe(0);
+    expect(budget.requiredCorrections.activeGapControlAuthorityShortfallN).toBe(0);
+    expect(budget.requiredCorrections.forceGradientConsistencyShortfall).toBe(0);
     expect(budget.summary.physicalViabilityClaimAllowed).toBe(false);
   });
 
@@ -1601,6 +1758,14 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.margins.pullInMarginToIdealGradient).toBeLessThan(1);
     expect(budget.margins.stictionMarginToMinimum).toBeLessThan(1);
     expect(budget.margins.activeAuthorityMarginToIdealLoad).toBeLessThan(1);
+    expect(budget.requiredCorrections.springConstantShortfallNPerM).toBeGreaterThan(0);
+    expect(budget.requiredCorrections.stictionMarginShortfall).toBeCloseTo(0.2, 6);
+    expect(budget.requiredCorrections.activeGapControlAuthorityShortfallN).toBeGreaterThan(0);
+    expect(budget.requiredCorrections.forceGradientConsistencyShortfall).toBeGreaterThan(0);
+    expect(budget.requiredCorrections.suppliedForceDeltaFromIdealStackForceN).toBeCloseTo(
+      11.62,
+      1,
+    );
     expect(budget.summary.transportClaimAllowed).toBe(false);
   });
 
@@ -1671,6 +1836,12 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.operatingTargets.asperityP99MaxMeters).toBe(2e-9);
     expect(budget.operatingTargets.asperityMaxMeters).toBe(4e-9);
     expect(budget.operatingTargets.residualElectrostaticForceMaxN).toBeCloseTo(709.419, 2);
+    expect(budget.requiredCorrections.roughnessRmsMaxMeters).toBe(1e-10);
+    expect(budget.requiredCorrections.roughnessRmsReductionMeters).toBeNull();
+    expect(budget.requiredCorrections.minimumGapClearanceRequiredMeters).toBe(4e-9);
+    expect(budget.requiredCorrections.patchVoltageRmsMaxVolts).toBe(0.01);
+    expect(budget.requiredCorrections.residualElectrostaticForceMaxN).toBeCloseTo(709.419, 2);
+    expect(budget.requiredCorrections.residualElectrostaticForceReductionN).toBeNull();
     expect(budget.summary.firstBlocker).toBe("roughness_patch_receipt_missing_for_operating_budget");
     expect(budget.claimBoundary.patchElectrostaticTermsMustEnterFullTensor).toBe(true);
   });
@@ -1696,6 +1867,14 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.derivedOperatingBudget.patchVoltageDerivedElectrostaticMargin).toBeGreaterThan(1);
     expect(budget.derivedOperatingBudget.residualElectrostaticForceN).toBeCloseTo(283.768, 2);
     expect(budget.derivedOperatingBudget.residualElectrostaticMargin).toBeGreaterThan(1);
+    expect(budget.requiredCorrections.roughnessRmsReductionMeters).toBe(0);
+    expect(budget.requiredCorrections.asperityP99ReductionMeters).toBe(0);
+    expect(budget.requiredCorrections.asperityMaxReductionMeters).toBe(0);
+    expect(budget.requiredCorrections.gapClearanceShortfallMeters).toBe(0);
+    expect(budget.requiredCorrections.patchVoltageReductionVolts).toBe(0);
+    expect(budget.requiredCorrections.patchVoltageDerivedElectrostaticFractionReduction).toBe(0);
+    expect(budget.requiredCorrections.residualElectrostaticForceFractionReduction).toBe(0);
+    expect(budget.requiredCorrections.residualElectrostaticForceReductionN).toBe(0);
     expect(budget.summary.physicalViabilityClaimAllowed).toBe(false);
   });
 
@@ -1732,6 +1911,10 @@ describe("NHM2 tile source material evidence receipts", () => {
     );
     expect(budget.summary.roughnessPatchEvidenceReady).toBe(false);
     expect(budget.derivedOperatingBudget.mapRefsAvailable).toBe(false);
+    expect(budget.requiredCorrections.roughnessRmsReductionMeters).toBe(0);
+    expect(budget.requiredCorrections.asperityMaxReductionMeters).toBe(0);
+    expect(budget.requiredCorrections.patchVoltageReductionVolts).toBe(0);
+    expect(budget.requiredCorrections.residualElectrostaticForceFractionReduction).toBe(0);
     expect(budget.blockers).toEqual(
       expect.arrayContaining([
         "roughness_map_ref_missing_for_operating_budget",
@@ -1804,6 +1987,19 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.derivedOperatingBudget.residualElectrostaticForceN).toBeCloseTo(1135.07, 2);
     expect(budget.derivedOperatingBudget.patchVoltageDerivedElectrostaticForceFraction).toBeGreaterThan(0.05);
     expect(budget.derivedOperatingBudget.patchVoltageDerivedElectrostaticMargin).toBeLessThan(1);
+    expect(budget.requiredCorrections.roughnessRmsReductionMeters).toBeCloseTo(1e-10, 15);
+    expect(budget.requiredCorrections.asperityP99ReductionMeters).toBeCloseTo(1e-9, 15);
+    expect(budget.requiredCorrections.asperityMaxReductionMeters).toBeCloseTo(5e-9, 15);
+    expect(budget.requiredCorrections.gapClearanceShortfallMeters).toBeCloseTo(5e-9, 15);
+    expect(budget.requiredCorrections.patchVoltageReductionVolts).toBeCloseTo(0.99, 12);
+    expect(
+      budget.requiredCorrections.patchVoltageDerivedElectrostaticFractionReduction,
+    ).toBeGreaterThan(0);
+    expect(budget.requiredCorrections.residualElectrostaticForceFractionReduction).toBeCloseTo(
+      0.03,
+      12,
+    );
+    expect(budget.requiredCorrections.residualElectrostaticForceReductionN).toBeGreaterThan(0);
     expect(budget.summary.transportClaimAllowed).toBe(false);
   });
 
@@ -1891,6 +2087,18 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.operatingTargets.timingJitterMaxSeconds).toBeCloseTo(6.666666666666667e-12);
     expect(budget.operatingTargets.requiredGapControlAuthorityN).toBeCloseTo(17026.06, 2);
     expect(budget.derivedOperatingBudget.gapControlAuthorityMargin).toBeNull();
+    expect(budget.requiredCorrections.switchingRateTargetHz).toBe(15e9);
+    expect(budget.requiredCorrections.switchingRateAbsDeltaHz).toBeNull();
+    expect(budget.requiredCorrections.bandwidthMinHz).toBe(30e9);
+    expect(budget.requiredCorrections.bandwidthShortfallHz).toBeNull();
+    expect(budget.requiredCorrections.gapControlAuthorityMinN).toBeCloseTo(17026.06, 2);
+    expect(budget.requiredCorrections.suppliedGapControlAuthorityN).toBeNull();
+    expect(budget.requiredCorrections.gapNoiseRmsMaxMeters).toBe(8e-11);
+    expect(budget.requiredCorrections.gapNoiseRmsReductionMeters).toBeNull();
+    expect(budget.requiredCorrections.requiredTraceRefCount).toBe(8);
+    expect(budget.requiredCorrections.missingTraceRefCount).toBe(8);
+    expect(budget.requiredCorrections.requiredFailureModeCount).toBe(5);
+    expect(budget.requiredCorrections.missingFailureModeCount).toBe(5);
     expect(budget.summary.firstBlocker).toBe("active_control_receipt_missing_for_operating_budget");
     expect(budget.claimBoundary.controllerEvidenceDoesNotSupplyFullApparatusTensor).toBe(true);
   });
@@ -1923,6 +2131,15 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.derivedOperatingBudget.noiseMargin).toBeGreaterThan(1);
     expect(budget.derivedOperatingBudget.timingMargin).toBeGreaterThan(1);
     expect(budget.derivedOperatingBudget.thermalAccountingMargin).toBeGreaterThan(1);
+    expect(budget.requiredCorrections.switchingRateAbsDeltaHz).toBe(0);
+    expect(budget.requiredCorrections.bandwidthShortfallHz).toBe(0);
+    expect(budget.requiredCorrections.gapControlAuthorityShortfallN).toBe(0);
+    expect(budget.requiredCorrections.gapNoiseRmsReductionMeters).toBe(0);
+    expect(budget.requiredCorrections.timingJitterReductionSeconds).toBe(0);
+    expect(budget.requiredCorrections.heatLoadShortfallW).toBe(0);
+    expect(budget.requiredCorrections.energyPerCycleReductionJ).toBe(0);
+    expect(budget.requiredCorrections.missingTraceRefCount).toBe(0);
+    expect(budget.requiredCorrections.missingFailureModeCount).toBe(0);
     expect(budget.summary.physicalViabilityClaimAllowed).toBe(false);
   });
 
@@ -1960,6 +2177,9 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.blockers).toContain("active_control_switching_rate_not_15ghz");
     expect(budget.derivedOperatingBudget.switchingRateMargin).toBe(0.5);
     expect(budget.derivedOperatingBudget.controlPowerW).toBe(7.5);
+    expect(budget.requiredCorrections.switchingRateAbsDeltaHz).toBe(7.5e9);
+    expect(budget.requiredCorrections.bandwidthShortfallHz).toBe(0);
+    expect(budget.requiredCorrections.timingJitterReductionSeconds).toBe(0);
     expect(budget.summary.physicalViabilityClaimAllowed).toBe(false);
   });
 
@@ -2022,6 +2242,18 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.derivedOperatingBudget.gapControlAuthorityMargin).toBeLessThan(1);
     expect(budget.derivedOperatingBudget.noiseSpectrumAvailable).toBe(false);
     expect(budget.derivedOperatingBudget.thermalAccountingMargin).toBeLessThan(1);
+    expect(budget.requiredCorrections.bandwidthShortfallHz).toBe(15e9);
+    expect(budget.requiredCorrections.gapControlAuthorityShortfallN).toBeGreaterThan(0);
+    expect(budget.requiredCorrections.gapNoiseRmsReductionMeters).toBeCloseTo(1.2e-10, 18);
+    expect(budget.requiredCorrections.timingJitterReductionSeconds).toBeGreaterThan(0);
+    expect(budget.requiredCorrections.heatLoadShortfallW).toBeCloseTo(14.9, 6);
+    expect(budget.requiredCorrections.energyPerCycleHeatLimitedMaxJ).toBeCloseTo(
+      6.666666666666667e-12,
+      18,
+    );
+    expect(budget.requiredCorrections.energyPerCycleReductionJ).toBeGreaterThan(0);
+    expect(budget.requiredCorrections.missingTraceRefCount).toBe(2);
+    expect(budget.requiredCorrections.missingFailureModeCount).toBe(5);
     expect(budget.summary.transportClaimAllowed).toBe(false);
   });
 
@@ -2095,6 +2327,13 @@ describe("NHM2 tile source material evidence receipts", () => {
         "active_control_fail_safe_shutdown_missing_for_operating_budget",
       ]),
     );
+    expect(budget.requiredCorrections.bandwidthShortfallHz).toBe(0);
+    expect(budget.requiredCorrections.gapNoiseRmsReductionMeters).toBe(0);
+    expect(budget.requiredCorrections.timingJitterReductionSeconds).toBe(0);
+    expect(budget.requiredCorrections.heatLoadShortfallW).toBe(0);
+    expect(budget.requiredCorrections.energyPerCycleReductionJ).toBe(0);
+    expect(budget.requiredCorrections.missingTraceRefCount).toBe(6);
+    expect(budget.requiredCorrections.missingFailureModeCount).toBe(5);
     expect(budget.summary.physicalViabilityClaimAllowed).toBe(false);
   });
 
@@ -2209,6 +2448,22 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.operatingTargets.creepDriftFractionMax).toBe(0.01);
     expect(budget.operatingTargets.effectiveActiveLayerCountMin).toBeCloseTo(217.242, 3);
     expect(budget.operatingTargets.effectiveSourceTensorLayerCountMin).toBeCloseTo(402.3, 3);
+    expect(budget.requiredCorrections.cycleMarginMin).toBe(1);
+    expect(budget.requiredCorrections.cycleCountRequired).toBeNull();
+    expect(budget.requiredCorrections.cycleCountShortfall).toBeNull();
+    expect(budget.requiredCorrections.thermalCycleDriftFractionMax).toBe(0.01);
+    expect(budget.requiredCorrections.thermalCycleDriftReduction).toBeNull();
+    expect(budget.requiredCorrections.layerScalingEfficiencyMin).toBe(0.9);
+    expect(budget.requiredCorrections.layerScalingEfficiencyShortfall).toBeNull();
+    expect(budget.requiredCorrections.effectiveActiveLayerCountMin).toBeCloseTo(217.242, 3);
+    expect(budget.requiredCorrections.effectiveActiveLayerCountShortfall).toBeNull();
+    expect(budget.requiredCorrections.effectiveSourceTensorLayerCountMin).toBeCloseTo(402.3, 3);
+    expect(budget.requiredCorrections.effectiveSourceTensorLayerCountShortfall).toBeNull();
+    expect(budget.requiredCorrections.requiredFatigueProvenanceRefCount).toBe(4);
+    expect(budget.requiredCorrections.missingFatigueProvenanceRefCount).toBe(4);
+    expect(budget.requiredCorrections.requiredLayerScalingProvenanceRefCount).toBe(5);
+    expect(budget.requiredCorrections.missingLayerScalingProvenanceRefCount).toBe(5);
+    expect(budget.requiredCorrections.supportCouplingStatusSatisfied).toBe(false);
     expect(budget.summary.firstBlocker).toBe(
       "fatigue_layer_scaling_receipt_missing_for_operating_budget",
     );
@@ -2238,6 +2493,18 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.derivedOperatingBudget.effectiveActiveLayerCountMargin).toBeGreaterThan(1);
     expect(budget.derivedOperatingBudget.sourceTensorRetentionFraction).toBeCloseTo(0.9025, 4);
     expect(budget.derivedOperatingBudget.sourceTensorRetentionMargin).toBeGreaterThan(1);
+    expect(budget.requiredCorrections.cycleCountShortfall).toBe(0);
+    expect(budget.requiredCorrections.thermalCycleDriftReduction).toBe(0);
+    expect(budget.requiredCorrections.creepDriftReduction).toBe(0);
+    expect(budget.requiredCorrections.layerScalingEfficiencyShortfall).toBe(0);
+    expect(budget.requiredCorrections.layerNonadditivityReduction).toBe(0);
+    expect(budget.requiredCorrections.activeAreaRetentionShortfall).toBe(0);
+    expect(budget.requiredCorrections.effectiveActiveLayerCountShortfall).toBe(0);
+    expect(budget.requiredCorrections.sourceTensorRetentionFractionShortfall).toBe(0);
+    expect(budget.requiredCorrections.effectiveSourceTensorLayerCountShortfall).toBe(0);
+    expect(budget.requiredCorrections.missingFatigueProvenanceRefCount).toBe(0);
+    expect(budget.requiredCorrections.missingLayerScalingProvenanceRefCount).toBe(0);
+    expect(budget.requiredCorrections.supportCouplingStatusSatisfied).toBe(true);
     expect(budget.summary.physicalViabilityClaimAllowed).toBe(false);
   });
 
@@ -2258,6 +2525,15 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.derivedOperatingBudget.sourceTensorRetentionMargin).toBeLessThan(1);
     expect(budget.blockers).toEqual(
       expect.arrayContaining(["source_tensor_retention_below_0p9_operating_budget"]),
+    );
+    expect(budget.requiredCorrections.activeAreaRetentionShortfall).toBe(0);
+    expect(budget.requiredCorrections.sourceTensorRetentionFractionShortfall).toBeCloseTo(
+      0.26825,
+      6,
+    );
+    expect(budget.requiredCorrections.effectiveSourceTensorLayerCountShortfall).toBeCloseTo(
+      119.90775,
+      4,
     );
     expect(budget.summary.falsifiesCurrentCandidate).toBe(true);
     expect(budget.summary.physicalViabilityClaimAllowed).toBe(false);
@@ -2305,6 +2581,22 @@ describe("NHM2 tile source material evidence receipts", () => {
     );
     expect(budget.derivedOperatingBudget.effectiveActiveLayerCount).toBeCloseTo(128.736, 3);
     expect(budget.derivedOperatingBudget.effectiveActiveLayerCountMargin).toBeLessThan(1);
+    expect(budget.requiredCorrections.cycleCountShortfall).toBe(5e8);
+    expect(budget.requiredCorrections.thermalCycleDriftReduction).toBeCloseTo(0.01, 12);
+    expect(budget.requiredCorrections.creepDriftReduction).toBeCloseTo(0.01, 12);
+    expect(budget.requiredCorrections.layerScalingEfficiencyShortfall).toBeCloseTo(0.18, 12);
+    expect(budget.requiredCorrections.layerNonadditivityReduction).toBeCloseTo(0.1, 12);
+    expect(budget.requiredCorrections.activeAreaRetentionShortfall).toBeCloseTo(0.1, 12);
+    expect(budget.requiredCorrections.effectiveActiveLayerCountShortfall).toBeCloseTo(88.506, 3);
+    expect(budget.requiredCorrections.sourceTensorRetentionFractionShortfall).toBeCloseTo(
+      0.612,
+      3,
+    );
+    expect(budget.requiredCorrections.effectiveSourceTensorLayerCountShortfall).toBeCloseTo(
+      273.564,
+      3,
+    );
+    expect(budget.requiredCorrections.supportCouplingStatusSatisfied).toBe(false);
     expect(budget.summary.transportClaimAllowed).toBe(false);
   });
 
@@ -2364,6 +2656,15 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.summary.fatigueLayerScalingEvidenceReady).toBe(false);
     expect(budget.derivedOperatingBudget.fatigueProvenanceRefsAvailable).toBe(false);
     expect(budget.derivedOperatingBudget.layerScalingProvenanceRefsAvailable).toBe(false);
+    expect(budget.requiredCorrections.cycleCountShortfall).toBe(0);
+    expect(budget.requiredCorrections.thermalCycleDriftReduction).toBeNull();
+    expect(budget.requiredCorrections.creepDriftReduction).toBeNull();
+    expect(budget.requiredCorrections.layerScalingEfficiencyShortfall).toBe(0);
+    expect(budget.requiredCorrections.layerNonadditivityReduction).toBe(0);
+    expect(budget.requiredCorrections.activeAreaRetentionShortfall).toBe(0);
+    expect(budget.requiredCorrections.missingFatigueProvenanceRefCount).toBe(4);
+    expect(budget.requiredCorrections.missingLayerScalingProvenanceRefCount).toBe(5);
+    expect(budget.requiredCorrections.supportCouplingStatusSatisfied).toBe(true);
     expect(budget.blockers).toEqual(
       expect.arrayContaining([
         "fatigue_cycle_protocol_ref_missing_for_operating_budget",
@@ -2505,6 +2806,25 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.derivedOperatingBudget.componentCoverageFraction).toBe(0);
     expect(budget.derivedOperatingBudget.termCoverageFraction).toBe(0);
     expect(budget.derivedOperatingBudget.regionalCoverageFraction).toBe(0);
+    expect(budget.requiredCorrections.componentGroupMissingCount).toBe(4);
+    expect(budget.requiredCorrections.missingComponentGroupIds).toEqual([
+      "T00",
+      "T0i",
+      "diagonalTij",
+      "offDiagonalTij",
+    ]);
+    expect(budget.requiredCorrections.componentGroupRefMissingCount).toBe(4);
+    expect(budget.requiredCorrections.tensorComponentRefMissingCount).toBe(10);
+    expect(budget.requiredCorrections.stressEnergyTermMissingCount).toBe(9);
+    expect(budget.requiredCorrections.stressEnergyTermRefMissingCount).toBe(9);
+    expect(budget.requiredCorrections.regionCoverageMissingCount).toBe(3);
+    expect(budget.requiredCorrections.regionalSupportRefMissingCount).toBe(3);
+    expect(budget.requiredCorrections.authorityMetadataMissingCount).toBe(4);
+    expect(budget.requiredCorrections.componentCoverageFractionShortfall).toBe(1);
+    expect(budget.requiredCorrections.termCoverageFractionShortfall).toBe(1);
+    expect(budget.requiredCorrections.regionalCoverageFractionShortfall).toBe(1);
+    expect(budget.requiredCorrections.tensorValueArtifactAvailable).toBe(false);
+    expect(budget.requiredCorrections.scalarT00OnlyDetected).toBe(false);
     expect(budget.summary.firstBlocker).toBe(
       "full_apparatus_tensor_receipt_missing_for_operating_budget",
     );
@@ -2547,6 +2867,20 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.derivedOperatingBudget.componentDetailRefsComplete).toBe(false);
     expect(budget.derivedOperatingBudget.termRefsComplete).toBe(false);
     expect(budget.derivedOperatingBudget.regionalSupportRefsComplete).toBe(false);
+    expect(budget.requiredCorrections.componentGroupMissingCount).toBe(0);
+    expect(budget.requiredCorrections.componentGroupRefMissingCount).toBe(4);
+    expect(budget.requiredCorrections.missingComponentGroupRefIds).toEqual([
+      "T00",
+      "T0i",
+      "diagonalTij",
+      "offDiagonalTij",
+    ]);
+    expect(budget.requiredCorrections.tensorComponentRefMissingCount).toBe(10);
+    expect(budget.requiredCorrections.missingTensorComponentIds).toContain("T01");
+    expect(budget.requiredCorrections.stressEnergyTermMissingCount).toBe(0);
+    expect(budget.requiredCorrections.stressEnergyTermRefMissingCount).toBe(9);
+    expect(budget.requiredCorrections.regionCoverageMissingCount).toBe(0);
+    expect(budget.requiredCorrections.regionalSupportRefMissingCount).toBe(3);
     expect(budget.blockers).toEqual(
       expect.arrayContaining([
         "full_apparatus_T00_ref_missing_for_operating_budget",
@@ -2625,6 +2959,21 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.summary.fullApparatusTensorEvidenceReady).toBe(false);
     expect(budget.derivedOperatingBudget.componentRefsComplete).toBe(true);
     expect(budget.derivedOperatingBudget.componentDetailRefsComplete).toBe(false);
+    expect(budget.requiredCorrections.componentGroupMissingCount).toBe(0);
+    expect(budget.requiredCorrections.componentGroupRefMissingCount).toBe(0);
+    expect(budget.requiredCorrections.tensorComponentRefMissingCount).toBe(10);
+    expect(budget.requiredCorrections.missingTensorComponentIds).toEqual([
+      "T00",
+      "T01",
+      "T02",
+      "T03",
+      "T11",
+      "T12",
+      "T13",
+      "T22",
+      "T23",
+      "T33",
+    ]);
     expect(budget.blockers).toEqual(
       expect.arrayContaining([
         "full_apparatus_T01_ref_missing_for_operating_budget",
@@ -2664,6 +3013,10 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.summary.fullApparatusTensorEvidenceReady).toBe(false);
     expect(budget.derivedOperatingBudget.componentDetailRefsComplete).toBe(true);
     expect(budget.derivedOperatingBudget.tensorValueArtifactAvailable).toBe(false);
+    expect(budget.requiredCorrections.tensorValueArtifactRequired).toBe(true);
+    expect(budget.requiredCorrections.tensorValueArtifactAvailable).toBe(false);
+    expect(budget.requiredCorrections.componentGroupMissingCount).toBe(0);
+    expect(budget.requiredCorrections.tensorComponentRefMissingCount).toBe(0);
     expect(budget.blockers).toEqual(
       expect.arrayContaining([
         "full_apparatus_tensor_value_artifact_ref_missing_for_operating_budget",
@@ -2694,6 +3047,19 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.derivedOperatingBudget.componentCoverageFraction).toBe(1);
     expect(budget.derivedOperatingBudget.termCoverageFraction).toBe(1);
     expect(budget.derivedOperatingBudget.regionalCoverageFraction).toBe(1);
+    expect(budget.requiredCorrections.componentGroupMissingCount).toBe(0);
+    expect(budget.requiredCorrections.componentGroupRefMissingCount).toBe(0);
+    expect(budget.requiredCorrections.tensorComponentRefMissingCount).toBe(0);
+    expect(budget.requiredCorrections.stressEnergyTermMissingCount).toBe(0);
+    expect(budget.requiredCorrections.stressEnergyTermRefMissingCount).toBe(0);
+    expect(budget.requiredCorrections.regionCoverageMissingCount).toBe(0);
+    expect(budget.requiredCorrections.regionalSupportRefMissingCount).toBe(0);
+    expect(budget.requiredCorrections.authorityMetadataMissingCount).toBe(0);
+    expect(budget.requiredCorrections.componentCoverageFractionShortfall).toBe(0);
+    expect(budget.requiredCorrections.termCoverageFractionShortfall).toBe(0);
+    expect(budget.requiredCorrections.regionalCoverageFractionShortfall).toBe(0);
+    expect(budget.requiredCorrections.tensorValueArtifactAvailable).toBe(true);
+    expect(budget.requiredCorrections.scalarT00OnlyDetected).toBe(false);
     expect(budget.summary.physicalViabilityClaimAllowed).toBe(false);
   });
 
@@ -2749,6 +3115,23 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.derivedOperatingBudget.componentCoverageFraction).toBe(0.25);
     expect(budget.derivedOperatingBudget.termCoverageFraction).toBeCloseTo(1 / 9);
     expect(budget.derivedOperatingBudget.regionalCoverageFraction).toBeCloseTo(1 / 3);
+    expect(budget.requiredCorrections.scalarT00OnlyDetected).toBe(true);
+    expect(budget.requiredCorrections.missingAuthorityMetadataIds).toContain("noMetricTargetEcho");
+    expect(budget.requiredCorrections.componentGroupMissingCount).toBe(3);
+    expect(budget.requiredCorrections.missingComponentGroupIds).toEqual([
+      "T0i",
+      "diagonalTij",
+      "offDiagonalTij",
+    ]);
+    expect(budget.requiredCorrections.stressEnergyTermMissingCount).toBe(8);
+    expect(budget.requiredCorrections.missingStressEnergyTermIds).toContain(
+      "activeControlFieldEnergy",
+    );
+    expect(budget.requiredCorrections.regionCoverageMissingCount).toBe(2);
+    expect(budget.requiredCorrections.missingRegionIds).toEqual(["hull", "exteriorShell"]);
+    expect(budget.requiredCorrections.componentCoverageFractionShortfall).toBe(0.75);
+    expect(budget.requiredCorrections.termCoverageFractionShortfall).toBeCloseTo(8 / 9);
+    expect(budget.requiredCorrections.regionalCoverageFractionShortfall).toBeCloseTo(2 / 3);
     expect(budget.summary.transportClaimAllowed).toBe(false);
   });
 

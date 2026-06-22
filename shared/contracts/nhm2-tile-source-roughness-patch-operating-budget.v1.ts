@@ -56,6 +56,24 @@ export type Nhm2TileSourceRoughnessPatchOperatingBudgetV1 = {
     residualElectrostaticForceN: number | null;
     residualElectrostaticMargin: number | null;
   };
+  requiredCorrections: {
+    roughnessRmsMaxMeters: 1e-10;
+    roughnessRmsReductionMeters: number | null;
+    asperityP99MaxMeters: 2e-9;
+    asperityP99ReductionMeters: number | null;
+    asperityMaxMeters: 4e-9;
+    asperityMaxReductionMeters: number | null;
+    minimumGapClearanceRequiredMeters: 4e-9;
+    gapClearanceShortfallMeters: number | null;
+    patchVoltageRmsMaxVolts: 0.01;
+    patchVoltageReductionVolts: number | null;
+    patchVoltageDerivedElectrostaticFractionMax: 0.05;
+    patchVoltageDerivedElectrostaticFractionReduction: number | null;
+    residualElectrostaticForceFractionMax: 0.05;
+    residualElectrostaticForceFractionReduction: number | null;
+    residualElectrostaticForceMaxN: number;
+    residualElectrostaticForceReductionN: number | null;
+  };
   blockers: string[];
   summary: {
     operatingBudgetComputed: boolean;
@@ -99,10 +117,16 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const finiteOrNull = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
 
+const isNumberOrNull = (value: unknown): value is number | null =>
+  value === null || (typeof value === "number" && Number.isFinite(value));
+
 const safeRatio = (numerator: number | null, denominator: number | null): number | null =>
   numerator == null || denominator == null || denominator === 0
     ? null
     : round(numerator / denominator);
+
+const reductionToLimit = (value: number | null | undefined, limit: number): number | null =>
+  value == null ? null : round(Math.max(0, value - limit));
 
 export const buildNhm2TileSourceRoughnessPatchOperatingBudget = (
   input: BuildNhm2TileSourceRoughnessPatchOperatingBudgetInput = {},
@@ -153,6 +177,7 @@ export const buildNhm2TileSourceRoughnessPatchOperatingBudget = (
   );
   const minimumGapClearanceMeters =
     evidence?.asperityMaxMeters == null ? null : round(gapMeters - evidence.asperityMaxMeters);
+  const minimumGapClearanceRequiredMeters = gapMeters - ASPERITY_MAX_METERS;
   const blockers = [
     ...(evidence == null || evidence.evidenceTier === "missing"
       ? ["roughness_patch_receipt_missing_for_operating_budget"]
@@ -269,6 +294,46 @@ export const buildNhm2TileSourceRoughnessPatchOperatingBudget = (
       residualElectrostaticForceN,
       residualElectrostaticMargin,
     },
+    requiredCorrections: {
+      roughnessRmsMaxMeters: ROUGHNESS_RMS_MAX_METERS,
+      roughnessRmsReductionMeters: reductionToLimit(
+        evidence?.roughnessRmsMeters,
+        ROUGHNESS_RMS_MAX_METERS,
+      ),
+      asperityP99MaxMeters: ASPERITY_P99_MAX_METERS,
+      asperityP99ReductionMeters: reductionToLimit(
+        evidence?.asperityP99Meters,
+        ASPERITY_P99_MAX_METERS,
+      ),
+      asperityMaxMeters: ASPERITY_MAX_METERS,
+      asperityMaxReductionMeters: reductionToLimit(evidence?.asperityMaxMeters, ASPERITY_MAX_METERS),
+      minimumGapClearanceRequiredMeters,
+      gapClearanceShortfallMeters:
+        minimumGapClearanceMeters == null
+          ? null
+          : round(Math.max(0, minimumGapClearanceRequiredMeters - minimumGapClearanceMeters)),
+      patchVoltageRmsMaxVolts: PATCH_VOLTAGE_RMS_MAX_VOLTS,
+      patchVoltageReductionVolts: reductionToLimit(
+        evidence?.patchVoltageRmsVolts,
+        PATCH_VOLTAGE_RMS_MAX_VOLTS,
+      ),
+      patchVoltageDerivedElectrostaticFractionMax:
+        RESIDUAL_ELECTROSTATIC_FORCE_FRACTION_MAX,
+      patchVoltageDerivedElectrostaticFractionReduction: reductionToLimit(
+        patchVoltageDerivedElectrostaticForceFraction,
+        RESIDUAL_ELECTROSTATIC_FORCE_FRACTION_MAX,
+      ),
+      residualElectrostaticForceFractionMax: RESIDUAL_ELECTROSTATIC_FORCE_FRACTION_MAX,
+      residualElectrostaticForceFractionReduction: reductionToLimit(
+        evidence?.residualElectrostaticForceFraction,
+        RESIDUAL_ELECTROSTATIC_FORCE_FRACTION_MAX,
+      ),
+      residualElectrostaticForceMaxN,
+      residualElectrostaticForceReductionN: reductionToLimit(
+        residualElectrostaticForceN,
+        residualElectrostaticForceMaxN,
+      ),
+    },
     blockers,
     summary: {
       operatingBudgetComputed: true,
@@ -302,6 +367,9 @@ export const isNhm2TileSourceRoughnessPatchOperatingBudget = (
   const budget = isRecord(value.derivedOperatingBudget)
     ? value.derivedOperatingBudget
     : null;
+  const requiredCorrections = isRecord(value.requiredCorrections)
+    ? value.requiredCorrections
+    : null;
   const summary = isRecord(value.summary) ? value.summary : null;
   const boundary = isRecord(value.claimBoundary) ? value.claimBoundary : null;
   return (
@@ -329,6 +397,23 @@ export const isNhm2TileSourceRoughnessPatchOperatingBudget = (
     (supplied.patchVoltageMapRef === null || typeof supplied.patchVoltageMapRef === "string") &&
     budget != null &&
     typeof budget.mapRefsAvailable === "boolean" &&
+    requiredCorrections != null &&
+    requiredCorrections.roughnessRmsMaxMeters === 1e-10 &&
+    isNumberOrNull(requiredCorrections.roughnessRmsReductionMeters) &&
+    requiredCorrections.asperityP99MaxMeters === 2e-9 &&
+    isNumberOrNull(requiredCorrections.asperityP99ReductionMeters) &&
+    requiredCorrections.asperityMaxMeters === 4e-9 &&
+    isNumberOrNull(requiredCorrections.asperityMaxReductionMeters) &&
+    requiredCorrections.minimumGapClearanceRequiredMeters === 4e-9 &&
+    isNumberOrNull(requiredCorrections.gapClearanceShortfallMeters) &&
+    requiredCorrections.patchVoltageRmsMaxVolts === 0.01 &&
+    isNumberOrNull(requiredCorrections.patchVoltageReductionVolts) &&
+    requiredCorrections.patchVoltageDerivedElectrostaticFractionMax === 0.05 &&
+    isNumberOrNull(requiredCorrections.patchVoltageDerivedElectrostaticFractionReduction) &&
+    requiredCorrections.residualElectrostaticForceFractionMax === 0.05 &&
+    isNumberOrNull(requiredCorrections.residualElectrostaticForceFractionReduction) &&
+    typeof requiredCorrections.residualElectrostaticForceMaxN === "number" &&
+    isNumberOrNull(requiredCorrections.residualElectrostaticForceReductionN) &&
     Array.isArray(value.blockers) &&
     value.blockers.every((entry) => typeof entry === "string") &&
     summary != null &&

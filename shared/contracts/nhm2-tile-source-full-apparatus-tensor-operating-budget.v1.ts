@@ -107,6 +107,35 @@ export type Nhm2TileSourceFullApparatusTensorOperatingBudgetV1 = {
     requiredRegionalCoverageComplete: boolean;
     scalarT00Only: boolean;
   };
+  requiredCorrections: {
+    requiredComponentGroupCount: 4;
+    componentGroupMissingCount: number;
+    missingComponentGroupIds: string[];
+    componentGroupRefMissingCount: number;
+    missingComponentGroupRefIds: string[];
+    requiredTensorComponentCount: 10;
+    tensorComponentRefMissingCount: number;
+    missingTensorComponentIds: string[];
+    requiredStressEnergyTermCount: 9;
+    stressEnergyTermMissingCount: number;
+    missingStressEnergyTermIds: string[];
+    stressEnergyTermRefMissingCount: number;
+    missingStressEnergyTermRefIds: string[];
+    requiredRegionCount: 3;
+    regionCoverageMissingCount: number;
+    missingRegionIds: string[];
+    regionalSupportRefMissingCount: number;
+    missingRegionalSupportRefIds: string[];
+    authorityMetadataMissingCount: number;
+    missingAuthorityMetadataIds: string[];
+    componentCoverageFractionShortfall: number;
+    termCoverageFractionShortfall: number;
+    regionalCoverageFractionShortfall: number;
+    tensorValueArtifactRequired: true;
+    tensorValueArtifactAvailable: boolean;
+    scalarT00OnlyForbidden: true;
+    scalarT00OnlyDetected: boolean;
+  };
   blockers: string[];
   summary: {
     operatingBudgetComputed: boolean;
@@ -143,6 +172,38 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   value != null && typeof value === "object" && !Array.isArray(value);
 
 const round = (value: number, digits = 12): number => Number(value.toPrecision(digits));
+
+const COMPONENT_GROUP_IDS = ["T00", "T0i", "diagonalTij", "offDiagonalTij"] as const;
+const TENSOR_COMPONENT_IDS = [
+  "T00",
+  "T01",
+  "T02",
+  "T03",
+  "T11",
+  "T12",
+  "T13",
+  "T22",
+  "T23",
+  "T33",
+] as const;
+const STRESS_ENERGY_TERM_IDS = [
+  "supportStructureStressEnergy",
+  "spacerContactStressEnergy",
+  "activeControlFieldEnergy",
+  "thermalLoadStressEnergy",
+  "patchPotentialElectrostaticStress",
+  "fatigueDamageEvolution",
+  "layerScalingCrossTerms",
+  "casimirInteractionStressEnergy",
+  "materialStrainEnergy",
+] as const;
+const REGION_IDS = ["wall", "hull", "exteriorShell"] as const;
+const AUTHORITY_METADATA_IDS = [
+  "sameChart",
+  "sameBasis",
+  "sameUnits",
+  "noMetricTargetEcho",
+] as const;
 
 const defaultEvidence = (): Nhm2TileSourceFullApparatusTensorEvidenceV1 => ({
   evidenceTier: "missing",
@@ -238,6 +299,31 @@ export const buildNhm2TileSourceFullApparatusTensorOperatingBudget = (
     !evidence.components.T0i &&
     !evidence.components.diagonalTij &&
     !evidence.components.offDiagonalTij;
+  const missingComponentGroupIds = COMPONENT_GROUP_IDS.filter((componentId) => {
+    if (componentId === "T00") return !evidence.components.T00;
+    if (componentId === "T0i") return !evidence.components.T0i;
+    if (componentId === "diagonalTij") return !evidence.components.diagonalTij;
+    return !evidence.components.offDiagonalTij;
+  });
+  const missingComponentGroupRefIds = COMPONENT_GROUP_IDS.filter(
+    (componentId) => evidence.componentRefs?.[componentId] == null,
+  );
+  const missingTensorComponentIds = TENSOR_COMPONENT_IDS.filter(
+    (componentId) => evidence.componentDetailRefs?.[componentId] == null,
+  );
+  const missingStressEnergyTermIds = STRESS_ENERGY_TERM_IDS.filter(
+    (termId) => !evidence.termCoverage[termId],
+  );
+  const missingStressEnergyTermRefIds = STRESS_ENERGY_TERM_IDS.filter(
+    (termId) => evidence.termRefs?.[termId] == null,
+  );
+  const missingRegionIds = REGION_IDS.filter((regionId) => !evidence.regionalCoverage[regionId]);
+  const missingRegionalSupportRefIds = REGION_IDS.filter(
+    (regionId) => evidence.regionalSupportRefs?.[regionId] == null,
+  );
+  const missingAuthorityMetadataIds = AUTHORITY_METADATA_IDS.filter(
+    (metadataId) => evidence[metadataId] !== true,
+  );
   const blockers = [
     ...(evidence.evidenceTier === "missing"
       ? ["full_apparatus_tensor_receipt_missing_for_operating_budget"]
@@ -471,6 +557,35 @@ export const buildNhm2TileSourceFullApparatusTensorOperatingBudget = (
       requiredRegionalCoverageComplete,
       scalarT00Only,
     },
+    requiredCorrections: {
+      requiredComponentGroupCount: 4,
+      componentGroupMissingCount: missingComponentGroupIds.length,
+      missingComponentGroupIds,
+      componentGroupRefMissingCount: missingComponentGroupRefIds.length,
+      missingComponentGroupRefIds,
+      requiredTensorComponentCount: 10,
+      tensorComponentRefMissingCount: missingTensorComponentIds.length,
+      missingTensorComponentIds,
+      requiredStressEnergyTermCount: 9,
+      stressEnergyTermMissingCount: missingStressEnergyTermIds.length,
+      missingStressEnergyTermIds,
+      stressEnergyTermRefMissingCount: missingStressEnergyTermRefIds.length,
+      missingStressEnergyTermRefIds,
+      requiredRegionCount: 3,
+      regionCoverageMissingCount: missingRegionIds.length,
+      missingRegionIds,
+      regionalSupportRefMissingCount: missingRegionalSupportRefIds.length,
+      missingRegionalSupportRefIds,
+      authorityMetadataMissingCount: missingAuthorityMetadataIds.length,
+      missingAuthorityMetadataIds,
+      componentCoverageFractionShortfall: round(Math.max(0, 1 - componentCoverageFraction)),
+      termCoverageFractionShortfall: round(Math.max(0, 1 - termCoverageFraction)),
+      regionalCoverageFractionShortfall: round(Math.max(0, 1 - regionalCoverageFraction)),
+      tensorValueArtifactRequired: true,
+      tensorValueArtifactAvailable,
+      scalarT00OnlyForbidden: true,
+      scalarT00OnlyDetected: scalarT00Only,
+    },
     blockers,
     summary: {
       operatingBudgetComputed: true,
@@ -505,6 +620,9 @@ export const isNhm2TileSourceFullApparatusTensorOperatingBudget = (
     : null;
   const budget = isRecord(value.derivedOperatingBudget)
     ? value.derivedOperatingBudget
+    : null;
+  const requiredCorrections = isRecord(value.requiredCorrections)
+    ? value.requiredCorrections
     : null;
   const summary = isRecord(value.summary) ? value.summary : null;
   const boundary = isRecord(value.claimBoundary) ? value.claimBoundary : null;
@@ -544,6 +662,34 @@ export const isNhm2TileSourceFullApparatusTensorOperatingBudget = (
     typeof budget.requiredStressEnergyTermsComplete === "boolean" &&
     typeof budget.requiredRegionalCoverageComplete === "boolean" &&
     typeof budget.scalarT00Only === "boolean" &&
+    requiredCorrections != null &&
+    requiredCorrections.requiredComponentGroupCount === 4 &&
+    typeof requiredCorrections.componentGroupMissingCount === "number" &&
+    Array.isArray(requiredCorrections.missingComponentGroupIds) &&
+    typeof requiredCorrections.componentGroupRefMissingCount === "number" &&
+    Array.isArray(requiredCorrections.missingComponentGroupRefIds) &&
+    requiredCorrections.requiredTensorComponentCount === 10 &&
+    typeof requiredCorrections.tensorComponentRefMissingCount === "number" &&
+    Array.isArray(requiredCorrections.missingTensorComponentIds) &&
+    requiredCorrections.requiredStressEnergyTermCount === 9 &&
+    typeof requiredCorrections.stressEnergyTermMissingCount === "number" &&
+    Array.isArray(requiredCorrections.missingStressEnergyTermIds) &&
+    typeof requiredCorrections.stressEnergyTermRefMissingCount === "number" &&
+    Array.isArray(requiredCorrections.missingStressEnergyTermRefIds) &&
+    requiredCorrections.requiredRegionCount === 3 &&
+    typeof requiredCorrections.regionCoverageMissingCount === "number" &&
+    Array.isArray(requiredCorrections.missingRegionIds) &&
+    typeof requiredCorrections.regionalSupportRefMissingCount === "number" &&
+    Array.isArray(requiredCorrections.missingRegionalSupportRefIds) &&
+    typeof requiredCorrections.authorityMetadataMissingCount === "number" &&
+    Array.isArray(requiredCorrections.missingAuthorityMetadataIds) &&
+    typeof requiredCorrections.componentCoverageFractionShortfall === "number" &&
+    typeof requiredCorrections.termCoverageFractionShortfall === "number" &&
+    typeof requiredCorrections.regionalCoverageFractionShortfall === "number" &&
+    requiredCorrections.tensorValueArtifactRequired === true &&
+    typeof requiredCorrections.tensorValueArtifactAvailable === "boolean" &&
+    requiredCorrections.scalarT00OnlyForbidden === true &&
+    typeof requiredCorrections.scalarT00OnlyDetected === "boolean" &&
     Array.isArray(value.blockers) &&
     value.blockers.every((entry) => typeof entry === "string") &&
     summary != null &&

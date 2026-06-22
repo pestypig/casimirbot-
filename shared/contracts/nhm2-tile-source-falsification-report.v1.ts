@@ -11,11 +11,34 @@ import type {
 } from "./nhm2-tile-source-physical-validation-plan.v1";
 import type {
   Nhm2TileSourceOperatingBudgetReadinessV1,
+  Nhm2TileSourceOperatingBudgetCorrectionValueV1,
   Nhm2TileSourceOperatingBudgetSurfaceIdV1,
 } from "./nhm2-tile-source-operating-budget-readiness.v1";
 
 export const NHM2_TILE_SOURCE_FALSIFICATION_REPORT_CONTRACT_VERSION =
   "nhm2_tile_source_falsification_report/v1";
+
+export type Nhm2TileSourceExperimentalCampaignDomainV1 =
+  | "material_coupon_behavior"
+  | "force_gap_pull_in"
+  | "roughness_patch_potential"
+  | "active_control_energy_noise_heat_timing"
+  | "fatigue_layer_scaling"
+  | "full_apparatus_tensor"
+  | "downstream_residual_conservation_qei_observer"
+  | "campaign_coordination";
+
+export type Nhm2TileSourceCampaignDomainSummaryV1 = {
+  campaignDomain: Nhm2TileSourceExperimentalCampaignDomainV1;
+  blockerCount: number;
+  falsifyingBlockerCount: number;
+  reviewBlockerCount: number;
+  firstBlocker: string;
+  minimumNumericalMargin: number | null;
+  evidenceTarget: string;
+  nextRequiredChange: string;
+  evidenceRefs: string[];
+};
 
 export type Nhm2TileSourceFalsificationReportRowV1 = {
   blockerId: string;
@@ -31,8 +54,11 @@ export type Nhm2TileSourceFalsificationReportRowV1 = {
   status: Nhm2TileSourceReceiptStatus | Nhm2TileSourceGateStatus | "open" | "falsifying" | "satisfied";
   numericalMargin: number | null;
   numericalMargins: Record<string, number | boolean | null>;
+  requiredCorrections: Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1>;
   marginUnit: string | null;
   requiredChange: string;
+  campaignDomain?: Nhm2TileSourceExperimentalCampaignDomainV1;
+  evidenceTarget?: string;
   falsifiesCurrentCandidate: boolean;
   evidenceRef: string | null;
 };
@@ -48,8 +74,11 @@ export type Nhm2TileSourceFalsificationCurrentBlockerV1 = {
     | "none";
   numericalMargin: number | null;
   numericalMargins: Record<string, number | boolean | null>;
+  requiredCorrections: Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1>;
   marginUnit: string | null;
   requiredChange: string;
+  campaignDomain?: Nhm2TileSourceExperimentalCampaignDomainV1;
+  evidenceTarget?: string;
   falsifiesCurrentCandidate: boolean;
   evidenceRef: string | null;
 };
@@ -74,6 +103,7 @@ export type Nhm2TileSourceFalsificationReportV1 = {
   };
   currentBlocker: Nhm2TileSourceFalsificationCurrentBlockerV1;
   blockerRows: Nhm2TileSourceFalsificationReportRowV1[];
+  campaignDomainSummary: Nhm2TileSourceCampaignDomainSummaryV1[];
   readiness: {
     materialEvidenceReady: boolean;
     fullApparatusTensorReady: boolean;
@@ -146,6 +176,7 @@ const receiptRows = (
       status: surface?.status ?? "review",
       numericalMargin: entry.numericalMargin,
       numericalMargins: {},
+      requiredCorrections: {},
       marginUnit: entry.marginUnit,
       requiredChange: entry.requiredChange,
       falsifiesCurrentCandidate: entry.falsifiesCurrentCandidate,
@@ -175,6 +206,7 @@ const validationRows = (
       status: entry.falsifiesCurrentCandidate ? "fail" : "review",
       numericalMargin: entry.numericalMargin,
       numericalMargins: {},
+      requiredCorrections: {},
       marginUnit: entry.marginUnit,
       requiredChange: entry.requiredChange,
       falsifiesCurrentCandidate: entry.falsifiesCurrentCandidate,
@@ -196,6 +228,7 @@ const downstreamRows = (
           status: gate.status,
           numericalMargin: null,
           numericalMargins: {},
+          requiredCorrections: {},
           marginUnit: null,
           requiredChange: gate.requiredChange,
           falsifiesCurrentCandidate: gate.status === "fail",
@@ -210,6 +243,22 @@ const marginSummary = (margins: Record<string, number | boolean | null>): string
     : entries.map(([key, value]) => `${key}=${String(value)}`).join(", ");
 };
 
+const correctionSummary = (
+  corrections: Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1>,
+): string => {
+  const entries = Object.entries(corrections).filter(([, value]) => {
+    if (Array.isArray(value)) return value.length > 0;
+    if (typeof value === "number") return Number.isFinite(value) && value !== 0;
+    if (typeof value === "boolean") return value === true;
+    return value != null && value !== "none";
+  });
+  return entries.length === 0
+    ? "no correction delta supplied"
+    : entries
+        .map(([key, value]) => `${key}=${Array.isArray(value) ? value.join("|") : String(value)}`)
+        .join(", ");
+};
+
 const minimumNumericalMargin = (
   margins: Record<string, number | boolean | null>,
 ): number | null => {
@@ -218,6 +267,114 @@ const minimumNumericalMargin = (
   );
   return values.length === 0 ? null : Math.min(...values);
 };
+
+const CAMPAIGN_DOMAIN_ORDER = [
+  "material_coupon_behavior",
+  "force_gap_pull_in",
+  "roughness_patch_potential",
+  "active_control_energy_noise_heat_timing",
+  "fatigue_layer_scaling",
+  "full_apparatus_tensor",
+  "downstream_residual_conservation_qei_observer",
+  "campaign_coordination",
+] as const satisfies readonly Nhm2TileSourceExperimentalCampaignDomainV1[];
+
+const domainFromSurface = (
+  surfaceId:
+    | Nhm2LayerStackReceiptSurfaceId
+    | Nhm2TileSourceOperatingBudgetSurfaceIdV1
+    | null,
+): Nhm2TileSourceExperimentalCampaignDomainV1 => {
+  switch (surfaceId) {
+    case "material_coupon":
+      return "material_coupon_behavior";
+    case "force_gap_pull_in":
+    case "force_gap_load":
+      return "force_gap_pull_in";
+    case "roughness_patch_metrology":
+    case "roughness_patch":
+      return "roughness_patch_potential";
+    case "active_control_energy":
+    case "active_control":
+      return "active_control_energy_noise_heat_timing";
+    case "fatigue_lifetime":
+    case "layer_scaling":
+    case "fatigue_layer_scaling":
+      return "fatigue_layer_scaling";
+    case "full_apparatus_tensor":
+      return "full_apparatus_tensor";
+    default:
+      return "campaign_coordination";
+  }
+};
+
+const evidenceTargetFromDomain = (
+  domain: Nhm2TileSourceExperimentalCampaignDomainV1,
+): string => {
+  switch (domain) {
+    case "material_coupon_behavior":
+      return "Measured or validated ultra-high-stress TiN/candidate-stack coupon behavior: stress, fracture/yield, fatigue, cryogenic state, conductivity, dielectric response, roughness, and fabrication tolerance.";
+    case "force_gap_pull_in":
+      return "8 nm force-gap receipt: F(g), dF/dg, effective stiffness, pull-in margin, stiction margin, and active gap-control authority.";
+    case "roughness_patch_potential":
+      return "Roughness/asperity/patch receipt: RMS roughness, asperity-tail distribution versus 8 nm gap, patch-voltage map, and residual electrostatic correction.";
+    case "active_control_energy_noise_heat_timing":
+      return "Active-control receipt: energy per cycle, bandwidth, gap-noise spectrum, heat load, timing synchronization, and failure-mode coverage.";
+    case "fatigue_layer_scaling":
+      return "Fatigue/layer-scaling receipt: lifetime under cycling, layer nonadditivity, support coupling, active-area retention, and multiphysics coupling.";
+    case "full_apparatus_tensor":
+      return "Full apparatus source tensor receipt: source-side T00, T0i, diagonal Tij, and off-diagonal Tij including supports, spacers, controls, electrostatic, thermal, elastic, Casimir, fatigue, and layer-scaling terms.";
+    case "downstream_residual_conservation_qei_observer":
+      return "Downstream gate receipt: regional residual closure, covariant conservation, QEI worldline dossier, observer-family energy conditions, and coupled closure in one frozen chain.";
+    case "campaign_coordination":
+      return "Campaign coordination receipt: coherent refs, operating-budget evidence, and non-stale artifact handoff.";
+  }
+};
+
+const annotateRow = (
+  row: Nhm2TileSourceFalsificationReportRowV1,
+): Nhm2TileSourceFalsificationReportRowV1 => {
+  const campaignDomain =
+    row.source === "downstream_gate"
+      ? "downstream_residual_conservation_qei_observer"
+      : domainFromSurface(row.surfaceId ?? row.operatingBudgetSurfaceId);
+  return {
+    ...row,
+    campaignDomain,
+    evidenceTarget: evidenceTargetFromDomain(campaignDomain),
+  };
+};
+
+const rowNumericalMargin = (
+  row: Nhm2TileSourceFalsificationReportRowV1,
+): number | null => row.numericalMargin ?? minimumNumericalMargin(row.numericalMargins);
+
+const uniqueText = (values: Array<string | null | undefined>): string[] =>
+  Array.from(
+    new Set(values.filter((value): value is string => value != null && value.length > 0)),
+  );
+
+const buildCampaignDomainSummary = (
+  rows: Nhm2TileSourceFalsificationReportRowV1[],
+): Nhm2TileSourceCampaignDomainSummaryV1[] =>
+  CAMPAIGN_DOMAIN_ORDER.map((campaignDomain) => {
+    const domainRows = rows.filter((row) => row.campaignDomain === campaignDomain);
+    const margins = domainRows
+      .map(rowNumericalMargin)
+      .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+    const firstRow = domainRows[0] ?? null;
+    return {
+      campaignDomain,
+      blockerCount: domainRows.length,
+      falsifyingBlockerCount: domainRows.filter((row) => row.falsifiesCurrentCandidate).length,
+      reviewBlockerCount: domainRows.filter((row) => !row.falsifiesCurrentCandidate).length,
+      firstBlocker: firstRow?.blockerId ?? "none",
+      minimumNumericalMargin: margins.length === 0 ? null : Math.min(...margins),
+      evidenceTarget: firstRow?.evidenceTarget ?? evidenceTargetFromDomain(campaignDomain),
+      nextRequiredChange: firstRow?.requiredChange ?? "none",
+      evidenceRefs: uniqueText(domainRows.map((row) => row.evidenceRef)),
+    };
+  });
 
 const operatingBudgetRows = (
   readiness: Nhm2TileSourceOperatingBudgetReadinessV1 | null | undefined,
@@ -234,10 +391,11 @@ const operatingBudgetRows = (
           status: status.falsifiesCurrentCandidate ? "falsifying" : "review",
           numericalMargin: minimumNumericalMargin(status.numericalMargins),
           numericalMargins: status.numericalMargins,
+          requiredCorrections: status.requiredCorrections,
           marginUnit: "ratio_or_boolean_margin",
           requiredChange: `supply or revise ${status.surfaceId} operating evidence; ${marginSummary(
             status.numericalMargins,
-          )}`,
+          )}; corrections: ${correctionSummary(status.requiredCorrections)}`,
           falsifiesCurrentCandidate: status.falsifiesCurrentCandidate,
           evidenceRef: status.artifactRef,
         })),
@@ -258,6 +416,9 @@ const currentBlockerFromRow = (
         numericalMargins: {},
         marginUnit: null,
         requiredChange: "none",
+        requiredCorrections: {},
+        campaignDomain: "campaign_coordination",
+        evidenceTarget: evidenceTargetFromDomain("campaign_coordination"),
         falsifiesCurrentCandidate: false,
         evidenceRef: null,
       }
@@ -270,8 +431,11 @@ const currentBlockerFromRow = (
         status: row.status,
         numericalMargin: row.numericalMargin,
         numericalMargins: row.numericalMargins,
+        requiredCorrections: row.requiredCorrections,
         marginUnit: row.marginUnit,
         requiredChange: row.requiredChange,
+        ...(row.campaignDomain != null ? { campaignDomain: row.campaignDomain } : {}),
+        ...(row.evidenceTarget != null ? { evidenceTarget: row.evidenceTarget } : {}),
         falsifiesCurrentCandidate: row.falsifiesCurrentCandidate,
         evidenceRef: row.evidenceRef,
       };
@@ -313,9 +477,10 @@ export const buildNhm2TileSourceFalsificationReport = (
     ...validationRows(plan, receiptBlockerIds, downstreamBlockerIds, budgetBlockerIds),
     ...budgetBlockers,
     ...downstreamRows(plan),
-  ];
+  ].map(annotateRow);
   const firstRow = rows[0] ?? null;
   const currentBlocker = currentBlockerFromRow(firstRow);
+  const campaignDomainSummary = buildCampaignDomainSummary(rows);
   const nextRoadmapItem = roadmap.roadmapItems.find(
     (item) => item.itemId === roadmap.summary.nextBestItemId,
   );
@@ -356,6 +521,7 @@ export const buildNhm2TileSourceFalsificationReport = (
     },
     currentBlocker,
     blockerRows: rows,
+    campaignDomainSummary,
     readiness: {
       materialEvidenceReady: receipts.summary.materialEvidenceReady,
       fullApparatusTensorReady: receipts.summary.fullApparatusTensorReady,
@@ -400,6 +566,19 @@ export const buildNhm2TileSourceFalsificationReport = (
   };
 };
 
+const isCorrectionRecord = (
+  value: unknown,
+): value is Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1> =>
+  isRecord(value) &&
+  Object.values(value).every(
+    (entry) =>
+      entry === null ||
+      typeof entry === "string" ||
+      typeof entry === "boolean" ||
+      (typeof entry === "number" && Number.isFinite(entry)) ||
+      (Array.isArray(entry) && entry.every((item) => typeof item === "string")),
+  );
+
 export const isNhm2TileSourceFalsificationReport = (
   value: unknown,
 ): value is Nhm2TileSourceFalsificationReportV1 => {
@@ -439,8 +618,13 @@ export const isNhm2TileSourceFalsificationReport = (
         typeof entry === "boolean" ||
         (typeof entry === "number" && Number.isFinite(entry)),
     ) &&
+    isCorrectionRecord(currentBlocker.requiredCorrections) &&
     (currentBlocker.marginUnit === null || typeof currentBlocker.marginUnit === "string") &&
     typeof currentBlocker.requiredChange === "string" &&
+    (currentBlocker.campaignDomain === undefined ||
+      typeof currentBlocker.campaignDomain === "string") &&
+    (currentBlocker.evidenceTarget === undefined ||
+      typeof currentBlocker.evidenceTarget === "string") &&
     typeof currentBlocker.falsifiesCurrentCandidate === "boolean" &&
     (currentBlocker.evidenceRef === null || typeof currentBlocker.evidenceRef === "string") &&
     Array.isArray(value.blockerRows) &&
@@ -462,10 +646,30 @@ export const isNhm2TileSourceFalsificationReport = (
             typeof value === "boolean" ||
             (typeof value === "number" && Number.isFinite(value)),
         ) &&
+        isCorrectionRecord(row.requiredCorrections) &&
         (row.marginUnit === null || typeof row.marginUnit === "string") &&
         typeof row.requiredChange === "string" &&
+        (row.campaignDomain === undefined || typeof row.campaignDomain === "string") &&
+        (row.evidenceTarget === undefined || typeof row.evidenceTarget === "string") &&
         typeof row.falsifiesCurrentCandidate === "boolean" &&
         (row.evidenceRef === null || typeof row.evidenceRef === "string"),
+    ) &&
+    Array.isArray(value.campaignDomainSummary) &&
+    value.campaignDomainSummary.every(
+      (entry) =>
+        isRecord(entry) &&
+        typeof entry.campaignDomain === "string" &&
+        typeof entry.blockerCount === "number" &&
+        typeof entry.falsifyingBlockerCount === "number" &&
+        typeof entry.reviewBlockerCount === "number" &&
+        typeof entry.firstBlocker === "string" &&
+        (entry.minimumNumericalMargin === null ||
+          (typeof entry.minimumNumericalMargin === "number" &&
+            Number.isFinite(entry.minimumNumericalMargin))) &&
+        typeof entry.evidenceTarget === "string" &&
+        typeof entry.nextRequiredChange === "string" &&
+        Array.isArray(entry.evidenceRefs) &&
+        entry.evidenceRefs.every((ref) => typeof ref === "string"),
     ) &&
     readiness != null &&
     typeof readiness.materialEvidenceReady === "boolean" &&

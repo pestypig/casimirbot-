@@ -61,6 +61,33 @@ export type Nhm2TileSourceFatigueLayerScalingOperatingBudgetV1 = {
     sourceTensorRetentionFraction: number | null;
     sourceTensorRetentionMargin: number | null;
   };
+  requiredCorrections: {
+    cycleMarginMin: 1;
+    cycleCountRequired: number | null;
+    cycleCountShortfall: number | null;
+    thermalCycleDriftFractionMax: 0.01;
+    thermalCycleDriftReduction: number | null;
+    creepDriftFractionMax: 0.01;
+    creepDriftReduction: number | null;
+    layerScalingEfficiencyMin: 0.9;
+    layerScalingEfficiencyShortfall: number | null;
+    layerNonadditivityFractionMax: 0.1;
+    layerNonadditivityReduction: number | null;
+    activeAreaRetentionMin: 0.6;
+    activeAreaRetentionShortfall: number | null;
+    effectiveActiveLayerCountMin: number;
+    effectiveActiveLayerCountShortfall: number | null;
+    sourceTensorRetentionFractionMin: 0.9;
+    sourceTensorRetentionFractionShortfall: number | null;
+    effectiveSourceTensorLayerCountMin: number;
+    effectiveSourceTensorLayerCountShortfall: number | null;
+    requiredFatigueProvenanceRefCount: 4;
+    missingFatigueProvenanceRefCount: number;
+    requiredLayerScalingProvenanceRefCount: 5;
+    missingLayerScalingProvenanceRefCount: number;
+    supportCouplingStatusRequired: "pass";
+    supportCouplingStatusSatisfied: boolean;
+  };
   blockers: string[];
   summary: {
     operatingBudgetComputed: boolean;
@@ -113,6 +140,9 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const finiteOrNull = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
 
+const isNumberOrNull = (value: unknown): value is number | null =>
+  value === null || (typeof value === "number" && Number.isFinite(value));
+
 const stringOrNull = (value: unknown): string | null =>
   typeof value === "string" && value.trim().length > 0 ? value : null;
 
@@ -123,6 +153,12 @@ const safeRatio = (numerator: number | null, denominator: number | null): number
 
 const upperBoundMargin = (limit: number, value: number | null | undefined): number | null =>
   value == null || !Number.isFinite(value) || value <= 0 ? null : round(limit / value);
+
+const shortfallToMinimum = (value: number | null | undefined, minimum: number): number | null =>
+  value == null ? null : round(Math.max(0, minimum - value));
+
+const reductionToMaximum = (value: number | null | undefined, maximum: number): number | null =>
+  value == null ? null : round(Math.max(0, value - maximum));
 
 export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
   input: BuildNhm2TileSourceFatigueLayerScalingOperatingBudgetInput = {},
@@ -173,6 +209,25 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
     sourceTensorRetentionFraction,
     SOURCE_TENSOR_RETENTION_FRACTION_MIN,
   );
+  const effectiveSourceTensorLayerCount =
+    sourceTensorRetentionFraction == null
+      ? null
+      : round(sourceTensorRetentionFraction * LAYER_COUNT);
+  const fatigueRefs = [
+    evidence?.cycleProtocolRef,
+    evidence?.fatigueCurveRef,
+    evidence?.thermalCycleRef,
+    evidence?.creepDriftRef,
+  ];
+  const layerScalingRefs = [
+    evidence?.layerScalingMapRef,
+    evidence?.nonadditivityModelRef,
+    evidence?.activeAreaMapRef,
+    evidence?.supportCouplingMapRef,
+    evidence?.multiphysicsCouplingRef,
+  ];
+  const missingFatigueProvenanceRefCount = fatigueRefs.filter((ref) => ref == null).length;
+  const missingLayerScalingProvenanceRefCount = layerScalingRefs.filter((ref) => ref == null).length;
   const blockers = [
     ...(evidence == null || evidence.evidenceTier === "missing"
       ? ["fatigue_layer_scaling_receipt_missing_for_operating_budget"]
@@ -336,6 +391,60 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
       sourceTensorRetentionFraction,
       sourceTensorRetentionMargin,
     },
+    requiredCorrections: {
+      cycleMarginMin: 1,
+      cycleCountRequired: evidence?.requiredCycleCount ?? null,
+      cycleCountShortfall:
+        evidence?.cycleCountToFailure == null || evidence?.requiredCycleCount == null
+          ? null
+          : round(Math.max(0, evidence.requiredCycleCount - evidence.cycleCountToFailure)),
+      thermalCycleDriftFractionMax: THERMAL_CYCLE_DRIFT_FRACTION_MAX,
+      thermalCycleDriftReduction: reductionToMaximum(
+        evidence?.thermalCycleDriftFraction,
+        THERMAL_CYCLE_DRIFT_FRACTION_MAX,
+      ),
+      creepDriftFractionMax: CREEP_DRIFT_FRACTION_MAX,
+      creepDriftReduction: reductionToMaximum(
+        evidence?.creepDriftFraction,
+        CREEP_DRIFT_FRACTION_MAX,
+      ),
+      layerScalingEfficiencyMin: LAYER_SCALING_EFFICIENCY_MIN,
+      layerScalingEfficiencyShortfall: shortfallToMinimum(
+        evidence?.layerScalingEfficiency,
+        LAYER_SCALING_EFFICIENCY_MIN,
+      ),
+      layerNonadditivityFractionMax: LAYER_NONADDITIVITY_FRACTION_MAX,
+      layerNonadditivityReduction: reductionToMaximum(
+        evidence?.nonadditivityFraction,
+        LAYER_NONADDITIVITY_FRACTION_MAX,
+      ),
+      activeAreaRetentionMin: ACTIVE_AREA_RETENTION_MIN,
+      activeAreaRetentionShortfall: shortfallToMinimum(
+        evidence?.activeAreaRetention,
+        ACTIVE_AREA_RETENTION_MIN,
+      ),
+      effectiveActiveLayerCountMin: round(EFFECTIVE_ACTIVE_LAYER_COUNT_MIN),
+      effectiveActiveLayerCountShortfall: shortfallToMinimum(
+        effectiveActiveLayerCount,
+        EFFECTIVE_ACTIVE_LAYER_COUNT_MIN,
+      ),
+      sourceTensorRetentionFractionMin: SOURCE_TENSOR_RETENTION_FRACTION_MIN,
+      sourceTensorRetentionFractionShortfall: shortfallToMinimum(
+        sourceTensorRetentionFraction,
+        SOURCE_TENSOR_RETENTION_FRACTION_MIN,
+      ),
+      effectiveSourceTensorLayerCountMin: round(EFFECTIVE_SOURCE_TENSOR_LAYER_COUNT_MIN),
+      effectiveSourceTensorLayerCountShortfall: shortfallToMinimum(
+        effectiveSourceTensorLayerCount,
+        EFFECTIVE_SOURCE_TENSOR_LAYER_COUNT_MIN,
+      ),
+      requiredFatigueProvenanceRefCount: 4,
+      missingFatigueProvenanceRefCount,
+      requiredLayerScalingProvenanceRefCount: 5,
+      missingLayerScalingProvenanceRefCount,
+      supportCouplingStatusRequired: "pass",
+      supportCouplingStatusSatisfied: evidence?.supportCouplingStatus === "pass",
+    },
     blockers,
     summary: {
       operatingBudgetComputed: true,
@@ -369,6 +478,9 @@ export const isNhm2TileSourceFatigueLayerScalingOperatingBudget = (
   const budget = isRecord(value.derivedOperatingBudget)
     ? value.derivedOperatingBudget
     : null;
+  const requiredCorrections = isRecord(value.requiredCorrections)
+    ? value.requiredCorrections
+    : null;
   const summary = isRecord(value.summary) ? value.summary : null;
   const boundary = isRecord(value.claimBoundary) ? value.claimBoundary : null;
   return (
@@ -394,6 +506,32 @@ export const isNhm2TileSourceFatigueLayerScalingOperatingBudget = (
     supplied != null &&
     typeof supplied.evidenceTier === "string" &&
     budget != null &&
+    requiredCorrections != null &&
+    requiredCorrections.cycleMarginMin === 1 &&
+    isNumberOrNull(requiredCorrections.cycleCountRequired) &&
+    isNumberOrNull(requiredCorrections.cycleCountShortfall) &&
+    requiredCorrections.thermalCycleDriftFractionMax === 0.01 &&
+    isNumberOrNull(requiredCorrections.thermalCycleDriftReduction) &&
+    requiredCorrections.creepDriftFractionMax === 0.01 &&
+    isNumberOrNull(requiredCorrections.creepDriftReduction) &&
+    requiredCorrections.layerScalingEfficiencyMin === 0.9 &&
+    isNumberOrNull(requiredCorrections.layerScalingEfficiencyShortfall) &&
+    requiredCorrections.layerNonadditivityFractionMax === 0.1 &&
+    isNumberOrNull(requiredCorrections.layerNonadditivityReduction) &&
+    requiredCorrections.activeAreaRetentionMin === 0.6 &&
+    isNumberOrNull(requiredCorrections.activeAreaRetentionShortfall) &&
+    typeof requiredCorrections.effectiveActiveLayerCountMin === "number" &&
+    isNumberOrNull(requiredCorrections.effectiveActiveLayerCountShortfall) &&
+    requiredCorrections.sourceTensorRetentionFractionMin === 0.9 &&
+    isNumberOrNull(requiredCorrections.sourceTensorRetentionFractionShortfall) &&
+    typeof requiredCorrections.effectiveSourceTensorLayerCountMin === "number" &&
+    isNumberOrNull(requiredCorrections.effectiveSourceTensorLayerCountShortfall) &&
+    requiredCorrections.requiredFatigueProvenanceRefCount === 4 &&
+    typeof requiredCorrections.missingFatigueProvenanceRefCount === "number" &&
+    requiredCorrections.requiredLayerScalingProvenanceRefCount === 5 &&
+    typeof requiredCorrections.missingLayerScalingProvenanceRefCount === "number" &&
+    requiredCorrections.supportCouplingStatusRequired === "pass" &&
+    typeof requiredCorrections.supportCouplingStatusSatisfied === "boolean" &&
     Array.isArray(value.blockers) &&
     value.blockers.every((entry) => typeof entry === "string") &&
     summary != null &&

@@ -63,6 +63,32 @@ export type Nhm2TileSourceMaterialCouponOperatingBudgetV1 = {
     roughnessRmsMargin: number | null;
     fabricationToleranceMargin: number | null;
   };
+  requiredCorrections: {
+    materialRequired: "ultra_high_stress_tin";
+    materialMismatch: boolean;
+    supportStressPa: number;
+    tensileStressMinPa: number;
+    tensileStressShortfallPa: number | null;
+    materialSafetyFactor: 2;
+    requiredFractureOrYieldStressPa: number;
+    fractureOrYieldStressShortfallPa: number | null;
+    operatingTemperatureK: 4;
+    cryogenicTemperatureReductionK: number | null;
+    materialResponseFrequencyHz: 15e9;
+    materialResponseFrequencyAbsDeltaHz: number | null;
+    materialResponseTemperatureK: 4;
+    dielectricTemperatureReductionK: number | null;
+    conductivityTemperatureReductionK: number | null;
+    roughnessRmsMaxMeters: 1e-10;
+    roughnessRmsReductionMeters: number | null;
+    fabricationToleranceMaxMeters: 5e-10;
+    fabricationToleranceReductionMeters: number | null;
+    requiredCurveAndMapRefCount: 5;
+    missingCurveAndMapRefCount: number;
+    requiredMaterialResponseRefCount: 2;
+    missingMaterialResponseRefCount: number;
+    materialResponseNumericValuesAvailable: boolean;
+  };
   blockers: string[];
   summary: {
     operatingBudgetComputed: boolean;
@@ -107,6 +133,9 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const finiteOrNull = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
 
+const isNumberOrNull = (value: unknown): value is number | null =>
+  value === null || (typeof value === "number" && Number.isFinite(value));
+
 const stringOrNull = (value: unknown): string | null =>
   typeof value === "string" && value.trim().length > 0 ? value : null;
 
@@ -114,6 +143,15 @@ const safeRatio = (numerator: number | null, denominator: number | null): number
   numerator == null || denominator == null || denominator === 0
     ? null
     : round(numerator / denominator);
+
+const shortfallToMinimum = (value: number | null | undefined, minimum: number): number | null =>
+  value == null ? null : round(Math.max(0, minimum - value));
+
+const reductionToMaximum = (value: number | null | undefined, maximum: number): number | null =>
+  value == null ? null : round(Math.max(0, value - maximum));
+
+const absDeltaToTarget = (value: number | null | undefined, target: number): number | null =>
+  value == null ? null : round(Math.abs(value - target));
 
 export const buildNhm2TileSourceMaterialCouponOperatingBudget = (
   input: BuildNhm2TileSourceMaterialCouponOperatingBudgetInput = {},
@@ -162,6 +200,19 @@ export const buildNhm2TileSourceMaterialCouponOperatingBudget = (
     FABRICATION_TOLERANCE_MAX_METERS,
     evidence?.fabricationToleranceMeters ?? null,
   );
+  const curveAndMapRefs = [
+    evidence?.tensileStressCurveRef,
+    evidence?.fractureYieldCurveRef,
+    evidence?.cryogenicStateRef,
+    evidence?.roughnessMapRef,
+    evidence?.fabricationToleranceMapRef,
+  ];
+  const materialResponseRefs = [
+    evidence?.dielectricResponseRef,
+    evidence?.conductivityRef,
+  ];
+  const missingCurveAndMapRefCount = curveAndMapRefs.filter((ref) => ref == null).length;
+  const missingMaterialResponseRefCount = materialResponseRefs.filter((ref) => ref == null).length;
   const blockers = [
     ...(evidence == null || evidence.evidenceTier === "missing"
       ? ["material_coupon_receipt_missing_for_operating_budget"]
@@ -319,6 +370,53 @@ export const buildNhm2TileSourceMaterialCouponOperatingBudget = (
       roughnessRmsMargin,
       fabricationToleranceMargin,
     },
+    requiredCorrections: {
+      materialRequired: "ultra_high_stress_tin",
+      materialMismatch: evidence?.material !== "ultra_high_stress_tin",
+      supportStressPa,
+      tensileStressMinPa: supportStressPa,
+      tensileStressShortfallPa: shortfallToMinimum(evidence?.measuredTensileStressPa, supportStressPa),
+      materialSafetyFactor: 2,
+      requiredFractureOrYieldStressPa,
+      fractureOrYieldStressShortfallPa: shortfallToMinimum(
+        evidence?.fractureOrYieldStressPa,
+        requiredFractureOrYieldStressPa,
+      ),
+      operatingTemperatureK: OPERATING_TEMPERATURE_K,
+      cryogenicTemperatureReductionK: reductionToMaximum(
+        evidence?.cryogenicTemperatureK,
+        OPERATING_TEMPERATURE_K,
+      ),
+      materialResponseFrequencyHz: MATERIAL_RESPONSE_FREQUENCY_HZ,
+      materialResponseFrequencyAbsDeltaHz: absDeltaToTarget(
+        evidence?.materialResponseFrequencyHz,
+        MATERIAL_RESPONSE_FREQUENCY_HZ,
+      ),
+      materialResponseTemperatureK: OPERATING_TEMPERATURE_K,
+      dielectricTemperatureReductionK: reductionToMaximum(
+        evidence?.dielectricResponseTemperatureK,
+        OPERATING_TEMPERATURE_K,
+      ),
+      conductivityTemperatureReductionK: reductionToMaximum(
+        evidence?.conductivityTemperatureK,
+        OPERATING_TEMPERATURE_K,
+      ),
+      roughnessRmsMaxMeters: ROUGHNESS_RMS_MAX_METERS,
+      roughnessRmsReductionMeters: reductionToMaximum(
+        evidence?.roughnessRmsMeters,
+        ROUGHNESS_RMS_MAX_METERS,
+      ),
+      fabricationToleranceMaxMeters: FABRICATION_TOLERANCE_MAX_METERS,
+      fabricationToleranceReductionMeters: reductionToMaximum(
+        evidence?.fabricationToleranceMeters,
+        FABRICATION_TOLERANCE_MAX_METERS,
+      ),
+      requiredCurveAndMapRefCount: 5,
+      missingCurveAndMapRefCount,
+      requiredMaterialResponseRefCount: 2,
+      missingMaterialResponseRefCount,
+      materialResponseNumericValuesAvailable: materialResponseValuesAvailable,
+    },
     blockers,
     summary: {
       operatingBudgetComputed: true,
@@ -352,6 +450,9 @@ export const isNhm2TileSourceMaterialCouponOperatingBudget = (
   const budget = isRecord(value.derivedOperatingBudget)
     ? value.derivedOperatingBudget
     : null;
+  const requiredCorrections = isRecord(value.requiredCorrections)
+    ? value.requiredCorrections
+    : null;
   const summary = isRecord(value.summary) ? value.summary : null;
   const boundary = isRecord(value.claimBoundary) ? value.claimBoundary : null;
   return (
@@ -379,6 +480,31 @@ export const isNhm2TileSourceMaterialCouponOperatingBudget = (
     supplied != null &&
     typeof supplied.evidenceTier === "string" &&
     budget != null &&
+    requiredCorrections != null &&
+    requiredCorrections.materialRequired === "ultra_high_stress_tin" &&
+    typeof requiredCorrections.materialMismatch === "boolean" &&
+    typeof requiredCorrections.supportStressPa === "number" &&
+    typeof requiredCorrections.tensileStressMinPa === "number" &&
+    isNumberOrNull(requiredCorrections.tensileStressShortfallPa) &&
+    requiredCorrections.materialSafetyFactor === 2 &&
+    typeof requiredCorrections.requiredFractureOrYieldStressPa === "number" &&
+    isNumberOrNull(requiredCorrections.fractureOrYieldStressShortfallPa) &&
+    requiredCorrections.operatingTemperatureK === 4 &&
+    isNumberOrNull(requiredCorrections.cryogenicTemperatureReductionK) &&
+    requiredCorrections.materialResponseFrequencyHz === 15e9 &&
+    isNumberOrNull(requiredCorrections.materialResponseFrequencyAbsDeltaHz) &&
+    requiredCorrections.materialResponseTemperatureK === 4 &&
+    isNumberOrNull(requiredCorrections.dielectricTemperatureReductionK) &&
+    isNumberOrNull(requiredCorrections.conductivityTemperatureReductionK) &&
+    requiredCorrections.roughnessRmsMaxMeters === 1e-10 &&
+    isNumberOrNull(requiredCorrections.roughnessRmsReductionMeters) &&
+    requiredCorrections.fabricationToleranceMaxMeters === 5e-10 &&
+    isNumberOrNull(requiredCorrections.fabricationToleranceReductionMeters) &&
+    requiredCorrections.requiredCurveAndMapRefCount === 5 &&
+    typeof requiredCorrections.missingCurveAndMapRefCount === "number" &&
+    requiredCorrections.requiredMaterialResponseRefCount === 2 &&
+    typeof requiredCorrections.missingMaterialResponseRefCount === "number" &&
+    typeof requiredCorrections.materialResponseNumericValuesAvailable === "boolean" &&
     Array.isArray(value.blockers) &&
     value.blockers.every((entry) => typeof entry === "string") &&
     summary != null &&

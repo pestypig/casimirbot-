@@ -28,6 +28,13 @@ export type Nhm2TileSourceOperatingBudgetSurfaceIdV1 =
   | "fatigue_layer_scaling"
   | "full_apparatus_tensor";
 
+export type Nhm2TileSourceOperatingBudgetCorrectionValueV1 =
+  | string
+  | number
+  | boolean
+  | null
+  | string[];
+
 export type Nhm2TileSourceOperatingBudgetStatusV1 = {
   surfaceId: Nhm2TileSourceOperatingBudgetSurfaceIdV1;
   contractVersion: string | null;
@@ -38,6 +45,7 @@ export type Nhm2TileSourceOperatingBudgetStatusV1 = {
   blockerCount: number;
   blockers: string[];
   numericalMargins: Record<string, number | boolean | null>;
+  requiredCorrections: Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1>;
 };
 
 export type Nhm2TileSourceOperatingBudgetReadinessV1 = {
@@ -109,6 +117,24 @@ const marginRecord = (
   ) as Record<string, number | boolean | null>;
 };
 
+const isCorrectionValue = (
+  value: unknown,
+): value is Nhm2TileSourceOperatingBudgetCorrectionValueV1 =>
+  value === null ||
+  typeof value === "string" ||
+  typeof value === "boolean" ||
+  isFiniteNumber(value) ||
+  (Array.isArray(value) && value.every((entry) => typeof entry === "string"));
+
+const correctionRecord = (
+  value: unknown,
+): Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1> => {
+  const record = isRecord(value) ? value : {};
+  return Object.fromEntries(
+    Object.entries(record).filter(([, entry]) => isCorrectionValue(entry)),
+  ) as Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1>;
+};
+
 const statusFromBudget = (
   surfaceId: Nhm2TileSourceOperatingBudgetSurfaceIdV1,
   budget:
@@ -141,6 +167,7 @@ const statusFromBudget = (
       blockerCount: 1,
       blockers: [blocker],
       numericalMargins: {},
+      requiredCorrections: {},
     };
   }
   const ready = budget.summary[readyKey] === true;
@@ -156,6 +183,9 @@ const statusFromBudget = (
     blockers,
     numericalMargins: marginRecord(
       "margins" in budget ? budget.margins : budget.derivedOperatingBudget,
+    ),
+    requiredCorrections: correctionRecord(
+      "requiredCorrections" in budget ? budget.requiredCorrections : {},
     ),
   };
 };
@@ -297,7 +327,9 @@ export const isNhm2TileSourceOperatingBudgetReadiness = (
         typeof status.blockerCount === "number" &&
         Array.isArray(status.blockers) &&
         status.blockers.every((blocker) => typeof blocker === "string") &&
-        isRecord(status.numericalMargins)
+        isRecord(status.numericalMargins) &&
+        isRecord(status.requiredCorrections) &&
+        Object.values(status.requiredCorrections).every(isCorrectionValue)
       );
     }) &&
     summary != null &&

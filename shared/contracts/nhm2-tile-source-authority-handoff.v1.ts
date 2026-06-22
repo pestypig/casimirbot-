@@ -1,6 +1,9 @@
 import type { Nhm2TileSourceFalsificationReportV1 } from "./nhm2-tile-source-falsification-report.v1";
 import type { Nhm2TileSourceMaterialEvidenceReceiptsV1 } from "./nhm2-tile-source-material-evidence-receipts.v1";
-import type { Nhm2TileSourceOperatingBudgetReadinessV1 } from "./nhm2-tile-source-operating-budget-readiness.v1";
+import type {
+  Nhm2TileSourceOperatingBudgetCorrectionValueV1,
+  Nhm2TileSourceOperatingBudgetReadinessV1,
+} from "./nhm2-tile-source-operating-budget-readiness.v1";
 import type { Nhm2TileSourcePhysicalValidationPlanV1 } from "./nhm2-tile-source-physical-validation-plan.v1";
 
 export const NHM2_TILE_SOURCE_AUTHORITY_HANDOFF_CONTRACT_VERSION =
@@ -26,6 +29,7 @@ export type Nhm2TileSourceAuthorityHandoffGateV1 = {
   status: "pass" | "review" | "fail" | "missing";
   blockers: string[];
   requiredChange: string;
+  requiredCorrections: Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1>;
 };
 
 export type Nhm2TileSourceAuthorityHandoffV1 = {
@@ -76,6 +80,7 @@ export type Nhm2TileSourceAuthorityHandoffV1 = {
     operatingBudgetsFalsifyCurrentCandidate: boolean;
     physicalValidationStillRequired: boolean;
     firstBlocker: string;
+    firstRequiredCorrections: Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1>;
     physicalViabilityClaimAllowed: false;
     transportClaimAllowed: false;
     propulsionClaimAllowed: false;
@@ -113,6 +118,39 @@ const unique = (values: Array<string | null | undefined>): string[] =>
     new Set(values.filter((value): value is string => typeof value === "string" && value.length > 0)),
   );
 
+const isFiniteNumber = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value);
+
+const isCorrectionValue = (
+  value: unknown,
+): value is Nhm2TileSourceOperatingBudgetCorrectionValueV1 =>
+  value === null ||
+  typeof value === "string" ||
+  typeof value === "boolean" ||
+  isFiniteNumber(value) ||
+  (Array.isArray(value) && value.every((entry) => typeof entry === "string"));
+
+const correctionRecord = (
+  value: unknown,
+): Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1> => {
+  const record = isRecord(value) ? value : {};
+  return Object.fromEntries(
+    Object.entries(record).filter(([, entry]) => isCorrectionValue(entry)),
+  ) as Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1>;
+};
+
+const mergeCorrectionRecords = (
+  records: Array<Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1> | null | undefined>,
+): Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1> => {
+  const merged: Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1> = {};
+  for (const record of records) {
+    for (const [key, value] of Object.entries(correctionRecord(record))) {
+      merged[key] = value;
+    }
+  }
+  return merged;
+};
+
 const gate = (args: {
   gateId: Nhm2TileSourceAuthorityHandoffGateV1["gateId"];
   pass: boolean;
@@ -120,11 +158,13 @@ const gate = (args: {
   missing?: boolean;
   blockers: string[];
   requiredChange: string;
+  requiredCorrections?: Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1> | null;
 }): Nhm2TileSourceAuthorityHandoffGateV1 => ({
   gateId: args.gateId,
   status: args.pass ? "pass" : args.fail ? "fail" : args.missing ? "missing" : "review",
   blockers: args.pass ? [] : unique(args.blockers),
   requiredChange: args.requiredChange,
+  requiredCorrections: args.pass ? {} : correctionRecord(args.requiredCorrections),
 });
 
 const surfaceBlockers = (
@@ -145,6 +185,23 @@ const fullApparatusOperatingStatus = (
   operatingBudgetReadiness?.budgetStatuses.find(
     (status) => status.surfaceId === "full_apparatus_tensor",
   ) ?? null;
+
+const operatingBudgetCorrectionRecords = (
+  operatingBudgetReadiness: Nhm2TileSourceOperatingBudgetReadinessV1 | null,
+  surfaceIds?: string[],
+): Array<Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1>> =>
+  operatingBudgetReadiness == null
+    ? []
+    : operatingBudgetReadiness.budgetStatuses
+        .filter((status) => surfaceIds == null || surfaceIds.includes(status.surfaceId))
+        .map((status) =>
+          Object.fromEntries(
+            Object.entries(status.requiredCorrections).map(([key, value]) => [
+              `${status.surfaceId}.${key}`,
+              value,
+            ]),
+          ),
+        );
 
 export const buildNhm2TileSourceAuthorityHandoff = (
   input: BuildNhm2TileSourceAuthorityHandoffInput,
@@ -194,6 +251,15 @@ export const buildNhm2TileSourceAuthorityHandoff = (
       blockers: materialReceiptBlockers,
       requiredChange:
         "Supply measured or validated material, force-gap, roughness/patch, active-control, fatigue, and layer-scaling receipts.",
+      requiredCorrections: mergeCorrectionRecords(
+        operatingBudgetCorrectionRecords(operatingBudgetReadiness, [
+          "material_coupon",
+          "force_gap_load",
+          "roughness_patch",
+          "active_control",
+          "fatigue_layer_scaling",
+        ]),
+      ),
     }),
     gate({
       gateId: "full_apparatus_tensor",
@@ -207,6 +273,9 @@ export const buildNhm2TileSourceAuthorityHandoff = (
       blockers: fullTensorBlockers,
       requiredChange:
         "Supply a source-side full apparatus tensor including support, spacer, active-control, thermal, electrostatic, fatigue, layer-scaling, Casimir, and material-strain terms.",
+      requiredCorrections: mergeCorrectionRecords(
+        operatingBudgetCorrectionRecords(operatingBudgetReadiness, ["full_apparatus_tensor"]),
+      ),
     }),
     gate({
       gateId: "source_authority_metadata",
@@ -221,6 +290,7 @@ export const buildNhm2TileSourceAuthorityHandoff = (
         ...authorityBlockers,
       ]),
       requiredChange: "Supply same chart, same basis, and same unit metadata for the apparatus tensor.",
+      requiredCorrections: {},
     }),
     gate({
       gateId: "component_coverage",
@@ -242,6 +312,9 @@ export const buildNhm2TileSourceAuthorityHandoff = (
       ]),
       requiredChange:
         "Supply source-side T00, T0i, diagonal Tij, and off-diagonal Tij without zero-filling missing components.",
+      requiredCorrections: mergeCorrectionRecords(
+        operatingBudgetCorrectionRecords(operatingBudgetReadiness, ["full_apparatus_tensor"]),
+      ),
     }),
     gate({
       gateId: "component_detail_refs",
@@ -256,6 +329,9 @@ export const buildNhm2TileSourceAuthorityHandoff = (
             : ["full_apparatus_component_detail_refs_incomplete"],
       requiredChange:
         "Supply component-level full-apparatus tensor refs for T00, T01, T02, T03, T11, T12, T13, T22, T23, and T33 before same-basis authority handoff.",
+      requiredCorrections: mergeCorrectionRecords([
+        fullApparatusBudgetStatus?.requiredCorrections ?? null,
+      ]),
     }),
     gate({
       gateId: "regional_coverage",
@@ -272,6 +348,9 @@ export const buildNhm2TileSourceAuthorityHandoff = (
         ...authorityBlockers,
       ]),
       requiredChange: "Supply wall, hull, and exterior-shell tensor coverage on the same regional supports.",
+      requiredCorrections: mergeCorrectionRecords(
+        operatingBudgetCorrectionRecords(operatingBudgetReadiness, ["full_apparatus_tensor"]),
+      ),
     }),
     gate({
       gateId: "no_metric_target_echo",
@@ -283,6 +362,7 @@ export const buildNhm2TileSourceAuthorityHandoff = (
       ]),
       requiredChange:
         "Supply anti-target-echo provenance proving the source tensor was not copied or fitted from the metric-required tensor.",
+      requiredCorrections: {},
     }),
     gate({
       gateId: "operating_budget_readiness",
@@ -292,6 +372,9 @@ export const buildNhm2TileSourceAuthorityHandoff = (
       blockers: operatingBudgetBlockers,
       requiredChange:
         "Supply ready material coupon, force-gap, roughness/patch, active-control, fatigue/layer-scaling, and full-apparatus tensor operating budgets.",
+      requiredCorrections: mergeCorrectionRecords(
+        operatingBudgetCorrectionRecords(operatingBudgetReadiness),
+      ),
     }),
     gate({
       gateId: "falsification_report",
@@ -301,6 +384,10 @@ export const buildNhm2TileSourceAuthorityHandoff = (
         .filter((row) => row.falsifiesCurrentCandidate)
         .map((row) => row.blockerId),
       requiredChange: report.summary.nextRequiredChange,
+      requiredCorrections: mergeCorrectionRecords([
+        report.currentBlocker.requiredCorrections,
+        report.correctionSummary,
+      ]),
     }),
   ];
   const firstFailedGate = gates.find((entry) => entry.status !== "pass");
@@ -363,6 +450,7 @@ export const buildNhm2TileSourceAuthorityHandoff = (
         operatingBudgetReadiness?.summary.anyOperatingBudgetFalsifies ?? false,
       physicalValidationStillRequired: true,
       firstBlocker: firstFailedGate?.blockers[0] ?? firstFailedGate?.gateId ?? "none",
+      firstRequiredCorrections: correctionRecord(firstFailedGate?.requiredCorrections ?? {}),
       physicalViabilityClaimAllowed: false,
       transportClaimAllowed: false,
       propulsionClaimAllowed: false,
@@ -416,7 +504,9 @@ export const isNhm2TileSourceAuthorityHandoff = (
         typeof entry.gateId === "string" &&
         ["pass", "review", "fail", "missing"].includes(String(entry.status)) &&
         Array.isArray(entry.blockers) &&
-        typeof entry.requiredChange === "string",
+        typeof entry.requiredChange === "string" &&
+        isRecord(entry.requiredCorrections) &&
+        Object.values(entry.requiredCorrections).every(isCorrectionValue)
     ) &&
     summary != null &&
     typeof summary.handoffStatus === "string" &&
@@ -430,6 +520,8 @@ export const isNhm2TileSourceAuthorityHandoff = (
     typeof summary.operatingBudgetsFalsifyCurrentCandidate === "boolean" &&
     summary.physicalValidationStillRequired === true &&
     typeof summary.firstBlocker === "string" &&
+    isRecord(summary.firstRequiredCorrections) &&
+    Object.values(summary.firstRequiredCorrections).every(isCorrectionValue) &&
     summary.physicalViabilityClaimAllowed === false &&
     summary.transportClaimAllowed === false &&
     summary.propulsionClaimAllowed === false &&

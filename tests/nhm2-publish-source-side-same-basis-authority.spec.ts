@@ -274,6 +274,7 @@ const handoffReady = (): Nhm2TileSourceAuthorityHandoffV1 => ({
     status: "pass",
     blockers: [],
     requiredChange: "No change required for fixture handoff.",
+    requiredCorrections: {},
   })),
   summary: {
     handoffStatus: "handoff_ready",
@@ -287,6 +288,7 @@ const handoffReady = (): Nhm2TileSourceAuthorityHandoffV1 => ({
     operatingBudgetsFalsifyCurrentCandidate: false,
     physicalValidationStillRequired: true,
     firstBlocker: "none",
+    firstRequiredCorrections: {},
     physicalViabilityClaimAllowed: false,
     transportClaimAllowed: false,
     propulsionClaimAllowed: false,

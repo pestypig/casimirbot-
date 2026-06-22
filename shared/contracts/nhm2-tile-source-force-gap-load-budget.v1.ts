@@ -59,6 +59,19 @@ export type Nhm2TileSourceForceGapLoadBudgetV1 = {
     stictionMarginToMinimum: number | null;
     activeAuthorityMarginToIdealLoad: number | null;
   };
+  requiredCorrections: {
+    pullInMarginDefinition: "effectiveSpringConstantNPerM / idealForceGradientNPerM";
+    springConstantMinNPerM: number;
+    springConstantShortfallNPerM: number | null;
+    stictionMarginMin: 1;
+    stictionMarginShortfall: number | null;
+    activeGapControlAuthorityMinN: number;
+    activeGapControlAuthorityShortfallN: number | null;
+    forceGradientConsistencyMin: 0.75;
+    forceGradientConsistencyShortfall: number | null;
+    suppliedForceDeltaFromIdealStackForceN: number | null;
+    suppliedForceAbsTargetN: number;
+  };
   blockers: string[];
   summary: {
     loadBudgetComputed: boolean;
@@ -112,6 +125,9 @@ const symmetricRatioMargin = (actual: number | null, expected: number | null): n
   return round(Math.min(ratio, 1 / ratio));
 };
 
+const shortfall = (required: number | null, supplied: number | null): number | null =>
+  required == null || supplied == null ? null : round(Math.max(0, required - supplied));
+
 export const buildNhm2TileSourceForceGapLoadBudget = (
   input: BuildNhm2TileSourceForceGapLoadBudgetInput = {},
 ): Nhm2TileSourceForceGapLoadBudgetV1 => {
@@ -150,6 +166,10 @@ export const buildNhm2TileSourceForceGapLoadBudget = (
   );
   const stictionMarginToMinimum = safeRatio(suppliedStictionMargin, 1);
   const activeAuthorityMarginToIdealLoad = safeRatio(suppliedAuthority, requiredActiveAuthority);
+  const forceGradientConsistencyShortfall =
+    suppliedGradientConsistencyWithForceCurve == null
+      ? null
+      : round(Math.max(0, FORCE_GRADIENT_CONSISTENCY_MIN - suppliedGradientConsistencyWithForceCurve));
   const blockers = [
     ...(forceGapEvidence == null || forceGapEvidence.evidenceTier === "missing"
       ? ["force_gap_receipt_missing_for_load_budget"]
@@ -254,6 +274,22 @@ export const buildNhm2TileSourceForceGapLoadBudget = (
       stictionMarginToMinimum,
       activeAuthorityMarginToIdealLoad,
     },
+    requiredCorrections: {
+      pullInMarginDefinition: "effectiveSpringConstantNPerM / idealForceGradientNPerM",
+      springConstantMinNPerM: idealGradient ?? 0,
+      springConstantShortfallNPerM: shortfall(idealGradient, suppliedSpring),
+      stictionMarginMin: 1,
+      stictionMarginShortfall: shortfall(1, suppliedStictionMargin),
+      activeGapControlAuthorityMinN: requiredActiveAuthority ?? 0,
+      activeGapControlAuthorityShortfallN: shortfall(requiredActiveAuthority, suppliedAuthority),
+      forceGradientConsistencyMin: FORCE_GRADIENT_CONSISTENCY_MIN,
+      forceGradientConsistencyShortfall,
+      suppliedForceDeltaFromIdealStackForceN:
+        suppliedForce == null || idealStackForceN == null
+          ? null
+          : round(Math.abs(suppliedForce) - Math.abs(idealStackForceN)),
+      suppliedForceAbsTargetN: idealStackForceN == null ? 0 : Math.abs(idealStackForceN),
+    },
     blockers,
     summary: {
       loadBudgetComputed: idealStackForceN != null && idealGradient != null,
@@ -287,6 +323,9 @@ export const isNhm2TileSourceForceGapLoadBudget = (
     ? value.suppliedForceGapEvidence
     : null;
   const margins = isRecord(value.margins) ? value.margins : null;
+  const requiredCorrections = isRecord(value.requiredCorrections)
+    ? value.requiredCorrections
+    : null;
   const summary = isRecord(value.summary) ? value.summary : null;
   const boundary = isRecord(value.claimBoundary) ? value.claimBoundary : null;
   return (
@@ -318,6 +357,24 @@ export const isNhm2TileSourceForceGapLoadBudget = (
     (supplied.stiffnessModelRef === null || typeof supplied.stiffnessModelRef === "string") &&
     margins != null &&
     typeof margins.curveModelRefsAvailable === "boolean" &&
+    requiredCorrections != null &&
+    requiredCorrections.pullInMarginDefinition ===
+      "effectiveSpringConstantNPerM / idealForceGradientNPerM" &&
+    typeof requiredCorrections.springConstantMinNPerM === "number" &&
+    (requiredCorrections.springConstantShortfallNPerM === null ||
+      typeof requiredCorrections.springConstantShortfallNPerM === "number") &&
+    requiredCorrections.stictionMarginMin === 1 &&
+    (requiredCorrections.stictionMarginShortfall === null ||
+      typeof requiredCorrections.stictionMarginShortfall === "number") &&
+    typeof requiredCorrections.activeGapControlAuthorityMinN === "number" &&
+    (requiredCorrections.activeGapControlAuthorityShortfallN === null ||
+      typeof requiredCorrections.activeGapControlAuthorityShortfallN === "number") &&
+    requiredCorrections.forceGradientConsistencyMin === 0.75 &&
+    (requiredCorrections.forceGradientConsistencyShortfall === null ||
+      typeof requiredCorrections.forceGradientConsistencyShortfall === "number") &&
+    (requiredCorrections.suppliedForceDeltaFromIdealStackForceN === null ||
+      typeof requiredCorrections.suppliedForceDeltaFromIdealStackForceN === "number") &&
+    typeof requiredCorrections.suppliedForceAbsTargetN === "number" &&
     Array.isArray(value.blockers) &&
     value.blockers.every((entry) => typeof entry === "string") &&
     summary != null &&

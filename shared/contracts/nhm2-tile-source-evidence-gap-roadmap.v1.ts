@@ -4,6 +4,11 @@ import type {
   Nhm2TileSourceReceiptSurfaceStatusV1,
 } from "./nhm2-tile-source-material-evidence-receipts.v1";
 import type { Nhm2TileSourcePhysicalValidationPlanV1 } from "./nhm2-tile-source-physical-validation-plan.v1";
+import type {
+  Nhm2TileSourceOperatingBudgetCorrectionValueV1,
+  Nhm2TileSourceOperatingBudgetReadinessV1,
+  Nhm2TileSourceOperatingBudgetSurfaceIdV1,
+} from "./nhm2-tile-source-operating-budget-readiness.v1";
 
 export const NHM2_TILE_SOURCE_EVIDENCE_GAP_ROADMAP_CONTRACT_VERSION =
   "nhm2_tile_source_evidence_gap_roadmap/v1";
@@ -20,6 +25,11 @@ export type Nhm2TileSourceEvidenceGapRoadmapItemV1 = {
   goCriteria: string[];
   noGoCriteria: string[];
   numericalMargins: Record<string, number | null>;
+  operatingBudgetSurfaceId: Nhm2TileSourceOperatingBudgetSurfaceIdV1 | null;
+  operatingBudgetReady: boolean | null;
+  operatingBudgetFirstBlocker: string | null;
+  operatingBudgetNumericalMargins: Record<string, number | boolean | null>;
+  requiredCorrections: Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1>;
   unlocks: string[];
   artifactToProduce: string;
 };
@@ -33,6 +43,7 @@ export type Nhm2TileSourceEvidenceGapRoadmapV1 = {
   sourceRefs: {
     materialEvidenceReceiptsRef: string | null;
     physicalValidationPlanRef: string | null;
+    operatingBudgetReadinessRef: string | null;
   };
   roadmapItems: Nhm2TileSourceEvidenceGapRoadmapItemV1[];
   summary: {
@@ -43,6 +54,7 @@ export type Nhm2TileSourceEvidenceGapRoadmapV1 = {
     satisfiedItemCount: number;
     materialEvidenceReady: boolean;
     fullApparatusTensorReady: boolean;
+    operatingBudgetsReady: boolean | null;
     downstreamGatesPass: boolean | null;
     physicalViabilityClaimAllowed: false;
     transportClaimAllowed: false;
@@ -63,8 +75,10 @@ export type Nhm2TileSourceEvidenceGapRoadmapV1 = {
 export type BuildNhm2TileSourceEvidenceGapRoadmapInput = {
   materialEvidenceReceipts: Nhm2TileSourceMaterialEvidenceReceiptsV1;
   physicalValidationPlan?: Nhm2TileSourcePhysicalValidationPlanV1 | null;
+  operatingBudgetReadiness?: Nhm2TileSourceOperatingBudgetReadinessV1 | null;
   materialEvidenceReceiptsRef?: string | null;
   physicalValidationPlanRef?: string | null;
+  operatingBudgetReadinessRef?: string | null;
 };
 
 const ROADMAP_POLICY: Record<
@@ -259,25 +273,70 @@ const itemStatus = (surface: Nhm2TileSourceReceiptSurfaceStatusV1): "open" | "fa
   return "open";
 };
 
+const budgetSurfaceFromReceiptSurface = (
+  surfaceId: Nhm2LayerStackReceiptSurfaceId,
+): Nhm2TileSourceOperatingBudgetSurfaceIdV1 => {
+  switch (surfaceId) {
+    case "force_gap_pull_in":
+      return "force_gap_load";
+    case "roughness_patch_metrology":
+      return "roughness_patch";
+    case "active_control_energy":
+      return "active_control";
+    case "fatigue_lifetime":
+    case "layer_scaling":
+      return "fatigue_layer_scaling";
+    default:
+      return surfaceId;
+  }
+};
+
+const roadmapStatus = (
+  surface: Nhm2TileSourceReceiptSurfaceStatusV1,
+  budgetStatus:
+    | NonNullable<Nhm2TileSourceOperatingBudgetReadinessV1["budgetStatuses"][number]>
+    | null,
+): "open" | "falsifying" | "satisfied" => {
+  const receiptStatus = itemStatus(surface);
+  if (receiptStatus === "falsifying" || budgetStatus?.falsifiesCurrentCandidate === true) {
+    return "falsifying";
+  }
+  if (receiptStatus === "satisfied" && budgetStatus?.ready === false) {
+    return "open";
+  }
+  return receiptStatus;
+};
+
 export const buildNhm2TileSourceEvidenceGapRoadmap = (
   input: BuildNhm2TileSourceEvidenceGapRoadmapInput,
 ): Nhm2TileSourceEvidenceGapRoadmapV1 => {
   const materialEvidence = input.materialEvidenceReceipts;
+  const operatingBudgetReadiness = input.operatingBudgetReadiness ?? null;
   const roadmapItems = materialEvidence.receiptSurfaces
     .map((surface) => {
       const policy = ROADMAP_POLICY[surface.surfaceId];
+      const budgetSurfaceId = budgetSurfaceFromReceiptSurface(surface.surfaceId);
+      const budgetStatus =
+        operatingBudgetReadiness?.budgetStatuses.find(
+          (status) => status.surfaceId === budgetSurfaceId,
+        ) ?? null;
       return {
         itemId: surface.surfaceId,
         priorityRank: policy.priorityRank,
-        status: itemStatus(surface),
+        status: roadmapStatus(surface, budgetStatus),
         evidenceTier: surface.evidenceTier,
         evidenceRef: surface.evidenceRef,
-        firstBlocker: surface.blockers[0] ?? "none",
+        firstBlocker: surface.blockers[0] ?? budgetStatus?.firstBlocker ?? "none",
         decisionQuestion: policy.decisionQuestion,
         requiredEvidence: policy.requiredEvidence,
         goCriteria: policy.goCriteria,
         noGoCriteria: policy.noGoCriteria,
         numericalMargins: surface.numericalMargins,
+        operatingBudgetSurfaceId: budgetSurfaceId,
+        operatingBudgetReady: budgetStatus?.ready ?? null,
+        operatingBudgetFirstBlocker: budgetStatus?.firstBlocker ?? null,
+        operatingBudgetNumericalMargins: budgetStatus?.numericalMargins ?? {},
+        requiredCorrections: budgetStatus?.requiredCorrections ?? {},
         unlocks: policy.unlocks,
         artifactToProduce: policy.artifactToProduce,
       };
@@ -296,6 +355,7 @@ export const buildNhm2TileSourceEvidenceGapRoadmap = (
     sourceRefs: {
       materialEvidenceReceiptsRef: input.materialEvidenceReceiptsRef ?? null,
       physicalValidationPlanRef: input.physicalValidationPlanRef ?? null,
+      operatingBudgetReadinessRef: input.operatingBudgetReadinessRef ?? null,
     },
     roadmapItems,
     summary: {
@@ -306,6 +366,7 @@ export const buildNhm2TileSourceEvidenceGapRoadmap = (
       satisfiedItemCount: satisfiedItems.length,
       materialEvidenceReady: materialEvidence.summary.materialEvidenceReady,
       fullApparatusTensorReady: materialEvidence.summary.fullApparatusTensorReady,
+      operatingBudgetsReady: operatingBudgetReadiness?.summary.allOperatingBudgetsReady ?? null,
       downstreamGatesPass: input.physicalValidationPlan?.summary.downstreamGatesPass ?? null,
       physicalViabilityClaimAllowed: false,
       transportClaimAllowed: false,
@@ -353,6 +414,27 @@ export const isNhm2TileSourceEvidenceGapRoadmap = (
         Array.isArray(item.goCriteria) &&
         Array.isArray(item.noGoCriteria) &&
         isRecord(item.numericalMargins) &&
+        (item.operatingBudgetSurfaceId === null ||
+          typeof item.operatingBudgetSurfaceId === "string") &&
+        (item.operatingBudgetReady === null || typeof item.operatingBudgetReady === "boolean") &&
+        (item.operatingBudgetFirstBlocker === null ||
+          typeof item.operatingBudgetFirstBlocker === "string") &&
+        isRecord(item.operatingBudgetNumericalMargins) &&
+        Object.values(item.operatingBudgetNumericalMargins).every(
+          (entry) =>
+            entry === null ||
+            typeof entry === "boolean" ||
+            (typeof entry === "number" && Number.isFinite(entry)),
+        ) &&
+        isRecord(item.requiredCorrections) &&
+        Object.values(item.requiredCorrections).every(
+          (entry) =>
+            entry === null ||
+            typeof entry === "string" ||
+            typeof entry === "boolean" ||
+            (typeof entry === "number" && Number.isFinite(entry)) ||
+            (Array.isArray(entry) && entry.every((value) => typeof value === "string")),
+        ) &&
         Array.isArray(item.unlocks) &&
         typeof item.artifactToProduce === "string",
     ) &&
@@ -364,6 +446,7 @@ export const isNhm2TileSourceEvidenceGapRoadmap = (
     typeof summary.satisfiedItemCount === "number" &&
     typeof summary.materialEvidenceReady === "boolean" &&
     typeof summary.fullApparatusTensorReady === "boolean" &&
+    (summary.operatingBudgetsReady === null || typeof summary.operatingBudgetsReady === "boolean") &&
     (summary.downstreamGatesPass === null || typeof summary.downstreamGatesPass === "boolean") &&
     summary.physicalViabilityClaimAllowed === false &&
     summary.transportClaimAllowed === false &&
