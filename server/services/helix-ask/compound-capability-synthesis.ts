@@ -363,10 +363,36 @@ export function resolveCompoundCapabilitySynthesisReadiness(input: {
       );
     });
   };
+  const compoundRowSatisfiesContractSubgoal = (subgoal: RecordLike): boolean => {
+    const subgoalId = readString(subgoal.subgoal_id);
+    const requestedCapability = readString(subgoal.requested_capability);
+    const runtimeCapability = readString(subgoal.runtime_capability);
+    return compoundRows.some((row) => {
+      if (!ledgerEntryHasSatisfiedObservation(row)) return false;
+      if (subgoalId && readString(row.subgoal_id) === subgoalId) return true;
+      const rowCapabilities = [
+        readString(row.requested_capability),
+        readString(row.runtime_capability),
+        readString(row.selected_capability),
+        readString(row.executed_capability),
+      ].filter((entry): entry is string => Boolean(entry));
+      return Boolean(
+        (requestedCapability && rowCapabilities.includes(requestedCapability)) ||
+        (runtimeCapability && rowCapabilities.includes(runtimeCapability)),
+      );
+    });
+  };
+  const mandatoryContractSubgoals =
+    contract?.requires_all_subgoals !== false && contractSubgoals.length > 1
+      ? contractSubgoals.filter((subgoal) => subgoal.mandatory !== false)
+      : [];
+  const contractSubgoalsSatisfiedByRuntimeRails =
+    mandatoryContractSubgoals.length > 1 &&
+    mandatoryContractSubgoals.every((subgoal) => compoundRowSatisfiesContractSubgoal(subgoal));
   const missingContractSubgoals =
     contract?.requires_all_subgoals !== false && contractSubgoals.length > 1
-      ? contractSubgoals.filter((subgoal) =>
-          subgoal.mandatory !== false && !compoundRowRepresentsContractSubgoal(subgoal)
+      ? mandatoryContractSubgoals.filter((subgoal) =>
+          !compoundRowRepresentsContractSubgoal(subgoal)
         )
       : [];
   const missingContractSubgoalIds = missingContractSubgoals
@@ -415,7 +441,7 @@ export function resolveCompoundCapabilitySynthesisReadiness(input: {
         railStatus === "broken";
     });
   const hasIncompleteSubgoal = compoundRows.length > 1 && incompleteCompoundRows.length > 0;
-  const complete = applies && state.complete === true && !hasFailedSubgoal && !hasIncompleteSubgoal;
+  const complete = applies && (state.complete === true || contractSubgoalsSatisfiedByRuntimeRails) && !hasFailedSubgoal && !hasIncompleteSubgoal;
   const subgoalTerminalKinds = terminalKindsFromSubgoals(subgoals);
   const terminalContributionKinds = terminalContributionKindsFromLedger(compoundRows);
   const allTerminalContributionKinds = unique([...terminalContributionKinds, ...subgoalTerminalKinds]);

@@ -435,6 +435,13 @@ describe("Helix capability plan contract", () => {
       },
       {
         promptText:
+          "First call docs-viewer.locate_in_doc on docs/helix-ask-codex-loop-discipline.md for the query 'routes choose procedures'. Then call scientific-calculator.solve_expression on '19 + 23'. Synthesize both observations.",
+        sourceTarget: "docs_viewer",
+        expectedFamilies: ["docs_viewer", "calculator", "workstation_action"],
+        expectedCapabilities: ["docs-viewer.locate_in_doc", "scientific-calculator.solve_expression"],
+      },
+      {
+        promptText:
           "Call helix_ask.inspect_capability_catalog, then use workspace_os.status to inspect workstation status.",
         sourceTarget: "runtime_evidence",
         expectedFamilies: ["capability_catalog", "runtime_evidence", "workspace_diagnostic"],
@@ -465,6 +472,9 @@ describe("Helix capability plan contract", () => {
       });
 
       expect(admission.admitted_tool_families).toEqual(expect.arrayContaining(testCase.expectedFamilies));
+      for (const expectedFamily of testCase.expectedFamilies) {
+        expect(admission.forbidden_tool_families ?? []).not.toContain(expectedFamily);
+      }
       expect(admission.admitted_tool_families).not.toContain("model_only");
       expect(admission.reason).toContain("compound_explicit_capability_contracts_required");
       expect(admission.compound_requested_capabilities).toEqual(testCase.expectedCapabilities);

@@ -84,6 +84,21 @@ export type Nhm2TileSourceFalsificationItemV1 = {
   falsifiesCurrentCandidate: boolean;
 };
 
+export type Nhm2TileSourcePhysicalValidationDecisiveMeasurementV1 = {
+  measurementId: string;
+  quantity: string;
+  target: string;
+  unit: string | null;
+  evidenceArtifact: string;
+  marginKey: string | null;
+  currentMargin: number | boolean | null;
+  requiredCorrectionKey: string | null;
+  requiredCorrectionValue: Nhm2TileSourceOperatingBudgetCorrectionValueV1 | null;
+  goCriterion: string;
+  noGoCriterion: string;
+  falsificationConsequence: string;
+};
+
 export type Nhm2TileSourcePhysicalValidationCampaignDomainV1 =
   | "material_coupon_behavior"
   | "force_gap_pull_in"
@@ -124,6 +139,7 @@ export type Nhm2TileSourcePhysicalValidationFrontierItemV1 = {
   measurementTargetSummary: string;
   falsificationRule: string;
   requiredCorrections: Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1>;
+  decisiveMeasurements: Nhm2TileSourcePhysicalValidationDecisiveMeasurementV1[];
   prevents: string[];
   evidenceRefs: string[];
   blocksPhysicallyCredibleSourceCandidate: true;
@@ -428,6 +444,170 @@ const falsificationRuleFromDomain = (
   }
 };
 
+const DECISIVE_MEASUREMENT_TEMPLATES: Record<
+  Nhm2TileSourcePhysicalValidationCampaignDomainV1,
+  Array<
+    Omit<
+      Nhm2TileSourcePhysicalValidationDecisiveMeasurementV1,
+      "currentMargin" | "requiredCorrectionValue"
+    >
+  >
+> = {
+  material_coupon_behavior: [
+    {
+      measurementId: "coupon_fracture_yield_margin",
+      quantity: "fracture or yield stress margin against 2x support stress",
+      target: "fracture/yield stress >= 1.09141417572e9 Pa",
+      unit: "dimensionless margin",
+      evidenceArtifact: "receipt://material_coupon/fracture_yield_margin_v1",
+      marginKey: "fractureOrYieldStressMargin",
+      requiredCorrectionKey: "fractureOrYieldStressShortfallPa",
+      goCriterion: "margin >= 1 with curve provenance tied to 4 K / 447-layer load case",
+      noGoCriterion: "margin < 1 or fracture/yield curve missing",
+      falsificationConsequence: "447-layer TiN support stack is mechanically inadmissible",
+    },
+    {
+      measurementId: "coupon_material_response",
+      quantity: "dielectric and conductivity response at 15 GHz and 4 K",
+      target: "numeric dielectric and conductivity values with refs at 15 GHz / 4 K",
+      unit: null,
+      evidenceArtifact: "receipt://material_coupon/material_response_15ghz_4k_v1",
+      marginKey: "materialResponseValuesAvailable",
+      requiredCorrectionKey: "materialResponseNumericValuesAvailable",
+      goCriterion: "dielectric and conductivity response refs include numeric values at target frequency/temperature",
+      noGoCriterion: "material response missing or not tied to 15 GHz / 4 K",
+      falsificationConsequence: "material receipt cannot support Lifshitz/source-tensor credibility",
+    },
+  ],
+  force_gap_pull_in: [
+    {
+      measurementId: "pull_in_margin",
+      quantity: "spring stiffness margin against Casimir force gradient",
+      target: "pull-in margin >= 1",
+      unit: "dimensionless margin",
+      evidenceArtifact: "receipt://force_gap_pull_in/pull_in_margin_8nm_v1",
+      marginKey: "pullInMarginToIdealGradient",
+      requiredCorrectionKey: "springConstantShortfallNPerM",
+      goCriterion: "effective stiffness exceeds force gradient at 8 nm",
+      noGoCriterion: "pull-in margin < 1",
+      falsificationConsequence: "447-layer gap collapses or cannot be operated statically",
+    },
+  ],
+  roughness_patch_potential: [
+    {
+      measurementId: "patch_potential_force_fraction",
+      quantity: "patch-potential electrostatic force fraction",
+      target: "residual electrostatic force <= 5% of Casimir load",
+      unit: "dimensionless margin",
+      evidenceArtifact: "receipt://roughness_patch_metrology/patch_potential_force_v1",
+      marginKey: "residualElectrostaticMargin",
+      requiredCorrectionKey: "residualElectrostaticForceFractionReduction",
+      goCriterion: "residual electrostatic margin >= 1",
+      noGoCriterion: "patch/electrostatic correction exceeds 5% or is unbounded",
+      falsificationConsequence: "source row is contaminated by electrostatic stress-energy",
+    },
+  ],
+  active_control_energy_noise_heat_timing: [
+    {
+      measurementId: "active_control_bandwidth",
+      quantity: "gap-control bandwidth",
+      target: "bandwidth >= 30 GHz for 15 GHz switching",
+      unit: "dimensionless margin",
+      evidenceArtifact: "receipt://active_control/bandwidth_15ghz_switching_v1",
+      marginKey: "bandwidthMargin",
+      requiredCorrectionKey: "bandwidthShortfallHz",
+      goCriterion: "bandwidth margin >= 1",
+      noGoCriterion: "bandwidth below 30 GHz or trace missing",
+      falsificationConsequence: "time-dependent source cannot be synchronized to the campaign",
+    },
+  ],
+  fatigue_layer_scaling: [
+    {
+      measurementId: "source_tensor_retention",
+      quantity: "source tensor retention after layer/support coupling",
+      target: "source tensor retention >= 0.9",
+      unit: "dimensionless margin",
+      evidenceArtifact: "receipt://layer_scaling/source_tensor_retention_v1",
+      marginKey: "sourceTensorRetentionMargin",
+      requiredCorrectionKey: "sourceTensorRetentionFractionShortfall",
+      goCriterion: "source-tensor retention margin >= 1",
+      noGoCriterion: "source tensor retention below 0.9",
+      falsificationConsequence: "full apparatus tensor cannot inherit the scalar layer budget",
+    },
+  ],
+  full_apparatus_tensor: [
+    {
+      measurementId: "tensor_component_coverage",
+      quantity: "source-side full tensor component coverage",
+      target: "10 component refs covering T00, T0i, diagonal Tij, off-diagonal Tij",
+      unit: "coverage fraction",
+      evidenceArtifact: "receipt://full_apparatus_tensor/component_detail_refs_v1",
+      marginKey: "componentCoverageFraction",
+      requiredCorrectionKey: "tensorComponentRefMissingCount",
+      goCriterion: "component coverage fraction = 1",
+      noGoCriterion: "any required component missing, scalar-proxy, or silently zeroed",
+      falsificationConsequence: "source-side same-basis tensor authority cannot pass",
+    },
+    {
+      measurementId: "apparatus_stress_energy_terms",
+      quantity: "apparatus stress-energy term coverage",
+      target: "9 term refs: Casimir, support, spacer, electrostatic, active-control, thermal, strain, fatigue, layer-scaling",
+      unit: "coverage fraction",
+      evidenceArtifact: "receipt://full_apparatus_tensor/stress_energy_terms_v1",
+      marginKey: "termCoverageFraction",
+      requiredCorrectionKey: "stressEnergyTermRefMissingCount",
+      goCriterion: "term coverage fraction = 1",
+      noGoCriterion: "support/control/electrostatic/thermal/material terms hidden",
+      falsificationConsequence: "apparatus tensor is incomplete and cannot represent the real tile source",
+    },
+  ],
+  downstream_residual_conservation_qei_observer: [
+    {
+      measurementId: "same_chain_downstream_gate_pass",
+      quantity: "same-chain regional residual, conservation, QEI, observer, material, and coupled closure status",
+      target: "all downstream gates pass against the same source tensor and support atlas",
+      unit: null,
+      evidenceArtifact: "artifact://nhm2/downstream-gates/frozen-chain-rerun-v1",
+      marginKey: null,
+      requiredCorrectionKey: "downstreamGateBlockers",
+      goCriterion: "all downstream gate artifacts pass in one frozen chain",
+      noGoCriterion: "any downstream gate is missing, stale, or failing",
+      falsificationConsequence: "source candidate cannot be promoted beyond diagnostic review",
+    },
+  ],
+  campaign_coordination: [
+    {
+      measurementId: "reference_capsule_congruence",
+      quantity: "single frozen profile/run/artifact capsule congruence",
+      target: "one profile, run, atlas, source tensor, receipt, authority, and downstream artifact set",
+      unit: null,
+      evidenceArtifact: "artifact://nhm2/campaign/reference-capsule-congruence-v1",
+      marginKey: null,
+      requiredCorrectionKey: "staleOrMissingReferenceCapsuleInputs",
+      goCriterion: "all artifacts are pinned and mutually congruent",
+      noGoCriterion: "latest aliases, stale refs, or profile mismatches remain",
+      falsificationConsequence: "campaign evidence cannot be read as a coherent source-candidate run",
+    },
+  ],
+};
+
+const decisiveMeasurementsFromDomain = (
+  domain: Nhm2TileSourcePhysicalValidationCampaignDomainV1,
+  numericalMargins: Record<string, number | boolean | null>,
+  requiredCorrections: Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1>,
+): Nhm2TileSourcePhysicalValidationDecisiveMeasurementV1[] =>
+  DECISIVE_MEASUREMENT_TEMPLATES[domain].map((measurement) => ({
+    ...measurement,
+    currentMargin:
+      measurement.marginKey == null
+        ? null
+        : numericalMargins[measurement.marginKey] ?? null,
+    requiredCorrectionValue:
+      measurement.requiredCorrectionKey == null
+        ? null
+        : requiredCorrections[measurement.requiredCorrectionKey] ?? null,
+  }));
+
 const preventsFromDomain = (
   domain: Nhm2TileSourcePhysicalValidationCampaignDomainV1,
 ): string[] => {
@@ -502,6 +682,7 @@ const frontierItem = (args: {
   status: Nhm2TileSourceGateStatus | "blocked";
   blockers: string[];
   numericalMargin: number | null;
+  numericalMargins?: Record<string, number | boolean | null>;
   marginUnit: string | null;
   requiredChange: string;
   requiredCorrections?: Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1>;
@@ -529,6 +710,11 @@ const frontierItem = (args: {
   measurementTargetSummary: measurementTargetSummaryFromDomain(args.campaignDomain),
   falsificationRule: falsificationRuleFromDomain(args.campaignDomain),
   requiredCorrections: args.requiredCorrections ?? {},
+  decisiveMeasurements: decisiveMeasurementsFromDomain(
+    args.campaignDomain,
+    args.numericalMargins ?? {},
+    args.requiredCorrections ?? {},
+  ),
   prevents: preventsFromDomain(args.campaignDomain),
   evidenceRefs: args.evidenceRefs ?? [],
   blocksPhysicallyCredibleSourceCandidate: true,
@@ -597,6 +783,7 @@ const buildFrontierResolutionQueue = (args: {
                 status: status.falsifiesCurrentCandidate ? "fail" : "review",
                 blockers: status.blockers,
                 numericalMargin: firstNonNullMargin(status.numericalMargins),
+                numericalMargins: status.numericalMargins,
                 marginUnit: "dimensionless operating-budget margin",
                 requiredChange:
                   "Clear operating-budget readiness for material coupon, force-gap, roughness/patch, active-control, fatigue/layer-scaling, and full-apparatus tensor evidence.",
@@ -1051,6 +1238,42 @@ export const buildNhm2TileSourcePhysicalValidationPlan = (
   };
 };
 
+const isCorrectionValue = (
+  value: unknown,
+): value is Nhm2TileSourceOperatingBudgetCorrectionValueV1 =>
+  value === null ||
+  typeof value === "string" ||
+  typeof value === "boolean" ||
+  (typeof value === "number" && Number.isFinite(value)) ||
+  (Array.isArray(value) && value.every((entry) => typeof entry === "string"));
+
+const isDecisiveMeasurementList = (
+  value: unknown,
+): value is Nhm2TileSourcePhysicalValidationDecisiveMeasurementV1[] =>
+  Array.isArray(value) &&
+  value.length > 0 &&
+  value.every(
+    (measurement) =>
+      isRecord(measurement) &&
+      typeof measurement.measurementId === "string" &&
+      typeof measurement.quantity === "string" &&
+      typeof measurement.target === "string" &&
+      (measurement.unit === null || typeof measurement.unit === "string") &&
+      typeof measurement.evidenceArtifact === "string" &&
+      (measurement.marginKey === null || typeof measurement.marginKey === "string") &&
+      (measurement.currentMargin === null ||
+        typeof measurement.currentMargin === "boolean" ||
+        (typeof measurement.currentMargin === "number" &&
+          Number.isFinite(measurement.currentMargin))) &&
+      (measurement.requiredCorrectionKey === null ||
+        typeof measurement.requiredCorrectionKey === "string") &&
+      (measurement.requiredCorrectionValue === null ||
+        isCorrectionValue(measurement.requiredCorrectionValue)) &&
+      typeof measurement.goCriterion === "string" &&
+      typeof measurement.noGoCriterion === "string" &&
+      typeof measurement.falsificationConsequence === "string",
+  );
+
 export const isNhm2TileSourcePhysicalValidationPlan = (
   value: unknown,
 ): value is Nhm2TileSourcePhysicalValidationPlanV1 => {
@@ -1158,6 +1381,8 @@ export const isNhm2TileSourcePhysicalValidationPlan = (
         typeof item.measurementTargetSummary === "string" &&
         typeof item.falsificationRule === "string" &&
         isRecord(item.requiredCorrections) &&
+        Object.values(item.requiredCorrections).every(isCorrectionValue) &&
+        isDecisiveMeasurementList(item.decisiveMeasurements) &&
         Array.isArray(item.prevents) &&
         item.prevents.every((entry) => typeof entry === "string") &&
         Array.isArray(item.evidenceRefs) &&

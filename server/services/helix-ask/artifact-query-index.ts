@@ -1839,6 +1839,126 @@ const buildToolRailFailureTriage = (input: {
   };
 };
 
+const withFinalRailSnapshot = (
+  record: RecordLike,
+  snapshotKind: "tool_turn_chain_audit" | "tool_rail_failure_triage",
+): RecordLike => ({
+  ...record,
+  snapshot_role: "final_authoritative",
+  snapshot_kind: snapshotKind,
+  authoritative_for_pass_fail: true,
+  historical_failure_strings_may_exist: true,
+  assistant_answer: false,
+  terminal_eligible: false,
+  raw_content_included: false,
+});
+
+const historicalRailCandidateArrays = (payload: RecordLike, finalRailStatuses: RecordLike[]): RecordLike[] => {
+  const debug = readRecord(payload.debug);
+  const artifactIndex = readRecord(payload.artifact_query_index);
+  const sources = [
+    ...readArray(payload.compound_subgoal_rail_statuses),
+    ...readArray(debug?.compound_subgoal_rail_statuses),
+    ...readArray(artifactIndex?.compound_subgoal_rail_statuses),
+    ...finalRailStatuses,
+  ];
+  const seen = new Set<string>();
+  const records: RecordLike[] = [];
+  for (const source of sources) {
+    const record = readRecord(source);
+    if (!record) continue;
+    const key = [
+      readNullableString(record.subgoal_id),
+      readNullableString(record.requested_capability),
+      readNullableString(record.executed_capability),
+      readNullableString(record.observation_ref),
+      readNullableString(record.rail_status),
+      readNullableString(record.rail_failure_code),
+    ].join("|");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    records.push(record);
+  }
+  return records;
+};
+
+const buildHistoricalRailEvents = (input: {
+  payload: RecordLike;
+  finalAudit: RecordLike;
+  finalRailStatuses: RecordLike[];
+}): RecordLike[] => {
+  const finalRailComplete = readString(input.finalAudit.rail_status) === "complete";
+  return historicalRailCandidateArrays(input.payload, input.finalRailStatuses)
+    .filter((entry) => {
+      const railStatus = readString(entry.rail_status);
+      const railFailureCode = readString(entry.rail_failure_code);
+      return Boolean(railFailureCode || (railStatus && railStatus !== "complete"));
+    })
+    .map((entry, index) => ({
+      schema: "helix.historical_rail_event.v1",
+      event_index: index,
+      event_source: "compound_subgoal_rail_statuses",
+      snapshot_role: "historical_intermediate",
+      superseded_by_final_rail: finalRailComplete,
+      subgoal_id: readNullableString(entry.subgoal_id),
+      order: readNumber(entry.order),
+      requested_capability: readNullableString(entry.requested_capability),
+      selected_capability: readNullableString(entry.selected_capability),
+      executed_capability: readNullableString(entry.executed_capability),
+      observation_kind: readNullableString(entry.observation_kind),
+      observation_ref: readNullableString(entry.observation_ref),
+      satisfaction: readNullableString(entry.satisfaction),
+      first_broken_rail: readNullableString(entry.first_broken_rail),
+      rail_failure_code: readNullableString(entry.rail_failure_code),
+      rail_status: readNullableString(entry.rail_status),
+      repair_target: readNullableString(entry.repair_target),
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    }));
+};
+
+const buildActiveTerminalRailStatus = (input: {
+  turnId: string;
+  payload: RecordLike;
+  finalAudit: RecordLike;
+  finalTriage: RecordLike;
+  historicalEvents: RecordLike[];
+}): RecordLike => ({
+  schema: "helix.active_terminal_rail_status.v1",
+  turn_id: input.turnId,
+  snapshot_role: "final_authoritative",
+  pass_fail_source: "final_tool_turn_chain_audit",
+  rail_status: readNullableString(input.finalAudit.rail_status),
+  rail_failure_code: readNullableString(input.finalAudit.rail_failure_code),
+  first_broken_rail: readNullableString(input.finalTriage.first_broken_rail),
+  repair_target: readNullableString(input.finalTriage.repair_target),
+  compound_rail_failure_code: readNullableString(input.finalAudit.compound_rail_failure_code),
+  terminal_error_code: readNullableString(input.payload.terminal_error_code),
+  response_type: readNullableString(input.payload.response_type),
+  final_status: readNullableString(input.payload.final_status),
+  final_answer_source: readNullableString(input.payload.final_answer_source),
+  terminal_artifact_kind:
+    readNullableString(input.finalAudit.terminal_authority_kind) ??
+    readNullableString(input.finalAudit.visible_terminal_kind) ??
+    readNullableString(input.finalAudit.materialized_terminal_artifact_kind) ??
+    readNullableString(input.payload.terminal_artifact_kind),
+  materialized_terminal_artifact_kind: readNullableString(input.finalAudit.materialized_terminal_artifact_kind),
+  terminal_authority_kind: readNullableString(input.finalAudit.terminal_authority_kind),
+  visible_terminal_kind: readNullableString(input.finalAudit.visible_terminal_kind),
+  requested_capability: readNullableString(input.finalAudit.requested_capability),
+  selected_capability: readNullableString(input.finalAudit.selected_capability),
+  executed_capability: readNullableString(input.finalAudit.executed_capability),
+  compound_subgoal_count: readNumber(input.finalAudit.compound_subgoal_count) ?? 0,
+  first_incomplete_compound_subgoal_id: readNullableString(input.finalAudit.first_incomplete_compound_subgoal_id),
+  historical_rail_event_count: input.historicalEvents.length,
+  debug_contains_historical_rail_events: input.historicalEvents.length > 0,
+  authoritative_for_pass_fail: true,
+  assistant_answer: false,
+  terminal_eligible: false,
+  raw_content_included: false,
+});
+
 const collectVisibleCapabilitySurfaceFromRecord = (record: RecordLike | null): string[] => {
   if (!record) return [];
   const keys = [
@@ -2709,6 +2829,26 @@ export const buildArtifactQueryIndex = (input: {
     audit: toolTurnChainAudit,
     triage: toolRailFailureTriage,
   });
+  const finalToolTurnChainAudit = withFinalRailSnapshot(
+    toolTurnChainAudit,
+    "tool_turn_chain_audit",
+  );
+  const finalToolRailFailureTriage = withFinalRailSnapshot(
+    toolRailFailureTriage,
+    "tool_rail_failure_triage",
+  );
+  const historicalRailEvents = buildHistoricalRailEvents({
+    payload: input.payload,
+    finalAudit: finalToolTurnChainAudit,
+    finalRailStatuses: compoundSubgoalRailStatuses,
+  });
+  const activeTerminalRailStatus = buildActiveTerminalRailStatus({
+    turnId: input.turnId,
+    payload: input.payload,
+    finalAudit: finalToolTurnChainAudit,
+    finalTriage: finalToolRailFailureTriage,
+    historicalEvents: historicalRailEvents,
+  });
 
   return {
     schema: "helix.artifact_query_index.v1",
@@ -2756,6 +2896,10 @@ export const buildArtifactQueryIndex = (input: {
     codex_parity_agent_spine_rail_table: codexParityAgentSpineRailTable,
     tool_turn_chain_audit: toolTurnChainAudit,
     tool_rail_failure_triage: toolRailFailureTriage,
+    final_tool_turn_chain_audit: finalToolTurnChainAudit,
+    final_tool_rail_failure_triage: finalToolRailFailureTriage,
+    active_terminal_rail_status: activeTerminalRailStatus,
+    historical_rail_events: historicalRailEvents,
     tool_turn_chain_family_matrix: buildToolTurnChainFamilyMatrix(
       toolTurnChainAudit,
       compoundSubgoalRailStatuses,

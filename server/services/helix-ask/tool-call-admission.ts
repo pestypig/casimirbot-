@@ -366,6 +366,12 @@ export function buildToolCallAdmissionDecision(input: {
     ...promptExplicitCapabilityContracts,
     explicitCapabilityContract,
   ]);
+  const explicitCapabilityAdmissionFamilies = unique(
+    explicitCapabilityContractsForAdmission.flatMap((contract) => contract.admission_families),
+  );
+  const explicitCapabilityAdmissionFamilySet = new Set<HelixToolCallAdmissionFamily>(
+    explicitCapabilityAdmissionFamilies,
+  );
   const requestedCapabilitySource = promptExplicitCapabilityContract
     ? "explicit_user_command"
     : explicitCapabilityContract
@@ -394,10 +400,18 @@ export function buildToolCallAdmissionDecision(input: {
     isCalculatorSolveCapability(mandatoryToolName) ||
     requiredActions.some(isCalculatorSolveCapability) ||
     promptRequiresCalculatorExecution(promptText);
+  const explicitCalculatorContractRequested =
+    explicitCapabilityContractsForAdmission.some((contract) =>
+      contract.admission_families.includes("calculator") ||
+      contract.capability === "scientific-calculator.solve_expression",
+    );
   const mandatoryCalculatorBlockedByContext =
-    contextualToolSuppressionBlocksFamily(contextualSuppression, "calculator") ||
-    contextualToolSuppressionBlocksFamily(contextualSuppression, "scientific_calculator") ||
-    contextualToolSuppressionBlocksFamily(contextualSuppression, "workstation_action");
+    !explicitCalculatorContractRequested &&
+    (
+      contextualToolSuppressionBlocksFamily(contextualSuppression, "calculator") ||
+      contextualToolSuppressionBlocksFamily(contextualSuppression, "scientific_calculator") ||
+      contextualToolSuppressionBlocksFamily(contextualSuppression, "workstation_action")
+    );
   const calculatorAdmissionDominatesSourceTarget =
     mandatoryCalculatorSolve &&
     !mandatoryCalculatorBlockedByContext &&
@@ -440,7 +454,8 @@ export function buildToolCallAdmissionDecision(input: {
       effectiveSourceTarget === "model_only" ||
       effectiveSourceTarget === "general_background" ||
       sourceTargetToolFamilies(effectiveSourceTarget, promptText, input.sourceTargetIntent).some((family: string) =>
-        contextualToolSuppressionBlocksFamily(contextualSuppression, family),
+        contextualToolSuppressionBlocksFamily(contextualSuppression, family) &&
+        !explicitCapabilityAdmissionFamilySet.has(family as HelixToolCallAdmissionFamily),
       )
     );
   if (contextualSuppressionBlocksSelectedTarget && contextualSuppression) {
@@ -751,14 +766,19 @@ export function buildToolCallAdmissionDecision(input: {
     reason = "no_hard_tool_path_admitted";
   }
 
+  const contextualForbiddenFamiliesForTurn = contextualForbiddenToolFamilies(contextualSuppression)
+    .filter((family) => !explicitCapabilityAdmissionFamilySet.has(family as HelixToolCallAdmissionFamily));
   const forbiddenFamiliesForTurn = unique([
     ...operationalFields.forbidden_tool_families,
     ...extraForbiddenToolFamilies,
-    ...contextualForbiddenToolFamilies(contextualSuppression),
+    ...contextualForbiddenFamiliesForTurn,
   ]);
   const familyAllowed = (family: HelixToolCallAdmissionFamily): boolean =>
     !forbiddenFamiliesForTurn.includes(family) &&
-    !contextualToolSuppressionBlocksFamily(contextualSuppression, family);
+    (
+      explicitCapabilityAdmissionFamilySet.has(family) ||
+      !contextualToolSuppressionBlocksFamily(contextualSuppression, family)
+    );
   const compoundPromptFamilies: HelixToolCallAdmissionFamily[] = [];
   if (detectScholarlyResearchIntent(promptText).researchRequested && familyAllowed("scholarly_research")) {
     compoundPromptFamilies.push("scholarly_research");
@@ -878,6 +898,12 @@ export function buildToolCallAdmissionDecision(input: {
           requested_capability_family: explicitCapabilityContract?.capability_family ?? null,
           compound_requested_capabilities: promptExplicitCapabilityContracts.map((contract) => contract.capability),
           compound_required_observation_kinds: unique(promptExplicitCapabilityContracts.flatMap((contract) => contract.required_observation_kinds)),
+          compound_explicit_capability_admission_families: explicitCapabilityAdmissionFamilies,
+          contextual_forbidden_tool_families_after_explicit_override: contextualForbiddenFamiliesForTurn,
+          contextual_suppression_overridden_for_explicit_capabilities:
+            contextualForbiddenToolFamilies(contextualSuppression).some((family) =>
+              explicitCapabilityAdmissionFamilySet.has(family as HelixToolCallAdmissionFamily),
+            ),
           requested_capability_source: requestedCapabilitySource,
           requested_capability_confidence: requestedCapabilityConfidence,
           required_observation_kinds_for_requested_capability:
@@ -953,6 +979,12 @@ export function buildToolCallAdmissionDecision(input: {
                 requested_capability_family: explicitCapabilityContract.capability_family,
                 compound_requested_capabilities: promptExplicitCapabilityContracts.map((contract) => contract.capability),
                 compound_required_observation_kinds: unique(promptExplicitCapabilityContracts.flatMap((contract) => contract.required_observation_kinds)),
+                compound_explicit_capability_admission_families: explicitCapabilityAdmissionFamilies,
+                contextual_forbidden_tool_families_after_explicit_override: contextualForbiddenFamiliesForTurn,
+                contextual_suppression_overridden_for_explicit_capabilities:
+                  contextualForbiddenToolFamilies(contextualSuppression).some((family) =>
+                    explicitCapabilityAdmissionFamilySet.has(family as HelixToolCallAdmissionFamily),
+                  ),
                 requested_capability_source: requestedCapabilitySource,
                 requested_capability_confidence: requestedCapabilityConfidence,
                 required_observation_kinds_for_requested_capability:

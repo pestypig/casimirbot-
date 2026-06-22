@@ -94,6 +94,38 @@ const makeTileSourceAuthorityHandoff = (args: {
               ? "Missing full-apparatus tensor evidence blocks source-side same-basis T_munu authority."
               : "Missing material coupon evidence keeps the frozen candidate in review before source authority.",
             requiredCorrections: firstRequiredCorrections,
+            decisiveMeasurements: [
+              {
+                measurementId: firstBlocker.includes("full_apparatus")
+                  ? "tensor_component_coverage"
+                  : "coupon_fracture_yield_margin",
+                quantity: firstBlocker.includes("full_apparatus")
+                  ? "source-side full tensor component coverage"
+                  : "fracture or yield stress margin against 2x support stress",
+                target: firstBlocker.includes("full_apparatus")
+                  ? "10 component refs covering T00, T0i, diagonal Tij, off-diagonal Tij"
+                  : "fracture/yield stress >= 1.09141417572e9 Pa",
+                unit: firstBlocker.includes("full_apparatus")
+                  ? "coverage fraction"
+                  : "dimensionless margin",
+                evidenceArtifact: firstBlocker.includes("full_apparatus")
+                  ? "receipt://full_apparatus_tensor/component_detail_refs_v1"
+                  : "receipt://material_coupon/fracture_yield_margin_v1",
+                marginKey: firstBlocker.includes("full_apparatus")
+                  ? "componentCoverageFraction"
+                  : "fractureOrYieldStressMargin",
+                currentMargin: null,
+                requiredCorrectionKey: firstBlocker.includes("full_apparatus")
+                  ? "tensorComponentRefMissingCount"
+                  : "fractureOrYieldStressShortfallPa",
+                requiredCorrectionValue: null,
+                goCriterion: "decisive measurement clears the frozen candidate threshold",
+                noGoCriterion: "decisive measurement is missing or below threshold",
+                falsificationConsequence: firstBlocker.includes("full_apparatus")
+                  ? "source-side same-basis tensor authority cannot pass"
+                  : "447-layer TiN support stack is mechanically inadmissible",
+              },
+            ],
             prevents: ["source_side_same_basis_authority"],
             evidenceRefs: ["artifact://tile-source/falsification-report"],
             blocksCampaignPass: true,
@@ -489,6 +521,12 @@ describe("nhm2 source-side same-basis tensor authority receipt", () => {
       campaignDomain: "material_coupon_behavior",
       resolutionMode: "supply_experimental_receipt",
       firstBlocker: "thermal_cycle_drift_above_0p01_operating_budget",
+      decisiveMeasurements: expect.arrayContaining([
+        expect.objectContaining({
+          measurementId: "coupon_fracture_yield_margin",
+          evidenceArtifact: "receipt://material_coupon/fracture_yield_margin_v1",
+        }),
+      ]),
       blocksCampaignPass: true,
     });
     expect(receipt.summary.tileSourceHandoffReady).toBe(false);
@@ -589,6 +627,12 @@ describe("nhm2 source-side same-basis tensor authority receipt", () => {
       campaignDomain: "full_apparatus_tensor",
       resolutionMode: "supply_same_basis_full_apparatus_tensor",
       firstBlocker: "full_apparatus_T01_ref_missing_for_operating_budget",
+      decisiveMeasurements: expect.arrayContaining([
+        expect.objectContaining({
+          measurementId: "tensor_component_coverage",
+          evidenceArtifact: "receipt://full_apparatus_tensor/component_detail_refs_v1",
+        }),
+      ]),
     });
     expect(receipt.summary.tileSourceHandoffReady).toBe(false);
     expect(receipt.summary.tileSourceHandoffFirstFrontierResolutionMode).toBe(

@@ -24,6 +24,11 @@ import {
   type Nhm2TileSourceAuthorityHandoffV1,
 } from "../../shared/contracts/nhm2-tile-source-authority-handoff.v1";
 import {
+  buildNhm2TileSourceExperimentalCampaignPackage,
+  isNhm2TileSourceExperimentalCampaignPackage,
+  type Nhm2TileSourceExperimentalCampaignPackageV1,
+} from "../../shared/contracts/nhm2-tile-source-experimental-campaign-package.v1";
+import {
   buildNhm2TileSourceMaterialCouponTestPlan,
   isNhm2TileSourceMaterialCouponTestPlan,
   type Nhm2TileSourceMaterialCouponTestPlanV1,
@@ -111,6 +116,8 @@ const VALIDATION_PLAN_FILE = "nhm2-tile-source-physical-validation-plan.json";
 const EVIDENCE_GAP_ROADMAP_FILE = "nhm2-tile-source-evidence-gap-roadmap.json";
 const FALSIFICATION_REPORT_FILE = "nhm2-tile-source-falsification-report.json";
 const AUTHORITY_HANDOFF_FILE = "nhm2-tile-source-authority-handoff.json";
+const EXPERIMENTAL_CAMPAIGN_PACKAGE_FILE =
+  "nhm2-tile-source-experimental-campaign-package.json";
 const MATERIAL_COUPON_TEST_PLAN_FILE = "nhm2-tile-source-material-coupon-test-plan.json";
 const MATERIAL_COUPON_OPERATING_BUDGET_FILE =
   "nhm2-tile-source-material-coupon-operating-budget.json";
@@ -157,6 +164,7 @@ export type PublishNhm2TileSourceMaterialEvidenceResult = {
   evidenceGapRoadmap: Nhm2TileSourceEvidenceGapRoadmapV1;
   falsificationReport: Nhm2TileSourceFalsificationReportV1;
   authorityHandoff: Nhm2TileSourceAuthorityHandoffV1;
+  experimentalCampaignPackage: Nhm2TileSourceExperimentalCampaignPackageV1;
   materialCouponTestPlan: Nhm2TileSourceMaterialCouponTestPlanV1;
   materialCouponOperatingBudget: Nhm2TileSourceMaterialCouponOperatingBudgetV1;
   forceGapPullInTestPlan: Nhm2TileSourceForceGapPullInTestPlanV1;
@@ -177,6 +185,7 @@ export type PublishNhm2TileSourceMaterialEvidenceResult = {
     evidenceGapRoadmap: string;
     falsificationReport: string;
     authorityHandoff: string;
+    experimentalCampaignPackage: string;
     materialCouponTestPlan: string;
     materialCouponOperatingBudget: string;
     forceGapPullInTestPlan: string;
@@ -457,6 +466,7 @@ export const publishNhm2TileSourceMaterialEvidenceReceipts = (args: {
     evidenceGapRoadmap: join(outDir, EVIDENCE_GAP_ROADMAP_FILE),
     falsificationReport: join(outDir, FALSIFICATION_REPORT_FILE),
     authorityHandoff: join(outDir, AUTHORITY_HANDOFF_FILE),
+    experimentalCampaignPackage: join(outDir, EXPERIMENTAL_CAMPAIGN_PACKAGE_FILE),
     materialCouponTestPlan: join(outDir, MATERIAL_COUPON_TEST_PLAN_FILE),
     materialCouponOperatingBudget: join(outDir, MATERIAL_COUPON_OPERATING_BUDGET_FILE),
     forceGapPullInTestPlan: join(outDir, FORCE_GAP_PULL_IN_TEST_PLAN_FILE),
@@ -686,11 +696,29 @@ export const publishNhm2TileSourceMaterialEvidenceReceipts = (args: {
   if (!isNhm2TileSourceAuthorityHandoff(authorityHandoff)) {
     throw new Error("built artifact failed nhm2_tile_source_authority_handoff/v1 validation");
   }
+  const experimentalCampaignPackage = buildNhm2TileSourceExperimentalCampaignPackage({
+    materialEvidenceReceipts,
+    physicalValidationPlan,
+    evidenceGapRoadmap,
+    falsificationReport,
+    authorityHandoff,
+    materialEvidenceReceiptsRef: outputRefs.materialEvidenceReceipts,
+    physicalValidationPlanRef: outputRefs.physicalValidationPlan,
+    evidenceGapRoadmapRef: outputRefs.evidenceGapRoadmap,
+    falsificationReportRef: outputRefs.falsificationReport,
+    authorityHandoffRef: outputRefs.authorityHandoff,
+  });
+  if (!isNhm2TileSourceExperimentalCampaignPackage(experimentalCampaignPackage)) {
+    throw new Error(
+      "built artifact failed nhm2_tile_source_experimental_campaign_package/v1 validation",
+    );
+  }
   writeJson(args.repoRoot, outputRefs.materialEvidenceReceipts, materialEvidenceReceipts);
   writeJson(args.repoRoot, outputRefs.physicalValidationPlan, physicalValidationPlan);
   writeJson(args.repoRoot, outputRefs.evidenceGapRoadmap, evidenceGapRoadmap);
   writeJson(args.repoRoot, outputRefs.falsificationReport, falsificationReport);
   writeJson(args.repoRoot, outputRefs.authorityHandoff, authorityHandoff);
+  writeJson(args.repoRoot, outputRefs.experimentalCampaignPackage, experimentalCampaignPackage);
   writeJson(args.repoRoot, outputRefs.materialCouponTestPlan, materialCouponTestPlan);
   writeJson(args.repoRoot, outputRefs.materialCouponOperatingBudget, materialCouponOperatingBudget);
   writeJson(args.repoRoot, outputRefs.forceGapPullInTestPlan, forceGapPullInTestPlan);
@@ -729,6 +757,7 @@ export const publishNhm2TileSourceMaterialEvidenceReceipts = (args: {
     evidenceGapRoadmap,
     falsificationReport,
     authorityHandoff,
+    experimentalCampaignPackage,
     materialCouponTestPlan,
     materialCouponOperatingBudget,
     forceGapPullInTestPlan,

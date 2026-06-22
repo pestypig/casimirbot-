@@ -3919,6 +3919,209 @@ describe("Helix Ask tool lifecycle trace", () => {
     });
   });
 
+  it("separates final authoritative rail state from historical compound rail failures", () => {
+    const turnId = "ask:test:compound-debug-index:historical-rail";
+    const docsSubgoalId = `${turnId}:subgoal:1:docs`;
+    const calculatorSubgoalId = `${turnId}:subgoal:2:calculator`;
+    const staleCalculatorRail = {
+      subgoal_id: calculatorSubgoalId,
+      order: 2,
+      requested_capability: "scientific-calculator.solve_expression",
+      selected_capability: "scientific-calculator.solve_expression",
+      executed_capability: null,
+      observation_kind: null,
+      observation_ref: null,
+      satisfaction: "missing",
+      rail_status: "pending",
+      first_broken_rail: "observation_artifact",
+      rail_failure_code: "subgoal_observation_missing",
+      repair_target: "observation_materializer",
+    };
+    const compoundContract = {
+      schema: "helix.compound_capability_contract.v1",
+      turn_id: turnId,
+      prompt_shape: "compound_capability",
+      requires_all_subgoals: true,
+      terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+      subgoals: [
+        {
+          subgoal_id: docsSubgoalId,
+          order: 1,
+          requested_capability: "docs-viewer.locate_in_doc",
+          runtime_capability: "docs-viewer.locate_in_doc",
+          required_observation_kinds: ["doc_location_matches"],
+          required_terminal_kind: "doc_location_matches",
+          contribution_role: "evidence",
+          terminal_contribution_kind: "doc_location_matches",
+          mandatory: true,
+        },
+        {
+          subgoal_id: calculatorSubgoalId,
+          order: 2,
+          requested_capability: "scientific-calculator.solve_expression",
+          runtime_capability: "scientific-calculator.solve_expression",
+          required_args: ["latex"],
+          args_hint: { latex: "2+2" },
+          required_observation_kinds: ["calculator_receipt", "workstation_tool_evaluation"],
+          required_terminal_kind: "workstation_tool_evaluation",
+          contribution_role: "terminal_component",
+          terminal_contribution_kind: "workstation_tool_evaluation",
+          mandatory: true,
+        },
+      ],
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const executionState = {
+      schema: "helix.capability_itinerary_execution_state.v1",
+      applies: true,
+      complete: true,
+      missing_compound_subgoal_ids: [],
+      missing_required_capabilities: [],
+      compound_subgoal_ledger: [
+        {
+          subgoal_id: docsSubgoalId,
+          order: 1,
+          requested_capability: "docs-viewer.locate_in_doc",
+          runtime_capability: "docs-viewer.locate_in_doc",
+          selected_capability: "docs-viewer.locate_in_doc",
+          executed_capability: "docs-viewer.locate_in_doc",
+          required_observation_kinds: ["doc_location_matches"],
+          observation_kind: "doc_location_matches",
+          observation_ref: `${turnId}:doc_location`,
+          support_refs: [`${turnId}:doc_location`],
+          satisfaction: "satisfied",
+          rail_status: "complete",
+          rail_failure_code: null,
+        },
+        {
+          subgoal_id: calculatorSubgoalId,
+          order: 2,
+          requested_capability: "scientific-calculator.solve_expression",
+          runtime_capability: "scientific-calculator.solve_expression",
+          selected_capability: "scientific-calculator.solve_expression",
+          executed_capability: "scientific-calculator.solve_expression",
+          args: { latex: "2+2" },
+          required_observation_kinds: ["calculator_receipt", "workstation_tool_evaluation"],
+          observation_kind: "calculator_receipt",
+          observation_ref: `${turnId}:calculator_receipt`,
+          support_refs: [`${turnId}:calculator_receipt`],
+          satisfaction: "satisfied",
+          rail_status: "complete",
+          rail_failure_code: null,
+        },
+      ],
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const payload: Record<string, unknown> = {
+      active_prompt: "Use docs-viewer.locate_in_doc, then scientific-calculator.solve_expression.",
+      tool_lifecycle_trace: {
+        executed_capability: "docs-viewer.locate_in_doc",
+        lifecycle_stage: "reentered_solver",
+      },
+      route_product_contract: {
+        required_terminal_artifact_kind: "doc_evidence_synthesis_answer",
+        allowed_terminal_artifact_kinds: ["doc_evidence_synthesis_answer"],
+      },
+      canonical_goal_frame: {
+        goal_kind: "compound_capability_synthesis",
+        required_terminal_kind: "doc_evidence_synthesis_answer",
+      },
+      terminal_authority_single_writer: {
+        selected_terminal_artifact_kind: "doc_evidence_synthesis_answer",
+        terminal_artifact_kind: "doc_evidence_synthesis_answer",
+        support_refs: [`${turnId}:doc_location`, `${turnId}:calculator_receipt`],
+      },
+      terminal_presentation: {
+        terminal_artifact_kind: "doc_evidence_synthesis_answer",
+      },
+      final_answer_draft: {
+        artifact_id: `${turnId}:final_answer_draft`,
+        support_refs: [`${turnId}:doc_location`, `${turnId}:calculator_receipt`],
+      },
+      compound_subgoal_rail_statuses: [staleCalculatorRail],
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: `${turnId}:compound_capability_contract`,
+          kind: "compound_capability_contract",
+          payload: compoundContract,
+        },
+        {
+          artifact_id: `${turnId}:capability_itinerary_execution_state`,
+          kind: "capability_itinerary_execution_state",
+          payload: executionState,
+        },
+        {
+          artifact_id: `${turnId}:doc_location`,
+          kind: "doc_location_matches",
+          payload: {
+            schema: "helix.doc_location_matches.v1",
+            capability: "docs-viewer.locate_in_doc",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+        {
+          artifact_id: `${turnId}:calculator_receipt`,
+          kind: "calculator_receipt",
+          payload: {
+            schema: "helix.calculator_receipt.v1",
+            capability: "scientific-calculator.solve_expression",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+        {
+          artifact_id: `${turnId}:final_answer_draft`,
+          kind: "final_answer_draft",
+          payload: {
+            support_refs: [`${turnId}:doc_location`, `${turnId}:calculator_receipt`],
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      ],
+    };
+
+    const index = buildArtifactQueryIndex({ turnId, payload });
+
+    expect(index.final_tool_turn_chain_audit).toMatchObject({
+      snapshot_role: "final_authoritative",
+      authoritative_for_pass_fail: true,
+      rail_status: "complete",
+      rail_failure_code: null,
+      compound_rail_failure_code: null,
+    });
+    expect(index.final_tool_rail_failure_triage).toMatchObject({
+      snapshot_role: "final_authoritative",
+      authoritative_for_pass_fail: true,
+      rail_status: "complete",
+      rail_failure_code: null,
+      first_broken_rail: null,
+    });
+    expect(index.active_terminal_rail_status).toMatchObject({
+      schema: "helix.active_terminal_rail_status.v1",
+      snapshot_role: "final_authoritative",
+      pass_fail_source: "final_tool_turn_chain_audit",
+      rail_status: "complete",
+      rail_failure_code: null,
+      terminal_artifact_kind: "doc_evidence_synthesis_answer",
+      historical_rail_event_count: 1,
+      debug_contains_historical_rail_events: true,
+    });
+    expect(index.historical_rail_events).toEqual([
+      expect.objectContaining({
+        schema: "helix.historical_rail_event.v1",
+        snapshot_role: "historical_intermediate",
+        superseded_by_final_rail: true,
+        subgoal_id: calculatorSubgoalId,
+        rail_status: "pending",
+        rail_failure_code: "subgoal_observation_missing",
+      }),
+    ]);
+  });
+
   it("exposes extended compound subgoal families in the family matrix", () => {
     const turnId = "ask:test:compound-debug-index:extended-families";
     const compoundSubgoalLedger = [

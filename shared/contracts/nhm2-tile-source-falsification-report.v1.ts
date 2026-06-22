@@ -147,6 +147,7 @@ export type Nhm2TileSourceFalsificationCurrentBlockerV1 = {
   requiredChange: string;
   campaignDomain?: Nhm2TileSourceExperimentalCampaignDomainV1;
   evidenceTarget?: string;
+  decisiveMeasurements: Nhm2TileSourceEvidenceGapRoadmapItemV1["decisiveMeasurements"];
   falsifiesCurrentCandidate: boolean;
   evidenceRef: string | null;
 };
@@ -704,13 +705,42 @@ const roadmapItemDomain = (
   item: Nhm2TileSourceEvidenceGapRoadmapItemV1,
 ): Nhm2TileSourceExperimentalCampaignDomainV1 => domainFromSurface(item.itemId);
 
+const fallbackDecisiveMeasurementsForDomain = (
+  campaignDomain: Nhm2TileSourceExperimentalCampaignDomainV1,
+): Nhm2TileSourceEvidenceGapRoadmapItemV1["decisiveMeasurements"] => [
+  {
+    measurementId: `${campaignDomain}_frontier_receipt`,
+    quantity: evidenceTargetFromDomain(campaignDomain),
+    target: measurementTargetSummaryFromDomain(campaignDomain),
+    unit: null,
+    evidenceArtifact: nextEvidenceArtifactFromDomain(
+      campaignDomain,
+      "domain_frontier_unresolved",
+      campaignDomain === "downstream_residual_conservation_qei_observer"
+        ? "downstream_blocked"
+        : "open_review",
+    ),
+    marginKey: null,
+    currentMargin: null,
+    requiredCorrectionKey: null,
+    requiredCorrectionValue: null,
+    goCriterion: "all required evidence receipts and downstream gates for this domain pass in the same frozen chain",
+    noGoCriterion: falsificationRuleFromDomain(campaignDomain),
+    falsificationConsequence: falsificationRuleFromDomain(campaignDomain),
+  },
+];
+
 const decisiveMeasurementsFromRoadmap = (
   roadmap: Nhm2TileSourceEvidenceGapRoadmapV1,
   campaignDomain: Nhm2TileSourceExperimentalCampaignDomainV1,
-): Nhm2TileSourceEvidenceGapRoadmapItemV1["decisiveMeasurements"] =>
-  roadmap.roadmapItems
+): Nhm2TileSourceEvidenceGapRoadmapItemV1["decisiveMeasurements"] => {
+  const measurements = roadmap.roadmapItems
     .filter((item) => roadmapItemDomain(item) === campaignDomain)
     .flatMap((item) => item.decisiveMeasurements);
+  return measurements.length > 0
+    ? measurements
+    : fallbackDecisiveMeasurementsForDomain(campaignDomain);
+};
 
 const buildFrontierResolutionQueue = (
   rows: Nhm2TileSourceFalsificationReportRowV1[],
@@ -873,42 +903,49 @@ const buildCorrectionSummary = (
 
 const currentBlockerFromRow = (
   row: Nhm2TileSourceFalsificationReportRowV1 | null,
-): Nhm2TileSourceFalsificationCurrentBlockerV1 =>
-  row == null
-    ? {
-        blockerId: "none",
-        source: "none",
-        surfaceId: null,
-        operatingBudgetSurfaceId: null,
-        downstreamGateId: null,
-        status: "none",
-        numericalMargin: null,
-        numericalMargins: {},
-        marginUnit: null,
-        requiredChange: "none",
-        requiredCorrections: {},
-        campaignDomain: "campaign_coordination",
-        evidenceTarget: evidenceTargetFromDomain("campaign_coordination"),
-        falsifiesCurrentCandidate: false,
-        evidenceRef: null,
-      }
-    : {
-        blockerId: row.blockerId,
-        source: row.source,
-        surfaceId: row.surfaceId,
-        operatingBudgetSurfaceId: row.operatingBudgetSurfaceId,
-        downstreamGateId: row.downstreamGateId,
-        status: row.status,
-        numericalMargin: row.numericalMargin,
-        numericalMargins: row.numericalMargins,
-        requiredCorrections: row.requiredCorrections,
-        marginUnit: row.marginUnit,
-        requiredChange: row.requiredChange,
-        ...(row.campaignDomain != null ? { campaignDomain: row.campaignDomain } : {}),
-        ...(row.evidenceTarget != null ? { evidenceTarget: row.evidenceTarget } : {}),
-        falsifiesCurrentCandidate: row.falsifiesCurrentCandidate,
-        evidenceRef: row.evidenceRef,
-      };
+  roadmap: Nhm2TileSourceEvidenceGapRoadmapV1,
+): Nhm2TileSourceFalsificationCurrentBlockerV1 => {
+  if (row == null) {
+    return {
+      blockerId: "none",
+      source: "none",
+      surfaceId: null,
+      operatingBudgetSurfaceId: null,
+      downstreamGateId: null,
+      status: "none",
+      numericalMargin: null,
+      numericalMargins: {},
+      marginUnit: null,
+      requiredChange: "none",
+      requiredCorrections: {},
+      campaignDomain: "campaign_coordination",
+      evidenceTarget: evidenceTargetFromDomain("campaign_coordination"),
+      decisiveMeasurements: decisiveMeasurementsFromRoadmap(roadmap, "campaign_coordination"),
+      falsifiesCurrentCandidate: false,
+      evidenceRef: null,
+    };
+  }
+  const campaignDomain =
+    row.campaignDomain ?? domainFromSurface(row.surfaceId ?? row.operatingBudgetSurfaceId);
+  return {
+    blockerId: row.blockerId,
+    source: row.source,
+    surfaceId: row.surfaceId,
+    operatingBudgetSurfaceId: row.operatingBudgetSurfaceId,
+    downstreamGateId: row.downstreamGateId,
+    status: row.status,
+    numericalMargin: row.numericalMargin,
+    numericalMargins: row.numericalMargins,
+    requiredCorrections: row.requiredCorrections,
+    marginUnit: row.marginUnit,
+    requiredChange: row.requiredChange,
+    campaignDomain,
+    ...(row.evidenceTarget != null ? { evidenceTarget: row.evidenceTarget } : {}),
+    decisiveMeasurements: decisiveMeasurementsFromRoadmap(roadmap, campaignDomain),
+    falsifiesCurrentCandidate: row.falsifiesCurrentCandidate,
+    evidenceRef: row.evidenceRef,
+  };
+};
 
 const reportStatus = (args: {
   materialDisposition: "receipt_ready" | "review" | "falsified";
@@ -959,7 +996,7 @@ export const buildNhm2TileSourceFalsificationReport = (
     ...downstreamRows(plan),
   ].map(annotateRow);
   const firstRow = rows[0] ?? null;
-  const currentBlocker = currentBlockerFromRow(firstRow);
+  const currentBlocker = currentBlockerFromRow(firstRow, roadmap);
   const allRequiredCorrections = buildCorrectionSummary(rows);
   const campaignDomainSummary = buildCampaignDomainSummary(rows);
   const goNoGoMatrix = buildGoNoGoMatrix(rows, campaignDomainSummary);
@@ -1152,6 +1189,7 @@ export const isNhm2TileSourceFalsificationReport = (
       typeof currentBlocker.campaignDomain === "string") &&
     (currentBlocker.evidenceTarget === undefined ||
       typeof currentBlocker.evidenceTarget === "string") &&
+    isDecisiveMeasurementList(currentBlocker.decisiveMeasurements) &&
     typeof currentBlocker.falsifiesCurrentCandidate === "boolean" &&
     (currentBlocker.evidenceRef === null || typeof currentBlocker.evidenceRef === "string") &&
     isCorrectionRecord(value.correctionSummary) &&

@@ -96,6 +96,45 @@ const readyOperatingBudgetReadiness = (
   },
 });
 
+const forceGapFailingOperatingBudgetReadiness = (
+  generatedAt: string,
+): Nhm2TileSourceOperatingBudgetReadinessV1 => {
+  const readiness = readyOperatingBudgetReadiness(generatedAt);
+  return {
+    ...readiness,
+    budgetStatuses: readiness.budgetStatuses.map((status) =>
+      status.surfaceId === "force_gap_load"
+        ? {
+            ...status,
+            ready: false,
+            falsifiesCurrentCandidate: true,
+            firstBlocker: "force_gap_pull_in_margin_below_operating_budget",
+            blockerCount: 1,
+            blockers: ["force_gap_pull_in_margin_below_operating_budget"],
+            numericalMargins: {
+              pullInMarginToIdealGradient: 0.8,
+              activeAuthorityMarginToIdealLoad: 0.5,
+            },
+            requiredCorrections: {
+              springConstantShortfallNPerM: 123,
+              activeGapControlAuthorityShortfallN: 456,
+            },
+          }
+        : status,
+    ),
+    summary: {
+      ...readiness.summary,
+      allOperatingBudgetsReady: false,
+      anyOperatingBudgetFalsifies: true,
+      firstBlocker: "force_gap_load:force_gap_pull_in_margin_below_operating_budget",
+      blockerCount: 1,
+      falsifyingBudgetCount: 1,
+      reviewBudgetCount: 0,
+    },
+    blockers: ["force_gap_load:force_gap_pull_in_margin_below_operating_budget"],
+  };
+};
+
 describe("NHM2 tile source physical validation plan", () => {
   const generatedAt = "2026-06-22T00:00:00.000Z";
 
@@ -142,6 +181,20 @@ describe("NHM2 tile source physical validation plan", () => {
     expect(plan.frontierResolutionQueue[0].falsificationRule).toContain(
       "447-layer TiN stack",
     );
+    expect(plan.frontierResolutionQueue[0].decisiveMeasurements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          measurementId: "coupon_fracture_yield_margin",
+          evidenceArtifact: "receipt://material_coupon/fracture_yield_margin_v1",
+          falsificationConsequence:
+            "447-layer TiN support stack is mechanically inadmissible",
+        }),
+        expect.objectContaining({
+          measurementId: "coupon_material_response",
+          evidenceArtifact: "receipt://material_coupon/material_response_15ghz_4k_v1",
+        }),
+      ]),
+    );
     expect(plan.frontierResolutionQueue[0].prevents).toEqual(
       expect.arrayContaining(["force_gap_pull_in", "full_apparatus_tensor"]),
     );
@@ -159,6 +212,15 @@ describe("NHM2 tile source physical validation plan", () => {
     expect(plan.falsificationMap.map((item) => item.blocker)).toContain(
       "material_coupon_receipt_missing",
     );
+  });
+
+  it("rejects stale frontier items that drop decisive measurement rows", () => {
+    const plan = buildNhm2TileSourcePhysicalValidationPlan({ generatedAt });
+    const stalePlan = JSON.parse(JSON.stringify(plan));
+
+    delete stalePlan.frontierResolutionQueue[0].decisiveMeasurements;
+
+    expect(isNhm2TileSourcePhysicalValidationPlan(stalePlan)).toBe(false);
   });
 
   it("requires full apparatus tensor authority after receipts exist", () => {
@@ -186,6 +248,16 @@ describe("NHM2 tile source physical validation plan", () => {
         "nhm2_tile_source_full_apparatus_tensor_values/v1",
       ),
       falsificationRule: expect.stringContaining("source-side same-basis T_munu"),
+      decisiveMeasurements: expect.arrayContaining([
+        expect.objectContaining({
+          measurementId: "tensor_component_coverage",
+          evidenceArtifact: "receipt://full_apparatus_tensor/component_detail_refs_v1",
+        }),
+        expect.objectContaining({
+          measurementId: "apparatus_stress_energy_terms",
+          evidenceArtifact: "receipt://full_apparatus_tensor/stress_energy_terms_v1",
+        }),
+      ]),
     });
     expect(plan.summary.sourceCandidateStatus).toBe("review");
   });
@@ -213,6 +285,13 @@ describe("NHM2 tile source physical validation plan", () => {
       nextEvidenceArtifact: "artifact://nhm2/downstream-gates/frozen-chain-rerun-v1",
       measurementTargetSummary: expect.stringContaining("observer-family WEC/NEC/SEC/DEC"),
       falsificationRule: expect.stringContaining("do not pass together"),
+      decisiveMeasurements: expect.arrayContaining([
+        expect.objectContaining({
+          measurementId: "same_chain_downstream_gate_pass",
+          evidenceArtifact: "artifact://nhm2/downstream-gates/frozen-chain-rerun-v1",
+          noGoCriterion: "any downstream gate is missing, stale, or failing",
+        }),
+      ]),
     });
     expect(plan.downstreamGates.every((gate) => gate.status === "not_run")).toBe(true);
     expect(plan.summary.sourceCandidateStatus).toBe("review");
@@ -241,6 +320,12 @@ describe("NHM2 tile source physical validation plan", () => {
       nextEvidenceArtifact: "artifact://nhm2/campaign/reference-capsule-congruence-v1",
       measurementTargetSummary: expect.stringContaining("one frozen profile/run"),
       falsificationRule: expect.stringContaining("stale or inadmissible"),
+      decisiveMeasurements: expect.arrayContaining([
+        expect.objectContaining({
+          measurementId: "reference_capsule_congruence",
+          evidenceArtifact: "artifact://nhm2/campaign/reference-capsule-congruence-v1",
+        }),
+      ]),
     });
     expect(plan.summary.physicallyCredibleSourceCandidate).toBe(false);
     expect(plan.summary.sourceCandidateStatus).toBe("review");
@@ -268,6 +353,39 @@ describe("NHM2 tile source physical validation plan", () => {
         "coupled_closure_operating_budgets_not_ready",
       ]),
     );
+  });
+
+  it("carries operating-budget margins into decisive measurement rows", () => {
+    const plan = buildNhm2TileSourcePhysicalValidationPlan({
+      generatedAt,
+      suppliedReceiptSurfaces: allReceipts,
+      tensorTermCoverage: fullTensorCoverage,
+      operatingBudgetReadiness: forceGapFailingOperatingBudgetReadiness(generatedAt),
+    });
+
+    expect(plan.summary.sourceCandidateStatus).toBe("falsified");
+    expect(plan.summary.operatingBudgetsFalsifyCurrentCandidate).toBe(true);
+    expect(plan.summary.firstFrontierCampaignDomain).toBe("force_gap_pull_in");
+    expect(plan.summary.firstFrontierResolutionMode).toBe(
+      "revise_architecture_or_operating_margin",
+    );
+    expect(plan.frontierResolutionQueue[0]).toMatchObject({
+      source: "operating_budget_readiness",
+      campaignDomain: "force_gap_pull_in",
+      firstBlocker: "force_gap_pull_in_margin_below_operating_budget",
+      numericalMargin: 0.5,
+      requiredCorrections: expect.objectContaining({
+        springConstantShortfallNPerM: 123,
+        activeGapControlAuthorityShortfallN: 456,
+      }),
+      decisiveMeasurements: expect.arrayContaining([
+        expect.objectContaining({
+          measurementId: "pull_in_margin",
+          currentMargin: 0.8,
+          requiredCorrectionValue: 123,
+        }),
+      ]),
+    });
   });
 
   it("admits a physically credible source candidate only when receipts, tensor authority, and downstream gates all pass", () => {

@@ -364,6 +364,76 @@ const isDocsEvidenceArtifact = (artifact: ArtifactLike): boolean => {
   return /\b(?:doc_summary|doc_equation_context|doc_equation_location|doc_calculator_evidence|agent_step_observation_packet)\b/i.test(signature);
 };
 
+const compoundSubgoalRows = (payload: RecordLike | null): RecordLike[] => {
+  if (!payload) return [];
+  const artifactQueryIndex = readRecord(payload.artifact_query_index);
+  const itinerary =
+    readRecord(payload.capability_itinerary) ??
+    payloadArtifactPayloadByKind(payload, "capability_itinerary");
+  const executionState =
+    readRecord(payload.capability_itinerary_execution_state) ??
+    readRecord(itinerary?.execution_state) ??
+    payloadArtifactPayloadByKind(payload, "capability_itinerary_execution_state");
+  return [
+    ...readArray(payload.compound_subgoal_rail_statuses),
+    ...readArray(artifactQueryIndex?.compound_subgoal_rail_statuses),
+    ...readArray(executionState?.compound_subgoal_ledger),
+  ]
+    .map(readRecord)
+    .filter((entry): entry is RecordLike => Boolean(entry));
+};
+
+const compoundRuntimeDocEvidenceObservationRefs = (payload: RecordLike | null): string[] =>
+  unique(compoundSubgoalRows(payload)
+    .filter((row) => {
+      const capabilityText = [
+        readString(row.requested_capability),
+        readString(row.runtime_capability),
+        readString(row.selected_capability),
+        readString(row.executed_capability),
+      ].join(" ");
+      const observationKind = readString(row.observation_kind);
+      const satisfaction = readString(row.satisfaction);
+      const railStatus = readString(row.rail_status);
+      return (
+        /docs-viewer\.(?:locate_in_doc|search_docs|doc_equation_context)/i.test(capabilityText) &&
+        /^(?:doc_location_matches|doc_location_result|doc_evidence_location|doc_equation_context)$/i.test(observationKind ?? "") &&
+        satisfaction === "satisfied" &&
+        (!railStatus || railStatus === "complete") &&
+        Boolean(readString(row.observation_ref))
+      );
+    })
+    .map((row) => readString(row.observation_ref))
+    .filter((entry): entry is string => Boolean(entry)));
+
+const refListIncludes = (refs: string[], target: string | null): boolean => {
+  if (!target) return false;
+  return refs.some((ref) => ref === target || ref.includes(target) || target.includes(ref));
+};
+
+const isCompoundRuntimeDocEvidenceArtifact = (input: {
+  artifact: ArtifactLike;
+  payload?: RecordLike | null;
+  finalAnswerDraftSupportRefs?: string[];
+}): boolean => {
+  const ref = artifactId(input.artifact);
+  const runtimeDocRefs = compoundRuntimeDocEvidenceObservationRefs(input.payload ?? null);
+  if (!refListIncludes(runtimeDocRefs, ref)) return false;
+  if (!refListIncludes(input.finalAnswerDraftSupportRefs ?? [], ref)) return false;
+  const signature = [artifactKind(input.artifact), artifactSchema(input.artifact)].join(" ");
+  if (!/\b(?:doc_location_result|doc_evidence_location|doc_location_matches|doc_equation_context)\b/i.test(signature)) {
+    return false;
+  }
+  const payload = artifactPayload(input.artifact);
+  return Boolean(
+    artifactText(input.artifact) ||
+    pathsFromPayload(payload).length > 0 ||
+    anchorsFromPayload(payload).length > 0 ||
+    readArray(payload?.matches).length > 0 ||
+    readArray(payload?.locations).length > 0,
+  );
+};
+
 const finalAnswerDraftPayload = (
   artifactLedger: ArtifactLike[],
   finalAnswerDraftRef?: string | null,
@@ -606,9 +676,15 @@ export function chooseStrongerDocEvidenceSynthesisPlan(
 
 export function collectDocEvidenceForSynthesis(input: {
   artifactLedger: ArtifactLike[];
+  payload?: RecordLike | null;
+  finalAnswerDraftSupportRefs?: string[];
 }): ArtifactLike[] {
   return input.artifactLedger.filter((artifact) => {
-    if (!isDocsEvidenceArtifact(artifact)) return false;
+    if (!isDocsEvidenceArtifact(artifact) && !isCompoundRuntimeDocEvidenceArtifact({
+      artifact,
+      payload: input.payload,
+      finalAnswerDraftSupportRefs: input.finalAnswerDraftSupportRefs,
+    })) return false;
     const text = artifactText(artifact);
     const paths = pathsFromPayload(artifactPayload(artifact));
     return Boolean(text || paths.length > 0 || anchorsFromPayload(artifactPayload(artifact)).length > 0);
@@ -785,14 +861,18 @@ export function materializeDocEvidenceSynthesisAnswer(input: {
     rebuiltPlan,
   );
   input.payload.doc_evidence_synthesis_plan = plan;
-  const evidenceArtifacts = collectDocEvidenceForSynthesis({ artifactLedger });
+  const draftSupportRefs = finalAnswerDraftSupportRefs(artifactLedger, input.finalAnswerDraftRef);
+  const evidenceArtifacts = collectDocEvidenceForSynthesis({
+    artifactLedger,
+    payload: input.payload,
+    finalAnswerDraftSupportRefs: draftSupportRefs,
+  });
   const coverage = evaluateDocEvidenceSynthesisCoverage({
     turnId: input.turnId,
     plan,
     evidenceArtifacts,
   });
   const evidenceRefs = coverage.observed_artifact_refs;
-  const draftSupportRefs = finalAnswerDraftSupportRefs(artifactLedger, input.finalAnswerDraftRef);
   const hasDraftSupportForDocs = draftSupportRefs.some((ref) =>
     evidenceRefs.includes(ref) ||
     evidenceRefs.some((evidenceRef) => ref.includes(evidenceRef) || evidenceRef.includes(ref)),

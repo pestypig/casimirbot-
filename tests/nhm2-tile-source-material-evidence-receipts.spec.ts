@@ -19,6 +19,7 @@ import {
   buildNhm2TileSourceAuthorityHandoff,
   isNhm2TileSourceAuthorityHandoff,
 } from "../shared/contracts/nhm2-tile-source-authority-handoff.v1";
+import { isNhm2TileSourceExperimentalCampaignPackage } from "../shared/contracts/nhm2-tile-source-experimental-campaign-package.v1";
 import {
   buildNhm2TileSourceMaterialCouponTestPlan,
   isNhm2TileSourceMaterialCouponTestPlan,
@@ -605,6 +606,19 @@ describe("NHM2 tile source material evidence receipts", () => {
       const authorityHandoffJson = JSON.parse(
         readFileSync(result.outputRefs.authorityHandoff, "utf8"),
       ) as { contractVersion?: string; summary?: { handoffStatus?: string } };
+      const experimentalCampaignPackageJson = JSON.parse(
+        readFileSync(result.outputRefs.experimentalCampaignPackage, "utf8"),
+      ) as {
+        contractVersion?: string;
+        summary?: {
+          packageStatus?: string;
+          measurementCount?: number;
+          allEvidenceObjectivesSatisfied?: boolean;
+          objectiveCoverageCount?: number;
+        };
+        campaignItems?: unknown[];
+        objectiveCoverage?: Array<{ objectiveId?: string; status?: string }>;
+      };
       const couponPlanJson = JSON.parse(
         readFileSync(result.outputRefs.materialCouponTestPlan, "utf8"),
       ) as { contractVersion?: string; summary?: { nextRequiredTestId?: string } };
@@ -662,6 +676,45 @@ describe("NHM2 tile source material evidence receipts", () => {
       expect(falsificationReportJson.disposition?.reportStatus).toBe("candidate_evidence_complete");
       expect(authorityHandoffJson.contractVersion).toBe("nhm2_tile_source_authority_handoff/v1");
       expect(authorityHandoffJson.summary?.handoffStatus).toBe("handoff_ready");
+      expect(experimentalCampaignPackageJson.contractVersion).toBe(
+        "nhm2_tile_source_experimental_campaign_package/v1",
+      );
+      expect(experimentalCampaignPackageJson.summary?.packageStatus).toBe(
+        "no_open_campaign_items",
+      );
+      expect(experimentalCampaignPackageJson.summary?.measurementCount).toBe(0);
+      expect(experimentalCampaignPackageJson.summary?.objectiveCoverageCount).toBe(9);
+      expect(experimentalCampaignPackageJson.summary?.allEvidenceObjectivesSatisfied).toBe(true);
+      expect(experimentalCampaignPackageJson.objectiveCoverage).toHaveLength(9);
+      expect(
+        experimentalCampaignPackageJson.objectiveCoverage?.map((coverage) => coverage.status),
+      ).toEqual(Array(9).fill("satisfied"));
+      expect(experimentalCampaignPackageJson.campaignItems).toHaveLength(0);
+      expect(result.experimentalCampaignPackage.summary.missingMeasurementCount).toBe(0);
+      expect(result.experimentalCampaignPackage.summary.failingMeasurementCount).toBe(0);
+      expect(result.experimentalCampaignPackage.summary.passingMeasurementCount).toBe(0);
+      expect(result.experimentalCampaignPackage.summary.openObjectiveCount).toBe(0);
+      expect(result.experimentalCampaignPackage.summary.falsifyingObjectiveCount).toBe(0);
+      expect(result.experimentalCampaignPackage.summary.satisfiedObjectiveCount).toBe(9);
+      expect(result.experimentalCampaignPackage.objectiveCoverage).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            objectiveId: "source_side_same_basis_authority",
+            status: "satisfied",
+          }),
+          expect.objectContaining({
+            objectiveId: "downstream_gate_readiness",
+            status: "satisfied",
+          }),
+          expect.objectContaining({
+            objectiveId: "falsification_map",
+            status: "satisfied",
+          }),
+        ]),
+      );
+      expect(isNhm2TileSourceExperimentalCampaignPackage(result.experimentalCampaignPackage)).toBe(
+        true,
+      );
       expect(couponPlanJson.contractVersion).toBe("nhm2_tile_source_material_coupon_test_plan/v1");
       expect(couponPlanJson.summary?.nextRequiredTestId).toBe("none");
       expect(couponOperatingBudgetJson.contractVersion).toBe(
@@ -760,6 +813,98 @@ describe("NHM2 tile source material evidence receipts", () => {
       expect(result.falsificationReport.summary.missingReceiptCount).toBe(7);
       expect(result.authorityHandoff.summary.handoffStatus).toBe("blocked");
       expect(result.authorityHandoff.summary.firstBlocker).toBe("material_coupon_tier_not_measured_or_validated");
+      expect(isNhm2TileSourceExperimentalCampaignPackage(result.experimentalCampaignPackage)).toBe(
+        true,
+      );
+      expect(result.experimentalCampaignPackage.summary.packageStatus).toBe(
+        "ready_for_evidence_collection",
+      );
+      expect(result.experimentalCampaignPackage.summary.firstCampaignDomain).toBe(
+        "material_coupon_behavior",
+      );
+      expect(result.experimentalCampaignPackage.summary.measurementCount).toBeGreaterThanOrEqual(3);
+      expect(result.experimentalCampaignPackage.summary.missingMeasurementCount).toBeGreaterThan(0);
+      expect(result.experimentalCampaignPackage.summary.failingMeasurementCount).toBe(0);
+      expect(result.experimentalCampaignPackage.summary.passingMeasurementCount).toBe(0);
+      expect(result.experimentalCampaignPackage.summary.objectiveCoverageCount).toBe(9);
+      expect(result.experimentalCampaignPackage.summary.allObjectiveCoveragePresent).toBe(true);
+      expect(result.experimentalCampaignPackage.summary.allEvidenceObjectivesSatisfied).toBe(false);
+      expect(result.experimentalCampaignPackage.summary.openObjectiveCount).toBeGreaterThan(0);
+      expect(result.experimentalCampaignPackage.summary.satisfiedObjectiveCount).toBeGreaterThan(0);
+      expect(result.experimentalCampaignPackage.objectiveCoverage).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            objectiveId: "material_coupon_receipts",
+            status: "ready_for_evidence",
+            openMeasurementIds: expect.arrayContaining([
+              "coupon_fracture_yield_margin",
+              "coupon_material_response",
+            ]),
+          }),
+          expect.objectContaining({
+            objectiveId: "full_apparatus_tensor_receipts",
+            status: "ready_for_evidence",
+            blockerIds: expect.arrayContaining([
+              "full_apparatus_tensor_tier_not_measured_or_validated",
+            ]),
+          }),
+          expect.objectContaining({
+            objectiveId: "source_side_same_basis_authority",
+            status: "ready_for_evidence",
+            openMeasurementIds: ["same_basis_authority_handoff"],
+          }),
+          expect.objectContaining({
+            objectiveId: "downstream_gate_readiness",
+            status: "blocked_by_downstream",
+            openMeasurementIds: expect.arrayContaining([
+              "regional_residual_closure",
+              "observer_family_energy_conditions",
+            ]),
+          }),
+          expect.objectContaining({
+            objectiveId: "falsification_map",
+            status: "satisfied",
+          }),
+        ]),
+      );
+      expect(result.experimentalCampaignPackage.currentBlocker.decisiveMeasurements).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            measurementId: "coupon_fracture_yield_margin",
+            evidenceArtifact: "receipt://material_coupon/fracture_yield_margin_v1",
+          }),
+        ]),
+      );
+      expect(result.experimentalCampaignPackage.campaignItems[0]).toMatchObject({
+        campaignDomain: "material_coupon_behavior",
+        firstBlocker: "material_coupon_tier_not_measured_or_validated",
+        nextEvidenceArtifact: "receipt://material_coupon/provenance_v1",
+        status: "ready_for_receipt",
+        measurementStatuses: expect.arrayContaining([
+          expect.objectContaining({
+            measurementId: "coupon_fracture_yield_margin",
+            evidenceArtifact: "receipt://material_coupon/fracture_yield_margin_v1",
+            status: "missing",
+            currentMargin: null,
+          }),
+          expect.objectContaining({
+            measurementId: "coupon_material_response",
+            evidenceArtifact: "receipt://material_coupon/material_response_15ghz_4k_v1",
+            status: "missing",
+            currentMargin: false,
+          }),
+        ]),
+        decisiveMeasurements: expect.arrayContaining([
+          expect.objectContaining({
+            measurementId: "coupon_material_response",
+            evidenceArtifact: "receipt://material_coupon/material_response_15ghz_4k_v1",
+          }),
+        ]),
+      });
+      expect(result.experimentalCampaignPackage.claimBoundary.packageDoesNotSupplyEvidence).toBe(
+        true,
+      );
+      expect(result.experimentalCampaignPackage.summary.physicalViabilityClaimAllowed).toBe(false);
       expect(result.materialCouponTestPlan.summary.nextRequiredTestId).toBe("coupon_provenance");
       expect(result.materialCouponTestPlan.summary.openTestCount).toBeGreaterThan(0);
       expect(result.materialCouponOperatingBudget.summary.firstBlocker).toBe(
@@ -921,6 +1066,12 @@ describe("NHM2 tile source material evidence receipts", () => {
     );
 
     expect(isNhm2TileSourceFalsificationReport(report)).toBe(true);
+    const staleReport = {
+      ...report,
+      currentBlocker: { ...report.currentBlocker },
+    } as typeof report & { currentBlocker: Record<string, unknown> };
+    delete staleReport.currentBlocker.decisiveMeasurements;
+    expect(isNhm2TileSourceFalsificationReport(staleReport)).toBe(false);
     expect(report.disposition.reportStatus).toBe("review");
     expect(report.disposition.firstBlocker).toBe("material_coupon_receipt_missing");
     expect(report.currentBlocker).toMatchObject({
@@ -934,6 +1085,18 @@ describe("NHM2 tile source material evidence receipts", () => {
       requiredChange: expect.stringContaining("Supply measured or validated coupon data"),
       falsifiesCurrentCandidate: false,
     });
+    expect(report.currentBlocker.decisiveMeasurements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          measurementId: "coupon_fracture_yield_margin",
+          evidenceArtifact: "receipt://material_coupon/fracture_yield_margin_v1",
+        }),
+        expect.objectContaining({
+          measurementId: "coupon_material_response",
+          evidenceArtifact: "receipt://material_coupon/material_response_15ghz_4k_v1",
+        }),
+      ]),
+    );
     expect(report.summary.missingReceiptCount).toBe(7);
     expect(report.summary.failingReceiptCount).toBe(0);
     expect(report.summary.operatingBudgetBlockerCount).toBeGreaterThan(0);
@@ -1088,6 +1251,21 @@ describe("NHM2 tile source material evidence receipts", () => {
       requiredChange: expect.stringContaining("material_coupon operating evidence"),
       falsifiesCurrentCandidate: false,
     });
+    expect(report.currentBlocker.decisiveMeasurements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          measurementId: "coupon_fracture_yield_margin",
+          evidenceArtifact: "receipt://material_coupon/fracture_yield_margin_v1",
+          currentMargin: null,
+        }),
+        expect.objectContaining({
+          measurementId: "coupon_material_response",
+          evidenceArtifact: "receipt://material_coupon/material_response_15ghz_4k_v1",
+          currentMargin: false,
+          requiredCorrectionValue: false,
+        }),
+      ]),
+    );
     expect(report.currentBlocker.numericalMargins).toMatchObject({
       tensileStressMargin: null,
       fractureOrYieldStressMargin: null,
@@ -1422,6 +1600,18 @@ describe("NHM2 tile source material evidence receipts", () => {
       evidenceTarget: expect.stringContaining("8 nm force-gap receipt"),
       falsifiesCurrentCandidate: true,
     });
+    expect(report.currentBlocker.decisiveMeasurements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          measurementId: "pull_in_margin",
+          evidenceArtifact: "receipt://force_gap_pull_in/pull_in_margin_8nm_v1",
+        }),
+        expect.objectContaining({
+          measurementId: "active_gap_authority",
+          evidenceArtifact: "receipt://force_gap_pull_in/active_authority_447_layer_v1",
+        }),
+      ]),
+    );
     expect(report.currentBlocker.numericalMargin).toBeLessThan(1);
     expect(report.summary.failingReceiptCount).toBe(1);
     expect(report.summary.failingDownstreamGateCount).toBe(1);
@@ -1599,6 +1789,12 @@ describe("NHM2 tile source material evidence receipts", () => {
       evidenceState: "missing_receipt",
       resolutionMode: "supply_experimental_receipt",
       firstBlocker: "material_coupon_receipt_missing",
+      decisiveMeasurements: expect.arrayContaining([
+        expect.objectContaining({
+          measurementId: "coupon_fracture_yield_margin",
+          evidenceArtifact: "receipt://material_coupon/fracture_yield_margin_v1",
+        }),
+      ]),
       blocksCampaignPass: true,
     });
     expect(materialGate?.status).toBe("missing");

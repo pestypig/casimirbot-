@@ -1099,6 +1099,54 @@ const liveEnvironmentBindingDiagnosisTerminalAllowed = (payload: Record<string, 
   return true;
 };
 
+const workstationControlReceiptTerminalAllowed = (payload: Record<string, unknown>): boolean => {
+  const terminalKind = readString(payload.terminal_artifact_kind);
+  const finalAnswerSource = readString(payload.final_answer_source);
+  if (terminalKind !== "workstation_tool_evaluation" || finalAnswerSource !== "workstation_tool_evaluation") return false;
+
+  const debug = readRecord(payload.debug);
+  const goalSatisfaction =
+    readRecord(payload.goal_satisfaction_evaluation) ??
+    readRecord(debug?.goal_satisfaction_evaluation) ??
+    readRecord(payload.runtime_goal_satisfaction_observation) ??
+    readRecord(payload.satisfaction_report);
+  const terminalContract =
+    readRecord(payload.terminal_contract) ??
+    readRecord(goalSatisfaction?.terminal_contract);
+  const goalKind =
+    payloadGoalKind(payload) ??
+    readString(goalSatisfaction?.canonical_goal_kind) ??
+    readString(terminalContract?.goal_kind);
+  if (goalKind !== "panel_control") return false;
+
+  const satisfaction = readString(goalSatisfaction?.satisfaction);
+  const nextDecision = readString(goalSatisfaction?.next_decision);
+  if (satisfaction && satisfaction !== "satisfied") return false;
+  if (nextDecision && nextDecision !== "allow_terminal") return false;
+
+  const evaluation =
+    readRecord(payload.workstation_tool_evaluation) ??
+    readRecord(debug?.workstation_tool_evaluation) ??
+    readRecord(readRecord(payload.planner_contract)?.workstation_tool_evaluation);
+  if (readString(evaluation?.schema) !== "helix.workstation_tool_evaluation.v1") return false;
+  if (readBoolean(evaluation?.supports_goal) !== true) return false;
+
+  const observation =
+    readRecord(payload.live_environment_tool_observation) ??
+    readRecord(debug?.live_environment_tool_observation);
+  if (readString(observation?.schema) !== "helix.live_environment_tool_observation.v1") return false;
+  if (readBoolean(observation?.assistant_answer) !== false || readBoolean(observation?.raw_content_included) !== false) return false;
+  if (readBoolean(observation?.terminal_eligible) !== false) return false;
+
+  const receipt = readRecord(observation?.observation);
+  if (readString(receipt?.schema) !== "stage_play_workstation_control_receipt/v1") return false;
+  if (readBoolean(receipt?.ok) !== true) return false;
+  if (readString(receipt?.status) !== "prepared") return false;
+  if (readBoolean(receipt?.assistant_answer) !== false || readBoolean(receipt?.raw_content_included) !== false) return false;
+
+  return true;
+};
+
 const payloadHasStagePlayCapabilityOrObservation = (payload: Record<string, unknown>): boolean => {
   const topLevelDecision = readRecord(payload.agent_step_decision);
   const topLevelCapability =
@@ -1141,6 +1189,7 @@ export function goalSatisfactionAllowsTerminal(payload: Record<string, unknown>)
   const terminalKind = readString(payload.terminal_artifact_kind);
   if (terminalKind === "typed_failure") return hasCleanTypedFailure(payload);
   if (livePipelineReceiptTerminalAllowed(payload)) return true;
+  if (workstationControlReceiptTerminalAllowed(payload)) return true;
   if (satisfaction === "satisfied" && (!nextDecision || nextDecision === "allow_terminal")) return true;
   const canonicalGoal = readRecord(payload.canonical_goal_frame);
   const docsSynthesisAnswer = readRecord(payload.doc_evidence_synthesis_answer);
@@ -1244,6 +1293,7 @@ export function evaluateTerminalBoundaryEligibility(payload: Record<string, unkn
   const finalAnswerSource = readString(payload.final_answer_source);
   const livePipelineReceiptAllowed = livePipelineReceiptTerminalAllowed(payload);
   const liveEnvironmentBindingDiagnosisAllowed = liveEnvironmentBindingDiagnosisTerminalAllowed(payload);
+  const workstationControlReceiptAllowed = workstationControlReceiptTerminalAllowed(payload);
   const stagePlayReceiptTerminal = stagePlayReceiptSelectedAsTerminal(payload);
   const contextResumeFrameRecallAllowed = contextResumeFrameRecallTerminalAllowed(payload);
   const microDeckObservationBackedRoute = isMicroDeckObservationBackedRoute(payload);
@@ -1264,11 +1314,12 @@ export function evaluateTerminalBoundaryEligibility(payload: Record<string, unkn
     terminalKind !== "typed_failure" &&
     !livePipelineReceiptAllowed &&
     !liveEnvironmentBindingDiagnosisAllowed &&
+    !workstationControlReceiptAllowed &&
     !contextResumeFrameRecallAllowed;
   const blockingReasons: string[] = [];
   if (runtimeBoundTurn) {
     if (stagePlayReceiptTerminal) blockingReasons.push("stage_play_receipt_terminal_without_model_review");
-    if (!checks.goal_satisfaction_allows_terminal && !livePipelineReceiptAllowed && !liveEnvironmentBindingDiagnosisAllowed) blockingReasons.push("goal_satisfaction_not_terminal");
+    if (!checks.goal_satisfaction_allows_terminal && !livePipelineReceiptAllowed && !liveEnvironmentBindingDiagnosisAllowed && !workstationControlReceiptAllowed) blockingReasons.push("goal_satisfaction_not_terminal");
     if (terminalKind === "typed_failure") {
       if (!checks.typed_failure_clean) blockingReasons.push("typed_failure_missing_code");
     } else if (modelDirectAnswerTurn) {
@@ -1277,7 +1328,7 @@ export function evaluateTerminalBoundaryEligibility(payload: Record<string, unkn
         if (!checks.agent_step_decision) blockingReasons.push("agent_step_decision_missing");
         if (!checks.post_observation_model_decision) blockingReasons.push("post_observation_model_decision_missing");
       }
-    } else if (livePipelineReceiptAllowed || liveEnvironmentBindingDiagnosisAllowed || contextResumeFrameRecallAllowed) {
+    } else if (livePipelineReceiptAllowed || liveEnvironmentBindingDiagnosisAllowed || workstationControlReceiptAllowed || contextResumeFrameRecallAllowed) {
       // Control/status Live Pipeline receipts and binding diagnostics are terminal only by route-product contract.
       // The receipt/diagnosis and disclosure remain observations, not assistant answers or raw logs.
     } else {

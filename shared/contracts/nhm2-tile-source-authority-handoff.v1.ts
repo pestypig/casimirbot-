@@ -138,6 +138,31 @@ const isCorrectionValue = (
   isFiniteNumber(value) ||
   (Array.isArray(value) && value.every((entry) => typeof entry === "string"));
 
+const isDecisiveMeasurementList = (value: unknown): boolean =>
+  Array.isArray(value) &&
+  value.length > 0 &&
+  value.every(
+    (measurement) =>
+      isRecord(measurement) &&
+      typeof measurement.measurementId === "string" &&
+      typeof measurement.quantity === "string" &&
+      typeof measurement.target === "string" &&
+      (measurement.unit === null || typeof measurement.unit === "string") &&
+      typeof measurement.evidenceArtifact === "string" &&
+      (measurement.marginKey === null || typeof measurement.marginKey === "string") &&
+      (measurement.currentMargin === null ||
+        typeof measurement.currentMargin === "boolean" ||
+        (typeof measurement.currentMargin === "number" &&
+          Number.isFinite(measurement.currentMargin))) &&
+      (measurement.requiredCorrectionKey === null ||
+        typeof measurement.requiredCorrectionKey === "string") &&
+      (measurement.requiredCorrectionValue === null ||
+        isCorrectionValue(measurement.requiredCorrectionValue)) &&
+      typeof measurement.goCriterion === "string" &&
+      typeof measurement.noGoCriterion === "string" &&
+      typeof measurement.falsificationConsequence === "string",
+  );
+
 const isFrontierResolutionItem = (
   value: unknown,
 ): value is Nhm2TileSourceFrontierResolutionItemV1 => {
@@ -181,6 +206,7 @@ const isFrontierResolutionItem = (
     typeof value.falsificationRule === "string" &&
     isRecord(value.requiredCorrections) &&
     Object.values(value.requiredCorrections).every(isCorrectionValue) &&
+    isDecisiveMeasurementList(value.decisiveMeasurements) &&
     Array.isArray(value.prevents) &&
     value.prevents.every((entry) => typeof entry === "string") &&
     Array.isArray(value.evidenceRefs) &&

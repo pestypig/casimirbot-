@@ -142,6 +142,99 @@ describe("compound capability synthesis readiness", () => {
     expect(readiness.support_refs).toContain("obs:doc-location-runtime");
   });
 
+  it("treats runtime-satisfied contract subgoals as complete despite stale broad itinerary families", () => {
+    const turnId = "ask:test:compound-stale-broad-family";
+    const docsSubgoalId = `${turnId}:compound_capability_subgoal:1:docs-viewer_locate_in_doc`;
+    const calculatorSubgoalId = `${turnId}:compound_capability_subgoal:2:scientific-calculator_solve_expression`;
+    const compoundRows = [
+      {
+        subgoal_id: docsSubgoalId,
+        requested_capability: "docs-viewer.locate_in_doc",
+        runtime_capability: "docs-viewer.locate_in_doc",
+        selected_capability: "docs-viewer.locate_in_doc",
+        executed_capability: "docs-viewer.locate_in_doc",
+        observation_kind: "doc_location_matches",
+        observation_ref: "obs:doc-location-runtime",
+        support_refs: ["obs:doc-location-runtime"],
+        satisfaction: "satisfied",
+        rail_status: "complete",
+      },
+      {
+        subgoal_id: calculatorSubgoalId,
+        requested_capability: "scientific-calculator.solve_expression",
+        runtime_capability: "scientific-calculator.solve_expression",
+        selected_capability: "scientific-calculator.solve_expression",
+        executed_capability: "scientific-calculator.solve_expression",
+        observation_kind: "calculator_receipt",
+        observation_ref: "obs:calculator-runtime",
+        support_refs: ["obs:calculator-runtime"],
+        satisfaction: "satisfied",
+        rail_status: "complete",
+      },
+    ];
+    const readiness = resolveCompoundCapabilitySynthesisReadiness({
+      payload: {
+        capability_itinerary: {
+          schema: "helix.capability_itinerary.v1",
+          terminal_success_criteria: {
+            requires_post_observation_synthesis: true,
+            required_observation_families: ["docs_viewer", "calculator", "scholarly_research"],
+            required_capabilities: ["docs-viewer.locate_in_doc", "scientific-calculator.solve_expression"],
+          },
+        },
+        capability_itinerary_execution_state: {
+          schema: "helix.capability_itinerary_execution_state.v1",
+          applies: true,
+          complete: false,
+          required_observation_families: ["docs_viewer", "calculator", "scholarly_research"],
+          observed_families: ["docs_viewer", "calculator"],
+          missing_observation_families: ["scholarly_research"],
+          compound_subgoal_ledger: compoundRows,
+        },
+        compound_capability_contract: {
+          schema: "helix.compound_capability_contract.v1",
+          requires_all_subgoals: true,
+          subgoals: [
+            {
+              subgoal_id: docsSubgoalId,
+              capability_family: "docs_viewer",
+              requested_capability: "docs-viewer.locate_in_doc",
+              runtime_capability: "docs-viewer.locate_in_doc",
+              mandatory: true,
+            },
+            {
+              subgoal_id: calculatorSubgoalId,
+              capability_family: "calculator",
+              requested_capability: "scientific-calculator.solve_expression",
+              runtime_capability: "scientific-calculator.solve_expression",
+              mandatory: true,
+            },
+          ],
+        },
+        artifact_query_index: {
+          compound_subgoal_rail_statuses: compoundRows,
+          compound_subgoal_missing_summary: {
+            missing_compound_subgoal_ids: [],
+            missing_required_capabilities: [],
+            complete: false,
+          },
+        },
+      },
+      artifacts: [],
+    });
+
+    expect(readiness).toMatchObject({
+      applies: true,
+      complete: true,
+      synthesis_required: true,
+      required_terminal_kind: "doc_evidence_synthesis_answer",
+      synthesis_terminal_kind: "doc_evidence_synthesis_answer",
+      missing_required_capabilities: [],
+      incomplete_compound_subgoal_ids: [],
+    });
+    expect(readiness.support_refs).toEqual(["obs:doc-location-runtime", "obs:calculator-runtime"]);
+  });
+
   it("recovers synthesis readiness from ledger-only compound itinerary artifacts", () => {
     const turnId = "ask:test:compound-synthesis-ledger-only-state";
     const docsSubgoalId = `${turnId}:compound_capability_subgoal:1:docs-viewer_locate_in_doc`;

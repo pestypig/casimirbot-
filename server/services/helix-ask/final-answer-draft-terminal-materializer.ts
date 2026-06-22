@@ -408,17 +408,106 @@ const compoundTerminalReadinessBlockedReason = (
   artifactLedger: ArtifactLike[] = [],
 ): "compound_subgoal_incomplete" | null => {
   if (!compoundTerminalPolicyActive(payload)) return null;
+  const artifactQueryIndex = readRecord(payload.artifact_query_index);
+  const existingItinerary = readCompoundItinerary(payload, artifactLedger);
+  const explicitExecutionState =
+    readRecord(payload.capability_itinerary_execution_state) ??
+    readRecord(existingItinerary?.execution_state) ??
+    artifactPayloadByKind(artifactLedger, "capability_itinerary_execution_state") ??
+    payloadArtifactPayloadByKind(payload, "capability_itinerary_execution_state");
+  const existingLedger = readArray(explicitExecutionState?.compound_subgoal_ledger)
+    .map(readRecord)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  const existingRailRows = [
+    ...readArray(payload.compound_subgoal_rail_statuses),
+    ...readArray(artifactQueryIndex?.compound_subgoal_rail_statuses),
+  ]
+    .map(readRecord)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  const explicitCompoundRows = [...existingLedger, ...existingRailRows];
+  const existingLedgerHasIncompleteObservation =
+    explicitCompoundRows.length > 1 &&
+    explicitCompoundRows.some((entry) => !compoundLedgerEntryHasSatisfiedObservation(entry));
+  const explicitContract = readCompoundContract(payload, artifactLedger);
+  const explicitContractSubgoals = readArray(explicitContract?.subgoals)
+    .map(readRecord)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  const explicitRowSubgoalIds = new Set(
+    explicitCompoundRows
+      .map((entry) => readString(entry.subgoal_id))
+      .filter((entry): entry is string => Boolean(entry)),
+  );
+  const explicitRowCapabilities = new Set(
+    explicitCompoundRows.flatMap((entry) => [
+      readString(entry.requested_capability),
+      readString(entry.runtime_capability),
+      readString(entry.selected_capability),
+      readString(entry.executed_capability),
+    ]).filter((entry): entry is string => Boolean(entry)),
+  );
+  const explicitRowsDropRequiredContractSubgoal =
+    explicitCompoundRows.length > 0 &&
+    explicitContractSubgoals.length > 1 &&
+    explicitContract?.requires_all_subgoals !== false &&
+    explicitContractSubgoals.some((subgoal) => {
+      const subgoalId = readString(subgoal.subgoal_id);
+      if (subgoalId) return !explicitRowSubgoalIds.has(subgoalId);
+      const capability =
+        readString(subgoal.requested_capability) ??
+        readString(subgoal.runtime_capability) ??
+        readString(subgoal.selected_capability);
+      return Boolean(capability && !explicitRowCapabilities.has(capability));
+    });
+  const existingReadiness = readRecord(payload.compound_capability_synthesis_readiness);
+  const existingReadinessComplete =
+    existingReadiness?.applies === true &&
+    existingReadiness.complete === true &&
+    existingReadiness.has_failed_subgoal !== true;
+  const existingReadinessHasSupportRefs =
+    readArray(existingReadiness?.support_refs).map(readString).filter(Boolean).length > 0;
+  const existingCompleteReadinessCanStandIn =
+    existingReadinessComplete &&
+    existingReadinessHasSupportRefs &&
+    !existingLedgerHasIncompleteObservation &&
+    !explicitRowsDropRequiredContractSubgoal;
   const synthesizedReadiness = resolveCompoundCapabilitySynthesisReadiness({
     payload,
     artifacts: artifactLedger,
   });
-  payload.compound_capability_synthesis_readiness = synthesizedReadiness;
   if (synthesizedReadiness.applies === true) {
-    if (synthesizedReadiness.has_failed_subgoal === true) return "compound_subgoal_incomplete";
-    if (synthesizedReadiness.complete === true) return null;
+    if (
+      (synthesizedReadiness.has_failed_subgoal === true && !existingCompleteReadinessCanStandIn) ||
+      existingLedgerHasIncompleteObservation ||
+      explicitRowsDropRequiredContractSubgoal
+    ) {
+      payload.compound_capability_synthesis_readiness = synthesizedReadiness;
+      return "compound_subgoal_incomplete";
+    }
+    if (synthesizedReadiness.complete === true) {
+      payload.compound_capability_synthesis_readiness = synthesizedReadiness;
+      return null;
+    }
+    if (existingCompleteReadinessCanStandIn) {
+      payload.compound_capability_synthesis_readiness = {
+        ...synthesizedReadiness,
+        ...existingReadiness,
+        complete: true,
+        has_failed_subgoal: false,
+        support_refs: unique([
+          ...readArray(synthesizedReadiness.support_refs).map(readString).filter((entry): entry is string => Boolean(entry)),
+          ...readArray(existingReadiness?.support_refs).map(readString).filter((entry): entry is string => Boolean(entry)),
+        ]),
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+      return null;
+    }
+    payload.compound_capability_synthesis_readiness = synthesizedReadiness;
     return "compound_subgoal_incomplete";
   }
-  const contract = readCompoundContract(payload, artifactLedger);
+  if (existingReadinessComplete) return null;
+  payload.compound_capability_synthesis_readiness = synthesizedReadiness;
+  const contract = explicitContract;
   const executionState = readCompoundExecutionState(payload, artifactLedger);
   const readiness = readRecord(payload.compound_capability_synthesis_readiness);
   if (readiness?.has_failed_subgoal === true) return "compound_subgoal_incomplete";

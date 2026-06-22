@@ -200,6 +200,31 @@ const isCorrectionValue = (
   isFiniteNumber(value) ||
   (Array.isArray(value) && value.every((entry) => typeof entry === "string"));
 
+const isHandoffDecisiveMeasurementList = (value: unknown): boolean =>
+  Array.isArray(value) &&
+  value.length > 0 &&
+  value.every(
+    (measurement) =>
+      isRecord(measurement) &&
+      toText(measurement.measurementId) != null &&
+      toText(measurement.quantity) != null &&
+      toText(measurement.target) != null &&
+      (measurement.unit === null || toText(measurement.unit) != null) &&
+      toText(measurement.evidenceArtifact) != null &&
+      (measurement.marginKey === null || toText(measurement.marginKey) != null) &&
+      (measurement.currentMargin === null ||
+        typeof measurement.currentMargin === "boolean" ||
+        (typeof measurement.currentMargin === "number" &&
+          Number.isFinite(measurement.currentMargin))) &&
+      (measurement.requiredCorrectionKey === null ||
+        toText(measurement.requiredCorrectionKey) != null) &&
+      (measurement.requiredCorrectionValue === null ||
+        isCorrectionValue(measurement.requiredCorrectionValue)) &&
+      toText(measurement.goCriterion) != null &&
+      toText(measurement.noGoCriterion) != null &&
+      toText(measurement.falsificationConsequence) != null,
+  );
+
 const isHandoffFrontierResolutionItem = (value: unknown): boolean => {
   if (!isRecord(value)) return false;
   const boundary = isRecord(value.claimBoundary) ? value.claimBoundary : null;
@@ -224,6 +249,7 @@ const isHandoffFrontierResolutionItem = (value: unknown): boolean => {
     toText(value.falsificationRule) != null &&
     isRecord(value.requiredCorrections) &&
     Object.values(value.requiredCorrections).every(isCorrectionValue) &&
+    isHandoffDecisiveMeasurementList(value.decisiveMeasurements) &&
     Array.isArray(value.prevents) &&
     value.prevents.every((entry) => toText(entry) != null) &&
     Array.isArray(value.evidenceRefs) &&

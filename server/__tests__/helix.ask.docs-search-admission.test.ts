@@ -292,4 +292,66 @@ describe("Helix Ask docs-search admission", () => {
       ]),
     );
   });
+
+  it("does not runtime-suppress an explicit compound calculator subgoal omitted from blocked capability keys", () => {
+    const promptText =
+      "First call docs-viewer.locate_in_doc on docs/helix-ask-codex-loop-discipline.md for the query 'routes choose procedures'. Then call scientific-calculator.solve_expression on '19 + 23'. Synthesize both observations.";
+    const admission = buildToolCallAdmissionDecision({
+      turnId: "ask:compound-runtime-admission",
+      promptText,
+      sourceTargetIntent: {
+        target_source: "docs_viewer",
+        target_kind: "docs_viewer",
+        explicit_cues: ["docs-viewer.locate_in_doc"],
+      },
+      canonicalGoalFrame: {
+        goal_kind: "locate_in_doc",
+        required_terminal_kind: "doc_location_matches",
+      },
+    });
+
+    expect(admission.admitted_tool_families).toEqual(
+      expect.arrayContaining(["docs_viewer", "calculator", "workstation_action"]),
+    );
+    expect(admission.forbidden_tool_families ?? []).not.toContain("calculator");
+
+    const availableCapabilities = {
+      schema: "helix.available_capabilities.v1",
+      capabilities: [
+        {
+          capability_key: "scientific-calculator.solve_expression",
+          requires_action: true,
+          availability: "available",
+          goal_fit: "primary",
+        },
+      ],
+      tool_admission_suppressed: true,
+      contextual_tool_suppression: {
+        suppression_reason: "quoted_or_contextual_tool_reference",
+        verb_or_cue: "on",
+        blocked_capability_keys: ["model.direct_answer"],
+        explicit_capability_override_keys: ["scientific-calculator.solve_expression"],
+      },
+    } as any;
+
+    const validation = __testHelixRuntimeToolCallValidation.validateHelixRuntimeToolCall({
+      availableCapabilities,
+      toolCallAdmissionDecision: admission,
+      call: {
+        schema: "helix.runtime_tool_call.v1",
+        turn_id: "ask:compound-runtime-admission",
+        call_id: "call:calculator",
+        capability_key: "scientific-calculator.solve_expression",
+        args: { latex: "19 + 23" },
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+
+    expect(validation.validation.errors).not.toContain("contextual_tool_reference_suppressed");
+    expect(validation.validation.errors).not.toContain(
+      "runtime_capability_family_forbidden_by_tool_policy:scientific-calculator.solve_expression:calculator",
+    );
+    expect(validation.validation.valid).toBe(true);
+  });
 });

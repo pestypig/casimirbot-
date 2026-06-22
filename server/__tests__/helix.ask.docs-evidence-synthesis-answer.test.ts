@@ -934,6 +934,110 @@ describe("Helix Ask docs evidence synthesis answer", () => {
     );
   });
 
+  it("accepts runtime compound doc-location support refs as docs synthesis coverage", () => {
+    const prompt =
+      "Use docs-viewer.locate_in_doc to find where docs/helix-ask-codex-loop-discipline.md says routes choose procedures, then call scientific-calculator.solve_expression for 19+23. Explain the connection from both observations.";
+    const docsRef = "doc-location:compound-runtime";
+    const calculatorRef = "calculator:compound-runtime";
+    const payload: Record<string, unknown> = synthesisPayload(prompt);
+    payload.compound_capability_synthesis_readiness = {
+      schema: "helix.compound_capability_synthesis_readiness.v1",
+      applies: true,
+      complete: true,
+      synthesis_required: true,
+      goal_kind: "doc_evidence_synthesis",
+      required_terminal_kind: "doc_evidence_synthesis_answer",
+      synthesis_terminal_kind: "doc_evidence_synthesis_answer",
+      support_refs: [docsRef, calculatorRef],
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    payload.compound_subgoal_rail_statuses = [
+      {
+        subgoal_id: "docs",
+        requested_capability: "docs-viewer.locate_in_doc",
+        runtime_capability: "docs-viewer.locate_in_doc",
+        selected_capability: "docs-viewer.locate_in_doc",
+        executed_capability: "docs-viewer.locate_in_doc",
+        observation_kind: "doc_location_matches",
+        observation_ref: docsRef,
+        satisfaction: "satisfied",
+        rail_status: "complete",
+      },
+      {
+        subgoal_id: "calculator",
+        requested_capability: "scientific-calculator.solve_expression",
+        runtime_capability: "scientific-calculator.solve_expression",
+        selected_capability: "scientific-calculator.solve_expression",
+        executed_capability: "scientific-calculator.solve_expression",
+        observation_kind: "calculator_receipt",
+        observation_ref: calculatorRef,
+        satisfaction: "satisfied",
+        rail_status: "complete",
+      },
+    ];
+    const location = {
+      artifact_id: docsRef,
+      turn_id: turnId,
+      kind: "doc_location_matches",
+      payload: {
+        schema: "helix.doc_location_matches.v1",
+        kind: "doc_location_matches",
+        query: "routes choose procedures",
+        source_path: "/docs/helix-ask-codex-loop-discipline.md",
+        matches: [
+          {
+            path: "/docs/helix-ask-codex-loop-discipline.md",
+            heading: "Turn-Chain Fundamentals",
+            snippet: "Routes choose procedures. Tools produce observations.",
+          },
+        ],
+        match_count: 1,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+    const finalDraft = {
+      artifact_id: "draft:compound-runtime",
+      turn_id: turnId,
+      kind: "final_answer_draft",
+      payload: {
+        schema: "helix.final_answer_draft.v1",
+        artifact_id: "draft:compound-runtime",
+        goal_kind: "doc_evidence_synthesis",
+        required_terminal_kind: "doc_evidence_synthesis_answer",
+        text: "The document observation identifies the rule-of-thumb section, and the calculator observation gives 42.",
+        support_refs: [docsRef, calculatorRef],
+        artifact_refs: [docsRef, calculatorRef],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+
+    const result = materializeDocEvidenceSynthesisAnswer({
+      turnId,
+      promptText: prompt,
+      payload,
+      artifactLedger: [location, finalDraft],
+      answerText: "The document observation identifies the rule-of-thumb section, and the calculator observation gives 42.",
+      finalAnswerDraftRef: "draft:compound-runtime",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.blocked_reason).not.toBe("doc_evidence_coverage_missing");
+    expect(result.coverage.observed_artifact_refs).toContain(docsRef);
+    expect(result.coverage.final_answer_draft_support_refs).toEqual(expect.arrayContaining([docsRef, calculatorRef]));
+    expect(result.answer?.terminal_artifact_kind).toBe("doc_evidence_synthesis_answer");
+    expect(result.answer?.source_docs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: "/docs/helix-ask-codex-loop-discipline.md",
+          evidence_refs: [docsRef],
+        }),
+      ]),
+    );
+  });
+
   it("materializes line-backed doc_location_matches with visible document evidence citations", () => {
     const prompt =
       "Use docs-viewer.locate_in_doc to find where docs/helix-ask-codex-loop-discipline.md says routes choose procedures. Answer only from the docs-viewer observation and cite the document evidence.";

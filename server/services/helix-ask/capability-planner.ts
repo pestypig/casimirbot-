@@ -776,7 +776,7 @@ export const buildCapabilityPlan = (input: {
     ...(phaseFilteredPlan.repaired ? { phase_repaired: true } : {}),
     ...(phaseFilteredPlan.violationReason ? { phase_violation_reason: phaseFilteredPlan.violationReason } : {}),
     ...(phaseFilteredPlan.phaseConstraint ? { phase_constraint: phaseFilteredPlan.phaseConstraint } : {}),
-    ...(contextualSuppression
+    ...(contextualSuppressionBlocksPlan
       ? {
           tool_admission_suppressed: true,
           suppression_reason: contextualSuppression.suppression_reason,
