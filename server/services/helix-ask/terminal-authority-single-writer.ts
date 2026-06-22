@@ -30,6 +30,7 @@ import { evaluateCalculatorToolAnswerSupport, routeMetadataIndicatesCalculator }
 import { synthesizeWorkstationToolAnswer } from "./workstation-answer-synthesizer";
 import { isWorkstationObservationTerminalKind } from "./tool-family-terminal-policy";
 import { applyCompoundTerminalPolicy, readCompoundTerminalPolicy } from "./compound-terminal-policy";
+import { resolveCompoundCapabilitySynthesisReadiness } from "./compound-capability-synthesis";
 
 type ArtifactLike = {
   artifact_id?: unknown;
@@ -2919,7 +2920,22 @@ export function applyHelixTerminalAuthoritySingleWriter(
         routeProductContract: readRecord(input.payload.route_product_contract),
         finalAnswerDraftRef: compoundPreferredDraftCandidate?.ref ?? undefined,
       });
-  const missingItineraryFamilies = attachItineraryExecutionState(input.payload, artifacts);
+  const rawMissingItineraryFamilies = attachItineraryExecutionState(input.payload, artifacts);
+  const compoundSynthesisReadiness = resolveCompoundCapabilitySynthesisReadiness({
+    payload: input.payload,
+    artifacts,
+  });
+  if (compoundSynthesisReadiness.applies) {
+    input.payload.compound_capability_synthesis_readiness = compoundSynthesisReadiness;
+    const debug = readRecord(input.payload.debug);
+    if (debug) {
+      debug.compound_capability_synthesis_readiness = compoundSynthesisReadiness;
+    }
+  }
+  const missingItineraryFamilies =
+    compoundSynthesisReadiness.applies === true && compoundSynthesisReadiness.complete === true
+      ? []
+      : rawMissingItineraryFamilies;
   const firstIncompleteCompoundSubgoalRailFailure = compoundCoverageFailedClosed
     ? readFirstIncompleteCompoundSubgoalRailFailure(input.payload)
     : null;
@@ -3021,6 +3037,9 @@ export function applyHelixTerminalAuthoritySingleWriter(
       materialization_ok: usableDraftMaterialization,
       materialization_blocked_reason: draftMaterializationBlockedReason,
       capability_itinerary_observation_missing_families: missingItineraryFamilies,
+      raw_capability_itinerary_observation_missing_families: rawMissingItineraryFamilies,
+      compound_synthesis_readiness_complete: compoundSynthesisReadiness.complete,
+      compound_synthesis_readiness_required_terminal_kind: compoundSynthesisReadiness.required_terminal_kind ?? null,
       compound_subgoal_support_refs_missing: compoundSubgoalDraftSupportMissing,
       compound_subgoal_missing_support_refs: compoundSubgoalDraftSupportCoverage.missing_observation_refs,
       stale_model_only_blocked_reason: materializedDraftRejectedForStaleObservation
