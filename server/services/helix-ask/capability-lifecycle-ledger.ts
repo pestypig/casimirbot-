@@ -195,15 +195,22 @@ export const buildCapabilityLifecycleLedger = (input: {
   const admitted =
     satisfiedWorkstationEvaluation ||
     Boolean(plan && (plan.admission_status === "admitted" || plan.admission_status === "needs_evidence"));
-  const resultObserved = satisfiedWorkstationEvaluation || Boolean(result) || (Boolean(plan) && hasExplicitNotRunReason(plan, result));
+  const mutatingWithoutOperator =
+    Boolean(plan?.mutating && plan.operator_command_required && !plan.operator_command_present);
+  const resultNotRun = result?.status === "not_run";
+  const admissibleExplicitNotRun =
+    !mutatingWithoutOperator &&
+    Boolean(plan) &&
+    hasExplicitNotRunReason(plan, result);
+  const resultObserved = satisfiedWorkstationEvaluation || Boolean(result && !resultNotRun) || admissibleExplicitNotRun;
   const validated =
     satisfiedWorkstationEvaluation ||
-    Boolean(result && (result.status === "succeeded" || result.status === "not_run" || (result.status === "partial" && result.evidence_refs.length > 0))) ||
-    (!result && Boolean(plan) && hasExplicitNotRunReason(plan, result));
+    Boolean(result && (result.status === "succeeded" || (result.status === "partial" && result.evidence_refs.length > 0))) ||
+    admissibleExplicitNotRun;
   const reentered =
     satisfiedWorkstationEvaluation ||
     Boolean(result?.reentered_solver) ||
-    (!result && Boolean(plan) && hasExplicitNotRunReason(plan, result));
+    admissibleExplicitNotRun;
   const terminalAllowed = terminalReceiptAllowed({
     terminalArtifactKind: input.terminalArtifactKind,
     plan,
@@ -214,7 +221,7 @@ export const buildCapabilityLifecycleLedger = (input: {
   if (dispatched && !plan && !satisfiedWorkstationEvaluation) failureCodes.push("capability_dispatched_without_admission");
   if (dispatched && plan && !admitted && !intentionallySuppressed) failureCodes.push("capability_dispatched_without_admission");
   if (plan && admitted && !dispatched && !resultObserved) failureCodes.push("capability_admitted_not_dispatched");
-  if (plan?.mutating && plan.operator_command_required && !plan.operator_command_present) failureCodes.push("mutating_capability_without_operator_command");
+  if (mutatingWithoutOperator) failureCodes.push("mutating_capability_without_operator_command");
   if (plan && !resultObserved) failureCodes.push("capability_result_missing");
   if (result && !validated) failureCodes.push("capability_result_unvalidated");
   if (result && (result.receipt_refs.length > 0 || result.evidence_refs.length > 0) && !result.reentered_solver) {
@@ -236,7 +243,7 @@ export const buildCapabilityLifecycleLedger = (input: {
         : plan && admitted && !resultObserved ? "capability_admitted_not_dispatched" : "no_action_dispatched",
     ),
     stage("adapter_acknowledged", dispatched ? receiptAcked(input.payload) ? "succeeded" : "failed" : "skipped", actionRefs, dispatched ? receiptAcked(input.payload) ? "adapter_acknowledgement_observed" : "adapter_acknowledgement_missing" : "no_action_dispatched"),
-    stage("result_observed", resultObserved ? "succeeded" : plan ? "failed" : "skipped", resultRefs(result).length ? resultRefs(result) : derivedWorkstationRefs, result ? "capability_result_present" : satisfiedWorkstationEvaluation ? "workstation_tool_evaluation_observed" : hasExplicitNotRunReason(plan, result) ? "explicit_not_run_reason_present" : "capability_result_missing"),
+    stage("result_observed", resultObserved ? "succeeded" : plan ? "failed" : "skipped", resultRefs(result).length ? resultRefs(result) : derivedWorkstationRefs, result ? "capability_result_present" : satisfiedWorkstationEvaluation ? "workstation_tool_evaluation_observed" : admissibleExplicitNotRun ? "explicit_not_run_reason_present" : "capability_result_missing"),
     stage("result_validated", validated ? "succeeded" : result ? "failed" : "skipped", resultRefs(result).length ? resultRefs(result) : derivedWorkstationRefs, validated ? "capability_result_validated_or_workstation_goal_satisfied" : "capability_result_unvalidated"),
     stage("reentered_solver", reentered ? "succeeded" : result ? "failed" : "skipped", resultRefs(result).length ? resultRefs(result) : derivedWorkstationRefs, reentered ? "capability_result_reentered_solver_or_workstation_goal_satisfied" : "capability_result_not_reentered"),
     stage("terminal_considered", terminalAllowed ? "succeeded" : "failed", [readString(input.terminalArtifactKind ?? input.payload.terminal_artifact_kind)], terminalAllowed ? "terminal_receipt_matches_canonical_goal_or_not_receipt" : "terminal_receipt_without_required_goal_kind"),

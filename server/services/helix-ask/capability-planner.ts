@@ -72,6 +72,18 @@ const hasOperatorCommand = (promptText: string): boolean => {
     /\b(?:and|then)\s+(?:click|press|tap|open|close|start|stop|set|change|update|run|repair|attach|select|choose|submit|use|solve|evaluate|compute|calculate|check|verify)\b/i.test(prompt);
 };
 
+const isAffirmativeAgentGoalSessionCommand = (promptText: string): boolean => {
+  const prompt = promptText.trim();
+  if (contextualCommandPattern.test(prompt)) return false;
+  if (/\b(?:write|draft|explain|describe|define)\b[\s\S]{0,80}\b(?:goal|goal\s+statement|project\s+goal)\b/i.test(prompt)) {
+    return false;
+  }
+  return (
+    /\blive_env\.start_agent_goal_session\b/i.test(prompt) ||
+    /\b(?:start|create|begin|set\s+up|setup|launch)\s+(?:an?\s+)?(?:agent\s+)?goal(?:\s+session)?\b[\s\S]{0,120}\b(?:objective|to|for|with\s+objective|work\s+until|monitor|track|refactor|implement|test|debug|fix|wire|build)\b/i.test(prompt)
+  );
+};
+
 const classifySourceFamily = (input: {
   promptText: string;
   sourceTarget: string;
@@ -584,6 +596,10 @@ export const buildCapabilityPlan = (input: {
   const requiresCapabilityCatalog =
     !hardLiveSourceMailboxRoute &&
     isAskCapabilityCatalogPrompt(input.promptText);
+  const requiresAgentGoalSessionSetup =
+    !hardLiveSourceMailboxRoute &&
+    !contextualToolSuppressionBlocksFamily(contextualSuppression, "live_environment") &&
+    isAffirmativeAgentGoalSessionCommand(input.promptText);
   const requiresDocsViewerEvidence =
     !hardLiveSourceMailboxRoute &&
     !contextualToolSuppressionBlocksFamily(contextualSuppression, "docs_viewer") &&
@@ -595,6 +611,7 @@ export const buildCapabilityPlan = (input: {
     (requestedCapabilityContract?.source_target ?? "") ||
     (requiresDocsViewerEvidence ? "docs_viewer" : "") ||
     (internetEvidenceDrivesPlan ? "internet_search" : "") ||
+    (requiresAgentGoalSessionSetup ? "live_environment" : "") ||
     (requiresCapabilityCatalog ? "runtime_evidence" : "") ||
     (requiresRepoConceptEvidence ? "repo_code" : "") ||
     sourceTargetIntentFallback ||
@@ -604,7 +621,10 @@ export const buildCapabilityPlan = (input: {
     (contextualSuppression ? "model_only" : "") ||
     "unknown";
   const targetKind = readString(sourceTargetIntent?.target_kind) || fallbackSourceTarget;
-  const admittedFamilies = readStringArray(toolCallAdmissionDecision?.admitted_tool_families);
+  const admittedFamilies = uniqueStrings([
+    ...readStringArray(toolCallAdmissionDecision?.admitted_tool_families),
+    ...(requiresAgentGoalSessionSetup ? ["live_environment"] : []),
+  ]);
   const originalCanonicalGoalKind = readString(canonicalGoalFrame?.goal_kind);
   const classifiedFamily = classifySourceFamily({
     promptText: input.promptText,
@@ -616,6 +636,8 @@ export const buildCapabilityPlan = (input: {
     ? "live_environment"
     : requiresCapabilityCatalog
     ? "capability_catalog"
+    : requiresAgentGoalSessionSetup
+    ? "live_environment"
     : requestedCapabilityContract
     ? requestedCapabilityContract.plan_family
     : requiresDocsViewerEvidence
@@ -633,6 +655,8 @@ export const buildCapabilityPlan = (input: {
     ? "repo_concept_explanation"
     : requiresCapabilityCatalog
     ? "capability_help"
+    : requiresAgentGoalSessionSetup
+      ? "workstation_goal_context"
     : requiresDocsViewerEvidence
       ? "doc_open_best"
     : internetEvidenceDrivesPlan
@@ -642,6 +666,8 @@ export const buildCapabilityPlan = (input: {
     ? "repo_code_evidence_answer"
     : requiresCapabilityCatalog
       ? "capability_help_summary"
+    : requiresAgentGoalSessionSetup
+      ? "workstation_tool_evaluation"
     : internetEvidenceDrivesPlan
       ? "internet_search_answer"
       : readString(canonicalGoalFrame?.required_terminal_kind) || null;
@@ -671,6 +697,9 @@ export const buildCapabilityPlan = (input: {
       sourceTarget === "model_only" ||
       contextualSuppressionBlocksCapabilityFamily(contextualSuppression, family)
     );
+  const effectiveRequestedCapabilityContract = contextualSuppressionBlocksPlan
+    ? null
+    : requestedCapabilityContract;
   const compoundCapabilityContract = contextualSuppressionBlocksPlan
     ? null
     : buildHelixCompoundCapabilityContract({
@@ -690,8 +719,10 @@ export const buildCapabilityPlan = (input: {
       )
     : contextualSuppressionBlocksPlan
       ? "suppressed_contextual_tool_reference"
-    : requestedCapabilityContract
-      ? requestedCapabilityContract.runtime_capability ?? requestedCapabilityContract.capability
+    : requiresAgentGoalSessionSetup
+      ? "live_env.start_agent_goal_session"
+    : effectiveRequestedCapabilityContract
+      ? effectiveRequestedCapabilityContract.runtime_capability ?? effectiveRequestedCapabilityContract.capability
     : family === "live_source" &&
       rules.includes("do_not_change_cadence_without_affirmative_operator_command")
         ? "inspect_live_source"
@@ -712,6 +743,10 @@ export const buildCapabilityPlan = (input: {
   const requestedAction = phaseFilteredPlan.requestedAction;
   const operatorCommandPresent =
     hasOperatorCommand(input.promptText) ||
+    (
+      requestedAction === "live_env.start_agent_goal_session" &&
+      isAffirmativeAgentGoalSessionCommand(input.promptText)
+    ) ||
     (
       canonicalGoalKind === "panel_control" &&
       /\b(?:open|close|show|bring\s+up|pull\s+up|switch\s+to|focus)\b/i.test(input.promptText)
@@ -743,14 +778,14 @@ export const buildCapabilityPlan = (input: {
     turn_id: input.turnId,
     capability_family: family,
     requested_action: requestedAction,
-    ...(requestedCapabilityContract
+    ...(effectiveRequestedCapabilityContract
       ? {
-          requested_capability: requestedCapabilityContract.capability,
+          requested_capability: effectiveRequestedCapabilityContract.capability,
           requested_capability_source:
             readString(toolCallAdmissionDecision?.requested_capability_source) || "explicit_user_command",
-          requested_capability_contract_ref: requestedCapabilityContract.schema,
+          requested_capability_contract_ref: effectiveRequestedCapabilityContract.schema,
           requested_selected_match: explicitCapabilityMatches(
-            requestedCapabilityContract.capability,
+            effectiveRequestedCapabilityContract.capability,
             phaseFilteredPlan.selectedCapability,
           ),
         }

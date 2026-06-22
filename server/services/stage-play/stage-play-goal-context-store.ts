@@ -389,6 +389,56 @@ export function upsertStagePlayAgentGoalSession(session: AgentGoalSessionV1): Ag
   return session;
 }
 
+export function updateStagePlayAgentGoalSession(input: {
+  threadId?: string | null;
+  goalId: string;
+  status?: AgentGoalSessionV1["status"];
+  objectiveText?: string | null;
+  checkpoint?: {
+    summary?: string | null;
+    evidenceRefs?: string[];
+    actionsTaken?: string[];
+    nextStep?: AgentGoalSessionV1["checkpoints"][number]["nextStep"];
+  };
+  nowMs?: number;
+}): AgentGoalSessionV1 | null {
+  const goalId = normalize(input.goalId);
+  if (!goalId) return null;
+  const existing = sessionsById.get(goalId);
+  if (!existing || (input.threadId && existing.threadId !== input.threadId)) return null;
+  const nowMs = input.nowMs ?? Date.now();
+  const objectiveText = normalize(input.objectiveText) ?? existing.objective;
+  const checkpointSummary =
+    normalize(input.checkpoint?.summary) ??
+    `Goal session ${input.status && input.status !== existing.status ? `status changed to ${input.status}` : "updated"}.`;
+  const checkpointActions = uniqueStrings([
+    ...(input.checkpoint?.actionsTaken ?? []),
+    input.status && input.status !== existing.status ? `set_goal_status:${input.status}` : "update_goal_session",
+    objectiveText !== existing.objective ? "edit_goal_objective" : null,
+  ]).slice(0, 12);
+  return upsertStagePlayAgentGoalSession({
+    ...existing,
+    objective: objectiveText,
+    userVisibleSummary: previewText(objectiveText, 120),
+    status: input.status ?? existing.status,
+    checkpoints: [
+      ...existing.checkpoints,
+      {
+        checkpointId: `stage_play_goal_checkpoint:${hashShort([goalId, nowMs, checkpointSummary], 12)}`,
+        createdAtMs: nowMs,
+        summary: checkpointSummary,
+        evidenceRefs: uniqueStrings([
+          ...(input.checkpoint?.evidenceRefs ?? []),
+          ...existing.sourceRefs.slice(0, 12),
+          ...existing.loopRefs.slice(0, 12),
+        ]).slice(0, 24),
+        actionsTaken: checkpointActions,
+        nextStep: input.checkpoint?.nextStep ?? (input.status === "satisfied" ? "report" : input.status === "stopped" ? "stop" : "continue"),
+      },
+    ].slice(-20),
+  });
+}
+
 export function listStagePlayAgentGoalSessions(input: {
   threadId?: string | null;
   goalId?: string | null;

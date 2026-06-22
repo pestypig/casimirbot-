@@ -24,6 +24,12 @@ const unique = (values: Array<string | null | undefined>): string[] =>
 export const capabilityPlanId = (plan: HelixCapabilityPlan): string =>
   `capability_plan:${plan.turn_id}:${plan.capability_family}:${plan.requested_action}`;
 
+const isSyntheticPresentationOrPreflightRef = (ref: string): boolean =>
+  /ask_turn_preflight_context|terminal_presentation|receipt_presentation_snapshot/i.test(ref);
+
+const capabilityEvidenceRefs = (refs: string[]): string[] =>
+  unique(refs).filter((ref) => !isSyntheticPresentationOrPreflightRef(ref));
+
 const isReceiptKind = (kind: string): boolean => /receipt|tool_evaluation|workstation_tool_evaluation/i.test(kind);
 
 const isEvidenceKind = (kind: string): boolean =>
@@ -83,11 +89,11 @@ export const buildCapabilityResultGate = (input: {
   explicitReceiptRefs?: string[];
 }): HelixCapabilityResult => {
   const collected = collectRefs(input.currentTurnArtifacts ?? []);
-  const receiptRefs = unique([
+  const receiptRefs = capabilityEvidenceRefs([
     ...collected.receiptRefs,
     ...(input.explicitReceiptRefs ?? []),
   ]);
-  const evidenceRefs = unique([
+  const evidenceRefs = capabilityEvidenceRefs([
     ...collected.evidenceRefs,
     ...(input.explicitEvidenceRefs ?? []),
   ]);

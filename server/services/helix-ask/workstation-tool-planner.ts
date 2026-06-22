@@ -1735,9 +1735,13 @@ function buildWatchJobAutomationPlan(
 function wantsStartAgentGoalSession(prompt: string): boolean {
   const contextPrompt = prompt.replace(/\bobjective\s*=\s*["'`][^"'`]+["'`]/gi, "objective=<objective>");
   if (hasContextualWorkstationGoalContextCue(contextPrompt)) return false;
+  if (/\b(?:write|draft|explain|describe|define)\b[\s\S]{0,80}\b(?:goal|goal\s+statement|project\s+goal)\b/i.test(prompt)) {
+    return false;
+  }
   return (
     /\blive_env\.start_agent_goal_session\b/i.test(prompt) ||
     /\b(?:start|create|open|begin|set\s+up|setup|launch|track|monitor)\b[\s\S]{0,160}\b(?:agent\s+goal\s+session|goal\s+session|durable\s+goal|goal-directed\s+(?:monitor|session)|standing\s+agent\s+goal|agent\s+objective)\b/i.test(prompt) ||
+    /\b(?:start|create|begin|set\s+up|setup|launch)\s+(?:an?\s+)?(?:agent\s+)?goal\b[\s\S]{0,120}\b(?:to|for|objective|with\s+objective|work\s+until|monitor|track|refactor|implement|test|debug|fix|wire|build)\b/i.test(prompt) ||
     /\b(?:monitor|keep\s+(?:watching|checking|tracking)|continue\s+(?:watching|checking|tracking))\b[\s\S]{0,180}\b(?:goal\s+context|trace\s+memory|packet\s+traces?|live\s+source|visual\s+capture|audio\s+capture|translation|micro[-\s]?deck)\b/i.test(prompt)
   );
 }

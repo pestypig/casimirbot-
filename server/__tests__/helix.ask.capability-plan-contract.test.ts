@@ -3,6 +3,7 @@ import { buildCapabilityPlan } from "../services/helix-ask/capability-planner";
 import { buildCapabilityResultGate } from "../services/helix-ask/capability-result-gate";
 import { buildToolCallAdmissionDecision } from "../services/helix-ask/tool-call-admission";
 import { isAskCapabilityCatalogPrompt } from "../services/helix-ask/capability-catalog-intent";
+import { detectRepoCodeEvidenceIntent } from "../services/helix-ask/repo-code-intent-detector";
 
 const baseSourceTarget = (target_source: string, target_kind = target_source) => ({
   schema: "helix.ask_source_target_intent.v1",
@@ -335,6 +336,8 @@ describe("Helix capability plan contract", () => {
       "Can you show what capabilities this agent can access?",
       "What tool calls can you see to make as the agent?",
       "What tool calls are visible to you as the agent right now?",
+      "What about the live answer tool call goals?",
+      "What live answer tool call goals are available to the agent?",
       "Which capabilities are available to you in this Ask turn?",
     ]) {
       const admission = buildToolCallAdmissionDecision({
@@ -383,10 +386,74 @@ describe("Helix capability plan contract", () => {
     }
   });
 
+  it("lets live-answer tool-goal catalog prompts dominate stale repo-code route metadata", () => {
+    const promptText = "What about the live answer tool call goals?";
+
+    expect(isAskCapabilityCatalogPrompt(promptText)).toBe(true);
+    expect(detectRepoCodeEvidenceIntent(promptText)).toMatchObject({
+      repoEvidenceRequested: false,
+      strength: "none",
+      reasons: expect.arrayContaining(["capability_catalog_prompt_not_repo_code"]),
+    });
+
+    const admission = buildToolCallAdmissionDecision({
+      turnId: "ask:live-answer-tool-goals",
+      promptText,
+      sourceTargetIntent: {
+        ...baseSourceTarget("repo_code", "repo_code"),
+        explicit_cues: ["project_local_agent_loop"],
+        reasons: ["project_local_agent_loop"],
+        requested_outputs: ["repo_code", "tool_call_eligibility"],
+      },
+      canonicalGoalFrame: canonicalGoal("capability_help", "capability_help_summary"),
+    });
+
+    expect(admission).toMatchObject({
+      source_target: "runtime_evidence",
+      admitted_tool_families: expect.arrayContaining(["capability_catalog", "runtime_evidence"]),
+      reason: expect.stringContaining("capability_catalog_prompt_requires_runtime_catalog_observation"),
+    });
+    expect(admission.admitted_tool_families).not.toContain("repo_code");
+
+    const plan = buildCapabilityPlan({
+      turnId: "ask:live-answer-tool-goals",
+      promptText,
+      sourceTargetIntent: {
+        ...baseSourceTarget("repo_code", "repo_code"),
+        explicit_cues: ["project_local_agent_loop"],
+        reasons: ["project_local_agent_loop"],
+        requested_outputs: ["repo_code", "tool_call_eligibility"],
+      },
+      toolCallAdmissionDecision: admission,
+      canonicalGoalFrame: canonicalGoal("capability_help", "capability_help_summary"),
+    });
+
+    expect(plan).toMatchObject({
+      capability_family: "capability_catalog",
+      requested_action: "helix_ask.inspect_capability_catalog",
+      selected_capability: "helix_ask.inspect_capability_catalog",
+      source_target: "runtime_evidence",
+      goal_kind: "capability_help",
+      required_terminal_kind: "capability_help_summary",
+    });
+  });
+
+  it("preserves explicit repo-code routing for implementation questions about live-answer tool goals", () => {
+    const promptText = "Where in the repo is the live answer tool call goal implemented? Cite file paths.";
+
+    expect(isAskCapabilityCatalogPrompt(promptText)).toBe(false);
+    expect(detectRepoCodeEvidenceIntent(promptText)).toMatchObject({
+      repoEvidenceRequested: true,
+      strength: "hard",
+      reasons: expect.arrayContaining(["repo_location_phrase"]),
+    });
+  });
+
   it("does not execute capability catalog routing from contextual tool availability mentions", () => {
     const contextualPrompts = [
       'The document says "what tools are available for the helix ask to use"; summarize that label.',
       'The UI label says "what tool calls can you see as the agent"; summarize that phrase.',
+      'The document says "what about the live answer tool call goals"; summarize that label.',
       'Explain the phrase "what tools are available for the helix ask to use" without inspecting the runtime catalog.',
       "Could we ask what tools Helix Ask can use later?",
       "Could we ask what tool calls are visible to you as the agent later?",
@@ -1208,6 +1275,30 @@ describe("Helix capability plan contract", () => {
     });
   });
 
+  it("routes natural prompt-only goal creation to the agent goal-session capability", () => {
+    const plan = buildCapabilityPlan({
+      turnId: "ask:natural-goal-session",
+      promptText:
+        "Create a goal to refactor the goal-session UI so it supports pause, resume, edit, archive, and expanded details. Work until tests pass.",
+      sourceTargetIntent: baseSourceTarget("unknown", "unknown"),
+      toolCallAdmissionDecision: toolAdmission("unknown", []),
+      canonicalGoalFrame: canonicalGoal("model_only_concept", "direct_answer_text"),
+    });
+
+    expect(plan).toMatchObject({
+      capability_family: "live_environment",
+      source_target: "live_environment",
+      requested_action: "live_env.start_agent_goal_session",
+      selected_capability: "live_env.start_agent_goal_session",
+      goal_kind: "workstation_goal_context",
+      required_terminal_kind: "workstation_tool_evaluation",
+      mutating: true,
+      operator_command_required: true,
+      operator_command_present: true,
+      admission_status: "needs_evidence",
+    });
+  });
+
   it("suppresses contextual narrator capability mentions instead of admitting voice control", () => {
     const plan = buildCapabilityPlan({
       turnId: "ask:narrator-contextual-reference",
@@ -1503,10 +1594,39 @@ describe("Helix capability plan contract", () => {
       required_terminal_kind: "direct_answer_text",
       tool_admission_suppressed: true,
     });
+    expect(plan).not.toHaveProperty("requested_capability");
+    expect(plan).not.toHaveProperty("requested_capability_contract_ref");
     expect(plan.capability_contract_arbitration).toMatchObject({
       contract_state: "suppressed_contextual_reference",
       route_metadata_demoted: true,
       demotion_reason: "contextual_tool_reference_demoted_route_metadata",
+    });
+  });
+
+  it("does not mirror calculator as requested capability for negated receipt explanations", () => {
+    const plan = buildCapabilityPlan({
+      turnId: "ask:negated-calculator-receipts-explanation",
+      promptText: "Do not call tools; explain why calculator receipts are observations, not answers.",
+      sourceTargetIntent: baseSourceTarget("calculator_stream", "calculator_stream"),
+      toolCallAdmissionDecision: toolAdmission("calculator_stream", ["calculator", "workstation_action"]),
+      canonicalGoalFrame: canonicalGoal("calculator_solve", "workstation_tool_evaluation"),
+    });
+
+    expect(plan).toMatchObject({
+      capability_family: "debug_export",
+      source_target: "model_only",
+      requested_action: "suppressed_contextual_tool_reference",
+      selected_capability: "suppressed_contextual_tool_reference",
+      goal_kind: "model_only_concept",
+      required_terminal_kind: "direct_answer_text",
+      tool_admission_suppressed: true,
+      suppression_reason: "negated_tool_instruction",
+    });
+    expect(plan).not.toHaveProperty("requested_capability");
+    expect(plan.capability_contract_arbitration).toMatchObject({
+      contract_state: "suppressed_contextual_reference",
+      requested_capability: null,
+      required_terminal_kind: "direct_answer_text",
     });
   });
 

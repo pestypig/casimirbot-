@@ -17,6 +17,9 @@ import type {
 import type {
   Nhm2TileSourcePhysicalValidationPlanV1,
 } from "./nhm2-tile-source-physical-validation-plan.v1";
+import type {
+  Nhm2SourceSideSameBasisTensorAuthorityArtifactV1,
+} from "./nhm2-source-side-same-basis-tensor-authority.v1";
 
 export const NHM2_TILE_SOURCE_EXPERIMENTAL_CAMPAIGN_PACKAGE_CONTRACT_VERSION =
   "nhm2_tile_source_experimental_campaign_package/v1" as const;
@@ -53,6 +56,23 @@ export type Nhm2TileSourceExperimentalCampaignObjectiveCoverageV1 = {
   unlocks: string[];
 };
 
+export type Nhm2TileSourceExperimentalCampaignMeasurementStatusV1 = {
+  measurementId: string;
+  evidenceArtifact: string;
+  status: "missing" | "pass" | "fail" | "review";
+  currentMargin: number | boolean | null;
+  requiredCorrectionValue:
+    Nhm2TileSourceEvidenceGapRoadmapItemV1["decisiveMeasurements"][number]["requiredCorrectionValue"];
+  goCriterion: string;
+  noGoCriterion: string;
+};
+
+export type Nhm2TileSourceExperimentalCampaignTargetValueStatusV1 =
+  | "available"
+  | "not_applicable"
+  | "derived_target_pending"
+  | "target_not_declared";
+
 export type Nhm2TileSourceExperimentalCampaignPackageItemV1 = {
   rank: number;
   campaignDomain: Nhm2TileSourceExperimentalCampaignDomainV1;
@@ -65,19 +85,96 @@ export type Nhm2TileSourceExperimentalCampaignPackageItemV1 = {
   measurementTargetSummary: string;
   falsificationRule: string;
   decisiveMeasurements: Nhm2TileSourceEvidenceGapRoadmapItemV1["decisiveMeasurements"];
-  measurementStatuses: Array<{
-    measurementId: string;
-    evidenceArtifact: string;
-    status: "missing" | "pass" | "fail" | "review";
-    currentMargin: number | boolean | null;
-    requiredCorrectionValue: number | boolean | null;
-    goCriterion: string;
-    noGoCriterion: string;
-  }>;
+  measurementStatuses: Nhm2TileSourceExperimentalCampaignMeasurementStatusV1[];
   prevents: string[];
   evidenceRefs: string[];
   status: "ready_for_receipt" | "falsifying" | "blocked_by_downstream" | "satisfied";
   blocksCampaignPass: true;
+};
+
+export type Nhm2TileSourceExperimentalCampaignMeasurementDocketEntryV1 = {
+  docketRank: number;
+  campaignDomain: Nhm2TileSourceExperimentalCampaignDomainV1;
+  sourceFrontierRank: number;
+  measurementId: string;
+  quantity: string;
+  target: string;
+  unit: string | null;
+  evidenceArtifact: string;
+  status: "missing" | "pass" | "fail" | "review";
+  currentMargin: number | boolean | null;
+  requiredCorrectionKey: string | null;
+  requiredCorrectionValue:
+    Nhm2TileSourceEvidenceGapRoadmapItemV1["decisiveMeasurements"][number]["requiredCorrectionValue"];
+  requiredTargetKey: string | null;
+  requiredTargetValue: Nhm2TileSourceFrontierResolutionItemV1["requiredCorrections"][string] | null;
+  requiredTargetStatus: Nhm2TileSourceExperimentalCampaignTargetValueStatusV1;
+  requiredTargetGapReason: string | null;
+  goCriterion: string;
+  noGoCriterion: string;
+  falsificationConsequence: string;
+  firstBlocker: string;
+  blockerIds: string[];
+  nextEvidenceArtifact: string;
+  prevents: string[];
+  blocksCampaignPass: true;
+};
+
+export type Nhm2TileSourceExperimentalCampaignDomainLedgerEntryV1 = {
+  campaignDomain: Nhm2TileSourceExperimentalCampaignDomainV1;
+  decision: "go" | "review" | "no_go";
+  evidenceState:
+    | "ready"
+    | "missing_receipt"
+    | "failing_margin"
+    | "source_authority_blocked"
+    | "downstream_blocked"
+    | "operating_budget_blocked"
+    | "open_review";
+  firstBlocker: string;
+  blockerIds: string[];
+  blockerCount: number;
+  falsifyingBlockerCount: number;
+  minimumNumericalMargin: number | null;
+  evidenceTarget: string;
+  nextRequiredChange: string;
+  nextEvidenceArtifact: string;
+  requiredCorrectionKeys: string[];
+  requiredCorrections: Nhm2TileSourceFrontierResolutionItemV1["requiredCorrections"];
+  decisiveMeasurementIds: string[];
+  decisiveMeasurementStatuses: Nhm2TileSourceExperimentalCampaignMeasurementStatusV1[];
+  prevents: string[];
+  blocksCampaignPass: boolean;
+};
+
+export type Nhm2TileSourceExperimentalCampaignReceiptAcquisitionEntryV1 = {
+  campaignDomain: Nhm2TileSourceExperimentalCampaignDomainV1;
+  acquisitionStatus:
+    | "ready"
+    | "missing_receipt"
+    | "failing_margin"
+    | "source_authority_blocked"
+    | "downstream_blocked"
+    | "operating_budget_blocked"
+    | "open_review";
+  decision: "go" | "review" | "no_go";
+  firstBlocker: string;
+  nextEvidenceArtifact: string;
+  requiredEvidenceArtifacts: string[];
+  blockerIds: string[];
+  measurementIds: string[];
+  openMeasurementIds: string[];
+  requiredTargetAvailableCount: number;
+  requiredTargetPendingCount: number;
+  requiredTargetNotApplicableCount: number;
+  requiredTargetNotDeclaredCount: number;
+  pendingTargetGaps: Array<{
+    measurementId: string;
+    requiredTargetKey: string;
+    requiredTargetGapReason: string;
+  }>;
+  prevents: string[];
+  blocksCampaignPass: boolean;
 };
 
 export type Nhm2TileSourceExperimentalCampaignPackageV1 = {
@@ -90,11 +187,16 @@ export type Nhm2TileSourceExperimentalCampaignPackageV1 = {
     materialEvidenceReceiptsRef: string | null;
     physicalValidationPlanRef: string | null;
     evidenceGapRoadmapRef: string | null;
+    operatingBudgetReadinessRef: string | null;
     falsificationReportRef: string | null;
     authorityHandoffRef: string | null;
+    sourceSideSameBasisTensorAuthorityRef: string | null;
   };
   currentBlocker: Nhm2TileSourceFalsificationCurrentBlockerV1;
   objectiveCoverage: Nhm2TileSourceExperimentalCampaignObjectiveCoverageV1[];
+  measurementDocket: Nhm2TileSourceExperimentalCampaignMeasurementDocketEntryV1[];
+  campaignDomainLedger: Nhm2TileSourceExperimentalCampaignDomainLedgerEntryV1[];
+  receiptAcquisitionLedger: Nhm2TileSourceExperimentalCampaignReceiptAcquisitionEntryV1[];
   campaignItems: Nhm2TileSourceExperimentalCampaignPackageItemV1[];
   summary: {
     packageStatus:
@@ -105,6 +207,11 @@ export type Nhm2TileSourceExperimentalCampaignPackageV1 = {
     firstCampaignDomain: Nhm2TileSourceExperimentalCampaignDomainV1 | "none";
     firstBlocker: string;
     measurementCount: number;
+    measurementDocketCount: number;
+    requiredTargetAvailableCount: number;
+    requiredTargetPendingCount: number;
+    requiredTargetNotApplicableCount: number;
+    requiredTargetNotDeclaredCount: number;
     missingMeasurementCount: number;
     failingMeasurementCount: number;
     passingMeasurementCount: number;
@@ -113,12 +220,27 @@ export type Nhm2TileSourceExperimentalCampaignPackageV1 = {
     failingReceiptCount: number;
     operatingBudgetBlockerCount: number;
     objectiveCoverageCount: number;
+    campaignDomainLedgerCount: number;
+    receiptAcquisitionDomainCount: number;
+    receiptArtifactRequirementCount: number;
+    domainsWithPendingDerivedTargetsCount: number;
+    targetGapMeasurementCount: number;
+    missingReceiptDomainCount: number;
+    failingMarginDomainCount: number;
+    sourceAuthorityBlockedDomainCount: number;
+    downstreamBlockedDomainCount: number;
+    operatingBudgetBlockedDomainCount: number;
+    noGoDomainCount: number;
+    reviewDomainCount: number;
+    goDomainCount: number;
     openObjectiveCount: number;
     falsifyingObjectiveCount: number;
     satisfiedObjectiveCount: number;
     allObjectiveCoveragePresent: boolean;
     allEvidenceObjectivesSatisfied: boolean;
     handoffReadyForSameBasisAuthority: boolean;
+    sourceSideAuthorityAvailable: boolean;
+    sourceSideAuthorityReady: boolean | null;
     physicalViabilityClaimAllowed: false;
     transportClaimAllowed: false;
     propulsionClaimAllowed: false;
@@ -151,6 +273,8 @@ export type BuildNhm2TileSourceExperimentalCampaignPackageInput = {
   evidenceGapRoadmapRef?: string | null;
   falsificationReportRef?: string | null;
   authorityHandoffRef?: string | null;
+  sourceSideSameBasisTensorAuthority?: Nhm2SourceSideSameBasisTensorAuthorityArtifactV1 | null;
+  sourceSideSameBasisTensorAuthorityRef?: string | null;
   maxItems?: number | null;
 };
 
@@ -204,6 +328,263 @@ const measurementStatusesForItem = (
     noGoCriterion: measurement.noGoCriterion,
   }));
 };
+
+const correctionValueForMeasurement = (
+  item: Nhm2TileSourceFrontierResolutionItemV1,
+  measurement: Nhm2TileSourceEvidenceGapRoadmapItemV1["decisiveMeasurements"][number],
+): Nhm2TileSourceEvidenceGapRoadmapItemV1["decisiveMeasurements"][number]["requiredCorrectionValue"] => {
+  if (measurement.requiredCorrectionValue != null || measurement.requiredCorrectionKey == null) {
+    return measurement.requiredCorrectionValue;
+  }
+  const directValue = item.requiredCorrections[measurement.requiredCorrectionKey];
+  if (directValue !== undefined) return directValue;
+  const suffixMatch = Object.entries(item.requiredCorrections).find(([key]) =>
+    key.endsWith(`.${measurement.requiredCorrectionKey}`),
+  );
+  return suffixMatch?.[1] ?? null;
+};
+
+const REQUIRED_TARGET_KEY_BY_CORRECTION_KEY: Record<string, string> = {
+  activeGapControlAuthorityShortfallN: "activeGapControlAuthorityMinN",
+  activeAreaRetentionShortfall: "activeAreaRetentionMin",
+  actuatorAuthorityShortfallN: "gapControlAuthorityMinN",
+  asperityMaxReductionMeters: "asperityMaxMeters",
+  asperityP999ReductionMeters: "asperityP999MaxMeters",
+  asperityP99ReductionMeters: "asperityP99MaxMeters",
+  bandwidthShortfallHz: "bandwidthMinHz",
+  componentGroupMissingCount: "requiredComponentGroupCount",
+  componentGroupRefMissingCount: "requiredComponentGroupCount",
+  componentCoverageFractionShortfall: "componentCoverageFractionMin",
+  conductivityTemperatureReductionK: "materialResponseTemperatureK",
+  controllerGainMarginShortfallDb: "controllerGainMarginMinDb",
+  controllerPhaseMarginShortfallDegrees: "controllerPhaseMarginMinDegrees",
+  couponCycleCountShortfall: "couponRequiredCycleCount",
+  creepDriftReduction: "creepDriftFractionMax",
+  cryogenicTemperatureReductionK: "operatingTemperatureK",
+  cycleCountShortfall: "cycleCountRequired",
+  dielectricTemperatureReductionK: "materialResponseTemperatureK",
+  delaminationMarginShortfall: "delaminationMarginMin",
+  effectiveActiveLayerCountShortfall: "effectiveActiveLayerCountMin",
+  effectiveSourceTensorLayerCountShortfall: "effectiveSourceTensorLayerCountMin",
+  electromagneticCouplingFractionReduction: "electromagneticCouplingFractionMax",
+  energyPerCycleReductionJ: "energyPerCycleHeatLimitedMaxJ",
+  fabricationToleranceReductionMeters: "fabricationToleranceMaxMeters",
+  fractureOrYieldStressShortfallPa: "requiredFractureOrYieldStressPa",
+  gapClearanceShortfallMeters: "minimumGapClearanceRequiredMeters",
+  gapControlAuthorityShortfallN: "gapControlAuthorityMinN",
+  gapNoiseRmsReductionMeters: "gapNoiseRmsMaxMeters",
+  heatLoadShortfallW: "heatLoadMinW",
+  heatSinkCapacityShortfallW: "heatSinkCapacityMinW",
+  interlayerAdhesionMarginShortfall: "interlayerAdhesionMarginMin",
+  layerNonadditivityReduction: "layerNonadditivityFractionMax",
+  layerScalingEfficiencyShortfall: "layerScalingEfficiencyMin",
+  materialResponseFrequencyAbsDeltaHz: "materialResponseFrequencyHz",
+  mechanicalCouplingFractionReduction: "mechanicalCouplingFractionMax",
+  missingCampaignCompatibilityRefCount: "requiredCampaignCompatibilityRefCount",
+  missingCurveAndMapRefCount: "requiredCurveAndMapRefCount",
+  missingFailureModeCount: "requiredFailureModeCount",
+  missingFatigueProvenanceRefCount: "requiredFatigueProvenanceRefCount",
+  missingLayerScalingProvenanceRefCount: "requiredLayerScalingProvenanceRefCount",
+  missingMaterialResponseRefCount: "requiredMaterialResponseRefCount",
+  missingTraceRefCount: "requiredTraceRefCount",
+  patchVoltageDerivedElectrostaticFractionReduction:
+    "patchVoltageDerivedElectrostaticFractionMax",
+  patchVoltageReductionVolts: "patchVoltageRmsMaxVolts",
+  perLayerVariationReduction: "perLayerVariationFractionMax",
+  phaseNoiseReductionSeconds: "phaseNoiseMaxSeconds",
+  regionCoverageMissingCount: "requiredRegionCount",
+  regionalCoverageFractionShortfall: "requiredCoverageFraction",
+  regionalSupportRefMissingCount: "requiredRegionCount",
+  residualElectrostaticForceFractionReduction: "residualElectrostaticForceFractionMax",
+  residualElectrostaticForceReductionN: "residualElectrostaticForceMaxN",
+  roughnessMapResolutionReductionMeters: "roughnessMapLateralResolutionMaxMeters",
+  roughnessRmsReductionMeters: "roughnessRmsMaxMeters",
+  roughnessScanAreaFractionShortfall: "roughnessScanAreaFractionMin",
+  springConstantShortfallNPerM: "springConstantMinNPerM",
+  stictionMarginShortfall: "stictionMarginMin",
+  sourceTensorRetentionFractionShortfall: "sourceTensorRetentionFractionMin",
+  stressEnergyTermMissingCount: "requiredStressEnergyTermCount",
+  stressEnergyTermRefMissingCount: "requiredStressEnergyTermCount",
+  supportCouplingFractionReduction: "supportCouplingFractionMax",
+  switchingRateAbsDeltaHz: "switchingRateTargetHz",
+  tensorComponentRefMissingCount: "requiredTensorComponentCount",
+  tensileStressShortfallPa: "tensileStressMinPa",
+  termCoverageFractionShortfall: "requiredCoverageFraction",
+  thermalCycleDriftReduction: "thermalCycleDriftFractionMax",
+  timingJitterReductionSeconds: "timingJitterMaxSeconds",
+};
+
+const valueFromCorrections = (
+  requiredCorrections: Nhm2TileSourceFrontierResolutionItemV1["requiredCorrections"],
+  key: string,
+): Nhm2TileSourceFrontierResolutionItemV1["requiredCorrections"][string] | null => {
+  const directValue = requiredCorrections[key];
+  if (directValue !== undefined) return directValue;
+  const suffixMatch = Object.entries(requiredCorrections).find(([candidate]) =>
+    candidate.endsWith(`.${key}`),
+  );
+  return suffixMatch?.[1] ?? null;
+};
+
+const requiredTargetForMeasurement = (
+  item: Nhm2TileSourceFrontierResolutionItemV1,
+  measurement: Nhm2TileSourceEvidenceGapRoadmapItemV1["decisiveMeasurements"][number],
+): {
+  requiredTargetKey: string | null;
+  requiredTargetValue: Nhm2TileSourceFrontierResolutionItemV1["requiredCorrections"][string] | null;
+  requiredTargetStatus: Nhm2TileSourceExperimentalCampaignTargetValueStatusV1;
+  requiredTargetGapReason: string | null;
+} => {
+  if (measurement.requiredCorrectionKey == null) {
+    return {
+      requiredTargetKey: null,
+      requiredTargetValue: null,
+      requiredTargetStatus: "not_applicable",
+      requiredTargetGapReason: null,
+    };
+  }
+  const requiredTargetKey =
+    REQUIRED_TARGET_KEY_BY_CORRECTION_KEY[measurement.requiredCorrectionKey] ??
+    measurement.requiredCorrectionKey;
+  const requiredTargetValue = valueFromCorrections(item.requiredCorrections, requiredTargetKey);
+  const requiredTargetStatus =
+    requiredTargetValue != null
+      ? "available"
+      : requiredTargetKey !== measurement.requiredCorrectionKey
+        ? "derived_target_pending"
+        : "target_not_declared";
+  return {
+    requiredTargetKey,
+    requiredTargetValue,
+    requiredTargetStatus,
+    requiredTargetGapReason:
+      requiredTargetStatus === "available"
+        ? null
+        : `${requiredTargetKey}_missing_from_required_corrections`,
+  };
+};
+
+const measurementDocketForFrontierQueue = (
+  frontierQueue: Nhm2TileSourceFalsificationReportV1["frontierResolutionQueue"],
+): Nhm2TileSourceExperimentalCampaignMeasurementDocketEntryV1[] => {
+  let docketRank = 0;
+  return frontierQueue.flatMap((item) => {
+    const itemStatus = packageItemStatus(item);
+    return item.decisiveMeasurements.map((measurement) => {
+      docketRank += 1;
+      const requiredTarget = requiredTargetForMeasurement(item, measurement);
+      return {
+        docketRank,
+        campaignDomain: item.campaignDomain,
+        sourceFrontierRank: item.rank,
+        measurementId: measurement.measurementId,
+        quantity: measurement.quantity,
+        target: measurement.target,
+        unit: measurement.unit,
+        evidenceArtifact: measurement.evidenceArtifact,
+        status: measurementStatus(measurement, itemStatus),
+        currentMargin: measurement.currentMargin,
+        requiredCorrectionKey: measurement.requiredCorrectionKey,
+        requiredCorrectionValue: correctionValueForMeasurement(item, measurement),
+        requiredTargetKey: requiredTarget.requiredTargetKey,
+        requiredTargetValue: requiredTarget.requiredTargetValue,
+        requiredTargetStatus: requiredTarget.requiredTargetStatus,
+        requiredTargetGapReason: requiredTarget.requiredTargetGapReason,
+        goCriterion: measurement.goCriterion,
+        noGoCriterion: measurement.noGoCriterion,
+        falsificationConsequence: measurement.falsificationConsequence,
+        firstBlocker: item.firstBlocker,
+        blockerIds: item.blockerIds,
+        nextEvidenceArtifact: item.nextEvidenceArtifact,
+        prevents: item.prevents,
+        blocksCampaignPass: true,
+      };
+    });
+  });
+};
+
+const domainLedgerEntry = (
+  matrixEntry: Nhm2TileSourceFalsificationReportV1["goNoGoMatrix"][number],
+  frontierQueue: Nhm2TileSourceFalsificationReportV1["frontierResolutionQueue"],
+): Nhm2TileSourceExperimentalCampaignDomainLedgerEntryV1 => {
+  const frontier = frontierQueue.find(
+    (item) => item.campaignDomain === matrixEntry.campaignDomain,
+  );
+  const decisiveMeasurementStatuses =
+    frontier == null ? [] : measurementStatusesForItem(frontier);
+  return {
+    campaignDomain: matrixEntry.campaignDomain,
+    decision: matrixEntry.decision,
+    evidenceState: matrixEntry.evidenceState,
+    firstBlocker: matrixEntry.firstBlocker,
+    blockerIds: frontier?.blockerIds ?? [],
+    blockerCount: matrixEntry.blockerCount,
+    falsifyingBlockerCount: matrixEntry.falsifyingBlockerCount,
+    minimumNumericalMargin: matrixEntry.minimumNumericalMargin,
+    evidenceTarget: matrixEntry.evidenceTarget,
+    nextRequiredChange: matrixEntry.nextRequiredChange,
+    nextEvidenceArtifact: frontier?.nextEvidenceArtifact ?? "none",
+    requiredCorrectionKeys: matrixEntry.requiredCorrectionKeys,
+    requiredCorrections: frontier?.requiredCorrections ?? {},
+    decisiveMeasurementIds:
+      decisiveMeasurementStatuses.map((measurement) => measurement.measurementId),
+    decisiveMeasurementStatuses,
+    prevents: matrixEntry.prevents,
+    blocksCampaignPass: matrixEntry.blocksCampaignPass,
+  };
+};
+
+const receiptAcquisitionLedger = (
+  domainLedger: Nhm2TileSourceExperimentalCampaignDomainLedgerEntryV1[],
+  measurementDocket: Nhm2TileSourceExperimentalCampaignMeasurementDocketEntryV1[],
+): Nhm2TileSourceExperimentalCampaignReceiptAcquisitionEntryV1[] =>
+  domainLedger.map((domainEntry) => {
+    const measurements = measurementDocket.filter(
+      (measurement) => measurement.campaignDomain === domainEntry.campaignDomain,
+    );
+    const pendingTargetGaps = measurements
+      .filter(
+        (measurement) =>
+          measurement.requiredTargetStatus === "derived_target_pending" ||
+          measurement.requiredTargetStatus === "target_not_declared",
+      )
+      .map((measurement) => ({
+        measurementId: measurement.measurementId,
+        requiredTargetKey: measurement.requiredTargetKey ?? "none",
+        requiredTargetGapReason:
+          measurement.requiredTargetGapReason ?? "required_target_gap_reason_missing",
+      }));
+    return {
+      campaignDomain: domainEntry.campaignDomain,
+      acquisitionStatus: domainEntry.evidenceState,
+      decision: domainEntry.decision,
+      firstBlocker: domainEntry.firstBlocker,
+      nextEvidenceArtifact: domainEntry.nextEvidenceArtifact,
+      requiredEvidenceArtifacts: uniqueStrings(
+        measurements.map((measurement) => measurement.evidenceArtifact),
+      ),
+      blockerIds: domainEntry.blockerIds,
+      measurementIds: measurements.map((measurement) => measurement.measurementId),
+      openMeasurementIds: measurements
+        .filter((measurement) => measurement.status !== "pass")
+        .map((measurement) => measurement.measurementId),
+      requiredTargetAvailableCount: measurements.filter(
+        (measurement) => measurement.requiredTargetStatus === "available",
+      ).length,
+      requiredTargetPendingCount: measurements.filter(
+        (measurement) => measurement.requiredTargetStatus === "derived_target_pending",
+      ).length,
+      requiredTargetNotApplicableCount: measurements.filter(
+        (measurement) => measurement.requiredTargetStatus === "not_applicable",
+      ).length,
+      requiredTargetNotDeclaredCount: measurements.filter(
+        (measurement) => measurement.requiredTargetStatus === "target_not_declared",
+      ).length,
+      pendingTargetGaps,
+      prevents: domainEntry.prevents,
+      blocksCampaignPass: domainEntry.blocksCampaignPass,
+    };
+  });
 
 const packageStatus = (
   items: Nhm2TileSourceExperimentalCampaignPackageItemV1[],
@@ -306,8 +687,10 @@ const buildObjectiveCoverage = (args: {
   physicalValidationPlan: Nhm2TileSourcePhysicalValidationPlanV1;
   falsificationReport: Nhm2TileSourceFalsificationReportV1;
   authorityHandoff: Nhm2TileSourceAuthorityHandoffV1;
+  sourceSideSameBasisTensorAuthority: Nhm2SourceSideSameBasisTensorAuthorityArtifactV1 | null;
   falsificationReportRef: string | null;
   authorityHandoffRef: string | null;
+  sourceSideSameBasisTensorAuthorityRef: string | null;
 }): Nhm2TileSourceExperimentalCampaignObjectiveCoverageV1[] =>
   OBJECTIVE_POLICIES.map((policy) => {
     const items = args.campaignItems.filter((item) =>
@@ -335,24 +718,56 @@ const buildObjectiveCoverage = (args: {
     let unlocks = uniqueStrings(items.flatMap((item) => item.prevents));
 
     if (policy.objectiveId === "source_side_same_basis_authority") {
-      status = args.authorityHandoff.summary.handoffReadyForSameBasisAuthority
-        ? "satisfied"
-        : args.authorityHandoff.summary.operatingBudgetsFalsifyCurrentCandidate
-          ? "falsifying"
-          : "ready_for_evidence";
-      blockerIds =
-        args.authorityHandoff.summary.firstBlocker === "none"
+      const sourceAuthority = args.sourceSideSameBasisTensorAuthority;
+      if (sourceAuthority != null) {
+        status = sourceAuthority.summary.allRequiredRegionsAuthoritative
+          ? "satisfied"
+          : sourceAuthority.summary.anyMetricEcho
+            ? "falsifying"
+            : "ready_for_evidence";
+        blockerIds = uniqueStrings([
+          ...sourceAuthority.regions.flatMap((region) => region.blockers),
+          ...sourceAuthority.summary.missingRegionIds.map(
+            (regionId) => `source_side_region_${regionId}_authority_missing`,
+          ),
+        ]);
+        requiredArtifactRefs = uniqueStrings(
+          [
+            args.sourceSideSameBasisTensorAuthorityRef,
+            args.authorityHandoffRef,
+            args.authorityHandoff.sourceRefs.targetAuthorityContractRef,
+          ].filter((ref): ref is string => typeof ref === "string" && ref.length > 0),
+        );
+        openMeasurementIds = sourceAuthority.summary.allRequiredRegionsAuthoritative
           ? []
-          : [args.authorityHandoff.summary.firstBlocker];
-      requiredArtifactRefs = uniqueStrings(
-        [
-          args.authorityHandoffRef,
-          args.authorityHandoff.sourceRefs.targetAuthorityContractRef,
-        ].filter((ref): ref is string => typeof ref === "string" && ref.length > 0),
-      );
-      openMeasurementIds = args.authorityHandoff.summary.handoffReadyForSameBasisAuthority
-        ? []
-        : ["same_basis_authority_handoff"];
+          : uniqueStrings([
+              ...sourceAuthority.regions.flatMap((region) =>
+                region.missingComponentIds.map(
+                  (componentId) => `${region.regionId}:${componentId}`,
+                ),
+              ),
+              ...(blockerIds.length > 0 ? ["source_side_authority_blockers"] : []),
+            ]);
+      } else {
+        status = args.authorityHandoff.summary.handoffReadyForSameBasisAuthority
+          ? "satisfied"
+          : args.authorityHandoff.summary.operatingBudgetsFalsifyCurrentCandidate
+            ? "falsifying"
+            : "ready_for_evidence";
+        blockerIds =
+          args.authorityHandoff.summary.firstBlocker === "none"
+            ? []
+            : [args.authorityHandoff.summary.firstBlocker];
+        requiredArtifactRefs = uniqueStrings(
+          [
+            args.authorityHandoffRef,
+            args.authorityHandoff.sourceRefs.targetAuthorityContractRef,
+          ].filter((ref): ref is string => typeof ref === "string" && ref.length > 0),
+        );
+        openMeasurementIds = args.authorityHandoff.summary.handoffReadyForSameBasisAuthority
+          ? []
+          : ["same_basis_authority_handoff"];
+      }
       unlocks = ["source_side_same_basis_authority", "regional_residual_closure"];
     } else if (policy.objectiveId === "downstream_gate_readiness") {
       const nonPassingGates = args.physicalValidationPlan.downstreamGates.filter(
@@ -404,6 +819,19 @@ export const buildNhm2TileSourceExperimentalCampaignPackage = (
   input: BuildNhm2TileSourceExperimentalCampaignPackageInput,
 ): Nhm2TileSourceExperimentalCampaignPackageV1 => {
   const maxItems = Math.max(1, Math.floor(input.maxItems ?? 7));
+  const measurementDocket = measurementDocketForFrontierQueue(
+    input.falsificationReport.frontierResolutionQueue,
+  );
+  const campaignDomainLedger = input.falsificationReport.goNoGoMatrix.map((entry) =>
+    domainLedgerEntry(entry, input.falsificationReport.frontierResolutionQueue),
+  );
+  const acquisitionLedger = receiptAcquisitionLedger(campaignDomainLedger, measurementDocket);
+  const countDomains = (
+    predicate: (entry: Nhm2TileSourceExperimentalCampaignDomainLedgerEntryV1) => boolean,
+  ): number => campaignDomainLedger.filter(predicate).length;
+  const countDocketTargets = (
+    status: Nhm2TileSourceExperimentalCampaignTargetValueStatusV1,
+  ): number => measurementDocket.filter((entry) => entry.requiredTargetStatus === status).length;
   const campaignItems = input.falsificationReport.frontierResolutionQueue
     .slice(0, maxItems)
     .map(
@@ -440,8 +868,11 @@ export const buildNhm2TileSourceExperimentalCampaignPackage = (
     physicalValidationPlan: input.physicalValidationPlan,
     falsificationReport: input.falsificationReport,
     authorityHandoff: input.authorityHandoff,
+    sourceSideSameBasisTensorAuthority: input.sourceSideSameBasisTensorAuthority ?? null,
     falsificationReportRef: input.falsificationReportRef ?? null,
     authorityHandoffRef: input.authorityHandoffRef ?? null,
+    sourceSideSameBasisTensorAuthorityRef:
+      input.sourceSideSameBasisTensorAuthorityRef ?? null,
   });
   const openObjectiveCount = objectiveCoverage.filter(
     (coverage) => coverage.status === "ready_for_evidence" || coverage.status === "blocked_by_downstream",
@@ -462,17 +893,29 @@ export const buildNhm2TileSourceExperimentalCampaignPackage = (
       materialEvidenceReceiptsRef: input.materialEvidenceReceiptsRef ?? null,
       physicalValidationPlanRef: input.physicalValidationPlanRef ?? null,
       evidenceGapRoadmapRef: input.evidenceGapRoadmapRef ?? null,
+      operatingBudgetReadinessRef:
+        input.falsificationReport.sourceRefs.operatingBudgetReadinessRef ?? null,
       falsificationReportRef: input.falsificationReportRef ?? null,
       authorityHandoffRef: input.authorityHandoffRef ?? null,
+      sourceSideSameBasisTensorAuthorityRef:
+        input.sourceSideSameBasisTensorAuthorityRef ?? null,
     },
     currentBlocker: input.falsificationReport.currentBlocker,
     objectiveCoverage,
+    measurementDocket,
+    campaignDomainLedger,
+    receiptAcquisitionLedger: acquisitionLedger,
     campaignItems,
     summary: {
       packageStatus: finalPackageStatus,
       firstCampaignDomain: firstItem?.campaignDomain ?? "none",
       firstBlocker: firstItem?.firstBlocker ?? "none",
       measurementCount,
+      measurementDocketCount: measurementDocket.length,
+      requiredTargetAvailableCount: countDocketTargets("available"),
+      requiredTargetPendingCount: countDocketTargets("derived_target_pending"),
+      requiredTargetNotApplicableCount: countDocketTargets("not_applicable"),
+      requiredTargetNotDeclaredCount: countDocketTargets("target_not_declared"),
       missingMeasurementCount: allMeasurementStatuses.filter(
         (measurement) => measurement.status === "missing",
       ).length,
@@ -487,6 +930,36 @@ export const buildNhm2TileSourceExperimentalCampaignPackage = (
       failingReceiptCount: input.falsificationReport.summary.failingReceiptCount,
       operatingBudgetBlockerCount: input.falsificationReport.summary.operatingBudgetBlockerCount,
       objectiveCoverageCount: objectiveCoverage.length,
+      campaignDomainLedgerCount: campaignDomainLedger.length,
+      receiptAcquisitionDomainCount: acquisitionLedger.length,
+      receiptArtifactRequirementCount: uniqueStrings(
+        acquisitionLedger.flatMap((entry) => entry.requiredEvidenceArtifacts),
+      ).length,
+      domainsWithPendingDerivedTargetsCount: acquisitionLedger.filter(
+        (entry) => entry.requiredTargetPendingCount > 0,
+      ).length,
+      targetGapMeasurementCount: acquisitionLedger.reduce(
+        (count, entry) => count + entry.pendingTargetGaps.length,
+        0,
+      ),
+      missingReceiptDomainCount: countDomains(
+        (entry) => entry.evidenceState === "missing_receipt",
+      ),
+      failingMarginDomainCount: countDomains(
+        (entry) => entry.evidenceState === "failing_margin",
+      ),
+      sourceAuthorityBlockedDomainCount: countDomains(
+        (entry) => entry.evidenceState === "source_authority_blocked",
+      ),
+      downstreamBlockedDomainCount: countDomains(
+        (entry) => entry.evidenceState === "downstream_blocked",
+      ),
+      operatingBudgetBlockedDomainCount: countDomains(
+        (entry) => entry.evidenceState === "operating_budget_blocked",
+      ),
+      noGoDomainCount: countDomains((entry) => entry.decision === "no_go"),
+      reviewDomainCount: countDomains((entry) => entry.decision === "review"),
+      goDomainCount: countDomains((entry) => entry.decision === "go"),
       openObjectiveCount,
       falsifyingObjectiveCount,
       satisfiedObjectiveCount,
@@ -496,6 +969,11 @@ export const buildNhm2TileSourceExperimentalCampaignPackage = (
         objectiveCoverage.every((coverage) => coverage.status === "satisfied"),
       handoffReadyForSameBasisAuthority:
         input.authorityHandoff.summary.handoffReadyForSameBasisAuthority,
+      sourceSideAuthorityAvailable: input.sourceSideSameBasisTensorAuthority != null,
+      sourceSideAuthorityReady:
+        input.sourceSideSameBasisTensorAuthority == null
+          ? null
+          : input.sourceSideSameBasisTensorAuthority.summary.allRequiredRegionsAuthoritative,
       physicalViabilityClaimAllowed: false,
       transportClaimAllowed: false,
       propulsionClaimAllowed: false,
@@ -549,7 +1027,6 @@ const isMeasurementStatusList = (
   value: unknown,
 ): value is Nhm2TileSourceExperimentalCampaignPackageItemV1["measurementStatuses"] =>
   Array.isArray(value) &&
-  value.length > 0 &&
   value.every(
     (entry) =>
       isRecord(entry) &&
@@ -560,11 +1037,62 @@ const isMeasurementStatusList = (
         typeof entry.currentMargin === "number" ||
         typeof entry.currentMargin === "boolean") &&
       (entry.requiredCorrectionValue === null ||
+        typeof entry.requiredCorrectionValue === "string" ||
         typeof entry.requiredCorrectionValue === "number" ||
-        typeof entry.requiredCorrectionValue === "boolean") &&
+        typeof entry.requiredCorrectionValue === "boolean" ||
+        (Array.isArray(entry.requiredCorrectionValue) &&
+          entry.requiredCorrectionValue.every((correction) => typeof correction === "string"))) &&
       typeof entry.goCriterion === "string" &&
       typeof entry.noGoCriterion === "string",
   );
+
+const isLedgerCorrectionValue = (value: unknown): boolean =>
+  value === null ||
+  typeof value === "string" ||
+  typeof value === "boolean" ||
+  (typeof value === "number" && Number.isFinite(value)) ||
+  (Array.isArray(value) && value.every((entry) => typeof entry === "string"));
+
+const isLedgerCorrectionRecord = (value: unknown): boolean =>
+  isRecord(value) && Object.values(value).every(isLedgerCorrectionValue);
+
+const isMeasurementDocketEntry = (
+  value: unknown,
+): value is Nhm2TileSourceExperimentalCampaignMeasurementDocketEntryV1 =>
+  isRecord(value) &&
+  typeof value.docketRank === "number" &&
+  typeof value.campaignDomain === "string" &&
+  typeof value.sourceFrontierRank === "number" &&
+  typeof value.measurementId === "string" &&
+  typeof value.quantity === "string" &&
+  typeof value.target === "string" &&
+  (value.unit === null || typeof value.unit === "string") &&
+  typeof value.evidenceArtifact === "string" &&
+  ["missing", "pass", "fail", "review"].includes(String(value.status)) &&
+  (value.currentMargin === null ||
+    typeof value.currentMargin === "number" ||
+    typeof value.currentMargin === "boolean") &&
+  (value.requiredCorrectionKey === null ||
+    typeof value.requiredCorrectionKey === "string") &&
+  isLedgerCorrectionValue(value.requiredCorrectionValue) &&
+  (value.requiredTargetKey === null ||
+    typeof value.requiredTargetKey === "string") &&
+  isLedgerCorrectionValue(value.requiredTargetValue) &&
+  ["available", "not_applicable", "derived_target_pending", "target_not_declared"].includes(
+    String(value.requiredTargetStatus),
+  ) &&
+  (value.requiredTargetGapReason === null ||
+    typeof value.requiredTargetGapReason === "string") &&
+  typeof value.goCriterion === "string" &&
+  typeof value.noGoCriterion === "string" &&
+  typeof value.falsificationConsequence === "string" &&
+  typeof value.firstBlocker === "string" &&
+  Array.isArray(value.blockerIds) &&
+  value.blockerIds.every((blockerId) => typeof blockerId === "string") &&
+  typeof value.nextEvidenceArtifact === "string" &&
+  Array.isArray(value.prevents) &&
+  value.prevents.every((prevent) => typeof prevent === "string") &&
+  value.blocksCampaignPass === true;
 
 const isCampaignItem = (
   value: unknown,
@@ -592,6 +1120,87 @@ const isCampaignItem = (
     String(value.status),
   ) &&
   value.blocksCampaignPass === true;
+
+const isCampaignDomainLedgerEntry = (
+  value: unknown,
+): value is Nhm2TileSourceExperimentalCampaignDomainLedgerEntryV1 =>
+  isRecord(value) &&
+  typeof value.campaignDomain === "string" &&
+  ["go", "review", "no_go"].includes(String(value.decision)) &&
+  [
+    "ready",
+    "missing_receipt",
+    "failing_margin",
+    "source_authority_blocked",
+    "downstream_blocked",
+    "operating_budget_blocked",
+    "open_review",
+  ].includes(String(value.evidenceState)) &&
+  typeof value.firstBlocker === "string" &&
+  Array.isArray(value.blockerIds) &&
+  value.blockerIds.every((blockerId) => typeof blockerId === "string") &&
+  typeof value.blockerCount === "number" &&
+  typeof value.falsifyingBlockerCount === "number" &&
+  (value.minimumNumericalMargin === null ||
+    typeof value.minimumNumericalMargin === "number") &&
+  typeof value.evidenceTarget === "string" &&
+  typeof value.nextRequiredChange === "string" &&
+  typeof value.nextEvidenceArtifact === "string" &&
+  Array.isArray(value.requiredCorrectionKeys) &&
+  value.requiredCorrectionKeys.every((key) => typeof key === "string") &&
+  isLedgerCorrectionRecord(value.requiredCorrections) &&
+  Array.isArray(value.decisiveMeasurementIds) &&
+  value.decisiveMeasurementIds.every((measurementId) => typeof measurementId === "string") &&
+  isMeasurementStatusList(value.decisiveMeasurementStatuses) &&
+  Array.isArray(value.prevents) &&
+  value.prevents.every((prevent) => typeof prevent === "string") &&
+  typeof value.blocksCampaignPass === "boolean";
+
+const isReceiptAcquisitionEntry = (
+  value: unknown,
+): value is Nhm2TileSourceExperimentalCampaignReceiptAcquisitionEntryV1 =>
+  isRecord(value) &&
+  typeof value.campaignDomain === "string" &&
+  [
+    "ready",
+    "missing_receipt",
+    "failing_margin",
+    "source_authority_blocked",
+    "downstream_blocked",
+    "operating_budget_blocked",
+    "open_review",
+  ].includes(String(value.acquisitionStatus)) &&
+  ["go", "review", "no_go"].includes(String(value.decision)) &&
+  typeof value.firstBlocker === "string" &&
+  typeof value.nextEvidenceArtifact === "string" &&
+  Array.isArray(value.requiredEvidenceArtifacts) &&
+  value.requiredEvidenceArtifacts.every((artifact) => typeof artifact === "string") &&
+  Array.isArray(value.blockerIds) &&
+  value.blockerIds.every((blockerId) => typeof blockerId === "string") &&
+  Array.isArray(value.measurementIds) &&
+  value.measurementIds.every((measurementId) => typeof measurementId === "string") &&
+  Array.isArray(value.openMeasurementIds) &&
+  value.openMeasurementIds.every((measurementId) => typeof measurementId === "string") &&
+  typeof value.requiredTargetAvailableCount === "number" &&
+  typeof value.requiredTargetPendingCount === "number" &&
+  typeof value.requiredTargetNotApplicableCount === "number" &&
+  typeof value.requiredTargetNotDeclaredCount === "number" &&
+  value.requiredTargetAvailableCount +
+    value.requiredTargetPendingCount +
+    value.requiredTargetNotApplicableCount +
+    value.requiredTargetNotDeclaredCount ===
+    value.measurementIds.length &&
+  Array.isArray(value.pendingTargetGaps) &&
+  value.pendingTargetGaps.every(
+    (gap) =>
+      isRecord(gap) &&
+      typeof gap.measurementId === "string" &&
+      typeof gap.requiredTargetKey === "string" &&
+      typeof gap.requiredTargetGapReason === "string",
+  ) &&
+  Array.isArray(value.prevents) &&
+  value.prevents.every((prevent) => typeof prevent === "string") &&
+  typeof value.blocksCampaignPass === "boolean";
 
 const isObjectiveCoverage = (
   value: unknown,
@@ -654,6 +1263,15 @@ export const isNhm2TileSourceExperimentalCampaignPackage = (
     Array.isArray(value.objectiveCoverage) &&
     value.objectiveCoverage.length === OBJECTIVE_POLICIES.length &&
     value.objectiveCoverage.every(isObjectiveCoverage) &&
+    Array.isArray(value.measurementDocket) &&
+    value.measurementDocket.length >= value.campaignItems.length &&
+    value.measurementDocket.every(isMeasurementDocketEntry) &&
+    Array.isArray(value.campaignDomainLedger) &&
+    value.campaignDomainLedger.length === 8 &&
+    value.campaignDomainLedger.every(isCampaignDomainLedgerEntry) &&
+    Array.isArray(value.receiptAcquisitionLedger) &&
+    value.receiptAcquisitionLedger.length === value.campaignDomainLedger.length &&
+    value.receiptAcquisitionLedger.every(isReceiptAcquisitionEntry) &&
     Array.isArray(value.campaignItems) &&
     value.campaignItems.every(isCampaignItem) &&
     isRecord(summary) &&
@@ -667,6 +1285,15 @@ export const isNhm2TileSourceExperimentalCampaignPackage = (
     typeof summary.firstBlocker === "string" &&
     typeof summary.measurementCount === "number" &&
     summary.measurementCount >= value.campaignItems.length &&
+    typeof summary.measurementDocketCount === "number" &&
+    summary.measurementDocketCount === value.measurementDocket.length &&
+    typeof summary.requiredTargetAvailableCount === "number" &&
+    typeof summary.requiredTargetPendingCount === "number" &&
+    typeof summary.requiredTargetNotApplicableCount === "number" &&
+    typeof summary.requiredTargetNotDeclaredCount === "number" &&
+    summary.requiredTargetAvailableCount + summary.requiredTargetPendingCount +
+      summary.requiredTargetNotApplicableCount + summary.requiredTargetNotDeclaredCount ===
+      value.measurementDocket.length &&
     typeof summary.missingMeasurementCount === "number" &&
     typeof summary.failingMeasurementCount === "number" &&
     typeof summary.passingMeasurementCount === "number" &&
@@ -676,12 +1303,42 @@ export const isNhm2TileSourceExperimentalCampaignPackage = (
     typeof summary.operatingBudgetBlockerCount === "number" &&
     typeof summary.objectiveCoverageCount === "number" &&
     summary.objectiveCoverageCount === value.objectiveCoverage.length &&
+    typeof summary.campaignDomainLedgerCount === "number" &&
+    summary.campaignDomainLedgerCount === value.campaignDomainLedger.length &&
+    typeof summary.receiptAcquisitionDomainCount === "number" &&
+    summary.receiptAcquisitionDomainCount === value.receiptAcquisitionLedger.length &&
+    typeof summary.receiptArtifactRequirementCount === "number" &&
+    summary.receiptArtifactRequirementCount ===
+      uniqueStrings(
+        value.receiptAcquisitionLedger.flatMap((entry) => entry.requiredEvidenceArtifacts),
+      ).length &&
+    typeof summary.domainsWithPendingDerivedTargetsCount === "number" &&
+    summary.domainsWithPendingDerivedTargetsCount ===
+      value.receiptAcquisitionLedger.filter((entry) => entry.requiredTargetPendingCount > 0)
+        .length &&
+    typeof summary.targetGapMeasurementCount === "number" &&
+    summary.targetGapMeasurementCount ===
+      value.receiptAcquisitionLedger.reduce(
+        (count, entry) => count + entry.pendingTargetGaps.length,
+        0,
+      ) &&
+    typeof summary.missingReceiptDomainCount === "number" &&
+    typeof summary.failingMarginDomainCount === "number" &&
+    typeof summary.sourceAuthorityBlockedDomainCount === "number" &&
+    typeof summary.downstreamBlockedDomainCount === "number" &&
+    typeof summary.operatingBudgetBlockedDomainCount === "number" &&
+    typeof summary.noGoDomainCount === "number" &&
+    typeof summary.reviewDomainCount === "number" &&
+    typeof summary.goDomainCount === "number" &&
     typeof summary.openObjectiveCount === "number" &&
     typeof summary.falsifyingObjectiveCount === "number" &&
     typeof summary.satisfiedObjectiveCount === "number" &&
     typeof summary.allObjectiveCoveragePresent === "boolean" &&
     typeof summary.allEvidenceObjectivesSatisfied === "boolean" &&
     typeof summary.handoffReadyForSameBasisAuthority === "boolean" &&
+    typeof summary.sourceSideAuthorityAvailable === "boolean" &&
+    (summary.sourceSideAuthorityReady === null ||
+      typeof summary.sourceSideAuthorityReady === "boolean") &&
     summary.physicalViabilityClaimAllowed === false &&
     summary.transportClaimAllowed === false &&
     summary.propulsionClaimAllowed === false &&

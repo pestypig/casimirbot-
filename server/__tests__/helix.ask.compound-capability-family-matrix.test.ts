@@ -628,6 +628,50 @@ describe("Helix Ask compound capability family matrix", () => {
     ]));
   });
 
+  it("reads compound terminal policy from the runtime intent packet itinerary", () => {
+    const payload = {
+      runtime_intent_packet: {
+        schema: "helix.runtime_intent_packet.v1",
+        capability_itinerary: {
+          terminal_success_criteria: {
+            compound_terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+          },
+          compound_capability_contract: {
+            subgoals: [
+              {
+                requested_capability: "docs-viewer.locate_in_doc",
+                runtime_capability: "docs-viewer.locate_in_doc",
+                capability_family: "docs_viewer",
+              },
+              {
+                requested_capability: "scientific-calculator.solve_expression",
+                runtime_capability: "scientific-calculator.solve_expression",
+                capability_family: "calculator",
+              },
+            ],
+          },
+        },
+      },
+    };
+
+    const policy = readCompoundTerminalPolicy(payload);
+
+    expect(policy).toMatchObject({
+      active: true,
+      source: "capability_itinerary.terminal_success_criteria",
+      required_terminal_kind: "doc_evidence_synthesis_answer",
+    });
+    expect(policy.allowed_terminal_artifact_kinds).toEqual(expect.arrayContaining([
+      "compound_evidence_synthesis_answer",
+      "doc_evidence_synthesis_answer",
+    ]));
+    expect(policy.forbidden_terminal_artifact_kinds).toEqual(expect.arrayContaining([
+      "tool_receipt",
+      "calculator_receipt",
+      "workspace_action_receipt",
+    ]));
+  });
+
   it("does not let stale compound terminal declarations re-allow receipt terminals", () => {
     const payload = {
       capability_itinerary: {

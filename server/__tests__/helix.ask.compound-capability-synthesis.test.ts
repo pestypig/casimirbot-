@@ -52,6 +52,129 @@ describe("compound capability synthesis readiness", () => {
     expect(readiness.support_refs).toEqual(["obs:doc-location", "obs:calculator"]);
   });
 
+  it("materializes docs plus calculator compounds as compound synthesis despite calculator route terminal", () => {
+    const turnId = "ask:test:docs-calculator-materializer";
+    const docsSubgoalId = `${turnId}:compound_capability_subgoal:1:docs-viewer_locate_in_doc`;
+    const calculatorSubgoalId = `${turnId}:compound_capability_subgoal:2:scientific-calculator_solve_expression`;
+    const docObservationRef = `${turnId}:doc_location_matches`;
+    const calculatorObservationRef = `${turnId}:calculator_receipt`;
+    const draftRef = `${turnId}:final_answer_draft`;
+    const draftText =
+      "The docs observation locates the terminal-authority claim, and the calculator observation verifies 19 + 23 = 42 for the numeric check.";
+    const artifactLedger = [
+      {
+        artifact_id: docObservationRef,
+        kind: "doc_location_matches",
+        payload: {
+          schema: "helix.doc_location_matches.v1",
+          artifact_id: docObservationRef,
+          support_refs: [docObservationRef],
+        },
+      },
+      {
+        artifact_id: calculatorObservationRef,
+        kind: "calculator_receipt",
+        payload: {
+          schema: "helix.calculator_receipt.v1",
+          artifact_id: calculatorObservationRef,
+          result: 42,
+        },
+      },
+      {
+        artifact_id: draftRef,
+        kind: "final_answer_draft",
+        payload: {
+          schema: "helix.final_answer_draft.v1",
+          artifact_id: draftRef,
+          text: draftText,
+          answer_text: draftText,
+          authority: "llm_post_observation_composer",
+          model_step_capability: "model.synthesize_from_compound_subgoal_observations",
+          support_refs: [docObservationRef, calculatorObservationRef],
+          artifact_refs: [docObservationRef, calculatorObservationRef],
+          subgoal_observation_refs: [docObservationRef, calculatorObservationRef],
+        },
+      },
+    ];
+    const payload = {
+      active_prompt:
+        "Use docs-viewer.locate_in_doc to find where terminal authority is discussed, then call scientific-calculator.solve_expression with 19 + 23.",
+      canonical_goal_frame: {
+        goal_kind: "calculator_solve",
+        required_terminal_kind: "workstation_tool_evaluation",
+      },
+      route_product_contract: {
+        source_target: "calculator_stream",
+        allowed_terminal_artifact_kinds: ["workstation_tool_evaluation", "typed_failure"],
+      },
+      compound_capability_contract: {
+        schema: "helix.compound_capability_contract.v1",
+        requires_all_subgoals: true,
+        subgoals: [
+          {
+            subgoal_id: docsSubgoalId,
+            capability_family: "docs_viewer",
+            requested_capability: "docs-viewer.locate_in_doc",
+            runtime_capability: "docs-viewer.locate_in_doc",
+            mandatory: true,
+          },
+          {
+            subgoal_id: calculatorSubgoalId,
+            capability_family: "calculator",
+            requested_capability: "scientific-calculator.solve_expression",
+            runtime_capability: "scientific-calculator.solve_expression",
+            mandatory: true,
+          },
+        ],
+      },
+      capability_itinerary_execution_state: {
+        schema: "helix.capability_itinerary_execution_state.v1",
+        applies: true,
+        complete: true,
+        compound_subgoal_ledger: [
+          {
+            subgoal_id: docsSubgoalId,
+            requested_capability: "docs-viewer.locate_in_doc",
+            executed_capability: "docs-viewer.locate_in_doc",
+            observation_kind: "doc_location_matches",
+            observation_ref: docObservationRef,
+            satisfaction: "satisfied",
+            rail_status: "complete",
+          },
+          {
+            subgoal_id: calculatorSubgoalId,
+            requested_capability: "scientific-calculator.solve_expression",
+            executed_capability: "scientific-calculator.solve_expression",
+            observation_kind: "calculator_receipt",
+            observation_ref: calculatorObservationRef,
+            satisfaction: "satisfied",
+            rail_status: "complete",
+          },
+        ],
+      },
+      current_turn_artifact_ledger: artifactLedger,
+    };
+
+    const result = materializeFinalAnswerDraftTerminal({
+      turnId,
+      payload,
+      artifactLedger,
+      routeProductContract: payload.route_product_contract,
+      finalAnswerDraftRef: draftRef,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      materialized_terminal_artifact_kind: "compound_evidence_synthesis_answer",
+    });
+    expect(payload.compound_evidence_synthesis_answer).toMatchObject({
+      schema: "helix.compound_evidence_synthesis_answer.v1",
+      support_refs: [docObservationRef, calculatorObservationRef],
+      subgoal_observation_refs: [docObservationRef, calculatorObservationRef],
+      model_step_capability: "model.synthesize_from_compound_subgoal_observations",
+    });
+  });
+
   it("filters stale missing summaries with artifact-query-index subgoal rails", () => {
     const turnId = "ask:test:compound-stale-missing-summary";
     const docsSubgoalId = `${turnId}:compound_capability_subgoal:1:docs-viewer_locate_in_doc`;

@@ -35,6 +35,10 @@ import {
   isNhm2TileSourceFalsificationReport,
 } from "../../shared/contracts/nhm2-tile-source-falsification-report.v1";
 import {
+  buildNhm2TileSourceExperimentalCampaignPackage,
+  isNhm2TileSourceExperimentalCampaignPackage,
+} from "../../shared/contracts/nhm2-tile-source-experimental-campaign-package.v1";
+import {
   runNhm2TimeDependentSourceCampaign,
   type Nhm2TimeDependentSourceCampaignArtifactV1,
 } from "./build-time-dependent-source-campaign";
@@ -317,6 +321,31 @@ export const runNhm2CandidateProfileCampaignRun = (args: {
   writeFileSync(
     tileSourceMaterialEvidence.outputRefs.falsificationReport,
     `${JSON.stringify(authorityAwareFalsificationReport, null, 2)}\n`,
+    "utf8",
+  );
+  const authorityAwareExperimentalCampaignPackage =
+    buildNhm2TileSourceExperimentalCampaignPackage({
+      materialEvidenceReceipts: tileSourceMaterialEvidence.materialEvidenceReceipts,
+      physicalValidationPlan: tileSourceMaterialEvidence.physicalValidationPlan,
+      evidenceGapRoadmap: tileSourceMaterialEvidence.evidenceGapRoadmap,
+      falsificationReport: authorityAwareFalsificationReport,
+      authorityHandoff: tileSourceMaterialEvidence.authorityHandoff,
+      sourceSideSameBasisTensorAuthority: sourceSideAuthority,
+      materialEvidenceReceiptsRef:
+        tileSourceMaterialEvidence.outputRefs.materialEvidenceReceipts,
+      physicalValidationPlanRef:
+        tileSourceMaterialEvidence.outputRefs.physicalValidationPlan,
+      evidenceGapRoadmapRef: tileSourceMaterialEvidence.outputRefs.evidenceGapRoadmap,
+      falsificationReportRef: tileSourceMaterialEvidence.outputRefs.falsificationReport,
+      authorityHandoffRef: tileSourceMaterialEvidence.outputRefs.authorityHandoff,
+      sourceSideSameBasisTensorAuthorityRef: sourceSideAuthorityPath,
+    });
+  if (!isNhm2TileSourceExperimentalCampaignPackage(authorityAwareExperimentalCampaignPackage)) {
+    throw new Error("authority-aware tile-source experimental campaign package failed validation");
+  }
+  writeFileSync(
+    tileSourceMaterialEvidence.outputRefs.experimentalCampaignPackage,
+    `${JSON.stringify(authorityAwareExperimentalCampaignPackage, null, 2)}\n`,
     "utf8",
   );
   publishSourceOffDiagonalShearAudit({

@@ -23,6 +23,83 @@ const makePostToolObservation = (turnId: string) => ({
 });
 
 describe("Helix terminal authority single writer", () => {
+  it("does not surface success-looking drafts for failed mutating capability rails", () => {
+    const turnId = "ask:test:goal-session-not-admitted";
+    const successLookingText =
+      "Started or updated workstation goal session stage_play_goal:abc123.";
+    const artifacts = [
+      {
+        artifact_id: `${turnId}:final_answer_draft`,
+        kind: "final_answer_draft",
+        payload: {
+          schema: "helix.final_answer_draft.v1",
+          turn_id: turnId,
+          text: successLookingText,
+          answer_text: successLookingText,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      selected_final_answer: successLookingText,
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "final_answer_draft",
+      canonical_goal_frame: {
+        goal_kind: "workstation_goal_context",
+        required_terminal_kind: "workstation_tool_evaluation",
+      },
+      capability_plan: {
+        schema: "helix.capability_plan.v1",
+        turn_id: turnId,
+        capability_family: "live_environment",
+        requested_action: "live_env.start_agent_goal_session",
+        requested_capability: "live_env.start_agent_goal_session",
+        selected_capability: "live_env.start_agent_goal_session",
+        mutating: true,
+        operator_command_required: true,
+        operator_command_present: false,
+        source_target: "live_environment",
+        goal_kind: "workstation_goal_context",
+        required_terminal_kind: "workstation_tool_evaluation",
+        admission_status: "needs_user_confirmation",
+        rejection_reason: "mutating_capability_requires_operator_command",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      capability_lifecycle_ledger: {
+        schema: "helix.capability_lifecycle_ledger.v1",
+        turn_id: turnId,
+        ok: false,
+        failure_codes: ["mutating_capability_without_operator_command"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      current_turn_artifact_ledger: artifacts,
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.final_answer_source).toBe("typed_failure");
+    expect(payload.terminal_error_code).toBe("mutating_capability_requires_operator_command");
+    expect(String(payload.selected_final_answer)).not.toContain("Started or updated workstation goal session");
+    expect(result.rejected_candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "model_synthesized_answer",
+          reason: "capability_lifecycle_failed",
+        }),
+      ]),
+    );
+  });
+
   it("preserves specific typed-failure rail code when projection guard reconciles stale visible kind", () => {
     const turnId = "ask:test:typed-failure-projection-guard-specific-rail";
     const failureText =
@@ -2412,10 +2489,10 @@ describe("Helix terminal authority single writer", () => {
       artifactLedger: artifacts,
     });
 
-    expect(result.selected_terminal_artifact_kind).toBe("model_synthesized_answer");
+    expect(result.selected_terminal_artifact_kind).toBe("compound_evidence_synthesis_answer");
     expect(result.visible_text).toBe(draftText);
-    expect(payload.model_synthesized_answer).toMatchObject({
-      schema: "helix.model_synthesized_answer.v1",
+    expect(payload.compound_evidence_synthesis_answer).toMatchObject({
+      schema: "helix.compound_evidence_synthesis_answer.v1",
       support_refs: [workspaceObservationRef, docsObservationRef],
       support_refs_count: 2,
       subgoal_observation_refs: [workspaceObservationRef, docsObservationRef],
@@ -2432,6 +2509,7 @@ describe("Helix terminal authority single writer", () => {
       missing_observation_refs: [],
     });
     expect(payload.final_answer_source).toBe("final_answer_draft");
+    expect(payload.terminal_artifact_kind).toBe("compound_evidence_synthesis_answer");
   });
 
   it("allows compound calculator drafts grounded through workstation evaluation evidence refs", () => {

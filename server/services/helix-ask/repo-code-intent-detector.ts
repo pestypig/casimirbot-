@@ -10,6 +10,7 @@ import {
   detectModelOnlyConceptSourceSignal,
   hasExplicitModelOnlyConceptScope,
 } from "./model-only-concept-source-guard";
+import { isAskCapabilityCatalogPrompt } from "./capability-catalog-intent";
 import { isExplicitDocsPathDocumentOperation } from "./docs-viewer-intent";
 
 export type HelixRepoCodeEvidenceIntent = {
@@ -173,6 +174,15 @@ export function detectRepoCodeEvidenceIntent(promptText: string): HelixRepoCodeE
       repoEvidenceRequested: false,
       strength: "none",
       reasons: ["docs_viewer_exact_doc_path_request_not_repo_code"],
+      requestedOutputs: [],
+      projectEntity: null,
+    };
+  }
+  if (isAskCapabilityCatalogPrompt(prompt) && !explicitRepoEvidenceRequest) {
+    return {
+      repoEvidenceRequested: false,
+      strength: "none",
+      reasons: ["capability_catalog_prompt_not_repo_code"],
       requestedOutputs: [],
       projectEntity: null,
     };

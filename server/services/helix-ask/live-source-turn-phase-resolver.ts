@@ -200,6 +200,7 @@ export const LIVE_SOURCE_TURN_PHASE_TABLE: Record<LiveSourceTurnPhaseV1, LiveSou
       "live_env.focus_process_graph",
       "live_env.narrator_say",
       "live_env.narrator_bind_stream",
+      "live_env.start_agent_goal_session",
     ],
     fallbackTools: [],
     forbiddenTools: [
@@ -214,11 +215,13 @@ export const LIVE_SOURCE_TURN_PHASE_TABLE: Record<LiveSourceTurnPhaseV1, LiveSou
       "stage_play_workstation_control_receipt",
       "helix.narrator_say_request",
       "helix.narrator_bind_stream_request",
+      "stage_play_agent_goal_session_tool_result",
     ],
     completionEvidence: [
       "stage_play_workstation_control_receipt",
       "helix.narrator_say_request",
       "helix.narrator_bind_stream_request",
+      "stage_play_agent_goal_session_tool_result",
     ],
     next: "terminal_checkpoint",
     terminalAllowed: false,
@@ -883,6 +886,16 @@ const hasNarratorEventReceipt = (receipts: RecordLike[]): boolean =>
     );
   });
 
+const hasAgentGoalSessionReceipt = (receipts: RecordLike[]): boolean =>
+  receipts.some((receipt) => {
+    const observation = receiptObservation(receipt);
+    return (
+      receiptToolName(receipt) === "live_env.start_agent_goal_session" ||
+      readString(observation?.schema) === "stage_play_agent_goal_session_tool_result/v1" ||
+      readString(observation?.artifactId ?? observation?.artifact_id) === "stage_play_agent_goal_session_tool_result"
+    );
+  });
+
 const WORKSTATION_CONTEXTUAL_FEED_CUE =
   String.raw`(?:live_env\.(?:query_workstation_goal_context|query_trace_memory|query_packet_traces|query_visual_summaries|query_audio_transcripts|query_translation_segments|query_microdeck_outputs|query_live_answer_state|query_source_health|query_narrator_events|query_route_evidence|query_automation_policies)|workstation\s+goal\s+context|goal\s+context\s+updates?|agent\s+goal\s+sessions?|per[-\s]?packet\s+traces?|packet\s+traces?|visual\s+summar(?:y|ies)|visual\s+captures?|audio\s+transcripts?|translation\s+segments?|translated\s+transcripts?|micro[-\s]?deck\s+outputs?|live\s+answer\s+(?:state|lines?|projection)|source\s+health|source\s+status|narrator\s+events?|narrator\s+bindings?|narrator\s+streams?|route[-\s]?watch\s+evidence|route\s+evidence|automation\s+polic(?:y|ies)|workstation\s+automations?|trace\s+memory|reasoning\s+traces?)`;
 
@@ -899,6 +912,17 @@ const hasWorkstationGoalContextQueryCue = (prompt: string): boolean => {
     /\blive_env\.query_workstation_goal_context\b/i.test(prompt) ||
     /\b(?:query|view|inspect|show|list|get|check|read|retrieve|summari[sz]e)\b[\s\S]{0,140}\b(?:workstation\s+goal\s+context|goal\s+context\s+updates?|active\s+goal\s+sessions?|agent\s+goal\s+sessions?|per[-\s]?packet\s+traces?|packet\s+traces?|trace\s+memory|reasoning\s+circuit|process\s+graph\s+traces?)\b/i.test(prompt) ||
     /\b(?:workstation\s+goal\s+context|goal\s+context\s+updates?|active\s+goal\s+sessions?|agent\s+goal\s+sessions?|per[-\s]?packet\s+traces?|packet\s+traces?|trace\s+memory|reasoning\s+circuit|process\s+graph\s+traces?)\b[\s\S]{0,140}\b(?:query|view|inspect|show|list|get|check|read|retrieve|latest|active|available|known)\b/i.test(prompt)
+  );
+};
+
+const hasStartAgentGoalSessionCue = (prompt: string): boolean => {
+  if (hasContextualWorkstationGoalContextCue(prompt)) return false;
+  if (/\b(?:write|draft|explain|describe|define)\b[\s\S]{0,80}\b(?:goal|goal\s+statement|project\s+goal)\b/i.test(prompt)) {
+    return false;
+  }
+  return (
+    /\blive_env\.start_agent_goal_session\b/i.test(prompt) ||
+    /\b(?:start|create|begin|set\s+up|setup|launch)\s+(?:an?\s+)?(?:agent\s+)?goal(?:\s+session)?\b[\s\S]{0,120}\b(?:objective|to|for|with\s+objective|work\s+until|monitor|track|refactor|implement|test|debug|fix|wire|build)\b/i.test(prompt)
   );
 };
 
@@ -1104,6 +1128,9 @@ export const resolveLiveSourceTurnPhase = (
   const latestPacket = packets.at(-1) ?? null;
   const selectedCapability = readString(input.selectedCapability);
   const contextualMicroReasonerDeckCue = hasContextualMicroReasonerDeckCue(prompt);
+  const startAgentGoalSessionCue =
+    selectedCapability === "live_env.start_agent_goal_session" ||
+    hasStartAgentGoalSessionCue(prompt);
   const workstationGoalContextQueryCue = hasWorkstationGoalContextQueryCue(prompt);
   const traceMemoryQueryCue = hasTraceMemoryQueryCue(prompt);
   const packetTraceQueryCue = hasPacketTraceQueryCue(prompt);
@@ -1252,6 +1279,54 @@ export const resolveLiveSourceTurnPhase = (
         evidenceRefs,
       });
     }
+  }
+
+  if (startAgentGoalSessionCue) {
+    if (hasAgentGoalSessionReceipt(receipts)) {
+      return makeResolution({
+        phase: "query_workstation_goal_context",
+        reason: "Goal-session receipt exists; query goal context before terminal synthesis.",
+        canonicalGoal: "workstation_goal_context",
+        allowedTools: ["live_env.query_workstation_goal_context"],
+        fallbackTools: [],
+        forbiddenTools: [
+          "live_env.start_agent_goal_session",
+          "live_env.read_processed_live_source_mail",
+          "live_env.process_live_source_mail",
+          "live_env.read_live_source_mail",
+          "live_env.record_live_source_mail_decision",
+          "live_env.request_interim_voice_callout",
+          "final_answer",
+        ],
+        requiredEvidence: ["stage_play_workstation_goal_context_read_result"],
+        completionEvidence: ["stage_play_workstation_goal_context_read_result"],
+        nextPhase: "terminal_checkpoint",
+        locked: true,
+        lockReason: "Goal-session setup must re-enter through the goal-context read before any visible answer.",
+        evidenceRefs,
+      });
+    }
+    return makeResolution({
+      phase: "dispatch_workstation_control",
+      reason: "Prompt asks to start a workstation agent goal session; create the goal-session receipt before querying goal context or answering.",
+      canonicalGoal: "workstation_goal_context",
+      allowedTools: ["live_env.start_agent_goal_session"],
+      fallbackTools: [],
+      forbiddenTools: [
+        "live_env.read_processed_live_source_mail",
+        "live_env.process_live_source_mail",
+        "live_env.read_live_source_mail",
+        "live_env.record_live_source_mail_decision",
+        "live_env.request_interim_voice_callout",
+        "final_answer",
+      ],
+      requiredEvidence: ["stage_play_agent_goal_session_tool_result"],
+      completionEvidence: ["stage_play_agent_goal_session_tool_result"],
+      nextPhase: "query_workstation_goal_context",
+      locked: true,
+      lockReason: "Goal-session setup is a mutating workstation control and must produce a Stage Play agent-goal receipt as non-terminal evidence first.",
+      evidenceRefs,
+    });
   }
 
   if (workstationControlSpec) {

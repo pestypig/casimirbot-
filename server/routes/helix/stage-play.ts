@@ -84,6 +84,7 @@ import {
   listStagePlayAgentGoalSessions,
   listStagePlayGoalContextUpdates,
   syncStagePlayGoalContextFromMailbox,
+  updateStagePlayAgentGoalSession,
 } from "../../services/stage-play/stage-play-goal-context-store";
 import {
   applyStagePlayVisualObserverProfile,
@@ -336,6 +337,11 @@ helixStagePlayRouter.options("/goal-context", (_req, res) => {
 });
 
 helixStagePlayRouter.options("/goal-session", (_req, res) => {
+  setCors(res);
+  res.status(200).end();
+});
+
+helixStagePlayRouter.options("/goal-session/action", (_req, res) => {
   setCors(res);
   res.status(200).end();
 });
@@ -1487,6 +1493,109 @@ helixStagePlayRouter.post("/goal-session", (req: Request, res: Response) => {
       error: "stage-play-goal-session-upsert-failed",
       err,
       schema: "stage_play_goal_session_response/v1",
+      contextRole: "tool_evidence",
+    });
+  }
+});
+
+helixStagePlayRouter.post("/goal-session/action", (req: Request, res: Response) => {
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+
+  try {
+    const body = readRecord(req.body) ?? {};
+    const threadId =
+      readQueryString(body.threadId) ??
+      readQueryString(body.thread_id) ??
+      readQueryString(req.query.threadId) ??
+      readQueryString(req.query.thread_id) ??
+      DEFAULT_STAGE_PLAY_MAILBOX_THREAD_ID;
+    const goalId =
+      readQueryString(body.goalId) ??
+      readQueryString(body.goal_id) ??
+      readQueryString(req.query.goalId) ??
+      readQueryString(req.query.goal_id);
+    const action = readQueryString(body.action) ?? readQueryString(req.query.action);
+    const objectiveText =
+      readQueryString(body.objective) ??
+      readQueryString(body.objectiveText) ??
+      readQueryString(body.objective_text);
+
+    if (!goalId || !action) {
+      return stagePlayJsonError(res, 400, {
+        error: "stage_play_goal_session_action_missing_input",
+        message: "A Stage Play goal session action requires goalId and action.",
+        schema: "stage_play_goal_session_action_response/v1",
+        contextRole: "tool_evidence",
+      });
+    }
+
+    const statusByAction: Record<string, AgentGoalSessionV1["status"] | undefined> = {
+      pause: "paused",
+      resume: "active",
+      archive: "stopped",
+      stop: "stopped",
+      mark_satisfied: "satisfied",
+    };
+    const status = statusByAction[action];
+    if (!status && action !== "edit_objective") {
+      return stagePlayJsonError(res, 400, {
+        error: "stage_play_goal_session_action_invalid",
+        message: "Unsupported Stage Play goal session action.",
+        schema: "stage_play_goal_session_action_response/v1",
+        contextRole: "tool_evidence",
+      });
+    }
+    if (action === "edit_objective" && !objectiveText) {
+      return stagePlayJsonError(res, 400, {
+        error: "stage_play_goal_session_action_missing_objective",
+        message: "Editing a Stage Play goal session requires an objective.",
+        schema: "stage_play_goal_session_action_response/v1",
+        contextRole: "tool_evidence",
+      });
+    }
+
+    const session = updateStagePlayAgentGoalSession({
+      threadId,
+      goalId,
+      status,
+      objectiveText,
+      checkpoint: {
+        summary:
+          action === "edit_objective"
+            ? "Goal prompt edited from the Helix Ask goal pill."
+            : action === "archive"
+              ? "Goal archived from the Helix Ask goal pill."
+              : `Goal ${action.replace(/_/g, " ")} from the Helix Ask goal pill.`,
+        evidenceRefs: readStringArray(body.evidenceRefs ?? body.evidence_refs),
+        actionsTaken: [`helix_ask_goal_pill:${action}`],
+        nextStep: status === "satisfied" ? "report" : status === "stopped" ? "stop" : "continue",
+      },
+    });
+    if (!session) {
+      return stagePlayJsonError(res, 404, {
+        error: "stage_play_goal_session_not_found",
+        message: "No matching Stage Play goal session was found for this action.",
+        schema: "stage_play_goal_session_action_response/v1",
+        contextRole: "tool_evidence",
+      });
+    }
+
+    return res.json({
+      ok: true,
+      schema: "stage_play_goal_session_action_response/v1",
+      action,
+      session,
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+  } catch (err) {
+    return stagePlayRouteError(res, {
+      error: "stage-play-goal-session-action-failed",
+      err,
+      schema: "stage_play_goal_session_action_response/v1",
       contextRole: "tool_evidence",
     });
   }

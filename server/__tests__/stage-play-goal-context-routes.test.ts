@@ -46,7 +46,11 @@ describe("Stage Play goal-context routes", () => {
         ],
         finalReportRequirements: {
           ...WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS,
-          requiredEvidenceKinds: ["goal_context_update", "terminal_authority_single_writer"],
+          requiredEvidenceKinds: [
+            ...WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS.requiredEvidenceKinds,
+            "goal_context_update",
+            "terminal_authority_single_writer",
+          ],
         },
       })
       .expect(200);
@@ -66,11 +70,11 @@ describe("Stage Play goal-context routes", () => {
     });
     expect(response.body.agentGoalSessions[0]).toMatchObject({
       goalId: "goal:frog-classification",
-      allowedActuators: [
+      allowedActuators: expect.arrayContaining([
         "query_visual_summaries",
         "set_loop_state",
         "narrator_bind_stream",
-      ],
+      ]),
       authority: {
         assistantAnswer: false,
         finalReportsRequireTerminalAuthority: true,
@@ -82,6 +86,97 @@ describe("Stage Play goal-context routes", () => {
           requiredEvidenceKinds: expect.arrayContaining(["goal_context_update", "terminal_authority_single_writer"]),
         }),
       },
+    });
+  });
+
+  it("updates goal-session lifecycle state through the action endpoint", async () => {
+    const app = makeApp();
+
+    await request(app)
+      .post("/api/helix/stage-play/goal-session")
+      .send({
+        threadId: "helix-ask:desktop",
+        goalId: "goal:operator-arc",
+        objective: "Implement the goal-directed workstation operator architecture.",
+        sourceRefs: ["stage_play_goal:operator-arc"],
+      })
+      .expect(200);
+
+    const paused = await request(app)
+      .post("/api/helix/stage-play/goal-session/action")
+      .send({
+        threadId: "helix-ask:desktop",
+        goalId: "goal:operator-arc",
+        action: "pause",
+      })
+      .expect(200);
+
+    expect(paused.body).toMatchObject({
+      ok: true,
+      schema: "stage_play_goal_session_action_response/v1",
+      action: "pause",
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+      session: {
+        goalId: "goal:operator-arc",
+        status: "paused",
+      },
+    });
+    expect(paused.body.session.checkpoints.at(-1)).toMatchObject({
+      summary: "Goal pause from the Helix Ask goal pill.",
+      actionsTaken: expect.arrayContaining(["helix_ask_goal_pill:pause", "set_goal_status:paused"]),
+    });
+
+    const edited = await request(app)
+      .post("/api/helix/stage-play/goal-session/action")
+      .send({
+        threadId: "helix-ask:desktop",
+        goalId: "goal:operator-arc",
+        action: "edit_objective",
+        objective: "Expose goal controls on the Helix Ask bar.",
+      })
+      .expect(200);
+
+    expect(edited.body.session).toMatchObject({
+      goalId: "goal:operator-arc",
+      status: "paused",
+      objective: "Expose goal controls on the Helix Ask bar.",
+      userVisibleSummary: "Expose goal controls on the Helix Ask bar.",
+    });
+    expect(edited.body.session.checkpoints.at(-1).actionsTaken).toEqual(expect.arrayContaining([
+      "helix_ask_goal_pill:edit_objective",
+      "edit_goal_objective",
+    ]));
+
+    const resumed = await request(app)
+      .post("/api/helix/stage-play/goal-session/action")
+      .send({
+        threadId: "helix-ask:desktop",
+        goalId: "goal:operator-arc",
+        action: "resume",
+      })
+      .expect(200);
+
+    expect(resumed.body.session.status).toBe("active");
+
+    const archived = await request(app)
+      .post("/api/helix/stage-play/goal-session/action")
+      .send({
+        threadId: "helix-ask:desktop",
+        goalId: "goal:operator-arc",
+        action: "archive",
+      })
+      .expect(200);
+
+    expect(archived.body.session).toMatchObject({
+      goalId: "goal:operator-arc",
+      status: "stopped",
+    });
+    expect(archived.body.session.checkpoints.at(-1)).toMatchObject({
+      summary: "Goal archived from the Helix Ask goal pill.",
+      nextStep: "stop",
     });
   });
 

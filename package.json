@@ -105,6 +105,7 @@
     "helix:ask:ui-debug-parity": "tsx scripts/helix-ask-ui-debug-parity-harness.ts",
     "helix:ask:api-parity": "tsx scripts/helix-ask-api-parity-probe.ts",
     "helix:ask:live-spine-smoke": "tsx scripts/helix-ask-live-spine-smoke.ts",
+    "helix:ask:user-prompt-corpus": "tsx scripts/helix-ask-user-prompt-corpus-probe.ts",
     "helix:ask:compound-live-probe": "tsx scripts/helix-ask-compound-capability-live-probe.ts",
     "helix:ask:live-source-playbook": "tsx scripts/helix-live-source-agent-goal-playbook-probe.ts",
     "helix:ask:tool-chain-matrix": "tsx scripts/helix-ask-tool-chain-matrix-probe.ts",

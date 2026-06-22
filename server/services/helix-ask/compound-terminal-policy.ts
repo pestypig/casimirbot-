@@ -58,8 +58,13 @@ export type HelixCompoundTerminalPolicy = {
 export const readCompoundTerminalPolicy = (
   payload: RecordLike | null | undefined,
 ): HelixCompoundTerminalPolicy => {
+  const runtimeIntentPacket = readRecord(payload?.runtime_intent_packet);
+  const debug = readRecord(payload?.debug);
+  const debugRuntimeIntentPacket = readRecord(debug?.runtime_intent_packet);
   const itinerary =
     readRecord(payload?.capability_itinerary) ??
+    readRecord(runtimeIntentPacket?.capability_itinerary) ??
+    readRecord(debugRuntimeIntentPacket?.capability_itinerary) ??
     payloadArtifactPayloadByKind(payload, "capability_itinerary");
   const criteria = readRecord(itinerary?.terminal_success_criteria);
   const contract =

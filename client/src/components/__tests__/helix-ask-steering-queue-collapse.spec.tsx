@@ -9,6 +9,22 @@ const helixAskPillSource = () =>
   );
 
 describe("HelixAskPill steering queue collapse", () => {
+  it("renders a compact goal-session pill above the steering queue", () => {
+    const source = helixAskPillSource();
+    const goalIndex = source.indexOf('data-testid="helix-ask-goal-pill"');
+    const queueIndex = source.indexOf('data-testid="helix-ask-steering-queue"');
+
+    expect(goalIndex).toBeGreaterThan(0);
+    expect(queueIndex).toBeGreaterThan(goalIndex);
+    expect(source).toContain('aria-label="Helix Ask goal session"');
+    expect(source).toContain('aria-controls="helix-ask-goal-pill-details"');
+    expect(source).toContain('aria-label="Edit goal prompt"');
+    expect(source).toContain('aria-label={isPaused ? "Resume goal" : "Pause goal"}');
+    expect(source).toContain('aria-label="Archive goal"');
+    expect(source).toContain('postHelixAskGoalSessionAction');
+    expect(source).toContain('/api/helix/stage-play/goal-session/action');
+  });
+
   it("renders the steering queue as a collapsible compact strip", () => {
     const source = helixAskPillSource();
 

@@ -11,7 +11,7 @@ import React, {
 } from "react";
 import { renderToString as renderKatexToString } from "katex";
 import "katex/dist/katex.min.css";
-import { BrainCircuit, Bug, Copy, FileText, Headphones, Image as ImageIcon, Mic, Plus, Radio, RotateCcw, Search, Square, Volume2, X } from "lucide-react";
+import { BrainCircuit, Bug, ChevronDown, Copy, FileText, Headphones, Image as ImageIcon, Mic, PauseCircle, Pencil, PlayCircle, Plus, Radio, RotateCcw, Search, Square, Trash2, Volume2, X } from "lucide-react";
 import { panelRegistry, getPanelDef, type PanelDefinition } from "@/lib/desktop/panelRegistry";
 import {
   findBestDocForTopic,
@@ -63,6 +63,7 @@ import {
   type ImageAttachmentLensRunAttachment,
 } from "@/lib/helix/imageAttachmentLensRun";
 import type { ImageAttachmentLensRunV1 } from "@shared/contracts/image-attachment-lens-run.v1";
+import type { AgentGoalSessionV1 } from "@shared/contracts/workstation-goal-context.v1";
 import { shouldUseIsolatedZenGraphAskTurn } from "@/lib/helix/zenGraphAskRouting";
 import { publishZenGraphCurrentAnswerFromDebugExport } from "@/store/useZenGraphCurrentAnswerStore";
 import {
@@ -9707,6 +9708,27 @@ type StagePlayLiveSourceMailStateResponse = {
   wakeResults?: unknown[];
 };
 
+type StagePlayGoalContextResponse = {
+  ok?: boolean;
+  agentGoalSessions?: AgentGoalSessionV1[];
+};
+
+type StagePlayGoalSessionAction =
+  | "pause"
+  | "resume"
+  | "edit_objective"
+  | "archive"
+  | "stop"
+  | "mark_satisfied";
+
+type StagePlayGoalSessionActionResponse = {
+  ok?: boolean;
+  action?: StagePlayGoalSessionAction;
+  session?: AgentGoalSessionV1;
+  error?: string;
+  message?: string;
+};
+
 const HELIX_ASK_LIVE_SOURCE_MAIL_THREAD_ID = "helix-ask:desktop";
 
 const uniqueTextValues = (values: Array<string | null | undefined>): string[] =>
@@ -9733,6 +9755,50 @@ async function fetchStagePlayLiveSourceMailState(input: {
   return await response.json() as StagePlayLiveSourceMailStateResponse;
 }
 
+async function fetchHelixAskGoalSessions(input: {
+  threadId: string;
+  limit?: number;
+}): Promise<AgentGoalSessionV1[]> {
+  const params = new URLSearchParams();
+  params.set("threadId", input.threadId);
+  params.set("limit", String(input.limit ?? 8));
+  const response = await fetch(`/api/helix/stage-play/goal-context?${params.toString()}`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw new Error(`Stage Play goal context failed: ${response.status}`);
+  }
+  const body = await response.json() as StagePlayGoalContextResponse;
+  return Array.isArray(body.agentGoalSessions) ? body.agentGoalSessions : [];
+}
+
+async function postHelixAskGoalSessionAction(input: {
+  threadId: string;
+  goalId: string;
+  action: StagePlayGoalSessionAction;
+  objective?: string | null;
+}): Promise<AgentGoalSessionV1> {
+  const response = await fetch("/api/helix/stage-play/goal-session/action", {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      threadId: input.threadId,
+      goalId: input.goalId,
+      action: input.action,
+      ...(input.objective ? { objective: input.objective } : {}),
+    }),
+  });
+  const body = await response.json().catch(() => ({})) as StagePlayGoalSessionActionResponse;
+  if (!response.ok || !body.ok || !body.session) {
+    throw new Error(body.message || body.error || `Stage Play goal action failed: ${response.status}`);
+  }
+  return body.session;
+}
+
 async function fetchStagePlayLiveSourceMailTranscript(input: {
   threadId: string;
   mailboxThreadId?: string | null;
@@ -9750,6 +9816,134 @@ async function fetchStagePlayLiveSourceMailTranscript(input: {
     throw new Error(`Stage Play live-source mail transcript failed: ${response.status}`);
   }
   return await response.json() as StagePlayLiveSourceMailTranscriptResponse;
+}
+
+function labelizeGoalPillValue(value: string | null | undefined): string {
+  return String(value ?? "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim() || "none";
+}
+
+function formatGoalPillCadence(cadence: AgentGoalSessionV1["cadence"]): string {
+  if (cadence.kind === "interval") return `${Math.round(cadence.everyMs / 1000)}s interval`;
+  if (cadence.kind === "event_accumulation") return `${cadence.minUpdates} updates`;
+  if (cadence.kind === "user_turn_only") return "user turns";
+  return "manual";
+}
+
+function HelixAskGoalPill({
+  session,
+  expanded,
+  busyAction,
+  error,
+  onToggleExpanded,
+  onAction,
+}: {
+  session: AgentGoalSessionV1;
+  expanded: boolean;
+  busyAction: StagePlayGoalSessionAction | null;
+  error: string | null;
+  onToggleExpanded: () => void;
+  onAction: (action: StagePlayGoalSessionAction) => void;
+}) {
+  const isPaused = session.status === "paused";
+  const latestCheckpoint = session.checkpoints.at(-1);
+  const statusTone =
+    session.status === "blocked"
+      ? "border-amber-300/35 bg-amber-400/10 text-amber-100"
+      : session.status === "paused"
+        ? "border-slate-300/20 bg-slate-300/10 text-slate-100"
+        : "border-emerald-300/25 bg-emerald-400/10 text-emerald-100";
+  const controlsDisabled = Boolean(busyAction);
+  return (
+    <section
+      className="mt-2 rounded-2xl border border-white/10 bg-slate-950/60 px-2.5 py-1.5 text-xs text-slate-100 shadow-[0_18px_50px_rgba(0,0,0,0.18)]"
+      aria-label="Helix Ask goal session"
+      data-testid="helix-ask-goal-pill"
+      data-goal-status={session.status}
+      data-expanded={expanded ? "true" : "false"}
+    >
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          aria-expanded={expanded}
+          aria-controls="helix-ask-goal-pill-details"
+          onClick={onToggleExpanded}
+          className="flex min-w-0 flex-1 items-center gap-2 rounded-xl px-1 py-0.5 text-left hover:bg-white/5"
+        >
+          <span className="shrink-0 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] text-slate-300">
+            {labelizeGoalPillValue(session.status)} goal
+          </span>
+          <span className="min-w-0 truncate text-[11px] font-semibold text-slate-200">
+            {clipText(session.userVisibleSummary || session.objective, 112)}
+          </span>
+          <span className={`hidden shrink-0 rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] sm:inline-flex ${statusTone}`}>
+            {formatGoalPillCadence(session.cadence)}
+          </span>
+        </button>
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            aria-label="Edit goal prompt"
+            title="Edit goal prompt"
+            disabled={controlsDisabled}
+            onClick={() => onAction("edit_objective")}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            <Pencil className="h-3.5 w-3.5" aria-hidden />
+          </button>
+          <button
+            type="button"
+            aria-label={isPaused ? "Resume goal" : "Pause goal"}
+            title={isPaused ? "Resume goal" : "Pause goal"}
+            disabled={controlsDisabled}
+            onClick={() => onAction(isPaused ? "resume" : "pause")}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            {isPaused ? <PlayCircle className="h-3.5 w-3.5" aria-hidden /> : <PauseCircle className="h-3.5 w-3.5" aria-hidden />}
+          </button>
+          <button
+            type="button"
+            aria-label="Archive goal"
+            title="Archive goal"
+            disabled={controlsDisabled}
+            onClick={() => onAction("archive")}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            <Trash2 className="h-3.5 w-3.5" aria-hidden />
+          </button>
+          <button
+            type="button"
+            aria-label={expanded ? "Collapse goal details" : "Expand goal details"}
+            title={expanded ? "Collapse goal details" : "Expand goal details"}
+            onClick={onToggleExpanded}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10"
+          >
+            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${expanded ? "rotate-180" : ""}`} aria-hidden />
+          </button>
+        </div>
+      </div>
+      {expanded ? (
+        <div id="helix-ask-goal-pill-details" className="mt-2 grid gap-1.5 rounded-xl border border-white/10 bg-black/20 p-2 text-[11px] text-slate-300">
+          <div className="break-words leading-4 text-slate-200">{session.objective}</div>
+          <div className="grid gap-1 font-mono text-[9px] text-slate-500 sm:grid-cols-2">
+            <div>feeds={session.contextFeeds.map((feed) => labelizeGoalPillValue(feed.sourceKind)).join(", ") || "none"}</div>
+            <div>actuators={session.allowedActuators.slice(0, 8).map(labelizeGoalPillValue).join(", ") || "none"}</div>
+            <div>loops={session.loopRefs.slice(0, 4).join(", ") || "none"}</div>
+            <div>checkpoint={latestCheckpoint?.summary ?? "none"}</div>
+            <div>terminal_authority={String(session.authority.finalReportsRequireTerminalAuthority)}</div>
+            <div>stop={session.stopConditions.slice(0, 2).join(" | ") || "none"}</div>
+          </div>
+        </div>
+      ) : null}
+      {busyAction || error ? (
+        <p className={`mt-1 px-1 text-[10px] ${error ? "text-rose-200" : "text-slate-400"}`}>
+          {error ?? `${labelizeGoalPillValue(busyAction)}...`}
+        </p>
+      ) : null}
+    </section>
+  );
 }
 
 export function isDurableHelixAskMailTranscriptGroup(
@@ -19104,6 +19298,10 @@ export function HelixAskPill({
   const [liveSourceMailTranscriptRefreshSeq, setLiveSourceMailTranscriptRefreshSeq] = useState(0);
   const [liveSourceMailStateRefreshSeq, setLiveSourceMailStateRefreshSeq] = useState(0);
   const [liveSourceMailState, setLiveSourceMailState] = useState<StagePlayLiveSourceMailStateResponse | null>(null);
+  const [askGoalSession, setAskGoalSession] = useState<AgentGoalSessionV1 | null>(null);
+  const [askGoalPillExpanded, setAskGoalPillExpanded] = useState(false);
+  const [askGoalPillBusyAction, setAskGoalPillBusyAction] = useState<StagePlayGoalSessionAction | null>(null);
+  const [askGoalPillError, setAskGoalPillError] = useState<string | null>(null);
   const debugCopyInFlightRef = useRef(false);
   const askReplyListRef = useRef<HTMLDivElement | null>(null);
   const askReplyListBottomRef = useRef<HTMLDivElement | null>(null);
@@ -19215,6 +19413,69 @@ export function HelixAskPill({
       if (interval !== null) window.clearInterval(interval);
     };
   }, [liveSourceMailStateRefreshSeq]);
+  useEffect(() => {
+    let cancelled = false;
+    const loadGoalSession = async () => {
+      try {
+        const sessions = await fetchHelixAskGoalSessions({
+          threadId: HELIX_ASK_LIVE_SOURCE_MAIL_THREAD_ID,
+          limit: 8,
+        });
+        if (cancelled) return;
+        const visibleSession = sessions.find((session) =>
+          session.status !== "stopped" &&
+          session.status !== "failed" &&
+          session.status !== "satisfied"
+        ) ?? null;
+        setAskGoalSession(visibleSession);
+      } catch (error) {
+        if (!cancelled) {
+          console.warn("[HelixAskPill] goal session refresh failed", error);
+        }
+      }
+    };
+    void loadGoalSession();
+    const interval = typeof window !== "undefined"
+      ? window.setInterval(() => {
+          void loadGoalSession();
+        }, 10000)
+      : null;
+    return () => {
+      cancelled = true;
+      if (interval !== null) window.clearInterval(interval);
+    };
+  }, [liveSourceMailStateRefreshSeq, askReplies.length]);
+  const handleAskGoalSessionAction = useCallback(async (action: StagePlayGoalSessionAction) => {
+    const session = askGoalSession;
+    if (!session || askGoalPillBusyAction) return;
+    let objective: string | null = null;
+    if (action === "edit_objective") {
+      const nextObjective = window.prompt("Edit goal prompt", session.objective);
+      if (!nextObjective || nextObjective.trim() === session.objective.trim()) return;
+      objective = nextObjective.trim();
+    }
+    if (action === "archive" && !window.confirm("Archive this goal session?")) return;
+    setAskGoalPillBusyAction(action);
+    setAskGoalPillError(null);
+    try {
+      const nextSession = await postHelixAskGoalSessionAction({
+        threadId: HELIX_ASK_LIVE_SOURCE_MAIL_THREAD_ID,
+        goalId: session.goalId,
+        action,
+        objective,
+      });
+      setAskGoalSession(
+        nextSession.status === "stopped" || nextSession.status === "failed" || nextSession.status === "satisfied"
+          ? null
+          : nextSession,
+      );
+      setLiveSourceMailStateRefreshSeq((current) => current + 1);
+    } catch (error) {
+      setAskGoalPillError(error instanceof Error ? error.message : "Goal action failed.");
+    } finally {
+      setAskGoalPillBusyAction(null);
+    }
+  }, [askGoalPillBusyAction, askGoalSession]);
   useEffect(() => {
     let cancelled = false;
     const loadDurableMailTranscript = async () => {
@@ -37705,6 +37966,16 @@ export function HelixAskPill({
         </div>
         </div>
         </form>
+        {askGoalSession ? (
+          <HelixAskGoalPill
+            session={askGoalSession}
+            expanded={askGoalPillExpanded}
+            busyAction={askGoalPillBusyAction}
+            error={askGoalPillError}
+            onToggleExpanded={() => setAskGoalPillExpanded((current) => !current)}
+            onAction={handleAskGoalSessionAction}
+          />
+        ) : null}
         {steeringQueueItems.length > 0 ? (
           <section
             className="mt-2 rounded-2xl border border-white/10 bg-slate-950/55 px-2.5 py-1.5 text-xs text-slate-100 shadow-[0_18px_50px_rgba(0,0,0,0.18)]"

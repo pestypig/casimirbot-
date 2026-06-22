@@ -3425,6 +3425,9 @@ export function applyHelixTerminalAuthoritySingleWriter(
       !compoundSubgoalDraftSupportCoverage.applies ||
       compoundSubgoalDraftSupportCoverage.ok
     );
+  const compoundSynthesisTerminalReady =
+    compoundMaterializedDraftCanSatisfyTerminal &&
+    draftMaterialization?.ok === true;
   const selectedDirectAnswerTerminal =
     goalAllowsTerminal
       ? findLatestDirectAnswerTerminal(input.payload, artifacts)
@@ -3461,6 +3464,34 @@ export function applyHelixTerminalAuthoritySingleWriter(
     Boolean(rawSelectedReceiptTerminal) &&
     multiSubgoalCompoundTerminalSynthesisActive(input.payload);
   const selectedReceiptTerminal = compoundReceiptTerminalBlocked ? null : rawSelectedReceiptTerminal;
+  const capabilityPlan = readRecord(input.payload.capability_plan);
+  const capabilityLifecycleLedger = readRecord(input.payload.capability_lifecycle_ledger);
+  const capabilityFailureCodes = readArray(capabilityLifecycleLedger?.failure_codes)
+    .map(readString)
+    .filter((entry): entry is string => Boolean(entry));
+  const blockingMutatingCapabilityFailure =
+    capabilityPlan?.mutating === true &&
+    capabilityLifecycleLedger?.ok === false &&
+    (
+      capabilityFailureCodes.includes("mutating_capability_without_operator_command") ||
+      capabilityFailureCodes.includes("capability_dispatched_without_admission") ||
+      capabilityFailureCodes.includes("capability_admitted_not_dispatched") ||
+      capabilityFailureCodes.includes("capability_result_missing")
+    );
+  const blockingMutatingCapabilityFailureCode = capabilityFailureCodes.includes("mutating_capability_without_operator_command")
+    ? "mutating_capability_requires_operator_command"
+    : capabilityFailureCodes.includes("capability_dispatched_without_admission")
+      ? "capability_dispatched_without_admission"
+      : capabilityFailureCodes.includes("capability_admitted_not_dispatched")
+        ? "capability_admitted_not_dispatched"
+        : capabilityFailureCodes.includes("capability_result_missing")
+          ? "capability_result_missing"
+          : "capability_lifecycle_failed";
+  const blockingMutatingCapabilityFailureText = blockingMutatingCapabilityFailure
+    ? blockingMutatingCapabilityFailureCode === "mutating_capability_requires_operator_command"
+      ? `I could not run ${readString(capabilityPlan?.selected_capability) || readString(capabilityPlan?.requested_action) || "the requested mutating capability"} because this turn did not include an admitted operator command.`
+      : `I could not complete this turn because ${readString(capabilityPlan?.selected_capability) || readString(capabilityPlan?.requested_action) || "the requested mutating capability"} did not complete its admitted tool lifecycle.`
+    : null;
   const selectedGoalArtifact =
     findGoalSatisfyingCapabilityHelpArtifact(input.payload, artifacts) ??
     findGoalSatisfyingTheoryContextReflectionArtifact(input.payload, artifacts) ??
@@ -4153,7 +4184,62 @@ export function applyHelixTerminalAuthoritySingleWriter(
     writeCompoundSubgoalRailFailureDetails(input.payload, firstIncompleteCompoundSubgoalRailFailure);
     selectedArtifactKind = "typed_failure";
     selectedSource = "typed_failure";
-  } else if (!solverContinuationPending && selectedWorkstationToolEvaluation) {
+  } else if (blockingMutatingCapabilityFailureText) {
+    const latestDraft = findLatestFinalAnswerDraftCandidate(artifacts);
+    if (latestDraft) {
+      rejectedCandidates.push({
+        ref: latestDraft.ref ?? undefined,
+        kind: "model_synthesized_answer",
+        source: "final_answer_draft",
+        reason: "capability_lifecycle_failed",
+      });
+    }
+    if (selectedReceiptTerminal) {
+      rejectedCandidates.push({
+        ref: selectedReceiptTerminal.ref ?? undefined,
+        kind: selectedReceiptTerminal.kind,
+        source: selectedReceiptTerminal.kind,
+        reason: "capability_lifecycle_failed",
+      });
+    }
+    selectedArtifactKind = "typed_failure";
+    selectedSource = "typed_failure";
+    input.payload.ok = false;
+    input.payload.response_type = "final_failure";
+    input.payload.final_status = "final_failure";
+    input.payload.status = "final_failure";
+    input.payload.terminal_artifact_kind = "typed_failure";
+    input.payload.final_answer_source = "typed_failure";
+    input.payload.terminal_error_code = blockingMutatingCapabilityFailureCode;
+    input.payload.terminal_failure_text = blockingMutatingCapabilityFailureText;
+    input.payload.selected_final_answer = blockingMutatingCapabilityFailureText;
+    input.payload.answer = blockingMutatingCapabilityFailureText;
+    input.payload.text = blockingMutatingCapabilityFailureText;
+    input.payload.assistant_answer = blockingMutatingCapabilityFailureText;
+    delete input.payload.model_synthesized_answer;
+    input.payload.typed_failure = {
+      ...(readRecord(input.payload.typed_failure) ?? {}),
+      schema: "helix.typed_failure.v1",
+      error_code: blockingMutatingCapabilityFailureCode,
+      message: blockingMutatingCapabilityFailureText,
+      text: blockingMutatingCapabilityFailureText,
+      answer_text: blockingMutatingCapabilityFailureText,
+      capability_failure_codes: capabilityFailureCodes,
+      requested_capability: readString(capabilityPlan?.requested_capability) || readString(capabilityPlan?.requested_action) || null,
+      selected_capability: readString(capabilityPlan?.selected_capability) || null,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    input.payload.terminal_presentation = {
+      ...(readRecord(input.payload.terminal_presentation) ?? {}),
+      schema: "helix.terminal_presentation.v1",
+      turn_id: input.turnId,
+      terminal_artifact_kind: "typed_failure",
+      concise_text: blockingMutatingCapabilityFailureText,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  } else if (!solverContinuationPending && selectedWorkstationToolEvaluation && !compoundSynthesisTerminalReady) {
     const workstationTerminalText = synthesizeWorkstationToolEvaluationTerminalText({
       turnId: input.turnId,
       payload: input.payload,
@@ -4267,6 +4353,15 @@ export function applyHelixTerminalAuthoritySingleWriter(
   ) {
     const terminalErrorCode = "capability_itinerary_observations_missing";
     const terminalErrorText = `I could not complete this turn because required itinerary observations are missing: ${missingItineraryFamilies.join(", ")}.`;
+    const latestDraft = findLatestFinalAnswerDraftCandidate(artifacts);
+    if (latestDraft) {
+      rejectedCandidates.push({
+        ref: latestDraft.ref ?? undefined,
+        kind: "model_synthesized_answer",
+        source: "final_answer_draft",
+        reason: "missing_required_observation",
+      });
+    }
     input.payload.terminal_artifact_kind = "typed_failure";
     input.payload.final_answer_source = "typed_failure";
     input.payload.terminal_error_code = terminalErrorCode;
@@ -4391,7 +4486,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
     };
     delete input.payload.terminal_error_code;
     delete input.payload.terminal_failure_text;
-  } else if (selectedGoalArtifact?.kind === "capability_help_summary") {
+  } else if (selectedGoalArtifact?.kind === "capability_help_summary" && !compoundSynthesisTerminalReady) {
     selectedArtifactRef = selectedGoalArtifact.ref;
     selectedArtifactKind = selectedGoalArtifact.kind;
     selectedSource = selectedGoalArtifact.kind;
@@ -4418,7 +4513,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
     };
     delete input.payload.terminal_error_code;
     delete input.payload.terminal_failure_text;
-  } else if (!solverContinuationPending && selectedDirectAnswerTerminal) {
+  } else if (!solverContinuationPending && selectedDirectAnswerTerminal && !compoundSynthesisTerminalReady) {
     selectedArtifactRef = selectedDirectAnswerTerminal.ref;
     selectedArtifactKind = "direct_answer_text";
     selectedSource = "direct_answer_text";
@@ -4468,7 +4563,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
       raw_content_included: false,
     };
     delete input.payload.terminal_error_code;
-  } else if (!solverContinuationPending && existingDocEvidenceTerminal) {
+  } else if (!solverContinuationPending && existingDocEvidenceTerminal && !compoundSynthesisTerminalReady) {
     selectedArtifactRef = existingDocEvidenceTerminal.ref;
     selectedArtifactKind = "doc_evidence_synthesis_answer";
     selectedSource = "final_answer_draft";
@@ -4495,7 +4590,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
     };
     delete input.payload.terminal_error_code;
     delete input.payload.terminal_failure_text;
-  } else if (!solverContinuationPending && selectedGoalArtifact) {
+  } else if (!solverContinuationPending && selectedGoalArtifact && !compoundSynthesisTerminalReady) {
     selectedArtifactRef = selectedGoalArtifact.ref;
     selectedArtifactKind = selectedGoalArtifact.kind;
     selectedSource = selectedGoalArtifact.kind;

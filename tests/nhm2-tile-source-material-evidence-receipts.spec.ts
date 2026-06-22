@@ -19,7 +19,10 @@ import {
   buildNhm2TileSourceAuthorityHandoff,
   isNhm2TileSourceAuthorityHandoff,
 } from "../shared/contracts/nhm2-tile-source-authority-handoff.v1";
-import { isNhm2TileSourceExperimentalCampaignPackage } from "../shared/contracts/nhm2-tile-source-experimental-campaign-package.v1";
+import {
+  buildNhm2TileSourceExperimentalCampaignPackage,
+  isNhm2TileSourceExperimentalCampaignPackage,
+} from "../shared/contracts/nhm2-tile-source-experimental-campaign-package.v1";
 import {
   buildNhm2TileSourceMaterialCouponTestPlan,
   isNhm2TileSourceMaterialCouponTestPlan,
@@ -823,14 +826,349 @@ describe("NHM2 tile source material evidence receipts", () => {
         "material_coupon_behavior",
       );
       expect(result.experimentalCampaignPackage.summary.measurementCount).toBeGreaterThanOrEqual(3);
+      expect(result.experimentalCampaignPackage.summary.measurementDocketCount).toBe(
+        result.experimentalCampaignPackage.measurementDocket.length,
+      );
+      expect(result.experimentalCampaignPackage.summary.measurementDocketCount).toBeGreaterThan(
+        result.experimentalCampaignPackage.summary.measurementCount,
+      );
+      expect(result.experimentalCampaignPackage.summary.requiredTargetAvailableCount).toBe(18);
+      expect(result.experimentalCampaignPackage.summary.requiredTargetPendingCount).toBe(2);
+      expect(result.experimentalCampaignPackage.summary.requiredTargetNotApplicableCount).toBe(3);
+      expect(result.experimentalCampaignPackage.summary.requiredTargetNotDeclaredCount).toBe(0);
       expect(result.experimentalCampaignPackage.summary.missingMeasurementCount).toBeGreaterThan(0);
       expect(result.experimentalCampaignPackage.summary.failingMeasurementCount).toBe(0);
       expect(result.experimentalCampaignPackage.summary.passingMeasurementCount).toBe(0);
       expect(result.experimentalCampaignPackage.summary.objectiveCoverageCount).toBe(9);
+      expect(result.experimentalCampaignPackage.summary.campaignDomainLedgerCount).toBe(8);
+      expect(result.experimentalCampaignPackage.summary.receiptAcquisitionDomainCount).toBe(8);
+      expect(result.experimentalCampaignPackage.summary.receiptArtifactRequirementCount).toBe(23);
+      expect(result.experimentalCampaignPackage.summary.domainsWithPendingDerivedTargetsCount).toBe(
+        2,
+      );
+      expect(result.experimentalCampaignPackage.summary.targetGapMeasurementCount).toBe(2);
+      expect(result.experimentalCampaignPackage.summary.missingReceiptDomainCount).toBe(7);
+      expect(result.experimentalCampaignPackage.summary.downstreamBlockedDomainCount).toBe(1);
+      expect(result.experimentalCampaignPackage.summary.noGoDomainCount).toBe(0);
+      expect(result.experimentalCampaignPackage.summary.reviewDomainCount).toBe(8);
+      expect(result.experimentalCampaignPackage.summary.goDomainCount).toBe(0);
       expect(result.experimentalCampaignPackage.summary.allObjectiveCoveragePresent).toBe(true);
       expect(result.experimentalCampaignPackage.summary.allEvidenceObjectivesSatisfied).toBe(false);
+      expect(result.experimentalCampaignPackage.sourceRefs.operatingBudgetReadinessRef).toBe(
+        result.outputRefs.operatingBudgetReadiness,
+      );
       expect(result.experimentalCampaignPackage.summary.openObjectiveCount).toBeGreaterThan(0);
       expect(result.experimentalCampaignPackage.summary.satisfiedObjectiveCount).toBeGreaterThan(0);
+      expect(result.experimentalCampaignPackage.campaignDomainLedger).toHaveLength(8);
+      expect(result.experimentalCampaignPackage.campaignDomainLedger.map((entry) => entry.campaignDomain)).toEqual([
+        "material_coupon_behavior",
+        "force_gap_pull_in",
+        "roughness_patch_potential",
+        "active_control_energy_noise_heat_timing",
+        "fatigue_layer_scaling",
+        "full_apparatus_tensor",
+        "downstream_residual_conservation_qei_observer",
+        "campaign_coordination",
+      ]);
+      expect(result.experimentalCampaignPackage.receiptAcquisitionLedger).toHaveLength(8);
+      expect(result.experimentalCampaignPackage.receiptAcquisitionLedger).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            campaignDomain: "material_coupon_behavior",
+            acquisitionStatus: "missing_receipt",
+            decision: "review",
+            nextEvidenceArtifact: "receipt://material_coupon/provenance_v1",
+            requiredEvidenceArtifacts: expect.arrayContaining([
+              "receipt://material_coupon/fracture_yield_margin_v1",
+              "receipt://material_coupon/fatigue_cycle_margin_v1",
+              "receipt://material_coupon/material_response_15ghz_4k_v1",
+            ]),
+            openMeasurementIds: expect.arrayContaining([
+              "coupon_fracture_yield_margin",
+              "coupon_fatigue_cycle_margin",
+              "coupon_material_response",
+            ]),
+            requiredTargetAvailableCount: 3,
+            requiredTargetPendingCount: 0,
+            blocksCampaignPass: true,
+          }),
+          expect.objectContaining({
+            campaignDomain: "active_control_energy_noise_heat_timing",
+            requiredEvidenceArtifacts: expect.arrayContaining([
+              "receipt://active_control/bandwidth_15ghz_switching_v1",
+              "receipt://active_control/gap_noise_spectrum_v1",
+              "receipt://active_control/heat_load_sink_capacity_v1",
+            ]),
+            openMeasurementIds: expect.arrayContaining([
+              "active_control_bandwidth",
+              "gap_noise_margin",
+              "thermal_sink_capacity",
+            ]),
+            requiredTargetPendingCount: 1,
+            pendingTargetGaps: [
+              {
+                measurementId: "thermal_sink_capacity",
+                requiredTargetKey: "heatSinkCapacityMinW",
+                requiredTargetGapReason:
+                  "heatSinkCapacityMinW_missing_from_required_corrections",
+              },
+            ],
+          }),
+          expect.objectContaining({
+            campaignDomain: "fatigue_layer_scaling",
+            requiredEvidenceArtifacts: expect.arrayContaining([
+              "receipt://fatigue_lifetime/cycle_count_margin_v1",
+              "receipt://fatigue_lifetime/thermal_creep_drift_v1",
+              "receipt://fatigue_lifetime/delamination_adhesion_v1",
+              "receipt://layer_scaling/scaling_efficiency_v1",
+              "receipt://layer_scaling/active_area_retention_v1",
+              "receipt://layer_scaling/source_tensor_retention_v1",
+            ]),
+            openMeasurementIds: expect.arrayContaining([
+              "fatigue_cycle_margin",
+              "thermal_creep_drift",
+              "delamination_adhesion_margin",
+              "layer_scaling_efficiency",
+              "active_area_retention",
+              "source_tensor_retention",
+            ]),
+            requiredTargetPendingCount: 1,
+            pendingTargetGaps: [
+              {
+                measurementId: "fatigue_cycle_margin",
+                requiredTargetKey: "cycleCountRequired",
+                requiredTargetGapReason: "cycleCountRequired_missing_from_required_corrections",
+              },
+            ],
+          }),
+          expect.objectContaining({
+            campaignDomain: "full_apparatus_tensor",
+            requiredEvidenceArtifacts: expect.arrayContaining([
+              "receipt://full_apparatus_tensor/component_detail_refs_v1",
+              "receipt://full_apparatus_tensor/stress_energy_terms_v1",
+              "receipt://full_apparatus_tensor/regional_supports_v1",
+            ]),
+            openMeasurementIds: [
+              "tensor_component_coverage",
+              "apparatus_stress_energy_terms",
+              "regional_support_coverage",
+            ],
+            requiredTargetAvailableCount: 3,
+          }),
+        ]),
+      );
+      expect(result.experimentalCampaignPackage.campaignItems).toHaveLength(7);
+      expect(result.experimentalCampaignPackage.measurementDocket).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            campaignDomain: "material_coupon_behavior",
+            measurementId: "coupon_fracture_yield_margin",
+            target: "fracture/yield stress >= 1.09141417572e9 Pa",
+            requiredCorrectionKey: "fractureOrYieldStressShortfallPa",
+            requiredTargetKey: "requiredFractureOrYieldStressPa",
+            requiredTargetValue: 1091414175.72,
+            requiredTargetStatus: "available",
+            requiredTargetGapReason: null,
+            status: "missing",
+            firstBlocker: "material_coupon_tier_not_measured_or_validated",
+            blocksCampaignPass: true,
+          }),
+          expect.objectContaining({
+            campaignDomain: "material_coupon_behavior",
+            measurementId: "coupon_fatigue_cycle_margin",
+            requiredCorrectionKey: "couponCycleCountShortfall",
+            requiredTargetKey: "couponRequiredCycleCount",
+            requiredTargetValue: 1e9,
+            requiredTargetStatus: "available",
+          }),
+          expect.objectContaining({
+            campaignDomain: "force_gap_pull_in",
+            measurementId: "force_curve_brackets_8nm",
+            requiredCorrectionKey: null,
+            requiredTargetKey: null,
+            requiredTargetValue: null,
+            requiredTargetStatus: "not_applicable",
+            requiredTargetGapReason: null,
+          }),
+          expect.objectContaining({
+            campaignDomain: "force_gap_pull_in",
+            measurementId: "pull_in_margin",
+            requiredCorrectionKey: "springConstantShortfallNPerM",
+            requiredCorrectionValue: null,
+            requiredTargetKey: "springConstantMinNPerM",
+            requiredTargetValue: 7094192142150,
+            requiredTargetStatus: "available",
+            status: "missing",
+            firstBlocker: "force_gap_tier_not_measured_or_validated",
+          }),
+          expect.objectContaining({
+            campaignDomain: "force_gap_pull_in",
+            measurementId: "active_gap_authority",
+            requiredCorrectionKey: "activeGapControlAuthorityShortfallN",
+            requiredCorrectionValue: null,
+            requiredTargetKey: "activeGapControlAuthorityMinN",
+            requiredTargetValue: 17026.0611412,
+            requiredTargetStatus: "available",
+            noGoCriterion: "authority margin < 1.2 or actuator authority missing",
+          }),
+          expect.objectContaining({
+            campaignDomain: "roughness_patch_potential",
+            measurementId: "roughness_rms_margin",
+            requiredCorrectionKey: "roughnessRmsReductionMeters",
+            requiredTargetKey: "roughnessRmsMaxMeters",
+            requiredTargetValue: 1e-10,
+            requiredTargetStatus: "available",
+          }),
+          expect.objectContaining({
+            campaignDomain: "roughness_patch_potential",
+            measurementId: "patch_potential_force_fraction",
+            requiredCorrectionKey: "residualElectrostaticForceFractionReduction",
+            requiredTargetKey: "residualElectrostaticForceFractionMax",
+            requiredTargetValue: 0.05,
+            requiredTargetStatus: "available",
+          }),
+          expect.objectContaining({
+            campaignDomain: "active_control_energy_noise_heat_timing",
+            measurementId: "active_control_bandwidth",
+            requiredCorrectionKey: "bandwidthShortfallHz",
+            requiredTargetKey: "bandwidthMinHz",
+            requiredTargetValue: 30e9,
+            requiredTargetStatus: "available",
+          }),
+          expect.objectContaining({
+            campaignDomain: "active_control_energy_noise_heat_timing",
+            measurementId: "gap_noise_margin",
+            requiredCorrectionKey: "gapNoiseRmsReductionMeters",
+            requiredTargetKey: "gapNoiseRmsMaxMeters",
+            requiredTargetValue: 8e-11,
+            requiredTargetStatus: "available",
+          }),
+          expect.objectContaining({
+            campaignDomain: "active_control_energy_noise_heat_timing",
+            measurementId: "thermal_sink_capacity",
+            requiredCorrectionKey: "heatSinkCapacityShortfallW",
+            requiredTargetKey: "heatSinkCapacityMinW",
+            requiredTargetValue: null,
+            requiredTargetStatus: "derived_target_pending",
+            requiredTargetGapReason: "heatSinkCapacityMinW_missing_from_required_corrections",
+          }),
+          expect.objectContaining({
+            campaignDomain: "fatigue_layer_scaling",
+            measurementId: "fatigue_cycle_margin",
+            requiredCorrectionKey: "cycleCountShortfall",
+            requiredTargetKey: "cycleCountRequired",
+            requiredTargetValue: null,
+            requiredTargetStatus: "derived_target_pending",
+            requiredTargetGapReason: "cycleCountRequired_missing_from_required_corrections",
+          }),
+          expect.objectContaining({
+            campaignDomain: "fatigue_layer_scaling",
+            measurementId: "thermal_creep_drift",
+            requiredCorrectionKey: "thermalCycleDriftReduction",
+            requiredTargetKey: "thermalCycleDriftFractionMax",
+            requiredTargetValue: 0.01,
+            requiredTargetStatus: "available",
+          }),
+          expect.objectContaining({
+            campaignDomain: "fatigue_layer_scaling",
+            measurementId: "layer_scaling_efficiency",
+            requiredCorrectionKey: "layerScalingEfficiencyShortfall",
+            requiredTargetKey: "layerScalingEfficiencyMin",
+            requiredTargetValue: 0.9,
+            requiredTargetStatus: "available",
+          }),
+          expect.objectContaining({
+            campaignDomain: "full_apparatus_tensor",
+            measurementId: "tensor_component_coverage",
+            requiredCorrectionKey: "tensorComponentRefMissingCount",
+            requiredCorrectionValue: 10,
+            requiredTargetKey: "requiredTensorComponentCount",
+            requiredTargetValue: 10,
+            requiredTargetStatus: "available",
+          }),
+          expect.objectContaining({
+            campaignDomain: "full_apparatus_tensor",
+            measurementId: "apparatus_stress_energy_terms",
+            requiredCorrectionValue: 9,
+            requiredTargetKey: "requiredStressEnergyTermCount",
+            requiredTargetValue: 9,
+            requiredTargetStatus: "available",
+            noGoCriterion: expect.stringContaining("support/control/electrostatic/thermal"),
+          }),
+          expect.objectContaining({
+            campaignDomain: "full_apparatus_tensor",
+            measurementId: "regional_support_coverage",
+            requiredCorrectionKey: "regionalSupportRefMissingCount",
+            requiredCorrectionValue: 3,
+            requiredTargetKey: "requiredRegionCount",
+            requiredTargetValue: 3,
+            requiredTargetStatus: "available",
+          }),
+        ]),
+      );
+      expect(
+        result.experimentalCampaignPackage.campaignDomainLedger.find(
+          (entry) => entry.campaignDomain === "material_coupon_behavior",
+        ),
+      ).toMatchObject({
+        decision: "review",
+        evidenceState: "missing_receipt",
+        firstBlocker: "material_coupon_tier_not_measured_or_validated",
+        blockerIds: expect.arrayContaining([
+          "material_coupon_tier_not_measured_or_validated",
+          "material_coupon:material_coupon_receipt_missing_for_operating_budget",
+        ]),
+        decisiveMeasurementIds: expect.arrayContaining([
+          "coupon_fracture_yield_margin",
+          "coupon_material_response",
+        ]),
+        decisiveMeasurementStatuses: expect.arrayContaining([
+          expect.objectContaining({
+            measurementId: "coupon_material_response",
+            status: "missing",
+            currentMargin: false,
+          }),
+        ]),
+      });
+      expect(
+        result.experimentalCampaignPackage.campaignDomainLedger.find(
+          (entry) => entry.campaignDomain === "campaign_coordination",
+        ),
+      ).toMatchObject({
+        decision: "review",
+        blocksCampaignPass: true,
+        firstBlocker: "material_coupon_receipt_missing",
+      });
+      expect(
+        result.experimentalCampaignPackage.campaignDomainLedger.find(
+          (entry) => entry.campaignDomain === "full_apparatus_tensor",
+        ),
+      ).toMatchObject({
+        decision: "review",
+        evidenceState: "missing_receipt",
+        blocksCampaignPass: true,
+        blockerIds: expect.arrayContaining([
+          "full_apparatus_tensor_tier_not_measured_or_validated",
+          "full_apparatus_tensor:full_apparatus_T12_ref_missing_for_operating_budget",
+        ]),
+        decisiveMeasurementStatuses: expect.arrayContaining([
+          expect.objectContaining({
+            measurementId: "tensor_component_coverage",
+            requiredCorrectionValue: 10,
+            status: "missing",
+          }),
+          expect.objectContaining({
+            measurementId: "apparatus_stress_energy_terms",
+            requiredCorrectionValue: 9,
+            status: "missing",
+          }),
+          expect.objectContaining({
+            measurementId: "regional_support_coverage",
+            requiredCorrectionValue: 3,
+            status: "missing",
+          }),
+        ]),
+      });
       expect(result.experimentalCampaignPackage.objectiveCoverage).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
@@ -954,6 +1292,90 @@ describe("NHM2 tile source material evidence receipts", () => {
     } finally {
       rmSync(tempRoot, { recursive: true, force: true });
     }
+  });
+
+  it("lets the campaign package consume source-side authority blockers after handoff", () => {
+    const receipts = buildNhm2TileSourceMaterialEvidenceReceipts(passingEvidence);
+    const operatingBudgetReadiness = buildPassingOperatingBudgetReadiness(receipts);
+    const physicalValidationPlan = buildNhm2TileSourcePhysicalValidationPlan({
+      generatedAt,
+      materialEvidenceReceipts: receipts,
+      operatingBudgetReadiness,
+      downstreamGateStatuses: allDownstreamPass,
+    });
+    const evidenceGapRoadmap = buildNhm2TileSourceEvidenceGapRoadmap({
+      materialEvidenceReceipts: receipts,
+      physicalValidationPlan,
+      operatingBudgetReadiness,
+      materialEvidenceReceiptsRef: "material-evidence.json",
+      physicalValidationPlanRef: "physical-validation-plan.json",
+      operatingBudgetReadinessRef: "operating-budget-readiness.json",
+    });
+    const baseFalsificationReport = buildNhm2TileSourceFalsificationReport({
+      materialEvidenceReceipts: receipts,
+      physicalValidationPlan,
+      evidenceGapRoadmap,
+      operatingBudgetReadiness,
+      materialEvidenceReceiptsRef: "material-evidence.json",
+      physicalValidationPlanRef: "physical-validation-plan.json",
+      evidenceGapRoadmapRef: "evidence-gap-roadmap.json",
+      operatingBudgetReadinessRef: "operating-budget-readiness.json",
+    });
+    const authorityHandoff = buildNhm2TileSourceAuthorityHandoff({
+      materialEvidenceReceipts: receipts,
+      physicalValidationPlan,
+      falsificationReport: baseFalsificationReport,
+      operatingBudgetReadiness,
+      materialEvidenceReceiptsRef: "material-evidence.json",
+      physicalValidationPlanRef: "physical-validation-plan.json",
+      falsificationReportRef: "falsification-report.json",
+      operatingBudgetReadinessRef: "operating-budget-readiness.json",
+    });
+    const sourceAuthority = blockedSourceAuthority();
+    const authorityAwareFalsificationReport = buildNhm2TileSourceFalsificationReport({
+      materialEvidenceReceipts: receipts,
+      physicalValidationPlan,
+      evidenceGapRoadmap,
+      operatingBudgetReadiness,
+      sourceSideSameBasisTensorAuthority: sourceAuthority,
+      materialEvidenceReceiptsRef: "material-evidence.json",
+      physicalValidationPlanRef: "physical-validation-plan.json",
+      evidenceGapRoadmapRef: "evidence-gap-roadmap.json",
+      operatingBudgetReadinessRef: "operating-budget-readiness.json",
+      sourceSideSameBasisTensorAuthorityRef: "source-authority.json",
+    });
+    const experimentalCampaignPackage = buildNhm2TileSourceExperimentalCampaignPackage({
+      materialEvidenceReceipts: receipts,
+      physicalValidationPlan,
+      evidenceGapRoadmap,
+      falsificationReport: authorityAwareFalsificationReport,
+      authorityHandoff,
+      sourceSideSameBasisTensorAuthority: sourceAuthority,
+      materialEvidenceReceiptsRef: "material-evidence.json",
+      physicalValidationPlanRef: "physical-validation-plan.json",
+      evidenceGapRoadmapRef: "evidence-gap-roadmap.json",
+      falsificationReportRef: "falsification-report.json",
+      authorityHandoffRef: "authority-handoff.json",
+      sourceSideSameBasisTensorAuthorityRef: "source-authority.json",
+    });
+    const sourceObjective = experimentalCampaignPackage.objectiveCoverage.find(
+      (coverage) => coverage.objectiveId === "source_side_same_basis_authority",
+    );
+
+    expect(isNhm2TileSourceExperimentalCampaignPackage(experimentalCampaignPackage)).toBe(true);
+    expect(authorityHandoff.summary.handoffReadyForSameBasisAuthority).toBe(true);
+    expect(experimentalCampaignPackage.summary.sourceSideAuthorityAvailable).toBe(true);
+    expect(experimentalCampaignPackage.summary.sourceSideAuthorityReady).toBe(false);
+    expect(experimentalCampaignPackage.summary.allEvidenceObjectivesSatisfied).toBe(false);
+    expect(experimentalCampaignPackage.sourceRefs.sourceSideSameBasisTensorAuthorityRef).toBe(
+      "source-authority.json",
+    );
+    expect(sourceObjective).toMatchObject({
+      status: "ready_for_evidence",
+      requiredArtifactRefs: expect.arrayContaining(["source-authority.json"]),
+      blockerIds: expect.arrayContaining(["T12:full_apparatus_term_missing"]),
+      openMeasurementIds: expect.arrayContaining(["wall:T12", "source_side_authority_blockers"]),
+    });
   });
 
   it("builds an evidence-gap roadmap that prioritizes falsifying force-gap evidence", () => {

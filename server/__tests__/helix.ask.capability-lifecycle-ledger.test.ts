@@ -107,7 +107,7 @@ describe("Helix capability lifecycle ledger", () => {
     });
   });
 
-  it("accepts explicit not-run reason for blocked mutating capability", () => {
+  it("does not count blocked mutating capability as observed or validated", () => {
     const plan = {
       schema: "helix.capability_plan.v1",
       turn_id: "ask:not-run",
@@ -132,12 +132,62 @@ describe("Helix capability lifecycle ledger", () => {
       },
     });
 
-    expect(ledger.failure_codes).not.toContain("capability_result_missing");
+    expect(ledger.failure_codes).toContain("capability_result_missing");
     expect(ledger.failure_codes).not.toContain("capability_admitted_not_dispatched");
     expect(ledger.failure_codes).toEqual(expect.arrayContaining(["mutating_capability_without_operator_command"]));
     expect(ledger.stages.find((stage) => stage.stage === "result_observed")).toMatchObject({
-      status: "succeeded",
-      reason: "explicit_not_run_reason_present",
+      status: "failed",
+      reason: "capability_result_missing",
+    });
+    expect(ledger.stages.find((stage) => stage.stage === "result_validated")).toMatchObject({
+      status: "skipped",
+    });
+  });
+
+  it("does not count preflight or presentation refs as a completed mutating capability result", () => {
+    const plan = buildCapabilityPlan({
+      turnId: "ask:synthetic-refs",
+      promptText: "Create a goal to refactor the goal-session UI and work until tests pass.",
+      sourceTargetIntent: sourceTarget("unknown", "unknown"),
+      toolCallAdmissionDecision: toolAdmission("unknown", []),
+      canonicalGoalFrame: canonicalGoal("model_only_concept", "direct_answer_text"),
+    });
+    const result = buildCapabilityResultGate({
+      plan,
+      terminalArtifactKind: "typed_failure",
+      explicitEvidenceRefs: [
+        "ask:synthetic-refs:ask_turn_preflight_context:abc",
+        "ask:synthetic-refs:terminal_presentation:def",
+        "ask:synthetic-refs:receipt_presentation_snapshot:def",
+      ],
+      reenteredRefs: [
+        "ask:synthetic-refs:terminal_presentation:def",
+      ],
+    });
+    const ledger = buildCapabilityLifecycleLedger({
+      turnId: "ask:synthetic-refs",
+      terminalArtifactKind: "typed_failure",
+      payload: {
+        capability_plan: plan,
+        capability_result: result,
+      },
+    });
+
+    expect(plan).toMatchObject({
+      requested_action: "live_env.start_agent_goal_session",
+      admission_status: "needs_evidence",
+    });
+    expect(result).toMatchObject({
+      status: "not_run",
+      evidence_refs: [],
+      reentered_solver: false,
+    });
+    expect(ledger.failure_codes).toEqual(expect.arrayContaining([
+      "capability_admitted_not_dispatched",
+      "capability_result_missing",
+    ]));
+    expect(ledger.stages.find((stage) => stage.stage === "result_observed")).toMatchObject({
+      status: "failed",
     });
   });
 

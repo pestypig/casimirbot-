@@ -211,6 +211,12 @@ const contextualRules: ContextualRule[] = [
 
 const commandRules: CommandRule[] = [
   {
+    action_family: "live_env.start_agent_goal_session",
+    pattern: /\b(?:call\s+live_env\.start_agent_goal_session|(?:start|create|begin|set\s+up|setup|launch)\s+(?:an?\s+)?(?:agent\s+)?goal(?:\s+session)?\b[\s\S]{0,80}\b(?:objective|to|for|with\s+objective|work\s+until|monitor|track|refactor|implement|test|debug|fix|wire|build)\b)/i,
+    confidence: 0.9,
+    reason: "affirmative workstation goal-session command",
+  },
+  {
     action_family: "live_pipeline.set_rate",
     pattern: /\b(?:set|change|update)\b[\s\S]{0,60}\b(?:visual\s+capture\s+)?(?:interval|cadence|rate)\b[\s\S]{0,60}\b(?:\d{1,3}\s*(?:seconds?|sec|s)|every\s+\d{1,3})\b/i,
     confidence: 0.91,

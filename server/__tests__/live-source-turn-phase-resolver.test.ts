@@ -179,17 +179,20 @@ describe("resolveLiveSourceTurnPhase", () => {
         "live_env.focus_process_graph",
         "live_env.narrator_say",
         "live_env.narrator_bind_stream",
+        "live_env.start_agent_goal_session",
       ]),
       fallbackTools: [],
       requiredEvidence: expect.arrayContaining([
         "stage_play_workstation_control_receipt",
         "helix.narrator_say_request",
         "helix.narrator_bind_stream_request",
+        "stage_play_agent_goal_session_tool_result",
       ]),
       completionEvidence: expect.arrayContaining([
         "stage_play_workstation_control_receipt",
         "helix.narrator_say_request",
         "helix.narrator_bind_stream_request",
+        "stage_play_agent_goal_session_tool_result",
       ]),
       next: "terminal_checkpoint",
     });
@@ -687,6 +690,14 @@ describe("resolveLiveSourceTurnPhase", () => {
       {
         prompt: "Run live_env.narrator_bind_stream goal_id=goal:frog source_ref=source:audio stream_kind=translated_transcript.",
         toolName: "live_env.narrator_bind_stream",
+      },
+      {
+        prompt: "Run live_env.start_agent_goal_session goal_id=goal:frog objective='Monitor frog classification.'",
+        toolName: "live_env.start_agent_goal_session",
+      },
+      {
+        prompt: "Create a goal to refactor the goal-session UI and work until tests pass.",
+        toolName: "live_env.start_agent_goal_session",
       },
     ] as const) {
       const phase = resolveLiveSourceTurnPhase({

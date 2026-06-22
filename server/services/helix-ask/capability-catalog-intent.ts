@@ -1,5 +1,5 @@
 const CAPABILITY_CATALOG_OBJECT_PATTERN =
-  "(?:helix\\s+ask|ask\\s+turn|this\\s+agent|the\\s+agent|ask|agent)[\\s\\S]{0,120}(?:tools?|tool\\s+calls?|capabilities)|(?:tools?|tool\\s+calls?|capabilities)[\\s\\S]{0,120}(?:helix\\s+ask|ask\\s+turn|this\\s+agent|the\\s+agent|ask|agent)";
+  "(?:helix\\s+ask|ask\\s+turn|this\\s+agent|the\\s+agent|ask|agent|live\\s+answer)[\\s\\S]{0,120}(?:tools?|tool\\s+calls?|tool\\s+call\\s+goals?|capabilities)|(?:tools?|tool\\s+calls?|tool\\s+call\\s+goals?|capabilities)[\\s\\S]{0,120}(?:helix\\s+ask|ask\\s+turn|this\\s+agent|the\\s+agent|ask|agent|live\\s+answer)";
 
 const stripWholePromptWrappingQuotes = (promptText: string): string | null => {
   const trimmed = promptText.trim();
@@ -21,13 +21,15 @@ const CAPABILITY_CATALOG_REQUEST_PATTERNS = [
   /\bwhat\s+(?:tools?|tool\s+calls?|capabilities)\s+can\s+(?:you|i|we)\s+(?:use|call|run|see|access)\b[\s\S]{0,100}\b(?:as|for|from|in)\s+(?:the\s+)?(?:helix\s+ask|ask|agent)\b/i,
   /\b(?:what|which)\s+(?:tools?|tool\s+calls?|capabilities)\s+(?:are\s+)?(?:available|visible|admissible|exposed)\s+to\s+(?:you|me|us)\b/i,
   /\b(?:what|which)\s+(?:runtime\s+)?(?:tools?|tool\s+calls?|capabilities)\s+(?:does|do|can)\s+(?:this\s+agent|the\s+agent|helix\s+ask|ask)\s+(?:have|expose|see|access|use|call|run)\b/i,
+  /\b(?:what|which|show|list|inspect|explain)\b[\s\S]{0,80}\b(?:live\s+answer\s+)?tool\s+call\s+goals?\b/i,
+  /\b(?:live\s+answer\s+)?tool\s+call\s+goals?\b[\s\S]{0,100}\b(?:available|visible|admissible|exposed|agent|helix\s+ask|ask|runtime|catalog|capabilit)/i,
   /\b(?:list|show|inspect|tell\s+me)\b[\s\S]{0,60}\b(?:tools?|tool\s+calls?|capabilities)\b/i,
 ] as const;
 
 const capabilityCatalogRequestMatchIndex = (promptText: string): number | null => {
   const prompt = promptText.trim();
   if (!prompt) return null;
-  const mentionsAskSurface = /\b(?:helix\s+ask|ask\s+turn|this\s+agent|the\s+agent)\b/i.test(prompt);
+  const mentionsAskSurface = /\b(?:helix\s+ask|ask\s+turn|this\s+agent|the\s+agent|live\s+answer)\b/i.test(prompt);
   const patterns = mentionsAskSurface
     ? CAPABILITY_CATALOG_REQUEST_PATTERNS
     : [CAPABILITY_CATALOG_REQUEST_PATTERNS[0]];

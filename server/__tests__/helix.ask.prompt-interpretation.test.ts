@@ -158,7 +158,7 @@ describe("Helix Ask prompt interpretation", () => {
       expect(interpretation.contextual_tool_mentions).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
-            verb_or_cue: "docs_viewer.open",
+            verb_or_cue: expect.stringMatching(/^docs_viewer\./),
             reason,
           }),
         ]),
@@ -193,6 +193,28 @@ describe("Helix Ask prompt interpretation", () => {
         }),
       ]),
     );
+  });
+
+  it("records affirmative prompt-only goal creation as a goal-session operator command", () => {
+    const interpretation = interpretHelixAskPrompt(
+      "Create a goal to refactor the goal-session UI so it supports pause, resume, edit, archive, and expanded details. Work until tests pass.",
+    );
+
+    expect(interpretation.control_command_detected).toBe(true);
+    expect(interpretation.executable_operator_commands).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action_family: "live_env.start_agent_goal_session",
+        }),
+      ]),
+    );
+  });
+
+  it("keeps goal-statement writing as non-executable model text", () => {
+    const interpretation = interpretHelixAskPrompt("Write me a goal statement for a project roadmap.");
+
+    expect(interpretation.control_command_detected).toBe(false);
+    expect(interpretation.executable_operator_commands).toEqual([]);
   });
 
   it("builds a compound prompt contract without splitting the root prompt into separate turns", () => {

@@ -155,6 +155,9 @@ const sourceTargetToolFamilies = (
   if (sourceTarget === "docs_viewer" || sourceTarget === "active_doc") return ["docs_viewer"];
   if (sourceTarget === "scholarly_research") return ["scholarly_research"];
   if (sourceTarget === "internet_search") return ["internet_search"];
+  if (sourceTarget === "repo_code" && isAskCapabilityCatalogPrompt(promptText)) {
+    return ["capability_catalog", "runtime_evidence"];
+  }
   if (sourceTarget === "repo_code") return ["repo_code"];
   if (sourceTarget === "runtime_evidence" && isAskCapabilityCatalogPrompt(promptText)) {
     return ["capability_catalog", "runtime_evidence"];
@@ -719,7 +722,7 @@ export function buildToolCallAdmissionDecision(input: {
     extraForbiddenRoutes = ["process_graph_overview", "live_environment_binding_diagnosis", "model_only_concept", "no_tool_direct"];
     reason = "visual_scene_memory_requires_scene_memory_path";
   } else if (sourceTarget === "repo_code" || sourceTarget === "runtime_evidence") {
-    const capabilityCatalogPrompt = sourceTarget === "runtime_evidence" && isAskCapabilityCatalogPrompt(promptText);
+    const capabilityCatalogPrompt = isAskCapabilityCatalogPrompt(promptText);
     admittedToolFamilies = capabilityCatalogPrompt
       ? ["capability_catalog", "runtime_evidence"]
       : sourceTarget === "runtime_evidence" ? ["repo_code", "runtime_evidence"] : ["repo_code"];

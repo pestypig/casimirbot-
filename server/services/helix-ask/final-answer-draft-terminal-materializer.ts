@@ -1512,7 +1512,7 @@ export function materializeFinalAnswerDraftTerminal(input: {
 
   const compoundPolicy = readCompoundTerminalPolicy(input.payload);
   const genericCompoundTargetKind =
-    compoundPolicy.active && compoundPolicy.required_terminal_kind === "compound_evidence_synthesis_answer"
+    compoundPolicy.active
       ? "compound_evidence_synthesis_answer"
       : "model_synthesized_answer";
   if (!contractAllows(input.payload, contract, genericCompoundTargetKind)) {
