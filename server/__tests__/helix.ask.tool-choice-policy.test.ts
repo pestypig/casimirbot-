@@ -102,10 +102,55 @@ describe("Helix Ask tool-choice policy", () => {
     const agiPlanSource = readFileSync(resolve(__dirname, "../routes/agi.plan.ts"), "utf8");
 
     expect(agiPlanSource).toContain("const responseBoundaryCanPromoteRepoEvidenceAnswer =");
+    expect(agiPlanSource).toContain("const finalizerCanPromoteRepoEvidenceAnswer =");
+    expect(agiPlanSource).toContain("const finalizerCanPromoteRepoDefinition =");
+    expect(agiPlanSource).toContain("const responseBoundaryCanPromoteRepoDefinition =");
     expect(agiPlanSource).toContain("repo_evidence_answer_requires_solver_or_terminal_authority");
+    expect(agiPlanSource).toContain("repo_definition_answer_requires_solver_or_terminal_authority");
     expect(agiPlanSource).toContain("response_boundary_repo_evidence_projection_suppressed");
+    expect(agiPlanSource).toContain("response_boundary_repo_definition_projection_suppressed");
     expect(agiPlanSource).toMatch(
       /repoAnswerTextForResponseBoundary &&[\s\S]*routeProductContractForPresentation\.source_target === "repo_code" &&[\s\S]*responseBoundaryCanPromoteRepoEvidenceAnswer &&[\s\S]*payload\.terminal_artifact_kind = "repo_code_evidence_answer"/,
+    );
+    expect(agiPlanSource).toMatch(
+      /modelAuthoredRepoEvidenceText && finalizerCanPromoteRepoEvidenceAnswer[\s\S]*payload\.terminal_artifact_kind = "repo_code_evidence_answer"/,
+    );
+    expect(agiPlanSource).toMatch(
+      /repoConceptForResponseBoundary &&[\s\S]*responseBoundaryCanPromoteRepoDefinition[\s\S]*payload\.terminal_artifact_kind = "repo_code_evidence_answer"/,
+    );
+  });
+
+  it("requires solver permission before attached visual evidence repairs a failed terminal answer", () => {
+    const agiPlanSource = readFileSync(resolve(__dirname, "../routes/agi.plan.ts"), "utf8");
+
+    expect(agiPlanSource).toContain("const responseBoundaryCanPromoteAttachedVisual =");
+    expect(agiPlanSource).toContain("visual_frame_evidence_requires_solver_or_terminal_authority");
+    expect(agiPlanSource).toContain("response_boundary_visual_projection_suppressed");
+    expect(agiPlanSource).toMatch(
+      /attachedVisualSummary &&[\s\S]*asksAboutAttachedVisual &&[\s\S]*visualPromotionDecision\?\.allowed === true &&[\s\S]*responseBoundaryCanPromoteAttachedVisual &&[\s\S]*applySituationContextFinalAnswer\(visualAnswer, terminalArtifactId\)/,
+    );
+  });
+
+  it("requires solver permission before processed-mail checkpoint evidence repairs a failed terminal answer", () => {
+    const agiPlanSource = readFileSync(resolve(__dirname, "../routes/agi.plan.ts"), "utf8");
+
+    expect(agiPlanSource).toContain("const responseBoundaryCanPromoteProcessedMailCheckpoint =");
+    expect(agiPlanSource).toContain("processed_mail_checkpoint_synthesis_requires_solver_or_terminal_authority");
+    expect(agiPlanSource).toContain("response_boundary_processed_mail_projection_suppressed");
+    expect(agiPlanSource).toMatch(
+      /processedMailCheckpointTextForResponseBoundary &&[\s\S]*processedMailCheckpointDecisionSatisfiedForResponseBoundary &&[\s\S]*responseBoundaryCanPromoteProcessedMailCheckpoint &&[\s\S]*payload\.terminal_artifact_kind = "model_synthesized_answer"/,
+    );
+  });
+
+  it("requires solver permission before doc concept artifacts repair a failed terminal answer", () => {
+    const agiPlanSource = readFileSync(resolve(__dirname, "../routes/agi.plan.ts"), "utf8");
+
+    expect(agiPlanSource).toContain("const responseBoundaryCanPromoteDocConceptExplanation =");
+    expect(agiPlanSource.match(/const responseBoundaryCanPromoteDocConceptExplanation =/g)?.length ?? 0).toBeGreaterThanOrEqual(6);
+    expect(agiPlanSource).toContain("doc_concept_explanation_requires_solver_or_terminal_authority");
+    expect(agiPlanSource).toContain("response_boundary_doc_concept_projection_suppressed");
+    expect(agiPlanSource).toMatch(
+      /conceptArtifact && conceptText\.trim\(\) && responseBoundaryCanPromoteDocConceptExplanation[\s\S]*payload\.terminal_artifact_kind = "doc_concept_explanation"/,
     );
   });
 

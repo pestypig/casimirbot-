@@ -108,6 +108,7 @@
     "helix:ask:user-prompt-corpus": "tsx scripts/helix-ask-user-prompt-corpus-probe.ts",
     "helix:ask:compound-live-probe": "tsx scripts/helix-ask-compound-capability-live-probe.ts",
     "helix:ask:live-source-playbook": "tsx scripts/helix-live-source-agent-goal-playbook-probe.ts",
+    "helix:ask:codex-methodology-debug": "tsx scripts/helix-ask-codex-methodology-debug-batch.ts",
     "helix:ask:tool-chain-matrix": "tsx scripts/helix-ask-tool-chain-matrix-probe.ts",
     "helix:ask:discipline": "tsx scripts/helix-ask-discipline-check.ts --run-required",
     "helix:ask:discipline:quick": "tsx scripts/helix-ask-discipline-check.ts --check-only",

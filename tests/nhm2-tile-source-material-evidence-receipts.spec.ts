@@ -230,9 +230,9 @@ const passingEvidence: BuildNhm2TileSourceMaterialEvidenceReceiptsInput = {
     creepDriftFraction: 0.005,
     delaminationMargin: 1.4,
     interlayerAdhesionMargin: 1.3,
-    layerScalingEfficiency: 0.95,
+    layerScalingEfficiency: 0.98,
     perLayerVariationFraction: 0.02,
-    nonadditivityFraction: 0.05,
+    nonadditivityFraction: 0.03,
     activeAreaRetention: 1,
     supportCouplingFraction: 0.04,
     electromagneticCouplingFraction: 0.03,
@@ -510,6 +510,88 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(
       Object.values(receipts.derivedReceiptInputs.suppliedReceiptSurfaces).every(Boolean),
     ).toBe(true);
+  });
+
+  it("falsifies material-coupon receipts when fabrication tolerance exceeds the 0.5 nm target", () => {
+    const receipts = buildNhm2TileSourceMaterialEvidenceReceipts({
+      ...passingEvidence,
+      materialCoupon: {
+        ...passingEvidence.materialCoupon!,
+        fabricationToleranceMeters: 1e-9,
+      },
+    });
+    const materialSurface = receipts.receiptSurfaces.find(
+      (surface) => surface.surfaceId === "material_coupon",
+    );
+
+    expect(receipts.thresholds.fabricationToleranceMaxMeters).toBe(5e-10);
+    expect(receipts.summary.candidateDisposition).toBe("falsified");
+    expect(receipts.summary.materialEvidenceReady).toBe(false);
+    expect(materialSurface?.status).toBe("fail");
+    expect(materialSurface?.blockers).toContain("fabrication_tolerance_above_0p5nm");
+    expect(materialSurface?.numericalMargins.fabricationToleranceMargin).toBe(0.5);
+    expect(materialSurface?.numericalMargins.fabricationToleranceMeters).toBe(1e-9);
+  });
+
+  it("falsifies material-coupon receipts when measured tensile stress is below support stress", () => {
+    const receipts = buildNhm2TileSourceMaterialEvidenceReceipts({
+      ...passingEvidence,
+      materialCoupon: {
+        ...passingEvidence.materialCoupon!,
+        measuredTensileStressPa: 4e8,
+      },
+    });
+    const materialSurface = receipts.receiptSurfaces.find(
+      (surface) => surface.surfaceId === "material_coupon",
+    );
+
+    expect(receipts.summary.candidateDisposition).toBe("falsified");
+    expect(receipts.summary.materialEvidenceReady).toBe(false);
+    expect(materialSurface?.status).toBe("fail");
+    expect(materialSurface?.blockers).toContain(
+      "measured_tensile_stress_below_support_stress",
+    );
+    expect(materialSurface?.numericalMargins.tensileStressMargin).toBeCloseTo(
+      4e8 / 5.45707087858e8,
+      12,
+    );
+    expect(materialSurface?.numericalMargins.supportStressPa).toBe(5.45707087858e8);
+    expect(materialSurface?.numericalMargins.measuredTensileStressPa).toBe(4e8);
+  });
+
+  it("falsifies material-coupon receipts with malformed measured coupon values", () => {
+    const receipts = buildNhm2TileSourceMaterialEvidenceReceipts({
+      ...passingEvidence,
+      materialCoupon: {
+        ...passingEvidence.materialCoupon!,
+        measuredTensileStressPa: Number.NaN,
+        fractureOrYieldStressPa: -2.1e9,
+        supportStressPa: Number.NaN,
+        cryogenicTemperatureK: -4,
+        roughnessRmsMeters: -5e-11,
+      },
+    });
+    const materialSurface = receipts.receiptSurfaces.find(
+      (surface) => surface.surfaceId === "material_coupon",
+    );
+
+    expect(receipts.summary.candidateDisposition).toBe("falsified");
+    expect(receipts.summary.materialEvidenceReady).toBe(false);
+    expect(materialSurface?.status).toBe("fail");
+    expect(materialSurface?.blockers).toEqual(
+      expect.arrayContaining([
+        "support_stress_invalid",
+        "fracture_or_yield_stress_invalid",
+        "measured_tensile_stress_invalid",
+        "cryogenic_temperature_invalid",
+        "coupon_roughness_rms_invalid",
+      ]),
+    );
+    expect(materialSurface?.numericalMargins.stressMargin).toBeNull();
+    expect(materialSurface?.numericalMargins.tensileStressMargin).toBeNull();
+    expect(materialSurface?.numericalMargins.supportStressPa).toBeNaN();
+    expect(materialSurface?.numericalMargins.measuredTensileStressPa).toBeNaN();
+    expect(materialSurface?.numericalMargins.roughnessRmsMeters).toBe(-5e-11);
   });
 
   it("does not admit full apparatus tensor receipts whose subsystem refs are not backed by the same receipt bundle", () => {
@@ -3885,6 +3967,35 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(plan.summary.transportClaimAllowed).toBe(false);
   });
 
+  it("falsifies roughness/patch receipts when RMS or residual fraction values are negative", () => {
+    const receipts = buildNhm2TileSourceMaterialEvidenceReceipts({
+      ...passingEvidence,
+      roughnessPatch: {
+        ...passingEvidence.roughnessPatch!,
+        roughnessRmsMeters: -5e-11,
+        patchVoltageRmsVolts: -5e-3,
+        residualElectrostaticForceFraction: -0.02,
+      },
+    });
+    const roughnessSurface = receipts.receiptSurfaces.find(
+      (surface) => surface.surfaceId === "roughness_patch_metrology",
+    );
+
+    expect(receipts.summary.candidateDisposition).toBe("falsified");
+    expect(receipts.summary.materialEvidenceReady).toBe(false);
+    expect(roughnessSurface?.status).toBe("fail");
+    expect(roughnessSurface?.blockers).toContain("roughness_rms_above_0p1nm_or_missing");
+    expect(roughnessSurface?.blockers).toContain("patch_voltage_rms_above_10mv_or_missing");
+    expect(roughnessSurface?.blockers).toContain(
+      "residual_electrostatic_force_correction_above_5pct_or_missing",
+    );
+    expect(roughnessSurface?.numericalMargins.roughnessRmsMeters).toBe(-5e-11);
+    expect(roughnessSurface?.numericalMargins.patchVoltageRmsVolts).toBe(-5e-3);
+    expect(
+      roughnessSurface?.numericalMargins.residualElectrostaticForceFraction,
+    ).toBe(-0.02);
+  });
+
   it("builds roughness/patch operating targets from the frozen 8 nm gap and load budget", () => {
     const budget = buildNhm2TileSourceRoughnessPatchOperatingBudget({ generatedAt });
 
@@ -4231,6 +4342,67 @@ describe("NHM2 tile source material evidence receipts", () => {
     });
     expect(failureMode?.falsificationRule).toContain("fail-safe");
     expect(plan.summary.transportClaimAllowed).toBe(false);
+  });
+
+  it("falsifies active-control receipts when heat load is below waveform-derived control power", () => {
+    const receipts = buildNhm2TileSourceMaterialEvidenceReceipts({
+      ...passingEvidence,
+      activeControl: {
+        ...passingEvidence.activeControl!,
+        heatLoadW: 0.1,
+      },
+    });
+    const activeSurface = receipts.receiptSurfaces.find(
+      (surface) => surface.surfaceId === "active_control_energy",
+    );
+
+    expect(receipts.summary.candidateDisposition).toBe("falsified");
+    expect(receipts.summary.materialEvidenceReady).toBe(false);
+    expect(activeSurface?.status).toBe("fail");
+    expect(activeSurface?.blockers).toContain(
+      "active_control_heat_load_below_computed_control_power",
+    );
+    expect(activeSurface?.numericalMargins.controlPowerW).toBe(15);
+    expect(activeSurface?.numericalMargins.thermalAccountingMargin).toBeCloseTo(
+      0.006666666666666667,
+      12,
+    );
+    expect(activeSurface?.numericalMargins.heatSinkReferenceLoadW).toBe(15);
+  });
+
+  it("falsifies active-control receipts when actuator authority is below the frozen 447-layer load", () => {
+    const receipts = buildNhm2TileSourceMaterialEvidenceReceipts({
+      ...passingEvidence,
+      activeControl: {
+        ...passingEvidence.activeControl!,
+        actuatorAuthorityN: 1e4,
+      },
+    });
+    const activeSurface = receipts.receiptSurfaces.find(
+      (surface) => surface.surfaceId === "active_control_energy",
+    );
+
+    expect(receipts.summary.candidateDisposition).toBe("falsified");
+    expect(receipts.summary.materialEvidenceReady).toBe(false);
+    expect(receipts.thresholds.ideal447LayerStackForceAbsN).toBeCloseTo(
+      14188.384284280897,
+      12,
+    );
+    expect(receipts.thresholds.activeControlAuthorityMinN).toBeCloseTo(
+      14188.384284280897 * 1.2,
+      12,
+    );
+    expect(activeSurface?.status).toBe("fail");
+    expect(activeSurface?.blockers).toContain(
+      "active_control_actuator_authority_below_447_layer_load",
+    );
+    expect(
+      activeSurface?.numericalMargins.activeControlActuatorAuthorityMargin,
+    ).toBeCloseTo(1e4 / (14188.384284280897 * 1.2), 12);
+    expect(activeSurface?.numericalMargins.activeControlAuthorityMinN).toBeCloseTo(
+      14188.384284280897 * 1.2,
+      12,
+    );
   });
 
   it("builds active-control operating targets from the frozen 15 GHz cadence", () => {
@@ -4772,6 +4944,38 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(plan.summary.transportClaimAllowed).toBe(false);
   });
 
+  it("falsifies source-tensor retention claims that exceed scaling and active-area support", () => {
+    const receipts = buildNhm2TileSourceMaterialEvidenceReceipts({
+      ...passingEvidence,
+      fatigueLayerScaling: {
+        ...passingEvidence.fatigueLayerScaling!,
+        layerScalingEfficiency: 0.92,
+        nonadditivityFraction: 0.08,
+        activeAreaRetention: 1,
+        sourceTensorRetentionFraction: 0.94,
+      },
+    });
+    const scalingSurface = receipts.receiptSurfaces.find(
+      (surface) => surface.surfaceId === "layer_scaling",
+    );
+
+    expect(receipts.summary.candidateDisposition).toBe("falsified");
+    expect(receipts.summary.materialEvidenceReady).toBe(false);
+    expect(scalingSurface?.status).toBe("fail");
+    expect(scalingSurface?.blockers).toContain("scalar_retention_estimate_below_0p9");
+    expect(scalingSurface?.blockers).toContain(
+      "source_tensor_retention_exceeds_scaling_area_estimate",
+    );
+    expect(scalingSurface?.numericalMargins.scalarRetentionEstimate).toBeCloseTo(0.8464, 12);
+    expect(scalingSurface?.numericalMargins.scalarRetentionEstimateMargin).toBeCloseTo(
+      0.9404444444444444,
+      12,
+    );
+    expect(
+      scalingSurface?.numericalMargins.sourceTensorRetentionConsistencyMargin,
+    ).toBeCloseTo(0.9004255319148936, 12);
+  });
+
   it("builds fatigue/layer-scaling operating targets for the frozen 447-layer candidate", () => {
     const budget = buildNhm2TileSourceFatigueLayerScalingOperatingBudget({ generatedAt });
 
@@ -4833,7 +5037,7 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.derivedOperatingBudget.scalingMargin).toBeGreaterThan(1);
     expect(budget.derivedOperatingBudget.nonadditivityMargin).toBeGreaterThan(1);
     expect(budget.derivedOperatingBudget.activeAreaMargin).toBeGreaterThan(1);
-    expect(budget.derivedOperatingBudget.effectiveActiveLayerCount).toBeCloseTo(403.4175, 5);
+    expect(budget.derivedOperatingBudget.effectiveActiveLayerCount).toBeCloseTo(424.9182, 5);
     expect(budget.derivedOperatingBudget.effectiveActiveLayerCountMargin).toBeGreaterThan(1);
     expect(budget.derivedOperatingBudget.sourceTensorRetentionFraction).toBeCloseTo(0.94, 4);
     expect(budget.derivedOperatingBudget.sourceTensorRetentionMargin).toBeGreaterThan(1);
