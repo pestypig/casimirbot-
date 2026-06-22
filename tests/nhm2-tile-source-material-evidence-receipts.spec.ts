@@ -1120,6 +1120,17 @@ describe("NHM2 tile source material evidence receipts", () => {
         "material_coupon.missingCurveAndMapRefCount": 7,
         "material_coupon.missingMaterialResponseRefCount": 2,
       }),
+      decisiveMeasurements: expect.arrayContaining([
+        expect.objectContaining({
+          measurementId: "coupon_fracture_yield_margin",
+          evidenceArtifact: "receipt://material_coupon/fracture_yield_margin_v1",
+          target: expect.stringContaining("1.09141417572e9 Pa"),
+        }),
+        expect.objectContaining({
+          measurementId: "coupon_material_response",
+          requiredCorrectionValue: false,
+        }),
+      ]),
     });
     expect(report.readiness.materialEvidenceReady).toBe(true);
     expect(report.readiness.operatingBudgetsReady).toBe(false);
@@ -1287,6 +1298,19 @@ describe("NHM2 tile source material evidence receipts", () => {
       requiredCorrections: expect.objectContaining({
         "full_apparatus_tensor.missingFullApparatusTensorComponentRefs": ["wall:T12"],
       }),
+      decisiveMeasurements: expect.arrayContaining([
+        expect.objectContaining({
+          measurementId: "tensor_component_coverage",
+          evidenceArtifact: "receipt://full_apparatus_tensor/component_detail_refs_v1",
+          falsificationConsequence: expect.stringContaining(
+            "source-side same-basis tensor authority cannot pass",
+          ),
+        }),
+        expect.objectContaining({
+          measurementId: "regional_support_coverage",
+          target: expect.stringContaining("wall, hull, and exterior_shell"),
+        }),
+      ]),
       prevents: expect.arrayContaining(["regional_residual_closure"]),
     });
     expect(report.summary.physicalViabilityClaimAllowed).toBe(false);
