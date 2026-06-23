@@ -45,6 +45,9 @@ export type HelixCapabilityPlan = {
   source_target: string;
   goal_kind: string;
   required_terminal_kind: string | null;
+  required_next_action?: string | null;
+  required_observation_kinds?: string[];
+  required_outputs?: string[];
   capability_contract_arbitration?: Record<string, unknown>;
   compound_capability_contract?: Record<string, unknown>;
   compound_requested_capabilities?: string[];

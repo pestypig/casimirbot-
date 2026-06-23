@@ -196,6 +196,77 @@ const classifySourceFamily = (input: {
 const routeMetadataSourceTarget = (routeMetadata?: RecordLike | null): string =>
   readString(routeMetadata?.sourceTarget) || readString(routeMetadata?.source_target);
 
+const routeMetadataRequiredToolFamily = (routeMetadata?: RecordLike | null): string =>
+  readString(routeMetadata?.requiredToolFamily) || readString(routeMetadata?.required_tool_family);
+
+const routeMetadataMandatoryNextTool = (routeMetadata?: RecordLike | null): RecordLike | null =>
+  readRecord(routeMetadata?.mandatory_next_tool) ??
+  readRecord(readRecord(routeMetadata?.source_target_intent)?.mandatory_next_tool);
+
+const mandatoryCapabilityName = (mandatoryNextTool?: RecordLike | null): string =>
+  readString(mandatoryNextTool?.tool_name) ||
+  readString(mandatoryNextTool?.selected_capability) ||
+  readString(mandatoryNextTool?.required_capability) ||
+  readString(mandatoryNextTool?.capability);
+
+const capabilityFamilyForMandatoryCapability = (
+  capability: string,
+  requiredToolFamily: string,
+  sourceTarget: string,
+): HelixCapabilityFamily | null => {
+  if (/^docs-viewer\./i.test(capability) || requiredToolFamily === "docs_viewer" || sourceTarget === "docs_viewer" || sourceTarget === "active_doc") {
+    return "docs";
+  }
+  if (/^scientific-calculator\./i.test(capability) || requiredToolFamily === "calculator" || sourceTarget === "calculator_stream") {
+    return "workstation_action";
+  }
+  if (/^repo-code\./i.test(capability) || requiredToolFamily === "repo_code" || sourceTarget === "repo_code") {
+    return "repo_evidence";
+  }
+  if (capability === HELIX_INTERNET_SEARCH_CAPABILITY || requiredToolFamily === "internet_search" || sourceTarget === "internet_search") {
+    return "internet_search";
+  }
+  if (
+    capability === HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY ||
+    capability === HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY ||
+    requiredToolFamily === "scholarly_research" ||
+    sourceTarget === "scholarly_research"
+  ) {
+    return "scholarly_research";
+  }
+  if (/^live_env\./i.test(capability) || requiredToolFamily === "live_env" || sourceTarget === "live_source_mailbox" || sourceTarget === "live_environment") {
+    return "live_environment";
+  }
+  if (capability === HELIX_WORKSPACE_OS_STATUS_CAPABILITY || requiredToolFamily === "workspace_diagnostic" || sourceTarget === "workspace_diagnostic") {
+    return "workspace_diagnostic";
+  }
+  if (capability === HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY || requiredToolFamily === "workspace_directory") {
+    return "workspace_directory";
+  }
+  return null;
+};
+
+const requiredObservationKindsForMandatoryCapability = (capability: string): string[] => {
+  if (capability === "docs-viewer.search_docs") return ["doc_search_results"];
+  if (capability === "docs-viewer.locate_in_doc") return ["doc_location_result", "doc_location_matches", "doc_evidence_location"];
+  if (/^docs-viewer\./i.test(capability)) return ["docs_viewer_receipt"];
+  if (/^scientific-calculator\./i.test(capability)) return ["calculator_receipt", "workstation_tool_evaluation"];
+  if (/^repo-code\./i.test(capability)) return ["repo_code_evidence_observation", "repo_evidence_relevance_gate"];
+  if (capability === HELIX_INTERNET_SEARCH_CAPABILITY) return ["internet_search_observation"];
+  if (capability === HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY || capability === HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY) {
+    return ["scholarly_research_observation"];
+  }
+  if (capability === HELIX_WORKSPACE_OS_STATUS_CAPABILITY) return ["workspace_os_status_observation", "workstation_tool_evaluation"];
+  return [];
+};
+
+const requiredOutputsForMandatoryCapability = (capability: string, requiredTerminalKind: string | null): string[] => {
+  if (requiredTerminalKind) return [requiredTerminalKind];
+  if (/^docs-viewer\./i.test(capability)) return ["doc_evidence_synthesis_answer"];
+  if (/^scientific-calculator\./i.test(capability)) return ["workstation_tool_evaluation"];
+  return [];
+};
+
 const isHardLiveSourceMailboxRoute = (input: {
   routeMetadata?: RecordLike | null;
   mandatoryPhaseTool?: string | null;
@@ -562,6 +633,13 @@ export const buildCapabilityPlan = (input: {
   const canonicalGoalFrame = readRecord(input.canonicalGoalFrame);
   const instructionFrame = readRecord(input.instructionFrame);
   const routeMetadata = readRecord(input.routeMetadata);
+  const mandatoryNextTool = routeMetadataMandatoryNextTool(routeMetadata);
+  const mandatoryConcreteCapability = mandatoryCapabilityName(mandatoryNextTool);
+  const mandatoryRouteSourceTarget = routeMetadataSourceTarget(routeMetadata);
+  const mandatoryRouteToolFamily = routeMetadataRequiredToolFamily(routeMetadata);
+  const mandatoryPlanFamily = mandatoryConcreteCapability
+    ? capabilityFamilyForMandatoryCapability(mandatoryConcreteCapability, mandatoryRouteToolFamily, mandatoryRouteSourceTarget)
+    : null;
   const mandatoryPhaseTool = mandatoryToolForPhase(input.liveSourceTurnPhaseResolution as LiveSourceTurnPhaseResolutionV1 | null);
   const requestedCapabilityContract =
     explicitCapabilityContractForCapability(readString(toolCallAdmissionDecision?.requested_capability)) ??
@@ -614,6 +692,7 @@ export const buildCapabilityPlan = (input: {
     toolUseRestatement.requiredToolFamilies.includes("docs_viewer");
   const fallbackSourceTarget =
     (hardLiveSourceMailboxRoute ? "live_source_mailbox" : "") ||
+    (mandatoryConcreteCapability && mandatoryRouteSourceTarget ? mandatoryRouteSourceTarget : "") ||
     (requestedCapabilityContract?.source_target ?? "") ||
     (requiresDocsViewerEvidence ? "docs_viewer" : "") ||
     (internetEvidenceDrivesPlan ? "internet_search" : "") ||
@@ -640,6 +719,8 @@ export const buildCapabilityPlan = (input: {
   });
   const fallbackFamily: HelixCapabilityFamily = hardLiveSourceMailboxRoute
     ? "live_environment"
+    : mandatoryPlanFamily
+    ? mandatoryPlanFamily
     : requiresCapabilityCatalog
     ? "capability_catalog"
     : requiresAgentGoalSessionSetup
@@ -659,6 +740,8 @@ export const buildCapabilityPlan = (input: {
           : classifiedFamily;
   const fallbackGoalKind = requiresRepoConceptEvidence
     ? "repo_concept_explanation"
+    : mandatoryConcreteCapability && /^docs-viewer\./i.test(mandatoryConcreteCapability)
+    ? "doc_evidence_synthesis"
     : requiresCapabilityCatalog
     ? "capability_help"
     : requiresAgentGoalSessionSetup
@@ -670,6 +753,8 @@ export const buildCapabilityPlan = (input: {
       : originalCanonicalGoalKind || "unknown";
   const fallbackRequiredTerminalKind = requiresRepoConceptEvidence
     ? "repo_code_evidence_answer"
+    : mandatoryConcreteCapability && /^docs-viewer\./i.test(mandatoryConcreteCapability)
+    ? "doc_evidence_synthesis_answer"
     : requiresCapabilityCatalog
       ? "capability_help_summary"
     : requiresAgentGoalSessionSetup
@@ -727,6 +812,8 @@ export const buildCapabilityPlan = (input: {
       ? "suppressed_contextual_tool_reference"
     : requiresAgentGoalSessionSetup
       ? "live_env.start_agent_goal_session"
+    : mandatoryConcreteCapability
+      ? mandatoryConcreteCapability
     : effectiveRequestedCapabilityContract
       ? effectiveRequestedCapabilityContract.runtime_capability ?? effectiveRequestedCapabilityContract.capability
     : family === "live_source" &&
@@ -747,6 +834,12 @@ export const buildCapabilityPlan = (input: {
           violationReason: undefined,
         };
   const requestedAction = phaseFilteredPlan.requestedAction;
+  const mandatoryRequiredObservationKinds = mandatoryConcreteCapability
+    ? requiredObservationKindsForMandatoryCapability(mandatoryConcreteCapability)
+    : [];
+  const mandatoryRequiredOutputs = mandatoryConcreteCapability
+    ? requiredOutputsForMandatoryCapability(mandatoryConcreteCapability, contractArbitration.required_terminal_kind)
+    : [];
   const operatorCommandPresent =
     hasOperatorCommand(input.promptText) ||
     (
@@ -802,6 +895,13 @@ export const buildCapabilityPlan = (input: {
     source_target: sourceTarget,
     goal_kind: canonicalGoalKind || "unknown",
     required_terminal_kind: contractArbitration.required_terminal_kind,
+    ...(mandatoryConcreteCapability
+      ? {
+          required_next_action: "model_tool_call",
+          required_observation_kinds: mandatoryRequiredObservationKinds,
+          required_outputs: mandatoryRequiredOutputs,
+        }
+      : {}),
     capability_contract_arbitration: contractArbitration as unknown as Record<string, unknown>,
     ...(compoundSubgoals.length > 1
       ? {
