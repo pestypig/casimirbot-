@@ -2,7 +2,7 @@
 
 Status: current-head map for structural extraction and decomposition-enabler work.
 
-Pinned source HEAD described: `dc222cd0d57c2b7de6c6247c846a2214ca28b493`
+Pinned source HEAD described: `7e2c834d3678becd28604c06a30a0b35688e2ebc`
 
 Snapshot command: `npx tsx scripts/helix-ask-route-inventory.ts --write`
 
@@ -11,9 +11,9 @@ Route snapshot:
 | Metric | Value |
 | --- | ---: |
 | File | `server/routes/agi.plan.ts` |
-| Lines | 181,594 |
-| Bytes | 8,132,693 |
-| Top-level helper estimate | 370 helper blocks |
+| Lines | 181,592 |
+| Bytes | 8,132,666 |
+| Top-level helper estimate | 369 helper blocks |
 | Route inventory | `artifacts/helix-ask-route-inventory.json` |
 | Machine-readable map | `artifacts/helix-ask-route-decomposition-map.json` |
 
@@ -30,7 +30,7 @@ Do not extract `runHelixAgentTurnRuntimeLoop` in this wave. Do not patch termina
 | `live-debug-slim` | service-owned | `DEBUG_EXPORT` | `MEDIUM_LOW` | `EXTRACTED` | `server/services/helix-ask/debug/live-debug-slim.ts` | Extracted by S93. Route still owns debug-mode parsing and response wrapper ordering. |
 | `transcript-events` | service-owned | `UI_API_PROJECTION` | `MEDIUM_LOW` | `EXTRACTED` | `server/services/helix-ask/runtime/transcript-events.ts` | Extracted by S94. Route retains transcript scaffold/finalization ordering. |
 | `decision-source-map` | service-owned | `SOLVER_CONTROL` | `MEDIUM` | `EXTRACTED` | `server/services/helix-ask/runtime/decision-source-map.ts` plus sibling runtime decision modules | S95 moved the debug map builder. S96 moved the pure runtime/terminal source mappers. S99 moved capability selection. S100 moved observation-decision. |
-| `turn-contract-builder` | 90065-90285 | `PROMPT_INTERPRETATION` | `MEDIUM_HIGH` | `PARTIAL_EXTRACTED` | `server/services/helix-ask/contracts/turn-contract-builder.ts` plus `server/services/helix-ask/contracts/turn-contract-seed-slots.ts` | S97 moved the pure seed-slot mapper. The main contract builder is bounded, but consumes many policy helpers. Characterize outputs before moving pure field assembly. |
+| `turn-contract-builder` | 90065-90285 | `PROMPT_INTERPRETATION` | `MEDIUM_HIGH` | `PARTIAL_EXTRACTED` | `server/services/helix-ask/contracts/turn-contract-builder.ts` plus `server/services/helix-ask/contracts/turn-contract-seed-slots.ts` and `turn-contract-hash.ts` | S97 moved the pure seed-slot mapper. S103 moved the pure turn-contract hash formatter. The main contract builder is bounded, but consumes many policy helpers. Characterize outputs before moving pure field assembly. |
 | `live-debug-slim-response-wrapper` | 108141-108165 | `DEBUG_EXPORT` / `UI_API_PROJECTION` | `MEDIUM_HIGH` | `PARTIAL_EXTRACTED` | `server/services/helix-ask/debug/live-response-payload.ts` plus `server/services/helix-ask/debug/live-debug-mode.ts` | S98 moved debug-mode parsing. `prepareHelixAskLiveResponsePayload` still calls typed-failure sync, mailbox projection, compound coverage sync, terminal projection sync, transcript scaffold, then slim debug. Requires ordered write proof before movement. |
 | `terminal-projection-debug-sync` | 106033-106214 | `TERMINAL_AUTHORITY` / `DEBUG_EXPORT` | `MEDIUM_HIGH` | `NEEDS_OWNER_PROOF` | `server/services/helix-ask/terminal-projection-debug-sync.ts` | Mutates payload/debug terminal mirrors after authority is selected. Extraction allowed only as projection sync, never terminal selection. |
 | `canonical-goal-frame` | 76899-77542 | `GOAL_SATISFACTION` / `INTENT_ARBITRATION` | `HIGH` | `NEEDS_OWNER_PROOF` | `server/services/helix-ask/goals/*` and `server/services/helix-ask/contracts/*` | Do not move full frame. S101-S102 moved pure goal-frame readers/formatters to `goals/goal-frame-readers.ts`; policy classification remains route-owned. |
@@ -50,6 +50,7 @@ Do not extract `runHelixAgentTurnRuntimeLoop` in this wave. Do not patch termina
 | `decision-source-map-builder` | `decision-source-map` | service-owned | Build debug/source map from payload. | Extracted; S96 moved the mapper callbacks into the same service owner. | `EXTRACTED` |
 | `turn-contract-field-assembly` | `turn-contract-builder` | 90065-90285 | Assemble contract goal/objectives/obligations/grounding/output family/format. | Pure-looking, but consumes planner pass, research contract, and classification helpers. | `READY_AFTER_CHARACTERIZATION` |
 | `turn-contract-seed-slots` | `turn-contract-builder` | service-owned | Convert a turn contract into slot plan entries. | Pure contract mapper. | `EXTRACTED` |
+| `turn-contract-hash-formatter` | `turn-contract-builder` | service-owned | Format stable turn-contract hash after contract construction. | Extracted by S103 as a pure formatter using shared stable JSON/SHA utilities. | `EXTRACTED` |
 | `turn-contract-retrieval-plan` | `turn-contract-builder` | starts 90289 | Build retrieval plan from contract and query constraints. | Touches retrieval/path ranking and prompt-research requirements. | `READY_AFTER_CHARACTERIZATION` |
 | `terminal-projection-sync` | `terminal-projection-debug-sync` | 106033-106214 | Copy already-selected terminal state into payload/debug mirrors. | Mutates terminal/debug fields; requires ordered write ledger and projection tests. | `NEEDS_OWNER_PROOF` |
 | `debug-export-envelope` | `terminal-projection-debug-sync` | starts 106215 | Build debug export envelope after terminal/projection sync. | Mutates/refreshes multiple debug records. | `NEEDS_OWNER_PROOF` |

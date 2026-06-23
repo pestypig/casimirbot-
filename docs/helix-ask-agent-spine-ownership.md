@@ -20,7 +20,7 @@ terminal eligibility, projection discipline, and debug traces.
 | Stage | Status | Canonical current owner | Temporary compatibility owner | Route-local implementation remaining | Principal input | Principal output | May write | Must not write | Callers | Consumers | Focused enforcement tests | Unresolved conflict |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Request and turn context | PARTIAL_SERVICE_OWNER | `server/services/helix-ask/runtime/request-context.ts` | `server/routes/agi.plan.ts` | request/transport shell and late route context assembly | Express request, payload, thread/session ids | route context, history events | request metadata, history lifecycle events | terminal authority, final answer text | `/api/agi/ask` route | Ask execution, debug export | request-context import/boundary checks | route still owns transport order |
-| Prompt interpretation | PARTIAL_SERVICE_OWNER | `server/services/helix-ask/prompt-interpretation.ts` plus route-local classifiers | `server/routes/agi.plan.ts` | large classifier bands and canonical goal-frame policy | prompt, workspace context, source hints | prompt contract, compound contract, goal frame inputs | interpretation records, compound contract | execution, terminal authority | route Ask path | source admission, contract builder | prompt-solving benchmark | classifiers still duplicate authority-like signals |
+| Prompt interpretation | PARTIAL_SERVICE_OWNER | `server/services/helix-ask/prompt-interpretation.ts`, `contracts/turn-contract-seed-slots.ts`, `contracts/turn-contract-hash.ts`, plus route-local classifiers | `server/routes/agi.plan.ts` | large classifier bands and canonical goal-frame policy | prompt, workspace context, source hints | prompt contract, compound contract, goal frame inputs | interpretation records, compound contract | execution, terminal authority | route Ask path | source admission, contract builder | prompt-solving benchmark | classifiers still duplicate authority-like signals |
 | Intent and source arbitration | PARTIAL_SERVICE_OWNER | `ask-source-target-arbitrator`, `evidence-target-arbitration`, `route-product-contract` services | `server/routes/agi.plan.ts` | glue and hard-gate route selection | prompt interpretation, route candidates | source target, evidence target, product contract | route/source/product policy records | tool execution, terminal text | Ask execution | capability plan, terminal gates | api parity matrix, prompt-solving benchmark | route still coordinates precedence |
 | Capability planning and selection | PARTIAL_SERVICE_OWNER | `runtime/capability-selection-result.ts`, `runtime/decision-source-map.ts`, capability-plan services | `server/routes/agi.plan.ts` | capability registry setup and selected-action compatibility wrappers | universal goal frame, selected action, payload | `capability_selection_result`, decision source map | capability selection result, decision-source debug | observations, terminal answer | route runtime setup | observation decision, debug export | policy-adjacent characterization, capability selection boundary | selected capability can still be mirrored by other ledgers |
 | Model next-step decisions | ROUTE_OWNED_PENDING_EXTRACTION | `server/routes/agi.plan.ts` | model-turn packet/executor services | runtime-loop bands | current state, capabilities, observations | `agent_step_decision` | model decision audits, selected next step | direct execution, terminal authority | private runtime loop | tool execution, observation packet | live-spine smoke when keyed, deterministic model-turn tests | still route-owned and closure-heavy |
@@ -76,6 +76,7 @@ terminal eligibility, projection discipline, and debug traces.
 | S100 | observation decision | `server/services/helix-ask/runtime/observation-decision.ts` | SERVICE_OWNED |
 | S101 | goal-frame mutation-target reader | `server/services/helix-ask/goals/goal-frame-readers.ts` | SERVICE_OWNED for the pure reader only |
 | S102 | goal-frame hash formatter | `server/services/helix-ask/goals/goal-frame-readers.ts` | SERVICE_OWNED for the pure formatter only |
+| S103 | turn-contract hash formatter | `server/services/helix-ask/contracts/turn-contract-hash.ts` | SERVICE_OWNED for the pure formatter only |
 
 ## Deferred Ownership Debt
 
@@ -85,5 +86,7 @@ terminal eligibility, projection discipline, and debug traces.
 - Post-tool authority bridge behavior remains out of scope for structural slices.
 - Canonical goal-frame policy remains high risk; S101-S102 moved pure helpers, but
   classifiers and required-terminal policy still need owner proof before moving.
+- Turn-contract construction remains route-owned; S103 moved only the post-build
+  hash formatter.
 - Recovery helpers can write terminal state and must not be treated as harmless
   glue without field-writer proof.
