@@ -2,7 +2,7 @@
 
 Status: current-head map for structural extraction and decomposition-enabler work.
 
-Pinned source HEAD described: `a5366d8c889e5b2e47086e114cff9749963b5b93`
+Pinned source HEAD described: `0e64dfd1bb221abdcdfbfed97f2da3974b96a823`
 
 Snapshot command: `npx tsx scripts/helix-ask-route-inventory.ts --write`
 
@@ -11,8 +11,8 @@ Route snapshot:
 | Metric | Value |
 | --- | ---: |
 | File | `server/routes/agi.plan.ts` |
-| Lines | 181,599 |
-| Bytes | 8,133,116 |
+| Lines | 181,594 |
+| Bytes | 8,132,868 |
 | Top-level helper estimate | 370 helper blocks |
 | Route inventory | `artifacts/helix-ask-route-inventory.json` |
 | Machine-readable map | `artifacts/helix-ask-route-decomposition-map.json` |
@@ -33,7 +33,7 @@ Do not extract `runHelixAgentTurnRuntimeLoop` in this wave. Do not patch termina
 | `turn-contract-builder` | 90065-90285 | `PROMPT_INTERPRETATION` | `MEDIUM_HIGH` | `PARTIAL_EXTRACTED` | `server/services/helix-ask/contracts/turn-contract-builder.ts` plus `server/services/helix-ask/contracts/turn-contract-seed-slots.ts` | S97 moved the pure seed-slot mapper. The main contract builder is bounded, but consumes many policy helpers. Characterize outputs before moving pure field assembly. |
 | `live-debug-slim-response-wrapper` | 108141-108165 | `DEBUG_EXPORT` / `UI_API_PROJECTION` | `MEDIUM_HIGH` | `PARTIAL_EXTRACTED` | `server/services/helix-ask/debug/live-response-payload.ts` plus `server/services/helix-ask/debug/live-debug-mode.ts` | S98 moved debug-mode parsing. `prepareHelixAskLiveResponsePayload` still calls typed-failure sync, mailbox projection, compound coverage sync, terminal projection sync, transcript scaffold, then slim debug. Requires ordered write proof before movement. |
 | `terminal-projection-debug-sync` | 106033-106214 | `TERMINAL_AUTHORITY` / `DEBUG_EXPORT` | `MEDIUM_HIGH` | `NEEDS_OWNER_PROOF` | `server/services/helix-ask/terminal-projection-debug-sync.ts` | Mutates payload/debug terminal mirrors after authority is selected. Extraction allowed only as projection sync, never terminal selection. |
-| `canonical-goal-frame` | 76899-77542 | `GOAL_SATISFACTION` / `INTENT_ARBITRATION` | `HIGH` | `NEEDS_OWNER_PROOF` | `server/services/helix-ask/goals/*` and `server/services/helix-ask/contracts/*` | Do not move full frame. Only pure readers/formatters/debug helpers may move after subdivision. |
+| `canonical-goal-frame` | 76899-77542 | `GOAL_SATISFACTION` / `INTENT_ARBITRATION` | `HIGH` | `NEEDS_OWNER_PROOF` | `server/services/helix-ask/goals/*` and `server/services/helix-ask/contracts/*` | Do not move full frame. S101 moved one pure mutation-target reader to `goals/goal-frame-readers.ts`; policy classification remains route-owned. |
 | `legacy-private-runtime-loop` | starts 67603 | `LEGACY_PRIVATE_RUNTIME_LOOP` | `HIGH` | `DEFER_RUNTIME_OWNERSHIP` | deferred legacy quarantine map only | Explicitly excluded from extraction. Map internal lifecycle bands only. |
 | `execute-helix-ask` | starts 110427 | `LEGACY_PRIVATE_RUNTIME_LOOP` / `SOLVER_CONTROL` | `HIGH` | `DEFER_RUNTIME_OWNERSHIP` | deferred | Deep engine body with many lifecycle stages and side effects. Map only. |
 | `handle-ask-turn-request` | starts 139091 | `TRANSPORT_EXPRESS_SSE` | `HIGH` | `DEFER_RUNTIME_OWNERSHIP` | route shell only | Owns request/response sequencing, terminal payload finalization, and runtime interactions. Map only. |
@@ -43,7 +43,7 @@ Do not extract `runHelixAgentTurnRuntimeLoop` in this wave. Do not patch termina
 | Sub-seam | Enclosing candidate | Current span | Responsibility | Dependency shape | Readiness |
 | --- | --- | ---: | --- | --- | --- |
 | `decision-source-mappers` | `decision-source-map` | service-owned | Runtime/terminal decision source normalization. | Pure mapping over source/reason/final-answer-source; no payload mutation. | `EXTRACTED` |
-| `goal-frame-mutation-target-reader` | `decision-source-map` / `canonical-goal-frame` | 77543-77547 | Read resolved mutation target from a built goal frame. | Pure frame reader; used outside decision-source selection. | `READY_AFTER_DEPENDENCY_REDUCTION` |
+| `goal-frame-mutation-target-reader` | `decision-source-map` / `canonical-goal-frame` | service-owned | Read resolved mutation target from a built goal frame. | Extracted by S101 as a pure goal-frame reader. | `EXTRACTED` |
 | `capability-selection-result` | `decision-source-map` | service-owned | Select expected capability from universal goal frame and optional selected action. | Extracted by S99 behind a 5-callback dependency interface for route-local goal/panel readers and workstation planner. | `EXTRACTED` |
 | `observation-decision` | `decision-source-map` | service-owned | Convert runtime observations, missing artifacts, pending requests, and next planned step into continue/finalize/input/failure decision. | Extracted by S100 behind invocation-time wrappers for shared route artifact collectors. | `EXTRACTED` |
 | `decision-source-map-builder` | `decision-source-map` | service-owned | Build debug/source map from payload. | Extracted; S96 moved the mapper callbacks into the same service owner. | `EXTRACTED` |

@@ -1,0 +1,24 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+import { describe, expect, it } from "vitest";
+
+const repoRoot = process.cwd();
+const routePath = join(repoRoot, "server/routes/agi.plan.ts");
+const servicePath = join(repoRoot, "server/services/helix-ask/goals/goal-frame-readers.ts");
+
+describe("Helix Ask goal-frame readers extraction boundary", () => {
+  it("keeps the mutation-target reader out of agi.plan.ts", () => {
+    const routeSource = readFileSync(routePath, "utf8");
+    const serviceSource = readFileSync(servicePath, "utf8");
+
+    expect(routeSource).toContain("../services/helix-ask/goals/goal-frame-readers");
+    expect(routeSource).not.toMatch(/const\s+readAskTurnGoalFrameMutationTarget\s*=\s*\(/);
+    expect(serviceSource).toMatch(/export\s+const\s+readAskTurnGoalFrameMutationTarget\s*=/);
+    expect(serviceSource).toContain("resolution !== \"missing\"");
+    expect(serviceSource).not.toContain("server/routes/agi.plan");
+    expect(serviceSource).not.toContain("../../../routes/agi.plan");
+    expect(serviceSource).not.toContain("../../routes/agi.plan");
+    expect(serviceSource).not.toContain("../routes/agi.plan");
+  });
+});

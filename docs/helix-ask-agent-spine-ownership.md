@@ -27,7 +27,7 @@ terminal eligibility, projection discipline, and debug traces.
 | Tool execution adapters | PARTIAL_SERVICE_OWNER | tool-family services and workstation adapter services | `server/routes/agi.plan.ts` | dispatch glue and selected tool invocation order | admitted action, args, context | receipts/results | tool receipt/result artifacts | final answer text unless contract permits receipt terminal | runtime loop | observation materializers | tool-chain matrix, capability lifecycle tests | generic execution ownership remains mixed |
 | Observation materialization | PARTIAL_SERVICE_OWNER | `runtime/observation-decision.ts`, tool-family materializers | `server/routes/agi.plan.ts` | artifact-store mutation and family-specific observation assembly | tool result, step result, artifact store | observation packet, missing-artifact decision | observation decision, artifact refs | terminal authority | runtime loop | evidence re-entry, goal satisfaction | observation-decision characterization/boundary | observation creation still route/family split |
 | Evidence re-entry | PARTIAL_SERVICE_OWNER | solver artifact reentry and payload-refresh services | `server/routes/agi.plan.ts` | post-tool synthesis bridge and docs synthesis coordination | observation ledger, support refs | reentry audit, draft candidates | reentry audit, support refs | selected terminal authority | runtime loop, post-tool bridge | goal satisfaction, terminal materializer | solver artifact reentry tests | post-tool bridge remains contested behavior |
-| Goal satisfaction | PARTIAL_SERVICE_OWNER | route-product/goal-satisfaction services plus route glue | `server/routes/agi.plan.ts` | canonical goal frame and satisfaction coordination | goal contract, observations, support refs | `goal_satisfaction_evaluation` | satisfaction status, missing requirements | terminal projection | solver controller | terminal materialization | api parity matrix | canonical goal frame still route-owned high risk |
+| Goal satisfaction | PARTIAL_SERVICE_OWNER | route-product/goal-satisfaction services plus `goals/goal-frame-readers.ts` | `server/routes/agi.plan.ts` | canonical goal frame and satisfaction coordination | goal contract, observations, support refs | `goal_satisfaction_evaluation` | satisfaction status, missing requirements | terminal projection | solver controller | terminal materialization | api parity matrix | canonical goal-frame policy still route-owned high risk |
 | Continuation and solver handoff | PARTIAL_SERVICE_OWNER | `runtime/observation-decision.ts`, solver-controller payload adapter | `server/routes/agi.plan.ts` | runtime-loop continuation/handoff order | observation decision, goal satisfaction | continue/finalize/typed failure candidate | decision records, pending requirements | final selected terminal unless authority passes | runtime loop | finalizer, hard gates | observation characterization, solver-controller tests | final continuation still route-orchestrated |
 | Terminal candidate materialization | PARTIAL_SERVICE_OWNER | materializer services, final-answer composer | `server/routes/agi.plan.ts` | family-specific terminal candidates and repair glue | final draft, route/product contract, support refs | terminal candidate artifacts | final answer draft, materialized terminal candidate | terminal authority single writer | finalizer, post-tool bridge | terminal authority | terminal materializer tests | candidate creation and selection not fully separated |
 | Terminal authority | PARTIAL_SERVICE_OWNER | terminal authority services and hard gate services | `server/routes/agi.plan.ts` | authority sequencing and fallback hard gates | terminal candidates, route contract, audits | `terminal_answer_authority`, `terminal_authority_single_writer` | authority records, typed failure when blocked | independent UI projection | finalizer | response projection | terminal authority contracts, API parity | post-tool bridge can still compete upstream |
@@ -74,6 +74,7 @@ terminal eligibility, projection discipline, and debug traces.
 | S98 | live debug mode reader | `server/services/helix-ask/debug/live-debug-mode.ts` | SERVICE_OWNED |
 | S99 | capability selection result | `server/services/helix-ask/runtime/capability-selection-result.ts` | SERVICE_OWNED |
 | S100 | observation decision | `server/services/helix-ask/runtime/observation-decision.ts` | SERVICE_OWNED |
+| S101 | goal-frame mutation-target reader | `server/services/helix-ask/goals/goal-frame-readers.ts` | SERVICE_OWNED for the pure reader only |
 
 ## Deferred Ownership Debt
 
@@ -81,7 +82,7 @@ terminal eligibility, projection discipline, and debug traces.
   remain route-owned runtime bands and must be mapped before any ownership move.
 - Terminal projection sync still needs ordered-write proof before extraction.
 - Post-tool authority bridge behavior remains out of scope for structural slices.
-- Canonical goal-frame policy remains high risk; only pure readers/formatters
-  should move before owner proof.
+- Canonical goal-frame policy remains high risk; S101 moved one pure reader, but
+  classifiers and required-terminal policy still need owner proof before moving.
 - Recovery helpers can write terminal state and must not be treated as harmless
   glue without field-writer proof.
