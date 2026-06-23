@@ -235,18 +235,27 @@ const summarizeScenario = (input: {
   const rails = railTables(ask, debug, debugExport);
   const rail = rails[0] ?? null;
   const subgoalRails = compoundSubgoalRails(ask, debug, debugExport);
-  const runtimeObserved = Array.from(new Set([
+  const actualObserved = Array.from(new Set([
     ...actualToolCalls(loop),
+    readString(rail?.executed_capability),
+    ...subgoalRails.map((entry) => readString(entry.executed_capability)),
+  ].filter((entry: string | null): entry is string => Boolean(entry))));
+  const selectedOrAdmittedObserved = Array.from(new Set([
     ...selectedCapabilities(ask, debug),
     readString(rail?.requested_capability),
     readString(rail?.selected_capability),
     readString(rail?.admitted_capability),
-    readString(rail?.executed_capability),
     ...subgoalRails.flatMap((entry) => [
       readString(entry.requested_capability),
       readString(entry.runtime_capability),
       readString(entry.selected_capability),
-      readString(entry.executed_capability),
+    ]),
+  ].filter((entry: string | null): entry is string => Boolean(entry))));
+  const runtimeObserved = Array.from(new Set([
+    ...actualObserved,
+    ...selectedOrAdmittedObserved,
+    ...subgoalRails.flatMap((entry) => [
+      readString(entry.observation_kind),
     ]),
   ].filter((entry: string | null): entry is string => Boolean(entry))));
   const visibleObserved = visibleToolSurface(rail);
@@ -256,7 +265,10 @@ const summarizeScenario = (input: {
     !capabilityObserved(capability, runtimeObserved),
   );
   const forbiddenSeen = (scenario.forbidden_capabilities ?? []).filter((capability) =>
-    capabilityObserved(capability, runtimeObserved),
+    capabilityObserved(capability, actualObserved),
+  );
+  const forbiddenSelectedOrAdmitted = (scenario.forbidden_capabilities ?? []).filter((capability) =>
+    capabilityObserved(capability, selectedOrAdmittedObserved),
   );
   const failures = [
     !debug ? "debug_export_missing" : null,
@@ -291,11 +303,14 @@ const summarizeScenario = (input: {
     failures,
     expected_capabilities: scenario.expected_capabilities ?? [],
     forbidden_capabilities: scenario.forbidden_capabilities ?? [],
+    actual_observed_capabilities: actualObserved,
+    selected_or_admitted_capabilities: selectedOrAdmittedObserved,
     runtime_observed_capabilities: runtimeObserved,
     visible_surface_capabilities: visibleObserved,
     observed_capabilities: observed,
     missing_expected_capabilities: missingExpected,
     forbidden_capabilities_seen: forbiddenSeen,
+    forbidden_selected_or_admitted_capabilities: forbiddenSelectedOrAdmitted,
     terminal_artifact_kind: terminalArtifactKind,
     final_answer_source: finalAnswerSource,
     terminal_error_code: terminalErrorCode,

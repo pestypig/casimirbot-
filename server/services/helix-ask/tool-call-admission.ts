@@ -81,9 +81,24 @@ const readMandatoryToolName = (record: Record<string, unknown> | null | undefine
 const isCalculatorSolveCapability = (value: string | null | undefined): boolean =>
   Boolean(value && /^scientific-calculator\.solve(?:_expression|_with_steps)?$/i.test(value.trim()));
 
+const promptNegatesCalculatorSolveCapability = (prompt: string): boolean => {
+  const matcher = /\bscientific-calculator\.solve(?:_expression|_with_steps)?\b/gi;
+  for (const match of prompt.matchAll(matcher)) {
+    const matchIndex = typeof match.index === "number" ? match.index : -1;
+    if (matchIndex < 0) continue;
+    const before = prompt.slice(Math.max(0, matchIndex - 140), matchIndex);
+    const clausePrefix = before.split(/[.!?;\n]/).pop() ?? before;
+    if (/\b(?:do\s+not|don't|dont|never|avoid|without|no)\b[\s\S]{0,80}\b(?:call|run|use|invoke|execute)?\b[\s\S]{0,80}$/i.test(clausePrefix)) {
+      return true;
+    }
+  }
+  return false;
+};
+
 const promptRequiresCalculatorExecution = (promptText: string): boolean => {
   const prompt = promptText.trim();
   if (!prompt) return false;
+  if (promptNegatesCalculatorSolveCapability(prompt)) return false;
   const namesCalculatorTool = /\bscientific-calculator\.solve(?:_expression|_with_steps)?\b/i.test(prompt);
   const affirmativeToolVerb = /\b(?:call|run|use|invoke|execute)\b[\s\S]{0,80}\bscientific-calculator\.solve(?:_expression|_with_steps)?\b/i.test(prompt);
   const receiptOrTerminalCue = /\b(?:calculator_receipt|workstation_tool_evaluation|calculator-backed terminal result|calculator-backed terminal)\b/i.test(prompt);

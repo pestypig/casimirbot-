@@ -173,6 +173,23 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const finiteOrNull = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
 
+const isPositiveFinite = (value: number | null | undefined): value is number =>
+  typeof value === "number" && Number.isFinite(value) && value > 0;
+
+const isNonNegativeFinite = (value: number | null | undefined): value is number =>
+  typeof value === "number" && Number.isFinite(value) && value >= 0;
+
+const isUnitFraction = (value: number | null | undefined): value is number =>
+  typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1;
+
+const upperBoundUnitFractionMargin = (
+  limit: number,
+  value: number | null | undefined,
+): number | null => {
+  if (!isUnitFraction(value)) return null;
+  return value === 0 ? Number.MAX_SAFE_INTEGER : round(limit / value);
+};
+
 const isNumberOrNull = (value: unknown): value is number | null =>
   value === null || (typeof value === "number" && Number.isFinite(value));
 
@@ -205,41 +222,73 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
   const evidence = input.activeControlEvidence ?? null;
   const gapControlAuthorityMargin =
     forceGapLoadBudget.margins.activeAuthorityMarginToIdealLoad;
+  const energyPerCycleValid = isPositiveFinite(evidence?.energyPerCycleJ);
+  const actuatorAuthorityValid = isPositiveFinite(evidence?.actuatorAuthorityN);
+  const switchingRateValid = isPositiveFinite(evidence?.switchingRateHz);
+  const bandwidthValid = isPositiveFinite(evidence?.bandwidthHz);
+  const gapNoiseValid = isPositiveFinite(evidence?.gapNoiseRmsMeters);
+  const timingJitterValid = isPositiveFinite(evidence?.timingJitterSeconds);
+  const phaseNoiseValid = isPositiveFinite(evidence?.phaseNoiseRmsSeconds);
+  const controllerPhaseMarginValid = isPositiveFinite(evidence?.controllerPhaseMarginDegrees);
+  const controllerGainMarginValid = isPositiveFinite(evidence?.controllerGainMarginDb);
+  const heatLoadValid = isNonNegativeFinite(evidence?.heatLoadW);
+  const heatSinkCapacityValid = isPositiveFinite(evidence?.heatSinkCapacityW);
+  const sourceTensorContaminationValid = isUnitFraction(
+    evidence?.sourceTensorContaminationFraction,
+  );
+  const lockAcquisitionTimeValid = isPositiveFinite(evidence?.lockAcquisitionTimeSeconds);
+  const energyPerCycleJ = energyPerCycleValid ? evidence?.energyPerCycleJ ?? null : null;
+  const actuatorAuthorityN = actuatorAuthorityValid ? evidence?.actuatorAuthorityN ?? null : null;
+  const evidenceSwitchingRate = switchingRateValid ? evidence?.switchingRateHz ?? null : null;
+  const bandwidthHz = bandwidthValid ? evidence?.bandwidthHz ?? null : null;
+  const gapNoiseRmsMeters = gapNoiseValid ? evidence?.gapNoiseRmsMeters ?? null : null;
+  const timingJitterSeconds = timingJitterValid ? evidence?.timingJitterSeconds ?? null : null;
+  const phaseNoiseRmsSeconds = phaseNoiseValid ? evidence?.phaseNoiseRmsSeconds ?? null : null;
+  const controllerPhaseMarginDegrees = controllerPhaseMarginValid
+    ? evidence?.controllerPhaseMarginDegrees ?? null
+    : null;
+  const controllerGainMarginDb = controllerGainMarginValid
+    ? evidence?.controllerGainMarginDb ?? null
+    : null;
+  const heatLoadW = heatLoadValid ? evidence?.heatLoadW ?? null : null;
+  const heatSinkCapacityW = heatSinkCapacityValid ? evidence?.heatSinkCapacityW ?? null : null;
+  const sourceTensorContaminationFraction = sourceTensorContaminationValid
+    ? evidence?.sourceTensorContaminationFraction ?? null
+    : null;
   const suppliedActuatorAuthorityMargin = safeRatio(
-    evidence?.actuatorAuthorityN ?? null,
+    actuatorAuthorityN,
     forceGapLoadBudget.idealLoadBudget.requiredActiveGapControlAuthorityN,
   );
-  const evidenceSwitchingRate = evidence?.switchingRateHz ?? null;
   const controlPowerW =
-    evidence?.energyPerCycleJ == null || evidenceSwitchingRate == null
+    energyPerCycleJ == null || evidenceSwitchingRate == null
       ? null
-      : round(evidence.energyPerCycleJ * evidenceSwitchingRate);
+      : round(energyPerCycleJ * evidenceSwitchingRate);
   const switchingRateMargin =
     evidenceSwitchingRate == null
       ? null
       : round(Math.min(evidenceSwitchingRate, SWITCHING_RATE_HZ) / SWITCHING_RATE_HZ);
-  const bandwidthMargin = safeRatio(evidence?.bandwidthHz ?? null, BANDWIDTH_MIN_HZ);
+  const bandwidthMargin = safeRatio(bandwidthHz, BANDWIDTH_MIN_HZ);
   const noiseMargin = safeRatio(
     GAP_NOISE_MAX_METERS,
-    evidence?.gapNoiseRmsMeters ?? null,
+    gapNoiseRmsMeters,
   );
   const timingMargin = safeRatio(
     TIMING_JITTER_MAX_SECONDS,
-    evidence?.timingJitterSeconds ?? null,
+    timingJitterSeconds,
   );
   const phaseNoiseMargin = safeRatio(
     PHASE_NOISE_MAX_SECONDS,
-    evidence?.phaseNoiseRmsSeconds ?? null,
+    phaseNoiseRmsSeconds,
   );
   const controllerPhaseMargin = safeRatio(
-    evidence?.controllerPhaseMarginDegrees ?? null,
+    controllerPhaseMarginDegrees,
     CONTROLLER_PHASE_MARGIN_MIN_DEGREES,
   );
   const controllerGainMargin = safeRatio(
-    evidence?.controllerGainMarginDb ?? null,
+    controllerGainMarginDb,
     CONTROLLER_GAIN_MARGIN_MIN_DB,
   );
-  const thermalAccountingMargin = safeRatio(evidence?.heatLoadW ?? null, controlPowerW);
+  const thermalAccountingMargin = safeRatio(heatLoadW, controlPowerW);
   const failureModeCoverage = evidence?.failureModeCoverage ?? null;
   const requiredGapControlAuthorityN =
     forceGapLoadBudget.idealLoadBudget.requiredActiveGapControlAuthorityN;
@@ -248,23 +297,23 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
       ? null
       : round(gapControlAuthorityMargin * requiredGapControlAuthorityN);
   const heatLoadMinW = controlPowerW;
-  const heatSinkReferenceLoadW = evidence?.heatLoadW ?? controlPowerW;
+  const heatSinkReferenceLoadW = heatLoadW ?? controlPowerW;
   const heatSinkCapacityMinW =
     heatSinkReferenceLoadW == null
       ? null
       : round(heatSinkReferenceLoadW * THERMAL_SINK_CAPACITY_FACTOR_MIN);
   const thermalSinkCapacityMargin = safeRatio(
-    evidence?.heatSinkCapacityW ?? null,
+    heatSinkCapacityW,
     heatSinkCapacityMinW,
   );
-  const sourceTensorContaminationMargin = safeRatio(
+  const sourceTensorContaminationMargin = upperBoundUnitFractionMargin(
     SOURCE_TENSOR_CONTAMINATION_FRACTION_MAX,
-    evidence?.sourceTensorContaminationFraction ?? null,
+    sourceTensorContaminationFraction,
   );
   const energyPerCycleHeatLimitedMaxJ =
-    evidence?.heatLoadW == null || evidenceSwitchingRate == null || evidenceSwitchingRate === 0
+    heatLoadW == null || evidenceSwitchingRate == null || evidenceSwitchingRate === 0
       ? null
-      : round(evidence.heatLoadW / evidenceSwitchingRate);
+      : round(heatLoadW / evidenceSwitchingRate);
   const traceRefs = [
     evidence?.energyWaveformRef,
     evidence?.actuatorAuthorityTraceRef,
@@ -304,7 +353,11 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
     evidence?.evidenceTier !== "validated_simulation"
       ? ["active_control_operating_budget_tier_not_measured_or_validated"]
       : []),
-    ...(evidence?.energyPerCycleJ == null ? ["active_control_energy_per_cycle_missing_for_power_budget"] : []),
+    ...(evidence?.energyPerCycleJ == null
+      ? ["active_control_energy_per_cycle_missing_for_power_budget"]
+      : !energyPerCycleValid
+        ? ["active_control_energy_per_cycle_invalid_for_operating_budget"]
+        : []),
     ...(evidence?.energyWaveformRef == null
       ? ["active_control_energy_waveform_ref_missing_for_operating_budget"]
       : []),
@@ -314,69 +367,103 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
     ...(evidence?.gapSensorCalibrationRef == null
       ? ["active_control_gap_sensor_calibration_ref_missing_for_operating_budget"]
       : []),
-    ...(evidenceSwitchingRate == null
+    ...(evidence?.switchingRateHz == null
       ? ["active_control_switching_rate_missing_for_operating_budget"]
-      : switchingRateMatchesTarget(evidenceSwitchingRate)
-        ? []
-        : ["active_control_switching_rate_not_15ghz"]),
+      : !switchingRateValid
+        ? ["active_control_switching_rate_invalid_for_operating_budget"]
+        : switchingRateMatchesTarget(evidenceSwitchingRate)
+          ? []
+          : ["active_control_switching_rate_not_15ghz"]),
     ...(controlPowerW == null ? ["active_control_power_budget_missing"] : []),
     ...(gapControlAuthorityMargin == null
       ? ["active_control_gap_authority_margin_missing_for_447_layer_load"]
       : gapControlAuthorityMargin < 1
         ? ["active_control_gap_authority_below_447_layer_load"]
         : []),
-    ...(suppliedActuatorAuthorityMargin == null
+    ...(evidence?.actuatorAuthorityN == null
       ? ["active_control_actuator_authority_missing_for_operating_budget"]
-      : suppliedActuatorAuthorityMargin < 1
-        ? ["active_control_supplied_actuator_authority_below_447_layer_load"]
-        : []),
-    ...(bandwidthMargin == null
+      : !actuatorAuthorityValid
+        ? ["active_control_actuator_authority_invalid_for_operating_budget"]
+        : suppliedActuatorAuthorityMargin == null
+          ? ["active_control_actuator_authority_missing_for_operating_budget"]
+          : suppliedActuatorAuthorityMargin < 1
+            ? ["active_control_supplied_actuator_authority_below_447_layer_load"]
+            : []),
+    ...(evidence?.bandwidthHz == null
       ? ["active_control_bandwidth_missing_for_operating_budget"]
-      : bandwidthMargin < 1
-        ? ["active_control_bandwidth_below_30ghz"]
-        : []),
+      : !bandwidthValid
+        ? ["active_control_bandwidth_invalid_for_operating_budget"]
+        : bandwidthMargin == null
+          ? ["active_control_bandwidth_missing_for_operating_budget"]
+          : bandwidthMargin < 1
+            ? ["active_control_bandwidth_below_30ghz"]
+            : []),
     ...(evidence?.controlTransferFunctionRef == null
       ? ["active_control_transfer_function_ref_missing_for_operating_budget"]
       : []),
     ...(evidence?.controllerStabilityRef == null
       ? ["active_control_controller_stability_ref_missing_for_operating_budget"]
       : []),
-    ...(controllerPhaseMargin == null
+    ...(evidence?.controllerPhaseMarginDegrees == null
       ? ["active_control_controller_phase_margin_missing_for_operating_budget"]
-      : controllerPhaseMargin < 1
-        ? ["active_control_controller_phase_margin_below_45deg"]
-        : []),
-    ...(controllerGainMargin == null
+      : !controllerPhaseMarginValid
+        ? ["active_control_controller_phase_margin_invalid_for_operating_budget"]
+        : controllerPhaseMargin == null
+          ? ["active_control_controller_phase_margin_missing_for_operating_budget"]
+          : controllerPhaseMargin < 1
+            ? ["active_control_controller_phase_margin_below_45deg"]
+            : []),
+    ...(evidence?.controllerGainMarginDb == null
       ? ["active_control_controller_gain_margin_missing_for_operating_budget"]
-      : controllerGainMargin < 1
-        ? ["active_control_controller_gain_margin_below_6db"]
-        : []),
-    ...(noiseMargin == null
+      : !controllerGainMarginValid
+        ? ["active_control_controller_gain_margin_invalid_for_operating_budget"]
+        : controllerGainMargin == null
+          ? ["active_control_controller_gain_margin_missing_for_operating_budget"]
+          : controllerGainMargin < 1
+            ? ["active_control_controller_gain_margin_below_6db"]
+            : []),
+    ...(evidence?.gapNoiseRmsMeters == null
       ? ["active_control_gap_noise_missing_for_operating_budget"]
-      : noiseMargin < 1
-        ? ["active_control_gap_noise_above_80pm"]
-        : []),
+      : !gapNoiseValid
+        ? ["active_control_gap_noise_invalid_for_operating_budget"]
+        : noiseMargin == null
+          ? ["active_control_gap_noise_missing_for_operating_budget"]
+          : noiseMargin < 1
+            ? ["active_control_gap_noise_above_80pm"]
+            : []),
     ...(evidence?.gapNoiseTraceRef == null
       ? ["active_control_gap_noise_trace_ref_missing_for_operating_budget"]
       : []),
     ...(evidence?.noiseSpectrumRef == null
       ? ["active_control_noise_spectrum_ref_missing_for_operating_budget"]
       : []),
-    ...(timingMargin == null
+    ...(evidence?.timingJitterSeconds == null
       ? ["active_control_timing_jitter_missing_for_operating_budget"]
-      : timingMargin < 1
-        ? ["active_control_timing_jitter_above_0p1_cycle"]
-        : []),
-    ...(thermalAccountingMargin == null
+      : !timingJitterValid
+        ? ["active_control_timing_jitter_invalid_for_operating_budget"]
+        : timingMargin == null
+          ? ["active_control_timing_jitter_missing_for_operating_budget"]
+          : timingMargin < 1
+            ? ["active_control_timing_jitter_above_0p1_cycle"]
+            : []),
+    ...(evidence?.heatLoadW == null
       ? ["active_control_heat_load_missing_for_power_budget"]
-      : thermalAccountingMargin < 1
-        ? ["active_control_heat_load_below_computed_control_power"]
-        : []),
-    ...(thermalSinkCapacityMargin == null
+      : !heatLoadValid
+        ? ["active_control_heat_load_invalid_for_operating_budget"]
+        : thermalAccountingMargin == null
+          ? ["active_control_heat_load_missing_for_power_budget"]
+          : thermalAccountingMargin < 1
+            ? ["active_control_heat_load_below_computed_control_power"]
+            : []),
+    ...(evidence?.heatSinkCapacityW == null
       ? ["active_control_heat_sink_capacity_missing_for_operating_budget"]
-      : thermalSinkCapacityMargin < 1
-        ? ["active_control_heat_sink_capacity_below_1p2x_heat_load"]
-        : []),
+      : !heatSinkCapacityValid
+        ? ["active_control_heat_sink_capacity_invalid_for_operating_budget"]
+        : thermalSinkCapacityMargin == null
+          ? ["active_control_heat_sink_capacity_missing_for_operating_budget"]
+          : thermalSinkCapacityMargin < 1
+            ? ["active_control_heat_sink_capacity_below_1p2x_heat_load"]
+            : []),
     ...(evidence?.thermalModelRef == null
       ? ["active_control_thermal_model_ref_missing_for_operating_budget"]
       : []),
@@ -386,31 +473,40 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
     ...(evidence?.heatLoadTraceRef == null
       ? ["active_control_heat_load_trace_ref_missing_for_operating_budget"]
       : []),
-    ...(sourceTensorContaminationMargin == null
+    ...(evidence?.sourceTensorContaminationFraction == null
       ? ["active_control_source_tensor_contamination_missing_for_operating_budget"]
-      : sourceTensorContaminationMargin < 1
-        ? ["active_control_source_tensor_contamination_above_5pct"]
-        : []),
+      : !sourceTensorContaminationValid
+        ? ["active_control_source_tensor_contamination_invalid_for_operating_budget"]
+        : sourceTensorContaminationMargin == null
+          ? ["active_control_source_tensor_contamination_missing_for_operating_budget"]
+          : sourceTensorContaminationMargin < 1
+            ? ["active_control_source_tensor_contamination_above_5pct"]
+            : []),
     ...(evidence?.sourceTensorContaminationRef == null
       ? ["active_control_source_tensor_contamination_ref_missing_for_operating_budget"]
       : []),
     ...(evidence?.timingSyncTraceRef == null
       ? ["active_control_timing_sync_trace_ref_missing_for_operating_budget"]
       : []),
-    ...(phaseNoiseMargin == null
+    ...(evidence?.phaseNoiseRmsSeconds == null
       ? ["active_control_phase_noise_missing_for_operating_budget"]
-      : phaseNoiseMargin < 1
-        ? ["active_control_phase_noise_above_0p05_cycle"]
-        : []),
+      : !phaseNoiseValid
+        ? ["active_control_phase_noise_invalid_for_operating_budget"]
+        : phaseNoiseMargin == null
+          ? ["active_control_phase_noise_missing_for_operating_budget"]
+          : phaseNoiseMargin < 1
+            ? ["active_control_phase_noise_above_0p05_cycle"]
+            : []),
     ...(evidence?.phaseNoiseSpectrumRef == null
       ? ["active_control_phase_noise_spectrum_ref_missing_for_operating_budget"]
       : []),
     ...(evidence?.lockAcquisitionTraceRef == null
       ? ["active_control_lock_acquisition_trace_ref_missing_for_operating_budget"]
       : []),
-    ...(evidence?.lockAcquisitionTimeSeconds == null ||
-    evidence.lockAcquisitionTimeSeconds <= 0
+    ...(evidence?.lockAcquisitionTimeSeconds == null
       ? ["active_control_lock_acquisition_time_missing_for_operating_budget"]
+      : !lockAcquisitionTimeValid
+        ? ["active_control_lock_acquisition_time_invalid_for_operating_budget"]
       : []),
     ...(evidence?.failureModeRef == null ? ["active_control_failure_mode_ref_missing_for_operating_budget"] : []),
     ...(failureModeCoverage?.lossOfLock === true
@@ -446,6 +542,19 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
             "active_control_heat_load_below_computed_control_power",
             "active_control_heat_sink_capacity_below_1p2x_heat_load",
             "active_control_source_tensor_contamination_above_5pct",
+            "active_control_energy_per_cycle_invalid_for_operating_budget",
+            "active_control_actuator_authority_invalid_for_operating_budget",
+            "active_control_switching_rate_invalid_for_operating_budget",
+            "active_control_bandwidth_invalid_for_operating_budget",
+            "active_control_gap_noise_invalid_for_operating_budget",
+            "active_control_timing_jitter_invalid_for_operating_budget",
+            "active_control_phase_noise_invalid_for_operating_budget",
+            "active_control_controller_phase_margin_invalid_for_operating_budget",
+            "active_control_controller_gain_margin_invalid_for_operating_budget",
+            "active_control_heat_load_invalid_for_operating_budget",
+            "active_control_heat_sink_capacity_invalid_for_operating_budget",
+            "active_control_source_tensor_contamination_invalid_for_operating_budget",
+            "active_control_lock_acquisition_time_invalid_for_operating_budget",
           ].includes(blocker),
         )
       : false;
@@ -561,63 +670,63 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
           ? null
           : round(Math.abs(evidenceSwitchingRate - SWITCHING_RATE_HZ)),
       bandwidthMinHz: BANDWIDTH_MIN_HZ,
-      bandwidthShortfallHz: shortfallToMinimum(evidence?.bandwidthHz, BANDWIDTH_MIN_HZ),
+      bandwidthShortfallHz: shortfallToMinimum(bandwidthHz, BANDWIDTH_MIN_HZ),
       gapControlAuthorityMinN: requiredGapControlAuthorityN,
       suppliedGapControlAuthorityN,
-      suppliedActuatorAuthorityN: evidence?.actuatorAuthorityN ?? null,
+      suppliedActuatorAuthorityN: actuatorAuthorityN,
       gapControlAuthorityShortfallN: shortfallToMinimum(
         suppliedGapControlAuthorityN,
         requiredGapControlAuthorityN,
       ),
       actuatorAuthorityShortfallN: shortfallToMinimum(
-        evidence?.actuatorAuthorityN,
+        actuatorAuthorityN,
         requiredGapControlAuthorityN,
       ),
       gapNoiseRmsMaxMeters: GAP_NOISE_MAX_METERS,
       gapNoiseRmsReductionMeters: reductionToMaximum(
-        evidence?.gapNoiseRmsMeters,
+        gapNoiseRmsMeters,
         GAP_NOISE_MAX_METERS,
       ),
       timingJitterMaxSeconds: TIMING_JITTER_MAX_SECONDS,
       timingJitterReductionSeconds: reductionToMaximum(
-        evidence?.timingJitterSeconds,
+        timingJitterSeconds,
         TIMING_JITTER_MAX_SECONDS,
       ),
       phaseNoiseMaxSeconds: PHASE_NOISE_MAX_SECONDS,
       phaseNoiseReductionSeconds: reductionToMaximum(
-        evidence?.phaseNoiseRmsSeconds,
+        phaseNoiseRmsSeconds,
         PHASE_NOISE_MAX_SECONDS,
       ),
       controllerPhaseMarginMinDegrees: CONTROLLER_PHASE_MARGIN_MIN_DEGREES,
       controllerPhaseMarginShortfallDegrees: shortfallToMinimum(
-        evidence?.controllerPhaseMarginDegrees,
+        controllerPhaseMarginDegrees,
         CONTROLLER_PHASE_MARGIN_MIN_DEGREES,
       ),
       controllerGainMarginMinDb: CONTROLLER_GAIN_MARGIN_MIN_DB,
       controllerGainMarginShortfallDb: shortfallToMinimum(
-        evidence?.controllerGainMarginDb,
+        controllerGainMarginDb,
         CONTROLLER_GAIN_MARGIN_MIN_DB,
       ),
       controlPowerW,
       heatLoadMinW,
       heatLoadShortfallW:
-        heatLoadMinW == null || evidence?.heatLoadW == null
+        heatLoadMinW == null || heatLoadW == null
           ? null
-          : round(Math.max(0, heatLoadMinW - evidence.heatLoadW)),
+          : round(Math.max(0, heatLoadMinW - heatLoadW)),
       heatSinkCapacityCriterion: HEAT_SINK_CAPACITY_CRITERION,
       energyPerCycleHeatLimitedMaxJ,
       heatSinkCapacityMinW,
       heatSinkCapacityShortfallW:
-        heatSinkCapacityMinW == null || evidence?.heatSinkCapacityW == null
+        heatSinkCapacityMinW == null || heatSinkCapacityW == null
           ? null
-          : round(Math.max(0, heatSinkCapacityMinW - evidence.heatSinkCapacityW)),
+          : round(Math.max(0, heatSinkCapacityMinW - heatSinkCapacityW)),
       energyPerCycleReductionJ:
-        evidence?.energyPerCycleJ == null || energyPerCycleHeatLimitedMaxJ == null
+        energyPerCycleJ == null || energyPerCycleHeatLimitedMaxJ == null
           ? null
-          : round(Math.max(0, evidence.energyPerCycleJ - energyPerCycleHeatLimitedMaxJ)),
+          : round(Math.max(0, energyPerCycleJ - energyPerCycleHeatLimitedMaxJ)),
       sourceTensorContaminationFractionMax: SOURCE_TENSOR_CONTAMINATION_FRACTION_MAX,
       sourceTensorContaminationFractionReduction: reductionToMaximum(
-        evidence?.sourceTensorContaminationFraction,
+        sourceTensorContaminationFraction,
         SOURCE_TENSOR_CONTAMINATION_FRACTION_MAX,
       ),
       requiredTraceRefCount: 15,

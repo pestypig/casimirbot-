@@ -198,8 +198,19 @@ const safeRatio = (numerator: number | null, denominator: number | null): number
     ? null
     : round(numerator / denominator);
 
-const upperBoundMargin = (limit: number, value: number | null | undefined): number | null =>
-  value == null || !Number.isFinite(value) || value <= 0 ? null : round(limit / value);
+const isPositiveFinite = (value: number | null | undefined): value is number =>
+  typeof value === "number" && Number.isFinite(value) && value > 0;
+
+const isUnitFraction = (value: number | null | undefined): value is number =>
+  typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1;
+
+const upperBoundUnitFractionMargin = (
+  limit: number,
+  value: number | null | undefined,
+): number | null => {
+  if (!isUnitFraction(value)) return null;
+  return value === 0 ? Number.MAX_SAFE_INTEGER : round(limit / value);
+};
 
 const shortfallToMinimum = (value: number | null | undefined, minimum: number): number | null =>
   value == null ? null : round(Math.max(0, minimum - value));
@@ -212,58 +223,72 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
 ): Nhm2TileSourceFatigueLayerScalingOperatingBudgetV1 => {
   const evidence = input.fatigueLayerScalingEvidence ?? null;
   const requiredCycleCount = evidence?.requiredCycleCount ?? REQUIRED_CYCLE_COUNT;
+  const cycleCountValid = isPositiveFinite(evidence?.cycleCountToFailure);
+  const requiredCycleCountValid = isPositiveFinite(requiredCycleCount);
+  const thermalCycleDriftValid = isUnitFraction(evidence?.thermalCycleDriftFraction);
+  const creepDriftValid = isUnitFraction(evidence?.creepDriftFraction);
+  const delaminationMarginValid = isPositiveFinite(evidence?.delaminationMargin);
+  const interlayerAdhesionMarginValid = isPositiveFinite(evidence?.interlayerAdhesionMargin);
+  const layerScalingEfficiencyValid = isUnitFraction(evidence?.layerScalingEfficiency);
+  const perLayerVariationValid = isUnitFraction(evidence?.perLayerVariationFraction);
+  const nonadditivityValid = isUnitFraction(evidence?.nonadditivityFraction);
+  const activeAreaRetentionValid = isUnitFraction(evidence?.activeAreaRetention);
+  const supportCouplingValid = isUnitFraction(evidence?.supportCouplingFraction);
+  const electromagneticCouplingValid = isUnitFraction(evidence?.electromagneticCouplingFraction);
+  const mechanicalCouplingValid = isUnitFraction(evidence?.mechanicalCouplingFraction);
+  const sourceTensorRetentionValid = isUnitFraction(evidence?.sourceTensorRetentionFraction);
   const cycleMargin = safeRatio(
-    evidence?.cycleCountToFailure ?? null,
-    requiredCycleCount,
+    cycleCountValid ? evidence?.cycleCountToFailure ?? null : null,
+    requiredCycleCountValid ? requiredCycleCount : null,
   );
-  const thermalCycleDriftMargin = upperBoundMargin(
+  const thermalCycleDriftMargin = upperBoundUnitFractionMargin(
     THERMAL_CYCLE_DRIFT_FRACTION_MAX,
     evidence?.thermalCycleDriftFraction,
   );
-  const creepDriftMargin = upperBoundMargin(
+  const creepDriftMargin = upperBoundUnitFractionMargin(
     CREEP_DRIFT_FRACTION_MAX,
     evidence?.creepDriftFraction,
   );
   const delaminationMargin = safeRatio(
-    evidence?.delaminationMargin ?? null,
+    delaminationMarginValid ? evidence?.delaminationMargin ?? null : null,
     DELAMINATION_MARGIN_MIN,
   );
   const interlayerAdhesionMargin = safeRatio(
-    evidence?.interlayerAdhesionMargin ?? null,
+    interlayerAdhesionMarginValid ? evidence?.interlayerAdhesionMargin ?? null : null,
     INTERLAYER_ADHESION_MARGIN_MIN,
   );
   const scalingMargin = safeRatio(
-    evidence?.layerScalingEfficiency ?? null,
+    layerScalingEfficiencyValid ? evidence?.layerScalingEfficiency ?? null : null,
     LAYER_SCALING_EFFICIENCY_MIN,
   );
-  const perLayerVariationMargin = upperBoundMargin(
+  const perLayerVariationMargin = upperBoundUnitFractionMargin(
     PER_LAYER_VARIATION_FRACTION_MAX,
     evidence?.perLayerVariationFraction,
   );
-  const nonadditivityMargin = safeRatio(
+  const nonadditivityMargin = upperBoundUnitFractionMargin(
     LAYER_NONADDITIVITY_FRACTION_MAX,
-    evidence?.nonadditivityFraction ?? null,
+    evidence?.nonadditivityFraction,
   );
   const activeAreaMargin = safeRatio(
-    evidence?.activeAreaRetention ?? null,
+    activeAreaRetentionValid ? evidence?.activeAreaRetention ?? null : null,
     ACTIVE_AREA_RETENTION_MIN,
   );
-  const supportCouplingMargin = upperBoundMargin(
+  const supportCouplingMargin = upperBoundUnitFractionMargin(
     SUPPORT_COUPLING_FRACTION_MAX,
     evidence?.supportCouplingFraction,
   );
-  const electromagneticCouplingMargin = upperBoundMargin(
+  const electromagneticCouplingMargin = upperBoundUnitFractionMargin(
     ELECTROMAGNETIC_COUPLING_FRACTION_MAX,
     evidence?.electromagneticCouplingFraction,
   );
-  const mechanicalCouplingMargin = upperBoundMargin(
+  const mechanicalCouplingMargin = upperBoundUnitFractionMargin(
     MECHANICAL_COUPLING_FRACTION_MAX,
     evidence?.mechanicalCouplingFraction,
   );
   const effectiveActiveLayerCount =
-    evidence?.layerScalingEfficiency == null ||
-    evidence.nonadditivityFraction == null ||
-    evidence.activeAreaRetention == null
+    !layerScalingEfficiencyValid ||
+    !nonadditivityValid ||
+    !activeAreaRetentionValid
       ? null
       : round(
           LAYER_COUNT *
@@ -276,7 +301,7 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
     EFFECTIVE_ACTIVE_LAYER_COUNT_MIN,
   );
   const sourceTensorRetentionFraction =
-    evidence?.sourceTensorRetentionFraction == null
+    !sourceTensorRetentionValid
       ? null
       : round(evidence.sourceTensorRetentionFraction);
   const sourceTensorRetentionMargin = safeRatio(
@@ -321,6 +346,12 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
     ...(evidence?.cycleCountToFailure == null
       ? ["cycle_count_to_failure_missing_for_operating_budget"]
       : []),
+    ...(evidence?.cycleCountToFailure != null && !cycleCountValid
+      ? ["cycle_count_to_failure_invalid_for_operating_budget"]
+      : []),
+    ...(evidence?.requiredCycleCount != null && !requiredCycleCountValid
+      ? ["required_cycle_count_invalid_for_operating_budget"]
+      : []),
     ...(evidence?.loadSpectrumRef == null
       ? ["fatigue_load_spectrum_ref_missing_for_operating_budget"]
       : []),
@@ -348,26 +379,41 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
     ...(cycleMargin != null && cycleMargin < 1
       ? ["fatigue_cycle_margin_below_one_operating_budget"]
       : []),
+    ...(evidence?.thermalCycleDriftFraction != null && !thermalCycleDriftValid
+      ? ["thermal_cycle_drift_fraction_invalid_for_operating_budget"]
+      : []),
     ...(thermalCycleDriftMargin == null
       ? ["thermal_cycle_drift_fraction_missing_for_operating_budget"]
       : thermalCycleDriftMargin < 1
         ? ["thermal_cycle_drift_above_0p01_operating_budget"]
         : []),
+    ...(evidence?.creepDriftFraction != null && !creepDriftValid
+      ? ["creep_drift_fraction_invalid_for_operating_budget"]
+      : []),
     ...(creepDriftMargin == null
       ? ["creep_drift_fraction_missing_for_operating_budget"]
       : creepDriftMargin < 1
         ? ["creep_drift_above_0p01_operating_budget"]
         : []),
+    ...(evidence?.delaminationMargin != null && !delaminationMarginValid
+      ? ["delamination_margin_invalid_for_operating_budget"]
+      : []),
     ...(delaminationMargin == null
       ? ["delamination_margin_missing_for_operating_budget"]
       : delaminationMargin < 1
         ? ["delamination_margin_below_one_operating_budget"]
         : []),
+    ...(evidence?.interlayerAdhesionMargin != null && !interlayerAdhesionMarginValid
+      ? ["interlayer_adhesion_margin_invalid_for_operating_budget"]
+      : []),
     ...(interlayerAdhesionMargin == null
       ? ["interlayer_adhesion_margin_missing_for_operating_budget"]
       : interlayerAdhesionMargin < 1
         ? ["interlayer_adhesion_margin_below_one_operating_budget"]
         : []),
+    ...(evidence?.layerScalingEfficiency != null && !layerScalingEfficiencyValid
+      ? ["layer_scaling_efficiency_invalid_for_operating_budget"]
+      : []),
     ...(evidence?.layerScalingEfficiency == null
       ? ["layer_scaling_efficiency_missing_for_operating_budget"]
       : scalingMargin != null && scalingMargin < 1
@@ -378,7 +424,9 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
       : []),
     ...(evidence?.perLayerVariationFraction == null
       ? ["per_layer_variation_fraction_missing_for_operating_budget"]
-      : perLayerVariationMargin != null && perLayerVariationMargin < 1
+      : !perLayerVariationValid
+        ? ["per_layer_variation_fraction_invalid_for_operating_budget"]
+        : perLayerVariationMargin != null && perLayerVariationMargin < 1
         ? ["per_layer_variation_above_0p05_operating_budget"]
         : []),
     ...(evidence?.perLayerVariationMapRef == null
@@ -386,7 +434,9 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
       : []),
     ...(evidence?.nonadditivityFraction == null
       ? ["layer_nonadditivity_fraction_missing_for_operating_budget"]
-      : nonadditivityMargin != null && nonadditivityMargin < 1
+      : !nonadditivityValid
+        ? ["layer_nonadditivity_fraction_invalid_for_operating_budget"]
+        : nonadditivityMargin != null && nonadditivityMargin < 1
         ? ["layer_nonadditivity_above_0p1_operating_budget"]
         : []),
     ...(evidence?.nonadditivityModelRef == null
@@ -394,7 +444,9 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
       : []),
     ...(evidence?.activeAreaRetention == null
       ? ["active_area_retention_missing_for_operating_budget"]
-      : activeAreaMargin != null && activeAreaMargin < 1
+      : !activeAreaRetentionValid
+        ? ["active_area_retention_invalid_for_operating_budget"]
+        : activeAreaMargin != null && activeAreaMargin < 1
         ? ["active_area_retention_below_0p6_operating_budget"]
         : []),
     ...(evidence?.activeAreaMapRef == null
@@ -416,12 +468,16 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
       : []),
     ...(evidence?.supportCouplingFraction == null
       ? ["support_coupling_fraction_missing_for_operating_budget"]
-      : supportCouplingMargin != null && supportCouplingMargin < 1
+      : !supportCouplingValid
+        ? ["support_coupling_fraction_invalid_for_operating_budget"]
+        : supportCouplingMargin != null && supportCouplingMargin < 1
         ? ["support_coupling_fraction_above_0p1_operating_budget"]
         : []),
     ...(evidence?.electromagneticCouplingFraction == null
       ? ["electromagnetic_coupling_fraction_missing_for_operating_budget"]
-      : electromagneticCouplingMargin != null && electromagneticCouplingMargin < 1
+      : !electromagneticCouplingValid
+        ? ["electromagnetic_coupling_fraction_invalid_for_operating_budget"]
+        : electromagneticCouplingMargin != null && electromagneticCouplingMargin < 1
         ? ["electromagnetic_coupling_fraction_above_0p1_operating_budget"]
         : []),
     ...(evidence?.electromagneticCouplingMapRef == null
@@ -429,7 +485,9 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
       : []),
     ...(evidence?.mechanicalCouplingFraction == null
       ? ["mechanical_coupling_fraction_missing_for_operating_budget"]
-      : mechanicalCouplingMargin != null && mechanicalCouplingMargin < 1
+      : !mechanicalCouplingValid
+        ? ["mechanical_coupling_fraction_invalid_for_operating_budget"]
+        : mechanicalCouplingMargin != null && mechanicalCouplingMargin < 1
         ? ["mechanical_coupling_fraction_above_0p1_operating_budget"]
         : []),
     ...(evidence?.mechanicalCouplingMapRef == null
@@ -441,25 +499,42 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
     ...(evidence?.sourceTensorRetentionMapRef == null
       ? ["source_tensor_retention_map_ref_missing_for_operating_budget"]
       : []),
+    ...(evidence?.sourceTensorRetentionFraction != null && !sourceTensorRetentionValid
+      ? ["source_tensor_retention_fraction_invalid_for_operating_budget"]
+      : []),
   ];
   const falsifiesCurrentCandidate =
     evidence?.evidenceTier === "measured" ||
     evidence?.evidenceTier === "validated_simulation"
       ? blockers.some((blocker) =>
           [
+            "cycle_count_to_failure_invalid_for_operating_budget",
+            "required_cycle_count_invalid_for_operating_budget",
             "fatigue_cycle_margin_below_one_operating_budget",
+            "thermal_cycle_drift_fraction_invalid_for_operating_budget",
             "thermal_cycle_drift_above_0p01_operating_budget",
+            "creep_drift_fraction_invalid_for_operating_budget",
             "creep_drift_above_0p01_operating_budget",
+            "delamination_margin_invalid_for_operating_budget",
             "delamination_margin_below_one_operating_budget",
+            "interlayer_adhesion_margin_invalid_for_operating_budget",
             "interlayer_adhesion_margin_below_one_operating_budget",
+            "layer_scaling_efficiency_invalid_for_operating_budget",
             "layer_scaling_efficiency_below_0p9_operating_budget",
+            "per_layer_variation_fraction_invalid_for_operating_budget",
             "per_layer_variation_above_0p05_operating_budget",
+            "layer_nonadditivity_fraction_invalid_for_operating_budget",
             "layer_nonadditivity_above_0p1_operating_budget",
+            "active_area_retention_invalid_for_operating_budget",
             "active_area_retention_below_0p6_operating_budget",
             "effective_active_layer_count_below_operating_budget",
+            "support_coupling_fraction_invalid_for_operating_budget",
             "support_coupling_fraction_above_0p1_operating_budget",
+            "electromagnetic_coupling_fraction_invalid_for_operating_budget",
             "electromagnetic_coupling_fraction_above_0p1_operating_budget",
+            "mechanical_coupling_fraction_invalid_for_operating_budget",
             "mechanical_coupling_fraction_above_0p1_operating_budget",
+            "source_tensor_retention_fraction_invalid_for_operating_budget",
             "source_tensor_retention_below_0p9_operating_budget",
             "support_coupling_status_not_pass_for_operating_budget",
           ].includes(blocker),

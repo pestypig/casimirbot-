@@ -100,6 +100,11 @@ export type Nhm2TileSourceFullApparatusTensorOperatingBudgetV1 = {
       hull: string | null;
       exteriorShell: string | null;
     };
+    regionalSampleCounts: {
+      wall: number | null;
+      hull: number | null;
+      exteriorShell: number | null;
+    };
   };
   derivedOperatingBudget: {
     componentCoverageFraction: number;
@@ -112,6 +117,7 @@ export type Nhm2TileSourceFullApparatusTensorOperatingBudgetV1 = {
     termRefsComplete: boolean;
     subsystemReceiptRefsComplete: boolean;
     regionalSupportRefsComplete: boolean;
+    regionalSampleCountsComplete: boolean;
     fullTensorCoverageComplete: boolean;
     requiredStressEnergyTermsComplete: boolean;
     requiredRegionalCoverageComplete: boolean;
@@ -139,6 +145,8 @@ export type Nhm2TileSourceFullApparatusTensorOperatingBudgetV1 = {
     missingRegionIds: string[];
     regionalSupportRefMissingCount: number;
     missingRegionalSupportRefIds: string[];
+    regionalSampleCountMissingOrInvalidCount: number;
+    missingOrInvalidRegionalSampleCountIds: string[];
     requiredAuthorityMetadataCount: 4;
     authorityMetadataMissingCount: number;
     missingAuthorityMetadataIds: string[];
@@ -184,6 +192,9 @@ const DEFAULT_SELECTED_PROFILE_ID =
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value != null && typeof value === "object" && !Array.isArray(value);
+
+const isPositiveFiniteNumber = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value) && value > 0;
 
 const round = (value: number, digits = 12): number => Number(value.toPrecision(digits));
 
@@ -318,6 +329,10 @@ export const buildNhm2TileSourceFullApparatusTensorOperatingBudget = (
     evidence.regionalSupportRefs?.wall != null &&
     evidence.regionalSupportRefs.hull != null &&
     evidence.regionalSupportRefs.exteriorShell != null;
+  const regionalSampleCountsComplete =
+    isPositiveFiniteNumber(evidence.regionalSampleCounts?.wall) &&
+    isPositiveFiniteNumber(evidence.regionalSampleCounts?.hull) &&
+    isPositiveFiniteNumber(evidence.regionalSampleCounts?.exteriorShell);
   const fullTensorCoverageComplete = componentCoverageFraction === 1;
   const requiredStressEnergyTermsComplete = termCoverageFraction === 1;
   const requiredRegionalCoverageComplete = regionalCoverageFraction === 1;
@@ -350,6 +365,9 @@ export const buildNhm2TileSourceFullApparatusTensorOperatingBudget = (
   const missingRegionIds = REGION_IDS.filter((regionId) => !evidence.regionalCoverage[regionId]);
   const missingRegionalSupportRefIds = REGION_IDS.filter(
     (regionId) => evidence.regionalSupportRefs?.[regionId] == null,
+  );
+  const missingOrInvalidRegionalSampleCountIds = REGION_IDS.filter(
+    (regionId) => !isPositiveFiniteNumber(evidence.regionalSampleCounts?.[regionId]),
   );
   const missingAuthorityMetadataIds = AUTHORITY_METADATA_IDS.filter(
     (metadataId) => evidence[metadataId] !== true,
@@ -501,17 +519,26 @@ export const buildNhm2TileSourceFullApparatusTensorOperatingBudget = (
     ...(evidence.regionalSupportRefs?.wall == null
       ? ["full_apparatus_wall_region_support_ref_missing_for_operating_budget"]
       : []),
+    ...(!isPositiveFiniteNumber(evidence.regionalSampleCounts?.wall)
+      ? ["full_apparatus_wall_region_sample_count_missing_or_invalid_for_operating_budget"]
+      : []),
     ...(!evidence.regionalCoverage.hull
       ? ["full_apparatus_hull_region_missing_for_operating_budget"]
       : []),
     ...(evidence.regionalSupportRefs?.hull == null
       ? ["full_apparatus_hull_region_support_ref_missing_for_operating_budget"]
       : []),
+    ...(!isPositiveFiniteNumber(evidence.regionalSampleCounts?.hull)
+      ? ["full_apparatus_hull_region_sample_count_missing_or_invalid_for_operating_budget"]
+      : []),
     ...(!evidence.regionalCoverage.exteriorShell
       ? ["full_apparatus_exterior_shell_region_missing_for_operating_budget"]
       : []),
     ...(evidence.regionalSupportRefs?.exteriorShell == null
       ? ["full_apparatus_exterior_shell_region_support_ref_missing_for_operating_budget"]
+      : []),
+    ...(!isPositiveFiniteNumber(evidence.regionalSampleCounts?.exteriorShell)
+      ? ["full_apparatus_exterior_shell_region_sample_count_missing_or_invalid_for_operating_budget"]
       : []),
   ];
   const falsifiesCurrentCandidate =
@@ -595,6 +622,11 @@ export const buildNhm2TileSourceFullApparatusTensorOperatingBudget = (
         hull: evidence.regionalSupportRefs?.hull ?? null,
         exteriorShell: evidence.regionalSupportRefs?.exteriorShell ?? null,
       },
+      regionalSampleCounts: {
+        wall: evidence.regionalSampleCounts?.wall ?? null,
+        hull: evidence.regionalSampleCounts?.hull ?? null,
+        exteriorShell: evidence.regionalSampleCounts?.exteriorShell ?? null,
+      },
     },
     derivedOperatingBudget: {
       componentCoverageFraction,
@@ -607,6 +639,7 @@ export const buildNhm2TileSourceFullApparatusTensorOperatingBudget = (
       termRefsComplete,
       subsystemReceiptRefsComplete,
       regionalSupportRefsComplete,
+      regionalSampleCountsComplete,
       fullTensorCoverageComplete,
       requiredStressEnergyTermsComplete,
       requiredRegionalCoverageComplete,
@@ -634,6 +667,8 @@ export const buildNhm2TileSourceFullApparatusTensorOperatingBudget = (
       missingRegionIds,
       regionalSupportRefMissingCount: missingRegionalSupportRefIds.length,
       missingRegionalSupportRefIds,
+      regionalSampleCountMissingOrInvalidCount: missingOrInvalidRegionalSampleCountIds.length,
+      missingOrInvalidRegionalSampleCountIds,
       requiredAuthorityMetadataCount: 4,
       authorityMetadataMissingCount: missingAuthorityMetadataIds.length,
       missingAuthorityMetadataIds,
@@ -720,6 +755,7 @@ export const isNhm2TileSourceFullApparatusTensorOperatingBudget = (
     typeof budget.termRefsComplete === "boolean" &&
     typeof budget.subsystemReceiptRefsComplete === "boolean" &&
     typeof budget.regionalSupportRefsComplete === "boolean" &&
+    typeof budget.regionalSampleCountsComplete === "boolean" &&
     typeof budget.fullTensorCoverageComplete === "boolean" &&
     typeof budget.requiredStressEnergyTermsComplete === "boolean" &&
     typeof budget.requiredRegionalCoverageComplete === "boolean" &&
@@ -746,6 +782,8 @@ export const isNhm2TileSourceFullApparatusTensorOperatingBudget = (
     Array.isArray(requiredCorrections.missingRegionIds) &&
     typeof requiredCorrections.regionalSupportRefMissingCount === "number" &&
     Array.isArray(requiredCorrections.missingRegionalSupportRefIds) &&
+    typeof requiredCorrections.regionalSampleCountMissingOrInvalidCount === "number" &&
+    Array.isArray(requiredCorrections.missingOrInvalidRegionalSampleCountIds) &&
     requiredCorrections.requiredAuthorityMetadataCount === 4 &&
     typeof requiredCorrections.authorityMetadataMissingCount === "number" &&
     Array.isArray(requiredCorrections.missingAuthorityMetadataIds) &&

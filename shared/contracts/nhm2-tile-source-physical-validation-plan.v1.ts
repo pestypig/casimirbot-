@@ -741,6 +741,18 @@ const DECISIVE_MEASUREMENT_TEMPLATES: Record<
       noGoCriterion: "regional supports missing or not same-basis",
       falsificationConsequence: "regional residual closure cannot consume the source tensor",
     },
+    {
+      measurementId: "regional_support_sample_counts",
+      quantity: "positive finite sample counts for each regional tensor support",
+      target: "wall, hull, and exterior_shell sample counts are positive finite and tied to the support atlas",
+      unit: "sample count",
+      evidenceArtifact: "receipt://full_apparatus_tensor/regional_support_sample_counts_v1",
+      marginKey: null,
+      requiredCorrectionKey: null,
+      goCriterion: "each computed regional tensor row has sampleCount > 0 on the same support basis",
+      noGoCriterion: "any computed regional tensor row has missing, zero, negative, nonfinite, or stale sample support metadata",
+      falsificationConsequence: "source tensor values cannot be admitted because their regional aggregation support is not well-defined",
+    },
   ],
   downstream_residual_conservation_qei_observer: [
     {

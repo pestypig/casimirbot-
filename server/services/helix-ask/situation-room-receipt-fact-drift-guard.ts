@@ -28,7 +28,51 @@ const readString = (value: unknown): string | null => {
   return trimmed ? trimmed : null;
 };
 
+const PANEL_CONTROL_LABELS: Record<string, string> = {
+  "docs-viewer": "Docs & Papers",
+  "frontier-board": "Frontier Board",
+  "project-hub": "Project Hub",
+  "situation-room": "Situation Room",
+  "workstation-notes": "Workstation Notes",
+};
+
+const readArray = (value: unknown): unknown[] =>
+  Array.isArray(value) ? value : [];
+
+const findPanelControlReceiptText = (payload: Record<string, unknown> | null | undefined): string | null => {
+  if (!payload) return null;
+  const canonicalGoalFrame = readRecord(payload.canonical_goal_frame);
+  const canonicalGoalKind = readString(canonicalGoalFrame?.goal_kind);
+  const terminalArtifactKind = readString(payload.terminal_artifact_kind);
+  if (canonicalGoalKind !== "panel_control" && terminalArtifactKind !== "workspace_action_receipt") return null;
+
+  const candidates = [
+    readString(payload.workspace_action_receipt),
+    readString(payload.message),
+    readString(readRecord(payload.workspace_action_receipt)?.message),
+    readString(readRecord(payload.workspace_action_receipt)?.summary),
+    readString(readRecord(payload.receipt_presentation_snapshot)?.full_summary),
+  ].filter((entry): entry is string => Boolean(entry));
+  const existingReceipt = candidates.find((candidate) =>
+    /^(?:Opening panel|Opened panel|The requested workspace panel action completed successfully\.)\b/i.test(
+      candidate.trim(),
+    ),
+  );
+  if (existingReceipt) return existingReceipt;
+
+  const actionEnvelope = readRecord(payload.action_envelope);
+  const workstationActions = readArray(actionEnvelope?.workstation_actions)
+    .map(readRecord)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  const openPanelAction = workstationActions.find((action) => readString(action.action_id) === "open");
+  const panelId = readString(openPanelAction?.panel_id);
+  const panelLabel = panelId ? PANEL_CONTROL_LABELS[panelId] ?? panelId : null;
+  return panelLabel ? `Opening panel: ${panelLabel}.` : null;
+};
+
 const findSafePresentationText = (payload: Record<string, unknown> | null | undefined): string | null => {
+  const panelControlReceiptText = findPanelControlReceiptText(payload);
+  if (panelControlReceiptText) return panelControlReceiptText;
   const presentation =
     payload?.terminal_presentation && typeof payload.terminal_presentation === "object"
       ? (payload.terminal_presentation as Record<string, unknown>)
@@ -110,7 +154,20 @@ export function guardSituationRoomReceiptFactDrift(
   const presentation = readRecord(payload?.terminal_presentation);
   const terminalArtifactKind =
     readString(payload?.terminal_artifact_kind) ?? readString(presentation?.terminal_artifact_kind);
+  const canonicalGoalFrame = readRecord(payload?.canonical_goal_frame);
+  const canonicalGoalKind = readString(canonicalGoalFrame?.goal_kind);
   if (terminalArtifactKind === "capability_help_summary") {
+    return {
+      text,
+      repaired: false,
+      codes: [],
+      evidence_text: null,
+    };
+  }
+  if (
+    (terminalArtifactKind === "workspace_action_receipt" || canonicalGoalKind === "panel_control") &&
+    /^(?:Opening panel|Opened panel|The requested workspace panel action completed successfully\.)\b/i.test(text.trim())
+  ) {
     return {
       text,
       repaired: false,

@@ -313,6 +313,11 @@ const passingEvidence: BuildNhm2TileSourceMaterialEvidenceReceiptsInput = {
       hull: "receipt://full-apparatus-tmunu/regions/hull-support-v1",
       exteriorShell: "receipt://full-apparatus-tmunu/regions/exterior-shell-support-v1",
     },
+    regionalSampleCounts: {
+      wall: 64,
+      hull: 64,
+      exteriorShell: 64,
+    },
   },
 };
 
@@ -3713,6 +3718,55 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(plan.summary.transportClaimAllowed).toBe(false);
   });
 
+  it("falsifies force-gap receipts with nonphysical force, stiffness, stiction, and authority values", () => {
+    const receipts = buildNhm2TileSourceMaterialEvidenceReceipts({
+      generatedAt,
+      forceGapPullIn: {
+        evidenceTier: "measured",
+        evidenceRef: "receipt://force-gap/nonphysical-values-v1",
+        ...forceGapProtocolRefs,
+        forceGapCurveRef: "receipt://force-gap/nonphysical-Fg-curve-v1",
+        forceGradientCurveRef: "receipt://force-gap/nonphysical-dFdg-curve-v1",
+        stiffnessModelRef: "receipt://force-gap/nonphysical-stiffness-model-v1",
+        curveMinGapMeters: 9e-9,
+        curveMaxGapMeters: 7e-9,
+        gapMeters: -8e-9,
+        casimirForceN: 0,
+        forceGradientNPerM: -1,
+        effectiveSpringConstantNPerM: -1,
+        stictionMargin: -0.1,
+        activeGapControlAuthorityN: -1,
+      },
+    });
+    const forceSurface = receipts.receiptSurfaces.find(
+      (surface) => surface.surfaceId === "force_gap_pull_in",
+    );
+
+    expect(receipts.summary.candidateDisposition).toBe("falsified");
+    expect(forceSurface?.status).toBe("fail");
+    expect(forceSurface?.blockers).toEqual(
+      expect.arrayContaining([
+        "force_gap_curve_bounds_invalid",
+        "force_gap_value_invalid",
+        "force_gap_not_at_8nm",
+        "casimir_force_at_gap_invalid",
+        "force_gradient_at_gap_invalid",
+        "force_gradient_consistency_with_force_curve_missing",
+        "effective_spring_constant_invalid",
+        "pull_in_margin_missing",
+        "stiction_margin_invalid",
+        "active_gap_control_authority_invalid",
+        "active_gap_control_authority_missing",
+      ]),
+    );
+    expect(forceSurface?.numericalMargins.pullInMargin).toBeNull();
+    expect(forceSurface?.numericalMargins.activeAuthorityMargin).toBeNull();
+    expect(forceSurface?.numericalMargins.expectedGradientFromSuppliedForce).toBeNull();
+    expect(forceSurface?.numericalMargins.forceGradientConsistencyMargin).toBeNull();
+    expect(receipts.summary.physicalViabilityClaimAllowed).toBe(false);
+    expect(receipts.summary.transportClaimAllowed).toBe(false);
+  });
+
   it("keeps scalar-only force-gap evidence blocked without curve and stiffness provenance", () => {
     const scalarOnlyForceGapEvidence = {
       evidenceTier: "measured" as const,
@@ -3994,6 +4048,73 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(
       roughnessSurface?.numericalMargins.residualElectrostaticForceFraction,
     ).toBe(-0.02);
+  });
+
+  it("falsifies roughness/patch receipts and budgets with nonphysical metrology domains", () => {
+    const invalidRoughnessPatch = {
+      ...passingEvidence.roughnessPatch!,
+      mapLateralResolutionMeters: -1e-9,
+      scanAreaFraction: 1.2,
+      roughnessRmsMeters: Number.NaN,
+      asperityP99Meters: 0,
+      asperityP999Meters: -1e-9,
+      asperityMaxMeters: 0,
+      patchVoltageRmsVolts: Number.NaN,
+      patchVoltageCorrelationLengthMeters: Number.POSITIVE_INFINITY,
+      residualElectrostaticForceFraction: -0.01,
+    };
+    const receipts = buildNhm2TileSourceMaterialEvidenceReceipts({
+      ...passingEvidence,
+      roughnessPatch: invalidRoughnessPatch,
+    });
+    const budget = buildNhm2TileSourceRoughnessPatchOperatingBudget({
+      generatedAt,
+      roughnessPatchEvidence: invalidRoughnessPatch,
+    });
+    const roughnessSurface = receipts.receiptSurfaces.find(
+      (surface) => surface.surfaceId === "roughness_patch_metrology",
+    );
+
+    expect(receipts.summary.candidateDisposition).toBe("falsified");
+    expect(roughnessSurface?.status).toBe("fail");
+    expect(roughnessSurface?.blockers).toEqual(
+      expect.arrayContaining([
+        "roughness_map_lateral_resolution_invalid",
+        "roughness_scan_area_fraction_invalid",
+        "roughness_rms_invalid",
+        "asperity_p99_invalid",
+        "asperity_p999_invalid",
+        "asperity_tail_margin_invalid",
+        "patch_voltage_correlation_length_invalid",
+        "patch_voltage_rms_invalid",
+        "residual_electrostatic_force_fraction_invalid",
+      ]),
+    );
+    expect(roughnessSurface?.numericalMargins.roughnessMapResolutionMargin).toBeNull();
+    expect(roughnessSurface?.numericalMargins.scanAreaCoverageMargin).toBeNull();
+    expect(roughnessSurface?.numericalMargins.asperityMaxMargin).toBeNull();
+    expect(roughnessSurface?.numericalMargins.patchVoltageDerivedElectrostaticPressurePa).toBeNull();
+    expect(budget.summary.falsifiesCurrentCandidate).toBe(true);
+    expect(budget.blockers).toEqual(
+      expect.arrayContaining([
+        "roughness_map_lateral_resolution_invalid_for_operating_budget",
+        "roughness_scan_area_fraction_invalid_for_operating_budget",
+        "roughness_rms_invalid_for_operating_budget",
+        "asperity_p99_invalid_for_operating_budget",
+        "asperity_p999_invalid_for_operating_budget",
+        "asperity_max_invalid_for_operating_budget",
+        "patch_voltage_correlation_length_invalid_for_operating_budget",
+        "patch_voltage_invalid_for_operating_budget",
+        "residual_electrostatic_force_fraction_invalid_for_operating_budget",
+      ]),
+    );
+    expect(budget.derivedOperatingBudget.roughnessMapResolutionMargin).toBeNull();
+    expect(budget.derivedOperatingBudget.scanAreaCoverageMargin).toBeNull();
+    expect(budget.derivedOperatingBudget.asperityMaxMargin).toBeNull();
+    expect(budget.derivedOperatingBudget.minimumGapClearanceMeters).toBeNull();
+    expect(budget.derivedOperatingBudget.patchVoltageDerivedElectrostaticPressurePa).toBeNull();
+    expect(budget.derivedOperatingBudget.residualElectrostaticForceN).toBeNull();
+    expect(budget.summary.physicalViabilityClaimAllowed).toBe(false);
   });
 
   it("builds roughness/patch operating targets from the frozen 8 nm gap and load budget", () => {
@@ -4389,6 +4510,95 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(activeSurface?.numericalMargins.energyPerCycleJ).toBe(-1e-9);
     expect(activeSurface?.numericalMargins.controlPowerW).toBeNull();
     expect(activeSurface?.numericalMargins.thermalAccountingMargin).toBeNull();
+  });
+
+  it("falsifies active-control receipts and budgets with nonphysical numeric domains", () => {
+    const invalidActiveControl = {
+      ...passingEvidence.activeControl!,
+      evidenceTier: "measured" as const,
+      evidenceRef: "receipt://active-control/nonphysical-domains-v1",
+      energyPerCycleJ: 1e-9,
+      actuatorAuthorityN: -1,
+      bandwidthHz: -1,
+      switchingRateHz: Number.NaN,
+      gapNoiseRmsMeters: 0,
+      heatLoadW: -1,
+      heatSinkCapacityW: -1,
+      sourceTensorContaminationFraction: 1.2,
+      timingJitterSeconds: -1,
+      phaseNoiseRmsSeconds: -1,
+      controllerPhaseMarginDegrees: -1,
+      controllerGainMarginDb: Number.NaN,
+      lockAcquisitionTimeSeconds: -1,
+    };
+    const receipts = buildNhm2TileSourceMaterialEvidenceReceipts({
+      ...passingEvidence,
+      activeControl: invalidActiveControl,
+    });
+    const activeSurface = receipts.receiptSurfaces.find(
+      (surface) => surface.surfaceId === "active_control_energy",
+    );
+    const forceGapLoadBudget = buildNhm2TileSourceForceGapLoadBudget({
+      generatedAt,
+      materialEvidenceReceipts: buildNhm2TileSourceMaterialEvidenceReceipts(passingEvidence),
+      forceGapPullInEvidence: passingEvidence.forceGapPullIn,
+    });
+    const budget = buildNhm2TileSourceActiveControlOperatingBudget({
+      generatedAt,
+      forceGapLoadBudget,
+      activeControlEvidence: invalidActiveControl,
+    });
+
+    expect(receipts.summary.candidateDisposition).toBe("falsified");
+    expect(receipts.summary.materialEvidenceReady).toBe(false);
+    expect(activeSurface?.status).toBe("fail");
+    expect(activeSurface?.blockers).toEqual(
+      expect.arrayContaining([
+        "active_control_actuator_authority_invalid",
+        "active_control_switching_rate_invalid",
+        "active_control_bandwidth_invalid",
+        "gap_noise_rms_invalid",
+        "active_control_heat_load_invalid",
+        "active_control_heat_sink_capacity_invalid",
+        "active_control_source_tensor_contamination_fraction_invalid",
+        "timing_jitter_invalid",
+        "phase_noise_invalid",
+        "controller_phase_margin_invalid",
+        "controller_gain_margin_invalid",
+        "active_control_lock_acquisition_time_invalid",
+      ]),
+    );
+    expect(activeSurface?.numericalMargins.controlPowerW).toBeNull();
+    expect(activeSurface?.numericalMargins.thermalAccountingMargin).toBeNull();
+    expect(activeSurface?.numericalMargins.thermalSinkMargin).toBeNull();
+    expect(activeSurface?.numericalMargins.sourceTensorContaminationMargin).toBeNull();
+
+    expect(budget.summary.activeControlEvidenceReady).toBe(false);
+    expect(budget.summary.falsifiesCurrentCandidate).toBe(true);
+    expect(budget.blockers).toEqual(
+      expect.arrayContaining([
+        "active_control_actuator_authority_invalid_for_operating_budget",
+        "active_control_switching_rate_invalid_for_operating_budget",
+        "active_control_bandwidth_invalid_for_operating_budget",
+        "active_control_gap_noise_invalid_for_operating_budget",
+        "active_control_heat_load_invalid_for_operating_budget",
+        "active_control_heat_sink_capacity_invalid_for_operating_budget",
+        "active_control_source_tensor_contamination_invalid_for_operating_budget",
+        "active_control_timing_jitter_invalid_for_operating_budget",
+        "active_control_phase_noise_invalid_for_operating_budget",
+        "active_control_controller_phase_margin_invalid_for_operating_budget",
+        "active_control_controller_gain_margin_invalid_for_operating_budget",
+        "active_control_lock_acquisition_time_invalid_for_operating_budget",
+      ]),
+    );
+    expect(budget.derivedOperatingBudget.controlPowerW).toBeNull();
+    expect(budget.derivedOperatingBudget.switchingRateMargin).toBeNull();
+    expect(budget.derivedOperatingBudget.thermalAccountingMargin).toBeNull();
+    expect(budget.derivedOperatingBudget.thermalSinkCapacityMargin).toBeNull();
+    expect(budget.derivedOperatingBudget.sourceTensorContaminationMargin).toBeNull();
+    expect(budget.suppliedActiveControlEvidence.switchingRateHz).toBeNull();
+    expect(budget.suppliedActiveControlEvidence.controllerGainMarginDb).toBeNull();
+    expect(budget.summary.physicalViabilityClaimAllowed).toBe(false);
   });
 
   it("falsifies active-control receipts when actuator authority is below the frozen 447-layer load", () => {
@@ -4995,6 +5205,97 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(
       scalingSurface?.numericalMargins.sourceTensorRetentionConsistencyMargin,
     ).toBeCloseTo(0.9004255319148936, 12);
+  });
+
+  it("falsifies fatigue/layer-scaling receipts and budgets with nonphysical numeric domains", () => {
+    const invalidFatigueScaling = {
+      ...passingEvidence.fatigueLayerScaling!,
+      cycleCountToFailure: -1,
+      requiredCycleCount: 0,
+      thermalCycleDriftFraction: -0.01,
+      creepDriftFraction: 1.2,
+      delaminationMargin: 0,
+      interlayerAdhesionMargin: Number.NaN,
+      layerScalingEfficiency: 1.2,
+      perLayerVariationFraction: -0.1,
+      nonadditivityFraction: 1.2,
+      activeAreaRetention: -0.1,
+      supportCouplingFraction: -0.1,
+      electromagneticCouplingFraction: 1.2,
+      mechanicalCouplingFraction: Number.NaN,
+      sourceTensorRetentionFraction: 1.2,
+    };
+    const receipts = buildNhm2TileSourceMaterialEvidenceReceipts({
+      ...passingEvidence,
+      fatigueLayerScaling: invalidFatigueScaling,
+    });
+    const budget = buildNhm2TileSourceFatigueLayerScalingOperatingBudget({
+      generatedAt,
+      fatigueLayerScalingEvidence: invalidFatigueScaling,
+    });
+    const fatigueSurface = receipts.receiptSurfaces.find(
+      (surface) => surface.surfaceId === "fatigue_lifetime",
+    );
+    const scalingSurface = receipts.receiptSurfaces.find(
+      (surface) => surface.surfaceId === "layer_scaling",
+    );
+
+    expect(receipts.summary.candidateDisposition).toBe("falsified");
+    expect(fatigueSurface?.status).toBe("fail");
+    expect(scalingSurface?.status).toBe("fail");
+    expect(fatigueSurface?.blockers).toEqual(
+      expect.arrayContaining([
+        "cycle_count_to_failure_invalid",
+        "required_cycle_count_invalid",
+        "thermal_cycle_drift_fraction_invalid",
+        "creep_drift_fraction_invalid",
+        "delamination_margin_invalid",
+        "interlayer_adhesion_margin_invalid",
+      ]),
+    );
+    expect(scalingSurface?.blockers).toEqual(
+      expect.arrayContaining([
+        "layer_scaling_efficiency_invalid",
+        "per_layer_variation_fraction_invalid",
+        "layer_nonadditivity_fraction_invalid",
+        "active_area_retention_invalid",
+        "support_coupling_fraction_invalid",
+        "electromagnetic_coupling_fraction_invalid",
+        "mechanical_coupling_fraction_invalid",
+        "source_tensor_retention_fraction_invalid",
+      ]),
+    );
+    expect(fatigueSurface?.numericalMargins.cycleMargin).toBeNull();
+    expect(fatigueSurface?.numericalMargins.thermalCycleDriftMargin).toBeNull();
+    expect(fatigueSurface?.numericalMargins.creepDriftMargin).toBeNull();
+    expect(scalingSurface?.numericalMargins.scalingMargin).toBeNull();
+    expect(scalingSurface?.numericalMargins.scalarRetentionEstimate).toBeNull();
+    expect(scalingSurface?.numericalMargins.sourceTensorRetentionFraction).toBeNull();
+    expect(budget.summary.falsifiesCurrentCandidate).toBe(true);
+    expect(budget.blockers).toEqual(
+      expect.arrayContaining([
+        "cycle_count_to_failure_invalid_for_operating_budget",
+        "required_cycle_count_invalid_for_operating_budget",
+        "thermal_cycle_drift_fraction_invalid_for_operating_budget",
+        "creep_drift_fraction_invalid_for_operating_budget",
+        "delamination_margin_invalid_for_operating_budget",
+        "interlayer_adhesion_margin_invalid_for_operating_budget",
+        "layer_scaling_efficiency_invalid_for_operating_budget",
+        "per_layer_variation_fraction_invalid_for_operating_budget",
+        "layer_nonadditivity_fraction_invalid_for_operating_budget",
+        "active_area_retention_invalid_for_operating_budget",
+        "support_coupling_fraction_invalid_for_operating_budget",
+        "electromagnetic_coupling_fraction_invalid_for_operating_budget",
+        "mechanical_coupling_fraction_invalid_for_operating_budget",
+        "source_tensor_retention_fraction_invalid_for_operating_budget",
+      ]),
+    );
+    expect(budget.derivedOperatingBudget.cycleMargin).toBeNull();
+    expect(budget.derivedOperatingBudget.effectiveActiveLayerCount).toBeNull();
+    expect(budget.derivedOperatingBudget.effectiveActiveLayerCountMargin).toBeNull();
+    expect(budget.derivedOperatingBudget.sourceTensorRetentionFraction).toBeNull();
+    expect(budget.derivedOperatingBudget.sourceTensorRetentionMargin).toBeNull();
+    expect(budget.summary.physicalViabilityClaimAllowed).toBe(false);
   });
 
   it("builds fatigue/layer-scaling operating targets for the frozen 447-layer candidate", () => {
@@ -5789,6 +6090,7 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.derivedOperatingBudget.tensorValueArtifactAvailable).toBe(true);
     expect(budget.derivedOperatingBudget.termRefsComplete).toBe(true);
     expect(budget.derivedOperatingBudget.regionalSupportRefsComplete).toBe(true);
+    expect(budget.derivedOperatingBudget.regionalSampleCountsComplete).toBe(true);
     expect(budget.derivedOperatingBudget.fullTensorCoverageComplete).toBe(true);
     expect(budget.derivedOperatingBudget.requiredStressEnergyTermsComplete).toBe(true);
     expect(budget.derivedOperatingBudget.requiredRegionalCoverageComplete).toBe(true);
@@ -5803,6 +6105,7 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.requiredCorrections.stressEnergyTermRefMissingCount).toBe(0);
     expect(budget.requiredCorrections.regionCoverageMissingCount).toBe(0);
     expect(budget.requiredCorrections.regionalSupportRefMissingCount).toBe(0);
+    expect(budget.requiredCorrections.regionalSampleCountMissingOrInvalidCount).toBe(0);
     expect(budget.requiredCorrections.authorityMetadataMissingCount).toBe(0);
     expect(budget.requiredCorrections.componentCoverageFractionShortfall).toBe(0);
     expect(budget.requiredCorrections.termCoverageFractionShortfall).toBe(0);

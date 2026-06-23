@@ -220,6 +220,10 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
     /\b(?:earlier|previously|last\s+turn|before|debug|screen|visible|mentioned|saw|quoted?)\b[\s\S]{0,160}\bdocs[-_. ]viewer(?:[-_. ][a-z][a-z0-9_]*)?\b[\s\S]{0,160}\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to|just\s+explain|explain|whether|should)\b|\bdocs[-_. ]viewer(?:[-_. ][a-z][a-z0-9_]*)?\b[\s\S]{0,160}\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to|just\s+explain|explain|whether|should)\b/i,
   )?.[0];
   if (contextualDocsIdentifier) {
+    const affirmativeDocsPanelCommand =
+      DOCS_VIEWER_ACTION_RE.test(prompt) &&
+      !/\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to)\b[\s\S]{0,180}\b(?:open|show|view|pull\s+up|bring\s+up|switch\s+to|go\s+to|navigate\s+to|load|run|call|execute|use)\b[\s\S]{0,120}\b(?:docs?\s+viewer|documents?\s+viewer|docs?\s+panel|documents?\s+panel|docs?|docs[-_. ]viewer)\b/i.test(prompt);
+    if (affirmativeDocsPanelCommand) return null;
     const negatedDocsReference = /\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to)\b[\s\S]{0,180}\bdocs[-_. ]viewer(?:[-_. ][a-z][a-z0-9_]*)?\b/i.test(prompt) ||
       /\bdocs[-_. ]viewer(?:[-_. ][a-z][a-z0-9_]*)?\b[\s\S]{0,180}\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to)\b/i.test(prompt);
     return {

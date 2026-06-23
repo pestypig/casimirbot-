@@ -1487,8 +1487,9 @@ const capabilityMentionRegex = (capability: string): RegExp =>
 const commandMentionsCapabilityAt = (prompt: string, capability: string, matchIndex: number): boolean => {
   const windowStart = Math.max(0, matchIndex - 100);
   const before = prompt.slice(windowStart, matchIndex);
-  return new RegExp(String.raw`\b${commandVerb}\b[\s\S]{0,100}$`, "i").test(before) ||
-    commandMentionsCapability(prompt.slice(Math.max(0, matchIndex - 20), matchIndex + capability.length + 90), capability);
+  const clausePrefix = before.split(/[.!?;\n]/).pop() ?? before;
+  return new RegExp(String.raw`\b${commandVerb}\b[\s\S]{0,100}$`, "i").test(clausePrefix) ||
+    commandMentionsCapability(`${clausePrefix}${prompt.slice(matchIndex, matchIndex + capability.length + 90).split(/[.!?;\n]/)[0] ?? ""}`, capability);
 };
 
 const negatedCommandMentionsCapabilityAt = (prompt: string, matchIndex: number): boolean => {
@@ -1502,8 +1503,9 @@ const negatedCommandMentionsCapabilityAt = (prompt: string, matchIndex: number):
 
 const compoundCommandChainMentionsCapabilityAt = (prompt: string, matchIndex: number): boolean => {
   const before = prompt.slice(Math.max(0, matchIndex - 120), matchIndex);
+  const clausePrefix = before.split(/[.!?;\n]/).pop() ?? before;
   if (!new RegExp(String.raw`\b${commandVerb}\b`, "i").test(prompt)) return false;
-  return /\b(?:then|and|plus|after|before|followed\s+by|next)\b[\s\S]{0,80}$/i.test(before);
+  return /\b(?:then|and|plus|after|before|followed\s+by|next)\b[\s\S]{0,80}$/i.test(clausePrefix);
 };
 
 const commandClauseOrdinal = (prompt: string, matchIndex: number): number => {

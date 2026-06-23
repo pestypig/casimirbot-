@@ -103,6 +103,27 @@ describe("helix ask E52 panel control terminal contract", () => {
     expect(String(response.body?.selected_final_answer ?? "")).toMatch(/Opening panel: Docs & Papers\./);
   }, 60000);
 
+  it("keeps compound docs-viewer open prompts on the panel-action rail", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Open the docs viewer, then explain whether opening the viewer is a receipt or a final answer.",
+        mode: "read",
+        debug: true,
+        sessionId: `e52-docs-panel-compound-${Date.now()}`,
+      })
+      .expect(200);
+
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("panel_control");
+    expect(response.body?.available_capabilities?.recommended_capability_key).toBe("docs-viewer.open");
+    expect(response.body?.agent_step_decision?.chosen_capability).toBe("docs-viewer.open");
+    expect(findAction(response.body, "docs-viewer", "open")).toBeTruthy();
+    expect(response.body?.terminal_artifact_kind).toBe("workspace_action_receipt");
+    expect(response.body?.terminal_error_code).not.toBe("observation_missing");
+    expect(response.body?.selected_final_answer).toBe("Opening panel: Docs & Papers.");
+  }, 60000);
+
   it("satisfies explicit workstation-notes panel opens with a workspace action receipt", async () => {
     const app = createApp();
     const response = await request(app)

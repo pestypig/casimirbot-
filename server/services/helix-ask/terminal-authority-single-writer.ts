@@ -1663,16 +1663,29 @@ const receiptTerminalText = (
   kind: string,
 ): string | null => {
   const artifactPayloadRecord = artifactPayload(artifact);
+  const result = readRecord(artifactPayloadRecord?.result);
+  const observation = readRecord(artifactPayloadRecord?.observation);
+  const payloadWorkspaceActionReceipt = readRecord(payload.workspace_action_receipt);
   const candidateText =
     artifactText(artifact) ??
+    readString(artifactPayloadRecord?.message) ??
+    readString(artifactPayloadRecord?.summary) ??
+    readString(artifactPayloadRecord?.text_preview) ??
+    readString(artifactPayloadRecord?.terminal_text_preview) ??
+    readString(result?.message) ??
+    readString(result?.summary) ??
+    readString(observation?.message) ??
+    readString(observation?.summary) ??
+    readString(payloadWorkspaceActionReceipt?.message) ??
+    readString(payloadWorkspaceActionReceipt?.summary) ??
     readString(artifactPayloadRecord?.label) ??
     readString(artifactPayloadRecord?.title);
   if (candidateText && !isStaleWorkspaceFailureText(candidateText)) return candidateText;
+  if (kind === "workspace_action_receipt") return "Workspace action completed.";
   const selectedText = readString(payload.selected_final_answer);
   if (selectedText && !isStaleWorkspaceFailureText(selectedText) && !isHelixGenericTypedFailureText(selectedText)) {
     return selectedText;
   }
-  if (kind === "workspace_action_receipt") return "Workspace action completed.";
   if (kind === "doc_open_receipt") return "Document opened.";
   if (/note/i.test(kind)) return "Note action completed.";
   return null;

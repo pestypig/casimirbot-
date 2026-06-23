@@ -201,6 +201,46 @@ describe("NHM2 tile-source full-apparatus tensor values", () => {
     expect(built.summary.firstBlocker).toBe("wall:T01:component_value_missing");
   });
 
+  it("blocks computed tensor regions with nonpositive sample counts", () => {
+    const built = artifact({
+      regions: [
+        region("global", 1.0e9),
+        region("hull", 1.1e9),
+        region("wall", 1.6995e9, {
+          sampleCount: 0,
+        }),
+        region("exterior_shell", 9.5e8),
+      ],
+    });
+    const evidence = buildFullApparatusTensorEvidenceFromTensorValues({
+      artifact: built,
+      evidenceTier: "validated_simulation",
+      subsystemReceiptRefs,
+    });
+    const budget = buildNhm2TileSourceFullApparatusTensorOperatingBudget({
+      generatedAt,
+      fullApparatusTensorEvidence: evidence,
+    });
+
+    expect(built.summary.valueArtifactReadyForReceipt).toBe(false);
+    expect(built.summary.allRequiredRegionsFullTensor).toBe(true);
+    expect(built.summary.allRequiredRegionsTermComplete).toBe(true);
+    expect(built.summary.firstBlocker).toBe("wall:sample_count_invalid");
+    expect(evidence.regionalSampleCounts?.wall).toBe(0);
+    expect(evidence.regionalSampleCounts?.hull).toBe(64);
+    expect(evidence.regionalSampleCounts?.exteriorShell).toBe(64);
+    expect(evidence.components.T00).toBe(false);
+    expect(evidence.components.T0i).toBe(false);
+    expect(evidence.components.diagonalTij).toBe(false);
+    expect(evidence.components.offDiagonalTij).toBe(false);
+    expect(budget.summary.fullApparatusTensorEvidenceReady).toBe(false);
+    expect(budget.derivedOperatingBudget.regionalSampleCountsComplete).toBe(false);
+    expect(budget.requiredCorrections.missingOrInvalidRegionalSampleCountIds).toEqual(["wall"]);
+    expect(budget.blockers).toContain(
+      "full_apparatus_wall_region_sample_count_missing_or_invalid_for_operating_budget",
+    );
+  });
+
   it("blocks metric-echo and scalar-proxy component authority", () => {
     const built = artifact({
       regions: [
@@ -394,6 +434,12 @@ describe("NHM2 tile-source full-apparatus tensor values", () => {
     );
     expect(receipts.summary.fullApparatusTensorReady).toBe(false);
     expect(budget.summary.fullApparatusTensorEvidenceReady).toBe(true);
+    expect(evidence.regionalSampleCounts).toEqual({
+      wall: 64,
+      hull: 64,
+      exteriorShell: 64,
+    });
+    expect(budget.derivedOperatingBudget.regionalSampleCountsComplete).toBe(true);
     expect(budget.derivedOperatingBudget.tensorValueArtifactAvailable).toBe(true);
     expect(budget.summary.transportClaimAllowed).toBe(false);
   });

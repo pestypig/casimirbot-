@@ -155,6 +155,9 @@ const isNullableText = (value: unknown): value is string | null =>
 const isNullableNumber = (value: unknown): value is number | null =>
   value === null || (typeof value === "number" && Number.isFinite(value));
 
+const isPositiveFiniteNumber = (value: number | null | undefined): value is number =>
+  typeof value === "number" && Number.isFinite(value) && value > 0;
+
 const sourceRefBlockers = (
   input: BuildNhm2TileSourceFullApparatusTensorValuesInput,
 ): string[] => [
@@ -313,7 +316,11 @@ const regionBlockers = (region: Nhm2FullApparatusTensorValueRegionV1): string[] 
     ...(region.normalizationBasis === "unknown"
       ? [`${region.regionId}:normalization_unknown`]
       : []),
-    ...(region.sampleCount == null ? [`${region.regionId}:sample_count_missing`] : []),
+    ...(region.sampleCount == null
+      ? [`${region.regionId}:sample_count_missing`]
+      : !isPositiveFiniteNumber(region.sampleCount)
+        ? [`${region.regionId}:sample_count_invalid`]
+        : []),
     ...missing.map((componentRef) => `${componentRef}:component_value_missing`),
     ...terms.map((termRef) => `${termRef}:term_contribution_missing`),
     ...missingTermComponents(region).map(
@@ -539,6 +546,13 @@ export const buildFullApparatusTensorEvidenceFromTensorValues = (args: {
       hull: artifact.regions.find((region) => region.regionId === "hull")?.regionSupportRef ?? null,
       exteriorShell:
         artifact.regions.find((region) => region.regionId === "exterior_shell")?.regionSupportRef ??
+        null,
+    },
+    regionalSampleCounts: {
+      wall: artifact.regions.find((region) => region.regionId === "wall")?.sampleCount ?? null,
+      hull: artifact.regions.find((region) => region.regionId === "hull")?.sampleCount ?? null,
+      exteriorShell:
+        artifact.regions.find((region) => region.regionId === "exterior_shell")?.sampleCount ??
         null,
     },
     subsystemReceiptRefs: args.subsystemReceiptRefs,

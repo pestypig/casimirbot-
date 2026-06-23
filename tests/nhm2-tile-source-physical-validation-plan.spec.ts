@@ -279,6 +279,11 @@ describe("NHM2 tile source physical validation plan", () => {
           measurementId: "apparatus_stress_energy_term_refs",
           evidenceArtifact: "receipt://full_apparatus_tensor/stress_energy_terms_v1",
         }),
+        expect.objectContaining({
+          measurementId: "regional_support_sample_counts",
+          evidenceArtifact: "receipt://full_apparatus_tensor/regional_support_sample_counts_v1",
+          noGoCriterion: expect.stringContaining("zero"),
+        }),
       ]),
     });
     expect(plan.summary.sourceCandidateStatus).toBe("review");
