@@ -2,7 +2,7 @@
 
 Status: current-head map for structural extraction and decomposition-enabler work.
 
-Pinned source HEAD described: `b05bb99200c10a20da40eca12f599c731dcf78bd`
+Pinned source HEAD described: `a5366d8c889e5b2e47086e114cff9749963b5b93`
 
 Snapshot command: `npx tsx scripts/helix-ask-route-inventory.ts --write`
 
@@ -11,8 +11,8 @@ Route snapshot:
 | Metric | Value |
 | --- | ---: |
 | File | `server/routes/agi.plan.ts` |
-| Lines | 181,719 |
-| Bytes | 8,137,753 |
+| Lines | 181,599 |
+| Bytes | 8,133,116 |
 | Top-level helper estimate | 370 helper blocks |
 | Route inventory | `artifacts/helix-ask-route-inventory.json` |
 | Machine-readable map | `artifacts/helix-ask-route-decomposition-map.json` |
@@ -29,7 +29,7 @@ Do not extract `runHelixAgentTurnRuntimeLoop` in this wave. Do not patch termina
 | --- | ---: | --- | --- | --- | --- | --- |
 | `live-debug-slim` | service-owned | `DEBUG_EXPORT` | `MEDIUM_LOW` | `EXTRACTED` | `server/services/helix-ask/debug/live-debug-slim.ts` | Extracted by S93. Route still owns debug-mode parsing and response wrapper ordering. |
 | `transcript-events` | service-owned | `UI_API_PROJECTION` | `MEDIUM_LOW` | `EXTRACTED` | `server/services/helix-ask/runtime/transcript-events.ts` | Extracted by S94. Route retains transcript scaffold/finalization ordering. |
-| `decision-source-map` | 77549-77885 | `SOLVER_CONTROL` | `MEDIUM` | `PARTIAL_EXTRACTED` | `server/services/helix-ask/runtime/decision-source-map.ts` plus sibling runtime decision modules | S95 moved the debug map builder. S96 moved the pure runtime/terminal source mappers. S99 moved capability selection. Observation-decision remains route-owned and characterized for movement. |
+| `decision-source-map` | service-owned | `SOLVER_CONTROL` | `MEDIUM` | `EXTRACTED` | `server/services/helix-ask/runtime/decision-source-map.ts` plus sibling runtime decision modules | S95 moved the debug map builder. S96 moved the pure runtime/terminal source mappers. S99 moved capability selection. S100 moved observation-decision. |
 | `turn-contract-builder` | 90065-90285 | `PROMPT_INTERPRETATION` | `MEDIUM_HIGH` | `PARTIAL_EXTRACTED` | `server/services/helix-ask/contracts/turn-contract-builder.ts` plus `server/services/helix-ask/contracts/turn-contract-seed-slots.ts` | S97 moved the pure seed-slot mapper. The main contract builder is bounded, but consumes many policy helpers. Characterize outputs before moving pure field assembly. |
 | `live-debug-slim-response-wrapper` | 108141-108165 | `DEBUG_EXPORT` / `UI_API_PROJECTION` | `MEDIUM_HIGH` | `PARTIAL_EXTRACTED` | `server/services/helix-ask/debug/live-response-payload.ts` plus `server/services/helix-ask/debug/live-debug-mode.ts` | S98 moved debug-mode parsing. `prepareHelixAskLiveResponsePayload` still calls typed-failure sync, mailbox projection, compound coverage sync, terminal projection sync, transcript scaffold, then slim debug. Requires ordered write proof before movement. |
 | `terminal-projection-debug-sync` | 106033-106214 | `TERMINAL_AUTHORITY` / `DEBUG_EXPORT` | `MEDIUM_HIGH` | `NEEDS_OWNER_PROOF` | `server/services/helix-ask/terminal-projection-debug-sync.ts` | Mutates payload/debug terminal mirrors after authority is selected. Extraction allowed only as projection sync, never terminal selection. |
@@ -45,7 +45,7 @@ Do not extract `runHelixAgentTurnRuntimeLoop` in this wave. Do not patch termina
 | `decision-source-mappers` | `decision-source-map` | service-owned | Runtime/terminal decision source normalization. | Pure mapping over source/reason/final-answer-source; no payload mutation. | `EXTRACTED` |
 | `goal-frame-mutation-target-reader` | `decision-source-map` / `canonical-goal-frame` | 77543-77547 | Read resolved mutation target from a built goal frame. | Pure frame reader; used outside decision-source selection. | `READY_AFTER_DEPENDENCY_REDUCTION` |
 | `capability-selection-result` | `decision-source-map` | service-owned | Select expected capability from universal goal frame and optional selected action. | Extracted by S99 behind a 5-callback dependency interface for route-local goal/panel readers and workstation planner. | `EXTRACTED` |
-| `observation-decision` | `decision-source-map` | 77750-77876 | Convert runtime observations, missing artifacts, pending requests, and next planned step into continue/finalize/input/failure decision. | Policy-adjacent; depends on runtime artifact collectors and fallback missing-artifact filter. | `READY_AFTER_CHARACTERIZATION` |
+| `observation-decision` | `decision-source-map` | service-owned | Convert runtime observations, missing artifacts, pending requests, and next planned step into continue/finalize/input/failure decision. | Extracted by S100 behind invocation-time wrappers for shared route artifact collectors. | `EXTRACTED` |
 | `decision-source-map-builder` | `decision-source-map` | service-owned | Build debug/source map from payload. | Extracted; S96 moved the mapper callbacks into the same service owner. | `EXTRACTED` |
 | `turn-contract-field-assembly` | `turn-contract-builder` | 90065-90285 | Assemble contract goal/objectives/obligations/grounding/output family/format. | Pure-looking, but consumes planner pass, research contract, and classification helpers. | `READY_AFTER_CHARACTERIZATION` |
 | `turn-contract-seed-slots` | `turn-contract-builder` | service-owned | Convert a turn contract into slot plan entries. | Pure contract mapper. | `EXTRACTED` |
@@ -83,10 +83,10 @@ This wave's next safe work should be characterization or dependency reduction, n
 
 Candidate order:
 
-1. `observation-decision` - `READY_AFTER_CHARACTERIZATION`
-2. `turn-contract-field-assembly` - `READY_AFTER_CHARACTERIZATION`
-3. `terminal-projection-sync` - `NEEDS_OWNER_PROOF`
-4. `live-response-payload-wrapper` - `NEEDS_OWNER_PROOF`
+1. `turn-contract-field-assembly` - `READY_AFTER_CHARACTERIZATION`
+2. `terminal-projection-sync` - `NEEDS_OWNER_PROOF`
+3. `live-response-payload-wrapper` - `NEEDS_OWNER_PROOF`
+4. `canonical-goal-record-readers` - `READY_AFTER_DEPENDENCY_REDUCTION`
 
 ## Deferred Sets
 
