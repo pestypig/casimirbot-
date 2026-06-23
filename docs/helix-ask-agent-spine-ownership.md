@@ -96,6 +96,7 @@ terminal eligibility, projection discipline, and debug traces.
 | S120 | objective assembly prompt renderer | `server/services/helix-ask/contracts/turn-contract-objective-mini-answers.ts` | SERVICE_OWNED for deterministic assembly prompt text only |
 | S121 | deterministic objective assembly fallback and weak-draft detector | `server/services/helix-ask/objectives/objective-assembly.ts` | SERVICE_OWNED for deterministic fallback assembly and weak-draft detection only |
 | S122 | objective loop diagnostics and OES enforcement | `server/services/helix-ask/objectives/objective-loop-debug.ts` | SERVICE_OWNED for pure terminal/coverage, unknown-block enforcement, and evidence-sufficiency diagnostics only |
+| S123 | objective scoped-recovery helper subset | `server/services/helix-ask/retrieval/objective-scoped-recovery.ts` | SERVICE_OWNED for behavior-identical scoped-recovery gate, target selection, max-attempt, escalation hint, target expansion, and variant scoring helpers only |
 
 ## Deferred Ownership Debt
 
@@ -144,6 +145,10 @@ terminal eligibility, projection discipline, and debug traces.
 - Objective loop transition sequencing, retrieval recovery, and LLM objective
   stages remain route-owned or recovery-shell-owned; S122 moved only pure
   terminal/coverage, unknown-block, and OES diagnostic/enforcement helpers.
+- Objective scoped-recovery query variants and missing scoped-retrieval
+  enforcement remain route-owned; S123 moved only the behavior-identical helper
+  subset, while route-local query merging and route-local required-objective
+  handling differ from the existing retrieval service optional-slot filtering.
 - Objective prompt rewriting remains dependent on route-owned LLM invocation,
   model selection, telemetry, and budget policy; S114 moved only deterministic
   rewrite mode, hash/token estimates, and rewrite prompt text construction.
