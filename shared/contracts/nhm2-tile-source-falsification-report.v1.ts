@@ -19,6 +19,8 @@ import type {
 } from "./nhm2-tile-source-operating-budget-readiness.v1";
 import type { Nhm2SourceSideSameBasisTensorAuthorityArtifactV1 } from "./nhm2-source-side-same-basis-tensor-authority.v1";
 import type { Nhm2LayerStackMechanicalReceiptV1 } from "./nhm2-layer-stack-mechanical-receipt.v1";
+import type { Nhm2LayerStackSupportFractionSweepV1 } from "./nhm2-layer-stack-support-fraction-sweep.v1";
+import type { Nhm2LayerStackFullApparatusReceiptLoopV1 } from "./nhm2-layer-stack-full-apparatus-receipt-loop.v1";
 
 export const NHM2_TILE_SOURCE_FALSIFICATION_REPORT_CONTRACT_VERSION =
   "nhm2_tile_source_falsification_report/v1";
@@ -113,6 +115,8 @@ export type Nhm2TileSourceFalsificationReportRowV1 = {
   source:
     | "material_evidence_receipts"
     | "layer_stack_mechanical_receipt"
+    | "layer_stack_support_fraction_sweep"
+    | "layer_stack_full_apparatus_receipt_loop"
     | "physical_validation_plan"
     | "source_side_same_basis_authority"
     | "downstream_gate"
@@ -165,6 +169,8 @@ export type Nhm2TileSourceFalsificationReportV1 = {
     physicalValidationPlanRef: string | null;
     evidenceGapRoadmapRef: string | null;
     layerStackMechanicalReceiptRef: string | null;
+    layerStackSupportFractionSweepRef: string | null;
+    layerStackFullApparatusReceiptLoopRef: string | null;
     operatingBudgetReadinessRef: string | null;
     sourceSideSameBasisTensorAuthorityRef: string | null;
   };
@@ -227,12 +233,16 @@ export type BuildNhm2TileSourceFalsificationReportInput = {
   physicalValidationPlan: Nhm2TileSourcePhysicalValidationPlanV1;
   evidenceGapRoadmap: Nhm2TileSourceEvidenceGapRoadmapV1;
   layerStackMechanicalReceipt?: Nhm2LayerStackMechanicalReceiptV1 | null;
+  layerStackSupportFractionSweep?: Nhm2LayerStackSupportFractionSweepV1 | null;
+  layerStackFullApparatusReceiptLoop?: Nhm2LayerStackFullApparatusReceiptLoopV1 | null;
   operatingBudgetReadiness?: Nhm2TileSourceOperatingBudgetReadinessV1 | null;
   sourceSideSameBasisTensorAuthority?: Nhm2SourceSideSameBasisTensorAuthorityArtifactV1 | null;
   materialEvidenceReceiptsRef?: string | null;
   physicalValidationPlanRef?: string | null;
   evidenceGapRoadmapRef?: string | null;
   layerStackMechanicalReceiptRef?: string | null;
+  layerStackSupportFractionSweepRef?: string | null;
+  layerStackFullApparatusReceiptLoopRef?: string | null;
   operatingBudgetReadinessRef?: string | null;
   sourceSideSameBasisTensorAuthorityRef?: string | null;
 };
@@ -369,6 +379,137 @@ const layerStackMechanicalRows = (
     falsifiesCurrentCandidate: supportWindow.status === "fail",
     evidenceRef: receiptRef ?? receipt.layerCandidateRef,
   }));
+};
+
+const layerStackSupportFractionRows = (
+  sweep: Nhm2LayerStackSupportFractionSweepV1 | null | undefined,
+  sweepRef: string | null | undefined,
+): Nhm2TileSourceFalsificationReportRowV1[] => {
+  if (sweep == null || sweep.summary.feasibleWindowExists) {
+    return [];
+  }
+  const blocker = sweep.summary.firstBlocker;
+  const requiredSupport = sweep.summary.minimumSupportFractionForStress;
+  const maximumRetainedSource = sweep.summary.maximumSupportFractionForSourceRetention;
+  const requiredSupportFractionShift =
+    requiredSupport != null && maximumRetainedSource != null
+      ? Math.max(0, requiredSupport - maximumRetainedSource)
+      : null;
+  const falsifies =
+    blocker === "stress_retention_overlap_missing" ||
+    blocker === "support_fraction_stress_window_missing" ||
+    blocker === "active_area_source_retention_window_missing";
+  return [
+    {
+      blockerId: blocker,
+      source: "layer_stack_support_fraction_sweep",
+      surfaceId: "layer_scaling",
+      operatingBudgetSurfaceId: null,
+      downstreamGateId: null,
+      status: falsifies ? "falsifying" : "review",
+      numericalMargin:
+        requiredSupport != null && maximumRetainedSource != null
+          ? maximumRetainedSource / requiredSupport
+          : null,
+      numericalMargins: {
+        feasibleWindowExists: sweep.summary.feasibleWindowExists,
+        minimumSupportFractionForStress: requiredSupport,
+        maximumSupportFractionForSourceRetention: maximumRetainedSource,
+        requiredSupportFractionShift,
+        bestCandidateRowCount: sweep.summary.bestCandidateRows.length,
+        sweepRowCount: sweep.summary.rowCount,
+      },
+      requiredCorrections: {
+        minimumSupportFractionForStress: requiredSupport,
+        maximumSupportFractionForSourceRetention: maximumRetainedSource,
+        requiredSupportFractionShift,
+        decoupleSupportLoadFromActiveSourceArea: true,
+      },
+      marginUnit: "ratio",
+      requiredChange:
+        "supply a support-fraction architecture whose stress-safe support fraction overlaps " +
+        "the active/source-retention window, or decouple load bearing from active source area",
+      campaignDomain: "fatigue_layer_scaling",
+      evidenceTarget: evidenceTargetFromDomain("fatigue_layer_scaling"),
+      falsifiesCurrentCandidate: falsifies,
+      evidenceRef: sweepRef ?? sweep.mechanicalReceiptRef,
+    },
+  ];
+};
+
+const domainFromArchitectureBlocker = (
+  blocker: string,
+): Nhm2TileSourceExperimentalCampaignDomainV1 => {
+  if (blocker.includes("material_coupon")) return "material_coupon_behavior";
+  if (blocker.includes("force_gap") || blocker.includes("pull_in")) return "force_gap_pull_in";
+  if (blocker.includes("roughness") || blocker.includes("patch")) {
+    return "roughness_patch_potential";
+  }
+  if (blocker.includes("active_control")) return "active_control_energy_noise_heat_timing";
+  if (blocker.includes("fatigue") || blocker.includes("layer_scaling")) {
+    return "fatigue_layer_scaling";
+  }
+  if (blocker.includes("Tmunu") || blocker.includes("tensor")) return "full_apparatus_tensor";
+  return "full_apparatus_tensor";
+};
+
+const layerStackFullApparatusRows = (
+  loop: Nhm2LayerStackFullApparatusReceiptLoopV1 | null | undefined,
+  loopRef: string | null | undefined,
+): Nhm2TileSourceFalsificationReportRowV1[] => {
+  if (loop == null || loop.summary.receiptedCandidateRows.length > 0) {
+    return [];
+  }
+  const row =
+    loop.rows.find((candidate) => candidate.architectureId === "topology_optimized_lattice_tin") ??
+    loop.summary.rankedRowsByEvidenceReadiness[0] ??
+    null;
+  if (row == null || row.firstBlocker === "none") return [];
+  const campaignDomain = domainFromArchitectureBlocker(row.firstBlocker);
+  const missingSurfaceId =
+    row.receiptSurfaces.find((surface) => surface.status !== "receipted")?.surfaceId ?? null;
+  return [
+    {
+      blockerId: `architecture:${row.architectureId}:${row.firstBlocker}`,
+      source: "layer_stack_full_apparatus_receipt_loop",
+      surfaceId:
+        missingSurfaceId ??
+        (campaignDomain === "full_apparatus_tensor" ? "full_apparatus_tensor" : null),
+      operatingBudgetSurfaceId: null,
+      downstreamGateId: null,
+      status: row.engineeringCandidateStatus === "fail" ? "falsifying" : "review",
+      numericalMargin: row.evidenceReadinessScore,
+      numericalMargins: {
+        evidenceReadinessScore: row.evidenceReadinessScore,
+        sourceRetention: row.sourceRetention,
+        supportStressMPa: row.supportStressMPa,
+        pullInMargin: row.pullInMargin,
+        receiptSurfaceCount: row.receiptSurfaces.length,
+        missingReceiptSurfaceCount: row.receiptSurfaces.filter(
+          (surface) => surface.status !== "receipted",
+        ).length,
+        tensorTermCoverageCount: Object.values(row.tensorTermCoverage).filter(Boolean).length,
+      },
+      requiredCorrections: {
+        evidenceReadinessScore: row.evidenceReadinessScore,
+        sourceRetention: row.sourceRetention,
+        supportStressMPa: row.supportStressMPa,
+        pullInMargin: row.pullInMargin,
+        missingReceiptSurfaceCount: row.receiptSurfaces.filter(
+          (surface) => surface.status !== "receipted",
+        ).length,
+        tensorTermCoverageCount: Object.values(row.tensorTermCoverage).filter(Boolean).length,
+      },
+      marginUnit: "readiness_ratio",
+      requiredChange:
+        "supply receipt surfaces and full apparatus tensor term coverage for the frozen topology architecture; " +
+        `architecture=${row.architectureId}; firstBlocker=${row.firstBlocker}`,
+      campaignDomain,
+      evidenceTarget: evidenceTargetFromDomain(campaignDomain),
+      falsifiesCurrentCandidate: row.engineeringCandidateStatus === "fail",
+      evidenceRef: loopRef ?? loop.architectureLoopRef,
+    },
+  ];
 };
 
 const marginSummary = (margins: Record<string, number | boolean | null>): string => {
@@ -654,6 +795,14 @@ const evidenceStateFromRows = (
   if (
     domainRows.some(
       (row) => row.source === "layer_stack_mechanical_receipt" && row.falsifiesCurrentCandidate,
+    )
+  ) {
+    return "failing_margin";
+  }
+  if (
+    domainRows.some(
+      (row) =>
+        row.source === "layer_stack_support_fraction_sweep" && row.falsifiesCurrentCandidate,
     )
   ) {
     return "failing_margin";
@@ -1126,20 +1275,25 @@ const reportStatus = (args: {
   downstreamGatesPass: boolean;
   sourceSideAuthorityPass: boolean;
   mechanicalReceiptFalsifies: boolean;
+  supportFractionSweepFalsifies: boolean;
+  fullApparatusLoopHasBlockers: boolean;
 }): Nhm2TileSourceFalsificationReportV1["disposition"]["reportStatus"] => {
   if (
     args.materialDisposition === "falsified" ||
     args.validationStatus === "falsified" ||
-    args.mechanicalReceiptFalsifies
+    args.mechanicalReceiptFalsifies ||
+    args.supportFractionSweepFalsifies
   ) {
     return "falsified";
   }
   if (
     args.validationStatus === "physically_credible_source_candidate" &&
-    args.sourceSideAuthorityPass
+    args.sourceSideAuthorityPass &&
+    !args.fullApparatusLoopHasBlockers
   ) {
     return "candidate_evidence_complete";
   }
+  if (args.fullApparatusLoopHasBlockers) return "review";
   if (args.allReceiptsPresent && (!args.downstreamGatesPass || !args.sourceSideAuthorityPass)) {
     return "receipt_ready_pending_downstream";
   }
@@ -1165,6 +1319,14 @@ export const buildNhm2TileSourceFalsificationReport = (
     input.layerStackMechanicalReceipt,
     input.layerStackMechanicalReceiptRef,
   );
+  const supportFractionBlockers = layerStackSupportFractionRows(
+    input.layerStackSupportFractionSweep,
+    input.layerStackSupportFractionSweepRef,
+  );
+  const fullApparatusLoopBlockers = layerStackFullApparatusRows(
+    input.layerStackFullApparatusReceiptLoop,
+    input.layerStackFullApparatusReceiptLoopRef,
+  );
   const sourceAuthorityBlockers = sourceAuthorityRows(
     sourceAuthority,
     input.sourceSideSameBasisTensorAuthorityRef,
@@ -1173,6 +1335,8 @@ export const buildNhm2TileSourceFalsificationReport = (
     ...receiptBlockers,
     ...validationRows(plan, receiptBlockerIds, downstreamBlockerIds, budgetBlockerIds),
     ...mechanicalBlockers,
+    ...supportFractionBlockers,
+    ...fullApparatusLoopBlockers,
     ...budgetBlockers,
     ...sourceAuthorityBlockers,
     ...downstreamRows(plan),
@@ -1205,6 +1369,10 @@ export const buildNhm2TileSourceFalsificationReport = (
     mechanicalReceiptFalsifies: mechanicalBlockers.some(
       (row) => row.falsifiesCurrentCandidate,
     ),
+    supportFractionSweepFalsifies: supportFractionBlockers.some(
+      (row) => row.falsifiesCurrentCandidate,
+    ),
+    fullApparatusLoopHasBlockers: fullApparatusLoopBlockers.length > 0,
     sourceSideAuthorityPass:
       sourceAuthority == null
         ? receipts.summary.sourceAuthorityEvidenceReady
@@ -1221,6 +1389,9 @@ export const buildNhm2TileSourceFalsificationReport = (
       physicalValidationPlanRef: input.physicalValidationPlanRef ?? null,
       evidenceGapRoadmapRef: input.evidenceGapRoadmapRef ?? null,
       layerStackMechanicalReceiptRef: input.layerStackMechanicalReceiptRef ?? null,
+      layerStackSupportFractionSweepRef: input.layerStackSupportFractionSweepRef ?? null,
+      layerStackFullApparatusReceiptLoopRef:
+        input.layerStackFullApparatusReceiptLoopRef ?? null,
       operatingBudgetReadinessRef: input.operatingBudgetReadinessRef ?? null,
       sourceSideSameBasisTensorAuthorityRef:
         input.sourceSideSameBasisTensorAuthorityRef ?? null,

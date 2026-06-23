@@ -646,7 +646,21 @@ const resolveDocsSynthesisTerminalContract = (input: {
     committedRoute && committedRoute.turn_id === input.turnId ? committedRoute : null;
   const canonicalGoal = readRecord(input.payload.canonical_goal_frame);
   const allowedTerminalArtifactKinds = effectiveAllowedKinds(input.payload, input.contract);
-  if (sameTurnCommittedRoute?.canonical_goal.forbidden_terminal_artifact_kinds.includes("doc_evidence_synthesis_answer")) {
+  const currentRouteRequiresDocsSynthesis =
+    (
+      readString(canonicalGoal?.goal_kind) === "doc_evidence_synthesis" &&
+      readString(canonicalGoal?.required_terminal_kind) === "doc_evidence_synthesis_answer"
+    ) ||
+    allowedTerminalArtifactKinds.includes("doc_evidence_synthesis_answer") ||
+    allowedTerminalArtifactKinds.includes("doc_evidence_synthesis") ||
+    (
+      readString(input.draftPayload?.goal_kind) === "doc_evidence_synthesis" &&
+      readString(input.draftPayload?.required_terminal_kind) === "doc_evidence_synthesis_answer"
+    );
+  if (
+    sameTurnCommittedRoute?.canonical_goal.forbidden_terminal_artifact_kinds.includes("doc_evidence_synthesis_answer") &&
+    !currentRouteRequiresDocsSynthesis
+  ) {
     return {
       allowed: false,
       goalKind: sameTurnCommittedRoute.canonical_goal.goal_kind,

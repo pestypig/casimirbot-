@@ -102,6 +102,14 @@ const artifactText = (artifact: ArtifactLike): string | null => {
   return readString(payload?.answer_text) ?? readString(payload?.text) ?? readString(payload?.summary);
 };
 
+const isUnavailableDocEvidencePlaceholder = (artifact: ArtifactLike): boolean => {
+  const text = artifactText(artifact) ?? "";
+  if (!text) return false;
+  return /\bsummary\s+unavailable\b/i.test(text) ||
+    /\bno\s+active\s+document\s+path\s+was\s+provided\b/i.test(text) ||
+    /\bactive_doc_summary_unavailable\b/i.test(text);
+};
+
 const artifactPayloadByKind = (
   artifacts: ArtifactLike[],
   kind: string,
@@ -251,8 +259,20 @@ const resolveDocsSynthesisTerminalContract = (input: {
   const committedGoal = committedRoute?.canonical_goal;
   const compoundTerminalContract = resolveCompoundDocsSynthesisTerminalContract(input.payload);
   if (compoundTerminalContract) return compoundTerminalContract;
+  const routeAllowedTerminalKinds = allowedTerminalArtifactKinds(input.payload);
+  const currentRouteRequiresDocsSynthesis =
+    (
+      readString(canonicalGoal?.goal_kind) === "doc_evidence_synthesis" &&
+      readString(canonicalGoal?.required_terminal_kind) === "doc_evidence_synthesis_answer"
+    ) ||
+    routeAllowedTerminalKinds.includes("doc_evidence_synthesis_answer") ||
+    routeAllowedTerminalKinds.includes("doc_evidence_synthesis") ||
+    (
+      readString(input.draftPayload?.goal_kind) === "doc_evidence_synthesis" &&
+      readString(input.draftPayload?.required_terminal_kind) === "doc_evidence_synthesis_answer"
+    );
   const committedForbidden = committedGoal?.forbidden_terminal_artifact_kinds ?? [];
-  if (committedForbidden.includes("doc_evidence_synthesis_answer")) {
+  if (committedForbidden.includes("doc_evidence_synthesis_answer") && !currentRouteRequiresDocsSynthesis) {
     return {
       allowed: false,
       goalKind: committedGoal?.goal_kind ?? null,
@@ -262,7 +282,6 @@ const resolveDocsSynthesisTerminalContract = (input: {
       disallowReason: "same_turn_committed_route_forbids_doc_evidence_synthesis_answer",
     };
   }
-  const routeAllowedTerminalKinds = allowedTerminalArtifactKinds(input.payload);
   const candidates: Array<{
     goalKind: string | null;
     goalKindSource: string;
@@ -681,6 +700,7 @@ export function collectDocEvidenceForSynthesis(input: {
   finalAnswerDraftSupportRefs?: string[];
 }): ArtifactLike[] {
   return input.artifactLedger.filter((artifact) => {
+    if (isUnavailableDocEvidencePlaceholder(artifact)) return false;
     const compoundRuntimeDocEvidence = isCompoundRuntimeDocEvidenceArtifact({
       artifact,
       payload: input.payload,

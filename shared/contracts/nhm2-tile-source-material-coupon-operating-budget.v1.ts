@@ -16,10 +16,17 @@ export type Nhm2TileSourceMaterialCouponOperatingBudgetV1 = {
   };
   operatingTargets: {
     material: "ultra_high_stress_tin";
+    architectureId: "topology_optimized_lattice_tin";
     layerCount: 447;
+    supportFraction: 0.26;
+    activeAreaLostFraction: 0.08;
     operatingTemperatureK: 4;
     campaignLoadCaseRefRequired: true;
     layerStackCompatibilityRefRequired: true;
+    topologyOptimizationRefRequired: true;
+    depositionProcessRefRequired: true;
+    residualStressUniformityMapRefRequired: true;
+    interlayerAdhesionProtocolRefRequired: true;
     supportStressPa: number;
     tensileStressMinPa: number;
     materialSafetyFactor: 2;
@@ -32,14 +39,20 @@ export type Nhm2TileSourceMaterialCouponOperatingBudgetV1 = {
     dielectricResponseRefRequired: true;
     conductivityRefRequired: true;
     mechanicalCouponSampleCountMin: number;
+    stackCompatibilityCouponSampleCountMin: number;
     cryogenicCycleSampleCountMin: number;
     materialResponseSweepSampleCountMin: number;
     surfaceMapSampleCountMin: number;
   };
   suppliedMaterialCouponEvidence: {
     evidenceTier: string;
+    architectureId: string | null;
     loadCaseRef: string | null;
     layerStackCompatibilityRef: string | null;
+    topologyOptimizationRef: string | null;
+    depositionProcessRef: string | null;
+    residualStressUniformityMapRef: string | null;
+    interlayerAdhesionProtocolRef: string | null;
     tensileStressCurveRef: string | null;
     fractureYieldCurveRef: string | null;
     cryogenicStateRef: string | null;
@@ -55,6 +68,10 @@ export type Nhm2TileSourceMaterialCouponOperatingBudgetV1 = {
     conductivityTemperatureSampleCount: number | null;
     roughnessMapSampleCount: number | null;
     fabricationToleranceMapSampleCount: number | null;
+    stackCompatibilityCouponSampleCount: number | null;
+    stackCompatibilityLayerCount: number | null;
+    stackCompatibilitySupportFraction: number | null;
+    stackCompatibilityActiveAreaLostFraction: number | null;
     material: string | null;
     measuredTensileStressPa: number | null;
     fractureOrYieldStressPa: number | null;
@@ -75,6 +92,11 @@ export type Nhm2TileSourceMaterialCouponOperatingBudgetV1 = {
   derivedOperatingBudget: {
     curveAndMapRefsAvailable: boolean;
     campaignCompatibilityRefsAvailable: boolean;
+    architectureCompatibilityRefsAvailable: boolean;
+    architectureIdMatches: boolean;
+    stackLayerCountMargin: number | null;
+    supportFractionMargin: number | null;
+    activeAreaLostFractionMargin: number | null;
     tensileStressMargin: number | null;
     fractureOrYieldStressMargin: number | null;
     couponFatigueCycleMargin: number | null;
@@ -84,6 +106,7 @@ export type Nhm2TileSourceMaterialCouponOperatingBudgetV1 = {
     conductivityTemperatureMargin: number | null;
     materialResponseValuesAvailable: boolean;
     couponSamplingComplete: boolean;
+    stackCompatibilityCouponSampleCountMargin: number | null;
     tensileStressCouponSampleCountMargin: number | null;
     fractureYieldCouponSampleCountMargin: number | null;
     cryogenicCycleSampleCountMargin: number | null;
@@ -97,6 +120,14 @@ export type Nhm2TileSourceMaterialCouponOperatingBudgetV1 = {
   };
   requiredCorrections: {
     materialRequired: "ultra_high_stress_tin";
+    architectureIdRequired: "topology_optimized_lattice_tin";
+    architectureIdMismatch: boolean;
+    layerCountRequired: 447;
+    stackCompatibilityLayerCountShortfall: number | null;
+    supportFractionRequired: 0.26;
+    supportFractionAbsDelta: number | null;
+    activeAreaLostFractionRequired: 0.08;
+    activeAreaLostFractionAbsDelta: number | null;
     materialMismatch: boolean;
     supportStressPa: number;
     tensileStressMinPa: number;
@@ -119,8 +150,10 @@ export type Nhm2TileSourceMaterialCouponOperatingBudgetV1 = {
     fabricationToleranceReductionMeters: number | null;
     requiredCurveAndMapRefCount: 7;
     missingCurveAndMapRefCount: number;
-    requiredCampaignCompatibilityRefCount: 2;
+    requiredCampaignCompatibilityRefCount: 7;
     missingCampaignCompatibilityRefCount: number;
+    stackCompatibilityCouponSampleCountMin: number;
+    stackCompatibilityCouponSampleCountShortfall: number | null;
     dielectricResponseRefRequired: true;
     dielectricResponseReceiptComplete: boolean;
     dielectricResponseNumericValueAvailable: boolean;
@@ -172,6 +205,10 @@ export type BuildNhm2TileSourceMaterialCouponOperatingBudgetInput = {
 
 const DEFAULT_SELECTED_PROFILE_ID =
   "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1";
+const FROZEN_TOPOLOGY_ARCHITECTURE_ID = "topology_optimized_lattice_tin";
+const FROZEN_TOPOLOGY_LAYER_COUNT = 447;
+const FROZEN_TOPOLOGY_SUPPORT_FRACTION = 0.26;
+const FROZEN_TOPOLOGY_ACTIVE_AREA_LOST_FRACTION = 0.08;
 const SUPPORT_STRESS_PA = 5.45707087858e8;
 const MATERIAL_SAFETY_FACTOR = 2;
 const ROUGHNESS_RMS_MAX_METERS = 1e-10;
@@ -180,6 +217,7 @@ const OPERATING_TEMPERATURE_K = 4;
 const MATERIAL_RESPONSE_FREQUENCY_HZ = 15e9;
 const COUPON_REQUIRED_CYCLE_COUNT = 1e9;
 const MECHANICAL_COUPON_SAMPLE_COUNT_MIN = 5;
+const STACK_COMPATIBILITY_COUPON_SAMPLE_COUNT_MIN = 5;
 const CRYOGENIC_CYCLE_SAMPLE_COUNT_MIN = 10;
 const MATERIAL_RESPONSE_SWEEP_SAMPLE_COUNT_MIN = 16;
 const SURFACE_MAP_SAMPLE_COUNT_MIN = 10000;
@@ -334,6 +372,45 @@ export const buildNhm2TileSourceMaterialCouponOperatingBudget = (
     FABRICATION_TOLERANCE_MAX_METERS,
     evidence?.fabricationToleranceMeters ?? null,
   );
+  const stackCompatibilityCouponSampleCountMargin = safeRatio(
+    evidence?.stackCompatibilityCouponSampleCount ?? null,
+    STACK_COMPATIBILITY_COUPON_SAMPLE_COUNT_MIN,
+  );
+  const stackLayerCountMargin =
+    evidence?.stackCompatibilityLayerCount == null ||
+    evidence.stackCompatibilityLayerCount <= 0
+      ? null
+      : round(
+          Math.min(
+            evidence.stackCompatibilityLayerCount / FROZEN_TOPOLOGY_LAYER_COUNT,
+            FROZEN_TOPOLOGY_LAYER_COUNT / evidence.stackCompatibilityLayerCount,
+          ),
+        );
+  const supportFractionMargin =
+    evidence?.stackCompatibilitySupportFraction == null ||
+    evidence.stackCompatibilitySupportFraction <= 0
+      ? null
+      : round(
+          Math.min(
+            evidence.stackCompatibilitySupportFraction / FROZEN_TOPOLOGY_SUPPORT_FRACTION,
+            FROZEN_TOPOLOGY_SUPPORT_FRACTION / evidence.stackCompatibilitySupportFraction,
+          ),
+        );
+  const activeAreaLostFractionMargin =
+    evidence?.stackCompatibilityActiveAreaLostFraction == null ||
+    evidence.stackCompatibilityActiveAreaLostFraction < 0
+      ? null
+      : evidence.stackCompatibilityActiveAreaLostFraction ===
+          FROZEN_TOPOLOGY_ACTIVE_AREA_LOST_FRACTION
+        ? 1
+        : round(
+            Math.min(
+              evidence.stackCompatibilityActiveAreaLostFraction /
+                FROZEN_TOPOLOGY_ACTIVE_AREA_LOST_FRACTION,
+              FROZEN_TOPOLOGY_ACTIVE_AREA_LOST_FRACTION /
+                evidence.stackCompatibilityActiveAreaLostFraction,
+            ),
+          );
   const curveAndMapRefs = [
     evidence?.tensileStressCurveRef,
     evidence?.fractureYieldCurveRef,
@@ -344,8 +421,15 @@ export const buildNhm2TileSourceMaterialCouponOperatingBudget = (
     evidence?.fabricationToleranceMapRef,
   ];
   const campaignCompatibilityRefs = [
+    evidence?.architectureId === FROZEN_TOPOLOGY_ARCHITECTURE_ID
+      ? evidence.architectureId
+      : null,
     evidence?.loadCaseRef,
     evidence?.layerStackCompatibilityRef,
+    evidence?.topologyOptimizationRef,
+    evidence?.depositionProcessRef,
+    evidence?.residualStressUniformityMapRef,
+    evidence?.interlayerAdhesionProtocolRef,
   ];
   const materialResponseRefs = [
     evidence?.dielectricResponseRef,
@@ -367,12 +451,52 @@ export const buildNhm2TileSourceMaterialCouponOperatingBudget = (
     ...(evidence?.material !== "ultra_high_stress_tin"
       ? ["material_coupon_candidate_material_mismatch_for_operating_budget"]
       : []),
+    ...(evidence?.architectureId == null
+      ? ["candidate_stack_architecture_id_missing_for_operating_budget"]
+      : evidence.architectureId !== FROZEN_TOPOLOGY_ARCHITECTURE_ID
+        ? ["candidate_stack_architecture_id_mismatch_for_operating_budget"]
+        : []),
     ...(evidence?.loadCaseRef == null
       ? ["candidate_stack_load_case_ref_missing_for_operating_budget"]
       : []),
     ...(evidence?.layerStackCompatibilityRef == null
       ? ["candidate_stack_layer_compatibility_ref_missing_for_operating_budget"]
       : []),
+    ...(evidence?.topologyOptimizationRef == null
+      ? ["candidate_stack_topology_optimization_ref_missing_for_operating_budget"]
+      : []),
+    ...(evidence?.depositionProcessRef == null
+      ? ["candidate_stack_deposition_process_ref_missing_for_operating_budget"]
+      : []),
+    ...(evidence?.residualStressUniformityMapRef == null
+      ? ["candidate_stack_residual_stress_uniformity_map_ref_missing_for_operating_budget"]
+      : []),
+    ...(evidence?.interlayerAdhesionProtocolRef == null
+      ? ["candidate_stack_interlayer_adhesion_protocol_ref_missing_for_operating_budget"]
+      : []),
+    ...(evidence?.stackCompatibilityCouponSampleCount == null
+      ? ["stack_compatibility_coupon_sample_count_missing_for_operating_budget"]
+      : !isPositiveInteger(evidence.stackCompatibilityCouponSampleCount)
+        ? ["stack_compatibility_coupon_sample_count_invalid_for_operating_budget"]
+        : stackCompatibilityCouponSampleCountMargin == null ||
+            stackCompatibilityCouponSampleCountMargin < 1
+          ? ["stack_compatibility_coupon_sample_count_below_5_for_operating_budget"]
+          : []),
+    ...(evidence?.stackCompatibilityLayerCount == null
+      ? ["stack_compatibility_layer_count_missing_for_operating_budget"]
+      : evidence.stackCompatibilityLayerCount !== FROZEN_TOPOLOGY_LAYER_COUNT
+        ? ["stack_compatibility_layer_count_not_447_for_operating_budget"]
+        : []),
+    ...(supportFractionMargin == null
+      ? ["stack_compatibility_support_fraction_missing_for_operating_budget"]
+      : supportFractionMargin < 1
+        ? ["stack_compatibility_support_fraction_not_topology_0p26_for_operating_budget"]
+        : []),
+    ...(activeAreaLostFractionMargin == null
+      ? ["stack_compatibility_active_area_lost_fraction_missing_for_operating_budget"]
+      : activeAreaLostFractionMargin < 1
+        ? ["stack_compatibility_active_area_lost_fraction_not_topology_0p08_for_operating_budget"]
+        : []),
     ...(evidence?.tensileStressCurveRef == null
       ? ["tensile_stress_curve_ref_missing_for_operating_budget"]
       : []),
@@ -517,6 +641,12 @@ export const buildNhm2TileSourceMaterialCouponOperatingBudget = (
       ? blockers.some((blocker) =>
           [
             "material_coupon_candidate_material_mismatch_for_operating_budget",
+            "candidate_stack_architecture_id_mismatch_for_operating_budget",
+            "stack_compatibility_coupon_sample_count_invalid_for_operating_budget",
+            "stack_compatibility_coupon_sample_count_below_5_for_operating_budget",
+            "stack_compatibility_layer_count_not_447_for_operating_budget",
+            "stack_compatibility_support_fraction_not_topology_0p26_for_operating_budget",
+            "stack_compatibility_active_area_lost_fraction_not_topology_0p08_for_operating_budget",
             "tensile_stress_coupon_sample_count_invalid_for_operating_budget",
             "tensile_stress_coupon_sample_count_below_5_for_operating_budget",
             "fracture_yield_coupon_sample_count_invalid_for_operating_budget",
@@ -557,10 +687,17 @@ export const buildNhm2TileSourceMaterialCouponOperatingBudget = (
     },
     operatingTargets: {
       material: "ultra_high_stress_tin",
-      layerCount: 447,
+      architectureId: FROZEN_TOPOLOGY_ARCHITECTURE_ID,
+      layerCount: FROZEN_TOPOLOGY_LAYER_COUNT,
+      supportFraction: FROZEN_TOPOLOGY_SUPPORT_FRACTION,
+      activeAreaLostFraction: FROZEN_TOPOLOGY_ACTIVE_AREA_LOST_FRACTION,
       operatingTemperatureK: OPERATING_TEMPERATURE_K,
       campaignLoadCaseRefRequired: true,
       layerStackCompatibilityRefRequired: true,
+      topologyOptimizationRefRequired: true,
+      depositionProcessRefRequired: true,
+      residualStressUniformityMapRefRequired: true,
+      interlayerAdhesionProtocolRefRequired: true,
       supportStressPa,
       tensileStressMinPa: supportStressPa,
       materialSafetyFactor: 2,
@@ -573,14 +710,25 @@ export const buildNhm2TileSourceMaterialCouponOperatingBudget = (
       dielectricResponseRefRequired: true,
       conductivityRefRequired: true,
       mechanicalCouponSampleCountMin: MECHANICAL_COUPON_SAMPLE_COUNT_MIN,
+      stackCompatibilityCouponSampleCountMin:
+        STACK_COMPATIBILITY_COUPON_SAMPLE_COUNT_MIN,
       cryogenicCycleSampleCountMin: CRYOGENIC_CYCLE_SAMPLE_COUNT_MIN,
       materialResponseSweepSampleCountMin: MATERIAL_RESPONSE_SWEEP_SAMPLE_COUNT_MIN,
       surfaceMapSampleCountMin: SURFACE_MAP_SAMPLE_COUNT_MIN,
     },
     suppliedMaterialCouponEvidence: {
       evidenceTier: evidence?.evidenceTier ?? "missing",
+      architectureId: stringOrNull(evidence?.architectureId),
       loadCaseRef: stringOrNull(evidence?.loadCaseRef),
       layerStackCompatibilityRef: stringOrNull(evidence?.layerStackCompatibilityRef),
+      topologyOptimizationRef: stringOrNull(evidence?.topologyOptimizationRef),
+      depositionProcessRef: stringOrNull(evidence?.depositionProcessRef),
+      residualStressUniformityMapRef: stringOrNull(
+        evidence?.residualStressUniformityMapRef,
+      ),
+      interlayerAdhesionProtocolRef: stringOrNull(
+        evidence?.interlayerAdhesionProtocolRef,
+      ),
       tensileStressCurveRef: stringOrNull(evidence?.tensileStressCurveRef),
       fractureYieldCurveRef: stringOrNull(evidence?.fractureYieldCurveRef),
       cryogenicStateRef: stringOrNull(evidence?.cryogenicStateRef),
@@ -601,6 +749,16 @@ export const buildNhm2TileSourceMaterialCouponOperatingBudget = (
       roughnessMapSampleCount: finiteOrNull(evidence?.roughnessMapSampleCount),
       fabricationToleranceMapSampleCount: finiteOrNull(
         evidence?.fabricationToleranceMapSampleCount,
+      ),
+      stackCompatibilityCouponSampleCount: finiteOrNull(
+        evidence?.stackCompatibilityCouponSampleCount,
+      ),
+      stackCompatibilityLayerCount: finiteOrNull(evidence?.stackCompatibilityLayerCount),
+      stackCompatibilitySupportFraction: finiteOrNull(
+        evidence?.stackCompatibilitySupportFraction,
+      ),
+      stackCompatibilityActiveAreaLostFraction: finiteOrNull(
+        evidence?.stackCompatibilityActiveAreaLostFraction,
       ),
       material: stringOrNull(evidence?.material),
       measuredTensileStressPa: finiteOrNull(evidence?.measuredTensileStressPa),
@@ -629,7 +787,23 @@ export const buildNhm2TileSourceMaterialCouponOperatingBudget = (
         evidence.roughnessMapRef != null &&
         evidence.fabricationToleranceMapRef != null,
       campaignCompatibilityRefsAvailable:
-        evidence?.loadCaseRef != null && evidence.layerStackCompatibilityRef != null,
+        evidence?.architectureId === FROZEN_TOPOLOGY_ARCHITECTURE_ID &&
+        evidence.loadCaseRef != null &&
+        evidence.layerStackCompatibilityRef != null &&
+        evidence.topologyOptimizationRef != null &&
+        evidence.depositionProcessRef != null &&
+        evidence.residualStressUniformityMapRef != null &&
+        evidence.interlayerAdhesionProtocolRef != null,
+      architectureCompatibilityRefsAvailable:
+        evidence?.topologyOptimizationRef != null &&
+        evidence.depositionProcessRef != null &&
+        evidence.residualStressUniformityMapRef != null &&
+        evidence.interlayerAdhesionProtocolRef != null,
+      architectureIdMatches:
+        evidence?.architectureId === FROZEN_TOPOLOGY_ARCHITECTURE_ID,
+      stackLayerCountMargin,
+      supportFractionMargin,
+      activeAreaLostFractionMargin,
       tensileStressMargin,
       fractureOrYieldStressMargin,
       couponFatigueCycleMargin,
@@ -639,6 +813,7 @@ export const buildNhm2TileSourceMaterialCouponOperatingBudget = (
       conductivityTemperatureMargin,
       materialResponseValuesAvailable,
       couponSamplingComplete,
+      stackCompatibilityCouponSampleCountMargin,
       tensileStressCouponSampleCountMargin,
       fractureYieldCouponSampleCountMargin,
       cryogenicCycleSampleCountMargin,
@@ -652,6 +827,38 @@ export const buildNhm2TileSourceMaterialCouponOperatingBudget = (
     },
     requiredCorrections: {
       materialRequired: "ultra_high_stress_tin",
+      architectureIdRequired: FROZEN_TOPOLOGY_ARCHITECTURE_ID,
+      architectureIdMismatch:
+        evidence?.architectureId !== FROZEN_TOPOLOGY_ARCHITECTURE_ID,
+      layerCountRequired: FROZEN_TOPOLOGY_LAYER_COUNT,
+      stackCompatibilityLayerCountShortfall:
+        evidence?.stackCompatibilityLayerCount == null
+          ? null
+          : round(
+              Math.abs(
+                FROZEN_TOPOLOGY_LAYER_COUNT - evidence.stackCompatibilityLayerCount,
+              ),
+            ),
+      supportFractionRequired: FROZEN_TOPOLOGY_SUPPORT_FRACTION,
+      supportFractionAbsDelta:
+        evidence?.stackCompatibilitySupportFraction == null
+          ? null
+          : round(
+              Math.abs(
+                FROZEN_TOPOLOGY_SUPPORT_FRACTION -
+                  evidence.stackCompatibilitySupportFraction,
+              ),
+            ),
+      activeAreaLostFractionRequired: FROZEN_TOPOLOGY_ACTIVE_AREA_LOST_FRACTION,
+      activeAreaLostFractionAbsDelta:
+        evidence?.stackCompatibilityActiveAreaLostFraction == null
+          ? null
+          : round(
+              Math.abs(
+                FROZEN_TOPOLOGY_ACTIVE_AREA_LOST_FRACTION -
+                  evidence.stackCompatibilityActiveAreaLostFraction,
+              ),
+            ),
       materialMismatch: evidence?.material !== "ultra_high_stress_tin",
       supportStressPa,
       tensileStressMinPa: supportStressPa,
@@ -698,8 +905,14 @@ export const buildNhm2TileSourceMaterialCouponOperatingBudget = (
       ),
       requiredCurveAndMapRefCount: 7,
       missingCurveAndMapRefCount,
-      requiredCampaignCompatibilityRefCount: 2,
+      requiredCampaignCompatibilityRefCount: 7,
       missingCampaignCompatibilityRefCount,
+      stackCompatibilityCouponSampleCountMin:
+        STACK_COMPATIBILITY_COUPON_SAMPLE_COUNT_MIN,
+      stackCompatibilityCouponSampleCountShortfall: shortfallToMinimum(
+        evidence?.stackCompatibilityCouponSampleCount,
+        STACK_COMPATIBILITY_COUPON_SAMPLE_COUNT_MIN,
+      ),
       dielectricResponseRefRequired: true,
       dielectricResponseReceiptComplete,
       dielectricResponseNumericValueAvailable,
@@ -794,10 +1007,17 @@ export const isNhm2TileSourceMaterialCouponOperatingBudget = (
     isRecord(value.sourceRefs) &&
     targets != null &&
     targets.material === "ultra_high_stress_tin" &&
+    targets.architectureId === "topology_optimized_lattice_tin" &&
     targets.layerCount === 447 &&
+    targets.supportFraction === 0.26 &&
+    targets.activeAreaLostFraction === 0.08 &&
     targets.operatingTemperatureK === 4 &&
     targets.campaignLoadCaseRefRequired === true &&
     targets.layerStackCompatibilityRefRequired === true &&
+    targets.topologyOptimizationRefRequired === true &&
+    targets.depositionProcessRefRequired === true &&
+    targets.residualStressUniformityMapRefRequired === true &&
+    targets.interlayerAdhesionProtocolRefRequired === true &&
     typeof targets.supportStressPa === "number" &&
     typeof targets.tensileStressMinPa === "number" &&
     targets.materialSafetyFactor === 2 &&
@@ -810,6 +1030,7 @@ export const isNhm2TileSourceMaterialCouponOperatingBudget = (
     targets.dielectricResponseRefRequired === true &&
     targets.conductivityRefRequired === true &&
     typeof targets.mechanicalCouponSampleCountMin === "number" &&
+    typeof targets.stackCompatibilityCouponSampleCountMin === "number" &&
     typeof targets.cryogenicCycleSampleCountMin === "number" &&
     typeof targets.materialResponseSweepSampleCountMin === "number" &&
     typeof targets.surfaceMapSampleCountMin === "number" &&
@@ -818,6 +1039,14 @@ export const isNhm2TileSourceMaterialCouponOperatingBudget = (
     budget != null &&
     requiredCorrections != null &&
     requiredCorrections.materialRequired === "ultra_high_stress_tin" &&
+    requiredCorrections.architectureIdRequired === "topology_optimized_lattice_tin" &&
+    typeof requiredCorrections.architectureIdMismatch === "boolean" &&
+    requiredCorrections.layerCountRequired === 447 &&
+    isNumberOrNull(requiredCorrections.stackCompatibilityLayerCountShortfall) &&
+    requiredCorrections.supportFractionRequired === 0.26 &&
+    isNumberOrNull(requiredCorrections.supportFractionAbsDelta) &&
+    requiredCorrections.activeAreaLostFractionRequired === 0.08 &&
+    isNumberOrNull(requiredCorrections.activeAreaLostFractionAbsDelta) &&
     typeof requiredCorrections.materialMismatch === "boolean" &&
     typeof requiredCorrections.supportStressPa === "number" &&
     typeof requiredCorrections.tensileStressMinPa === "number" &&
@@ -840,8 +1069,10 @@ export const isNhm2TileSourceMaterialCouponOperatingBudget = (
     isNumberOrNull(requiredCorrections.fabricationToleranceReductionMeters) &&
     requiredCorrections.requiredCurveAndMapRefCount === 7 &&
     typeof requiredCorrections.missingCurveAndMapRefCount === "number" &&
-    requiredCorrections.requiredCampaignCompatibilityRefCount === 2 &&
+    requiredCorrections.requiredCampaignCompatibilityRefCount === 7 &&
     typeof requiredCorrections.missingCampaignCompatibilityRefCount === "number" &&
+    typeof requiredCorrections.stackCompatibilityCouponSampleCountMin === "number" &&
+    isNumberOrNull(requiredCorrections.stackCompatibilityCouponSampleCountShortfall) &&
     requiredCorrections.dielectricResponseRefRequired === true &&
     typeof requiredCorrections.dielectricResponseReceiptComplete === "boolean" &&
     typeof requiredCorrections.dielectricResponseNumericValueAvailable === "boolean" &&

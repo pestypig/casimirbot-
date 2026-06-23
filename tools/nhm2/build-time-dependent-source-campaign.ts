@@ -156,6 +156,10 @@ export const runNhm2TimeDependentSourceCampaign = (args: {
   tileSourceFalsificationReportPath?: string | null;
   tileSourceAuthorityHandoffPath?: string | null;
   tileSourceOperatingBudgetReadinessPath?: string | null;
+  layerStackMechanicalReceiptPath?: string | null;
+  layerStackSupportFractionSweepPath?: string | null;
+  layerStackEngineeringArchitectureLoopPath?: string | null;
+  layerStackFullApparatusReceiptLoopPath?: string | null;
   coupledClosurePassCandidatePath?: string | null;
   regionalTensorPassPathHarnessPath?: string | null;
   frequencyConvergencePath?: string | null;
@@ -344,6 +348,12 @@ export const runNhm2TimeDependentSourceCampaign = (args: {
       tileSourceAuthorityHandoff: args.tileSourceAuthorityHandoffPath ?? null,
       tileSourceOperatingBudgetReadiness:
         args.tileSourceOperatingBudgetReadinessPath ?? null,
+      layerStackMechanicalReceipt: args.layerStackMechanicalReceiptPath ?? null,
+      layerStackSupportFractionSweep: args.layerStackSupportFractionSweepPath ?? null,
+      layerStackEngineeringArchitectureLoop:
+        args.layerStackEngineeringArchitectureLoopPath ?? null,
+      layerStackFullApparatusReceiptLoop:
+        args.layerStackFullApparatusReceiptLoopPath ?? null,
       coupledClosurePassCandidate: args.coupledClosurePassCandidatePath ?? null,
       regionalTensorPassPathHarness: args.regionalTensorPassPathHarnessPath ?? null,
       sourceModelRef: args.sourceModelRef ?? null,
@@ -451,6 +461,16 @@ if (normalize(process.argv[1] ?? "") === normalize(fileURLToPath(import.meta.url
     tileSourceAuthorityHandoffPath: asString(args["tile-source-authority-handoff"]),
     tileSourceOperatingBudgetReadinessPath: asString(
       args["tile-source-operating-budget-readiness"],
+    ),
+    layerStackMechanicalReceiptPath: asString(args["layer-stack-mechanical-receipt"]),
+    layerStackSupportFractionSweepPath: asString(
+      args["layer-stack-support-fraction-sweep"],
+    ),
+    layerStackEngineeringArchitectureLoopPath: asString(
+      args["layer-stack-engineering-architecture-loop"],
+    ),
+    layerStackFullApparatusReceiptLoopPath: asString(
+      args["layer-stack-full-apparatus-receipt-loop"],
     ),
     coupledClosurePassCandidatePath: asString(args["coupled-closure-pass-candidate"]),
     regionalTensorPassPathHarnessPath: asString(

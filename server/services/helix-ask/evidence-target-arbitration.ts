@@ -113,6 +113,19 @@ const hasLocalDocsTopicSummary = (prompt: string): boolean =>
     /\bdocs?\s+only\b/i.test(prompt)
   );
 
+const hasAffirmativeLocalDocumentEvidenceRequest = (prompt: string): boolean => {
+  if (isExplicitDocsPathDocumentOperation(prompt) || isExplicitDocsPathComparePrompt(prompt) || isExplicitDocsPathLocateSynthesisPrompt(prompt)) {
+    return true;
+  }
+  const documentCue = /\b(?:white\s*paper|whitepaper|paper|document|doc|docs|report|memo)\b/i.test(prompt);
+  if (!documentCue) return false;
+  const evidenceCue =
+    /\b(?:check|use|from|in|inside|look\s+in|look\s+at|consult|according\s+to|where|find|locate|reported|stated|specified|listed|table|row|source|cite|citation|evidence|white\s*paper)\b/i.test(prompt);
+  const valueCue =
+    /\b(?:load[-\s]?bearing|lbs?|pounds?|numeric|value|capacity|spec(?:ification)?s?|engineering|parameter|measurement|reported|stated)\b/i.test(prompt);
+  return evidenceCue && (valueCue || /\b(?:NHM[-\s]?2|casimir|tile)\b/i.test(prompt));
+};
+
 const makeCandidate = (input: {
   candidateId: string;
   targetSource: HelixAskSourceTarget;
@@ -307,6 +320,25 @@ export function buildAskEvidenceTargetArbitration(input: {
       requestedOutputs: ["file_path", "tool_call_eligibility"],
       capabilityKeys: ["docs-viewer.search_docs", "docs-viewer.summarize_doc"],
       terminalProductConstraints: ["doc_summary", "typed_failure", "request_user_input"],
+    }));
+  }
+
+  if (!contextualToolSuppressionBlocksFamily(contextualSuppression, "docs_viewer") && hasAffirmativeLocalDocumentEvidenceRequest(prompt)) {
+    promptIntentCandidates.push("local_document_evidence");
+    candidates.push(makeCandidate({
+      candidateId: "docs_viewer.local_document_evidence",
+      targetSource: "docs_viewer",
+      targetKind: "docs_viewer",
+      strength: "hard",
+      score: 0.95,
+      reasonCodes: [
+        "explicit_local_document_evidence_request",
+        "whitepaper_or_document_source_requested",
+        "local_docs_scope_suppresses_repo_code",
+      ],
+      requestedOutputs: ["file_path", "line_backed_source", "paper_pdf_pages", "typed_failure"],
+      capabilityKeys: ["docs-viewer.search_docs", "docs-viewer.locate_in_doc"],
+      terminalProductConstraints: ["doc_evidence_synthesis_answer", "doc_location_result", "typed_failure", "request_user_input"],
     }));
   }
 

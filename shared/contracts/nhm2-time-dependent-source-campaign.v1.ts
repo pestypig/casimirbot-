@@ -159,6 +159,10 @@ export type Nhm2TimeDependentSourceCampaignArtifactRefsV1 = {
   tileSourceFalsificationReport: string | null;
   tileSourceAuthorityHandoff: string | null;
   tileSourceOperatingBudgetReadiness: string | null;
+  layerStackMechanicalReceipt: string | null;
+  layerStackSupportFractionSweep: string | null;
+  layerStackEngineeringArchitectureLoop: string | null;
+  layerStackFullApparatusReceiptLoop: string | null;
   coupledClosurePassCandidate: string | null;
   regionalTensorPassPathHarness: string | null;
   sourceModelRef: string | null;
@@ -603,6 +607,12 @@ const refs = (
   tileSourceAuthorityHandoff: input?.tileSourceAuthorityHandoff ?? null,
   tileSourceOperatingBudgetReadiness:
     input?.tileSourceOperatingBudgetReadiness ?? null,
+  layerStackMechanicalReceipt: input?.layerStackMechanicalReceipt ?? null,
+  layerStackSupportFractionSweep: input?.layerStackSupportFractionSweep ?? null,
+  layerStackEngineeringArchitectureLoop:
+    input?.layerStackEngineeringArchitectureLoop ?? null,
+  layerStackFullApparatusReceiptLoop:
+    input?.layerStackFullApparatusReceiptLoop ?? null,
   coupledClosurePassCandidate: input?.coupledClosurePassCandidate ?? null,
   regionalTensorPassPathHarness: input?.regionalTensorPassPathHarness ?? null,
   sourceModelRef: input?.sourceModelRef ?? null,
@@ -1438,6 +1448,10 @@ const isArtifactRefs = (
     isNullableText(record.tileSourceFalsificationReport) &&
     isNullableText(record.tileSourceAuthorityHandoff) &&
     isNullableText(record.tileSourceOperatingBudgetReadiness) &&
+    isNullableText(record.layerStackMechanicalReceipt) &&
+    isNullableText(record.layerStackSupportFractionSweep) &&
+    isNullableText(record.layerStackEngineeringArchitectureLoop) &&
+    isNullableText(record.layerStackFullApparatusReceiptLoop) &&
     isNullableText(record.coupledClosurePassCandidate) &&
     isNullableText(record.regionalTensorPassPathHarness) &&
     isNullableText(record.sourceModelRef) &&

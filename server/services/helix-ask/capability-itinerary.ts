@@ -101,10 +101,15 @@ const requestedRepoFamilies = (promptText: string): HelixCapabilityItineraryFami
 const explicitRepoEvidenceCueAllowedInCompound = (promptText: string): boolean =>
   /\b(?:repo-code\.search_concept|repo\s*\/\s*code|repo\s+evidence|repository\s+evidence|code\s+evidence|source\s+code|codebase|where\s+in\s+(?:the\s+)?(?:code|repo|repository|codebase)|implementation\s+(?:path|file|location|evidence)|line-backed|line\s+backed|repo\s+grep|rg\s+search)\b/i.test(promptText);
 
+const hasAffirmativeLocalDocumentEvidenceRequest = (promptText: string): boolean =>
+  /\b(?:check|use|from|in|inside|look\s+in|look\s+at|consult|according\s+to|where|find|locate|reported|stated|specified|listed|table|row|source|cite|citation|evidence)\b/i.test(promptText) &&
+  /\b(?:white\s*paper|whitepaper|paper|document|doc|docs|report|memo|NHM[-\s]?2|casimir|tile|load[-\s]?bearing|lbs?|pounds?|newtons?)\b/i.test(promptText);
+
 const requestedDocsFamilies = (promptText: string): HelixCapabilityItineraryFamily[] => {
   const suppression = detectContextualToolAdmissionSuppression(promptText);
   if (contextualToolSuppressionBlocksFamily(suppression, "docs_viewer")) return [];
-  return buildToolUseRestatement(promptText).requiredToolFamilies.includes("docs_viewer")
+  return buildToolUseRestatement(promptText).requiredToolFamilies.includes("docs_viewer") ||
+    hasAffirmativeLocalDocumentEvidenceRequest(promptText)
     ? ["docs_viewer"]
     : [];
 };
@@ -119,7 +124,7 @@ const observationKindsFor = (family: HelixCapabilityItineraryFamily, promptText:
       : kinds;
   }
   if (family === "internet_search") return ["internet_search_observation"];
-  if (family === "docs_viewer") return ["doc_search_results", "doc_candidate_validation", "doc_open_receipt"];
+  if (family === "docs_viewer") return ["doc_search_results", "doc_candidate_validation", "doc_location_matches", "doc_evidence_location", "doc_summary"];
   if (family === "theory_locator") {
     if (isTheoryFrontierVectorFieldTracePrompt(promptText)) {
       return [
@@ -162,7 +167,7 @@ const allowedTerminalKindsFor = (families: HelixCapabilityItineraryFamily[]): st
   const kinds: string[] = ["final_answer_draft"];
   if (families.includes("scholarly_research")) kinds.push("scholarly_research_answer");
   if (families.includes("internet_search")) kinds.push("internet_search_answer");
-  if (families.includes("docs_viewer")) kinds.push("doc_open_receipt", "doc_summary", "doc_location_result");
+  if (families.includes("docs_viewer")) kinds.push("doc_open_receipt", "doc_summary", "doc_location_result", "doc_evidence_synthesis_answer");
   if (families.includes("repo_code")) kinds.push("repo_code_evidence_answer");
   if (families.includes("theory_locator")) kinds.push("theory_context_reflection_answer", "workstation_tool_evaluation");
   return unique(kinds);

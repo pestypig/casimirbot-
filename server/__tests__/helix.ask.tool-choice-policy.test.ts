@@ -71,6 +71,23 @@ describe("Helix Ask tool-choice policy", () => {
     );
   });
 
+  it("does not hand-write completed solver traces for zen/civilization route terminals", () => {
+    const agiPlanSource = readFileSync(resolve(__dirname, "../routes/agi.plan.ts"), "utf8");
+
+    expect(agiPlanSource).not.toMatch(
+      /ask_turn_solver_trace:\s*\{[^}]*route:\s*"zen_graph_reflection"[^}]*completed_solver_path:\s*true/s,
+    );
+    expect(agiPlanSource).not.toMatch(
+      /ask_turn_solver_trace:\s*\{[^}]*route:\s*"civilization_bounds_reflection"[^}]*completed_solver_path:\s*true/s,
+    );
+    expect(agiPlanSource).toMatch(
+      /selectedRoute:\s*"zen_graph_reflection"[\s\S]{0,420}payload\.ask_turn_solver_trace = buildAskTurnSolverTrace/,
+    );
+    expect(agiPlanSource).toMatch(
+      /selectedRoute:\s*"civilization_bounds_reflection"[\s\S]{0,420}payload\.ask_turn_solver_trace = buildAskTurnSolverTrace/,
+    );
+  });
+
   it("requires solver permission before stream projection promotes a model draft to terminal authority", () => {
     const agiPlanSource = readFileSync(resolve(__dirname, "../routes/agi.plan.ts"), "utf8");
 
@@ -107,6 +124,18 @@ describe("Helix Ask tool-choice policy", () => {
 
     expect(agiPlanSource).toContain("const canProjectAskTurnTerminalAtResponseBoundary =");
     expect(agiPlanSource).toContain("const canPromoteAskTurnTerminalKindAtResponseBoundary =");
+    expect(agiPlanSource).toContain("const isAskTurnAuthorityRecordUsableForProjection =");
+    expect(agiPlanSource).toMatch(
+      /isAskTurnAuthorityRecordUsableForProjection[\s\S]*server_authoritative !== false[\s\S]*terminal_eligible !== false[\s\S]*assistant_answer !== true/,
+    );
+    expect(agiPlanSource).toContain("const hasAskTurnSelectedTerminalAuthorityForProjection =");
+    expect(agiPlanSource).toContain("const hasAskTurnTerminalAuthoritySelectingKindForProjection =");
+    expect(agiPlanSource).not.toMatch(
+      /hasAskTurnSelectedTerminalAuthorityForProjection[\s\S]{0,700}writer\?\.source/,
+    );
+    expect(agiPlanSource).not.toMatch(
+      /hasAskTurnTerminalAuthoritySelectingKindForProjection[\s\S]{0,900}terminal_presentation/,
+    );
     expect(agiPlanSource).toContain("const responseBoundaryCanProjectTerminalPresentation =");
     expect(agiPlanSource).toContain("terminal_presentation_requires_solver_or_terminal_authority");
     expect(agiPlanSource).toContain("const responseBoundaryCanProjectTerminalAuthority =");
@@ -337,6 +366,27 @@ describe("Helix Ask tool-choice policy", () => {
     );
   });
 
+  it("requires solver permission before summary-to-note reentry repairs rewrite terminal answers", () => {
+    const agiPlanSource = readFileSync(resolve(__dirname, "../routes/agi.plan.ts"), "utf8");
+
+    expect(agiPlanSource).toContain("const responseBoundaryCanPromoteSummaryToNoteRepair =");
+    expect(agiPlanSource).toContain("const responseBoundaryCanPromoteRuntimeSummaryToNoteRepair =");
+    expect(agiPlanSource).toContain("summary_to_note_repair_requires_solver_or_terminal_authority");
+    expect(agiPlanSource).toContain("response_boundary_summary_to_note_repair_projection_suppressed");
+    expect(agiPlanSource).toMatch(
+      /summaryToResolvedNoteRouteReentryRepairApplies &&[\s\S]*responseBoundaryCanPromoteSummaryToNoteRepair[\s\S]*payload\.final_answer_source = "universal_composer"/,
+    );
+    expect(agiPlanSource).toMatch(
+      /summaryToResolvedNoteRouteReentryRepairApplies &&[\s\S]*!responseBoundaryCanPromoteSummaryToNoteRepair[\s\S]*response_boundary_summary_to_note_repair_projection_suppressed/,
+    );
+    expect(agiPlanSource).toMatch(
+      /runtimeSummaryToNoteRepairApplies &&[\s\S]*responseBoundaryCanPromoteRuntimeSummaryToNoteRepair[\s\S]*payload\.final_answer_source = "universal_composer"/,
+    );
+    expect(agiPlanSource).toMatch(
+      /runtimeSummaryToNoteRepairApplies &&[\s\S]*!responseBoundaryCanPromoteRuntimeSummaryToNoteRepair[\s\S]*response_boundary_summary_to_note_repair_projection_suppressed/,
+    );
+  });
+
   it("requires terminal authority before the source-path note receipt shortcut can answer", () => {
     const agiPlanSource = readFileSync(resolve(__dirname, "../routes/agi.plan.ts"), "utf8");
 
@@ -432,14 +482,40 @@ describe("Helix Ask tool-choice policy", () => {
     expect(agiPlanSource).toMatch(
       /replacement && !responseBoundaryCanPromoteModelOnlyDirectRepair[\s\S]*response_boundary_model_only_direct_repair_suppressed/,
     );
+    expect(agiPlanSource).toContain("const responseBoundaryCanPromoteLateModelOnlyDirectRepair =");
+    expect(agiPlanSource).toContain("response_boundary_late_model_only_direct_repair_suppressed");
+    expect(agiPlanSource).toMatch(
+      /modelOnlyReplacement && responseBoundaryCanPromoteLateModelOnlyDirectRepair[\s\S]*payload\.final_answer_source = "model_direct_answer"/,
+    );
+    expect(agiPlanSource).toMatch(
+      /modelOnlyReplacement && !responseBoundaryCanPromoteLateModelOnlyDirectRepair[\s\S]*model_only_direct_repair_requires_solver_authority/,
+    );
+  });
+
+  it("requires solver permission before force-meta test terminals rewrite failed terminal state", () => {
+    const agiPlanSource = readFileSync(resolve(__dirname, "../routes/agi.plan.ts"), "utf8");
+
+    expect(agiPlanSource).toContain("const responseBoundaryCanPromoteForceMetaTerminal =");
+    expect(agiPlanSource).toContain("force_meta_terminal_requires_solver_or_terminal_authority");
+    expect(agiPlanSource).toContain("response_boundary_force_meta_terminal_projection_suppressed");
+    expect(agiPlanSource).toMatch(
+      /forceMetaTerminalForTest && finalAnswerContractRepairApplied && responseBoundaryCanPromoteForceMetaTerminal[\s\S]*payload\.final_answer_source = "model_direct_answer"/,
+    );
+    expect(agiPlanSource).toMatch(
+      /forceMetaTerminalForTest && finalAnswerContractRepairApplied && !responseBoundaryCanPromoteForceMetaTerminal[\s\S]*response_boundary_force_meta_terminal_projection_suppressed/,
+    );
   });
 
   it("requires solver permission before situation context terminals repair failed terminal state", () => {
     const agiPlanSource = readFileSync(resolve(__dirname, "../routes/agi.plan.ts"), "utf8");
 
+    expect(agiPlanSource).toContain("const responseBoundaryCanPromoteSituationContextHelper =");
     expect(agiPlanSource).toContain("const responseBoundaryCanPromoteSituationContextTerminal =");
     expect(agiPlanSource).toContain("situation_context_terminal_requires_solver_or_terminal_authority");
     expect(agiPlanSource).toContain("response_boundary_situation_context_projection_suppressed");
+    expect(agiPlanSource).toMatch(
+      /applySituationContextFinalAnswer[\s\S]*responseBoundaryCanPromoteSituationContextHelper[\s\S]*if \(!responseBoundaryCanPromoteSituationContextHelper\)[\s\S]*return;[\s\S]*payload\.final_answer_source = "artifact_synthesis"/,
+    );
     expect(agiPlanSource).toMatch(
       /situationContextTerminalKind === "situation_context_pack"[\s\S]*responseBoundaryCanPromoteSituationContextTerminal[\s\S]*delete payload\.terminal_error_code/,
     );

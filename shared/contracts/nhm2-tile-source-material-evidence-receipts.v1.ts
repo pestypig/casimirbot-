@@ -27,8 +27,13 @@ export type Nhm2TileSourceReceiptSurfaceStatusV1 = {
 export type Nhm2TileSourceMaterialCouponEvidenceV1 = {
   evidenceTier: Nhm2TileSourceEvidenceTier;
   evidenceRef?: string | null;
+  architectureId?: "topology_optimized_lattice_tin" | string | null;
   loadCaseRef?: string | null;
   layerStackCompatibilityRef?: string | null;
+  topologyOptimizationRef?: string | null;
+  depositionProcessRef?: string | null;
+  residualStressUniformityMapRef?: string | null;
+  interlayerAdhesionProtocolRef?: string | null;
   tensileStressCurveRef?: string | null;
   fractureYieldCurveRef?: string | null;
   cryogenicStateRef?: string | null;
@@ -44,6 +49,10 @@ export type Nhm2TileSourceMaterialCouponEvidenceV1 = {
   conductivityTemperatureSampleCount?: number | null;
   roughnessMapSampleCount?: number | null;
   fabricationToleranceMapSampleCount?: number | null;
+  stackCompatibilityCouponSampleCount?: number | null;
+  stackCompatibilityLayerCount?: number | null;
+  stackCompatibilitySupportFraction?: number | null;
+  stackCompatibilityActiveAreaLostFraction?: number | null;
   material: "ultra_high_stress_tin" | "sin" | "aln_alscn" | "custom";
   measuredTensileStressPa: number | null;
   fractureOrYieldStressPa: number | null;
@@ -399,6 +408,7 @@ const ASPERITY_MAX_FRACTION_OF_GAP = 0.5;
 const MATERIAL_RESPONSE_FREQUENCY_HZ = 15e9;
 const MATERIAL_RESPONSE_TEMPERATURE_K = 4;
 const MATERIAL_COUPON_MECHANICAL_SAMPLE_COUNT_MIN = 5;
+const MATERIAL_COUPON_STACK_COMPATIBILITY_SAMPLE_COUNT_MIN = 5;
 const MATERIAL_COUPON_CRYOGENIC_CYCLE_SAMPLE_COUNT_MIN = 10;
 const MATERIAL_COUPON_RESPONSE_SWEEP_SAMPLE_COUNT_MIN = 16;
 const MATERIAL_COUPON_SURFACE_MAP_SAMPLE_COUNT_MIN = 10000;
@@ -425,6 +435,10 @@ const ACTIVE_CONTROL_TIME_TRACE_SAMPLE_COUNT_MIN = 4096;
 const ACTIVE_CONTROL_PHASE_NOISE_SPECTRUM_BIN_COUNT_MIN = 512;
 const ACTIVE_CONTROL_LOCK_ACQUISITION_TRIAL_COUNT_MIN = 100;
 const SWITCHING_RATE_HZ = 15e9;
+const FROZEN_TOPOLOGY_ARCHITECTURE_ID = "topology_optimized_lattice_tin";
+const FROZEN_TOPOLOGY_LAYER_COUNT = 447;
+const FROZEN_TOPOLOGY_SUPPORT_FRACTION = 0.26;
+const FROZEN_TOPOLOGY_ACTIVE_AREA_LOST_FRACTION = 0.08;
 const LAYER_SCALING_EFFICIENCY_MIN = 0.9;
 const LAYER_SCALING_SAMPLE_LAYER_COUNT_MIN = 447;
 const LAYER_SCALING_SAMPLE_INTERFACE_COUNT_MIN = 446;
@@ -600,6 +614,43 @@ const materialCouponSurface = (
     MATERIAL_COUPON_SURFACE_MAP_SAMPLE_COUNT_MIN,
     evidence.fabricationToleranceMapSampleCount,
   );
+  const stackCompatibilityCouponSampleCountMargin = lowerBoundMargin(
+    MATERIAL_COUPON_STACK_COMPATIBILITY_SAMPLE_COUNT_MIN,
+    evidence.stackCompatibilityCouponSampleCount,
+  );
+  const stackLayerCountMargin =
+    evidence.stackCompatibilityLayerCount == null || evidence.stackCompatibilityLayerCount <= 0
+      ? null
+      : round(
+          Math.min(
+            evidence.stackCompatibilityLayerCount / FROZEN_TOPOLOGY_LAYER_COUNT,
+            FROZEN_TOPOLOGY_LAYER_COUNT / evidence.stackCompatibilityLayerCount,
+          ),
+        );
+  const supportFractionMargin =
+    evidence.stackCompatibilitySupportFraction == null ||
+    evidence.stackCompatibilitySupportFraction <= 0
+      ? null
+      : round(
+          Math.min(
+            evidence.stackCompatibilitySupportFraction / FROZEN_TOPOLOGY_SUPPORT_FRACTION,
+            FROZEN_TOPOLOGY_SUPPORT_FRACTION / evidence.stackCompatibilitySupportFraction,
+          ),
+        );
+  const activeAreaLostFractionMargin =
+    evidence.stackCompatibilityActiveAreaLostFraction == null ||
+    evidence.stackCompatibilityActiveAreaLostFraction < 0
+      ? null
+      : evidence.stackCompatibilityActiveAreaLostFraction === FROZEN_TOPOLOGY_ACTIVE_AREA_LOST_FRACTION
+        ? 1
+        : round(
+            Math.min(
+              evidence.stackCompatibilityActiveAreaLostFraction /
+                FROZEN_TOPOLOGY_ACTIVE_AREA_LOST_FRACTION,
+              FROZEN_TOPOLOGY_ACTIVE_AREA_LOST_FRACTION /
+                evidence.stackCompatibilityActiveAreaLostFraction,
+            ),
+          );
   const couponSamplingComplete =
     tensileStressCouponSampleCountMargin != null &&
     tensileStressCouponSampleCountMargin >= 1 &&
@@ -616,7 +667,9 @@ const materialCouponSurface = (
     roughnessMapSampleCountMargin != null &&
     roughnessMapSampleCountMargin >= 1 &&
     fabricationToleranceMapSampleCountMargin != null &&
-    fabricationToleranceMapSampleCountMargin >= 1;
+    fabricationToleranceMapSampleCountMargin >= 1 &&
+    stackCompatibilityCouponSampleCountMargin != null &&
+    stackCompatibilityCouponSampleCountMargin >= 1;
   const fabricationToleranceMargin =
     evidence.fabricationToleranceMeters == null || evidence.fabricationToleranceMeters <= 0
       ? null
@@ -624,9 +677,26 @@ const materialCouponSurface = (
   const blockers = [
     ...(!measuredOrValidated(evidence.evidenceTier) ? ["material_coupon_tier_not_measured_or_validated"] : []),
     ...evidenceRefBlocker(evidence, "material_coupon_evidence_ref_missing"),
+    ...(evidence.architectureId == null ? ["candidate_stack_architecture_id_missing"] : []),
+    ...(evidence.architectureId != null &&
+    evidence.architectureId !== FROZEN_TOPOLOGY_ARCHITECTURE_ID
+      ? ["candidate_stack_architecture_id_mismatch"]
+      : []),
     ...(evidence.loadCaseRef == null ? ["candidate_stack_load_case_ref_missing"] : []),
     ...(evidence.layerStackCompatibilityRef == null
       ? ["candidate_stack_layer_compatibility_ref_missing"]
+      : []),
+    ...(evidence.topologyOptimizationRef == null
+      ? ["candidate_stack_topology_optimization_ref_missing"]
+      : []),
+    ...(evidence.depositionProcessRef == null
+      ? ["candidate_stack_deposition_process_ref_missing"]
+      : []),
+    ...(evidence.residualStressUniformityMapRef == null
+      ? ["candidate_stack_residual_stress_uniformity_map_ref_missing"]
+      : []),
+    ...(evidence.interlayerAdhesionProtocolRef == null
+      ? ["candidate_stack_interlayer_adhesion_protocol_ref_missing"]
       : []),
     ...(evidence.tensileStressCurveRef == null ? ["tensile_stress_curve_ref_missing"] : []),
     ...(evidence.fractureYieldCurveRef == null ? ["fracture_yield_curve_ref_missing"] : []),
@@ -697,6 +767,29 @@ const materialCouponSurface = (
             fabricationToleranceMapSampleCountMargin < 1
           ? ["fabrication_tolerance_map_sample_count_below_10000"]
           : []),
+    ...(evidence.stackCompatibilityCouponSampleCount == null
+      ? ["stack_compatibility_coupon_sample_count_missing"]
+      : !isPositiveInteger(evidence.stackCompatibilityCouponSampleCount)
+        ? ["stack_compatibility_coupon_sample_count_invalid"]
+        : stackCompatibilityCouponSampleCountMargin == null ||
+            stackCompatibilityCouponSampleCountMargin < 1
+          ? ["stack_compatibility_coupon_sample_count_below_5"]
+          : []),
+    ...(evidence.stackCompatibilityLayerCount == null
+      ? ["stack_compatibility_layer_count_missing"]
+      : evidence.stackCompatibilityLayerCount !== FROZEN_TOPOLOGY_LAYER_COUNT
+        ? ["stack_compatibility_layer_count_not_447"]
+        : []),
+    ...(supportFractionMargin == null
+      ? ["stack_compatibility_support_fraction_missing"]
+      : supportFractionMargin < 1
+        ? ["stack_compatibility_support_fraction_not_topology_0p26"]
+        : []),
+    ...(activeAreaLostFractionMargin == null
+      ? ["stack_compatibility_active_area_lost_fraction_missing"]
+      : activeAreaLostFractionMargin < 1
+        ? ["stack_compatibility_active_area_lost_fraction_not_topology_0p08"]
+        : []),
     ...(evidence.material !== "ultra_high_stress_tin" ? ["candidate_material_mismatch"] : []),
     ...(evidence.supportStressPa != null && !isPositiveFinite(evidence.supportStressPa)
       ? ["support_stress_invalid"]
@@ -800,10 +893,30 @@ const materialCouponSurface = (
       fabricationToleranceMeters: evidence.fabricationToleranceMeters,
       fabricationToleranceMapSampleCount: evidence.fabricationToleranceMapSampleCount ?? null,
       fabricationToleranceMapSampleCountMargin,
+      stackCompatibilityCouponSampleCount:
+        evidence.stackCompatibilityCouponSampleCount ?? null,
+      stackCompatibilityCouponSampleCountMargin,
+      stackCompatibilityLayerCount: evidence.stackCompatibilityLayerCount ?? null,
+      stackLayerCountMargin,
+      frozenTopologyLayerCount: FROZEN_TOPOLOGY_LAYER_COUNT,
+      stackCompatibilitySupportFraction:
+        evidence.stackCompatibilitySupportFraction ?? null,
+      supportFractionMargin,
+      frozenTopologySupportFraction: FROZEN_TOPOLOGY_SUPPORT_FRACTION,
+      stackCompatibilityActiveAreaLostFraction:
+        evidence.stackCompatibilityActiveAreaLostFraction ?? null,
+      activeAreaLostFractionMargin,
+      frozenTopologyActiveAreaLostFraction:
+        FROZEN_TOPOLOGY_ACTIVE_AREA_LOST_FRACTION,
       couponSamplingComplete: couponSamplingComplete ? 1 : 0,
       couponProvenanceRefsAvailable:
+        evidence.architectureId === FROZEN_TOPOLOGY_ARCHITECTURE_ID &&
         evidence.loadCaseRef != null &&
         evidence.layerStackCompatibilityRef != null &&
+        evidence.topologyOptimizationRef != null &&
+        evidence.depositionProcessRef != null &&
+        evidence.residualStressUniformityMapRef != null &&
+        evidence.interlayerAdhesionProtocolRef != null &&
         evidence.tensileStressCurveRef != null &&
         evidence.fractureYieldCurveRef != null &&
         evidence.cryogenicStateRef != null &&

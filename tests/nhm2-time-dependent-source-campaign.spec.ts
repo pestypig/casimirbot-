@@ -908,6 +908,14 @@ describe("NHM2 time-dependent source campaign", () => {
           "runs/candidate/nhm2-tile-source-authority-handoff.json",
         tileSourceOperatingBudgetReadiness:
           "runs/candidate/nhm2-tile-source-operating-budget-readiness.json",
+        layerStackMechanicalReceipt:
+          "runs/candidate/nhm2-layer-stack-mechanical-receipt.json",
+        layerStackSupportFractionSweep:
+          "runs/candidate/nhm2-layer-stack-support-fraction-sweep.json",
+        layerStackEngineeringArchitectureLoop:
+          "runs/candidate/nhm2-layer-stack-engineering-architecture-loop.json",
+        layerStackFullApparatusReceiptLoop:
+          "runs/candidate/nhm2-layer-stack-full-apparatus-receipt-loop.json",
       },
     });
 
@@ -916,6 +924,18 @@ describe("NHM2 time-dependent source campaign", () => {
     );
     expect(artifact.artifactRefs.tileSourceAuthorityHandoff).toBe(
       "runs/candidate/nhm2-tile-source-authority-handoff.json",
+    );
+    expect(artifact.artifactRefs.layerStackMechanicalReceipt).toBe(
+      "runs/candidate/nhm2-layer-stack-mechanical-receipt.json",
+    );
+    expect(artifact.artifactRefs.layerStackSupportFractionSweep).toBe(
+      "runs/candidate/nhm2-layer-stack-support-fraction-sweep.json",
+    );
+    expect(artifact.artifactRefs.layerStackEngineeringArchitectureLoop).toBe(
+      "runs/candidate/nhm2-layer-stack-engineering-architecture-loop.json",
+    );
+    expect(artifact.artifactRefs.layerStackFullApparatusReceiptLoop).toBe(
+      "runs/candidate/nhm2-layer-stack-full-apparatus-receipt-loop.json",
     );
     expect(artifact.summary.campaignPass).toBe(false);
     expect(artifact.claimBoundary.physicalViabilityClaimAllowed).toBe(false);

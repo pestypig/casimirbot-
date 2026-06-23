@@ -1245,7 +1245,14 @@ const committedRouteForbiddenTerminalKinds = (payload: Record<string, unknown>):
       .map(readString)
       .filter((entry): entry is string => Boolean(entry)),
     requiredTerminalKind: readString(readRecord(readRecord(payload.committed_ask_route)?.canonical_goal)?.required_terminal_kind),
-  }).forbidden;
+  }).forbidden.filter((kind) => {
+    if (kind !== "doc_evidence_synthesis_answer") return true;
+    const canonicalGoal = readRecord(payload.canonical_goal_frame);
+    return !(
+      readString(canonicalGoal?.goal_kind) === "doc_evidence_synthesis" &&
+      readString(canonicalGoal?.required_terminal_kind) === "doc_evidence_synthesis_answer"
+    );
+  });
 
 const existingDocEvidenceSynthesisTerminal = (
   payload: Record<string, unknown>,
@@ -1296,6 +1303,14 @@ const routeContractAllowsTerminalKind = (
     return compoundPolicy.allowed.length === 0 ||
       compoundPolicy.allowed.includes(kind) ||
       (kind === "doc_evidence_synthesis_answer" && compoundPolicy.allowed.includes("doc_evidence_synthesis"));
+  }
+  const canonicalGoal = readRecord(payload.canonical_goal_frame);
+  if (
+    kind === "doc_evidence_synthesis_answer" &&
+    readString(canonicalGoal?.goal_kind) === "doc_evidence_synthesis" &&
+    readString(canonicalGoal?.required_terminal_kind) === "doc_evidence_synthesis_answer"
+  ) {
+    return true;
   }
   const committedRoute = readRecord(payload.committed_ask_route);
   if (committedRoute?.schema === HELIX_COMMITTED_ASK_ROUTE_SCHEMA) {

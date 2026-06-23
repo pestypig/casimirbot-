@@ -309,7 +309,7 @@ const measurementTargetsForTest = (
       return {
         requiredEvidenceTier: "measured_or_validated_simulation",
         requiredCurveAndMapRefCount: 7,
-        requiredCampaignCompatibilityRefCount: 2,
+        requiredCampaignCompatibilityRefCount: 7,
         requiredMaterialResponseRefCount: 2,
       };
     case "candidate_stack_load_case":

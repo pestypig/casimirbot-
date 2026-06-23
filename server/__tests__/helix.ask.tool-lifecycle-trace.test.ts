@@ -1367,6 +1367,106 @@ describe("Helix Ask tool lifecycle trace", () => {
     });
   });
 
+  it("does not count explicitly non-authoritative terminal records as rail proof", () => {
+    const payload: Record<string, unknown> = {
+      tool_call_admission_decision: {
+        schema: "helix.tool_call_admission_decision.v1",
+        turn_id: "ask:test:invalid-terminal-authority",
+        source_target: "docs_viewer",
+        required: true,
+        admitted_tool_families: ["docs_viewer"],
+        requested_capability: "docs-viewer.summarize_doc",
+        requested_capability_family: "docs_viewer",
+        required_observation_kinds_for_requested_capability: ["observation_review"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      capability_plan: {
+        schema: "helix.capability_plan.v1",
+        turn_id: "ask:test:invalid-terminal-authority",
+        capability_family: "docs_viewer",
+        selected_capability: "docs-viewer.summarize_doc",
+        requested_capability: "docs-viewer.summarize_doc",
+        admission_status: "admitted",
+      },
+      runtime_tool_call: {
+        tool_call_id: "tool:invalid-terminal-authority",
+        capability_key: "docs-viewer.summarize_doc",
+        status: "completed",
+      },
+      tool_lifecycle_trace: {
+        schema: "helix.tool_lifecycle_trace.v1",
+        requested_capability: "docs-viewer.summarize_doc",
+        admitted_capability: "docs-viewer.summarize_doc",
+        executed_capability: "docs-viewer.summarize_doc",
+        lifecycle_stage: "reentered_solver",
+        terminal_eligible: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      tool_followup_decision: {
+        schema: "helix.tool_followup_decision.v1",
+        next_action: "terminal_answer",
+        evidence_reentered: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_artifact_kind: "doc_summary",
+      terminal_presentation: { terminal_artifact_kind: "doc_summary" },
+      terminal_answer_authority: {
+        terminal_artifact_kind: "doc_summary",
+        server_authoritative: false,
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "doc_summary:invalid-terminal-authority",
+          kind: "doc_summary",
+          payload: {
+            schema: "helix.doc_summary.v1",
+            summary: "Summarized the document.",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+        {
+          artifact_id: "observation_review:invalid-terminal-authority",
+          kind: "observation_review",
+          payload: {
+            schema: "helix.observation_review.v1",
+            summary: "Summarized the document.",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      ],
+    };
+
+    const index = buildArtifactQueryIndex({ turnId: "ask:test:invalid-terminal-authority", payload });
+
+    expect(index.tool_turn_chain_audit).toMatchObject({
+      requested_capability: "docs-viewer.summarize_doc",
+      selected_capability: "docs-viewer.summarize_doc",
+      executed_capability: "docs-viewer.summarize_doc",
+      materialized_terminal_artifact_kind: "doc_summary",
+      terminal_authority_kind: null,
+      terminal_authority_proof_source: null,
+      terminal_authority_proven: false,
+      visible_terminal_kind: "doc_summary",
+      visible_projection_proven: true,
+      rail_status: "broken",
+      rail_failure_code: "terminal_authority_missing",
+    });
+    expect(index.codex_parity_agent_spine_rail_table).toMatchObject({
+      selected_terminal_kind: null,
+      terminal_authority_proof_source: null,
+      terminal_authority_proven: false,
+      visible_terminal_kind: "doc_summary",
+      visible_projection_proven: true,
+      rail_status: "broken",
+      rail_failure_code: "terminal_authority_missing",
+    });
+  });
+
   it("classifies repeated weak repo evidence as an evidence re-entry progress failure", () => {
     const payload: Record<string, unknown> = {
       terminal_error_code: "repo_evidence_weak_after_repair",
@@ -2084,6 +2184,181 @@ describe("Helix Ask tool lifecycle trace", () => {
       repair_target: "draft_builder",
       codex_parity_class: "goal_contract_mismatch",
       rail_failure_code: "support_refs_missing",
+    });
+  });
+
+  it("does not count support refs from explicitly non-authoritative terminal records", () => {
+    const payload: Record<string, unknown> = {
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "calculator_solve",
+        required_terminal_kind: "calculator_stream_result",
+      },
+      capability_plan: {
+        schema: "helix.capability_plan.v1",
+        turn_id: "ask:test:invalid-authority-support-refs",
+        capability_family: "calculator",
+        requested_action: "scientific-calculator.solve_expression",
+        admission_status: "admitted",
+      },
+      capability_result: {
+        schema: "helix.capability_result.v1",
+        turn_id: "ask:test:invalid-authority-support-refs",
+        status: "succeeded",
+        receipt_refs: ["calculator_receipt:invalid-authority-support"],
+        evidence_refs: ["calculator_result_validation:invalid-authority-support"],
+        selected_for_answer: true,
+        reentered_solver: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      tool_lifecycle_trace: {
+        schema: "helix.tool_lifecycle_trace.v1",
+        requested_capability: "scientific-calculator.solve_expression",
+        admitted_capability: "scientific-calculator.solve_expression",
+        executed_capability: "scientific-calculator.solve_expression",
+        lifecycle_stage: "reentered_solver",
+        status: "completed",
+        observation_refs: ["calculator_receipt:invalid-authority-support"],
+        evidence_refs: ["calculator_result_validation:invalid-authority-support"],
+      },
+      runtime_tool_call: {
+        tool_call_id: "tool:invalid-authority-support",
+        capability_key: "scientific-calculator.solve_expression",
+        status: "completed",
+      },
+      final_answer_draft: {
+        schema: "helix.final_answer_draft.v1",
+        draft_id: "ask:test:invalid-authority-support-refs:final_answer_draft",
+        support_refs: [],
+      },
+      terminal_artifact_kind: "calculator_stream_result",
+      terminal_authority_single_writer: {
+        schema: "helix.terminal_authority_single_writer_result.v1",
+        selected_terminal_artifact_kind: "calculator_stream_result",
+        support_refs: ["calculator_receipt:invalid-authority-support"],
+        support_refs_count: 1,
+        server_authoritative: false,
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        terminal_artifact_kind: "calculator_stream_result",
+      },
+      current_turn_artifact_ledger: [
+        { artifact_id: "calculator_receipt:invalid-authority-support", kind: "calculator_receipt", payload: { schema: "helix.calculator_receipt.v1" } },
+        { artifact_id: "calculator_subgoal_receipt:invalid-authority-support", kind: "calculator_subgoal_receipt", payload: { schema: "helix.calculator_subgoal_receipt.v1" } },
+        { artifact_id: "calculator_result_trace:invalid-authority-support", kind: "calculator_result_trace", payload: { schema: "helix.calculator_result_trace.v1" } },
+        { artifact_id: "calculator_result_validation:invalid-authority-support", kind: "calculator_result_validation", payload: { schema: "helix.calculator_result_validation.v1" } },
+        { artifact_id: "workstation_tool_evaluation:invalid-authority-support", kind: "workstation_tool_evaluation", payload: { schema: "helix.workstation_tool_evaluation.v1" } },
+      ],
+    };
+
+    refreshToolLifecycleRecords({ turnId: "ask:test:invalid-authority-support-refs", payload });
+    const index = buildArtifactQueryIndex({ turnId: "ask:test:invalid-authority-support-refs", payload });
+
+    expect(index.tool_turn_chain_audit).toMatchObject({
+      selected_capability: "scientific-calculator.solve_expression",
+      executed_capability: "scientific-calculator.solve_expression",
+      final_answer_draft_ref: "ask:test:invalid-authority-support-refs:final_answer_draft",
+      support_refs_count: 0,
+      terminal_authority_kind: null,
+      terminal_authority_proven: false,
+      rail_status: "broken",
+      rail_failure_code: "support_refs_missing",
+    });
+    expect(index.codex_parity_agent_spine_rail_table).toMatchObject({
+      terminal_authority_proven: false,
+      rail_status: "broken",
+      rail_failure_code: "support_refs_missing",
+    });
+  });
+
+  it("does not count blocked draft selection materialization as terminal rail proof", () => {
+    const payload: Record<string, unknown> = {
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "calculator_solve",
+        required_terminal_kind: "calculator_stream_result",
+      },
+      capability_plan: {
+        schema: "helix.capability_plan.v1",
+        turn_id: "ask:test:blocked-draft-selection-proof",
+        capability_family: "calculator",
+        requested_action: "scientific-calculator.solve_expression",
+        admission_status: "admitted",
+      },
+      capability_result: {
+        schema: "helix.capability_result.v1",
+        turn_id: "ask:test:blocked-draft-selection-proof",
+        status: "succeeded",
+        receipt_refs: ["calculator_receipt:blocked-draft-selection"],
+        evidence_refs: ["calculator_result_validation:blocked-draft-selection"],
+        selected_for_answer: true,
+        reentered_solver: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      tool_lifecycle_trace: {
+        schema: "helix.tool_lifecycle_trace.v1",
+        requested_capability: "scientific-calculator.solve_expression",
+        admitted_capability: "scientific-calculator.solve_expression",
+        executed_capability: "scientific-calculator.solve_expression",
+        lifecycle_stage: "reentered_solver",
+        status: "completed",
+        observation_refs: ["calculator_receipt:blocked-draft-selection"],
+        evidence_refs: ["calculator_result_validation:blocked-draft-selection"],
+      },
+      runtime_tool_call: {
+        tool_call_id: "tool:blocked-draft-selection",
+        capability_key: "scientific-calculator.solve_expression",
+        status: "completed",
+      },
+      final_answer_draft: {
+        schema: "helix.final_answer_draft.v1",
+        draft_id: "ask:test:blocked-draft-selection-proof:final_answer_draft",
+        support_refs: [],
+      },
+      final_answer_draft_selection: {
+        schema: "helix.final_answer_draft_selection.v1",
+        materialized_terminal_artifact_kind: "calculator_stream_result",
+        materialized_terminal_artifact_ref: "calculator_stream_result:blocked-draft-selection",
+        support_refs: ["calculator_result_validation:blocked-draft-selection"],
+        support_refs_count: 1,
+        blocked_reason: "compound_subgoal_support_refs_missing",
+      },
+      route_terminal_materialization: {
+        schema: "helix.route_terminal_materialization.v1",
+        materialization_attempted: true,
+        materialization_ok: false,
+        materialization_blocked_reason: "compound_subgoal_support_refs_missing",
+      },
+      current_turn_artifact_ledger: [
+        { artifact_id: "calculator_receipt:blocked-draft-selection", kind: "calculator_receipt", payload: { schema: "helix.calculator_receipt.v1" } },
+        { artifact_id: "calculator_subgoal_receipt:blocked-draft-selection", kind: "calculator_subgoal_receipt", payload: { schema: "helix.calculator_subgoal_receipt.v1" } },
+        { artifact_id: "calculator_result_trace:blocked-draft-selection", kind: "calculator_result_trace", payload: { schema: "helix.calculator_result_trace.v1" } },
+        { artifact_id: "calculator_result_validation:blocked-draft-selection", kind: "calculator_result_validation", payload: { schema: "helix.calculator_result_validation.v1" } },
+        { artifact_id: "workstation_tool_evaluation:blocked-draft-selection", kind: "workstation_tool_evaluation", payload: { schema: "helix.workstation_tool_evaluation.v1" } },
+      ],
+    };
+
+    refreshToolLifecycleRecords({ turnId: "ask:test:blocked-draft-selection-proof", payload });
+    const index = buildArtifactQueryIndex({ turnId: "ask:test:blocked-draft-selection-proof", payload });
+
+    expect(index.tool_turn_chain_audit).toMatchObject({
+      selected_capability: "scientific-calculator.solve_expression",
+      executed_capability: "scientific-calculator.solve_expression",
+      final_answer_draft_ref: "ask:test:blocked-draft-selection-proof:final_answer_draft",
+      support_refs_count: 0,
+      materialized_terminal_artifact_kind: null,
+      terminal_authority_kind: null,
+      terminal_authority_proven: false,
+      rail_status: "broken",
+      rail_failure_code: "terminal_not_materialized",
+    });
+    expect(index.codex_parity_agent_spine_rail_table).toMatchObject({
+      terminal_authority_proven: false,
+      rail_status: "broken",
+      rail_failure_code: "terminal_not_materialized",
     });
   });
 

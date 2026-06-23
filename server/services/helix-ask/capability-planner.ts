@@ -211,6 +211,12 @@ const requestedActionFor = (
   const prompt = normalize(promptText);
   if (isTheoryFrontierVectorFieldTracePrompt(promptText)) return HELIX_THEORY_FRONTIER_VECTOR_FIELD_TRACE_CAPABILITY;
   if (family === "docs") {
+    if (
+      /\b(?:check|use|from|in|inside|look\s+in|look\s+at|consult|according\s+to|where|find|locate|reported|stated|specified|listed|table|row|source|cite|citation|evidence|white\s*paper|whitepaper|paper|document|doc|docs|report|memo)\b/i.test(promptText) &&
+      /\b(?:white\s*paper|whitepaper|paper|document|doc|docs|report|memo|NHM[-\s]?2|casimir|tile|load[-\s]?bearing|lbs?|pounds?|newtons?)\b/i.test(promptText)
+    ) {
+      return "docs-viewer.search_docs";
+    }
     if (/\b(?:summari[sz]e|summary|overview|takeaways?|gist|describe|explain)\b/.test(prompt)) {
       if (/(?:^|[\s"'(])(?:\/docs\/|docs[\\/])\S+/.test(prompt) || /\b(?:current|active|this|that)\s+(?:doc|document|paper)\b/.test(prompt)) {
         return "docs-viewer.summarize_doc";

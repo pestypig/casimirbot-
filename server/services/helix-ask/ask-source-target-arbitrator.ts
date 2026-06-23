@@ -189,6 +189,17 @@ const isAffirmativeDocsSourceRequirementPrompt = (prompt: string): boolean =>
     /\b(?:use|using|from)\s+(?:the\s+)?docs?\s+only\b/i.test(prompt)
   );
 
+const isAffirmativeLocalDocumentEvidencePrompt = (prompt: string): boolean => {
+  if (isExplicitDocsPathComparePrompt(prompt) || isExplicitDocsPathLocateSynthesisPrompt(prompt)) return true;
+  const documentCue = /\b(?:white\s*paper|whitepaper|paper|document|doc|docs|report|memo)\b/i.test(prompt);
+  if (!documentCue) return false;
+  const evidenceCue =
+    /\b(?:check|use|from|in|inside|look\s+in|look\s+at|consult|according\s+to|where|find|locate|reported|stated|specified|listed|table|row|source|cite|citation|evidence|white\s*paper)\b/i.test(prompt);
+  const valueCue =
+    /\b(?:load[-\s]?bearing|lbs?|pounds?|numeric|value|capacity|spec(?:ification)?s?|engineering|parameter|measurement|reported|stated)\b/i.test(prompt);
+  return evidenceCue && (valueCue || /\b(?:NHM[-\s]?2|casimir|tile)\b/i.test(prompt));
+};
+
 const isAffirmativeDocsSearchPrompt = (prompt: string): boolean =>
   hasAffirmativeDocsViewerSearchCue(prompt);
 
@@ -642,6 +653,44 @@ export function arbitrateAskSourceTarget(input: {
       suppressedRoutes: ["internet_search_lookup", "scholarly_research_lookup", "repo_code_evidence_question", "situation_context_question", "visual_deictic", "visual_frame_evidence", "model_only_concept", "no_tool_direct"],
       precedenceReason: "active_doc_identity_source_target",
       confidence: sourceBound ? 0.99 : 0.94,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
+  if (selectedEvidenceCandidate?.target_source === "docs_viewer") {
+    const localDocumentEvidence = isAffirmativeLocalDocumentEvidencePrompt(prompt);
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "docs_viewer",
+      targetKind: "docs_viewer",
+      strength: selectedEvidenceCandidate.strength,
+      explicitCues: selectedEvidenceCandidate.reason_codes,
+      reasons: [
+        localDocumentEvidence
+          ? "explicit_local_document_evidence_source_target"
+          : "evidence_target_arbitration_selected_docs_viewer",
+        ...selectedEvidenceCandidate.reason_codes,
+      ],
+      requestedOutputs: selectedEvidenceCandidate.requested_outputs.length > 0
+        ? selectedEvidenceCandidate.requested_outputs
+        : ["file_path", "line_backed_source", "typed_failure"],
+      suppressedRoutes: [
+        "repo_code_evidence_question",
+        "internet_search_lookup",
+        "scholarly_research_lookup",
+        "live_source_mailbox",
+        "situation_context_question",
+        "visual_deictic",
+        "visual_frame_evidence",
+        "active_doc_identity",
+        "model_only_concept",
+        "no_tool_direct",
+      ],
+      precedenceReason: localDocumentEvidence
+        ? "explicit_local_document_evidence_source_target"
+        : "evidence_target_arbitration_selected_docs_viewer",
+      confidence: selectedEvidenceCandidate.score,
       allowClientShortcut: false,
       allowNoToolDirect: false,
     });

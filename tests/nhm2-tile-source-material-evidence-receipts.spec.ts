@@ -77,6 +77,8 @@ import {
 } from "../shared/contracts/nhm2-tile-source-operating-budget-readiness.v1";
 import { buildNhm2TileSourcePhysicalValidationPlan } from "../shared/contracts/nhm2-tile-source-physical-validation-plan.v1";
 import { buildNhm2LayerStackMechanicalReceipt } from "../shared/contracts/nhm2-layer-stack-mechanical-receipt.v1";
+import { buildNhm2LayerStackSupportFractionSweep } from "../shared/contracts/nhm2-layer-stack-support-fraction-sweep.v1";
+import { buildNhm2LayerStackFullApparatusReceiptLoop } from "../shared/contracts/nhm2-layer-stack-full-apparatus-receipt-loop.v1";
 import {
   buildNhm2TileSourceMaterialEvidenceTemplate,
   publishNhm2TileSourceMaterialEvidenceReceipts,
@@ -117,8 +119,15 @@ const passingEvidence: BuildNhm2TileSourceMaterialEvidenceReceiptsInput = {
   materialCoupon: {
     evidenceTier: "measured",
     evidenceRef: "receipt://coupon/tin/cryogenic-4k-v1",
+    architectureId: "topology_optimized_lattice_tin",
     loadCaseRef: "receipt://coupon/tin/447-layer-load-case-8nm-4k-15ghz-v1",
     layerStackCompatibilityRef: "receipt://coupon/tin/447-layer-stack-compatibility-v1",
+    topologyOptimizationRef: "receipt://coupon/tin/topology-optimized-lattice-v1",
+    depositionProcessRef: "receipt://coupon/tin/deposition-process-v1",
+    residualStressUniformityMapRef:
+      "receipt://coupon/tin/residual-stress-uniformity-map-v1",
+    interlayerAdhesionProtocolRef:
+      "receipt://coupon/tin/interlayer-adhesion-protocol-v1",
     tensileStressCurveRef: "receipt://coupon/tin/tensile-stress-curve-4k-v1",
     fractureYieldCurveRef: "receipt://coupon/tin/fracture-yield-curve-4k-v1",
     cryogenicStateRef: "receipt://coupon/tin/cryogenic-state-4k-v1",
@@ -134,6 +143,10 @@ const passingEvidence: BuildNhm2TileSourceMaterialEvidenceReceiptsInput = {
     conductivityTemperatureSampleCount: 32,
     roughnessMapSampleCount: 20000,
     fabricationToleranceMapSampleCount: 20000,
+    stackCompatibilityCouponSampleCount: 8,
+    stackCompatibilityLayerCount: 447,
+    stackCompatibilitySupportFraction: 0.26,
+    stackCompatibilityActiveAreaLostFraction: 0.08,
     material: "ultra_high_stress_tin",
     measuredTensileStressPa: 2.3e9,
     fractureOrYieldStressPa: 2.1e9,
@@ -1291,10 +1304,11 @@ describe("NHM2 tile source material evidence receipts", () => {
           expect.objectContaining({
             campaignDomain: "material_coupon_behavior",
             measurementId: "coupon_stack_compatibility",
-            target: "2 compatibility refs: load case and layer stack",
+            target:
+              "7 compatibility items: architecture id, load case, layer stack, topology optimization, deposition process, residual stress uniformity, and interlayer adhesion protocol",
             requiredCorrectionKey: "missingCampaignCompatibilityRefCount",
             requiredTargetKey: "requiredCampaignCompatibilityRefCount",
-            requiredTargetValue: 2,
+            requiredTargetValue: 7,
             requiredTargetStatus: "available",
           }),
           expect.objectContaining({
@@ -3052,6 +3066,148 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(report.claimBoundary.falsificationReportOnly).toBe(true);
   });
 
+  it("surfaces the support-fraction sweep no-overlap map as a falsifying campaign blocker", () => {
+    const receipts = buildNhm2TileSourceMaterialEvidenceReceipts(passingEvidence);
+    const operatingBudgetReadiness = buildPassingOperatingBudgetReadiness(receipts);
+    const plan = buildNhm2TileSourcePhysicalValidationPlan({
+      generatedAt,
+      materialEvidenceReceipts: receipts,
+      operatingBudgetReadiness,
+      downstreamGateStatuses: allDownstreamPass,
+      downstreamGateArtifactRefs: allDownstreamArtifactRefs,
+    });
+    const roadmap = buildNhm2TileSourceEvidenceGapRoadmap({
+      materialEvidenceReceipts: receipts,
+      physicalValidationPlan: plan,
+      operatingBudgetReadiness,
+    });
+    const supportFractionSweep = buildNhm2LayerStackSupportFractionSweep({ generatedAt });
+    const report = buildNhm2TileSourceFalsificationReport({
+      materialEvidenceReceipts: receipts,
+      physicalValidationPlan: plan,
+      evidenceGapRoadmap: roadmap,
+      layerStackSupportFractionSweep: supportFractionSweep,
+      layerStackSupportFractionSweepRef: "artifact://support-fraction-sweep",
+      operatingBudgetReadiness,
+    });
+    const sweepRow = report.blockerRows.find(
+      (row) => row.source === "layer_stack_support_fraction_sweep",
+    );
+    const fatigueDecision = report.goNoGoMatrix.find(
+      (entry) => entry.campaignDomain === "fatigue_layer_scaling",
+    );
+
+    expect(isNhm2TileSourceFalsificationReport(report)).toBe(true);
+    expect(report.disposition.reportStatus).toBe("falsified");
+    expect(report.sourceRefs.layerStackSupportFractionSweepRef).toBe(
+      "artifact://support-fraction-sweep",
+    );
+    expect(sweepRow).toMatchObject({
+      blockerId: "stress_retention_overlap_missing",
+      source: "layer_stack_support_fraction_sweep",
+      surfaceId: "layer_scaling",
+      status: "falsifying",
+      campaignDomain: "fatigue_layer_scaling",
+      numericalMargin: 0.25,
+      falsifiesCurrentCandidate: true,
+      evidenceRef: "artifact://support-fraction-sweep",
+    });
+    expect(sweepRow?.numericalMargins).toMatchObject({
+      feasibleWindowExists: false,
+      minimumSupportFractionForStress: 0.2,
+      maximumSupportFractionForSourceRetention: 0.05,
+      requiredSupportFractionShift: 0.15000000000000002,
+      bestCandidateRowCount: 0,
+      sweepRowCount: 36,
+    });
+    expect(sweepRow?.requiredCorrections).toMatchObject({
+      minimumSupportFractionForStress: 0.2,
+      maximumSupportFractionForSourceRetention: 0.05,
+      requiredSupportFractionShift: 0.15000000000000002,
+      decoupleSupportLoadFromActiveSourceArea: true,
+    });
+    expect(sweepRow?.requiredChange).toContain("decouple load bearing");
+    expect(fatigueDecision).toMatchObject({
+      decision: "no_go",
+      evidenceState: "failing_margin",
+      firstBlocker: "stress_retention_overlap_missing",
+      requiredCorrectionKeys: expect.arrayContaining([
+        "layer_scaling.requiredSupportFractionShift",
+        "layer_scaling.decoupleSupportLoadFromActiveSourceArea",
+      ]),
+    });
+    expect(report.summary.physicalViabilityClaimAllowed).toBe(false);
+  });
+
+  it("surfaces the topology architecture receipt loop as a review lead, not tensor authority", () => {
+    const receipts = buildNhm2TileSourceMaterialEvidenceReceipts(passingEvidence);
+    const operatingBudgetReadiness = buildPassingOperatingBudgetReadiness(receipts);
+    const plan = buildNhm2TileSourcePhysicalValidationPlan({
+      generatedAt,
+      materialEvidenceReceipts: receipts,
+      operatingBudgetReadiness,
+      downstreamGateStatuses: allDownstreamPass,
+      downstreamGateArtifactRefs: allDownstreamArtifactRefs,
+    });
+    const roadmap = buildNhm2TileSourceEvidenceGapRoadmap({
+      materialEvidenceReceipts: receipts,
+      physicalValidationPlan: plan,
+      operatingBudgetReadiness,
+    });
+    const receiptLoop = buildNhm2LayerStackFullApparatusReceiptLoop({ generatedAt });
+    const report = buildNhm2TileSourceFalsificationReport({
+      materialEvidenceReceipts: receipts,
+      physicalValidationPlan: plan,
+      evidenceGapRoadmap: roadmap,
+      layerStackFullApparatusReceiptLoop: receiptLoop,
+      layerStackFullApparatusReceiptLoopRef: "artifact://full-apparatus-receipt-loop",
+      operatingBudgetReadiness,
+    });
+    const architectureRow = report.blockerRows.find(
+      (row) => row.source === "layer_stack_full_apparatus_receipt_loop",
+    );
+
+    expect(isNhm2TileSourceFalsificationReport(report)).toBe(true);
+    expect(report.disposition.reportStatus).toBe("review");
+    expect(report.sourceRefs.layerStackFullApparatusReceiptLoopRef).toBe(
+      "artifact://full-apparatus-receipt-loop",
+    );
+    expect(architectureRow).toMatchObject({
+      blockerId:
+        "architecture:topology_optimized_lattice_tin:material_coupon_receipt_missing",
+      source: "layer_stack_full_apparatus_receipt_loop",
+      surfaceId: "material_coupon",
+      status: "review",
+      campaignDomain: "material_coupon_behavior",
+      numericalMargin: 0,
+      marginUnit: "readiness_ratio",
+      falsifiesCurrentCandidate: false,
+      evidenceRef: "artifact://full-apparatus-receipt-loop",
+    });
+    expect(architectureRow?.numericalMargins).toMatchObject({
+      evidenceReadinessScore: 0,
+      sourceRetention: 0.7038,
+      supportStressMPa: 545.707087858,
+      pullInMargin: 1.31563018682,
+      receiptSurfaceCount: 7,
+      missingReceiptSurfaceCount: 7,
+      tensorTermCoverageCount: 0,
+    });
+    expect(architectureRow?.requiredCorrections).toMatchObject({
+      evidenceReadinessScore: 0,
+      sourceRetention: 0.7038,
+      supportStressMPa: 545.707087858,
+      pullInMargin: 1.31563018682,
+      missingReceiptSurfaceCount: 7,
+      tensorTermCoverageCount: 0,
+    });
+    expect(architectureRow?.requiredChange).toContain(
+      "architecture=topology_optimized_lattice_tin",
+    );
+    expect(report.summary.physicalViabilityClaimAllowed).toBe(false);
+    expect(report.claimBoundary.sourceCandidateRequiresFullApparatusTensor).toBe(true);
+  });
+
   it("builds a falsification report with quantitative force-gap no-go margins", () => {
     const failingForceGapEvidence = {
       evidenceTier: "measured" as const,
@@ -3619,7 +3775,7 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(provenance?.measurementTargets).toMatchObject({
       requiredEvidenceTier: "measured_or_validated_simulation",
       requiredCurveAndMapRefCount: 7,
-      requiredCampaignCompatibilityRefCount: 2,
+      requiredCampaignCompatibilityRefCount: 7,
       requiredMaterialResponseRefCount: 2,
     });
     expect(provenance?.blocksCampaignDomains).toEqual(
@@ -3634,8 +3790,16 @@ describe("NHM2 tile source material evidence receipts", () => {
       materialCoupon: {
         evidenceTier: "measured",
         evidenceRef: "receipt://coupon/tin/under-strength-v1",
+        architectureId: "topology_optimized_lattice_tin",
         loadCaseRef: "receipt://coupon/tin/under-strength-load-case-v1",
         layerStackCompatibilityRef: "receipt://coupon/tin/under-strength-stack-compatibility-v1",
+        topologyOptimizationRef:
+          "receipt://coupon/tin/under-strength-topology-optimization-v1",
+        depositionProcessRef: "receipt://coupon/tin/under-strength-deposition-process-v1",
+        residualStressUniformityMapRef:
+          "receipt://coupon/tin/under-strength-residual-stress-map-v1",
+        interlayerAdhesionProtocolRef:
+          "receipt://coupon/tin/under-strength-interlayer-adhesion-v1",
         tensileStressCurveRef: "receipt://coupon/tin/under-strength-tensile-curve-v1",
         fractureYieldCurveRef: "receipt://coupon/tin/under-strength-fracture-yield-curve-v1",
         cryogenicStateRef: "receipt://coupon/tin/under-strength-cryogenic-state-v1",
@@ -3655,6 +3819,10 @@ describe("NHM2 tile source material evidence receipts", () => {
         materialResponseFrequencyHz: 15e9,
         dielectricResponseTemperatureK: 4,
         conductivityTemperatureK: 4,
+        stackCompatibilityCouponSampleCount: 8,
+        stackCompatibilityLayerCount: 447,
+        stackCompatibilitySupportFraction: 0.26,
+        stackCompatibilityActiveAreaLostFraction: 0.08,
         dielectricLossTangent: 0.002,
         conductivitySiemensPerMeter: 1.2e6,
         roughnessRmsMeters: 5e-11,
@@ -3686,15 +3854,23 @@ describe("NHM2 tile source material evidence receipts", () => {
 
     expect(isNhm2TileSourceMaterialCouponOperatingBudget(budget)).toBe(true);
     expect(budget.operatingTargets.material).toBe("ultra_high_stress_tin");
+    expect(budget.operatingTargets.architectureId).toBe("topology_optimized_lattice_tin");
     expect(budget.operatingTargets.layerCount).toBe(447);
+    expect(budget.operatingTargets.supportFraction).toBe(0.26);
+    expect(budget.operatingTargets.activeAreaLostFraction).toBe(0.08);
     expect(budget.operatingTargets.operatingTemperatureK).toBe(4);
     expect(budget.operatingTargets.campaignLoadCaseRefRequired).toBe(true);
+    expect(budget.operatingTargets.topologyOptimizationRefRequired).toBe(true);
+    expect(budget.operatingTargets.depositionProcessRefRequired).toBe(true);
+    expect(budget.operatingTargets.residualStressUniformityMapRefRequired).toBe(true);
+    expect(budget.operatingTargets.interlayerAdhesionProtocolRefRequired).toBe(true);
     expect(budget.operatingTargets.supportStressPa).toBe(5.45707087858e8);
     expect(budget.operatingTargets.requiredFractureOrYieldStressPa).toBeCloseTo(1.091414175716e9);
     expect(budget.operatingTargets.couponRequiredCycleCount).toBe(1e9);
     expect(budget.operatingTargets.fabricationToleranceMaxMeters).toBe(5e-10);
     expect(budget.operatingTargets.materialResponseFrequencyHz).toBe(15e9);
     expect(budget.operatingTargets.mechanicalCouponSampleCountMin).toBe(5);
+    expect(budget.operatingTargets.stackCompatibilityCouponSampleCountMin).toBe(5);
     expect(budget.operatingTargets.cryogenicCycleSampleCountMin).toBe(10);
     expect(budget.operatingTargets.materialResponseSweepSampleCountMin).toBe(16);
     expect(budget.operatingTargets.surfaceMapSampleCountMin).toBe(10000);
@@ -3711,7 +3887,7 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.requiredCorrections.roughnessRmsReductionMeters).toBeNull();
     expect(budget.requiredCorrections.fabricationToleranceReductionMeters).toBeNull();
     expect(budget.requiredCorrections.missingCurveAndMapRefCount).toBe(7);
-    expect(budget.requiredCorrections.missingCampaignCompatibilityRefCount).toBe(2);
+    expect(budget.requiredCorrections.missingCampaignCompatibilityRefCount).toBe(7);
     expect(budget.requiredCorrections.missingMaterialResponseRefCount).toBe(2);
     expect(budget.requiredCorrections.materialResponseNumericValuesAvailable).toBe(false);
     expect(budget.requiredCorrections.mechanicalCouponSampleCountMin).toBe(5);
@@ -3740,6 +3916,11 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.summary.firstBlocker).toBe("none");
     expect(budget.derivedOperatingBudget.curveAndMapRefsAvailable).toBe(true);
     expect(budget.derivedOperatingBudget.campaignCompatibilityRefsAvailable).toBe(true);
+    expect(budget.derivedOperatingBudget.architectureCompatibilityRefsAvailable).toBe(true);
+    expect(budget.derivedOperatingBudget.architectureIdMatches).toBe(true);
+    expect(budget.derivedOperatingBudget.stackLayerCountMargin).toBe(1);
+    expect(budget.derivedOperatingBudget.supportFractionMargin).toBe(1);
+    expect(budget.derivedOperatingBudget.activeAreaLostFractionMargin).toBe(1);
     expect(budget.suppliedMaterialCouponEvidence.tensileStressCurveRef).toBe(
       "receipt://coupon/tin/tensile-stress-curve-4k-v1",
     );
@@ -3752,6 +3933,7 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.derivedOperatingBudget.conductivityTemperatureMargin).toBe(1);
     expect(budget.derivedOperatingBudget.materialResponseValuesAvailable).toBe(true);
     expect(budget.derivedOperatingBudget.couponSamplingComplete).toBe(true);
+    expect(budget.derivedOperatingBudget.stackCompatibilityCouponSampleCountMargin).toBe(1.6);
     expect(budget.derivedOperatingBudget.tensileStressCouponSampleCountMargin).toBe(1.6);
     expect(budget.derivedOperatingBudget.fractureYieldCouponSampleCountMargin).toBe(1.6);
     expect(budget.derivedOperatingBudget.cryogenicCycleSampleCountMargin).toBe(1.6);
@@ -3765,6 +3947,10 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.derivedOperatingBudget.roughnessRmsMargin).toBeGreaterThan(1);
     expect(budget.derivedOperatingBudget.fabricationToleranceMargin).toBe(1);
     expect(budget.requiredCorrections.materialMismatch).toBe(false);
+    expect(budget.requiredCorrections.architectureIdMismatch).toBe(false);
+    expect(budget.requiredCorrections.stackCompatibilityLayerCountShortfall).toBe(0);
+    expect(budget.requiredCorrections.supportFractionAbsDelta).toBe(0);
+    expect(budget.requiredCorrections.activeAreaLostFractionAbsDelta).toBe(0);
     expect(budget.requiredCorrections.tensileStressShortfallPa).toBe(0);
     expect(budget.requiredCorrections.fractureOrYieldStressShortfallPa).toBe(0);
     expect(budget.requiredCorrections.couponCycleCountShortfall).toBe(0);
@@ -3786,6 +3972,7 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.requiredCorrections.conductivityTemperatureSampleCountShortfall).toBe(0);
     expect(budget.requiredCorrections.roughnessMapSampleCountShortfall).toBe(0);
     expect(budget.requiredCorrections.fabricationToleranceMapSampleCountShortfall).toBe(0);
+    expect(budget.requiredCorrections.stackCompatibilityCouponSampleCountShortfall).toBe(0);
     expect(budget.summary.physicalViabilityClaimAllowed).toBe(false);
   });
 
@@ -3864,8 +4051,16 @@ describe("NHM2 tile source material evidence receipts", () => {
       materialCouponEvidence: {
         evidenceTier: "measured",
         evidenceRef: "receipt://coupon/tin/failing-operating-budget-v1",
+        architectureId: "topology_optimized_lattice_tin",
         loadCaseRef: "receipt://coupon/tin/failing-load-case-v1",
         layerStackCompatibilityRef: "receipt://coupon/tin/failing-stack-compatibility-v1",
+        topologyOptimizationRef:
+          "receipt://coupon/tin/failing-topology-optimization-v1",
+        depositionProcessRef: "receipt://coupon/tin/failing-deposition-process-v1",
+        residualStressUniformityMapRef:
+          "receipt://coupon/tin/failing-residual-stress-map-v1",
+        interlayerAdhesionProtocolRef:
+          "receipt://coupon/tin/failing-interlayer-adhesion-v1",
         tensileStressCurveRef: "receipt://coupon/tin/failing-tensile-curve-v1",
         fractureYieldCurveRef: "receipt://coupon/tin/failing-fracture-yield-curve-v1",
         cryogenicStateRef: "receipt://coupon/tin/failing-cryogenic-state-v1",
@@ -3889,6 +4084,10 @@ describe("NHM2 tile source material evidence receipts", () => {
         conductivitySiemensPerMeter: null,
         roughnessRmsMeters: 2e-10,
         fabricationToleranceMeters: 1e-9,
+        stackCompatibilityCouponSampleCount: 8,
+        stackCompatibilityLayerCount: 447,
+        stackCompatibilitySupportFraction: 0.26,
+        stackCompatibilityActiveAreaLostFraction: 0.08,
       },
     });
 
@@ -3976,8 +4175,17 @@ describe("NHM2 tile source material evidence receipts", () => {
         "tensile_stress_curve_ref_missing",
         "fracture_yield_curve_ref_missing",
         "cryogenic_state_ref_missing",
+        "candidate_stack_architecture_id_missing",
         "candidate_stack_load_case_ref_missing",
         "candidate_stack_layer_compatibility_ref_missing",
+        "candidate_stack_topology_optimization_ref_missing",
+        "candidate_stack_deposition_process_ref_missing",
+        "candidate_stack_residual_stress_uniformity_map_ref_missing",
+        "candidate_stack_interlayer_adhesion_protocol_ref_missing",
+        "stack_compatibility_coupon_sample_count_missing",
+        "stack_compatibility_layer_count_missing",
+        "stack_compatibility_support_fraction_missing",
+        "stack_compatibility_active_area_lost_fraction_missing",
         "cryogenic_cycle_ref_missing",
         "coupon_fatigue_curve_ref_missing",
         "coupon_fatigue_cycle_margin_missing",
@@ -3995,7 +4203,7 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.requiredCorrections.tensileStressShortfallPa).toBe(0);
     expect(budget.requiredCorrections.fractureOrYieldStressShortfallPa).toBe(0);
     expect(budget.requiredCorrections.missingCurveAndMapRefCount).toBe(7);
-    expect(budget.requiredCorrections.missingCampaignCompatibilityRefCount).toBe(2);
+    expect(budget.requiredCorrections.missingCampaignCompatibilityRefCount).toBe(7);
     expect(budget.requiredCorrections.missingMaterialResponseRefCount).toBe(0);
     expect(budget.requiredCorrections.materialResponseNumericValuesAvailable).toBe(false);
     expect(budget.blockers).toEqual(
@@ -4003,8 +4211,17 @@ describe("NHM2 tile source material evidence receipts", () => {
         "tensile_stress_curve_ref_missing_for_operating_budget",
         "fracture_yield_curve_ref_missing_for_operating_budget",
         "cryogenic_state_ref_missing_for_operating_budget",
+        "candidate_stack_architecture_id_missing_for_operating_budget",
         "candidate_stack_load_case_ref_missing_for_operating_budget",
         "candidate_stack_layer_compatibility_ref_missing_for_operating_budget",
+        "candidate_stack_topology_optimization_ref_missing_for_operating_budget",
+        "candidate_stack_deposition_process_ref_missing_for_operating_budget",
+        "candidate_stack_residual_stress_uniformity_map_ref_missing_for_operating_budget",
+        "candidate_stack_interlayer_adhesion_protocol_ref_missing_for_operating_budget",
+        "stack_compatibility_coupon_sample_count_missing_for_operating_budget",
+        "stack_compatibility_layer_count_missing_for_operating_budget",
+        "stack_compatibility_support_fraction_missing_for_operating_budget",
+        "stack_compatibility_active_area_lost_fraction_missing_for_operating_budget",
         "cryogenic_cycle_ref_missing_for_operating_budget",
         "coupon_fatigue_curve_ref_missing_for_operating_budget",
         "coupon_fatigue_cycle_margin_missing_for_operating_budget",

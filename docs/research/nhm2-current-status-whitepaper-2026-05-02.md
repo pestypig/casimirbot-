@@ -1304,6 +1304,59 @@ The larger tile-source validation goal now sits above the full-apparatus receipt
 
 This row is a falsification and evidence-planning surface, not an experimental validation. `R_{receipts}` covers material coupon, pull-in, roughness/patch, active-control, fatigue, and layer-scaling receipts. `T^{apparatus}_{\mu\nu}` must include source-side `T00`, momentum density `T0i`, diagonal `Tij`, off-diagonal `Tij`, supports, spacers, active control, electrostatic, thermal, and elastic terms on the same chart, basis, units, and regional supports as the NHM2 comparison. The source tensor must pass a no-metric-target-echo check. Even then, the candidate cannot become a physical claim unless regional residuals, wall `T00`, covariant conservation, QEI worldline dossier, observer-family energy-condition checks, material credibility, and coupled closure pass together. If any surface fails, the artifact should emit the exact blocker, numerical margin when available, and required change rather than promoting the architecture.
 
+### 9.17 Frozen 447-layer material-evidence gate
+
+The latest tile-source evidence work narrows the material blocker again. A generic high-stress TiN coupon is no longer enough to support the strongest current stack candidate. The coupon must be compatible with the frozen architecture `nhm2_447_layer_topology_optimized_lattice_tin_v1`, otherwise it remains useful background material evidence but cannot stand in for the selected source architecture.
+
+<!-- helix-doc-equation-action/v1 id=nhm2-frozen-447-material-evidence-gate -->
+
+\[
+\mathrm{Coupon}_{admit}=
+A_{topology}\land N_{layer}=447\land f_{support}=0.26\land f_{lost}=0.08
+\land R_{topology}\land R_{deposition}\land R_{\sigma,map}\land R_{adhesion}\land n_{coupon}\ge 5.
+\]
+
+The required compatibility items are now:
+
+| compatibility surface | required current value or receipt | why it matters |
+|---|---|---|
+| architecture identity | `topology_optimized_lattice_tin` | prevents a generic coupon from being reused as the selected stack architecture |
+| layer count | `447` | ties the material evidence to the current fixed-control-volume wall-source lead |
+| support fraction | `0.26` | ties coupon and load-path evidence to the topology-optimized support scaffold |
+| active-area lost fraction | `0.08` | keeps source retention visible instead of hiding support area loss |
+| topology optimization receipt | required | records the geometry that decouples load path from active aperture |
+| deposition-process receipt | required | binds film stress, roughness, conductivity, adhesion, and layer repeatability to a build process |
+| residual-stress uniformity map | required | prevents a single coupon number from hiding stress gradients or local failure zones |
+| interlayer-adhesion protocol | required | addresses delamination and stack-scale fatigue, not only single-film strength |
+| compatible coupon sample count | `>= 5` | blocks one-off coupon evidence from clearing the architecture gate |
+
+This gate is intentionally stricter than a material-property lookup. It asks whether the chosen coupon population represents the exact `447`-layer, `8 nm`, `4 K`, topology-optimized support architecture that the pass-path campaign is trying to judge. A coupon can pass tensile or yield-stress margins and still fail admission if it lacks the architecture ID, stack layer count, topology receipt, deposition process, residual-stress map, interlayer-adhesion protocol, or compatible sample population.
+
+The current numerical figures remain diagnostic anchors, not validation:
+
+| figure | current diagnostic value | interpretation boundary |
+|---|---:|---|
+| ideal gap | `8 nm` | scalar perfect-conductor replay baseline only |
+| projected tile area | `10 mm x 10 mm` | source-area arithmetic, not apparatus fabrication proof |
+| ideal pressure scale | `3.17e5 Pa` per layer | perfect-conductor pressure sanity check |
+| force per projected tile layer | `31.7 N` | internal attraction load, not thrust |
+| naive 447-layer stack force | `14.2 kN` | load that supports, spacers, and active control must carry |
+| effective projected stress | `142 MPa` | reduced-order support stress scale |
+| stack thickness | about `1.345 mm` | geometric stack arithmetic before wiring, controls, and packaging |
+| topology support fraction | `0.26` | selected architecture compatibility target |
+| topology active-area loss | `0.08` | selected source-retention compatibility target |
+
+The white-paper claim boundary is therefore:
+
+```text
+current progress = sharper material-evidence falsification surface
+not = physical tile-source validation
+not = experimental Casimir actuator proof
+not = transport viability
+```
+
+The next physical-evidence step is to fill or falsify these receipt surfaces: material coupon behavior under the selected topology, force-gap and pull-in margin at `8 nm`, roughness and asperity-tail statistics, patch-potential maps, active-control energy/noise/heat/timing, fatigue and layer-scaling nonadditivity, and full-apparatus `T00/T0i/Tij` including supports, controls, electrostatic, elastic, thermal, and interaction-energy terms. Until those receipts exist, the campaign can remain internally diagnostic and useful, but the tile source is not material-validated.
+
 ## Appendix A. Repository artifact status and claim-tier table
 
 The detailed implementation state belongs in an appendix because it is evidence metadata, not the scientific argument itself.
@@ -1340,6 +1393,7 @@ The detailed implementation state belongs in an appendix because it is evidence 
 | source-side same-basis tensor authority | implemented as `nhm2_source_side_same_basis_tensor_authority/v1` | gate that distinguishes authoritative regional source tensors from proxy, diagonal-only, contract-misaligned, or metric-echo source rows |
 | tile counterpart conservation artifact | implemented as `nhm2_tile_counterpart_conservation/v1` | diagnostic conservation surface; missing/failing conservation remains a blocker |
 | tile-source physical validation plan | implemented as `nhm2_tile_source_physical_validation_plan/v1` | freezes the strongest 447-layer candidate and emits receipt, tensor-authority, downstream-gate, and falsification blockers; not physical validation |
+| frozen 447-layer material coupon compatibility gate | implemented in `nhm2_tile_source_material_evidence_receipts/v1` and `nhm2_tile_source_material_coupon_operating_budget/v1` | generic TiN coupon data cannot satisfy the selected source architecture unless it is tied to `topology_optimized_lattice_tin`, `447` layers, `0.26` support fraction, `0.08` active-area loss, topology/deposition/residual-stress/interlayer-adhesion receipts, and compatible sample count |
 | same-chart full tensor ledger | implemented as `nhm2_same_chart_full_tensor/v1` | records `T00`, `T0i`, diagonal `Tij`, and off-diagonal `Tij`; missing components are blockers, not zeros |
 | wall source closure | implemented as `nhm2_wall_source_closure/v1` | wall `T00` residual is the front-door source-closure blocker; global residual cannot override wall failure |
 | observer-robust energy conditions | implemented as `nhm2_observer_robust_energy_conditions/v1` | Eulerian-only checks are labeled restricted and do not become observer-robust passes |

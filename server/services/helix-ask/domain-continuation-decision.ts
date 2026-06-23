@@ -149,6 +149,26 @@ const artifactRefsForKinds = (payload: Record<string, unknown>, kinds: string[])
     .map((artifact) => readString(artifact.artifact_id) ?? readString(artifact.id))
     .filter((ref): ref is string => Boolean(ref));
 
+const runtimeCapabilityValidationCount = (payload: Record<string, unknown>, capability: string): number =>
+  getLedger(payload).filter((artifact) => {
+    if (String(artifact.kind ?? "") !== "runtime_tool_call_validation") return false;
+    const record = artifactPayload(artifact);
+    return readString(record?.capability_key) === capability;
+  }).length;
+
+const repairedDocEvidenceSearchQuery = (prompt: string): string => {
+  const terms = [
+    /\bNHM[-\s]?2\b/i.test(prompt) ? "NHM2" : null,
+    /\bcasimir\b/i.test(prompt) ? "Casimir" : null,
+    /\btile\b/i.test(prompt) ? "tile" : null,
+    /\b(?:newtons?|N)\b/i.test(prompt) ? "newtons" : null,
+    /\b(?:lbs?|pounds?)\b/i.test(prompt) ? "lbs" : null,
+    /\bload[-\s]?bearing|capacity\b/i.test(prompt) ? "load bearing capacity" : null,
+    /\bwhite\s*paper|whitepaper|paper\b/i.test(prompt) ? "whitepaper" : null,
+  ].filter((entry): entry is string => Boolean(entry));
+  return terms.length > 0 ? Array.from(new Set(terms)).join(" ") : prompt;
+};
+
 const docsContract = (args: {
   phase: HelixDocsContinuationContract["current_docs_phase"];
   priorKind: string | null;
@@ -241,8 +261,19 @@ const readOpenReceipt = (payload: Record<string, unknown>): Record<string, unkno
 const hasDocSummary = (payload: Record<string, unknown>): boolean =>
   Boolean(findArtifactPayload(payload, ["doc_summary", "focused_doc_answer"]));
 
-const hasDocEvidenceSynthesisAnswer = (payload: Record<string, unknown>): boolean =>
-  Boolean(findArtifactPayload(payload, ["doc_evidence_synthesis_answer"]));
+const hasDocEvidenceSynthesisAnswer = (payload: Record<string, unknown>): boolean => {
+  const answer = findArtifactPayload(payload, ["doc_evidence_synthesis_answer"]);
+  if (!answer) return false;
+  const sourceDocs = readArray(answer.source_docs);
+  const supportRefs = readArray(answer.support_refs);
+  return Boolean(
+    readString(answer.answer_text) &&
+      (
+        sourceDocs.some((entry) => Boolean(asRecord(entry)?.path)) ||
+        supportRefs.some((entry) => Boolean(readString(entry)))
+      ),
+  );
+};
 
 const hasLocationResult = (payload: Record<string, unknown>): boolean => {
   const location = findArtifactPayload(payload, ["doc_location_result", "doc_location_matches", "doc_evidence_location"]);
@@ -254,11 +285,35 @@ const hasLocationResult = (payload: Record<string, unknown>): boolean => {
 
 const activeDocPath = (payload: Record<string, unknown>): string | null => {
   const snapshot = asRecord(payload.workspace_context_snapshot) ?? asRecord(asRecord(payload.ask_turn_preflight_context)?.workspace_snapshot);
+  const activeDocPathArtifact = findArtifactPayload(payload, ["active_doc_path"]);
   return (
+    normalizePath(activeDocPathArtifact?.path) ??
+    normalizePath(activeDocPathArtifact?.active_doc_path) ??
+    normalizePath(activeDocPathArtifact?.doc_path) ??
+    normalizePath(activeDocPathArtifact?.selected_path) ??
     normalizePath(snapshot?.activeDocPath) ??
     normalizePath(snapshot?.docContextPath) ??
     normalizePath(asRecord(payload.canonical_goal_frame)?.source_doc_path)
   );
+};
+
+const activeDocPathForPrompt = (payload: Record<string, unknown>, prompt: string): string | null => {
+  const path = activeDocPath(payload);
+  if (!path) return null;
+  if (/\b(?:this|current|open|opened|active|loaded)\s+(?:doc|document|paper|white\s*paper|whitepaper|file)\b/i.test(prompt)) {
+    return path;
+  }
+  const normalizedPath = path.toLowerCase().replace(/[^a-z0-9]+/g, " ");
+  if (/\bNHM[-\s]?2\b/i.test(prompt)) {
+    return normalizedPath.includes("nhm2") ? path : null;
+  }
+  const requiredTokens = [
+    /\bcasimir\b/i.test(prompt) ? "casimir" : null,
+    /\btile\b/i.test(prompt) ? "tile" : null,
+  ].filter((entry): entry is string => Boolean(entry));
+  return requiredTokens.length === 0 || requiredTokens.every((token) => normalizedPath.includes(token))
+    ? path
+    : null;
 };
 
 const sameDocPath = (left: string, right: string): boolean =>
@@ -290,15 +345,31 @@ const observedDocEvidencePaths = (payload: Record<string, unknown>): string[] =>
 };
 
 const locateQuery = (payload: Record<string, unknown>, prompt: string): string | null => {
+  const usableQuery = (value: string | null | undefined): string | null => {
+    const cleaned = typeof value === "string" ? value.trim() : "";
+    if (!cleaned || cleaned.length <= 2) return null;
+    if (/^(?:local_document_evidence|whitepaper|document|doc|docs|paper)$/i.test(cleaned)) return null;
+    return cleaned;
+  };
+  const quoted = usableQuery(prompt.match(/"(.+?)"/)?.[1]);
+  if (quoted) return quoted;
+  const loadBearingQuestion = prompt.match(
+    /\b(?:load[-\s]?bearing|load|bearing|capacity|newtons?|lbs?|pounds?)\b[\s\S]{0,180}\b(?:casimir|tile|NHM[-\s]?2)\b|\b(?:casimir|tile|NHM[-\s]?2)\b[\s\S]{0,180}\b(?:load[-\s]?bearing|load|bearing|capacity|newtons?|lbs?|pounds?)\b/i,
+  );
+  if (loadBearingQuestion) {
+    return "Casimir tile load bearing capacity newtons lbs";
+  }
+  const afterFind = usableQuery(
+    prompt.match(/\b(?:find|where|locate|check|look\s+(?:in|for))\b\s+(?:where\s+)?(.+?)(?:\s+in\s+the\b|\s+from\s+the\b|[?.!]|$)/i)?.[1],
+  );
+  if (afterFind) return afterFind;
   const target = asRecord(payload.evidence_target_request);
-  const targetQuery = readString(target?.query);
+  const targetQuery = usableQuery(readString(target?.query));
   if (targetQuery) return targetQuery;
   const conceptTokens = readArray(asRecord(payload.canonical_goal_frame)?.concept_tokens).map(String).filter(Boolean);
-  if (conceptTokens[0]) return conceptTokens[0];
-  const quoted = prompt.match(/"(.+?)"/)?.[1]?.trim();
-  if (quoted) return quoted;
-  const afterFind = prompt.match(/\b(?:find|where|locate)\b\s+(?:where\s+)?(.+?)(?:\s+in\s+the\b|\s+from\s+the\b|[?.!]|$)/i)?.[1]?.trim();
-  return afterFind && afterFind.length > 2 ? afterFind : null;
+  const conceptQuery = usableQuery(conceptTokens[0]);
+  if (conceptQuery) return conceptQuery;
+  return null;
 };
 
 const docSummaryFocusQuery = (prompt: string): string | null => {
@@ -428,7 +499,7 @@ export const buildHelixDomainContinuationDecision = (input: DomainContinuationIn
 
   if (goalKind === "doc_summary") {
     const validation = readValidation(input.payload);
-    const selectedPath = normalizePath(validation?.selected_path) ?? firstDocSearchCandidatePath(input.payload);
+    const selectedPath = normalizePath(validation?.selected_path) ?? firstDocSearchCandidatePath(input.payload) ?? activeDocPath(input.payload);
     const selectedStatus = readString(validation?.selected_status);
     const openReceipt = readOpenReceipt(input.payload);
     const openedPath = normalizePath(openReceipt?.path) ?? normalizePath(openReceipt?.active_doc_path) ?? activeDocPath(input.payload);
@@ -570,6 +641,15 @@ export const buildHelixDomainContinuationDecision = (input: DomainContinuationIn
     input.payload.doc_evidence_synthesis_plan = plan;
     input.payload.doc_evidence_synthesis_coverage = coverage;
 
+    const validation = readValidation(input.payload);
+    const selectedPath =
+      normalizePath(validation?.selected_path) ??
+      firstDocSearchCandidatePath(input.payload) ??
+      activeDocPathForPrompt(input.payload, input.prompt);
+    const selectedStatus = readString(validation?.selected_status);
+    const search = findArtifactPayload(input.payload, ["doc_search_results"]);
+    const query = readString(validation?.query) ?? readString(search?.query) ?? locateQuery(input.payload, input.prompt) ?? input.prompt;
+
     if (hasDocEvidenceSynthesisAnswer(input.payload)) {
       return continuation(input, goalKind, "none", "doc_evidence_synthesis_has_terminal_artifact", {
         docs_continuation_contract: docsContract({
@@ -583,6 +663,108 @@ export const buildHelixDomainContinuationDecision = (input: DomainContinuationIn
           instruction:
             "The docs evidence synthesis workflow has a doc_evidence_synthesis_answer artifact. Terminal answer may be allowed if goal satisfaction and terminal authority pass.",
         }),
+      });
+    }
+
+    if (hasDocSearchCandidates(input.payload) && !validation) {
+      return continuation(input, goalKind, "continue", "doc_evidence_synthesis_search_candidates_require_validation", {
+        docs_continuation_contract: docsContract({
+          phase: "candidate_validation_required",
+          priorKind: "doc_search_results",
+          priorRefs: artifactRefsForKinds(input.payload, ["doc_search_results"]),
+          requiredCapability: "docs-viewer.validate_doc_candidates",
+          forbiddenRepeatedCapabilities: ["docs-viewer.search_docs"],
+          requiredActionArgs: { query, transcript: input.prompt, limit: 8 },
+          expectedArtifacts: ["doc_candidate_validation"],
+          terminalBlockReason: "doc_candidate_validation missing",
+          doneCondition: "doc search candidates are validated before location or synthesis",
+          instruction:
+            "The docs evidence synthesis workflow has doc_search_results. Do not repeat docs-viewer.search_docs. Validate the candidates next and expect doc_candidate_validation.",
+        }),
+        recommended_capability_hint: capabilityHint(
+          action("docs-viewer", "validate_doc_candidates", { query, transcript: input.prompt, limit: 8 }),
+          "doc_evidence_synthesis_search_candidates_require_validation",
+        ),
+        expected_artifacts: ["doc_candidate_validation"],
+      });
+    }
+
+    if (
+      selectedPath &&
+      !hasLocationResult(input.payload) &&
+      plan.synthesis_kind !== "compare" &&
+      plan.synthesis_kind !== "multi_doc_summary"
+    ) {
+      const query = locateQuery(input.payload, input.prompt) ?? plan.required_anchors[0] ?? input.prompt;
+      return continuation(input, goalKind, "continue", "doc_evidence_synthesis_requires_location", {
+        docs_continuation_contract: docsContract({
+          phase: "location_required",
+          priorKind: validation ? "doc_candidate_validation" : "active_doc_path",
+          priorRefs: artifactRefsForKinds(input.payload, ["doc_candidate_validation", "active_doc_path", "doc_open_receipt"]),
+          requiredCapability: "docs-viewer.locate_in_doc",
+          forbiddenRepeatedCapabilities: ["docs-viewer.search_docs", "docs-viewer.validate_doc_candidates"],
+          requiredActionArgs: { path: selectedPath, query, locate_strategy: "variant" },
+          expectedArtifacts: ["doc_location_matches", "doc_location_result", "doc_evidence_location"],
+          terminalBlockReason: "doc_evidence_synthesis_answer missing",
+          doneCondition: "requested document location evidence exists before synthesis",
+          instruction:
+            "You are in a docs evidence synthesis workflow and a document path is already selected or active. Do not repeat docs search or validation. Locate the requested section or numeric claim in the document; location evidence must re-enter synthesis first.",
+        }),
+        recommended_capability_hint: capabilityHint(
+          action("docs-viewer", "locate_in_doc", { path: selectedPath, query, locate_strategy: "variant" }),
+          "doc_evidence_synthesis_requires_location",
+        ),
+        expected_artifacts: ["doc_location_matches", "doc_location_result", "doc_evidence_location"],
+      });
+    }
+
+    if (search && !hasDocSearchCandidates(input.payload) && !selectedPath) {
+      const searchAttempts = runtimeCapabilityValidationCount(input.payload, "docs-viewer.search_docs");
+      if (searchAttempts <= 1) {
+        const repairedQuery = repairedDocEvidenceSearchQuery(input.prompt);
+        return continuation(input, goalKind, "retry", "doc_evidence_synthesis_search_no_candidates_retry_repaired_query", {
+          docs_continuation_contract: docsContract({
+            phase: "search_required",
+            priorKind: "doc_search_results",
+            priorRefs: artifactRefsForKinds(input.payload, ["doc_search_results"]),
+            requiredCapability: "docs-viewer.search_docs",
+            forbiddenRepeatedCapabilities: [],
+            requiredActionArgs: {
+              query: repairedQuery,
+              target_transcript: input.prompt,
+              search_repair_reason: "previous_doc_search_returned_no_candidates",
+            },
+            expectedArtifacts: ["doc_search_results", "doc_candidate_validation", "doc_location_matches", "doc_evidence_location"],
+            terminalBlockReason: "doc_search_results had no candidates",
+            doneCondition: "a repaired document search produces candidates before synthesis",
+            instruction:
+              "The prior docs search returned no candidates. Retry once with the narrowed document-evidence query; do not synthesize from empty search results.",
+          }),
+          recommended_capability_hint: capabilityHint(
+            action("docs-viewer", "search_docs", {
+              query: repairedQuery,
+              target_transcript: input.prompt,
+              search_repair_reason: "previous_doc_search_returned_no_candidates",
+            }),
+            "doc_evidence_synthesis_search_no_candidates_retry_repaired_query",
+          ),
+          expected_artifacts: ["doc_search_results", "doc_candidate_validation", "doc_location_matches", "doc_evidence_location"],
+        });
+      }
+      return continuation(input, goalKind, "typed_failure", "doc_evidence_synthesis_search_no_candidates_after_repair", {
+        docs_continuation_contract: docsContract({
+          phase: "blocked",
+          priorKind: "doc_search_results",
+          priorRefs: artifactRefsForKinds(input.payload, ["doc_search_results"]),
+          requiredCapability: null,
+          expectedArtifacts: ["doc_evidence_synthesis_answer"],
+          terminalBlockReason: "doc_search_results had no candidates after repaired search",
+          doneCondition: "document evidence must be found before synthesis",
+          instruction:
+            "The docs evidence synthesis workflow could not find document candidates after a repaired search. Fail closed with a typed document-evidence retrieval failure.",
+        }),
+        typed_failure_code: "doc_evidence_search_no_candidates",
+        expected_artifacts: ["doc_evidence_synthesis_answer"],
       });
     }
 
@@ -621,15 +803,16 @@ export const buildHelixDomainContinuationDecision = (input: DomainContinuationIn
     }
 
     if ((plan.synthesis_kind === "locate_then_explain" || plan.synthesis_kind === "runbook_answer") && !hasLocationResult(input.payload)) {
-      const path = plan.required_doc_paths[0] ?? activeDocPath(input.payload);
+      const path = plan.required_doc_paths[0] ?? selectedPath ?? activeDocPathForPrompt(input.payload, input.prompt);
       const query = locateQuery(input.payload, input.prompt) ?? plan.required_anchors[0] ?? input.prompt;
       if (path && query) {
         return continuation(input, goalKind, "continue", "doc_evidence_synthesis_requires_location", {
           docs_continuation_contract: docsContract({
             phase: "location_required",
-            priorKind: null,
-            priorRefs: artifactRefsForKinds(input.payload, ["active_doc_path", "doc_open_receipt"]),
+            priorKind: selectedPath ? "doc_candidate_validation" : null,
+            priorRefs: artifactRefsForKinds(input.payload, ["doc_candidate_validation", "active_doc_path", "doc_open_receipt"]),
             requiredCapability: "docs-viewer.locate_in_doc",
+            forbiddenRepeatedCapabilities: ["docs-viewer.search_docs", "docs-viewer.validate_doc_candidates"],
             requiredActionArgs: { path, query, locate_strategy: "variant" },
             expectedArtifacts: ["doc_location_matches", "doc_location_result", "doc_evidence_location"],
             terminalBlockReason: "doc_evidence_synthesis_answer missing",
@@ -683,19 +866,30 @@ export const buildHelixDomainContinuationDecision = (input: DomainContinuationIn
       });
     }
 
-    return continuation(input, goalKind, "continue", "doc_evidence_synthesis_coverage_missing", {
+    return continuation(input, goalKind, "continue", "doc_evidence_synthesis_requires_doc_search", {
       docs_continuation_contract: docsContract({
-        phase: "blocked",
+        phase: "search_required",
         priorKind: evidenceArtifacts.length > 0 ? "doc_evidence_observations" : null,
         priorRefs: artifactRefsForKinds(input.payload, ["doc_summary", "doc_location_result", "doc_location_matches", "doc_evidence_location"]),
-        requiredCapability: null,
-        expectedArtifacts: ["doc_evidence_synthesis_answer"],
+        requiredCapability: "docs-viewer.search_docs",
+        requiredActionArgs: {
+          query: input.prompt,
+          target_transcript: input.prompt,
+        },
+        expectedArtifacts: ["doc_search_results", "doc_candidate_validation", "doc_location_matches", "doc_evidence_location"],
         terminalBlockReason: coverage.missing_requirements.join(", ") || "doc_evidence_synthesis_answer missing",
-        doneCondition: "required doc evidence coverage is sufficient before synthesis",
+        doneCondition: "document search or location evidence exists before synthesis",
         instruction:
-          "The docs evidence synthesis workflow is missing required coverage. Continue with an admitted Docs evidence capability or fail closed; do not answer from partial evidence.",
+          "The docs evidence synthesis workflow is missing required coverage. Execute docs-viewer.search_docs or another admitted Docs evidence capability before synthesis; do not answer from partial evidence.",
       }),
-      expected_artifacts: ["doc_evidence_synthesis_answer"],
+      recommended_capability_hint: capabilityHint(
+        action("docs-viewer", "search_docs", {
+          query: input.prompt,
+          target_transcript: input.prompt,
+        }),
+        "doc_evidence_synthesis_requires_doc_search",
+      ),
+      expected_artifacts: ["doc_search_results", "doc_candidate_validation", "doc_location_matches", "doc_evidence_location"],
     });
   }
 

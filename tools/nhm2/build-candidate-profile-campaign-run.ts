@@ -35,6 +35,18 @@ import {
   isNhm2LayerStackMechanicalReceipt,
 } from "../../shared/contracts/nhm2-layer-stack-mechanical-receipt.v1";
 import {
+  buildNhm2LayerStackSupportFractionSweep,
+  isNhm2LayerStackSupportFractionSweep,
+} from "../../shared/contracts/nhm2-layer-stack-support-fraction-sweep.v1";
+import {
+  buildNhm2LayerStackEngineeringArchitectureLoop,
+  isNhm2LayerStackEngineeringArchitectureLoop,
+} from "../../shared/contracts/nhm2-layer-stack-engineering-architecture-loop.v1";
+import {
+  buildNhm2LayerStackFullApparatusReceiptLoop,
+  isNhm2LayerStackFullApparatusReceiptLoop,
+} from "../../shared/contracts/nhm2-layer-stack-full-apparatus-receipt-loop.v1";
+import {
   buildNhm2TileSourceFalsificationReport,
   isNhm2TileSourceFalsificationReport,
 } from "../../shared/contracts/nhm2-tile-source-falsification-report.v1";
@@ -160,6 +172,11 @@ export const runNhm2CandidateProfileCampaignRun = (args: {
   const observerPath = path("nhm2-observer-robust-energy-conditions.json");
   const stabilityPath = path("nhm2-campaign-stability-evidence.json");
   const mechanicalReceiptPath = path("nhm2-layer-stack-mechanical-receipt.json");
+  const supportFractionSweepPath = path("nhm2-layer-stack-support-fraction-sweep.json");
+  const architectureLoopPath = path("nhm2-layer-stack-engineering-architecture-loop.json");
+  const fullApparatusReceiptLoopPath = path(
+    "nhm2-layer-stack-full-apparatus-receipt-loop.json",
+  );
   const referenceRunPath = path("nhm2-reference-run.json");
   const campaignPath = path("nhm2-time-dependent-source-campaign.json");
 
@@ -171,12 +188,59 @@ export const runNhm2CandidateProfileCampaignRun = (args: {
     throw new Error("layer-stack mechanical receipt failed validation");
   }
   writeFileSync(mechanicalReceiptPath, `${JSON.stringify(mechanicalReceipt, null, 2)}\n`, "utf8");
+  const supportFractionSweep = buildNhm2LayerStackSupportFractionSweep({
+    selectedProfileId: args.candidateProfileId,
+  });
+  if (!isNhm2LayerStackSupportFractionSweep(supportFractionSweep)) {
+    throw new Error("layer-stack support fraction sweep failed validation");
+  }
+  writeFileSync(
+    supportFractionSweepPath,
+    `${JSON.stringify(supportFractionSweep, null, 2)}\n`,
+    "utf8",
+  );
   const tileSourceMaterialEvidence = publishNhm2TileSourceMaterialEvidenceReceipts({
     repoRoot: args.repoRoot,
     evidencePath: args.tileSourceMaterialEvidencePath ?? null,
     outDir: runRoot,
     selectedProfileId: args.candidateProfileId,
   });
+  const architectureLoop = buildNhm2LayerStackEngineeringArchitectureLoop({
+    selectedProfileId: args.candidateProfileId,
+    materialReceiptsSupplied:
+      tileSourceMaterialEvidence.materialEvidenceReceipts.summary.materialEvidenceReady,
+    roughnessAndPatchReceiptsSupplied: Boolean(
+      tileSourceMaterialEvidence.materialEvidenceReceipts.derivedReceiptInputs
+        .suppliedReceiptSurfaces.roughness_patch_metrology,
+    ),
+    activeControlReceiptsSupplied: Boolean(
+      tileSourceMaterialEvidence.materialEvidenceReceipts.derivedReceiptInputs
+        .suppliedReceiptSurfaces.active_control_energy,
+    ),
+    supportDriveTensorTermsSupplied:
+      tileSourceMaterialEvidence.materialEvidenceReceipts.summary.fullApparatusTensorReady,
+  });
+  if (!isNhm2LayerStackEngineeringArchitectureLoop(architectureLoop)) {
+    throw new Error("layer-stack engineering architecture loop failed validation");
+  }
+  writeFileSync(architectureLoopPath, `${JSON.stringify(architectureLoop, null, 2)}\n`, "utf8");
+  const fullApparatusReceiptLoop = buildNhm2LayerStackFullApparatusReceiptLoop({
+    selectedProfileId: args.candidateProfileId,
+    suppliedReceiptSurfaces:
+      tileSourceMaterialEvidence.materialEvidenceReceipts.derivedReceiptInputs
+        .suppliedReceiptSurfaces,
+    tensorTermCoverage:
+      tileSourceMaterialEvidence.materialEvidenceReceipts.derivedReceiptInputs
+        .tensorTermCoverage,
+  });
+  if (!isNhm2LayerStackFullApparatusReceiptLoop(fullApparatusReceiptLoop)) {
+    throw new Error("layer-stack full apparatus receipt loop failed validation");
+  }
+  writeFileSync(
+    fullApparatusReceiptLoopPath,
+    `${JSON.stringify(fullApparatusReceiptLoop, null, 2)}\n`,
+    "utf8",
+  );
   freezeNhm2ReferenceRun({
     repoRoot: args.repoRoot,
     profile: args.candidateProfileId,
@@ -317,6 +381,8 @@ export const runNhm2CandidateProfileCampaignRun = (args: {
     physicalValidationPlan: tileSourceMaterialEvidence.physicalValidationPlan,
     evidenceGapRoadmap: tileSourceMaterialEvidence.evidenceGapRoadmap,
     layerStackMechanicalReceipt: mechanicalReceipt,
+    layerStackSupportFractionSweep: supportFractionSweep,
+    layerStackFullApparatusReceiptLoop: fullApparatusReceiptLoop,
     operatingBudgetReadiness: tileSourceMaterialEvidence.operatingBudgetReadiness,
     materialEvidenceReceiptsRef:
       tileSourceMaterialEvidence.outputRefs.materialEvidenceReceipts,
@@ -324,6 +390,8 @@ export const runNhm2CandidateProfileCampaignRun = (args: {
       tileSourceMaterialEvidence.outputRefs.physicalValidationPlan,
     evidenceGapRoadmapRef: tileSourceMaterialEvidence.outputRefs.evidenceGapRoadmap,
     layerStackMechanicalReceiptRef: mechanicalReceiptPath,
+    layerStackSupportFractionSweepRef: supportFractionSweepPath,
+    layerStackFullApparatusReceiptLoopRef: fullApparatusReceiptLoopPath,
     operatingBudgetReadinessRef:
       tileSourceMaterialEvidence.outputRefs.operatingBudgetReadiness,
     sourceSideSameBasisTensorAuthority: sourceSideAuthority,
@@ -518,6 +586,10 @@ export const runNhm2CandidateProfileCampaignRun = (args: {
       tileSourceMaterialEvidence.outputRefs.authorityHandoff,
     tileSourceOperatingBudgetReadinessPath:
       tileSourceMaterialEvidence.outputRefs.operatingBudgetReadiness,
+    layerStackMechanicalReceiptPath: mechanicalReceiptPath,
+    layerStackSupportFractionSweepPath: supportFractionSweepPath,
+    layerStackEngineeringArchitectureLoopPath: architectureLoopPath,
+    layerStackFullApparatusReceiptLoopPath: fullApparatusReceiptLoopPath,
     sourceModelRef: sourcePath,
     metricRequiredTensorRef: metricRequiredPath,
     dynamicGeometryRef: path("nhm2-dynamic-geometry-samples.json"),

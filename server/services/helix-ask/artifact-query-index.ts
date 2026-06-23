@@ -887,6 +887,31 @@ const finalAnswerDraftRef = (payload: RecordLike, artifacts: RecordLike[]): stri
   );
 };
 
+const authorityRecordUsableForTerminalProof = (record: RecordLike | null): boolean =>
+  Boolean(record) &&
+  record?.server_authoritative !== false &&
+  record?.terminal_eligible !== false &&
+  record?.assistant_answer !== true;
+
+const draftSelectionUsableForTerminalProof = (payload: RecordLike, record: RecordLike | null): boolean => {
+  if (!record) return false;
+  const routeTerminalMaterialization = readRecord(payload.route_terminal_materialization);
+  const blockedReason = firstString(
+    record.blocked_reason,
+    record.materialization_blocked_reason,
+    routeTerminalMaterialization?.materialization_blocked_reason,
+  );
+  return (
+    record.server_authoritative !== false &&
+    record.terminal_eligible !== false &&
+    record.assistant_answer !== true &&
+    record.allowed !== false &&
+    record.terminal_allowed !== false &&
+    routeTerminalMaterialization?.materialization_ok !== false &&
+    !blockedReason
+  );
+};
+
 const supportRefsCount = (payload: RecordLike, artifacts: RecordLike[]): number => {
   const draftArtifact = [...artifacts].reverse().find((artifact) => normalize(artifact.kind) === "final_answer_draft");
   const draftPayload = readRecord(draftArtifact?.payload);
@@ -894,22 +919,31 @@ const supportRefsCount = (payload: RecordLike, artifacts: RecordLike[]): number 
   const terminalAuthority = readRecord(payload.terminal_authority_single_writer);
   const terminalAnswerAuthority = readRecord(payload.terminal_answer_authority);
   const draftSelection = readRecord(payload.final_answer_draft_selection);
+  const usableDraftSelection = draftSelectionUsableForTerminalProof(payload, draftSelection);
   const refs = unique([
     ...readStringArray(payloadDraft?.support_refs),
     ...readStringArray(payloadDraft?.artifact_refs),
     ...readStringArray(draftPayload?.support_refs),
     ...readStringArray(draftPayload?.artifact_refs),
-    ...readStringArray(terminalAuthority?.support_refs),
-    ...readStringArray(terminalAnswerAuthority?.support_refs),
-    ...readStringArray(draftSelection?.support_refs),
+    ...(authorityRecordUsableForTerminalProof(terminalAuthority)
+      ? readStringArray(terminalAuthority?.support_refs)
+      : []),
+    ...(authorityRecordUsableForTerminalProof(terminalAnswerAuthority)
+      ? readStringArray(terminalAnswerAuthority?.support_refs)
+      : []),
+    ...(usableDraftSelection ? readStringArray(draftSelection?.support_refs) : []),
   ]);
   return (
     refs.length ||
     readNumber(payloadDraft?.support_refs_count) ||
     readNumber(draftPayload?.support_refs_count) ||
-    readNumber(terminalAuthority?.support_refs_count) ||
-    readNumber(terminalAnswerAuthority?.support_refs_count) ||
-    readNumber(draftSelection?.support_refs_count) ||
+    (authorityRecordUsableForTerminalProof(terminalAuthority)
+      ? readNumber(terminalAuthority?.support_refs_count)
+      : null) ||
+    (authorityRecordUsableForTerminalProof(terminalAnswerAuthority)
+      ? readNumber(terminalAnswerAuthority?.support_refs_count)
+      : null) ||
+    (usableDraftSelection ? readNumber(draftSelection?.support_refs_count) : null) ||
     0
   );
 };
@@ -933,13 +967,24 @@ const materializedTerminalKind = (payload: RecordLike): string | null => {
   const terminalAuthority = readRecord(payload.terminal_authority_single_writer);
   const terminalAnswerAuthority = readRecord(payload.terminal_answer_authority);
   const draftSelection = readRecord(payload.final_answer_draft_selection);
+  const usableDraftSelection = draftSelectionUsableForTerminalProof(payload, draftSelection);
   return firstString(
-    terminalAuthority?.selected_terminal_artifact_kind,
-    terminalAnswerAuthority?.terminal_artifact_kind,
-    terminalAuthority?.terminal_artifact_kind,
-    terminalAuthority?.integrity && readRecord(terminalAuthority.integrity)?.materialized_terminal_artifact_kind,
-    terminalAuthority?.materialized_terminal_artifact_kind,
-    draftSelection?.materialized_terminal_artifact_kind,
+    authorityRecordUsableForTerminalProof(terminalAuthority)
+      ? terminalAuthority?.selected_terminal_artifact_kind
+      : null,
+    authorityRecordUsableForTerminalProof(terminalAnswerAuthority)
+      ? terminalAnswerAuthority?.terminal_artifact_kind
+      : null,
+    authorityRecordUsableForTerminalProof(terminalAuthority)
+      ? terminalAuthority?.terminal_artifact_kind
+      : null,
+    authorityRecordUsableForTerminalProof(terminalAuthority) && terminalAuthority?.integrity
+      ? readRecord(terminalAuthority.integrity)?.materialized_terminal_artifact_kind
+      : null,
+    authorityRecordUsableForTerminalProof(terminalAuthority)
+      ? terminalAuthority?.materialized_terminal_artifact_kind
+      : null,
+    usableDraftSelection ? draftSelection?.materialized_terminal_artifact_kind : null,
     payload.terminal_artifact_kind,
   );
 };
@@ -947,23 +992,26 @@ const materializedTerminalKind = (payload: RecordLike): string | null => {
 const terminalAuthorityEvidence = (payload: RecordLike): { kind: string | null; source: string | null; proven: boolean } => {
   const terminalAuthority = readRecord(payload.terminal_authority_single_writer);
   const terminalAnswerAuthority = readRecord(payload.terminal_answer_authority);
-  const candidates: Array<{ kind: unknown; source: string }> = [
+  const candidates: Array<{ kind: unknown; source: string; record: RecordLike | null }> = [
     {
       kind: terminalAuthority?.selected_terminal_artifact_kind,
       source: "terminal_authority_single_writer.selected_terminal_artifact_kind",
+      record: terminalAuthority,
     },
     {
       kind: terminalAnswerAuthority?.terminal_artifact_kind,
       source: "terminal_answer_authority.terminal_artifact_kind",
+      record: terminalAnswerAuthority,
     },
     {
       kind: terminalAuthority?.terminal_artifact_kind,
       source: "terminal_authority_single_writer.terminal_artifact_kind",
+      record: terminalAuthority,
     },
   ];
   for (const candidate of candidates) {
     const kind = readString(candidate.kind);
-    if (kind) {
+    if (kind && authorityRecordUsableForTerminalProof(candidate.record)) {
       return { kind, source: candidate.source, proven: true };
     }
   }

@@ -150,7 +150,8 @@ const ROADMAP_POLICY: Record<
       {
         measurementId: "coupon_stack_compatibility",
         quantity: "447-layer frozen load-case and stack compatibility",
-        target: "2 compatibility refs: load case and layer stack",
+        target:
+          "7 compatibility items: architecture id, load case, layer stack, topology optimization, deposition process, residual stress uniformity, and interlayer adhesion protocol",
         unit: "ref count",
         evidenceArtifact: "receipt://material_coupon/447_layer_load_case_compatibility_v1",
         marginKey: "campaignCompatibilityRefsAvailable",
