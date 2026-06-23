@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildHelixAskObjectiveMiniAnswers,
+  buildHelixAskObjectiveMiniSynthPrompt,
   summarizeHelixAskObjectiveMiniValidation,
 } from "../services/helix-ask/contracts/turn-contract-objective-mini-answers";
 import type { HelixAskEvidencePackObligationCoverage } from "../services/helix-ask/obligation-coverage";
@@ -36,8 +37,10 @@ describe("Helix Ask objective mini-answer extraction boundary", () => {
 
     expect(routeSource).toContain("../services/helix-ask/contracts/turn-contract-objective-mini-answers");
     expect(routeSource).not.toMatch(/const\s+buildHelixAskObjectiveMiniAnswers\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+buildHelixAskObjectiveMiniSynthPrompt\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+summarizeHelixAskObjectiveMiniValidation\s*=\s*\(/);
     expect(serviceSource).toMatch(/export\s+const\s+buildHelixAskObjectiveMiniAnswers\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+buildHelixAskObjectiveMiniSynthPrompt\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+summarizeHelixAskObjectiveMiniValidation\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");
     expect(serviceSource).not.toContain("../../../routes/agi.plan");
@@ -171,5 +174,53 @@ describe("Helix Ask objective mini-answer extraction boundary", () => {
       blocked: 1,
       unresolved: 2,
     });
+  });
+
+  it("preserves objective mini-synth prompt rendering", () => {
+    expect(
+      buildHelixAskObjectiveMiniSynthPrompt({
+        question: "Where is the evidence?",
+        responseLanguage: "en",
+        miniAnswers: [
+          {
+            objective_id: "obj_1",
+            objective_label: "Evidence Coverage",
+            status: "partial",
+            matched_slots: ["doc-evidence"],
+            missing_slots: ["numeric-result"],
+            evidence_refs: [
+              "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+              "server/services/helix-ask/evidence.ts",
+            ],
+            summary: "Evidence Coverage: partially covered.",
+          },
+        ],
+      }),
+    ).toContain(
+      [
+        "You are Helix Ask objective mini-synthesizer.",
+        "Return strict JSON only. No markdown. No commentary.",
+        "Schema:",
+        '{ "objectives": [{"objective_id":"string","status":"covered|partial|blocked","matched_slots":["slot-id"],"missing_slots":["slot-id"],"summary":"string","evidence_refs":["path"],"unknown_block":{"unknown":"string","why":"string","what_i_checked":["string"],"next_retrieval":"string"}}] }',
+        "Rules:",
+        "- Include each objective_id exactly once.",
+        "- Use only objective-local evidence refs already provided unless absolutely needed.",
+        "- If status=covered, missing_slots must be empty.",
+        "- If status=partial|blocked, include meaningful missing_slots.",
+        "- Keep summary concise.",
+        "responseLanguage=en",
+        "",
+        "Question: Where is the evidence?",
+        "",
+        "Objective checkpoints:",
+        "1. objective_id=obj_1",
+        "label=Evidence Coverage",
+        "baseline_status=partial",
+        "matched_slots=doc-evidence",
+        "missing_slots=numeric-result",
+        "evidence_refs=docs/research/nhm2-current-status-whitepaper-2026-05-02.md, server/services/helix-ask/evidence.ts",
+        "summary=Evidence Coverage: partially covered.",
+      ].join("\n"),
+    );
   });
 });
