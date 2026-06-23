@@ -119,6 +119,8 @@ export type Nhm2TileSourceFullApparatusTensorValuesV1 = {
     inadmissibleAuthorityRefs: string[];
     missingTermRefs: string[];
     missingTermComponentRefs: string[];
+    regionalSampleCountMin: number;
+    undersampledRegionRefs: string[];
     termBalanceMaxAbsResidualSI: number | null;
     termBalanceMaxRelativeResidual: number | null;
     termBalanceToleranceRelative: number;
@@ -188,6 +190,7 @@ const finiteTensorValue = (
 };
 
 const TERM_BALANCE_RELATIVE_TOLERANCE = 1e-9;
+const REGIONAL_TENSOR_SAMPLE_COUNT_MIN = 447;
 
 const AUTHORITATIVE_COMPONENT_AUTHORITIES = [
   "source_model",
@@ -294,6 +297,13 @@ const termBalanceBlockers = (region: Nhm2FullApparatusTensorValueRegionV1): stri
         `${region.regionId}:${entry.componentId}:term_sum_balance_residual_exceeds_tolerance`,
     );
 
+const undersampledRegionRef = (
+  region: Nhm2FullApparatusTensorValueRegionV1,
+): string | null =>
+  isPositiveFiniteNumber(region.sampleCount) && region.sampleCount < REGIONAL_TENSOR_SAMPLE_COUNT_MIN
+    ? `${region.regionId}:sample_count_below_${REGIONAL_TENSOR_SAMPLE_COUNT_MIN}`
+    : null;
+
 const regionBlockers = (region: Nhm2FullApparatusTensorValueRegionV1): string[] => {
   const missing = missingComponents(region);
   const terms = missingTerms(region);
@@ -320,6 +330,8 @@ const regionBlockers = (region: Nhm2FullApparatusTensorValueRegionV1): string[] 
       ? [`${region.regionId}:sample_count_missing`]
       : !isPositiveFiniteNumber(region.sampleCount)
         ? [`${region.regionId}:sample_count_invalid`]
+        : region.sampleCount < REGIONAL_TENSOR_SAMPLE_COUNT_MIN
+          ? [`${region.regionId}:sample_count_below_${REGIONAL_TENSOR_SAMPLE_COUNT_MIN}`]
         : []),
     ...missing.map((componentRef) => `${componentRef}:component_value_missing`),
     ...terms.map((termRef) => `${termRef}:term_contribution_missing`),
@@ -349,6 +361,9 @@ export const buildNhm2TileSourceFullApparatusTensorValues = (
   const inadmissibleAuthorityRefs = input.regions.flatMap(inadmissibleAuthorityComponents);
   const missingTermRefs = input.regions.flatMap(missingTerms);
   const missingTermComponentRefs = input.regions.flatMap(missingTermComponents);
+  const undersampledRegionRefs = input.regions
+    .map(undersampledRegionRef)
+    .filter((entry): entry is string => entry != null);
   const missingSourceRefs = sourceRefBlockers(input);
   const balanceResiduals = input.regions.flatMap(termBalanceResiduals);
   const termBalanceMaxAbsResidualSI =
@@ -422,6 +437,8 @@ export const buildNhm2TileSourceFullApparatusTensorValues = (
       inadmissibleAuthorityRefs,
       missingTermRefs,
       missingTermComponentRefs,
+      regionalSampleCountMin: REGIONAL_TENSOR_SAMPLE_COUNT_MIN,
+      undersampledRegionRefs,
       termBalanceMaxAbsResidualSI,
       termBalanceMaxRelativeResidual,
       termBalanceToleranceRelative: TERM_BALANCE_RELATIVE_TOLERANCE,

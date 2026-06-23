@@ -740,12 +740,43 @@ const hasIncompleteCompoundPromptCoverageGate = (payload: RecordLike): boolean =
   );
 };
 
+const compoundCapabilityKeysFromPayload = (payload: RecordLike): string[] => {
+  const capabilityPlan = readRecord(payload.capability_plan);
+  const admission = readRecord(payload.tool_call_admission_decision);
+  const itinerary = readRecord(payload.capability_itinerary);
+  const contract =
+    readRecord(payload.compound_capability_contract) ??
+    readRecord(readRecord(itinerary?.compound_capability_contract));
+  const subgoalCapabilities = readArray(contract?.subgoals)
+    .map(readRecord)
+    .flatMap((subgoal) => [
+      readString(subgoal?.requested_capability),
+      readString(subgoal?.runtime_capability),
+      readString(subgoal?.selected_capability),
+      readString(subgoal?.executed_capability),
+    ]);
+  return [
+    ...subgoalCapabilities,
+    ...readStringArray(admission?.compound_requested_capabilities),
+    ...readStringArray(capabilityPlan?.compound_requested_capabilities),
+  ].filter((entry): entry is string => Boolean(entry));
+};
+
+const hasExplicitToolCompoundCapabilityRequirement = (payload: RecordLike): boolean => {
+  const capabilities = compoundCapabilityKeysFromPayload(payload);
+  if (capabilities.length <= 1) return false;
+  return capabilities.some((capability) =>
+    !/^(?:model(?:[._-]direct)?|model_only|conversation)(?:[._-]|$)/i.test(capability)
+  );
+};
+
 const hasModelOnlyCompoundAnswerCoverage = (payload: RecordLike): boolean => {
   const coverage = readRecord(payload.model_only_compound_coverage_from_answer);
   return (
     readString(coverage?.schema) === "helix.model_only_compound_coverage_from_answer.v1" &&
     coverage?.passed === true &&
-    readString(coverage?.route_scope) === "model_only_allowed"
+    readString(coverage?.route_scope) === "model_only_allowed" &&
+    !hasExplicitToolCompoundCapabilityRequirement(payload)
   );
 };
 

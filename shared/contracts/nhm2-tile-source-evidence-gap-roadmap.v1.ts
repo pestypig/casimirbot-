@@ -1171,6 +1171,19 @@ const ROADMAP_POLICY: Record<
         noGoCriterion: "regional supports missing or not same-basis",
         falsificationConsequence: "regional residual closure cannot consume the source tensor",
       },
+      {
+        measurementId: "regional_tensor_sample_counts",
+        quantity: "wall/hull/exterior regional tensor sampling support",
+        target: ">= 447 tensor samples in each closure region for the frozen 447-layer candidate",
+        unit: "sample count",
+        evidenceArtifact: "receipt://full_apparatus_tensor/regional_sample_counts_v1",
+        marginKey: "regionalSampleCountsMeetMinimum",
+        requiredCorrectionKey: "regionalSampleCountBelowMinimumCount",
+        goCriterion: "wall, hull, and exterior-shell tensor regions each have at least 447 samples",
+        noGoCriterion: "any closure region has fewer than 447 tensor samples",
+        falsificationConsequence:
+          "regional residual, conservation, QEI, and observer gates cannot trust the source tensor sampling support",
+      },
     ],
     unlocks: [
       "source_side_same_basis_authority",

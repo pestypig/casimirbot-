@@ -432,13 +432,15 @@ const nextEvidenceArtifactFromDomain = (
         ? "receipt://fatigue_layer_scaling/cycle_margin_v1"
         : "receipt://fatigue_layer_scaling/provenance_v1";
     case "full_apparatus_tensor":
-      return !missingReceipt &&
-        (firstBlocker.includes("T0") ||
-          firstBlocker.includes("T1") ||
-          firstBlocker.includes("T2") ||
-          firstBlocker.includes("T3"))
-        ? "receipt://full_apparatus_tensor/component_detail_refs_v1"
-        : "receipt://full_apparatus_tensor/provenance_v1";
+      return !missingReceipt && firstBlocker.includes("sample_count")
+        ? "receipt://full_apparatus_tensor/regional_sample_counts_v1"
+        : !missingReceipt &&
+            (firstBlocker.includes("T0") ||
+              firstBlocker.includes("T1") ||
+              firstBlocker.includes("T2") ||
+              firstBlocker.includes("T3"))
+          ? "receipt://full_apparatus_tensor/component_detail_refs_v1"
+          : "receipt://full_apparatus_tensor/provenance_v1";
     case "downstream_residual_conservation_qei_observer":
       return "artifact://nhm2/downstream-gates/regional-residual-closure-v1";
     case "campaign_coordination":
@@ -461,7 +463,7 @@ const measurementTargetSummaryFromDomain = (
     case "fatigue_layer_scaling":
       return "Fatigue/layer-scaling evidence must cover cycle lifetime, thermal cycling, creep, delamination, adhesion, 447-layer scaling efficiency >= 0.9, nonadditivity <= 0.1, active area retention >= 0.6, and source-tensor retention >= 0.9.";
     case "full_apparatus_tensor":
-      return "Full apparatus source tensor must provide nhm2_tile_source_full_apparatus_tensor_values/v1 with 10 component refs, 9 stress-energy term refs, wall/hull/exterior supports, same chart/basis/units, and no metric-target echo.";
+      return "Full apparatus source tensor must provide nhm2_tile_source_full_apparatus_tensor_values/v1 with 10 component refs, 9 stress-energy term refs, wall/hull/exterior supports, at least 447 regional samples per closure region, same chart/basis/units, and no metric-target echo.";
     case "downstream_residual_conservation_qei_observer":
       return "Downstream chain must rerun regional residual closure, wall T00, covariant conservation, QEI worldline dossier, observer-family WEC/NEC/SEC/DEC, material credibility, and coupled closure against the same source tensor.";
     case "campaign_coordination":
@@ -484,7 +486,7 @@ const falsificationRuleFromDomain = (
     case "fatigue_layer_scaling":
       return "If cycling lifetime, layer additivity, active-area retention, or source-tensor retention fail, the 447-layer architecture is not a credible scalable source candidate.";
     case "full_apparatus_tensor":
-      return "If the apparatus tensor is missing T0i/off-diagonal Tij, support/control/electrostatic/thermal/material terms, regional supports, or anti-echo provenance, it cannot be consumed as source-side same-basis T_munu.";
+      return "If the apparatus tensor is missing T0i/off-diagonal Tij, support/control/electrostatic/thermal/material terms, regional supports, at least 447 regional samples per closure region, or anti-echo provenance, it cannot be consumed as source-side same-basis T_munu.";
     case "downstream_residual_conservation_qei_observer":
       return "If residual closure, conservation, QEI, observer-family checks, material credibility, and coupled closure do not pass together, the campaign remains non-physical and non-promotional.";
     case "campaign_coordination":

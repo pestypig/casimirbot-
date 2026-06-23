@@ -50,6 +50,9 @@ export type Nhm2TileSourceForceGapLoadBudgetV1 = {
     activeControlAuthorityRef: string | null;
     curveMinGapMeters: number | null;
     curveMaxGapMeters: number | null;
+    localSampleWindowMeters: number | null;
+    forceGapCurveSampleCountNearOperatingGap: number | null;
+    forceGradientCurveSampleCountNearOperatingGap: number | null;
     casimirForceN: number | null;
     forceGradientNPerM: number | null;
     effectiveSpringConstantNPerM: number | null;
@@ -59,6 +62,10 @@ export type Nhm2TileSourceForceGapLoadBudgetV1 = {
   margins: {
     curveModelRefsAvailable: boolean;
     curveBracketsOperatingGap: boolean;
+    localCurveSamplingComplete: boolean;
+    localSampleWindowMargin: number | null;
+    forceGapCurveLocalSampleMargin: number | null;
+    forceGradientCurveLocalSampleMargin: number | null;
     suppliedForceToIdealStackForce: number | null;
     suppliedGradientToIdealGradient: number | null;
     suppliedGradientConsistencyWithForceCurve: number | null;
@@ -76,6 +83,11 @@ export type Nhm2TileSourceForceGapLoadBudgetV1 = {
     activeGapControlAuthorityShortfallN: number | null;
     forceGradientConsistencyMin: 0.75;
     forceGradientConsistencyShortfall: number | null;
+    localSampleWindowMinMeters: number;
+    localSampleWindowShortfallMeters: number | null;
+    localCurveSampleCountMin: number;
+    forceGapCurveLocalSampleCountShortfall: number | null;
+    forceGradientCurveLocalSampleCountShortfall: number | null;
     suppliedForceDeltaFromIdealStackForceN: number | null;
     suppliedForceAbsTargetN: number;
   };
@@ -112,6 +124,8 @@ export type BuildNhm2TileSourceForceGapLoadBudgetInput = {
 
 const AUTHORITY_FACTOR = 1.2;
 const FORCE_GRADIENT_CONSISTENCY_MIN = 0.75;
+const LOCAL_SAMPLE_WINDOW_MIN_METERS = 1e-9;
+const LOCAL_CURVE_SAMPLE_COUNT_MIN = 9;
 
 const round = (value: number, digits = 12): number => Number(value.toPrecision(digits));
 
@@ -120,6 +134,14 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const finiteOrNull = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
+
+const positiveFiniteOrNull = (value: unknown): number | null =>
+  typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
+
+const positiveIntegerOrNull = (value: unknown): number | null =>
+  typeof value === "number" && Number.isFinite(value) && Number.isInteger(value) && value > 0
+    ? value
+    : null;
 
 const safeRatio = (numerator: number | null, denominator: number | null): number | null =>
   numerator == null || denominator == null || denominator === 0
@@ -160,6 +182,15 @@ export const buildNhm2TileSourceForceGapLoadBudget = (
   const suppliedSpring = forceGapEvidence?.effectiveSpringConstantNPerM ?? null;
   const suppliedStictionMargin = forceGapEvidence?.stictionMargin ?? null;
   const suppliedAuthority = forceGapEvidence?.activeGapControlAuthorityN ?? null;
+  const localSampleWindowMeters = positiveFiniteOrNull(
+    forceGapEvidence?.localSampleWindowMeters,
+  );
+  const forceGapCurveSampleCountNearOperatingGap = positiveIntegerOrNull(
+    forceGapEvidence?.forceGapCurveSampleCountNearOperatingGap,
+  );
+  const forceGradientCurveSampleCountNearOperatingGap = positiveIntegerOrNull(
+    forceGapEvidence?.forceGradientCurveSampleCountNearOperatingGap,
+  );
   const curveModelRefsAvailable =
     forceGapEvidence?.gapMetrologyRef != null &&
     forceGapEvidence?.forceGapCurveRef != null &&
@@ -173,6 +204,25 @@ export const buildNhm2TileSourceForceGapLoadBudget = (
     forceGapEvidence.curveMaxGapMeters != null &&
     forceGapEvidence.curveMinGapMeters <= gapMeters &&
     forceGapEvidence.curveMaxGapMeters >= gapMeters;
+  const localSampleWindowMargin = safeRatio(
+    localSampleWindowMeters,
+    LOCAL_SAMPLE_WINDOW_MIN_METERS,
+  );
+  const forceGapCurveLocalSampleMargin = safeRatio(
+    forceGapCurveSampleCountNearOperatingGap,
+    LOCAL_CURVE_SAMPLE_COUNT_MIN,
+  );
+  const forceGradientCurveLocalSampleMargin = safeRatio(
+    forceGradientCurveSampleCountNearOperatingGap,
+    LOCAL_CURVE_SAMPLE_COUNT_MIN,
+  );
+  const localCurveSamplingComplete =
+    localSampleWindowMargin != null &&
+    localSampleWindowMargin >= 1 &&
+    forceGapCurveLocalSampleMargin != null &&
+    forceGapCurveLocalSampleMargin >= 1 &&
+    forceGradientCurveLocalSampleMargin != null &&
+    forceGradientCurveLocalSampleMargin >= 1;
   const pullInMarginToIdealGradient = safeRatio(suppliedSpring, idealGradient);
   const expectedGradientFromSuppliedForce =
     suppliedForce == null ? null : round((4 * Math.abs(suppliedForce)) / gapMeters);
@@ -218,6 +268,28 @@ export const buildNhm2TileSourceForceGapLoadBudget = (
     ...(!curveBracketsOperatingGap
       ? ["force_gap_curve_does_not_bracket_8nm_for_load_budget"]
       : []),
+    ...(forceGapEvidence?.localSampleWindowMeters == null
+      ? ["force_gap_local_sample_window_missing_for_load_budget"]
+      : localSampleWindowMeters == null
+        ? ["force_gap_local_sample_window_invalid_for_load_budget"]
+        : localSampleWindowMargin == null || localSampleWindowMargin < 1
+          ? ["force_gap_local_sample_window_below_1nm_for_load_budget"]
+          : []),
+    ...(forceGapEvidence?.forceGapCurveSampleCountNearOperatingGap == null
+      ? ["force_gap_curve_local_sample_count_missing_for_load_budget"]
+      : forceGapCurveSampleCountNearOperatingGap == null
+        ? ["force_gap_curve_local_sample_count_invalid_for_load_budget"]
+        : forceGapCurveLocalSampleMargin == null || forceGapCurveLocalSampleMargin < 1
+          ? ["force_gap_curve_local_sample_count_below_9_for_load_budget"]
+          : []),
+    ...(forceGapEvidence?.forceGradientCurveSampleCountNearOperatingGap == null
+      ? ["force_gradient_curve_local_sample_count_missing_for_load_budget"]
+      : forceGradientCurveSampleCountNearOperatingGap == null
+        ? ["force_gradient_curve_local_sample_count_invalid_for_load_budget"]
+        : forceGradientCurveLocalSampleMargin == null ||
+            forceGradientCurveLocalSampleMargin < 1
+          ? ["force_gradient_curve_local_sample_count_below_9_for_load_budget"]
+          : []),
     ...(suppliedForce == null ? ["force_gap_casimir_force_missing_for_447_layer_budget"] : []),
     ...(suppliedGradient == null ? ["force_gap_gradient_missing_for_447_layer_budget"] : []),
     ...(suppliedGradientConsistencyWithForceCurve == null
@@ -249,6 +321,9 @@ export const buildNhm2TileSourceForceGapLoadBudget = (
           [
             "ideal_load_pull_in_margin_below_one",
             "force_gap_gradient_inconsistent_with_force_curve_for_load_budget",
+            "force_gap_local_sample_window_below_1nm_for_load_budget",
+            "force_gap_curve_local_sample_count_below_9_for_load_budget",
+            "force_gradient_curve_local_sample_count_below_9_for_load_budget",
             "force_gap_stiction_margin_below_one_for_load_budget",
             "ideal_load_active_control_authority_below_1p2x_stack_force",
           ].includes(blocker),
@@ -293,6 +368,9 @@ export const buildNhm2TileSourceForceGapLoadBudget = (
       activeControlAuthorityRef: forceGapEvidence?.activeControlAuthorityRef ?? null,
       curveMinGapMeters: finiteOrNull(forceGapEvidence?.curveMinGapMeters),
       curveMaxGapMeters: finiteOrNull(forceGapEvidence?.curveMaxGapMeters),
+      localSampleWindowMeters,
+      forceGapCurveSampleCountNearOperatingGap,
+      forceGradientCurveSampleCountNearOperatingGap,
       casimirForceN: finiteOrNull(suppliedForce),
       forceGradientNPerM: finiteOrNull(suppliedGradient),
       effectiveSpringConstantNPerM: finiteOrNull(suppliedSpring),
@@ -302,6 +380,10 @@ export const buildNhm2TileSourceForceGapLoadBudget = (
     margins: {
       curveModelRefsAvailable,
       curveBracketsOperatingGap,
+      localCurveSamplingComplete,
+      localSampleWindowMargin,
+      forceGapCurveLocalSampleMargin,
+      forceGradientCurveLocalSampleMargin,
       suppliedForceToIdealStackForce: safeRatio(
         suppliedForce == null ? null : Math.abs(suppliedForce),
         idealStackForceN == null ? null : Math.abs(idealStackForceN),
@@ -322,6 +404,20 @@ export const buildNhm2TileSourceForceGapLoadBudget = (
       activeGapControlAuthorityShortfallN: shortfall(requiredActiveAuthority, suppliedAuthority),
       forceGradientConsistencyMin: FORCE_GRADIENT_CONSISTENCY_MIN,
       forceGradientConsistencyShortfall,
+      localSampleWindowMinMeters: LOCAL_SAMPLE_WINDOW_MIN_METERS,
+      localSampleWindowShortfallMeters: shortfall(
+        LOCAL_SAMPLE_WINDOW_MIN_METERS,
+        localSampleWindowMeters,
+      ),
+      localCurveSampleCountMin: LOCAL_CURVE_SAMPLE_COUNT_MIN,
+      forceGapCurveLocalSampleCountShortfall: shortfall(
+        LOCAL_CURVE_SAMPLE_COUNT_MIN,
+        forceGapCurveSampleCountNearOperatingGap,
+      ),
+      forceGradientCurveLocalSampleCountShortfall: shortfall(
+        LOCAL_CURVE_SAMPLE_COUNT_MIN,
+        forceGradientCurveSampleCountNearOperatingGap,
+      ),
       suppliedForceDeltaFromIdealStackForceN:
         suppliedForce == null || idealStackForceN == null
           ? null
@@ -400,9 +496,16 @@ export const isNhm2TileSourceForceGapLoadBudget = (
       typeof supplied.activeControlAuthorityRef === "string") &&
     (supplied.curveMinGapMeters === null || typeof supplied.curveMinGapMeters === "number") &&
     (supplied.curveMaxGapMeters === null || typeof supplied.curveMaxGapMeters === "number") &&
+    (supplied.localSampleWindowMeters === null ||
+      typeof supplied.localSampleWindowMeters === "number") &&
+    (supplied.forceGapCurveSampleCountNearOperatingGap === null ||
+      typeof supplied.forceGapCurveSampleCountNearOperatingGap === "number") &&
+    (supplied.forceGradientCurveSampleCountNearOperatingGap === null ||
+      typeof supplied.forceGradientCurveSampleCountNearOperatingGap === "number") &&
     margins != null &&
     typeof margins.curveModelRefsAvailable === "boolean" &&
     typeof margins.curveBracketsOperatingGap === "boolean" &&
+    typeof margins.localCurveSamplingComplete === "boolean" &&
     requiredCorrections != null &&
     requiredCorrections.pullInMarginDefinition ===
       "effectiveSpringConstantNPerM / idealForceGradientNPerM" &&
@@ -418,6 +521,14 @@ export const isNhm2TileSourceForceGapLoadBudget = (
     requiredCorrections.forceGradientConsistencyMin === 0.75 &&
     (requiredCorrections.forceGradientConsistencyShortfall === null ||
       typeof requiredCorrections.forceGradientConsistencyShortfall === "number") &&
+    typeof requiredCorrections.localSampleWindowMinMeters === "number" &&
+    (requiredCorrections.localSampleWindowShortfallMeters === null ||
+      typeof requiredCorrections.localSampleWindowShortfallMeters === "number") &&
+    typeof requiredCorrections.localCurveSampleCountMin === "number" &&
+    (requiredCorrections.forceGapCurveLocalSampleCountShortfall === null ||
+      typeof requiredCorrections.forceGapCurveLocalSampleCountShortfall === "number") &&
+    (requiredCorrections.forceGradientCurveLocalSampleCountShortfall === null ||
+      typeof requiredCorrections.forceGradientCurveLocalSampleCountShortfall === "number") &&
     (requiredCorrections.suppliedForceDeltaFromIdealStackForceN === null ||
       typeof requiredCorrections.suppliedForceDeltaFromIdealStackForceN === "number") &&
     typeof requiredCorrections.suppliedForceAbsTargetN === "number" &&

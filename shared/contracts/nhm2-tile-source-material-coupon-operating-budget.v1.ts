@@ -31,6 +31,10 @@ export type Nhm2TileSourceMaterialCouponOperatingBudgetV1 = {
     materialResponseTemperatureK: 4;
     dielectricResponseRefRequired: true;
     conductivityRefRequired: true;
+    mechanicalCouponSampleCountMin: number;
+    cryogenicCycleSampleCountMin: number;
+    materialResponseSweepSampleCountMin: number;
+    surfaceMapSampleCountMin: number;
   };
   suppliedMaterialCouponEvidence: {
     evidenceTier: string;
@@ -43,6 +47,14 @@ export type Nhm2TileSourceMaterialCouponOperatingBudgetV1 = {
     couponFatigueCurveRef: string | null;
     roughnessMapRef: string | null;
     fabricationToleranceMapRef: string | null;
+    tensileStressCouponSampleCount: number | null;
+    fractureYieldCouponSampleCount: number | null;
+    cryogenicCycleSampleCount: number | null;
+    couponFatigueCurveSampleCount: number | null;
+    dielectricResponseFrequencySampleCount: number | null;
+    conductivityTemperatureSampleCount: number | null;
+    roughnessMapSampleCount: number | null;
+    fabricationToleranceMapSampleCount: number | null;
     material: string | null;
     measuredTensileStressPa: number | null;
     fractureOrYieldStressPa: number | null;
@@ -71,6 +83,15 @@ export type Nhm2TileSourceMaterialCouponOperatingBudgetV1 = {
     dielectricTemperatureMargin: number | null;
     conductivityTemperatureMargin: number | null;
     materialResponseValuesAvailable: boolean;
+    couponSamplingComplete: boolean;
+    tensileStressCouponSampleCountMargin: number | null;
+    fractureYieldCouponSampleCountMargin: number | null;
+    cryogenicCycleSampleCountMargin: number | null;
+    couponFatigueCurveSampleCountMargin: number | null;
+    dielectricResponseFrequencySampleCountMargin: number | null;
+    conductivityTemperatureSampleCountMargin: number | null;
+    roughnessMapSampleCountMargin: number | null;
+    fabricationToleranceMapSampleCountMargin: number | null;
     roughnessRmsMargin: number | null;
     fabricationToleranceMargin: number | null;
   };
@@ -109,6 +130,18 @@ export type Nhm2TileSourceMaterialCouponOperatingBudgetV1 = {
     requiredMaterialResponseRefCount: 2;
     missingMaterialResponseRefCount: number;
     materialResponseNumericValuesAvailable: boolean;
+    mechanicalCouponSampleCountMin: number;
+    cryogenicCycleSampleCountMin: number;
+    materialResponseSweepSampleCountMin: number;
+    surfaceMapSampleCountMin: number;
+    tensileStressCouponSampleCountShortfall: number | null;
+    fractureYieldCouponSampleCountShortfall: number | null;
+    cryogenicCycleSampleCountShortfall: number | null;
+    couponFatigueCurveSampleCountShortfall: number | null;
+    dielectricResponseFrequencySampleCountShortfall: number | null;
+    conductivityTemperatureSampleCountShortfall: number | null;
+    roughnessMapSampleCountShortfall: number | null;
+    fabricationToleranceMapSampleCountShortfall: number | null;
   };
   blockers: string[];
   summary: {
@@ -146,6 +179,10 @@ const FABRICATION_TOLERANCE_MAX_METERS = 5e-10;
 const OPERATING_TEMPERATURE_K = 4;
 const MATERIAL_RESPONSE_FREQUENCY_HZ = 15e9;
 const COUPON_REQUIRED_CYCLE_COUNT = 1e9;
+const MECHANICAL_COUPON_SAMPLE_COUNT_MIN = 5;
+const CRYOGENIC_CYCLE_SAMPLE_COUNT_MIN = 10;
+const MATERIAL_RESPONSE_SWEEP_SAMPLE_COUNT_MIN = 16;
+const SURFACE_MAP_SAMPLE_COUNT_MIN = 10000;
 
 const round = (value: number, digits = 12): number => Number(value.toPrecision(digits));
 
@@ -157,6 +194,9 @@ const finiteOrNull = (value: unknown): number | null =>
 
 const isNumberOrNull = (value: unknown): value is number | null =>
   value === null || (typeof value === "number" && Number.isFinite(value));
+
+const isPositiveInteger = (value: number | null | undefined): value is number =>
+  typeof value === "number" && Number.isFinite(value) && Number.isInteger(value) && value > 0;
 
 const stringOrNull = (value: unknown): string | null =>
   typeof value === "string" && value.trim().length > 0 ? value : null;
@@ -237,6 +277,55 @@ export const buildNhm2TileSourceMaterialCouponOperatingBudget = (
     conductivityNumericValueAvailable;
   const materialResponseValuesAvailable =
     dielectricResponseNumericValueAvailable && conductivityNumericValueAvailable;
+  const tensileStressCouponSampleCountMargin = safeRatio(
+    evidence?.tensileStressCouponSampleCount ?? null,
+    MECHANICAL_COUPON_SAMPLE_COUNT_MIN,
+  );
+  const fractureYieldCouponSampleCountMargin = safeRatio(
+    evidence?.fractureYieldCouponSampleCount ?? null,
+    MECHANICAL_COUPON_SAMPLE_COUNT_MIN,
+  );
+  const cryogenicCycleSampleCountMargin = safeRatio(
+    evidence?.cryogenicCycleSampleCount ?? null,
+    CRYOGENIC_CYCLE_SAMPLE_COUNT_MIN,
+  );
+  const couponFatigueCurveSampleCountMargin = safeRatio(
+    evidence?.couponFatigueCurveSampleCount ?? null,
+    MECHANICAL_COUPON_SAMPLE_COUNT_MIN,
+  );
+  const dielectricResponseFrequencySampleCountMargin = safeRatio(
+    evidence?.dielectricResponseFrequencySampleCount ?? null,
+    MATERIAL_RESPONSE_SWEEP_SAMPLE_COUNT_MIN,
+  );
+  const conductivityTemperatureSampleCountMargin = safeRatio(
+    evidence?.conductivityTemperatureSampleCount ?? null,
+    MATERIAL_RESPONSE_SWEEP_SAMPLE_COUNT_MIN,
+  );
+  const roughnessMapSampleCountMargin = safeRatio(
+    evidence?.roughnessMapSampleCount ?? null,
+    SURFACE_MAP_SAMPLE_COUNT_MIN,
+  );
+  const fabricationToleranceMapSampleCountMargin = safeRatio(
+    evidence?.fabricationToleranceMapSampleCount ?? null,
+    SURFACE_MAP_SAMPLE_COUNT_MIN,
+  );
+  const couponSamplingComplete =
+    tensileStressCouponSampleCountMargin != null &&
+    tensileStressCouponSampleCountMargin >= 1 &&
+    fractureYieldCouponSampleCountMargin != null &&
+    fractureYieldCouponSampleCountMargin >= 1 &&
+    cryogenicCycleSampleCountMargin != null &&
+    cryogenicCycleSampleCountMargin >= 1 &&
+    couponFatigueCurveSampleCountMargin != null &&
+    couponFatigueCurveSampleCountMargin >= 1 &&
+    dielectricResponseFrequencySampleCountMargin != null &&
+    dielectricResponseFrequencySampleCountMargin >= 1 &&
+    conductivityTemperatureSampleCountMargin != null &&
+    conductivityTemperatureSampleCountMargin >= 1 &&
+    roughnessMapSampleCountMargin != null &&
+    roughnessMapSampleCountMargin >= 1 &&
+    fabricationToleranceMapSampleCountMargin != null &&
+    fabricationToleranceMapSampleCountMargin >= 1;
   const roughnessRmsMargin = safeRatio(
     ROUGHNESS_RMS_MAX_METERS,
     evidence?.roughnessRmsMeters ?? null,
@@ -305,6 +394,37 @@ export const buildNhm2TileSourceMaterialCouponOperatingBudget = (
     ...(evidence?.fabricationToleranceMapRef == null
       ? ["fabrication_tolerance_map_ref_missing_for_operating_budget"]
       : []),
+    ...(evidence?.tensileStressCouponSampleCount == null
+      ? ["tensile_stress_coupon_sample_count_missing_for_operating_budget"]
+      : !isPositiveInteger(evidence.tensileStressCouponSampleCount)
+        ? ["tensile_stress_coupon_sample_count_invalid_for_operating_budget"]
+        : tensileStressCouponSampleCountMargin == null ||
+            tensileStressCouponSampleCountMargin < 1
+          ? ["tensile_stress_coupon_sample_count_below_5_for_operating_budget"]
+          : []),
+    ...(evidence?.fractureYieldCouponSampleCount == null
+      ? ["fracture_yield_coupon_sample_count_missing_for_operating_budget"]
+      : !isPositiveInteger(evidence.fractureYieldCouponSampleCount)
+        ? ["fracture_yield_coupon_sample_count_invalid_for_operating_budget"]
+        : fractureYieldCouponSampleCountMargin == null ||
+            fractureYieldCouponSampleCountMargin < 1
+          ? ["fracture_yield_coupon_sample_count_below_5_for_operating_budget"]
+          : []),
+    ...(evidence?.cryogenicCycleSampleCount == null
+      ? ["cryogenic_cycle_sample_count_missing_for_operating_budget"]
+      : !isPositiveInteger(evidence.cryogenicCycleSampleCount)
+        ? ["cryogenic_cycle_sample_count_invalid_for_operating_budget"]
+        : cryogenicCycleSampleCountMargin == null || cryogenicCycleSampleCountMargin < 1
+          ? ["cryogenic_cycle_sample_count_below_10_for_operating_budget"]
+          : []),
+    ...(evidence?.couponFatigueCurveSampleCount == null
+      ? ["coupon_fatigue_curve_sample_count_missing_for_operating_budget"]
+      : !isPositiveInteger(evidence.couponFatigueCurveSampleCount)
+        ? ["coupon_fatigue_curve_sample_count_invalid_for_operating_budget"]
+        : couponFatigueCurveSampleCountMargin == null ||
+            couponFatigueCurveSampleCountMargin < 1
+          ? ["coupon_fatigue_curve_sample_count_below_5_for_operating_budget"]
+          : []),
     ...(tensileStressMargin == null
       ? ["measured_tensile_stress_missing_for_operating_budget"]
       : tensileStressMargin < 1
@@ -328,9 +448,25 @@ export const buildNhm2TileSourceMaterialCouponOperatingBudget = (
     ...(evidence?.dielectricResponseRef == null
       ? ["dielectric_response_ref_missing_for_operating_budget"]
       : []),
+    ...(evidence?.dielectricResponseFrequencySampleCount == null
+      ? ["dielectric_response_frequency_sample_count_missing_for_operating_budget"]
+      : !isPositiveInteger(evidence.dielectricResponseFrequencySampleCount)
+        ? ["dielectric_response_frequency_sample_count_invalid_for_operating_budget"]
+        : dielectricResponseFrequencySampleCountMargin == null ||
+            dielectricResponseFrequencySampleCountMargin < 1
+          ? ["dielectric_response_frequency_sample_count_below_16_for_operating_budget"]
+          : []),
     ...(evidence?.conductivityRef == null
       ? ["conductivity_ref_missing_for_operating_budget"]
       : []),
+    ...(evidence?.conductivityTemperatureSampleCount == null
+      ? ["conductivity_temperature_sample_count_missing_for_operating_budget"]
+      : !isPositiveInteger(evidence.conductivityTemperatureSampleCount)
+        ? ["conductivity_temperature_sample_count_invalid_for_operating_budget"]
+        : conductivityTemperatureSampleCountMargin == null ||
+            conductivityTemperatureSampleCountMargin < 1
+          ? ["conductivity_temperature_sample_count_below_16_for_operating_budget"]
+          : []),
     ...(materialResponseFrequencyMargin == null
       ? ["material_response_frequency_missing_for_operating_budget"]
       : materialResponseFrequencyMargin < 1
@@ -354,11 +490,26 @@ export const buildNhm2TileSourceMaterialCouponOperatingBudget = (
       : roughnessRmsMargin < 1
         ? ["coupon_roughness_rms_above_0p1nm_operating_budget"]
         : []),
+    ...(evidence?.roughnessMapSampleCount == null
+      ? ["coupon_roughness_map_sample_count_missing_for_operating_budget"]
+      : !isPositiveInteger(evidence.roughnessMapSampleCount)
+        ? ["coupon_roughness_map_sample_count_invalid_for_operating_budget"]
+        : roughnessMapSampleCountMargin == null || roughnessMapSampleCountMargin < 1
+          ? ["coupon_roughness_map_sample_count_below_10000_for_operating_budget"]
+          : []),
     ...(fabricationToleranceMargin == null
       ? ["fabrication_tolerance_missing_for_operating_budget"]
       : fabricationToleranceMargin < 1
         ? ["fabrication_tolerance_above_0p5nm_operating_budget"]
         : []),
+    ...(evidence?.fabricationToleranceMapSampleCount == null
+      ? ["fabrication_tolerance_map_sample_count_missing_for_operating_budget"]
+      : !isPositiveInteger(evidence.fabricationToleranceMapSampleCount)
+        ? ["fabrication_tolerance_map_sample_count_invalid_for_operating_budget"]
+        : fabricationToleranceMapSampleCountMargin == null ||
+            fabricationToleranceMapSampleCountMargin < 1
+          ? ["fabrication_tolerance_map_sample_count_below_10000_for_operating_budget"]
+          : []),
   ];
   const falsifiesCurrentCandidate =
     evidence?.evidenceTier === "measured" ||
@@ -366,16 +517,32 @@ export const buildNhm2TileSourceMaterialCouponOperatingBudget = (
       ? blockers.some((blocker) =>
           [
             "material_coupon_candidate_material_mismatch_for_operating_budget",
+            "tensile_stress_coupon_sample_count_invalid_for_operating_budget",
+            "tensile_stress_coupon_sample_count_below_5_for_operating_budget",
+            "fracture_yield_coupon_sample_count_invalid_for_operating_budget",
+            "fracture_yield_coupon_sample_count_below_5_for_operating_budget",
+            "cryogenic_cycle_sample_count_invalid_for_operating_budget",
+            "cryogenic_cycle_sample_count_below_10_for_operating_budget",
+            "coupon_fatigue_curve_sample_count_invalid_for_operating_budget",
+            "coupon_fatigue_curve_sample_count_below_5_for_operating_budget",
             "measured_tensile_stress_below_support_stress_operating_budget",
             "fracture_or_yield_margin_below_2x_support_stress_operating_budget",
             "coupon_fatigue_cycle_margin_below_required_campaign_cycles_operating_budget",
             "cryogenic_temperature_above_4k_operating_budget",
             "material_response_frequency_not_15ghz_for_operating_budget",
+            "dielectric_response_frequency_sample_count_invalid_for_operating_budget",
+            "dielectric_response_frequency_sample_count_below_16_for_operating_budget",
             "dielectric_response_temperature_above_4k_for_operating_budget",
+            "conductivity_temperature_sample_count_invalid_for_operating_budget",
+            "conductivity_temperature_sample_count_below_16_for_operating_budget",
             "conductivity_temperature_above_4k_for_operating_budget",
             "material_response_numeric_values_missing_for_operating_budget",
             "coupon_roughness_rms_above_0p1nm_operating_budget",
+            "coupon_roughness_map_sample_count_invalid_for_operating_budget",
+            "coupon_roughness_map_sample_count_below_10000_for_operating_budget",
             "fabrication_tolerance_above_0p5nm_operating_budget",
+            "fabrication_tolerance_map_sample_count_invalid_for_operating_budget",
+            "fabrication_tolerance_map_sample_count_below_10000_for_operating_budget",
           ].includes(blocker),
         )
       : false;
@@ -405,6 +572,10 @@ export const buildNhm2TileSourceMaterialCouponOperatingBudget = (
       materialResponseTemperatureK: OPERATING_TEMPERATURE_K,
       dielectricResponseRefRequired: true,
       conductivityRefRequired: true,
+      mechanicalCouponSampleCountMin: MECHANICAL_COUPON_SAMPLE_COUNT_MIN,
+      cryogenicCycleSampleCountMin: CRYOGENIC_CYCLE_SAMPLE_COUNT_MIN,
+      materialResponseSweepSampleCountMin: MATERIAL_RESPONSE_SWEEP_SAMPLE_COUNT_MIN,
+      surfaceMapSampleCountMin: SURFACE_MAP_SAMPLE_COUNT_MIN,
     },
     suppliedMaterialCouponEvidence: {
       evidenceTier: evidence?.evidenceTier ?? "missing",
@@ -417,6 +588,20 @@ export const buildNhm2TileSourceMaterialCouponOperatingBudget = (
       couponFatigueCurveRef: stringOrNull(evidence?.couponFatigueCurveRef),
       roughnessMapRef: stringOrNull(evidence?.roughnessMapRef),
       fabricationToleranceMapRef: stringOrNull(evidence?.fabricationToleranceMapRef),
+      tensileStressCouponSampleCount: finiteOrNull(evidence?.tensileStressCouponSampleCount),
+      fractureYieldCouponSampleCount: finiteOrNull(evidence?.fractureYieldCouponSampleCount),
+      cryogenicCycleSampleCount: finiteOrNull(evidence?.cryogenicCycleSampleCount),
+      couponFatigueCurveSampleCount: finiteOrNull(evidence?.couponFatigueCurveSampleCount),
+      dielectricResponseFrequencySampleCount: finiteOrNull(
+        evidence?.dielectricResponseFrequencySampleCount,
+      ),
+      conductivityTemperatureSampleCount: finiteOrNull(
+        evidence?.conductivityTemperatureSampleCount,
+      ),
+      roughnessMapSampleCount: finiteOrNull(evidence?.roughnessMapSampleCount),
+      fabricationToleranceMapSampleCount: finiteOrNull(
+        evidence?.fabricationToleranceMapSampleCount,
+      ),
       material: stringOrNull(evidence?.material),
       measuredTensileStressPa: finiteOrNull(evidence?.measuredTensileStressPa),
       fractureOrYieldStressPa: finiteOrNull(evidence?.fractureOrYieldStressPa),
@@ -453,6 +638,15 @@ export const buildNhm2TileSourceMaterialCouponOperatingBudget = (
       dielectricTemperatureMargin,
       conductivityTemperatureMargin,
       materialResponseValuesAvailable,
+      couponSamplingComplete,
+      tensileStressCouponSampleCountMargin,
+      fractureYieldCouponSampleCountMargin,
+      cryogenicCycleSampleCountMargin,
+      couponFatigueCurveSampleCountMargin,
+      dielectricResponseFrequencySampleCountMargin,
+      conductivityTemperatureSampleCountMargin,
+      roughnessMapSampleCountMargin,
+      fabricationToleranceMapSampleCountMargin,
       roughnessRmsMargin,
       fabricationToleranceMargin,
     },
@@ -515,6 +709,42 @@ export const buildNhm2TileSourceMaterialCouponOperatingBudget = (
       requiredMaterialResponseRefCount: 2,
       missingMaterialResponseRefCount,
       materialResponseNumericValuesAvailable: materialResponseValuesAvailable,
+      mechanicalCouponSampleCountMin: MECHANICAL_COUPON_SAMPLE_COUNT_MIN,
+      cryogenicCycleSampleCountMin: CRYOGENIC_CYCLE_SAMPLE_COUNT_MIN,
+      materialResponseSweepSampleCountMin: MATERIAL_RESPONSE_SWEEP_SAMPLE_COUNT_MIN,
+      surfaceMapSampleCountMin: SURFACE_MAP_SAMPLE_COUNT_MIN,
+      tensileStressCouponSampleCountShortfall: shortfallToMinimum(
+        evidence?.tensileStressCouponSampleCount,
+        MECHANICAL_COUPON_SAMPLE_COUNT_MIN,
+      ),
+      fractureYieldCouponSampleCountShortfall: shortfallToMinimum(
+        evidence?.fractureYieldCouponSampleCount,
+        MECHANICAL_COUPON_SAMPLE_COUNT_MIN,
+      ),
+      cryogenicCycleSampleCountShortfall: shortfallToMinimum(
+        evidence?.cryogenicCycleSampleCount,
+        CRYOGENIC_CYCLE_SAMPLE_COUNT_MIN,
+      ),
+      couponFatigueCurveSampleCountShortfall: shortfallToMinimum(
+        evidence?.couponFatigueCurveSampleCount,
+        MECHANICAL_COUPON_SAMPLE_COUNT_MIN,
+      ),
+      dielectricResponseFrequencySampleCountShortfall: shortfallToMinimum(
+        evidence?.dielectricResponseFrequencySampleCount,
+        MATERIAL_RESPONSE_SWEEP_SAMPLE_COUNT_MIN,
+      ),
+      conductivityTemperatureSampleCountShortfall: shortfallToMinimum(
+        evidence?.conductivityTemperatureSampleCount,
+        MATERIAL_RESPONSE_SWEEP_SAMPLE_COUNT_MIN,
+      ),
+      roughnessMapSampleCountShortfall: shortfallToMinimum(
+        evidence?.roughnessMapSampleCount,
+        SURFACE_MAP_SAMPLE_COUNT_MIN,
+      ),
+      fabricationToleranceMapSampleCountShortfall: shortfallToMinimum(
+        evidence?.fabricationToleranceMapSampleCount,
+        SURFACE_MAP_SAMPLE_COUNT_MIN,
+      ),
     },
     blockers,
     summary: {
@@ -579,6 +809,10 @@ export const isNhm2TileSourceMaterialCouponOperatingBudget = (
     targets.materialResponseTemperatureK === 4 &&
     targets.dielectricResponseRefRequired === true &&
     targets.conductivityRefRequired === true &&
+    typeof targets.mechanicalCouponSampleCountMin === "number" &&
+    typeof targets.cryogenicCycleSampleCountMin === "number" &&
+    typeof targets.materialResponseSweepSampleCountMin === "number" &&
+    typeof targets.surfaceMapSampleCountMin === "number" &&
     supplied != null &&
     typeof supplied.evidenceTier === "string" &&
     budget != null &&
@@ -617,6 +851,18 @@ export const isNhm2TileSourceMaterialCouponOperatingBudget = (
     requiredCorrections.requiredMaterialResponseRefCount === 2 &&
     typeof requiredCorrections.missingMaterialResponseRefCount === "number" &&
     typeof requiredCorrections.materialResponseNumericValuesAvailable === "boolean" &&
+    typeof requiredCorrections.mechanicalCouponSampleCountMin === "number" &&
+    typeof requiredCorrections.cryogenicCycleSampleCountMin === "number" &&
+    typeof requiredCorrections.materialResponseSweepSampleCountMin === "number" &&
+    typeof requiredCorrections.surfaceMapSampleCountMin === "number" &&
+    isNumberOrNull(requiredCorrections.tensileStressCouponSampleCountShortfall) &&
+    isNumberOrNull(requiredCorrections.fractureYieldCouponSampleCountShortfall) &&
+    isNumberOrNull(requiredCorrections.cryogenicCycleSampleCountShortfall) &&
+    isNumberOrNull(requiredCorrections.couponFatigueCurveSampleCountShortfall) &&
+    isNumberOrNull(requiredCorrections.dielectricResponseFrequencySampleCountShortfall) &&
+    isNumberOrNull(requiredCorrections.conductivityTemperatureSampleCountShortfall) &&
+    isNumberOrNull(requiredCorrections.roughnessMapSampleCountShortfall) &&
+    isNumberOrNull(requiredCorrections.fabricationToleranceMapSampleCountShortfall) &&
     Array.isArray(value.blockers) &&
     value.blockers.every((entry) => typeof entry === "string") &&
     summary != null &&

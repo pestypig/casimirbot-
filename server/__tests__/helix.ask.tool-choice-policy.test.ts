@@ -239,6 +239,134 @@ describe("Helix Ask tool-choice policy", () => {
     );
   });
 
+  it("requires solver permission before panel-control receipt projection rewrites visible answers", () => {
+    const agiPlanSource = readFileSync(resolve(__dirname, "../routes/agi.plan.ts"), "utf8");
+
+    expect(agiPlanSource).toContain("const responseBoundaryCanProjectPanelControlReceipt =");
+    expect(agiPlanSource).toContain("panel_control_receipt_requires_solver_or_terminal_authority");
+    expect(agiPlanSource).toContain("response_boundary_panel_control_receipt_projection_suppressed");
+    expect(agiPlanSource).toMatch(
+      /openedPanelId[\s\S]*responseBoundaryCanProjectPanelControlReceipt[\s\S]*responsePayload\.selected_final_answer = panelReceiptText/,
+    );
+    expect(agiPlanSource).toMatch(
+      /openedPanelId[\s\S]*responseBoundaryCanProjectPanelControlReceipt[\s\S]*response_boundary_panel_control_receipt_projection_suppressed/,
+    );
+  });
+
+  it("requires solver permission before note receipts repair terminal-boundary failures", () => {
+    const agiPlanSource = readFileSync(resolve(__dirname, "../routes/agi.plan.ts"), "utf8");
+
+    expect(agiPlanSource).toContain("const responseBoundaryCanPromoteNoteReceiptRepair =");
+    expect(agiPlanSource).toContain("note_receipt_repair_requires_solver_or_terminal_authority");
+    expect(agiPlanSource).toContain("response_boundary_note_receipt_repair_projection_suppressed");
+    expect(agiPlanSource).toMatch(
+      /lateNoteUpdateReceiptForBoundaryRepair &&[\s\S]*terminal_boundary_ineligible[\s\S]*responseBoundaryCanPromoteNoteReceiptRepair[\s\S]*payload\.terminal_artifact_kind = "model_synthesized_answer"/,
+    );
+    expect(agiPlanSource).toMatch(
+      /lateNoteCreateTitle &&[\s\S]*terminal_boundary_ineligible[\s\S]*responseBoundaryCanPromoteNoteReceiptRepair[\s\S]*payload\.terminal_artifact_kind = "model_synthesized_answer"/,
+    );
+    expect(agiPlanSource).toMatch(
+      /lateNoteUpdateReceiptForBoundaryRepair &&[\s\S]*!responseBoundaryCanPromoteNoteReceiptRepair[\s\S]*response_boundary_note_receipt_repair_projection_suppressed/,
+    );
+  });
+
+  it("requires terminal authority before the source-path note receipt shortcut can answer", () => {
+    const agiPlanSource = readFileSync(resolve(__dirname, "../routes/agi.plan.ts"), "utf8");
+
+    expect(agiPlanSource).toContain("note_receipt_source_path_short_circuit");
+    expect(agiPlanSource).toContain("const noteReceiptSourcePathCanPromote =");
+    expect(agiPlanSource).toMatch(
+      /noteReceiptSourcePathCanPromote[\s\S]*canPromoteAskTurnTerminalKindAtResponseBoundary\([\s\S]*"model_synthesized_answer"[\s\S]*\)/,
+    );
+    expect(agiPlanSource).toMatch(
+      /activeDocPath && noteReceiptSourcePathCanPromote[\s\S]*terminal_artifact_id: `\$\{turnId\}:model_synthesized_answer:from_note_receipt`/,
+    );
+  });
+
+  it("requires solver permission before late note receipts repair failed terminal state", () => {
+    const agiPlanSource = readFileSync(resolve(__dirname, "../routes/agi.plan.ts"), "utf8");
+
+    expect(agiPlanSource).toContain("const responseBoundaryCanPromoteLateNoteReceiptTerminal =");
+    expect(agiPlanSource).toContain("late_note_receipt_terminal_requires_solver_or_terminal_authority");
+    expect(agiPlanSource).toContain("response_boundary_late_note_receipt_terminal_projection_suppressed");
+    expect(agiPlanSource).toMatch(
+      /lateNoteReceiptForTerminal &&[\s\S]*responseBoundaryCanPromoteLateNoteReceiptTerminal[\s\S]*payload\.terminal_artifact_kind = "model_synthesized_answer"/,
+    );
+    expect(agiPlanSource).toMatch(
+      /lateNoteReceiptForTerminal &&[\s\S]*!responseBoundaryCanPromoteLateNoteReceiptTerminal[\s\S]*response_boundary_late_note_receipt_terminal_projection_suppressed/,
+    );
+  });
+
+  it("requires solver permission before live-environment drafts repair failed terminal state", () => {
+    const agiPlanSource = readFileSync(resolve(__dirname, "../routes/agi.plan.ts"), "utf8");
+
+    expect(agiPlanSource).toContain("const responseBoundaryCanPromoteLiveEnvironmentDraft =");
+    expect(agiPlanSource.match(/const responseBoundaryCanPromoteLiveEnvironmentDraft =/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+    expect(agiPlanSource).toContain("live_environment_draft_requires_solver_or_terminal_authority");
+    expect(agiPlanSource).toContain("response_boundary_live_environment_draft_projection_suppressed");
+    expect(agiPlanSource).toMatch(
+      /liveEnvironmentDraftText &&[\s\S]*responseBoundaryCanPromoteLiveEnvironmentDraft[\s\S]*payload\.selected_final_answer = liveEnvironmentDraftText/,
+    );
+    expect(agiPlanSource).toMatch(
+      /liveEnvironmentDraftIsDeterministicReceipt[\s\S]*responseBoundaryCanPromoteLiveEnvironmentDraft[\s\S]*payload\.final_answer_source = "deterministic_receipt_fallback"/,
+    );
+    expect(agiPlanSource).toMatch(
+      /liveEnvironmentDraftText &&[\s\S]*!responseBoundaryCanPromoteLiveEnvironmentDraft[\s\S]*response_boundary_live_environment_draft_projection_suppressed/,
+    );
+  });
+
+  it("requires solver permission before terminal note receipts repair failed terminal state", () => {
+    const agiPlanSource = readFileSync(resolve(__dirname, "../routes/agi.plan.ts"), "utf8");
+
+    expect(agiPlanSource).toContain("const responseBoundaryCanPromoteTerminalNoteReceipt =");
+    expect(agiPlanSource).toContain("note_receipt_terminal_candidate_requires_solver_or_terminal_authority");
+    expect(agiPlanSource).toContain("response_boundary_terminal_note_receipt_projection_suppressed");
+    expect(agiPlanSource).toMatch(
+      /terminalNoteUpdateReceipt && responseBoundaryCanPromoteTerminalNoteReceipt[\s\S]*payload\.note_update_receipt_terminal_candidate_quarantined = true/,
+    );
+    expect(agiPlanSource).toMatch(
+      /terminalNoteCreateReceipt &&[\s\S]*responseBoundaryCanPromoteTerminalNoteReceipt[\s\S]*payload\.note_create_receipt_terminal_candidate_quarantined = true/,
+    );
+    expect(agiPlanSource).toMatch(
+      /terminalNoteUpdateReceipt && !responseBoundaryCanPromoteTerminalNoteReceipt[\s\S]*response_boundary_terminal_note_receipt_projection_suppressed/,
+    );
+  });
+
+  it("requires solver permission before route draft projections rewrite terminal answers", () => {
+    const agiPlanSource = readFileSync(resolve(__dirname, "../routes/agi.plan.ts"), "utf8");
+
+    expect(agiPlanSource).toContain("const responseBoundaryCanPromoteRouteDraftProjection =");
+    expect(agiPlanSource.match(/const responseBoundaryCanPromoteRouteDraftProjection =/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+    expect(agiPlanSource).toContain("route_draft_projection_requires_solver_or_terminal_authority");
+    expect(agiPlanSource).toContain("response_boundary_route_draft_projection_suppressed");
+    expect(agiPlanSource).toMatch(
+      /calculator_solve \/ calculator_compound_chain[\s\S]*responseBoundaryCanPromoteRouteDraftProjection[\s\S]*payload\.terminal_artifact_kind = "workstation_tool_evaluation"/,
+    );
+    expect(agiPlanSource).toMatch(
+      /zen_graph_reflection[\s\S]*responseBoundaryCanPromoteRouteDraftProjection[\s\S]*payload\.terminal_error_code = null/,
+    );
+    expect(agiPlanSource).toMatch(
+      /route_draft_projection_requires_solver_or_terminal_authority[\s\S]*response_boundary_route_draft_projection_suppressed/,
+    );
+  });
+
+  it("requires solver permission before model-only direct repairs rewrite failed terminal state", () => {
+    const agiPlanSource = readFileSync(resolve(__dirname, "../routes/agi.plan.ts"), "utf8");
+
+    expect(agiPlanSource).toContain("const responseBoundaryCanPromoteModelOnlyDirectRepair =");
+    expect(agiPlanSource).toContain("model_only_direct_repair_requires_solver_or_terminal_authority");
+    expect(agiPlanSource).toContain("response_boundary_model_only_direct_repair_suppressed");
+    expect(agiPlanSource).toMatch(
+      /replacement && responseBoundaryCanPromoteModelOnlyDirectRepair[\s\S]*payload\.final_answer_source = "model_direct_answer"/,
+    );
+    expect(agiPlanSource).toMatch(
+      /repairAnswer &&[\s\S]*responseBoundaryCanPromoteModelOnlyDirectRepair[\s\S]*payload\.terminal_artifact_kind = "direct_answer_text"/,
+    );
+    expect(agiPlanSource).toMatch(
+      /replacement && !responseBoundaryCanPromoteModelOnlyDirectRepair[\s\S]*response_boundary_model_only_direct_repair_suppressed/,
+    );
+  });
+
   it("requires solver permission before the top-level Ask wrapper mints terminal authority", () => {
     const agiPlanSource = readFileSync(resolve(__dirname, "../routes/agi.plan.ts"), "utf8");
 

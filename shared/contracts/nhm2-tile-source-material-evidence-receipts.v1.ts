@@ -36,6 +36,14 @@ export type Nhm2TileSourceMaterialCouponEvidenceV1 = {
   couponFatigueCurveRef?: string | null;
   roughnessMapRef?: string | null;
   fabricationToleranceMapRef?: string | null;
+  tensileStressCouponSampleCount?: number | null;
+  fractureYieldCouponSampleCount?: number | null;
+  cryogenicCycleSampleCount?: number | null;
+  couponFatigueCurveSampleCount?: number | null;
+  dielectricResponseFrequencySampleCount?: number | null;
+  conductivityTemperatureSampleCount?: number | null;
+  roughnessMapSampleCount?: number | null;
+  fabricationToleranceMapSampleCount?: number | null;
   material: "ultra_high_stress_tin" | "sin" | "aln_alscn" | "custom";
   measuredTensileStressPa: number | null;
   fractureOrYieldStressPa: number | null;
@@ -66,6 +74,9 @@ export type Nhm2TileSourceForceGapPullInEvidenceV1 = {
   activeControlAuthorityRef?: string | null;
   curveMinGapMeters?: number | null;
   curveMaxGapMeters?: number | null;
+  localSampleWindowMeters?: number | null;
+  forceGapCurveSampleCountNearOperatingGap?: number | null;
+  forceGradientCurveSampleCountNearOperatingGap?: number | null;
   gapMeters: number | null;
   casimirForceN: number | null;
   forceGradientNPerM: number | null;
@@ -86,6 +97,9 @@ export type Nhm2TileSourceRoughnessPatchEvidenceV1 = {
   patchVoltageCalibrationRef?: string | null;
   residualElectrostaticModelRef?: string | null;
   mapLateralResolutionMeters?: number | null;
+  roughnessMapSampleCount?: number | null;
+  asperityTailSampleCount?: number | null;
+  patchVoltageMapSampleCount?: number | null;
   scanAreaFraction?: number | null;
   roughnessRmsMeters: number | null;
   asperityP99Meters: number | null;
@@ -112,6 +126,13 @@ export type Nhm2TileSourceActiveControlEvidenceV1 = {
   timingSyncTraceRef?: string | null;
   phaseNoiseSpectrumRef?: string | null;
   lockAcquisitionTraceRef?: string | null;
+  energyWaveformSampleCount?: number | null;
+  actuatorAuthorityTraceSampleCount?: number | null;
+  gapNoiseTraceSampleCount?: number | null;
+  heatLoadTraceSampleCount?: number | null;
+  timingSyncTraceSampleCount?: number | null;
+  phaseNoiseSpectrumBinCount?: number | null;
+  lockAcquisitionTrialCount?: number | null;
   energyPerCycleJ: number | null;
   actuatorAuthorityN?: number | null;
   bandwidthHz: number | null;
@@ -157,6 +178,13 @@ export type Nhm2TileSourceFatigueLayerScalingEvidenceV1 = {
   mechanicalCouplingMapRef?: string | null;
   multiphysicsCouplingRef?: string | null;
   sourceTensorRetentionMapRef?: string | null;
+  layerScalingSampledLayerCount?: number | null;
+  perLayerVariationSampledLayerCount?: number | null;
+  activeAreaMapSampledLayerCount?: number | null;
+  sourceTensorRetentionSampledLayerCount?: number | null;
+  supportCouplingSampledInterfaceCount?: number | null;
+  electromagneticCouplingSampledInterfaceCount?: number | null;
+  mechanicalCouplingSampledInterfaceCount?: number | null;
   cycleCountToFailure: number | null;
   requiredCycleCount: number | null;
   thermalCycleDriftFraction?: number | null;
@@ -292,6 +320,11 @@ export type Nhm2TileSourceMaterialEvidenceReceiptsV1 = {
     controllerPhaseMarginMinDegrees: 45;
     controllerGainMarginMinDb: 6;
     thermalSinkCapacityFactorMin: 1.2;
+    activeControlTimeTraceSampleCountMin: number;
+    activeControlPhaseNoiseSpectrumBinCountMin: number;
+    activeControlLockAcquisitionTrialCountMin: number;
+    layerScalingSampleLayerCountMin: number;
+    layerScalingSampleInterfaceCountMin: number;
     layerScalingEfficiencyMin: 0.9;
     perLayerVariationFractionMax: 0.05;
     layerNonadditivityFractionMax: 0.1;
@@ -351,13 +384,22 @@ const ROUGHNESS_RMS_MAX_METERS = 1e-10;
 const FABRICATION_TOLERANCE_MAX_METERS = 5e-10;
 const ROUGHNESS_MAP_LATERAL_RESOLUTION_MAX_METERS = 5e-10;
 const ROUGHNESS_SCAN_AREA_FRACTION_MIN = 0.95;
+const ROUGHNESS_PATCH_MAP_SAMPLE_COUNT_MIN = 10000;
+const ASPERITY_TAIL_SAMPLE_COUNT_MIN = 1000;
+const PATCH_VOLTAGE_MAP_SAMPLE_COUNT_MIN = 10000;
 const ASPERITY_P99_MAX_METERS = 2e-9;
 const ASPERITY_P999_MAX_METERS = 3e-9;
 const ASPERITY_MAX_FRACTION_OF_GAP = 0.5;
 const MATERIAL_RESPONSE_FREQUENCY_HZ = 15e9;
 const MATERIAL_RESPONSE_TEMPERATURE_K = 4;
+const MATERIAL_COUPON_MECHANICAL_SAMPLE_COUNT_MIN = 5;
+const MATERIAL_COUPON_CRYOGENIC_CYCLE_SAMPLE_COUNT_MIN = 10;
+const MATERIAL_COUPON_RESPONSE_SWEEP_SAMPLE_COUNT_MIN = 16;
+const MATERIAL_COUPON_SURFACE_MAP_SAMPLE_COUNT_MIN = 10000;
 const IDEAL_447_LAYER_STACK_FORCE_ABS_N = 14188.384284280897;
 const FORCE_GRADIENT_CONSISTENCY_MIN = 0.75;
+const FORCE_GAP_LOCAL_SAMPLE_WINDOW_METERS = 1e-9;
+const FORCE_GAP_LOCAL_SAMPLE_COUNT_MIN = 9;
 const PATCH_VOLTAGE_RMS_MAX_VOLTS = 0.01;
 const RESIDUAL_ELECTROSTATIC_FORCE_FRACTION_MAX = 0.05;
 const PATCH_VOLTAGE_DERIVED_ELECTROSTATIC_FRACTION_MAX = 0.05;
@@ -372,8 +414,13 @@ const CONTROLLER_PHASE_MARGIN_MIN_DEGREES = 45;
 const CONTROLLER_GAIN_MARGIN_MIN_DB = 6;
 const THERMAL_SINK_CAPACITY_FACTOR_MIN = 1.2;
 const ACTIVE_CONTROL_SOURCE_TENSOR_CONTAMINATION_FRACTION_MAX = 0.05;
+const ACTIVE_CONTROL_TIME_TRACE_SAMPLE_COUNT_MIN = 4096;
+const ACTIVE_CONTROL_PHASE_NOISE_SPECTRUM_BIN_COUNT_MIN = 512;
+const ACTIVE_CONTROL_LOCK_ACQUISITION_TRIAL_COUNT_MIN = 100;
 const SWITCHING_RATE_HZ = 15e9;
 const LAYER_SCALING_EFFICIENCY_MIN = 0.9;
+const LAYER_SCALING_SAMPLE_LAYER_COUNT_MIN = 447;
+const LAYER_SCALING_SAMPLE_INTERFACE_COUNT_MIN = 446;
 const PER_LAYER_VARIATION_FRACTION_MAX = 0.05;
 const LAYER_NONADDITIVITY_FRACTION_MAX = 0.1;
 const ACTIVE_AREA_RETENTION_MIN = 0.6;
@@ -410,6 +457,9 @@ const lowerBoundMargin = (minimum: number, value: number | null | undefined): nu
 
 const isPositiveFinite = (value: number | null | undefined): value is number =>
   typeof value === "number" && Number.isFinite(value) && value > 0;
+
+const isPositiveInteger = (value: number | null | undefined): value is number =>
+  typeof value === "number" && Number.isFinite(value) && Number.isInteger(value) && value > 0;
 
 const isNonNegativeFinite = (value: number | null | undefined): value is number =>
   typeof value === "number" && Number.isFinite(value) && value >= 0;
@@ -503,6 +553,55 @@ const materialCouponSurface = (
     evidence.couponRequiredCycleCount <= 0
       ? null
       : round(evidence.couponCycleCountToFailure / evidence.couponRequiredCycleCount);
+  const tensileStressCouponSampleCountMargin = lowerBoundMargin(
+    MATERIAL_COUPON_MECHANICAL_SAMPLE_COUNT_MIN,
+    evidence.tensileStressCouponSampleCount,
+  );
+  const fractureYieldCouponSampleCountMargin = lowerBoundMargin(
+    MATERIAL_COUPON_MECHANICAL_SAMPLE_COUNT_MIN,
+    evidence.fractureYieldCouponSampleCount,
+  );
+  const cryogenicCycleSampleCountMargin = lowerBoundMargin(
+    MATERIAL_COUPON_CRYOGENIC_CYCLE_SAMPLE_COUNT_MIN,
+    evidence.cryogenicCycleSampleCount,
+  );
+  const couponFatigueCurveSampleCountMargin = lowerBoundMargin(
+    MATERIAL_COUPON_MECHANICAL_SAMPLE_COUNT_MIN,
+    evidence.couponFatigueCurveSampleCount,
+  );
+  const dielectricResponseFrequencySampleCountMargin = lowerBoundMargin(
+    MATERIAL_COUPON_RESPONSE_SWEEP_SAMPLE_COUNT_MIN,
+    evidence.dielectricResponseFrequencySampleCount,
+  );
+  const conductivityTemperatureSampleCountMargin = lowerBoundMargin(
+    MATERIAL_COUPON_RESPONSE_SWEEP_SAMPLE_COUNT_MIN,
+    evidence.conductivityTemperatureSampleCount,
+  );
+  const roughnessMapSampleCountMargin = lowerBoundMargin(
+    MATERIAL_COUPON_SURFACE_MAP_SAMPLE_COUNT_MIN,
+    evidence.roughnessMapSampleCount,
+  );
+  const fabricationToleranceMapSampleCountMargin = lowerBoundMargin(
+    MATERIAL_COUPON_SURFACE_MAP_SAMPLE_COUNT_MIN,
+    evidence.fabricationToleranceMapSampleCount,
+  );
+  const couponSamplingComplete =
+    tensileStressCouponSampleCountMargin != null &&
+    tensileStressCouponSampleCountMargin >= 1 &&
+    fractureYieldCouponSampleCountMargin != null &&
+    fractureYieldCouponSampleCountMargin >= 1 &&
+    cryogenicCycleSampleCountMargin != null &&
+    cryogenicCycleSampleCountMargin >= 1 &&
+    couponFatigueCurveSampleCountMargin != null &&
+    couponFatigueCurveSampleCountMargin >= 1 &&
+    dielectricResponseFrequencySampleCountMargin != null &&
+    dielectricResponseFrequencySampleCountMargin >= 1 &&
+    conductivityTemperatureSampleCountMargin != null &&
+    conductivityTemperatureSampleCountMargin >= 1 &&
+    roughnessMapSampleCountMargin != null &&
+    roughnessMapSampleCountMargin >= 1 &&
+    fabricationToleranceMapSampleCountMargin != null &&
+    fabricationToleranceMapSampleCountMargin >= 1;
   const fabricationToleranceMargin =
     evidence.fabricationToleranceMeters == null || evidence.fabricationToleranceMeters <= 0
       ? null
@@ -521,6 +620,68 @@ const materialCouponSurface = (
     ...(evidence.couponFatigueCurveRef == null ? ["coupon_fatigue_curve_ref_missing"] : []),
     ...(evidence.roughnessMapRef == null ? ["coupon_roughness_map_ref_missing"] : []),
     ...(evidence.fabricationToleranceMapRef == null ? ["fabrication_tolerance_map_ref_missing"] : []),
+    ...(evidence.tensileStressCouponSampleCount == null
+      ? ["tensile_stress_coupon_sample_count_missing"]
+      : !isPositiveInteger(evidence.tensileStressCouponSampleCount)
+        ? ["tensile_stress_coupon_sample_count_invalid"]
+        : tensileStressCouponSampleCountMargin == null ||
+            tensileStressCouponSampleCountMargin < 1
+          ? ["tensile_stress_coupon_sample_count_below_5"]
+          : []),
+    ...(evidence.fractureYieldCouponSampleCount == null
+      ? ["fracture_yield_coupon_sample_count_missing"]
+      : !isPositiveInteger(evidence.fractureYieldCouponSampleCount)
+        ? ["fracture_yield_coupon_sample_count_invalid"]
+        : fractureYieldCouponSampleCountMargin == null ||
+            fractureYieldCouponSampleCountMargin < 1
+          ? ["fracture_yield_coupon_sample_count_below_5"]
+          : []),
+    ...(evidence.cryogenicCycleSampleCount == null
+      ? ["cryogenic_cycle_sample_count_missing"]
+      : !isPositiveInteger(evidence.cryogenicCycleSampleCount)
+        ? ["cryogenic_cycle_sample_count_invalid"]
+        : cryogenicCycleSampleCountMargin == null || cryogenicCycleSampleCountMargin < 1
+          ? ["cryogenic_cycle_sample_count_below_10"]
+          : []),
+    ...(evidence.couponFatigueCurveSampleCount == null
+      ? ["coupon_fatigue_curve_sample_count_missing"]
+      : !isPositiveInteger(evidence.couponFatigueCurveSampleCount)
+        ? ["coupon_fatigue_curve_sample_count_invalid"]
+        : couponFatigueCurveSampleCountMargin == null ||
+            couponFatigueCurveSampleCountMargin < 1
+          ? ["coupon_fatigue_curve_sample_count_below_5"]
+          : []),
+    ...(evidence.dielectricResponseFrequencySampleCount == null
+      ? ["dielectric_response_frequency_sample_count_missing"]
+      : !isPositiveInteger(evidence.dielectricResponseFrequencySampleCount)
+        ? ["dielectric_response_frequency_sample_count_invalid"]
+        : dielectricResponseFrequencySampleCountMargin == null ||
+            dielectricResponseFrequencySampleCountMargin < 1
+          ? ["dielectric_response_frequency_sample_count_below_16"]
+          : []),
+    ...(evidence.conductivityTemperatureSampleCount == null
+      ? ["conductivity_temperature_sample_count_missing"]
+      : !isPositiveInteger(evidence.conductivityTemperatureSampleCount)
+        ? ["conductivity_temperature_sample_count_invalid"]
+        : conductivityTemperatureSampleCountMargin == null ||
+            conductivityTemperatureSampleCountMargin < 1
+          ? ["conductivity_temperature_sample_count_below_16"]
+          : []),
+    ...(evidence.roughnessMapSampleCount == null
+      ? ["coupon_roughness_map_sample_count_missing"]
+      : !isPositiveInteger(evidence.roughnessMapSampleCount)
+        ? ["coupon_roughness_map_sample_count_invalid"]
+        : roughnessMapSampleCountMargin == null || roughnessMapSampleCountMargin < 1
+          ? ["coupon_roughness_map_sample_count_below_10000"]
+          : []),
+    ...(evidence.fabricationToleranceMapSampleCount == null
+      ? ["fabrication_tolerance_map_sample_count_missing"]
+      : !isPositiveInteger(evidence.fabricationToleranceMapSampleCount)
+        ? ["fabrication_tolerance_map_sample_count_invalid"]
+        : fabricationToleranceMapSampleCountMargin == null ||
+            fabricationToleranceMapSampleCountMargin < 1
+          ? ["fabrication_tolerance_map_sample_count_below_10000"]
+          : []),
     ...(evidence.material !== "ultra_high_stress_tin" ? ["candidate_material_mismatch"] : []),
     ...(evidence.supportStressPa != null && !isPositiveFinite(evidence.supportStressPa)
       ? ["support_stress_invalid"]
@@ -598,15 +759,33 @@ const materialCouponSurface = (
       couponFatigueCycleMargin,
       couponCycleCountToFailure: evidence.couponCycleCountToFailure ?? null,
       couponRequiredCycleCount: evidence.couponRequiredCycleCount ?? null,
+      tensileStressCouponSampleCount: evidence.tensileStressCouponSampleCount ?? null,
+      tensileStressCouponSampleCountMargin,
+      fractureYieldCouponSampleCount: evidence.fractureYieldCouponSampleCount ?? null,
+      fractureYieldCouponSampleCountMargin,
+      cryogenicCycleSampleCount: evidence.cryogenicCycleSampleCount ?? null,
+      cryogenicCycleSampleCountMargin,
+      couponFatigueCurveSampleCount: evidence.couponFatigueCurveSampleCount ?? null,
+      couponFatigueCurveSampleCountMargin,
       materialResponseFrequencyMargin,
+      dielectricResponseFrequencySampleCount:
+        evidence.dielectricResponseFrequencySampleCount ?? null,
+      dielectricResponseFrequencySampleCountMargin,
       dielectricTemperatureMargin,
+      conductivityTemperatureSampleCount: evidence.conductivityTemperatureSampleCount ?? null,
+      conductivityTemperatureSampleCountMargin,
       conductivityTemperatureMargin,
       dielectricLossTangent: evidence.dielectricLossTangent ?? null,
       conductivitySiemensPerMeter: evidence.conductivitySiemensPerMeter ?? null,
       materialResponseValuesAvailable: materialResponseValuesAvailable ? 1 : 0,
       roughnessRmsMeters: evidence.roughnessRmsMeters,
+      roughnessMapSampleCount: evidence.roughnessMapSampleCount ?? null,
+      roughnessMapSampleCountMargin,
       fabricationToleranceMargin,
       fabricationToleranceMeters: evidence.fabricationToleranceMeters,
+      fabricationToleranceMapSampleCount: evidence.fabricationToleranceMapSampleCount ?? null,
+      fabricationToleranceMapSampleCountMargin,
+      couponSamplingComplete: couponSamplingComplete ? 1 : 0,
       couponProvenanceRefsAvailable:
         evidence.loadCaseRef != null &&
         evidence.layerStackCompatibilityRef != null &&
@@ -647,6 +826,31 @@ const forceGapSurface = (
     isPositiveFinite(evidence.curveMinGapMeters) &&
     isPositiveFinite(evidence.curveMaxGapMeters) &&
     evidence.curveMinGapMeters <= evidence.curveMaxGapMeters;
+  const localSampleWindowValid = isPositiveFinite(evidence.localSampleWindowMeters);
+  const localSampleWindowMargin =
+    !localSampleWindowValid
+      ? null
+      : round(evidence.localSampleWindowMeters / FORCE_GAP_LOCAL_SAMPLE_WINDOW_METERS);
+  const forceGapCurveSampleCountValid = isPositiveInteger(
+    evidence.forceGapCurveSampleCountNearOperatingGap,
+  );
+  const forceGradientCurveSampleCountValid = isPositiveInteger(
+    evidence.forceGradientCurveSampleCountNearOperatingGap,
+  );
+  const forceGapCurveLocalSampleMargin =
+    !forceGapCurveSampleCountValid
+      ? null
+      : round(
+          evidence.forceGapCurveSampleCountNearOperatingGap /
+            FORCE_GAP_LOCAL_SAMPLE_COUNT_MIN,
+        );
+  const forceGradientCurveLocalSampleMargin =
+    !forceGradientCurveSampleCountValid
+      ? null
+      : round(
+          evidence.forceGradientCurveSampleCountNearOperatingGap /
+            FORCE_GAP_LOCAL_SAMPLE_COUNT_MIN,
+        );
   const pullInMargin =
     !springConstantValid || !forceGradientValid
       ? null
@@ -686,6 +890,28 @@ const forceGapSurface = (
         : ["force_gap_curve_bounds_invalid"]
       : []),
     ...(!curveBracketsOperatingGap ? ["force_gap_curve_does_not_bracket_8nm"] : []),
+    ...(evidence.localSampleWindowMeters == null
+      ? ["force_gap_local_sample_window_missing"]
+      : !localSampleWindowValid
+        ? ["force_gap_local_sample_window_invalid"]
+        : localSampleWindowMargin == null || localSampleWindowMargin < 1
+          ? ["force_gap_local_sample_window_below_1nm"]
+          : []),
+    ...(evidence.forceGapCurveSampleCountNearOperatingGap == null
+      ? ["force_gap_curve_local_sample_count_missing"]
+      : !forceGapCurveSampleCountValid
+        ? ["force_gap_curve_local_sample_count_invalid"]
+        : forceGapCurveLocalSampleMargin == null || forceGapCurveLocalSampleMargin < 1
+          ? ["force_gap_curve_local_sample_count_below_9"]
+          : []),
+    ...(evidence.forceGradientCurveSampleCountNearOperatingGap == null
+      ? ["force_gradient_curve_local_sample_count_missing"]
+      : !forceGradientCurveSampleCountValid
+        ? ["force_gradient_curve_local_sample_count_invalid"]
+        : forceGradientCurveLocalSampleMargin == null ||
+            forceGradientCurveLocalSampleMargin < 1
+          ? ["force_gradient_curve_local_sample_count_below_9"]
+          : []),
     ...(evidence.gapMeters != null && !isPositiveFinite(evidence.gapMeters)
       ? ["force_gap_value_invalid"]
       : []),
@@ -735,6 +961,14 @@ const forceGapSurface = (
       curveMinGapMeters: evidence.curveMinGapMeters ?? null,
       curveMaxGapMeters: evidence.curveMaxGapMeters ?? null,
       curveBracketsOperatingGap: curveBracketsOperatingGap ? 1 : 0,
+      localSampleWindowMeters: evidence.localSampleWindowMeters ?? null,
+      localSampleWindowMargin,
+      forceGapCurveSampleCountNearOperatingGap:
+        evidence.forceGapCurveSampleCountNearOperatingGap ?? null,
+      forceGapCurveLocalSampleMargin,
+      forceGradientCurveSampleCountNearOperatingGap:
+        evidence.forceGradientCurveSampleCountNearOperatingGap ?? null,
+      forceGradientCurveLocalSampleMargin,
       curveRefsAvailable:
         evidence.gapMetrologyRef != null &&
         evidence.forceGapCurveRef != null &&
@@ -759,6 +993,9 @@ const roughnessPatchSurface = (
     return missingSurface("roughness_patch_metrology", "roughness_asperity_tail_and_patch_potential_map_missing", requiredChange);
   }
   const roughnessMapResolutionValid = isPositiveFinite(evidence.mapLateralResolutionMeters);
+  const roughnessMapSampleCountValid = isPositiveInteger(evidence.roughnessMapSampleCount);
+  const asperityTailSampleCountValid = isPositiveInteger(evidence.asperityTailSampleCount);
+  const patchVoltageMapSampleCountValid = isPositiveInteger(evidence.patchVoltageMapSampleCount);
   const scanAreaFractionValid =
     typeof evidence.scanAreaFraction === "number" &&
     Number.isFinite(evidence.scanAreaFraction) &&
@@ -779,6 +1016,18 @@ const roughnessPatchSurface = (
     !roughnessMapResolutionValid
       ? null
       : round(ROUGHNESS_MAP_LATERAL_RESOLUTION_MAX_METERS / evidence.mapLateralResolutionMeters);
+  const roughnessMapSampleCountMargin =
+    !roughnessMapSampleCountValid
+      ? null
+      : round(evidence.roughnessMapSampleCount / ROUGHNESS_PATCH_MAP_SAMPLE_COUNT_MIN);
+  const asperityTailSampleCountMargin =
+    !asperityTailSampleCountValid
+      ? null
+      : round(evidence.asperityTailSampleCount / ASPERITY_TAIL_SAMPLE_COUNT_MIN);
+  const patchVoltageMapSampleCountMargin =
+    !patchVoltageMapSampleCountValid
+      ? null
+      : round(evidence.patchVoltageMapSampleCount / PATCH_VOLTAGE_MAP_SAMPLE_COUNT_MIN);
   const scanAreaCoverageMargin =
     !scanAreaFractionValid
       ? null
@@ -834,6 +1083,28 @@ const roughnessPatchSurface = (
       : roughnessMapResolutionMargin < 1
         ? ["roughness_map_lateral_resolution_above_0p5nm"]
         : []),
+    ...(evidence.roughnessMapSampleCount == null
+      ? ["roughness_map_sample_count_missing"]
+      : !roughnessMapSampleCountValid
+        ? ["roughness_map_sample_count_invalid"]
+        : roughnessMapSampleCountMargin == null || roughnessMapSampleCountMargin < 1
+          ? ["roughness_map_sample_count_below_10000"]
+          : []),
+    ...(evidence.asperityTailSampleCount == null
+      ? ["asperity_tail_sample_count_missing"]
+      : !asperityTailSampleCountValid
+        ? ["asperity_tail_sample_count_invalid"]
+        : asperityTailSampleCountMargin == null || asperityTailSampleCountMargin < 1
+          ? ["asperity_tail_sample_count_below_1000"]
+          : []),
+    ...(evidence.patchVoltageMapSampleCount == null
+      ? ["patch_voltage_map_sample_count_missing"]
+      : !patchVoltageMapSampleCountValid
+        ? ["patch_voltage_map_sample_count_invalid"]
+        : patchVoltageMapSampleCountMargin == null ||
+            patchVoltageMapSampleCountMargin < 1
+          ? ["patch_voltage_map_sample_count_below_10000"]
+          : []),
     ...(evidence.scanAreaFraction != null && !scanAreaFractionValid
       ? ["roughness_scan_area_fraction_invalid"]
       : []),
@@ -912,6 +1183,12 @@ const roughnessPatchSurface = (
     numericalMargins: {
       roughnessRmsMeters: evidence.roughnessRmsMeters,
       roughnessMapResolutionMargin,
+      roughnessMapSampleCount: evidence.roughnessMapSampleCount ?? null,
+      roughnessMapSampleCountMargin,
+      asperityTailSampleCount: evidence.asperityTailSampleCount ?? null,
+      asperityTailSampleCountMargin,
+      patchVoltageMapSampleCount: evidence.patchVoltageMapSampleCount ?? null,
+      patchVoltageMapSampleCountMargin,
       scanAreaCoverageMargin,
       asperityP99Margin,
       asperityP999Margin,
@@ -965,6 +1242,17 @@ const activeControlSurface = (
     evidence.sourceTensorContaminationFraction,
   );
   const lockAcquisitionTimeValid = isPositiveFinite(evidence.lockAcquisitionTimeSeconds);
+  const energyWaveformSampleCountValid = isPositiveInteger(evidence.energyWaveformSampleCount);
+  const actuatorAuthorityTraceSampleCountValid = isPositiveInteger(
+    evidence.actuatorAuthorityTraceSampleCount,
+  );
+  const gapNoiseTraceSampleCountValid = isPositiveInteger(evidence.gapNoiseTraceSampleCount);
+  const heatLoadTraceSampleCountValid = isPositiveInteger(evidence.heatLoadTraceSampleCount);
+  const timingSyncTraceSampleCountValid = isPositiveInteger(evidence.timingSyncTraceSampleCount);
+  const phaseNoiseSpectrumBinCountValid = isPositiveInteger(
+    evidence.phaseNoiseSpectrumBinCount,
+  );
+  const lockAcquisitionTrialCountValid = isPositiveInteger(evidence.lockAcquisitionTrialCount);
   const energyPerCycleJ = energyPerCycleValid ? evidence.energyPerCycleJ : null;
   const actuatorAuthorityN = actuatorAuthorityValid ? evidence.actuatorAuthorityN : null;
   const switchingRateHz = switchingRateValid ? evidence.switchingRateHz : null;
@@ -1031,6 +1319,34 @@ const activeControlSurface = (
           ACTIVE_CONTROL_SOURCE_TENSOR_CONTAMINATION_FRACTION_MAX,
           evidence.sourceTensorContaminationFraction,
         );
+  const energyWaveformSampleCountMargin = lowerBoundMargin(
+    ACTIVE_CONTROL_TIME_TRACE_SAMPLE_COUNT_MIN,
+    evidence.energyWaveformSampleCount,
+  );
+  const actuatorAuthorityTraceSampleCountMargin = lowerBoundMargin(
+    ACTIVE_CONTROL_TIME_TRACE_SAMPLE_COUNT_MIN,
+    evidence.actuatorAuthorityTraceSampleCount,
+  );
+  const gapNoiseTraceSampleCountMargin = lowerBoundMargin(
+    ACTIVE_CONTROL_TIME_TRACE_SAMPLE_COUNT_MIN,
+    evidence.gapNoiseTraceSampleCount,
+  );
+  const heatLoadTraceSampleCountMargin = lowerBoundMargin(
+    ACTIVE_CONTROL_TIME_TRACE_SAMPLE_COUNT_MIN,
+    evidence.heatLoadTraceSampleCount,
+  );
+  const timingSyncTraceSampleCountMargin = lowerBoundMargin(
+    ACTIVE_CONTROL_TIME_TRACE_SAMPLE_COUNT_MIN,
+    evidence.timingSyncTraceSampleCount,
+  );
+  const phaseNoiseSpectrumBinCountMargin = lowerBoundMargin(
+    ACTIVE_CONTROL_PHASE_NOISE_SPECTRUM_BIN_COUNT_MIN,
+    evidence.phaseNoiseSpectrumBinCount,
+  );
+  const lockAcquisitionTrialCountMargin = lowerBoundMargin(
+    ACTIVE_CONTROL_LOCK_ACQUISITION_TRIAL_COUNT_MIN,
+    evidence.lockAcquisitionTrialCount,
+  );
   const switchingRateMargin =
     switchingRateHz == null
       ? null
@@ -1050,9 +1366,27 @@ const activeControlSurface = (
     ...(!measuredOrValidated(evidence.evidenceTier) ? ["active_control_tier_not_measured_or_validated"] : []),
     ...evidenceRefBlocker(evidence, "active_control_evidence_ref_missing"),
     ...(evidence.energyWaveformRef == null ? ["active_control_energy_waveform_ref_missing"] : []),
+    ...(evidence.energyWaveformSampleCount == null
+      ? ["active_control_energy_waveform_sample_count_missing"]
+      : !energyWaveformSampleCountValid
+        ? ["active_control_energy_waveform_sample_count_invalid"]
+        : energyWaveformSampleCountMargin == null
+          ? ["active_control_energy_waveform_sample_count_missing"]
+          : energyWaveformSampleCountMargin < 1
+            ? ["active_control_energy_waveform_sample_count_below_4096"]
+            : []),
     ...(evidence.actuatorAuthorityTraceRef == null
       ? ["active_control_actuator_authority_trace_ref_missing"]
       : []),
+    ...(evidence.actuatorAuthorityTraceSampleCount == null
+      ? ["active_control_actuator_authority_trace_sample_count_missing"]
+      : !actuatorAuthorityTraceSampleCountValid
+        ? ["active_control_actuator_authority_trace_sample_count_invalid"]
+        : actuatorAuthorityTraceSampleCountMargin == null
+          ? ["active_control_actuator_authority_trace_sample_count_missing"]
+          : actuatorAuthorityTraceSampleCountMargin < 1
+            ? ["active_control_actuator_authority_trace_sample_count_below_4096"]
+            : []),
     ...(evidence.gapSensorCalibrationRef == null
       ? ["active_control_gap_sensor_calibration_ref_missing"]
       : []),
@@ -1061,18 +1395,63 @@ const activeControlSurface = (
       ? ["active_control_controller_stability_ref_missing"]
       : []),
     ...(evidence.gapNoiseTraceRef == null ? ["active_control_gap_noise_trace_ref_missing"] : []),
+    ...(evidence.gapNoiseTraceSampleCount == null
+      ? ["active_control_gap_noise_trace_sample_count_missing"]
+      : !gapNoiseTraceSampleCountValid
+        ? ["active_control_gap_noise_trace_sample_count_invalid"]
+        : gapNoiseTraceSampleCountMargin == null
+          ? ["active_control_gap_noise_trace_sample_count_missing"]
+          : gapNoiseTraceSampleCountMargin < 1
+            ? ["active_control_gap_noise_trace_sample_count_below_4096"]
+            : []),
     ...(evidence.thermalModelRef == null ? ["active_control_thermal_model_ref_missing"] : []),
     ...(evidence.heatSinkCapacityTraceRef == null
       ? ["active_control_heat_sink_capacity_trace_ref_missing"]
       : []),
     ...(evidence.heatLoadTraceRef == null ? ["active_control_heat_load_trace_ref_missing"] : []),
+    ...(evidence.heatLoadTraceSampleCount == null
+      ? ["active_control_heat_load_trace_sample_count_missing"]
+      : !heatLoadTraceSampleCountValid
+        ? ["active_control_heat_load_trace_sample_count_invalid"]
+        : heatLoadTraceSampleCountMargin == null
+          ? ["active_control_heat_load_trace_sample_count_missing"]
+          : heatLoadTraceSampleCountMargin < 1
+            ? ["active_control_heat_load_trace_sample_count_below_4096"]
+            : []),
     ...(evidence.timingSyncTraceRef == null ? ["active_control_timing_sync_trace_ref_missing"] : []),
+    ...(evidence.timingSyncTraceSampleCount == null
+      ? ["active_control_timing_sync_trace_sample_count_missing"]
+      : !timingSyncTraceSampleCountValid
+        ? ["active_control_timing_sync_trace_sample_count_invalid"]
+        : timingSyncTraceSampleCountMargin == null
+          ? ["active_control_timing_sync_trace_sample_count_missing"]
+          : timingSyncTraceSampleCountMargin < 1
+            ? ["active_control_timing_sync_trace_sample_count_below_4096"]
+            : []),
     ...(evidence.phaseNoiseSpectrumRef == null
       ? ["active_control_phase_noise_spectrum_ref_missing"]
       : []),
+    ...(evidence.phaseNoiseSpectrumBinCount == null
+      ? ["active_control_phase_noise_spectrum_bin_count_missing"]
+      : !phaseNoiseSpectrumBinCountValid
+        ? ["active_control_phase_noise_spectrum_bin_count_invalid"]
+        : phaseNoiseSpectrumBinCountMargin == null
+          ? ["active_control_phase_noise_spectrum_bin_count_missing"]
+          : phaseNoiseSpectrumBinCountMargin < 1
+            ? ["active_control_phase_noise_spectrum_bin_count_below_512"]
+            : []),
     ...(evidence.lockAcquisitionTraceRef == null
       ? ["active_control_lock_acquisition_trace_ref_missing"]
       : []),
+    ...(evidence.lockAcquisitionTrialCount == null
+      ? ["active_control_lock_acquisition_trial_count_missing"]
+      : !lockAcquisitionTrialCountValid
+        ? ["active_control_lock_acquisition_trial_count_invalid"]
+        : lockAcquisitionTrialCountMargin == null
+          ? ["active_control_lock_acquisition_trial_count_missing"]
+          : lockAcquisitionTrialCountMargin < 1
+            ? ["active_control_lock_acquisition_trial_count_below_100"]
+            : []),
     ...(evidence.energyPerCycleJ == null
       ? ["active_control_energy_per_cycle_missing"]
       : !energyPerCycleValid
@@ -1229,6 +1608,13 @@ const activeControlSurface = (
       heatSinkCapacityW: evidence.heatSinkCapacityW ?? null,
       sourceTensorContaminationFraction: evidence.sourceTensorContaminationFraction ?? null,
       sourceTensorContaminationMargin,
+      energyWaveformSampleCountMargin,
+      actuatorAuthorityTraceSampleCountMargin,
+      gapNoiseTraceSampleCountMargin,
+      heatLoadTraceSampleCountMargin,
+      timingSyncTraceSampleCountMargin,
+      phaseNoiseSpectrumBinCountMargin,
+      lockAcquisitionTrialCountMargin,
       phaseNoiseRmsSeconds: evidence.phaseNoiseRmsSeconds ?? null,
       lockAcquisitionTimeSeconds: evidence.lockAcquisitionTimeSeconds ?? null,
       failureModeCoverageComplete: failureModeCoverageComplete ? 1 : 0,
@@ -1247,7 +1633,14 @@ const activeControlSurface = (
         evidence.timingSyncTraceRef != null &&
         evidence.phaseNoiseSpectrumRef != null &&
         evidence.lockAcquisitionTraceRef != null &&
-        evidence.failureModeRef != null
+        evidence.failureModeRef != null &&
+        (energyWaveformSampleCountMargin ?? 0) >= 1 &&
+        (actuatorAuthorityTraceSampleCountMargin ?? 0) >= 1 &&
+        (gapNoiseTraceSampleCountMargin ?? 0) >= 1 &&
+        (heatLoadTraceSampleCountMargin ?? 0) >= 1 &&
+        (timingSyncTraceSampleCountMargin ?? 0) >= 1 &&
+        (phaseNoiseSpectrumBinCountMargin ?? 0) >= 1 &&
+        (lockAcquisitionTrialCountMargin ?? 0) >= 1
           ? 1
           : 0,
     },
@@ -1357,6 +1750,34 @@ const fatigueLayerScalingSurfaces = (
     sourceTensorRetentionFraction <= 0
       ? null
       : scalarRetentionEstimate / sourceTensorRetentionFraction;
+  const layerScalingSampledLayerCountMargin = lowerBoundMargin(
+    LAYER_SCALING_SAMPLE_LAYER_COUNT_MIN,
+    evidence.layerScalingSampledLayerCount,
+  );
+  const perLayerVariationSampledLayerCountMargin = lowerBoundMargin(
+    LAYER_SCALING_SAMPLE_LAYER_COUNT_MIN,
+    evidence.perLayerVariationSampledLayerCount,
+  );
+  const activeAreaMapSampledLayerCountMargin = lowerBoundMargin(
+    LAYER_SCALING_SAMPLE_LAYER_COUNT_MIN,
+    evidence.activeAreaMapSampledLayerCount,
+  );
+  const sourceTensorRetentionSampledLayerCountMargin = lowerBoundMargin(
+    LAYER_SCALING_SAMPLE_LAYER_COUNT_MIN,
+    evidence.sourceTensorRetentionSampledLayerCount,
+  );
+  const supportCouplingSampledInterfaceCountMargin = lowerBoundMargin(
+    LAYER_SCALING_SAMPLE_INTERFACE_COUNT_MIN,
+    evidence.supportCouplingSampledInterfaceCount,
+  );
+  const electromagneticCouplingSampledInterfaceCountMargin = lowerBoundMargin(
+    LAYER_SCALING_SAMPLE_INTERFACE_COUNT_MIN,
+    evidence.electromagneticCouplingSampledInterfaceCount,
+  );
+  const mechanicalCouplingSampledInterfaceCountMargin = lowerBoundMargin(
+    LAYER_SCALING_SAMPLE_INTERFACE_COUNT_MIN,
+    evidence.mechanicalCouplingSampledInterfaceCount,
+  );
   const tierBlockers = !measuredOrValidated(evidence.evidenceTier)
     ? ["fatigue_layer_scaling_tier_not_measured_or_validated"]
     : [];
@@ -1419,14 +1840,77 @@ const fatigueLayerScalingSurfaces = (
     ...tierBlockers,
     ...receiptRefBlockers,
     ...(evidence.layerScalingMapRef == null ? ["layer_scaling_map_ref_missing"] : []),
+    ...(evidence.layerScalingSampledLayerCount == null
+      ? ["layer_scaling_sampled_layer_count_missing"]
+      : !isPositiveInteger(evidence.layerScalingSampledLayerCount)
+        ? ["layer_scaling_sampled_layer_count_invalid"]
+        : layerScalingSampledLayerCountMargin == null
+          ? ["layer_scaling_sampled_layer_count_missing"]
+          : layerScalingSampledLayerCountMargin < 1
+            ? ["layer_scaling_sampled_layer_count_below_447"]
+            : []),
     ...(evidence.perLayerVariationMapRef == null ? ["per_layer_variation_map_ref_missing"] : []),
+    ...(evidence.perLayerVariationSampledLayerCount == null
+      ? ["per_layer_variation_sampled_layer_count_missing"]
+      : !isPositiveInteger(evidence.perLayerVariationSampledLayerCount)
+        ? ["per_layer_variation_sampled_layer_count_invalid"]
+        : perLayerVariationSampledLayerCountMargin == null
+          ? ["per_layer_variation_sampled_layer_count_missing"]
+          : perLayerVariationSampledLayerCountMargin < 1
+            ? ["per_layer_variation_sampled_layer_count_below_447"]
+            : []),
     ...(evidence.nonadditivityModelRef == null ? ["layer_nonadditivity_model_ref_missing"] : []),
     ...(evidence.activeAreaMapRef == null ? ["active_area_map_ref_missing"] : []),
+    ...(evidence.activeAreaMapSampledLayerCount == null
+      ? ["active_area_map_sampled_layer_count_missing"]
+      : !isPositiveInteger(evidence.activeAreaMapSampledLayerCount)
+        ? ["active_area_map_sampled_layer_count_invalid"]
+        : activeAreaMapSampledLayerCountMargin == null
+          ? ["active_area_map_sampled_layer_count_missing"]
+          : activeAreaMapSampledLayerCountMargin < 1
+            ? ["active_area_map_sampled_layer_count_below_447"]
+            : []),
     ...(evidence.supportCouplingMapRef == null ? ["support_coupling_map_ref_missing"] : []),
+    ...(evidence.supportCouplingSampledInterfaceCount == null
+      ? ["support_coupling_sampled_interface_count_missing"]
+      : !isPositiveInteger(evidence.supportCouplingSampledInterfaceCount)
+        ? ["support_coupling_sampled_interface_count_invalid"]
+        : supportCouplingSampledInterfaceCountMargin == null
+          ? ["support_coupling_sampled_interface_count_missing"]
+          : supportCouplingSampledInterfaceCountMargin < 1
+            ? ["support_coupling_sampled_interface_count_below_446"]
+            : []),
     ...(evidence.electromagneticCouplingMapRef == null ? ["electromagnetic_coupling_map_ref_missing"] : []),
+    ...(evidence.electromagneticCouplingSampledInterfaceCount == null
+      ? ["electromagnetic_coupling_sampled_interface_count_missing"]
+      : !isPositiveInteger(evidence.electromagneticCouplingSampledInterfaceCount)
+        ? ["electromagnetic_coupling_sampled_interface_count_invalid"]
+        : electromagneticCouplingSampledInterfaceCountMargin == null
+          ? ["electromagnetic_coupling_sampled_interface_count_missing"]
+          : electromagneticCouplingSampledInterfaceCountMargin < 1
+            ? ["electromagnetic_coupling_sampled_interface_count_below_446"]
+            : []),
     ...(evidence.mechanicalCouplingMapRef == null ? ["mechanical_coupling_map_ref_missing"] : []),
+    ...(evidence.mechanicalCouplingSampledInterfaceCount == null
+      ? ["mechanical_coupling_sampled_interface_count_missing"]
+      : !isPositiveInteger(evidence.mechanicalCouplingSampledInterfaceCount)
+        ? ["mechanical_coupling_sampled_interface_count_invalid"]
+        : mechanicalCouplingSampledInterfaceCountMargin == null
+          ? ["mechanical_coupling_sampled_interface_count_missing"]
+          : mechanicalCouplingSampledInterfaceCountMargin < 1
+            ? ["mechanical_coupling_sampled_interface_count_below_446"]
+            : []),
     ...(evidence.multiphysicsCouplingRef == null ? ["multiphysics_coupling_ref_missing"] : []),
     ...(evidence.sourceTensorRetentionMapRef == null ? ["source_tensor_retention_map_ref_missing"] : []),
+    ...(evidence.sourceTensorRetentionSampledLayerCount == null
+      ? ["source_tensor_retention_sampled_layer_count_missing"]
+      : !isPositiveInteger(evidence.sourceTensorRetentionSampledLayerCount)
+        ? ["source_tensor_retention_sampled_layer_count_invalid"]
+        : sourceTensorRetentionSampledLayerCountMargin == null
+          ? ["source_tensor_retention_sampled_layer_count_missing"]
+          : sourceTensorRetentionSampledLayerCountMargin < 1
+            ? ["source_tensor_retention_sampled_layer_count_below_447"]
+            : []),
     ...(evidence.layerScalingEfficiency != null && !layerScalingEfficiencyValid
       ? ["layer_scaling_efficiency_invalid"]
       : []),
@@ -1539,6 +2023,23 @@ const fatigueLayerScalingSurfaces = (
         sourceTensorRetentionFraction,
         sourceTensorRetentionMargin,
         sourceTensorRetentionConsistencyMargin,
+        layerScalingSampledLayerCountMargin,
+        perLayerVariationSampledLayerCountMargin,
+        activeAreaMapSampledLayerCountMargin,
+        sourceTensorRetentionSampledLayerCountMargin,
+        supportCouplingSampledInterfaceCountMargin,
+        electromagneticCouplingSampledInterfaceCountMargin,
+        mechanicalCouplingSampledInterfaceCountMargin,
+        layerMapCoverageComplete:
+          (layerScalingSampledLayerCountMargin ?? 0) >= 1 &&
+          (perLayerVariationSampledLayerCountMargin ?? 0) >= 1 &&
+          (activeAreaMapSampledLayerCountMargin ?? 0) >= 1 &&
+          (sourceTensorRetentionSampledLayerCountMargin ?? 0) >= 1 &&
+          (supportCouplingSampledInterfaceCountMargin ?? 0) >= 1 &&
+          (electromagneticCouplingSampledInterfaceCountMargin ?? 0) >= 1 &&
+          (mechanicalCouplingSampledInterfaceCountMargin ?? 0) >= 1
+            ? 1
+            : 0,
         layerScalingProvenanceRefsAvailable:
           evidence.layerScalingMapRef != null &&
           evidence.perLayerVariationMapRef != null &&
@@ -1928,6 +2429,13 @@ export const buildNhm2TileSourceMaterialEvidenceReceipts = (
       controllerPhaseMarginMinDegrees: CONTROLLER_PHASE_MARGIN_MIN_DEGREES,
       controllerGainMarginMinDb: CONTROLLER_GAIN_MARGIN_MIN_DB,
       thermalSinkCapacityFactorMin: THERMAL_SINK_CAPACITY_FACTOR_MIN,
+      activeControlTimeTraceSampleCountMin: ACTIVE_CONTROL_TIME_TRACE_SAMPLE_COUNT_MIN,
+      activeControlPhaseNoiseSpectrumBinCountMin:
+        ACTIVE_CONTROL_PHASE_NOISE_SPECTRUM_BIN_COUNT_MIN,
+      activeControlLockAcquisitionTrialCountMin:
+        ACTIVE_CONTROL_LOCK_ACQUISITION_TRIAL_COUNT_MIN,
+      layerScalingSampleLayerCountMin: LAYER_SCALING_SAMPLE_LAYER_COUNT_MIN,
+      layerScalingSampleInterfaceCountMin: LAYER_SCALING_SAMPLE_INTERFACE_COUNT_MIN,
       layerScalingEfficiencyMin: LAYER_SCALING_EFFICIENCY_MIN,
       perLayerVariationFractionMax: PER_LAYER_VARIATION_FRACTION_MAX,
       layerNonadditivityFractionMax: LAYER_NONADDITIVITY_FRACTION_MAX,

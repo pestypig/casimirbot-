@@ -24,6 +24,7 @@ export type Nhm2TileSourceFullApparatusTensorOperatingBudgetV1 = {
     requiredSubsystemReceiptCount: 5;
     requiredAuthorityMetadataCount: 4;
     requiredRegions: ["wall", "hull", "exterior_shell"];
+    regionalTensorSampleCountMin: number;
     sourceSideOnly: true;
     targetEchoForbidden: true;
     scalarT00OnlyForbidden: true;
@@ -118,6 +119,7 @@ export type Nhm2TileSourceFullApparatusTensorOperatingBudgetV1 = {
     subsystemReceiptRefsComplete: boolean;
     regionalSupportRefsComplete: boolean;
     regionalSampleCountsComplete: boolean;
+    regionalSampleCountsMeetMinimum: boolean;
     fullTensorCoverageComplete: boolean;
     requiredStressEnergyTermsComplete: boolean;
     requiredRegionalCoverageComplete: boolean;
@@ -147,6 +149,12 @@ export type Nhm2TileSourceFullApparatusTensorOperatingBudgetV1 = {
     missingRegionalSupportRefIds: string[];
     regionalSampleCountMissingOrInvalidCount: number;
     missingOrInvalidRegionalSampleCountIds: string[];
+    regionalTensorSampleCountMin: number;
+    regionalSampleCountBelowMinimumCount: number;
+    regionalSampleCountBelowMinimumIds: string[];
+    wallRegionalSampleCountShortfall: number | null;
+    hullRegionalSampleCountShortfall: number | null;
+    exteriorShellRegionalSampleCountShortfall: number | null;
     requiredAuthorityMetadataCount: 4;
     authorityMetadataMissingCount: number;
     missingAuthorityMetadataIds: string[];
@@ -196,7 +204,13 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const isPositiveFiniteNumber = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value) && value > 0;
 
+const isNumberOrNull = (value: unknown): value is number | null =>
+  value === null || (typeof value === "number" && Number.isFinite(value));
+
 const round = (value: number, digits = 12): number => Number(value.toPrecision(digits));
+
+const shortfallToMinimum = (value: number | null | undefined, minimum: number): number | null =>
+  value == null ? null : round(Math.max(0, minimum - value));
 
 const COMPONENT_GROUP_IDS = ["T00", "T0i", "diagonalTij", "offDiagonalTij"] as const;
 const TENSOR_COMPONENT_IDS = [
@@ -230,6 +244,7 @@ const SUBSYSTEM_RECEIPT_IDS = [
   "fatigueLayerScaling",
 ] as const;
 const REGION_IDS = ["wall", "hull", "exteriorShell"] as const;
+const REGIONAL_TENSOR_SAMPLE_COUNT_MIN = 447;
 const AUTHORITY_METADATA_IDS = [
   "sameChart",
   "sameBasis",
@@ -333,6 +348,13 @@ export const buildNhm2TileSourceFullApparatusTensorOperatingBudget = (
     isPositiveFiniteNumber(evidence.regionalSampleCounts?.wall) &&
     isPositiveFiniteNumber(evidence.regionalSampleCounts?.hull) &&
     isPositiveFiniteNumber(evidence.regionalSampleCounts?.exteriorShell);
+  const regionalSampleCountBelowMinimumIds = REGION_IDS.filter(
+    (regionId) =>
+      isPositiveFiniteNumber(evidence.regionalSampleCounts?.[regionId]) &&
+      evidence.regionalSampleCounts[regionId] < REGIONAL_TENSOR_SAMPLE_COUNT_MIN,
+  );
+  const regionalSampleCountsMeetMinimum =
+    regionalSampleCountsComplete && regionalSampleCountBelowMinimumIds.length === 0;
   const fullTensorCoverageComplete = componentCoverageFraction === 1;
   const requiredStressEnergyTermsComplete = termCoverageFraction === 1;
   const requiredRegionalCoverageComplete = regionalCoverageFraction === 1;
@@ -521,6 +543,8 @@ export const buildNhm2TileSourceFullApparatusTensorOperatingBudget = (
       : []),
     ...(!isPositiveFiniteNumber(evidence.regionalSampleCounts?.wall)
       ? ["full_apparatus_wall_region_sample_count_missing_or_invalid_for_operating_budget"]
+      : evidence.regionalSampleCounts.wall < REGIONAL_TENSOR_SAMPLE_COUNT_MIN
+        ? ["full_apparatus_wall_region_sample_count_below_447_for_operating_budget"]
       : []),
     ...(!evidence.regionalCoverage.hull
       ? ["full_apparatus_hull_region_missing_for_operating_budget"]
@@ -530,6 +554,8 @@ export const buildNhm2TileSourceFullApparatusTensorOperatingBudget = (
       : []),
     ...(!isPositiveFiniteNumber(evidence.regionalSampleCounts?.hull)
       ? ["full_apparatus_hull_region_sample_count_missing_or_invalid_for_operating_budget"]
+      : evidence.regionalSampleCounts.hull < REGIONAL_TENSOR_SAMPLE_COUNT_MIN
+        ? ["full_apparatus_hull_region_sample_count_below_447_for_operating_budget"]
       : []),
     ...(!evidence.regionalCoverage.exteriorShell
       ? ["full_apparatus_exterior_shell_region_missing_for_operating_budget"]
@@ -539,6 +565,10 @@ export const buildNhm2TileSourceFullApparatusTensorOperatingBudget = (
       : []),
     ...(!isPositiveFiniteNumber(evidence.regionalSampleCounts?.exteriorShell)
       ? ["full_apparatus_exterior_shell_region_sample_count_missing_or_invalid_for_operating_budget"]
+      : evidence.regionalSampleCounts.exteriorShell < REGIONAL_TENSOR_SAMPLE_COUNT_MIN
+        ? [
+            "full_apparatus_exterior_shell_region_sample_count_below_447_for_operating_budget",
+          ]
       : []),
   ];
   const falsifiesCurrentCandidate =
@@ -564,6 +594,7 @@ export const buildNhm2TileSourceFullApparatusTensorOperatingBudget = (
       requiredSubsystemReceiptCount: 5,
       requiredAuthorityMetadataCount: 4,
       requiredRegions: ["wall", "hull", "exterior_shell"],
+      regionalTensorSampleCountMin: REGIONAL_TENSOR_SAMPLE_COUNT_MIN,
       sourceSideOnly: true,
       targetEchoForbidden: true,
       scalarT00OnlyForbidden: true,
@@ -640,6 +671,7 @@ export const buildNhm2TileSourceFullApparatusTensorOperatingBudget = (
       subsystemReceiptRefsComplete,
       regionalSupportRefsComplete,
       regionalSampleCountsComplete,
+      regionalSampleCountsMeetMinimum,
       fullTensorCoverageComplete,
       requiredStressEnergyTermsComplete,
       requiredRegionalCoverageComplete,
@@ -669,6 +701,21 @@ export const buildNhm2TileSourceFullApparatusTensorOperatingBudget = (
       missingRegionalSupportRefIds,
       regionalSampleCountMissingOrInvalidCount: missingOrInvalidRegionalSampleCountIds.length,
       missingOrInvalidRegionalSampleCountIds,
+      regionalTensorSampleCountMin: REGIONAL_TENSOR_SAMPLE_COUNT_MIN,
+      regionalSampleCountBelowMinimumCount: regionalSampleCountBelowMinimumIds.length,
+      regionalSampleCountBelowMinimumIds,
+      wallRegionalSampleCountShortfall: shortfallToMinimum(
+        evidence.regionalSampleCounts?.wall,
+        REGIONAL_TENSOR_SAMPLE_COUNT_MIN,
+      ),
+      hullRegionalSampleCountShortfall: shortfallToMinimum(
+        evidence.regionalSampleCounts?.hull,
+        REGIONAL_TENSOR_SAMPLE_COUNT_MIN,
+      ),
+      exteriorShellRegionalSampleCountShortfall: shortfallToMinimum(
+        evidence.regionalSampleCounts?.exteriorShell,
+        REGIONAL_TENSOR_SAMPLE_COUNT_MIN,
+      ),
       requiredAuthorityMetadataCount: 4,
       authorityMetadataMissingCount: missingAuthorityMetadataIds.length,
       missingAuthorityMetadataIds,
@@ -738,6 +785,7 @@ export const isNhm2TileSourceFullApparatusTensorOperatingBudget = (
     targets.requiredAuthorityMetadataCount === 4 &&
     Array.isArray(targets.requiredRegions) &&
     targets.requiredRegions.length === 3 &&
+    typeof targets.regionalTensorSampleCountMin === "number" &&
     targets.sourceSideOnly === true &&
     targets.targetEchoForbidden === true &&
     targets.scalarT00OnlyForbidden === true &&
@@ -756,6 +804,7 @@ export const isNhm2TileSourceFullApparatusTensorOperatingBudget = (
     typeof budget.subsystemReceiptRefsComplete === "boolean" &&
     typeof budget.regionalSupportRefsComplete === "boolean" &&
     typeof budget.regionalSampleCountsComplete === "boolean" &&
+    typeof budget.regionalSampleCountsMeetMinimum === "boolean" &&
     typeof budget.fullTensorCoverageComplete === "boolean" &&
     typeof budget.requiredStressEnergyTermsComplete === "boolean" &&
     typeof budget.requiredRegionalCoverageComplete === "boolean" &&
@@ -784,6 +833,12 @@ export const isNhm2TileSourceFullApparatusTensorOperatingBudget = (
     Array.isArray(requiredCorrections.missingRegionalSupportRefIds) &&
     typeof requiredCorrections.regionalSampleCountMissingOrInvalidCount === "number" &&
     Array.isArray(requiredCorrections.missingOrInvalidRegionalSampleCountIds) &&
+    typeof requiredCorrections.regionalTensorSampleCountMin === "number" &&
+    typeof requiredCorrections.regionalSampleCountBelowMinimumCount === "number" &&
+    Array.isArray(requiredCorrections.regionalSampleCountBelowMinimumIds) &&
+    isNumberOrNull(requiredCorrections.wallRegionalSampleCountShortfall) &&
+    isNumberOrNull(requiredCorrections.hullRegionalSampleCountShortfall) &&
+    isNumberOrNull(requiredCorrections.exteriorShellRegionalSampleCountShortfall) &&
     requiredCorrections.requiredAuthorityMetadataCount === 4 &&
     typeof requiredCorrections.authorityMetadataMissingCount === "number" &&
     Array.isArray(requiredCorrections.missingAuthorityMetadataIds) &&

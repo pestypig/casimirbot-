@@ -84,7 +84,7 @@ const region = (
   regionSupportRef: `receipt://atlas/support/${regionId}`,
   aggregationMode: "support_weighted",
   normalizationBasis: "volume",
-  sampleCount: 64,
+  sampleCount: 512,
   valueReceiptRef: `receipt://full-apparatus-tmunu/values/${regionId}`,
   blockers: [],
   warnings: [],
@@ -227,18 +227,73 @@ describe("NHM2 tile-source full-apparatus tensor values", () => {
     expect(built.summary.allRequiredRegionsTermComplete).toBe(true);
     expect(built.summary.firstBlocker).toBe("wall:sample_count_invalid");
     expect(evidence.regionalSampleCounts?.wall).toBe(0);
-    expect(evidence.regionalSampleCounts?.hull).toBe(64);
-    expect(evidence.regionalSampleCounts?.exteriorShell).toBe(64);
+    expect(evidence.regionalSampleCounts?.hull).toBe(512);
+    expect(evidence.regionalSampleCounts?.exteriorShell).toBe(512);
     expect(evidence.components.T00).toBe(false);
     expect(evidence.components.T0i).toBe(false);
     expect(evidence.components.diagonalTij).toBe(false);
     expect(evidence.components.offDiagonalTij).toBe(false);
     expect(budget.summary.fullApparatusTensorEvidenceReady).toBe(false);
     expect(budget.derivedOperatingBudget.regionalSampleCountsComplete).toBe(false);
+    expect(budget.derivedOperatingBudget.regionalSampleCountsMeetMinimum).toBe(false);
     expect(budget.requiredCorrections.missingOrInvalidRegionalSampleCountIds).toEqual(["wall"]);
     expect(budget.blockers).toContain(
       "full_apparatus_wall_region_sample_count_missing_or_invalid_for_operating_budget",
     );
+  });
+
+  it("blocks regional tensor values sampled below the 447-layer architecture minimum", () => {
+    const built = artifact({
+      regions: [
+        region("global", 1.0e9, { sampleCount: 128 }),
+        region("hull", 1.1e9, { sampleCount: 256 }),
+        region("wall", 1.6995e9, { sampleCount: 128 }),
+        region("exterior_shell", 9.5e8, { sampleCount: 300 }),
+      ],
+    });
+    const evidence = buildFullApparatusTensorEvidenceFromTensorValues({
+      artifact: built,
+      evidenceTier: "validated_simulation",
+      subsystemReceiptRefs,
+    });
+    const budget = buildNhm2TileSourceFullApparatusTensorOperatingBudget({
+      generatedAt,
+      fullApparatusTensorEvidence: evidence,
+    });
+
+    expect(built.summary.valueArtifactReadyForReceipt).toBe(false);
+    expect(built.summary.regionalSampleCountMin).toBe(447);
+    expect(built.summary.undersampledRegionRefs).toEqual(
+      expect.arrayContaining([
+        "global:sample_count_below_447",
+        "hull:sample_count_below_447",
+        "wall:sample_count_below_447",
+        "exterior_shell:sample_count_below_447",
+      ]),
+    );
+    expect(built.summary.firstBlocker).toBe("global:sample_count_below_447");
+    expect(evidence.components.T00).toBe(false);
+    expect(evidence.regionalSampleCounts?.wall).toBe(128);
+    expect(budget.summary.fullApparatusTensorEvidenceReady).toBe(false);
+    expect(budget.derivedOperatingBudget.regionalSampleCountsComplete).toBe(true);
+    expect(budget.derivedOperatingBudget.regionalSampleCountsMeetMinimum).toBe(false);
+    expect(budget.requiredCorrections.regionalTensorSampleCountMin).toBe(447);
+    expect(budget.requiredCorrections.regionalSampleCountBelowMinimumIds).toEqual([
+      "wall",
+      "hull",
+      "exteriorShell",
+    ]);
+    expect(budget.requiredCorrections.wallRegionalSampleCountShortfall).toBe(319);
+    expect(budget.requiredCorrections.hullRegionalSampleCountShortfall).toBe(191);
+    expect(budget.requiredCorrections.exteriorShellRegionalSampleCountShortfall).toBe(147);
+    expect(budget.blockers).toEqual(
+      expect.arrayContaining([
+        "full_apparatus_wall_region_sample_count_below_447_for_operating_budget",
+        "full_apparatus_hull_region_sample_count_below_447_for_operating_budget",
+        "full_apparatus_exterior_shell_region_sample_count_below_447_for_operating_budget",
+      ]),
+    );
+    expect(budget.summary.transportClaimAllowed).toBe(false);
   });
 
   it("blocks metric-echo and scalar-proxy component authority", () => {
@@ -435,11 +490,12 @@ describe("NHM2 tile-source full-apparatus tensor values", () => {
     expect(receipts.summary.fullApparatusTensorReady).toBe(false);
     expect(budget.summary.fullApparatusTensorEvidenceReady).toBe(true);
     expect(evidence.regionalSampleCounts).toEqual({
-      wall: 64,
-      hull: 64,
-      exteriorShell: 64,
+      wall: 512,
+      hull: 512,
+      exteriorShell: 512,
     });
     expect(budget.derivedOperatingBudget.regionalSampleCountsComplete).toBe(true);
+    expect(budget.derivedOperatingBudget.regionalSampleCountsMeetMinimum).toBe(true);
     expect(budget.derivedOperatingBudget.tensorValueArtifactAvailable).toBe(true);
     expect(budget.summary.transportClaimAllowed).toBe(false);
   });

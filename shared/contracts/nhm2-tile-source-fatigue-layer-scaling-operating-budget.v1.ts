@@ -31,6 +31,8 @@ export type Nhm2TileSourceFatigueLayerScalingOperatingBudgetV1 = {
     interlayerAdhesionMarginMin: 1;
     supportCouplingStatusRequired: "pass";
     requiredCycleCount: 1e9;
+    layerMapSampleLayerCountMin: 447;
+    couplingMapSampleInterfaceCountMin: 446;
     effectiveActiveLayerCountMin: number;
     effectiveSourceTensorLayerCountMin: number;
   };
@@ -53,6 +55,13 @@ export type Nhm2TileSourceFatigueLayerScalingOperatingBudgetV1 = {
     mechanicalCouplingMapRef: string | null;
     multiphysicsCouplingRef: string | null;
     sourceTensorRetentionMapRef: string | null;
+    layerScalingSampledLayerCount: number | null;
+    perLayerVariationSampledLayerCount: number | null;
+    activeAreaMapSampledLayerCount: number | null;
+    sourceTensorRetentionSampledLayerCount: number | null;
+    supportCouplingSampledInterfaceCount: number | null;
+    electromagneticCouplingSampledInterfaceCount: number | null;
+    mechanicalCouplingSampledInterfaceCount: number | null;
     cycleCountToFailure: number | null;
     requiredCycleCount: number | null;
     thermalCycleDriftFraction: number | null;
@@ -88,6 +97,14 @@ export type Nhm2TileSourceFatigueLayerScalingOperatingBudgetV1 = {
     effectiveActiveLayerCountMargin: number | null;
     sourceTensorRetentionFraction: number | null;
     sourceTensorRetentionMargin: number | null;
+    layerMapCoverageComplete: boolean;
+    layerScalingSampledLayerCountMargin: number | null;
+    perLayerVariationSampledLayerCountMargin: number | null;
+    activeAreaMapSampledLayerCountMargin: number | null;
+    sourceTensorRetentionSampledLayerCountMargin: number | null;
+    supportCouplingSampledInterfaceCountMargin: number | null;
+    electromagneticCouplingSampledInterfaceCountMargin: number | null;
+    mechanicalCouplingSampledInterfaceCountMargin: number | null;
   };
   requiredCorrections: {
     cycleMarginMin: 1;
@@ -127,6 +144,15 @@ export type Nhm2TileSourceFatigueLayerScalingOperatingBudgetV1 = {
     missingLayerScalingProvenanceRefCount: number;
     supportCouplingStatusRequired: "pass";
     supportCouplingStatusSatisfied: boolean;
+    layerMapSampleLayerCountMin: 447;
+    layerScalingSampledLayerCountShortfall: number | null;
+    perLayerVariationSampledLayerCountShortfall: number | null;
+    activeAreaMapSampledLayerCountShortfall: number | null;
+    sourceTensorRetentionSampledLayerCountShortfall: number | null;
+    couplingMapSampleInterfaceCountMin: 446;
+    supportCouplingSampledInterfaceCountShortfall: number | null;
+    electromagneticCouplingSampledInterfaceCountShortfall: number | null;
+    mechanicalCouplingSampledInterfaceCountShortfall: number | null;
   };
   blockers: string[];
   summary: {
@@ -158,6 +184,7 @@ export type BuildNhm2TileSourceFatigueLayerScalingOperatingBudgetInput = {
 const DEFAULT_SELECTED_PROFILE_ID =
   "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1";
 const LAYER_COUNT = 447;
+const INTERFACE_COUNT = LAYER_COUNT - 1;
 const LAYER_SCALING_EFFICIENCY_MIN = 0.9;
 const PER_LAYER_VARIATION_FRACTION_MAX = 0.05;
 const LAYER_NONADDITIVITY_FRACTION_MAX = 0.1;
@@ -201,6 +228,9 @@ const safeRatio = (numerator: number | null, denominator: number | null): number
 const isPositiveFinite = (value: number | null | undefined): value is number =>
   typeof value === "number" && Number.isFinite(value) && value > 0;
 
+const isPositiveInteger = (value: number | null | undefined): value is number =>
+  typeof value === "number" && Number.isFinite(value) && Number.isInteger(value) && value > 0;
+
 const isUnitFraction = (value: number | null | undefined): value is number =>
   typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1;
 
@@ -217,6 +247,14 @@ const shortfallToMinimum = (value: number | null | undefined, minimum: number): 
 
 const reductionToMaximum = (value: number | null | undefined, maximum: number): number | null =>
   value == null ? null : round(Math.max(0, value - maximum));
+
+const sampleCountMargin = (minimum: number, value: number | null | undefined): number | null =>
+  value == null || !Number.isFinite(value) ? null : round(value / minimum);
+
+const sampleCountShortfall = (
+  minimum: number,
+  value: number | null | undefined,
+): number | null => (value == null ? null : round(Math.max(0, minimum - value)));
 
 export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
   input: BuildNhm2TileSourceFatigueLayerScalingOperatingBudgetInput = {},
@@ -237,6 +275,27 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
   const electromagneticCouplingValid = isUnitFraction(evidence?.electromagneticCouplingFraction);
   const mechanicalCouplingValid = isUnitFraction(evidence?.mechanicalCouplingFraction);
   const sourceTensorRetentionValid = isUnitFraction(evidence?.sourceTensorRetentionFraction);
+  const layerScalingSampledLayerCountValid = isPositiveInteger(
+    evidence?.layerScalingSampledLayerCount,
+  );
+  const perLayerVariationSampledLayerCountValid = isPositiveInteger(
+    evidence?.perLayerVariationSampledLayerCount,
+  );
+  const activeAreaMapSampledLayerCountValid = isPositiveInteger(
+    evidence?.activeAreaMapSampledLayerCount,
+  );
+  const sourceTensorRetentionSampledLayerCountValid = isPositiveInteger(
+    evidence?.sourceTensorRetentionSampledLayerCount,
+  );
+  const supportCouplingSampledInterfaceCountValid = isPositiveInteger(
+    evidence?.supportCouplingSampledInterfaceCount,
+  );
+  const electromagneticCouplingSampledInterfaceCountValid = isPositiveInteger(
+    evidence?.electromagneticCouplingSampledInterfaceCount,
+  );
+  const mechanicalCouplingSampledInterfaceCountValid = isPositiveInteger(
+    evidence?.mechanicalCouplingSampledInterfaceCount,
+  );
   const cycleMargin = safeRatio(
     cycleCountValid ? evidence?.cycleCountToFailure ?? null : null,
     requiredCycleCountValid ? requiredCycleCount : null,
@@ -308,6 +367,42 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
     sourceTensorRetentionFraction,
     SOURCE_TENSOR_RETENTION_FRACTION_MIN,
   );
+  const layerScalingSampledLayerCountMargin = sampleCountMargin(
+    LAYER_COUNT,
+    evidence?.layerScalingSampledLayerCount,
+  );
+  const perLayerVariationSampledLayerCountMargin = sampleCountMargin(
+    LAYER_COUNT,
+    evidence?.perLayerVariationSampledLayerCount,
+  );
+  const activeAreaMapSampledLayerCountMargin = sampleCountMargin(
+    LAYER_COUNT,
+    evidence?.activeAreaMapSampledLayerCount,
+  );
+  const sourceTensorRetentionSampledLayerCountMargin = sampleCountMargin(
+    LAYER_COUNT,
+    evidence?.sourceTensorRetentionSampledLayerCount,
+  );
+  const supportCouplingSampledInterfaceCountMargin = sampleCountMargin(
+    INTERFACE_COUNT,
+    evidence?.supportCouplingSampledInterfaceCount,
+  );
+  const electromagneticCouplingSampledInterfaceCountMargin = sampleCountMargin(
+    INTERFACE_COUNT,
+    evidence?.electromagneticCouplingSampledInterfaceCount,
+  );
+  const mechanicalCouplingSampledInterfaceCountMargin = sampleCountMargin(
+    INTERFACE_COUNT,
+    evidence?.mechanicalCouplingSampledInterfaceCount,
+  );
+  const layerMapCoverageComplete =
+    (layerScalingSampledLayerCountMargin ?? 0) >= 1 &&
+    (perLayerVariationSampledLayerCountMargin ?? 0) >= 1 &&
+    (activeAreaMapSampledLayerCountMargin ?? 0) >= 1 &&
+    (sourceTensorRetentionSampledLayerCountMargin ?? 0) >= 1 &&
+    (supportCouplingSampledInterfaceCountMargin ?? 0) >= 1 &&
+    (electromagneticCouplingSampledInterfaceCountMargin ?? 0) >= 1 &&
+    (mechanicalCouplingSampledInterfaceCountMargin ?? 0) >= 1;
   const effectiveSourceTensorLayerCount =
     sourceTensorRetentionFraction == null
       ? null
@@ -422,6 +517,15 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
     ...(evidence?.layerScalingMapRef == null
       ? ["layer_scaling_map_ref_missing_for_operating_budget"]
       : []),
+    ...(evidence?.layerScalingSampledLayerCount == null
+      ? ["layer_scaling_sampled_layer_count_missing_for_operating_budget"]
+      : !layerScalingSampledLayerCountValid
+        ? ["layer_scaling_sampled_layer_count_invalid_for_operating_budget"]
+        : layerScalingSampledLayerCountMargin == null
+          ? ["layer_scaling_sampled_layer_count_missing_for_operating_budget"]
+          : layerScalingSampledLayerCountMargin < 1
+            ? ["layer_scaling_sampled_layer_count_below_447_for_operating_budget"]
+            : []),
     ...(evidence?.perLayerVariationFraction == null
       ? ["per_layer_variation_fraction_missing_for_operating_budget"]
       : !perLayerVariationValid
@@ -432,6 +536,15 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
     ...(evidence?.perLayerVariationMapRef == null
       ? ["per_layer_variation_map_ref_missing_for_operating_budget"]
       : []),
+    ...(evidence?.perLayerVariationSampledLayerCount == null
+      ? ["per_layer_variation_sampled_layer_count_missing_for_operating_budget"]
+      : !perLayerVariationSampledLayerCountValid
+        ? ["per_layer_variation_sampled_layer_count_invalid_for_operating_budget"]
+        : perLayerVariationSampledLayerCountMargin == null
+          ? ["per_layer_variation_sampled_layer_count_missing_for_operating_budget"]
+          : perLayerVariationSampledLayerCountMargin < 1
+            ? ["per_layer_variation_sampled_layer_count_below_447_for_operating_budget"]
+            : []),
     ...(evidence?.nonadditivityFraction == null
       ? ["layer_nonadditivity_fraction_missing_for_operating_budget"]
       : !nonadditivityValid
@@ -452,6 +565,15 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
     ...(evidence?.activeAreaMapRef == null
       ? ["active_area_map_ref_missing_for_operating_budget"]
       : []),
+    ...(evidence?.activeAreaMapSampledLayerCount == null
+      ? ["active_area_map_sampled_layer_count_missing_for_operating_budget"]
+      : !activeAreaMapSampledLayerCountValid
+        ? ["active_area_map_sampled_layer_count_invalid_for_operating_budget"]
+        : activeAreaMapSampledLayerCountMargin == null
+          ? ["active_area_map_sampled_layer_count_missing_for_operating_budget"]
+          : activeAreaMapSampledLayerCountMargin < 1
+            ? ["active_area_map_sampled_layer_count_below_447_for_operating_budget"]
+            : []),
     ...(effectiveActiveLayerCountMargin != null && effectiveActiveLayerCountMargin < 1
       ? ["effective_active_layer_count_below_operating_budget"]
       : []),
@@ -466,6 +588,15 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
     ...(evidence?.supportCouplingMapRef == null
       ? ["support_coupling_map_ref_missing_for_operating_budget"]
       : []),
+    ...(evidence?.supportCouplingSampledInterfaceCount == null
+      ? ["support_coupling_sampled_interface_count_missing_for_operating_budget"]
+      : !supportCouplingSampledInterfaceCountValid
+        ? ["support_coupling_sampled_interface_count_invalid_for_operating_budget"]
+        : supportCouplingSampledInterfaceCountMargin == null
+          ? ["support_coupling_sampled_interface_count_missing_for_operating_budget"]
+          : supportCouplingSampledInterfaceCountMargin < 1
+            ? ["support_coupling_sampled_interface_count_below_446_for_operating_budget"]
+            : []),
     ...(evidence?.supportCouplingFraction == null
       ? ["support_coupling_fraction_missing_for_operating_budget"]
       : !supportCouplingValid
@@ -483,6 +614,15 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
     ...(evidence?.electromagneticCouplingMapRef == null
       ? ["electromagnetic_coupling_map_ref_missing_for_operating_budget"]
       : []),
+    ...(evidence?.electromagneticCouplingSampledInterfaceCount == null
+      ? ["electromagnetic_coupling_sampled_interface_count_missing_for_operating_budget"]
+      : !electromagneticCouplingSampledInterfaceCountValid
+        ? ["electromagnetic_coupling_sampled_interface_count_invalid_for_operating_budget"]
+        : electromagneticCouplingSampledInterfaceCountMargin == null
+          ? ["electromagnetic_coupling_sampled_interface_count_missing_for_operating_budget"]
+          : electromagneticCouplingSampledInterfaceCountMargin < 1
+            ? ["electromagnetic_coupling_sampled_interface_count_below_446_for_operating_budget"]
+            : []),
     ...(evidence?.mechanicalCouplingFraction == null
       ? ["mechanical_coupling_fraction_missing_for_operating_budget"]
       : !mechanicalCouplingValid
@@ -493,12 +633,30 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
     ...(evidence?.mechanicalCouplingMapRef == null
       ? ["mechanical_coupling_map_ref_missing_for_operating_budget"]
       : []),
+    ...(evidence?.mechanicalCouplingSampledInterfaceCount == null
+      ? ["mechanical_coupling_sampled_interface_count_missing_for_operating_budget"]
+      : !mechanicalCouplingSampledInterfaceCountValid
+        ? ["mechanical_coupling_sampled_interface_count_invalid_for_operating_budget"]
+        : mechanicalCouplingSampledInterfaceCountMargin == null
+          ? ["mechanical_coupling_sampled_interface_count_missing_for_operating_budget"]
+          : mechanicalCouplingSampledInterfaceCountMargin < 1
+            ? ["mechanical_coupling_sampled_interface_count_below_446_for_operating_budget"]
+            : []),
     ...(evidence?.multiphysicsCouplingRef == null
       ? ["multiphysics_coupling_ref_missing_for_operating_budget"]
       : []),
     ...(evidence?.sourceTensorRetentionMapRef == null
       ? ["source_tensor_retention_map_ref_missing_for_operating_budget"]
       : []),
+    ...(evidence?.sourceTensorRetentionSampledLayerCount == null
+      ? ["source_tensor_retention_sampled_layer_count_missing_for_operating_budget"]
+      : !sourceTensorRetentionSampledLayerCountValid
+        ? ["source_tensor_retention_sampled_layer_count_invalid_for_operating_budget"]
+        : sourceTensorRetentionSampledLayerCountMargin == null
+          ? ["source_tensor_retention_sampled_layer_count_missing_for_operating_budget"]
+          : sourceTensorRetentionSampledLayerCountMargin < 1
+            ? ["source_tensor_retention_sampled_layer_count_below_447_for_operating_budget"]
+            : []),
     ...(evidence?.sourceTensorRetentionFraction != null && !sourceTensorRetentionValid
       ? ["source_tensor_retention_fraction_invalid_for_operating_budget"]
       : []),
@@ -537,6 +695,20 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
             "source_tensor_retention_fraction_invalid_for_operating_budget",
             "source_tensor_retention_below_0p9_operating_budget",
             "support_coupling_status_not_pass_for_operating_budget",
+            "layer_scaling_sampled_layer_count_invalid_for_operating_budget",
+            "per_layer_variation_sampled_layer_count_invalid_for_operating_budget",
+            "active_area_map_sampled_layer_count_invalid_for_operating_budget",
+            "source_tensor_retention_sampled_layer_count_invalid_for_operating_budget",
+            "support_coupling_sampled_interface_count_invalid_for_operating_budget",
+            "electromagnetic_coupling_sampled_interface_count_invalid_for_operating_budget",
+            "mechanical_coupling_sampled_interface_count_invalid_for_operating_budget",
+            "layer_scaling_sampled_layer_count_below_447_for_operating_budget",
+            "per_layer_variation_sampled_layer_count_below_447_for_operating_budget",
+            "active_area_map_sampled_layer_count_below_447_for_operating_budget",
+            "source_tensor_retention_sampled_layer_count_below_447_for_operating_budget",
+            "support_coupling_sampled_interface_count_below_446_for_operating_budget",
+            "electromagnetic_coupling_sampled_interface_count_below_446_for_operating_budget",
+            "mechanical_coupling_sampled_interface_count_below_446_for_operating_budget",
           ].includes(blocker),
         )
       : false;
@@ -566,6 +738,8 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
       interlayerAdhesionMarginMin: INTERLAYER_ADHESION_MARGIN_MIN,
       supportCouplingStatusRequired: "pass",
       requiredCycleCount: REQUIRED_CYCLE_COUNT,
+      layerMapSampleLayerCountMin: LAYER_COUNT,
+      couplingMapSampleInterfaceCountMin: INTERFACE_COUNT,
       effectiveActiveLayerCountMin: round(EFFECTIVE_ACTIVE_LAYER_COUNT_MIN),
       effectiveSourceTensorLayerCountMin: round(EFFECTIVE_SOURCE_TENSOR_LAYER_COUNT_MIN),
     },
@@ -588,6 +762,23 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
       mechanicalCouplingMapRef: stringOrNull(evidence?.mechanicalCouplingMapRef),
       multiphysicsCouplingRef: stringOrNull(evidence?.multiphysicsCouplingRef),
       sourceTensorRetentionMapRef: stringOrNull(evidence?.sourceTensorRetentionMapRef),
+      layerScalingSampledLayerCount: finiteOrNull(evidence?.layerScalingSampledLayerCount),
+      perLayerVariationSampledLayerCount: finiteOrNull(
+        evidence?.perLayerVariationSampledLayerCount,
+      ),
+      activeAreaMapSampledLayerCount: finiteOrNull(evidence?.activeAreaMapSampledLayerCount),
+      sourceTensorRetentionSampledLayerCount: finiteOrNull(
+        evidence?.sourceTensorRetentionSampledLayerCount,
+      ),
+      supportCouplingSampledInterfaceCount: finiteOrNull(
+        evidence?.supportCouplingSampledInterfaceCount,
+      ),
+      electromagneticCouplingSampledInterfaceCount: finiteOrNull(
+        evidence?.electromagneticCouplingSampledInterfaceCount,
+      ),
+      mechanicalCouplingSampledInterfaceCount: finiteOrNull(
+        evidence?.mechanicalCouplingSampledInterfaceCount,
+      ),
       cycleCountToFailure: finiteOrNull(evidence?.cycleCountToFailure),
       requiredCycleCount: finiteOrNull(evidence?.requiredCycleCount),
       thermalCycleDriftFraction: finiteOrNull(evidence?.thermalCycleDriftFraction),
@@ -640,6 +831,14 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
       effectiveActiveLayerCountMargin,
       sourceTensorRetentionFraction,
       sourceTensorRetentionMargin,
+      layerMapCoverageComplete,
+      layerScalingSampledLayerCountMargin,
+      perLayerVariationSampledLayerCountMargin,
+      activeAreaMapSampledLayerCountMargin,
+      sourceTensorRetentionSampledLayerCountMargin,
+      supportCouplingSampledInterfaceCountMargin,
+      electromagneticCouplingSampledInterfaceCountMargin,
+      mechanicalCouplingSampledInterfaceCountMargin,
     },
     requiredCorrections: {
       cycleMarginMin: 1,
@@ -724,6 +923,36 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
       missingLayerScalingProvenanceRefCount,
       supportCouplingStatusRequired: "pass",
       supportCouplingStatusSatisfied: evidence?.supportCouplingStatus === "pass",
+      layerMapSampleLayerCountMin: LAYER_COUNT,
+      layerScalingSampledLayerCountShortfall: sampleCountShortfall(
+        LAYER_COUNT,
+        evidence?.layerScalingSampledLayerCount,
+      ),
+      perLayerVariationSampledLayerCountShortfall: sampleCountShortfall(
+        LAYER_COUNT,
+        evidence?.perLayerVariationSampledLayerCount,
+      ),
+      activeAreaMapSampledLayerCountShortfall: sampleCountShortfall(
+        LAYER_COUNT,
+        evidence?.activeAreaMapSampledLayerCount,
+      ),
+      sourceTensorRetentionSampledLayerCountShortfall: sampleCountShortfall(
+        LAYER_COUNT,
+        evidence?.sourceTensorRetentionSampledLayerCount,
+      ),
+      couplingMapSampleInterfaceCountMin: INTERFACE_COUNT,
+      supportCouplingSampledInterfaceCountShortfall: sampleCountShortfall(
+        INTERFACE_COUNT,
+        evidence?.supportCouplingSampledInterfaceCount,
+      ),
+      electromagneticCouplingSampledInterfaceCountShortfall: sampleCountShortfall(
+        INTERFACE_COUNT,
+        evidence?.electromagneticCouplingSampledInterfaceCount,
+      ),
+      mechanicalCouplingSampledInterfaceCountShortfall: sampleCountShortfall(
+        INTERFACE_COUNT,
+        evidence?.mechanicalCouplingSampledInterfaceCount,
+      ),
     },
     blockers,
     summary: {
@@ -787,6 +1016,8 @@ export const isNhm2TileSourceFatigueLayerScalingOperatingBudget = (
     targets.delaminationMarginMin === 1 &&
     targets.interlayerAdhesionMarginMin === 1 &&
     targets.supportCouplingStatusRequired === "pass" &&
+    targets.layerMapSampleLayerCountMin === LAYER_COUNT &&
+    targets.couplingMapSampleInterfaceCountMin === INTERFACE_COUNT &&
     typeof targets.effectiveActiveLayerCountMin === "number" &&
     typeof targets.effectiveSourceTensorLayerCountMin === "number" &&
     supplied != null &&
@@ -831,6 +1062,15 @@ export const isNhm2TileSourceFatigueLayerScalingOperatingBudget = (
     typeof requiredCorrections.missingLayerScalingProvenanceRefCount === "number" &&
     requiredCorrections.supportCouplingStatusRequired === "pass" &&
     typeof requiredCorrections.supportCouplingStatusSatisfied === "boolean" &&
+    requiredCorrections.layerMapSampleLayerCountMin === LAYER_COUNT &&
+    isNumberOrNull(requiredCorrections.layerScalingSampledLayerCountShortfall) &&
+    isNumberOrNull(requiredCorrections.perLayerVariationSampledLayerCountShortfall) &&
+    isNumberOrNull(requiredCorrections.activeAreaMapSampledLayerCountShortfall) &&
+    isNumberOrNull(requiredCorrections.sourceTensorRetentionSampledLayerCountShortfall) &&
+    requiredCorrections.couplingMapSampleInterfaceCountMin === INTERFACE_COUNT &&
+    isNumberOrNull(requiredCorrections.supportCouplingSampledInterfaceCountShortfall) &&
+    isNumberOrNull(requiredCorrections.electromagneticCouplingSampledInterfaceCountShortfall) &&
+    isNumberOrNull(requiredCorrections.mechanicalCouplingSampledInterfaceCountShortfall) &&
     Array.isArray(value.blockers) &&
     value.blockers.every((entry) => typeof entry === "string") &&
     summary != null &&

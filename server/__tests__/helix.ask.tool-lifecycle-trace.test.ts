@@ -3576,6 +3576,69 @@ describe("Helix Ask tool lifecycle trace", () => {
     );
   });
 
+  it("reconstructs compound rail rows from explicit prompt contracts when route payload drops the contract", () => {
+    const turnId = "ask:test:compound-debug-index:missing-contract";
+    const prompt =
+      "Use internet_search.web_research to find a current public source about Codex, " +
+      "then use helix_ask.reflect_theory_context to connect that source to the receipts-as-observations rule, " +
+      "then run scientific-calculator.solve_expression with this exact expression: (9+3)*7-25.";
+    const payload: Record<string, unknown> = {
+      active_turn_id: turnId,
+      active_prompt: prompt,
+      tool_call_admission_decision: {
+        requested_capability: "internet_search.web_research",
+        compound_requested_capabilities: [
+          "internet_search.web_research",
+          "helix_ask.reflect_theory_context",
+          "scientific-calculator.solve_expression",
+        ],
+        admitted_tool_families: ["internet_search", "theory_locator", "calculator", "workstation_action"],
+        required_observation_kinds_for_requested_capability: ["internet_search_observation"],
+      },
+      capability_plan: {
+        requested_capability: "internet_search.web_research",
+        selected_capability: "internet-search.search_web",
+        compound_requested_capabilities: [
+          "internet_search.web_research",
+          "helix_ask.reflect_theory_context",
+          "scientific-calculator.solve_expression",
+        ],
+      },
+      terminal_artifact_kind: "request_user_input",
+      terminal_answer_authority: { terminal_artifact_kind: "request_user_input" },
+      terminal_presentation: { terminal_artifact_kind: "request_user_input" },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: `${turnId}:agent_runtime_loop_admission`,
+          kind: "agent_runtime_loop_admission",
+          payload: { assistant_answer: false, raw_content_included: false },
+        },
+      ],
+    };
+
+    const index = buildArtifactQueryIndex({ turnId, payload });
+
+    expect(index.compound_capability_contract).toMatchObject({
+      subgoals: [
+        expect.objectContaining({ requested_capability: "internet_search.web_research" }),
+        expect.objectContaining({ requested_capability: "helix_ask.reflect_theory_context" }),
+        expect.objectContaining({ requested_capability: "scientific-calculator.solve_expression" }),
+      ],
+    });
+    expect(index.compound_subgoal_rail_statuses).toEqual([
+      expect.objectContaining({ requested_capability: "internet_search.web_research" }),
+      expect.objectContaining({ requested_capability: "helix_ask.reflect_theory_context" }),
+      expect.objectContaining({ requested_capability: "scientific-calculator.solve_expression" }),
+    ]);
+    expect(index.codex_parity_agent_spine_rail_table).toMatchObject({
+      compound_subgoal_count: 3,
+      first_incomplete_compound_requested_capability: "internet_search.web_research",
+      compound_first_broken_rail: "capability_execution",
+      compound_rail_failure_code: "compound_subgoal_dropped",
+      compound_repair_target: "agent_step_selection",
+    });
+  });
+
   it("synthesizes fail-closed rail status for required compound subgoals dropped from the execution ledger", () => {
     const turnId = "ask:test:compound-debug-index:dropped-subgoal";
     const workspaceSubgoalId = `${turnId}:compound_capability_subgoal:1:workspace_os_status`;

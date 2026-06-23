@@ -226,6 +226,63 @@ describe("model-only compound coverage from answer artifacts", () => {
     expect(decision.decision).toBe("allow_terminal");
   });
 
+  it("does not let stale model-only coverage supersede explicit compound tool capability requirements", () => {
+    const turnId = "ask:test:model-only-compound-tool-contract";
+    const payload = withModelAnswer(turnId, completeAnswer);
+    const coverage = installCoverage(payload, turnId);
+    payload.compound_capability_contract = {
+      schema: "helix.compound_capability_contract.v1",
+      turn_id: turnId,
+      prompt_shape: "compound_capability",
+      requires_all_subgoals: true,
+      terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+      subgoals: [
+        {
+          subgoal_id: `${turnId}:compound_capability_subgoal:1:internet_search_web_research`,
+          order: 1,
+          requested_capability: "internet_search.web_research",
+          runtime_capability: "internet-search.search_web",
+          required_observation_kinds: ["internet_search_observation"],
+          satisfaction: "pending",
+        },
+        {
+          subgoal_id: `${turnId}:compound_capability_subgoal:2:scientific_calculator_solve_expression`,
+          order: 2,
+          requested_capability: "scientific-calculator.solve_expression",
+          runtime_capability: "scientific-calculator.solve_expression",
+          required_observation_kinds: ["calculator_result"],
+          satisfaction: "pending",
+        },
+      ],
+    };
+    payload.tool_call_admission_decision = {
+      compound_requested_capabilities: [
+        "internet_search.web_research",
+        "scientific-calculator.solve_expression",
+      ],
+    };
+    payload.compound_prompt_coverage_gate = {
+      schema: "helix.compound_prompt_coverage_gate.v1",
+      applies: true,
+      passed: false,
+      decision: "FAIL_CLOSED",
+      required_count: 2,
+      answered_count: 0,
+      unresolved_requirement_ids: ["internet_search.web_research", "scientific-calculator.solve_expression"],
+    };
+
+    const decision = buildSolverControllerDecision({
+      turnId,
+      finalRoute: "model_only_concept",
+      payload,
+    });
+
+    expect(coverage.passed).toBe(true);
+    expect(decision.blocking_reasons).toContain("compound_prompt_coverage_incomplete");
+    expect(decision.compound_prompt_coverage_gate_superseded_by_answer_artifact).toBeUndefined();
+    expect(decision.decision).not.toBe("allow_terminal");
+  });
+
   it("keeps weak direct answers from satisfying compound coverage", () => {
     const turnId = "ask:test:model-only-compound-weak";
     const payload = withModelAnswer(turnId, "An electron is a fundamental subatomic particle.");

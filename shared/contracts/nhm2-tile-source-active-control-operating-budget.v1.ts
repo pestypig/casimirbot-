@@ -32,6 +32,9 @@ export type Nhm2TileSourceActiveControlOperatingBudgetV1 = {
     thermalSinkCapacityFactorMin: 1.2;
     sourceTensorContaminationFractionMax: 0.05;
     requiredGapControlAuthorityN: number;
+    timeTraceSampleCountMin: number;
+    phaseNoiseSpectrumBinCountMin: number;
+    lockAcquisitionTrialCountMin: number;
   };
   suppliedActiveControlEvidence: {
     evidenceTier: string;
@@ -48,6 +51,13 @@ export type Nhm2TileSourceActiveControlOperatingBudgetV1 = {
     timingSyncTraceRef: string | null;
     phaseNoiseSpectrumRef: string | null;
     lockAcquisitionTraceRef: string | null;
+    energyWaveformSampleCount: number | null;
+    actuatorAuthorityTraceSampleCount: number | null;
+    gapNoiseTraceSampleCount: number | null;
+    heatLoadTraceSampleCount: number | null;
+    timingSyncTraceSampleCount: number | null;
+    phaseNoiseSpectrumBinCount: number | null;
+    lockAcquisitionTrialCount: number | null;
     energyPerCycleJ: number | null;
     actuatorAuthorityN: number | null;
     bandwidthHz: number | null;
@@ -79,6 +89,7 @@ export type Nhm2TileSourceActiveControlOperatingBudgetV1 = {
     activeControlCalibrationRefsAvailable: boolean;
     noiseSpectrumAvailable: boolean;
     failureModeCoverageComplete: boolean;
+    activeControlTraceSamplingComplete: boolean;
     switchingRateMargin: number | null;
     bandwidthMargin: number | null;
     noiseMargin: number | null;
@@ -89,6 +100,13 @@ export type Nhm2TileSourceActiveControlOperatingBudgetV1 = {
     thermalAccountingMargin: number | null;
     thermalSinkCapacityMargin: number | null;
     sourceTensorContaminationMargin: number | null;
+    energyWaveformSampleCountMargin: number | null;
+    actuatorAuthorityTraceSampleCountMargin: number | null;
+    gapNoiseTraceSampleCountMargin: number | null;
+    heatLoadTraceSampleCountMargin: number | null;
+    timingSyncTraceSampleCountMargin: number | null;
+    phaseNoiseSpectrumBinCountMargin: number | null;
+    lockAcquisitionTrialCountMargin: number | null;
   };
   requiredCorrections: {
     switchingRateTargetHz: 15e9;
@@ -122,6 +140,16 @@ export type Nhm2TileSourceActiveControlOperatingBudgetV1 = {
     sourceTensorContaminationFractionReduction: number | null;
     requiredTraceRefCount: 15;
     missingTraceRefCount: number;
+    timeTraceSampleCountMin: number;
+    energyWaveformSampleCountShortfall: number | null;
+    actuatorAuthorityTraceSampleCountShortfall: number | null;
+    gapNoiseTraceSampleCountShortfall: number | null;
+    heatLoadTraceSampleCountShortfall: number | null;
+    timingSyncTraceSampleCountShortfall: number | null;
+    phaseNoiseSpectrumBinCountMin: number;
+    phaseNoiseSpectrumBinCountShortfall: number | null;
+    lockAcquisitionTrialCountMin: number;
+    lockAcquisitionTrialCountShortfall: number | null;
     requiredFailureModeCount: 5;
     missingFailureModeCount: number;
   };
@@ -162,6 +190,9 @@ const CONTROLLER_PHASE_MARGIN_MIN_DEGREES = 45;
 const CONTROLLER_GAIN_MARGIN_MIN_DB = 6;
 const THERMAL_SINK_CAPACITY_FACTOR_MIN = 1.2;
 const SOURCE_TENSOR_CONTAMINATION_FRACTION_MAX = 0.05;
+const TIME_TRACE_SAMPLE_COUNT_MIN = 4096;
+const PHASE_NOISE_SPECTRUM_BIN_COUNT_MIN = 512;
+const LOCK_ACQUISITION_TRIAL_COUNT_MIN = 100;
 const HEAT_SINK_CAPACITY_CRITERION =
   "heatSinkCapacityW >= 1.2 * max(heatLoadW, energyPerCycleJ * switchingRateHz)";
 
@@ -193,6 +224,9 @@ const upperBoundUnitFractionMargin = (
 const isNumberOrNull = (value: unknown): value is number | null =>
   value === null || (typeof value === "number" && Number.isFinite(value));
 
+const isPositiveInteger = (value: number | null | undefined): value is number =>
+  typeof value === "number" && Number.isFinite(value) && Number.isInteger(value) && value > 0;
+
 const stringOrNull = (value: unknown): string | null =>
   typeof value === "string" && value.trim().length > 0 ? value : null;
 
@@ -209,6 +243,14 @@ const shortfallToMinimum = (value: number | null | undefined, minimum: number): 
 
 const reductionToMaximum = (value: number | null | undefined, maximum: number): number | null =>
   value == null ? null : round(Math.max(0, value - maximum));
+
+const sampleCountMargin = (minimum: number, value: number | null | undefined): number | null =>
+  value == null || !Number.isFinite(value) ? null : round(value / minimum);
+
+const sampleCountShortfall = (
+  minimum: number,
+  value: number | null | undefined,
+): number | null => (value == null ? null : round(Math.max(0, minimum - value)));
 
 export const buildNhm2TileSourceActiveControlOperatingBudget = (
   input: BuildNhm2TileSourceActiveControlOperatingBudgetInput = {},
@@ -237,6 +279,17 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
     evidence?.sourceTensorContaminationFraction,
   );
   const lockAcquisitionTimeValid = isPositiveFinite(evidence?.lockAcquisitionTimeSeconds);
+  const energyWaveformSampleCountValid = isPositiveInteger(evidence?.energyWaveformSampleCount);
+  const actuatorAuthorityTraceSampleCountValid = isPositiveInteger(
+    evidence?.actuatorAuthorityTraceSampleCount,
+  );
+  const gapNoiseTraceSampleCountValid = isPositiveInteger(evidence?.gapNoiseTraceSampleCount);
+  const heatLoadTraceSampleCountValid = isPositiveInteger(evidence?.heatLoadTraceSampleCount);
+  const timingSyncTraceSampleCountValid = isPositiveInteger(evidence?.timingSyncTraceSampleCount);
+  const phaseNoiseSpectrumBinCountValid = isPositiveInteger(
+    evidence?.phaseNoiseSpectrumBinCount,
+  );
+  const lockAcquisitionTrialCountValid = isPositiveInteger(evidence?.lockAcquisitionTrialCount);
   const energyPerCycleJ = energyPerCycleValid ? evidence?.energyPerCycleJ ?? null : null;
   const actuatorAuthorityN = actuatorAuthorityValid ? evidence?.actuatorAuthorityN ?? null : null;
   const evidenceSwitchingRate = switchingRateValid ? evidence?.switchingRateHz ?? null : null;
@@ -310,6 +363,42 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
     SOURCE_TENSOR_CONTAMINATION_FRACTION_MAX,
     sourceTensorContaminationFraction,
   );
+  const energyWaveformSampleCountMargin = sampleCountMargin(
+    TIME_TRACE_SAMPLE_COUNT_MIN,
+    evidence?.energyWaveformSampleCount,
+  );
+  const actuatorAuthorityTraceSampleCountMargin = sampleCountMargin(
+    TIME_TRACE_SAMPLE_COUNT_MIN,
+    evidence?.actuatorAuthorityTraceSampleCount,
+  );
+  const gapNoiseTraceSampleCountMargin = sampleCountMargin(
+    TIME_TRACE_SAMPLE_COUNT_MIN,
+    evidence?.gapNoiseTraceSampleCount,
+  );
+  const heatLoadTraceSampleCountMargin = sampleCountMargin(
+    TIME_TRACE_SAMPLE_COUNT_MIN,
+    evidence?.heatLoadTraceSampleCount,
+  );
+  const timingSyncTraceSampleCountMargin = sampleCountMargin(
+    TIME_TRACE_SAMPLE_COUNT_MIN,
+    evidence?.timingSyncTraceSampleCount,
+  );
+  const phaseNoiseSpectrumBinCountMargin = sampleCountMargin(
+    PHASE_NOISE_SPECTRUM_BIN_COUNT_MIN,
+    evidence?.phaseNoiseSpectrumBinCount,
+  );
+  const lockAcquisitionTrialCountMargin = sampleCountMargin(
+    LOCK_ACQUISITION_TRIAL_COUNT_MIN,
+    evidence?.lockAcquisitionTrialCount,
+  );
+  const activeControlTraceSamplingComplete =
+    (energyWaveformSampleCountMargin ?? 0) >= 1 &&
+    (actuatorAuthorityTraceSampleCountMargin ?? 0) >= 1 &&
+    (gapNoiseTraceSampleCountMargin ?? 0) >= 1 &&
+    (heatLoadTraceSampleCountMargin ?? 0) >= 1 &&
+    (timingSyncTraceSampleCountMargin ?? 0) >= 1 &&
+    (phaseNoiseSpectrumBinCountMargin ?? 0) >= 1 &&
+    (lockAcquisitionTrialCountMargin ?? 0) >= 1;
   const energyPerCycleHeatLimitedMaxJ =
     heatLoadW == null || evidenceSwitchingRate == null || evidenceSwitchingRate === 0
       ? null
@@ -361,9 +450,27 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
     ...(evidence?.energyWaveformRef == null
       ? ["active_control_energy_waveform_ref_missing_for_operating_budget"]
       : []),
+    ...(evidence?.energyWaveformSampleCount == null
+      ? ["active_control_energy_waveform_sample_count_missing_for_operating_budget"]
+      : !energyWaveformSampleCountValid
+        ? ["active_control_energy_waveform_sample_count_invalid_for_operating_budget"]
+        : energyWaveformSampleCountMargin == null
+          ? ["active_control_energy_waveform_sample_count_missing_for_operating_budget"]
+          : energyWaveformSampleCountMargin < 1
+            ? ["active_control_energy_waveform_sample_count_below_4096_for_operating_budget"]
+            : []),
     ...(evidence?.actuatorAuthorityTraceRef == null
       ? ["active_control_actuator_authority_trace_ref_missing_for_operating_budget"]
       : []),
+    ...(evidence?.actuatorAuthorityTraceSampleCount == null
+      ? ["active_control_actuator_authority_trace_sample_count_missing_for_operating_budget"]
+      : !actuatorAuthorityTraceSampleCountValid
+        ? ["active_control_actuator_authority_trace_sample_count_invalid_for_operating_budget"]
+        : actuatorAuthorityTraceSampleCountMargin == null
+          ? ["active_control_actuator_authority_trace_sample_count_missing_for_operating_budget"]
+          : actuatorAuthorityTraceSampleCountMargin < 1
+            ? ["active_control_actuator_authority_trace_sample_count_below_4096_for_operating_budget"]
+            : []),
     ...(evidence?.gapSensorCalibrationRef == null
       ? ["active_control_gap_sensor_calibration_ref_missing_for_operating_budget"]
       : []),
@@ -434,6 +541,15 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
     ...(evidence?.gapNoiseTraceRef == null
       ? ["active_control_gap_noise_trace_ref_missing_for_operating_budget"]
       : []),
+    ...(evidence?.gapNoiseTraceSampleCount == null
+      ? ["active_control_gap_noise_trace_sample_count_missing_for_operating_budget"]
+      : !gapNoiseTraceSampleCountValid
+        ? ["active_control_gap_noise_trace_sample_count_invalid_for_operating_budget"]
+        : gapNoiseTraceSampleCountMargin == null
+          ? ["active_control_gap_noise_trace_sample_count_missing_for_operating_budget"]
+          : gapNoiseTraceSampleCountMargin < 1
+            ? ["active_control_gap_noise_trace_sample_count_below_4096_for_operating_budget"]
+            : []),
     ...(evidence?.noiseSpectrumRef == null
       ? ["active_control_noise_spectrum_ref_missing_for_operating_budget"]
       : []),
@@ -473,6 +589,15 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
     ...(evidence?.heatLoadTraceRef == null
       ? ["active_control_heat_load_trace_ref_missing_for_operating_budget"]
       : []),
+    ...(evidence?.heatLoadTraceSampleCount == null
+      ? ["active_control_heat_load_trace_sample_count_missing_for_operating_budget"]
+      : !heatLoadTraceSampleCountValid
+        ? ["active_control_heat_load_trace_sample_count_invalid_for_operating_budget"]
+        : heatLoadTraceSampleCountMargin == null
+          ? ["active_control_heat_load_trace_sample_count_missing_for_operating_budget"]
+          : heatLoadTraceSampleCountMargin < 1
+            ? ["active_control_heat_load_trace_sample_count_below_4096_for_operating_budget"]
+            : []),
     ...(evidence?.sourceTensorContaminationFraction == null
       ? ["active_control_source_tensor_contamination_missing_for_operating_budget"]
       : !sourceTensorContaminationValid
@@ -488,6 +613,15 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
     ...(evidence?.timingSyncTraceRef == null
       ? ["active_control_timing_sync_trace_ref_missing_for_operating_budget"]
       : []),
+    ...(evidence?.timingSyncTraceSampleCount == null
+      ? ["active_control_timing_sync_trace_sample_count_missing_for_operating_budget"]
+      : !timingSyncTraceSampleCountValid
+        ? ["active_control_timing_sync_trace_sample_count_invalid_for_operating_budget"]
+        : timingSyncTraceSampleCountMargin == null
+          ? ["active_control_timing_sync_trace_sample_count_missing_for_operating_budget"]
+          : timingSyncTraceSampleCountMargin < 1
+            ? ["active_control_timing_sync_trace_sample_count_below_4096_for_operating_budget"]
+            : []),
     ...(evidence?.phaseNoiseRmsSeconds == null
       ? ["active_control_phase_noise_missing_for_operating_budget"]
       : !phaseNoiseValid
@@ -500,9 +634,27 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
     ...(evidence?.phaseNoiseSpectrumRef == null
       ? ["active_control_phase_noise_spectrum_ref_missing_for_operating_budget"]
       : []),
+    ...(evidence?.phaseNoiseSpectrumBinCount == null
+      ? ["active_control_phase_noise_spectrum_bin_count_missing_for_operating_budget"]
+      : !phaseNoiseSpectrumBinCountValid
+        ? ["active_control_phase_noise_spectrum_bin_count_invalid_for_operating_budget"]
+        : phaseNoiseSpectrumBinCountMargin == null
+          ? ["active_control_phase_noise_spectrum_bin_count_missing_for_operating_budget"]
+          : phaseNoiseSpectrumBinCountMargin < 1
+            ? ["active_control_phase_noise_spectrum_bin_count_below_512_for_operating_budget"]
+            : []),
     ...(evidence?.lockAcquisitionTraceRef == null
       ? ["active_control_lock_acquisition_trace_ref_missing_for_operating_budget"]
       : []),
+    ...(evidence?.lockAcquisitionTrialCount == null
+      ? ["active_control_lock_acquisition_trial_count_missing_for_operating_budget"]
+      : !lockAcquisitionTrialCountValid
+        ? ["active_control_lock_acquisition_trial_count_invalid_for_operating_budget"]
+        : lockAcquisitionTrialCountMargin == null
+          ? ["active_control_lock_acquisition_trial_count_missing_for_operating_budget"]
+          : lockAcquisitionTrialCountMargin < 1
+            ? ["active_control_lock_acquisition_trial_count_below_100_for_operating_budget"]
+            : []),
     ...(evidence?.lockAcquisitionTimeSeconds == null
       ? ["active_control_lock_acquisition_time_missing_for_operating_budget"]
       : !lockAcquisitionTimeValid
@@ -555,6 +707,20 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
             "active_control_heat_sink_capacity_invalid_for_operating_budget",
             "active_control_source_tensor_contamination_invalid_for_operating_budget",
             "active_control_lock_acquisition_time_invalid_for_operating_budget",
+            "active_control_energy_waveform_sample_count_invalid_for_operating_budget",
+            "active_control_actuator_authority_trace_sample_count_invalid_for_operating_budget",
+            "active_control_gap_noise_trace_sample_count_invalid_for_operating_budget",
+            "active_control_heat_load_trace_sample_count_invalid_for_operating_budget",
+            "active_control_timing_sync_trace_sample_count_invalid_for_operating_budget",
+            "active_control_phase_noise_spectrum_bin_count_invalid_for_operating_budget",
+            "active_control_lock_acquisition_trial_count_invalid_for_operating_budget",
+            "active_control_energy_waveform_sample_count_below_4096_for_operating_budget",
+            "active_control_actuator_authority_trace_sample_count_below_4096_for_operating_budget",
+            "active_control_gap_noise_trace_sample_count_below_4096_for_operating_budget",
+            "active_control_heat_load_trace_sample_count_below_4096_for_operating_budget",
+            "active_control_timing_sync_trace_sample_count_below_4096_for_operating_budget",
+            "active_control_phase_noise_spectrum_bin_count_below_512_for_operating_budget",
+            "active_control_lock_acquisition_trial_count_below_100_for_operating_budget",
           ].includes(blocker),
         )
       : false;
@@ -580,6 +746,9 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
       thermalSinkCapacityFactorMin: THERMAL_SINK_CAPACITY_FACTOR_MIN,
       sourceTensorContaminationFractionMax: SOURCE_TENSOR_CONTAMINATION_FRACTION_MAX,
       requiredGapControlAuthorityN,
+      timeTraceSampleCountMin: TIME_TRACE_SAMPLE_COUNT_MIN,
+      phaseNoiseSpectrumBinCountMin: PHASE_NOISE_SPECTRUM_BIN_COUNT_MIN,
+      lockAcquisitionTrialCountMin: LOCK_ACQUISITION_TRIAL_COUNT_MIN,
     },
     suppliedActiveControlEvidence: {
       evidenceTier: evidence?.evidenceTier ?? "missing",
@@ -596,6 +765,15 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
       timingSyncTraceRef: stringOrNull(evidence?.timingSyncTraceRef),
       phaseNoiseSpectrumRef: stringOrNull(evidence?.phaseNoiseSpectrumRef),
       lockAcquisitionTraceRef: stringOrNull(evidence?.lockAcquisitionTraceRef),
+      energyWaveformSampleCount: finiteOrNull(evidence?.energyWaveformSampleCount),
+      actuatorAuthorityTraceSampleCount: finiteOrNull(
+        evidence?.actuatorAuthorityTraceSampleCount,
+      ),
+      gapNoiseTraceSampleCount: finiteOrNull(evidence?.gapNoiseTraceSampleCount),
+      heatLoadTraceSampleCount: finiteOrNull(evidence?.heatLoadTraceSampleCount),
+      timingSyncTraceSampleCount: finiteOrNull(evidence?.timingSyncTraceSampleCount),
+      phaseNoiseSpectrumBinCount: finiteOrNull(evidence?.phaseNoiseSpectrumBinCount),
+      lockAcquisitionTrialCount: finiteOrNull(evidence?.lockAcquisitionTrialCount),
       energyPerCycleJ: finiteOrNull(evidence?.energyPerCycleJ),
       actuatorAuthorityN: finiteOrNull(evidence?.actuatorAuthorityN),
       bandwidthHz: finiteOrNull(evidence?.bandwidthHz),
@@ -652,6 +830,7 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
         evidence.phaseNoiseSpectrumRef != null,
       noiseSpectrumAvailable: evidence?.noiseSpectrumRef != null,
       failureModeCoverageComplete,
+      activeControlTraceSamplingComplete,
       switchingRateMargin,
       bandwidthMargin,
       noiseMargin,
@@ -662,6 +841,13 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
       thermalAccountingMargin,
       thermalSinkCapacityMargin,
       sourceTensorContaminationMargin,
+      energyWaveformSampleCountMargin,
+      actuatorAuthorityTraceSampleCountMargin,
+      gapNoiseTraceSampleCountMargin,
+      heatLoadTraceSampleCountMargin,
+      timingSyncTraceSampleCountMargin,
+      phaseNoiseSpectrumBinCountMargin,
+      lockAcquisitionTrialCountMargin,
     },
     requiredCorrections: {
       switchingRateTargetHz: SWITCHING_RATE_HZ,
@@ -731,6 +917,37 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
       ),
       requiredTraceRefCount: 15,
       missingTraceRefCount,
+      timeTraceSampleCountMin: TIME_TRACE_SAMPLE_COUNT_MIN,
+      energyWaveformSampleCountShortfall: sampleCountShortfall(
+        TIME_TRACE_SAMPLE_COUNT_MIN,
+        evidence?.energyWaveformSampleCount,
+      ),
+      actuatorAuthorityTraceSampleCountShortfall: sampleCountShortfall(
+        TIME_TRACE_SAMPLE_COUNT_MIN,
+        evidence?.actuatorAuthorityTraceSampleCount,
+      ),
+      gapNoiseTraceSampleCountShortfall: sampleCountShortfall(
+        TIME_TRACE_SAMPLE_COUNT_MIN,
+        evidence?.gapNoiseTraceSampleCount,
+      ),
+      heatLoadTraceSampleCountShortfall: sampleCountShortfall(
+        TIME_TRACE_SAMPLE_COUNT_MIN,
+        evidence?.heatLoadTraceSampleCount,
+      ),
+      timingSyncTraceSampleCountShortfall: sampleCountShortfall(
+        TIME_TRACE_SAMPLE_COUNT_MIN,
+        evidence?.timingSyncTraceSampleCount,
+      ),
+      phaseNoiseSpectrumBinCountMin: PHASE_NOISE_SPECTRUM_BIN_COUNT_MIN,
+      phaseNoiseSpectrumBinCountShortfall: sampleCountShortfall(
+        PHASE_NOISE_SPECTRUM_BIN_COUNT_MIN,
+        evidence?.phaseNoiseSpectrumBinCount,
+      ),
+      lockAcquisitionTrialCountMin: LOCK_ACQUISITION_TRIAL_COUNT_MIN,
+      lockAcquisitionTrialCountShortfall: sampleCountShortfall(
+        LOCK_ACQUISITION_TRIAL_COUNT_MIN,
+        evidence?.lockAcquisitionTrialCount,
+      ),
       requiredFailureModeCount: 5,
       missingFailureModeCount,
     },
@@ -791,6 +1008,9 @@ export const isNhm2TileSourceActiveControlOperatingBudget = (
     targets.thermalSinkCapacityFactorMin === 1.2 &&
     targets.sourceTensorContaminationFractionMax === 0.05 &&
     typeof targets.requiredGapControlAuthorityN === "number" &&
+    targets.timeTraceSampleCountMin === TIME_TRACE_SAMPLE_COUNT_MIN &&
+    targets.phaseNoiseSpectrumBinCountMin === PHASE_NOISE_SPECTRUM_BIN_COUNT_MIN &&
+    targets.lockAcquisitionTrialCountMin === LOCK_ACQUISITION_TRIAL_COUNT_MIN &&
     supplied != null &&
     typeof supplied.evidenceTier === "string" &&
     budget != null &&
@@ -801,6 +1021,7 @@ export const isNhm2TileSourceActiveControlOperatingBudget = (
     typeof budget.activeControlCalibrationRefsAvailable === "boolean" &&
     typeof budget.noiseSpectrumAvailable === "boolean" &&
     typeof budget.failureModeCoverageComplete === "boolean" &&
+    typeof budget.activeControlTraceSamplingComplete === "boolean" &&
     (budget.switchingRateMargin === null || typeof budget.switchingRateMargin === "number") &&
     requiredCorrections != null &&
     requiredCorrections.switchingRateTargetHz === 15e9 &&
@@ -834,6 +1055,16 @@ export const isNhm2TileSourceActiveControlOperatingBudget = (
     isNumberOrNull(requiredCorrections.sourceTensorContaminationFractionReduction) &&
     requiredCorrections.requiredTraceRefCount === 15 &&
     typeof requiredCorrections.missingTraceRefCount === "number" &&
+    requiredCorrections.timeTraceSampleCountMin === TIME_TRACE_SAMPLE_COUNT_MIN &&
+    isNumberOrNull(requiredCorrections.energyWaveformSampleCountShortfall) &&
+    isNumberOrNull(requiredCorrections.actuatorAuthorityTraceSampleCountShortfall) &&
+    isNumberOrNull(requiredCorrections.gapNoiseTraceSampleCountShortfall) &&
+    isNumberOrNull(requiredCorrections.heatLoadTraceSampleCountShortfall) &&
+    isNumberOrNull(requiredCorrections.timingSyncTraceSampleCountShortfall) &&
+    requiredCorrections.phaseNoiseSpectrumBinCountMin === PHASE_NOISE_SPECTRUM_BIN_COUNT_MIN &&
+    isNumberOrNull(requiredCorrections.phaseNoiseSpectrumBinCountShortfall) &&
+    requiredCorrections.lockAcquisitionTrialCountMin === LOCK_ACQUISITION_TRIAL_COUNT_MIN &&
+    isNumberOrNull(requiredCorrections.lockAcquisitionTrialCountShortfall) &&
     requiredCorrections.requiredFailureModeCount === 5 &&
     typeof requiredCorrections.missingFailureModeCount === "number" &&
     Array.isArray(value.blockers) &&

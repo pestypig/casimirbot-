@@ -23,6 +23,7 @@ import {
   detectContextualToolAdmissionSuppression,
   type HelixContextualToolAdmissionSuppression,
 } from "./contextual-tool-admission";
+import { buildHelixCompoundCapabilityContract } from "./compound-capability-contract";
 import { WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS } from "./workstation-context-feed-query-tool-contracts";
 
 type RecordLike = Record<string, unknown>;
@@ -1072,6 +1073,64 @@ const compoundSubgoalHasSatisfiedObservation = (entry: RecordLike): boolean => {
   );
 };
 
+const compoundCapabilityContractFromPayload = (payload: RecordLike): RecordLike | null => {
+  const itinerary = readRecord(payload.capability_itinerary);
+  const promptText = readFirstPromptText(payload);
+  const turnId =
+    readString(payload.active_turn_id) ||
+    readString(payload.turn_id) ||
+    readString(payload.backend_turn_id) ||
+    "ask:debug-export";
+  const promptDerivedContract = promptText
+    ? buildHelixCompoundCapabilityContract({ turnId, promptText }) as unknown as RecordLike | null
+    : null;
+  return (
+    readRecord(payload.compound_capability_contract) ??
+    readRecord(itinerary?.compound_capability_contract) ??
+    readArray(payload.current_turn_artifact_ledger)
+      .map(readRecord)
+      .filter((artifact): artifact is RecordLike => Boolean(artifact))
+      .filter((artifact) => readString(artifact.kind) === "compound_capability_contract")
+      .map((artifact) => readRecord(artifact.payload))
+      .find((artifact): artifact is RecordLike => Boolean(artifact)) ??
+    (
+      readArray(promptDerivedContract?.subgoals).length > 1
+        ? promptDerivedContract
+        : null
+    ) ??
+    null
+  );
+};
+
+const compoundSubgoalRailStatusesFromContract = (payload: RecordLike): RecordLike[] => {
+  const contract = compoundCapabilityContractFromPayload(payload);
+  const subgoals = readArray(contract?.subgoals)
+    .map(readRecord)
+    .filter((entry): entry is RecordLike => Boolean(entry));
+  if (subgoals.length <= 1) return [];
+  return subgoals.map((subgoal, index) => ({
+    subgoal_id: readNullableString(subgoal.subgoal_id) ?? `compound_subgoal:${index + 1}`,
+    order: readNumber(subgoal.order) ?? index + 1,
+    requested_capability: readNullableString(subgoal.requested_capability),
+    runtime_capability:
+      readNullableString(subgoal.runtime_capability) ??
+      readNullableString(subgoal.requested_capability),
+    selected_capability: readNullableString(subgoal.selected_capability),
+    executed_capability: readNullableString(subgoal.executed_capability),
+    required_observation_kinds: readStringArray(subgoal.required_observation_kinds),
+    required_terminal_kind: readNullableString(subgoal.required_terminal_kind),
+    satisfaction: readNullableString(subgoal.satisfaction) ?? "pending",
+    rail_status: readNullableString(subgoal.rail_status) ?? "broken",
+    first_broken_rail: readNullableString(subgoal.first_broken_rail) ?? "observation",
+    rail_failure_code: readNullableString(subgoal.rail_failure_code) ?? "subgoal_observation_missing",
+    repair_target: readNullableString(subgoal.repair_target) ?? "observation_materializer",
+    observation_ref: readNullableString(subgoal.observation_ref),
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+  }));
+};
+
 const buildToolTurnChainAudit = (input: {
   payload: RecordLike;
   artifacts: RecordLike[];
@@ -1345,7 +1404,11 @@ const buildToolTurnChainAudit = (input: {
     Boolean(finalDraftRef) &&
     Boolean(materializedTerminal) &&
     !["typed_failure", "direct_answer_text", "tool_receipt"].some((kind) => normalizedEqual(kind, materializedTerminal));
-  const firstIncompleteCompoundSubgoal = (input.compoundSubgoalRailStatuses ?? []).find((entry) =>
+  const compoundSubgoalRailStatuses =
+    input.compoundSubgoalRailStatuses?.length
+      ? input.compoundSubgoalRailStatuses
+      : compoundSubgoalRailStatusesFromContract(input.payload);
+  const firstIncompleteCompoundSubgoal = compoundSubgoalRailStatuses.find((entry) =>
     !compoundSubgoalHasSatisfiedObservation(entry)
   ) ?? null;
   const compoundFirstBrokenRail = readNullableString(firstIncompleteCompoundSubgoal?.first_broken_rail);
@@ -1435,7 +1498,7 @@ const buildToolTurnChainAudit = (input: {
     requested_capability_confidence: readNumber(admission?.requested_capability_confidence),
     selected_capability: selectedCapability,
     executed_capability: executedCapability,
-    compound_subgoal_count: input.compoundSubgoalRailStatuses?.length ?? 0,
+    compound_subgoal_count: compoundSubgoalRailStatuses.length,
     first_incomplete_compound_subgoal_id: readNullableString(firstIncompleteCompoundSubgoal?.subgoal_id),
     first_incomplete_compound_requested_capability: readNullableString(firstIncompleteCompoundSubgoal?.requested_capability),
     first_incomplete_compound_runtime_capability: readNullableString(firstIncompleteCompoundSubgoal?.runtime_capability),
@@ -2441,8 +2504,7 @@ export const buildArtifactQueryIndex = (input: {
     readRecord(input.payload.capability_itinerary) ??
     artifactPayloadByKind("capability_itinerary");
   const compoundCapabilityContract =
-    readRecord(input.payload.compound_capability_contract) ??
-    readRecord(capabilityItinerary?.compound_capability_contract) ??
+    compoundCapabilityContractFromPayload(input.payload) ??
     artifactPayloadByKind("compound_capability_contract");
   const capabilityItineraryExecutionState =
     readRecord(input.payload.capability_itinerary_execution_state) ??

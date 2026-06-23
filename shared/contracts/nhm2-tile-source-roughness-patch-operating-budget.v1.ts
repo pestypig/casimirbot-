@@ -25,6 +25,9 @@ export type Nhm2TileSourceRoughnessPatchOperatingBudgetV1 = {
     idealCasimirPressureAbsPa: number;
     roughnessRmsMaxMeters: 1e-10;
     roughnessMapLateralResolutionMaxMeters: 5e-10;
+    roughnessMapSampleCountMin: 10000;
+    asperityTailSampleCountMin: 1000;
+    patchVoltageMapSampleCountMin: 10000;
     roughnessScanAreaFractionMin: 0.95;
     asperityP99MaxMeters: 2e-9;
     asperityP999MaxMeters: 3e-9;
@@ -46,6 +49,9 @@ export type Nhm2TileSourceRoughnessPatchOperatingBudgetV1 = {
     patchVoltageCalibrationRef: string | null;
     residualElectrostaticModelRef: string | null;
     mapLateralResolutionMeters: number | null;
+    roughnessMapSampleCount: number | null;
+    asperityTailSampleCount: number | null;
+    patchVoltageMapSampleCount: number | null;
     scanAreaFraction: number | null;
     roughnessRmsMeters: number | null;
     asperityP99Meters: number | null;
@@ -60,6 +66,10 @@ export type Nhm2TileSourceRoughnessPatchOperatingBudgetV1 = {
     mapRefsAvailable: boolean;
     mapProvenanceRefsAvailable: boolean;
     roughnessMapResolutionMargin: number | null;
+    mapSamplingComplete: boolean;
+    roughnessMapSampleCountMargin: number | null;
+    asperityTailSampleCountMargin: number | null;
+    patchVoltageMapSampleCountMargin: number | null;
     scanAreaCoverageMargin: number | null;
     roughnessRmsMargin: number | null;
     asperityP99Margin: number | null;
@@ -77,6 +87,12 @@ export type Nhm2TileSourceRoughnessPatchOperatingBudgetV1 = {
     roughnessRmsMaxMeters: 1e-10;
     roughnessMapLateralResolutionMaxMeters: 5e-10;
     roughnessMapResolutionReductionMeters: number | null;
+    roughnessMapSampleCountMin: 10000;
+    roughnessMapSampleCountShortfall: number | null;
+    asperityTailSampleCountMin: 1000;
+    asperityTailSampleCountShortfall: number | null;
+    patchVoltageMapSampleCountMin: 10000;
+    patchVoltageMapSampleCountShortfall: number | null;
     roughnessScanAreaFractionMin: 0.95;
     roughnessScanAreaFractionShortfall: number | null;
     roughnessRmsReductionMeters: number | null;
@@ -129,6 +145,9 @@ export type BuildNhm2TileSourceRoughnessPatchOperatingBudgetInput = {
 
 const ROUGHNESS_RMS_MAX_METERS = 1e-10;
 const ROUGHNESS_MAP_LATERAL_RESOLUTION_MAX_METERS = 5e-10;
+const ROUGHNESS_PATCH_MAP_SAMPLE_COUNT_MIN = 10000;
+const ASPERITY_TAIL_SAMPLE_COUNT_MIN = 1000;
+const PATCH_VOLTAGE_MAP_SAMPLE_COUNT_MIN = 10000;
 const ROUGHNESS_SCAN_AREA_FRACTION_MIN = 0.95;
 const ASPERITY_P99_MAX_METERS = 2e-9;
 const ASPERITY_P999_MAX_METERS = 3e-9;
@@ -144,6 +163,11 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const finiteOrNull = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
+
+const positiveIntegerOrNull = (value: unknown): number | null =>
+  typeof value === "number" && Number.isFinite(value) && Number.isInteger(value) && value > 0
+    ? value
+    : null;
 
 const isNumberOrNull = (value: unknown): value is number | null =>
   value === null || (typeof value === "number" && Number.isFinite(value));
@@ -164,6 +188,9 @@ const isScanAreaFraction = (value: number | null | undefined): value is number =
 
 const reductionToLimit = (value: number | null | undefined, limit: number): number | null =>
   value == null ? null : round(Math.max(0, value - limit));
+
+const countShortfall = (minimum: number, value: number | null | undefined): number | null =>
+  value == null ? null : Math.max(0, minimum - value);
 
 export const buildNhm2TileSourceRoughnessPatchOperatingBudget = (
   input: BuildNhm2TileSourceRoughnessPatchOperatingBudgetInput = {},
@@ -198,6 +225,9 @@ export const buildNhm2TileSourceRoughnessPatchOperatingBudget = (
             evidence.residualElectrostaticForceFraction,
         );
   const roughnessMapResolutionValid = isPositiveFinite(evidence?.mapLateralResolutionMeters);
+  const roughnessMapSampleCount = positiveIntegerOrNull(evidence?.roughnessMapSampleCount);
+  const asperityTailSampleCount = positiveIntegerOrNull(evidence?.asperityTailSampleCount);
+  const patchVoltageMapSampleCount = positiveIntegerOrNull(evidence?.patchVoltageMapSampleCount);
   const scanAreaFractionValid = isScanAreaFraction(evidence?.scanAreaFraction);
   const roughnessRmsValid = isNonNegativeFinite(evidence?.roughnessRmsMeters);
   const asperityP99Valid = isPositiveFinite(evidence?.asperityP99Meters);
@@ -218,6 +248,25 @@ export const buildNhm2TileSourceRoughnessPatchOperatingBudget = (
     ROUGHNESS_MAP_LATERAL_RESOLUTION_MAX_METERS,
     roughnessMapResolutionValid ? evidence?.mapLateralResolutionMeters ?? null : null,
   );
+  const roughnessMapSampleCountMargin = safeRatio(
+    roughnessMapSampleCount,
+    ROUGHNESS_PATCH_MAP_SAMPLE_COUNT_MIN,
+  );
+  const asperityTailSampleCountMargin = safeRatio(
+    asperityTailSampleCount,
+    ASPERITY_TAIL_SAMPLE_COUNT_MIN,
+  );
+  const patchVoltageMapSampleCountMargin = safeRatio(
+    patchVoltageMapSampleCount,
+    PATCH_VOLTAGE_MAP_SAMPLE_COUNT_MIN,
+  );
+  const mapSamplingComplete =
+    roughnessMapSampleCountMargin != null &&
+    roughnessMapSampleCountMargin >= 1 &&
+    asperityTailSampleCountMargin != null &&
+    asperityTailSampleCountMargin >= 1 &&
+    patchVoltageMapSampleCountMargin != null &&
+    patchVoltageMapSampleCountMargin >= 1;
   const scanAreaCoverageMargin =
     !scanAreaFractionValid
       ? null
@@ -302,6 +351,28 @@ export const buildNhm2TileSourceRoughnessPatchOperatingBudget = (
       : roughnessMapResolutionMargin < 1
         ? ["roughness_map_lateral_resolution_above_0p5nm_operating_budget"]
         : []),
+    ...(evidence?.roughnessMapSampleCount == null
+      ? ["roughness_map_sample_count_missing_for_operating_budget"]
+      : roughnessMapSampleCount == null
+        ? ["roughness_map_sample_count_invalid_for_operating_budget"]
+        : roughnessMapSampleCountMargin == null || roughnessMapSampleCountMargin < 1
+          ? ["roughness_map_sample_count_below_10000_for_operating_budget"]
+          : []),
+    ...(evidence?.asperityTailSampleCount == null
+      ? ["asperity_tail_sample_count_missing_for_operating_budget"]
+      : asperityTailSampleCount == null
+        ? ["asperity_tail_sample_count_invalid_for_operating_budget"]
+        : asperityTailSampleCountMargin == null || asperityTailSampleCountMargin < 1
+          ? ["asperity_tail_sample_count_below_1000_for_operating_budget"]
+          : []),
+    ...(evidence?.patchVoltageMapSampleCount == null
+      ? ["patch_voltage_map_sample_count_missing_for_operating_budget"]
+      : patchVoltageMapSampleCount == null
+        ? ["patch_voltage_map_sample_count_invalid_for_operating_budget"]
+        : patchVoltageMapSampleCountMargin == null ||
+            patchVoltageMapSampleCountMargin < 1
+          ? ["patch_voltage_map_sample_count_below_10000_for_operating_budget"]
+          : []),
     ...(evidence?.scanAreaFraction != null && !scanAreaFractionValid
       ? ["roughness_scan_area_fraction_invalid_for_operating_budget"]
       : []),
@@ -387,6 +458,12 @@ export const buildNhm2TileSourceRoughnessPatchOperatingBudget = (
             "roughness_rms_above_0p1nm_operating_budget",
             "roughness_map_lateral_resolution_invalid_for_operating_budget",
             "roughness_map_lateral_resolution_above_0p5nm_operating_budget",
+            "roughness_map_sample_count_invalid_for_operating_budget",
+            "roughness_map_sample_count_below_10000_for_operating_budget",
+            "asperity_tail_sample_count_invalid_for_operating_budget",
+            "asperity_tail_sample_count_below_1000_for_operating_budget",
+            "patch_voltage_map_sample_count_invalid_for_operating_budget",
+            "patch_voltage_map_sample_count_below_10000_for_operating_budget",
             "roughness_scan_area_fraction_invalid_for_operating_budget",
             "roughness_scan_area_fraction_below_0p95_operating_budget",
             "asperity_p99_invalid_for_operating_budget",
@@ -420,6 +497,9 @@ export const buildNhm2TileSourceRoughnessPatchOperatingBudget = (
       idealCasimirPressureAbsPa,
       roughnessRmsMaxMeters: ROUGHNESS_RMS_MAX_METERS,
       roughnessMapLateralResolutionMaxMeters: ROUGHNESS_MAP_LATERAL_RESOLUTION_MAX_METERS,
+      roughnessMapSampleCountMin: ROUGHNESS_PATCH_MAP_SAMPLE_COUNT_MIN,
+      asperityTailSampleCountMin: ASPERITY_TAIL_SAMPLE_COUNT_MIN,
+      patchVoltageMapSampleCountMin: PATCH_VOLTAGE_MAP_SAMPLE_COUNT_MIN,
       roughnessScanAreaFractionMin: ROUGHNESS_SCAN_AREA_FRACTION_MIN,
       asperityP99MaxMeters: ASPERITY_P99_MAX_METERS,
       asperityP999MaxMeters: ASPERITY_P999_MAX_METERS,
@@ -442,6 +522,9 @@ export const buildNhm2TileSourceRoughnessPatchOperatingBudget = (
       patchVoltageCalibrationRef: evidence?.patchVoltageCalibrationRef ?? null,
       residualElectrostaticModelRef: evidence?.residualElectrostaticModelRef ?? null,
       mapLateralResolutionMeters: finiteOrNull(evidence?.mapLateralResolutionMeters),
+      roughnessMapSampleCount,
+      asperityTailSampleCount,
+      patchVoltageMapSampleCount,
       scanAreaFraction: finiteOrNull(evidence?.scanAreaFraction),
       roughnessRmsMeters: finiteOrNull(evidence?.roughnessRmsMeters),
       asperityP99Meters: finiteOrNull(evidence?.asperityP99Meters),
@@ -458,6 +541,10 @@ export const buildNhm2TileSourceRoughnessPatchOperatingBudget = (
       mapRefsAvailable,
       mapProvenanceRefsAvailable,
       roughnessMapResolutionMargin,
+      mapSamplingComplete,
+      roughnessMapSampleCountMargin,
+      asperityTailSampleCountMargin,
+      patchVoltageMapSampleCountMargin,
       scanAreaCoverageMargin,
       roughnessRmsMargin,
       asperityP99Margin,
@@ -477,6 +564,21 @@ export const buildNhm2TileSourceRoughnessPatchOperatingBudget = (
       roughnessMapResolutionReductionMeters: reductionToLimit(
         evidence?.mapLateralResolutionMeters,
         ROUGHNESS_MAP_LATERAL_RESOLUTION_MAX_METERS,
+      ),
+      roughnessMapSampleCountMin: ROUGHNESS_PATCH_MAP_SAMPLE_COUNT_MIN,
+      roughnessMapSampleCountShortfall: countShortfall(
+        ROUGHNESS_PATCH_MAP_SAMPLE_COUNT_MIN,
+        roughnessMapSampleCount,
+      ),
+      asperityTailSampleCountMin: ASPERITY_TAIL_SAMPLE_COUNT_MIN,
+      asperityTailSampleCountShortfall: countShortfall(
+        ASPERITY_TAIL_SAMPLE_COUNT_MIN,
+        asperityTailSampleCount,
+      ),
+      patchVoltageMapSampleCountMin: PATCH_VOLTAGE_MAP_SAMPLE_COUNT_MIN,
+      patchVoltageMapSampleCountShortfall: countShortfall(
+        PATCH_VOLTAGE_MAP_SAMPLE_COUNT_MIN,
+        patchVoltageMapSampleCount,
       ),
       roughnessScanAreaFractionMin: ROUGHNESS_SCAN_AREA_FRACTION_MIN,
       roughnessScanAreaFractionShortfall:
@@ -578,6 +680,9 @@ export const isNhm2TileSourceRoughnessPatchOperatingBudget = (
     typeof targets.idealCasimirPressureAbsPa === "number" &&
     targets.roughnessRmsMaxMeters === 1e-10 &&
     targets.roughnessMapLateralResolutionMaxMeters === 5e-10 &&
+    targets.roughnessMapSampleCountMin === 10000 &&
+    targets.asperityTailSampleCountMin === 1000 &&
+    targets.patchVoltageMapSampleCountMin === 10000 &&
     targets.roughnessScanAreaFractionMin === 0.95 &&
     targets.asperityP99MaxMeters === 2e-9 &&
     targets.asperityP999MaxMeters === 3e-9 &&
@@ -605,10 +710,17 @@ export const isNhm2TileSourceRoughnessPatchOperatingBudget = (
     budget != null &&
     typeof budget.mapRefsAvailable === "boolean" &&
     typeof budget.mapProvenanceRefsAvailable === "boolean" &&
+    typeof budget.mapSamplingComplete === "boolean" &&
     requiredCorrections != null &&
     requiredCorrections.roughnessRmsMaxMeters === 1e-10 &&
     requiredCorrections.roughnessMapLateralResolutionMaxMeters === 5e-10 &&
     isNumberOrNull(requiredCorrections.roughnessMapResolutionReductionMeters) &&
+    requiredCorrections.roughnessMapSampleCountMin === 10000 &&
+    isNumberOrNull(requiredCorrections.roughnessMapSampleCountShortfall) &&
+    requiredCorrections.asperityTailSampleCountMin === 1000 &&
+    isNumberOrNull(requiredCorrections.asperityTailSampleCountShortfall) &&
+    requiredCorrections.patchVoltageMapSampleCountMin === 10000 &&
+    isNumberOrNull(requiredCorrections.patchVoltageMapSampleCountShortfall) &&
     requiredCorrections.roughnessScanAreaFractionMin === 0.95 &&
     isNumberOrNull(requiredCorrections.roughnessScanAreaFractionShortfall) &&
     isNumberOrNull(requiredCorrections.roughnessRmsReductionMeters) &&
