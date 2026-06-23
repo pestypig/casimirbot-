@@ -25,7 +25,7 @@ Do not extract `runHelixAgentTurnRuntimeLoop` in this wave. Do not patch termina
 
 | Candidate | Lines | Boundary | Risk | Readiness | Likely Owner | Notes |
 | --- | ---: | --- | --- | --- | --- | --- |
-| `live-debug-slim` | 108690-108864 | `DEBUG_EXPORT` | `MEDIUM_LOW` | `MOVE_WITH_EXCLUSIVE_HELPERS` | `server/services/helix-ask/debug/live-debug-slim.ts` | Builds slim debug payload from existing payload/debug records. Mutates nothing. Needs exclusive helper `summarizeHelixAskDebugValue`; depends on existing debug-export builders and constants. |
+| `live-debug-slim` | 108690-108864 | `DEBUG_EXPORT` | `MEDIUM_LOW` | `EXTRACTED_S93` | `server/services/helix-ask/debug/live-debug-slim.ts` | Extracted by S93. Builds slim debug payload from existing payload/debug records. Mutates nothing. Keeps response wrapper and projection mirror ordering in the route. |
 | `transcript-events` | 80945-81206 | `UI_API_PROJECTION` | `MEDIUM_LOW` | `MOVE_WITH_EXCLUSIVE_HELPERS` | `server/services/helix-ask/runtime/transcript-events.ts` | Converts turn events into transcript events. Local mutation is bounded to a new array and sequence counter. Needs `formatAskTurnTranscriptArtifacts` and nearby supersession normalizer if selected as a family. |
 | `decision-source-map` | 77530-78085 | `SOLVER_CONTROL` | `MEDIUM_LOW` | `MOVE_WITH_EXCLUSIVE_HELPERS` | `server/services/helix-ask/runtime/decision-source-map.ts` | Builds capability selection, observation decision, and decision source map from runtime payload artifacts. Read-heavy, no transport ownership; touches solver decision semantics, so focused tests needed. |
 | `turn-contract-builder` | 90520-90775 | `PROMPT_INTERPRETATION` | `MEDIUM_HIGH` | `NEEDS_DEPENDENCY_REDUCTION` | `server/services/helix-ask/contracts/turn-contract-builder.ts` | Builds turn contract and uses many objective/planner helpers. Larger prompt-policy surface; defer until helper ownership and tests are tighter. |
@@ -40,9 +40,9 @@ Do not extract `runHelixAgentTurnRuntimeLoop` in this wave. Do not patch termina
 
 The current low-risk batch is intentionally small and ordered by structural risk:
 
-1. `live-debug-slim`
-2. `transcript-events`
-3. `decision-source-map`
+1. `live-debug-slim` - `EXTRACTED_S93`
+2. `transcript-events` - `READY_NEXT_WAVE`
+3. `decision-source-map` - `READY_NEXT_WAVE`
 
 No fourth seam is selected yet. The remaining candidates inspected either touch terminal/debug mirror sequencing, prompt/goal policy, or runtime-loop ownership and need dependency reduction or owner proof first.
 
