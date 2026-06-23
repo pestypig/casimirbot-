@@ -86,6 +86,7 @@ terminal eligibility, projection discipline, and debug traces.
 | S110 | turn-contract objective evidence slot-hit inference | `server/services/helix-ask/contracts/turn-contract-objective-evidence.ts` | SERVICE_OWNED for pure evidence matching only |
 | S111 | turn-contract objective unknown blocks | `server/services/helix-ask/contracts/turn-contract-objective-unknown.ts` | SERVICE_OWNED for pure unknown-block construction/sanitization only |
 | S112 | objective mini-answer assembly | `server/services/helix-ask/contracts/turn-contract-objective-mini-answers.ts` | SERVICE_OWNED for deterministic mini-answer assembly only |
+| S113 | objective mini-answer validation summary | `server/services/helix-ask/contracts/turn-contract-objective-mini-answers.ts` | SERVICE_OWNED for deterministic mini-answer status counts only |
 
 ## Deferred Ownership Debt
 
@@ -116,5 +117,7 @@ terminal eligibility, projection discipline, and debug traces.
 - Objective mini-answer assembly remains dependent on route-owned objective loop
   states, retrieval logs, and LLM mini-synth/critic stages; S112 moved only
   deterministic assembly from supplied inputs.
+- Objective mini-answer validation remains dependent on route-owned finalization
+  policy; S113 moved only status counting.
 - Recovery helpers can write terminal state and must not be treated as harmless
   glue without field-writer proof.

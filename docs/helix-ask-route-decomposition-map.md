@@ -2,7 +2,7 @@
 
 Status: current-head map for structural extraction and decomposition-enabler work.
 
-Pinned source HEAD described: `411b61a2b618631425c0c49870bbb6065b2b98f4`
+Pinned source HEAD described: `ff54e293922fb5866b375859ced099085f4b882b`
 
 Snapshot command: `npx tsx scripts/helix-ask-route-inventory.ts --write`
 
@@ -11,9 +11,9 @@ Route snapshot:
 | Metric | Value |
 | --- | ---: |
 | File | `server/routes/agi.plan.ts` |
-| Lines | 181,116 |
-| Bytes | 8,116,298 |
-| Top-level helper estimate | 356 helper blocks |
+| Lines | 181,102 |
+| Bytes | 8,115,783 |
+| Top-level helper estimate | 355 helper blocks |
 | Route inventory | `artifacts/helix-ask-route-inventory.json` |
 | Machine-readable map | `artifacts/helix-ask-route-decomposition-map.json` |
 
@@ -30,7 +30,7 @@ Do not extract `runHelixAgentTurnRuntimeLoop` in this wave. Do not patch termina
 | `live-debug-slim` | service-owned | `DEBUG_EXPORT` | `MEDIUM_LOW` | `EXTRACTED` | `server/services/helix-ask/debug/live-debug-slim.ts` | Extracted by S93. Route still owns debug-mode parsing and response wrapper ordering. |
 | `transcript-events` | service-owned | `UI_API_PROJECTION` | `MEDIUM_LOW` | `EXTRACTED` | `server/services/helix-ask/runtime/transcript-events.ts` | Extracted by S94. Route retains transcript scaffold/finalization ordering. |
 | `decision-source-map` | service-owned | `SOLVER_CONTROL` | `MEDIUM` | `EXTRACTED` | `server/services/helix-ask/runtime/decision-source-map.ts` plus sibling runtime decision modules | S95 moved the debug map builder. S96 moved the pure runtime/terminal source mappers. S99 moved capability selection. S100 moved observation-decision. |
-| `turn-contract-builder` | 90065-90285 | `PROMPT_INTERPRETATION` | `MEDIUM_HIGH` | `PARTIAL_EXTRACTED` | `server/services/helix-ask/contracts/turn-contract-builder.ts` plus `server/services/helix-ask/contracts/turn-contract-seed-slots.ts`, `turn-contract-hash.ts`, `turn-contract-text.ts`, `turn-contract-normalizers.ts`, `turn-contract-slots.ts`, `turn-contract-objective-support.ts`, `turn-contract-objective-slots.ts`, `turn-contract-objective-evidence.ts`, `turn-contract-objective-unknown.ts`, and `turn-contract-objective-mini-answers.ts` | S97 moved the pure seed-slot mapper. S103 moved the pure turn-contract hash formatter. S105 moved text normalization. S106 moved family/grounding-mode normalizers. S107 moved required-slot aggregation. S108 moved objective-support mapping. S109 moved objective-slot inference from obligation coverage. S110 moved objective evidence slot-hit matching. S111 moved unknown-block construction/sanitization. S112 moved objective mini-answer assembly from supplied states/support/coverage. The main contract builder is bounded, but consumes many policy helpers. Characterize outputs before moving pure field assembly. |
+| `turn-contract-builder` | 90065-90285 | `PROMPT_INTERPRETATION` | `MEDIUM_HIGH` | `PARTIAL_EXTRACTED` | `server/services/helix-ask/contracts/turn-contract-builder.ts` plus `server/services/helix-ask/contracts/turn-contract-seed-slots.ts`, `turn-contract-hash.ts`, `turn-contract-text.ts`, `turn-contract-normalizers.ts`, `turn-contract-slots.ts`, `turn-contract-objective-support.ts`, `turn-contract-objective-slots.ts`, `turn-contract-objective-evidence.ts`, `turn-contract-objective-unknown.ts`, and `turn-contract-objective-mini-answers.ts` | S97 moved the pure seed-slot mapper. S103 moved the pure turn-contract hash formatter. S105 moved text normalization. S106 moved family/grounding-mode normalizers. S107 moved required-slot aggregation. S108 moved objective-support mapping. S109 moved objective-slot inference from obligation coverage. S110 moved objective evidence slot-hit matching. S111 moved unknown-block construction/sanitization. S112 moved objective mini-answer assembly from supplied states/support/coverage. S113 moved objective mini-answer validation summary counts into the same service. The main contract builder is bounded, but consumes many policy helpers. Characterize outputs before moving pure field assembly. |
 | `live-debug-slim-response-wrapper` | 108141-108165 | `DEBUG_EXPORT` / `UI_API_PROJECTION` | `MEDIUM_HIGH` | `PARTIAL_EXTRACTED` | `server/services/helix-ask/debug/live-response-payload.ts` plus `server/services/helix-ask/debug/live-debug-mode.ts` | S98 moved debug-mode parsing. `prepareHelixAskLiveResponsePayload` still calls typed-failure sync, mailbox projection, compound coverage sync, terminal projection sync, transcript scaffold, then slim debug. Requires ordered write proof before movement. |
 | `terminal-projection-debug-sync` | 106033-106214 | `TERMINAL_AUTHORITY` / `DEBUG_EXPORT` | `MEDIUM_HIGH` | `NEEDS_OWNER_PROOF` | `server/services/helix-ask/terminal-projection-debug-sync.ts` | Mutates payload/debug terminal mirrors after authority is selected. Extraction allowed only as projection sync, never terminal selection. |
 | `canonical-goal-frame` | 76899-77542 | `GOAL_SATISFACTION` / `INTENT_ARBITRATION` | `HIGH` | `NEEDS_OWNER_PROOF` | `server/services/helix-ask/goals/*` and `server/services/helix-ask/contracts/*` | Do not move full frame. S101-S102 moved pure goal-frame readers/formatters to `goals/goal-frame-readers.ts`; policy classification remains route-owned. |
@@ -57,7 +57,7 @@ Do not extract `runHelixAgentTurnRuntimeLoop` in this wave. Do not patch termina
 | `turn-contract-objective-slots` | `turn-contract-builder` / evidence pack | service-owned | Infer objective slot labels from obligation coverage refs and kinds. | Extracted by S109 with doc/code/roadmap slot inference coverage. | `EXTRACTED` |
 | `turn-contract-objective-evidence` | `turn-contract-builder` / evidence pack | service-owned | Normalize objective labels and infer required-slot hits from evidence refs. | Extracted by S110 with label-key and evidence slot-hit coverage. | `EXTRACTED` |
 | `turn-contract-objective-unknown` | `turn-contract-builder` / evidence pack | service-owned | Build and sanitize objective unknown blocks for unresolved slots. | Extracted by S111 with fallback and scaffold-sanitization coverage. | `EXTRACTED` |
-| `turn-contract-objective-mini-answers` | objective loop / evidence re-entry | service-owned | Assemble objective mini-answer records from loop states, support, coverage, retrieval files, and fallback evidence refs. | Extracted by S112 with covered/blocked/fallback behavior coverage. LLM mini-synth and critic remain route-owned. | `EXTRACTED` |
+| `turn-contract-objective-mini-answers` | objective loop / evidence re-entry | service-owned | Assemble objective mini-answer records from loop states, support, coverage, retrieval files, fallback evidence refs, and summarize status counts. | Extracted by S112-S113 with covered/blocked/fallback and summary-count behavior coverage. LLM mini-synth and critic remain route-owned. | `EXTRACTED` |
 | `turn-contract-seed-slots` | `turn-contract-builder` | service-owned | Convert a turn contract into slot plan entries. | Pure contract mapper. | `EXTRACTED` |
 | `turn-contract-hash-formatter` | `turn-contract-builder` | service-owned | Format stable turn-contract hash after contract construction. | Extracted by S103 as a pure formatter using shared stable JSON/SHA utilities. | `EXTRACTED` |
 | `turn-contract-retrieval-plan` | `turn-contract-builder` | starts 90289 | Build retrieval plan from contract and query constraints. | Touches retrieval/path ranking and prompt-research requirements. | `READY_AFTER_CHARACTERIZATION` |

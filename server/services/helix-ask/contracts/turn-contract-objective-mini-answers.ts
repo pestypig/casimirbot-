@@ -33,6 +33,14 @@ export type HelixAskObjectiveMiniAnswer = {
   unknown_block?: HelixAskObjectiveUnknownBlock;
 };
 
+export type HelixAskObjectiveMiniValidation = {
+  total: number;
+  covered: number;
+  partial: number;
+  blocked: number;
+  unresolved: number;
+};
+
 const clampHelixAskObjectiveUnitInterval = (value: number): number => {
   if (!Number.isFinite(value)) return 0;
   if (value < 0) return 0;
@@ -183,4 +191,21 @@ export const buildHelixAskObjectiveMiniAnswers = (args: {
     });
   }
   return answers;
+};
+
+export const summarizeHelixAskObjectiveMiniValidation = (
+  miniAnswers: HelixAskObjectiveMiniAnswer[],
+): HelixAskObjectiveMiniValidation => {
+  const total = miniAnswers.length;
+  const covered = miniAnswers.filter((entry) => entry.status === "covered").length;
+  const partial = miniAnswers.filter((entry) => entry.status === "partial").length;
+  const blocked = miniAnswers.filter((entry) => entry.status === "blocked").length;
+  const unresolved = Math.max(0, total - covered);
+  return {
+    total,
+    covered,
+    partial,
+    blocked,
+    unresolved,
+  };
 };

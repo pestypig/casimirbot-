@@ -3,7 +3,10 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { buildHelixAskObjectiveMiniAnswers } from "../services/helix-ask/contracts/turn-contract-objective-mini-answers";
+import {
+  buildHelixAskObjectiveMiniAnswers,
+  summarizeHelixAskObjectiveMiniValidation,
+} from "../services/helix-ask/contracts/turn-contract-objective-mini-answers";
 import type { HelixAskEvidencePackObligationCoverage } from "../services/helix-ask/obligation-coverage";
 
 const repoRoot = process.cwd();
@@ -33,7 +36,9 @@ describe("Helix Ask objective mini-answer extraction boundary", () => {
 
     expect(routeSource).toContain("../services/helix-ask/contracts/turn-contract-objective-mini-answers");
     expect(routeSource).not.toMatch(/const\s+buildHelixAskObjectiveMiniAnswers\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+summarizeHelixAskObjectiveMiniValidation\s*=\s*\(/);
     expect(serviceSource).toMatch(/export\s+const\s+buildHelixAskObjectiveMiniAnswers\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+summarizeHelixAskObjectiveMiniValidation\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");
     expect(serviceSource).not.toContain("../../../routes/agi.plan");
     expect(serviceSource).not.toContain("../../routes/agi.plan");
@@ -126,5 +131,45 @@ describe("Helix Ask objective mini-answer extraction boundary", () => {
         },
       },
     ]);
+  });
+
+  it("preserves mini-answer validation summary counts", () => {
+    expect(
+      summarizeHelixAskObjectiveMiniValidation([
+        {
+          objective_id: "covered",
+          objective_label: "Covered",
+          status: "covered",
+          matched_slots: [],
+          missing_slots: [],
+          evidence_refs: [],
+          summary: "covered",
+        },
+        {
+          objective_id: "partial",
+          objective_label: "Partial",
+          status: "partial",
+          matched_slots: [],
+          missing_slots: ["evidence"],
+          evidence_refs: [],
+          summary: "partial",
+        },
+        {
+          objective_id: "blocked",
+          objective_label: "Blocked",
+          status: "blocked",
+          matched_slots: [],
+          missing_slots: ["evidence"],
+          evidence_refs: [],
+          summary: "blocked",
+        },
+      ]),
+    ).toEqual({
+      total: 3,
+      covered: 1,
+      partial: 1,
+      blocked: 1,
+      unresolved: 2,
+    });
   });
 });
