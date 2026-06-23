@@ -250,3 +250,44 @@ export const buildHelixAskObjectiveMiniSynthPrompt = (args: {
     objectiveBlocks,
   ].join("\n");
 };
+
+export const buildHelixAskObjectiveMiniCritiquePrompt = (args: {
+  question: string;
+  miniAnswers: HelixAskObjectiveMiniAnswer[];
+  responseLanguage?: string | null;
+}): string => {
+  const objectiveBlocks = args.miniAnswers
+    .map((entry, index) => {
+      const matched = entry.matched_slots.join(", ") || "none";
+      const missing = entry.missing_slots.join(", ") || "none";
+      const evidence = entry.evidence_refs.slice(0, 6).join(", ") || "none";
+      return [
+        `${index + 1}. objective_id=${entry.objective_id}`,
+        `label=${entry.objective_label}`,
+        `current_status=${entry.status}`,
+        `matched_slots=${matched}`,
+        `missing_slots=${missing}`,
+        `evidence_refs=${evidence}`,
+        `summary=${entry.summary}`,
+      ].join("\n");
+    })
+    .join("\n\n");
+  return [
+    "You are Helix Ask objective mini-critic.",
+    "Return strict JSON only. No markdown. No commentary.",
+    "Schema:",
+    '{ "objectives": [{"objective_id":"string","status":"covered|partial|blocked","missing_slots":["slot-id"],"reason":"string"}] }',
+    "Rules:",
+    "- Include each objective_id exactly once.",
+    "- Status must be one of covered|partial|blocked.",
+    "- missing_slots must use only slot ids from that objective context when possible.",
+    "- If status=covered, missing_slots must be empty.",
+    "- Keep reason brief.",
+    `responseLanguage=${args.responseLanguage ?? "auto"}`,
+    "",
+    `Question: ${args.question}`,
+    "",
+    "Objective checkpoints:",
+    objectiveBlocks,
+  ].join("\n");
+};
