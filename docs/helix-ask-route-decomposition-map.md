@@ -2,7 +2,7 @@
 
 Status: current-head map for structural extraction and decomposition-enabler work.
 
-Pinned source HEAD described: `7e2c834d3678becd28604c06a30a0b35688e2ebc`
+Pinned source HEAD described: `6a870b4f708c9d079ad2939a35ffda2805bde3df`
 
 Snapshot command: `npx tsx scripts/helix-ask-route-inventory.ts --write`
 
@@ -11,9 +11,9 @@ Route snapshot:
 | Metric | Value |
 | --- | ---: |
 | File | `server/routes/agi.plan.ts` |
-| Lines | 181,592 |
-| Bytes | 8,132,666 |
-| Top-level helper estimate | 369 helper blocks |
+| Lines | 181,590 |
+| Bytes | 8,132,639 |
+| Top-level helper estimate | 368 helper blocks |
 | Route inventory | `artifacts/helix-ask-route-inventory.json` |
 | Machine-readable map | `artifacts/helix-ask-route-decomposition-map.json` |
 
@@ -49,6 +49,7 @@ Do not extract `runHelixAgentTurnRuntimeLoop` in this wave. Do not patch termina
 | `observation-decision` | `decision-source-map` | service-owned | Convert runtime observations, missing artifacts, pending requests, and next planned step into continue/finalize/input/failure decision. | Extracted by S100 behind invocation-time wrappers for shared route artifact collectors. | `EXTRACTED` |
 | `decision-source-map-builder` | `decision-source-map` | service-owned | Build debug/source map from payload. | Extracted; S96 moved the mapper callbacks into the same service owner. | `EXTRACTED` |
 | `turn-contract-field-assembly` | `turn-contract-builder` | 90065-90285 | Assemble contract goal/objectives/obligations/grounding/output family/format. | Pure-looking, but consumes planner pass, research contract, and classification helpers. | `READY_AFTER_CHARACTERIZATION` |
+| `intent-contract-hash-formatter` | `turn-contract-builder` / equation intent contract | service-owned | Format stable equation intent-contract hash after intent construction. | Extracted by S104 as a pure formatter using shared stable JSON/SHA utilities. | `EXTRACTED` |
 | `turn-contract-seed-slots` | `turn-contract-builder` | service-owned | Convert a turn contract into slot plan entries. | Pure contract mapper. | `EXTRACTED` |
 | `turn-contract-hash-formatter` | `turn-contract-builder` | service-owned | Format stable turn-contract hash after contract construction. | Extracted by S103 as a pure formatter using shared stable JSON/SHA utilities. | `EXTRACTED` |
 | `turn-contract-retrieval-plan` | `turn-contract-builder` | starts 90289 | Build retrieval plan from contract and query constraints. | Touches retrieval/path ranking and prompt-research requirements. | `READY_AFTER_CHARACTERIZATION` |
