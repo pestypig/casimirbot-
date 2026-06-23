@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { __testHelixRuntimeAuthorityAudit } from "../routes/agi.plan";
+import { __testHelixRuntimeAuthorityAudit } from "../services/helix-ask/runtime/runtime-authority-audit";
 
 const buildSynthesisPayload = (artifacts: Array<Record<string, unknown>>) => ({
   terminal_artifact_kind: "final_answer_draft",
