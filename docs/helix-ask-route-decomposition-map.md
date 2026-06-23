@@ -2,7 +2,7 @@
 
 Status: current-head map for structural extraction and decomposition-enabler work.
 
-Pinned source HEAD described: `f314679b13bdd03ed91c7c4b263e1651f902398f`
+Pinned source HEAD described: `5d46eb6fa6afb5a9c76d04b74c41679fa389e8c1`
 
 Snapshot command: `npx tsx scripts/helix-ask-route-inventory.ts --write`
 
@@ -11,9 +11,9 @@ Route snapshot:
 | Metric | Value |
 | --- | ---: |
 | File | `server/routes/agi.plan.ts` |
-| Lines | 181,944 |
-| Bytes | 8,148,694 |
-| Top-level helper estimate | 372 helper blocks |
+| Lines | 181,893 |
+| Bytes | 8,147,013 |
+| Top-level helper estimate | 370 helper blocks |
 | Route inventory | `artifacts/helix-ask-route-inventory.json` |
 | Machine-readable map | `artifacts/helix-ask-route-decomposition-map.json` |
 
@@ -29,37 +29,37 @@ Do not extract `runHelixAgentTurnRuntimeLoop` in this wave. Do not patch termina
 | --- | ---: | --- | --- | --- | --- | --- |
 | `live-debug-slim` | service-owned | `DEBUG_EXPORT` | `MEDIUM_LOW` | `EXTRACTED` | `server/services/helix-ask/debug/live-debug-slim.ts` | Extracted by S93. Route still owns debug-mode parsing and response wrapper ordering. |
 | `transcript-events` | service-owned | `UI_API_PROJECTION` | `MEDIUM_LOW` | `EXTRACTED` | `server/services/helix-ask/runtime/transcript-events.ts` | Extracted by S94. Route retains transcript scaffold/finalization ordering. |
-| `decision-source-map` | 76810-77878 | `SOLVER_CONTROL` | `MEDIUM` | `PARTIAL_EXTRACTED` | `server/services/helix-ask/runtime/decision-source-map.ts` plus possible sibling modules | S95 moved the debug map builder. S96 moved the pure runtime/terminal source mappers. Capability selection and observation-decision helpers remain route-owned and need characterization before movement. |
-| `turn-contract-builder` | 90077-90297 | `PROMPT_INTERPRETATION` | `MEDIUM_HIGH` | `READY_AFTER_CHARACTERIZATION` | `server/services/helix-ask/contracts/turn-contract-builder.ts` | The main contract builder is bounded, but consumes many policy helpers. Characterize outputs before moving pure field assembly. |
-| `live-debug-slim-response-wrapper` | 108183-108237 | `DEBUG_EXPORT` / `UI_API_PROJECTION` | `MEDIUM_HIGH` | `NEEDS_OWNER_PROOF` | `server/services/helix-ask/debug/live-response-payload.ts` | `prepareHelixAskLiveResponsePayload` calls typed-failure sync, mailbox projection, compound coverage sync, terminal projection sync, transcript scaffold, then slim debug. Requires ordered write proof. |
-| `terminal-projection-debug-sync` | 106080-106261 | `TERMINAL_AUTHORITY` / `DEBUG_EXPORT` | `MEDIUM_HIGH` | `NEEDS_OWNER_PROOF` | `server/services/helix-ask/terminal-projection-debug-sync.ts` | Mutates payload/debug terminal mirrors after authority is selected. Extraction allowed only as projection sync, never terminal selection. |
-| `canonical-goal-frame` | 76911-77554 | `GOAL_SATISFACTION` / `INTENT_ARBITRATION` | `HIGH` | `NEEDS_OWNER_PROOF` | `server/services/helix-ask/goals/*` and `server/services/helix-ask/contracts/*` | Do not move full frame. Only pure readers/formatters/debug helpers may move after subdivision. |
-| `legacy-private-runtime-loop` | starts 67592 | `LEGACY_PRIVATE_RUNTIME_LOOP` | `HIGH` | `DEFER_RUNTIME_OWNERSHIP` | deferred legacy quarantine map only | Explicitly excluded from extraction. Map internal lifecycle bands only. |
-| `execute-helix-ask` | starts 110497 | `LEGACY_PRIVATE_RUNTIME_LOOP` / `SOLVER_CONTROL` | `HIGH` | `DEFER_RUNTIME_OWNERSHIP` | deferred | Deep engine body with many lifecycle stages and side effects. Map only. |
-| `handle-ask-turn-request` | starts 139161 | `TRANSPORT_EXPRESS_SSE` | `HIGH` | `DEFER_RUNTIME_OWNERSHIP` | route shell only | Owns request/response sequencing, terminal payload finalization, and runtime interactions. Map only. |
+| `decision-source-map` | 77549-77885 | `SOLVER_CONTROL` | `MEDIUM` | `PARTIAL_EXTRACTED` | `server/services/helix-ask/runtime/decision-source-map.ts` plus possible sibling modules | S95 moved the debug map builder. S96 moved the pure runtime/terminal source mappers. Capability selection and observation-decision helpers remain route-owned and need characterization before movement. |
+| `turn-contract-builder` | 90065-90285 | `PROMPT_INTERPRETATION` | `MEDIUM_HIGH` | `PARTIAL_EXTRACTED` | `server/services/helix-ask/contracts/turn-contract-builder.ts` plus `server/services/helix-ask/contracts/turn-contract-seed-slots.ts` | S97 moved the pure seed-slot mapper. The main contract builder is bounded, but consumes many policy helpers. Characterize outputs before moving pure field assembly. |
+| `live-debug-slim-response-wrapper` | 108141-108165 | `DEBUG_EXPORT` / `UI_API_PROJECTION` | `MEDIUM_HIGH` | `PARTIAL_EXTRACTED` | `server/services/helix-ask/debug/live-response-payload.ts` plus `server/services/helix-ask/debug/live-debug-mode.ts` | S98 moved debug-mode parsing. `prepareHelixAskLiveResponsePayload` still calls typed-failure sync, mailbox projection, compound coverage sync, terminal projection sync, transcript scaffold, then slim debug. Requires ordered write proof before movement. |
+| `terminal-projection-debug-sync` | 106033-106214 | `TERMINAL_AUTHORITY` / `DEBUG_EXPORT` | `MEDIUM_HIGH` | `NEEDS_OWNER_PROOF` | `server/services/helix-ask/terminal-projection-debug-sync.ts` | Mutates payload/debug terminal mirrors after authority is selected. Extraction allowed only as projection sync, never terminal selection. |
+| `canonical-goal-frame` | 76899-77542 | `GOAL_SATISFACTION` / `INTENT_ARBITRATION` | `HIGH` | `NEEDS_OWNER_PROOF` | `server/services/helix-ask/goals/*` and `server/services/helix-ask/contracts/*` | Do not move full frame. Only pure readers/formatters/debug helpers may move after subdivision. |
+| `legacy-private-runtime-loop` | starts 67603 | `LEGACY_PRIVATE_RUNTIME_LOOP` | `HIGH` | `DEFER_RUNTIME_OWNERSHIP` | deferred legacy quarantine map only | Explicitly excluded from extraction. Map internal lifecycle bands only. |
+| `execute-helix-ask` | starts 110427 | `LEGACY_PRIVATE_RUNTIME_LOOP` / `SOLVER_CONTROL` | `HIGH` | `DEFER_RUNTIME_OWNERSHIP` | deferred | Deep engine body with many lifecycle stages and side effects. Map only. |
+| `handle-ask-turn-request` | starts 139091 | `TRANSPORT_EXPRESS_SSE` | `HIGH` | `DEFER_RUNTIME_OWNERSHIP` | route shell only | Owns request/response sequencing, terminal payload finalization, and runtime interactions. Map only. |
 
 ## Second-Level Decomposition
 
 | Sub-seam | Enclosing candidate | Current span | Responsibility | Dependency shape | Readiness |
 | --- | --- | ---: | --- | --- | --- |
 | `decision-source-mappers` | `decision-source-map` | service-owned | Runtime/terminal decision source normalization. | Pure mapping over source/reason/final-answer-source; no payload mutation. | `EXTRACTED` |
-| `goal-frame-mutation-target-reader` | `decision-source-map` / `canonical-goal-frame` | 77555-77559 | Read resolved mutation target from a built goal frame. | Pure frame reader; used outside decision-source selection. | `READY_AFTER_DEPENDENCY_REDUCTION` |
-| `capability-selection-result` | `decision-source-map` | 77561-77753 | Select expected capability from universal goal frame and optional selected action. | Policy-adjacent; depends on docs/panel classifiers and workstation planner. | `READY_AFTER_CHARACTERIZATION` |
-| `observation-decision` | `decision-source-map` | 77762-77888 | Convert runtime observations, missing artifacts, pending requests, and next planned step into continue/finalize/input/failure decision. | Policy-adjacent; depends on runtime artifact collectors and fallback missing-artifact filter. | `READY_AFTER_CHARACTERIZATION` |
+| `goal-frame-mutation-target-reader` | `decision-source-map` / `canonical-goal-frame` | 77543-77547 | Read resolved mutation target from a built goal frame. | Pure frame reader; used outside decision-source selection. | `READY_AFTER_DEPENDENCY_REDUCTION` |
+| `capability-selection-result` | `decision-source-map` | 77549-77741 | Select expected capability from universal goal frame and optional selected action. | Policy-adjacent; depends on docs/panel classifiers and workstation planner. | `READY_AFTER_CHARACTERIZATION` |
+| `observation-decision` | `decision-source-map` | 77750-77876 | Convert runtime observations, missing artifacts, pending requests, and next planned step into continue/finalize/input/failure decision. | Policy-adjacent; depends on runtime artifact collectors and fallback missing-artifact filter. | `READY_AFTER_CHARACTERIZATION` |
 | `decision-source-map-builder` | `decision-source-map` | service-owned | Build debug/source map from payload. | Extracted; S96 moved the mapper callbacks into the same service owner. | `EXTRACTED` |
-| `turn-contract-field-assembly` | `turn-contract-builder` | 90077-90297 | Assemble contract goal/objectives/obligations/grounding/output family/format. | Pure-looking, but consumes planner pass, research contract, and classification helpers. | `READY_AFTER_CHARACTERIZATION` |
-| `turn-contract-seed-slots` | `turn-contract-builder` | 90301-90334 | Convert a turn contract into slot plan entries. | Pure contract mapper. | `READY_MECHANICAL` |
-| `turn-contract-retrieval-plan` | `turn-contract-builder` | starts 90336 | Build retrieval plan from contract and query constraints. | Touches retrieval/path ranking and prompt-research requirements. | `READY_AFTER_CHARACTERIZATION` |
-| `terminal-projection-sync` | `terminal-projection-debug-sync` | 106080-106261 | Copy already-selected terminal state into payload/debug mirrors. | Mutates terminal/debug fields; requires ordered write ledger and projection tests. | `NEEDS_OWNER_PROOF` |
-| `debug-export-envelope` | `terminal-projection-debug-sync` | starts 106262 | Build debug export envelope after terminal/projection sync. | Mutates/refreshes multiple debug records. | `NEEDS_OWNER_PROOF` |
-| `live-debug-mode-reader` | `live-debug-slim-response-wrapper` | 108183-108209 | Read env/request debug mode. | Pure env/request reader; route-owned for now because response wrapper is adjacent. | `READY_MECHANICAL` |
-| `live-response-payload-wrapper` | `live-debug-slim-response-wrapper` | 108211-108237 | Ordered response projection: typed failure sync, mailbox sync, compound sync, terminal sync, transcript scaffold, slim debug. | Behavior-sensitive mutation order. | `NEEDS_OWNER_PROOF` |
-| `canonical-goal-record-readers` | `canonical-goal-frame` | 76911-77554 subset | Read payload/workspace/source details for goal frame inputs. | Needs AST subdivision; do not move classifiers/admission. | `READY_AFTER_DEPENDENCY_REDUCTION` |
-| `canonical-goal-policy-classifier` | `canonical-goal-frame` | 76911-77554 subset | Goal-kind/source-target/required-product policy. | Policy-sensitive. | `NEEDS_OWNER_PROOF` |
-| `legacy-runtime-intake-to-plan` | `legacy-private-runtime-loop` | starts 67592 | Runtime-loop intake/context/capability plan setup. | Closure-heavy; map only. | `DEFER_RUNTIME_OWNERSHIP` |
-| `legacy-runtime-tool-to-observation` | `legacy-private-runtime-loop` | starts 67592 | Tool dispatch, observation materialization, evidence re-entry. | Runtime ownership; map only. | `DEFER_RUNTIME_OWNERSHIP` |
-| `execute-helix-ask-engine-bands` | `execute-helix-ask` | starts 110497 | Deep engine: route prep, tool/observation/evidence/goal/terminal flow. | Too many lifecycle bands; map only. | `DEFER_RUNTIME_OWNERSHIP` |
-| `handle-ask-turn-transport-bands` | `handle-ask-turn-request` | starts 139161 | Express/SSE/API response and capture transport. | Transport shell plus terminal projection calls; map only. | `DEFER_RUNTIME_OWNERSHIP` |
+| `turn-contract-field-assembly` | `turn-contract-builder` | 90065-90285 | Assemble contract goal/objectives/obligations/grounding/output family/format. | Pure-looking, but consumes planner pass, research contract, and classification helpers. | `READY_AFTER_CHARACTERIZATION` |
+| `turn-contract-seed-slots` | `turn-contract-builder` | service-owned | Convert a turn contract into slot plan entries. | Pure contract mapper. | `EXTRACTED` |
+| `turn-contract-retrieval-plan` | `turn-contract-builder` | starts 90289 | Build retrieval plan from contract and query constraints. | Touches retrieval/path ranking and prompt-research requirements. | `READY_AFTER_CHARACTERIZATION` |
+| `terminal-projection-sync` | `terminal-projection-debug-sync` | 106033-106214 | Copy already-selected terminal state into payload/debug mirrors. | Mutates terminal/debug fields; requires ordered write ledger and projection tests. | `NEEDS_OWNER_PROOF` |
+| `debug-export-envelope` | `terminal-projection-debug-sync` | starts 106215 | Build debug export envelope after terminal/projection sync. | Mutates/refreshes multiple debug records. | `NEEDS_OWNER_PROOF` |
+| `live-debug-mode-reader` | `live-debug-slim-response-wrapper` | service-owned | Read env/request debug mode. | Pure env/request reader. | `EXTRACTED` |
+| `live-response-payload-wrapper` | `live-debug-slim-response-wrapper` | 108141-108165 | Ordered response projection: typed failure sync, mailbox sync, compound sync, terminal sync, transcript scaffold, slim debug. | Behavior-sensitive mutation order. | `NEEDS_OWNER_PROOF` |
+| `canonical-goal-record-readers` | `canonical-goal-frame` | 76899-77542 subset | Read payload/workspace/source details for goal frame inputs. | Needs AST subdivision; do not move classifiers/admission. | `READY_AFTER_DEPENDENCY_REDUCTION` |
+| `canonical-goal-policy-classifier` | `canonical-goal-frame` | 76899-77542 subset | Goal-kind/source-target/required-product policy. | Policy-sensitive. | `NEEDS_OWNER_PROOF` |
+| `legacy-runtime-intake-to-plan` | `legacy-private-runtime-loop` | starts 67603 | Runtime-loop intake/context/capability plan setup. | Closure-heavy; map only. | `DEFER_RUNTIME_OWNERSHIP` |
+| `legacy-runtime-tool-to-observation` | `legacy-private-runtime-loop` | starts 67603 | Tool dispatch, observation materialization, evidence re-entry. | Runtime ownership; map only. | `DEFER_RUNTIME_OWNERSHIP` |
+| `execute-helix-ask-engine-bands` | `execute-helix-ask` | starts 110427 | Deep engine: route prep, tool/observation/evidence/goal/terminal flow. | Too many lifecycle bands; map only. | `DEFER_RUNTIME_OWNERSHIP` |
+| `handle-ask-turn-transport-bands` | `handle-ask-turn-request` | starts 139091 | Express/SSE/API response and capture transport. | Transport shell plus terminal projection calls; map only. | `DEFER_RUNTIME_OWNERSHIP` |
 
 ## Large Runtime Region Lifecycle Bands
 
@@ -83,10 +83,10 @@ This wave's next safe work should be characterization or dependency reduction, n
 
 Candidate order:
 
-1. `turn-contract-seed-slots` - `READY_MECHANICAL`
-2. `capability-selection-result` - `READY_AFTER_CHARACTERIZATION`
-3. `observation-decision` - `READY_AFTER_CHARACTERIZATION`
-4. `terminal-projection-sync` - `NEEDS_OWNER_PROOF`
+1. `capability-selection-result` - `READY_AFTER_CHARACTERIZATION`
+2. `observation-decision` - `READY_AFTER_CHARACTERIZATION`
+3. `terminal-projection-sync` - `NEEDS_OWNER_PROOF`
+4. `live-response-payload-wrapper` - `NEEDS_OWNER_PROOF`
 
 ## Deferred Sets
 
