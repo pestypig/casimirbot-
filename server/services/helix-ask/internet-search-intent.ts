@@ -77,6 +77,13 @@ export const hasAffirmativeDocsViewerSearchCue = (promptText: string): boolean =
   ) {
     return true;
   }
+  if (
+    /\b(?:check|use|consult|look\s+(?:in|at)|read|inspect|pull\s+from)\b[\s\S]{0,120}\b(?:white\s*paper|whitepaper|paper|doc(?:ument)?|docs?)\b/i.test(withoutQuotedDocsSearch) ||
+    /\b(?:white\s*paper|whitepaper|paper|doc(?:ument)?|docs?)\b[\s\S]{0,120}\b(?:figure|figures|table|tables|value|values|newtons?|lbs?|pounds?|load[-\s]?bearing|capacity|reported|stated|specified)\b/i.test(withoutQuotedDocsSearch) ||
+    /\b(?:NHM[-\s]?2)\b[\s\S]{0,160}\b(?:white\s*paper|whitepaper|paper|doc(?:ument)?|figures?|newtons?|lbs?|pounds?|load[-\s]?bearing|capacity)\b/i.test(withoutQuotedDocsSearch)
+  ) {
+    return true;
+  }
   return /\b(?:which|what)\s+(?:doc(?:ument)?|paper)\s+path\b/i.test(prompt) &&
     /\b(?:from|in)\s+(?:our\s+|local\s+|the\s+)?docs?\b/i.test(prompt);
 };

@@ -1152,6 +1152,36 @@ export function arbitrateAskSourceTarget(input: {
       allowNoToolDirect: false,
     });
   }
+  if (isAffirmativeLocalDocumentEvidencePrompt(prompt)) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "docs_viewer",
+      targetKind: "docs_viewer",
+      strength: "hard",
+      explicitCues: ["local_document_evidence", "whitepaper_or_document_value_lookup"],
+      reasons: [
+        "explicit_local_document_evidence_source_target",
+        "local_document_value_lookup_suppresses_model_only",
+      ],
+      requestedOutputs: ["file_path", "line_backed_source", "doc_evidence_synthesis_answer", "typed_failure"],
+      suppressedRoutes: [
+        "internet_search_lookup",
+        "scholarly_research_lookup",
+        "repo_code_evidence_question",
+        "situation_context_question",
+        "visual_deictic",
+        "visual_frame_evidence",
+        "active_doc_identity",
+        "model_only_concept",
+        "no_tool_direct",
+      ],
+      precedenceReason: "explicit_local_document_evidence_source_target",
+      confidence: 0.97,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
   if (isAffirmativeDocsSearchPrompt(prompt)) {
     return toSourceTargetIntent({
       turnId: input.turnId,

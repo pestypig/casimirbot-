@@ -114,6 +114,8 @@ const hasAny = (promptText: string, patterns: RegExp[]): boolean =>
   patterns.some((pattern) => pattern.test(promptText));
 
 const contentQuestionPatterns = [
+  /\b(?:what(?:'s|\s+is)?|how\s+much|which|where)\b[\s\S]{0,180}\b(?:white\s*paper|whitepaper|paper|doc(?:ument)?|docs?|NHM[-\s]?2)\b[\s\S]{0,180}\b(?:figure|figures|table|tables|value|values|newtons?|lbs?|pounds?|load[-\s]?bearing|capacity|reported|stated|specified)\b/i,
+  /\b(?:check|use|consult|look\s+(?:in|at)|read|inspect)\b[\s\S]{0,160}\b(?:white\s*paper|whitepaper|paper|doc(?:ument)?|docs?|NHM[-\s]?2)\b[\s\S]{0,160}\b(?:figure|figures|table|tables|value|values|newtons?|lbs?|pounds?|load[-\s]?bearing|capacity)\b/i,
   /\b(?:review|explain|describe|summari[sz]e|compare|what(?:'s|\s+is)?|what\s+changed|look\s+at|see|seeing)\b[\s\S]{0,140}\b(?:screen|screenshot|capture|visual|frame|window|tab|image|picture)\b/i,
   /\b(?:screen|screenshot|capture|visual|frame|window|tab|image|picture)\b[\s\S]{0,140}\b(?:show|shows|showing|seeing|visible|happening|changed)\b/i,
   /\b(?:text|label|page)\b[\s\S]{0,80}\b(?:says|shows|reads|contains|imply|implies)\b/i,

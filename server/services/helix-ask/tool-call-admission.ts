@@ -456,9 +456,14 @@ export function buildToolCallAdmissionDecision(input: {
       ? "calculator_stream"
       : unknownSourceArtifactDiscoveryIntent
       ? "unknown"
-      : sourceTarget === "unknown" && !unknownSourceArtifactDiscoveryIntent && toolUseRestatement.requiredToolFamilies.includes("docs_viewer")
+      : (
+        sourceTarget === "unknown" ||
+        sourceTarget === "" ||
+        sourceTarget === "model_only" ||
+        sourceTarget === "general_background"
+      ) && !unknownSourceArtifactDiscoveryIntent && toolUseRestatement.requiredToolFamilies.includes("docs_viewer")
       ? "docs_viewer"
-      : sourceTarget === "unknown" && toolUseRestatement.requiredToolFamilies.includes("internet_search")
+      : (sourceTarget === "unknown" || sourceTarget === "") && toolUseRestatement.requiredToolFamilies.includes("internet_search")
       ? "internet_search"
       : sourceTarget === "unknown" && (calculatorSolveIntent || mandatoryCalculatorSolve)
       ? "calculator_stream"
