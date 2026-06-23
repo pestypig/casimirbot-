@@ -91,6 +91,7 @@ terminal eligibility, projection discipline, and debug traces.
 | S115 | turn-contract retrieval-plan assembly | `server/services/helix-ask/contracts/turn-contract-retrieval-plan.ts` | SERVICE_OWNED for deterministic retrieval budget/path/precedence assembly only |
 | S116 | objective mini-synth prompt renderer | `server/services/helix-ask/contracts/turn-contract-objective-mini-answers.ts` | SERVICE_OWNED for deterministic mini-synth prompt text only |
 | S117 | objective mini-critic prompt renderer | `server/services/helix-ask/contracts/turn-contract-objective-mini-answers.ts` | SERVICE_OWNED for deterministic mini-critic prompt text only |
+| S118 | objective mini-synth application | `server/services/helix-ask/contracts/turn-contract-objective-mini-answers.ts` | SERVICE_OWNED for deterministic parsed mini-synth merge only |
 
 ## Deferred Ownership Debt
 
@@ -128,6 +129,8 @@ terminal eligibility, projection discipline, and debug traces.
 - Objective mini-critic remains dependent on route-owned LLM invocation, parsing,
   repair, and critique application policy; S117 moved only deterministic prompt
   rendering.
+- Objective mini-synth parsing and repair remain route-owned; S118 moved only
+  deterministic application of an already parsed mini-synth result.
 - Objective prompt rewriting remains dependent on route-owned LLM invocation,
   model selection, telemetry, and budget policy; S114 moved only deterministic
   rewrite mode, hash/token estimates, and rewrite prompt text construction.

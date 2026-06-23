@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  applyHelixAskObjectiveMiniSynth,
   buildHelixAskObjectiveMiniAnswers,
   buildHelixAskObjectiveMiniCritiquePrompt,
   buildHelixAskObjectiveMiniSynthPrompt,
@@ -37,10 +38,12 @@ describe("Helix Ask objective mini-answer extraction boundary", () => {
     const serviceSource = readFileSync(servicePath, "utf8");
 
     expect(routeSource).toContain("../services/helix-ask/contracts/turn-contract-objective-mini-answers");
+    expect(routeSource).not.toMatch(/const\s+applyHelixAskObjectiveMiniSynth\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+buildHelixAskObjectiveMiniAnswers\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+buildHelixAskObjectiveMiniCritiquePrompt\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+buildHelixAskObjectiveMiniSynthPrompt\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+summarizeHelixAskObjectiveMiniValidation\s*=\s*\(/);
+    expect(serviceSource).toMatch(/export\s+const\s+applyHelixAskObjectiveMiniSynth\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+buildHelixAskObjectiveMiniAnswers\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+buildHelixAskObjectiveMiniCritiquePrompt\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+buildHelixAskObjectiveMiniSynthPrompt\s*=/);
@@ -270,5 +273,60 @@ describe("Helix Ask objective mini-answer extraction boundary", () => {
         "summary=Evidence Coverage: covered.",
       ].join("\n"),
     );
+  });
+
+  it("preserves objective mini-synth application semantics", () => {
+    expect(
+      applyHelixAskObjectiveMiniSynth({
+        miniAnswers: [
+          {
+            objective_id: "obj_1",
+            objective_label: "Evidence Coverage",
+            status: "partial",
+            matched_slots: ["doc-evidence"],
+            missing_slots: ["numeric-result", "unit-conversion"],
+            evidence_refs: ["docs/base.md"],
+            linked_evidence_refs: ["docs/base.md"],
+            summary: "Original partial summary.",
+            unknown_block: {
+              unknown: "Missing numeric result.",
+              why: "numeric-result missing",
+              what_i_checked: ["docs/base.md"],
+              next_retrieval: "Find numeric-result.",
+            },
+          },
+        ],
+        synth: {
+          objectives: [
+            {
+              objective_id: "obj_1",
+              status: "covered",
+              matched_slots: ["numeric-result"],
+              missing_slots: ["unit-conversion"],
+              evidence_refs: ["docs/synth.md"],
+              summary: "Synth covered summary.",
+            },
+          ],
+        },
+        objectiveStates: [
+          {
+            objective_id: "obj_1",
+            required_slots: ["doc-evidence", "numeric-result", "unit-conversion"],
+          },
+        ],
+      }),
+    ).toEqual([
+      {
+        objective_id: "obj_1",
+        objective_label: "Evidence Coverage",
+        status: "covered",
+        matched_slots: ["doc-evidence", "numeric-result", "unit-conversion"],
+        missing_slots: [],
+        evidence_refs: ["docs/synth.md", "docs/base.md"],
+        linked_evidence_refs: ["docs/base.md"],
+        summary: "Synth covered summary.",
+        unknown_block: undefined,
+      },
+    ]);
   });
 });

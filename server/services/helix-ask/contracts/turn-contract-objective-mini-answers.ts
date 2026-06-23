@@ -41,6 +41,27 @@ export type HelixAskObjectiveMiniValidation = {
   unresolved: number;
 };
 
+export type HelixAskObjectiveMiniSynthStatus = "covered" | "partial" | "blocked";
+
+export type HelixAskObjectiveMiniSynthObjective = {
+  objective_id: string;
+  status: HelixAskObjectiveMiniSynthStatus;
+  matched_slots: string[];
+  missing_slots: string[];
+  summary?: string;
+  evidence_refs: string[];
+  unknown_block?: HelixAskObjectiveUnknownBlock;
+};
+
+export type HelixAskObjectiveMiniSynth = {
+  objectives: HelixAskObjectiveMiniSynthObjective[];
+};
+
+export type HelixAskObjectiveMiniSynthLoopState = {
+  objective_id: string;
+  required_slots: string[];
+};
+
 const clampHelixAskObjectiveUnitInterval = (value: number): number => {
   if (!Number.isFinite(value)) return 0;
   if (value < 0) return 0;
@@ -290,4 +311,64 @@ export const buildHelixAskObjectiveMiniCritiquePrompt = (args: {
     "Objective checkpoints:",
     objectiveBlocks,
   ].join("\n");
+};
+
+export const applyHelixAskObjectiveMiniSynth = (args: {
+  miniAnswers: HelixAskObjectiveMiniAnswer[];
+  synth: HelixAskObjectiveMiniSynth;
+  objectiveStates: HelixAskObjectiveMiniSynthLoopState[];
+}): HelixAskObjectiveMiniAnswer[] => {
+  const synthById = new Map(
+    args.synth.objectives.map((entry) => [entry.objective_id, entry] as const),
+  );
+  const stateById = new Map(
+    args.objectiveStates.map((entry) => [entry.objective_id, entry] as const),
+  );
+  return args.miniAnswers.map((entry) => {
+    const synth = synthById.get(entry.objective_id);
+    if (!synth) return entry;
+    const state = stateById.get(entry.objective_id);
+    const requiredSlots =
+      state?.required_slots.length
+        ? state.required_slots
+        : Array.from(new Set([...entry.matched_slots, ...entry.missing_slots]));
+    const matchedSlots = Array.from(
+      new Set(synth.matched_slots.filter((slot) => requiredSlots.includes(slot))),
+    );
+    const missingSlotsFromSynth = Array.from(
+      new Set(synth.missing_slots.filter((slot) => requiredSlots.includes(slot))),
+    );
+    const missingSlots =
+      synth.status === "covered"
+        ? []
+        : missingSlotsFromSynth.length > 0
+          ? missingSlotsFromSynth
+          : requiredSlots.filter((slot) => !matchedSlots.includes(slot));
+    const evidenceRefs = Array.from(
+      new Set([...(synth.evidence_refs ?? []), ...entry.evidence_refs].filter(Boolean)),
+    ).slice(0, 8);
+    const unknownBlock =
+      synth.status === "covered"
+        ? undefined
+        : sanitizeHelixAskObjectiveUnknownBlock({
+            objectiveLabel: entry.objective_label,
+            missingSlots,
+            evidenceRefs,
+            block: synth.unknown_block ?? entry.unknown_block,
+          });
+    return {
+      ...entry,
+      status: synth.status,
+      matched_slots: synth.status === "covered"
+        ? Array.from(new Set([...requiredSlots, ...matchedSlots]))
+        : matchedSlots,
+      missing_slots: missingSlots,
+      evidence_refs: evidenceRefs,
+      summary:
+        synth.summary && synth.summary.trim().length > 0
+          ? synth.summary
+          : entry.summary,
+      unknown_block: unknownBlock,
+    };
+  });
 };
