@@ -326,6 +326,51 @@ export const buildHelixAskObjectiveMiniCritiquePrompt = (args: {
   ].join("\n");
 };
 
+export const buildHelixAskObjectiveAssemblyPrompt = (args: {
+  question: string;
+  currentAnswer: string;
+  miniAnswers: HelixAskObjectiveMiniAnswer[];
+  responseLanguage?: string | null;
+}): string => {
+  const hasUnresolvedObjectives = args.miniAnswers.some((entry) => entry.status !== "covered");
+  const objectiveLines = args.miniAnswers
+    .map((entry, index) => {
+      const evidence = entry.evidence_refs.slice(0, 4).join(", ") || "none";
+      const missing = entry.missing_slots.join(", ") || "none";
+      return `${index + 1}. ${entry.objective_label}\nstatus=${entry.status}\nmissing=${missing}\nevidence=${evidence}\nsummary=${entry.summary}`;
+    })
+    .join("\n\n");
+  return [
+    "You are Helix Ask objective assembler.",
+    "Return a concise final answer only, no JSON and no debug metadata.",
+    "Preserve existing citations and uncertainty statements.",
+    ...(hasUnresolvedObjectives
+      ? [
+          "If any objective remains partial or blocked, fail closed: emit an assembly-blocked reason plus objective-local UNKNOWN blocks only.",
+          "For every objective with status=partial or status=blocked, emit an explicit UNKNOWN block with: UNKNOWN, Why, What I checked, Next retrieval.",
+          'Forbidden in UNKNOWN output: "start with one concrete claim", "core meaning of the concept in its domain context", and "Sources: open-world best-effort".',
+        ]
+      : [
+          "All objectives are covered.",
+          "Do not emit fail-closed or UNKNOWN scaffolds.",
+          'Forbidden tokens/headers: "UNKNOWN", "Assembly blocked:", "Open gaps / UNKNOWNs:", "Why:", "What I checked:", "Next retrieval:".',
+          "If the current draft contains blocked/unknown scaffolds, rewrite it into a direct covered answer using objective summaries and evidence.",
+        ]),
+    "Never present unresolved objectives as complete.",
+    "Use objective checkpoints internally; do not expose planner/checkpoint labels or status fields in the final answer.",
+    "Use the same language as the current answer unless responseLanguage explicitly requests a different language.",
+    `responseLanguage=${args.responseLanguage ?? "auto"}`,
+    "",
+    `Question: ${args.question}`,
+    "",
+    "Objective checkpoints:",
+    objectiveLines,
+    "",
+    "Current answer draft:",
+    args.currentAnswer,
+  ].join("\n");
+};
+
 export const applyHelixAskObjectiveMiniSynth = (args: {
   miniAnswers: HelixAskObjectiveMiniAnswer[];
   synth: HelixAskObjectiveMiniSynth;

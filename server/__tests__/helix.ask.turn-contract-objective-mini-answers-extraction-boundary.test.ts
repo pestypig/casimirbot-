@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyHelixAskObjectiveMiniCritique,
   applyHelixAskObjectiveMiniSynth,
+  buildHelixAskObjectiveAssemblyPrompt,
   buildHelixAskObjectiveMiniAnswers,
   buildHelixAskObjectiveMiniCritiquePrompt,
   buildHelixAskObjectiveMiniSynthPrompt,
@@ -41,12 +42,14 @@ describe("Helix Ask objective mini-answer extraction boundary", () => {
     expect(routeSource).toContain("../services/helix-ask/contracts/turn-contract-objective-mini-answers");
     expect(routeSource).not.toMatch(/const\s+applyHelixAskObjectiveMiniCritique\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+applyHelixAskObjectiveMiniSynth\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+buildHelixAskObjectiveAssemblyPrompt\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+buildHelixAskObjectiveMiniAnswers\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+buildHelixAskObjectiveMiniCritiquePrompt\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+buildHelixAskObjectiveMiniSynthPrompt\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+summarizeHelixAskObjectiveMiniValidation\s*=\s*\(/);
     expect(serviceSource).toMatch(/export\s+const\s+applyHelixAskObjectiveMiniCritique\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+applyHelixAskObjectiveMiniSynth\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+buildHelixAskObjectiveAssemblyPrompt\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+buildHelixAskObjectiveMiniAnswers\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+buildHelixAskObjectiveMiniCritiquePrompt\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+buildHelixAskObjectiveMiniSynthPrompt\s*=/);
@@ -384,5 +387,36 @@ describe("Helix Ask objective mini-answer extraction boundary", () => {
         },
       },
     ]);
+  });
+
+  it("preserves objective assembly prompt rendering semantics", () => {
+    const prompt = buildHelixAskObjectiveAssemblyPrompt({
+      question: "What did the evidence prove?",
+      currentAnswer: "Current draft.",
+      responseLanguage: "en",
+      miniAnswers: [
+        {
+          objective_id: "obj_1",
+          objective_label: "Evidence Coverage",
+          status: "partial",
+          matched_slots: ["doc-evidence"],
+          missing_slots: ["numeric-result"],
+          evidence_refs: ["docs/base.md", "server/file.ts"],
+          summary: "Evidence Coverage: partially covered.",
+        },
+      ],
+    });
+
+    expect(prompt).toContain("You are Helix Ask objective assembler.");
+    expect(prompt).toContain("If any objective remains partial or blocked, fail closed");
+    expect(prompt).toContain("For every objective with status=partial or status=blocked");
+    expect(prompt).toContain("responseLanguage=en");
+    expect(prompt).toContain("Question: What did the evidence prove?");
+    expect(prompt).toContain("1. Evidence Coverage");
+    expect(prompt).toContain("status=partial");
+    expect(prompt).toContain("missing=numeric-result");
+    expect(prompt).toContain("evidence=docs/base.md, server/file.ts");
+    expect(prompt).toContain("summary=Evidence Coverage: partially covered.");
+    expect(prompt).toContain("Current answer draft:\nCurrent draft.");
   });
 });
