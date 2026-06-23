@@ -62,6 +62,19 @@ export type HelixAskObjectiveMiniSynthLoopState = {
   required_slots: string[];
 };
 
+export type HelixAskObjectiveMiniCritiqueStatus = "covered" | "partial" | "blocked";
+
+export type HelixAskObjectiveMiniCritiqueObjective = {
+  objective_id: string;
+  status: HelixAskObjectiveMiniCritiqueStatus;
+  missing_slots: string[];
+  reason?: string;
+};
+
+export type HelixAskObjectiveMiniCritique = {
+  objectives: HelixAskObjectiveMiniCritiqueObjective[];
+};
+
 const clampHelixAskObjectiveUnitInterval = (value: number): number => {
   if (!Number.isFinite(value)) return 0;
   if (value < 0) return 0;
@@ -368,6 +381,58 @@ export const applyHelixAskObjectiveMiniSynth = (args: {
         synth.summary && synth.summary.trim().length > 0
           ? synth.summary
           : entry.summary,
+      unknown_block: unknownBlock,
+    };
+  });
+};
+
+export const applyHelixAskObjectiveMiniCritique = (args: {
+  miniAnswers: HelixAskObjectiveMiniAnswer[];
+  critique: HelixAskObjectiveMiniCritique;
+  objectiveStates: HelixAskObjectiveMiniSynthLoopState[];
+}): HelixAskObjectiveMiniAnswer[] => {
+  const critiqueById = new Map(
+    args.critique.objectives.map((entry) => [entry.objective_id, entry] as const),
+  );
+  const stateById = new Map(
+    args.objectiveStates.map((entry) => [entry.objective_id, entry] as const),
+  );
+  return args.miniAnswers.map((entry) => {
+    const critique = critiqueById.get(entry.objective_id);
+    if (!critique) return entry;
+    const state = stateById.get(entry.objective_id);
+    const requiredSlots =
+      state?.required_slots.length
+        ? state.required_slots
+        : Array.from(new Set([...entry.matched_slots, ...entry.missing_slots]));
+    const filteredMissing = Array.from(
+      new Set(critique.missing_slots.filter((slot) => requiredSlots.includes(slot))),
+    );
+    const status = critique.status;
+    const missingSlots =
+      status === "covered"
+        ? []
+        : filteredMissing.length > 0
+          ? filteredMissing
+          : status === "partial"
+            ? entry.missing_slots
+            : filteredMissing;
+    const matchedSlots = requiredSlots.filter((slot) => !missingSlots.includes(slot));
+    const reasonSentence = critique.reason ? ` LLM critic: ${critique.reason}.` : "";
+    const unknownBlock =
+      status === "covered"
+        ? undefined
+        : buildHelixAskObjectiveUnknownBlock({
+            objectiveLabel: entry.objective_label,
+            missingSlots,
+            evidenceRefs: entry.evidence_refs,
+          });
+    return {
+      ...entry,
+      status,
+      matched_slots: matchedSlots,
+      missing_slots: missingSlots,
+      summary: `${entry.summary}${reasonSentence}`.trim(),
       unknown_block: unknownBlock,
     };
   });

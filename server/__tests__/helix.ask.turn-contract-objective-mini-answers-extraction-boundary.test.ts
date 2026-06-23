@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  applyHelixAskObjectiveMiniCritique,
   applyHelixAskObjectiveMiniSynth,
   buildHelixAskObjectiveMiniAnswers,
   buildHelixAskObjectiveMiniCritiquePrompt,
@@ -38,11 +39,13 @@ describe("Helix Ask objective mini-answer extraction boundary", () => {
     const serviceSource = readFileSync(servicePath, "utf8");
 
     expect(routeSource).toContain("../services/helix-ask/contracts/turn-contract-objective-mini-answers");
+    expect(routeSource).not.toMatch(/const\s+applyHelixAskObjectiveMiniCritique\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+applyHelixAskObjectiveMiniSynth\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+buildHelixAskObjectiveMiniAnswers\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+buildHelixAskObjectiveMiniCritiquePrompt\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+buildHelixAskObjectiveMiniSynthPrompt\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+summarizeHelixAskObjectiveMiniValidation\s*=\s*\(/);
+    expect(serviceSource).toMatch(/export\s+const\s+applyHelixAskObjectiveMiniCritique\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+applyHelixAskObjectiveMiniSynth\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+buildHelixAskObjectiveMiniAnswers\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+buildHelixAskObjectiveMiniCritiquePrompt\s*=/);
@@ -326,6 +329,59 @@ describe("Helix Ask objective mini-answer extraction boundary", () => {
         linked_evidence_refs: ["docs/base.md"],
         summary: "Synth covered summary.",
         unknown_block: undefined,
+      },
+    ]);
+  });
+
+  it("preserves objective mini-critic application semantics", () => {
+    expect(
+      applyHelixAskObjectiveMiniCritique({
+        miniAnswers: [
+          {
+            objective_id: "obj_1",
+            objective_label: "Evidence Coverage",
+            status: "covered",
+            matched_slots: ["doc-evidence", "numeric-result"],
+            missing_slots: [],
+            evidence_refs: ["docs/base.md"],
+            linked_evidence_refs: ["docs/base.md"],
+            summary: "Original covered summary.",
+          },
+        ],
+        critique: {
+          objectives: [
+            {
+              objective_id: "obj_1",
+              status: "partial",
+              missing_slots: ["numeric-result"],
+              reason: "numeric result needs firmer evidence",
+            },
+          ],
+        },
+        objectiveStates: [
+          {
+            objective_id: "obj_1",
+            required_slots: ["doc-evidence", "numeric-result"],
+          },
+        ],
+      }),
+    ).toEqual([
+      {
+        objective_id: "obj_1",
+        objective_label: "Evidence Coverage",
+        status: "partial",
+        matched_slots: ["doc-evidence"],
+        missing_slots: ["numeric-result"],
+        evidence_refs: ["docs/base.md"],
+        linked_evidence_refs: ["docs/base.md"],
+        summary: "Original covered summary. LLM critic: numeric result needs firmer evidence.",
+        unknown_block: {
+          unknown: "Required objective unresolved: Evidence Coverage.",
+          why: "required objective unresolved; missing numeric-result",
+          what_i_checked: ["docs/base.md"],
+          next_retrieval:
+            'Run objective-scoped retrieval for "Evidence Coverage" and collect evidence for slots: numeric-result.',
+        },
       },
     ]);
   });
