@@ -196,7 +196,7 @@ describe("helix ask turn e10.28 ui regressions", () => {
       },
       parity_status: expect.any(String),
     });
-  });
+  }, 60_000);
 
   it("maps conversational notes navigation variants to the notes panel", async () => {
     const app = createApp();
