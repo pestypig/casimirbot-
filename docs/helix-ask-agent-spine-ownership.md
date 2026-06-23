@@ -75,6 +75,7 @@ terminal eligibility, projection discipline, and debug traces.
 | S99 | capability selection result | `server/services/helix-ask/runtime/capability-selection-result.ts` | SERVICE_OWNED |
 | S100 | observation decision | `server/services/helix-ask/runtime/observation-decision.ts` | SERVICE_OWNED |
 | S101 | goal-frame mutation-target reader | `server/services/helix-ask/goals/goal-frame-readers.ts` | SERVICE_OWNED for the pure reader only |
+| S102 | goal-frame hash formatter | `server/services/helix-ask/goals/goal-frame-readers.ts` | SERVICE_OWNED for the pure formatter only |
 
 ## Deferred Ownership Debt
 
@@ -82,7 +83,7 @@ terminal eligibility, projection discipline, and debug traces.
   remain route-owned runtime bands and must be mapped before any ownership move.
 - Terminal projection sync still needs ordered-write proof before extraction.
 - Post-tool authority bridge behavior remains out of scope for structural slices.
-- Canonical goal-frame policy remains high risk; S101 moved one pure reader, but
+- Canonical goal-frame policy remains high risk; S101-S102 moved pure helpers, but
   classifiers and required-terminal policy still need owner proof before moving.
 - Recovery helpers can write terminal state and must not be treated as harmless
   glue without field-writer proof.
