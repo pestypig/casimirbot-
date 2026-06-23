@@ -11,8 +11,8 @@ Route snapshot:
 | Metric | Value |
 | --- | ---: |
 | File | `server/routes/agi.plan.ts` |
-| Lines | 181,963 |
-| Bytes | 8,149,727 |
+| Lines | 181,944 |
+| Bytes | 8,148,694 |
 | Top-level helper estimate | 372 helper blocks |
 | Route inventory | `artifacts/helix-ask-route-inventory.json` |
 | Machine-readable map | `artifacts/helix-ask-route-decomposition-map.json` |
@@ -29,7 +29,7 @@ Do not extract `runHelixAgentTurnRuntimeLoop` in this wave. Do not patch termina
 | --- | ---: | --- | --- | --- | --- | --- |
 | `live-debug-slim` | service-owned | `DEBUG_EXPORT` | `MEDIUM_LOW` | `EXTRACTED` | `server/services/helix-ask/debug/live-debug-slim.ts` | Extracted by S93. Route still owns debug-mode parsing and response wrapper ordering. |
 | `transcript-events` | service-owned | `UI_API_PROJECTION` | `MEDIUM_LOW` | `EXTRACTED` | `server/services/helix-ask/runtime/transcript-events.ts` | Extracted by S94. Route retains transcript scaffold/finalization ordering. |
-| `decision-source-map` | 76810-77897 | `SOLVER_CONTROL` | `MEDIUM` | `PARTIAL_EXTRACTED` | `server/services/helix-ask/runtime/decision-source-map.ts` plus possible sibling modules | S95 moved the debug map builder. Source mappers, capability selection, and observation-decision helpers remain route-owned and need characterization before movement. |
+| `decision-source-map` | 76810-77878 | `SOLVER_CONTROL` | `MEDIUM` | `PARTIAL_EXTRACTED` | `server/services/helix-ask/runtime/decision-source-map.ts` plus possible sibling modules | S95 moved the debug map builder. S96 moved the pure runtime/terminal source mappers. Capability selection and observation-decision helpers remain route-owned and need characterization before movement. |
 | `turn-contract-builder` | 90077-90297 | `PROMPT_INTERPRETATION` | `MEDIUM_HIGH` | `READY_AFTER_CHARACTERIZATION` | `server/services/helix-ask/contracts/turn-contract-builder.ts` | The main contract builder is bounded, but consumes many policy helpers. Characterize outputs before moving pure field assembly. |
 | `live-debug-slim-response-wrapper` | 108183-108237 | `DEBUG_EXPORT` / `UI_API_PROJECTION` | `MEDIUM_HIGH` | `NEEDS_OWNER_PROOF` | `server/services/helix-ask/debug/live-response-payload.ts` | `prepareHelixAskLiveResponsePayload` calls typed-failure sync, mailbox projection, compound coverage sync, terminal projection sync, transcript scaffold, then slim debug. Requires ordered write proof. |
 | `terminal-projection-debug-sync` | 106080-106261 | `TERMINAL_AUTHORITY` / `DEBUG_EXPORT` | `MEDIUM_HIGH` | `NEEDS_OWNER_PROOF` | `server/services/helix-ask/terminal-projection-debug-sync.ts` | Mutates payload/debug terminal mirrors after authority is selected. Extraction allowed only as projection sync, never terminal selection. |
@@ -42,11 +42,11 @@ Do not extract `runHelixAgentTurnRuntimeLoop` in this wave. Do not patch termina
 
 | Sub-seam | Enclosing candidate | Current span | Responsibility | Dependency shape | Readiness |
 | --- | --- | ---: | --- | --- | --- |
-| `decision-source-mappers` | `decision-source-map` | 76810-76838 | Runtime/terminal decision source normalization. | Pure mapping over source/reason/final-answer-source; no payload mutation. | `READY_MECHANICAL` |
+| `decision-source-mappers` | `decision-source-map` | service-owned | Runtime/terminal decision source normalization. | Pure mapping over source/reason/final-answer-source; no payload mutation. | `EXTRACTED` |
 | `goal-frame-mutation-target-reader` | `decision-source-map` / `canonical-goal-frame` | 77555-77559 | Read resolved mutation target from a built goal frame. | Pure frame reader; used outside decision-source selection. | `READY_AFTER_DEPENDENCY_REDUCTION` |
 | `capability-selection-result` | `decision-source-map` | 77561-77753 | Select expected capability from universal goal frame and optional selected action. | Policy-adjacent; depends on docs/panel classifiers and workstation planner. | `READY_AFTER_CHARACTERIZATION` |
 | `observation-decision` | `decision-source-map` | 77762-77888 | Convert runtime observations, missing artifacts, pending requests, and next planned step into continue/finalize/input/failure decision. | Policy-adjacent; depends on runtime artifact collectors and fallback missing-artifact filter. | `READY_AFTER_CHARACTERIZATION` |
-| `decision-source-map-builder` | `decision-source-map` | service-owned | Build debug/source map from payload. | Extracted with two route mapper callbacks. | `EXTRACTED` |
+| `decision-source-map-builder` | `decision-source-map` | service-owned | Build debug/source map from payload. | Extracted; S96 moved the mapper callbacks into the same service owner. | `EXTRACTED` |
 | `turn-contract-field-assembly` | `turn-contract-builder` | 90077-90297 | Assemble contract goal/objectives/obligations/grounding/output family/format. | Pure-looking, but consumes planner pass, research contract, and classification helpers. | `READY_AFTER_CHARACTERIZATION` |
 | `turn-contract-seed-slots` | `turn-contract-builder` | 90301-90334 | Convert a turn contract into slot plan entries. | Pure contract mapper. | `READY_MECHANICAL` |
 | `turn-contract-retrieval-plan` | `turn-contract-builder` | starts 90336 | Build retrieval plan from contract and query constraints. | Touches retrieval/path ranking and prompt-research requirements. | `READY_AFTER_CHARACTERIZATION` |
@@ -77,17 +77,16 @@ The current low-risk batch is intentionally small and ordered by structural risk
 
 1. `live-debug-slim` - `EXTRACTED_S93`
 2. `transcript-events` - `EXTRACTED_S94`
-3. `decision-source-map` - `PARTIAL_EXTRACTED_S95`
+3. `decision-source-map` - `PARTIAL_EXTRACTED_S95_S96`
 
 This wave's next safe work should be characterization or dependency reduction, not direct movement of the high-risk bands.
 
 Candidate order:
 
-1. `decision-source-mappers` - `READY_MECHANICAL`
-2. `turn-contract-seed-slots` - `READY_MECHANICAL`
-3. `capability-selection-result` - `READY_AFTER_CHARACTERIZATION`
-4. `observation-decision` - `READY_AFTER_CHARACTERIZATION`
-5. `terminal-projection-sync` - `NEEDS_OWNER_PROOF`
+1. `turn-contract-seed-slots` - `READY_MECHANICAL`
+2. `capability-selection-result` - `READY_AFTER_CHARACTERIZATION`
+3. `observation-decision` - `READY_AFTER_CHARACTERIZATION`
+4. `terminal-projection-sync` - `NEEDS_OWNER_PROOF`
 
 ## Deferred Sets
 

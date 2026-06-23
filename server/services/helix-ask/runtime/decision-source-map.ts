@@ -41,6 +41,29 @@ type HelixAskDecisionSourceMapDependencies = {
   mapAskTurnTerminalDecisionSource: (finalAnswerSource?: string | null) => HelixAskTurnDecisionSource;
 };
 
+export const mapAskTurnRuntimeStepSource = (source: unknown, reason?: unknown): HelixAskTurnDecisionSource => {
+  const normalizedSource = typeof source === "string" ? source.trim() : "";
+  const normalizedReason = typeof reason === "string" ? reason.trim() : "";
+  if (normalizedReason.includes("model_decision")) return "model_planner";
+  if (normalizedSource === "capability_registry") return "capability_registry";
+  if (normalizedSource === "artifact_policy") return "artifact_policy";
+  if (normalizedSource === "fallback") return "legacy_fallback";
+  return "phrase_detector";
+};
+
+export const mapAskTurnTerminalDecisionSource = (
+  finalAnswerSource?: string | null,
+): HelixAskTurnDecisionSource => {
+  if (finalAnswerSource === "legacy_fallback" || finalAnswerSource === "client_fallback") return "legacy_fallback";
+  if (
+    finalAnswerSource === "universal_composer" ||
+    finalAnswerSource === "artifact_synthesis" ||
+    finalAnswerSource === "typed_failure" ||
+    finalAnswerSource === "request_user_input"
+  ) return "artifact_policy";
+  return "model_planner";
+};
+
 export const createAskTurnDecisionSourceMapBuilder = (
   deps: HelixAskDecisionSourceMapDependencies,
 ) => (args: {
