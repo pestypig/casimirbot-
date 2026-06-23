@@ -106,6 +106,48 @@ describe("helix ask E50 terminal consistency", () => {
     expect(answerText(response.body)).not.toMatch(/Completed reasoning turn|active doc|\/docs\//i);
   }, 60000);
 
+  it("keeps deterministic model-only fallback answers on the solver-trace spine", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Without using workspace, are calculator receipts observations or terminal authority?",
+        mode: "read",
+        debug: true,
+        sessionId: `e50-deterministic-fallback-trace-${Date.now()}`,
+      })
+      .expect(200);
+
+    expect(response.body?.terminal_artifact_kind).toBe("direct_answer_text");
+    expect(response.body?.final_answer_source).toBe("model_direct_answer");
+    expect(response.body?.route_reason_code).toBe("model_only_concept / model_direct_answer");
+    expect(response.body?.route_authority_audit?.route_authority_ok).toBe(true);
+    expect(response.body?.poison_audit?.ok).toBe(true);
+    expect(response.body?.ask_turn_solver_trace?.completed_solver_path).toBe(true);
+    expect(response.body?.ask_turn_solver_trace?.evidence_reentry_gate).toMatchObject({
+      required: false,
+      completed: true,
+      violation_codes: [],
+    });
+    expect(response.body?.ask_turn_solver_trace?.solver_short_circuit_flags).toEqual([]);
+    expect(response.body?.current_turn_events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "terminal_answer",
+          text: response.body?.selected_final_answer,
+          terminal_artifact_kind: "direct_answer_text",
+          final_answer_source: "model_direct_answer",
+        }),
+      ]),
+    );
+
+    const debugRef = response.body?.debug_export_ref?.endpoint;
+    expect(debugRef).toMatch(/\/api\/agi\/ask\/turn\/.+\/debug-export/);
+    const debugExport = await request(app).get(debugRef).expect(200);
+    expect(debugExport.body?.payload?.ask_turn_solver_trace?.completed_solver_path).toBe(true);
+    expect(debugExport.body?.payload?.poison_audit?.ok).toBe(true);
+  }, 60000);
+
   it("keeps conceptual no-numeric physics prompts out of the calculator route", async () => {
     const app = createApp();
     const response = await request(app)

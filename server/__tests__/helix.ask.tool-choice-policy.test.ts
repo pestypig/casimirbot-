@@ -63,6 +63,14 @@ describe("Helix Ask tool-choice policy", () => {
     expect(agiPlanSource).toContain("context_resume_memory_must_not_repair_solver_path_incomplete_before_terminal");
   });
 
+  it("does not let response-boundary projection guards bypass solver authority just because payload is not failed", () => {
+    const agiPlanSource = readFileSync(resolve(__dirname, "../routes/agi.plan.ts"), "utf8");
+
+    expect(agiPlanSource).not.toMatch(
+      /const responseBoundaryCan(?:Promote|Project)[A-Za-z0-9_]+ =[\s\S]{0,260}!isAskTurnFailureOrPendingProjectionState\((?:payload|responsePayload)\)\s*\|\|/,
+    );
+  });
+
   it("requires solver permission before stream projection promotes a model draft to terminal authority", () => {
     const agiPlanSource = readFileSync(resolve(__dirname, "../routes/agi.plan.ts"), "utf8");
 
@@ -168,7 +176,7 @@ describe("Helix Ask tool-choice policy", () => {
     expect(agiPlanSource).toContain("model_only_concept_answer_requires_solver_or_terminal_authority");
     expect(agiPlanSource).toContain("response_boundary_model_only_concept_projection_suppressed");
     expect(agiPlanSource).toMatch(
-      /!isAskTurnFailureOrPendingProjectionState\(payload\) \|\|[\s\S]*canPromoteAskTurnTerminalKindAtResponseBoundary\([\s\S]*"model_synthesized_answer"/,
+      /responseBoundaryCanPromoteModelOnlyConcept =[\s\S]*canPromoteAskTurnTerminalKindAtResponseBoundary\([\s\S]*"model_synthesized_answer"/,
     );
     expect(agiPlanSource).toMatch(
       /richModelOnlyConceptSignalForBoundary\?\.applies === true &&[\s\S]*responseBoundaryCanPromoteModelOnlyConcept[\s\S]*payload\.terminal_artifact_kind = "model_synthesized_answer"/,
@@ -253,6 +261,31 @@ describe("Helix Ask tool-choice policy", () => {
     );
   });
 
+  it("requires solver permission before the top-level wrapper projects panel-control receipts", () => {
+    const agiPlanSource = readFileSync(resolve(__dirname, "../routes/agi.plan.ts"), "utf8");
+
+    expect(agiPlanSource).toContain("const responseBoundaryCanPromoteTopLevelPanelControlReceipt =");
+    expect(agiPlanSource).toContain("const topLevelPanelControlRouteContractAllowsReceiptProjection =");
+    expect(agiPlanSource).toContain("top_level_panel_control_receipt_requires_solver_or_terminal_authority");
+    expect(agiPlanSource).toContain("response_boundary_top_level_panel_control_receipt_projection_suppressed");
+    expect(agiPlanSource).toMatch(
+      /responseBoundaryCanPromoteTopLevelPanelControlReceipt[\s\S]*payload\.selected_final_answer = panelReceiptText/,
+    );
+    expect(agiPlanSource).toMatch(
+      /topLevelPanelControlRouteContractAllowsReceiptProjection[\s\S]*canPromoteAskTurnTerminalKindAtResponseBoundary\([\s\S]*"workspace_action_receipt"/,
+    );
+    expect(agiPlanSource).toMatch(
+      /responseCanonicalGoalKind === "panel_control"[\s\S]*required_terminal_kind\) === "workspace_action_receipt"/,
+    );
+    expect(agiPlanSource).toContain("const streamMirroredTruthTable =");
+    expect(agiPlanSource).toMatch(
+      /streamMirroredTruthTable[\s\S]*terminal:[\s\S]*kind: streamTerminalStatus[\s\S]*text: selectedStreamAnswer/,
+    );
+    expect(agiPlanSource).toMatch(
+      /capability_adapter_request", "capability_adapter_result", "capability_lifecycle_ledger"[\s\S]*streamDebug\[key\] = streamFinalPayload\[key\]/,
+    );
+  });
+
   it("requires solver permission before note receipts repair terminal-boundary failures", () => {
     const agiPlanSource = readFileSync(resolve(__dirname, "../routes/agi.plan.ts"), "utf8");
 
@@ -267,6 +300,40 @@ describe("Helix Ask tool-choice policy", () => {
     );
     expect(agiPlanSource).toMatch(
       /lateNoteUpdateReceiptForBoundaryRepair &&[\s\S]*!responseBoundaryCanPromoteNoteReceiptRepair[\s\S]*response_boundary_note_receipt_repair_projection_suppressed/,
+    );
+  });
+
+  it("requires solver permission before late location-to-note repair rewrites terminal answers", () => {
+    const agiPlanSource = readFileSync(resolve(__dirname, "../routes/agi.plan.ts"), "utf8");
+
+    expect(agiPlanSource).toContain("const responseBoundaryCanPromoteLocationNoteRepair =");
+    expect(agiPlanSource).toContain("location_note_repair_requires_solver_or_terminal_authority");
+    expect(agiPlanSource).toContain("response_boundary_location_note_repair_projection_suppressed");
+    expect(agiPlanSource).toMatch(
+      /lateLocationToNoteWriteCue &&[\s\S]*responseBoundaryCanPromoteLocationNoteRepair[\s\S]*payload\.final_answer_source = "universal_composer"/,
+    );
+    expect(agiPlanSource).toMatch(
+      /lateLocationToNoteWriteCue &&[\s\S]*!responseBoundaryCanPromoteLocationNoteRepair[\s\S]*response_boundary_location_note_repair_projection_suppressed/,
+    );
+  });
+
+  it("requires solver permission before pre-failure note repairs rewrite terminal answers", () => {
+    const agiPlanSource = readFileSync(resolve(__dirname, "../routes/agi.plan.ts"), "utf8");
+
+    expect(agiPlanSource).toContain("const responseBoundaryCanPromotePreFailureNoteRepair =");
+    expect(agiPlanSource).toContain("pre_failure_note_repair_requires_solver_or_terminal_authority");
+    expect(agiPlanSource).toContain("response_boundary_pre_failure_note_repair_projection_suppressed");
+    expect(agiPlanSource).toMatch(
+      /preFailureLocationToNoteCue &&[\s\S]*responseBoundaryCanPromotePreFailureNoteRepair[\s\S]*payload\.final_answer_source = "universal_composer"/,
+    );
+    expect(agiPlanSource).toMatch(
+      /preFailureLocationToNoteCue &&[\s\S]*!responseBoundaryCanPromotePreFailureNoteRepair[\s\S]*response_boundary_pre_failure_note_repair_projection_suppressed/,
+    );
+    expect(agiPlanSource).toMatch(
+      /preFailureNoteCreateTitle &&[\s\S]*responseBoundaryCanPromotePreFailureNoteRepair[\s\S]*payload\.terminal_artifact_id = `\$\{preFailureTurnId\}:note_create_repair:model_synthesized_answer`/,
+    );
+    expect(agiPlanSource).toMatch(
+      /preFailureNoteCreateTitle &&[\s\S]*!responseBoundaryCanPromotePreFailureNoteRepair[\s\S]*response_boundary_pre_failure_note_repair_projection_suppressed/,
     );
   });
 
@@ -364,6 +431,34 @@ describe("Helix Ask tool-choice policy", () => {
     );
     expect(agiPlanSource).toMatch(
       /replacement && !responseBoundaryCanPromoteModelOnlyDirectRepair[\s\S]*response_boundary_model_only_direct_repair_suppressed/,
+    );
+  });
+
+  it("requires solver permission before situation context terminals repair failed terminal state", () => {
+    const agiPlanSource = readFileSync(resolve(__dirname, "../routes/agi.plan.ts"), "utf8");
+
+    expect(agiPlanSource).toContain("const responseBoundaryCanPromoteSituationContextTerminal =");
+    expect(agiPlanSource).toContain("situation_context_terminal_requires_solver_or_terminal_authority");
+    expect(agiPlanSource).toContain("response_boundary_situation_context_projection_suppressed");
+    expect(agiPlanSource).toMatch(
+      /situationContextTerminalKind === "situation_context_pack"[\s\S]*responseBoundaryCanPromoteSituationContextTerminal[\s\S]*delete payload\.terminal_error_code/,
+    );
+    expect(agiPlanSource).toMatch(
+      /!responseBoundaryCanPromoteSituationContextTerminal[\s\S]*response_boundary_situation_context_projection_suppressed/,
+    );
+  });
+
+  it("requires solver permission before process graph overview repairs failed terminal state", () => {
+    const agiPlanSource = readFileSync(resolve(__dirname, "../routes/agi.plan.ts"), "utf8");
+
+    expect(agiPlanSource).toContain("const responseBoundaryCanPromoteProcessGraphOverview =");
+    expect(agiPlanSource).toContain("process_graph_overview_requires_solver_or_terminal_authority");
+    expect(agiPlanSource).toContain("response_boundary_process_graph_overview_projection_suppressed");
+    expect(agiPlanSource).toMatch(
+      /processGraphRuntimeLoopBacked &&[\s\S]*responseBoundaryCanPromoteProcessGraphOverview[\s\S]*payload\.terminal_artifact_kind = "process_graph_overview"/,
+    );
+    expect(agiPlanSource).toMatch(
+      /processGraphRuntimeLoopBacked &&[\s\S]*!responseBoundaryCanPromoteProcessGraphOverview[\s\S]*response_boundary_process_graph_overview_projection_suppressed/,
     );
   });
 

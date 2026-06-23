@@ -26,6 +26,8 @@ export type Nhm2TileSourceActiveControlOperatingBudgetV1 = {
     bandwidthMinHz: 30e9;
     gapNoiseRmsMaxMeters: 8e-11;
     timingJitterMaxSeconds: number;
+    sectorBoundarySkewMaxSeconds: number;
+    lightCrossingSyncMarginMin: 1;
     phaseNoiseMaxSeconds: number;
     controllerPhaseMarginMinDegrees: 45;
     controllerGainMarginMinDb: 6;
@@ -49,6 +51,8 @@ export type Nhm2TileSourceActiveControlOperatingBudgetV1 = {
     heatLoadTraceRef: string | null;
     sourceTensorContaminationRef: string | null;
     timingSyncTraceRef: string | null;
+    sectorLightCrossingSyncRef: string | null;
+    sectorBoundaryTimingMapRef: string | null;
     phaseNoiseSpectrumRef: string | null;
     lockAcquisitionTraceRef: string | null;
     energyWaveformSampleCount: number | null;
@@ -68,6 +72,8 @@ export type Nhm2TileSourceActiveControlOperatingBudgetV1 = {
     heatSinkCapacityW: number | null;
     sourceTensorContaminationFraction: number | null;
     timingJitterSeconds: number | null;
+    sectorBoundarySkewSeconds: number | null;
+    lightCrossingSyncMargin: number | null;
     phaseNoiseRmsSeconds: number | null;
     controllerPhaseMarginDegrees: number | null;
     controllerGainMarginDb: number | null;
@@ -94,6 +100,8 @@ export type Nhm2TileSourceActiveControlOperatingBudgetV1 = {
     bandwidthMargin: number | null;
     noiseMargin: number | null;
     timingMargin: number | null;
+    sectorBoundarySkewMargin: number | null;
+    lightCrossingSyncMargin: number | null;
     phaseNoiseMargin: number | null;
     controllerPhaseMargin: number | null;
     controllerGainMargin: number | null;
@@ -122,6 +130,10 @@ export type Nhm2TileSourceActiveControlOperatingBudgetV1 = {
     gapNoiseRmsReductionMeters: number | null;
     timingJitterMaxSeconds: number;
     timingJitterReductionSeconds: number | null;
+    sectorBoundarySkewMaxSeconds: number;
+    sectorBoundarySkewReductionSeconds: number | null;
+    lightCrossingSyncMarginMin: 1;
+    lightCrossingSyncMarginShortfall: number | null;
     phaseNoiseMaxSeconds: number;
     phaseNoiseReductionSeconds: number | null;
     controllerPhaseMarginMinDegrees: 45;
@@ -138,7 +150,7 @@ export type Nhm2TileSourceActiveControlOperatingBudgetV1 = {
     energyPerCycleReductionJ: number | null;
     sourceTensorContaminationFractionMax: 0.05;
     sourceTensorContaminationFractionReduction: number | null;
-    requiredTraceRefCount: 15;
+    requiredTraceRefCount: 17;
     missingTraceRefCount: number;
     timeTraceSampleCountMin: number;
     energyWaveformSampleCountShortfall: number | null;
@@ -186,6 +198,7 @@ const BANDWIDTH_MIN_HZ = 30e9;
 const GAP_NOISE_MAX_METERS = 8e-11;
 const TIMING_JITTER_MAX_SECONDS = 0.1 / SWITCHING_RATE_HZ;
 const PHASE_NOISE_MAX_SECONDS = 0.05 / SWITCHING_RATE_HZ;
+const LIGHT_CROSSING_SYNC_MARGIN_MIN = 1;
 const CONTROLLER_PHASE_MARGIN_MIN_DEGREES = 45;
 const CONTROLLER_GAIN_MARGIN_MIN_DB = 6;
 const THERMAL_SINK_CAPACITY_FACTOR_MIN = 1.2;
@@ -218,6 +231,14 @@ const upperBoundUnitFractionMargin = (
   value: number | null | undefined,
 ): number | null => {
   if (!isUnitFraction(value)) return null;
+  return value === 0 ? Number.MAX_SAFE_INTEGER : round(limit / value);
+};
+
+const upperBoundFiniteMargin = (
+  limit: number,
+  value: number | null | undefined,
+): number | null => {
+  if (value == null || !Number.isFinite(value) || value < 0) return null;
   return value === 0 ? Number.MAX_SAFE_INTEGER : round(limit / value);
 };
 
@@ -270,6 +291,8 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
   const bandwidthValid = isPositiveFinite(evidence?.bandwidthHz);
   const gapNoiseValid = isPositiveFinite(evidence?.gapNoiseRmsMeters);
   const timingJitterValid = isPositiveFinite(evidence?.timingJitterSeconds);
+  const sectorBoundarySkewValid = isNonNegativeFinite(evidence?.sectorBoundarySkewSeconds);
+  const lightCrossingSyncMarginValid = isPositiveFinite(evidence?.lightCrossingSyncMargin);
   const phaseNoiseValid = isPositiveFinite(evidence?.phaseNoiseRmsSeconds);
   const controllerPhaseMarginValid = isPositiveFinite(evidence?.controllerPhaseMarginDegrees);
   const controllerGainMarginValid = isPositiveFinite(evidence?.controllerGainMarginDb);
@@ -296,6 +319,12 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
   const bandwidthHz = bandwidthValid ? evidence?.bandwidthHz ?? null : null;
   const gapNoiseRmsMeters = gapNoiseValid ? evidence?.gapNoiseRmsMeters ?? null : null;
   const timingJitterSeconds = timingJitterValid ? evidence?.timingJitterSeconds ?? null : null;
+  const sectorBoundarySkewSeconds = sectorBoundarySkewValid
+    ? evidence?.sectorBoundarySkewSeconds ?? null
+    : null;
+  const suppliedLightCrossingSyncMargin = lightCrossingSyncMarginValid
+    ? evidence?.lightCrossingSyncMargin ?? null
+    : null;
   const phaseNoiseRmsSeconds = phaseNoiseValid ? evidence?.phaseNoiseRmsSeconds ?? null : null;
   const controllerPhaseMarginDegrees = controllerPhaseMarginValid
     ? evidence?.controllerPhaseMarginDegrees ?? null
@@ -328,6 +357,14 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
   const timingMargin = safeRatio(
     TIMING_JITTER_MAX_SECONDS,
     timingJitterSeconds,
+  );
+  const sectorBoundarySkewMargin = upperBoundFiniteMargin(
+    TIMING_JITTER_MAX_SECONDS,
+    sectorBoundarySkewSeconds,
+  );
+  const lightCrossingSyncMargin = safeRatio(
+    suppliedLightCrossingSyncMargin,
+    LIGHT_CROSSING_SYNC_MARGIN_MIN,
   );
   const phaseNoiseMargin = safeRatio(
     PHASE_NOISE_MAX_SECONDS,
@@ -416,6 +453,8 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
     evidence?.heatLoadTraceRef,
     evidence?.sourceTensorContaminationRef,
     evidence?.timingSyncTraceRef,
+    evidence?.sectorLightCrossingSyncRef,
+    evidence?.sectorBoundaryTimingMapRef,
     evidence?.phaseNoiseSpectrumRef,
     evidence?.lockAcquisitionTraceRef,
     evidence?.failureModeRef,
@@ -613,6 +652,12 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
     ...(evidence?.timingSyncTraceRef == null
       ? ["active_control_timing_sync_trace_ref_missing_for_operating_budget"]
       : []),
+    ...(evidence?.sectorLightCrossingSyncRef == null
+      ? ["active_control_sector_light_crossing_sync_ref_missing_for_operating_budget"]
+      : []),
+    ...(evidence?.sectorBoundaryTimingMapRef == null
+      ? ["active_control_sector_boundary_timing_map_ref_missing_for_operating_budget"]
+      : []),
     ...(evidence?.timingSyncTraceSampleCount == null
       ? ["active_control_timing_sync_trace_sample_count_missing_for_operating_budget"]
       : !timingSyncTraceSampleCountValid
@@ -621,6 +666,24 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
           ? ["active_control_timing_sync_trace_sample_count_missing_for_operating_budget"]
           : timingSyncTraceSampleCountMargin < 1
             ? ["active_control_timing_sync_trace_sample_count_below_4096_for_operating_budget"]
+            : []),
+    ...(evidence?.sectorBoundarySkewSeconds == null
+      ? ["active_control_sector_boundary_skew_missing_for_operating_budget"]
+      : !sectorBoundarySkewValid
+        ? ["active_control_sector_boundary_skew_invalid_for_operating_budget"]
+        : sectorBoundarySkewMargin == null
+          ? ["active_control_sector_boundary_skew_missing_for_operating_budget"]
+          : sectorBoundarySkewMargin < 1
+            ? ["active_control_sector_boundary_skew_above_0p1_cycle"]
+            : []),
+    ...(evidence?.lightCrossingSyncMargin == null
+      ? ["active_control_light_crossing_sync_margin_missing_for_operating_budget"]
+      : !lightCrossingSyncMarginValid
+        ? ["active_control_light_crossing_sync_margin_invalid_for_operating_budget"]
+        : lightCrossingSyncMargin == null
+          ? ["active_control_light_crossing_sync_margin_missing_for_operating_budget"]
+          : lightCrossingSyncMargin < 1
+            ? ["active_control_light_crossing_sync_margin_below_1"]
             : []),
     ...(evidence?.phaseNoiseRmsSeconds == null
       ? ["active_control_phase_noise_missing_for_operating_budget"]
@@ -700,6 +763,8 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
             "active_control_bandwidth_invalid_for_operating_budget",
             "active_control_gap_noise_invalid_for_operating_budget",
             "active_control_timing_jitter_invalid_for_operating_budget",
+            "active_control_sector_boundary_skew_invalid_for_operating_budget",
+            "active_control_light_crossing_sync_margin_invalid_for_operating_budget",
             "active_control_phase_noise_invalid_for_operating_budget",
             "active_control_controller_phase_margin_invalid_for_operating_budget",
             "active_control_controller_gain_margin_invalid_for_operating_budget",
@@ -719,6 +784,8 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
             "active_control_gap_noise_trace_sample_count_below_4096_for_operating_budget",
             "active_control_heat_load_trace_sample_count_below_4096_for_operating_budget",
             "active_control_timing_sync_trace_sample_count_below_4096_for_operating_budget",
+            "active_control_sector_boundary_skew_above_0p1_cycle",
+            "active_control_light_crossing_sync_margin_below_1",
             "active_control_phase_noise_spectrum_bin_count_below_512_for_operating_budget",
             "active_control_lock_acquisition_trial_count_below_100_for_operating_budget",
           ].includes(blocker),
@@ -740,6 +807,8 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
       bandwidthMinHz: BANDWIDTH_MIN_HZ,
       gapNoiseRmsMaxMeters: GAP_NOISE_MAX_METERS,
       timingJitterMaxSeconds: TIMING_JITTER_MAX_SECONDS,
+      sectorBoundarySkewMaxSeconds: TIMING_JITTER_MAX_SECONDS,
+      lightCrossingSyncMarginMin: LIGHT_CROSSING_SYNC_MARGIN_MIN,
       phaseNoiseMaxSeconds: PHASE_NOISE_MAX_SECONDS,
       controllerPhaseMarginMinDegrees: CONTROLLER_PHASE_MARGIN_MIN_DEGREES,
       controllerGainMarginMinDb: CONTROLLER_GAIN_MARGIN_MIN_DB,
@@ -763,6 +832,8 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
       heatLoadTraceRef: stringOrNull(evidence?.heatLoadTraceRef),
       sourceTensorContaminationRef: stringOrNull(evidence?.sourceTensorContaminationRef),
       timingSyncTraceRef: stringOrNull(evidence?.timingSyncTraceRef),
+      sectorLightCrossingSyncRef: stringOrNull(evidence?.sectorLightCrossingSyncRef),
+      sectorBoundaryTimingMapRef: stringOrNull(evidence?.sectorBoundaryTimingMapRef),
       phaseNoiseSpectrumRef: stringOrNull(evidence?.phaseNoiseSpectrumRef),
       lockAcquisitionTraceRef: stringOrNull(evidence?.lockAcquisitionTraceRef),
       energyWaveformSampleCount: finiteOrNull(evidence?.energyWaveformSampleCount),
@@ -786,6 +857,8 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
         evidence?.sourceTensorContaminationFraction,
       ),
       timingJitterSeconds: finiteOrNull(evidence?.timingJitterSeconds),
+      sectorBoundarySkewSeconds: finiteOrNull(evidence?.sectorBoundarySkewSeconds),
+      lightCrossingSyncMargin: finiteOrNull(evidence?.lightCrossingSyncMargin),
       phaseNoiseRmsSeconds: finiteOrNull(evidence?.phaseNoiseRmsSeconds),
       controllerPhaseMarginDegrees: finiteOrNull(evidence?.controllerPhaseMarginDegrees),
       controllerGainMarginDb: finiteOrNull(evidence?.controllerGainMarginDb),
@@ -819,6 +892,8 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
         evidence.heatLoadTraceRef != null &&
         evidence.sourceTensorContaminationRef != null &&
         evidence.timingSyncTraceRef != null &&
+        evidence.sectorLightCrossingSyncRef != null &&
+        evidence.sectorBoundaryTimingMapRef != null &&
         evidence.phaseNoiseSpectrumRef != null &&
         evidence.lockAcquisitionTraceRef != null &&
         evidence.failureModeRef != null,
@@ -835,6 +910,8 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
       bandwidthMargin,
       noiseMargin,
       timingMargin,
+      sectorBoundarySkewMargin,
+      lightCrossingSyncMargin,
       phaseNoiseMargin,
       controllerPhaseMargin,
       controllerGainMargin,
@@ -878,6 +955,16 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
         timingJitterSeconds,
         TIMING_JITTER_MAX_SECONDS,
       ),
+      sectorBoundarySkewMaxSeconds: TIMING_JITTER_MAX_SECONDS,
+      sectorBoundarySkewReductionSeconds: reductionToMaximum(
+        sectorBoundarySkewSeconds,
+        TIMING_JITTER_MAX_SECONDS,
+      ),
+      lightCrossingSyncMarginMin: LIGHT_CROSSING_SYNC_MARGIN_MIN,
+      lightCrossingSyncMarginShortfall: shortfallToMinimum(
+        suppliedLightCrossingSyncMargin,
+        LIGHT_CROSSING_SYNC_MARGIN_MIN,
+      ),
       phaseNoiseMaxSeconds: PHASE_NOISE_MAX_SECONDS,
       phaseNoiseReductionSeconds: reductionToMaximum(
         phaseNoiseRmsSeconds,
@@ -915,7 +1002,7 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
         sourceTensorContaminationFraction,
         SOURCE_TENSOR_CONTAMINATION_FRACTION_MAX,
       ),
-      requiredTraceRefCount: 15,
+      requiredTraceRefCount: 17,
       missingTraceRefCount,
       timeTraceSampleCountMin: TIME_TRACE_SAMPLE_COUNT_MIN,
       energyWaveformSampleCountShortfall: sampleCountShortfall(
@@ -1002,6 +1089,8 @@ export const isNhm2TileSourceActiveControlOperatingBudget = (
     targets.bandwidthMinHz === 30e9 &&
     targets.gapNoiseRmsMaxMeters === 8e-11 &&
     typeof targets.timingJitterMaxSeconds === "number" &&
+    typeof targets.sectorBoundarySkewMaxSeconds === "number" &&
+    targets.lightCrossingSyncMarginMin === 1 &&
     typeof targets.phaseNoiseMaxSeconds === "number" &&
     targets.controllerPhaseMarginMinDegrees === 45 &&
     targets.controllerGainMarginMinDb === 6 &&
@@ -1037,6 +1126,10 @@ export const isNhm2TileSourceActiveControlOperatingBudget = (
     isNumberOrNull(requiredCorrections.gapNoiseRmsReductionMeters) &&
     typeof requiredCorrections.timingJitterMaxSeconds === "number" &&
     isNumberOrNull(requiredCorrections.timingJitterReductionSeconds) &&
+    typeof requiredCorrections.sectorBoundarySkewMaxSeconds === "number" &&
+    isNumberOrNull(requiredCorrections.sectorBoundarySkewReductionSeconds) &&
+    requiredCorrections.lightCrossingSyncMarginMin === 1 &&
+    isNumberOrNull(requiredCorrections.lightCrossingSyncMarginShortfall) &&
     typeof requiredCorrections.phaseNoiseMaxSeconds === "number" &&
     isNumberOrNull(requiredCorrections.phaseNoiseReductionSeconds) &&
     requiredCorrections.controllerPhaseMarginMinDegrees === 45 &&
@@ -1053,7 +1146,7 @@ export const isNhm2TileSourceActiveControlOperatingBudget = (
     isNumberOrNull(requiredCorrections.energyPerCycleReductionJ) &&
     requiredCorrections.sourceTensorContaminationFractionMax === 0.05 &&
     isNumberOrNull(requiredCorrections.sourceTensorContaminationFractionReduction) &&
-    requiredCorrections.requiredTraceRefCount === 15 &&
+    requiredCorrections.requiredTraceRefCount === 17 &&
     typeof requiredCorrections.missingTraceRefCount === "number" &&
     requiredCorrections.timeTraceSampleCountMin === TIME_TRACE_SAMPLE_COUNT_MIN &&
     isNumberOrNull(requiredCorrections.energyWaveformSampleCountShortfall) &&

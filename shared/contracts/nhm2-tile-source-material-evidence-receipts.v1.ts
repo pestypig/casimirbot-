@@ -124,6 +124,8 @@ export type Nhm2TileSourceActiveControlEvidenceV1 = {
   heatSinkCapacityTraceRef?: string | null;
   heatLoadTraceRef?: string | null;
   timingSyncTraceRef?: string | null;
+  sectorLightCrossingSyncRef?: string | null;
+  sectorBoundaryTimingMapRef?: string | null;
   phaseNoiseSpectrumRef?: string | null;
   lockAcquisitionTraceRef?: string | null;
   energyWaveformSampleCount?: number | null;
@@ -144,6 +146,8 @@ export type Nhm2TileSourceActiveControlEvidenceV1 = {
   sourceTensorContaminationRef?: string | null;
   sourceTensorContaminationFraction?: number | null;
   timingJitterSeconds: number | null;
+  sectorBoundarySkewSeconds?: number | null;
+  lightCrossingSyncMargin?: number | null;
   phaseNoiseRmsSeconds?: number | null;
   controllerPhaseMarginDegrees?: number | null;
   controllerGainMarginDb?: number | null;
@@ -316,6 +320,8 @@ export type Nhm2TileSourceMaterialEvidenceReceiptsV1 = {
     activeControlBandwidthFactorMin: 2;
     gapNoiseFractionMax: 0.01;
     timingJitterCycleFractionMax: 0.1;
+    sectorBoundarySkewMaxSeconds: number;
+    lightCrossingSyncMarginMin: 1;
     phaseNoiseCycleFractionMax: 0.05;
     controllerPhaseMarginMinDegrees: 45;
     controllerGainMarginMinDb: 6;
@@ -410,6 +416,7 @@ const ACTIVE_CONTROL_BANDWIDTH_FACTOR_MIN = 2;
 const GAP_NOISE_FRACTION_MAX = 0.01;
 const TIMING_JITTER_CYCLE_FRACTION_MAX = 0.1;
 const PHASE_NOISE_CYCLE_FRACTION_MAX = 0.05;
+const LIGHT_CROSSING_SYNC_MARGIN_MIN = 1;
 const CONTROLLER_PHASE_MARGIN_MIN_DEGREES = 45;
 const CONTROLLER_GAIN_MARGIN_MIN_DB = 6;
 const THERMAL_SINK_CAPACITY_FACTOR_MIN = 1.2;
@@ -472,6 +479,14 @@ const upperBoundUnitFractionMargin = (
   value: number | null | undefined,
 ): number | null => {
   if (!isUnitFraction(value)) return null;
+  return value === 0 ? Number.MAX_SAFE_INTEGER : round(limit / value);
+};
+
+const upperBoundFiniteMargin = (
+  limit: number,
+  value: number | null | undefined,
+): number | null => {
+  if (value == null || !Number.isFinite(value) || value < 0) return null;
   return value === 0 ? Number.MAX_SAFE_INTEGER : round(limit / value);
 };
 
@@ -1233,6 +1248,8 @@ const activeControlSurface = (
   const bandwidthValid = isPositiveFinite(evidence.bandwidthHz);
   const gapNoiseValid = isPositiveFinite(evidence.gapNoiseRmsMeters);
   const timingJitterValid = isPositiveFinite(evidence.timingJitterSeconds);
+  const sectorBoundarySkewValid = isNonNegativeFinite(evidence.sectorBoundarySkewSeconds);
+  const lightCrossingSyncMarginValid = isPositiveFinite(evidence.lightCrossingSyncMargin);
   const phaseNoiseValid = isPositiveFinite(evidence.phaseNoiseRmsSeconds);
   const controllerPhaseMarginValid = isPositiveFinite(evidence.controllerPhaseMarginDegrees);
   const controllerGainMarginValid = isPositiveFinite(evidence.controllerGainMarginDb);
@@ -1280,6 +1297,17 @@ const activeControlSurface = (
     timingJitterSeconds == null || switchingRateHz == null
       ? null
       : (TIMING_JITTER_CYCLE_FRACTION_MAX / switchingRateHz) / timingJitterSeconds;
+  const sectorBoundarySkewMargin =
+    switchingRateHz == null
+      ? null
+      : upperBoundFiniteMargin(
+          TIMING_JITTER_CYCLE_FRACTION_MAX / switchingRateHz,
+          evidence.sectorBoundarySkewSeconds,
+        );
+  const lightCrossingSyncMargin =
+    lightCrossingSyncMarginValid && evidence.lightCrossingSyncMargin != null
+      ? round(evidence.lightCrossingSyncMargin / LIGHT_CROSSING_SYNC_MARGIN_MIN)
+      : null;
   const phaseNoiseMargin =
     phaseNoiseRmsSeconds == null || switchingRateHz == null
       ? null
@@ -1419,6 +1447,12 @@ const activeControlSurface = (
             ? ["active_control_heat_load_trace_sample_count_below_4096"]
             : []),
     ...(evidence.timingSyncTraceRef == null ? ["active_control_timing_sync_trace_ref_missing"] : []),
+    ...(evidence.sectorLightCrossingSyncRef == null
+      ? ["active_control_sector_light_crossing_sync_ref_missing"]
+      : []),
+    ...(evidence.sectorBoundaryTimingMapRef == null
+      ? ["active_control_sector_boundary_timing_map_ref_missing"]
+      : []),
     ...(evidence.timingSyncTraceSampleCount == null
       ? ["active_control_timing_sync_trace_sample_count_missing"]
       : !timingSyncTraceSampleCountValid
@@ -1532,6 +1566,24 @@ const activeControlSurface = (
           : timingMargin < 1
             ? ["timing_jitter_above_0p1_cycle"]
             : []),
+    ...(evidence.sectorBoundarySkewSeconds == null
+      ? ["active_control_sector_boundary_skew_missing"]
+      : !sectorBoundarySkewValid
+        ? ["active_control_sector_boundary_skew_invalid"]
+        : sectorBoundarySkewMargin == null
+          ? ["active_control_sector_boundary_skew_missing"]
+          : sectorBoundarySkewMargin < 1
+            ? ["active_control_sector_boundary_skew_above_0p1_cycle"]
+            : []),
+    ...(evidence.lightCrossingSyncMargin == null
+      ? ["active_control_light_crossing_sync_margin_missing"]
+      : !lightCrossingSyncMarginValid
+        ? ["active_control_light_crossing_sync_margin_invalid"]
+        : lightCrossingSyncMargin == null
+          ? ["active_control_light_crossing_sync_margin_missing"]
+          : lightCrossingSyncMargin < 1
+            ? ["active_control_light_crossing_sync_margin_below_1"]
+            : []),
     ...(evidence.phaseNoiseRmsSeconds == null
       ? ["phase_noise_receipt_missing"]
       : !phaseNoiseValid
@@ -1592,6 +1644,8 @@ const activeControlSurface = (
       switchingRateMargin,
       noiseMargin,
       timingMargin,
+      sectorBoundarySkewMargin,
+      lightCrossingSyncMargin,
       phaseNoiseMargin,
       controllerPhaseMargin,
       controllerGainMargin,
@@ -1615,6 +1669,8 @@ const activeControlSurface = (
       timingSyncTraceSampleCountMargin,
       phaseNoiseSpectrumBinCountMargin,
       lockAcquisitionTrialCountMargin,
+      sectorBoundarySkewSeconds: evidence.sectorBoundarySkewSeconds ?? null,
+      lightCrossingSyncMarginSupplied: evidence.lightCrossingSyncMargin ?? null,
       phaseNoiseRmsSeconds: evidence.phaseNoiseRmsSeconds ?? null,
       lockAcquisitionTimeSeconds: evidence.lockAcquisitionTimeSeconds ?? null,
       failureModeCoverageComplete: failureModeCoverageComplete ? 1 : 0,
@@ -1631,6 +1687,8 @@ const activeControlSurface = (
         evidence.heatLoadTraceRef != null &&
         evidence.sourceTensorContaminationRef != null &&
         evidence.timingSyncTraceRef != null &&
+        evidence.sectorLightCrossingSyncRef != null &&
+        evidence.sectorBoundaryTimingMapRef != null &&
         evidence.phaseNoiseSpectrumRef != null &&
         evidence.lockAcquisitionTraceRef != null &&
         evidence.failureModeRef != null &&
@@ -2425,6 +2483,8 @@ export const buildNhm2TileSourceMaterialEvidenceReceipts = (
       activeControlBandwidthFactorMin: ACTIVE_CONTROL_BANDWIDTH_FACTOR_MIN,
       gapNoiseFractionMax: GAP_NOISE_FRACTION_MAX,
       timingJitterCycleFractionMax: TIMING_JITTER_CYCLE_FRACTION_MAX,
+      sectorBoundarySkewMaxSeconds: TIMING_JITTER_CYCLE_FRACTION_MAX / SWITCHING_RATE_HZ,
+      lightCrossingSyncMarginMin: LIGHT_CROSSING_SYNC_MARGIN_MIN,
       phaseNoiseCycleFractionMax: PHASE_NOISE_CYCLE_FRACTION_MAX,
       controllerPhaseMarginMinDegrees: CONTROLLER_PHASE_MARGIN_MIN_DEGREES,
       controllerGainMarginMinDb: CONTROLLER_GAIN_MARGIN_MIN_DB,

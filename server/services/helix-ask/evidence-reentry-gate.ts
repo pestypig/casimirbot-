@@ -123,6 +123,11 @@ const collectObservationRefs = (loopTrace: RecordLike | null): string[] =>
   (Array.isArray(loopTrace?.observations_created) ? loopTrace.observations_created : [])
     .map((entry) => readRecord(entry))
     .filter((entry): entry is RecordLike => Boolean(entry))
+    .filter((entry) => {
+      const sourceKind = readString(entry.source_kind);
+      return sourceKind !== "observation_review" &&
+        sourceKind !== "runtime_goal_satisfaction_observation";
+    })
     .map((entry) => readString(entry.observation_id))
     .filter(Boolean);
 

@@ -67,6 +67,16 @@ const termContributions = (scale: number): Nhm2FullApparatusTensorValueRegionV1[
     ]),
   );
 
+const termReceiptRefs = (
+  regionId: Nhm2RegionalSourceClosureRegionId,
+): Nhm2FullApparatusTensorValueRegionV1["termReceiptRefs"] =>
+  Object.fromEntries(
+    NHM2_FULL_APPARATUS_REQUIRED_TERM_IDS.map((termId) => [
+      termId,
+      `receipt://full-apparatus-tmunu/terms/${regionId}/${termId}`,
+    ]),
+  );
+
 const region = (
   regionId: Nhm2RegionalSourceClosureRegionId,
   scale: number,
@@ -78,6 +88,7 @@ const region = (
   componentStatus: completeStatus,
   componentAuthority: completeAuthority,
   termContributions: termContributions(scale),
+  termReceiptRefs: termReceiptRefs(regionId),
   chartRef: "comoving_cartesian",
   basisRef: "same_basis",
   unitsRef: "J/m^3",
@@ -451,6 +462,41 @@ describe("NHM2 tile-source full-apparatus tensor values", () => {
     expect(budget.requiredCorrections.missingStressEnergyTermIds).toContain(
       "activeControlFieldEnergy",
     );
+  });
+
+  it("blocks apparatus term contributions without term receipt provenance", () => {
+    const built = artifact({
+      regions: [
+        region("global", 1.0e9),
+        region("hull", 1.1e9),
+        region("wall", 1.6995e9, {
+          termReceiptRefs: {
+            ...termReceiptRefs("wall"),
+            activeControlFieldEnergy: null,
+          },
+        }),
+        region("exterior_shell", 9.5e8),
+      ],
+    });
+    const evidence = buildFullApparatusTensorEvidenceFromTensorValues({
+      artifact: built,
+      evidenceTier: "validated_simulation",
+    });
+
+    expect(built.summary.valueArtifactReadyForReceipt).toBe(false);
+    expect(built.summary.allRequiredRegionsFullTensor).toBe(true);
+    expect(built.summary.allRequiredRegionsTermComplete).toBe(false);
+    expect(built.summary.missingTermRefs).toEqual([]);
+    expect(built.summary.missingTermComponentRefs).toEqual([]);
+    expect(built.summary.missingTermReceiptRefs).toContain(
+      "wall:activeControlFieldEnergy",
+    );
+    expect(built.summary.firstBlocker).toBe(
+      "wall:activeControlFieldEnergy:term_receipt_ref_missing",
+    );
+    expect(evidence.termCoverage.activeControlFieldEnergy).toBe(false);
+    expect(evidence.termRefs?.activeControlFieldEnergy).toBeNull();
+    expect(evidence.components.T00).toBe(false);
   });
 
   it("keeps tensor-values evidence out of material receipts until subsystem receipts are backed", () => {

@@ -76,6 +76,7 @@ import {
   isNhm2TileSourceOperatingBudgetReadiness,
 } from "../shared/contracts/nhm2-tile-source-operating-budget-readiness.v1";
 import { buildNhm2TileSourcePhysicalValidationPlan } from "../shared/contracts/nhm2-tile-source-physical-validation-plan.v1";
+import { buildNhm2LayerStackMechanicalReceipt } from "../shared/contracts/nhm2-layer-stack-mechanical-receipt.v1";
 import {
   buildNhm2TileSourceMaterialEvidenceTemplate,
   publishNhm2TileSourceMaterialEvidenceReceipts,
@@ -193,6 +194,8 @@ const passingEvidence: BuildNhm2TileSourceMaterialEvidenceReceiptsInput = {
     sourceTensorContaminationRef:
       "receipt://active-control/source-tensor-contamination-v1",
     timingSyncTraceRef: "receipt://active-control/timing-sync-trace-v1",
+    sectorLightCrossingSyncRef: "receipt://active-control/sector-light-crossing-sync-v1",
+    sectorBoundaryTimingMapRef: "receipt://active-control/sector-boundary-timing-map-v1",
     phaseNoiseSpectrumRef: "receipt://active-control/phase-noise-spectrum-v1",
     lockAcquisitionTraceRef: "receipt://active-control/lock-acquisition-trace-v1",
     energyWaveformSampleCount: 8192,
@@ -212,6 +215,8 @@ const passingEvidence: BuildNhm2TileSourceMaterialEvidenceReceiptsInput = {
     heatSinkCapacityW: 30,
     sourceTensorContaminationFraction: 0.01,
     timingJitterSeconds: 1e-12,
+    sectorBoundarySkewSeconds: 1e-12,
+    lightCrossingSyncMargin: 1.25,
     phaseNoiseRmsSeconds: 1e-12,
     controllerPhaseMarginDegrees: 60,
     controllerGainMarginDb: 10,
@@ -1005,9 +1010,9 @@ describe("NHM2 tile source material evidence receipts", () => {
       expect(result.experimentalCampaignPackage.summary.measurementDocketCount).toBeGreaterThan(
         result.experimentalCampaignPackage.summary.measurementCount,
       );
-      expect(result.experimentalCampaignPackage.summary.measurementCount).toBe(77);
-      expect(result.experimentalCampaignPackage.summary.measurementDocketCount).toBe(78);
-      expect(result.experimentalCampaignPackage.summary.requiredTargetAvailableCount).toBe(68);
+      expect(result.experimentalCampaignPackage.summary.measurementCount).toBe(78);
+      expect(result.experimentalCampaignPackage.summary.measurementDocketCount).toBe(79);
+      expect(result.experimentalCampaignPackage.summary.requiredTargetAvailableCount).toBe(69);
       expect(result.experimentalCampaignPackage.summary.requiredTargetPendingCount).toBe(0);
       expect(result.experimentalCampaignPackage.summary.requiredTargetNotApplicableCount).toBe(10);
       expect(result.experimentalCampaignPackage.summary.requiredTargetNotDeclaredCount).toBe(0);
@@ -1017,7 +1022,7 @@ describe("NHM2 tile source material evidence receipts", () => {
       expect(result.experimentalCampaignPackage.summary.objectiveCoverageCount).toBe(9);
       expect(result.experimentalCampaignPackage.summary.campaignDomainLedgerCount).toBe(8);
       expect(result.experimentalCampaignPackage.summary.receiptAcquisitionDomainCount).toBe(8);
-      expect(result.experimentalCampaignPackage.summary.receiptArtifactRequirementCount).toBe(78);
+      expect(result.experimentalCampaignPackage.summary.receiptArtifactRequirementCount).toBe(79);
       expect(result.experimentalCampaignPackage.summary.domainsWithPendingDerivedTargetsCount).toBe(
         0,
       );
@@ -1144,6 +1149,7 @@ describe("NHM2 tile source material evidence receipts", () => {
               "receipt://active_control/gap_control_authority_v1",
               "receipt://active_control/gap_noise_spectrum_v1",
               "receipt://active_control/timing_jitter_v1",
+              "receipt://active_control/sector_light_crossing_sync_v1",
               "receipt://active_control/phase_noise_v1",
               "receipt://active_control/controller_phase_margin_v1",
               "receipt://active_control/controller_gain_margin_v1",
@@ -1160,6 +1166,7 @@ describe("NHM2 tile source material evidence receipts", () => {
               "gap_control_authority",
               "gap_noise_margin",
               "timing_jitter_margin",
+              "sector_light_crossing_sync",
               "phase_noise_margin",
               "controller_phase_margin",
               "controller_gain_margin",
@@ -1169,7 +1176,7 @@ describe("NHM2 tile source material evidence receipts", () => {
               "energy_per_cycle_heat_limit",
               "failure_mode_coverage",
             ]),
-            requiredTargetAvailableCount: 14,
+            requiredTargetAvailableCount: 15,
             requiredTargetPendingCount: 0,
             pendingTargetGaps: [],
           }),
@@ -1502,7 +1509,7 @@ describe("NHM2 tile source material evidence receipts", () => {
             measurementId: "active_control_trace_refs",
             requiredCorrectionKey: "missingTraceRefCount",
             requiredTargetKey: "requiredTraceRefCount",
-            requiredTargetValue: 15,
+            requiredTargetValue: 17,
             requiredTargetStatus: "available",
           }),
           expect.objectContaining({
@@ -1543,6 +1550,14 @@ describe("NHM2 tile source material evidence receipts", () => {
             requiredCorrectionKey: "timingJitterReductionSeconds",
             requiredTargetKey: "timingJitterMaxSeconds",
             requiredTargetValue: 6.666666666666667e-12,
+            requiredTargetStatus: "available",
+          }),
+          expect.objectContaining({
+            campaignDomain: "active_control_energy_noise_heat_timing",
+            measurementId: "sector_light_crossing_sync",
+            requiredCorrectionKey: "lightCrossingSyncMarginShortfall",
+            requiredTargetKey: "lightCrossingSyncMarginMin",
+            requiredTargetValue: 1,
             requiredTargetStatus: "available",
           }),
           expect.objectContaining({
@@ -2939,6 +2954,102 @@ describe("NHM2 tile source material evidence receipts", () => {
     );
     expect(report.readiness.operatingBudgetsReady).toBe(false);
     expect(report.summary.physicalViabilityClaimAllowed).toBe(false);
+  });
+
+  it("surfaces the layer-stack support/source-retention overlap as a falsifying campaign blocker", () => {
+    const receipts = buildNhm2TileSourceMaterialEvidenceReceipts(passingEvidence);
+    const operatingBudgetReadiness = buildPassingOperatingBudgetReadiness(receipts);
+    const plan = buildNhm2TileSourcePhysicalValidationPlan({
+      generatedAt,
+      materialEvidenceReceipts: receipts,
+      operatingBudgetReadiness,
+      downstreamGateStatuses: allDownstreamPass,
+      downstreamGateArtifactRefs: allDownstreamArtifactRefs,
+    });
+    const roadmap = buildNhm2TileSourceEvidenceGapRoadmap({
+      materialEvidenceReceipts: receipts,
+      physicalValidationPlan: plan,
+      operatingBudgetReadiness,
+    });
+    const mechanicalReceipt = buildNhm2LayerStackMechanicalReceipt({ generatedAt });
+    const report = buildNhm2TileSourceFalsificationReport({
+      materialEvidenceReceipts: receipts,
+      physicalValidationPlan: plan,
+      evidenceGapRoadmap: roadmap,
+      layerStackMechanicalReceipt: mechanicalReceipt,
+      layerStackMechanicalReceiptRef: "artifact://mechanical-receipt",
+      operatingBudgetReadiness,
+    });
+    const supportWindowRow = report.blockerRows.find(
+      (row) => row.blockerId === "support_retention_overlap_window_missing",
+    );
+    const fatigueDomain = report.campaignDomainSummary.find(
+      (entry) => entry.campaignDomain === "fatigue_layer_scaling",
+    );
+    const fatigueDecision = report.goNoGoMatrix.find(
+      (entry) => entry.campaignDomain === "fatigue_layer_scaling",
+    );
+    const fatigueResolution = report.frontierResolutionQueue.find(
+      (entry) => entry.campaignDomain === "fatigue_layer_scaling",
+    );
+
+    expect(isNhm2TileSourceFalsificationReport(report)).toBe(true);
+    expect(report.disposition.reportStatus).toBe("falsified");
+    expect(report.sourceRefs.layerStackMechanicalReceiptRef).toBe("artifact://mechanical-receipt");
+    expect(supportWindowRow).toMatchObject({
+      source: "layer_stack_mechanical_receipt",
+      surfaceId: "layer_scaling",
+      status: "falsifying",
+      campaignDomain: "fatigue_layer_scaling",
+      numericalMargin: mechanicalReceipt.supportWindow.overlapMargin,
+      falsifiesCurrentCandidate: true,
+      evidenceRef: "artifact://mechanical-receipt",
+    });
+    expect(supportWindowRow?.numericalMargins).toMatchObject({
+      supportRetentionOverlapMargin: 0.459119311228,
+      feasibleSupportRetentionWindow: false,
+      minimumSupportFractionForStress: 0.185065881969,
+      maximumSupportFractionForSourceRetention: 0.0849673202614,
+      requiredSupportFractionReductionForOverlap: 0.100098561707,
+      requiredSourceRetentionIncreaseForStressSupport: 0.0765753997062,
+      forceScaleKilonewtons: 14.1883842843,
+    });
+    expect(supportWindowRow?.requiredCorrections).toMatchObject({
+      supportRetentionOverlapMargin: 0.459119311228,
+      requiredSupportFractionReductionForOverlap: 0.100098561707,
+      requiredSourceRetentionIncreaseForStressSupport: 0.0765753997062,
+    });
+    expect(supportWindowRow?.requiredChange).toContain(
+      "support-retention overlap margin is >= 1",
+    );
+    expect(fatigueDomain).toMatchObject({
+      firstBlocker: "support_retention_overlap_window_missing",
+      minimumNumericalMargin: 0.459119311228,
+      evidenceTarget: expect.stringContaining("Fatigue/layer-scaling receipt"),
+    });
+    expect(fatigueDecision).toMatchObject({
+      decision: "no_go",
+      evidenceState: "failing_margin",
+      firstBlocker: "support_retention_overlap_window_missing",
+      prevents: expect.arrayContaining(["full_apparatus_tensor", "material_credibility_gate"]),
+    });
+    expect(fatigueDecision?.requiredCorrectionKeys).toEqual(
+      expect.arrayContaining([
+        "layer_scaling.requiredSupportFractionReductionForOverlap",
+        "layer_scaling.requiredSourceRetentionIncreaseForStressSupport",
+      ]),
+    );
+    expect(fatigueResolution).toMatchObject({
+      resolutionMode: "revise_architecture_or_operating_margin",
+      numericalMargin: 0.459119311228,
+      marginInterpretation: "below_one_fails",
+      requiredCorrections: expect.objectContaining({
+        "layer_scaling.requiredSupportFractionReductionForOverlap": 0.100098561707,
+        "layer_scaling.requiredSourceRetentionIncreaseForStressSupport": 0.0765753997062,
+      }),
+    });
+    expect(report.summary.physicalViabilityClaimAllowed).toBe(false);
+    expect(report.claimBoundary.falsificationReportOnly).toBe(true);
   });
 
   it("builds a falsification report with quantitative force-gap no-go margins", () => {
@@ -4785,7 +4896,7 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(provenance?.blockerIds).toContain("active_gap_control_energy_and_noise_missing");
     expect(provenance?.measurementTargets).toMatchObject({
       requiredEvidenceTier: "measured_or_validated_simulation",
-      requiredTraceRefCount: 15,
+      requiredTraceRefCount: 17,
       requiredFailureModeCount: 5,
       switchingRateHz: 15e9,
     });
@@ -5091,8 +5202,8 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.requiredCorrections.heatSinkCapacityMinW).toBeNull();
     expect(budget.requiredCorrections.sourceTensorContaminationFractionMax).toBe(0.05);
     expect(budget.requiredCorrections.sourceTensorContaminationFractionReduction).toBeNull();
-    expect(budget.requiredCorrections.requiredTraceRefCount).toBe(15);
-    expect(budget.requiredCorrections.missingTraceRefCount).toBe(15);
+    expect(budget.requiredCorrections.requiredTraceRefCount).toBe(17);
+    expect(budget.requiredCorrections.missingTraceRefCount).toBe(17);
     expect(budget.requiredCorrections.timeTraceSampleCountMin).toBe(4096);
     expect(budget.requiredCorrections.energyWaveformSampleCountShortfall).toBeNull();
     expect(budget.requiredCorrections.actuatorAuthorityTraceSampleCountShortfall).toBeNull();
@@ -5385,7 +5496,7 @@ describe("NHM2 tile source material evidence receipts", () => {
       18,
     );
     expect(budget.requiredCorrections.energyPerCycleReductionJ).toBeGreaterThan(0);
-    expect(budget.requiredCorrections.missingTraceRefCount).toBe(3);
+    expect(budget.requiredCorrections.missingTraceRefCount).toBe(5);
     expect(budget.requiredCorrections.missingFailureModeCount).toBe(5);
     expect(budget.summary.transportClaimAllowed).toBe(false);
   });
@@ -5443,11 +5554,15 @@ describe("NHM2 tile source material evidence receipts", () => {
         "active_control_heat_sink_capacity_trace_ref_missing",
         "active_control_heat_load_trace_ref_missing",
         "active_control_timing_sync_trace_ref_missing",
+        "active_control_sector_light_crossing_sync_ref_missing",
+        "active_control_sector_boundary_timing_map_ref_missing",
         "active_control_phase_noise_spectrum_ref_missing",
         "active_control_lock_acquisition_trace_ref_missing",
         "active_control_actuator_authority_missing",
         "active_control_heat_sink_capacity_missing",
         "phase_noise_receipt_missing",
+        "active_control_sector_boundary_skew_missing",
+        "active_control_light_crossing_sync_margin_missing",
         "controller_phase_margin_missing",
         "controller_gain_margin_missing",
         "active_control_lock_acquisition_time_missing",
@@ -5458,7 +5573,7 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(activeSurface?.numericalMargins.activeControlProvenanceRefsAvailable).toBe(0);
     expect(plan.summary.nextRequiredTestId).toBe("active_control_provenance");
     expect(provenance?.status).toBe("falsifying");
-    expect(provenance?.measurementTargets.requiredTraceRefCount).toBe(15);
+    expect(provenance?.measurementTargets.requiredTraceRefCount).toBe(17);
     expect(provenance?.falsificationRule).toContain("trace");
     expect(plan.summary.nextRequiredArtifactToProduce).toBe(
       "receipt://active_control/provenance_v1",
@@ -5478,6 +5593,10 @@ describe("NHM2 tile source material evidence receipts", () => {
         "active_control_heat_sink_capacity_trace_ref_missing_for_operating_budget",
         "active_control_heat_load_trace_ref_missing_for_operating_budget",
         "active_control_timing_sync_trace_ref_missing_for_operating_budget",
+        "active_control_sector_light_crossing_sync_ref_missing_for_operating_budget",
+        "active_control_sector_boundary_timing_map_ref_missing_for_operating_budget",
+        "active_control_sector_boundary_skew_missing_for_operating_budget",
+        "active_control_light_crossing_sync_margin_missing_for_operating_budget",
         "active_control_phase_noise_spectrum_ref_missing_for_operating_budget",
         "active_control_lock_acquisition_trace_ref_missing_for_operating_budget",
         "active_control_phase_noise_missing_for_operating_budget",
@@ -5494,7 +5613,7 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.requiredCorrections.timingJitterReductionSeconds).toBe(0);
     expect(budget.requiredCorrections.heatLoadShortfallW).toBe(0);
     expect(budget.requiredCorrections.energyPerCycleReductionJ).toBe(0);
-    expect(budget.requiredCorrections.missingTraceRefCount).toBe(13);
+    expect(budget.requiredCorrections.missingTraceRefCount).toBe(15);
     expect(budget.requiredCorrections.missingFailureModeCount).toBe(5);
     expect(budget.summary.physicalViabilityClaimAllowed).toBe(false);
   });

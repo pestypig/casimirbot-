@@ -189,6 +189,12 @@ const fullApparatusTensorValueRegion = (
       symmetricValueTensor(0.1),
     ]),
   ),
+  termReceiptRefs: Object.fromEntries(
+    NHM2_FULL_APPARATUS_REQUIRED_TERM_IDS.map((termId) => [
+      termId,
+      `receipt://full-apparatus-tmunu/terms/${regionId}/${termId}`,
+    ]),
+  ),
   chartRef: "comoving_cartesian",
   basisRef: "same_basis",
   unitsRef: "J/m^3",
@@ -401,6 +407,50 @@ describe("publish source-side same-basis tensor authority", () => {
       expect(wall?.blockers).toEqual([]);
       expect(wall?.warnings).not.toContain(
         "tile_source_handoff_is_evidence_intake_not_tensor_authority",
+      );
+    }));
+
+  it("blocks full-apparatus tensor values with unreceipted term contributions", () =>
+    withTemp((root) => {
+      writeFileSync(
+        join(root, "tile.json"),
+        JSON.stringify(counterpart("tile_effective_counterpart", "diagonal_reduced_order")),
+        "utf8",
+      );
+      writeFileSync(join(root, "handoff.json"), JSON.stringify(handoffReady()), "utf8");
+      const values = fullApparatusTensorValues();
+      values.regions = values.regions.map((entry) =>
+        entry.regionId === "wall"
+          ? {
+              ...entry,
+              termReceiptRefs: {
+                ...entry.termReceiptRefs,
+                activeControlFieldEnergy: null,
+              },
+            }
+          : entry,
+      );
+      writeFileSync(
+        join(root, "full-apparatus-values.json"),
+        JSON.stringify(values),
+        "utf8",
+      );
+
+      const artifact = publishSourceSideSameBasisTensorAuthority({
+        repoRoot: root,
+        referenceRunPath: "reference.json",
+        tileEffectiveCounterpartPath: "tile.json",
+        tileSourceAuthorityHandoffPath: "handoff.json",
+        fullApparatusTensorValuesPath: "full-apparatus-values.json",
+        outPath: "authority.json",
+      });
+      const wall = artifact.regions.find((entry) => entry.regionId === "wall");
+
+      expect(artifact.summary.hasWallAuthority).toBe(false);
+      expect(artifact.summary.allRequiredRegionsAuthoritative).toBe(false);
+      expect(wall?.status).toBe("blocked");
+      expect(wall?.blockers).toContain(
+        "full_apparatus_activeControlFieldEnergy_term_receipt_ref_missing",
       );
     }));
 

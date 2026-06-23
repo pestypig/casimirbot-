@@ -67,6 +67,7 @@ export type Nhm2FullApparatusTensorValueRegionV1 = {
     Record<Nhm2TensorComponent, Nhm2FullApparatusComponentAuthority>
   >;
   termContributions: Partial<Record<Nhm2FullApparatusTensorTermId, Nhm2RegionalTensor>>;
+  termReceiptRefs: Partial<Record<Nhm2FullApparatusTensorTermId, string | null>>;
   chartRef: "comoving_cartesian" | string;
   basisRef: "same_basis" | "unknown" | string;
   unitsRef: "J/m^3" | string;
@@ -118,6 +119,7 @@ export type Nhm2TileSourceFullApparatusTensorValuesV1 = {
     proxyStatusComponentRefs: string[];
     inadmissibleAuthorityRefs: string[];
     missingTermRefs: string[];
+    missingTermReceiptRefs: string[];
     missingTermComponentRefs: string[];
     regionalSampleCountMin: number;
     undersampledRegionRefs: string[];
@@ -267,6 +269,13 @@ const missingTermComponents = (region: Nhm2FullApparatusTensorValueRegionV1): st
     ).map((componentId) => `${region.regionId}:${termId}:${componentId}`);
   });
 
+const missingTermReceiptRefsForRegion = (
+  region: Nhm2FullApparatusTensorValueRegionV1,
+): string[] =>
+  NHM2_FULL_APPARATUS_REQUIRED_TERM_IDS.filter(
+    (termId) => !isText(region.termReceiptRefs[termId]),
+  ).map((termId) => `${region.regionId}:${termId}`);
+
 const termBalanceResiduals = (
   region: Nhm2FullApparatusTensorValueRegionV1,
 ): Array<{
@@ -307,6 +316,7 @@ const undersampledRegionRef = (
 const regionBlockers = (region: Nhm2FullApparatusTensorValueRegionV1): string[] => {
   const missing = missingComponents(region);
   const terms = missingTerms(region);
+  const termReceipts = missingTermReceiptRefsForRegion(region);
   const metricEcho = NHM2_FULL_APPARATUS_SYMMETRIC_TENSOR_COMPONENTS.filter(
     (componentId) => region.componentAuthority[componentId] === "metric_echo",
   );
@@ -335,6 +345,7 @@ const regionBlockers = (region: Nhm2FullApparatusTensorValueRegionV1): string[] 
         : []),
     ...missing.map((componentRef) => `${componentRef}:component_value_missing`),
     ...terms.map((termRef) => `${termRef}:term_contribution_missing`),
+    ...termReceipts.map((termRef) => `${termRef}:term_receipt_ref_missing`),
     ...missingTermComponents(region).map(
       (termComponentRef) => `${termComponentRef}:term_component_value_missing`,
     ),
@@ -360,6 +371,7 @@ export const buildNhm2TileSourceFullApparatusTensorValues = (
   const proxyStatusComponentRefs = input.regions.flatMap(proxyStatusComponents);
   const inadmissibleAuthorityRefs = input.regions.flatMap(inadmissibleAuthorityComponents);
   const missingTermRefs = input.regions.flatMap(missingTerms);
+  const missingTermReceiptRefs = input.regions.flatMap(missingTermReceiptRefsForRegion);
   const missingTermComponentRefs = input.regions.flatMap(missingTermComponents);
   const undersampledRegionRefs = input.regions
     .map(undersampledRegionRef)
@@ -377,7 +389,9 @@ export const buildNhm2TileSourceFullApparatusTensorValues = (
   const allRequiredRegionsPresent = missingRegionIds.length === 0;
   const allRequiredRegionsFullTensor = missingComponentRefs.length === 0;
   const allRequiredRegionsTermComplete =
-    missingTermRefs.length === 0 && missingTermComponentRefs.length === 0;
+    missingTermRefs.length === 0 &&
+    missingTermReceiptRefs.length === 0 &&
+    missingTermComponentRefs.length === 0;
   const allRequiredRegionsSameBasis = input.regions.every(
     (region) =>
       region.chartRef === "comoving_cartesian" &&
@@ -436,6 +450,7 @@ export const buildNhm2TileSourceFullApparatusTensorValues = (
       proxyStatusComponentRefs,
       inadmissibleAuthorityRefs,
       missingTermRefs,
+      missingTermReceiptRefs,
       missingTermComponentRefs,
       regionalSampleCountMin: REGIONAL_TENSOR_SAMPLE_COUNT_MIN,
       undersampledRegionRefs,
@@ -485,6 +500,7 @@ export const buildFullApparatusTensorEvidenceFromTensorValues = (args: {
     artifact.regions.every((region) => {
       const contribution = region.termContributions[termId];
       return (
+        isText(region.termReceiptRefs[termId]) &&
         contribution != null &&
         NHM2_FULL_APPARATUS_SYMMETRIC_TENSOR_COMPONENTS.every(
           (componentId) => finiteTensorValue(contribution, componentId) != null,
@@ -612,6 +628,17 @@ const isTermContributionMap = (
   );
 };
 
+const isTermReceiptRefMap = (
+  value: unknown,
+): value is Partial<Record<Nhm2FullApparatusTensorTermId, string | null>> => {
+  if (!isRecord(value)) return false;
+  return Object.entries(value).every(
+    ([key, entry]) =>
+      NHM2_FULL_APPARATUS_REQUIRED_TERM_IDS.includes(key as Nhm2FullApparatusTensorTermId) &&
+      isNullableText(entry),
+  );
+};
+
 const isRegion = (value: unknown): value is Nhm2FullApparatusTensorValueRegionV1 => {
   if (!isRecord(value)) return false;
   const componentStatus = isRecord(value.componentStatus) ? value.componentStatus : null;
@@ -636,6 +663,7 @@ const isRegion = (value: unknown): value is Nhm2FullApparatusTensorValueRegionV1
         isComponentAuthority(entry),
     ) &&
     isTermContributionMap(value.termContributions) &&
+    isTermReceiptRefMap(value.termReceiptRefs) &&
     typeof value.chartRef === "string" &&
     typeof value.basisRef === "string" &&
     typeof value.unitsRef === "string" &&

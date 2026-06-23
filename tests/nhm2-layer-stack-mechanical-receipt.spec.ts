@@ -43,6 +43,52 @@ describe("NHM2 layer stack mechanical receipt", () => {
     expect(receipt.summary.stackThicknessMm).toBeCloseTo(1.344576, 9);
   });
 
+  it("computes the support/source-retention overlap window for the TiN comparator", () => {
+    const receipt = buildNhm2LayerStackMechanicalReceipt({ generatedAt });
+
+    expect(receipt.supportWindow.materialPresetId).toBe(
+      "ultra_high_stress_tin_literature_comparator",
+    );
+    expect(receipt.supportWindow.allowableStressPa).toBe(2.3e9);
+    expect(receipt.supportWindow.safetyFactor).toBe(3);
+    expect(receipt.supportWindow.designStressLimitPa).toBeCloseTo(7.66666666667e8, 2);
+    expect(receipt.supportWindow.minimumSupportFractionForStress).toBeCloseTo(
+      0.185065881969,
+      12,
+    );
+    expect(receipt.supportWindow.maximumSupportFractionForSourceRetention).toBeCloseTo(
+      0.0849673202614,
+      12,
+    );
+    expect(receipt.supportWindow.minimumSupportAreaMeters2).toBeCloseTo(
+      0.0000185065881969,
+      16,
+    );
+    expect(receipt.supportWindow.maximumSupportAreaForRetentionMeters2).toBeCloseTo(
+      0.00000849673202614,
+      17,
+    );
+    expect(receipt.supportWindow.overlapMargin).toBeCloseTo(0.459119311228, 12);
+    expect(receipt.summary.supportRetentionOverlapMargin).toBeCloseTo(0.459119311228, 12);
+    expect(receipt.supportWindow.feasibleSupportRetentionWindow).toBe(false);
+    expect(receipt.supportWindow.status).toBe("fail");
+    expect(receipt.supportWindow.requiredSupportFractionReductionForOverlap).toBeCloseTo(
+      0.100098561707,
+      12,
+    );
+    expect(receipt.supportWindow.requiredSourceRetentionIncreaseForStressSupport).toBeCloseTo(
+      0.0765753997062,
+      12,
+    );
+    expect(receipt.supportWindow.blockers).toEqual(
+      expect.arrayContaining([
+        "support_retention_overlap_window_missing",
+        "support_fraction_receipt_missing",
+        "support_drive_tensor_terms_missing",
+      ]),
+    );
+  });
+
   it("keeps mechanical survivability incomplete until real receipts exist", () => {
     const receipt = buildNhm2LayerStackMechanicalReceipt({ generatedAt });
 
@@ -60,6 +106,7 @@ describe("NHM2 layer stack mechanical receipt", () => {
     expect(receipt.blockers).toEqual(
       expect.arrayContaining([
         "pull_in_margin_not_evaluated",
+        "support_retention_overlap_window_missing",
         "linear_scaling_receipt_missing",
         "active_control_energy_receipt_missing",
       ]),

@@ -31,6 +31,10 @@ import { buildAtlasBoundObserverRobustEnergyConditions } from "./build-atlas-bou
 import { publishNhm2CampaignStabilityEvidence } from "./build-campaign-stability-evidence";
 import { publishNhm2TileSourceMaterialEvidenceReceipts } from "./publish-tile-source-material-evidence-receipts";
 import {
+  buildNhm2LayerStackMechanicalReceipt,
+  isNhm2LayerStackMechanicalReceipt,
+} from "../../shared/contracts/nhm2-layer-stack-mechanical-receipt.v1";
+import {
   buildNhm2TileSourceFalsificationReport,
   isNhm2TileSourceFalsificationReport,
 } from "../../shared/contracts/nhm2-tile-source-falsification-report.v1";
@@ -155,10 +159,18 @@ export const runNhm2CandidateProfileCampaignRun = (args: {
   const dynamicPath = path("nhm2-dynamic-effective-geometry-evidence.json");
   const observerPath = path("nhm2-observer-robust-energy-conditions.json");
   const stabilityPath = path("nhm2-campaign-stability-evidence.json");
+  const mechanicalReceiptPath = path("nhm2-layer-stack-mechanical-receipt.json");
   const referenceRunPath = path("nhm2-reference-run.json");
   const campaignPath = path("nhm2-time-dependent-source-campaign.json");
 
   mkdirSync(runRoot, { recursive: true });
+  const mechanicalReceipt = buildNhm2LayerStackMechanicalReceipt({
+    selectedProfileId: args.candidateProfileId,
+  });
+  if (!isNhm2LayerStackMechanicalReceipt(mechanicalReceipt)) {
+    throw new Error("layer-stack mechanical receipt failed validation");
+  }
+  writeFileSync(mechanicalReceiptPath, `${JSON.stringify(mechanicalReceipt, null, 2)}\n`, "utf8");
   const tileSourceMaterialEvidence = publishNhm2TileSourceMaterialEvidenceReceipts({
     repoRoot: args.repoRoot,
     evidencePath: args.tileSourceMaterialEvidencePath ?? null,
@@ -304,12 +316,14 @@ export const runNhm2CandidateProfileCampaignRun = (args: {
     materialEvidenceReceipts: tileSourceMaterialEvidence.materialEvidenceReceipts,
     physicalValidationPlan: tileSourceMaterialEvidence.physicalValidationPlan,
     evidenceGapRoadmap: tileSourceMaterialEvidence.evidenceGapRoadmap,
+    layerStackMechanicalReceipt: mechanicalReceipt,
     operatingBudgetReadiness: tileSourceMaterialEvidence.operatingBudgetReadiness,
     materialEvidenceReceiptsRef:
       tileSourceMaterialEvidence.outputRefs.materialEvidenceReceipts,
     physicalValidationPlanRef:
       tileSourceMaterialEvidence.outputRefs.physicalValidationPlan,
     evidenceGapRoadmapRef: tileSourceMaterialEvidence.outputRefs.evidenceGapRoadmap,
+    layerStackMechanicalReceiptRef: mechanicalReceiptPath,
     operatingBudgetReadinessRef:
       tileSourceMaterialEvidence.outputRefs.operatingBudgetReadiness,
     sourceSideSameBasisTensorAuthority: sourceSideAuthority,

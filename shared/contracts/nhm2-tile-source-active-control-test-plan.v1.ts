@@ -114,7 +114,7 @@ const GAP_NOISE_RMS_MAX_METERS = 8e-11;
 const TIMING_JITTER_MAX_SECONDS = TIMING_JITTER_CYCLE_FRACTION_MAX / SWITCHING_RATE_HZ;
 const PHASE_NOISE_MAX_SECONDS = PHASE_NOISE_CYCLE_FRACTION_MAX / SWITCHING_RATE_HZ;
 const REQUIRED_GAP_CONTROL_AUTHORITY_N = 17026.061141137077;
-const REQUIRED_TRACE_REF_COUNT = 15;
+const REQUIRED_TRACE_REF_COUNT = 17;
 const REQUIRED_FAILURE_MODE_COUNT = 5;
 const SOURCE_TENSOR_CONTAMINATION_FRACTION_MAX = 0.05;
 
@@ -154,12 +154,14 @@ const TEST_POLICY: Record<
       "active_control_heat_load_trace_ref_missing",
       "active_control_source_tensor_contamination_ref_missing",
       "active_control_timing_sync_trace_ref_missing",
+      "active_control_sector_light_crossing_sync_ref_missing",
+      "active_control_sector_boundary_timing_map_ref_missing",
       "active_control_phase_noise_spectrum_ref_missing",
       "active_control_lock_acquisition_trace_ref_missing",
       "active_control_failure_mode_ref_missing",
     ],
     requiredMeasurement:
-      "Measured or validated-simulation active-control receipt with actuator authority, sensor calibration, controller transfer/stability, energy waveform, noise trace/spectrum, thermal model/sink, heat trace, timing/phase trace, lock acquisition, and failure-mode provenance.",
+      "Measured or validated-simulation active-control receipt with actuator authority, sensor calibration, controller transfer/stability, energy waveform, noise trace/spectrum, thermal model/sink, heat trace, timing/phase trace, sector light-crossing synchronization, lock acquisition, and failure-mode provenance.",
     acceptanceCriterion:
       "Evidence tier is measured or validated_simulation and all required active-control trace/model refs are present.",
     falsificationRule:
@@ -253,9 +255,15 @@ const TEST_POLICY: Record<
     blockers: [
       "timing_jitter_receipt_missing",
       "timing_jitter_above_0p1_cycle",
+      "active_control_sector_boundary_skew_missing",
+      "active_control_sector_boundary_skew_above_0p1_cycle",
+      "active_control_light_crossing_sync_margin_missing",
+      "active_control_light_crossing_sync_margin_below_1",
       "phase_noise_receipt_missing",
       "phase_noise_above_0p05_cycle",
       "active_control_timing_sync_trace_ref_missing",
+      "active_control_sector_light_crossing_sync_ref_missing",
+      "active_control_sector_boundary_timing_map_ref_missing",
       "active_control_phase_noise_spectrum_ref_missing",
       "active_control_lock_acquisition_trace_ref_missing",
       "active_control_lock_acquisition_time_missing",
@@ -263,7 +271,7 @@ const TEST_POLICY: Record<
     requiredMeasurement: "Timing-jitter and synchronization trace for control action relative to switching cycle.",
     acceptanceCriterion: "Timing jitter is no greater than 0.1 cycle at 15 GHz with trace provenance.",
     falsificationRule:
-      "If timing jitter exceeds 0.1 cycle, phase noise exceeds 0.05 cycle, or synchronization/lock acquisition traces are missing at 15 GHz, the synchronized time-dependent campaign is blocked.",
+      "If timing jitter or sector-boundary skew exceeds 0.1 cycle, light-crossing sync margin is below 1, phase noise exceeds 0.05 cycle, or synchronization/lock acquisition traces are missing at 15 GHz, the synchronized time-dependent campaign is blocked.",
     blocksCampaignDomains: ["force_gap_pull_in", "full_apparatus_tensor", "material_credibility_gate", "covariant_conservation", "time_dependent_source_campaign"],
     artifactToProduce: "receipt://active_control/timing_jitter_v1",
   },
@@ -356,6 +364,10 @@ const measurementTargetsForTest = (
       return {
         switchingRateHz: SWITCHING_RATE_HZ,
         timingJitterMaxSeconds: TIMING_JITTER_MAX_SECONDS,
+        sectorBoundarySkewMaxSeconds: TIMING_JITTER_MAX_SECONDS,
+        lightCrossingSyncMarginMin: 1,
+        sectorLightCrossingSyncRefRequired: true,
+        sectorBoundaryTimingMapRefRequired: true,
         phaseNoiseMaxSeconds: PHASE_NOISE_MAX_SECONDS,
         lockAcquisitionTraceRefRequired: true,
       };

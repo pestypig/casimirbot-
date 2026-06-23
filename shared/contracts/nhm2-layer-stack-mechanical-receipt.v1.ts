@@ -63,12 +63,33 @@ export type Nhm2LayerStackMechanicalReceiptV1 = {
     activeControlEnergyStatus: Nhm2LayerStackMechanicalStatus;
     linearScalingValidityStatus: Nhm2LayerStackMechanicalStatus;
   };
+  supportWindow: {
+    materialPresetId: "ultra_high_stress_tin_literature_comparator";
+    allowableStressPa: number;
+    safetyFactor: number;
+    designStressLimitPa: number;
+    materialCorrection: number;
+    layerScalingEfficiency: number;
+    minimumSourceRetention: number;
+    minimumSupportFractionForStress: number;
+    maximumSupportFractionForSourceRetention: number;
+    minimumSupportAreaMeters2: number;
+    maximumSupportAreaForRetentionMeters2: number;
+    overlapMargin: number;
+    feasibleSupportRetentionWindow: boolean;
+    requiredSupportFractionReductionForOverlap: number;
+    requiredSourceRetentionIncreaseForStressSupport: number;
+    status: "candidate_window" | "review" | "fail";
+    blockers: string[];
+    notes: string[];
+  };
   blockers: string[];
   summary: {
     scalarForceComputed: boolean;
     forceScaleKilonewtons: number;
     effectiveStackPressureMPa: number;
     stackThicknessMm: number;
+    supportRetentionOverlapMargin: number;
     mechanicalReceiptComplete: boolean;
     materialReceiptComplete: boolean;
     fullTensorSourceAuthorityAllowed: false;
@@ -117,6 +138,11 @@ const DEFAULT_GAP_M = 8e-9;
 const DEFAULT_TILE_AREA_M2 = 1e-4;
 const DEFAULT_MIRROR_THICKNESS_M = 1.5e-6;
 const DEFAULT_LAYER_COUNT = 447;
+const TIN_ALLOWABLE_STRESS_PA = 2.3e9;
+const SUPPORT_WINDOW_SAFETY_FACTOR = 3;
+const SUPPORT_WINDOW_MATERIAL_CORRECTION = 0.85;
+const SUPPORT_WINDOW_LAYER_SCALING_EFFICIENCY = 0.9;
+const SUPPORT_WINDOW_MINIMUM_SOURCE_RETENTION = 0.7;
 
 const quantity = (
   valueSI: number | null,
@@ -167,6 +193,37 @@ export const buildNhm2LayerStackMechanicalReceipt = (
   const idealTileEnergyJ =
     (Math.PI ** 2 * HBAR_SI * C_SI * tileAreaMeters2) / (720 * gapMeters ** 3);
   const idealStackEnergyJ = idealTileEnergyJ * layerCount;
+  const designStressLimitPa = TIN_ALLOWABLE_STRESS_PA / SUPPORT_WINDOW_SAFETY_FACTOR;
+  const minimumSupportFractionForStress =
+    forcePerStackN / (tileAreaMeters2 * designStressLimitPa);
+  const maximumSupportFractionForSourceRetention =
+    1 -
+    SUPPORT_WINDOW_MINIMUM_SOURCE_RETENTION /
+      (SUPPORT_WINDOW_MATERIAL_CORRECTION * SUPPORT_WINDOW_LAYER_SCALING_EFFICIENCY);
+  const minimumSupportAreaMeters2 = tileAreaMeters2 * minimumSupportFractionForStress;
+  const maximumSupportAreaForRetentionMeters2 =
+    tileAreaMeters2 * maximumSupportFractionForSourceRetention;
+  const supportRetentionOverlapMargin = round(
+    maximumSupportFractionForSourceRetention / minimumSupportFractionForStress,
+  );
+  const feasibleSupportRetentionWindow = supportRetentionOverlapMargin >= 1;
+  const requiredSupportFractionReductionForOverlap = round(
+    Math.max(0, minimumSupportFractionForStress - maximumSupportFractionForSourceRetention),
+  );
+  const sourceRetentionAtStressSupport = Math.max(
+    0,
+    (1 - minimumSupportFractionForStress) *
+      SUPPORT_WINDOW_MATERIAL_CORRECTION *
+      SUPPORT_WINDOW_LAYER_SCALING_EFFICIENCY,
+  );
+  const requiredSourceRetentionIncreaseForStressSupport = round(
+    Math.max(0, SUPPORT_WINDOW_MINIMUM_SOURCE_RETENTION - sourceRetentionAtStressSupport),
+  );
+  const supportWindowBlockers = [
+    ...(!feasibleSupportRetentionWindow ? ["support_retention_overlap_window_missing"] : []),
+    "support_fraction_receipt_missing",
+    "support_drive_tensor_terms_missing",
+  ];
   const blockers = [
     "material_coupon_receipt_missing",
     "force_gap_curve_receipt_missing",
@@ -178,6 +235,7 @@ export const buildNhm2LayerStackMechanicalReceipt = (
     "fatigue_margin_receipt_missing",
     "active_control_energy_receipt_missing",
     "linear_scaling_receipt_missing",
+    ...supportWindowBlockers,
   ];
   return {
     contractVersion: NHM2_LAYER_STACK_MECHANICAL_RECEIPT_CONTRACT_VERSION,
@@ -254,12 +312,39 @@ export const buildNhm2LayerStackMechanicalReceipt = (
       activeControlEnergyStatus: "missing",
       linearScalingValidityStatus: "missing",
     },
+    supportWindow: {
+      materialPresetId: "ultra_high_stress_tin_literature_comparator",
+      allowableStressPa: TIN_ALLOWABLE_STRESS_PA,
+      safetyFactor: SUPPORT_WINDOW_SAFETY_FACTOR,
+      designStressLimitPa: round(designStressLimitPa),
+      materialCorrection: SUPPORT_WINDOW_MATERIAL_CORRECTION,
+      layerScalingEfficiency: SUPPORT_WINDOW_LAYER_SCALING_EFFICIENCY,
+      minimumSourceRetention: SUPPORT_WINDOW_MINIMUM_SOURCE_RETENTION,
+      minimumSupportFractionForStress: round(minimumSupportFractionForStress),
+      maximumSupportFractionForSourceRetention: round(
+        maximumSupportFractionForSourceRetention,
+      ),
+      minimumSupportAreaMeters2: round(minimumSupportAreaMeters2),
+      maximumSupportAreaForRetentionMeters2: round(maximumSupportAreaForRetentionMeters2),
+      overlapMargin: supportRetentionOverlapMargin,
+      feasibleSupportRetentionWindow,
+      requiredSupportFractionReductionForOverlap,
+      requiredSourceRetentionIncreaseForStressSupport,
+      status: feasibleSupportRetentionWindow ? "review" : "fail",
+      blockers: supportWindowBlockers,
+      notes: [
+        "Computed diagnostic overlap between load-bearing support fraction and retained active/source fraction.",
+        "Uses literature-comparator TiN allowable stress; this is not a measured material coupon receipt.",
+        "Support and spacer stress-energy terms must still enter the full apparatus tensor.",
+      ],
+    },
     blockers,
     summary: {
       scalarForceComputed: true,
       forceScaleKilonewtons: round(forcePerStackN / 1000),
       effectiveStackPressureMPa: round(effectiveStackPressurePa / 1e6),
       stackThicknessMm: round(stackThicknessMeters * 1000),
+      supportRetentionOverlapMargin,
       mechanicalReceiptComplete: false,
       materialReceiptComplete: false,
       fullTensorSourceAuthorityAllowed: false,
@@ -296,6 +381,7 @@ export const isNhm2LayerStackMechanicalReceipt = (
   const inputGeometry = isRecord(value.inputGeometry) ? value.inputGeometry : null;
   const idealCasimirLoad = isRecord(value.idealCasimirLoad) ? value.idealCasimirLoad : null;
   const receipts = isRecord(value.engineeringReceipts) ? value.engineeringReceipts : null;
+  const supportWindow = isRecord(value.supportWindow) ? value.supportWindow : null;
   const summary = isRecord(value.summary) ? value.summary : null;
   const boundary = isRecord(value.claimBoundary) ? value.claimBoundary : null;
   return (
@@ -319,6 +405,29 @@ export const isNhm2LayerStackMechanicalReceipt = (
     isQuantity(idealCasimirLoad.idealStackEnergyJ) &&
     receipts != null &&
     Object.values(receipts).every(isStatus) &&
+    supportWindow != null &&
+    supportWindow.materialPresetId === "ultra_high_stress_tin_literature_comparator" &&
+    typeof supportWindow.allowableStressPa === "number" &&
+    typeof supportWindow.safetyFactor === "number" &&
+    typeof supportWindow.designStressLimitPa === "number" &&
+    typeof supportWindow.materialCorrection === "number" &&
+    typeof supportWindow.layerScalingEfficiency === "number" &&
+    typeof supportWindow.minimumSourceRetention === "number" &&
+    typeof supportWindow.minimumSupportFractionForStress === "number" &&
+    typeof supportWindow.maximumSupportFractionForSourceRetention === "number" &&
+    typeof supportWindow.minimumSupportAreaMeters2 === "number" &&
+    typeof supportWindow.maximumSupportAreaForRetentionMeters2 === "number" &&
+    typeof supportWindow.overlapMargin === "number" &&
+    typeof supportWindow.feasibleSupportRetentionWindow === "boolean" &&
+    typeof supportWindow.requiredSupportFractionReductionForOverlap === "number" &&
+    typeof supportWindow.requiredSourceRetentionIncreaseForStressSupport === "number" &&
+    (supportWindow.status === "candidate_window" ||
+      supportWindow.status === "review" ||
+      supportWindow.status === "fail") &&
+    Array.isArray(supportWindow.blockers) &&
+    supportWindow.blockers.every((entry) => typeof entry === "string") &&
+    Array.isArray(supportWindow.notes) &&
+    supportWindow.notes.every((entry) => typeof entry === "string") &&
     Array.isArray(value.blockers) &&
     value.blockers.every((entry) => typeof entry === "string") &&
     value.blockers.length > 0 &&
@@ -327,6 +436,7 @@ export const isNhm2LayerStackMechanicalReceipt = (
     typeof summary.forceScaleKilonewtons === "number" &&
     typeof summary.effectiveStackPressureMPa === "number" &&
     typeof summary.stackThicknessMm === "number" &&
+    typeof summary.supportRetentionOverlapMargin === "number" &&
     summary.mechanicalReceiptComplete === false &&
     summary.materialReceiptComplete === false &&
     summary.fullTensorSourceAuthorityAllowed === false &&

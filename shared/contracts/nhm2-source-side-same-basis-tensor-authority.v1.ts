@@ -406,6 +406,9 @@ const buildRegionFromFullApparatusTensorValues = (args: {
     if (contribution == null) {
       blockers.add(`full_apparatus_${termId}_term_missing`);
     }
+    if (args.region.termReceiptRefs[termId] == null) {
+      blockers.add(`full_apparatus_${termId}_term_receipt_ref_missing`);
+    }
   }
 
   const receiptStatus = materialReceiptStatus(args.materialReceipt);

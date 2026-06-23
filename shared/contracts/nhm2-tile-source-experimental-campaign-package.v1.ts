@@ -412,6 +412,7 @@ const REQUIRED_TARGET_KEY_BY_CORRECTION_KEY: Record<string, string> = {
   sourceTensorContaminationFractionReduction:
     "sourceTensorContaminationFractionMax",
   sourceTensorRetentionFractionShortfall: "sourceTensorRetentionFractionMin",
+  sectorBoundarySkewReductionSeconds: "sectorBoundarySkewMaxSeconds",
   stressEnergyTermMissingCount: "requiredStressEnergyTermCount",
   stressEnergyTermRefMissingCount: "requiredStressEnergyTermCount",
   subsystemReceiptRefMissingCount: "requiredSubsystemReceiptCount",
@@ -425,6 +426,7 @@ const REQUIRED_TARGET_KEY_BY_CORRECTION_KEY: Record<string, string> = {
   termCoverageFractionShortfall: "requiredCoverageFraction",
   thermalCycleDriftReduction: "thermalCycleDriftFractionMax",
   timingJitterReductionSeconds: "timingJitterMaxSeconds",
+  lightCrossingSyncMarginShortfall: "lightCrossingSyncMarginMin",
 };
 
 const valueFromCorrections = (
