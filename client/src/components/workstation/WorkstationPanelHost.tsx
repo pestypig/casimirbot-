@@ -1,4 +1,5 @@
 import React, { Suspense, useMemo } from "react";
+import { HelixLoadingMark } from "@/components/common/HelixLoadingMark";
 import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
 import { getPanelDef } from "@/lib/desktop/panelRegistry";
 import { getInterfaceLanguageOption } from "@/lib/i18n/interfaceLanguage";
@@ -43,9 +44,11 @@ export function WorkstationPanelHost({ panelId }: { panelId: string }) {
     >
       <Suspense
         fallback={
-          <div className="p-4 text-sm text-slate-400">
-            {t("workstation.panel.loadingTitle", { title: panelTitle })}
-          </div>
+          <HelixLoadingMark
+            title={t("workstation.panel.loadingTitle", { title: panelTitle })}
+            detail="Preparing panel workspace"
+            compact
+          />
         }
       >
         <LazyPanel />

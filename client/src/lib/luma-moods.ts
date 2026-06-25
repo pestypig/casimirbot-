@@ -16,31 +16,31 @@ export type LumaMoodAsset = { label: string; sources: string[] };
 export const LUMA_MOOD_ASSETS: Record<LumaMood, LumaMoodAsset> = {
   mad: {
     label: "Mad",
-    sources: ["/luma/emotes/emoji%20mad.png", "/luma/emotes/mad.png"],
+    sources: ["/luma/emotes/emoji%20mad.svg", "/luma/emotes/mad.svg", "/luma/emotes/emoji%20mad.png", "/luma/emotes/mad.png"],
   },
   upset: {
     label: "Upset",
-    sources: ["/luma/emotes/emoji%20upset.png", "/luma/emotes/upset.png"],
+    sources: ["/luma/emotes/emoji%20upset.svg", "/luma/emotes/upset.svg", "/luma/emotes/emoji%20upset.png", "/luma/emotes/upset.png"],
   },
   shock: {
     label: "Shock",
-    sources: ["/luma/emotes/emoji%20shock.png", "/luma/emotes/shock.png"],
+    sources: ["/luma/emotes/emoji%20shock.svg", "/luma/emotes/shock.svg", "/luma/emotes/emoji%20shock.png", "/luma/emotes/shock.png"],
   },
   question: {
     label: "Question",
-    sources: ["/luma/emotes/emoji%20question.png", "/luma/emotes/question.png"],
+    sources: ["/luma/emotes/emoji%20question.svg", "/luma/emotes/question.svg", "/luma/emotes/emoji%20question.png", "/luma/emotes/question.png"],
   },
   happy: {
     label: "Happy",
-    sources: ["/luma/emotes/emoji%20happy.png", "/luma/emotes/happy.png"],
+    sources: ["/luma/emotes/emoji%20happy.svg", "/luma/emotes/happy.svg", "/luma/emotes/emoji%20happy.png", "/luma/emotes/happy.png"],
   },
   friend: {
     label: "Friendly",
-    sources: ["/luma/emotes/emoji%20friend.png", "/luma/emotes/friend.png"],
+    sources: ["/luma/emotes/emoji%20friend.svg", "/luma/emotes/friend.svg", "/luma/emotes/emoji%20friend.png", "/luma/emotes/friend.png"],
   },
   love: {
     label: "Love",
-    sources: ["/luma/emotes/emoji%20love.png", "/luma/emotes/love.png"],
+    sources: ["/luma/emotes/emoji%20love.svg", "/luma/emotes/love.svg", "/luma/emotes/emoji%20love.png", "/luma/emotes/love.png"],
   },
 };
 

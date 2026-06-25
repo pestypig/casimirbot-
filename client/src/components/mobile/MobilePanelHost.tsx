@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { Home, PanelsTopLeft } from "lucide-react";
+import { HelixLoadingMark } from "@/components/common/HelixLoadingMark";
 import { useTouchToMouseBridge } from "./useTouchToMouseBridge";
 
 type Props = {
@@ -110,9 +111,7 @@ export function MobilePanelHost({ panelId, title, loader, onHome, onShowSwitcher
           >
             <Suspense
               fallback={
-                <div className="flex h-full items-center justify-center bg-slate-900 text-sm text-slate-300">
-                  Loading panel...
-                </div>
+                <HelixLoadingMark title="Loading panel" detail={title} compact />
               }
             >
               <LazyPanel />
