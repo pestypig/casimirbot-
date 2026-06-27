@@ -101,6 +101,86 @@ export const isAskTurnInvalidResolvedNoteTitle = (value: string | null | undefin
   );
 };
 
+export type HelixAskNoteSinkArgReadersDependencies = {
+  trimActionArgBoundaries: (value: string) => string;
+};
+
+export const createAskTurnNoteSinkArgReaders = (
+  deps: HelixAskNoteSinkArgReadersDependencies,
+) => {
+  const normalizeAskTurnRequestedNoteTitle = (value: string | null | undefined): string | null => {
+    const cleaned = deps.trimActionArgBoundaries(value ?? "")
+    .replace(/^(?:a\s+|the\s+|my\s+)?(?:note|notepad)\s+(?:called|named|titled)\s+/i, "")
+    .replace(/^(?:called|named|titled)\s+/i, "")
+    .replace(/^(?:a\s+|the\s+|my\s+)?(?:note|notepad)\s+/i, "")
+    .replace(/\s+(?:note|notepad)$/i, "")
+    .replace(/\s+(?:too|also|as\s+well|please)$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!cleaned || isAskTurnDeicticNoteTarget(cleaned) || isAskTurnInvalidResolvedNoteTitle(cleaned)) return null;
+  const key = cleaned.toLowerCase();
+  if (/^(?:a|an|the|my)?\s*(?:note|notepad)?$/.test(key)) return null;
+  if (/^(?:scratch|memo|brief|log|journal|pad)$/.test(key)) return null;
+    return cleaned;
+  };
+
+  const resolveAskTurnLayDestinationNoteSinkArg = (transcript: string): string | null => {
+    const match = transcript.match(
+      /\b(?:drop|put|save|add|append|write|store|stash|file|park|place)\s+(?:(?:that|this|it)\s+)?(?:(?:finding|result|answer|part|bit|section|location|takeaway|summary)\s+)?(?:to|into|in|inside)\s+(?!clipboard\b|docs?\b|documents?\b|papers?\b)(.+?)\s*$/i,
+    );
+    const target = normalizeAskTurnRequestedNoteTitle(match?.[1] ?? "");
+    return target;
+  };
+
+  const resolveAskTurnSummaryNamedNoteSinkArg = (transcript: string): string | null => {
+    const match = transcript.match(
+      /\b(?:summari[sz]e|explain)\b[\s\S]*?\b(?:to|into|in|inside)\s+(?!clipboard\b|docs?\b|documents?\b|papers?\b|sections?\b|paragraphs?\b)(.+?)\s*$/i,
+    );
+    const target = normalizeAskTurnRequestedNoteTitle(match?.[1] ?? "");
+    if (!target || isAskTurnDeicticNoteTarget(target)) return target || null;
+    const hasNoteLikeTarget =
+      /\b(?:note|notepad|scratch|refs?|reference|test|log|journal|brief|memo|pad)\b/i.test(target);
+    const looksLikeFormattingInstruction =
+      /\b(?:one|two|three|few|short|brief|concise|paragraph|paragraphs|sentence|sentences|bullets?|plain\s+english|plain\s+language)\b/i.test(
+        target,
+      );
+    const hasNamedSinkShape = target.split(/\s+/).filter(Boolean).length >= 2;
+    return (hasNoteLikeTarget || hasNamedSinkShape) && !looksLikeFormattingInstruction ? target : null;
+  };
+
+  const resolveAskTurnLocationNamedNoteSinkArg = (transcript: string): string | null => {
+    const match = transcript.match(
+      /\b(?:put|add|append|save|write|store|stash|file|park|place|drop)\b[\s\S]*?\b(?:location|finding|part|bit|section)\b[\s\S]*?\b(?:to|into|in|inside)\s+(?!clipboard\b|docs?\b|documents?\b|papers?\b|sections?\b)(.+?)\s*$/i,
+    );
+    const target = normalizeAskTurnRequestedNoteTitle(match?.[1] ?? "") ?? resolveAskTurnLayDestinationNoteSinkArg(transcript);
+    if (!target || isAskTurnDeicticNoteTarget(target)) return target || null;
+    const hasNoteLikeTarget = /\b(?:note|notepad|scratch|refs?|reference|test|log|journal|brief|memo|pad)\b/i.test(target);
+    const hasNamedSinkShape = target.split(/\s+/).filter(Boolean).length >= 2;
+    return hasNoteLikeTarget || hasNamedSinkShape
+      ? target
+      : null;
+  };
+
+  const resolveAskTurnArtifactBareNoteTargetArg = (transcript: string): string | null => {
+    const normalized = transcript.trim();
+    if (!isAskTurnArtifactReferenceIntent(normalized)) return null;
+    const match = normalized.match(
+      /\b(?:put|save|copy|add|append|drop|store|stash|file|park|place)\b[\s\S]*\b(?:clipboard\s+)?(?:result|answer|output|response)\b[\s\S]*\b(?:to|into|in|inside)\s+(?!clipboard\b|docs?\b|documents?\b|papers?\b)(.+?)\s*$/i,
+    );
+    const target = deps.trimActionArgBoundaries(match?.[1] ?? "");
+    if (!target) return null;
+    return target;
+  };
+
+  return {
+    normalizeAskTurnRequestedNoteTitle,
+    resolveAskTurnArtifactBareNoteTargetArg,
+    resolveAskTurnLayDestinationNoteSinkArg,
+    resolveAskTurnLocationNamedNoteSinkArg,
+    resolveAskTurnSummaryNamedNoteSinkArg,
+  };
+};
+
 export const isAskTurnArtifactReferenceIntent = (transcript: string): boolean => {
   const normalized = transcript.trim().toLowerCase();
   return /\b(?:that|this|it|current|active|result|answer|finding|output|response)\b/.test(normalized);

@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createAskTurnActionArgBoundaryTrimmer,
+  createAskTurnNoteSinkArgReaders,
   isAskTurnArtifactReferenceIntent,
   isAskTurnArtifactToClipboardIntent,
   isAskTurnArtifactToNoteIntent,
@@ -45,7 +46,13 @@ describe("Helix Ask note arg boundary extraction boundary", () => {
     expect(routeSource).not.toMatch(/const\s+isAskTurnArtifactToNoteIntent\s*=/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnDeicticNoteWriteWithoutExplicitTitle\s*=/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnArtifactToClipboardIntent\s*=/);
+    expect(routeSource).not.toMatch(/const\s+normalizeAskTurnRequestedNoteTitle\s*=/);
+    expect(routeSource).not.toMatch(/const\s+resolveAskTurnLayDestinationNoteSinkArg\s*=/);
+    expect(routeSource).not.toMatch(/const\s+resolveAskTurnSummaryNamedNoteSinkArg\s*=/);
+    expect(routeSource).not.toMatch(/const\s+resolveAskTurnLocationNamedNoteSinkArg\s*=/);
+    expect(routeSource).not.toMatch(/const\s+resolveAskTurnArtifactBareNoteTargetArg\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+createAskTurnActionArgBoundaryTrimmer\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+createAskTurnNoteSinkArgReaders\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+trimAskTurnProtectedTitleArgBoundaries\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+resolveAskTurnTextArg\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+resolveAskTurnTitleArg\s*=/);
@@ -107,5 +114,26 @@ describe("Helix Ask note arg boundary extraction boundary", () => {
     expect(isAskTurnDeicticNoteWriteWithoutExplicitTitle("save that answer into the note")).toBe(true);
     expect(isAskTurnArtifactToClipboardIntent("copy that answer to clipboard")).toBe(true);
     expect(isAskTurnArtifactToClipboardIntent("copy Field Notes to clipboard")).toBe(false);
+  });
+
+  it("preserves requested note-title normalization and named sink readers", () => {
+    const {
+      normalizeAskTurnRequestedNoteTitle,
+      resolveAskTurnArtifactBareNoteTargetArg,
+      resolveAskTurnLayDestinationNoteSinkArg,
+      resolveAskTurnLocationNamedNoteSinkArg,
+      resolveAskTurnSummaryNamedNoteSinkArg,
+    } = createAskTurnNoteSinkArgReaders({
+      trimActionArgBoundaries: createAskTurnActionArgBoundaryTrimmer({ isBoundedNoteArgsEnabled: () => true }),
+    });
+
+    expect(normalizeAskTurnRequestedNoteTitle("the note called Field Notes, too")).toBe("Field Notes");
+    expect(normalizeAskTurnRequestedNoteTitle("this note")).toBeNull();
+    expect(resolveAskTurnLayDestinationNoteSinkArg("drop that finding into Field Notes")).toBe("Field Notes");
+    expect(resolveAskTurnSummaryNamedNoteSinkArg("summarize this doc into Field Notes")).toBe("Field Notes");
+    expect(resolveAskTurnSummaryNamedNoteSinkArg("summarize this doc into two paragraphs")).toBeNull();
+    expect(resolveAskTurnLocationNamedNoteSinkArg("put the location into Field Notes")).toBe("Field Notes");
+    expect(resolveAskTurnArtifactBareNoteTargetArg("copy that result into Field Notes")).toBe("Field Notes");
+    expect(resolveAskTurnArtifactBareNoteTargetArg("copy Field Notes into clipboard")).toBeNull();
   });
 });
