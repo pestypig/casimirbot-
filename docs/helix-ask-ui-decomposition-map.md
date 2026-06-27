@@ -204,3 +204,114 @@ No repair was attempted for:
 2. Extract workstation parser helpers only after parser-focused characterization tests are green.
 3. Produce an `api.ts` split plan artifact before moving direct/job/stream transport code.
 4. Keep TTS, chat persistence, stale completion, endpoint fallback, route metadata, and `legacy_shadow` in the behavior queue.
+
+## Wave 3 UI Ownership Extraction
+
+Status: third UI ownership extraction wave committed.
+
+Starting HEAD: `188e2c58d0d7fa4f636ce2614d2556d28d2e4bb5`
+`2026-06-27 14:34:04 -0400`, `Document runtime goal observation extraction`
+
+Ending extraction HEAD: `25ee2f9d0cc51f7e5f009ee40d6a9ca031c530b0`
+`2026-06-27 14:44:21 -0400`, `helix-ui-slice-workstation-parser-helpers`
+
+An unrelated route-runtime commit, `3bd0e4c93` `helix-route-slice-135-runtime-composer-support-refs`, appeared between the starting HEAD and the Wave 3 UI commits. It is not part of this UI extraction accounting.
+
+| File | Start lines | End lines | Start bytes | End bytes |
+| --- | ---: | ---: | ---: | ---: |
+| `client/src/components/helix/HelixAskPill.tsx` | 36,960 | 36,543 | 1,614,172 | 1,593,105 |
+| `client/src/lib/helix/ask-stage-play-ledger.ts` | 0 | 406 | 0 | 19,639 |
+| `client/src/lib/workstation/ask-workstation-parser.ts` | 0 | 78 | 0 | 3,540 |
+| `artifacts/helix-ask-ui-current-head-proof/api-transport-split-plan.md` | 0 | 47 | 0 | 4,875 |
+
+`HelixAskPill.tsx` exported-symbol count moved from 214 to 211. Production static import files from `HelixAskPill.tsx` stayed at 5. Test import hit lines moved from 175 to 177 after compatibility re-exports and boundary coverage.
+
+### Wave 3 Commits
+
+- `5df286c6b` `helix-ui-slice-stage-play-ledger-display`
+- `25ee2f9d0` `helix-ui-slice-workstation-parser-helpers`
+
+The transport split plan artifact was created at `artifacts/helix-ask-ui-current-head-proof/api-transport-split-plan.md` and left uncommitted because this artifact directory is not tracked in the current repo.
+
+### Wave 3 Owners
+
+| Module | Lines | Responsibility |
+| --- | ---: | --- |
+| `client/src/lib/helix/ask-stage-play-ledger.ts` | 406 | Pure Stage Play chat-ledger display event construction, ledger payload readers, evidence ref normalization, and row ordering. |
+| `client/src/lib/workstation/ask-workstation-parser.ts` | 78 | Pure chained workstation action parser for copy-selection-to-note then compare workflows. |
+
+The component re-exports moved helpers for compatibility. Inline implementations are gone for the moved symbols.
+
+### Extracted Candidates
+
+| Slice | Symbols | Owner |
+| --- | --- | --- |
+| Stage Play ledger display | `buildStagePlayChatLedgerEvents`, `StagePlayChatLedgerEvent`, `StagePlayChatLedgerEventKind` | `ask-stage-play-ledger.ts` |
+| Workstation parser helper | `parseWorkstationActionChainCommand` | `ask-workstation-parser.ts` |
+
+`parseWorkstationActionCommand` intentionally remains in `HelixAskPill.tsx` because the current implementation still reads `useDocViewerStore` for deictic current-doc commands. Moving it safely requires dependency reduction or an explicit store-free input contract.
+
+### Boundary Coverage
+
+`client/src/lib/helix/__tests__/ask-ui-ownership-boundary.spec.ts` now also proves:
+
+- Stage Play chat-ledger display helpers live in `ask-stage-play-ledger.ts`
+- the pure chained workstation parser lives in `ask-workstation-parser.ts`
+- both new owners avoid React, stores, `HelixAskPill.tsx`, reply-state writers, TTS writers, turn execution, and workstation dispatch functions
+
+Focused slice tests run:
+
+- `npx vitest run client/src/lib/helix/__tests__/ask-ui-ownership-boundary.spec.ts client/src/components/__tests__/helix-ask-pill-ui.spec.tsx --pool=forks`
+- Slice A result: 2 files passed, 163 tests passed.
+- Slice B result: 2 files passed, 164 tests passed.
+
+### API Transport Split Plan
+
+Map-only plan created at `artifacts/helix-ask-ui-current-head-proof/api-transport-split-plan.md`.
+
+Planned future owners:
+
+- request body assembly
+- direct Ask transport
+- turn transport
+- stream transport
+- job transport
+- pending job persistence
+- response normalization
+- retry/fallback policy
+
+Blocked behavior goals remain: legacy `/api/agi/ask` cleanup, jobs-to-direct re-execution cleanup, stream retry cleanup, static fallback cleanup, pending-job stale completion cleanup, and route metadata trust cleanup.
+
+### Deferred Behavior Traps
+
+No repair was attempted for:
+
+- endpoint behavior or legacy `/api/agi/ask`
+- jobs-to-direct fallback
+- stream retry behavior
+- response normalization fallback text
+- terminal legacy shadow
+- route metadata shape or policy fields
+- stale-completion behavior
+- TTS or chat persistence
+- local workstation action execution or panel/docs/notes/clipboard mutation
+- ids, timeouts, polling, pending-request behavior
+
+### Remaining HelixAskPill Policy Exports
+
+Representative remaining non-rendering export families:
+
+- planner/dispatch policy: `classifyHelixReasoningIntent`, `resolveHelixDispatchPolicyAtTurnStart`, `deriveHelixPlannerContract`, `deriveObserverDispatchPlan`
+- evidence/finalization: `evaluateEvidenceFinalizationGate`, `registerTurnTerminalOutcome`
+- workstation/pending input: `parseWorkstationActionCommand`, `buildWorkstationUserInputRequest`, `resolvePendingWorkstationUserInput`, `syncDocViewerStateFromWorkstationAction`
+- voice/read-aloud/TTS: `shouldAutoSpeakAnswerForTurn`, voice playback retry helpers, transcript confirmation helpers, barge-in helpers
+- active reply ordering/render gate: `sortHelixAskRepliesChronologically`, `appendHelixAskReplyChronologically`, `shouldRenderHelixAskActiveTurnStream`
+- Stage Play/live bridge display: `buildLiveAnswerTurnBridgeState`, mail-loop stream rows, steering queue display helpers
+- math/debug utilities: math tokenization/render debug and debug export drawer helpers
+
+### Recommended Next Wave
+
+1. Extract mail-loop stream row builders and steering queue display helpers into a Stage Play/live-source display owner.
+2. Extract `buildLiveAnswerTurnBridgeState` only after adding bridge-specific fixtures for receipt fallback, checkpoint queued, checkpoint waiting, and reviewed snapshot cases.
+3. Reduce `parseWorkstationActionCommand` dependencies by passing current-doc context explicitly before moving it.
+4. Keep planner/dispatch policy helpers for a separate owner-proof wave, not a broad utility extraction.
