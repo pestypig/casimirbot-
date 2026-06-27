@@ -462,3 +462,74 @@ export const createAskTurnDocSummaryIntentReaders = (
     shouldAskTurnSearchDocsBeforeSummary,
   };
 };
+
+export const isAskTurnCurrentDocIdentityTransferIntent = (transcript: string): boolean =>
+  /\b(?:the\s+)?current\s+(?:doc|document|paper)\s+(?:path|name|title)\b/i.test(transcript);
+
+export const isAskTurnCurrentDocIdentityToDeicticNoteIntent = (transcript: string): boolean =>
+  /\b(?:copy|put|add|append|save|store|stash|file|park|place|write)\b[\s\S]*\b(?:the\s+)?current\s+(?:doc|document|paper)\s+(?:path|name|title)\b[\s\S]*\b(?:to|into|in|inside)\s+(?:that|this|it|my|the|active|current)(?:\s+note|\s+notepad)?\b/i.test(
+    transcript,
+  );
+
+export type HelixAskDocIdentityIntentReaderDependencies = {
+  isAskTurnComposedResearchToNoteIntent: (transcript: string) => boolean;
+  isAskTurnDocNotesHybridCompareIntent: (transcript: string) => boolean;
+  isAskTurnDocVsNoteCompareIntent: (transcript: string) => boolean;
+  isAskTurnDocDocCompareIntent: (transcript: string) => boolean;
+  isAskTurnSummarizeAndAddToNoteIntent: (transcript: string) => boolean;
+  isAskTurnCompareCopyResultToClipboardIntent: (transcript: string) => boolean;
+  isAskTurnExplainIntent: (transcript: string) => boolean;
+};
+
+export const createAskTurnDocIdentityIntentReaders = (
+  deps: HelixAskDocIdentityIntentReaderDependencies,
+) => {
+  const isAskTurnDocIdentityIntent = (transcript: string): boolean => {
+    const normalized = transcript.trim().toLowerCase();
+    if (!normalized) return false;
+    if (isAskTurnDocsPanelOpenIntent(transcript)) return false;
+    if (
+      deps.isAskTurnComposedResearchToNoteIntent(transcript) ||
+      deps.isAskTurnDocNotesHybridCompareIntent(transcript) ||
+      deps.isAskTurnDocVsNoteCompareIntent(transcript) ||
+      deps.isAskTurnDocDocCompareIntent(transcript) ||
+      deps.isAskTurnSummarizeAndAddToNoteIntent(transcript) ||
+      deps.isAskTurnCompareCopyResultToClipboardIntent(transcript)
+    ) {
+      return false;
+    }
+    if (/\b(?:about|summari[sz]e|explain|plain language|mean|means)\b/i.test(normalized)) {
+      return false;
+    }
+    return (
+      /\bwhat\s+(?:docs?|documents?|papers?)\s+are\s+we\s+on\b/.test(normalized) ||
+      /\bwhat\s+(?:exact\s+)?(?:docs?|documents?|papers?)\s+did\s+(?:you|we)\s+open\b/.test(normalized) ||
+      /\bwhich\s+(?:docs?|documents?|papers?)\s+did\s+(?:you|we)\s+open\b/.test(normalized) ||
+      /\bwhat\s+(?:docs?|documents?|papers?)\s+(?:is|are)\s+(?:this|that|these|those)\b/.test(normalized) ||
+      /\bwhat\s+(?:is|are)\s+(?:this|that|these|those)\s+(?:docs?|documents?|papers?)\b/.test(normalized) ||
+      /\bwhat\s+(?:is|are)\s+(?:the\s+)?(?:docs?|documents?|papers?)\s+we\s+are\s+looking\s+at\b/.test(normalized) ||
+      /\bwhat\s+(?:is|are)\s+(?:the\s+)?(?:docs?|documents?|papers?)\s+we(?:'re)\s+looking\s+at\b/.test(normalized) ||
+      /\bwhat\s+(?:docs?|documents?|papers?)\s+(?:am\s+i|are\s+we)\s+(?:viewing|looking\s+at|reading|on)\b/.test(normalized) ||
+      /\bwhich\s+(?:docs?|documents?|papers?)\s+(?:am\s+i|are\s+we)\s+(?:viewing|looking\s+at|reading|on)\b/.test(normalized) ||
+      /\bwhich\s+(?:docs?|documents?|papers?)\s+(?:is|are)\s+(?:showing|displayed|on\s+screen)(?:\s+now|\s+right\s+now)?\b/.test(normalized) ||
+      /\bwhat\s+(?:docs?|documents?|papers?)\s+(?:is|are)\s+(?:showing|displayed|on\s+screen)(?:\s+now|\s+right\s+now)?\b/.test(normalized) ||
+      /\bwhich\s+(?:docs?|documents?|papers?)\s+(?:is|are)\s+in\s+(?:the\s+)?viewer(?:\s+now|\s+right\s+now)?\b/.test(normalized) ||
+      /\bwhat\s+(?:docs?|documents?|papers?)\s+(?:is|are)\s+in\s+(?:the\s+)?viewer(?:\s+now|\s+right\s+now)?\b/.test(normalized) ||
+      /\bwhat\s+(?:papers?|documents?|docs?)\s+am\s+i\s+viewing\b/.test(normalized) ||
+      /\bwhat\s+(?:papers?|documents?|docs?)\s+are\s+we\s+viewing\b/.test(normalized) ||
+      /\bwhat\s+(?:is\s+)?(?:the\s+)?current\s+(?:viewer\s+)?(?:docs?|documents?|papers?)\b/.test(normalized) ||
+      /\bwhat\s+(?:docs?|documents?|papers?)\s+(?:is|are)\s+(?:open|active|current)(?:\s+now|\s+right\s+now)?\b/.test(normalized) ||
+      /\bwhich\s+(?:docs?|documents?|papers?)\s+(?:is|are)\s+(?:open|active|current)\b/.test(normalized) ||
+      /\bwhich\s+(?:docs?|documents?|papers?)\s+(?:is|are)\s+open\s+right\s+now\b/.test(normalized) ||
+      /\bwhat\s+(?:docs?|documents?|papers?)\s+(?:is|are)\s+open\b/.test(normalized)
+    );
+  };
+
+  const isAskTurnDocIdentityExplainHybridIntent = (transcript: string): boolean =>
+    isAskTurnDocIdentityIntent(transcript) && deps.isAskTurnExplainIntent(transcript);
+
+  return {
+    isAskTurnDocIdentityExplainHybridIntent,
+    isAskTurnDocIdentityIntent,
+  };
+};
