@@ -260,3 +260,8 @@ export const isAskTurnAppendToNoteCue = (transcript: string): boolean => {
     /\b(?:append|add|save|put|write)\b[\s\S]*\b(?:note|notes|notepad)\b/.test(normalized)
   );
 };
+
+export const isAskTurnNoteMutationPrecedenceIntent = (transcript: string): boolean =>
+  /\b(?:create|make|start|new|append|update|add|write|save|store)\b[\s\S]{0,140}\b(?:workstation\s+)?(?:note|notepad|scratch|memo)\b/i.test(
+    transcript,
+  );

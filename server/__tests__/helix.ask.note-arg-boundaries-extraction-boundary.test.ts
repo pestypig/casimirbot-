@@ -15,6 +15,7 @@ import {
   isAskTurnDeicticNoteWriteWithoutExplicitTitle,
   isAskTurnDeicticNoteTarget,
   isAskTurnInvalidResolvedNoteTitle,
+  isAskTurnNoteMutationPrecedenceIntent,
   isAskTurnRepoCueIntent,
   maskAskTurnProtectedArgumentSpansForIntent,
   resolveAskTurnCreateNoteTitleArg,
@@ -57,6 +58,7 @@ describe("Helix Ask note arg boundary extraction boundary", () => {
     expect(routeSource).not.toMatch(/const\s+resolveAskTurnDocsRetrievalQueryArg\s*=/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnRepoCueIntent\s*=/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnAppendToNoteCue\s*=/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnNoteMutationPrecedenceIntent\s*=\s*\(transcript/);
     expect(serviceSource).toMatch(/export\s+const\s+createAskTurnActionArgBoundaryTrimmer\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+createAskTurnNoteSinkArgReaders\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+trimAskTurnProtectedTitleArgBoundaries\s*=/);
@@ -74,6 +76,7 @@ describe("Helix Ask note arg boundary extraction boundary", () => {
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnArtifactToClipboardIntent\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnRepoCueIntent\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnAppendToNoteCue\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+isAskTurnNoteMutationPrecedenceIntent\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");
     expect(serviceSource).not.toContain("../routes/agi.plan");
   });
@@ -158,5 +161,7 @@ describe("Helix Ask note arg boundary extraction boundary", () => {
     expect(isAskTurnRepoCueIntent("check the document")).toBe(false);
     expect(isAskTurnAppendToNoteCue("append this to my note")).toBe(true);
     expect(isAskTurnAppendToNoteCue("open my note")).toBe(false);
+    expect(isAskTurnNoteMutationPrecedenceIntent("Create a workstation note called Field Notes.")).toBe(true);
+    expect(isAskTurnNoteMutationPrecedenceIntent("Explain the current document.")).toBe(false);
   });
 });
