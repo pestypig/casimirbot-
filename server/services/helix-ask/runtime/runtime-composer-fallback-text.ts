@@ -150,3 +150,41 @@ export const buildHelixInternetSearchFallbackText = (args: {
   }
   return lines.join("\n");
 };
+
+export const buildHelixRuntimeWorkspaceOsStatusFallbackText = (
+  artifacts: HelixRuntimeComposerSupportRefArtifact[],
+): string => {
+  const statusArtifact = [...artifacts].reverse().find((artifact) => artifact.kind === "workspace_os_status_observation");
+  const payload = statusArtifact ? readComposerFallbackPayloadRecord(statusArtifact) : null;
+  if (!payload) return "";
+  const summary = payload.summary && typeof payload.summary === "object" && !Array.isArray(payload.summary)
+    ? (payload.summary as RecordLike)
+    : {};
+  const counts = [
+    `available ${Number(summary.available_count ?? 0)}`,
+    `degraded ${Number(summary.degraded_count ?? 0)}`,
+    `blocked ${Number(summary.blocked_count ?? 0)}`,
+    `error ${Number(summary.error_count ?? 0)}`,
+    `unknown ${Number(summary.unknown_count ?? 0)}`,
+  ].join(", ");
+  const noteworthy = Array.isArray(payload.noteworthy_capabilities)
+    ? payload.noteworthy_capabilities
+        .map((entry) => (entry && typeof entry === "object" && !Array.isArray(entry) ? (entry as RecordLike) : null))
+        .filter((entry): entry is RecordLike => Boolean(entry))
+        .slice(0, 8)
+    : [];
+  const lines = [`Workspace OS status is diagnostic only. Summary: ${counts}.`];
+  if (noteworthy.length > 0) {
+    lines.push("Notable capabilities:");
+    for (const capability of noteworthy) {
+      const id = readComposerFallbackString(capability.capability_id) ?? "unknown";
+      const status = readComposerFallbackString(capability.status) ?? "unknown";
+      const reason =
+        readComposerFallbackString(capability.failure_reason) ??
+        readComposerFallbackString(capability.missing_reason) ??
+        readComposerFallbackString(capability.next_required_action);
+      lines.push(`- ${id}: ${status}${reason ? ` (${reason})` : ""}`);
+    }
+  }
+  return lines.join("\n").trim();
+};
