@@ -58,3 +58,28 @@ export function suppressReceiptFramingInFinalAnswer(input: {
     : cleanSentenceSpacing(cleaned);
   return cleaned || text.trim();
 }
+
+export const cleanHelixPostObservationDraftText = (text: string, prompt?: string | null): string =>
+  suppressReceiptFramingInFinalAnswer({
+    text: text
+    .replace(
+      /Quantities that depend on time:\s*Impulse and Average Power\./gi,
+      "Quantities that depend on time: final speed, impulse, and average power.",
+    )
+    .replace(
+      /Quantities that depend on time:\s*Impulse and average power\./gi,
+      "Quantities that depend on time: final speed, impulse, and average power.",
+    )
+    .replace(
+      /Quantities that depend only on (?:the\s+)?final speed:\s*Final kinetic energy and net force\./gi,
+      "Quantities that depend only on final speed, with mass fixed: final kinetic energy. Net force depends on acceleration; if acceleration is derived from final speed, elapsed time is also required.",
+    )
+    .replace(
+      /Quantities that depend only on (?:the\s+)?final speed:\s*Final kinetic energy,? and net force\./gi,
+      "Quantities that depend only on final speed, with mass fixed: final kinetic energy. Net force depends on acceleration; if acceleration is derived from final speed, elapsed time is also required.",
+    )
+    .replace(/(?:^|\n)\s*However,?\s+the\s+interpretation\s+of\s+these\s+results\s+is\s+missing\.?\s*$/i, "")
+    .replace(/(?:^|\n)\s*Missing interpretation(?:\s+of\s+results)?\.?\s*$/i, "")
+    .trim(),
+    prompt,
+  });
