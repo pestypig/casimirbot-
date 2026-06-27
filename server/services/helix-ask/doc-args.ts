@@ -40,6 +40,20 @@ export const isAskTurnDocOpenBestIntent = (transcript: string): boolean =>
     transcript,
   );
 
+export const isAskTurnExplicitDocLocationPrompt = (transcript: string): boolean =>
+  Boolean(resolveAskTurnDocPathArg(transcript)) &&
+  /\b(?:where\s+in|find\s+where|locate|location|locations|nearby\s+anchors?|nearby\s+sections?|return\s+(?:the\s+)?(?:section|sections|anchors?|locations?)|line(?:s|[-\s]?backed)?|discuss(?:es|ed|ing)?|mention(?:s|ed|ing)?)\b/i.test(
+    transcript,
+  ) &&
+  !/\b(?:summari[sz]e|summary|in\s+\d+\s+bullets?|bullet\s+points?|overview|takeaways?)\b/i.test(transcript);
+
+export const isAskTurnActiveDocLocationPrompt = (transcript: string): boolean =>
+  /\b(?:current|active|this|that|the)\s+(?:doc|document|paper|white\s*paper|whitepaper)\b/i.test(transcript) &&
+  /\b(?:find|locate|where|location|locations|line(?:s|[-\s]?backed)?|section|sections|discuss(?:es|ed|ing)?|mention(?:s|ed|ing)?|return\s+(?:the\s+)?(?:line|lines|locations?))\b/i.test(
+    transcript,
+  ) &&
+  !/\b(?:summari[sz]e|summary|in\s+\d+\s+bullets?|bullet\s+points?|overview|takeaways?)\b/i.test(transcript);
+
 export const HELIX_ASK_OPEN_DOC_NOUN_PATTERN = String.raw`(?:doc|docs|document|documents|paper|papers|writeup|writeups|artifact|artifacts|result|results|thing|things|report|reports|file|files)`;
 export const HELIX_ASK_RECENT_DOC_PATTERN = String.raw`(?:latest|newest|freshest|most\s+recent|recent)`;
 
