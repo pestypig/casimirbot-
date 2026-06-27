@@ -14,6 +14,11 @@ export const askTurnHasExplicitWorkspaceCompareOperand = (normalizedTranscript: 
     normalizedTranscript,
   );
 
+export const isAskTurnComparePrecedenceIntent = (transcript: string): boolean =>
+  /\bcompare\b[\s\S]{0,160}\b(?:against|with|to|versus|vs\.?)\b[\s\S]{0,120}\b(?:note|notes|current\s+doc|current\s+document|doc|document)\b/i.test(
+    transcript,
+  );
+
 export const createAskTurnCompareIntentReaders = (
   deps: HelixAskCompareIntentReaderDependencies,
 ) => {

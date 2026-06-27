@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
   askTurnHasExplicitWorkspaceCompareOperand,
   createAskTurnCompareIntentReaders,
+  isAskTurnComparePrecedenceIntent,
 } from "../services/helix-ask/compare-intent";
 import {
   createAskTurnActionArgBoundaryTrimmer,
@@ -29,12 +30,14 @@ describe("Helix Ask compare intent extraction boundary", () => {
     expect(routeSource).toContain("../services/helix-ask/compare-intent");
     expect(routeSource).toContain("createAskTurnCompareIntentReaders({");
     expect(routeSource).not.toMatch(/const\s+askTurnHasExplicitWorkspaceCompareOperand\s*=/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnComparePrecedenceIntent\s*=\s*\(transcript/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnConceptualVsQuestion\s*=\s*\(transcript/);
     expect(routeSource).not.toMatch(/const\s+askTurnHasCompareCueOutsideProtectedArgs\s*=\s*\(transcript/);
     expect(routeSource).not.toMatch(/const\s+resolveAskTurnCompareRightHandTargetArg\s*=\s*\(transcript/);
     expect(routeSource).not.toMatch(/const\s+HELIX_ASK_TURN_COMPARE_CUE_RE\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+HELIX_ASK_TURN_COMPARE_CUE_RE\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+askTurnHasExplicitWorkspaceCompareOperand\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+isAskTurnComparePrecedenceIntent\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+createAskTurnCompareIntentReaders\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");
     expect(serviceSource).not.toContain("../routes/agi.plan");
@@ -42,6 +45,8 @@ describe("Helix Ask compare intent extraction boundary", () => {
 
   it("preserves workspace compare and conceptual-vs behavior", () => {
     expect(askTurnHasExplicitWorkspaceCompareOperand("compare docs/research/a.md with notes/b.md")).toBe(true);
+    expect(isAskTurnComparePrecedenceIntent("Compare this document against my notes.")).toBe(true);
+    expect(isAskTurnComparePrecedenceIntent("Compare proper time versus coordinate time.")).toBe(false);
     expect(readers.isAskTurnConceptualVsQuestion("what is proper time vs coordinate time?")).toBe(true);
     expect(readers.askTurnHasCompareCueOutsideProtectedArgs("what is proper time vs coordinate time?")).toBe(false);
     expect(readers.askTurnHasCompareCueOutsideProtectedArgs("compare the current doc with Field Notes")).toBe(true);
