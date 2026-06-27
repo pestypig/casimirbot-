@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   cleanupAskTurnOpenDocSearchTopic,
+  createAskTurnActiveDocPromptReaders,
   createAskTurnDocIdentityIntentReaders,
   createAskTurnDocSummaryIntentReaders,
   createAskTurnLatestDocIntentReaders,
@@ -13,8 +14,10 @@ import {
   isAskTurnActiveDocLocationPrompt,
   isAskTurnActiveDocNumericExtractionIntent,
   isAskTurnActiveDocUsefulnessIntent,
+  isAskTurnDeicticDocsIdentityIntent,
   isAskTurnCurrentDocIdentityToDeicticNoteIntent,
   isAskTurnCurrentDocIdentityTransferIntent,
+  isAskTurnDocEvidenceSynthesisIntent,
   isAskTurnDocLocationCitationRequired,
   isAskTurnDocOpenBestIntent,
   isAskTurnDocSummaryDetailRequested,
@@ -65,6 +68,9 @@ describe("Helix Ask doc args extraction boundary", () => {
     expect(routeSource).not.toMatch(/const\s+isAskTurnDocIdentityIntent\s*=\s*\(transcript/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnDocIdentityExplainHybridIntent\s*=\s*\(transcript/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnDocLocationCitationRequired\s*=\s*\(transcript/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnDocEvidenceSynthesisIntent\s*=\s*\(transcript/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnDeicticDocsIdentityIntent\s*=\s*\(transcript/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnActiveDocSummaryIntent\s*=\s*\(transcript/);
     expect(routeSource).not.toMatch(/const\s+normalizeAskTurnLatestDocTopicText\s*=/);
     expect(routeSource).not.toMatch(/const\s+resolveAskTurnLatestDocTopicArg\s*=/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnTopicQualifiedLatestDocIntent\s*=/);
@@ -97,6 +103,9 @@ describe("Helix Ask doc args extraction boundary", () => {
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnCurrentDocIdentityTransferIntent\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnCurrentDocIdentityToDeicticNoteIntent\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnDocLocationCitationRequired\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+isAskTurnDocEvidenceSynthesisIntent\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+isAskTurnDeicticDocsIdentityIntent\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+createAskTurnActiveDocPromptReaders\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+createAskTurnDocIdentityIntentReaders\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+tokenizeAskTurnDocTopic\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+normalizeAskTurnLatestDocTopicText\s*=/);
@@ -140,6 +149,9 @@ describe("Helix Ask doc args extraction boundary", () => {
     expect(isAskTurnActiveDocUsefulnessIntent("What is this document useful for?")).toBe(true);
     expect(isAskTurnActiveDocConceptExplanationIntent("Explain what Casimir tiles means in this document.")).toBe(true);
     expect(isAskTurnActiveDocNumericExtractionIntent("Find the key numeric value in this document.")).toBe(true);
+    expect(isAskTurnDocEvidenceSynthesisIntent("What problem is this solving?")).toBe(true);
+    expect(isAskTurnDeicticDocsIdentityIntent("Which paper are we reading right now?")).toBe(true);
+    expect(isAskTurnDeicticDocsIdentityIntent("What screen are we looking at?")).toBe(false);
   });
 
   it("preserves latest-doc topic and acquisition prompt readers", () => {
@@ -192,11 +204,23 @@ describe("Helix Ask doc args extraction boundary", () => {
     const latestReaders = createAskTurnLatestDocIntentReaders({
       isStructuredDocsViewerPrompt: (prompt) => /\bDocument\s+path\s*:/i.test(prompt),
     });
+    const activeDocReaders = createAskTurnActiveDocPromptReaders({
+      isAskTurnComparePrecedenceIntent: (prompt) => /\bcompare\b/i.test(prompt),
+      isAskTurnCurrentOpenDocsViewerSummaryPrompt: (prompt) => /\bcurrent open docs viewer summary\b/i.test(prompt),
+      isAskTurnNoWorkspaceBackgroundScope: (prompt) => /\bbackground\s+only\b/i.test(prompt),
+      isAskTurnNoteMutationPrecedenceIntent: (prompt) => /\bnote\b/i.test(prompt),
+      isAskTurnSummarizeAndAddToNoteIntent: (prompt) => /\bsummarize\b[\s\S]*\bnote\b/i.test(prompt),
+      maskProtectedArgumentSpansForIntent: (prompt) => prompt,
+    });
     const summaryReaders = createAskTurnDocSummaryIntentReaders({
       isAskTurnNoWorkspaceBackgroundScope: (prompt) => /\bbackground\s+only\b/i.test(prompt),
       resolveAskTurnOpenDocSearchQueryArg: latestReaders.resolveAskTurnOpenDocSearchQueryArg,
     });
 
+    expect(activeDocReaders.isAskTurnActiveDocSummaryIntent("What is this document about?")).toBe(true);
+    expect(activeDocReaders.isAskTurnActiveDocSummaryIntent("Summarize this doc background only")).toBe(false);
+    expect(activeDocReaders.isAskTurnActiveDocSummaryIntent("Compare this document with the note")).toBe(false);
+    expect(activeDocReaders.isAskTurnActiveDocSummaryIntent("current open docs viewer summary")).toBe(true);
     expect(summaryReaders.isAskTurnCompoundDocAnswerIntent("open the doc about Casimir tiles and summarize it")).toBe(true);
     expect(summaryReaders.isAskTurnDocAboutSummaryPrompt("What is this document about?")).toBe(true);
     expect(summaryReaders.isAskTurnDocsViewerCapabilityTopicLabelPrompt("Docs viewer: dynamic actions coverage")).toBe(true);

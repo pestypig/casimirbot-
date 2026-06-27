@@ -79,6 +79,60 @@ export const isAskTurnActiveDocNumericExtractionIntent = (transcript: string): b
     transcript,
   );
 
+export const isAskTurnDocEvidenceSynthesisIntent = (transcript: string): boolean =>
+  /\b(?:does\s+(?:this|the\s+current|the)\s+.*\bmean|what\s+problem\s+(?:is\s+)?(?:it|this|that)\s+(?:is\s+)?solv(?:ing|es)|tell\s+me\s+what\s+problem|why\s+does\s+it\s+matter|classif(?:y|ication)|decide\s+whether|is\s+this\s+.+\bor\s+.+\bor\s+something\s+else|what\s+should\s+I\s+(?:verify|check)\s+next|recommend\s+next\s+checks?|what\s+is\s+missing|what\s+does\s+.+\s+capture\s+versus\s+miss)\b/i.test(
+    transcript,
+  );
+
+export const isAskTurnDeicticDocsIdentityIntent = (transcript: string): boolean =>
+  !/\b(?:screen|visual|capture|frame|screenshot|visible)\b/i.test(transcript) &&
+  /\b(?:what|which)\s+(?:docs?|documents?|papers?|white\s*papers?)\s+(?:am\s+i|are\s+we)\s+(?:looking\s+at|viewing|reading|on|open)(?:\s+(?:now|right\s+now|currently))?\b/i.test(transcript);
+
+export type HelixAskActiveDocPromptReaderDependencies = {
+  isAskTurnComparePrecedenceIntent: (transcript: string) => boolean;
+  isAskTurnCurrentOpenDocsViewerSummaryPrompt: (transcript: string) => boolean;
+  isAskTurnNoWorkspaceBackgroundScope: (transcript: string) => boolean;
+  isAskTurnNoteMutationPrecedenceIntent: (transcript: string) => boolean;
+  isAskTurnSummarizeAndAddToNoteIntent: (transcript: string) => boolean;
+  maskProtectedArgumentSpansForIntent: (transcript: string) => string;
+};
+
+export const createAskTurnActiveDocPromptReaders = (
+  deps: HelixAskActiveDocPromptReaderDependencies,
+) => {
+  const isAskTurnActiveDocSummaryIntent = (transcript: string): boolean => {
+    const normalized = deps.maskProtectedArgumentSpansForIntent(transcript).trim().toLowerCase();
+    if (!normalized) return false;
+    if (
+      (deps.isAskTurnNoteMutationPrecedenceIntent(transcript) && !deps.isAskTurnSummarizeAndAddToNoteIntent(transcript)) ||
+      deps.isAskTurnComparePrecedenceIntent(transcript)
+    ) return false;
+    if (/\bbackground\s+only\b/i.test(transcript) || deps.isAskTurnNoWorkspaceBackgroundScope(transcript)) return false;
+    if (deps.isAskTurnCurrentOpenDocsViewerSummaryPrompt(transcript)) return true;
+    if (
+      /\b(?:summari[sz]e|explain|summary)\b[\s\S]*\b(?:this|that|the|my)?\s*(?:note|notepad)\b[\s\S]*\b(?:doc|document|paper)\b/i.test(normalized) ||
+      /\b(?:summari[sz]e|explain|summary)\b[\s\S]*\b(?:doc|document|paper)\b[\s\S]*\b(?:this|that|the|my)?\s*(?:note|notepad)\b/i.test(normalized)
+    ) return true;
+    return (
+      /\bwhat\s+is\s+(?:this|that|the|current|active|open)\s+(?:doc|document|paper)\s+about\b/i.test(normalized) ||
+      /\bwhat\s+is\s+(?:this|that)\s+about\b/i.test(normalized) ||
+      /\b(?:summari[sz]e|explain|describe|give\s+me\s+the\s+gist\s+of)\s+(?:this|that|the|current|active|open)\s+(?:doc|document|paper)\b/i.test(
+        normalized,
+      ) ||
+      /\b(?:summari[sz]e|explain|describe|give\s+me\s+the\s+gist\s+of)\s+(?:(?:this|that)\s+|(?:the\s+)?(?:current|active|open)\s+)[\w-]{1,40}\s+(?:doc|document|paper)\b/i.test(
+        normalized,
+      ) ||
+      /\bwhat\s+(?:is|are)\s+(?:the\s+)?(?:main\s+)?(?:point|points|claim|claims|takeaways?)\s+(?:of|from)\s+(?:this|that|the|current|active|open)\s+(?:doc|document|paper)\b/i.test(
+        normalized,
+      )
+    );
+  };
+
+  return {
+    isAskTurnActiveDocSummaryIntent,
+  };
+};
+
 export const HELIX_ASK_OPEN_DOC_NOUN_PATTERN = String.raw`(?:doc|docs|document|documents|paper|papers|writeup|writeups|artifact|artifacts|result|results|thing|things|report|reports|file|files)`;
 export const HELIX_ASK_RECENT_DOC_PATTERN = String.raw`(?:latest|newest|freshest|most\s+recent|recent)`;
 
