@@ -32,3 +32,21 @@ export const trimAskTurnProtectedTitleArgBoundaries = (value: string): string =>
   }
   return normalized.replace(/[.?!]+$/, "").trim();
 };
+
+export const resolveAskTurnTextArg = (transcript: string): string | null => {
+  const colonMatch = transcript.match(/:\s*([\s\S]+)$/);
+  if (colonMatch?.[1]?.trim()) return colonMatch[1].trim();
+  const quotedMatch = transcript.match(/"([^"]+)"/);
+  if (quotedMatch?.[1]?.trim()) return quotedMatch[1].trim();
+  return null;
+};
+
+export const resolveAskTurnTitleArg = (transcript: string): string | null => {
+  const quoted = transcript.match(/"(.*?)"/);
+  if (quoted?.[1]?.trim()) return trimAskTurnProtectedTitleArgBoundaries(quoted[1]);
+  const called = transcript.match(/\b(?:called|named|title)\s+(.+?)(?:\s*(?:,|\band then\b|\bthen\b|\bafter that\b|\bwhile\b|\balso\b)\s+|$)/i);
+  if (called?.[1]?.trim()) return trimAskTurnProtectedTitleArgBoundaries(called[1]);
+  const noteTitle = transcript.match(/\bnote\s+(.+?)(?:\s*(?:,|\band then\b|\bthen\b|\bafter that\b|\bwhile\b|\balso\b)\s+|$)/i);
+  if (noteTitle?.[1]?.trim()) return trimAskTurnProtectedTitleArgBoundaries(noteTitle[1]);
+  return null;
+};

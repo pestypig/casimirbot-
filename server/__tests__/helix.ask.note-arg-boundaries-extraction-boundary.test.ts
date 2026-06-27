@@ -5,6 +5,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   createAskTurnActionArgBoundaryTrimmer,
+  resolveAskTurnTextArg,
+  resolveAskTurnTitleArg,
   trimAskTurnProtectedTitleArgBoundaries,
 } from "../services/helix-ask/note-arg-boundaries";
 
@@ -21,8 +23,12 @@ describe("Helix Ask note arg boundary extraction boundary", () => {
     expect(routeSource).toContain("createAskTurnActionArgBoundaryTrimmer({");
     expect(routeSource).not.toMatch(/const\s+trimAskTurnActionArgBoundaries\s*=\s*\(value/);
     expect(routeSource).not.toMatch(/const\s+trimAskTurnProtectedTitleArgBoundaries\s*=/);
+    expect(routeSource).not.toMatch(/const\s+resolveAskTurnTextArg\s*=\s*\(transcript/);
+    expect(routeSource).not.toMatch(/const\s+resolveAskTurnTitleArg\s*=\s*\(transcript/);
     expect(serviceSource).toMatch(/export\s+const\s+createAskTurnActionArgBoundaryTrimmer\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+trimAskTurnProtectedTitleArgBoundaries\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+resolveAskTurnTextArg\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+resolveAskTurnTitleArg\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");
     expect(serviceSource).not.toContain("../routes/agi.plan");
   });
@@ -35,5 +41,14 @@ describe("Helix Ask note arg boundary extraction boundary", () => {
     expect(boundedTrim("field notes explain later")).toBe("field notes");
     expect(unboundedTrim('"field notes, then summarize the doc."')).toBe("field notes, then summarize the doc");
     expect(trimAskTurnProtectedTitleArgBoundaries('"field notes, then open docs."')).toBe("field notes");
+  });
+
+  it("preserves basic text and title argument readers", () => {
+    expect(resolveAskTurnTextArg("write this: alpha beta")).toBe("alpha beta");
+    expect(resolveAskTurnTextArg('write "quoted text"')).toBe("quoted text");
+    expect(resolveAskTurnTextArg("write without explicit content")).toBeNull();
+    expect(resolveAskTurnTitleArg('create note "Field Notes, then read docs"')).toBe("Field Notes");
+    expect(resolveAskTurnTitleArg("create note called Field Notes, then read docs")).toBe("Field Notes");
+    expect(resolveAskTurnTitleArg("create note Field Notes, then read docs")).toBe("Field Notes");
   });
 });
