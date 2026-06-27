@@ -1,0 +1,152 @@
+import {
+  collectHelixRuntimeComposerInternetSearchSupportRefs,
+  collectHelixRuntimeComposerScholarlySupportRefs,
+  type HelixRuntimeComposerSupportRefArtifact,
+} from "./runtime-composer-support-refs";
+
+type RecordLike = Record<string, unknown>;
+
+const readComposerFallbackString = (value: unknown): string | null =>
+  typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+
+const readComposerFallbackPayloadRecord = (
+  artifact: HelixRuntimeComposerSupportRefArtifact,
+): RecordLike | null =>
+  artifact.payload && typeof artifact.payload === "object" && !Array.isArray(artifact.payload)
+    ? (artifact.payload as RecordLike)
+    : null;
+
+const readComposerFallbackScalarText = (value: unknown): string | null => {
+  const stringValue = readComposerFallbackString(value);
+  if (stringValue) return stringValue;
+  return typeof value === "number" && Number.isFinite(value) ? String(value) : null;
+};
+
+const clipComposerFallbackText = (value: string | undefined, limit: number): string => {
+  if (!value) return "";
+  if (value.length <= limit) return value;
+  return `${value.slice(0, limit)}...`;
+};
+
+export const buildHelixScholarlyResearchFallbackText = (args: {
+  prompt: string;
+  artifacts: HelixRuntimeComposerSupportRefArtifact[];
+}): string | null => {
+  const lookupPayload = [...args.artifacts]
+    .reverse()
+    .filter((artifact) => artifact.kind === "scholarly_research_observation")
+    .map((artifact) => readComposerFallbackPayloadRecord(artifact))
+    .find((payload): payload is RecordLike => Boolean(payload)) ?? null;
+  const fullTextPayload = [...args.artifacts]
+    .reverse()
+    .filter((artifact) => artifact.kind === "scholarly_full_text_observation")
+    .map((artifact) => readComposerFallbackPayloadRecord(artifact))
+    .find((payload): payload is RecordLike => Boolean(payload)) ?? null;
+  if (!lookupPayload && !fullTextPayload) return null;
+
+  const papers = Array.isArray(lookupPayload?.papers) ? lookupPayload.papers : [];
+  const firstPaper = papers
+    .map((paper) => (paper && typeof paper === "object" && !Array.isArray(paper) ? (paper as RecordLike) : null))
+    .find((paper): paper is RecordLike => Boolean(paper)) ?? null;
+  const identifiers = firstPaper?.identifiers && typeof firstPaper.identifiers === "object" && !Array.isArray(firstPaper.identifiers)
+    ? (firstPaper.identifiers as RecordLike)
+    : {};
+  const authors = Array.isArray(firstPaper?.authors)
+    ? firstPaper.authors
+        .map((author) => author && typeof author === "object" && !Array.isArray(author) ? readComposerFallbackString((author as RecordLike).name) : readComposerFallbackString(author))
+        .filter((entry): entry is string => Boolean(entry))
+        .slice(0, 3)
+    : [];
+  const title =
+    readComposerFallbackString(firstPaper?.title) ??
+    readComposerFallbackString(fullTextPayload?.paper_title) ??
+    readComposerFallbackString(fullTextPayload?.title) ??
+    "selected paper";
+  const year = readComposerFallbackScalarText(firstPaper?.year);
+  const idText = [
+    readComposerFallbackString(identifiers.arxiv_id) ? `arXiv:${readComposerFallbackString(identifiers.arxiv_id)}` : null,
+    readComposerFallbackString(identifiers.doi) ? `DOI:${readComposerFallbackString(identifiers.doi)}` : null,
+  ].filter((entry): entry is string => Boolean(entry)).join(", ");
+
+  const lines = [
+    `Paper: ${title}${authors.length ? `, ${authors.join(", ")}` : ""}${year ? ` (${year})` : ""}${idText ? ` [${idText}]` : ""}.`,
+  ];
+  const selectedChunks = Array.isArray(fullTextPayload?.selected_chunks) ? fullTextPayload.selected_chunks : [];
+  const chunkLines = selectedChunks
+    .map((chunk) => (chunk && typeof chunk === "object" && !Array.isArray(chunk) ? (chunk as RecordLike) : null))
+    .filter((chunk): chunk is RecordLike => Boolean(chunk))
+    .slice(0, 5)
+    .map((chunk) => {
+      const pageStart = readComposerFallbackScalarText(chunk.page_start);
+      const pageEnd = readComposerFallbackScalarText(chunk.page_end);
+      const pageLabel = pageStart
+        ? pageEnd && pageEnd !== pageStart
+          ? `pages ${pageStart}-${pageEnd}`
+          : `page ${pageStart}`
+        : "selected excerpt";
+      const ref =
+        readComposerFallbackString(chunk.chunk_ref) ??
+        readComposerFallbackString(chunk.source_text_ref) ??
+        readComposerFallbackString(chunk.citation_ref);
+      const excerpt = clipComposerFallbackText(
+        readComposerFallbackString(chunk.summary) ?? readComposerFallbackString(chunk.text_excerpt) ?? "",
+        420,
+      );
+      return excerpt ? `- ${pageLabel}${ref ? ` (${ref})` : ""}: ${excerpt}` : null;
+    })
+    .filter((entry): entry is string => Boolean(entry));
+
+  if (chunkLines.length > 0) {
+    lines.push("Relevant PDF/full-text excerpts selected for this prompt:");
+    lines.push(...chunkLines);
+  } else if (papers.length > 0) {
+    lines.push("I found paper metadata, but no selected full-text chunks were available for extraction in this turn.");
+  }
+
+  const supportRefs = collectHelixRuntimeComposerScholarlySupportRefs(args.artifacts);
+  if (supportRefs.length > 0) {
+    lines.push(`Support refs: ${supportRefs.slice(0, 8).join("; ")}.`);
+  }
+  return lines.join("\n");
+};
+
+export const buildHelixInternetSearchFallbackText = (args: {
+  prompt: string;
+  artifacts: HelixRuntimeComposerSupportRefArtifact[];
+}): string | null => {
+  const observationPayload = [...args.artifacts]
+    .reverse()
+    .filter((artifact) => artifact.kind === "internet_search_observation")
+    .map((artifact) => readComposerFallbackPayloadRecord(artifact))
+    .find((payload): payload is RecordLike => Boolean(payload)) ?? null;
+  if (!observationPayload) return null;
+  const results = Array.isArray(observationPayload.results) ? observationPayload.results : [];
+  const resultLines = results
+    .map((result) => (result && typeof result === "object" && !Array.isArray(result) ? (result as RecordLike) : null))
+    .filter((result): result is RecordLike => Boolean(result))
+    .slice(0, 5)
+    .map((result) => {
+      const title = readComposerFallbackString(result.title) ?? readComposerFallbackString(result.url) ?? "web result";
+      const url = readComposerFallbackString(result.url);
+      const snippet = clipComposerFallbackText(
+        readComposerFallbackString(result.snippet) ?? readComposerFallbackString(result.summary) ?? "",
+        420,
+      );
+      return `- ${title}${url ? ` (${url})` : ""}${snippet ? `: ${snippet}` : ""}`;
+    });
+  if (resultLines.length === 0) {
+    const missing = Array.isArray(observationPayload.missing_requirements)
+      ? observationPayload.missing_requirements.map((entry) => readComposerFallbackString(entry)).filter((entry): entry is string => Boolean(entry))
+      : [];
+    return `Internet search did not return selected web results${missing.length ? ` (${missing.join(", ")})` : ""}.`;
+  }
+  const lines = [
+    "Web sources found for the prompt:",
+    ...resultLines,
+  ];
+  const supportRefs = collectHelixRuntimeComposerInternetSearchSupportRefs(args.artifacts);
+  if (supportRefs.length > 0) {
+    lines.push(`Support refs: ${supportRefs.slice(0, 8).join("; ")}.`);
+  }
+  return lines.join("\n");
+};
