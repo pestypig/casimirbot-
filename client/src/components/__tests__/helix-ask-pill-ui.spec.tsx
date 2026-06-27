@@ -1420,6 +1420,10 @@ describe("HelixAskPill mic-first surface contract", () => {
 
   it("renders the Codex-style turn transcript ahead of raw plan/debug blocks", () => {
     const source = fs.readFileSync(pillPath, "utf8");
+    const activeStreamSource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/lib/helix/ask-active-turn-stream.ts"),
+      "utf8",
+    );
     expect(source).toContain("buildHelixTurnTranscriptRows");
     expect(source).toContain("buildHelixContinuousTurnStreamRows");
     expect(source).toContain("buildHelixCausalTurnTraceRows");
@@ -1448,11 +1452,12 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("askReplyListBottomRef");
     expect(source).toContain("scrollIntoView({ behavior, block: \"end\" })");
     expect(source).toContain("askReplyListPinnedToBottomRef.current = true");
-    expect(source).toContain("LOW_SIGNAL_ASK_LIVE_TRANSCRIPT_PATTERNS");
-    expect(source).toContain("shouldShowAskLiveAgenticEventRow");
-    expect(source).toContain("live turn completed");
-    expect(source).toContain("live question");
-    expect(source).toContain("/^model decision:\\s*.+\\.?$/i");
+    expect(source).toContain('from "@/lib/helix/ask-active-turn-stream"');
+    expect(activeStreamSource).toContain("LOW_SIGNAL_ASK_LIVE_TRANSCRIPT_PATTERNS");
+    expect(activeStreamSource).toContain("shouldShowAskLiveAgenticEventRow");
+    expect(activeStreamSource).toContain("live turn completed");
+    expect(activeStreamSource).toContain("live question");
+    expect(activeStreamSource).toContain("/^model decision:\\s*.+\\.?$/i");
     expect(source).not.toContain("askLiveStatusText");
     expect(source).toContain("helixAskSessionContextRef.current === normalizedContextId");
     expect(source).toContain("ensureContextSession(normalizedContextId, \"Helix Ask\")");

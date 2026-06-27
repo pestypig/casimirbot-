@@ -78,6 +78,14 @@ import {
   buildObserverPlanItemCompletedEvent,
   buildWorkstationProceduralStepEvent,
 } from "@/lib/helix/ask-observer-events";
+import {
+  attachHelixAskClientTraceToLiveEvent,
+  buildAskLiveAgenticEventRows,
+  buildHelixActiveTurnStreamRows,
+  createHelixAskConsoleStreamIngressDebug,
+  filterHelixAskActiveTurnStreamRows,
+  shouldAdmitHelixAskExternalLiveEventToActiveStream,
+} from "@/lib/helix/ask-active-turn-stream";
 export {
   buildNeedsRetrievalPlanEvent,
   buildObserverFinalizationEvent,
@@ -85,6 +93,14 @@ export {
   buildObserverPlanDeltaEvent,
   buildObserverPlanItemCompletedEvent,
   buildWorkstationProceduralStepEvent,
+};
+export {
+  attachHelixAskClientTraceToLiveEvent,
+  buildAskLiveAgenticEventRows,
+  buildHelixActiveTurnStreamRows,
+  createHelixAskConsoleStreamIngressDebug,
+  filterHelixAskActiveTurnStreamRows,
+  shouldAdmitHelixAskExternalLiveEventToActiveStream,
 };
 import {
   buildVisibleResolvedTurn,
@@ -6828,36 +6844,6 @@ type HelixAskConsoleStreamIngressDebug = {
   lastUpdatedAtMs: number | null;
 };
 
-export function createHelixAskConsoleStreamIngressDebug(input?: {
-  turnId?: string | null;
-  traceId?: string | null;
-  startedAtMs?: number | null;
-}): HelixAskConsoleStreamIngressDebug {
-  return {
-    schema: "helix.ask.console_stream_ingress_debug.v1",
-    turnId: coerceText(input?.turnId).trim() || null,
-    traceId: coerceText(input?.traceId).trim() || null,
-    startedAtMs:
-      typeof input?.startedAtMs === "number" && Number.isFinite(input.startedAtMs)
-        ? Math.trunc(input.startedAtMs)
-        : null,
-    rawStreamPacketCount: 0,
-    transcriptPacketCount: 0,
-    acceptedLiveEventCount: 0,
-    replayedTranscriptEventCount: 0,
-    droppedEventCount: 0,
-    droppedReasons: {},
-    terminalTranscriptEventCount: 0,
-    nonTranscriptPacketCount: 0,
-    lastEventName: null,
-    lastTranscriptType: null,
-    lastAcceptedEventId: null,
-    lastAcceptedText: null,
-    lastDropReason: null,
-    lastUpdatedAtMs: null,
-  };
-}
-
 function incrementHelixAskConsoleDropReason(
   droppedReasons: Record<string, number>,
   reason: string,
@@ -9192,14 +9178,6 @@ function toneForStagePlayLedgerEvent(event: StagePlayChatLedgerEvent): HelixCont
   return "working";
 }
 
-function toneForAskLiveAgenticEventRow(row: AskLiveAgenticEventRow): HelixContinuousTurnStreamTone {
-  if (row.tone === "observation") return "observation";
-  if (row.tone === "decision") return "checkpoint";
-  if (row.tone === "warning") return "warning";
-  if (row.tone === "final") return "final";
-  return "working";
-}
-
 function readHelixMailLoopTranscriptRow(value: unknown): HelixMailLoopTranscriptRow | null {
   const record = readAgentLoopAuditRecord(value);
   const rowKind = coerceText(record?.rowKind).trim() as HelixMailLoopTranscriptRowKind;
@@ -9937,54 +9915,6 @@ function buildHelixContinuousTurnStreamRows(args: {
   return rows;
 }
 
-export function buildHelixActiveTurnStreamRows(args: {
-  question?: string | null;
-  eventRows: AskLiveAgenticEventRow[];
-  draftText?: string | null;
-}): HelixContinuousTurnStreamRow[] {
-  const rows: HelixContinuousTurnStreamRow[] = [];
-  const question = (args.question ?? "").trim();
-  if (question) {
-    rows.push({
-      key: "active-stream-question",
-      source: "question",
-      label: "Question",
-      text: question,
-      meta: "current prompt",
-      status: "submitted",
-      tone: "question",
-      evidenceRefs: [],
-    });
-  }
-  args.eventRows.forEach((row) => {
-    rows.push({
-      key: `${row.key}-active-stream`,
-      source: "agent_work",
-      label: row.label,
-      text: row.text,
-      meta: row.meta,
-      status: row.tone,
-      tone: toneForAskLiveAgenticEventRow(row),
-      evidenceRefs: [],
-    });
-  });
-  const draftText = (args.draftText ?? "").trim();
-  if (draftText && !rows.some((row) => row.text.trim() === draftText)) {
-    rows.push({
-      key: "active-stream-draft",
-      source: "agent_work",
-      label: "Working",
-      text: draftText,
-      meta: "streaming draft",
-      status: "running",
-      tone: "working",
-      evidenceRefs: [],
-      detailLimit: 420,
-    });
-  }
-  return rows;
-}
-
 function resolveHelixAskReplyOrderMs(reply: HelixAskReply): number | null {
   const record = readAgentLoopAuditRecord(reply);
   const debug = readAgentLoopAuditRecord(reply.debug);
@@ -10154,57 +10084,6 @@ export function shouldRenderHelixAskActiveTurnStream(input: {
   }
   if (!activeTurnId && activeStartedAtMs === null) return false;
   return true;
-}
-
-function collectHelixAskExternalLiveEventIdentityKeys(input: {
-  eventTraceId?: string | null;
-  eventMeta?: Record<string, unknown> | null;
-}): string[] {
-  const meta = input.eventMeta ?? null;
-  return Array.from(new Set([
-    coerceText(input.eventTraceId).trim(),
-    coerceText(meta?.traceId).trim(),
-    coerceText(meta?.trace_id).trim(),
-    coerceText(meta?.turnKey).trim(),
-    coerceText(meta?.turn_key).trim(),
-    coerceText(meta?.turnId).trim(),
-    coerceText(meta?.turn_id).trim(),
-    coerceText(meta?.askTurnId).trim(),
-    coerceText(meta?.ask_turn_id).trim(),
-    coerceText(meta?.activeTurnId).trim(),
-    coerceText(meta?.active_turn_id).trim(),
-  ].filter(Boolean)));
-}
-
-export function shouldAdmitHelixAskExternalLiveEventToActiveStream(input: {
-  askBusy: boolean;
-  activeTurnId?: string | null;
-  activeTraceId?: string | null;
-  eventTraceId?: string | null;
-  eventMeta?: Record<string, unknown> | null;
-}): boolean {
-  if (!input.askBusy) return false;
-  const activeKeys = new Set([
-    coerceText(input.activeTurnId).trim(),
-    coerceText(input.activeTraceId).trim(),
-  ].filter(Boolean));
-  if (activeKeys.size === 0) return false;
-  return collectHelixAskExternalLiveEventIdentityKeys({
-    eventTraceId: input.eventTraceId,
-    eventMeta: input.eventMeta,
-  }).some((key) => activeKeys.has(key));
-}
-
-export function filterHelixAskActiveTurnStreamRows(
-  rows: HelixContinuousTurnStreamRow[],
-  options?: {
-    includeTerminalRows?: boolean;
-  },
-): HelixContinuousTurnStreamRow[] {
-  if (!rows.length) return rows;
-  if (options?.includeTerminalRows) return rows;
-  const hasTerminalRow = rows.some((row) => row.tone === "final" || row.source === "final" || row.status === "final");
-  return hasTerminalRow ? [] : rows;
 }
 
 function readHelixContinuousTurnStreamRowClass(tone: HelixContinuousTurnStreamTone): string {
@@ -12477,37 +12356,6 @@ function buildAskLiveEventFromTurnTranscriptRecord(
   };
 }
 
-export function attachHelixAskClientTraceToLiveEvent(
-  event: AskLiveEventEntry,
-  input: {
-    traceId?: string | null;
-    turnId?: string | null;
-  },
-): AskLiveEventEntry {
-  const meta = asObjectRecord(event.meta) ?? {};
-  const clientTraceId = coerceText(input.traceId).trim();
-  const clientTurnId = coerceText(input.turnId ?? input.traceId).trim();
-  const backendTurnId = coerceText(meta.turn_id ?? meta.turnId ?? meta.active_turn_id ?? meta.activeTurnId).trim();
-  const nextMeta: Record<string, unknown> = {
-    ...meta,
-  };
-  if (clientTraceId) {
-    nextMeta.trace_id = clientTraceId;
-    nextMeta.ask_trace_id = clientTraceId;
-  }
-  if (clientTurnId) {
-    nextMeta.active_turn_id = clientTurnId;
-    nextMeta.client_active_turn_id = clientTurnId;
-  }
-  if (backendTurnId && clientTurnId && backendTurnId !== clientTurnId) {
-    nextMeta.backend_turn_id = backendTurnId;
-  }
-  return {
-    ...event,
-    meta: nextMeta,
-  };
-}
-
 function resolveAskLiveEventTimestampMs(event: AskLiveEventEntry): number | null {
   if (typeof event.tsMs === "number" && Number.isFinite(event.tsMs)) {
     return event.tsMs;
@@ -12585,10 +12433,6 @@ function formatAskLiveEventLogLine(event: AskLiveEventEntry): string {
   return `[${timestamp}] ${parts.join(" | ")} | text=${text}`;
 }
 
-function isAskLiveEventSuperseded(event: AskLiveEventEntry): boolean {
-  return Boolean(event.meta && String(event.meta.status ?? "").trim() === "superseded");
-}
-
 function buildAskLiveEventLogExport(events: AskLiveEventEntry[]): string {
   if (!events.length) return "";
   return events.map((event) => formatAskLiveEventLogLine(event)).join("\n");
@@ -12602,135 +12446,6 @@ function humanizeAskLiveEventToken(value: string): string {
     .trim();
   if (!cleaned) return "";
   return cleaned.replace(/\b(?:llm|api|id|url|ui)\b/gi, (token) => token.toUpperCase());
-}
-
-function resolveAskLiveEventStageParts(event: AskLiveEventEntry): {
-  stage: string;
-  detail: string;
-  body: string;
-} {
-  const meta = asObjectRecord(event.meta);
-  const rawText = (event.text ?? "").trim();
-  const [rawHeader = "", ...bodyLines] = rawText.split(/\n+/);
-  const header = rawHeader.replace(/^Helix Ask:\s*/i, "").trim();
-  const [headerStage = "", ...headerDetailParts] = header.split(/\s+-\s+/);
-  const stage =
-    humanizeAskLiveEventToken(
-      typeof meta?.stage === "string" && meta.stage.trim() ? meta.stage : headerStage,
-    ) || "Agent step";
-  const detail =
-    humanizeAskLiveEventToken(
-      typeof meta?.detail === "string" && meta.detail.trim()
-        ? meta.detail
-        : headerDetailParts.join(" - "),
-    );
-  const body = summarizeVoiceDebugText(bodyLines.join(" "), 180);
-  return { stage, detail, body };
-}
-
-function classifyAskLiveAgenticEventRow(event: AskLiveEventEntry): Pick<
-  AskLiveAgenticEventRow,
-  "label" | "tone"
-> {
-  const meta = asObjectRecord(event.meta);
-  const { stage, detail } = resolveAskLiveEventStageParts(event);
-  const haystack = `${event.tool ?? ""} ${stage} ${detail} ${event.text ?? ""} ${safeJsonStringify(meta ?? {})}`;
-  if (isAskLiveEventWarning(event)) return { label: "Notice", tone: "warning" };
-  if (/\b(final|terminal|complete|completed|answer)\b/i.test(haystack)) {
-    return { label: "Final", tone: "final" };
-  }
-  if (/\b(decision|choose|chosen|selected|route|dispatch|handoff)\b/i.test(haystack)) {
-    return { label: "Decision", tone: "decision" };
-  }
-  if (/\b(done|observed|observation|result|receipt|retrieved|evidence)\b/i.test(haystack)) {
-    return { label: "Observation", tone: "observation" };
-  }
-  if (/\b(llm|model|draft|synthes|reason|think|commentary)\b/i.test(haystack)) {
-    return { label: "Thinking", tone: "thinking" };
-  }
-  return { label: "Working", tone: "default" };
-}
-
-function buildAskLiveAgenticEventText(event: AskLiveEventEntry): string {
-  const meta = asObjectRecord(event.meta);
-  if (
-    String(meta?.stage ?? "").trim() === "public_commentary" ||
-    String(meta?.source_event_type ?? "").trim() === "public_commentary"
-  ) {
-    return clipText(event.text ?? "", 220);
-  }
-  const { stage, detail, body } = resolveAskLiveEventStageParts(event);
-  const combined = `${body} ${stage} ${detail} ${event.text ?? ""}`;
-  const progressNotice = normalizeAskLiveProgressNotice(combined);
-  if (progressNotice !== combined) return progressNotice;
-  const detailLower = detail.toLowerCase();
-  if (body && !/^start$|^done$|^error$/i.test(detail)) {
-    return clipText(body, 180);
-  }
-  if (detailLower === "start") return `${stage} started.`;
-  if (detailLower === "done") return `${stage} finished.`;
-  if (detailLower === "error") return `${stage} hit a problem.`;
-  if (detail) return `${stage}: ${detail}.`;
-  return `${stage}.`;
-}
-
-const LOW_SIGNAL_ASK_LIVE_TRANSCRIPT_PATTERNS: RegExp[] = [
-  /^answer cleaned preview:\s*final\.?$/i,
-  /^citations:\s*optional\.?$/i,
-  /^clipboard copy:\s*live question\b.*$/i,
-  /^clipboard copy:\s*live turn completed\.?$/i,
-  /^finalization finished\.?$/i,
-  /^live turn completed\.?$/i,
-  /^model decision:\s*.+\.?$/i,
-  /^mode gate consistency:\s*ok\.?$/i,
-  /^objective gate consistency:\s*ok\.?$/i,
-  /^rattling gate:\s*pass\.?$/i,
-  /^step started\.?$/i,
-  /^stream visible\.?$/i,
-  /^tool result:\s*artifact contract satisfied\.?$/i,
-  /^turn completed\.?$/i,
-  /^work delta:\s*stream visible\.?$/i,
-];
-
-function shouldShowAskLiveAgenticEventRow(row: AskLiveAgenticEventRow): boolean {
-  if (row.tone === "warning") return true;
-  const normalizedText = row.text.replace(/\s+/g, " ").replace(/\.+$/g, ".").trim();
-  if (!normalizedText) return false;
-  return !LOW_SIGNAL_ASK_LIVE_TRANSCRIPT_PATTERNS.some((pattern) => pattern.test(normalizedText));
-}
-
-export function buildAskLiveAgenticEventRows(
-  events: AskLiveEventEntry[],
-  options?: {
-    includeLowSignalRows?: boolean;
-  },
-): AskLiveAgenticEventRow[] {
-  return events
-    .filter((event) => !isAskLiveEventSuperseded(event))
-    .map((event, index) => {
-      const tsMs = resolveAskLiveEventTimestampMs(event);
-      const timestamp =
-        tsMs === null
-          ? ""
-          : new Date(tsMs).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-              second: "2-digit",
-            });
-      const duration =
-        typeof event.durationMs === "number" && Number.isFinite(event.durationMs)
-          ? `${Math.max(0, Math.round(event.durationMs))}ms`
-          : "";
-      const classified = classifyAskLiveAgenticEventRow(event);
-      return {
-        key: `${event.id}:agentic:${index}`,
-        ...classified,
-        text: buildAskLiveAgenticEventText(event),
-        meta: [timestamp, duration].filter(Boolean).join(" / "),
-      };
-    })
-    .filter((row) => options?.includeLowSignalRows || shouldShowAskLiveAgenticEventRow(row))
-    .slice(-18);
 }
 
 function buildReasoningTheaterFloatingActionText(input: {
@@ -13165,39 +12880,6 @@ function buildAskLiveEventLogDetailPayload(event: AskLiveEventEntry): string {
     meta: event.meta ?? null,
   };
   return safeJsonStringify(payload);
-}
-
-function isAskLiveMissingArtifactProgressText(value: string): boolean {
-  return /\b(?:missing_artifacts|missing_required_artifacts|blocked_missing_artifacts|required artifacts were satisfied|required artifacts are satisfied)\b/i.test(
-    value,
-  );
-}
-
-function isAskLiveTerminalFailureText(value: string): boolean {
-  return /\b(?:final_failure|typed_failure|fail_closed|terminal_error|terminal failure|Cause:)\b/i.test(value);
-}
-
-function normalizeAskLiveProgressNotice(value: string): string {
-  return isAskLiveMissingArtifactProgressText(value) && !isAskLiveTerminalFailureText(value)
-    ? "Waiting for required tool receipt..."
-    : value;
-}
-
-function isAskLiveEventWarning(event: AskLiveEventEntry): boolean {
-  const metaRecord = asObjectRecord(event.meta);
-  const metaOk = typeof metaRecord?.ok === "boolean" ? metaRecord.ok : null;
-  if (metaOk === false) return true;
-  const haystackParts = [event.text ?? "", event.tool ?? ""];
-  if (metaRecord) {
-    haystackParts.push(safeJsonStringify(metaRecord));
-  }
-  const haystack = haystackParts.join(" ");
-  if (isAskLiveMissingArtifactProgressText(haystack) && !isAskLiveTerminalFailureText(haystack)) {
-    return false;
-  }
-  return /\b(error|fail|failed|blocked|fallback|suppressed|unknown_terminal|no_context|unresolved)\b/i.test(
-    haystack,
-  );
 }
 
 function readEventMetaString(

@@ -29,4 +29,29 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(observer).not.toContain("enqueueVoicePlaybackIntent");
     expect(observer).not.toContain("runAskTurn");
   });
+
+  it("keeps pure active-turn stream helpers in the non-React active stream module", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const activeStream = read("client/src/lib/helix/ask-active-turn-stream.ts");
+
+    expect(pill).toContain('from "@/lib/helix/ask-active-turn-stream"');
+    for (const symbol of [
+      "createHelixAskConsoleStreamIngressDebug",
+      "attachHelixAskClientTraceToLiveEvent",
+      "buildAskLiveAgenticEventRows",
+      "buildHelixActiveTurnStreamRows",
+      "shouldAdmitHelixAskExternalLiveEventToActiveStream",
+      "filterHelixAskActiveTurnStreamRows",
+    ]) {
+      expect(pill).not.toContain(`export function ${symbol}`);
+      expect(activeStream).toContain(`export function ${symbol}`);
+    }
+    expect(pill).toContain("export function shouldRenderHelixAskActiveTurnStream");
+    expect(activeStream).not.toMatch(/from ["']react["']/);
+    expect(activeStream).not.toContain("@/store/");
+    expect(activeStream).not.toContain("@/components/helix/HelixAskPill");
+    expect(activeStream).not.toContain("setAskReplies");
+    expect(activeStream).not.toContain("enqueueVoicePlaybackIntent");
+    expect(activeStream).not.toContain("runAskTurn");
+  });
 });
