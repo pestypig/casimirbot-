@@ -1,7 +1,7 @@
 import {
   evaluateVoiceReasoningResponseAuthority,
   evaluateVoiceTurnSealGate,
-} from "@/components/helix/HelixAskPill";
+} from "@/lib/helix/voice/voice-turn-authority";
 import {
   mergeVoiceTranscriptDraft,
 } from "@/lib/helix/voice/voice-transcript";

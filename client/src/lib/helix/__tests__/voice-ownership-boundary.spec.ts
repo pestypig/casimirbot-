@@ -20,4 +20,20 @@ describe("Helix Ask voice ownership boundaries", () => {
     expect(transcript).not.toContain("@/components/helix/HelixAskPill");
   });
 
+  it("keeps voice authority evaluators in the non-React voice authority module", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const harness = read("client/src/lib/helix/turn-loop-harness.ts");
+    const authority = read("client/src/lib/helix/voice/voice-turn-authority.ts");
+
+    expect(pill).toContain('from "@/lib/helix/voice/voice-turn-authority"');
+    expect(harness).toContain('from "@/lib/helix/voice/voice-turn-authority"');
+    expect(harness).not.toContain("@/components/helix/HelixAskPill");
+    expect(pill).not.toMatch(/export function evaluateVoiceTurnSealGate\s*\(/);
+    expect(pill).not.toMatch(/export function evaluateVoiceReasoningResponseAuthority\s*\(/);
+    expect(authority).toMatch(/export function evaluateVoiceTurnSealGate\s*\(/);
+    expect(authority).toMatch(/export function evaluateVoiceReasoningResponseAuthority\s*\(/);
+    expect(authority).not.toMatch(/from ["']react["']/);
+    expect(authority).not.toContain("@/store/");
+    expect(authority).not.toContain("@/components/helix/HelixAskPill");
+  });
 });

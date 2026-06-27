@@ -89,13 +89,29 @@ import {
   mergeVoiceTranscriptDraft,
   resolveVoiceDispatchTranscriptFromDraft,
 } from "@/lib/helix/voice/voice-transcript";
+import {
+  evaluateVoiceReasoningResponseAuthority,
+  evaluateVoiceTurnSealGate,
+  type ReasoningAttemptSource,
+  type ReasoningAttemptStatus,
+  type VoiceReasoningResponseAuthorityDecision,
+} from "@/lib/helix/voice/voice-turn-authority";
 export {
   mergeVoiceTranscriptDraft,
   resolveVoiceDispatchTranscriptFromDraft,
 };
+export {
+  evaluateVoiceReasoningResponseAuthority,
+  evaluateVoiceTurnSealGate,
+};
 export type {
   VoiceDispatchTranscriptSource,
 } from "@/lib/helix/voice/voice-transcript";
+export type {
+  ReasoningAttemptSource,
+  ReasoningAttemptStatus,
+  VoiceReasoningResponseAuthorityDecision,
+} from "@/lib/helix/voice/voice-turn-authority";
 import {
   adoptServerVisualProducerPolicies,
   getActiveVisualFrameStream,
@@ -2136,17 +2152,6 @@ export type ConversationGovernorState = {
   completion_score: CompletionScore;
   narrative_spine: NarrativeSpine;
 };
-
-export type ReasoningAttemptStatus =
-  | "queued"
-  | "running"
-  | "streaming"
-  | "done"
-  | "failed"
-  | "cancelled"
-  | "suppressed";
-
-export type ReasoningAttemptSource = "voice_auto" | "manual";
 
 export type VoiceDecisionLifecycle =
   | "queued"
@@ -4277,26 +4282,6 @@ export function shouldFlushHeldTranscriptFromWatchdog(args: {
   });
 }
 
-export function evaluateVoiceTurnSealGate(args: {
-  sinceLastSpeechMs: number;
-  sttQueueDepth: number;
-  sttInFlight: boolean;
-  heldPending: boolean;
-  hashStableDwellMs: number;
-  closeSilenceMs?: number;
-  hashStableMs?: number;
-}): boolean {
-  const closeSilenceMs = args.closeSilenceMs ?? VOICE_TURN_CLOSE_SILENCE_MS;
-  const hashStableMs = args.hashStableMs ?? VOICE_TURN_HASH_STABLE_DWELL_MS;
-  return (
-    args.sinceLastSpeechMs >= closeSilenceMs &&
-    args.sttQueueDepth <= 0 &&
-    !args.sttInFlight &&
-    !args.heldPending &&
-    args.hashStableDwellMs >= hashStableMs
-  );
-}
-
 export function scoreConversationCompletion(input: {
   transcript: string;
   pauseMs: number;
@@ -4761,126 +4746,6 @@ export function scoreIntentShift(args: {
     return { score, band: "shift", reason: explicitShift ? "explicit_topic_shift" : "semantic_shift" };
   }
   return { score, band: "continuation", reason: "semantic_continuation" };
-}
-
-export type VoiceReasoningResponseAuthorityDecision = {
-  suppress: boolean;
-  reason:
-    | "ok"
-    | "continuation_merged"
-    | "stale_prompt"
-    | "phase_not_sealed"
-    | "seal_token_mismatch"
-    | "sealed_revision_mismatch"
-    | "dispatch_hash_mismatch"
-    | "inactive_attempt";
-  restart: boolean;
-};
-
-export function evaluateVoiceReasoningResponseAuthority(args: {
-  source: ReasoningAttemptSource;
-  continuationRestartRequested: boolean;
-  latestAskPromptForAttempt: string;
-  askPromptForRequest: string;
-  latestAttemptStatus?: ReasoningAttemptStatus;
-  requestIntentRevision?: number;
-  latestIntentRevision?: number;
-  latestAttemptIntentRevision?: number;
-  requestDispatchPromptHash?: string | null;
-  latestDispatchPromptHash?: string | null;
-  attemptTranscriptRevision?: number | null;
-  latestSealedTranscriptRevision?: number | null;
-  attemptSealToken?: string | null;
-  latestSealToken?: string | null;
-  assemblerPhase?: VoiceTurnAssemblerPhase | null;
-}): VoiceReasoningResponseAuthorityDecision {
-  if (args.continuationRestartRequested) {
-    return { suppress: true, reason: "continuation_merged", restart: true };
-  }
-  if (
-    args.latestAttemptStatus === "suppressed" ||
-    args.latestAttemptStatus === "cancelled" ||
-    args.latestAttemptStatus === "failed"
-  ) {
-    return { suppress: true, reason: "inactive_attempt", restart: false };
-  }
-  if (
-    args.latestAskPromptForAttempt.length > 0 &&
-    args.latestAskPromptForAttempt !== args.askPromptForRequest.trim()
-  ) {
-    return { suppress: true, reason: "stale_prompt", restart: true };
-  }
-  if (args.source !== "voice_auto") {
-    return { suppress: false, reason: "ok", restart: false };
-  }
-  if (args.assemblerPhase && args.assemblerPhase !== "sealed") {
-    return { suppress: true, reason: "phase_not_sealed", restart: false };
-  }
-  const attemptTranscriptRevision =
-    typeof args.attemptTranscriptRevision === "number" && Number.isFinite(args.attemptTranscriptRevision)
-      ? Math.max(0, Math.floor(args.attemptTranscriptRevision))
-      : null;
-  const latestSealedTranscriptRevision =
-    typeof args.latestSealedTranscriptRevision === "number" &&
-    Number.isFinite(args.latestSealedTranscriptRevision)
-      ? Math.max(0, Math.floor(args.latestSealedTranscriptRevision))
-      : null;
-  if (
-    attemptTranscriptRevision !== null &&
-    latestSealedTranscriptRevision !== null &&
-    attemptTranscriptRevision !== latestSealedTranscriptRevision
-  ) {
-    return { suppress: true, reason: "sealed_revision_mismatch", restart: false };
-  }
-  const attemptSealToken = args.attemptSealToken?.trim() || null;
-  const latestSealToken = args.latestSealToken?.trim() || null;
-  if (attemptSealToken && latestSealToken && attemptSealToken !== latestSealToken) {
-    return { suppress: true, reason: "seal_token_mismatch", restart: false };
-  }
-  const requestIntentRevision =
-    typeof args.requestIntentRevision === "number" && Number.isFinite(args.requestIntentRevision)
-      ? args.requestIntentRevision
-      : null;
-  const latestIntentRevision =
-    typeof args.latestIntentRevision === "number" && Number.isFinite(args.latestIntentRevision)
-      ? args.latestIntentRevision
-      : null;
-  const latestAttemptIntentRevision =
-    typeof args.latestAttemptIntentRevision === "number" &&
-    Number.isFinite(args.latestAttemptIntentRevision)
-      ? args.latestAttemptIntentRevision
-      : null;
-  if (
-    requestIntentRevision !== null &&
-    latestAttemptIntentRevision !== null &&
-    requestIntentRevision !== latestAttemptIntentRevision
-  ) {
-    return { suppress: true, reason: "sealed_revision_mismatch", restart: true };
-  }
-  if (
-    requestIntentRevision !== null &&
-    latestIntentRevision !== null &&
-    requestIntentRevision < latestIntentRevision
-  ) {
-    return { suppress: true, reason: "sealed_revision_mismatch", restart: true };
-  }
-  if (
-    latestAttemptIntentRevision !== null &&
-    latestIntentRevision !== null &&
-    latestAttemptIntentRevision < latestIntentRevision
-  ) {
-    return { suppress: true, reason: "sealed_revision_mismatch", restart: true };
-  }
-  const requestDispatchPromptHash = args.requestDispatchPromptHash?.trim() || null;
-  const latestDispatchPromptHash = args.latestDispatchPromptHash?.trim() || null;
-  if (
-    requestDispatchPromptHash !== null &&
-    latestDispatchPromptHash !== null &&
-    requestDispatchPromptHash !== latestDispatchPromptHash
-  ) {
-    return { suppress: true, reason: "dispatch_hash_mismatch", restart: true };
-  }
-  return { suppress: false, reason: "ok", restart: false };
 }
 
 function resolveVoiceAuthoritySuppression(
