@@ -7,6 +7,7 @@ import {
   cleanupAskTurnOpenDocSearchTopic,
   createAskTurnLatestDocIntentReaders,
   extractAskTurnDocPathArgs,
+  isAskTurnReadAloudRequested,
   isAskTurnDocsPanelOpenIntent,
   isAskTurnTopicQualifiedLatestDocIntent,
   normalizeAskTurnLatestDocTopicText,
@@ -30,6 +31,7 @@ describe("Helix Ask doc args extraction boundary", () => {
     expect(routeSource).toContain("../services/helix-ask/doc-args");
     expect(routeSource).not.toMatch(/const\s+extractAskTurnDocPathArgs\s*=\s*\(transcript/);
     expect(routeSource).not.toMatch(/const\s+resolveAskTurnDocPathArg\s*=\s*\(transcript/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnReadAloudRequested\s*=\s*\(transcript/);
     expect(routeSource).not.toMatch(/const\s+normalizeAskTurnLatestDocTopicText\s*=/);
     expect(routeSource).not.toMatch(/const\s+resolveAskTurnLatestDocTopicArg\s*=/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnTopicQualifiedLatestDocIntent\s*=/);
@@ -49,6 +51,7 @@ describe("Helix Ask doc args extraction boundary", () => {
     expect(routeSource).toContain("createAskTurnLatestDocIntentReaders({");
     expect(serviceSource).toMatch(/export\s+const\s+extractAskTurnDocPathArgs\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+resolveAskTurnDocPathArg\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+isAskTurnReadAloudRequested\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+tokenizeAskTurnDocTopic\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+normalizeAskTurnLatestDocTopicText\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+resolveAskTurnLatestDocTopicArg\s*=/);
@@ -76,6 +79,9 @@ describe("Helix Ask doc args extraction boundary", () => {
       "/docs/research/nhm2-deeper-reformulation-decision-memo-2026-04-02.md",
     );
     expect(resolveAskTurnDocPathArg("no explicit path here")).toBeNull();
+    expect(isAskTurnReadAloudRequested("Read this document aloud.")).toBe(true);
+    expect(isAskTurnReadAloudRequested("Narrate it to me.")).toBe(true);
+    expect(isAskTurnReadAloudRequested("Summarize this document silently.")).toBe(false);
   });
 
   it("preserves latest-doc topic and acquisition prompt readers", () => {

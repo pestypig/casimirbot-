@@ -16,6 +16,13 @@ export const resolveAskTurnDocPathArg = (transcript: string): string | null => {
   return null;
 };
 
+export const isAskTurnReadAloudRequested = (transcript: string): boolean =>
+  /\b(?:read|speak|say|narrate|voice)\b[\s\S]{0,80}\b(?:aloud|out\s*loud|outloud|to\s+me|this|it|the\s+(?:doc|document|file|source|audit|artifact))\b/i.test(
+    transcript,
+  ) ||
+  /\b(?:read|speak|say|narrate)\s+(?:it|this|the\s+(?:doc|document|file|source|audit|artifact))\b/i.test(transcript) ||
+  /\b(?:read|speak|say|narrate)\s+(?:aloud|out\s*loud|outloud)\b/i.test(transcript);
+
 export const HELIX_ASK_OPEN_DOC_NOUN_PATTERN = String.raw`(?:doc|docs|document|documents|paper|papers|writeup|writeups|artifact|artifacts|result|results|thing|things|report|reports|file|files)`;
 export const HELIX_ASK_RECENT_DOC_PATTERN = String.raw`(?:latest|newest|freshest|most\s+recent|recent)`;
 
