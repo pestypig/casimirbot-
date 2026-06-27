@@ -50,3 +50,33 @@ export const resolveAskTurnTitleArg = (transcript: string): string | null => {
   if (noteTitle?.[1]?.trim()) return trimAskTurnProtectedTitleArgBoundaries(noteTitle[1]);
   return null;
 };
+
+export const isAskTurnDeicticNoteLabel = (value: string | null | undefined): boolean => {
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[?!.;,:"'`]+$/g, "")
+    .replace(/\s+/g, " ");
+  return /^(?:that|this|it|the|my|active|current)(?:\s+note|\s+notepad)?$/.test(normalized) ||
+    /^(?:the\s+)?(?:note\s+)?i\s+just\s+created(?:\s+note|\s+notepad)?$/.test(normalized) ||
+    /^(?:the\s+)?(?:last|latest|recent|newly)\s+(?:created\s+)?(?:note|notepad)$/.test(normalized) ||
+    /^(?:just\s+created|newly\s+created)(?:\s+note|\s+notepad)?$/.test(normalized);
+};
+
+export const isAskTurnDeicticNoteTarget = (value: string | null | undefined): boolean => {
+  return isAskTurnDeicticNoteLabel(value);
+};
+
+export const isAskTurnInvalidResolvedNoteTitle = (value: string | null | undefined): boolean => {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (!normalized) return true;
+  return (
+    /^(?:and|then|also|after|afterwards|list|tell|show|explain|summari[sz]e|compare|difference|differences|deltas?)$/.test(
+      normalized,
+    ) ||
+    /^(?:and|then|also|afterwards?)\b/i.test(normalized) ||
+    /^(?:tell|show|list|explain|summari[sz]e)\s+(?:me|the|main|key|differences|deltas)\b/i.test(normalized) ||
+    /^(?:against|with|versus|vs\.?|to)\s+(?:the\s+)?(?:doc|docs|document|paper)\b/i.test(normalized) ||
+    /\b(?:doc|docs|document|paper)\b[\s\S]*\b(?:tell|show|list|captured|main\s+point|takeaway|summary)\b/i.test(normalized)
+  );
+};
