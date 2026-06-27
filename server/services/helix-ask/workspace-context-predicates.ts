@@ -66,3 +66,8 @@ export const isAskTurnWorkspaceChangeSummaryIntent = (transcript: string): boole
 export const isAskTurnWorkspaceHelpIntent = (transcript: string): boolean =>
   /\bwhat\s+can\s+you\s+(?:help\s+me\s+do|do|help\s+with)\b[\s\S]*\b(?:workspace|helix|here)\b/i.test(transcript.trim()) ||
   /\bhow\s+do\s+i\s+use\s+(?:this\s+)?(?:workspace|helix\s+ask)\b/i.test(transcript.trim());
+
+export const isAskTurnProcessGraphOverviewIntent = (transcript: string): boolean =>
+  /\b(?:process\s+graph|workstation\s+(?:process\s+)?graph|workstation\s+state)\b/i.test(transcript) ||
+  /\b(?:what|which)\s+panels\s+are\s+open\b/i.test(transcript) ||
+  /\b(?:what|which|show|list)\b[\s\S]{0,40}\b(?:open|active|visible)\s+panels\b/i.test(transcript);

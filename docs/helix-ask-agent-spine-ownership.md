@@ -170,6 +170,7 @@ terminal eligibility, projection discipline, and debug traces.
 | S155 | workspace context predicates | `server/services/helix-ask/workspace-context-predicates.ts` | SERVICE_OWNED for reasoning-context mode and workspace/doc-context predicate helpers only |
 | S156 | workspace context intents | `server/services/helix-ask/workspace-context-predicates.ts` | SERVICE_OWNED for composite workspace status and workspace-change summary intent predicates only |
 | S157 | workspace help intent | `server/services/helix-ask/workspace-context-predicates.ts` | SERVICE_OWNED for workspace-help intent predicate only |
+| S178 | process graph overview intent | `server/services/helix-ask/workspace-context-predicates.ts` | SERVICE_OWNED for process-graph/open-panels overview intent predicate only |
 | S140 | runtime civilization-bounds composer guard | `server/services/helix-ask/runtime/runtime-civilization-bounds-composer-guard.ts` | SERVICE_OWNED for detecting civilization-bounds draft contradictions against supplied receipt evidence only |
 | S141 | post-observation draft text cleanup | `server/services/helix-ask/receipt-framing-suppression.ts` | SERVICE_OWNED for post-observation draft text cleanup and receipt-framing suppression only |
 | S142 | runtime composer artifact collectors | `server/services/helix-ask/runtime/runtime-composer-artifact-collectors.ts` | SERVICE_OWNED for composer receipt/coverage/tool-observation/text-line collection only |

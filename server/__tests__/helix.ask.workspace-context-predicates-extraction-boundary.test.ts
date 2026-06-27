@@ -8,6 +8,7 @@ import {
   isAskTurnCompositeWorkspaceContextStatusIntent,
   isAskTurnDocContextMutatingAction,
   isAskTurnDocContextPreservingAction,
+  isAskTurnProcessGraphOverviewIntent,
   isAskTurnWorkspaceChangeSummaryIntent,
   isAskTurnWorkspaceHelpIntent,
   resolveAskTurnReasoningContextMode,
@@ -30,6 +31,7 @@ describe("Helix Ask workspace context predicates extraction boundary", () => {
     expect(routeSource).not.toMatch(/const\s+isAskTurnCompositeWorkspaceContextStatusIntent\s*=/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnWorkspaceChangeSummaryIntent\s*=/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnWorkspaceHelpIntent\s*=/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnProcessGraphOverviewIntent\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+resolveAskTurnReasoningContextMode\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+createShouldUseAskTurnDeicticWorkspaceContext\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnDocContextMutatingAction\s*=/);
@@ -37,6 +39,7 @@ describe("Helix Ask workspace context predicates extraction boundary", () => {
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnCompositeWorkspaceContextStatusIntent\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnWorkspaceChangeSummaryIntent\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnWorkspaceHelpIntent\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+isAskTurnProcessGraphOverviewIntent\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");
     expect(serviceSource).not.toContain("../routes/agi.plan");
   });
@@ -72,5 +75,12 @@ describe("Helix Ask workspace context predicates extraction boundary", () => {
     expect(isAskTurnWorkspaceHelpIntent("What can you help me do in this workspace?")).toBe(true);
     expect(isAskTurnWorkspaceHelpIntent("How do I use Helix Ask?")).toBe(true);
     expect(isAskTurnWorkspaceHelpIntent("Summarize this document")).toBe(false);
+  });
+
+  it("preserves process graph overview classifier behavior", () => {
+    expect(isAskTurnProcessGraphOverviewIntent("Show the process graph overview.")).toBe(true);
+    expect(isAskTurnProcessGraphOverviewIntent("Which panels are open?")).toBe(true);
+    expect(isAskTurnProcessGraphOverviewIntent("List visible panels.")).toBe(true);
+    expect(isAskTurnProcessGraphOverviewIntent("Summarize this document.")).toBe(false);
   });
 });
