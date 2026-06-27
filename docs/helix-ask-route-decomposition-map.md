@@ -2,7 +2,7 @@
 
 Status: current-head map for structural extraction and decomposition-enabler work.
 
-Pinned source state described: S148 runtime-live-environment-fallback-text extraction.
+Pinned source state described: S149 capability-catalog-summary extraction.
 
 Snapshot command: `npx tsx scripts/helix-ask-route-inventory.ts --write`
 
@@ -11,8 +11,8 @@ Route snapshot:
 | Metric | Value |
 | --- | ---: |
 | File | `server/routes/agi.plan.ts` |
-| Lines | 177,404 |
-| Bytes | 7,972,023 |
+| Lines | 177,395 |
+| Bytes | 7,970,286 |
 | Top-level helper estimate | 303 helper blocks |
 | Route inventory | `artifacts/helix-ask-route-inventory.json` |
 | Machine-readable map | `artifacts/helix-ask-route-decomposition-map.json` |
@@ -38,6 +38,7 @@ Do not extract `runHelixAgentTurnRuntimeLoop` in this wave. Do not patch termina
 | `runtime-voice-side-effect-composer` | service-owned | `EVIDENCE_REENTRY` / `FINAL_ANSWER_COMPOSITION_SUPPORT` | `MEDIUM` | `EXTRACTED` | `server/services/helix-ask/runtime/runtime-voice-side-effect-composer.ts` | S137 moved compound interim voice side-effect prompt/fallback/receipt-satisfaction/direct-answer helper logic behind a one-callback factory for the existing route-owned unquoted voice callout extractor. It does not move voice tool execution, live-source phase policy, terminal materialization, terminal authority, or projection behavior. |
 | `runtime-repo-evidence-synthesis-text` | service-owned | `EVIDENCE_REENTRY` / `FINAL_ANSWER_COMPOSITION_SUPPORT` | `MEDIUM` | `EXTRACTED` | `server/services/helix-ask/runtime/runtime-repo-evidence-synthesis-text.ts` | S138 moved deterministic repo evidence synthesis support text into a dedicated runtime service. It does not move repo retrieval, evidence selection, final-answer draft selection, terminal materialization, terminal authority, or projection behavior. |
 | `response-language-instruction` | service-owned | `PROMPT_INTERPRETATION` / `FINAL_ANSWER_COMPOSITION_SUPPORT` | `LOW` | `EXTRACTED` | `server/services/helix-ask/language-contract.ts` | S139 moved response-language instruction construction into the existing language contract owner. It does not move language detection, LLM invocation, terminal materialization, terminal authority, or projection behavior. |
+| `capability-catalog-summary` | service-owned | `FINAL_ANSWER_COMPOSITION_SUPPORT` / `CAPABILITY_CATALOG` | `LOW` | `EXTRACTED` | `server/services/helix-ask/capability-catalog-summary.ts` | S149 moved deterministic capability help summary text construction into a dedicated service. It does not move capability catalog intent detection, observation construction, runtime catalog materialization, terminal materialization, terminal authority, or projection behavior. |
 | `runtime-civilization-bounds-composer-guard` | service-owned | `EVIDENCE_REENTRY` / `FINAL_ANSWER_COMPOSITION_SUPPORT` | `MEDIUM` | `EXTRACTED` | `server/services/helix-ask/runtime/runtime-civilization-bounds-composer-guard.ts` | S140 moved the civilization-bounds draft contradiction guard into a dedicated runtime service. It does not move civilization tool execution, evidence selection, final-answer draft selection, terminal materialization, terminal authority, or projection behavior. |
 | `post-observation-draft-text` | service-owned | `FINAL_ANSWER_COMPOSITION_SUPPORT` / `PRESENTATION_HYGIENE` | `MEDIUM_LOW` | `EXTRACTED` | `server/services/helix-ask/receipt-framing-suppression.ts` | S141 moved post-observation draft text cleanup into the existing receipt-framing suppression owner. It does not move final-answer draft selection, LLM invocation, terminal materialization, terminal authority, or projection behavior. |
 | `runtime-composer-artifact-collectors` | service-owned | `EVIDENCE_REENTRY` / `FINAL_ANSWER_COMPOSITION_SUPPORT` | `MEDIUM` | `EXTRACTED` | `server/services/helix-ask/runtime/runtime-composer-artifact-collectors.ts` | S142 moved composer receipt, coverage, tool-observation, and text-line collectors behind a two-callback factory using route-supplied artifact payload and string readers. It does not move artifact creation, evidence selection, final-answer drafting, terminal materialization, terminal authority, or projection behavior. |
@@ -68,6 +69,7 @@ Do not extract `runHelixAgentTurnRuntimeLoop` in this wave. Do not patch termina
 | `runtime-voice-side-effect-composer` | final-answer composition / evidence re-entry | service-owned | Detect compound interim voice side-effect prompts, build evidence-only receipt explanation fallback text, check explanation sufficiency, and read the latest non-voice direct answer from current artifacts. | Extracted by S137 behind a one-callback dependency for the route-owned unquoted voice callout extractor. It does not execute voice tools, alter live-source phase policy, choose authority, materialize terminal products, or mutate payload/debug state. | `EXTRACTED` |
 | `runtime-repo-evidence-synthesis-text` | final-answer composition / evidence re-entry | service-owned | Build deterministic repo evidence synthesis support text from an already-built repo docs synthesis packet. | Extracted by S138 as pure text construction. It does not select evidence, retrieve repo code, choose authority, materialize terminal products, or mutate payload/debug state. | `EXTRACTED` |
 | `response-language-instruction` | language contract / final-answer composition support | service-owned | Convert an existing language contract into model-facing final-answer language instructions. | Extracted by S139 into the existing language contract owner. It does not detect language, invoke an LLM, choose authority, materialize terminal products, or mutate payload/debug state. | `EXTRACTED` |
+| `capability-catalog-summary` | capability catalog / final-answer composition support | service-owned | Format capability help summary text from an already-built capability catalog observation and workspace snapshot. | Extracted by S149 behind route-supplied doc normalization, note-title, catalog-observation, and capability-key dependencies. It does not detect capability catalog intent, build catalog observations, materialize terminals, choose authority, or mutate payload/debug state. | `EXTRACTED` |
 | `runtime-civilization-bounds-composer-guard` | final-answer composition / evidence re-entry | service-owned | Detect when a civilization-bounds model draft contradicts already-selected civilization-bounds receipt evidence. | Extracted by S140 as a pure guard over supplied model text, fallback text, selected artifacts, receipt refs, goal satisfaction state, and goal frame. It does not select evidence, draft an answer, materialize terminal products, choose authority, or mutate payload/debug state. | `EXTRACTED` |
 | `post-observation-draft-text` | final-answer composition support / presentation hygiene | service-owned | Clean post-observation draft text and then apply receipt-framing suppression. | Extracted by S141 into the existing receipt-framing suppression owner. It does not select draft authority, create a terminal product, choose terminal authority, or mutate payload/debug state. | `EXTRACTED` |
 | `runtime-composer-artifact-collectors` | final-answer composition / evidence re-entry | service-owned | Collect receipt records, coverage records, tool observation records, and nested text lines from already-materialized artifacts. | Extracted by S142 behind a two-callback dependency interface for route-owned artifact payload and string readers. It does not create observations, select evidence, draft an answer, choose authority, or mutate payload/debug state. | `EXTRACTED` |
@@ -140,11 +142,12 @@ Candidate order:
 11. `runtime-voice-side-effect-composer` - `EXTRACTED_S137`
 12. `runtime-repo-evidence-synthesis-text` - `EXTRACTED_S138`
 13. `response-language-instruction` - `EXTRACTED_S139`
-14. `runtime-civilization-bounds-composer-guard` - `EXTRACTED_S140`
-15. `post-observation-draft-text` - `EXTRACTED_S141`
-16. `runtime-composer-artifact-collectors` - `EXTRACTED_S142`
-17. `runtime-composer-coverage` - `EXTRACTED_S146`
-18. `runtime-calculator-receipt-answer` - `EXTRACTED_S147`
+14. `capability-catalog-summary` - `EXTRACTED_S149`
+15. `runtime-civilization-bounds-composer-guard` - `EXTRACTED_S140`
+16. `post-observation-draft-text` - `EXTRACTED_S141`
+17. `runtime-composer-artifact-collectors` - `EXTRACTED_S142`
+18. `runtime-composer-coverage` - `EXTRACTED_S146`
+19. `runtime-calculator-receipt-answer` - `EXTRACTED_S147`
 
 ## Deferred Sets
 
