@@ -21,6 +21,11 @@ export type HelixRuntimeDocSummaryFallbackDependencies = {
   asksToIncludePath: (transcript: string) => boolean;
 };
 
+export type HelixRuntimeRepoEvidenceFallbackGoalFrame = {
+  corpus_anchors?: string[] | null;
+  concept_tokens?: string[] | null;
+};
+
 const readComposerFallbackString = (value: unknown): string | null =>
   typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 
@@ -272,4 +277,53 @@ export const buildHelixRuntimeWorkspaceOsStatusFallbackText = (
     }
   }
   return lines.join("\n").trim();
+};
+
+export const buildHelixRuntimeRepoEvidenceFallbackText = (args: {
+  canonicalGoalFrame: HelixRuntimeRepoEvidenceFallbackGoalFrame;
+  artifacts: HelixRuntimeComposerSupportRefArtifact[];
+}): string => {
+  const evidenceArtifact = [...args.artifacts].reverse().find((artifact) => artifact.kind === "repo_code_evidence_observation");
+  const payload = evidenceArtifact ? readComposerFallbackPayloadRecord(evidenceArtifact) : null;
+  if (!payload) return "";
+  const concept =
+    readComposerFallbackString(payload.concept) ??
+    args.canonicalGoalFrame.corpus_anchors?.[0] ??
+    args.canonicalGoalFrame.concept_tokens?.[0] ??
+    "this internal concept";
+  const rawEvidence = Array.isArray(payload.observations) && payload.observations.length > 0
+    ? payload.observations
+    : Array.isArray(payload.spans) && payload.spans.length > 0
+      ? payload.spans
+      : [];
+  const sourceLines = rawEvidence
+    .map((entry) => {
+      const record = entry && typeof entry === "object" && !Array.isArray(entry)
+        ? (entry as RecordLike)
+        : null;
+      if (!record) return null;
+      const source =
+        readComposerFallbackString(record.source_id) ??
+        readComposerFallbackString(record.ref) ??
+        readComposerFallbackString(record.path) ??
+        readComposerFallbackString(record.filePath) ??
+        readComposerFallbackString(record.id);
+      const excerpt = clipComposerFallbackText(
+        readComposerFallbackString(record.snippet) ??
+          readComposerFallbackString(record.excerpt) ??
+          readComposerFallbackString(record.reason) ??
+          "",
+        180,
+      );
+      return source ? `- ${source}${excerpt ? `: ${excerpt}` : ""}` : null;
+    })
+    .filter((entry): entry is string => Boolean(entry))
+    .slice(0, 6);
+  if (sourceLines.length === 0) return "";
+  return [
+    `I found current repo evidence for ${concept}.`,
+    "",
+    "Key evidence:",
+    ...sourceLines,
+  ].join("\n").trim();
 };
