@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   cleanupAskTurnOpenDocSearchTopic,
+  createAskTurnActiveDocIdentityReaders,
   createAskTurnActiveDocPromptReaders,
   createAskTurnDocIdentityIntentReaders,
   createAskTurnDocSummaryIntentReaders,
@@ -71,6 +72,7 @@ describe("Helix Ask doc args extraction boundary", () => {
     expect(routeSource).not.toMatch(/const\s+isAskTurnDocEvidenceSynthesisIntent\s*=\s*\(transcript/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnDeicticDocsIdentityIntent\s*=\s*\(transcript/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnActiveDocSummaryIntent\s*=\s*\(transcript/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnActiveDocIdentityIntent\s*=\s*\(transcript/);
     expect(routeSource).not.toMatch(/const\s+normalizeAskTurnLatestDocTopicText\s*=/);
     expect(routeSource).not.toMatch(/const\s+resolveAskTurnLatestDocTopicArg\s*=/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnTopicQualifiedLatestDocIntent\s*=/);
@@ -106,6 +108,7 @@ describe("Helix Ask doc args extraction boundary", () => {
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnDocEvidenceSynthesisIntent\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnDeicticDocsIdentityIntent\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+createAskTurnActiveDocPromptReaders\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+createAskTurnActiveDocIdentityReaders\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+createAskTurnDocIdentityIntentReaders\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+tokenizeAskTurnDocTopic\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+normalizeAskTurnLatestDocTopicText\s*=/);
@@ -230,6 +233,16 @@ describe("Helix Ask doc args extraction boundary", () => {
     expect(summaryReaders.isAskTurnDocsTopicSummaryPrompt("summarize the NHM2 whitepaper docs")).toBe(true);
     expect(summaryReaders.shouldAskTurnSearchDocsBeforeSummary("summarize the NHM2 whitepaper docs")).toBe(true);
     expect(summaryReaders.shouldAskTurnSearchDocsBeforeSummary("summarize this document")).toBe(false);
+  });
+
+  it("preserves active-doc identity prompt readers with visual precedence", () => {
+    const readers = createAskTurnActiveDocIdentityReaders({
+      isAskTurnVisualScreenTargetIntent: (prompt) => /\bvisual\s+screen\s+capture\b/i.test(prompt),
+    });
+
+    expect(readers.isAskTurnActiveDocIdentityIntent("What docs are open right now?")).toBe(true);
+    expect(readers.isAskTurnActiveDocIdentityIntent("What docs are open in the visual screen capture?")).toBe(false);
+    expect(readers.isAskTurnActiveDocIdentityIntent("Summarize this document.")).toBe(false);
   });
 
   it("preserves doc identity prompt readers", () => {

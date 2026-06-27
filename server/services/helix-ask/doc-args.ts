@@ -133,6 +133,24 @@ export const createAskTurnActiveDocPromptReaders = (
   };
 };
 
+export type HelixAskActiveDocIdentityReaderDependencies = {
+  isAskTurnVisualScreenTargetIntent: (transcript: string) => boolean;
+};
+
+export const createAskTurnActiveDocIdentityReaders = (
+  deps: HelixAskActiveDocIdentityReaderDependencies,
+) => {
+  const isAskTurnActiveDocIdentityIntent = (transcript: string): boolean =>
+    !deps.isAskTurnVisualScreenTargetIntent(transcript) &&
+    /\b(?:what\s+(?:papers?|docs?|documents?)\s+(?:am\s+I|are\s+we)\s+(?:viewing|looking\s+at|reading|on)|what\s+is\s+the\s+(?:active|current|open)\s+(?:docs?|documents?|papers?)|what\s+(?:docs?|documents?|papers?)\s+(?:is|are)\s+(?:open|currently\s+open|active|current))\b/i.test(
+      transcript,
+    );
+
+  return {
+    isAskTurnActiveDocIdentityIntent,
+  };
+};
+
 export const HELIX_ASK_OPEN_DOC_NOUN_PATTERN = String.raw`(?:doc|docs|document|documents|paper|papers|writeup|writeups|artifact|artifacts|result|results|thing|things|report|reports|file|files)`;
 export const HELIX_ASK_RECENT_DOC_PATTERN = String.raw`(?:latest|newest|freshest|most\s+recent|recent)`;
 
