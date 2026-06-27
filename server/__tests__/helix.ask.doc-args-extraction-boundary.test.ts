@@ -11,6 +11,7 @@ import {
   isAskTurnTopicQualifiedLatestDocIntent,
   normalizeAskTurnLatestDocTopicText,
   resolveAskTurnCreateThenOpenDocTopicArg,
+  resolveAskTurnDocPathArg,
   resolveAskTurnLatestDocTopicArg,
   resolveAskTurnTitleLikeOpenDocQueryArg,
   resolveAskTurnTopicDocQueryArg,
@@ -28,6 +29,7 @@ describe("Helix Ask doc args extraction boundary", () => {
 
     expect(routeSource).toContain("../services/helix-ask/doc-args");
     expect(routeSource).not.toMatch(/const\s+extractAskTurnDocPathArgs\s*=\s*\(transcript/);
+    expect(routeSource).not.toMatch(/const\s+resolveAskTurnDocPathArg\s*=\s*\(transcript/);
     expect(routeSource).not.toMatch(/const\s+normalizeAskTurnLatestDocTopicText\s*=/);
     expect(routeSource).not.toMatch(/const\s+resolveAskTurnLatestDocTopicArg\s*=/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnTopicQualifiedLatestDocIntent\s*=/);
@@ -46,6 +48,7 @@ describe("Helix Ask doc args extraction boundary", () => {
     expect(routeSource).not.toMatch(/const\s+isAskTurnOpenDocSearchIntent\s*=/);
     expect(routeSource).toContain("createAskTurnLatestDocIntentReaders({");
     expect(serviceSource).toMatch(/export\s+const\s+extractAskTurnDocPathArgs\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+resolveAskTurnDocPathArg\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+tokenizeAskTurnDocTopic\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+normalizeAskTurnLatestDocTopicText\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+resolveAskTurnLatestDocTopicArg\s*=/);
@@ -66,6 +69,13 @@ describe("Helix Ask doc args extraction boundary", () => {
       extractAskTurnDocPathArgs("Read docs/research/nhm2-current-status-whitepaper-2026-05-02.md, then ./notes/a.txt and docs/research/nhm2-current-status-whitepaper-2026-05-02.md"),
     ).toEqual(["docs/research/nhm2-current-status-whitepaper-2026-05-02.md", "./notes/a.txt"]);
     expect(extractAskTurnDocPathArgs("no explicit path here")).toEqual([]);
+    expect(resolveAskTurnDocPathArg("Read docs/research/nhm2-current-status-whitepaper-2026-05-02.md, then ./notes/a.txt")).toBe(
+      "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+    );
+    expect(resolveAskTurnDocPathArg("Open the NHM2 deeper reformulation decision memo")).toBe(
+      "/docs/research/nhm2-deeper-reformulation-decision-memo-2026-04-02.md",
+    );
+    expect(resolveAskTurnDocPathArg("no explicit path here")).toBeNull();
   });
 
   it("preserves latest-doc topic and acquisition prompt readers", () => {

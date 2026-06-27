@@ -5,6 +5,17 @@ export const extractAskTurnDocPathArgs = (transcript: string): string[] => {
   return Array.from(new Set(matches.map((entry) => entry.trim()).filter(Boolean)));
 };
 
+export const resolveAskTurnDocPathArg = (transcript: string): string | null => {
+  const normalized = transcript.trim();
+  if (!normalized) return null;
+  const match = normalized.match(/((?:[A-Za-z]:\\|\/|\.\/|docs\/)[^\s,;]+(?:\.md|\.txt|\.pdf))/i);
+  if (match?.[1]) return match[1].trim();
+  if (/\bNHM2\b[\s\S]{0,80}\bdeeper\s+reformulation\s+decision\s+memo\b/i.test(normalized)) {
+    return "/docs/research/nhm2-deeper-reformulation-decision-memo-2026-04-02.md";
+  }
+  return null;
+};
+
 export const HELIX_ASK_OPEN_DOC_NOUN_PATTERN = String.raw`(?:doc|docs|document|documents|paper|papers|writeup|writeups|artifact|artifacts|result|results|thing|things|report|reports|file|files)`;
 export const HELIX_ASK_RECENT_DOC_PATTERN = String.raw`(?:latest|newest|freshest|most\s+recent|recent)`;
 

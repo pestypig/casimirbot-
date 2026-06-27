@@ -155,7 +155,7 @@ terminal eligibility, projection discipline, and debug traces.
 | S165 | model-only fallback answer builder | `server/services/helix-ask/model-only-fallback-answer.ts` | SERVICE_OWNED for terminal-eligible deterministic model-only fallback answer construction only |
 | S150 | workspace change labels | `server/services/helix-ask/workspace-change-labels.ts` | SERVICE_OWNED for deterministic completed workspace action label filtering only |
 | S151 | artifact text helpers | `server/services/helix-ask/artifact-text.ts` | SERVICE_OWNED for pure artifact text normalization and artifact-store text lookup only |
-| S152 | doc path args | `server/services/helix-ask/doc-args.ts` | SERVICE_OWNED for explicit doc-path argument extraction only |
+| S152/S177 | doc path args | `server/services/helix-ask/doc-args.ts` | SERVICE_OWNED for explicit doc-path argument extraction and singular doc-path resolution only |
 | S175 | doc latest topic readers | `server/services/helix-ask/doc-args.ts` | SERVICE_OWNED for latest-doc topic normalization/extraction, topic-qualified latest-doc detection, open-doc topic cleanup, create-note-then-open-doc topic reading, and latest/recent doc acquisition prompt readers only |
 | S176 | doc open query readers | `server/services/helix-ask/doc-args.ts` | SERVICE_OWNED for doc-topic tokenization, docs-panel-open detection, topic-doc query reading, title-like open-doc query reading, result-doc query reading, aggregate open-doc search query reading, and topic/open-doc acquisition predicates only |
 | S153 | note arg boundaries | `server/services/helix-ask/note-arg-boundaries.ts` | SERVICE_OWNED for note/workspace action argument boundary trimming only |
