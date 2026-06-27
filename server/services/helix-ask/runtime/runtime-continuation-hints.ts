@@ -64,6 +64,7 @@ export type HelixRuntimeContinuationHint = RecordLike & {
 
 export type HelixRuntimeContinuationHintDependencies = {
   capabilityKeyForAction: (action: HelixAskTurnSelectedAction | null | undefined) => string | null;
+  normalizeWorkspaceDocPath: (value: unknown) => string | null;
   readArtifactPayloadRecord: (artifact: HelixTurnArtifact) => RecordLike | null;
   readDecisionActionArgs: (decision: HelixAgentStepDecision) => RecordLike;
   readString: (value: unknown) => string | null;
@@ -157,6 +158,102 @@ export const appendHelixRuntimeContinuationHintsToPayload = (args: {
     debug.runtime_continuation_hints = hints;
     debug.current_turn_artifact_ledger = args.payload.current_turn_artifact_ledger;
   }
+};
+
+export const collectHelixRuntimeObservationRefsForHint = (args: {
+  hint: HelixRuntimeContinuationHint;
+  artifacts: HelixTurnArtifact[];
+  dependencies: Pick<
+    HelixRuntimeContinuationHintDependencies,
+    "capabilityKeyForAction" | "normalizeWorkspaceDocPath" | "readArtifactPayloadRecord" | "readString"
+  >;
+}): { producedArtifacts: string[]; observedArtifactRefs: string[] } => {
+  const hintedCapability = args.hint.suggested_capability;
+  const hintedAction = args.hint.suggested_action;
+  const hintedActionKey = args.dependencies.capabilityKeyForAction(hintedAction);
+  const subgoalId =
+    args.dependencies.readString(args.hint.suggested_args?.compound_subgoal_id) ??
+    args.dependencies.readString(args.hint.suggested_action?.args?.compound_subgoal_id) ??
+    null;
+  const expression =
+    args.dependencies.readString(args.hint.suggested_args?.latex) ??
+    args.dependencies.readString(args.hint.suggested_action?.args?.latex) ??
+    null;
+  const path =
+    args.dependencies.normalizeWorkspaceDocPath(args.hint.suggested_args?.path) ??
+    args.dependencies.normalizeWorkspaceDocPath(args.hint.suggested_action?.args?.path) ??
+    args.dependencies.normalizeWorkspaceDocPath(args.hint.suggested_args?.selected_path) ??
+    args.dependencies.normalizeWorkspaceDocPath(args.hint.suggested_action?.args?.selected_path) ??
+    null;
+  const query =
+    args.dependencies.readString(args.hint.suggested_args?.query) ??
+    args.dependencies.readString(args.hint.suggested_action?.args?.query) ??
+    null;
+  const matches = args.artifacts.filter((artifact) => {
+    if (
+      ![
+        "calculator_receipt",
+        "calculator_subgoal_receipt",
+        "calculator_result_validation",
+        "workspace_action_receipt",
+        "doc_search_results",
+        "doc_open_receipt",
+        "doc_location_matches",
+        "doc_evidence_location",
+        "process_graph_overview",
+      ].includes(artifact.kind)
+    ) {
+      return false;
+    }
+    const payload = args.dependencies.readArtifactPayloadRecord(artifact);
+    if (artifact.kind === "workspace_action_receipt") {
+      const actionKey =
+        args.dependencies.readString(payload?.action_key) ??
+        (args.dependencies.readString(payload?.target_id) && args.dependencies.readString(payload?.action_id)
+          ? `${args.dependencies.readString(payload?.target_id)}.${args.dependencies.readString(payload?.action_id)}`
+          : null);
+      if (hintedCapability && actionKey === hintedCapability) return true;
+      if (hintedActionKey && actionKey === hintedActionKey) return true;
+      if (
+        hintedAction?.panel_id &&
+        hintedAction.action_id &&
+        args.dependencies.readString(payload?.target_id) === hintedAction.panel_id &&
+        args.dependencies.readString(payload?.action_id) === hintedAction.action_id
+      ) {
+        return true;
+      }
+      return false;
+    }
+    if (artifact.kind === "process_graph_overview") {
+      return hintedCapability === "process-graph.inspect" || hintedActionKey === "process-graph.inspect";
+    }
+    if (artifact.kind === "doc_open_receipt") {
+      const artifactPath =
+        args.dependencies.normalizeWorkspaceDocPath(payload?.path) ??
+        args.dependencies.normalizeWorkspaceDocPath(payload?.selected_path);
+      return Boolean(path && artifactPath === path);
+    }
+    if (artifact.kind === "doc_search_results") {
+      const artifactQuery = args.dependencies.readString(payload?.query);
+      return Boolean(query && artifactQuery === query);
+    }
+    if (artifact.kind === "doc_location_matches" || artifact.kind === "doc_evidence_location") {
+      const artifactQuery = args.dependencies.readString(payload?.query);
+      const artifactPath =
+        args.dependencies.normalizeWorkspaceDocPath(payload?.source_path) ??
+        args.dependencies.normalizeWorkspaceDocPath(payload?.path);
+      return Boolean((query && artifactQuery === query) || (path && artifactPath === path));
+    }
+    const artifactSubgoalId = args.dependencies.readString(payload?.subgoal_id);
+    const artifactExpression = args.dependencies.readString(payload?.expression);
+    if (subgoalId && artifactSubgoalId === subgoalId) return true;
+    if (expression && artifactExpression === expression) return true;
+    return false;
+  });
+  return {
+    producedArtifacts: Array.from(new Set(matches.map((artifact) => artifact.kind))),
+    observedArtifactRefs: matches.map((artifact) => artifact.artifact_id),
+  };
 };
 
 const isHelixAgentStepDecisionLike = (value: unknown): value is HelixAgentStepDecision =>

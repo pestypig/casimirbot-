@@ -7,6 +7,7 @@ import {
   appendHelixRuntimeContinuationHintsToPayload,
   buildHelixRuntimeContinuationHint,
   collectHelixAgentStepDecisionsFromPayload,
+  collectHelixRuntimeObservationRefsForHint,
   helixRuntimeHintMatchesAgentStepDecision,
   markHelixRuntimeContinuationHintsMigratedToAgentRuntimeLoop,
 } from "../services/helix-ask/runtime/runtime-continuation-hints";
@@ -20,6 +21,8 @@ const dependencies = {
     action?.panel_id === "docs-viewer" && action?.action_id === "locate_in_doc"
       ? "docs-viewer.locate_in_doc"
       : null,
+  normalizeWorkspaceDocPath: (value: unknown): string | null =>
+    typeof value === "string" && value.trim() ? value.trim().replace(/\\/g, "/") : null,
   readArtifactPayloadRecord: (artifact: any): Record<string, unknown> | null =>
     artifact.payload && typeof artifact.payload === "object" ? artifact.payload : null,
   readDecisionActionArgs: (decision: any): Record<string, unknown> =>
@@ -38,11 +41,13 @@ describe("Helix Ask runtime continuation hints extraction boundary", () => {
     expect(routeSource).toContain("../services/helix-ask/runtime/runtime-continuation-hints");
     expect(routeSource).not.toMatch(/^const\s+buildHelixRuntimeContinuationHint\s*=/m);
     expect(routeSource).not.toMatch(/^const\s+appendHelixRuntimeContinuationHintsToPayload\s*=/m);
+    expect(routeSource).not.toMatch(/^const\s+collectHelixRuntimeObservationRefsForHint\s*=/m);
     expect(routeSource).not.toMatch(/^const\s+collectHelixAgentStepDecisionsFromPayload\s*=/m);
     expect(routeSource).not.toMatch(/^const\s+helixRuntimeHintMatchesAgentStepDecision\s*=/m);
     expect(routeSource).not.toMatch(/^const\s+markHelixRuntimeContinuationHintsMigratedToAgentRuntimeLoop\s*=/m);
     expect(serviceSource).toMatch(/export\s+const\s+buildHelixRuntimeContinuationHint\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+appendHelixRuntimeContinuationHintsToPayload\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+collectHelixRuntimeObservationRefsForHint\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+markHelixRuntimeContinuationHintsMigratedToAgentRuntimeLoop\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");
     expect(serviceSource).not.toContain("../../../routes/agi.plan");
@@ -162,5 +167,46 @@ describe("Helix Ask runtime continuation hints extraction boundary", () => {
       },
     ]);
     expect((payload.debug as Record<string, unknown>).runtime_continuation_hints).toBe(payload.runtime_continuation_hints);
+  });
+
+  it("preserves observation refs matched to continuation hints", () => {
+    const hint = buildHelixRuntimeContinuationHint({
+      turnId: "turn-1",
+      source: "blocked_artifact_recovery",
+      suggestedAction: {
+        panel_id: "docs-viewer",
+        action_id: "locate_in_doc",
+        args: { path: "docs/example.md" },
+      },
+      missingArtifacts: ["doc_location_matches"],
+      reason: "needs location",
+      dependencies,
+    });
+
+    expect(
+      collectHelixRuntimeObservationRefsForHint({
+        hint,
+        artifacts: [
+          {
+            artifact_id: "match-1",
+            kind: "doc_location_matches",
+            payload: {
+              path: "docs/example.md",
+            },
+          },
+          {
+            artifact_id: "miss-1",
+            kind: "doc_location_matches",
+            payload: {
+              path: "docs/other.md",
+            },
+          },
+        ],
+        dependencies,
+      }),
+    ).toEqual({
+      producedArtifacts: ["doc_location_matches"],
+      observedArtifactRefs: ["match-1"],
+    });
   });
 });
