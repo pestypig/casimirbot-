@@ -94,24 +94,25 @@ Priorities:
 
 - Title: job polling fallback can submit the same logical prompt directly after a job was created.
 - Classification: `DUPLICATE_EXECUTION_RISK`.
-- Priority: `P0_FIX_FIRST`.
+- Priority: `P0_CLIENT_GUARDED_SERVER_PROOF_REMAINING`.
+- Repair status: client guard applied in `client/src/lib/agi/api.ts`; once `createAskJob` succeeds, interrupted/missing job polling no longer automatically calls direct Ask for the same logical request.
 - Current owner file: `client/src/lib/agi/api.ts`.
 - Current symbols: `askLocal`, `createAskJob`, `pollAskJob`, `isInterruptedJobFallbackResponse`, `askLocalDirect`, `writePendingHelixAskJob`, `clearPendingHelixAskJob`.
 - Current callers: `askLocal` compatibility path, `HelixAskPill` legacy/local fallback wrappers, `resumeHelixAskJob` for pending jobs.
-- Endpoint or UI lane: `/api/agi/ask/jobs`, `/api/agi/ask/jobs/:id`, then `/api/agi/ask`.
-- Trigger condition: job polling returns `"Request interrupted. Please try again."`, job missing returns interrupted fallback text, or job endpoint is unsupported and compatibility direct fallback is still enabled.
+- Endpoint or UI lane: `/api/agi/ask/jobs`, `/api/agi/ask/jobs/:id`; direct `/api/agi/ask` remains reachable only when no job was successfully created or another compatibility lane selects direct.
+- Trigger condition: job polling returns `"Request interrupted. Please try again."`, job missing returns interrupted fallback text, or job endpoint is unsupported before any job is created.
 - State written: `sessionStorage` pending job record, then returned `LocalAskResponse`.
-- Visible text effect: direct fallback response can become the visible answer.
-- Persistence effect: fallback text or direct fallback answer can be persisted by `HelixAskPill`.
-- TTS/read-aloud effect: direct fallback answer can be spoken if autospeak gates pass.
-- Duplicate execution risk: high; a server job may already have executed before the direct fallback request is sent.
-- Route-policy effect: fallback direct body preserves current body, including client-written route metadata.
-- Current guards: local `AbortSignal`, pending job cleanup, offline wait, compatibility flag.
-- Missing guards: no server cancellation proof before direct fallback, no idempotency key, no `turnId` in `askLocal`, no dedupe token shared across job and direct lanes.
-- Tests present: current job-missing fallback, body-preserving job-to-direct characterization, job unsupported direct fallback.
-- Tests missing: server dedupe contract, cancellation-before-fallback contract, stale later-job completion suppression.
-- Proposed future repair owner: one-file patch in `client/src/lib/agi/api.ts`.
-- Proposed future repair strategy: add a client-side fallback policy guard that either requires a server dedupe/idempotency token or quarantines interrupted job text without re-executing. Keep existing compatibility paths until the new guard has tests.
+- Visible text effect: interrupted job text is returned as a marked non-authoritative client transport fallback instead of a direct fallback answer.
+- Persistence effect: the returned interruption text may still be consumed by existing UI persistence paths, but it now carries `client_transport_fallback`, `fallback_blocked`, `terminal_eligible: false`, and `authorityVerified: false` markers.
+- TTS/read-aloud effect: no TTS/read-aloud behavior was changed; downstream suppression from the new markers remains a future sink-specific repair.
+- Duplicate execution risk: client-side automatic duplicate direct execution is guarded after successful job creation. Server-side late job completion/dedupe proof remains open.
+- Route-policy effect: route metadata shape is unchanged; direct fallback after job creation is blocked, so route metadata is no longer re-submitted by that path.
+- Current guards: local `AbortSignal`, pending job cleanup, offline wait, compatibility flag, and `buildBlockedJobDirectFallbackResponse` for interrupted polling after job creation.
+- Missing guards: no server cancellation proof, no idempotency key, no `turnId` in `askLocal`, no dedupe token shared across job/direct lanes, and no downstream persistence/TTS marker suppression proof.
+- Tests present: job-missing direct re-execution blocked, route metadata/request identity preserved on job create body while direct re-execution is blocked, interrupted partial-text fallback blocked, job unsupported direct compatibility fallback preserved, empty turn fallback remains non-authoritative.
+- Tests missing: server dedupe contract, cancellation-before-fallback contract, stale later-job completion suppression, and UI persistence/TTS behavior for `client_transport_fallback`.
+- Proposed future repair owner: server idempotency/dedupe owner after backend ownership wave; UI sink suppression later in `HelixAskPill.tsx`.
+- Proposed future repair strategy: add server-side idempotency/cancellation proof and teach UI persistence/TTS sinks to suppress or demote `client_transport_fallback` responses.
 - Stop condition: if a patch changes endpoint selection, retry behavior, response normalization, or route metadata shape at the same time, stop and split the work.
 - Confidence: high.
 
@@ -374,15 +375,15 @@ Priorities:
 
 ### A. Job/Direct Duplicate Execution Guard
 
-- Priority: `P0_FIX_FIRST`.
+- Priority: `DONE_CLIENT_GUARD_SERVER_PROOF_REMAINING`.
 - Exact owner file: `client/src/lib/agi/api.ts`.
 - Exact symbols: `askLocal`, `createAskJob`, `pollAskJob`, `isInterruptedJobFallbackResponse`, `askLocalDirect`, pending job helpers.
-- Tests to write first: the added fetch-mock tests now cover job missing body preservation and job unsupported fallback; add one more before repair for interrupted partial text if changing that branch.
-- Behavior invariant: one logical prompt must not execute a second server request unless an explicit compatibility flag and dedupe/idempotency contract allow it.
-- Proposed patch shape: one-file API change that introduces a named fallback admission decision and blocks/quarantines direct re-execution when no dedupe token or cancellation proof exists.
+- Tests now present: job missing blocked, interrupted partial-text blocked, job unsupported direct compatibility preserved, request identity/route metadata preserved in the job create body.
+- Behavior invariant: after `createAskJob` succeeds for a request, `askLocal` must not issue an automatic direct Ask request for that same logical request merely because polling returned interrupted/missing fallback text.
+- Applied patch shape: one-file API change introducing `buildBlockedJobDirectFallbackResponse`, which returns a marked non-authoritative `LocalAskResponse` instead of calling `askLocalDirect` after job creation.
 - Rollback condition: if endpoint selection or response text changes outside the job-to-direct fallback cases, revert.
-- Reason for priority: highest direct duplicate execution risk with narrowest owner.
-- Server-side proof required: yes, for final dedupe/cancellation guarantee.
+- Reason for priority: highest direct duplicate execution risk with narrowest owner; client guard is now applied.
+- Server-side proof required: yes, for final dedupe/cancellation guarantee and late job completion semantics.
 - Keyed validation required afterward: no for unit behavior; yes later for live job/dedupe parity.
 
 ### B. `normalizeLocalAskResponse` Fallback Text Quarantine
@@ -474,13 +475,15 @@ Priorities:
 
 ## Tests Added In This Pass
 
-Added to `client/src/lib/agi/__tests__/api.voice-transcribe.spec.ts`:
+Updated in `client/src/lib/agi/__tests__/api.voice-transcribe.spec.ts`:
 
-- `preserves current job-to-direct fallback body when a job disappears`
+- `blocks direct fallback when a created job disappears during polling`
+- `preserves request identity and route metadata while blocking job-to-direct re-execution`
+- `blocks direct fallback when polling returns interrupted text after a partial result`
 - `falls back to legacy direct ask when jobs are unsupported under the current compatibility flag`
 - `characterizes empty turn responses as client fallback text without authority markers`
 
-These tests use fetch mocks only and encode current behavior, not desired behavior.
+These tests use fetch mocks only. They preserve direct compatibility when no job was created and prove the new client guard when a job was created.
 
 ## API Split Plan Status
 
@@ -496,7 +499,7 @@ Extractable without behavior change after characterization:
 
 Requires behavior work first:
 
-- job/direct fallback policy
+- server idempotency/dedupe proof for job/direct fallback policy
 - response normalization fallback text
 - stream retry/fallback policy
 - legacy direct endpoint removal or narrowing
@@ -504,6 +507,6 @@ Requires behavior work first:
 
 ## Readiness
 
-`READY_FOR_FIRST_UI_BEHAVIOR_REPAIR: YES`
+`READY_FOR_FIRST_UI_BEHAVIOR_REPAIR: NO`
 
-The top repair, job/direct duplicate execution guard, has an exact owner file, exact current symbols, deterministic characterization tests, no unresolved ownership conflict, a rollback condition, and can be changed without fixing the other traps in the same patch.
+The first UI behavior repair is now applied on the client side. The next repair should be selected after reviewing the backend ownership result or after choosing a separate client-only sink repair for response normalization markers, legacy shadow, persistence, or TTS.
