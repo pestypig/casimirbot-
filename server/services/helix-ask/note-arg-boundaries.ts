@@ -265,3 +265,58 @@ export const isAskTurnNoteMutationPrecedenceIntent = (transcript: string): boole
   /\b(?:create|make|start|new|append|update|add|write|save|store)\b[\s\S]{0,140}\b(?:workstation\s+)?(?:note|notepad|scratch|memo)\b/i.test(
     transcript,
   );
+
+export type HelixAskNoteTransferIntentReaderDependencies = {
+  isAskTurnArtifactReferenceIntent: (transcript: string) => boolean;
+  resolveAskTurnAnyNoteSinkArg: (transcript: string) => string | null;
+  resolveAskTurnCreateNoteTitleArg: (transcript: string) => string | null;
+  resolveAskTurnCreateThenOpenDocTopicArg: (transcript: string) => string | null;
+  resolveAskTurnLayDestinationNoteSinkArg: (transcript: string) => string | null;
+};
+
+export const createAskTurnNoteTransferIntentReaders = (
+  deps: HelixAskNoteTransferIntentReaderDependencies,
+) => {
+  const isAskTurnCreateNoteThenOpenDocIntent = (transcript: string): boolean =>
+    Boolean(deps.resolveAskTurnCreateNoteTitleArg(transcript) && deps.resolveAskTurnCreateThenOpenDocTopicArg(transcript));
+
+  const isAskTurnArtifactCarryoverToNoteIntent = (transcript: string): boolean => {
+    const normalized = transcript.trim().toLowerCase();
+    if (!deps.isAskTurnArtifactReferenceIntent(normalized)) return false;
+    if (/\b(?:summari[sz]e|explain|compare|contrast|look|search|find|scan)\b/.test(normalized)) return false;
+    if (deps.resolveAskTurnLayDestinationNoteSinkArg(transcript)) return true;
+    return (
+      /\b(?:that|this|it|location|finding|result|answer|output|response)\b[\s\S]*\b(?:to|into|in|inside)\s+(?:it|that\s+note|the\s+note|my\s+note|notes?|notepad)\b/.test(normalized) ||
+      /\b(?:put|add|append|save|store|copy|write|place|drop)\b[\s\S]*\b(?:that|this|it|location|finding|result|answer|output|response)\b[\s\S]*\b(?:it|note|notes|notepad)\b/.test(normalized)
+    );
+  };
+
+  const isAskTurnSafeDefaultPreserveToNoteIntent = (transcript: string): boolean => {
+    const normalized = transcript.trim().toLowerCase();
+    return (
+      /\b(?:preserve|save|store|capture|keep|record)\b/.test(normalized) &&
+      /\b(?:somewhere\s+useful|decide\s+whether|you\s+decide|wherever\s+is\s+best|best\s+place)\b/.test(normalized) &&
+      /\b(?:note|notes|clipboard|notepad|somewhere)\b/.test(normalized)
+    );
+  };
+
+  const isAskTurnDocsRetrievalToNoteIntent = (transcript: string): boolean => {
+    const normalized = transcript.trim().toLowerCase();
+    if (!normalized) return false;
+    const hasRetrievalCue =
+      /\b(?:look|search|find|scan|check)\b[\s\S]*\b(?:docs?|documents?|files?|repo|repository)\b/.test(normalized) ||
+      /\b(?:look\s+for|search\s+for|find)\b/.test(normalized);
+    const hasSummaryCue = /\b(?:summary|summari[sz]e|useful|key\s+(?:points|details)|details|notes?)\b/.test(normalized);
+    const hasNoteSink =
+      /\b(?:put|add|save|store|stash|file|park|place|write)\b[\s\S]*\b(?:to|into|in|inside)\b/.test(normalized) &&
+      Boolean(deps.resolveAskTurnAnyNoteSinkArg(transcript));
+    return hasRetrievalCue && hasSummaryCue && hasNoteSink;
+  };
+
+  return {
+    isAskTurnArtifactCarryoverToNoteIntent,
+    isAskTurnCreateNoteThenOpenDocIntent,
+    isAskTurnDocsRetrievalToNoteIntent,
+    isAskTurnSafeDefaultPreserveToNoteIntent,
+  };
+};

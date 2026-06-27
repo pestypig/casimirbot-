@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
   createAskTurnActionArgBoundaryTrimmer,
   createAskTurnNoteSinkArgReaders,
+  createAskTurnNoteTransferIntentReaders,
   isAskTurnArtifactReferenceIntent,
   isAskTurnArtifactToClipboardIntent,
   isAskTurnArtifactToNoteIntent,
@@ -59,8 +60,13 @@ describe("Helix Ask note arg boundary extraction boundary", () => {
     expect(routeSource).not.toMatch(/const\s+isAskTurnRepoCueIntent\s*=/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnAppendToNoteCue\s*=/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnNoteMutationPrecedenceIntent\s*=\s*\(transcript/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnCreateNoteThenOpenDocIntent\s*=\s*\(transcript/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnArtifactCarryoverToNoteIntent\s*=\s*\(transcript/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnSafeDefaultPreserveToNoteIntent\s*=\s*\(transcript/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnDocsRetrievalToNoteIntent\s*=\s*\(transcript/);
     expect(serviceSource).toMatch(/export\s+const\s+createAskTurnActionArgBoundaryTrimmer\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+createAskTurnNoteSinkArgReaders\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+createAskTurnNoteTransferIntentReaders\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+trimAskTurnProtectedTitleArgBoundaries\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+resolveAskTurnTextArg\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+resolveAskTurnTitleArg\s*=/);
@@ -163,5 +169,23 @@ describe("Helix Ask note arg boundary extraction boundary", () => {
     expect(isAskTurnAppendToNoteCue("open my note")).toBe(false);
     expect(isAskTurnNoteMutationPrecedenceIntent("Create a workstation note called Field Notes.")).toBe(true);
     expect(isAskTurnNoteMutationPrecedenceIntent("Explain the current document.")).toBe(false);
+  });
+
+  it("preserves note transfer intent readers behind route-owned dependencies", () => {
+    const transferReaders = createAskTurnNoteTransferIntentReaders({
+      isAskTurnArtifactReferenceIntent,
+      resolveAskTurnAnyNoteSinkArg: (prompt) => /\bField Notes\b/.test(prompt) ? "Field Notes" : null,
+      resolveAskTurnCreateNoteTitleArg,
+      resolveAskTurnCreateThenOpenDocTopicArg: (prompt) => /\bopen\s+NHM2\b/i.test(prompt) ? "NHM2" : null,
+      resolveAskTurnLayDestinationNoteSinkArg: (prompt) => /\bField Notes\b/.test(prompt) ? "Field Notes" : null,
+    });
+
+    expect(transferReaders.isAskTurnCreateNoteThenOpenDocIntent("create note called Field Notes and open NHM2")).toBe(true);
+    expect(transferReaders.isAskTurnCreateNoteThenOpenDocIntent("create note called Field Notes")).toBe(false);
+    expect(transferReaders.isAskTurnArtifactCarryoverToNoteIntent("copy that result to Field Notes")).toBe(true);
+    expect(transferReaders.isAskTurnArtifactCarryoverToNoteIntent("summarize that result to Field Notes")).toBe(false);
+    expect(transferReaders.isAskTurnSafeDefaultPreserveToNoteIntent("preserve this somewhere useful in notes")).toBe(true);
+    expect(transferReaders.isAskTurnDocsRetrievalToNoteIntent("look in the docs for NHM2 summary and put it into Field Notes")).toBe(true);
+    expect(transferReaders.isAskTurnDocsRetrievalToNoteIntent("look in the docs for NHM2")).toBe(false);
   });
 });
