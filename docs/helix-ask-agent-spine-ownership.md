@@ -98,6 +98,7 @@ terminal eligibility, projection discipline, and debug traces.
 | S122 | objective loop diagnostics and OES enforcement | `server/services/helix-ask/objectives/objective-loop-debug.ts` | SERVICE_OWNED for pure terminal/coverage, unknown-block enforcement, and evidence-sufficiency diagnostics only |
 | S123 | objective scoped-recovery helper subset | `server/services/helix-ask/retrieval/objective-scoped-recovery.ts` | SERVICE_OWNED for behavior-identical scoped-recovery gate, target selection, max-attempt, escalation hint, target expansion, and variant scoring helpers only |
 | S124 | objective loop state/readout helpers | `server/services/helix-ask/objectives/objective-loop-debug.ts` | SERVICE_OWNED for objective-loop state construction, transition, coverage snapshot, summary, plain reasoning trace, and finalization helpers using explicit route callback injection only |
+| S125 | objective retrieve-proposal contracts | `server/services/helix-ask/objectives/objective-llm-contracts.ts` | SERVICE_OWNED for deterministic retrieve-proposal prompt rendering and JSON proposal parsing only |
 
 ## Deferred Ownership Debt
 
@@ -150,6 +151,9 @@ terminal eligibility, projection discipline, and debug traces.
   plain reasoning trace, and finalization helpers are service-owned after S124;
   route-owned wrappers still control transition-log clipping, runtime ordering,
   retrieval recovery, and LLM objective stages.
+- Objective retrieve-proposal prompt rendering and proposal parsing are
+  service-owned after S125; route-local mini-synth and mini-critic parsers
+  remain pending separate type/equivalence characterization.
 - Objective scoped-recovery query variants and missing scoped-retrieval
   enforcement remain route-owned; S123 moved only the behavior-identical helper
   subset, while route-local query merging and route-local required-objective
