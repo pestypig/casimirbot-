@@ -23,6 +23,23 @@ export const isAskTurnReadAloudRequested = (transcript: string): boolean =>
   /\b(?:read|speak|say|narrate)\s+(?:it|this|the\s+(?:doc|document|file|source|audit|artifact))\b/i.test(transcript) ||
   /\b(?:read|speak|say|narrate)\s+(?:aloud|out\s*loud|outloud)\b/i.test(transcript);
 
+export const isAskTurnExplicitDocumentAcquisitionIntent = (transcript: string): boolean =>
+  !isAskTurnDocsPanelOpenIntent(transcript) &&
+  /\b(?:open|open\s+up|show|view|pull\s+up|bring\s+up|load)\b[\s\S]{0,140}\b(?:NHM[-\s]?2|white\s*paper|whitepaper|paper|document|doc)\b[\s\S]{0,100}\b(?:docs?|docks?|documents?|viewer)\b/i.test(
+    transcript,
+  );
+
+export const isAskTurnDocOpenBestIntent = (transcript: string): boolean =>
+  /\b(?:find|search|open|show|get|load)\b[\s\S]{0,80}\b(?:and\s+)?open\b[\s\S]{0,120}\b(?:best|matching|relevant|NHM2|doc|document|paper|source|report)\b/i.test(
+    transcript,
+  ) ||
+  /\bopen\b[\s\S]{0,60}\b(?:best|matching|most\s+relevant)\b[\s\S]{0,120}\b(?:doc|document|paper|source|report|NHM2)\b/i.test(
+    transcript,
+  ) ||
+  /\b(?:open|open\s+up|show|view|pull\s+up|bring\s+up|load|go\s+to|navigate\s+to|take\s+me\s+to)\b[\s\S]{0,120}\b(?:NHM[-\s]?2|white\s*paper|whitepaper)\b[\s\S]{0,80}\b(?:doc|document|paper|white\s*paper|whitepaper|report|source)\b/i.test(
+    transcript,
+  );
+
 export const HELIX_ASK_OPEN_DOC_NOUN_PATTERN = String.raw`(?:doc|docs|document|documents|paper|papers|writeup|writeups|artifact|artifacts|result|results|thing|things|report|reports|file|files)`;
 export const HELIX_ASK_RECENT_DOC_PATTERN = String.raw`(?:latest|newest|freshest|most\s+recent|recent)`;
 

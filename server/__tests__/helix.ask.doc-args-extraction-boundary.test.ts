@@ -7,8 +7,10 @@ import {
   cleanupAskTurnOpenDocSearchTopic,
   createAskTurnLatestDocIntentReaders,
   extractAskTurnDocPathArgs,
+  isAskTurnDocOpenBestIntent,
   isAskTurnReadAloudRequested,
   isAskTurnDocsPanelOpenIntent,
+  isAskTurnExplicitDocumentAcquisitionIntent,
   isAskTurnTopicQualifiedLatestDocIntent,
   normalizeAskTurnLatestDocTopicText,
   resolveAskTurnCreateThenOpenDocTopicArg,
@@ -32,6 +34,8 @@ describe("Helix Ask doc args extraction boundary", () => {
     expect(routeSource).not.toMatch(/const\s+extractAskTurnDocPathArgs\s*=\s*\(transcript/);
     expect(routeSource).not.toMatch(/const\s+resolveAskTurnDocPathArg\s*=\s*\(transcript/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnReadAloudRequested\s*=\s*\(transcript/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnExplicitDocumentAcquisitionIntent\s*=\s*\(transcript/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnDocOpenBestIntent\s*=\s*\(transcript/);
     expect(routeSource).not.toMatch(/const\s+normalizeAskTurnLatestDocTopicText\s*=/);
     expect(routeSource).not.toMatch(/const\s+resolveAskTurnLatestDocTopicArg\s*=/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnTopicQualifiedLatestDocIntent\s*=/);
@@ -52,6 +56,8 @@ describe("Helix Ask doc args extraction boundary", () => {
     expect(serviceSource).toMatch(/export\s+const\s+extractAskTurnDocPathArgs\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+resolveAskTurnDocPathArg\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnReadAloudRequested\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+isAskTurnExplicitDocumentAcquisitionIntent\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+isAskTurnDocOpenBestIntent\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+tokenizeAskTurnDocTopic\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+normalizeAskTurnLatestDocTopicText\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+resolveAskTurnLatestDocTopicArg\s*=/);
@@ -82,6 +88,10 @@ describe("Helix Ask doc args extraction boundary", () => {
     expect(isAskTurnReadAloudRequested("Read this document aloud.")).toBe(true);
     expect(isAskTurnReadAloudRequested("Narrate it to me.")).toBe(true);
     expect(isAskTurnReadAloudRequested("Summarize this document silently.")).toBe(false);
+    expect(isAskTurnExplicitDocumentAcquisitionIntent("Open the NHM2 white paper in the docs viewer.")).toBe(true);
+    expect(isAskTurnExplicitDocumentAcquisitionIntent("Open the docs viewer.")).toBe(false);
+    expect(isAskTurnDocOpenBestIntent("Find and open the best matching NHM2 document.")).toBe(true);
+    expect(isAskTurnDocOpenBestIntent("Summarize the current document.")).toBe(false);
   });
 
   it("preserves latest-doc topic and acquisition prompt readers", () => {
