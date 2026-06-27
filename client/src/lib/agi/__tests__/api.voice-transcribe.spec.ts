@@ -345,7 +345,7 @@ describe("askLocal capsule ids", () => {
     expect(payload.extracted_question_label).toBe("diagnose Helix Ask large prompt behavior");
   });
 
-  it("recovers from job-missing interrupted fallback by retrying direct ask", async () => {
+  it("blocks direct fallback when a created job disappears during polling", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(
@@ -363,18 +363,9 @@ describe("askLocal capsule ids", () => {
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
-            error: "not_found",
-          }),
-          {
-            status: 404,
-            headers: { "content-type": "application/json" },
-          },
-        ),
-      )
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            text: "Recovered direct ask answer.",
+            jobId: "job-partial-interrupted",
+            status: "completed",
+            partialText: "Request interrupted. Please try again.",
           }),
           {
             status: 200,
@@ -388,13 +379,26 @@ describe("askLocal capsule ids", () => {
       question: "how do we solve the warp level in codebase?",
     });
 
-    expect(response.text).toBe("Recovered direct ask answer.");
+    expect(response.text).toBe("Request interrupted. Please try again.");
+    expect(response).toMatchObject({
+      ok: false,
+      error: "helix_ask_job_direct_fallback_blocked",
+      fail_reason: "HELIX_ASK_JOB_DIRECT_FALLBACK_BLOCKED",
+      fail_class: "client_transport_duplicate_execution_guard",
+      client_transport_fallback: true,
+      client_transport_fallback_reason: "job_created_poll_interrupted",
+      fallback_blocked: true,
+      fallback_block_reason: "job_created_direct_reexecution_blocked",
+      terminal_eligible: false,
+      authorityVerified: false,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/agi/ask/jobs");
     expect(String(fetchMock.mock.calls[1]?.[0])).toContain("/api/agi/ask/jobs/job-missing-race");
-    expect(fetchMock.mock.calls[2]?.[0]).toBe("/api/agi/ask");
+    expect(fetchMock.mock.calls.some((call) => call[0] === "/api/agi/ask")).toBe(false);
   });
 
-  it("preserves current job-to-direct fallback body when a job disappears", async () => {
+  it("preserves request identity and route metadata while blocking job-to-direct re-execution", async () => {
     const routeMetadata = {
       schema: "helix.ask.route_metadata.v1",
       invocationKind: "behavior_trap_characterization",
@@ -438,17 +442,6 @@ describe("askLocal capsule ids", () => {
             headers: { "content-type": "application/json" },
           },
         ),
-      )
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            selected_final_answer: "Recovered direct answer.",
-          }),
-          {
-            status: 200,
-            headers: { "content-type": "application/json" },
-          },
-        ),
       );
     vi.stubGlobal("fetch", fetchMock);
 
@@ -459,21 +452,77 @@ describe("askLocal capsule ids", () => {
       route_metadata: routeMetadata,
     });
 
-    expect(response.text).toBe("Recovered direct answer.");
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(response.text).toBe("Request interrupted. Please try again.");
+    expect(response).toMatchObject({
+      ok: false,
+      error: "helix_ask_job_direct_fallback_blocked",
+      fail_reason: "HELIX_ASK_JOB_DIRECT_FALLBACK_BLOCKED",
+      fail_class: "client_transport_duplicate_execution_guard",
+      client_transport_fallback: true,
+      fallback_blocked: true,
+      terminal_eligible: false,
+      authorityVerified: false,
+    });
+    expect(response.debug?.duplicate_execution_guard).toMatchObject({
+      schema: "helix.ask.client_transport_duplicate_execution_guard.v1",
+      jobId: "job-current-body",
+      action: "blocked_direct_fallback_after_job_created",
+      assistant_answer: false,
+      terminal_eligible: false,
+      authorityVerified: false,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/agi/ask/jobs");
     expect(String(fetchMock.mock.calls[1]?.[0])).toContain("/api/agi/ask/jobs/job-current-body");
-    expect(fetchMock.mock.calls[2]?.[0]).toBe("/api/agi/ask");
     const jobBody = JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body ?? "{}"));
-    const directBody = JSON.parse(String((fetchMock.mock.calls[2]?.[1] as RequestInit).body ?? "{}"));
-    expect(directBody).toMatchObject(jobBody);
-    expect(directBody).toMatchObject({
+    expect(jobBody).toMatchObject({
       sessionId: "session-from-client",
       traceId: "trace-from-client",
       route_metadata: routeMetadata,
       source_target_intent: routeMetadata.source_target_intent,
       mandatory_next_tool: routeMetadata.mandatory_next_tool,
     });
+    expect(fetchMock.mock.calls.some((call) => call[0] === "/api/agi/ask")).toBe(false);
+  });
+
+  it("blocks direct fallback when polling returns interrupted text after a partial result", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            jobId: "job-partial-interrupted",
+            status: "queued",
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            error: "not_found",
+          }),
+          {
+            status: 404,
+            headers: { "content-type": "application/json" },
+          },
+        ),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await askLocal(undefined, {
+      question: "partial interrupted probe",
+    });
+
+    expect(response.text).toBe("Request interrupted. Please try again.");
+    expect(response.client_transport_fallback).toBe(true);
+    expect(response.fallback_blocked).toBe(true);
+    expect(response.terminal_eligible).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls.some((call) => call[0] === "/api/agi/ask")).toBe(false);
   });
 
   it("falls back to legacy direct ask when jobs are unsupported under the current compatibility flag", async () => {

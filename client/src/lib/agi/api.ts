@@ -270,6 +270,12 @@ export type LocalAskResponse = {
   interpreter_confirm_prompt?: string | null;
   fail_reason?: string | null;
   fail_class?: string | null;
+  client_transport_fallback?: boolean;
+  client_transport_fallback_reason?: string | null;
+  fallback_blocked?: boolean;
+  fallback_block_reason?: string | null;
+  terminal_eligible?: boolean;
+  authorityVerified?: boolean;
   memory_citation?: HelixMemoryCitation | null;
   context_capsule?: ContextCapsuleSummary;
   situation_context_pack?: SituationContextPack | null;
@@ -2266,6 +2272,40 @@ const isInterruptedJobFallbackResponse = (response: LocalAskResponse | null | un
   return text === HELIX_ASK_JOB_INTERRUPTED_FALLBACK_TEXT;
 };
 
+const buildBlockedJobDirectFallbackResponse = (
+  response: LocalAskResponse,
+  jobId: string,
+): LocalAskResponse => ({
+  ...response,
+  text: response.text || "Request interrupted. Please try again.",
+  ok: false,
+  error: "helix_ask_job_direct_fallback_blocked",
+  fail_reason: "HELIX_ASK_JOB_DIRECT_FALLBACK_BLOCKED",
+  fail_class: "client_transport_duplicate_execution_guard",
+  client_transport_fallback: true,
+  client_transport_fallback_reason: "job_created_poll_interrupted",
+  fallback_blocked: true,
+  fallback_block_reason: "job_created_direct_reexecution_blocked",
+  terminal_eligible: false,
+  authorityVerified: false,
+  debug: {
+    ...(response.debug ?? {}),
+    client_transport_fallback: true,
+    client_transport_fallback_reason: "job_created_poll_interrupted",
+    fallback_blocked: true,
+    fallback_block_reason: "job_created_direct_reexecution_blocked",
+    duplicate_execution_guard: {
+      schema: "helix.ask.client_transport_duplicate_execution_guard.v1",
+      jobId,
+      action: "blocked_direct_fallback_after_job_created",
+      reason: "poll_returned_interrupted_fallback_text",
+      assistant_answer: false,
+      terminal_eligible: false,
+      authorityVerified: false,
+    },
+  } as LocalAskResponse["debug"] & Record<string, unknown>,
+});
+
 const normalizeLocalAskResponse = (payload: unknown): LocalAskResponse => {
   const record = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
   const selectedFinalAnswer = typeof record.selected_final_answer === "string" ? record.selected_final_answer.trim() : "";
@@ -2674,7 +2714,7 @@ export async function askLocal(
     try {
       const result = await pollAskJob(job.jobId, { signal });
       if (!signal?.aborted && isInterruptedJobFallbackResponse(result)) {
-        return await askLocalDirect(body, signal);
+        return buildBlockedJobDirectFallbackResponse(result, job.jobId);
       }
       return result;
     } finally {
@@ -2695,7 +2735,7 @@ export async function askLocal(
       try {
         const result = await pollAskJob(job.jobId, { signal });
         if (!signal?.aborted && isInterruptedJobFallbackResponse(result)) {
-          return await askLocalDirect(body, signal);
+          return buildBlockedJobDirectFallbackResponse(result, job.jobId);
         }
         return result;
       } finally {
