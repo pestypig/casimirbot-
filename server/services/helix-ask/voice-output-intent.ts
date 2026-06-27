@@ -13,3 +13,23 @@ export const isAskTurnDottieVoiceReadoutIntent = (transcript: string): boolean =
   !/\b(?:do\s+not|don't|dont|without|not\s+asking\s+to)\b[\s\S]{0,80}\b(?:read|speak|say|narrate|voice)\b/i.test(
     transcript,
   );
+
+export type HelixAskVoiceOutputIntentLike = {
+  kind: string;
+};
+
+export type HelixAskDocsReadAloudIntentReaderDependencies = {
+  classifyAskTurnVoiceOutputIntent: (transcript: string) => HelixAskVoiceOutputIntentLike;
+};
+
+export const createAskTurnDocsReadAloudIntentReader = (
+  deps: HelixAskDocsReadAloudIntentReaderDependencies,
+) => {
+  const isAskTurnDocsReadAloudIntent = (transcript: string): boolean =>
+    deps.classifyAskTurnVoiceOutputIntent(transcript).kind === "document_read" &&
+    !isAskTurnDottieVoiceReadoutIntent(transcript);
+
+  return {
+    isAskTurnDocsReadAloudIntent,
+  };
+};
