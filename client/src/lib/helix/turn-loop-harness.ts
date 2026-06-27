@@ -1,8 +1,10 @@
 import {
   evaluateVoiceReasoningResponseAuthority,
   evaluateVoiceTurnSealGate,
-  mergeVoiceTranscriptDraft,
 } from "@/components/helix/HelixAskPill";
+import {
+  mergeVoiceTranscriptDraft,
+} from "@/lib/helix/voice/voice-transcript";
 
 export type TurnLoopHarnessSuppressionCause =
   | "phase_not_sealed"
