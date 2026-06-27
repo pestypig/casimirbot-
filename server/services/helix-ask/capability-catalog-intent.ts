@@ -74,3 +74,19 @@ export const askCapabilityCatalogPromptMatchIndex = (promptText: string): number
   }
   return capabilityCatalogRequestMatchIndex(promptText);
 };
+
+export const isAskTurnCapabilityCatalogAvailabilityPrompt = (transcript: string): boolean => {
+  return isAskCapabilityCatalogPrompt(transcript);
+};
+
+export const isAskTurnCapabilityHelpIntent = (transcript: string): boolean => {
+  const normalized = transcript.trim().toLowerCase().replace(/[?!.]+$/g, "").replace(/\s+/g, " ");
+  if (!normalized) return false;
+  return (
+    isAskTurnCapabilityCatalogAvailabilityPrompt(transcript) ||
+    /\bwhat\s+can\s+i\s+do\s+with\s+helix\s+ask\b/i.test(normalized) ||
+    /\bhow\s+can\s+(?:you|helix\s+ask)\s+help\s+me\b/i.test(normalized) ||
+    /\bwhat\s+can\s+(?:this\s+)?(?:workspace\s+)?agent\s+do\b/i.test(normalized) ||
+    /\bwhat\s+can\s+helix\s+ask\s+do\b/i.test(normalized)
+  );
+};

@@ -1368,11 +1368,13 @@ describe("Helix Ask tool-family parity goal coverage", () => {
   it("keeps the route entrypoint on the shared capability-catalog detector", () => {
     const routeSource = readRepoSource("server/routes/agi.plan.ts");
     expect(routeSource).toEqual(
-      expect.stringContaining('import { isAskCapabilityCatalogPrompt } from "../services/helix-ask/capability-catalog-intent";'),
+      expect.stringContaining('} from "../services/helix-ask/capability-catalog-intent";'),
     );
     expect(routeSource).toEqual(
-      expect.stringContaining("return isAskCapabilityCatalogPrompt(transcript);"),
+      expect.stringContaining("isAskTurnCapabilityCatalogAvailabilityPrompt"),
     );
+    expect(routeSource).not.toMatch(/const\s+isAskTurnCapabilityCatalogAvailabilityPrompt\s*=/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnCapabilityHelpIntent\s*=/);
   });
 
   it("materializes compound input bindings before forced runtime subgoal execution", () => {

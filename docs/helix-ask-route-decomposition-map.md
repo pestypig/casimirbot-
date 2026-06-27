@@ -2,7 +2,7 @@
 
 Status: current-head map for structural extraction and decomposition-enabler work.
 
-Pinned source state described: S157 workspace-help-intent extraction.
+Pinned source state described: S158 capability-catalog-help-intent extraction.
 
 Snapshot command: `npx tsx scripts/helix-ask-route-inventory.ts --write`
 
@@ -11,8 +11,8 @@ Route snapshot:
 | Metric | Value |
 | --- | ---: |
 | File | `server/routes/agi.plan.ts` |
-| Lines | 177,243 |
-| Bytes | 7,962,739 |
+| Lines | 177,231 |
+| Bytes | 7,962,102 |
 | Top-level helper estimate | 303 helper blocks |
 | Route inventory | `artifacts/helix-ask-route-inventory.json` |
 | Machine-readable map | `artifacts/helix-ask-route-decomposition-map.json` |
@@ -38,6 +38,7 @@ Do not extract `runHelixAgentTurnRuntimeLoop` in this wave. Do not patch termina
 | `runtime-voice-side-effect-composer` | service-owned | `EVIDENCE_REENTRY` / `FINAL_ANSWER_COMPOSITION_SUPPORT` | `MEDIUM` | `EXTRACTED` | `server/services/helix-ask/runtime/runtime-voice-side-effect-composer.ts` | S137 moved compound interim voice side-effect prompt/fallback/receipt-satisfaction/direct-answer helper logic behind a one-callback factory for the existing route-owned unquoted voice callout extractor. It does not move voice tool execution, live-source phase policy, terminal materialization, terminal authority, or projection behavior. |
 | `runtime-repo-evidence-synthesis-text` | service-owned | `EVIDENCE_REENTRY` / `FINAL_ANSWER_COMPOSITION_SUPPORT` | `MEDIUM` | `EXTRACTED` | `server/services/helix-ask/runtime/runtime-repo-evidence-synthesis-text.ts` | S138 moved deterministic repo evidence synthesis support text into a dedicated runtime service. It does not move repo retrieval, evidence selection, final-answer draft selection, terminal materialization, terminal authority, or projection behavior. |
 | `response-language-instruction` | service-owned | `PROMPT_INTERPRETATION` / `FINAL_ANSWER_COMPOSITION_SUPPORT` | `LOW` | `EXTRACTED` | `server/services/helix-ask/language-contract.ts` | S139 moved response-language instruction construction into the existing language contract owner. It does not move language detection, LLM invocation, terminal materialization, terminal authority, or projection behavior. |
+| `capability-catalog-intent` | service-owned | `PROMPT_INTERPRETATION` / `CAPABILITY_CATALOG` | `LOW` | `EXTRACTED` | `server/services/helix-ask/capability-catalog-intent.ts` | S158 moved Ask-turn capability catalog availability and capability-help intent classification into the existing capability-catalog intent owner. It does not build catalog observations, format capability summaries, materialize terminals, choose authority, or mutate payload/debug state. |
 | `capability-catalog-summary` | service-owned | `FINAL_ANSWER_COMPOSITION_SUPPORT` / `CAPABILITY_CATALOG` | `LOW` | `EXTRACTED` | `server/services/helix-ask/capability-catalog-summary.ts` | S149 moved deterministic capability help summary text construction into a dedicated service. It does not move capability catalog intent detection, observation construction, runtime catalog materialization, terminal materialization, terminal authority, or projection behavior. |
 | `workspace-change-labels` | service-owned | `FINAL_ANSWER_COMPOSITION_SUPPORT` / `WORKSPACE_CONTEXT` | `LOW` | `EXTRACTED` | `server/services/helix-ask/workspace-change-labels.ts` | S150 moved completed workspace action label filtering into a dedicated service. It does not execute workspace actions, choose route/terminal authority, mutate payload/debug state, or change visible projection. |
 | `artifact-text` | service-owned | `FINAL_ANSWER_COMPOSITION_SUPPORT` / `PRESENTATION_HYGIENE` | `LOW` | `EXTRACTED` | `server/services/helix-ask/artifact-text.ts` | S151 moved pure artifact text normalization, artifact-store text lookup by kind, and instruction-only summary text detection into a dedicated service. It does not read route artifact payloads, find terminal candidates, materialize terminals, choose authority, or mutate payload/debug state. |
@@ -74,6 +75,7 @@ Do not extract `runHelixAgentTurnRuntimeLoop` in this wave. Do not patch termina
 | `runtime-voice-side-effect-composer` | final-answer composition / evidence re-entry | service-owned | Detect compound interim voice side-effect prompts, build evidence-only receipt explanation fallback text, check explanation sufficiency, and read the latest non-voice direct answer from current artifacts. | Extracted by S137 behind a one-callback dependency for the route-owned unquoted voice callout extractor. It does not execute voice tools, alter live-source phase policy, choose authority, materialize terminal products, or mutate payload/debug state. | `EXTRACTED` |
 | `runtime-repo-evidence-synthesis-text` | final-answer composition / evidence re-entry | service-owned | Build deterministic repo evidence synthesis support text from an already-built repo docs synthesis packet. | Extracted by S138 as pure text construction. It does not select evidence, retrieve repo code, choose authority, materialize terminal products, or mutate payload/debug state. | `EXTRACTED` |
 | `response-language-instruction` | language contract / final-answer composition support | service-owned | Convert an existing language contract into model-facing final-answer language instructions. | Extracted by S139 into the existing language contract owner. It does not detect language, invoke an LLM, choose authority, materialize terminal products, or mutate payload/debug state. | `EXTRACTED` |
+| `capability-catalog-intent` | capability catalog / prompt interpretation | service-owned | Classify capability catalog availability and capability-help prompt intent for Ask turns. | S158 moved the Ask-turn wrapper and help-intent classifier into the existing capability-catalog intent service, preserving the existing contextual-cue guard in `isAskCapabilityCatalogPrompt`. Route still owns catalog observation construction, runtime materialization, terminal materialization, and authority. | `EXTRACTED` |
 | `capability-catalog-summary` | capability catalog / final-answer composition support | service-owned | Format capability help summary text from an already-built capability catalog observation and workspace snapshot. | Extracted by S149 behind route-supplied doc normalization, note-title, catalog-observation, and capability-key dependencies. It does not detect capability catalog intent, build catalog observations, materialize terminals, choose authority, or mutate payload/debug state. | `EXTRACTED` |
 | `workspace-change-labels` | workspace context / final-answer composition support | service-owned | Collect non-low-value completed workspace action labels from an already-supplied execution trace and workspace snapshot. | Extracted by S150 with structural input types so it does not import route-local plan/snapshot types. It does not execute actions, infer intent, select terminal products, choose authority, or mutate payload/debug state. | `EXTRACTED` |
 | `artifact-text` | final-answer composition support / presentation hygiene | service-owned | Normalize text from already-supplied artifact-like payloads, read artifact-store text by kind, and identify instruction-only summary placeholders. | Extracted by S151 as pure helpers. Route still owns terminal-specific artifact payload reads and workstation terminal candidate lookup. | `EXTRACTED` |
@@ -153,6 +155,7 @@ Candidate order:
 12. `runtime-repo-evidence-synthesis-text` - `EXTRACTED_S138`
 13. `response-language-instruction` - `EXTRACTED_S139`
 14. `capability-catalog-summary` - `EXTRACTED_S149`
+14a. `capability-catalog-intent` - `EXTRACTED_S158`
 15. `workspace-change-labels` - `EXTRACTED_S150`
 16. `artifact-text` - `EXTRACTED_S151`
 17. `doc-args` - `EXTRACTED_S152`
