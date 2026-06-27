@@ -5,6 +5,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildHelixAskObjectiveRetrieveProposalPrompt,
+  parseHelixAskObjectiveMiniCritique,
+  parseHelixAskObjectiveMiniSynth,
   parseHelixAskObjectiveRetrieveProposal,
 } from "../services/helix-ask/objectives/objective-llm-contracts";
 
@@ -16,17 +18,23 @@ const servicePath = join(
 );
 
 describe("Helix Ask objective LLM contracts extraction boundary", () => {
-  it("keeps retrieve-proposal prompt and parser helpers out of agi.plan.ts", () => {
+  it("keeps objective LLM prompt and parser helpers out of agi.plan.ts", () => {
     const routeSource = readFileSync(routePath, "utf8");
     const serviceSource = readFileSync(servicePath, "utf8");
 
     expect(routeSource).toContain("../services/helix-ask/objectives/objective-llm-contracts");
     expect(routeSource).not.toMatch(/const\s+buildHelixAskObjectiveRetrieveProposalPrompt\s*=/);
     expect(routeSource).not.toMatch(/const\s+parseHelixAskObjectiveRetrieveProposal\s*=/);
+    expect(routeSource).not.toMatch(/^const\s+parseHelixAskObjectiveMiniSynth\s*=/m);
+    expect(routeSource).not.toMatch(/^const\s+parseHelixAskObjectiveMiniCritique\s*=/m);
+    expect(routeSource).not.toMatch(/^const\s+collectHelixAskJsonParseCandidates\s*=/m);
+    expect(routeSource).not.toMatch(/^const\s+normalizeHelixAskObjectiveSlotArray\s*=/m);
     expect(serviceSource).toMatch(
       /export\s+const\s+buildHelixAskObjectiveRetrieveProposalPrompt\s*=/,
     );
     expect(serviceSource).toMatch(/export\s+const\s+parseHelixAskObjectiveRetrieveProposal\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+parseHelixAskObjectiveMiniSynth\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+parseHelixAskObjectiveMiniCritique\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");
     expect(serviceSource).not.toContain("../../../routes/agi.plan");
     expect(serviceSource).not.toContain("../../routes/agi.plan");
@@ -73,5 +81,87 @@ describe("Helix Ask objective LLM contracts extraction boundary", () => {
     });
 
     expect(parseHelixAskObjectiveRetrieveProposal("not json")).toBeNull();
+  });
+
+  it("preserves mini-synth parsing from JSON and single-objective text fallback", () => {
+    expect(
+      parseHelixAskObjectiveMiniSynth(
+        JSON.stringify({
+          objectives: [
+            {
+              objective_id: "load-bearing",
+              status: "complete",
+              matched_slots: ["numeric result", "doc evidence"],
+              missing_slots: ["unused"],
+              summary: "Load bearing was grounded.",
+              evidence_refs: ["docs/research/nhm2.md"],
+            },
+          ],
+        }),
+      ),
+    ).toEqual({
+      objectives: [
+        {
+          objective_id: "load-bearing",
+          status: "covered",
+          matched_slots: ["numeric-result", "doc-evidence"],
+          missing_slots: [],
+          summary: "Load bearing was grounded.",
+          evidence_refs: ["docs/research/nhm2.md"],
+          unknown_block: undefined,
+        },
+      ],
+    });
+
+    expect(
+      parseHelixAskObjectiveMiniSynth("partial. Missing slots: doc evidence.", {
+        objectiveHints: [
+          {
+            objective_id: "load-bearing",
+            objective_label: "Load Bearing",
+            required_slots: ["numeric-result", "doc-evidence"],
+          },
+        ],
+      }),
+    ).toMatchObject({
+      objectives: [
+        {
+          objective_id: "load-bearing",
+          status: "partial",
+          matched_slots: ["numeric-result"],
+          missing_slots: ["doc-evidence"],
+        },
+      ],
+    });
+  });
+
+  it("preserves mini-critique parsing", () => {
+    expect(
+      parseHelixAskObjectiveMiniCritique(
+        JSON.stringify({
+          data: {
+            objectives: [
+              {
+                objective_id: "load-bearing",
+                status: "blocked",
+                missing_slots: ["doc evidence"],
+                reason: "No citation reached the target document.",
+              },
+            ],
+          },
+        }),
+      ),
+    ).toEqual({
+      objectives: [
+        {
+          objective_id: "load-bearing",
+          status: "blocked",
+          missing_slots: ["doc-evidence"],
+          reason: "No citation reached the target document.",
+        },
+      ],
+    });
+
+    expect(parseHelixAskObjectiveMiniCritique("no json")).toBeNull();
   });
 });
