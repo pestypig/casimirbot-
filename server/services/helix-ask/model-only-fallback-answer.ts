@@ -1,3 +1,6 @@
+import { classifyDeterministicFallbackUse } from "./deterministic-fallback-policy";
+import { classifyAskTurnModelOnlyFallbackId } from "./model-only-fallback-classifier";
+
 export const renderAskTurnModelOnlyFallbackAnswer = (fallbackId: string): string | null => {
   switch (fallbackId) {
     case "model_only_fallback.underspecified_kinetic_energy":
@@ -28,4 +31,22 @@ export const renderAskTurnModelOnlyFallbackAnswer = (fallbackId: string): string
     default:
       return null;
   }
+};
+
+export const buildAskTurnModelOnlyFallbackAnswer = (
+  transcript: string,
+  payload: Record<string, unknown> = {},
+): string | null => {
+  const fallbackId = classifyAskTurnModelOnlyFallbackId(transcript);
+  if (!fallbackId) return null;
+  const fallbackText = renderAskTurnModelOnlyFallbackAnswer(fallbackId);
+  if (!fallbackText) return null;
+  const policy = classifyDeterministicFallbackUse({
+    promptText: transcript,
+    payload,
+    fallbackId,
+    fallbackText,
+  });
+  if (!policy.terminal_allowed) return null;
+  return fallbackText;
 };

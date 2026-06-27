@@ -2,7 +2,7 @@
 
 Status: current-head map for structural extraction and decomposition-enabler work.
 
-Pinned source state described: S164 model-only-fallback-classifier extraction.
+Pinned source state described: S165 model-only-fallback-answer-builder extraction.
 
 Snapshot command: `npx tsx scripts/helix-ask-route-inventory.ts --write`
 
@@ -11,8 +11,8 @@ Route snapshot:
 | Metric | Value |
 | --- | ---: |
 | File | `server/routes/agi.plan.ts` |
-| Lines | 177,096 |
-| Bytes | 7,953,016 |
+| Lines | 177,081 |
+| Bytes | 7,952,514 |
 | Top-level helper estimate | 303 helper blocks |
 | Route inventory | `artifacts/helix-ask-route-inventory.json` |
 | Machine-readable map | `artifacts/helix-ask-route-decomposition-map.json` |
@@ -45,7 +45,7 @@ Do not extract `runHelixAgentTurnRuntimeLoop` in this wave. Do not patch termina
 | `model-only-answer-prompt` | service-owned | `PROMPT_INTERPRETATION` / `FINAL_ANSWER_COMPOSITION_SUPPORT` | `LOW` | `EXTRACTED` | `server/services/helix-ask/model-only-answer-prompt.ts` | S161 moved model-only answer prompt construction into a dedicated service. It does not classify model-only prompts, invoke the model, select fallback answers, materialize terminal candidates, choose authority, or mutate payload/debug state. |
 | `model-only-answer-quality` | service-owned | `FINAL_ANSWER_COMPOSITION_SUPPORT` / `PRESENTATION_HYGIENE` | `LOW` | `EXTRACTED` | `server/services/helix-ask/model-only-answer-quality.ts` | S162 moved model-only workspace-leak and non-substantive direct-answer predicates into a dedicated service. It does not classify prompts, invoke the model, select fallback answers, materialize terminal candidates, choose authority, or mutate payload/debug state. |
 | `model-only-fallback-classifier` | service-owned | `PROMPT_INTERPRETATION` / `MODEL_ONLY_CONVERSATION` | `LOW` | `EXTRACTED` | `server/services/helix-ask/model-only-fallback-classifier.ts` | S164 moved deterministic model-only fallback-id classification into a dedicated service. It does not admit deterministic fallback use, render fallback answer text, materialize terminal candidates, choose authority, or mutate payload/debug state. |
-| `model-only-fallback-answer` | service-owned | `FINAL_ANSWER_COMPOSITION_SUPPORT` / `MODEL_ONLY_CONVERSATION` | `LOW` | `EXTRACTED` | `server/services/helix-ask/model-only-fallback-answer.ts` | S163 moved deterministic model-only fallback answer text rendering into a dedicated service. It does not classify fallback ids, admit deterministic fallback use, materialize terminal candidates, choose authority, or mutate payload/debug state. |
+| `model-only-fallback-answer` | service-owned | `FINAL_ANSWER_COMPOSITION_SUPPORT` / `MODEL_ONLY_CONVERSATION` | `LOW` | `EXTRACTED` | `server/services/helix-ask/model-only-fallback-answer.ts` | S163 moved deterministic model-only fallback answer text rendering into a dedicated service. S165 moved terminal-eligible fallback answer construction through the existing deterministic fallback policy. It does not build demoted observations, materialize terminal candidates, choose authority, or mutate payload/debug state. |
 | `workspace-change-labels` | service-owned | `FINAL_ANSWER_COMPOSITION_SUPPORT` / `WORKSPACE_CONTEXT` | `LOW` | `EXTRACTED` | `server/services/helix-ask/workspace-change-labels.ts` | S150 moved completed workspace action label filtering into a dedicated service. It does not execute workspace actions, choose route/terminal authority, mutate payload/debug state, or change visible projection. |
 | `artifact-text` | service-owned | `FINAL_ANSWER_COMPOSITION_SUPPORT` / `PRESENTATION_HYGIENE` | `LOW` | `EXTRACTED` | `server/services/helix-ask/artifact-text.ts` | S151 moved pure artifact text normalization, artifact-store text lookup by kind, and instruction-only summary text detection into a dedicated service. It does not read route artifact payloads, find terminal candidates, materialize terminals, choose authority, or mutate payload/debug state. |
 | `doc-args` | service-owned | `PROMPT_INTERPRETATION` / `DOC_CONTEXT` | `LOW` | `EXTRACTED` | `server/services/helix-ask/doc-args.ts` | S152 moved explicit doc-path argument extraction into a dedicated service. It does not infer source target, mutate workspace context, open/read docs, select evidence, or choose terminal authority. |
@@ -88,7 +88,7 @@ Do not extract `runHelixAgentTurnRuntimeLoop` in this wave. Do not patch termina
 | `model-only-answer-prompt` | model-only conversation / final-answer composition support | service-owned | Build the model-only answer prompt from the already-classified transcript and admitted conversation memory context. | Extracted by S161 as pure prompt construction. Route still owns model-only classification, LLM invocation, fallback selection, terminal materialization, and authority. | `EXTRACTED` |
 | `model-only-answer-quality` | model-only conversation / final-answer composition support | service-owned | Detect workspace-evidence leakage in model-only drafts and generic non-substantive direct-answer text. | Extracted by S162 as pure predicate logic. Route still owns the repair/fallback decision, LLM invocation, terminal materialization, and authority. | `EXTRACTED` |
 | `model-only-fallback-classifier` | model-only conversation / prompt interpretation support | service-owned | Classify deterministic model-only fallback ids from prompt text. | Extracted by S164 as pure fallback-id classification. Route still owns deterministic fallback admission, demoted observation construction, terminal materialization, and authority. | `EXTRACTED` |
-| `model-only-fallback-answer` | model-only conversation / final-answer composition support | service-owned | Render deterministic fallback answer text from an already-selected fallback id. | Extracted by S163 as pure text rendering. Route still owns fallback-id classification, deterministic fallback admission, demoted observation construction, terminal materialization, and authority. | `EXTRACTED` |
+| `model-only-fallback-answer` | model-only conversation / final-answer composition support | service-owned | Render deterministic fallback answer text and return terminal-eligible fallback text from supplied transcript/payload using existing deterministic fallback policy. | Extracted by S163 as pure text rendering. S165 moved terminal-eligible fallback answer construction. Route still owns demoted observation construction, terminal materialization, and authority. | `EXTRACTED` |
 | `workspace-change-labels` | workspace context / final-answer composition support | service-owned | Collect non-low-value completed workspace action labels from an already-supplied execution trace and workspace snapshot. | Extracted by S150 with structural input types so it does not import route-local plan/snapshot types. It does not execute actions, infer intent, select terminal products, choose authority, or mutate payload/debug state. | `EXTRACTED` |
 | `artifact-text` | final-answer composition support / presentation hygiene | service-owned | Normalize text from already-supplied artifact-like payloads, read artifact-store text by kind, and identify instruction-only summary placeholders. | Extracted by S151 as pure helpers. Route still owns terminal-specific artifact payload reads and workstation terminal candidate lookup. | `EXTRACTED` |
 | `doc-args` | prompt interpretation / doc context | service-owned | Extract explicit `.md`, `.txt`, and `.pdf` path-like arguments from prompt text while preserving existing order and dedupe behavior. | Extracted by S152 as a pure regex helper with behavior coverage. Route still owns workspace doc-path normalization, context mutation, source admission, and docs tool planning. | `EXTRACTED` |
@@ -175,6 +175,7 @@ Candidate order:
 15d. `model-only-answer-quality` - `EXTRACTED_S162`
 15e. `model-only-fallback-answer` - `EXTRACTED_S163`
 15f. `model-only-fallback-classifier` - `EXTRACTED_S164`
+15g. `model-only-fallback-answer-builder` - `EXTRACTED_S165`
 16. `artifact-text` - `EXTRACTED_S151`
 17. `doc-args` - `EXTRACTED_S152`
 18. `note-arg-boundaries` - `EXTRACTED_S153_S154`

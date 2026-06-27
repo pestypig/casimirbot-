@@ -3,7 +3,10 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { renderAskTurnModelOnlyFallbackAnswer } from "../services/helix-ask/model-only-fallback-answer";
+import {
+  buildAskTurnModelOnlyFallbackAnswer,
+  renderAskTurnModelOnlyFallbackAnswer,
+} from "../services/helix-ask/model-only-fallback-answer";
 
 const repoRoot = process.cwd();
 const routePath = join(repoRoot, "server/routes/agi.plan.ts");
@@ -16,7 +19,9 @@ describe("Helix Ask model-only fallback answer extraction boundary", () => {
 
     expect(routeSource).toContain("../services/helix-ask/model-only-fallback-answer");
     expect(routeSource).not.toMatch(/const\s+renderAskTurnModelOnlyFallbackAnswer\s*=/);
+    expect(routeSource).not.toMatch(/const\s+buildAskTurnModelOnlyFallbackAnswer\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+renderAskTurnModelOnlyFallbackAnswer\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+buildAskTurnModelOnlyFallbackAnswer\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");
     expect(serviceSource).not.toContain("../routes/agi.plan");
   });
@@ -26,5 +31,10 @@ describe("Helix Ask model-only fallback answer extraction boundary", () => {
     expect(renderAskTurnModelOnlyFallbackAnswer("model_only_fallback.electron_proton_comparison")).toContain("1836 times");
     expect(renderAskTurnModelOnlyFallbackAnswer("model_only_fallback.receipts_observations_terminal_authority")).toContain("Terminal authority must select");
     expect(renderAskTurnModelOnlyFallbackAnswer("model_only_fallback.unknown")).toBeNull();
+  });
+
+  it("preserves admitted deterministic fallback answer eligibility", () => {
+    expect(buildAskTurnModelOnlyFallbackAnswer("What is an electron?")).toContain("negative electric charge");
+    expect(buildAskTurnModelOnlyFallbackAnswer("Compare electron and proton charge and mass.")).toBeNull();
   });
 });
