@@ -8,6 +8,8 @@ const BREADCRUMB_SCHEMA = "helix.voice_lane_crash_breadcrumb.v1" as const;
 const diagnosticsDir = path.resolve(process.cwd(), "artifacts", "diagnostics");
 const jsonlPath = path.join(diagnosticsDir, "voice-lane-crash.jsonl");
 const latestPath = path.join(diagnosticsDir, "voice-lane-crash-latest.json");
+const configuredMaxJsonlBytes = Number.parseInt(process.env.VOICE_LANE_CRASH_BREADCRUMB_MAX_BYTES ?? "", 10);
+const maxJsonlBytes = configuredMaxJsonlBytes > 0 ? configuredMaxJsonlBytes : 10 * 1024 * 1024;
 
 const enabled = (): boolean => process.env.VOICE_LANE_CRASH_BREADCRUMBS !== "0";
 
@@ -64,6 +66,18 @@ const sanitizeError = (value: unknown): unknown => {
   return sanitize(value);
 };
 
+const rotateJsonlIfNeeded = (): void => {
+  try {
+    const stats = fs.statSync(jsonlPath);
+    if (stats.size < maxJsonlBytes) return;
+
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    fs.renameSync(jsonlPath, path.join(diagnosticsDir, `voice-lane-crash.${stamp}.jsonl`));
+  } catch {
+    // Crash breadcrumbs must never become the crash source.
+  }
+};
+
 export const createVoiceLaneBreadcrumbId = (prefix = "voice_lane"): string =>
   `${prefix}:${randomUUID()}`;
 
@@ -83,6 +97,7 @@ export const writeVoiceLaneBreadcrumb = (
       details: sanitizeError(details),
     };
     const line = `${JSON.stringify(entry)}\n`;
+    rotateJsonlIfNeeded();
     fs.appendFileSync(jsonlPath, line, "utf8");
     fs.writeFileSync(latestPath, JSON.stringify(entry, null, 2), "utf8");
   } catch {
