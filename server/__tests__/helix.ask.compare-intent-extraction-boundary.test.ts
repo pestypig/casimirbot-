@@ -7,6 +7,7 @@ import {
   askTurnHasExplicitWorkspaceCompareOperand,
   createAskTurnCompareIntentReaders,
   isAskTurnComparePrecedenceIntent,
+  isAskTurnGenericDocCompareTarget,
 } from "../services/helix-ask/compare-intent";
 import {
   createAskTurnActionArgBoundaryTrimmer,
@@ -34,10 +35,12 @@ describe("Helix Ask compare intent extraction boundary", () => {
     expect(routeSource).not.toMatch(/const\s+isAskTurnConceptualVsQuestion\s*=\s*\(transcript/);
     expect(routeSource).not.toMatch(/const\s+askTurnHasCompareCueOutsideProtectedArgs\s*=\s*\(transcript/);
     expect(routeSource).not.toMatch(/const\s+resolveAskTurnCompareRightHandTargetArg\s*=\s*\(transcript/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnGenericDocCompareTarget\s*=\s*\(value/);
     expect(routeSource).not.toMatch(/const\s+HELIX_ASK_TURN_COMPARE_CUE_RE\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+HELIX_ASK_TURN_COMPARE_CUE_RE\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+askTurnHasExplicitWorkspaceCompareOperand\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnComparePrecedenceIntent\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+isAskTurnGenericDocCompareTarget\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+createAskTurnCompareIntentReaders\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");
     expect(serviceSource).not.toContain("../routes/agi.plan");
@@ -50,6 +53,9 @@ describe("Helix Ask compare intent extraction boundary", () => {
     expect(readers.isAskTurnConceptualVsQuestion("what is proper time vs coordinate time?")).toBe(true);
     expect(readers.askTurnHasCompareCueOutsideProtectedArgs("what is proper time vs coordinate time?")).toBe(false);
     expect(readers.askTurnHasCompareCueOutsideProtectedArgs("compare the current doc with Field Notes")).toBe(true);
+    expect(isAskTurnGenericDocCompareTarget("docs/research/nhm2-current-status-whitepaper-2026-05-02.md")).toBe(true);
+    expect(isAskTurnGenericDocCompareTarget("the current document")).toBe(true);
+    expect(isAskTurnGenericDocCompareTarget("Field Notes")).toBe(false);
   });
 
   it("preserves protected title masking and right-hand target parsing", () => {

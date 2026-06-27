@@ -1,3 +1,5 @@
+import { extractAskTurnDocPathArgs } from "./doc-args";
+
 export const HELIX_ASK_TURN_COMPARE_CUE_RE =
   /\b(?:compare|comparison|contrast|difference|differences|different|delta|deltas|versus|vs\.?)\b/i;
 
@@ -18,6 +20,13 @@ export const isAskTurnComparePrecedenceIntent = (transcript: string): boolean =>
   /\bcompare\b[\s\S]{0,160}\b(?:against|with|to|versus|vs\.?)\b[\s\S]{0,120}\b(?:note|notes|current\s+doc|current\s+document|doc|document)\b/i.test(
     transcript,
   );
+
+export const isAskTurnGenericDocCompareTarget = (value: string | null | undefined): boolean => {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (!normalized) return false;
+  if (extractAskTurnDocPathArgs(normalized).length > 0) return true;
+  return /\b(?:doc|docs|document|paper|figure|figures|pdf|markdown|file)\b/.test(normalized);
+};
 
 export const createAskTurnCompareIntentReaders = (
   deps: HelixAskCompareIntentReaderDependencies,
