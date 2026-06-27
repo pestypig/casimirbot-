@@ -2,7 +2,7 @@
 
 Status: current-head map for structural extraction and decomposition-enabler work.
 
-Pinned source state described: S155 workspace-context-predicates extraction.
+Pinned source state described: S156 workspace-context-intents extraction.
 
 Snapshot command: `npx tsx scripts/helix-ask-route-inventory.ts --write`
 
@@ -11,8 +11,8 @@ Route snapshot:
 | Metric | Value |
 | --- | ---: |
 | File | `server/routes/agi.plan.ts` |
-| Lines | 177,264 |
-| Bytes | 7,963,934 |
+| Lines | 177,246 |
+| Bytes | 7,962,995 |
 | Top-level helper estimate | 303 helper blocks |
 | Route inventory | `artifacts/helix-ask-route-inventory.json` |
 | Machine-readable map | `artifacts/helix-ask-route-decomposition-map.json` |
@@ -43,7 +43,7 @@ Do not extract `runHelixAgentTurnRuntimeLoop` in this wave. Do not patch termina
 | `artifact-text` | service-owned | `FINAL_ANSWER_COMPOSITION_SUPPORT` / `PRESENTATION_HYGIENE` | `LOW` | `EXTRACTED` | `server/services/helix-ask/artifact-text.ts` | S151 moved pure artifact text normalization, artifact-store text lookup by kind, and instruction-only summary text detection into a dedicated service. It does not read route artifact payloads, find terminal candidates, materialize terminals, choose authority, or mutate payload/debug state. |
 | `doc-args` | service-owned | `PROMPT_INTERPRETATION` / `DOC_CONTEXT` | `LOW` | `EXTRACTED` | `server/services/helix-ask/doc-args.ts` | S152 moved explicit doc-path argument extraction into a dedicated service. It does not infer source target, mutate workspace context, open/read docs, select evidence, or choose terminal authority. |
 | `note-arg-boundaries` | service-owned | `PROMPT_INTERPRETATION` / `WORKSPACE_NOTES` | `LOW` | `EXTRACTED` | `server/services/helix-ask/note-arg-boundaries.ts` | S153 moved note/workspace action argument boundary trimming into a dedicated service behind a live bounded-note-args flag getter. S154 moved basic text/title argument readers into the same owner. It does not resolve note targets, execute note actions, mutate workspace context, or choose terminal authority. |
-| `workspace-context-predicates` | service-owned | `PROMPT_INTERPRETATION` / `WORKSPACE_CONTEXT` | `LOW` | `EXTRACTED` | `server/services/helix-ask/workspace-context-predicates.ts` | S155 moved reasoning-context mode normalization, deictic workspace-context detection, and docs-viewer context action predicates into a dedicated service behind a route-owned deictic-doc-fix flag getter. It does not mutate workspace context, infer source admission, plan doc tools, or choose terminal authority. |
+| `workspace-context-predicates` | service-owned | `PROMPT_INTERPRETATION` / `WORKSPACE_CONTEXT` | `LOW` | `EXTRACTED` | `server/services/helix-ask/workspace-context-predicates.ts` | S155 moved reasoning-context mode normalization, deictic workspace-context detection, and docs-viewer context action predicates into a dedicated service behind a route-owned deictic-doc-fix flag getter. S156 moved composite workspace status and workspace-change summary intent predicates into the same owner. It does not mutate workspace context, infer source admission, plan doc tools, or choose terminal authority. |
 | `runtime-civilization-bounds-composer-guard` | service-owned | `EVIDENCE_REENTRY` / `FINAL_ANSWER_COMPOSITION_SUPPORT` | `MEDIUM` | `EXTRACTED` | `server/services/helix-ask/runtime/runtime-civilization-bounds-composer-guard.ts` | S140 moved the civilization-bounds draft contradiction guard into a dedicated runtime service. It does not move civilization tool execution, evidence selection, final-answer draft selection, terminal materialization, terminal authority, or projection behavior. |
 | `post-observation-draft-text` | service-owned | `FINAL_ANSWER_COMPOSITION_SUPPORT` / `PRESENTATION_HYGIENE` | `MEDIUM_LOW` | `EXTRACTED` | `server/services/helix-ask/receipt-framing-suppression.ts` | S141 moved post-observation draft text cleanup into the existing receipt-framing suppression owner. It does not move final-answer draft selection, LLM invocation, terminal materialization, terminal authority, or projection behavior. |
 | `runtime-composer-artifact-collectors` | service-owned | `EVIDENCE_REENTRY` / `FINAL_ANSWER_COMPOSITION_SUPPORT` | `MEDIUM` | `EXTRACTED` | `server/services/helix-ask/runtime/runtime-composer-artifact-collectors.ts` | S142 moved composer receipt, coverage, tool-observation, and text-line collectors behind a two-callback factory using route-supplied artifact payload and string readers. It does not move artifact creation, evidence selection, final-answer drafting, terminal materialization, terminal authority, or projection behavior. |
@@ -79,7 +79,7 @@ Do not extract `runHelixAgentTurnRuntimeLoop` in this wave. Do not patch termina
 | `artifact-text` | final-answer composition support / presentation hygiene | service-owned | Normalize text from already-supplied artifact-like payloads, read artifact-store text by kind, and identify instruction-only summary placeholders. | Extracted by S151 as pure helpers. Route still owns terminal-specific artifact payload reads and workstation terminal candidate lookup. | `EXTRACTED` |
 | `doc-args` | prompt interpretation / doc context | service-owned | Extract explicit `.md`, `.txt`, and `.pdf` path-like arguments from prompt text while preserving existing order and dedupe behavior. | Extracted by S152 as a pure regex helper with behavior coverage. Route still owns workspace doc-path normalization, context mutation, source admission, and docs tool planning. | `EXTRACTED` |
 | `note-arg-boundaries` | prompt interpretation / workspace notes | service-owned | Trim note/workspace action arguments at clause and intent-tail boundaries while preserving the route-owned bounded-note-args feature flag timing through a getter dependency; read simple text/title arguments from prompt text. | Extracted by S153 with behavior coverage for bounded, unbounded, and protected title trim cases. S154 moved basic text/title readers into the same service. Route still owns note-target resolution, deictic note handling, workspace note matching, action planning, and execution. | `EXTRACTED` |
-| `workspace-context-predicates` | prompt interpretation / workspace context | service-owned | Normalize reasoning context mode, detect deictic workspace-context prompts under the route-owned deictic-doc-fix flag, and identify docs-viewer actions that mutate or preserve doc context. | Extracted by S155 with behavior coverage for flag-dependent deictic matching and doc-context action predicates. Route still owns workspace snapshot mutation, source admission, docs planning, and terminal behavior. | `EXTRACTED` |
+| `workspace-context-predicates` | prompt interpretation / workspace context | service-owned | Normalize reasoning context mode, detect deictic workspace-context prompts under the route-owned deictic-doc-fix flag, identify docs-viewer actions that mutate or preserve doc context, and classify composite workspace context/status and workspace-change summary prompts. | Extracted by S155 with behavior coverage for flag-dependent deictic matching and doc-context action predicates. S156 added composite workspace status and workspace-change summary predicate coverage. Route still owns workspace snapshot mutation, source admission, docs planning, and terminal behavior. | `EXTRACTED` |
 | `runtime-civilization-bounds-composer-guard` | final-answer composition / evidence re-entry | service-owned | Detect when a civilization-bounds model draft contradicts already-selected civilization-bounds receipt evidence. | Extracted by S140 as a pure guard over supplied model text, fallback text, selected artifacts, receipt refs, goal satisfaction state, and goal frame. It does not select evidence, draft an answer, materialize terminal products, choose authority, or mutate payload/debug state. | `EXTRACTED` |
 | `post-observation-draft-text` | final-answer composition support / presentation hygiene | service-owned | Clean post-observation draft text and then apply receipt-framing suppression. | Extracted by S141 into the existing receipt-framing suppression owner. It does not select draft authority, create a terminal product, choose terminal authority, or mutate payload/debug state. | `EXTRACTED` |
 | `runtime-composer-artifact-collectors` | final-answer composition / evidence re-entry | service-owned | Collect receipt records, coverage records, tool observation records, and nested text lines from already-materialized artifacts. | Extracted by S142 behind a two-callback dependency interface for route-owned artifact payload and string readers. It does not create observations, select evidence, draft an answer, choose authority, or mutate payload/debug state. | `EXTRACTED` |
@@ -157,7 +157,7 @@ Candidate order:
 16. `artifact-text` - `EXTRACTED_S151`
 17. `doc-args` - `EXTRACTED_S152`
 18. `note-arg-boundaries` - `EXTRACTED_S153_S154`
-19. `workspace-context-predicates` - `EXTRACTED_S155`
+19. `workspace-context-predicates` - `EXTRACTED_S155_S156`
 20. `runtime-civilization-bounds-composer-guard` - `EXTRACTED_S140`
 21. `post-observation-draft-text` - `EXTRACTED_S141`
 22. `runtime-composer-artifact-collectors` - `EXTRACTED_S142`

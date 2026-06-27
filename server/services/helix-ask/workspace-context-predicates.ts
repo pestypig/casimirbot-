@@ -42,3 +42,23 @@ export const isAskTurnDocContextPreservingAction = (action?: HelixAskDocContextA
     "locate_in_doc",
     "verify_active_doc",
   ].includes(String(action.action_id));
+
+export const isAskTurnCompositeWorkspaceContextStatusIntent = (transcript: string): boolean => {
+  const normalized = transcript.trim().toLowerCase().replace(/\s+/g, " ");
+  if (!normalized) return false;
+  const wantsDoc =
+    /\b(?:what|which)\s+(?:doc|document|paper)\b[\s\S]*\b(?:open|viewing|on|looking\s+at)\b/i.test(normalized) ||
+    /\b(?:doc|document|paper)\s+(?:is\s+)?(?:open|active|current)\b/i.test(normalized);
+  const wantsNote =
+    /\b(?:what|which)\s+note\b[\s\S]*\b(?:editing|open|active|current|on)\b/i.test(normalized) ||
+    /\bnote\s+(?:is\s+)?(?:editing|open|active|current)\b/i.test(normalized);
+  return wantsDoc && wantsNote;
+};
+
+export const isAskTurnWorkspaceChangeSummaryIntent = (transcript: string): boolean => {
+  const normalized = transcript.trim().toLowerCase().replace(/\s+/g, " ");
+  return (
+    /\b(?:summari[sz]e|recap|tell\s+me)\b[\s\S]*\b(?:what\s+changed|changes?|changed)\b[\s\S]*\bworkspace\b/i.test(normalized) ||
+    /\bwhat\s+changed\s+in\s+(?:my|the)\s+workspace\b/i.test(normalized)
+  );
+};

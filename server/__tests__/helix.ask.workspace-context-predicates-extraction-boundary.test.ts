@@ -5,8 +5,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   createShouldUseAskTurnDeicticWorkspaceContext,
+  isAskTurnCompositeWorkspaceContextStatusIntent,
   isAskTurnDocContextMutatingAction,
   isAskTurnDocContextPreservingAction,
+  isAskTurnWorkspaceChangeSummaryIntent,
   resolveAskTurnReasoningContextMode,
 } from "../services/helix-ask/workspace-context-predicates";
 
@@ -24,10 +26,14 @@ describe("Helix Ask workspace context predicates extraction boundary", () => {
     expect(routeSource).not.toMatch(/const\s+resolveAskTurnReasoningContextMode\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnDocContextMutatingAction\s*=/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnDocContextPreservingAction\s*=/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnCompositeWorkspaceContextStatusIntent\s*=/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnWorkspaceChangeSummaryIntent\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+resolveAskTurnReasoningContextMode\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+createShouldUseAskTurnDeicticWorkspaceContext\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnDocContextMutatingAction\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnDocContextPreservingAction\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+isAskTurnCompositeWorkspaceContextStatusIntent\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+isAskTurnWorkspaceChangeSummaryIntent\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");
     expect(serviceSource).not.toContain("../routes/agi.plan");
   });
@@ -50,5 +56,12 @@ describe("Helix Ask workspace context predicates extraction boundary", () => {
     expect(legacy("Where in this document does it say that?")).toBe(false);
     expect(fixed("Read this")).toBe(true);
     expect(legacy("Read this")).toBe(true);
+  });
+
+  it("preserves workspace status and change-summary classifiers", () => {
+    expect(isAskTurnCompositeWorkspaceContextStatusIntent("Which document is open and what note am I editing?")).toBe(true);
+    expect(isAskTurnCompositeWorkspaceContextStatusIntent("Which document is open?")).toBe(false);
+    expect(isAskTurnWorkspaceChangeSummaryIntent("Summarize what changed in my workspace")).toBe(true);
+    expect(isAskTurnWorkspaceChangeSummaryIntent("Summarize the document")).toBe(false);
   });
 });
