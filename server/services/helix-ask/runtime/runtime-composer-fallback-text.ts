@@ -6,6 +6,21 @@ import {
 
 type RecordLike = Record<string, unknown>;
 
+export type HelixRuntimeDocSummaryFallbackDependencies = {
+  readArtifactPayloadRecord: (artifact: HelixRuntimeComposerSupportRefArtifact) => RecordLike | null;
+  readString: (value: unknown) => string | null;
+  normalizeDocPath: (value: unknown) => string | null;
+  collectTextLines: (value: unknown, lines: string[]) => void;
+  summarizeDocSummaryForFinal: (args: {
+    transcript: string;
+    docSummaryArtifact: Record<string, unknown>;
+    activeDocPath?: string | null;
+    forceConcise?: boolean;
+  }) => string;
+  readRequestedBulletCount: (transcript: string) => number | null;
+  asksToIncludePath: (transcript: string) => boolean;
+};
+
 const readComposerFallbackString = (value: unknown): string | null =>
   typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 
@@ -26,6 +41,76 @@ const clipComposerFallbackText = (value: string | undefined, limit: number): str
   if (!value) return "";
   if (value.length <= limit) return value;
   return `${value.slice(0, limit)}...`;
+};
+
+export const createHelixRuntimeDocSummaryFallbackTextBuilder = (
+  deps: HelixRuntimeDocSummaryFallbackDependencies,
+) => (args: {
+  prompt: string;
+  artifacts: HelixRuntimeComposerSupportRefArtifact[];
+}): string => {
+  const summaryArtifact =
+    [...args.artifacts].reverse().find((artifact) => artifact.kind === "doc_summary") ??
+    [...args.artifacts].reverse().find((artifact) => ["focused_doc_answer", "doc_concept_explanation"].includes(artifact.kind));
+  if (!summaryArtifact) return "";
+  const payload = deps.readArtifactPayloadRecord(summaryArtifact);
+  if (!payload) return "";
+  const path =
+    deps.normalizeDocPath(payload.path) ??
+    deps.normalizeDocPath(payload.source_path) ??
+    deps.normalizeDocPath(payload.active_doc_path) ??
+    deps.normalizeDocPath(payload.doc_path);
+  const textLines: string[] = [];
+  deps.collectTextLines(payload.bullets, textLines);
+  deps.collectTextLines(payload.key_points, textLines);
+  deps.collectTextLines(payload.takeaways, textLines);
+  const summaryText =
+    deps.readString(payload.summary) ??
+    deps.readString(payload.summary_text) ??
+    deps.readString(payload.text) ??
+    deps.readString(payload.answer_text) ??
+    deps.readString(payload.markdown) ??
+    deps.readString(payload.content) ??
+    "";
+  const summarizedText = deps.summarizeDocSummaryForFinal({
+    transcript: args.prompt,
+    docSummaryArtifact: {
+      ...payload,
+      text: summaryText || textLines.join("\n"),
+    },
+    activeDocPath: path,
+    forceConcise: true,
+  });
+  if (summarizedText && !/no summary artifact was produced/i.test(summarizedText)) return summarizedText;
+  if (textLines.length === 0 && summaryText) {
+    const existingBullets = summaryText
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => /^\s*(?:[-*\u2022]|\d+[.)])\s+\S/.test(line));
+    if (existingBullets.length > 0) {
+      textLines.push(...existingBullets.map((line) => line.replace(/^\s*(?:[-*â€¢]|\d+[.)])\s+/, "").trim()));
+    } else {
+      textLines.push(
+        ...summaryText
+          .split(/\r?\n+/)
+          .map((line) => line.trim())
+          .filter(Boolean),
+      );
+    }
+  }
+  const requestedBulletCount = deps.readRequestedBulletCount(args.prompt) ?? 0;
+  const fallbackLines = textLines
+    .flatMap((line) => line.split(/(?<=[.!?])\s+(?=[A-Z0-9])/))
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const bulletLines = fallbackLines
+    .slice(0, Math.max(requestedBulletCount, Math.min(fallbackLines.length, 4)))
+    .map((line) => `- ${line.replace(/^\s*(?:[-*â€¢]|\d+[.)])\s+/, "")}`);
+  const output: string[] = [];
+  if (path && deps.asksToIncludePath(args.prompt)) output.push(`Path: ${path}`);
+  output.push(...bulletLines);
+  if (output.length === 0 && path) output.push(`Path: ${path}`);
+  return output.join("\n").trim();
 };
 
 export const buildHelixScholarlyResearchFallbackText = (args: {

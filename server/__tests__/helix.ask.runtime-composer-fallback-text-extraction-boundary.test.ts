@@ -13,10 +13,13 @@ describe("Helix Ask runtime composer fallback text extraction boundary", () => {
     const serviceSource = readFileSync(servicePath, "utf8");
 
     expect(routeSource).toContain("../services/helix-ask/runtime/runtime-composer-fallback-text");
+    expect(routeSource).toContain("createHelixRuntimeDocSummaryFallbackTextBuilder({");
+    expect(routeSource).not.toMatch(/const\s+buildHelixRuntimeDocSummaryFallbackText\s*=\s*\(args/);
     expect(routeSource).not.toMatch(/const\s+buildHelixScholarlyResearchFallbackText\s*=\s*\(args/);
     expect(routeSource).not.toMatch(/const\s+buildHelixInternetSearchFallbackText\s*=\s*\(args/);
     expect(routeSource).not.toMatch(/const\s+buildHelixRuntimeWorkspaceOsStatusFallbackText\s*=\s*\(artifacts/);
     expect(routeSource).toMatch(/export\s+const\s+__testHelixScholarlyFinalFallback\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+createHelixRuntimeDocSummaryFallbackTextBuilder\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+buildHelixScholarlyResearchFallbackText\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+buildHelixInternetSearchFallbackText\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+buildHelixRuntimeWorkspaceOsStatusFallbackText\s*=/);
