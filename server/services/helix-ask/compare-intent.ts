@@ -44,6 +44,16 @@ export const createAskTurnCompareIntentReaders = (
     !isAskTurnConceptualVsQuestion(transcript) &&
     HELIX_ASK_TURN_COMPARE_CUE_RE.test(deps.maskProtectedArgumentSpansForIntent(transcript).toLowerCase());
 
+  const isAskTurnDocNotesHybridCompareIntent = (transcript: string): boolean => {
+    const normalized = deps.maskProtectedArgumentSpansForIntent(transcript).trim().toLowerCase();
+    if (!normalized) return false;
+    const hasCompareCue = askTurnHasCompareCueOutsideProtectedArgs(transcript);
+    if (!hasCompareCue) return false;
+    const hasDocCue = /\b(?:doc|docs|document|paper)\b/.test(normalized);
+    const hasNotesCue = /\b(?:note|notes|notepad)\b/.test(normalized);
+    return hasDocCue && hasNotesCue;
+  };
+
   const resolveAskTurnCompareRightHandTargetArg = (transcript: string): string | null => {
     const match = transcript.match(
       /\b(?:with|against|versus|vs\.?|to)\s+(.+?)(?:\s*(?:,|\band\s+(?:tell|show|list|explain|summari[sz]e)\b|\btell\s+me\b|\bshow\s+me\b|\blist\s+the\b|\bmain\s+differences\b|\bdifferences\b|\bdeltas\b)\s*[\s\S]*|$)/i,
@@ -59,6 +69,7 @@ export const createAskTurnCompareIntentReaders = (
 
   return {
     askTurnHasCompareCueOutsideProtectedArgs,
+    isAskTurnDocNotesHybridCompareIntent,
     isAskTurnConceptualVsQuestion,
     resolveAskTurnCompareRightHandTargetArg,
   };
