@@ -79,4 +79,20 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(transcript).not.toContain("enqueueVoicePlaybackIntent");
     expect(transcript).not.toContain("runAskTurn");
   });
+
+  it("keeps Stage Play chat ledger display builders in the non-React ledger module", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const ledger = read("client/src/lib/helix/ask-stage-play-ledger.ts");
+
+    expect(pill).toContain('from "@/lib/helix/ask-stage-play-ledger"');
+    expect(pill).not.toContain("export function buildStagePlayChatLedgerEvents");
+    expect(ledger).toContain("export function buildStagePlayChatLedgerEvents");
+    expect(ledger).toContain("export type StagePlayChatLedgerEvent");
+    expect(ledger).not.toMatch(/from ["']react["']/);
+    expect(ledger).not.toContain("@/store/");
+    expect(ledger).not.toContain("@/components/helix/HelixAskPill");
+    expect(ledger).not.toContain("setAskReplies");
+    expect(ledger).not.toContain("enqueueVoicePlaybackIntent");
+    expect(ledger).not.toContain("runAskTurn");
+  });
 });
