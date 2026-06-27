@@ -394,6 +394,133 @@ describe("askLocal capsule ids", () => {
     expect(fetchMock.mock.calls[2]?.[0]).toBe("/api/agi/ask");
   });
 
+  it("preserves current job-to-direct fallback body when a job disappears", async () => {
+    const routeMetadata = {
+      schema: "helix.ask.route_metadata.v1",
+      invocationKind: "behavior_trap_characterization",
+      requiredCanonicalGoal: "transport_duplicate_execution_probe",
+      allowedCapabilities: ["repo.search"],
+      forbiddenCapabilities: ["workspace_os.write"],
+      source_target_intent: {
+        schema: "helix.ask_source_target_intent.v1",
+        target_source: "repo_code",
+        strength: "hard",
+      },
+      mandatory_next_tool: {
+        schema: "helix.mandatory_next_tool.v1",
+        tool_name: "repo.search",
+        terminal_forbidden: true,
+      },
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            jobId: "job-current-body",
+            status: "queued",
+            sessionId: "session-from-job",
+            traceId: "trace-from-job",
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            error: "not_found",
+          }),
+          {
+            status: 404,
+            headers: { "content-type": "application/json" },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            selected_final_answer: "Recovered direct answer.",
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          },
+        ),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await askLocal("Find the current repo authority owner.", {
+      question: "Find the current repo authority owner.",
+      sessionId: "session-from-client",
+      traceId: "trace-from-client",
+      route_metadata: routeMetadata,
+    });
+
+    expect(response.text).toBe("Recovered direct answer.");
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/agi/ask/jobs");
+    expect(String(fetchMock.mock.calls[1]?.[0])).toContain("/api/agi/ask/jobs/job-current-body");
+    expect(fetchMock.mock.calls[2]?.[0]).toBe("/api/agi/ask");
+    const jobBody = JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body ?? "{}"));
+    const directBody = JSON.parse(String((fetchMock.mock.calls[2]?.[1] as RequestInit).body ?? "{}"));
+    expect(directBody).toMatchObject(jobBody);
+    expect(directBody).toMatchObject({
+      sessionId: "session-from-client",
+      traceId: "trace-from-client",
+      route_metadata: routeMetadata,
+      source_target_intent: routeMetadata.source_target_intent,
+      mandatory_next_tool: routeMetadata.mandatory_next_tool,
+    });
+  });
+
+  it("falls back to legacy direct ask when jobs are unsupported under the current compatibility flag", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            error: "not_found",
+          }),
+          {
+            status: 404,
+            headers: { "content-type": "application/json" },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            text: "Legacy direct compatibility response.",
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          },
+        ),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await askLocal(undefined, {
+      question: "compatibility path probe",
+      sessionId: "session-compat",
+      traceId: "trace-compat",
+    });
+
+    expect(response.text).toBe("Legacy direct compatibility response.");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/agi/ask/jobs");
+    expect(fetchMock.mock.calls[1]?.[0]).toBe("/api/agi/ask");
+    const directBody = JSON.parse(String((fetchMock.mock.calls[1]?.[1] as RequestInit).body ?? "{}"));
+    expect(directBody).toMatchObject({
+      question: "compatibility path probe",
+      sessionId: "session-compat",
+      traceId: "trace-compat",
+    });
+  });
+
   it("maps blocked multilang responses to deterministic text when final text is missing", async () => {
     const fetchMock = vi
       .fn()
@@ -467,6 +594,27 @@ describe("askLocal lane parity default", () => {
     expect(response.text).toBe("Turn path response.");
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/agi/ask/turn");
+  });
+
+  it("characterizes empty turn responses as client fallback text without authority markers", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({}), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await askLocal(undefined, {
+      question: "empty response fallback probe",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/agi/ask/turn");
+    expect(response.text).toBe("I couldn't produce a final answer for that turn. Please retry once.");
+    expect(response.selected_final_answer).toBeUndefined();
+    expect(response.terminal_answer_authority).toBeUndefined();
+    expect((response as { authorityVerified?: unknown }).authorityVerified).toBeUndefined();
   });
 
   it("serializes structured route_metadata for mailbox wake turns without prompt text embedding", async () => {
