@@ -5,7 +5,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   createAskTurnActionArgBoundaryTrimmer,
+  isAskTurnArtifactReferenceIntent,
+  isAskTurnArtifactToClipboardIntent,
+  isAskTurnArtifactToNoteIntent,
   isAskTurnDeicticNoteLabel,
+  isAskTurnDeicticNoteWriteWithoutExplicitTitle,
   isAskTurnDeicticNoteTarget,
   isAskTurnInvalidResolvedNoteTitle,
   resolveAskTurnTextArg,
@@ -31,6 +35,10 @@ describe("Helix Ask note arg boundary extraction boundary", () => {
     expect(routeSource).not.toMatch(/const\s+isAskTurnDeicticNoteLabel\s*=/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnDeicticNoteTarget\s*=/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnInvalidResolvedNoteTitle\s*=/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnArtifactReferenceIntent\s*=/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnArtifactToNoteIntent\s*=/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnDeicticNoteWriteWithoutExplicitTitle\s*=/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnArtifactToClipboardIntent\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+createAskTurnActionArgBoundaryTrimmer\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+trimAskTurnProtectedTitleArgBoundaries\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+resolveAskTurnTextArg\s*=/);
@@ -38,6 +46,10 @@ describe("Helix Ask note arg boundary extraction boundary", () => {
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnDeicticNoteLabel\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnDeicticNoteTarget\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnInvalidResolvedNoteTitle\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+isAskTurnArtifactReferenceIntent\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+isAskTurnArtifactToNoteIntent\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+isAskTurnDeicticNoteWriteWithoutExplicitTitle\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+isAskTurnArtifactToClipboardIntent\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");
     expect(serviceSource).not.toContain("../routes/agi.plan");
   });
@@ -67,5 +79,14 @@ describe("Helix Ask note arg boundary extraction boundary", () => {
     expect(isAskTurnDeicticNoteTarget("Field Notes")).toBe(false);
     expect(isAskTurnInvalidResolvedNoteTitle("and then compare")).toBe(true);
     expect(isAskTurnInvalidResolvedNoteTitle("Field Notes")).toBe(false);
+  });
+
+  it("preserves artifact reference destination predicates", () => {
+    expect(isAskTurnArtifactReferenceIntent("copy that result to my note")).toBe(true);
+    expect(isAskTurnArtifactToNoteIntent("copy that result to my note")).toBe(true);
+    expect(isAskTurnArtifactToNoteIntent("copy that result to Field Notes")).toBe(true);
+    expect(isAskTurnDeicticNoteWriteWithoutExplicitTitle("save that answer into the note")).toBe(true);
+    expect(isAskTurnArtifactToClipboardIntent("copy that answer to clipboard")).toBe(true);
+    expect(isAskTurnArtifactToClipboardIntent("copy Field Notes to clipboard")).toBe(false);
   });
 });

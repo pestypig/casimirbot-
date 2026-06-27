@@ -80,3 +80,33 @@ export const isAskTurnInvalidResolvedNoteTitle = (value: string | null | undefin
     /\b(?:doc|docs|document|paper)\b[\s\S]*\b(?:tell|show|list|captured|main\s+point|takeaway|summary)\b/i.test(normalized)
   );
 };
+
+export const isAskTurnArtifactReferenceIntent = (transcript: string): boolean => {
+  const normalized = transcript.trim().toLowerCase();
+  return /\b(?:that|this|it|current|active|result|answer|finding|output|response)\b/.test(normalized);
+};
+
+export const isAskTurnArtifactToNoteIntent = (transcript: string): boolean => {
+  const normalized = transcript.trim().toLowerCase();
+  if (!isAskTurnArtifactReferenceIntent(transcript)) return false;
+  return (
+    /\b(?:put|save|copy|add|append|drop|store|stash|file|park|place)\b[\s\S]*\b(?:to|into|in|inside)\b[\s\S]*\b(?:note|notes|notepad)\b/.test(normalized) ||
+    /\b(?:put|save|copy|add|append|drop|store|stash|file|park|place)\b[\s\S]*\b(?:note|notes|notepad)\b/.test(normalized) ||
+    /\b(?:put|save|copy|add|append|drop|store|stash|file|park|place)\b[\s\S]*\b(?:clipboard\s+)?(?:result|answer|output|response)\b[\s\S]*\b(?:to|into|in|inside)\s+(?!clipboard\b|docs?\b|documents?\b|papers?\b)([a-z0-9][\w\s-]{1,120})$/i.test(
+      normalized,
+    )
+  );
+};
+
+export const isAskTurnDeicticNoteWriteWithoutExplicitTitle = (transcript: string): boolean => {
+  const normalized = transcript.trim().toLowerCase();
+  return /\b(?:put|save|copy|add|append|drop|store|stash|file|park|place)\b[\s\S]*\b(?:to|into|in|inside)\s+(?:the\s+|that\s+|this\s+|my\s+)?(?:note|notes|notepad)\b/.test(
+    normalized,
+  );
+};
+
+export const isAskTurnArtifactToClipboardIntent = (transcript: string): boolean => {
+  const normalized = transcript.trim().toLowerCase();
+  if (!isAskTurnArtifactReferenceIntent(transcript)) return false;
+  return /\b(?:copy|save|write|put|store)\b[\s\S]*\b(?:to|into|in)\b[\s\S]*\bclipboard\b/.test(normalized);
+};
