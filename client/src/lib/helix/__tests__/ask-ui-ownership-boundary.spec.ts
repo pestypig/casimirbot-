@@ -95,4 +95,19 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(ledger).not.toContain("enqueueVoicePlaybackIntent");
     expect(ledger).not.toContain("runAskTurn");
   });
+
+  it("keeps pure workstation chain parser helpers in the non-React workstation parser module", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const parser = read("client/src/lib/workstation/ask-workstation-parser.ts");
+
+    expect(pill).toContain('from "@/lib/workstation/ask-workstation-parser"');
+    expect(pill).not.toContain("export function parseWorkstationActionChainCommand");
+    expect(parser).toContain("export function parseWorkstationActionChainCommand");
+    expect(parser).not.toMatch(/from ["']react["']/);
+    expect(parser).not.toContain("@/store/");
+    expect(parser).not.toContain("@/components/helix/HelixAskPill");
+    expect(parser).not.toContain("dispatchHelixWorkstationAction");
+    expect(parser).not.toContain("dispatchHelixWorkstationActions");
+    expect(parser).not.toContain("useDocViewerStore");
+  });
 });
