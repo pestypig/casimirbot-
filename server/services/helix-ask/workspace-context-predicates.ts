@@ -62,3 +62,7 @@ export const isAskTurnWorkspaceChangeSummaryIntent = (transcript: string): boole
     /\bwhat\s+changed\s+in\s+(?:my|the)\s+workspace\b/i.test(normalized)
   );
 };
+
+export const isAskTurnWorkspaceHelpIntent = (transcript: string): boolean =>
+  /\bwhat\s+can\s+you\s+(?:help\s+me\s+do|do|help\s+with)\b[\s\S]*\b(?:workspace|helix|here)\b/i.test(transcript.trim()) ||
+  /\bhow\s+do\s+i\s+use\s+(?:this\s+)?(?:workspace|helix\s+ask)\b/i.test(transcript.trim());

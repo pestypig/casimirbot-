@@ -9,6 +9,7 @@ import {
   isAskTurnDocContextMutatingAction,
   isAskTurnDocContextPreservingAction,
   isAskTurnWorkspaceChangeSummaryIntent,
+  isAskTurnWorkspaceHelpIntent,
   resolveAskTurnReasoningContextMode,
 } from "../services/helix-ask/workspace-context-predicates";
 
@@ -28,12 +29,14 @@ describe("Helix Ask workspace context predicates extraction boundary", () => {
     expect(routeSource).not.toMatch(/const\s+isAskTurnDocContextPreservingAction\s*=/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnCompositeWorkspaceContextStatusIntent\s*=/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnWorkspaceChangeSummaryIntent\s*=/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnWorkspaceHelpIntent\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+resolveAskTurnReasoningContextMode\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+createShouldUseAskTurnDeicticWorkspaceContext\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnDocContextMutatingAction\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnDocContextPreservingAction\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnCompositeWorkspaceContextStatusIntent\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnWorkspaceChangeSummaryIntent\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+isAskTurnWorkspaceHelpIntent\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");
     expect(serviceSource).not.toContain("../routes/agi.plan");
   });
@@ -63,5 +66,11 @@ describe("Helix Ask workspace context predicates extraction boundary", () => {
     expect(isAskTurnCompositeWorkspaceContextStatusIntent("Which document is open?")).toBe(false);
     expect(isAskTurnWorkspaceChangeSummaryIntent("Summarize what changed in my workspace")).toBe(true);
     expect(isAskTurnWorkspaceChangeSummaryIntent("Summarize the document")).toBe(false);
+  });
+
+  it("preserves workspace-help classifier behavior", () => {
+    expect(isAskTurnWorkspaceHelpIntent("What can you help me do in this workspace?")).toBe(true);
+    expect(isAskTurnWorkspaceHelpIntent("How do I use Helix Ask?")).toBe(true);
+    expect(isAskTurnWorkspaceHelpIntent("Summarize this document")).toBe(false);
   });
 });
