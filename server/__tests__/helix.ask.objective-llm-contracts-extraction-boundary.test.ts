@@ -4,9 +4,11 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  buildHelixAskObjectivePlannerPrompt,
   buildHelixAskObjectiveRetrieveProposalPrompt,
   parseHelixAskObjectiveMiniCritique,
   parseHelixAskObjectiveMiniSynth,
+  parseHelixAskObjectivePlannerPass,
   parseHelixAskObjectiveRetrieveProposal,
 } from "../services/helix-ask/objectives/objective-llm-contracts";
 
@@ -23,12 +25,16 @@ describe("Helix Ask objective LLM contracts extraction boundary", () => {
     const serviceSource = readFileSync(servicePath, "utf8");
 
     expect(routeSource).toContain("../services/helix-ask/objectives/objective-llm-contracts");
+    expect(routeSource).not.toMatch(/^const\s+buildHelixAskObjectivePlannerPrompt\s*=/m);
+    expect(routeSource).not.toMatch(/^const\s+parseHelixAskObjectivePlannerPass\s*=/m);
     expect(routeSource).not.toMatch(/const\s+buildHelixAskObjectiveRetrieveProposalPrompt\s*=/);
     expect(routeSource).not.toMatch(/const\s+parseHelixAskObjectiveRetrieveProposal\s*=/);
     expect(routeSource).not.toMatch(/^const\s+parseHelixAskObjectiveMiniSynth\s*=/m);
     expect(routeSource).not.toMatch(/^const\s+parseHelixAskObjectiveMiniCritique\s*=/m);
     expect(routeSource).not.toMatch(/^const\s+collectHelixAskJsonParseCandidates\s*=/m);
     expect(routeSource).not.toMatch(/^const\s+normalizeHelixAskObjectiveSlotArray\s*=/m);
+    expect(serviceSource).toMatch(/export\s+const\s+buildHelixAskObjectivePlannerPrompt\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+parseHelixAskObjectivePlannerPass\s*=/);
     expect(serviceSource).toMatch(
       /export\s+const\s+buildHelixAskObjectiveRetrieveProposalPrompt\s*=/,
     );
@@ -60,6 +66,98 @@ describe("Helix Ask objective LLM contracts extraction boundary", () => {
         '{ "objective_id":"string","queries":["string"],"rationale":"string" }',
       ].join("\n"),
     );
+  });
+
+  it("preserves objective planner prompt rendering and parser normalization", () => {
+    expect(
+      buildHelixAskObjectivePlannerPrompt({
+        question: "Explain NHM2 load bearing.",
+        requiresRepoEvidence: true,
+        intentDomain: "repo",
+        outputFamily: "mechanism_process",
+        maxObjectives: 4,
+        maxRequiredSlots: 10,
+        maxQueryHints: 16,
+      }),
+    ).toContain(
+      [
+        "You are Helix Ask objective planner.",
+        "Return strict JSON only. No markdown. No commentary.",
+        "Do not emit file paths, code symbols, citations, or final-answer prose.",
+      ].join("\n"),
+    );
+
+    expect(
+      parseHelixAskObjectivePlannerPass({
+        raw: JSON.stringify({
+          goal: "Explain docs/research/nhm2.md load bearing",
+          objectives: [
+            {
+              label: "Find newtons per tile",
+              required_slots: ["numeric result", "doc evidence"],
+              query_hints: ["newtons per tile", "load bearing lbs"],
+            },
+          ],
+          grounding_mode: "repo",
+          output_family: "mechanism_process",
+          sections: [
+            {
+              id: "numeric answer",
+              title: "Numeric Answer",
+              required: true,
+              must_answer: ["Convert newtons to lbs"],
+              required_slots: ["numeric result"],
+              preferred_evidence: ["doc"],
+              kind: "answer",
+            },
+          ],
+          verbosity: "normal",
+          required_slots: ["numeric result", "doc evidence"],
+          query_hints: ["NHM2 Casimir tile newtons"],
+          clarify_question: "Which tile variant?",
+          risk_flags: ["multi objective"],
+        }),
+        maxObjectives: 4,
+        maxRequiredSlots: 10,
+        maxQueryHints: 16,
+      }),
+    ).toEqual({
+      goal: "Explain load bearing",
+      objectives: [
+        {
+          label: "Find newtons per tile",
+          required_slots: ["numeric-result", "doc-evidence"],
+          query_hints: ["newtons per tile", "load bearing lbs"],
+        },
+      ],
+      grounding_mode: "repo",
+      output_family: "mechanism_process",
+      sections: [
+        {
+          id: "numeric_answer",
+          title: "Numeric Answer",
+          required: true,
+          must_answer: ["Convert newtons to lbs"],
+          required_slots: ["numeric-result"],
+          preferred_evidence: ["doc"],
+          kind: "answer",
+        },
+      ],
+      verbosity: "normal",
+      required_slots: ["numeric-result", "doc-evidence"],
+      query_hints: ["NHM2 Casimir tile newtons"],
+      clarify_question: "Which tile variant?",
+      risk_flags: ["multi-objective"],
+    });
+
+    expect(
+      parseHelixAskObjectivePlannerPass({
+        raw: "not json",
+        maxObjectives: 4,
+        maxRequiredSlots: 10,
+        maxQueryHints: 16,
+      }),
+    ).toBeNull();
   });
 
   it("preserves retrieve-proposal parsing from nested and action-shaped JSON", () => {

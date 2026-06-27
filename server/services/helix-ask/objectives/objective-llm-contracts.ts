@@ -1,5 +1,15 @@
 import crypto from "node:crypto";
-import { normalizeHelixAskTurnContractText } from "../obligations";
+import {
+  inferHelixAskAnswerPlanSectionKindFromShape,
+  normalizeHelixAskAnswerFormatSectionKind,
+  normalizeHelixAskTurnContractText,
+  type HelixAskAnswerPlanFamily,
+} from "../obligations";
+import {
+  normalizeHelixAskTurnContractFamily,
+  normalizeHelixAskTurnContractGroundingMode,
+  type HelixAskTurnContractGroundingMode,
+} from "../contracts/turn-contract-normalizers";
 import {
   buildHelixAskObjectiveUnknownBlock,
   sanitizeHelixAskObjectiveUnknownBlock,
@@ -27,6 +37,37 @@ export type HelixAskObjectivePromptRewriteResult = {
   effectiveTokenEstimate: number;
   rewrittenHash: string | null;
   rewrittenTokenEstimate: number | null;
+};
+
+export type HelixAskObjectivePlannerVerbosity = "brief" | "normal" | "extended";
+
+export type HelixAskObjectivePlannerPassObjective = {
+  label: string;
+  required_slots?: string[];
+  query_hints?: string[];
+};
+
+export type HelixAskObjectivePlannerPassSection = {
+  id?: string;
+  title?: string;
+  required?: boolean;
+  must_answer?: string[];
+  required_slots?: string[];
+  preferred_evidence?: string[];
+  kind?: string;
+};
+
+export type HelixAskObjectivePlannerPass = {
+  goal: string;
+  objectives: HelixAskObjectivePlannerPassObjective[];
+  grounding_mode: HelixAskTurnContractGroundingMode;
+  output_family: HelixAskAnswerPlanFamily;
+  sections?: HelixAskObjectivePlannerPassSection[];
+  verbosity?: HelixAskObjectivePlannerVerbosity | null;
+  required_slots?: string[];
+  query_hints?: string[];
+  clarify_question?: string;
+  risk_flags?: string[];
 };
 
 export type HelixAskObjectiveMiniSynthStatus = "covered" | "partial" | "blocked";
@@ -76,6 +117,17 @@ const extractJsonObject = (text: string): string | null => {
   const end = text.lastIndexOf("}");
   if (start === -1 || end === -1 || end <= start) return null;
   return text.slice(start, end + 1);
+};
+
+const slugifyHelixAskAnswerPlanSectionId = (value: string, fallback: string): string => {
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[`"']/g, "")
+    .replace(/[^\w]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return normalized || fallback;
 };
 
 const buildHelixAskObjectivePromptRewriteLines = (
@@ -159,6 +211,182 @@ const normalizeHelixAskObjectiveSlotArray = (value: unknown): string[] => {
       .slice(0, 8);
   }
   return [];
+};
+
+export const buildHelixAskObjectivePlannerPrompt = (args: {
+  question: string;
+  requiresRepoEvidence: boolean;
+  intentDomain: string;
+  outputFamily: HelixAskAnswerPlanFamily;
+  maxObjectives: number;
+  maxRequiredSlots: number;
+  maxQueryHints: number;
+}): string => {
+  return [
+    "You are Helix Ask objective planner.",
+    "Return strict JSON only. No markdown. No commentary.",
+    "Do not emit file paths, code symbols, citations, or final-answer prose.",
+    "Do not use placeholder section titles or objective labels such as Plan for X or Notes: See X.",
+    `Use one of these output_family values: definition_overview, mechanism_process, equation_formalism, comparison_tradeoff, troubleshooting_diagnosis, implementation_code_path, roadmap_planning, recommendation_decision, general_overview.`,
+    "Use grounding_mode repo when repo grounding is required, hybrid when both repo and open-world planning are useful, open when repo grounding is not required.",
+    `Limit objectives to ${args.maxObjectives}.`,
+    `Limit required_slots to ${args.maxRequiredSlots}.`,
+    `Limit query_hints to ${args.maxQueryHints}.`,
+    "Choose a prompt-fitting visible answer format. Sections should describe what the final answer must cover, not final answer prose.",
+    "Schema:",
+    '{',
+    '  "goal": "string",',
+    '  "objectives": [{"label":"string","required_slots":["string"],"query_hints":["string"]}],',
+    '  "grounding_mode": "repo|open|hybrid",',
+    '  "output_family": "definition_overview|mechanism_process|equation_formalism|comparison_tradeoff|troubleshooting_diagnosis|implementation_code_path|roadmap_planning|recommendation_decision|general_overview",',
+    '  "sections": [{"id":"string","title":"string","required":true,"must_answer":["string"],"required_slots":["string"],"preferred_evidence":["doc|code|test|runtime"],"kind":"answer|definition|mechanism|comparison|repo|diagnosis|roadmap|gaps|sources"}],',
+    '  "verbosity": "brief|normal|extended",',
+    '  "required_slots": ["string"],',
+    '  "query_hints": ["string"],',
+    '  "clarify_question": "string",',
+    '  "risk_flags": ["string"]',
+    '}',
+    `Repo grounding required: ${args.requiresRepoEvidence ? "yes" : "no"}.`,
+    `Intent domain: ${args.intentDomain}.`,
+    `Current family prior: ${args.outputFamily}.`,
+    "",
+    `Question: ${args.question}`,
+  ].join("\n");
+};
+
+export const parseHelixAskObjectivePlannerPass = (args: {
+  raw: string;
+  maxObjectives: number;
+  maxRequiredSlots: number;
+  maxQueryHints: number;
+}): HelixAskObjectivePlannerPass | null => {
+  const trimmed = String(args.raw ?? "").trim();
+  if (!trimmed) return null;
+  const jsonCandidate = extractJsonObject(trimmed) ?? trimmed;
+  try {
+    const parsed = JSON.parse(jsonCandidate) as Record<string, unknown>;
+    const goal = normalizeHelixAskTurnContractText(String(parsed.goal ?? ""), 180);
+    const outputFamily = normalizeHelixAskTurnContractFamily(String(parsed.output_family ?? ""));
+    const groundingMode = normalizeHelixAskTurnContractGroundingMode(
+      String(parsed.grounding_mode ?? ""),
+    );
+    const verbosityRaw = String(parsed.verbosity ?? "")
+      .trim()
+      .toLowerCase();
+    const plannerVerbosity =
+      verbosityRaw === "brief" || verbosityRaw === "normal" || verbosityRaw === "extended"
+        ? (verbosityRaw as HelixAskObjectivePlannerVerbosity)
+        : null;
+    const objectiveRaw = Array.isArray(parsed.objectives) ? parsed.objectives : [];
+    const objectives: HelixAskObjectivePlannerPassObjective[] = [];
+    for (const entry of objectiveRaw) {
+      if (objectives.length >= args.maxObjectives) break;
+      if (typeof entry === "string") {
+        const label = normalizeHelixAskTurnContractText(entry, 180);
+        if (label) {
+          objectives.push({ label });
+        }
+        continue;
+      }
+      if (!entry || typeof entry !== "object") continue;
+      const record = entry as Record<string, unknown>;
+      const label = normalizeHelixAskTurnContractText(String(record.label ?? ""), 180);
+      if (!label) continue;
+      const requiredSlots = Array.isArray(record.required_slots)
+        ? record.required_slots
+            .map((slot) => normalizeObjectiveSlotId(String(slot ?? "")))
+            .filter((slot): slot is string => Boolean(slot))
+            .slice(0, 4)
+        : [];
+      const queryHints = Array.isArray(record.query_hints)
+        ? record.query_hints
+            .map((hint) => normalizeHelixAskTurnContractText(String(hint ?? ""), 120))
+            .filter((hint): hint is string => Boolean(hint))
+            .slice(0, 5)
+        : [];
+      objectives.push({
+        label,
+        required_slots: requiredSlots,
+        query_hints: queryHints,
+      });
+    }
+    if (!goal || !outputFamily || !groundingMode || objectives.length === 0) {
+      return null;
+    }
+    const sectionRaw = Array.isArray(parsed.sections) ? parsed.sections : [];
+    const sections: HelixAskObjectivePlannerPassSection[] = [];
+    for (const [index, entry] of sectionRaw.entries()) {
+      if (sections.length >= 8) break;
+      if (!entry || typeof entry !== "object") continue;
+      const record = entry as Record<string, unknown>;
+      const title = normalizeHelixAskTurnContractText(String(record.title ?? ""), 72);
+      if (!title) continue;
+      const id = slugifyHelixAskAnswerPlanSectionId(String(record.id ?? title), `section_${index + 1}`);
+      const requiredSlots = Array.isArray(record.required_slots)
+        ? record.required_slots
+            .map((slot) => normalizeObjectiveSlotId(String(slot ?? "")))
+            .filter(Boolean)
+            .slice(0, 6)
+        : [];
+      const mustAnswer = Array.isArray(record.must_answer)
+        ? record.must_answer
+            .map((item) => normalizeHelixAskTurnContractText(String(item ?? ""), 160))
+            .filter(Boolean)
+            .slice(0, 4)
+        : [];
+      sections.push({
+        id,
+        title,
+        required: record.required !== false,
+        must_answer: mustAnswer,
+        required_slots: requiredSlots,
+        preferred_evidence: Array.isArray(record.preferred_evidence)
+          ? record.preferred_evidence.map((item) => String(item ?? ""))
+          : [],
+        kind: normalizeHelixAskAnswerFormatSectionKind(
+          String(record.kind ?? ""),
+          inferHelixAskAnswerPlanSectionKindFromShape({
+            family: outputFamily,
+            id,
+            title,
+            requiredSlots,
+          }),
+        ),
+      });
+    }
+    return {
+      goal,
+      objectives,
+      grounding_mode: groundingMode,
+      output_family: outputFamily,
+      sections,
+      verbosity: plannerVerbosity,
+      required_slots: Array.isArray(parsed.required_slots)
+        ? parsed.required_slots
+            .map((slot) => normalizeObjectiveSlotId(String(slot ?? "")))
+            .filter(Boolean)
+            .slice(0, args.maxRequiredSlots)
+        : [],
+      query_hints: Array.isArray(parsed.query_hints)
+        ? parsed.query_hints
+            .map((hint) => normalizeHelixAskTurnContractText(String(hint ?? ""), 120))
+            .filter(Boolean)
+            .slice(0, args.maxQueryHints)
+        : [],
+      clarify_question: normalizeHelixAskTurnContractText(
+        String(parsed.clarify_question ?? ""),
+        180,
+      ),
+      risk_flags: Array.isArray(parsed.risk_flags)
+        ? parsed.risk_flags
+            .map((flag) => normalizeObjectiveSlotId(String(flag ?? "")))
+            .filter(Boolean)
+            .slice(0, 8)
+        : [],
+    };
+  } catch {
+    return null;
+  }
 };
 
 export const resolveHelixAskObjectivePromptRewriteMode = (): HelixAskObjectivePromptRewriteMode => {

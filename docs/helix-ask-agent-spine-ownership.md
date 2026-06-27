@@ -20,7 +20,7 @@ terminal eligibility, projection discipline, and debug traces.
 | Stage | Status | Canonical current owner | Temporary compatibility owner | Route-local implementation remaining | Principal input | Principal output | May write | Must not write | Callers | Consumers | Focused enforcement tests | Unresolved conflict |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Request and turn context | PARTIAL_SERVICE_OWNER | `server/services/helix-ask/runtime/request-context.ts` | `server/routes/agi.plan.ts` | request/transport shell and late route context assembly | Express request, payload, thread/session ids | route context, history events | request metadata, history lifecycle events | terminal authority, final answer text | `/api/agi/ask` route | Ask execution, debug export | request-context import/boundary checks | route still owns transport order |
-| Prompt interpretation | PARTIAL_SERVICE_OWNER | `server/services/helix-ask/prompt-interpretation.ts`, `contracts/turn-contract-seed-slots.ts`, `contracts/turn-contract-hash.ts`, `contracts/intent-contract-hash.ts`, `contracts/turn-contract-text.ts`, `contracts/turn-contract-normalizers.ts`, `contracts/turn-contract-slots.ts`, `contracts/turn-contract-retrieval-plan.ts`, plus route-local classifiers | `server/routes/agi.plan.ts` | large classifier bands and canonical goal-frame policy | prompt, workspace context, source hints | prompt contract, compound contract, goal frame inputs | interpretation records, compound contract | execution, terminal authority | route Ask path | source admission, contract builder | prompt-solving benchmark | classifiers still duplicate authority-like signals |
+| Prompt interpretation | PARTIAL_SERVICE_OWNER | `server/services/helix-ask/prompt-interpretation.ts`, `contracts/turn-contract-seed-slots.ts`, `contracts/turn-contract-hash.ts`, `contracts/intent-contract-hash.ts`, `contracts/turn-contract-text.ts`, `contracts/turn-contract-normalizers.ts`, `contracts/turn-contract-slots.ts`, `contracts/turn-contract-objective-planning.ts`, `contracts/turn-contract-retrieval-plan.ts`, `objectives/objective-llm-contracts.ts`, plus route-local classifiers | `server/routes/agi.plan.ts` | large classifier bands and canonical goal-frame policy | prompt, workspace context, source hints | prompt contract, compound contract, objective planner pass, goal frame inputs | interpretation records, compound contract, objective planner parse packet | execution, terminal authority | route Ask path | source admission, contract builder | prompt-solving benchmark, objective LLM contracts boundary | classifiers still duplicate authority-like signals |
 | Intent and source arbitration | PARTIAL_SERVICE_OWNER | `ask-source-target-arbitrator`, `evidence-target-arbitration`, `route-product-contract` services | `server/routes/agi.plan.ts` | glue and hard-gate route selection | prompt interpretation, route candidates | source target, evidence target, product contract | route/source/product policy records | tool execution, terminal text | Ask execution | capability plan, terminal gates | api parity matrix, prompt-solving benchmark | route still coordinates precedence |
 | Capability planning and selection | PARTIAL_SERVICE_OWNER | `runtime/capability-selection-result.ts`, `runtime/decision-source-map.ts`, capability-plan services | `server/routes/agi.plan.ts` | capability registry setup and selected-action compatibility wrappers | universal goal frame, selected action, payload | `capability_selection_result`, decision source map | capability selection result, decision-source debug | observations, terminal answer | route runtime setup | observation decision, debug export | policy-adjacent characterization, capability selection boundary | selected capability can still be mirrored by other ledgers |
 | Model next-step decisions | ROUTE_OWNED_PENDING_EXTRACTION | `server/routes/agi.plan.ts` | model-turn packet/executor services | runtime-loop bands | current state, capabilities, observations | `agent_step_decision` | model decision audits, selected next step | direct execution, terminal authority | private runtime loop | tool execution, observation packet | live-spine smoke when keyed, deterministic model-turn tests | still route-owned and closure-heavy |
@@ -102,6 +102,8 @@ terminal eligibility, projection discipline, and debug traces.
 | S126 | evidence path classification | `server/services/helix-ask/surface/evidence-path-classification.ts` | SERVICE_OWNED for evidence path key normalization, doc/code/tree path classification, code-floor counts, and tree-citation stats only |
 | S127 | objective mini-synth/mini-critic parsers | `server/services/helix-ask/objectives/objective-llm-contracts.ts` | SERVICE_OWNED for deterministic parsing of already-produced mini-synth and mini-critic outputs only |
 | S128 | objective scoped-recovery route-compatible enforcement | `server/services/helix-ask/retrieval/objective-scoped-recovery.ts` | SERVICE_OWNED for query variant construction and route-compatible missing scoped-retrieval enforcement only |
+| S129 | objective planner prompt/parser contract | `server/services/helix-ask/objectives/objective-llm-contracts.ts` | SERVICE_OWNED for deterministic objective planner prompt rendering and parser normalization only |
+| S130 | turn-contract objective planning | `server/services/helix-ask/contracts/turn-contract-objective-planning.ts` | SERVICE_OWNED for deterministic objective fragment splitting, slot/query-hint inference, and prompt-research objective/section projection only |
 
 ## Deferred Ownership Debt
 
@@ -134,9 +136,9 @@ terminal eligibility, projection discipline, and debug traces.
   deterministic assembly from supplied inputs.
 - Objective mini-answer validation remains dependent on route-owned finalization
   policy; S113 moved only status counting.
-- Objective mini-synth remains dependent on route-owned LLM invocation, parsing,
+- Objective mini-synth remains dependent on route-owned LLM invocation, parser
   repair, and critique policy; S116 moved only the deterministic prompt renderer.
-- Objective mini-critic remains dependent on route-owned LLM invocation, parsing,
+- Objective mini-critic remains dependent on route-owned LLM invocation, parser
   repair, and critique application policy; S117 moved only deterministic prompt
   rendering.
 - Objective mini-synth and mini-critic parsing are service-owned after S127;
@@ -154,8 +156,15 @@ terminal eligibility, projection discipline, and debug traces.
   route-owned wrappers still control transition-log clipping, runtime ordering,
   retrieval recovery, and LLM objective stages.
 - Objective retrieve-proposal prompt rendering and proposal parsing are
-  service-owned after S125; route-local mini-synth and mini-critic parsers
-  remain pending separate type/equivalence characterization.
+  service-owned after S125; mini-synth and mini-critic parsers are
+  service-owned after S127.
+- Objective planner prompt rendering and planner-pass parsing are service-owned
+  after S129; route-owned LLM invocation, parsed-pass application, and planner
+  repair policy remain unresolved.
+- Turn-contract objective fragment splitting, slot/query-hint inference, and
+  prompt-research objective/section projection are service-owned after S130;
+  route-owned family/specificity selection, planner-pass application,
+  obligations assembly, and final turn-contract construction remain unresolved.
 - Objective scoped-recovery query variants and missing scoped-retrieval
   enforcement are service-owned after S128; the service intentionally keeps
   route-compatible enforcement exports separate from the newer optional-slot
