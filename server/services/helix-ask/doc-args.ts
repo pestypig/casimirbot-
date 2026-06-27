@@ -151,6 +151,38 @@ export const createAskTurnActiveDocIdentityReaders = (
   };
 };
 
+export type HelixAskOpenDocGoalIntentReaderDependencies = {
+  isAskTurnDocsPanelOpenIntent: (transcript: string) => boolean;
+  isAskTurnDottieVoiceReadoutIntent: (transcript: string) => boolean;
+  isAskTurnOpenDocSearchIntent: (transcript: string) => boolean;
+  isAskTurnOpenLatestDocIntent: (transcript: string) => boolean;
+  isAskTurnReadAloudRequested: (transcript: string) => boolean;
+  isAskTurnTopicQualifiedLatestDocIntent: (transcript: string) => boolean;
+};
+
+export const createAskTurnOpenDocGoalIntentReader = (
+  deps: HelixAskOpenDocGoalIntentReaderDependencies,
+) => {
+  const isAskTurnOpenDocGoalIntent = (transcript: string): boolean =>
+    !deps.isAskTurnDocsPanelOpenIntent(transcript) &&
+    (
+      deps.isAskTurnOpenDocSearchIntent(transcript) ||
+      deps.isAskTurnOpenLatestDocIntent(transcript) ||
+      deps.isAskTurnTopicQualifiedLatestDocIntent(transcript) ||
+      (deps.isAskTurnReadAloudRequested(transcript) && !deps.isAskTurnDottieVoiceReadoutIntent(transcript)) ||
+      /\b(?:open|open\s+up|show|view|pull\s+up|bring\s+up|load)\b[\s\S]{0,140}\b(?:NHM[-\s]?2|white\s*paper|whitepaper|paper|document|doc)\b[\s\S]{0,100}\b(?:docs?|docks?|documents?|viewer)\b/i.test(
+        transcript,
+      ) ||
+      /\b(?:find|get|locate|open|view|show|pull\s+up|bring\s+up)\b[\s\S]{0,80}\b(?:doc|docs|document|paper|file|source|audit|artifact)\b[\s\S]{0,80}\b(?:about|on|for|related\s+to|matching)\b/i.test(
+        transcript,
+      )
+    );
+
+  return {
+    isAskTurnOpenDocGoalIntent,
+  };
+};
+
 export const HELIX_ASK_OPEN_DOC_NOUN_PATTERN = String.raw`(?:doc|docs|document|documents|paper|papers|writeup|writeups|artifact|artifacts|result|results|thing|things|report|reports|file|files)`;
 export const HELIX_ASK_RECENT_DOC_PATTERN = String.raw`(?:latest|newest|freshest|most\s+recent|recent)`;
 
