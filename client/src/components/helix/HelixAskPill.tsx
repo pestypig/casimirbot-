@@ -71,6 +71,26 @@ import {
   coerceHelixAskLiveEventBusPayload,
 } from "@/lib/helix/liveEventsBus";
 import {
+  buildVisibleResolvedTurn,
+  chooseVisibleFinalText,
+  readHelixAskFinalAnswerSourceLabel,
+  renderTypedFailureFallback,
+  resolveHelixAskFinalAnswerPresentation,
+  type HelixAskFinalAnswerPresentation,
+  type VisibleResolvedTurn,
+} from "@/lib/helix/ask-terminal-projection";
+export {
+  buildVisibleResolvedTurn,
+  chooseVisibleFinalText,
+  readHelixAskFinalAnswerSourceLabel,
+  renderTypedFailureFallback,
+  resolveHelixAskFinalAnswerPresentation,
+};
+export type {
+  HelixAskFinalAnswerPresentation,
+  VisibleResolvedTurn,
+} from "@/lib/helix/ask-terminal-projection";
+import {
   STAGE_PLAY_LIVE_SOURCE_MAIL_WAKE_TRANSCRIPT_EVENT,
   type StagePlayLiveSourceMailWakeTranscriptEventDetail,
 } from "@/lib/helix/liveSourceMailWakeTranscriptEvent";
@@ -80,8 +100,6 @@ import {
 } from "@/lib/helix/liveSourceMailRefreshEvent";
 import type { StagePlayLiveSourceMailTranscriptEntryV1 } from "@shared/contracts/stage-play-live-source-mail.v1";
 import {
-  formatHelixVisibleTerminalSourceLabel,
-  normalizeFinalAnswerSourceForTerminalKind,
   resolveHelixVisibleTerminal as resolveHelixVisibleTerminalCore,
   shouldShowHelixRuntimeStopReason,
 } from "@/lib/helix/resolveHelixVisibleTerminal";
@@ -8058,16 +8076,6 @@ type HelixAskVisibleTerminalResolution = {
   backendTerminalText: string | null;
 };
 
-type VisibleResolvedTurn = {
-  active_turn_id: string;
-  primary_route_label: string;
-  primary_terminal_label: "final_answer" | "final_failure" | "pending_input";
-  primary_source_label: string;
-  selected_final_answer: string;
-  terminal_error_code?: string | null;
-  pending_server_request_present: boolean;
-};
-
 function readHelixAskTerminalText(record: Record<string, unknown> | null | undefined): string | null {
   if (!record) return null;
   const text = typeof record.text === "string" ? record.text.trim() : "";
@@ -8203,340 +8211,6 @@ const renderLiveAnswerEnvironmentContextPackAnswer = (contextPack: unknown): str
   const text = [summary, ...utilityLines, ...missingEvidenceLines, ...semanticLines, ...renderedLines].filter(Boolean).join("\n").trim();
   return text || null;
 };
-
-export function buildVisibleResolvedTurn(reply: HelixAskReply): VisibleResolvedTurn {
-  const replyRecord = readAgentLoopAuditRecord(reply);
-  const debugRecord = readAgentLoopAuditRecord(reply.debug);
-  const terminalAuthorityRecord =
-    readAgentLoopAuditRecord(replyRecord?.terminal_answer_authority) ??
-    readAgentLoopAuditRecord(debugRecord?.terminal_answer_authority);
-  const terminalAuthorityTrusted =
-    terminalAuthorityRecord?.schema === "helix.turn_terminal_authority.v1" &&
-    terminalAuthorityRecord.server_authoritative === true;
-  const summary = readHelixResolvedTurnSummary(reply);
-  const terminalResolution = resolveHelixVisibleTerminalCore(reply);
-  const terminalResolutionIsFinalAnswer =
-    Boolean(terminalResolution.backendTerminalText) &&
-    terminalResolution.source !== "typed_failure" &&
-    terminalResolution.source !== "terminal_authority_missing" &&
-    terminalResolution.finalAnswerSource !== "typed_failure" &&
-    terminalResolution.finalAnswerSource !== "request_user_input" &&
-    terminalResolution.terminalKind !== "failure" &&
-    terminalResolution.terminalKind !== "request_user_input" &&
-    terminalResolution.terminalArtifactKind !== "typed_failure";
-  const pendingRequest = readHelixTopLevelPendingServerRequest(reply);
-  const pendingPresent = Boolean(pendingRequest) && !terminalResolutionIsFinalAnswer;
-  const statusCandidate =
-    terminalResolutionIsFinalAnswer
-      ? "final_answer"
-      : coerceText(summary?.final_status).trim() ||
-        coerceText(readAgentLoopAuditRecord(replyRecord?.satisfaction_report ?? debugRecord?.satisfaction_report)?.terminal_kind).trim() ||
-        (pendingPresent ? "pending_input" : reply.ok === false ? "final_failure" : "final_answer");
-  const normalizedStatus: VisibleResolvedTurn["primary_terminal_label"] =
-    statusCandidate === "pending_input" && pendingPresent
-      ? "pending_input"
-      : statusCandidate === "final_failure" || (statusCandidate === "pending_input" && !pendingPresent)
-        ? "final_failure"
-        : "final_answer";
-  const terminalErrorCode =
-    terminalResolutionIsFinalAnswer
-      ? null
-      : terminalResolution.terminalErrorCode ||
-        coerceText(replyRecord?.terminal_error_code).trim() ||
-        coerceText(debugRecord?.terminal_error_code).trim() ||
-        coerceText(summary?.terminal_error_code).trim() ||
-        (
-          !pendingPresent &&
-          reply.ok !== false &&
-          !terminalAuthorityTrusted &&
-          (
-            coerceText(replyRecord?.selected_final_answer).trim() ||
-            coerceText(debugRecord?.selected_final_answer).trim() ||
-            coerceText(reply.assistant_answer).trim() ||
-            coerceText(reply.text).trim() ||
-            coerceText(reply.content).trim()
-          )
-            ? "terminal_authority_missing"
-            : null
-        );
-  const explicitFinalAnswerSource =
-    coerceText(terminalResolution.finalAnswerSource).trim() ||
-    coerceText(replyRecord?.final_answer_source).trim() ||
-    coerceText(debugRecord?.final_answer_source).trim() ||
-    coerceText(terminalAuthorityRecord?.final_answer_source).trim();
-  const finalAnswerSource =
-    explicitFinalAnswerSource ||
-    (terminalErrorCode ? "typed_failure" : "unknown");
-  const explicitTypedFailureSignal =
-    explicitFinalAnswerSource === "typed_failure" ||
-    terminalResolution.terminalKind === "failure" ||
-    terminalResolution.terminalArtifactKind === "typed_failure" ||
-    coerceText(summary?.terminal_artifact_kind).trim() === "typed_failure" ||
-    coerceText(replyRecord?.terminal_artifact_kind).trim() === "typed_failure" ||
-    coerceText(debugRecord?.terminal_artifact_kind).trim() === "typed_failure" ||
-    coerceText(terminalAuthorityRecord?.terminal_artifact_kind).trim() === "typed_failure";
-  const isTypedFailure = finalAnswerSource === "typed_failure" || Boolean(terminalErrorCode);
-  const liveFinalAnswer = readLatestAuthoritativeFinalLiveEventText(reply);
-  const terminalAuthorityText = coerceText(terminalAuthorityRecord?.terminal_text_preview).trim();
-  const typedFailureRecord =
-    readAgentLoopAuditRecord(replyRecord?.typed_failure) ??
-    readAgentLoopAuditRecord(debugRecord?.typed_failure);
-  const selectedTypedFailureAnswer =
-    explicitTypedFailureSignal
-      ? (
-          coerceText(replyRecord?.selected_final_answer).trim() ||
-          coerceText(debugRecord?.selected_final_answer).trim() ||
-          coerceText(typedFailureRecord?.answer_text).trim() ||
-          coerceText(typedFailureRecord?.text).trim() ||
-          coerceText(replyRecord?.terminal_failure_text).trim() ||
-          coerceText(debugRecord?.terminal_failure_text).trim()
-        )
-      : "";
-  const selectedFinalAnswerCandidate =
-    isTypedFailure
-      ? selectedTypedFailureAnswer || terminalAuthorityText || terminalResolution.text || renderTypedFailureFallback(terminalErrorCode)
-      : terminalAuthorityTrusted && terminalAuthorityText
-        ? terminalAuthorityText
-        : "";
-  const canonicalGoalKind = readHelixCanonicalGoalKind(reply);
-  const terminalArtifactKind =
-    coerceText(terminalResolution.terminalArtifactKind).trim() ||
-    coerceText(summary?.terminal_artifact_kind).trim() ||
-    coerceText(replyRecord?.terminal_artifact_kind).trim() ||
-    coerceText(debugRecord?.terminal_artifact_kind).trim() ||
-    coerceText(terminalAuthorityRecord?.terminal_artifact_kind).trim();
-  const effectiveFinalAnswerSource =
-    normalizeFinalAnswerSourceForTerminalKind(finalAnswerSource, terminalArtifactKind) ??
-    finalAnswerSource;
-  const situationContextAnswer =
-    effectiveFinalAnswerSource === "artifact_synthesis" && terminalArtifactKind === "situation_context_pack"
-      ? (
-          coerceText(replyRecord?.assistant_answer).trim() ||
-          coerceText(replyRecord?.answer).trim() ||
-          coerceText(replyRecord?.text).trim() ||
-          liveFinalAnswer
-        )
-      : "";
-  const canonicalSelectedFinalAnswer =
-    !isTypedFailure && terminalArtifactKind === "model_synthesized_answer" && effectiveFinalAnswerSource === "final_answer_draft"
-      ? (
-          coerceText(replyRecord?.selected_final_answer).trim() ||
-          coerceText(debugRecord?.selected_final_answer).trim()
-        )
-      : "";
-  const selectedFinalAnswerRaw =
-    terminalResolutionIsFinalAnswer
-      ? terminalResolution.text
-      : canonicalSelectedFinalAnswer
-      ? canonicalSelectedFinalAnswer
-      : isTypedFailure
-        ? selectedFinalAnswerCandidate
-      : terminalResolution.text &&
-    terminalResolution.source !== "legacy_shadow" &&
-    terminalResolution.source !== "empty" &&
-    terminalResolution.source !== "typed_failure"
-      ? terminalResolution.text
-      : terminalResolution.source === "typed_failure"
-      ? terminalResolution.text
-      : situationContextAnswer
-        ? situationContextAnswer
-      : !isTypedFailure && liveFinalAnswer && isInvalidTerminalAnswerText(selectedFinalAnswerCandidate)
-      ? liveFinalAnswer
-      : selectedFinalAnswerCandidate;
-  const selectedFinalAnswer =
-    pendingPresent
-      ? ""
-      : renderDocOpenTerminalFromLocationText({
-        text: selectedFinalAnswerRaw,
-        goalKind: canonicalGoalKind,
-        terminalKind: terminalArtifactKind,
-      }) ?? selectedFinalAnswerRaw;
-  const summaryRouteLabel = coerceText(summary?.resolved_route_label).trim();
-  const routeLabel =
-    terminalArtifactKind === "workstation_tool_evaluation" && /model_synthesized_answer/i.test(summaryRouteLabel)
-      ? `${canonicalGoalKind} / workstation_tool_evaluation`
-      : summaryRouteLabel || `${canonicalGoalKind} / ${effectiveFinalAnswerSource}`;
-  return {
-    active_turn_id: coerceText(reply.turn_id).trim() || coerceText(summary?.turn_id).trim() || reply.id,
-    primary_route_label: routeLabel,
-    primary_terminal_label: normalizedStatus,
-    primary_source_label: formatHelixVisibleTerminalSourceLabel({
-      terminalArtifactKind,
-      finalAnswerSource: effectiveFinalAnswerSource,
-    }),
-    selected_final_answer: selectedFinalAnswer,
-    terminal_error_code: terminalErrorCode,
-    pending_server_request_present: pendingPresent,
-  };
-}
-
-export function chooseVisibleFinalText(reply: HelixAskReply): string {
-  const visible = buildVisibleResolvedTurn(reply);
-  const replyRecord = readAgentLoopAuditRecord(reply);
-  if (visible.primary_source_label.replace(/\s+/g, "_") === "typed_failure" || visible.terminal_error_code) {
-    return visible.selected_final_answer || renderTypedFailureFallback(visible.terminal_error_code);
-  }
-  if (!visible.selected_final_answer && replyRecord?.ok === false) {
-    return renderTypedFailureFallback("terminal_authority_missing");
-  }
-  return visible.selected_final_answer || "";
-}
-
-const renderTypedFailureFallback = (code?: string | null): string => {
-  const normalized = coerceText(code).trim();
-  if (normalized === "synthesis_unavailable") {
-    return "I found candidate evidence, but no current-turn synthesis artifact answered the requested conclusion.\nCause: synthesis_unavailable.";
-  }
-  if (normalized === "equation_source_unavailable") {
-    return "I looked for an equation-bearing source, but no current-turn equation artifact satisfied the source contract.\nCause: equation_source_unavailable.";
-  }
-  if (normalized === HELIX_ASK_BACKEND_DEBUG_MATERIALIZATION_ERROR_CODE) {
-    return HELIX_ASK_BACKEND_DEBUG_MATERIALIZATION_TEXT;
-  }
-  if (normalized === HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE) {
-    return HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT;
-  }
-  return normalized ? `I could not complete that turn.\nCause: ${normalized}.` : "I could not complete that turn.";
-};
-
-const readTerminalAnswerAuthorityRecord = (value: unknown): Record<string, unknown> | null => {
-  const record = readAgentLoopAuditRecord(value);
-  return record?.schema === "helix.turn_terminal_authority.v1" && record.server_authoritative === true
-    ? record
-    : null;
-};
-
-const readTerminalSourceLabelCandidate = (
-  record: Record<string, unknown> | null | undefined,
-  fallbackFinalAnswerSource?: string | null,
-): string | null => {
-  const terminalKind =
-    typeof record?.terminal_artifact_kind === "string" && record.terminal_artifact_kind.trim()
-      ? record.terminal_artifact_kind.trim()
-      : typeof record?.selected_terminal_artifact_kind === "string" && record.selected_terminal_artifact_kind.trim()
-        ? record.selected_terminal_artifact_kind.trim()
-      : null;
-  const recordSource =
-    typeof record?.final_answer_source === "string" && record.final_answer_source.trim()
-      ? record.final_answer_source.trim()
-      : typeof record?.source === "string" && record.source.trim()
-        ? record.source.trim()
-      : null;
-  if (!terminalKind && !recordSource) return null;
-  return formatHelixVisibleTerminalSourceLabel({
-    terminalArtifactKind: terminalKind,
-    finalAnswerSource: normalizeFinalAnswerSourceForTerminalKind(recordSource ?? fallbackFinalAnswerSource ?? null, terminalKind),
-  });
-};
-
-export function readHelixAskFinalAnswerSourceLabel(...sources: unknown[]): string | null {
-  for (const source of sources) {
-    const record = readAgentLoopAuditRecord(source);
-    if (!record) continue;
-    const finalAnswerDraft = readAgentLoopAuditRecord(record.final_answer_draft);
-    const finalAnswerDraftAuthority =
-      typeof finalAnswerDraft?.authority === "string" && finalAnswerDraft.authority.trim()
-        ? finalAnswerDraft.authority.trim()
-        : null;
-    if (finalAnswerDraftAuthority === "deterministic_receipt_fallback") {
-      return "deterministic receipt fallback";
-    }
-    const directSource =
-      typeof record.final_answer_source === "string" && record.final_answer_source.trim()
-        ? record.final_answer_source.trim()
-        : null;
-    const resolvedSummary = readAgentLoopAuditRecord(record.resolved_turn_summary);
-    const terminalAuthorityRecord = readTerminalAnswerAuthorityRecord(record.terminal_answer_authority);
-    const terminalAuthoritySingleWriterRecord = readAgentLoopAuditRecord(record.terminal_authority_single_writer);
-    const debugRecord = readAgentLoopAuditRecord(record.debug);
-    const debugResolvedSummary = readAgentLoopAuditRecord(debugRecord?.resolved_turn_summary);
-    const debugTerminalAuthorityRecord = readTerminalAnswerAuthorityRecord(debugRecord?.terminal_answer_authority);
-    const debugTerminalAuthoritySingleWriterRecord = readAgentLoopAuditRecord(debugRecord?.terminal_authority_single_writer);
-    for (const terminalRecord of [
-      terminalAuthorityRecord,
-      terminalAuthoritySingleWriterRecord,
-      debugTerminalAuthorityRecord,
-      debugTerminalAuthoritySingleWriterRecord,
-      resolvedSummary,
-      debugResolvedSummary,
-    ]) {
-      const label = readTerminalSourceLabelCandidate(terminalRecord, directSource);
-      if (label) return label;
-    }
-    const directTerminalKind =
-      typeof record.terminal_artifact_kind === "string" && record.terminal_artifact_kind.trim()
-        ? record.terminal_artifact_kind.trim()
-        : null;
-    if (directSource || directTerminalKind) {
-      return formatHelixVisibleTerminalSourceLabel({
-        terminalArtifactKind: directTerminalKind,
-        finalAnswerSource: normalizeFinalAnswerSourceForTerminalKind(directSource, directTerminalKind),
-      });
-    }
-    const truthTable = readAgentLoopAuditRecord(record.turn_truth_table);
-    const truthTerminal = readAgentLoopAuditRecord(truthTable?.terminal);
-    const truthSource =
-      typeof truthTerminal?.final_answer_source === "string" && truthTerminal.final_answer_source.trim()
-        ? truthTerminal.final_answer_source.trim()
-        : null;
-    const truthTerminalKind =
-      typeof truthTerminal?.kind === "string" && truthTerminal.kind.trim()
-        ? truthTerminal.kind.trim()
-        : typeof truthTerminal?.terminal_artifact_kind === "string" && truthTerminal.terminal_artifact_kind.trim()
-          ? truthTerminal.terminal_artifact_kind.trim()
-          : null;
-    if (truthSource || truthTerminalKind) {
-      return formatHelixVisibleTerminalSourceLabel({
-        terminalArtifactKind: truthTerminalKind,
-        finalAnswerSource: normalizeFinalAnswerSourceForTerminalKind(truthSource, truthTerminalKind),
-      });
-    }
-    const audit = readAgentLoopAuditRecord(record.agent_loop_audit);
-    const auditSource =
-      typeof audit?.final_answer_source === "string" && audit.final_answer_source.trim()
-        ? audit.final_answer_source.trim()
-        : null;
-    const auditTerminalKind =
-      typeof audit?.terminal_artifact_kind === "string" && audit.terminal_artifact_kind.trim()
-        ? audit.terminal_artifact_kind.trim()
-        : null;
-    if (auditSource || auditTerminalKind) {
-      return formatHelixVisibleTerminalSourceLabel({
-        terminalArtifactKind: auditTerminalKind,
-        finalAnswerSource: normalizeFinalAnswerSourceForTerminalKind(auditSource, auditTerminalKind),
-      });
-    }
-  }
-  return null;
-}
-
-export type HelixAskFinalAnswerPresentation = {
-  heading: "Final answer" | "Checkpoint receipt";
-  sourceLabel: string | null;
-  isDeterministicReceiptFallback: boolean;
-};
-
-export function isHelixAskDeterministicReceiptFallbackLabel(value: unknown): boolean {
-  return /^deterministic[\s_-]+receipt[\s_-]+fallback$/i.test(coerceText(value).trim());
-}
-
-export function resolveHelixAskFinalAnswerPresentation(
-  sourceLabel: string | null | undefined,
-): HelixAskFinalAnswerPresentation {
-  if (isHelixAskDeterministicReceiptFallbackLabel(sourceLabel)) {
-    return {
-      heading: "Checkpoint receipt",
-      sourceLabel: "checkpoint receipt (not reviewed)",
-      isDeterministicReceiptFallback: true,
-    };
-  }
-  const normalized = coerceText(sourceLabel).trim();
-  return {
-    heading: "Final answer",
-    sourceLabel: normalized || null,
-    isDeterministicReceiptFallback: false,
-  };
-}
 
 function resolveHelixAskVisibleTerminal(value: unknown, fallbackContent?: string | null): HelixAskVisibleTerminalResolution {
   const terminal = resolveHelixVisibleTerminalCore(value, fallbackContent);

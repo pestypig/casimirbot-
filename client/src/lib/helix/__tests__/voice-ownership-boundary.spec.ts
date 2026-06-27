@@ -36,4 +36,25 @@ describe("Helix Ask voice ownership boundaries", () => {
     expect(authority).not.toContain("@/store/");
     expect(authority).not.toContain("@/components/helix/HelixAskPill");
   });
+
+  it("keeps terminal projection helpers in the non-React terminal projection module", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const projection = read("client/src/lib/helix/ask-terminal-projection.ts");
+
+    expect(pill).toContain('from "@/lib/helix/ask-terminal-projection"');
+    expect(pill).not.toMatch(/export function buildVisibleResolvedTurn\s*\(/);
+    expect(pill).not.toMatch(/export function chooseVisibleFinalText\s*\(/);
+    expect(pill).not.toMatch(/export function readHelixAskFinalAnswerSourceLabel\s*\(/);
+    expect(pill).not.toMatch(/export function resolveHelixAskFinalAnswerPresentation\s*\(/);
+    expect(projection).toMatch(/export function buildVisibleResolvedTurn\s*\(/);
+    expect(projection).toMatch(/export function chooseVisibleFinalText\s*\(/);
+    expect(projection).toMatch(/export function readHelixAskFinalAnswerSourceLabel\s*\(/);
+    expect(projection).toMatch(/export function resolveHelixAskFinalAnswerPresentation\s*\(/);
+    expect(projection).not.toMatch(/from ["']react["']/);
+    expect(projection).not.toContain("@/store/");
+    expect(projection).not.toContain("@/components/helix/HelixAskPill");
+    expect(projection).not.toContain("setAskReplies");
+    expect(projection).not.toContain("enqueueVoicePlaybackIntent");
+    expect(projection).not.toContain("runAskTurn");
+  });
 });
