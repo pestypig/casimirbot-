@@ -7,8 +7,12 @@ import {
   cleanupAskTurnOpenDocSearchTopic,
   createAskTurnLatestDocIntentReaders,
   extractAskTurnDocPathArgs,
+  isAskTurnActiveDocConceptExplanationIntent,
   isAskTurnActiveDocLocationPrompt,
+  isAskTurnActiveDocNumericExtractionIntent,
+  isAskTurnActiveDocUsefulnessIntent,
   isAskTurnDocOpenBestIntent,
+  isAskTurnDocSummaryDetailRequested,
   isAskTurnReadAloudRequested,
   isAskTurnDocsPanelOpenIntent,
   isAskTurnExplicitDocLocationPrompt,
@@ -40,6 +44,10 @@ describe("Helix Ask doc args extraction boundary", () => {
     expect(routeSource).not.toMatch(/const\s+isAskTurnDocOpenBestIntent\s*=\s*\(transcript/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnExplicitDocLocationPrompt\s*=\s*\(transcript/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnActiveDocLocationPrompt\s*=\s*\(transcript/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnDocSummaryDetailRequested\s*=\s*\(transcript/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnActiveDocUsefulnessIntent\s*=\s*\(transcript/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnActiveDocConceptExplanationIntent\s*=\s*\(transcript/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnActiveDocNumericExtractionIntent\s*=\s*\(transcript/);
     expect(routeSource).not.toMatch(/const\s+normalizeAskTurnLatestDocTopicText\s*=/);
     expect(routeSource).not.toMatch(/const\s+resolveAskTurnLatestDocTopicArg\s*=/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnTopicQualifiedLatestDocIntent\s*=/);
@@ -64,6 +72,10 @@ describe("Helix Ask doc args extraction boundary", () => {
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnDocOpenBestIntent\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnExplicitDocLocationPrompt\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnActiveDocLocationPrompt\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+isAskTurnDocSummaryDetailRequested\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+isAskTurnActiveDocUsefulnessIntent\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+isAskTurnActiveDocConceptExplanationIntent\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+isAskTurnActiveDocNumericExtractionIntent\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+tokenizeAskTurnDocTopic\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+normalizeAskTurnLatestDocTopicText\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+resolveAskTurnLatestDocTopicArg\s*=/);
@@ -102,6 +114,10 @@ describe("Helix Ask doc args extraction boundary", () => {
     expect(isAskTurnExplicitDocLocationPrompt("Summarize docs/research/nhm2-current-status-whitepaper-2026-05-02.md")).toBe(false);
     expect(isAskTurnActiveDocLocationPrompt("Where in this document does it mention Casimir tiles?")).toBe(true);
     expect(isAskTurnActiveDocLocationPrompt("Summarize this document in 3 bullets.")).toBe(false);
+    expect(isAskTurnDocSummaryDetailRequested("Summarize this document with citations and exact claims.")).toBe(true);
+    expect(isAskTurnActiveDocUsefulnessIntent("What is this document useful for?")).toBe(true);
+    expect(isAskTurnActiveDocConceptExplanationIntent("Explain what Casimir tiles means in this document.")).toBe(true);
+    expect(isAskTurnActiveDocNumericExtractionIntent("Find the key numeric value in this document.")).toBe(true);
   });
 
   it("preserves latest-doc topic and acquisition prompt readers", () => {

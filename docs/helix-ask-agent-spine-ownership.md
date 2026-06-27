@@ -159,6 +159,7 @@ terminal eligibility, projection discipline, and debug traces.
 | S179 | doc read-aloud request intent | `server/services/helix-ask/doc-args.ts` | SERVICE_OWNED for pure read-aloud request predicate only |
 | S180 | doc acquisition intent readers | `server/services/helix-ask/doc-args.ts` | SERVICE_OWNED for pure explicit document acquisition and best/open matching-doc predicates only |
 | S181 | doc location prompt intents | `server/services/helix-ask/doc-args.ts` | SERVICE_OWNED for pure explicit-doc-location and active-doc-location prompt predicates only |
+| S182 | active doc summary intent readers | `server/services/helix-ask/doc-args.ts` | SERVICE_OWNED for pure active-doc usefulness, concept-explanation, numeric-extraction, and summary-detail predicates only |
 | S175 | doc latest topic readers | `server/services/helix-ask/doc-args.ts` | SERVICE_OWNED for latest-doc topic normalization/extraction, topic-qualified latest-doc detection, open-doc topic cleanup, create-note-then-open-doc topic reading, and latest/recent doc acquisition prompt readers only |
 | S176 | doc open query readers | `server/services/helix-ask/doc-args.ts` | SERVICE_OWNED for doc-topic tokenization, docs-panel-open detection, topic-doc query reading, title-like open-doc query reading, result-doc query reading, aggregate open-doc search query reading, and topic/open-doc acquisition predicates only |
 | S153 | note arg boundaries | `server/services/helix-ask/note-arg-boundaries.ts` | SERVICE_OWNED for note/workspace action argument boundary trimming only |

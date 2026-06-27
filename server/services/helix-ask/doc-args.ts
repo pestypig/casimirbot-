@@ -54,6 +54,31 @@ export const isAskTurnActiveDocLocationPrompt = (transcript: string): boolean =>
   ) &&
   !/\b(?:summari[sz]e|summary|in\s+\d+\s+bullets?|bullet\s+points?|overview|takeaways?)\b/i.test(transcript);
 
+export const isAskTurnDocSummaryDetailRequested = (transcript: string): boolean =>
+  /\b(?:cite|citation|citations|evidence|full|detailed|detail|technical|exact\s+claims?|verbatim|all\s+details)\b/i.test(
+    transcript,
+  );
+
+export const isAskTurnActiveDocUsefulnessIntent = (transcript: string): boolean => {
+  const normalized = transcript.trim().toLowerCase();
+  if (!normalized) return false;
+  return (
+    /\bwhat\s+would\s+(?:a\s+)?(?:normal\s+person|lay(?:person|reader)|reader|user)\s+use\s+(?:this|that|the|current)\s+(?:doc|document|paper)\s+for\b/.test(normalized) ||
+    /\bwhat\s+is\s+(?:this|that|the|current)\s+(?:doc|document|paper)\s+useful\s+for\b/.test(normalized) ||
+    /\bwhy\s+does\s+(?:this|that|the|current)\s+(?:doc|document|paper)\s+matter\b/.test(normalized) ||
+    /\bexplain\s+(?:this|that|the|current)\s+(?:doc|document|paper)?\s*(?:in\s+)?(?:normal\s+words|plain\s+english|plain\s+language)\b/.test(normalized) ||
+    /\bwhat\s+should\s+i\s+use\s+(?:this|that|the|current)\s+(?:doc|document|paper)\s+for\b/.test(normalized)
+  );
+};
+
+export const isAskTurnActiveDocConceptExplanationIntent = (transcript: string): boolean =>
+  /\bexplain\s+what\s+.+?\s+means?\s+in\s+(?:this|that|the|current|active)\s+(?:doc|document|paper)\b/i.test(transcript);
+
+export const isAskTurnActiveDocNumericExtractionIntent = (transcript: string): boolean =>
+  /\b(?:what\s+is|find|extract|tell\s+me|show\s+me|give\s+me)\b[\s\S]*\b(?:key|main|important|specific)?\s*(?:numeric|number|figure|value|result|measurement|metric|quantity|distance|speed|time|target|eta|0p\d+|0\.\d+)\b[\s\S]*\b(?:in|from)\s+(?:this|that|the|current|active)\s+(?:doc|document|paper)\b/i.test(
+    transcript,
+  );
+
 export const HELIX_ASK_OPEN_DOC_NOUN_PATTERN = String.raw`(?:doc|docs|document|documents|paper|papers|writeup|writeups|artifact|artifacts|result|results|thing|things|report|reports|file|files)`;
 export const HELIX_ASK_RECENT_DOC_PATTERN = String.raw`(?:latest|newest|freshest|most\s+recent|recent)`;
 
