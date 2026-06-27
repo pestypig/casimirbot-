@@ -1,3 +1,5 @@
+import { clipConversationText } from "./conversation-text";
+
 const HELIX_ASK_TURN_CLAUSE_BOUNDARY_RE = /\s*(?:,|\band then\b|\bthen\b|\bafter that\b|\bwhile\b|\balso\b)\s+/i;
 const HELIX_ASK_TURN_NOTE_ARG_TAIL_INTENT_RE =
   /\b(?:copy|compare|contrast|difference|different|versus|vs\.?|explain|summari[sz]e|open|read|list|delete|rename|clear|switch|go\s+to|view|show)\b/i;
@@ -184,10 +186,30 @@ export const createAskTurnNoteSinkArgReaders = (
     return null;
   };
 
+  const resolveAskTurnDocsRetrievalQueryArg = (transcript: string): string => {
+    const normalized = transcript.trim();
+    const patterns = [
+      /\b(?:look|search|find|scan|check)\s+(?:in|through|across)\s+(?:the\s+)?(?:docs?|documents?|files?|repo|repository)\s+(?:for|about)\s+(.+?)(?:\s+\b(?:and|then)\b\s+|\s+\b(?:to|into|in|inside)\b\s+|$)/i,
+      /\b(?:look\s+for|search\s+for|find)\s+(.+?)(?:\s+\b(?:and|then)\b\s+|\s+\b(?:to|into|in|inside)\b\s+|$)/i,
+    ];
+    for (const pattern of patterns) {
+      const match = normalized.match(pattern);
+      const value = deps.trimActionArgBoundaries(match?.[1] ?? "");
+      if (value) return value;
+    }
+    return clipConversationText(
+      normalized
+        .replace(/\b(?:look|search|find|scan|check)\b/gi, " ")
+        .replace(/\b(?:docs?|documents?|files?|repo|repository|summary|summari[sz]e|useful|key|details|points|put|add|save|store|stash|file|park|place|write|note|notepad)\b/gi, " "),
+      120,
+    );
+  };
+
   return {
     normalizeAskTurnRequestedNoteTitle,
     resolveAskTurnAppendNoteTextArg,
     resolveAskTurnArtifactBareNoteTargetArg,
+    resolveAskTurnDocsRetrievalQueryArg,
     resolveAskTurnLayDestinationNoteSinkArg,
     resolveAskTurnLocationNamedNoteSinkArg,
     resolveAskTurnSummaryNamedNoteSinkArg,

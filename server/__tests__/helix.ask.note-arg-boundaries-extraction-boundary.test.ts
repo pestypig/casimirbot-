@@ -54,6 +54,7 @@ describe("Helix Ask note arg boundary extraction boundary", () => {
     expect(routeSource).not.toMatch(/const\s+resolveAskTurnLocationNamedNoteSinkArg\s*=/);
     expect(routeSource).not.toMatch(/const\s+resolveAskTurnArtifactBareNoteTargetArg\s*=/);
     expect(routeSource).not.toMatch(/const\s+resolveAskTurnAppendNoteTextArg\s*=/);
+    expect(routeSource).not.toMatch(/const\s+resolveAskTurnDocsRetrievalQueryArg\s*=/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnRepoCueIntent\s*=/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnAppendToNoteCue\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+createAskTurnActionArgBoundaryTrimmer\s*=/);
@@ -128,6 +129,7 @@ describe("Helix Ask note arg boundary extraction boundary", () => {
       normalizeAskTurnRequestedNoteTitle,
       resolveAskTurnAppendNoteTextArg,
       resolveAskTurnArtifactBareNoteTargetArg,
+      resolveAskTurnDocsRetrievalQueryArg,
       resolveAskTurnLayDestinationNoteSinkArg,
       resolveAskTurnLocationNamedNoteSinkArg,
       resolveAskTurnSummaryNamedNoteSinkArg,
@@ -146,6 +148,12 @@ describe("Helix Ask note arg boundary extraction boundary", () => {
     expect(resolveAskTurnAppendNoteTextArg("append alpha beta to my note")).toBe("alpha beta");
     expect(resolveAskTurnAppendNoteTextArg("append: alpha beta")).toBe("alpha beta");
     expect(resolveAskTurnAppendNoteTextArg("append alpha beta, then open docs")).toBe("alpha beta");
+    expect(resolveAskTurnDocsRetrievalQueryArg("look in the docs for warp field notes and then put summary into Field Notes")).toBe(
+      "warp field notes",
+    );
+    expect(resolveAskTurnDocsRetrievalQueryArg("find Casimir tile capacity to put useful notes into Field Notes")).toBe(
+      "Casimir tile capacity",
+    );
     expect(isAskTurnRepoCueIntent("check the repo code paths")).toBe(true);
     expect(isAskTurnRepoCueIntent("check the document")).toBe(false);
     expect(isAskTurnAppendToNoteCue("append this to my note")).toBe(true);
