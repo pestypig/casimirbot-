@@ -341,3 +341,87 @@ export const enforceHelixAskObjectiveScopedRetrievalRequirementForMiniAnswers = 
     missingObjectiveIds,
   };
 };
+
+export const collectHelixAskObjectiveIdsWithoutScopedRetrievalPassRouteCompatible = <
+  T extends HelixAskObjectiveLoopStateLike,
+>(args: {
+  states: T[];
+  retrievalQueries: Array<{ objective_id: string }>;
+  unresolvedOnly?: boolean;
+  maxObjectives: number;
+}): string[] => {
+  const coveredObjectiveIds = new Set(
+    args.retrievalQueries
+      .map((entry) => String(entry?.objective_id ?? "").trim())
+      .filter(Boolean),
+  );
+  const unresolvedOnly = args.unresolvedOnly !== false;
+  return args.states
+    .filter((state) => !unresolvedOnly || !isHelixAskObjectiveTerminalStatus(state.status))
+    .filter((state) => state.required_slots.length > 0)
+    .filter((state) => !coveredObjectiveIds.has(state.objective_id))
+    .map((state) => state.objective_id)
+    .slice(0, Math.max(0, args.maxObjectives));
+};
+
+export const enforceHelixAskObjectiveScopedRetrievalRequirementForMiniAnswersRouteCompatible = <
+  T extends HelixAskObjectiveMiniAnswer,
+  S extends HelixAskObjectiveLoopStateLike,
+>(args: {
+  miniAnswers: T[];
+  states: S[];
+  retrievalQueries: Array<{ objective_id: string }>;
+  maxObjectives: number;
+}): {
+  miniAnswers: T[];
+  missingObjectiveIds: string[];
+} => {
+  const missingObjectiveIds = collectHelixAskObjectiveIdsWithoutScopedRetrievalPassRouteCompatible({
+    states: args.states,
+    retrievalQueries: args.retrievalQueries,
+    unresolvedOnly: false,
+    maxObjectives: args.maxObjectives,
+  });
+  if (missingObjectiveIds.length === 0) {
+    return {
+      miniAnswers: args.miniAnswers,
+      missingObjectiveIds,
+    };
+  }
+  const missingSet = new Set(missingObjectiveIds);
+  const stateById = new Map(args.states.map((entry) => [entry.objective_id, entry] as const));
+  const patched = args.miniAnswers.map((entry) => {
+    if (!missingSet.has(entry.objective_id)) return entry;
+    const state = stateById.get(entry.objective_id);
+    const requiredSlots =
+      state?.required_slots.length
+        ? state.required_slots
+        : Array.from(new Set([...entry.matched_slots, ...entry.missing_slots]));
+    const derivedMissingSlots = requiredSlots.filter((slot) => !entry.matched_slots.includes(slot));
+    const missingSlots = Array.from(
+      new Set(
+        [...entry.missing_slots, ...derivedMissingSlots, ...(requiredSlots.length > 0 ? [] : ["evidence"])].filter(
+          Boolean,
+        ),
+      ),
+    ).slice(0, 8);
+    const status: HelixAskObjectiveMiniAnswerStatus =
+      entry.status === "blocked" ? "blocked" : "partial";
+    return {
+      ...entry,
+      status,
+      missing_slots: missingSlots,
+      summary: `${entry.summary} Assembly blocked until objective-scoped retrieval runs for this required objective.`.trim(),
+      unknown_block: buildHelixAskObjectiveUnknownBlock({
+        objectiveLabel: entry.objective_label,
+        missingSlots,
+        evidenceRefs: entry.evidence_refs,
+        scopedRetrievalMissing: true,
+      }),
+    } as T;
+  });
+  return {
+    miniAnswers: patched,
+    missingObjectiveIds,
+  };
+};

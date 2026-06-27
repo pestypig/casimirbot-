@@ -4,9 +4,13 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  buildHelixAskObjectiveScopedRecoveryQueryVariants,
   buildHelixAskObjectiveScopedRecoveryEscalationHints,
+  collectHelixAskObjectiveIdsWithoutScopedRetrievalPass,
+  collectHelixAskObjectiveIdsWithoutScopedRetrievalPassRouteCompatible,
   collectHelixAskObjectiveScopedRetrievalRecoveryTargets,
   computeHelixAskObjectiveScopedRecoveryMaxAttempts,
+  enforceHelixAskObjectiveScopedRetrievalRequirementForMiniAnswersRouteCompatible,
   expandHelixAskObjectiveScopedRecoveryTargets,
   scoreHelixAskObjectiveRecoveryVariantResult,
   shouldBypassHelixAskObjectiveScopedRetrievalAgentGate,
@@ -45,6 +49,15 @@ describe("Helix Ask objective scoped recovery extraction boundary", () => {
     expect(routeSource).not.toMatch(
       /const\s+scoreHelixAskObjectiveRecoveryVariantResult\s*=/,
     );
+    expect(routeSource).not.toMatch(
+      /const\s+buildHelixAskObjectiveScopedRecoveryQueryVariants\s*=/,
+    );
+    expect(routeSource).not.toMatch(
+      /const\s+collectHelixAskObjectiveIdsWithoutScopedRetrievalPass\s*=/,
+    );
+    expect(routeSource).not.toMatch(
+      /const\s+enforceHelixAskObjectiveScopedRetrievalRequirementForMiniAnswers\s*=/,
+    );
 
     expect(serviceSource).toMatch(
       /export\s+const\s+shouldBypassHelixAskObjectiveScopedRetrievalAgentGate\s*=/,
@@ -64,24 +77,19 @@ describe("Helix Ask objective scoped recovery extraction boundary", () => {
     expect(serviceSource).toMatch(
       /export\s+const\s+scoreHelixAskObjectiveRecoveryVariantResult\s*=/,
     );
+    expect(serviceSource).toMatch(
+      /export\s+const\s+buildHelixAskObjectiveScopedRecoveryQueryVariants\s*=/,
+    );
+    expect(serviceSource).toMatch(
+      /export\s+const\s+collectHelixAskObjectiveIdsWithoutScopedRetrievalPassRouteCompatible\s*=/,
+    );
+    expect(serviceSource).toMatch(
+      /export\s+const\s+enforceHelixAskObjectiveScopedRetrievalRequirementForMiniAnswersRouteCompatible\s*=/,
+    );
     expect(serviceSource).not.toContain("server/routes/agi.plan");
     expect(serviceSource).not.toContain("../../../routes/agi.plan");
     expect(serviceSource).not.toContain("../../routes/agi.plan");
     expect(serviceSource).not.toContain("../routes/agi.plan");
-  });
-
-  it("keeps non-equivalent scoped recovery helpers route-owned for a later slice", () => {
-    const routeSource = readFileSync(routePath, "utf8");
-
-    expect(routeSource).toMatch(
-      /const\s+buildHelixAskObjectiveScopedRecoveryQueryVariants\s*=/,
-    );
-    expect(routeSource).toMatch(
-      /const\s+collectHelixAskObjectiveIdsWithoutScopedRetrievalPass\s*=/,
-    );
-    expect(routeSource).toMatch(
-      /const\s+enforceHelixAskObjectiveScopedRetrievalRequirementForMiniAnswers\s*=/,
-    );
   });
 
   it("preserves recovery agent gate bypass behavior", () => {
@@ -210,5 +218,84 @@ describe("Helix Ask objective scoped recovery extraction boundary", () => {
         topicMustIncludeOk: false,
       }),
     ).toBe(2195);
+  });
+
+  it("preserves route-compatible query variants and missing retrieval enforcement", () => {
+    expect(
+      buildHelixAskObjectiveScopedRecoveryQueryVariants({
+        baseQuestion: "Base question",
+        primaryQueries: ["Primary query"],
+        objectiveLabel: "Tile load",
+        missingSlots: ["mechanism"],
+        maxQueries: 3,
+        maxVariants: 4,
+      }),
+    ).toEqual([
+      ["Primary query"],
+      ["Base question", "Tile load", "Tile load mechanism"],
+      ["Tile load", "Tile load mechanism", "how does Tile load work"],
+    ]);
+
+    const states = [
+      {
+        objective_id: "definition-only",
+        objective_label: "Definition only",
+        required_slots: ["definition"],
+        matched_slots: [],
+        status: "pending" as const,
+        attempt: 0,
+      },
+      {
+        objective_id: "mechanism",
+        objective_label: "Mechanism",
+        required_slots: ["mechanism"],
+        matched_slots: [],
+        status: "pending" as const,
+        attempt: 0,
+      },
+    ];
+
+    expect(
+      collectHelixAskObjectiveIdsWithoutScopedRetrievalPass({
+        states,
+        retrievalQueries: [],
+        maxObjectives: 4,
+      }),
+    ).toEqual(["mechanism"]);
+    expect(
+      collectHelixAskObjectiveIdsWithoutScopedRetrievalPassRouteCompatible({
+        states,
+        retrievalQueries: [],
+        maxObjectives: 4,
+      }),
+    ).toEqual(["definition-only", "mechanism"]);
+
+    expect(
+      enforceHelixAskObjectiveScopedRetrievalRequirementForMiniAnswersRouteCompatible({
+        states,
+        retrievalQueries: [],
+        maxObjectives: 1,
+        miniAnswers: [
+          {
+            objective_id: "definition-only",
+            objective_label: "Definition only",
+            status: "covered" as const,
+            matched_slots: [],
+            missing_slots: [],
+            evidence_refs: [],
+            summary: "Definition covered.",
+          },
+        ],
+      }),
+    ).toMatchObject({
+      missingObjectiveIds: ["definition-only"],
+      miniAnswers: [
+        {
+          objective_id: "definition-only",
+          status: "partial",
+          missing_slots: ["definition"],
+        },
+      ],
+    });
   });
 });
