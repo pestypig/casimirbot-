@@ -471,6 +471,11 @@ export const isAskTurnCurrentDocIdentityToDeicticNoteIntent = (transcript: strin
     transcript,
   );
 
+export const isAskTurnDocLocationCitationRequired = (transcript: string | null | undefined): boolean =>
+  /\b(?:cite|citation|document\s+evidence|evidence\s+refs?|line[-\s]?backed|source\s+line|path\s*:\s*line)\b/i.test(
+    String(transcript ?? ""),
+  );
+
 export type HelixAskDocIdentityIntentReaderDependencies = {
   isAskTurnComposedResearchToNoteIntent: (transcript: string) => boolean;
   isAskTurnDocNotesHybridCompareIntent: (transcript: string) => boolean;

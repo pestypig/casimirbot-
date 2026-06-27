@@ -15,6 +15,7 @@ import {
   isAskTurnActiveDocUsefulnessIntent,
   isAskTurnCurrentDocIdentityToDeicticNoteIntent,
   isAskTurnCurrentDocIdentityTransferIntent,
+  isAskTurnDocLocationCitationRequired,
   isAskTurnDocOpenBestIntent,
   isAskTurnDocSummaryDetailRequested,
   isAskTurnReadAloudRequested,
@@ -63,6 +64,7 @@ describe("Helix Ask doc args extraction boundary", () => {
     expect(routeSource).not.toMatch(/const\s+isAskTurnCurrentDocIdentityToDeicticNoteIntent\s*=\s*\(transcript/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnDocIdentityIntent\s*=\s*\(transcript/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnDocIdentityExplainHybridIntent\s*=\s*\(transcript/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnDocLocationCitationRequired\s*=\s*\(transcript/);
     expect(routeSource).not.toMatch(/const\s+normalizeAskTurnLatestDocTopicText\s*=/);
     expect(routeSource).not.toMatch(/const\s+resolveAskTurnLatestDocTopicArg\s*=/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnTopicQualifiedLatestDocIntent\s*=/);
@@ -94,6 +96,7 @@ describe("Helix Ask doc args extraction boundary", () => {
     expect(serviceSource).toMatch(/export\s+const\s+createAskTurnDocSummaryIntentReaders\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnCurrentDocIdentityTransferIntent\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnCurrentDocIdentityToDeicticNoteIntent\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+isAskTurnDocLocationCitationRequired\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+createAskTurnDocIdentityIntentReaders\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+tokenizeAskTurnDocTopic\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+normalizeAskTurnLatestDocTopicText\s*=/);
@@ -222,5 +225,7 @@ describe("Helix Ask doc args extraction boundary", () => {
     expect(identityReaders.isAskTurnDocIdentityIntent("Open the docs viewer.")).toBe(false);
     expect(identityReaders.isAskTurnDocIdentityIntent("Summarize this document.")).toBe(false);
     expect(identityReaders.isAskTurnDocIdentityExplainHybridIntent("What document are we viewing? explain")).toBe(false);
+    expect(isAskTurnDocLocationCitationRequired("Find where NHM2 appears and cite document evidence.")).toBe(true);
+    expect(isAskTurnDocLocationCitationRequired("Find where NHM2 appears.")).toBe(false);
   });
 });
