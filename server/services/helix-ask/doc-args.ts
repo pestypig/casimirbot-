@@ -392,3 +392,73 @@ export const createAskTurnLatestDocIntentReaders = (
     resolveAskTurnRecentDocAcquisitionQueryArg,
   };
 };
+
+export type HelixAskDocSummaryIntentReaderDependencies = {
+  isAskTurnNoWorkspaceBackgroundScope: (transcript: string) => boolean;
+  resolveAskTurnOpenDocSearchQueryArg: (transcript: string) => string | null;
+};
+
+export const createAskTurnDocSummaryIntentReaders = (
+  deps: HelixAskDocSummaryIntentReaderDependencies,
+) => {
+  const isAskTurnCompoundDocAnswerIntent = (transcript: string): boolean =>
+    Boolean(deps.resolveAskTurnOpenDocSearchQueryArg(transcript)) &&
+    /\b(?:tell\s+me|answer|summari[sz]e|explain|extract|key|numeric|number|result|takeaway|what\s+is|what\s+are)\b/i.test(transcript);
+
+  const isAskTurnDocAboutSummaryPrompt = (transcript: string): boolean =>
+    isAskTurnActiveDocUsefulnessIntent(transcript) ||
+    isAskTurnActiveDocConceptExplanationIntent(transcript) ||
+    isAskTurnActiveDocNumericExtractionIntent(transcript) ||
+    (Boolean(resolveAskTurnDocPathArg(transcript)) && /\b(?:summari[sz]e|summary|section|sections|explain|takeaway)\b/i.test(transcript)) ||
+    isAskTurnCompoundDocAnswerIntent(transcript) ||
+    /\b(?:what\s+is\s+(?:this|that|the|current)\s+(?:doc|document|paper)\s+about|what\s+is\s+this\s+about|summari[sz]e\s+(?:this|that|the|current)\s+(?:doc|document|paper)|explain\s+(?:this|that|the|current)\s+(?:doc|document|paper)|what\s+does\s+(?:this|that|the|current)\s+(?:doc|document|paper)\s+mean)\b/i.test(
+      transcript,
+    );
+
+  const isAskTurnDocsViewerCapabilityTopicLabelPrompt = (transcript: string): boolean => {
+    const label = transcript.match(/^\s*(?:docs?\s+viewer|documents?\s+viewer|docs[-_. ]viewer)\s*:\s*/i);
+    if (!label) return false;
+    const body = transcript.slice(label[0].length).trim();
+    return /\b(?:dynamic\s+actions?|capabilit(?:y|ies)|coverage|test\s+evidence|surface|well\s+represented|core\s+actions?|implementation\s+claim)\b/i.test(
+      body,
+    );
+  };
+
+  const isAskTurnDocsSummaryRequest = (transcript: string): boolean =>
+    !/\bbackground\s+only\b/i.test(transcript) &&
+    !isAskTurnDocsViewerCapabilityTopicLabelPrompt(transcript) &&
+    !deps.isAskTurnNoWorkspaceBackgroundScope(transcript) &&
+    /\b(?:summari[sz]e|summary|overview|takeaways?|explain|describe|gist|what\s+(?:it|the\s+(?:doc|document|paper))\s+says)\b/i.test(
+      transcript,
+    );
+
+  const isAskTurnDocsOpenAndSummarizeIntent = (transcript: string): boolean =>
+    isAskTurnDocsSummaryRequest(transcript) &&
+    /\b(?:docs?|documents?|papers?|white\s*papers?|whitepapers?)\b/i.test(transcript) &&
+    /\b(?:find|search|open|show|get|load|best|matching|relevant)\b/i.test(transcript) &&
+    !isAskTurnExplicitDocLocationPrompt(transcript) &&
+    !isAskTurnActiveDocLocationPrompt(transcript);
+
+  const isAskTurnDocsTopicSummaryPrompt = (transcript: string): boolean =>
+    isAskTurnDocsSummaryRequest(transcript) &&
+    /\b(?:docs?|documents?|papers?|white\s*papers?|whitepapers?)\b/i.test(transcript) &&
+    (!isAskTurnExplicitDocumentAcquisitionIntent(transcript) || isAskTurnDocsOpenAndSummarizeIntent(transcript)) &&
+    (!isAskTurnDocOpenBestIntent(transcript) || isAskTurnDocsOpenAndSummarizeIntent(transcript)) &&
+    !isAskTurnExplicitDocLocationPrompt(transcript) &&
+    !isAskTurnActiveDocLocationPrompt(transcript);
+
+  const shouldAskTurnSearchDocsBeforeSummary = (transcript: string): boolean =>
+    isAskTurnDocsTopicSummaryPrompt(transcript) &&
+    !resolveAskTurnDocPathArg(transcript) &&
+    !/\b(?:current|active|this|that)\s+(?:doc|document|paper|white\s*paper|whitepaper)\b/i.test(transcript);
+
+  return {
+    isAskTurnCompoundDocAnswerIntent,
+    isAskTurnDocAboutSummaryPrompt,
+    isAskTurnDocsOpenAndSummarizeIntent,
+    isAskTurnDocsSummaryRequest,
+    isAskTurnDocsTopicSummaryPrompt,
+    isAskTurnDocsViewerCapabilityTopicLabelPrompt,
+    shouldAskTurnSearchDocsBeforeSummary,
+  };
+};

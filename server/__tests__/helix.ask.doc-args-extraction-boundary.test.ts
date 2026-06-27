@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   cleanupAskTurnOpenDocSearchTopic,
+  createAskTurnDocSummaryIntentReaders,
   createAskTurnLatestDocIntentReaders,
   extractAskTurnDocPathArgs,
   isAskTurnActiveDocConceptExplanationIntent,
@@ -48,6 +49,13 @@ describe("Helix Ask doc args extraction boundary", () => {
     expect(routeSource).not.toMatch(/const\s+isAskTurnActiveDocUsefulnessIntent\s*=\s*\(transcript/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnActiveDocConceptExplanationIntent\s*=\s*\(transcript/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnActiveDocNumericExtractionIntent\s*=\s*\(transcript/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnCompoundDocAnswerIntent\s*=\s*\(transcript/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnDocAboutSummaryPrompt\s*=\s*\(transcript/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnDocsSummaryRequest\s*=\s*\(transcript/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnDocsViewerCapabilityTopicLabelPrompt\s*=\s*\(transcript/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnDocsOpenAndSummarizeIntent\s*=\s*\(transcript/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnDocsTopicSummaryPrompt\s*=\s*\(transcript/);
+    expect(routeSource).not.toMatch(/const\s+shouldAskTurnSearchDocsBeforeSummary\s*=\s*\(transcript/);
     expect(routeSource).not.toMatch(/const\s+normalizeAskTurnLatestDocTopicText\s*=/);
     expect(routeSource).not.toMatch(/const\s+resolveAskTurnLatestDocTopicArg\s*=/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnTopicQualifiedLatestDocIntent\s*=/);
@@ -76,6 +84,7 @@ describe("Helix Ask doc args extraction boundary", () => {
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnActiveDocUsefulnessIntent\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnActiveDocConceptExplanationIntent\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnActiveDocNumericExtractionIntent\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+createAskTurnDocSummaryIntentReaders\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+tokenizeAskTurnDocTopic\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+normalizeAskTurnLatestDocTopicText\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+resolveAskTurnLatestDocTopicArg\s*=/);
@@ -164,5 +173,25 @@ describe("Helix Ask doc args extraction boundary", () => {
     );
     expect(readers.isAskTurnTopicDocAcquisitionIntent("find a doc about Casimir tiles")).toBe(true);
     expect(readers.isAskTurnOpenDocSearchIntent("open the docs viewer")).toBe(false);
+  });
+
+  it("preserves doc summary prompt readers", () => {
+    const latestReaders = createAskTurnLatestDocIntentReaders({
+      isStructuredDocsViewerPrompt: (prompt) => /\bDocument\s+path\s*:/i.test(prompt),
+    });
+    const summaryReaders = createAskTurnDocSummaryIntentReaders({
+      isAskTurnNoWorkspaceBackgroundScope: (prompt) => /\bbackground\s+only\b/i.test(prompt),
+      resolveAskTurnOpenDocSearchQueryArg: latestReaders.resolveAskTurnOpenDocSearchQueryArg,
+    });
+
+    expect(summaryReaders.isAskTurnCompoundDocAnswerIntent("open the doc about Casimir tiles and summarize it")).toBe(true);
+    expect(summaryReaders.isAskTurnDocAboutSummaryPrompt("What is this document about?")).toBe(true);
+    expect(summaryReaders.isAskTurnDocsViewerCapabilityTopicLabelPrompt("Docs viewer: dynamic actions coverage")).toBe(true);
+    expect(summaryReaders.isAskTurnDocsSummaryRequest("Summarize this document")).toBe(true);
+    expect(summaryReaders.isAskTurnDocsSummaryRequest("Summarize this document background only")).toBe(false);
+    expect(summaryReaders.isAskTurnDocsOpenAndSummarizeIntent("find and open the best NHM2 whitepaper and summarize it")).toBe(true);
+    expect(summaryReaders.isAskTurnDocsTopicSummaryPrompt("summarize the NHM2 whitepaper docs")).toBe(true);
+    expect(summaryReaders.shouldAskTurnSearchDocsBeforeSummary("summarize the NHM2 whitepaper docs")).toBe(true);
+    expect(summaryReaders.shouldAskTurnSearchDocsBeforeSummary("summarize this document")).toBe(false);
   });
 });
