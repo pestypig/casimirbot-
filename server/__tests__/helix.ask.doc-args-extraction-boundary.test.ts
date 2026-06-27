@@ -7,10 +7,14 @@ import {
   cleanupAskTurnOpenDocSearchTopic,
   createAskTurnLatestDocIntentReaders,
   extractAskTurnDocPathArgs,
+  isAskTurnDocsPanelOpenIntent,
   isAskTurnTopicQualifiedLatestDocIntent,
   normalizeAskTurnLatestDocTopicText,
   resolveAskTurnCreateThenOpenDocTopicArg,
   resolveAskTurnLatestDocTopicArg,
+  resolveAskTurnTitleLikeOpenDocQueryArg,
+  resolveAskTurnTopicDocQueryArg,
+  tokenizeAskTurnDocTopic,
 } from "../services/helix-ask/doc-args";
 
 const repoRoot = process.cwd();
@@ -32,13 +36,26 @@ describe("Helix Ask doc args extraction boundary", () => {
     expect(routeSource).not.toMatch(/const\s+isAskTurnOpenLatestDocIntent\s*=/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnStrictLatestDocAcquisitionIntent\s*=/);
     expect(routeSource).not.toMatch(/const\s+resolveAskTurnRecentDocAcquisitionQueryArg\s*=/);
+    expect(routeSource).not.toMatch(/const\s+tokenizeAskTurnDocTopic\s*=/);
+    expect(routeSource).not.toMatch(/const\s+resolveAskTurnTopicDocQueryArg\s*=/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnDocsPanelOpenIntent\s*=/);
+    expect(routeSource).not.toMatch(/const\s+resolveAskTurnTitleLikeOpenDocQueryArg\s*=/);
+    expect(routeSource).not.toMatch(/const\s+resolveAskTurnOpenResultDocQueryArg\s*=/);
+    expect(routeSource).not.toMatch(/const\s+resolveAskTurnOpenDocSearchQueryArg\s*=/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnTopicDocAcquisitionIntent\s*=/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnOpenDocSearchIntent\s*=/);
     expect(routeSource).toContain("createAskTurnLatestDocIntentReaders({");
     expect(serviceSource).toMatch(/export\s+const\s+extractAskTurnDocPathArgs\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+tokenizeAskTurnDocTopic\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+normalizeAskTurnLatestDocTopicText\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+resolveAskTurnLatestDocTopicArg\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnTopicQualifiedLatestDocIntent\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+cleanupAskTurnOpenDocSearchTopic\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+resolveAskTurnCreateThenOpenDocTopicArg\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+resolveAskTurnTopicDocQueryArg\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+isAskTurnDocsPanelOpenIntent\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+resolveAskTurnTitleLikeOpenDocQueryArg\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+resolveAskTurnOpenResultDocQueryArg\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+createAskTurnLatestDocIntentReaders\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");
     expect(serviceSource).not.toContain("../routes/agi.plan");
@@ -73,5 +90,27 @@ describe("Helix Ask doc args extraction boundary", () => {
     expect(resolveAskTurnCreateThenOpenDocTopicArg("create note called Field Notes, then open latest doc about NHM2")).toBe(
       "NHM2",
     );
+  });
+
+  it("preserves open-doc search query readers", () => {
+    const readers = createAskTurnLatestDocIntentReaders({
+      isStructuredDocsViewerPrompt: (prompt) => /\bDocument\s+path\s*:/i.test(prompt),
+    });
+
+    expect(tokenizeAskTurnDocTopic("Latest NHM2 white paper report")).toEqual(["nhm2", "white", "report"]);
+    expect(isAskTurnDocsPanelOpenIntent("open the docs viewer")).toBe(true);
+    expect(isAskTurnDocsPanelOpenIntent("open the docs about NHM2")).toBe(false);
+    expect(resolveAskTurnTopicDocQueryArg("open the doc about Casimir tile load bearing")).toBe("Casimir tile load bearing");
+    expect(resolveAskTurnTitleLikeOpenDocQueryArg("open the NHM2 deeper reformulation decision memo")).toBe(
+      "NHM2 deeper reformulation decision memo",
+    );
+    expect(readers.resolveAskTurnOpenDocSearchQueryArg("show the latest result about Casimir tile load bearing")).toBe(
+      "Casimir tile load bearing",
+    );
+    expect(readers.resolveAskTurnOpenDocSearchQueryArg("NHM2 deeper reformulation decision memo")).toBe(
+      "NHM2 deeper reformulation decision memo",
+    );
+    expect(readers.isAskTurnTopicDocAcquisitionIntent("find a doc about Casimir tiles")).toBe(true);
+    expect(readers.isAskTurnOpenDocSearchIntent("open the docs viewer")).toBe(false);
   });
 });

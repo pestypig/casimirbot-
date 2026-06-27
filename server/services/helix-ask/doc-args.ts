@@ -8,6 +8,30 @@ export const extractAskTurnDocPathArgs = (transcript: string): string[] => {
 export const HELIX_ASK_OPEN_DOC_NOUN_PATTERN = String.raw`(?:doc|docs|document|documents|paper|papers|writeup|writeups|artifact|artifacts|result|results|thing|things|report|reports|file|files)`;
 export const HELIX_ASK_RECENT_DOC_PATTERN = String.raw`(?:latest|newest|freshest|most\s+recent|recent)`;
 
+export const tokenizeAskTurnDocTopic = (value: string): string[] =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter(
+      (token) =>
+        token.length >= 2 &&
+        ![
+          "the",
+          "doc",
+          "docs",
+          "document",
+          "paper",
+          "latest",
+          "newest",
+          "recent",
+          "about",
+          "regarding",
+          "for",
+        ].includes(token),
+    );
+
 export type HelixAskLatestDocIntentReaderDependencies = {
   isStructuredDocsViewerPrompt: (transcript: string) => boolean;
 };
@@ -109,6 +133,117 @@ export const resolveAskTurnCreateThenOpenDocTopicArg = (transcript: string): str
   return topic || null;
 };
 
+export const resolveAskTurnTopicDocQueryArg = (transcript: string): string | null => {
+  const normalized = transcript.trim();
+  if (!normalized || /\b(?:latest|newest|most\s+recent|recent)\b/i.test(normalized)) return null;
+  const patterns = [
+    /\b(?:find\s+and\s+open|search\s+for\s+and\s+open|pull\s+up|open|view|show|pick|grab|go\s+to|navigate\s+to|take\s+me\s+to|bring\s+me\s+to)\s+(?:a|an|the)?\s*(?:doc|docs|document|paper)\s+(?:about|on|regarding|for)\s+(.+)$/i,
+    /\b(?:find|search|pick|select|get)\s+(?:me\s+)?(?:(?:a|an|the)\s+)?(?:best|right|top|closest|most\s+relevant)?\s*(?:doc|docs|document|paper)\s+(?:about|on|regarding|for)\s+(.+)$/i,
+  ];
+  for (const pattern of patterns) {
+    const match = normalized.match(pattern);
+    const rawTopic = match?.[1]
+      ?.replace(/\s+\b(?:and\s+then|then|after\s+that|also)\b[\s\S]*$/i, "")
+      .replace(/\s*,?\s*(?:then\s+)?tell\s+me[\s\S]*$/i, "")
+      .replace(/\s+\band\s+(?:tell|show|explain|summari[sz]e|answer|extract|give)\b[\s\S]*$/i, "")
+      .replace(/[?!.;,:"'`]+$/g, "")
+      .trim();
+    const topic = cleanupAskTurnOpenDocSearchTopic(rawTopic);
+    if (topic) return topic;
+  }
+  return null;
+};
+
+export const isAskTurnDocsPanelOpenIntent = (transcript: string): boolean => {
+  if (/\bDocument\s+path\s*:/i.test(transcript) && /\bLocate\s+query\s*:/i.test(transcript)) return false;
+  const normalized = transcript
+    .trim()
+    .replace(/^[\s,]*(?:ok|okay|all\s+right|alright|hello|hey)[\s,]+/i, "")
+    .replace(/\b(?:please|for\s+me|for\s+us)\b/gi, " ")
+    .replace(/[.?!]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!normalized) return false;
+  if (
+    /\b(?:open|open\s+up|show|view|pull\s+up|bring\s+up|switch\s+to|go\s+to|navigate\s+to)\s+(?:(?:the|a)\s+)?docs?\s+(?:viewer|panel|dock)\b/i.test(normalized) &&
+    !/\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to)\b[\s\S]{0,120}\b(?:open|show|view|pull\s+up|bring\s+up|switch\s+to|go\s+to|navigate\s+to)\b[\s\S]{0,80}\bdocs?\s+(?:viewer|panel|dock)\b/i.test(normalized)
+  ) {
+    return true;
+  }
+  return /(?:^|[.?!]\s+)(?:(?:can|could|would)\s+you\s+)?(?:open|open\s+up|show|view|pull\s+up|bring\s+up|switch\s+to|go\s+to|navigate\s+to)\s+(?:(?:the|a)\s+)?(?:docs?|documents?)(?:\s+(?:viewer|panel|dock))?(?:\s|[.?!,]|$)/i.test(normalized) &&
+    !/\b(?:docs?|documents?)\s+(?:about|on|regarding|for|named|called|matching)\b/i.test(normalized);
+};
+
+export const resolveAskTurnTitleLikeOpenDocQueryArg = (transcript: string): string | null => {
+  const normalized = transcript.trim();
+  if (isAskTurnDocsPanelOpenIntent(normalized)) return null;
+  if (!normalized || /\b(?:latest|newest|most\s+recent|recent)\b/i.test(normalized)) return null;
+  const match = normalized.match(
+    /^\s*(?:(?:ok|okay)\s+)?(?:please\s+)?(?:(?:you\s+have\s+to|can\s+you|could\s+you|would\s+you)\s+)?(?:open\s+up|open|view|show|pull\s+up|bring\s+up|go\s+to|navigate\s+to|read|speak|narrate)\s+(?:the\s+)?(.+)$/i,
+  );
+  const rawTopic = match?.[1]
+    ?.replace(/\s+\b(?:and\s+then|then|after\s+that|also)\b[\s\S]*$/i, "")
+    .replace(/\s*,?\s*(?:then\s+)?tell\s+me[\s\S]*$/i, "")
+    .replace(/\s+\b(?:to\s+me|aloud|out\s*loud|outloud)\b[\s\S]*$/i, "")
+    .replace(/[?!.;,:"'`]+$/g, "")
+    .trim();
+  if (!rawTopic) return null;
+  if (/^(?:this|that|current|active|open)?\s*(?:docs?|focs?|documents?|papers?|files?|notes?|clipboard|calculator|panel|viewer)$/i.test(rawTopic)) return null;
+  if (/^(?:the\s+)?(?:docs?|focs?|documents?|papers?)\s+(?:viewer|panel)$/i.test(rawTopic)) return null;
+  const topic = cleanupAskTurnOpenDocSearchTopic(rawTopic);
+  if (!topic) return null;
+  const tokens = tokenizeAskTurnDocTopic(topic).map((token) => token.toLowerCase());
+  const strongSignals = tokens.filter(
+    (token) =>
+      token === "nhm2" ||
+      token === "warp" ||
+      token === "frontier" ||
+      token === "distance" ||
+      token === "report" ||
+      token === "audit" ||
+      token === "solve" ||
+      token === "profile" ||
+      token === "whitepaper" ||
+      token === "deeper" ||
+      token === "reformulation" ||
+      token === "decision" ||
+      token === "memo" ||
+      token === "clocking" ||
+      token === "target" ||
+      token === "targets" ||
+      /^0p\d+$/i.test(token) ||
+      /^20\d{2}$/.test(token),
+  );
+  if (strongSignals.length === 0) return null;
+  if (tokens.length < 2 && !tokens.some((token) => /^0p\d+$/i.test(token))) return null;
+  return topic;
+};
+
+export const resolveAskTurnOpenResultDocQueryArg = (transcript: string): string | null => {
+  const normalized = transcript.trim();
+  if (!normalized) return null;
+  if (isAskTurnTopicQualifiedLatestDocIntent(normalized)) return null;
+  if (
+    /\b(?:latest|newest|most\s+recent|recent)\b[\s\S]*\b(?:doc|docs|document|paper)\b/i.test(normalized) &&
+    !/\bresult\b/i.test(normalized)
+  ) return null;
+  const patterns = [
+    /\b(?:open|view|show|pull\s+up|go\s+to|navigate\s+to)\s+(?:the\s+)?(?:latest|newest|most\s+recent|recent|first|top|best)\s+(.+?)\s+(?:result|doc|docs|document|paper)\b/i,
+    /\b(?:open|view|show|pull\s+up|go\s+to|navigate\s+to)\s+(?:the\s+)?(?:latest|newest|most\s+recent|recent|first|top|best)\s+(?:result|doc|docs|document|paper)\s+(?:about|on|regarding|for)\s+(.+)$/i,
+  ];
+  for (const pattern of patterns) {
+    const match = normalized.match(pattern);
+    const rawTopic = match?.[1]
+      ?.replace(/\s+\b(?:and\s+then|then|after\s+that|also)\b[\s\S]*$/i, "")
+      .replace(/\b(?:result|doc|docs|document|paper)\b/gi, " ")
+      .replace(/[?!.;,:"'`]+$/g, "")
+      .trim();
+    const topic = rawTopic ? normalizeAskTurnLatestDocTopicText(rawTopic) : null;
+    if (topic) return topic;
+  }
+  return null;
+};
+
 export const createAskTurnLatestDocIntentReaders = (
   deps: HelixAskLatestDocIntentReaderDependencies,
 ) => {
@@ -158,9 +293,28 @@ export const createAskTurnLatestDocIntentReaders = (
     return null;
   };
 
+  const resolveAskTurnOpenDocSearchQueryArg = (transcript: string): string | null =>
+    isAskTurnDocsPanelOpenIntent(transcript)
+      ? null
+      : /\bNHM2\b[\s\S]{0,80}\bdeeper\s+reformulation\s+decision\s+memo\b/i.test(transcript)
+        ? "NHM2 deeper reformulation decision memo"
+      : resolveAskTurnRecentDocAcquisitionQueryArg(transcript) ??
+        resolveAskTurnTopicDocQueryArg(transcript) ??
+        resolveAskTurnOpenResultDocQueryArg(transcript) ??
+        resolveAskTurnTitleLikeOpenDocQueryArg(transcript);
+
+  const isAskTurnTopicDocAcquisitionIntent = (transcript: string): boolean =>
+    Boolean(resolveAskTurnOpenDocSearchQueryArg(transcript));
+
+  const isAskTurnOpenDocSearchIntent = (transcript: string): boolean =>
+    Boolean(resolveAskTurnOpenDocSearchQueryArg(transcript));
+
   return {
+    isAskTurnOpenDocSearchIntent,
     isAskTurnOpenLatestDocIntent,
     isAskTurnStrictLatestDocAcquisitionIntent,
+    isAskTurnTopicDocAcquisitionIntent,
+    resolveAskTurnOpenDocSearchQueryArg,
     resolveAskTurnRecentDocAcquisitionQueryArg,
   };
 };
