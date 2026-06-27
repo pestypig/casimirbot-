@@ -1424,6 +1424,10 @@ describe("HelixAskPill mic-first surface contract", () => {
       path.resolve(process.cwd(), "client/src/lib/helix/ask-active-turn-stream.ts"),
       "utf8",
     );
+    const transcriptSource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/lib/helix/ask-turn-transcript.ts"),
+      "utf8",
+    );
     expect(source).toContain("buildHelixTurnTranscriptRows");
     expect(source).toContain("buildHelixContinuousTurnStreamRows");
     expect(source).toContain("buildHelixCausalTurnTraceRows");
@@ -1498,7 +1502,7 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("reasoningBattleBeatPrimitive");
     expect(source).toContain("reasoningBattlePrimitiveClassName");
     expect(source).toContain("prefers-reduced-motion: reduce");
-    expect(source).toContain('type === "model_decision"');
+    expect(transcriptSource).toContain('type === "model_decision"');
     expect(source).toContain("Thinking");
     expect(source).toContain("turn_transcript_events");
     expect(source).toContain("buildAskLiveEventFromTurnTranscriptRecord");

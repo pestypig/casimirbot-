@@ -54,4 +54,29 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(activeStream).not.toContain("enqueueVoicePlaybackIntent");
     expect(activeStream).not.toContain("runAskTurn");
   });
+
+  it("keeps transcript and causal display builders in the non-React transcript module", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const transcript = read("client/src/lib/helix/ask-turn-transcript.ts");
+
+    expect(pill).toContain('from "@/lib/helix/ask-turn-transcript"');
+    for (const symbol of [
+      "buildHelixCausalTurnTraceRows",
+      "buildHelixRuntimeTranscriptEvents",
+      "buildHelixTurnTranscriptRows",
+      "isDurableHelixAskMailTranscriptGroup",
+      "normalizeHelixVisibleEventText",
+      "readHelixCausalTurnTimeline",
+      "resolveHelixTurnTranscriptEvents",
+    ]) {
+      expect(pill).not.toContain(`export function ${symbol}`);
+      expect(transcript).toContain(`export function ${symbol}`);
+    }
+    expect(transcript).not.toMatch(/from ["']react["']/);
+    expect(transcript).not.toContain("@/store/");
+    expect(transcript).not.toContain("@/components/helix/HelixAskPill");
+    expect(transcript).not.toContain("setAskReplies");
+    expect(transcript).not.toContain("enqueueVoicePlaybackIntent");
+    expect(transcript).not.toContain("runAskTurn");
+  });
 });
