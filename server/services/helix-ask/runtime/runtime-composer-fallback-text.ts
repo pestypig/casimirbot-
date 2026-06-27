@@ -26,6 +26,12 @@ export type HelixRuntimeRepoEvidenceFallbackGoalFrame = {
   concept_tokens?: string[] | null;
 };
 
+export type HelixRuntimeLiveEnvironmentFallbackDependencies = {
+  readArtifactPayloadRecord: (artifact: HelixRuntimeComposerSupportRefArtifact) => RecordLike | null;
+  readString: (value: unknown) => string | null;
+  getLiveAnswerEnvironment: (environmentId: string) => { objective?: unknown } | null;
+};
+
 const readComposerFallbackString = (value: unknown): string | null =>
   typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 
@@ -326,4 +332,91 @@ export const buildHelixRuntimeRepoEvidenceFallbackText = (args: {
     "Key evidence:",
     ...sourceLines,
   ].join("\n").trim();
+};
+
+const readLiveCardLineValue = (
+  deps: Pick<HelixRuntimeLiveEnvironmentFallbackDependencies, "readString">,
+  observation: RecordLike | null,
+  key: string,
+): string | null => {
+  const lines = Array.isArray(observation?.lines) ? observation.lines : [];
+  for (const line of lines) {
+    if (!line || typeof line !== "object" || Array.isArray(line)) continue;
+    const record = line as RecordLike;
+    if (deps.readString(record.key) === key) {
+      return deps.readString(record.value);
+    }
+  }
+  return null;
+};
+
+const readFirstFiniteNumber = (value: string | null): number | null => {
+  if (!value) return null;
+  const match = value.match(/[-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?/i);
+  if (!match) return null;
+  const parsed = Number(match[0]);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const resolveLiveAnswerThreshold = (
+  prompt: string,
+  environment?: { objective?: unknown } | null,
+): number | null => {
+  const haystack = `${prompt}\n${typeof environment?.objective === "string" ? environment.objective : ""}`;
+  const thresholdMatch =
+    haystack.match(/\bthreshold(?:\s+(?:of|is|=|above|over|under))?\s*([-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?)/i) ??
+    haystack.match(/\bcross(?:ed|es|ing)?\s+(?:the\s+)?(?:value\s+)?([-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?)/i);
+  if (!thresholdMatch?.[1]) return null;
+  const threshold = Number(thresholdMatch[1]);
+  return Number.isFinite(threshold) ? threshold : null;
+};
+
+export const createHelixRuntimeLiveEnvironmentFallbackTextBuilder = (
+  deps: HelixRuntimeLiveEnvironmentFallbackDependencies,
+) => (args: {
+  prompt: string;
+  artifacts: HelixRuntimeComposerSupportRefArtifact[];
+}): string => {
+  const liveToolArtifact = [...args.artifacts]
+    .reverse()
+    .find((artifact) => artifact.kind === "live_environment_tool_observation") ?? null;
+  const toolPayload = liveToolArtifact ? deps.readArtifactPayloadRecord(liveToolArtifact) : null;
+  const toolName = deps.readString(toolPayload?.tool_name);
+  const observation =
+    toolPayload?.observation && typeof toolPayload.observation === "object" && !Array.isArray(toolPayload.observation)
+      ? (toolPayload.observation as RecordLike)
+      : null;
+  if (toolName !== "live_env.read_card" || !observation) return "";
+
+  const environmentId = deps.readString(observation.environment_id);
+  const environment = environmentId ? deps.getLiveAnswerEnvironment(environmentId) : null;
+  const equation = readLiveCardLineValue(deps, observation, "current_equation");
+  const latestResult = readLiveCardLineValue(deps, observation, "latest_result");
+  const interpretation = readLiveCardLineValue(deps, observation, "interpretation");
+  const resultNumber = readFirstFiniteNumber(latestResult);
+  const threshold = resolveLiveAnswerThreshold(args.prompt, environment);
+  const wantsThreshold =
+    /\b(?:threshold|cross(?:ed|es|ing)?|above|over|under)\b/i.test(args.prompt) ||
+    threshold !== null;
+  const lines: string[] = [];
+  if (latestResult) lines.push(`Latest result: ${latestResult}.`);
+  if (equation) lines.push(`Current equation: ${equation}.`);
+  if (wantsThreshold && threshold !== null && resultNumber !== null) {
+    lines.push(
+      resultNumber > threshold || resultNumber === threshold
+        ? `Threshold ${threshold}: crossed by the latest result.`
+        : `Threshold ${threshold}: not crossed by the latest result.`,
+    );
+  }
+  if (interpretation && !lines.some((line) => line.includes(interpretation))) {
+    lines.push(`Live interpretation: ${interpretation}`);
+  }
+  if (/\b(?:spoken|speaking|voice|dottie|quiet|silent)\b/i.test(args.prompt)) {
+    lines.push("This live-card read is evidence only; it does not prove any spoken audio.");
+  }
+  if (lines.length === 0) {
+    const summary = deps.readString(toolPayload?.summary);
+    return summary ? `${summary} It is tool evidence, not a panel-generated answer.` : "";
+  }
+  return lines.join("\n");
 };
