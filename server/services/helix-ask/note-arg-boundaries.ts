@@ -51,6 +51,26 @@ export const resolveAskTurnTitleArg = (transcript: string): string | null => {
   return null;
 };
 
+export const resolveAskTurnCreateNoteTitleArg = (transcript: string): string | null => {
+  const createMatch = transcript.match(
+    /\b(?:create|make|new|start)\s+(?:a\s+)?(?:[\w-]+\s+){0,3}note(?:\s+(?:called|named|titled?)\s+)?(.+?)(?:\s*,|\s+\bwith\b|\s+\bfrom\b|\s+\busing\b|\s+\band\s+(?:then|put|add|save|write|copy|store|append)\b|\s+\bthen\b|\s+\bafter that\b|\s+\bwhile\b|\s+\balso\b|$)/i,
+  );
+  const value = trimAskTurnProtectedTitleArgBoundaries(createMatch?.[1] ?? "");
+  if (value) return value;
+  return resolveAskTurnTitleArg(transcript);
+};
+
+export const isAskTurnCreateNoteIntent = (transcript: string): boolean =>
+  /\b(?:create|make|new|start)\s+(?:a\s+)?(?:[\w-]+\s+){0,3}note\b/i.test(transcript.trim());
+
+export const maskAskTurnProtectedArgumentSpansForIntent = (transcript: string): string => {
+  if (!isAskTurnCreateNoteIntent(transcript)) return transcript;
+  return transcript.replace(
+    /\b((?:called|named|titled?|title))\s+(.+?)(?=\s*(?:,|\band\s+then\b|\bthen\b|\bafter\s+that\b|\bwhile\b|\balso\b)\s+|$)/gi,
+    (_match, introducer: string) => `${introducer} <NOTE_TITLE>`,
+  );
+};
+
 export const isAskTurnDeicticNoteLabel = (value: string | null | undefined): boolean => {
   const normalized = String(value ?? "")
     .trim()

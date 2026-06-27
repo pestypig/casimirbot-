@@ -8,10 +8,13 @@ import {
   isAskTurnArtifactReferenceIntent,
   isAskTurnArtifactToClipboardIntent,
   isAskTurnArtifactToNoteIntent,
+  isAskTurnCreateNoteIntent,
   isAskTurnDeicticNoteLabel,
   isAskTurnDeicticNoteWriteWithoutExplicitTitle,
   isAskTurnDeicticNoteTarget,
   isAskTurnInvalidResolvedNoteTitle,
+  maskAskTurnProtectedArgumentSpansForIntent,
+  resolveAskTurnCreateNoteTitleArg,
   resolveAskTurnTextArg,
   resolveAskTurnTitleArg,
   trimAskTurnProtectedTitleArgBoundaries,
@@ -32,6 +35,9 @@ describe("Helix Ask note arg boundary extraction boundary", () => {
     expect(routeSource).not.toMatch(/const\s+trimAskTurnProtectedTitleArgBoundaries\s*=/);
     expect(routeSource).not.toMatch(/const\s+resolveAskTurnTextArg\s*=\s*\(transcript/);
     expect(routeSource).not.toMatch(/const\s+resolveAskTurnTitleArg\s*=\s*\(transcript/);
+    expect(routeSource).not.toMatch(/const\s+resolveAskTurnCreateNoteTitleArg\s*=\s*\(transcript/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnCreateNoteIntent\s*=/);
+    expect(routeSource).not.toMatch(/const\s+maskAskTurnProtectedArgumentSpansForIntent\s*=/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnDeicticNoteLabel\s*=/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnDeicticNoteTarget\s*=/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnInvalidResolvedNoteTitle\s*=/);
@@ -43,6 +49,9 @@ describe("Helix Ask note arg boundary extraction boundary", () => {
     expect(serviceSource).toMatch(/export\s+const\s+trimAskTurnProtectedTitleArgBoundaries\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+resolveAskTurnTextArg\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+resolveAskTurnTitleArg\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+resolveAskTurnCreateNoteTitleArg\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+isAskTurnCreateNoteIntent\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+maskAskTurnProtectedArgumentSpansForIntent\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnDeicticNoteLabel\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnDeicticNoteTarget\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnInvalidResolvedNoteTitle\s*=/);
@@ -71,6 +80,16 @@ describe("Helix Ask note arg boundary extraction boundary", () => {
     expect(resolveAskTurnTitleArg('create note "Field Notes, then read docs"')).toBe("Field Notes");
     expect(resolveAskTurnTitleArg("create note called Field Notes, then read docs")).toBe("Field Notes");
     expect(resolveAskTurnTitleArg("create note Field Notes, then read docs")).toBe("Field Notes");
+  });
+
+  it("preserves create-note title and protected argument masking", () => {
+    expect(resolveAskTurnCreateNoteTitleArg("title Field Notes, then read docs")).toBe("Field Notes");
+    expect(resolveAskTurnCreateNoteTitleArg('write "Warp Metrics"')).toBe("Warp Metrics");
+    expect(isAskTurnCreateNoteIntent("make a new research note")).toBe(true);
+    expect(isAskTurnCreateNoteIntent("append to the active note")).toBe(false);
+    expect(maskAskTurnProtectedArgumentSpansForIntent("create note called compare vs contrast, then open docs")).toBe(
+      "create note called <NOTE_TITLE>, then open docs",
+    );
   });
 
   it("preserves deictic and invalid note title predicates", () => {
