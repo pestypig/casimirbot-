@@ -89,6 +89,32 @@ export const buildHelixLocalizedTypedFailureTextForPayload = (
 ): string =>
   buildHelixLocalizedTypedFailureText(resolveHelixAskResponseLanguageFromPayload(payload));
 
+export const buildHelixResponseLanguageInstruction = (
+  contract: HelixAskLanguageContractV1 | null | undefined,
+): string[] => {
+  switch (contract?.response_language) {
+    case "zh":
+      return [
+        "Final answer language contract:",
+        "Respond in Chinese.",
+        "Do not switch to English unless quoting code symbols, file paths, APIs, or exact source text.",
+      ];
+    case "es":
+      return [
+        "Final answer language contract:",
+        "Respond in Spanish.",
+        "Do not switch to English unless quoting code symbols, file paths, APIs, or exact source text.",
+      ];
+    case "en":
+      return [
+        "Final answer language contract:",
+        "Respond in English.",
+      ];
+    default:
+      return [];
+  }
+};
+
 type BuildLanguageContractInput = {
   inputModality?: "typed" | "voice";
   sourceText: string;
