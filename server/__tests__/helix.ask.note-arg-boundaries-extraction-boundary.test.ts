@@ -9,11 +9,13 @@ import {
   isAskTurnArtifactReferenceIntent,
   isAskTurnArtifactToClipboardIntent,
   isAskTurnArtifactToNoteIntent,
+  isAskTurnAppendToNoteCue,
   isAskTurnCreateNoteIntent,
   isAskTurnDeicticNoteLabel,
   isAskTurnDeicticNoteWriteWithoutExplicitTitle,
   isAskTurnDeicticNoteTarget,
   isAskTurnInvalidResolvedNoteTitle,
+  isAskTurnRepoCueIntent,
   maskAskTurnProtectedArgumentSpansForIntent,
   resolveAskTurnCreateNoteTitleArg,
   resolveAskTurnTextArg,
@@ -51,6 +53,9 @@ describe("Helix Ask note arg boundary extraction boundary", () => {
     expect(routeSource).not.toMatch(/const\s+resolveAskTurnSummaryNamedNoteSinkArg\s*=/);
     expect(routeSource).not.toMatch(/const\s+resolveAskTurnLocationNamedNoteSinkArg\s*=/);
     expect(routeSource).not.toMatch(/const\s+resolveAskTurnArtifactBareNoteTargetArg\s*=/);
+    expect(routeSource).not.toMatch(/const\s+resolveAskTurnAppendNoteTextArg\s*=/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnRepoCueIntent\s*=/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnAppendToNoteCue\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+createAskTurnActionArgBoundaryTrimmer\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+createAskTurnNoteSinkArgReaders\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+trimAskTurnProtectedTitleArgBoundaries\s*=/);
@@ -66,6 +71,8 @@ describe("Helix Ask note arg boundary extraction boundary", () => {
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnArtifactToNoteIntent\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnDeicticNoteWriteWithoutExplicitTitle\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnArtifactToClipboardIntent\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+isAskTurnRepoCueIntent\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+isAskTurnAppendToNoteCue\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");
     expect(serviceSource).not.toContain("../routes/agi.plan");
   });
@@ -119,6 +126,7 @@ describe("Helix Ask note arg boundary extraction boundary", () => {
   it("preserves requested note-title normalization and named sink readers", () => {
     const {
       normalizeAskTurnRequestedNoteTitle,
+      resolveAskTurnAppendNoteTextArg,
       resolveAskTurnArtifactBareNoteTargetArg,
       resolveAskTurnLayDestinationNoteSinkArg,
       resolveAskTurnLocationNamedNoteSinkArg,
@@ -135,5 +143,12 @@ describe("Helix Ask note arg boundary extraction boundary", () => {
     expect(resolveAskTurnLocationNamedNoteSinkArg("put the location into Field Notes")).toBe("Field Notes");
     expect(resolveAskTurnArtifactBareNoteTargetArg("copy that result into Field Notes")).toBe("Field Notes");
     expect(resolveAskTurnArtifactBareNoteTargetArg("copy Field Notes into clipboard")).toBeNull();
+    expect(resolveAskTurnAppendNoteTextArg("append alpha beta to my note")).toBe("alpha beta");
+    expect(resolveAskTurnAppendNoteTextArg("append: alpha beta")).toBe("alpha beta");
+    expect(resolveAskTurnAppendNoteTextArg("append alpha beta, then open docs")).toBe("alpha beta");
+    expect(isAskTurnRepoCueIntent("check the repo code paths")).toBe(true);
+    expect(isAskTurnRepoCueIntent("check the document")).toBe(false);
+    expect(isAskTurnAppendToNoteCue("append this to my note")).toBe(true);
+    expect(isAskTurnAppendToNoteCue("open my note")).toBe(false);
   });
 });

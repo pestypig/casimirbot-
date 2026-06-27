@@ -172,8 +172,21 @@ export const createAskTurnNoteSinkArgReaders = (
     return target;
   };
 
+  const resolveAskTurnAppendNoteTextArg = (transcript: string): string | null => {
+    const colon = transcript.match(/:\s*([\s\S]+)$/);
+    if (colon?.[1]?.trim()) return colon[1].trim();
+    const appendBeforeTarget = transcript.match(
+      /\b(?:append|add|put|save|write)\s+(.+?)\s+\b(?:to|into|in)\s+(?:the\s+|my\s+)?(?:note|notepad)\b/i,
+    );
+    if (appendBeforeTarget?.[1]?.trim()) return deps.trimActionArgBoundaries(appendBeforeTarget[1]);
+    const appendSimple = transcript.match(/\b(?:append|add|put|save|write)\s+(.+?)$/i);
+    if (appendSimple?.[1]?.trim()) return deps.trimActionArgBoundaries(appendSimple[1]);
+    return null;
+  };
+
   return {
     normalizeAskTurnRequestedNoteTitle,
+    resolveAskTurnAppendNoteTextArg,
     resolveAskTurnArtifactBareNoteTargetArg,
     resolveAskTurnLayDestinationNoteSinkArg,
     resolveAskTurnLocationNamedNoteSinkArg,
@@ -209,4 +222,19 @@ export const isAskTurnArtifactToClipboardIntent = (transcript: string): boolean 
   const normalized = transcript.trim().toLowerCase();
   if (!isAskTurnArtifactReferenceIntent(transcript)) return false;
   return /\b(?:copy|save|write|put|store)\b[\s\S]*\b(?:to|into|in)\b[\s\S]*\bclipboard\b/.test(normalized);
+};
+
+export const isAskTurnRepoCueIntent = (transcript: string): boolean => {
+  const normalized = transcript.trim().toLowerCase();
+  if (!normalized) return false;
+  return /\b(?:repo|repository|files?|codebase|source code|code paths?)\b/.test(normalized);
+};
+
+export const isAskTurnAppendToNoteCue = (transcript: string): boolean => {
+  const normalized = transcript.trim().toLowerCase();
+  if (!normalized) return false;
+  return (
+    /\b(?:append|add|save|put|write)\b[\s\S]*\b(?:to|into)\b[\s\S]*\b(?:note|notes|notepad)\b/.test(normalized) ||
+    /\b(?:append|add|save|put|write)\b[\s\S]*\b(?:note|notes|notepad)\b/.test(normalized)
+  );
 };
