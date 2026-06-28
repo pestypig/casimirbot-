@@ -303,6 +303,29 @@ describe("Helix Ask agent provider route metadata", () => {
     });
   });
 
+  it("does not route plain Helix stream prompts into planner-derived provider gateway observations", async () => {
+    const response = await request(createApp())
+      .post("/api/agi/ask/turn/stream")
+      .send({
+        turn_id: "ask:test:plain-helix-stream-no-provider-gateway",
+        question: "Open the NHM-2 white paper from the docs.",
+        mode: "read",
+        debug: true,
+      })
+      .expect(200);
+    const finalEvent = parseSseEvents(response.text).find((entry) => entry.event === "turn_final");
+
+    expect(finalEvent?.data).toBeTruthy();
+    expect(finalEvent?.data.agent_runtime).not.toBe("helix");
+    expect(finalEvent?.data.response_type).not.toBe("workstation_gateway_observation");
+    expect(finalEvent?.data.final_status).not.toBe("requires_provider_reasoning_reentry");
+    expect(finalEvent?.data.workstation_gateway_call_results).toBeUndefined();
+    expect(finalEvent?.data.route_authority_audit).toBeTruthy();
+    expect(finalEvent?.data.ask_turn_solver_trace).toBeTruthy();
+    expect(finalEvent?.data.goal_satisfaction_evaluation).toBeTruthy();
+    expect(finalEvent?.data.solver_controller_decision).toBeTruthy();
+  }, 60_000);
+
   it("routes selected Helix Native calculator prompts through planner-derived gateway observations", async () => {
     const response = await request(createApp())
       .post("/api/agi/ask/turn")
