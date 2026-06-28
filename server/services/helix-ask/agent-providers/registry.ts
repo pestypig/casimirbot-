@@ -4,10 +4,12 @@ import type { HelixAgentProvider } from "./types";
 import { selectHelixAgentRuntime } from "./runtime-select";
 import { helixNativeProvider } from "./helix-native-provider";
 import { codexProvider } from "./codex-provider";
+import { futureProvider } from "./future-provider";
 
 const providers = new Map<string, HelixAgentProvider>([
   [helixNativeProvider.id, helixNativeProvider],
   [codexProvider.id, codexProvider],
+  [futureProvider.id, futureProvider],
 ]);
 
 export function listHelixAgentProviders(): HelixAgentRuntimeDescriptor[] {

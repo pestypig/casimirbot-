@@ -7,6 +7,10 @@ import {
   runExplicitCodexWorkstationGatewayCalls,
 } from "../agent-providers/codex-provider";
 import {
+  futureProvider,
+  runExplicitFutureWorkstationGatewayCalls,
+} from "../agent-providers/future-provider";
+import {
   buildStructuredAdmissionWorkstationGatewayCallRequests,
   buildPlannerDerivedWorkstationGatewayCallRequests,
   runExplicitWorkstationGatewayCalls,
@@ -17,6 +21,7 @@ import { listWorkstationGatewayCapabilities } from "../workstation-tool-gateway/
 const ENV_KEYS = [
   "HELIX_ASK_AGENT_RUNTIME",
   "ENABLE_CODEX_AGENT",
+  "ENABLE_FUTURE_AGENT",
   "CODEX_AGENT_FAKE_STDOUT",
   "CODEX_AGENT_FAKE_STDERR",
   "CODEX_AGENT_FAKE_EXIT_CODE",
@@ -79,6 +84,13 @@ describe("Helix Ask agent provider selection", () => {
     expect(resolveHelixAgentProvider({ body: { agent_runtime: "codex" } }).id).toBe("helix");
   });
 
+  it("falls back to Helix when the future provider is requested but disabled", () => {
+    delete process.env.ENABLE_FUTURE_AGENT;
+
+    expect(selectHelixAgentRuntime({ body: { agent_runtime: "future" } })).toBe("future");
+    expect(resolveHelixAgentProvider({ body: { agent_runtime: "future" } }).id).toBe("helix");
+  });
+
   it("selects Codex when requested and enabled", () => {
     process.env.ENABLE_CODEX_AGENT = "1";
 
@@ -103,8 +115,33 @@ describe("Helix Ask agent provider selection", () => {
     });
   });
 
-  it("lists Helix as enabled and Codex as disabled by default", () => {
+  it("selects the future provider wrapper when requested and explicitly enabled", () => {
+    process.env.ENABLE_FUTURE_AGENT = "1";
+
+    const provider = resolveHelixAgentProvider({ body: { agentRuntime: "future" } });
+
+    expect(provider.id).toBe("future");
+    expect(provider.supports).toEqual({
+      streaming: false,
+      workstationTools: true,
+      codeMutation: false,
+    });
+    expect(provider.permissionProfile).toMatchObject({
+      id: "read-observe",
+      allows: {
+        observe: true,
+        read: true,
+        act: false,
+        write: false,
+        shell: false,
+        codeMutation: false,
+      },
+    });
+  });
+
+  it("lists Helix as enabled and experimental providers as disabled by default", () => {
     delete process.env.ENABLE_CODEX_AGENT;
+    delete process.env.ENABLE_FUTURE_AGENT;
 
     const providers = listHelixAgentProviders();
 
@@ -121,6 +158,23 @@ describe("Helix Ask agent provider selection", () => {
     expect(providers).toContainEqual(
       expect.objectContaining({
         id: "codex",
+        enabled: false,
+        experimental: true,
+        permission_profile: expect.objectContaining({
+          id: "read-observe",
+          allows: expect.objectContaining({
+            read: true,
+            write: false,
+            shell: false,
+            codeMutation: false,
+          }),
+        }),
+      }),
+    );
+    expect(providers).toContainEqual(
+      expect.objectContaining({
+        id: "future",
+        label: "Future Agent Wrapper",
         enabled: false,
         experimental: true,
         permission_profile: expect.objectContaining({
@@ -226,6 +280,53 @@ describe("Helix Ask agent provider selection", () => {
     });
   });
 
+  it("returns future provider scaffold failures with provider and gateway debug metadata", async () => {
+    process.env.ENABLE_FUTURE_AGENT = "1";
+
+    const result = await futureProvider.runTurn({
+      runtime: "future",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:future-provider-scaffold",
+        question: "Use the future provider wrapper.",
+      },
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      runtime: "future",
+      response_type: "final_failure",
+      final_status: "final_failure",
+      debug: {
+        turn_id: "ask:test:future-provider-scaffold",
+        agent_runtime: "future",
+        fail_reason: "future_provider_adapter_not_configured",
+        agent_runtime_selection_trace: {
+          schema: "helix.agent_runtime_selection_trace.v1",
+          selected_runtime: "future",
+          workstation_gateway: {
+            manifest_version: "read-observe.v1",
+            shell_enabled: false,
+            file_mutation_enabled: false,
+            code_mutation_enabled: false,
+          },
+        },
+        selected_agent_provider: {
+          id: "future",
+          permission_profile: {
+            id: "read-observe",
+          },
+        },
+        workstation_gateway_manifest: {
+          schema: "helix.workstation_tool_gateway.v1",
+          manifest_version: "read-observe.v1",
+        },
+        workstation_gateway_reentry_status: "pending_provider_reasoning",
+        terminal_authority_status: "pending_helix_terminal_authority",
+      },
+    });
+  });
+
   it("runs only explicit Codex workstation gateway call requests through shared admission", async () => {
     const results = await runExplicitCodexWorkstationGatewayCalls({
       body: {
@@ -268,6 +369,49 @@ describe("Helix Ask agent provider selection", () => {
       },
       tool_followup_decision: {
         schema: "helix.tool_followup_decision.v1",
+        next_action: "continue_reasoning",
+        evidence_reentered: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+  });
+
+  it("runs future provider workstation gateway calls through the same shared admission", async () => {
+    const results = await runExplicitFutureWorkstationGatewayCalls({
+      body: {
+        turn_id: "ask:test:future-explicit-gateway",
+        workstation_gateway_call: {
+          capability_id: "scientific-calculator.solve_expression",
+          arguments: {
+            expression: "8 * 8",
+          },
+        },
+      },
+    });
+
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({
+      ok: true,
+      agent_runtime: "future",
+      capability_id: "scientific-calculator.solve_expression",
+      gateway_admission: {
+        selected_agent_provider: "future",
+        admission_status: "admitted",
+      },
+      observation_packet: {
+        schema: "helix.agent_step_observation_packet.v1",
+        status: "succeeded",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.calculator_solve_observation.v1",
+        result: "64",
+      },
+      tool_followup_decision: {
         next_action: "continue_reasoning",
         evidence_reentered: false,
         assistant_answer: false,

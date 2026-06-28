@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { planRouter } from "../routes/agi.plan";
 
 const originalEnableCodexAgent = process.env.ENABLE_CODEX_AGENT;
+const originalEnableFutureAgent = process.env.ENABLE_FUTURE_AGENT;
 const originalCodexFakeStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
 const originalCodexFakeStderr = process.env.CODEX_AGENT_FAKE_STDERR;
 const originalCodexFakeExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
@@ -13,6 +14,11 @@ afterEach(() => {
     delete process.env.ENABLE_CODEX_AGENT;
   } else {
     process.env.ENABLE_CODEX_AGENT = originalEnableCodexAgent;
+  }
+  if (originalEnableFutureAgent === undefined) {
+    delete process.env.ENABLE_FUTURE_AGENT;
+  } else {
+    process.env.ENABLE_FUTURE_AGENT = originalEnableFutureAgent;
   }
   if (originalCodexFakeStdout === undefined) {
     delete process.env.CODEX_AGENT_FAKE_STDOUT;
@@ -678,6 +684,114 @@ describe("Helix Ask agent provider route metadata", () => {
     });
     expect(response.body.workstation_gateway_capability_ids).toContain("workspace_os.status");
     expect(response.body.workstation_gateway_capability_ids).toContain("docs.search");
+  });
+
+  it("routes enabled future providers through the same Ask gateway contract", async () => {
+    process.env.ENABLE_FUTURE_AGENT = "1";
+
+    const response = await request(createApp())
+      .post("/api/agi/ask/turn")
+      .send({
+        agent_runtime: "future",
+        turn_id: "ask:test:future-provider-route",
+        workstation_gateway_call: {
+          capability_id: "scientific-calculator.solve_expression",
+          arguments: {
+            expression: "8 * 8",
+          },
+        },
+      })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      ok: false,
+      turn_id: "ask:test:future-provider-route",
+      runtime: "future",
+      response_type: "workstation_gateway_observation",
+      final_status: "requires_provider_reasoning_reentry",
+      agent_runtime: "future",
+      agent_runtime_selection_trace: {
+        schema: "helix.agent_runtime_selection_trace.v1",
+        route: "/ask/turn",
+        requested_runtime: "future",
+        selected_runtime: "future",
+        fallback_used: false,
+        workstation_gateway: {
+          manifest_version: "read-observe.v1",
+          shell_enabled: false,
+          file_mutation_enabled: false,
+          code_mutation_enabled: false,
+        },
+      },
+      selected_agent_provider: {
+        id: "future",
+        label: "Future Agent Wrapper",
+        permission_profile: {
+          id: "read-observe",
+          allows: {
+            read: true,
+            write: false,
+            shell: false,
+            codeMutation: false,
+          },
+        },
+      },
+      workstation_gateway_manifest_version: "read-observe.v1",
+      workstation_gateway_reentry_status: "pending_helix_solver_reentry",
+      terminal_authority_status: "not_authorized_observation_only",
+      workstation_gateway_call_results: [
+        {
+          ok: true,
+          agent_runtime: "future",
+          capability_id: "scientific-calculator.solve_expression",
+          gateway_admission: {
+            selected_agent_provider: "future",
+            permission_profile: "read",
+            admission_status: "admitted",
+          },
+          observation_packet: {
+            status: "succeeded",
+            terminal_eligible: false,
+            post_tool_model_step_required: true,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+          observation: {
+            schema: "helix.calculator_solve_observation.v1",
+            result: "64",
+          },
+        },
+      ],
+      provider_reasoning_reentry: {
+        status: "pending_helix_solver_reentry",
+        provider_terminal_candidate_present: false,
+        post_tool_model_step_required: true,
+        evidence_reentered: false,
+      },
+      terminal_authority_candidate_review: {
+        terminal_authority_status: "not_authorized_observation_only",
+        terminal_authority_granted: false,
+        final_visible_answer_authorized: false,
+        blockers: ["provider_reasoning_reentry_required"],
+      },
+      provider_terminal_candidate: null,
+      terminal_answer_authority: null,
+      final_answer_source: null,
+      terminal_artifact_kind: null,
+      debug: {
+        turn_id: "ask:test:future-provider-route",
+        agent_runtime: "future",
+        workstation_gateway_manifest_version: "read-observe.v1",
+        terminal_authority_status: "not_authorized_observation_only",
+        terminal_answer_authority: null,
+      },
+    });
+    expect(response.body.workstation_gateway_capability_ids).toContain("workspace_os.status");
+    expect(response.body.workstation_gateway_capability_ids).toContain("docs.search");
+    expect(response.body.debug_export_ref).toMatchObject({
+      endpoint: "/api/agi/ask/turn/ask%3Atest%3Afuture-provider-route/debug-export",
+      turn_id: "ask:test:future-provider-route",
+    });
   });
 
   it("emits provider and gateway debug metadata in stream final events", async () => {

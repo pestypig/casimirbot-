@@ -1,4 +1,4 @@
-export const HELIX_AGENT_RUNTIME_IDS = ["helix", "codex"] as const;
+export const HELIX_AGENT_RUNTIME_IDS = ["helix", "codex", "future"] as const;
 
 export type HelixAgentRuntimeId = (typeof HELIX_AGENT_RUNTIME_IDS)[number];
 

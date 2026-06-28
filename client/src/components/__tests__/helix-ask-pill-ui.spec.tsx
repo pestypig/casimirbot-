@@ -899,7 +899,7 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("{selectedAgentRuntimeLabel}");
   });
 
-  it("normalizes Helix and Codex providers from the mocked agent provider response", () => {
+  it("normalizes Helix, Codex, and Future providers from the mocked agent provider response", () => {
     const providers = normalizeHelixAgentProvidersResponse({
       providers: [
         {
@@ -928,14 +928,28 @@ describe("HelixAskPill mic-first surface contract", () => {
           },
           supports: { streaming: true, workstationTools: true, codeMutation: true },
         },
+        {
+          id: "future",
+          label: "Future Agent Wrapper",
+          enabled: false,
+          experimental: true,
+          supports: { streaming: false, workstationTools: true, codeMutation: false },
+        },
       ],
     });
 
-    expect(providers.map((provider) => provider.label)).toEqual([
+    expect(providers.map((provider: { label: string }) => provider.label)).toEqual([
       "Helix Ask Native",
       "Codex Workstation Mode",
+      "Future Agent Wrapper",
     ]);
-    expect(providers.find((provider) => provider.id === "codex")?.permission_profile).toMatchObject({
+    const codexProvider = providers.find((provider: { id: string }) => provider.id === "codex") as
+      | { permission_profile?: Record<string, unknown> }
+      | undefined;
+    const futureProvider = providers.find((provider: { id: string }) => provider.id === "future") as
+      | { permission_profile?: Record<string, unknown> }
+      | undefined;
+    expect(codexProvider?.permission_profile).toMatchObject({
       id: "read-observe",
       allows: {
         read: true,
@@ -945,6 +959,16 @@ describe("HelixAskPill mic-first surface contract", () => {
       },
     });
     expect(resolveSelectedHelixAgentRuntime("codex", providers)).toBe("codex");
+    expect(futureProvider?.permission_profile).toMatchObject({
+      id: "read-observe",
+      allows: {
+        read: true,
+        write: false,
+        shell: false,
+        codeMutation: false,
+      },
+    });
+    expect(resolveSelectedHelixAgentRuntime("future", providers)).toBe("helix");
   });
 
   it("keeps disabled Codex visible but not selectable", () => {
@@ -967,8 +991,11 @@ describe("HelixAskPill mic-first surface contract", () => {
       ],
     });
 
-    expect(providers.find((provider) => provider.id === "codex")?.enabled).toBe(false);
-    expect(providers.find((provider) => provider.id === "codex")?.permission_profile.id).toBe("read-observe");
+    const codexProvider = providers.find((provider: { id: string }) => provider.id === "codex") as
+      | { enabled?: boolean; permission_profile?: { id?: string } }
+      | undefined;
+    expect(codexProvider?.enabled).toBe(false);
+    expect(codexProvider?.permission_profile?.id).toBe("read-observe");
     expect(resolveSelectedHelixAgentRuntime("codex", providers)).toBe("helix");
   });
 
@@ -999,6 +1026,15 @@ describe("HelixAskPill mic-first surface contract", () => {
         },
       }),
     ).toBe("Provider: Helix Ask Native");
+    expect(
+      resolveHelixAskActualAgentProviderLabel({
+        agent_runtime: "future",
+        selected_agent_provider: {
+          id: "future",
+          label: "Future Agent Wrapper",
+        },
+      }),
+    ).toBe("Provider: Future Agent Wrapper");
   });
 
   it("does not label a response as Codex from agent_runtime_loop alone", () => {

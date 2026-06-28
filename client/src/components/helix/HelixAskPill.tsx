@@ -7113,7 +7113,7 @@ function coerceText(value: unknown): string {
 }
 
 function isHelixAgentRuntimeId(value: unknown): value is HelixAgentRuntimeId {
-  return value === "helix" || value === "codex";
+  return value === "helix" || value === "codex" || value === "future";
 }
 
 function readStoredHelixAskAgentRuntime(): HelixAgentRuntimeId {
@@ -7141,7 +7141,7 @@ function normalizeHelixAgentProvider(value: unknown): HelixAgentRuntimeDescripto
   const supports = readAgentLoopAuditRecord(record.supports);
   const permissionProfile = readAgentLoopAuditRecord(record.permission_profile);
   const permissionAllows = readAgentLoopAuditRecord(permissionProfile?.allows);
-  const fallbackPermissionProfile = record.id === "codex"
+  const fallbackPermissionProfile = record.id === "codex" || record.id === "future"
     ? {
         id: "read-observe" as const,
         label: "Read/observe only",
@@ -7153,11 +7153,17 @@ function normalizeHelixAgentProvider(value: unknown): HelixAgentRuntimeDescripto
           shell: false,
           codeMutation: false,
         },
-      }
+    }
     : DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS[0].permission_profile;
+  const fallbackLabel =
+    record.id === "codex"
+      ? "Codex Workstation Mode"
+      : record.id === "future"
+        ? "Future Agent Wrapper"
+        : "Helix Ask Native";
   return {
     id: record.id,
-    label: coerceText(record.label).trim() || (record.id === "codex" ? "Codex Workstation Mode" : "Helix Ask Native"),
+    label: coerceText(record.label).trim() || fallbackLabel,
     enabled: record.enabled === true,
     experimental: record.experimental === true,
     permission_profile: {
@@ -7186,15 +7192,15 @@ function normalizeHelixAgentProvider(value: unknown): HelixAgentRuntimeDescripto
 
 export function normalizeHelixAgentProvidersResponse(value: unknown): HelixAgentRuntimeDescriptor[] {
   const record = readAgentLoopAuditRecord(value);
-  const rawProviders = Array.isArray(record?.providers)
+  const rawProviders: unknown[] = Array.isArray(record?.providers)
     ? record.providers
     : Array.isArray(value)
       ? value
       : [];
   const providers = rawProviders
-    .map((entry) => normalizeHelixAgentProvider(entry))
-    .filter((entry): entry is HelixAgentRuntimeDescriptor => Boolean(entry));
-  const hasHelix = providers.some((provider) => provider.id === "helix");
+    .map((entry: unknown) => normalizeHelixAgentProvider(entry))
+    .filter((entry: HelixAgentRuntimeDescriptor | null): entry is HelixAgentRuntimeDescriptor => Boolean(entry));
+  const hasHelix = providers.some((provider: HelixAgentRuntimeDescriptor) => provider.id === "helix");
   return hasHelix ? providers : [...DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS, ...providers];
 }
 
@@ -7203,13 +7209,14 @@ export function resolveSelectedHelixAgentRuntime(
   providers: HelixAgentRuntimeDescriptor[],
 ): HelixAgentRuntimeId {
   const candidate = isHelixAgentRuntimeId(requested) ? requested : "helix";
-  const provider = providers.find((entry) => entry.id === candidate);
+  const provider = providers.find((entry: HelixAgentRuntimeDescriptor) => entry.id === candidate);
   if (provider?.enabled) return provider.id;
   return "helix";
 }
 
 export function formatHelixAgentRuntimeShortLabel(provider: HelixAgentRuntimeDescriptor | null | undefined): string {
   if (provider?.id === "codex") return "Codex";
+  if (provider?.id === "future") return "Future";
   return "Helix";
 }
 
@@ -7233,8 +7240,14 @@ export function resolveHelixAskActualAgentProviderLabel(
   if (!runtime) return null;
   const explicitLabel = coerceText(selectedProvider?.label).trim();
   if (explicitLabel) return `Provider: ${explicitLabel}`;
-  const provider = fallbackProviders.find((entry) => entry.id === runtime);
-  return `Provider: ${provider?.label || (runtime === "codex" ? "Codex Workstation Mode" : "Helix Ask Native")}`;
+  const provider = fallbackProviders.find((entry: HelixAgentRuntimeDescriptor) => entry.id === runtime);
+  const fallbackLabel =
+    runtime === "codex"
+      ? "Codex Workstation Mode"
+      : runtime === "future"
+        ? "Future Agent Wrapper"
+        : "Helix Ask Native";
+  return `Provider: ${provider?.label || fallbackLabel}`;
 }
 
 export function resolveHelixAskVisibleJobReadyLinks(reply: unknown): Record<string, unknown>[] {
