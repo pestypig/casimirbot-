@@ -112,3 +112,21 @@ export const stagePlayProcessedMailPacketAllowsDirectCheckpointSummary = (
   if (!packet || !stagePlayProcessedMailPacketHasSatisfyingContent(packet)) return false;
   return !stagePlayProcessedMailPacketRequiresDecision(packet);
 };
+
+export const artifactHasSatisfyingStagePlayProcessedMailPacket = (
+  artifact: AskTurnLiveSourceArtifactLike,
+): boolean => {
+  const payload = readAskTurnArtifactPayloadRecord(artifact);
+  if (artifact.kind === "stage_play_processed_mail_packet") {
+    return stagePlayProcessedMailPacketHasSatisfyingContent(payload ?? {});
+  }
+  if (artifact.kind !== "live_environment_tool_observation" && artifact.kind !== "tool_observation") return false;
+  return readStagePlayProcessedMailPacketRecordsFromArtifact(artifact).some(stagePlayProcessedMailPacketHasSatisfyingContent);
+};
+
+export const latestStagePlayProcessedMailPacketRecordFromArtifacts = (
+  artifacts: AskTurnLiveSourceArtifactLike[] | null | undefined,
+): Record<string, unknown> | null => {
+  const packets = (artifacts ?? []).flatMap(readStagePlayProcessedMailPacketRecordsFromArtifact);
+  return packets.at(-1) ?? null;
+};

@@ -4,7 +4,9 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  artifactHasSatisfyingStagePlayProcessedMailPacket,
   isStagePlayLiveSourceMailReadObservationArtifact,
+  latestStagePlayProcessedMailPacketRecordFromArtifacts,
   readAskTurnLiveEnvironmentObservationRecord,
   readStagePlayProcessedMailPacketRecommendedNext,
   readStagePlayProcessedMailPacketRecordsFromArtifact,
@@ -26,10 +28,14 @@ describe("Helix Ask live-source mail observation reader extraction boundary", ()
     expect(routeSource).not.toMatch(/const\s+readAskTurnLiveEnvironmentObservationRecord\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+readStagePlayProcessedMailPacketRecordsFromArtifact\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+stagePlayProcessedMailPacketHasSatisfyingContent\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+artifactHasSatisfyingStagePlayProcessedMailPacket\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+latestStagePlayProcessedMailPacketRecordFromArtifacts\s*=\s*\(/);
     expect(routeSource).not.toContain("STAGE_PLAY_PROCESSED_MAIL_RECOMMENDATIONS_REQUIRING_DECISION");
     expect(serviceSource).toMatch(/export\s+const\s+readAskTurnLiveEnvironmentObservationRecord\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+readStagePlayProcessedMailPacketRecordsFromArtifact\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+stagePlayProcessedMailPacketRequiresDecision\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+artifactHasSatisfyingStagePlayProcessedMailPacket\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+latestStagePlayProcessedMailPacketRecordFromArtifacts\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");
     expect(serviceSource).not.toContain("../../../routes/agi.plan");
     expect(serviceSource).not.toContain("../../routes/agi.plan");
@@ -97,5 +103,29 @@ describe("Helix Ask live-source mail observation reader extraction boundary", ()
     expect(stagePlayProcessedMailPacketRequiresDecision(decisionPacket)).toBe(true);
     expect(stagePlayProcessedMailPacketAllowsDirectCheckpointSummary(decisionPacket)).toBe(false);
     expect(stagePlayProcessedMailPacketAllowsDirectCheckpointSummary(directPacket)).toBe(true);
+  });
+
+  it("preserves artifact-level packet satisfaction and latest packet lookup", () => {
+    const first = {
+      kind: "stage_play_processed_mail_packet",
+      payload: { packetId: "stage_play_processed_mail_packet:first" },
+    };
+    const second = {
+      kind: "live_environment_tool_observation",
+      payload: {
+        observation: {
+          packets: [
+            { packetId: "stage_play_processed_mail_packet:second", inferredFacts: ["movement"] },
+          ],
+        },
+      },
+    };
+
+    expect(artifactHasSatisfyingStagePlayProcessedMailPacket(first)).toBe(false);
+    expect(artifactHasSatisfyingStagePlayProcessedMailPacket(second)).toBe(true);
+    expect(latestStagePlayProcessedMailPacketRecordFromArtifacts([first, second])).toEqual({
+      packetId: "stage_play_processed_mail_packet:second",
+      inferredFacts: ["movement"],
+    });
   });
 });
