@@ -11,6 +11,11 @@ export type HelixAskTurnContractPromptResearchSummary = {
   unknown_marker: string;
 };
 
+export const selectHelixAskTurnContractPromptResearchContract = (
+  promptResearchContract?: PromptResearchContract | null,
+): PromptResearchContract | null =>
+  promptResearchContract?.mode === "research_contract" ? promptResearchContract : null;
+
 export const buildHelixAskTurnContractPromptResearchSummary = (
   researchContract: PromptResearchContract | null,
 ): HelixAskTurnContractPromptResearchSummary | null => {

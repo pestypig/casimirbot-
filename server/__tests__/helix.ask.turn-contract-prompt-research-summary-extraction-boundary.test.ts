@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildHelixAskTurnContractPromptResearchSummary,
+  selectHelixAskTurnContractPromptResearchContract,
   type HelixAskTurnContractPromptResearchSummary,
 } from "../services/helix-ask/contracts/turn-contract-prompt-research-summary";
 import type { PromptResearchContract } from "../services/helix-ask/prompt-research-contract";
@@ -22,8 +23,11 @@ describe("Helix Ask turn-contract prompt-research summary extraction boundary", 
     const serviceSource = readFileSync(servicePath, "utf8");
 
     expect(routeSource).toContain("../services/helix-ask/contracts/turn-contract-prompt-research-summary");
+    expect(routeSource).toContain("selectHelixAskTurnContractPromptResearchContract(args.promptResearchContract)");
+    expect(routeSource).not.toContain("args.promptResearchContract?.mode === \"research_contract\"");
     expect(routeSource).not.toContain("required_top_level_titles: researchContract.required_top_level_structure");
     expect(serviceSource).toMatch(/export\s+const\s+buildHelixAskTurnContractPromptResearchSummary\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+selectHelixAskTurnContractPromptResearchContract\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");
     expect(serviceSource).not.toContain("../../../routes/agi.plan");
     expect(serviceSource).not.toContain("../../routes/agi.plan");
@@ -61,5 +65,28 @@ describe("Helix Ask turn-contract prompt-research summary extraction boundary", 
 
   it("preserves null summary when no research contract is active", () => {
     expect(buildHelixAskTurnContractPromptResearchSummary(null)).toBeNull();
+  });
+
+  it("preserves active prompt-research contract mode selection", () => {
+    const activeContract = {
+      mode: "research_contract",
+      verbatim_constraints: [],
+      provenance_table_schema: [],
+      required_top_level_structure: [],
+      appendix_requirements: [],
+      claim_discipline: [],
+      self_check: [],
+      fail_closed_behavior: {
+        unknown_marker: "UNKNOWN",
+      },
+    } as PromptResearchContract;
+    const defaultContract = {
+      ...activeContract,
+      mode: "default",
+    } as PromptResearchContract;
+
+    expect(selectHelixAskTurnContractPromptResearchContract(activeContract)).toBe(activeContract);
+    expect(selectHelixAskTurnContractPromptResearchContract(defaultContract)).toBeNull();
+    expect(selectHelixAskTurnContractPromptResearchContract(null)).toBeNull();
   });
 });
