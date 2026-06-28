@@ -1,4 +1,5 @@
 import { normalizeAskTurnWorkspaceDocPath } from "./doc-args";
+import { readAskTurnString } from "./value-readers";
 
 export const normalizeAskTurnArtifactText = (value: unknown): string | null => {
   if (typeof value === "string") {
@@ -79,3 +80,27 @@ export const readAskTurnArtifactSnippets = (payload: Record<string, unknown> | n
     : Array.isArray(payload?.matches)
       ? payload.matches.filter((entry): entry is Record<string, unknown> => Boolean(entry && typeof entry === "object"))
       : [];
+
+export const askTurnArtifactHasNonemptyText = (artifact: { payload?: unknown }): boolean => {
+  const payload = readAskTurnArtifactPayloadRecord(artifact);
+  return Boolean(
+    readAskTurnString(payload?.answer_text)?.trim() ||
+      readAskTurnString(payload?.plain_language_summary)?.trim() ||
+      readAskTurnString(payload?.text)?.trim(),
+  );
+};
+
+export const askTurnArtifactHasEvidenceSnippets = (artifact: { payload?: unknown }): boolean => {
+  const payload = readAskTurnArtifactPayloadRecord(artifact);
+  return Array.isArray(payload?.snippets) && payload.snippets.length > 0;
+};
+
+export const askTurnArtifactHasNumericValues = (artifact: { payload?: unknown }): boolean => {
+  const payload = readAskTurnArtifactPayloadRecord(artifact);
+  return Array.isArray(payload?.values) && payload.values.length > 0;
+};
+
+export const askTurnArtifactHasSourcePath = (artifact: { payload?: unknown }): boolean => {
+  const payload = readAskTurnArtifactPayloadRecord(artifact);
+  return Boolean(readAskTurnString(payload?.source_path)?.trim() || readAskTurnString(payload?.path)?.trim());
+};

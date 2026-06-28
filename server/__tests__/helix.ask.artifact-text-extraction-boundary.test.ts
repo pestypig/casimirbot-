@@ -4,6 +4,10 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  askTurnArtifactHasEvidenceSnippets,
+  askTurnArtifactHasNonemptyText,
+  askTurnArtifactHasNumericValues,
+  askTurnArtifactHasSourcePath,
   readAskTurnArtifactSnippets,
   readAskTurnArtifactSourcePath,
 } from "../services/helix-ask/artifact-text";
@@ -26,6 +30,10 @@ describe("Helix Ask artifact text extraction boundary", () => {
     expect(routeSource).not.toMatch(/const\s+readAskTurnArtifactPayloadRecord\s*=/);
     expect(routeSource).not.toMatch(/const\s+readAskTurnArtifactSourcePath\s*=/);
     expect(routeSource).not.toMatch(/const\s+readAskTurnArtifactSnippets\s*=/);
+    expect(routeSource).not.toMatch(/const\s+askTurnArtifactHasNonemptyText\s*=/);
+    expect(routeSource).not.toMatch(/const\s+askTurnArtifactHasEvidenceSnippets\s*=/);
+    expect(routeSource).not.toMatch(/const\s+askTurnArtifactHasNumericValues\s*=/);
+    expect(routeSource).not.toMatch(/const\s+askTurnArtifactHasSourcePath\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+normalizeAskTurnArtifactText\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+readAskTurnArtifactTextByKind\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnInstructionOnlySummaryText\s*=/);
@@ -34,6 +42,10 @@ describe("Helix Ask artifact text extraction boundary", () => {
     expect(serviceSource).toMatch(/export\s+const\s+readAskTurnArtifactPayloadRecord\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+readAskTurnArtifactSourcePath\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+readAskTurnArtifactSnippets\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+askTurnArtifactHasNonemptyText\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+askTurnArtifactHasEvidenceSnippets\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+askTurnArtifactHasNumericValues\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+askTurnArtifactHasSourcePath\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");
     expect(serviceSource).not.toContain("../routes/agi.plan");
   });
@@ -46,5 +58,13 @@ describe("Helix Ask artifact text extraction boundary", () => {
     expect(readAskTurnArtifactSnippets({ snippets: [{ text: "a" }, null, "x"] })).toEqual([{ text: "a" }]);
     expect(readAskTurnArtifactSnippets({ matches: [{ text: "b" }, 1] })).toEqual([{ text: "b" }]);
     expect(readAskTurnArtifactSnippets({})).toEqual([]);
+    expect(askTurnArtifactHasNonemptyText({ payload: { answer_text: " answer " } })).toBe(true);
+    expect(askTurnArtifactHasNonemptyText({ payload: { text: " " } })).toBe(false);
+    expect(askTurnArtifactHasEvidenceSnippets({ payload: { snippets: [] } })).toBe(false);
+    expect(askTurnArtifactHasEvidenceSnippets({ payload: { snippets: ["not-record"] } })).toBe(true);
+    expect(askTurnArtifactHasNumericValues({ payload: { values: [1] } })).toBe(true);
+    expect(askTurnArtifactHasNumericValues({ payload: { values: [] } })).toBe(false);
+    expect(askTurnArtifactHasSourcePath({ payload: { source_path: " docs/a.md " } })).toBe(true);
+    expect(askTurnArtifactHasSourcePath({ payload: { path: " " } })).toBe(false);
   });
 });
