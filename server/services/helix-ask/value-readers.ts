@@ -1,6 +1,21 @@
 export const readAskTurnString = (value: unknown): string | null =>
   typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 
+export const readAskTurnObjectRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+
+export const readAskTurnStringList = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? value.map((entry) => readAskTurnString(entry)).filter((entry): entry is string => Boolean(entry))
+    : [];
+
+export const readAskTurnRecordArray = (value: unknown): Record<string, unknown>[] =>
+  Array.isArray(value)
+    ? value.filter((entry): entry is Record<string, unknown> => Boolean(entry && typeof entry === "object" && !Array.isArray(entry)))
+    : [];
+
 export const readAskTurnActionArgString = (
   action: { args?: unknown } | null | undefined,
   keys: string[],
