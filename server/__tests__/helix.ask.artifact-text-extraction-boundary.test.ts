@@ -16,9 +16,15 @@ describe("Helix Ask artifact text extraction boundary", () => {
     expect(routeSource).not.toMatch(/const\s+normalizeAskTurnArtifactText\s*=\s*\(value/);
     expect(routeSource).not.toMatch(/const\s+readAskTurnArtifactTextByKind\s*=/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnInstructionOnlySummaryText\s*=/);
+    expect(routeSource).not.toMatch(/const\s+mergeAskTurnLedgerArtifacts\s*=/);
+    expect(routeSource).not.toMatch(/const\s+readAskTurnLedgerArtifact\s*=/);
+    expect(routeSource).not.toMatch(/const\s+readAskTurnArtifactPayloadRecord\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+normalizeAskTurnArtifactText\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+readAskTurnArtifactTextByKind\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnInstructionOnlySummaryText\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+mergeAskTurnLedgerArtifacts\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+readAskTurnLedgerArtifact\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+readAskTurnArtifactPayloadRecord\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");
     expect(serviceSource).not.toContain("../routes/agi.plan");
   });

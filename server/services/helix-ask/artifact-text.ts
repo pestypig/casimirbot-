@@ -33,3 +33,35 @@ export const isAskTurnInstructionOnlySummaryText = (value: unknown): boolean => 
     /^summari[sz]e the key points from the document\.?$/i.test(text)
   );
 };
+
+type HelixAskLedgerArtifactLike = {
+  artifact_id?: string | null;
+  turn_id?: string | null;
+  producer_item_id?: string | null;
+  kind: string;
+  payload?: unknown;
+};
+
+export const mergeAskTurnLedgerArtifacts = <Artifact extends HelixAskLedgerArtifactLike>(
+  artifacts: Artifact[],
+): Artifact[] => {
+  const seen = new Set<string>();
+  const merged: Artifact[] = [];
+  for (const artifact of artifacts) {
+    const key = artifact.artifact_id || `${artifact.turn_id}:${artifact.producer_item_id}:${artifact.kind}:${merged.length}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(artifact);
+  }
+  return merged;
+};
+
+export const readAskTurnLedgerArtifact = <Artifact extends { kind: string }>(
+  artifacts: Artifact[],
+  kinds: string[],
+): Artifact | null => artifacts.find((artifact) => kinds.includes(artifact.kind)) ?? null;
+
+export const readAskTurnArtifactPayloadRecord = (
+  artifact: { payload?: unknown },
+): Record<string, unknown> | null =>
+  artifact.payload && typeof artifact.payload === "object" ? (artifact.payload as Record<string, unknown>) : null;
