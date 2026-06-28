@@ -40,3 +40,12 @@ export const normalizeHelixAskTurnContractGroundingMode = (
   }
   return null;
 };
+
+export const selectHelixAskTurnContractPlannerFamily = (
+  outputFamily?: unknown,
+): HelixAskAnswerPlanFamily | null => normalizeHelixAskTurnContractFamily(outputFamily);
+
+export const selectHelixAskTurnContractRequestedGroundingMode = (
+  groundingMode?: unknown,
+): HelixAskTurnContractGroundingMode | null =>
+  normalizeHelixAskTurnContractGroundingMode(groundingMode);

@@ -146,6 +146,7 @@ ownership proof.
 | S129 | objective planner prompt/parser contract | `server/services/helix-ask/objectives/objective-llm-contracts.ts` | SERVICE_OWNED for deterministic objective planner prompt rendering and parser normalization only |
 | S130 | turn-contract objective planning | `server/services/helix-ask/contracts/turn-contract-objective-planning.ts` | SERVICE_OWNED for deterministic objective fragment splitting, slot/query-hint inference, and prompt-research objective/section projection only |
 | S198/S212 | turn-contract prompt-research summary | `server/services/helix-ask/contracts/turn-contract-prompt-research-summary.ts` | SERVICE_OWNED for deterministic active prompt-research contract selection and prompt-research summary field projection only |
+| S106/S213 | turn-contract normalizers | `server/services/helix-ask/contracts/turn-contract-normalizers.ts` | SERVICE_OWNED for deterministic family/grounding literal normalization and planner family/requested-grounding selector normalization only |
 | S199/S210 | turn-contract risk flags | `server/services/helix-ask/contracts/turn-contract-risk-flags.ts` | SERVICE_OWNED for deterministic risk-flag aggregation and final cap from already-selected inputs only |
 | S200/S211 | turn-contract clarify question | `server/services/helix-ask/contracts/turn-contract-clarify-question.ts` | SERVICE_OWNED for deterministic clarify-question assembly and nullable contract-field packaging from already-selected inputs only |
 | S201 | turn-contract planner sections | `server/services/helix-ask/contracts/turn-contract-planner-sections.ts` | SERVICE_OWNED for deterministic planner-section normalization only |
@@ -279,10 +280,10 @@ ownership proof.
 - Turn-contract objective fragment splitting, slot/query-hint inference,
   prompt-research objective/section projection, active prompt-research contract selection, prompt-research summary field
   projection, risk-flag aggregation/capping, clarify-question assembly/field packaging, and
-  planner-section source selection/normalization, goal text selection,
+  planner family/requested-grounding selector normalization, planner-section source selection/normalization, goal text selection,
   objective normalization/fallback construction, query-hint assembly,
   answer-format packaging, planner metadata packaging, and constraints field
-  assembly are service-owned after S130 and S198-S212;
+  assembly are service-owned after S130, S198-S213;
   route-owned family/specificity selection, planner-pass application,
   obligations assembly, and final turn-contract construction remain unresolved.
 - Query merging is service-owned after S205; turn-contract query-hint assembly
