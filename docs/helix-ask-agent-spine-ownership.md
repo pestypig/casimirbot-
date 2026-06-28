@@ -46,6 +46,7 @@ terminal eligibility, projection discipline, and debug traces.
 | `source_target_intent` | source-target arbitrator | source-target services, route glue | yes | evidence target fallback | no | yes | prompt-solving benchmark, API parity | PARTIAL_SERVICE_OWNER |
 | `stage_play_mail_wake_route_metadata` | `live-source/stage-play-mail-wake-route-metadata.ts` for parse/merge only | service via route import | route applies canonical goal/source-target/phase policy | request/payload compatibility readers | yes, metadata can be merged from request, route metadata, source-target intent, and canonical goal fallback | yes for metadata merge order only | stage-play mail-wake route metadata boundary, live-source phase resolver, evidence-target arbitration | SERVICE_OWNED_METADATA_ONLY |
 | `live_source_mail_read_defaults` | `live-source/mail-read-defaults.ts` | service factory via route import | no inline implementation | route-supplied interpretation-cue predicate plus env-backed limits | yes, read defaults feed route-owned live-source mailbox action args | yes for mailbox read limit/batch cap/reason selection only | live-source mail read defaults boundary test | SERVICE_OWNED |
+| `live_source_mail_observation_readers` | `live-source/mail-observation-readers.ts` | service via route import | no inline implementation | already-materialized artifacts and payload records | yes, observation and packet reader outputs feed route-owned live-source phase, continuation, and terminal-support logic | yes for live-environment observation unwrapping, mail-read artifact detection, processed packet extraction, packet-content sufficiency, and recommendation decision predicates only | live-source mail observation readers boundary test | SERVICE_OWNED |
 | `hard_tool_route_metadata` | `hard-tool-route-metadata.ts` | service via route import | no inline implementation | route constructs hard-route metadata and source-target intent records | yes, parsed metadata feeds canonical goal, hard calculator detection, and request/stream routing guards | yes for parsing/synthesis/read-only metadata helpers only | hard-tool route metadata boundary test | SERVICE_OWNED |
 | `evidence_target_arbitration` | evidence target arbitration service | service plus route attachment | yes | none expected | no | yes | API parity matrix | PARTIAL_SERVICE_OWNER |
 | `capability_plan` | capability-plan contract owner | capability plan services, route glue | yes | compatibility wrappers | yes during migration | yes | capability-plan contract test | PARTIAL_SERVICE_OWNER |
@@ -110,7 +111,7 @@ terminal eligibility, projection discipline, and debug traces.
 
 ## Current Extraction Status
 
-The extraction wave now continues through S244. Recent slices moved small,
+The extraction wave now continues through S245. Recent slices moved small,
 mechanical readers and formatters behind service owners, while intentionally
 leaving source admission, tool execution, runtime-loop orchestration, terminal
 materialization, terminal authority, projection, live-source behavior, and
@@ -175,6 +176,7 @@ helper moves as runtime ownership proof.
 | S227 | turn-contract builder shell | `server/services/helix-ask/contracts/turn-contract-builder.ts` | PARTIAL_SERVICE_OWNER for final deterministic contract assembly from supplied route classifiers, cue predicates, obligation wrapper, max caps, planner pass, research contract, and version only |
 | S228 | stage-play mail-wake route metadata | `server/services/helix-ask/live-source/stage-play-mail-wake-route-metadata.ts` | SERVICE_OWNED for stage-play mail-wake route metadata schema, synthesis, request/payload reading, and merge helpers only |
 | S244 | live-source mail read defaults | `server/services/helix-ask/live-source/mail-read-defaults.ts` | SERVICE_OWNED for env-backed mailbox read limit, batch cap, and reason selection only |
+| S245 | live-source mail observation readers | `server/services/helix-ask/live-source/mail-observation-readers.ts` | SERVICE_OWNED for already-materialized live-source observation and processed mail packet reading only |
 | S131 | runtime intent packet | `server/services/helix-ask/runtime/runtime-intent-packet.ts` | SERVICE_OWNED for runtime-intent packet readers, source/capability predicates, packet assembly, ledger/debug append, and runtime-audit refresh handoff only |
 | S132 | runtime continuation hints | `server/services/helix-ask/runtime/runtime-continuation-hints.ts` | SERVICE_OWNED for continuation hint construction, append/ledger/debug writes, agent-step decision collection, hint-decision matching, and migration marking only |
 | S133 | runtime continuation observation refs | `server/services/helix-ask/runtime/runtime-continuation-hints.ts` | SERVICE_OWNED for matching accepted continuation hints to observed artifact refs only |
