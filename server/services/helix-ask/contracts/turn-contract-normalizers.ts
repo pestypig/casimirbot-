@@ -59,6 +59,19 @@ export const selectHelixAskTurnContractFamily = (args: {
 }): HelixAskAnswerPlanFamily =>
   args.definitionRelationRepoMismatch ? args.fallbackFamily : args.plannerFamily ?? args.fallbackFamily;
 
+export const detectHelixAskTurnContractDefinitionRelationRepoMismatch = (args: {
+  plannerFamily?: HelixAskAnswerPlanFamily | null;
+  fallbackFamily: HelixAskAnswerPlanFamily;
+  definitionFocus: boolean;
+  relationQuery: boolean;
+  definitionRepoAnchorCue: boolean;
+}): boolean =>
+  args.plannerFamily === "definition_overview" &&
+  args.fallbackFamily === "mechanism_process" &&
+  args.definitionFocus &&
+  args.relationQuery &&
+  args.definitionRepoAnchorCue;
+
 export const selectHelixAskTurnContractGroundingMode = (args: {
   requiresRepoEvidence: boolean;
   intentDomain: HelixAskDomain;

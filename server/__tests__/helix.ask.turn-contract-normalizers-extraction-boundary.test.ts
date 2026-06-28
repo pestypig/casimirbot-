@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  detectHelixAskTurnContractDefinitionRelationRepoMismatch,
   normalizeHelixAskTurnContractFamily,
   normalizeHelixAskTurnContractGroundingMode,
   selectHelixAskTurnContractFamily,
@@ -25,16 +26,21 @@ describe("Helix Ask turn-contract normalizers extraction boundary", () => {
     expect(routeSource).not.toMatch(/const\s+normalizeHelixAskTurnContractFamily\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+normalizeHelixAskTurnContractGroundingMode\s*=\s*\(/);
     expect(routeSource).toContain("selectHelixAskTurnContractPlannerFamily(args.plannerPass?.output_family)");
+    expect(routeSource).toContain("detectHelixAskTurnContractDefinitionRelationRepoMismatch({");
     expect(routeSource).toContain("selectHelixAskTurnContractFamily({");
     expect(routeSource).toContain("selectHelixAskTurnContractRequestedGroundingMode(");
     expect(routeSource).toContain("selectHelixAskTurnContractGroundingMode({");
     expect(routeSource).not.toContain("const defaultGroundingMode: HelixAskTurnContractGroundingMode =");
     expect(routeSource).not.toContain("const family = plannerDefinitionRelationRepoMismatch");
+    expect(routeSource).not.toContain('plannerFamily === "definition_overview" &&');
     expect(routeSource).not.toContain("? normalizeHelixAskTurnContractFamily(args.plannerPass.output_family)");
     expect(routeSource).not.toContain("? normalizeHelixAskTurnContractGroundingMode(args.plannerPass.grounding_mode)");
     expect(serviceSource).toMatch(/export\s+const\s+normalizeHelixAskTurnContractFamily\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+normalizeHelixAskTurnContractGroundingMode\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+selectHelixAskTurnContractPlannerFamily\s*=/);
+    expect(serviceSource).toMatch(
+      /export\s+const\s+detectHelixAskTurnContractDefinitionRelationRepoMismatch\s*=/,
+    );
     expect(serviceSource).toMatch(/export\s+const\s+selectHelixAskTurnContractFamily\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+selectHelixAskTurnContractRequestedGroundingMode\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+selectHelixAskTurnContractGroundingMode\s*=/);
@@ -84,6 +90,63 @@ describe("Helix Ask turn-contract normalizers extraction boundary", () => {
         definitionRelationRepoMismatch: false,
       }),
     ).toBe("general_overview");
+  });
+
+  it("preserves definition relation repo mismatch detection", () => {
+    expect(
+      detectHelixAskTurnContractDefinitionRelationRepoMismatch({
+        plannerFamily: "definition_overview",
+        fallbackFamily: "mechanism_process",
+        definitionFocus: true,
+        relationQuery: true,
+        definitionRepoAnchorCue: true,
+      }),
+    ).toBe(true);
+    expect(
+      detectHelixAskTurnContractDefinitionRelationRepoMismatch({
+        plannerFamily: "recommendation_decision",
+        fallbackFamily: "mechanism_process",
+        definitionFocus: true,
+        relationQuery: true,
+        definitionRepoAnchorCue: true,
+      }),
+    ).toBe(false);
+    expect(
+      detectHelixAskTurnContractDefinitionRelationRepoMismatch({
+        plannerFamily: "definition_overview",
+        fallbackFamily: "general_overview",
+        definitionFocus: true,
+        relationQuery: true,
+        definitionRepoAnchorCue: true,
+      }),
+    ).toBe(false);
+    expect(
+      detectHelixAskTurnContractDefinitionRelationRepoMismatch({
+        plannerFamily: "definition_overview",
+        fallbackFamily: "mechanism_process",
+        definitionFocus: false,
+        relationQuery: true,
+        definitionRepoAnchorCue: true,
+      }),
+    ).toBe(false);
+    expect(
+      detectHelixAskTurnContractDefinitionRelationRepoMismatch({
+        plannerFamily: "definition_overview",
+        fallbackFamily: "mechanism_process",
+        definitionFocus: true,
+        relationQuery: false,
+        definitionRepoAnchorCue: true,
+      }),
+    ).toBe(false);
+    expect(
+      detectHelixAskTurnContractDefinitionRelationRepoMismatch({
+        plannerFamily: "definition_overview",
+        fallbackFamily: "mechanism_process",
+        definitionFocus: true,
+        relationQuery: true,
+        definitionRepoAnchorCue: false,
+      }),
+    ).toBe(false);
   });
 
   it("preserves final grounding-mode precedence", () => {
