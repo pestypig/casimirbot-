@@ -27,9 +27,11 @@ describe("Helix workstation tool gateway", () => {
     expect(manifest.capabilities).toContainEqual(
       expect.objectContaining({
         capability_id: HELIX_WORKSPACE_OS_STATUS_CAPABILITY,
+        mode: "observe",
         mutating: false,
         code_mutation: false,
         shell_access: false,
+        output_observation_schema: "helix.workspace_os_status_observation.v1",
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
@@ -38,10 +40,12 @@ describe("Helix workstation tool gateway", () => {
     expect(manifest.capabilities).toContainEqual(
       expect.objectContaining({
         capability_id: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+        mode: "read",
         mutating: false,
         code_mutation: false,
         shell_access: false,
         permission_profile_required: "read",
+        output_observation_schema: "helix.calculator_solve_observation.v1",
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
@@ -50,11 +54,13 @@ describe("Helix workstation tool gateway", () => {
     expect(manifest.capabilities).toContainEqual(
       expect.objectContaining({
         capability_id: REPO_SEARCH_CAPABILITY,
+        mode: "read",
         mutating: false,
         code_mutation: false,
         shell_access: false,
         requires_source: true,
         permission_profile_required: "read",
+        output_observation_schema: "helix.repo_search_observation.v1",
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
@@ -63,11 +69,13 @@ describe("Helix workstation tool gateway", () => {
     expect(manifest.capabilities).toContainEqual(
       expect.objectContaining({
         capability_id: DOCS_SEARCH_CAPABILITY,
+        mode: "read",
         mutating: false,
         code_mutation: false,
         shell_access: false,
         requires_source: true,
         permission_profile_required: "read",
+        output_observation_schema: "helix.docs_search_observation.v1",
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,

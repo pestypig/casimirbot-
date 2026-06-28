@@ -31,39 +31,83 @@ describe("AGI workstation tool gateway route", () => {
     expect(response.body.capabilities).toContainEqual(
       expect.objectContaining({
         capability_id: HELIX_WORKSPACE_OS_STATUS_CAPABILITY,
+        mode: "observe",
         mutating: false,
         code_mutation: false,
         shell_access: false,
+        output_observation_schema: "helix.workspace_os_status_observation.v1",
         terminal_eligible: false,
       }),
     );
     expect(response.body.capabilities).toContainEqual(
       expect.objectContaining({
         capability_id: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+        mode: "read",
         mutating: false,
         code_mutation: false,
         shell_access: false,
+        output_observation_schema: "helix.calculator_solve_observation.v1",
         terminal_eligible: false,
       }),
     );
     expect(response.body.capabilities).toContainEqual(
       expect.objectContaining({
         capability_id: REPO_SEARCH_CAPABILITY,
+        mode: "read",
         mutating: false,
         code_mutation: false,
         shell_access: false,
+        output_observation_schema: "helix.repo_search_observation.v1",
         terminal_eligible: false,
       }),
     );
     expect(response.body.capabilities).toContainEqual(
       expect.objectContaining({
         capability_id: DOCS_SEARCH_CAPABILITY,
+        mode: "read",
         mutating: false,
         code_mutation: false,
         shell_access: false,
+        output_observation_schema: "helix.docs_search_observation.v1",
         terminal_eligible: false,
       }),
     );
+  });
+
+  it("exposes the same read/observe manifest for a future provider runtime", async () => {
+    const response = await request(createApp())
+      .get("/api/agi/workstation-tool-gateway/capabilities?agent_runtime=future-agent&mode=read")
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      schema: "helix.workstation_tool_gateway.v1",
+      manifest_version: "read-observe.v1",
+      agent_runtime: "future-agent",
+      mode: "read",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(response.body.capabilities.map((entry: { capability_id: string }) => entry.capability_id)).toEqual(
+      expect.arrayContaining([
+        HELIX_WORKSPACE_OS_STATUS_CAPABILITY,
+        CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+        REPO_SEARCH_CAPABILITY,
+        DOCS_SEARCH_CAPABILITY,
+      ]),
+    );
+    for (const capability of response.body.capabilities) {
+      expect(capability).toMatchObject({
+        mutating: false,
+        code_mutation: false,
+        shell_access: false,
+        output_observation_schema: expect.stringMatching(/^helix\..+_observation\.v1$/),
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      });
+      expect(["observe", "read"]).toContain(capability.mode);
+    }
   });
 
   it("calls workspace_os.status through the gateway route as non-terminal evidence", async () => {
@@ -139,6 +183,105 @@ describe("AGI workstation tool gateway route", () => {
         assistant_answer: false,
         raw_content_included: false,
       },
+    });
+  });
+
+  it("calls read-only capabilities for a future provider through the same admission path", async () => {
+    const response = await request(createApp())
+      .post("/api/agi/workstation-tool-gateway/call")
+      .send({
+        agent_runtime: "future-agent",
+        mode: "read",
+        capability_id: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+        turn_id: "ask:test:gateway-route-future-provider",
+        iteration: 1,
+        arguments: {
+          expression: "11 * 12",
+        },
+      })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      ok: true,
+      agent_runtime: "future-agent",
+      capability_id: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+      gateway_admission: {
+        requested_capability: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+        selected_agent_provider: "future-agent",
+        permission_profile: "read",
+        admission_status: "admitted",
+        admission_reason: "read_only_gateway_capability",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.calculator_solve_observation.v1",
+        result: "132",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation_packet: {
+        capability_key: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+        status: "succeeded",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
+  it("blocks unknown or mutating future-provider capabilities with typed gateway admission", async () => {
+    const response = await request(createApp())
+      .post("/api/agi/workstation-tool-gateway/call")
+      .send({
+        agent_runtime: "future-agent",
+        mode: "act",
+        capability_id: "filesystem.write_file",
+        turn_id: "ask:test:gateway-route-future-provider-blocked",
+        arguments: {
+          path: "server/routes/agi.plan.ts",
+          text: "blocked",
+        },
+      })
+      .expect(400);
+
+    expect(response.body).toMatchObject({
+      ok: false,
+      agent_runtime: "future-agent",
+      capability_id: "filesystem.write_file",
+      error: "capability_not_registered",
+      gateway_admission: {
+        requested_capability: "filesystem.write_file",
+        selected_agent_provider: "future-agent",
+        admission_status: "blocked",
+        blocked_reason: "capability_not_registered",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.workstation_tool_gateway.unknown_capability.v1",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation_packet: {
+        status: "failed",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
     });
   });
 

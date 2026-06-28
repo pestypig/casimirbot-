@@ -2,11 +2,14 @@ import { spawn } from "node:child_process";
 import crypto from "node:crypto";
 import type { HelixAgentProvider, HelixAgentRunResult } from "./types";
 import {
-  callWorkstationGatewayCapability,
   listWorkstationGatewayCapabilities,
 } from "../workstation-tool-gateway/registry";
 import type { HelixWorkstationGatewayCallResult } from "../workstation-tool-gateway/types";
 import { buildHelixAgentRuntimeSelectionTrace } from "./runtime-debug";
+import { buildHelixProviderReasoningReentry } from "./provider-terminal-authority";
+import {
+  runExplicitWorkstationGatewayCalls,
+} from "./explicit-workstation-gateway";
 
 const enabled = (): boolean => process.env.ENABLE_CODEX_AGENT === "1";
 
@@ -41,114 +44,25 @@ const readRecord = (value: unknown): Record<string, unknown> | null =>
 const readString = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
 
-const sha256 = (value: string): string =>
-  crypto.createHash("sha256").update(value).digest("hex");
-
 const readTurnId = (body: Record<string, unknown>): string =>
   readString(body.turn_id) ?? readString(body.turnId) ?? `ask:codex:${crypto.randomUUID()}`;
 
-const readExplicitGatewayCallRequests = (body: Record<string, unknown>): Record<string, unknown>[] => {
-  const calls = body.workstation_gateway_calls ?? body.workstationGatewayCalls;
-  const call = body.workstation_gateway_call ?? body.workstationGatewayCall;
-  const records = [
-    ...(Array.isArray(calls) ? calls : []),
-    ...(call ? [call] : []),
-  ]
-    .map(readRecord)
-    .filter((record): record is Record<string, unknown> => Boolean(record))
-    .slice(0, 3);
-  return records;
-};
+const readThreadId = (body: Record<string, unknown>): string =>
+  readString(body.thread_id) ??
+  readString(body.threadId) ??
+  readString(body.conversation_id) ??
+  readString(body.session_id) ??
+  "helix-agent-provider";
 
 export const runExplicitCodexWorkstationGatewayCalls = async (input: {
   body: Record<string, unknown>;
   turnId?: string | null;
 }): Promise<HelixWorkstationGatewayCallResult[]> => {
-  const requests = readExplicitGatewayCallRequests(input.body);
-  const turnId = input.turnId ?? readTurnId(input.body);
-  const results: HelixWorkstationGatewayCallResult[] = [];
-  for (const [index, request] of requests.entries()) {
-    results.push(await callWorkstationGatewayCapability({
-      agentRuntime: "codex",
-      mode: readString(request.mode),
-      capabilityId: readString(request.capability_id) ?? readString(request.capabilityId) ?? "",
-      arguments: readRecord(request.arguments ?? request.args) ?? {},
-      approvalToken: readString(request.approval_token) ?? readString(request.approvalToken),
-      turnId,
-      iteration: typeof request.iteration === "number" ? request.iteration : index + 1,
-    }));
-  }
-  return results;
-};
-
-export const buildCodexProviderReasoningReentry = (input: {
-  turnId: string;
-  gatewayCallResults: HelixWorkstationGatewayCallResult[];
-  providerText: string;
-  ok: boolean;
-}) => {
-  const observationRefs = input.gatewayCallResults.flatMap((result) => result.artifact_refs);
-  const candidateId = input.ok && input.providerText.trim()
-    ? `${input.turnId}:agent_provider_terminal_candidate:codex:${sha256(input.providerText).slice(0, 16)}`
-    : null;
-  const providerTerminalCandidate = candidateId
-    ? {
-        schema: "helix.agent_provider_terminal_candidate.v1",
-        candidate_id: candidateId,
-        turn_id: input.turnId,
-        agent_runtime: "codex",
-        selected_agent_provider: "codex",
-        source: "codex_text_mode_adapter",
-        candidate_text_hash: sha256(input.providerText),
-        candidate_text_length: input.providerText.length,
-        candidate_text_preview: input.providerText.slice(0, 4000),
-        grounded_in_observation_refs: observationRefs,
-        evidence_reentry_required: input.gatewayCallResults.length > 0,
-        provider_reasoning_completed: true,
-        assistant_answer: false,
-        terminal_eligible: false,
-        raw_content_included: false,
-      }
-    : null;
-  const providerReasoningReentry = {
-    schema: "helix.provider_reasoning_reentry.v1",
-    turn_id: input.turnId,
-    agent_runtime: "codex",
-    selected_agent_provider: "codex",
-    status: candidateId ? "completed" : input.ok ? "empty_provider_answer" : "not_run",
-    input_observation_refs: observationRefs,
-    provider_terminal_candidate_ref: candidateId,
-    provider_terminal_candidate_present: Boolean(candidateId),
-    post_tool_model_step_required: false,
-    evidence_reentered: Boolean(candidateId && observationRefs.length > 0),
-    assistant_answer: false,
-    terminal_eligible: false,
-    raw_content_included: false,
-  };
-  const terminalAuthorityCandidateReview = {
-    schema: "helix.provider_terminal_authority_candidate_review.v1",
-    turn_id: input.turnId,
-    agent_runtime: "codex",
-    candidate_ref: candidateId,
-    terminal_authority_status: candidateId
-      ? "pending_helix_terminal_authority"
-      : "not_evaluated_provider_text_mode",
-    terminal_authority_granted: false,
-    final_visible_answer_authorized: false,
-    blockers: candidateId
-      ? ["helix_terminal_authority_not_run_for_provider_candidate"]
-      : ["provider_terminal_candidate_missing"],
-    assistant_answer: false,
-    terminal_eligible: false,
-    raw_content_included: false,
-  };
-  return {
-    providerTerminalCandidate,
-    providerReasoningReentry,
-    terminalAuthorityCandidateReview,
-    workstationGatewayReentryStatus: providerReasoningReentry.status,
-    terminalAuthorityStatus: terminalAuthorityCandidateReview.terminal_authority_status,
-  };
+  return runExplicitWorkstationGatewayCalls({
+    body: input.body,
+    agentRuntime: "codex",
+    turnId: input.turnId ?? readTurnId(input.body),
+  });
 };
 
 async function runCodexProcess(input: {
@@ -240,6 +154,7 @@ export const codexProvider: HelixAgentProvider = {
   async runTurn(request): Promise<HelixAgentRunResult> {
     const question = readQuestion(request.body);
     const turnId = readTurnId(request.body);
+    const threadId = readThreadId(request.body);
     const gatewayManifest = listWorkstationGatewayCapabilities({
       agentRuntime: "codex",
       mode: "observe",
@@ -324,8 +239,12 @@ export const codexProvider: HelixAgentProvider = {
     });
     const text = result.stdout.trim() || result.stderr.trim();
     const ok = result.exitCode === 0 && text.length > 0;
-    const providerReentry = buildCodexProviderReasoningReentry({
+    const providerReentry = buildHelixProviderReasoningReentry({
+      runtime: "codex",
+      providerLabel: codexProvider.label,
       turnId,
+      threadId,
+      route: request.route,
       gatewayCallResults,
       providerText: text,
       ok,
@@ -359,6 +278,15 @@ export const codexProvider: HelixAgentProvider = {
         provider_terminal_candidate: providerReentry.providerTerminalCandidate,
         provider_reasoning_reentry: providerReentry.providerReasoningReentry,
         terminal_authority_candidate_review: providerReentry.terminalAuthorityCandidateReview,
+        provider_terminal_authority_bridge: providerReentry.providerTerminalAuthorityBridge,
+        terminal_answer_authority: providerReentry.terminalAnswerAuthority,
+        terminal_presentation: providerReentry.terminalPresentation,
+        final_answer_source: providerReentry.terminalAnswerAuthority
+          ? "agent_provider_terminal_candidate"
+          : null,
+        terminal_artifact_kind: providerReentry.terminalAnswerAuthority
+          ? "agent_provider_terminal_candidate"
+          : null,
         workstation_gateway_reentry_status: providerReentry.workstationGatewayReentryStatus,
         terminal_authority_status: providerReentry.terminalAuthorityStatus,
       },

@@ -3,10 +3,15 @@ import { listHelixAgentProviders, resolveHelixAgentProvider } from "../agent-pro
 import { selectHelixAgentRuntime } from "../agent-providers/runtime-select";
 import { buildHelixAgentRuntimeSelectionTrace } from "../agent-providers/runtime-debug";
 import {
-  buildCodexProviderReasoningReentry,
   codexProvider,
   runExplicitCodexWorkstationGatewayCalls,
 } from "../agent-providers/codex-provider";
+import {
+  buildStructuredAdmissionWorkstationGatewayCallRequests,
+  buildPlannerDerivedWorkstationGatewayCallRequests,
+  runExplicitWorkstationGatewayCalls,
+} from "../agent-providers/explicit-workstation-gateway";
+import { buildHelixProviderReasoningReentry } from "../agent-providers/provider-terminal-authority";
 import { listWorkstationGatewayCapabilities } from "../workstation-tool-gateway/registry";
 
 const ENV_KEYS = [
@@ -271,6 +276,189 @@ describe("Helix Ask agent provider selection", () => {
     });
   });
 
+  it("derives read-only calculator gateway calls only after a runtime is selected", async () => {
+    const body = {
+      turn_id: "ask:test:planner-derived-gateway",
+      question: "Use the scientific calculator to evaluate 6 * 7 and explain the result.",
+    };
+
+    expect(buildPlannerDerivedWorkstationGatewayCallRequests(body)).toEqual([
+      expect.objectContaining({
+        schema: "helix.workstation_gateway.planner_derived_call_request.v1",
+        derivation_source: "helix_workstation_tool_planner",
+        planner_intent: "calculator_solve",
+        capability_id: "scientific-calculator.solve_expression",
+        mode: "read",
+        arguments: expect.objectContaining({
+          expression: "6*7",
+          source_target_intent: expect.objectContaining({
+            source: "helix_workstation_tool_planner",
+            intent: "calculator_solve",
+            panel_id: "scientific-calculator",
+            action_id: "solve_expression",
+          }),
+        }),
+      }),
+    ]);
+
+    await expect(runExplicitWorkstationGatewayCalls({
+      body,
+      agentRuntime: "codex",
+    })).resolves.toEqual([]);
+
+    const selectedRuntimeResults = await runExplicitWorkstationGatewayCalls({
+      body: {
+        ...body,
+        agent_runtime: "codex",
+      },
+      agentRuntime: "codex",
+    });
+
+    expect(selectedRuntimeResults).toHaveLength(1);
+    expect(selectedRuntimeResults[0]).toMatchObject({
+      ok: true,
+      agent_runtime: "codex",
+      capability_id: "scientific-calculator.solve_expression",
+      gateway_admission: {
+        selected_agent_provider: "codex",
+        permission_profile: "read",
+        admission_status: "admitted",
+      },
+      observation: {
+        schema: "helix.calculator_solve_observation.v1",
+        expression: "6*7",
+        result: "42",
+      },
+      observation_packet: {
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+  });
+
+  it("derives repo and docs gateway calls from structured source-target admission records", async () => {
+    const repoBody = {
+      turn_id: "ask:test:structured-repo-gateway",
+      question: "Where is workspace_os.status implemented?",
+      source_target_intent: {
+        schema: "helix.ask_source_target_intent.v1",
+        source_target: "repo_code",
+        target_source: "repo_code",
+        selected_capability: "repo-code.search_concept",
+        args: {
+          query: "workspace_os.status",
+          paths: ["server/services/helix-ask"],
+        },
+      },
+    };
+    const docsBody = {
+      turn_id: "ask:test:structured-docs-gateway",
+      question: "Locate the Helix Ask rule in docs.",
+      route_metadata: {
+        schema: "helix.ask.route_metadata.v1",
+        source_target: "docs_viewer",
+        source_target_intent: {
+          schema: "helix.ask_source_target_intent.v1",
+          source_target: "docs_viewer",
+          target_source: "docs_viewer",
+          mandatory_next_tool: {
+            tool_name: "docs-viewer.locate_in_doc",
+            selected_capability: "docs-viewer.locate_in_doc",
+            args: {
+              query: "Helix Ask",
+              paths: ["docs"],
+            },
+          },
+        },
+      },
+    };
+
+    expect(buildStructuredAdmissionWorkstationGatewayCallRequests(repoBody)).toEqual([
+      expect.objectContaining({
+        schema: "helix.workstation_gateway.structured_admission_call_request.v1",
+        derivation_source: "helix_structured_source_target_admission",
+        capability_id: "repo.search",
+        mode: "read",
+        arguments: expect.objectContaining({
+          query: "workspace_os.status",
+          paths: ["server/services/helix-ask"],
+          source_target_intent: expect.objectContaining({
+            source: "helix_structured_source_target_admission",
+            selected_capability: "repo-code.search_concept",
+          }),
+        }),
+      }),
+    ]);
+    expect(buildStructuredAdmissionWorkstationGatewayCallRequests(docsBody)).toEqual([
+      expect.objectContaining({
+        schema: "helix.workstation_gateway.structured_admission_call_request.v1",
+        derivation_source: "helix_structured_source_target_admission",
+        capability_id: "docs.search",
+        mode: "read",
+        arguments: expect.objectContaining({
+          query: "Helix Ask",
+          paths: ["docs"],
+          source_target_intent: expect.objectContaining({
+            source: "helix_structured_source_target_admission",
+            selected_capability: "docs-viewer.locate_in_doc",
+          }),
+        }),
+      }),
+    ]);
+
+    const repoResults = await runExplicitWorkstationGatewayCalls({
+      body: {
+        ...repoBody,
+        agent_runtime: "helix",
+      },
+      agentRuntime: "helix",
+    });
+    const docsResults = await runExplicitWorkstationGatewayCalls({
+      body: {
+        ...docsBody,
+        agent_runtime: "codex",
+      },
+      agentRuntime: "codex",
+    });
+
+    expect(repoResults[0]).toMatchObject({
+      ok: true,
+      agent_runtime: "helix",
+      capability_id: "repo.search",
+      gateway_admission: {
+        selected_agent_provider: "helix",
+        permission_profile: "read",
+        admission_status: "admitted",
+      },
+      observation: {
+        schema: "helix.repo_search_observation.v1",
+        query: "workspace_os.status",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    expect(docsResults[0]).toMatchObject({
+      ok: true,
+      agent_runtime: "codex",
+      capability_id: "docs.search",
+      gateway_admission: {
+        selected_agent_provider: "codex",
+        permission_profile: "read",
+        admission_status: "admitted",
+      },
+      observation: {
+        schema: "helix.docs_search_observation.v1",
+        query: "Helix Ask",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+  });
+
   it("records Codex provider text as a non-authoritative terminal candidate after gateway observations", async () => {
     const gatewayResults = await runExplicitCodexWorkstationGatewayCalls({
       body: {
@@ -284,8 +472,12 @@ describe("Helix Ask agent provider selection", () => {
       },
     });
 
-    const trace = buildCodexProviderReasoningReentry({
+    const trace = buildHelixProviderReasoningReentry({
+      runtime: "codex",
+      providerLabel: "Codex Workstation Mode",
       turnId: "ask:test:codex-provider-candidate",
+      threadId: "thread:test",
+      route: "/ask/turn",
       gatewayCallResults: gatewayResults,
       providerText: "The calculator observation reports 45.",
       ok: true,
@@ -297,7 +489,7 @@ describe("Helix Ask agent provider selection", () => {
         turn_id: "ask:test:codex-provider-candidate",
         agent_runtime: "codex",
         selected_agent_provider: "codex",
-        source: "codex_text_mode_adapter",
+        source: "agent_provider_text_mode_adapter",
         candidate_text_length: 38,
         grounded_in_observation_refs: expect.arrayContaining([
           expect.stringContaining("scientific-calculator.solve_expression"),
@@ -320,19 +512,112 @@ describe("Helix Ask agent provider selection", () => {
       },
       terminalAuthorityCandidateReview: {
         schema: "helix.provider_terminal_authority_candidate_review.v1",
-        terminal_authority_status: "pending_helix_terminal_authority",
-        terminal_authority_granted: false,
-        final_visible_answer_authorized: false,
-        blockers: ["helix_terminal_authority_not_run_for_provider_candidate"],
+        terminal_authority_status: "authorized_by_helix_provider_candidate_bridge",
+        terminal_authority_granted: true,
+        final_visible_answer_authorized: true,
+        blockers: [],
         assistant_answer: false,
         terminal_eligible: false,
         raw_content_included: false,
       },
+      providerTerminalAuthorityBridge: {
+        schema: "helix.provider_terminal_authority_bridge.v1",
+        route_authority_status: "provider_gateway_read_observe_contract_satisfied",
+        terminal_authority_status: "authorized_by_helix_provider_candidate_bridge",
+        terminal_authority_granted: true,
+        final_visible_answer_authorized: true,
+        final_answer_source: "agent_provider_terminal_candidate",
+        terminal_artifact_kind: "agent_provider_terminal_candidate",
+      },
+      terminalAnswerAuthority: {
+        schema: "helix.turn_terminal_authority.v1",
+        thread_id: "thread:test",
+        turn_id: "ask:test:codex-provider-candidate",
+        route: "/ask/turn",
+        terminal_kind: "answer",
+        final_answer_source: "agent_provider_terminal_candidate",
+        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        server_authoritative: true,
+        terminal_eligible: true,
+        assistant_answer: false,
+      },
+      terminalPresentation: {
+        schema: "helix.terminal_presentation.v1",
+        concise_text: "The calculator observation reports 45.",
+        final_answer_source: "agent_provider_terminal_candidate",
+        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
       workstationGatewayReentryStatus: "completed",
-      terminalAuthorityStatus: "pending_helix_terminal_authority",
+      terminalAuthorityStatus: "authorized_by_helix_provider_candidate_bridge",
     });
     expect(trace.providerTerminalCandidate?.candidate_id).toContain(
       "ask:test:codex-provider-candidate:agent_provider_terminal_candidate:codex:",
     );
+  });
+
+  it("blocks terminal authority for provider candidates when the gateway observation failed", async () => {
+    const gatewayResults = await runExplicitCodexWorkstationGatewayCalls({
+      body: {
+        turn_id: "ask:test:codex-provider-blocked-candidate",
+        workstation_gateway_call: {
+          capability_id: "filesystem.write_file",
+          arguments: {
+            path: "server/routes/agi.plan.ts",
+            text: "blocked",
+          },
+        },
+      },
+    });
+
+    const trace = buildHelixProviderReasoningReentry({
+      runtime: "codex",
+      providerLabel: "Codex Workstation Mode",
+      turnId: "ask:test:codex-provider-blocked-candidate",
+      threadId: "thread:test",
+      route: "/ask/turn",
+      gatewayCallResults: gatewayResults,
+      providerText: "The requested write capability was blocked.",
+      ok: true,
+    });
+
+    expect(trace).toMatchObject({
+      providerTerminalCandidate: {
+        schema: "helix.agent_provider_terminal_candidate.v1",
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+      terminalAuthorityCandidateReview: {
+        schema: "helix.provider_terminal_authority_candidate_review.v1",
+        terminal_authority_status: "blocked_by_gateway_observation_state",
+        terminal_authority_granted: false,
+        final_visible_answer_authorized: false,
+        blockers: ["gateway_observation_missing_or_failed"],
+      },
+      providerTerminalAuthorityBridge: {
+        schema: "helix.provider_terminal_authority_bridge.v1",
+        route_authority_status: "not_authorized",
+        terminal_authority_status: "blocked_by_gateway_observation_state",
+        terminal_authority_granted: false,
+        final_visible_answer_authorized: false,
+        final_answer_source: null,
+        terminal_artifact_kind: null,
+        terminal_answer_authority: null,
+        terminal_presentation: null,
+      },
+      terminalAnswerAuthority: null,
+      terminalPresentation: null,
+      terminalAuthorityStatus: "blocked_by_gateway_observation_state",
+    });
+    expect(gatewayResults[0]).toMatchObject({
+      ok: false,
+      error: "capability_not_registered",
+      gateway_admission: {
+        admission_status: "blocked",
+        blocked_reason: "capability_not_registered",
+      },
+    });
   });
 });

@@ -168,6 +168,12 @@ export const createHelixAskLiveDebugSlimBuilder = (
         payload.provider_reasoning_reentry ?? debug.provider_reasoning_reentry ?? null,
       terminal_authority_candidate_review:
         payload.terminal_authority_candidate_review ?? debug.terminal_authority_candidate_review ?? null,
+      provider_terminal_authority_bridge:
+        payload.provider_terminal_authority_bridge ?? debug.provider_terminal_authority_bridge ?? null,
+      terminal_answer_authority:
+        payload.terminal_answer_authority ?? debug.terminal_answer_authority ?? null,
+      terminal_presentation:
+        payload.terminal_presentation ?? debug.terminal_presentation ?? null,
       terminal_authority_status:
         payload.terminal_authority_status ?? debug.terminal_authority_status ?? null,
       route_reason_code: payload.route_reason_code ?? debug.route_reason_code ?? null,

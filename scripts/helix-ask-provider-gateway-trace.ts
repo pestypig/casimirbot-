@@ -152,6 +152,28 @@ const buildGatewayCallSummary = (result: Record<string, unknown>) => {
   };
 };
 
+const buildManifestCapabilitySummary = (
+  manifest: Record<string, unknown> | null,
+  capabilityId: string | null,
+) => {
+  const capability = readRecordArray(manifest?.capabilities)
+    .find((entry) => readString(entry.capability_id) === capabilityId);
+  return {
+    capability_id: readString(capability?.capability_id),
+    mode: readString(capability?.mode),
+    permission_profile_required: readString(capability?.permission_profile_required),
+    output_observation_schema: readString(capability?.output_observation_schema),
+    observation_schema: readString(capability?.observation_schema),
+    mutating: capability?.mutating,
+    code_mutation: capability?.code_mutation,
+    shell_access: capability?.shell_access,
+    terminal_eligible: capability?.terminal_eligible,
+    post_tool_model_step_required: capability?.post_tool_model_step_required,
+    assistant_answer: capability?.assistant_answer,
+    raw_content_included: capability?.raw_content_included,
+  };
+};
+
 const buildProviderCandidateSummary = (ask: Record<string, unknown>) => {
   const candidate = readRecord(ask.provider_terminal_candidate);
   const reentry = readRecord(ask.provider_reasoning_reentry);
@@ -300,6 +322,10 @@ const runScenario = async (scenario: Scenario) => {
   const firstResult = callResults[0] ?? {};
   const codexSummary = buildGatewayCallSummary(firstResult);
   const helixSummary = buildGatewayCallSummary(helixGatewayResult as unknown as Record<string, unknown>);
+  const manifestSummary = buildManifestCapabilitySummary(
+    readRecord(ask.workstation_gateway_manifest),
+    codexSummary.capability_id,
+  );
   const candidateSummary = buildProviderCandidateSummary(ask);
   const failures: string[] = [];
 
@@ -310,17 +336,48 @@ const runScenario = async (scenario: Scenario) => {
   if (readString(ask.workstation_gateway_manifest_version) !== "read-observe.v1") {
     failures.push("manifest_version_missing");
   }
+  if (scenario.expectedOk && manifestSummary.capability_id !== scenario.capabilityId) {
+    failures.push(`manifest_capability_missing:${scenario.capabilityId}`);
+  }
+  if (manifestSummary.capability_id) {
+    if (!["read", "observe"].includes(manifestSummary.mode ?? "")) {
+      failures.push(`manifest_capability_mode:${manifestSummary.mode ?? "missing"}`);
+    }
+    if (manifestSummary.output_observation_schema !== manifestSummary.observation_schema) {
+      failures.push(
+        `manifest_output_observation_schema_mismatch:${manifestSummary.output_observation_schema ?? "missing"}!=${manifestSummary.observation_schema ?? "missing"}`,
+      );
+    }
+    for (const [field, expected] of [
+      ["mutating", false],
+      ["code_mutation", false],
+      ["shell_access", false],
+      ["terminal_eligible", false],
+      ["post_tool_model_step_required", true],
+      ["assistant_answer", false],
+      ["raw_content_included", false],
+    ] as const) {
+      if (manifestSummary[field] !== expected) failures.push(`manifest_${field}_not_${String(expected)}`);
+    }
+  }
   if (callResults.length !== 1) failures.push(`gateway_call_result_count:${callResults.length}`);
   if (!candidateSummary.candidate_present) failures.push("provider_terminal_candidate_missing");
   if (candidateSummary.candidate_terminal_eligible !== false) failures.push("provider_terminal_candidate_terminal_eligible_not_false");
   if (candidateSummary.candidate_assistant_answer !== false) failures.push("provider_terminal_candidate_assistant_answer_not_false");
   if (candidateSummary.candidate_raw_content_included !== false) failures.push("provider_terminal_candidate_raw_content_included_not_false");
   if (candidateSummary.reentry_status !== "completed") failures.push(`provider_reentry_status:${candidateSummary.reentry_status ?? "missing"}`);
-  if (candidateSummary.terminal_authority_status !== "pending_helix_terminal_authority") {
-    failures.push(`terminal_authority_status:${candidateSummary.terminal_authority_status ?? "missing"}`);
+  const expectedAuthorityStatus = scenario.expectedOk
+    ? "authorized_by_helix_provider_candidate_bridge"
+    : "blocked_by_gateway_observation_state";
+  if (candidateSummary.terminal_authority_status !== expectedAuthorityStatus) {
+    failures.push(`terminal_authority_status:${candidateSummary.terminal_authority_status ?? "missing"}!=${expectedAuthorityStatus}`);
   }
-  if (candidateSummary.terminal_authority_granted !== false) failures.push("terminal_authority_granted_not_false");
-  if (candidateSummary.final_visible_answer_authorized !== false) failures.push("final_visible_answer_authorized_not_false");
+  if (candidateSummary.terminal_authority_granted !== scenario.expectedOk) {
+    failures.push(`terminal_authority_granted:${String(candidateSummary.terminal_authority_granted)}!=${String(scenario.expectedOk)}`);
+  }
+  if (candidateSummary.final_visible_answer_authorized !== scenario.expectedOk) {
+    failures.push(`final_visible_answer_authorized:${String(candidateSummary.final_visible_answer_authorized)}!=${String(scenario.expectedOk)}`);
+  }
   addGatewayInvariantFailures({ failures, prefix: "codex", result: firstResult, scenario });
   addGatewayInvariantFailures({
     failures,
@@ -356,6 +413,7 @@ const runScenario = async (scenario: Scenario) => {
     response_status: 200,
     provider_selected: readString(ask.agent_runtime),
     manifest_version: readString(ask.workstation_gateway_manifest_version),
+    manifest_capability: manifestSummary,
     capability_id: codexSummary.capability_id,
     gateway_ok: codexSummary.ok,
     gateway_error: codexSummary.error,

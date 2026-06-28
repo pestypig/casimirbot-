@@ -12,7 +12,7 @@ export type HelixWorkstationCapabilityManifest = {
   capability_id: string;
   label: string;
   description: string;
-  mode: "read_only" | "observe_only";
+  mode: HelixWorkstationGatewayMode;
   mutating: false;
   code_mutation: false;
   shell_access: false;
@@ -22,6 +22,7 @@ export type HelixWorkstationCapabilityManifest = {
   permission_profile_required: "observe" | "read" | "act" | "write" | "danger";
   post_tool_model_step_required: true;
   input_schema: Record<string, unknown>;
+  output_observation_schema: string;
   observation_schema: string;
   safety_tags: string[];
   assistant_answer: false;

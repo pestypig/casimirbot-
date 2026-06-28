@@ -30,11 +30,13 @@ describe("Helix workstation tool gateway provider parity", () => {
         mutating: false,
         code_mutation: false,
         shell_access: false,
+        output_observation_schema: expect.stringMatching(/^helix\..+_observation\.v1$/),
         terminal_eligible: false,
         post_tool_model_step_required: true,
         assistant_answer: false,
         raw_content_included: false,
       });
+      expect(["observe", "read"]).toContain(capability.mode);
     }
   });
 
