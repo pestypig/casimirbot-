@@ -130,7 +130,7 @@ terminal eligibility, projection discipline, and debug traces.
 
 ## Current Extraction Status
 
-The extraction wave now continues through S275. Recent slices moved small,
+The extraction wave now continues through S277. Recent slices moved small,
 mechanical readers and formatters behind service owners, while intentionally
 leaving source admission, tool execution, runtime-loop orchestration, terminal
 materialization, terminal authority, projection, live-source behavior, and
