@@ -1007,6 +1007,14 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("backendAskCallPath = \"askLocal\"");
   });
 
+  it("preserves provider gateway trace fields in the UI debug export path", () => {
+    const source = fs.readFileSync(pillPath, "utf8");
+    expect(source).toContain("providerGatewayDebugSummary");
+    expect(source).toContain("provider_gateway_debug_summary: providerGatewayDebugSummary");
+    expect(source).toContain("workstation_gateway_call_results: workstationGatewayCallResults");
+    expect(source).toContain("provider_terminal_authority_bridge: providerTerminalAuthorityBridge");
+  });
+
   it("labels console responses from backend provider metadata, not client selection", () => {
     expect(
       resolveHelixAskActualAgentProviderLabel({

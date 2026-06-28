@@ -275,6 +275,129 @@ describe("helix ask pill E68 debug export envelope", () => {
     });
   });
 
+  it("preserves provider gateway debug trace fields for selected Codex answers", () => {
+    const payload = buildHelixDebugExportEnvelopeFromMasterPayload(
+      {
+        id: "ask:codex-provider-debug",
+        question: "Use the calculator observation.",
+        content: "The calculator observation reports 42.",
+      } as any,
+      {
+        selected_final_answer: "The calculator observation reports 42.",
+        final_answer_source: "agent_provider_terminal_candidate",
+        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        agent_runtime: "codex",
+        selected_agent_provider: {
+          id: "codex",
+          label: "Codex Workstation Mode",
+        },
+        provider_gateway_debug_summary: {
+          schema: "helix.provider_gateway_debug_summary.v1",
+          turn_id: "ask:codex-provider-debug",
+          prompt: "Use the calculator observation.",
+          selected_provider: "codex",
+          capability_manifest_version: "read-observe.v1",
+          requested_capabilities: ["scientific-calculator.solve_expression"],
+          admitted_capabilities: ["scientific-calculator.solve_expression"],
+          blocked_capabilities: [],
+          executed_capabilities: ["scientific-calculator.solve_expression"],
+          evidence_reentry_status: "completed",
+          route_authority_result: "provider_gateway_read_observe_contract_satisfied",
+          terminal_authority_result: "authorized_by_helix_provider_candidate_bridge",
+          final_answer_source: "agent_provider_terminal_candidate",
+        },
+        workstation_gateway_manifest_version: "read-observe.v1",
+        workstation_gateway_call_results: [
+          {
+            capability_id: "scientific-calculator.solve_expression",
+            ok: true,
+            gateway_admission: {
+              requested_capability: "scientific-calculator.solve_expression",
+              selected_agent_provider: "codex",
+              admission_status: "admitted",
+            },
+            observation_packet: {
+              terminal_eligible: false,
+              post_tool_model_step_required: true,
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+          },
+        ],
+        workstation_gateway_observation_packets: [
+          {
+            terminal_eligible: false,
+            post_tool_model_step_required: true,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        ],
+        provider_reasoning_reentry: {
+          schema: "helix.provider_reasoning_reentry.v1",
+          status: "completed",
+          evidence_reentered: true,
+        },
+        terminal_authority_candidate_review: {
+          schema: "helix.provider_terminal_authority_candidate_review.v1",
+          terminal_authority_status: "authorized_by_helix_provider_candidate_bridge",
+          terminal_authority_granted: true,
+          final_visible_answer_authorized: true,
+        },
+        provider_terminal_authority_bridge: {
+          schema: "helix.provider_terminal_authority_bridge.v1",
+          route_authority_status: "provider_gateway_read_observe_contract_satisfied",
+          terminal_authority_status: "authorized_by_helix_provider_candidate_bridge",
+          terminal_authority_granted: true,
+          final_answer_source: "agent_provider_terminal_candidate",
+        },
+        terminal_answer_authority: {
+          turn_id: "ask:codex-provider-debug",
+          terminal_text_preview: "The calculator observation reports 42.",
+          final_answer_source: "agent_provider_terminal_candidate",
+          terminal_artifact_kind: "agent_provider_terminal_candidate",
+          server_authoritative: true,
+        },
+        debug: {
+          turn_id: "ask:codex-provider-debug",
+        },
+      },
+    );
+    const parsed = JSON.parse(payload);
+
+    expect(parsed.agent_runtime).toBe("codex");
+    expect(parsed.selected_agent_provider.label).toBe("Codex Workstation Mode");
+    expect(parsed.provider_gateway_debug_summary).toMatchObject({
+      schema: "helix.provider_gateway_debug_summary.v1",
+      selected_provider: "codex",
+      requested_capabilities: ["scientific-calculator.solve_expression"],
+      admitted_capabilities: ["scientific-calculator.solve_expression"],
+      executed_capabilities: ["scientific-calculator.solve_expression"],
+      evidence_reentry_status: "completed",
+      route_authority_result: "provider_gateway_read_observe_contract_satisfied",
+      terminal_authority_result: "authorized_by_helix_provider_candidate_bridge",
+      final_answer_source: "agent_provider_terminal_candidate",
+    });
+    expect(parsed.workstation_gateway_manifest_version).toBe("read-observe.v1");
+    expect(parsed.workstation_gateway_call_results[0].gateway_admission).toMatchObject({
+      selected_agent_provider: "codex",
+      admission_status: "admitted",
+    });
+    expect(parsed.workstation_gateway_observation_packets[0]).toMatchObject({
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(parsed.provider_reasoning_reentry).toMatchObject({
+      status: "completed",
+      evidence_reentered: true,
+    });
+    expect(parsed.terminal_authority_candidate_review.terminal_authority_granted).toBe(true);
+    expect(parsed.provider_terminal_authority_bridge.route_authority_status).toBe(
+      "provider_gateway_read_observe_contract_satisfied",
+    );
+  });
+
   it("exports backend selected_final_answer for model-synthesized final drafts instead of concise presentation text", () => {
     const longSelected =
       "Long model-authored synthesis: curvature is encoded by the metric and Riemann tensor, matter enters through stress-energy, and free fall follows geodesics while tidal forces reveal curvature.";

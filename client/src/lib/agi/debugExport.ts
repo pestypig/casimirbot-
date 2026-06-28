@@ -747,6 +747,53 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
   const runtimeAuthorityAudit =
     asRecord(payload.runtime_authority_audit ?? debug?.runtime_authority_audit ?? agentLoop?.runtime_authority_audit) ??
     findLedgerPayload(ledger, "runtime_authority_audit");
+  const agentRuntime = payload.agent_runtime ?? debug?.agent_runtime ?? agentLoop?.agent_runtime ?? null;
+  const agentRuntimeSelectionTrace = asRecord(
+    payload.agent_runtime_selection_trace ??
+      debug?.agent_runtime_selection_trace ??
+      agentLoop?.agent_runtime_selection_trace,
+  );
+  const selectedAgentProvider = asRecord(
+    payload.selected_agent_provider ?? debug?.selected_agent_provider ?? agentLoop?.selected_agent_provider,
+  );
+  const providerGatewayDebugSummary = asRecord(
+    payload.provider_gateway_debug_summary ??
+      debug?.provider_gateway_debug_summary ??
+      agentLoop?.provider_gateway_debug_summary,
+  );
+  const workstationGatewayManifest = asRecord(
+    payload.workstation_gateway_manifest ??
+      debug?.workstation_gateway_manifest ??
+      agentLoop?.workstation_gateway_manifest,
+  );
+  const workstationGatewayCallResults =
+    payload.workstation_gateway_call_results ??
+    debug?.workstation_gateway_call_results ??
+    agentLoop?.workstation_gateway_call_results;
+  const workstationGatewayObservationPackets =
+    payload.workstation_gateway_observation_packets ??
+    debug?.workstation_gateway_observation_packets ??
+    agentLoop?.workstation_gateway_observation_packets;
+  const providerTerminalCandidate = asRecord(
+    payload.provider_terminal_candidate ??
+      debug?.provider_terminal_candidate ??
+      agentLoop?.provider_terminal_candidate,
+  );
+  const providerReasoningReentry = asRecord(
+    payload.provider_reasoning_reentry ??
+      debug?.provider_reasoning_reentry ??
+      agentLoop?.provider_reasoning_reentry,
+  );
+  const terminalAuthorityCandidateReview = asRecord(
+    payload.terminal_authority_candidate_review ??
+      debug?.terminal_authority_candidate_review ??
+      agentLoop?.terminal_authority_candidate_review,
+  );
+  const providerTerminalAuthorityBridge = asRecord(
+    payload.provider_terminal_authority_bridge ??
+      debug?.provider_terminal_authority_bridge ??
+      agentLoop?.provider_terminal_authority_bridge,
+  );
   const runtimeIntentPacket =
     asRecord(payload.runtime_intent_packet ?? debug?.runtime_intent_packet ?? agentLoop?.runtime_intent_packet) ??
     findLedgerPayload(ledger, "runtime_intent_packet");
@@ -1061,6 +1108,34 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     agent_step_loop: agentStepLoop,
     agent_runtime_loop: agentRuntimeLoop,
     agent_runtime_loop_admission: agentRuntimeLoopAdmission,
+    agent_runtime: agentRuntime,
+    agent_runtime_selection_trace: agentRuntimeSelectionTrace,
+    selected_agent_provider: selectedAgentProvider,
+    provider_gateway_debug_summary: providerGatewayDebugSummary,
+    workstation_gateway_manifest: workstationGatewayManifest,
+    workstation_gateway_manifest_version:
+      payload.workstation_gateway_manifest_version ??
+      debug?.workstation_gateway_manifest_version ??
+      agentLoop?.workstation_gateway_manifest_version ??
+      workstationGatewayManifest?.manifest_version,
+    workstation_gateway_capability_ids:
+      payload.workstation_gateway_capability_ids ??
+      debug?.workstation_gateway_capability_ids ??
+      agentLoop?.workstation_gateway_capability_ids,
+    workstation_gateway_reentry_status:
+      payload.workstation_gateway_reentry_status ??
+      debug?.workstation_gateway_reentry_status ??
+      agentLoop?.workstation_gateway_reentry_status,
+    terminal_authority_status:
+      payload.terminal_authority_status ??
+      debug?.terminal_authority_status ??
+      agentLoop?.terminal_authority_status,
+    workstation_gateway_call_results: workstationGatewayCallResults,
+    workstation_gateway_observation_packets: workstationGatewayObservationPackets,
+    provider_terminal_candidate: providerTerminalCandidate,
+    provider_reasoning_reentry: providerReasoningReentry,
+    terminal_authority_candidate_review: terminalAuthorityCandidateReview,
+    provider_terminal_authority_bridge: providerTerminalAuthorityBridge,
     runtime_intent_packet: runtimeIntentPacket,
     runtime_authority_audit: runtimeAuthorityAudit,
     runtime_continuation_hints: runtimeContinuationHints,
