@@ -298,6 +298,108 @@ const runRouteDebugExportProbe = async (input: {
   };
 };
 
+const runFutureRouteDebugExportProbe = async (input: {
+  app: ReturnType<typeof createRouteTraceApp>;
+  body: Record<string, unknown>;
+  scenario: Scenario;
+}) => {
+  const response = await request(input.app)
+    .post("/api/agi/ask/turn")
+    .send({
+      ...input.body,
+      agent_runtime: "future",
+      turn_id: `${readString(input.body.turn_id) ?? "ask:provider-gateway-trace"}:future`,
+      question: `Use the provided Helix workstation gateway observation for ${input.scenario.id} through the Future provider wrapper.`,
+    });
+  const ask = readRecord(response.body) ?? {};
+  const endpoint = readDebugExportEndpoint(ask);
+  const debugResponse = endpoint
+    ? await request(input.app).get(endpoint)
+    : null;
+  const debugExport = readRecord(debugResponse?.body) ?? null;
+  const debugPayload = readRecord(debugExport?.payload);
+  const routeFailures: string[] = [];
+  if (response.status !== 200) routeFailures.push(`future_route_status:${response.status}`);
+  if (!endpoint) routeFailures.push("future_route_debug_export_ref_missing");
+  if (endpoint && debugResponse?.status !== 200) {
+    routeFailures.push(`future_route_debug_export_status:${debugResponse?.status ?? "missing"}`);
+  }
+  if (readString(ask.agent_runtime) !== "future") {
+    routeFailures.push(`future_route_agent_runtime:${readString(ask.agent_runtime) ?? "missing"}!=future`);
+  }
+  if (readString(ask.workstation_gateway_manifest_version) !== "read-observe.v1") {
+    routeFailures.push("future_route_manifest_version_missing");
+  }
+  if (readString(ask.workstation_gateway_reentry_status) !== "pending_helix_solver_reentry") {
+    routeFailures.push(
+      `future_route_reentry_status:${readString(ask.workstation_gateway_reentry_status) ?? "missing"}!=pending_helix_solver_reentry`,
+    );
+  }
+  if (readString(ask.terminal_authority_status) !== "not_authorized_observation_only") {
+    routeFailures.push(
+      `future_route_terminal_authority_status:${readString(ask.terminal_authority_status) ?? "missing"}!=not_authorized_observation_only`,
+    );
+  }
+  if (readString(ask.final_answer_source) !== null) {
+    routeFailures.push(`future_route_final_answer_source:${readString(ask.final_answer_source) ?? "missing"}!=null`);
+  }
+  if (debugPayload) {
+    if (readString(debugPayload.agent_runtime) !== "future") {
+      routeFailures.push(`future_debug_agent_runtime:${readString(debugPayload.agent_runtime) ?? "missing"}!=future`);
+    }
+    if (readString(debugPayload.workstation_gateway_manifest_version) !== "read-observe.v1") {
+      routeFailures.push("future_debug_manifest_version_missing");
+    }
+    if (readRecordArray(debugPayload.workstation_gateway_call_results).length !== 1) {
+      routeFailures.push(
+        `future_debug_gateway_call_result_count:${readRecordArray(debugPayload.workstation_gateway_call_results).length}`,
+      );
+    }
+    if (readRecordArray(debugPayload.workstation_gateway_observation_packets).length !== 1) {
+      routeFailures.push(
+        `future_debug_observation_packet_count:${readRecordArray(debugPayload.workstation_gateway_observation_packets).length}`,
+      );
+    }
+    if (readString(debugPayload.workstation_gateway_reentry_status) !== "pending_helix_solver_reentry") {
+      routeFailures.push(
+        `future_debug_reentry_status:${readString(debugPayload.workstation_gateway_reentry_status) ?? "missing"}!=pending_helix_solver_reentry`,
+      );
+    }
+    if (readString(debugPayload.terminal_authority_status) !== "not_authorized_observation_only") {
+      routeFailures.push(
+        `future_debug_terminal_authority_status:${readString(debugPayload.terminal_authority_status) ?? "missing"}!=not_authorized_observation_only`,
+      );
+    }
+    if (readString(debugPayload.final_answer_source) !== null) {
+      routeFailures.push(`future_debug_final_answer_source:${readString(debugPayload.final_answer_source) ?? "missing"}!=null`);
+    }
+  }
+
+  return {
+    ask,
+    debugExport,
+    summary: {
+      schema: "helix.provider_gateway_future_route_debug_export_probe.v1",
+      response_status: response.status,
+      debug_export_status: debugResponse?.status ?? null,
+      debug_export_endpoint: endpoint,
+      provider_selected: readString(ask.agent_runtime),
+      manifest_version: readString(ask.workstation_gateway_manifest_version),
+      gateway_call_result_count: readRecordArray(ask.workstation_gateway_call_results).length,
+      debug_gateway_call_result_count: readRecordArray(debugPayload?.workstation_gateway_call_results).length,
+      debug_observation_packet_count: readRecordArray(debugPayload?.workstation_gateway_observation_packets).length,
+      reentry_status: readString(ask.workstation_gateway_reentry_status),
+      debug_reentry_status: readString(debugPayload?.workstation_gateway_reentry_status),
+      terminal_authority_status: readString(ask.terminal_authority_status),
+      debug_terminal_authority_status: readString(debugPayload?.terminal_authority_status),
+      final_answer_source: readString(ask.final_answer_source),
+      debug_final_answer_source: readString(debugPayload?.final_answer_source),
+      procedural_ok: routeFailures.length === 0,
+      failures: routeFailures,
+    },
+  };
+};
+
 const addGatewayInvariantFailures = (input: {
   failures: string[];
   prefix: string;
@@ -422,6 +524,22 @@ const runScenario = async (scenario: Scenario, routeTraceApp: ReturnType<typeof 
       }
     }
   }
+  const originalEnableFutureAgent = process.env.ENABLE_FUTURE_AGENT;
+  process.env.ENABLE_FUTURE_AGENT = "1";
+  let futureRouteProbe: Awaited<ReturnType<typeof runFutureRouteDebugExportProbe>>;
+  try {
+    futureRouteProbe = await runFutureRouteDebugExportProbe({
+      app: routeTraceApp,
+      body,
+      scenario,
+    });
+  } finally {
+    if (originalEnableFutureAgent === undefined) {
+      delete process.env.ENABLE_FUTURE_AGENT;
+    } else {
+      process.env.ENABLE_FUTURE_AGENT = originalEnableFutureAgent;
+    }
+  }
   const providerDebug = readRecord(providerResult.debug) ?? {};
   const ask = {
     ...providerResult,
@@ -510,6 +628,9 @@ const runScenario = async (scenario: Scenario, routeTraceApp: ReturnType<typeof 
   for (const routeFailure of routeProbe.summary.failures) {
     failures.push(`route_debug_export_${routeFailure}`);
   }
+  for (const futureRouteFailure of futureRouteProbe.summary.failures) {
+    failures.push(`future_route_debug_export_${futureRouteFailure}`);
+  }
   addGatewayInvariantFailures({ failures, prefix: "codex", result: firstResult, scenario });
   addGatewayInvariantFailures({
     failures,
@@ -555,6 +676,7 @@ const runScenario = async (scenario: Scenario, routeTraceApp: ReturnType<typeof 
     followup_next_action: codexSummary.followup_next_action,
     provider_terminal_candidate: candidateSummary,
     route_debug_export: routeProbe.summary,
+    future_route_debug_export: futureRouteProbe.summary,
     provider_parity: {
       helix: helixSummary,
       codex: codexSummary,
@@ -570,6 +692,9 @@ const runScenario = async (scenario: Scenario, routeTraceApp: ReturnType<typeof 
   await writeJson(path.join(scenarioDir, "route-ask-response.json"), routeProbe.ask);
   await writeJson(path.join(scenarioDir, "route-debug-export.json"), routeProbe.debugExport);
   await writeJson(path.join(scenarioDir, "route-debug-export-probe.json"), routeProbe.summary);
+  await writeJson(path.join(scenarioDir, "future-route-ask-response.json"), futureRouteProbe.ask);
+  await writeJson(path.join(scenarioDir, "future-route-debug-export.json"), futureRouteProbe.debugExport);
+  await writeJson(path.join(scenarioDir, "future-route-debug-export-probe.json"), futureRouteProbe.summary);
   await writeJson(path.join(scenarioDir, "helix-gateway-result.json"), helixGatewayResult);
   await writeJson(path.join(scenarioDir, "codex-gateway-result.json"), firstResult);
   await writeJson(path.join(scenarioDir, "probe-result.json"), probeResult);
@@ -669,6 +794,7 @@ const runLiveScenario = async (scenario: Scenario) => {
 
 const main = async () => {
   const originalEnableCodexAgent = process.env.ENABLE_CODEX_AGENT;
+  const originalEnableFutureAgent = process.env.ENABLE_FUTURE_AGENT;
   try {
     if (LIVE_MODE) {
       if (!BASE_URL) {
@@ -734,6 +860,11 @@ const main = async () => {
       delete process.env.ENABLE_CODEX_AGENT;
     } else {
       process.env.ENABLE_CODEX_AGENT = originalEnableCodexAgent;
+    }
+    if (originalEnableFutureAgent === undefined) {
+      delete process.env.ENABLE_FUTURE_AGENT;
+    } else {
+      process.env.ENABLE_FUTURE_AGENT = originalEnableFutureAgent;
     }
   }
 };
