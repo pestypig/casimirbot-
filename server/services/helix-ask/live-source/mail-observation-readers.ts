@@ -4,6 +4,7 @@ import { readAskTurnString, readAskTurnStringList } from "../value-readers";
 export type AskTurnLiveSourceArtifactLike = {
   kind: string;
   payload?: unknown;
+  artifact_id?: unknown;
 };
 
 const uniqueAskTurnStrings = (values: Array<string | null | undefined>): string[] =>
@@ -166,6 +167,34 @@ export const collectStagePlayCurrentBatchMailIds = (artifacts: AskTurnLiveSource
     }
   }
   return uniqueAskTurnStrings(mailIds);
+};
+
+export const latestLiveEnvironmentToolObservationArtifact = <T extends AskTurnLiveSourceArtifactLike>(
+  artifacts: T[] | null | undefined,
+  toolName: string,
+): T | null => {
+  const matches = (artifacts ?? []).filter((artifact) => {
+    if (artifact.kind !== "live_environment_tool_observation") return false;
+    const payload = readAskTurnArtifactPayloadRecord(artifact);
+    return readAskTurnString(payload?.tool_name) === toolName;
+  });
+  return matches.at(-1) ?? null;
+};
+
+export const latestLiveEnvironmentToolObservationRecord = (
+  artifacts: AskTurnLiveSourceArtifactLike[] | null | undefined,
+  toolName: string,
+): Record<string, unknown> | null => {
+  const artifact = latestLiveEnvironmentToolObservationArtifact(artifacts, toolName);
+  return artifact ? readAskTurnLiveEnvironmentObservationRecord(artifact) : null;
+};
+
+export const artifactIndexInList = <T extends { artifact_id?: unknown }>(
+  artifacts: T[] | null | undefined,
+  target: T | null,
+): number => {
+  if (!target) return -1;
+  return (artifacts ?? []).findIndex((artifact) => artifact.artifact_id === target.artifact_id);
 };
 
 export const processedMailReadObservationHasPacket = (

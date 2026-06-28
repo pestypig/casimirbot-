@@ -5,9 +5,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   artifactHasSatisfyingStagePlayProcessedMailPacket,
+  artifactIndexInList,
   collectStagePlayCurrentBatchMailIds,
   collectStagePlayMailIdsFromRecord,
   isStagePlayLiveSourceMailReadObservationArtifact,
+  latestLiveEnvironmentToolObservationArtifact,
+  latestLiveEnvironmentToolObservationRecord,
   latestStagePlayProcessedMailPacketRecordFromArtifacts,
   processedMailReadObservationHasPacket,
   processedMailReadObservationMissingRawMailIds,
@@ -40,6 +43,9 @@ describe("Helix Ask live-source mail observation reader extraction boundary", ()
     expect(routeSource).not.toMatch(/const\s+processedMailReadObservationHasPacket\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+processedMailReadObservationMissingRawMailIds\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+processedMailReadObservationNeedsProcessFallback\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+latestLiveEnvironmentToolObservationArtifact\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+latestLiveEnvironmentToolObservationRecord\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+artifactIndexInList\s*=\s*\(/);
     expect(routeSource).not.toContain("STAGE_PLAY_PROCESSED_MAIL_RECOMMENDATIONS_REQUIRING_DECISION");
     expect(serviceSource).toMatch(/export\s+const\s+readAskTurnLiveEnvironmentObservationRecord\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+readStagePlayProcessedMailPacketRecordsFromArtifact\s*=/);
@@ -51,6 +57,9 @@ describe("Helix Ask live-source mail observation reader extraction boundary", ()
     expect(serviceSource).toMatch(/export\s+const\s+processedMailReadObservationHasPacket\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+processedMailReadObservationMissingRawMailIds\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+processedMailReadObservationNeedsProcessFallback\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+latestLiveEnvironmentToolObservationArtifact\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+latestLiveEnvironmentToolObservationRecord\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+artifactIndexInList\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");
     expect(serviceSource).not.toContain("../../../routes/agi.plan");
     expect(serviceSource).not.toContain("../../routes/agi.plan");
@@ -200,5 +209,48 @@ describe("Helix Ask live-source mail observation reader extraction boundary", ()
       processed_packet_refs: ["stage_play_processed_mail_packet:done"],
       fallbackTool: "live_env.process_live_source_mail",
     })).toBe(false);
+  });
+
+  it("preserves latest live-environment tool observation lookup and artifact indexing", () => {
+    const artifacts = [
+      {
+        kind: "live_environment_tool_observation",
+        artifact_id: "artifact:first",
+        payload: {
+          tool_name: "live_env.read_processed_live_source_mail",
+          observation: { readId: "read:first" },
+        },
+      },
+      {
+        kind: "live_environment_tool_observation",
+        artifact_id: "artifact:other",
+        payload: {
+          tool_name: "live_env.process_live_source_mail",
+          observation: { processId: "process:other" },
+        },
+      },
+      {
+        kind: "live_environment_tool_observation",
+        artifact_id: "artifact:last",
+        payload: {
+          tool_name: "live_env.read_processed_live_source_mail",
+          observation: { readId: "read:last" },
+        },
+      },
+    ];
+
+    const latest = latestLiveEnvironmentToolObservationArtifact(
+      artifacts,
+      "live_env.read_processed_live_source_mail",
+    );
+
+    expect(latest?.artifact_id).toBe("artifact:last");
+    expect(latestLiveEnvironmentToolObservationRecord(
+      artifacts,
+      "live_env.read_processed_live_source_mail",
+    )).toEqual({ readId: "read:last" });
+    expect(artifactIndexInList(artifacts, latest)).toBe(2);
+    expect(artifactIndexInList(artifacts, null)).toBe(-1);
+    expect(latestLiveEnvironmentToolObservationArtifact(artifacts, "live_env.missing")).toBeNull();
   });
 });
