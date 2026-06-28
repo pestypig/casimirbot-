@@ -153,6 +153,35 @@ export const filterSignalTokens = (tokens: string[]): string[] =>
 export const filterCriticTokens = (tokens: string[]): string[] =>
   filterSignalTokens(tokens).filter((token) => !HELIX_ASK_META_TOKENS.has(token));
 
+export function mergeHelixAskQueries(
+  ...parts: Array<string[] | number | null | undefined>
+): string[] {
+  const merged: string[] = [];
+  const seen = new Set<string>();
+  const maybeLimit = parts.length > 0 ? parts[parts.length - 1] : undefined;
+  const limit =
+    typeof maybeLimit === "number" && Number.isFinite(maybeLimit)
+      ? maybeLimit
+      : 16;
+  const groups =
+    typeof maybeLimit === "number" && Number.isFinite(maybeLimit)
+      ? parts.slice(0, -1)
+      : parts;
+  const push = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    merged.push(trimmed);
+  };
+  for (const group of groups) {
+    if (!Array.isArray(group)) continue;
+    group.forEach(push);
+  }
+  return merged.slice(0, Math.max(1, limit));
+}
+
 const uniqueTokens = (tokens: string[]): string[] => Array.from(new Set(tokens));
 
 const CLAIM_LINE_PREFIX = /^\s*(?:[-*]|\d+\.)\s+/;

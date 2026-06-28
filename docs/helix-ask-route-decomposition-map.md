@@ -2,7 +2,7 @@
 
 Status: current-head map for structural extraction and decomposition-enabler work.
 
-Pinned source state described: S204 turn-contract objectives extraction.
+Pinned source state described: S205 query merge extraction.
 
 Snapshot command: `npx tsx scripts/helix-ask-route-inventory.ts --write`
 
@@ -11,9 +11,9 @@ Route snapshot:
 | Metric | Value |
 | --- | ---: |
 | File | `server/routes/agi.plan.ts` |
-| Lines | 176,243 |
-| Bytes | 8,078,847 |
-| Top-level helper estimate | 303 helper blocks |
+| Lines | 176,215 |
+| Bytes | 8,077,947 |
+| Top-level helper estimate | 302 helper blocks |
 | Route inventory | `artifacts/helix-ask-route-inventory.json` |
 | Machine-readable map | `artifacts/helix-ask-route-decomposition-map.json` |
 
@@ -56,6 +56,7 @@ Do not extract `runHelixAgentTurnRuntimeLoop` in this wave. Do not patch termina
 | `note-arg-boundaries` | service-owned | `PROMPT_INTERPRETATION` / `WORKSPACE_NOTES` | `LOW` | `EXTRACTED` | `server/services/helix-ask/note-arg-boundaries.ts` | S153 moved note/workspace action argument boundary trimming into a dedicated service behind a live bounded-note-args flag getter. S154 moved basic text/title argument readers into the same owner. S168 moved deictic note label/target and invalid resolved-title predicates. S169 moved artifact reference destination predicates. S170 moved create-note title reading, create-note intent detection, and protected create-note argument masking. S171 moved requested note-title normalization and named sink target readers behind the same route-supplied live trimmer. S172 moved append-note text reading plus repo and append-to-note cue predicates. S173 moved docs-retrieval query text extraction for note retrieval prompts. S189 moved note mutation precedence prompt detection. S193 moved note transfer intent readers behind route-supplied doc-topic, note-sink, create-title, and artifact-reference callbacks. It does not resolve workspace note targets, plan docs retrieval, execute note actions, mutate workspace context, store artifacts, or choose terminal authority. |
 | `compare-intent` | service-owned | `PROMPT_INTERPRETATION` / `DOC_CONTEXT` / `WORKSPACE_NOTES` | `LOW` | `EXTRACTED` | `server/services/helix-ask/compare-intent.ts` | S174 moved compare cue regex, explicit workspace compare operand predicate, conceptual-vs predicate, compare-cue-outside-protected-args predicate, and compare right-hand target reader into a dedicated service behind route-supplied protected-argument masking and live trim callbacks. S188 moved compare precedence prompt detection into the same owner. S195 moved the generic document compare target predicate into the same owner while reusing the service-owned doc-path extractor. S196 moved doc-plus-notes hybrid compare prompt detection into the same owner. S197 moved extract-append-compare, create-copy-compare, and compare-copy-result-to-clipboard prompt predicates into the same owner. It does not move flagged open-create-compare detection, summary-to-note detection, doc-vs-note/doc-vs-doc compare policy, compare target resolution policy, workspace note matching, action planning, execution, terminal materialization, terminal authority, or projection behavior. |
 | `workspace-context-predicates` | service-owned | `PROMPT_INTERPRETATION` / `WORKSPACE_CONTEXT` | `LOW` | `EXTRACTED` | `server/services/helix-ask/workspace-context-predicates.ts` | S155 moved reasoning-context mode normalization, deictic workspace-context detection, and docs-viewer context action predicates into a dedicated service behind a route-owned deictic-doc-fix flag getter. S156 moved composite workspace status and workspace-change summary intent predicates into the same owner. S157 moved workspace-help intent classification into the same owner. S178 moved process-graph/open-panels overview intent classification into the same owner. It does not mutate workspace context, infer source admission, plan doc/workstation tools, execute actions, materialize terminals, or choose terminal authority. |
+| `query-merge` | service-owned | `PROMPT_INTERPRETATION` / `RETRIEVAL_QUERY_SUPPORT` | `LOW` | `EXTRACTED` | `server/services/helix-ask/query.ts` | S205 moved the pure `mergeHelixAskQueries` helper into the shared query service. It preserves trimming, case-insensitive dedupe, group filtering, and caller-supplied limits. It does not choose retrieval policy, execute retrieval, select evidence, materialize terminals, or mutate payload/debug state. |
 | `runtime-civilization-bounds-composer-guard` | service-owned | `EVIDENCE_REENTRY` / `FINAL_ANSWER_COMPOSITION_SUPPORT` | `MEDIUM` | `EXTRACTED` | `server/services/helix-ask/runtime/runtime-civilization-bounds-composer-guard.ts` | S140 moved the civilization-bounds draft contradiction guard into a dedicated runtime service. It does not move civilization tool execution, evidence selection, final-answer draft selection, terminal materialization, terminal authority, or projection behavior. |
 | `post-observation-draft-text` | service-owned | `FINAL_ANSWER_COMPOSITION_SUPPORT` / `PRESENTATION_HYGIENE` | `MEDIUM_LOW` | `EXTRACTED` | `server/services/helix-ask/receipt-framing-suppression.ts` | S141 moved post-observation draft text cleanup into the existing receipt-framing suppression owner. It does not move final-answer draft selection, LLM invocation, terminal materialization, terminal authority, or projection behavior. |
 | `runtime-composer-artifact-collectors` | service-owned | `EVIDENCE_REENTRY` / `FINAL_ANSWER_COMPOSITION_SUPPORT` | `MEDIUM` | `EXTRACTED` | `server/services/helix-ask/runtime/runtime-composer-artifact-collectors.ts` | S142 moved composer receipt, coverage, tool-observation, and text-line collectors behind a two-callback factory using route-supplied artifact payload and string readers. It does not move artifact creation, evidence selection, final-answer drafting, terminal materialization, terminal authority, or projection behavior. |
