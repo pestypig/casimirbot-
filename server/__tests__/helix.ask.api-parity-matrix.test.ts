@@ -413,7 +413,20 @@ const seedScenario = async (
     .expect(200);
 };
 
-const enabledParityScenarios = API_PARITY_SCENARIOS.filter((scenario) => scenario.enabled);
+const readApiParityScenarioFilter = (): Set<string> | null => {
+  const raw = process.env.HELIX_API_PARITY_SCENARIO_ID ?? process.env.HELIX_API_PARITY_SCENARIO_IDS;
+  if (!raw?.trim()) return null;
+  const ids = raw
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  return ids.length > 0 ? new Set(ids) : null;
+};
+
+const enabledParityScenarioFilter = readApiParityScenarioFilter();
+const enabledParityScenarios = API_PARITY_SCENARIOS.filter((scenario) =>
+  scenario.enabled && (!enabledParityScenarioFilter || enabledParityScenarioFilter.has(scenario.id)),
+);
 
 const buildCompleteCapabilityCatalogRailTable = (
   turnId: string,
