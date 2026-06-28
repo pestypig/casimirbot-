@@ -763,7 +763,8 @@ describe("Helix Ask agent provider route metadata", () => {
     process.env.CODEX_AGENT_FAKE_STDOUT = "The calculator observation reports 21.";
     process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
 
-    const response = await request(createApp())
+    const app = createApp();
+    const response = await request(app)
       .post("/api/agi/ask/turn")
       .send({
         agent_runtime: "codex",
@@ -865,6 +866,71 @@ describe("Helix Ask agent provider route metadata", () => {
     expect(response.body.provider_terminal_candidate.candidate_id).toContain(
       "ask:test:codex-provider-candidate-route:agent_provider_terminal_candidate:codex:",
     );
+    expect(response.body.debug_export_ref).toMatchObject({
+      endpoint: "/api/agi/ask/turn/ask%3Atest%3Acodex-provider-candidate-route/debug-export",
+      turn_id: "ask:test:codex-provider-candidate-route",
+    });
+    const debugExport = await request(app)
+      .get("/api/agi/ask/turn/ask%3Atest%3Acodex-provider-candidate-route/debug-export")
+      .expect(200);
+    expect(debugExport.body).toMatchObject({
+      ok: true,
+      payload: {
+        active_turn_id: "ask:test:codex-provider-candidate-route",
+        agent_runtime: "codex",
+        response_type: "final_answer",
+        final_status: "final_answer",
+        final_answer_source: "agent_provider_terminal_candidate",
+        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        workstation_gateway_manifest_version: "read-observe.v1",
+        workstation_gateway_reentry_status: "completed",
+        terminal_authority_status: "authorized_by_helix_provider_candidate_bridge",
+        workstation_gateway_call_results: [
+          {
+            ok: true,
+            capability_id: "scientific-calculator.solve_expression",
+            gateway_admission: {
+              selected_agent_provider: "codex",
+              admission_status: "admitted",
+            },
+            observation_packet: {
+              terminal_eligible: false,
+              post_tool_model_step_required: true,
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+          },
+        ],
+        workstation_gateway_observation_packets: [
+          {
+            terminal_eligible: false,
+            post_tool_model_step_required: true,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        ],
+        provider_reasoning_reentry: {
+          schema: "helix.provider_reasoning_reentry.v1",
+          status: "completed",
+          evidence_reentered: true,
+        },
+        terminal_authority_candidate_review: {
+          schema: "helix.provider_terminal_authority_candidate_review.v1",
+          terminal_authority_status: "authorized_by_helix_provider_candidate_bridge",
+          terminal_authority_granted: true,
+        },
+        provider_terminal_authority_bridge: {
+          schema: "helix.provider_terminal_authority_bridge.v1",
+          terminal_authority_granted: true,
+        },
+        terminal_answer_authority: {
+          schema: "helix.turn_terminal_authority.v1",
+          final_answer_source: "agent_provider_terminal_candidate",
+          terminal_artifact_kind: "agent_provider_terminal_candidate",
+          server_authoritative: true,
+        },
+      },
+    });
   });
 
   it("emits provider terminal authority records in stream final events for Codex text-mode answers", async () => {
@@ -872,7 +938,8 @@ describe("Helix Ask agent provider route metadata", () => {
     process.env.CODEX_AGENT_FAKE_STDOUT = "The streamed calculator observation reports 64.";
     process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
 
-    const response = await request(createApp())
+    const app = createApp();
+    const response = await request(app)
       .post("/api/agi/ask/turn/stream")
       .send({
         agent_runtime: "codex",
@@ -950,6 +1017,46 @@ describe("Helix Ask agent provider route metadata", () => {
       assistant_answer: false,
       terminal_eligible: false,
       raw_content_included: false,
+    });
+    expect(finalEvent?.data.debug_export_ref).toMatchObject({
+      endpoint: "/api/agi/ask/turn/ask%3Atest%3Acodex-provider-candidate-stream/debug-export",
+      turn_id: "ask:test:codex-provider-candidate-stream",
+    });
+    const debugExport = await request(app)
+      .get("/api/agi/ask/turn/ask%3Atest%3Acodex-provider-candidate-stream/debug-export")
+      .expect(200);
+    expect(debugExport.body).toMatchObject({
+      ok: true,
+      payload: {
+        active_turn_id: "ask:test:codex-provider-candidate-stream",
+        agent_runtime: "codex",
+        response_type: "final_answer",
+        final_status: "final_answer",
+        final_answer_source: "agent_provider_terminal_candidate",
+        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        workstation_gateway_manifest_version: "read-observe.v1",
+        workstation_gateway_reentry_status: "completed",
+        terminal_authority_status: "authorized_by_helix_provider_candidate_bridge",
+        provider_reasoning_reentry: {
+          schema: "helix.provider_reasoning_reentry.v1",
+          status: "completed",
+          evidence_reentered: true,
+        },
+        terminal_authority_candidate_review: {
+          schema: "helix.provider_terminal_authority_candidate_review.v1",
+          terminal_authority_status: "authorized_by_helix_provider_candidate_bridge",
+          terminal_authority_granted: true,
+        },
+        provider_terminal_authority_bridge: {
+          schema: "helix.provider_terminal_authority_bridge.v1",
+          terminal_authority_granted: true,
+        },
+        terminal_answer_authority: {
+          schema: "helix.turn_terminal_authority.v1",
+          route: "/ask/turn/stream",
+          server_authoritative: true,
+        },
+      },
     });
   });
 });
