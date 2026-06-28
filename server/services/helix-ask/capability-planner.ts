@@ -282,6 +282,7 @@ const requestedActionFor = (
   const prompt = normalize(promptText);
   if (isTheoryFrontierVectorFieldTracePrompt(promptText)) return HELIX_THEORY_FRONTIER_VECTOR_FIELD_TRACE_CAPABILITY;
   if (family === "docs") {
+    if (/\b(?:open|pull up|bring up|show)\b/.test(prompt)) return "open_or_validate_document";
     if (
       /\b(?:check|use|from|in|inside|look\s+in|look\s+at|consult|according\s+to|where|find|locate|reported|stated|specified|listed|table|row|source|cite|citation|evidence|white\s*paper|whitepaper|paper|document|doc|docs|report|memo)\b/i.test(promptText) &&
       /\b(?:white\s*paper|whitepaper|paper|document|doc|docs|report|memo|NHM[-\s]?2|casimir|tile|load[-\s]?bearing|lbs?|pounds?|newtons?)\b/i.test(promptText)
@@ -294,7 +295,6 @@ const requestedActionFor = (
       }
       return "docs-viewer.search_docs";
     }
-    if (/\b(?:open|pull up|bring up|show)\b/.test(prompt)) return "open_or_validate_document";
     if (/\b(?:read|locate|find|search)\b/.test(prompt)) return "docs-viewer.search_docs";
     return "retrieve_document_evidence";
   }

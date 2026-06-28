@@ -1,6 +1,11 @@
 import { spawn } from "node:child_process";
+import crypto from "node:crypto";
 import type { HelixAgentProvider, HelixAgentRunResult } from "./types";
-import { listWorkstationGatewayCapabilities } from "../workstation-tool-gateway/registry";
+import {
+  callWorkstationGatewayCapability,
+  listWorkstationGatewayCapabilities,
+} from "../workstation-tool-gateway/registry";
+import type { HelixWorkstationGatewayCallResult } from "../workstation-tool-gateway/types";
 import { buildHelixAgentRuntimeSelectionTrace } from "./runtime-debug";
 
 const enabled = (): boolean => process.env.ENABLE_CODEX_AGENT === "1";
@@ -30,10 +35,135 @@ const readCodexArgs = (): string[] =>
     .map((entry) => entry.trim())
     .filter(Boolean);
 
+const readRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+
+const readString = (value: unknown): string | null =>
+  typeof value === "string" && value.trim() ? value.trim() : null;
+
+const sha256 = (value: string): string =>
+  crypto.createHash("sha256").update(value).digest("hex");
+
+const readTurnId = (body: Record<string, unknown>): string =>
+  readString(body.turn_id) ?? readString(body.turnId) ?? `ask:codex:${crypto.randomUUID()}`;
+
+const readExplicitGatewayCallRequests = (body: Record<string, unknown>): Record<string, unknown>[] => {
+  const calls = body.workstation_gateway_calls ?? body.workstationGatewayCalls;
+  const call = body.workstation_gateway_call ?? body.workstationGatewayCall;
+  const records = [
+    ...(Array.isArray(calls) ? calls : []),
+    ...(call ? [call] : []),
+  ]
+    .map(readRecord)
+    .filter((record): record is Record<string, unknown> => Boolean(record))
+    .slice(0, 3);
+  return records;
+};
+
+export const runExplicitCodexWorkstationGatewayCalls = async (input: {
+  body: Record<string, unknown>;
+  turnId?: string | null;
+}): Promise<HelixWorkstationGatewayCallResult[]> => {
+  const requests = readExplicitGatewayCallRequests(input.body);
+  const turnId = input.turnId ?? readTurnId(input.body);
+  const results: HelixWorkstationGatewayCallResult[] = [];
+  for (const [index, request] of requests.entries()) {
+    results.push(await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: readString(request.mode),
+      capabilityId: readString(request.capability_id) ?? readString(request.capabilityId) ?? "",
+      arguments: readRecord(request.arguments ?? request.args) ?? {},
+      approvalToken: readString(request.approval_token) ?? readString(request.approvalToken),
+      turnId,
+      iteration: typeof request.iteration === "number" ? request.iteration : index + 1,
+    }));
+  }
+  return results;
+};
+
+export const buildCodexProviderReasoningReentry = (input: {
+  turnId: string;
+  gatewayCallResults: HelixWorkstationGatewayCallResult[];
+  providerText: string;
+  ok: boolean;
+}) => {
+  const observationRefs = input.gatewayCallResults.flatMap((result) => result.artifact_refs);
+  const candidateId = input.ok && input.providerText.trim()
+    ? `${input.turnId}:agent_provider_terminal_candidate:codex:${sha256(input.providerText).slice(0, 16)}`
+    : null;
+  const providerTerminalCandidate = candidateId
+    ? {
+        schema: "helix.agent_provider_terminal_candidate.v1",
+        candidate_id: candidateId,
+        turn_id: input.turnId,
+        agent_runtime: "codex",
+        selected_agent_provider: "codex",
+        source: "codex_text_mode_adapter",
+        candidate_text_hash: sha256(input.providerText),
+        candidate_text_length: input.providerText.length,
+        candidate_text_preview: input.providerText.slice(0, 4000),
+        grounded_in_observation_refs: observationRefs,
+        evidence_reentry_required: input.gatewayCallResults.length > 0,
+        provider_reasoning_completed: true,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      }
+    : null;
+  const providerReasoningReentry = {
+    schema: "helix.provider_reasoning_reentry.v1",
+    turn_id: input.turnId,
+    agent_runtime: "codex",
+    selected_agent_provider: "codex",
+    status: candidateId ? "completed" : input.ok ? "empty_provider_answer" : "not_run",
+    input_observation_refs: observationRefs,
+    provider_terminal_candidate_ref: candidateId,
+    provider_terminal_candidate_present: Boolean(candidateId),
+    post_tool_model_step_required: false,
+    evidence_reentered: Boolean(candidateId && observationRefs.length > 0),
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+  };
+  const terminalAuthorityCandidateReview = {
+    schema: "helix.provider_terminal_authority_candidate_review.v1",
+    turn_id: input.turnId,
+    agent_runtime: "codex",
+    candidate_ref: candidateId,
+    terminal_authority_status: candidateId
+      ? "pending_helix_terminal_authority"
+      : "not_evaluated_provider_text_mode",
+    terminal_authority_granted: false,
+    final_visible_answer_authorized: false,
+    blockers: candidateId
+      ? ["helix_terminal_authority_not_run_for_provider_candidate"]
+      : ["provider_terminal_candidate_missing"],
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+  };
+  return {
+    providerTerminalCandidate,
+    providerReasoningReentry,
+    terminalAuthorityCandidateReview,
+    workstationGatewayReentryStatus: providerReasoningReentry.status,
+    terminalAuthorityStatus: terminalAuthorityCandidateReview.terminal_authority_status,
+  };
+};
+
 async function runCodexProcess(input: {
   prompt: string;
   signal?: AbortSignal;
 }): Promise<{ stdout: string; stderr: string; exitCode: number | null }> {
+  const fakeStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+  if (fakeStdout !== undefined) {
+    return {
+      stdout: fakeStdout,
+      stderr: process.env.CODEX_AGENT_FAKE_STDERR ?? "",
+      exitCode: Number(process.env.CODEX_AGENT_FAKE_EXIT_CODE ?? "0"),
+    };
+  }
+
   const bin = process.env.CODEX_BIN || "codex";
   const child = spawn(bin, readCodexArgs(), {
     stdio: ["pipe", "pipe", "pipe"],
@@ -109,6 +239,7 @@ export const codexProvider: HelixAgentProvider = {
 
   async runTurn(request): Promise<HelixAgentRunResult> {
     const question = readQuestion(request.body);
+    const turnId = readTurnId(request.body);
     const gatewayManifest = listWorkstationGatewayCapabilities({
       agentRuntime: "codex",
       mode: "observe",
@@ -119,6 +250,13 @@ export const codexProvider: HelixAgentProvider = {
       provider: codexProvider,
       gatewayManifest,
     });
+    const gatewayCallResults = await runExplicitCodexWorkstationGatewayCalls({
+      body: request.body,
+      turnId,
+    });
+    const gatewayObservationPackets = gatewayCallResults.map((result) => result.observation_packet);
+    const gatewayLifecycleTraces = gatewayCallResults.map((result) => result.tool_lifecycle_trace);
+    const gatewayFollowupDecisions = gatewayCallResults.map((result) => result.tool_followup_decision);
 
     if (!question) {
       const text = "Codex runtime could not run because the Ask turn had no question.";
@@ -140,6 +278,10 @@ export const codexProvider: HelixAgentProvider = {
           workstation_gateway_capability_ids: gatewayManifest.capabilities.map(
             (capability) => capability.capability_id,
           ),
+          workstation_gateway_call_results: gatewayCallResults,
+          workstation_gateway_observation_packets: gatewayObservationPackets,
+          tool_lifecycle_traces: gatewayLifecycleTraces,
+          tool_followup_decisions: gatewayFollowupDecisions,
           workstation_gateway_reentry_status: runtimeSelectionTrace.evidence_reentry_status,
           terminal_authority_status: runtimeSelectionTrace.terminal_authority_status,
         },
@@ -155,6 +297,9 @@ export const codexProvider: HelixAgentProvider = {
       "",
       "Available Helix workstation gateway capabilities:",
       JSON.stringify(gatewayManifest, null, 2),
+      "",
+      "Helix workstation gateway observations already executed for this turn:",
+      JSON.stringify(gatewayCallResults, null, 2),
       "",
       "User request:",
       question,
@@ -179,6 +324,12 @@ export const codexProvider: HelixAgentProvider = {
     });
     const text = result.stdout.trim() || result.stderr.trim();
     const ok = result.exitCode === 0 && text.length > 0;
+    const providerReentry = buildCodexProviderReasoningReentry({
+      turnId,
+      gatewayCallResults,
+      providerText: text,
+      ok,
+    });
 
     return {
       ok,
@@ -201,8 +352,15 @@ export const codexProvider: HelixAgentProvider = {
         workstation_gateway_capability_ids: gatewayManifest.capabilities.map(
           (capability) => capability.capability_id,
         ),
-        workstation_gateway_reentry_status: runtimeSelectionTrace.evidence_reentry_status,
-        terminal_authority_status: runtimeSelectionTrace.terminal_authority_status,
+        workstation_gateway_call_results: gatewayCallResults,
+        workstation_gateway_observation_packets: gatewayObservationPackets,
+        tool_lifecycle_traces: gatewayLifecycleTraces,
+        tool_followup_decisions: gatewayFollowupDecisions,
+        provider_terminal_candidate: providerReentry.providerTerminalCandidate,
+        provider_reasoning_reentry: providerReentry.providerReasoningReentry,
+        terminal_authority_candidate_review: providerReentry.terminalAuthorityCandidateReview,
+        workstation_gateway_reentry_status: providerReentry.workstationGatewayReentryStatus,
+        terminal_authority_status: providerReentry.terminalAuthorityStatus,
       },
       raw: {
         stdout: result.stdout,

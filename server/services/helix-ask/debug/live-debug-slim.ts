@@ -152,6 +152,22 @@ export const createHelixAskLiveDebugSlimBuilder = (
         payload.workstation_gateway_capability_ids ?? debug.workstation_gateway_capability_ids ?? null,
       workstation_gateway_reentry_status:
         payload.workstation_gateway_reentry_status ?? debug.workstation_gateway_reentry_status ?? null,
+      workstation_gateway_call_results:
+        summarizeHelixAskDebugValue(payload.workstation_gateway_call_results ?? debug.workstation_gateway_call_results ?? []),
+      workstation_gateway_observation_packets:
+        summarizeHelixAskDebugValue(
+          payload.workstation_gateway_observation_packets ?? debug.workstation_gateway_observation_packets ?? [],
+        ),
+      tool_lifecycle_traces:
+        summarizeHelixAskDebugValue(payload.tool_lifecycle_traces ?? debug.tool_lifecycle_traces ?? []),
+      tool_followup_decisions:
+        summarizeHelixAskDebugValue(payload.tool_followup_decisions ?? debug.tool_followup_decisions ?? []),
+      provider_terminal_candidate:
+        summarizeHelixAskDebugValue(payload.provider_terminal_candidate ?? debug.provider_terminal_candidate ?? null),
+      provider_reasoning_reentry:
+        payload.provider_reasoning_reentry ?? debug.provider_reasoning_reentry ?? null,
+      terminal_authority_candidate_review:
+        payload.terminal_authority_candidate_review ?? debug.terminal_authority_candidate_review ?? null,
       terminal_authority_status:
         payload.terminal_authority_status ?? debug.terminal_authority_status ?? null,
       route_reason_code: payload.route_reason_code ?? debug.route_reason_code ?? null,
