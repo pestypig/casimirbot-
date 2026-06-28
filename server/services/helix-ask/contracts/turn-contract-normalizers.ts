@@ -52,6 +52,13 @@ export const selectHelixAskTurnContractRequestedGroundingMode = (
 ): HelixAskTurnContractGroundingMode | null =>
   normalizeHelixAskTurnContractGroundingMode(groundingMode);
 
+export const selectHelixAskTurnContractFamily = (args: {
+  plannerFamily?: HelixAskAnswerPlanFamily | null;
+  fallbackFamily: HelixAskAnswerPlanFamily;
+  definitionRelationRepoMismatch: boolean;
+}): HelixAskAnswerPlanFamily =>
+  args.definitionRelationRepoMismatch ? args.fallbackFamily : args.plannerFamily ?? args.fallbackFamily;
+
 export const selectHelixAskTurnContractGroundingMode = (args: {
   requiresRepoEvidence: boolean;
   intentDomain: HelixAskDomain;
