@@ -119,6 +119,74 @@ export const createHelixAskAnswerPlanSection = (args: {
   };
 };
 
+export const HELIX_ASK_ANSWER_PLAN_PROFILE_SECTIONS: Record<
+  HelixAskAnswerPlanFamily,
+  HelixAskAnswerPlanSection[]
+> = {
+  definition_overview: [
+    createHelixAskAnswerPlanSection({ id: "definition", title: "Definition", required: true, family: "definition_overview", kind: "definition", requiredSlots: ["definition"] }),
+    createHelixAskAnswerPlanSection({ id: "why_matters", title: "Why it matters", required: true, family: "definition_overview", kind: "answer", requiredSlots: ["mechanism"] }),
+    createHelixAskAnswerPlanSection({ id: "key_terms", title: "Key terms", required: true, family: "definition_overview", kind: "definition", requiredSlots: ["definition"] }),
+    createHelixAskAnswerPlanSection({ id: "sources", title: "Sources", required: true, family: "definition_overview", kind: "sources" }),
+  ],
+  mechanism_process: [
+    createHelixAskAnswerPlanSection({ id: "mechanism", title: "Mechanism Explanation", required: true, family: "mechanism_process", kind: "mechanism", requiredSlots: ["mechanism"] }),
+    createHelixAskAnswerPlanSection({ id: "inputs_outputs", title: "Inputs/Outputs", required: true, family: "mechanism_process", kind: "mechanism", requiredSlots: ["mechanism", "code_path"] }),
+    createHelixAskAnswerPlanSection({ id: "constraints", title: "Constraints", required: true, family: "mechanism_process", kind: "repo", requiredSlots: ["definition", "code_path"] }),
+    createHelixAskAnswerPlanSection({ id: "failure_modes", title: "Common failure modes", required: false, family: "mechanism_process", kind: "gaps", requiredSlots: ["failure_path"] }),
+    createHelixAskAnswerPlanSection({ id: "sources", title: "Sources", required: true, family: "mechanism_process", kind: "sources" }),
+  ],
+  equation_formalism: [
+    createHelixAskAnswerPlanSection({ id: "primary_topic", title: "Primary Topic", required: true, family: "equation_formalism", kind: "definition", requiredSlots: ["definition"] }),
+    createHelixAskAnswerPlanSection({ id: "primary_equation", title: "Primary Equation", required: true, family: "equation_formalism", kind: "mechanism", requiredSlots: ["equation"] }),
+    createHelixAskAnswerPlanSection({ id: "mechanism", title: "Mechanism Explanation", required: true, family: "equation_formalism", kind: "mechanism", requiredSlots: ["mechanism", "code_path"] }),
+    createHelixAskAnswerPlanSection({ id: "cross_topic", title: "Related Cross-Topic Evidence", required: false, family: "equation_formalism", kind: "comparison", requiredSlots: ["cross_topic"] }),
+    createHelixAskAnswerPlanSection({ id: "rejected", title: "Rejected Candidates", required: false, family: "equation_formalism", kind: "gaps", requiredSlots: ["failure_path"] }),
+    createHelixAskAnswerPlanSection({ id: "sources", title: "Sources", required: true, family: "equation_formalism", kind: "sources" }),
+  ],
+  comparison_tradeoff: [
+    createHelixAskAnswerPlanSection({ id: "option_a", title: "Option A/B", required: true, family: "comparison_tradeoff", kind: "comparison", requiredSlots: ["definition"] }),
+    createHelixAskAnswerPlanSection({ id: "differences", title: "Key differences", required: true, family: "comparison_tradeoff", kind: "comparison", requiredSlots: ["mechanism", "code_path"] }),
+    createHelixAskAnswerPlanSection({ id: "choice", title: "When to choose", required: true, family: "comparison_tradeoff", kind: "answer", requiredSlots: ["recommendation"] }),
+    createHelixAskAnswerPlanSection({ id: "risks", title: "Risks", required: true, family: "comparison_tradeoff", kind: "gaps", requiredSlots: ["failure_path"] }),
+    createHelixAskAnswerPlanSection({ id: "sources", title: "Sources", required: true, family: "comparison_tradeoff", kind: "sources" }),
+  ],
+  troubleshooting_diagnosis: [
+    createHelixAskAnswerPlanSection({ id: "symptoms", title: "Symptoms", required: true, family: "troubleshooting_diagnosis", kind: "diagnosis", requiredSlots: ["definition"] }),
+    createHelixAskAnswerPlanSection({ id: "likely_causes", title: "Most likely causes", required: true, family: "troubleshooting_diagnosis", kind: "diagnosis", requiredSlots: ["failure_path", "mechanism"] }),
+    createHelixAskAnswerPlanSection({ id: "checks", title: "Checks", required: true, family: "troubleshooting_diagnosis", kind: "diagnosis", requiredSlots: ["verification", "code_path"] }),
+    createHelixAskAnswerPlanSection({ id: "fixes", title: "Fixes", required: true, family: "troubleshooting_diagnosis", kind: "repo", requiredSlots: ["code_path"] }),
+    createHelixAskAnswerPlanSection({ id: "sources", title: "Sources", required: true, family: "troubleshooting_diagnosis", kind: "sources" }),
+  ],
+  implementation_code_path: [
+    createHelixAskAnswerPlanSection({ id: "where_repo", title: "Where in repo", required: true, family: "implementation_code_path", kind: "repo", requiredSlots: ["code_path"] }),
+    createHelixAskAnswerPlanSection({ id: "call_chain", title: "Call chain", required: true, family: "implementation_code_path", kind: "repo", requiredSlots: ["code_path", "mechanism"] }),
+    createHelixAskAnswerPlanSection({ id: "key_types", title: "Key structs/types", required: false, family: "implementation_code_path", kind: "repo", requiredSlots: ["definition"] }),
+    createHelixAskAnswerPlanSection({ id: "safe_changes", title: "What to change safely", required: false, family: "implementation_code_path", kind: "repo", requiredSlots: ["code_path", "verification"] }),
+    createHelixAskAnswerPlanSection({ id: "sources", title: "Sources", required: true, family: "implementation_code_path", kind: "sources" }),
+  ],
+  roadmap_planning: [
+    createHelixAskAnswerPlanSection({ id: "repo_grounded_findings", title: "Repo-Grounded Findings", required: true, family: "roadmap_planning", kind: "roadmap", requiredSlots: ["repo_mapping", "code_path"] }),
+    createHelixAskAnswerPlanSection({ id: "implementation_roadmap", title: "Implementation Roadmap", required: true, family: "roadmap_planning", kind: "roadmap", requiredSlots: ["next_steps", "implementation_touchpoints"] }),
+    createHelixAskAnswerPlanSection({ id: "evidence_gaps", title: "Evidence Gaps", required: true, family: "roadmap_planning", kind: "gaps", requiredSlots: ["failure_path"] }),
+    createHelixAskAnswerPlanSection({ id: "next_anchors_needed", title: "Next Anchors Needed", required: true, family: "roadmap_planning", kind: "repo", requiredSlots: ["code_path"] }),
+    createHelixAskAnswerPlanSection({ id: "sources", title: "Sources", required: true, family: "roadmap_planning", kind: "sources" }),
+  ],
+  recommendation_decision: [
+    createHelixAskAnswerPlanSection({ id: "decision", title: "Decision", required: true, family: "recommendation_decision", kind: "answer", requiredSlots: ["recommendation"] }),
+    createHelixAskAnswerPlanSection({ id: "rationale", title: "Rationale", required: true, family: "recommendation_decision", kind: "mechanism", requiredSlots: ["mechanism", "definition"] }),
+    createHelixAskAnswerPlanSection({ id: "constraints", title: "Constraints", required: true, family: "recommendation_decision", kind: "repo", requiredSlots: ["code_path"] }),
+    createHelixAskAnswerPlanSection({ id: "risks", title: "Risks", required: true, family: "recommendation_decision", kind: "gaps", requiredSlots: ["failure_path"] }),
+    createHelixAskAnswerPlanSection({ id: "fallback", title: "Fallback plan", required: false, family: "recommendation_decision", kind: "roadmap", requiredSlots: ["next_steps"] }),
+    createHelixAskAnswerPlanSection({ id: "sources", title: "Sources", required: true, family: "recommendation_decision", kind: "sources" }),
+  ],
+  general_overview: [
+    createHelixAskAnswerPlanSection({ id: "summary", title: "Summary", required: true, family: "general_overview", kind: "answer", requiredSlots: ["definition"] }),
+    createHelixAskAnswerPlanSection({ id: "evidence", title: "Evidence", required: true, family: "general_overview", kind: "mechanism", requiredSlots: ["mechanism"] }),
+    createHelixAskAnswerPlanSection({ id: "sources", title: "Sources", required: true, family: "general_overview", kind: "sources" }),
+  ],
+};
+
 const buildHelixAskObjectiveSectionTitle = (args: {
   family: HelixAskAnswerPlanFamily;
   objective: HelixAskTurnContractObjective;
