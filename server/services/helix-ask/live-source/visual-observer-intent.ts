@@ -1,0 +1,5 @@
+export const hasAskTurnVisualObserverProfileCue = (transcript: string): boolean =>
+  /\blive_env\.(?:configure_visual_observer_profile|apply_visual_observer_profile|query_visual_observer_profiles|test_visual_observer_profile|compare_visual_observer_profiles|request_visual_action_replay)\b/i.test(transcript) ||
+  /\b(?:visual\s+observer|observer\s+profile|observer\s+shades|visual\s+shades|shades\s+profile|action\s+replay|replay\s+(?:selected\s+)?frames?|minecraft\s+gameplay\s+observer|browser\s+workflow\s+observer|video\s+scene\s+observer|debug\s+ui\s+observer)\b/i.test(transcript) ||
+  /\b(?:put|use|apply|configure|set\s+up|setup|create|make|test|compare|replay|rerun)\b[\s\S]{0,120}\b(?:minecraft\s+shades|minecraft\s+gameplay\s+observer|visual\s+observer\s+profile|observer\s+shades|visual\s+shades|shades\s+prompt|capture\s+prompt|selected\s+frames?|recent\s+frames?)\b/i.test(transcript) ||
+  /\b(?:make|have)\b[\s\S]{0,120}\b(?:visual\s+capture|observer|vision|image\s+model)\b[\s\S]{0,120}\b(?:focus|look\s+for|watch)\b[\s\S]{0,120}\b(?:hud|hotbar|mobs?|health|hunger|fire|damage|minecraft|ui)\b/i.test(transcript);
