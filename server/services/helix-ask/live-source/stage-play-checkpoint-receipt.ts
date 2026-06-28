@@ -1,5 +1,6 @@
 import { readAskTurnArtifactPayloadRecord } from "../artifact-text";
 import { readAskTurnString } from "../value-readers";
+import type { RecordStagePlayAskCheckpointReceiptInput } from "../../stage-play/stage-play-ask-checkpoint-store";
 
 export type StagePlayCheckpointReceiptArtifactLike = {
   artifact_id: string;
@@ -128,4 +129,83 @@ export const collectStagePlaySourceWindowRefsForReceipt = (
       ...readStringList(source.evidenceRefs),
     ]),
   ].filter((entry): entry is string => Boolean(entry))));
+};
+
+export const buildStagePlayAskCheckpointReceiptPayload = (args: {
+  payload: Record<string, unknown>;
+  turnId: string;
+  artifacts: StagePlayCheckpointReceiptArtifactLike[];
+  finalAnswerDraft: { text?: unknown; authority?: unknown };
+  finalAnswerDraftRef: string;
+  createdAt: string;
+}): RecordStagePlayAskCheckpointReceiptInput | null => {
+  const stagePlay = readStagePlayReflectionObservationFromArtifacts(args.artifacts);
+  if (!stagePlay) return null;
+  const graph = readStagePlayGraphRecord(stagePlay.observation);
+  const sourceWindow = readStagePlaySourceWindowRecord(graph);
+  const liveAnswerProjection = readStagePlayLiveAnswerProjectionRecord(stagePlay.observation);
+  const debugReceipt =
+    stagePlay.observation.debugReceipt &&
+    typeof stagePlay.observation.debugReceipt === "object" &&
+    !Array.isArray(stagePlay.observation.debugReceipt)
+      ? (stagePlay.observation.debugReceipt as Record<string, unknown>)
+      : null;
+  const checkpointRequestId = readAskTurnString(debugReceipt?.checkpointRequestId);
+  const answerText = readAskTurnString(args.finalAnswerDraft.text);
+  const terminalArtifactKind = readAskTurnString(args.payload.terminal_artifact_kind);
+  const finalAnswerSource = readAskTurnString(args.payload.final_answer_source);
+  const draftAuthority = readAskTurnString(args.finalAnswerDraft.authority);
+  const completedSolverPath =
+    Boolean(args.payload.ask_turn_solver_trace) &&
+    Boolean(answerText) &&
+    draftAuthority !== "deterministic_receipt_fallback" &&
+    finalAnswerSource !== "typed_failure" &&
+    terminalArtifactKind !== "typed_failure" &&
+    (finalAnswerSource === "final_answer_draft" || finalAnswerSource === "model_direct_answer") &&
+    (terminalArtifactKind === "model_synthesized_answer" ||
+      terminalArtifactKind === "direct_answer_text" ||
+      terminalArtifactKind === "repo_code_evidence_answer");
+  if (!completedSolverPath) return null;
+
+  const threadId =
+    readAskTurnString(args.payload.thread_id) ??
+    readAskTurnString(args.payload.threadId) ??
+    readAskTurnString(args.payload.session_id) ??
+    readAskTurnString(args.payload.sessionId) ??
+    readAskTurnString(stagePlay.toolPayload.thread_id) ??
+    "helix-ask:desktop";
+  const environmentId =
+    readAskTurnString(liveAnswerProjection?.environmentId) ??
+    readAskTurnString(stagePlay.toolPayload.environment_id) ??
+    readAskTurnString(sourceWindow?.environmentId);
+
+  return {
+    threadId,
+    roomId: readAskTurnString(sourceWindow?.roomId),
+    environmentId,
+    graphId: readAskTurnString(graph?.graphId),
+    checkpointRequestId,
+    askTurnId: args.turnId,
+    solverTraceRef: `${args.turnId}:ask_turn_solver_trace`,
+    terminalArtifactKind,
+    finalAnswerSource,
+    completedSolverPath: true,
+    answerText,
+    evidenceRefs: collectStagePlayCheckpointEvidenceRefs({
+      stagePlayArtifact: stagePlay.artifact,
+      toolPayload: stagePlay.toolPayload,
+      observation: stagePlay.observation,
+      graph,
+      liveAnswerProjection,
+      turnId: args.turnId,
+      finalAnswerDraftRef: args.finalAnswerDraftRef,
+    }),
+    sourceWindowRefs: collectStagePlaySourceWindowRefsForReceipt(graph, sourceWindow),
+    sourceArtifactRefs: [
+      stagePlay.artifact.artifact_id,
+      args.finalAnswerDraftRef,
+      `${args.turnId}:ask_turn_solver_trace`,
+    ],
+    createdAt: args.createdAt,
+  };
 };

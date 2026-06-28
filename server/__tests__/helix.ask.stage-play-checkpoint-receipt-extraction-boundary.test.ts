@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  buildStagePlayAskCheckpointReceiptPayload,
   collectStagePlayCheckpointEvidenceRefs,
   collectStagePlaySourceWindowRefsForReceipt,
   readStagePlayGraphRecord,
@@ -21,17 +22,30 @@ describe("stage play checkpoint receipt extraction boundary", () => {
     const serviceSource = readFileSync(servicePath, "utf8");
 
     expect(routeSource).toContain("../services/helix-ask/live-source/stage-play-checkpoint-receipt");
+    expect(routeSource).toContain("buildStagePlayAskCheckpointReceiptPayload");
     expect(routeSource).not.toMatch(/const readStagePlayReflectionObservationFromArtifacts\s*=/);
     expect(routeSource).not.toMatch(/const readStagePlayGraphRecord\s*=/);
     expect(routeSource).not.toMatch(/const readStagePlaySourceWindowRecord\s*=/);
     expect(routeSource).not.toMatch(/const readStagePlayLiveAnswerProjectionRecord\s*=/);
     expect(routeSource).not.toMatch(/const collectStagePlayCheckpointEvidenceRefs\s*=/);
     expect(routeSource).not.toMatch(/const collectStagePlaySourceWindowRefsForReceipt\s*=/);
+    expect(routeSource).not.toMatch(/const stagePlay = readStagePlayReflectionObservationFromArtifacts\(args\.artifacts\)/);
+    expect(routeSource).not.toMatch(/const completedSolverPath\s*=\s*\n\s*Boolean\(args\.payload\.ask_turn_solver_trace\)/);
     expect(routeSource).toMatch(/const maybeRecordStagePlayAskCheckpointReceipt\s*=/);
+    expect(routeSource).toContain("recordStagePlayAskCheckpointReceipt(receiptPayload)");
+    expect(routeSource).toContain("completeStagePlayCheckpointRequestForGraph");
+    expect(routeSource).toContain("args.payload.stage_play_ask_checkpoint_receipt = receipt");
+    expect(routeSource).toContain("args.payload.stage_play_checkpoint_queue_completion = checkpointQueueCompletion");
 
     expect(serviceSource).toContain("export const readStagePlayReflectionObservationFromArtifacts");
     expect(serviceSource).toContain("export const collectStagePlayCheckpointEvidenceRefs");
+    expect(serviceSource).toContain("export const buildStagePlayAskCheckpointReceiptPayload");
+    expect(serviceSource).not.toContain("recordStagePlayAskCheckpointReceipt(");
+    expect(serviceSource).not.toContain("completeStagePlayCheckpointRequestForGraph");
+    expect(serviceSource).not.toContain("stage_play_checkpoint_queue_completion");
     expect(serviceSource).not.toContain("server/routes/agi.plan");
+    expect(serviceSource).not.toContain("../routes/agi.plan");
+    expect(serviceSource).not.toContain("../../routes/agi.plan");
   });
 
   it("reads the latest Stage Play reflection observation and preserves checkpoint refs", () => {
@@ -132,5 +146,34 @@ describe("stage play checkpoint receipt extraction boundary", () => {
       "screen:visual_frame",
       "source-ref",
     ]);
+
+    expect(buildStagePlayAskCheckpointReceiptPayload({
+      payload: {
+        ask_turn_solver_trace: { schema: "helix.ask_turn_solver_trace.v1" },
+        final_answer_source: "final_answer_draft",
+        terminal_artifact_kind: "model_synthesized_answer",
+        thread_id: "thread-1",
+      },
+      turnId: "ask:turn",
+      artifacts,
+      finalAnswerDraft: {
+        text: "Checkpoint answer",
+        authority: "model_synthesized",
+      },
+      finalAnswerDraftRef: "draft-ref",
+      createdAt: "2026-06-28T00:00:00.000Z",
+    })).toMatchObject({
+      threadId: "thread-1",
+      environmentId: "env-1",
+      graphId: "graph-1",
+      askTurnId: "ask:turn",
+      solverTraceRef: "ask:turn:ask_turn_solver_trace",
+      terminalArtifactKind: "model_synthesized_answer",
+      finalAnswerSource: "final_answer_draft",
+      completedSolverPath: true,
+      answerText: "Checkpoint answer",
+      sourceArtifactRefs: ["reflection-artifact", "draft-ref", "ask:turn:ask_turn_solver_trace"],
+      createdAt: "2026-06-28T00:00:00.000Z",
+    });
   });
 });
