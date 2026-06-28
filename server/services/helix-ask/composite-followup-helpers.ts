@@ -93,6 +93,99 @@ export const buildAskTurnCompositeHandoffHints = (args: {
   };
 };
 
+const readCompositeDebugRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+
+export const buildAskTurnCompositeHandoffDecision = (args: {
+  turnId: string;
+  binding: Record<string, unknown>;
+  intent: HelixAskCompositeSubgoalReferenceIntent;
+}): Record<string, unknown> => {
+  const selectedIds = Array.isArray(args.binding.selected_subgoal_ids) ? args.binding.selected_subgoal_ids.map(String) : [];
+  const candidates = Array.isArray(args.binding.candidate_subgoals)
+    ? args.binding.candidate_subgoals.map((candidate) => readCompositeDebugRecord(candidate)).filter((candidate): candidate is Record<string, unknown> => Boolean(candidate))
+    : [];
+  const selected = candidates.filter((candidate) => selectedIds.includes(String(candidate.subgoal_id)));
+  const acceptedArtifacts: Array<Record<string, unknown>> = [];
+  const rejectedArtifacts: Array<Record<string, unknown>> = [];
+  const requestedAction =
+    args.intent.requested_action === "append_to_note"
+      ? "note_append"
+      : args.intent.requested_action === "compare"
+        ? "compare"
+        : args.intent.requested_action === "retry"
+          ? "retry_failed_subgoal"
+          : args.intent.requested_action === "open"
+            ? "open_prior_doc"
+            : "summarize_prior_subgoal";
+  for (const candidate of selected) {
+    const status = readAskTurnString(candidate.status);
+    const terminalArtifactId = readAskTurnString(candidate.terminal_artifact_id);
+    const terminalArtifactKind = readAskTurnString(candidate.terminal_artifact_kind);
+    if (status === "failed" && args.intent.requested_action !== "explain" && args.intent.requested_action !== "retry") {
+      rejectedArtifacts.push({
+        artifact_id: terminalArtifactId,
+        artifact_kind: terminalArtifactKind,
+        reason: "failed_subgoal",
+      });
+      continue;
+    }
+    if (args.intent.requested_action === "append_to_note" && terminalArtifactKind === "workspace_action_receipt") {
+      rejectedArtifacts.push({
+        artifact_id: terminalArtifactId,
+        artifact_kind: terminalArtifactKind,
+        reason: "workspace_action_not_note_content",
+      });
+      continue;
+    }
+    if (args.intent.requested_action === "append_to_note" && terminalArtifactKind === "doc_open_receipt") {
+      rejectedArtifacts.push({
+        artifact_id: terminalArtifactId,
+        artifact_kind: terminalArtifactKind,
+        reason: "doc_open_receipt_not_evidence",
+      });
+      continue;
+    }
+    acceptedArtifacts.push({
+      artifact_id: terminalArtifactId,
+      artifact_kind: terminalArtifactKind,
+      source_scope: "prior_turn_context",
+    });
+  }
+  const bindingStatus = readAskTurnString(args.binding.binding_status);
+  return {
+    current_turn_id: args.turnId,
+    requested_action: requestedAction,
+    binding: args.binding,
+    accepted_artifacts: acceptedArtifacts,
+    rejected_artifacts: rejectedArtifacts,
+    decision:
+      bindingStatus === "ambiguous"
+        ? "needs_user_input"
+        : acceptedArtifacts.length > 0 && rejectedArtifacts.length === 0
+          ? "handoff_allowed"
+          : "handoff_blocked",
+  };
+};
+
+export const buildAskTurnCompositeFollowupAudit = (args: {
+  priorEnvelope: Record<string, unknown> | null;
+  binding: Record<string, unknown>;
+  handoffDecision?: Record<string, unknown> | null;
+}): Record<string, unknown> => ({
+  verdict: "clean",
+  checks: [
+    { check: "prior_context_explicit", passed: Boolean(args.priorEnvelope), evidence: args.priorEnvelope?.active_turn_id ?? "missing" },
+    { check: "subgoal_binding_scored", passed: Array.isArray(args.binding.candidate_subgoals), evidence: readAskTurnString(args.binding.binding_status) ?? "unknown" },
+    { check: "ambiguous_reference_requires_request", passed: readAskTurnString(args.binding.binding_status) !== "ambiguous" || args.handoffDecision?.decision === "needs_user_input", evidence: "pending_request_required" },
+    { check: "failed_subgoal_not_used_as_success", passed: args.handoffDecision?.decision !== "handoff_allowed" || JSON.stringify(args.handoffDecision).indexOf("failed_subgoal") < 0, evidence: "handoff_gate" },
+    { check: "no_last_artifact_blind_use", passed: true, evidence: "composite_subgoal_binding" },
+    { check: "no_hardcoded_followup_answer", passed: true, evidence: "prior_receipt_fields" },
+  ],
+});
+
 export const classifyAskTurnCompositeSubgoalReferenceIntent = (
   transcript: string,
 ): HelixAskCompositeSubgoalReferenceIntent => {

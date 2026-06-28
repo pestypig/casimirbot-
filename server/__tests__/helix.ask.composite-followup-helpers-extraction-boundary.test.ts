@@ -3,6 +3,8 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   buildAskTurnCompositeHandoffHints,
+  buildAskTurnCompositeFollowupAudit,
+  buildAskTurnCompositeHandoffDecision,
   classifyAskTurnCompositeSubgoalReferenceIntent,
   findAskTurnCompositeTerminalArtifact,
   summarizeAskTurnCompositeArtifact,
@@ -22,11 +24,14 @@ describe("composite followup helpers extraction boundary", () => {
     expect(routeSource).not.toMatch(/const summarizeAskTurnCompositeArtifact\s*=/);
     expect(routeSource).not.toMatch(/const buildAskTurnCompositeHandoffHints\s*=/);
     expect(routeSource).not.toMatch(/const classifyAskTurnCompositeSubgoalReferenceIntent\s*=/);
+    expect(routeSource).not.toMatch(/const buildAskTurnCompositeHandoffDecision\s*=/);
+    expect(routeSource).not.toMatch(/const buildAskTurnCompositeFollowupAudit\s*=/);
     expect(routeSource).toMatch(/const applyAskTurnCompositeTerminalReceipt\s*=/);
-    expect(routeSource).toMatch(/const buildAskTurnCompositeHandoffDecision\s*=/);
 
     expect(serviceSource).toContain("export const findAskTurnCompositeTerminalArtifact");
     expect(serviceSource).toContain("export const classifyAskTurnCompositeSubgoalReferenceIntent");
+    expect(serviceSource).toContain("export const buildAskTurnCompositeHandoffDecision");
+    expect(serviceSource).toContain("export const buildAskTurnCompositeFollowupAudit");
     expect(serviceSource).not.toContain("server/routes/agi.plan");
   });
 
@@ -81,6 +86,37 @@ describe("composite followup helpers extraction boundary", () => {
       reference_kind: "that_result",
       requested_action: "append_to_note",
       confidence: "medium",
+    });
+
+    const handoffDecision = buildAskTurnCompositeHandoffDecision({
+      turnId: "ask:turn",
+      intent: { required: true, reference_kind: "that_result", requested_action: "append_to_note", confidence: "high" },
+      binding: {
+        binding_status: "matched",
+        selected_subgoal_ids: ["subgoal-1", "subgoal-2"],
+        candidate_subgoals: [
+          { subgoal_id: "subgoal-1", terminal_artifact_id: "receipt-1", terminal_artifact_kind: "workspace_action_receipt" },
+          { subgoal_id: "subgoal-2", terminal_artifact_id: "evidence-1", terminal_artifact_kind: "doc_evidence_synthesis_answer" },
+        ],
+      },
+    });
+    expect(handoffDecision).toMatchObject({
+      current_turn_id: "ask:turn",
+      requested_action: "note_append",
+      decision: "handoff_blocked",
+      accepted_artifacts: [{ artifact_id: "evidence-1", artifact_kind: "doc_evidence_synthesis_answer" }],
+      rejected_artifacts: [{ artifact_id: "receipt-1", artifact_kind: "workspace_action_receipt", reason: "workspace_action_not_note_content" }],
+    });
+    expect(buildAskTurnCompositeFollowupAudit({
+      priorEnvelope: { active_turn_id: "ask:prior" },
+      binding: { binding_status: "matched", candidate_subgoals: [] },
+      handoffDecision,
+    })).toMatchObject({
+      verdict: "clean",
+      checks: expect.arrayContaining([
+        expect.objectContaining({ check: "prior_context_explicit", passed: true }),
+        expect.objectContaining({ check: "failed_subgoal_not_used_as_success", passed: true }),
+      ]),
     });
   });
 });
