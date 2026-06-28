@@ -167,3 +167,42 @@ export const collectStagePlayCurrentBatchMailIds = (artifacts: AskTurnLiveSource
   }
   return uniqueAskTurnStrings(mailIds);
 };
+
+export const processedMailReadObservationHasPacket = (
+  observation: Record<string, unknown> | null | undefined,
+): boolean => {
+  const packetRefs = uniqueAskTurnStrings([
+    ...readAskTurnStringList(observation?.processedPacketRefs),
+    ...readAskTurnStringList(observation?.processed_packet_refs),
+  ]);
+  if (packetRefs.some((ref) => /^stage_play_processed_mail_packet:/i.test(ref))) return true;
+  const packets = Array.isArray(observation?.packets)
+    ? observation.packets.filter((packet): packet is Record<string, unknown> =>
+        Boolean(packet && typeof packet === "object" && !Array.isArray(packet)),
+      )
+    : [];
+  return packets.some(stagePlayProcessedMailPacketHasSatisfyingContent);
+};
+
+export const processedMailReadObservationMissingRawMailIds = (
+  observation: Record<string, unknown> | null | undefined,
+): string[] => uniqueAskTurnStrings([
+  ...readAskTurnStringList(observation?.missingRawMailIds),
+  ...readAskTurnStringList(observation?.missing_raw_mail_ids),
+]);
+
+export const processedMailReadObservationNeedsProcessFallback = (
+  observation: Record<string, unknown> | null | undefined,
+): boolean => {
+  if (!observation || processedMailReadObservationHasPacket(observation)) return false;
+  const fallbackTool = readAskTurnString(observation.fallbackTool ?? observation.fallback_tool);
+  const schema = readAskTurnString(observation.schema ?? observation.schemaVersion);
+  return (
+    fallbackTool === "live_env.process_live_source_mail" ||
+    processedMailReadObservationMissingRawMailIds(observation).length > 0 ||
+    (
+      schema === "stage_play_processed_live_source_mail_read_result/v1" &&
+      observation.ok !== true
+    )
+  );
+};

@@ -9,6 +9,9 @@ import {
   collectStagePlayMailIdsFromRecord,
   isStagePlayLiveSourceMailReadObservationArtifact,
   latestStagePlayProcessedMailPacketRecordFromArtifacts,
+  processedMailReadObservationHasPacket,
+  processedMailReadObservationMissingRawMailIds,
+  processedMailReadObservationNeedsProcessFallback,
   readAskTurnLiveEnvironmentObservationRecord,
   readStagePlayProcessedMailPacketRecommendedNext,
   readStagePlayProcessedMailPacketRecordsFromArtifact,
@@ -34,6 +37,9 @@ describe("Helix Ask live-source mail observation reader extraction boundary", ()
     expect(routeSource).not.toMatch(/const\s+latestStagePlayProcessedMailPacketRecordFromArtifacts\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+collectStagePlayMailIdsFromRecord\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+collectStagePlayCurrentBatchMailIds\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+processedMailReadObservationHasPacket\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+processedMailReadObservationMissingRawMailIds\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+processedMailReadObservationNeedsProcessFallback\s*=\s*\(/);
     expect(routeSource).not.toContain("STAGE_PLAY_PROCESSED_MAIL_RECOMMENDATIONS_REQUIRING_DECISION");
     expect(serviceSource).toMatch(/export\s+const\s+readAskTurnLiveEnvironmentObservationRecord\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+readStagePlayProcessedMailPacketRecordsFromArtifact\s*=/);
@@ -42,6 +48,9 @@ describe("Helix Ask live-source mail observation reader extraction boundary", ()
     expect(serviceSource).toMatch(/export\s+const\s+latestStagePlayProcessedMailPacketRecordFromArtifacts\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+collectStagePlayMailIdsFromRecord\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+collectStagePlayCurrentBatchMailIds\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+processedMailReadObservationHasPacket\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+processedMailReadObservationMissingRawMailIds\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+processedMailReadObservationNeedsProcessFallback\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");
     expect(serviceSource).not.toContain("../../../routes/agi.plan");
     expect(serviceSource).not.toContain("../../routes/agi.plan");
@@ -159,5 +168,37 @@ describe("Helix Ask live-source mail observation reader extraction boundary", ()
         },
       },
     ])).toEqual(["mail:payload", "mail:observation", "mail:packet", "mail:item"]);
+  });
+
+  it("preserves processed-mail packet and process-fallback observation predicates", () => {
+    expect(processedMailReadObservationHasPacket({
+      processedPacketRefs: ["stage_play_processed_mail_packet:ref"],
+    })).toBe(true);
+    expect(processedMailReadObservationHasPacket({
+      packets: [{ packetId: "stage_play_processed_mail_packet:packet", observedFacts: ["visible"] }],
+    })).toBe(true);
+    expect(processedMailReadObservationHasPacket({
+      packets: [{ packetId: "stage_play_processed_mail_packet:empty" }],
+    })).toBe(false);
+
+    expect(processedMailReadObservationMissingRawMailIds({
+      missingRawMailIds: ["mail:1", ""],
+      missing_raw_mail_ids: ["mail:2", "mail:1"],
+    })).toEqual(["mail:1", "mail:2"]);
+
+    expect(processedMailReadObservationNeedsProcessFallback({
+      fallbackTool: "live_env.process_live_source_mail",
+    })).toBe(true);
+    expect(processedMailReadObservationNeedsProcessFallback({
+      missing_raw_mail_ids: ["mail:missing"],
+    })).toBe(true);
+    expect(processedMailReadObservationNeedsProcessFallback({
+      schema: "stage_play_processed_live_source_mail_read_result/v1",
+      ok: false,
+    })).toBe(true);
+    expect(processedMailReadObservationNeedsProcessFallback({
+      processed_packet_refs: ["stage_play_processed_mail_packet:done"],
+      fallbackTool: "live_env.process_live_source_mail",
+    })).toBe(false);
   });
 });
