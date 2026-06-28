@@ -235,3 +235,85 @@ export const processedMailReadObservationNeedsProcessFallback = (
     )
   );
 };
+
+export const isStagePlayLiveSourceMailDecisionObservationArtifact = (
+  artifact: AskTurnLiveSourceArtifactLike,
+): boolean => {
+  const observation = readAskTurnLiveEnvironmentObservationRecord(artifact);
+  const payload = readAskTurnArtifactPayloadRecord(artifact);
+  return (
+    artifact.kind === "stage_play_live_source_mail_decision" ||
+    readAskTurnString(payload?.artifactId) === "stage_play_live_source_mail_decision" ||
+    readAskTurnString(payload?.schemaVersion) === "stage_play_live_source_mail_decision/v1" ||
+    readAskTurnString(observation?.artifactId) === "stage_play_live_source_mail_decision" ||
+    readAskTurnString(observation?.schemaVersion) === "stage_play_live_source_mail_decision/v1" ||
+    Boolean(readAskTurnString(observation?.decisionId ?? payload?.decisionId))
+  );
+};
+
+export const isStagePlayLiveSourceWatchJobPolicyObservationArtifact = (
+  artifact: AskTurnLiveSourceArtifactLike,
+): boolean => {
+  const payload = artifact.kind === "live_environment_tool_observation"
+    ? readAskTurnArtifactPayloadRecord(artifact)
+    : null;
+  const observation = readAskTurnLiveEnvironmentObservationRecord(artifact);
+  const policy = observation?.policy && typeof observation.policy === "object" && !Array.isArray(observation.policy)
+    ? observation.policy as Record<string, unknown>
+    : null;
+  return (
+    (
+      readAskTurnString(payload?.tool_name) === "live_env.configure_live_source_watch_job" &&
+      payload?.ok !== false
+    ) ||
+    readAskTurnString(observation?.artifactId) === "stage_play_live_source_watch_job_policy_result" ||
+    readAskTurnString(observation?.artifactId) === "stage_play_live_source_watch_job_policy_config_result" ||
+    readAskTurnString(observation?.schemaVersion) === "stage_play_live_source_watch_job_policy_result/v1" ||
+    readAskTurnString(observation?.schemaVersion) === "stage_play_live_source_watch_job_policy_config_result/v1" ||
+    readAskTurnString(observation?.schema) === "stage_play_live_source_watch_job_policy_config_result/v1" ||
+    readAskTurnString(policy?.artifactId) === "stage_play_live_source_watch_job_policy" ||
+    readAskTurnString(policy?.schemaVersion) === "stage_play_live_source_watch_job_policy/v1" ||
+    Boolean(readAskTurnString(observation?.watchJobPolicyRef ?? observation?.watch_job_policy_ref))
+  );
+};
+
+export const isStagePlayInterpreterProfileConfigObservationArtifact = (
+  artifact: AskTurnLiveSourceArtifactLike,
+): boolean => {
+  const payload = artifact.kind === "live_environment_tool_observation"
+    ? readAskTurnArtifactPayloadRecord(artifact)
+    : null;
+  const observation = readAskTurnLiveEnvironmentObservationRecord(artifact);
+  const profile = observation?.profile && typeof observation.profile === "object" && !Array.isArray(observation.profile)
+    ? observation.profile as Record<string, unknown>
+    : null;
+  return (
+    (
+      readAskTurnString(payload?.tool_name) === "live_env.configure_interpreter_profile" &&
+      payload?.ok !== false
+    ) ||
+    readAskTurnString(observation?.artifactId) === "stage_play_interpreter_profile_config_result" ||
+    readAskTurnString(observation?.schema) === "stage_play_interpreter_profile_config_result/v1" ||
+    readAskTurnString(profile?.artifactId) === "stage_play_live_source_interpreter_profile" ||
+    readAskTurnString(profile?.schemaVersion) === "stage_play_live_source_interpreter_profile/v1" ||
+    Boolean(readAskTurnString(observation?.interpreterProfileRef ?? observation?.interpreter_profile_ref))
+  );
+};
+
+export const isStagePlayInterpreterProfileComparisonObservationArtifact = (
+  artifact: AskTurnLiveSourceArtifactLike,
+): boolean => {
+  const payload = artifact.kind === "live_environment_tool_observation"
+    ? readAskTurnArtifactPayloadRecord(artifact)
+    : null;
+  const observation = readAskTurnLiveEnvironmentObservationRecord(artifact);
+  return (
+    (
+      readAskTurnString(payload?.tool_name) === "live_env.compare_mail_to_interpreter_profile" &&
+      payload?.ok !== false
+    ) ||
+    readAskTurnString(observation?.artifactId) === "stage_play_live_source_interpreter_profile_comparison" ||
+    readAskTurnString(observation?.schemaVersion) === "stage_play_live_source_interpreter_profile_comparison/v1" ||
+    Boolean(readAskTurnString(observation?.comparisonId))
+  );
+};

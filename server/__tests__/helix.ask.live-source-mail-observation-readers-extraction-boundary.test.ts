@@ -8,7 +8,11 @@ import {
   artifactIndexInList,
   collectStagePlayCurrentBatchMailIds,
   collectStagePlayMailIdsFromRecord,
+  isStagePlayInterpreterProfileComparisonObservationArtifact,
+  isStagePlayInterpreterProfileConfigObservationArtifact,
   isStagePlayLiveSourceMailReadObservationArtifact,
+  isStagePlayLiveSourceMailDecisionObservationArtifact,
+  isStagePlayLiveSourceWatchJobPolicyObservationArtifact,
   latestLiveEnvironmentToolObservationArtifact,
   latestLiveEnvironmentToolObservationRecord,
   latestStagePlayProcessedMailPacketRecordFromArtifacts,
@@ -46,6 +50,10 @@ describe("Helix Ask live-source mail observation reader extraction boundary", ()
     expect(routeSource).not.toMatch(/const\s+latestLiveEnvironmentToolObservationArtifact\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+latestLiveEnvironmentToolObservationRecord\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+artifactIndexInList\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+isStagePlayLiveSourceMailDecisionObservationArtifact\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+isStagePlayLiveSourceWatchJobPolicyObservationArtifact\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+isStagePlayInterpreterProfileConfigObservationArtifact\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+isStagePlayInterpreterProfileComparisonObservationArtifact\s*=\s*\(/);
     expect(routeSource).not.toContain("STAGE_PLAY_PROCESSED_MAIL_RECOMMENDATIONS_REQUIRING_DECISION");
     expect(serviceSource).toMatch(/export\s+const\s+readAskTurnLiveEnvironmentObservationRecord\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+readStagePlayProcessedMailPacketRecordsFromArtifact\s*=/);
@@ -60,6 +68,10 @@ describe("Helix Ask live-source mail observation reader extraction boundary", ()
     expect(serviceSource).toMatch(/export\s+const\s+latestLiveEnvironmentToolObservationArtifact\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+latestLiveEnvironmentToolObservationRecord\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+artifactIndexInList\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+isStagePlayLiveSourceMailDecisionObservationArtifact\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+isStagePlayLiveSourceWatchJobPolicyObservationArtifact\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+isStagePlayInterpreterProfileConfigObservationArtifact\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+isStagePlayInterpreterProfileComparisonObservationArtifact\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");
     expect(serviceSource).not.toContain("../../../routes/agi.plan");
     expect(serviceSource).not.toContain("../../routes/agi.plan");
@@ -252,5 +264,73 @@ describe("Helix Ask live-source mail observation reader extraction boundary", ()
     expect(artifactIndexInList(artifacts, latest)).toBe(2);
     expect(artifactIndexInList(artifacts, null)).toBe(-1);
     expect(latestLiveEnvironmentToolObservationArtifact(artifacts, "live_env.missing")).toBeNull();
+  });
+
+  it("preserves live-source decision and profile artifact predicates", () => {
+    expect(isStagePlayLiveSourceMailDecisionObservationArtifact({
+      kind: "stage_play_live_source_mail_decision",
+      payload: {},
+    })).toBe(true);
+    expect(isStagePlayLiveSourceMailDecisionObservationArtifact({
+      kind: "live_environment_tool_observation",
+      payload: {
+        observation: { decisionId: "decision:1" },
+      },
+    })).toBe(true);
+
+    expect(isStagePlayLiveSourceWatchJobPolicyObservationArtifact({
+      kind: "live_environment_tool_observation",
+      payload: {
+        ok: true,
+        tool_name: "live_env.configure_live_source_watch_job",
+        observation: {},
+      },
+    })).toBe(true);
+    expect(isStagePlayLiveSourceWatchJobPolicyObservationArtifact({
+      kind: "live_environment_tool_observation",
+      payload: {
+        observation: {
+          policy: {
+            artifactId: "stage_play_live_source_watch_job_policy",
+          },
+        },
+      },
+    })).toBe(true);
+
+    expect(isStagePlayInterpreterProfileConfigObservationArtifact({
+      kind: "live_environment_tool_observation",
+      payload: {
+        ok: true,
+        tool_name: "live_env.configure_interpreter_profile",
+        observation: {},
+      },
+    })).toBe(true);
+    expect(isStagePlayInterpreterProfileConfigObservationArtifact({
+      kind: "live_environment_tool_observation",
+      payload: {
+        observation: {
+          profile: {
+            schemaVersion: "stage_play_live_source_interpreter_profile/v1",
+          },
+        },
+      },
+    })).toBe(true);
+
+    expect(isStagePlayInterpreterProfileComparisonObservationArtifact({
+      kind: "live_environment_tool_observation",
+      payload: {
+        ok: true,
+        tool_name: "live_env.compare_mail_to_interpreter_profile",
+        observation: {},
+      },
+    })).toBe(true);
+    expect(isStagePlayInterpreterProfileComparisonObservationArtifact({
+      kind: "live_environment_tool_observation",
+      payload: {
+        observation: {
+          comparisonId: "comparison:1",
+        },
+      },
+    })).toBe(true);
   });
 });
