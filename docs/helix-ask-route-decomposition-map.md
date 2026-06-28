@@ -2,7 +2,7 @@
 
 Status: current-head map for structural extraction and decomposition-enabler work.
 
-Pinned source state described: S241 goal-frame string reader extraction.
+Pinned source state described: S242 capability-key parser extraction.
 
 Snapshot command: `npx tsx scripts/helix-ask-route-inventory.ts --write`
 
@@ -11,8 +11,8 @@ Route snapshot:
 | Metric | Value |
 | --- | ---: |
 | File | `server/routes/agi.plan.ts` |
-| Lines | 174,866 |
-| Bytes | 8,018,885 |
+| Lines | 174,858 |
+| Bytes | 8,018,626 |
 | Top-level helper estimate | 283 helper blocks |
 | Route inventory | `artifacts/helix-ask-route-inventory.json` |
 | Machine-readable map | `artifacts/helix-ask-route-decomposition-map.json` |
@@ -30,6 +30,7 @@ Do not extract `runHelixAgentTurnRuntimeLoop` in this wave. Do not patch termina
 | `live-debug-slim` | service-owned | `DEBUG_EXPORT` | `MEDIUM_LOW` | `EXTRACTED` | `server/services/helix-ask/debug/live-debug-slim.ts` | Extracted by S93. Route still owns debug-mode parsing and response wrapper ordering. |
 | `transcript-events` | service-owned | `UI_API_PROJECTION` | `MEDIUM_LOW` | `EXTRACTED` | `server/services/helix-ask/runtime/transcript-events.ts` | Extracted by S94. S229 moved incremental event completion, prompt/turn/trace inference, meaningful-row detection, and single-event transcript projection into the same owner. Route retains transcript scaffold/finalization ordering, response transport, terminal projection, and debug envelope ordering. |
 | `decision-source-map` | service-owned | `SOLVER_CONTROL` | `MEDIUM` | `EXTRACTED` | `server/services/helix-ask/runtime/decision-source-map.ts` plus sibling runtime decision modules | S95 moved the debug map builder. S96 moved the pure runtime/terminal source mappers. S99 moved capability selection. S100 moved observation-decision. |
+| `capability-key-parser` | service-owned | `TOOL_EXECUTION_SUPPORT` / `CAPABILITY_PLANNING_SUPPORT` | `LOW` | `EXTRACTED` | `server/services/helix-ask/tool-router/capability-key.ts` | S242 moved the pure capability-key panel/action parser into a dedicated tool-router support service. It does not move capability selection, tool validation, tool execution, observation materialization, source admission, terminal materialization, terminal authority, or projection behavior. |
 | `runtime-intent-packet` | service-owned | `CONTINUATION_SOLVER_HANDOFF` | `MEDIUM` | `EXTRACTED` | `server/services/helix-ask/runtime/runtime-intent-packet.ts` | S131 moved runtime-intent packet readers, source/capability turn predicates, packet assembly, ledger/debug append, and audit-refresh handoff through a four-callback dependency interface. It does not move runtime-loop orchestration, tool execution, goal satisfaction, terminal materialization, or terminal authority. |
 | `runtime-continuation-hints` | service-owned | `CONTINUATION_SOLVER_HANDOFF` | `MEDIUM` | `EXTRACTED` | `server/services/helix-ask/runtime/runtime-continuation-hints.ts` | S132 moved runtime continuation hint construction, append/ledger/debug writes, agent-step decision collection, hint-to-decision matching, and migration marking through a seven-callback dependency interface. S133 moved continuation-hint observation-ref matching into the same owner with route-supplied artifact/path/string readers. It does not move tool execution, model sampling, retry policy, terminal materialization, or terminal authority. |
 | `runtime-goal-satisfaction-observation` | service-owned | `GOAL_SATISFACTION` / `OBSERVATION_MATERIALIZATION` | `MEDIUM` | `EXTRACTED` | `server/services/helix-ask/runtime/runtime-goal-satisfaction-observation.ts` | S134 moved missing-requirement collection and runtime goal-satisfaction observation payload/ledger/debug append through a five-callback dependency interface. It does not move the goal-satisfaction evaluator, terminal contract policy, runtime-loop orchestration, tool execution, terminal materialization, terminal authority, or projection behavior. |
@@ -89,6 +90,7 @@ Do not extract `runHelixAgentTurnRuntimeLoop` in this wave. Do not patch termina
 | `goal-frame-hash-formatter` | `canonical-goal-frame` | service-owned | Format the stable current-turn goal hash from goal kind and normalized prompt text. | Extracted by S102 as a pure goal-frame formatter; no policy classification moved. | `EXTRACTED` |
 | `goal-frame-string-reader` | `canonical-goal-frame` | service-owned | Read a trimmed non-empty goal-frame/workspace action string value. | Extracted by S241 as a pure value reader in the goal-frame reader owner; no workspace mutation planning or canonical goal policy moved. | `EXTRACTED` |
 | `capability-selection-result` | `decision-source-map` | service-owned | Select expected capability from universal goal frame and optional selected action. | Extracted by S99 behind a 5-callback dependency interface for route-local goal/panel readers and workstation planner. | `EXTRACTED` |
+| `capability-key-parser` | `legacy-private-runtime-loop` / `tool execution dispatch` | service-owned | Split a runtime `capability_key` into panel/action fallback parts for tool observation packets. | Extracted by S242 as pure parsing support; it does not select, admit, validate, or execute the tool. | `EXTRACTED` |
 | `observation-decision` | `decision-source-map` | service-owned | Convert runtime observations, missing artifacts, pending requests, and next planned step into continue/finalize/input/failure decision. | Extracted by S100 behind invocation-time wrappers for shared route artifact collectors. | `EXTRACTED` |
 | `runtime-intent-packet` | `legacy-private-runtime-loop` / debug export | service-owned | Build the non-authoritative runtime handoff packet, source/capability turn predicates, ledger/debug append, and audit-refresh pointer. | Extracted by S131 behind a four-callback dependency interface for route string reading, terminal-contract fallback, hashing, and ledger merge. | `EXTRACTED` |
 | `runtime-continuation-hints` | `legacy-private-runtime-loop` / solver handoff | service-owned | Build non-authoritative continuation hints, append them to payload/ledger/debug, collect agent decisions, match accepted hints, mark migration status, and match observed artifact refs for accepted hints. | Extracted by S132-S133 behind route callbacks for capability keys, decision args, string reads, artifact payloads, doc-path normalization, hashing, ledger merge, and time. | `EXTRACTED` |
