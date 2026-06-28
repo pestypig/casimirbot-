@@ -6,6 +6,10 @@ import {
   buildStagePlayMailBatchTextAnswerDraft,
   buildStagePlayMailVoiceCalloutCandidate,
   compactStagePlayMailSummarySentence,
+  formatStagePlayAnswerList,
+  formatStagePlayNarrativeTerminalAnswer,
+  liveSourceMailModelAnswerConflictsWithDecision,
+  normalizeLiveSourceMailWaitWording,
   formatStagePlayMailUserRelevantMeaning,
   stagePlayWatchPolicyWantsTextForEveryMailBatch,
 } from "../services/helix-ask/live-source/mail-answer-drafts";
@@ -27,6 +31,14 @@ describe("Helix Ask live-source mail answer draft extraction boundary", () => {
     expect(routeSource).not.toMatch(/const\s+buildStagePlayMailVoiceCalloutCandidate\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+formatStagePlayMailUserRelevantMeaning\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+buildStagePlayMailBatchInterpretationPayload\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+buildHelixRuntimeLiveSourceMailFallbackText\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+buildHelixRuntimeProcessedMailTerminalText\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+formatStagePlayAnswerList\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+formatStagePlayNarrativeTerminalAnswer\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+latestHelixRuntimeLiveSourceMailTextAnswerDraft\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+latestHelixRuntimeLiveSourceMailInterpretationText\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+normalizeLiveSourceMailWaitWording\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+liveSourceMailModelAnswerConflictsWithDecision\s*=\s*\(/);
     expect(serviceSource).toMatch(/export\s+const\s+stagePlayWatchPolicyWantsTextForEveryMailBatch\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+compactStagePlayMailSummarySentence\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+buildStagePlayMailBatchTextAnswerDraft\s*=/);
@@ -34,6 +46,14 @@ describe("Helix Ask live-source mail answer draft extraction boundary", () => {
     expect(serviceSource).toMatch(/export\s+const\s+buildStagePlayMailVoiceCalloutCandidate\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+formatStagePlayMailUserRelevantMeaning\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+buildStagePlayMailBatchInterpretationPayload\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+buildHelixRuntimeLiveSourceMailFallbackText\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+buildHelixRuntimeProcessedMailTerminalText\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+formatStagePlayAnswerList\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+formatStagePlayNarrativeTerminalAnswer\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+latestHelixRuntimeLiveSourceMailTextAnswerDraft\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+latestHelixRuntimeLiveSourceMailInterpretationText\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+normalizeLiveSourceMailWaitWording\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+liveSourceMailModelAnswerConflictsWithDecision\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");
     expect(serviceSource).not.toContain("../../../routes/agi.plan");
     expect(serviceSource).not.toContain("../../routes/agi.plan");
@@ -121,5 +141,33 @@ describe("Helix Ask live-source mail answer draft extraction boundary", () => {
         reason: "Multiple unread mail items interpreted as a time-ordered observation batch.",
       },
     });
+  });
+
+  it("preserves stage-play terminal text helpers", () => {
+    expect(formatStagePlayAnswerList([" mail-1 ", "mail-2", "mail-1"])).toBe("mail-1 and mail-2");
+    expect(formatStagePlayNarrativeTerminalAnswer({
+      narrativeState: {
+        currentSceneSummary: "The screen shows a config panel.",
+        interpretedSituation: {
+          userRelevantMeaning: "The visual source appears to show the current live frame.",
+        },
+        prediction: { text: "The next mail should clarify whether it changes." },
+        watchNext: { reason: "Watch next for a route change." },
+        mailCoverage: {
+          mode: "chronological_batch",
+          interpretedMailIds: ["mail-1", "mail-2"],
+        },
+      },
+    })).toBe(
+      "I interpreted the current chronological batch mail batch as The screen shows a config panel. The checkpoint meaning is: The current live frame. Prediction: The next mail should clarify whether it changes. Watch next for a route change.",
+    );
+    expect(normalizeLiveSourceMailWaitWording(
+      "Wait for next visual summary.",
+      "Live-source mail decision recorded: wait_for_next_summary.\nLoop state: armed for next source update.",
+    )).toBe("Wait for next source update.");
+    expect(liveSourceMailModelAnswerConflictsWithDecision(
+      "Live-source mail decision recorded: wait_for_next_summary.",
+      "Live-source mail decision recorded: draft_text_answer.\nText draft: The source changed.",
+    )).toBe(true);
   });
 });
