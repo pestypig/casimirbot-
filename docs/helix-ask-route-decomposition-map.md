@@ -2,7 +2,7 @@
 
 Status: current-head map for structural extraction and decomposition-enabler work.
 
-Pinned source state described: S176 doc-open-query-readers extraction.
+Pinned source state described: S197 compare-action-intent-readers extraction.
 
 Snapshot command: `npx tsx scripts/helix-ask-route-inventory.ts --write`
 
@@ -11,8 +11,8 @@ Route snapshot:
 | Metric | Value |
 | --- | ---: |
 | File | `server/routes/agi.plan.ts` |
-| Lines | 176,562 |
-| Bytes | 7,923,818 |
+| Lines | 176,301 |
+| Bytes | 8,081,155 |
 | Top-level helper estimate | 303 helper blocks |
 | Route inventory | `artifacts/helix-ask-route-inventory.json` |
 | Machine-readable map | `artifacts/helix-ask-route-decomposition-map.json` |
@@ -151,17 +151,28 @@ These regions are mapped for future ownership proof only. They must not be extra
 | `executeHelixAsk` | request normalization, context assembly, route candidates, source/product contract, tool/retrieval execution, observation ledger, post-tool synthesis, solver-controller reconciliation, hard gates, terminal materialization, terminal authority, response payload | future engine band modules; no canonical runtime module |
 | `handleAskTurnRequest` | HTTP/body/auth/context intake, short-circuit branches, Ask execution call, response capture, debug/export projection, UI/live payload preparation, transport return | route shell plus small response helpers only |
 
-## Ready Batch
+## Current Wave Checkpoint
 
-The current low-risk batch is intentionally small and ordered by structural risk:
+S190-S197 completed the current prompt-interpretation extraction wave without
+moving source admission, tool execution, terminal materialization, terminal
+authority, projection, live-source behavior, or keyed-server behavior.
 
-1. `live-debug-slim` - `EXTRACTED_S93`
-2. `transcript-events` - `EXTRACTED_S94`
-3. `decision-source-map` - `PARTIAL_EXTRACTED_S95_S96`
+Committed seams:
 
-This wave's next safe work should be characterization or dependency reduction, not direct movement of the high-risk bands.
+1. `active-doc-identity-reader` - `EXTRACTED_S190`
+2. `open-doc-goal-intent-reader` - `EXTRACTED_S191`
+3. `dottie-voice-readout-intent-reader` - `EXTRACTED_S192`
+4. `note-transfer-intent-readers` - `EXTRACTED_S193`
+5. `docs-read-aloud-intent-reader` - `EXTRACTED_S194`
+6. `generic-doc-compare-target-predicate` - `EXTRACTED_S195`
+7. `doc-notes-hybrid-compare-intent-reader` - `EXTRACTED_S196`
+8. `compare-action-intent-readers` - `EXTRACTED_S197`
 
-Candidate order:
+This wave's next safe work should be characterization or dependency reduction,
+not direct movement of high-risk runtime, terminal, projection, or transport
+bands.
+
+## Ready / Deferred Candidate Order
 
 1. `turn-contract-field-assembly` - `PARTIAL_EXTRACTED_S130`
 2. `terminal-projection-sync` - `NEEDS_OWNER_PROOF`

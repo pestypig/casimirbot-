@@ -96,6 +96,15 @@ terminal eligibility, projection discipline, and debug traces.
 
 ## Current Extraction Status
 
+S190-S197 completed the current prompt-interpretation extraction wave. Those
+slices moved doc, voice, note, and compare prompt predicates behind service
+owners, while intentionally leaving source admission, tool execution, runtime
+loop orchestration, terminal materialization, terminal authority, projection,
+live-source behavior, and keyed-server behavior route-owned. The next wave
+should start with characterization or dependency reduction for the remaining
+policy-adjacent bands instead of treating these predicate moves as runtime
+ownership proof.
+
 | Slice | Boundary | Owner | Status |
 | --- | --- | --- | --- |
 | S93 | live debug slim | `server/services/helix-ask/debug/live-debug-slim.ts` | SERVICE_OWNED for slim builder only |
