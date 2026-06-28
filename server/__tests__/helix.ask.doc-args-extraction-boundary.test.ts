@@ -29,6 +29,7 @@ import {
   isAskTurnExplicitDocumentAcquisitionIntent,
   isAskTurnTopicQualifiedLatestDocIntent,
   normalizeAskTurnLatestDocTopicText,
+  normalizeAskTurnWorkspaceDocPath,
   resolveAskTurnCreateThenOpenDocTopicArg,
   resolveAskTurnDocPathArg,
   resolveAskTurnLatestDocTopicArg,
@@ -47,6 +48,7 @@ describe("Helix Ask doc args extraction boundary", () => {
     const serviceSource = readFileSync(servicePath, "utf8");
 
     expect(routeSource).toContain("../services/helix-ask/doc-args");
+    expect(routeSource).not.toMatch(/const\s+normalizeAskTurnWorkspaceDocPath\s*=\s*\(value/);
     expect(routeSource).not.toMatch(/const\s+extractAskTurnDocPathArgs\s*=\s*\(transcript/);
     expect(routeSource).not.toMatch(/const\s+resolveAskTurnDocPathArg\s*=\s*\(transcript/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnReadAloudRequested\s*=\s*\(transcript/);
@@ -93,6 +95,7 @@ describe("Helix Ask doc args extraction boundary", () => {
     expect(routeSource).not.toMatch(/const\s+isAskTurnOpenDocSearchIntent\s*=/);
     expect(routeSource).toContain("createAskTurnLatestDocIntentReaders({");
     expect(serviceSource).toMatch(/export\s+const\s+extractAskTurnDocPathArgs\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+normalizeAskTurnWorkspaceDocPath\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+resolveAskTurnDocPathArg\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnReadAloudRequested\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnExplicitDocumentAcquisitionIntent\s*=/);
@@ -129,6 +132,9 @@ describe("Helix Ask doc args extraction boundary", () => {
   });
 
   it("preserves doc path extraction behavior", () => {
+    expect(normalizeAskTurnWorkspaceDocPath(" docs/research/a.md ")).toBe("docs/research/a.md");
+    expect(normalizeAskTurnWorkspaceDocPath("   ")).toBeNull();
+    expect(normalizeAskTurnWorkspaceDocPath(null)).toBeNull();
     expect(
       extractAskTurnDocPathArgs("Read docs/research/nhm2-current-status-whitepaper-2026-05-02.md, then ./notes/a.txt and docs/research/nhm2-current-status-whitepaper-2026-05-02.md"),
     ).toEqual(["docs/research/nhm2-current-status-whitepaper-2026-05-02.md", "./notes/a.txt"]);
