@@ -5,12 +5,29 @@ import {
   type HelixAskTurnContractObjective,
 } from "../obligations";
 import type { HelixAskObjectivePlannerPassObjective } from "../objectives/objective-llm-contracts";
+import type { PromptResearchContract } from "../prompt-research-contract";
 import type { HelixAskTurnContractGroundingMode } from "./turn-contract-normalizers";
 import {
+  buildHelixAskPromptResearchObjectiveInputs,
   buildHelixAskTurnObjectiveQueryHints,
   buildHelixAskTurnObjectiveSlots,
   extractHelixAskTurnObjectiveFragments,
 } from "./turn-contract-objective-planning";
+
+export const buildHelixAskTurnContractResearchObjectiveInputs = (args: {
+  researchContract?: PromptResearchContract | null;
+  family: HelixAskAnswerPlanFamily;
+  groundingMode: HelixAskTurnContractGroundingMode;
+  maxObjectives: number;
+}): HelixAskObjectivePlannerPassObjective[] =>
+  args.researchContract
+    ? buildHelixAskPromptResearchObjectiveInputs({
+        contract: args.researchContract,
+        family: args.family,
+        groundingMode: args.groundingMode,
+        maxObjectives: args.maxObjectives,
+      })
+    : [];
 
 export const buildHelixAskTurnContractFallbackObjectiveLabels = (args: {
   hasResearchObjectiveInputs: boolean;
