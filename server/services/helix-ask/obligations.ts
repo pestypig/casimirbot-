@@ -378,6 +378,62 @@ export const createHelixAskAnswerObligation = (args: {
   };
 };
 
+export const adaptHelixAskFallbackSectionsForGrounding = <
+  Section extends HelixAskAnswerPlanSectionLike,
+>(args: {
+  family: HelixAskAnswerPlanFamily;
+  requiresRepoEvidence: boolean;
+  requiredSlots?: string[];
+  sections: Section[];
+}): Section[] => {
+  if (args.family !== "comparison_tradeoff") {
+    return args.sections;
+  }
+  const requiredSlotSet = new Set(
+    (args.requiredSlots ?? []).map((slot) => normalizeSlotId(slot)).filter(Boolean),
+  );
+  const hasRequiredSlots = requiredSlotSet.size > 0;
+  const chooseSectionSlots = (candidates: string[], fallback: string[]): string[] => {
+    if (!hasRequiredSlots) return candidates.length > 0 ? candidates : fallback;
+    const matched = candidates
+      .map((slot) => normalizeSlotId(slot))
+      .filter((slot) => requiredSlotSet.has(slot));
+    if (matched.length > 0) return Array.from(new Set(matched));
+    return fallback
+      .map((slot) => normalizeSlotId(slot))
+      .filter((slot) => requiredSlotSet.has(slot));
+  };
+  return args.sections.map((section) => {
+    const sectionKey = normalizeSlotId(section.id || section.title || "");
+    if (sectionKey === "differences") {
+      const comparisonSlots = (section.required_slots ?? [])
+        .map((slot) => normalizeSlotId(slot))
+        .filter(Boolean)
+        .filter((slot) => (args.requiresRepoEvidence ? true : slot !== "code-path" && slot !== "code_path"));
+      const requiredSlots = chooseSectionSlots(comparisonSlots, ["definition"]);
+      return {
+        ...section,
+        required_slots: requiredSlots.length > 0 ? requiredSlots : ["definition"],
+      };
+    }
+    if (sectionKey === "choice") {
+      const requiredSlots = chooseSectionSlots(["recommendation", "decision"], []);
+      return {
+        ...section,
+        required_slots: requiredSlots,
+      };
+    }
+    if (sectionKey === "risks") {
+      const requiredSlots = chooseSectionSlots(["failure_path", "risks", "risk"], []);
+      return {
+        ...section,
+        required_slots: requiredSlots,
+      };
+    }
+    return section;
+  });
+};
+
 const doesHelixAskPlannerSectionCoverObjective = (args: {
   objective: HelixAskTurnContractObjective;
   sections: Array<{
