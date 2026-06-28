@@ -8,14 +8,16 @@ import { buildHelixAskTurnContractQueryHints } from "../services/helix-ask/contr
 const repoRoot = process.cwd();
 const routePath = join(repoRoot, "server/routes/agi.plan.ts");
 const servicePath = join(repoRoot, "server/services/helix-ask/contracts/turn-contract-query-hints.ts");
+const builderPath = join(repoRoot, "server/services/helix-ask/contracts/turn-contract-builder.ts");
 
 describe("Helix Ask turn-contract query-hints extraction boundary", () => {
   it("keeps turn-contract query-hint assembly out of agi.plan.ts", () => {
     const routeSource = readFileSync(routePath, "utf8");
     const serviceSource = readFileSync(servicePath, "utf8");
+    const builderSource = readFileSync(builderPath, "utf8");
 
-    expect(routeSource).toContain("../services/helix-ask/contracts/turn-contract-query-hints");
-    expect(routeSource).toContain("buildHelixAskTurnContractQueryHints({");
+    expect(`${routeSource}\n${builderSource}`).toContain("turn-contract-query-hints");
+    expect(`${routeSource}\n${builderSource}`).toContain("buildHelixAskTurnContractQueryHints({");
     expect(routeSource).not.toContain("const queryHints = mergeHelixAskQueries(\n    researchContract?.required_repo_inputs.slice(0, 4) ?? [],");
     expect(serviceSource).toMatch(/export\s+const\s+buildHelixAskTurnContractQueryHints\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");

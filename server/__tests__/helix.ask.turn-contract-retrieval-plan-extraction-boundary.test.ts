@@ -11,13 +11,15 @@ const servicePath = join(
   repoRoot,
   "server/services/helix-ask/contracts/turn-contract-retrieval-plan.ts",
 );
+const builderPath = join(repoRoot, "server/services/helix-ask/contracts/turn-contract-builder.ts");
 
 describe("Helix Ask turn-contract retrieval-plan extraction boundary", () => {
   it("keeps retrieval-plan assembly out of agi.plan.ts", () => {
     const routeSource = readFileSync(routePath, "utf8");
     const serviceSource = readFileSync(servicePath, "utf8");
+    const builderSource = readFileSync(builderPath, "utf8");
 
-    expect(routeSource).toContain("../services/helix-ask/contracts/turn-contract-retrieval-plan");
+    expect(`${routeSource}\n${builderSource}`).toContain("turn-contract-retrieval-plan");
     expect(routeSource).not.toMatch(/const\s+buildHelixAskTurnRetrievalPlan\s*=\s*\(/);
     expect(routeSource).not.toMatch(/type\s+HelixAskTurnRetrievalPlan\s*=\s*{/);
     expect(serviceSource).toMatch(/export\s+type\s+HelixAskTurnRetrievalPlan\s*=/);

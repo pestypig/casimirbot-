@@ -8,14 +8,16 @@ import { buildHelixAskTurnContractRiskFlags } from "../services/helix-ask/contra
 const repoRoot = process.cwd();
 const routePath = join(repoRoot, "server/routes/agi.plan.ts");
 const servicePath = join(repoRoot, "server/services/helix-ask/contracts/turn-contract-risk-flags.ts");
+const builderPath = join(repoRoot, "server/services/helix-ask/contracts/turn-contract-builder.ts");
 
 describe("Helix Ask turn-contract risk-flags extraction boundary", () => {
   it("keeps risk-flag aggregation out of agi.plan.ts", () => {
     const routeSource = readFileSync(routePath, "utf8");
     const serviceSource = readFileSync(servicePath, "utf8");
+    const builderSource = readFileSync(builderPath, "utf8");
 
-    expect(routeSource).toContain("../services/helix-ask/contracts/turn-contract-risk-flags");
-    expect(routeSource).toContain("maxRiskFlags: 8");
+    expect(`${routeSource}\n${builderSource}`).toContain("turn-contract-risk-flags");
+    expect(`${routeSource}\n${builderSource}`).toContain("maxRiskFlags: 8");
     expect(routeSource).not.toContain("risk_flags: riskFlags.slice(0, 8)");
     expect(routeSource).not.toContain('objectives.length > 1 ? "multi_objective" : null');
     expect(serviceSource).toMatch(/export\s+const\s+buildHelixAskTurnContractRiskFlags\s*=/);

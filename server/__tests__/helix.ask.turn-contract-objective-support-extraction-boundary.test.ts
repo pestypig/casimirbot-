@@ -11,13 +11,15 @@ const servicePath = join(
   repoRoot,
   "server/services/helix-ask/contracts/turn-contract-objective-support.ts",
 );
+const builderPath = join(repoRoot, "server/services/helix-ask/contracts/turn-contract-builder.ts");
 
 describe("Helix Ask turn-contract objective-support extraction boundary", () => {
   it("keeps objective-support mapping out of agi.plan.ts", () => {
     const routeSource = readFileSync(routePath, "utf8");
     const serviceSource = readFileSync(servicePath, "utf8");
+    const builderSource = readFileSync(builderPath, "utf8");
 
-    expect(routeSource).toContain("../services/helix-ask/contracts/turn-contract-objective-support");
+    expect(`${routeSource}\n${builderSource}`).toContain("turn-contract-objective-support");
     expect(routeSource).not.toMatch(/const\s+buildHelixAskTurnContractObjectiveSupport\s*=\s*\(/);
     expect(serviceSource).toMatch(/export\s+const\s+buildHelixAskTurnContractObjectiveSupport\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");

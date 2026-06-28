@@ -16,20 +16,22 @@ import {
 const repoRoot = process.cwd();
 const routePath = join(repoRoot, "server/routes/agi.plan.ts");
 const servicePath = join(repoRoot, "server/services/helix-ask/contracts/turn-contract-normalizers.ts");
+const builderPath = join(repoRoot, "server/services/helix-ask/contracts/turn-contract-builder.ts");
 
 describe("Helix Ask turn-contract normalizers extraction boundary", () => {
   it("keeps turn-contract normalizers out of agi.plan.ts", () => {
     const routeSource = readFileSync(routePath, "utf8");
     const serviceSource = readFileSync(servicePath, "utf8");
+    const builderSource = readFileSync(builderPath, "utf8");
 
-    expect(routeSource).toContain("../services/helix-ask/contracts/turn-contract-normalizers");
+    expect(`${routeSource}\n${builderSource}`).toContain("turn-contract-normalizers");
     expect(routeSource).not.toMatch(/const\s+normalizeHelixAskTurnContractFamily\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+normalizeHelixAskTurnContractGroundingMode\s*=\s*\(/);
-    expect(routeSource).toContain("selectHelixAskTurnContractPlannerFamily(args.plannerPass?.output_family)");
-    expect(routeSource).toContain("detectHelixAskTurnContractDefinitionRelationRepoMismatch({");
-    expect(routeSource).toContain("selectHelixAskTurnContractFamily({");
-    expect(routeSource).toContain("selectHelixAskTurnContractRequestedGroundingMode(");
-    expect(routeSource).toContain("selectHelixAskTurnContractGroundingMode({");
+    expect(`${routeSource}\n${builderSource}`).toContain("selectHelixAskTurnContractPlannerFamily(args.plannerPass?.output_family)");
+    expect(`${routeSource}\n${builderSource}`).toContain("detectHelixAskTurnContractDefinitionRelationRepoMismatch({");
+    expect(`${routeSource}\n${builderSource}`).toContain("selectHelixAskTurnContractFamily({");
+    expect(`${routeSource}\n${builderSource}`).toContain("selectHelixAskTurnContractRequestedGroundingMode(");
+    expect(`${routeSource}\n${builderSource}`).toContain("selectHelixAskTurnContractGroundingMode({");
     expect(routeSource).not.toContain("const defaultGroundingMode: HelixAskTurnContractGroundingMode =");
     expect(routeSource).not.toContain("const family = plannerDefinitionRelationRepoMismatch");
     expect(routeSource).not.toContain('plannerFamily === "definition_overview" &&');

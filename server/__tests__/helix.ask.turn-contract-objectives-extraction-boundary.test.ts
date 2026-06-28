@@ -14,19 +14,21 @@ import type { PromptResearchContract } from "../services/helix-ask/prompt-resear
 const repoRoot = process.cwd();
 const routePath = join(repoRoot, "server/routes/agi.plan.ts");
 const servicePath = join(repoRoot, "server/services/helix-ask/contracts/turn-contract-objectives.ts");
+const builderPath = join(repoRoot, "server/services/helix-ask/contracts/turn-contract-builder.ts");
 
 describe("Helix Ask turn-contract objectives extraction boundary", () => {
   it("keeps objective normalization out of agi.plan.ts", () => {
     const routeSource = readFileSync(routePath, "utf8");
     const serviceSource = readFileSync(servicePath, "utf8");
+    const builderSource = readFileSync(builderPath, "utf8");
 
-    expect(routeSource).toContain("../services/helix-ask/contracts/turn-contract-objectives");
+    expect(`${routeSource}\n${builderSource}`).toContain("turn-contract-objectives");
     expect(routeSource).not.toContain("const objectives = objectiveInputs\n    .map((entry) => {");
-    expect(routeSource).toContain("buildHelixAskTurnContractResearchObjectiveInputs({");
+    expect(`${routeSource}\n${builderSource}`).toContain("buildHelixAskTurnContractResearchObjectiveInputs({");
     expect(routeSource).not.toContain("const researchObjectiveInputs = researchContract\n    ? buildHelixAskPromptResearchObjectiveInputs({");
-    expect(routeSource).toContain("buildHelixAskTurnContractFallbackObjectiveLabels({");
+    expect(`${routeSource}\n${builderSource}`).toContain("buildHelixAskTurnContractFallbackObjectiveLabels({");
     expect(routeSource).not.toContain("const fallbackObjectiveLabels = researchObjectiveInputs.length\n    ? []");
-    expect(routeSource).toContain("selectHelixAskTurnContractObjectiveInputs({");
+    expect(`${routeSource}\n${builderSource}`).toContain("selectHelixAskTurnContractObjectiveInputs({");
     expect(routeSource).not.toContain("? args.plannerPass.objectives\n        : fallbackObjectiveLabels.map");
     expect(routeSource).not.toContain("return {\n        label,\n        required_slots: requiredSlots,\n        query_hints: queryHints,\n      } satisfies HelixAskTurnContractObjective;");
     expect(serviceSource).toMatch(/export\s+const\s+buildHelixAskTurnContractResearchObjectiveInputs\s*=/);

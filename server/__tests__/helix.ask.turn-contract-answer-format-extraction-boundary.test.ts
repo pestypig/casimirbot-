@@ -9,14 +9,16 @@ import type { HelixAskAnswerPlanSection } from "../services/helix-ask/answer-pla
 const repoRoot = process.cwd();
 const routePath = join(repoRoot, "server/routes/agi.plan.ts");
 const servicePath = join(repoRoot, "server/services/helix-ask/contracts/turn-contract-answer-format.ts");
+const builderPath = join(repoRoot, "server/services/helix-ask/contracts/turn-contract-builder.ts");
 
 describe("Helix Ask turn-contract answer-format extraction boundary", () => {
   it("keeps answer-format packaging out of agi.plan.ts", () => {
     const routeSource = readFileSync(routePath, "utf8");
     const serviceSource = readFileSync(servicePath, "utf8");
+    const builderSource = readFileSync(builderPath, "utf8");
 
-    expect(routeSource).toContain("../services/helix-ask/contracts/turn-contract-answer-format");
-    expect(routeSource).toContain("answer_format: buildHelixAskTurnContractAnswerFormat({");
+    expect(`${routeSource}\n${builderSource}`).toContain("turn-contract-answer-format");
+    expect(`${routeSource}\n${builderSource}`).toContain("answer_format: buildHelixAskTurnContractAnswerFormat({");
     expect(routeSource).not.toContain("answer_format: {\n      sections: plannerSections,\n      preferred_verbosity: args.plannerPass?.verbosity ?? null,\n    },");
     expect(serviceSource).toMatch(/export\s+const\s+buildHelixAskTurnContractAnswerFormat\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");

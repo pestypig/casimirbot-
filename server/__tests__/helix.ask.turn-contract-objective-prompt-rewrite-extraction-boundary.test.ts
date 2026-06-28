@@ -16,13 +16,15 @@ const servicePath = join(
   repoRoot,
   "server/services/helix-ask/contracts/turn-contract-objective-prompt-rewrite.ts",
 );
+const builderPath = join(repoRoot, "server/services/helix-ask/contracts/turn-contract-builder.ts");
 
 describe("Helix Ask objective prompt rewrite extraction boundary", () => {
   it("keeps deterministic prompt rewrite helpers out of agi.plan.ts", () => {
     const routeSource = readFileSync(routePath, "utf8");
     const serviceSource = readFileSync(servicePath, "utf8");
+    const builderSource = readFileSync(builderPath, "utf8");
 
-    expect(routeSource).toContain("../services/helix-ask/contracts/turn-contract-objective-prompt-rewrite");
+    expect(`${routeSource}\n${builderSource}`).toContain("turn-contract-objective-prompt-rewrite");
     expect(routeSource).not.toMatch(/const\s+resolveHelixAskObjectivePromptRewriteMode\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+estimateHelixAskPromptTokens\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+hashHelixAskPromptText\s*=\s*\(/);

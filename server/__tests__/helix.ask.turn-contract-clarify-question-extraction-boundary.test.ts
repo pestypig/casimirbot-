@@ -11,14 +11,16 @@ import {
 const repoRoot = process.cwd();
 const routePath = join(repoRoot, "server/routes/agi.plan.ts");
 const servicePath = join(repoRoot, "server/services/helix-ask/contracts/turn-contract-clarify-question.ts");
+const builderPath = join(repoRoot, "server/services/helix-ask/contracts/turn-contract-builder.ts");
 
 describe("Helix Ask turn-contract clarify-question extraction boundary", () => {
   it("keeps clarify-question assembly out of agi.plan.ts", () => {
     const routeSource = readFileSync(routePath, "utf8");
     const serviceSource = readFileSync(servicePath, "utf8");
+    const builderSource = readFileSync(builderPath, "utf8");
 
-    expect(routeSource).toContain("../services/helix-ask/contracts/turn-contract-clarify-question");
-    expect(routeSource).toContain("finalizeHelixAskTurnContractClarifyQuestion(clarifyQuestion)");
+    expect(`${routeSource}\n${builderSource}`).toContain("turn-contract-clarify-question");
+    expect(`${routeSource}\n${builderSource}`).toContain("finalizeHelixAskTurnContractClarifyQuestion(clarifyQuestion)");
     expect(routeSource).not.toContain("clarify_question: clarifyQuestion || null");
     expect(routeSource).not.toContain("Which objective should be pinned to explicit repo anchors first?");
     expect(serviceSource).toMatch(/export\s+const\s+buildHelixAskTurnContractClarifyQuestion\s*=/);

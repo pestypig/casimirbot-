@@ -12,13 +12,15 @@ import {
 const repoRoot = process.cwd();
 const routePath = join(repoRoot, "server/routes/agi.plan.ts");
 const servicePath = join(repoRoot, "server/services/helix-ask/contracts/turn-contract-objective-unknown.ts");
+const builderPath = join(repoRoot, "server/services/helix-ask/contracts/turn-contract-builder.ts");
 
 describe("Helix Ask objective unknown-block extraction boundary", () => {
   it("keeps unknown-block helpers out of agi.plan.ts", () => {
     const routeSource = readFileSync(routePath, "utf8");
     const serviceSource = readFileSync(servicePath, "utf8");
+    const builderSource = readFileSync(builderPath, "utf8");
 
-    expect(routeSource).toContain("../services/helix-ask/contracts/turn-contract-objective-unknown");
+    expect(`${routeSource}\n${builderSource}`).toContain("turn-contract-objective-unknown");
     expect(routeSource).not.toMatch(/const\s+buildHelixAskObjectiveUnknownBlock\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+sanitizeHelixAskObjectiveUnknownBlock\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+isHelixAskGenericUnknownScaffold\s*=\s*\(/);

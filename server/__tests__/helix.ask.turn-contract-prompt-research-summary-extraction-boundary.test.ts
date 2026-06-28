@@ -16,14 +16,16 @@ const servicePath = join(
   repoRoot,
   "server/services/helix-ask/contracts/turn-contract-prompt-research-summary.ts",
 );
+const builderPath = join(repoRoot, "server/services/helix-ask/contracts/turn-contract-builder.ts");
 
 describe("Helix Ask turn-contract prompt-research summary extraction boundary", () => {
   it("keeps prompt-research summary projection out of agi.plan.ts", () => {
     const routeSource = readFileSync(routePath, "utf8");
     const serviceSource = readFileSync(servicePath, "utf8");
+    const builderSource = readFileSync(builderPath, "utf8");
 
-    expect(routeSource).toContain("../services/helix-ask/contracts/turn-contract-prompt-research-summary");
-    expect(routeSource).toContain("selectHelixAskTurnContractPromptResearchContract(args.promptResearchContract)");
+    expect(`${routeSource}\n${builderSource}`).toContain("turn-contract-prompt-research-summary");
+    expect(`${routeSource}\n${builderSource}`).toContain("selectHelixAskTurnContractPromptResearchContract(args.promptResearchContract)");
     expect(routeSource).not.toContain("args.promptResearchContract?.mode === \"research_contract\"");
     expect(routeSource).not.toContain("required_top_level_titles: researchContract.required_top_level_structure");
     expect(serviceSource).toMatch(/export\s+const\s+buildHelixAskTurnContractPromptResearchSummary\s*=/);

@@ -8,14 +8,16 @@ import { buildHelixAskTurnContractConstraints } from "../services/helix-ask/cont
 const repoRoot = process.cwd();
 const routePath = join(repoRoot, "server/routes/agi.plan.ts");
 const servicePath = join(repoRoot, "server/services/helix-ask/contracts/turn-contract-constraints.ts");
+const builderPath = join(repoRoot, "server/services/helix-ask/contracts/turn-contract-builder.ts");
 
 describe("Helix Ask turn-contract constraints extraction boundary", () => {
   it("keeps constraints field assembly out of agi.plan.ts", () => {
     const routeSource = readFileSync(routePath, "utf8");
     const serviceSource = readFileSync(servicePath, "utf8");
+    const builderSource = readFileSync(builderPath, "utf8");
 
-    expect(routeSource).toContain("../services/helix-ask/contracts/turn-contract-constraints");
-    expect(routeSource).toContain("constraints: buildHelixAskTurnContractConstraints({");
+    expect(`${routeSource}\n${builderSource}`).toContain("turn-contract-constraints");
+    expect(`${routeSource}\n${builderSource}`).toContain("constraints: buildHelixAskTurnContractConstraints({");
     expect(routeSource).not.toContain("requires_citations: args.requiresRepoEvidence || groundingMode !== \"open\"");
     expect(routeSource).not.toContain("allow_open_world_bypass: !args.requiresRepoEvidence && groundingMode !== \"repo\"");
     expect(routeSource).not.toContain("clarify_allowed: family !== \"equation_formalism\" || specificity !== \"specific\"");

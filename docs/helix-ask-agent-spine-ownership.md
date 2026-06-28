@@ -42,6 +42,7 @@ terminal eligibility, projection discipline, and debug traces.
 | `route` | route/product contract owner | route, route-product services | yes | legacy route branches | yes, candidates then selected | yes | API parity matrix | PARTIAL_SERVICE_OWNER |
 | `route_reason_code` | route authority/product contract | route and route authority audit | yes | compatibility fallbacks | yes | yes | route authority tests | PARTIAL_SERVICE_OWNER |
 | `dispatch_policy` | turn planner/contract | route planner contract | yes | legacy fallback | no final duplicate expected | yes | prompt-solving benchmark | ROUTE_OWNED_PENDING_EXTRACTION |
+| `turn_contract` | `contracts/turn-contract-builder.ts` for deterministic assembly from supplied inputs | service via route import | route supplies classifiers, cue predicates, obligation wrapper, profile selections, max caps, version, planner pass, and research contract | no separate compatibility writer expected | no final duplicate expected | yes for input selection and wrapper sequencing | turn-contract builder extraction boundary and turn-contract boundary suite | PARTIAL_SERVICE_OWNER |
 | `source_target_intent` | source-target arbitrator | source-target services, route glue | yes | evidence target fallback | no | yes | prompt-solving benchmark, API parity | PARTIAL_SERVICE_OWNER |
 | `hard_tool_route_metadata` | `hard-tool-route-metadata.ts` | service via route import | no inline implementation | route constructs hard-route metadata and source-target intent records | yes, parsed metadata feeds canonical goal, hard calculator detection, and request/stream routing guards | yes for parsing/synthesis/read-only metadata helpers only | hard-tool route metadata boundary test | SERVICE_OWNED |
 | `evidence_target_arbitration` | evidence target arbitration service | service plus route attachment | yes | none expected | no | yes | API parity matrix | PARTIAL_SERVICE_OWNER |
@@ -164,6 +165,7 @@ ownership proof.
 | S207 | turn-contract answer format | `server/services/helix-ask/contracts/turn-contract-answer-format.ts` | SERVICE_OWNED for deterministic answer-format packaging from already-normalized sections and planner verbosity only |
 | S208 | turn-contract planner metadata | `server/services/helix-ask/contracts/turn-contract-planner-metadata.ts` | SERVICE_OWNED for deterministic planner metadata packaging from already-selected mode, validity, and source only |
 | S209 | turn-contract constraints | `server/services/helix-ask/contracts/turn-contract-constraints.ts` | SERVICE_OWNED for deterministic constraints field assembly from already-selected repo-evidence, grounding, family, and specificity inputs only |
+| S227 | turn-contract builder shell | `server/services/helix-ask/contracts/turn-contract-builder.ts` | PARTIAL_SERVICE_OWNER for final deterministic contract assembly from supplied route classifiers, cue predicates, obligation wrapper, max caps, planner pass, research contract, and version only |
 | S131 | runtime intent packet | `server/services/helix-ask/runtime/runtime-intent-packet.ts` | SERVICE_OWNED for runtime-intent packet readers, source/capability predicates, packet assembly, ledger/debug append, and runtime-audit refresh handoff only |
 | S132 | runtime continuation hints | `server/services/helix-ask/runtime/runtime-continuation-hints.ts` | SERVICE_OWNED for continuation hint construction, append/ledger/debug writes, agent-step decision collection, hint-decision matching, and migration marking only |
 | S133 | runtime continuation observation refs | `server/services/helix-ask/runtime/runtime-continuation-hints.ts` | SERVICE_OWNED for matching accepted continuation hints to observed artifact refs only |
@@ -304,10 +306,10 @@ ownership proof.
   projection, risk-flag aggregation/capping, clarify-question assembly/field packaging, and
   planner family/requested-grounding/final-grounding/final-family selector normalization plus definition/relation mismatch detection, planner-section source selection/normalization, goal text selection,
   research objective-input assembly, objective-input precedence selection, objective normalization/fallback construction, query-hint assembly,
-  answer-format packaging, planner metadata packaging, and constraints field
-  assembly are service-owned after S130, S198-S219;
+  answer-format packaging, planner metadata packaging, constraints field assembly, and final deterministic turn-contract assembly
+  are service-owned after S130, S198-S219, and S227;
   route-owned family/specificity selection, planner-pass application,
-  obligations assembly, and final turn-contract construction remain unresolved.
+  cue predicates, obligation wrapper sequencing, profile lookup fallback, and contract input selection remain unresolved.
 - Query merging is service-owned after S205; turn-contract query-hint assembly
   is service-owned after S206; route-owned retrieval policy, query source
   selection, and retrieval execution remain unresolved.

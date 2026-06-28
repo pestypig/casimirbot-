@@ -15,6 +15,7 @@ import type { PromptResearchContract } from "../services/helix-ask/prompt-resear
 const repoRoot = process.cwd();
 const routePath = join(repoRoot, "server/routes/agi.plan.ts");
 const servicePath = join(repoRoot, "server/services/helix-ask/contracts/turn-contract-objective-planning.ts");
+const builderPath = join(repoRoot, "server/services/helix-ask/contracts/turn-contract-builder.ts");
 
 const researchContract: PromptResearchContract = {
   mode: "research_contract",
@@ -57,8 +58,9 @@ describe("Helix Ask turn-contract objective-planning extraction boundary", () =>
   it("keeps deterministic objective-planning helpers out of agi.plan.ts", () => {
     const routeSource = readFileSync(routePath, "utf8");
     const serviceSource = readFileSync(servicePath, "utf8");
+    const builderSource = readFileSync(builderPath, "utf8");
 
-    expect(routeSource).toContain("../services/helix-ask/contracts/turn-contract-objective-planning");
+    expect(`${routeSource}\n${builderSource}`).toContain("turn-contract-objective-planning");
     expect(routeSource).not.toMatch(/const\s+extractHelixAskTurnObjectiveFragments\s*=/);
     expect(routeSource).not.toMatch(/const\s+buildHelixAskTurnObjectiveSlots\s*=/);
     expect(routeSource).not.toMatch(/const\s+buildHelixAskTurnObjectiveQueryHints\s*=/);

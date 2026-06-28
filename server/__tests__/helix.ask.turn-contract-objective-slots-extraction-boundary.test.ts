@@ -8,6 +8,7 @@ import { inferHelixAskObjectiveSlotsFromObligationCoverage } from "../services/h
 const repoRoot = process.cwd();
 const routePath = join(repoRoot, "server/routes/agi.plan.ts");
 const servicePath = join(repoRoot, "server/services/helix-ask/contracts/turn-contract-objective-slots.ts");
+const builderPath = join(repoRoot, "server/services/helix-ask/contracts/turn-contract-builder.ts");
 
 const coverage = (entry: Partial<Parameters<typeof inferHelixAskObjectiveSlotsFromObligationCoverage>[0][number]>) => ({
   obligation_id: "obligation",
@@ -26,8 +27,9 @@ describe("Helix Ask turn-contract objective-slot inference extraction boundary",
   it("keeps objective-slot inference out of agi.plan.ts", () => {
     const routeSource = readFileSync(routePath, "utf8");
     const serviceSource = readFileSync(servicePath, "utf8");
+    const builderSource = readFileSync(builderPath, "utf8");
 
-    expect(routeSource).toContain("../services/helix-ask/contracts/turn-contract-objective-slots");
+    expect(`${routeSource}\n${builderSource}`).toContain("turn-contract-objective-slots");
     expect(routeSource).not.toMatch(/const\s+inferHelixAskObjectiveSlotsFromObligationCoverage\s*=\s*\(/);
     expect(serviceSource).toMatch(/export\s+const\s+inferHelixAskObjectiveSlotsFromObligationCoverage\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");

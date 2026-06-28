@@ -12,13 +12,15 @@ import type { PromptResearchContract } from "../services/helix-ask/prompt-resear
 const repoRoot = process.cwd();
 const routePath = join(repoRoot, "server/routes/agi.plan.ts");
 const servicePath = join(repoRoot, "server/services/helix-ask/contracts/turn-contract-planner-sections.ts");
+const builderPath = join(repoRoot, "server/services/helix-ask/contracts/turn-contract-builder.ts");
 
 describe("Helix Ask turn-contract planner-sections extraction boundary", () => {
   it("keeps planner-section normalization out of agi.plan.ts", () => {
     const routeSource = readFileSync(routePath, "utf8");
     const serviceSource = readFileSync(servicePath, "utf8");
+    const builderSource = readFileSync(builderPath, "utf8");
 
-    expect(routeSource).toContain("../services/helix-ask/contracts/turn-contract-planner-sections");
+    expect(`${routeSource}\n${builderSource}`).toContain("turn-contract-planner-sections");
     expect(routeSource).not.toContain("const plannerSections = plannerSectionSource.map((section) => ({");
     expect(routeSource).not.toContain("const plannerSectionSource = args.plannerPass?.sections?.length");
     expect(routeSource).not.toContain("buildHelixAskPromptResearchPlannerSections({");

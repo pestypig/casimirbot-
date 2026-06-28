@@ -8,13 +8,15 @@ import { normalizeHelixAskTurnContractText } from "../services/helix-ask/contrac
 const repoRoot = process.cwd();
 const routePath = join(repoRoot, "server/routes/agi.plan.ts");
 const servicePath = join(repoRoot, "server/services/helix-ask/contracts/turn-contract-text.ts");
+const builderPath = join(repoRoot, "server/services/helix-ask/contracts/turn-contract-builder.ts");
 
 describe("Helix Ask turn-contract text extraction boundary", () => {
   it("keeps turn-contract text normalization out of agi.plan.ts", () => {
     const routeSource = readFileSync(routePath, "utf8");
     const serviceSource = readFileSync(servicePath, "utf8");
+    const builderSource = readFileSync(builderPath, "utf8");
 
-    expect(routeSource).toContain("../services/helix-ask/contracts/turn-contract-text");
+    expect(`${routeSource}\n${builderSource}`).toContain("turn-contract-text");
     expect(routeSource).not.toMatch(/const\s+normalizeHelixAskTurnContractText\s*=\s*\(/);
     expect(routeSource).not.toContain("HELIX_ASK_TURN_CONTRACT_PATH_FRAGMENT_RE");
     expect(serviceSource).toMatch(/export\s+const\s+normalizeHelixAskTurnContractText\s*=/);

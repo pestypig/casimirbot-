@@ -20,6 +20,7 @@ const servicePath = join(
   repoRoot,
   "server/services/helix-ask/contracts/turn-contract-objective-mini-answers.ts",
 );
+const builderPath = join(repoRoot, "server/services/helix-ask/contracts/turn-contract-builder.ts");
 
 const coverage = (entry: Partial<HelixAskEvidencePackObligationCoverage>): HelixAskEvidencePackObligationCoverage => ({
   obligation_id: "obligation",
@@ -38,8 +39,9 @@ describe("Helix Ask objective mini-answer extraction boundary", () => {
   it("keeps objective mini-answer assembly out of agi.plan.ts", () => {
     const routeSource = readFileSync(routePath, "utf8");
     const serviceSource = readFileSync(servicePath, "utf8");
+    const builderSource = readFileSync(builderPath, "utf8");
 
-    expect(routeSource).toContain("../services/helix-ask/contracts/turn-contract-objective-mini-answers");
+    expect(`${routeSource}\n${builderSource}`).toContain("turn-contract-objective-mini-answers");
     expect(routeSource).not.toMatch(/const\s+applyHelixAskObjectiveMiniCritique\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+applyHelixAskObjectiveMiniSynth\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+buildHelixAskObjectiveAssemblyPrompt\s*=\s*\(/);
