@@ -379,3 +379,134 @@ export const attachHelixAskReasoningTheaterStateToDebug = (args: {
   const state = buildHelixAskReasoningTheaterStateFromDebug(args);
   args.debugRecord.reasoning_theater_state_v1 = state;
 };
+
+export const coerceHelixAskReasoningTheaterTraceEvents = (value: unknown): HelixAskTraceEvent[] => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry): HelixAskTraceEvent | null => {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
+      const record = entry as Record<string, unknown>;
+      const stage =
+        typeof record.stage === "string" && record.stage.trim()
+          ? record.stage.trim()
+          : typeof record.type === "string" && record.type.trim()
+            ? record.type.trim()
+            : null;
+      if (!stage) return null;
+      const ts =
+        typeof record.ts === "string" && record.ts.trim()
+          ? record.ts.trim()
+          : typeof record.at === "string" && record.at.trim()
+            ? record.at.trim()
+            : new Date().toISOString();
+      const tool =
+        typeof record.tool === "string" && record.tool.trim()
+          ? record.tool.trim()
+          : "helix.ask.turn";
+      const detail =
+        typeof record.detail === "string" && record.detail.trim()
+          ? record.detail.trim()
+          : typeof record.status === "string" && record.status.trim()
+            ? record.status.trim()
+            : undefined;
+      const text =
+        typeof record.text === "string" && record.text.trim()
+          ? record.text.trim()
+          : typeof record.message === "string" && record.message.trim()
+            ? record.message.trim()
+            : undefined;
+      const durationMs =
+        typeof record.durationMs === "number" && Number.isFinite(record.durationMs)
+          ? record.durationMs
+          : typeof record.duration_ms === "number" && Number.isFinite(record.duration_ms)
+            ? record.duration_ms
+            : undefined;
+      const meta =
+        record.meta && typeof record.meta === "object" && !Array.isArray(record.meta)
+          ? (record.meta as Record<string, unknown>)
+          : undefined;
+      return {
+        ts,
+        tool,
+        stage,
+        ...(detail ? { detail } : {}),
+        ...(typeof record.ok === "boolean" ? { ok: record.ok } : {}),
+        ...(typeof durationMs === "number" ? { durationMs } : {}),
+        ...(text ? { text } : {}),
+        ...(meta ? { meta } : {}),
+      };
+    })
+    .filter((entry): entry is HelixAskTraceEvent => Boolean(entry));
+};
+
+export const buildHelixAskReasoningTheaterFallbackTraceEvents = (
+  payload: Record<string, unknown>,
+): HelixAskTraceEvent[] => {
+  const fromTranscript = coerceHelixAskReasoningTheaterTraceEvents(payload.turn_transcript_events);
+  if (fromTranscript.length > 0) return fromTranscript;
+  const fromTurnEvents = coerceHelixAskReasoningTheaterTraceEvents(payload.turn_events);
+  if (fromTurnEvents.length > 0) return fromTurnEvents;
+  const route =
+    typeof payload.route_reason_code === "string" && payload.route_reason_code.trim()
+      ? payload.route_reason_code.trim()
+      : typeof payload.route === "string" && payload.route.trim()
+        ? payload.route.trim()
+        : "ask_turn";
+  const terminalKind =
+    typeof payload.terminal_artifact_kind === "string" && payload.terminal_artifact_kind.trim()
+      ? payload.terminal_artifact_kind.trim()
+      : "unknown_terminal";
+  const text =
+    typeof payload.selected_final_answer === "string" && payload.selected_final_answer.trim()
+      ? payload.selected_final_answer.trim()
+      : typeof payload.text === "string" && payload.text.trim()
+        ? payload.text.trim()
+        : undefined;
+  return [{
+    ts: new Date().toISOString(),
+    tool: "helix.ask.turn",
+    stage: "Finalization",
+    detail: route,
+    ok: payload.ok !== false,
+    durationMs: 0,
+    ...(text ? { text } : {}),
+    meta: {
+      terminal_artifact_kind: terminalKind,
+      final_answer_source: payload.final_answer_source ?? null,
+    },
+  }];
+};
+
+export const attachHelixAskReasoningTheaterStateToPayloadDebug = (
+  payload: Record<string, unknown>,
+): void => {
+  if (!payload.debug || typeof payload.debug !== "object" || Array.isArray(payload.debug)) return;
+  const debugRecord = payload.debug as Record<string, unknown>;
+  if (typeof debugRecord.trace_id !== "string" || !debugRecord.trace_id.trim()) {
+    const traceId =
+      typeof payload.trace_id === "string" && payload.trace_id.trim()
+        ? payload.trace_id.trim()
+        : typeof payload.turn_id === "string" && payload.turn_id.trim()
+          ? payload.turn_id.trim()
+          : "unknown-trace";
+    debugRecord.trace_id = traceId;
+  }
+  const debugTraceEvents = coerceHelixAskReasoningTheaterTraceEvents(debugRecord.trace_events);
+  const debugLiveEvents = coerceHelixAskReasoningTheaterTraceEvents(debugRecord.live_events);
+  const traceEvents =
+    debugTraceEvents.length > 0
+      ? debugTraceEvents
+      : debugLiveEvents.length > 0
+        ? debugLiveEvents
+        : buildHelixAskReasoningTheaterFallbackTraceEvents(payload);
+  if (!Array.isArray(debugRecord.trace_events) || debugRecord.trace_events.length === 0) {
+    debugRecord.trace_events = traceEvents;
+  }
+  if (!Array.isArray(debugRecord.live_events) || debugRecord.live_events.length === 0) {
+    debugRecord.live_events = traceEvents;
+  }
+  attachHelixAskReasoningTheaterStateToDebug({
+    debugRecord,
+    traceEvents,
+  });
+};

@@ -2,7 +2,7 @@
 
 Status: current-head map for structural extraction and decomposition-enabler work.
 
-Pinned source state described: S277 composite follow-up builders extraction.
+Pinned source state described: S278 reasoning theater payload-debug extraction.
 
 Snapshot command: `npx tsx scripts/helix-ask-route-inventory.ts --write`
 
@@ -11,9 +11,9 @@ Route snapshot:
 | Metric | Value |
 | --- | ---: |
 | File | `server/routes/agi.plan.ts` |
-| Lines | 173,938 |
-| Bytes | 7,962,337 |
-| Top-level helper estimate | 283 helper blocks |
+| Lines | 172,304 |
+| Bytes | 7,879,825 |
+| Top-level helper estimate | 280 helper blocks |
 | Route inventory | `artifacts/helix-ask-route-inventory.json` |
 | Machine-readable map | `artifacts/helix-ask-route-decomposition-map.json` |
 
@@ -29,6 +29,7 @@ Do not extract `runHelixAgentTurnRuntimeLoop` in this wave. Do not patch termina
 | --- | ---: | --- | --- | --- | --- | --- |
 | `live-debug-slim` | service-owned | `DEBUG_EXPORT` | `MEDIUM_LOW` | `EXTRACTED` | `server/services/helix-ask/debug/live-debug-slim.ts` | Extracted by S93. Route still owns debug-mode parsing and response wrapper ordering. |
 | `transcript-events` | service-owned | `UI_API_PROJECTION` | `MEDIUM_LOW` | `EXTRACTED` | `server/services/helix-ask/runtime/transcript-events.ts` | Extracted by S94. S229 moved incremental event completion, prompt/turn/trace inference, meaningful-row detection, and single-event transcript projection into the same owner. Route retains transcript scaffold/finalization ordering, response transport, terminal projection, and debug envelope ordering. |
+| `reasoning-theater-state` | service-owned | `DEBUG_EXPORT` / `UI_API_PROJECTION` | `MEDIUM_LOW` | `EXTRACTED` | `server/services/helix-ask/surface/reasoning-theater-state.ts` | S278 moved payload-debug trace-event coercion, fallback trace-event assembly, and payload debug state attachment into the existing reasoning theater state owner. It preserves trace/live event preference order, fallback terminal metadata, trace id fallback order, and debug field writes while leaving response finalization, terminal authority, projection precedence, and live behavior route-owned. |
 | `decision-source-map` | service-owned | `SOLVER_CONTROL` | `MEDIUM` | `EXTRACTED` | `server/services/helix-ask/runtime/decision-source-map.ts` plus sibling runtime decision modules | S95 moved the debug map builder. S96 moved the pure runtime/terminal source mappers. S99 moved capability selection. S100 moved observation-decision. |
 | `capability-key-parser` | service-owned | `TOOL_EXECUTION_SUPPORT` / `CAPABILITY_PLANNING_SUPPORT` | `LOW` | `EXTRACTED` | `server/services/helix-ask/tool-router/capability-key.ts` | S242 moved the pure capability-key panel/action parser into a dedicated tool-router support service. It does not move capability selection, tool validation, tool execution, observation materialization, source admission, terminal materialization, terminal authority, or projection behavior. |
 | `runtime-intent-packet` | service-owned | `CONTINUATION_SOLVER_HANDOFF` | `MEDIUM` | `EXTRACTED` | `server/services/helix-ask/runtime/runtime-intent-packet.ts` | S131 moved runtime-intent packet readers, source/capability turn predicates, packet assembly, ledger/debug append, and audit-refresh handoff through a four-callback dependency interface. It does not move runtime-loop orchestration, tool execution, goal satisfaction, terminal materialization, or terminal authority. |
@@ -183,6 +184,7 @@ Do not extract `runHelixAgentTurnRuntimeLoop` in this wave. Do not patch termina
 | `live-source-mail-progress-refs` | live-source mailbox support / observation materialization support | service-owned | Match accepted mail-loop progress ref prefixes, recursively collect refs from already-materialized values, classify progress kind, and build mail-loop progress receipts from route-supplied live predicates. | Extracted by S248-S249 into `server/services/helix-ask/live-source/mail-progress-refs.ts`. Mail-loop budget and continuation policy remain route-owned. | `EXTRACTED` |
 | `turn-contract-objective-evidence` | `turn-contract-builder` / evidence pack | service-owned | Normalize objective labels and infer required-slot hits from evidence refs. | Extracted by S110 with label-key and evidence slot-hit coverage. | `EXTRACTED` |
 | `composite-followup-helpers` | composite follow-up / solver handoff support | service-owned | Find latest matching composite terminal artifacts, render deterministic composite artifact summaries, build handoff hints, classify references to prior composite subgoals, build pure handoff decisions, and build the follow-up audit record. | Extracted by S273 and extended by S277 in `server/services/helix-ask/composite-followup-helpers.ts`. It preserves pure lookup/text/intent/decision/audit behavior while leaving composite receipt creation, pending request creation, terminal authority, projection, and live behavior route-owned. | `EXTRACTED` |
+| `reasoning-theater-state` | debug export / UI projection support | service-owned | Coerce trace/live events, build fallback reasoning theater events from payload terminal metadata, and attach reasoning theater state into debug payloads. | Extracted by S278 into `server/services/helix-ask/surface/reasoning-theater-state.ts`. It preserves event coercion, transcript/turn-event fallback order, trace id fallback order, and debug mirror writes while leaving response finalization, terminal authority, projection precedence, and live behavior route-owned. | `EXTRACTED` |
 | `composite-subgoal-detector` | composite prompt interpretation / compound goal support | service-owned | Normalize compound prompt text, locate prompt spans, and detect deterministic composite subgoals from workspace-action, doc-open, and equation cues. | Extracted by S274 into `server/services/helix-ask/composite-subgoal-detector.ts`. It preserves prompt detection behavior while leaving receipt artifact construction, subgoal execution, handoff decision, terminal authority, projection, and live behavior route-owned. | `EXTRACTED` |
 | `turn-contract-objective-unknown` | `turn-contract-builder` / evidence pack | service-owned | Build and sanitize objective unknown blocks for unresolved slots. | Extracted by S111 with fallback and scaffold-sanitization coverage. | `EXTRACTED` |
 | `turn-contract-objective-mini-answers` | objective loop / evidence re-entry | service-owned | Assemble objective mini-answer records from loop states, support, coverage, retrieval files, fallback evidence refs, summarize status counts, render objective mini-synth/mini-critic/objective-assembly prompts, and apply parsed mini-synth/mini-critic results. | Extracted by S112-S113 and S116-S120 with covered/blocked/fallback, summary-count, prompt-rendering, mini-synth application, mini-critic application, and assembly-prompt behavior coverage. LLM invocation, repair, and objective assembly policy remain route-owned or delegated to the objective assembly service; mini-synth/critic parsing is now routed through `objective-llm-contracts` by S127. | `EXTRACTED` |

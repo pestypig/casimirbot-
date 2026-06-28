@@ -130,7 +130,7 @@ terminal eligibility, projection discipline, and debug traces.
 
 ## Current Extraction Status
 
-The extraction wave now continues through S277. Recent slices moved small,
+The extraction wave now continues through S278. Recent slices moved small,
 mechanical readers and formatters behind service owners, while intentionally
 leaving source admission, tool execution, runtime-loop orchestration, terminal
 materialization, terminal authority, projection, live-source behavior, and
@@ -202,6 +202,7 @@ helper moves as runtime ownership proof.
 | S273 | composite follow-up helpers | `server/services/helix-ask/composite-followup-helpers.ts` | SERVICE_OWNED for latest composite artifact lookup, deterministic composite artifact summary rendering, handoff hint construction, and subgoal-reference intent classification only; composite receipt creation, pending-server-request materialization, handoff decision, terminal materialization, authority, projection, and live behavior remain route-owned |
 | S276 | Stage Play checkpoint receipt payload | `server/services/helix-ask/live-source/stage-play-checkpoint-receipt.ts` | SERVICE_OWNED_SUPPORT_ONLY for pure checkpoint receipt input assembly from already-supplied route payload/draft/artifacts; checkpoint receipt recording, queue completion, payload/ledger mutation, terminal materialization, authority, projection, and live behavior remain route-owned |
 | S277 | composite follow-up builders | `server/services/helix-ask/composite-followup-helpers.ts` | SERVICE_OWNED for pure composite handoff decision and follow-up audit builders only; composite binding, follow-up payload assembly, pending-server-request materialization, terminal materialization, authority, projection, and live behavior remain route-owned |
+| S278 | reasoning theater payload debug | `server/services/helix-ask/surface/reasoning-theater-state.ts` | SERVICE_OWNED for trace/live event coercion, fallback reasoning theater event assembly, and debug payload state attachment only; response finalization, terminal materialization, terminal authority, projection precedence, and live behavior remain route-owned |
 | S274 | composite subgoal detector | `server/services/helix-ask/composite-subgoal-detector.ts` | SERVICE_OWNED for composite prompt normalization, prompt-span lookup, composite subgoal type definitions, and deterministic composite subgoal detection only; receipt construction, typed-failure construction, subgoal execution, handoff decision, terminal materialization, authority, projection, and live behavior remain route-owned |
 | S275 | goal satisfaction artifact | `server/services/helix-ask/goal-satisfaction-artifact.ts` | SERVICE_OWNED for reusable `goal_satisfaction_evaluation` ledger artifact construction only; satisfaction evaluation, goal-hash fallback selection, merge order, pending-input handling, terminal materialization, authority, projection, and runtime-loop behavior remain route-owned |
 | S257 | live-answer environment intent | `server/services/helix-ask/live-answer-environment-intent.ts` | SERVICE_OWNED for the live-answer environment/card state prompt predicate only |
