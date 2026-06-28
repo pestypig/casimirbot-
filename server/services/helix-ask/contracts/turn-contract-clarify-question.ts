@@ -20,3 +20,7 @@ export const buildHelixAskTurnContractClarifyQuestion = (args: {
   }
   return "";
 };
+
+export const finalizeHelixAskTurnContractClarifyQuestion = (
+  clarifyQuestion: string,
+): string | null => clarifyQuestion || null;

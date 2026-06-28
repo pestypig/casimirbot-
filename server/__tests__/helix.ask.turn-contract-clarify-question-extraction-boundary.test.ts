@@ -3,7 +3,10 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { buildHelixAskTurnContractClarifyQuestion } from "../services/helix-ask/contracts/turn-contract-clarify-question";
+import {
+  buildHelixAskTurnContractClarifyQuestion,
+  finalizeHelixAskTurnContractClarifyQuestion,
+} from "../services/helix-ask/contracts/turn-contract-clarify-question";
 
 const repoRoot = process.cwd();
 const routePath = join(repoRoot, "server/routes/agi.plan.ts");
@@ -15,8 +18,11 @@ describe("Helix Ask turn-contract clarify-question extraction boundary", () => {
     const serviceSource = readFileSync(servicePath, "utf8");
 
     expect(routeSource).toContain("../services/helix-ask/contracts/turn-contract-clarify-question");
+    expect(routeSource).toContain("finalizeHelixAskTurnContractClarifyQuestion(clarifyQuestion)");
+    expect(routeSource).not.toContain("clarify_question: clarifyQuestion || null");
     expect(routeSource).not.toContain("Which objective should be pinned to explicit repo anchors first?");
     expect(serviceSource).toMatch(/export\s+const\s+buildHelixAskTurnContractClarifyQuestion\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+finalizeHelixAskTurnContractClarifyQuestion\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");
     expect(serviceSource).not.toContain("../../../routes/agi.plan");
     expect(serviceSource).not.toContain("../../routes/agi.plan");
@@ -52,5 +58,10 @@ describe("Helix Ask turn-contract clarify-question extraction boundary", () => {
         explicitAnchorPathCount: 1,
       }),
     ).toBe("");
+  });
+
+  it("keeps nullable contract-field packaging in the clarify-question owner", () => {
+    expect(finalizeHelixAskTurnContractClarifyQuestion("Which source first?")).toBe("Which source first?");
+    expect(finalizeHelixAskTurnContractClarifyQuestion("")).toBeNull();
   });
 });
