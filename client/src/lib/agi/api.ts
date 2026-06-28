@@ -9,6 +9,7 @@ import type { PromptSpec } from "@shared/prompt-spec";
 import type { ChatSession } from "@shared/agi-chat";
 import type { AgiRefineryRequest } from "@shared/agi-refinery";
 import type { HelixAskResponseEnvelope } from "@shared/helix-ask-envelope";
+import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
 import type { HelixAskRouteMetadata } from "@/lib/helix/ask-prompt-launch";
 import type { HelixTurnInputItem } from "@shared/helix-turn-input-item";
 import type { SituationContextPack } from "@shared/helix-situation-context-pack";
@@ -524,6 +525,8 @@ export type HelixAskTurnStreamEvent = {
 
 type RunAskTurnPayload = {
   question: string;
+  agentRuntime?: HelixAgentRuntimeId;
+  agent_runtime?: HelixAgentRuntimeId;
   sessionId?: string;
   traceId?: string;
   turnId?: string;
@@ -1864,6 +1867,8 @@ const buildRunAskTurnBody = (payload: RunAskTurnPayload): Record<string, unknown
   const body: Record<string, unknown> = {
     question: payload.question,
   };
+  if (payload.agentRuntime) body.agent_runtime = payload.agentRuntime;
+  if (payload.agent_runtime) body.agent_runtime = payload.agent_runtime;
   if (payload.sessionId?.trim()) body.sessionId = payload.sessionId.trim();
   if (payload.traceId?.trim()) body.traceId = payload.traceId.trim();
   if (payload.turnId?.trim()) body.turnId = payload.turnId.trim();
