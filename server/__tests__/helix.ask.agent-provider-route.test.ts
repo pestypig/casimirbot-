@@ -171,11 +171,30 @@ describe("Helix Ask agent provider route metadata", () => {
       .get("/api/agi/ask/turn/ask%3Atest%3Ahelix-provider-gateway-route/debug-export")
       .expect(200);
     expect(debugExport.body).toMatchObject({
-      active_turn_id: "ask:test:helix-provider-gateway-route",
+      ok: true,
       payload: {
+        active_turn_id: "ask:test:helix-provider-gateway-route",
         response_type: "workstation_gateway_observation",
         final_status: "requires_provider_reasoning_reentry",
         terminal_authority_status: "not_authorized_observation_only",
+        workstation_gateway_reentry_status: "pending_helix_solver_reentry",
+        workstation_gateway_observation_packets: [
+          {
+            status: "succeeded",
+            terminal_eligible: false,
+            post_tool_model_step_required: true,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        ],
+        provider_reasoning_reentry: {
+          schema: "helix.provider_reasoning_reentry.v1",
+          status: "pending_helix_solver_reentry",
+        },
+        terminal_authority_candidate_review: {
+          schema: "helix.provider_terminal_authority_candidate_review.v1",
+          terminal_authority_granted: false,
+        },
       },
     });
   });
@@ -256,11 +275,30 @@ describe("Helix Ask agent provider route metadata", () => {
       .get("/api/agi/ask/turn/ask%3Atest%3Ahelix-provider-gateway-stream/debug-export")
       .expect(200);
     expect(debugExport.body).toMatchObject({
-      active_turn_id: "ask:test:helix-provider-gateway-stream",
+      ok: true,
       payload: {
+        active_turn_id: "ask:test:helix-provider-gateway-stream",
         response_type: "workstation_gateway_observation",
         final_status: "requires_provider_reasoning_reentry",
         terminal_authority_status: "not_authorized_observation_only",
+        workstation_gateway_reentry_status: "pending_helix_solver_reentry",
+        workstation_gateway_observation_packets: [
+          {
+            status: "succeeded",
+            terminal_eligible: false,
+            post_tool_model_step_required: true,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        ],
+        provider_reasoning_reentry: {
+          schema: "helix.provider_reasoning_reentry.v1",
+          status: "pending_helix_solver_reentry",
+        },
+        terminal_authority_candidate_review: {
+          schema: "helix.provider_terminal_authority_candidate_review.v1",
+          terminal_authority_granted: false,
+        },
       },
     });
   });
