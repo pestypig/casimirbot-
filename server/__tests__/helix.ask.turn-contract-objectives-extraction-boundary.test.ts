@@ -3,7 +3,10 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { buildHelixAskTurnContractObjectives } from "../services/helix-ask/contracts/turn-contract-objectives";
+import {
+  buildHelixAskTurnContractObjectives,
+  selectHelixAskTurnContractObjectiveInputs,
+} from "../services/helix-ask/contracts/turn-contract-objectives";
 
 const repoRoot = process.cwd();
 const routePath = join(repoRoot, "server/routes/agi.plan.ts");
@@ -16,8 +19,11 @@ describe("Helix Ask turn-contract objectives extraction boundary", () => {
 
     expect(routeSource).toContain("../services/helix-ask/contracts/turn-contract-objectives");
     expect(routeSource).not.toContain("const objectives = objectiveInputs\n    .map((entry) => {");
+    expect(routeSource).toContain("selectHelixAskTurnContractObjectiveInputs({");
+    expect(routeSource).not.toContain("? args.plannerPass.objectives\n        : fallbackObjectiveLabels.map");
     expect(routeSource).not.toContain("return {\n        label,\n        required_slots: requiredSlots,\n        query_hints: queryHints,\n      } satisfies HelixAskTurnContractObjective;");
     expect(serviceSource).toMatch(/export\s+const\s+buildHelixAskTurnContractObjectives\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+selectHelixAskTurnContractObjectiveInputs\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");
     expect(serviceSource).not.toContain("../../../routes/agi.plan");
     expect(serviceSource).not.toContain("../../routes/agi.plan");
@@ -68,5 +74,35 @@ describe("Helix Ask turn-contract objectives extraction boundary", () => {
         query_hints: ["Answer the current ask.", "current ask."],
       },
     ]);
+  });
+
+  it("preserves objective input precedence from research, planner, then fallback labels", () => {
+    const researchObjectiveInputs = [{ label: "research objective" }];
+    const plannerObjectiveInputs = [{ label: "planner objective" }];
+    const fallbackObjectiveLabels = ["fallback objective"];
+
+    expect(
+      selectHelixAskTurnContractObjectiveInputs({
+        researchObjectiveInputs,
+        plannerObjectiveInputs,
+        fallbackObjectiveLabels,
+      }),
+    ).toBe(researchObjectiveInputs);
+
+    expect(
+      selectHelixAskTurnContractObjectiveInputs({
+        researchObjectiveInputs: [],
+        plannerObjectiveInputs,
+        fallbackObjectiveLabels,
+      }),
+    ).toBe(plannerObjectiveInputs);
+
+    expect(
+      selectHelixAskTurnContractObjectiveInputs({
+        researchObjectiveInputs: [],
+        plannerObjectiveInputs: [],
+        fallbackObjectiveLabels,
+      }),
+    ).toEqual([{ label: "fallback objective" }]);
   });
 });

@@ -11,6 +11,17 @@ import {
   buildHelixAskTurnObjectiveSlots,
 } from "./turn-contract-objective-planning";
 
+export const selectHelixAskTurnContractObjectiveInputs = (args: {
+  researchObjectiveInputs: HelixAskObjectivePlannerPassObjective[];
+  plannerObjectiveInputs?: HelixAskObjectivePlannerPassObjective[] | null;
+  fallbackObjectiveLabels: string[];
+}): HelixAskObjectivePlannerPassObjective[] =>
+  args.researchObjectiveInputs.length
+    ? args.researchObjectiveInputs
+    : args.plannerObjectiveInputs?.length
+      ? args.plannerObjectiveInputs
+      : args.fallbackObjectiveLabels.map((label): HelixAskObjectivePlannerPassObjective => ({ label }));
+
 export const buildHelixAskTurnContractObjectives = (args: {
   objectiveInputs: HelixAskObjectivePlannerPassObjective[];
   question: string;
