@@ -875,7 +875,10 @@ describe("HelixAskPill mic-first surface contract", () => {
   it("keeps the prompt textarea below the controls at full composer width", () => {
     const source = fs.readFileSync(pillPath, "utf8");
     expect(source).toContain('className="flex flex-col gap-2 px-4 py-3"');
-    expect(source).toContain('className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2"');
+    expect(source).toContain('className="relative min-w-0 flex-1"');
+    expect(source).toContain("snap-x snap-mandatory");
+    expect(source).toContain("[scrollbar-width:none]");
+    expect(source).toContain("Scroll Ask controls right");
     expect(source).toContain("helix-ask-textarea w-full min-w-0 resize-none");
     expect(source).toContain("const HELIX_ASK_MAX_PROMPT_LINES = 10;");
   });

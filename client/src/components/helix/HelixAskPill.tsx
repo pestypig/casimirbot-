@@ -17251,6 +17251,11 @@ export function HelixAskPill({
   const helixAskSessionContextRef = useRef<string | null>(null);
   const askInputRef = useRef<HTMLTextAreaElement | null>(null);
   const askImageInputRef = useRef<HTMLInputElement | null>(null);
+  const askActionCarouselRef = useRef<HTMLDivElement | null>(null);
+  const [askActionCarouselEdges, setAskActionCarouselEdges] = useState({
+    canScrollLeft: false,
+    canScrollRight: false,
+  });
   const [askBusy, setAskBusy] = useState(false);
   const activeAskTurnIdRef = useRef<string | null>(null);
   const activeAskStartedAtMsRef = useRef<number | null>(null);
@@ -17259,6 +17264,52 @@ export function HelixAskPill({
   const [askAttachments, setAskAttachments] = useState<HelixAskAttachment[]>([]);
   const [askReplies, setAskReplies] = useState<HelixAskReply[]>([]);
   const askRepliesRef = useRef<HelixAskReply[]>([]);
+  const triggerAskActionHaptic = useCallback(() => {
+    try {
+      navigator.vibrate?.(12);
+    } catch {
+      // Some browsers expose vibrate but reject it outside supported contexts.
+    }
+  }, []);
+  const updateAskActionCarouselEdges = useCallback(() => {
+    const node = askActionCarouselRef.current;
+    if (!node) {
+      setAskActionCarouselEdges({ canScrollLeft: false, canScrollRight: false });
+      return;
+    }
+    const maxScrollLeft = Math.max(0, node.scrollWidth - node.clientWidth);
+    const scrollLeft = Math.max(0, node.scrollLeft);
+    setAskActionCarouselEdges({
+      canScrollLeft: scrollLeft > 2,
+      canScrollRight: scrollLeft < maxScrollLeft - 2,
+    });
+  }, []);
+  const scrollAskActionCarousel = useCallback((direction: "left" | "right") => {
+    const node = askActionCarouselRef.current;
+    if (!node) return;
+    const firstAction = node.querySelector<HTMLElement>("[data-helix-ask-action-item='true']");
+    const step = Math.max(48, (firstAction?.offsetWidth ?? 40) + 8);
+    triggerAskActionHaptic();
+    node.scrollBy({
+      left: direction === "left" ? -step : step,
+      behavior: "smooth",
+    });
+    window.setTimeout(updateAskActionCarouselEdges, 260);
+  }, [triggerAskActionHaptic, updateAskActionCarouselEdges]);
+  useEffect(() => {
+    const node = askActionCarouselRef.current;
+    if (!node) return;
+    updateAskActionCarouselEdges();
+    const handleScroll = () => updateAskActionCarouselEdges();
+    node.addEventListener("scroll", handleScroll, { passive: true });
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined" ? new ResizeObserver(updateAskActionCarouselEdges) : null;
+    resizeObserver?.observe(node);
+    return () => {
+      node.removeEventListener("scroll", handleScroll);
+      resizeObserver?.disconnect();
+    };
+  }, [updateAskActionCarouselEdges]);
   useEffect(() => {
     askRepliesRef.current = askReplies;
   }, [askReplies]);
@@ -34313,6 +34364,17 @@ export function HelixAskPill({
     check: validateHelixAskAttachmentForSubmit(attachment),
   }));
   const hasReadyAskAttachment = askAttachmentCommitChecks.some((entry) => entry.check?.can_submit);
+  useEffect(() => {
+    updateAskActionCarouselEdges();
+  }, [
+    askAttachments.length,
+    askBusy,
+    hasReadyAskAttachment,
+    updateAskActionCarouselEdges,
+    visualSituationIncludeAudio,
+    visualSituationSourceStatus,
+    voiceRetainedTranscriptionRetry,
+  ]);
   const inputPlaceholder = placeholder ?? "Ask anything about this system";
   const replyListClassNameResolved =
     replyListClassName ??
@@ -35222,7 +35284,20 @@ export function HelixAskPill({
                     )}
                   </div>
                 </div>
-                <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2">
+                <div className="relative min-w-0 flex-1">
+                  <button
+                    type="button"
+                    aria-label="Scroll Ask controls left"
+                    className={`absolute inset-y-0 left-0 z-10 w-12 rounded-l-full bg-gradient-to-r from-slate-950/95 via-slate-950/50 to-transparent transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 ${
+                      askActionCarouselEdges.canScrollLeft ? "opacity-100" : "pointer-events-none opacity-0"
+                    }`}
+                    onClick={() => scrollAskActionCarousel("left")}
+                    disabled={!askActionCarouselEdges.canScrollLeft}
+                  />
+                  <div
+                    ref={askActionCarouselRef}
+                    className="flex min-w-0 snap-x snap-mandatory items-center justify-end gap-2 overflow-x-auto scroll-smooth px-12 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                  >
                   <input
                     ref={askImageInputRef}
                     type="file"
@@ -35233,33 +35308,41 @@ export function HelixAskPill({
                   />
                   <button
                     type="button"
+                    data-helix-ask-action-item="true"
                     aria-label="Attach image"
                     title="Attach image"
-                    className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60 ${
+                    className={`inline-flex h-10 w-10 shrink-0 snap-center items-center justify-center rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60 ${
                       hasReadyAskAttachment
                         ? "border-violet-300/50 bg-violet-400/15 text-violet-100 hover:bg-violet-400/20"
                         : askAttachments.length > 0
                           ? "border-amber-300/45 bg-amber-400/12 text-amber-100 hover:bg-amber-400/20"
                           : "border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
                     }`}
-                    onClick={() => askImageInputRef.current?.click()}
+                    onClick={() => {
+                      triggerAskActionHaptic();
+                      askImageInputRef.current?.click();
+                    }}
                     disabled={askBusy}
                   >
                     <Plus className="h-4 w-4" />
                   </button>
                   <button
                     type="button"
+                    data-helix-ask-action-item="true"
                     aria-label={micArmState === "on" ? "Disable microphone" : "Enable microphone"}
                     aria-pressed={micArmState === "on"}
                     title={micArmState === "on" ? "Disable microphone" : "Enable microphone"}
-                    className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60 ${
+                    className={`inline-flex h-10 w-10 shrink-0 snap-center items-center justify-center rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60 ${
                       micArmState === "on"
                         ? voiceInputState === "transcribing"
                           ? "border-cyan-300/45 bg-cyan-400/12 text-cyan-100"
                           : "border-emerald-300/55 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/20"
                         : "border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
                     }`}
-                    onClick={handleVoiceInputToggle}
+                    onClick={() => {
+                      triggerAskActionHaptic();
+                      handleVoiceInputToggle();
+                    }}
                   >
                     <Mic
                       className={`h-4 w-4 ${
@@ -35270,10 +35353,14 @@ export function HelixAskPill({
                   {voiceRetainedTranscriptionRetry ? (
                     <button
                       type="button"
+                      data-helix-ask-action-item="true"
                       aria-label="Retry saved voice sample"
                       title="Retry saved voice sample"
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-amber-300/45 bg-amber-400/12 text-amber-100 transition hover:bg-amber-400/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200/70 disabled:opacity-60"
-                      onClick={handleRetainedVoiceTranscriptionRetry}
+                      className="inline-flex h-10 w-10 shrink-0 snap-center items-center justify-center rounded-full border border-amber-300/45 bg-amber-400/12 text-amber-100 transition hover:bg-amber-400/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200/70 disabled:opacity-60"
+                      onClick={() => {
+                        triggerAskActionHaptic();
+                        handleRetainedVoiceTranscriptionRetry();
+                      }}
                       disabled={micArmState !== "on" || voiceTranscribeBusyRef.current}
                     >
                       <RotateCcw className="h-4 w-4" />
@@ -35281,10 +35368,11 @@ export function HelixAskPill({
                   ) : null}
                   <button
                     type="button"
+                    data-helix-ask-action-item="true"
                     aria-label="Capture visual source for Situation Room"
                     aria-pressed={visualSituationSourceStatus === "active"}
                     title="Capture visual source"
-                    className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60 ${
+                    className={`inline-flex h-10 w-10 shrink-0 snap-center items-center justify-center rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60 ${
                       visualSituationSourceStatus === "active"
                         ? "border-cyan-300/50 bg-cyan-400/15 text-cyan-100 hover:bg-cyan-400/20"
                         : visualSituationSourceStatus === "requesting"
@@ -35293,7 +35381,10 @@ export function HelixAskPill({
                             ? "border-rose-300/45 bg-rose-400/12 text-rose-100 hover:bg-rose-400/20"
                             : "border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
                     }`}
-                    onClick={handleVisualSituationSourceCapture}
+                    onClick={() => {
+                      triggerAskActionHaptic();
+                      handleVisualSituationSourceCapture();
+                    }}
                   >
                     <ImageIcon
                       className={`h-4 w-4 ${visualSituationSourceStatus === "active" ? "animate-pulse" : ""}`}
@@ -35301,17 +35392,21 @@ export function HelixAskPill({
                   </button>
                   <button
                     type="button"
+                    data-helix-ask-action-item="true"
                     aria-label={visualSituationIncludeAudio ? "Disable tab audio for visual capture" : "Enable tab audio for visual capture"}
                     aria-pressed={visualSituationIncludeAudio}
                     title={visualSituationIncludeAudio ? "Disable tab audio for visual capture" : "Enable tab audio for visual capture"}
-                    className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60 ${
+                    className={`inline-flex h-10 w-10 shrink-0 snap-center items-center justify-center rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60 ${
                       visualSituationIncludeAudio
                         ? displayAudioStatus === "error"
                           ? "border-rose-300/45 bg-rose-400/12 text-rose-100 hover:bg-rose-400/20"
                           : "border-teal-300/50 bg-teal-400/15 text-teal-100 hover:bg-teal-400/20"
                         : "border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
                     }`}
-                    onClick={handleVisualSituationAudioPreferenceToggle}
+                    onClick={() => {
+                      triggerAskActionHaptic();
+                      handleVisualSituationAudioPreferenceToggle();
+                    }}
                     disabled={visualSituationSourceStatus === "requesting"}
                   >
                     <Headphones
@@ -35319,14 +35414,32 @@ export function HelixAskPill({
                     />
                   </button>
                   <button
+                    data-helix-ask-action-item="true"
                     aria-label={askBusy ? "Stop generation" : "Submit prompt"}
                     title={askBusy ? "Stop generation" : "Submit prompt"}
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-100 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60"
-                    onClick={askBusy ? handleStop : undefined}
+                    className="inline-flex h-10 w-10 shrink-0 snap-center items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-100 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60"
+                    onClick={
+                      askBusy
+                        ? () => {
+                            triggerAskActionHaptic();
+                            handleStop();
+                          }
+                        : () => triggerAskActionHaptic()
+                    }
                     type={askBusy ? "button" : "submit"}
                   >
                     {askBusy ? <Square className="h-4 w-4" /> : <Search className="h-4 w-4" />}
                   </button>
+                  </div>
+                  <button
+                    type="button"
+                    aria-label="Scroll Ask controls right"
+                    className={`absolute inset-y-0 right-0 z-10 w-12 rounded-r-full bg-gradient-to-l from-slate-950/95 via-slate-950/50 to-transparent transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 ${
+                      askActionCarouselEdges.canScrollRight ? "opacity-100" : "pointer-events-none opacity-0"
+                    }`}
+                    onClick={() => scrollAskActionCarousel("right")}
+                    disabled={!askActionCarouselEdges.canScrollRight}
+                  />
                 </div>
               </div>
               <textarea
