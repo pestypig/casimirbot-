@@ -26,3 +26,6 @@ type HelixAskGoalFrameHashSource = {
 
 export const hashAskTurnGoalFrame = (frame: HelixAskGoalFrameHashSource): string =>
   crypto.createHash("sha1").update(`${frame.user_goal.goal_kind}:${frame.user_goal.normalized}`).digest("hex").slice(0, 16);
+
+export const readAskTurnGoalFrameString = (value: unknown): string | null =>
+  typeof value === "string" && value.trim().length > 0 ? value.trim() : null;

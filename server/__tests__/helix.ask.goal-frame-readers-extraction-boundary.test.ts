@@ -15,11 +15,14 @@ describe("Helix Ask goal-frame readers extraction boundary", () => {
     expect(routeSource).toContain("../services/helix-ask/goals/goal-frame-readers");
     expect(routeSource).not.toMatch(/const\s+readAskTurnGoalFrameMutationTarget\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+hashAskTurnGoalFrame\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+readAskTurnGoalFrameString\s*=\s*\(/);
     expect(serviceSource).toMatch(/export\s+const\s+readAskTurnGoalFrameMutationTarget\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+hashAskTurnGoalFrame\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+readAskTurnGoalFrameString\s*=/);
     expect(serviceSource).toContain("resolution !== \"missing\"");
     expect(serviceSource).toContain("sha1");
     expect(serviceSource).toContain("slice(0, 16)");
+    expect(serviceSource).toContain("value.trim().length > 0");
     expect(serviceSource).not.toContain("server/routes/agi.plan");
     expect(serviceSource).not.toContain("../../../routes/agi.plan");
     expect(serviceSource).not.toContain("../../routes/agi.plan");
