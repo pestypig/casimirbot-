@@ -10,6 +10,7 @@ import { buildHelixProviderReasoningReentry } from "./provider-terminal-authorit
 import {
   runExplicitWorkstationGatewayCalls,
 } from "./explicit-workstation-gateway";
+import { buildProviderGatewayDebugSummary } from "./provider-gateway-debug-summary";
 
 const enabled = (): boolean => process.env.ENABLE_CODEX_AGENT === "1";
 
@@ -175,6 +176,18 @@ export const codexProvider: HelixAgentProvider = {
 
     if (!question) {
       const text = "Codex runtime could not run because the Ask turn had no question.";
+      const providerGatewayDebugSummary = buildProviderGatewayDebugSummary({
+        body: request.body,
+        runtime: "codex",
+        providerLabel: codexProvider.label,
+        turnId,
+        route: request.route,
+        gatewayManifest,
+        gatewayCallResults,
+        runtimeSelectionTrace,
+        evidenceReentryStatus: runtimeSelectionTrace.evidence_reentry_status,
+        terminalAuthorityStatus: runtimeSelectionTrace.terminal_authority_status,
+      });
       return {
         ok: false,
         runtime: "codex",
@@ -199,6 +212,7 @@ export const codexProvider: HelixAgentProvider = {
           tool_followup_decisions: gatewayFollowupDecisions,
           workstation_gateway_reentry_status: runtimeSelectionTrace.evidence_reentry_status,
           terminal_authority_status: runtimeSelectionTrace.terminal_authority_status,
+          provider_gateway_debug_summary: providerGatewayDebugSummary,
         },
       };
     }
@@ -249,6 +263,29 @@ export const codexProvider: HelixAgentProvider = {
       providerText: text,
       ok,
     });
+    const providerGatewayDebugSummary = buildProviderGatewayDebugSummary({
+      body: request.body,
+      runtime: "codex",
+      providerLabel: codexProvider.label,
+      turnId,
+      route: request.route,
+      gatewayManifest,
+      gatewayCallResults,
+      runtimeSelectionTrace,
+      providerReasoningReentry: providerReentry.providerReasoningReentry,
+      providerTerminalCandidate: providerReentry.providerTerminalCandidate,
+      providerTerminalAuthorityBridge: providerReentry.providerTerminalAuthorityBridge,
+      terminalAuthorityCandidateReview: providerReentry.terminalAuthorityCandidateReview,
+      terminalAnswerAuthority: providerReentry.terminalAnswerAuthority,
+      finalAnswerSource: providerReentry.terminalAnswerAuthority
+        ? "agent_provider_terminal_candidate"
+        : null,
+      terminalArtifactKind: providerReentry.terminalAnswerAuthority
+        ? "agent_provider_terminal_candidate"
+        : null,
+      evidenceReentryStatus: providerReentry.workstationGatewayReentryStatus,
+      terminalAuthorityStatus: providerReentry.terminalAuthorityStatus,
+    });
 
     return {
       ok,
@@ -289,6 +326,7 @@ export const codexProvider: HelixAgentProvider = {
           : null,
         workstation_gateway_reentry_status: providerReentry.workstationGatewayReentryStatus,
         terminal_authority_status: providerReentry.terminalAuthorityStatus,
+        provider_gateway_debug_summary: providerGatewayDebugSummary,
       },
       raw: {
         stdout: result.stdout,

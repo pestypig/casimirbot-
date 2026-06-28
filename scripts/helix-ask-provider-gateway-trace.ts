@@ -69,6 +69,11 @@ const readRecordArray = (value: unknown): Record<string, unknown>[] =>
     ? value.map(readRecord).filter((entry): entry is Record<string, unknown> => Boolean(entry))
     : [];
 
+const readStringArray = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+    : [];
+
 const writeJson = async (filePath: string, value: unknown) => {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
   await fs.writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
@@ -79,6 +84,71 @@ const createRouteTraceApp = () => {
   app.use(express.json({ limit: "2mb" }));
   app.use("/api/agi", planRouter);
   return app;
+};
+
+const addProviderGatewaySummaryFailures = (input: {
+  failures: string[];
+  prefix: string;
+  source: Record<string, unknown> | null;
+  expectedProvider: string;
+  expectedCapabilityId: string;
+  expectedOk: boolean;
+  expectedReentryStatus: string;
+  expectedTerminalAuthorityStatus: string;
+  expectedFinalAnswerSource: string | null;
+}) => {
+  const summary = readRecord(input.source?.provider_gateway_debug_summary);
+  if (!summary) {
+    input.failures.push(`${input.prefix}_provider_gateway_debug_summary_missing`);
+    return;
+  }
+  if (readString(summary.schema) !== "helix.provider_gateway_debug_summary.v1") {
+    input.failures.push(`${input.prefix}_provider_gateway_debug_summary_schema:${readString(summary.schema) ?? "missing"}`);
+  }
+  if (readString(summary.selected_provider) !== input.expectedProvider) {
+    input.failures.push(
+      `${input.prefix}_summary_provider:${readString(summary.selected_provider) ?? "missing"}!=${input.expectedProvider}`,
+    );
+  }
+  if (readString(summary.capability_manifest_version) !== "read-observe.v1") {
+    input.failures.push(`${input.prefix}_summary_manifest_version:${readString(summary.capability_manifest_version) ?? "missing"}`);
+  }
+  const requestedCapabilities = readStringArray(summary.requested_capabilities);
+  const admittedCapabilities = readStringArray(summary.admitted_capabilities);
+  const executedCapabilities = readStringArray(summary.executed_capabilities);
+  if (!requestedCapabilities.includes(input.expectedCapabilityId)) {
+    input.failures.push(`${input.prefix}_summary_requested_capability_missing:${input.expectedCapabilityId}`);
+  }
+  if (input.expectedOk && !admittedCapabilities.includes(input.expectedCapabilityId)) {
+    input.failures.push(`${input.prefix}_summary_admitted_capability_missing:${input.expectedCapabilityId}`);
+  }
+  if (input.expectedOk && !executedCapabilities.includes(input.expectedCapabilityId)) {
+    input.failures.push(`${input.prefix}_summary_executed_capability_missing:${input.expectedCapabilityId}`);
+  }
+  if (!input.expectedOk) {
+    const blockedCapabilities = readRecordArray(summary.blocked_capabilities);
+    const blockedCapabilityIds = blockedCapabilities
+      .map((entry) => readString(entry.capability_id))
+      .filter((entry): entry is string => Boolean(entry));
+    if (!blockedCapabilityIds.includes(input.expectedCapabilityId)) {
+      input.failures.push(`${input.prefix}_summary_blocked_capability_missing:${input.expectedCapabilityId}`);
+    }
+  }
+  if (readString(summary.evidence_reentry_status) !== input.expectedReentryStatus) {
+    input.failures.push(
+      `${input.prefix}_summary_reentry_status:${readString(summary.evidence_reentry_status) ?? "missing"}!=${input.expectedReentryStatus}`,
+    );
+  }
+  if (readString(summary.terminal_authority_result) !== input.expectedTerminalAuthorityStatus) {
+    input.failures.push(
+      `${input.prefix}_summary_terminal_authority:${readString(summary.terminal_authority_result) ?? "missing"}!=${input.expectedTerminalAuthorityStatus}`,
+    );
+  }
+  if (readString(summary.final_answer_source) !== input.expectedFinalAnswerSource) {
+    input.failures.push(
+      `${input.prefix}_summary_final_answer_source:${readString(summary.final_answer_source) ?? "missing"}!=${input.expectedFinalAnswerSource ?? "null"}`,
+    );
+  }
 };
 
 const fetchJson = async (url: string, init?: RequestInit): Promise<{
@@ -272,6 +342,32 @@ const runRouteDebugExportProbe = async (input: {
       }
     }
   }
+  addProviderGatewaySummaryFailures({
+    failures: routeFailures,
+    prefix: "route",
+    source: ask,
+    expectedProvider: "codex",
+    expectedCapabilityId: input.scenario.capabilityId,
+    expectedOk: input.scenario.expectedOk,
+    expectedReentryStatus: "completed",
+    expectedTerminalAuthorityStatus: input.scenario.expectedOk
+      ? "authorized_by_helix_provider_candidate_bridge"
+      : "blocked_by_gateway_observation_state",
+    expectedFinalAnswerSource: input.scenario.expectedOk ? "agent_provider_terminal_candidate" : null,
+  });
+  addProviderGatewaySummaryFailures({
+    failures: routeFailures,
+    prefix: "debug",
+    source: debugPayload,
+    expectedProvider: "codex",
+    expectedCapabilityId: input.scenario.capabilityId,
+    expectedOk: input.scenario.expectedOk,
+    expectedReentryStatus: "completed",
+    expectedTerminalAuthorityStatus: input.scenario.expectedOk
+      ? "authorized_by_helix_provider_candidate_bridge"
+      : "blocked_by_gateway_observation_state",
+    expectedFinalAnswerSource: input.scenario.expectedOk ? "agent_provider_terminal_candidate" : null,
+  });
 
   return {
     ask,
@@ -292,6 +388,8 @@ const runRouteDebugExportProbe = async (input: {
       debug_terminal_authority_status: readString(debugPayload?.terminal_authority_status),
       final_answer_source: readString(ask.final_answer_source),
       debug_final_answer_source: readString(debugPayload?.final_answer_source),
+      provider_gateway_debug_summary: readRecord(ask.provider_gateway_debug_summary),
+      debug_provider_gateway_debug_summary: readRecord(debugPayload?.provider_gateway_debug_summary),
       procedural_ok: routeFailures.length === 0,
       failures: routeFailures,
     },
@@ -374,6 +472,28 @@ const runFutureRouteDebugExportProbe = async (input: {
       routeFailures.push(`future_debug_final_answer_source:${readString(debugPayload.final_answer_source) ?? "missing"}!=null`);
     }
   }
+  addProviderGatewaySummaryFailures({
+    failures: routeFailures,
+    prefix: "future_route",
+    source: ask,
+    expectedProvider: "future",
+    expectedCapabilityId: input.scenario.capabilityId,
+    expectedOk: input.scenario.expectedOk,
+    expectedReentryStatus: "pending_helix_solver_reentry",
+    expectedTerminalAuthorityStatus: "not_authorized_observation_only",
+    expectedFinalAnswerSource: null,
+  });
+  addProviderGatewaySummaryFailures({
+    failures: routeFailures,
+    prefix: "future_debug",
+    source: debugPayload,
+    expectedProvider: "future",
+    expectedCapabilityId: input.scenario.capabilityId,
+    expectedOk: input.scenario.expectedOk,
+    expectedReentryStatus: "pending_helix_solver_reentry",
+    expectedTerminalAuthorityStatus: "not_authorized_observation_only",
+    expectedFinalAnswerSource: null,
+  });
 
   return {
     ask,
@@ -394,6 +514,8 @@ const runFutureRouteDebugExportProbe = async (input: {
       debug_terminal_authority_status: readString(debugPayload?.terminal_authority_status),
       final_answer_source: readString(ask.final_answer_source),
       debug_final_answer_source: readString(debugPayload?.final_answer_source),
+      provider_gateway_debug_summary: readRecord(ask.provider_gateway_debug_summary),
+      debug_provider_gateway_debug_summary: readRecord(debugPayload?.provider_gateway_debug_summary),
       procedural_ok: routeFailures.length === 0,
       failures: routeFailures,
     },

@@ -3,6 +3,7 @@ import type {
   HelixWorkstationGatewayCallResult,
   HelixWorkstationGatewayListResult,
 } from "../workstation-tool-gateway/types";
+import { buildProviderGatewayDebugSummary } from "./provider-gateway-debug-summary";
 
 const buildSelectedAgentProviderDebug = (provider: HelixAgentProvider) => ({
   id: provider.id,
@@ -14,6 +15,7 @@ const buildSelectedAgentProviderDebug = (provider: HelixAgentProvider) => ({
 export const buildHelixProviderGatewayObservationPayload = (input: {
   provider: HelixAgentProvider;
   turnId: string;
+  body: Record<string, unknown>;
   runtimeSelectionTrace: Record<string, unknown>;
   gatewayManifest: HelixWorkstationGatewayListResult;
   gatewayCallResults: HelixWorkstationGatewayCallResult[];
@@ -55,6 +57,27 @@ export const buildHelixProviderGatewayObservationPayload = (input: {
     terminal_eligible: false,
     raw_content_included: false,
   };
+  const providerGatewayDebugSummary = buildProviderGatewayDebugSummary({
+    body: input.body,
+    runtime: input.provider.id,
+    providerLabel: input.provider.label,
+    turnId: input.turnId,
+    route: typeof input.runtimeSelectionTrace.route === "string"
+      ? (input.runtimeSelectionTrace.route as "/ask/turn" | "/ask/turn/stream" | "/ask")
+      : "/ask/turn",
+    gatewayManifest: input.gatewayManifest,
+    gatewayCallResults: input.gatewayCallResults,
+    runtimeSelectionTrace: input.runtimeSelectionTrace,
+    providerReasoningReentry,
+    providerTerminalCandidate: null,
+    providerTerminalAuthorityBridge: null,
+    terminalAuthorityCandidateReview,
+    terminalAnswerAuthority: null,
+    finalAnswerSource: null,
+    terminalArtifactKind: null,
+    evidenceReentryStatus: "pending_helix_solver_reentry",
+    terminalAuthorityStatus: "not_authorized_observation_only",
+  });
   const sharedDebug = {
     turn_id: input.turnId,
     agent_runtime: input.provider.id,
@@ -77,6 +100,7 @@ export const buildHelixProviderGatewayObservationPayload = (input: {
     terminal_presentation: null,
     final_answer_source: null,
     terminal_artifact_kind: null,
+    provider_gateway_debug_summary: providerGatewayDebugSummary,
   };
 
   return {

@@ -8,6 +8,7 @@ import {
   runExplicitWorkstationGatewayCalls,
 } from "./explicit-workstation-gateway";
 import { buildHelixProviderGatewayObservationPayload } from "./workstation-gateway-observation";
+import { buildProviderGatewayDebugSummary } from "./provider-gateway-debug-summary";
 
 const enabled = (): boolean => process.env.ENABLE_FUTURE_AGENT === "1";
 
@@ -74,6 +75,7 @@ export const futureProvider: HelixAgentProvider = {
       return buildHelixProviderGatewayObservationPayload({
         provider: futureProvider,
         turnId,
+        body: request.body,
         runtimeSelectionTrace,
         gatewayManifest,
         gatewayCallResults,
@@ -83,6 +85,18 @@ export const futureProvider: HelixAgentProvider = {
     const text = question
       ? "Future Agent Wrapper is selected, but no concrete future provider adapter has been attached yet."
       : "Future Agent Wrapper could not run because the Ask turn had no question.";
+    const providerGatewayDebugSummary = buildProviderGatewayDebugSummary({
+      body: request.body,
+      runtime: "future",
+      providerLabel: futureProvider.label,
+      turnId,
+      route: request.route,
+      gatewayManifest,
+      gatewayCallResults: [],
+      runtimeSelectionTrace,
+      evidenceReentryStatus: "pending_provider_reasoning",
+      terminalAuthorityStatus: "pending_helix_terminal_authority",
+    });
 
     return {
       ok: false,
@@ -109,6 +123,7 @@ export const futureProvider: HelixAgentProvider = {
         terminal_answer_authority: null,
         final_answer_source: null,
         terminal_artifact_kind: null,
+        provider_gateway_debug_summary: providerGatewayDebugSummary,
       },
     };
   },
