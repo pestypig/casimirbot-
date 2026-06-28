@@ -63,8 +63,10 @@ describe("Helix Ask obligations extraction boundary", () => {
 
     expect(routeSource).toContain("normalizeHelixAskAnswerFormatEvidenceKinds");
     expect(routeSource).toContain("inferHelixAskAnswerPlanSectionEvidenceKinds");
+    expect(routeSource).not.toMatch(/const\s+normalizeHelixAskAnswerFormatSectionKind\s*=/);
     expect(routeSource).not.toMatch(/const\s+normalizeHelixAskAnswerFormatEvidenceKinds\s*=/);
     expect(routeSource).not.toMatch(/const\s+inferHelixAskAnswerPlanSectionEvidenceKinds\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+normalizeHelixAskAnswerFormatSectionKind\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+normalizeHelixAskAnswerFormatEvidenceKinds\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+inferHelixAskAnswerPlanSectionEvidenceKinds\s*=/);
   });
