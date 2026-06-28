@@ -396,6 +396,132 @@ const runRouteDebugExportProbe = async (input: {
   };
 };
 
+const runHelixRouteDebugExportProbe = async (input: {
+  app: ReturnType<typeof createRouteTraceApp>;
+  body: Record<string, unknown>;
+  scenario: Scenario;
+}) => {
+  const response = await request(input.app)
+    .post("/api/agi/ask/turn")
+    .send({
+      ...input.body,
+      agent_runtime: "helix",
+      turn_id: `${readString(input.body.turn_id) ?? "ask:provider-gateway-trace"}:helix-route`,
+      question: `Use the provided Helix workstation gateway observation for ${input.scenario.id} through Helix Native.`,
+    });
+  const ask = readRecord(response.body) ?? {};
+  const endpoint = readDebugExportEndpoint(ask);
+  const debugResponse = endpoint
+    ? await request(input.app).get(endpoint)
+    : null;
+  const debugExport = readRecord(debugResponse?.body) ?? null;
+  const debugPayload = readRecord(debugExport?.payload);
+  const routeFailures: string[] = [];
+  if (response.status !== 200) routeFailures.push(`helix_route_status:${response.status}`);
+  if (!endpoint) routeFailures.push("helix_route_debug_export_ref_missing");
+  if (endpoint && debugResponse?.status !== 200) {
+    routeFailures.push(`helix_route_debug_export_status:${debugResponse?.status ?? "missing"}`);
+  }
+  if (readString(ask.agent_runtime) !== "helix") {
+    routeFailures.push(`helix_route_agent_runtime:${readString(ask.agent_runtime) ?? "missing"}!=helix`);
+  }
+  if (readString(ask.workstation_gateway_manifest_version) !== "read-observe.v1") {
+    routeFailures.push("helix_route_manifest_version_missing");
+  }
+  if (readString(ask.workstation_gateway_reentry_status) !== "pending_helix_solver_reentry") {
+    routeFailures.push(
+      `helix_route_reentry_status:${readString(ask.workstation_gateway_reentry_status) ?? "missing"}!=pending_helix_solver_reentry`,
+    );
+  }
+  if (readString(ask.terminal_authority_status) !== "not_authorized_observation_only") {
+    routeFailures.push(
+      `helix_route_terminal_authority_status:${readString(ask.terminal_authority_status) ?? "missing"}!=not_authorized_observation_only`,
+    );
+  }
+  if (readString(ask.final_answer_source) !== null) {
+    routeFailures.push(`helix_route_final_answer_source:${readString(ask.final_answer_source) ?? "missing"}!=null`);
+  }
+  if (debugPayload) {
+    if (readString(debugPayload.agent_runtime) !== "helix") {
+      routeFailures.push(`helix_debug_agent_runtime:${readString(debugPayload.agent_runtime) ?? "missing"}!=helix`);
+    }
+    if (readString(debugPayload.workstation_gateway_manifest_version) !== "read-observe.v1") {
+      routeFailures.push("helix_debug_manifest_version_missing");
+    }
+    if (readRecordArray(debugPayload.workstation_gateway_call_results).length !== 1) {
+      routeFailures.push(
+        `helix_debug_gateway_call_result_count:${readRecordArray(debugPayload.workstation_gateway_call_results).length}`,
+      );
+    }
+    if (readRecordArray(debugPayload.workstation_gateway_observation_packets).length !== 1) {
+      routeFailures.push(
+        `helix_debug_observation_packet_count:${readRecordArray(debugPayload.workstation_gateway_observation_packets).length}`,
+      );
+    }
+    if (readString(debugPayload.workstation_gateway_reentry_status) !== "pending_helix_solver_reentry") {
+      routeFailures.push(
+        `helix_debug_reentry_status:${readString(debugPayload.workstation_gateway_reentry_status) ?? "missing"}!=pending_helix_solver_reentry`,
+      );
+    }
+    if (readString(debugPayload.terminal_authority_status) !== "not_authorized_observation_only") {
+      routeFailures.push(
+        `helix_debug_terminal_authority_status:${readString(debugPayload.terminal_authority_status) ?? "missing"}!=not_authorized_observation_only`,
+      );
+    }
+    if (readString(debugPayload.final_answer_source) !== null) {
+      routeFailures.push(`helix_debug_final_answer_source:${readString(debugPayload.final_answer_source) ?? "missing"}!=null`);
+    }
+  }
+  addProviderGatewaySummaryFailures({
+    failures: routeFailures,
+    prefix: "helix_route",
+    source: ask,
+    expectedProvider: "helix",
+    expectedCapabilityId: input.scenario.capabilityId,
+    expectedOk: input.scenario.expectedOk,
+    expectedReentryStatus: "pending_helix_solver_reentry",
+    expectedTerminalAuthorityStatus: "not_authorized_observation_only",
+    expectedFinalAnswerSource: null,
+  });
+  addProviderGatewaySummaryFailures({
+    failures: routeFailures,
+    prefix: "helix_debug",
+    source: debugPayload,
+    expectedProvider: "helix",
+    expectedCapabilityId: input.scenario.capabilityId,
+    expectedOk: input.scenario.expectedOk,
+    expectedReentryStatus: "pending_helix_solver_reentry",
+    expectedTerminalAuthorityStatus: "not_authorized_observation_only",
+    expectedFinalAnswerSource: null,
+  });
+
+  return {
+    ask,
+    debugExport,
+    summary: {
+      schema: "helix.provider_gateway_helix_route_debug_export_probe.v1",
+      response_status: response.status,
+      debug_export_status: debugResponse?.status ?? null,
+      debug_export_endpoint: endpoint,
+      provider_selected: readString(ask.agent_runtime),
+      manifest_version: readString(ask.workstation_gateway_manifest_version),
+      gateway_call_result_count: readRecordArray(ask.workstation_gateway_call_results).length,
+      debug_gateway_call_result_count: readRecordArray(debugPayload?.workstation_gateway_call_results).length,
+      debug_observation_packet_count: readRecordArray(debugPayload?.workstation_gateway_observation_packets).length,
+      reentry_status: readString(ask.workstation_gateway_reentry_status),
+      debug_reentry_status: readString(debugPayload?.workstation_gateway_reentry_status),
+      terminal_authority_status: readString(ask.terminal_authority_status),
+      debug_terminal_authority_status: readString(debugPayload?.terminal_authority_status),
+      final_answer_source: readString(ask.final_answer_source),
+      debug_final_answer_source: readString(debugPayload?.final_answer_source),
+      provider_gateway_debug_summary: readRecord(ask.provider_gateway_debug_summary),
+      debug_provider_gateway_debug_summary: readRecord(debugPayload?.provider_gateway_debug_summary),
+      procedural_ok: routeFailures.length === 0,
+      failures: routeFailures,
+    },
+  };
+};
+
 const runFutureRouteDebugExportProbe = async (input: {
   app: ReturnType<typeof createRouteTraceApp>;
   body: Record<string, unknown>;
@@ -646,6 +772,11 @@ const runScenario = async (scenario: Scenario, routeTraceApp: ReturnType<typeof 
       }
     }
   }
+  const helixRouteProbe = await runHelixRouteDebugExportProbe({
+    app: routeTraceApp,
+    body,
+    scenario,
+  });
   const originalEnableFutureAgent = process.env.ENABLE_FUTURE_AGENT;
   process.env.ENABLE_FUTURE_AGENT = "1";
   let futureRouteProbe: Awaited<ReturnType<typeof runFutureRouteDebugExportProbe>>;
@@ -750,6 +881,9 @@ const runScenario = async (scenario: Scenario, routeTraceApp: ReturnType<typeof 
   for (const routeFailure of routeProbe.summary.failures) {
     failures.push(`route_debug_export_${routeFailure}`);
   }
+  for (const helixRouteFailure of helixRouteProbe.summary.failures) {
+    failures.push(`helix_route_debug_export_${helixRouteFailure}`);
+  }
   for (const futureRouteFailure of futureRouteProbe.summary.failures) {
     failures.push(`future_route_debug_export_${futureRouteFailure}`);
   }
@@ -758,6 +892,15 @@ const runScenario = async (scenario: Scenario, routeTraceApp: ReturnType<typeof 
     failures,
     prefix: "helix",
     result: helixGatewayResult as unknown as Record<string, unknown>,
+    scenario,
+  });
+  const helixRouteCallResults = readRecordArray(helixRouteProbe.ask.workstation_gateway_call_results);
+  const helixRouteFirstResult = helixRouteCallResults[0] ?? {};
+  const helixRouteSummary = buildGatewayCallSummary(helixRouteFirstResult);
+  addGatewayInvariantFailures({
+    failures,
+    prefix: "helix_route",
+    result: helixRouteFirstResult,
     scenario,
   });
   for (const field of [
@@ -779,6 +922,9 @@ const runScenario = async (scenario: Scenario, routeTraceApp: ReturnType<typeof 
     if (JSON.stringify(codexSummary[field]) !== JSON.stringify(helixSummary[field])) {
       failures.push(`provider_parity_${field}:${String(codexSummary[field])}!=${String(helixSummary[field])}`);
     }
+    if (JSON.stringify(codexSummary[field]) !== JSON.stringify(helixRouteSummary[field])) {
+      failures.push(`provider_route_parity_${field}:${String(codexSummary[field])}!=${String(helixRouteSummary[field])}`);
+    }
   }
 
   const probeResult = {
@@ -798,9 +944,11 @@ const runScenario = async (scenario: Scenario, routeTraceApp: ReturnType<typeof 
     followup_next_action: codexSummary.followup_next_action,
     provider_terminal_candidate: candidateSummary,
     route_debug_export: routeProbe.summary,
+    helix_route_debug_export: helixRouteProbe.summary,
     future_route_debug_export: futureRouteProbe.summary,
     provider_parity: {
       helix: helixSummary,
+      helix_route: helixRouteSummary,
       codex: codexSummary,
     },
     procedural_ok: failures.length === 0,
@@ -814,6 +962,9 @@ const runScenario = async (scenario: Scenario, routeTraceApp: ReturnType<typeof 
   await writeJson(path.join(scenarioDir, "route-ask-response.json"), routeProbe.ask);
   await writeJson(path.join(scenarioDir, "route-debug-export.json"), routeProbe.debugExport);
   await writeJson(path.join(scenarioDir, "route-debug-export-probe.json"), routeProbe.summary);
+  await writeJson(path.join(scenarioDir, "helix-route-ask-response.json"), helixRouteProbe.ask);
+  await writeJson(path.join(scenarioDir, "helix-route-debug-export.json"), helixRouteProbe.debugExport);
+  await writeJson(path.join(scenarioDir, "helix-route-debug-export-probe.json"), helixRouteProbe.summary);
   await writeJson(path.join(scenarioDir, "future-route-ask-response.json"), futureRouteProbe.ask);
   await writeJson(path.join(scenarioDir, "future-route-debug-export.json"), futureRouteProbe.debugExport);
   await writeJson(path.join(scenarioDir, "future-route-debug-export-probe.json"), futureRouteProbe.summary);
