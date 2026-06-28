@@ -80,6 +80,7 @@ terminal eligibility, projection discipline, and debug traces.
 | `runtime_calculator_receipt_answer` | `runtime/runtime-calculator-receipt-answer.ts` | service factory via route import | no inline implementation | supplied calculator receipts, coverage, route-owned receipt readers, coverage normalizer, and expression evaluator callbacks | yes, synthesized/sanitized text can be used as draft fallback input | yes for draft support only | runtime-calculator-receipt-answer boundary test; targeted stale calculator sanitizer cases | SERVICE_OWNED |
 | `obligation_coverage_support_refs` | `obligation-coverage.ts` | service via route import | no inline implementation | supplied obligation, allowed citations, precedence paths, and route-supplied citation prioritizer | yes, selected refs feed obligation coverage and downstream objective support | yes for obligation coverage/support refs only | obligation-coverage boundary test | SERVICE_OWNED |
 | `fallback_section_grounding_adapter` | `obligations.ts` | service via route import | no inline implementation | supplied family, requires-repo-evidence flag, required slots, and route-selected fallback sections | yes, adapted fallback sections feed obligation and answer-plan section assembly | yes for fallback-section required-slot adaptation only | obligations extraction-boundary test | SERVICE_OWNED |
+| `obligation_label_and_factory_helpers` | `obligations.ts` | service via route import | no inline implementation | supplied obligation labels, answer-plan family, section kind, required slots, and planner sections | yes, normalized labels and service-built obligation records feed turn-contract obligations and later fallback section text | yes for obligation label normalization, kind inference, obligation factory output, and planner-section objective coverage only | obligations extraction-boundary test | SERVICE_OWNED |
 | `answer_plan_profile_sections` | `answer-plan.ts` | service via route import | no inline implementation | answer-plan family key plus service-owned profile table | yes, profile sections feed obligation and answer-plan section assembly | yes for fallback profile section data only | answer-plan profile extraction-boundary test | SERVICE_OWNED |
 | `agent_step_decision` | model next-step decision owner | route runtime loop, model-turn services | yes | deterministic fallback | yes while tracing | yes | live-spine smoke, model-turn tests | ROUTE_OWNED_PENDING_EXTRACTION |
 | `agent_step_observation_packet` | observation/materialization owner | route/family materializers | yes | tool-family adapters | yes during migration | yes | capability lifecycle, tool-chain matrix | PARTIAL_SERVICE_OWNER |
@@ -257,6 +258,9 @@ ownership proof.
   and answer-plan section assembly.
 - Answer-plan fallback profile sections are service-owned after S222; route still
   performs family lookup fallback and preserves wrapper call order.
+- Obligation label normalization, obligation factory construction, and planner-section
+  objective coverage helpers are service-owned after S223; route still preserves wrapper
+  call order and final turn-contract assembly.
 - Objective evidence slot-hit inference remains dependent on route-owned evidence
   refs and required slots; S110 moved only matching helpers.
 - Objective unknown blocks remain dependent on route-owned mini-answer and

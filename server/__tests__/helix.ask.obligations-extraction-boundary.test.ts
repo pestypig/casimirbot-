@@ -5,6 +5,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   adaptHelixAskFallbackSectionsForGrounding,
+  createHelixAskAnswerObligation,
+  normalizeHelixAskAnswerObligationLabel,
   type HelixAskAnswerPlanSectionLike,
 } from "../services/helix-ask/obligations";
 
@@ -37,6 +39,47 @@ describe("Helix Ask obligations extraction boundary", () => {
     expect(serviceSource).not.toContain("../../../routes/agi.plan");
     expect(serviceSource).not.toContain("../../routes/agi.plan");
     expect(serviceSource).not.toContain("../routes/agi.plan");
+  });
+
+  it("keeps obligation label and factory helpers out of agi.plan.ts", () => {
+    const routeSource = readFileSync(routePath, "utf8");
+    const serviceSource = readFileSync(servicePath, "utf8");
+
+    expect(routeSource).toContain("normalizeHelixAskAnswerObligationLabel");
+    expect(routeSource).not.toMatch(/const\s+normalizeHelixAskAnswerObligationLabel\s*=/);
+    expect(routeSource).not.toMatch(/const\s+mapHelixAskSectionKindToObligationKind\s*=/);
+    expect(routeSource).not.toMatch(/const\s+inferHelixAskAnswerObligationKind\s*=/);
+    expect(routeSource).not.toMatch(/const\s+createHelixAskAnswerObligation\s*=/);
+    expect(routeSource).not.toMatch(/const\s+doesHelixAskPlannerSectionCoverObjective\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+normalizeHelixAskAnswerObligationLabel\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+createHelixAskAnswerObligation\s*=/);
+  });
+
+  it("preserves service-owned obligation label normalization and factory output", () => {
+    expect(normalizeHelixAskAnswerObligationLabel("Plan for repo evidence?", "fallback")).toBe(
+      "repo evidence",
+    );
+
+    expect(
+      createHelixAskAnswerObligation({
+        id: "implementation",
+        label: "Show the repo path",
+        family: "implementation_code_path",
+        required: true,
+        requiredSlots: ["code_path", "runtime"],
+        sectionKind: "repo",
+        sectionTitle: "Implementation",
+      }),
+    ).toEqual({
+      id: "implementation",
+      label: "Show the repo path",
+      kind: "implementation",
+      required: true,
+      required_slots: ["code-path", "runtime"],
+      preferred_evidence: ["code", "doc", "runtime"],
+      objective_label: null,
+      section_title: "Implementation",
+    });
   });
 
   it("preserves pass-through behavior for non-comparison families", () => {
