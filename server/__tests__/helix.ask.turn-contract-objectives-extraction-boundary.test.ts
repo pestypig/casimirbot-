@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  buildHelixAskTurnContractFallbackObjectiveLabels,
   buildHelixAskTurnContractObjectives,
   selectHelixAskTurnContractObjectiveInputs,
 } from "../services/helix-ask/contracts/turn-contract-objectives";
@@ -19,9 +20,12 @@ describe("Helix Ask turn-contract objectives extraction boundary", () => {
 
     expect(routeSource).toContain("../services/helix-ask/contracts/turn-contract-objectives");
     expect(routeSource).not.toContain("const objectives = objectiveInputs\n    .map((entry) => {");
+    expect(routeSource).toContain("buildHelixAskTurnContractFallbackObjectiveLabels({");
+    expect(routeSource).not.toContain("const fallbackObjectiveLabels = researchObjectiveInputs.length\n    ? []");
     expect(routeSource).toContain("selectHelixAskTurnContractObjectiveInputs({");
     expect(routeSource).not.toContain("? args.plannerPass.objectives\n        : fallbackObjectiveLabels.map");
     expect(routeSource).not.toContain("return {\n        label,\n        required_slots: requiredSlots,\n        query_hints: queryHints,\n      } satisfies HelixAskTurnContractObjective;");
+    expect(serviceSource).toMatch(/export\s+const\s+buildHelixAskTurnContractFallbackObjectiveLabels\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+buildHelixAskTurnContractObjectives\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+selectHelixAskTurnContractObjectiveInputs\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");
@@ -104,5 +108,23 @@ describe("Helix Ask turn-contract objectives extraction boundary", () => {
         fallbackObjectiveLabels,
       }),
     ).toEqual([{ label: "fallback objective" }]);
+  });
+
+  it("preserves fallback objective label suppression when research objectives exist", () => {
+    expect(
+      buildHelixAskTurnContractFallbackObjectiveLabels({
+        hasResearchObjectiveInputs: true,
+        question: "find alpha and beta; then cite gamma",
+        maxObjectives: 4,
+      }),
+    ).toEqual([]);
+
+    expect(
+      buildHelixAskTurnContractFallbackObjectiveLabels({
+        hasResearchObjectiveInputs: false,
+        question: "find alpha and beta; then cite gamma",
+        maxObjectives: 4,
+      }),
+    ).toEqual(["find alpha and beta; then cite gamma", "find alpha", "beta; then cite gamma"]);
   });
 });

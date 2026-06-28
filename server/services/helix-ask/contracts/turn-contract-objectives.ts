@@ -9,7 +9,17 @@ import type { HelixAskTurnContractGroundingMode } from "./turn-contract-normaliz
 import {
   buildHelixAskTurnObjectiveQueryHints,
   buildHelixAskTurnObjectiveSlots,
+  extractHelixAskTurnObjectiveFragments,
 } from "./turn-contract-objective-planning";
+
+export const buildHelixAskTurnContractFallbackObjectiveLabels = (args: {
+  hasResearchObjectiveInputs: boolean;
+  question: string;
+  maxObjectives: number;
+}): string[] =>
+  args.hasResearchObjectiveInputs
+    ? []
+    : extractHelixAskTurnObjectiveFragments(args.question, args.maxObjectives);
 
 export const selectHelixAskTurnContractObjectiveInputs = (args: {
   researchObjectiveInputs: HelixAskObjectivePlannerPassObjective[];

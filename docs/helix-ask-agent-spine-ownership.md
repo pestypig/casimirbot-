@@ -152,7 +152,7 @@ ownership proof.
 | S201 | turn-contract planner sections | `server/services/helix-ask/contracts/turn-contract-planner-sections.ts` | SERVICE_OWNED for deterministic planner-section normalization only |
 | S202 | turn-contract goal | `server/services/helix-ask/contracts/turn-contract-goal.ts` | SERVICE_OWNED for deterministic goal text selection only |
 | S203 | turn-contract planner-section source | `server/services/helix-ask/contracts/turn-contract-planner-sections.ts` | SERVICE_OWNED for deterministic planner-section source selection only |
-| S204/S214 | turn-contract objectives | `server/services/helix-ask/contracts/turn-contract-objectives.ts` | SERVICE_OWNED for deterministic objective-input precedence selection, objective normalization, and fallback construction only |
+| S204/S214/S215 | turn-contract objectives | `server/services/helix-ask/contracts/turn-contract-objectives.ts` | SERVICE_OWNED for deterministic objective-input precedence selection, fallback objective-label assembly, objective normalization, and fallback construction only |
 | S205 | query merge | `server/services/helix-ask/query.ts` | SERVICE_OWNED for pure query merging only |
 | S206 | turn-contract query hints | `server/services/helix-ask/contracts/turn-contract-query-hints.ts` | SERVICE_OWNED for deterministic query-hint assembly from already-selected prompt-research, planner, and objective hint inputs only |
 | S207 | turn-contract answer format | `server/services/helix-ask/contracts/turn-contract-answer-format.ts` | SERVICE_OWNED for deterministic answer-format packaging from already-normalized sections and planner verbosity only |
@@ -283,7 +283,7 @@ ownership proof.
   planner family/requested-grounding selector normalization, planner-section source selection/normalization, goal text selection,
   objective-input precedence selection, objective normalization/fallback construction, query-hint assembly,
   answer-format packaging, planner metadata packaging, and constraints field
-  assembly are service-owned after S130, S198-S214;
+  assembly are service-owned after S130, S198-S215;
   route-owned family/specificity selection, planner-pass application,
   obligations assembly, and final turn-contract construction remain unresolved.
 - Query merging is service-owned after S205; turn-contract query-hint assembly
