@@ -28,6 +28,7 @@ import {
   isAskTurnExplicitDocLocationPrompt,
   isAskTurnExplicitDocumentAcquisitionIntent,
   isAskTurnTopicQualifiedLatestDocIntent,
+  normalizeAskTurnDocRoute,
   normalizeAskTurnLatestDocTopicText,
   normalizeAskTurnWorkspaceDocPath,
   resolveAskTurnCreateThenOpenDocTopicArg,
@@ -50,6 +51,7 @@ describe("Helix Ask doc args extraction boundary", () => {
 
     expect(routeSource).toContain("../services/helix-ask/doc-args");
     expect(routeSource).not.toMatch(/const\s+normalizeAskTurnWorkspaceDocPath\s*=\s*\(value/);
+    expect(routeSource).not.toMatch(/const\s+normalizeAskTurnDocRoute\s*=\s*\(value/);
     expect(routeSource).not.toMatch(/const\s+resolveAskTurnWorkspaceActionDocPath\s*=/);
     expect(routeSource).not.toMatch(/const\s+extractAskTurnDocPathArgs\s*=\s*\(transcript/);
     expect(routeSource).not.toMatch(/const\s+resolveAskTurnDocPathArg\s*=\s*\(transcript/);
@@ -97,6 +99,7 @@ describe("Helix Ask doc args extraction boundary", () => {
     expect(routeSource).not.toMatch(/const\s+isAskTurnOpenDocSearchIntent\s*=/);
     expect(routeSource).toContain("createAskTurnLatestDocIntentReaders({");
     expect(serviceSource).toMatch(/export\s+const\s+extractAskTurnDocPathArgs\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+normalizeAskTurnDocRoute\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+normalizeAskTurnWorkspaceDocPath\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+resolveAskTurnWorkspaceActionDocPath\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+resolveAskTurnDocPathArg\s*=/);
@@ -138,6 +141,10 @@ describe("Helix Ask doc args extraction boundary", () => {
     expect(normalizeAskTurnWorkspaceDocPath(" docs/research/a.md ")).toBe("docs/research/a.md");
     expect(normalizeAskTurnWorkspaceDocPath("   ")).toBeNull();
     expect(normalizeAskTurnWorkspaceDocPath(null)).toBeNull();
+    expect(normalizeAskTurnDocRoute(" research/a.md ")).toBe("/docs/research/a.md");
+    expect(normalizeAskTurnDocRoute(" /docs/research/a.md ")).toBe("/docs/research/a.md");
+    expect(normalizeAskTurnDocRoute("docs\\research\\a.md")).toBe("/docs/research/a.md");
+    expect(normalizeAskTurnDocRoute("")).toBe("");
     expect(resolveAskTurnWorkspaceActionDocPath({ args: { path: " docs/a.md ", doc_path: "docs/b.md" } })).toBe(
       "docs/a.md",
     );

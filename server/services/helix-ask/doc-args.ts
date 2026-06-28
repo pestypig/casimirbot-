@@ -3,6 +3,12 @@ export const normalizeAskTurnWorkspaceDocPath = (value: unknown): string | null 
   return normalized.length > 0 ? normalized : null;
 };
 
+export const normalizeAskTurnDocRoute = (value: string): string => {
+  const normalized = value.trim().replace(/\\/g, "/").replace(/^\/+/, "");
+  if (!normalized) return "";
+  return `/${normalized.startsWith("docs/") ? normalized : `docs/${normalized}`}`.replace(/\/{2,}/g, "/");
+};
+
 export const resolveAskTurnWorkspaceActionDocPath = (
   action?: { args?: Record<string, unknown> | null } | null,
 ): string | null =>
