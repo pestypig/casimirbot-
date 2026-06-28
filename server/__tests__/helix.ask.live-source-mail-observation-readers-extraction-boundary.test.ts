@@ -8,6 +8,10 @@ import {
   artifactIndexInList,
   collectStagePlayCurrentBatchMailIds,
   collectStagePlayMailIdsFromRecord,
+  hasStagePlayInterpreterProfileConfigObservation,
+  hasStagePlayLiveSourceMailDecisionObservation,
+  hasStagePlayLiveSourceWatchJobPolicyObservation,
+  hasStagePlayRequestVoiceCalloutDecisionObservation,
   isStagePlayInterpreterProfileComparisonObservationArtifact,
   isStagePlayInterpreterProfileConfigObservationArtifact,
   isStagePlayLiveSourceMailReadObservationArtifact,
@@ -15,6 +19,10 @@ import {
   isStagePlayLiveSourceWatchJobPolicyObservationArtifact,
   latestLiveEnvironmentToolObservationArtifact,
   latestLiveEnvironmentToolObservationRecord,
+  latestStagePlayInterpreterProfileComparisonObservation,
+  latestStagePlayLiveSourceMailDecisionObservation,
+  latestStagePlayLiveSourceMailReadObservation,
+  latestStagePlayLiveSourceWatchJobPolicyObservation,
   latestStagePlayProcessedMailPacketRecordFromArtifacts,
   processedMailReadObservationHasPacket,
   processedMailReadObservationMissingRawMailIds,
@@ -54,6 +62,14 @@ describe("Helix Ask live-source mail observation reader extraction boundary", ()
     expect(routeSource).not.toMatch(/const\s+isStagePlayLiveSourceWatchJobPolicyObservationArtifact\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+isStagePlayInterpreterProfileConfigObservationArtifact\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+isStagePlayInterpreterProfileComparisonObservationArtifact\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+latestStagePlayLiveSourceMailReadObservation\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+hasStagePlayLiveSourceMailDecisionObservation\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+hasStagePlayRequestVoiceCalloutDecisionObservation\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+latestStagePlayLiveSourceMailDecisionObservation\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+hasStagePlayLiveSourceWatchJobPolicyObservation\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+hasStagePlayInterpreterProfileConfigObservation\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+latestStagePlayInterpreterProfileComparisonObservation\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+latestStagePlayLiveSourceWatchJobPolicyObservation\s*=\s*\(/);
     expect(routeSource).not.toContain("STAGE_PLAY_PROCESSED_MAIL_RECOMMENDATIONS_REQUIRING_DECISION");
     expect(serviceSource).toMatch(/export\s+const\s+readAskTurnLiveEnvironmentObservationRecord\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+readStagePlayProcessedMailPacketRecordsFromArtifact\s*=/);
@@ -72,6 +88,14 @@ describe("Helix Ask live-source mail observation reader extraction boundary", ()
     expect(serviceSource).toMatch(/export\s+const\s+isStagePlayLiveSourceWatchJobPolicyObservationArtifact\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isStagePlayInterpreterProfileConfigObservationArtifact\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isStagePlayInterpreterProfileComparisonObservationArtifact\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+latestStagePlayLiveSourceMailReadObservation\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+hasStagePlayLiveSourceMailDecisionObservation\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+hasStagePlayRequestVoiceCalloutDecisionObservation\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+latestStagePlayLiveSourceMailDecisionObservation\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+hasStagePlayLiveSourceWatchJobPolicyObservation\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+hasStagePlayInterpreterProfileConfigObservation\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+latestStagePlayInterpreterProfileComparisonObservation\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+latestStagePlayLiveSourceWatchJobPolicyObservation\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");
     expect(serviceSource).not.toContain("../../../routes/agi.plan");
     expect(serviceSource).not.toContain("../../routes/agi.plan");
@@ -332,5 +356,70 @@ describe("Helix Ask live-source mail observation reader extraction boundary", ()
         },
       },
     })).toBe(true);
+  });
+
+  it("preserves aggregate live-source observation readers", () => {
+    const artifacts = [
+      {
+        kind: "live_environment_tool_observation",
+        payload: {
+          tool_name: "live_env.read_processed_live_source_mail",
+          observation: { readId: "read:1" },
+        },
+      },
+      {
+        kind: "stage_play_live_source_mail_decision",
+        payload: { decision: "draft_text_answer" },
+      },
+      {
+        kind: "live_environment_tool_observation",
+        payload: {
+          observation: {
+            decisionId: "decision:voice",
+            decision: "request_voice_callout",
+          },
+        },
+      },
+      {
+        kind: "live_environment_tool_observation",
+        payload: {
+          observation: {
+            policy: { artifactId: "stage_play_live_source_watch_job_policy" },
+          },
+        },
+      },
+      {
+        kind: "live_environment_tool_observation",
+        payload: {
+          observation: {
+            profile: { artifactId: "stage_play_live_source_interpreter_profile" },
+          },
+        },
+      },
+      {
+        kind: "live_environment_tool_observation",
+        payload: {
+          observation: {
+            comparisonId: "comparison:latest",
+          },
+        },
+      },
+    ];
+
+    expect(latestStagePlayLiveSourceMailReadObservation(artifacts)).toEqual({ readId: "read:1" });
+    expect(hasStagePlayLiveSourceMailDecisionObservation(artifacts)).toBe(true);
+    expect(hasStagePlayRequestVoiceCalloutDecisionObservation(artifacts)).toBe(true);
+    expect(latestStagePlayLiveSourceMailDecisionObservation(artifacts)).toEqual({
+      decisionId: "decision:voice",
+      decision: "request_voice_callout",
+    });
+    expect(hasStagePlayLiveSourceWatchJobPolicyObservation(artifacts)).toBe(true);
+    expect(hasStagePlayInterpreterProfileConfigObservation(artifacts)).toBe(true);
+    expect(latestStagePlayLiveSourceWatchJobPolicyObservation(artifacts)).toEqual({
+      policy: { artifactId: "stage_play_live_source_watch_job_policy" },
+    });
+    expect(latestStagePlayInterpreterProfileComparisonObservation(artifacts)).toEqual({
+      comparisonId: "comparison:latest",
+    });
   });
 });

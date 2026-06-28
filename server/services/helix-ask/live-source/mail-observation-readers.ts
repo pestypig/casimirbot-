@@ -317,3 +317,73 @@ export const isStagePlayInterpreterProfileComparisonObservationArtifact = (
     Boolean(readAskTurnString(observation?.comparisonId))
   );
 };
+
+export const latestStagePlayLiveSourceMailReadObservation = (
+  artifacts: AskTurnLiveSourceArtifactLike[] | null | undefined,
+): Record<string, unknown> | null => {
+  const matches = (artifacts ?? [])
+    .map((artifact) => isStagePlayLiveSourceMailReadObservationArtifact(artifact)
+      ? readAskTurnLiveEnvironmentObservationRecord(artifact)
+      : null)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  return matches.at(-1) ?? null;
+};
+
+export const hasStagePlayLiveSourceMailDecisionObservation = (
+  artifacts: AskTurnLiveSourceArtifactLike[] | null | undefined,
+): boolean => (artifacts ?? []).some((artifact) => isStagePlayLiveSourceMailDecisionObservationArtifact(artifact));
+
+export const hasStagePlayRequestVoiceCalloutDecisionObservation = (
+  artifacts: AskTurnLiveSourceArtifactLike[] | null | undefined,
+): boolean => (artifacts ?? []).some((artifact) => {
+  if (!isStagePlayLiveSourceMailDecisionObservationArtifact(artifact)) return false;
+  const payload = readAskTurnArtifactPayloadRecord(artifact);
+  const observation = artifact.kind === "live_environment_tool_observation"
+    ? readAskTurnLiveEnvironmentObservationRecord(artifact)
+    : payload;
+  return readAskTurnString(observation?.decision ?? payload?.decision) === "request_voice_callout";
+});
+
+export const latestStagePlayLiveSourceMailDecisionObservation = (
+  artifacts: AskTurnLiveSourceArtifactLike[] | null | undefined,
+): Record<string, unknown> | null => {
+  for (const artifact of [...(artifacts ?? [])].reverse()) {
+    if (!isStagePlayLiveSourceMailDecisionObservationArtifact(artifact)) continue;
+    const payload = readAskTurnArtifactPayloadRecord(artifact);
+    const observation = artifact.kind === "live_environment_tool_observation"
+      ? readAskTurnLiveEnvironmentObservationRecord(artifact)
+      : payload;
+    if (observation) return observation;
+  }
+  return null;
+};
+
+export const hasStagePlayLiveSourceWatchJobPolicyObservation = (
+  artifacts: AskTurnLiveSourceArtifactLike[] | null | undefined,
+): boolean => (artifacts ?? []).some((artifact) => isStagePlayLiveSourceWatchJobPolicyObservationArtifact(artifact));
+
+export const hasStagePlayInterpreterProfileConfigObservation = (
+  artifacts: AskTurnLiveSourceArtifactLike[] | null | undefined,
+): boolean => (artifacts ?? []).some((artifact) => isStagePlayInterpreterProfileConfigObservationArtifact(artifact));
+
+export const latestStagePlayInterpreterProfileComparisonObservation = (
+  artifacts: AskTurnLiveSourceArtifactLike[] | null | undefined,
+): Record<string, unknown> | null => {
+  const matches = (artifacts ?? [])
+    .map((artifact) => isStagePlayInterpreterProfileComparisonObservationArtifact(artifact)
+      ? readAskTurnLiveEnvironmentObservationRecord(artifact)
+      : null)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  return matches.at(-1) ?? null;
+};
+
+export const latestStagePlayLiveSourceWatchJobPolicyObservation = (
+  artifacts: AskTurnLiveSourceArtifactLike[] | null | undefined,
+): Record<string, unknown> | null => {
+  const matches = (artifacts ?? [])
+    .map((artifact) => isStagePlayLiveSourceWatchJobPolicyObservationArtifact(artifact)
+      ? readAskTurnLiveEnvironmentObservationRecord(artifact)
+      : null)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  return matches.at(-1) ?? null;
+};
