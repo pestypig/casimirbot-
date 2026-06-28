@@ -22,6 +22,7 @@ import {
   latestStagePlayInterpreterProfileComparisonObservation,
   latestStagePlayLiveSourceMailDecisionObservation,
   latestStagePlayLiveSourceMailReadObservation,
+  latestStagePlayLiveSourceWatchJobPolicy,
   latestStagePlayLiveSourceWatchJobPolicyObservation,
   latestStagePlayProcessedMailPacketRecordFromArtifacts,
   processedMailReadObservationHasPacket,
@@ -70,6 +71,7 @@ describe("Helix Ask live-source mail observation reader extraction boundary", ()
     expect(routeSource).not.toMatch(/const\s+hasStagePlayInterpreterProfileConfigObservation\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+latestStagePlayInterpreterProfileComparisonObservation\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+latestStagePlayLiveSourceWatchJobPolicyObservation\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+latestStagePlayLiveSourceWatchJobPolicy\s*=\s*\(/);
     expect(routeSource).not.toContain("STAGE_PLAY_PROCESSED_MAIL_RECOMMENDATIONS_REQUIRING_DECISION");
     expect(serviceSource).toMatch(/export\s+const\s+readAskTurnLiveEnvironmentObservationRecord\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+readStagePlayProcessedMailPacketRecordsFromArtifact\s*=/);
@@ -96,6 +98,7 @@ describe("Helix Ask live-source mail observation reader extraction boundary", ()
     expect(serviceSource).toMatch(/export\s+const\s+hasStagePlayInterpreterProfileConfigObservation\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+latestStagePlayInterpreterProfileComparisonObservation\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+latestStagePlayLiveSourceWatchJobPolicyObservation\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+latestStagePlayLiveSourceWatchJobPolicy\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");
     expect(serviceSource).not.toContain("../../../routes/agi.plan");
     expect(serviceSource).not.toContain("../../routes/agi.plan");
@@ -420,6 +423,43 @@ describe("Helix Ask live-source mail observation reader extraction boundary", ()
     });
     expect(latestStagePlayInterpreterProfileComparisonObservation(artifacts)).toEqual({
       comparisonId: "comparison:latest",
+    });
+  });
+
+  it("preserves latest live-source watch-job policy resolution", () => {
+    expect(latestStagePlayLiveSourceWatchJobPolicy([
+      {
+        kind: "live_source_mail_context_pack",
+        payload: {
+          activeWatchJobs: [
+            { objectiveText: "first context policy" },
+            { objectiveText: "latest context policy" },
+          ],
+        },
+      },
+    ])).toEqual({ objectiveText: "latest context policy" });
+
+    expect(latestStagePlayLiveSourceWatchJobPolicy([
+      {
+        kind: "live_source_mail_context_pack",
+        payload: {
+          activeWatchJobs: [{ objectiveText: "context fallback policy" }],
+        },
+      },
+      {
+        kind: "live_environment_tool_observation",
+        payload: {
+          observation: {
+            policy: {
+              artifactId: "stage_play_live_source_watch_job_policy",
+              objectiveText: "observation policy",
+            },
+          },
+        },
+      },
+    ])).toEqual({
+      artifactId: "stage_play_live_source_watch_job_policy",
+      objectiveText: "observation policy",
     });
   });
 });

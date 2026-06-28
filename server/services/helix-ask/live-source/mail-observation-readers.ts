@@ -387,3 +387,26 @@ export const latestStagePlayLiveSourceWatchJobPolicyObservation = (
     .filter((entry): entry is Record<string, unknown> => Boolean(entry));
   return matches.at(-1) ?? null;
 };
+
+export const latestStagePlayLiveSourceWatchJobPolicy = (
+  artifacts: AskTurnLiveSourceArtifactLike[] | null | undefined,
+): Record<string, unknown> | null => {
+  const observation = latestStagePlayLiveSourceWatchJobPolicyObservation(artifacts);
+  const policy = observation?.policy;
+  if (policy && typeof policy === "object" && !Array.isArray(policy)) {
+    return policy as Record<string, unknown>;
+  }
+  const contextPack = (artifacts ?? [])
+    .filter((artifact) => artifact?.kind === "live_source_mail_context_pack")
+    .map((artifact) => artifact?.payload)
+    .filter((payload): payload is Record<string, unknown> =>
+      Boolean(payload && typeof payload === "object" && !Array.isArray(payload)),
+    )
+    .at(-1);
+  const activeWatchJobs = Array.isArray(contextPack?.activeWatchJobs)
+    ? contextPack.activeWatchJobs.filter((entry): entry is Record<string, unknown> =>
+        Boolean(entry && typeof entry === "object" && !Array.isArray(entry)),
+      )
+    : [];
+  return activeWatchJobs.at(-1) ?? null;
+};
