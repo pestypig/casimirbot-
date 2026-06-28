@@ -1,39 +1,14 @@
 import { readFileSync } from "node:fs";
-import express from "express";
-import request from "supertest";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { planRouter } from "../routes/agi.plan";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
   buildHelixAskGoldenPathRuntimePayload,
   runHelixAskGoldenPathRuntime,
 } from "../services/helix-ask/golden-path-runtime";
-import { resetHelixAskTurnAdmissionForTests } from "../services/helix-ask/ask-turn-admission";
-import { resetRuntimeMemoryGovernorForTests } from "../services/runtime/runtime-memory-governor";
 
 const routePath = "server/routes/agi.plan.ts";
 const servicePath = "server/services/helix-ask/golden-path-runtime.ts";
-
-const createApp = (): express.Express => {
-  const app = express();
-  app.use(express.json({ limit: "1mb" }));
-  app.use("/api/agi", planRouter);
-  return app;
-};
-
-const resetRuntimeState = (): void => {
-  resetHelixAskTurnAdmissionForTests();
-  resetRuntimeMemoryGovernorForTests({
-    memoryReader: () => ({
-      rss: 300 * 1024 * 1024,
-      heapTotal: 180 * 1024 * 1024,
-      heapUsed: 120 * 1024 * 1024,
-      external: 8 * 1024 * 1024,
-      arrayBuffers: 4 * 1024 * 1024,
-    }),
-  });
-};
 
 const readLedger = (body: Record<string, any>): any[] =>
   Array.isArray(body.current_turn_artifact_ledger) ? body.current_turn_artifact_ledger : [];
