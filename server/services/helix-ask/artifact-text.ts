@@ -1,3 +1,5 @@
+import { normalizeAskTurnWorkspaceDocPath } from "./doc-args";
+
 export const normalizeAskTurnArtifactText = (value: unknown): string | null => {
   if (typeof value === "string") {
     const text = value.replace(/\s+/g, " ").trim();
@@ -65,3 +67,15 @@ export const readAskTurnArtifactPayloadRecord = (
   artifact: { payload?: unknown },
 ): Record<string, unknown> | null =>
   artifact.payload && typeof artifact.payload === "object" ? (artifact.payload as Record<string, unknown>) : null;
+
+export const readAskTurnArtifactSourcePath = (payload: Record<string, unknown> | null): string | null =>
+  normalizeAskTurnWorkspaceDocPath(payload?.source_path) ??
+  normalizeAskTurnWorkspaceDocPath(payload?.path) ??
+  normalizeAskTurnWorkspaceDocPath(payload?.active_doc_path);
+
+export const readAskTurnArtifactSnippets = (payload: Record<string, unknown> | null): Record<string, unknown>[] =>
+  Array.isArray(payload?.snippets)
+    ? payload.snippets.filter((entry): entry is Record<string, unknown> => Boolean(entry && typeof entry === "object"))
+    : Array.isArray(payload?.matches)
+      ? payload.matches.filter((entry): entry is Record<string, unknown> => Boolean(entry && typeof entry === "object"))
+      : [];

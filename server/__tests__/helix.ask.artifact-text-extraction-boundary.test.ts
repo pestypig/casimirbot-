@@ -3,6 +3,11 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import {
+  readAskTurnArtifactSnippets,
+  readAskTurnArtifactSourcePath,
+} from "../services/helix-ask/artifact-text";
+
 const repoRoot = process.cwd();
 const routePath = join(repoRoot, "server/routes/agi.plan.ts");
 const servicePath = join(repoRoot, "server/services/helix-ask/artifact-text.ts");
@@ -19,13 +24,27 @@ describe("Helix Ask artifact text extraction boundary", () => {
     expect(routeSource).not.toMatch(/const\s+mergeAskTurnLedgerArtifacts\s*=/);
     expect(routeSource).not.toMatch(/const\s+readAskTurnLedgerArtifact\s*=/);
     expect(routeSource).not.toMatch(/const\s+readAskTurnArtifactPayloadRecord\s*=/);
+    expect(routeSource).not.toMatch(/const\s+readAskTurnArtifactSourcePath\s*=/);
+    expect(routeSource).not.toMatch(/const\s+readAskTurnArtifactSnippets\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+normalizeAskTurnArtifactText\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+readAskTurnArtifactTextByKind\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnInstructionOnlySummaryText\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+mergeAskTurnLedgerArtifacts\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+readAskTurnLedgerArtifact\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+readAskTurnArtifactPayloadRecord\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+readAskTurnArtifactSourcePath\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+readAskTurnArtifactSnippets\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");
     expect(serviceSource).not.toContain("../routes/agi.plan");
+  });
+
+  it("preserves source path and snippet reader behavior", () => {
+    expect(readAskTurnArtifactSourcePath({ source_path: " docs/a.md ", path: "docs/b.md" })).toBe("docs/a.md");
+    expect(readAskTurnArtifactSourcePath({ path: " docs/b.md " })).toBe("docs/b.md");
+    expect(readAskTurnArtifactSourcePath({ active_doc_path: " docs/c.md " })).toBe("docs/c.md");
+    expect(readAskTurnArtifactSourcePath({ source_path: " " })).toBeNull();
+    expect(readAskTurnArtifactSnippets({ snippets: [{ text: "a" }, null, "x"] })).toEqual([{ text: "a" }]);
+    expect(readAskTurnArtifactSnippets({ matches: [{ text: "b" }, 1] })).toEqual([{ text: "b" }]);
+    expect(readAskTurnArtifactSnippets({})).toEqual([]);
   });
 });
