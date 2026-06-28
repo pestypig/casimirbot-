@@ -54,6 +54,38 @@ export const createAskTurnCompareIntentReaders = (
     return hasDocCue && hasNotesCue;
   };
 
+  const isAskTurnExtractAppendCompareIntent = (transcript: string): boolean => {
+    const normalized = deps.maskProtectedArgumentSpansForIntent(transcript).trim().toLowerCase();
+    if (!normalized) return false;
+    const hasExtractCue = /\b(?:extract|pull|collect)\b/.test(normalized) && /\b(?:numeric|number|figure|claim)s?\b/.test(normalized);
+    const hasAppendCue = /\bappend\b/.test(normalized) && /\b(?:note|notes|notepad)\b/.test(normalized);
+    const hasCompareCue = askTurnHasCompareCueOutsideProtectedArgs(transcript);
+    return hasExtractCue && hasAppendCue && hasCompareCue;
+  };
+
+  const isAskTurnCreateCopyCompareIntent = (transcript: string): boolean => {
+    const normalized = deps.maskProtectedArgumentSpansForIntent(transcript).trim().toLowerCase();
+    if (!normalized) return false;
+    const hasCreateNoteCue = /\b(?:create|new|start)\s+(?:a\s+)?note\b/.test(normalized);
+    const hasCopyClipboardCue =
+      /\bcopy\b[\s\S]*\b(?:latest|last|recent)\b[\s\S]*\bclipboard\b[\s\S]*\b(?:entry|item|text)?\b[\s\S]*\bnote\b/.test(
+        normalized,
+      );
+    const hasCompareCue = askTurnHasCompareCueOutsideProtectedArgs(transcript);
+    return hasCreateNoteCue && hasCopyClipboardCue && hasCompareCue;
+  };
+
+  const isAskTurnCompareCopyResultToClipboardIntent = (transcript: string): boolean => {
+    const normalized = deps.maskProtectedArgumentSpansForIntent(transcript).trim().toLowerCase();
+    if (!normalized) return false;
+    const hasCompareCue = askTurnHasCompareCueOutsideProtectedArgs(transcript);
+    const hasClipboardCopyCue =
+      /\bcopy\b[\s\S]*\b(?:result|results|summary|differences|deltas|analysis|it|that)\b[\s\S]*\bclipboard\b/.test(
+        normalized,
+      ) || /\bcopy\b[\s\S]*\bclipboard\b/.test(normalized);
+    return hasCompareCue && hasClipboardCopyCue;
+  };
+
   const resolveAskTurnCompareRightHandTargetArg = (transcript: string): string | null => {
     const match = transcript.match(
       /\b(?:with|against|versus|vs\.?|to)\s+(.+?)(?:\s*(?:,|\band\s+(?:tell|show|list|explain|summari[sz]e)\b|\btell\s+me\b|\bshow\s+me\b|\blist\s+the\b|\bmain\s+differences\b|\bdifferences\b|\bdeltas\b)\s*[\s\S]*|$)/i,
@@ -69,7 +101,10 @@ export const createAskTurnCompareIntentReaders = (
 
   return {
     askTurnHasCompareCueOutsideProtectedArgs,
+    isAskTurnCompareCopyResultToClipboardIntent,
+    isAskTurnCreateCopyCompareIntent,
     isAskTurnDocNotesHybridCompareIntent,
+    isAskTurnExtractAppendCompareIntent,
     isAskTurnConceptualVsQuestion,
     resolveAskTurnCompareRightHandTargetArg,
   };

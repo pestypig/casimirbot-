@@ -35,6 +35,9 @@ describe("Helix Ask compare intent extraction boundary", () => {
     expect(routeSource).not.toMatch(/const\s+isAskTurnConceptualVsQuestion\s*=\s*\(transcript/);
     expect(routeSource).not.toMatch(/const\s+askTurnHasCompareCueOutsideProtectedArgs\s*=\s*\(transcript/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnDocNotesHybridCompareIntent\s*=\s*\(transcript/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnExtractAppendCompareIntent\s*=\s*\(transcript/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnCreateCopyCompareIntent\s*=\s*\(transcript/);
+    expect(routeSource).not.toMatch(/const\s+isAskTurnCompareCopyResultToClipboardIntent\s*=\s*\(transcript/);
     expect(routeSource).not.toMatch(/const\s+resolveAskTurnCompareRightHandTargetArg\s*=\s*\(transcript/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnGenericDocCompareTarget\s*=\s*\(value/);
     expect(routeSource).not.toMatch(/const\s+HELIX_ASK_TURN_COMPARE_CUE_RE\s*=/);
@@ -57,6 +60,12 @@ describe("Helix Ask compare intent extraction boundary", () => {
     expect(readers.isAskTurnDocNotesHybridCompareIntent("compare this document with my notes")).toBe(true);
     expect(readers.isAskTurnDocNotesHybridCompareIntent("compare proper time with coordinate time")).toBe(false);
     expect(readers.isAskTurnDocNotesHybridCompareIntent("summarize this document")).toBe(false);
+    expect(readers.isAskTurnExtractAppendCompareIntent("extract numeric claims, append them to note, and compare")).toBe(true);
+    expect(readers.isAskTurnExtractAppendCompareIntent("extract numeric claims into a note")).toBe(false);
+    expect(readers.isAskTurnCreateCopyCompareIntent("create a note, copy latest clipboard entry into note, and compare")).toBe(true);
+    expect(readers.isAskTurnCreateCopyCompareIntent("create a note from the clipboard")).toBe(false);
+    expect(readers.isAskTurnCompareCopyResultToClipboardIntent("compare this doc and copy the result to clipboard")).toBe(true);
+    expect(readers.isAskTurnCompareCopyResultToClipboardIntent("copy the result to clipboard")).toBe(false);
     expect(isAskTurnGenericDocCompareTarget("docs/research/nhm2-current-status-whitepaper-2026-05-02.md")).toBe(true);
     expect(isAskTurnGenericDocCompareTarget("the current document")).toBe(true);
     expect(isAskTurnGenericDocCompareTarget("Field Notes")).toBe(false);
