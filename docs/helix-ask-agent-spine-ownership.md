@@ -125,7 +125,7 @@ terminal eligibility, projection discipline, and debug traces.
 
 ## Current Extraction Status
 
-The extraction wave now continues through S268. Recent slices moved small,
+The extraction wave now continues through S269. Recent slices moved small,
 mechanical readers and formatters behind service owners, while intentionally
 leaving source admission, tool execution, runtime-loop orchestration, terminal
 materialization, terminal authority, projection, live-source behavior, and
@@ -204,7 +204,7 @@ helper moves as runtime ownership proof.
 | S266 | Stage Play operation intent | `server/services/helix-ask/live-source/stage-play-operation-intent.ts` | SERVICE_OWNED for explicit Stage Play operation cue detection only |
 | S267 | live-source mail-loop intent aggregation | `server/services/helix-ask/live-source/mail-loop-intent.ts` | SERVICE_OWNED for mailbox loop and watch-job setup intent aggregation only |
 | S268 | live-source mail continuation budget | `server/services/helix-ask/live-source/mail-continuation-budget.ts` | SERVICE_OWNED for continuation budget defaults, env-backed budget reading, and budget-goal eligibility only |
-| S248-S249 | live-source mail progress refs | `server/services/helix-ask/live-source/mail-progress-refs.ts` | SERVICE_OWNED for mail-loop progress-ref prefix matching, recursive collection, progress-kind classification, and route-callback-backed progress receipt construction only |
+| S248-S249/S269 | live-source mail progress refs | `server/services/helix-ask/live-source/mail-progress-refs.ts` | SERVICE_OWNED for mail-loop progress-ref prefix matching, recursive collection, progress-kind classification, route-callback-backed progress receipt construction, progress receipt append/mirror mutation, and stop-reason resolution only |
 | S131 | runtime intent packet | `server/services/helix-ask/runtime/runtime-intent-packet.ts` | SERVICE_OWNED for runtime-intent packet readers, source/capability predicates, packet assembly, ledger/debug append, and runtime-audit refresh handoff only |
 | S132 | runtime continuation hints | `server/services/helix-ask/runtime/runtime-continuation-hints.ts` | SERVICE_OWNED for continuation hint construction, append/ledger/debug writes, agent-step decision collection, hint-decision matching, and migration marking only |
 | S133 | runtime continuation observation refs | `server/services/helix-ask/runtime/runtime-continuation-hints.ts` | SERVICE_OWNED for matching accepted continuation hints to observed artifact refs only |

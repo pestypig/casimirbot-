@@ -56,6 +56,27 @@ export type MailLoopToolProgressReceipt = {
   raw_content_included: false;
 };
 
+export type MailLoopToolProgressBudget = {
+  maxContinuationWakesPerCycle: number;
+  maxNoProgressRepeats: number;
+};
+
+export type MailLoopToolProgressLoopState = {
+  tool_progress_receipts?: MailLoopToolProgressReceipt[];
+  mail_loop_no_progress_repeat_count?: number;
+  mail_loop_continuation_wake_count?: number;
+};
+
+export type MailLoopToolProgressPayloadState = {
+  mail_loop_tool_progress_receipts?: MailLoopToolProgressReceipt[];
+  mail_loop_continuation_budget?: unknown;
+  debug?: unknown;
+};
+
+export type MailLoopToolProgressLoopIteration = {
+  tool_progress_receipt?: MailLoopToolProgressReceipt;
+};
+
 export type MailLoopToolProgressReceiptDependencies = {
   readRuntimeRecord: (value: unknown) => Record<string, unknown> | null;
   processedMailReadObservationNeedsProcessFallback: (
@@ -72,6 +93,17 @@ export type BuildMailLoopToolProgressReceiptArgs = {
   toolName: string;
   observation: Record<string, unknown> | null | undefined;
   previousRefs: Set<string>;
+};
+
+export type AppendMailLoopToolProgressReceiptArgs = {
+  mailLoopContinuationBudget: unknown | null | undefined;
+  turnId: string;
+  iteration: number;
+  toolName: string;
+  observation: Record<string, unknown> | null | undefined;
+  loop: MailLoopToolProgressLoopState;
+  payload: MailLoopToolProgressPayloadState;
+  loopIteration: MailLoopToolProgressLoopIteration;
 };
 
 export const mailLoopProgressKindForRefs = (
@@ -126,4 +158,92 @@ export const createMailLoopToolProgressReceiptBuilder = (
     assistant_answer: false,
     raw_content_included: false,
   };
+};
+
+export type MailLoopToolProgressReceiptAppenderDependencies = {
+  buildMailLoopToolProgressReceipt: (args: BuildMailLoopToolProgressReceiptArgs) => MailLoopToolProgressReceipt;
+};
+
+export const createMailLoopToolProgressReceiptAppender = (
+  dependencies: MailLoopToolProgressReceiptAppenderDependencies,
+) => (args: AppendMailLoopToolProgressReceiptArgs): MailLoopToolProgressReceipt | null => {
+  if (!args.mailLoopContinuationBudget) return null;
+  const previousReceipts = args.loop.tool_progress_receipts ?? [];
+  const previousRefs = new Set(previousReceipts.flatMap((receipt) => receipt.producedRefs));
+  let receipt = dependencies.buildMailLoopToolProgressReceipt({
+    turnId: args.turnId,
+    iteration: args.iteration,
+    toolName: args.toolName,
+    observation: args.observation,
+    previousRefs,
+  });
+  const previousReceipt = previousReceipts.at(-1) ?? null;
+  if (
+    receipt.toolName === "live_env.read_processed_live_source_mail" &&
+    receipt.progressKind === "no_progress" &&
+    receipt.producedRefs.length > 0 &&
+    previousReceipt?.toolName === "live_env.process_live_source_mail" &&
+    previousReceipt.progressKind === "processed_packet" &&
+    receipt.producedRefs.some((ref) => previousReceipt.producedRefs.includes(ref))
+  ) {
+    receipt = {
+      ...receipt,
+      progressKind: "processed_packet",
+    };
+  }
+  args.loop.tool_progress_receipts = [...(args.loop.tool_progress_receipts ?? []), receipt];
+  args.loopIteration.tool_progress_receipt = receipt;
+  if (receipt.progressKind === "no_progress") {
+    args.loop.mail_loop_no_progress_repeat_count = (args.loop.mail_loop_no_progress_repeat_count ?? 0) + 1;
+  } else {
+    args.loop.mail_loop_no_progress_repeat_count = 0;
+  }
+  if (receipt.progressKind === "wake_result") {
+    args.loop.mail_loop_continuation_wake_count = (args.loop.mail_loop_continuation_wake_count ?? 0) + 1;
+  }
+  args.payload.mail_loop_tool_progress_receipts = args.loop.tool_progress_receipts;
+  args.payload.mail_loop_continuation_budget = args.mailLoopContinuationBudget;
+  if (args.payload.debug && typeof args.payload.debug === "object") {
+    const debug = args.payload.debug as Record<string, unknown>;
+    debug.mail_loop_tool_progress_receipts = args.loop.tool_progress_receipts;
+    debug.mail_loop_continuation_budget = args.mailLoopContinuationBudget;
+  }
+  return receipt;
+};
+
+export type MailLoopProgressStopReasonDependencies = {
+  hasStagePlayLiveSourceMailDecisionObservation: (artifacts: unknown[]) => boolean;
+};
+
+export type ResolveMailLoopProgressStopReasonArgs = {
+  mailLoopContinuationBudget: MailLoopToolProgressBudget | null | undefined;
+  receipt: MailLoopToolProgressReceipt | null;
+  goalSatisfaction: string | null | undefined;
+  currentTurnArtifacts: unknown[];
+  loop: MailLoopToolProgressLoopState;
+};
+
+export const createMailLoopProgressStopReasonResolver = (
+  dependencies: MailLoopProgressStopReasonDependencies,
+) => (args: ResolveMailLoopProgressStopReasonArgs): string | null => {
+  if (!args.mailLoopContinuationBudget || !args.receipt) return null;
+  if (args.goalSatisfaction === "satisfied") return null;
+  const emptyMailboxReadRequiresDecision =
+    args.receipt.toolName === "live_env.read_live_source_mail" &&
+    args.receipt.progressKind === "no_progress" &&
+    !dependencies.hasStagePlayLiveSourceMailDecisionObservation(args.currentTurnArtifacts);
+  if (
+    args.receipt.progressKind === "no_progress" &&
+    !emptyMailboxReadRequiresDecision &&
+    (args.loop.mail_loop_no_progress_repeat_count ?? 0) > args.mailLoopContinuationBudget.maxNoProgressRepeats
+  ) {
+    return "mail_loop_no_progress";
+  }
+  if (
+    args.receipt.progressKind === "wake_result" &&
+    (args.loop.mail_loop_continuation_wake_count ?? 0) > args.mailLoopContinuationBudget.maxContinuationWakesPerCycle
+  ) {
+    return "mail_loop_wake_continuation_budget_exhausted";
+  }
+  return null;
 };

@@ -5,6 +5,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   collectMailLoopProgressRefs,
+  createMailLoopProgressStopReasonResolver,
+  createMailLoopToolProgressReceiptAppender,
   createMailLoopToolProgressReceiptBuilder,
   isMailLoopProgressRef,
   mailLoopProgressKindForRefs,
@@ -26,10 +28,14 @@ describe("Helix Ask live-source mail progress refs extraction boundary", () => {
     expect(routeSource).not.toMatch(/const\s+mailLoopProgressKindForRefs\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+buildMailLoopToolProgressReceipt\s*=\s*\(args:\s*\{/);
     expect(routeSource).toMatch(/const\s+buildMailLoopToolProgressReceipt\s*=\s*createMailLoopToolProgressReceiptBuilder\(/);
+    expect(routeSource).toMatch(/createMailLoopToolProgressReceiptAppender\(\{/);
+    expect(routeSource).toMatch(/createMailLoopProgressStopReasonResolver\(\{/);
     expect(serviceSource).toMatch(/export\s+const\s+isMailLoopProgressRef\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+collectMailLoopProgressRefs\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+mailLoopProgressKindForRefs\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+createMailLoopToolProgressReceiptBuilder\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+createMailLoopToolProgressReceiptAppender\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+createMailLoopProgressStopReasonResolver\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");
     expect(serviceSource).not.toContain("../../../routes/agi.plan");
     expect(serviceSource).not.toContain("../../routes/agi.plan");
@@ -115,5 +121,117 @@ describe("Helix Ask live-source mail progress refs extraction boundary", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
+  });
+
+  it("preserves receipt append mutation and duplicate process fallback promotion", () => {
+    const appendReceipt = createMailLoopToolProgressReceiptAppender({
+      buildMailLoopToolProgressReceipt: (args) => ({
+        schema: "helix.mail_loop_tool_progress_receipt.v1",
+        turn_id: args.turnId,
+        iteration: args.iteration,
+        toolName: args.toolName,
+        producedRefs: ["stage_play_processed_mail_packet:1"],
+        newRefs: [],
+        progressKind: "no_progress",
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    });
+    const loop = {
+      tool_progress_receipts: [{
+        schema: "helix.mail_loop_tool_progress_receipt.v1" as const,
+        turn_id: "ask:progress",
+        iteration: 1,
+        toolName: "live_env.process_live_source_mail",
+        producedRefs: ["stage_play_processed_mail_packet:1"],
+        newRefs: ["stage_play_processed_mail_packet:1"],
+        progressKind: "processed_packet" as const,
+        assistant_answer: false as const,
+        raw_content_included: false as const,
+      }],
+      mail_loop_no_progress_repeat_count: 2,
+      mail_loop_continuation_wake_count: 0,
+    };
+    const payload = { debug: {} };
+    const loopIteration = {};
+
+    const receipt = appendReceipt({
+      mailLoopContinuationBudget: { maxNoProgressRepeats: 0 },
+      turnId: "ask:progress",
+      iteration: 2,
+      toolName: "live_env.read_processed_live_source_mail",
+      observation: {},
+      loop,
+      payload,
+      loopIteration,
+    });
+
+    expect(receipt?.progressKind).toBe("processed_packet");
+    expect(loop.mail_loop_no_progress_repeat_count).toBe(0);
+    expect(loop.tool_progress_receipts).toHaveLength(2);
+    expect(loopIteration).toMatchObject({ tool_progress_receipt: receipt });
+    expect(payload).toMatchObject({
+      mail_loop_tool_progress_receipts: loop.tool_progress_receipts,
+      mail_loop_continuation_budget: { maxNoProgressRepeats: 0 },
+      debug: {
+        mail_loop_tool_progress_receipts: loop.tool_progress_receipts,
+        mail_loop_continuation_budget: { maxNoProgressRepeats: 0 },
+      },
+    });
+  });
+
+  it("preserves mail-loop progress stop reasons", () => {
+    const resolveStopReason = createMailLoopProgressStopReasonResolver({
+      hasStagePlayLiveSourceMailDecisionObservation: (artifacts) => artifacts.includes("decision"),
+    });
+    const noProgressReceipt = {
+      schema: "helix.mail_loop_tool_progress_receipt.v1" as const,
+      turn_id: "ask:progress",
+      iteration: 1,
+      toolName: "live_env.read_processed_live_source_mail",
+      producedRefs: [],
+      newRefs: [],
+      progressKind: "no_progress" as const,
+      assistant_answer: false as const,
+      raw_content_included: false as const,
+    };
+    const wakeReceipt = {
+      ...noProgressReceipt,
+      toolName: "live_env.read_live_source_mail",
+      progressKind: "wake_result" as const,
+    };
+    const emptyMailboxReadReceipt = {
+      ...noProgressReceipt,
+      toolName: "live_env.read_live_source_mail",
+    };
+
+    expect(resolveStopReason({
+      mailLoopContinuationBudget: { maxNoProgressRepeats: 0, maxContinuationWakesPerCycle: 1 },
+      receipt: noProgressReceipt,
+      goalSatisfaction: "missing",
+      currentTurnArtifacts: [],
+      loop: { mail_loop_no_progress_repeat_count: 1 },
+    })).toBe("mail_loop_no_progress");
+    expect(resolveStopReason({
+      mailLoopContinuationBudget: { maxNoProgressRepeats: 0, maxContinuationWakesPerCycle: 1 },
+      receipt: emptyMailboxReadReceipt,
+      goalSatisfaction: "missing",
+      currentTurnArtifacts: [],
+      loop: { mail_loop_no_progress_repeat_count: 1 },
+    })).toBeNull();
+    expect(resolveStopReason({
+      mailLoopContinuationBudget: { maxNoProgressRepeats: 0, maxContinuationWakesPerCycle: 1 },
+      receipt: wakeReceipt,
+      goalSatisfaction: "missing",
+      currentTurnArtifacts: [],
+      loop: { mail_loop_continuation_wake_count: 2 },
+    })).toBe("mail_loop_wake_continuation_budget_exhausted");
+    expect(resolveStopReason({
+      mailLoopContinuationBudget: { maxNoProgressRepeats: 0, maxContinuationWakesPerCycle: 1 },
+      receipt: wakeReceipt,
+      goalSatisfaction: "satisfied",
+      currentTurnArtifacts: [],
+      loop: { mail_loop_continuation_wake_count: 2 },
+    })).toBeNull();
   });
 });
