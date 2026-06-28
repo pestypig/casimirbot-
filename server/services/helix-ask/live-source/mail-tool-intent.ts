@@ -1,0 +1,3 @@
+export const hasAskTurnExplicitMailToolCue = (transcript: string): boolean =>
+  /\blive_env\.(?:read_live_source_mail|read_processed_live_source_mail|process_live_source_mail|query_micro_reasoner_prompts|query_micro_reasoner_presets|draft_micro_reasoner_preset|apply_micro_reasoner_preset|create_micro_reasoner_preset|route_micro_reasoner_prompt|update_micro_reasoner_prompt|test_micro_reasoner_prompt|record_live_source_mail_decision|check_live_source_mail)\b/i.test(transcript) ||
+  /\b(?:live[-\s]?source\s+mailbox|processed\s+mail|processed\s+packet|micro[-\s]?reasoner|observer\s+mailbox|stage\s+play\s+mail|latest\s+visual\s+summary\s+mail)\b/i.test(transcript);
