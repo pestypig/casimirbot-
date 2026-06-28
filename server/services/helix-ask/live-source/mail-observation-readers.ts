@@ -1,10 +1,13 @@
 import { readAskTurnArtifactPayloadRecord } from "../artifact-text";
-import { readAskTurnString } from "../value-readers";
+import { readAskTurnString, readAskTurnStringList } from "../value-readers";
 
 export type AskTurnLiveSourceArtifactLike = {
   kind: string;
   payload?: unknown;
 };
+
+const uniqueAskTurnStrings = (values: Array<string | null | undefined>): string[] =>
+  Array.from(new Set(values.map((value) => String(value ?? "").trim()).filter(Boolean)));
 
 export const readAskTurnLiveEnvironmentObservationRecord = (
   artifact: AskTurnLiveSourceArtifactLike,
@@ -129,4 +132,38 @@ export const latestStagePlayProcessedMailPacketRecordFromArtifacts = (
 ): Record<string, unknown> | null => {
   const packets = (artifacts ?? []).flatMap(readStagePlayProcessedMailPacketRecordsFromArtifact);
   return packets.at(-1) ?? null;
+};
+
+export const collectStagePlayMailIdsFromRecord = (value: unknown): string[] => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return [];
+  const record = value as Record<string, unknown>;
+  return uniqueAskTurnStrings([
+    ...readAskTurnStringList(record.mailIds),
+    ...readAskTurnStringList(record.mail_ids),
+    readAskTurnString(record.mailId ?? record.mail_id),
+  ]);
+};
+
+export const collectStagePlayCurrentBatchMailIds = (artifacts: AskTurnLiveSourceArtifactLike[]): string[] => {
+  const mailIds: string[] = [];
+  for (const artifact of artifacts) {
+    const payload = readAskTurnArtifactPayloadRecord(artifact);
+    const observation = artifact.kind === "live_environment_tool_observation"
+      ? readAskTurnLiveEnvironmentObservationRecord(artifact)
+      : payload;
+    mailIds.push(...collectStagePlayMailIdsFromRecord(payload));
+    mailIds.push(...collectStagePlayMailIdsFromRecord(observation));
+    for (const packet of readStagePlayProcessedMailPacketRecordsFromArtifact(artifact)) {
+      mailIds.push(...collectStagePlayMailIdsFromRecord(packet));
+    }
+    const items = Array.isArray(observation?.items) ? observation.items : [];
+    for (const item of items) {
+      mailIds.push(...collectStagePlayMailIdsFromRecord(item));
+    }
+    const packets = Array.isArray(observation?.packets) ? observation.packets : [];
+    for (const packet of packets) {
+      mailIds.push(...collectStagePlayMailIdsFromRecord(packet));
+    }
+  }
+  return uniqueAskTurnStrings(mailIds);
 };

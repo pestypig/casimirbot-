@@ -5,6 +5,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   artifactHasSatisfyingStagePlayProcessedMailPacket,
+  collectStagePlayCurrentBatchMailIds,
+  collectStagePlayMailIdsFromRecord,
   isStagePlayLiveSourceMailReadObservationArtifact,
   latestStagePlayProcessedMailPacketRecordFromArtifacts,
   readAskTurnLiveEnvironmentObservationRecord,
@@ -30,12 +32,16 @@ describe("Helix Ask live-source mail observation reader extraction boundary", ()
     expect(routeSource).not.toMatch(/const\s+stagePlayProcessedMailPacketHasSatisfyingContent\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+artifactHasSatisfyingStagePlayProcessedMailPacket\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+latestStagePlayProcessedMailPacketRecordFromArtifacts\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+collectStagePlayMailIdsFromRecord\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+collectStagePlayCurrentBatchMailIds\s*=\s*\(/);
     expect(routeSource).not.toContain("STAGE_PLAY_PROCESSED_MAIL_RECOMMENDATIONS_REQUIRING_DECISION");
     expect(serviceSource).toMatch(/export\s+const\s+readAskTurnLiveEnvironmentObservationRecord\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+readStagePlayProcessedMailPacketRecordsFromArtifact\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+stagePlayProcessedMailPacketRequiresDecision\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+artifactHasSatisfyingStagePlayProcessedMailPacket\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+latestStagePlayProcessedMailPacketRecordFromArtifacts\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+collectStagePlayMailIdsFromRecord\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+collectStagePlayCurrentBatchMailIds\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");
     expect(serviceSource).not.toContain("../../../routes/agi.plan");
     expect(serviceSource).not.toContain("../../routes/agi.plan");
@@ -127,5 +133,31 @@ describe("Helix Ask live-source mail observation reader extraction boundary", ()
       packetId: "stage_play_processed_mail_packet:second",
       inferredFacts: ["movement"],
     });
+  });
+
+  it("preserves mail id collection across payload, observation, items, and packets", () => {
+    expect(collectStagePlayMailIdsFromRecord({
+      mailIds: ["mail:1", "mail:2", "mail:1", ""],
+      mail_id: "mail:3",
+    })).toEqual(["mail:1", "mail:2", "mail:3"]);
+
+    expect(collectStagePlayCurrentBatchMailIds([
+      {
+        kind: "live_environment_tool_observation",
+        payload: {
+          mailId: "mail:payload",
+          observation: {
+            mail_ids: ["mail:observation"],
+            items: [{ mailId: "mail:item" }],
+            packets: [
+              {
+                packetId: "stage_play_processed_mail_packet:nested",
+                mailIds: ["mail:packet", "mail:item"],
+              },
+            ],
+          },
+        },
+      },
+    ])).toEqual(["mail:payload", "mail:observation", "mail:packet", "mail:item"]);
   });
 });
