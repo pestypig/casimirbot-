@@ -2,7 +2,7 @@
 
 Status: current-head map for structural extraction and decomposition-enabler work.
 
-Pinned source state described: S229 transcript runtime helper extraction.
+Pinned source state described: S230 doc open-goal reader initialization order fix.
 
 Snapshot command: `npx tsx scripts/helix-ask-route-inventory.ts --write`
 
