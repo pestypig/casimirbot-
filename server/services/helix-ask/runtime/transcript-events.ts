@@ -1,3 +1,5 @@
+import crypto from "node:crypto";
+
 import type { HelixAskPublicCommentaryEventV1 } from "@shared/helix-agent-commentary";
 
 type HelixAskTurnPlanLaneForTranscript = "workspace" | "reasoning" | "conversation";
@@ -75,6 +77,16 @@ type HelixAskTurnEventForTranscript =
       };
     }
   | {
+      type: "interim_voice_callout_handoff";
+      at_ms: number;
+      turn_id: string;
+      artifact: unknown;
+      artifact_refs: string[];
+      assistant_answer: false;
+      terminal_eligible: false;
+      raw_content_included: false;
+    }
+  | {
       type: "decision_delta";
       at_ms: number;
       decision:
@@ -91,7 +103,7 @@ type HelixAskTurnEventForTranscript =
       status: HelixAskTurnPlanStepStatusForTranscript;
     }
   | { type: "terminal_answer"; at_ms: number; text: string; status: "final_answer" | "final_failure" | "pending_input" }
-  | { type: "turn_completed"; at_ms: number; turn_id: string; status: string };
+  | { type: "turn_completed"; at_ms: number; turn_id: string; status: "running" | "pending_input" | "completed" | "failed" };
 
 export type HelixAskTurnTranscriptEventForTranscript = {
   id: string;
@@ -123,6 +135,39 @@ export type HelixAskTurnTranscriptEventForTranscript = {
   source_event_type?: HelixAskTurnEventForTranscript["type"] | "question";
   event_source: HelixAskTurnTranscriptEventSource;
   reconstructed?: boolean;
+};
+
+const readTranscriptString = (value: unknown): string | null => {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed || null;
+};
+
+export const completeAskTurnIncrementalEvents = <Event extends HelixAskTurnEventForTranscript>(args: {
+  turnEvents: Event[];
+  turnId: string;
+  terminalText: string;
+  status: "final_answer" | "final_failure" | "pending_input";
+  runtimeStatus: "running" | "pending_input" | "completed" | "failed";
+}): Event[] => {
+  const withoutTerminal = args.turnEvents.filter(
+    (event) => event.type !== "terminal_answer" && event.type !== "turn_completed",
+  );
+  return [
+    ...withoutTerminal,
+    {
+      type: "terminal_answer",
+      at_ms: Date.now(),
+      text: args.terminalText,
+      status: args.status,
+    },
+    {
+      type: "turn_completed",
+      at_ms: Date.now(),
+      turn_id: args.turnId,
+      status: args.runtimeStatus,
+    },
+  ] as Event[];
 };
 
 const formatAskTurnTranscriptArtifacts = (artifacts: string[]): string =>
@@ -366,6 +411,84 @@ export const buildAskTurnTranscriptEventsForRuntime = (args: {
   });
   return transcriptEvents;
 };
+
+export const buildAskTurnTranscriptEvents = (args: {
+  turnEvents: HelixAskTurnEventForTranscript[];
+  question: string;
+  eventSource: HelixAskTurnTranscriptEventSource;
+  turnId?: string | null;
+  startingSeq?: number;
+}): HelixAskTurnTranscriptEventForTranscript[] =>
+  buildAskTurnTranscriptEventsForRuntime(args);
+
+export const buildAskTurnTranscriptEventsForRuntimeEvent = (args: {
+  event: HelixAskTurnEventForTranscript;
+  eventIndex: number;
+  question: string;
+  eventSource: HelixAskTurnTranscriptEventSource;
+  turnId?: string | null;
+}): HelixAskTurnTranscriptEventForTranscript[] =>
+  buildAskTurnTranscriptEvents({
+    turnEvents: [args.event],
+    question: args.eventIndex === 0 ? args.question : "",
+    eventSource: args.eventSource,
+    turnId: args.turnId,
+    startingSeq: args.eventIndex,
+  }).map((event) => ({
+    ...event,
+    id: `transcript:${args.eventIndex}:${event.source_event_type ?? event.type}`,
+  }));
+
+export const hasMeaningfulAskTurnTranscriptRows = (value: unknown): boolean =>
+  Array.isArray(value) &&
+  value.some((entry) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return false;
+    const record = entry as Record<string, unknown>;
+    const type = readTranscriptString(record.type);
+    const sourceEventType = readTranscriptString(record.source_event_type);
+    if (!type || type === "question" || type === "final_answer" || type === "turn_completed") return false;
+    if (sourceEventType === "terminal_answer" || sourceEventType === "turn_completed") return false;
+    return Boolean(readTranscriptString(record.text));
+  });
+
+export const inferHelixAskTranscriptPrompt = (
+  payload: Record<string, unknown>,
+  fallbackPrompt?: string | null,
+): string => {
+  const prompt =
+    readTranscriptString(fallbackPrompt) ??
+    readTranscriptString(payload.active_prompt) ??
+    readTranscriptString(payload.question) ??
+    readTranscriptString(payload.prompt) ??
+    readTranscriptString(payload.raw_user_prompt) ??
+    readTranscriptString(payload.transcript);
+  return prompt ?? "";
+};
+
+export const inferHelixAskTranscriptTurnId = (
+  payload: Record<string, unknown>,
+  fallbackTurnId?: string | null,
+): string => {
+  const turnId =
+    readTranscriptString(fallbackTurnId) ??
+    readTranscriptString(payload.turn_id) ??
+    readTranscriptString(payload.turnId) ??
+    readTranscriptString(payload.active_turn_id) ??
+    readTranscriptString(payload.trace_id) ??
+    readTranscriptString(payload.traceId);
+  return turnId ?? `ask:${crypto.randomUUID()}`;
+};
+
+export const inferHelixAskTranscriptTraceId = (
+  payload: Record<string, unknown>,
+  turnId: string,
+  fallbackTraceId?: string | null,
+): string =>
+  readTranscriptString(fallbackTraceId) ??
+  readTranscriptString(payload.trace_id) ??
+  readTranscriptString(payload.traceId) ??
+  readTranscriptString(payload.active_trace_id) ??
+  turnId;
 
 export const normalizeAskTurnTranscriptSupersessionsForRuntime = (
   events: HelixAskTurnTranscriptEventForTranscript[],

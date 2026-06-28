@@ -2,7 +2,7 @@
 
 Status: current-head map for structural extraction and decomposition-enabler work.
 
-Pinned source state described: S228 stage-play mail-wake route metadata extraction.
+Pinned source state described: S229 transcript runtime helper extraction.
 
 Snapshot command: `npx tsx scripts/helix-ask-route-inventory.ts --write`
 
@@ -11,9 +11,9 @@ Route snapshot:
 | Metric | Value |
 | --- | ---: |
 | File | `server/routes/agi.plan.ts` |
-| Lines | 175,499 |
-| Bytes | 8,045,949 |
-| Top-level helper estimate | 287 helper blocks |
+| Lines | 174,987 |
+| Bytes | 8,024,346 |
+| Top-level helper estimate | 283 helper blocks |
 | Route inventory | `artifacts/helix-ask-route-inventory.json` |
 | Machine-readable map | `artifacts/helix-ask-route-decomposition-map.json` |
 
@@ -28,7 +28,7 @@ Do not extract `runHelixAgentTurnRuntimeLoop` in this wave. Do not patch termina
 | Candidate | Lines | Boundary | Risk | Readiness | Likely Owner | Notes |
 | --- | ---: | --- | --- | --- | --- | --- |
 | `live-debug-slim` | service-owned | `DEBUG_EXPORT` | `MEDIUM_LOW` | `EXTRACTED` | `server/services/helix-ask/debug/live-debug-slim.ts` | Extracted by S93. Route still owns debug-mode parsing and response wrapper ordering. |
-| `transcript-events` | service-owned | `UI_API_PROJECTION` | `MEDIUM_LOW` | `EXTRACTED` | `server/services/helix-ask/runtime/transcript-events.ts` | Extracted by S94. Route retains transcript scaffold/finalization ordering. |
+| `transcript-events` | service-owned | `UI_API_PROJECTION` | `MEDIUM_LOW` | `EXTRACTED` | `server/services/helix-ask/runtime/transcript-events.ts` | Extracted by S94. S229 moved incremental event completion, prompt/turn/trace inference, meaningful-row detection, and single-event transcript projection into the same owner. Route retains transcript scaffold/finalization ordering, response transport, terminal projection, and debug envelope ordering. |
 | `decision-source-map` | service-owned | `SOLVER_CONTROL` | `MEDIUM` | `EXTRACTED` | `server/services/helix-ask/runtime/decision-source-map.ts` plus sibling runtime decision modules | S95 moved the debug map builder. S96 moved the pure runtime/terminal source mappers. S99 moved capability selection. S100 moved observation-decision. |
 | `runtime-intent-packet` | service-owned | `CONTINUATION_SOLVER_HANDOFF` | `MEDIUM` | `EXTRACTED` | `server/services/helix-ask/runtime/runtime-intent-packet.ts` | S131 moved runtime-intent packet readers, source/capability turn predicates, packet assembly, ledger/debug append, and audit-refresh handoff through a four-callback dependency interface. It does not move runtime-loop orchestration, tool execution, goal satisfaction, terminal materialization, or terminal authority. |
 | `runtime-continuation-hints` | service-owned | `CONTINUATION_SOLVER_HANDOFF` | `MEDIUM` | `EXTRACTED` | `server/services/helix-ask/runtime/runtime-continuation-hints.ts` | S132 moved runtime continuation hint construction, append/ledger/debug writes, agent-step decision collection, hint-to-decision matching, and migration marking through a seven-callback dependency interface. S133 moved continuation-hint observation-ref matching into the same owner with route-supplied artifact/path/string readers. It does not move tool execution, model sampling, retry policy, terminal materialization, or terminal authority. |
