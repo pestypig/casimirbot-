@@ -594,21 +594,20 @@ const runLiveScenario = async (scenario: Scenario) => {
   const body: Record<string, unknown> = {
     agent_runtime: "codex",
     turn_id: turnId,
+    question: `Use the provided Helix workstation gateway observation for ${scenario.id}.`,
     workstation_gateway_call: seed.workstation_gateway_call,
   };
-  if (SPAWN_CODEX) {
-    body.question = `Use the provided Helix workstation gateway observation for ${scenario.id}.`;
-  }
   const askResponse = await fetchJson(`${BASE_URL}/api/agi/ask/turn`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
   const ask = readRecord(askResponse.json) ?? {};
-  const debugExportRef = readString(ask.debug_export_ref);
-  const debugExport = debugExportRef
-    ? await fetchJson(`${BASE_URL}/api/agi/ask/turn/${encodeURIComponent(turnId)}/debug-export`)
+  const debugExportEndpoint = readDebugExportEndpoint(ask);
+  const debugExport = debugExportEndpoint
+    ? await fetchJson(`${BASE_URL}${debugExportEndpoint}`)
     : { ok: false, status: 0, json: null, error: "debug_export_ref_missing" };
+  const debugPayload = readRecord(readRecord(debugExport.json)?.payload);
   const callResults = readRecordArray(ask.workstation_gateway_call_results);
   const firstResult = callResults[0] ?? {};
   const codexSummary = buildGatewayCallSummary(firstResult);
@@ -625,6 +624,17 @@ const runLiveScenario = async (scenario: Scenario) => {
   if (callResults.length !== 1) failures.push(`gateway_call_result_count:${callResults.length}`);
   addGatewayInvariantFailures({ failures, prefix: "codex", result: firstResult, scenario });
   if (!debugExport.ok) failures.push(`debug_export_unavailable:${debugExport.status || debugExport.error || "missing"}`);
+  if (debugExport.ok) {
+    if (readString(debugPayload?.agent_runtime) !== "codex") {
+      failures.push(`debug_agent_runtime:${readString(debugPayload?.agent_runtime) ?? "missing"}!=codex`);
+    }
+    if (readRecordArray(debugPayload?.workstation_gateway_call_results).length !== 1) {
+      failures.push(`debug_gateway_call_result_count:${readRecordArray(debugPayload?.workstation_gateway_call_results).length}`);
+    }
+    if (readRecordArray(debugPayload?.workstation_gateway_observation_packets).length !== 1) {
+      failures.push(`debug_observation_packet_count:${readRecordArray(debugPayload?.workstation_gateway_observation_packets).length}`);
+    }
+  }
 
   const probeResult = {
     schema: "helix.provider_gateway_trace_probe_result.v1",
@@ -642,6 +652,9 @@ const runLiveScenario = async (scenario: Scenario) => {
     lifecycle_status: codexSummary.lifecycle_status,
     followup_next_action: codexSummary.followup_next_action,
     debug_export_available: debugExport.ok,
+    debug_export_endpoint: debugExportEndpoint,
+    debug_gateway_call_result_count: readRecordArray(debugPayload?.workstation_gateway_call_results).length,
+    debug_observation_packet_count: readRecordArray(debugPayload?.workstation_gateway_observation_packets).length,
     procedural_ok: failures.length === 0,
     failures,
   };
