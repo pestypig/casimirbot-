@@ -1,0 +1,4 @@
+export const hasAskTurnLiveSourceOneTimeMailReadCue = (transcript: string): boolean =>
+  /\blive_env\.(?:read_live_source_mail|read_processed_live_source_mail|process_live_source_mail|check_live_source_mail)\b/i.test(transcript) ||
+  /\b(?:read|check|process|review)\b[\s\S]{0,110}\b(?:latest|current|active|unread|new)?[\s\S]{0,40}\b(?:mailbox|live\s+source\s+mail|source\s+mail|new\s+source\s+mail|visual\s+mail|visual\s+summary\s+mail|latest\s+visual\s+update|visual\s+update|source\s+update|latest\s+unread|unread\s+(?:mail|updates?))\b/i.test(transcript) ||
+  /\b(?:mailbox|live\s+source\s+mail|source\s+mail|new\s+source\s+mail|visual\s+mail|visual\s+summary\s+mail|latest\s+visual\s+update|visual\s+update|source\s+update|latest\s+unread|unread\s+(?:mail|updates?))\b[\s\S]{0,110}\b(?:read|check|process|review|decide|record\s+decision|show|shows|showing|contains?|reports?)\b/i.test(transcript);
