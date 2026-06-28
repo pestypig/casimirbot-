@@ -128,6 +128,77 @@ export const buildStagePlayMailVoiceCalloutCandidate = (
     reasonCodes,
     rationale: routineOnly
       ? "The visual-summary mail looks routine or stable, so voice should be suppressed."
-      : "No configured voice-callout salience cue was detected in the visual-summary mail.",
+    : "No configured voice-callout salience cue was detected in the visual-summary mail.",
+  };
+};
+
+export const formatStagePlayMailUserRelevantMeaning = (summary: string): string => {
+  const clean = summary.replace(/\s+/g, " ").trim();
+  if (!clean) return "The latest live-source mail contains a compact visual observation.";
+  const sentence = clean.replace(/[.!?]+$/, "");
+  if (
+    /^(?:the\s+)?(?:live\s+)?(?:frame|scene|source|visual|screen|interface)\b/i.test(sentence) ||
+    /^(?:the\s+)?(?:displayed|current)\s+(?:live\s+)?(?:frame|scene|source|visual|screen|interface)\b/i.test(sentence)
+  ) {
+    return `${sentence}.`;
+  }
+  const object = /^(?:a|an|the)\s+/i.test(sentence)
+    ? sentence.charAt(0).toLowerCase() + sentence.slice(1)
+    : sentence;
+  return `The visual source shows ${object}.`;
+};
+
+export const buildStagePlayMailBatchInterpretationPayload = (
+  items: Record<string, unknown>[],
+): Record<string, unknown> => {
+  const mailIds = items
+    .map((item) => readAskTurnString(item.mailId ?? item.mail_id))
+    .filter((entry): entry is string => Boolean(entry));
+  const summaries = collectStagePlayMailBatchSummaries(items);
+  const currentSceneSummary = compactStagePlayMailSummarySentence(summaries.at(-1) ?? summaries[0] ?? "");
+  const joined = summaries.join(" ");
+  const watchTargets = Array.from(new Set(
+    Array.from(joined.matchAll(/\b(?:window|screen|tab|menu|button|icon|app|grid|player|mob|cat|book|table|mountain|waterfall|scene|source|content)\b/gi))
+      .map((match) => match[0].toLowerCase())
+  )).slice(0, 5);
+  const activeWindowOrScene =
+    /\b(?:app|icon|grid|launcher|browser|window|screen|desktop)\b/i.test(joined)
+      ? "app or screen navigation scene"
+      : /\b(?:minecraft|player|mob|cat|mountain|waterfall|book)\b/i.test(joined)
+        ? "game-like visual scene"
+        : "live-source visual scene";
+  return {
+    currentSceneSummary,
+    runningStorySummary: `Latest visual mail interpretation: ${currentSceneSummary}`,
+    setting: "visual live source",
+    activeWindowOrScene,
+    entities: [],
+    objects: watchTargets,
+    activities: ["compact visual mail interpretation"],
+    userRelevantMeaning: formatStagePlayMailUserRelevantMeaning(currentSceneSummary),
+    meaningfulChanges: summaries.map((summary) => compactStagePlayMailSummarySentence(summary)).slice(-12),
+    uncertainties: ["This interpretation is based on compact visual-summary mail, not raw image data."],
+    watchNextTargets: watchTargets.length > 0 ? watchTargets : ["next compact source summary"],
+    watchNextReason: "Watch for a change in active window, opened app, visible scene, or new content replacing the current view.",
+    predictionText: "The next mail batch should clarify whether the visible source remains stable or changes to a new active scene.",
+    predictionHorizon: "next_mail",
+    predictionConfidence: 0.45,
+    validationSignals: ["next mail summary reports same visual state", "next mail summary reports opened app, window change, or new content"],
+    mailCoverage: {
+      readMailIds: mailIds,
+      interpretedMailIds: mailIds,
+      compressedMailIds: mailIds.length > 1 ? mailIds : [],
+      skippedMailIds: [],
+      mode:
+        mailIds.length <= 1
+          ? "latest_only"
+          : mailIds.length <= 5
+            ? "chronological_batch"
+            : "micro_batch",
+      reason:
+        mailIds.length <= 1
+          ? "Single mail item interpreted as the latest observation."
+          : "Multiple unread mail items interpreted as a time-ordered observation batch.",
+    },
   };
 };

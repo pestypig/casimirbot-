@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  buildStagePlayMailBatchInterpretationPayload,
   buildStagePlayMailBatchTextAnswerDraft,
   buildStagePlayMailVoiceCalloutCandidate,
   compactStagePlayMailSummarySentence,
+  formatStagePlayMailUserRelevantMeaning,
   stagePlayWatchPolicyWantsTextForEveryMailBatch,
 } from "../services/helix-ask/live-source/mail-answer-drafts";
 
@@ -23,11 +25,15 @@ describe("Helix Ask live-source mail answer draft extraction boundary", () => {
     expect(routeSource).not.toMatch(/const\s+buildStagePlayMailBatchTextAnswerDraft\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+collectStagePlayMailBatchSummaries\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+buildStagePlayMailVoiceCalloutCandidate\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+formatStagePlayMailUserRelevantMeaning\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+buildStagePlayMailBatchInterpretationPayload\s*=\s*\(/);
     expect(serviceSource).toMatch(/export\s+const\s+stagePlayWatchPolicyWantsTextForEveryMailBatch\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+compactStagePlayMailSummarySentence\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+buildStagePlayMailBatchTextAnswerDraft\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+collectStagePlayMailBatchSummaries\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+buildStagePlayMailVoiceCalloutCandidate\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+formatStagePlayMailUserRelevantMeaning\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+buildStagePlayMailBatchInterpretationPayload\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");
     expect(serviceSource).not.toContain("../../../routes/agi.plan");
     expect(serviceSource).not.toContain("../../routes/agi.plan");
@@ -75,6 +81,45 @@ describe("Helix Ask live-source mail answer draft extraction boundary", () => {
       draft: null,
       reasonCodes: ["routine_or_stable_scene_suppressed"],
       rationale: "The visual-summary mail looks routine or stable, so voice should be suppressed.",
+    });
+  });
+
+  it("preserves mail interpretation payload assembly", () => {
+    expect(formatStagePlayMailUserRelevantMeaning("A player opens a chest.")).toBe(
+      "The visual source shows a player opens a chest.",
+    );
+    expect(formatStagePlayMailUserRelevantMeaning("The screen shows an app grid.")).toBe(
+      "The screen shows an app grid.",
+    );
+
+    expect(buildStagePlayMailBatchInterpretationPayload([
+      {
+        mailId: "mail-1",
+        summary: { text: "A desktop app grid is visible." },
+      },
+      {
+        mail_id: "mail-2",
+        summary: { preview: "A browser window opens with content." },
+      },
+    ])).toMatchObject({
+      currentSceneSummary: "A browser window opens with content.",
+      runningStorySummary: "Latest visual mail interpretation: A browser window opens with content.",
+      setting: "visual live source",
+      activeWindowOrScene: "app or screen navigation scene",
+      entities: [],
+      activities: ["compact visual mail interpretation"],
+      userRelevantMeaning: "The visual source shows a browser window opens with content.",
+      watchNextReason: "Watch for a change in active window, opened app, visible scene, or new content replacing the current view.",
+      predictionHorizon: "next_mail",
+      predictionConfidence: 0.45,
+      mailCoverage: {
+        readMailIds: ["mail-1", "mail-2"],
+        interpretedMailIds: ["mail-1", "mail-2"],
+        compressedMailIds: ["mail-1", "mail-2"],
+        skippedMailIds: [],
+        mode: "chronological_batch",
+        reason: "Multiple unread mail items interpreted as a time-ordered observation batch.",
+      },
     });
   });
 });
