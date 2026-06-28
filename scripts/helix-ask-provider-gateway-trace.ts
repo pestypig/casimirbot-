@@ -152,6 +152,28 @@ const buildGatewayCallSummary = (result: Record<string, unknown>) => {
   };
 };
 
+const buildProviderCandidateSummary = (ask: Record<string, unknown>) => {
+  const candidate = readRecord(ask.provider_terminal_candidate);
+  const reentry = readRecord(ask.provider_reasoning_reentry);
+  const review = readRecord(ask.terminal_authority_candidate_review);
+  return {
+    candidate_schema: readString(candidate?.schema),
+    candidate_present: Boolean(candidate),
+    candidate_ref: readString(candidate?.candidate_id),
+    candidate_provider: readString(candidate?.selected_agent_provider),
+    candidate_terminal_eligible: candidate?.terminal_eligible,
+    candidate_assistant_answer: candidate?.assistant_answer,
+    candidate_raw_content_included: candidate?.raw_content_included,
+    reentry_schema: readString(reentry?.schema),
+    reentry_status: readString(reentry?.status),
+    reentry_evidence_reentered: reentry?.evidence_reentered,
+    terminal_review_schema: readString(review?.schema),
+    terminal_authority_status: readString(review?.terminal_authority_status),
+    terminal_authority_granted: review?.terminal_authority_granted,
+    final_visible_answer_authorized: review?.final_visible_answer_authorized,
+  };
+};
+
 const addGatewayInvariantFailures = (input: {
   failures: string[];
   prefix: string;
@@ -207,11 +229,9 @@ const runScenario = async (scenario: Scenario) => {
   const body: Record<string, unknown> = {
     agent_runtime: "codex",
     turn_id: turnId,
+    question: `Use the provided Helix workstation gateway observation for ${scenario.id}.`,
     workstation_gateway_call: seed.workstation_gateway_call,
   };
-  if (SPAWN_CODEX) {
-    body.question = `Use the provided Helix workstation gateway observation for ${scenario.id}.`;
-  }
 
   const helixGatewayResult = await callWorkstationGatewayCapability({
     agentRuntime: "helix",
@@ -222,11 +242,35 @@ const runScenario = async (scenario: Scenario) => {
     iteration: 1,
   });
   process.env.ENABLE_CODEX_AGENT = "1";
-  const providerResult = await codexProvider.runTurn({
-    runtime: "codex",
-    route: "/ask/turn",
-    body,
-  });
+  const originalFakeStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+  const originalFakeExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+  if (!SPAWN_CODEX) {
+    process.env.CODEX_AGENT_FAKE_STDOUT = scenario.expectedOk
+      ? `Provider candidate for ${scenario.id} is grounded in the Helix gateway observation.`
+      : `Provider candidate for ${scenario.id} reports that the requested workstation capability was blocked.`;
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+  }
+  let providerResult: Awaited<ReturnType<typeof codexProvider.runTurn>>;
+  try {
+    providerResult = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body,
+    });
+  } finally {
+    if (!SPAWN_CODEX) {
+      if (originalFakeStdout === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      } else {
+        process.env.CODEX_AGENT_FAKE_STDOUT = originalFakeStdout;
+      }
+      if (originalFakeExitCode === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      } else {
+        process.env.CODEX_AGENT_FAKE_EXIT_CODE = originalFakeExitCode;
+      }
+    }
+  }
   const providerDebug = readRecord(providerResult.debug) ?? {};
   const ask = {
     ...providerResult,
@@ -245,6 +289,9 @@ const runScenario = async (scenario: Scenario) => {
     workstation_gateway_observation_packets: providerDebug.workstation_gateway_observation_packets,
     tool_lifecycle_traces: providerDebug.tool_lifecycle_traces,
     tool_followup_decisions: providerDebug.tool_followup_decisions,
+    provider_terminal_candidate: providerDebug.provider_terminal_candidate,
+    provider_reasoning_reentry: providerDebug.provider_reasoning_reentry,
+    terminal_authority_candidate_review: providerDebug.terminal_authority_candidate_review,
     workstation_gateway_reentry_status: providerDebug.workstation_gateway_reentry_status,
     terminal_authority_status: providerDebug.terminal_authority_status,
   };
@@ -253,6 +300,7 @@ const runScenario = async (scenario: Scenario) => {
   const firstResult = callResults[0] ?? {};
   const codexSummary = buildGatewayCallSummary(firstResult);
   const helixSummary = buildGatewayCallSummary(helixGatewayResult as unknown as Record<string, unknown>);
+  const candidateSummary = buildProviderCandidateSummary(ask);
   const failures: string[] = [];
 
   if (readString(ask.agent_runtime) !== "codex") failures.push("agent_runtime_not_codex");
@@ -263,6 +311,16 @@ const runScenario = async (scenario: Scenario) => {
     failures.push("manifest_version_missing");
   }
   if (callResults.length !== 1) failures.push(`gateway_call_result_count:${callResults.length}`);
+  if (!candidateSummary.candidate_present) failures.push("provider_terminal_candidate_missing");
+  if (candidateSummary.candidate_terminal_eligible !== false) failures.push("provider_terminal_candidate_terminal_eligible_not_false");
+  if (candidateSummary.candidate_assistant_answer !== false) failures.push("provider_terminal_candidate_assistant_answer_not_false");
+  if (candidateSummary.candidate_raw_content_included !== false) failures.push("provider_terminal_candidate_raw_content_included_not_false");
+  if (candidateSummary.reentry_status !== "completed") failures.push(`provider_reentry_status:${candidateSummary.reentry_status ?? "missing"}`);
+  if (candidateSummary.terminal_authority_status !== "pending_helix_terminal_authority") {
+    failures.push(`terminal_authority_status:${candidateSummary.terminal_authority_status ?? "missing"}`);
+  }
+  if (candidateSummary.terminal_authority_granted !== false) failures.push("terminal_authority_granted_not_false");
+  if (candidateSummary.final_visible_answer_authorized !== false) failures.push("final_visible_answer_authorized_not_false");
   addGatewayInvariantFailures({ failures, prefix: "codex", result: firstResult, scenario });
   addGatewayInvariantFailures({
     failures,
@@ -305,6 +363,7 @@ const runScenario = async (scenario: Scenario) => {
     observation_packet_status: codexSummary.observation_packet_status,
     lifecycle_status: codexSummary.lifecycle_status,
     followup_next_action: codexSummary.followup_next_action,
+    provider_terminal_candidate: candidateSummary,
     provider_parity: {
       helix: helixSummary,
       codex: codexSummary,
