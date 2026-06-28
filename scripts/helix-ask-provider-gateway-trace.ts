@@ -283,14 +283,44 @@ const readDebugExportEndpoint = (ask: Record<string, unknown>): string | null =>
   return readString(refRecord?.endpoint);
 };
 
+const parseSseEvents = (text: string): Array<{ event: string; data: Record<string, unknown> }> =>
+  text
+    .split(/\n\n+/)
+    .map((block) => block.trim())
+    .filter(Boolean)
+    .map((block) => {
+      const event = block
+        .split(/\n/)
+        .find((line) => line.startsWith("event:"))
+        ?.slice("event:".length)
+        .trim() ?? "";
+      const dataText = block
+        .split(/\n/)
+        .filter((line) => line.startsWith("data:"))
+        .map((line) => line.slice("data:".length).trim())
+        .join("\n");
+      let data: Record<string, unknown> = {};
+      try {
+        data = JSON.parse(dataText);
+      } catch {
+        data = {};
+      }
+      return { event, data };
+    });
+
 const runRouteDebugExportProbe = async (input: {
   app: ReturnType<typeof createRouteTraceApp>;
   body: Record<string, unknown>;
   scenario: Scenario;
 }) => {
+  const turnId = readString(input.body.turn_id) ?? "ask:provider-gateway-trace";
   const response = await request(input.app)
     .post("/api/agi/ask/turn")
-    .send(input.body);
+    .send({
+      ...input.body,
+      session_id: `${turnId}:codex-route-session`,
+      sessionId: `${turnId}:codex-route-session`,
+    });
   const ask = readRecord(response.body) ?? {};
   const endpoint = readDebugExportEndpoint(ask);
   const debugResponse = endpoint
@@ -401,12 +431,15 @@ const runHelixRouteDebugExportProbe = async (input: {
   body: Record<string, unknown>;
   scenario: Scenario;
 }) => {
+  const turnId = readString(input.body.turn_id) ?? "ask:provider-gateway-trace";
   const response = await request(input.app)
     .post("/api/agi/ask/turn")
     .send({
       ...input.body,
       agent_runtime: "helix",
-      turn_id: `${readString(input.body.turn_id) ?? "ask:provider-gateway-trace"}:helix-route`,
+      turn_id: `${turnId}:helix-route`,
+      session_id: `${turnId}:helix-route-session`,
+      sessionId: `${turnId}:helix-route-session`,
       question: `Use the provided Helix workstation gateway observation for ${input.scenario.id} through Helix Native.`,
     });
   const ask = readRecord(response.body) ?? {};
@@ -527,12 +560,15 @@ const runFutureRouteDebugExportProbe = async (input: {
   body: Record<string, unknown>;
   scenario: Scenario;
 }) => {
+  const turnId = readString(input.body.turn_id) ?? "ask:provider-gateway-trace";
   const response = await request(input.app)
     .post("/api/agi/ask/turn")
     .send({
       ...input.body,
       agent_runtime: "future",
-      turn_id: `${readString(input.body.turn_id) ?? "ask:provider-gateway-trace"}:future`,
+      turn_id: `${turnId}:future`,
+      session_id: `${turnId}:future-route-session`,
+      sessionId: `${turnId}:future-route-session`,
       question: `Use the provided Helix workstation gateway observation for ${input.scenario.id} through the Future provider wrapper.`,
     });
   const ask = readRecord(response.body) ?? {};
@@ -641,6 +677,181 @@ const runFutureRouteDebugExportProbe = async (input: {
       final_answer_source: readString(ask.final_answer_source),
       debug_final_answer_source: readString(debugPayload?.final_answer_source),
       provider_gateway_debug_summary: readRecord(ask.provider_gateway_debug_summary),
+      debug_provider_gateway_debug_summary: readRecord(debugPayload?.provider_gateway_debug_summary),
+      procedural_ok: routeFailures.length === 0,
+      failures: routeFailures,
+    },
+  };
+};
+
+const runStreamRouteDebugExportProbe = async (input: {
+  app: ReturnType<typeof createRouteTraceApp>;
+  body: Record<string, unknown>;
+  scenario: Scenario;
+  providerId: "helix" | "codex" | "future";
+}) => {
+  const turnId = readString(input.body.turn_id) ?? "ask:provider-gateway-trace";
+  const providerLabels = {
+    helix: "Helix Native",
+    codex: "Codex Workstation Mode",
+    future: "Future provider wrapper",
+  };
+  const body = {
+    ...input.body,
+    agent_runtime: input.providerId,
+    turn_id: `${turnId}:${input.providerId}:stream`,
+    session_id: `${turnId}:${input.providerId}:stream-session`,
+    sessionId: `${turnId}:${input.providerId}:stream-session`,
+    question: `Use the provided Helix workstation gateway observation for ${input.scenario.id} through ${providerLabels[input.providerId]} stream.`,
+  };
+  const response = await request(input.app)
+    .post("/api/agi/ask/turn/stream")
+    .send(body);
+  const streamEvents = parseSseEvents(response.text);
+  const finalEvent = streamEvents.find((entry) => entry.event === "turn_final") ?? null;
+  const finalPayload = readRecord(finalEvent?.data) ?? {};
+  const endpoint = readDebugExportEndpoint(finalPayload);
+  const debugResponse = endpoint
+    ? await request(input.app).get(endpoint)
+    : null;
+  const debugExport = readRecord(debugResponse?.body) ?? null;
+  const debugPayload = readRecord(debugExport?.payload);
+  const routeFailures: string[] = [];
+  const expectedReentryStatus = input.providerId === "codex"
+    ? "completed"
+    : "pending_helix_solver_reentry";
+  const expectedTerminalAuthorityStatus = input.providerId === "codex"
+    ? input.scenario.expectedOk
+      ? "authorized_by_helix_provider_candidate_bridge"
+      : "blocked_by_gateway_observation_state"
+    : "not_authorized_observation_only";
+  const expectedFinalAnswerSource = input.providerId === "codex" && input.scenario.expectedOk
+    ? "agent_provider_terminal_candidate"
+    : null;
+
+  if (response.status !== 200) routeFailures.push(`${input.providerId}_stream_status:${response.status}`);
+  if (!finalEvent) routeFailures.push(`${input.providerId}_stream_final_event_missing`);
+  if (!endpoint) routeFailures.push(`${input.providerId}_stream_debug_export_ref_missing`);
+  if (endpoint && debugResponse?.status !== 200) {
+    routeFailures.push(`${input.providerId}_stream_debug_export_status:${debugResponse?.status ?? "missing"}`);
+  }
+  if (readString(finalPayload.agent_runtime) !== input.providerId) {
+    routeFailures.push(
+      `${input.providerId}_stream_agent_runtime:${readString(finalPayload.agent_runtime) ?? "missing"}!=${input.providerId}`,
+    );
+  }
+  if (readString(finalPayload.workstation_gateway_manifest_version) !== "read-observe.v1") {
+    routeFailures.push(`${input.providerId}_stream_manifest_version_missing`);
+  }
+  if (readRecordArray(finalPayload.workstation_gateway_call_results).length !== 1) {
+    routeFailures.push(
+      `${input.providerId}_stream_gateway_call_result_count:${readRecordArray(finalPayload.workstation_gateway_call_results).length}`,
+    );
+  }
+  if (readRecordArray(finalPayload.workstation_gateway_observation_packets).length !== 1) {
+    routeFailures.push(
+      `${input.providerId}_stream_observation_packet_count:${readRecordArray(finalPayload.workstation_gateway_observation_packets).length}`,
+    );
+  }
+  if (readString(finalPayload.workstation_gateway_reentry_status) !== expectedReentryStatus) {
+    routeFailures.push(
+      `${input.providerId}_stream_reentry_status:${readString(finalPayload.workstation_gateway_reentry_status) ?? "missing"}!=${expectedReentryStatus}`,
+    );
+  }
+  if (readString(finalPayload.terminal_authority_status) !== expectedTerminalAuthorityStatus) {
+    routeFailures.push(
+      `${input.providerId}_stream_terminal_authority_status:${readString(finalPayload.terminal_authority_status) ?? "missing"}!=${expectedTerminalAuthorityStatus}`,
+    );
+  }
+  if (readString(finalPayload.final_answer_source) !== expectedFinalAnswerSource) {
+    routeFailures.push(
+      `${input.providerId}_stream_final_answer_source:${readString(finalPayload.final_answer_source) ?? "missing"}!=${expectedFinalAnswerSource ?? "null"}`,
+    );
+  }
+  if (debugPayload) {
+    if (readString(debugPayload.agent_runtime) !== input.providerId) {
+      routeFailures.push(
+        `${input.providerId}_stream_debug_agent_runtime:${readString(debugPayload.agent_runtime) ?? "missing"}!=${input.providerId}`,
+      );
+    }
+    if (readString(debugPayload.workstation_gateway_manifest_version) !== "read-observe.v1") {
+      routeFailures.push(`${input.providerId}_stream_debug_manifest_version_missing`);
+    }
+    if (readRecordArray(debugPayload.workstation_gateway_call_results).length !== 1) {
+      routeFailures.push(
+        `${input.providerId}_stream_debug_gateway_call_result_count:${readRecordArray(debugPayload.workstation_gateway_call_results).length}`,
+      );
+    }
+    if (readRecordArray(debugPayload.workstation_gateway_observation_packets).length !== 1) {
+      routeFailures.push(
+        `${input.providerId}_stream_debug_observation_packet_count:${readRecordArray(debugPayload.workstation_gateway_observation_packets).length}`,
+      );
+    }
+    if (readString(debugPayload.workstation_gateway_reentry_status) !== expectedReentryStatus) {
+      routeFailures.push(
+        `${input.providerId}_stream_debug_reentry_status:${readString(debugPayload.workstation_gateway_reentry_status) ?? "missing"}!=${expectedReentryStatus}`,
+      );
+    }
+    if (readString(debugPayload.terminal_authority_status) !== expectedTerminalAuthorityStatus) {
+      routeFailures.push(
+        `${input.providerId}_stream_debug_terminal_authority_status:${readString(debugPayload.terminal_authority_status) ?? "missing"}!=${expectedTerminalAuthorityStatus}`,
+      );
+    }
+    if (readString(debugPayload.final_answer_source) !== expectedFinalAnswerSource) {
+      routeFailures.push(
+        `${input.providerId}_stream_debug_final_answer_source:${readString(debugPayload.final_answer_source) ?? "missing"}!=${expectedFinalAnswerSource ?? "null"}`,
+      );
+    }
+  }
+
+  addProviderGatewaySummaryFailures({
+    failures: routeFailures,
+    prefix: `${input.providerId}_stream`,
+    source: finalPayload,
+    expectedProvider: input.providerId,
+    expectedCapabilityId: input.scenario.capabilityId,
+    expectedOk: input.scenario.expectedOk,
+    expectedReentryStatus,
+    expectedTerminalAuthorityStatus,
+    expectedFinalAnswerSource,
+  });
+  addProviderGatewaySummaryFailures({
+    failures: routeFailures,
+    prefix: `${input.providerId}_stream_debug`,
+    source: debugPayload,
+    expectedProvider: input.providerId,
+    expectedCapabilityId: input.scenario.capabilityId,
+    expectedOk: input.scenario.expectedOk,
+    expectedReentryStatus,
+    expectedTerminalAuthorityStatus,
+    expectedFinalAnswerSource,
+  });
+
+  return {
+    streamEvents,
+    finalPayload,
+    debugExport,
+    summary: {
+      schema: "helix.provider_gateway_stream_route_debug_export_probe.v1",
+      provider_id: input.providerId,
+      response_status: response.status,
+      event_count: streamEvents.length,
+      final_event_present: Boolean(finalEvent),
+      debug_export_status: debugResponse?.status ?? null,
+      debug_export_endpoint: endpoint,
+      provider_selected: readString(finalPayload.agent_runtime),
+      manifest_version: readString(finalPayload.workstation_gateway_manifest_version),
+      gateway_call_result_count: readRecordArray(finalPayload.workstation_gateway_call_results).length,
+      observation_packet_count: readRecordArray(finalPayload.workstation_gateway_observation_packets).length,
+      debug_gateway_call_result_count: readRecordArray(debugPayload?.workstation_gateway_call_results).length,
+      debug_observation_packet_count: readRecordArray(debugPayload?.workstation_gateway_observation_packets).length,
+      reentry_status: readString(finalPayload.workstation_gateway_reentry_status),
+      debug_reentry_status: readString(debugPayload?.workstation_gateway_reentry_status),
+      terminal_authority_status: readString(finalPayload.terminal_authority_status),
+      debug_terminal_authority_status: readString(debugPayload?.terminal_authority_status),
+      final_answer_source: readString(finalPayload.final_answer_source),
+      debug_final_answer_source: readString(debugPayload?.final_answer_source),
+      provider_gateway_debug_summary: readRecord(finalPayload.provider_gateway_debug_summary),
       debug_provider_gateway_debug_summary: readRecord(debugPayload?.provider_gateway_debug_summary),
       procedural_ok: routeFailures.length === 0,
       failures: routeFailures,
@@ -793,6 +1004,56 @@ const runScenario = async (scenario: Scenario, routeTraceApp: ReturnType<typeof 
       process.env.ENABLE_FUTURE_AGENT = originalEnableFutureAgent;
     }
   }
+  const helixStreamRouteProbe = await runStreamRouteDebugExportProbe({
+    app: routeTraceApp,
+    body,
+    scenario,
+    providerId: "helix",
+  });
+  if (!SPAWN_CODEX) {
+    process.env.CODEX_AGENT_FAKE_STDOUT = scenario.expectedOk
+      ? `Stream route provider candidate for ${scenario.id} is grounded in the Helix gateway observation.`
+      : `Stream route provider candidate for ${scenario.id} reports that the requested workstation capability was blocked.`;
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+  }
+  let codexStreamRouteProbe: Awaited<ReturnType<typeof runStreamRouteDebugExportProbe>>;
+  try {
+    codexStreamRouteProbe = await runStreamRouteDebugExportProbe({
+      app: routeTraceApp,
+      body,
+      scenario,
+      providerId: "codex",
+    });
+  } finally {
+    if (!SPAWN_CODEX) {
+      if (originalFakeStdout === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      } else {
+        process.env.CODEX_AGENT_FAKE_STDOUT = originalFakeStdout;
+      }
+      if (originalFakeExitCode === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      } else {
+        process.env.CODEX_AGENT_FAKE_EXIT_CODE = originalFakeExitCode;
+      }
+    }
+  }
+  process.env.ENABLE_FUTURE_AGENT = "1";
+  let futureStreamRouteProbe: Awaited<ReturnType<typeof runStreamRouteDebugExportProbe>>;
+  try {
+    futureStreamRouteProbe = await runStreamRouteDebugExportProbe({
+      app: routeTraceApp,
+      body,
+      scenario,
+      providerId: "future",
+    });
+  } finally {
+    if (originalEnableFutureAgent === undefined) {
+      delete process.env.ENABLE_FUTURE_AGENT;
+    } else {
+      process.env.ENABLE_FUTURE_AGENT = originalEnableFutureAgent;
+    }
+  }
   const providerDebug = readRecord(providerResult.debug) ?? {};
   const ask = {
     ...providerResult,
@@ -887,6 +1148,15 @@ const runScenario = async (scenario: Scenario, routeTraceApp: ReturnType<typeof 
   for (const futureRouteFailure of futureRouteProbe.summary.failures) {
     failures.push(`future_route_debug_export_${futureRouteFailure}`);
   }
+  for (const helixStreamRouteFailure of helixStreamRouteProbe.summary.failures) {
+    failures.push(`helix_stream_route_debug_export_${helixStreamRouteFailure}`);
+  }
+  for (const codexStreamRouteFailure of codexStreamRouteProbe.summary.failures) {
+    failures.push(`codex_stream_route_debug_export_${codexStreamRouteFailure}`);
+  }
+  for (const futureStreamRouteFailure of futureStreamRouteProbe.summary.failures) {
+    failures.push(`future_stream_route_debug_export_${futureStreamRouteFailure}`);
+  }
   addGatewayInvariantFailures({ failures, prefix: "codex", result: firstResult, scenario });
   addGatewayInvariantFailures({
     failures,
@@ -946,6 +1216,9 @@ const runScenario = async (scenario: Scenario, routeTraceApp: ReturnType<typeof 
     route_debug_export: routeProbe.summary,
     helix_route_debug_export: helixRouteProbe.summary,
     future_route_debug_export: futureRouteProbe.summary,
+    helix_stream_route_debug_export: helixStreamRouteProbe.summary,
+    codex_stream_route_debug_export: codexStreamRouteProbe.summary,
+    future_stream_route_debug_export: futureStreamRouteProbe.summary,
     provider_parity: {
       helix: helixSummary,
       helix_route: helixRouteSummary,
@@ -968,6 +1241,18 @@ const runScenario = async (scenario: Scenario, routeTraceApp: ReturnType<typeof 
   await writeJson(path.join(scenarioDir, "future-route-ask-response.json"), futureRouteProbe.ask);
   await writeJson(path.join(scenarioDir, "future-route-debug-export.json"), futureRouteProbe.debugExport);
   await writeJson(path.join(scenarioDir, "future-route-debug-export-probe.json"), futureRouteProbe.summary);
+  await writeJson(path.join(scenarioDir, "helix-stream-route-events.json"), helixStreamRouteProbe.streamEvents);
+  await writeJson(path.join(scenarioDir, "helix-stream-route-final-event.json"), helixStreamRouteProbe.finalPayload);
+  await writeJson(path.join(scenarioDir, "helix-stream-route-debug-export.json"), helixStreamRouteProbe.debugExport);
+  await writeJson(path.join(scenarioDir, "helix-stream-route-debug-export-probe.json"), helixStreamRouteProbe.summary);
+  await writeJson(path.join(scenarioDir, "codex-stream-route-events.json"), codexStreamRouteProbe.streamEvents);
+  await writeJson(path.join(scenarioDir, "codex-stream-route-final-event.json"), codexStreamRouteProbe.finalPayload);
+  await writeJson(path.join(scenarioDir, "codex-stream-route-debug-export.json"), codexStreamRouteProbe.debugExport);
+  await writeJson(path.join(scenarioDir, "codex-stream-route-debug-export-probe.json"), codexStreamRouteProbe.summary);
+  await writeJson(path.join(scenarioDir, "future-stream-route-events.json"), futureStreamRouteProbe.streamEvents);
+  await writeJson(path.join(scenarioDir, "future-stream-route-final-event.json"), futureStreamRouteProbe.finalPayload);
+  await writeJson(path.join(scenarioDir, "future-stream-route-debug-export.json"), futureStreamRouteProbe.debugExport);
+  await writeJson(path.join(scenarioDir, "future-stream-route-debug-export-probe.json"), futureStreamRouteProbe.summary);
   await writeJson(path.join(scenarioDir, "helix-gateway-result.json"), helixGatewayResult);
   await writeJson(path.join(scenarioDir, "codex-gateway-result.json"), firstResult);
   await writeJson(path.join(scenarioDir, "probe-result.json"), probeResult);
@@ -1068,7 +1353,12 @@ const runLiveScenario = async (scenario: Scenario) => {
 const main = async () => {
   const originalEnableCodexAgent = process.env.ENABLE_CODEX_AGENT;
   const originalEnableFutureAgent = process.env.ENABLE_FUTURE_AGENT;
+  const originalActiveUserTurnBurstLimit = process.env.RUNTIME_TASK_ACTIVE_USER_TURN_BURST_LIMIT;
   try {
+    if (!LIVE_MODE) {
+      process.env.RUNTIME_TASK_ACTIVE_USER_TURN_BURST_LIMIT =
+        process.env.RUNTIME_TASK_ACTIVE_USER_TURN_BURST_LIMIT ?? "200";
+    }
     if (LIVE_MODE) {
       if (!BASE_URL) {
         await writeBlockedLiveSummary("helix_ask_base_url_missing");
@@ -1138,6 +1428,11 @@ const main = async () => {
       delete process.env.ENABLE_FUTURE_AGENT;
     } else {
       process.env.ENABLE_FUTURE_AGENT = originalEnableFutureAgent;
+    }
+    if (originalActiveUserTurnBurstLimit === undefined) {
+      delete process.env.RUNTIME_TASK_ACTIVE_USER_TURN_BURST_LIMIT;
+    } else {
+      process.env.RUNTIME_TASK_ACTIVE_USER_TURN_BURST_LIMIT = originalActiveUserTurnBurstLimit;
     }
   }
 };
