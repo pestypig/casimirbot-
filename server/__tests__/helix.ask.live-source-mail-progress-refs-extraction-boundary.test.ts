@@ -5,7 +5,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   collectMailLoopProgressRefs,
+  createMailLoopToolProgressReceiptBuilder,
   isMailLoopProgressRef,
+  mailLoopProgressKindForRefs,
 } from "../services/helix-ask/live-source/mail-progress-refs";
 
 const repoRoot = process.cwd();
@@ -21,8 +23,13 @@ describe("Helix Ask live-source mail progress refs extraction boundary", () => {
     expect(routeSource).not.toContain("STAGE_PLAY_MAIL_LOOP_PROGRESS_REF_RE");
     expect(routeSource).not.toMatch(/const\s+isMailLoopProgressRef\s*=\s*\(/);
     expect(routeSource).not.toMatch(/const\s+collectMailLoopProgressRefs\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+mailLoopProgressKindForRefs\s*=\s*\(/);
+    expect(routeSource).not.toMatch(/const\s+buildMailLoopToolProgressReceipt\s*=\s*\(args:\s*\{/);
+    expect(routeSource).toMatch(/const\s+buildMailLoopToolProgressReceipt\s*=\s*createMailLoopToolProgressReceiptBuilder\(/);
     expect(serviceSource).toMatch(/export\s+const\s+isMailLoopProgressRef\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+collectMailLoopProgressRefs\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+mailLoopProgressKindForRefs\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+createMailLoopToolProgressReceiptBuilder\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");
     expect(serviceSource).not.toContain("../../../routes/agi.plan");
     expect(serviceSource).not.toContain("../../routes/agi.plan");
@@ -68,5 +75,45 @@ describe("Helix Ask live-source mail progress refs extraction boundary", () => {
       packetId: null,
       packet_id: "stage_play_processed_mail_packet:snake",
     })).toEqual(["stage_play_processed_mail_packet:snake"]);
+  });
+
+  it("preserves progress-kind precedence and receipt construction", () => {
+    expect(mailLoopProgressKindForRefs(["stage_play_live_source_mail_decision:1"], null)).toBe("mail_decision");
+    expect(mailLoopProgressKindForRefs(["stage_play_live_source_narrative_state:1"], null)).toBe("narrative_state");
+    expect(mailLoopProgressKindForRefs(["stage_play_live_source_mail_wake_result:1"], null)).toBe("wake_result");
+    expect(mailLoopProgressKindForRefs(["voice_receipt:1"], null)).toBe("voice_receipt");
+    expect(mailLoopProgressKindForRefs([], { voiceCandidate: true })).toBe("no_progress");
+    expect(mailLoopProgressKindForRefs(["stage_play_processed_mail_packet:1"], { voiceCandidate: true })).toBe("voice_candidate");
+
+    const buildReceipt = createMailLoopToolProgressReceiptBuilder({
+      readRuntimeRecord: (value) =>
+        value && typeof value === "object" && !Array.isArray(value)
+          ? value as Record<string, unknown>
+          : null,
+      processedMailReadObservationNeedsProcessFallback: () => false,
+      processedMailReadObservationHasPacket: () => false,
+    });
+
+    expect(buildReceipt({
+      turnId: "ask:progress",
+      iteration: 3,
+      toolName: "live_env.read_processed_live_source_mail",
+      previousRefs: new Set(["stage_play_processed_mail_packet:old"]),
+      observation: {
+        observation: {
+          packetId: "stage_play_processed_mail_packet:new",
+        },
+      },
+    })).toMatchObject({
+      schema: "helix.mail_loop_tool_progress_receipt.v1",
+      turn_id: "ask:progress",
+      iteration: 3,
+      toolName: "live_env.read_processed_live_source_mail",
+      producedRefs: ["stage_play_processed_mail_packet:new"],
+      newRefs: ["stage_play_processed_mail_packet:new"],
+      progressKind: "processed_packet",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
   });
 });
