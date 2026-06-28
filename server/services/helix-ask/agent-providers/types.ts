@@ -1,5 +1,8 @@
 import type { IncomingHttpHeaders } from "node:http";
-import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
+import type {
+  HelixAgentPermissionProfile,
+  HelixAgentRuntimeId,
+} from "@shared/helix-agent-runtime";
 
 export type HelixAgentRunRoute = "/ask/turn" | "/ask/turn/stream" | "/ask";
 
@@ -37,6 +40,7 @@ export type HelixAgentRunResult = {
 export type HelixAgentProvider = {
   id: HelixAgentRuntimeId;
   label: string;
+  permissionProfile: HelixAgentPermissionProfile;
   enabled(): boolean;
   supports: {
     streaming: boolean;

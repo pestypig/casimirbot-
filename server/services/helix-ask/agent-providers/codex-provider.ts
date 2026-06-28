@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import type { HelixAgentProvider, HelixAgentRunResult } from "./types";
 import { listWorkstationGatewayCapabilities } from "../workstation-tool-gateway/registry";
+import { buildHelixAgentRuntimeSelectionTrace } from "./runtime-debug";
 
 const enabled = (): boolean => process.env.ENABLE_CODEX_AGENT === "1";
 
@@ -87,6 +88,18 @@ async function runCodexProcess(input: {
 export const codexProvider: HelixAgentProvider = {
   id: "codex",
   label: "Codex Workstation Mode",
+  permissionProfile: {
+    id: "read-observe",
+    label: "Read/observe only",
+    allows: {
+      observe: true,
+      read: true,
+      act: false,
+      write: false,
+      shell: false,
+      codeMutation: false,
+    },
+  },
   enabled,
   supports: {
     streaming: false,
@@ -96,6 +109,16 @@ export const codexProvider: HelixAgentProvider = {
 
   async runTurn(request): Promise<HelixAgentRunResult> {
     const question = readQuestion(request.body);
+    const gatewayManifest = listWorkstationGatewayCapabilities({
+      agentRuntime: "codex",
+      mode: "observe",
+    });
+    const runtimeSelectionTrace = buildHelixAgentRuntimeSelectionTrace({
+      route: request.route,
+      requestedRuntime: request.runtime,
+      provider: codexProvider,
+      gatewayManifest,
+    });
 
     if (!question) {
       const text = "Codex runtime could not run because the Ask turn had no question.";
@@ -108,7 +131,17 @@ export const codexProvider: HelixAgentProvider = {
         answer: text,
         debug: {
           agent_runtime: "codex",
+          agent_runtime_selection_trace: runtimeSelectionTrace,
           fail_reason: "missing_question",
+          permission_profile: codexProvider.permissionProfile,
+          workstation_gateway_manifest: gatewayManifest,
+          workstation_gateway_manifest_schema: gatewayManifest.schema,
+          workstation_gateway_manifest_version: gatewayManifest.manifest_version,
+          workstation_gateway_capability_ids: gatewayManifest.capabilities.map(
+            (capability) => capability.capability_id,
+          ),
+          workstation_gateway_reentry_status: runtimeSelectionTrace.evidence_reentry_status,
+          terminal_authority_status: runtimeSelectionTrace.terminal_authority_status,
         },
       };
     }
@@ -117,13 +150,11 @@ export const codexProvider: HelixAgentProvider = {
       "You are running inside Helix Codex Workstation Mode.",
       "Do not mutate files or run shell commands. The current Helix workstation gateway is read/observe only.",
       "Do not claim that a workstation tool ran unless a Helix observation packet is present in the request context.",
+      `Provider permission profile: ${JSON.stringify(codexProvider.permissionProfile)}`,
       "Answer the user request using the provided context.",
       "",
       "Available Helix workstation gateway capabilities:",
-      JSON.stringify(listWorkstationGatewayCapabilities({
-        agentRuntime: "codex",
-        mode: "observe",
-      }), null, 2),
+      JSON.stringify(gatewayManifest, null, 2),
       "",
       "User request:",
       question,
@@ -158,10 +189,20 @@ export const codexProvider: HelixAgentProvider = {
       answer: text,
       debug: {
         agent_runtime: "codex",
+        agent_runtime_selection_trace: runtimeSelectionTrace,
+        permission_profile: codexProvider.permissionProfile,
         codex_exit_code: result.exitCode,
         codex_stderr_preview: result.stderr.slice(0, 2000),
         workstation_tools_enabled: false,
         code_mutation_enabled: false,
+        workstation_gateway_manifest: gatewayManifest,
+        workstation_gateway_manifest_schema: gatewayManifest.schema,
+        workstation_gateway_manifest_version: gatewayManifest.manifest_version,
+        workstation_gateway_capability_ids: gatewayManifest.capabilities.map(
+          (capability) => capability.capability_id,
+        ),
+        workstation_gateway_reentry_status: runtimeSelectionTrace.evidence_reentry_status,
+        terminal_authority_status: runtimeSelectionTrace.terminal_authority_status,
       },
       raw: {
         stdout: result.stdout,

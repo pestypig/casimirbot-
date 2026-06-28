@@ -6,6 +6,7 @@ import { HELIX_WORKSPACE_OS_STATUS_CAPABILITY } from "../../workspace-os-status-
 
 const CALCULATOR_SOLVE_EXPRESSION_CAPABILITY = "scientific-calculator.solve_expression";
 const REPO_SEARCH_CAPABILITY = "repo.search";
+const DOCS_SEARCH_CAPABILITY = "docs.search";
 
 const createApp = (): express.Express => {
   const app = express();
@@ -48,6 +49,15 @@ describe("AGI workstation tool gateway route", () => {
     expect(response.body.capabilities).toContainEqual(
       expect.objectContaining({
         capability_id: REPO_SEARCH_CAPABILITY,
+        mutating: false,
+        code_mutation: false,
+        shell_access: false,
+        terminal_eligible: false,
+      }),
+    );
+    expect(response.body.capabilities).toContainEqual(
+      expect.objectContaining({
+        capability_id: DOCS_SEARCH_CAPABILITY,
         mutating: false,
         code_mutation: false,
         shell_access: false,
@@ -167,6 +177,50 @@ describe("AGI workstation tool gateway route", () => {
       },
       observation_packet: {
         capability_key: REPO_SEARCH_CAPABILITY,
+        status: "succeeded",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    expect(response.body.observation.hit_count).toBeGreaterThan(0);
+  });
+
+  it("calls docs.search through the gateway route as non-terminal evidence", async () => {
+    const response = await request(createApp())
+      .post("/api/agi/workstation-tool-gateway/call")
+      .send({
+        agent_runtime: "codex",
+        mode: "read",
+        capability_id: DOCS_SEARCH_CAPABILITY,
+        turn_id: "ask:test:gateway-route-docs",
+        iteration: 5,
+        arguments: {
+          query: "Helix Ask",
+          paths: ["docs"],
+          max_hits: 2,
+        },
+      })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      ok: true,
+      agent_runtime: "codex",
+      capability_id: DOCS_SEARCH_CAPABILITY,
+      gateway_admission: {
+        selected_agent_provider: "codex",
+        permission_profile: "read",
+        admission_status: "admitted",
+      },
+      observation: {
+        schema: "helix.docs_search_observation.v1",
+        query: "Helix Ask",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation_packet: {
+        capability_key: DOCS_SEARCH_CAPABILITY,
         status: "succeeded",
         terminal_eligible: false,
         assistant_answer: false,

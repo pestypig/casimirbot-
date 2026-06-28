@@ -376,6 +376,18 @@ const DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS: HelixAgentRuntimeDescriptor[] = [
     label: "Helix Ask Native",
     enabled: true,
     experimental: false,
+    permission_profile: {
+      id: "helix-native",
+      label: "Helix native governed runtime",
+      allows: {
+        observe: true,
+        read: true,
+        act: true,
+        write: false,
+        shell: false,
+        codeMutation: false,
+      },
+    },
     supports: {
       streaming: true,
       workstationTools: true,
@@ -7127,11 +7139,43 @@ function normalizeHelixAgentProvider(value: unknown): HelixAgentRuntimeDescripto
   const record = readAgentLoopAuditRecord(value);
   if (!record || !isHelixAgentRuntimeId(record.id)) return null;
   const supports = readAgentLoopAuditRecord(record.supports);
+  const permissionProfile = readAgentLoopAuditRecord(record.permission_profile);
+  const permissionAllows = readAgentLoopAuditRecord(permissionProfile?.allows);
+  const fallbackPermissionProfile = record.id === "codex"
+    ? {
+        id: "read-observe" as const,
+        label: "Read/observe only",
+        allows: {
+          observe: true,
+          read: true,
+          act: false,
+          write: false,
+          shell: false,
+          codeMutation: false,
+        },
+      }
+    : DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS[0].permission_profile;
   return {
     id: record.id,
     label: coerceText(record.label).trim() || (record.id === "codex" ? "Codex Workstation Mode" : "Helix Ask Native"),
     enabled: record.enabled === true,
     experimental: record.experimental === true,
+    permission_profile: {
+      id: permissionProfile?.id === "read-observe" || permissionProfile?.id === "helix-native"
+        ? permissionProfile.id
+        : fallbackPermissionProfile.id,
+      label: coerceText(permissionProfile?.label).trim() || fallbackPermissionProfile.label,
+      allows: {
+        observe: typeof permissionAllows?.observe === "boolean" ? permissionAllows.observe : fallbackPermissionProfile.allows.observe,
+        read: typeof permissionAllows?.read === "boolean" ? permissionAllows.read : fallbackPermissionProfile.allows.read,
+        act: typeof permissionAllows?.act === "boolean" ? permissionAllows.act : fallbackPermissionProfile.allows.act,
+        write: typeof permissionAllows?.write === "boolean" ? permissionAllows.write : fallbackPermissionProfile.allows.write,
+        shell: typeof permissionAllows?.shell === "boolean" ? permissionAllows.shell : fallbackPermissionProfile.allows.shell,
+        codeMutation: typeof permissionAllows?.codeMutation === "boolean"
+          ? permissionAllows.codeMutation
+          : fallbackPermissionProfile.allows.codeMutation,
+      },
+    },
     supports: {
       streaming: supports?.streaming === true,
       workstationTools: supports?.workstationTools === true,

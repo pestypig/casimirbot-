@@ -1,5 +1,9 @@
 import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
 import type { HelixAgentStepObservationPacket } from "@shared/helix-agent-step-observation-packet";
+import type {
+  HelixToolFollowupDecision,
+  HelixToolLifecycleTrace,
+} from "@shared/helix-tool-lifecycle";
 
 export type HelixWorkstationGatewayMode = "read" | "observe" | "act" | "verify";
 
@@ -29,6 +33,16 @@ export type HelixWorkstationGatewayListInput = {
   mode?: HelixWorkstationGatewayMode | string | null;
 };
 
+export type HelixWorkstationGatewayListResult = {
+  schema: "helix.workstation_tool_gateway.v1";
+  manifest_version: string;
+  agent_runtime: string;
+  mode: HelixWorkstationGatewayMode;
+  capabilities: HelixWorkstationCapabilityManifest[];
+  assistant_answer: false;
+  raw_content_included: false;
+};
+
 export type HelixWorkstationGatewayCallInput = {
   agentRuntime?: HelixAgentRuntimeId | string | null;
   mode?: HelixWorkstationGatewayMode | string | null;
@@ -54,12 +68,15 @@ export type HelixWorkstationGatewayAdmissionRecord = {
 
 export type HelixWorkstationGatewayCallResult = {
   schema: "helix.workstation_tool_gateway.call_result.v1";
+  manifest_version: string;
   ok: boolean;
   agent_runtime: string;
   capability_id: string;
   mode: HelixWorkstationGatewayMode;
   gateway_admission: HelixWorkstationGatewayAdmissionRecord;
   observation_packet: HelixAgentStepObservationPacket;
+  tool_lifecycle_trace: HelixToolLifecycleTrace;
+  tool_followup_decision: HelixToolFollowupDecision;
   observation: unknown;
   artifact_refs: string[];
   terminal_eligible: false;

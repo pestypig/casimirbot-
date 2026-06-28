@@ -16,6 +16,7 @@ export function listHelixAgentProviders(): HelixAgentRuntimeDescriptor[] {
     label: provider.label,
     enabled: provider.enabled(),
     experimental: provider.id !== "helix",
+    permission_profile: provider.permissionProfile,
     supports: provider.supports,
   }));
 }

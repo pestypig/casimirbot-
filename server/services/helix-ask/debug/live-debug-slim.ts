@@ -139,6 +139,21 @@ export const createHelixAskLiveDebugSlimBuilder = (
       turn_id: payload.turn_id ?? debug.turn_id ?? null,
       trace_id: payload.trace_id ?? payload.traceId ?? debug.trace_id ?? null,
       session_id: payload.session_id ?? payload.sessionId ?? debug.session_id ?? null,
+      agent_runtime: payload.agent_runtime ?? debug.agent_runtime ?? null,
+      agent_runtime_selection_trace:
+        payload.agent_runtime_selection_trace ?? debug.agent_runtime_selection_trace ?? null,
+      selected_agent_provider:
+        payload.selected_agent_provider ?? debug.selected_agent_provider ?? null,
+      workstation_gateway_manifest:
+        payload.workstation_gateway_manifest ?? debug.workstation_gateway_manifest ?? null,
+      workstation_gateway_manifest_version:
+        payload.workstation_gateway_manifest_version ?? debug.workstation_gateway_manifest_version ?? null,
+      workstation_gateway_capability_ids:
+        payload.workstation_gateway_capability_ids ?? debug.workstation_gateway_capability_ids ?? null,
+      workstation_gateway_reentry_status:
+        payload.workstation_gateway_reentry_status ?? debug.workstation_gateway_reentry_status ?? null,
+      terminal_authority_status:
+        payload.terminal_authority_status ?? debug.terminal_authority_status ?? null,
       route_reason_code: payload.route_reason_code ?? debug.route_reason_code ?? null,
       selected_final_answer: payload.selected_final_answer ?? debug.selected_final_answer ?? null,
       answer: payload.answer ?? debug.answer ?? null,

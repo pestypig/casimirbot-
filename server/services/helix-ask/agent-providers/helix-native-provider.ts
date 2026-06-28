@@ -3,6 +3,18 @@ import type { HelixAgentProvider } from "./types";
 export const helixNativeProvider: HelixAgentProvider = {
   id: "helix",
   label: "Helix Ask Native",
+  permissionProfile: {
+    id: "helix-native",
+    label: "Helix native governed runtime",
+    allows: {
+      observe: true,
+      read: true,
+      act: true,
+      write: false,
+      shell: false,
+      codeMutation: false,
+    },
+  },
   enabled: () => true,
   supports: {
     streaming: true,

@@ -914,6 +914,18 @@ describe("HelixAskPill mic-first surface contract", () => {
           label: "Codex Workstation Mode",
           enabled: true,
           experimental: true,
+          permission_profile: {
+            id: "read-observe",
+            label: "Read/observe only",
+            allows: {
+              observe: true,
+              read: true,
+              act: false,
+              write: false,
+              shell: false,
+              codeMutation: false,
+            },
+          },
           supports: { streaming: true, workstationTools: true, codeMutation: true },
         },
       ],
@@ -923,6 +935,15 @@ describe("HelixAskPill mic-first surface contract", () => {
       "Helix Ask Native",
       "Codex Workstation Mode",
     ]);
+    expect(providers.find((provider) => provider.id === "codex")?.permission_profile).toMatchObject({
+      id: "read-observe",
+      allows: {
+        read: true,
+        write: false,
+        shell: false,
+        codeMutation: false,
+      },
+    });
     expect(resolveSelectedHelixAgentRuntime("codex", providers)).toBe("codex");
   });
 
@@ -947,6 +968,7 @@ describe("HelixAskPill mic-first surface contract", () => {
     });
 
     expect(providers.find((provider) => provider.id === "codex")?.enabled).toBe(false);
+    expect(providers.find((provider) => provider.id === "codex")?.permission_profile.id).toBe("read-observe");
     expect(resolveSelectedHelixAgentRuntime("codex", providers)).toBe("helix");
   });
 
