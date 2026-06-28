@@ -33,6 +33,7 @@ import {
   resolveAskTurnCreateThenOpenDocTopicArg,
   resolveAskTurnDocPathArg,
   resolveAskTurnLatestDocTopicArg,
+  resolveAskTurnWorkspaceActionDocPath,
   resolveAskTurnTitleLikeOpenDocQueryArg,
   resolveAskTurnTopicDocQueryArg,
   tokenizeAskTurnDocTopic,
@@ -49,6 +50,7 @@ describe("Helix Ask doc args extraction boundary", () => {
 
     expect(routeSource).toContain("../services/helix-ask/doc-args");
     expect(routeSource).not.toMatch(/const\s+normalizeAskTurnWorkspaceDocPath\s*=\s*\(value/);
+    expect(routeSource).not.toMatch(/const\s+resolveAskTurnWorkspaceActionDocPath\s*=/);
     expect(routeSource).not.toMatch(/const\s+extractAskTurnDocPathArgs\s*=\s*\(transcript/);
     expect(routeSource).not.toMatch(/const\s+resolveAskTurnDocPathArg\s*=\s*\(transcript/);
     expect(routeSource).not.toMatch(/const\s+isAskTurnReadAloudRequested\s*=\s*\(transcript/);
@@ -96,6 +98,7 @@ describe("Helix Ask doc args extraction boundary", () => {
     expect(routeSource).toContain("createAskTurnLatestDocIntentReaders({");
     expect(serviceSource).toMatch(/export\s+const\s+extractAskTurnDocPathArgs\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+normalizeAskTurnWorkspaceDocPath\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+resolveAskTurnWorkspaceActionDocPath\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+resolveAskTurnDocPathArg\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnReadAloudRequested\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+isAskTurnExplicitDocumentAcquisitionIntent\s*=/);
@@ -135,6 +138,14 @@ describe("Helix Ask doc args extraction boundary", () => {
     expect(normalizeAskTurnWorkspaceDocPath(" docs/research/a.md ")).toBe("docs/research/a.md");
     expect(normalizeAskTurnWorkspaceDocPath("   ")).toBeNull();
     expect(normalizeAskTurnWorkspaceDocPath(null)).toBeNull();
+    expect(resolveAskTurnWorkspaceActionDocPath({ args: { path: " docs/a.md ", doc_path: "docs/b.md" } })).toBe(
+      "docs/a.md",
+    );
+    expect(resolveAskTurnWorkspaceActionDocPath({ args: { path: " ", doc_path: " docs/b.md " } })).toBe("docs/b.md");
+    expect(resolveAskTurnWorkspaceActionDocPath({ args: { docPath: " docs/c.md " } })).toBe("docs/c.md");
+    expect(resolveAskTurnWorkspaceActionDocPath({ args: { currentPath: " docs/d.md " } })).toBe("docs/d.md");
+    expect(resolveAskTurnWorkspaceActionDocPath({ args: { path: " " } })).toBeNull();
+    expect(resolveAskTurnWorkspaceActionDocPath(null)).toBeNull();
     expect(
       extractAskTurnDocPathArgs("Read docs/research/nhm2-current-status-whitepaper-2026-05-02.md, then ./notes/a.txt and docs/research/nhm2-current-status-whitepaper-2026-05-02.md"),
     ).toEqual(["docs/research/nhm2-current-status-whitepaper-2026-05-02.md", "./notes/a.txt"]);

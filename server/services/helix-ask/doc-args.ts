@@ -3,6 +3,14 @@ export const normalizeAskTurnWorkspaceDocPath = (value: unknown): string | null 
   return normalized.length > 0 ? normalized : null;
 };
 
+export const resolveAskTurnWorkspaceActionDocPath = (
+  action?: { args?: Record<string, unknown> | null } | null,
+): string | null =>
+  normalizeAskTurnWorkspaceDocPath(action?.args?.path) ??
+  normalizeAskTurnWorkspaceDocPath(action?.args?.doc_path) ??
+  normalizeAskTurnWorkspaceDocPath(action?.args?.docPath) ??
+  normalizeAskTurnWorkspaceDocPath(action?.args?.currentPath);
+
 export const extractAskTurnDocPathArgs = (transcript: string): string[] => {
   const normalized = transcript.trim();
   if (!normalized) return [];
