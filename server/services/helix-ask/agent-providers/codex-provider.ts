@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import type { HelixAgentProvider, HelixAgentRunResult } from "./types";
+import { listWorkstationGatewayCapabilities } from "../workstation-tool-gateway/registry";
 
 const enabled = (): boolean => process.env.ENABLE_CODEX_AGENT === "1";
 
@@ -89,7 +90,7 @@ export const codexProvider: HelixAgentProvider = {
   enabled,
   supports: {
     streaming: false,
-    workstationTools: false,
+    workstationTools: true,
     codeMutation: false,
   },
 
@@ -114,8 +115,15 @@ export const codexProvider: HelixAgentProvider = {
 
     const prompt = [
       "You are running inside Helix Codex Workstation Mode.",
-      "Do not mutate files or run shell commands unless a future Helix tool gateway explicitly grants that capability.",
+      "Do not mutate files or run shell commands. The current Helix workstation gateway is read/observe only.",
+      "Do not claim that a workstation tool ran unless a Helix observation packet is present in the request context.",
       "Answer the user request using the provided context.",
+      "",
+      "Available Helix workstation gateway capabilities:",
+      JSON.stringify(listWorkstationGatewayCapabilities({
+        agentRuntime: "codex",
+        mode: "observe",
+      }), null, 2),
       "",
       "User request:",
       question,

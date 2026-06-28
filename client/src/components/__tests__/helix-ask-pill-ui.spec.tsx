@@ -107,6 +107,9 @@ let shouldBlockStagePlayMailboxWakePromptWithoutRouteMetadata: typeof import("@/
 let HELIX_E6_ASK_TURN_VOICE_PARITY_FLAG: typeof import("@/components/helix/HelixAskPill").HELIX_E6_ASK_TURN_VOICE_PARITY_FLAG;
 let HELIX_VOICE_LEGACY_DISPATCH_FALLBACK_FLAG: typeof import("@/components/helix/HelixAskPill").HELIX_VOICE_LEGACY_DISPATCH_FALLBACK_FLAG;
 let evaluateVoiceAutoDispatchGovernance: typeof import("@/components/helix/HelixAskPill").evaluateVoiceAutoDispatchGovernance;
+let normalizeHelixAgentProvidersResponse: typeof import("@/components/helix/HelixAskPill").normalizeHelixAgentProvidersResponse;
+let resolveSelectedHelixAgentRuntime: typeof import("@/components/helix/HelixAskPill").resolveSelectedHelixAgentRuntime;
+let resolveHelixAskActualAgentProviderLabel: typeof import("@/components/helix/HelixAskPill").resolveHelixAskActualAgentProviderLabel;
 
 beforeAll(async () => {
   (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
@@ -215,6 +218,9 @@ beforeAll(async () => {
     HELIX_E6_ASK_TURN_VOICE_PARITY_FLAG,
     HELIX_VOICE_LEGACY_DISPATCH_FALLBACK_FLAG,
     evaluateVoiceAutoDispatchGovernance,
+    normalizeHelixAgentProvidersResponse,
+    resolveSelectedHelixAgentRuntime,
+    resolveHelixAskActualAgentProviderLabel,
   } = await import("@/components/helix/HelixAskPill"));
 });
 
@@ -881,6 +887,109 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("Scroll Ask controls right");
     expect(source).toContain("helix-ask-textarea w-full min-w-0 resize-none");
     expect(source).toContain("const HELIX_ASK_MAX_PROMPT_LINES = 10;");
+  });
+
+  it("renders an agent runtime picker sourced from the backend provider scaffold", () => {
+    const source = fs.readFileSync(pillPath, "utf8");
+    expect(source).toContain('fetch("/api/agi/agent-providers"');
+    expect(source).toContain('aria-label="Choose Ask agent runtime"');
+    expect(source).toContain('aria-label="Ask agent runtime"');
+    expect(source).toContain("agentRuntimeProviders.map");
+    expect(source).toContain("disabled={!provider.enabled}");
+    expect(source).toContain("{selectedAgentRuntimeLabel}");
+  });
+
+  it("normalizes Helix and Codex providers from the mocked agent provider response", () => {
+    const providers = normalizeHelixAgentProvidersResponse({
+      providers: [
+        {
+          id: "helix",
+          label: "Helix Ask Native",
+          enabled: true,
+          experimental: false,
+          supports: { streaming: true, workstationTools: true, codeMutation: false },
+        },
+        {
+          id: "codex",
+          label: "Codex Workstation Mode",
+          enabled: true,
+          experimental: true,
+          supports: { streaming: true, workstationTools: true, codeMutation: true },
+        },
+      ],
+    });
+
+    expect(providers.map((provider) => provider.label)).toEqual([
+      "Helix Ask Native",
+      "Codex Workstation Mode",
+    ]);
+    expect(resolveSelectedHelixAgentRuntime("codex", providers)).toBe("codex");
+  });
+
+  it("keeps disabled Codex visible but not selectable", () => {
+    const providers = normalizeHelixAgentProvidersResponse({
+      providers: [
+        {
+          id: "helix",
+          label: "Helix Ask Native",
+          enabled: true,
+          experimental: false,
+          supports: { streaming: true, workstationTools: true, codeMutation: false },
+        },
+        {
+          id: "codex",
+          label: "Codex Workstation Mode",
+          enabled: false,
+          experimental: true,
+          supports: { streaming: true, workstationTools: true, codeMutation: true },
+        },
+      ],
+    });
+
+    expect(providers.find((provider) => provider.id === "codex")?.enabled).toBe(false);
+    expect(resolveSelectedHelixAgentRuntime("codex", providers)).toBe("helix");
+  });
+
+  it("threads the selected runtime only through backend Ask turn payloads", () => {
+    const source = fs.readFileSync(pillPath, "utf8");
+    expect(source).toContain("agentRuntime: selectedAgentRuntime");
+    expect(source.indexOf("agentRuntime: selectedAgentRuntime")).toBeLessThan(source.indexOf("runAskTurnStream(askTurnPayload"));
+    expect(source.indexOf("agentRuntime: selectedAgentRuntime")).toBeLessThan(source.indexOf("runAskTurn(askTurnPayload"));
+    expect(source).toContain("backendAskCallPath = \"askLocal\"");
+  });
+
+  it("labels console responses from backend provider metadata, not client selection", () => {
+    expect(
+      resolveHelixAskActualAgentProviderLabel({
+        agent_runtime: "codex",
+        selected_agent_provider: {
+          id: "codex",
+          label: "Codex Workstation Mode",
+        },
+      }),
+    ).toBe("Provider: Codex Workstation Mode");
+    expect(
+      resolveHelixAskActualAgentProviderLabel({
+        agent_runtime: "helix",
+        selected_agent_provider: {
+          id: "helix",
+          label: "Helix Ask Native",
+        },
+      }),
+    ).toBe("Provider: Helix Ask Native");
+  });
+
+  it("does not label a response as Codex from agent_runtime_loop alone", () => {
+    expect(
+      resolveHelixAskActualAgentProviderLabel({
+        debug: {
+          agent_runtime_loop: {
+            schema: "helix.agent_runtime_loop.v1",
+            iterations: [{ chosen_capability: "repo-code.search" }],
+          },
+        },
+      }),
+    ).toBeNull();
   });
 
   it("interrupts read-aloud playback when speech is detected", () => {

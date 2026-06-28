@@ -69,7 +69,7 @@ describe("Helix Ask agent provider selection", () => {
     expect(provider.id).toBe("codex");
     expect(provider.supports).toEqual({
       streaming: false,
-      workstationTools: false,
+      workstationTools: true,
       codeMutation: false,
     });
   });

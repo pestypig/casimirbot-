@@ -331,6 +331,10 @@ import {
   type MirekReasoningCanonicalStateV1,
 } from "@shared/helix-reasoning-mirek";
 import type { HelixCausalTurnTimeline } from "@shared/helix-causal-turn-timeline";
+import type {
+  HelixAgentRuntimeDescriptor,
+  HelixAgentRuntimeId,
+} from "@shared/helix-agent-runtime";
 import type { KnowledgeProjectExport } from "@shared/knowledge";
 import type { HelixAskResponseEnvelope } from "@shared/helix-ask-envelope";
 import type { SituationContextPack } from "@shared/helix-situation-context-pack";
@@ -365,6 +369,20 @@ import { useWorkstationNotesStore } from "@/store/useWorkstationNotesStore";
 
 type HelixAskVisualCaptureRoute = "live_answer" | "image_lens" | "audio_transcript";
 
+const HELIX_ASK_AGENT_RUNTIME_STORAGE_KEY = "helix.ask.agentRuntime.v1";
+const DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS: HelixAgentRuntimeDescriptor[] = [
+  {
+    id: "helix",
+    label: "Helix Ask Native",
+    enabled: true,
+    experimental: false,
+    supports: {
+      streaming: true,
+      workstationTools: true,
+      codeMutation: false,
+    },
+  },
+];
 const HELIX_LIVE_ANSWER_VISUAL_CAPTURE_ROUTE_STORAGE_KEY = "helix.liveAnswer.visualCaptureRoutes.v1";
 const HELIX_LIVE_ANSWER_VISUAL_CAPTURE_ROUTE_SYNC_EVENT = "helix:live-answer:visual-capture-routes";
 const HELIX_ASK_THREAD_ID = "helix-ask:desktop";
@@ -6494,6 +6512,8 @@ type HelixAskReply = {
   final_answer_source?: string | null;
   terminal_error_code?: string | null;
   terminal_artifact_kind?: string | null;
+  agent_runtime?: HelixAgentRuntimeId | null;
+  selected_agent_provider?: Record<string, unknown> | null;
   pending_server_request?: Record<string, unknown> | null;
   resolved_turn_summary?: Record<string, unknown> | null;
   turn_id?: string | null;
@@ -6549,6 +6569,8 @@ type HelixAskReply = {
     certifying?: boolean;
     fail_reason?: string | null;
     fail_class?: string | null;
+    agent_runtime?: HelixAgentRuntimeId | null;
+    selected_agent_provider?: Record<string, unknown> | null;
     helix_ask_fail_reason?: string | null;
     helix_ask_fail_class?: string | null;
     arbiter_mode?: "repo_grounded" | "hybrid" | "general" | "clarify";
@@ -7076,6 +7098,99 @@ function coerceText(value: unknown): string {
   } catch {
     return "";
   }
+}
+
+function isHelixAgentRuntimeId(value: unknown): value is HelixAgentRuntimeId {
+  return value === "helix" || value === "codex";
+}
+
+function readStoredHelixAskAgentRuntime(): HelixAgentRuntimeId {
+  if (typeof window === "undefined") return "helix";
+  try {
+    const value = window.localStorage.getItem(HELIX_ASK_AGENT_RUNTIME_STORAGE_KEY);
+    return isHelixAgentRuntimeId(value) ? value : "helix";
+  } catch {
+    return "helix";
+  }
+}
+
+function persistHelixAskAgentRuntime(value: HelixAgentRuntimeId): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(HELIX_ASK_AGENT_RUNTIME_STORAGE_KEY, value);
+  } catch {
+    // Local storage can be unavailable in embedded or test contexts.
+  }
+}
+
+function normalizeHelixAgentProvider(value: unknown): HelixAgentRuntimeDescriptor | null {
+  const record = readAgentLoopAuditRecord(value);
+  if (!record || !isHelixAgentRuntimeId(record.id)) return null;
+  const supports = readAgentLoopAuditRecord(record.supports);
+  return {
+    id: record.id,
+    label: coerceText(record.label).trim() || (record.id === "codex" ? "Codex Workstation Mode" : "Helix Ask Native"),
+    enabled: record.enabled === true,
+    experimental: record.experimental === true,
+    supports: {
+      streaming: supports?.streaming === true,
+      workstationTools: supports?.workstationTools === true,
+      codeMutation: supports?.codeMutation === true,
+    },
+  };
+}
+
+export function normalizeHelixAgentProvidersResponse(value: unknown): HelixAgentRuntimeDescriptor[] {
+  const record = readAgentLoopAuditRecord(value);
+  const rawProviders = Array.isArray(record?.providers)
+    ? record.providers
+    : Array.isArray(value)
+      ? value
+      : [];
+  const providers = rawProviders
+    .map((entry) => normalizeHelixAgentProvider(entry))
+    .filter((entry): entry is HelixAgentRuntimeDescriptor => Boolean(entry));
+  const hasHelix = providers.some((provider) => provider.id === "helix");
+  return hasHelix ? providers : [...DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS, ...providers];
+}
+
+export function resolveSelectedHelixAgentRuntime(
+  requested: unknown,
+  providers: HelixAgentRuntimeDescriptor[],
+): HelixAgentRuntimeId {
+  const candidate = isHelixAgentRuntimeId(requested) ? requested : "helix";
+  const provider = providers.find((entry) => entry.id === candidate);
+  if (provider?.enabled) return provider.id;
+  return "helix";
+}
+
+export function formatHelixAgentRuntimeShortLabel(provider: HelixAgentRuntimeDescriptor | null | undefined): string {
+  if (provider?.id === "codex") return "Codex";
+  return "Helix";
+}
+
+export function resolveHelixAskActualAgentProviderLabel(
+  response: unknown,
+  fallbackProviders: HelixAgentRuntimeDescriptor[] = DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS,
+): string | null {
+  const record = readAgentLoopAuditRecord(response);
+  const debug = readAgentLoopAuditRecord(record?.debug);
+  const selectedProvider =
+    readAgentLoopAuditRecord(record?.selected_agent_provider) ??
+    readAgentLoopAuditRecord(debug?.selected_agent_provider);
+  const selectedProviderId = selectedProvider?.id;
+  const runtime = isHelixAgentRuntimeId(record?.agent_runtime)
+    ? record?.agent_runtime
+    : isHelixAgentRuntimeId(debug?.agent_runtime)
+      ? debug?.agent_runtime
+      : isHelixAgentRuntimeId(selectedProviderId)
+        ? selectedProviderId
+        : null;
+  if (!runtime) return null;
+  const explicitLabel = coerceText(selectedProvider?.label).trim();
+  if (explicitLabel) return `Provider: ${explicitLabel}`;
+  const provider = fallbackProviders.find((entry) => entry.id === runtime);
+  return `Provider: ${provider?.label || (runtime === "codex" ? "Codex Workstation Mode" : "Helix Ask Native")}`;
 }
 
 export function resolveHelixAskVisibleJobReadyLinks(reply: unknown): Record<string, unknown>[] {
@@ -17256,6 +17371,13 @@ export function HelixAskPill({
     canScrollLeft: false,
     canScrollRight: false,
   });
+  const [agentRuntimeMenuOpen, setAgentRuntimeMenuOpen] = useState(false);
+  const [agentRuntimeProviders, setAgentRuntimeProviders] = useState<HelixAgentRuntimeDescriptor[]>(
+    DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS,
+  );
+  const [selectedAgentRuntime, setSelectedAgentRuntime] = useState<HelixAgentRuntimeId>(() =>
+    readStoredHelixAskAgentRuntime(),
+  );
   const [askBusy, setAskBusy] = useState(false);
   const activeAskTurnIdRef = useRef<string | null>(null);
   const activeAskStartedAtMsRef = useRef<number | null>(null);
@@ -17310,6 +17432,55 @@ export function HelixAskPill({
       resizeObserver?.disconnect();
     };
   }, [updateAskActionCarouselEdges]);
+  useEffect(() => {
+    let cancelled = false;
+    const fetchProviders = async () => {
+      try {
+        const response = await fetch("/api/agi/agent-providers", {
+          headers: { Accept: "application/json" },
+        });
+        if (!response.ok) throw new Error(`agent_providers_unavailable:${response.status}`);
+        const providers = normalizeHelixAgentProvidersResponse(await response.json());
+        if (cancelled) return;
+        setAgentRuntimeProviders(providers);
+        setSelectedAgentRuntime((current) => {
+          const validated = resolveSelectedHelixAgentRuntime(current, providers);
+          persistHelixAskAgentRuntime(validated);
+          return validated;
+        });
+      } catch (error) {
+        if (!cancelled) {
+          setAgentRuntimeProviders(DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS);
+          setSelectedAgentRuntime("helix");
+          persistHelixAskAgentRuntime("helix");
+        }
+      }
+    };
+    void fetchProviders();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const selectedAgentRuntimeProvider = useMemo(
+    () =>
+      agentRuntimeProviders.find((provider) => provider.id === selectedAgentRuntime) ??
+      DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS[0],
+    [agentRuntimeProviders, selectedAgentRuntime],
+  );
+  const selectedAgentRuntimeLabel = formatHelixAgentRuntimeShortLabel(selectedAgentRuntimeProvider);
+  const handleAgentRuntimeSelect = useCallback((runtime: HelixAgentRuntimeId) => {
+    const validated = resolveSelectedHelixAgentRuntime(runtime, agentRuntimeProviders);
+    if (validated !== runtime) {
+      triggerAskActionHaptic();
+      setSelectedAgentRuntime("helix");
+      persistHelixAskAgentRuntime("helix");
+      return;
+    }
+    triggerAskActionHaptic();
+    setSelectedAgentRuntime(validated);
+    persistHelixAskAgentRuntime(validated);
+    setAgentRuntimeMenuOpen(false);
+  }, [agentRuntimeProviders, triggerAskActionHaptic]);
   useEffect(() => {
     askRepliesRef.current = askReplies;
   }, [askReplies]);
@@ -32318,6 +32489,7 @@ export function HelixAskPill({
           if (useBackendAskTurnEntrypoint) {
             const askTurnPayload = {
               sessionId: sessionId ?? undefined,
+              agentRuntime: selectedAgentRuntime,
               traceId,
               turnId: runAskTurnId,
               maxTokens: HELIX_ASK_OUTPUT_TOKENS,
@@ -33130,10 +33302,23 @@ export function HelixAskPill({
                   `final_answer / ${responseDebugResolvedTerminalArtifactKind}`
                 )
               : null;
+          const responseSelectedAgentProvider =
+            readAgentLoopAuditRecord(localResponseRecord.selected_agent_provider) ??
+            readAgentLoopAuditRecord(responseDebugPayload?.selected_agent_provider);
+          const responseAgentRuntime =
+            isHelixAgentRuntimeId(localResponseRecord.agent_runtime)
+              ? localResponseRecord.agent_runtime
+              : isHelixAgentRuntimeId(responseDebugPayload?.agent_runtime)
+                ? responseDebugPayload.agent_runtime
+                : isHelixAgentRuntimeId(responseSelectedAgentProvider?.id)
+                  ? responseSelectedAgentProvider.id
+                  : null;
           const responseDebugForReply =
             responseDebugPayload && typeof responseDebugPayload === "object"
               ? {
                   ...responseDebugPayload,
+                  ...(responseAgentRuntime ? { agent_runtime: responseAgentRuntime } : {}),
+                  ...(responseSelectedAgentProvider ? { selected_agent_provider: responseSelectedAgentProvider } : {}),
                   selected_final_answer: responseDebugSelectedFinalAnswer,
                   final_answer_source: responseDebugResolvedFinalAnswerSource,
                   terminal_artifact_kind: responseDebugResolvedTerminalArtifactKind,
@@ -33275,6 +33460,8 @@ export function HelixAskPill({
                   content: responseText,
                   question: trimmed,
                   debug: responseDebugForReply,
+                  ...(responseAgentRuntime ? { agent_runtime: responseAgentRuntime } : {}),
+                  ...(responseSelectedAgentProvider ? { selected_agent_provider: responseSelectedAgentProvider } : {}),
                   promptIngested: responsePromptIngested,
                   envelope: responseEnvelope,
                   mode: responseMode,
@@ -33596,6 +33783,7 @@ export function HelixAskPill({
       unresolvedPendingRequestCountForTurn,
       missionContextControls.voiceMode,
       preferredResponseLanguage,
+      selectedAgentRuntime,
       userSettings.showHelixAskDebug,
       visualSituationEvidenceForTurn,
       visualSituationSourceLabel,
@@ -34367,6 +34555,8 @@ export function HelixAskPill({
   useEffect(() => {
     updateAskActionCarouselEdges();
   }, [
+    agentRuntimeMenuOpen,
+    agentRuntimeProviders.length,
     askAttachments.length,
     askBusy,
     hasReadyAskAttachment,
@@ -35309,6 +35499,21 @@ export function HelixAskPill({
                   <button
                     type="button"
                     data-helix-ask-action-item="true"
+                    aria-label="Choose Ask agent runtime"
+                    aria-haspopup="menu"
+                    aria-expanded={agentRuntimeMenuOpen}
+                    title="Choose Ask agent runtime"
+                    className="inline-flex h-10 shrink-0 snap-center items-center justify-center rounded-full border border-white/10 bg-white/5 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-cyan-100 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
+                    onClick={() => {
+                      triggerAskActionHaptic();
+                      setAgentRuntimeMenuOpen((current) => !current);
+                    }}
+                  >
+                    {selectedAgentRuntimeLabel}
+                  </button>
+                  <button
+                    type="button"
+                    data-helix-ask-action-item="true"
                     aria-label="Attach image"
                     title="Attach image"
                     className={`inline-flex h-10 w-10 shrink-0 snap-center items-center justify-center rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60 ${
@@ -35440,6 +35645,47 @@ export function HelixAskPill({
                     onClick={() => scrollAskActionCarousel("right")}
                     disabled={!askActionCarouselEdges.canScrollRight}
                   />
+                  {agentRuntimeMenuOpen ? (
+                    <div
+                      role="menu"
+                      aria-label="Ask agent runtime"
+                      className="absolute right-10 top-12 z-30 min-w-52 rounded-lg border border-white/10 bg-slate-950/95 p-1.5 text-xs text-slate-100 shadow-[0_18px_48px_rgba(0,0,0,0.45)] backdrop-blur"
+                    >
+                      {agentRuntimeProviders.map((provider) => {
+                        const selected = provider.id === selectedAgentRuntime;
+                        const shortLabel = formatHelixAgentRuntimeShortLabel(provider);
+                        return (
+                          <button
+                            key={provider.id}
+                            type="button"
+                            role="menuitemradio"
+                            aria-checked={selected}
+                            disabled={!provider.enabled}
+                            className={`flex w-full items-center justify-between gap-3 rounded-md px-2.5 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 ${
+                              selected
+                                ? "bg-cyan-400/15 text-cyan-100"
+                                : provider.enabled
+                                  ? "text-slate-100 hover:bg-white/10"
+                                  : "cursor-not-allowed text-slate-500 opacity-70"
+                            }`}
+                            onClick={() => handleAgentRuntimeSelect(provider.id)}
+                          >
+                            <span>
+                              <span className="block text-[11px] font-semibold uppercase tracking-[0.12em]">
+                                {shortLabel}
+                              </span>
+                              <span className="mt-0.5 block text-[10px] text-slate-400">
+                                {provider.label}
+                              </span>
+                            </span>
+                            <span className="text-[9px] uppercase tracking-[0.14em] text-slate-400">
+                              {provider.enabled ? (provider.experimental ? "exp" : "on") : "off"}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
                 </div>
               </div>
               <textarea
@@ -36285,6 +36531,7 @@ export function HelixAskPill({
               finalAnswerPresentation,
             });
             const mailLoopRows = collectHelixMailLoopTranscriptRows(reply);
+            const actualAgentProviderLabel = resolveHelixAskActualAgentProviderLabel(reply, agentRuntimeProviders);
             const turnStreamRows = buildHelixContinuousTurnStreamRows({
               replyId: reply.id,
               question: reply.question,
@@ -36427,6 +36674,7 @@ export function HelixAskPill({
                                 ) : null}
                                 <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-slate-400/80">
                                   {row.meta}
+                                  {isFinalRow && actualAgentProviderLabel ? ` | ${actualAgentProviderLabel}` : ""}
                                   {row.evidenceRefs.length > 0 ? ` | refs ${row.evidenceRefs.length}` : ""}
                                 </p>
                                 {row.evidenceRefs.length > 0 ? (
