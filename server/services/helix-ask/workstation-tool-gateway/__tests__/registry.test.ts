@@ -5,6 +5,9 @@ import {
   listWorkstationGatewayCapabilities,
 } from "../registry";
 
+const CALCULATOR_SOLVE_EXPRESSION_CAPABILITY = "scientific-calculator.solve_expression";
+const REPO_SEARCH_CAPABILITY = "repo.search";
+
 describe("Helix workstation tool gateway", () => {
   it("lists read-only non-terminal workstation capabilities", () => {
     const manifest = listWorkstationGatewayCapabilities({
@@ -30,6 +33,31 @@ describe("Helix workstation tool gateway", () => {
         raw_content_included: false,
       }),
     );
+    expect(manifest.capabilities).toContainEqual(
+      expect.objectContaining({
+        capability_id: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+        mutating: false,
+        code_mutation: false,
+        shell_access: false,
+        permission_profile_required: "read",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    );
+    expect(manifest.capabilities).toContainEqual(
+      expect.objectContaining({
+        capability_id: REPO_SEARCH_CAPABILITY,
+        mutating: false,
+        code_mutation: false,
+        shell_access: false,
+        requires_source: true,
+        permission_profile_required: "read",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    );
   });
 
   it("calls workspace_os.status as an observation packet, not an answer", async () => {
@@ -49,6 +77,15 @@ describe("Helix workstation tool gateway", () => {
       ok: true,
       agent_runtime: "codex",
       capability_id: HELIX_WORKSPACE_OS_STATUS_CAPABILITY,
+      gateway_admission: {
+        schema: "helix.workstation_tool_gateway.admission.v1",
+        requested_capability: HELIX_WORKSPACE_OS_STATUS_CAPABILITY,
+        selected_agent_provider: "codex",
+        permission_profile: "observe",
+        admission_status: "admitted",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
       terminal_eligible: false,
       post_tool_model_step_required: true,
       assistant_answer: false,
@@ -77,6 +114,169 @@ describe("Helix workstation tool gateway", () => {
     });
   });
 
+  it("calls scientific-calculator.solve_expression as read-only non-terminal evidence", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+      arguments: {
+        expression: "2 + 2 * 3",
+      },
+      turnId: "ask:test:gateway-calculator",
+      iteration: 2,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      agent_runtime: "codex",
+      capability_id: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+      gateway_admission: {
+        requested_capability: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+        selected_agent_provider: "codex",
+        permission_profile: "read",
+        admission_status: "admitted",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      observation_packet: {
+        schema: "helix.agent_step_observation_packet.v1",
+        turn_id: "ask:test:gateway-calculator",
+        iteration: 2,
+        capability_key: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+        panel_id: "scientific-calculator",
+        action: "solve_expression",
+        status: "succeeded",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.calculator_solve_observation.v1",
+        expression: "2 + 2 * 3",
+        result: "8",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+  });
+
+  it("blocks unsupported calculator expressions as non-terminal observations", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      capabilityId: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+      arguments: {
+        expression: "process.exit()",
+      },
+      turnId: "ask:test:gateway-calculator-blocked",
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: "unsupported_expression_syntax",
+      gateway_admission: {
+        requested_capability: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+        admission_status: "blocked",
+        blocked_reason: "unsupported_expression_syntax",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+      observation_packet: {
+        status: "blocked",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+  });
+
+  it("calls repo.search as read-only repo evidence, not an answer", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: REPO_SEARCH_CAPABILITY,
+      arguments: {
+        query: "workspace_os.status",
+        paths: ["server/services/helix-ask"],
+        max_hits: 3,
+      },
+      turnId: "ask:test:gateway-repo-search",
+      iteration: 3,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      agent_runtime: "codex",
+      capability_id: REPO_SEARCH_CAPABILITY,
+      gateway_admission: {
+        requested_capability: REPO_SEARCH_CAPABILITY,
+        selected_agent_provider: "codex",
+        permission_profile: "read",
+        admission_status: "admitted",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      observation_packet: {
+        capability_key: REPO_SEARCH_CAPABILITY,
+        panel_id: "repo-evidence",
+        action: "search",
+        status: "succeeded",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.repo_search_observation.v1",
+        query: "workspace_os.status",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    expect((result.observation as { hit_count?: number }).hit_count).toBeGreaterThan(0);
+  });
+
+  it("blocks missing repo.search query as a non-terminal observation", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      capabilityId: REPO_SEARCH_CAPABILITY,
+      arguments: {},
+      turnId: "ask:test:gateway-repo-search-blocked",
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: "missing_query",
+      gateway_admission: {
+        requested_capability: REPO_SEARCH_CAPABILITY,
+        admission_status: "blocked",
+        blocked_reason: "missing_query",
+      },
+      observation_packet: {
+        status: "blocked",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
   it("rejects unknown capabilities as non-terminal failed observations", async () => {
     const result = await callWorkstationGatewayCapability({
       capabilityId: "filesystem.write_file",
@@ -86,6 +286,12 @@ describe("Helix workstation tool gateway", () => {
     expect(result).toMatchObject({
       ok: false,
       error: "capability_not_registered",
+      gateway_admission: {
+        admission_status: "blocked",
+        blocked_reason: "capability_not_registered",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
       terminal_eligible: false,
       assistant_answer: false,
       raw_content_included: false,
