@@ -7,6 +7,7 @@ export const buildHelixAskTurnContractRiskFlags = (args: {
   promptResearchMissingRequiredInputsStop: boolean;
   explicitAnchorPathCount: number;
   groundingMode: HelixAskTurnContractGroundingMode;
+  maxRiskFlags?: number;
 }): string[] =>
   Array.from(
     new Set(
@@ -19,4 +20,4 @@ export const buildHelixAskTurnContractRiskFlags = (args: {
         args.groundingMode === "open" ? "open_world_allowed" : null,
       ].filter(Boolean) as string[],
     ),
-  );
+  ).slice(0, Math.max(0, Math.floor(args.maxRiskFlags ?? Number.POSITIVE_INFINITY)));

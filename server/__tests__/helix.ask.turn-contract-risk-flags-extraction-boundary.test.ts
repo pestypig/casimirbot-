@@ -15,6 +15,8 @@ describe("Helix Ask turn-contract risk-flags extraction boundary", () => {
     const serviceSource = readFileSync(servicePath, "utf8");
 
     expect(routeSource).toContain("../services/helix-ask/contracts/turn-contract-risk-flags");
+    expect(routeSource).toContain("maxRiskFlags: 8");
+    expect(routeSource).not.toContain("risk_flags: riskFlags.slice(0, 8)");
     expect(routeSource).not.toContain('objectives.length > 1 ? "multi_objective" : null');
     expect(serviceSource).toMatch(/export\s+const\s+buildHelixAskTurnContractRiskFlags\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");
@@ -54,5 +56,19 @@ describe("Helix Ask turn-contract risk-flags extraction boundary", () => {
         groundingMode: "repo",
       }),
     ).toEqual([]);
+  });
+
+  it("preserves caller-supplied risk flag cap", () => {
+    expect(
+      buildHelixAskTurnContractRiskFlags({
+        objectiveCount: 3,
+        requiresRepoEvidence: true,
+        promptResearchContractActive: true,
+        promptResearchMissingRequiredInputsStop: true,
+        explicitAnchorPathCount: 2,
+        groundingMode: "open",
+        maxRiskFlags: 3,
+      }),
+    ).toEqual(["multi_objective", "repo_grounding_required", "prompt_research_contract"]);
   });
 });
