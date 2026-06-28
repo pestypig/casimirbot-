@@ -6,6 +6,8 @@ import { describe, expect, it } from "vitest";
 import {
   adaptHelixAskFallbackSectionsForGrounding,
   createHelixAskAnswerObligation,
+  inferHelixAskAnswerPlanSectionEvidenceKinds,
+  normalizeHelixAskAnswerFormatEvidenceKinds,
   normalizeHelixAskAnswerObligationLabel,
   type HelixAskAnswerPlanSectionLike,
 } from "../services/helix-ask/obligations";
@@ -55,6 +57,18 @@ describe("Helix Ask obligations extraction boundary", () => {
     expect(serviceSource).toMatch(/export\s+const\s+createHelixAskAnswerObligation\s*=/);
   });
 
+  it("keeps answer-format evidence helpers out of agi.plan.ts", () => {
+    const routeSource = readFileSync(routePath, "utf8");
+    const serviceSource = readFileSync(servicePath, "utf8");
+
+    expect(routeSource).toContain("normalizeHelixAskAnswerFormatEvidenceKinds");
+    expect(routeSource).toContain("inferHelixAskAnswerPlanSectionEvidenceKinds");
+    expect(routeSource).not.toMatch(/const\s+normalizeHelixAskAnswerFormatEvidenceKinds\s*=/);
+    expect(routeSource).not.toMatch(/const\s+inferHelixAskAnswerPlanSectionEvidenceKinds\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+normalizeHelixAskAnswerFormatEvidenceKinds\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+inferHelixAskAnswerPlanSectionEvidenceKinds\s*=/);
+  });
+
   it("preserves service-owned obligation label normalization and factory output", () => {
     expect(normalizeHelixAskAnswerObligationLabel("Plan for repo evidence?", "fallback")).toBe(
       "repo evidence",
@@ -80,6 +94,20 @@ describe("Helix Ask obligations extraction boundary", () => {
       objective_label: null,
       section_title: "Implementation",
     });
+  });
+
+  it("preserves service-owned evidence normalization and section evidence inference", () => {
+    expect(normalizeHelixAskAnswerFormatEvidenceKinds(["doc", "runtime", "doc"], ["code"])).toEqual([
+      "doc",
+      "runtime",
+    ]);
+    expect(normalizeHelixAskAnswerFormatEvidenceKinds(["unknown"], ["code"])).toEqual(["code"]);
+    expect(
+      inferHelixAskAnswerPlanSectionEvidenceKinds({
+        kind: "mechanism",
+        requiredSlots: ["code_path"],
+      }),
+    ).toEqual(["doc", "code"]);
   });
 
   it("preserves pass-through behavior for non-comparison families", () => {
