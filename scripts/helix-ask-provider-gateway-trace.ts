@@ -1,6 +1,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import express from "express";
+import request from "supertest";
 import { codexProvider } from "../server/services/helix-ask/agent-providers/codex-provider";
+import { planRouter } from "../server/routes/agi.plan";
 import { callWorkstationGatewayCapability } from "../server/services/helix-ask/workstation-tool-gateway/registry";
 
 type Scenario = {
@@ -69,6 +72,13 @@ const readRecordArray = (value: unknown): Record<string, unknown>[] =>
 const writeJson = async (filePath: string, value: unknown) => {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
   await fs.writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+};
+
+const createRouteTraceApp = () => {
+  const app = express();
+  app.use(express.json({ limit: "2mb" }));
+  app.use("/api/agi", planRouter);
+  return app;
 };
 
 const fetchJson = async (url: string, init?: RequestInit): Promise<{
@@ -196,6 +206,98 @@ const buildProviderCandidateSummary = (ask: Record<string, unknown>) => {
   };
 };
 
+const readDebugExportEndpoint = (ask: Record<string, unknown>): string | null => {
+  const ref = ask.debug_export_ref;
+  if (typeof ref === "string" && ref.trim()) return ref.trim();
+  const refRecord = readRecord(ref);
+  return readString(refRecord?.endpoint);
+};
+
+const runRouteDebugExportProbe = async (input: {
+  app: ReturnType<typeof createRouteTraceApp>;
+  body: Record<string, unknown>;
+  scenario: Scenario;
+}) => {
+  const response = await request(input.app)
+    .post("/api/agi/ask/turn")
+    .send(input.body);
+  const ask = readRecord(response.body) ?? {};
+  const endpoint = readDebugExportEndpoint(ask);
+  const debugResponse = endpoint
+    ? await request(input.app).get(endpoint)
+    : null;
+  const debugExport = readRecord(debugResponse?.body) ?? null;
+  const debugPayload = readRecord(debugExport?.payload);
+  const routeFailures: string[] = [];
+  if (response.status !== 200) routeFailures.push(`route_status:${response.status}`);
+  if (!endpoint) routeFailures.push("route_debug_export_ref_missing");
+  if (endpoint && debugResponse?.status !== 200) routeFailures.push(`route_debug_export_status:${debugResponse?.status ?? "missing"}`);
+  if (readString(ask.agent_runtime) !== "codex") routeFailures.push(`route_agent_runtime:${readString(ask.agent_runtime) ?? "missing"}!=codex`);
+  if (readString(ask.workstation_gateway_manifest_version) !== "read-observe.v1") {
+    routeFailures.push("route_manifest_version_missing");
+  }
+  if (readString(ask.workstation_gateway_reentry_status) !== "completed") {
+    routeFailures.push(`route_reentry_status:${readString(ask.workstation_gateway_reentry_status) ?? "missing"}!=completed`);
+  }
+  if (input.scenario.expectedOk) {
+    if (readString(ask.terminal_authority_status) !== "authorized_by_helix_provider_candidate_bridge") {
+      routeFailures.push(`route_terminal_authority_status:${readString(ask.terminal_authority_status) ?? "missing"}`);
+    }
+    if (readString(ask.final_answer_source) !== "agent_provider_terminal_candidate") {
+      routeFailures.push(`route_final_answer_source:${readString(ask.final_answer_source) ?? "missing"}`);
+    }
+  }
+  if (debugPayload) {
+    if (readString(debugPayload.agent_runtime) !== "codex") {
+      routeFailures.push(`debug_agent_runtime:${readString(debugPayload.agent_runtime) ?? "missing"}!=codex`);
+    }
+    if (readString(debugPayload.workstation_gateway_manifest_version) !== "read-observe.v1") {
+      routeFailures.push("debug_manifest_version_missing");
+    }
+    if (readRecordArray(debugPayload.workstation_gateway_call_results).length !== 1) {
+      routeFailures.push(`debug_gateway_call_result_count:${readRecordArray(debugPayload.workstation_gateway_call_results).length}`);
+    }
+    if (readRecordArray(debugPayload.workstation_gateway_observation_packets).length !== 1) {
+      routeFailures.push(`debug_observation_packet_count:${readRecordArray(debugPayload.workstation_gateway_observation_packets).length}`);
+    }
+    if (input.scenario.expectedOk) {
+      if (readString(debugPayload.workstation_gateway_reentry_status) !== "completed") {
+        routeFailures.push(`debug_reentry_status:${readString(debugPayload.workstation_gateway_reentry_status) ?? "missing"}!=completed`);
+      }
+      if (readString(debugPayload.terminal_authority_status) !== "authorized_by_helix_provider_candidate_bridge") {
+        routeFailures.push(`debug_terminal_authority_status:${readString(debugPayload.terminal_authority_status) ?? "missing"}`);
+      }
+      if (readString(debugPayload.final_answer_source) !== "agent_provider_terminal_candidate") {
+        routeFailures.push(`debug_final_answer_source:${readString(debugPayload.final_answer_source) ?? "missing"}`);
+      }
+    }
+  }
+
+  return {
+    ask,
+    debugExport,
+    summary: {
+      schema: "helix.provider_gateway_route_debug_export_probe.v1",
+      response_status: response.status,
+      debug_export_status: debugResponse?.status ?? null,
+      debug_export_endpoint: endpoint,
+      provider_selected: readString(ask.agent_runtime),
+      manifest_version: readString(ask.workstation_gateway_manifest_version),
+      gateway_call_result_count: readRecordArray(ask.workstation_gateway_call_results).length,
+      debug_gateway_call_result_count: readRecordArray(debugPayload?.workstation_gateway_call_results).length,
+      debug_observation_packet_count: readRecordArray(debugPayload?.workstation_gateway_observation_packets).length,
+      reentry_status: readString(ask.workstation_gateway_reentry_status),
+      debug_reentry_status: readString(debugPayload?.workstation_gateway_reentry_status),
+      terminal_authority_status: readString(ask.terminal_authority_status),
+      debug_terminal_authority_status: readString(debugPayload?.terminal_authority_status),
+      final_answer_source: readString(ask.final_answer_source),
+      debug_final_answer_source: readString(debugPayload?.final_answer_source),
+      procedural_ok: routeFailures.length === 0,
+      failures: routeFailures,
+    },
+  };
+};
+
 const addGatewayInvariantFailures = (input: {
   failures: string[];
   prefix: string;
@@ -235,7 +337,7 @@ const addGatewayInvariantFailures = (input: {
   if (followupDecision?.evidence_reentered !== false) failures.push(`${prefix}_followup_evidence_reentered_not_false`);
 };
 
-const runScenario = async (scenario: Scenario) => {
+const runScenario = async (scenario: Scenario, routeTraceApp: ReturnType<typeof createRouteTraceApp>) => {
   const turnId = `ask:provider-gateway-trace:${scenario.id}`;
   const seed = {
     schema: "helix.provider_gateway_trace_seed.v1",
@@ -278,6 +380,33 @@ const runScenario = async (scenario: Scenario) => {
       runtime: "codex",
       route: "/ask/turn",
       body,
+    });
+  } finally {
+    if (!SPAWN_CODEX) {
+      if (originalFakeStdout === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      } else {
+        process.env.CODEX_AGENT_FAKE_STDOUT = originalFakeStdout;
+      }
+      if (originalFakeExitCode === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      } else {
+        process.env.CODEX_AGENT_FAKE_EXIT_CODE = originalFakeExitCode;
+      }
+    }
+  }
+  if (!SPAWN_CODEX) {
+    process.env.CODEX_AGENT_FAKE_STDOUT = scenario.expectedOk
+      ? `Route provider candidate for ${scenario.id} is grounded in the Helix gateway observation.`
+      : `Route provider candidate for ${scenario.id} reports that the requested workstation capability was blocked.`;
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+  }
+  let routeProbe: Awaited<ReturnType<typeof runRouteDebugExportProbe>>;
+  try {
+    routeProbe = await runRouteDebugExportProbe({
+      app: routeTraceApp,
+      body,
+      scenario,
     });
   } finally {
     if (!SPAWN_CODEX) {
@@ -378,6 +507,9 @@ const runScenario = async (scenario: Scenario) => {
   if (candidateSummary.final_visible_answer_authorized !== scenario.expectedOk) {
     failures.push(`final_visible_answer_authorized:${String(candidateSummary.final_visible_answer_authorized)}!=${String(scenario.expectedOk)}`);
   }
+  for (const routeFailure of routeProbe.summary.failures) {
+    failures.push(`route_debug_export_${routeFailure}`);
+  }
   addGatewayInvariantFailures({ failures, prefix: "codex", result: firstResult, scenario });
   addGatewayInvariantFailures({
     failures,
@@ -422,6 +554,7 @@ const runScenario = async (scenario: Scenario) => {
     lifecycle_status: codexSummary.lifecycle_status,
     followup_next_action: codexSummary.followup_next_action,
     provider_terminal_candidate: candidateSummary,
+    route_debug_export: routeProbe.summary,
     provider_parity: {
       helix: helixSummary,
       codex: codexSummary,
@@ -434,6 +567,9 @@ const runScenario = async (scenario: Scenario) => {
   await writeJson(path.join(scenarioDir, "seed.json"), seed);
   await writeJson(path.join(scenarioDir, "ask-response.json"), ask);
   await writeJson(path.join(scenarioDir, "debug-export.json"), debugExport);
+  await writeJson(path.join(scenarioDir, "route-ask-response.json"), routeProbe.ask);
+  await writeJson(path.join(scenarioDir, "route-debug-export.json"), routeProbe.debugExport);
+  await writeJson(path.join(scenarioDir, "route-debug-export-probe.json"), routeProbe.summary);
   await writeJson(path.join(scenarioDir, "helix-gateway-result.json"), helixGatewayResult);
   await writeJson(path.join(scenarioDir, "codex-gateway-result.json"), firstResult);
   await writeJson(path.join(scenarioDir, "probe-result.json"), probeResult);
@@ -563,8 +699,9 @@ const main = async () => {
       return;
     }
     const results = [];
+    const routeTraceApp = createRouteTraceApp();
     for (const scenario of scenarios) {
-      results.push(await runScenario(scenario));
+      results.push(await runScenario(scenario, routeTraceApp));
     }
     const summary = {
       schema: "helix.provider_gateway_trace_summary.v1",
@@ -588,7 +725,13 @@ const main = async () => {
   }
 };
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+main()
+  .then(() => {
+    if (process.env.HELIX_ASK_PROVIDER_GATEWAY_TRACE_NATURAL_EXIT !== "1") {
+      process.exit(process.exitCode ?? 0);
+    }
+  })
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
