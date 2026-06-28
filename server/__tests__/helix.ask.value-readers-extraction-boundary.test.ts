@@ -3,7 +3,11 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { readAskTurnString } from "../services/helix-ask/value-readers";
+import {
+  readAskTurnActionArgString,
+  readAskTurnString,
+  readAskTurnWorkspaceSnapshotPath,
+} from "../services/helix-ask/value-readers";
 
 const repoRoot = process.cwd();
 const routePath = join(repoRoot, "server/routes/agi.plan.ts");
@@ -16,7 +20,11 @@ describe("Helix Ask value readers extraction boundary", () => {
 
     expect(routeSource).toContain("../services/helix-ask/value-readers");
     expect(routeSource).not.toMatch(/const\s+readAskTurnString\s*=\s*\(value/);
+    expect(routeSource).not.toMatch(/const\s+readAskTurnActionArgString\s*=/);
+    expect(routeSource).not.toMatch(/const\s+readAskTurnWorkspaceSnapshotPath\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+readAskTurnString\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+readAskTurnActionArgString\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+readAskTurnWorkspaceSnapshotPath\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");
     expect(serviceSource).not.toContain("../routes/agi.plan");
   });
@@ -26,5 +34,11 @@ describe("Helix Ask value readers extraction boundary", () => {
     expect(readAskTurnString("   ")).toBeNull();
     expect(readAskTurnString(42)).toBeNull();
     expect(readAskTurnString(null)).toBeNull();
+    expect(readAskTurnActionArgString({ args: { title: " My Note ", name: "Fallback" } }, ["title", "name"])).toBe("My Note");
+    expect(readAskTurnActionArgString({ args: { title: " ", name: "Fallback" } }, ["title", "name"])).toBe("Fallback");
+    expect(readAskTurnActionArgString({ args: null }, ["title"])).toBeNull();
+    expect(readAskTurnWorkspaceSnapshotPath({ workspace_context_snapshot: { activeDocPath: " docs/a.md " } })).toBe("docs/a.md");
+    expect(readAskTurnWorkspaceSnapshotPath({ workspace_context_snapshot: { activeDocPath: " " } })).toBeNull();
+    expect(readAskTurnWorkspaceSnapshotPath({})).toBeNull();
   });
 });
