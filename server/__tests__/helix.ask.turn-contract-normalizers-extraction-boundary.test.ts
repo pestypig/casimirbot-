@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
   normalizeHelixAskTurnContractFamily,
   normalizeHelixAskTurnContractGroundingMode,
+  selectHelixAskTurnContractGroundingMode,
   selectHelixAskTurnContractPlannerFamily,
   selectHelixAskTurnContractRequestedGroundingMode,
 } from "../services/helix-ask/contracts/turn-contract-normalizers";
@@ -24,12 +25,15 @@ describe("Helix Ask turn-contract normalizers extraction boundary", () => {
     expect(routeSource).not.toMatch(/const\s+normalizeHelixAskTurnContractGroundingMode\s*=\s*\(/);
     expect(routeSource).toContain("selectHelixAskTurnContractPlannerFamily(args.plannerPass?.output_family)");
     expect(routeSource).toContain("selectHelixAskTurnContractRequestedGroundingMode(");
+    expect(routeSource).toContain("selectHelixAskTurnContractGroundingMode({");
+    expect(routeSource).not.toContain("const defaultGroundingMode: HelixAskTurnContractGroundingMode =");
     expect(routeSource).not.toContain("? normalizeHelixAskTurnContractFamily(args.plannerPass.output_family)");
     expect(routeSource).not.toContain("? normalizeHelixAskTurnContractGroundingMode(args.plannerPass.grounding_mode)");
     expect(serviceSource).toMatch(/export\s+const\s+normalizeHelixAskTurnContractFamily\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+normalizeHelixAskTurnContractGroundingMode\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+selectHelixAskTurnContractPlannerFamily\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+selectHelixAskTurnContractRequestedGroundingMode\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+selectHelixAskTurnContractGroundingMode\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");
     expect(serviceSource).not.toContain("../../../routes/agi.plan");
     expect(serviceSource).not.toContain("../../routes/agi.plan");
@@ -52,5 +56,43 @@ describe("Helix Ask turn-contract normalizers extraction boundary", () => {
     expect(selectHelixAskTurnContractRequestedGroundingMode("Repo")).toBe("repo");
     expect(selectHelixAskTurnContractRequestedGroundingMode(undefined)).toBeNull();
     expect(selectHelixAskTurnContractRequestedGroundingMode("local")).toBeNull();
+  });
+
+  it("preserves final grounding-mode precedence", () => {
+    expect(
+      selectHelixAskTurnContractGroundingMode({
+        requiresRepoEvidence: true,
+        intentDomain: "general",
+        requestedGroundingMode: "open",
+      }),
+    ).toBe("repo");
+    expect(
+      selectHelixAskTurnContractGroundingMode({
+        requiresRepoEvidence: false,
+        intentDomain: "repo",
+        requestedGroundingMode: "hybrid",
+      }),
+    ).toBe("repo");
+    expect(
+      selectHelixAskTurnContractGroundingMode({
+        requiresRepoEvidence: false,
+        intentDomain: "hybrid",
+        requestedGroundingMode: null,
+      }),
+    ).toBe("hybrid");
+    expect(
+      selectHelixAskTurnContractGroundingMode({
+        requiresRepoEvidence: false,
+        intentDomain: "general",
+        requestedGroundingMode: "repo",
+      }),
+    ).toBe("repo");
+    expect(
+      selectHelixAskTurnContractGroundingMode({
+        requiresRepoEvidence: false,
+        intentDomain: "falsifiable",
+        requestedGroundingMode: null,
+      }),
+    ).toBe("open");
   });
 });

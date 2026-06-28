@@ -1,3 +1,5 @@
+import type { HelixAskDomain } from "../intent-directory";
+
 export type HelixAskAnswerPlanFamily =
   | "definition_overview"
   | "mechanism_process"
@@ -49,3 +51,14 @@ export const selectHelixAskTurnContractRequestedGroundingMode = (
   groundingMode?: unknown,
 ): HelixAskTurnContractGroundingMode | null =>
   normalizeHelixAskTurnContractGroundingMode(groundingMode);
+
+export const selectHelixAskTurnContractGroundingMode = (args: {
+  requiresRepoEvidence: boolean;
+  intentDomain: HelixAskDomain;
+  requestedGroundingMode?: HelixAskTurnContractGroundingMode | null;
+}): HelixAskTurnContractGroundingMode => {
+  if (args.requiresRepoEvidence || args.intentDomain === "repo") return "repo";
+  const defaultGroundingMode: HelixAskTurnContractGroundingMode =
+    args.intentDomain === "hybrid" ? "hybrid" : "open";
+  return args.requestedGroundingMode ?? defaultGroundingMode;
+};
