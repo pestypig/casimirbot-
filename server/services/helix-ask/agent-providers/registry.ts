@@ -23,6 +23,10 @@ export function listHelixAgentProviders(): HelixAgentRuntimeDescriptor[] {
   }));
 }
 
+export function resolveDefaultHelixAgentProvider(): HelixAgentProvider {
+  return resolveHelixAgentProvider({ body: {} });
+}
+
 export function resolveHelixAgentProvider(input: {
   body: Record<string, unknown>;
   headers?: IncomingHttpHeaders;

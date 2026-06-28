@@ -499,7 +499,7 @@ describe("Helix Ask agent provider selection", () => {
     };
     const docsBody = {
       turn_id: "ask:test:structured-docs-gateway",
-      question: "Locate the Helix Ask rule in docs.",
+      question: "Locate the Helix Ask Codex loop discipline doc.",
       route_metadata: {
         schema: "helix.ask.route_metadata.v1",
         source_target: "docs_viewer",
@@ -511,8 +511,8 @@ describe("Helix Ask agent provider selection", () => {
             tool_name: "docs-viewer.locate_in_doc",
             selected_capability: "docs-viewer.locate_in_doc",
             args: {
-              query: "Helix Ask",
-              paths: ["docs"],
+              query: "Helix Ask / Codex Loop Discipline",
+              paths: ["docs/helix-ask-codex-loop-discipline.md"],
             },
           },
         },
@@ -542,8 +542,8 @@ describe("Helix Ask agent provider selection", () => {
         capability_id: "docs.search",
         mode: "read",
         arguments: expect.objectContaining({
-          query: "Helix Ask",
-          paths: ["docs"],
+          query: "Helix Ask / Codex Loop Discipline",
+          paths: ["docs/helix-ask-codex-loop-discipline.md"],
           source_target_intent: expect.objectContaining({
             source: "helix_structured_source_target_admission",
             selected_capability: "docs-viewer.locate_in_doc",
@@ -595,7 +595,7 @@ describe("Helix Ask agent provider selection", () => {
       },
       observation: {
         schema: "helix.docs_search_observation.v1",
-        query: "Helix Ask",
+        query: "Helix Ask / Codex Loop Discipline",
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
