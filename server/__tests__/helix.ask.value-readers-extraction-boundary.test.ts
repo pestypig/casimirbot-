@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   readAskTurnActionArgString,
+  readAskTurnMandatoryToolName,
   readAskTurnObjectRecord,
   readAskTurnRecordArray,
   readAskTurnString,
@@ -26,12 +27,14 @@ describe("Helix Ask value readers extraction boundary", () => {
     expect(routeSource).not.toMatch(/const\s+readAskTurnObjectRecord\s*=/);
     expect(routeSource).not.toMatch(/const\s+readAskTurnStringList\s*=/);
     expect(routeSource).not.toMatch(/const\s+readAskTurnRecordArray\s*=/);
+    expect(routeSource).not.toMatch(/const\s+readAskTurnMandatoryToolName\s*=/);
     expect(routeSource).not.toMatch(/const\s+readAskTurnActionArgString\s*=/);
     expect(routeSource).not.toMatch(/const\s+readAskTurnWorkspaceSnapshotPath\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+readAskTurnString\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+readAskTurnObjectRecord\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+readAskTurnStringList\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+readAskTurnRecordArray\s*=/);
+    expect(serviceSource).toMatch(/export\s+const\s+readAskTurnMandatoryToolName\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+readAskTurnActionArgString\s*=/);
     expect(serviceSource).toMatch(/export\s+const\s+readAskTurnWorkspaceSnapshotPath\s*=/);
     expect(serviceSource).not.toContain("server/routes/agi.plan");
@@ -50,6 +53,16 @@ describe("Helix Ask value readers extraction boundary", () => {
     expect(readAskTurnStringList("a")).toEqual([]);
     expect(readAskTurnRecordArray([{ a: 1 }, ["b"], null, { c: 3 }])).toEqual([{ a: 1 }, { c: 3 }]);
     expect(readAskTurnRecordArray({ a: 1 })).toEqual([]);
+    expect(readAskTurnMandatoryToolName({ tool_name: " scientific-calculator.solve_expression " })).toBe(
+      "scientific-calculator.solve_expression",
+    );
+    expect(readAskTurnMandatoryToolName({ tool_name: " ", toolName: "docs-viewer.locate_in_doc" })).toBe(
+      "docs-viewer.locate_in_doc",
+    );
+    expect(readAskTurnMandatoryToolName({ selected_capability: "repo-code.search_concept" })).toBe("repo-code.search_concept");
+    expect(readAskTurnMandatoryToolName({ requiredCapability: "workspace_os.status" })).toBe("workspace_os.status");
+    expect(readAskTurnMandatoryToolName(["scientific-calculator.solve_expression"])).toBeNull();
+    expect(readAskTurnMandatoryToolName({ tool_name: " " })).toBeNull();
     expect(readAskTurnActionArgString({ args: { title: " My Note ", name: "Fallback" } }, ["title", "name"])).toBe("My Note");
     expect(readAskTurnActionArgString({ args: { title: " ", name: "Fallback" } }, ["title", "name"])).toBe("Fallback");
     expect(readAskTurnActionArgString({ args: null }, ["title"])).toBeNull();

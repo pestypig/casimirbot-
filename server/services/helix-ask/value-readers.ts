@@ -16,6 +16,26 @@ export const readAskTurnRecordArray = (value: unknown): Record<string, unknown>[
     ? value.filter((entry): entry is Record<string, unknown> => Boolean(entry && typeof entry === "object" && !Array.isArray(entry)))
     : [];
 
+export const readAskTurnMandatoryToolName = (value: unknown): string | null => {
+  const record = readAskTurnObjectRecord(value);
+  if (!record) return null;
+  const candidates = [
+    record.tool_name,
+    record.toolName,
+    record.selected_capability,
+    record.selectedCapability,
+    record.capability,
+    record.required_capability,
+    record.requiredCapability,
+    record.name,
+  ];
+  for (const candidate of candidates) {
+    const toolName = readAskTurnString(candidate);
+    if (toolName) return toolName;
+  }
+  return null;
+};
+
 export const readAskTurnActionArgString = (
   action: { args?: unknown } | null | undefined,
   keys: string[],
