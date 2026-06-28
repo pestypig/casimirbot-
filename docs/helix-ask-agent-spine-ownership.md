@@ -88,6 +88,7 @@ terminal eligibility, projection discipline, and debug traces.
 | `live_source_mail_wake_intent` | `live-source/mail-wake-intent.ts` | service via route import | no inline implementation | supplied transcript text | yes, compact UI mailbox wake prompt predicate feeds route-owned live-source/mail wake routing and phase policy | yes for compact stage-play mailbox wake prompt predicate only | live-source-mail-wake-intent boundary test | SERVICE_OWNED |
 | `live_source_mail_tool_intent` | `live-source/mail-tool-intent.ts` | service via route import | no inline implementation | supplied transcript text | yes, explicit live-source mail and MicroReasoner tool cue predicate feeds route-owned live-source/mail loop admission | yes for explicit mail tool prompt-cue predicate only | live-source-mail-tool-intent boundary test | SERVICE_OWNED |
 | `live_source_mail_read_intent` | `live-source/mail-read-intent.ts` | service via route import | no inline implementation | supplied transcript text | yes, one-time live-source mail read cue predicate feeds route-owned live-source/mail loop and watch-job setup policy | yes for one-time mail read prompt-cue predicate only | live-source-mail-read-intent boundary test | SERVICE_OWNED |
+| `live_source_mail_watch_intent` | `live-source/mail-watch-intent.ts` | service via route import | no inline implementation | supplied transcript text | yes, standing watch cue predicate feeds route-owned live-source/mail loop and watch-job setup policy | yes for standing watch prompt-cue predicate only | live-source-mail-watch-intent boundary test | SERVICE_OWNED |
 | `query_merge` | `query.ts` | service via route import | no inline implementation | supplied query groups and caller-supplied limit | yes, merged query lists feed turn-contract query hints and retrieval planning | yes for pure query trimming, dedupe, group filtering, and limiting only | query-merge boundary test | SERVICE_OWNED |
 | `goal_frame_readers` | `goals/goal-frame-readers.ts` | service via route import | no inline implementation for extracted readers | supplied built goal frame or candidate scalar value | yes, mutation-target reads, goal-frame hashes, and trimmed goal-frame/workspace-action strings can feed canonical goal-frame, capability selection, and workspace mutation planning | yes for pure mutation-target lookup, goal-frame hash formatting, and string trim/null reading only | goal-frame-readers boundary test | SERVICE_OWNED |
 | `capability_key_parser` | `tool-router/capability-key.ts` | service via route import | no inline implementation | supplied capability key string | yes, parsed panel/action fallback parts can feed runtime tool observation packets when the tool surface entry is missing | yes for pure first-dot splitting only | capability-key boundary test | SERVICE_OWNED |
@@ -120,7 +121,7 @@ terminal eligibility, projection discipline, and debug traces.
 
 ## Current Extraction Status
 
-The extraction wave now continues through S263. Recent slices moved small,
+The extraction wave now continues through S264. Recent slices moved small,
 mechanical readers and formatters behind service owners, while intentionally
 leaving source admission, tool execution, runtime-loop orchestration, terminal
 materialization, terminal authority, projection, live-source behavior, and
@@ -194,6 +195,7 @@ helper moves as runtime ownership proof.
 | S261 | compact mailbox wake intent | `server/services/helix-ask/live-source/mail-wake-intent.ts` | SERVICE_OWNED for compact UI mailbox wake prompt predicate only |
 | S262 | explicit mail tool intent | `server/services/helix-ask/live-source/mail-tool-intent.ts` | SERVICE_OWNED for explicit live-source mail and MicroReasoner prompt-cue predicate only |
 | S263 | one-time mail read intent | `server/services/helix-ask/live-source/mail-read-intent.ts` | SERVICE_OWNED for one-time live-source mail read prompt-cue predicate only |
+| S264 | standing watch intent | `server/services/helix-ask/live-source/mail-watch-intent.ts` | SERVICE_OWNED for standing live-source watch prompt-cue predicate only |
 | S248-S249 | live-source mail progress refs | `server/services/helix-ask/live-source/mail-progress-refs.ts` | SERVICE_OWNED for mail-loop progress-ref prefix matching, recursive collection, progress-kind classification, and route-callback-backed progress receipt construction only |
 | S131 | runtime intent packet | `server/services/helix-ask/runtime/runtime-intent-packet.ts` | SERVICE_OWNED for runtime-intent packet readers, source/capability predicates, packet assembly, ledger/debug append, and runtime-audit refresh handoff only |
 | S132 | runtime continuation hints | `server/services/helix-ask/runtime/runtime-continuation-hints.ts` | SERVICE_OWNED for continuation hint construction, append/ledger/debug writes, agent-step decision collection, hint-decision matching, and migration marking only |
