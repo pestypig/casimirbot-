@@ -33,7 +33,7 @@ import {
   buildGoldenPathTypedFailureTerminalResult,
 } from "../terminal-envelope";
 import { buildGoldenPathSolverTrace } from "../solver-trace";
-import { buildGoldenPathRuntimeStatus } from "../runtime-status";
+import { buildGoldenPathCompoundRuntimeStatus } from "../runtime-status";
 
 export type HelixAskGoldenPathCivilizationBoundsZenReflectionCompoundDependencies = {
   now: () => Date;
@@ -128,13 +128,10 @@ export const buildHelixAskGoldenPathCivilizationBoundsZenReflectionCompoundPaylo
       selected_terminal_result_id: terminalResult.result_id,
       terminal_result: terminalResult,
       terminal_results: [terminalResult],
-      golden_path_runtime: buildGoldenPathRuntimeStatus({
+      golden_path_runtime: buildGoldenPathCompoundRuntimeStatus({
         status: "civilization_bounds_zen_reflection_compound_failed",
-        requestedCapability: "compound_capability_contract",
-        selectedCapability: "compound_capability_contract",
-        executedCapability: null,
+        executed: false,
         firstBrokenRail: "observation",
-        routeGate: "enabled_explicit_request",
       }),
       canonical_goal_frame: canonicalGoalFrame,
       capability_plan: buildGoldenPathCompoundCapabilityPlan({
@@ -355,17 +352,13 @@ export const buildHelixAskGoldenPathCivilizationBoundsZenReflectionCompoundPaylo
     selected_terminal_result_id: terminalResult.result_id,
     terminal_result: terminalResult,
     terminal_results: [terminalResult],
-    golden_path_runtime: buildGoldenPathRuntimeStatus({
+    golden_path_runtime: buildGoldenPathCompoundRuntimeStatus({
       status: "civilization_bounds_zen_reflection_compound",
-      requestedCapability: "compound_capability_contract",
-      selectedCapability: "compound_capability_contract",
-      executedCapability: "compound_capability_contract",
-      observedArtifactKind: "compound_subgoal_observations",
+      executed: true,
       observedArtifactRef: civilizationObservationArtifactId,
       terminalArtifactRef: terminalArtifactId,
       terminalResultId,
       legacyFallbackPossibleWhenUnhandled: true,
-      routeGate: "enabled_explicit_request",
     }),
     canonical_goal_frame: canonicalGoalFrame,
     compound_capability_contract: compoundCapabilityContract,

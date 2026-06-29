@@ -47,3 +47,34 @@ export const buildGoldenPathRuntimeStatus = (args: {
   assistant_answer: false,
   raw_content_included: false,
 });
+
+export const HELIX_GOLDEN_PATH_COMPOUND_CAPABILITY_CONTRACT = "compound_capability_contract";
+export const HELIX_GOLDEN_PATH_COMPOUND_SUBGOAL_OBSERVATIONS = "compound_subgoal_observations";
+
+export const buildGoldenPathCompoundRuntimeStatus = (args: {
+  status: string;
+  executed: boolean;
+  observedArtifactRef?: string;
+  terminalArtifactRef?: string;
+  terminalResultId?: string;
+  firstBrokenRail?: string;
+  legacyFallbackPossibleWhenUnhandled?: boolean;
+  routeGate?: string;
+}): RecordLike =>
+  buildGoldenPathRuntimeStatus({
+    status: args.status,
+    requestedCapability: HELIX_GOLDEN_PATH_COMPOUND_CAPABILITY_CONTRACT,
+    selectedCapability: HELIX_GOLDEN_PATH_COMPOUND_CAPABILITY_CONTRACT,
+    executedCapability: args.executed ? HELIX_GOLDEN_PATH_COMPOUND_CAPABILITY_CONTRACT : null,
+    ...(args.executed
+      ? {
+          observedArtifactKind: HELIX_GOLDEN_PATH_COMPOUND_SUBGOAL_OBSERVATIONS,
+          observedArtifactRef: args.observedArtifactRef,
+        }
+      : {}),
+    terminalArtifactRef: args.terminalArtifactRef,
+    terminalResultId: args.terminalResultId,
+    firstBrokenRail: args.firstBrokenRail,
+    legacyFallbackPossibleWhenUnhandled: args.legacyFallbackPossibleWhenUnhandled,
+    routeGate: args.routeGate ?? "enabled_explicit_request",
+  });

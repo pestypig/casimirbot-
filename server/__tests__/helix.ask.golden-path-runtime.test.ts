@@ -153,8 +153,8 @@ describe("Helix Ask golden path runtime", () => {
     for (const modulePath of modulePaths) {
       const source = readFileSync(modulePath, "utf8");
       if (source.includes("golden_path_runtime:")) {
-        expect(source, `${modulePath} must build runtime status through the shared helper`).toContain(
-          "buildGoldenPathRuntimeStatus",
+        expect(source, `${modulePath} must build runtime status through a shared helper`).toMatch(
+          /buildGoldenPath(?:Compound)?RuntimeStatus/,
         );
         expect(source, `${modulePath} must not inline golden_path_runtime object ownership`).not.toContain(
           "golden_path_runtime: {",

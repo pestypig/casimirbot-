@@ -39,7 +39,7 @@ import {
   buildGoldenPathTypedFailureTerminalResult,
 } from "../terminal-envelope";
 import { buildGoldenPathSolverTrace } from "../solver-trace";
-import { buildGoldenPathRuntimeStatus } from "../runtime-status";
+import { buildGoldenPathCompoundRuntimeStatus } from "../runtime-status";
 
 export type HelixAskGoldenPathDocsCalculatorCompoundDependencies = {
   now: () => Date;
@@ -135,13 +135,10 @@ export const buildHelixAskGoldenPathDocsCalculatorCompoundPayload = (args: {
       selected_terminal_result_id: terminalResult.result_id,
       terminal_result: terminalResult,
       terminal_results: [terminalResult],
-      golden_path_runtime: buildGoldenPathRuntimeStatus({
+      golden_path_runtime: buildGoldenPathCompoundRuntimeStatus({
         status: "docs_calculator_compound_failed",
-        requestedCapability: "compound_capability_contract",
-        selectedCapability: "compound_capability_contract",
-        executedCapability: null,
+        executed: false,
         firstBrokenRail: params.brokenRail,
-        routeGate: "enabled_explicit_request",
       }),
       canonical_goal_frame: canonicalGoalFrame,
       capability_plan: buildGoldenPathCompoundCapabilityPlan({
@@ -361,17 +358,13 @@ export const buildHelixAskGoldenPathDocsCalculatorCompoundPayload = (args: {
     selected_terminal_result_id: terminalResult.result_id,
     terminal_result: terminalResult,
     terminal_results: [terminalResult],
-    golden_path_runtime: buildGoldenPathRuntimeStatus({
+    golden_path_runtime: buildGoldenPathCompoundRuntimeStatus({
       status: "docs_calculator_compound",
-      requestedCapability: "compound_capability_contract",
-      selectedCapability: "compound_capability_contract",
-      executedCapability: "compound_capability_contract",
-      observedArtifactKind: "compound_subgoal_observations",
+      executed: true,
       observedArtifactRef: docObservationArtifactId,
       terminalArtifactRef: terminalArtifactId,
       terminalResultId,
       legacyFallbackPossibleWhenUnhandled: true,
-      routeGate: "enabled_explicit_request",
     }),
     canonical_goal_frame: canonicalGoalFrame,
     compound_capability_contract: compoundCapabilityContract,
