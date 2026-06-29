@@ -1,0 +1,529 @@
+import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfaction-artifact";
+import { HELIX_VISUAL_FRAME_EVIDENCE_SCHEMA } from "../../../../../shared/helix-visual-frame-evidence";
+import {
+  HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
+  HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
+  HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY,
+  HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
+  readHelixAskGoldenPathPrompt,
+  readRecord,
+  readString,
+  readStringArray,
+  type HelixAskGoldenPathRuntimeTerminalResult,
+  type RecordLike,
+} from "../core";
+
+export type HelixAskGoldenPathVisualCaptureDependencies = {
+  now: () => Date;
+  hashGoalFrame: (value: unknown) => string;
+  buildGoalSatisfactionEvaluationArtifact: typeof buildHelixGoalSatisfactionEvaluationArtifact;
+};
+
+export const isHelixAskGoldenPathVisualCaptureRequested = (body: RecordLike): boolean => {
+  const requestedCapabilities = readStringArray(body.requested_capabilities ?? body.requestedCapabilities);
+  if (requestedCapabilities.includes(HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY)) return true;
+  if (requestedCapabilities.includes(HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY)) return true;
+  const requestedCapability =
+    readString(body.requested_capability) ??
+    readString(body.requestedCapability) ??
+    readString(body.capability) ??
+    readString(body.tool_name) ??
+    readString(body.toolName);
+  if (requestedCapability === HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY) return true;
+  if (requestedCapability === HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY) return true;
+  const prompt = readHelixAskGoldenPathPrompt(body);
+  return (
+    /\bimage_lens\.inspect\b/i.test(prompt) ||
+    /\bsituation-room\.describe_visual_capture\b/i.test(prompt) ||
+    (/\b(?:visual capture|visual frame|image lens|screen capture|current screen|visible right now)\b/i.test(prompt) &&
+      /\b(?:inspect|describe|review|summarize|what|seeing|visible)\b/i.test(prompt))
+  );
+};
+
+export const readVisualCaptureSummary = (body: RecordLike): string | null =>
+  readString(body.visual_summary) ??
+  readString(body.visualSummary) ??
+  readString(body.scene_text) ??
+  readString(body.sceneText) ??
+  readString(readRecord(body.visual_frame_evidence)?.summary) ??
+  readString(readRecord(body.visualFrameEvidence)?.summary);
+
+
+export const buildHelixAskGoldenPathVisualCapturePayload = (args: {
+  body: RecordLike;
+  deps: HelixAskGoldenPathVisualCaptureDependencies;
+}): RecordLike => {
+  const now = args.deps.now();
+  const createdAtMs = now.getTime();
+  const turnId = readString(args.body.turn_id) ?? readString(args.body.turnId) ?? `ask:golden-visual:${createdAtMs}`;
+  const traceId = readString(args.body.trace_id) ?? readString(args.body.traceId) ?? turnId;
+  const sessionId = readString(args.body.session_id) ?? readString(args.body.sessionId);
+  const threadId = readString(args.body.thread_id) ?? readString(args.body.threadId) ?? "helix-ask:visual";
+  const promptText = readHelixAskGoldenPathPrompt(args.body);
+  const requestedCapability =
+    readString(args.body.requested_capability) ??
+    readString(args.body.requestedCapability) ??
+    readString(args.body.capability) ??
+    (/\bimage_lens\.inspect\b/i.test(promptText)
+      ? HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY
+      : HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY);
+  const visualSummary = readVisualCaptureSummary(args.body);
+  const routeGateArtifactId = `${turnId}:golden_path_route_gate`;
+  const observationArtifactId = `${turnId}:visual_frame_evidence`;
+  const terminalArtifactId = `${turnId}:situation_context_pack`;
+  const terminalResultId = `${turnId}:golden_path_terminal_result`;
+  const requiredTerminalKind = "situation_context_pack";
+  const goalKind = "visual_capture_describe";
+
+  if (!visualSummary) {
+    const failureText =
+      "I could not complete this golden-path visual capture turn because no compact visual evidence was provided.";
+    const terminalResult = {
+      schema: "helix.ask_golden_path_terminal_result.v1",
+      result_id: terminalResultId,
+      artifact_id: `${turnId}:typed_failure`,
+      artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      text: failureText,
+      support_refs: [routeGateArtifactId],
+      terminal_authority_ok: true,
+      route_authority_ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const canonicalGoalFrame = {
+      schema: "helix.ask_canonical_goal_frame.v1",
+      turn_id: turnId,
+      goal_kind: goalKind,
+      answer_scope: "runtime_evidence",
+      required_terminal_kind: requiredTerminalKind,
+      classifier_reasons: ["explicit_visual_capture"],
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const goalSatisfactionEvaluation = {
+      schema: "helix.goal_satisfaction_evaluation.v1",
+      turn_id: turnId,
+      satisfaction: "not_satisfied",
+      goal_kind: goalKind,
+      required_terminal_kind: requiredTerminalKind,
+      selected_terminal_artifact_kind: "typed_failure",
+      missing_requirements: ["visual_frame_evidence"],
+      first_broken_rail: "observation",
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+
+    return {
+      ok: false,
+      mode: "read",
+      schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
+      turn_id: turnId,
+      trace_id: traceId,
+      session_id: sessionId,
+      thread_id: threadId,
+      prompt_text: promptText,
+      response_type: "typed_failure",
+      final_status: "typed_failure",
+      final_answer_source: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      terminal_artifact_id: terminalResult.artifact_id,
+      terminal_error_code: "missing_compact_visual_evidence",
+      answer: failureText,
+      text: failureText,
+      assistant_answer: failureText,
+      selected_final_answer: failureText,
+      selected_terminal_result_id: terminalResult.result_id,
+      terminal_result: terminalResult,
+      terminal_results: [terminalResult],
+      golden_path_runtime: {
+        schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
+        status: "visual_capture_missing_evidence",
+        flag: HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
+        requested_capability: requestedCapability,
+        selected_capability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
+        executed_capability: null,
+        observed_artifact_kind: null,
+        observed_artifact_ref: null,
+        terminal_artifact_ref: terminalResult.artifact_id,
+        terminal_result_id: terminalResultId,
+        legacy_route_bypassed: true,
+        private_runtime_loop_entered: false,
+        route_gate: "enabled_explicit_request",
+        terminal_result_count: 1,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      canonical_goal_frame: canonicalGoalFrame,
+      capability_plan: {
+        schema: "helix.ask_capability_plan.v1",
+        requested_capability: requestedCapability,
+        selected_capability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
+        executed_capability: null,
+        source_target: "visual_capture",
+        family: "visual_capture",
+        required_observation_kinds: ["visual_frame_evidence", "situation_context_pack"],
+        required_terminal_kind: requiredTerminalKind,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      goal_satisfaction_evaluation: goalSatisfactionEvaluation,
+      terminal_answer_authority: {
+        schema: "helix.terminal_answer_authority.v1",
+        completed_solver_path: false,
+        selected_terminal_artifact_kind: "typed_failure",
+        terminal_artifact_kind: "typed_failure",
+        selected_terminal_artifact_id: terminalResult.artifact_id,
+        terminal_artifact_id: terminalResult.artifact_id,
+        selected_terminal_result_id: terminalResult.result_id,
+        selected_final_answer: failureText,
+        final_answer_source: "typed_failure",
+        first_broken_rail: "observation",
+        terminal_authority_ok: true,
+        route: "golden_path_runtime / visual_capture",
+        server_authoritative: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_authority_single_writer: {
+        schema: "helix.terminal_authority_single_writer.v1",
+        selected_terminal_artifact_kind: "typed_failure",
+        selected_terminal_artifact_id: terminalResult.artifact_id,
+        selected_terminal_result_id: terminalResult.result_id,
+        visible_text: failureText,
+        source: "typed_failure",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      ask_turn_solver_trace: {
+        schema: "helix.ask_turn_solver_trace.v1",
+        completed_solver_path: false,
+        route_authority_ok: true,
+        terminal_authority_ok: true,
+        goal_satisfaction: "not_satisfied",
+        golden_path_runtime: true,
+        private_runtime_loop_entered: false,
+        requested_capability: requestedCapability,
+        selected_capability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
+        executed_capability: null,
+        observed_artifact_kind: null,
+        observed_artifact_ref: null,
+        terminal_artifact_kind: "typed_failure",
+        first_broken_rail: "observation",
+        terminal_error_code: "missing_compact_visual_evidence",
+        solver_risk_flags: [],
+        solver_short_circuit_flags: [],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: routeGateArtifactId,
+          turn_id: turnId,
+          producer_item_id: "golden_path_runtime",
+          kind: "golden_path_route_gate",
+          terminal_eligible: false,
+          created_at_ms: createdAtMs,
+          source_scope: "current_turn",
+          payload: {
+            schema: "helix.golden_path_route_gate.v1",
+            route_gate: "enabled_explicit_request",
+            requested_capability: requestedCapability,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+        {
+          artifact_id: terminalResult.artifact_id,
+          turn_id: turnId,
+          producer_item_id: "golden_path_runtime",
+          kind: "typed_failure",
+          terminal_eligible: true,
+          created_at_ms: createdAtMs,
+          source_scope: "current_turn",
+          payload: {
+            schema: "helix.typed_failure.v1",
+            text: failureText,
+            answer_text: failureText,
+            terminal_error_code: "missing_compact_visual_evidence",
+            first_broken_rail: "observation",
+            support_refs: terminalResult.support_refs,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      ],
+      debug: {
+        schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
+        golden_path_runtime: true,
+        golden_path_runtime_status: "visual_capture_missing_evidence",
+        private_runtime_loop_entered: false,
+        requested_capability: requestedCapability,
+        selected_capability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
+        executed_capability: null,
+        terminal_artifact_kind: "typed_failure",
+        final_answer_source: "typed_failure",
+        first_broken_rail: "observation",
+        terminal_error_code: "missing_compact_visual_evidence",
+        goal_satisfaction_evaluation: goalSatisfactionEvaluation,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+  }
+
+  const detectedObjects = readStringArray(args.body.detected_objects ?? args.body.detectedObjects);
+  const detectedRelations = readStringArray(args.body.detected_scene_relations ?? args.body.detectedSceneRelations);
+  const uncertainty = readStringArray(args.body.uncertainty);
+  const sourceId = readString(args.body.source_id) ?? readString(args.body.sourceId) ?? "golden_path_visual_capture";
+  const frameId = readString(args.body.frame_id) ?? readString(args.body.frameId) ?? `${turnId}:visual_frame`;
+  const evidence = {
+    schema: HELIX_VISUAL_FRAME_EVIDENCE_SCHEMA,
+    frame_id: frameId,
+    evidence_id: observationArtifactId,
+    source_id: sourceId,
+    thread_id: threadId,
+    ts: now.toISOString(),
+    image_model: readString(args.body.image_model) ?? readString(args.body.imageModel) ?? "golden_path_compact_visual_evidence",
+    model_invoked: true,
+    summary: visualSummary,
+    detected_objects: detectedObjects,
+    detected_scene_relations: detectedRelations,
+    uncertainty,
+    supports_claims: [],
+    raw_image_included: false,
+    assistant_answer: false,
+    context_policy: "compact_context_pack_only",
+  };
+  const answerText = [
+    "Visual capture compact evidence was inspected.",
+    `Summary: ${visualSummary}`,
+    detectedObjects.length > 0 ? `Detected objects: ${detectedObjects.slice(0, 8).join(", ")}.` : "Detected objects: none provided.",
+    detectedRelations.length > 0 ? `Scene relations: ${detectedRelations.slice(0, 6).join(", ")}.` : "Scene relations: none provided.",
+    uncertainty.length > 0 ? `Uncertainty: ${uncertainty.slice(0, 4).join(", ")}.` : "Uncertainty: none provided.",
+    "This is compact visual evidence; no raw image is included or promoted as answer authority.",
+  ].join("\n");
+  const canonicalGoalFrame = {
+    schema: "helix.ask_canonical_goal_frame.v1",
+    turn_id: turnId,
+    goal_kind: goalKind,
+    answer_scope: "runtime_evidence",
+    required_terminal_kind: requiredTerminalKind,
+    allows_workspace_context: true,
+    allows_prior_artifacts: false,
+    classifier_reasons: ["explicit_visual_capture", "golden_path_visual_capture"],
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  const goalSatisfactionEvaluation = {
+    schema: "helix.goal_satisfaction_evaluation.v1",
+    turn_id: turnId,
+    satisfaction: "satisfied",
+    goal_kind: goalKind,
+    required_terminal_kind: requiredTerminalKind,
+    selected_terminal_artifact_kind: requiredTerminalKind,
+    missing_requirements: [],
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  const goalHash = args.deps.hashGoalFrame(canonicalGoalFrame);
+  const goalSatisfactionArtifact = args.deps.buildGoalSatisfactionEvaluationArtifact({
+    turnId,
+    goalHash,
+    evaluation: goalSatisfactionEvaluation,
+    createdAtMs,
+  });
+  const terminalResult: HelixAskGoldenPathRuntimeTerminalResult = {
+    schema: "helix.ask_golden_path_terminal_result.v1",
+    result_id: terminalResultId,
+    artifact_id: terminalArtifactId,
+    artifact_kind: requiredTerminalKind,
+    final_answer_source: requiredTerminalKind,
+    text: answerText,
+    support_refs: [observationArtifactId, routeGateArtifactId, goalSatisfactionArtifact.artifact_id],
+    terminal_authority_ok: true,
+    route_authority_ok: true,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  const substitutionApplied = requestedCapability === HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY;
+  const situationContextPack = {
+    schema: "helix.situation_context_pack.v1",
+    artifact_id: terminalArtifactId,
+    turn_id: turnId,
+    answer_text: answerText,
+    visual_frame_evidence_ref: observationArtifactId,
+    source_observation_refs: [observationArtifactId],
+    support_refs: terminalResult.support_refs,
+    terminal_eligible: true,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+
+  return {
+    ok: true,
+    mode: "read",
+    schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
+    turn_id: turnId,
+    trace_id: traceId,
+    session_id: sessionId,
+    thread_id: threadId,
+    prompt_text: promptText,
+    response_type: "final_answer",
+    final_status: "final_answer",
+    final_answer_source: terminalResult.final_answer_source,
+    terminal_artifact_kind: terminalResult.artifact_kind,
+    terminal_artifact_id: terminalResult.artifact_id,
+    terminal_error_code: null,
+    answer: terminalResult.text,
+    text: terminalResult.text,
+    assistant_answer: terminalResult.text,
+    selected_final_answer: terminalResult.text,
+    selected_terminal_result_id: terminalResult.result_id,
+    terminal_result: terminalResult,
+    terminal_results: [terminalResult],
+    golden_path_runtime: {
+      schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
+      status: "visual_capture",
+      flag: HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
+      requested_capability: requestedCapability,
+      selected_capability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
+      executed_capability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
+      observed_artifact_kind: "visual_frame_evidence",
+      observed_artifact_ref: observationArtifactId,
+      terminal_artifact_ref: terminalArtifactId,
+      terminal_result_id: terminalResultId,
+      legacy_route_bypassed: true,
+      legacy_fallback_possible_when_unhandled: true,
+      private_runtime_loop_entered: false,
+      route_gate: "enabled_explicit_request",
+      terminal_result_count: 1,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    canonical_goal_frame: canonicalGoalFrame,
+    visual_frame_evidence: evidence,
+    situation_context_pack: situationContextPack,
+    capability_plan: {
+      schema: "helix.ask_capability_plan.v1",
+      requested_capability: requestedCapability,
+      selected_capability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
+      executed_capability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
+      source_target: "visual_capture",
+      family: "visual_capture",
+      substitution_rule_applied: substitutionApplied,
+      substitution_rule_id: substitutionApplied ? "image_lens.inspect->situation-room.describe_visual_capture" : null,
+      required_observation_kinds: ["visual_frame_evidence", "situation_context_pack"],
+      required_terminal_kind: requiredTerminalKind,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    goal_satisfaction_evaluation: goalSatisfactionEvaluation,
+    terminal_answer_authority: {
+      schema: "helix.terminal_answer_authority.v1",
+      selected_terminal_artifact_kind: terminalResult.artifact_kind,
+      terminal_artifact_kind: terminalResult.artifact_kind,
+      selected_terminal_artifact_id: terminalResult.artifact_id,
+      terminal_artifact_id: terminalResult.artifact_id,
+      selected_terminal_result_id: terminalResult.result_id,
+      selected_final_answer: terminalResult.text,
+      final_answer_source: terminalResult.final_answer_source,
+      terminal_authority_ok: true,
+      route: "golden_path_runtime / visual_capture",
+      server_authoritative: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    terminal_authority_single_writer: {
+      schema: "helix.terminal_authority_single_writer.v1",
+      selected_terminal_artifact_kind: terminalResult.artifact_kind,
+      selected_terminal_artifact_id: terminalResult.artifact_id,
+      selected_terminal_result_id: terminalResult.result_id,
+      visible_text: terminalResult.text,
+      source: terminalResult.final_answer_source,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    ask_turn_solver_trace: {
+      schema: "helix.ask_turn_solver_trace.v1",
+      completed_solver_path: true,
+      route_authority_ok: true,
+      terminal_authority_ok: true,
+      goal_satisfaction: "satisfied",
+      golden_path_runtime: true,
+      private_runtime_loop_entered: false,
+      requested_capability: requestedCapability,
+      selected_capability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
+      executed_capability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
+      observed_artifact_kind: "visual_frame_evidence",
+      observed_artifact_ref: observationArtifactId,
+      terminal_artifact_kind: terminalResult.artifact_kind,
+      substitution_rule_applied: substitutionApplied,
+      substitution_rule_id: substitutionApplied ? "image_lens.inspect->situation-room.describe_visual_capture" : null,
+      solver_risk_flags: [],
+      solver_short_circuit_flags: [],
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    current_turn_artifact_ledger: [
+      {
+        artifact_id: routeGateArtifactId,
+        turn_id: turnId,
+        producer_item_id: "golden_path_runtime",
+        kind: "golden_path_route_gate",
+        terminal_eligible: false,
+        created_at_ms: createdAtMs,
+        source_scope: "current_turn",
+        goal_hash: goalHash,
+        payload: {
+          schema: "helix.golden_path_route_gate.v1",
+          route_gate: "enabled_explicit_request",
+          requested_capability: requestedCapability,
+          goal_satisfaction_artifact: goalSatisfactionArtifact,
+          goal_satisfaction_evaluation: goalSatisfactionEvaluation,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+      {
+        artifact_id: observationArtifactId,
+        turn_id: turnId,
+        producer_item_id: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
+        kind: "visual_frame_evidence",
+        terminal_eligible: false,
+        created_at_ms: createdAtMs,
+        source_scope: "current_turn",
+        goal_hash: goalHash,
+        payload: evidence,
+      },
+      {
+        artifact_id: terminalArtifactId,
+        turn_id: turnId,
+        producer_item_id: "golden_path_visual_capture_synthesis",
+        kind: requiredTerminalKind,
+        terminal_eligible: true,
+        created_at_ms: createdAtMs,
+        source_scope: "current_turn",
+        goal_hash: goalHash,
+        payload: situationContextPack,
+      },
+    ],
+    debug: {
+      schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
+      golden_path_runtime: true,
+      golden_path_runtime_status: "visual_capture",
+      private_runtime_loop_entered: false,
+      requested_capability: requestedCapability,
+      selected_capability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
+      executed_capability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
+      observed_artifact_kind: "visual_frame_evidence",
+      observed_artifact_ref: observationArtifactId,
+      terminal_artifact_kind: terminalResult.artifact_kind,
+      terminal_result_count: 1,
+      final_answer_source: terminalResult.final_answer_source,
+      goal_satisfaction_evaluation: goalSatisfactionEvaluation,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+  };
+};
