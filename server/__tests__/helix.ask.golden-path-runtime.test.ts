@@ -5,6 +5,7 @@ import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
   HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
   HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
+  HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
   HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,
   buildHelixAskGoldenPathRuntimePayload,
   runHelixAskGoldenPathRuntime,
@@ -377,6 +378,112 @@ describe("Helix Ask golden path runtime", () => {
       },
     });
     expect(body.selected_final_answer).toContain("no calculator expression");
+    expect(readLedger(body).map((artifact) => artifact.kind)).toEqual(["golden_path_route_gate", "typed_failure"]);
+    expect(terminalLedgerEntries(body)).toHaveLength(1);
+  });
+
+  it("handles docs locate prompts as line-backed document evidence", () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+
+    const decision = runHelixAskGoldenPathRuntime({
+      now: new Date("2026-06-28T12:27:00.000Z"),
+      body: {
+        turn_id: "ask:golden:docs-locate",
+        prompt:
+          "helix_ask_golden_path_runtime use docs-viewer.locate_in_doc for Casimir tile newtons load bearing",
+        goldenPathRuntime: true,
+        requested_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+        doc_path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        doc_content: [
+          "# NHM2 Current Status",
+          "The Casimir tile generation table reports force output in newtons for each tile.",
+          "A later section discusses unrelated instrumentation.",
+        ].join("\n"),
+      },
+    });
+
+    expect(decision.handled).toBe(true);
+    if (!decision.handled) throw new Error("golden path should handle docs locate");
+    const body = decision.payload;
+
+    expect(body).toMatchObject({
+      final_status: "final_answer",
+      terminal_artifact_kind: "doc_location_matches",
+      final_answer_source: "doc_location_matches",
+      terminal_error_code: null,
+      doc_location_matches: {
+        capability_key: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+        doc_path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        match_count: 1,
+      },
+      capability_plan: {
+        requested_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+        executed_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+        required_observation_kinds: ["doc_location_matches"],
+        required_terminal_kind: "doc_location_matches",
+      },
+      ask_turn_solver_trace: {
+        completed_solver_path: true,
+        requested_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+        executed_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+        observed_artifact_kind: "doc_location_matches",
+        terminal_artifact_kind: "doc_location_matches",
+      },
+    });
+    expect(body.selected_final_answer).toContain("Line 2");
+    expect(body.selected_final_answer).toContain("force output in newtons");
+    expect(readLedger(body).map((artifact) => artifact.kind)).toEqual([
+      "golden_path_route_gate",
+      "doc_location_matches",
+    ]);
+    expect(terminalLedgerEntries(body)).toHaveLength(1);
+  });
+
+  it("fails closed when docs locate has no readable document content", () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+
+    const decision = runHelixAskGoldenPathRuntime({
+      now: new Date("2026-06-28T12:28:00.000Z"),
+      body: {
+        turn_id: "ask:golden:docs-locate-missing-content",
+        prompt: "helix_ask_golden_path_runtime docs-viewer.locate_in_doc query: Casimir tile newtons",
+        goldenPathRuntime: true,
+        requested_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+        doc_path: "docs/research/missing-fixture.md",
+      },
+    });
+
+    expect(decision.handled).toBe(true);
+    if (!decision.handled) throw new Error("golden path should handle missing docs content");
+    const body = decision.payload;
+
+    expect(body).toMatchObject({
+      final_status: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      terminal_error_code: "missing_doc_content",
+      goal_satisfaction_evaluation: {
+        satisfaction: "not_satisfied",
+        first_broken_rail: "observation",
+      },
+      capability_plan: {
+        requested_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+        executed_capability: null,
+        required_observation_kinds: ["doc_location_matches"],
+        required_terminal_kind: "doc_location_matches",
+      },
+      ask_turn_solver_trace: {
+        completed_solver_path: false,
+        requested_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+        executed_capability: null,
+        first_broken_rail: "observation",
+      },
+    });
+    expect(body.selected_final_answer).toContain("no readable document content");
     expect(readLedger(body).map((artifact) => artifact.kind)).toEqual(["golden_path_route_gate", "typed_failure"]);
     expect(terminalLedgerEntries(body)).toHaveLength(1);
   });
