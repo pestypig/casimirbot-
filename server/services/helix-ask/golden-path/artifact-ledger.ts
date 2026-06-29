@@ -8,6 +8,7 @@ export const buildGoldenPathRouteGateLedgerArtifact = (args: {
   terminalEligible?: boolean;
   promptText?: string;
   requestedCapability?: string;
+  compoundCapabilityContract?: RecordLike;
   modelPacketRef?: string;
   goalSatisfactionArtifact?: RecordLike;
   goalSatisfactionEvaluation?: RecordLike;
@@ -26,6 +27,7 @@ export const buildGoldenPathRouteGateLedgerArtifact = (args: {
     route_gate: "enabled_explicit_request",
     ...(args.promptText ? { prompt_text: args.promptText } : {}),
     ...(args.requestedCapability ? { requested_capability: args.requestedCapability } : {}),
+    ...(args.compoundCapabilityContract ? { compound_capability_contract: args.compoundCapabilityContract } : {}),
     ...(args.modelPacketRef ? { model_turn_packet_ref: args.modelPacketRef } : {}),
     ...(args.goalSatisfactionArtifact ? { goal_satisfaction_artifact: args.goalSatisfactionArtifact } : {}),
     ...(args.goalSatisfactionEvaluation ? { goal_satisfaction_evaluation: args.goalSatisfactionEvaluation } : {}),
