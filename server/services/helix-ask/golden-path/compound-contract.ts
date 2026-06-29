@@ -40,6 +40,39 @@ export type HelixAskGoldenPathCompositeDebugDependencies = {
   buildCompositeFollowupAudit: typeof buildAskTurnCompositeFollowupAudit;
 };
 
+export type HelixAskGoldenPathCompoundSubgoalContractInput = {
+  subgoalIdSuffix: string;
+  requestedCapability: string;
+  selectedCapability?: string;
+  executedCapability?: string;
+  args?: RecordLike;
+  observationKind: string;
+  observationRef: string;
+  satisfaction?: "satisfied" | "missing" | "failed";
+};
+
+export const buildGoldenPathCompoundCapabilityContract = (args: {
+  turnId: string;
+  subgoals: readonly HelixAskGoldenPathCompoundSubgoalContractInput[];
+  satisfaction?: "satisfied" | "missing" | "failed";
+}): RecordLike => ({
+  schema: "helix.compound_capability_contract.v1",
+  turn_id: args.turnId,
+  ordered_subgoals: args.subgoals.map((subgoal) => ({
+    subgoal_id: `${args.turnId}:subgoal:${subgoal.subgoalIdSuffix}`,
+    requested_capability: subgoal.requestedCapability,
+    selected_capability: subgoal.selectedCapability ?? subgoal.requestedCapability,
+    executed_capability: subgoal.executedCapability ?? subgoal.selectedCapability ?? subgoal.requestedCapability,
+    args: subgoal.args ?? {},
+    observation_kind: subgoal.observationKind,
+    observation_ref: subgoal.observationRef,
+    satisfaction: subgoal.satisfaction ?? "satisfied",
+  })),
+  satisfaction: args.satisfaction ?? "satisfied",
+  assistant_answer: false,
+  raw_content_included: false,
+});
+
 export const isHelixAskGoldenPathCatalogWorkspaceCompoundRequested = (body: RecordLike): boolean => {
   const requestedCapabilities = readStringArray(body.requested_capabilities ?? body.requestedCapabilities);
   const hasCatalog = requestedCapabilities.includes(HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY);

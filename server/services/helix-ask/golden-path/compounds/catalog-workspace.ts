@@ -6,7 +6,10 @@ import {
   buildGoldenPathObservationLedgerArtifact,
   buildGoldenPathRouteGateLedgerArtifact,
 } from "../artifact-ledger";
-import { isHelixAskGoldenPathCatalogWorkspaceCompoundRequested } from "../compound-contract";
+import {
+  buildGoldenPathCompoundCapabilityContract,
+  isHelixAskGoldenPathCatalogWorkspaceCompoundRequested,
+} from "../compound-contract";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
@@ -67,35 +70,23 @@ export const buildHelixAskGoldenPathCatalogWorkspaceCompoundPayload = (args: {
   const catalogObservation = buildGoldenPathCapabilityCatalogObservation();
   const counts = readRecord(workspaceObservation.capability_counts) ?? {};
   const workspaceSummary = `Workspace status: ${readNumber(counts.total) ?? 0} total, ${readNumber(counts.available) ?? 0} available, ${readNumber(counts.degraded) ?? 0} degraded, ${readNumber(counts.blocked) ?? 0} blocked, ${readNumber(counts.error) ?? 0} error, ${readNumber(counts.unknown) ?? 0} unknown.`;
-  const compoundCapabilityContract = {
-    schema: "helix.compound_capability_contract.v1",
-    turn_id: turnId,
-    ordered_subgoals: [
+  const compoundCapabilityContract = buildGoldenPathCompoundCapabilityContract({
+    turnId,
+    subgoals: [
       {
-        subgoal_id: `${turnId}:subgoal:capability_catalog`,
-        requested_capability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
-        selected_capability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
-        executed_capability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
-        args: {},
-        observation_kind: "capability_registry",
-        observation_ref: catalogObservationArtifactId,
-        satisfaction: "satisfied",
+        subgoalIdSuffix: "capability_catalog",
+        requestedCapability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
+        observationKind: "capability_registry",
+        observationRef: catalogObservationArtifactId,
       },
       {
-        subgoal_id: `${turnId}:subgoal:workspace_status`,
-        requested_capability: HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,
-        selected_capability: HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,
-        executed_capability: HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,
-        args: {},
-        observation_kind: "workspace_os_status_observation",
-        observation_ref: workspaceObservationArtifactId,
-        satisfaction: "satisfied",
+        subgoalIdSuffix: "workspace_status",
+        requestedCapability: HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,
+        observationKind: "workspace_os_status_observation",
+        observationRef: workspaceObservationArtifactId,
       },
     ],
-    satisfaction: "satisfied",
-    assistant_answer: false,
-    raw_content_included: false,
-  };
+  });
   const answerText = [
     "Compound capability/workspace synthesis completed.",
     "Capability catalog observation completed.",
