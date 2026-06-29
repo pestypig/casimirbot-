@@ -11,6 +11,7 @@ import {
   buildHelixAskGoldenPathRuntimePayload,
   runHelixAskGoldenPathRuntime,
 } from "../services/helix-ask/golden-path-runtime";
+import { HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY } from "../services/helix-ask/workspace-directory-resolver";
 
 const routePath = "server/routes/agi.plan.ts";
 const servicePath = "server/services/helix-ask/golden-path-runtime.ts";
@@ -604,6 +605,96 @@ describe("Helix Ask golden path runtime", () => {
       },
     });
     expect(body.selected_final_answer).toContain("could not find strong repo evidence");
+    expect(readLedger(body).map((artifact) => artifact.kind)).toEqual(["golden_path_route_gate", "typed_failure"]);
+    expect(terminalLedgerEntries(body)).toHaveLength(1);
+  });
+
+  it("handles workspace directory resolution as a terminal golden-path observation", () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+
+    const decision = runHelixAskGoldenPathRuntime({
+      now: new Date("2026-06-28T12:40:00.000Z"),
+      body: {
+        turn_id: "ask:golden:workspace-directory",
+        prompt:
+          "helix_ask_golden_path_runtime run workspace-directory.resolve for docs/helix-ask-codex-loop-discipline.md",
+        goldenPathRuntime: true,
+        requested_capability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
+      },
+    });
+
+    expect(decision.handled).toBe(true);
+    if (!decision.handled) throw new Error("golden path should handle workspace directory resolution");
+    const body = decision.payload;
+
+    expect(body).toMatchObject({
+      final_status: "final_answer",
+      terminal_artifact_kind: "workspace_directory_resolution",
+      final_answer_source: "workspace_directory_resolution",
+      terminal_error_code: null,
+      capability_plan: {
+        requested_capability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
+        selected_capability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
+        executed_capability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
+        required_observation_kinds: ["workspace_directory_resolution"],
+        required_terminal_kind: "workspace_directory_resolution",
+      },
+      ask_turn_solver_trace: {
+        completed_solver_path: true,
+        requested_capability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
+        selected_capability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
+        executed_capability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
+        observed_artifact_kind: "workspace_directory_resolution",
+        terminal_artifact_kind: "workspace_directory_resolution",
+      },
+      workspace_directory_resolution: {
+        query: "docs/helix-ask-codex-loop-discipline.md",
+      },
+    });
+    expect(["resolved", "ambiguous"]).toContain((body.workspace_directory_resolution as any)?.status);
+    expect((body.workspace_directory_resolution as any)?.candidates?.length ?? 0).toBeGreaterThan(0);
+    expect(body.selected_final_answer).toContain("Workspace directory resolution for");
+    expect(readLedger(body).map((artifact) => artifact.kind)).toEqual([
+      "golden_path_route_gate",
+      "workspace_directory_resolution",
+    ]);
+    expect(terminalLedgerEntries(body)).toHaveLength(1);
+  });
+
+  it("fails closed when workspace directory resolution has no query", () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+
+    const decision = runHelixAskGoldenPathRuntime({
+      now: new Date("2026-06-28T12:41:00.000Z"),
+      body: {
+        turn_id: "ask:golden:workspace-directory-missing",
+        prompt: "helix_ask_golden_path_runtime workspace-directory.resolve",
+        goldenPathRuntime: true,
+      },
+    });
+
+    expect(decision.handled).toBe(true);
+    if (!decision.handled) throw new Error("golden path should handle missing workspace directory args");
+    const body = decision.payload;
+
+    expect(body).toMatchObject({
+      final_status: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      terminal_error_code: "missing_workspace_directory_query",
+      goal_satisfaction_evaluation: {
+        satisfaction: "not_satisfied",
+        first_broken_rail: "argument_extraction",
+      },
+      ask_turn_solver_trace: {
+        completed_solver_path: false,
+        requested_capability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
+        selected_capability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
+        executed_capability: null,
+        first_broken_rail: "argument_extraction",
+      },
+    });
+    expect(body.selected_final_answer).toContain("without a path, URI, or query");
     expect(readLedger(body).map((artifact) => artifact.kind)).toEqual(["golden_path_route_gate", "typed_failure"]);
     expect(terminalLedgerEntries(body)).toHaveLength(1);
   });
