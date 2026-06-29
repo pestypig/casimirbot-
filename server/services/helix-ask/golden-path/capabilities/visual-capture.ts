@@ -3,6 +3,7 @@ import { HELIX_VISUAL_FRAME_EVIDENCE_SCHEMA } from "../../../../../shared/helix-
 import { buildGoldenPathCapabilityTypedFailurePayload } from "../capability-failure";
 import { buildGoldenPathCapabilityTerminalPayloadSuccessPayload } from "../capability-terminal-payload-success";
 import {
+  isHelixAskGoldenPathCapabilityExplicitlyRequested,
   HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY,
   HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
   readHelixAskGoldenPathPrompt,
@@ -20,17 +21,7 @@ export type HelixAskGoldenPathVisualCaptureDependencies = {
 };
 
 export const isHelixAskGoldenPathVisualCaptureRequested = (body: RecordLike): boolean => {
-  const requestedCapabilities = readStringArray(body.requested_capabilities ?? body.requestedCapabilities);
-  if (requestedCapabilities.includes(HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY)) return true;
-  if (requestedCapabilities.includes(HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY)) return true;
-  const requestedCapability =
-    readString(body.requested_capability) ??
-    readString(body.requestedCapability) ??
-    readString(body.capability) ??
-    readString(body.tool_name) ??
-    readString(body.toolName);
-  if (requestedCapability === HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY) return true;
-  if (requestedCapability === HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY) return true;
+  if (isHelixAskGoldenPathCapabilityExplicitlyRequested(body, [HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY, HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY])) return true;
   const prompt = readHelixAskGoldenPathPrompt(body);
   return (
     /\bimage_lens\.inspect\b/i.test(prompt) ||

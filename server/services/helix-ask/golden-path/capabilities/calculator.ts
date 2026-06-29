@@ -2,11 +2,11 @@ import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfa
 import { buildGoldenPathCapabilityTypedFailurePayload } from "../capability-failure";
 import { buildGoldenPathCapabilitySuccessPayload } from "../capability-success";
 import {
+  isHelixAskGoldenPathCapabilityExplicitlyRequested,
   HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
   readHelixAskGoldenPathPrompt,
   readHelixAskGoldenPathTurnContext,
   readString,
-  readStringArray,
   type RecordLike,
 } from "../core";
 
@@ -17,15 +17,7 @@ export type HelixAskGoldenPathCalculatorDependencies = {
 };
 
 export const isHelixAskGoldenPathCalculatorSolveRequested = (body: RecordLike): boolean => {
-  const requestedCapabilities = readStringArray(body.requested_capabilities ?? body.requestedCapabilities);
-  if (requestedCapabilities.includes(HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY)) return true;
-  const requestedCapability =
-    readString(body.requested_capability) ??
-    readString(body.requestedCapability) ??
-    readString(body.capability) ??
-    readString(body.tool_name) ??
-    readString(body.toolName);
-  if (requestedCapability === HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY) return true;
+  if (isHelixAskGoldenPathCapabilityExplicitlyRequested(body, [HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY])) return true;
   const prompt = readHelixAskGoldenPathPrompt(body).toLowerCase();
   return (
     prompt.includes(HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY) ||

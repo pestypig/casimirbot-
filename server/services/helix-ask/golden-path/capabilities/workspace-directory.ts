@@ -6,10 +6,10 @@ import {
 import { buildGoldenPathCapabilityTypedFailurePayload } from "../capability-failure";
 import { buildGoldenPathCapabilityTerminalObservationSuccessPayload } from "../capability-terminal-observation-success";
 import {
+  isHelixAskGoldenPathCapabilityExplicitlyRequested,
   readHelixAskGoldenPathPrompt,
   readHelixAskGoldenPathTurnContext,
   readString,
-  readStringArray,
   type RecordLike,
 } from "../core";
 
@@ -20,15 +20,7 @@ export type HelixAskGoldenPathWorkspaceDirectoryDependencies = {
 };
 
 export const isHelixAskGoldenPathWorkspaceDirectoryRequested = (body: RecordLike): boolean => {
-  const requestedCapabilities = readStringArray(body.requested_capabilities ?? body.requestedCapabilities);
-  if (requestedCapabilities.includes(HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY)) return true;
-  const requestedCapability =
-    readString(body.requested_capability) ??
-    readString(body.requestedCapability) ??
-    readString(body.capability) ??
-    readString(body.tool_name) ??
-    readString(body.toolName);
-  if (requestedCapability === HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY) return true;
+  if (isHelixAskGoldenPathCapabilityExplicitlyRequested(body, [HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY])) return true;
   const prompt = readHelixAskGoldenPathPrompt(body).toLowerCase();
   return (
     prompt.includes(HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY) ||

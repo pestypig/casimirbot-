@@ -6,12 +6,12 @@ import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfa
 import { buildGoldenPathCapabilityEvidenceAnswerSuccessPayload } from "../capability-evidence-answer-success";
 import { buildGoldenPathCapabilityTypedFailurePayload } from "../capability-failure";
 import {
+  isHelixAskGoldenPathCapabilityExplicitlyRequested,
   HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
   readHelixAskGoldenPathPrompt,
   readHelixAskGoldenPathTurnContext,
   readRecord,
   readString,
-  readStringArray,
   type RecordLike,
 } from "../core";
 
@@ -22,15 +22,7 @@ export type HelixAskGoldenPathRepoSearchConceptDependencies = {
 };
 
 export const isHelixAskGoldenPathRepoSearchConceptRequested = (body: RecordLike): boolean => {
-  const requestedCapabilities = readStringArray(body.requested_capabilities ?? body.requestedCapabilities);
-  if (requestedCapabilities.includes(HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY)) return true;
-  const requestedCapability =
-    readString(body.requested_capability) ??
-    readString(body.requestedCapability) ??
-    readString(body.capability) ??
-    readString(body.tool_name) ??
-    readString(body.toolName);
-  if (requestedCapability === HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY) return true;
+  if (isHelixAskGoldenPathCapabilityExplicitlyRequested(body, [HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY])) return true;
   const prompt = readHelixAskGoldenPathPrompt(body).toLowerCase();
   return (
     prompt.includes(HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY) ||
