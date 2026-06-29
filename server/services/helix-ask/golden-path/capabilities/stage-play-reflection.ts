@@ -1,16 +1,7 @@
 import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfaction-artifact";
-import {
-  buildGoldenPathTypedFailureTerminalErrorLedgerArtifact,
-  buildGoldenPathRouteGateLedgerArtifact,
-} from "../artifact-ledger";
-import {
-  buildGoldenPathCapabilityGoalSatisfactionEvaluation,
-  buildGoldenPathCapabilityPlan,
-} from "../capability-contract";
 import { buildGoldenPathCapabilitySuccessPayload } from "../capability-success";
-import { buildGoldenPathCapabilityDebugMirror } from "../debug-mirror";
+import { buildGoldenPathCapabilityTypedFailurePayload } from "../capability-failure";
 import {
-  HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
   HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
   readBoolean,
   readHelixAskGoldenPathPrompt,
@@ -19,13 +10,6 @@ import {
   readStringArray,
   type RecordLike,
 } from "../core";
-import {
-  buildGoldenPathTerminalAuthorityProjection,
-  buildGoldenPathTypedFailureResponseProjection,
-  buildGoldenPathTypedFailureTerminalResult,
-} from "../terminal-envelope";
-import { buildGoldenPathSolverTrace } from "../solver-trace";
-import { buildGoldenPathRuntimeStatus } from "../runtime-status";
 
 export type HelixAskGoldenPathStagePlayReflectionDependencies = {
   now: () => Date;
@@ -92,131 +76,62 @@ export const buildHelixAskGoldenPathStagePlayReflectionPayload = (args: {
   const makeFailurePayload = (): RecordLike => {
     const failureText =
       "I could not complete this golden-path Stage Play reflection turn because no compact Stage Play reflection result was provided.";
-    const canonicalGoalFrame = {
-      schema: "helix.ask_canonical_goal_frame.v1",
-      turn_id: turnId,
-      goal_kind: goalKind,
-      answer_scope: "current_turn",
-      required_terminal_kind: requiredTerminalKind,
-      allows_workspace_context: true,
-      allows_prior_artifacts: false,
-      classifier_reasons: ["explicit_stage_play_reflection_request"],
-      assistant_answer: false,
-      raw_content_included: false,
-    };
-    const goalSatisfactionEvaluation = buildGoldenPathCapabilityGoalSatisfactionEvaluation({
+    return buildGoldenPathCapabilityTypedFailurePayload({
       turnId,
-      goalKind,
-      requiredTerminalKind,
-      satisfaction: "not_satisfied",
-      selectedTerminalArtifactKind: "typed_failure",
-      missingRequirements: ["stage_play_reflection_result"],
-      firstBrokenRail: "observation",
-      repairTarget: "stage_play_reflection_input",
-    });
-    const goalHash = args.deps.hashGoalFrame(canonicalGoalFrame);
-    const goalSatisfactionArtifact = args.deps.buildGoalSatisfactionEvaluationArtifact({
-      turnId,
-      goalHash,
-      evaluation: goalSatisfactionEvaluation,
-      createdAtMs,
-    });
-    const terminalResult = buildGoldenPathTypedFailureTerminalResult({
-      resultId: terminalResultId,
-      artifactId: terminalArtifactId,
-      text: failureText,
-      supportRefs: [routeGateArtifactId, goalSatisfactionArtifact.artifact_id],
-    });
-    return {
+      traceId,
+      sessionId,
+      threadId,
       ok: true,
-      mode: "read",
-      schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
-      turn_id: turnId,
-      trace_id: traceId,
-      session_id: sessionId,
-      thread_id: threadId,
-      prompt_text: promptText,
-      ...buildGoldenPathTypedFailureResponseProjection({
-        terminalResult,
-        terminalErrorCode: "missing_stage_play_reflection_result",
-      }),
-      golden_path_runtime: buildGoldenPathRuntimeStatus({
-        status: "stage_play_reflection_missing_result",
-        requestedCapability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
-        selectedCapability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
-        executedCapability: null,
-        observedArtifactKind: null,
-        observedArtifactRef: null,
-        terminalArtifactRef: terminalResult.artifact_id,
-        terminalResultId: terminalResult.result_id,
-        routeGate: "enabled_explicit_request",
-      }),
-      canonical_goal_frame: canonicalGoalFrame,
-      capability_plan: buildGoldenPathCapabilityPlan({
-        requestedCapability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
-        sourceTarget: "stage_play",
-        family: "live_environment",
-        executedCapability: null,
-        requiredObservationKinds: ["stage_play_reflection_result"],
-        requiredTerminalKind,
-      }),
-      goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-      ...buildGoldenPathTerminalAuthorityProjection({
-        terminalResult,
-        route: "golden_path_runtime / stage_play_reflection",
-        completedSolverPath: false,
-        firstBrokenRail: "observation",
-      }),
-      ask_turn_solver_trace: buildGoldenPathSolverTrace({
-        completedSolverPath: false,
-        routeAuthorityOk: true,
-        terminalAuthorityOk: true,
-        goalSatisfaction: "not_satisfied",
-        requestedCapability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
-        selectedCapability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
-        executedCapability: null,
-        observedArtifactKind: null,
-        observedArtifactRef: null,
-        terminalArtifactKind: "typed_failure",
-        firstBrokenRail: "observation",
-        terminalErrorCode: "missing_stage_play_reflection_result",
-        extra: {
-          solver_risk_flags: [],
-          solver_short_circuit_flags: [],
-        },
-      }),
-      current_turn_artifact_ledger: [
-        buildGoldenPathRouteGateLedgerArtifact({
-          artifactId: routeGateArtifactId,
-          turnId,
-          createdAtMs,
-          goalHash,
-          terminalEligible: false,
-          requestedCapability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
-          goalSatisfactionArtifact,
-        }),
-        buildGoldenPathTypedFailureTerminalErrorLedgerArtifact({
-          artifactId: terminalResult.artifact_id,
-          turnId,
-          createdAtMs,
-          goalHash,
-          terminalResult,
-          terminalErrorCode: "missing_stage_play_reflection_result",
-          firstBrokenRail: "observation",
-        }),
-      ],
-      debug: buildGoldenPathCapabilityDebugMirror({
-        status: "stage_play_reflection_missing_result",
-        privateRuntimeLoopEntered: false,
-        requestedCapability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
-        selectedCapability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
-        executedCapability: null,
-        terminalResult,
-        terminalResultCount: 1,
-        terminalErrorCode: "missing_stage_play_reflection_result",
-        goalSatisfactionEvaluation,
-      }),
-    };
+      promptText,
+      createdAtMs,
+      routeGateArtifactId,
+      terminalResultId,
+      requiredTerminalKind,
+      goalKind,
+      canonicalGoalFrameExtra: {
+        allows_workspace_context: true,
+        allows_prior_artifacts: false,
+      },
+      classifierReasons: ["explicit_stage_play_reflection_request"],
+      requestedCapability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
+      sourceTarget: "stage_play",
+      family: "live_environment",
+      requiredObservationKinds: ["stage_play_reflection_result"],
+      status: "stage_play_reflection_missing_result",
+      route: "golden_path_runtime / stage_play_reflection",
+      errorCode: "missing_stage_play_reflection_result",
+      brokenRail: "observation",
+      missingRequirement: "stage_play_reflection_result",
+      text: failureText,
+      terminalArtifactId,
+      routeGate: "enabled_explicit_request",
+      routeGateTerminalEligible: false,
+      includeRouteGateGoalSatisfactionArtifact: true,
+      debugStatus: "stage_play_reflection_missing_result",
+      debugPrivateRuntimeLoopEntered: false,
+      debugTerminalResultCount: 1,
+      includeFirstBrokenRailInDebug: false,
+      observedArtifactKind: null,
+      observedArtifactRef: null,
+      terminalArtifactRef: terminalArtifactId,
+      terminalResultIdInRuntimeStatus: terminalResultId,
+      completedSolverPath: false,
+      goalSatisfaction: "not_satisfied",
+      goalSatisfactionRepairTarget: "stage_play_reflection_input",
+      routeAuthorityOk: true,
+      terminalAuthorityOk: true,
+      solverTraceExtra: {
+        solver_risk_flags: [],
+        solver_short_circuit_flags: [],
+      },
+      includeGoalSatisfactionInDebug: true,
+      includeTerminalErrorCodeInSolverTrace: true,
+      includeFirstBrokenRailInTerminalAuthority: true,
+      useTerminalErrorLedgerArtifact: true,
+      includeGoalHashInTerminalErrorLedger: true,
+      buildGoalSatisfactionEvaluationArtifact: args.deps.buildGoalSatisfactionEvaluationArtifact,
+      hashGoalFrame: args.deps.hashGoalFrame,
+    });
   };
 
   if (!observation) return makeFailurePayload();
