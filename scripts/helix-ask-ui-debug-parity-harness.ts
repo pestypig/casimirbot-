@@ -304,6 +304,37 @@ const uiHarnessVisibleAnswer = (result: Record<string, unknown> | null): string 
 const uiHarnessMentionsCalculatorResult14 = (result: Record<string, unknown> | null): boolean =>
   /\b(?:result|answer|equals?|is|=)\s*:?\s*14(?:\b|$)/i.test(uiHarnessVisibleAnswer(result));
 
+const uiHarnessActionEnvelopeCapabilities = (result: Record<string, unknown> | null): string[] => {
+  const values = new Set<string>();
+  const candidates = [
+    asRecord(result?.action_envelope),
+    asRecord(getPath(result, ["debug_export", "action_envelope"])),
+    asRecord(getPath(result, ["debug_export", "payload", "action_envelope"])),
+    asRecord(getPath(result, ["debug_export", "payload", "debug", "action_envelope"])),
+    asRecord(getPath(result, ["api_response", "action_envelope"])),
+    asRecord(getPath(result, ["api_debug_export", "action_envelope"])),
+    asRecord(getPath(result, ["api_debug_export", "payload", "action_envelope"])),
+  ].filter(Boolean) as Array<Record<string, unknown>>;
+  for (const envelope of candidates) {
+    const actions = Array.isArray(envelope.workstation_actions) ? envelope.workstation_actions : [];
+    for (const actionValue of actions) {
+      const action = asRecord(actionValue);
+      if (!action) continue;
+      const capabilityId = readString(action.capability_id);
+      const panelId = readString(action.panel_id);
+      const actionKind = readString(action.action);
+      const actionId = readString(action.action_id);
+      if (capabilityId) values.add(capabilityId);
+      if (panelId && actionKind) values.add(`${panelId}.${actionKind}`);
+      if (panelId && actionId) values.add(`${panelId}.${actionId}`);
+    }
+    for (const receiptCapabilityId of readStringArray(envelope.receipt_capability_ids)) {
+      values.add(receiptCapabilityId);
+    }
+  }
+  return [...values].sort();
+};
+
 export const summarizeUiDebugParityGoalAcceptance = (
   results: Array<Record<string, unknown>>,
 ): {
@@ -376,6 +407,18 @@ export const summarizeUiDebugParityGoalAcceptance = (
     }
     if (!uiHarnessMentionsCalculatorResult14(explicit)) {
       failures.push("ui_calculator_explicit_expected_result_14_missing");
+    }
+    for (const [label, result] of [
+      ["natural", natural],
+      ["explicit", explicit],
+    ] as const) {
+      const actionEnvelopeCapabilities = uiHarnessActionEnvelopeCapabilities(result);
+      if (!actionEnvelopeCapabilities.includes("scientific-calculator.open_panel")) {
+        failures.push(`ui_calculator_${label}_open_panel_action_receipt_missing`);
+      }
+      if (!actionEnvelopeCapabilities.includes("scientific-calculator.focus_panel")) {
+        failures.push(`ui_calculator_${label}_focus_panel_action_receipt_missing`);
+      }
     }
 
     return { selected: true, skippedReason: null, failures };

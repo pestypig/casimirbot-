@@ -108,6 +108,7 @@ export type LiveSpineScenario = {
     repairTarget?: ExpectedValue;
     visibleToolSurfaceIncludes?: string[];
     visibleToolSurfaceExcludes?: string[];
+    actionEnvelopeIncludes?: string[];
     forbidTerminalErrorCodes?: string[];
   };
 };
@@ -147,6 +148,7 @@ export const LIVE_SPINE_SMOKE_SCENARIOS: LiveSpineScenario[] = [
       firstBrokenRail: null,
       repairTarget: null,
       visibleToolSurfaceIncludes: ["scientific-calculator.solve_expression"],
+      actionEnvelopeIncludes: ["scientific-calculator.open_panel", "scientific-calculator.focus_panel"],
     },
   },
   {
@@ -606,6 +608,37 @@ const railCandidates = (ask: RecordLike, debugExport: unknown): RecordLike[] => 
     readRecord(getPath(rawDebug, ["payload", "artifact_query_index", "codex_parity_agent_spine_rail_table"])),
     readRecord(getPath(rawDebug, ["debug", "codex_parity_agent_spine_rail_table"])),
   ].filter((entry: RecordLike | null): entry is RecordLike => Boolean(entry));
+};
+
+const actionEnvelopeCapabilities = (ask: RecordLike, debugExport: unknown): string[] => {
+  const rawDebug = readRecord(debugExport);
+  const payload = extractPayload(debugExport);
+  const values = new Set<string>();
+  const candidates = [
+    readRecord(ask.action_envelope),
+    readRecord(getPath(ask, ["debug", "action_envelope"])),
+    readRecord(payload?.action_envelope),
+    readRecord(getPath(payload, ["debug", "action_envelope"])),
+    readRecord(rawDebug?.action_envelope),
+    readRecord(getPath(rawDebug, ["payload", "action_envelope"])),
+    readRecord(getPath(rawDebug, ["payload", "debug", "action_envelope"])),
+    readRecord(getPath(rawDebug, ["debug", "action_envelope"])),
+  ].filter((entry: RecordLike | null): entry is RecordLike => Boolean(entry));
+  for (const envelope of candidates) {
+    for (const action of readRecordArray(envelope.workstation_actions)) {
+      const directCapability = readString(action.capability_id);
+      const panelId = readString(action.panel_id);
+      const actionKind = readString(action.action);
+      const actionId = readString(action.action_id);
+      if (directCapability) values.add(directCapability);
+      if (panelId && actionKind) values.add(`${panelId}.${actionKind}`);
+      if (panelId && actionId) values.add(`${panelId}.${actionId}`);
+    }
+    for (const receiptCapabilityId of readStringArray(envelope.receipt_capability_ids)) {
+      values.add(receiptCapabilityId);
+    }
+  }
+  return [...values].sort();
 };
 
 const compoundSubgoalRailCandidates = (ask: RecordLike, debugExport: unknown): RecordLike[] => {
@@ -1119,6 +1152,7 @@ export const classifyLiveSpineSmokeResult = (
   const terminalArtifactKind = terminalArtifactKindFor(ask, debugExport);
   const reconciliationRuntime = terminalFailureReconciliationRuntime(ask, debugExport);
   const reconciliationRuntimeVersion = readString(reconciliationRuntime?.version);
+  const actionEnvelopeCapabilityIds = actionEnvelopeCapabilities(ask, debugExport);
 
   if (!reconciliationRuntime) {
     failures.push("server_runtime_marker_missing:tool_rail_terminal_failure_reconciliation");
@@ -1172,6 +1206,10 @@ export const classifyLiveSpineSmokeResult = (
     }
   }
 
+  for (const required of scenario.expected.actionEnvelopeIncludes ?? []) {
+    if (!actionEnvelopeCapabilityIds.includes(required)) failures.push(`action_envelope_missing:${required}`);
+  }
+
   for (const forbidden of scenario.expected.forbidTerminalErrorCodes ?? []) {
     if (errorCode === forbidden) failures.push(`forbidden_terminal_error_code:${forbidden}`);
   }
@@ -1192,6 +1230,7 @@ export const classifyLiveSpineSmokeResult = (
     terminal_error_code: errorCode,
     terminal_artifact_kind: terminalArtifactKind,
     final_answer_source: readString(ask.final_answer_source) ?? null,
+    action_envelope_capabilities: actionEnvelopeCapabilityIds,
     tool_rail_terminal_failure_reconciliation_runtime: reconciliationRuntime
       ? {
           version: reconciliationRuntimeVersion,

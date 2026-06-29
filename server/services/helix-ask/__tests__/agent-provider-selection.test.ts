@@ -460,7 +460,7 @@ describe("Helix Ask agent provider selection", () => {
         code_mutation_enabled: false,
         shell_enabled: false,
         file_mutation_enabled: false,
-        gateway_contract: "read_observe_only",
+        gateway_contract: "read_observe_act",
       },
       evidence_reentry_status: "not_run_text_mode_adapter",
       terminal_authority_status: "not_evaluated_provider_text_mode",

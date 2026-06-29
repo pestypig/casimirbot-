@@ -7743,7 +7743,14 @@ function readHelixWorkstationActionRuntimeKeys(action: HelixWorkstationAction | 
     keys.add(`${panelId}.${actionId}`);
     keys.add(`${panelId}/${actionId}`);
   }
-  if (panelId && actionName === "open_panel") keys.add(`${panelId}.open`);
+  if (panelId && actionName === "open_panel") {
+    keys.add(`${panelId}.open`);
+    keys.add(`${panelId}.open_panel`);
+  }
+  if (panelId && actionName === "focus_panel") {
+    keys.add(`${panelId}.focus`);
+    keys.add(`${panelId}.focus_panel`);
+  }
   if (actionName === "restore_view_state") {
     keys.add("workstation.restore_view_state");
     keys.add("workstation/restore_view_state");
@@ -7754,7 +7761,7 @@ function readHelixWorkstationActionRuntimeKeys(action: HelixWorkstationAction | 
   return [...keys].map(normalizeHelixRuntimeActionKey).filter(Boolean);
 }
 
-function buildHelixActionEnvelopeRuntimeAuthority(
+export function buildHelixActionEnvelopeRuntimeAuthority(
   envelope: HelixActionEnvelope | undefined,
   ...authoritySources: unknown[]
 ): { executableEnvelope: HelixActionEnvelope | undefined; audit: HelixActionEnvelopeRuntimeAuthority } {

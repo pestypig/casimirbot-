@@ -65,6 +65,43 @@ describe("Helix Ask live spine smoke dry-run contract", () => {
     });
   });
 
+  it("fails calculator fixture classification when calculator panel action receipts are missing", () => {
+    const scenario = LIVE_SPINE_SMOKE_SCENARIOS.find((entry) => entry.id === "calculator_explicit");
+    expect(scenario).toBeTruthy();
+
+    const result = classifyLiveSpineSmokeResult(
+      scenario!,
+      buildCalculatorAskFixture({ includeActionEnvelope: false }),
+      { payload: {} },
+    );
+
+    expect(result.verdict).toBe("FAIL");
+    expect(result.failures).toEqual(
+      expect.arrayContaining([
+        "action_envelope_missing:scientific-calculator.open_panel",
+        "action_envelope_missing:scientific-calculator.focus_panel",
+      ]),
+    );
+  });
+
+  it("passes calculator fixture classification when calculator panel action receipts are present", () => {
+    const scenario = LIVE_SPINE_SMOKE_SCENARIOS.find((entry) => entry.id === "calculator_explicit");
+    expect(scenario).toBeTruthy();
+
+    const result = classifyLiveSpineSmokeResult(
+      scenario!,
+      buildCalculatorAskFixture({ includeActionEnvelope: true }),
+      { payload: {} },
+    );
+
+    expect(result.verdict).toBe("PASS");
+    expect(result.failures).toEqual([]);
+    expect(result.action_envelope_capabilities).toEqual([
+      "scientific-calculator.focus_panel",
+      "scientific-calculator.open_panel",
+    ]);
+  });
+
   it("fails fixture classification when visible projection source is missing", () => {
     const scenario = LIVE_SPINE_SMOKE_SCENARIOS.find((entry) => entry.id === "capability_catalog_runtime");
     expect(scenario).toBeTruthy();
@@ -373,6 +410,92 @@ const buildCapabilityCatalogAskFixture = (input: { includeRuntimeMarker: boolean
             schema: "helix.tool_rail_terminal_failure_reconciliation.runtime.v1",
             version: HELIX_TOOL_RAIL_TERMINAL_FAILURE_RECONCILIATION_VERSION,
             available: true,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        }
+      : {}),
+  };
+};
+
+const buildCalculatorAskFixture = (input: { includeActionEnvelope: boolean }): Record<string, unknown> => {
+  const turnId = "ask:live-spine-smoke-calculator-fixture";
+  const prompt =
+    "Call scientific-calculator.solve_expression with this exact expression: 2 + 2. Wait for calculator_receipt and answer from workstation_tool_evaluation.";
+  const terminalKind = "workstation_tool_evaluation";
+  const rail = {
+    schema: "helix.codex_parity_agent_spine_rail_table.v1",
+    turn_id: turnId,
+    prompt,
+    requested_capability: "scientific-calculator.solve_expression",
+    visible_tool_surface: ["scientific-calculator.solve_expression"],
+    visible_tool_surface_original_count: 1,
+    visible_tool_surface_truncated: false,
+    selected_capability: "scientific-calculator.solve_expression",
+    admitted_capability: "scientific-calculator.solve_expression",
+    admission_proof_source: "tool_call_admission_decision.admitted_capability",
+    admission_proven: true,
+    executed_capability: "scientific-calculator.solve_expression",
+    observation_kind: "calculator_receipt",
+    observation_ref: `${turnId}:scientific-calculator.solve_expression:calculator_receipt:1`,
+    required_observation_kinds_for_requested_capability: ["calculator_receipt"],
+    observed_artifact_supports_requested_capability: true,
+    reentry_status: "reentered",
+    reentry_proof_source: "workstation_tool_evaluation_materialized_from_calculator_observation",
+    reentry_proven: true,
+    goal_satisfaction: "satisfied",
+    required_terminal_kind: terminalKind,
+    selected_terminal_kind: terminalKind,
+    terminal_authority_proof_source: "terminal_answer_authority.terminal_artifact_kind",
+    terminal_authority_proven: true,
+    visible_terminal_kind: terminalKind,
+    visible_projection_source: "terminal_presentation.terminal_artifact_kind",
+    visible_projection_proven: true,
+    first_broken_rail: null,
+    repair_target: null,
+    rail_status: "complete",
+    rail_failure_code: null,
+    codex_parity_class: "complete",
+    normalized_codex_parity_classes: CODEX_PARITY_AGENT_SPINE_CLASSES,
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+  };
+  return {
+    turn_id: turnId,
+    final_status: "final_answer",
+    response_type: "final_answer",
+    final_answer_source: terminalKind,
+    terminal_artifact_kind: terminalKind,
+    selected_final_answer: "2 + 2 = 4.",
+    codex_parity_agent_spine_rail_table: rail,
+    tool_rail_terminal_failure_reconciliation_runtime: {
+      schema: "helix.tool_rail_terminal_failure_reconciliation.runtime.v1",
+      version: HELIX_TOOL_RAIL_TERMINAL_FAILURE_RECONCILIATION_VERSION,
+      available: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    ...(input.includeActionEnvelope
+      ? {
+          action_envelope: {
+            schema: "helix.ask.action_envelope.v1",
+            receipt_capability_ids: [
+              "scientific-calculator.open_panel",
+              "scientific-calculator.focus_panel",
+            ],
+            workstation_actions: [
+              {
+                schema_version: "helix.workstation.action/v1",
+                action: "open_panel",
+                panel_id: "scientific-calculator",
+              },
+              {
+                schema_version: "helix.workstation.action/v1",
+                action: "focus_panel",
+                panel_id: "scientific-calculator",
+              },
+            ],
             assistant_answer: false,
             raw_content_included: false,
           },

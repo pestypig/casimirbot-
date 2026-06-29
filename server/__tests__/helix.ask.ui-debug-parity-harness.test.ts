@@ -185,6 +185,28 @@ const compoundSubgoalRails = (): Array<Record<string, unknown>> => [
   },
 ];
 
+const calculatorActionEnvelope = (): Record<string, unknown> => ({
+  schema: "helix.ask.action_envelope.v1",
+  receipt_capability_ids: [
+    "scientific-calculator.open_panel",
+    "scientific-calculator.focus_panel",
+  ],
+  workstation_actions: [
+    {
+      schema_version: "helix.workstation.action/v1",
+      action: "open_panel",
+      panel_id: "scientific-calculator",
+    },
+    {
+      schema_version: "helix.workstation.action/v1",
+      action: "focus_panel",
+      panel_id: "scientific-calculator",
+    },
+  ],
+  assistant_answer: false,
+  raw_content_included: false,
+});
+
 describe("Helix Ask UI debug parity harness", () => {
   it("collects rail tables from top-level, payload, and nested debug mirrors", () => {
     const rail = baseRail();
@@ -966,6 +988,7 @@ describe("Helix Ask UI debug parity harness", () => {
           prompt: HELIX_ASK_NATURAL_CALCULATOR_PROMPT,
           visible_final_answer: "Calculator verification plan completed.\nExpression: 2*(3+4)\nResult: 14",
           warnings: [],
+          action_envelope: calculatorActionEnvelope(),
           codex_parity_agent_spine_rail_table: {
             executed_capability: "scientific-calculator.solve_expression",
             observation_kind: "calculator_receipt",
@@ -976,6 +999,7 @@ describe("Helix Ask UI debug parity harness", () => {
           prompt: HELIX_ASK_EXPLICIT_CALCULATOR_PROMPT,
           visible_final_answer: "Calculator verification plan completed.\nExpression: 2*(3+4)\nResult: 14",
           warnings: [],
+          action_envelope: calculatorActionEnvelope(),
           codex_parity_agent_spine_rail_table: {
             executed_capability: "scientific-calculator.solve_expression",
             observation_kind: "calculator_receipt",
@@ -1024,6 +1048,10 @@ describe("Helix Ask UI debug parity harness", () => {
     ).toEqual([
       "ui_calculator_natural_explicit_executed_capability_mismatch:execute_workstation_action!=scientific-calculator.solve_expression",
       "ui_calculator_natural_expected_result_14_missing",
+      "ui_calculator_natural_open_panel_action_receipt_missing",
+      "ui_calculator_natural_focus_panel_action_receipt_missing",
+      "ui_calculator_explicit_open_panel_action_receipt_missing",
+      "ui_calculator_explicit_focus_panel_action_receipt_missing",
     ]);
   });
 

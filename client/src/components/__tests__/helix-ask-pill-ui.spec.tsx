@@ -112,6 +112,7 @@ let resolveSelectedHelixAgentRuntime: typeof import("@/components/helix/HelixAsk
 let resolveNextSelectableHelixAgentRuntime: typeof import("@/components/helix/HelixAskPill").resolveNextSelectableHelixAgentRuntime;
 let resolveHelixAskActualAgentProviderLabel: typeof import("@/components/helix/HelixAskPill").resolveHelixAskActualAgentProviderLabel;
 let parseHelixAskFinalAnswerBulletLine: typeof import("@/components/helix/HelixAskPill").parseHelixAskFinalAnswerBulletLine;
+let buildHelixActionEnvelopeRuntimeAuthority: typeof import("@/components/helix/HelixAskPill").buildHelixActionEnvelopeRuntimeAuthority;
 
 beforeAll(async () => {
   (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
@@ -225,6 +226,7 @@ beforeAll(async () => {
     resolveNextSelectableHelixAgentRuntime,
     resolveHelixAskActualAgentProviderLabel,
     parseHelixAskFinalAnswerBulletLine,
+    buildHelixActionEnvelopeRuntimeAuthority,
   } = await import("@/components/helix/HelixAskPill"));
 });
 
@@ -1995,6 +1997,63 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(combined).toContain("Tool observation: scientific-calculator.solve_expression observed 8*9 = 72.");
     expect(combined).toContain("Model re-entry: Codex received the workstation observation packet");
     expect(combined).toContain("The result is 72.");
+  });
+
+  it("admits Codex provider calculator open/focus action envelopes when backed by action receipts", () => {
+    const actionEnvelope = {
+      schema: "helix.ask.action_envelope.v1",
+      governance: {
+        dispatch: "allow",
+        reason: "admitted_non_mutating_codex_workstation_action",
+      },
+      workstation_actions: [
+        {
+          schema_version: "helix.workstation.action/v1",
+          action: "open_panel",
+          panel_id: "scientific-calculator",
+        },
+        {
+          schema_version: "helix.workstation.action/v1",
+          action: "focus_panel",
+          panel_id: "scientific-calculator",
+        },
+      ],
+    } as never;
+    const agentStepLoop = {
+      schema: "helix.agent_step_loop.v1",
+      iterations: [
+        {
+          next_step: "workstation_action",
+          chosen_capability: "scientific-calculator.open_panel",
+          selected_capability: "scientific-calculator.open_panel",
+          observed_artifact_refs: ["ask:test:scientific-calculator.open_panel:observation"],
+        },
+        {
+          next_step: "workstation_action",
+          chosen_capability: "scientific-calculator.focus_panel",
+          selected_capability: "scientific-calculator.focus_panel",
+          observed_artifact_refs: ["ask:test:scientific-calculator.focus_panel:observation"],
+        },
+      ],
+    };
+
+    const result = buildHelixActionEnvelopeRuntimeAuthority(actionEnvelope, { agent_step_loop: agentStepLoop });
+
+    expect(result.audit).toMatchObject({
+      allowed: true,
+      reason: "agent_step_decision_backed",
+      selected_capabilities: expect.arrayContaining([
+        "scientific-calculator.open_panel",
+        "scientific-calculator.focus_panel",
+      ]),
+      envelope_action_keys: expect.arrayContaining([
+        "scientific-calculator.open_panel",
+        "scientific-calculator.focus_panel",
+      ]),
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(result.executableEnvelope).toBe(actionEnvelope);
   });
 
   it("parses compact Codex Markdown bullets through the final-answer renderer contract", () => {

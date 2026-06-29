@@ -917,6 +917,34 @@ const collectCapabilities = (payload: RecordLike, timelineEvents: RecordLike[], 
   return [...values].sort();
 };
 
+const collectActionEnvelopeCapabilities = (payload: RecordLike, debug: RecordLike | null): string[] => {
+  const values = new Set<string>();
+  const candidates = [
+    readRecord(payload.action_envelope),
+    readRecord(readRecord(payload.debug)?.action_envelope),
+    readRecord(debug?.action_envelope),
+    readRecord(readRecord(debug?.debug)?.action_envelope),
+    readRecord(getPath(payload, ["agent_loop_audit", "action_envelope"])),
+    readRecord(getPath(debug, ["agent_loop_audit", "action_envelope"])),
+  ].filter(Boolean) as RecordLike[];
+  for (const envelope of candidates) {
+    for (const action of readArray(envelope.workstation_actions).map(readRecord).filter(Boolean) as RecordLike[]) {
+      const directCapability = readString(action.capability_id);
+      const panelId = readString(action.panel_id);
+      const actionKind = readString(action.action);
+      const actionId = readString(action.action_id);
+      if (directCapability) values.add(directCapability);
+      if (panelId && actionKind) values.add(`${panelId}.${actionKind}`);
+      if (panelId && actionId) values.add(`${panelId}.${actionId}`);
+    }
+    for (const receiptCapabilityId of readArray(envelope.receipt_capability_ids)) {
+      const value = readString(receiptCapabilityId);
+      if (value) values.add(value);
+    }
+  }
+  return [...values].sort();
+};
+
 const collectArtifactKinds = (ledger: RecordLike[]): string[] => {
   const values = new Set<string>();
   for (const artifact of ledger) {
@@ -1018,6 +1046,22 @@ export const calculatorScenarioAcceptanceFailures = (scenario: ToolChainScenario
   }
   if (!/\b(?:result|answer|equals?|is|=)\s*:?\s*14(?:\b|$)/i.test(visibleText)) {
     failures.push(`${scenario.id}_expected_result_14_missing`);
+  }
+  return failures;
+};
+
+export const calculatorScenarioWorkstationActionFailures = (
+  scenario: ToolChainScenario,
+  actionEnvelopeCapabilities: string[],
+): string[] => {
+  if (scenario.id !== "calculator_steps" && scenario.id !== "calculator_explicit_equivalent") return [];
+  const values = actionEnvelopeCapabilities.join("\n");
+  const failures: string[] = [];
+  if (!/\bscientific-calculator\.open_panel\b/.test(values)) {
+    failures.push(`${scenario.id}_calculator_open_panel_action_receipt_missing`);
+  }
+  if (!/\bscientific-calculator\.focus_panel\b/.test(values)) {
+    failures.push(`${scenario.id}_calculator_focus_panel_action_receipt_missing`);
   }
   return failures;
 };
@@ -1177,6 +1221,7 @@ const includesAny = (values: string[], pattern: RegExp): boolean => values.some(
 const classifyScenario = (input: {
   scenario: ToolChainScenario;
   capabilities: string[];
+  actionEnvelopeCapabilities: string[];
   artifactKinds: string[];
   terminalKind: string;
   terminalError: string;
@@ -1194,6 +1239,7 @@ const classifyScenario = (input: {
   const {
     scenario,
     capabilities,
+    actionEnvelopeCapabilities,
     artifactKinds,
     terminalKind,
     terminalError,
@@ -1221,6 +1267,7 @@ const classifyScenario = (input: {
   failures.push(...compareRailMirrors(railTables));
   failures.push(...completeRailEnvelopeFailures({ railTable, terminalKind, terminalError, visibleText }));
   failures.push(...calculatorScenarioAcceptanceFailures(scenario, visibleText));
+  failures.push(...calculatorScenarioWorkstationActionFailures(scenario, actionEnvelopeCapabilities));
   failures.push(...visualSourceContextAcceptanceFailures({ scenario, artifactKinds, terminalKind, terminalError, visibleText }));
   failures.push(...railSpecificFailureProjectionAcceptanceFailures({ railTable, terminalError, visibleText }));
   if (!timelineEvents.length) warnings.push("causal_timeline_missing");
@@ -1353,6 +1400,7 @@ const runScenario = async (
   const ledger = collectLedger(payload, debug);
   const artifactKinds = collectArtifactKinds(ledger);
   const capabilities = collectCapabilities(payload, timelineEvents, ledger);
+  const actionEnvelopeCapabilities = collectActionEnvelopeCapabilities(payload, debug);
   const terminalWriter = findTerminalWriter(payload, debug);
   const visibleText = visibleTextOf(ask, payload, terminalWriter);
   const terminalKind = getTerminalKind(ask, payload, terminalWriter);
@@ -1375,6 +1423,7 @@ const runScenario = async (
   const classification = classifyScenario({
     scenario,
     capabilities,
+    actionEnvelopeCapabilities,
     artifactKinds,
     terminalKind,
     terminalError,
@@ -1423,6 +1472,7 @@ const runScenario = async (
       stale: serverFreshnessWarnings.length > 0,
     },
     selected_capabilities: capabilities,
+    action_envelope_capabilities: actionEnvelopeCapabilities,
     artifact_kinds: artifactKinds,
     terminal_artifact_kind: terminalKind,
     terminal_error_code: terminalError || null,

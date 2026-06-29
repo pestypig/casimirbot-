@@ -24,7 +24,7 @@ export type HelixAgentRuntimeSelectionTrace = {
     code_mutation_enabled: boolean;
     shell_enabled: boolean;
     file_mutation_enabled: boolean;
-    gateway_contract: "read_observe_only" | "provider_disabled";
+    gateway_contract: "read_observe_act" | "provider_disabled";
   };
   evidence_reentry_status: "not_run_text_mode_adapter" | "pending_provider_reasoning" | "not_applicable";
   terminal_authority_status: "not_evaluated_provider_text_mode" | "pending_helix_terminal_authority" | "not_applicable";
@@ -63,7 +63,7 @@ export const buildHelixAgentRuntimeSelectionTrace = (input: {
       code_mutation_enabled: input.provider.permissionProfile.allows.codeMutation,
       shell_enabled: input.provider.permissionProfile.allows.shell,
       file_mutation_enabled: input.provider.permissionProfile.allows.write,
-      gateway_contract: input.provider.supports.workstationTools ? "read_observe_only" : "provider_disabled",
+      gateway_contract: input.provider.supports.workstationTools ? "read_observe_act" : "provider_disabled",
     },
     evidence_reentry_status: input.provider.id === "codex" ? "not_run_text_mode_adapter" : "pending_provider_reasoning",
     terminal_authority_status:

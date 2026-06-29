@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   calculatorScenarioAgreementFailures,
   calculatorScenarioAcceptanceFailures,
+  calculatorScenarioWorkstationActionFailures,
   railSpecificFailureProjectionAcceptanceFailures,
   readCapacityAdmissionStressReason,
   readThrownScenarioCapacityAdmissionStressReason,
@@ -93,6 +94,29 @@ describe("Helix Ask tool-chain matrix scenario selection", () => {
         scenario!,
         "Calculator verification plan completed.\nExpression: 2*(3+4)\nResult: 14\nTrace source: scientific-calculator.solve_expression.",
       ),
+    ).toEqual([]);
+  });
+
+  it("fails calculator scenarios when calculator panel action receipts are missing", () => {
+    const scenario = TOOL_CHAIN_MATRIX_SCENARIOS.find((entry) => entry.id === "calculator_steps");
+
+    expect(scenario).toBeDefined();
+    expect(calculatorScenarioWorkstationActionFailures(scenario!, ["scientific-calculator.solve_expression"])).toEqual([
+      "calculator_steps_calculator_open_panel_action_receipt_missing",
+      "calculator_steps_calculator_focus_panel_action_receipt_missing",
+    ]);
+  });
+
+  it("accepts calculator scenarios when open and focus action receipts are present", () => {
+    const scenario = TOOL_CHAIN_MATRIX_SCENARIOS.find((entry) => entry.id === "calculator_explicit_equivalent");
+
+    expect(scenario).toBeDefined();
+    expect(
+      calculatorScenarioWorkstationActionFailures(scenario!, [
+        "scientific-calculator.open_panel",
+        "scientific-calculator.focus_panel",
+        "scientific-calculator.solve_expression",
+      ]),
     ).toEqual([]);
   });
 
