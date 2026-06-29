@@ -8,6 +8,7 @@ import {
   HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
   HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
   HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+  HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
   HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,
   buildHelixAskGoldenPathRuntimePayload,
   runHelixAskGoldenPathRuntime,
@@ -158,6 +159,107 @@ describe("Helix Ask golden path runtime", () => {
       },
     });
     expect(body.selected_final_answer).toContain("no processed live-source mail packet");
+    expect(readLedger(body).map((artifact) => artifact.kind)).toEqual(["golden_path_route_gate", "typed_failure"]);
+    expect(terminalLedgerEntries(body)).toHaveLength(1);
+  });
+
+  it("handles theory reflection as receipt-backed reflection answers", () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+
+    const decision = runHelixAskGoldenPathRuntime({
+      now: new Date("2026-06-28T12:29:00.000Z"),
+      body: {
+        turn_id: "ask:golden:theory-reflection",
+        prompt: "helix_ask_golden_path_runtime use helix_ask.reflect_theory_context",
+        goldenPathRuntime: true,
+        requested_capability: HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
+        topic: "Casimir tile duty budget",
+        anchors: ["Casimir Cavities and Curvature", "Collapse and Stellar Evolution"],
+      },
+    });
+
+    expect(decision.handled).toBe(true);
+    if (!decision.handled) throw new Error("golden path should handle theory reflection");
+    const body = decision.payload;
+
+    expect(body).toMatchObject({
+      final_status: "final_answer",
+      terminal_artifact_kind: "theory_context_reflection_answer",
+      final_answer_source: "theory_context_reflection_answer",
+      terminal_error_code: null,
+      helix_theory_context_reflection_tool_receipt: {
+        capability_key: HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
+        topic: "Casimir tile duty budget",
+        anchors: ["Casimir Cavities and Curvature", "Collapse and Stellar Evolution"],
+      },
+      theory_context_reflection_answer: {
+        topic: "Casimir tile duty budget",
+      },
+      capability_plan: {
+        requested_capability: HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
+        executed_capability: HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
+        required_observation_kinds: ["helix_theory_context_reflection_tool_receipt"],
+        required_terminal_kind: "theory_context_reflection_answer",
+      },
+      ask_turn_solver_trace: {
+        completed_solver_path: true,
+        requested_capability: HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
+        executed_capability: HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
+        observed_artifact_kind: "helix_theory_context_reflection_tool_receipt",
+        terminal_artifact_kind: "theory_context_reflection_answer",
+      },
+      terminal_answer_authority: {
+        server_authoritative: true,
+        terminal_artifact_kind: "theory_context_reflection_answer",
+        final_answer_source: "theory_context_reflection_answer",
+      },
+    });
+    expect(body.selected_final_answer).toContain("Theory context reflection for: Casimir tile duty budget");
+    expect(readLedger(body).map((artifact) => artifact.kind)).toEqual([
+      "golden_path_route_gate",
+      "helix_theory_context_reflection_tool_receipt",
+      "theory_context_reflection_answer",
+    ]);
+    expect(terminalLedgerEntries(body)).toHaveLength(1);
+  });
+
+  it("fails closed when theory reflection is requested without a topic", () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+
+    const decision = runHelixAskGoldenPathRuntime({
+      now: new Date("2026-06-28T12:29:30.000Z"),
+      body: {
+        turn_id: "ask:golden:theory-reflection-missing",
+        prompt: "helix_ask_golden_path_runtime helix_ask.reflect_theory_context",
+        goldenPathRuntime: true,
+        requested_capability: HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
+      },
+    });
+
+    expect(decision.handled).toBe(true);
+    if (!decision.handled) throw new Error("golden path should handle missing theory topic as typed failure");
+    const body = decision.payload;
+
+    expect(body).toMatchObject({
+      final_status: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      terminal_error_code: "missing_theory_reflection_topic",
+      goal_satisfaction_evaluation: {
+        satisfaction: "not_satisfied",
+        first_broken_rail: "argument_extraction",
+      },
+      ask_turn_solver_trace: {
+        completed_solver_path: false,
+        requested_capability: HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
+        executed_capability: null,
+        first_broken_rail: "argument_extraction",
+      },
+    });
+    expect(body.selected_final_answer).toContain("no reflection topic");
     expect(readLedger(body).map((artifact) => artifact.kind)).toEqual(["golden_path_route_gate", "typed_failure"]);
     expect(terminalLedgerEntries(body)).toHaveLength(1);
   });
