@@ -13,6 +13,7 @@ import {
   HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
   HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
   HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+  HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
   HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY,
   HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
   HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,
@@ -685,6 +686,96 @@ describe("Helix Ask golden path runtime", () => {
       "golden_path_route_gate",
       "helix_civilization_bounds_tool_result",
       "civilization_bounds_reflection_answer",
+    ]);
+    expect(terminalLedgerEntries(body)).toHaveLength(1);
+  });
+
+  it("handles compact zen graph ideology evidence as a reflection answer", () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+
+    const decision = runHelixAskGoldenPathRuntime({
+      now: new Date("2026-06-28T12:30:00.000Z"),
+      body: {
+        turn_id: "ask:golden:zen-graph",
+        prompt: "helix_ask_golden_path_runtime use helix_ask.reflect_ideology_context",
+        goldenPathRuntime: true,
+        requested_capability: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
+        helix_zen_graph_reflection_tool_result: {
+          reflection: {
+            artifactId: "ideology_context_reflection",
+            reflectionId: "ideology-context-reflection:test",
+            schemaVersion: "ideology_context_reflection/v1",
+            input: {
+              kind: "user_prompt",
+              summary: "Reflect right speech and two-key review as evidence-only lenses.",
+              refs: ["turn:zen-graph", "doc:ethos"],
+            },
+            activated_traits: [{ nodeId: "right-speech", label: "Right Speech" }],
+            tensions: [{ id: "missing-check", severity: "medium" }],
+            recommended_actions: [{ id: "ask-for-evidence", type: "diagnostic", label: "Ask for missing evidence" }],
+            authority: {
+              assistant_answer: false,
+              raw_content_included: false,
+              terminal_eligible: false,
+              context_role: "tool_policy",
+              ask_context_policy: "evidence_only",
+              agent_executable: false,
+            },
+          },
+          proceduralClassification: {
+            classifications: [{ observedPattern: "practice_commitment", proceduralMove: "ask_for_concrete_evidence" }],
+          },
+          locator: {
+            matches: [{ nodeId: "right-speech", path: ["speech", "review"] }],
+          },
+          admissions: [{ id: "admission:diagnostic", actions: [] }],
+        },
+      },
+    });
+
+    expect(decision.handled).toBe(true);
+    if (!decision.handled) throw new Error("golden path should handle zen graph reflection");
+    const body = decision.payload;
+
+    expect(body).toMatchObject({
+      final_status: "final_answer",
+      terminal_artifact_kind: "ideology_context_reflection_answer",
+      final_answer_source: "ideology_context_reflection_answer",
+      terminal_error_code: null,
+      helix_zen_graph_reflection_tool_result: {
+        kind: "helix_zen_graph_reflection_tool_result",
+        tool_id: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
+      },
+      ideology_context_reflection_answer: {
+        reflection_id: "ideology-context-reflection:test",
+      },
+      capability_plan: {
+        requested_capability: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
+        executed_capability: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
+        required_observation_kinds: ["helix_zen_graph_reflection_tool_result"],
+        required_terminal_kind: "ideology_context_reflection_answer",
+      },
+      ask_turn_solver_trace: {
+        completed_solver_path: true,
+        requested_capability: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
+        executed_capability: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
+        observed_artifact_kind: "helix_zen_graph_reflection_tool_result",
+        terminal_artifact_kind: "ideology_context_reflection_answer",
+      },
+      terminal_answer_authority: {
+        server_authoritative: true,
+        terminal_artifact_kind: "ideology_context_reflection_answer",
+        final_answer_source: "ideology_context_reflection_answer",
+      },
+    });
+    expect(body.selected_final_answer).toContain("Ideology context reflection completed");
+    expect(body.selected_final_answer).toContain("does not grant moral, character, policy, or execution authority");
+    expect(readLedger(body).map((artifact) => artifact.kind)).toEqual([
+      "golden_path_route_gate",
+      "helix_zen_graph_reflection_tool_result",
+      "ideology_context_reflection_answer",
     ]);
     expect(terminalLedgerEntries(body)).toHaveLength(1);
   });
