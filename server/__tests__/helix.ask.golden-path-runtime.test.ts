@@ -9,6 +9,8 @@ import {
   HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
   HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
   HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
+  HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY,
+  HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
   HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,
   buildHelixAskGoldenPathRuntimePayload,
   runHelixAskGoldenPathRuntime,
@@ -260,6 +262,106 @@ describe("Helix Ask golden path runtime", () => {
       },
     });
     expect(body.selected_final_answer).toContain("no reflection topic");
+    expect(readLedger(body).map((artifact) => artifact.kind)).toEqual(["golden_path_route_gate", "typed_failure"]);
+    expect(terminalLedgerEntries(body)).toHaveLength(1);
+  });
+
+  it("handles compact visual capture evidence as a situation context pack", () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+
+    const decision = runHelixAskGoldenPathRuntime({
+      now: new Date("2026-06-28T12:32:00.000Z"),
+      body: {
+        turn_id: "ask:golden:visual-capture",
+        prompt: "helix_ask_golden_path_runtime use image_lens.inspect to describe the current screen",
+        goldenPathRuntime: true,
+        requested_capability: HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY,
+        visual_summary: "The Docs Viewer is focused on the NHM2 whitepaper with a theory graph panel nearby.",
+        detected_objects: ["Docs Viewer", "NHM2 whitepaper", "Theory graph panel"],
+        detected_scene_relations: ["Docs Viewer is the focused panel"],
+        uncertainty: ["No raw image is included in the golden-path fixture"],
+      },
+    });
+
+    expect(decision.handled).toBe(true);
+    if (!decision.handled) throw new Error("golden path should handle compact visual capture evidence");
+    const body = decision.payload;
+
+    expect(body).toMatchObject({
+      final_status: "final_answer",
+      terminal_artifact_kind: "situation_context_pack",
+      final_answer_source: "situation_context_pack",
+      terminal_error_code: null,
+      visual_frame_evidence: {
+        summary: "The Docs Viewer is focused on the NHM2 whitepaper with a theory graph panel nearby.",
+        raw_image_included: false,
+      },
+      capability_plan: {
+        requested_capability: HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
+        executed_capability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
+        substitution_rule_applied: true,
+        required_observation_kinds: ["visual_frame_evidence", "situation_context_pack"],
+        required_terminal_kind: "situation_context_pack",
+      },
+      ask_turn_solver_trace: {
+        completed_solver_path: true,
+        requested_capability: HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
+        executed_capability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
+        observed_artifact_kind: "visual_frame_evidence",
+        terminal_artifact_kind: "situation_context_pack",
+      },
+      terminal_answer_authority: {
+        server_authoritative: true,
+        terminal_artifact_kind: "situation_context_pack",
+        final_answer_source: "situation_context_pack",
+      },
+    });
+    expect(body.selected_final_answer).toContain("Visual capture compact evidence was inspected");
+    expect(readLedger(body).map((artifact) => artifact.kind)).toEqual([
+      "golden_path_route_gate",
+      "visual_frame_evidence",
+      "situation_context_pack",
+    ]);
+    expect(terminalLedgerEntries(body)).toHaveLength(1);
+  });
+
+  it("fails closed when visual capture is requested without compact evidence", () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+
+    const decision = runHelixAskGoldenPathRuntime({
+      now: new Date("2026-06-28T12:32:30.000Z"),
+      body: {
+        turn_id: "ask:golden:visual-capture-missing",
+        prompt: "helix_ask_golden_path_runtime situation-room.describe_visual_capture",
+        goldenPathRuntime: true,
+        requested_capability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
+      },
+    });
+
+    expect(decision.handled).toBe(true);
+    if (!decision.handled) throw new Error("golden path should handle missing visual evidence as typed failure");
+    const body = decision.payload;
+
+    expect(body).toMatchObject({
+      final_status: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      terminal_error_code: "missing_compact_visual_evidence",
+      goal_satisfaction_evaluation: {
+        satisfaction: "not_satisfied",
+        first_broken_rail: "observation",
+      },
+      ask_turn_solver_trace: {
+        completed_solver_path: false,
+        requested_capability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
+        executed_capability: null,
+        first_broken_rail: "observation",
+      },
+    });
+    expect(body.selected_final_answer).toContain("no compact visual evidence");
     expect(readLedger(body).map((artifact) => artifact.kind)).toEqual(["golden_path_route_gate", "typed_failure"]);
     expect(terminalLedgerEntries(body)).toHaveLength(1);
   });
