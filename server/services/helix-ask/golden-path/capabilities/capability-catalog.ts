@@ -10,9 +10,8 @@ import {
   HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
   HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,
   HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
-  readHelixAskGoldenPathPrompt,
+  isHelixAskGoldenPathCapabilityNamedInRequest,
   readHelixAskGoldenPathTurnContext,
-  readString,
   readStringArray,
   type RecordLike,
 } from "../core";
@@ -24,12 +23,7 @@ export type HelixAskGoldenPathCapabilityCatalogDependencies = {
 };
 
 export const isHelixAskGoldenPathCapabilityCatalogRequested = (body: RecordLike): boolean => {
-  const requestedCapabilities = readStringArray(body.requested_capabilities ?? body.requestedCapabilities);
-  if (requestedCapabilities.includes(HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY)) return true;
-  const requestedCapability = readString(body.requested_capability ?? body.requestedCapability);
-  if (requestedCapability === HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY) return true;
-  const prompt = readHelixAskGoldenPathPrompt(body).toLowerCase();
-  return prompt.includes(HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY);
+  return isHelixAskGoldenPathCapabilityNamedInRequest(body, [HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY]);
 };
 
 export const buildGoldenPathCapabilityCatalogObservation = (): RecordLike => ({

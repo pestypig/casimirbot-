@@ -4,12 +4,11 @@ import {
   buildHelixAskGoldenPathRouteGateArtifactId,
   buildHelixAskGoldenPathTerminalResultId,
   HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,
-  readHelixAskGoldenPathPrompt,
+  isHelixAskGoldenPathCapabilityNamedInRequest,
   readHelixAskGoldenPathTurnContext,
   readNumber,
   readRecord,
   readString,
-  readStringArray,
   type RecordLike,
 } from "../core";
 
@@ -20,12 +19,7 @@ export type HelixAskGoldenPathWorkspaceStatusDependencies = {
 };
 
 export const isHelixAskGoldenPathWorkspaceStatusRequested = (body: RecordLike): boolean => {
-  const requestedCapabilities = readStringArray(body.requested_capabilities ?? body.requestedCapabilities);
-  if (requestedCapabilities.includes(HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY)) return true;
-  const requestedCapability = readString(body.requested_capability ?? body.requestedCapability);
-  if (requestedCapability === HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY) return true;
-  const prompt = readHelixAskGoldenPathPrompt(body).toLowerCase();
-  return prompt.includes(HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY);
+  return isHelixAskGoldenPathCapabilityNamedInRequest(body, [HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY]);
 };
 
 export const workspaceStatusSummaryText = (observation: RecordLike): string => {

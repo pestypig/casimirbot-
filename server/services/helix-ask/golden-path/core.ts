@@ -123,6 +123,15 @@ export const isHelixAskGoldenPathCapabilityExplicitlyRequested = (
   return Boolean(requestedCapability && capabilities.includes(requestedCapability));
 };
 
+export const isHelixAskGoldenPathCapabilityNamedInRequest = (
+  body: RecordLike,
+  capabilities: readonly string[],
+): boolean => {
+  if (isHelixAskGoldenPathCapabilityExplicitlyRequested(body, capabilities)) return true;
+  const prompt = readHelixAskGoldenPathPrompt(body).toLowerCase();
+  return capabilities.some((capability) => prompt.includes(capability.toLowerCase()));
+};
+
 export const buildHelixAskGoldenPathRouteGateArtifactId = (turnId: string): string =>
   `${turnId}:golden_path_route_gate`;
 
