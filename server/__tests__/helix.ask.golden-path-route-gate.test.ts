@@ -56,6 +56,76 @@ const parseSseEvents = (text: string): Array<{ event: string; data: Record<strin
       return { event, data };
     });
 
+const expectExplicitCapabilityRails = (
+  payload: Record<string, any>,
+  expectedObservationKind: string,
+  expectedTerminalKind: string,
+): void => {
+  expect(payload.capability_plan).toMatchObject({
+    requested_capability: expect.any(String),
+    selected_capability: expect.any(String),
+    executed_capability: expect.any(String),
+    required_terminal_kind: expectedTerminalKind,
+  });
+  expect(payload.capability_plan?.required_observation_kinds).toEqual(
+    expect.arrayContaining([expectedObservationKind]),
+  );
+  expect(payload.goal_satisfaction_evaluation).toMatchObject({
+    satisfaction: "satisfied",
+    required_terminal_kind: expectedTerminalKind,
+  });
+  expect(payload.ask_turn_solver_trace).toMatchObject({
+    completed_solver_path: true,
+    requested_capability: expect.any(String),
+    selected_capability: expect.any(String),
+    executed_capability: expect.any(String),
+    observed_artifact_kind: expectedObservationKind,
+    terminal_artifact_kind: expectedTerminalKind,
+  });
+};
+
+const expectCompoundRails = (
+  payload: Record<string, any>,
+  expectedObservationKinds: readonly string[],
+): void => {
+  expect(payload.capability_plan).toMatchObject({
+    requested_capability: "compound_capability_contract",
+    selected_capability: "compound_capability_contract",
+    executed_capability: "compound_capability_contract",
+    required_terminal_kind: "compound_evidence_synthesis_answer",
+  });
+  expect(payload.capability_plan?.required_observation_kinds).toEqual(
+    expect.arrayContaining(expectedObservationKinds),
+  );
+  expect(payload.goal_satisfaction_evaluation).toMatchObject({
+    satisfaction: "satisfied",
+    required_terminal_kind: "compound_evidence_synthesis_answer",
+  });
+  expect(payload.compound_capability_contract).toMatchObject({
+    satisfaction: "satisfied",
+  });
+  expect(payload.compound_capability_contract?.ordered_subgoals).toHaveLength(2);
+  for (const subgoal of payload.compound_capability_contract?.ordered_subgoals ?? []) {
+    expect(subgoal).toMatchObject({
+      requested_capability: expect.any(String),
+      selected_capability: expect.any(String),
+      executed_capability: expect.any(String),
+      observation_kind: expect.any(String),
+      observation_ref: expect.any(String),
+      satisfaction: "satisfied",
+    });
+  }
+  expect(payload.ask_turn_solver_trace).toMatchObject({
+    completed_solver_path: true,
+    requested_capability: "compound_capability_contract",
+    selected_capability: "compound_capability_contract",
+    executed_capability: "compound_capability_contract",
+    observed_artifact_kind: "compound_subgoal_observations",
+    terminal_artifact_kind: "compound_evidence_synthesis_answer",
+    compound_subgoal_count: 2,
+  });
+};
+
 afterEach(() => {
   resetHelixAskDebugPayloadCacheForTests();
   if (originalGoldenPathFlag === undefined) {
@@ -317,6 +387,7 @@ describe("Helix Ask golden-path route gate", () => {
         terminal_artifact_kind: expectedTerminalKind,
       },
     });
+    expectExplicitCapabilityRails(response.body, expectedObservationKind, expectedTerminalKind);
     expect(response.body.current_turn_artifact_ledger?.some((artifact: { kind?: string }) => artifact.kind === expectedObservationKind)).toBe(true);
     expect(response.body.current_turn_artifact_ledger?.filter((artifact: { kind?: string }) => artifact.kind === expectedTerminalKind)).toHaveLength(1);
   });
@@ -361,6 +432,7 @@ describe("Helix Ask golden-path route gate", () => {
         compound_subgoal_count: 2,
       },
     });
+    expectCompoundRails(response.body, ["doc_location_matches", "calculator_receipt"]);
     expect(response.body.compound_capability_contract?.ordered_subgoals).toHaveLength(2);
     expect(response.body.current_turn_artifact_ledger?.map((artifact: { kind?: string }) => artifact.kind)).toContain("doc_location_matches");
     expect(response.body.current_turn_artifact_ledger?.map((artifact: { kind?: string }) => artifact.kind)).toContain("calculator_receipt");
@@ -505,6 +577,7 @@ describe("Helix Ask golden-path route gate", () => {
         compound_subgoal_count: 2,
       },
     });
+    expectCompoundRails(response.body, expectedObservationKinds);
     for (const expectedKind of expectedObservationKinds) {
       expect(ledgerKinds).toContain(expectedKind);
     }
@@ -540,6 +613,7 @@ describe("Helix Ask golden-path route gate", () => {
         terminal_artifact_kind: "workstation_tool_evaluation",
       },
     });
+    expectExplicitCapabilityRails(finalEvent?.data ?? {}, "calculator_receipt", "workstation_tool_evaluation");
     expect((finalEvent?.data.debug as { golden_path_runtime?: unknown } | undefined)?.golden_path_runtime).toEqual(
       expect.objectContaining({
         legacy_route_bypassed: true,
@@ -586,6 +660,7 @@ describe("Helix Ask golden-path route gate", () => {
         compound_subgoal_count: 2,
       },
     });
+    expectCompoundRails(finalEvent?.data ?? {}, ["doc_location_matches", "calculator_receipt"]);
     expect((finalEvent?.data.debug as { golden_path_runtime?: unknown } | undefined)?.golden_path_runtime).toEqual(
       expect.objectContaining({
         legacy_route_bypassed: true,
