@@ -4,7 +4,6 @@ import {
   executeWorkspaceDirectoryResolveTool,
 } from "../../workspace-directory-resolver";
 import {
-  buildGoldenPathObservationLedgerArtifact,
   buildGoldenPathPayloadLedgerArtifact,
   buildGoldenPathRouteGateLedgerArtifact,
 } from "../artifact-ledger";
@@ -12,6 +11,7 @@ import {
   buildGoldenPathCapabilityGoalSatisfactionEvaluation,
   buildGoldenPathCapabilityPlan,
 } from "../capability-contract";
+import { buildGoldenPathCapabilityTerminalObservationSuccessPayload } from "../capability-terminal-observation-success";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
   readHelixAskGoldenPathPrompt,
@@ -21,9 +21,7 @@ import {
 } from "../core";
 import {
   buildGoldenPathTerminalAuthorityProjection,
-  buildGoldenPathTerminalResponseProjection,
   buildGoldenPathTypedFailureResponseProjection,
-  buildGoldenPathTerminalResult,
   buildGoldenPathTypedFailureTerminalResult,
 } from "../terminal-envelope";
 import { buildGoldenPathSolverTrace } from "../solver-trace";
@@ -207,122 +205,35 @@ export const buildHelixAskGoldenPathWorkspaceDirectoryPayload = (args: {
   ]
     .filter((line): line is string => Boolean(line))
     .join("\n");
-  const canonicalGoalFrame = {
-    schema: "helix.ask_canonical_goal_frame.v1",
-    turn_id: turnId,
-    goal_kind: goalKind,
-    answer_scope: "current_turn",
-    required_terminal_kind: requiredTerminalKind,
-    allows_workspace_context: true,
-    allows_prior_artifacts: false,
-    classifier_reasons: ["explicit_workspace_directory_request"],
-    assistant_answer: false,
-    raw_content_included: false,
-  };
-  const goalSatisfactionEvaluation = buildGoldenPathCapabilityGoalSatisfactionEvaluation({
-    turnId,
-    goalKind,
-    requiredTerminalKind,
-  });
-  const goalHash = args.deps.hashGoalFrame(canonicalGoalFrame);
-  const goalSatisfactionArtifact = args.deps.buildGoalSatisfactionEvaluationArtifact({
-    turnId,
-    goalHash,
-    evaluation: goalSatisfactionEvaluation,
-    createdAtMs,
-  });
-  const terminalResult = buildGoldenPathTerminalResult({
-    resultId: terminalResultId,
-    artifactId: resolution.artifact_id,
-    artifactKind: requiredTerminalKind,
-    finalAnswerSource: requiredTerminalKind,
-    text: answerText,
-    supportRefs: [resolution.artifact_id, routeGateArtifactId, goalSatisfactionArtifact.artifact_id],
-  });
 
-  return {
-    ok: true,
-    mode: "read",
-    schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
-    turn_id: turnId,
-    trace_id: traceId,
-    session_id: sessionId,
-    thread_id: threadId,
-    prompt_text: promptText,
-    ...buildGoldenPathTerminalResponseProjection({ terminalResult }),
-    workspace_directory_resolution: resolution,
-    golden_path_runtime: buildGoldenPathRuntimeStatus({
-      status: "workspace_directory_resolution",
-      requestedCapability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
-      selectedCapability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
-      executedCapability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
-      observedArtifactKind: "workspace_directory_resolution",
-      observedArtifactRef: resolution.artifact_id,
-      terminalArtifactRef: resolution.artifact_id,
-      terminalResultId,
-    }),
-    canonical_goal_frame: canonicalGoalFrame,
-    capability_plan: buildGoldenPathCapabilityPlan({
-      requestedCapability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
-      sourceTarget: "workspace_directory",
-      family: "workspace_directory",
-      requiredObservationKinds: ["workspace_directory_resolution"],
-      requiredTerminalKind,
-    }),
-    goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-    ...buildGoldenPathTerminalAuthorityProjection({
-      terminalResult,
-      route: "golden_path_runtime / workspace_directory_resolution",
-    }),
-    ask_turn_solver_trace: buildGoldenPathSolverTrace({
-      completedSolverPath: true,
-      routeAuthorityOk: true,
-      terminalAuthorityOk: true,
-      goalSatisfaction: "satisfied",
-      requestedCapability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
-      selectedCapability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
-      executedCapability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
-      observedArtifactKind: "workspace_directory_resolution",
-      observedArtifactRef: resolution.artifact_id,
-      terminalArtifactKind: terminalResult.artifact_kind,
-      extra: {
-        solver_risk_flags: [],
-        solver_short_circuit_flags: [],
-      },
-    }),
-    current_turn_artifact_ledger: [
-      buildGoldenPathRouteGateLedgerArtifact({
-        artifactId: routeGateArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        promptText,
-        requestedCapability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
-        goalSatisfactionArtifact,
-        goalSatisfactionEvaluation,
-      }),
-      buildGoldenPathObservationLedgerArtifact({
-        artifactId: resolution.artifact_id,
-        turnId,
-        createdAtMs,
-        goalHash,
-        kind: "workspace_directory_resolution",
-        terminalEligible: true,
-        payload: resolution,
-      }),
-    ],
-    debug: buildGoldenPathCapabilityDebugMirror({
-      status: "workspace_directory_resolution",
-      privateRuntimeLoopEntered: false,
-      requestedCapability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
-      selectedCapability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
-      executedCapability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
-      observedArtifactKind: "workspace_directory_resolution",
-      observedArtifactRef: resolution.artifact_id,
-      terminalResult,
-      goalSatisfactionEvaluation,
-    }),
-  };
+  return buildGoldenPathCapabilityTerminalObservationSuccessPayload({
+    turnId,
+    traceId,
+    sessionId,
+    threadId,
+    promptText,
+    createdAtMs,
+    routeGateArtifactId,
+    observationArtifactId: resolution.artifact_id,
+    terminalResultId,
+    requiredTerminalKind,
+    goalKind,
+    sourceTarget: "workspace_directory",
+    family: "workspace_directory",
+    classifierReasons: ["explicit_workspace_directory_request"],
+    allowsWorkspaceContext: true,
+    requestedCapability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
+    observedArtifactKind: "workspace_directory_resolution",
+    observationPayload: resolution,
+    answerText,
+    status: "workspace_directory_resolution",
+    route: "golden_path_runtime / workspace_directory_resolution",
+    requiredObservationKinds: ["workspace_directory_resolution"],
+    includeRuntimeRouteGate: false,
+    includeRuntimeLegacyFallbackPossibleWhenUnhandled: false,
+    hashGoalFrame: args.deps.hashGoalFrame,
+    buildGoalSatisfactionEvaluationArtifact: args.deps.buildGoalSatisfactionEvaluationArtifact,
+  });
 };
 
 export const requiredObservationKinds = ["workspace_directory_resolution"] as const;
