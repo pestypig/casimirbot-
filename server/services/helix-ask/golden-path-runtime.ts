@@ -1,31 +1,19 @@
 import { buildHelixGoalSatisfactionEvaluationArtifact } from "./goal-satisfaction-artifact";
 import {
   buildHelixAskGoldenPathCalculatorSolvePayload,
-  evaluateGoldenPathCalculatorExpression,
-  formatGoldenPathNumber,
   isHelixAskGoldenPathCalculatorSolveRequested,
-  readCalculatorExpression,
 } from "./golden-path/capabilities/calculator";
 import {
   buildHelixAskGoldenPathDocsLocatePayload,
-  findGoldenPathDocLocationMatches,
   isHelixAskGoldenPathDocsLocateRequested,
-  readGoldenPathDocContent,
-  readGoldenPathDocLocateQuery,
-  readGoldenPathDocPath,
 } from "./golden-path/capabilities/docs-locate";
 import {
   buildHelixAskGoldenPathRepoSearchConceptPayload,
-  findGoldenPathRepoEvidence,
   isHelixAskGoldenPathRepoSearchConceptRequested,
-  readGoldenPathRepoSearchFiles,
-  readRepoSearchConcept,
 } from "./golden-path/capabilities/repo-search-concept";
 import {
   buildHelixAskGoldenPathInternetSearchPayload,
   isHelixAskGoldenPathInternetSearchRequested,
-  readCompactInternetSearchResults,
-  readInternetSearchQuery,
 } from "./golden-path/capabilities/internet-search";
 import {
   buildHelixAskGoldenPathScholarlyResearchPayload,
@@ -34,18 +22,14 @@ import {
 import {
   buildHelixAskGoldenPathTheoryReflectionPayload,
   isHelixAskGoldenPathTheoryReflectionRequested,
-  readTheoryReflectionAnchors,
-  readTheoryReflectionTopic,
 } from "./golden-path/capabilities/theory-reflection";
 import {
   buildHelixAskGoldenPathCivilizationBoundsReflectionPayload,
   isHelixAskGoldenPathCivilizationBoundsReflectionRequested,
-  readCompactCivilizationBoundsToolResult,
 } from "./golden-path/capabilities/civilization-bounds-reflection";
 import {
   buildHelixAskGoldenPathZenGraphReflectionPayload,
   isHelixAskGoldenPathZenGraphReflectionRequested,
-  readCompactZenGraphReflectionToolResult,
 } from "./golden-path/capabilities/zen-graph-reflection";
 import {
   buildHelixAskGoldenPathVisualCapturePayload,
@@ -60,7 +44,6 @@ import {
   buildAskTurnCompositeHandoffDecision,
 } from "./composite-followup-helpers";
 import {
-  buildGoldenPathCompositeDebug,
   isHelixAskGoldenPathCatalogWorkspaceCompoundRequested,
   isHelixAskGoldenPathCivilizationBoundsZenReflectionCompoundRequested,
   isHelixAskGoldenPathDocsCalculatorCompoundRequested,
@@ -91,45 +74,17 @@ import {
 } from "./golden-path/runtime-contract-payload";
 import {
   buildStagePlayAskCheckpointReceiptPayload,
-  type StagePlayCheckpointReceiptArtifactLike,
 } from "./live-source/stage-play-checkpoint-receipt";
-import {
-  HELIX_INTERNET_SEARCH_OBSERVATION_SCHEMA,
-} from "../../../shared/helix-internet-search-observation";
 import {
   defaultHashGoalFrame,
   flagEnabled,
   HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
-  HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
-  HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
-  HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
-  HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
-  HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-  HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY,
-  HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
-  HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
-  HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
-  HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
-  HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
-  HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
-  HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
-  HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
-  HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,
-  HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
-  readArray,
-  readBoolean,
-  readHelixAskGoldenPathPrompt,
-  readNumber,
   readRecord,
-  readString,
-  readStringArray,
   isHelixAskGoldenPathRequested,
   type HelixAskGoldenPathRuntimeDecision,
-  type HelixAskGoldenPathRuntimeTerminalResult,
   type RecordLike,
 } from "./golden-path/core";
 import {
-  buildGoldenPathCapabilityCatalogObservation,
   buildHelixAskGoldenPathCapabilityCatalogPayload,
   isHelixAskGoldenPathCapabilityCatalogRequested,
 } from "./golden-path/capabilities/capability-catalog";
@@ -138,7 +93,6 @@ import {
   isHelixAskGoldenPathStagePlayReflectionRequested,
 } from "./golden-path/capabilities/stage-play-reflection";
 import {
-  buildGoldenPathWorkspaceStatusObservation,
   buildHelixAskGoldenPathWorkspaceStatusPayload,
   isHelixAskGoldenPathWorkspaceStatusRequested,
 } from "./golden-path/capabilities/workspace-status";
