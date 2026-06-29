@@ -7,7 +7,6 @@ import {
 } from "../artifact-ledger";
 import { buildGoldenPathCapabilityPlan } from "../capability-contract";
 import {
-  HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
   HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
   readHelixAskGoldenPathPrompt,
@@ -21,6 +20,7 @@ import {
   buildGoldenPathTerminalResult,
 } from "../terminal-envelope";
 import { buildGoldenPathSolverTrace } from "../solver-trace";
+import { buildGoldenPathRuntimeStatus } from "../runtime-status";
 
 export type HelixAskGoldenPathTheoryReflectionDependencies = {
   now: () => Date;
@@ -164,24 +164,17 @@ export const buildHelixAskGoldenPathTheoryReflectionPayload = (args: {
       selected_terminal_result_id: terminalResult.result_id,
       terminal_result: terminalResult,
       terminal_results: [terminalResult],
-      golden_path_runtime: {
-        schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
+      golden_path_runtime: buildGoldenPathRuntimeStatus({
         status: "theory_context_reflection_missing_topic",
-        flag: HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
-        requested_capability: HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
-        selected_capability: HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
-        executed_capability: null,
-        observed_artifact_kind: null,
-        observed_artifact_ref: null,
-        terminal_artifact_ref: terminalResult.artifact_id,
-        terminal_result_id: terminalResultId,
-        legacy_route_bypassed: true,
-        private_runtime_loop_entered: false,
-        route_gate: "enabled_explicit_request",
-        terminal_result_count: 1,
-        assistant_answer: false,
-        raw_content_included: false,
-      },
+        requestedCapability: HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
+        selectedCapability: HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
+        executedCapability: null,
+        observedArtifactKind: null,
+        observedArtifactRef: null,
+        terminalArtifactRef: terminalResult.artifact_id,
+        terminalResultId,
+        routeGate: "enabled_explicit_request",
+      }),
       canonical_goal_frame: canonicalGoalFrame,
       capability_plan: buildGoldenPathCapabilityPlan({
         requestedCapability: HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
@@ -339,25 +332,18 @@ export const buildHelixAskGoldenPathTheoryReflectionPayload = (args: {
     selected_terminal_result_id: terminalResult.result_id,
     terminal_result: terminalResult,
     terminal_results: [terminalResult],
-    golden_path_runtime: {
-      schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
+    golden_path_runtime: buildGoldenPathRuntimeStatus({
       status: "theory_context_reflection",
-      flag: HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
-      requested_capability: HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
-      selected_capability: HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
-      executed_capability: HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
-      observed_artifact_kind: "helix_theory_context_reflection_tool_receipt",
-      observed_artifact_ref: observationArtifactId,
-      terminal_artifact_ref: terminalArtifactId,
-      terminal_result_id: terminalResultId,
-      legacy_route_bypassed: true,
-      legacy_fallback_possible_when_unhandled: true,
-      private_runtime_loop_entered: false,
-      route_gate: "enabled_explicit_request",
-      terminal_result_count: 1,
-      assistant_answer: false,
-      raw_content_included: false,
-    },
+      requestedCapability: HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
+      selectedCapability: HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
+      executedCapability: HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
+      observedArtifactKind: "helix_theory_context_reflection_tool_receipt",
+      observedArtifactRef: observationArtifactId,
+      terminalArtifactRef: terminalArtifactId,
+      terminalResultId,
+      legacyFallbackPossibleWhenUnhandled: true,
+      routeGate: "enabled_explicit_request",
+    }),
     canonical_goal_frame: canonicalGoalFrame,
     helix_theory_context_reflection_tool_receipt: reflectionReceipt,
     theory_context_reflection_answer: {
