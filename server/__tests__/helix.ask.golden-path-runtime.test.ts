@@ -228,6 +228,59 @@ describe("Helix Ask golden path runtime", () => {
     }
   });
 
+  it("keeps dispatch-owned golden-path modules on the standard contract surface", () => {
+    const modulePaths = [
+      ...readdirSync(capabilityDir)
+        .filter((fileName) => fileName.endsWith(".ts"))
+        .map((fileName) => `${capabilityDir}/${fileName}`),
+      ...readdirSync(compoundDir)
+        .filter((fileName) => fileName.endsWith(".ts"))
+        .map((fileName) => `${compoundDir}/${fileName}`),
+    ];
+
+    expect(modulePaths.length).toBeGreaterThan(0);
+    for (const modulePath of modulePaths) {
+      const source = readFileSync(modulePath, "utf8");
+      expect(
+        /export\s+const\s+requiredObservationKinds\b|requiredObservationKinds\s*,/.test(source),
+        `${modulePath} must expose requiredObservationKinds directly or through a compatibility re-export`,
+      ).toBe(true);
+      expect(
+        /export\s+const\s+requiredTerminalKinds\b|requiredTerminalKinds\s*,/.test(source),
+        `${modulePath} must expose requiredTerminalKinds directly or through a compatibility re-export`,
+      ).toBe(true);
+      expect(
+        /export\s+const\s+isRequested\b|isRequested\s*,/.test(source),
+        `${modulePath} must expose isRequested directly or through a compatibility re-export`,
+      ).toBe(true);
+      expect(
+        /export\s+const\s+buildPayload\b|buildPayload\s*,/.test(source),
+        `${modulePath} must expose buildPayload directly or through a compatibility re-export`,
+      ).toBe(true);
+    }
+  });
+
+  it("keeps low-level failure ledger and terminal builders out of dispatch-owned modules", () => {
+    const modulePaths = [
+      ...readdirSync(capabilityDir)
+        .filter((fileName) => fileName.endsWith(".ts"))
+        .map((fileName) => `${capabilityDir}/${fileName}`),
+      ...readdirSync(compoundDir)
+        .filter((fileName) => fileName.endsWith(".ts"))
+        .map((fileName) => `${compoundDir}/${fileName}`),
+    ];
+    const lowLevelFailureBuilderPattern =
+      /buildGoldenPath(?:TypedFailure(?:TerminalError)?LedgerArtifact|TypedFailure(?:ResponseProjection|TerminalResult)|RouteGateLedgerArtifact)/;
+
+    for (const modulePath of modulePaths) {
+      const source = readFileSync(modulePath, "utf8");
+      expect(
+        source,
+        `${modulePath} must delegate failure envelope construction to golden-path failure helpers`,
+      ).not.toMatch(lowLevelFailureBuilderPattern);
+    }
+  });
+
   it("declines when the flag is disabled or the request is not explicit", () => {
     expect(
       runHelixAskGoldenPathRuntime({
