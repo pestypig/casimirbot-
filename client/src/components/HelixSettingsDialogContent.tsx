@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { AgiKnowledgePanel } from "@/components/AgiKnowledgePanel";
 import CoreKnowledgePanel from "@/components/CoreKnowledgePanel";
-import { buildHelixAskMathRenderDebugForText } from "@/components/helix/HelixAskPill";
+import { buildHelixAskMathRenderDebugForText } from "@/lib/helix/ask-answer-rendering";
 import type { SettingsTab, StartSettings } from "@/hooks/useHelixStartSettings";
 import { isFlagEnabled } from "@/lib/envFlags";
 import {

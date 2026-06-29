@@ -3,6 +3,7 @@ import type {
   HelixCausalTurnTimeline,
 } from "@shared/helix-causal-turn-timeline";
 import type { StagePlayLiveSourceMailTranscriptEntryV1 } from "@shared/contracts/stage-play-live-source-mail.v1";
+import { humanizeAskLiveEventToken } from "@/lib/helix/ask-display-text";
 
 type HelixAskTranscriptReply = {
   id: string;
@@ -52,16 +53,6 @@ function dedupeStrings(values: string[]): string[] {
     out.push(value);
   }
   return out;
-}
-
-function humanizeAskLiveEventToken(value: string): string {
-  const cleaned = value
-    .replace(/^Helix Ask:\s*/i, "")
-    .replace(/[_-]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  if (!cleaned) return "";
-  return cleaned.replace(/\b(?:llm|api|id|url|ui)\b/gi, (token) => token.toUpperCase());
 }
 
 function resolveHelixTranscriptActionLabel(event: Record<string, unknown>): string | null {

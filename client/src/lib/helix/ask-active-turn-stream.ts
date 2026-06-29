@@ -1,4 +1,5 @@
 import type { AskLiveEventEntry } from "@/lib/helix/ask-observer-events";
+import { humanizeAskLiveEventToken } from "@/lib/helix/ask-display-text";
 
 export type HelixAskConsoleStreamIngressDebug = {
   schema: "helix.ask.console_stream_ingress_debug.v1";
@@ -21,7 +22,7 @@ export type HelixAskConsoleStreamIngressDebug = {
   lastUpdatedAtMs: number | null;
 };
 
-type HelixContinuousTurnStreamTone =
+export type HelixContinuousTurnStreamTone =
   | "question"
   | "working"
   | "observation"
@@ -32,7 +33,7 @@ type HelixContinuousTurnStreamTone =
 
 export type HelixContinuousTurnStreamRow = {
   key: string;
-  source: "question" | "agent_work" | "stage_play" | "live_bridge" | "live_source_mail" | "voice" | "final";
+  source: "question" | "agent_work" | "stage_play" | "live_bridge" | "live_source_mail" | "live_answer" | "voice" | "final";
   label: string;
   text: string;
   meta: string;
@@ -167,16 +168,6 @@ function resolveAskLiveEventTimestampMs(event: AskLiveEventEntry): number | null
     return event.tsMs;
   }
   return parseTimestampMs(event.ts);
-}
-
-function humanizeAskLiveEventToken(value: string): string {
-  const cleaned = value
-    .replace(/^Helix Ask:\s*/i, "")
-    .replace(/[_-]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  if (!cleaned) return "";
-  return cleaned.replace(/\b(?:llm|api|id|url|ui)\b/gi, (token) => token.toUpperCase());
 }
 
 function resolveAskLiveEventStageParts(event: AskLiveEventEntry): {

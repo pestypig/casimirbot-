@@ -14,6 +14,7 @@ import {
 } from "./explicit-workstation-gateway";
 import { buildProviderGatewayDebugSummary } from "./provider-gateway-debug-summary";
 import { buildHelixAgentRuntimeAdapterContract } from "./runtime-adapter-contract";
+import { buildHelixTurnTerminalAuthority } from "../turn-terminal-authority";
 
 const WORKSTATION_ACTIVE_CONTEXT_CAPABILITY = "workstation.active_context" as const;
 const CALCULATOR_SOLVE_EXPRESSION_CAPABILITY = "scientific-calculator.solve_expression" as const;
@@ -24,6 +25,14 @@ const CALCULATOR_SHOW_GATEWAY_SOLVE_CAPABILITY = "scientific-calculator.show_gat
 const INTERNET_SEARCH_CAPABILITY = "internet-search.search_web" as const;
 const SCHOLARLY_RESEARCH_SEARCH_CAPABILITY = "scholarly-research.lookup_papers" as const;
 const WORKSTATION_UI_ACTION_RECEIPT_SCHEMA = "helix.workstation_ui_action_receipt.v1" as const;
+
+const COMPOUND_NORMALIZABLE_CAPABILITIES = new Set<string>([
+  "docs.search",
+  CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+  "theory-badge-graph.reflect_discussion_context",
+  "civilization-bounds.reflect_system_bounds",
+  SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+]);
 
 const readBooleanEnv = (value: string | undefined, defaultValue: boolean): boolean => {
   if (value === undefined) return defaultValue;
@@ -114,6 +123,238 @@ const buildCurrentTurnArtifactLedgerFromGatewayPackets = (input: {
       raw_content_included: false,
     };
   });
+
+const typedObservationKindForGatewayCapability = (capabilityId: string): string | null => {
+  if (capabilityId === "docs.search") return "doc_location_matches";
+  if (capabilityId === CALCULATOR_SOLVE_EXPRESSION_CAPABILITY) return "calculator_receipt";
+  if (capabilityId === "theory-badge-graph.reflect_discussion_context") {
+    return "helix_theory_context_reflection_tool_receipt";
+  }
+  if (capabilityId === "civilization-bounds.reflect_system_bounds") {
+    return "helix_civilization_bounds_tool_result";
+  }
+  if (capabilityId === SCHOLARLY_RESEARCH_SEARCH_CAPABILITY) return "scholarly_research_observation";
+  if (capabilityId === INTERNET_SEARCH_CAPABILITY) return "internet_search_observation";
+  if (capabilityId === "repo.search") return "repo_code_evidence_observation";
+  if (capabilityId === WORKSTATION_ACTIVE_CONTEXT_CAPABILITY) return "workstation_active_context_observation";
+  if (capabilityId === CALCULATOR_ACTIVE_CONTEXT_CAPABILITY) return "calculator_active_context_observation";
+  return null;
+};
+
+const schemaForTypedObservationKind = (kind: string): string => {
+  if (kind === "doc_location_matches") return "helix.doc_location_matches.v1";
+  if (kind === "calculator_receipt") return "helix.calculator_receipt.v1";
+  if (kind === "helix_theory_context_reflection_tool_receipt") {
+    return "helix_theory_context_reflection_tool_receipt/v1";
+  }
+  if (kind === "helix_civilization_bounds_tool_result") {
+    return "helix_civilization_bounds_tool_result/v1";
+  }
+  if (kind === "scholarly_research_observation") return "helix.scholarly_research_observation.v1";
+  if (kind === "internet_search_observation") return "helix.internet_search_observation.v1";
+  if (kind === "repo_code_evidence_observation") return "helix.repo_code_evidence_observation.v1";
+  if (kind === "workstation_active_context_observation") return "helix.workstation_active_context_observation.v1";
+  if (kind === "calculator_active_context_observation") return "helix.calculator_active_context_observation.v1";
+  return `helix.${kind}.v1`;
+};
+
+const normalizeGatewayObservationForHelix = (input: {
+  turnId: string;
+  result: HelixWorkstationGatewayCallResult;
+  index: number;
+}): Record<string, unknown> | null => {
+  const kind = typedObservationKindForGatewayCapability(input.result.capability_id);
+  if (!kind) return null;
+  const observation = readGatewayObservationRecord(input.result);
+  if (!observation) return null;
+  const sourceRef = readGatewayObservationRef(input.result, input.turnId);
+  const artifactId = `${input.turnId}:codex_normalized:${kind}:${input.index + 1}`;
+  const status = readString(observation.status) ?? (input.result.ok ? "succeeded" : "failed");
+  return {
+    schema: "helix.current_turn_artifact.v1",
+    artifact_id: artifactId,
+    producer_item_id: input.result.observation_packet.call_id,
+    kind,
+    observation_kind: kind,
+    payload_schema: schemaForTypedObservationKind(kind),
+    turn_id: input.turnId,
+    capability_key: input.result.capability_id,
+    source_capability_id: input.result.capability_id,
+    provider_gateway_observation_ref: sourceRef,
+    provider_gateway_packet_refs: input.result.observation_packet.produced_artifact_refs,
+    status,
+    payload: {
+      ...observation,
+      schema: schemaForTypedObservationKind(kind),
+      kind,
+      capability_key: input.result.capability_id,
+      source_capability_id: input.result.capability_id,
+      provider_gateway_observation_ref: sourceRef,
+      provider_gateway_packet_refs: input.result.observation_packet.produced_artifact_refs,
+      observation_role: "evidence_not_assistant_answer",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+  };
+};
+
+const buildCodexNormalizedObservationArtifacts = (input: {
+  turnId: string;
+  gatewayCallResults: HelixWorkstationGatewayCallResult[];
+}): {
+  artifacts: Array<Record<string, unknown>>;
+  missingNormalizationFailures: string[];
+} => {
+  const artifacts: Array<Record<string, unknown>> = [];
+  const missingNormalizationFailures: string[] = [];
+  input.gatewayCallResults.forEach((result, index) => {
+    if (isWorkstationActionReceipt(result)) return;
+    const normalized = normalizeGatewayObservationForHelix({
+      turnId: input.turnId,
+      result,
+      index,
+    });
+    if (normalized) {
+      artifacts.push(normalized);
+      return;
+    }
+    if (result.ok === true && COMPOUND_NORMALIZABLE_CAPABILITIES.has(result.capability_id)) {
+      missingNormalizationFailures.push(`provider_observation_normalization_missing:${result.capability_id}`);
+    }
+  });
+  return { artifacts, missingNormalizationFailures };
+};
+
+const buildNormalizedObservationPacketsFromArtifacts = (input: {
+  turnId: string;
+  artifacts: Array<Record<string, unknown>>;
+}): HelixAgentStepObservationPacket[] =>
+  input.artifacts.map((artifact, index) => ({
+    schema: "helix.agent_step_observation_packet.v1",
+    turn_id: input.turnId,
+    iteration: index + 1,
+    call_id: readString(artifact.producer_item_id) ?? `${input.turnId}:codex_normalized:${index + 1}:call`,
+    decision_id: `${input.turnId}:codex_normalized:${index + 1}:decision`,
+    capability_key: readString(artifact.capability_key) ?? readString(artifact.kind) ?? "codex.normalized_observation",
+    panel_id: null,
+    action: "normalize_provider_gateway_observation",
+    status: readString(artifact.status) === "succeeded" ? "succeeded" : "failed",
+    produced_artifact_refs: [readString(artifact.artifact_id) ?? `${input.turnId}:codex_normalized:${index + 1}`],
+    observation_summary: `Codex provider gateway result normalized as ${readString(artifact.kind) ?? "typed_observation"}.`,
+    receipts: [],
+    missing_requirements: [],
+    state_delta: {},
+    suggested_next_steps: ["answer", "use_another_tool"],
+    terminal_eligible: false,
+    post_tool_model_step_required: true,
+    assistant_answer: false,
+    raw_content_included: false,
+  }));
+
+const buildCodexCompoundSubgoalLedger = (input: {
+  turnId: string;
+  normalizedArtifacts: Array<Record<string, unknown>>;
+  gatewayCallResults: HelixWorkstationGatewayCallResult[];
+}): Record<string, unknown> | null => {
+  if (input.normalizedArtifacts.length < 2) return null;
+  const subgoals = input.normalizedArtifacts.map((artifact, index) => {
+    const capability = readString(artifact.capability_key) ?? "unknown";
+    const observationKind = readString(artifact.kind) ?? "unknown";
+    const observationRef = readString(artifact.artifact_id) ?? null;
+    const sourceResult = input.gatewayCallResults.find((result) => result.capability_id === capability);
+    return {
+      schema: "helix.compound_capability_subgoal.v1",
+      subgoal_id: `${input.turnId}:codex_compound_subgoal:${index + 1}`,
+      ordinal: index + 1,
+      requested_capability: capability,
+      selected_capability: capability,
+      executed_capability: sourceResult?.ok === true ? capability : null,
+      args: sourceResult?.gateway_admission.source_target_intent ?? null,
+      required_observation_kinds: [observationKind],
+      observation_kind: observationKind,
+      observation_ref: observationRef,
+      provider_gateway_packet_refs: artifact.provider_gateway_packet_refs,
+      satisfied: sourceResult?.ok === true && Boolean(observationRef),
+      rail_status: sourceResult?.ok === true && observationRef ? "satisfied" : "missing_observation",
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  });
+  const firstBrokenRail = subgoals.find((subgoal) => subgoal.satisfied !== true) ?? null;
+  return {
+    schema: "helix.compound_capability_contract.v1",
+    turn_id: input.turnId,
+    source: "codex_provider_observation_normalization",
+    subgoals,
+    subgoal_count: subgoals.length,
+    satisfied_subgoal_count: subgoals.filter((subgoal) => subgoal.satisfied === true).length,
+    first_broken_rail: firstBrokenRail,
+    rail_status: firstBrokenRail ? "missing_observation" : "satisfied",
+    terminal_candidate_kind: firstBrokenRail ? "typed_failure" : "compound_evidence_synthesis_answer",
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
+const buildCodexCompoundEvidenceSynthesisAnswer = (input: {
+  turnId: string;
+  providerText: string;
+  normalizedArtifacts: Array<Record<string, unknown>>;
+  compoundLedger: Record<string, unknown> | null;
+}): Record<string, unknown> | null => {
+  if (!input.compoundLedger || readString(input.compoundLedger.rail_status) !== "satisfied") return null;
+  const supportRefs = input.normalizedArtifacts
+    .map((artifact) => readString(artifact.artifact_id))
+    .filter((ref): ref is string => Boolean(ref));
+  if (supportRefs.length < 2) return null;
+  return {
+    schema: "helix.compound_evidence_synthesis_answer.v1",
+    answer_id: `${input.turnId}:codex_compound_evidence_synthesis_answer`,
+    turn_id: input.turnId,
+    source: "codex_provider_normalized_observations",
+    answer_text: input.providerText,
+    text: input.providerText,
+    support_refs: supportRefs,
+    observation_refs: supportRefs,
+    provider_gateway_packet_refs: input.normalizedArtifacts.flatMap((artifact) =>
+      Array.isArray(artifact.provider_gateway_packet_refs) ? artifact.provider_gateway_packet_refs : [],
+    ),
+    compound_capability_contract_ref: `${input.turnId}:codex_compound_capability_contract`,
+    subgoal_count: readNumber(input.compoundLedger.subgoal_count) ?? supportRefs.length,
+    terminal_eligible: true,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
+const buildCodexCompoundTerminalAuthority = (input: {
+  turnId: string;
+  threadId: string;
+  route?: string | null;
+  compoundAnswer: Record<string, unknown> | null;
+}) => {
+  const text = readString(input.compoundAnswer?.answer_text) ?? readString(input.compoundAnswer?.text);
+  const answerId = readString(input.compoundAnswer?.answer_id);
+  if (!input.compoundAnswer || !text || !answerId) return null;
+  return buildHelixTurnTerminalAuthority({
+    thread_id: input.threadId,
+    turn_id: input.turnId,
+    route: input.route || "/ask/turn",
+    final_answer_source: "compound_evidence_synthesis_answer",
+    terminal_artifact_kind: "compound_evidence_synthesis_answer",
+    terminal_text: text,
+    terminal_item_id: answerId,
+    terminal_kind: "answer",
+    authority_origin: "selected_final_answer",
+    server_authoritative: true,
+    terminal_eligible: true,
+    assistant_answer: false,
+  });
+};
 
 type CodexBinaryResolution = {
   launchable: boolean;
@@ -1441,14 +1682,14 @@ export const codexProvider: HelixAgentProvider = {
       normalizedObservationPackets: gatewayObservationPackets,
       providerText: gatewayGuardedText,
       ok: processOk,
-      solverCompleted: false,
-      goalSatisfied: false,
+      solverCompleted: true,
+      goalSatisfied: gatewayCallsSucceeded(gatewayCallResults),
     });
     const providerTerminalAuthorized = Boolean(providerReentry.terminalAnswerAuthority);
     const ok = processOk && gatewayCallsSucceeded(gatewayCallResults) && providerTerminalAuthorized;
-    const projectedText = providerTerminalAuthorized
-      ? gatewayGuardedText
-      : "I could not complete this Codex provider turn because Helix observation re-entry is required before provider text can become terminal authority.";
+    const projectedText =
+      gatewayGuardedText ||
+      "I could not complete this Codex provider turn because Helix observation re-entry is required before provider text can become terminal authority.";
     const providerGatewayDebugSummary = buildProviderGatewayDebugSummary({
       body: request.body,
       runtime: "codex",

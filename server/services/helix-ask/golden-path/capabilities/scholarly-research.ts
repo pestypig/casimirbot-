@@ -27,7 +27,7 @@ export const isHelixAskGoldenPathScholarlyResearchRequested = (body: RecordLike)
   if (isHelixAskGoldenPathCapabilityNamedInRequest(body, [HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY])) return true;
   const prompt = readHelixAskGoldenPathPrompt(body).toLowerCase();
   return (
-    /\b(?:scholarly\s+research|research\s+papers?|paper\s+metadata|peer[-\s]?reviewed|literature|preprints?|arxiv|crossref|openalex|semantic\s+scholar)\b/.test(prompt)
+    /\b(?:scholarly\s+research|scholarly\s+papers?|research\s+papers?|paper\s+metadata|papers?\s+for\s+corroboration|corroborat(?:e|ion)|peer[-\s]?reviewed|literature|preprints?|arxiv|crossref|openalex|semantic\s+scholar)\b/.test(prompt)
   );
 };
 

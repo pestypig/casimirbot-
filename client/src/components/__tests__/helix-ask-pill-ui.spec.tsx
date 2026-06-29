@@ -111,7 +111,7 @@ let normalizeHelixAgentProvidersResponse: typeof import("@/components/helix/Heli
 let resolveSelectedHelixAgentRuntime: typeof import("@/components/helix/HelixAskPill").resolveSelectedHelixAgentRuntime;
 let resolveNextSelectableHelixAgentRuntime: typeof import("@/components/helix/HelixAskPill").resolveNextSelectableHelixAgentRuntime;
 let resolveHelixAskActualAgentProviderLabel: typeof import("@/components/helix/HelixAskPill").resolveHelixAskActualAgentProviderLabel;
-let parseHelixAskFinalAnswerBulletLine: typeof import("@/components/helix/HelixAskPill").parseHelixAskFinalAnswerBulletLine;
+let parseHelixAskFinalAnswerBulletLine: typeof import("@/lib/helix/ask-answer-rendering").parseHelixAskFinalAnswerBulletLine;
 let buildHelixActionEnvelopeRuntimeAuthority: typeof import("@/components/helix/HelixAskPill").buildHelixActionEnvelopeRuntimeAuthority;
 
 beforeAll(async () => {
@@ -225,9 +225,9 @@ beforeAll(async () => {
     resolveSelectedHelixAgentRuntime,
     resolveNextSelectableHelixAgentRuntime,
     resolveHelixAskActualAgentProviderLabel,
-    parseHelixAskFinalAnswerBulletLine,
     buildHelixActionEnvelopeRuntimeAuthority,
   } = await import("@/components/helix/HelixAskPill"));
+  ({ parseHelixAskFinalAnswerBulletLine } = await import("@/lib/helix/ask-answer-rendering"));
 });
 
 const pillPath = path.resolve(process.cwd(), "client/src/components/helix/HelixAskPill.tsx");
@@ -1160,12 +1160,28 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain('normalized.startsWith("docs/")');
   });
 
+  it("promotes current whitepaper prompts to the retained docs-viewer path", () => {
+    const source = fs.readFileSync(pillPath, "utf8");
+    expect(source).toContain("HELIX_ACTIVE_DOC_VIEWER_ARTIFACT_CUE_RE");
+    expect(source).toContain("white\\s*paper|whitepaper");
+    expect(source).toContain("resolveAskTurnDocViewerSnapshotPath().path");
+    expect(source).toContain("contextFiles: docsViewerAnchorPath ? [docsViewerAnchorPath] : undefined");
+  });
+
   it("advertises backend debug export lookup for chat-scoped Ask turn ids", () => {
     const source = fs.readFileSync(pillPath, "utf8");
     expect(source).toContain("isBackendAskTurnDebugExportEligibleTurnId");
     expect(source).toContain('trimmed.startsWith("ask:")');
     expect(source).toContain('(?:^|:)ask:[^:]+');
     expect(source).toContain("const activeTurnFallbackRef = isBackendAskTurnDebugExportEligibleTurnId(activeTurnId)");
+  });
+
+  it("keeps rendered-button debug copy scoped to the visible reply turn", () => {
+    const source = fs.readFileSync(pillPath, "utf8");
+    expect(source).toContain('debug_export_rebuild_reason: reason');
+    expect(source).toContain('rebuildReason === "rendered_button_scope"');
+    expect(source).toContain("matchingBackendRef ??");
+    expect(source).toContain("(isReplyScopedRebuild ? null : refCandidates[0])");
   });
 
   it("routes voice lite prompts through normal-turn lane without queued reasoning", () => {
@@ -1726,6 +1742,13 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("@keyframes helixAskTurnFadeIn");
     expect(source).toContain('title="Copy response"');
     expect(source).toContain('title="Unified Debug Copy"');
+    expect(source).toContain("buildReplyScopedDebugExportFromRenderedButton");
+    expect(source).toContain("selectedDebugTurnId: reply.id");
+    expect(source).toContain('selectedDebugSource: "rendered_reply_dom"');
+    expect(source).toContain("debug_export_ref: replyRecord.debug_export_ref ?? replyDebugRecord?.debug_export_ref ?? null");
+    expect(source.indexOf("buildReplyScopedDebugExportFromRenderedButton")).toBeLessThan(
+      source.indexOf('title="Unified Debug Copy"'),
+    );
     expect(source).toContain("formatReadAloudButtonLabel");
     expect(source).not.toContain("Copy Capsule");
     expect(source).not.toContain("Open conversation");
@@ -1786,57 +1809,63 @@ describe("HelixAskPill mic-first surface contract", () => {
 
   it("renders live-source mail loop rows in the continuous Helix Ask transcript", () => {
     const source = fs.readFileSync(pillPath, "utf8");
+    const liveSourceDisplay = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/lib/helix/ask-live-source-display.ts"),
+      "utf8",
+    );
+    expect(source).toContain('from "@/lib/helix/ask-live-source-display"');
     expect(source).toContain("collectHelixMailLoopTranscriptRows");
     expect(source).toContain("buildHelixMailLoopTurnStreamRows");
-    expect(source).toContain("HELIX_MAIL_LOOP_TRANSCRIPT_ROW_KINDS");
-    expect(source).toContain('"mail_received"');
-    expect(source).toContain('"mail_read_tool_call"');
-    expect(source).toContain('"mail_read_receipt"');
-    expect(source).toContain('"prediction_check"');
-    expect(source).toContain('"task_queued"');
-    expect(source).toContain('"narrative_projection"');
-    expect(source).toContain('"agent_decision"');
-    expect(source).toContain('"interpretation"');
-    expect(source).toContain('"watch_next"');
-    expect(source).toContain('"prediction"');
-    expect(source).toContain('"narrative_state"');
-    expect(source).toContain('"interpreter_profile"');
-    expect(source).toContain('"profile_comparison"');
-    expect(source).toContain('"profile_note_link"');
-    expect(source).toContain('"profile_compiled"');
-    expect(source).toContain('"text_answer"');
-    expect(source).toContain('"voice_callout_request"');
-    expect(source).toContain('"voice_tool_call"');
-    expect(source).toContain('"voice_receipt"');
-    expect(source).toContain('"voice_steering_received"');
-    expect(source).toContain('"voice_steering_queued"');
-    expect(source).toContain('"voice_steering_applied"');
-    expect(source).toContain('"steering_ack_receipt"');
-    expect(source).toContain('"goal_context_snapshot"');
-    expect(source).toContain('"wait_for_next_summary"');
-    expect(source).toContain('if (row.rowKind === "prediction_check") return row.body || "No prior prediction."');
-    expect(source).toContain('if (row.rowKind === "goal_context_snapshot") return row.body || "Goal context snapshot recorded as non-terminal evidence."');
-    expect(source).toContain("live_env.read_live_source_mail");
-    expect(source).toContain("Read ${count} unread live-source mail item");
-    expect(source).toContain('count === "1"');
-    expect(source).toContain("Reason:");
-    expect(source).toContain("Prediction check");
-    expect(source).toContain("Narrative projection");
-    expect(source).toContain("Narrative state");
-    expect(source).toContain("Interpreter profile");
-    expect(source).toContain("Profile comparison");
-    expect(source).toContain("Text draft");
-    expect(source).toContain("Voice callout request");
-    expect(source).toContain("Voice tool call");
-    expect(source).toContain("Voice receipt");
-    expect(source).toContain("Voice steering received");
-    expect(source).toContain("Steering ack receipt");
-    expect(source).toContain("Goal context snapshot");
-    expect(source).toContain('if (row.rowKind === "goal_context_snapshot") return "observation"');
-    expect(source).toContain('row.rowKind === "goal_context_snapshot"');
-    expect(source).toContain('? "live_answer"');
-    expect(source).toContain('if (row.rowKind === "loop_state") return row.title || "Loop state"');
-    expect(source).toContain('row.rowKind.startsWith("voice_steering_")');
+    expect(source).not.toContain("const HELIX_MAIL_LOOP_TRANSCRIPT_ROW_KINDS");
+    expect(liveSourceDisplay).toContain("HELIX_MAIL_LOOP_TRANSCRIPT_ROW_KINDS");
+    expect(liveSourceDisplay).toContain('"mail_received"');
+    expect(liveSourceDisplay).toContain('"mail_read_tool_call"');
+    expect(liveSourceDisplay).toContain('"mail_read_receipt"');
+    expect(liveSourceDisplay).toContain('"prediction_check"');
+    expect(liveSourceDisplay).toContain('"task_queued"');
+    expect(liveSourceDisplay).toContain('"narrative_projection"');
+    expect(liveSourceDisplay).toContain('"agent_decision"');
+    expect(liveSourceDisplay).toContain('"interpretation"');
+    expect(liveSourceDisplay).toContain('"watch_next"');
+    expect(liveSourceDisplay).toContain('"prediction"');
+    expect(liveSourceDisplay).toContain('"narrative_state"');
+    expect(liveSourceDisplay).toContain('"interpreter_profile"');
+    expect(liveSourceDisplay).toContain('"profile_comparison"');
+    expect(liveSourceDisplay).toContain('"profile_note_link"');
+    expect(liveSourceDisplay).toContain('"profile_compiled"');
+    expect(liveSourceDisplay).toContain('"text_answer"');
+    expect(liveSourceDisplay).toContain('"voice_callout_request"');
+    expect(liveSourceDisplay).toContain('"voice_tool_call"');
+    expect(liveSourceDisplay).toContain('"voice_receipt"');
+    expect(liveSourceDisplay).toContain('"voice_steering_received"');
+    expect(liveSourceDisplay).toContain('"voice_steering_queued"');
+    expect(liveSourceDisplay).toContain('"voice_steering_applied"');
+    expect(liveSourceDisplay).toContain('"steering_ack_receipt"');
+    expect(liveSourceDisplay).toContain('"goal_context_snapshot"');
+    expect(liveSourceDisplay).toContain('"wait_for_next_summary"');
+    expect(liveSourceDisplay).toContain('if (row.rowKind === "prediction_check") return row.body || "No prior prediction."');
+    expect(liveSourceDisplay).toContain('if (row.rowKind === "goal_context_snapshot") return row.body || "Goal context snapshot recorded as non-terminal evidence."');
+    expect(liveSourceDisplay).toContain("live_env.read_live_source_mail");
+    expect(liveSourceDisplay).toContain("Read ${count} unread live-source mail item");
+    expect(liveSourceDisplay).toContain('count === "1"');
+    expect(liveSourceDisplay).toContain("Reason:");
+    expect(liveSourceDisplay).toContain("Prediction check");
+    expect(liveSourceDisplay).toContain("Narrative projection");
+    expect(liveSourceDisplay).toContain("Narrative state");
+    expect(liveSourceDisplay).toContain("Interpreter profile");
+    expect(liveSourceDisplay).toContain("Profile comparison");
+    expect(liveSourceDisplay).toContain("Text draft");
+    expect(liveSourceDisplay).toContain("Voice callout request");
+    expect(liveSourceDisplay).toContain("Voice tool call");
+    expect(liveSourceDisplay).toContain("Voice receipt");
+    expect(liveSourceDisplay).toContain("Voice steering received");
+    expect(liveSourceDisplay).toContain("Steering ack receipt");
+    expect(liveSourceDisplay).toContain("Goal context snapshot");
+    expect(liveSourceDisplay).toContain('if (row.rowKind === "goal_context_snapshot") return "observation"');
+    expect(liveSourceDisplay).toContain('row.rowKind === "goal_context_snapshot"');
+    expect(liveSourceDisplay).toContain('? "live_answer"');
+    expect(liveSourceDisplay).toContain('if (row.rowKind === "loop_state") return row.title || "Loop state"');
+    expect(liveSourceDisplay).toContain('row.rowKind.startsWith("voice_steering_")');
   });
 
   it("keeps wake mail transcript rows out of the durable chat projection", () => {

@@ -1,8 +1,9 @@
 import express from "express";
 import request from "supertest";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { planRouter, resetHelixAskDebugPayloadCacheForTests } from "../routes/agi.plan";
+import { resetHelixAskTurnAdmissionForTests } from "../services/helix-ask/ask-turn-admission";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
   HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
@@ -20,6 +21,7 @@ import {
   HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
 } from "../services/helix-ask/golden-path-runtime";
 import { HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY } from "../services/helix-ask/workspace-directory-resolver";
+import { resetRuntimeMemoryGovernorForTests } from "../services/runtime/runtime-memory-governor";
 
 const originalGoldenPathFlag = process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG];
 
@@ -104,7 +106,7 @@ const expectCompoundRails = (
   expect(payload.compound_capability_contract).toMatchObject({
     satisfaction: "satisfied",
   });
-  expect(payload.compound_capability_contract?.ordered_subgoals).toHaveLength(2);
+  expect(payload.compound_capability_contract?.ordered_subgoals).toHaveLength(expectedObservationKinds.length);
   for (const subgoal of payload.compound_capability_contract?.ordered_subgoals ?? []) {
     expect(subgoal).toMatchObject({
       requested_capability: expect.any(String),
@@ -122,12 +124,19 @@ const expectCompoundRails = (
     executed_capability: "compound_capability_contract",
     observed_artifact_kind: "compound_subgoal_observations",
     terminal_artifact_kind: "compound_evidence_synthesis_answer",
-    compound_subgoal_count: 2,
+    compound_subgoal_count: expectedObservationKinds.length,
   });
 };
 
+beforeEach(() => {
+  resetHelixAskTurnAdmissionForTests();
+  resetRuntimeMemoryGovernorForTests();
+});
+
 afterEach(() => {
   resetHelixAskDebugPayloadCacheForTests();
+  resetHelixAskTurnAdmissionForTests();
+  resetRuntimeMemoryGovernorForTests();
   if (originalGoldenPathFlag === undefined) {
     delete process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG];
   } else {
@@ -461,6 +470,59 @@ describe("Helix Ask golden-path route gate", () => {
     expectExplicitCapabilityRails(response.body, "calculator_receipt", "workstation_tool_evaluation");
   });
 
+  it("routes UI Helix-mode payload markers through golden path without prompt scaffold text", async () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+    const app = createApp();
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        agent_runtime: "helix",
+        goldenPathRuntime: true,
+        golden_path_runtime: true,
+        turn_id: "ask:test:golden-route-ui-helix-payload",
+        prompt:
+          "Use the NHM2 whitepaper, calculate 6 * 7, reflect with the theory badge graph, apply civilization bounds, and check scholarly papers for corroboration.",
+        doc_path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        query: "NHM2 Casimir tile",
+        doc_content:
+          "The NHM2 whitepaper discusses Casimir tile generation. A bounded diagnostic table mentions Casimir tile pressure internal normal attraction stack force claim boundary.",
+        calculator_expression: "6 * 7",
+      })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      final_status: "final_answer",
+      terminal_artifact_kind: "compound_evidence_synthesis_answer",
+      final_answer_source: "compound_evidence_synthesis_answer",
+      terminal_error_code: null,
+      debug: {
+        golden_path_runtime: expect.objectContaining({
+          legacy_route_bypassed: true,
+          status: "compound_itinerary",
+        }),
+      },
+      compound_capability_contract: {
+        satisfaction: "satisfied",
+      },
+    });
+    expectCompoundRails(response.body, [
+      "doc_location_matches",
+      "calculator_receipt",
+      "helix_theory_context_reflection_tool_receipt",
+      "helix_civilization_bounds_tool_result",
+      "scholarly_research_observation",
+    ]);
+    expect(response.body.current_turn_artifact_ledger?.some((artifact: { kind?: string }) => artifact.kind === "doc_location_matches")).toBe(true);
+    expect(response.body.current_turn_artifact_ledger?.some((artifact: { kind?: string }) => artifact.kind === "calculator_receipt")).toBe(true);
+    expect(
+      response.body.current_turn_artifact_ledger?.some(
+        (artifact: { kind?: string }) => artifact.kind === "scholarly_research_observation",
+      ),
+    ).toBe(true);
+    expect(response.body.terminal_artifact_kind).not.toBe("agent_provider_terminal_candidate");
+  });
+
   it("routes a docs plus calculator compound turn through the golden-path runtime", async () => {
     process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
     const app = createApp();
@@ -547,7 +609,7 @@ describe("Helix Ask golden-path route gate", () => {
         doc_content: "The completed solver path gates terminal authority and visible projection.",
       },
       expectedStatus: "repo_docs_compound",
-      expectedObservationKinds: ["repo_code_evidence_observation", "repo_evidence_relevance_gate", "doc_location_matches"],
+      expectedObservationKinds: ["repo_code_evidence_observation", "doc_location_matches"],
     },
     {
       name: "internet research plus theory reflection",
@@ -698,6 +760,9 @@ describe("Helix Ask golden-path route gate", () => {
       .post("/api/agi/ask/turn/stream")
       .send({
         turn_id: "ask:test:golden-stream-docs-calculator",
+        sessionId: "helix-ask:test:golden-stream-docs-calculator",
+        traceId: "trace:test:golden-stream-docs-calculator",
+        question: "Use docs-viewer.locate_in_doc and scientific-calculator.solve_expression",
         prompt: "helix_ask_golden_path_runtime use docs-viewer.locate_in_doc and scientific-calculator.solve_expression",
         goldenPathRuntime: true,
         requested_capabilities: [

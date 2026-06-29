@@ -102,6 +102,118 @@ export {
   filterHelixAskActiveTurnStreamRows,
   shouldAdmitHelixAskExternalLiveEventToActiveStream,
 };
+export type {
+  HelixContinuousTurnStreamRow,
+  HelixContinuousTurnStreamTone,
+} from "@/lib/helix/ask-active-turn-stream";
+import {
+  buildHelixContinuousTurnStreamRows,
+  buildLiveAnswerTurnBridgeState,
+  readHelixContinuousTurnStreamDotClass,
+  readHelixContinuousTurnStreamRowClass,
+  readLiveAnswerTurnBridgeClassName,
+  readLiveAnswerTurnBridgePillClassName,
+} from "@/lib/helix/ask-continuous-turn-display";
+export {
+  buildHelixContinuousTurnStreamRows,
+  buildLiveAnswerTurnBridgeState,
+  readHelixContinuousTurnStreamDotClass,
+  readHelixContinuousTurnStreamRowClass,
+  readLiveAnswerTurnBridgeClassName,
+  readLiveAnswerTurnBridgePillClassName,
+};
+export type {
+  LiveAnswerTurnBridgePill,
+  LiveAnswerTurnBridgeState,
+  LiveAnswerTurnBridgeTone,
+} from "@/lib/helix/ask-continuous-turn-display";
+import {
+  buildHelixAskMathRenderDebugForText,
+  hasHelixAskRenderableMath,
+  isHelixAskEquationFamilyDebug,
+  isLikelyCodeStyleMathToken,
+  parseHelixAskFinalAnswerBulletLine,
+  shouldShowHelixAskCalculatorPanel,
+  tokenizeHelixAskMathTokens,
+  type HelixAskMathToken,
+} from "@/lib/helix/ask-answer-rendering";
+export {
+  buildHelixAskMathRenderDebugForText,
+  hasHelixAskRenderableMath,
+  isHelixAskEquationFamilyDebug,
+  isLikelyCodeStyleMathToken,
+  parseHelixAskFinalAnswerBulletLine,
+  shouldShowHelixAskCalculatorPanel,
+  tokenizeHelixAskMathTokens,
+};
+export type {
+  HelixAskMathRenderDebug,
+  HelixAskMathToken,
+  HelixAskMathTokenDebugStatus,
+  HelixAskMathTokenRenderStatus,
+} from "@/lib/helix/ask-answer-rendering";
+import {
+  buildHelixMailLoopTurnStreamRows,
+  collectHelixMailLoopTranscriptRows,
+} from "@/lib/helix/ask-live-source-display";
+export {
+  buildHelixMailLoopTurnStreamRows,
+  collectHelixMailLoopTranscriptRows,
+};
+export type { HelixMailLoopTranscriptRow } from "@/lib/helix/ask-live-source-display";
+import {
+  HELIX_ASK_STEERING_QUEUE_MAX_ITEMS,
+  buildHelixAskSteeringQueueItems,
+  readHelixSteeringQueueDotClass,
+  readHelixSteeringQueueItemClass,
+  shouldAutoWakeHelixMailboxQueueItem,
+} from "@/lib/helix/ask-steering-queue-display";
+export {
+  HELIX_ASK_STEERING_QUEUE_MAX_ITEMS,
+  buildHelixAskSteeringQueueItems,
+  readHelixSteeringQueueDotClass,
+  readHelixSteeringQueueItemClass,
+  shouldAutoWakeHelixMailboxQueueItem,
+};
+export type {
+  HelixAskSteeringQueueItem,
+  HelixAskSteeringQueueStatus,
+  HelixAskSteeringQueueTone,
+} from "@/lib/helix/ask-steering-queue-display";
+import {
+  buildAskLiveEventLogDetailPayload,
+  buildAskLiveEventLogExport,
+  formatAskLiveEventLogLine,
+  parseHelixAskQueuedQuestionsInput,
+  readEventMetaString,
+  resolveAskLiveEventTimestampMs,
+  type AskLiveEventEntry,
+} from "@/lib/helix/ask-debug-event-display";
+export { parseHelixAskQueuedQuestionsInput };
+import {
+  buildObserverCommentaryForRow,
+  type ObserverCommentaryOptions,
+} from "@/lib/helix/ask-observer-commentary-display";
+export { buildObserverCommentaryForRow };
+import {
+  readHelixCausalTraceRowClass,
+  readProceduralStatusClass,
+} from "@/lib/helix/ask-status-classnames";
+import { readProceduralActionLabel } from "@/lib/helix/ask-procedural-display";
+import {
+  buildContextCapsuleCopyText,
+  resolveContextCapsulePalette,
+  stripContextCapsuleTokensFromText,
+} from "@/lib/helix/ask-context-capsule-display";
+import {
+  formatEnvelopeSectionsForCopy,
+  normalizeHelixAskEnvelopeCitations,
+} from "@/lib/helix/ask-envelope-copy";
+import {
+  formatGoalPillCadence,
+  labelizeGoalPillValue,
+} from "@/lib/helix/ask-goal-pill-display";
+import { humanizeAskLiveEventToken } from "@/lib/helix/ask-display-text";
 import {
   buildHelixCausalTurnTraceRows,
   buildHelixRuntimeTranscriptEvents,
@@ -317,7 +429,6 @@ import {
   extractContextCapsuleIdsFromText,
   injectContextCapsuleCommit,
   normalizeContextCapsuleId,
-  renderContextCapsuleStampLines,
   stepContextCapsuleAutomaton,
   type ContextCapsuleAutomaton,
   type ContextCapsuleConvergence,
@@ -6855,17 +6966,6 @@ type HelixAskReply = {
   };
 };
 
-type AskLiveEventEntry = {
-  id: string;
-  text: string;
-  tool?: string;
-  ts?: string | number;
-  tsMs?: number;
-  seq?: number;
-  durationMs?: number;
-  meta?: Record<string, unknown>;
-};
-
 type HelixAskConsoleStreamIngressDebug = {
   schema: "helix.ask.console_stream_ingress_debug.v1";
   turnId: string | null;
@@ -8148,27 +8248,6 @@ function buildHelixRuntimeAskLiveEvents(reply: HelixAskReply): AskLiveEventEntry
   }));
 }
 
-function readProceduralActionLabel(value: unknown): string {
-  const action = readAgentLoopAuditRecord(value);
-  if (!action) return "model step";
-  const panelId = typeof action.panel_id === "string" && action.panel_id.trim() ? action.panel_id.trim() : "";
-  const actionId = typeof action.action_id === "string" && action.action_id.trim() ? action.action_id.trim() : "";
-  if (panelId && actionId) return `${panelId}.${actionId}`;
-  if (actionId) return actionId;
-  return "model step";
-}
-
-function readProceduralStatusClass(status: string): string {
-  if (status === "completed") return "border-emerald-300/35 bg-emerald-400/10 text-emerald-50";
-  if (status === "canceled") return "border-slate-300/25 bg-slate-400/10 text-slate-200";
-  if (status === "running") return "animate-pulse border-sky-300/35 bg-sky-400/10 text-sky-50";
-  if (status === "suppressed") return "border-amber-300/35 bg-amber-400/10 text-amber-50";
-  if (status === "failed") return "border-rose-300/35 bg-rose-400/10 text-rose-50";
-  if (status === "pending_input") return "border-blue-300/35 bg-blue-400/10 text-blue-50";
-  if (status === "planned") return "border-white/10 bg-white/5 text-slate-300";
-  return "border-white/10 bg-white/5 text-slate-300";
-}
-
 function renderProceduralTurnTimeline(reply: HelixAskReply): React.ReactNode {
   const replyRecord = readAgentLoopAuditRecord(reply);
   const truthTable = readAgentLoopAuditRecord(reply.debug?.turn_truth_table);
@@ -8370,186 +8449,6 @@ function renderProceduralTurnTimeline(reply: HelixAskReply): React.ReactNode {
   );
 }
 
-function readHelixCausalTraceRowClass(row: HelixTurnTranscriptRow): string {
-  if (/\b(?:failed|blocked)\b/i.test(row.status)) {
-    return "border-amber-300/30 bg-amber-950/20 text-amber-50";
-  }
-  if (row.label === "Final" || row.label === "Terminal") {
-    return "border-violet-300/25 bg-violet-950/15 text-violet-50";
-  }
-  if (row.label === "Observation") {
-    return "border-emerald-300/25 bg-emerald-950/15 text-emerald-50";
-  }
-  if (row.label === "Gate") {
-    return "border-cyan-300/25 bg-cyan-950/15 text-cyan-50";
-  }
-  return "border-slate-600/30 bg-black/15 text-slate-100";
-}
-
-function uniqueStagePlayLedgerStrings(values: string[]): string[] {
-  return Array.from(new Set(values.filter(Boolean)));
-}
-
-export type LiveAnswerTurnBridgeTone = "cyan" | "amber" | "emerald" | "slate";
-
-export type LiveAnswerTurnBridgePill = {
-  label: string;
-  tone: LiveAnswerTurnBridgeTone;
-};
-
-export type LiveAnswerTurnBridgeState = {
-  title: string;
-  detail: string;
-  meta: string;
-  tone: LiveAnswerTurnBridgeTone;
-  evidenceRefs: string[];
-  pills: LiveAnswerTurnBridgePill[];
-  status:
-    | "answer_snapshot_ready"
-    | "checkpoint_queued"
-    | "checkpoint_waiting"
-    | "receipt_fallback"
-    | "live_state_available";
-};
-
-type HelixContinuousTurnStreamTone =
-  | "question"
-  | "working"
-  | "observation"
-  | "checkpoint"
-  | "bridge"
-  | "final"
-  | "warning";
-
-export type HelixContinuousTurnStreamRow = {
-  key: string;
-  source: "question" | "agent_work" | "stage_play" | "live_bridge" | "live_source_mail" | "voice" | "final";
-  label: string;
-  text: string;
-  meta: string;
-  status: string;
-  tone: HelixContinuousTurnStreamTone;
-  evidenceRefs: string[];
-  actions?: Array<"Run" | "Skip" | "Pause job">;
-  bridgePills?: LiveAnswerTurnBridgePill[];
-  detailLimit?: number;
-};
-
-export type HelixMailLoopTranscriptRowKind =
-  | "mail_received"
-  | "mail_wake_requested"
-  | "mail_wake_deferred"
-  | "mail_read_tool_call"
-  | "mail_read_receipt"
-  | "task_queued"
-  | "task_deferred"
-  | "task_running"
-  | "task_completed"
-  | "budget_state"
-  | "processed_mail_read"
-  | "processed_mail_packet"
-  | "processed_mail_goal_satisfied"
-  | "decision_recorded"
-  | "voice_candidate"
-  | "voice_requested"
-  | "voice_blocked"
-  | "checkpoint_summary"
-  | "continuation_scheduled"
-  | "continuation_deferred"
-  | "tool_budget_no_progress"
-  | "micro_reasoner_run"
-  | "prediction_check"
-  | "narrative_projection"
-  | "agent_decision"
-  | "interpretation"
-  | "prediction"
-  | "watch_next"
-  | "narrative_state"
-  | "interpretation_state"
-  | "interpreter_profile"
-  | "profile_comparison"
-  | "profile_note_link"
-  | "profile_compiled"
-  | "text_answer"
-  | "voice_callout_request"
-  | "voice_tool_call"
-  | "voice_receipt"
-  | "voice_steering_received"
-  | "voice_steering_queued"
-  | "voice_steering_applied"
-  | "voice_steering_deferred"
-  | "voice_steering_rejected"
-  | "voice_steering_cancel_requested"
-  | "steering_ack_receipt"
-  | "goal_context_snapshot"
-  | "wait_for_next_summary"
-  | "requested_tool"
-  | "loop_state"
-  | "blocked";
-
-const HELIX_MAIL_LOOP_TRANSCRIPT_ROW_KINDS = new Set<HelixMailLoopTranscriptRowKind>([
-  "mail_received",
-  "mail_wake_requested",
-  "mail_wake_deferred",
-  "mail_read_tool_call",
-  "mail_read_receipt",
-  "task_queued",
-  "task_deferred",
-  "task_running",
-  "task_completed",
-  "budget_state",
-  "processed_mail_read",
-  "processed_mail_packet",
-  "processed_mail_goal_satisfied",
-  "decision_recorded",
-  "voice_candidate",
-  "voice_requested",
-  "voice_blocked",
-  "checkpoint_summary",
-  "continuation_scheduled",
-  "continuation_deferred",
-  "tool_budget_no_progress",
-  "micro_reasoner_run",
-  "prediction_check",
-  "narrative_projection",
-  "agent_decision",
-  "interpretation",
-  "prediction",
-  "watch_next",
-  "narrative_state",
-  "interpretation_state",
-  "interpreter_profile",
-  "profile_comparison",
-  "profile_note_link",
-  "profile_compiled",
-  "text_answer",
-  "voice_callout_request",
-  "voice_tool_call",
-  "voice_receipt",
-  "voice_steering_received",
-  "voice_steering_queued",
-  "voice_steering_applied",
-  "voice_steering_deferred",
-  "voice_steering_rejected",
-  "voice_steering_cancel_requested",
-  "steering_ack_receipt",
-  "goal_context_snapshot",
-  "wait_for_next_summary",
-  "requested_tool",
-  "loop_state",
-  "blocked",
-]);
-
-export type HelixMailLoopTranscriptRow = {
-  rowId: string;
-  rowKind: HelixMailLoopTranscriptRowKind;
-  title: string;
-  body: string;
-  evidenceRefs: string[];
-  authority: string;
-  terminalEligible: boolean;
-};
-
 type StagePlayLiveSourceMailTranscriptResponse = {
   ok?: boolean;
   threadId?: string | null;
@@ -8690,20 +8589,6 @@ async function fetchStagePlayLiveSourceMailTranscript(input: {
   return await response.json() as StagePlayLiveSourceMailTranscriptResponse;
 }
 
-function labelizeGoalPillValue(value: string | null | undefined): string {
-  return String(value ?? "")
-    .replace(/[_-]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim() || "none";
-}
-
-function formatGoalPillCadence(cadence: AgentGoalSessionV1["cadence"]): string {
-  if (cadence.kind === "interval") return `${Math.round(cadence.everyMs / 1000)}s interval`;
-  if (cadence.kind === "event_accumulation") return `${cadence.minUpdates} updates`;
-  if (cadence.kind === "user_turn_only") return "user turns";
-  return "manual";
-}
-
 function HelixAskGoalPill({
   session,
   expanded,
@@ -8816,759 +8701,6 @@ function HelixAskGoalPill({
       ) : null}
     </section>
   );
-}
-
-function toneForHelixTranscriptRow(row: HelixTurnTranscriptRow): HelixContinuousTurnStreamTone {
-  if (/\b(?:failed|blocked|error|mismatch)\b/i.test(row.status) || row.label === "Notice") return "warning";
-  if (row.label === "Observation" || row.label === "Recorded") return "observation";
-  if (row.label === "Decision" || row.label === "Gate") return "checkpoint";
-  if (row.label === "Final" || row.label === "Terminal") return "final";
-  return "working";
-}
-
-function toneForStagePlayLedgerEvent(event: StagePlayChatLedgerEvent): HelixContinuousTurnStreamTone {
-  if (event.kind === "checkpoint_request" || event.kind === "ask_checkpoint") return "checkpoint";
-  if (event.kind === "answer_snapshot") return "final";
-  if (event.kind === "debug_receipt" || event.kind === "source_observation" || event.kind === "live_output") return "observation";
-  if (event.kind === "perturbation") return "warning";
-  return "working";
-}
-
-function readHelixMailLoopTranscriptRow(value: unknown): HelixMailLoopTranscriptRow | null {
-  const record = readAgentLoopAuditRecord(value);
-  const rowKind = coerceText(record?.rowKind).trim() as HelixMailLoopTranscriptRowKind;
-  if (!record || !HELIX_MAIL_LOOP_TRANSCRIPT_ROW_KINDS.has(rowKind)) return null;
-  const rowId = coerceText(record.rowId).trim() || `mail-loop-row:${rowKind}:${clipText(coerceText(record.body), 48)}`;
-  const evidenceRefs = Array.isArray(record.evidenceRefs)
-    ? record.evidenceRefs.map((entry) => coerceText(entry).trim()).filter(Boolean)
-    : [];
-  return {
-    rowId,
-    rowKind,
-    title: coerceText(record.title).trim(),
-    body: coerceText(record.body).trim(),
-    evidenceRefs: Array.from(new Set(evidenceRefs)),
-    authority: coerceText(record.authority).trim(),
-    terminalEligible: record.terminalEligible === true,
-  };
-}
-
-function collectHelixMailLoopTranscriptRowsFromCandidate(value: unknown): HelixMailLoopTranscriptRow[] {
-  const record = readAgentLoopAuditRecord(value);
-  if (!record) return [];
-  const rows = Array.isArray(record.transcriptRows)
-    ? record.transcriptRows.map(readHelixMailLoopTranscriptRow).filter((row): row is HelixMailLoopTranscriptRow => Boolean(row))
-    : [];
-  const payload = readAgentLoopAuditRecord(record.payload);
-  if (payload) rows.push(...collectHelixMailLoopTranscriptRowsFromCandidate(payload));
-  const observation = readAgentLoopAuditRecord(record.observation);
-  if (observation) rows.push(...collectHelixMailLoopTranscriptRowsFromCandidate(observation));
-  return rows;
-}
-
-function collectHelixMailLoopTranscriptRows(reply: HelixAskReply): HelixMailLoopTranscriptRow[] {
-  const replyRecord = readAgentLoopAuditRecord(reply);
-  const debugRecord = readAgentLoopAuditRecord(reply.debug);
-  const candidates: unknown[] = [
-    replyRecord,
-    debugRecord,
-    replyRecord?.latest_result_artifact,
-    debugRecord?.latest_result_artifact,
-    replyRecord?.stage_play_live_source_mail,
-    debugRecord?.stage_play_live_source_mail,
-    replyRecord?.live_source_mail_read_result,
-    debugRecord?.live_source_mail_read_result,
-    replyRecord?.live_source_mail_decision,
-    debugRecord?.live_source_mail_decision,
-    ...readAgentLoopAuditArray(replyRecord?.current_turn_artifact_ledger),
-    ...readAgentLoopAuditArray(debugRecord?.current_turn_artifact_ledger),
-    ...readAgentLoopAuditArray(replyRecord?.artifact_ledger),
-    ...readAgentLoopAuditArray(debugRecord?.artifact_ledger),
-  ];
-  const rows = candidates.flatMap(collectHelixMailLoopTranscriptRowsFromCandidate);
-  const seen = new Set<string>();
-  return rows.filter((row) => {
-    const key = `${row.rowId}:${row.rowKind}:${row.body}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-
-function formatHelixMailLoopTranscriptBody(row: HelixMailLoopTranscriptRow): string {
-  if (row.rowKind === "mail_received") {
-    const preview = row.body.match(/\bPreview:\s*([\s\S]+)/i)?.[1]?.trim();
-    return preview ?? (row.body || "Visual summary received.");
-  }
-  if (row.rowKind === "prediction_check") return row.body || "No prior prediction.";
-  if (row.rowKind === "narrative_projection") return row.body || "Narrative projection recorded.";
-  if (row.rowKind === "budget_state") return row.body || "Mail-loop budget state recorded.";
-  if (row.rowKind === "processed_mail_read") return row.body || "Processed live-source mail packet read.";
-  if (row.rowKind === "processed_mail_packet") return row.body || "Processed mail packet available.";
-  if (row.rowKind === "processed_mail_goal_satisfied") return row.body || "Goal satisfied by processed mail.";
-  if (row.rowKind === "decision_recorded") return row.body || "Decision recorded.";
-  if (row.rowKind === "voice_candidate") return row.body || "Voice candidate prepared.";
-  if (row.rowKind === "voice_requested") return row.body || "Voice callout requested.";
-  if (row.rowKind === "voice_blocked") return row.body || "Voice callout blocked or held by policy.";
-  if (row.rowKind === "checkpoint_summary") return row.body || "Checkpoint summary recorded.";
-  if (row.rowKind === "continuation_scheduled") return row.body || "Continuation scheduled; backend wake loop remains armed.";
-  if (row.rowKind === "continuation_deferred") return row.body || "Continuation deferred for pressure; unread mail retained.";
-  if (row.rowKind === "tool_budget_no_progress") return row.body || "Tool budget stopped because the latest tool call made no progress.";
-  if (row.rowKind === "micro_reasoner_run") return row.body || "Micro-reasoner run recorded.";
-  if (row.rowKind === "task_queued" || row.rowKind === "task_deferred" || row.rowKind === "task_running" || row.rowKind === "task_completed") return row.body;
-  if (row.rowKind === "mail_read_tool_call") return "live_env.read_live_source_mail";
-  if (row.rowKind === "mail_read_receipt") {
-    if (/^\s*Read\s+\d+\s+/i.test(row.body)) return row.body;
-    const count = row.body.match(/\b(\d+)\s+unread\b/i)?.[1] ?? "1";
-    return `Read ${count} unread live-source mail item${count === "1" ? "" : "s"}.`;
-  }
-  if (row.rowKind === "agent_decision") {
-    const match = row.body.match(/^([^:]+):\s*([\s\S]+)$/);
-    if (match) return `${match[1].trim()}\nReason: ${match[2].trim()}`;
-    return row.body;
-  }
-  if (row.rowKind === "interpretation") return row.body || "Interpretation recorded.";
-  if (row.rowKind === "watch_next") return row.body || "Watch the next compact source summary.";
-  if (row.rowKind === "prediction") return row.body || "Prediction recorded.";
-  if (row.rowKind === "narrative_state") return row.body || "Narrative state recorded.";
-  if (row.rowKind === "interpretation_state") return row.body || "Interpretation state recorded.";
-  if (row.rowKind === "interpreter_profile") return row.body || "Interpreter profile applied.";
-  if (row.rowKind === "profile_comparison") return row.body || "Profile comparison recorded.";
-  if (row.rowKind === "profile_note_link") return row.body || "Interpreter profile note linked.";
-  if (row.rowKind === "profile_compiled") return row.body || "Interpreter profile compiled from note.";
-  if (row.rowKind === "wait_for_next_summary") return "No unread live-source updates.\nStanding by for the next source update.";
-  if (row.rowKind === "mail_wake_requested") return row.body || "Wake requested for live-source mail.";
-  if (row.rowKind === "mail_wake_deferred") return row.body || "Wake deferred; mailbox remains armed for the next summary.";
-  if (row.rowKind === "blocked") return row.body || "Wake blocked; mailbox remains available for a later check.";
-  if (row.rowKind === "voice_tool_call" && !row.body) return "voice_delivery";
-  if (row.rowKind === "voice_receipt" && !row.body) return "Voice delivery receipt recorded.";
-  if (row.rowKind === "voice_steering_received") return row.body || "Voice steering received.";
-  if (row.rowKind === "voice_steering_queued") return row.body || "Voice steering queued for a safe boundary.";
-  if (row.rowKind === "voice_steering_applied") return row.body || "Voice steering applied at a safe boundary.";
-  if (row.rowKind === "voice_steering_deferred") return row.body || "Voice steering deferred.";
-  if (row.rowKind === "voice_steering_rejected") return row.body || "Voice steering rejected.";
-  if (row.rowKind === "voice_steering_cancel_requested") return row.body || "Voice steering cancel requested.";
-  if (row.rowKind === "steering_ack_receipt") return row.body || "Steering acknowledgement receipt recorded.";
-  if (row.rowKind === "goal_context_snapshot") return row.body || "Goal context snapshot recorded as non-terminal evidence.";
-  return row.body;
-}
-
-function labelForHelixMailLoopTranscriptRow(row: HelixMailLoopTranscriptRow): string {
-  if (row.rowKind === "mail_received") return "Observation mail";
-  if (row.rowKind === "prediction_check") return "Prediction check";
-  if (row.rowKind === "narrative_projection") return "Narrative projection";
-  if (row.rowKind === "budget_state") return row.title || "Budget state";
-  if (row.rowKind === "processed_mail_read") return row.title || "Processed mail read";
-  if (row.rowKind === "processed_mail_packet") return row.title || "Processed packet";
-  if (row.rowKind === "processed_mail_goal_satisfied") return row.title || "Goal satisfied";
-  if (row.rowKind === "decision_recorded") return row.title || "Decision recorded";
-  if (row.rowKind === "voice_candidate") return row.title || "Voice candidate";
-  if (row.rowKind === "voice_requested") return row.title || "Voice requested";
-  if (row.rowKind === "voice_blocked") return row.title || "Voice blocked";
-  if (row.rowKind === "checkpoint_summary") return row.title || "Checkpoint summary";
-  if (row.rowKind === "continuation_scheduled") return row.title || "Continuation scheduled";
-  if (row.rowKind === "continuation_deferred") return row.title || "Continuation deferred";
-  if (row.rowKind === "tool_budget_no_progress") return row.title || "Tool budget stopped";
-  if (row.rowKind === "micro_reasoner_run") return row.title || "Micro-reasoner run";
-  if (row.rowKind === "task_queued") return "Task queued";
-  if (row.rowKind === "task_deferred") return "Task deferred";
-  if (row.rowKind === "task_running") return "Task running";
-  if (row.rowKind === "task_completed") return "Task completed";
-  if (row.rowKind === "mail_read_tool_call") return "Tool call";
-  if (row.rowKind === "mail_read_receipt" || row.rowKind === "wait_for_next_summary") return "Tool receipt";
-  if (row.rowKind === "agent_decision") return "Agent decision";
-  if (row.rowKind === "interpretation") return "Interpretation";
-  if (row.rowKind === "watch_next") return "Watch next";
-  if (row.rowKind === "prediction") return "Prediction";
-  if (row.rowKind === "narrative_state") return "Narrative state";
-  if (row.rowKind === "interpretation_state") return row.title || "Interpretation";
-  if (row.rowKind === "interpreter_profile") return row.title || "Interpreter profile";
-  if (row.rowKind === "profile_comparison") return row.title || "Profile comparison";
-  if (row.rowKind === "profile_note_link") return row.title || "Profile note";
-  if (row.rowKind === "profile_compiled") return row.title || "Profile compiled";
-  if (row.rowKind === "text_answer") return "Text draft";
-  if (row.rowKind === "voice_callout_request") return "Voice callout request";
-  if (row.rowKind === "voice_tool_call") return "Voice tool call";
-  if (row.rowKind === "voice_receipt") return "Voice receipt";
-  if (row.rowKind === "voice_steering_received") return "Voice steering received";
-  if (row.rowKind === "voice_steering_queued") return "Voice steering queued";
-  if (row.rowKind === "voice_steering_applied") return "Voice steering applied";
-  if (row.rowKind === "voice_steering_deferred") return "Voice steering deferred";
-  if (row.rowKind === "voice_steering_rejected") return "Voice steering rejected";
-  if (row.rowKind === "voice_steering_cancel_requested") return "Voice steering cancel";
-  if (row.rowKind === "steering_ack_receipt") return "Steering ack receipt";
-  if (row.rowKind === "goal_context_snapshot") return row.title || "Goal context snapshot";
-  if (row.rowKind === "mail_wake_requested") return "Wake requested";
-  if (row.rowKind === "mail_wake_deferred") return "Wake deferred";
-  if (row.rowKind === "requested_tool") return "Requested tool";
-  if (row.rowKind === "loop_state") return row.title || "Loop state";
-  if (row.rowKind === "blocked") return "Wake blocked";
-  return row.title || "Live source mail";
-}
-
-function toneForHelixMailLoopTranscriptRow(row: HelixMailLoopTranscriptRow): HelixContinuousTurnStreamTone {
-  if (row.rowKind === "mail_received" || row.rowKind === "mail_read_receipt") return "observation";
-  if (row.rowKind === "prediction_check") return "observation";
-  if (row.rowKind === "processed_mail_read" || row.rowKind === "processed_mail_packet" || row.rowKind === "micro_reasoner_run") return "observation";
-  if (row.rowKind === "processed_mail_goal_satisfied" || row.rowKind === "decision_recorded" || row.rowKind === "checkpoint_summary" || row.rowKind === "continuation_scheduled") return "checkpoint";
-  if (row.rowKind === "voice_candidate" || row.rowKind === "voice_requested") return "checkpoint";
-  if (row.rowKind === "voice_blocked" || row.rowKind === "continuation_deferred" || row.rowKind === "tool_budget_no_progress") return "warning";
-  if (row.rowKind === "budget_state") return /\b(?:deferred|pressure|exhausted|no progress|stopped)\b/i.test(row.body) ? "warning" : "checkpoint";
-  if (row.rowKind === "interpretation" || row.rowKind === "watch_next" || row.rowKind === "prediction" || row.rowKind === "narrative_state" || row.rowKind === "interpretation_state" || row.rowKind === "interpreter_profile" || row.rowKind === "profile_comparison" || row.rowKind === "profile_note_link" || row.rowKind === "profile_compiled" || row.rowKind === "narrative_projection") return "checkpoint";
-  if (row.rowKind === "agent_decision" || row.rowKind === "voice_callout_request" || row.rowKind === "wait_for_next_summary" || row.rowKind === "loop_state") return "checkpoint";
-  if (row.rowKind === "task_queued" || row.rowKind === "task_running") return "working";
-  if (row.rowKind === "task_deferred") return "warning";
-  if (row.rowKind === "task_completed") return "checkpoint";
-  if (row.rowKind === "mail_wake_requested") return "working";
-  if (row.rowKind === "mail_wake_deferred") return "warning";
-  if (row.rowKind === "blocked") return "warning";
-  if (row.rowKind === "text_answer") return row.terminalEligible ? "final" : "checkpoint";
-  if (row.rowKind === "voice_tool_call") return "working";
-  if (row.rowKind === "voice_receipt") return "observation";
-  if (row.rowKind === "voice_steering_received" || row.rowKind === "steering_ack_receipt") return "observation";
-  if (row.rowKind === "goal_context_snapshot") return "observation";
-  if (row.rowKind === "voice_steering_rejected" || row.rowKind === "voice_steering_cancel_requested") return "warning";
-  if (row.rowKind === "voice_steering_queued" || row.rowKind === "voice_steering_applied" || row.rowKind === "voice_steering_deferred") return "checkpoint";
-  return "working";
-}
-
-export function buildHelixMailLoopTurnStreamRows(replyId: string, mailRows: HelixMailLoopTranscriptRow[]): HelixContinuousTurnStreamRow[] {
-  return mailRows.map((row) => ({
-    key: `${replyId}-mail-loop-${row.rowId}-${row.rowKind}`,
-    source: row.rowKind === "voice_tool_call" ||
-      row.rowKind === "voice_receipt" ||
-      row.rowKind === "voice_candidate" ||
-      row.rowKind === "voice_requested" ||
-      row.rowKind === "voice_blocked" ||
-      row.rowKind.startsWith("voice_steering_") ||
-      row.rowKind === "steering_ack_receipt"
-      ? "voice"
-      : row.rowKind === "goal_context_snapshot"
-        ? "live_answer"
-      : "live_source_mail",
-    label: labelForHelixMailLoopTranscriptRow(row),
-    text: formatHelixMailLoopTranscriptBody(row),
-    meta: row.authority || "tool_evidence",
-    status: row.rowKind,
-    tone: toneForHelixMailLoopTranscriptRow(row),
-    evidenceRefs: row.evidenceRefs,
-    detailLimit: row.rowKind === "mail_received" ? 520 : 420,
-  }));
-}
-
-export type HelixAskSteeringQueueStatus =
-  | "next"
-  | "queued"
-  | "running"
-  | "held"
-  | "deferred"
-  | "completed"
-  | "blocked";
-
-export type HelixAskSteeringQueueTone = "cyan" | "amber" | "emerald" | "rose" | "slate";
-
-export type HelixAskSteeringQueueItem = {
-  key: string;
-  label: string;
-  detail: string;
-  meta: string;
-  status: HelixAskSteeringQueueStatus;
-  tone: HelixAskSteeringQueueTone;
-  evidenceRefs: string[];
-  createdAtMs: number;
-};
-
-const HELIX_ASK_STEERING_QUEUE_MAX_ITEMS = 8;
-
-const HELIX_ASK_STEERING_QUEUE_STATUS_RANK: Record<HelixAskSteeringQueueStatus, number> = {
-  running: 0,
-  next: 1,
-  queued: 2,
-  held: 3,
-  deferred: 4,
-  blocked: 5,
-  completed: 6,
-};
-
-const readHelixSteeringQueueRefs = (...values: unknown[]): string[] =>
-  uniqueTextValues(values.flatMap((value) => {
-    if (typeof value === "string") return [value];
-    if (!Array.isArray(value)) return [];
-    return value.map((entry) => coerceText(entry).trim()).filter(Boolean);
-  }));
-
-const readHelixSteeringCreatedAtMs = (record: Record<string, unknown> | null | undefined, fallback: number): number => {
-  const candidates = [
-    record?.createdAt,
-    record?.created_at,
-    record?.updatedAt,
-    record?.updated_at,
-    record?.completedAt,
-    record?.completed_at,
-  ];
-  for (const candidate of candidates) {
-    if (typeof candidate === "number" && Number.isFinite(candidate)) return candidate;
-    if (typeof candidate === "string") {
-      const parsed = Date.parse(candidate);
-      if (Number.isFinite(parsed)) return parsed;
-    }
-  }
-  return fallback;
-};
-
-const readHelixQueueRecordArray = (value: unknown): Record<string, unknown>[] =>
-  Array.isArray(value)
-    ? value.map(readAgentLoopAuditRecord).filter(Boolean) as Record<string, unknown>[]
-    : [];
-
-const intersectsHelixQueueRefs = (left: unknown, right: unknown): boolean => {
-  const leftRefs = new Set(readHelixSteeringQueueRefs(left));
-  if (leftRefs.size === 0) return false;
-  return readHelixSteeringQueueRefs(right).some((ref) => leftRefs.has(ref));
-};
-
-const statusForHelixProcessedFinding = (input: {
-  packet: Record<string, unknown>;
-  wakeRequests: Record<string, unknown>[];
-  decisions: Record<string, unknown>[];
-}): HelixAskSteeringQueueStatus => {
-  const packetMailIds = readHelixSteeringQueueRefs(input.packet.mailIds, input.packet.mail_ids);
-  const matchingWake = input.wakeRequests
-    .filter(isHelixQueuePacketBackedAskWake)
-    .filter((wake) => intersectsHelixQueueRefs(packetMailIds, wake.mailIds))
-    .at(-1) ?? null;
-  const wakeStatus = coerceText(matchingWake?.status).trim();
-  if (wakeStatus === "running") return "running";
-  if (wakeStatus === "queued" || wakeStatus === "waiting_for_ui_handoff" || wakeStatus === "failed_retryable") return "queued";
-  if (wakeStatus === "deferred_for_pressure") return "deferred";
-  if (wakeStatus === "completed") return "completed";
-  const matchingDecision = input.decisions
-    .filter((decision) => intersectsHelixQueueRefs(packetMailIds, decision.mailIds))
-    .at(-1) ?? null;
-  if (matchingDecision) return "completed";
-  const recommendedNext = coerceText(input.packet.recommendedNext ?? input.packet.recommended_next).trim();
-  return recommendedNext && recommendedNext !== "wait_for_next_summary" ? "next" : "held";
-};
-
-const isHelixQueuePacketBackedAskWake = (wake: Record<string, unknown>): boolean => {
-  const wakeIntent = coerceText(wake.wakeIntent ?? wake.wake_intent).trim();
-  if (wakeIntent === "ask_from_processed_packet") return true;
-  if (coerceText(wake.askTurnId ?? wake.ask_turn_id).trim()) return true;
-  const packetIds = readHelixSteeringQueueRefs(wake.packetIds, wake.packet_ids);
-  const deckVerdict = readAgentLoopAuditRecord(wake.deckVerdict ?? wake.deck_verdict);
-  return packetIds.length > 0 && deckVerdict?.wakeAsk === true;
-};
-
-const toneForHelixSteeringQueueStatus = (status: HelixAskSteeringQueueStatus): HelixAskSteeringQueueTone => {
-  if (status === "running" || status === "next") return "cyan";
-  if (status === "queued" || status === "held" || status === "deferred") return "amber";
-  if (status === "blocked") return "rose";
-  if (status === "completed") return "emerald";
-  return "slate";
-};
-
-function mapHelixTurnStreamRowToSteeringQueueItem(
-  row: HelixContinuousTurnStreamRow,
-  index: number,
-): HelixAskSteeringQueueItem | null {
-  if (row.source === "question" || row.source === "final") return null;
-  const status: HelixAskSteeringQueueStatus =
-    row.tone === "warning"
-      ? "held"
-      : row.tone === "checkpoint" || row.tone === "observation"
-        ? "running"
-        : "running";
-  const detail = clipText(row.text, 180);
-  if (!detail && !row.label) return null;
-  return {
-    key: `active:${row.key}:${index}`,
-    label: row.label || "Agent step",
-    detail: detail || row.status || "Agent steering step is active.",
-    meta: row.meta || row.status || "active turn",
-    status,
-    tone: toneForHelixSteeringQueueStatus(status),
-    evidenceRefs: row.evidenceRefs,
-    createdAtMs: Date.now() + index,
-  };
-}
-
-function buildHelixSteeringQueuePhaseItem(
-  reply: HelixAskReply | null | undefined,
-  fallbackCreatedAtMs: number,
-): HelixAskSteeringQueueItem | null {
-  const debugRecord = readAgentLoopAuditRecord(reply?.debug);
-  const phase = readAgentLoopAuditRecord(debugRecord?.live_source_turn_phase_resolution);
-  if (!phase) return null;
-  const phaseName = coerceText(phase.phase).trim();
-  if (!phaseName) return null;
-  const allowedTools = Array.isArray(phase.allowedTools)
-    ? phase.allowedTools.map((entry) => coerceText(entry).trim()).filter(Boolean)
-    : [];
-  const completionEvidence = Array.isArray(phase.completionEvidence)
-    ? phase.completionEvidence.map((entry) => coerceText(entry).trim()).filter(Boolean)
-    : [];
-  const locked = readAgentLoopAuditRecord(phase.phaseLock)?.locked === true;
-  const status: HelixAskSteeringQueueStatus =
-    phaseName === "terminal_checkpoint" || completionEvidence.length > 0
-      ? "next"
-      : locked
-        ? "next"
-        : "queued";
-  const reason = coerceText(phase.reason).trim();
-  return {
-    key: `phase:${phaseName}:${coerceText(phase.canonicalGoal).trim()}`,
-    label: phaseName.replace(/_/g, " "),
-    detail: reason || `Canonical goal: ${coerceText(phase.canonicalGoal).trim() || "live-source turn"}.`,
-    meta: allowedTools.length > 0 ? `tool: ${allowedTools.slice(0, 2).join(", ")}` : "phase resolver",
-    status,
-    tone: toneForHelixSteeringQueueStatus(status),
-    evidenceRefs: readHelixSteeringQueueRefs(phase.evidenceRefs, completionEvidence),
-    createdAtMs: fallbackCreatedAtMs,
-  };
-}
-
-function buildHelixSteeringQueueMailboxItems(
-  mailbox: StagePlayLiveSourceMailStateResponse | null | undefined,
-  fallbackCreatedAtMs: number,
-): HelixAskSteeringQueueItem[] {
-  if (!mailbox || mailbox.ok === false) return [];
-  const items: HelixAskSteeringQueueItem[] = [];
-  const mailItems = readHelixQueueRecordArray(mailbox.mailItems);
-  const unread = mailItems.filter((mail) => coerceText(mail.status).trim() === "unread");
-  if (unread.length > 0) {
-    const latestUnread = unread.at(-1) ?? null;
-    const summary = readAgentLoopAuditRecord(latestUnread?.summary);
-    const preview = coerceText(summary?.preview ?? summary?.text).trim();
-    items.push({
-      key: `mailbox:unread:${unread.map((mail) => coerceText(mail.mailId)).join(":")}`,
-      label: "Observer backlog",
-      detail: preview
-        ? `${unread.length} raw visual summary${unread.length === 1 ? "" : " summaries"} awaiting micro-reasoner processing | ${clipText(preview, 150)}`
-        : `${unread.length} raw live-source mail item${unread.length === 1 ? "" : "s"} awaiting micro-reasoner processing.`,
-      meta: `not Ask-ready | mailbox ${mailbox.mailboxThreadId ?? HELIX_ASK_LIVE_SOURCE_MAIL_THREAD_ID}`,
-      status: "held",
-      tone: "amber",
-      evidenceRefs: readHelixSteeringQueueRefs(unread.map((mail) => mail.mailId), unread.flatMap((mail) => Array.isArray(mail.evidenceRefs) ? mail.evidenceRefs : [])),
-      createdAtMs: readHelixSteeringCreatedAtMs(latestUnread, fallbackCreatedAtMs),
-    });
-  }
-
-  const wakeRequests = readHelixQueueRecordArray(mailbox.wakeRequests);
-  const decisions = readHelixQueueRecordArray(mailbox.decisions);
-  const processedPackets = readHelixQueueRecordArray(mailbox.processedMailPackets);
-  processedPackets.slice(-4).forEach((packet, index) => {
-    const recommendedNext = coerceText(packet.recommendedNext ?? packet.recommended_next).trim();
-    const salience = readAgentLoopAuditRecord(packet.salience);
-    const salienceLevel = coerceText(salience?.level).trim();
-    const voiceCandidate = salience?.voiceCandidate === true || salience?.voice_candidate === true;
-    const packetId = coerceText(packet.packetId ?? packet.packet_id).trim();
-    const status = statusForHelixProcessedFinding({ packet, wakeRequests, decisions });
-    if (status === "held" && recommendedNext === "wait_for_next_summary") return;
-    const changedFacts = readHelixSteeringQueueRefs(packet.changedFacts, packet.changed_facts);
-    const riskMatches = readHelixSteeringQueueRefs(packet.riskMatches, packet.risk_matches);
-    items.push({
-      key: `processed-finding:${packetId || index}:${recommendedNext}:${status}`,
-      label: status === "completed" ? "Processed finding handled" : "Micro-reasoner finding",
-      detail: [
-        recommendedNext ? `recommended ${recommendedNext}` : "recommendation pending",
-        salienceLevel ? `salience ${salienceLevel}${voiceCandidate ? " voice candidate" : ""}` : null,
-        changedFacts.length > 0 ? `changed: ${clipText(changedFacts.slice(0, 2).join("; "), 150)}` : null,
-        riskMatches.length > 0 ? `risk: ${clipText(riskMatches.slice(0, 2).join("; "), 120)}` : null,
-      ].filter(Boolean).join(" | "),
-      meta: packetId || "processed mail packet",
-      status,
-      tone: toneForHelixSteeringQueueStatus(status),
-      evidenceRefs: readHelixSteeringQueueRefs(packetId, packet.mailIds, packet.evidenceRefs, packet.microReasonerRunRefs),
-      createdAtMs: readHelixSteeringCreatedAtMs(packet, fallbackCreatedAtMs + 5 + index),
-    });
-  });
-
-  const microReasonerRuns = readHelixQueueRecordArray(mailbox.microReasonerRuns);
-  const latestDecisionRun = microReasonerRuns
-    .filter((run) => coerceText(run.role).trim() === "decision_selector")
-    .at(-1) ?? null;
-  if (latestDecisionRun && processedPackets.length === 0) {
-    const selectedDecision = coerceText(latestDecisionRun.selectedDecision ?? latestDecisionRun.selected_decision).trim();
-    const nextTool = coerceText(latestDecisionRun.recommendedNextTool ?? latestDecisionRun.recommended_next_tool).trim();
-    const status: HelixAskSteeringQueueStatus =
-      selectedDecision && selectedDecision !== "wait_for_next_summary" ? "next" : "held";
-    items.push({
-      key: `micro-decision:${coerceText(latestDecisionRun.runId).trim()}:${selectedDecision}`,
-      label: "Micro-reasoner decision",
-      detail: [
-        selectedDecision ? `selected ${selectedDecision}` : "decision pending",
-        nextTool ? `next tool ${nextTool}` : null,
-        coerceText(latestDecisionRun.outputPreview).trim() || null,
-      ].filter(Boolean).join(" | "),
-      meta: coerceText(latestDecisionRun.runId).trim() || "decision_selector",
-      status,
-      tone: toneForHelixSteeringQueueStatus(status),
-      evidenceRefs: readHelixSteeringQueueRefs(latestDecisionRun.runId, latestDecisionRun.inputRefs, latestDecisionRun.outputRefs),
-      createdAtMs: readHelixSteeringCreatedAtMs(latestDecisionRun, fallbackCreatedAtMs + 7),
-    });
-  }
-
-  wakeRequests.filter(isHelixQueuePacketBackedAskWake).slice(-5).forEach((wake, index) => {
-    const rawStatus = coerceText(wake.status).trim();
-    const status: HelixAskSteeringQueueStatus =
-      rawStatus === "running"
-        ? "running"
-        : rawStatus === "queued" || rawStatus === "waiting_for_ui_handoff" || rawStatus === "runnable"
-          ? "queued"
-          : rawStatus === "deferred_for_pressure"
-            ? "deferred"
-            : /^failed/i.test(rawStatus)
-              ? "blocked"
-              : "completed";
-    if (status === "completed" && !/completed|decision_recorded|answered/i.test(rawStatus)) return;
-    const mailIds = Array.isArray(wake.mailIds) ? wake.mailIds : [];
-    items.push({
-      key: `wake:${coerceText(wake.wakeRequestId).trim() || index}:${rawStatus}`,
-      label: rawStatus === "waiting_for_ui_handoff"
-        ? "Ask handoff waiting for UI"
-        : status === "deferred" ? "Ask handoff deferred" : status === "running" ? "Ask handoff running" : status === "queued" ? "Ask handoff queued" : "Ask handoff completed",
-      detail: [
-        mailIds.length > 0 ? `${mailIds.length} packet-backed input${mailIds.length === 1 ? "" : "s"}` : null,
-        coerceText(wake.failureReason ?? wake.reason).trim() || null,
-        coerceText(wake.askTurnId).trim() ? `ask ${coerceText(wake.askTurnId).trim()}` : null,
-      ].filter(Boolean).join(" | ") || "Backend interrupt queue item.",
-      meta: coerceText(wake.wakeRequestId).trim() || "interrupt request",
-      status,
-      tone: toneForHelixSteeringQueueStatus(status),
-      evidenceRefs: readHelixSteeringQueueRefs(wake.wakeRequestId, mailIds, wake.evidenceRefs),
-      createdAtMs: readHelixSteeringCreatedAtMs(wake, fallbackCreatedAtMs + index),
-    });
-  });
-
-  const admission = readAgentLoopAuditRecord(mailbox.wakeAdmissionCycle);
-  const continuation = readAgentLoopAuditRecord(admission?.continuation);
-  const runtimeAdmission = readAgentLoopAuditRecord(admission?.runtimeAdmission);
-  const deferredWakeIds = Array.isArray(admission?.deferredWakeIds) ? admission.deferredWakeIds : [];
-  const continuationScheduled = continuation?.scheduled === true;
-  if (deferredWakeIds.length > 0 || continuationScheduled) {
-    const status: HelixAskSteeringQueueStatus = deferredWakeIds.length > 0 ? "deferred" : "queued";
-    items.push({
-      key: `continuation:${status}:${deferredWakeIds.join(":")}:${coerceText(continuation?.reason).trim()}`,
-      label: status === "deferred" ? "Continuation deferred" : "Continuation scheduled",
-      detail:
-        status === "deferred"
-          ? `${deferredWakeIds.length} wake${deferredWakeIds.length === 1 ? "" : "s"} retained for pressure.`
-          : `Next wake: ${coerceText(continuation?.reason).trim() || "scheduled"}.`,
-      meta: coerceText(runtimeAdmission?.reason).trim() || "backend wake loop",
-      status,
-      tone: toneForHelixSteeringQueueStatus(status),
-      evidenceRefs: readHelixSteeringQueueRefs(deferredWakeIds, continuation?.runnableWakeIds),
-      createdAtMs: fallbackCreatedAtMs + 20,
-    });
-  }
-
-  const policies = (mailbox.watchJobPolicies ?? []).map(readAgentLoopAuditRecord).filter(Boolean) as Record<string, unknown>[];
-  const latestPolicy = policies.filter((policy) => coerceText(policy.status).trim() !== "ended").at(-1) ?? null;
-  if (latestPolicy) {
-    items.push({
-      key: `policy:${coerceText(latestPolicy.policyId).trim()}`,
-      label: "Watch policy armed",
-      detail: clipText(coerceText(latestPolicy.objectiveText ?? latestPolicy.objective).trim() || "Standing live-source objective is active.", 180),
-      meta: coerceText(latestPolicy.interpretationMode).trim() || "watch policy",
-      status: "completed",
-      tone: "emerald",
-      evidenceRefs: readHelixSteeringQueueRefs(latestPolicy.policyId, latestPolicy.evidenceRefs),
-      createdAtMs: readHelixSteeringCreatedAtMs(latestPolicy, fallbackCreatedAtMs - 20),
-    });
-  }
-
-  const profiles = (mailbox.interpreterProfiles ?? []).map(readAgentLoopAuditRecord).filter(Boolean) as Record<string, unknown>[];
-  const latestProfile = profiles.filter((profile) => coerceText(profile.status).trim() !== "archived").at(-1) ?? null;
-  if (latestProfile) {
-    items.push({
-      key: `profile:${coerceText(latestProfile.profileId).trim()}`,
-      label: "Interpreter profile active",
-      detail: clipText(coerceText(latestProfile.title).trim() || "Active interpreter profile.", 180),
-      meta: coerceText(latestProfile.domain).trim() || "interpreter profile",
-      status: "completed",
-      tone: "emerald",
-      evidenceRefs: readHelixSteeringQueueRefs(latestProfile.profileId, latestProfile.evidenceRefs),
-      createdAtMs: readHelixSteeringCreatedAtMs(latestProfile, fallbackCreatedAtMs - 10),
-    });
-  }
-
-  return items;
-}
-
-function buildHelixSteeringQueueDebugItems(
-  reply: HelixAskReply | null | undefined,
-  fallbackCreatedAtMs: number,
-): HelixAskSteeringQueueItem[] {
-  const debugRecord = readAgentLoopAuditRecord(reply?.debug);
-  const mailboxDebug = readAgentLoopAuditRecord(debugRecord?.stage_play_live_source_mailbox_debug);
-  if (!mailboxDebug) return [];
-  const items: HelixAskSteeringQueueItem[] = [];
-  const capability = coerceText(mailboxDebug.capability).trim();
-  const route = coerceText(mailboxDebug.route).trim();
-  if (capability) {
-    const decisionId = coerceText(mailboxDebug.decision_id ?? mailboxDebug.decisionId).trim();
-    items.push({
-      key: `debug-capability:${capability}:${decisionId}`,
-      label: decisionId ? "Decision recorded" : "Capability selected",
-      detail: decisionId ? `Decision: ${decisionId}` : `Next capability: ${capability}`,
-      meta: route || "live-source mailbox",
-      status: decisionId ? "completed" : "next",
-      tone: decisionId ? "emerald" : "cyan",
-      evidenceRefs: readHelixSteeringQueueRefs(decisionId, mailboxDebug.mail_ids, mailboxDebug.decision_ids),
-      createdAtMs: fallbackCreatedAtMs + 10,
-    });
-  }
-  const continuation = readAgentLoopAuditRecord(mailboxDebug.wake_continuation);
-  if (continuation) {
-    const loopState = coerceText(continuation.loop_state ?? mailboxDebug.next_loop_state).trim();
-    const pressureDeferred = continuation.pressure_deferred === true;
-    const continuationRecord = readAgentLoopAuditRecord(continuation.continuation);
-    const scheduled = continuationRecord?.scheduled === true;
-    if (pressureDeferred || scheduled || loopState) {
-      const status: HelixAskSteeringQueueStatus = pressureDeferred ? "deferred" : scheduled ? "queued" : "completed";
-      items.push({
-        key: `debug-continuation:${status}:${loopState}`,
-        label: pressureDeferred ? "Continuation deferred" : scheduled ? "Continuation scheduled" : "Loop state",
-        detail: loopState ? loopState.replace(/_/g, " ") : "Backend wake loop remains armed.",
-        meta: coerceText(continuationRecord?.reason).trim() || "loop state",
-        status,
-        tone: toneForHelixSteeringQueueStatus(status),
-        evidenceRefs: readHelixSteeringQueueRefs(continuation.runnable_wake_ids, continuation.deferred_wake_ids),
-        createdAtMs: fallbackCreatedAtMs + 30,
-      });
-    }
-  }
-  return items;
-}
-
-function sortHelixAskSteeringQueueItems(items: HelixAskSteeringQueueItem[]): HelixAskSteeringQueueItem[] {
-  return [...items].sort((left, right) => {
-    const leftRank = HELIX_ASK_STEERING_QUEUE_STATUS_RANK[left.status] ?? 99;
-    const rightRank = HELIX_ASK_STEERING_QUEUE_STATUS_RANK[right.status] ?? 99;
-    if (leftRank !== rightRank) return leftRank - rightRank;
-    if (left.status === "completed" && right.status === "completed") return left.createdAtMs - right.createdAtMs;
-    return right.createdAtMs - left.createdAtMs;
-  });
-}
-
-function shouldAutoWakeHelixMailboxQueueItem(item: HelixAskSteeringQueueItem | null | undefined): boolean {
-  if (!item) return false;
-  if (item.status === "held" || item.status === "completed" || item.status === "running") return false;
-  return (
-    item.key.startsWith("processed-finding:") ||
-    item.key.startsWith("micro-decision:") ||
-    item.key.startsWith("wake:") ||
-    item.key.startsWith("continuation:")
-  );
-}
-
-export function buildHelixAskSteeringQueueItems(input: {
-  activeTurnStreamRows?: HelixContinuousTurnStreamRow[];
-  latestReply?: HelixAskReply | null;
-  mailbox?: StagePlayLiveSourceMailStateResponse | null;
-  maxItems?: number;
-}): HelixAskSteeringQueueItem[] {
-  const fallbackCreatedAtMs = Date.now();
-  const candidates = [
-    ...(input.activeTurnStreamRows ?? [])
-      .map(mapHelixTurnStreamRowToSteeringQueueItem)
-      .filter((item): item is HelixAskSteeringQueueItem => Boolean(item)),
-    buildHelixSteeringQueuePhaseItem(input.latestReply, fallbackCreatedAtMs),
-    ...buildHelixSteeringQueueMailboxItems(input.mailbox, fallbackCreatedAtMs),
-    ...buildHelixSteeringQueueDebugItems(input.latestReply, fallbackCreatedAtMs),
-  ].filter((item): item is HelixAskSteeringQueueItem => Boolean(item));
-  const seen = new Set<string>();
-  const deduped = candidates.filter((item) => {
-    const key = `${item.label}:${item.detail}:${item.status}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-  return sortHelixAskSteeringQueueItems(deduped).slice(0, input.maxItems ?? HELIX_ASK_STEERING_QUEUE_MAX_ITEMS);
-}
-
-function buildHelixContinuousTurnStreamRows(args: {
-  replyId: string;
-  question?: string | null;
-  turnTranscriptRows: HelixTurnTranscriptRow[];
-  mailLoopRows?: HelixMailLoopTranscriptRow[];
-  stagePlayEvents: StagePlayChatLedgerEvent[];
-  liveAnswerTurnBridge: LiveAnswerTurnBridgeState | null;
-  finalAnswerText: string;
-  finalAnswerHeading: string;
-  finalAnswerSourceLabel: string;
-  terminalMismatch: boolean;
-}): HelixContinuousTurnStreamRow[] {
-  const rows: HelixContinuousTurnStreamRow[] = [];
-  const question = (args.question ?? "").trim();
-  if (question) {
-    rows.push({
-      key: `${args.replyId}-stream-question`,
-      source: "question",
-      label: "Question",
-      text: question,
-      meta: "user prompt",
-      status: "submitted",
-      tone: "question",
-      evidenceRefs: [],
-    });
-  }
-  args.turnTranscriptRows
-    .filter((row) => row.label !== "Final")
-    .forEach((row) => {
-      rows.push({
-        key: `${row.key}-stream`,
-        source: "agent_work",
-        label: row.label,
-        text: row.text,
-        meta: row.meta,
-        status: row.status,
-        tone: toneForHelixTranscriptRow(row),
-        evidenceRefs: [],
-      });
-    });
-  buildHelixMailLoopTurnStreamRows(args.replyId, args.mailLoopRows ?? []).forEach((row) => rows.push(row));
-  args.stagePlayEvents.forEach((event) => {
-    rows.push({
-      key: `${event.key}-stream`,
-      source: "stage_play",
-      label: event.kind === "debug_receipt" ? "Stage Play Receipt" : event.title.replace(/\.$/, ""),
-      text: event.detail,
-      meta: event.meta,
-      status: event.status ?? "observed",
-      tone: toneForStagePlayLedgerEvent(event),
-      evidenceRefs: event.evidenceRefs,
-      actions: event.actions,
-      detailLimit: event.kind === "debug_receipt" ? 1200 : 360,
-    });
-  });
-  if (args.liveAnswerTurnBridge) {
-    rows.push({
-      key: `${args.replyId}-stream-live-bridge`,
-      source: "live_bridge",
-      label: "Live turn bridge",
-      text: args.liveAnswerTurnBridge.detail,
-      meta: args.liveAnswerTurnBridge.meta,
-      status: args.liveAnswerTurnBridge.status,
-      tone: args.liveAnswerTurnBridge.tone === "amber" ? "checkpoint" : args.liveAnswerTurnBridge.tone === "emerald" ? "final" : "bridge",
-      evidenceRefs: args.liveAnswerTurnBridge.evidenceRefs,
-      bridgePills: args.liveAnswerTurnBridge.pills,
-    });
-  }
-  if (args.finalAnswerText.trim()) {
-    rows.push({
-      key: `${args.replyId}-stream-final-answer`,
-      source: "final",
-      label: args.finalAnswerHeading || "Final",
-      text: args.finalAnswerText,
-      meta: args.terminalMismatch ? "terminal mismatch" : args.finalAnswerSourceLabel,
-      status: args.terminalMismatch ? "mismatch" : "terminal",
-      tone: args.terminalMismatch ? "warning" : "final",
-      evidenceRefs: [],
-      detailLimit: 1600,
-    });
-  }
-  return rows;
 }
 
 function resolveHelixAskReplyOrderMs(reply: HelixAskReply): number | null {
@@ -9740,660 +8872,6 @@ export function shouldRenderHelixAskActiveTurnStream(input: {
   }
   if (!activeTurnId && activeStartedAtMs === null) return false;
   return true;
-}
-
-function readHelixContinuousTurnStreamRowClass(tone: HelixContinuousTurnStreamTone): string {
-  if (tone === "question") return "border-cyan-300/20 text-cyan-50";
-  if (tone === "observation") return "border-emerald-300/20 text-emerald-50";
-  if (tone === "checkpoint") return "border-amber-300/25 text-amber-50";
-  if (tone === "bridge") return "border-sky-300/25 text-sky-50";
-  if (tone === "final") return "border-violet-300/25 text-violet-50";
-  if (tone === "warning") return "border-rose-300/30 text-rose-50";
-  return "border-slate-500/25 text-slate-100";
-}
-
-function readHelixContinuousTurnStreamDotClass(tone: HelixContinuousTurnStreamTone): string {
-  if (tone === "question") return "border-cyan-200/70 bg-cyan-300";
-  if (tone === "observation") return "border-emerald-200/70 bg-emerald-300";
-  if (tone === "checkpoint") return "border-amber-200/70 bg-amber-300";
-  if (tone === "bridge") return "border-sky-200/70 bg-sky-300";
-  if (tone === "final") return "border-violet-200/70 bg-violet-300";
-  if (tone === "warning") return "border-rose-200/70 bg-rose-300";
-  return "border-slate-200/60 bg-slate-400";
-}
-
-function readHelixSteeringQueueItemClass(item: HelixAskSteeringQueueItem): string {
-  if (item.tone === "cyan") return "border-cyan-300/25 bg-cyan-400/10 text-cyan-50";
-  if (item.tone === "amber") return "border-amber-300/25 bg-amber-400/10 text-amber-50";
-  if (item.tone === "emerald") return "border-emerald-300/20 bg-emerald-400/10 text-emerald-50";
-  if (item.tone === "rose") return "border-rose-300/30 bg-rose-400/10 text-rose-50";
-  return "border-white/10 bg-white/5 text-slate-100";
-}
-
-function readHelixSteeringQueueDotClass(item: HelixAskSteeringQueueItem): string {
-  if (item.tone === "cyan") return "bg-cyan-300 shadow-cyan-300/25";
-  if (item.tone === "amber") return "bg-amber-300 shadow-amber-300/25";
-  if (item.tone === "emerald") return "bg-emerald-300 shadow-emerald-300/20";
-  if (item.tone === "rose") return "bg-rose-300 shadow-rose-300/25";
-  return "bg-slate-400 shadow-slate-300/10";
-}
-
-export function buildLiveAnswerTurnBridgeState({
-  hasLiveState,
-  stagePlayEvents,
-  finalAnswerPresentation,
-}: {
-  hasLiveState: boolean;
-  stagePlayEvents: StagePlayChatLedgerEvent[];
-  finalAnswerPresentation: HelixAskFinalAnswerPresentation;
-}): LiveAnswerTurnBridgeState | null {
-  const evidenceRefs = uniqueStagePlayLedgerStrings(stagePlayEvents.flatMap((event) => event.evidenceRefs));
-  const checkpointRequest = stagePlayEvents.find((event) => event.kind === "checkpoint_request") ?? null;
-  const askCheckpoint = stagePlayEvents.find((event) => event.kind === "ask_checkpoint") ?? null;
-  const answerSnapshot = stagePlayEvents.find((event) => event.kind === "answer_snapshot") ?? null;
-  const liveOutput = stagePlayEvents.find((event) => event.kind === "live_output") ?? null;
-  const modelReviewed =
-    askCheckpoint?.status === "model_reviewed" ||
-    Boolean(answerSnapshot && !/\b(?:missing|stale|invalid|not_reviewed)\b/i.test(answerSnapshot.status ?? ""));
-  const checkpointPill: LiveAnswerTurnBridgePill = modelReviewed
-    ? { label: "checkpoint reviewed", tone: "emerald" }
-    : checkpointRequest
-      ? { label: "checkpoint queued", tone: "amber" }
-      : { label: "checkpoint waiting", tone: "slate" };
-  const snapshotPill: LiveAnswerTurnBridgePill = modelReviewed
-    ? { label: "snapshot reviewed", tone: "emerald" }
-    : { label: "snapshot pending", tone: "slate" };
-  const voicePill: LiveAnswerTurnBridgePill = modelReviewed
-    ? { label: "voice snapshot-bound", tone: "emerald" }
-    : { label: "voice waiting", tone: "slate" };
-  const pills: LiveAnswerTurnBridgePill[] = [
-    { label: liveOutput || hasLiveState ? "live evidence" : "no live evidence", tone: hasLiveState ? "cyan" : "slate" },
-    checkpointPill,
-    snapshotPill,
-    voicePill,
-  ];
-
-  if (modelReviewed) {
-    return {
-      title: "Answer snapshot ready",
-      detail: "Live state was consumed by a model-reviewed checkpoint; terminal answer and voice lanes can bind to that snapshot.",
-      meta: `refs ${evidenceRefs.length} | ${answerSnapshot?.meta ?? askCheckpoint?.meta ?? "checkpoint reviewed"}`,
-      tone: "emerald",
-      evidenceRefs,
-      pills,
-      status: "answer_snapshot_ready",
-    };
-  }
-
-  if (checkpointRequest) {
-    return {
-      title: "Checkpoint queued",
-      detail: clipText(checkpointRequest.detail, 240),
-      meta: `refs ${evidenceRefs.length} | ${checkpointRequest.meta}`,
-      tone: "amber",
-      evidenceRefs,
-      pills,
-      status: "checkpoint_queued",
-    };
-  }
-
-  if (askCheckpoint?.status === "missing_evidence") {
-    return {
-      title: "Waiting for model-reviewed checkpoint",
-      detail: clipText(askCheckpoint.detail, 240),
-      meta: `refs ${evidenceRefs.length} | ${askCheckpoint.meta}`,
-      tone: "slate",
-      evidenceRefs,
-      pills,
-      status: "checkpoint_waiting",
-    };
-  }
-
-  if (finalAnswerPresentation.isDeterministicReceiptFallback) {
-    return {
-      title: "Receipt fallback is evidence",
-      detail: "A deterministic receipt was produced for this turn; it is displayed as checkpoint bridge material until Ask creates a reviewed answer snapshot.",
-      meta: `refs ${evidenceRefs.length} | not reviewed`,
-      tone: "amber",
-      evidenceRefs,
-      pills,
-      status: "receipt_fallback",
-    };
-  }
-
-  if (hasLiveState || stagePlayEvents.length > 0) {
-    return {
-      title: "Live state available",
-      detail: "Live interpretation lanes are present for this turn; no reviewed answer snapshot has been emitted yet.",
-      meta: `refs ${evidenceRefs.length} | ${liveOutput?.meta ?? "staging"}`,
-      tone: "cyan",
-      evidenceRefs,
-      pills,
-      status: "live_state_available",
-    };
-  }
-
-  return null;
-}
-
-function readLiveAnswerTurnBridgeClassName(tone: LiveAnswerTurnBridgeTone): string {
-  if (tone === "emerald") return "border-emerald-300/25 bg-emerald-950/15 text-emerald-50";
-  if (tone === "amber") return "border-amber-300/25 bg-amber-950/20 text-amber-50";
-  if (tone === "slate") return "border-slate-500/25 bg-slate-950/35 text-slate-100";
-  return "border-cyan-300/25 bg-cyan-950/20 text-cyan-50";
-}
-
-function readLiveAnswerTurnBridgePillClassName(tone: LiveAnswerTurnBridgeTone): string {
-  if (tone === "emerald") return "border-emerald-300/35 bg-emerald-400/10 text-emerald-100";
-  if (tone === "amber") return "border-amber-300/35 bg-amber-400/10 text-amber-100";
-  if (tone === "slate") return "border-slate-400/25 bg-black/20 text-slate-200";
-  return "border-cyan-300/35 bg-cyan-400/10 text-cyan-100";
-}
-
-function normalizeCitations(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter((entry) => typeof entry === "string" && entry.trim().length > 0);
-}
-
-type HelixAskMathToken =
-  | { kind: "text"; text: string }
-  | {
-      kind: "math";
-      text: string;
-      displayMode: boolean;
-      openDelimiter: string;
-      closeDelimiter: string;
-    };
-
-type HelixAskMathTokenRenderStatus = "formatted" | "katex_error" | "ignored_reason";
-
-type HelixAskMathTokenDebugStatus = {
-  tokenText: string;
-  status: HelixAskMathTokenRenderStatus;
-  displayMode: boolean | null;
-  openDelimiter: string | null;
-  closeDelimiter: string | null;
-  reason: string | null;
-};
-
-type HelixAskMathRenderDebug = {
-  sourceChars: number;
-  tokenCount: number;
-  mathTokenCount: number;
-  delimiterMathCount: number;
-  bareMathCount: number;
-  katexErrorCount: number;
-  bareCandidateCount: number;
-  bareAcceptedCount: number;
-  bareIgnoredCount: number;
-  katexErrorSamples: string[];
-  bareIgnoredSamples: string[];
-  tokenStatuses: HelixAskMathTokenDebugStatus[];
-};
-
-const HELIX_ASK_MATH_DELIMITERS: ReadonlyArray<{
-  openDelimiter: string;
-  closeDelimiter: string;
-  displayMode: boolean;
-}> = [
-  { openDelimiter: "$$", closeDelimiter: "$$", displayMode: true },
-  { openDelimiter: "\\[", closeDelimiter: "\\]", displayMode: true },
-  { openDelimiter: "\\(", closeDelimiter: "\\)", displayMode: false },
-  { openDelimiter: "$", closeDelimiter: "$", displayMode: false },
-];
-
-const HELIX_ASK_BARE_EQUATION_CANDIDATE_RE =
-  /[A-Za-z][A-Za-z0-9_]*(?:\([^=\n]{1,24}\))?\s*=\s*[^\n]{3,220}/g;
-const HELIX_ASK_BARE_EQUATION_SIGNAL_RE =
-  /(?:[0-9+\-*/^()|]|\b(?:sqrt|frac|integral|int|pi|hbar|delta|gamma|beta|rho|theta|tau|kappa|psi|phi|lambda)\b)/i;
-
-function normalizeBareEquationCandidate(value: string): string {
-  const compact = value.replace(/\s+/g, " ").trim();
-  if (!compact) return "";
-  const cutPatterns = [
-    /,\s+/,
-    /,\s*(?:with|where|and|but|which|that)\b/i,
-    /\s+\bfor\b/i,
-    /\s+\b(?:variables?|interpretation|trace source)\b/i,
-    /\s+-\s+(?:Keep|This|In|The|Term-to-implementation|Sources)\b/i,
-    /\.\s+(?:Keep|This|In|The|Term-to-implementation|Sources)\b/i,
-    /\s+Sources:\s*/i,
-  ];
-  let cutIndex = compact.length;
-  for (const pattern of cutPatterns) {
-    const match = compact.match(pattern);
-    if (!match || match.index === undefined) continue;
-    cutIndex = Math.min(cutIndex, match.index);
-  }
-  return compact.slice(0, cutIndex).trim().replace(/(?<=\d)[.;:]$/, "");
-}
-
-function classifyBareEquationCandidate(value: string): { accepted: boolean; reason: string | null } {
-  const normalized = normalizeBareEquationCandidate(value);
-  if (!normalized) return { accepted: false, reason: "empty_candidate" };
-  const eqIndex = normalized.indexOf("=");
-  if (eqIndex <= 0 || eqIndex >= normalized.length - 1) {
-    return { accepted: false, reason: "malformed_equals" };
-  }
-  const lhs = normalized.slice(0, eqIndex).trim();
-  const rhs = normalized.slice(eqIndex + 1).trim();
-  if (!lhs || !rhs) {
-    return { accepted: false, reason: "missing_lhs_or_rhs" };
-  }
-  if (/^(?:score|confidence|threshold|count|ratio|rate|rank|index|line|id)$/i.test(lhs)) {
-    return { accepted: false, reason: "lhs_metadata_assignment" };
-  }
-  if (lhs.includes("/") || lhs.includes(":") || lhs.includes("\\")) {
-    return { accepted: false, reason: "lhs_path_like" };
-  }
-  if (/^(?:docs|server|client|modules|tools|scripts|tmp)\b/i.test(lhs)) {
-    return { accepted: false, reason: "lhs_repo_prefix" };
-  }
-  if (/^https?:\/\//i.test(rhs)) {
-    return { accepted: false, reason: "rhs_url_like" };
-  }
-  if (!HELIX_ASK_BARE_EQUATION_SIGNAL_RE.test(rhs)) {
-    return { accepted: false, reason: "rhs_low_math_signal" };
-  }
-  return { accepted: true, reason: null };
-}
-
-function isLikelyBareEquationSegment(value: string): boolean {
-  return classifyBareEquationCandidate(value).accepted;
-}
-
-function tokenizeHelixAskBareEquationSegments(content: string): HelixAskMathToken[] {
-  const text = coerceText(content);
-  if (!text) return [];
-  const tokens: HelixAskMathToken[] = [];
-  let cursor = 0;
-  HELIX_ASK_BARE_EQUATION_CANDIDATE_RE.lastIndex = 0;
-  for (const match of text.matchAll(HELIX_ASK_BARE_EQUATION_CANDIDATE_RE)) {
-    const raw = match[0] ?? "";
-    const start = match.index ?? -1;
-    if (!raw || start < 0) continue;
-    const candidate = normalizeBareEquationCandidate(raw);
-    if (!isLikelyBareEquationSegment(candidate)) continue;
-    const offset = raw.indexOf(candidate);
-    const mathStart = start + Math.max(0, offset);
-    const mathEnd = mathStart + candidate.length;
-    if (mathStart < cursor) continue;
-    if (mathStart > cursor) {
-      pushTextMathToken(tokens, text.slice(cursor, mathStart));
-    }
-    tokens.push({
-      kind: "math",
-      text: candidate,
-      displayMode: false,
-      openDelimiter: "",
-      closeDelimiter: "",
-    });
-    cursor = mathEnd;
-  }
-  if (cursor < text.length) {
-    pushTextMathToken(tokens, text.slice(cursor));
-  }
-  return tokens.length > 0 ? tokens : [{ kind: "text", text }];
-}
-
-function collectHelixAskBareEquationCandidateStats(content: string): {
-  bareCandidateCount: number;
-  bareAcceptedCount: number;
-  bareIgnoredCount: number;
-  bareIgnoredSamples: string[];
-  bareIgnoredDetails: Array<{ candidate: string; reason: string }>;
-} {
-  const text = coerceText(content);
-  if (!text) {
-    return {
-      bareCandidateCount: 0,
-      bareAcceptedCount: 0,
-      bareIgnoredCount: 0,
-      bareIgnoredSamples: [],
-      bareIgnoredDetails: [],
-    };
-  }
-  let bareCandidateCount = 0;
-  let bareAcceptedCount = 0;
-  let bareIgnoredCount = 0;
-  const bareIgnoredSamples: string[] = [];
-  const bareIgnoredDetails: Array<{ candidate: string; reason: string }> = [];
-  HELIX_ASK_BARE_EQUATION_CANDIDATE_RE.lastIndex = 0;
-  for (const match of text.matchAll(HELIX_ASK_BARE_EQUATION_CANDIDATE_RE)) {
-    const raw = match[0] ?? "";
-    if (!raw) continue;
-    const candidate = normalizeBareEquationCandidate(raw);
-    if (!candidate) continue;
-    bareCandidateCount += 1;
-    const classification = classifyBareEquationCandidate(candidate);
-    if (classification.accepted) {
-      bareAcceptedCount += 1;
-    } else {
-      bareIgnoredCount += 1;
-      if (bareIgnoredSamples.length < 3) {
-        bareIgnoredSamples.push(clipText(candidate, 120));
-      }
-      if (bareIgnoredDetails.length < 24) {
-        bareIgnoredDetails.push({
-          candidate: clipText(candidate, 180),
-          reason: classification.reason ?? "unclassified_reject",
-        });
-      }
-    }
-  }
-  return {
-    bareCandidateCount,
-    bareAcceptedCount,
-    bareIgnoredCount,
-    bareIgnoredSamples,
-    bareIgnoredDetails,
-  };
-}
-
-function isLikelyCodeStyleMathToken(token: Extract<HelixAskMathToken, { kind: "math" }>): boolean {
-  if (token.openDelimiter !== "" || token.closeDelimiter !== "") return false;
-  const text = token.text;
-  if (!text) return false;
-  if (/^[A-Za-z][A-Za-z0-9_]*\s*=\s*-?(?:\d+(?:\.\d+)?|\.\d+)(?:e[+-]?\d+)?$/i.test(text)) return true;
-  if (/\bMath\.[A-Za-z_][A-Za-z0-9_]*\s*\(/.test(text)) return true;
-  if (/[A-Za-z][A-Za-z0-9]*_[A-Za-z0-9_]+/.test(text)) return true;
-  if (/\b(?:const|let|var)\b/.test(text)) return true;
-  return false;
-}
-
-export function parseHelixAskFinalAnswerBulletLine(line: string): string | null {
-  const trimmed = coerceText(line).trim();
-  const bulletMatch = trimmed.match(/^[-*]\s*(\S.+)$/);
-  return bulletMatch?.[1] ?? null;
-}
-
-function expandMathTokensWithBareEquations(tokens: HelixAskMathToken[]): HelixAskMathToken[] {
-  if (tokens.length === 0) return tokens;
-  const expanded: HelixAskMathToken[] = [];
-  for (const token of tokens) {
-    if (token.kind !== "text") {
-      expanded.push(token);
-      continue;
-    }
-    const splitTokens = tokenizeHelixAskBareEquationSegments(token.text);
-    if (splitTokens.length === 0) {
-      pushTextMathToken(expanded, token.text);
-      continue;
-    }
-    for (const splitToken of splitTokens) {
-      if (splitToken.kind === "text") {
-        pushTextMathToken(expanded, splitToken.text);
-      } else {
-        expanded.push(splitToken);
-      }
-    }
-  }
-  return expanded;
-}
-
-function isEscapedDelimiterAt(value: string, index: number): boolean {
-  if (index <= 0) return false;
-  let slashCount = 0;
-  for (let cursor = index - 1; cursor >= 0 && value[cursor] === "\\"; cursor -= 1) {
-    slashCount += 1;
-  }
-  return slashCount % 2 === 1;
-}
-
-function findNextUnescapedDelimiter(value: string, delimiter: string, startIndex: number): number {
-  let index = value.indexOf(delimiter, Math.max(0, startIndex));
-  while (index >= 0) {
-    if (!isEscapedDelimiterAt(value, index)) {
-      if (delimiter === "$" && value[index + 1] === "$") {
-        index = value.indexOf(delimiter, index + 1);
-        continue;
-      }
-      return index;
-    }
-    index = value.indexOf(delimiter, index + 1);
-  }
-  return -1;
-}
-
-function findNextMathOpenDelimiter(
-  value: string,
-  startIndex: number,
-):
-  | {
-      index: number;
-      openDelimiter: string;
-      closeDelimiter: string;
-      displayMode: boolean;
-    }
-  | null {
-  let winner:
-    | {
-        index: number;
-        openDelimiter: string;
-        closeDelimiter: string;
-        displayMode: boolean;
-      }
-    | null = null;
-  for (const delimiter of HELIX_ASK_MATH_DELIMITERS) {
-    const nextIndex = findNextUnescapedDelimiter(value, delimiter.openDelimiter, startIndex);
-    if (nextIndex < 0) continue;
-    if (!winner || nextIndex < winner.index) {
-      winner = {
-        index: nextIndex,
-        openDelimiter: delimiter.openDelimiter,
-        closeDelimiter: delimiter.closeDelimiter,
-        displayMode: delimiter.displayMode,
-      };
-    }
-  }
-  return winner;
-}
-
-function pushTextMathToken(tokens: HelixAskMathToken[], text: string): void {
-  if (!text) return;
-  const last = tokens[tokens.length - 1];
-  if (last && last.kind === "text") {
-    last.text += text;
-    return;
-  }
-  tokens.push({ kind: "text", text });
-}
-
-export function tokenizeHelixAskMathTokens(content: string): HelixAskMathToken[] {
-  const text = coerceText(content);
-  if (!text) return [];
-  const tokens: HelixAskMathToken[] = [];
-  let cursor = 0;
-  while (cursor < text.length) {
-    const nextOpen = findNextMathOpenDelimiter(text, cursor);
-    if (!nextOpen) {
-      pushTextMathToken(tokens, text.slice(cursor));
-      break;
-    }
-    if (nextOpen.index > cursor) {
-      pushTextMathToken(tokens, text.slice(cursor, nextOpen.index));
-    }
-    const contentStart = nextOpen.index + nextOpen.openDelimiter.length;
-    const closeIndex = findNextUnescapedDelimiter(text, nextOpen.closeDelimiter, contentStart);
-    if (closeIndex < 0) {
-      pushTextMathToken(tokens, nextOpen.openDelimiter);
-      cursor = contentStart;
-      continue;
-    }
-    const mathBody = text.slice(contentStart, closeIndex);
-    if (!mathBody.trim()) {
-      pushTextMathToken(tokens, `${nextOpen.openDelimiter}${mathBody}${nextOpen.closeDelimiter}`);
-    } else {
-      tokens.push({
-        kind: "math",
-        text: mathBody,
-        displayMode: nextOpen.displayMode,
-        openDelimiter: nextOpen.openDelimiter,
-        closeDelimiter: nextOpen.closeDelimiter,
-      });
-    }
-    cursor = closeIndex + nextOpen.closeDelimiter.length;
-  }
-  return expandMathTokensWithBareEquations(tokens);
-}
-
-export function hasHelixAskRenderableMath(content: unknown): boolean {
-  const text = coerceText(content);
-  if (!text) return false;
-  return tokenizeHelixAskMathTokens(text).some((token) => token.kind === "math");
-}
-
-const HELIX_ASK_EQUATION_FAMILY_ID = "equation_formalism";
-
-export function isHelixAskEquationFamilyDebug(debug: unknown): boolean {
-  const debugRecord = asObjectRecord(debug);
-  if (!debugRecord) return false;
-  const policyFamily =
-    typeof debugRecord.policy_prompt_family === "string"
-      ? debugRecord.policy_prompt_family.trim().toLowerCase()
-      : "";
-  const composerFamily =
-    typeof debugRecord.composer_prompt_family === "string"
-      ? debugRecord.composer_prompt_family.trim().toLowerCase()
-      : "";
-  if (policyFamily === HELIX_ASK_EQUATION_FAMILY_ID || composerFamily === HELIX_ASK_EQUATION_FAMILY_ID) {
-    return true;
-  }
-  if (
-    typeof debugRecord.equation_selector_primary_key === "string" &&
-    debugRecord.equation_selector_primary_key.trim().length > 0
-  ) {
-    return true;
-  }
-  if (debugRecord.equation_selector_authority_lock === true) {
-    return true;
-  }
-  const equationQuoteContract = asObjectRecord(debugRecord.equation_quote_contract);
-  if (equationQuoteContract && equationQuoteContract.required === true) {
-    return true;
-  }
-  return false;
-}
-
-export function shouldShowHelixAskCalculatorPanel(args: {
-  canLaunchPanel: boolean;
-  hasRenderableMath: boolean;
-  debug?: unknown;
-}): boolean {
-  if (!args.canLaunchPanel || !args.hasRenderableMath) return false;
-  const debugRecord = asObjectRecord(args.debug);
-  if (!debugRecord) {
-    // Legacy responses without debug context keep prior math-only behavior.
-    return true;
-  }
-  const policyFamily =
-    typeof debugRecord.policy_prompt_family === "string"
-      ? debugRecord.policy_prompt_family.trim().toLowerCase()
-      : "";
-  const composerFamily =
-    typeof debugRecord.composer_prompt_family === "string"
-      ? debugRecord.composer_prompt_family.trim().toLowerCase()
-      : "";
-  if (policyFamily || composerFamily) {
-    return (
-      policyFamily === HELIX_ASK_EQUATION_FAMILY_ID ||
-      composerFamily === HELIX_ASK_EQUATION_FAMILY_ID
-    );
-  }
-  return isHelixAskEquationFamilyDebug(debugRecord);
-}
-
-export function buildHelixAskMathRenderDebugForText(content: unknown): HelixAskMathRenderDebug | null {
-  const text = coerceText(content);
-  if (!text) return null;
-  const tokens = tokenizeHelixAskMathTokens(text);
-  const mathTokens = tokens.filter((token): token is Extract<HelixAskMathToken, { kind: "math" }> => token.kind === "math");
-  const { bareCandidateCount, bareAcceptedCount, bareIgnoredCount, bareIgnoredSamples, bareIgnoredDetails } =
-    collectHelixAskBareEquationCandidateStats(text);
-  if (mathTokens.length === 0 && bareCandidateCount === 0) {
-    return null;
-  }
-  let katexErrorCount = 0;
-  const katexErrorSamples: string[] = [];
-  const tokenStatuses: HelixAskMathTokenDebugStatus[] = [];
-  for (const token of mathTokens) {
-    let status: HelixAskMathTokenRenderStatus = "formatted";
-    let reason: string | null = null;
-    if (isLikelyCodeStyleMathToken(token)) {
-      reason = "code_style_plaintext";
-      if (tokenStatuses.length < 64) {
-        tokenStatuses.push({
-          tokenText: clipText(token.text, 180),
-          status,
-          displayMode: token.displayMode,
-          openDelimiter: token.openDelimiter || null,
-          closeDelimiter: token.closeDelimiter || null,
-          reason,
-        });
-      }
-      continue;
-    }
-    try {
-      const html = renderKatexToString(token.text, {
-        displayMode: token.displayMode,
-        strict: "ignore",
-        throwOnError: false,
-      });
-      if (/\bkatex-error\b/i.test(html)) {
-        katexErrorCount += 1;
-        status = "katex_error";
-        reason = "katex_error_markup";
-        if (katexErrorSamples.length < 3) {
-          katexErrorSamples.push(clipText(token.text, 120));
-        }
-      }
-    } catch {
-      katexErrorCount += 1;
-      status = "katex_error";
-      reason = "katex_exception";
-      if (katexErrorSamples.length < 3) {
-        katexErrorSamples.push(clipText(token.text, 120));
-      }
-    }
-    if (tokenStatuses.length < 64) {
-      tokenStatuses.push({
-        tokenText: clipText(token.text, 180),
-        status,
-        displayMode: token.displayMode,
-        openDelimiter: token.openDelimiter || null,
-        closeDelimiter: token.closeDelimiter || null,
-        reason,
-      });
-    }
-  }
-  for (const ignored of bareIgnoredDetails) {
-    if (tokenStatuses.length >= 64) break;
-    tokenStatuses.push({
-      tokenText: ignored.candidate,
-      status: "ignored_reason",
-      displayMode: null,
-      openDelimiter: null,
-      closeDelimiter: null,
-      reason: ignored.reason,
-    });
-  }
-  const bareMathCount = mathTokens.filter(
-    (token) => token.openDelimiter === "" && token.closeDelimiter === "",
-  ).length;
-  return {
-    sourceChars: text.length,
-    tokenCount: tokens.length,
-    mathTokenCount: mathTokens.length,
-    delimiterMathCount: mathTokens.length - bareMathCount,
-    bareMathCount,
-    katexErrorCount,
-    bareCandidateCount,
-    bareAcceptedCount,
-    bareIgnoredCount,
-    katexErrorSamples,
-    bareIgnoredSamples,
-    tokenStatuses,
-  };
 }
 
 function asObjectRecord(value: unknown): Record<string, unknown> | null {
@@ -11094,33 +9572,6 @@ const stripAnswerBoundaryPrefix = (value: string): string => {
   return cursor;
 };
 
-function formatEnvelopeSectionsForCopy(
-  sections: HelixAskResponseEnvelope["sections"],
-  hideTitle?: string,
-): string {
-  if (!sections || sections.length === 0) return "";
-  const hidden = hideTitle?.toLowerCase();
-  return sections
-    .map((section) => {
-      const lines: string[] = [];
-      const title = coerceText(section.title);
-      if (title && title.toLowerCase() !== hidden) {
-        lines.push(title);
-      }
-      const body = coerceText(section.body);
-      if (body) {
-        lines.push(body);
-      }
-      const citations = normalizeCitations(section.citations);
-      if (citations.length > 0) {
-        lines.push(`Sources: ${citations.join(", ")}`);
-      }
-      return lines.filter(Boolean).join("\n");
-    })
-    .filter(Boolean)
-    .join("\n\n");
-}
-
 const HELIX_ASK_CONTEXT_FILES = clampNumber(
   readNumber((import.meta as any)?.env?.VITE_HELIX_ASK_CONTEXT_FILES, 18),
   4,
@@ -11184,10 +9635,6 @@ const HELIX_REASONING_ATTEMPT_HARD_TIMEOUT_MS = clampNumber(
   15 * 60_000,
 );
 
-export function parseHelixAskQueuedQuestionsInput(value: string): string[] {
-  const normalized = value.replace(/\r\n/g, "\n").trim();
-  return normalized ? [normalized] : [];
-}
 const HELIX_REASONING_ATTEMPT_TIMEOUT_MS = HELIX_REASONING_ATTEMPT_IDLE_TIMEOUT_MS;
 const HELIX_REASONING_TIMEOUT_RETRY_MAX_ATTEMPTS = clampNumber(
   readNumber((import.meta as any)?.env?.VITE_HELIX_REASONING_TIMEOUT_RETRY_MAX_ATTEMPTS, 1),
@@ -11621,19 +10068,6 @@ function clamp01(value: number): number {
   return clampNumber(value, 0, 1);
 }
 
-function parseTimestampMs(value: unknown): number | null {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-  if (typeof value === "string") {
-    const parsed = Date.parse(value);
-    if (Number.isFinite(parsed)) {
-      return parsed;
-    }
-  }
-  return null;
-}
-
 function buildAskLiveEventFromTurnTranscriptRecord(
   record: Record<string, unknown>,
   fallbackId: string,
@@ -11670,13 +10104,6 @@ function buildAskLiveEventFromTurnTranscriptRecord(
       stream_event: "turn_transcript_event",
     },
   };
-}
-
-function resolveAskLiveEventTimestampMs(event: AskLiveEventEntry): number | null {
-  if (typeof event.tsMs === "number" && Number.isFinite(event.tsMs)) {
-    return event.tsMs;
-  }
-  return parseTimestampMs(event.ts);
 }
 
 function readAskLiveEventIdentity(event: AskLiveEventEntry): {
@@ -11716,52 +10143,6 @@ function askLiveEventBelongsToActiveTurn(args: {
     return eventTs >= args.activeStartedAtMs - 500;
   }
   return true;
-}
-
-function formatAskLiveEventLogLine(event: AskLiveEventEntry): string {
-  const tsMs = resolveAskLiveEventTimestampMs(event);
-  const timestamp =
-    tsMs === null
-      ? "time"
-      : new Date(tsMs).toISOString().split("T")[1]?.replace("Z", "") ?? "time";
-  const toolLabel = event.tool?.trim()
-    ? event.tool.startsWith("helix.ask.")
-      ? event.tool.replace("helix.ask.", "").replace(/\./g, " ")
-      : event.tool
-    : "event";
-  const stageLabel =
-    event.meta && typeof event.meta.stage === "string" ? String(event.meta.stage).trim() : "";
-  const detailLabel =
-    event.meta && typeof event.meta.detail === "string" ? String(event.meta.detail).trim() : "";
-  const statusLabel =
-    event.meta && typeof event.meta.status === "string" ? String(event.meta.status).trim() : "";
-  const parts: string[] = [`tool=${toolLabel}`];
-  if (stageLabel) parts.push(`stage=${stageLabel}`);
-  if (statusLabel) parts.push(`status=${statusLabel}`);
-  if (detailLabel) parts.push(`detail=${detailLabel}`);
-  if (typeof event.seq === "number" && Number.isFinite(event.seq)) {
-    parts.push(`seq=${Math.max(0, Math.trunc(event.seq))}`);
-  }
-  if (typeof event.durationMs === "number" && Number.isFinite(event.durationMs)) {
-    parts.push(`dur=${Math.max(0, Math.round(event.durationMs))}ms`);
-  }
-  const text = summarizeVoiceDebugText(event.text ?? "", 220) || "event";
-  return `[${timestamp}] ${parts.join(" | ")} | text=${text}`;
-}
-
-function buildAskLiveEventLogExport(events: AskLiveEventEntry[]): string {
-  if (!events.length) return "";
-  return events.map((event) => formatAskLiveEventLogLine(event)).join("\n");
-}
-
-function humanizeAskLiveEventToken(value: string): string {
-  const cleaned = value
-    .replace(/^Helix Ask:\s*/i, "")
-    .replace(/[_-]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  if (!cleaned) return "";
-  return cleaned.replace(/\b(?:llm|api|id|url|ui)\b/gi, (token) => token.toUpperCase());
 }
 
 function buildReasoningTheaterFloatingActionText(input: {
@@ -12181,35 +10562,6 @@ function resolveObjectiveTelemetryUsedSummary(
   };
 }
 
-function buildAskLiveEventLogDetailPayload(event: AskLiveEventEntry): string {
-  const payload = {
-    id: event.id,
-    ts: event.ts ?? null,
-    tsMs: resolveAskLiveEventTimestampMs(event),
-    tool: typeof event.tool === "string" ? event.tool : null,
-    seq: typeof event.seq === "number" && Number.isFinite(event.seq) ? event.seq : null,
-    durationMs:
-      typeof event.durationMs === "number" && Number.isFinite(event.durationMs)
-        ? Math.max(0, Math.round(event.durationMs))
-        : null,
-    text: typeof event.text === "string" ? event.text : "",
-    meta: event.meta ?? null,
-  };
-  return safeJsonStringify(payload);
-}
-
-function readEventMetaString(
-  meta: Record<string, unknown> | undefined,
-  keys: string[],
-): string | null {
-  if (!meta) return null;
-  for (const key of keys) {
-    const value = meta[key];
-    if (typeof value === "string" && value.trim()) return value.trim();
-  }
-  return null;
-}
-
 type UnifiedDebugEventRow = {
   index: number;
   channel: "ask_live" | "voice_timeline" | "voice_call" | "voice_playback_receipt" | "observer_lane";
@@ -12231,101 +10583,6 @@ type AskLiveAgenticEventRow = {
   meta: string;
   tone: "default" | "thinking" | "observation" | "decision" | "warning" | "final";
 };
-
-type ObserverCommentaryOptions = {
-  userPrompt?: string | null;
-};
-
-function buildObserverUserRestatement(
-  rowText: string,
-  userPrompt: string | null | undefined,
-): string | null {
-  const normalizedPrompt = (userPrompt ?? "").replace(/\s+/g, " ").trim();
-  if (!normalizedPrompt) return null;
-  const promptSnippet =
-    normalizedPrompt.length > 96 ? `${normalizedPrompt.slice(0, 93).trimEnd()}...` : normalizedPrompt;
-  if (/summarizing current document/i.test(rowText)) {
-    return `From your request ("${promptSnippet}"), this means your current document will be summarized in plain language.`;
-  }
-  if (/opening selected document/i.test(rowText)) {
-    return `From your request ("${promptSnippet}"), this means Docs viewer is opening the selected source before explanation.`;
-  }
-  if (/closed active panel/i.test(rowText)) {
-    return `From your request ("${promptSnippet}"), this means the active panel you asked to close was removed.`;
-  }
-  if (/starting read-aloud/i.test(rowText)) {
-    return `From your request ("${promptSnippet}"), this means read-aloud is beginning for the active document context.`;
-  }
-  if (/^fail:/i.test(rowText)) {
-    return `From your request ("${promptSnippet}"), this means execution failed before the requested action completed.`;
-  }
-  return `From your request ("${promptSnippet}"), this is the current workstation step being executed.`;
-}
-
-export function buildObserverCommentaryForRow(
-  row: Pick<UnifiedDebugEventRow, "tool" | "text" | "detail">,
-  options: ObserverCommentaryOptions = {},
-): string | null {
-  const tool = (row.tool ?? "").trim().toLowerCase();
-  const text = (row.text ?? "").trim();
-  const detail = (row.detail ?? "").trim().toLowerCase();
-  const isWorkstationRow =
-    tool === "helix.ask.fast_path" ||
-    tool === "helix.observer.plan" ||
-    tool.startsWith("workstation.") ||
-    detail.startsWith("workstation_") ||
-    detail.startsWith("job_") ||
-    detail.startsWith("observer_plan_");
-  if (!isWorkstationRow || !text) return null;
-
-  const restatement = buildObserverUserRestatement(text, options.userPrompt);
-  const withRestatement = (technical: string): string =>
-    restatement ? `Observer: ${restatement} ${technical}` : `Observer: ${technical}`;
-
-  if (/focusing panel picker/i.test(text)) {
-    return withRestatement("Dispatcher acknowledged request and is moving focus to panel picker.");
-  }
-  if (/opening panel picker/i.test(text)) {
-    return withRestatement("UI control path opened panel picker for action routing.");
-  }
-  if (/targeting docs panel/i.test(text)) {
-    return withRestatement("Action router resolved Docs panel as active destination.");
-  }
-  if (/opening selected document/i.test(text)) {
-    return withRestatement("Selected document is now being opened in Docs viewer.");
-  }
-  if (/starting read-aloud/i.test(text)) {
-    return withRestatement("Read-aloud stage entered; playback dispatch is expected next.");
-  }
-  if (/summarizing current document/i.test(text)) {
-    return withRestatement("Summarize-doc action dispatched using current Docs viewer context.");
-  }
-  if (/closed active panel/i.test(text)) {
-    return withRestatement("Close-panel action completed and active workspace panel was removed.");
-  }
-  if (/workstation fast-path dispatched/i.test(text)) {
-    return withRestatement("Intent resolved to workstation fast-path and handed to action router.");
-  }
-  if (/request_user_input:/i.test(text)) {
-    return withRestatement("Action routing paused because required inputs are missing and were requested.");
-  }
-  if (/request_user_input resolved:/i.test(text)) {
-    return withRestatement("Requested workstation input was resolved and routing resumed.");
-  }
-  if (/observer plan update:/i.test(text)) {
-    return withRestatement("Observer updated the workspace/reasoning execution plan.");
-  }
-  if (/observer plan step complete:/i.test(text)) {
-    return withRestatement("Observer marked a planned execution step as complete.");
-  }
-  if (/^ok:/i.test(text)) {
-    return withRestatement(`Action receipt confirmed - ${text.replace(/^ok:\s*/i, "").trim()}`);
-  }
-  if (/^fail:/i.test(text)) {
-    return withRestatement(`Action failure detected - ${text.replace(/^fail:\s*/i, "").trim()}`);
-  }
-  return withRestatement(`Interpreted workstation event - ${text}`);
-}
 
 function summarizeVoiceSegments(segments: VoiceCaptureSegmentSnapshot[] | undefined): {
   total: number;
@@ -12556,6 +10813,8 @@ function resolveAskTurnDocViewerSnapshotPath(): { path: string | null; source: s
 
 const HELIX_DOC_VIEWER_DEICTIC_CUE_RE = /\b(?:this|current)\s+doc(?:ument)?\b/i;
 const HELIX_DOC_VIEWER_CONTEXT_CUE_RE = /\b(?:docs?|document)\s+viewer(?:\s+context)?\b/i;
+const HELIX_ACTIVE_DOC_VIEWER_ARTIFACT_CUE_RE =
+  /\b(?:this|current|active|open)\s+(?:[a-z0-9._-]+\s+){0,4}(?:white\s*paper|whitepaper|paper|report|article|manuscript|spec(?:ification)?|brief|research\s+note|markdown|readme|document|doc)\b/i;
 const HELIX_EXPLICIT_PATH_CUE_RE =
   /(?:\b[a-z0-9_./-]+\.(?:ts|tsx|js|jsx|json|md|mdx|txt|pdf|docx?|ya?ml|py|go|rs)\b|(?:^|[\s(])\/?(?:docs|client|server|modules|shared)\/[^\s)]+)/i;
 
@@ -12620,12 +10879,13 @@ function resolveDocsViewerAnchorPathForQuestion(
   const docsCueDetected =
     HELIX_DOC_VIEWER_DEICTIC_CUE_RE.test(question) ||
     HELIX_DOC_VIEWER_CONTEXT_CUE_RE.test(question) ||
+    HELIX_ACTIVE_DOC_VIEWER_ARTIFACT_CUE_RE.test(question) ||
     answerContract?.source === "docs_viewer";
   if (!docsCueDetected) return null;
   const explicitPath = extractExplicitDocsViewerPath(question);
   if (explicitPath) return explicitPath;
   if (HELIX_EXPLICIT_PATH_CUE_RE.test(question)) return null;
-  const currentPath = rememberDocViewerPathForAskSnapshot(useDocViewerStore.getState().currentPath) ?? "";
+  const currentPath = resolveAskTurnDocViewerSnapshotPath().path ?? "";
   if (!currentPath) return null;
   const normalizedPath = normalizeDocsViewerAnchorPath(currentPath);
   return normalizedPath.length > 0 ? normalizedPath : null;
@@ -14759,7 +13019,9 @@ async function resolveAuthoritativeDebugExportPayload(localPayload: string): Pro
   const isReplyScopedRebuild =
     rebuildReason === "empty_payload" ||
     rebuildReason === "payload_reply_mismatch" ||
-    rebuildReason === "invalid_json_payload";
+    rebuildReason === "invalid_json_payload" ||
+    rebuildReason === "rendered_reply" ||
+    rebuildReason === "rendered_button_scope";
   const parsedDebug = readAgentLoopAuditRecord(parsed.debug);
   const refCandidates = [
     readAgentLoopAuditRecord(parsed.backend_debug_response_ref),
@@ -15304,45 +13566,6 @@ function buildObservationGroundedReplyText(entry: AskLiveEventEntry): { text: st
     if (message) return { text: message, ok: true };
   }
   return null;
-}
-
-function stripContextCapsuleTokensFromText(value: string): string {
-  const ids = extractContextCapsuleIdsFromText(value);
-  if (ids.length === 0) return value.trim();
-  let next = value;
-  for (const id of ids) {
-    const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    next = next.replace(new RegExp(`\\b${escaped}\\b`, "gi"), " ");
-  }
-  return next.replace(/\s{2,}/g, " ").trim();
-}
-
-function resolveContextCapsulePalette(state: ConvergenceStripState): {
-  r: number;
-  g: number;
-  b: number;
-} {
-  if (state.proof === "fail_closed") return { r: 239, g: 68, b: 68 };
-  if (state.source === "open_world") return { r: 244, g: 114, b: 182 };
-  if (state.source === "atlas_exact") return { r: 34, g: 211, b: 238 };
-  if (state.source === "repo_exact") return { r: 56, g: 189, b: 248 };
-  return { r: 148, g: 163, b: 184 };
-}
-
-function buildContextCapsuleCopyText(summary: ContextCapsuleSummary): string {
-  const proofTag = summary.commit.proof_verdict ?? "UNKNOWN";
-  const sourceTag = summary.convergence.source;
-  const stampLines = renderContextCapsuleStampLines({
-    bits: summary.stamp.finalBits,
-    width: summary.stamp.gridW,
-    height: summary.stamp.gridH,
-    targetWidth: 10,
-    targetHeight: 3,
-  });
-  return [
-    ...stampLines,
-    `proof:${proofTag}  src:${sourceTag}`,
-  ].join("\n");
 }
 
 function buildContextCapsuleStampDataUri(
@@ -20355,9 +18578,9 @@ export function HelixAskPill({
               <p className="mt-1 whitespace-pre-wrap leading-relaxed">
                 {renderHelixAskContent(coerceText(section.body))}
               </p>
-              {section.layer === "proof" && normalizeCitations(section.citations).length > 0 ? (
+              {section.layer === "proof" && normalizeHelixAskEnvelopeCitations(section.citations).length > 0 ? (
                 <p className="mt-1 text-[11px] text-slate-400">
-                  Sources: {renderHelixAskContent(normalizeCitations(section.citations).join(", "))}
+                  Sources: {renderHelixAskContent(normalizeHelixAskEnvelopeCitations(section.citations).join(", "))}
                 </p>
               ) : null}
             </div>
@@ -20403,7 +18626,7 @@ export function HelixAskPill({
       const expandDetails = reply.envelope.mode === "extended";
       const extension = reply.envelope.extension;
       const extensionBody = coerceText(extension?.body).trim();
-      const extensionCitations = normalizeCitations(extension?.citations);
+      const extensionCitations = normalizeHelixAskEnvelopeCitations(extension?.citations);
       const extensionAvailable = Boolean(extension?.available && extensionBody);
       const extensionOpen = Boolean(askExtensionOpenByReply[reply.id]);
       const answerText = coerceText(envelopeAnswer || fallbackAnswer);

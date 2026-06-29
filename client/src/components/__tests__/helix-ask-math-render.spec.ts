@@ -1,19 +1,11 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
-let tokenizeHelixAskMathTokens: typeof import("@/components/helix/HelixAskPill").tokenizeHelixAskMathTokens;
-let hasHelixAskRenderableMath: typeof import("@/components/helix/HelixAskPill").hasHelixAskRenderableMath;
-let buildHelixAskMathRenderDebugForText: typeof import("@/components/helix/HelixAskPill").buildHelixAskMathRenderDebugForText;
-let shouldShowHelixAskCalculatorPanel: typeof import("@/components/helix/HelixAskPill").shouldShowHelixAskCalculatorPanel;
-
-beforeAll(async () => {
-  (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
-  ({
-    tokenizeHelixAskMathTokens,
-    hasHelixAskRenderableMath,
-    buildHelixAskMathRenderDebugForText,
-    shouldShowHelixAskCalculatorPanel,
-  } = await import("@/components/helix/HelixAskPill"));
-});
+import {
+  buildHelixAskMathRenderDebugForText,
+  hasHelixAskRenderableMath,
+  shouldShowHelixAskCalculatorPanel,
+  tokenizeHelixAskMathTokens,
+} from "@/lib/helix/ask-answer-rendering";
 
 describe("tokenizeHelixAskMathTokens", () => {
   it("tokenizes inline and display math delimiters", () => {

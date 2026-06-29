@@ -4,12 +4,13 @@ let transcribeVoice: typeof import("@/lib/agi/api").transcribeVoice;
 let runConversationTurn: typeof import("@/lib/agi/api").runConversationTurn;
 let askLocal: typeof import("@/lib/agi/api").askLocal;
 let runAskTurn: typeof import("@/lib/agi/api").runAskTurn;
+let runAskTurnStream: typeof import("@/lib/agi/api").runAskTurnStream;
 let getVoiceCallDiagnosticsSnapshot: typeof import("@/lib/helix/voice-call-diagnostics").getVoiceCallDiagnosticsSnapshot;
 let clearVoiceCallDiagnosticsSnapshot: typeof import("@/lib/helix/voice-call-diagnostics").clearVoiceCallDiagnosticsSnapshot;
 
 beforeAll(async () => {
   (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
-  ({ transcribeVoice, runConversationTurn, askLocal, runAskTurn } = await import("@/lib/agi/api"));
+  ({ transcribeVoice, runConversationTurn, askLocal, runAskTurn, runAskTurnStream } = await import("@/lib/agi/api"));
   ({ getVoiceCallDiagnosticsSnapshot, clearVoiceCallDiagnosticsSnapshot } = await import(
     "@/lib/helix/voice-call-diagnostics"
   ));
@@ -848,5 +849,43 @@ describe("askLocal lane parity default", () => {
     expect(body.agent_runtime).toBe("codex");
     expect(body.goldenPathRuntime).toBeUndefined();
     expect(body.golden_path_runtime).toBeUndefined();
+  });
+
+  it("enables golden-path runtime markers when runAskTurnStream uses Helix runtime", async () => {
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          new TextEncoder().encode(
+            [
+              "event: turn_final",
+              'data: {"text":"Golden path stream accepted.","final_answer_source":"helix_ask_golden_path_runtime","terminal_artifact_kind":"golden_path_contract_answer"}',
+              "",
+              "",
+            ].join("\n"),
+          ),
+        );
+        controller.close();
+      },
+    });
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(stream, {
+        status: 200,
+        headers: { "content-type": "text/event-stream" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await runAskTurnStream({
+      question: "Use Helix stream mode to answer from the current document.",
+      agentRuntime: "helix",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/agi/ask/turn/stream");
+    const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const body = JSON.parse(String(requestInit.body ?? "{}")) as Record<string, any>;
+    expect(body.agent_runtime).toBe("helix");
+    expect(body.goldenPathRuntime).toBe(true);
+    expect(body.golden_path_runtime).toBe(true);
   });
 });

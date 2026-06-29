@@ -170,7 +170,7 @@ describe("Helix Ask live-source watch transcript rows", () => {
     });
 
     expect(rows.map((row) => row.label)).toEqual([
-      "Unread mail waiting",
+      "Observer backlog",
       "Continuation deferred",
     ]);
     expect(rows[0].detail).toContain("Minecraft player moves");
