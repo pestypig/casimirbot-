@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 import {
   HELIX_WORKSPACE_OS_STATUS_CAPABILITY,
 } from "../workspace-os-status-intent";
@@ -32,9 +35,12 @@ import type {
 
 const DEFAULT_MODE: HelixWorkstationGatewayMode = "observe";
 const WORKSTATION_GATEWAY_SCHEMA = "helix.workstation_tool_gateway.v1" as const;
-const WORKSTATION_GATEWAY_MANIFEST_VERSION = "read-observe.v1" as const;
+const WORKSTATION_GATEWAY_MANIFEST_VERSION = "read-observe-act.v1" as const;
 const CALCULATOR_SOLVE_EXPRESSION_CAPABILITY = "scientific-calculator.solve_expression" as const;
 const CALCULATOR_SOLVE_OBSERVATION_SCHEMA = "helix.calculator_solve_observation.v1" as const;
+const CALCULATOR_OPEN_PANEL_CAPABILITY = "scientific-calculator.open_panel" as const;
+const CALCULATOR_FOCUS_PANEL_CAPABILITY = "scientific-calculator.focus_panel" as const;
+const WORKSTATION_UI_ACTION_RECEIPT_SCHEMA = "helix.workstation_ui_action_receipt.v1" as const;
 const REPO_SEARCH_CAPABILITY = "repo.search" as const;
 const REPO_SEARCH_OBSERVATION_SCHEMA = "helix.repo_search_observation.v1" as const;
 const DOCS_SEARCH_CAPABILITY = "docs.search" as const;
@@ -74,6 +80,26 @@ const normalizeMode = (value: unknown): HelixWorkstationGatewayMode => {
   if (mode === "read" || mode === "observe" || mode === "act" || mode === "verify") return mode;
   return DEFAULT_MODE;
 };
+
+const gatewayModeRank: Record<HelixWorkstationGatewayMode, number> = {
+  observe: 2,
+  read: 2,
+  verify: 2,
+  act: 3,
+};
+
+const permissionProfileRank: Record<HelixWorkstationCapabilityManifest["permission_profile_required"], number> = {
+  observe: 1,
+  read: 2,
+  act: 3,
+  write: 4,
+  danger: 5,
+};
+
+const modeAllowsManifest = (
+  mode: HelixWorkstationGatewayMode,
+  manifest: HelixWorkstationCapabilityManifest,
+): boolean => gatewayModeRank[mode] >= permissionProfileRank[manifest.permission_profile_required];
 
 const readArguments = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
@@ -155,6 +181,76 @@ const readDocsSearchPaths = (value: unknown): string[] => {
     .filter(isSafeRelativeDocsPath)
     .slice(0, 8);
   return requested.length > 0 ? requested : [...DOCS_SEARCH_DEFAULT_PATHS];
+};
+
+const normalizeDocsObservationLine = (line: string): string => {
+  const normalized = line
+    .normalize("NFKC")
+    .replace(/[\u200b\u200c\u200d\ufeff]/g, "")
+    .replace(/[ \t]+/g, " ")
+    .trimEnd();
+  const codeSpanMatches = [...normalized.matchAll(/`([^`\n]{1,120})`/g)];
+  if (codeSpanMatches.length < 2) return normalized;
+
+  let deduped = normalized;
+  const seen = new Map<string, string>();
+  for (const match of codeSpanMatches) {
+    const full = match[0];
+    const body = match[1] ?? "";
+    const key = body.replace(/\s+/g, "").toLowerCase();
+    if (!key) continue;
+    const prior = seen.get(key);
+    if (!prior) {
+      seen.set(key, full);
+      continue;
+    }
+    deduped = deduped.replace(full, "");
+  }
+  return deduped.replace(/\s{2,}/g, " ").replace(/\s+([,.;:])/g, "$1").trimEnd();
+};
+
+export const normalizeDocsObservationExcerptText = (text: string): string => {
+  const normalizedLines = text
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .map(normalizeDocsObservationLine)
+    .filter((line) => line.trim().length > 0);
+  return normalizedLines.join("\n").trim();
+};
+
+const readBoundedDocsExcerpt = (paths: string[]): {
+  path: string;
+  excerpt: string;
+  excerpt_char_count: number;
+  truncated: boolean;
+} | null => {
+  const exactPath = paths.find((entry) => /^docs\/.+\.md$/i.test(entry));
+  if (!exactPath) return null;
+  const workspaceRoot = process.cwd();
+  const absolutePath = path.resolve(workspaceRoot, exactPath);
+  const docsRoot = path.resolve(workspaceRoot, "docs");
+  if (absolutePath !== docsRoot && !absolutePath.startsWith(`${docsRoot}${path.sep}`)) return null;
+  let text = "";
+  try {
+    text = readFileSync(absolutePath, "utf8");
+  } catch {
+    return null;
+  }
+  const cleaned = normalizeDocsObservationExcerptText(text)
+    .split("\n")
+    .slice(0, 60)
+    .join("\n")
+    .trim();
+  if (!cleaned) return null;
+  const maxChars = 3200;
+  const excerpt = cleaned.length > maxChars ? cleaned.slice(0, maxChars).trimEnd() : cleaned;
+  return {
+    path: exactPath,
+    excerpt,
+    excerpt_char_count: excerpt.length,
+    truncated: cleaned.length > excerpt.length || text.length > cleaned.length,
+  };
 };
 
 const clipRepoSearchHit = (hit: RepoSearchHit): RepoSearchHit => ({
@@ -319,6 +415,47 @@ const calculatorSolveExpressionManifest: HelixWorkstationCapabilityManifest = {
   raw_content_included: false,
 };
 
+const makeCalculatorPanelActionManifest = (
+  capabilityId: typeof CALCULATOR_OPEN_PANEL_CAPABILITY | typeof CALCULATOR_FOCUS_PANEL_CAPABILITY,
+  action: "open_panel" | "focus_panel",
+): HelixWorkstationCapabilityManifest => ({
+  schema: "helix.workstation_tool_gateway.capability.v1",
+  capability_id: capabilityId,
+  label: action === "open_panel" ? "Scientific Calculator open panel" : "Scientific Calculator focus panel",
+  description:
+    "Requests a governed, non-mutating workstation UI action for the Scientific Calculator panel. It is a non-terminal action receipt and cannot answer the user.",
+  mode: "act",
+  mutating: false,
+  code_mutation: false,
+  shell_access: false,
+  requires_confirmation: false,
+  requires_source: false,
+  terminal_eligible: false,
+  permission_profile_required: "act",
+  post_tool_model_step_required: true,
+  input_schema: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      reason: { type: "string" },
+    },
+  },
+  output_observation_schema: WORKSTATION_UI_ACTION_RECEIPT_SCHEMA,
+  observation_schema: WORKSTATION_UI_ACTION_RECEIPT_SCHEMA,
+  safety_tags: ["non_mutating_ui_action", "calculator", "panel_action", "action_receipt", "non_terminal", "no_shell", "no_code_mutation"],
+  assistant_answer: false,
+  raw_content_included: false,
+});
+
+const calculatorOpenPanelManifest = makeCalculatorPanelActionManifest(
+  CALCULATOR_OPEN_PANEL_CAPABILITY,
+  "open_panel",
+);
+const calculatorFocusPanelManifest = makeCalculatorPanelActionManifest(
+  CALCULATOR_FOCUS_PANEL_CAPABILITY,
+  "focus_panel",
+);
+
 const repoSearchManifest: HelixWorkstationCapabilityManifest = {
   schema: "helix.workstation_tool_gateway.capability.v1",
   capability_id: REPO_SEARCH_CAPABILITY,
@@ -386,6 +523,8 @@ const docsSearchManifest: HelixWorkstationCapabilityManifest = {
 const capabilities = new Map<string, HelixWorkstationCapabilityManifest>([
   [workspaceOsStatusManifest.capability_id, workspaceOsStatusManifest],
   [calculatorSolveExpressionManifest.capability_id, calculatorSolveExpressionManifest],
+  [calculatorOpenPanelManifest.capability_id, calculatorOpenPanelManifest],
+  [calculatorFocusPanelManifest.capability_id, calculatorFocusPanelManifest],
   [repoSearchManifest.capability_id, repoSearchManifest],
   [docsSearchManifest.capability_id, docsSearchManifest],
 ]);
@@ -467,6 +606,74 @@ export const callWorkstationGatewayCapability = async (
       assistant_answer: false,
       raw_content_included: false,
       error: "capability_not_registered",
+    };
+  }
+
+  if (!modeAllowsManifest(mode, manifest)) {
+    const blockedReason = `permission_profile_${mode}_does_not_allow_${manifest.permission_profile_required}`;
+    const args = readArguments(input.arguments);
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: "blocked",
+      reason: "permission_profile_insufficient",
+      blockedReason,
+      sourceTargetIntent: args.source_target_intent,
+    });
+    const observation = {
+      schema: "helix.workstation_tool_gateway.permission_blocked.v1",
+      capability_key: manifest.capability_id,
+      requested_mode: mode,
+      required_permission_profile: manifest.permission_profile_required,
+      status: "blocked",
+      blocked_reason: blockedReason,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: "workstation-gateway",
+      action: "permission_check",
+      status: "blocked",
+      summary: `Workstation gateway blocked ${manifest.capability_id}: ${blockedReason}.`,
+      observation,
+      missingRequirements: [{
+        code: blockedReason,
+        message: `Capability ${manifest.capability_id} requires ${manifest.permission_profile_required} permission.`,
+        repair_action: "ask_user",
+      }],
+    });
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error: blockedReason,
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: false,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      error: blockedReason,
     };
   }
 
@@ -590,6 +797,75 @@ export const callWorkstationGatewayCapability = async (
       assistant_answer: false,
       raw_content_included: false,
       error: solved.ok ? undefined : solved.blocked_reason,
+    };
+  }
+
+  if (
+    manifest.capability_id === CALCULATOR_OPEN_PANEL_CAPABILITY ||
+    manifest.capability_id === CALCULATOR_FOCUS_PANEL_CAPABILITY
+  ) {
+    const args = readArguments(input.arguments);
+    const action = manifest.capability_id === CALCULATOR_OPEN_PANEL_CAPABILITY ? "open_panel" : "focus_panel";
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: "admitted",
+      reason: "non_mutating_workstation_ui_action",
+      sourceTargetIntent: args.source_target_intent,
+    });
+    const workstationAction = {
+      schema_version: "helix.workstation.action/v1",
+      action,
+      panel_id: "scientific-calculator",
+    };
+    const observation = {
+      schema: WORKSTATION_UI_ACTION_RECEIPT_SCHEMA,
+      capability_key: manifest.capability_id,
+      action_kind: action,
+      panel_id: "scientific-calculator",
+      status: "succeeded",
+      dispatch_status: "admitted",
+      workstation_action: workstationAction,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: "scientific-calculator",
+      action,
+      status: "succeeded",
+      summary: `Admitted non-mutating Scientific Calculator ${action.replace(/_/g, " ")} action.`,
+      observation,
+    });
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: true,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
     };
   }
 
@@ -858,6 +1134,7 @@ export const callWorkstationGatewayCapability = async (
     });
     const hits = result.hits.slice(0, maxHits).map(clipRepoSearchHit);
     const truncated = result.truncated || result.hits.length > hits.length;
+    const activeDocumentObservation = readBoundedDocsExcerpt(paths);
     const evidence = formatRepoSearchEvidence(
       {
         ...result,
@@ -879,6 +1156,19 @@ export const callWorkstationGatewayCapability = async (
       hits,
       hit_count: hits.length,
       file_paths: evidence.filePaths,
+      active_document_observation: activeDocumentObservation
+        ? {
+            schema: "helix.docs_active_document_observation.v1",
+            path: activeDocumentObservation.path,
+            excerpt: activeDocumentObservation.excerpt,
+            excerpt_char_count: activeDocumentObservation.excerpt_char_count,
+            truncated: activeDocumentObservation.truncated,
+            observation_role: "evidence_not_assistant_answer",
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          }
+        : null,
       evidence_observations: evidence.observations,
       truncated,
       error: result.error,
@@ -900,7 +1190,9 @@ export const callWorkstationGatewayCapability = async (
       status: result.error ? "failed" : "succeeded",
       summary: result.error
         ? `Docs search failed with ${result.error}.`
-        : `Docs search returned ${hits.length} evidence hit(s) for ${query}.`,
+        : activeDocumentObservation
+          ? `Docs search materialized a bounded active-document excerpt from ${activeDocumentObservation.path}.`
+          : `Docs search returned ${hits.length} evidence hit(s) for ${query}.`,
       observation,
       missingRequirements: result.error
         ? [{

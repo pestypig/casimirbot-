@@ -6,6 +6,7 @@ import {
 } from "../registry";
 
 const CALCULATOR_SOLVE_EXPRESSION_CAPABILITY = "scientific-calculator.solve_expression";
+const CALCULATOR_OPEN_PANEL_CAPABILITY = "scientific-calculator.open_panel";
 const REPO_SEARCH_CAPABILITY = "repo.search";
 const DOCS_SEARCH_CAPABILITY = "docs.search";
 
@@ -36,7 +37,7 @@ describe("Helix workstation tool gateway", () => {
 
     expect(manifest).toMatchObject({
       schema: "helix.workstation_tool_gateway.v1",
-      manifest_version: "read-observe.v1",
+      manifest_version: "read-observe-act.v1",
       agent_runtime: "codex",
       mode: "observe",
       assistant_answer: false,
@@ -86,6 +87,20 @@ describe("Helix workstation tool gateway", () => {
     );
     expect(manifest.capabilities).toContainEqual(
       expect.objectContaining({
+        capability_id: CALCULATOR_OPEN_PANEL_CAPABILITY,
+        mode: "act",
+        mutating: false,
+        code_mutation: false,
+        shell_access: false,
+        permission_profile_required: "act",
+        output_observation_schema: "helix.workstation_ui_action_receipt.v1",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    );
+    expect(manifest.capabilities).toContainEqual(
+      expect.objectContaining({
         capability_id: DOCS_SEARCH_CAPABILITY,
         mode: "read",
         mutating: false,
@@ -115,7 +130,7 @@ describe("Helix workstation tool gateway", () => {
     });
 
     expect(result).toMatchObject({
-      manifest_version: "read-observe.v1",
+      manifest_version: "read-observe-act.v1",
       ok: true,
       agent_runtime: "codex",
       capability_id: HELIX_WORKSPACE_OS_STATUS_CAPABILITY,
@@ -226,6 +241,97 @@ describe("Helix workstation tool gateway", () => {
         result: "8",
         terminal_eligible: false,
         post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+  });
+
+  it("blocks calculator panel UI actions without act permission", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: CALCULATOR_OPEN_PANEL_CAPABILITY,
+      turnId: "ask:test:gateway-calculator-open-blocked",
+      iteration: 3,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      capability_id: CALCULATOR_OPEN_PANEL_CAPABILITY,
+      mode: "read",
+      gateway_admission: {
+        requested_capability: CALCULATOR_OPEN_PANEL_CAPABILITY,
+        permission_profile: "act",
+        admission_status: "blocked",
+        admission_reason: "permission_profile_insufficient",
+        blocked_reason: "permission_profile_read_does_not_allow_act",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+      observation: {
+        schema: "helix.workstation_tool_gateway.permission_blocked.v1",
+        requested_mode: "read",
+        required_permission_profile: "act",
+        status: "blocked",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+  });
+
+  it("admits calculator panel UI actions as non-terminal action receipts under act permission", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "act",
+      capabilityId: CALCULATOR_OPEN_PANEL_CAPABILITY,
+      turnId: "ask:test:gateway-calculator-open",
+      iteration: 4,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      capability_id: CALCULATOR_OPEN_PANEL_CAPABILITY,
+      mode: "act",
+      gateway_admission: {
+        requested_capability: CALCULATOR_OPEN_PANEL_CAPABILITY,
+        permission_profile: "act",
+        admission_status: "admitted",
+        admission_reason: "non_mutating_workstation_ui_action",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      observation_packet: {
+        schema: "helix.agent_step_observation_packet.v1",
+        capability_key: CALCULATOR_OPEN_PANEL_CAPABILITY,
+        panel_id: "scientific-calculator",
+        action: "open_panel",
+        status: "succeeded",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.workstation_ui_action_receipt.v1",
+        capability_key: CALCULATOR_OPEN_PANEL_CAPABILITY,
+        action_kind: "open_panel",
+        panel_id: "scientific-calculator",
+        status: "succeeded",
+        dispatch_status: "admitted",
+        workstation_action: {
+          schema_version: "helix.workstation.action/v1",
+          action: "open_panel",
+          panel_id: "scientific-calculator",
+        },
+        terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
       },

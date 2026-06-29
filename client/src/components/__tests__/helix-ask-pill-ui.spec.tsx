@@ -109,7 +109,9 @@ let HELIX_VOICE_LEGACY_DISPATCH_FALLBACK_FLAG: typeof import("@/components/helix
 let evaluateVoiceAutoDispatchGovernance: typeof import("@/components/helix/HelixAskPill").evaluateVoiceAutoDispatchGovernance;
 let normalizeHelixAgentProvidersResponse: typeof import("@/components/helix/HelixAskPill").normalizeHelixAgentProvidersResponse;
 let resolveSelectedHelixAgentRuntime: typeof import("@/components/helix/HelixAskPill").resolveSelectedHelixAgentRuntime;
+let resolveNextSelectableHelixAgentRuntime: typeof import("@/components/helix/HelixAskPill").resolveNextSelectableHelixAgentRuntime;
 let resolveHelixAskActualAgentProviderLabel: typeof import("@/components/helix/HelixAskPill").resolveHelixAskActualAgentProviderLabel;
+let parseHelixAskFinalAnswerBulletLine: typeof import("@/components/helix/HelixAskPill").parseHelixAskFinalAnswerBulletLine;
 
 beforeAll(async () => {
   (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
@@ -220,7 +222,9 @@ beforeAll(async () => {
     evaluateVoiceAutoDispatchGovernance,
     normalizeHelixAgentProvidersResponse,
     resolveSelectedHelixAgentRuntime,
+    resolveNextSelectableHelixAgentRuntime,
     resolveHelixAskActualAgentProviderLabel,
+    parseHelixAskFinalAnswerBulletLine,
   } = await import("@/components/helix/HelixAskPill"));
 });
 
@@ -897,6 +901,9 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("agentRuntimeProviders.map");
     expect(source).toContain("disabled={!provider.enabled}");
     expect(source).toContain("{selectedAgentRuntimeLabel}");
+    expect(source).toContain("resolveNextSelectableHelixAgentRuntime(selectedAgentRuntime, agentRuntimeProviders)");
+    expect(source).toContain("onClick={handleAgentRuntimeButtonClick}");
+    expect(source).toContain("event.stopPropagation();");
   });
 
   it("normalizes Helix, Codex, and Future providers from the mocked agent provider response", () => {
@@ -915,12 +922,12 @@ describe("HelixAskPill mic-first surface contract", () => {
           enabled: true,
           experimental: true,
           permission_profile: {
-            id: "read-observe",
-            label: "Read/observe only",
+            id: "read-observe-act",
+            label: "Read/observe plus non-mutating workstation action",
             allows: {
               observe: true,
               read: true,
-              act: false,
+              act: true,
               write: false,
               shell: false,
               codeMutation: false,
@@ -950,9 +957,10 @@ describe("HelixAskPill mic-first surface contract", () => {
       | { permission_profile?: Record<string, unknown> }
       | undefined;
     expect(codexProvider?.permission_profile).toMatchObject({
-      id: "read-observe",
+      id: "read-observe-act",
       allows: {
         read: true,
+        act: true,
         write: false,
         shell: false,
         codeMutation: false,
@@ -969,6 +977,8 @@ describe("HelixAskPill mic-first surface contract", () => {
       },
     });
     expect(resolveSelectedHelixAgentRuntime("future", providers)).toBe("helix");
+    expect(resolveNextSelectableHelixAgentRuntime("helix", providers)).toBe("codex");
+    expect(resolveNextSelectableHelixAgentRuntime("codex", providers)).toBe("helix");
   });
 
   it("keeps disabled Codex visible but not selectable", () => {
@@ -997,6 +1007,7 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(codexProvider?.enabled).toBe(false);
     expect(codexProvider?.permission_profile?.id).toBe("read-observe");
     expect(resolveSelectedHelixAgentRuntime("codex", providers)).toBe("helix");
+    expect(resolveNextSelectableHelixAgentRuntime("helix", providers)).toBe("helix");
   });
 
   it("threads the selected runtime only through backend Ask turn payloads", () => {
@@ -1878,6 +1889,101 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(combined).toContain("Composed final answer");
     expect(combined).not.toContain("No tool step selected");
     expect(rows.some((row) => row.label === "Final" && /final_answer_draft/i.test(row.text))).toBe(false);
+  });
+
+  it("renders Codex provider gateway transcript rows with provider and tool observation labels", () => {
+    const rows = buildHelixTurnTranscriptRows({
+      id: "reply-codex-gateway-trace",
+      question: "Use the scientific calculator to evaluate 8 * 9.",
+      content: "The result is 72.",
+      debug: {
+        agent_runtime: "codex",
+        selected_agent_provider: {
+          id: "codex",
+          label: "Codex Workstation Mode",
+        },
+        turn_transcript_events: [
+          {
+            role: "system",
+            type: "plan",
+            status: "completed",
+            text: "Runtime selected: Codex Workstation Mode.",
+            lane: "agent_runtime",
+            step_id: "runtime_selected",
+            source_event_type: "runtime_selected",
+          },
+          {
+            role: "agent",
+            type: "model_decision",
+            status: "completed",
+            text: "Action request: scientific-calculator.open_panel.",
+            lane: "workstation_gateway",
+            step_id: "workstation_gateway_1",
+            source_event_type: "action_request",
+          },
+          {
+            role: "tool",
+            type: "tool_result",
+            status: "completed",
+            text: "Action observation: scientific-calculator.open_panel admitted open_panel for scientific-calculator.",
+            lane: "scientific-calculator.open_panel",
+            step_id: "workstation_gateway_1",
+            source_event_type: "action_observation",
+          },
+          {
+            role: "agent",
+            type: "model_decision",
+            status: "completed",
+            text: "Tool request: scientific-calculator.solve_expression.",
+            lane: "workstation_gateway",
+            step_id: "workstation_gateway_1",
+            source_event_type: "tool_request",
+          },
+          {
+            role: "tool",
+            type: "tool_result",
+            status: "completed",
+            text: "Tool observation: scientific-calculator.solve_expression observed 8*9 = 72.",
+            lane: "scientific-calculator.solve_expression",
+            step_id: "workstation_gateway_1",
+            source_event_type: "tool_observation",
+          },
+          {
+            role: "agent",
+            type: "model_decision",
+            status: "completed",
+            text: "Model re-entry: Codex received the workstation observation packet(s) before final answer.",
+            lane: "codex_provider",
+            step_id: "model_reentry",
+            source_event_type: "model_reentry",
+          },
+          {
+            role: "assistant",
+            type: "final_answer",
+            status: "completed",
+            text: "The result is 72.",
+            lane: "codex_provider",
+            step_id: "final_answer",
+            source_event_type: "terminal_answer",
+          },
+        ],
+      },
+    } as never);
+
+    const combined = rows.map((row) => `${row.label}: ${row.text} ${row.meta}`).join("\n");
+    expect(combined).toContain("Runtime selected: Codex Workstation Mode.");
+    expect(combined).toContain("Action request: scientific-calculator.open_panel.");
+    expect(combined).toContain("Action observation: scientific-calculator.open_panel admitted open_panel for scientific-calculator.");
+    expect(combined).toContain("Tool request: scientific-calculator.solve_expression.");
+    expect(combined).toContain("Tool observation: scientific-calculator.solve_expression observed 8*9 = 72.");
+    expect(combined).toContain("Model re-entry: Codex received the workstation observation packet");
+    expect(combined).toContain("The result is 72.");
+  });
+
+  it("parses compact Codex Markdown bullets through the final-answer renderer contract", () => {
+    expect(parseHelixAskFinalAnswerBulletLine("-NHM2 remains claim-bounded.")).toBe("NHM2 remains claim-bounded.");
+    expect(parseHelixAskFinalAnswerBulletLine("- NHM2 remains claim-bounded.")).toBe("NHM2 remains claim-bounded.");
+    expect(parseHelixAskFinalAnswerBulletLine("NHM2 remains claim-bounded.")).toBeNull();
   });
 
   it("renders public commentary rows before generic lifecycle rows", () => {

@@ -175,7 +175,7 @@ describe("Helix Ask agent provider route metadata", () => {
         selected_runtime: "helix",
         fallback_used: false,
         workstation_gateway: {
-          manifest_version: "read-observe.v1",
+          manifest_version: "read-observe-act.v1",
           shell_enabled: false,
           file_mutation_enabled: false,
           code_mutation_enabled: false,
@@ -187,7 +187,7 @@ describe("Helix Ask agent provider route metadata", () => {
           id: "helix-native",
         },
       },
-      workstation_gateway_manifest_version: "read-observe.v1",
+      workstation_gateway_manifest_version: "read-observe-act.v1",
       workstation_gateway_reentry_status: "pending_helix_solver_reentry",
       terminal_authority_status: "not_authorized_observation_only",
       workstation_gateway_call_results: [
@@ -242,7 +242,7 @@ describe("Helix Ask agent provider route metadata", () => {
         prompt: null,
         selected_provider: "helix",
         fallback_used: false,
-        capability_manifest_version: "read-observe.v1",
+        capability_manifest_version: "read-observe-act.v1",
         requested_capabilities: ["scientific-calculator.solve_expression"],
         admitted_capabilities: ["scientific-calculator.solve_expression"],
         blocked_capabilities: [],
@@ -260,7 +260,7 @@ describe("Helix Ask agent provider route metadata", () => {
       debug: {
         turn_id: "ask:test:helix-provider-gateway-route",
         agent_runtime: "helix",
-        workstation_gateway_manifest_version: "read-observe.v1",
+        workstation_gateway_manifest_version: "read-observe-act.v1",
         terminal_authority_status: "not_authorized_observation_only",
         terminal_answer_authority: null,
       },
@@ -341,7 +341,7 @@ describe("Helix Ask agent provider route metadata", () => {
         route: "/ask/turn/stream",
         selected_runtime: "helix",
       },
-      workstation_gateway_manifest_version: "read-observe.v1",
+      workstation_gateway_manifest_version: "read-observe-act.v1",
       workstation_gateway_reentry_status: "pending_helix_solver_reentry",
       terminal_authority_status: "not_authorized_observation_only",
       workstation_gateway_call_results: [
@@ -754,7 +754,7 @@ describe("Helix Ask agent provider route metadata", () => {
         selected_runtime: "codex",
         fallback_used: false,
         workstation_gateway: {
-          manifest_version: "read-observe.v1",
+          manifest_version: "read-observe-act.v1",
           shell_enabled: false,
           file_mutation_enabled: false,
           code_mutation_enabled: false,
@@ -779,9 +779,9 @@ describe("Helix Ask agent provider route metadata", () => {
       },
       workstation_gateway_manifest: {
         schema: "helix.workstation_tool_gateway.v1",
-        manifest_version: "read-observe.v1",
+        manifest_version: "read-observe-act.v1",
       },
-      workstation_gateway_manifest_version: "read-observe.v1",
+      workstation_gateway_manifest_version: "read-observe-act.v1",
       workstation_gateway_call_results: [
         {
           ok: true,
@@ -805,7 +805,7 @@ describe("Helix Ask agent provider route metadata", () => {
         prompt: null,
         selected_provider: "codex",
         fallback_used: false,
-        capability_manifest_version: "read-observe.v1",
+        capability_manifest_version: "read-observe-act.v1",
         requested_capabilities: ["scientific-calculator.solve_expression"],
         admitted_capabilities: ["scientific-calculator.solve_expression"],
         blocked_capabilities: [],
@@ -820,7 +820,7 @@ describe("Helix Ask agent provider route metadata", () => {
           schema: "helix.agent_runtime_selection_trace.v1",
           selected_runtime: "codex",
         },
-        workstation_gateway_manifest_version: "read-observe.v1",
+        workstation_gateway_manifest_version: "read-observe-act.v1",
         workstation_gateway_call_results: {
           count: 1,
           truncated: false,
@@ -862,7 +862,7 @@ describe("Helix Ask agent provider route metadata", () => {
         selected_runtime: "future",
         fallback_used: false,
         workstation_gateway: {
-          manifest_version: "read-observe.v1",
+          manifest_version: "read-observe-act.v1",
           shell_enabled: false,
           file_mutation_enabled: false,
           code_mutation_enabled: false,
@@ -881,7 +881,7 @@ describe("Helix Ask agent provider route metadata", () => {
           },
         },
       },
-      workstation_gateway_manifest_version: "read-observe.v1",
+      workstation_gateway_manifest_version: "read-observe-act.v1",
       workstation_gateway_reentry_status: "pending_helix_solver_reentry",
       terminal_authority_status: "not_authorized_observation_only",
       workstation_gateway_call_results: [
@@ -930,7 +930,7 @@ describe("Helix Ask agent provider route metadata", () => {
         prompt: null,
         selected_provider: "future",
         fallback_used: false,
-        capability_manifest_version: "read-observe.v1",
+        capability_manifest_version: "read-observe-act.v1",
         requested_capabilities: ["scientific-calculator.solve_expression"],
         admitted_capabilities: ["scientific-calculator.solve_expression"],
         blocked_capabilities: [],
@@ -945,7 +945,7 @@ describe("Helix Ask agent provider route metadata", () => {
       debug: {
         turn_id: "ask:test:future-provider-route",
         agent_runtime: "future",
-        workstation_gateway_manifest_version: "read-observe.v1",
+        workstation_gateway_manifest_version: "read-observe-act.v1",
         terminal_authority_status: "not_authorized_observation_only",
         terminal_answer_authority: null,
       },
@@ -1004,13 +1004,13 @@ describe("Helix Ask agent provider route metadata", () => {
         route: "/ask/turn/stream",
         selected_runtime: "codex",
         workstation_gateway: {
-          manifest_version: "read-observe.v1",
+          manifest_version: "read-observe-act.v1",
           shell_enabled: false,
           file_mutation_enabled: false,
           code_mutation_enabled: false,
         },
       },
-      workstation_gateway_manifest_version: "read-observe.v1",
+      workstation_gateway_manifest_version: "read-observe-act.v1",
       workstation_gateway_call_results: [
         {
           ok: true,
@@ -1046,7 +1046,7 @@ describe("Helix Ask agent provider route metadata", () => {
           schema: "helix.agent_runtime_selection_trace.v1",
           selected_runtime: "codex",
         },
-        workstation_gateway_manifest_version: "read-observe.v1",
+        workstation_gateway_manifest_version: "read-observe-act.v1",
         workstation_gateway_call_results: [
           {
             ok: true,
@@ -1173,7 +1173,7 @@ describe("Helix Ask agent provider route metadata", () => {
         prompt: "Use the calculator observation.",
         selected_provider: "codex",
         fallback_used: false,
-        capability_manifest_version: "read-observe.v1",
+        capability_manifest_version: "read-observe-act.v1",
         requested_capabilities: ["scientific-calculator.solve_expression"],
         admitted_capabilities: ["scientific-calculator.solve_expression"],
         blocked_capabilities: [],
@@ -1221,7 +1221,7 @@ describe("Helix Ask agent provider route metadata", () => {
         final_status: "final_answer",
         final_answer_source: "agent_provider_terminal_candidate",
         terminal_artifact_kind: "agent_provider_terminal_candidate",
-        workstation_gateway_manifest_version: "read-observe.v1",
+        workstation_gateway_manifest_version: "read-observe-act.v1",
         workstation_gateway_reentry_status: "completed",
         terminal_authority_status: "authorized_by_helix_provider_candidate_bridge",
         workstation_gateway_call_results: [
@@ -1409,7 +1409,7 @@ describe("Helix Ask agent provider route metadata", () => {
         final_status: "final_answer",
         final_answer_source: "agent_provider_terminal_candidate",
         terminal_artifact_kind: "agent_provider_terminal_candidate",
-        workstation_gateway_manifest_version: "read-observe.v1",
+        workstation_gateway_manifest_version: "read-observe-act.v1",
         workstation_gateway_reentry_status: "completed",
         terminal_authority_status: "authorized_by_helix_provider_candidate_bridge",
         provider_reasoning_reentry: {

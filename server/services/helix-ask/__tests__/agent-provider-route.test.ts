@@ -63,9 +63,10 @@ describe("AGI agent provider route", () => {
         enabled: true,
         experimental: true,
         permission_profile: expect.objectContaining({
-          id: "read-observe",
+          id: "read-observe-act",
           allows: expect.objectContaining({
             read: true,
+            act: true,
             write: false,
             shell: false,
             codeMutation: false,

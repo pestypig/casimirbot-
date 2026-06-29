@@ -296,7 +296,7 @@ describe("helix ask pill E68 debug export envelope", () => {
           turn_id: "ask:codex-provider-debug",
           prompt: "Use the calculator observation.",
           selected_provider: "codex",
-          capability_manifest_version: "read-observe.v1",
+          capability_manifest_version: "read-observe-act.v1",
           requested_capabilities: ["scientific-calculator.solve_expression"],
           admitted_capabilities: ["scientific-calculator.solve_expression"],
           blocked_capabilities: [],
@@ -306,7 +306,7 @@ describe("helix ask pill E68 debug export envelope", () => {
           terminal_authority_result: "authorized_by_helix_provider_candidate_bridge",
           final_answer_source: "agent_provider_terminal_candidate",
         },
-        workstation_gateway_manifest_version: "read-observe.v1",
+        workstation_gateway_manifest_version: "read-observe-act.v1",
         workstation_gateway_call_results: [
           {
             capability_id: "scientific-calculator.solve_expression",
@@ -377,7 +377,7 @@ describe("helix ask pill E68 debug export envelope", () => {
       terminal_authority_result: "authorized_by_helix_provider_candidate_bridge",
       final_answer_source: "agent_provider_terminal_candidate",
     });
-    expect(parsed.workstation_gateway_manifest_version).toBe("read-observe.v1");
+    expect(parsed.workstation_gateway_manifest_version).toBe("read-observe-act.v1");
     expect(parsed.workstation_gateway_call_results[0].gateway_admission).toMatchObject({
       selected_agent_provider: "codex",
       admission_status: "admitted",

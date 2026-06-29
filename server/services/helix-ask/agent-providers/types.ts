@@ -33,6 +33,11 @@ export type HelixAgentRunResult = {
   final_status: string;
   text?: string;
   answer?: string;
+  selected_final_answer?: string;
+  turn_transcript_events?: Record<string, unknown>[];
+  turn_transcript_event_count?: number;
+  turn_transcript_source?: string;
+  action_envelope?: Record<string, unknown> | null;
   debug?: Record<string, unknown>;
   raw?: unknown;
 };

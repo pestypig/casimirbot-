@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { HelixAgentProvider, HelixAgentRunResult } from "./types";
 import {
+  callWorkstationGatewayCapability,
   listWorkstationGatewayCapabilities,
 } from "../workstation-tool-gateway/registry";
 import type { HelixWorkstationGatewayCallResult } from "../workstation-tool-gateway/types";
@@ -13,6 +14,11 @@ import {
   runExplicitWorkstationGatewayCalls,
 } from "./explicit-workstation-gateway";
 import { buildProviderGatewayDebugSummary } from "./provider-gateway-debug-summary";
+
+const CALCULATOR_SOLVE_EXPRESSION_CAPABILITY = "scientific-calculator.solve_expression" as const;
+const CALCULATOR_OPEN_PANEL_CAPABILITY = "scientific-calculator.open_panel" as const;
+const CALCULATOR_FOCUS_PANEL_CAPABILITY = "scientific-calculator.focus_panel" as const;
+const WORKSTATION_UI_ACTION_RECEIPT_SCHEMA = "helix.workstation_ui_action_receipt.v1" as const;
 
 const readBooleanEnv = (value: string | undefined, defaultValue: boolean): boolean => {
   if (value === undefined) return defaultValue;
@@ -329,6 +335,268 @@ const readThreadId = (body: Record<string, unknown>): string =>
   readString(body.session_id) ??
   "helix-agent-provider";
 
+const readGatewayObservationRecord = (
+  value: HelixWorkstationGatewayCallResult | unknown,
+): Record<string, unknown> | null => {
+  const candidate =
+    value && typeof value === "object" && !Array.isArray(value) && "observation" in value
+      ? (value as HelixWorkstationGatewayCallResult).observation
+      : value;
+  return candidate && typeof candidate === "object" && !Array.isArray(candidate)
+    ? (candidate as Record<string, unknown>)
+    : null;
+};
+
+const isCalculatorSolveObservation = (result: HelixWorkstationGatewayCallResult): boolean => {
+  if (result.ok !== true || result.capability_id !== CALCULATOR_SOLVE_EXPRESSION_CAPABILITY) return false;
+  const observation = readGatewayObservationRecord(result);
+  return Boolean(readString(observation?.expression) && readString(observation?.result));
+};
+
+const isWorkstationActionReceipt = (result: HelixWorkstationGatewayCallResult): boolean => {
+  const observation = readGatewayObservationRecord(result);
+  return observation?.schema === WORKSTATION_UI_ACTION_RECEIPT_SCHEMA;
+};
+
+const readWorkstationActionReceiptAction = (
+  result: HelixWorkstationGatewayCallResult,
+): Record<string, unknown> | null => {
+  const observation = readGatewayObservationRecord(result);
+  return readRecord(observation?.workstation_action);
+};
+
+const buildCalculatorPanelActionReceipts = async (input: {
+  turnId: string;
+  gatewayCallResults: HelixWorkstationGatewayCallResult[];
+}): Promise<HelixWorkstationGatewayCallResult[]> => {
+  if (!input.gatewayCallResults.some(isCalculatorSolveObservation)) return [];
+  const actionInputs = [
+    { capabilityId: CALCULATOR_OPEN_PANEL_CAPABILITY, iteration: 0 },
+    { capabilityId: CALCULATOR_FOCUS_PANEL_CAPABILITY, iteration: 0 },
+  ];
+  const results: HelixWorkstationGatewayCallResult[] = [];
+  for (const actionInput of actionInputs) {
+    results.push(await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "act",
+      capabilityId: actionInput.capabilityId,
+      arguments: {
+        source_target_intent: {
+          source: "codex_calculator_gateway_observation",
+          reason: "calculator_solve_projection",
+          backed_by_capability: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+        },
+      },
+      turnId: input.turnId,
+      iteration: actionInput.iteration,
+    }));
+  }
+  return results.filter((result) => result.ok === true && isWorkstationActionReceipt(result));
+};
+
+const buildCodexActionEnvelopeFromReceipts = (
+  actionReceiptResults: HelixWorkstationGatewayCallResult[],
+): Record<string, unknown> | null => {
+  const actions = actionReceiptResults
+    .map(readWorkstationActionReceiptAction)
+    .filter((action): action is Record<string, unknown> => Boolean(action));
+  if (actions.length === 0) return null;
+  return {
+    schema: "helix.ask.action_envelope.v1",
+    source: "codex_workstation_gateway_action_receipts",
+    governance: {
+      dispatch: "allow",
+      reason: "admitted_non_mutating_codex_workstation_action",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    workstation_actions: actions,
+    receipt_capability_ids: actionReceiptResults.map((result) => result.capability_id),
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
+const buildCodexAgentStepLoopFromReceipts = (input: {
+  turnId: string;
+  actionReceiptResults: HelixWorkstationGatewayCallResult[];
+  gatewayCallResults: HelixWorkstationGatewayCallResult[];
+}): Record<string, unknown> | null => {
+  const iterations = [
+    ...input.actionReceiptResults.map((result, index) => ({
+      iteration: index + 1,
+      next_step: "workstation_action",
+      chosen_capability: result.capability_id,
+      selected_capability: result.capability_id,
+      observed_artifact_refs: result.artifact_refs,
+      decision_authority: "helix_gateway_admission",
+      assistant_answer: false,
+      raw_content_included: false,
+    })),
+    ...input.gatewayCallResults.map((result, index) => ({
+      iteration: input.actionReceiptResults.length + index + 1,
+      next_step: "workstation_tool",
+      chosen_capability: result.capability_id,
+      selected_capability: result.capability_id,
+      observed_artifact_refs: result.artifact_refs,
+      decision_authority: "helix_gateway_admission",
+      assistant_answer: false,
+      raw_content_included: false,
+    })),
+  ];
+  if (iterations.length === 0) return null;
+  return {
+    schema: "helix.agent_step_loop.v1",
+    turn_id: input.turnId,
+    iterations,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
+const isDeicticDocumentContentQuestion = (text: string): boolean => {
+  if (/\bbackground\s+only\b/i.test(text)) return false;
+  return (
+    (/\b(?:this|current|open|active|visible)\s+(?:doc|document|paper|white\s*paper|whitepaper)\b/i.test(text) ||
+      /\b(?:doc|document|paper|white\s*paper|whitepaper)\s+(?:on\s+screen|in\s+(?:the\s+)?docs?\s+viewer|I'?m\s+viewing|we'?re\s+viewing)\b/i.test(text)) &&
+    /\b(?:summari[sz]e|explain|what\s+is|what'?s|about|key\s+(?:points|findings)|caveats?|read)\b/i.test(text)
+  );
+};
+
+const hasDocsContentObservation = (gatewayCallResults: HelixWorkstationGatewayCallResult[]): boolean =>
+  gatewayCallResults.some((result) => {
+    if (result.ok !== true || result.capability_id !== "docs.search") return false;
+    const observation = readGatewayObservationRecord(result);
+    const activeDocumentObservation = readGatewayObservationRecord(observation?.active_document_observation);
+    return Boolean(readString(activeDocumentObservation?.excerpt));
+  });
+
+const applyDocumentObservationAuthorityGuard = (input: {
+  question: string;
+  text: string;
+  gatewayCallResults: HelixWorkstationGatewayCallResult[];
+}): string => {
+  if (!isDeicticDocumentContentQuestion(input.question)) return input.text;
+  if (hasDocsContentObservation(input.gatewayCallResults)) return input.text;
+  return [
+    "I cannot answer the current document's content from this turn because no docs observation packet was materialized.",
+    "Ask with the docs-viewer focused and an active document path, or provide an explicit document path so Helix can create a bounded docs observation first.",
+  ].join("\n");
+};
+
+const buildCodexProviderTurnTranscriptEvents = (input: {
+  turnId: string;
+  providerLabel: string;
+  gatewayCallResults: HelixWorkstationGatewayCallResult[];
+  providerText: string;
+  finalStatus: string;
+}): Record<string, unknown>[] => {
+  const events: Record<string, unknown>[] = [{
+    id: `${input.turnId}:codex-runtime-selected`,
+    role: "system",
+    type: "plan",
+    status: "completed",
+    text: `Runtime selected: ${input.providerLabel}.`,
+    detail: "agent_runtime=codex",
+    lane: "agent_runtime",
+    step_id: "runtime_selected",
+    turn_id: input.turnId,
+    source_event_type: "runtime_selected",
+    reconstructed: true,
+    assistant_answer: false,
+    raw_content_included: false,
+  }];
+
+  input.gatewayCallResults.forEach((result, index) => {
+    const stepId = `workstation_gateway_${index + 1}`;
+    const observation = readGatewayObservationRecord(result);
+    const isActionReceipt = isWorkstationActionReceipt(result);
+    const actionKind = readString(observation?.action_kind);
+    const panelId = readString(observation?.panel_id);
+    const expression = readString(observation?.expression);
+    const resultValue = readString(observation?.result);
+    const activeDocumentObservation = readGatewayObservationRecord(observation?.active_document_observation);
+    const docPath = readString(activeDocumentObservation?.path);
+    const toolObservationText =
+      isActionReceipt && actionKind && panelId
+        ? `Action observation: ${result.capability_id} admitted ${actionKind} for ${panelId}.`
+        : result.capability_id === CALCULATOR_SOLVE_EXPRESSION_CAPABILITY && expression && resultValue
+        ? `Tool observation: ${result.capability_id} observed ${expression} = ${resultValue}.`
+        : docPath
+          ? `Tool observation: ${result.capability_id} materialized a bounded document excerpt from ${docPath}.`
+          : `Tool observation: ${result.observation_packet.observation_summary}`;
+    events.push({
+      id: `${input.turnId}:codex-tool-request:${index + 1}`,
+      role: "agent",
+      type: "model_decision",
+      status: "completed",
+      text: `${isActionReceipt ? "Action request" : "Tool request"}: ${result.capability_id}.`,
+      detail: result.gateway_admission.admission_reason,
+      lane: "workstation_gateway",
+      step_id: stepId,
+      turn_id: input.turnId,
+      source_event_type: isActionReceipt ? "action_request" : "tool_request",
+      capability_id: result.capability_id,
+      reconstructed: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    events.push({
+      id: `${input.turnId}:codex-tool-observation:${index + 1}`,
+      role: "tool",
+      type: "tool_result",
+      status: result.ok ? "completed" : "failed",
+      text: toolObservationText,
+      detail: result.observation_packet.observation_summary,
+      lane: result.capability_id,
+      step_id: stepId,
+      turn_id: input.turnId,
+      source_event_type: isActionReceipt ? "action_observation" : "tool_observation",
+      capability_id: result.capability_id,
+      artifact_refs: result.artifact_refs,
+      reconstructed: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
+  events.push({
+    id: `${input.turnId}:codex-model-reentry`,
+    role: "agent",
+    type: "model_decision",
+    status: input.gatewayCallResults.length > 0 ? "completed" : "skipped",
+    text:
+      input.gatewayCallResults.length > 0
+        ? "Model re-entry: Codex received the workstation observation packet(s) before final answer."
+        : "Model re-entry: no workstation observation packet was available for this Codex turn.",
+    detail: input.gatewayCallResults.map((result) => result.capability_id).join(", ") || "no_gateway_observation",
+    lane: "codex_provider",
+    step_id: "model_reentry",
+    turn_id: input.turnId,
+    source_event_type: "model_reentry",
+    reconstructed: true,
+    assistant_answer: false,
+    raw_content_included: false,
+  });
+  events.push({
+    id: `${input.turnId}:codex-final-answer`,
+    role: "assistant",
+    type: "final_answer",
+    status: input.finalStatus,
+    text: input.providerText,
+    detail: "agent_provider_terminal_candidate",
+    lane: "codex_provider",
+    step_id: "final_answer",
+    turn_id: input.turnId,
+    source_event_type: "terminal_answer",
+    reconstructed: true,
+    assistant_answer: false,
+    raw_content_included: false,
+  });
+  return events;
+};
+
 export const runExplicitCodexWorkstationGatewayCalls = async (input: {
   body: Record<string, unknown>;
   turnId?: string | null;
@@ -502,12 +770,12 @@ export const codexProvider: HelixAgentProvider = {
   id: "codex",
   label: "Codex Workstation Mode",
   permissionProfile: {
-    id: "read-observe",
-    label: "Read/observe only",
+    id: "read-observe-act",
+    label: "Read/observe plus non-mutating workstation action",
     allows: {
       observe: true,
       read: true,
-      act: false,
+      act: true,
       write: false,
       shell: false,
       codeMutation: false,
@@ -527,7 +795,7 @@ export const codexProvider: HelixAgentProvider = {
     const threadId = readThreadId(request.body);
     const gatewayManifest = listWorkstationGatewayCapabilities({
       agentRuntime: "codex",
-      mode: "observe",
+      mode: "act",
     });
     const runtimeSelectionTrace = buildHelixAgentRuntimeSelectionTrace({
       route: request.route,
@@ -535,13 +803,34 @@ export const codexProvider: HelixAgentProvider = {
       provider: codexProvider,
       gatewayManifest,
     });
-    const gatewayCallResults = await runExplicitCodexWorkstationGatewayCalls({
+    const evidenceGatewayCallResults = await runExplicitCodexWorkstationGatewayCalls({
       body: request.body,
       turnId,
+    });
+    const actionReceiptResults = await buildCalculatorPanelActionReceipts({
+      turnId,
+      gatewayCallResults: evidenceGatewayCallResults,
+    });
+    const gatewayCallResults = [
+      ...actionReceiptResults,
+      ...evidenceGatewayCallResults,
+    ];
+    const actionEnvelope = buildCodexActionEnvelopeFromReceipts(actionReceiptResults);
+    const agentStepLoop = buildCodexAgentStepLoopFromReceipts({
+      turnId,
+      actionReceiptResults,
+      gatewayCallResults: evidenceGatewayCallResults,
     });
     const gatewayObservationPackets = gatewayCallResults.map((result) => result.observation_packet);
     const gatewayLifecycleTraces = gatewayCallResults.map((result) => result.tool_lifecycle_trace);
     const gatewayFollowupDecisions = gatewayCallResults.map((result) => result.tool_followup_decision);
+    const initialTranscriptEvents = buildCodexProviderTurnTranscriptEvents({
+      turnId,
+      providerLabel: codexProvider.label,
+      gatewayCallResults,
+      providerText: "Codex runtime could not run because the Ask turn had no question.",
+      finalStatus: "final_failure",
+    });
 
     if (!question) {
       const text = "Codex runtime could not run because the Ask turn had no question.";
@@ -564,6 +853,10 @@ export const codexProvider: HelixAgentProvider = {
         final_status: "final_failure",
         text,
         answer: text,
+        turn_transcript_events: initialTranscriptEvents,
+        turn_transcript_event_count: initialTranscriptEvents.length,
+        turn_transcript_source: "codex_provider_gateway_projection",
+        action_envelope: actionEnvelope,
         debug: {
           agent_runtime: "codex",
           agent_runtime_selection_trace: runtimeSelectionTrace,
@@ -582,14 +875,19 @@ export const codexProvider: HelixAgentProvider = {
           workstation_gateway_reentry_status: runtimeSelectionTrace.evidence_reentry_status,
           terminal_authority_status: runtimeSelectionTrace.terminal_authority_status,
           provider_gateway_debug_summary: providerGatewayDebugSummary,
+          action_envelope: actionEnvelope,
+          agent_step_loop: agentStepLoop,
+          turn_transcript_events: initialTranscriptEvents,
+          turn_transcript_event_count: initialTranscriptEvents.length,
+          turn_transcript_source: "codex_provider_gateway_projection",
         },
       };
     }
 
     const prompt = [
       "You are running inside Helix Codex Workstation Mode.",
-      "Do not mutate files or run shell commands. The current Helix workstation gateway is read/observe only.",
-      "Do not claim that a workstation tool ran unless a Helix observation packet is present in the request context.",
+      "Do not mutate files or run shell commands. The current Helix workstation gateway allows read/observe tools plus admitted non-mutating UI actions only.",
+      "Do not claim that a workstation tool or UI action ran unless a Helix observation packet or action receipt is present in the request context.",
       `Provider permission profile: ${JSON.stringify(codexProvider.permissionProfile)}`,
       "Answer the user request using the provided context.",
       "",
@@ -598,6 +896,9 @@ export const codexProvider: HelixAgentProvider = {
       "",
       "Helix workstation gateway observations already executed for this turn:",
       JSON.stringify(gatewayCallResults, null, 2),
+      "",
+      "Use calculator observations when present, but do not force a special answer format unless the user asked for one.",
+      "For any document-backed turn, answer only from the provided docs observation packet. If no docs observation packet exists, say the document content is not available from this turn.",
       "",
       "User request:",
       question,
@@ -624,6 +925,11 @@ export const codexProvider: HelixAgentProvider = {
       result.stdout.trim() ||
       result.stderr.trim() ||
       "Codex runtime did not return output before the provider adapter stopped waiting.";
+    const finalText = applyDocumentObservationAuthorityGuard({
+      question,
+      text,
+      gatewayCallResults,
+    });
     const ok = result.exitCode === 0 && text.length > 0;
     const providerReentry = buildHelixProviderReasoningReentry({
       runtime: "codex",
@@ -632,7 +938,7 @@ export const codexProvider: HelixAgentProvider = {
       threadId,
       route: request.route,
       gatewayCallResults,
-      providerText: text,
+      providerText: finalText,
       ok,
     });
     const providerGatewayDebugSummary = buildProviderGatewayDebugSummary({
@@ -658,14 +964,26 @@ export const codexProvider: HelixAgentProvider = {
       evidenceReentryStatus: providerReentry.workstationGatewayReentryStatus,
       terminalAuthorityStatus: providerReentry.terminalAuthorityStatus,
     });
+    const turnTranscriptEvents = buildCodexProviderTurnTranscriptEvents({
+      turnId,
+      providerLabel: codexProvider.label,
+      gatewayCallResults,
+      providerText: finalText,
+      finalStatus: ok ? "completed" : "final_failure",
+    });
 
     return {
       ok,
       runtime: "codex",
       response_type: ok ? "final_answer" : "final_failure",
       final_status: ok ? "completed" : "final_failure",
-      text,
-      answer: text,
+      text: finalText,
+      answer: finalText,
+      selected_final_answer: finalText,
+      turn_transcript_events: turnTranscriptEvents,
+      turn_transcript_event_count: turnTranscriptEvents.length,
+      turn_transcript_source: "codex_provider_gateway_projection",
+      action_envelope: actionEnvelope,
       debug: {
         agent_runtime: "codex",
         agent_runtime_selection_trace: runtimeSelectionTrace,
@@ -706,6 +1024,11 @@ export const codexProvider: HelixAgentProvider = {
         workstation_gateway_reentry_status: providerReentry.workstationGatewayReentryStatus,
         terminal_authority_status: providerReentry.terminalAuthorityStatus,
         provider_gateway_debug_summary: providerGatewayDebugSummary,
+        action_envelope: actionEnvelope,
+        agent_step_loop: agentStepLoop,
+        turn_transcript_events: turnTranscriptEvents,
+        turn_transcript_event_count: turnTranscriptEvents.length,
+        turn_transcript_source: "codex_provider_gateway_projection",
       },
       raw: {
         stdout: result.stdout,

@@ -17,12 +17,16 @@ import {
   runExplicitFutureWorkstationGatewayCalls,
 } from "../agent-providers/future-provider";
 import {
+  buildActiveDocsContextWorkstationGatewayCallRequests,
   buildStructuredAdmissionWorkstationGatewayCallRequests,
   buildPlannerDerivedWorkstationGatewayCallRequests,
   runExplicitWorkstationGatewayCalls,
 } from "../agent-providers/explicit-workstation-gateway";
 import { buildHelixProviderReasoningReentry } from "../agent-providers/provider-terminal-authority";
-import { listWorkstationGatewayCapabilities } from "../workstation-tool-gateway/registry";
+import {
+  listWorkstationGatewayCapabilities,
+  normalizeDocsObservationExcerptText,
+} from "../workstation-tool-gateway/registry";
 
 const ENV_KEYS = [
   "HELIX_ASK_AGENT_RUNTIME",
@@ -118,11 +122,11 @@ describe("Helix Ask agent provider selection", () => {
       codeMutation: false,
     });
     expect(provider.permissionProfile).toMatchObject({
-      id: "read-observe",
+      id: "read-observe-act",
       allows: {
         observe: true,
         read: true,
-        act: false,
+        act: true,
         write: false,
         shell: false,
         codeMutation: false,
@@ -382,9 +386,10 @@ describe("Helix Ask agent provider selection", () => {
         enabled: true,
         experimental: true,
         permission_profile: expect.objectContaining({
-          id: "read-observe",
+          id: "read-observe-act",
           allows: expect.objectContaining({
             read: true,
+            act: true,
             write: false,
             shell: false,
             codeMutation: false,
@@ -416,7 +421,7 @@ describe("Helix Ask agent provider selection", () => {
     const provider = resolveHelixAgentProvider({ body: { agent_runtime: "codex" } });
     const manifest = listWorkstationGatewayCapabilities({
       agentRuntime: provider.id,
-      mode: "observe",
+      mode: "act",
     });
 
     const trace = buildHelixAgentRuntimeSelectionTrace({
@@ -434,11 +439,12 @@ describe("Helix Ask agent provider selection", () => {
       fallback_used: false,
       provider_enabled: true,
       selected_agent_provider: {
-        id: "codex",
-        permission_profile: {
-          id: "read-observe",
+          id: "codex",
+          permission_profile: {
+          id: "read-observe-act",
           allows: {
             read: true,
+            act: true,
             write: false,
             shell: false,
             codeMutation: false,
@@ -447,7 +453,7 @@ describe("Helix Ask agent provider selection", () => {
       },
       workstation_gateway: {
         manifest_schema: "helix.workstation_tool_gateway.v1",
-        manifest_version: "read-observe.v1",
+        manifest_version: "read-observe-act.v1",
         tools_enabled_for_provider: true,
         code_mutation_enabled: false,
         shell_enabled: false,
@@ -483,7 +489,7 @@ describe("Helix Ask agent provider selection", () => {
           schema: "helix.agent_runtime_selection_trace.v1",
           selected_runtime: "codex",
           workstation_gateway: {
-            manifest_version: "read-observe.v1",
+            manifest_version: "read-observe-act.v1",
             shell_enabled: false,
             file_mutation_enabled: false,
             code_mutation_enabled: false,
@@ -493,7 +499,7 @@ describe("Helix Ask agent provider selection", () => {
         },
         workstation_gateway_manifest: {
           schema: "helix.workstation_tool_gateway.v1",
-          manifest_version: "read-observe.v1",
+          manifest_version: "read-observe-act.v1",
         },
         workstation_gateway_reentry_status: "not_run_text_mode_adapter",
         terminal_authority_status: "not_evaluated_provider_text_mode",
@@ -526,7 +532,7 @@ describe("Helix Ask agent provider selection", () => {
           schema: "helix.agent_runtime_selection_trace.v1",
           selected_runtime: "future",
           workstation_gateway: {
-            manifest_version: "read-observe.v1",
+            manifest_version: "read-observe-act.v1",
             shell_enabled: false,
             file_mutation_enabled: false,
             code_mutation_enabled: false,
@@ -540,7 +546,7 @@ describe("Helix Ask agent provider selection", () => {
         },
         workstation_gateway_manifest: {
           schema: "helix.workstation_tool_gateway.v1",
-          manifest_version: "read-observe.v1",
+          manifest_version: "read-observe-act.v1",
         },
         workstation_gateway_reentry_status: "pending_provider_reasoning",
         terminal_authority_status: "pending_helix_terminal_authority",
@@ -701,6 +707,221 @@ describe("Helix Ask agent provider selection", () => {
         raw_content_included: false,
       },
     });
+  });
+
+  it("materializes active docs-viewer context as a bounded docs observation for Codex", async () => {
+    const body = {
+      turn_id: "ask:test:codex-active-doc-context",
+      agent_runtime: "codex",
+      question: "Summarize this document from the current docs viewer context.",
+      workspace_context_snapshot: {
+        activePanel: "docs-viewer",
+        activeDocPath: "/docs/helix-ask-flow.md",
+        hasDocContext: true,
+      },
+    };
+
+    const requests = buildActiveDocsContextWorkstationGatewayCallRequests(body);
+    expect(requests).toEqual([
+      expect.objectContaining({
+        schema: "helix.workstation_gateway.active_docs_context_call_request.v1",
+        derivation_source: "helix_active_docs_viewer_context",
+        capability_id: "docs.search",
+        arguments: expect.objectContaining({
+          paths: ["docs/helix-ask-flow.md"],
+          source_target_intent: expect.objectContaining({
+            target_source: "active_doc",
+            active_panel: "docs-viewer",
+            active_doc_path: "docs/helix-ask-flow.md",
+          }),
+        }),
+      }),
+    ]);
+
+    const results = await runExplicitWorkstationGatewayCalls({
+      body,
+      agentRuntime: "codex",
+    });
+
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({
+      ok: true,
+      agent_runtime: "codex",
+      capability_id: "docs.search",
+      observation_packet: {
+        status: "succeeded",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+      },
+      observation: {
+        schema: "helix.docs_search_observation.v1",
+        active_document_observation: {
+          schema: "helix.docs_active_document_observation.v1",
+          path: "docs/helix-ask-flow.md",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    });
+    expect(String((results[0].observation as any).active_document_observation.excerpt ?? "")).toContain("Helix Ask");
+  });
+
+  it("normalizes docs observation excerpt transport without dropping provenance", () => {
+    const excerpt = normalizeDocsObservationExcerptText([
+      "The frontier records `alpha = 0.7` and duplicate renderer echo `alpha=0.7` for the same inline value.",
+      "",
+      "  Claim locks remain closed.  ",
+    ].join("\n"));
+
+    expect(excerpt).toContain("`alpha = 0.7`");
+    expect(excerpt).toContain("Claim locks remain closed.");
+    expect(excerpt).not.toContain("`alpha=0.7`");
+  });
+
+  it("keeps Codex docs final answer separate from visible gateway trace rows", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "- NHM2 is claim-bounded.\n- It does not claim physical viability.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:codex-doc-final-answer-separate",
+        agent_runtime: "codex",
+        question: "Summarize this document from the current docs viewer context.",
+        workspace_context_snapshot: {
+          activePanel: "docs-viewer",
+          activeDocPath: "/docs/helix-ask-flow.md",
+          hasDocContext: true,
+        },
+      },
+      headers: {},
+    });
+
+    expect(result.selected_final_answer).toBe("- NHM2 is claim-bounded.\n- It does not claim physical viability.");
+    expect(result.text).toBe(result.selected_final_answer);
+    expect(result.text).not.toContain("Tool observation:");
+    expect(result.turn_transcript_events?.some((event: any) =>
+      event.source_event_type === "tool_observation" &&
+      /docs\.search materialized a bounded document excerpt/i.test(String(event.text)),
+    )).toBe(true);
+    expect(result.turn_transcript_events?.find((event: any) => event.source_event_type === "terminal_answer"))
+      .toMatchObject({
+        text: result.selected_final_answer,
+        assistant_answer: false,
+        raw_content_included: false,
+      });
+  });
+
+  it("projects explicit Codex calculator gateway calls into visible action/tool rows without templating final text", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "The result is 72.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:codex-calculator-visible-trace",
+        agent_runtime: "codex",
+        question: "Use the scientific calculator to evaluate 8 * 9 and answer normally.",
+        workstation_gateway_call: {
+          capability_id: "scientific-calculator.solve_expression",
+          mode: "read",
+          arguments: {
+            expression: "8 * 9",
+          },
+        },
+      },
+      headers: {},
+    });
+
+    expect(result.text).toBe("The result is 72.");
+    expect(result.text).not.toContain("Ran `scientific-calculator.solve_expression`.");
+    expect(result.text).not.toContain("Observed expression:");
+    expect((result.action_envelope as any)?.workstation_actions).toEqual([
+      {
+        schema_version: "helix.workstation.action/v1",
+        action: "open_panel",
+        panel_id: "scientific-calculator",
+      },
+      {
+        schema_version: "helix.workstation.action/v1",
+        action: "focus_panel",
+        panel_id: "scientific-calculator",
+      },
+    ]);
+    expect((result.debug as any)?.agent_step_loop?.iterations?.map((iteration: any) => iteration.chosen_capability))
+      .toEqual([
+        "scientific-calculator.open_panel",
+        "scientific-calculator.focus_panel",
+        "scientific-calculator.solve_expression",
+      ]);
+    expect(result.turn_transcript_events?.map((event: any) => event.source_event_type)).toEqual([
+      "runtime_selected",
+      "action_request",
+      "action_observation",
+      "action_request",
+      "action_observation",
+      "tool_request",
+      "tool_observation",
+      "model_reentry",
+      "terminal_answer",
+    ]);
+    expect(result.turn_transcript_events?.some((event: any) =>
+      /Action observation: scientific-calculator\.open_panel admitted open_panel for scientific-calculator\./.test(String(event.text)),
+    )).toBe(true);
+    expect(result.turn_transcript_events?.some((event: any) =>
+      /Tool observation: scientific-calculator\.solve_expression observed 8 \* 9 = 72\./.test(String(event.text)),
+    )).toBe(true);
+    expect((result.debug as any)?.turn_transcript_events).toEqual(result.turn_transcript_events);
+  });
+
+  it("does not add calculator provenance when no calculator observation exists", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "72";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:codex-calculator-no-observation",
+        agent_runtime: "codex",
+        question: "What is 8 * 9?",
+      },
+      headers: {},
+    });
+
+    expect(result.text).toBe("72");
+    expect(result.text).not.toContain("scientific-calculator.solve_expression");
+    expect(result.turn_transcript_events?.some((event: any) => event.source_event_type === "tool_observation")).toBe(false);
+  });
+
+  it("does not answer current document content when no docs observation exists", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "This document says the answer is already known.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:codex-doc-no-observation",
+        agent_runtime: "codex",
+        question: "Summarize this document from the current docs viewer context.",
+        workspace_context_snapshot: {
+          activePanel: "docs-viewer",
+          hasDocContext: false,
+        },
+      },
+      headers: {},
+    });
+
+    expect(result.text).toContain("no docs observation packet was materialized");
+    expect(result.text).not.toContain("already known");
+    expect(result.turn_transcript_events?.some((event: any) =>
+      event.source_event_type === "model_reentry" &&
+      /no workstation observation packet was available/i.test(String(event.text)),
+    )).toBe(true);
   });
 
   it("derives repo and docs gateway calls from structured source-target admission records", async () => {

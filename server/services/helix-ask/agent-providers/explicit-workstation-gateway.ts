@@ -42,6 +42,62 @@ export const hasSelectedHelixAgentRuntime = (body: Record<string, unknown>): boo
 const readPrompt = (body: Record<string, unknown>): string | null =>
   readString(body.question) ?? readString(body.prompt) ?? readString(body.raw_user_prompt);
 
+const normalizeDocPath = (value: unknown): string | null => {
+  const raw = readString(value);
+  if (!raw) return null;
+  const normalized = raw.replace(/\\/g, "/").replace(/^\/+/, "").trim();
+  if (!normalized || normalized.includes("..") || /^[a-z]:\//i.test(normalized)) return null;
+  return normalized.startsWith("docs/") ? normalized : null;
+};
+
+const readWorkspaceSnapshot = (body: Record<string, unknown>): Record<string, unknown> | null =>
+  readRecord(body.workspace_context_snapshot ?? body.workspaceContextSnapshot);
+
+const isActiveDocsViewerDeicticPrompt = (prompt: string): boolean => {
+  if (/\bbackground\s+only\b/i.test(prompt)) return false;
+  const mentionsCurrentDoc =
+    /\b(?:this|current|open|active|visible)\s+(?:doc|document|paper|white\s*paper|whitepaper)\b/i.test(prompt) ||
+    /\b(?:doc|document|paper|white\s*paper|whitepaper)\s+(?:on\s+screen|in\s+(?:the\s+)?docs?\s+viewer|I'?m\s+viewing|we'?re\s+viewing)\b/i.test(prompt);
+  const asksForContent = /\b(?:summari[sz]e|explain|what\s+is|what'?s|about|key\s+(?:points|findings)|caveats?|read)\b/i.test(prompt);
+  return mentionsCurrentDoc && asksForContent;
+};
+
+export const buildActiveDocsContextWorkstationGatewayCallRequests = (
+  body: Record<string, unknown>,
+): Record<string, unknown>[] => {
+  const prompt = readPrompt(body);
+  if (!prompt || !isActiveDocsViewerDeicticPrompt(prompt)) return [];
+  const workspaceSnapshot = readWorkspaceSnapshot(body);
+  const activePanel = readString(workspaceSnapshot?.activePanel ?? workspaceSnapshot?.active_panel);
+  const activeDocPath = normalizeDocPath(
+    workspaceSnapshot?.activeDocPath ??
+      workspaceSnapshot?.active_doc_path ??
+      workspaceSnapshot?.docContextPath ??
+      workspaceSnapshot?.doc_context_path,
+  );
+  if (activePanel !== "docs-viewer" || !activeDocPath) return [];
+  const fileName = activeDocPath.split("/").pop()?.replace(/\.md$/i, "").replace(/[-_]+/g, " ").trim();
+  const query = fileName || activeDocPath;
+  return [{
+    schema: "helix.workstation_gateway.active_docs_context_call_request.v1",
+    derivation_source: "helix_active_docs_viewer_context",
+    capability_id: DOCS_SEARCH_CAPABILITY,
+    mode: "read",
+    arguments: {
+      query,
+      paths: [activeDocPath],
+      source_target_intent: {
+        source: "helix_active_docs_viewer_context",
+        target_source: "active_doc",
+        target_kind: "active_doc",
+        active_panel: activePanel,
+        active_doc_path: activeDocPath,
+        deictic_prompt: true,
+      },
+    },
+  }];
+};
+
 const readCapabilitySelection = (record: Record<string, unknown> | null): string | null => {
   if (!record) return null;
   const mandatoryNextTool = readRecord(record.mandatory_next_tool ?? record.mandatoryNextTool);
@@ -199,6 +255,8 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   if (input.includePlannerDerived !== true) return [];
   const structured = buildStructuredAdmissionWorkstationGatewayCallRequests(input.body);
   if (structured.length > 0) return structured;
+  const activeDocsContext = buildActiveDocsContextWorkstationGatewayCallRequests(input.body);
+  if (activeDocsContext.length > 0) return activeDocsContext;
   return buildPlannerDerivedWorkstationGatewayCallRequests(input.body);
 };
 

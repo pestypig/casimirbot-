@@ -10,7 +10,7 @@ const REPO_SEARCH_CAPABILITY = "repo.search";
 const DOCS_SEARCH_CAPABILITY = "docs.search";
 
 describe("Helix workstation tool gateway provider parity", () => {
-  it("exposes the same read/observe manifest to Helix, Codex, and Future providers", () => {
+  it("exposes the same read/observe/action manifest to Helix, Codex, and Future providers", () => {
     const helixManifest = listWorkstationGatewayCapabilities({
       agentRuntime: "helix",
       mode: "observe",
@@ -24,9 +24,9 @@ describe("Helix workstation tool gateway provider parity", () => {
       mode: "observe",
     });
 
-    expect(helixManifest.manifest_version).toBe("read-observe.v1");
-    expect(codexManifest.manifest_version).toBe("read-observe.v1");
-    expect(futureManifest.manifest_version).toBe("read-observe.v1");
+    expect(helixManifest.manifest_version).toBe("read-observe-act.v1");
+    expect(codexManifest.manifest_version).toBe("read-observe-act.v1");
+    expect(futureManifest.manifest_version).toBe("read-observe-act.v1");
     expect(codexManifest.capabilities.map((capability) => capability.capability_id)).toEqual(
       helixManifest.capabilities.map((capability) => capability.capability_id),
     );
@@ -38,13 +38,13 @@ describe("Helix workstation tool gateway provider parity", () => {
         mutating: false,
         code_mutation: false,
         shell_access: false,
-        output_observation_schema: expect.stringMatching(/^helix\..+_observation\.v1$/),
+        output_observation_schema: expect.stringMatching(/^helix\..+(?:_observation|_receipt)\.v1$/),
         terminal_eligible: false,
         post_tool_model_step_required: true,
         assistant_answer: false,
         raw_content_included: false,
       });
-      expect(["observe", "read"]).toContain(capability.mode);
+      expect(["observe", "read", "act"]).toContain(capability.mode);
     }
   });
 
@@ -87,7 +87,7 @@ describe("Helix workstation tool gateway provider parity", () => {
     expect(helixResult.gateway_admission.selected_agent_provider).toBe("helix");
     for (const result of [helixResult, codexResult, futureResult]) {
       expect(result).toMatchObject({
-        manifest_version: "read-observe.v1",
+        manifest_version: "read-observe-act.v1",
         terminal_eligible: false,
         post_tool_model_step_required: true,
         assistant_answer: false,

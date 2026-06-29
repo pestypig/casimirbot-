@@ -7214,6 +7214,18 @@ export function resolveSelectedHelixAgentRuntime(
   return "helix";
 }
 
+export function resolveNextSelectableHelixAgentRuntime(
+  current: unknown,
+  providers: HelixAgentRuntimeDescriptor[],
+): HelixAgentRuntimeId {
+  const enabledProviders = providers.filter((provider) => provider.enabled);
+  if (enabledProviders.length === 0) return "helix";
+  const currentRuntime = resolveSelectedHelixAgentRuntime(current, providers);
+  const currentIndex = enabledProviders.findIndex((provider) => provider.id === currentRuntime);
+  const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % enabledProviders.length : 0;
+  return enabledProviders[nextIndex]?.id ?? "helix";
+}
+
 export function formatHelixAgentRuntimeShortLabel(provider: HelixAgentRuntimeDescriptor | null | undefined): string {
   if (provider?.id === "codex") return "Codex";
   if (provider?.id === "future") return "Future";
@@ -9938,7 +9950,7 @@ function normalizeBareEquationCandidate(value: string): string {
     if (!match || match.index === undefined) continue;
     cutIndex = Math.min(cutIndex, match.index);
   }
-  return compact.slice(0, cutIndex).trim();
+  return compact.slice(0, cutIndex).trim().replace(/(?<=\d)[.;:]$/, "");
 }
 
 function classifyBareEquationCandidate(value: string): { accepted: boolean; reason: string | null } {
@@ -10067,10 +10079,17 @@ function isLikelyCodeStyleMathToken(token: Extract<HelixAskMathToken, { kind: "m
   if (token.openDelimiter !== "" || token.closeDelimiter !== "") return false;
   const text = token.text;
   if (!text) return false;
+  if (/^[A-Za-z][A-Za-z0-9_]*\s*=\s*-?(?:\d+(?:\.\d+)?|\.\d+)(?:e[+-]?\d+)?$/i.test(text)) return true;
   if (/\bMath\.[A-Za-z_][A-Za-z0-9_]*\s*\(/.test(text)) return true;
   if (/[A-Za-z][A-Za-z0-9]*_[A-Za-z0-9_]+/.test(text)) return true;
   if (/\b(?:const|let|var)\b/.test(text)) return true;
   return false;
+}
+
+export function parseHelixAskFinalAnswerBulletLine(line: string): string | null {
+  const trimmed = coerceText(line).trim();
+  const bulletMatch = trimmed.match(/^[-*]\s*(\S.+)$/);
+  return bulletMatch?.[1] ?? null;
 }
 
 function expandMathTokensWithBareEquations(tokens: HelixAskMathToken[]): HelixAskMathToken[] {
@@ -17613,6 +17632,18 @@ export function HelixAskPill({
     persistHelixAskAgentRuntime(validated);
     setAgentRuntimeMenuOpen(false);
   }, [agentRuntimeProviders, triggerAskActionHaptic]);
+  const handleAgentRuntimeButtonClick = useCallback(() => {
+    triggerAskActionHaptic();
+    const enabledProviderCount = agentRuntimeProviders.filter((provider) => provider.enabled).length;
+    if (enabledProviderCount <= 2) {
+      const nextRuntime = resolveNextSelectableHelixAgentRuntime(selectedAgentRuntime, agentRuntimeProviders);
+      setSelectedAgentRuntime(nextRuntime);
+      persistHelixAskAgentRuntime(nextRuntime);
+      setAgentRuntimeMenuOpen(false);
+      return;
+    }
+    setAgentRuntimeMenuOpen((current) => !current);
+  }, [agentRuntimeProviders, selectedAgentRuntime, triggerAskActionHaptic]);
   useEffect(() => {
     askRepliesRef.current = askReplies;
   }, [askReplies]);
@@ -19943,45 +19974,73 @@ export function HelixAskPill({
     (content: unknown): ReactNode[] => {
       const text = coerceText(content);
       if (!text) return [];
-      const mathTokens = tokenizeHelixAskMathTokens(text);
-      if (mathTokens.length === 0) return [];
-      if (mathTokens.length === 1 && mathTokens[0]?.kind === "text") {
-        return renderHelixAskTextWithPathLinks(mathTokens[0].text, "plain");
-      }
+      const renderMathAwareText = (segment: string, keyPrefix: string): ReactNode[] => {
+        const mathTokens = tokenizeHelixAskMathTokens(segment);
+        if (mathTokens.length === 0) return [];
+        if (mathTokens.length === 1 && mathTokens[0]?.kind === "text") {
+          return renderHelixAskTextWithPathLinks(mathTokens[0].text, `${keyPrefix}-plain`);
+        }
+        const segmentParts: ReactNode[] = [];
+        mathTokens.forEach((token, index) => {
+          if (token.kind === "text") {
+            segmentParts.push(...renderHelixAskTextWithPathLinks(token.text, `${keyPrefix}-text-${index}`));
+            return;
+          }
+          if (isLikelyCodeStyleMathToken(token)) {
+            segmentParts.push(
+              <code
+                key={`${keyPrefix}-math-code-${index}`}
+                className="mx-0.5 rounded border border-slate-700 bg-slate-950/70 px-1 py-0.5 font-mono text-[0.9em] text-emerald-200"
+              >
+                {token.text}
+              </code>,
+            );
+            return;
+          }
+          try {
+            const katexHtml = renderKatexToString(token.text, {
+              displayMode: token.displayMode,
+              strict: "ignore",
+              throwOnError: false,
+            });
+            segmentParts.push(
+              <span
+                key={`${keyPrefix}-math-${index}`}
+                className={token.displayMode ? "my-1 block overflow-x-auto text-slate-100" : "inline-block align-middle text-slate-100"}
+                dangerouslySetInnerHTML={{ __html: katexHtml }}
+              />,
+            );
+          } catch {
+            segmentParts.push(`${token.openDelimiter}${token.text}${token.closeDelimiter}`);
+          }
+        });
+        return segmentParts.length ? segmentParts : [segment];
+      };
+      const codeSpanMatches = [...text.matchAll(/`([^`\n]+)`/g)];
+      if (codeSpanMatches.length === 0) return renderMathAwareText(text, "plain");
       const parts: ReactNode[] = [];
-      mathTokens.forEach((token, index) => {
-        if (token.kind === "text") {
-          parts.push(...renderHelixAskTextWithPathLinks(token.text, `text-${index}`));
-          return;
+      let cursor = 0;
+      codeSpanMatches.forEach((match, index) => {
+        const full = match[0] ?? "";
+        const body = match[1] ?? "";
+        const start = match.index ?? -1;
+        if (!full || start < 0) return;
+        if (start > cursor) {
+          parts.push(...renderMathAwareText(text.slice(cursor, start), `pre-code-${index}`));
         }
-        if (isLikelyCodeStyleMathToken(token)) {
-          parts.push(
-            <code
-              key={`math-code-${index}`}
-              className="mx-0.5 rounded border border-slate-700 bg-slate-950/70 px-1 py-0.5 font-mono text-[0.9em] text-emerald-200"
-            >
-              {token.text}
-            </code>,
-          );
-          return;
-        }
-        try {
-          const katexHtml = renderKatexToString(token.text, {
-            displayMode: token.displayMode,
-            strict: "ignore",
-            throwOnError: false,
-          });
-          parts.push(
-            <span
-              key={`math-${index}`}
-              className={token.displayMode ? "my-1 block overflow-x-auto text-slate-100" : "inline-block align-middle text-slate-100"}
-              dangerouslySetInnerHTML={{ __html: katexHtml }}
-            />,
-          );
-        } catch {
-          parts.push(`${token.openDelimiter}${token.text}${token.closeDelimiter}`);
-        }
+        parts.push(
+          <code
+            key={`inline-code-${index}`}
+            className="mx-0.5 rounded border border-slate-700 bg-slate-950/70 px-1 py-0.5 font-mono text-[0.9em] text-emerald-200"
+          >
+            {body}
+          </code>,
+        );
+        cursor = start + full.length;
       });
+      if (cursor < text.length) {
+        parts.push(...renderMathAwareText(text.slice(cursor), "post-code"));
+      }
       return parts.length ? parts : [text];
     },
     [renderHelixAskTextWithPathLinks],
@@ -19999,8 +20058,8 @@ export function HelixAskPill({
             if (!trimmed) {
               return <div key={`final-answer-blank-${index}`} className="h-2" aria-hidden="true" />;
             }
-            const bulletMatch = trimmed.match(/^[-*]\s+(.+)$/);
-            if (bulletMatch) {
+            const bulletText = parseHelixAskFinalAnswerBulletLine(trimmed);
+            if (bulletText) {
               return (
                 <div key={`final-answer-bullet-${index}`} className="flex gap-2 pl-2">
                   <span className="mt-[0.15rem] text-cyan-300/80" aria-hidden="true">
@@ -20010,7 +20069,7 @@ export function HelixAskPill({
                     className="min-w-0 flex-1"
                     data-narrator-source-id={`helix-final-answer-bullet-${index}`}
                   >
-                    {renderHelixAskContent(bulletMatch[1] ?? trimmed)}
+                    {renderHelixAskContent(bulletText)}
                   </span>
                 </div>
               );
@@ -35636,10 +35695,7 @@ export function HelixAskPill({
                     aria-expanded={agentRuntimeMenuOpen}
                     title="Choose Ask agent runtime"
                     className="inline-flex h-10 shrink-0 snap-center items-center justify-center rounded-full border border-white/10 bg-white/5 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-cyan-100 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
-                    onClick={() => {
-                      triggerAskActionHaptic();
-                      setAgentRuntimeMenuOpen((current) => !current);
-                    }}
+                    onClick={handleAgentRuntimeButtonClick}
                   >
                     {selectedAgentRuntimeLabel}
                   </button>
@@ -35800,7 +35856,15 @@ export function HelixAskPill({
                                   ? "text-slate-100 hover:bg-white/10"
                                   : "cursor-not-allowed text-slate-500 opacity-70"
                             }`}
-                            onClick={() => handleAgentRuntimeSelect(provider.id)}
+                            onMouseDown={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                            }}
+                            onClick={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              handleAgentRuntimeSelect(provider.id);
+                            }}
                           >
                             <span>
                               <span className="block text-[11px] font-semibold uppercase tracking-[0.12em]">

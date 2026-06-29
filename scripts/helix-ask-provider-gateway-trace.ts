@@ -110,7 +110,7 @@ const addProviderGatewaySummaryFailures = (input: {
       `${input.prefix}_summary_provider:${readString(summary.selected_provider) ?? "missing"}!=${input.expectedProvider}`,
     );
   }
-  if (readString(summary.capability_manifest_version) !== "read-observe.v1") {
+  if (readString(summary.capability_manifest_version) !== "read-observe-act.v1") {
     input.failures.push(`${input.prefix}_summary_manifest_version:${readString(summary.capability_manifest_version) ?? "missing"}`);
   }
   const requestedCapabilities = readStringArray(summary.requested_capabilities);
@@ -333,7 +333,7 @@ const runRouteDebugExportProbe = async (input: {
   if (!endpoint) routeFailures.push("route_debug_export_ref_missing");
   if (endpoint && debugResponse?.status !== 200) routeFailures.push(`route_debug_export_status:${debugResponse?.status ?? "missing"}`);
   if (readString(ask.agent_runtime) !== "codex") routeFailures.push(`route_agent_runtime:${readString(ask.agent_runtime) ?? "missing"}!=codex`);
-  if (readString(ask.workstation_gateway_manifest_version) !== "read-observe.v1") {
+  if (readString(ask.workstation_gateway_manifest_version) !== "read-observe-act.v1") {
     routeFailures.push("route_manifest_version_missing");
   }
   if (readString(ask.workstation_gateway_reentry_status) !== "completed") {
@@ -351,7 +351,7 @@ const runRouteDebugExportProbe = async (input: {
     if (readString(debugPayload.agent_runtime) !== "codex") {
       routeFailures.push(`debug_agent_runtime:${readString(debugPayload.agent_runtime) ?? "missing"}!=codex`);
     }
-    if (readString(debugPayload.workstation_gateway_manifest_version) !== "read-observe.v1") {
+    if (readString(debugPayload.workstation_gateway_manifest_version) !== "read-observe-act.v1") {
       routeFailures.push("debug_manifest_version_missing");
     }
     if (readRecordArray(debugPayload.workstation_gateway_call_results).length !== 1) {
@@ -458,7 +458,7 @@ const runHelixRouteDebugExportProbe = async (input: {
   if (readString(ask.agent_runtime) !== "helix") {
     routeFailures.push(`helix_route_agent_runtime:${readString(ask.agent_runtime) ?? "missing"}!=helix`);
   }
-  if (readString(ask.workstation_gateway_manifest_version) !== "read-observe.v1") {
+  if (readString(ask.workstation_gateway_manifest_version) !== "read-observe-act.v1") {
     routeFailures.push("helix_route_manifest_version_missing");
   }
   if (readString(ask.workstation_gateway_reentry_status) !== "pending_helix_solver_reentry") {
@@ -478,7 +478,7 @@ const runHelixRouteDebugExportProbe = async (input: {
     if (readString(debugPayload.agent_runtime) !== "helix") {
       routeFailures.push(`helix_debug_agent_runtime:${readString(debugPayload.agent_runtime) ?? "missing"}!=helix`);
     }
-    if (readString(debugPayload.workstation_gateway_manifest_version) !== "read-observe.v1") {
+    if (readString(debugPayload.workstation_gateway_manifest_version) !== "read-observe-act.v1") {
       routeFailures.push("helix_debug_manifest_version_missing");
     }
     if (readRecordArray(debugPayload.workstation_gateway_call_results).length !== 1) {
@@ -587,7 +587,7 @@ const runFutureRouteDebugExportProbe = async (input: {
   if (readString(ask.agent_runtime) !== "future") {
     routeFailures.push(`future_route_agent_runtime:${readString(ask.agent_runtime) ?? "missing"}!=future`);
   }
-  if (readString(ask.workstation_gateway_manifest_version) !== "read-observe.v1") {
+  if (readString(ask.workstation_gateway_manifest_version) !== "read-observe-act.v1") {
     routeFailures.push("future_route_manifest_version_missing");
   }
   if (readString(ask.workstation_gateway_reentry_status) !== "pending_helix_solver_reentry") {
@@ -607,7 +607,7 @@ const runFutureRouteDebugExportProbe = async (input: {
     if (readString(debugPayload.agent_runtime) !== "future") {
       routeFailures.push(`future_debug_agent_runtime:${readString(debugPayload.agent_runtime) ?? "missing"}!=future`);
     }
-    if (readString(debugPayload.workstation_gateway_manifest_version) !== "read-observe.v1") {
+    if (readString(debugPayload.workstation_gateway_manifest_version) !== "read-observe-act.v1") {
       routeFailures.push("future_debug_manifest_version_missing");
     }
     if (readRecordArray(debugPayload.workstation_gateway_call_results).length !== 1) {
@@ -740,7 +740,7 @@ const runStreamRouteDebugExportProbe = async (input: {
       `${input.providerId}_stream_agent_runtime:${readString(finalPayload.agent_runtime) ?? "missing"}!=${input.providerId}`,
     );
   }
-  if (readString(finalPayload.workstation_gateway_manifest_version) !== "read-observe.v1") {
+  if (readString(finalPayload.workstation_gateway_manifest_version) !== "read-observe-act.v1") {
     routeFailures.push(`${input.providerId}_stream_manifest_version_missing`);
   }
   if (readRecordArray(finalPayload.workstation_gateway_call_results).length !== 1) {
@@ -774,7 +774,7 @@ const runStreamRouteDebugExportProbe = async (input: {
         `${input.providerId}_stream_debug_agent_runtime:${readString(debugPayload.agent_runtime) ?? "missing"}!=${input.providerId}`,
       );
     }
-    if (readString(debugPayload.workstation_gateway_manifest_version) !== "read-observe.v1") {
+    if (readString(debugPayload.workstation_gateway_manifest_version) !== "read-observe-act.v1") {
       routeFailures.push(`${input.providerId}_stream_debug_manifest_version_missing`);
     }
     if (readRecordArray(debugPayload.workstation_gateway_call_results).length !== 1) {
@@ -1094,7 +1094,7 @@ const runScenario = async (scenario: Scenario, routeTraceApp: ReturnType<typeof 
   if (readString(readRecord(ask.agent_runtime_selection_trace)?.selected_runtime) !== "codex") {
     failures.push("provider_selection_trace_missing_codex");
   }
-  if (readString(ask.workstation_gateway_manifest_version) !== "read-observe.v1") {
+  if (readString(ask.workstation_gateway_manifest_version) !== "read-observe-act.v1") {
     failures.push("manifest_version_missing");
   }
   if (scenario.expectedOk && manifestSummary.capability_id !== scenario.capabilityId) {
@@ -1301,7 +1301,7 @@ const runLiveScenario = async (scenario: Scenario) => {
   if (readString(readRecord(ask.agent_runtime_selection_trace)?.selected_runtime) !== "codex") {
     failures.push("provider_selection_trace_missing_codex");
   }
-  if (readString(ask.workstation_gateway_manifest_version) !== "read-observe.v1") {
+  if (readString(ask.workstation_gateway_manifest_version) !== "read-observe-act.v1") {
     failures.push("manifest_version_missing");
   }
   if (callResults.length !== 1) failures.push(`gateway_call_result_count:${callResults.length}`);

@@ -79,6 +79,20 @@ describe("tokenizeHelixAskMathTokens", () => {
     expect(hasHelixAskRenderableMath(text)).toBe(false);
   });
 
+  it("renders simple numeric assignment tokens as code-style text to avoid duplicate KaTeX text", () => {
+    const debug = buildHelixAskMathRenderDebugForText("The current frontier is alpha = 0.7.");
+
+    expect(debug).not.toBeNull();
+    expect(
+      debug?.tokenStatuses.some(
+        (status) =>
+          status.status === "formatted" &&
+          status.reason === "code_style_plaintext" &&
+          status.tokenText === "alpha = 0.7",
+      ),
+    ).toBe(true);
+  });
+
   it("reports math formatting debug stats including ignored candidates", () => {
     const debug = buildHelixAskMathRenderDebugForText(
       "tau = hbar / DeltaE\nfoo = bar",

@@ -81,7 +81,7 @@ describe("AGI workstation tool gateway route", () => {
 
     expect(response.body).toMatchObject({
       schema: "helix.workstation_tool_gateway.v1",
-      manifest_version: "read-observe.v1",
+      manifest_version: "read-observe-act.v1",
       agent_runtime: "future-agent",
       mode: "read",
       assistant_answer: false,
