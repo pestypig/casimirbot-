@@ -23,6 +23,7 @@ import {
   HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
   HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
   readHelixAskGoldenPathPrompt,
+  readHelixAskGoldenPathTurnContext,
   readString,
   type RecordLike,
 } from "../core";
@@ -50,13 +51,12 @@ export const buildHelixAskGoldenPathRepoDocsCompoundPayload = (args: {
   deps: HelixAskGoldenPathRepoDocsCompoundDependencies;
 }): RecordLike => {
   const deps = args.deps;
-  const now = deps.now();
-  const createdAtMs = now.getTime();
-  const turnId = readString(args.body.turn_id) ?? readString(args.body.turnId) ?? `ask:golden-repo-docs:${createdAtMs}`;
-  const traceId = readString(args.body.trace_id) ?? readString(args.body.traceId) ?? turnId;
-  const sessionId = readString(args.body.session_id) ?? readString(args.body.sessionId);
-  const threadId = readString(args.body.thread_id) ?? readString(args.body.threadId);
-  const promptText = readHelixAskGoldenPathPrompt(args.body);
+  const { createdAtMs, turnId, traceId, sessionId, threadId, promptText } =
+    readHelixAskGoldenPathTurnContext({
+      body: args.body,
+      now: args.deps.now(),
+      fallbackTurnIdPrefix: "ask:golden-repo-docs",
+    });
   const routeGateArtifactId = `${turnId}:golden_path_route_gate`;
   const repoObservationArtifactId = `${turnId}:repo_code_evidence_observation`;
   const relevanceGateArtifactId = `${turnId}:repo_evidence_relevance_gate`;

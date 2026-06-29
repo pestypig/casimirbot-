@@ -22,6 +22,7 @@ import {
   HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
   HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
   readHelixAskGoldenPathPrompt,
+  readHelixAskGoldenPathTurnContext,
   readNumber,
   readString,
   readStringArray,
@@ -58,14 +59,12 @@ export const buildHelixAskGoldenPathInternetResearchReflectionCompoundPayload = 
   deps: HelixAskGoldenPathInternetResearchReflectionCompoundDependencies;
 }): RecordLike => {
   const deps = args.deps;
-  const now = deps.now();
-  const createdAtMs = now.getTime();
-  const turnId =
-    readString(args.body.turn_id) ?? readString(args.body.turnId) ?? `ask:golden-research-reflection:${createdAtMs}`;
-  const traceId = readString(args.body.trace_id) ?? readString(args.body.traceId) ?? turnId;
-  const sessionId = readString(args.body.session_id) ?? readString(args.body.sessionId);
-  const threadId = readString(args.body.thread_id) ?? readString(args.body.threadId);
-  const promptText = readHelixAskGoldenPathPrompt(args.body);
+  const { createdAtMs, turnId, traceId, sessionId, threadId, promptText } =
+    readHelixAskGoldenPathTurnContext({
+      body: args.body,
+      now: args.deps.now(),
+      fallbackTurnIdPrefix: "ask:golden-research-reflection",
+    });
   const routeGateArtifactId = `${turnId}:golden_path_route_gate`;
   const internetObservationArtifactId = `${turnId}:internet_search_observation`;
   const reflectionObservationArtifactId = `${turnId}:helix_theory_context_reflection_tool_receipt`;

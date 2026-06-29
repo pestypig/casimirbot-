@@ -138,6 +138,37 @@ export const readHelixAskGoldenPathPrompt = (body: RecordLike): string => {
   );
 };
 
+export type HelixAskGoldenPathTurnContext = {
+  now: Date;
+  createdAtMs: number;
+  turnId: string;
+  traceId: string;
+  sessionId: string | null;
+  threadId: string | null;
+  promptText: string;
+};
+
+export const readHelixAskGoldenPathTurnContext = (args: {
+  body: RecordLike;
+  now: Date;
+  fallbackTurnIdPrefix: string;
+}): HelixAskGoldenPathTurnContext => {
+  const createdAtMs = args.now.getTime();
+  const turnId =
+    readString(args.body.turn_id) ??
+    readString(args.body.turnId) ??
+    `${args.fallbackTurnIdPrefix}:${createdAtMs}`;
+  return {
+    now: args.now,
+    createdAtMs,
+    turnId,
+    traceId: readString(args.body.trace_id) ?? readString(args.body.traceId) ?? turnId,
+    sessionId: readString(args.body.session_id) ?? readString(args.body.sessionId),
+    threadId: readString(args.body.thread_id) ?? readString(args.body.threadId),
+    promptText: readHelixAskGoldenPathPrompt(args.body),
+  };
+};
+
 export const isHelixAskGoldenPathRequested = (body: RecordLike): boolean => {
   if (readBoolean(body.goldenPathRuntime) === true) return true;
   if (readBoolean(body.golden_path_runtime) === true) return true;

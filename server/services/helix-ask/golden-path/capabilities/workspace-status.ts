@@ -3,6 +3,7 @@ import { buildGoldenPathCapabilitySuccessPayload } from "../capability-success";
 import {
   HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,
   readHelixAskGoldenPathPrompt,
+  readHelixAskGoldenPathTurnContext,
   readNumber,
   readRecord,
   readString,
@@ -66,14 +67,12 @@ export const buildHelixAskGoldenPathWorkspaceStatusPayload = (args: {
   body: RecordLike;
   deps: HelixAskGoldenPathWorkspaceStatusDependencies;
 }): RecordLike => {
-  const now = args.deps.now();
-  const createdAtMs = now.getTime();
-  const turnId =
-    readString(args.body.turn_id) ?? readString(args.body.turnId) ?? `ask:golden-workspace-status:${createdAtMs}`;
-  const traceId = readString(args.body.trace_id) ?? readString(args.body.traceId) ?? turnId;
-  const sessionId = readString(args.body.session_id) ?? readString(args.body.sessionId);
-  const threadId = readString(args.body.thread_id) ?? readString(args.body.threadId);
-  const promptText = readHelixAskGoldenPathPrompt(args.body);
+  const { createdAtMs, turnId, traceId, sessionId, threadId, promptText } =
+    readHelixAskGoldenPathTurnContext({
+      body: args.body,
+      now: args.deps.now(),
+      fallbackTurnIdPrefix: "ask:golden-workspace-status",
+    });
   const routeGateArtifactId = `${turnId}:golden_path_route_gate`;
   const workspaceObservation = buildGoldenPathWorkspaceStatusObservation({ body: args.body, turnId, createdAtMs });
   const observationArtifactId = readString(workspaceObservation.artifact_id) ?? `${turnId}:workspace_os_status_observation`;

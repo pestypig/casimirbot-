@@ -5,6 +5,7 @@ import {
   HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
   readArray,
   readHelixAskGoldenPathPrompt,
+  readHelixAskGoldenPathTurnContext,
   readRecord,
   readString,
   readStringArray,
@@ -51,14 +52,12 @@ export const buildHelixAskGoldenPathCivilizationBoundsReflectionPayload = (args:
   body: RecordLike;
   deps: HelixAskGoldenPathCivilizationBoundsReflectionDependencies;
 }): RecordLike => {
-  const now = args.deps.now();
-  const createdAtMs = now.getTime();
-  const turnId =
-    readString(args.body.turn_id) ?? readString(args.body.turnId) ?? `ask:golden-civilization-bounds:${createdAtMs}`;
-  const traceId = readString(args.body.trace_id) ?? readString(args.body.traceId) ?? turnId;
-  const sessionId = readString(args.body.session_id) ?? readString(args.body.sessionId);
-  const threadId = readString(args.body.thread_id) ?? readString(args.body.threadId);
-  const promptText = readHelixAskGoldenPathPrompt(args.body);
+  const { createdAtMs, turnId, traceId, sessionId, threadId, promptText } =
+    readHelixAskGoldenPathTurnContext({
+      body: args.body,
+      now: args.deps.now(),
+      fallbackTurnIdPrefix: "ask:golden-civilization-bounds",
+    });
   const routeGateArtifactId = `${turnId}:golden_path_route_gate`;
   const observationArtifactId = `${turnId}:helix_civilization_bounds_tool_result`;
   const terminalArtifactId = `${turnId}:civilization_bounds_reflection_answer`;

@@ -15,6 +15,7 @@ import {
   HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
   readArray,
   readHelixAskGoldenPathPrompt,
+  readHelixAskGoldenPathTurnContext,
   readRecord,
   readString,
   readStringArray,
@@ -47,14 +48,12 @@ export const buildHelixAskGoldenPathCivilizationBoundsZenReflectionCompoundPaylo
   deps: HelixAskGoldenPathCivilizationBoundsZenReflectionCompoundDependencies;
 }): RecordLike => {
   const deps = args.deps;
-  const now = deps.now();
-  const createdAtMs = now.getTime();
-  const turnId =
-    readString(args.body.turn_id) ?? readString(args.body.turnId) ?? `ask:golden-civilization-zen:${createdAtMs}`;
-  const traceId = readString(args.body.trace_id) ?? readString(args.body.traceId) ?? turnId;
-  const sessionId = readString(args.body.session_id) ?? readString(args.body.sessionId);
-  const threadId = readString(args.body.thread_id) ?? readString(args.body.threadId);
-  const promptText = readHelixAskGoldenPathPrompt(args.body);
+  const { createdAtMs, turnId, traceId, sessionId, threadId, promptText } =
+    readHelixAskGoldenPathTurnContext({
+      body: args.body,
+      now: args.deps.now(),
+      fallbackTurnIdPrefix: "ask:golden-civilization-zen",
+    });
   const routeGateArtifactId = `${turnId}:golden_path_route_gate`;
   const civilizationObservationArtifactId = `${turnId}:helix_civilization_bounds_tool_result`;
   const zenObservationArtifactId = `${turnId}:helix_zen_graph_reflection_tool_result`;

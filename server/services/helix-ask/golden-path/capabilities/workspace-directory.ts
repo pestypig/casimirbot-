@@ -7,6 +7,7 @@ import { buildGoldenPathCapabilityTypedFailurePayload } from "../capability-fail
 import { buildGoldenPathCapabilityTerminalObservationSuccessPayload } from "../capability-terminal-observation-success";
 import {
   readHelixAskGoldenPathPrompt,
+  readHelixAskGoldenPathTurnContext,
   readString,
   readStringArray,
   type RecordLike,
@@ -58,14 +59,12 @@ export const buildHelixAskGoldenPathWorkspaceDirectoryPayload = (args: {
   body: RecordLike;
   deps: HelixAskGoldenPathWorkspaceDirectoryDependencies;
 }): RecordLike => {
-  const now = args.deps.now();
-  const createdAtMs = now.getTime();
-  const turnId =
-    readString(args.body.turn_id) ?? readString(args.body.turnId) ?? `ask:golden-workspace-directory:${createdAtMs}`;
-  const traceId = readString(args.body.trace_id) ?? readString(args.body.traceId) ?? turnId;
-  const sessionId = readString(args.body.session_id) ?? readString(args.body.sessionId);
-  const threadId = readString(args.body.thread_id) ?? readString(args.body.threadId);
-  const promptText = readHelixAskGoldenPathPrompt(args.body);
+  const { createdAtMs, turnId, traceId, sessionId, threadId, promptText } =
+    readHelixAskGoldenPathTurnContext({
+      body: args.body,
+      now: args.deps.now(),
+      fallbackTurnIdPrefix: "ask:golden-workspace-directory",
+    });
   const query = readWorkspaceDirectoryQuery(args.body);
   const routeGateArtifactId = `${turnId}:golden_path_route_gate`;
   const terminalResultId = `${turnId}:golden_path_terminal_result`;

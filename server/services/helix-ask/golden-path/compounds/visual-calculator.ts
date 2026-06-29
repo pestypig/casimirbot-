@@ -20,6 +20,7 @@ import {
   HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY,
   HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
   readHelixAskGoldenPathPrompt,
+  readHelixAskGoldenPathTurnContext,
   readString,
   readStringArray,
   type RecordLike,
@@ -52,14 +53,13 @@ export const buildHelixAskGoldenPathVisualCalculatorCompoundPayload = (args: {
   deps: HelixAskGoldenPathVisualCalculatorCompoundDependencies;
 }): RecordLike => {
   const deps = args.deps;
-  const now = deps.now();
-  const createdAtMs = now.getTime();
-  const turnId =
-    readString(args.body.turn_id) ?? readString(args.body.turnId) ?? `ask:golden-visual-calculator:${createdAtMs}`;
-  const traceId = readString(args.body.trace_id) ?? readString(args.body.traceId) ?? turnId;
-  const sessionId = readString(args.body.session_id) ?? readString(args.body.sessionId);
-  const threadId = readString(args.body.thread_id) ?? readString(args.body.threadId) ?? "helix-ask:visual-calculator";
-  const promptText = readHelixAskGoldenPathPrompt(args.body);
+  const context = readHelixAskGoldenPathTurnContext({
+    body: args.body,
+    now: deps.now(),
+    fallbackTurnIdPrefix: "ask:golden-visual-calculator",
+  });
+  const { now, createdAtMs, turnId, traceId, sessionId, promptText } = context;
+  const threadId = context.threadId ?? "helix-ask:visual-calculator";
   const visualRequestedCapability =
     readString(args.body.visual_requested_capability) ??
     readString(args.body.visualRequestedCapability) ??

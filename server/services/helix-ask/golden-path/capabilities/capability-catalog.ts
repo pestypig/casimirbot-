@@ -9,6 +9,7 @@ import {
   HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,
   HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
   readHelixAskGoldenPathPrompt,
+  readHelixAskGoldenPathTurnContext,
   readString,
   readStringArray,
   type RecordLike,
@@ -55,14 +56,12 @@ export const buildHelixAskGoldenPathCapabilityCatalogPayload = (args: {
   body: RecordLike;
   deps: HelixAskGoldenPathCapabilityCatalogDependencies;
 }): RecordLike => {
-  const now = args.deps.now();
-  const createdAtMs = now.getTime();
-  const turnId =
-    readString(args.body.turn_id) ?? readString(args.body.turnId) ?? `ask:golden-capability-catalog:${createdAtMs}`;
-  const traceId = readString(args.body.trace_id) ?? readString(args.body.traceId) ?? turnId;
-  const sessionId = readString(args.body.session_id) ?? readString(args.body.sessionId);
-  const threadId = readString(args.body.thread_id) ?? readString(args.body.threadId);
-  const promptText = readHelixAskGoldenPathPrompt(args.body);
+  const { createdAtMs, turnId, traceId, sessionId, threadId, promptText } =
+    readHelixAskGoldenPathTurnContext({
+      body: args.body,
+      now: args.deps.now(),
+      fallbackTurnIdPrefix: "ask:golden-capability-catalog",
+    });
   const routeGateArtifactId = `${turnId}:golden_path_route_gate`;
   const observationArtifactId = `${turnId}:capability_registry`;
   const terminalArtifactId = `${turnId}:capability_help_summary`;

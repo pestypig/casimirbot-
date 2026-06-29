@@ -5,6 +5,7 @@ import {
   HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
   readBoolean,
   readHelixAskGoldenPathPrompt,
+  readHelixAskGoldenPathTurnContext,
   readRecord,
   readString,
   readStringArray,
@@ -57,14 +58,12 @@ export const buildHelixAskGoldenPathStagePlayReflectionPayload = (args: {
   body: RecordLike;
   deps: HelixAskGoldenPathStagePlayReflectionDependencies;
 }): RecordLike => {
-  const now = args.deps.now();
-  const createdAtMs = now.getTime();
-  const turnId =
-    readString(args.body.turn_id) ?? readString(args.body.turnId) ?? `ask:golden-stage-play-reflection:${createdAtMs}`;
-  const traceId = readString(args.body.trace_id) ?? readString(args.body.traceId) ?? turnId;
-  const sessionId = readString(args.body.session_id) ?? readString(args.body.sessionId);
-  const threadId = readString(args.body.thread_id) ?? readString(args.body.threadId);
-  const promptText = readHelixAskGoldenPathPrompt(args.body);
+  const { createdAtMs, turnId, traceId, sessionId, threadId, promptText } =
+    readHelixAskGoldenPathTurnContext({
+      body: args.body,
+      now: args.deps.now(),
+      fallbackTurnIdPrefix: "ask:golden-stage-play-reflection",
+    });
   const routeGateArtifactId = `${turnId}:golden_path_route_gate`;
   const observationArtifactId = `${turnId}:stage_play_reflection_result`;
   const terminalArtifactId = `${turnId}:stage_play_reflection_answer`;

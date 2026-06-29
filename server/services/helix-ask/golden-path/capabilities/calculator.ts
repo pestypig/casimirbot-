@@ -4,6 +4,7 @@ import { buildGoldenPathCapabilitySuccessPayload } from "../capability-success";
 import {
   HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
   readHelixAskGoldenPathPrompt,
+  readHelixAskGoldenPathTurnContext,
   readString,
   readStringArray,
   type RecordLike,
@@ -85,13 +86,12 @@ export const buildHelixAskGoldenPathCalculatorSolvePayload = (args: {
   body: RecordLike;
   deps: HelixAskGoldenPathCalculatorDependencies;
 }): RecordLike => {
-  const now = args.deps.now();
-  const createdAtMs = now.getTime();
-  const turnId = readString(args.body.turn_id) ?? readString(args.body.turnId) ?? `ask:golden-calculator:${createdAtMs}`;
-  const traceId = readString(args.body.trace_id) ?? readString(args.body.traceId) ?? turnId;
-  const sessionId = readString(args.body.session_id) ?? readString(args.body.sessionId);
-  const threadId = readString(args.body.thread_id) ?? readString(args.body.threadId);
-  const promptText = readHelixAskGoldenPathPrompt(args.body);
+  const { createdAtMs, turnId, traceId, sessionId, threadId, promptText } =
+    readHelixAskGoldenPathTurnContext({
+      body: args.body,
+      now: args.deps.now(),
+      fallbackTurnIdPrefix: "ask:golden-calculator",
+    });
   const routeGateArtifactId = `${turnId}:golden_path_route_gate`;
   const terminalResultId = `${turnId}:golden_path_terminal_result`;
   const requiredTerminalKind = "workstation_tool_evaluation";

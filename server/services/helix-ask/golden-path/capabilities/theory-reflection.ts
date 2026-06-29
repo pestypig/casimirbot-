@@ -4,6 +4,7 @@ import { buildGoldenPathCapabilityTypedFailurePayload } from "../capability-fail
 import {
   HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
   readHelixAskGoldenPathPrompt,
+  readHelixAskGoldenPathTurnContext,
   readString,
   readStringArray,
   type RecordLike,
@@ -72,13 +73,12 @@ export const buildHelixAskGoldenPathTheoryReflectionPayload = (args: {
   body: RecordLike;
   deps: HelixAskGoldenPathTheoryReflectionDependencies;
 }): RecordLike => {
-  const now = args.deps.now();
-  const createdAtMs = now.getTime();
-  const turnId = readString(args.body.turn_id) ?? readString(args.body.turnId) ?? `ask:golden-theory:${createdAtMs}`;
-  const traceId = readString(args.body.trace_id) ?? readString(args.body.traceId) ?? turnId;
-  const sessionId = readString(args.body.session_id) ?? readString(args.body.sessionId);
-  const threadId = readString(args.body.thread_id) ?? readString(args.body.threadId);
-  const promptText = readHelixAskGoldenPathPrompt(args.body);
+  const { createdAtMs, turnId, traceId, sessionId, threadId, promptText } =
+    readHelixAskGoldenPathTurnContext({
+      body: args.body,
+      now: args.deps.now(),
+      fallbackTurnIdPrefix: "ask:golden-theory",
+    });
   const routeGateArtifactId = `${turnId}:golden_path_route_gate`;
   const observationArtifactId = `${turnId}:helix_theory_context_reflection_tool_receipt`;
   const terminalArtifactId = `${turnId}:theory_context_reflection_answer`;

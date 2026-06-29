@@ -6,6 +6,7 @@ import {
   HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY,
   HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
   readHelixAskGoldenPathPrompt,
+  readHelixAskGoldenPathTurnContext,
   readRecord,
   readString,
   readStringArray,
@@ -52,13 +53,13 @@ export const buildHelixAskGoldenPathVisualCapturePayload = (args: {
   body: RecordLike;
   deps: HelixAskGoldenPathVisualCaptureDependencies;
 }): RecordLike => {
-  const now = args.deps.now();
-  const createdAtMs = now.getTime();
-  const turnId = readString(args.body.turn_id) ?? readString(args.body.turnId) ?? `ask:golden-visual:${createdAtMs}`;
-  const traceId = readString(args.body.trace_id) ?? readString(args.body.traceId) ?? turnId;
-  const sessionId = readString(args.body.session_id) ?? readString(args.body.sessionId);
-  const threadId = readString(args.body.thread_id) ?? readString(args.body.threadId) ?? "helix-ask:visual";
-  const promptText = readHelixAskGoldenPathPrompt(args.body);
+  const context = readHelixAskGoldenPathTurnContext({
+    body: args.body,
+    now: args.deps.now(),
+    fallbackTurnIdPrefix: "ask:golden-visual",
+  });
+  const { now, createdAtMs, turnId, traceId, sessionId, promptText } = context;
+  const threadId = context.threadId ?? "helix-ask:visual";
   const requestedCapability =
     readString(args.body.requested_capability) ??
     readString(args.body.requestedCapability) ??
