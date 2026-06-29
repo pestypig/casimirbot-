@@ -20,6 +20,7 @@ import {
   buildGoldenPathTerminalResult,
   buildGoldenPathTypedFailureTerminalResult,
 } from "../terminal-envelope";
+import { buildGoldenPathSolverTrace } from "../solver-trace";
 
 export type HelixAskGoldenPathDocsLocateDependencies = {
   now: () => Date;
@@ -258,19 +259,14 @@ export const buildHelixAskGoldenPathDocsLocatePayload = (args: {
         assistant_answer: false,
         raw_content_included: false,
       },
-      ask_turn_solver_trace: {
-        schema: "helix.ask_turn_solver_trace.v1",
-        completed_solver_path: false,
-        golden_path_runtime: true,
-        requested_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-        selected_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-        executed_capability: null,
-        first_broken_rail: params.brokenRail,
-        terminal_artifact_kind: "typed_failure",
-        private_runtime_loop_entered: false,
-        assistant_answer: false,
-        raw_content_included: false,
-      },
+      ask_turn_solver_trace: buildGoldenPathSolverTrace({
+        completedSolverPath: false,
+        requestedCapability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+        selectedCapability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+        executedCapability: null,
+        firstBrokenRail: params.brokenRail,
+        terminalArtifactKind: "typed_failure",
+      }),
       current_turn_artifact_ledger: [
         buildGoldenPathRouteGateLedgerArtifact({
           artifactId: routeGateArtifactId,
