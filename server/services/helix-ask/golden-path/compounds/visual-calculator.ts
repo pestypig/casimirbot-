@@ -6,7 +6,10 @@ import {
   readCalculatorExpression,
 } from "../capabilities/calculator";
 import { readVisualCaptureSummary } from "../capabilities/visual-capture";
-import { isHelixAskGoldenPathVisualCalculatorCompoundRequested } from "../compound-contract";
+import {
+  buildGoldenPathCompoundCapabilityContract,
+  isHelixAskGoldenPathVisualCalculatorCompoundRequested,
+} from "../compound-contract";
 import {
   buildGoldenPathAnswerLedgerArtifact,
   buildGoldenPathObservationLedgerArtifact,
@@ -310,37 +313,29 @@ export const buildHelixAskGoldenPathVisualCalculatorCompoundPayload = (args: {
     assistant_answer: false,
     raw_content_included: false,
   };
-  const compoundCapabilityContract = {
-    schema: "helix.compound_capability_contract.v1",
-    turn_id: turnId,
-    ordered_subgoals: [
+  const compoundCapabilityContract = buildGoldenPathCompoundCapabilityContract({
+    turnId,
+    subgoals: [
       {
-        subgoal_id: `${turnId}:subgoal:visual_capture`,
-        requested_capability: visualRequestedCapability,
-        selected_capability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
-        executed_capability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
+        subgoalIdSuffix: "visual_capture",
+        requestedCapability: visualRequestedCapability,
+        selectedCapability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
+        executedCapability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
         args: { source_id: sourceId, frame_id: frameId },
-        observation_kind: "visual_frame_evidence",
-        observation_ref: visualObservationArtifactId,
-        terminal_contribution_kind: "situation_context_pack",
-        satisfaction: "satisfied",
+        observationKind: "visual_frame_evidence",
+        observationRef: visualObservationArtifactId,
+        terminalContributionKind: "situation_context_pack",
       },
       {
-        subgoal_id: `${turnId}:subgoal:calculator`,
-        requested_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
-        selected_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
-        executed_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+        subgoalIdSuffix: "calculator",
+        requestedCapability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
         args: { expression },
-        observation_kind: "calculator_receipt",
-        observation_ref: calculatorObservationArtifactId,
-        terminal_contribution_kind: "workstation_tool_evaluation",
-        satisfaction: "satisfied",
+        observationKind: "calculator_receipt",
+        observationRef: calculatorObservationArtifactId,
+        terminalContributionKind: "workstation_tool_evaluation",
       },
     ],
-    satisfaction: "satisfied",
-    assistant_answer: false,
-    raw_content_included: false,
-  };
+  });
   const answerText = [
     "Compound visual/calculator synthesis completed.",
     `Visual evidence: ${visualSummary}`,
