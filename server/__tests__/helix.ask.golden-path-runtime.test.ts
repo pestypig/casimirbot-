@@ -44,6 +44,8 @@ const listTypeScriptFiles = (directory: string): string[] =>
     return entry.isFile() && entry.name.endsWith(".ts") ? [entryPath] : [];
   });
 
+const countOccurrences = (source: string, pattern: RegExp): number => source.match(pattern)?.length ?? 0;
+
 describe("Helix Ask golden path runtime", () => {
   afterEach(() => {
     delete process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG];
@@ -137,6 +139,46 @@ describe("Helix Ask golden path runtime", () => {
           new RegExp(`export\\s+(?:const\\s+${symbolName}|\\{[\\s\\S]*\\b${symbolName}\\b[\\s\\S]*\\}\\s+from)`),
         );
       }
+    }
+  });
+
+  it("keeps every dispatch-owned golden-path module imported and ordered exactly once", () => {
+    const dispatchSource = readFileSync(dispatchPath, "utf8");
+    const dispatchModules = [
+      ["Calculator", "./capabilities/calculator"],
+      ["CapabilityCatalog", "./capabilities/capability-catalog"],
+      ["CivilizationBounds", "./capabilities/civilization-bounds"],
+      ["DocsViewer", "./capabilities/docs-viewer"],
+      ["InternetSearch", "./capabilities/internet-search"],
+      ["ProcessedLiveSourceMail", "./capabilities/processed-live-source-mail"],
+      ["RepoCode", "./capabilities/repo-code"],
+      ["ScholarlyResearch", "./capabilities/scholarly-research"],
+      ["StagePlayReflection", "./capabilities/stage-play-reflection"],
+      ["TheoryReflection", "./capabilities/theory-reflection"],
+      ["VisualCapture", "./capabilities/visual-capture"],
+      ["WorkspaceDirectory", "./capabilities/workspace-directory"],
+      ["WorkspaceStatus", "./capabilities/workspace-status"],
+      ["ZenGraphReflection", "./capabilities/zen-graph-reflection"],
+      ["CatalogWorkspace", "./compounds/catalog-workspace"],
+      ["CivilizationZenReflection", "./compounds/civilization-zen-reflection"],
+      ["DocsCalculator", "./compounds/docs-calculator"],
+      ["InternetTheoryReflection", "./compounds/internet-theory-reflection"],
+      ["RepoDocs", "./compounds/repo-docs"],
+      ["VisualCalculator", "./compounds/visual-calculator"],
+    ] as const;
+
+    for (const [moduleName, modulePath] of dispatchModules) {
+      expect(
+        countOccurrences(
+          dispatchSource,
+          new RegExp(`import \\* as ${moduleName} from "${modulePath.replace(/\//g, "\\/")}";`, "g"),
+        ),
+        `${moduleName} must be imported exactly once`,
+      ).toBe(1);
+      expect(
+        countOccurrences(dispatchSource, new RegExp(`^\\s*${moduleName},\\s*$`, "gm")),
+        `${moduleName} must be listed in orderedDispatchModules exactly once`,
+      ).toBe(1);
     }
   });
 
