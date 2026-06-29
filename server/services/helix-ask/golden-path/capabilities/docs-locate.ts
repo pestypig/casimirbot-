@@ -4,6 +4,7 @@ import {
   buildGoldenPathPayloadLedgerArtifact,
   buildGoldenPathRouteGateLedgerArtifact,
 } from "../artifact-ledger";
+import { buildGoldenPathCapabilityPlan } from "../capability-contract";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
@@ -220,19 +221,15 @@ export const buildHelixAskGoldenPathDocsLocatePayload = (args: {
         raw_content_included: false,
       },
       canonical_goal_frame: canonicalGoalFrame,
-      capability_plan: {
-        schema: "helix.ask_capability_plan.v1",
-        requested_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-        selected_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-        executed_capability: null,
-        source_target: "docs_viewer",
+      capability_plan: buildGoldenPathCapabilityPlan({
+        requestedCapability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+        executedCapability: null,
+        sourceTarget: "docs_viewer",
         family: "docs_viewer",
-        args: { doc_path: docPath, query },
-        required_observation_kinds: ["doc_location_matches"],
-        required_terminal_kind: requiredTerminalKind,
-        assistant_answer: false,
-        raw_content_included: false,
-      },
+        planArgs: { doc_path: docPath, query },
+        requiredObservationKinds,
+        requiredTerminalKind,
+      }),
       goal_satisfaction_evaluation: goalSatisfactionEvaluation,
       terminal_answer_authority: {
         schema: "helix.terminal_answer_authority.v1",
@@ -435,19 +432,14 @@ export const buildHelixAskGoldenPathDocsLocatePayload = (args: {
       raw_content_included: false,
     },
     canonical_goal_frame: canonicalGoalFrame,
-    capability_plan: {
-      schema: "helix.ask_capability_plan.v1",
-      requested_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-      selected_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-      executed_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-      source_target: "docs_viewer",
+    capability_plan: buildGoldenPathCapabilityPlan({
+      requestedCapability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+      sourceTarget: "docs_viewer",
       family: "docs_viewer",
-      args: { doc_path: docPath, query },
-      required_observation_kinds: ["doc_location_matches"],
-      required_terminal_kind: requiredTerminalKind,
-      assistant_answer: false,
-      raw_content_included: false,
-    },
+      planArgs: { doc_path: docPath, query },
+      requiredObservationKinds,
+      requiredTerminalKind,
+    }),
     goal_satisfaction_evaluation: goalSatisfactionEvaluation,
     terminal_answer_authority: buildGoldenPathTerminalAnswerAuthority({
       terminalResult,

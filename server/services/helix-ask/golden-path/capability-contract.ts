@@ -9,6 +9,7 @@ export const buildGoldenPathCapabilityPlan = (args: {
   selectedCapability?: string;
   executedCapability?: string | null;
   planArgs?: RecordLike;
+  extraFields?: RecordLike;
 }): RecordLike => ({
   schema: "helix.ask_capability_plan.v1",
   requested_capability: args.requestedCapability,
@@ -20,6 +21,7 @@ export const buildGoldenPathCapabilityPlan = (args: {
   source_target: args.sourceTarget,
   family: args.family,
   ...(args.planArgs ? { args: args.planArgs } : {}),
+  ...(args.extraFields ?? {}),
   required_observation_kinds: [...args.requiredObservationKinds],
   required_terminal_kind: args.requiredTerminalKind,
   assistant_answer: false,
