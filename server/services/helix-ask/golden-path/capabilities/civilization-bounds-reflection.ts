@@ -1,16 +1,7 @@
 import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfaction-artifact";
-import {
-  buildGoldenPathTypedFailureTerminalErrorLedgerArtifact,
-  buildGoldenPathRouteGateLedgerArtifact,
-} from "../artifact-ledger";
-import {
-  buildGoldenPathCapabilityGoalSatisfactionEvaluation,
-  buildGoldenPathCapabilityPlan,
-} from "../capability-contract";
 import { buildGoldenPathCapabilitySuccessPayload } from "../capability-success";
-import { buildGoldenPathCapabilityDebugMirror } from "../debug-mirror";
+import { buildGoldenPathCapabilityTypedFailurePayload } from "../capability-failure";
 import {
-  HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
   HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
   readArray,
   readHelixAskGoldenPathPrompt,
@@ -19,12 +10,6 @@ import {
   readStringArray,
   type RecordLike,
 } from "../core";
-import {
-  buildGoldenPathTerminalAuthorityProjection,
-  buildGoldenPathTypedFailureResponseProjection,
-} from "../terminal-envelope";
-import { buildGoldenPathSolverTrace } from "../solver-trace";
-import { buildGoldenPathRuntimeStatus } from "../runtime-status";
 
 export type HelixAskGoldenPathCivilizationBoundsReflectionDependencies = {
   now: () => Date;
@@ -86,127 +71,53 @@ export const buildHelixAskGoldenPathCivilizationBoundsReflectionPayload = (args:
   if (!compactResult || !roadmap) {
     const failureText =
       "I could not complete this golden-path civilization-bounds turn because no compact civilization-bounds tool result was provided.";
-    const terminalResult = {
-      schema: "helix.ask_golden_path_terminal_result.v1",
-      result_id: terminalResultId,
-      artifact_id: `${turnId}:typed_failure`,
-      artifact_kind: "typed_failure",
-      final_answer_source: "typed_failure",
-      text: failureText,
-      support_refs: [routeGateArtifactId],
-      terminal_authority_ok: true,
-      route_authority_ok: true,
-      assistant_answer: false,
-      raw_content_included: false,
-    };
-    const canonicalGoalFrame = {
-      schema: "helix.ask_canonical_goal_frame.v1",
-      turn_id: turnId,
-      goal_kind: goalKind,
-      answer_scope: "runtime_evidence",
-      required_terminal_kind: requiredTerminalKind,
-      classifier_reasons: ["explicit_civilization_bounds_reflection_request"],
-      assistant_answer: false,
-      raw_content_included: false,
-    };
-    const goalSatisfactionEvaluation = buildGoldenPathCapabilityGoalSatisfactionEvaluation({
+    return buildGoldenPathCapabilityTypedFailurePayload({
       turnId,
-      goalKind,
+      traceId,
+      sessionId,
+      threadId,
+      promptText,
+      createdAtMs,
+      routeGateArtifactId,
+      terminalResultId,
       requiredTerminalKind,
-      satisfaction: "not_satisfied",
-      selectedTerminalArtifactKind: "typed_failure",
-      missingRequirements: ["helix_civilization_bounds_tool_result"],
-      firstBrokenRail: "observation",
+      answerScope: "runtime_evidence",
+      goalKind,
+      classifierReasons: ["explicit_civilization_bounds_reflection_request"],
+      requestedCapability: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+      sourceTarget: "civilization_bounds",
+      family: "civilization_bounds",
+      requiredObservationKinds: ["helix_civilization_bounds_tool_result"],
+      status: "civilization_bounds_reflection_missing_result",
+      route: "golden_path_runtime / civilization_bounds_reflection",
+      errorCode: "missing_civilization_bounds_tool_result",
+      brokenRail: "observation",
+      missingRequirement: "helix_civilization_bounds_tool_result",
+      text: failureText,
+      routeGate: "enabled_explicit_request",
+      routeGateTerminalEligible: false,
+      includeRouteGateGoalHash: false,
+      debugStatus: "civilization_bounds_reflection_missing_result",
+      debugPrivateRuntimeLoopEntered: false,
+      observedArtifactKind: null,
+      observedArtifactRef: null,
+      terminalArtifactRef: `${turnId}:typed_failure`,
+      terminalResultIdInRuntimeStatus: terminalResultId,
+      completedSolverPath: false,
+      goalSatisfaction: "not_satisfied",
+      routeAuthorityOk: true,
+      terminalAuthorityOk: true,
+      solverTraceExtra: {
+        solver_risk_flags: [],
+        solver_short_circuit_flags: [],
+      },
+      includeGoalSatisfactionInDebug: true,
+      includeLedgerSupportRefs: true,
+      includeTerminalErrorCodeInSolverTrace: true,
+      includeFirstBrokenRailInTerminalAuthority: true,
+      useTerminalErrorLedgerArtifact: true,
+      hashGoalFrame: args.deps.hashGoalFrame,
     });
-
-    return {
-      ok: false,
-      mode: "read",
-      schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
-      turn_id: turnId,
-      trace_id: traceId,
-      session_id: sessionId,
-      thread_id: threadId,
-      prompt_text: promptText,
-      ...buildGoldenPathTypedFailureResponseProjection({
-        terminalResult,
-        terminalErrorCode: "missing_civilization_bounds_tool_result",
-      }),
-      golden_path_runtime: buildGoldenPathRuntimeStatus({
-        status: "civilization_bounds_reflection_missing_result",
-        requestedCapability: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
-        selectedCapability: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
-        executedCapability: null,
-        observedArtifactKind: null,
-        observedArtifactRef: null,
-        terminalArtifactRef: terminalResult.artifact_id,
-        terminalResultId,
-        routeGate: "enabled_explicit_request",
-      }),
-      canonical_goal_frame: canonicalGoalFrame,
-      capability_plan: buildGoldenPathCapabilityPlan({
-        requestedCapability: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
-        sourceTarget: "civilization_bounds",
-        family: "civilization_bounds",
-        executedCapability: null,
-        requiredObservationKinds: ["helix_civilization_bounds_tool_result"],
-        requiredTerminalKind,
-      }),
-      goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-      ...buildGoldenPathTerminalAuthorityProjection({
-        terminalResult,
-        route: "golden_path_runtime / civilization_bounds_reflection",
-        completedSolverPath: false,
-        firstBrokenRail: "observation",
-      }),
-      ask_turn_solver_trace: buildGoldenPathSolverTrace({
-        completedSolverPath: false,
-        routeAuthorityOk: true,
-        terminalAuthorityOk: true,
-        goalSatisfaction: "not_satisfied",
-        requestedCapability: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
-        selectedCapability: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
-        executedCapability: null,
-        observedArtifactKind: null,
-        observedArtifactRef: null,
-        terminalArtifactKind: "typed_failure",
-        firstBrokenRail: "observation",
-        terminalErrorCode: "missing_civilization_bounds_tool_result",
-        extra: {
-          solver_risk_flags: [],
-          solver_short_circuit_flags: [],
-        },
-      }),
-      current_turn_artifact_ledger: [
-        buildGoldenPathRouteGateLedgerArtifact({
-          artifactId: routeGateArtifactId,
-          turnId,
-          createdAtMs,
-          terminalEligible: false,
-          requestedCapability: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
-        }),
-        buildGoldenPathTypedFailureTerminalErrorLedgerArtifact({
-          artifactId: terminalResult.artifact_id,
-          turnId,
-          createdAtMs,
-          terminalResult,
-          terminalErrorCode: "missing_civilization_bounds_tool_result",
-          firstBrokenRail: "observation",
-          includeSupportRefs: true,
-        }),
-      ],
-      debug: buildGoldenPathCapabilityDebugMirror({
-        status: "civilization_bounds_reflection_missing_result",
-        privateRuntimeLoopEntered: false,
-        requestedCapability: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
-        selectedCapability: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
-        executedCapability: null,
-        terminalResult,
-        firstBrokenRail: "observation",
-        terminalErrorCode: "missing_civilization_bounds_tool_result",
-        goalSatisfactionEvaluation,
-      }),
-    };
   }
 
   const roadmapId =
