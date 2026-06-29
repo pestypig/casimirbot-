@@ -1732,6 +1732,145 @@ describe("Helix Ask golden path runtime", () => {
     expect(terminalLedgerEntries(body)).toHaveLength(1);
   });
 
+  it("handles civilization bounds plus zen graph reflection as an ordered compound contract", () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+
+    const decision = runHelixAskGoldenPathRuntime({
+      now: new Date("2026-06-28T12:34:30.000Z"),
+      body: {
+        turn_id: "ask:golden:civilization-zen-compound",
+        prompt:
+          "helix_ask_golden_path_runtime use helix_ask.reflect_civilization_bounds and helix_ask.reflect_ideology_context",
+        goldenPathRuntime: true,
+        requested_capabilities: [
+          HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+          HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
+        ],
+        civilization_bounds_tool_result: {
+          roadmap: {
+            roadmapId: "civilization-bounds:compound",
+            title: "Civilization Bounds Roadmap",
+            systems: [{ systemId: "energy", label: "Energy system" }],
+            badges: [{ badgeId: "badge:governance", label: "Governance review" }],
+            collaborationBounds: [{ boundId: "bound:two-key", limitingFactor: "two_key_review" }],
+            missingEvidence: ["source_backed_capacity_measurements"],
+            authority: {
+              assistant_answer: false,
+              terminal_eligible: false,
+              agent_executable: false,
+              prediction_finality: false,
+              policy_finality: false,
+              moral_finality: false,
+              execution_permission: false,
+            },
+          },
+          bridgeContext: {
+            systemIds: ["energy"],
+            missingEvidence: ["source_backed_capacity_measurements"],
+          },
+        },
+        helix_zen_graph_reflection_tool_result: {
+          reflection: {
+            artifactId: "ideology_context_reflection",
+            reflectionId: "ideology-context-reflection:compound",
+            schemaVersion: "ideology_context_reflection/v1",
+            input: {
+              kind: "user_prompt",
+              summary: "Relate civilization bounds to right speech and two-key review.",
+              refs: ["turn:civilization-zen", "doc:ethos"],
+            },
+            activated_traits: [{ nodeId: "two-key-review", label: "Two-key review" }],
+            tensions: [{ id: "capacity-claim-boundary", severity: "medium" }],
+            recommended_actions: [{ id: "ask-for-capacity-evidence", type: "diagnostic", label: "Ask for capacity evidence" }],
+            authority: {
+              assistant_answer: false,
+              raw_content_included: false,
+              terminal_eligible: false,
+              context_role: "tool_policy",
+              ask_context_policy: "evidence_only",
+              agent_executable: false,
+            },
+          },
+          proceduralClassification: {
+            classifications: [{ observedPattern: "practice_commitment", proceduralMove: "ask_for_concrete_evidence" }],
+          },
+          locator: {
+            matches: [{ nodeId: "two-key-review", path: ["review", "bounds"] }],
+          },
+          admissions: [{ id: "admission:bounds-diagnostic", actions: [] }],
+        },
+      },
+    });
+
+    expect(decision.handled).toBe(true);
+    if (!decision.handled) throw new Error("golden path should handle civilization+zen compound");
+    const body = decision.payload;
+
+    expect(body).toMatchObject({
+      final_status: "final_answer",
+      terminal_artifact_kind: "compound_evidence_synthesis_answer",
+      final_answer_source: "compound_evidence_synthesis_answer",
+      terminal_error_code: null,
+      helix_civilization_bounds_tool_result: {
+        kind: "helix_civilization_bounds_tool_result",
+        tool_id: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+      },
+      helix_zen_graph_reflection_tool_result: {
+        kind: "helix_zen_graph_reflection_tool_result",
+        tool_id: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
+      },
+      compound_capability_contract: {
+        satisfaction: "satisfied",
+        ordered_subgoals: [
+          {
+            requested_capability: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+            selected_capability: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+            executed_capability: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+            observation_kind: "helix_civilization_bounds_tool_result",
+            terminal_contribution_kind: "civilization_bounds_reflection_answer",
+            satisfaction: "satisfied",
+          },
+          {
+            requested_capability: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
+            selected_capability: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
+            executed_capability: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
+            observation_kind: "helix_zen_graph_reflection_tool_result",
+            terminal_contribution_kind: "ideology_context_reflection_answer",
+            satisfaction: "satisfied",
+          },
+        ],
+      },
+      capability_plan: {
+        requested_capability: "compound_capability_contract",
+        selected_capability: "compound_capability_contract",
+        executed_capability: "compound_capability_contract",
+        required_observation_kinds: [
+          "helix_civilization_bounds_tool_result",
+          "helix_zen_graph_reflection_tool_result",
+        ],
+        required_terminal_kind: "compound_evidence_synthesis_answer",
+      },
+      ask_turn_solver_trace: {
+        completed_solver_path: true,
+        requested_capability: "compound_capability_contract",
+        selected_capability: "compound_capability_contract",
+        executed_capability: "compound_capability_contract",
+        observed_artifact_kind: "compound_subgoal_observations",
+        terminal_artifact_kind: "compound_evidence_synthesis_answer",
+        compound_subgoal_count: 2,
+      },
+    });
+    expect(body.selected_final_answer).toContain("Compound civilization-bounds/reflection synthesis completed");
+    expect(body.selected_final_answer).toContain("Both receipts are evidence-only");
+    expect(readLedger(body).map((artifact) => artifact.kind)).toEqual([
+      "golden_path_route_gate",
+      "helix_civilization_bounds_tool_result",
+      "helix_zen_graph_reflection_tool_result",
+      "compound_evidence_synthesis_answer",
+    ]);
+    expect(terminalLedgerEntries(body)).toHaveLength(1);
+  });
+
   it("handles capability catalog plus workspace status as an ordered compound contract", () => {
     process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
 
