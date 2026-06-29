@@ -6,6 +6,7 @@ import {
   HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
   HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
   HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+  HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
   HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,
   buildHelixAskGoldenPathRuntimePayload,
   runHelixAskGoldenPathRuntime,
@@ -484,6 +485,125 @@ describe("Helix Ask golden path runtime", () => {
       },
     });
     expect(body.selected_final_answer).toContain("no readable document content");
+    expect(readLedger(body).map((artifact) => artifact.kind)).toEqual(["golden_path_route_gate", "typed_failure"]);
+    expect(terminalLedgerEntries(body)).toHaveLength(1);
+  });
+
+  it("handles repo concept search as evidence-backed repo answers", () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+
+    const decision = runHelixAskGoldenPathRuntime({
+      now: new Date("2026-06-28T12:32:00.000Z"),
+      body: {
+        turn_id: "ask:golden:repo-search",
+        prompt: "helix_ask_golden_path_runtime use repo-code.search_concept for terminal authority",
+        goldenPathRuntime: true,
+        requested_capability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+        concept: "terminal authority",
+        repo_files: [
+          {
+            path: "server/services/helix-ask/runtime-authority-contract.ts",
+            content: [
+              "export const terminalAuthorityContract = true;",
+              "terminal authority selects the final answer only after runtime evidence exists.",
+            ].join("\n"),
+          },
+          {
+            path: "docs/helix-ask-turn-solver-spine.md",
+            content: "The completed solver path gates terminal authority and visible projection.",
+          },
+        ],
+      },
+    });
+
+    expect(decision.handled).toBe(true);
+    if (!decision.handled) throw new Error("golden path should handle repo concept search");
+    const body = decision.payload;
+
+    expect(body).toMatchObject({
+      final_status: "final_answer",
+      terminal_artifact_kind: "repo_code_evidence_answer",
+      final_answer_source: "repo_code_evidence_answer",
+      terminal_error_code: null,
+      repo_code_evidence_observation: {
+        capability_key: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+        concept: "terminal authority",
+        match_count: 3,
+      },
+      repo_evidence_relevance_gate: {
+        terminal_allowed: true,
+        repair_required: false,
+      },
+      capability_plan: {
+        requested_capability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+        executed_capability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+        required_observation_kinds: ["repo_code_evidence_observation", "repo_evidence_relevance_gate"],
+        required_terminal_kind: "repo_code_evidence_answer",
+      },
+      ask_turn_solver_trace: {
+        completed_solver_path: true,
+        requested_capability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+        executed_capability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+        observed_artifact_kind: "repo_code_evidence_observation",
+        terminal_artifact_kind: "repo_code_evidence_answer",
+      },
+    });
+    expect(body.selected_final_answer).toContain("runtime-authority-contract.ts:2");
+    expect(readLedger(body).map((artifact) => artifact.kind)).toEqual([
+      "golden_path_route_gate",
+      "repo_code_evidence_observation",
+      "repo_evidence_relevance_gate",
+      "repo_code_evidence_answer",
+    ]);
+    expect(terminalLedgerEntries(body)).toHaveLength(1);
+  });
+
+  it("fails closed when repo concept search has no evidence", () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+
+    const decision = runHelixAskGoldenPathRuntime({
+      now: new Date("2026-06-28T12:33:00.000Z"),
+      body: {
+        turn_id: "ask:golden:repo-search-missing",
+        prompt: "helix_ask_golden_path_runtime repo-code.search_concept",
+        goldenPathRuntime: true,
+        requested_capability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+        concept: "nonexistent capability phrase",
+        repo_files: [{ path: "server/example.ts", content: "export const other = true;" }],
+      },
+    });
+
+    expect(decision.handled).toBe(true);
+    if (!decision.handled) throw new Error("golden path should handle weak repo evidence");
+    const body = decision.payload;
+
+    expect(body).toMatchObject({
+      final_status: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      terminal_error_code: "repo_evidence_weak_after_repair",
+      goal_satisfaction_evaluation: {
+        satisfaction: "not_satisfied",
+        first_broken_rail: "evidence_reentry",
+      },
+      capability_plan: {
+        requested_capability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+        executed_capability: null,
+        required_observation_kinds: ["repo_code_evidence_observation", "repo_evidence_relevance_gate"],
+        required_terminal_kind: "repo_code_evidence_answer",
+      },
+      ask_turn_solver_trace: {
+        completed_solver_path: false,
+        requested_capability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+        executed_capability: null,
+        first_broken_rail: "evidence_reentry",
+      },
+    });
+    expect(body.selected_final_answer).toContain("could not find strong repo evidence");
     expect(readLedger(body).map((artifact) => artifact.kind)).toEqual(["golden_path_route_gate", "typed_failure"]);
     expect(terminalLedgerEntries(body)).toHaveLength(1);
   });
