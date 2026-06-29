@@ -16,6 +16,7 @@ import {
   buildGoldenPathCompoundGoalSatisfactionEvaluation,
   isHelixAskGoldenPathCivilizationBoundsZenReflectionCompoundRequested,
 } from "../compound-contract";
+import { buildGoldenPathCompoundTypedFailurePayload } from "../compound-failure";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
   HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
@@ -88,96 +89,26 @@ export const buildHelixAskGoldenPathCivilizationBoundsZenReflectionCompoundPaylo
     missingRequirement: string;
     text: string;
   }): RecordLike => {
-    const canonicalGoalFrame = buildGoldenPathCompoundCanonicalGoalFrame({
+    return buildGoldenPathCompoundTypedFailurePayload({
       turnId,
+      traceId,
+      sessionId,
+      threadId,
+      promptText,
+      createdAtMs,
+      routeGateArtifactId,
+      terminalResultId,
       requiredTerminalKind,
       classifierReasons: ["explicit_civilization_bounds_zen_reflection_compound_request"],
-    });
-    const goalSatisfactionEvaluation = buildGoldenPathCompoundGoalSatisfactionEvaluation({
-      turnId,
-      requiredTerminalKind,
-      satisfaction: "not_satisfied",
-      selectedTerminalArtifactKind: "typed_failure",
-      missingRequirements: [params.missingRequirement],
-      firstBrokenRail: "observation",
-    });
-    const goalHash = deps.hashGoalFrame(canonicalGoalFrame);
-    const terminalResult = buildGoldenPathTypedFailureTerminalResult({
-      resultId: terminalResultId,
-      artifactId: `${turnId}:typed_failure`,
+      hashGoalFrame: deps.hashGoalFrame,
+      status: "civilization_bounds_zen_reflection_compound_failed",
+      route: "golden_path_runtime / civilization_bounds_zen_reflection_compound",
+      requiredObservationKinds,
+      errorCode: params.errorCode,
+      brokenRail: params.brokenRail,
+      missingRequirement: params.missingRequirement,
       text: params.text,
-      supportRefs: [routeGateArtifactId],
     });
-
-    return {
-      ok: false,
-      mode: "read",
-      schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
-      turn_id: turnId,
-      trace_id: traceId,
-      session_id: sessionId,
-      thread_id: threadId,
-      prompt_text: promptText,
-      ...buildGoldenPathTypedFailureResponseProjection({
-        terminalResult,
-        terminalErrorCode: params.errorCode,
-      }),
-      golden_path_runtime: buildGoldenPathCompoundRuntimeStatus({
-        status: "civilization_bounds_zen_reflection_compound_failed",
-        executed: false,
-        firstBrokenRail: "observation",
-      }),
-      canonical_goal_frame: canonicalGoalFrame,
-      capability_plan: buildGoldenPathCompoundCapabilityPlan({
-        executedCapability: null,
-        requiredObservationKinds,
-        requiredTerminalKind,
-      }),
-      goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-      ...buildGoldenPathTerminalAuthorityProjection({
-        terminalResult,
-        route: "golden_path_runtime / civilization_bounds_zen_reflection_compound",
-        firstBrokenRail: "observation",
-      }),
-      ask_turn_solver_trace: buildGoldenPathSolverTrace({
-        completedSolverPath: false,
-        requestedCapability: "compound_capability_contract",
-        selectedCapability: "compound_capability_contract",
-        executedCapability: null,
-        terminalArtifactKind: "typed_failure",
-        firstBrokenRail: "observation",
-        terminalErrorCode: params.errorCode,
-        extra: { compound_subgoal_count: 2 },
-      }),
-      current_turn_artifact_ledger: [
-        buildGoldenPathRouteGateLedgerArtifact({
-          artifactId: routeGateArtifactId,
-          turnId,
-          createdAtMs,
-          goalHash,
-          terminalEligible: false,
-          requestedCapability: "compound_capability_contract",
-        }),
-        buildGoldenPathTypedFailureLedgerArtifact({
-          artifactId: terminalResult.artifact_id,
-          turnId,
-          createdAtMs,
-          goalHash,
-          terminalResult,
-          errorCode: params.errorCode,
-          firstBrokenRail: "observation",
-          includeSupportRefs: true,
-        }),
-      ],
-      debug: buildGoldenPathCompoundDebugMirror({
-        status: "civilization_bounds_zen_reflection_compound_failed",
-        executed: false,
-        terminalResult,
-        firstBrokenRail: "observation",
-        terminalErrorCode: params.errorCode,
-        goalSatisfactionEvaluation,
-      }),
-    };
   };
 
   if (!civilizationResult || !roadmap) {
