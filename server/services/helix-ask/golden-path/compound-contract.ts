@@ -77,6 +77,20 @@ export const buildGoldenPathCompoundCapabilityContract = (args: {
   raw_content_included: false,
 });
 
+export const buildGoldenPathCompoundEvidenceSynthesisAnswer = (args: {
+  text: string;
+  supportRefs: readonly string[];
+  satisfiedSubgoalCount: number;
+}): RecordLike => ({
+  schema: "helix.compound_evidence_synthesis_answer.v1",
+  text: args.text,
+  answer_text: args.text,
+  support_refs: [...args.supportRefs],
+  satisfied_subgoal_count: args.satisfiedSubgoalCount,
+  assistant_answer: false,
+  raw_content_included: false,
+});
+
 export const isHelixAskGoldenPathCatalogWorkspaceCompoundRequested = (body: RecordLike): boolean => {
   const requestedCapabilities = readStringArray(body.requested_capabilities ?? body.requestedCapabilities);
   const hasCatalog = requestedCapabilities.includes(HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY);
