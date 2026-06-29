@@ -8,6 +8,7 @@ import {
 import { readVisualCaptureSummary } from "../capabilities/visual-capture";
 import {
   buildGoldenPathCompoundCapabilityContract,
+  buildGoldenPathCompoundEvidenceSynthesisAnswer,
   isHelixAskGoldenPathVisualCalculatorCompoundRequested,
 } from "../compound-contract";
 import {
@@ -433,15 +434,11 @@ export const buildHelixAskGoldenPathVisualCalculatorCompoundPayload = (args: {
     compound_capability_contract: compoundCapabilityContract,
     visual_frame_evidence: visualEvidence,
     calculator_receipt: calculatorReceipt,
-    compound_evidence_synthesis_answer: {
-      schema: "helix.compound_evidence_synthesis_answer.v1",
+    compound_evidence_synthesis_answer: buildGoldenPathCompoundEvidenceSynthesisAnswer({
       text: terminalResult.text,
-      answer_text: terminalResult.text,
-      support_refs: terminalResult.support_refs,
-      satisfied_subgoal_count: 2,
-      assistant_answer: false,
-      raw_content_included: false,
-    },
+      supportRefs: terminalResult.support_refs,
+      satisfiedSubgoalCount: 2,
+    }),
     capability_plan: {
       schema: "helix.ask_capability_plan.v1",
       requested_capability: "compound_capability_contract",
