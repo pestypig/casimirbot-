@@ -4,6 +4,7 @@ import {
   buildGoldenPathObservationLedgerArtifact,
   buildGoldenPathRouteGateLedgerArtifact,
 } from "../artifact-ledger";
+import { buildGoldenPathCapabilityPlan } from "../capability-contract";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
@@ -172,18 +173,13 @@ export const buildHelixAskGoldenPathCapabilityCatalogPayload = (args: {
       assistant_answer: false,
       raw_content_included: false,
     },
-    capability_plan: {
-      schema: "helix.ask_capability_plan.v1",
-      requested_capability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
-      selected_capability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
-      executed_capability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
-      source_target: "capability_catalog",
+    capability_plan: buildGoldenPathCapabilityPlan({
+      requestedCapability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
+      sourceTarget: "capability_catalog",
       family: "capability_catalog",
-      required_observation_kinds: ["capability_registry"],
-      required_terminal_kind: requiredTerminalKind,
-      assistant_answer: false,
-      raw_content_included: false,
-    },
+      requiredObservationKinds,
+      requiredTerminalKind,
+    }),
     goal_satisfaction_evaluation: goalSatisfactionEvaluation,
     terminal_answer_authority: buildGoldenPathTerminalAnswerAuthority({
       terminalResult,
