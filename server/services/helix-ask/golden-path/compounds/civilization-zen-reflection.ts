@@ -7,7 +7,10 @@ import {
 } from "../artifact-ledger";
 import { readCompactCivilizationBoundsToolResult } from "../capabilities/civilization-bounds-reflection";
 import { readCompactZenGraphReflectionToolResult } from "../capabilities/zen-graph-reflection";
-import { isHelixAskGoldenPathCivilizationBoundsZenReflectionCompoundRequested } from "../compound-contract";
+import {
+  buildGoldenPathCompoundCapabilityContract,
+  isHelixAskGoldenPathCivilizationBoundsZenReflectionCompoundRequested,
+} from "../compound-contract";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
@@ -311,37 +314,27 @@ export const buildHelixAskGoldenPathCivilizationBoundsZenReflectionCompoundPaylo
     assistant_answer: false,
     raw_content_included: false,
   };
-  const compoundCapabilityContract = {
-    schema: "helix.compound_capability_contract.v1",
-    turn_id: turnId,
-    ordered_subgoals: [
+  const compoundCapabilityContract = buildGoldenPathCompoundCapabilityContract({
+    turnId,
+    subgoals: [
       {
-        subgoal_id: `${turnId}:subgoal:civilization_bounds`,
-        requested_capability: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
-        selected_capability: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
-        executed_capability: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+        subgoalIdSuffix: "civilization_bounds",
+        requestedCapability: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
         args: { roadmap_id: roadmapId, title },
-        observation_kind: "helix_civilization_bounds_tool_result",
-        observation_ref: civilizationObservationArtifactId,
-        terminal_contribution_kind: "civilization_bounds_reflection_answer",
-        satisfaction: "satisfied",
+        observationKind: "helix_civilization_bounds_tool_result",
+        observationRef: civilizationObservationArtifactId,
+        terminalContributionKind: "civilization_bounds_reflection_answer",
       },
       {
-        subgoal_id: `${turnId}:subgoal:zen_graph_reflection`,
-        requested_capability: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
-        selected_capability: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
-        executed_capability: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
+        subgoalIdSuffix: "zen_graph_reflection",
+        requestedCapability: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
         args: { reflection_id: reflectionId, input_summary: inputSummary },
-        observation_kind: "helix_zen_graph_reflection_tool_result",
-        observation_ref: zenObservationArtifactId,
-        terminal_contribution_kind: "ideology_context_reflection_answer",
-        satisfaction: "satisfied",
+        observationKind: "helix_zen_graph_reflection_tool_result",
+        observationRef: zenObservationArtifactId,
+        terminalContributionKind: "ideology_context_reflection_answer",
       },
     ],
-    satisfaction: "satisfied",
-    assistant_answer: false,
-    raw_content_included: false,
-  };
+  });
   const answerText = [
     "Compound civilization-bounds/reflection synthesis completed.",
     `Civilization roadmap: ${title} (${roadmapId})`,
