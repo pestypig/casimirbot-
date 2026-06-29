@@ -7,6 +7,7 @@ import {
   buildGoldenPathRouteGateLedgerArtifact,
 } from "../artifact-ledger";
 import {
+  buildGoldenPathCompoundCapabilityPlan,
   buildGoldenPathCompoundCapabilityContract,
   buildGoldenPathCompoundEvidenceSynthesisAnswer,
   isHelixAskGoldenPathCatalogWorkspaceCompoundRequested,
@@ -187,18 +188,10 @@ export const buildHelixAskGoldenPathCatalogWorkspaceCompoundPayload = (args: {
       supportRefs: terminalResult.support_refs,
       satisfiedSubgoalCount: 2,
     }),
-    capability_plan: {
-      schema: "helix.ask_capability_plan.v1",
-      requested_capability: "compound_capability_contract",
-      selected_capability: "compound_capability_contract",
-      executed_capability: "compound_capability_contract",
-      source_target: "compound",
-      family: "compound",
-      required_observation_kinds: ["capability_registry", "workspace_os_status_observation"],
-      required_terminal_kind: requiredTerminalKind,
-      assistant_answer: false,
-      raw_content_included: false,
-    },
+    capability_plan: buildGoldenPathCompoundCapabilityPlan({
+      requiredObservationKinds,
+      requiredTerminalKind,
+    }),
     goal_satisfaction_evaluation: goalSatisfactionEvaluation,
     terminal_answer_authority: buildGoldenPathTerminalAnswerAuthority({
       terminalResult,

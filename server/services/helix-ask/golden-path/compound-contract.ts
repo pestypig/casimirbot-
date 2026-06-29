@@ -91,6 +91,26 @@ export const buildGoldenPathCompoundEvidenceSynthesisAnswer = (args: {
   raw_content_included: false,
 });
 
+export const buildGoldenPathCompoundCapabilityPlan = (args: {
+  requiredObservationKinds: readonly string[];
+  requiredTerminalKind: string;
+  executedCapability?: string | null;
+  planArgs?: RecordLike;
+}): RecordLike => ({
+  schema: "helix.ask_capability_plan.v1",
+  requested_capability: "compound_capability_contract",
+  selected_capability: "compound_capability_contract",
+  executed_capability:
+    args.executedCapability === undefined ? "compound_capability_contract" : args.executedCapability,
+  source_target: "compound",
+  family: "compound",
+  ...(args.planArgs ? { args: args.planArgs } : {}),
+  required_observation_kinds: [...args.requiredObservationKinds],
+  required_terminal_kind: args.requiredTerminalKind,
+  assistant_answer: false,
+  raw_content_included: false,
+});
+
 export const isHelixAskGoldenPathCatalogWorkspaceCompoundRequested = (body: RecordLike): boolean => {
   const requestedCapabilities = readStringArray(body.requested_capabilities ?? body.requestedCapabilities);
   const hasCatalog = requestedCapabilities.includes(HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY);

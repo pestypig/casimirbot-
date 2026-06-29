@@ -17,6 +17,7 @@ import {
   buildGoldenPathRouteGateLedgerArtifact,
 } from "../artifact-ledger";
 import {
+  buildGoldenPathCompoundCapabilityPlan,
   buildGoldenPathCompoundCapabilityContract,
   buildGoldenPathCompoundEvidenceSynthesisAnswer,
   isHelixAskGoldenPathRepoDocsCompoundRequested,
@@ -158,19 +159,12 @@ export const buildHelixAskGoldenPathRepoDocsCompoundPayload = (args: {
         raw_content_included: false,
       },
       canonical_goal_frame: canonicalGoalFrame,
-      capability_plan: {
-        schema: "helix.ask_capability_plan.v1",
-        requested_capability: "compound_capability_contract",
-        selected_capability: "compound_capability_contract",
-        executed_capability: null,
-        source_target: "compound",
-        family: "compound",
-        args: { concept, doc_path: docPath, query },
-        required_observation_kinds: ["repo_code_evidence_observation", "repo_evidence_relevance_gate", "doc_location_matches"],
-        required_terminal_kind: requiredTerminalKind,
-        assistant_answer: false,
-        raw_content_included: false,
-      },
+      capability_plan: buildGoldenPathCompoundCapabilityPlan({
+        executedCapability: null,
+        planArgs: { concept, doc_path: docPath, query },
+        requiredObservationKinds: ["repo_code_evidence_observation", "repo_evidence_relevance_gate", "doc_location_matches"],
+        requiredTerminalKind,
+      }),
       goal_satisfaction_evaluation: goalSatisfactionEvaluation,
       terminal_answer_authority: {
         schema: "helix.terminal_answer_authority.v1",
@@ -456,18 +450,10 @@ export const buildHelixAskGoldenPathRepoDocsCompoundPayload = (args: {
       supportRefs: terminalResult.support_refs,
       satisfiedSubgoalCount: 2,
     }),
-    capability_plan: {
-      schema: "helix.ask_capability_plan.v1",
-      requested_capability: "compound_capability_contract",
-      selected_capability: "compound_capability_contract",
-      executed_capability: "compound_capability_contract",
-      source_target: "compound",
-      family: "compound",
-      required_observation_kinds: ["repo_code_evidence_observation", "repo_evidence_relevance_gate", "doc_location_matches"],
-      required_terminal_kind: requiredTerminalKind,
-      assistant_answer: false,
-      raw_content_included: false,
-    },
+    capability_plan: buildGoldenPathCompoundCapabilityPlan({
+      requiredObservationKinds: ["repo_code_evidence_observation", "repo_evidence_relevance_gate", "doc_location_matches"],
+      requiredTerminalKind,
+    }),
     goal_satisfaction_evaluation: goalSatisfactionEvaluation,
     terminal_answer_authority: buildGoldenPathTerminalAnswerAuthority({
       terminalResult,

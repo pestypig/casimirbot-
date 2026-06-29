@@ -7,6 +7,7 @@ import {
 } from "../capabilities/calculator";
 import { readVisualCaptureSummary } from "../capabilities/visual-capture";
 import {
+  buildGoldenPathCompoundCapabilityPlan,
   buildGoldenPathCompoundCapabilityContract,
   buildGoldenPathCompoundEvidenceSynthesisAnswer,
   isHelixAskGoldenPathVisualCalculatorCompoundRequested,
@@ -158,18 +159,11 @@ export const buildHelixAskGoldenPathVisualCalculatorCompoundPayload = (args: {
         raw_content_included: false,
       },
       canonical_goal_frame: canonicalGoalFrame,
-      capability_plan: {
-        schema: "helix.ask_capability_plan.v1",
-        requested_capability: "compound_capability_contract",
-        selected_capability: "compound_capability_contract",
-        executed_capability: null,
-        source_target: "compound",
-        family: "compound",
-        required_observation_kinds: ["visual_frame_evidence", "calculator_receipt"],
-        required_terminal_kind: requiredTerminalKind,
-        assistant_answer: false,
-        raw_content_included: false,
-      },
+      capability_plan: buildGoldenPathCompoundCapabilityPlan({
+        executedCapability: null,
+        requiredObservationKinds,
+        requiredTerminalKind,
+      }),
       goal_satisfaction_evaluation: goalSatisfactionEvaluation,
       terminal_answer_authority: {
         schema: "helix.terminal_answer_authority.v1",
@@ -439,18 +433,10 @@ export const buildHelixAskGoldenPathVisualCalculatorCompoundPayload = (args: {
       supportRefs: terminalResult.support_refs,
       satisfiedSubgoalCount: 2,
     }),
-    capability_plan: {
-      schema: "helix.ask_capability_plan.v1",
-      requested_capability: "compound_capability_contract",
-      selected_capability: "compound_capability_contract",
-      executed_capability: "compound_capability_contract",
-      source_target: "compound",
-      family: "compound",
-      required_observation_kinds: ["visual_frame_evidence", "calculator_receipt"],
-      required_terminal_kind: requiredTerminalKind,
-      assistant_answer: false,
-      raw_content_included: false,
-    },
+    capability_plan: buildGoldenPathCompoundCapabilityPlan({
+      requiredObservationKinds,
+      requiredTerminalKind,
+    }),
     goal_satisfaction_evaluation: goalSatisfactionEvaluation,
     terminal_answer_authority: buildGoldenPathTerminalAnswerAuthority({
       terminalResult,
