@@ -61,6 +61,23 @@ describe("Helix Ask golden path runtime", () => {
     expect(dependencySource).not.toContain("../../routes/agi.plan");
   });
 
+  it("keeps the golden path runtime service as a thin orchestrator", () => {
+    const serviceSource = readFileSync(servicePath, "utf8");
+
+    expect(serviceSource).toContain("isHelixAskGoldenPathRuntimeEnabled");
+    expect(serviceSource).toContain("isHelixAskGoldenPathRequested");
+    expect(serviceSource).toContain("dispatchHelixAskGoldenPathRuntime");
+    expect(serviceSource).toContain("buildHelixAskGoldenPathRuntimeContractPayload");
+    expect(serviceSource).not.toMatch(/from\s+["']\.\/golden-path\/capabilities\//);
+    expect(serviceSource).not.toMatch(/from\s+["']\.\/golden-path\/compounds\//);
+    expect(serviceSource).not.toContain("terminal_artifact_kind");
+    expect(serviceSource).not.toContain("current_turn_artifact_ledger");
+    expect(serviceSource).not.toContain("buildTerminalEnvelope");
+    expect(serviceSource).not.toContain("buildGoldenPathTerminalEnvelope");
+    expect(serviceSource).not.toContain("buildCapabilityLedger");
+    expect(serviceSource).not.toContain("buildCompoundCapabilityContract");
+  });
+
   it("keeps every golden-path capability and compound module on the standard dispatch surface", () => {
     const modulePaths = [capabilityDir, compoundDir].flatMap((directory) =>
       readdirSync(directory)
