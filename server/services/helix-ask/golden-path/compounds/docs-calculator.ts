@@ -10,7 +10,10 @@ import {
   readGoldenPathDocLocateQuery,
   readGoldenPathDocPath,
 } from "../capabilities/docs-locate";
-import { isHelixAskGoldenPathDocsCalculatorCompoundRequested } from "../compound-contract";
+import {
+  buildGoldenPathCompoundCapabilityContract,
+  isHelixAskGoldenPathDocsCalculatorCompoundRequested,
+} from "../compound-contract";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
@@ -314,37 +317,27 @@ export const buildHelixAskGoldenPathDocsCalculatorCompoundPayload = (args: {
     assistant_answer: false,
     raw_content_included: false,
   };
-  const compoundCapabilityContract = {
-    schema: "helix.compound_capability_contract.v1",
-    turn_id: turnId,
-    ordered_subgoals: [
+  const compoundCapabilityContract = buildGoldenPathCompoundCapabilityContract({
+    turnId,
+    subgoals: [
       {
-        subgoal_id: `${turnId}:subgoal:docs_locate`,
-        requested_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-        selected_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-        executed_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+        subgoalIdSuffix: "docs_locate",
+        requestedCapability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
         args: { doc_path: docPath, query },
-        observation_kind: "doc_location_matches",
-        observation_ref: docObservationArtifactId,
-        terminal_contribution_kind: "doc_location_matches",
-        satisfaction: "satisfied",
+        observationKind: "doc_location_matches",
+        observationRef: docObservationArtifactId,
+        terminalContributionKind: "doc_location_matches",
       },
       {
-        subgoal_id: `${turnId}:subgoal:calculator`,
-        requested_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
-        selected_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
-        executed_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+        subgoalIdSuffix: "calculator",
+        requestedCapability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
         args: { expression },
-        observation_kind: "calculator_receipt",
-        observation_ref: calculatorObservationArtifactId,
-        terminal_contribution_kind: "workstation_tool_evaluation",
-        satisfaction: "satisfied",
+        observationKind: "calculator_receipt",
+        observationRef: calculatorObservationArtifactId,
+        terminalContributionKind: "workstation_tool_evaluation",
       },
     ],
-    satisfaction: "satisfied",
-    assistant_answer: false,
-    raw_content_included: false,
-  };
+  });
   const answerText = [
     "Compound docs/calculator synthesis completed.",
     `Document query: ${query}`,

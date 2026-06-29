@@ -48,6 +48,7 @@ export type HelixAskGoldenPathCompoundSubgoalContractInput = {
   args?: RecordLike;
   observationKind: string;
   observationRef: string;
+  terminalContributionKind?: string;
   satisfaction?: "satisfied" | "missing" | "failed";
 };
 
@@ -66,6 +67,9 @@ export const buildGoldenPathCompoundCapabilityContract = (args: {
     args: subgoal.args ?? {},
     observation_kind: subgoal.observationKind,
     observation_ref: subgoal.observationRef,
+    ...(subgoal.terminalContributionKind
+      ? { terminal_contribution_kind: subgoal.terminalContributionKind }
+      : {}),
     satisfaction: subgoal.satisfaction ?? "satisfied",
   })),
   satisfaction: args.satisfaction ?? "satisfied",
