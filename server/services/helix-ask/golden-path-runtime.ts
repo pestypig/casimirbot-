@@ -59,8 +59,16 @@ import {
 import {
   buildAskTurnCompositeFollowupAudit,
   buildAskTurnCompositeHandoffDecision,
-  type HelixAskCompositeSubgoalReferenceIntent,
 } from "./composite-followup-helpers";
+import {
+  buildGoldenPathCompositeDebug,
+  isHelixAskGoldenPathCatalogWorkspaceCompoundRequested,
+  isHelixAskGoldenPathCivilizationBoundsZenReflectionCompoundRequested,
+  isHelixAskGoldenPathDocsCalculatorCompoundRequested,
+  isHelixAskGoldenPathInternetResearchReflectionCompoundRequested,
+  isHelixAskGoldenPathRepoDocsCompoundRequested,
+  isHelixAskGoldenPathVisualCalculatorCompoundRequested,
+} from "./golden-path/compound-contract";
 import {
   buildStagePlayAskCheckpointReceiptPayload,
   type StagePlayCheckpointReceiptArtifactLike,
@@ -167,64 +175,6 @@ export const createHelixAskGoldenPathRuntimeDependencies = (
 export const isHelixAskGoldenPathRuntimeEnabled = (
   env: Record<string, string | undefined> = process.env,
 ): boolean => flagEnabled(env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG]);
-
-const isHelixAskGoldenPathCatalogWorkspaceCompoundRequested = (body: RecordLike): boolean => {
-  const requestedCapabilities = readStringArray(body.requested_capabilities ?? body.requestedCapabilities);
-  const hasCatalog = requestedCapabilities.includes(HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY);
-  const hasWorkspace = requestedCapabilities.includes(HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY);
-  if (hasCatalog && hasWorkspace) return true;
-  const prompt = readHelixAskGoldenPathPrompt(body).toLowerCase();
-  return (
-    prompt.includes(HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY) &&
-    prompt.includes(HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY)
-  );
-};
-
-const isHelixAskGoldenPathVisualCalculatorCompoundRequested = (body: RecordLike): boolean => {
-  return isHelixAskGoldenPathVisualCaptureRequested(body) && isHelixAskGoldenPathCalculatorSolveRequested(body);
-};
-
-const isHelixAskGoldenPathDocsCalculatorCompoundRequested = (body: RecordLike): boolean => {
-  return isHelixAskGoldenPathDocsLocateRequested(body) && isHelixAskGoldenPathCalculatorSolveRequested(body);
-};
-
-const isHelixAskGoldenPathRepoDocsCompoundRequested = (body: RecordLike): boolean => {
-  return isHelixAskGoldenPathRepoSearchConceptRequested(body) && isHelixAskGoldenPathDocsLocateRequested(body);
-};
-
-const isHelixAskGoldenPathInternetResearchReflectionCompoundRequested = (body: RecordLike): boolean => {
-  return isHelixAskGoldenPathInternetSearchRequested(body) && isHelixAskGoldenPathTheoryReflectionRequested(body);
-};
-
-const isHelixAskGoldenPathCivilizationBoundsZenReflectionCompoundRequested = (body: RecordLike): boolean => {
-  return isHelixAskGoldenPathCivilizationBoundsReflectionRequested(body) && isHelixAskGoldenPathZenGraphReflectionRequested(body);
-};
-
-const buildGoldenPathCompositeDebug = (args: {
-  deps: HelixAskGoldenPathRuntimeDependencies;
-  turnId: string;
-}): { decision: RecordLike; audit: RecordLike } => {
-  const intent: HelixAskCompositeSubgoalReferenceIntent = {
-    required: false,
-    reference_kind: "that_result",
-    requested_action: "inspect_debug",
-    matched_phrases: [],
-    confidence: "low",
-  };
-  const binding = {
-    current_turn_id: args.turnId,
-    prior_composite_turn_id: null,
-    prior_composite_receipt_id: null,
-    selected_subgoal_ids: [],
-    candidate_subgoals: [],
-    rejected_subgoals: [],
-    binding_status: "no_usable_subgoal",
-    non_authoritative_debug_probe: true,
-  };
-  const decision = args.deps.buildCompositeHandoffDecision({ turnId: args.turnId, binding, intent });
-  const audit = args.deps.buildCompositeFollowupAudit({ priorEnvelope: null, binding, handoffDecision: decision });
-  return { decision, audit };
-};
 
 export const buildHelixAskGoldenPathRuntimePayload = (args: {
   body: RecordLike;
