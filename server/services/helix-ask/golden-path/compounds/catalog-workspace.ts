@@ -8,6 +8,7 @@ import {
 } from "../artifact-ledger";
 import {
   buildGoldenPathCompoundCapabilityPlan,
+  buildGoldenPathCompoundCanonicalGoalFrame,
   buildGoldenPathCompoundCapabilityContract,
   buildGoldenPathCompoundEvidenceSynthesisAnswer,
   isHelixAskGoldenPathCatalogWorkspaceCompoundRequested,
@@ -94,18 +95,12 @@ export const buildHelixAskGoldenPathCatalogWorkspaceCompoundPayload = (args: {
     "Capability catalog observation completed.",
     workspaceSummary,
   ].join("\n");
-  const canonicalGoalFrame = {
-    schema: "helix.ask_canonical_goal_frame.v1",
-    turn_id: turnId,
-    goal_kind: "compound_capability_contract",
-    answer_scope: "current_turn",
-    required_terminal_kind: requiredTerminalKind,
-    allows_workspace_context: true,
-    allows_prior_artifacts: false,
-    classifier_reasons: ["explicit_catalog_workspace_compound_request"],
-    assistant_answer: false,
-    raw_content_included: false,
-  };
+  const canonicalGoalFrame = buildGoldenPathCompoundCanonicalGoalFrame({
+    turnId,
+    requiredTerminalKind,
+    classifierReasons: ["explicit_catalog_workspace_compound_request"],
+    includeWorkspaceContextFields: true,
+  });
   const goalSatisfactionEvaluation = {
     schema: "helix.goal_satisfaction_evaluation.v1",
     turn_id: turnId,

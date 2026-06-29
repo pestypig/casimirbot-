@@ -111,6 +111,28 @@ export const buildGoldenPathCompoundCapabilityPlan = (args: {
   raw_content_included: false,
 });
 
+export const buildGoldenPathCompoundCanonicalGoalFrame = (args: {
+  turnId: string;
+  requiredTerminalKind: string;
+  classifierReasons: readonly string[];
+  includeWorkspaceContextFields?: boolean;
+}): RecordLike => ({
+  schema: "helix.ask_canonical_goal_frame.v1",
+  turn_id: args.turnId,
+  goal_kind: "compound_capability_contract",
+  answer_scope: "current_turn",
+  required_terminal_kind: args.requiredTerminalKind,
+  ...(args.includeWorkspaceContextFields
+    ? {
+        allows_workspace_context: true,
+        allows_prior_artifacts: false,
+      }
+    : {}),
+  classifier_reasons: [...args.classifierReasons],
+  assistant_answer: false,
+  raw_content_included: false,
+});
+
 export const isHelixAskGoldenPathCatalogWorkspaceCompoundRequested = (body: RecordLike): boolean => {
   const requestedCapabilities = readStringArray(body.requested_capabilities ?? body.requestedCapabilities);
   const hasCatalog = requestedCapabilities.includes(HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY);

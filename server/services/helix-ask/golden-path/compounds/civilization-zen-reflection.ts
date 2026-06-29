@@ -9,6 +9,7 @@ import { readCompactCivilizationBoundsToolResult } from "../capabilities/civiliz
 import { readCompactZenGraphReflectionToolResult } from "../capabilities/zen-graph-reflection";
 import {
   buildGoldenPathCompoundCapabilityPlan,
+  buildGoldenPathCompoundCanonicalGoalFrame,
   buildGoldenPathCompoundCapabilityContract,
   buildGoldenPathCompoundEvidenceSynthesisAnswer,
   isHelixAskGoldenPathCivilizationBoundsZenReflectionCompoundRequested,
@@ -83,16 +84,11 @@ export const buildHelixAskGoldenPathCivilizationBoundsZenReflectionCompoundPaylo
     missingRequirement: string;
     text: string;
   }): RecordLike => {
-    const canonicalGoalFrame = {
-      schema: "helix.ask_canonical_goal_frame.v1",
-      turn_id: turnId,
-      goal_kind: "compound_capability_contract",
-      answer_scope: "current_turn",
-      required_terminal_kind: requiredTerminalKind,
-      classifier_reasons: ["explicit_civilization_bounds_zen_reflection_compound_request"],
-      assistant_answer: false,
-      raw_content_included: false,
-    };
+    const canonicalGoalFrame = buildGoldenPathCompoundCanonicalGoalFrame({
+      turnId,
+      requiredTerminalKind,
+      classifierReasons: ["explicit_civilization_bounds_zen_reflection_compound_request"],
+    });
     const goalSatisfactionEvaluation = {
       schema: "helix.goal_satisfaction_evaluation.v1",
       turn_id: turnId,
@@ -336,18 +332,12 @@ export const buildHelixAskGoldenPathCivilizationBoundsZenReflectionCompoundPaylo
     `Procedural classifications: ${proceduralClassifications.length}; badge locator matches: ${locatorMatches.length}.`,
     "Both receipts are evidence-only; synthesis is terminal authority only after the civilization-bounds and ideology-reflection subgoals are satisfied.",
   ].join("\n");
-  const canonicalGoalFrame = {
-    schema: "helix.ask_canonical_goal_frame.v1",
-    turn_id: turnId,
-    goal_kind: "compound_capability_contract",
-    answer_scope: "current_turn",
-    required_terminal_kind: requiredTerminalKind,
-    allows_workspace_context: true,
-    allows_prior_artifacts: false,
-    classifier_reasons: ["explicit_civilization_bounds_zen_reflection_compound_request"],
-    assistant_answer: false,
-    raw_content_included: false,
-  };
+  const canonicalGoalFrame = buildGoldenPathCompoundCanonicalGoalFrame({
+    turnId,
+    requiredTerminalKind,
+    classifierReasons: ["explicit_civilization_bounds_zen_reflection_compound_request"],
+    includeWorkspaceContextFields: true,
+  });
   const goalSatisfactionEvaluation = {
     schema: "helix.goal_satisfaction_evaluation.v1",
     turn_id: turnId,
