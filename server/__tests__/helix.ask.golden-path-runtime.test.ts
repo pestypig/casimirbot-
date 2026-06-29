@@ -1440,6 +1440,122 @@ describe("Helix Ask golden path runtime", () => {
     expect(terminalLedgerEntries(body)).toHaveLength(1);
   });
 
+  it("handles repo search plus docs locate as an ordered compound contract", () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+
+    const decision = runHelixAskGoldenPathRuntime({
+      now: new Date("2026-06-28T12:44:00.000Z"),
+      body: {
+        turn_id: "ask:golden:repo-docs-compound",
+        prompt:
+          "helix_ask_golden_path_runtime use repo-code.search_concept and docs-viewer.locate_in_doc",
+        goldenPathRuntime: true,
+        requested_capabilities: [
+          HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+          HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+        ],
+        concept: "terminal authority",
+        repo_files: [
+          {
+            path: "server/services/helix-ask/runtime-authority-contract.ts",
+            content: [
+              "export const terminalAuthorityContract = true;",
+              "terminal authority selects the final answer only after runtime evidence exists.",
+            ].join("\n"),
+          },
+          {
+            path: "docs/helix-ask-turn-solver-spine.md",
+            content: "The completed solver path gates terminal authority and visible projection.",
+          },
+        ],
+        doc_path: "docs/helix-ask-turn-solver-spine.md",
+        query: "completed solver path terminal authority",
+        doc_content: [
+          "# Helix Ask Turn Solver Spine",
+          "The completed solver path gates terminal authority and visible projection.",
+          "Receipts remain observations until terminal authority selects a supported product.",
+        ].join("\n"),
+      },
+    });
+
+    expect(decision.handled).toBe(true);
+    if (!decision.handled) throw new Error("golden path should handle repo+docs compound");
+    const body = decision.payload;
+
+    expect(body).toMatchObject({
+      final_status: "final_answer",
+      terminal_artifact_kind: "compound_evidence_synthesis_answer",
+      final_answer_source: "compound_evidence_synthesis_answer",
+      terminal_error_code: null,
+      repo_code_evidence_observation: {
+        capability_key: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+        concept: "terminal authority",
+        match_count: 3,
+      },
+      repo_evidence_relevance_gate: {
+        terminal_allowed: true,
+        repair_required: false,
+      },
+      doc_location_matches: {
+        capability_key: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+        doc_path: "docs/helix-ask-turn-solver-spine.md",
+        query: "completed solver path terminal authority",
+        match_count: 2,
+      },
+      compound_capability_contract: {
+        satisfaction: "satisfied",
+        ordered_subgoals: [
+          {
+            requested_capability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+            selected_capability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+            executed_capability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+            observation_kind: "repo_code_evidence_observation",
+            terminal_contribution_kind: "repo_code_evidence_answer",
+            satisfaction: "satisfied",
+          },
+          {
+            requested_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+            selected_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+            executed_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+            observation_kind: "doc_location_matches",
+            terminal_contribution_kind: "doc_location_matches",
+            satisfaction: "satisfied",
+          },
+        ],
+      },
+      capability_plan: {
+        requested_capability: "compound_capability_contract",
+        selected_capability: "compound_capability_contract",
+        executed_capability: "compound_capability_contract",
+        required_observation_kinds: [
+          "repo_code_evidence_observation",
+          "repo_evidence_relevance_gate",
+          "doc_location_matches",
+        ],
+        required_terminal_kind: "compound_evidence_synthesis_answer",
+      },
+      ask_turn_solver_trace: {
+        completed_solver_path: true,
+        requested_capability: "compound_capability_contract",
+        selected_capability: "compound_capability_contract",
+        executed_capability: "compound_capability_contract",
+        observed_artifact_kind: "compound_subgoal_observations",
+        terminal_artifact_kind: "compound_evidence_synthesis_answer",
+        compound_subgoal_count: 2,
+      },
+    });
+    expect(body.selected_final_answer).toContain("Compound repo/docs synthesis completed");
+    expect(body.selected_final_answer).toContain("docs/helix-ask-turn-solver-spine.md:1");
+    expect(readLedger(body).map((artifact) => artifact.kind)).toEqual([
+      "golden_path_route_gate",
+      "repo_code_evidence_observation",
+      "repo_evidence_relevance_gate",
+      "doc_location_matches",
+      "compound_evidence_synthesis_answer",
+    ]);
+    expect(terminalLedgerEntries(body)).toHaveLength(1);
+  });
+
   it("handles capability catalog plus workspace status as an ordered compound contract", () => {
     process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
 
