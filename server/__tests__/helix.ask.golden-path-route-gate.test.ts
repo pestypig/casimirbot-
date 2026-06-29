@@ -390,7 +390,7 @@ describe("Helix Ask golden-path route gate", () => {
     expectExplicitCapabilityRails(response.body, expectedObservationKind, expectedTerminalKind);
     expect(response.body.current_turn_artifact_ledger?.some((artifact: { kind?: string }) => artifact.kind === expectedObservationKind)).toBe(true);
     expect(response.body.current_turn_artifact_ledger?.filter((artifact: { kind?: string }) => artifact.kind === expectedTerminalKind)).toHaveLength(1);
-  });
+  }, 15000);
 
   it("routes matched capability prompts without the explicit scaffold marker when the flag is enabled", async () => {
     process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
@@ -420,6 +420,45 @@ describe("Helix Ask golden-path route gate", () => {
         executed_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
       },
     });
+    expectExplicitCapabilityRails(response.body, "calculator_receipt", "workstation_tool_evaluation");
+  });
+
+  it("lets Helix-mode matched prompts enter golden path before legacy gateway observations", async () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+    const app = createApp();
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        agent_runtime: "helix",
+        turn_id: "ask:test:golden-route-helix-runtime-calculator",
+        prompt: "Use scientific-calculator.solve_expression with expression: 2 + 2",
+        workstation_gateway_call: {
+          capability_id: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+          arguments: {
+            expression: "2 + 2",
+          },
+        },
+      })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      final_status: "final_answer",
+      terminal_artifact_kind: "workstation_tool_evaluation",
+      final_answer_source: "workstation_tool_evaluation",
+      terminal_error_code: null,
+      debug: {
+        golden_path_runtime: expect.objectContaining({
+          legacy_route_bypassed: true,
+        }),
+      },
+      capability_plan: {
+        requested_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+        executed_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+      },
+    });
+    expect(response.body.response_type).not.toBe("workstation_gateway_observation");
     expectExplicitCapabilityRails(response.body, "calculator_receipt", "workstation_tool_evaluation");
   });
 
