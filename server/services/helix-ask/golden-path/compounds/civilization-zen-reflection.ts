@@ -15,6 +15,11 @@ import {
   type HelixAskGoldenPathRuntimeTerminalResult,
   type RecordLike,
 } from "../core";
+import {
+  buildGoldenPathTerminalAnswerAuthority,
+  buildGoldenPathTerminalAuthoritySingleWriter,
+  buildGoldenPathTerminalResult,
+} from "../terminal-envelope";
 
 export type HelixAskGoldenPathCivilizationBoundsZenReflectionCompoundDependencies = {
   now: () => Date;
@@ -392,24 +397,19 @@ export const buildHelixAskGoldenPathCivilizationBoundsZenReflectionCompoundPaylo
     evaluation: goalSatisfactionEvaluation,
     createdAtMs,
   });
-  const terminalResult: HelixAskGoldenPathRuntimeTerminalResult = {
-    schema: "helix.ask_golden_path_terminal_result.v1",
-    result_id: terminalResultId,
-    artifact_id: terminalArtifactId,
-    artifact_kind: requiredTerminalKind,
-    final_answer_source: requiredTerminalKind,
+  const terminalResult = buildGoldenPathTerminalResult({
+    resultId: terminalResultId,
+    artifactId: terminalArtifactId,
+    artifactKind: requiredTerminalKind,
+    finalAnswerSource: requiredTerminalKind,
     text: answerText,
-    support_refs: [
+    supportRefs: [
       civilizationObservationArtifactId,
       zenObservationArtifactId,
       routeGateArtifactId,
       goalSatisfactionArtifact.artifact_id,
     ],
-    terminal_authority_ok: true,
-    route_authority_ok: true,
-    assistant_answer: false,
-    raw_content_included: false,
-  };
+  });
 
   return {
     ok: true,
@@ -481,31 +481,11 @@ export const buildHelixAskGoldenPathCivilizationBoundsZenReflectionCompoundPaylo
       raw_content_included: false,
     },
     goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-    terminal_answer_authority: {
-      schema: "helix.terminal_answer_authority.v1",
-      selected_terminal_artifact_kind: terminalResult.artifact_kind,
-      terminal_artifact_kind: terminalResult.artifact_kind,
-      selected_terminal_artifact_id: terminalResult.artifact_id,
-      terminal_artifact_id: terminalResult.artifact_id,
-      selected_terminal_result_id: terminalResult.result_id,
-      selected_final_answer: terminalResult.text,
-      final_answer_source: terminalResult.final_answer_source,
-      terminal_authority_ok: true,
+    terminal_answer_authority: buildGoldenPathTerminalAnswerAuthority({
+      terminalResult,
       route: "golden_path_runtime / civilization_bounds_zen_reflection_compound",
-      server_authoritative: true,
-      assistant_answer: false,
-      raw_content_included: false,
-    },
-    terminal_authority_single_writer: {
-      schema: "helix.terminal_authority_single_writer.v1",
-      selected_terminal_artifact_kind: terminalResult.artifact_kind,
-      selected_terminal_artifact_id: terminalResult.artifact_id,
-      selected_terminal_result_id: terminalResult.result_id,
-      visible_text: terminalResult.text,
-      source: terminalResult.final_answer_source,
-      assistant_answer: false,
-      raw_content_included: false,
-    },
+    }),
+    terminal_authority_single_writer: buildGoldenPathTerminalAuthoritySingleWriter({ terminalResult }),
     ask_turn_solver_trace: {
       schema: "helix.ask_turn_solver_trace.v1",
       completed_solver_path: true,
