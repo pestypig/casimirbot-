@@ -84,6 +84,35 @@ export const buildGoldenPathObservationLedgerArtifact = (args: {
   payload: args.payload,
 });
 
+export type GoldenPathObservationLedgerInput = {
+  artifactId: string;
+  kind: string;
+  payload: RecordLike;
+  producerItemId?: string;
+  terminalEligible?: boolean;
+};
+
+export const buildGoldenPathObservationLedgerArtifacts = (args: {
+  turnId: string;
+  createdAtMs: number;
+  goalHash: string;
+  observations: readonly GoldenPathObservationLedgerInput[];
+}): readonly RecordLike[] =>
+  args.observations.map((observation) =>
+    buildGoldenPathObservationLedgerArtifact({
+      artifactId: observation.artifactId,
+      turnId: args.turnId,
+      createdAtMs: args.createdAtMs,
+      goalHash: args.goalHash,
+      kind: observation.kind,
+      payload: observation.payload,
+      ...(observation.producerItemId ? { producerItemId: observation.producerItemId } : {}),
+      ...(typeof observation.terminalEligible === "boolean"
+        ? { terminalEligible: observation.terminalEligible }
+        : {}),
+    }),
+  );
+
 export const buildGoldenPathAnswerLedgerArtifact = (args: {
   artifactId: string;
   turnId: string;

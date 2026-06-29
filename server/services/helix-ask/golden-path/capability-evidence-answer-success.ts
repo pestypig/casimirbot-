@@ -1,7 +1,8 @@
 import {
   buildGoldenPathAnswerLedgerArtifact,
-  buildGoldenPathObservationLedgerArtifact,
+  buildGoldenPathObservationLedgerArtifacts,
   buildGoldenPathRouteGateLedgerArtifact,
+  type GoldenPathObservationLedgerInput,
 } from "./artifact-ledger";
 import { buildGoldenPathCapabilityGoalSatisfactionEvaluation, buildGoldenPathCapabilityPlan } from "./capability-contract";
 import {
@@ -25,13 +26,7 @@ type BuildGoalSatisfactionArtifact = (args: {
   createdAtMs: number;
 }) => RecordLike;
 
-export type GoldenPathEvidenceObservation = {
-  artifactId: string;
-  kind: string;
-  payload: RecordLike;
-  producerItemId?: string;
-  terminalEligible?: boolean;
-};
+export type GoldenPathEvidenceObservation = GoldenPathObservationLedgerInput;
 
 export const buildGoldenPathCapabilityEvidenceAnswerSuccessPayload = (args: {
   turnId: string;
@@ -178,20 +173,12 @@ export const buildGoldenPathCapabilityEvidenceAnswerSuccessPayload = (args: {
         goalSatisfactionArtifact,
         goalSatisfactionEvaluation,
       }),
-      ...args.observations.map((observation) =>
-        buildGoldenPathObservationLedgerArtifact({
-          artifactId: observation.artifactId,
-          turnId: args.turnId,
-          createdAtMs: args.createdAtMs,
-          goalHash,
-          kind: observation.kind,
-          payload: observation.payload,
-          ...(observation.producerItemId ? { producerItemId: observation.producerItemId } : {}),
-          ...(typeof observation.terminalEligible === "boolean"
-            ? { terminalEligible: observation.terminalEligible }
-            : {}),
-        }),
-      ),
+      ...buildGoldenPathObservationLedgerArtifacts({
+        turnId: args.turnId,
+        createdAtMs: args.createdAtMs,
+        goalHash,
+        observations: args.observations,
+      }),
       buildGoldenPathAnswerLedgerArtifact({
         artifactId: args.terminalArtifactId,
         turnId: args.turnId,
