@@ -103,6 +103,26 @@ export const readStringArray = (value: unknown): string[] => {
   return value.map((item) => readString(item)).filter((item): item is string => Boolean(item));
 };
 
+export const readHelixAskGoldenPathRequestedCapabilities = (body: RecordLike): string[] =>
+  readStringArray(body.requested_capabilities ?? body.requestedCapabilities);
+
+export const readHelixAskGoldenPathRequestedCapability = (body: RecordLike): string | null =>
+  readString(body.requested_capability) ??
+  readString(body.requestedCapability) ??
+  readString(body.capability) ??
+  readString(body.tool_name) ??
+  readString(body.toolName);
+
+export const isHelixAskGoldenPathCapabilityExplicitlyRequested = (
+  body: RecordLike,
+  capabilities: readonly string[],
+): boolean => {
+  const requestedCapabilities = readHelixAskGoldenPathRequestedCapabilities(body);
+  if (capabilities.some((capability) => requestedCapabilities.includes(capability))) return true;
+  const requestedCapability = readHelixAskGoldenPathRequestedCapability(body);
+  return Boolean(requestedCapability && capabilities.includes(requestedCapability));
+};
+
 export const flagEnabled = (value: unknown): boolean => {
   const normalized = String(value ?? "").trim().toLowerCase();
   return normalized === "1" || normalized === "true" || normalized === "enabled";
