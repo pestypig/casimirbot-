@@ -9,14 +9,14 @@ import {
   readTheoryReflectionTopic,
 } from "../capabilities/theory-reflection";
 import {
-  buildGoldenPathObservationLedgerArtifact,
-} from "../artifact-ledger";
-import {
   buildGoldenPathCompoundCapabilityContract,
   isHelixAskGoldenPathInternetResearchReflectionCompoundRequested,
 } from "../compound-contract";
 import { buildGoldenPathCompoundTypedFailurePayload } from "../compound-failure";
-import { buildGoldenPathCompoundSuccessPayload } from "../compound-success";
+import {
+  buildGoldenPathCompoundObservationLedgerArtifacts,
+  buildGoldenPathCompoundSuccessPayload,
+} from "../compound-success";
 import {
   HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
   HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
@@ -238,28 +238,28 @@ export const buildHelixAskGoldenPathInternetResearchReflectionCompoundPayload = 
       internet_search_observation: internetObservation,
       helix_theory_context_reflection_tool_receipt: reflectionReceipt,
     },
-    observationLedgerArtifacts: ({ goalHash }) => [
-      buildGoldenPathObservationLedgerArtifact({
-        artifactId: internetObservationArtifactId,
+    observationLedgerArtifacts: ({ goalHash }) =>
+      buildGoldenPathCompoundObservationLedgerArtifacts({
         turnId,
         createdAtMs,
         goalHash,
-        kind: "internet_search_observation",
-        producerItemId: HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
-        terminalEligible: false,
-        payload: internetObservation,
+        observations: [
+          {
+            artifactId: internetObservationArtifactId,
+            kind: "internet_search_observation",
+            producerItemId: HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
+            terminalEligible: false,
+            payload: internetObservation,
+          },
+          {
+            artifactId: reflectionObservationArtifactId,
+            kind: "helix_theory_context_reflection_tool_receipt",
+            producerItemId: HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
+            terminalEligible: false,
+            payload: reflectionReceipt,
+          },
+        ],
       }),
-      buildGoldenPathObservationLedgerArtifact({
-        artifactId: reflectionObservationArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        kind: "helix_theory_context_reflection_tool_receipt",
-        producerItemId: HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
-        terminalEligible: false,
-        payload: reflectionReceipt,
-      }),
-    ],
     compoundCapabilityContract,
     routeGateTerminalEligible: false,
     answerProducerItemId: "golden_path_compound_synthesis",

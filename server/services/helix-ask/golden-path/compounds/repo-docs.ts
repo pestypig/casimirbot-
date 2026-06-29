@@ -11,14 +11,14 @@ import {
   readRepoSearchConcept,
 } from "../capabilities/repo-search-concept";
 import {
-  buildGoldenPathObservationLedgerArtifact,
-} from "../artifact-ledger";
-import {
   buildGoldenPathCompoundCapabilityContract,
   isHelixAskGoldenPathRepoDocsCompoundRequested,
 } from "../compound-contract";
 import { buildGoldenPathCompoundTypedFailurePayload } from "../compound-failure";
-import { buildGoldenPathCompoundSuccessPayload } from "../compound-success";
+import {
+  buildGoldenPathCompoundObservationLedgerArtifacts,
+  buildGoldenPathCompoundSuccessPayload,
+} from "../compound-success";
 import {
   HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
   HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
@@ -234,38 +234,35 @@ export const buildHelixAskGoldenPathRepoDocsCompoundPayload = (args: {
       repo_evidence_relevance_gate: repoEvidenceRelevanceGate,
       doc_location_matches: docLocationMatches,
     },
-    observationLedgerArtifacts: ({ goalHash }) => [
-      buildGoldenPathObservationLedgerArtifact({
-        artifactId: repoObservationArtifactId,
+    observationLedgerArtifacts: ({ goalHash }) =>
+      buildGoldenPathCompoundObservationLedgerArtifacts({
         turnId,
         createdAtMs,
         goalHash,
-        kind: "repo_code_evidence_observation",
-        producerItemId: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
-        terminalEligible: false,
-        payload: repoEvidenceObservation,
+        observations: [
+          {
+            artifactId: repoObservationArtifactId,
+            kind: "repo_code_evidence_observation",
+            producerItemId: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+            terminalEligible: false,
+            payload: repoEvidenceObservation,
+          },
+          {
+            artifactId: relevanceGateArtifactId,
+            kind: "repo_evidence_relevance_gate",
+            producerItemId: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+            terminalEligible: false,
+            payload: repoEvidenceRelevanceGate,
+          },
+          {
+            artifactId: docObservationArtifactId,
+            kind: "doc_location_matches",
+            producerItemId: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+            terminalEligible: false,
+            payload: docLocationMatches,
+          },
+        ],
       }),
-      buildGoldenPathObservationLedgerArtifact({
-        artifactId: relevanceGateArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        kind: "repo_evidence_relevance_gate",
-        producerItemId: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
-        terminalEligible: false,
-        payload: repoEvidenceRelevanceGate,
-      }),
-      buildGoldenPathObservationLedgerArtifact({
-        artifactId: docObservationArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        kind: "doc_location_matches",
-        producerItemId: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-        terminalEligible: false,
-        payload: docLocationMatches,
-      }),
-    ],
     compoundCapabilityContract,
     routeGateTerminalEligible: false,
     answerProducerItemId: "golden_path_compound_synthesis",

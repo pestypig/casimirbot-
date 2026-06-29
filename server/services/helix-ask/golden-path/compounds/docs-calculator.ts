@@ -15,7 +15,10 @@ import {
   isHelixAskGoldenPathDocsCalculatorCompoundRequested,
 } from "../compound-contract";
 import { buildGoldenPathCompoundTypedFailurePayload } from "../compound-failure";
-import { buildGoldenPathCompoundSuccessPayload } from "../compound-success";
+import {
+  buildGoldenPathCompoundObservationLedgerArtifacts,
+  buildGoldenPathCompoundSuccessPayload,
+} from "../compound-success";
 import {
   HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
   HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
@@ -23,10 +26,6 @@ import {
   readString,
   type RecordLike,
 } from "../core";
-import {
-  buildGoldenPathObservationLedgerArtifact,
-} from "../artifact-ledger";
-
 export type HelixAskGoldenPathDocsCalculatorCompoundDependencies = {
   now: () => Date;
   hashGoalFrame: (value: unknown) => string;
@@ -221,28 +220,28 @@ export const buildHelixAskGoldenPathDocsCalculatorCompoundPayload = (args: {
       doc_location_matches: docLocationMatches,
       calculator_receipt: calculatorReceipt,
     },
-    observationLedgerArtifacts: ({ goalHash }) => [
-      buildGoldenPathObservationLedgerArtifact({
-        artifactId: docObservationArtifactId,
+    observationLedgerArtifacts: ({ goalHash }) =>
+      buildGoldenPathCompoundObservationLedgerArtifacts({
         turnId,
         createdAtMs,
         goalHash,
-        kind: "doc_location_matches",
-        producerItemId: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-        terminalEligible: false,
-        payload: docLocationMatches,
+        observations: [
+          {
+            artifactId: docObservationArtifactId,
+            kind: "doc_location_matches",
+            producerItemId: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+            terminalEligible: false,
+            payload: docLocationMatches,
+          },
+          {
+            artifactId: calculatorObservationArtifactId,
+            kind: "calculator_receipt",
+            producerItemId: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+            terminalEligible: false,
+            payload: calculatorReceipt,
+          },
+        ],
       }),
-      buildGoldenPathObservationLedgerArtifact({
-        artifactId: calculatorObservationArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        kind: "calculator_receipt",
-        producerItemId: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
-        terminalEligible: false,
-        payload: calculatorReceipt,
-      }),
-    ],
     compoundCapabilityContract,
     routeGateTerminalEligible: false,
     answerProducerItemId: "golden_path_compound_synthesis",

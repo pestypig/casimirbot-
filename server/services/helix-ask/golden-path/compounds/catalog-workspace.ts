@@ -2,13 +2,13 @@ import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfa
 import { buildGoldenPathCapabilityCatalogObservation } from "../capabilities/capability-catalog";
 import { buildGoldenPathWorkspaceStatusObservation } from "../capabilities/workspace-status";
 import {
-  buildGoldenPathObservationLedgerArtifact,
-} from "../artifact-ledger";
-import {
   buildGoldenPathCompoundCapabilityContract,
   isHelixAskGoldenPathCatalogWorkspaceCompoundRequested,
 } from "../compound-contract";
-import { buildGoldenPathCompoundSuccessPayload } from "../compound-success";
+import {
+  buildGoldenPathCompoundObservationLedgerArtifacts,
+  buildGoldenPathCompoundSuccessPayload,
+} from "../compound-success";
 import {
   HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
   HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,
@@ -108,26 +108,26 @@ export const buildHelixAskGoldenPathCatalogWorkspaceCompoundPayload = (args: {
       capability_registry: catalogObservation,
       workspace_os_status_observation: workspaceObservation,
     },
-    observationLedgerArtifacts: ({ goalHash }) => [
-      buildGoldenPathObservationLedgerArtifact({
-        artifactId: catalogObservationArtifactId,
+    observationLedgerArtifacts: ({ goalHash }) =>
+      buildGoldenPathCompoundObservationLedgerArtifacts({
         turnId,
         createdAtMs,
         goalHash,
-        kind: "capability_registry",
-        terminalEligible: false,
-        payload: catalogObservation,
+        observations: [
+          {
+            artifactId: catalogObservationArtifactId,
+            kind: "capability_registry",
+            terminalEligible: false,
+            payload: catalogObservation,
+          },
+          {
+            artifactId: workspaceObservationArtifactId,
+            kind: "workspace_os_status_observation",
+            terminalEligible: false,
+            payload: workspaceObservation,
+          },
+        ],
       }),
-      buildGoldenPathObservationLedgerArtifact({
-        artifactId: workspaceObservationArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        kind: "workspace_os_status_observation",
-        terminalEligible: false,
-        payload: workspaceObservation,
-      }),
-    ],
     compoundCapabilityContract,
   });
 };

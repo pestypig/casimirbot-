@@ -1,5 +1,4 @@
 import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfaction-artifact";
-import { buildGoldenPathObservationLedgerArtifact } from "../artifact-ledger";
 import { readCompactCivilizationBoundsToolResult } from "../capabilities/civilization-bounds-reflection";
 import { readCompactZenGraphReflectionToolResult } from "../capabilities/zen-graph-reflection";
 import {
@@ -7,7 +6,10 @@ import {
   isHelixAskGoldenPathCivilizationBoundsZenReflectionCompoundRequested,
 } from "../compound-contract";
 import { buildGoldenPathCompoundTypedFailurePayload } from "../compound-failure";
-import { buildGoldenPathCompoundSuccessPayload } from "../compound-success";
+import {
+  buildGoldenPathCompoundObservationLedgerArtifacts,
+  buildGoldenPathCompoundSuccessPayload,
+} from "../compound-success";
 import {
   HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
   HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
@@ -212,28 +214,28 @@ export const buildHelixAskGoldenPathCivilizationBoundsZenReflectionCompoundPaylo
       helix_civilization_bounds_tool_result: civilizationReceipt,
       helix_zen_graph_reflection_tool_result: zenReceipt,
     },
-    observationLedgerArtifacts: ({ goalHash }) => [
-      buildGoldenPathObservationLedgerArtifact({
-        artifactId: civilizationObservationArtifactId,
+    observationLedgerArtifacts: ({ goalHash }) =>
+      buildGoldenPathCompoundObservationLedgerArtifacts({
         turnId,
         createdAtMs,
         goalHash,
-        kind: "helix_civilization_bounds_tool_result",
-        producerItemId: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
-        terminalEligible: false,
-        payload: civilizationReceipt,
+        observations: [
+          {
+            artifactId: civilizationObservationArtifactId,
+            kind: "helix_civilization_bounds_tool_result",
+            producerItemId: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+            terminalEligible: false,
+            payload: civilizationReceipt,
+          },
+          {
+            artifactId: zenObservationArtifactId,
+            kind: "helix_zen_graph_reflection_tool_result",
+            producerItemId: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
+            terminalEligible: false,
+            payload: zenReceipt,
+          },
+        ],
       }),
-      buildGoldenPathObservationLedgerArtifact({
-        artifactId: zenObservationArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        kind: "helix_zen_graph_reflection_tool_result",
-        producerItemId: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
-        terminalEligible: false,
-        payload: zenReceipt,
-      }),
-    ],
     compoundCapabilityContract,
     routeGateTerminalEligible: false,
     includeRouteGatePromptText: false,

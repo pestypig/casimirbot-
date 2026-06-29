@@ -11,10 +11,10 @@ import {
   isHelixAskGoldenPathVisualCalculatorCompoundRequested,
 } from "../compound-contract";
 import { buildGoldenPathCompoundTypedFailurePayload } from "../compound-failure";
-import { buildGoldenPathCompoundSuccessPayload } from "../compound-success";
 import {
-  buildGoldenPathObservationLedgerArtifact,
-} from "../artifact-ledger";
+  buildGoldenPathCompoundObservationLedgerArtifacts,
+  buildGoldenPathCompoundSuccessPayload,
+} from "../compound-success";
 import {
   HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
   HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY,
@@ -218,28 +218,28 @@ export const buildHelixAskGoldenPathVisualCalculatorCompoundPayload = (args: {
       visual_frame_evidence: visualEvidence,
       calculator_receipt: calculatorReceipt,
     },
-    observationLedgerArtifacts: ({ goalHash }) => [
-      buildGoldenPathObservationLedgerArtifact({
-        artifactId: visualObservationArtifactId,
+    observationLedgerArtifacts: ({ goalHash }) =>
+      buildGoldenPathCompoundObservationLedgerArtifacts({
         turnId,
         createdAtMs,
         goalHash,
-        kind: "visual_frame_evidence",
-        producerItemId: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
-        terminalEligible: false,
-        payload: visualEvidence,
+        observations: [
+          {
+            artifactId: visualObservationArtifactId,
+            kind: "visual_frame_evidence",
+            producerItemId: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
+            terminalEligible: false,
+            payload: visualEvidence,
+          },
+          {
+            artifactId: calculatorObservationArtifactId,
+            kind: "calculator_receipt",
+            producerItemId: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+            terminalEligible: false,
+            payload: calculatorReceipt,
+          },
+        ],
       }),
-      buildGoldenPathObservationLedgerArtifact({
-        artifactId: calculatorObservationArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        kind: "calculator_receipt",
-        producerItemId: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
-        terminalEligible: false,
-        payload: calculatorReceipt,
-      }),
-    ],
     compoundCapabilityContract,
     routeGateTerminalEligible: false,
     answerProducerItemId: "golden_path_compound_synthesis",
