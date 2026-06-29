@@ -6,6 +6,8 @@ import {
   HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
   HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
   HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+  HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
+  HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
   HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
   HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
   HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
@@ -162,6 +164,123 @@ describe("Helix Ask golden path runtime", () => {
       },
     });
     expect(body.selected_final_answer).toContain("no processed live-source mail packet");
+    expect(readLedger(body).map((artifact) => artifact.kind)).toEqual(["golden_path_route_gate", "typed_failure"]);
+    expect(terminalLedgerEntries(body)).toHaveLength(1);
+  });
+
+  it("handles compact internet search evidence as an internet search answer", () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+
+    const decision = runHelixAskGoldenPathRuntime({
+      now: new Date("2026-06-28T12:27:00.000Z"),
+      body: {
+        turn_id: "ask:golden:internet-search",
+        prompt: "helix_ask_golden_path_runtime use internet_search.web_research for current Codex documentation",
+        goldenPathRuntime: true,
+        requested_capability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
+        internet_search_query: "OpenAI Codex documentation",
+        internet_search_results: [
+          {
+            result_id: "web:codex-docs",
+            title: "OpenAI Codex documentation",
+            url: "https://platform.openai.com/docs/codex",
+            snippet: "Codex documentation for agentic coding workflows.",
+            source_provider: "tavily",
+            rank: 1,
+            evidence_refs: ["tavily:codex-docs"],
+            confidence: "high",
+          },
+        ],
+      },
+    });
+
+    expect(decision.handled).toBe(true);
+    if (!decision.handled) throw new Error("golden path should handle compact internet search evidence");
+    const body = decision.payload;
+
+    expect(body).toMatchObject({
+      final_status: "final_answer",
+      terminal_artifact_kind: "internet_search_answer",
+      final_answer_source: "internet_search_answer",
+      terminal_error_code: null,
+      internet_search_observation: {
+        schema: "helix.internet_search_observation.v1",
+        capability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
+        query: "OpenAI Codex documentation",
+        results: [
+          {
+            result_id: "web:codex-docs",
+            title: "OpenAI Codex documentation",
+            url: "https://platform.openai.com/docs/codex",
+            rank: 1,
+          },
+        ],
+      },
+      internet_search_answer: {
+        result_count: 1,
+      },
+      capability_plan: {
+        requested_capability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
+        executed_capability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
+        required_observation_kinds: ["internet_search_observation"],
+        required_terminal_kind: "internet_search_answer",
+      },
+      ask_turn_solver_trace: {
+        completed_solver_path: true,
+        requested_capability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
+        executed_capability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
+        observed_artifact_kind: "internet_search_observation",
+        terminal_artifact_kind: "internet_search_answer",
+      },
+    });
+    expect(body.selected_final_answer).toContain("Internet search completed");
+    expect(body.selected_final_answer).toContain("OpenAI Codex documentation");
+    expect(readLedger(body).map((artifact) => artifact.kind)).toEqual([
+      "golden_path_route_gate",
+      "internet_search_observation",
+      "internet_search_answer",
+    ]);
+    expect(terminalLedgerEntries(body)).toHaveLength(1);
+  });
+
+  it("fails closed when internet search lacks compact web result evidence", () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+
+    const decision = runHelixAskGoldenPathRuntime({
+      now: new Date("2026-06-28T12:27:30.000Z"),
+      body: {
+        turn_id: "ask:golden:internet-search-missing",
+        prompt: "helix_ask_golden_path_runtime use internet_search.web_research for current Codex documentation",
+        goldenPathRuntime: true,
+        requested_capability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
+        internet_search_query: "OpenAI Codex documentation",
+      },
+    });
+
+    expect(decision.handled).toBe(true);
+    if (!decision.handled) throw new Error("golden path should handle missing internet evidence as typed failure");
+    const body = decision.payload;
+
+    expect(body).toMatchObject({
+      final_status: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      terminal_error_code: "missing_compact_internet_search_evidence",
+      goal_satisfaction_evaluation: {
+        satisfaction: "not_satisfied",
+        first_broken_rail: "observation",
+      },
+      ask_turn_solver_trace: {
+        completed_solver_path: false,
+        requested_capability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
+        executed_capability: null,
+        first_broken_rail: "observation",
+      },
+    });
+    expect(body.selected_final_answer).toContain("no compact web result evidence");
     expect(readLedger(body).map((artifact) => artifact.kind)).toEqual(["golden_path_route_gate", "typed_failure"]);
     expect(terminalLedgerEntries(body)).toHaveLength(1);
   });
