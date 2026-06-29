@@ -6,6 +6,7 @@ import {
   buildGoldenPathRouteGateLedgerArtifact,
 } from "../artifact-ledger";
 import { buildGoldenPathCapabilityPlan } from "../capability-contract";
+import { buildGoldenPathCapabilityDebugMirror } from "../debug-mirror";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
   HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
@@ -214,22 +215,17 @@ export const buildHelixAskGoldenPathCivilizationBoundsReflectionPayload = (args:
           },
         }),
       ],
-      debug: {
-        schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
-        golden_path_runtime: true,
-        golden_path_runtime_status: "civilization_bounds_reflection_missing_result",
-        private_runtime_loop_entered: false,
-        requested_capability: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
-        selected_capability: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
-        executed_capability: null,
-        terminal_artifact_kind: "typed_failure",
-        final_answer_source: "typed_failure",
-        first_broken_rail: "observation",
-        terminal_error_code: "missing_civilization_bounds_tool_result",
-        goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-        assistant_answer: false,
-        raw_content_included: false,
-      },
+      debug: buildGoldenPathCapabilityDebugMirror({
+        status: "civilization_bounds_reflection_missing_result",
+        privateRuntimeLoopEntered: false,
+        requestedCapability: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+        selectedCapability: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+        executedCapability: null,
+        terminalResult,
+        firstBrokenRail: "observation",
+        terminalErrorCode: "missing_civilization_bounds_tool_result",
+        goalSatisfactionEvaluation,
+      }),
     };
   }
 
@@ -429,23 +425,17 @@ export const buildHelixAskGoldenPathCivilizationBoundsReflectionPayload = (args:
         },
       }),
     ],
-    debug: {
-      schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
-      golden_path_runtime: true,
-      golden_path_runtime_status: "civilization_bounds_reflection",
-      private_runtime_loop_entered: false,
-      requested_capability: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
-      selected_capability: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
-      executed_capability: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
-      observed_artifact_kind: "helix_civilization_bounds_tool_result",
-      observed_artifact_ref: observationArtifactId,
-      terminal_artifact_kind: terminalResult.artifact_kind,
-      terminal_result_count: 1,
-      final_answer_source: terminalResult.final_answer_source,
-      goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-      assistant_answer: false,
-      raw_content_included: false,
-    },
+    debug: buildGoldenPathCapabilityDebugMirror({
+      status: "civilization_bounds_reflection",
+      privateRuntimeLoopEntered: false,
+      requestedCapability: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+      selectedCapability: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+      executedCapability: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+      observedArtifactKind: "helix_civilization_bounds_tool_result",
+      observedArtifactRef: observationArtifactId,
+      terminalResult,
+      goalSatisfactionEvaluation,
+    }),
   };
 };
 

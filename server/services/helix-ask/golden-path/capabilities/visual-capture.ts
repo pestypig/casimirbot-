@@ -6,6 +6,7 @@ import {
   buildGoldenPathRouteGateLedgerArtifact,
 } from "../artifact-ledger";
 import { buildGoldenPathCapabilityPlan } from "../capability-contract";
+import { buildGoldenPathCapabilityDebugMirror } from "../debug-mirror";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
   HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY,
@@ -220,22 +221,17 @@ export const buildHelixAskGoldenPathVisualCapturePayload = (args: {
           },
         }),
       ],
-      debug: {
-        schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
-        golden_path_runtime: true,
-        golden_path_runtime_status: "visual_capture_missing_evidence",
-        private_runtime_loop_entered: false,
-        requested_capability: requestedCapability,
-        selected_capability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
-        executed_capability: null,
-        terminal_artifact_kind: "typed_failure",
-        final_answer_source: "typed_failure",
-        first_broken_rail: "observation",
-        terminal_error_code: "missing_compact_visual_evidence",
-        goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-        assistant_answer: false,
-        raw_content_included: false,
-      },
+      debug: buildGoldenPathCapabilityDebugMirror({
+        status: "visual_capture_missing_evidence",
+        privateRuntimeLoopEntered: false,
+        requestedCapability,
+        selectedCapability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
+        executedCapability: null,
+        terminalResult,
+        firstBrokenRail: "observation",
+        terminalErrorCode: "missing_compact_visual_evidence",
+        goalSatisfactionEvaluation,
+      }),
     };
   }
 
@@ -426,23 +422,17 @@ export const buildHelixAskGoldenPathVisualCapturePayload = (args: {
         payload: situationContextPack,
       }),
     ],
-    debug: {
-      schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
-      golden_path_runtime: true,
-      golden_path_runtime_status: "visual_capture",
-      private_runtime_loop_entered: false,
-      requested_capability: requestedCapability,
-      selected_capability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
-      executed_capability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
-      observed_artifact_kind: "visual_frame_evidence",
-      observed_artifact_ref: observationArtifactId,
-      terminal_artifact_kind: terminalResult.artifact_kind,
-      terminal_result_count: 1,
-      final_answer_source: terminalResult.final_answer_source,
-      goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-      assistant_answer: false,
-      raw_content_included: false,
-    },
+    debug: buildGoldenPathCapabilityDebugMirror({
+      status: "visual_capture",
+      privateRuntimeLoopEntered: false,
+      requestedCapability,
+      selectedCapability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
+      executedCapability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
+      observedArtifactKind: "visual_frame_evidence",
+      observedArtifactRef: observationArtifactId,
+      terminalResult,
+      goalSatisfactionEvaluation,
+    }),
   };
 };
 
