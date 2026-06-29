@@ -66,6 +66,8 @@ export const buildGoldenPathCapabilitySuccessPayload = (args: {
   requiredObservationKinds: readonly string[];
   routeGateTerminalEligible?: boolean;
   includeRouteGatePromptText?: boolean;
+  includeRouteGateGoalSatisfactionEvaluation?: boolean;
+  additionalSupportRefs?: readonly string[];
   additionalTopLevelFields?: BuildCapabilitySuccessAdditionalFields;
   answerProducerItemId?: string;
   answerLedgerExtraPayload?: RecordLike;
@@ -108,7 +110,12 @@ export const buildGoldenPathCapabilitySuccessPayload = (args: {
     artifactKind: args.requiredTerminalKind,
     finalAnswerSource: args.requiredTerminalKind,
     text: args.answerText,
-    supportRefs: [args.observationArtifactId, args.routeGateArtifactId, goalSatisfactionArtifact.artifact_id],
+    supportRefs: [
+      args.observationArtifactId,
+      args.routeGateArtifactId,
+      goalSatisfactionArtifact.artifact_id,
+      ...(args.additionalSupportRefs ?? []),
+    ],
   });
 
   return {
@@ -190,7 +197,7 @@ export const buildGoldenPathCapabilitySuccessPayload = (args: {
           ...(args.includeRouteGatePromptText === false ? {} : { promptText: args.promptText }),
           requestedCapability: args.requestedCapability,
           goalSatisfactionArtifact,
-          goalSatisfactionEvaluation,
+          ...(args.includeRouteGateGoalSatisfactionEvaluation === false ? {} : { goalSatisfactionEvaluation }),
         }),
       },
       buildGoldenPathObservationLedgerArtifact({

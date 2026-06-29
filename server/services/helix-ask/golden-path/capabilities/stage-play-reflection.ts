@@ -1,8 +1,5 @@
 import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfaction-artifact";
 import {
-  buildGoldenPathAnswerLedgerArtifact,
-  buildGoldenPathObservationLedgerArtifact,
-  buildGoldenPathPayloadLedgerArtifact,
   buildGoldenPathTypedFailureTerminalErrorLedgerArtifact,
   buildGoldenPathRouteGateLedgerArtifact,
 } from "../artifact-ledger";
@@ -10,6 +7,7 @@ import {
   buildGoldenPathCapabilityGoalSatisfactionEvaluation,
   buildGoldenPathCapabilityPlan,
 } from "../capability-contract";
+import { buildGoldenPathCapabilitySuccessPayload } from "../capability-success";
 import { buildGoldenPathCapabilityDebugMirror } from "../debug-mirror";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
@@ -23,9 +21,7 @@ import {
 } from "../core";
 import {
   buildGoldenPathTerminalAuthorityProjection,
-  buildGoldenPathTerminalResponseProjection,
   buildGoldenPathTypedFailureResponseProjection,
-  buildGoldenPathTerminalResult,
   buildGoldenPathTypedFailureTerminalResult,
 } from "../terminal-envelope";
 import { buildGoldenPathSolverTrace } from "../solver-trace";
@@ -286,165 +282,67 @@ export const buildHelixAskGoldenPathStagePlayReflectionPayload = (args: {
   ]
     .filter((line): line is string => Boolean(line))
     .join("\n");
-  const canonicalGoalFrame = {
-    schema: "helix.ask_canonical_goal_frame.v1",
-    turn_id: turnId,
-    goal_kind: goalKind,
-    answer_scope: "current_turn",
-    required_terminal_kind: requiredTerminalKind,
-    allows_workspace_context: true,
-    allows_prior_artifacts: false,
-    classifier_reasons: ["explicit_stage_play_reflection_request"],
-    assistant_answer: false,
-    raw_content_included: false,
-  };
-  const goalSatisfactionEvaluation = buildGoldenPathCapabilityGoalSatisfactionEvaluation({
-    turnId,
-    goalKind,
-    requiredTerminalKind,
-  });
-  const goalHash = args.deps.hashGoalFrame(canonicalGoalFrame);
-  const goalSatisfactionArtifact = args.deps.buildGoalSatisfactionEvaluationArtifact({
-    turnId,
-    goalHash,
-    evaluation: goalSatisfactionEvaluation,
-    createdAtMs,
-  });
-  const terminalResult = buildGoldenPathTerminalResult({
-    resultId: terminalResultId,
-    artifactId: terminalArtifactId,
-    artifactKind: requiredTerminalKind,
-    finalAnswerSource: requiredTerminalKind,
-    text: answerText,
-    supportRefs: [observationArtifactId, routeGateArtifactId, goalSatisfactionArtifact.artifact_id, ...sourceRefs],
-  });
 
-  return {
-    ok: true,
-    mode: "read",
-    schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
-    turn_id: turnId,
-    trace_id: traceId,
-    session_id: sessionId,
-    thread_id: threadId,
-    prompt_text: promptText,
-    ...buildGoldenPathTerminalResponseProjection({ terminalResult }),
-    golden_path_runtime: buildGoldenPathRuntimeStatus({
-      status: "stage_play_reflection",
-      requestedCapability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
-      selectedCapability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
-      executedCapability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
-      observedArtifactKind: "stage_play_reflection_result",
-      observedArtifactRef: observationArtifactId,
-      terminalArtifactRef: terminalArtifactId,
-      terminalResultId,
-      legacyFallbackPossibleWhenUnhandled: true,
-      routeGate: "enabled_explicit_request",
-    }),
-    canonical_goal_frame: canonicalGoalFrame,
-    stage_play_reflection_result: stagePlayReceipt,
-    stage_play_reflection_answer: {
-      schema: "helix.stage_play_reflection_answer.v1",
+  return buildGoldenPathCapabilitySuccessPayload({
+    turnId,
+    traceId,
+    sessionId,
+    threadId,
+    promptText,
+    createdAtMs,
+    routeGateArtifactId,
+    observationArtifactId,
+    terminalArtifactId,
+    terminalResultId,
+    requiredTerminalKind,
+    goalKind,
+    sourceTarget: "stage_play",
+    family: "live_environment",
+    classifierReasons: ["explicit_stage_play_reflection_request"],
+    allowsWorkspaceContext: true,
+    requestedCapability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
+    observedArtifactKind: "stage_play_reflection_result",
+    observationPayload: stagePlayReceipt,
+    terminalPayloadField: "stage_play_reflection_answer",
+    terminalPayloadSchema: "helix.stage_play_reflection_answer.v1",
+    terminalPayloadExtra: { graph_id: graphId },
+    answerText,
+    status: "stage_play_reflection",
+    route: "golden_path_runtime / stage_play_reflection",
+    requiredObservationKinds: ["stage_play_reflection_result"],
+    routeGateTerminalEligible: false,
+    includeRouteGatePromptText: false,
+    includeRouteGateGoalSatisfactionEvaluation: false,
+    additionalSupportRefs: sourceRefs,
+    answerLedgerExtraPayload: {
       graph_id: graphId,
-      text: terminalResult.text,
-      answer_text: terminalResult.text,
-      support_refs: terminalResult.support_refs,
-      assistant_answer: false,
-      raw_content_included: false,
     },
-    model_turn_input: {
-      schema: "helix.ask_model_turn_input.v1",
-      turn_id: turnId,
-      prompt_text: promptText,
-      available_capabilities: [HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY],
-      function_call_outputs: [
-        {
-          call_id: `${turnId}:call:reflect_stage_play_context`,
-          name: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
-          output_ref: observationArtifactId,
-          output_kind: "stage_play_reflection_result",
+    additionalTopLevelFields: ({ goalSatisfactionArtifact }) => ({
+      model_turn_input: {
+        schema: "helix.ask_model_turn_input.v1",
+        turn_id: turnId,
+        prompt_text: promptText,
+        available_capabilities: [HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY],
+        function_call_outputs: [
+          {
+            call_id: `${turnId}:call:reflect_stage_play_context`,
+            name: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
+            output_ref: observationArtifactId,
+            output_kind: "stage_play_reflection_result",
+          },
+        ],
+        model_visible_artifacts: [observationArtifactId, goalSatisfactionArtifact.artifact_id],
+        loop_policy: {
+          max_model_steps: 1,
+          private_runtime_loop_entered: false,
         },
-      ],
-      model_visible_artifacts: [observationArtifactId, goalSatisfactionArtifact.artifact_id],
-      loop_policy: {
-        max_model_steps: 1,
-        private_runtime_loop_entered: false,
-      },
-      assistant_answer: false,
-      raw_content_included: false,
-    },
-    capability_plan: buildGoldenPathCapabilityPlan({
-      requestedCapability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
-      sourceTarget: "stage_play",
-      family: "live_environment",
-      requiredObservationKinds: ["stage_play_reflection_result"],
-      requiredTerminalKind,
-    }),
-    goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-    ...buildGoldenPathTerminalAuthorityProjection({
-      terminalResult,
-      route: "golden_path_runtime / stage_play_reflection",
-    }),
-    ask_turn_solver_trace: buildGoldenPathSolverTrace({
-      completedSolverPath: true,
-      routeAuthorityOk: true,
-      terminalAuthorityOk: true,
-      goalSatisfaction: "satisfied",
-      requestedCapability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
-      selectedCapability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
-      executedCapability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
-      observedArtifactKind: "stage_play_reflection_result",
-      observedArtifactRef: observationArtifactId,
-      terminalArtifactKind: terminalResult.artifact_kind,
-      extra: {
-        solver_risk_flags: [],
-        solver_short_circuit_flags: [],
+        assistant_answer: false,
+        raw_content_included: false,
       },
     }),
-    current_turn_artifact_ledger: [
-      buildGoldenPathRouteGateLedgerArtifact({
-        artifactId: routeGateArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        terminalEligible: false,
-        requestedCapability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
-        goalSatisfactionArtifact,
-      }),
-      buildGoldenPathObservationLedgerArtifact({
-        artifactId: observationArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        kind: "stage_play_reflection_result",
-        terminalEligible: false,
-        payload: stagePlayReceipt,
-      }),
-      buildGoldenPathAnswerLedgerArtifact({
-        artifactId: terminalArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        kind: requiredTerminalKind,
-        payloadSchema: "helix.stage_play_reflection_answer.v1",
-        terminalResult,
-        extraPayload: {
-          graph_id: graphId,
-        },
-      }),
-    ],
-    debug: buildGoldenPathCapabilityDebugMirror({
-      status: "stage_play_reflection",
-      privateRuntimeLoopEntered: false,
-      requestedCapability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
-      selectedCapability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
-      executedCapability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
-      observedArtifactKind: "stage_play_reflection_result",
-      observedArtifactRef: observationArtifactId,
-      terminalResult,
-      goalSatisfactionEvaluation,
-    }),
-  };
+    hashGoalFrame: args.deps.hashGoalFrame,
+    buildGoalSatisfactionEvaluationArtifact: args.deps.buildGoalSatisfactionEvaluationArtifact,
+  });
 };
 
 
