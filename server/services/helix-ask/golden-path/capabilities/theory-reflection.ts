@@ -4,7 +4,7 @@ import { buildGoldenPathCapabilityTypedFailurePayload } from "../capability-fail
 import {
   buildHelixAskGoldenPathRouteGateArtifactId,
   buildHelixAskGoldenPathTerminalResultId,
-  isHelixAskGoldenPathCapabilityExplicitlyRequested,
+  isHelixAskGoldenPathCapabilityNamedInRequest,
   HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
   readHelixAskGoldenPathPrompt,
   readHelixAskGoldenPathTurnContext,
@@ -20,10 +20,9 @@ export type HelixAskGoldenPathTheoryReflectionDependencies = {
 };
 
 export const isHelixAskGoldenPathTheoryReflectionRequested = (body: RecordLike): boolean => {
-  if (isHelixAskGoldenPathCapabilityExplicitlyRequested(body, [HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY])) return true;
+  if (isHelixAskGoldenPathCapabilityNamedInRequest(body, [HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY])) return true;
   const prompt = readHelixAskGoldenPathPrompt(body).toLowerCase();
   return (
-    prompt.includes(HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY) ||
     /\b(?:reflect|reflection|theory\s+context|concept\s+route|theory\s+badge\s+graph)\b/.test(prompt)
   );
 };

@@ -4,7 +4,7 @@ import { buildGoldenPathCapabilityTypedFailurePayload } from "../capability-fail
 import {
   buildHelixAskGoldenPathRouteGateArtifactId,
   buildHelixAskGoldenPathTerminalResultId,
-  isHelixAskGoldenPathCapabilityExplicitlyRequested,
+  isHelixAskGoldenPathCapabilityNamedInRequest,
   HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
   readBoolean,
   readHelixAskGoldenPathPrompt,
@@ -22,10 +22,9 @@ export type HelixAskGoldenPathStagePlayReflectionDependencies = {
 };
 
 export const isHelixAskGoldenPathStagePlayReflectionRequested = (body: RecordLike): boolean => {
-  if (isHelixAskGoldenPathCapabilityExplicitlyRequested(body, [HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY])) return true;
+  if (isHelixAskGoldenPathCapabilityNamedInRequest(body, [HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY])) return true;
   const prompt = readHelixAskGoldenPathPrompt(body).toLowerCase();
   return (
-    prompt.includes(HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY) ||
     /\b(?:reflect_stage_play_context|stage\s*play\s*badge\s*graph|live\s+interpretation|stage\s*play\s+reflection|stage_play_reflection_result)\b/.test(
       prompt,
     )

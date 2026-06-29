@@ -5,7 +5,7 @@ import { buildGoldenPathCapabilityTypedFailurePayload } from "../capability-fail
 import {
   buildHelixAskGoldenPathRouteGateArtifactId,
   buildHelixAskGoldenPathTerminalResultId,
-  isHelixAskGoldenPathCapabilityExplicitlyRequested,
+  isHelixAskGoldenPathCapabilityNamedInRequest,
   HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
   readArray,
   readHelixAskGoldenPathPrompt,
@@ -24,10 +24,9 @@ export type HelixAskGoldenPathScholarlyResearchDependencies = {
 };
 
 export const isHelixAskGoldenPathScholarlyResearchRequested = (body: RecordLike): boolean => {
-  if (isHelixAskGoldenPathCapabilityExplicitlyRequested(body, [HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY])) return true;
+  if (isHelixAskGoldenPathCapabilityNamedInRequest(body, [HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY])) return true;
   const prompt = readHelixAskGoldenPathPrompt(body).toLowerCase();
   return (
-    prompt.includes(HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY) ||
     /\b(?:scholarly\s+research|research\s+papers?|paper\s+metadata|peer[-\s]?reviewed|literature|preprints?|arxiv|crossref|openalex|semantic\s+scholar)\b/.test(prompt)
   );
 };

@@ -4,7 +4,7 @@ import { buildGoldenPathCapabilityTypedFailurePayload } from "../capability-fail
 import {
   buildHelixAskGoldenPathRouteGateArtifactId,
   buildHelixAskGoldenPathTerminalResultId,
-  isHelixAskGoldenPathCapabilityExplicitlyRequested,
+  isHelixAskGoldenPathCapabilityNamedInRequest,
   HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
   readArray,
   readHelixAskGoldenPathPrompt,
@@ -22,10 +22,9 @@ export type HelixAskGoldenPathZenGraphReflectionDependencies = {
 };
 
 export const isHelixAskGoldenPathZenGraphReflectionRequested = (body: RecordLike): boolean => {
-  if (isHelixAskGoldenPathCapabilityExplicitlyRequested(body, [HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY])) return true;
+  if (isHelixAskGoldenPathCapabilityNamedInRequest(body, [HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY])) return true;
   const prompt = readHelixAskGoldenPathPrompt(body).toLowerCase();
   return (
-    prompt.includes(HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY) ||
     /\b(?:zen\s+graph|ideology\s+context|ideology\s+lens|right\s+speech|two-key|two\s+key|fruition|moral\s+guilt|missing\s+considerations?)\b/.test(prompt)
   );
 };

@@ -4,7 +4,7 @@ import { buildGoldenPathCapabilitySuccessPayload } from "../capability-success";
 import {
   buildHelixAskGoldenPathRouteGateArtifactId,
   buildHelixAskGoldenPathTerminalResultId,
-  isHelixAskGoldenPathCapabilityExplicitlyRequested,
+  isHelixAskGoldenPathCapabilityNamedInRequest,
   HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
   readHelixAskGoldenPathPrompt,
   readHelixAskGoldenPathTurnContext,
@@ -19,10 +19,9 @@ export type HelixAskGoldenPathCalculatorDependencies = {
 };
 
 export const isHelixAskGoldenPathCalculatorSolveRequested = (body: RecordLike): boolean => {
-  if (isHelixAskGoldenPathCapabilityExplicitlyRequested(body, [HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY])) return true;
+  if (isHelixAskGoldenPathCapabilityNamedInRequest(body, [HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY])) return true;
   const prompt = readHelixAskGoldenPathPrompt(body).toLowerCase();
   return (
-    prompt.includes(HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY) ||
     /\b(?:scientific\s+calculator|calculator)\b[\s\S]{0,120}\b(?:solve|evaluate|calculate|compute)\b/.test(prompt) ||
     /\b(?:solve|evaluate|calculate|compute)\b[\s\S]{0,120}\b(?:scientific\s+calculator|calculator)\b/.test(prompt)
   );

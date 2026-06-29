@@ -4,7 +4,7 @@ import { buildGoldenPathCapabilityTerminalObservationSuccessPayload } from "../c
 import {
   buildHelixAskGoldenPathRouteGateArtifactId,
   buildHelixAskGoldenPathTerminalResultId,
-  isHelixAskGoldenPathCapabilityExplicitlyRequested,
+  isHelixAskGoldenPathCapabilityNamedInRequest,
   HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
   readHelixAskGoldenPathPrompt,
   readHelixAskGoldenPathTurnContext,
@@ -20,10 +20,9 @@ export type HelixAskGoldenPathDocsLocateDependencies = {
 };
 
 export const isHelixAskGoldenPathDocsLocateRequested = (body: RecordLike): boolean => {
-  if (isHelixAskGoldenPathCapabilityExplicitlyRequested(body, [HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY])) return true;
+  if (isHelixAskGoldenPathCapabilityNamedInRequest(body, [HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY])) return true;
   const prompt = readHelixAskGoldenPathPrompt(body).toLowerCase();
   return (
-    prompt.includes(HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY) ||
     /\b(?:locate|find|cite|check)\b[\s\S]{0,120}\b(?:doc|document|white\s*paper|paper)\b/.test(prompt) ||
     /\b(?:doc|document|white\s*paper|paper)\b[\s\S]{0,120}\b(?:locate|find|cite|check)\b/.test(prompt)
   );

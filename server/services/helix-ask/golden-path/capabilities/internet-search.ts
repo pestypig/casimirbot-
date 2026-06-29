@@ -5,7 +5,7 @@ import { buildGoldenPathCapabilityTypedFailurePayload } from "../capability-fail
 import {
   buildHelixAskGoldenPathRouteGateArtifactId,
   buildHelixAskGoldenPathTerminalResultId,
-  isHelixAskGoldenPathCapabilityExplicitlyRequested,
+  isHelixAskGoldenPathCapabilityNamedInRequest,
   HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
   HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
   readArray,
@@ -25,11 +25,15 @@ export type HelixAskGoldenPathInternetSearchDependencies = {
 };
 
 export const isHelixAskGoldenPathInternetSearchRequested = (body: RecordLike): boolean => {
-  if (isHelixAskGoldenPathCapabilityExplicitlyRequested(body, [HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY, HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY])) return true;
+  if (
+    isHelixAskGoldenPathCapabilityNamedInRequest(body, [
+      HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
+      HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
+    ])
+  )
+    return true;
   const prompt = readHelixAskGoldenPathPrompt(body).toLowerCase();
   return (
-    prompt.includes(HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY) ||
-    prompt.includes(HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY) ||
     /\b(?:internet\s+search|web\s+research|web\s+search|search\s+web|look\s+up\s+online|check\s+online|current\s+web|public\s+web)\b/.test(prompt)
   );
 };

@@ -8,7 +8,7 @@ import { buildGoldenPathCapabilityTypedFailurePayload } from "../capability-fail
 import {
   buildHelixAskGoldenPathRouteGateArtifactId,
   buildHelixAskGoldenPathTerminalResultId,
-  isHelixAskGoldenPathCapabilityExplicitlyRequested,
+  isHelixAskGoldenPathCapabilityNamedInRequest,
   HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
   readHelixAskGoldenPathPrompt,
   readHelixAskGoldenPathTurnContext,
@@ -24,10 +24,9 @@ export type HelixAskGoldenPathRepoSearchConceptDependencies = {
 };
 
 export const isHelixAskGoldenPathRepoSearchConceptRequested = (body: RecordLike): boolean => {
-  if (isHelixAskGoldenPathCapabilityExplicitlyRequested(body, [HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY])) return true;
+  if (isHelixAskGoldenPathCapabilityNamedInRequest(body, [HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY])) return true;
   const prompt = readHelixAskGoldenPathPrompt(body).toLowerCase();
   return (
-    prompt.includes(HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY) ||
     /\b(?:repo|codebase|source\s+code)\b[\s\S]{0,120}\b(?:search|find|where|concept|evidence)\b/.test(prompt) ||
     /\b(?:search|find|where)\b[\s\S]{0,120}\b(?:repo|codebase|source\s+code)\b/.test(prompt)
   );
