@@ -1,4 +1,5 @@
 import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfaction-artifact";
+import { buildGoldenPathRouteGateLedgerArtifact } from "../artifact-ledger";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
@@ -228,22 +229,13 @@ export const buildHelixAskGoldenPathCalculatorSolvePayload = (args: {
         raw_content_included: false,
       },
       current_turn_artifact_ledger: [
-        {
-          artifact_id: routeGateArtifactId,
-          turn_id: turnId,
-          producer_item_id: "golden_path_runtime",
-          kind: "golden_path_route_gate",
-          created_at_ms: createdAtMs,
-          source_scope: "current_turn",
-          goal_hash: goalHash,
-          payload: {
-            schema: "helix.golden_path_route_gate.v1",
-            route_gate: "enabled_explicit_request",
-            requested_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
-            assistant_answer: false,
-            raw_content_included: false,
-          },
-        },
+        buildGoldenPathRouteGateLedgerArtifact({
+          artifactId: routeGateArtifactId,
+          turnId,
+          createdAtMs,
+          goalHash,
+          requestedCapability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+        }),
         {
           artifact_id: terminalArtifactId,
           turn_id: turnId,
@@ -450,25 +442,16 @@ export const buildHelixAskGoldenPathCalculatorSolvePayload = (args: {
       raw_content_included: false,
     },
     current_turn_artifact_ledger: [
-      {
-        artifact_id: routeGateArtifactId,
-        turn_id: turnId,
-        producer_item_id: "golden_path_runtime",
-        kind: "golden_path_route_gate",
-        created_at_ms: createdAtMs,
-        source_scope: "current_turn",
-        goal_hash: goalHash,
-        payload: {
-          schema: "helix.golden_path_route_gate.v1",
-          route_gate: "enabled_explicit_request",
-          prompt_text: promptText,
-          requested_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
-          goal_satisfaction_artifact: goalSatisfactionArtifact,
-          goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-          assistant_answer: false,
-          raw_content_included: false,
-        },
-      },
+      buildGoldenPathRouteGateLedgerArtifact({
+        artifactId: routeGateArtifactId,
+        turnId,
+        createdAtMs,
+        goalHash,
+        promptText,
+        requestedCapability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+        goalSatisfactionArtifact,
+        goalSatisfactionEvaluation,
+      }),
       {
         artifact_id: observationArtifactId,
         turn_id: turnId,
