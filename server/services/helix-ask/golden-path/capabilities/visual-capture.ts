@@ -1,8 +1,6 @@
 import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfaction-artifact";
 import { HELIX_VISUAL_FRAME_EVIDENCE_SCHEMA } from "../../../../../shared/helix-visual-frame-evidence";
 import {
-  buildGoldenPathObservationLedgerArtifact,
-  buildGoldenPathPayloadLedgerArtifact,
   buildGoldenPathTypedFailureTerminalErrorLedgerArtifact,
   buildGoldenPathRouteGateLedgerArtifact,
 } from "../artifact-ledger";
@@ -11,6 +9,7 @@ import {
   buildGoldenPathCapabilityPlan,
 } from "../capability-contract";
 import { buildGoldenPathCapabilityDebugMirror } from "../debug-mirror";
+import { buildGoldenPathCapabilityTerminalPayloadSuccessPayload } from "../capability-terminal-payload-success";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
   HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY,
@@ -23,9 +22,7 @@ import {
 } from "../core";
 import {
   buildGoldenPathTerminalAuthorityProjection,
-  buildGoldenPathTerminalResponseProjection,
   buildGoldenPathTypedFailureResponseProjection,
-  buildGoldenPathTerminalResult,
 } from "../terminal-envelope";
 import { buildGoldenPathSolverTrace } from "../solver-trace";
 import { buildGoldenPathRuntimeStatus } from "../runtime-status";
@@ -250,38 +247,6 @@ export const buildHelixAskGoldenPathVisualCapturePayload = (args: {
     uncertainty.length > 0 ? `Uncertainty: ${uncertainty.slice(0, 4).join(", ")}.` : "Uncertainty: none provided.",
     "This is compact visual evidence; no raw image is included or promoted as answer authority.",
   ].join("\n");
-  const canonicalGoalFrame = {
-    schema: "helix.ask_canonical_goal_frame.v1",
-    turn_id: turnId,
-    goal_kind: goalKind,
-    answer_scope: "runtime_evidence",
-    required_terminal_kind: requiredTerminalKind,
-    allows_workspace_context: true,
-    allows_prior_artifacts: false,
-    classifier_reasons: ["explicit_visual_capture", "golden_path_visual_capture"],
-    assistant_answer: false,
-    raw_content_included: false,
-  };
-  const goalSatisfactionEvaluation = buildGoldenPathCapabilityGoalSatisfactionEvaluation({
-    turnId,
-    goalKind,
-    requiredTerminalKind,
-  });
-  const goalHash = args.deps.hashGoalFrame(canonicalGoalFrame);
-  const goalSatisfactionArtifact = args.deps.buildGoalSatisfactionEvaluationArtifact({
-    turnId,
-    goalHash,
-    evaluation: goalSatisfactionEvaluation,
-    createdAtMs,
-  });
-  const terminalResult = buildGoldenPathTerminalResult({
-    resultId: terminalResultId,
-    artifactId: terminalArtifactId,
-    artifactKind: requiredTerminalKind,
-    finalAnswerSource: requiredTerminalKind,
-    text: answerText,
-    supportRefs: [observationArtifactId, routeGateArtifactId, goalSatisfactionArtifact.artifact_id],
-  });
   const substitutionApplied = requestedCapability === HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY;
   const situationContextPack = {
     schema: "helix.situation_context_pack.v1",
@@ -290,115 +255,52 @@ export const buildHelixAskGoldenPathVisualCapturePayload = (args: {
     answer_text: answerText,
     visual_frame_evidence_ref: observationArtifactId,
     source_observation_refs: [observationArtifactId],
-    support_refs: terminalResult.support_refs,
     terminal_eligible: true,
     assistant_answer: false,
     raw_content_included: false,
   };
 
-  return {
-    ok: true,
-    mode: "read",
-    schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
-    turn_id: turnId,
-    trace_id: traceId,
-    session_id: sessionId,
-    thread_id: threadId,
-    prompt_text: promptText,
-    ...buildGoldenPathTerminalResponseProjection({ terminalResult }),
-    golden_path_runtime: buildGoldenPathRuntimeStatus({
-      status: "visual_capture",
-      requestedCapability,
-      selectedCapability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
-      executedCapability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
-      observedArtifactKind: "visual_frame_evidence",
-      observedArtifactRef: observationArtifactId,
-      terminalArtifactRef: terminalArtifactId,
-      terminalResultId,
-      legacyFallbackPossibleWhenUnhandled: true,
-      routeGate: "enabled_explicit_request",
-    }),
-    canonical_goal_frame: canonicalGoalFrame,
-    visual_frame_evidence: evidence,
-    situation_context_pack: situationContextPack,
-    capability_plan: buildGoldenPathCapabilityPlan({
-      requestedCapability,
-      selectedCapability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
-      sourceTarget: "visual_capture",
-      family: "visual_capture",
-      extraFields: {
-        substitution_rule_applied: substitutionApplied,
-        substitution_rule_id: substitutionApplied ? "image_lens.inspect->situation-room.describe_visual_capture" : null,
-      },
-      requiredObservationKinds: ["visual_frame_evidence", "situation_context_pack"],
-      requiredTerminalKind,
-    }),
-    goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-    ...buildGoldenPathTerminalAuthorityProjection({
-      terminalResult,
-      route: "golden_path_runtime / visual_capture",
-    }),
-    ask_turn_solver_trace: buildGoldenPathSolverTrace({
-      completedSolverPath: true,
-      routeAuthorityOk: true,
-      terminalAuthorityOk: true,
-      goalSatisfaction: "satisfied",
-      requestedCapability,
-      selectedCapability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
-      executedCapability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
-      observedArtifactKind: "visual_frame_evidence",
-      observedArtifactRef: observationArtifactId,
-      terminalArtifactKind: terminalResult.artifact_kind,
-      extra: {
-        substitution_rule_applied: substitutionApplied,
-        substitution_rule_id: substitutionApplied ? "image_lens.inspect->situation-room.describe_visual_capture" : null,
-        solver_risk_flags: [],
-        solver_short_circuit_flags: [],
-      },
-    }),
-    current_turn_artifact_ledger: [
-      buildGoldenPathRouteGateLedgerArtifact({
-        artifactId: routeGateArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        terminalEligible: false,
-        requestedCapability,
-        goalSatisfactionArtifact,
-        goalSatisfactionEvaluation,
-      }),
-      buildGoldenPathObservationLedgerArtifact({
-        artifactId: observationArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        producerItemId: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
-        kind: "visual_frame_evidence",
-        payload: evidence,
-      }),
-      buildGoldenPathPayloadLedgerArtifact({
-        artifactId: terminalArtifactId,
-        turnId,
-        createdAtMs,
-        terminalEligible: true,
-        goalHash,
-        producerItemId: "golden_path_visual_capture_synthesis",
-        kind: requiredTerminalKind,
-        payload: situationContextPack,
-      }),
-    ],
-    debug: buildGoldenPathCapabilityDebugMirror({
-      status: "visual_capture",
-      privateRuntimeLoopEntered: false,
-      requestedCapability,
-      selectedCapability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
-      executedCapability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
-      observedArtifactKind: "visual_frame_evidence",
-      observedArtifactRef: observationArtifactId,
-      terminalResult,
-      goalSatisfactionEvaluation,
-    }),
-  };
+  return buildGoldenPathCapabilityTerminalPayloadSuccessPayload({
+    turnId,
+    traceId,
+    sessionId,
+    threadId,
+    promptText,
+    createdAtMs,
+    routeGateArtifactId,
+    observationArtifactId,
+    terminalArtifactId,
+    terminalResultId,
+    requiredTerminalKind,
+    goalKind,
+    answerScope: "runtime_evidence",
+    sourceTarget: "visual_capture",
+    family: "visual_capture",
+    classifierReasons: ["explicit_visual_capture", "golden_path_visual_capture"],
+    allowsWorkspaceContext: true,
+    requestedCapability,
+    selectedCapability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
+    executedCapability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
+    observedArtifactKind: "visual_frame_evidence",
+    observationPayload: evidence,
+    terminalPayload: situationContextPack,
+    terminalPayloadProducerItemId: "golden_path_visual_capture_synthesis",
+    answerText,
+    status: "visual_capture",
+    route: "golden_path_runtime / visual_capture",
+    requiredObservationKinds: ["visual_frame_evidence", "situation_context_pack"],
+    capabilityPlanExtraFields: {
+      substitution_rule_applied: substitutionApplied,
+      substitution_rule_id: substitutionApplied ? "image_lens.inspect->situation-room.describe_visual_capture" : null,
+    },
+    solverTraceExtra: {
+      substitution_rule_applied: substitutionApplied,
+      substitution_rule_id: substitutionApplied ? "image_lens.inspect->situation-room.describe_visual_capture" : null,
+    },
+    routeGateTerminalEligible: false,
+    hashGoalFrame: args.deps.hashGoalFrame,
+    buildGoalSatisfactionEvaluationArtifact: args.deps.buildGoalSatisfactionEvaluationArtifact,
+  });
 };
 
 export const requiredObservationKinds = ["visual_frame_evidence"] as const;
