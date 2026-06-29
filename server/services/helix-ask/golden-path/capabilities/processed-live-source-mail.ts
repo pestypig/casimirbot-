@@ -22,6 +22,7 @@ import {
   buildGoldenPathTerminalAuthoritySingleWriter,
   buildGoldenPathTerminalResult,
 } from "../terminal-envelope";
+import { buildGoldenPathSolverTrace } from "../solver-trace";
 
 export type HelixAskGoldenPathProcessedLiveSourceMailDependencies = {
   now: () => Date;
@@ -237,27 +238,24 @@ export const buildHelixAskGoldenPathProcessedLiveSourceMailPayload = (args: {
         assistant_answer: false,
         raw_content_included: false,
       },
-      ask_turn_solver_trace: {
-        schema: "helix.ask_turn_solver_trace.v1",
-        completed_solver_path: false,
-        route_authority_ok: true,
-        terminal_authority_ok: true,
-        goal_satisfaction: "not_satisfied",
-        golden_path_runtime: true,
-        private_runtime_loop_entered: false,
-        requested_capability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
-        selected_capability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
-        executed_capability: null,
-        observed_artifact_kind: null,
-        observed_artifact_ref: null,
-        terminal_artifact_kind: "typed_failure",
-        first_broken_rail: "observation",
-        terminal_error_code: "missing_processed_live_source_mail_packet",
-        solver_risk_flags: [],
-        solver_short_circuit_flags: [],
-        assistant_answer: false,
-        raw_content_included: false,
-      },
+      ask_turn_solver_trace: buildGoldenPathSolverTrace({
+        completedSolverPath: false,
+        routeAuthorityOk: true,
+        terminalAuthorityOk: true,
+        goalSatisfaction: "not_satisfied",
+        requestedCapability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+        selectedCapability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+        executedCapability: null,
+        observedArtifactKind: null,
+        observedArtifactRef: null,
+        terminalArtifactKind: "typed_failure",
+        firstBrokenRail: "observation",
+        terminalErrorCode: "missing_processed_live_source_mail_packet",
+        extra: {
+          solver_risk_flags: [],
+          solver_short_circuit_flags: [],
+        },
+      }),
       current_turn_artifact_ledger: [
         buildGoldenPathRouteGateLedgerArtifact({
           artifactId: routeGateArtifactId,
