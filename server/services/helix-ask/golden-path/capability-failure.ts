@@ -40,6 +40,9 @@ export const buildGoldenPathCapabilityTypedFailurePayload = (args: {
   brokenRail: string;
   missingRequirement: string;
   text: string;
+  terminalArtifactId?: string;
+  supportRefs?: string[];
+  includeRuntimeStatus?: boolean;
   routeGate?: string;
   routeGateTerminalEligible?: boolean;
   includeRouteGateGoalHash?: boolean;
@@ -60,10 +63,11 @@ export const buildGoldenPathCapabilityTypedFailurePayload = (args: {
   includeTerminalErrorCodeInSolverTrace?: boolean;
   includeFirstBrokenRailInTerminalAuthority?: boolean;
   useTerminalErrorLedgerArtifact?: boolean;
+  includeGoalHashInTerminalErrorLedger?: boolean;
   hashGoalFrame: (value: unknown) => string;
 }): RecordLike => {
   const selectedCapability = args.selectedCapability ?? args.requestedCapability;
-  const terminalArtifactId = `${args.turnId}:typed_failure`;
+  const terminalArtifactId = args.terminalArtifactId ?? `${args.turnId}:typed_failure`;
   const canonicalGoalFrame = {
     schema: "helix.ask_canonical_goal_frame.v1",
     turn_id: args.turnId,
@@ -89,7 +93,7 @@ export const buildGoldenPathCapabilityTypedFailurePayload = (args: {
     resultId: args.terminalResultId,
     artifactId: terminalArtifactId,
     text: args.text,
-    supportRefs: [args.routeGateArtifactId],
+    supportRefs: args.supportRefs ?? [args.routeGateArtifactId],
   });
 
   return {
@@ -105,18 +109,24 @@ export const buildGoldenPathCapabilityTypedFailurePayload = (args: {
       terminalResult,
       terminalErrorCode: args.errorCode,
     }),
-    golden_path_runtime: buildGoldenPathRuntimeStatus({
-      status: args.status,
-      requestedCapability: args.requestedCapability,
-      selectedCapability,
-      executedCapability: null,
-      ...(typeof args.observedArtifactKind !== "undefined" ? { observedArtifactKind: args.observedArtifactKind } : {}),
-      ...(typeof args.observedArtifactRef !== "undefined" ? { observedArtifactRef: args.observedArtifactRef } : {}),
-      terminalArtifactRef: args.terminalArtifactRef,
-      terminalResultId: args.terminalResultIdInRuntimeStatus,
-      firstBrokenRail: args.brokenRail,
-      routeGate: args.routeGate,
-    }),
+    ...(args.includeRuntimeStatus === false
+      ? {}
+      : {
+          golden_path_runtime: buildGoldenPathRuntimeStatus({
+            status: args.status,
+            requestedCapability: args.requestedCapability,
+            selectedCapability,
+            executedCapability: null,
+            ...(typeof args.observedArtifactKind !== "undefined"
+              ? { observedArtifactKind: args.observedArtifactKind }
+              : {}),
+            ...(typeof args.observedArtifactRef !== "undefined" ? { observedArtifactRef: args.observedArtifactRef } : {}),
+            terminalArtifactRef: args.terminalArtifactRef,
+            terminalResultId: args.terminalResultIdInRuntimeStatus,
+            firstBrokenRail: args.brokenRail,
+            routeGate: args.routeGate,
+          }),
+        }),
     canonical_goal_frame: canonicalGoalFrame,
     capability_plan: buildGoldenPathCapabilityPlan({
       requestedCapability: args.requestedCapability,
@@ -164,6 +174,7 @@ export const buildGoldenPathCapabilityTypedFailurePayload = (args: {
             artifactId: terminalArtifactId,
             turnId: args.turnId,
             createdAtMs: args.createdAtMs,
+            ...(args.includeGoalHashInTerminalErrorLedger ? { goalHash } : {}),
             terminalResult,
             terminalErrorCode: args.errorCode,
             firstBrokenRail: args.brokenRail,

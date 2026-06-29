@@ -3,30 +3,14 @@ import {
   HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
   executeWorkspaceDirectoryResolveTool,
 } from "../../workspace-directory-resolver";
-import {
-  buildGoldenPathTypedFailureTerminalErrorLedgerArtifact,
-  buildGoldenPathRouteGateLedgerArtifact,
-} from "../artifact-ledger";
-import {
-  buildGoldenPathCapabilityGoalSatisfactionEvaluation,
-  buildGoldenPathCapabilityPlan,
-} from "../capability-contract";
+import { buildGoldenPathCapabilityTypedFailurePayload } from "../capability-failure";
 import { buildGoldenPathCapabilityTerminalObservationSuccessPayload } from "../capability-terminal-observation-success";
 import {
-  HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
   readHelixAskGoldenPathPrompt,
   readString,
   readStringArray,
   type RecordLike,
 } from "../core";
-import {
-  buildGoldenPathTerminalAuthorityProjection,
-  buildGoldenPathTypedFailureResponseProjection,
-  buildGoldenPathTypedFailureTerminalResult,
-} from "../terminal-envelope";
-import { buildGoldenPathSolverTrace } from "../solver-trace";
-import { buildGoldenPathRuntimeStatus } from "../runtime-status";
-import { buildGoldenPathCapabilityDebugMirror } from "../debug-mirror";
 
 export type HelixAskGoldenPathWorkspaceDirectoryDependencies = {
   now: () => Date;
@@ -92,94 +76,34 @@ export const buildHelixAskGoldenPathWorkspaceDirectoryPayload = (args: {
     const failureText =
       "I could not complete this golden-path Ask turn because workspace-directory.resolve was requested without a path, URI, or query.";
     const terminalArtifactId = `${turnId}:typed_failure`;
-    const canonicalGoalFrame = {
-      schema: "helix.ask_canonical_goal_frame.v1",
-      turn_id: turnId,
-      goal_kind: goalKind,
-      answer_scope: "current_turn",
-      required_terminal_kind: requiredTerminalKind,
-      classifier_reasons: ["explicit_workspace_directory_request"],
-      assistant_answer: false,
-      raw_content_included: false,
-    };
-    const goalSatisfactionEvaluation = buildGoldenPathCapabilityGoalSatisfactionEvaluation({
+    return buildGoldenPathCapabilityTypedFailurePayload({
       turnId,
-      goalKind,
+      traceId,
+      sessionId,
+      threadId,
+      promptText,
+      createdAtMs,
+      routeGateArtifactId,
+      terminalResultId,
       requiredTerminalKind,
-      satisfaction: "not_satisfied",
-      selectedTerminalArtifactKind: "typed_failure",
-      missingRequirements: ["workspace_directory_query"],
-      firstBrokenRail: "argument_extraction",
-    });
-    const goalHash = args.deps.hashGoalFrame(canonicalGoalFrame);
-    const terminalResult = buildGoldenPathTypedFailureTerminalResult({
-      resultId: terminalResultId,
-      artifactId: terminalArtifactId,
+      goalKind,
+      classifierReasons: ["explicit_workspace_directory_request"],
+      requestedCapability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
+      sourceTarget: "workspace_directory",
+      family: "workspace_directory",
+      requiredObservationKinds: ["workspace_directory_resolution"],
+      status: "workspace_directory_resolution_missing_query",
+      route: "golden_path_runtime / workspace_directory_resolution",
+      errorCode: "missing_workspace_directory_query",
+      brokenRail: "argument_extraction",
+      missingRequirement: "workspace_directory_query",
       text: failureText,
-      supportRefs: [routeGateArtifactId],
+      terminalArtifactId,
+      includeRuntimeStatus: false,
+      useTerminalErrorLedgerArtifact: true,
+      includeGoalHashInTerminalErrorLedger: true,
+      hashGoalFrame: args.deps.hashGoalFrame,
     });
-    return {
-      ok: false,
-      mode: "read",
-      schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
-      turn_id: turnId,
-      trace_id: traceId,
-      session_id: sessionId,
-      thread_id: threadId,
-      prompt_text: promptText,
-      ...buildGoldenPathTypedFailureResponseProjection({
-        terminalResult,
-        terminalErrorCode: "missing_workspace_directory_query",
-      }),
-      canonical_goal_frame: canonicalGoalFrame,
-      capability_plan: buildGoldenPathCapabilityPlan({
-        requestedCapability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
-        sourceTarget: "workspace_directory",
-        family: "workspace_directory",
-        executedCapability: null,
-        requiredObservationKinds: ["workspace_directory_resolution"],
-        requiredTerminalKind,
-      }),
-      goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-      ...buildGoldenPathTerminalAuthorityProjection({
-        terminalResult,
-        route: "golden_path_runtime / workspace_directory_resolution",
-      }),
-      ask_turn_solver_trace: buildGoldenPathSolverTrace({
-        completedSolverPath: false,
-        requestedCapability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
-        selectedCapability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
-        executedCapability: null,
-        firstBrokenRail: "argument_extraction",
-        terminalArtifactKind: "typed_failure",
-      }),
-      current_turn_artifact_ledger: [
-        buildGoldenPathRouteGateLedgerArtifact({
-          artifactId: routeGateArtifactId,
-          turnId,
-          createdAtMs,
-          goalHash,
-          requestedCapability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
-        }),
-        buildGoldenPathTypedFailureTerminalErrorLedgerArtifact({
-          artifactId: terminalArtifactId,
-          turnId,
-          createdAtMs,
-          goalHash,
-          terminalResult,
-          terminalErrorCode: "missing_workspace_directory_query",
-          firstBrokenRail: "argument_extraction",
-        }),
-      ],
-      debug: buildGoldenPathCapabilityDebugMirror({
-        requestedCapability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
-        selectedCapability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
-        executedCapability: null,
-        terminalResult,
-        firstBrokenRail: "argument_extraction",
-        terminalErrorCode: "missing_workspace_directory_query",
-      }),
-    };
   }
 
   const callId = `${turnId}:call:workspace_directory_resolve`;
