@@ -26,6 +26,8 @@ import {
 import { buildHelixAskGoldenPathRuntimeContractPayload } from "./runtime-contract-payload";
 
 type GoldenPathDispatchModule = {
+  requiredObservationKinds: readonly string[];
+  requiredTerminalKinds: readonly string[];
   isRequested: (body: RecordLike) => boolean;
   buildPayload: (args: {
     body: RecordLike;
