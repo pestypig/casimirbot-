@@ -3,6 +3,8 @@ import { HELIX_INTERNET_SEARCH_OBSERVATION_SCHEMA } from "../../../../../shared/
 import { buildGoldenPathCapabilitySuccessPayload } from "../capability-success";
 import { buildGoldenPathCapabilityTypedFailurePayload } from "../capability-failure";
 import {
+  buildHelixAskGoldenPathRouteGateArtifactId,
+  buildHelixAskGoldenPathTerminalResultId,
   isHelixAskGoldenPathCapabilityExplicitlyRequested,
   HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
   HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
@@ -76,10 +78,10 @@ export const buildHelixAskGoldenPathInternetSearchPayload = (args: {
       now: args.deps.now(),
       fallbackTurnIdPrefix: "ask:golden-internet",
     });
-  const routeGateArtifactId = `${turnId}:golden_path_route_gate`;
+  const routeGateArtifactId = buildHelixAskGoldenPathRouteGateArtifactId(turnId);
   const observationArtifactId = `${turnId}:internet_search_observation`;
   const terminalArtifactId = `${turnId}:internet_search_answer`;
-  const terminalResultId = `${turnId}:golden_path_terminal_result`;
+  const terminalResultId = buildHelixAskGoldenPathTerminalResultId(turnId);
   const requiredTerminalKind = "internet_search_answer";
   const goalKind = "internet_search_lookup";
   const query = readInternetSearchQuery(args.body);

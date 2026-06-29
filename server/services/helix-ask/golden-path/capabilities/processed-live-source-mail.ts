@@ -3,6 +3,8 @@ import { STAGE_PLAY_PROCESSED_MAIL_PACKET_SCHEMA } from "../../../../../shared/c
 import { buildGoldenPathCapabilitySuccessPayload } from "../capability-success";
 import { buildGoldenPathCapabilityTypedFailurePayload } from "../capability-failure";
 import {
+  buildHelixAskGoldenPathRouteGateArtifactId,
+  buildHelixAskGoldenPathTerminalResultId,
   isHelixAskGoldenPathCapabilityExplicitlyRequested,
   HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
   readHelixAskGoldenPathPrompt,
@@ -88,10 +90,10 @@ export const buildHelixAskGoldenPathProcessedLiveSourceMailPayload = (args: {
       fallbackTurnIdPrefix: "ask:golden-processed-mail",
     });
   const packetPayload = buildProcessedMailPacketPayload({ body: args.body, turnId, createdAtMs });
-  const routeGateArtifactId = `${turnId}:golden_path_route_gate`;
+  const routeGateArtifactId = buildHelixAskGoldenPathRouteGateArtifactId(turnId);
   const observationArtifactId = readString(packetPayload?.packetId) ?? `${turnId}:stage_play_processed_mail_packet`;
   const terminalArtifactId = `${turnId}:model_synthesized_answer`;
-  const terminalResultId = `${turnId}:golden_path_terminal_result`;
+  const terminalResultId = buildHelixAskGoldenPathTerminalResultId(turnId);
   const requiredTerminalKind = "model_synthesized_answer";
   const goalKind = "processed_live_source_mail_read";
 

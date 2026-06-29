@@ -6,6 +6,8 @@ import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfa
 import { buildGoldenPathCapabilityEvidenceAnswerSuccessPayload } from "../capability-evidence-answer-success";
 import { buildGoldenPathCapabilityTypedFailurePayload } from "../capability-failure";
 import {
+  buildHelixAskGoldenPathRouteGateArtifactId,
+  buildHelixAskGoldenPathTerminalResultId,
   isHelixAskGoldenPathCapabilityExplicitlyRequested,
   HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
   readHelixAskGoldenPathPrompt,
@@ -186,11 +188,11 @@ export const buildHelixAskGoldenPathRepoSearchConceptPayload = (args: {
       now: args.deps.now(),
       fallbackTurnIdPrefix: "ask:golden-repo",
     });
-  const routeGateArtifactId = `${turnId}:golden_path_route_gate`;
+  const routeGateArtifactId = buildHelixAskGoldenPathRouteGateArtifactId(turnId);
   const observationArtifactId = `${turnId}:repo_code_evidence_observation`;
   const relevanceGateArtifactId = `${turnId}:repo_evidence_relevance_gate`;
   const terminalArtifactId = `${turnId}:repo_code_evidence_answer`;
-  const terminalResultId = `${turnId}:golden_path_terminal_result`;
+  const terminalResultId = buildHelixAskGoldenPathTerminalResultId(turnId);
   const requiredTerminalKind = "repo_code_evidence_answer";
   const goalKind = "repo_concept_explanation";
   const concept = readRepoSearchConcept(args.body);

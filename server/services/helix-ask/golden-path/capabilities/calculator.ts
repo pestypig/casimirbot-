@@ -2,6 +2,8 @@ import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfa
 import { buildGoldenPathCapabilityTypedFailurePayload } from "../capability-failure";
 import { buildGoldenPathCapabilitySuccessPayload } from "../capability-success";
 import {
+  buildHelixAskGoldenPathRouteGateArtifactId,
+  buildHelixAskGoldenPathTerminalResultId,
   isHelixAskGoldenPathCapabilityExplicitlyRequested,
   HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
   readHelixAskGoldenPathPrompt,
@@ -84,8 +86,8 @@ export const buildHelixAskGoldenPathCalculatorSolvePayload = (args: {
       now: args.deps.now(),
       fallbackTurnIdPrefix: "ask:golden-calculator",
     });
-  const routeGateArtifactId = `${turnId}:golden_path_route_gate`;
-  const terminalResultId = `${turnId}:golden_path_terminal_result`;
+  const routeGateArtifactId = buildHelixAskGoldenPathRouteGateArtifactId(turnId);
+  const terminalResultId = buildHelixAskGoldenPathTerminalResultId(turnId);
   const requiredTerminalKind = "workstation_tool_evaluation";
   const goalKind = "calculator_solve";
 

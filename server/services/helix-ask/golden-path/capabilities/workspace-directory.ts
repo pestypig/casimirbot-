@@ -6,6 +6,8 @@ import {
 import { buildGoldenPathCapabilityTypedFailurePayload } from "../capability-failure";
 import { buildGoldenPathCapabilityTerminalObservationSuccessPayload } from "../capability-terminal-observation-success";
 import {
+  buildHelixAskGoldenPathRouteGateArtifactId,
+  buildHelixAskGoldenPathTerminalResultId,
   isHelixAskGoldenPathCapabilityExplicitlyRequested,
   readHelixAskGoldenPathPrompt,
   readHelixAskGoldenPathTurnContext,
@@ -58,8 +60,8 @@ export const buildHelixAskGoldenPathWorkspaceDirectoryPayload = (args: {
       fallbackTurnIdPrefix: "ask:golden-workspace-directory",
     });
   const query = readWorkspaceDirectoryQuery(args.body);
-  const routeGateArtifactId = `${turnId}:golden_path_route_gate`;
-  const terminalResultId = `${turnId}:golden_path_terminal_result`;
+  const routeGateArtifactId = buildHelixAskGoldenPathRouteGateArtifactId(turnId);
+  const terminalResultId = buildHelixAskGoldenPathTerminalResultId(turnId);
   const requiredTerminalKind = "workspace_directory_resolution";
   const goalKind = "workspace_directory_resolution";
 

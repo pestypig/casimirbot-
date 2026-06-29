@@ -2,6 +2,8 @@ import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfa
 import { buildGoldenPathCapabilitySuccessPayload } from "../capability-success";
 import { buildGoldenPathCapabilityTypedFailurePayload } from "../capability-failure";
 import {
+  buildHelixAskGoldenPathRouteGateArtifactId,
+  buildHelixAskGoldenPathTerminalResultId,
   isHelixAskGoldenPathCapabilityExplicitlyRequested,
   HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
   readArray,
@@ -51,10 +53,10 @@ export const buildHelixAskGoldenPathCivilizationBoundsReflectionPayload = (args:
       now: args.deps.now(),
       fallbackTurnIdPrefix: "ask:golden-civilization-bounds",
     });
-  const routeGateArtifactId = `${turnId}:golden_path_route_gate`;
+  const routeGateArtifactId = buildHelixAskGoldenPathRouteGateArtifactId(turnId);
   const observationArtifactId = `${turnId}:helix_civilization_bounds_tool_result`;
   const terminalArtifactId = `${turnId}:civilization_bounds_reflection_answer`;
-  const terminalResultId = `${turnId}:golden_path_terminal_result`;
+  const terminalResultId = buildHelixAskGoldenPathTerminalResultId(turnId);
   const requiredTerminalKind = "civilization_bounds_reflection_answer";
   const goalKind = "civilization_bounds_reflection";
   const compactResult = readCompactCivilizationBoundsToolResult(args.body);

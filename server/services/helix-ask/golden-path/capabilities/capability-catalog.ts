@@ -1,6 +1,8 @@
 import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfaction-artifact";
 import { buildGoldenPathCapabilitySuccessPayload } from "../capability-success";
 import {
+  buildHelixAskGoldenPathRouteGateArtifactId,
+  buildHelixAskGoldenPathTerminalResultId,
   HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
   HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
   HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
@@ -62,10 +64,10 @@ export const buildHelixAskGoldenPathCapabilityCatalogPayload = (args: {
       now: args.deps.now(),
       fallbackTurnIdPrefix: "ask:golden-capability-catalog",
     });
-  const routeGateArtifactId = `${turnId}:golden_path_route_gate`;
+  const routeGateArtifactId = buildHelixAskGoldenPathRouteGateArtifactId(turnId);
   const observationArtifactId = `${turnId}:capability_registry`;
   const terminalArtifactId = `${turnId}:capability_help_summary`;
-  const terminalResultId = `${turnId}:golden_path_terminal_result`;
+  const terminalResultId = buildHelixAskGoldenPathTerminalResultId(turnId);
   const requiredTerminalKind = "capability_help_summary";
   const catalogObservation = buildGoldenPathCapabilityCatalogObservation();
   const answerText = capabilityCatalogSummaryText(catalogObservation);

@@ -3,6 +3,8 @@ import { HELIX_SCHOLARLY_RESEARCH_OBSERVATION_SCHEMA } from "../../../../../shar
 import { buildGoldenPathCapabilitySuccessPayload } from "../capability-success";
 import { buildGoldenPathCapabilityTypedFailurePayload } from "../capability-failure";
 import {
+  buildHelixAskGoldenPathRouteGateArtifactId,
+  buildHelixAskGoldenPathTerminalResultId,
   isHelixAskGoldenPathCapabilityExplicitlyRequested,
   HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
   readArray,
@@ -73,10 +75,10 @@ export const buildHelixAskGoldenPathScholarlyResearchPayload = (args: {
       now: args.deps.now(),
       fallbackTurnIdPrefix: "ask:golden-scholarly",
     });
-  const routeGateArtifactId = `${turnId}:golden_path_route_gate`;
+  const routeGateArtifactId = buildHelixAskGoldenPathRouteGateArtifactId(turnId);
   const observationArtifactId = `${turnId}:scholarly_research_observation`;
   const terminalArtifactId = `${turnId}:scholarly_research_answer`;
-  const terminalResultId = `${turnId}:golden_path_terminal_result`;
+  const terminalResultId = buildHelixAskGoldenPathTerminalResultId(turnId);
   const requiredTerminalKind = "scholarly_research_answer";
   const goalKind = "scholarly_research_lookup";
   const query = readScholarlyResearchQuery(args.body);

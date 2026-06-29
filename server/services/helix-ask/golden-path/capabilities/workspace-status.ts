@@ -1,6 +1,8 @@
 import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfaction-artifact";
 import { buildGoldenPathCapabilitySuccessPayload } from "../capability-success";
 import {
+  buildHelixAskGoldenPathRouteGateArtifactId,
+  buildHelixAskGoldenPathTerminalResultId,
   HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,
   readHelixAskGoldenPathPrompt,
   readHelixAskGoldenPathTurnContext,
@@ -73,11 +75,11 @@ export const buildHelixAskGoldenPathWorkspaceStatusPayload = (args: {
       now: args.deps.now(),
       fallbackTurnIdPrefix: "ask:golden-workspace-status",
     });
-  const routeGateArtifactId = `${turnId}:golden_path_route_gate`;
+  const routeGateArtifactId = buildHelixAskGoldenPathRouteGateArtifactId(turnId);
   const workspaceObservation = buildGoldenPathWorkspaceStatusObservation({ body: args.body, turnId, createdAtMs });
   const observationArtifactId = readString(workspaceObservation.artifact_id) ?? `${turnId}:workspace_os_status_observation`;
   const terminalArtifactId = `${turnId}:workspace_status_answer`;
-  const terminalResultId = `${turnId}:golden_path_terminal_result`;
+  const terminalResultId = buildHelixAskGoldenPathTerminalResultId(turnId);
   const requiredTerminalKind = "workspace_status_answer";
   const answerText = workspaceStatusSummaryText(workspaceObservation);
   return buildGoldenPathCapabilitySuccessPayload({

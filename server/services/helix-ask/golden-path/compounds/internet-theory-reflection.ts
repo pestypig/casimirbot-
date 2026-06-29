@@ -18,6 +18,8 @@ import {
   buildGoldenPathCompoundSuccessPayload,
 } from "../compound-success";
 import {
+  buildHelixAskGoldenPathRouteGateArtifactId,
+  buildHelixAskGoldenPathTerminalResultId,
   HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
   HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
   HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
@@ -65,11 +67,11 @@ export const buildHelixAskGoldenPathInternetResearchReflectionCompoundPayload = 
       now: args.deps.now(),
       fallbackTurnIdPrefix: "ask:golden-research-reflection",
     });
-  const routeGateArtifactId = `${turnId}:golden_path_route_gate`;
+  const routeGateArtifactId = buildHelixAskGoldenPathRouteGateArtifactId(turnId);
   const internetObservationArtifactId = `${turnId}:internet_search_observation`;
   const reflectionObservationArtifactId = `${turnId}:helix_theory_context_reflection_tool_receipt`;
   const terminalArtifactId = `${turnId}:compound_evidence_synthesis_answer`;
-  const terminalResultId = `${turnId}:golden_path_terminal_result`;
+  const terminalResultId = buildHelixAskGoldenPathTerminalResultId(turnId);
   const requiredTerminalKind = "compound_evidence_synthesis_answer";
   const query = readInternetSearchQuery(args.body);
   const results = readCompactInternetSearchResults(args.body);

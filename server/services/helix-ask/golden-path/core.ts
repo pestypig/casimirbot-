@@ -123,6 +123,12 @@ export const isHelixAskGoldenPathCapabilityExplicitlyRequested = (
   return Boolean(requestedCapability && capabilities.includes(requestedCapability));
 };
 
+export const buildHelixAskGoldenPathRouteGateArtifactId = (turnId: string): string =>
+  `${turnId}:golden_path_route_gate`;
+
+export const buildHelixAskGoldenPathTerminalResultId = (turnId: string): string =>
+  `${turnId}:golden_path_terminal_result`;
+
 export const flagEnabled = (value: unknown): boolean => {
   const normalized = String(value ?? "").trim().toLowerCase();
   return normalized === "1" || normalized === "true" || normalized === "enabled";

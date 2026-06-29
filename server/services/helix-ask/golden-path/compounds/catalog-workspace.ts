@@ -10,6 +10,8 @@ import {
   buildGoldenPathCompoundSuccessPayload,
 } from "../compound-success";
 import {
+  buildHelixAskGoldenPathRouteGateArtifactId,
+  buildHelixAskGoldenPathTerminalResultId,
   HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
   HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,
   readHelixAskGoldenPathPrompt,
@@ -49,13 +51,13 @@ export const buildHelixAskGoldenPathCatalogWorkspaceCompoundPayload = (args: {
       now: args.deps.now(),
       fallbackTurnIdPrefix: "ask:golden-catalog-workspace",
     });
-  const routeGateArtifactId = `${turnId}:golden_path_route_gate`;
+  const routeGateArtifactId = buildHelixAskGoldenPathRouteGateArtifactId(turnId);
   const catalogObservationArtifactId = `${turnId}:capability_registry`;
   const workspaceObservation = buildGoldenPathWorkspaceStatusObservation({ body: args.body, turnId, createdAtMs });
   const workspaceObservationArtifactId =
     readString(workspaceObservation.artifact_id) ?? `${turnId}:workspace_os_status_observation`;
   const terminalArtifactId = `${turnId}:compound_evidence_synthesis_answer`;
-  const terminalResultId = `${turnId}:golden_path_terminal_result`;
+  const terminalResultId = buildHelixAskGoldenPathTerminalResultId(turnId);
   const requiredTerminalKind = "compound_evidence_synthesis_answer";
   const catalogObservation = buildGoldenPathCapabilityCatalogObservation();
   const counts = readRecord(workspaceObservation.capability_counts) ?? {};

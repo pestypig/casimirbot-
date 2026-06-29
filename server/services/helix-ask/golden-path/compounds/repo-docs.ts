@@ -20,6 +20,8 @@ import {
   buildGoldenPathCompoundSuccessPayload,
 } from "../compound-success";
 import {
+  buildHelixAskGoldenPathRouteGateArtifactId,
+  buildHelixAskGoldenPathTerminalResultId,
   HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
   HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
   readHelixAskGoldenPathPrompt,
@@ -57,12 +59,12 @@ export const buildHelixAskGoldenPathRepoDocsCompoundPayload = (args: {
       now: args.deps.now(),
       fallbackTurnIdPrefix: "ask:golden-repo-docs",
     });
-  const routeGateArtifactId = `${turnId}:golden_path_route_gate`;
+  const routeGateArtifactId = buildHelixAskGoldenPathRouteGateArtifactId(turnId);
   const repoObservationArtifactId = `${turnId}:repo_code_evidence_observation`;
   const relevanceGateArtifactId = `${turnId}:repo_evidence_relevance_gate`;
   const docObservationArtifactId = `${turnId}:doc_location_matches`;
   const terminalArtifactId = `${turnId}:compound_evidence_synthesis_answer`;
-  const terminalResultId = `${turnId}:golden_path_terminal_result`;
+  const terminalResultId = buildHelixAskGoldenPathTerminalResultId(turnId);
   const requiredTerminalKind = "compound_evidence_synthesis_answer";
   const concept = readRepoSearchConcept(args.body);
   const docPath = readGoldenPathDocPath(args.body);

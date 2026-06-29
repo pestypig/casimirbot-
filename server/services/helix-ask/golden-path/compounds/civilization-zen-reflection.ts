@@ -11,6 +11,8 @@ import {
   buildGoldenPathCompoundSuccessPayload,
 } from "../compound-success";
 import {
+  buildHelixAskGoldenPathRouteGateArtifactId,
+  buildHelixAskGoldenPathTerminalResultId,
   HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
   HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
   readArray,
@@ -54,11 +56,11 @@ export const buildHelixAskGoldenPathCivilizationBoundsZenReflectionCompoundPaylo
       now: args.deps.now(),
       fallbackTurnIdPrefix: "ask:golden-civilization-zen",
     });
-  const routeGateArtifactId = `${turnId}:golden_path_route_gate`;
+  const routeGateArtifactId = buildHelixAskGoldenPathRouteGateArtifactId(turnId);
   const civilizationObservationArtifactId = `${turnId}:helix_civilization_bounds_tool_result`;
   const zenObservationArtifactId = `${turnId}:helix_zen_graph_reflection_tool_result`;
   const terminalArtifactId = `${turnId}:compound_evidence_synthesis_answer`;
-  const terminalResultId = `${turnId}:golden_path_terminal_result`;
+  const terminalResultId = buildHelixAskGoldenPathTerminalResultId(turnId);
   const requiredTerminalKind = "compound_evidence_synthesis_answer";
   const civilizationResult = readCompactCivilizationBoundsToolResult(args.body);
   const roadmap = readRecord(civilizationResult?.roadmap);

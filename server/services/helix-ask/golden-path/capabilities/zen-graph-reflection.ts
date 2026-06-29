@@ -2,6 +2,8 @@ import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfa
 import { buildGoldenPathCapabilitySuccessPayload } from "../capability-success";
 import { buildGoldenPathCapabilityTypedFailurePayload } from "../capability-failure";
 import {
+  buildHelixAskGoldenPathRouteGateArtifactId,
+  buildHelixAskGoldenPathTerminalResultId,
   isHelixAskGoldenPathCapabilityExplicitlyRequested,
   HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
   readArray,
@@ -53,10 +55,10 @@ export const buildHelixAskGoldenPathZenGraphReflectionPayload = (args: {
       now: args.deps.now(),
       fallbackTurnIdPrefix: "ask:golden-zen",
     });
-  const routeGateArtifactId = `${turnId}:golden_path_route_gate`;
+  const routeGateArtifactId = buildHelixAskGoldenPathRouteGateArtifactId(turnId);
   const observationArtifactId = `${turnId}:helix_zen_graph_reflection_tool_result`;
   const terminalArtifactId = `${turnId}:ideology_context_reflection_answer`;
-  const terminalResultId = `${turnId}:golden_path_terminal_result`;
+  const terminalResultId = buildHelixAskGoldenPathTerminalResultId(turnId);
   const requiredTerminalKind = "ideology_context_reflection_answer";
   const goalKind = "ideology_context_reflection";
   const compactResult = readCompactZenGraphReflectionToolResult(args.body);

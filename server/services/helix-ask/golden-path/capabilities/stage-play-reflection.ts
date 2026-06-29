@@ -2,6 +2,8 @@ import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfa
 import { buildGoldenPathCapabilitySuccessPayload } from "../capability-success";
 import { buildGoldenPathCapabilityTypedFailurePayload } from "../capability-failure";
 import {
+  buildHelixAskGoldenPathRouteGateArtifactId,
+  buildHelixAskGoldenPathTerminalResultId,
   isHelixAskGoldenPathCapabilityExplicitlyRequested,
   HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
   readBoolean,
@@ -57,10 +59,10 @@ export const buildHelixAskGoldenPathStagePlayReflectionPayload = (args: {
       now: args.deps.now(),
       fallbackTurnIdPrefix: "ask:golden-stage-play-reflection",
     });
-  const routeGateArtifactId = `${turnId}:golden_path_route_gate`;
+  const routeGateArtifactId = buildHelixAskGoldenPathRouteGateArtifactId(turnId);
   const observationArtifactId = `${turnId}:stage_play_reflection_result`;
   const terminalArtifactId = `${turnId}:stage_play_reflection_answer`;
-  const terminalResultId = `${turnId}:golden_path_terminal_result`;
+  const terminalResultId = buildHelixAskGoldenPathTerminalResultId(turnId);
   const requiredTerminalKind = "stage_play_reflection_answer";
   const goalKind = "stage_play_reflection";
   const observation = readCompactStagePlayReflectionResult(args.body);

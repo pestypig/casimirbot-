@@ -20,6 +20,8 @@ import {
   buildGoldenPathCompoundSuccessPayload,
 } from "../compound-success";
 import {
+  buildHelixAskGoldenPathRouteGateArtifactId,
+  buildHelixAskGoldenPathTerminalResultId,
   HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
   HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
   readHelixAskGoldenPathPrompt,
@@ -56,11 +58,11 @@ export const buildHelixAskGoldenPathDocsCalculatorCompoundPayload = (args: {
       now: args.deps.now(),
       fallbackTurnIdPrefix: "ask:golden-docs-calculator",
     });
-  const routeGateArtifactId = `${turnId}:golden_path_route_gate`;
+  const routeGateArtifactId = buildHelixAskGoldenPathRouteGateArtifactId(turnId);
   const docObservationArtifactId = `${turnId}:doc_location_matches`;
   const calculatorObservationArtifactId = `${turnId}:calculator_receipt`;
   const terminalArtifactId = `${turnId}:compound_evidence_synthesis_answer`;
-  const terminalResultId = `${turnId}:golden_path_terminal_result`;
+  const terminalResultId = buildHelixAskGoldenPathTerminalResultId(turnId);
   const requiredTerminalKind = "compound_evidence_synthesis_answer";
   const docPath = readGoldenPathDocPath(args.body);
   const query = readGoldenPathDocLocateQuery(args.body);

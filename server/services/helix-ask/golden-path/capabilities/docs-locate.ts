@@ -2,6 +2,8 @@ import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfa
 import { buildGoldenPathCapabilityTypedFailurePayload } from "../capability-failure";
 import { buildGoldenPathCapabilityTerminalObservationSuccessPayload } from "../capability-terminal-observation-success";
 import {
+  buildHelixAskGoldenPathRouteGateArtifactId,
+  buildHelixAskGoldenPathTerminalResultId,
   isHelixAskGoldenPathCapabilityExplicitlyRequested,
   HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
   readHelixAskGoldenPathPrompt,
@@ -118,8 +120,8 @@ export const buildHelixAskGoldenPathDocsLocatePayload = (args: {
       now: args.deps.now(),
       fallbackTurnIdPrefix: "ask:golden-docs-locate",
     });
-  const routeGateArtifactId = `${turnId}:golden_path_route_gate`;
-  const terminalResultId = `${turnId}:golden_path_terminal_result`;
+  const routeGateArtifactId = buildHelixAskGoldenPathRouteGateArtifactId(turnId);
+  const terminalResultId = buildHelixAskGoldenPathTerminalResultId(turnId);
   const requiredTerminalKind = "doc_location_matches";
   const goalKind = "locate_in_doc";
   const docPath = readGoldenPathDocPath(args.body);

@@ -3,6 +3,8 @@ import { HELIX_VISUAL_FRAME_EVIDENCE_SCHEMA } from "../../../../../shared/helix-
 import { buildGoldenPathCapabilityTypedFailurePayload } from "../capability-failure";
 import { buildGoldenPathCapabilityTerminalPayloadSuccessPayload } from "../capability-terminal-payload-success";
 import {
+  buildHelixAskGoldenPathRouteGateArtifactId,
+  buildHelixAskGoldenPathTerminalResultId,
   isHelixAskGoldenPathCapabilityExplicitlyRequested,
   HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY,
   HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
@@ -59,10 +61,10 @@ export const buildHelixAskGoldenPathVisualCapturePayload = (args: {
       ? HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY
       : HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY);
   const visualSummary = readVisualCaptureSummary(args.body);
-  const routeGateArtifactId = `${turnId}:golden_path_route_gate`;
+  const routeGateArtifactId = buildHelixAskGoldenPathRouteGateArtifactId(turnId);
   const observationArtifactId = `${turnId}:visual_frame_evidence`;
   const terminalArtifactId = `${turnId}:situation_context_pack`;
-  const terminalResultId = `${turnId}:golden_path_terminal_result`;
+  const terminalResultId = buildHelixAskGoldenPathTerminalResultId(turnId);
   const requiredTerminalKind = "situation_context_pack";
   const goalKind = "visual_capture_describe";
 
