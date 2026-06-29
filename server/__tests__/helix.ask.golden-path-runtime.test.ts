@@ -2208,10 +2208,18 @@ describe("Helix Ask golden path runtime", () => {
   it("wires the route through a thin hook without importing the route from the service", () => {
     const routeSource = readFileSync(routePath, "utf8");
     const serviceSource = readFileSync(servicePath, "utf8");
+    const turnGateIndex = routeSource.indexOf("const goldenPathRuntimeDecision = runHelixAskGoldenPathRuntime({ body })");
+    const turnCarryoverIndex = routeSource.indexOf("const carryoverPrompt = readHelixAskRuntimePrompt(body)");
+    const streamGateIndex = routeSource.indexOf("const streamGoldenPathRuntimeDecision = runHelixAskGoldenPathRuntime");
+    const streamCarryoverIndex = routeSource.indexOf("const streamCarryoverBody = req.body as Record<string, unknown>");
 
     expect(routeSource).toContain('from "../services/helix-ask/golden-path-runtime"');
-    expect(routeSource).toContain("runHelixAskGoldenPathRuntime({ body })");
+    expect(turnGateIndex).toBeGreaterThan(0);
+    expect(turnCarryoverIndex).toBeGreaterThan(turnGateIndex);
+    expect(streamGateIndex).toBeGreaterThan(0);
+    expect(streamCarryoverIndex).toBeGreaterThan(streamGateIndex);
     expect(routeSource).toContain("if (goldenPathRuntimeDecision.handled)");
+    expect(routeSource).toContain("if (streamGoldenPathRuntimeDecision.handled)");
     expect(routeSource).toContain('source: "helix_ask_golden_path_runtime"');
     expect(serviceSource).not.toContain("server/routes/agi.plan");
     expect(serviceSource).not.toContain("../routes/agi.plan");
