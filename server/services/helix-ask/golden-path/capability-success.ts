@@ -63,6 +63,8 @@ export const buildGoldenPathCapabilitySuccessPayload = (args: {
   answerText: string;
   status: string;
   route: string;
+  includeRuntimeRouteGate?: boolean;
+  includeRuntimeLegacyFallbackPossibleWhenUnhandled?: boolean;
   requiredObservationKinds: readonly string[];
   routeGateTerminalEligible?: boolean;
   includeRouteGatePromptText?: boolean;
@@ -137,8 +139,10 @@ export const buildGoldenPathCapabilitySuccessPayload = (args: {
       observedArtifactRef: args.observationArtifactId,
       terminalArtifactRef: args.terminalArtifactId,
       terminalResultId: args.terminalResultId,
-      legacyFallbackPossibleWhenUnhandled: true,
-      routeGate: "enabled_explicit_request",
+      ...(args.includeRuntimeLegacyFallbackPossibleWhenUnhandled === false
+        ? {}
+        : { legacyFallbackPossibleWhenUnhandled: true }),
+      ...(args.includeRuntimeRouteGate === false ? {} : { routeGate: "enabled_explicit_request" }),
     }),
     canonical_goal_frame: canonicalGoalFrame,
     [args.observedArtifactKind]: args.observationPayload,

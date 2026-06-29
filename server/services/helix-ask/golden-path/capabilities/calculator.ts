@@ -1,8 +1,5 @@
 import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfaction-artifact";
 import {
-  buildGoldenPathAnswerLedgerArtifact,
-  buildGoldenPathObservationLedgerArtifact,
-  buildGoldenPathPayloadLedgerArtifact,
   buildGoldenPathTypedFailureLedgerArtifact,
   buildGoldenPathRouteGateLedgerArtifact,
 } from "../artifact-ledger";
@@ -10,6 +7,7 @@ import {
   buildGoldenPathCapabilityGoalSatisfactionEvaluation,
   buildGoldenPathCapabilityPlan,
 } from "../capability-contract";
+import { buildGoldenPathCapabilitySuccessPayload } from "../capability-success";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
   HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
@@ -20,9 +18,7 @@ import {
 } from "../core";
 import {
   buildGoldenPathTerminalAuthorityProjection,
-  buildGoldenPathTerminalResponseProjection,
   buildGoldenPathTypedFailureResponseProjection,
-  buildGoldenPathTerminalResult,
   buildGoldenPathTypedFailureTerminalResult,
 } from "../terminal-envelope";
 import { buildGoldenPathSolverTrace } from "../solver-trace";
@@ -249,30 +245,6 @@ export const buildHelixAskGoldenPathCalculatorSolvePayload = (args: {
     `Result: ${resultText}`,
     `Trace source: ${HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY}.`,
   ].join("\n");
-  const canonicalGoalFrame = {
-    schema: "helix.ask_canonical_goal_frame.v1",
-    turn_id: turnId,
-    goal_kind: goalKind,
-    answer_scope: "current_turn",
-    required_terminal_kind: requiredTerminalKind,
-    allows_workspace_context: false,
-    allows_prior_artifacts: false,
-    classifier_reasons: ["explicit_calculator_solve_request"],
-    assistant_answer: false,
-    raw_content_included: false,
-  };
-  const goalSatisfactionEvaluation = buildGoldenPathCapabilityGoalSatisfactionEvaluation({
-    turnId,
-    goalKind,
-    requiredTerminalKind,
-  });
-  const goalHash = args.deps.hashGoalFrame(canonicalGoalFrame);
-  const goalSatisfactionArtifact = args.deps.buildGoalSatisfactionEvaluationArtifact({
-    turnId,
-    goalHash,
-    evaluation: goalSatisfactionEvaluation,
-    createdAtMs,
-  });
   const calculatorReceipt = {
     schema: "helix.calculator_receipt.v1",
     capability_key: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
@@ -283,125 +255,51 @@ export const buildHelixAskGoldenPathCalculatorSolvePayload = (args: {
     assistant_answer: false,
     raw_content_included: false,
   };
-  const terminalResult = buildGoldenPathTerminalResult({
-    resultId: terminalResultId,
-    artifactId: terminalArtifactId,
-    artifactKind: requiredTerminalKind,
-    finalAnswerSource: requiredTerminalKind,
-    text: answerText,
-    supportRefs: [observationArtifactId, routeGateArtifactId, goalSatisfactionArtifact.artifact_id],
-  });
 
-  return {
-    ok: true,
-    mode: "read",
-    schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
-    turn_id: turnId,
-    trace_id: traceId,
-    session_id: sessionId,
-    thread_id: threadId,
-    prompt_text: promptText,
-    ...buildGoldenPathTerminalResponseProjection({ terminalResult }),
-    calculator_receipt: calculatorReceipt,
-    workstation_tool_evaluation: {
-      schema: "helix.workstation_tool_evaluation.v1",
+  return buildGoldenPathCapabilitySuccessPayload({
+    turnId,
+    traceId,
+    sessionId,
+    threadId,
+    promptText,
+    createdAtMs,
+    routeGateArtifactId,
+    observationArtifactId,
+    terminalArtifactId,
+    terminalResultId,
+    requiredTerminalKind,
+    goalKind,
+    sourceTarget: "calculator",
+    family: "calculator",
+    planArgs: { expression },
+    classifierReasons: ["explicit_calculator_solve_request"],
+    allowsWorkspaceContext: false,
+    requestedCapability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+    observedArtifactKind: "calculator_receipt",
+    observationPayload: calculatorReceipt,
+    terminalPayloadField: "workstation_tool_evaluation",
+    terminalPayloadSchema: "helix.workstation_tool_evaluation.v1",
+    terminalPayloadExtra: {
       capability_key: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
       expression,
       result,
       result_text: resultText,
       trace_source: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
-      answer_text: terminalResult.text,
-      support_refs: terminalResult.support_refs,
-      assistant_answer: false,
-      raw_content_included: false,
     },
-    golden_path_runtime: buildGoldenPathRuntimeStatus({
-      status: "calculator_solve",
-      requestedCapability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
-      selectedCapability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
-      executedCapability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
-      observedArtifactKind: "calculator_receipt",
-      observedArtifactRef: observationArtifactId,
-      terminalArtifactRef: terminalArtifactId,
-      terminalResultId,
-    }),
-    canonical_goal_frame: canonicalGoalFrame,
-    capability_plan: buildGoldenPathCapabilityPlan({
-      requestedCapability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
-      sourceTarget: "calculator",
-      family: "calculator",
-      planArgs: { expression },
-      requiredObservationKinds: ["calculator_receipt", "workstation_tool_evaluation"],
-      requiredTerminalKind,
-    }),
-    goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-    ...buildGoldenPathTerminalAuthorityProjection({
-      terminalResult,
-      route: "golden_path_runtime / calculator_solve",
-    }),
-    ask_turn_solver_trace: buildGoldenPathSolverTrace({
-      completedSolverPath: true,
-      routeAuthorityOk: true,
-      terminalAuthorityOk: true,
-      goalSatisfaction: "satisfied",
-      requestedCapability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
-      selectedCapability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
-      executedCapability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
-      observedArtifactKind: "calculator_receipt",
-      observedArtifactRef: observationArtifactId,
-      terminalArtifactKind: terminalResult.artifact_kind,
-      extra: {
-        solver_risk_flags: [],
-        solver_short_circuit_flags: [],
-      },
-    }),
-    current_turn_artifact_ledger: [
-      buildGoldenPathRouteGateLedgerArtifact({
-        artifactId: routeGateArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        promptText,
-        requestedCapability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
-        goalSatisfactionArtifact,
-        goalSatisfactionEvaluation,
-      }),
-      buildGoldenPathObservationLedgerArtifact({
-        artifactId: observationArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        kind: "calculator_receipt",
-        terminalEligible: false,
-        payload: calculatorReceipt,
-      }),
-      buildGoldenPathAnswerLedgerArtifact({
-        artifactId: terminalArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        kind: requiredTerminalKind,
-        payloadSchema: "helix.workstation_tool_evaluation.v1",
-        terminalResult,
-        extraPayload: {
-          expression,
-          result,
-          result_text: resultText,
-        },
-      }),
-    ],
-    debug: buildGoldenPathCapabilityDebugMirror({
-      status: "calculator_solve",
-      privateRuntimeLoopEntered: false,
-      requestedCapability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
-      selectedCapability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
-      executedCapability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
-      observedArtifactKind: "calculator_receipt",
-      observedArtifactRef: observationArtifactId,
-      terminalResult,
-      goalSatisfactionEvaluation,
-    }),
-  };
+    answerText,
+    status: "calculator_solve",
+    route: "golden_path_runtime / calculator_solve",
+    includeRuntimeRouteGate: false,
+    includeRuntimeLegacyFallbackPossibleWhenUnhandled: false,
+    requiredObservationKinds: ["calculator_receipt", "workstation_tool_evaluation"],
+    answerLedgerExtraPayload: {
+      expression,
+      result,
+      result_text: resultText,
+    },
+    hashGoalFrame: args.deps.hashGoalFrame,
+    buildGoalSatisfactionEvaluationArtifact: args.deps.buildGoalSatisfactionEvaluationArtifact,
+  });
 };
 
 
