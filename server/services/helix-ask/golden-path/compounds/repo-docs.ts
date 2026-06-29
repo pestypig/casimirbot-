@@ -16,7 +16,10 @@ import {
   buildGoldenPathPayloadLedgerArtifact,
   buildGoldenPathRouteGateLedgerArtifact,
 } from "../artifact-ledger";
-import { isHelixAskGoldenPathRepoDocsCompoundRequested } from "../compound-contract";
+import {
+  buildGoldenPathCompoundCapabilityContract,
+  isHelixAskGoldenPathRepoDocsCompoundRequested,
+} from "../compound-contract";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
@@ -326,37 +329,27 @@ export const buildHelixAskGoldenPathRepoDocsCompoundPayload = (args: {
     assistant_answer: false,
     raw_content_included: false,
   };
-  const compoundCapabilityContract = {
-    schema: "helix.compound_capability_contract.v1",
-    turn_id: turnId,
-    ordered_subgoals: [
+  const compoundCapabilityContract = buildGoldenPathCompoundCapabilityContract({
+    turnId,
+    subgoals: [
       {
-        subgoal_id: `${turnId}:subgoal:repo_search`,
-        requested_capability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
-        selected_capability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
-        executed_capability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+        subgoalIdSuffix: "repo_search",
+        requestedCapability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
         args: { concept },
-        observation_kind: "repo_code_evidence_observation",
-        observation_ref: repoObservationArtifactId,
-        terminal_contribution_kind: "repo_code_evidence_answer",
-        satisfaction: "satisfied",
+        observationKind: "repo_code_evidence_observation",
+        observationRef: repoObservationArtifactId,
+        terminalContributionKind: "repo_code_evidence_answer",
       },
       {
-        subgoal_id: `${turnId}:subgoal:docs_locate`,
-        requested_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-        selected_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-        executed_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+        subgoalIdSuffix: "docs_locate",
+        requestedCapability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
         args: { doc_path: docPath, query },
-        observation_kind: "doc_location_matches",
-        observation_ref: docObservationArtifactId,
-        terminal_contribution_kind: "doc_location_matches",
-        satisfaction: "satisfied",
+        observationKind: "doc_location_matches",
+        observationRef: docObservationArtifactId,
+        terminalContributionKind: "doc_location_matches",
       },
     ],
-    satisfaction: "satisfied",
-    assistant_answer: false,
-    raw_content_included: false,
-  };
+  });
   const answerText = [
     "Compound repo/docs synthesis completed.",
     `Repo concept: ${concept}`,
