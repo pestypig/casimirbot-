@@ -1283,6 +1283,74 @@ describe("Helix Ask agent provider selection", () => {
     )).toBe(true);
   });
 
+  it("derives natural Codex compound workstation itinerary from retained docs, calculator, and repo prompt cues", async () => {
+    const providerAnswer = "The natural compound turn synthesized the retained document, calculator result, and repo search.";
+    process.env.CODEX_AGENT_FAKE_STDOUT = providerAnswer;
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:codex-natural-compound-docs-calculator-repo",
+        agent_runtime: "codex",
+        question:
+          "Use the open document, calculate 8*9, search the repo for workstation_gateway, then synthesize the implication.",
+        workspace_context_snapshot: {
+          activePanel: "scientific-calculator",
+          focusedPanel: "scientific-calculator",
+          openPanels: ["docs-viewer", "scientific-calculator"],
+          activeDocPath: "/docs/helix-ask-flow.md",
+          hasDocContext: true,
+        },
+      },
+      headers: {},
+    });
+
+    expect(result.text).toBe(providerAnswer);
+    expect((result.debug as any)?.workstation_gateway_call_results?.map((entry: any) => entry.capability_id))
+      .toEqual([
+        "scientific-calculator.open_panel",
+        "scientific-calculator.focus_panel",
+        "scientific-calculator.show_gateway_solve",
+        "docs.search",
+        "scientific-calculator.solve_expression",
+        "repo.search",
+      ]);
+    expect(result.turn_transcript_events?.map((event: any) => event.source_event_type)).toEqual([
+      "runtime_selected",
+      "context_state",
+      "action_request",
+      "action_observation",
+      "action_request",
+      "action_observation",
+      "action_request",
+      "action_observation",
+      "tool_request",
+      "tool_observation",
+      "tool_request",
+      "tool_observation",
+      "tool_request",
+      "tool_observation",
+      "model_reentry",
+      "terminal_answer",
+    ]);
+    expect(result.turn_transcript_events?.some((event: any) =>
+      event.source_event_type === "tool_observation" &&
+      event.capability_id === "docs.search" &&
+      /bounded document excerpt from docs\/helix-ask-flow\.md/i.test(String(event.text)),
+    )).toBe(true);
+    expect(result.turn_transcript_events?.some((event: any) =>
+      event.source_event_type === "tool_observation" &&
+      event.capability_id === "scientific-calculator.solve_expression" &&
+      /8\*9 = 72|8 \* 9 = 72/i.test(String(event.text)),
+    )).toBe(true);
+    expect(result.turn_transcript_events?.some((event: any) =>
+      event.source_event_type === "tool_observation" &&
+      event.capability_id === "repo.search",
+    )).toBe(true);
+  });
+
   it("fails closed when one compound Codex gateway observation is missing", async () => {
     process.env.CODEX_AGENT_FAKE_STDOUT = "The calculator and reflection both ran successfully.";
     process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";

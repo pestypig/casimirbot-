@@ -12,6 +12,8 @@ const CALCULATOR_ACTIVE_CONTEXT_CAPABILITY = "scientific-calculator.active_conte
 const REPO_SEARCH_CAPABILITY = "repo.search" as const;
 const DOCS_SEARCH_CAPABILITY = "docs.search" as const;
 const DOCS_OPEN_DOC_CAPABILITY = "docs-viewer.open_doc" as const;
+const THEORY_CONTEXT_REFLECTION_CAPABILITY = "theory-badge-graph.reflect_discussion_context" as const;
+const CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY = "civilization-bounds.reflect_system_bounds" as const;
 
 const readRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
@@ -33,7 +35,7 @@ export const readExplicitWorkstationGatewayCallRequests = (
   ]
     .map(readRecord)
     .filter((record): record is Record<string, unknown> => Boolean(record))
-    .slice(0, 3);
+    .slice(0, 6);
 };
 
 export const hasExplicitWorkstationGatewayCalls = (body: Record<string, unknown>): boolean =>
@@ -44,6 +46,38 @@ export const hasSelectedHelixAgentRuntime = (body: Record<string, unknown>): boo
 
 const readPrompt = (body: Record<string, unknown>): string | null =>
   readString(body.question) ?? readString(body.prompt) ?? readString(body.raw_user_prompt);
+
+const unquotePrompt = (prompt: string): string => prompt.replace(/"[^"]*"|'[^']*'|`[^`]*`/g, " ");
+
+const hasNegatedToolInstruction = (prompt: string, toolPattern: RegExp): boolean => {
+  const unquoted = unquotePrompt(prompt);
+  const negated = /\b(?:do\s+not|don't|dont|without|no\s+need\s+to|not\s+asking\s+to|avoid)\b[\s\S]{0,100}/i;
+  return negated.test(unquoted) && toolPattern.test(unquoted);
+};
+
+const requestKey = (request: Record<string, unknown>): string => {
+  const args = readRecord(request.arguments ?? request.args) ?? {};
+  const capability = readString(request.capability_id) ?? readString(request.capabilityId) ?? "";
+  const expression = readString(args.expression) ?? readString(args.latex);
+  const query = readString(args.query) ?? readString(args.prompt) ?? readString(args.text);
+  const pathList = Array.isArray(args.paths)
+    ? args.paths.map(readString).filter(Boolean).join(",")
+    : readString(args.path) ?? "";
+  return [capability, expression, query, pathList].filter(Boolean).join(":");
+};
+
+const appendDedupe = (
+  requests: Record<string, unknown>[],
+  seen: Set<string>,
+  next: Record<string, unknown>[],
+): void => {
+  for (const request of next) {
+    const key = requestKey(request);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    requests.push(request);
+  }
+};
 
 const normalizeDocPath = (value: unknown): string | null => {
   const raw = readString(value);
@@ -58,10 +92,14 @@ const readWorkspaceSnapshot = (body: Record<string, unknown>): Record<string, un
 
 const isActiveDocsViewerDeicticPrompt = (prompt: string): boolean => {
   if (/\bbackground\s+only\b/i.test(prompt)) return false;
+  const unquotedPrompt = unquotePrompt(prompt);
+  if (/\b(?:not|don'?t|do\s+not)\s+(?:asking\s+about|ask|answer|use|read|explain|interpret|summari[sz]e)\b.{0,100}\b(?:this|current|open|active|visible)\s+(?:doc|document|paper|white\s*paper|whitepaper)\b/i.test(unquotedPrompt)) return false;
+  if (/\b(?:before|after|if|when)\b.{0,80}\b(?:open|focus|use|show|read|summari[sz]e)\b.{0,50}\b(?:doc|document|paper|white\s*paper|whitepaper)\b/i.test(unquotedPrompt)) return false;
+  if (/\b(?:previous|last|earlier|historical)\b.{0,80}\b(?:doc|document|paper|white\s*paper|whitepaper)\b/i.test(unquotedPrompt)) return false;
   const mentionsCurrentDoc =
-    /\b(?:this|current|open|active|visible)\s+(?:doc|document|paper|white\s*paper|whitepaper)\b/i.test(prompt) ||
-    /\b(?:doc|document|paper|white\s*paper|whitepaper)\s+(?:on\s+screen|in\s+(?:the\s+)?docs?\s+viewer|I'?m\s+viewing|we'?re\s+viewing)\b/i.test(prompt);
-  const asksForContent = /\b(?:summari[sz]e|explain|what\s+is|what'?s|about|key\s+(?:points|findings)|caveats?|read)\b/i.test(prompt);
+    /\b(?:this|current|open|active|visible)\s+(?:doc|document|paper|white\s*paper|whitepaper)\b/i.test(unquotedPrompt) ||
+    /\b(?:doc|document|paper|white\s*paper|whitepaper)\s+(?:on\s+screen|in\s+(?:the\s+)?docs?\s+viewer|I'?m\s+viewing|we'?re\s+viewing)\b/i.test(unquotedPrompt);
+  const asksForContent = /\b(?:summari[sz]e|synthesi[sz]e|explain|what\s+is|what'?s|about|key\s+(?:points|findings)|main\s+claim|claim\s+boundary|caveats?|read|use|include|observation)\b/i.test(unquotedPrompt);
   return mentionsCurrentDoc && asksForContent;
 };
 
@@ -283,7 +321,7 @@ export const buildStructuredAdmissionWorkstationGatewayCallRequests = (
     }
     const query = readGatewayQuery(body, admission);
     if (!query) continue;
-    if (selectedCapability === "repo-code.search_concept") {
+    if (selectedCapability === "repo-code.search_concept" || selectedCapability === REPO_SEARCH_CAPABILITY) {
       const key = `${REPO_SEARCH_CAPABILITY}:${query}`;
       if (seen.has(key)) continue;
       seen.add(key);
@@ -299,7 +337,11 @@ export const buildStructuredAdmissionWorkstationGatewayCallRequests = (
         },
       });
     }
-    if (selectedCapability === "docs-viewer.locate_in_doc" || selectedCapability === "docs-viewer.search_docs") {
+    if (
+      selectedCapability === "docs-viewer.locate_in_doc" ||
+      selectedCapability === "docs-viewer.search_docs" ||
+      selectedCapability === DOCS_SEARCH_CAPABILITY
+    ) {
       const key = `${DOCS_SEARCH_CAPABILITY}:${query}`;
       if (seen.has(key)) continue;
       seen.add(key);
@@ -315,8 +357,38 @@ export const buildStructuredAdmissionWorkstationGatewayCallRequests = (
         },
       });
     }
+    if (selectedCapability === THEORY_CONTEXT_REFLECTION_CAPABILITY) {
+      const key = `${THEORY_CONTEXT_REFLECTION_CAPABILITY}:${query}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      requests.push({
+        schema: "helix.workstation_gateway.structured_admission_call_request.v1",
+        derivation_source: "helix_structured_source_target_admission",
+        capability_id: THEORY_CONTEXT_REFLECTION_CAPABILITY,
+        mode: "read",
+        arguments: {
+          prompt: query,
+          source_target_intent: sourceTargetIntent,
+        },
+      });
+    }
+    if (selectedCapability === CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY) {
+      const key = `${CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY}:${query}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      requests.push({
+        schema: "helix.workstation_gateway.structured_admission_call_request.v1",
+        derivation_source: "helix_structured_source_target_admission",
+        capability_id: CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+        mode: "read",
+        arguments: {
+          prompt: query,
+          source_target_intent: sourceTargetIntent,
+        },
+      });
+    }
   }
-  return requests.slice(0, 3);
+  return requests.slice(0, 6);
 };
 
 export const buildPlannerDerivedWorkstationGatewayCallRequests = (
@@ -330,27 +402,146 @@ export const buildPlannerDerivedWorkstationGatewayCallRequests = (
     workspaceSnapshot: readRecord(body.workspace_context_snapshot ?? body.workspaceContextSnapshot),
   });
   if (!planned.should_use_tool || planned.missing_required_args.length > 0) return [];
-  if (planned.intent !== "calculator_solve" && planned.intent !== "calculator_verify") return [];
+  const requests: Record<string, unknown>[] = [];
+  const seen = new Set<string>();
+  const addPlannerRequest = (request: Record<string, unknown>): void => appendDedupe(requests, seen, [request]);
+  const addCalculatorSolve = (expression: string, source: Record<string, unknown>): void => {
+    addPlannerRequest({
+      schema: "helix.workstation_gateway.planner_derived_call_request.v1",
+      derivation_source: "helix_workstation_tool_planner",
+      planner_intent: planned.intent,
+      planner_reason: planned.reason,
+      capability_id: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+      mode: "read",
+      arguments: {
+        expression,
+        source_target_intent: {
+          source: "helix_workstation_tool_planner",
+          intent: planned.intent,
+          ...source,
+          tool_plan_id: planned.tool_plan?.plan_id ?? null,
+        },
+      },
+    });
+  };
   const action = planned.action;
-  if (!action || action.panel_id !== "scientific-calculator") return [];
-  if (action.action_id !== "solve_expression" && action.action_id !== "solve_with_steps") return [];
-  const expression = readString(action.args.latex) ?? readString(action.args.expression);
-  if (!expression) return [];
+  if (
+    action?.panel_id === "scientific-calculator" &&
+    (action.action_id === "solve_expression" || action.action_id === "solve_with_steps")
+  ) {
+    const expression = readString(action.args.latex) ?? readString(action.args.expression);
+    if (expression) addCalculatorSolve(expression, { panel_id: action.panel_id, action_id: action.action_id });
+  }
+  for (const step of planned.tool_plan?.steps ?? []) {
+    if (
+      step.kind === "run_panel_action" &&
+      step.panel_id === "scientific-calculator" &&
+      (step.action_id === "solve_expression" || step.action_id === "solve_with_steps")
+    ) {
+      const args = readRecord(step.args) ?? {};
+      const expression = readString(args.latex) ?? readString(args.expression);
+      if (expression) {
+        addCalculatorSolve(expression, {
+          panel_id: step.panel_id,
+          action_id: step.action_id,
+          step_id: step.step_id,
+        });
+      }
+    }
+    if (
+      step.tool_id === "helix_ask.reflect_theory_context" ||
+      (step.kind === "run_panel_action" &&
+        step.panel_id === "theory-badge-graph" &&
+        step.action_id === "reflect_discussion_context")
+    ) {
+      const args = readRecord(step.args) ?? {};
+      const reflectionPrompt = readString(args.prompt) ?? prompt;
+      addPlannerRequest({
+        schema: "helix.workstation_gateway.planner_derived_call_request.v1",
+        derivation_source: "helix_workstation_tool_planner",
+        planner_intent: planned.intent,
+        planner_reason: planned.reason,
+        capability_id: THEORY_CONTEXT_REFLECTION_CAPABILITY,
+        mode: "read",
+        arguments: {
+          prompt: reflectionPrompt,
+          conversation_context: prompt,
+          build_explanation_plan: args.build_explanation_plan ?? args.buildExplanationPlan ?? true,
+          source_target_intent: {
+            source: "helix_workstation_tool_planner",
+            intent: planned.intent,
+            step_id: step.step_id,
+            tool_id: step.tool_id ?? null,
+            panel_id: step.panel_id ?? null,
+            action_id: step.action_id ?? null,
+            tool_plan_id: planned.tool_plan?.plan_id ?? null,
+          },
+        },
+      });
+    }
+    if (step.tool_id === "helix_ask.reflect_civilization_bounds") {
+      const args = readRecord(step.args) ?? {};
+      const reflectionPrompt = readString(args.prompt) ?? prompt;
+      addPlannerRequest({
+        schema: "helix.workstation_gateway.planner_derived_call_request.v1",
+        derivation_source: "helix_workstation_tool_planner",
+        planner_intent: planned.intent,
+        planner_reason: planned.reason,
+        capability_id: CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+        mode: "read",
+        arguments: {
+          prompt: reflectionPrompt,
+          include_bridge_context: true,
+          include_collaboration_bounds: true,
+          include_falsification_hooks: true,
+          source_target_intent: {
+            source: "helix_workstation_tool_planner",
+            intent: planned.intent,
+            step_id: step.step_id,
+            tool_id: step.tool_id,
+            tool_plan_id: planned.tool_plan?.plan_id ?? null,
+          },
+        },
+      });
+    }
+  }
+  return requests.slice(0, 6);
+};
+
+const extractRepoSearchQueryFromPrompt = (prompt: string): string | null => {
+  if (hasNegatedToolInstruction(prompt, /\b(?:repo|repository|code|source|implementation|search)\b/i)) return null;
+  const unquoted = unquotePrompt(prompt);
+  const exact =
+    unquoted.match(/\b(?:search|grep|look\s+(?:in|through)|find)\s+(?:the\s+)?(?:repo|repository|codebase|source|code)\s+(?:for|about)\s+([A-Za-z0-9_.:/\\-]{3,80})/i)?.[1] ??
+    unquoted.match(/\b(?:repo|repository|codebase|source|code)\s+(?:search|grep)\s+(?:for|about)\s+([A-Za-z0-9_.:/\\-]{3,80})/i)?.[1] ??
+    null;
+  if (exact) return exact.replace(/[.,;:!?)]*$/g, "").trim();
+  if (!/\b(?:repo|repository|codebase|source|implementation|where\s+(?:is|are).+\b(?:implemented|defined|handled))\b/i.test(unquoted)) {
+    return null;
+  }
+  const fallback = unquoted.match(/\b([A-Za-z][A-Za-z0-9_.-]{2,80})\b(?=[^.!?]*\b(?:repo|repository|codebase|source|implementation)\b)/i)?.[1];
+  return fallback?.trim() ?? null;
+};
+
+export const buildPromptDerivedRepoSearchGatewayCallRequests = (
+  body: Record<string, unknown>,
+): Record<string, unknown>[] => {
+  const prompt = readPrompt(body);
+  if (!prompt) return [];
+  const query = extractRepoSearchQueryFromPrompt(prompt);
+  if (!query) return [];
   return [{
-    schema: "helix.workstation_gateway.planner_derived_call_request.v1",
-    derivation_source: "helix_workstation_tool_planner",
-    planner_intent: planned.intent,
-    planner_reason: planned.reason,
-    capability_id: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+    schema: "helix.workstation_gateway.prompt_derived_repo_search_call_request.v1",
+    derivation_source: "helix_prompt_derived_repo_search",
+    capability_id: REPO_SEARCH_CAPABILITY,
     mode: "read",
     arguments: {
-      expression,
+      query,
       source_target_intent: {
-        source: "helix_workstation_tool_planner",
-        intent: planned.intent,
-        panel_id: action.panel_id,
-        action_id: action.action_id,
-        tool_plan_id: planned.tool_plan?.plan_id ?? null,
+        source: "helix_prompt_derived_repo_search",
+        target_source: "repo_code",
+        target_kind: "repo_search",
+        query,
       },
     },
   }];
@@ -363,15 +554,19 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   const explicit = readExplicitWorkstationGatewayCallRequests(input.body);
   if (explicit.length > 0) return explicit;
   if (input.includePlannerDerived !== true) return [];
+  const requests: Record<string, unknown>[] = [];
+  const seen = new Set<string>();
   const structured = buildStructuredAdmissionWorkstationGatewayCallRequests(input.body);
-  if (structured.length > 0) return structured;
+  appendDedupe(requests, seen, structured);
   const activeDocsContext = buildActiveDocsContextWorkstationGatewayCallRequests(input.body);
-  if (activeDocsContext.length > 0) return activeDocsContext;
+  appendDedupe(requests, seen, activeDocsContext);
   const activeCalculatorContext = buildActiveCalculatorContextWorkstationGatewayCallRequests(input.body);
-  if (activeCalculatorContext.length > 0) return activeCalculatorContext;
+  appendDedupe(requests, seen, activeCalculatorContext);
   const activeWorkstationContext = buildActiveWorkstationContextGatewayCallRequests(input.body);
-  if (activeWorkstationContext.length > 0) return activeWorkstationContext;
-  return buildPlannerDerivedWorkstationGatewayCallRequests(input.body);
+  appendDedupe(requests, seen, activeWorkstationContext);
+  appendDedupe(requests, seen, buildPlannerDerivedWorkstationGatewayCallRequests(input.body));
+  appendDedupe(requests, seen, buildPromptDerivedRepoSearchGatewayCallRequests(input.body));
+  return requests.slice(0, 6);
 };
 
 export const hasWorkstationGatewayCallsForTurn = (input: {

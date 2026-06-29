@@ -197,7 +197,7 @@ function parensBalanced(value: string): boolean {
 }
 
 function extractArithmeticCandidate(value: string): string | null {
-  const matches = value.match(/[()+\-*/^\d.eE\s]+/g) ?? [];
+  const matches = value.match(/(?:\d+(?:\.\d+)?(?:e[-+]?\d+)?|[()+\-*/^\s.])+/gi) ?? [];
   for (const match of matches) {
     const candidate = stripExpressionPunctuation(match).replace(/\s+/g, "");
     if (!candidate || !/\d/.test(candidate) || !/[+\-*/^]/.test(candidate)) continue;
