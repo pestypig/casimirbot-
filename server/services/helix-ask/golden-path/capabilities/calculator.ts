@@ -30,6 +30,20 @@ export const isHelixAskGoldenPathCalculatorSolveRequested = (body: RecordLike): 
 const normalizeCalculatorExpression = (value: string): string =>
   value.trim().replace(/[;,.!?]+$/g, "").replace(/\s+/g, " ");
 
+const extractNaturalCalculatorExpression = (value: string): string | null => {
+  const normalized = normalizeCalculatorExpression(value)
+    .replace(/\bhelix_ask_golden_path_runtime\b/gi, " ")
+    .replace(/\buse\s+scientific-calculator\.solve_expression\b/gi, " ")
+    .replace(/\bscientific-calculator\.solve_expression\b/gi, " ")
+    .replace(/\b(?:please|can you|could you|would you)\b/gi, " ")
+    .trim();
+  const afterIntent = normalized.match(
+    /\b(?:calculate|evaluate|compute|solve|expression(?:\s+is)?|with)\b\s*:?\s*([0-9eEpiPI().+\-*/^%,\s]+)$/i,
+  );
+  const candidate = afterIntent?.[1] ?? normalized.match(/([0-9eEpiPI().+\-*/^%,\s]{3,})$/i)?.[1];
+  return candidate ? normalizeCalculatorExpression(candidate) : null;
+};
+
 export const readCalculatorExpression = (body: RecordLike): string | null => {
   const direct =
     readString(body.calculator_expression) ??
@@ -44,7 +58,12 @@ export const readCalculatorExpression = (body: RecordLike): string | null => {
   const capabilityMatch = prompt.match(
     /scientific-calculator\.solve_expression(?:\s+with)?(?:\s+this\s+exact\s+expression)?\s*:?\s*([^\n\r]+)/i,
   );
-  if (capabilityMatch?.[1]) return normalizeCalculatorExpression(capabilityMatch[1]);
+  if (capabilityMatch?.[1]) {
+    const naturalExpression = extractNaturalCalculatorExpression(capabilityMatch[1]);
+    return naturalExpression ?? normalizeCalculatorExpression(capabilityMatch[1]);
+  }
+  const naturalExpression = extractNaturalCalculatorExpression(prompt);
+  if (naturalExpression) return naturalExpression;
   const compactMath = prompt.match(/((?:sqrt|ln|log|sin|cos|tan|pi|e|\d|\(|\)|\+|\-|\*|\/|\^|\s|\.){3,})/i);
   return compactMath?.[1] ? normalizeCalculatorExpression(compactMath[1]) : null;
 };

@@ -12,6 +12,7 @@ import {
   readStringArray,
   type RecordLike,
 } from "../core";
+import { buildHelixReflectionObservationLayers } from "../reflection-answer-guidance";
 
 export type HelixAskGoldenPathTheoryReflectionDependencies = {
   now: () => Date;
@@ -140,17 +141,67 @@ export const buildHelixAskGoldenPathTheoryReflectionPayload = (args: {
   const answerText = [
     `Theory context reflection for: ${topic}`,
     anchors.length > 0
-      ? `Relevant anchors: ${anchors.join("; ")}.`
-      : "No explicit theory anchors were supplied, so this answer stays at a concept-routing level.",
-    "Use this as reflection context, not as numerical proof or terminal scientific authority.",
+      ? `Use the supplied anchors to bound the answer: ${anchors.join("; ")}.`
+      : "No explicit theory anchors were supplied, so the answer must stay at concept-routing level.",
+    "This can guide what claims are allowed, conditional, or missing; it is not numerical proof or terminal scientific authority.",
   ].join("\n");
+  const reflectionLayers = buildHelixReflectionObservationLayers({
+    promptText,
+    selectedNodes: [topic, ...anchors],
+    locatorRationale:
+      "The theory reflection was selected because the turn asks for concept routing, theory context, or bounded interpretation.",
+    supportRefs: anchors,
+    constraintsIntroduced: [
+      "Theory reflection can shape the claim boundary but does not prove the theory.",
+      "Unanchored claims must stay exploratory.",
+      "Numerical, scientific, or implementation claims require separate evidence.",
+    ],
+    missingEvidence: anchors.length > 0 ? [] : ["theory_anchor_refs"],
+    confidence: anchors.length > 0 ? "medium" : "low",
+    maturity: "exploratory",
+    practicalFraming:
+      "Treat the topic as a concept route and identify what evidence would be needed before stronger claims.",
+    allowedClaims: [
+      "The topic can be discussed as a bounded concept route.",
+      "Anchors may constrain how the final answer frames the concept.",
+    ],
+    conditionalClaims: [
+      "Specific mechanism or implementation claims are conditional on retrieved support evidence.",
+    ],
+    blockedClaims: [
+      "Do not claim scientific proof.",
+      "Do not claim numerical validation.",
+      "Do not claim implementation readiness from theory reflection alone.",
+    ],
+    reasoningMoves: [
+      "Name the topic and anchors.",
+      "State the claim boundary introduced by the anchors.",
+      "Identify missing support before stronger claims.",
+      "Hand off bounded wording to terminal synthesis.",
+    ],
+    suggestedAnswerShape: [
+      "Start with the concept route.",
+      "Name the anchors or say that anchors are missing.",
+      "Separate exploratory claims from evidence-backed claims.",
+      "Give the next retrieval or verification step.",
+    ],
+    wordingGuidance:
+      "Use theory reflection as bounded answer guidance; avoid presenting the receipt as proof or a final scientific conclusion.",
+    compoundHandoffNotes: {
+      research: "Use retrieved sources to fill missing support before strengthening theory claims.",
+      docs: "Use document anchors as support refs for any implementation or repository claim.",
+      calculator: "Only compute quantities explicitly provided by a separate evidence observation.",
+    },
+  });
   const reflectionReceipt = {
     schema: "helix.theory_context_reflection_tool_receipt.v1",
     capability_key: HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
     topic,
     anchors,
     reflection_mode: "golden_path_deterministic_context",
+    ...reflectionLayers,
     assistant_answer: false,
+    terminal_eligible: false,
     raw_content_included: false,
   };
 
@@ -187,6 +238,7 @@ export const buildHelixAskGoldenPathTheoryReflectionPayload = (args: {
     answerLedgerExtraPayload: {
       topic,
       anchors,
+      answer_guidance: reflectionLayers.answer_guidance,
     },
     additionalTopLevelFields: ({ goalSatisfactionArtifact }) => ({
       model_turn_input: {

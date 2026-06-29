@@ -45,14 +45,23 @@ const admittedCapabilityIds = (
     })
     .map((capability) => capability.capability_id);
 
+const projectionReceiptCapabilityIds = (manifest: HelixWorkstationGatewayListResult): string[] =>
+  manifest.capabilities
+    .filter((capability) =>
+      capability.permission_profile_required === "act" &&
+      Boolean(capability.panel_id || capability.action_id),
+    )
+    .map((capability) => capability.capability_id);
+
 const blockedCapabilityIds = (
   manifest: HelixWorkstationGatewayListResult,
   provider: HelixAgentProvider,
 ): string[] => {
   const admitted = new Set(admittedCapabilityIds(manifest, provider));
+  const projectionReceipts = new Set(projectionReceiptCapabilityIds(manifest));
   return manifest.capabilities
     .map((capability) => capability.capability_id)
-    .filter((capabilityId) => !admitted.has(capabilityId));
+    .filter((capabilityId) => !admitted.has(capabilityId) && !projectionReceipts.has(capabilityId));
 };
 
 export type HelixAgentRuntimeAdapterContract = {
@@ -70,6 +79,7 @@ export type HelixAgentRuntimeAdapterContract = {
   workstation_gateway_manifest: HelixWorkstationGatewayListResult;
   workstation_gateway_capability_ids: string[];
   workstation_gateway_admitted_capability_ids: string[];
+  workstation_gateway_projection_receipt_capability_ids: string[];
   workstation_gateway_blocked_capability_ids: string[];
   runtime_selection_trace: HelixAgentRuntimeSelectionTrace;
   adapter_invariants: {
@@ -78,6 +88,7 @@ export type HelixAgentRuntimeAdapterContract = {
     helix_owns_observation_packets: true;
     helix_owns_terminal_authority: true;
     receipts_are_not_answers: true;
+    non_mutating_ui_actions_are_receipts_only: true;
     observations_require_reentry_before_final_answer: true;
     helix_preserves_provider_answer_style: true;
     helix_style_rewrite_enabled: false;
@@ -126,6 +137,7 @@ export const buildHelixAgentRuntimeAdapterContract = (input: {
     workstation_gateway_manifest: gatewayManifest,
     workstation_gateway_capability_ids: gatewayManifest.capabilities.map((capability) => capability.capability_id),
     workstation_gateway_admitted_capability_ids: admittedCapabilityIds(gatewayManifest, input.provider),
+    workstation_gateway_projection_receipt_capability_ids: projectionReceiptCapabilityIds(gatewayManifest),
     workstation_gateway_blocked_capability_ids: blockedCapabilityIds(gatewayManifest, input.provider),
     runtime_selection_trace: runtimeSelectionTrace,
     adapter_invariants: {
@@ -134,6 +146,7 @@ export const buildHelixAgentRuntimeAdapterContract = (input: {
       helix_owns_observation_packets: true,
       helix_owns_terminal_authority: true,
       receipts_are_not_answers: true,
+      non_mutating_ui_actions_are_receipts_only: true,
       observations_require_reentry_before_final_answer: true,
       helix_preserves_provider_answer_style: true,
       helix_style_rewrite_enabled: false,

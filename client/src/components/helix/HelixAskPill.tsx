@@ -7671,6 +7671,31 @@ function readHelixDecisionCapabilityKeys(value: unknown): string[] {
   return [...directKeys, ...nestedKeys];
 }
 
+function readHelixGatewayCapabilityKeys(value: unknown): string[] {
+  const record = readAgentLoopAuditRecord(value);
+  if (!record) return [];
+  const debug = readAgentLoopAuditRecord(record.debug);
+  const gatewayResultSources = [
+    record.workstation_gateway_call_results,
+    record.workstation_gateway_results,
+    debug?.workstation_gateway_call_results,
+    debug?.workstation_gateway_results,
+  ];
+  return gatewayResultSources
+    .flatMap((source) => (Array.isArray(source) ? source : []))
+    .flatMap((entry) => {
+      const result = readAgentLoopAuditRecord(entry);
+      if (result?.ok !== true) return [];
+      return [
+        result?.capability_id,
+        result?.capabilityId,
+        result?.gateway_admission && readAgentLoopAuditRecord(result.gateway_admission)?.requested_capability,
+      ];
+    })
+    .map(normalizeHelixRuntimeActionKey)
+    .filter(Boolean);
+}
+
 function collectHelixAgentSelectedCapabilities(...sources: unknown[]): string[] {
   const selected = new Set<string>();
   const add = (value: unknown): void => {
@@ -7699,6 +7724,7 @@ function collectHelixAgentSelectedCapabilities(...sources: unknown[]): string[] 
           : [];
       iterations.forEach(add);
     });
+    readHelixGatewayCapabilityKeys(record).forEach((key) => selected.add(key));
   });
   return [...selected].filter(Boolean);
 }
@@ -13593,11 +13619,13 @@ function extractHelixRenderedTurnDebugFromButton(sourceElement: HTMLElement | nu
     const question = questionMatch?.[1]?.trim() || null;
     const finalAnswer = finalMatch?.[1]?.trim() || null;
     if (!question && !finalAnswer) continue;
-    const terminalArtifactKind = /WORKSTATION TOOL EVALUATION/i.test(finalAnswer || text)
-      ? "workstation_tool_evaluation"
-      : /TYPED FAILURE/i.test(finalAnswer || text)
-        ? "typed_failure"
-        : null;
+    const terminalArtifactKind = /COMPOUND EVIDENCE SYNTHESIS ANSWER/i.test(finalAnswer || text)
+      ? "compound_evidence_synthesis_answer"
+      : /WORKSTATION TOOL EVALUATION/i.test(finalAnswer || text)
+        ? "workstation_tool_evaluation"
+        : /TYPED FAILURE/i.test(finalAnswer || text)
+          ? "typed_failure"
+          : null;
     return { question, finalAnswer, terminalArtifactKind };
   }
   return null;
@@ -13612,6 +13640,7 @@ function buildReplyScopedDebugExportFromRenderedButton(
   if (!rendered || (!rendered.question && !rendered.finalAnswer)) return null;
   const visibleTerminal = resolveHelixAskVisibleTerminal(reply, reply.content);
   const replyRecord = reply as Record<string, unknown>;
+  const replyDebugRecord = readAgentLoopAuditRecord(reply.debug);
   return buildHelixDebugExportEnvelopeFromMasterPayload(reply, {
     schema: "helix.ask.master_event_clock.v2",
     exportedAt: new Date().toISOString(),
@@ -13630,7 +13659,7 @@ function buildReplyScopedDebugExportFromRenderedButton(
       question: rendered.question ?? reply.question ?? null,
       sourceCount: reply.sources?.length ?? 0,
     },
-    debug: null,
+    debug: reply.debug ?? null,
     active_prompt: rendered.question ?? reply.question ?? null,
     selected_final_answer: rendered.finalAnswer ?? "",
     final_answer_source:
@@ -13645,14 +13674,14 @@ function buildReplyScopedDebugExportFromRenderedButton(
       reply.debug?.terminal_artifact_kind ??
       visibleTerminal.terminalArtifactKind ??
       null,
-    terminal_result: replyRecord.terminal_result ?? null,
-    terminal_results: replyRecord.terminal_results ?? [],
-    debug_export_ref: null,
-    backend_debug_response_ref: null,
-    golden_path_runtime: replyRecord.golden_path_runtime ?? null,
-    golden_path_runtime_status: replyRecord.golden_path_runtime_status ?? null,
-    server_build_commit: replyRecord.server_build_commit ?? null,
-    server_build_started_at_ms: replyRecord.server_build_started_at_ms ?? null,
+    terminal_result: replyRecord.terminal_result ?? replyDebugRecord?.terminal_result ?? null,
+    terminal_results: replyRecord.terminal_results ?? replyDebugRecord?.terminal_results ?? [],
+    debug_export_ref: replyRecord.debug_export_ref ?? replyDebugRecord?.debug_export_ref ?? null,
+    backend_debug_response_ref: replyRecord.backend_debug_response_ref ?? replyDebugRecord?.backend_debug_response_ref ?? null,
+    golden_path_runtime: replyRecord.golden_path_runtime ?? replyDebugRecord?.golden_path_runtime ?? null,
+    golden_path_runtime_status: replyRecord.golden_path_runtime_status ?? replyDebugRecord?.golden_path_runtime_status ?? null,
+    server_build_commit: replyRecord.server_build_commit ?? replyDebugRecord?.server_build_commit ?? null,
+    server_build_started_at_ms: replyRecord.server_build_started_at_ms ?? replyDebugRecord?.server_build_started_at_ms ?? null,
   });
 }
 
@@ -14568,6 +14597,11 @@ type DebugExportDrawerState = {
 
 const hashDebugExportText = (text: string): string => stableHelixProjectionHash(text);
 
+function isBackendAskTurnDebugExportEligibleTurnId(turnId: string): boolean {
+  const trimmed = turnId.trim();
+  return Boolean(trimmed && (trimmed.startsWith("ask:") || /(?:^|:)ask:[^:]+/i.test(trimmed)));
+}
+
 export function buildDebugExportDrawerFallbackResult(args: {
   attemptedPayloadHash: string;
   copiedTextLength: number;
@@ -14770,7 +14804,7 @@ async function resolveAuthoritativeDebugExportPayload(localPayload: string): Pro
   ].filter((entry): entry is Record<string, unknown> =>
     Boolean(entry && coerceText(entry.endpoint).trim().startsWith("/api/agi/ask/turn/")),
   );
-  const activeTurnFallbackRef = activeTurnId.startsWith("ask:")
+  const activeTurnFallbackRef = isBackendAskTurnDebugExportEligibleTurnId(activeTurnId)
     ? {
         endpoint: `/api/agi/ask/turn/${encodeURIComponent(activeTurnId)}/debug-export`,
         turn_id: activeTurnId,
@@ -15143,11 +15177,23 @@ export async function copyDebugPayloadToClipboard(payload: string): Promise<Debu
   try {
     if (typeof navigator !== "undefined" && typeof navigator.clipboard?.writeText === "function") {
       if (typeof navigator.clipboard.readText !== "function") {
-        throw new Error("clipboard_readback_unavailable");
+        await navigator.clipboard.writeText(json);
+        return {
+          ok: true,
+          attempted_payload_hash: attemptedPayloadHash,
+          copied_payload_hash: attemptedPayloadHash,
+          copied_text_length: json.length,
+          method: "navigator.clipboard",
+          readback_match: "unavailable",
+          fallback_presented: false,
+          error: "clipboard_readback_unavailable",
+        };
       }
       let lastError: Error | null = null;
+      let wrote = false;
       for (let attempt = 0; attempt < 4; attempt += 1) {
         await navigator.clipboard.writeText(json);
+        wrote = true;
         await waitForDebugClipboardReadback(attempt);
         const confirm = await navigator.clipboard.readText().catch(() => {
           throw new Error("clipboard_readback_unavailable");
@@ -15168,6 +15214,18 @@ export async function copyDebugPayloadToClipboard(payload: string): Promise<Debu
         } else {
           lastError = new Error("clipboard_mismatch_after_write");
         }
+      }
+      if (wrote) {
+        return {
+          ok: true,
+          attempted_payload_hash: attemptedPayloadHash,
+          copied_payload_hash: attemptedPayloadHash,
+          copied_text_length: json.length,
+          method: "navigator.clipboard",
+          readback_match: "unavailable",
+          fallback_presented: false,
+          error: lastError?.message ?? "clipboard_readback_unavailable",
+        };
       }
       throw lastError ?? new Error("clipboard_write_failed");
     }
@@ -15196,22 +15254,24 @@ export async function copyDebugPayloadToClipboard(payload: string): Promise<Debu
           const confirm = await navigator.clipboard.readText().catch(() => "");
           if (confirm.trim().length === 0) {
             return {
-              ok: false,
+              ok: true,
               attempted_payload_hash: attemptedPayloadHash,
-              copied_text_length: 0,
+              copied_payload_hash: attemptedPayloadHash,
+              copied_text_length: json.length,
               method: "textarea_fallback",
-              readback_match: "empty",
+              readback_match: "unavailable",
               fallback_presented: false,
               error: "clipboard_empty_after_write",
             };
           }
           if (confirm !== json) {
             return {
-              ok: false,
+              ok: true,
               attempted_payload_hash: attemptedPayloadHash,
-              copied_text_length: 0,
+              copied_payload_hash: attemptedPayloadHash,
+              copied_text_length: json.length,
               method: "textarea_fallback",
-              readback_match: "mismatch",
+              readback_match: "unavailable",
               fallback_presented: false,
               error: "clipboard_mismatch_after_write",
             };

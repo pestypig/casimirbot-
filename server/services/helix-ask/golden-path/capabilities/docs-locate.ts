@@ -1,3 +1,6 @@
+import fs from "node:fs";
+import path from "node:path";
+
 import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfaction-artifact";
 import { buildGoldenPathCapabilityTypedFailurePayload } from "../capability-failure";
 import { buildGoldenPathCapabilityTerminalObservationSuccessPayload } from "../capability-terminal-observation-success";
@@ -41,15 +44,53 @@ export const readGoldenPathDocPath = (body: RecordLike): string | null => {
   return match?.[0] ? match[0].replace(/[),.;:!?]+$/g, "") : null;
 };
 
-export const readGoldenPathDocContent = (body: RecordLike): string | null => {
-  return (
+const GOLDEN_PATH_DOC_CONTENT_MAX_CHARS = 750_000;
+const GOLDEN_PATH_DOC_READABLE_EXTENSIONS = new Set([".md", ".mdx", ".txt", ".json", ".rst", ".adoc"]);
+
+export const normalizeGoldenPathReadableDocPath = (docPath: string | null): string | null => {
+  if (!docPath) return null;
+  const normalized = docPath.replace(/\\/g, "/").replace(/^\/+/, "").replace(/[),.;:!?]+$/g, "").trim();
+  if (!normalized || normalized.includes("\0")) return null;
+  if (/^[a-z]+:\/\//i.test(normalized)) return null;
+  if (/^[a-z]:\//i.test(normalized)) return null;
+  if (!normalized.toLowerCase().startsWith("docs/")) return null;
+  if (normalized.split("/").some((part) => part === "..")) return null;
+  const extension = path.extname(normalized).toLowerCase();
+  if (extension && !GOLDEN_PATH_DOC_READABLE_EXTENSIONS.has(extension)) return null;
+  return normalized;
+};
+
+export const readGoldenPathDocContentFromPath = (docPath: string | null): string | null => {
+  const normalized = normalizeGoldenPathReadableDocPath(docPath);
+  if (!normalized) return null;
+
+  const repoRoot = process.cwd();
+  const docsRoot = path.resolve(repoRoot, "docs");
+  const resolvedPath = path.resolve(repoRoot, normalized);
+  const relativeToDocsRoot = path.relative(docsRoot, resolvedPath);
+  if (relativeToDocsRoot.startsWith("..") || path.isAbsolute(relativeToDocsRoot)) return null;
+
+  try {
+    const stat = fs.statSync(resolvedPath);
+    if (!stat.isFile()) return null;
+    const content = fs.readFileSync(resolvedPath, "utf8");
+    return content.length > GOLDEN_PATH_DOC_CONTENT_MAX_CHARS
+      ? content.slice(0, GOLDEN_PATH_DOC_CONTENT_MAX_CHARS)
+      : content;
+  } catch {
+    return null;
+  }
+};
+
+export const readGoldenPathDocContent = (body: RecordLike, docPath?: string | null): string | null => {
+  const explicitContent =
     readString(body.doc_content) ??
     readString(body.docContent) ??
     readString(body.document_content) ??
     readString(body.documentContent) ??
     readString(body.active_doc_content) ??
-    readString(body.activeDocContent)
-  );
+    readString(body.activeDocContent);
+  return explicitContent ?? readGoldenPathDocContentFromPath(docPath ?? readGoldenPathDocPath(body));
 };
 
 export const readGoldenPathDocLocateQuery = (body: RecordLike): string | null => {
@@ -125,7 +166,7 @@ export const buildHelixAskGoldenPathDocsLocatePayload = (args: {
   const goalKind = "locate_in_doc";
   const docPath = readGoldenPathDocPath(args.body);
   const query = readGoldenPathDocLocateQuery(args.body);
-  const docContent = readGoldenPathDocContent(args.body);
+  const docContent = readGoldenPathDocContent(args.body, docPath);
 
   const makeFailurePayload = (params: {
     errorCode: "missing_doc_location_query" | "missing_doc_content" | "no_doc_location_matches";

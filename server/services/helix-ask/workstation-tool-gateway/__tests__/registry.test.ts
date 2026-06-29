@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HELIX_WORKSPACE_OS_STATUS_CAPABILITY } from "../../workspace-os-status-intent";
 import {
   callWorkstationGatewayCapability,
@@ -15,6 +15,8 @@ const WORKSTATION_FOCUS_PANEL_CAPABILITY = "workstation.focus_panel";
 const DOCS_OPEN_DOC_CAPABILITY = "docs-viewer.open_doc";
 const REPO_SEARCH_CAPABILITY = "repo.search";
 const DOCS_SEARCH_CAPABILITY = "docs.search";
+const INTERNET_SEARCH_CAPABILITY = "internet-search.search_web";
+const SCHOLARLY_RESEARCH_SEARCH_CAPABILITY = "scholarly-research.lookup_papers";
 const CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY = "civilization-bounds.reflect_system_bounds";
 const THEORY_CONTEXT_REFLECTION_CAPABILITY = "theory-badge-graph.reflect_discussion_context";
 
@@ -23,18 +25,32 @@ describe("Helix workstation tool gateway", () => {
     RG_BIN: process.env.RG_BIN,
     PATH: process.env.PATH,
     Path: process.env.Path,
+    TAVILY_API_KEY: process.env.TAVILY_API_KEY,
+  };
+  const originalFetch = globalThis.fetch;
+  const restoreEnvKey = (key: keyof typeof originalEnv): void => {
+    const original = originalEnv[key];
+    if (original === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = original;
+    }
   };
 
   beforeEach(() => {
-    process.env.RG_BIN = originalEnv.RG_BIN;
-    process.env.PATH = originalEnv.PATH;
-    process.env.Path = originalEnv.Path;
+    restoreEnvKey("RG_BIN");
+    restoreEnvKey("PATH");
+    restoreEnvKey("Path");
+    restoreEnvKey("TAVILY_API_KEY");
   });
 
   afterEach(() => {
-    process.env.RG_BIN = originalEnv.RG_BIN;
-    process.env.PATH = originalEnv.PATH;
-    process.env.Path = originalEnv.Path;
+    restoreEnvKey("RG_BIN");
+    restoreEnvKey("PATH");
+    restoreEnvKey("Path");
+    restoreEnvKey("TAVILY_API_KEY");
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
   });
 
   it("lists read-only non-terminal workstation capabilities", () => {
@@ -211,6 +227,40 @@ describe("Helix workstation tool gateway", () => {
         requires_source: true,
         permission_profile_required: "read",
         output_observation_schema: "helix.docs_search_observation.v1",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    );
+    expect(manifest.capabilities).toContainEqual(
+      expect.objectContaining({
+        capability_id: INTERNET_SEARCH_CAPABILITY,
+        panel_id: "internet-search",
+        action_id: "search_web",
+        mode: "read",
+        mutating: false,
+        code_mutation: false,
+        shell_access: false,
+        requires_source: true,
+        permission_profile_required: "read",
+        output_observation_schema: "helix.internet_search_observation.v1",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    );
+    expect(manifest.capabilities).toContainEqual(
+      expect.objectContaining({
+        capability_id: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+        panel_id: "scholarly-research",
+        action_id: "lookup_papers",
+        mode: "read",
+        mutating: false,
+        code_mutation: false,
+        shell_access: false,
+        requires_source: true,
+        permission_profile_required: "read",
+        output_observation_schema: "helix.scholarly_research_observation.v1",
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
@@ -1239,6 +1289,90 @@ describe("Helix workstation tool gateway", () => {
     expect((result.observation as { hit_count?: number }).hit_count).toBeGreaterThan(0);
   });
 
+  it("finds the NHM2 current status whitepaper from a multi-word docs query", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: DOCS_SEARCH_CAPABILITY,
+      arguments: {
+        query: "NHM2 white paper",
+        paths: ["docs/research"],
+        max_hits: 5,
+      },
+      turnId: "ask:test:gateway-docs-search-nhm2-whitepaper",
+      iteration: 4,
+    });
+
+    const observation = result.observation as {
+      hits?: Array<{ filePath?: string }>;
+      document_candidates?: Array<{ path?: string; matched_terms?: string[] }>;
+      unique_document_count?: number;
+      terms?: string[];
+    };
+    const hits = observation.hits ?? [];
+    const candidates = observation.document_candidates ?? [];
+    expect(result.ok).toBe(true);
+    expect(observation.terms).toContain("whitepaper");
+    expect((result.observation as { hit_count?: number }).hit_count).toBeGreaterThan(0);
+    expect(hits.some((hit) =>
+      hit.filePath === "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+    )).toBe(true);
+    expect(observation.unique_document_count).toBeGreaterThan(0);
+    expect(candidates[0]?.path).toBe("docs/research/nhm2-current-status-whitepaper-2026-05-02.md");
+    expect(candidates[0]?.matched_terms).toEqual(expect.arrayContaining(["nhm2", "whitepaper"]));
+  });
+
+  it("reports unique docs candidates separately from repeated line hits", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: DOCS_SEARCH_CAPABILITY,
+      arguments: {
+        query: "halobank paper definition congruence plan",
+        paths: ["docs/architecture"],
+        max_hits: 5,
+      },
+      turnId: "ask:test:gateway-docs-search-unique-candidates",
+      iteration: 4,
+    });
+
+    const observation = result.observation as {
+      hit_count?: number;
+      document_candidates?: Array<{ path?: string; line_hit_count?: number }>;
+      unique_document_count?: number;
+    };
+    expect(result.ok).toBe(true);
+    expect(observation.hit_count).toBeGreaterThan(1);
+    expect(observation.unique_document_count).toBeGreaterThan(0);
+    expect(observation.document_candidates?.[0]).toMatchObject({
+      path: "docs/architecture/halobank-paper-definition-congruence-plan.md",
+    });
+    expect(observation.document_candidates?.[0]?.line_hit_count).toBeGreaterThan(0);
+  });
+
+  it("ranks markdown documents ahead of sidecar docs search matches", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: DOCS_SEARCH_CAPABILITY,
+      arguments: {
+        query: "nhm2 current status whitepaper equation actions",
+        paths: ["docs/research"],
+        max_hits: 20,
+      },
+      turnId: "ask:test:gateway-docs-search-sidecar-ranking",
+      iteration: 4,
+    });
+
+    const candidates = (result.observation as {
+      document_candidates?: Array<{ path?: string }>;
+    }).document_candidates ?? [];
+    expect(result.ok).toBe(true);
+    expect(candidates[0]?.path).toBe("docs/research/nhm2-current-status-whitepaper-2026-05-02.md");
+    const sidecarIndex = candidates.findIndex((candidate) => candidate.path?.endsWith(".equation-actions.json"));
+    expect(sidecarIndex === -1 || sidecarIndex > 0).toBe(true);
+  });
+
   it("falls back to bounded Node docs search when ripgrep is unavailable", async () => {
     process.env.RG_BIN = "__helix_missing_rg_binary__";
     process.env.PATH = "";
@@ -1303,6 +1437,252 @@ describe("Helix workstation tool gateway", () => {
       terminal_eligible: false,
       assistant_answer: false,
       raw_content_included: false,
+    });
+  });
+
+  it("calls internet-search.search_web as read-only web evidence, not an answer", async () => {
+    process.env.TAVILY_API_KEY = "test-tavily-key";
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        results: [{
+          title: "Quantum inequalities constrain warp metrics",
+          url: "https://example.com/qei-warp",
+          content: "Quantum inequality margins are diagnostic evidence, not physical validation.",
+          published_date: "2026-06-01",
+        }],
+      }),
+    })) as typeof fetch;
+
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: INTERNET_SEARCH_CAPABILITY,
+      arguments: {
+        query: "QEI warp drive constraints",
+        providers: ["tavily"],
+        limit: 1,
+      },
+      turnId: "ask:test:gateway-internet-search",
+      iteration: 5,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      agent_runtime: "codex",
+      capability_id: INTERNET_SEARCH_CAPABILITY,
+      gateway_admission: {
+        requested_capability: INTERNET_SEARCH_CAPABILITY,
+        permission_profile: "read",
+        admission_status: "admitted",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation_packet: {
+        capability_key: INTERNET_SEARCH_CAPABILITY,
+        panel_id: "internet-search",
+        action: "search_web",
+        status: "succeeded",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.internet_search_observation.v1",
+        capability_key: INTERNET_SEARCH_CAPABILITY,
+        query: "QEI warp drive constraints",
+        providers_considered: ["tavily"],
+        providers_called: ["tavily"],
+        selected_for_answer: true,
+        status: "succeeded",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    const observation = result.observation as {
+      results?: Array<{ title?: string; url?: string }>;
+      evidence_refs?: Array<{ provider?: string; url?: string }>;
+    };
+    expect(observation.results?.[0]).toMatchObject({
+      title: "Quantum inequalities constrain warp metrics",
+      url: "https://example.com/qei-warp",
+    });
+    expect(observation.evidence_refs?.[0]).toMatchObject({
+      provider: "tavily",
+      url: "https://example.com/qei-warp",
+    });
+  });
+
+  it("accepts internet.search as an explicit alias for the canonical internet gateway capability", async () => {
+    process.env.TAVILY_API_KEY = "test-tavily-key";
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        results: [{
+          title: "Current QEI discussion",
+          url: "https://example.com/current-qei",
+          content: "Current web source about QEI margins.",
+        }],
+      }),
+    })) as typeof fetch;
+
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: "internet.search",
+      arguments: {
+        query: "current QEI warp constraints",
+        providers: ["tavily"],
+        limit: 1,
+      },
+      turnId: "ask:test:gateway-internet-search-alias",
+      iteration: 5,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      capability_id: INTERNET_SEARCH_CAPABILITY,
+      observation: {
+        schema: "helix.internet_search_observation.v1",
+        capability_key: INTERNET_SEARCH_CAPABILITY,
+        selected_for_answer: true,
+      },
+    });
+  });
+
+  it("calls scholarly-research.lookup_papers as read-only paper evidence, not an answer", async () => {
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => [
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+        "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
+        "<entry>",
+        "<id>https://arxiv.org/abs/2606.00001</id>",
+        "<title>Quantum inequalities for warp constraints</title>",
+        "<summary>Bounded abstract about quantum inequality margins and warp metrics.</summary>",
+        "<published>2026-06-01T00:00:00Z</published>",
+        "<author><name>A. Researcher</name></author>",
+        "</entry>",
+        "</feed>",
+      ].join(""),
+    })) as typeof fetch;
+
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+      arguments: {
+        query: "quantum inequalities warp drive",
+        providers: ["arxiv"],
+        limit: 1,
+      },
+      turnId: "ask:test:gateway-scholarly-search",
+      iteration: 6,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      agent_runtime: "codex",
+      capability_id: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+      gateway_admission: {
+        requested_capability: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+        permission_profile: "read",
+        admission_status: "admitted",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation_packet: {
+        capability_key: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+        panel_id: "scholarly-research",
+        action: "lookup_papers",
+        status: "succeeded",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.scholarly_research_observation.v1",
+        capability_key: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+        query: "quantum inequalities warp drive",
+        providers_considered: ["arxiv"],
+        providers_called: ["arxiv"],
+        selected_for_answer: true,
+        status: "succeeded",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    const observation = result.observation as {
+      papers?: Array<{
+        title?: string;
+        abstract?: string;
+        identifiers?: { arxiv_id?: string };
+      }>;
+      evidence_refs?: Array<{ provider?: string; url?: string }>;
+    };
+    expect(observation.papers?.[0]).toMatchObject({
+      title: "Quantum inequalities for warp constraints",
+      identifiers: { arxiv_id: "2606.00001" },
+    });
+    expect(observation.papers?.[0]?.abstract).toContain("quantum inequality margins");
+    expect(observation.evidence_refs?.[0]).toMatchObject({
+      provider: "arxiv",
+      url: "https://arxiv.org/abs/2606.00001",
+    });
+  });
+
+  it("accepts research-papers.search as an explicit alias for the canonical scholarly gateway capability", async () => {
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => [
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+        "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
+        "<entry>",
+        "<id>https://arxiv.org/abs/2606.00002</id>",
+        "<title>Paper evidence for QEI boundaries</title>",
+        "<summary>Bounded abstract about QEI boundary evidence.</summary>",
+        "<published>2026-06-02T00:00:00Z</published>",
+        "<author><name>B. Researcher</name></author>",
+        "</entry>",
+        "</feed>",
+      ].join(""),
+    })) as typeof fetch;
+
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: "research-papers.search",
+      arguments: {
+        query: "QEI boundary paper evidence",
+        providers: ["arxiv"],
+        limit: 1,
+      },
+      turnId: "ask:test:gateway-research-papers-search-alias",
+      iteration: 6,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      capability_id: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+      observation: {
+        schema: "helix.scholarly_research_observation.v1",
+        capability_key: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+        selected_for_answer: true,
+      },
     });
   });
 

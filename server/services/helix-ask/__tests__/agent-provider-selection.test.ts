@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -20,6 +20,8 @@ import {
   buildActiveCalculatorContextWorkstationGatewayCallRequests,
   buildActiveDocsContextWorkstationGatewayCallRequests,
   buildActiveWorkstationContextGatewayCallRequests,
+  buildPromptDerivedInternetSearchGatewayCallRequests,
+  buildPromptDerivedScholarlyResearchGatewayCallRequests,
   buildStructuredAdmissionWorkstationGatewayCallRequests,
   buildPlannerDerivedWorkstationGatewayCallRequests,
   runExplicitWorkstationGatewayCalls,
@@ -46,8 +48,10 @@ const ENV_KEYS = [
   "CODEX_AGENT_FAKE_STDOUT",
   "CODEX_AGENT_FAKE_STDERR",
   "CODEX_AGENT_FAKE_EXIT_CODE",
+  "TAVILY_API_KEY",
 ] as const;
 const originalEnv = new Map<string, string | undefined>();
+const originalFetch = globalThis.fetch;
 
 for (const key of ENV_KEYS) {
   originalEnv.set(key, process.env[key]);
@@ -62,6 +66,8 @@ afterEach(() => {
       process.env[key] = original;
     }
   }
+  globalThis.fetch = originalFetch;
+  vi.restoreAllMocks();
 });
 
 describe("Helix Ask agent provider selection", () => {
@@ -124,11 +130,11 @@ describe("Helix Ask agent provider selection", () => {
       codeMutation: false,
     });
     expect(provider.permissionProfile).toMatchObject({
-      id: "read-observe-act",
+      id: "read-observe",
       allows: {
         observe: true,
         read: true,
-        act: true,
+        act: false,
         write: false,
         shell: false,
         codeMutation: false,
@@ -388,10 +394,10 @@ describe("Helix Ask agent provider selection", () => {
         enabled: true,
         experimental: true,
         permission_profile: expect.objectContaining({
-          id: "read-observe-act",
+          id: "read-observe",
           allows: expect.objectContaining({
             read: true,
-            act: true,
+            act: false,
             write: false,
             shell: false,
             codeMutation: false,
@@ -443,10 +449,10 @@ describe("Helix Ask agent provider selection", () => {
       selected_agent_provider: {
           id: "codex",
           permission_profile: {
-          id: "read-observe-act",
+          id: "read-observe",
           allows: {
             read: true,
-            act: true,
+            act: false,
             write: false,
             shell: false,
             codeMutation: false,
@@ -637,6 +643,225 @@ describe("Helix Ask agent provider selection", () => {
       event.capability_id === "workspace_os.status" &&
       /Workspace OS status returned/i.test(String(event.text)),
     )).toBe(true);
+  });
+
+  it("derives natural Codex internet search prompts into bounded web observations", async () => {
+    process.env.TAVILY_API_KEY = "test-tavily-key";
+    process.env.CODEX_AGENT_FAKE_STDOUT = "Web evidence observation is available and bounded.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        results: [{
+          title: "Current QEI discussion",
+          url: "https://example.com/current-qei",
+          content: "Current web source about QEI margins.",
+        }],
+      }),
+    })) as typeof fetch;
+
+    const body = {
+      turn_id: "ask:test:codex-natural-internet-search",
+      agent_runtime: "codex",
+      question: "Search the web for current QEI warp metric constraints and summarize what the sources show.",
+    };
+
+    expect(buildPromptDerivedInternetSearchGatewayCallRequests(body)).toEqual([
+      expect.objectContaining({
+        capability_id: "internet-search.search_web",
+        mode: "read",
+        arguments: expect.objectContaining({
+          query: body.question,
+          source_target_intent: expect.objectContaining({
+            target_kind: "internet_search",
+          }),
+        }),
+      }),
+    ]);
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body,
+      headers: {},
+    });
+
+    expect(result.text).toBe("Web evidence observation is available and bounded.");
+    expect((result.debug as any)?.workstation_gateway_call_results?.map((entry: any) => entry.capability_id))
+      .toEqual(["internet-search.search_web"]);
+    expect((result.debug as any)?.codex_host_workstation_affordances?.support_refs)
+      .toEqual(expect.arrayContaining([expect.stringContaining("internet-search.search_web")]));
+    expect(result.turn_transcript_events?.some((event: any) =>
+      event.source_event_type === "tool_observation" &&
+      event.capability_id === "internet-search.search_web" &&
+      /Internet search returned 1 result/i.test(String(event.text)),
+    )).toBe(true);
+  });
+
+  it("derives natural Codex scholarly prompts into bounded paper observations", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "Scholarly paper observation is available and bounded.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => [
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+        "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
+        "<entry>",
+        "<id>https://arxiv.org/abs/2606.00001</id>",
+        "<title>Quantum inequalities for warp constraints</title>",
+        "<summary>Bounded abstract about QEI and warp metrics.</summary>",
+        "<published>2026-06-01T00:00:00Z</published>",
+        "<author><name>A. Researcher</name></author>",
+        "</entry>",
+        "</feed>",
+      ].join(""),
+    })) as typeof fetch;
+
+    const body = {
+      turn_id: "ask:test:codex-natural-scholarly-search",
+      agent_runtime: "codex",
+      question: "Search research papers on arXiv for quantum inequalities and warp constraints, then summarize the paper evidence.",
+    };
+
+    expect(buildPromptDerivedScholarlyResearchGatewayCallRequests(body)).toEqual([
+      expect.objectContaining({
+        capability_id: "scholarly-research.lookup_papers",
+        mode: "read",
+        arguments: expect.objectContaining({
+          query: body.question,
+          mode: "paper_search",
+          source_target_intent: expect.objectContaining({
+            target_kind: "research_paper_search",
+          }),
+        }),
+      }),
+    ]);
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body,
+      headers: {},
+    });
+
+    expect(result.text).toBe("Scholarly paper observation is available and bounded.");
+    expect((result.debug as any)?.workstation_gateway_call_results?.map((entry: any) => entry.capability_id))
+      .toEqual(["scholarly-research.lookup_papers"]);
+    expect((result.debug as any)?.codex_host_workstation_affordances?.support_refs)
+      .toEqual(expect.arrayContaining([expect.stringContaining("scholarly-research.lookup_papers")]));
+    expect(result.turn_transcript_events?.some((event: any) =>
+      event.source_event_type === "tool_observation" &&
+      event.capability_id === "scholarly-research.lookup_papers" &&
+      /Scholarly research lookup returned 1 paper/i.test(String(event.text)),
+    )).toBe(true);
+  });
+
+  it("keeps compound Codex gateway turns from truncating docs, calculator, repo, reflections, web, and papers", async () => {
+    process.env.TAVILY_API_KEY = "test-tavily-key";
+    process.env.CODEX_AGENT_FAKE_STDOUT = "Compound evidence was available across workstation tools.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    globalThis.fetch = vi.fn(async (url: string) => {
+      if (/arxiv\.org/i.test(url)) {
+        return {
+          ok: true,
+          status: 200,
+          text: async () => [
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+            "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
+            "<entry>",
+            "<id>https://arxiv.org/abs/2606.00001</id>",
+            "<title>Quantum inequalities for warp constraints</title>",
+            "<summary>Bounded abstract about QEI and warp metrics.</summary>",
+            "<published>2026-06-01T00:00:00Z</published>",
+            "<author><name>A. Researcher</name></author>",
+            "</entry>",
+            "</feed>",
+          ].join(""),
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          results: [{
+            title: "Current QEI discussion",
+            url: "https://example.com/current-qei",
+            content: "Current web source about QEI margins.",
+          }],
+        }),
+      };
+    }) as typeof fetch;
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:codex-compound-search-reflection",
+        agent_runtime: "codex",
+        question: "Combine the provided workstation observations into a bounded evidence answer.",
+        workstation_gateway_calls: [
+          {
+            capability_id: "docs.search",
+            mode: "read",
+            arguments: { query: "Helix Ask", paths: ["docs"], max_hits: 1 },
+          },
+          {
+            capability_id: "scientific-calculator.solve_expression",
+            mode: "read",
+            arguments: { expression: "6*7" },
+          },
+          {
+            capability_id: "repo.search",
+            mode: "read",
+            arguments: { query: "workstation_gateway", paths: ["server"], max_hits: 1 },
+          },
+          {
+            capability_id: "theory-badge-graph.reflect_discussion_context",
+            mode: "read",
+            arguments: { prompt: "Reflect QEI margin in the theory badge graph." },
+          },
+          {
+            capability_id: "civilization-bounds.reflect_system_bounds",
+            mode: "read",
+            arguments: { prompt: "Reflect QEI margin through civilization bounds." },
+          },
+          {
+            capability_id: "internet-search.search_web",
+            mode: "read",
+            arguments: { query: "current QEI warp metric constraints", providers: ["tavily"], limit: 1 },
+          },
+          {
+            capability_id: "scholarly-research.lookup_papers",
+            mode: "read",
+            arguments: { query: "quantum inequalities warp drive", providers: ["arxiv"], limit: 1 },
+          },
+        ],
+      },
+      headers: {},
+    });
+
+    expect(result.text).toBe("Compound evidence was available across workstation tools.");
+    const capabilityIds = (result.debug as any)?.workstation_gateway_call_results?.map((entry: any) => entry.capability_id);
+    expect(capabilityIds.slice(0, 7)).toEqual([
+        "docs.search",
+        "scientific-calculator.solve_expression",
+        "repo.search",
+        "theory-badge-graph.reflect_discussion_context",
+        "civilization-bounds.reflect_system_bounds",
+        "internet-search.search_web",
+        "scholarly-research.lookup_papers",
+      ]);
+    expect(capabilityIds).toEqual(expect.arrayContaining([
+      "scientific-calculator.show_gateway_solve",
+    ]));
+    expect(result.turn_transcript_events?.filter((event: any) => event.source_event_type === "tool_observation"))
+      .toHaveLength(7);
+    expect(result.tool_output_refs).toEqual(expect.arrayContaining([
+      expect.stringContaining("internet-search.search_web"),
+      expect.stringContaining("scholarly-research.lookup_papers"),
+    ]));
   });
 
   it("runs future provider workstation gateway calls through the same shared admission", async () => {
@@ -861,6 +1086,16 @@ describe("Helix Ask agent provider selection", () => {
       event.source_event_type === "tool_observation" &&
       /docs\.search materialized a bounded document excerpt from docs\/helix-ask-flow\.md/i.test(String(event.text)),
     )).toBe(true);
+    expect(result.workstation_actions).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        kind: "open_doc_at_line",
+        doc_path: "docs/helix-ask-flow.md",
+        line: expect.any(Number),
+        observation_ref: expect.stringContaining("docs.search"),
+      }),
+    ]));
+    expect((result.debug as any)?.codex_host_workstation_affordances?.workstation_actions)
+      .toEqual(result.workstation_actions);
   });
 
   it("normalizes docs observation excerpt transport without dropping provenance", () => {
@@ -935,6 +1170,44 @@ describe("Helix Ask agent provider selection", () => {
     expect(result.text).toBe("The result is 72.");
     expect(result.text).not.toContain("Ran `scientific-calculator.solve_expression`.");
     expect(result.text).not.toContain("Observed expression:");
+    expect(result.workstation_actions).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        kind: "fill_calculator_expression",
+        expression_text: "8 * 9",
+        result: "72",
+        observation_ref: expect.stringContaining("scientific-calculator.solve_expression"),
+      }),
+      expect.objectContaining({
+        kind: "inspect_workstation_receipt",
+        receipt_ref: expect.stringContaining("scientific-calculator.open_panel"),
+      }),
+      expect.objectContaining({
+        kind: "inspect_workstation_receipt",
+        receipt_ref: expect.stringContaining("scientific-calculator.focus_panel"),
+      }),
+      expect.objectContaining({
+        kind: "inspect_workstation_receipt",
+        receipt_ref: expect.stringContaining("scientific-calculator.show_gateway_solve"),
+      }),
+    ]));
+    expect(result.support_refs).toEqual(expect.arrayContaining([
+      expect.stringContaining("scientific-calculator.solve_expression"),
+    ]));
+    expect(result.tool_output_refs).toEqual(expect.arrayContaining([
+      expect.stringContaining("scientific-calculator.solve_expression"),
+      expect.stringContaining("scientific-calculator.open_panel"),
+      expect.stringContaining("scientific-calculator.focus_panel"),
+      expect.stringContaining("scientific-calculator.show_gateway_solve"),
+    ]));
+    expect((result.debug as any)?.codex_host_workstation_affordances).toMatchObject({
+      schema: "helix.codex_host_workstation_affordances.v1",
+      assistant_answer: false,
+      raw_content_included: false,
+      terminal_eligible: false,
+      workstation_actions: result.workstation_actions,
+      support_refs: result.support_refs,
+      tool_output_refs: result.tool_output_refs,
+    });
     expect((result.action_envelope as any)?.workstation_actions).toEqual([
       {
         schema_version: "helix.workstation.action/v1",
@@ -962,21 +1235,49 @@ describe("Helix Ask agent provider selection", () => {
     ]);
     expect((result.debug as any)?.agent_step_loop?.iterations?.map((iteration: any) => iteration.chosen_capability))
       .toEqual([
+        "scientific-calculator.solve_expression",
         "scientific-calculator.open_panel",
         "scientific-calculator.focus_panel",
         "scientific-calculator.show_gateway_solve",
-        "scientific-calculator.solve_expression",
       ]);
+    expect((result.debug as any)?.agent_runtime_adapter_contract).toMatchObject({
+      selected_agent_provider: {
+        permission_profile: {
+          id: "read-observe",
+          allows: {
+            read: true,
+            act: false,
+            write: false,
+            shell: false,
+            codeMutation: false,
+          },
+        },
+      },
+      workstation_gateway_admitted_capability_ids: expect.arrayContaining([
+        "scientific-calculator.solve_expression",
+      ]),
+      workstation_gateway_projection_receipt_capability_ids: expect.arrayContaining([
+        "scientific-calculator.open_panel",
+        "scientific-calculator.focus_panel",
+        "scientific-calculator.show_gateway_solve",
+      ]),
+    });
+    expect((result.debug as any)?.agent_runtime_adapter_contract?.workstation_gateway_blocked_capability_ids)
+      .not.toEqual(expect.arrayContaining([
+        "scientific-calculator.open_panel",
+        "scientific-calculator.focus_panel",
+        "scientific-calculator.show_gateway_solve",
+      ]));
     expect(result.turn_transcript_events?.map((event: any) => event.source_event_type)).toEqual([
       "runtime_selected",
-      "action_request",
-      "action_observation",
-      "action_request",
-      "action_observation",
-      "action_request",
-      "action_observation",
       "tool_request",
       "tool_observation",
+      "action_request",
+      "action_observation",
+      "action_request",
+      "action_observation",
+      "action_request",
+      "action_observation",
       "model_reentry",
       "terminal_answer",
     ]);
@@ -1266,12 +1567,12 @@ describe("Helix Ask agent provider selection", () => {
     expect(result.text).not.toContain("Tool observation:");
     expect((result.debug as any)?.workstation_gateway_call_results?.map((entry: any) => entry.capability_id))
       .toEqual([
-        "scientific-calculator.open_panel",
-        "scientific-calculator.focus_panel",
-        "scientific-calculator.show_gateway_solve",
         "docs.search",
         "scientific-calculator.solve_expression",
         "repo.search",
+        "scientific-calculator.open_panel",
+        "scientific-calculator.focus_panel",
+        "scientific-calculator.show_gateway_solve",
       ]);
     expect((result.debug as any)?.provider_gateway_debug_summary).toMatchObject({
       gateway_call_count: 6,
@@ -1284,18 +1585,18 @@ describe("Helix Ask agent provider selection", () => {
     });
     expect(result.turn_transcript_events?.map((event: any) => event.source_event_type)).toEqual([
       "runtime_selected",
-      "action_request",
-      "action_observation",
-      "action_request",
-      "action_observation",
-      "action_request",
-      "action_observation",
       "tool_request",
       "tool_observation",
       "tool_request",
       "tool_observation",
       "tool_request",
       "tool_observation",
+      "action_request",
+      "action_observation",
+      "action_request",
+      "action_observation",
+      "action_request",
+      "action_observation",
       "model_reentry",
       "terminal_answer",
     ]);
@@ -1343,28 +1644,28 @@ describe("Helix Ask agent provider selection", () => {
     expect(result.text).toBe(providerAnswer);
     expect((result.debug as any)?.workstation_gateway_call_results?.map((entry: any) => entry.capability_id))
       .toEqual([
-        "scientific-calculator.open_panel",
-        "scientific-calculator.focus_panel",
-        "scientific-calculator.show_gateway_solve",
         "docs.search",
         "scientific-calculator.solve_expression",
         "repo.search",
+        "scientific-calculator.open_panel",
+        "scientific-calculator.focus_panel",
+        "scientific-calculator.show_gateway_solve",
       ]);
     expect(result.turn_transcript_events?.map((event: any) => event.source_event_type)).toEqual([
       "runtime_selected",
       "context_state",
-      "action_request",
-      "action_observation",
-      "action_request",
-      "action_observation",
-      "action_request",
-      "action_observation",
       "tool_request",
       "tool_observation",
       "tool_request",
       "tool_observation",
       "tool_request",
       "tool_observation",
+      "action_request",
+      "action_observation",
+      "action_request",
+      "action_observation",
+      "action_request",
+      "action_observation",
       "model_reentry",
       "terminal_answer",
     ]);
@@ -1382,6 +1683,17 @@ describe("Helix Ask agent provider selection", () => {
       event.source_event_type === "tool_observation" &&
       event.capability_id === "repo.search",
     )).toBe(true);
+    expect(result.workstation_actions).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        kind: "open_repo_file",
+        path: expect.any(String),
+        line: expect.any(Number),
+        observation_ref: expect.stringContaining("repo.search"),
+      }),
+    ]));
+    expect(result.support_refs).toEqual(expect.arrayContaining([
+      expect.stringContaining("repo.search"),
+    ]));
   });
 
   it("fails closed when one compound Codex gateway observation is missing", async () => {
@@ -1421,11 +1733,11 @@ describe("Helix Ask agent provider selection", () => {
       capability_id: entry.capability_id,
       ok: entry.ok,
     }))).toEqual([
+      { capability_id: "scientific-calculator.solve_expression", ok: true },
+      { capability_id: "theory-badge-graph.reflect_discussion_context", ok: false },
       { capability_id: "scientific-calculator.open_panel", ok: true },
       { capability_id: "scientific-calculator.focus_panel", ok: true },
       { capability_id: "scientific-calculator.show_gateway_solve", ok: true },
-      { capability_id: "scientific-calculator.solve_expression", ok: true },
-      { capability_id: "theory-badge-graph.reflect_discussion_context", ok: false },
     ]);
     expect(result.turn_transcript_events?.some((event: any) =>
       event.source_event_type === "tool_observation" &&
@@ -1961,6 +2273,189 @@ describe("Helix Ask agent provider selection", () => {
     expect(result.turn_transcript_events?.some((event: any) =>
       event.source_event_type === "model_reentry" &&
       /no workstation observation packet was available/i.test(String(event.text)),
+    )).toBe(true);
+  });
+
+  it("does not answer repository content when no repo search observation exists", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "The repo shows workstation_gateway is fully wired.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:codex-repo-no-observation",
+        agent_runtime: "codex",
+        question: "Open docs/helix-ask-api-parity-matrix.md and, according to the repo observation, what does workstation_gateway prove?",
+        workstation_gateway_call: {
+          capability_id: "docs-viewer.open_doc",
+          mode: "act",
+          arguments: {
+            path: "docs/helix-ask-api-parity-matrix.md",
+          },
+        },
+      },
+      headers: {},
+    });
+
+    expect((result.debug as any)?.workstation_gateway_call_results?.map((entry: any) => entry.capability_id))
+      .toEqual(["docs-viewer.open_doc"]);
+    expect(result.text).toContain("no repo.search observation packet was materialized");
+    expect(result.text).not.toContain("fully wired");
+    expect(result.turn_transcript_events?.map((event: any) => event.source_event_type)).toEqual([
+      "runtime_selected",
+      "action_request",
+      "action_observation",
+      "model_reentry",
+      "terminal_answer",
+    ]);
+    expect(result.turn_transcript_events?.find((event: any) => event.source_event_type === "terminal_answer"))
+      .toMatchObject({
+        text: result.text,
+        assistant_answer: false,
+        raw_content_included: false,
+      });
+  });
+
+  it("does not answer internet-backed content when no internet search observation exists", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "Current web sources show the claim was validated.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:codex-internet-no-observation",
+        agent_runtime: "codex",
+        question: "Open docs/helix-ask-api-parity-matrix.md and, according to current web sources, what changed?",
+        workstation_gateway_call: {
+          capability_id: "docs-viewer.open_doc",
+          mode: "act",
+          arguments: {
+            path: "docs/helix-ask-api-parity-matrix.md",
+          },
+        },
+      },
+      headers: {},
+    });
+
+    expect((result.debug as any)?.workstation_gateway_call_results?.map((entry: any) => entry.capability_id))
+      .toEqual(["docs-viewer.open_doc"]);
+    expect(result.text).toContain("no internet-search.search_web observation packet was materialized");
+    expect(result.text).not.toContain("validated");
+  });
+
+  it("does not answer scholarly paper content when no scholarly observation exists", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "The arXiv papers prove the claim boundary is solved.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:codex-scholarly-no-observation",
+        agent_runtime: "codex",
+        question: "Open docs/helix-ask-api-parity-matrix.md and, according to arXiv research papers, what evidence supports this?",
+        workstation_gateway_call: {
+          capability_id: "docs-viewer.open_doc",
+          mode: "act",
+          arguments: {
+            path: "docs/helix-ask-api-parity-matrix.md",
+          },
+        },
+      },
+      headers: {},
+    });
+
+    expect((result.debug as any)?.workstation_gateway_call_results?.map((entry: any) => entry.capability_id))
+      .toEqual(["docs-viewer.open_doc"]);
+    expect(result.text).toContain("no scholarly-research.lookup_papers observation packet was materialized");
+    expect(result.text).not.toContain("solved");
+  });
+
+  it("does not create host workstation actions by scraping Codex final prose", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT =
+      "Open docs/helix-ask-flow.md at line 12; also 6 * 7 = 42.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:codex-no-prose-scraped-actions",
+        agent_runtime: "codex",
+        question: "Give a background-only answer about workstation affordance projection.",
+      },
+      headers: {},
+    });
+
+    expect(result.text).toBe("Open docs/helix-ask-flow.md at line 12; also 6 * 7 = 42.");
+    expect(result.workstation_actions).toEqual([]);
+    expect(result.support_refs).toEqual([]);
+    expect(result.tool_output_refs).toEqual([]);
+    expect((result.debug as any)?.codex_host_workstation_affordances).toMatchObject({
+      workstation_actions: [],
+      support_refs: [],
+      tool_output_refs: [],
+    });
+  });
+
+  it("does not guess host workstation actions from malformed tool outputs", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "The calculator result is available.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:codex-malformed-tool-output-no-action",
+        agent_runtime: "codex",
+        question: "Use the scientific calculator and answer normally.",
+        workstation_gateway_call: {
+          capability_id: "scientific-calculator.solve_expression",
+          mode: "read",
+          arguments: {},
+        },
+      },
+      headers: {},
+    });
+
+    expect((result.debug as any)?.workstation_gateway_call_results?.[0]).toMatchObject({
+      ok: false,
+      capability_id: "scientific-calculator.solve_expression",
+    });
+    expect(result.workstation_actions).toEqual([]);
+    expect(result.support_refs).toEqual([]);
+    expect(result.tool_output_refs).toEqual([]);
+    expect((result.debug as any)?.codex_host_workstation_affordances).toMatchObject({
+      workstation_actions: [],
+      support_refs: [],
+      tool_output_refs: [],
+    });
+  });
+
+  it("allows repository content answers when a repo search observation exists", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "The repo observation found workstation_gateway debug-export plumbing.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:codex-repo-observation-authorized",
+        agent_runtime: "codex",
+        question: "Search the repo for workstation_gateway and summarize what the repo observation shows.",
+      },
+      headers: {},
+    });
+
+    expect(result.text).toBe("The repo observation found workstation_gateway debug-export plumbing.");
+    expect((result.debug as any)?.workstation_gateway_call_results?.some((entry: any) =>
+      entry.ok === true && entry.capability_id === "repo.search",
+    )).toBe(true);
+    expect(result.turn_transcript_events?.some((event: any) =>
+      event.source_event_type === "tool_observation" &&
+      event.capability_id === "repo.search",
     )).toBe(true);
   });
 

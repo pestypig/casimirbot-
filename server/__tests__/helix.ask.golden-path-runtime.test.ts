@@ -987,6 +987,22 @@ describe("Helix Ask golden path runtime", () => {
       helix_civilization_bounds_tool_result: {
         kind: "helix_civilization_bounds_tool_result",
         tool_id: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+        procedural_receipt: {
+          schema: "helix.reflection_procedural_receipt.v1",
+          constraints_introduced: expect.arrayContaining([
+            "Treat the idea as a bounded scenario or hypothesis, not as feasibility proof.",
+          ]),
+          missing_evidence: expect.arrayContaining(["source_backed_capacity_measurements"]),
+          assistant_answer: false,
+          terminal_eligible: false,
+        },
+        answer_guidance: {
+          schema: "helix.reflection_answer_guidance.v1",
+          blocked_claims: expect.arrayContaining(["Do not claim feasibility."]),
+          assistant_answer: false,
+          terminal_eligible: false,
+        },
+        terminal_eligible: false,
       },
       civilization_bounds_reflection_answer: {
         roadmap_id: "civilization-bounds:test",
@@ -1013,8 +1029,10 @@ describe("Helix Ask golden path runtime", () => {
         final_answer_source: "civilization_bounds_reflection_answer",
       },
     });
-    expect(body.selected_final_answer).toContain("Civilization bounds reflection completed");
-    expect(body.selected_final_answer).toContain("does not grant prediction, policy, moral, or execution authority");
+    expect(body.selected_final_answer).toContain("bounded hypothesis rather than proof");
+    expect(body.selected_final_answer).toContain("capacity, material inventory, fairness, and explicit review ownership");
+    expect(body.selected_final_answer).toContain("cannot grant prediction, policy, moral, execution, or implementation authority");
+    expect(body.selected_final_answer).not.toContain("Systems:");
     expect(readLedger(body).map((artifact) => artifact.kind)).toEqual([
       "golden_path_route_gate",
       "helix_civilization_bounds_tool_result",
@@ -1078,6 +1096,21 @@ describe("Helix Ask golden path runtime", () => {
       helix_zen_graph_reflection_tool_result: {
         kind: "helix_zen_graph_reflection_tool_result",
         tool_id: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
+        procedural_receipt: {
+          schema: "helix.reflection_procedural_receipt.v1",
+          constraints_introduced: expect.arrayContaining([
+            "Treat ideology graph matches as normative and procedural constraints, not as moral verdicts.",
+          ]),
+          assistant_answer: false,
+          terminal_eligible: false,
+        },
+        answer_guidance: {
+          schema: "helix.reflection_answer_guidance.v1",
+          blocked_claims: expect.arrayContaining(["Do not claim moral finality."]),
+          assistant_answer: false,
+          terminal_eligible: false,
+        },
+        terminal_eligible: false,
       },
       ideology_context_reflection_answer: {
         reflection_id: "ideology-context-reflection:test",
@@ -1103,8 +1136,10 @@ describe("Helix Ask golden path runtime", () => {
         final_answer_source: "ideology_context_reflection_answer",
       },
     });
-    expect(body.selected_final_answer).toContain("Ideology context reflection completed");
-    expect(body.selected_final_answer).toContain("does not grant moral, character, policy, or execution authority");
+    expect(body.selected_final_answer).toContain("bounded framing question");
+    expect(body.selected_final_answer).toContain("cannot become a moral verdict or execution permission");
+    expect(body.selected_final_answer).toContain("evidence-seeking steps");
+    expect(body.selected_final_answer).not.toContain("Activated lenses:");
     expect(readLedger(body).map((artifact) => artifact.kind)).toEqual([
       "golden_path_route_gate",
       "helix_zen_graph_reflection_tool_result",
@@ -1899,6 +1934,36 @@ describe("Helix Ask golden path runtime", () => {
         expression: "10 * 0.224809",
         result: 2.24809,
         result_text: "2.24809",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      workstation_actions: [
+        {
+          kind: "open_doc_at_line",
+          doc_path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          line: 2,
+          observation_ref: "ask:golden:docs-calculator-compound:doc_location_matches",
+        },
+        {
+          kind: "fill_calculator_expression",
+          expression_text: "10 * 0.224809",
+          result: 2.24809,
+          result_text: "2.24809",
+          unit: null,
+          observation_ref: "ask:golden:docs-calculator-compound:calculator_receipt",
+        },
+      ],
+      compound_evidence_synthesis_answer: {
+        workstation_actions: [
+          {
+            kind: "open_doc_at_line",
+            observation_ref: "ask:golden:docs-calculator-compound:doc_location_matches",
+          },
+          {
+            kind: "fill_calculator_expression",
+            observation_ref: "ask:golden:docs-calculator-compound:calculator_receipt",
+          },
+        ],
       },
       compound_capability_contract: {
         satisfaction: "satisfied",
@@ -1946,6 +2011,21 @@ describe("Helix Ask golden path runtime", () => {
       "calculator_receipt",
       "compound_evidence_synthesis_answer",
     ]);
+    expect(readLedger(body).at(-1)).toMatchObject({
+      kind: "compound_evidence_synthesis_answer",
+      payload: {
+        workstation_actions: [
+          {
+            kind: "open_doc_at_line",
+            observation_ref: "ask:golden:docs-calculator-compound:doc_location_matches",
+          },
+          {
+            kind: "fill_calculator_expression",
+            observation_ref: "ask:golden:docs-calculator-compound:calculator_receipt",
+          },
+        ],
+      },
+    });
     expect(terminalLedgerEntries(body)).toHaveLength(1);
   });
 
@@ -2147,10 +2227,57 @@ describe("Helix Ask golden path runtime", () => {
       helix_civilization_bounds_tool_result: {
         kind: "helix_civilization_bounds_tool_result",
         tool_id: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+        procedural_receipt: {
+          schema: "helix.reflection_procedural_receipt.v1",
+          selected_nodes: expect.arrayContaining([
+            expect.objectContaining({ id: "civilization-bounds:compound" }),
+          ]),
+          support_refs: expect.arrayContaining(["civilization-bounds:compound"]),
+          constraints_introduced: expect.arrayContaining([
+            "Treat the possibility as a bounded hypothesis, not as feasibility proof.",
+          ]),
+          missing_evidence: expect.arrayContaining(["source_backed_capacity_measurements"]),
+          assistant_answer: false,
+          terminal_eligible: false,
+        },
+        answer_guidance: {
+          schema: "helix.reflection_answer_guidance.v1",
+          practical_framing: expect.stringContaining("civilization bounds"),
+          allowed_claims: expect.arrayContaining([
+            "The idea can be explored as a bounded scenario.",
+          ]),
+          blocked_claims: expect.arrayContaining(["Do not claim feasibility."]),
+          assistant_answer: false,
+          terminal_eligible: false,
+        },
+        terminal_eligible: false,
       },
       helix_zen_graph_reflection_tool_result: {
         kind: "helix_zen_graph_reflection_tool_result",
         tool_id: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
+        procedural_receipt: {
+          schema: "helix.reflection_procedural_receipt.v1",
+          selected_nodes: expect.arrayContaining([
+            expect.objectContaining({ id: "ideology-context-reflection:compound" }),
+          ]),
+          support_refs: expect.arrayContaining(["ideology-context-reflection:compound", "turn:civilization-zen"]),
+          constraints_introduced: expect.arrayContaining([
+            "Treat activated lenses and tensions as answer-shaping constraints, not terminal moral authority.",
+          ]),
+          assistant_answer: false,
+          terminal_eligible: false,
+        },
+        answer_guidance: {
+          schema: "helix.reflection_answer_guidance.v1",
+          practical_framing: expect.stringContaining("review-gated"),
+          blocked_claims: expect.arrayContaining(["Do not claim moral finality."]),
+          reasoning_moves: expect.arrayContaining([
+            "Keep the civilization-bounds evidence as the feasibility boundary.",
+          ]),
+          assistant_answer: false,
+          terminal_eligible: false,
+        },
+        terminal_eligible: false,
       },
       compound_capability_contract: {
         satisfaction: "satisfied",
@@ -2193,8 +2320,12 @@ describe("Helix Ask golden path runtime", () => {
         compound_subgoal_count: 2,
       },
     });
-    expect(body.selected_final_answer).toContain("Compound civilization-bounds/reflection synthesis completed");
-    expect(body.selected_final_answer).toContain("Both receipts are evidence-only");
+    expect(body.selected_final_answer).toContain("bounded hypothesis");
+    expect(body.selected_final_answer).toContain("capacity, material inventory, fairness, and explicit review gates");
+    expect(body.selected_final_answer).toContain("not as moral finality or execution permission");
+    expect(body.selected_final_answer).not.toContain("activated lenses");
+    expect(body.selected_final_answer).not.toContain("Procedural classifications");
+    expect(body.compound_evidence_synthesis_answer.text).toBe(body.selected_final_answer);
     expect(readLedger(body).map((artifact) => artifact.kind)).toEqual([
       "golden_path_route_gate",
       "helix_civilization_bounds_tool_result",

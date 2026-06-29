@@ -10,6 +10,10 @@ import {
   isWorkspaceOsStatusPrompt,
   workspaceOsStatusReasonCodes,
 } from "../workspace-os-status-intent";
+import { HELIX_INTERNET_SEARCH_CAPABILITY } from "@shared/helix-internet-search-observation";
+import { HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY } from "@shared/helix-scholarly-research-observation";
+import { detectInternetSearchIntent } from "../internet-search-intent";
+import { detectScholarlyResearchIntent } from "../scholarly-research-intent";
 
 const WORKSTATION_ACTIVE_CONTEXT_CAPABILITY = "workstation.active_context" as const;
 const CALCULATOR_SOLVE_EXPRESSION_CAPABILITY = "scientific-calculator.solve_expression" as const;
@@ -18,6 +22,8 @@ const WORKSPACE_OS_STATUS_CAPABILITY = HELIX_WORKSPACE_OS_STATUS_CAPABILITY;
 const REPO_SEARCH_CAPABILITY = "repo.search" as const;
 const DOCS_SEARCH_CAPABILITY = "docs.search" as const;
 const DOCS_OPEN_DOC_CAPABILITY = "docs-viewer.open_doc" as const;
+const INTERNET_SEARCH_CAPABILITY = HELIX_INTERNET_SEARCH_CAPABILITY;
+const SCHOLARLY_RESEARCH_SEARCH_CAPABILITY = HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY;
 const THEORY_CONTEXT_REFLECTION_CAPABILITY = "theory-badge-graph.reflect_discussion_context" as const;
 const CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY = "civilization-bounds.reflect_system_bounds" as const;
 
@@ -41,7 +47,7 @@ export const readExplicitWorkstationGatewayCallRequests = (
   ]
     .map(readRecord)
     .filter((record): record is Record<string, unknown> => Boolean(record))
-    .slice(0, 6);
+    .slice(0, 10);
 };
 
 export const hasExplicitWorkstationGatewayCalls = (body: Record<string, unknown>): boolean =>
@@ -366,6 +372,46 @@ export const buildStructuredAdmissionWorkstationGatewayCallRequests = (
         },
       });
     }
+    if (
+      selectedCapability === INTERNET_SEARCH_CAPABILITY ||
+      selectedCapability === "internet.search" ||
+      selectedCapability === "internet_search.web_research" ||
+      selectedCapability === "web.search"
+    ) {
+      const key = `${INTERNET_SEARCH_CAPABILITY}:${query}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      requests.push({
+        schema: "helix.workstation_gateway.structured_admission_call_request.v1",
+        derivation_source: "helix_structured_source_target_admission",
+        capability_id: INTERNET_SEARCH_CAPABILITY,
+        mode: "read",
+        arguments: {
+          query,
+          source_target_intent: sourceTargetIntent,
+        },
+      });
+    }
+    if (
+      selectedCapability === SCHOLARLY_RESEARCH_SEARCH_CAPABILITY ||
+      selectedCapability === "scholarly.search" ||
+      selectedCapability === "research-papers.search" ||
+      selectedCapability === "research_papers.search"
+    ) {
+      const key = `${SCHOLARLY_RESEARCH_SEARCH_CAPABILITY}:${query}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      requests.push({
+        schema: "helix.workstation_gateway.structured_admission_call_request.v1",
+        derivation_source: "helix_structured_source_target_admission",
+        capability_id: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+        mode: "read",
+        arguments: {
+          query,
+          source_target_intent: sourceTargetIntent,
+        },
+      });
+    }
     if (selectedCapability === THEORY_CONTEXT_REFLECTION_CAPABILITY) {
       const key = `${THEORY_CONTEXT_REFLECTION_CAPABILITY}:${query}`;
       if (seen.has(key)) continue;
@@ -411,7 +457,7 @@ export const buildStructuredAdmissionWorkstationGatewayCallRequests = (
       });
     }
   }
-  return requests.slice(0, 6);
+  return requests.slice(0, 10);
 };
 
 export const buildPlannerDerivedWorkstationGatewayCallRequests = (
@@ -528,7 +574,7 @@ export const buildPlannerDerivedWorkstationGatewayCallRequests = (
       });
     }
   }
-  return requests.slice(0, 6);
+  return requests.slice(0, 10);
 };
 
 const extractRepoSearchQueryFromPrompt = (prompt: string): string | null => {
@@ -587,6 +633,66 @@ export const buildPromptDerivedRepoSearchGatewayCallRequests = (
   }];
 };
 
+export const buildPromptDerivedInternetSearchGatewayCallRequests = (
+  body: Record<string, unknown>,
+): Record<string, unknown>[] => {
+  const prompt = readPrompt(body);
+  if (!prompt) return [];
+  const intent = detectInternetSearchIntent(prompt);
+  if (!intent.searchRequested) return [];
+  return [{
+    schema: "helix.workstation_gateway.prompt_derived_internet_search_call_request.v1",
+    derivation_source: "helix_prompt_derived_internet_search",
+    capability_id: INTERNET_SEARCH_CAPABILITY,
+    mode: "read",
+    arguments: {
+      query: intent.normalizedQuery,
+      ...(intent.domains.length > 0 ? { domains: intent.domains } : {}),
+      ...(intent.recencyDays ? { recency_days: intent.recencyDays } : {}),
+      source_target_intent: {
+        source: "helix_prompt_derived_internet_search",
+        target_source: "internet",
+        target_kind: "internet_search",
+        strength: intent.strength,
+        explicit_cues: intent.explicitCues,
+        reasons: intent.reasons,
+        requested_outputs: intent.requestedOutputs,
+      },
+    },
+  }];
+};
+
+export const buildPromptDerivedScholarlyResearchGatewayCallRequests = (
+  body: Record<string, unknown>,
+): Record<string, unknown>[] => {
+  const prompt = readPrompt(body);
+  if (!prompt) return [];
+  const intent = detectScholarlyResearchIntent(prompt);
+  if (!intent.researchRequested) return [];
+  return [{
+    schema: "helix.workstation_gateway.prompt_derived_scholarly_research_call_request.v1",
+    derivation_source: "helix_prompt_derived_scholarly_research",
+    capability_id: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+    mode: "read",
+    arguments: {
+      query: intent.normalizedQuery,
+      mode: intent.mode,
+      source_target_intent: {
+        source: "helix_prompt_derived_scholarly_research",
+        target_source: "scholarly_research",
+        target_kind: "research_paper_search",
+        strength: intent.strength,
+        explicit_cues: intent.explicitCues,
+        reasons: intent.reasons,
+        requested_outputs: intent.requestedOutputs,
+        doi: intent.doi,
+        arxiv_id: intent.arxivId,
+        full_text_requested: intent.fullTextRequested,
+      },
+    },
+  }];
+};
+
 export const buildPromptDerivedWorkspaceStatusGatewayCallRequests = (
   body: Record<string, unknown>,
 ): Record<string, unknown>[] => {
@@ -627,8 +733,10 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   appendDedupe(requests, seen, activeWorkstationContext);
   appendDedupe(requests, seen, buildPromptDerivedWorkspaceStatusGatewayCallRequests(input.body));
   appendDedupe(requests, seen, buildPlannerDerivedWorkstationGatewayCallRequests(input.body));
+  appendDedupe(requests, seen, buildPromptDerivedScholarlyResearchGatewayCallRequests(input.body));
+  appendDedupe(requests, seen, buildPromptDerivedInternetSearchGatewayCallRequests(input.body));
   appendDedupe(requests, seen, buildPromptDerivedRepoSearchGatewayCallRequests(input.body));
-  return requests.slice(0, 6);
+  return requests.slice(0, 10);
 };
 
 export const hasWorkstationGatewayCallsForTurn = (input: {

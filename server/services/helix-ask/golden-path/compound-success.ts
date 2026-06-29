@@ -68,6 +68,7 @@ export const buildGoldenPathCompoundSuccessPayload = (args: {
   includeRouteGatePromptText?: boolean;
   answerProducerItemId?: string;
   compoundSubgoalCount?: number;
+  workstationActions?: readonly RecordLike[];
 }): RecordLike => {
   const canonicalGoalFrame = buildGoldenPathCompoundCanonicalGoalFrame({
     turnId: args.turnId,
@@ -121,7 +122,9 @@ export const buildGoldenPathCompoundSuccessPayload = (args: {
       text: terminalResult.text,
       supportRefs: terminalResult.support_refs,
       satisfiedSubgoalCount: compoundSubgoalCount,
+      workstationActions: args.workstationActions,
     }),
+    ...(args.workstationActions?.length ? { workstation_actions: [...args.workstationActions] } : {}),
     capability_plan: buildGoldenPathCompoundCapabilityPlan({
       requiredObservationKinds: args.requiredObservationKinds,
       requiredTerminalKind: args.requiredTerminalKind,
@@ -171,7 +174,10 @@ export const buildGoldenPathCompoundSuccessPayload = (args: {
         producerItemId: args.answerProducerItemId,
         payloadSchema: "helix.compound_evidence_synthesis_answer.v1",
         terminalResult,
-        extraPayload: { satisfied_subgoal_count: compoundSubgoalCount },
+        extraPayload: {
+          satisfied_subgoal_count: compoundSubgoalCount,
+          ...(args.workstationActions?.length ? { workstation_actions: [...args.workstationActions] } : {}),
+        },
       }),
     ],
     debug: buildGoldenPathCompoundDebugMirror({

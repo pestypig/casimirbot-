@@ -14,6 +14,7 @@ import {
   readStringArray,
   type RecordLike,
 } from "../core";
+import { buildHelixReflectionObservationLayers } from "../reflection-answer-guidance";
 
 export type HelixAskGoldenPathZenGraphReflectionDependencies = {
   now: () => Date;
@@ -134,14 +135,64 @@ export const buildHelixAskGoldenPathZenGraphReflectionPayload = (args: {
   const admissions = readArray(compactResult.admissions);
   const refs = readStringArray(input?.refs).length > 0 ? readStringArray(input?.refs) : readStringArray(args.body.refs);
   const evidenceRefs = [reflectionId, ...refs].filter((ref): ref is string => ref.length > 0).slice(0, 8);
+  const reflectionLayers = buildHelixReflectionObservationLayers({
+    promptText,
+    selectedNodes: [
+      reflection,
+      ...activatedTraits.slice(0, 4),
+      ...tensions.slice(0, 4),
+      ...locatorMatches.slice(0, 4),
+    ],
+    locatorRationale:
+      "The zen graph reflection was selected because the turn asks for ideology context, moral/behavioral framing, or missing considerations.",
+    supportRefs: evidenceRefs,
+    constraintsIntroduced: [
+      "Treat ideology graph matches as normative and procedural constraints, not as moral verdicts.",
+      "Recommended actions are diagnostic moves until separate evidence and route authority support them.",
+      "Admissions and locator matches bound wording but do not make the receipt terminal.",
+    ],
+    missingEvidence: refs.length > 0 ? [] : ["source_refs_for_ideology_context"],
+    practicalFraming:
+      "Use the graph location to explain how the prompt should be phrased and bounded without claiming final moral authority.",
+    allowedClaims: [
+      "The selected graph relation can shape the answer's caution, tone, and next evidence step.",
+      "The answer may name tensions and recommended diagnostic moves as constraints.",
+    ],
+    conditionalClaims: [
+      "Any stronger recommendation is conditional on support refs, admissions, and the route-product contract.",
+    ],
+    blockedClaims: [
+      "Do not claim moral finality.",
+      "Do not diagnose character or intent.",
+      "Do not treat activated lenses, tensions, locator matches, or admissions as the final answer.",
+    ],
+    reasoningMoves: [
+      "Interpret the user question through the selected graph relation.",
+      "Name the relevant tension or procedural move.",
+      "Explain what the relation allows and blocks.",
+      "Hand off the constrained framing to terminal synthesis.",
+    ],
+    suggestedAnswerShape: [
+      "Start with the bounded interpretation.",
+      "Explain how the graph relation constrains the answer.",
+      "State allowed and blocked claims.",
+      "Give a concrete next evidence or review step.",
+    ],
+    wordingGuidance:
+      "Write in natural prose about what the relation permits and forbids; do not expose lens or locator counts as the answer.",
+    compoundHandoffNotes: {
+      civilization_bounds: "Use this as normative wording guidance after capacity and evidence bounds are named.",
+      docs: "Retrieve the cited ideology or policy source before making source-backed claims.",
+      calculator: "No scalar computation is authorized by ideology reflection alone.",
+    },
+  });
   const answerText = [
-    "Ideology context reflection completed.",
-    `Reflection: ${reflectionId}`,
-    `Input: ${inputSummary}`,
-    `Activated lenses: ${activatedTraits.length}; tensions: ${tensions.length}; recommended actions: ${recommendedActions.length}.`,
-    `Procedural classifications: ${proceduralClassifications.length}; badge locator matches: ${locatorMatches.length}; admissions: ${admissions.length}.`,
-    fruition ? "Fruition procedure evidence is present as support, not final authority." : null,
-    "The zen graph receipt is evidence-only; this answer is a synthesis summary and does not grant moral, character, policy, or execution authority.",
+    `The ideology reflection (${reflectionId}) treats the prompt as a bounded framing question: ${inputSummary}`,
+    "It can shape wording, caution, and next diagnostic moves, but it cannot become a moral verdict or execution permission.",
+    recommendedActions.length > 0
+      ? "The safe move is to use the recommended actions as evidence-seeking steps, not as final authority."
+      : "No recommended action evidence was supplied, so the answer should stay at framing level.",
+    fruition ? "Fruition procedure evidence may support the phrasing, but it remains non-terminal." : null,
   ]
     .filter((line): line is string => typeof line === "string" && line.length > 0)
     .join("\n");
@@ -155,7 +206,9 @@ export const buildHelixAskGoldenPathZenGraphReflectionPayload = (args: {
     fruition,
     admissions,
     evidence_refs: evidenceRefs,
+    ...reflectionLayers,
     assistant_answer: false,
+    terminal_eligible: false,
     raw_content_included: false,
   };
 
@@ -193,6 +246,7 @@ export const buildHelixAskGoldenPathZenGraphReflectionPayload = (args: {
     includeRouteGatePromptText: false,
     answerLedgerExtraPayload: {
       reflection_id: reflectionId,
+      answer_guidance: reflectionLayers.answer_guidance,
     },
     additionalTopLevelFields: ({ goalSatisfactionArtifact }) => ({
       model_turn_input: {

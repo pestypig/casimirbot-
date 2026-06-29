@@ -297,10 +297,19 @@ describe("helix ask pill E68 debug export envelope", () => {
           prompt: "Use the calculator observation.",
           selected_provider: "codex",
           capability_manifest_version: "read-observe-act.v1",
-          requested_capabilities: ["scientific-calculator.solve_expression"],
-          admitted_capabilities: ["scientific-calculator.solve_expression"],
+          requested_capabilities: [
+            "scientific-calculator.solve_expression",
+            "scientific-calculator.show_gateway_solve",
+          ],
+          admitted_capabilities: [
+            "scientific-calculator.solve_expression",
+            "scientific-calculator.show_gateway_solve",
+          ],
           blocked_capabilities: [],
-          executed_capabilities: ["scientific-calculator.solve_expression"],
+          executed_capabilities: [
+            "scientific-calculator.solve_expression",
+            "scientific-calculator.show_gateway_solve",
+          ],
           evidence_reentry_status: "completed",
           route_authority_result: "provider_gateway_read_observe_contract_satisfied",
           terminal_authority_result: "authorized_by_helix_provider_candidate_bridge",
@@ -319,6 +328,21 @@ describe("helix ask pill E68 debug export envelope", () => {
             observation_packet: {
               terminal_eligible: false,
               post_tool_model_step_required: true,
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+          },
+          {
+            capability_id: "scientific-calculator.show_gateway_solve",
+            ok: true,
+            gateway_admission: {
+              requested_capability: "scientific-calculator.show_gateway_solve",
+              selected_agent_provider: "codex",
+              admission_status: "admitted",
+            },
+            observation_packet: {
+              terminal_eligible: false,
+              post_tool_model_step_required: false,
               assistant_answer: false,
               raw_content_included: false,
             },
@@ -346,6 +370,16 @@ describe("helix ask pill E68 debug export envelope", () => {
             source_event_type: "tool_observation",
             capability_id: "scientific-calculator.solve_expression",
             text: "Tool observation: scientific-calculator.solve_expression observed 6*7 = 42.",
+          },
+          {
+            source_event_type: "action_request",
+            capability_id: "scientific-calculator.show_gateway_solve",
+            text: "Action request: scientific-calculator.show_gateway_solve.",
+          },
+          {
+            source_event_type: "action_observation",
+            capability_id: "scientific-calculator.show_gateway_solve",
+            text: "Action observation: scientific-calculator.show_gateway_solve admitted show_gateway_solve for scientific-calculator.",
           },
           {
             source_event_type: "model_reentry",
@@ -393,9 +427,18 @@ describe("helix ask pill E68 debug export envelope", () => {
     expect(parsed.provider_gateway_debug_summary).toMatchObject({
       schema: "helix.provider_gateway_debug_summary.v1",
       selected_provider: "codex",
-      requested_capabilities: ["scientific-calculator.solve_expression"],
-      admitted_capabilities: ["scientific-calculator.solve_expression"],
-      executed_capabilities: ["scientific-calculator.solve_expression"],
+      requested_capabilities: [
+        "scientific-calculator.solve_expression",
+        "scientific-calculator.show_gateway_solve",
+      ],
+      admitted_capabilities: [
+        "scientific-calculator.solve_expression",
+        "scientific-calculator.show_gateway_solve",
+      ],
+      executed_capabilities: [
+        "scientific-calculator.solve_expression",
+        "scientific-calculator.show_gateway_solve",
+      ],
       evidence_reentry_status: "completed",
       route_authority_result: "provider_gateway_read_observe_contract_satisfied",
       terminal_authority_result: "authorized_by_helix_provider_candidate_bridge",
@@ -416,12 +459,18 @@ describe("helix ask pill E68 debug export envelope", () => {
       "runtime_selected",
       "tool_request",
       "tool_observation",
+      "action_request",
+      "action_observation",
       "model_reentry",
       "terminal_answer",
     ]);
     expect(parsed.turn_transcript_events[2]).toMatchObject({
       capability_id: "scientific-calculator.solve_expression",
       text: "Tool observation: scientific-calculator.solve_expression observed 6*7 = 42.",
+    });
+    expect(parsed.turn_transcript_events[4]).toMatchObject({
+      capability_id: "scientific-calculator.show_gateway_solve",
+      text: "Action observation: scientific-calculator.show_gateway_solve admitted show_gateway_solve for scientific-calculator.",
     });
     expect(parsed.provider_reasoning_reentry).toMatchObject({
       status: "completed",
@@ -701,5 +750,80 @@ describe("helix ask pill E68 debug export envelope", () => {
     );
     expect(parsed.tool_trace_disclosure.assistant_answer).toBe(false);
     expect(parsed.tool_trace_disclosure.terminal_eligible).toBe(false);
+  });
+
+  it("exports Codex host workstation affordances beside final prose", () => {
+    const payload = buildHelixDebugExportEnvelopeFromMasterPayload(
+      {
+        id: "ask:codex-affordance",
+        question: "Use the calculator to evaluate 8 * 9.",
+        content: "8 * 9 = 72",
+      } as any,
+      {
+        agent_runtime: "codex",
+        selected_final_answer: "8 * 9 = 72",
+        final_answer_source: "agent_provider_terminal_candidate",
+        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        workstation_actions: [
+          {
+            kind: "fill_calculator_expression",
+            expression_text: "8 * 9",
+            result: "72",
+            observation_ref: "ask:codex-affordance:workstation_gateway:scientific-calculator.solve_expression:abc123",
+          },
+        ],
+        support_refs: [
+          "ask:codex-affordance:workstation_gateway:scientific-calculator.solve_expression:abc123",
+        ],
+        tool_output_refs: [
+          "ask:codex-affordance:workstation_gateway:scientific-calculator.solve_expression:abc123",
+        ],
+        debug: {
+          turn_id: "ask:codex-affordance",
+          codex_host_workstation_affordances: {
+            schema: "helix.codex_host_workstation_affordances.v1",
+            workstation_actions: [
+              {
+                kind: "fill_calculator_expression",
+                expression_text: "8 * 9",
+                result: "72",
+                observation_ref: "ask:codex-affordance:workstation_gateway:scientific-calculator.solve_expression:abc123",
+              },
+            ],
+            support_refs: [
+              "ask:codex-affordance:workstation_gateway:scientific-calculator.solve_expression:abc123",
+            ],
+            tool_output_refs: [
+              "ask:codex-affordance:workstation_gateway:scientific-calculator.solve_expression:abc123",
+            ],
+            assistant_answer: false,
+            raw_content_included: false,
+            terminal_eligible: false,
+          },
+        },
+      },
+    );
+    const parsed = JSON.parse(payload);
+
+    expect(parsed.selected_final_answer).toBe("8 * 9 = 72");
+    expect(parsed.codex_host_workstation_affordances).toMatchObject({
+      schema: "helix.codex_host_workstation_affordances.v1",
+      assistant_answer: false,
+      raw_content_included: false,
+      terminal_eligible: false,
+    });
+    expect(parsed.workstation_actions).toEqual([
+      expect.objectContaining({
+        kind: "fill_calculator_expression",
+        expression_text: "8 * 9",
+        result: "72",
+      }),
+    ]);
+    expect(parsed.support_refs).toEqual([
+      "ask:codex-affordance:workstation_gateway:scientific-calculator.solve_expression:abc123",
+    ]);
+    expect(parsed.tool_output_refs).toEqual([
+      "ask:codex-affordance:workstation_gateway:scientific-calculator.solve_expression:abc123",
+    ]);
   });
 });

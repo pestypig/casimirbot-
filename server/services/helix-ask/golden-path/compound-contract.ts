@@ -81,12 +81,14 @@ export const buildGoldenPathCompoundEvidenceSynthesisAnswer = (args: {
   text: string;
   supportRefs: readonly string[];
   satisfiedSubgoalCount: number;
+  workstationActions?: readonly RecordLike[];
 }): RecordLike => ({
   schema: "helix.compound_evidence_synthesis_answer.v1",
   text: args.text,
   answer_text: args.text,
   support_refs: [...args.supportRefs],
   satisfied_subgoal_count: args.satisfiedSubgoalCount,
+  ...(args.workstationActions?.length ? { workstation_actions: [...args.workstationActions] } : {}),
   assistant_answer: false,
   raw_content_included: false,
 });
@@ -169,7 +171,17 @@ export const isHelixAskGoldenPathVisualCalculatorCompoundRequested = (body: Reco
   isHelixAskGoldenPathVisualCaptureRequested(body) && isHelixAskGoldenPathCalculatorSolveRequested(body);
 
 export const isHelixAskGoldenPathDocsCalculatorCompoundRequested = (body: RecordLike): boolean =>
-  isHelixAskGoldenPathDocsLocateRequested(body) && isHelixAskGoldenPathCalculatorSolveRequested(body);
+  isHelixAskGoldenPathDocsLocateRequested(body) &&
+  (isHelixAskGoldenPathCalculatorSolveRequested(body) || isHelixAskGoldenPathDocumentUnitConversionRequested(body));
+
+export const isHelixAskGoldenPathDocumentUnitConversionRequested = (body: RecordLike): boolean => {
+  const prompt = readHelixAskGoldenPathPrompt(body).toLowerCase();
+  const asksForForceUnits =
+    /\b(?:newtons?|kn|kilonewtons?)\b/.test(prompt) &&
+    /\b(?:lbs?|pounds?|lbf)\b/.test(prompt);
+  const asksForLoadContext = /\b(?:load[-\s]?bearing|load|force|capacity|tile|stack)\b/.test(prompt);
+  return isHelixAskGoldenPathDocsLocateRequested(body) && asksForForceUnits && asksForLoadContext;
+};
 
 export const isHelixAskGoldenPathRepoDocsCompoundRequested = (body: RecordLike): boolean =>
   isHelixAskGoldenPathRepoSearchConceptRequested(body) && isHelixAskGoldenPathDocsLocateRequested(body);

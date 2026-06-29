@@ -30,6 +30,7 @@ import {
   readStringArray,
   type RecordLike,
 } from "../core";
+import { buildHelixReflectionObservationLayers } from "../reflection-answer-guidance";
 
 export type HelixAskGoldenPathInternetResearchReflectionCompoundDependencies = {
   now: () => Date;
@@ -173,6 +174,52 @@ export const buildHelixAskGoldenPathInternetResearchReflectionCompoundPayload = 
     assistant_answer: false,
     raw_content_included: false,
   };
+  const reflectionLayers = buildHelixReflectionObservationLayers({
+    promptText,
+    selectedNodes: [topic, ...anchors, ...normalizedResults.slice(0, 3)],
+    locatorRationale:
+      "The theory reflection was selected after web research so the retrieved evidence can be interpreted with explicit claim boundaries.",
+    supportRefs: [internetObservationArtifactId, ...internetEvidenceRefs.map((ref) => ref.ref)].slice(0, 8),
+    constraintsIntroduced: [
+      "Retrieved web evidence may support current-source claims only through cited result refs.",
+      "Theory reflection can shape interpretation but cannot override missing or weak source evidence.",
+      "Any trend, recommendation, or mechanism claim must stay tied to the retrieved result set.",
+    ],
+    missingEvidence: normalizedResults.length > 0 ? [] : ["internet_search_result_refs"],
+    practicalFraming:
+      "Use the research as evidence and the reflection as a claim boundary for what the final answer may safely infer.",
+    allowedClaims: [
+      "The final answer may summarize what the retrieved results support.",
+      "The reflection may identify which claims should remain conditional or blocked.",
+    ],
+    conditionalClaims: [
+      "Broader conclusions are conditional on source quality, recency, and additional corroborating evidence.",
+    ],
+    blockedClaims: [
+      "Do not generalize beyond the retrieved sources.",
+      "Do not treat theory reflection as a source citation.",
+      "Do not claim proof or implementation readiness from research plus reflection alone.",
+    ],
+    reasoningMoves: [
+      "Name the retrieved evidence set.",
+      "Use the reflection topic to bound interpretation.",
+      "Separate source-backed claims from conditional claims.",
+      "Identify the next evidence gap.",
+    ],
+    suggestedAnswerShape: [
+      "Start with the source-backed answer.",
+      "Explain how the reflection constrains interpretation.",
+      "State what remains conditional or blocked.",
+      "Cite the evidence refs or ask for more evidence.",
+    ],
+    wordingGuidance:
+      "Synthesize the source-backed point in prose and mention reflection only as a bounding procedure, not as a separate answer.",
+    compoundHandoffNotes: {
+      docs: "Use document retrieval for source-specific gaps that web results do not close.",
+      calculator: "Compute only quantities explicitly present in the retrieved evidence.",
+      terminal_synthesis: "Use answer_guidance for claim boundaries and internet_search_observation for facts.",
+    },
+  });
   const reflectionReceipt = {
     schema: "helix.theory_context_reflection_tool_receipt.v1",
     capability_key: HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
@@ -180,7 +227,9 @@ export const buildHelixAskGoldenPathInternetResearchReflectionCompoundPayload = 
     anchors,
     source_refs: [internetObservationArtifactId, ...internetEvidenceRefs.map((ref) => ref.ref)].slice(0, 8),
     reflection_mode: "golden_path_research_grounded_context",
+    ...reflectionLayers,
     assistant_answer: false,
+    terminal_eligible: false,
     raw_content_included: false,
   };
   const compoundCapabilityContract = buildGoldenPathCompoundCapabilityContract({
@@ -211,8 +260,10 @@ export const buildHelixAskGoldenPathInternetResearchReflectionCompoundPayload = 
     `Research query: ${query}`,
     normalizedResults[0] ? `Top web result: ${normalizedResults[0].title} - ${normalizedResults[0].url}` : "",
     `Reflection topic: ${topic}`,
-    anchors.length > 0 ? `Reflection anchors: ${anchors.join(", ")}.` : "Reflection anchors: none provided.",
-    "The web observation and theory reflection receipt are support artifacts; synthesis is terminal authority only after both subgoals are satisfied.",
+    anchors.length > 0
+      ? `The reflection bounds interpretation through these anchors: ${anchors.join(", ")}.`
+      : "No reflection anchors were provided, so broader interpretation stays conditional.",
+    "Use the web observation for factual claims and the reflection guidance for claim limits; neither receipt is itself the final answer.",
   ].filter(Boolean).join("\n");
   return buildGoldenPathCompoundSuccessPayload({
     turnId,

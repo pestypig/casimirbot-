@@ -924,12 +924,12 @@ describe("HelixAskPill mic-first surface contract", () => {
           enabled: true,
           experimental: true,
           permission_profile: {
-            id: "read-observe-act",
-            label: "Read/observe plus non-mutating workstation action",
+            id: "read-observe",
+            label: "Read/observe only; Helix may project non-mutating UI receipts",
             allows: {
               observe: true,
               read: true,
-              act: true,
+              act: false,
               write: false,
               shell: false,
               codeMutation: false,
@@ -959,10 +959,10 @@ describe("HelixAskPill mic-first surface contract", () => {
       | { permission_profile?: Record<string, unknown> }
       | undefined;
     expect(codexProvider?.permission_profile).toMatchObject({
-      id: "read-observe-act",
+      id: "read-observe",
       allows: {
         read: true,
-        act: true,
+        act: false,
         write: false,
         shell: false,
         codeMutation: false,
@@ -1133,6 +1133,14 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain('params.get("doc")');
     expect(source).toContain('source: "desktop_url_doc_param"');
     expect(source).toContain('normalized.startsWith("docs/")');
+  });
+
+  it("advertises backend debug export lookup for chat-scoped Ask turn ids", () => {
+    const source = fs.readFileSync(pillPath, "utf8");
+    expect(source).toContain("isBackendAskTurnDebugExportEligibleTurnId");
+    expect(source).toContain('trimmed.startsWith("ask:")');
+    expect(source).toContain('(?:^|:)ask:[^:]+');
+    expect(source).toContain("const activeTurnFallbackRef = isBackendAskTurnDebugExportEligibleTurnId(activeTurnId)");
   });
 
   it("routes voice lite prompts through normal-turn lane without queued reasoning", () => {
@@ -1956,24 +1964,6 @@ describe("HelixAskPill mic-first surface contract", () => {
             role: "agent",
             type: "model_decision",
             status: "completed",
-            text: "Action request: scientific-calculator.open_panel.",
-            lane: "workstation_gateway",
-            step_id: "workstation_gateway_1",
-            source_event_type: "action_request",
-          },
-          {
-            role: "tool",
-            type: "tool_result",
-            status: "completed",
-            text: "Action observation: scientific-calculator.open_panel admitted open_panel for scientific-calculator.",
-            lane: "scientific-calculator.open_panel",
-            step_id: "workstation_gateway_1",
-            source_event_type: "action_observation",
-          },
-          {
-            role: "agent",
-            type: "model_decision",
-            status: "completed",
             text: "Tool request: scientific-calculator.solve_expression.",
             lane: "workstation_gateway",
             step_id: "workstation_gateway_1",
@@ -1987,6 +1977,24 @@ describe("HelixAskPill mic-first surface contract", () => {
             lane: "scientific-calculator.solve_expression",
             step_id: "workstation_gateway_1",
             source_event_type: "tool_observation",
+          },
+          {
+            role: "agent",
+            type: "model_decision",
+            status: "completed",
+            text: "Action request: scientific-calculator.open_panel.",
+            lane: "workstation_gateway",
+            step_id: "workstation_gateway_2",
+            source_event_type: "action_request",
+          },
+          {
+            role: "tool",
+            type: "tool_result",
+            status: "completed",
+            text: "Action observation: scientific-calculator.open_panel admitted open_panel for scientific-calculator.",
+            lane: "scientific-calculator.open_panel",
+            step_id: "workstation_gateway_2",
+            source_event_type: "action_observation",
           },
           {
             role: "agent",
@@ -2022,10 +2030,10 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(rows.map((row) => row.label)).toEqual([
       "Runtime",
       "Context",
-      "Action Request",
-      "Action Observation",
       "Tool Request",
       "Tool Observation",
+      "Action Request",
+      "Action Observation",
       "Model Re-entry",
       "Final",
     ]);
@@ -2208,6 +2216,98 @@ describe("HelixAskPill mic-first surface contract", () => {
       raw_content_included: false,
     });
     expect(result.executableEnvelope).toBe(actionEnvelope);
+  });
+
+  it("admits Codex calculator gateway solve projections when backed by gateway receipts", () => {
+    const actionEnvelope = {
+      schema: "helix.ask.action_envelope.v1",
+      governance: {
+        dispatch: "allow",
+        reason: "admitted_non_mutating_codex_workstation_action",
+      },
+      workstation_actions: [
+        {
+          schema_version: "helix.workstation.action/v1",
+          action: "run_panel_action",
+          panel_id: "scientific-calculator",
+          action_id: "show_gateway_solve",
+          args: {
+            expression: "6*7",
+            normalized_expression: "6*7",
+            result: "42",
+            source_capability: "scientific-calculator.solve_expression",
+            observation_ref: "ask:test:scientific-calculator.solve_expression",
+          },
+        },
+      ],
+    } as never;
+
+    const result = buildHelixActionEnvelopeRuntimeAuthority(actionEnvelope, {
+      workstation_gateway_call_results: [
+        {
+          capability_id: "scientific-calculator.show_gateway_solve",
+          ok: true,
+          gateway_admission: {
+            requested_capability: "scientific-calculator.show_gateway_solve",
+          },
+        },
+      ],
+    });
+
+    expect(result.audit).toMatchObject({
+      allowed: true,
+      reason: "agent_step_decision_backed",
+      selected_capabilities: expect.arrayContaining(["scientific-calculator.show_gateway_solve"]),
+      envelope_action_keys: expect.arrayContaining(["scientific-calculator.show_gateway_solve"]),
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(result.executableEnvelope).toBe(actionEnvelope);
+  });
+
+  it("does not admit Codex calculator panel projections from blocked gateway receipts", () => {
+    const actionEnvelope = {
+      schema: "helix.ask.action_envelope.v1",
+      governance: {
+        dispatch: "allow",
+        reason: "admitted_non_mutating_codex_workstation_action",
+      },
+      workstation_actions: [
+        {
+          schema_version: "helix.workstation.action/v1",
+          action: "run_panel_action",
+          panel_id: "scientific-calculator",
+          action_id: "show_gateway_solve",
+          args: {
+            expression: "6*7",
+            result: "42",
+          },
+        },
+      ],
+    } as never;
+
+    const result = buildHelixActionEnvelopeRuntimeAuthority(actionEnvelope, {
+      workstation_gateway_call_results: [
+        {
+          capability_id: "scientific-calculator.show_gateway_solve",
+          ok: false,
+          gateway_admission: {
+            requested_capability: "scientific-calculator.show_gateway_solve",
+            blocked_reason: "calculator_gateway_solve_observation_missing",
+          },
+        },
+      ],
+    });
+
+    expect(result.audit).toMatchObject({
+      allowed: false,
+      reason: "agent_step_decision_missing_for_action_envelope",
+      selected_capabilities: [],
+      envelope_action_keys: expect.arrayContaining(["scientific-calculator.show_gateway_solve"]),
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(result.executableEnvelope).toBeUndefined();
   });
 
   it("parses compact Codex Markdown bullets through the final-answer renderer contract", () => {

@@ -13,6 +13,25 @@ import {
   runRepoSearch,
   type RepoSearchHit,
 } from "../repo-search";
+import {
+  buildDocsSearchDocumentCandidates,
+  buildDocsSearchTerms,
+  mergeDocsSearchPathCandidates,
+  rankDocsSearchHits,
+} from "../docs-search";
+import {
+  HELIX_INTERNET_SEARCH_CAPABILITY,
+  HELIX_INTERNET_SEARCH_OBSERVATION_SCHEMA,
+  type HelixInternetSearchProvider,
+} from "@shared/helix-internet-search-observation";
+import {
+  HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+  HELIX_SCHOLARLY_RESEARCH_OBSERVATION_SCHEMA,
+  type HelixScholarlyResearchIntentMode,
+  type HelixScholarlyResearchProvider,
+} from "@shared/helix-scholarly-research-observation";
+import { runInternetSearch } from "../retrieval/internet-search";
+import { runScholarlyResearchLookup } from "../retrieval/scholarly-research-lookup";
 import { buildWorkstationGatewayObservationPacket } from "./observation-packet";
 import {
   HELIX_TOOL_FOLLOWUP_DECISION_SCHEMA,
@@ -60,6 +79,10 @@ const REPO_SEARCH_OBSERVATION_SCHEMA = "helix.repo_search_observation.v1" as con
 const DOCS_SEARCH_CAPABILITY = "docs.search" as const;
 const DOCS_SEARCH_OBSERVATION_SCHEMA = "helix.docs_search_observation.v1" as const;
 const DOCS_OPEN_DOC_CAPABILITY = "docs-viewer.open_doc" as const;
+const INTERNET_SEARCH_CAPABILITY = HELIX_INTERNET_SEARCH_CAPABILITY;
+const INTERNET_SEARCH_OBSERVATION_SCHEMA = HELIX_INTERNET_SEARCH_OBSERVATION_SCHEMA;
+const SCHOLARLY_RESEARCH_SEARCH_CAPABILITY = HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY;
+const SCHOLARLY_RESEARCH_OBSERVATION_SCHEMA = HELIX_SCHOLARLY_RESEARCH_OBSERVATION_SCHEMA;
 const CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY = "civilization-bounds.reflect_system_bounds" as const;
 const CIVILIZATION_BOUNDS_REFLECTION_OBSERVATION_SCHEMA =
   "helix.civilization_bounds_reflection_observation.v1" as const;
@@ -67,6 +90,21 @@ const THEORY_CONTEXT_REFLECTION_CAPABILITY = "theory-badge-graph.reflect_discuss
 const THEORY_CONTEXT_REFLECTION_OBSERVATION_SCHEMA = "helix.theory_context_reflection_observation.v1" as const;
 const REPO_SEARCH_DEFAULT_PATHS = ["server", "shared", "client/src", "docs"] as const;
 const DOCS_SEARCH_DEFAULT_PATHS = ["docs"] as const;
+const INTERNET_SEARCH_PROVIDERS = ["tavily", "exa", "google_custom_search"] as const;
+const SCHOLARLY_RESEARCH_PROVIDERS = [
+  "arxiv",
+  "openalex",
+  "crossref",
+  "semantic_scholar",
+  "unpaywall",
+  "core",
+] as const;
+const SCHOLARLY_RESEARCH_MODES = [
+  "paper_search",
+  "doi_lookup",
+  "citation_lookup",
+  "reference_lookup",
+] as const;
 const SAFE_WORKSTATION_PANEL_ACTION_IDS = [
   "docs-viewer",
   "scientific-calculator",
@@ -137,6 +175,20 @@ const modeAllowsManifest = (
   mode: HelixWorkstationGatewayMode,
   manifest: HelixWorkstationCapabilityManifest,
 ): boolean => gatewayModeRank[mode] >= permissionProfileRank[manifest.permission_profile_required];
+
+const normalizeGatewayCapabilityId = (value: string): string => {
+  if (value === "internet.search" || value === "web.search" || value === "internet_search.web_research") {
+    return INTERNET_SEARCH_CAPABILITY;
+  }
+  if (
+    value === "scholarly.search" ||
+    value === "research-papers.search" ||
+    value === "research_papers.search"
+  ) {
+    return SCHOLARLY_RESEARCH_SEARCH_CAPABILITY;
+  }
+  return value;
+};
 
 const readArguments = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
@@ -210,6 +262,48 @@ const normalizeRepoSearchQuery = (value: unknown): string => {
   const query = cleanString(value).replace(/\s+/g, " ");
   return query.length > 180 ? query.slice(0, 180).trim() : query;
 };
+
+const normalizeExternalSearchQuery = (value: unknown): string => {
+  const query = cleanString(value).replace(/\s+/g, " ");
+  return query.length > 260 ? query.slice(0, 260).trim() : query;
+};
+
+const readInternetSearchProviders = (value: unknown): HelixInternetSearchProvider[] =>
+  readStringArray(value)
+    .filter((entry): entry is HelixInternetSearchProvider =>
+      (INTERNET_SEARCH_PROVIDERS as readonly string[]).includes(entry),
+    )
+    .slice(0, 3);
+
+const readScholarlyResearchProviders = (value: unknown): HelixScholarlyResearchProvider[] =>
+  readStringArray(value)
+    .filter((entry): entry is HelixScholarlyResearchProvider =>
+      (SCHOLARLY_RESEARCH_PROVIDERS as readonly string[]).includes(entry),
+    )
+    .slice(0, 6);
+
+const readScholarlyResearchMode = (value: unknown): HelixScholarlyResearchIntentMode | undefined => {
+  const mode = cleanString(value);
+  return (SCHOLARLY_RESEARCH_MODES as readonly string[]).includes(mode)
+    ? (mode as HelixScholarlyResearchIntentMode)
+    : undefined;
+};
+
+const readExternalSearchLimit = (value: unknown): number => {
+  const limit = Number(value);
+  return Number.isFinite(limit) ? Math.max(1, Math.min(Math.floor(limit), 10)) : 5;
+};
+
+const readInternetSearchRecencyDays = (value: unknown): number | null => {
+  const days = Number(value);
+  return Number.isFinite(days) && days > 0 ? Math.max(1, Math.min(Math.floor(days), 365)) : null;
+};
+
+const readInternetSearchDomains = (value: unknown): string[] =>
+  readStringArray(value)
+    .map((entry) => entry.toLowerCase().replace(/^site:/i, "").trim())
+    .filter((entry) => /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(entry))
+    .slice(0, 8);
 
 const isSafeRelativeRepoPath = (value: string): boolean => {
   const normalized = value.replace(/\\/g, "/").replace(/^\/+/, "").trim();
@@ -832,6 +926,79 @@ const docsSearchManifest: HelixWorkstationCapabilityManifest = {
   raw_content_included: false,
 };
 
+const internetSearchManifest: HelixWorkstationCapabilityManifest = {
+  schema: "helix.workstation_tool_gateway.capability.v1",
+  capability_id: INTERNET_SEARCH_CAPABILITY,
+  label: "Internet search",
+  description:
+    "Runs the existing Helix internet search retriever as bounded, read-only external web evidence. It returns observations only and cannot browse the UI, scrape hidden pages, mutate files, or answer by itself.",
+  panel_id: "internet-search",
+  action_id: "search_web",
+  mode: "read",
+  mutating: false,
+  code_mutation: false,
+  shell_access: false,
+  requires_confirmation: false,
+  requires_source: true,
+  terminal_eligible: false,
+  permission_profile_required: "read",
+  post_tool_model_step_required: true,
+  input_schema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["query"],
+    properties: {
+      query: { type: "string" },
+      providers: { type: "array", items: { type: "string" } },
+      domains: { type: "array", items: { type: "string" } },
+      recency_days: { type: "number" },
+      limit: { type: "number" },
+      source_target_intent: { type: "object" },
+    },
+  },
+  output_observation_schema: INTERNET_SEARCH_OBSERVATION_SCHEMA,
+  observation_schema: INTERNET_SEARCH_OBSERVATION_SCHEMA,
+  safety_tags: ["read_or_observe", "internet_search", "external_web_evidence", "non_terminal", "no_shell", "no_code_mutation"],
+  assistant_answer: false,
+  raw_content_included: false,
+};
+
+const scholarlyResearchSearchManifest: HelixWorkstationCapabilityManifest = {
+  schema: "helix.workstation_tool_gateway.capability.v1",
+  capability_id: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+  label: "Scholarly research search",
+  description:
+    "Runs the existing Helix scholarly paper lookup as bounded, read-only research-paper evidence. It returns metadata/abstract observations only and cannot fetch hidden full text, mutate files, or answer by itself.",
+  panel_id: "scholarly-research",
+  action_id: "lookup_papers",
+  mode: "read",
+  mutating: false,
+  code_mutation: false,
+  shell_access: false,
+  requires_confirmation: false,
+  requires_source: true,
+  terminal_eligible: false,
+  permission_profile_required: "read",
+  post_tool_model_step_required: true,
+  input_schema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["query"],
+    properties: {
+      query: { type: "string" },
+      mode: { type: "string" },
+      providers: { type: "array", items: { type: "string" } },
+      limit: { type: "number" },
+      source_target_intent: { type: "object" },
+    },
+  },
+  output_observation_schema: SCHOLARLY_RESEARCH_OBSERVATION_SCHEMA,
+  observation_schema: SCHOLARLY_RESEARCH_OBSERVATION_SCHEMA,
+  safety_tags: ["read_or_observe", "scholarly_research", "paper_evidence", "non_terminal", "no_shell", "no_code_mutation"],
+  assistant_answer: false,
+  raw_content_included: false,
+};
+
 const civilizationBoundsReflectionManifest: HelixWorkstationCapabilityManifest = {
   schema: "helix.workstation_tool_gateway.capability.v1",
   capability_id: CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
@@ -925,6 +1092,8 @@ const capabilities = new Map<string, HelixWorkstationCapabilityManifest>([
   [docsOpenDocManifest.capability_id, docsOpenDocManifest],
   [repoSearchManifest.capability_id, repoSearchManifest],
   [docsSearchManifest.capability_id, docsSearchManifest],
+  [internetSearchManifest.capability_id, internetSearchManifest],
+  [scholarlyResearchSearchManifest.capability_id, scholarlyResearchSearchManifest],
   [civilizationBoundsReflectionManifest.capability_id, civilizationBoundsReflectionManifest],
   [theoryContextReflectionManifest.capability_id, theoryContextReflectionManifest],
 ]);
@@ -950,7 +1119,7 @@ export const callWorkstationGatewayCapability = async (
   const iteration = typeof input.iteration === "number" && Number.isFinite(input.iteration)
     ? Math.max(0, Math.floor(input.iteration))
     : 0;
-  const capabilityId = cleanString(input.capabilityId);
+  const capabilityId = normalizeGatewayCapabilityId(cleanString(input.capabilityId));
   const manifest = capabilities.get(capabilityId);
 
   if (!manifest) {
@@ -1932,9 +2101,10 @@ export const callWorkstationGatewayCapability = async (
       };
     }
 
+    const searchTerms = buildDocsSearchTerms(query);
     const result = await runRepoSearch({
       rawQuestion: query,
-      terms: [query],
+      terms: searchTerms,
       paths,
       explicit: true,
       reason: "workstation_gateway_docs_search",
@@ -1942,8 +2112,11 @@ export const callWorkstationGatewayCapability = async (
       intentDomain: "repo",
       topicTags: [],
     });
-    const hits = result.hits.slice(0, maxHits).map(clipRepoSearchHit);
-    const truncated = result.truncated || result.hits.length > hits.length;
+    const docsHits = mergeDocsSearchPathCandidates(result.hits, paths, query);
+    const rankedHits = rankDocsSearchHits(docsHits, query);
+    const hits = rankedHits.slice(0, maxHits).map(clipRepoSearchHit);
+    const documentCandidates = buildDocsSearchDocumentCandidates(rankedHits, query, maxHits);
+    const truncated = result.truncated || rankedHits.length > hits.length;
     const activeDocumentObservation = readBoundedDocsExcerpt(paths);
     const evidence = formatRepoSearchEvidence(
       {
@@ -1961,10 +2134,12 @@ export const callWorkstationGatewayCapability = async (
       schema: DOCS_SEARCH_OBSERVATION_SCHEMA,
       capability_key: manifest.capability_id,
       query,
-      terms: [query],
+      terms: searchTerms,
       paths,
       hits,
       hit_count: hits.length,
+      document_candidates: documentCandidates,
+      unique_document_count: documentCandidates.length,
       file_paths: evidence.filePaths,
       active_document_observation: activeDocumentObservation
         ? {
@@ -2002,7 +2177,7 @@ export const callWorkstationGatewayCapability = async (
         ? `Docs search failed with ${result.error}.`
         : activeDocumentObservation
           ? `Docs search materialized a bounded active-document excerpt from ${activeDocumentObservation.path}.`
-          : `Docs search returned ${hits.length} evidence hit(s) for ${query}.`,
+          : `Docs search returned ${documentCandidates.length} document candidate(s) and ${hits.length} evidence hit(s) for ${query}.`,
       observation,
       missingRequirements: result.error
         ? [{
@@ -2038,6 +2213,315 @@ export const callWorkstationGatewayCapability = async (
       assistant_answer: false,
       raw_content_included: false,
       error: result.error,
+    };
+  }
+
+  if (manifest.capability_id === INTERNET_SEARCH_CAPABILITY) {
+    const args = readArguments(input.arguments);
+    const query = normalizeExternalSearchQuery(args.query ?? args.search_query ?? args.prompt);
+    const providers = readInternetSearchProviders(args.providers);
+    const domains = readInternetSearchDomains(args.domains);
+    const recencyDays = readInternetSearchRecencyDays(args.recency_days ?? args.recencyDays);
+    const limit = readExternalSearchLimit(args.limit ?? args.max_results ?? args.maxResults);
+    const blockedReason = !query
+      ? "missing_query"
+      : query.length < 3 || !/[a-z0-9]/i.test(query)
+        ? "query_too_broad"
+        : null;
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: blockedReason ? "blocked" : "admitted",
+      reason: blockedReason ? "internet_search_query_blocked" : "read_only_gateway_capability",
+      blockedReason: blockedReason ?? undefined,
+      sourceTargetIntent: args.source_target_intent,
+    });
+
+    if (blockedReason) {
+      const observation = {
+        schema: INTERNET_SEARCH_OBSERVATION_SCHEMA,
+        capability_key: manifest.capability_id,
+        capability: manifest.capability_id,
+        query: query || null,
+        providers_considered: providers,
+        providers_called: [],
+        domains,
+        recency_days: recencyDays,
+        evidence_refs: [],
+        results: [],
+        missing_requirements: [blockedReason],
+        selected_for_answer: false,
+        status: "blocked",
+        blocked_reason: blockedReason,
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+      const observationPacket = buildWorkstationGatewayObservationPacket({
+        turnId,
+        iteration,
+        capabilityId: manifest.capability_id,
+        panelId: "internet-search",
+        action: "search_web",
+        status: "blocked",
+        summary: `Internet search gateway blocked query: ${blockedReason}.`,
+        observation,
+        missingRequirements: [{
+          code: blockedReason,
+          message: "Provide a specific internet search query.",
+          repair_action: "ask_user",
+        }],
+      });
+      const trace = buildGatewayTrace({
+        turnId,
+        capabilityId: manifest.capability_id,
+        agentRuntime,
+        admission,
+        observationPacket,
+        error: blockedReason,
+      });
+      return {
+        schema: "helix.workstation_tool_gateway.call_result.v1",
+        manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+        ok: false,
+        agent_runtime: agentRuntime,
+        capability_id: manifest.capability_id,
+        mode,
+        gateway_admission: admission,
+        observation_packet: observationPacket,
+        tool_lifecycle_trace: trace.tool_lifecycle_trace,
+        tool_followup_decision: trace.tool_followup_decision,
+        observation,
+        artifact_refs: observationPacket.produced_artifact_refs,
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+        error: blockedReason,
+      };
+    }
+
+    const searchObservation = await runInternetSearch({
+      turnId,
+      callId: `${turnId}:workstation_gateway:${manifest.capability_id}:${iteration}`,
+      query,
+      providers: providers.length ? providers : undefined,
+      domains,
+      recencyDays,
+      limit,
+    });
+    const observation = {
+      ...searchObservation,
+      capability_key: manifest.capability_id,
+      status: searchObservation.selected_for_answer ? "succeeded" : "failed",
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: "internet-search",
+      action: "search_web",
+      status: searchObservation.selected_for_answer ? "succeeded" : "failed",
+      summary: searchObservation.selected_for_answer
+        ? `Internet search returned ${searchObservation.results.length} result(s) for ${query}.`
+        : `Internet search returned no usable results for ${query}.`,
+      observation,
+      missingRequirements: searchObservation.selected_for_answer
+        ? []
+        : searchObservation.missing_requirements.map((code) => ({
+            code,
+            message: "Internet search could not produce usable bounded evidence for this query.",
+            repair_action: "repair" as const,
+          })),
+    });
+    const error = searchObservation.selected_for_answer
+      ? undefined
+      : searchObservation.missing_requirements[0] ?? "no_internet_search_results_returned";
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error,
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: searchObservation.selected_for_answer,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      error,
+    };
+  }
+
+  if (manifest.capability_id === SCHOLARLY_RESEARCH_SEARCH_CAPABILITY) {
+    const args = readArguments(input.arguments);
+    const query = normalizeExternalSearchQuery(args.query ?? args.search_query ?? args.prompt ?? args.doi ?? args.arxiv_id);
+    const providers = readScholarlyResearchProviders(args.providers);
+    const scholarlyMode = readScholarlyResearchMode(args.mode);
+    const limit = readExternalSearchLimit(args.limit ?? args.max_results ?? args.maxResults);
+    const blockedReason = !query
+      ? "missing_query"
+      : query.length < 3 || !/[a-z0-9]/i.test(query)
+        ? "query_too_broad"
+        : null;
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: blockedReason ? "blocked" : "admitted",
+      reason: blockedReason ? "scholarly_research_query_blocked" : "read_only_gateway_capability",
+      blockedReason: blockedReason ?? undefined,
+      sourceTargetIntent: args.source_target_intent,
+    });
+
+    if (blockedReason) {
+      const observation = {
+        schema: SCHOLARLY_RESEARCH_OBSERVATION_SCHEMA,
+        capability_key: manifest.capability_id,
+        capability: manifest.capability_id,
+        query: query || null,
+        intent: scholarlyMode ?? "paper_search",
+        providers_considered: providers,
+        providers_called: [],
+        evidence_refs: [],
+        papers: [],
+        missing_requirements: [blockedReason],
+        selected_for_answer: false,
+        status: "blocked",
+        blocked_reason: blockedReason,
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+      const observationPacket = buildWorkstationGatewayObservationPacket({
+        turnId,
+        iteration,
+        capabilityId: manifest.capability_id,
+        panelId: "scholarly-research",
+        action: "lookup_papers",
+        status: "blocked",
+        summary: `Scholarly research gateway blocked query: ${blockedReason}.`,
+        observation,
+        missingRequirements: [{
+          code: blockedReason,
+          message: "Provide a specific scholarly search query, DOI, or arXiv id.",
+          repair_action: "ask_user",
+        }],
+      });
+      const trace = buildGatewayTrace({
+        turnId,
+        capabilityId: manifest.capability_id,
+        agentRuntime,
+        admission,
+        observationPacket,
+        error: blockedReason,
+      });
+      return {
+        schema: "helix.workstation_tool_gateway.call_result.v1",
+        manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+        ok: false,
+        agent_runtime: agentRuntime,
+        capability_id: manifest.capability_id,
+        mode,
+        gateway_admission: admission,
+        observation_packet: observationPacket,
+        tool_lifecycle_trace: trace.tool_lifecycle_trace,
+        tool_followup_decision: trace.tool_followup_decision,
+        observation,
+        artifact_refs: observationPacket.produced_artifact_refs,
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+        error: blockedReason,
+      };
+    }
+
+    const searchObservation = await runScholarlyResearchLookup({
+      turnId,
+      callId: `${turnId}:workstation_gateway:${manifest.capability_id}:${iteration}`,
+      query,
+      mode: scholarlyMode,
+      providers: providers.length ? providers : undefined,
+      limit,
+    });
+    const observation = {
+      ...searchObservation,
+      capability_key: manifest.capability_id,
+      status: searchObservation.selected_for_answer ? "succeeded" : "failed",
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: "scholarly-research",
+      action: "lookup_papers",
+      status: searchObservation.selected_for_answer ? "succeeded" : "failed",
+      summary: searchObservation.selected_for_answer
+        ? `Scholarly research lookup returned ${searchObservation.papers.length} paper(s) for ${query}.`
+        : `Scholarly research lookup returned no usable papers for ${query}.`,
+      observation,
+      missingRequirements: searchObservation.selected_for_answer
+        ? []
+        : searchObservation.missing_requirements.map((code) => ({
+            code,
+            message: "Scholarly research lookup could not produce usable bounded paper evidence for this query.",
+            repair_action: "repair" as const,
+          })),
+    });
+    const error = searchObservation.selected_for_answer
+      ? undefined
+      : searchObservation.missing_requirements[0] ?? "no_scholarly_results_returned";
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error,
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: searchObservation.selected_for_answer,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      error,
     };
   }
 

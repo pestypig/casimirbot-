@@ -38,6 +38,9 @@ export type HelixAgentRunResult = {
   turn_transcript_event_count?: number;
   turn_transcript_source?: string;
   action_envelope?: Record<string, unknown> | null;
+  workstation_actions?: Record<string, unknown>[];
+  support_refs?: string[];
+  tool_output_refs?: string[];
   debug?: Record<string, unknown>;
   raw?: unknown;
 };

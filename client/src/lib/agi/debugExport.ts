@@ -852,6 +852,32 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     asRecord(payload.final_answer_draft ?? debug?.final_answer_draft ?? agentLoop?.final_answer_draft) ??
     findLedgerPayload(ledger, "final_answer_draft");
   const actionEnvelope = asRecord(payload.action_envelope ?? debug?.action_envelope ?? agentLoop?.action_envelope);
+  const codexHostWorkstationAffordances = asRecord(
+    payload.codex_host_workstation_affordances ??
+      debug?.codex_host_workstation_affordances ??
+      agentLoop?.codex_host_workstation_affordances,
+  );
+  const hostWorkstationActions = Array.isArray(payload.workstation_actions)
+    ? payload.workstation_actions
+    : Array.isArray(debug?.workstation_actions)
+      ? debug.workstation_actions
+      : Array.isArray(codexHostWorkstationAffordances?.workstation_actions)
+        ? codexHostWorkstationAffordances.workstation_actions
+        : [];
+  const hostSupportRefs = Array.isArray(payload.support_refs)
+    ? payload.support_refs
+    : Array.isArray(debug?.support_refs)
+      ? debug.support_refs
+      : Array.isArray(codexHostWorkstationAffordances?.support_refs)
+        ? codexHostWorkstationAffordances.support_refs
+        : [];
+  const hostToolOutputRefs = Array.isArray(payload.tool_output_refs)
+    ? payload.tool_output_refs
+    : Array.isArray(debug?.tool_output_refs)
+      ? debug.tool_output_refs
+      : Array.isArray(codexHostWorkstationAffordances?.tool_output_refs)
+        ? codexHostWorkstationAffordances.tool_output_refs
+        : [];
   const coverageArtifacts = collectCoverageArtifacts(ledger);
   const calculatorPanelState = asRecord(payload.calculator_panel_state ?? debug?.calculator_panel_state ?? agentLoop?.calculator_panel_state);
   const terminalArtifactKind =
@@ -1155,6 +1181,10 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     final_answer_repair_request: finalAnswerRepairRequest,
     final_answer_draft: finalAnswerDraft,
     action_envelope: actionEnvelope,
+    codex_host_workstation_affordances: codexHostWorkstationAffordances,
+    workstation_actions: hostWorkstationActions,
+    support_refs: hostSupportRefs,
+    tool_output_refs: hostToolOutputRefs,
     tool_trace_disclosure: toolTraceDisclosure,
     coverage_artifacts: coverageArtifacts,
     calculator_panel_state: calculatorPanelState,

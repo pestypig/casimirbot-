@@ -69,7 +69,7 @@ export const buildHelixAskGoldenPathRepoDocsCompoundPayload = (args: {
   const concept = readRepoSearchConcept(args.body);
   const docPath = readGoldenPathDocPath(args.body);
   const query = readGoldenPathDocLocateQuery(args.body);
-  const docContent = readGoldenPathDocContent(args.body);
+  const docContent = readGoldenPathDocContent(args.body, docPath);
 
   const makeFailurePayload = (params: {
     errorCode:

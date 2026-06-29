@@ -20,6 +20,8 @@ const CALCULATOR_ACTIVE_CONTEXT_CAPABILITY = "scientific-calculator.active_conte
 const CALCULATOR_OPEN_PANEL_CAPABILITY = "scientific-calculator.open_panel" as const;
 const CALCULATOR_FOCUS_PANEL_CAPABILITY = "scientific-calculator.focus_panel" as const;
 const CALCULATOR_SHOW_GATEWAY_SOLVE_CAPABILITY = "scientific-calculator.show_gateway_solve" as const;
+const INTERNET_SEARCH_CAPABILITY = "internet-search.search_web" as const;
+const SCHOLARLY_RESEARCH_SEARCH_CAPABILITY = "scholarly-research.lookup_papers" as const;
 const WORKSTATION_UI_ACTION_RECEIPT_SCHEMA = "helix.workstation_ui_action_receipt.v1" as const;
 
 const readBooleanEnv = (value: string | undefined, defaultValue: boolean): boolean => {
@@ -77,6 +79,15 @@ const readRecord = (value: unknown): Record<string, unknown> | null =>
 
 const readString = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
+
+const readNumber = (value: unknown): number | null => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value !== "string") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const readArray = (value: unknown): unknown[] => Array.isArray(value) ? value : [];
 
 type CodexBinaryResolution = {
   launchable: boolean;
@@ -436,15 +447,166 @@ const buildCodexActionEnvelopeFromReceipts = (
   };
 };
 
+const uniqueStrings = (values: string[]): string[] => [...new Set(values.filter(Boolean))];
+
+const readGatewayObservationRef = (
+  result: HelixWorkstationGatewayCallResult,
+  turnId: string,
+): string => {
+  const artifactRef = Array.isArray(result.artifact_refs)
+    ? result.artifact_refs.map(readString).find((entry): entry is string => Boolean(entry))
+    : null;
+  return artifactRef ?? `${turnId}:${result.capability_id}`;
+};
+
+const readFirstDocsLocation = (
+  observation: Record<string, unknown>,
+): { docPath: string; line: number; snippet?: string } | null => {
+  for (const candidateValue of readArray(observation.document_candidates)) {
+    const candidate = readRecord(candidateValue);
+    const candidatePath = readString(candidate?.path) ?? readString(candidate?.filePath) ?? readString(candidate?.file_path);
+    if (!candidatePath) continue;
+    for (const snippetValue of readArray(candidate?.best_snippets)) {
+      const snippet = readRecord(snippetValue);
+      const line = readNumber(snippet?.line) ?? readNumber(snippet?.line_number);
+      if (!line) continue;
+      const text = readString(snippet?.text);
+      return {
+        docPath: candidatePath,
+        line,
+        ...(text ? { snippet: text } : {}),
+      };
+    }
+  }
+
+  const activeDocument = readRecord(observation.active_document_observation);
+  const activePath = readString(activeDocument?.path);
+  if (!activePath) return null;
+  const excerpt = readString(activeDocument?.excerpt);
+  return {
+    docPath: activePath,
+    line: 1,
+    ...(excerpt ? { snippet: excerpt } : {}),
+  };
+};
+
+const readFirstRepoLocation = (
+  observation: Record<string, unknown>,
+): { path: string; line: number } | null => {
+  for (const hitValue of readArray(observation.hits)) {
+    const hit = readRecord(hitValue);
+    const pathValue = readString(hit?.filePath) ?? readString(hit?.file_path) ?? readString(hit?.path);
+    const line = readNumber(hit?.line) ?? readNumber(hit?.lineNumber) ?? readNumber(hit?.line_number);
+    if (pathValue && line) return { path: pathValue, line };
+  }
+  return null;
+};
+
+const buildCodexHostWorkstationAffordances = (input: {
+  turnId: string;
+  gatewayCallResults: HelixWorkstationGatewayCallResult[];
+}): {
+  schema: "helix.codex_host_workstation_affordances.v1";
+  workstation_actions: Record<string, unknown>[];
+  support_refs: string[];
+  tool_output_refs: string[];
+  assistant_answer: false;
+  raw_content_included: false;
+  terminal_eligible: false;
+} => {
+  const workstationActions: Record<string, unknown>[] = [];
+  const supportRefs: string[] = [];
+  const toolOutputRefs: string[] = [];
+
+  for (const result of input.gatewayCallResults) {
+    if (result.ok !== true) continue;
+    const observation = readGatewayObservationRecord(result);
+    if (!observation) continue;
+    const observationRef = readGatewayObservationRef(result, input.turnId);
+    toolOutputRefs.push(observationRef);
+
+    if (result.capability_id === CALCULATOR_SOLVE_EXPRESSION_CAPABILITY) {
+      const expression = readString(observation.expression) ?? readString(observation.normalized_expression);
+      const observedResult = readString(observation.result) ?? readString(observation.result_text);
+      if (expression && observedResult) {
+        supportRefs.push(observationRef);
+        workstationActions.push({
+          kind: "fill_calculator_expression",
+          expression_text: expression,
+          result: observedResult,
+          ...(readString(observation.unit) ? { unit: readString(observation.unit) } : {}),
+          observation_ref: observationRef,
+        });
+      }
+      continue;
+    }
+
+    if (result.capability_id === "docs.search") {
+      const docsLocation = readFirstDocsLocation(observation);
+      if (docsLocation) {
+        supportRefs.push(observationRef);
+        workstationActions.push({
+          kind: "open_doc_at_line",
+          doc_path: docsLocation.docPath,
+          line: docsLocation.line,
+          ...(docsLocation.snippet ? { snippet: docsLocation.snippet } : {}),
+          observation_ref: observationRef,
+        });
+      }
+      continue;
+    }
+
+    if (result.capability_id === "repo.search") {
+      const repoLocation = readFirstRepoLocation(observation);
+      if (repoLocation) {
+        supportRefs.push(observationRef);
+        workstationActions.push({
+          kind: "open_repo_file",
+          path: repoLocation.path,
+          line: repoLocation.line,
+          observation_ref: observationRef,
+        });
+      }
+      continue;
+    }
+
+    if (
+      result.capability_id === INTERNET_SEARCH_CAPABILITY ||
+      result.capability_id === SCHOLARLY_RESEARCH_SEARCH_CAPABILITY
+    ) {
+      supportRefs.push(observationRef);
+      continue;
+    }
+
+    if (isWorkstationActionReceipt(result)) {
+      supportRefs.push(observationRef);
+      workstationActions.push({
+        kind: "inspect_workstation_receipt",
+        receipt_ref: observationRef,
+      });
+    }
+  }
+
+  return {
+    schema: "helix.codex_host_workstation_affordances.v1",
+    workstation_actions: workstationActions,
+    support_refs: uniqueStrings(supportRefs),
+    tool_output_refs: uniqueStrings(toolOutputRefs),
+    assistant_answer: false,
+    raw_content_included: false,
+    terminal_eligible: false,
+  };
+};
+
 const buildCodexAgentStepLoopFromReceipts = (input: {
   turnId: string;
   actionReceiptResults: HelixWorkstationGatewayCallResult[];
   gatewayCallResults: HelixWorkstationGatewayCallResult[];
 }): Record<string, unknown> | null => {
   const iterations = [
-    ...input.actionReceiptResults.map((result, index) => ({
+    ...input.gatewayCallResults.map((result, index) => ({
       iteration: index + 1,
-      next_step: "workstation_action",
+      next_step: "workstation_tool",
       chosen_capability: result.capability_id,
       selected_capability: result.capability_id,
       observed_artifact_refs: result.artifact_refs,
@@ -452,9 +614,9 @@ const buildCodexAgentStepLoopFromReceipts = (input: {
       assistant_answer: false,
       raw_content_included: false,
     })),
-    ...input.gatewayCallResults.map((result, index) => ({
-      iteration: input.actionReceiptResults.length + index + 1,
-      next_step: "workstation_tool",
+    ...input.actionReceiptResults.map((result, index) => ({
+      iteration: input.gatewayCallResults.length + index + 1,
+      next_step: "workstation_action",
       chosen_capability: result.capability_id,
       selected_capability: result.capability_id,
       observed_artifact_refs: result.artifact_refs,
@@ -505,6 +667,109 @@ const applyDocumentObservationAuthorityGuard = (input: {
   return [
     "I cannot answer the current document's content from this turn because no docs observation packet was materialized.",
     "Ask with a valid retained active document path, focus the docs-viewer, or provide an explicit document path so Helix can create a bounded docs observation first.",
+  ].join("\n");
+};
+
+const isRepoContentQuestion = (text: string): boolean => {
+  if (/\bbackground\s+only\b/i.test(text)) return false;
+  const unquotedText = text.replace(/"[^"]*"|'[^']*'|`[^`]*`/g, " ");
+  if (/\b(?:not|don'?t|do\s+not)\s+(?:asking\s+about|ask|answer|use|read|explain|search|inspect)\b.{0,100}\b(?:repo|repository|codebase|source|implementation|search\s+results?)\b/i.test(unquotedText)) {
+    return false;
+  }
+  if (/\b(?:before|after|if|when)\b.{0,80}\b(?:search|inspect|look\s+(?:in|through)|find)\b.{0,50}\b(?:repo|repository|codebase|source)\b/i.test(unquotedText)) {
+    return false;
+  }
+  if (/\b(?:previous|last|earlier|historical)\b.{0,80}\b(?:repo|repository|codebase|source|search\s+results?)\b/i.test(unquotedText)) {
+    return false;
+  }
+  const asksRepoContent =
+    /\b(?:according\s+to|from|using|based\s+on)\s+(?:the\s+)?(?:repo|repository|codebase|source|repo\s+search|repository\s+search|search\s+results?|repo\s+observation)\b/i.test(unquotedText) ||
+    /\b(?:what\s+(?:does|do|did)|summari[sz]e|explain|show|tell\s+me)\b.{0,80}\b(?:repo|repository|codebase|source|repo\s+search|search\s+results?|implementation)\b/i.test(unquotedText) ||
+    /\b(?:where|how)\s+(?:is|are|does|do)\b.{0,100}\b(?:implemented|defined|handled|wired|called|used)\b/i.test(unquotedText);
+  const hasRepoTarget =
+    /\b(?:repo|repository|codebase|source|implementation|repo\s+search|search\s+results?|workstation_gateway|workspace_os\.status)\b/i.test(unquotedText) ||
+    /\b[A-Za-z][A-Za-z0-9_-]*\.[A-Za-z][A-Za-z0-9_-]*\b/.test(unquotedText);
+  return asksRepoContent && hasRepoTarget;
+};
+
+const hasRepoSearchObservation = (gatewayCallResults: HelixWorkstationGatewayCallResult[]): boolean =>
+  gatewayCallResults.some((result) => result.ok === true && result.capability_id === "repo.search");
+
+const applyRepoObservationAuthorityGuard = (input: {
+  question: string;
+  text: string;
+  gatewayCallResults: HelixWorkstationGatewayCallResult[];
+}): string => {
+  if (!isRepoContentQuestion(input.question)) return input.text;
+  if (hasRepoSearchObservation(input.gatewayCallResults)) return input.text;
+  return [
+    "I cannot answer repository or codebase content from this turn because no repo.search observation packet was materialized.",
+    "Ask with an explicit repository search target or provide a repo.search gateway observation so Helix can create bounded repository evidence first.",
+  ].join("\n");
+};
+
+const isInternetSearchContentQuestion = (text: string): boolean => {
+  if (/\bbackground\s+only\b/i.test(text)) return false;
+  const unquotedText = text.replace(/"[^"]*"|'[^']*'|`[^`]*`/g, " ");
+  if (/\b(?:do\s+not|don'?t|dont|never|without|no)\b.{0,100}\b(?:browse|search|web|internet|online|google)\b/i.test(unquotedText)) {
+    return false;
+  }
+  if (/\b(?:previous|last|earlier|historical)\b.{0,80}\b(?:web|internet|online|search\s+results?)\b/i.test(unquotedText)) {
+    return false;
+  }
+  const asksForExternalEvidence =
+    /\b(?:according\s+to|from|using|based\s+on)\s+(?:the\s+)?(?:(?:current|latest|recent)\s+)?(?:web|internet|online\s+sources?|web\s+sources?|search\s+results?|internet\s+search|web\s+search)\b/i.test(unquotedText) ||
+    /\b(?:search|find|look\s*up|check|verify|source|cite)\b.{0,120}\b(?:web|internet|online|google|latest|current|recent)\b/i.test(unquotedText) ||
+    /\b(?:latest|current|recent|today|this\s+week|this\s+month|news)\b.{0,80}\b(?:web|internet|online|sources?)\b.{0,120}\b(?:say|show|report|claim|evidence|source|cite|verify|changed)\b/i.test(unquotedText) ||
+    /\b(?:web|internet|online\s+sources?|web\s+sources?)\b.{0,120}\b(?:say|show|report|claim|evidence|source|cite|verify|changed)\b/i.test(unquotedText);
+  const hasExternalTarget = /\b(?:web|internet|online|google|web\s+sources?|online\s+sources?|internet\s+search|web\s+search)\b/i.test(unquotedText);
+  return asksForExternalEvidence && hasExternalTarget;
+};
+
+const hasInternetSearchObservation = (gatewayCallResults: HelixWorkstationGatewayCallResult[]): boolean =>
+  gatewayCallResults.some((result) => result.ok === true && result.capability_id === INTERNET_SEARCH_CAPABILITY);
+
+const applyInternetSearchObservationAuthorityGuard = (input: {
+  question: string;
+  text: string;
+  gatewayCallResults: HelixWorkstationGatewayCallResult[];
+}): string => {
+  if (!isInternetSearchContentQuestion(input.question)) return input.text;
+  if (hasInternetSearchObservation(input.gatewayCallResults)) return input.text;
+  return [
+    "I cannot answer internet or web-search-backed content from this turn because no internet-search.search_web observation packet was materialized.",
+    "Ask with an explicit internet search target so Helix can create bounded web evidence first.",
+  ].join("\n");
+};
+
+const isScholarlyResearchContentQuestion = (text: string): boolean => {
+  if (/\bbackground\s+only\b/i.test(text)) return false;
+  const unquotedText = text.replace(/"[^"]*"|'[^']*'|`[^`]*`/g, " ");
+  if (/\b(?:do\s+not|don'?t|dont|never|without|no)\b.{0,100}\b(?:paper|papers|scholarly|doi|arxiv|citation|references?)\b/i.test(unquotedText)) {
+    return false;
+  }
+  if (/\b(?:previous|last|earlier|historical)\b.{0,80}\b(?:paper|papers|scholarly|doi|arxiv|citation|references?)\b/i.test(unquotedText)) {
+    return false;
+  }
+  return (
+    /\b(?:according\s+to|from|using|based\s+on|look\s*up|search|find|cite|verify|collect)\b.{0,140}\b(?:papers?|research\s+papers?|scholarly|doi|arxiv|openalex|crossref|semantic\s+scholar|citations?|references?)\b/i.test(unquotedText) ||
+    /\b(?:papers?|research\s+papers?|scholarly\s+(?:sources?|articles?)|doi|arxiv|citations?|references?)\b.{0,140}\b(?:say|show|claim|evidence|source|cite|verify|support)\b/i.test(unquotedText)
+  );
+};
+
+const hasScholarlyResearchObservation = (gatewayCallResults: HelixWorkstationGatewayCallResult[]): boolean =>
+  gatewayCallResults.some((result) => result.ok === true && result.capability_id === SCHOLARLY_RESEARCH_SEARCH_CAPABILITY);
+
+const applyScholarlyResearchObservationAuthorityGuard = (input: {
+  question: string;
+  text: string;
+  gatewayCallResults: HelixWorkstationGatewayCallResult[];
+}): string => {
+  if (!isScholarlyResearchContentQuestion(input.question)) return input.text;
+  if (hasScholarlyResearchObservation(input.gatewayCallResults)) return input.text;
+  return [
+    "I cannot answer scholarly paper content from this turn because no scholarly-research.lookup_papers observation packet was materialized.",
+    "Ask with an explicit scholarly search target, DOI, or arXiv id so Helix can create bounded research-paper evidence first.",
   ].join("\n");
 };
 
@@ -924,12 +1189,12 @@ export const codexProvider: HelixAgentProvider = {
   id: "codex",
   label: "Codex Workstation Mode",
   permissionProfile: {
-    id: "read-observe-act",
-    label: "Read/observe plus non-mutating workstation action",
+    id: "read-observe",
+    label: "Read/observe only; Helix may project non-mutating UI receipts",
     allows: {
       observe: true,
       read: true,
-      act: true,
+      act: false,
       write: false,
       shell: false,
       codeMutation: false,
@@ -964,14 +1229,18 @@ export const codexProvider: HelixAgentProvider = {
       gatewayCallResults: evidenceGatewayCallResults,
     });
     const gatewayCallResults = [
-      ...actionReceiptResults,
       ...evidenceGatewayCallResults,
+      ...actionReceiptResults,
     ];
     const projectedActionReceiptResults = [
       ...actionReceiptResults,
       ...evidenceGatewayCallResults.filter(isWorkstationActionReceipt),
     ];
     const actionEnvelope = buildCodexActionEnvelopeFromReceipts(projectedActionReceiptResults);
+    const hostWorkstationAffordances = buildCodexHostWorkstationAffordances({
+      turnId,
+      gatewayCallResults,
+    });
     const agentStepLoop = buildCodexAgentStepLoopFromReceipts({
       turnId,
       actionReceiptResults,
@@ -1014,6 +1283,9 @@ export const codexProvider: HelixAgentProvider = {
         turn_transcript_event_count: initialTranscriptEvents.length,
         turn_transcript_source: "codex_provider_gateway_projection",
         action_envelope: actionEnvelope,
+        workstation_actions: hostWorkstationAffordances.workstation_actions,
+        support_refs: hostWorkstationAffordances.support_refs,
+        tool_output_refs: hostWorkstationAffordances.tool_output_refs,
         debug: {
           agent_runtime: "codex",
           agent_runtime_adapter_contract: adapterContract,
@@ -1034,6 +1306,10 @@ export const codexProvider: HelixAgentProvider = {
           terminal_authority_status: runtimeSelectionTrace.terminal_authority_status,
           provider_gateway_debug_summary: providerGatewayDebugSummary,
           action_envelope: actionEnvelope,
+          codex_host_workstation_affordances: hostWorkstationAffordances,
+          workstation_actions: hostWorkstationAffordances.workstation_actions,
+          support_refs: hostWorkstationAffordances.support_refs,
+          tool_output_refs: hostWorkstationAffordances.tool_output_refs,
           agent_step_loop: agentStepLoop,
           turn_transcript_events: initialTranscriptEvents,
           turn_transcript_event_count: initialTranscriptEvents.length,
@@ -1045,7 +1321,7 @@ export const codexProvider: HelixAgentProvider = {
     const prompt = [
       "You are running inside Helix Codex Workstation Mode.",
       ...adapterContract.prompt_policy_lines,
-      "The current Helix workstation gateway allows read/observe tools plus admitted non-mutating UI actions only.",
+      "The current Helix workstation gateway gives Codex read/observe evidence only. Helix may separately project non-mutating UI action receipts from those observations.",
       `Provider permission profile: ${JSON.stringify(codexProvider.permissionProfile)}`,
       "Answer the user request using the provided context.",
       "",
@@ -1059,6 +1335,9 @@ export const codexProvider: HelixAgentProvider = {
       "For current-calculator turns, answer only from the provided calculator observation packet or explicit calculator solve observation.",
       "For current-workstation panel/layout turns, answer only from the provided workstation active-context observation packet.",
       "For any document-backed turn, answer only from the provided docs observation packet. If no docs observation packet exists, say the document content is not available from this turn.",
+      "For any repository/codebase-backed turn, answer only from the provided repo.search observation packet. If no repo.search observation packet exists, say repository content is not available from this turn.",
+      "For any internet/web-backed turn, answer only from the provided internet-search.search_web observation packet. If no internet search observation packet exists, say web evidence is not available from this turn.",
+      "For any scholarly/paper-backed turn, answer only from the provided scholarly-research.lookup_papers observation packet. If no scholarly observation packet exists, say paper evidence is not available from this turn.",
       "",
       "User request:",
       question,
@@ -1090,9 +1369,24 @@ export const codexProvider: HelixAgentProvider = {
       text,
       gatewayCallResults,
     });
-    const finalText = applyCalculatorObservationAuthorityGuard({
+    const repoGuardedText = applyRepoObservationAuthorityGuard({
       question,
       text: documentGuardedText,
+      gatewayCallResults,
+    });
+    const internetGuardedText = applyInternetSearchObservationAuthorityGuard({
+      question,
+      text: repoGuardedText,
+      gatewayCallResults,
+    });
+    const scholarlyGuardedText = applyScholarlyResearchObservationAuthorityGuard({
+      question,
+      text: internetGuardedText,
+      gatewayCallResults,
+    });
+    const finalText = applyCalculatorObservationAuthorityGuard({
+      question,
+      text: scholarlyGuardedText,
       gatewayCallResults,
     });
     const workstationGuardedText = applyWorkstationContextAuthorityGuard({
@@ -1160,6 +1454,9 @@ export const codexProvider: HelixAgentProvider = {
       turn_transcript_event_count: turnTranscriptEvents.length,
       turn_transcript_source: "codex_provider_gateway_projection",
       action_envelope: actionEnvelope,
+      workstation_actions: hostWorkstationAffordances.workstation_actions,
+      support_refs: hostWorkstationAffordances.support_refs,
+      tool_output_refs: hostWorkstationAffordances.tool_output_refs,
       debug: {
         agent_runtime: "codex",
         agent_runtime_adapter_contract: adapterContract,
@@ -1202,6 +1499,10 @@ export const codexProvider: HelixAgentProvider = {
         terminal_authority_status: providerReentry.terminalAuthorityStatus,
         provider_gateway_debug_summary: providerGatewayDebugSummary,
         action_envelope: actionEnvelope,
+        codex_host_workstation_affordances: hostWorkstationAffordances,
+        workstation_actions: hostWorkstationAffordances.workstation_actions,
+        support_refs: hostWorkstationAffordances.support_refs,
+        tool_output_refs: hostWorkstationAffordances.tool_output_refs,
         agent_step_loop: agentStepLoop,
         turn_transcript_events: turnTranscriptEvents,
         turn_transcript_event_count: turnTranscriptEvents.length,
