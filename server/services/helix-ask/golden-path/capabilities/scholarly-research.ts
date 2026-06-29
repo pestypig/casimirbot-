@@ -7,6 +7,7 @@ import {
   buildGoldenPathRouteGateLedgerArtifact,
 } from "../artifact-ledger";
 import { buildGoldenPathCapabilityPlan } from "../capability-contract";
+import { buildGoldenPathCapabilityDebugMirror } from "../debug-mirror";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
   HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
@@ -221,21 +222,16 @@ export const buildHelixAskGoldenPathScholarlyResearchPayload = (args: {
           },
         }),
       ],
-      debug: {
-        schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
-        golden_path_runtime: true,
-        golden_path_runtime_status: "scholarly_research_lookup_failed",
-        requested_capability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
-        selected_capability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
-        executed_capability: null,
-        terminal_artifact_kind: "typed_failure",
-        final_answer_source: "typed_failure",
-        first_broken_rail: params.brokenRail,
-        terminal_error_code: params.errorCode,
-        goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-        assistant_answer: false,
-        raw_content_included: false,
-      },
+      debug: buildGoldenPathCapabilityDebugMirror({
+        status: "scholarly_research_lookup_failed",
+        requestedCapability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+        selectedCapability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+        executedCapability: null,
+        terminalResult,
+        firstBrokenRail: params.brokenRail,
+        terminalErrorCode: params.errorCode,
+        goalSatisfactionEvaluation,
+      }),
     };
   };
 
@@ -452,23 +448,17 @@ export const buildHelixAskGoldenPathScholarlyResearchPayload = (args: {
         },
       }),
     ],
-    debug: {
-      schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
-      golden_path_runtime: true,
-      golden_path_runtime_status: "scholarly_research_lookup",
-      private_runtime_loop_entered: false,
-      requested_capability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
-      selected_capability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
-      executed_capability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
-      observed_artifact_kind: "scholarly_research_observation",
-      observed_artifact_ref: observationArtifactId,
-      terminal_artifact_kind: terminalResult.artifact_kind,
-      terminal_result_count: 1,
-      final_answer_source: terminalResult.final_answer_source,
-      goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-      assistant_answer: false,
-      raw_content_included: false,
-    },
+    debug: buildGoldenPathCapabilityDebugMirror({
+      status: "scholarly_research_lookup",
+      privateRuntimeLoopEntered: false,
+      requestedCapability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+      selectedCapability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+      executedCapability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+      observedArtifactKind: "scholarly_research_observation",
+      observedArtifactRef: observationArtifactId,
+      terminalResult,
+      goalSatisfactionEvaluation,
+    }),
   };
 };
 

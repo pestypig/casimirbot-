@@ -43,6 +43,7 @@ export const buildGoldenPathCapabilityDebugMirror = (args: {
   observedArtifactRef?: string;
   firstBrokenRail?: string;
   terminalErrorCode?: string;
+  terminalResultCount?: number;
   privateRuntimeLoopEntered?: boolean;
 }): RecordLike => ({
   schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
@@ -57,7 +58,11 @@ export const buildGoldenPathCapabilityDebugMirror = (args: {
   ...(args.observedArtifactKind ? { observed_artifact_kind: args.observedArtifactKind } : {}),
   ...(args.observedArtifactRef ? { observed_artifact_ref: args.observedArtifactRef } : {}),
   terminal_artifact_kind: args.terminalResult.artifact_kind,
-  ...(args.executedCapability ? { terminal_result_count: 1 } : {}),
+  ...(typeof args.terminalResultCount === "number"
+    ? { terminal_result_count: args.terminalResultCount }
+    : args.executedCapability
+      ? { terminal_result_count: 1 }
+      : {}),
   final_answer_source: args.terminalResult.final_answer_source,
   ...(args.firstBrokenRail ? { first_broken_rail: args.firstBrokenRail } : {}),
   ...(args.terminalErrorCode ? { terminal_error_code: args.terminalErrorCode } : {}),
