@@ -18,6 +18,13 @@ import {
   HELIX_TOOL_FOLLOWUP_DECISION_SCHEMA,
   HELIX_TOOL_LIFECYCLE_TRACE_SCHEMA,
 } from "@shared/helix-tool-lifecycle";
+import {
+  CIVILIZATION_LAYER_MODES,
+  type CivilizationLayerModeV1,
+} from "@shared/civilization-bounds-roadmap";
+import { buildNhm2TheoryBadgeGraphV1 } from "@shared/theory/nhm2-theory-badges";
+import { runHelixTheoryContextReflectionTool } from "@shared/theory/theory-context-reflection-tool";
+import { runHelixAskCivilizationBoundsTool } from "../../../skills/helix-ask.civilization-bounds-roadmap";
 import type {
   HelixWorkstationGatewayAdmissionRecord,
   HelixWorkstationCapabilityManifest,
@@ -44,6 +51,7 @@ const CALCULATOR_ACTIVE_CONTEXT_CAPABILITY = "scientific-calculator.active_conte
 const CALCULATOR_ACTIVE_CONTEXT_OBSERVATION_SCHEMA = "helix.calculator_active_context_observation.v1" as const;
 const CALCULATOR_OPEN_PANEL_CAPABILITY = "scientific-calculator.open_panel" as const;
 const CALCULATOR_FOCUS_PANEL_CAPABILITY = "scientific-calculator.focus_panel" as const;
+const CALCULATOR_SHOW_GATEWAY_SOLVE_CAPABILITY = "scientific-calculator.show_gateway_solve" as const;
 const WORKSTATION_OPEN_PANEL_CAPABILITY = "workstation.open_panel" as const;
 const WORKSTATION_FOCUS_PANEL_CAPABILITY = "workstation.focus_panel" as const;
 const WORKSTATION_UI_ACTION_RECEIPT_SCHEMA = "helix.workstation_ui_action_receipt.v1" as const;
@@ -52,6 +60,11 @@ const REPO_SEARCH_OBSERVATION_SCHEMA = "helix.repo_search_observation.v1" as con
 const DOCS_SEARCH_CAPABILITY = "docs.search" as const;
 const DOCS_SEARCH_OBSERVATION_SCHEMA = "helix.docs_search_observation.v1" as const;
 const DOCS_OPEN_DOC_CAPABILITY = "docs-viewer.open_doc" as const;
+const CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY = "civilization-bounds.reflect_system_bounds" as const;
+const CIVILIZATION_BOUNDS_REFLECTION_OBSERVATION_SCHEMA =
+  "helix.civilization_bounds_reflection_observation.v1" as const;
+const THEORY_CONTEXT_REFLECTION_CAPABILITY = "theory-badge-graph.reflect_discussion_context" as const;
+const THEORY_CONTEXT_REFLECTION_OBSERVATION_SCHEMA = "helix.theory_context_reflection_observation.v1" as const;
 const REPO_SEARCH_DEFAULT_PATHS = ["server", "shared", "client/src", "docs"] as const;
 const DOCS_SEARCH_DEFAULT_PATHS = ["docs"] as const;
 const SAFE_WORKSTATION_PANEL_ACTION_IDS = [
@@ -91,6 +104,13 @@ const readStringArray = (value: unknown): string[] =>
   Array.isArray(value)
     ? value.map((entry) => cleanString(entry)).filter(Boolean).slice(0, 32)
     : [];
+
+const readCivilizationLayerMode = (value: unknown): CivilizationLayerModeV1 | undefined => {
+  const cleaned = cleanString(value);
+  return (CIVILIZATION_LAYER_MODES as readonly string[]).includes(cleaned)
+    ? (cleaned as CivilizationLayerModeV1)
+    : undefined;
+};
 
 const normalizeMode = (value: unknown): HelixWorkstationGatewayMode => {
   const mode = cleanString(value, DEFAULT_MODE).toLowerCase();
@@ -626,6 +646,43 @@ const calculatorFocusPanelManifest = makeCalculatorPanelActionManifest(
   "focus_panel",
 );
 
+const calculatorShowGatewaySolveManifest: HelixWorkstationCapabilityManifest = {
+  schema: "helix.workstation_tool_gateway.capability.v1",
+  capability_id: CALCULATOR_SHOW_GATEWAY_SOLVE_CAPABILITY,
+  label: "Scientific Calculator show gateway solve",
+  description:
+    "Projects an already-observed calculator gateway solve into the Scientific Calculator panel as a governed, non-mutating UI action receipt. It cannot answer the user.",
+  panel_id: "scientific-calculator",
+  action_id: "show_gateway_solve",
+  mode: "act",
+  mutating: false,
+  code_mutation: false,
+  shell_access: false,
+  requires_confirmation: false,
+  requires_source: true,
+  terminal_eligible: false,
+  permission_profile_required: "act",
+  post_tool_model_step_required: true,
+  input_schema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["expression", "result"],
+    properties: {
+      expression: { type: "string" },
+      normalized_expression: { type: "string" },
+      result: { type: "string" },
+      source_capability: { type: "string" },
+      observation_ref: { type: "string" },
+      source_target_intent: { type: "object" },
+    },
+  },
+  output_observation_schema: WORKSTATION_UI_ACTION_RECEIPT_SCHEMA,
+  observation_schema: WORKSTATION_UI_ACTION_RECEIPT_SCHEMA,
+  safety_tags: ["non_mutating_ui_action", "calculator", "gateway_projection", "action_receipt", "non_terminal", "no_shell", "no_code_mutation"],
+  assistant_answer: false,
+  raw_content_included: false,
+};
+
 const makeWorkstationPanelActionManifest = (
   capabilityId: typeof WORKSTATION_OPEN_PANEL_CAPABILITY | typeof WORKSTATION_FOCUS_PANEL_CAPABILITY,
   action: "open_panel" | "focus_panel",
@@ -775,6 +832,86 @@ const docsSearchManifest: HelixWorkstationCapabilityManifest = {
   raw_content_included: false,
 };
 
+const civilizationBoundsReflectionManifest: HelixWorkstationCapabilityManifest = {
+  schema: "helix.workstation_tool_gateway.capability.v1",
+  capability_id: CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+  label: "Civilization Bounds reflect system bounds",
+  description:
+    "Reflects the prompt through the existing Civilization Bounds Roadmap as bounded, evidence-only situational context. It does not write files, run shell commands, authorize actions, or become a final answer.",
+  panel_id: "civilization-bounds-roadmap",
+  action_id: "reflect_system_bounds",
+  mode: "read",
+  mutating: false,
+  code_mutation: false,
+  shell_access: false,
+  requires_confirmation: false,
+  requires_source: true,
+  terminal_eligible: false,
+  permission_profile_required: "read",
+  post_tool_model_step_required: true,
+  input_schema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["prompt"],
+    properties: {
+      prompt: { type: "string" },
+      scenario_id: { type: "string" },
+      phase_id: { type: "string" },
+      layer_mode: { type: "string" },
+      selected_system_ids: { type: "array", items: { type: "string" } },
+      selected_badge_ids: { type: "array", items: { type: "string" } },
+      theory_reflection_ref: { type: "string" },
+      ideology_reflection_ref: { type: "string" },
+      include_bridge_context: { type: "boolean" },
+      include_collaboration_bounds: { type: "boolean" },
+      include_falsification_hooks: { type: "boolean" },
+    },
+  },
+  output_observation_schema: CIVILIZATION_BOUNDS_REFLECTION_OBSERVATION_SCHEMA,
+  observation_schema: CIVILIZATION_BOUNDS_REFLECTION_OBSERVATION_SCHEMA,
+  safety_tags: ["read_or_observe", "civilization_bounds", "reflection", "non_terminal", "no_shell", "no_code_mutation"],
+  assistant_answer: false,
+  raw_content_included: false,
+};
+
+const theoryContextReflectionManifest: HelixWorkstationCapabilityManifest = {
+  schema: "helix.workstation_tool_gateway.capability.v1",
+  capability_id: THEORY_CONTEXT_REFLECTION_CAPABILITY,
+  label: "Theory Badge Graph reflect discussion context",
+  description:
+    "Reflects the prompt against the existing Theory Badge Graph as bounded, evidence-only context. It does not solve, mutate files, run shell commands, or become a final answer.",
+  panel_id: "theory-badge-graph",
+  action_id: "reflect_discussion_context",
+  mode: "read",
+  mutating: false,
+  code_mutation: false,
+  shell_access: false,
+  requires_confirmation: false,
+  requires_source: true,
+  terminal_eligible: false,
+  permission_profile_required: "read",
+  post_tool_model_step_required: true,
+  input_schema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["prompt"],
+    properties: {
+      prompt: { type: "string" },
+      conversation_context: { type: "string" },
+      mentioned_equations: { type: "array", items: { type: "string" } },
+      mentioned_symbols: { type: "array", items: { type: "string" } },
+      mentioned_domains: { type: "array", items: { type: "string" } },
+      build_explanation_plan: { type: "boolean" },
+      limit: { type: "number" },
+    },
+  },
+  output_observation_schema: THEORY_CONTEXT_REFLECTION_OBSERVATION_SCHEMA,
+  observation_schema: THEORY_CONTEXT_REFLECTION_OBSERVATION_SCHEMA,
+  safety_tags: ["read_or_observe", "theory_badge_graph", "reflection", "non_terminal", "no_shell", "no_code_mutation"],
+  assistant_answer: false,
+  raw_content_included: false,
+};
+
 const capabilities = new Map<string, HelixWorkstationCapabilityManifest>([
   [workspaceOsStatusManifest.capability_id, workspaceOsStatusManifest],
   [workstationActiveContextManifest.capability_id, workstationActiveContextManifest],
@@ -782,11 +919,14 @@ const capabilities = new Map<string, HelixWorkstationCapabilityManifest>([
   [calculatorActiveContextManifest.capability_id, calculatorActiveContextManifest],
   [calculatorOpenPanelManifest.capability_id, calculatorOpenPanelManifest],
   [calculatorFocusPanelManifest.capability_id, calculatorFocusPanelManifest],
+  [calculatorShowGatewaySolveManifest.capability_id, calculatorShowGatewaySolveManifest],
   [workstationOpenPanelManifest.capability_id, workstationOpenPanelManifest],
   [workstationFocusPanelManifest.capability_id, workstationFocusPanelManifest],
   [docsOpenDocManifest.capability_id, docsOpenDocManifest],
   [repoSearchManifest.capability_id, repoSearchManifest],
   [docsSearchManifest.capability_id, docsSearchManifest],
+  [civilizationBoundsReflectionManifest.capability_id, civilizationBoundsReflectionManifest],
+  [theoryContextReflectionManifest.capability_id, theoryContextReflectionManifest],
 ]);
 
 export const listWorkstationGatewayCapabilities = (
@@ -1274,6 +1414,97 @@ export const callWorkstationGatewayCapability = async (
       post_tool_model_step_required: true,
       assistant_answer: false,
       raw_content_included: false,
+    };
+  }
+
+  if (manifest.capability_id === CALCULATOR_SHOW_GATEWAY_SOLVE_CAPABILITY) {
+    const args = readArguments(input.arguments);
+    const expression = cleanString(args.expression);
+    const resultText = cleanString(args.result);
+    const normalizedExpression = cleanString(args.normalized_expression ?? args.normalizedExpression, expression);
+    const hasSolveObservation = Boolean(expression && resultText);
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: hasSolveObservation ? "admitted" : "blocked",
+      reason: hasSolveObservation ? "non_mutating_workstation_ui_action" : "calculator_gateway_solve_observation_missing",
+      blockedReason: hasSolveObservation ? undefined : "calculator_gateway_solve_observation_missing",
+      sourceTargetIntent: args.source_target_intent,
+    });
+    const workstationAction = hasSolveObservation
+      ? {
+          schema_version: "helix.workstation.action/v1",
+          action: "run_panel_action",
+          panel_id: "scientific-calculator",
+          action_id: "show_gateway_solve",
+          args: {
+            expression,
+            normalized_expression: normalizedExpression,
+            result: resultText,
+            source_capability: cleanString(args.source_capability, CALCULATOR_SOLVE_EXPRESSION_CAPABILITY),
+            observation_ref: cleanString(args.observation_ref, `${turnId}:${CALCULATOR_SOLVE_EXPRESSION_CAPABILITY}`),
+          },
+        }
+      : null;
+    const observation = {
+      schema: WORKSTATION_UI_ACTION_RECEIPT_SCHEMA,
+      capability_key: manifest.capability_id,
+      action_kind: "run_panel_action",
+      panel_id: "scientific-calculator",
+      action_id: "show_gateway_solve",
+      status: hasSolveObservation ? "succeeded" : "blocked",
+      dispatch_status: hasSolveObservation ? "admitted" : "blocked",
+      workstation_action: workstationAction,
+      source_capability: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: "scientific-calculator",
+      action: "show_gateway_solve",
+      status: hasSolveObservation ? "succeeded" : "blocked",
+      summary: hasSolveObservation
+        ? `Admitted non-mutating Scientific Calculator gateway solve projection for ${expression} = ${resultText}.`
+        : "Scientific Calculator gateway solve projection was blocked because no solve observation was supplied.",
+      observation,
+      missingRequirements: hasSolveObservation ? [] : [{
+        code: "calculator_gateway_solve_observation_missing",
+        message: "Provide an observed calculator expression and result from scientific-calculator.solve_expression.",
+        repair_action: "run_required_tool",
+      }],
+    });
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error: hasSolveObservation ? undefined : "calculator_gateway_solve_observation_missing",
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: hasSolveObservation,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      error: hasSolveObservation ? undefined : "calculator_gateway_solve_observation_missing",
     };
   }
 
@@ -1807,6 +2038,308 @@ export const callWorkstationGatewayCapability = async (
       assistant_answer: false,
       raw_content_included: false,
       error: result.error,
+    };
+  }
+
+  if (manifest.capability_id === CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY) {
+    const args = readArguments(input.arguments);
+    const prompt = cleanString(args.prompt ?? args.query ?? args.text);
+    const hasPrompt = Boolean(prompt);
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: hasPrompt ? "admitted" : "blocked",
+      reason: hasPrompt ? "read_only_gateway_capability" : "civilization_bounds_prompt_missing",
+      blockedReason: hasPrompt ? undefined : "civilization_bounds_prompt_missing",
+      sourceTargetIntent: args.source_target_intent,
+    });
+    if (!hasPrompt) {
+      const observation = {
+        schema: CIVILIZATION_BOUNDS_REFLECTION_OBSERVATION_SCHEMA,
+        capability_key: manifest.capability_id,
+        status: "blocked",
+        blocked_reason: "civilization_bounds_prompt_missing",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+      const observationPacket = buildWorkstationGatewayObservationPacket({
+        turnId,
+        iteration,
+        capabilityId: manifest.capability_id,
+        panelId: "civilization-bounds-roadmap",
+        action: "reflect_system_bounds",
+        status: "blocked",
+        summary: "Civilization Bounds reflection was blocked because no prompt was supplied.",
+        observation,
+        missingRequirements: [{
+          code: "civilization_bounds_prompt_missing",
+          message: "Provide a prompt or scenario context to reflect through Civilization Bounds.",
+          repair_action: "ask_user",
+        }],
+      });
+      const trace = buildGatewayTrace({
+        turnId,
+        capabilityId: manifest.capability_id,
+        agentRuntime,
+        admission,
+        observationPacket,
+        error: "civilization_bounds_prompt_missing",
+      });
+      return {
+        schema: "helix.workstation_tool_gateway.call_result.v1",
+        manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+        ok: false,
+        agent_runtime: agentRuntime,
+        capability_id: manifest.capability_id,
+        mode,
+        gateway_admission: admission,
+        observation_packet: observationPacket,
+        tool_lifecycle_trace: trace.tool_lifecycle_trace,
+        tool_followup_decision: trace.tool_followup_decision,
+        observation,
+        artifact_refs: observationPacket.produced_artifact_refs,
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+        error: "civilization_bounds_prompt_missing",
+      };
+    }
+
+    const output = await runHelixAskCivilizationBoundsTool({
+      prompt,
+      scenarioId: optionalString(args.scenario_id ?? args.scenarioId) ?? undefined,
+      phaseId: optionalString(args.phase_id ?? args.phaseId) ?? undefined,
+      layerMode: readCivilizationLayerMode(args.layer_mode ?? args.layerMode),
+      selectedSystemIds: readStringArray(args.selected_system_ids ?? args.selectedSystemIds),
+      selectedBadgeIds: readStringArray(args.selected_badge_ids ?? args.selectedBadgeIds),
+      theoryReflectionRef: optionalString(args.theory_reflection_ref ?? args.theoryReflectionRef) ?? undefined,
+      ideologyReflectionRef: optionalString(args.ideology_reflection_ref ?? args.ideologyReflectionRef) ?? undefined,
+      options: {
+        includeBridgeContext: args.include_bridge_context === true || args.includeBridgeContext === true,
+        includeCollaborationBounds:
+          args.include_collaboration_bounds === true || args.includeCollaborationBounds === true,
+        includeFalsificationHooks: args.include_falsification_hooks === true || args.includeFalsificationHooks === true,
+      },
+    });
+    const roadmap = output.roadmap;
+    const parameterScopeKinds = output.parameterScopes.map((scope) => scope.kind).slice(0, 12);
+    const actionChannelKinds = output.actionChannels.map((channel) => channel.kind).slice(0, 12);
+    const missingEvidence = (output.bridgeContext?.missingEvidence ?? [])
+      .map((entry) => cleanString(entry))
+      .filter(Boolean)
+      .slice(0, 12);
+    const observation = {
+      schema: CIVILIZATION_BOUNDS_REFLECTION_OBSERVATION_SCHEMA,
+      capability_key: manifest.capability_id,
+      panel_id: "civilization-bounds-roadmap",
+      action_id: "reflect_system_bounds",
+      status: "succeeded",
+      prompt,
+      roadmap_id: roadmap.roadmapId,
+      scenario_id: roadmap.scenarioId,
+      parameter_scope_kinds: parameterScopeKinds,
+      action_channel_kinds: actionChannelKinds,
+      dependency_chain_count: output.dependencyChains.length,
+      comparison_case_count: output.comparisonCases.length,
+      hypothesis_claim_count: output.hypothesisClaims.length,
+      missing_evidence: missingEvidence,
+      bridge_context_included: Boolean(output.bridgeContext),
+      procedural_scaffold_id: output.proceduralScaffold.scaffoldId,
+      authority: roadmap.authority,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: "civilization-bounds-roadmap",
+      action: "reflect_system_bounds",
+      status: "succeeded",
+      summary: `Civilization Bounds reflection produced ${parameterScopeKinds.length} parameter scope(s), ${actionChannelKinds.length} action channel(s), and ${missingEvidence.length} missing-evidence hook(s).`,
+      observation,
+    });
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: true,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
+
+  if (manifest.capability_id === THEORY_CONTEXT_REFLECTION_CAPABILITY) {
+    const args = readArguments(input.arguments);
+    const prompt = cleanString(args.prompt ?? args.query ?? args.text);
+    const conversationContext = optionalString(args.conversation_context ?? args.conversationContext);
+    const limitRaw = Number(args.limit);
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.floor(limitRaw), 12) : undefined;
+    const hasPrompt = Boolean(prompt);
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: hasPrompt ? "admitted" : "blocked",
+      reason: hasPrompt ? "read_only_gateway_capability" : "theory_reflection_prompt_missing",
+      blockedReason: hasPrompt ? undefined : "theory_reflection_prompt_missing",
+      sourceTargetIntent: args.source_target_intent,
+    });
+    if (!hasPrompt) {
+      const observation = {
+        schema: THEORY_CONTEXT_REFLECTION_OBSERVATION_SCHEMA,
+        capability_key: manifest.capability_id,
+        status: "blocked",
+        blocked_reason: "theory_reflection_prompt_missing",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+      const observationPacket = buildWorkstationGatewayObservationPacket({
+        turnId,
+        iteration,
+        capabilityId: manifest.capability_id,
+        panelId: "theory-badge-graph",
+        action: "reflect_discussion_context",
+        status: "blocked",
+        summary: "Theory Badge Graph reflection was blocked because no prompt was supplied.",
+        observation,
+        missingRequirements: [{
+          code: "theory_reflection_prompt_missing",
+          message: "Provide a prompt or discussion context to reflect against the Theory Badge Graph.",
+          repair_action: "ask_user",
+        }],
+      });
+      const trace = buildGatewayTrace({
+        turnId,
+        capabilityId: manifest.capability_id,
+        agentRuntime,
+        admission,
+        observationPacket,
+        error: "theory_reflection_prompt_missing",
+      });
+      return {
+        schema: "helix.workstation_tool_gateway.call_result.v1",
+        manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+        ok: false,
+        agent_runtime: agentRuntime,
+        capability_id: manifest.capability_id,
+        mode,
+        gateway_admission: admission,
+        observation_packet: observationPacket,
+        tool_lifecycle_trace: trace.tool_lifecycle_trace,
+        tool_followup_decision: trace.tool_followup_decision,
+        observation,
+        artifact_refs: observationPacket.produced_artifact_refs,
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+        error: "theory_reflection_prompt_missing",
+      };
+    }
+
+    const receipt = runHelixTheoryContextReflectionTool({
+      graph: buildNhm2TheoryBadgeGraphV1(),
+      turnId,
+      threadId: optionalString(args.thread_id ?? args.threadId),
+      prompt,
+      conversationContext,
+      mentionedEquations: readStringArray(args.mentioned_equations ?? args.mentionedEquations),
+      mentionedSymbols: readStringArray(args.mentioned_symbols ?? args.mentionedSymbols),
+      mentionedDomains: readStringArray(args.mentioned_domains ?? args.mentionedDomains),
+      limit,
+      buildExplanationPlan: args.build_explanation_plan === true || args.buildExplanationPlan === true,
+      panelSync: {
+        requested: false,
+        applied: false,
+        openPanel: false,
+        overlayMode: "none",
+      },
+    });
+    const reflection = receipt.reflectionV1;
+    const observation = {
+      schema: THEORY_CONTEXT_REFLECTION_OBSERVATION_SCHEMA,
+      capability_key: manifest.capability_id,
+      panel_id: "theory-badge-graph",
+      action_id: "reflect_discussion_context",
+      status: "succeeded",
+      prompt,
+      conversation_context_included: Boolean(conversationContext),
+      reflection_id: reflection.reflectionId,
+      summary: reflection.evidenceForAsk.summary,
+      exact_badge_ids: reflection.overlay.exactBadgeIds.slice(0, 12),
+      likely_badge_ids: reflection.overlay.likelyBadgeIds.slice(0, 12),
+      highlighted_badge_ids: reflection.overlay.highlightedBadgeIds.slice(0, 12),
+      claim_boundary_notes: reflection.evidenceForAsk.claimBoundaries.slice(0, 8),
+      recommended_action_ids: receipt.recommendedNextActions.map((action) => action.actionId).slice(0, 12),
+      recommended_actions_solve: receipt.recommendedNextActions.some((action) => action.solves === true),
+      receipt_schema: receipt.schemaVersion,
+      reflection_terminal_eligible: reflection.terminal_eligible,
+      authority: receipt.authority,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: "theory-badge-graph",
+      action: "reflect_discussion_context",
+      status: "succeeded",
+      summary: `Theory Badge Graph reflection produced ${observation.exact_badge_ids.length} exact badge match(es), ${observation.likely_badge_ids.length} likely match(es), and ${observation.claim_boundary_notes.length} claim-boundary note(s).`,
+      observation,
+    });
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: true,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
     };
   }
 

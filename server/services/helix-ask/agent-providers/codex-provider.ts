@@ -19,6 +19,7 @@ const CALCULATOR_SOLVE_EXPRESSION_CAPABILITY = "scientific-calculator.solve_expr
 const CALCULATOR_ACTIVE_CONTEXT_CAPABILITY = "scientific-calculator.active_context" as const;
 const CALCULATOR_OPEN_PANEL_CAPABILITY = "scientific-calculator.open_panel" as const;
 const CALCULATOR_FOCUS_PANEL_CAPABILITY = "scientific-calculator.focus_panel" as const;
+const CALCULATOR_SHOW_GATEWAY_SOLVE_CAPABILITY = "scientific-calculator.show_gateway_solve" as const;
 const WORKSTATION_UI_ACTION_RECEIPT_SCHEMA = "helix.workstation_ui_action_receipt.v1" as const;
 
 const readBooleanEnv = (value: string | undefined, defaultValue: boolean): boolean => {
@@ -370,10 +371,25 @@ const buildCalculatorPanelActionReceipts = async (input: {
   turnId: string;
   gatewayCallResults: HelixWorkstationGatewayCallResult[];
 }): Promise<HelixWorkstationGatewayCallResult[]> => {
-  if (!input.gatewayCallResults.some(isCalculatorSolveObservation)) return [];
+  const solveResults = input.gatewayCallResults.filter(isCalculatorSolveObservation);
+  if (solveResults.length === 0) return [];
+  const latestSolveObservation = readGatewayObservationRecord(solveResults[solveResults.length - 1]);
+  const observedExpression = readString(latestSolveObservation?.expression);
+  const observedResult = readString(latestSolveObservation?.result);
   const actionInputs = [
-    { capabilityId: CALCULATOR_OPEN_PANEL_CAPABILITY, iteration: 0 },
-    { capabilityId: CALCULATOR_FOCUS_PANEL_CAPABILITY, iteration: 0 },
+    { capabilityId: CALCULATOR_OPEN_PANEL_CAPABILITY, iteration: 0, arguments: {} },
+    { capabilityId: CALCULATOR_FOCUS_PANEL_CAPABILITY, iteration: 0, arguments: {} },
+    {
+      capabilityId: CALCULATOR_SHOW_GATEWAY_SOLVE_CAPABILITY,
+      iteration: 0,
+      arguments: {
+        expression: observedExpression,
+        normalized_expression: observedExpression,
+        result: observedResult,
+        source_capability: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+        observation_ref: `${input.turnId}:${CALCULATOR_SOLVE_EXPRESSION_CAPABILITY}`,
+      },
+    },
   ];
   const results: HelixWorkstationGatewayCallResult[] = [];
   for (const actionInput of actionInputs) {
@@ -382,6 +398,7 @@ const buildCalculatorPanelActionReceipts = async (input: {
       mode: "act",
       capabilityId: actionInput.capabilityId,
       arguments: {
+        ...actionInput.arguments,
         source_target_intent: {
           source: "codex_calculator_gateway_observation",
           reason: "calculator_solve_projection",
@@ -487,7 +504,7 @@ const applyDocumentObservationAuthorityGuard = (input: {
   if (hasDocsContentObservation(input.gatewayCallResults)) return input.text;
   return [
     "I cannot answer the current document's content from this turn because no docs observation packet was materialized.",
-    "Ask with the docs-viewer focused and an active document path, or provide an explicit document path so Helix can create a bounded docs observation first.",
+    "Ask with a valid retained active document path, focus the docs-viewer, or provide an explicit document path so Helix can create a bounded docs observation first.",
   ].join("\n");
 };
 
@@ -580,6 +597,7 @@ const applyGatewayFailureAuthorityGuard = (input: {
 const buildCodexProviderTurnTranscriptEvents = (input: {
   turnId: string;
   providerLabel: string;
+  body?: Record<string, unknown> | null;
   gatewayCallResults: HelixWorkstationGatewayCallResult[];
   providerText: string;
   finalStatus: string;
@@ -599,6 +617,42 @@ const buildCodexProviderTurnTranscriptEvents = (input: {
     assistant_answer: false,
     raw_content_included: false,
   }];
+  const workspaceSnapshot = readRecord(input.body?.workspace_context_snapshot ?? input.body?.workspaceContextSnapshot);
+  if (workspaceSnapshot) {
+    const focusedPanel = readString(
+      workspaceSnapshot.focusedPanel ??
+        workspaceSnapshot.focused_panel ??
+        workspaceSnapshot.activePanel ??
+        workspaceSnapshot.active_panel,
+    );
+    const retainedDocPath = readString(
+      workspaceSnapshot.activeDocPath ??
+        workspaceSnapshot.active_doc_path ??
+        workspaceSnapshot.docContextPath ??
+        workspaceSnapshot.doc_context_path,
+    );
+    const contextParts = [
+      focusedPanel ? `focused panel ${focusedPanel}` : null,
+      retainedDocPath ? `retained doc ${retainedDocPath.replace(/\\/g, "/").replace(/^\/+/, "")}` : null,
+    ].filter(Boolean);
+    if (contextParts.length > 0) {
+      events.push({
+        id: `${input.turnId}:codex-context-state`,
+        role: "system",
+        type: "observation",
+        status: "completed",
+        text: `Context state: ${contextParts.join("; ")}.`,
+        detail: "workspace_context_snapshot",
+        lane: "workstation_context",
+        step_id: "context_state",
+        turn_id: input.turnId,
+        source_event_type: "context_state",
+        reconstructed: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      });
+    }
+  }
 
   input.gatewayCallResults.forEach((result, index) => {
     const stepId = `workstation_gateway_${index + 1}`;
@@ -929,6 +983,7 @@ export const codexProvider: HelixAgentProvider = {
     const initialTranscriptEvents = buildCodexProviderTurnTranscriptEvents({
       turnId,
       providerLabel: codexProvider.label,
+      body: request.body,
       gatewayCallResults,
       providerText: "Codex runtime could not run because the Ask turn had no question.",
       finalStatus: "final_failure",
@@ -1087,6 +1142,7 @@ export const codexProvider: HelixAgentProvider = {
     const turnTranscriptEvents = buildCodexProviderTurnTranscriptEvents({
       turnId,
       providerLabel: codexProvider.label,
+      body: request.body,
       gatewayCallResults,
       providerText: gatewayGuardedText,
       finalStatus: ok ? "completed" : "final_failure",

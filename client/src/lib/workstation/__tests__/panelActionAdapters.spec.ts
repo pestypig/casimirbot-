@@ -185,6 +185,63 @@ describe("panelActionAdapters", () => {
     });
   });
 
+  it("projects calculator gateway solve observations into the visible calculator state without answer authority", () => {
+    const opened: string[] = [];
+    const result = executeHelixPanelAction(
+      {
+        panel_id: "scientific-calculator",
+        action_id: "show_gateway_solve",
+        args: {
+          expression: "(18+6)*3",
+          normalized_expression: "(18+6)*3",
+          result: "72",
+          source_capability: "scientific-calculator.solve_expression",
+          observation_ref: "ask:test:calculator-projection:scientific-calculator.solve_expression",
+        },
+      },
+      {
+        openPanel: (panelId) => opened.push(`open:${panelId}`),
+        focusPanel: (panelId) => opened.push(`focus:${panelId}`),
+        closePanel: () => undefined,
+        openSettings: () => undefined,
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(opened).toEqual(["open:scientific-calculator", "focus:scientific-calculator"]);
+    expect(result.artifact).toMatchObject({
+      kind: "calculator_gateway_solve_projection",
+      expression: "(18+6)*3",
+      normalized_expression: "(18+6)*3",
+      result_text: "72",
+      source_capability: "scientific-calculator.solve_expression",
+      gateway_observation_authority: true,
+      panel_generated_answer: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+    const calculatorState = useScientificCalculatorStore.getState();
+    expect(calculatorState.currentLatex).toBe("(18+6)*3");
+    expect(calculatorState.lastSolve).toMatchObject({
+      ok: true,
+      input_latex: "(18+6)*3",
+      normalized_expression: "(18+6)*3",
+      result_text: "72",
+      trace: {
+        route: "helix_workstation_gateway_observation",
+        delegatedTo: "scientific-calculator.solve_expression",
+      },
+    });
+    expect(calculatorState.debugEvents[0]).toMatchObject({
+      action_id: "solve_expression",
+      source: "workstation_action",
+      input_latex: "(18+6)*3",
+      result_text: "72",
+      normalized_expression: "(18+6)*3",
+      message: "solve_completed",
+    });
+  });
+
   it("routes narrator source policy and confirm-speak actions as non-answer receipts", () => {
     const policyResult = executeHelixPanelAction(
       {

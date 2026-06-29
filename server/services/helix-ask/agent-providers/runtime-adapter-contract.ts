@@ -79,6 +79,8 @@ export type HelixAgentRuntimeAdapterContract = {
     helix_owns_terminal_authority: true;
     receipts_are_not_answers: true;
     observations_require_reentry_before_final_answer: true;
+    helix_preserves_provider_answer_style: true;
+    helix_style_rewrite_enabled: false;
     shell_access_enabled: false;
     file_mutation_enabled: false;
     code_mutation_enabled: false;
@@ -133,6 +135,8 @@ export const buildHelixAgentRuntimeAdapterContract = (input: {
       helix_owns_terminal_authority: true,
       receipts_are_not_answers: true,
       observations_require_reentry_before_final_answer: true,
+      helix_preserves_provider_answer_style: true,
+      helix_style_rewrite_enabled: false,
       shell_access_enabled: false,
       file_mutation_enabled: false,
       code_mutation_enabled: false,
@@ -143,6 +147,7 @@ export const buildHelixAgentRuntimeAdapterContract = (input: {
       "Use only Helix workstation gateway capabilities admitted for this turn.",
       "Do not claim a workstation tool or UI action ran unless a Helix observation packet or action receipt is present.",
       "Receipts and observations are not final answers; they must re-enter provider reasoning before any terminal candidate.",
+      "Helix gates answer authority but does not rewrite, shorten, bulletize, or otherwise impose answer style on the provider terminal candidate.",
       "Do not mutate files, run shell commands, or perform code mutation through this adapter contract.",
     ],
     assistant_answer: false,

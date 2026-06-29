@@ -66,10 +66,13 @@ describe("agent runtime adapter contract", () => {
     expect(contract.adapter_invariants.helix_owns_tool_admission).toBe(true);
     expect(contract.adapter_invariants.helix_owns_observation_packets).toBe(true);
     expect(contract.adapter_invariants.helix_owns_terminal_authority).toBe(true);
+    expect(contract.adapter_invariants.helix_preserves_provider_answer_style).toBe(true);
+    expect(contract.adapter_invariants.helix_style_rewrite_enabled).toBe(false);
     expect(contract.adapter_invariants.shell_access_enabled).toBe(false);
     expect(contract.adapter_invariants.file_mutation_enabled).toBe(false);
     expect(contract.adapter_invariants.code_mutation_enabled).toBe(false);
     expect(contract.prompt_policy_lines.join("\n")).toContain("Runtime-specific protocol glue stays inside");
+    expect(contract.prompt_policy_lines.join("\n")).toContain("does not rewrite, shorten, bulletize");
   });
 
   it("keeps observation-only providers on the same contract while blocking action capabilities", () => {

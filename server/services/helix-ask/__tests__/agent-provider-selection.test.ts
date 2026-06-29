@@ -769,6 +769,67 @@ describe("Helix Ask agent provider selection", () => {
     expect(String((results[0].observation as any).active_document_observation.excerpt ?? "")).toContain("Helix Ask");
   });
 
+  it("materializes retained document context even when calculator is focused", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "- Retained doc claim boundary.\n- Still observation-backed.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const body = {
+      turn_id: "ask:test:codex-retained-doc-context-after-calculator-focus",
+      agent_runtime: "codex",
+      question: "From this current document, what is the claim boundary? Answer in two short bullets.",
+      workspace_context_snapshot: {
+        activePanel: "scientific-calculator",
+        focusedPanel: "scientific-calculator",
+        openPanels: ["docs-viewer", "scientific-calculator"],
+        activeDocPath: "/docs/helix-ask-flow.md",
+        hasDocContext: true,
+      },
+    };
+
+    const requests = buildActiveDocsContextWorkstationGatewayCallRequests(body);
+    expect(requests).toEqual([
+      expect.objectContaining({
+        derivation_source: "helix_retained_active_doc_context",
+        capability_id: "docs.search",
+        arguments: expect.objectContaining({
+          paths: ["docs/helix-ask-flow.md"],
+          source_target_intent: expect.objectContaining({
+            focused_panel: "scientific-calculator",
+            active_doc_path: "docs/helix-ask-flow.md",
+            retained_source_context: true,
+          }),
+        }),
+      }),
+    ]);
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body,
+      headers: {},
+    });
+
+    expect(result.text).toBe("- Retained doc claim boundary.\n- Still observation-backed.");
+    expect((result.debug as any)?.workstation_gateway_call_results?.map((entry: any) => entry.capability_id))
+      .toEqual(["docs.search"]);
+    expect(result.turn_transcript_events?.map((event: any) => event.source_event_type)).toEqual([
+      "runtime_selected",
+      "context_state",
+      "tool_request",
+      "tool_observation",
+      "model_reentry",
+      "terminal_answer",
+    ]);
+    expect(result.turn_transcript_events?.some((event: any) =>
+      event.source_event_type === "context_state" &&
+      /focused panel scientific-calculator; retained doc docs\/helix-ask-flow\.md/i.test(String(event.text)),
+    )).toBe(true);
+    expect(result.turn_transcript_events?.some((event: any) =>
+      event.source_event_type === "tool_observation" &&
+      /docs\.search materialized a bounded document excerpt from docs\/helix-ask-flow\.md/i.test(String(event.text)),
+    )).toBe(true);
+  });
+
   it("normalizes docs observation excerpt transport without dropping provenance", () => {
     const excerpt = normalizeDocsObservationExcerptText([
       "The frontier records `alpha = 0.7` and duplicate renderer echo `alpha=0.7` for the same inline value.",
@@ -852,15 +913,31 @@ describe("Helix Ask agent provider selection", () => {
         action: "focus_panel",
         panel_id: "scientific-calculator",
       },
+      {
+        schema_version: "helix.workstation.action/v1",
+        action: "run_panel_action",
+        panel_id: "scientific-calculator",
+        action_id: "show_gateway_solve",
+        args: {
+          expression: "8 * 9",
+          normalized_expression: "8 * 9",
+          result: "72",
+          source_capability: "scientific-calculator.solve_expression",
+          observation_ref: "ask:test:codex-calculator-visible-trace:scientific-calculator.solve_expression",
+        },
+      },
     ]);
     expect((result.debug as any)?.agent_step_loop?.iterations?.map((iteration: any) => iteration.chosen_capability))
       .toEqual([
         "scientific-calculator.open_panel",
         "scientific-calculator.focus_panel",
+        "scientific-calculator.show_gateway_solve",
         "scientific-calculator.solve_expression",
       ]);
     expect(result.turn_transcript_events?.map((event: any) => event.source_event_type)).toEqual([
       "runtime_selected",
+      "action_request",
+      "action_observation",
       "action_request",
       "action_observation",
       "action_request",
@@ -877,15 +954,389 @@ describe("Helix Ask agent provider selection", () => {
       /Tool observation: scientific-calculator\.solve_expression observed 8 \* 9 = 72\./.test(String(event.text)),
     )).toBe(true);
     expect((result.debug as any)?.provider_gateway_debug_summary).toMatchObject({
-      gateway_call_count: 3,
-      gateway_action_receipt_count: 2,
-      gateway_successful_action_receipt_count: 2,
+      gateway_call_count: 4,
+      gateway_action_receipt_count: 3,
+      gateway_successful_action_receipt_count: 3,
       gateway_tool_observation_count: 1,
       gateway_successful_tool_observation_count: 1,
       gateway_observation_count: 1,
       terminal_authority_result: "authorized_by_helix_provider_candidate_bridge",
     });
     expect((result.debug as any)?.turn_transcript_events).toEqual(result.turn_transcript_events);
+  });
+
+  it("preserves detailed Codex provider answers without Helix shortening or style rewrite", async () => {
+    const detailedAnswer = [
+      "The calculator observation gives a numeric anchor, but the implication is broader:",
+      "",
+      "First, the gateway result is evidence, not the answer itself. Codex can use it as a grounded input and then explain why the arithmetic matters in the user's context.",
+      "",
+      "Second, the workstation trace should remain visible alongside the answer. That lets the user inspect the tool request, the observation packet, and the model re-entry without those rows being spliced into the final prose.",
+      "",
+      "Third, preserving this full answer matters because a detailed prompt should not be collapsed into a terse receipt-style line just because a tool ran.",
+    ].join("\n");
+    process.env.CODEX_AGENT_FAKE_STDOUT = detailedAnswer;
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:codex-detailed-answer-preserved",
+        agent_runtime: "codex",
+        question: "Use the scientific calculator to evaluate 8 * 9, then give a detailed explanation of what the tool-backed result means for the workstation loop.",
+        workstation_gateway_call: {
+          capability_id: "scientific-calculator.solve_expression",
+          mode: "read",
+          arguments: {
+            expression: "8 * 9",
+          },
+        },
+      },
+      headers: {},
+    });
+
+    expect(result.text).toBe(detailedAnswer);
+    expect(result.answer).toBe(detailedAnswer);
+    expect(result.selected_final_answer).toBe(detailedAnswer);
+    expect(result.text.length).toBe(detailedAnswer.length);
+    expect(result.text).not.toContain("Tool observation:");
+    expect(result.text).not.toContain("Ran `scientific-calculator.solve_expression`.");
+    expect((result.debug as any)?.agent_runtime_adapter_contract?.adapter_invariants).toMatchObject({
+      helix_preserves_provider_answer_style: true,
+      helix_style_rewrite_enabled: false,
+    });
+    expect((result.debug as any)?.provider_terminal_candidate).toMatchObject({
+      candidate_text_length: detailedAnswer.length,
+      candidate_text_hash: expect.any(String),
+    });
+    expect((result.debug as any)?.terminal_presentation).toMatchObject({
+      concise_text: detailedAnswer,
+      presentation_policy: "preserve_provider_text",
+      helix_style_rewrite_applied: false,
+    });
+    expect(result.turn_transcript_events?.find((event: any) => event.source_event_type === "terminal_answer"))
+      .toMatchObject({
+        text: detailedAnswer,
+        assistant_answer: false,
+        raw_content_included: false,
+      });
+  });
+
+  it("routes explicit Codex theory reflection calls as visible observation-backed re-entry", async () => {
+    const providerAnswer = [
+      "The reflection observation is useful as context, not as proof.",
+      "",
+      "It points Codex toward claim-boundary badges, so the final answer should explain what remains bounded instead of pretending the theory graph certified the claim.",
+    ].join("\n");
+    process.env.CODEX_AGENT_FAKE_STDOUT = providerAnswer;
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:codex-theory-reflection-visible-trace",
+        agent_runtime: "codex",
+        question: "Reflect QEI margin and source residual against the theory badge graph, then answer with the claim boundary.",
+        workstation_gateway_call: {
+          capability_id: "theory-badge-graph.reflect_discussion_context",
+          mode: "read",
+          arguments: {
+            prompt: "Reflect QEI margin and source residual against the theory badge graph.",
+            mentioned_symbols: ["QEI", "source residual"],
+            mentioned_domains: ["warp metrics", "claim boundaries"],
+            build_explanation_plan: true,
+            limit: 4,
+          },
+        },
+      },
+      headers: {},
+    });
+
+    expect(result.text).toBe(providerAnswer);
+    expect(result.text).not.toContain("Tool observation:");
+    expect((result.action_envelope as any)?.workstation_actions ?? []).toEqual([]);
+    expect((result.debug as any)?.workstation_gateway_call_results).toHaveLength(1);
+    expect((result.debug as any)?.workstation_gateway_call_results?.[0]).toMatchObject({
+      ok: true,
+      capability_id: "theory-badge-graph.reflect_discussion_context",
+      observation: {
+        schema: "helix.theory_context_reflection_observation.v1",
+        status: "succeeded",
+        receipt_schema: "helix_theory_context_reflection_tool_receipt/v1",
+        reflection_terminal_eligible: false,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation_packet: {
+        panel_id: "theory-badge-graph",
+        action: "reflect_discussion_context",
+        status: "succeeded",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    expect((result.debug as any)?.provider_gateway_debug_summary).toMatchObject({
+      gateway_call_count: 1,
+      gateway_action_receipt_count: 0,
+      gateway_tool_observation_count: 1,
+      gateway_successful_tool_observation_count: 1,
+      gateway_observation_count: 1,
+      terminal_authority_result: "authorized_by_helix_provider_candidate_bridge",
+    });
+    expect(result.turn_transcript_events?.map((event: any) => event.source_event_type)).toEqual([
+      "runtime_selected",
+      "tool_request",
+      "tool_observation",
+      "model_reentry",
+      "terminal_answer",
+    ]);
+    expect(result.turn_transcript_events?.some((event: any) =>
+      event.source_event_type === "tool_observation" &&
+      /Theory Badge Graph reflection produced/i.test(String(event.text)),
+    )).toBe(true);
+    expect(result.turn_transcript_events?.find((event: any) => event.source_event_type === "terminal_answer"))
+      .toMatchObject({
+        text: providerAnswer,
+        assistant_answer: false,
+        raw_content_included: false,
+      });
+  });
+
+  it("routes explicit Codex civilization-bounds calls as visible observation-backed re-entry", async () => {
+    const providerAnswer = [
+      "The civilization-bounds observation gives situational constraints, not a decision.",
+      "",
+      "The final answer should explain missing evidence and capability bounds without treating the roadmap as policy authority.",
+    ].join("\n");
+    process.env.CODEX_AGENT_FAKE_STDOUT = providerAnswer;
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:codex-civilization-bounds-visible-trace",
+        agent_runtime: "codex",
+        question: "Reflect planetary trade through civilization bounds, then answer with the missing evidence boundary.",
+        workstation_gateway_call: {
+          capability_id: "civilization-bounds.reflect_system_bounds",
+          mode: "read",
+          arguments: {
+            prompt: "Reflect planetary trade through civilization bounds with material inventory and governance review.",
+            include_bridge_context: true,
+            include_collaboration_bounds: true,
+            include_falsification_hooks: true,
+          },
+        },
+      },
+      headers: {},
+    });
+
+    expect(result.text).toBe(providerAnswer);
+    expect(result.text).not.toContain("Tool observation:");
+    expect((result.action_envelope as any)?.workstation_actions ?? []).toEqual([]);
+    expect((result.debug as any)?.workstation_gateway_call_results).toHaveLength(1);
+    expect((result.debug as any)?.workstation_gateway_call_results?.[0]).toMatchObject({
+      ok: true,
+      capability_id: "civilization-bounds.reflect_system_bounds",
+      observation: {
+        schema: "helix.civilization_bounds_reflection_observation.v1",
+        status: "succeeded",
+        bridge_context_included: true,
+        procedural_scaffold_id: "spore_civilization_stage_procedural_scaffold",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation_packet: {
+        panel_id: "civilization-bounds-roadmap",
+        action: "reflect_system_bounds",
+        status: "succeeded",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    expect((result.debug as any)?.provider_gateway_debug_summary).toMatchObject({
+      gateway_call_count: 1,
+      gateway_action_receipt_count: 0,
+      gateway_tool_observation_count: 1,
+      gateway_successful_tool_observation_count: 1,
+      gateway_observation_count: 1,
+      terminal_authority_result: "authorized_by_helix_provider_candidate_bridge",
+    });
+    expect(result.turn_transcript_events?.map((event: any) => event.source_event_type)).toEqual([
+      "runtime_selected",
+      "tool_request",
+      "tool_observation",
+      "model_reentry",
+      "terminal_answer",
+    ]);
+    expect(result.turn_transcript_events?.some((event: any) =>
+      event.source_event_type === "tool_observation" &&
+      /Civilization Bounds reflection produced/i.test(String(event.text)),
+    )).toBe(true);
+  });
+
+  it("preserves compound Codex workstation observations before one final model re-entry", async () => {
+    const providerAnswer = [
+      "The compound turn has three evidence inputs: the document excerpt, the calculator result, and repo search context.",
+      "",
+      "The answer can synthesize those observations, but none of the receipts are themselves the final answer.",
+    ].join("\n");
+    process.env.CODEX_AGENT_FAKE_STDOUT = providerAnswer;
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:codex-compound-docs-calculator-repo",
+        agent_runtime: "codex",
+        question: "Use the open document, calculate 8 * 9, search the repo for workstation_gateway, then synthesize the implication.",
+        workstation_gateway_calls: [
+          {
+            capability_id: "docs.search",
+            mode: "read",
+            arguments: {
+              query: "Helix Ask remains the grounded reasoning surface",
+              paths: ["docs/helix-ask-flow.md"],
+              max_hits: 2,
+            },
+          },
+          {
+            capability_id: "scientific-calculator.solve_expression",
+            mode: "read",
+            arguments: {
+              expression: "8 * 9",
+            },
+          },
+          {
+            capability_id: "repo.search",
+            mode: "read",
+            arguments: {
+              query: "workstation_gateway",
+              paths: ["server/services/helix-ask"],
+              max_hits: 2,
+            },
+          },
+        ],
+      },
+      headers: {},
+    });
+
+    expect(result.text).toBe(providerAnswer);
+    expect(result.text).not.toContain("Tool observation:");
+    expect((result.debug as any)?.workstation_gateway_call_results?.map((entry: any) => entry.capability_id))
+      .toEqual([
+        "scientific-calculator.open_panel",
+        "scientific-calculator.focus_panel",
+        "scientific-calculator.show_gateway_solve",
+        "docs.search",
+        "scientific-calculator.solve_expression",
+        "repo.search",
+      ]);
+    expect((result.debug as any)?.provider_gateway_debug_summary).toMatchObject({
+      gateway_call_count: 6,
+      gateway_action_receipt_count: 3,
+      gateway_successful_action_receipt_count: 3,
+      gateway_tool_observation_count: 3,
+      gateway_successful_tool_observation_count: 3,
+      gateway_observation_count: 3,
+      terminal_authority_result: "authorized_by_helix_provider_candidate_bridge",
+    });
+    expect(result.turn_transcript_events?.map((event: any) => event.source_event_type)).toEqual([
+      "runtime_selected",
+      "action_request",
+      "action_observation",
+      "action_request",
+      "action_observation",
+      "action_request",
+      "action_observation",
+      "tool_request",
+      "tool_observation",
+      "tool_request",
+      "tool_observation",
+      "tool_request",
+      "tool_observation",
+      "model_reentry",
+      "terminal_answer",
+    ]);
+    expect(result.turn_transcript_events?.filter((event: any) => event.source_event_type === "model_reentry"))
+      .toHaveLength(1);
+    expect(result.turn_transcript_events?.some((event: any) =>
+      event.source_event_type === "tool_observation" &&
+      /docs\.search materialized a bounded document excerpt from docs\/helix-ask-flow\.md/i.test(String(event.text)),
+    )).toBe(true);
+    expect(result.turn_transcript_events?.some((event: any) =>
+      event.source_event_type === "tool_observation" &&
+      /scientific-calculator\.solve_expression observed 8 \* 9 = 72/i.test(String(event.text)),
+    )).toBe(true);
+    expect(result.turn_transcript_events?.some((event: any) =>
+      event.source_event_type === "tool_observation" &&
+      event.capability_id === "repo.search" &&
+      /repo search/i.test(String(event.text)),
+    )).toBe(true);
+  });
+
+  it("fails closed when one compound Codex gateway observation is missing", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "The calculator and reflection both ran successfully.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:codex-compound-missing-reflection-observation",
+        agent_runtime: "codex",
+        question: "Calculate 8 * 9, reflect it against the theory badge graph, then answer.",
+        workstation_gateway_calls: [
+          {
+            capability_id: "scientific-calculator.solve_expression",
+            mode: "read",
+            arguments: {
+              expression: "8 * 9",
+            },
+          },
+          {
+            capability_id: "theory-badge-graph.reflect_discussion_context",
+            mode: "read",
+            arguments: {},
+          },
+        ],
+      },
+      headers: {},
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.text).toContain("I cannot claim the requested workstation tool or UI action ran");
+    expect(result.text).toContain("theory-badge-graph.reflect_discussion_context: theory_reflection_prompt_missing");
+    expect(result.text).not.toBe("The calculator and reflection both ran successfully.");
+    expect((result.debug as any)?.workstation_gateway_call_results?.map((entry: any) => ({
+      capability_id: entry.capability_id,
+      ok: entry.ok,
+    }))).toEqual([
+      { capability_id: "scientific-calculator.open_panel", ok: true },
+      { capability_id: "scientific-calculator.focus_panel", ok: true },
+      { capability_id: "scientific-calculator.show_gateway_solve", ok: true },
+      { capability_id: "scientific-calculator.solve_expression", ok: true },
+      { capability_id: "theory-badge-graph.reflect_discussion_context", ok: false },
+    ]);
+    expect(result.turn_transcript_events?.some((event: any) =>
+      event.source_event_type === "tool_observation" &&
+      event.capability_id === "theory-badge-graph.reflect_discussion_context" &&
+      event.status === "failed",
+    )).toBe(true);
+    expect(result.turn_transcript_events?.find((event: any) => event.source_event_type === "terminal_answer"))
+      .toMatchObject({
+        text: result.text,
+        assistant_answer: false,
+        raw_content_included: false,
+      });
   });
 
   it("projects explicit Codex docs-viewer open-doc gateway calls as action receipts", async () => {
@@ -1688,6 +2139,8 @@ describe("Helix Ask agent provider selection", () => {
         concise_text: "The calculator observation reports 45.",
         final_answer_source: "agent_provider_terminal_candidate",
         terminal_artifact_kind: "agent_provider_terminal_candidate",
+        presentation_policy: "preserve_provider_text",
+        helix_style_rewrite_applied: false,
         assistant_answer: false,
         raw_content_included: false,
       },

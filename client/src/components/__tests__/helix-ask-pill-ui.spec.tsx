@@ -1512,6 +1512,9 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain('const latestFinalAnswerTestId = isLatestReply ? "helix-ask-latest-final-answer"');
     expect(source).toContain("isFinalRow");
     expect(source).toContain("? latestFinalAnswerTestId");
+    expect(source).toContain("latestCodexAnswerPreservesProviderText");
+    expect(source).toContain("answerExpandedForDisplay = expanded || latestCodexAnswerPreservesProviderText");
+    expect(source).toContain("clipForDisplay(\n              finalAnswerRawText,\n              HELIX_ASK_MAX_RENDER_CHARS,\n              answerExpandedForDisplay");
     expect(compactSource).toContain("data-final-answer-text={isFinalRow ? finalAnswerRawText : undefined}");
     expect(compactSource).toContain("data-visible-terminal-source={ isFinalRow ? finalAnswerPresentation.sourceLabel || finalAnswerSourceLabel || transcriptTerminal.source : undefined }");
     expect(compactSource).toContain("data-backend-terminal-answer={isFinalRow ? transcriptTerminal.backendTerminalText ?? \"\" : undefined}");
@@ -1657,6 +1660,7 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("activeStreamBeforeBottom");
     expect(source).toContain("retainedLiveEventCount");
     expect(source).toContain('aria-label="Turn stream"');
+    expect(source).toContain('data-latest-turn-stream={isLatestReply ? "true" : undefined}');
     expect(source).not.toContain(">Turn stream<");
     expect(source).toContain("data-turn-stream-lines");
     expect(source).toContain("data-stream-row-source");
@@ -1932,6 +1936,15 @@ describe("HelixAskPill mic-first surface contract", () => {
             source_event_type: "runtime_selected",
           },
           {
+            role: "system",
+            type: "observation",
+            status: "completed",
+            text: "Context state: focused panel scientific-calculator; retained doc docs/helix-ask-flow.md.",
+            lane: "workstation_context",
+            step_id: "context_state",
+            source_event_type: "context_state",
+          },
+          {
             role: "agent",
             type: "model_decision",
             status: "completed",
@@ -1991,6 +2004,7 @@ describe("HelixAskPill mic-first surface contract", () => {
 
     const combined = rows.map((row) => `${row.label}: ${row.text} ${row.meta}`).join("\n");
     expect(combined).toContain("Runtime selected: Codex Workstation Mode.");
+    expect(combined).toContain("Context state: focused panel scientific-calculator; retained doc docs/helix-ask-flow.md.");
     expect(combined).toContain("Action request: scientific-calculator.open_panel.");
     expect(combined).toContain("Action observation: scientific-calculator.open_panel admitted open_panel for scientific-calculator.");
     expect(combined).toContain("Tool request: scientific-calculator.solve_expression.");
@@ -1999,6 +2013,7 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(combined).toContain("The result is 72.");
     expect(rows.map((row) => row.label)).toEqual([
       "Runtime",
+      "Context",
       "Action Request",
       "Action Observation",
       "Tool Request",

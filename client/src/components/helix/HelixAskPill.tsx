@@ -36758,12 +36758,16 @@ export function HelixAskPill({
             const finalAnswerRawText = shouldUseTranscriptFinalRow
               ? transcriptFinalRowText ?? chosenVisibleFinalText
               : chosenVisibleFinalText;
+            const actualAgentProviderLabel = resolveHelixAskActualAgentProviderLabel(reply, agentRuntimeProviders);
+            const latestCodexAnswerPreservesProviderText =
+              isLatestReply && /codex/i.test(actualAgentProviderLabel ?? "");
+            const answerExpandedForDisplay = expanded || latestCodexAnswerPreservesProviderText;
             const finalAnswerIsLong = hasLongText(finalAnswerRawText, HELIX_ASK_MAX_RENDER_CHARS);
-            const finalAnswerIsCollapsedPreview = finalAnswerIsLong && !expanded;
+            const finalAnswerIsCollapsedPreview = finalAnswerIsLong && !answerExpandedForDisplay;
             const transcriptAnswer = clipForDisplay(
               finalAnswerRawText,
               HELIX_ASK_MAX_RENDER_CHARS,
-              expanded,
+              answerExpandedForDisplay,
             );
             const terminalMismatchForReply = Boolean(
               transcriptTerminal.backendTerminalText &&
@@ -36777,7 +36781,6 @@ export function HelixAskPill({
               finalAnswerPresentation,
             });
             const mailLoopRows = collectHelixMailLoopTranscriptRows(reply);
-            const actualAgentProviderLabel = resolveHelixAskActualAgentProviderLabel(reply, agentRuntimeProviders);
             const turnStreamRows = buildHelixContinuousTurnStreamRows({
               replyId: reply.id,
               question: reply.question,
@@ -36831,6 +36834,7 @@ export function HelixAskPill({
                       className="px-1 py-1 text-xs text-slate-100"
                       aria-label="Turn stream"
                       data-testid={latestWorkLogTestId}
+                      data-latest-turn-stream={isLatestReply ? "true" : undefined}
                       data-turn-stream-lines={turnStreamRows.length}
                       data-stage-play-events={stagePlayChatLedgerEvents.length}
                     >

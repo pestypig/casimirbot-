@@ -111,13 +111,15 @@ export const buildHelixProviderReasoningReentry = (input: {
           schema: "helix.terminal_presentation.v1",
           turn_id: input.turnId,
           concise_text: input.providerText,
-          terminal_artifact_kind: "agent_provider_terminal_candidate",
-          final_answer_source: "agent_provider_terminal_candidate",
-          terminal_authority_ref: candidateId,
-          selected_observation_refs: successfulObservationRefs,
-          assistant_answer: false,
-          raw_content_included: false,
-        }
+        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        final_answer_source: "agent_provider_terminal_candidate",
+        terminal_authority_ref: candidateId,
+        selected_observation_refs: successfulObservationRefs,
+        presentation_policy: "preserve_provider_text",
+        helix_style_rewrite_applied: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }
       : null;
   const providerTerminalAuthorityBridge = {
     schema: "helix.provider_terminal_authority_bridge.v1",
@@ -137,6 +139,8 @@ export const buildHelixProviderReasoningReentry = (input: {
     final_visible_answer_authorized: terminalAuthorityCandidateReview.final_visible_answer_authorized,
     final_answer_source: terminalAnswerAuthority ? "agent_provider_terminal_candidate" : null,
     terminal_artifact_kind: terminalAnswerAuthority ? "agent_provider_terminal_candidate" : null,
+    terminal_presentation_policy: terminalAnswerAuthority ? "preserve_provider_text" : null,
+    helix_style_rewrite_applied: false,
     terminal_answer_authority: terminalAnswerAuthority,
     terminal_presentation: terminalPresentation,
     assistant_answer: false,

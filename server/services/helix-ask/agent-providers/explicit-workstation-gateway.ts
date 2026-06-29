@@ -71,30 +71,41 @@ export const buildActiveDocsContextWorkstationGatewayCallRequests = (
   const prompt = readPrompt(body);
   if (!prompt || !isActiveDocsViewerDeicticPrompt(prompt)) return [];
   const workspaceSnapshot = readWorkspaceSnapshot(body);
-  const activePanel = readString(workspaceSnapshot?.activePanel ?? workspaceSnapshot?.active_panel);
+  const activePanel = readString(
+    workspaceSnapshot?.activePanel ??
+      workspaceSnapshot?.active_panel ??
+      workspaceSnapshot?.focusedPanel ??
+      workspaceSnapshot?.focused_panel,
+  );
   const activeDocPath = normalizeDocPath(
     workspaceSnapshot?.activeDocPath ??
       workspaceSnapshot?.active_doc_path ??
       workspaceSnapshot?.docContextPath ??
       workspaceSnapshot?.doc_context_path,
   );
-  if (activePanel !== "docs-viewer" || !activeDocPath) return [];
+  if (!activeDocPath) return [];
   const fileName = activeDocPath.split("/").pop()?.replace(/\.md$/i, "").replace(/[-_]+/g, " ").trim();
   const query = fileName || activeDocPath;
+  const derivationSource =
+    activePanel === "docs-viewer"
+      ? "helix_active_docs_viewer_context"
+      : "helix_retained_active_doc_context";
   return [{
     schema: "helix.workstation_gateway.active_docs_context_call_request.v1",
-    derivation_source: "helix_active_docs_viewer_context",
+    derivation_source: derivationSource,
     capability_id: DOCS_SEARCH_CAPABILITY,
     mode: "read",
     arguments: {
       query,
       paths: [activeDocPath],
       source_target_intent: {
-        source: "helix_active_docs_viewer_context",
+        source: derivationSource,
         target_source: "active_doc",
         target_kind: "active_doc",
+        focused_panel: activePanel,
         active_panel: activePanel,
         active_doc_path: activeDocPath,
+        retained_source_context: activePanel !== "docs-viewer",
         deictic_prompt: true,
       },
     },

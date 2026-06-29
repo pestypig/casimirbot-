@@ -9,11 +9,14 @@ const WORKSTATION_ACTIVE_CONTEXT_CAPABILITY = "workstation.active_context";
 const CALCULATOR_SOLVE_EXPRESSION_CAPABILITY = "scientific-calculator.solve_expression";
 const CALCULATOR_ACTIVE_CONTEXT_CAPABILITY = "scientific-calculator.active_context";
 const CALCULATOR_OPEN_PANEL_CAPABILITY = "scientific-calculator.open_panel";
+const CALCULATOR_SHOW_GATEWAY_SOLVE_CAPABILITY = "scientific-calculator.show_gateway_solve";
 const WORKSTATION_OPEN_PANEL_CAPABILITY = "workstation.open_panel";
 const WORKSTATION_FOCUS_PANEL_CAPABILITY = "workstation.focus_panel";
 const DOCS_OPEN_DOC_CAPABILITY = "docs-viewer.open_doc";
 const REPO_SEARCH_CAPABILITY = "repo.search";
 const DOCS_SEARCH_CAPABILITY = "docs.search";
+const CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY = "civilization-bounds.reflect_system_bounds";
+const THEORY_CONTEXT_REFLECTION_CAPABILITY = "theory-badge-graph.reflect_discussion_context";
 
 describe("Helix workstation tool gateway", () => {
   const originalEnv = {
@@ -146,6 +149,23 @@ describe("Helix workstation tool gateway", () => {
     );
     expect(manifest.capabilities).toContainEqual(
       expect.objectContaining({
+        capability_id: CALCULATOR_SHOW_GATEWAY_SOLVE_CAPABILITY,
+        panel_id: "scientific-calculator",
+        action_id: "show_gateway_solve",
+        mode: "act",
+        mutating: false,
+        code_mutation: false,
+        shell_access: false,
+        requires_source: true,
+        permission_profile_required: "act",
+        output_observation_schema: "helix.workstation_ui_action_receipt.v1",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    );
+    expect(manifest.capabilities).toContainEqual(
+      expect.objectContaining({
         capability_id: DOCS_OPEN_DOC_CAPABILITY,
         panel_id: "docs-viewer",
         action_id: "open_doc",
@@ -191,6 +211,40 @@ describe("Helix workstation tool gateway", () => {
         requires_source: true,
         permission_profile_required: "read",
         output_observation_schema: "helix.docs_search_observation.v1",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    );
+    expect(manifest.capabilities).toContainEqual(
+      expect.objectContaining({
+        capability_id: THEORY_CONTEXT_REFLECTION_CAPABILITY,
+        panel_id: "theory-badge-graph",
+        action_id: "reflect_discussion_context",
+        mode: "read",
+        mutating: false,
+        code_mutation: false,
+        shell_access: false,
+        requires_source: true,
+        permission_profile_required: "read",
+        output_observation_schema: "helix.theory_context_reflection_observation.v1",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    );
+    expect(manifest.capabilities).toContainEqual(
+      expect.objectContaining({
+        capability_id: CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+        panel_id: "civilization-bounds-roadmap",
+        action_id: "reflect_system_bounds",
+        mode: "read",
+        mutating: false,
+        code_mutation: false,
+        shell_access: false,
+        requires_source: true,
+        permission_profile_required: "read",
+        output_observation_schema: "helix.civilization_bounds_reflection_observation.v1",
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
@@ -631,6 +685,77 @@ describe("Helix workstation tool gateway", () => {
           action: "open_panel",
           panel_id: "scientific-calculator",
         },
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+  });
+
+  it("admits calculator gateway solve panel projection only from an observed expression/result", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "act",
+      capabilityId: CALCULATOR_SHOW_GATEWAY_SOLVE_CAPABILITY,
+      arguments: {
+        expression: "(18+6)*3",
+        normalized_expression: "(18+6)*3",
+        result: "72",
+        source_capability: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+        observation_ref: "ask:test:calculator-projection:scientific-calculator.solve_expression",
+      },
+      turnId: "ask:test:gateway-calculator-projection",
+      iteration: 6,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      capability_id: CALCULATOR_SHOW_GATEWAY_SOLVE_CAPABILITY,
+      mode: "act",
+      gateway_admission: {
+        requested_capability: CALCULATOR_SHOW_GATEWAY_SOLVE_CAPABILITY,
+        permission_profile: "act",
+        admission_status: "admitted",
+        admission_reason: "non_mutating_workstation_ui_action",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      observation_packet: {
+        schema: "helix.agent_step_observation_packet.v1",
+        capability_key: CALCULATOR_SHOW_GATEWAY_SOLVE_CAPABILITY,
+        panel_id: "scientific-calculator",
+        action: "show_gateway_solve",
+        status: "succeeded",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.workstation_ui_action_receipt.v1",
+        capability_key: CALCULATOR_SHOW_GATEWAY_SOLVE_CAPABILITY,
+        action_kind: "run_panel_action",
+        panel_id: "scientific-calculator",
+        action_id: "show_gateway_solve",
+        status: "succeeded",
+        dispatch_status: "admitted",
+        workstation_action: {
+          schema_version: "helix.workstation.action/v1",
+          action: "run_panel_action",
+          panel_id: "scientific-calculator",
+          action_id: "show_gateway_solve",
+          args: {
+            expression: "(18+6)*3",
+            normalized_expression: "(18+6)*3",
+            result: "72",
+            source_capability: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+            observation_ref: "ask:test:calculator-projection:scientific-calculator.solve_expression",
+          },
+        },
+        source_capability: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
@@ -1141,6 +1266,239 @@ describe("Helix workstation tool gateway", () => {
       terminal_eligible: false,
       assistant_answer: false,
       raw_content_included: false,
+    });
+  });
+
+  it("calls civilization-bounds reflection as read-only evidence, not an answer", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+      arguments: {
+        prompt: "Reflect planetary trade through civilization bounds with material inventory and governance review.",
+        include_bridge_context: true,
+        include_collaboration_bounds: true,
+        include_falsification_hooks: true,
+      },
+      turnId: "ask:test:gateway-civilization-bounds",
+      iteration: 5,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      agent_runtime: "codex",
+      capability_id: CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+      gateway_admission: {
+        requested_capability: CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+        selected_agent_provider: "codex",
+        permission_profile: "read",
+        admission_status: "admitted",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      observation_packet: {
+        capability_key: CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+        panel_id: "civilization-bounds-roadmap",
+        action: "reflect_system_bounds",
+        status: "succeeded",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.civilization_bounds_reflection_observation.v1",
+        capability_key: CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+        panel_id: "civilization-bounds-roadmap",
+        action_id: "reflect_system_bounds",
+        status: "succeeded",
+        prompt: "Reflect planetary trade through civilization bounds with material inventory and governance review.",
+        bridge_context_included: true,
+        procedural_scaffold_id: "spore_civilization_stage_procedural_scaffold",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+        authority: expect.objectContaining({
+          assistant_answer: false,
+          terminal_eligible: false,
+          execution_permission: false,
+        }),
+      },
+      tool_followup_decision: {
+        next_action: "continue_reasoning",
+        evidence_reentered: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    expect(String((result.observation as { roadmap_id?: string }).roadmap_id ?? ""))
+      .toMatch(/^civilization-bounds:/);
+    expect((result.observation as { parameter_scope_kinds?: string[] }).parameter_scope_kinds)
+      .toEqual(expect.arrayContaining(["material_base", "governance_institutional_capacity"]));
+    expect((result.observation as { missing_evidence?: string[] }).missing_evidence)
+      .toContain("source_backed_capacity_measurements");
+  });
+
+  it("blocks civilization-bounds reflection without prompt as a missing observation", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+      arguments: {},
+      turnId: "ask:test:gateway-civilization-bounds-blocked",
+      iteration: 6,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      capability_id: CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+      error: "civilization_bounds_prompt_missing",
+      gateway_admission: {
+        admission_status: "blocked",
+        blocked_reason: "civilization_bounds_prompt_missing",
+      },
+      observation_packet: {
+        status: "blocked",
+        missing_requirements: [
+          expect.objectContaining({
+            code: "civilization_bounds_prompt_missing",
+            repair_action: "ask_user",
+          }),
+        ],
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.civilization_bounds_reflection_observation.v1",
+        status: "blocked",
+        blocked_reason: "civilization_bounds_prompt_missing",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+  });
+
+  it("calls theory-badge reflection as read-only evidence, not an answer", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: THEORY_CONTEXT_REFLECTION_CAPABILITY,
+      arguments: {
+        prompt: "Reflect QEI margin and source residual against the theory badge graph.",
+        mentioned_symbols: ["QEI", "source residual"],
+        mentioned_domains: ["warp metrics", "claim boundaries"],
+        build_explanation_plan: true,
+        limit: 4,
+      },
+      turnId: "ask:test:gateway-theory-reflection",
+      iteration: 5,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      agent_runtime: "codex",
+      capability_id: THEORY_CONTEXT_REFLECTION_CAPABILITY,
+      gateway_admission: {
+        requested_capability: THEORY_CONTEXT_REFLECTION_CAPABILITY,
+        selected_agent_provider: "codex",
+        permission_profile: "read",
+        admission_status: "admitted",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      observation_packet: {
+        capability_key: THEORY_CONTEXT_REFLECTION_CAPABILITY,
+        panel_id: "theory-badge-graph",
+        action: "reflect_discussion_context",
+        status: "succeeded",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.theory_context_reflection_observation.v1",
+        capability_key: THEORY_CONTEXT_REFLECTION_CAPABILITY,
+        panel_id: "theory-badge-graph",
+        action_id: "reflect_discussion_context",
+        status: "succeeded",
+        prompt: "Reflect QEI margin and source residual against the theory badge graph.",
+        conversation_context_included: false,
+        receipt_schema: "helix_theory_context_reflection_tool_receipt/v1",
+        reflection_terminal_eligible: false,
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+        authority: expect.objectContaining({
+          assistant_answer: false,
+          terminal_eligible: false,
+          deterministic_content_role: "observation_not_assistant_answer",
+        }),
+      },
+      tool_followup_decision: {
+        next_action: "continue_reasoning",
+        evidence_reentered: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    expect(String((result.observation as { reflection_id?: string }).reflection_id ?? "")).toMatch(/^theory-context-reflection:/);
+    expect(String((result.observation as { summary?: string }).summary ?? "")).not.toHaveLength(0);
+    expect((result.observation as { claim_boundary_notes?: string[] }).claim_boundary_notes?.length ?? 0)
+      .toBeGreaterThan(0);
+    expect((result.observation as { recommended_actions_solve?: boolean }).recommended_actions_solve).toBe(false);
+  });
+
+  it("blocks theory-badge reflection without prompt as a missing observation", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: THEORY_CONTEXT_REFLECTION_CAPABILITY,
+      arguments: {},
+      turnId: "ask:test:gateway-theory-reflection-blocked",
+      iteration: 6,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      capability_id: THEORY_CONTEXT_REFLECTION_CAPABILITY,
+      error: "theory_reflection_prompt_missing",
+      gateway_admission: {
+        admission_status: "blocked",
+        blocked_reason: "theory_reflection_prompt_missing",
+      },
+      observation_packet: {
+        status: "blocked",
+        missing_requirements: [
+          expect.objectContaining({
+            code: "theory_reflection_prompt_missing",
+            repair_action: "ask_user",
+          }),
+        ],
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.theory_context_reflection_observation.v1",
+        status: "blocked",
+        blocked_reason: "theory_reflection_prompt_missing",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
     });
   });
 

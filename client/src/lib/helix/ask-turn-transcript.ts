@@ -98,6 +98,7 @@ function resolveHelixTranscriptActionLabel(event: Record<string, unknown>): stri
 function resolveHelixTranscriptRowLabel(event: Record<string, unknown>): string {
   const sourceEventType = coerceText(event.source_event_type).trim();
   if (sourceEventType === "runtime_selected") return "Runtime";
+  if (sourceEventType === "context_state") return "Context";
   if (sourceEventType === "action_request") return "Action Request";
   if (sourceEventType === "action_observation") return "Action Observation";
   if (sourceEventType === "tool_request") return "Tool Request";

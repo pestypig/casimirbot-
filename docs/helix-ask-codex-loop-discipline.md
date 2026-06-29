@@ -882,6 +882,18 @@ prompts should default the timer to isolated execution unless the user explicitl
 attaches workspace context. Screen, document, visual, and deictic prompts may
 default to attached context.
 
+Focused panel state is an interaction target, not the only admissible source
+target. Non-mutating workstation actions may focus a tool panel for visibility,
+for example the scientific calculator after a solve. That focus change must not
+erase a still-valid retained source context. If a turn input still carries a
+safe active/open document path and the prompt is document-targeted (`this
+document`, `current document`, `open whitepaper`, etc.), Helix may admit a
+bounded docs observation from that retained document even when another panel is
+focused. The retained path is only source admission: the final answer still
+requires a materialized docs observation packet to re-enter reasoning. If no
+observation packet is materialized, the turn must fail closed or refuse document
+content rather than answering from the path alone.
+
 Model timeouts, missing terminal events, lost debug exports, and connection
 drops are runtime failures. Do not classify them as retrieval, observation, or
 repo-claim gate failures unless the terminal debug payload proves that the

@@ -12,7 +12,7 @@ import {
   buildScientificCalculatorDebugSnapshot,
   formatScientificCalculatorDebugLog,
 } from "@/lib/scientific-calculator/debugLog";
-import { runScientificSolve } from "@/lib/scientific-calculator/solver";
+import { runScientificSolve, type ScientificSolveResult } from "@/lib/scientific-calculator/solver";
 import { runTheoryBadgePlaybackNow } from "@/lib/theory/theoryBadgePlaybackRunner";
 import { runTheoryCompoundRunNow, type TheoryCompoundRunSolveScope } from "@/lib/theory/runTheoryCompoundRunNow";
 import { solveTheoryCalculatorLoadoutNow } from "@/lib/theory/theoryCalculatorLoadoutRunner";
@@ -6473,6 +6473,94 @@ export function executeHelixPanelAction(
           warnings: solveResult.trace.warnings,
           target_workbench: targetWorkbench,
           error: solveResult.error ?? null,
+          debug_event: latestCalculatorState.debugEvents[0] ?? null,
+          debug_log_tail: buildScientificCalculatorDebugSnapshot(latestCalculatorState.debugEvents, 8),
+        },
+      };
+    }
+
+    if (actionId === "show_gateway_solve") {
+      const expression = asNonEmptyString(args.expression ?? args.latex ?? args.text);
+      const resultText = asNonEmptyString(args.result ?? args.result_text ?? args.value);
+      if (!expression || !resultText) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "scientific-calculator.show_gateway_solve requires an observed expression and result.",
+        };
+      }
+      const normalizedExpression = asNonEmptyString(args.normalized_expression ?? args.normalizedExpression) ?? expression;
+      const observationRef = asNonEmptyString(args.observation_ref ?? args.observationRef);
+      const sourceCapability = asNonEmptyString(args.source_capability ?? args.sourceCapability) ?? "scientific-calculator.solve_expression";
+      const historyEntry = scientificState.ingestLatex(expression, {
+        sourcePath: sourceCapability,
+        anchor: observationRef,
+        source: "workstation_action",
+        calculatorSetup,
+        compoundRunId,
+        compoundSubgoalId,
+        targetWorkbench,
+      });
+      const projectedSolve: ScientificSolveResult = {
+        ok: true,
+        mode: normalizedExpression.includes("=") ? "equation" : "expression",
+        input_latex: expression,
+        normalized_expression: normalizedExpression,
+        variable: null,
+        result_text: resultText,
+        result_latex: resultText,
+        steps: [
+          { id: "input", label: "Observed Expression", value: expression },
+          { id: "gateway_observation", label: "Gateway Observation", value: resultText },
+        ],
+        trace: {
+          traceId: observationRef ?? `scicalc-gateway:${Date.now().toString(36)}`,
+          runId: observationRef ?? `scicalc-gateway:${Date.now().toString(36)}`,
+          route: "helix_workstation_gateway_observation",
+          engine: "unsupported",
+          sourceOfTruth: "unsupported",
+          capabilityClass: "arithmetic",
+          artifactPath: null,
+          delegatedTo: sourceCapability,
+          warnings: ["panel_projection_from_gateway_observation"],
+        },
+      };
+      scientificState.setSolveResult(projectedSolve, {
+        actionId: "solve_expression",
+        source: "workstation_action",
+        calculatorSetup,
+        compoundRunId,
+        compoundSubgoalId,
+        targetWorkbench,
+      });
+      dispatchScientificCalculatorMathPicked({
+        latex: expression,
+        sourcePath: sourceCapability,
+        anchor: observationRef,
+        source: "workstation_action",
+      });
+      useWorkstationSessionMemoryStore.getState().rememberDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY, expression);
+      context.openPanel(panelId, undefined);
+      context.focusPanel(panelId, undefined);
+      const latestCalculatorState = useScientificCalculatorStore.getState();
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "calculator_gateway_solve_projection",
+          schema: "helix.calculator_gateway_solve_projection.v1",
+          expression,
+          normalized_expression: normalizedExpression,
+          result_text: resultText,
+          source_capability: sourceCapability,
+          observation_ref: observationRef,
+          history_id: historyEntry.id,
+          gateway_observation_authority: true,
+          panel_generated_answer: false,
+          assistant_answer: false,
+          terminal_eligible: false,
           debug_event: latestCalculatorState.debugEvents[0] ?? null,
           debug_log_tail: buildScientificCalculatorDebugSnapshot(latestCalculatorState.debugEvents, 8),
         },
