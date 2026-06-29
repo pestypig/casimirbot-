@@ -27,6 +27,7 @@ const routePath = "server/routes/agi.plan.ts";
 const servicePath = "server/services/helix-ask/golden-path-runtime.ts";
 const dependencyPath = "server/services/helix-ask/golden-path/runtime-dependencies.ts";
 const dispatchPath = "server/services/helix-ask/golden-path/runtime-dispatch.ts";
+const goldenPathDir = "server/services/helix-ask/golden-path";
 const capabilityDir = "server/services/helix-ask/golden-path/capabilities";
 const compoundDir = "server/services/helix-ask/golden-path/compounds";
 
@@ -35,6 +36,13 @@ const readLedger = (body: Record<string, any>): any[] =>
 
 const terminalLedgerEntries = (body: Record<string, any>): any[] =>
   readLedger(body).filter((artifact) => artifact?.kind === body.terminal_artifact_kind);
+
+const listTypeScriptFiles = (directory: string): string[] =>
+  readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const entryPath = `${directory}/${entry.name}`;
+    if (entry.isDirectory()) return listTypeScriptFiles(entryPath);
+    return entry.isFile() && entry.name.endsWith(".ts") ? [entryPath] : [];
+  });
 
 describe("Helix Ask golden path runtime", () => {
   afterEach(() => {
@@ -94,6 +102,19 @@ describe("Helix Ask golden path runtime", () => {
     expect(dispatchSource).not.toContain("buildGoldenPathTerminalEnvelope");
     expect(dispatchSource).not.toContain("buildGoldenPathLedger");
     expect(dispatchSource).not.toContain("buildCompoundCapabilityContract");
+  });
+
+  it("keeps the golden path service tree independent from the legacy route", () => {
+    const serviceTreePaths = [servicePath, ...listTypeScriptFiles(goldenPathDir)];
+
+    expect(serviceTreePaths.length).toBeGreaterThan(1);
+    for (const modulePath of serviceTreePaths) {
+      const source = readFileSync(modulePath, "utf8");
+      expect(source, `${modulePath} must not import agi.plan.ts`).not.toContain("server/routes/agi.plan");
+      expect(source, `${modulePath} must not import agi.plan.ts`).not.toContain("../routes/agi.plan");
+      expect(source, `${modulePath} must not import agi.plan.ts`).not.toContain("../../routes/agi.plan");
+      expect(source, `${modulePath} must not import agi.plan.ts`).not.toContain("../../../routes/agi.plan");
+    }
   });
 
   it("keeps every golden-path capability and compound module on the standard dispatch surface", () => {
