@@ -201,9 +201,12 @@ import {
 } from "@/lib/helix/ask-status-classnames";
 import { readProceduralActionLabel } from "@/lib/helix/ask-procedural-display";
 import {
+  SESSION_CAPSULE_CONFIDENCE_LABEL,
   buildContextCapsuleCopyText,
+  buildContextCapsuleStampDataUri,
   resolveContextCapsulePalette,
   stripContextCapsuleTokensFromText,
+  type SessionCapsuleConfidenceBand,
 } from "@/lib/helix/ask-context-capsule-display";
 import {
   formatEnvelopeSectionsForCopy,
@@ -214,6 +217,58 @@ import {
   labelizeGoalPillValue,
 } from "@/lib/helix/ask-goal-pill-display";
 import { humanizeAskLiveEventToken } from "@/lib/helix/ask-display-text";
+import {
+  formatReadAloudButtonLabel,
+  resolveInitialMicArmState,
+  shouldStopReadAloudOnButtonPress,
+  transitionReadAloudState,
+  type MicArmState,
+  type ReadAloudPlaybackState,
+} from "@/lib/helix/ask-read-aloud-display";
+export {
+  formatReadAloudButtonLabel,
+  resolveInitialMicArmState,
+  shouldStopReadAloudOnButtonPress,
+  transitionReadAloudState,
+};
+export type {
+  MicArmState,
+  ReadAloudPlaybackState,
+} from "@/lib/helix/ask-read-aloud-display";
+import {
+  buildSpeakText,
+  cleanReasoningDisplayArtifacts,
+  hasRuntimeFallbackArtifactSpill,
+  isArtifactDominatedReasoningText,
+  sanitizeReasoningOutputText,
+  stripVoiceCitationArtifacts,
+  summarizeVoiceDebugText,
+} from "@/lib/helix/ask-voice-text-display";
+import {
+  buildVoiceInputStatusLabel,
+  composeVoiceBriefWithDecision,
+  describeVoiceCommandAction,
+  formatVoiceDecisionSentence,
+  laneLabelForConversationMode,
+  normalizeConversationRouteReasonCode,
+  normalizeVoiceFailureReasonText,
+  resolveReasoningAttemptTimelineText,
+  type VoiceDecisionLifecycle,
+} from "@/lib/helix/ask-voice-copy-display";
+export {
+  buildSpeakText,
+  buildVoiceInputStatusLabel,
+  cleanReasoningDisplayArtifacts,
+  composeVoiceBriefWithDecision,
+  describeVoiceCommandAction,
+  formatVoiceDecisionSentence,
+  hasRuntimeFallbackArtifactSpill,
+  isArtifactDominatedReasoningText,
+  resolveReasoningAttemptTimelineText,
+  sanitizeReasoningOutputText,
+  stripVoiceCitationArtifacts,
+};
+export type { VoiceDecisionLifecycle } from "@/lib/helix/ask-voice-copy-display";
 import {
   buildHelixCausalTurnTraceRows,
   buildHelixRuntimeTranscriptEvents,
@@ -395,12 +450,30 @@ import {
   type ReasoningTheaterFrontierTrackerState,
 } from "@/lib/helix/reasoning-theater-frontier";
 import {
+  REASONING_THEATER_FRONTIER_ACTION_LABEL,
+  buildReasoningTheaterFloatingActionText,
+  reasoningTheaterFloatingActionTextClassName,
+  type ReasoningTheaterFloatingActionText,
+} from "@/lib/helix/ask-reasoning-frontier-display";
+import {
+  REASONING_THEATER_ARCHETYPE_LABEL,
+  REASONING_THEATER_CERTAINTY_LABEL,
+  REASONING_THEATER_MEDAL_ASSET,
+  REASONING_THEATER_MEDAL_LABEL,
+  REASONING_THEATER_PHASE_LABEL,
+  REASONING_THEATER_STANCE_META,
+} from "@/lib/helix/ask-reasoning-theater-display";
+import {
   deriveConvergenceStripState,
-  getConvergencePhaseOrder,
   type ConvergenceCollapseEvent,
   type ConvergenceDebug,
   type ConvergenceStripState,
 } from "@/lib/helix/reasoning-theater-convergence";
+import {
+  CONVERGENCE_MATURITY_LABEL,
+  CONVERGENCE_PROOF_LABEL,
+  CONVERGENCE_SOURCE_LABEL,
+} from "@/lib/helix/ask-convergence-display";
 import {
   buildReasoningBattleAmbientState,
   buildReasoningBattleBeats,
@@ -408,9 +481,16 @@ import {
   reasoningBattleBeatClassName,
   type ReasoningBattleAmbientState,
   type ReasoningBattleBeat,
-  type ReasoningBattleLane,
-  type ReasoningBattleVisualPrimitive,
 } from "@/lib/helix/reasoning-battle-stage";
+import {
+  buildReasoningBattleAnswerTint,
+  reasoningBattleAmbientClassName,
+  reasoningBattleAmbientMarkerClassName,
+  reasoningBattleBeatHeightPx,
+  reasoningBattleBeatPositionPct,
+  reasoningBattlePrimitiveClassName,
+  reasoningBattlePrimitiveStyle,
+} from "@/lib/helix/ask-reasoning-battle-display";
 import {
   applyLatestWinsVoiceQueue,
   createVoicePlaybackUtterance,
@@ -540,35 +620,6 @@ function syncHelixAskVisualCaptureRoutePreference(includeAudio: boolean): HelixA
 const HELIX_ASK_CONTEXT_RESUME_FRAME_STORAGE_KEY = "helix.ask.contextResumeFrame.v1";
 const HELIX_ASK_DURABLE_TRANSCRIPT_LIMIT = 80;
 const HELIX_ASK_PROGRESS_PLACEHOLDER_TEXT = "Reasoning in progress...";
-
-export type ReadAloudPlaybackState = "idle" | "requesting" | "playing" | "dry-run" | "error";
-
-export function resolveInitialMicArmState(persisted: string | null | undefined): MicArmState {
-  return persisted === "off" ? "off" : "on";
-}
-
-export function transitionReadAloudState(
-  current: ReadAloudPlaybackState,
-  event: "request" | "audio" | "dry-run" | "error" | "stop" | "ended",
-): ReadAloudPlaybackState {
-  if (event === "request") return "requesting";
-  if (event === "audio") return "playing";
-  if (event === "dry-run") return "dry-run";
-  if (event === "error") return "error";
-  if (event === "stop" || event === "ended") return "idle";
-  return current;
-}
-
-export function shouldStopReadAloudOnButtonPress(state: ReadAloudPlaybackState): boolean {
-  return state === "requesting" || state === "playing";
-}
-
-export function formatReadAloudButtonLabel(state: ReadAloudPlaybackState): string {
-  if (shouldStopReadAloudOnButtonPress(state)) return `Stop reading (${state})`;
-  if (state === "dry-run") return "Read aloud (dry-run)";
-  if (state === "error") return "Read aloud (error)";
-  return "Read aloud";
-}
 
 function HelixAskLiveSituationProjection({
   threadId,
@@ -763,27 +814,9 @@ function HelixAskLiveAnswerEnvironmentProjection({
   );
 }
 
-const SPEAK_TEXT_MAX_CHARS = 600;
 const VOICE_AUTO_SPEAK_UTTERANCE_ID_MAX_CHARS = 180;
 const MOBILE_AUDIO_UNLOCK_DATA_URI =
   "data:audio/wav;base64,UklGRsQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YaAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
-const FILE_PATH_CITATION_SEGMENT =
-  "(?:[A-Za-z]:[\\\\/]|(?:docs|client|server|shared|scripts|tests|configs|reports|artifacts|packages|sdk|cli)/)";
-const FILE_PATH_CITATION_PATTERN = new RegExp(`${FILE_PATH_CITATION_SEGMENT}[^\\s)\\]]+`, "gi");
-const SOURCE_TRAILER_PATTERN = new RegExp(`(?:;|,)?\\s*source:\\s*${FILE_PATH_CITATION_SEGMENT}[^)\\s]+`, "gi");
-const SOURCE_PAREN_PATTERN = new RegExp(`\\(\\s*source:\\s*${FILE_PATH_CITATION_SEGMENT}[^)]*\\)`, "gi");
-const FILE_PATH_PAREN_PATTERN = new RegExp(`\\(\\s*${FILE_PATH_CITATION_SEGMENT}[^)]*\\)`, "gi");
-const FILE_BASENAME_PATTERN = /\b[A-Za-z0-9_.-]+\.(?:ts|tsx|js|jsx|md|json|yaml|yml)\b/gi;
-const RESIDUAL_EXTENSION_TOKEN_PATTERN = /\b(?:ts|tsx|js|jsx|md|json|yaml|yml)\b(?=[,;:])/gi;
-const DANGLING_EXTENSION_BRACKET_PATTERN =
-  /(^|[\s([{'"`])(?:ts|tsx|js|jsx|md|json|yaml|yml)\](?=[\s.,;:!?]|$)/gim;
-const ORPHAN_EXTENSION_LINE_PATTERN =
-  /(^|\n)\s*(?:\d+\.\s*)?(?:ts|tsx|js|jsx|md|json|yaml|yml)\](?=\s|$)/gi;
-const MARKDOWN_LINK_PATTERN = /\[([^\]]+)\]\(([^)]+)\)/g;
-const URL_PATTERN = /\bhttps?:\/\/[^\s)]+/gi;
-const RUNTIME_FALLBACK_FETCH_FAILED_RE = /\bruntime fallback:\s*fetch failed\.?/gi;
-const RUNTIME_FALLBACK_FETCH_FAILED_TEST_RE = /\bruntime fallback:\s*fetch failed\.?/i;
-const HELPER_TIMEOUT_FALLBACK_RE = /\bhelper[_\s-]?timeout[_\s-]?fallback\b/i;
 const MOBILE_AUDIO_USER_AGENT_PATTERN =
   /(iphone|ipad|ipod|android|mobile|silk|kindle|fennec|iemobile|opera mini)/i;
 const IOS_AUDIO_USER_AGENT_PATTERN = /(iphone|ipad|ipod)/i;
@@ -1839,120 +1872,6 @@ function describeMediaErrorCode(code: number | null): string {
   }
 }
 
-export function stripVoiceCitationArtifacts(source: string): string {
-  if (!source) return "";
-  const normalized = source
-    .replace(/\r\n/g, "\n")
-    .replace(MARKDOWN_LINK_PATTERN, "$1")
-    .replace(URL_PATTERN, "");
-  const strippedLines = normalized
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0)
-    .map((line) =>
-      line
-        .replace(SOURCE_TRAILER_PATTERN, "")
-        .replace(SOURCE_PAREN_PATTERN, "")
-        .replace(FILE_PATH_PAREN_PATTERN, "")
-        .replace(FILE_PATH_CITATION_PATTERN, "")
-        .replace(FILE_BASENAME_PATTERN, "")
-        .replace(RESIDUAL_EXTENSION_TOKEN_PATTERN, "")
-        .replace(/\[\s*\]/g, " ")
-        .replace(/\bsources?\s*:\s*$/i, "")
-        .replace(/\s{2,}/g, " ")
-        .replace(/\s+([,.;:!?])/g, "$1")
-        .trim(),
-    )
-    .filter((line) => line.length > 0 && !/^sources?\s*:/i.test(line))
-    .filter((line) => !/^[(){}\[\],.;:!?-]+$/.test(line));
-
-  return strippedLines.join("\n").trim();
-}
-
-function hasRuntimeFallbackArtifactSpill(source: string): boolean {
-  const text = source.trim();
-  if (!text) return false;
-  const fetchFailedMentions = (text.match(RUNTIME_FALLBACK_FETCH_FAILED_RE) ?? []).length;
-  if (fetchFailedMentions >= 2) return true;
-  if (!RUNTIME_FALLBACK_FETCH_FAILED_TEST_RE.test(text)) return false;
-  return HELPER_TIMEOUT_FALLBACK_RE.test(text);
-}
-
-export function isArtifactDominatedReasoningText(source: string): boolean {
-  const text = source.trim();
-  if (!text) return true;
-  if (hasRuntimeFallbackArtifactSpill(text)) return true;
-  if (/\bwhat[\s_]?is[\s_](warp[\s_]?bubble|mission[\s_]?ethos)\s*:/i.test(text)) return true;
-  if (/\bhow[\s_]?they[\s_]?connect\s*:/i.test(text)) return true;
-  if (/\bconstraints?_and_falsifiability\s*:/i.test(text)) return true;
-  const underscoreTemplateHits = (
-    text.match(/\b(?:what|how|focus|constraints?|policy|mission|sources?)_[a-z0-9_]+\s*:/gi) ?? []
-  ).length;
-  if (underscoreTemplateHits >= 2) return true;
-  if (
-    /\bfocus anchor\s*:/i.test(text) &&
-    /\b(?:what[\s_]?is[\s_]|how[\s_]?they[\s_]?connect|constraints?_and_)\b/i.test(text)
-  ) {
-    return true;
-  }
-  if (
-    /\bexport\s+default\s+function\b/i.test(text) &&
-    /\b(?:useState|const\s+state\s*,\s*actions|\.tsx?\b)\b/i.test(text)
-  ) {
-    return true;
-  }
-  if (/\bhow they connect:\b/i.test(text) && /\bverification hooks|constraints and falsifiability|policy bounds\b/i.test(text)) {
-    return true;
-  }
-  const fileRefHits = (
-    text.match(
-      /\b(?:[A-Za-z]:[\\/]|(?:docs|client|server|shared|modules|tests|scripts)[\\/]|[A-Za-z0-9_.-]+\.(?:ts|tsx|js|jsx|md|json|yaml|yml))\S*/gi,
-    ) ?? []
-  ).length;
-  const labelHits = (text.match(/\b(?:tree walk|checked files|searched terms|sources?:|evidence:|constraint:)\b/gi) ?? [])
-    .length;
-  const semanticHits = (
-    text.match(
-      /\b(?:is|are|means|refers|describes|involves|because|therefore|allows|helps|shows|occurs|happens)\b/gi,
-    ) ?? []
-  ).length;
-  const citationBracketHits = (text.match(/\[[^\]]+\]/g) ?? []).length;
-  const emptyBracketHits = (text.match(/\[\s*\]/g) ?? []).length;
-  const sentenceHits = (text.match(/[.!?](?:\s|$)/g) ?? []).length;
-  if (fileRefHits >= 3 && semanticHits <= 2) return true;
-  if (fileRefHits >= 4 && labelHits >= 1) return true;
-  if (labelHits >= 2 && fileRefHits >= 2 && semanticHits <= 2) return true;
-  if (citationBracketHits >= 4 && fileRefHits >= 1 && semanticHits <= 12) return true;
-  if (citationBracketHits >= 6 && semanticHits <= 5) return true;
-  if (emptyBracketHits >= 2 && semanticHits <= 18) return true;
-  if (/\bsources?\s*:\s*$/i.test(text) && (fileRefHits >= 1 || citationBracketHits >= 1)) return true;
-  if (sentenceHits === 0 && fileRefHits >= 3) return true;
-  return false;
-}
-
-export function sanitizeReasoningOutputText(source: string): string {
-  const text = hasRuntimeFallbackArtifactSpill(source)
-    ? source.replace(RUNTIME_FALLBACK_FETCH_FAILED_RE, " ").replace(HELPER_TIMEOUT_FALLBACK_RE, " ")
-    : source;
-  return stripVoiceCitationArtifacts(text)
-    .replace(/\s{2,}/g, " ")
-    .replace(/\s+([,.;:!?])/g, "$1")
-    .trim();
-}
-
-export function cleanReasoningDisplayArtifacts(source: string): string {
-  if (!source) return "";
-  return source
-    .replace(/\r\n/g, "\n")
-    .replace(ORPHAN_EXTENSION_LINE_PATTERN, "$1")
-    .replace(DANGLING_EXTENSION_BRACKET_PATTERN, "$1")
-    .replace(/\[\s*\]/g, " ")
-    .replace(/[ \t]{2,}/g, " ")
-    .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
-
 function isLikelyIdeologyDomainLeak(args: {
   promptText?: string;
   outputText: string;
@@ -1977,26 +1896,6 @@ function isLikelyIdeologyDomainLeak(args: {
     if (overlap >= 2) return false;
   }
   return true;
-}
-
-export function buildSpeakText(source: string, maxChars = SPEAK_TEXT_MAX_CHARS): string {
-  const text = stripVoiceCitationArtifacts(source).trim();
-  if (!text || maxChars <= 0) return "";
-  if (text.length <= maxChars) return text;
-
-  const capped = text.slice(0, maxChars).trimEnd();
-  const boundaryIndex = Math.max(
-    capped.lastIndexOf("\n"),
-    capped.lastIndexOf("."),
-    capped.lastIndexOf("!"),
-    capped.lastIndexOf("?"),
-  );
-  const bounded = boundaryIndex > 0 ? capped.slice(0, boundaryIndex + 1).trimEnd() : capped;
-  const fallback = bounded || capped;
-  if (!fallback) return "";
-  if (fallback.length < maxChars) return `${fallback}...`;
-  if (maxChars === 1) return ".";
-  return `${fallback.slice(0, maxChars - 1).trimEnd()}...`;
 }
 
 function hashVoiceUtteranceKey(source: string): string {
@@ -2024,18 +1923,10 @@ function buildVoiceAutoSpeakUtteranceId(parts: Array<string | undefined | null>)
   return `${normalized.slice(0, headMax)}:${digest}`;
 }
 
-function summarizeVoiceDebugText(source: string, maxChars = 220): string {
-  const normalized = source.replace(/\s+/g, " ").trim();
-  if (!normalized) return "";
-  if (normalized.length <= maxChars) return normalized;
-  return `${normalized.slice(0, Math.max(1, maxChars - 1)).trimEnd()}...`;
-}
-
 export function isActivePlayback(audio: HTMLAudioElement | null, active: HTMLAudioElement): boolean {
   return audio === active;
 }
 
-export type MicArmState = "off" | "on";
 export type MicRuntimeState = "listening" | "transcribing" | "cooldown" | "error";
 export type FloorOwner = "none" | "user" | "bot";
 export type TurnState =
@@ -2086,14 +1977,6 @@ export type ConversationGovernorState = {
   completion_score: CompletionScore;
   narrative_spine: NarrativeSpine;
 };
-
-export type VoiceDecisionLifecycle =
-  | "queued"
-  | "running"
-  | "suppressed"
-  | "escalated"
-  | "done"
-  | "failed";
 
 export type ReasoningAttempt = {
   id: string;
@@ -3446,21 +3329,6 @@ const HELIX_VOICE_AUTO_SPEAK_PROVIDER = "elevenlabs";
 const HELIX_VOICE_AUTO_SPEAK_QUEUE_MAX = 8;
 const HELIX_VOICE_AUTO_SPEAK_TEXT_MAX_CHARS = 2400;
 const HELIX_VOICE_DEBUG_TIMELINE_LIMIT = 280;
-const HELIX_TIMELINE_TYPE_LABEL: Record<HelixTimelineEntryType, string> = {
-  conversation_recorded: "recorded",
-  conversation_brief: "brief",
-  reasoning_attempt: "reasoning",
-  reasoning_stream: "stream",
-  reasoning_final: "final",
-  action_receipt: "action",
-  suppressed: "suppressed",
-};
-
-const SESSION_CAPSULE_CONFIDENCE_LABEL: Record<SessionCapsuleConfidenceBand, string> = {
-  reinforcing: "reinforcing",
-  building: "building",
-  uncertain: "uncertain",
-};
 
 type VoiceNoiseHandlingProfile = {
   bargeStartMsDesktop: number;
@@ -4608,12 +4476,6 @@ export function normalizeVoiceCommandLaneEnvelope(
   };
 }
 
-export function describeVoiceCommandAction(action: "send" | "cancel" | "retry"): string {
-  if (action === "send") return "Send current draft";
-  if (action === "retry") return "Retry previous ask";
-  return "Cancel pending flow";
-}
-
 export function scoreVoiceTurnComplete(input: {
   transcript: string;
   pauseMs: number;
@@ -5252,36 +5114,6 @@ function buildExplorationArtifactRetryPrompt(args: {
   ].join("\n");
 }
 
-function isExplorationArtifactRetryPrompt(promptText: string): boolean {
-  const normalized = promptText.trim().toLowerCase();
-  if (!normalized) return false;
-  return (
-    normalized.startsWith("topic:") &&
-    normalized.includes("restart observe mode from the top of the reasoning chain.")
-  );
-}
-
-function extractOriginalTurnFromExplorationArtifactRetryPrompt(promptText: string): string | null {
-  const match =
-    /(?:^|\n)\s*Original user turn:\s*\n([\s\S]*?)(?:\n\s*Previous artifact-dominated output|\n\s*$)/i.exec(
-      promptText,
-    );
-  const extracted = match?.[1]?.trim() ?? "";
-  return extracted || null;
-}
-
-export function resolveReasoningAttemptTimelineText(
-  attempt: Pick<ReasoningAttempt, "source" | "prompt" | "recordedText">,
-): string {
-  const recordedText = typeof attempt.recordedText === "string" ? attempt.recordedText.trim() : "";
-  if (recordedText) return recordedText;
-  const prompt = attempt.prompt.trim();
-  if (!prompt) return "";
-  if (attempt.source !== "voice_auto") return prompt;
-  if (!isExplorationArtifactRetryPrompt(prompt)) return prompt;
-  return extractOriginalTurnFromExplorationArtifactRetryPrompt(prompt) ?? prompt;
-}
-
 function isRepoFileLocationRequestPrompt(promptText: string): boolean {
   const normalized = promptText.trim().toLowerCase();
   if (!normalized) return false;
@@ -5505,80 +5337,6 @@ function isBriefEchoingTranscript(briefText: string, transcript: string): boolea
   if (brief === source) return true;
   if (brief.startsWith(source) && brief.length <= source.length + 24) return true;
   return false;
-}
-
-function laneLabelForConversationMode(mode?: "observe" | "act" | "verify" | "clarify"): string {
-  if (mode === "verify") return "verification";
-  if (mode === "act") return "action";
-  if (mode === "observe") return "observe";
-  if (mode === "clarify") return "clarify";
-  return "reasoning";
-}
-
-function normalizeConversationRouteReasonCode(reasonCode?: string | null): string | null {
-  const trimmed = reasonCode?.trim().toLowerCase();
-  return trimmed ? trimmed : null;
-}
-
-function normalizeVoiceFailureReasonText(reason?: string | null): string | null {
-  const trimmed = reason?.trim();
-  if (!trimmed) return null;
-  const normalized = trimmed.toUpperCase();
-  const messageMap: Array<{ pattern: RegExp; text: string }> = [
-    {
-      pattern: /\bDESKTOP_JOINT_SCOPE_REQUIRED\b/,
-      text: "desktop joint scope is required before this run can execute",
-    },
-    {
-      pattern: /\bCALIBRATION_STATE_INCOMPLETE\b/,
-      text: "calibration is incomplete for this run",
-    },
-    {
-      pattern: /\bIMU_BASELINE_NOT_CONFIGURED\b/,
-      text: "the IMU baseline is not configured for this run",
-    },
-    {
-      pattern: /\bESTOP_NOT_READY\b/,
-      text: "the emergency stop state is not ready for this run",
-    },
-    {
-      pattern: /\bFORBIDDEN_CONTROL_PATH\b/,
-      text: "the request targets restricted actuator-level controls",
-    },
-    {
-      pattern: /\bEVIDENCE_CONTRACT_FIELD_MISSING\b/,
-      text: "required evidence fields were missing",
-    },
-    {
-      pattern: /\bTOOL_NOT_ALLOWED\b/,
-      text: "the requested tool is not allowed in this lane",
-    },
-    {
-      pattern: /\bGENERIC_COLLAPSE\b/,
-      text: "the reasoning stack could not complete the run",
-    },
-    {
-      pattern: /\bHELIX_ASK_FAILED_400\b/,
-      text: "a request gate blocked this run",
-    },
-    {
-      pattern: /\bHELIX_ASK_FAILED_403\b/,
-      text: "access policy blocked this run",
-    },
-    {
-      pattern: /\bREASONING_TIMEOUT\b|\bHELIX_ASK_TIMEOUT\b|\bREQUEST TIMED OUT\b/,
-      text: "the run timed out before completion",
-    },
-  ];
-  for (const entry of messageMap) {
-    if (entry.pattern.test(normalized)) {
-      return entry.text;
-    }
-  }
-  if (/\bABORT|CANCEL|INTERRUPT|SUPERSEDE\b/i.test(trimmed)) {
-    return "the run was interrupted by a newer turn";
-  }
-  return null;
 }
 
 function isReasoningTimeoutReason(reason?: string | null): boolean {
@@ -6265,61 +6023,6 @@ export async function askLocalWithPreflightScopeFallback(
   }
 }
 
-export function formatVoiceDecisionSentence(args: {
-  lifecycle: VoiceDecisionLifecycle;
-  mode?: "observe" | "act" | "verify" | "clarify";
-  routeReasonCode?: string | null;
-  escalatedMode?: "verify" | "act";
-  failureReasonRaw?: string | null;
-}): string {
-  const reasonCode = normalizeConversationRouteReasonCode(args.routeReasonCode);
-  const normalizedFailureReason = normalizeVoiceFailureReasonText(args.failureReasonRaw ?? args.routeReasonCode);
-  if (args.lifecycle === "queued") {
-    if (reasonCode === "dispatch:verify") return "I am thinking through a verification pass in the background.";
-    if (reasonCode === "dispatch:act") return "I am thinking through an action-oriented pass in the background.";
-    if (reasonCode === "dispatch:observe_explore") return "I am thinking through this in the background.";
-    if (reasonCode === "dispatch:observe") return "I am thinking through this in the background.";
-    return "I am thinking through this in the background.";
-  }
-  if (args.lifecycle === "running") {
-    return `Reasoning is running in ${laneLabelForConversationMode(args.mode)} mode.`;
-  }
-  if (args.lifecycle === "suppressed") {
-    if (normalizedFailureReason === "the run was interrupted by a newer turn") {
-      return "Switched to your newer request.";
-    }
-    if (reasonCode === "suppressed:filler") {
-      return "Reasoning is suppressed for this filler turn.";
-    }
-    if (reasonCode === "suppressed:clarify_after_attempt1") {
-      return "Reasoning is paused until you share one concrete detail.";
-    }
-    if (reasonCode === "suppressed:low_salience") {
-      return "Reasoning is suppressed for now while we keep this conversational.";
-    }
-    if (normalizedFailureReason) {
-      return `Reasoning is paused because ${normalizedFailureReason}.`;
-    }
-    return "Reasoning is suppressed for this turn.";
-  }
-  if (args.lifecycle === "escalated") {
-    if (args.escalatedMode === "verify") return "Reasoning is escalated to verification mode.";
-    if (args.escalatedMode === "act") return "Reasoning is escalated to action mode.";
-    return "Reasoning is escalated to a deeper lane.";
-  }
-  if (args.lifecycle === "done") {
-    if (args.mode === "act") return "Action reasoning is complete; see the receipt below.";
-    return "Reasoning is complete; see the answer below.";
-  }
-  if (normalizedFailureReason === "the run was interrupted by a newer turn") {
-    return "Switched to your newer request.";
-  }
-  if (normalizedFailureReason) {
-    return `Reasoning failed for this turn because ${normalizedFailureReason}.`;
-  }
-  return "Reasoning failed for this turn; I can retry on your next prompt.";
-}
-
 export function shouldAutoSpeakVoiceDecisionLifecycle(
   lifecycle: VoiceDecisionLifecycle | undefined,
   options?: {
@@ -6510,15 +6213,6 @@ function mapVoicePreemptPolicyToCancelReason(
   return policy === "pending_final" ? "preempted_by_final" : "superseded_same_turn";
 }
 
-export function composeVoiceBriefWithDecision(baseBrief: string, decisionSentence: string): string {
-  const brief = baseBrief.trim();
-  const decision = decisionSentence.trim();
-  if (!brief) return clipText(decision, 640);
-  if (!decision) return clipText(brief, 640);
-  const separator = /[.!?]["')\]]?$/.test(brief) ? " " : ". ";
-  return clipText(`${brief}${separator}${decision}`, 640);
-}
-
 function normalizeConversationBriefSource(value: unknown): "llm" | "none" {
   return value === "llm" ? "llm" : "none";
 }
@@ -6550,19 +6244,6 @@ function buildSuppressedVoiceSpeechText(args: {
     selected.push(decision);
   }
   return clipText(sanitizeConversationBriefTextForVoice(selected.join(" "), 360), 360);
-}
-
-export function buildVoiceInputStatusLabel(
-  micArmState: MicArmState,
-  state: MicRuntimeState,
-  error: string | null,
-): string | null {
-  if (micArmState === "off") return null;
-  if (state === "listening") return "Listening";
-  if (state === "transcribing") return "Transcribing";
-  if (state === "cooldown") return "Cooldown";
-  if (state === "error") return error ?? "Voice input unavailable.";
-  return null;
 }
 
 function describeVoiceInputError(error: unknown): string {
@@ -7146,8 +6827,6 @@ export type ContextCapsuleLedgerEntry = {
   pinnedAtMs: number | null;
   touchedAtMs: number;
 };
-
-export type SessionCapsuleConfidenceBand = "reinforcing" | "building" | "uncertain";
 
 export type SessionCapsuleState = {
   id: string;
@@ -9880,110 +9559,6 @@ type ReasoningTheaterFrontierParticleNode = {
   baseRadiusPx: number;
 };
 
-type ReasoningTheaterFloatingActionText = {
-  id: string;
-  text: string;
-  tone: "gain" | "loss" | "tool" | "gate" | "steady";
-  leftPct: number;
-  driftPx: number;
-  yPx: number;
-  durationMs: number;
-};
-
-const REASONING_THEATER_STANCE_META: Record<
-  ReasoningTheaterStance,
-  { badge: string; bar: string; label: string }
-> = {
-  winning: {
-    badge: "text-emerald-200",
-    bar: "bg-emerald-300/80",
-    label: "Winning",
-  },
-  contested: {
-    badge: "text-sky-200",
-    bar: "bg-sky-300/80",
-    label: "Contested",
-  },
-  losing: {
-    badge: "text-amber-200",
-    bar: "bg-amber-300/80",
-    label: "Losing",
-  },
-  fail_closed: {
-    badge: "text-rose-200",
-    bar: "bg-rose-300/80",
-    label: "Fail-closed",
-  },
-};
-
-const REASONING_THEATER_ARCHETYPE_LABEL: Record<ReasoningTheaterArchetype, string> = {
-  ambiguity: "ambiguity",
-  missing_evidence: "missing evidence",
-  coverage_gap: "coverage gap",
-  contradiction: "contradiction",
-  overload: "overload",
-};
-
-const REASONING_THEATER_PHASE_LABEL: Record<ReasoningTheaterPhase, string> = {
-  observe: "observe",
-  plan: "plan",
-  retrieve: "retrieve",
-  gate: "gate",
-  synthesize: "synthesize",
-  verify: "verify",
-  execute: "execute",
-  debrief: "debrief",
-};
-
-const REASONING_THEATER_CERTAINTY_LABEL: Record<ReasoningTheaterCertaintyClass, string> = {
-  confirmed: "confirmed",
-  reasoned: "reasoned",
-  hypothesis: "hypothesis",
-  unknown: "unknown",
-};
-
-const REASONING_THEATER_SUPPRESSION_LABEL: Record<ReasoningTheaterSuppressionReason, string> = {
-  context_ineligible: "context ineligible",
-  dedupe_cooldown: "dedupe cooldown",
-  mission_rate_limited: "mission rate limited",
-  voice_rate_limited: "voice rate limited",
-  voice_budget_exceeded: "voice budget exceeded",
-  voice_backend_error: "voice backend error",
-  missing_evidence: "missing evidence",
-  contract_violation: "contract violation",
-  agi_overload_admission_control: "agi overload admission control",
-};
-
-const REASONING_THEATER_MEDAL_LABEL: Record<ReasoningTheaterMedal, string> = {
-  scout: "Scout",
-  anchor: "Anchor",
-  lattice: "Lattice",
-  prism: "Prism",
-  fracture: "Fracture",
-  stitch: "Stitch",
-  relay: "Relay",
-  gate: "Gate",
-  seal: "Seal",
-  lantern: "Lantern",
-  valve: "Valve",
-  crown: "Crown",
-};
-
-const REASONING_THEATER_MEDAL_ASSET: Record<ReasoningTheaterMedal, string> = {
-  scout: "/reasoning-theater/medals/scout.svg",
-  anchor: "/reasoning-theater/medals/anchor.svg",
-  lattice: "/reasoning-theater/medals/lattice.svg",
-  prism: "/reasoning-theater/medals/prism.svg",
-  fracture: "/reasoning-theater/medals/fracture.svg",
-  stitch: "/reasoning-theater/medals/stitch.svg",
-  relay: "/reasoning-theater/medals/relay.svg",
-  gate: "/reasoning-theater/medals/gate.svg",
-  seal: "/reasoning-theater/medals/seal.svg",
-  lantern: "/reasoning-theater/medals/lantern.svg",
-  valve: "/reasoning-theater/medals/valve.svg",
-  crown: "/reasoning-theater/medals/crown.svg",
-};
-
 const REASONING_THEATER_MEDAL_VISIBLE_MS = 4200;
 const REASONING_THEATER_MEDAL_FADE_MS = 900;
 const REASONING_THEATER_MEDAL_MAX_VISIBLE = 6;
@@ -9992,53 +9567,6 @@ const REASONING_THEATER_CLOCK_STEP_MS = 1000 / REASONING_THEATER_CLOCK_FPS;
 const REASONING_THEATER_METER_GAIN_ALPHA = 0.16;
 const REASONING_THEATER_METER_LOSS_ALPHA = 0.24;
 const REASONING_THEATER_METER_EPSILON = 0.05;
-const REASONING_THEATER_CLOCK_SOURCE_LABEL: Record<ReasoningTheaterClockSource, string> = {
-  local: "local",
-  event_ts: "event-ts",
-  event_seq: "event-seq",
-};
-const REASONING_THEATER_FRONTIER_ACTION_LABEL: Record<ReasoningTheaterFrontierAction, string> = {
-  large_gain: "Large gain",
-  small_gain: "Small gain",
-  steady: "Steady",
-  small_loss: "Small loss",
-  large_loss: "Large loss",
-  hard_drop: "Hard drop",
-};
-const CONVERGENCE_SOURCE_LABEL: Record<ConvergenceStripState["source"], string> = {
-  atlas_exact: "atlas exact",
-  repo_exact: "repo exact",
-  open_world: "open-world",
-  unknown: "unknown",
-};
-const CONVERGENCE_PROOF_LABEL: Record<ConvergenceStripState["proof"], string> = {
-  confirmed: "confirmed",
-  reasoned: "reasoned",
-  hypothesis: "hypothesis",
-  unknown: "unknown",
-  fail_closed: "fail-closed",
-};
-const CONVERGENCE_MATURITY_LABEL: Record<ConvergenceStripState["maturity"], string> = {
-  exploratory: "exploratory",
-  reduced_order: "reduced-order",
-  diagnostic: "diagnostic",
-  certified: "certified",
-};
-const CONVERGENCE_PHASE_ORDER = getConvergencePhaseOrder();
-const CONVERGENCE_PHASE_LABEL: Record<ConvergenceStripState["phase"], string> = {
-  observe: "observe",
-  plan: "plan",
-  retrieve: "retrieve",
-  gate: "gate",
-  synthesize: "synthesize",
-  verify: "verify",
-  execute: "execute",
-  debrief: "debrief",
-};
-const CONVERGENCE_COLLAPSE_LABEL: Record<ConvergenceCollapseEvent, string> = {
-  arbiter_commit: "arbiter commit",
-  proof_commit: "proof commit",
-};
 const REASONING_THEATER_FRONTIER_CURSOR_PULSE_MS = 420;
 const REASONING_THEATER_FRONTIER_PARTICLE_COUNT = 8;
 const REASONING_THEATER_FRONTIER_ACTIONS_ENABLED = (() => {
@@ -10066,6 +9594,17 @@ const REASONING_THEATER_SUPPRESSION_PATTERNS: Array<{
 
 function clamp01(value: number): number {
   return clampNumber(value, 0, 1);
+}
+
+function parseTimestampMs(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return Math.trunc(value);
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const numeric = Number(trimmed);
+  if (Number.isFinite(numeric)) return Math.trunc(numeric);
+  const parsed = Date.parse(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function buildAskLiveEventFromTurnTranscriptRecord(
@@ -10143,147 +9682,6 @@ function askLiveEventBelongsToActiveTurn(args: {
     return eventTs >= args.activeStartedAtMs - 500;
   }
   return true;
-}
-
-function buildReasoningTheaterFloatingActionText(input: {
-  id: string;
-  frontierAction: ReasoningTheaterFrontierAction;
-  frontierDeltaPct: number;
-  meterPct: number;
-  latestLiveEvent: AskLiveAgenticEventRow | null;
-  seed: number;
-}): ReasoningTheaterFloatingActionText {
-  const magnitude = Math.max(1, Math.round(Math.abs(input.frontierDeltaPct)));
-  const eventLabel = input.latestLiveEvent?.label ?? "Working";
-  let text = "";
-  let tone: ReasoningTheaterFloatingActionText["tone"] = "steady";
-  if (input.frontierAction === "large_gain" || input.frontierAction === "small_gain") {
-    text = `+${magnitude} clarity`;
-    tone = "gain";
-  } else if (
-    input.frontierAction === "large_loss" ||
-    input.frontierAction === "small_loss" ||
-    input.frontierAction === "hard_drop"
-  ) {
-    text = `-${magnitude} pressure`;
-    tone = "loss";
-  } else if (eventLabel === "Observation") {
-    text = "tool";
-    tone = "tool";
-  } else if (eventLabel === "Decision" || eventLabel === "Final") {
-    text = eventLabel === "Final" ? "settle" : "choose";
-    tone = "gate";
-  } else {
-    text = "hold";
-  }
-  const seedJitter = ((input.seed % 23) - 11) * 0.9;
-  return {
-    id: input.id,
-    text,
-    tone,
-    leftPct: clampNumber(input.meterPct + seedJitter, 5, 95),
-    driftPx: ((input.seed >>> 3) % 15) - 7,
-    yPx: -18 - ((input.seed >>> 7) % 12),
-    durationMs: 1180 + ((input.seed >>> 11) % 360),
-  };
-}
-
-function reasoningTheaterFloatingActionTextClassName(
-  tone: ReasoningTheaterFloatingActionText["tone"],
-): string {
-  if (tone === "gain") return "border-emerald-200/35 bg-emerald-300/10 text-emerald-100";
-  if (tone === "loss") return "border-rose-200/35 bg-rose-300/10 text-rose-100";
-  if (tone === "tool") return "border-cyan-200/35 bg-cyan-300/10 text-cyan-100";
-  if (tone === "gate") return "border-violet-200/35 bg-violet-300/10 text-violet-100";
-  return "border-slate-200/25 bg-white/5 text-slate-200";
-}
-
-function reasoningBattleBeatPositionPct(beat: ReasoningBattleBeat): number {
-  const jitter = (hash32(`${beat.id}:x`) % 1700) / 100;
-  if (beat.lane === "orb") return clampNumber(24 + jitter, 10, 58);
-  if (beat.lane === "ambiguity") return clampNumber(62 + jitter, 54, 94);
-  if (beat.lane === "terminal") return clampNumber(76 + jitter * 0.7, 70, 96);
-  return clampNumber(10 + jitter * 0.9, 6, 30);
-}
-
-function reasoningBattleBeatHeightPx(beat: ReasoningBattleBeat): number {
-  const jitter = hash32(`${beat.id}:y`) % 8;
-  return -18 - Math.abs(beat.impact) * 4 - jitter;
-}
-
-function reasoningBattlePrimitiveClassName(primitive: ReasoningBattleVisualPrimitive): string {
-  const laneClass =
-    primitive.lane === "orb"
-      ? "border-emerald-200/55 bg-emerald-200/45 shadow-[0_0_10px_rgba(110,231,183,0.45)]"
-      : primitive.lane === "ambiguity"
-        ? "border-rose-200/60 bg-rose-300/45 shadow-[0_0_10px_rgba(251,113,133,0.42)]"
-        : primitive.lane === "terminal"
-          ? "border-cyan-100/70 bg-cyan-200/50 shadow-[0_0_12px_rgba(103,232,249,0.48)]"
-          : "border-slate-200/45 bg-slate-200/35 shadow-[0_0_8px_rgba(226,232,240,0.28)]";
-  if (primitive.kind === "slash") return `${laneClass} h-7 w-[2px] rotate-[24deg] rounded-full`;
-  if (primitive.kind === "gate") return `${laneClass} h-8 w-[3px] rounded-sm`;
-  if (primitive.kind === "notch") return `${laneClass} h-3 w-5 rounded-[2px]`;
-  if (primitive.kind === "recoil") return `${laneClass} h-[2px] w-7 rounded-full`;
-  if (primitive.kind === "ring") return `${laneClass} h-7 w-7 rounded-full border-2 bg-transparent`;
-  if (primitive.kind === "spark") return `${laneClass} h-2.5 w-2.5 rotate-45 rounded-[2px]`;
-  if (primitive.kind === "settle") return `${laneClass} h-6 w-6 rounded-full border-2 bg-cyan-200/15`;
-  return `${laneClass} h-4 w-4 rounded-full`;
-}
-
-function reasoningBattlePrimitiveStyle(input: {
-  beat: ReasoningBattleBeat;
-  primitive: ReasoningBattleVisualPrimitive;
-  reducedMotion: boolean;
-}): React.CSSProperties & Record<string, string | undefined> {
-  const { beat, primitive, reducedMotion } = input;
-  const yPx =
-    primitive.kind === "ring" || primitive.kind === "settle"
-      ? -8
-      : primitive.lane === "ambiguity"
-        ? -4
-        : -10;
-  const driftBase = (hash32(`${beat.id}:primitive-drift`) % 15) - 7;
-  const driftPx =
-    primitive.direction === "backward" ? -Math.abs(driftBase) - 5 : primitive.direction === "forward" ? Math.abs(driftBase) + 5 : 0;
-  return {
-    left: `${reasoningBattleBeatPositionPct(beat)}%`,
-    opacity: `${0.62 + primitive.intensity * 0.1}`,
-    transform: reducedMotion
-      ? `translate3d(-50%, ${yPx}px, 0)`
-      : "translate3d(-50%, -50%, 0)",
-    animation: reducedMotion
-      ? undefined
-      : `helixReasoningBattlePrimitive ${beat.ttl_ms + 140}ms ease-out forwards`,
-    "--battle-primitive-drift": `${driftPx}px`,
-    "--battle-primitive-y": `${yPx}px`,
-    "--battle-primitive-scale": `${1 + primitive.intensity * 0.09}`,
-  };
-}
-
-function reasoningBattleAmbientClassName(state: ReasoningBattleAmbientState, reducedMotion: boolean): string {
-  const laneClass =
-    state.lane === "orb"
-      ? "border-emerald-200/30 bg-emerald-300/10 text-emerald-100"
-      : state.lane === "ambiguity"
-        ? "border-rose-200/35 bg-rose-300/10 text-rose-100"
-        : state.lane === "terminal"
-          ? "border-cyan-200/35 bg-cyan-300/10 text-cyan-100"
-          : "border-slate-200/25 bg-white/5 text-slate-200";
-  const motionClass = reducedMotion || state.intensity === 0 ? "" : "animate-pulse";
-  return `${laneClass} ${motionClass}`.trim();
-}
-
-function reasoningBattleAmbientMarkerClassName(state: ReasoningBattleAmbientState, reducedMotion: boolean): string {
-  const laneClass =
-    state.lane === "orb"
-      ? "bg-emerald-200/45 shadow-[0_0_12px_rgba(110,231,183,0.42)]"
-      : state.lane === "ambiguity"
-        ? "bg-rose-300/45 shadow-[0_0_12px_rgba(251,113,133,0.40)]"
-        : state.lane === "terminal"
-          ? "bg-cyan-200/45 shadow-[0_0_12px_rgba(103,232,249,0.42)]"
-          : "bg-slate-200/35 shadow-[0_0_8px_rgba(226,232,240,0.24)]";
-  const motionClass = reducedMotion || state.intensity === 0 ? "" : "animate-pulse";
-  return `${laneClass} ${motionClass}`.trim();
 }
 
 function renderReasoningBattleStage(input: {
@@ -10388,58 +9786,6 @@ function renderReasoningBattleStage(input: {
       </div>
     </div>
   );
-}
-
-function buildReasoningBattleAnswerTint(input: {
-  beats: ReasoningBattleBeat[];
-  ambient: ReasoningBattleAmbientState;
-}): { style: React.CSSProperties; palette: string; label: string } | null {
-  if (input.beats.length === 0 && input.ambient.kind === "idle") return null;
-  const palette = {
-    orb: { r: 16, g: 185, b: 129 },
-    ambiguity: { r: 244, g: 63, b: 94 },
-    terminal: { r: 34, g: 211, b: 238 },
-    neutral: { r: 148, g: 163, b: 184 },
-  } satisfies Record<ReasoningBattleLane, { r: number; g: number; b: number }>;
-  const totals = input.beats.reduce(
-    (acc, beat) => {
-      const weight = Math.max(1, Math.abs(beat.impact)) * (beat.lane === "terminal" ? 1.25 : 1);
-      const color = palette[beat.lane];
-      acc.r += color.r * weight;
-      acc.g += color.g * weight;
-      acc.b += color.b * weight;
-      acc.weight += weight;
-      acc.pressure += beat.pressure_delta;
-      acc.progress += beat.progress_delta;
-      return acc;
-    },
-    { r: 0, g: 0, b: 0, weight: 0, pressure: 0, progress: 0 },
-  );
-  const ambientColor = palette[input.ambient.lane];
-  const ambientWeight = input.ambient.intensity === 0 ? 0.35 : input.ambient.intensity * 0.75;
-  totals.r += ambientColor.r * ambientWeight;
-  totals.g += ambientColor.g * ambientWeight;
-  totals.b += ambientColor.b * ambientWeight;
-  totals.weight += ambientWeight;
-  if (totals.weight <= 0) return null;
-  const r = Math.round(totals.r / totals.weight);
-  const g = Math.round(totals.g / totals.weight);
-  const b = Math.round(totals.b / totals.weight);
-  const balance =
-    totals.pressure > totals.progress
-      ? "pressure"
-      : totals.progress > totals.pressure
-        ? "constructive"
-        : input.ambient.kind;
-  return {
-    label: balance,
-    palette: `rgb(${r}, ${g}, ${b})`,
-    style: {
-      background:
-        `linear-gradient(135deg, rgba(${r}, ${g}, ${b}, 0.18), rgba(${r}, ${g}, ${b}, 0.07) 48%, rgba(8, 47, 73, 0.18)), rgba(8, 47, 73, 0.18)`,
-      boxShadow: `inset 0 1px 0 rgba(${r}, ${g}, ${b}, 0.16), 0 0 26px rgba(${r}, ${g}, ${b}, 0.08)`,
-    },
-  };
 }
 
 function resolveObjectiveReasoningTrace(
@@ -13566,27 +12912,6 @@ function buildObservationGroundedReplyText(entry: AskLiveEventEntry): { text: st
     if (message) return { text: message, ok: true };
   }
   return null;
-}
-
-function buildContextCapsuleStampDataUri(
-  stamp: ContextCapsuleSummary["stamp"],
-  options?: { onColor?: string; offColor?: string },
-): string {
-  const width = Math.max(1, Math.floor(stamp.gridW));
-  const height = Math.max(1, Math.floor(stamp.gridH));
-  const bits = typeof stamp.finalBits === "string" ? stamp.finalBits : "";
-  const total = width * height;
-  const onColor = options?.onColor ?? "#D4F4FF";
-  const offColor = options?.offColor ?? "#071525";
-  const rects: string[] = [];
-  for (let i = 0; i < total; i += 1) {
-    if (bits[i] !== "1") continue;
-    const x = i % width;
-    const y = Math.floor(i / width);
-    rects.push(`<rect x="${x}" y="${y}" width="1" height="1" fill="${onColor}" />`);
-  }
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" shape-rendering="crispEdges"><rect width="${width}" height="${height}" fill="${offColor}" />${rects.join("")}</svg>`;
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
 function hash32(value: string): number {

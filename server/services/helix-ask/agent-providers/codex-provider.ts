@@ -240,7 +240,7 @@ const buildNormalizedObservationPacketsFromArtifacts = (input: {
     call_id: readString(artifact.producer_item_id) ?? `${input.turnId}:codex_normalized:${index + 1}:call`,
     decision_id: `${input.turnId}:codex_normalized:${index + 1}:decision`,
     capability_key: readString(artifact.capability_key) ?? readString(artifact.kind) ?? "codex.normalized_observation",
-    panel_id: null,
+    panel_id: "codex-provider",
     action: "normalize_provider_gateway_observation",
     status: readString(artifact.status) === "succeeded" ? "succeeded" : "failed",
     produced_artifact_refs: [readString(artifact.artifact_id) ?? `${input.turnId}:codex_normalized:${index + 1}`],
@@ -1514,9 +1514,27 @@ export const codexProvider: HelixAgentProvider = {
       gatewayCallResults: evidenceGatewayCallResults,
     });
     const gatewayObservationPackets = gatewayCallResults.map((result) => result.observation_packet);
-    const currentTurnArtifactLedger = buildCurrentTurnArtifactLedgerFromGatewayPackets({
+    const normalizedObservationResult = buildCodexNormalizedObservationArtifacts({
+      turnId,
+      gatewayCallResults,
+    });
+    const normalizedObservationArtifacts = normalizedObservationResult.artifacts;
+    const normalizedObservationPackets = buildNormalizedObservationPacketsFromArtifacts({
+      turnId,
+      artifacts: normalizedObservationArtifacts,
+    });
+    const providerGatewayPacketLedger = buildCurrentTurnArtifactLedgerFromGatewayPackets({
       turnId,
       packets: gatewayObservationPackets,
+    });
+    const currentTurnArtifactLedger = [
+      ...providerGatewayPacketLedger,
+      ...normalizedObservationArtifacts,
+    ];
+    const codexCompoundSubgoalLedger = buildCodexCompoundSubgoalLedger({
+      turnId,
+      normalizedArtifacts: normalizedObservationArtifacts,
+      gatewayCallResults: evidenceGatewayCallResults,
     });
     const gatewayLifecycleTraces = gatewayCallResults.map((result) => result.tool_lifecycle_trace);
     const gatewayFollowupDecisions = gatewayCallResults.map((result) => result.tool_followup_decision);
@@ -1572,6 +1590,11 @@ export const codexProvider: HelixAgentProvider = {
           ),
           workstation_gateway_call_results: gatewayCallResults,
           workstation_gateway_observation_packets: gatewayObservationPackets,
+          provider_gateway_packet_artifacts: providerGatewayPacketLedger,
+          normalized_provider_observation_artifacts: normalizedObservationArtifacts,
+          normalized_provider_observation_packets: normalizedObservationPackets,
+          provider_observation_normalization_failures: normalizedObservationResult.missingNormalizationFailures,
+          compound_capability_contract: codexCompoundSubgoalLedger,
           current_turn_artifact_ledger: currentTurnArtifactLedger,
           tool_lifecycle_traces: gatewayLifecycleTraces,
           tool_followup_decisions: gatewayFollowupDecisions,
@@ -1679,17 +1702,44 @@ export const codexProvider: HelixAgentProvider = {
       threadId,
       route: request.route,
       gatewayCallResults,
-      normalizedObservationPackets: gatewayObservationPackets,
+      normalizedObservationPackets: codexCompoundSubgoalLedger && normalizedObservationPackets.length > 0
+        ? normalizedObservationPackets
+        : gatewayObservationPackets,
       providerText: gatewayGuardedText,
       ok: processOk,
       solverCompleted: true,
       goalSatisfied: gatewayCallsSucceeded(gatewayCallResults),
     });
+    const compoundAnswer = buildCodexCompoundEvidenceSynthesisAnswer({
+      turnId,
+      providerText: gatewayGuardedText,
+      normalizedArtifacts: normalizedObservationArtifacts.filter((artifact) => {
+        const capability = readString(artifact.capability_key);
+        return Boolean(capability && evidenceGatewayCallResults.some((result) => result.capability_id === capability));
+      }),
+      compoundLedger: codexCompoundSubgoalLedger,
+    });
+    const compoundTerminalAuthority = buildCodexCompoundTerminalAuthority({
+      turnId,
+      threadId,
+      route: request.route,
+      compoundAnswer,
+    });
+    const compoundTerminalAuthorized = Boolean(compoundTerminalAuthority);
     const providerTerminalAuthorized = Boolean(providerReentry.terminalAnswerAuthority);
-    const ok = processOk && gatewayCallsSucceeded(gatewayCallResults) && providerTerminalAuthorized;
+    const normalizationFailures = normalizedObservationResult.missingNormalizationFailures;
+    const normalizationFailureText = normalizationFailures[0]
+      ? `I cannot complete this Codex provider turn because Helix could not normalize a provider gateway result: ${normalizationFailures[0]}.`
+      : null;
+    const ok =
+      processOk &&
+      normalizationFailures.length === 0 &&
+      gatewayCallsSucceeded(gatewayCallResults) &&
+      (compoundTerminalAuthorized || providerTerminalAuthorized);
     const projectedText =
-      gatewayGuardedText ||
-      "I could not complete this Codex provider turn because Helix observation re-entry is required before provider text can become terminal authority.";
+      normalizationFailureText ??
+      (gatewayGuardedText ||
+        "I could not complete this Codex provider turn because Helix observation re-entry is required before provider text can become terminal authority.");
     const providerGatewayDebugSummary = buildProviderGatewayDebugSummary({
       body: request.body,
       runtime: "codex",
@@ -1704,14 +1754,20 @@ export const codexProvider: HelixAgentProvider = {
       providerTerminalAuthorityBridge: providerReentry.providerTerminalAuthorityBridge,
       terminalAuthorityCandidateReview: providerReentry.terminalAuthorityCandidateReview,
       terminalAnswerAuthority: providerReentry.terminalAnswerAuthority,
-      finalAnswerSource: providerReentry.terminalAnswerAuthority
-        ? "agent_provider_terminal_candidate"
-        : null,
-      terminalArtifactKind: providerReentry.terminalAnswerAuthority
-        ? "agent_provider_terminal_candidate"
-        : null,
+      finalAnswerSource: compoundTerminalAuthority
+        ? "compound_evidence_synthesis_answer"
+        : providerReentry.terminalAnswerAuthority
+          ? "agent_provider_terminal_candidate"
+          : null,
+      terminalArtifactKind: compoundTerminalAuthority
+        ? "compound_evidence_synthesis_answer"
+        : providerReentry.terminalAnswerAuthority
+          ? "agent_provider_terminal_candidate"
+          : null,
       evidenceReentryStatus: providerReentry.workstationGatewayReentryStatus,
-      terminalAuthorityStatus: providerReentry.terminalAuthorityStatus,
+      terminalAuthorityStatus: compoundTerminalAuthority
+        ? "authorized_by_codex_provider_compound_synthesis"
+        : providerReentry.terminalAuthorityStatus,
     });
     const turnTranscriptEvents = buildCodexProviderTurnTranscriptEvents({
       turnId,
@@ -1721,6 +1777,19 @@ export const codexProvider: HelixAgentProvider = {
       providerText: projectedText,
       finalStatus: ok ? "completed" : "final_failure",
     });
+    const finalAnswerSource = compoundTerminalAuthority
+      ? "compound_evidence_synthesis_answer"
+      : providerReentry.terminalAnswerAuthority
+        ? "agent_provider_terminal_candidate"
+        : null;
+    const terminalArtifactKind = compoundTerminalAuthority
+      ? "compound_evidence_synthesis_answer"
+      : providerReentry.terminalAnswerAuthority
+        ? "agent_provider_terminal_candidate"
+        : null;
+    const terminalAuthorityStatus = compoundTerminalAuthority
+      ? "authorized_by_codex_provider_compound_synthesis"
+      : providerReentry.terminalAuthorityStatus;
 
     return {
       ok,
@@ -1730,6 +1799,8 @@ export const codexProvider: HelixAgentProvider = {
       text: projectedText,
       answer: projectedText,
       selected_final_answer: projectedText,
+      final_answer_source: finalAnswerSource,
+      terminal_artifact_kind: terminalArtifactKind,
       turn_transcript_events: turnTranscriptEvents,
       turn_transcript_event_count: turnTranscriptEvents.length,
       turn_transcript_source: "codex_provider_gateway_projection",
@@ -1738,14 +1809,21 @@ export const codexProvider: HelixAgentProvider = {
       support_refs: hostWorkstationAffordances.support_refs,
       tool_output_refs: hostWorkstationAffordances.tool_output_refs,
       current_turn_artifact_ledger: currentTurnArtifactLedger,
+      ...(compoundAnswer ? { compound_evidence_synthesis_answer: compoundAnswer } : {}),
+      ...(codexCompoundSubgoalLedger ? { compound_capability_contract: codexCompoundSubgoalLedger } : {}),
       debug: {
         agent_runtime: "codex",
         agent_runtime_adapter_contract: adapterContract,
         agent_runtime_selection_trace: runtimeSelectionTrace,
         permission_profile: codexProvider.permissionProfile,
         fail_reason:
+          normalizationFailures[0] ??
           result.failReason ??
-          (ok ? null : providerTerminalAuthorized ? "codex_process_failed" : "helix_observation_reentry_required"),
+          (ok
+            ? null
+            : compoundTerminalAuthorized || providerTerminalAuthorized
+              ? "codex_process_failed"
+              : "helix_observation_reentry_required"),
         codex_exit_code: result.exitCode,
         codex_timed_out: result.timedOut,
         codex_process_killed: result.killed,
@@ -1764,6 +1842,12 @@ export const codexProvider: HelixAgentProvider = {
         ),
         workstation_gateway_call_results: gatewayCallResults,
         workstation_gateway_observation_packets: gatewayObservationPackets,
+        provider_gateway_packet_artifacts: providerGatewayPacketLedger,
+        normalized_provider_observation_artifacts: normalizedObservationArtifacts,
+        normalized_provider_observation_packets: normalizedObservationPackets,
+        provider_observation_normalization_failures: normalizationFailures,
+        compound_capability_contract: codexCompoundSubgoalLedger,
+        compound_evidence_synthesis_answer: compoundAnswer,
         current_turn_artifact_ledger: currentTurnArtifactLedger,
         tool_lifecycle_traces: gatewayLifecycleTraces,
         tool_followup_decisions: gatewayFollowupDecisions,
@@ -1771,16 +1855,26 @@ export const codexProvider: HelixAgentProvider = {
         provider_reasoning_reentry: providerReentry.providerReasoningReentry,
         terminal_authority_candidate_review: providerReentry.terminalAuthorityCandidateReview,
         provider_terminal_authority_bridge: providerReentry.providerTerminalAuthorityBridge,
-        terminal_answer_authority: providerReentry.terminalAnswerAuthority,
-        terminal_presentation: providerReentry.terminalPresentation,
-        final_answer_source: providerReentry.terminalAnswerAuthority
-          ? "agent_provider_terminal_candidate"
-          : null,
-        terminal_artifact_kind: providerReentry.terminalAnswerAuthority
-          ? "agent_provider_terminal_candidate"
-          : null,
+        terminal_answer_authority: compoundTerminalAuthority ?? providerReentry.terminalAnswerAuthority,
+        terminal_presentation: compoundTerminalAuthority
+          ? {
+              schema: "helix.terminal_presentation.v1",
+              turn_id: turnId,
+              concise_text: projectedText,
+              terminal_artifact_kind: "compound_evidence_synthesis_answer",
+              final_answer_source: "compound_evidence_synthesis_answer",
+              terminal_authority_ref: readString(compoundAnswer?.answer_id),
+              selected_observation_refs: compoundAnswer?.support_refs,
+              presentation_policy: "preserve_provider_text",
+              helix_style_rewrite_applied: false,
+              assistant_answer: false,
+              raw_content_included: false,
+            }
+          : providerReentry.terminalPresentation,
+        final_answer_source: finalAnswerSource,
+        terminal_artifact_kind: terminalArtifactKind,
         workstation_gateway_reentry_status: providerReentry.workstationGatewayReentryStatus,
-        terminal_authority_status: providerReentry.terminalAuthorityStatus,
+        terminal_authority_status: terminalAuthorityStatus,
         provider_gateway_debug_summary: providerGatewayDebugSummary,
         action_envelope: actionEnvelope,
         codex_host_workstation_affordances: hostWorkstationAffordances,

@@ -99,6 +99,36 @@ describe("resolveHelixVisibleTerminal", () => {
     ).toBe("workstation tool evaluation");
   });
 
+  it("does not render terminal authority preview as the full final answer", () => {
+    const fullAnswer =
+      "I cannot answer scholarly paper content from this turn because no scholarly-research.lookup_papers observation packet was materialized.\nAsk with an explicit scholarly search target, DOI, or arXiv id so Helix can create bounded research-paper evidence first.";
+    const preview = fullAnswer.slice(0, 240);
+
+    const terminal = resolveHelixVisibleTerminal({
+      selected_final_answer: fullAnswer,
+      final_answer_source: "compound_evidence_synthesis_answer",
+      terminal_artifact_kind: "compound_evidence_synthesis_answer",
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        server_authoritative: true,
+        terminal_kind: "answer",
+        final_answer_source: "compound_evidence_synthesis_answer",
+        terminal_artifact_kind: "compound_evidence_synthesis_answer",
+        terminal_text_preview: preview,
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        concise_text: fullAnswer,
+        final_answer_source: "compound_evidence_synthesis_answer",
+        terminal_artifact_kind: "compound_evidence_synthesis_answer",
+      },
+    });
+
+    expect(terminal.text).toBe(fullAnswer);
+    expect(terminal.text).toContain("research-paper evidence first.");
+    expect(terminal.source).toBe("terminal_answer_authority");
+  });
+
   it("prefers terminal envelope text over stale model-synthesis selected_final_answer", () => {
     const terminal = resolveHelixVisibleTerminal({
       selected_final_answer: "stale model synthesis",

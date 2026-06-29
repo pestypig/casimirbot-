@@ -429,4 +429,42 @@ describe("explicit workstation gateway derived calls", () => {
       },
     });
   });
+
+  it("keeps named whitepaper evidence and scholarly corroboration in Codex compound prompts", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "I am trying to judge whether the NHM2 Casimir tile generation idea is a serious diagnostic engineering direction, a speculative metaphor, or something in between. Use the NHM2 whitepaper as document evidence, calculate 6 * 7 as a small scalar sanity check, reflect through the theory badge graph for where the claim should be bounded, apply civilization bounds for what social/energy/material conditions would have to be true, and check scholarly papers for corroboration. Give me a practical answer: what can I responsibly believe from this evidence, what remains unproven, and what should I test next?",
+        workspace_context_snapshot: {
+          activePanel: "scientific-calculator",
+          focusedPanel: "scientific-calculator",
+          openPanels: ["docs-viewer", "scientific-calculator"],
+          activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          hasDocContext: true,
+        },
+      },
+    });
+
+    expect(capabilities(requests)).toEqual([
+      "docs.search",
+      "scientific-calculator.solve_expression",
+      "theory-badge-graph.reflect_discussion_context",
+      "civilization-bounds.reflect_system_bounds",
+      "scholarly-research.lookup_papers",
+    ]);
+    expect(requests.find((request) => request.capability_id === "docs.search")).toMatchObject({
+      arguments: {
+        paths: ["docs/research/nhm2-current-status-whitepaper-2026-05-02.md"],
+      },
+    });
+    expect(requests.find((request) => request.capability_id === "scholarly-research.lookup_papers")).toMatchObject({
+      arguments: {
+        source_target_intent: expect.objectContaining({
+          target_kind: "research_paper_search",
+        }),
+      },
+    });
+  });
 });

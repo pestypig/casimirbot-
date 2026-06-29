@@ -5,6 +5,14 @@ import {
 } from "@shared/helix-context-capsule";
 import type { ConvergenceStripState } from "@/lib/helix/reasoning-theater-convergence";
 
+export type SessionCapsuleConfidenceBand = "reinforcing" | "building" | "uncertain";
+
+export const SESSION_CAPSULE_CONFIDENCE_LABEL: Record<SessionCapsuleConfidenceBand, string> = {
+  reinforcing: "reinforcing",
+  building: "building",
+  uncertain: "uncertain",
+};
+
 export function stripContextCapsuleTokensFromText(value: string): string {
   const ids = extractContextCapsuleIdsFromText(value);
   if (ids.length === 0) return value.trim();
@@ -42,4 +50,25 @@ export function buildContextCapsuleCopyText(summary: ContextCapsuleSummary): str
     ...stampLines,
     `proof:${proofTag}  src:${sourceTag}`,
   ].join("\n");
+}
+
+export function buildContextCapsuleStampDataUri(
+  stamp: ContextCapsuleSummary["stamp"],
+  options?: { onColor?: string; offColor?: string },
+): string {
+  const width = Math.max(1, Math.floor(stamp.gridW));
+  const height = Math.max(1, Math.floor(stamp.gridH));
+  const bits = typeof stamp.finalBits === "string" ? stamp.finalBits : "";
+  const total = width * height;
+  const onColor = options?.onColor ?? "#D4F4FF";
+  const offColor = options?.offColor ?? "#071525";
+  const rects: string[] = [];
+  for (let i = 0; i < total; i += 1) {
+    if (bits[i] !== "1") continue;
+    const x = i % width;
+    const y = Math.floor(i / width);
+    rects.push(`<rect x="${x}" y="${y}" width="1" height="1" fill="${onColor}" />`);
+  }
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" shape-rendering="crispEdges"><rect width="${width}" height="${height}" fill="${offColor}" />${rects.join("")}</svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }

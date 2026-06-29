@@ -41,13 +41,13 @@ const hasLocalDocsScopeCue = (promptText: string): boolean =>
   /\b(?:docs?\s+viewer|documents?\s+viewer|current\s+(?:doc|document|paper)|active\s+(?:doc|document|paper)|document\s+path\s*:|locate\s+query\s*:|\/docs\/|from\s+(?:our|local|the)\s+docs?)\b/i.test(promptText);
 
 const hasLookupActionCue = (promptText: string): boolean =>
-  /\b(?:do\s+research|research|find|search|look\s*up|lookup|retrieve|fetch|pull|query|get|resolve|repair|collect|cite|cross-?check)\b/i.test(promptText);
+  /\b(?:do\s+research|research|find|search|look\s*up|lookup|retrieve|fetch|pull|query|get|resolve|repair|collect|cite|check|cross-?check)\b/i.test(promptText);
 
 const hasScholarlyProviderCue = (promptText: string): boolean =>
   /\b(?:arxiv|crossref|openalex|semantic\s+scholar|pubmed|unpaywall|core\s+api)\b/i.test(promptText);
 
 const hasCitationCue = (promptText: string): boolean =>
-  /\b(?:cited\s+by|citations?|references?|bibliograph(?:y|ies)|bibtex|journal\s+references?|reference\s+list)\b/i.test(promptText);
+  /\b(?:cited\s+by|citations?|references?|bibliograph(?:y|ies)|bibtex|journal\s+references?|reference\s+list|corroborat(?:e|es|ed|ing|ion))\b/i.test(promptText);
 
 const hasPaperCorpusCue = (promptText: string): boolean =>
   /\b(?:scholarly\s+research|research\s+papers?|paper\s+metadata|journal\s+(?:article|articles|paper|papers)|peer[-\s]?reviewed|literature|preprints?|scholarly\s+(?:papers?|articles?|sources?))\b/i.test(promptText);

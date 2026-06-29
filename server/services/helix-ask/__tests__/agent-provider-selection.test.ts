@@ -1581,8 +1581,26 @@ describe("Helix Ask agent provider selection", () => {
       gateway_tool_observation_count: 3,
       gateway_successful_tool_observation_count: 3,
       gateway_observation_count: 3,
-      terminal_authority_result: "authorized_by_helix_provider_candidate_bridge",
+      terminal_authority_result: "authorized_by_codex_provider_compound_synthesis",
+      final_answer_source: "compound_evidence_synthesis_answer",
+      terminal_artifact_kind: "compound_evidence_synthesis_answer",
     });
+    expect((result as any).terminal_artifact_kind).toBe("compound_evidence_synthesis_answer");
+    expect((result.debug as any)?.compound_evidence_synthesis_answer).toMatchObject({
+      schema: "helix.compound_evidence_synthesis_answer.v1",
+      answer_text: providerAnswer,
+      support_refs: expect.arrayContaining([
+        expect.stringContaining("doc_location_matches"),
+        expect.stringContaining("calculator_receipt"),
+        expect.stringContaining("repo_code_evidence_observation"),
+      ]),
+    });
+    expect((result.debug as any)?.normalized_provider_observation_artifacts?.map((artifact: any) => artifact.kind))
+      .toEqual(expect.arrayContaining([
+        "doc_location_matches",
+        "calculator_receipt",
+        "repo_code_evidence_observation",
+      ]));
     expect(result.turn_transcript_events?.map((event: any) => event.source_event_type)).toEqual([
       "runtime_selected",
       "tool_request",
@@ -1642,6 +1660,8 @@ describe("Helix Ask agent provider selection", () => {
     });
 
     expect(result.text).toBe(providerAnswer);
+    expect((result as any).terminal_artifact_kind).toBe("compound_evidence_synthesis_answer");
+    expect((result as any).final_answer_source).toBe("compound_evidence_synthesis_answer");
     expect((result.debug as any)?.workstation_gateway_call_results?.map((entry: any) => entry.capability_id))
       .toEqual([
         "docs.search",
@@ -1694,6 +1714,11 @@ describe("Helix Ask agent provider selection", () => {
     expect(result.support_refs).toEqual(expect.arrayContaining([
       expect.stringContaining("repo.search"),
     ]));
+    expect((result.debug as any)?.compound_capability_contract).toMatchObject({
+      schema: "helix.compound_capability_contract.v1",
+      rail_status: "satisfied",
+      satisfied_subgoal_count: 3,
+    });
   });
 
   it("derives the Codex workstation acceptance prompt into docs, calculator, scholarly, theory, and civ observations", async () => {
@@ -1740,6 +1765,9 @@ describe("Helix Ask agent provider selection", () => {
     });
 
     expect(result.text).toBe(providerAnswer);
+    expect(result.ok).toBe(true);
+    expect((result as any).terminal_artifact_kind).toBe("compound_evidence_synthesis_answer");
+    expect((result as any).final_answer_source).toBe("compound_evidence_synthesis_answer");
     const capabilityIds = (result.debug as any)?.workstation_gateway_call_results?.map((entry: any) => entry.capability_id);
     expect(capabilityIds).toEqual(expect.arrayContaining([
       "docs.search",
@@ -1782,6 +1810,32 @@ describe("Helix Ask agent provider selection", () => {
       .toMatchObject({
         text: providerAnswer,
       });
+    expect((result.debug as any)?.normalized_provider_observation_artifacts?.map((artifact: any) => artifact.kind))
+      .toEqual(expect.arrayContaining([
+        "doc_location_matches",
+        "calculator_receipt",
+        "helix_theory_context_reflection_tool_receipt",
+        "helix_civilization_bounds_tool_result",
+        "scholarly_research_observation",
+      ]));
+    expect((result.debug as any)?.provider_observation_normalization_failures).toEqual([]);
+    expect((result.debug as any)?.compound_capability_contract).toMatchObject({
+      schema: "helix.compound_capability_contract.v1",
+      rail_status: "satisfied",
+      satisfied_subgoal_count: 5,
+    });
+    expect((result.debug as any)?.compound_evidence_synthesis_answer).toMatchObject({
+      schema: "helix.compound_evidence_synthesis_answer.v1",
+      answer_text: providerAnswer,
+      support_refs: expect.arrayContaining([
+        expect.stringContaining("doc_location_matches"),
+        expect.stringContaining("calculator_receipt"),
+        expect.stringContaining("helix_theory_context_reflection_tool_receipt"),
+        expect.stringContaining("helix_civilization_bounds_tool_result"),
+        expect.stringContaining("scholarly_research_observation"),
+      ]),
+    });
+    expect((result.debug as any)?.terminal_artifact_kind).toBe("compound_evidence_synthesis_answer");
   });
 
   it("fails closed when one compound Codex gateway observation is missing", async () => {

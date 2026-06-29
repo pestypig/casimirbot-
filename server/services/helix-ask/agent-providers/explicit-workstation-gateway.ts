@@ -113,7 +113,8 @@ const isActiveDocsViewerDeicticPrompt = (prompt: string): boolean => {
   if (/\b(?:previous|last|earlier|historical)\b.{0,80}\b(?:doc|document|paper|white\s*paper|whitepaper)\b/i.test(unquotedPrompt)) return false;
   const mentionsCurrentDoc =
     /\b(?:this|current|open|active|visible)\b[\s\S]{0,80}\b(?:doc|document|paper|white\s*paper|whitepaper)\b/i.test(unquotedPrompt) ||
-    /\b(?:doc|document|paper|white\s*paper|whitepaper)\s+(?:on\s+screen|in\s+(?:the\s+)?docs?\s+viewer|I'?m\s+viewing|we'?re\s+viewing)\b/i.test(unquotedPrompt);
+    /\b(?:doc|document|paper|white\s*paper|whitepaper)\s+(?:on\s+screen|in\s+(?:the\s+)?docs?\s+viewer|I'?m\s+viewing|we'?re\s+viewing)\b/i.test(unquotedPrompt) ||
+    /\b(?:use|consult|check|read|inspect|apply|ground|base)\b[\s\S]{0,100}\b(?:NHM[-\s]?2\b[\s\S]{0,40})?(?:white\s*paper|whitepaper|document)\b[\s\S]{0,100}\b(?:document\s+)?evidence\b/i.test(unquotedPrompt);
   const asksForContent = /\b(?:summari[sz]e|synthesi[sz]e|explain|what\s+is|what'?s|about|key\s+(?:points|findings)|main\s+claim|claim\s+boundary|caveats?|read|use|include|observation)\b/i.test(unquotedPrompt);
   return mentionsCurrentDoc && asksForContent;
 };

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  SESSION_CAPSULE_CONFIDENCE_LABEL,
   buildContextCapsuleCopyText,
+  buildContextCapsuleStampDataUri,
   resolveContextCapsulePalette,
   stripContextCapsuleTokensFromText,
 } from "@/lib/helix/ask-context-capsule-display";
@@ -31,6 +33,14 @@ describe("Helix Ask context capsule display", () => {
     expect(resolveContextCapsulePalette(baseState)).toEqual({ r: 148, g: 163, b: 184 });
   });
 
+  it("formats session capsule confidence labels", () => {
+    expect(SESSION_CAPSULE_CONFIDENCE_LABEL).toEqual({
+      reinforcing: "reinforcing",
+      building: "building",
+      uncertain: "uncertain",
+    });
+  });
+
   it("builds compact context capsule copy text from stamp and convergence summary", () => {
     const summary = {
       stamp: {
@@ -49,5 +59,20 @@ describe("Helix Ask context capsule display", () => {
     expect(buildContextCapsuleCopyText(summary)).toBe(
       ["##########", "##########", "##########", "proof:PASS  src:repo_exact"].join("\n"),
     );
+  });
+
+  it("builds SVG data URIs for context capsule stamps", () => {
+    const uri = buildContextCapsuleStampDataUri({
+      finalBits: "1010",
+      gridW: 2,
+      gridH: 2,
+    } as ContextCapsuleSummary["stamp"]);
+    expect(uri.startsWith("data:image/svg+xml;utf8,")).toBe(true);
+    const svg = decodeURIComponent(uri.slice("data:image/svg+xml;utf8,".length));
+    expect(svg).toContain('viewBox="0 0 2 2"');
+    expect(svg).toContain('fill="#071525"');
+    expect(svg).toContain('<rect x="0" y="0" width="1" height="1" fill="#D4F4FF" />');
+    expect(svg).toContain('<rect x="0" y="1" width="1" height="1" fill="#D4F4FF" />');
+    expect(svg).not.toContain('<rect x="1" y="0" width="1" height="1" fill="#D4F4FF" />');
   });
 });

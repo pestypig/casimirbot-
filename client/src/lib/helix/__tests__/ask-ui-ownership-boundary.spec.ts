@@ -11,6 +11,7 @@ describe("Helix Ask UI ownership boundaries", () => {
     for (const moduleName of [
       "ask-answer-rendering.ts",
       "ask-active-turn-stream.ts",
+      "ask-convergence-display.ts",
       "ask-context-capsule-display.ts",
       "ask-continuous-turn-display.ts",
       "ask-debug-event-display.ts",
@@ -21,11 +22,17 @@ describe("Helix Ask UI ownership boundaries", () => {
       "ask-observer-commentary-display.ts",
       "ask-observer-events.ts",
       "ask-procedural-display.ts",
+      "ask-read-aloud-display.ts",
+      "ask-reasoning-battle-display.ts",
+      "ask-reasoning-frontier-display.ts",
+      "ask-reasoning-theater-display.ts",
       "ask-stage-play-ledger.ts",
       "ask-status-classnames.ts",
       "ask-steering-queue-display.ts",
       "ask-terminal-projection.ts",
       "ask-turn-transcript.ts",
+      "ask-voice-copy-display.ts",
+      "ask-voice-text-display.ts",
     ]) {
       expect(map).toContain(moduleName);
     }
@@ -40,6 +47,17 @@ describe("Helix Ask UI ownership boundaries", () => {
       "Debug export authority",
     ]) {
       expect(map).toContain(quarantine);
+    }
+    for (const remainingCluster of [
+      "Remaining Local Cluster Map",
+      "Prompt interpretation and planner policy",
+      "Voice capture, STT, confirmation, continuation, and auto-dispatch",
+      "Ask request construction and attachment admission",
+      "Visible terminal and route authority",
+      "Debug export and clipboard authority",
+      "Legacy local Ask fallback",
+    ]) {
+      expect(map).toContain(remainingCluster);
     }
     for (const behaviorQueueItem of [
       "HASK-BSQ-001",
@@ -148,6 +166,40 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(ledger).not.toContain("runAskTurn");
   });
 
+  it("keeps timeline lifecycle behavior local and removes unused timeline label trap doors", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
+
+    expect(pill).not.toContain("const HELIX_TIMELINE_TYPE_LABEL");
+    expect(pill).toContain("const addHelixTimelineEntry = useCallback");
+    expect(pill).toContain("const patchHelixTimelineEntry = useCallback");
+    expect(map).toContain("Timeline entry creation, ordering, patching, filtering, and feed state");
+    expect(map).toContain("Unused timeline label constants should be deleted");
+  });
+
+  it("documents representative behavior-sensitive clusters that still live in HelixAskPill", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
+
+    for (const localAnchor of [
+      "deriveHelixPlannerContract",
+      "evaluateEvidenceFinalizationGate",
+      "resolveTranscriptConfirmPolicy",
+      "buildQueuedAskTurn",
+      "buildAskTurnWorkspaceContextSnapshot",
+      "resolveHelixAskVisibleTerminal",
+      "resolveAuthoritativeDebugExportPayload",
+      "deriveReasoningTheaterState",
+      "buildHelixAskSearchQueries",
+    ]) {
+      expect(pill).toContain(localAnchor);
+      expect(map).toContain(localAnchor);
+    }
+    expect(map).toContain("behavior-goal only");
+    expect(map).toContain("do not move as display");
+    expect(map).toContain("backend Ask is authoritative");
+  });
+
   it("keeps live-source mail transcript display builders in the non-React live-source display module", () => {
     const pill = read("client/src/components/helix/HelixAskPill.tsx");
     const liveSourceDisplay = read("client/src/lib/helix/ask-live-source-display.ts");
@@ -207,10 +259,17 @@ describe("Helix Ask UI ownership boundaries", () => {
       "stripContextCapsuleTokensFromText",
       "resolveContextCapsulePalette",
       "buildContextCapsuleCopyText",
+      "buildContextCapsuleStampDataUri",
     ]) {
       expect(pill).not.toContain(`function ${symbol}`);
       expect(contextCapsule).toContain(`export function ${symbol}`);
     }
+    expect(pill).not.toContain("const SESSION_CAPSULE_CONFIDENCE_LABEL");
+    expect(pill).toContain("function resolveSessionCapsuleConfidenceBand");
+    expect(contextCapsule).toContain("export const SESSION_CAPSULE_CONFIDENCE_LABEL");
+    expect(contextCapsule).toContain("export type SessionCapsuleConfidenceBand");
+    expect(contextCapsule).not.toContain("resolveSessionCapsuleConfidenceBand");
+    expect(contextCapsule).not.toContain("deriveSessionCapsuleState");
     expect(contextCapsule).not.toMatch(/from ["']react["']/);
     expect(contextCapsule).not.toContain("@/store/");
     expect(contextCapsule).not.toContain("@/components/helix/HelixAskPill");
@@ -218,6 +277,31 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(contextCapsule).not.toContain("enqueueVoicePlaybackIntent");
     expect(contextCapsule).not.toContain("runAskTurn");
     expect(contextCapsule).not.toContain("fetch(");
+  });
+
+  it("keeps convergence labels in the non-React convergence display module", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const convergenceDisplay = read("client/src/lib/helix/ask-convergence-display.ts");
+
+    expect(pill).toContain('from "@/lib/helix/ask-convergence-display"');
+    for (const symbol of [
+      "CONVERGENCE_SOURCE_LABEL",
+      "CONVERGENCE_PROOF_LABEL",
+      "CONVERGENCE_MATURITY_LABEL",
+    ]) {
+      expect(pill).not.toContain(`const ${symbol}`);
+      expect(convergenceDisplay).toContain(`export const ${symbol}`);
+    }
+    expect(pill).not.toContain("const CONVERGENCE_PHASE_ORDER");
+    expect(pill).not.toContain("const CONVERGENCE_PHASE_LABEL");
+    expect(pill).not.toContain("const CONVERGENCE_COLLAPSE_LABEL");
+    expect(convergenceDisplay).not.toMatch(/from ["']react["']/);
+    expect(convergenceDisplay).not.toContain("@/store/");
+    expect(convergenceDisplay).not.toContain("@/components/helix/HelixAskPill");
+    expect(convergenceDisplay).not.toContain("setAskReplies");
+    expect(convergenceDisplay).not.toContain("enqueueVoicePlaybackIntent");
+    expect(convergenceDisplay).not.toContain("runAskTurn");
+    expect(convergenceDisplay).not.toContain("fetch(");
   });
 
   it("keeps answer rendering and math debug helpers in the non-React answer rendering module", () => {
@@ -350,6 +434,163 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(procedural).not.toContain("enqueueVoicePlaybackIntent");
     expect(procedural).not.toContain("runAskTurn");
     expect(procedural).not.toContain("fetch(");
+  });
+
+  it("keeps read-aloud labels and UI state transitions in the non-React read-aloud display module", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const readAloud = read("client/src/lib/helix/ask-read-aloud-display.ts");
+
+    expect(pill).toContain('from "@/lib/helix/ask-read-aloud-display"');
+    for (const symbol of [
+      "resolveInitialMicArmState",
+      "transitionReadAloudState",
+      "shouldStopReadAloudOnButtonPress",
+      "formatReadAloudButtonLabel",
+    ]) {
+      expect(pill).not.toContain(`function ${symbol}`);
+      expect(pill).not.toContain(`export function ${symbol}`);
+      expect(readAloud).toContain(`export function ${symbol}`);
+    }
+    expect(readAloud).not.toMatch(/from ["']react["']/);
+    expect(readAloud).not.toContain("@/store/");
+    expect(readAloud).not.toContain("@/components/helix/HelixAskPill");
+    expect(readAloud).not.toContain("speakVoice");
+    expect(readAloud).not.toContain("AudioContext");
+    expect(readAloud).not.toContain("enqueueVoicePlaybackIntent");
+    expect(readAloud).not.toContain("runAskTurn");
+    expect(readAloud).not.toContain("fetch(");
+  });
+
+  it("keeps voice text cleanup and speech-copy formatting in the non-React voice text display module", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const voiceText = read("client/src/lib/helix/ask-voice-text-display.ts");
+
+    expect(pill).toContain('from "@/lib/helix/ask-voice-text-display"');
+    for (const symbol of [
+      "stripVoiceCitationArtifacts",
+      "hasRuntimeFallbackArtifactSpill",
+      "isArtifactDominatedReasoningText",
+      "sanitizeReasoningOutputText",
+      "cleanReasoningDisplayArtifacts",
+      "buildSpeakText",
+      "summarizeVoiceDebugText",
+    ]) {
+      expect(pill).not.toContain(`function ${symbol}`);
+      expect(pill).not.toContain(`export function ${symbol}`);
+      expect(voiceText).toContain(`export function ${symbol}`);
+    }
+    expect(pill).not.toContain("const FILE_PATH_CITATION_SEGMENT");
+    expect(voiceText).not.toMatch(/from ["']react["']/);
+    expect(voiceText).not.toContain("@/store/");
+    expect(voiceText).not.toContain("@/components/helix/HelixAskPill");
+    expect(voiceText).not.toContain("speakVoice");
+    expect(voiceText).not.toContain("AudioContext");
+    expect(voiceText).not.toContain("enqueueVoicePlaybackIntent");
+    expect(voiceText).not.toContain("runAskTurn");
+    expect(voiceText).not.toContain("fetch(");
+  });
+
+  it("keeps voice labels and lifecycle copy formatting in the non-React voice copy display module", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const voiceCopy = read("client/src/lib/helix/ask-voice-copy-display.ts");
+
+    expect(pill).toContain('from "@/lib/helix/ask-voice-copy-display"');
+    for (const symbol of [
+      "describeVoiceCommandAction",
+      "resolveReasoningAttemptTimelineText",
+      "formatVoiceDecisionSentence",
+      "composeVoiceBriefWithDecision",
+      "buildVoiceInputStatusLabel",
+    ]) {
+      expect(pill).not.toContain(`function ${symbol}`);
+      expect(pill).not.toContain(`export function ${symbol}`);
+      expect(voiceCopy).toContain(`export function ${symbol}`);
+    }
+    expect(voiceCopy).not.toMatch(/from ["']react["']/);
+    expect(voiceCopy).not.toContain("@/store/");
+    expect(voiceCopy).not.toContain("@/components/helix/HelixAskPill");
+    expect(voiceCopy).not.toContain("speakVoice");
+    expect(voiceCopy).not.toContain("AudioContext");
+    expect(voiceCopy).not.toContain("enqueueVoicePlaybackIntent");
+    expect(voiceCopy).not.toContain("shouldAutoSpeakVoiceDecisionLifecycle");
+    expect(voiceCopy).not.toContain("runAskTurn");
+    expect(voiceCopy).not.toContain("fetch(");
+  });
+
+  it("keeps reasoning battle visual projection helpers in the non-React reasoning battle display module", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const battleDisplay = read("client/src/lib/helix/ask-reasoning-battle-display.ts");
+
+    expect(pill).toContain('from "@/lib/helix/ask-reasoning-battle-display"');
+    for (const symbol of [
+      "reasoningBattleBeatPositionPct",
+      "reasoningBattleBeatHeightPx",
+      "reasoningBattlePrimitiveClassName",
+      "reasoningBattlePrimitiveStyle",
+      "reasoningBattleAmbientClassName",
+      "reasoningBattleAmbientMarkerClassName",
+      "buildReasoningBattleAnswerTint",
+    ]) {
+      expect(pill).not.toContain(`function ${symbol}`);
+      expect(battleDisplay).toContain(`export function ${symbol}`);
+    }
+    expect(pill).toContain("function renderReasoningBattleStage");
+    expect(battleDisplay).not.toMatch(/from ["']react["']/);
+    expect(battleDisplay).not.toContain("@/store/");
+    expect(battleDisplay).not.toContain("@/components/helix/HelixAskPill");
+    expect(battleDisplay).not.toContain("runAskTurn");
+    expect(battleDisplay).not.toContain("fetch(");
+  });
+
+  it("keeps reasoning frontier floating text projection in the non-React frontier display module", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const frontierDisplay = read("client/src/lib/helix/ask-reasoning-frontier-display.ts");
+
+    expect(pill).toContain('from "@/lib/helix/ask-reasoning-frontier-display"');
+    expect(pill).not.toContain("const REASONING_THEATER_FRONTIER_ACTION_LABEL");
+    for (const symbol of [
+      "buildReasoningTheaterFloatingActionText",
+      "reasoningTheaterFloatingActionTextClassName",
+    ]) {
+      expect(pill).not.toContain(`function ${symbol}`);
+      expect(frontierDisplay).toContain(`export function ${symbol}`);
+    }
+    expect(frontierDisplay).toContain("REASONING_THEATER_FRONTIER_ACTION_LABEL");
+    expect(frontierDisplay).not.toMatch(/from ["']react["']/);
+    expect(frontierDisplay).not.toContain("@/store/");
+    expect(frontierDisplay).not.toContain("@/components/helix/HelixAskPill");
+    expect(frontierDisplay).not.toContain("setReasoningTheaterFloatingActionTexts");
+    expect(frontierDisplay).not.toContain("runAskTurn");
+    expect(frontierDisplay).not.toContain("fetch(");
+  });
+
+  it("keeps reasoning theater labels and assets in the non-React theater display module", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const theaterDisplay = read("client/src/lib/helix/ask-reasoning-theater-display.ts");
+
+    expect(pill).toContain('from "@/lib/helix/ask-reasoning-theater-display"');
+    for (const symbol of [
+      "REASONING_THEATER_STANCE_META",
+      "REASONING_THEATER_ARCHETYPE_LABEL",
+      "REASONING_THEATER_PHASE_LABEL",
+      "REASONING_THEATER_CERTAINTY_LABEL",
+      "REASONING_THEATER_MEDAL_LABEL",
+      "REASONING_THEATER_MEDAL_ASSET",
+    ]) {
+      expect(pill).not.toContain(`const ${symbol}`);
+      expect(theaterDisplay).toContain(`export const ${symbol}`);
+    }
+    expect(theaterDisplay).toContain("REASONING_THEATER_SUPPRESSION_LABEL");
+    expect(pill).toContain("function deriveReasoningTheaterState");
+    expect(pill).toContain("const REASONING_THEATER_SUPPRESSION_PATTERNS");
+    expect(pill).toContain("function resolveReasoningTheaterPhase");
+    expect(theaterDisplay).not.toMatch(/from ["']react["']/);
+    expect(theaterDisplay).not.toContain("@/store/");
+    expect(theaterDisplay).not.toContain("@/components/helix/HelixAskPill");
+    expect(theaterDisplay).not.toContain("deriveReasoningTheaterState");
+    expect(theaterDisplay).not.toContain("setReasoningTheater");
+    expect(theaterDisplay).not.toContain("runAskTurn");
+    expect(theaterDisplay).not.toContain("fetch(");
   });
 
   it("keeps response envelope copy formatting in the non-React envelope copy module", () => {

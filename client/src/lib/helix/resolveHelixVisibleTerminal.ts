@@ -433,7 +433,15 @@ export function resolveHelixVisibleTerminal(
     };
   }
 
-  const authorityText = authority?.server_authoritative === true ? firstText(authority?.terminal_text_preview) : "";
+  const authorityText = authority?.server_authoritative === true
+    ? firstText(
+        presentation?.concise_text,
+        record?.selected_final_answer,
+        debug?.selected_final_answer,
+        authority?.terminal_text,
+        authority?.terminal_text_preview,
+      )
+    : "";
   if (authorityText) {
     return {
       text: authorityText,
