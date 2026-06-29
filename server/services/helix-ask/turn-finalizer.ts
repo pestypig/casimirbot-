@@ -503,6 +503,27 @@ export const createHelixAskTurnFinalizer = (dependencies: HelixAskTurnFinalizerD
           : null,
       routeMetadata: payloadStagePlayMailWakeRouteMetadata,
     });
+    if (
+      (
+        /\bwhat\s+changed\s+since\s+(?:the\s+)?(?:last|previous|prior)\s+(?:scene|epoch|frame|visual|screen|capture)\b/i.test(args.prompt) ||
+        /\b(?:compare|compared|changed|difference|different)\b[\s\S]{0,140}\b(?:last|previous|prior)\s+(?:scene|epoch|frame|visual|screen|capture)\b|\b(?:last|previous|prior)\s+(?:scene|epoch|frame|visual|screen|capture)\b[\s\S]{0,140}\b(?:compare|compared|changed|difference|different|running)\b|\bscene\s+epoch\b/i.test(args.prompt)
+      ) &&
+      payload.capability_plan &&
+      typeof payload.capability_plan === "object" &&
+      !Array.isArray(payload.capability_plan)
+    ) {
+      payload.capability_plan = {
+        ...(payload.capability_plan as Record<string, unknown>),
+        requested_capability: "procedure_memory",
+        selected_capability: "procedure_memory",
+        source_target: "procedure_memory",
+        family: "procedure_memory",
+        required_observation_kinds: ["procedure_epoch_replay", "visual_scene_comparison_result"],
+        required_terminal_kind: "procedure_epoch_replay",
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+    }
     const capabilityAdapterRequest = buildCapabilityAdapterRequestForPayload({ payload });
     if (capabilityAdapterRequest) {
       payload.capability_adapter_request = capabilityAdapterRequest;

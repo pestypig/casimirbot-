@@ -13509,6 +13509,7 @@ function buildReplyMasterEventClockExport(args: {
 function buildFallbackReplyMasterDebugExport(reply: HelixAskReply, reason: string): string {
   const visibleTerminal = resolveHelixAskVisibleTerminal(reply, reply.content);
   const visibleAnswerText = visibleTerminal.text || reply.content || "";
+  const suppressVisibleAnswer = isHelixAskProgressPlaceholderText(visibleAnswerText);
   const canceledPendingTurn = isHelixCanceledPendingTurn(reply, reply.debug);
   return safeJsonStringify({
     schema: "helix.ask.unified_debug.v1",
@@ -13525,11 +13526,11 @@ function buildFallbackReplyMasterDebugExport(reply: HelixAskReply, reason: strin
     },
     visibleAnswerState: {
       question: reply.question ?? null,
-      finalAnswer: clientProgressPlaceholderExport ? "" : visibleAnswerText,
+      finalAnswer: suppressVisibleAnswer ? "" : visibleAnswerText,
       terminalSource: visibleTerminal.source,
       backendTerminalAnswer: visibleTerminal.backendTerminalText,
     },
-    finalAnswer: clientProgressPlaceholderExport ? "" : visibleAnswerText,
+    finalAnswer: suppressVisibleAnswer ? "" : visibleAnswerText,
     plannerContract: readAgentLoopAuditRecord(reply.debug?.planner_contract),
     executionTrace: Array.isArray(reply.debug?.execution_trace) ? reply.debug.execution_trace : [],
     stepResults: Array.isArray(reply.debug?.step_results) ? reply.debug.step_results : [],
@@ -13542,14 +13543,17 @@ function buildFallbackReplyMasterDebugExport(reply: HelixAskReply, reason: strin
 function buildReplyScopedDebugExportFromRenderedReply(reply: HelixAskReply, reason: string): string {
   const visibleTerminal = resolveHelixAskVisibleTerminal(reply, reply.content);
   const visibleAnswerText = visibleTerminal.text || reply.content || "";
+  const suppressVisibleAnswer = isHelixAskProgressPlaceholderText(visibleAnswerText);
   const replyRecord = reply as Record<string, unknown>;
   return buildHelixDebugExportEnvelopeFromMasterPayload(reply, {
     schema: "helix.ask.master_event_clock.v2",
     exportedAt: new Date().toISOString(),
     debug_export_rebuild_reason: reason,
+    active_turn_id: reply.id,
+    client_active_turn_id: reply.id,
     selectedDebugTurnId: reply.id,
     selectedDebugQuestion: reply.question ?? null,
-    selectedDebugFinalAnswer: clientProgressPlaceholderExport ? "" : visibleAnswerText,
+    selectedDebugFinalAnswer: suppressVisibleAnswer ? "" : visibleAnswerText,
     selectedDebugSource: "rendered_reply",
     reply: {
       id: reply.id,
@@ -13559,7 +13563,7 @@ function buildReplyScopedDebugExportFromRenderedReply(reply: HelixAskReply, reas
     },
     debug: reply.debug ?? null,
     active_prompt: reply.question ?? null,
-    selected_final_answer: clientProgressPlaceholderExport ? "" : visibleAnswerText,
+    selected_final_answer: suppressVisibleAnswer ? "" : visibleAnswerText,
     final_answer_source: replyRecord.final_answer_source ?? reply.debug?.final_answer_source ?? visibleTerminal.finalAnswerSource ?? null,
     terminal_artifact_kind:
       replyRecord.terminal_artifact_kind ?? reply.debug?.terminal_artifact_kind ?? visibleTerminal.terminalArtifactKind ?? null,
@@ -13571,6 +13575,84 @@ function buildReplyScopedDebugExportFromRenderedReply(reply: HelixAskReply, reas
     golden_path_runtime_status: replyRecord.golden_path_runtime_status ?? reply.debug?.golden_path_runtime_status ?? null,
     server_build_commit: replyRecord.server_build_commit ?? reply.debug?.server_build_commit ?? null,
     server_build_started_at_ms: replyRecord.server_build_started_at_ms ?? reply.debug?.server_build_started_at_ms ?? null,
+  });
+}
+
+function extractHelixRenderedTurnDebugFromButton(sourceElement: HTMLElement | null | undefined): {
+  question: string | null;
+  finalAnswer: string | null;
+  terminalArtifactKind: string | null;
+} | null {
+  if (!sourceElement) return null;
+  let node: HTMLElement | null = sourceElement;
+  for (let depth = 0; node && depth < 10; depth += 1, node = node.parentElement) {
+    const text = (node.innerText || "").trim();
+    if (!text || !/\bQuestion\b/i.test(text) || !/\bFinal answer\b/i.test(text)) continue;
+    const questionMatch = text.match(/Question\s+QUESTION\s+([\s\S]*?)\s+USER PROMPT/i);
+    const finalMatch = text.match(/Final answer\s+FINAL\s+([\s\S]*?)(?:\s+IN HELIX CONSOLE|\s+\d+\s+Question|\s*$)/i);
+    const question = questionMatch?.[1]?.trim() || null;
+    const finalAnswer = finalMatch?.[1]?.trim() || null;
+    if (!question && !finalAnswer) continue;
+    const terminalArtifactKind = /WORKSTATION TOOL EVALUATION/i.test(finalAnswer || text)
+      ? "workstation_tool_evaluation"
+      : /TYPED FAILURE/i.test(finalAnswer || text)
+        ? "typed_failure"
+        : null;
+    return { question, finalAnswer, terminalArtifactKind };
+  }
+  return null;
+}
+
+function buildReplyScopedDebugExportFromRenderedButton(
+  reply: HelixAskReply,
+  sourceElement: HTMLElement | null | undefined,
+  reason: string,
+): string | null {
+  const rendered = extractHelixRenderedTurnDebugFromButton(sourceElement);
+  if (!rendered || (!rendered.question && !rendered.finalAnswer)) return null;
+  const visibleTerminal = resolveHelixAskVisibleTerminal(reply, reply.content);
+  const replyRecord = reply as Record<string, unknown>;
+  return buildHelixDebugExportEnvelopeFromMasterPayload(reply, {
+    schema: "helix.ask.master_event_clock.v2",
+    exportedAt: new Date().toISOString(),
+    debug_export_rebuild_reason: reason,
+    debug_export_source: "rendered_reply_dom",
+    backend_debug_response_status: "not_advertised",
+    active_turn_id: reply.id,
+    client_active_turn_id: reply.id,
+    selectedDebugTurnId: reply.id,
+    selectedDebugQuestion: rendered.question ?? reply.question ?? null,
+    selectedDebugFinalAnswer: rendered.finalAnswer ?? "",
+    selectedDebugSource: "rendered_reply_dom",
+    reply: {
+      id: reply.id,
+      mode: reply.mode ?? null,
+      question: rendered.question ?? reply.question ?? null,
+      sourceCount: reply.sources?.length ?? 0,
+    },
+    debug: null,
+    active_prompt: rendered.question ?? reply.question ?? null,
+    selected_final_answer: rendered.finalAnswer ?? "",
+    final_answer_source:
+      rendered.terminalArtifactKind ??
+      replyRecord.final_answer_source ??
+      reply.debug?.final_answer_source ??
+      visibleTerminal.finalAnswerSource ??
+      null,
+    terminal_artifact_kind:
+      rendered.terminalArtifactKind ??
+      replyRecord.terminal_artifact_kind ??
+      reply.debug?.terminal_artifact_kind ??
+      visibleTerminal.terminalArtifactKind ??
+      null,
+    terminal_result: replyRecord.terminal_result ?? null,
+    terminal_results: replyRecord.terminal_results ?? [],
+    debug_export_ref: null,
+    backend_debug_response_ref: null,
+    golden_path_runtime: replyRecord.golden_path_runtime ?? null,
+    golden_path_runtime_status: replyRecord.golden_path_runtime_status ?? null,
+    server_build_commit: replyRecord.server_build_commit ?? null,
+    server_build_started_at_ms: replyRecord.server_build_started_at_ms ?? null,
   });
 }
 
@@ -14674,6 +14756,11 @@ async function resolveAuthoritativeDebugExportPayload(localPayload: string): Pro
       ...extra,
     }, null, 2);
   const activeTurnId = coerceText(parsed.active_turn_id).trim();
+  const rebuildReason = coerceText(parsed.debug_export_rebuild_reason).trim();
+  const isReplyScopedRebuild =
+    rebuildReason === "empty_payload" ||
+    rebuildReason === "payload_reply_mismatch" ||
+    rebuildReason === "invalid_json_payload";
   const parsedDebug = readAgentLoopAuditRecord(parsed.debug);
   const refCandidates = [
     readAgentLoopAuditRecord(parsed.backend_debug_response_ref),
@@ -14689,12 +14776,16 @@ async function resolveAuthoritativeDebugExportPayload(localPayload: string): Pro
         turn_id: activeTurnId,
       }
     : null;
+  const matchingBackendRef = refCandidates.find((entry) => {
+    const candidateTurnId = coerceText(entry.turn_id).trim();
+    return activeTurnId && candidateTurnId === activeTurnId;
+  });
+  if (isReplyScopedRebuild && !matchingBackendRef && !activeTurnFallbackRef) {
+    return projectionPayload("not_advertised", { backend_debug_response_ref: undefined });
+  }
   const backendRef =
-    refCandidates.find((entry) => {
-      const candidateTurnId = coerceText(entry.turn_id).trim();
-      return activeTurnId && candidateTurnId === activeTurnId;
-    }) ??
-    refCandidates[0] ??
+    matchingBackendRef ??
+    (isReplyScopedRebuild ? null : refCandidates[0]) ??
     activeTurnFallbackRef;
   const endpoint = coerceText(backendRef?.endpoint).trim();
   const backendTurnId = coerceText(backendRef?.turn_id).trim();
@@ -20486,12 +20577,14 @@ export function HelixAskPill({
   );
 
   const handleCopyReplyMasterDebug = useCallback(
-    async (reply: HelixAskReply, payload: string | null | undefined) => {
+    async (reply: HelixAskReply, payload: string | null | undefined, sourceElement?: HTMLElement | null) => {
       if (debugCopyInFlightRef.current) return;
       debugCopyInFlightRef.current = true;
       setDebugExportDrawer(null);
       try {
-        const localExportPayload = normalizeReplyMasterDebugPayload(reply, payload);
+        const localExportPayload =
+          buildReplyScopedDebugExportFromRenderedButton(reply, sourceElement, "rendered_button_scope") ??
+          normalizeReplyMasterDebugPayload(reply, payload);
         const exportPayload = boundHelixDebugExportTextForUi(
           await resolveAuthoritativeDebugExportPayload(localExportPayload),
         );
@@ -37089,7 +37182,7 @@ export function HelixAskPill({
                                       {userSettings.showHelixAskDebug ? (
                                         <button
                                           type="button"
-                                          onClick={() => void handleCopyReplyMasterDebug(reply, replyMasterEventClockPayload)}
+                                          onClick={(event) => void handleCopyReplyMasterDebug(reply, null, event.currentTarget)}
                                           disabled={typeof window === "undefined"}
                                           className="rounded-full border border-white/10 bg-white/5 p-1.5 text-slate-400 transition hover:border-cyan-300/40 hover:bg-cyan-400/10 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-50"
                                           aria-label="Debug copy"

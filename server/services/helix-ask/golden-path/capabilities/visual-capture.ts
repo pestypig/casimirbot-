@@ -23,6 +23,13 @@ export type HelixAskGoldenPathVisualCaptureDependencies = {
 };
 
 export const isHelixAskGoldenPathVisualCaptureRequested = (body: RecordLike): boolean => {
+  const prompt = readHelixAskGoldenPathPrompt(body);
+  if (
+    /\bwhat\s+changed\s+since\s+(?:the\s+)?(?:last|previous|prior)\s+(?:scene|epoch|frame|visual|screen|capture)\b/i.test(prompt) ||
+    /\b(?:compare|compared|changed|difference|different)\b[\s\S]{0,140}\b(?:last|previous|prior)\s+(?:scene|epoch|frame|visual|screen|capture)\b|\b(?:last|previous|prior)\s+(?:scene|epoch|frame|visual|screen|capture)\b[\s\S]{0,140}\b(?:compare|compared|changed|difference|different|running)\b|\bscene\s+epoch\b/i.test(prompt)
+  ) {
+    return false;
+  }
   if (
     isHelixAskGoldenPathCapabilityNamedInRequest(body, [
       HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY,
@@ -30,7 +37,6 @@ export const isHelixAskGoldenPathVisualCaptureRequested = (body: RecordLike): bo
     ])
   )
     return true;
-  const prompt = readHelixAskGoldenPathPrompt(body);
   return (
     /\bimage_lens\.inspect\b/i.test(prompt) ||
     /\bsituation-room\.describe_visual_capture\b/i.test(prompt) ||
