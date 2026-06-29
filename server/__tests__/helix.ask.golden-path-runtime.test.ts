@@ -1345,6 +1345,101 @@ describe("Helix Ask golden path runtime", () => {
     expect(terminalLedgerEntries(body)).toHaveLength(1);
   });
 
+  it("handles docs locate plus calculator as an ordered compound contract", () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+
+    const decision = runHelixAskGoldenPathRuntime({
+      now: new Date("2026-06-28T12:43:00.000Z"),
+      body: {
+        turn_id: "ask:golden:docs-calculator-compound",
+        prompt:
+          "helix_ask_golden_path_runtime use docs-viewer.locate_in_doc and scientific-calculator.solve_expression",
+        goldenPathRuntime: true,
+        requested_capabilities: [
+          HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+          HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+        ],
+        doc_path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        query: "Casimir tile newtons load bearing",
+        doc_content: [
+          "# NHM2 Current Status",
+          "The Casimir tile generation table reports a load bearing force of 10 newtons per tile.",
+          "The conversion note says pounds-force are derived from the newton scalar cut.",
+        ].join("\n"),
+        calculator_expression: "10 * 0.224809",
+      },
+    });
+
+    expect(decision.handled).toBe(true);
+    if (!decision.handled) throw new Error("golden path should handle docs+calculator compound");
+    const body = decision.payload;
+
+    expect(body).toMatchObject({
+      final_status: "final_answer",
+      terminal_artifact_kind: "compound_evidence_synthesis_answer",
+      final_answer_source: "compound_evidence_synthesis_answer",
+      terminal_error_code: null,
+      doc_location_matches: {
+        capability_key: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+        doc_path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        query: "Casimir tile newtons load bearing",
+        match_count: 1,
+      },
+      calculator_receipt: {
+        capability_key: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+        expression: "10 * 0.224809",
+        result: 2.24809,
+        result_text: "2.24809",
+      },
+      compound_capability_contract: {
+        satisfaction: "satisfied",
+        ordered_subgoals: [
+          {
+            requested_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+            selected_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+            executed_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+            observation_kind: "doc_location_matches",
+            terminal_contribution_kind: "doc_location_matches",
+            satisfaction: "satisfied",
+          },
+          {
+            requested_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+            selected_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+            executed_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+            observation_kind: "calculator_receipt",
+            terminal_contribution_kind: "workstation_tool_evaluation",
+            satisfaction: "satisfied",
+          },
+        ],
+      },
+      capability_plan: {
+        requested_capability: "compound_capability_contract",
+        selected_capability: "compound_capability_contract",
+        executed_capability: "compound_capability_contract",
+        required_observation_kinds: ["doc_location_matches", "calculator_receipt"],
+        required_terminal_kind: "compound_evidence_synthesis_answer",
+      },
+      ask_turn_solver_trace: {
+        completed_solver_path: true,
+        requested_capability: "compound_capability_contract",
+        selected_capability: "compound_capability_contract",
+        executed_capability: "compound_capability_contract",
+        observed_artifact_kind: "compound_subgoal_observations",
+        terminal_artifact_kind: "compound_evidence_synthesis_answer",
+        compound_subgoal_count: 2,
+      },
+    });
+    expect(body.selected_final_answer).toContain("Compound docs/calculator synthesis completed");
+    expect(body.selected_final_answer).toContain("Calculator result: 2.24809");
+    expect(readLedger(body).map((artifact) => artifact.kind)).toEqual([
+      "golden_path_route_gate",
+      "doc_location_matches",
+      "calculator_receipt",
+      "compound_evidence_synthesis_answer",
+    ]);
+    expect(terminalLedgerEntries(body)).toHaveLength(1);
+  });
+
   it("handles capability catalog plus workspace status as an ordered compound contract", () => {
     process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
 
