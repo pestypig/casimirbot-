@@ -1,15 +1,7 @@
 import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfaction-artifact";
-import {
-  buildGoldenPathTypedFailureLedgerArtifact,
-  buildGoldenPathRouteGateLedgerArtifact,
-} from "../artifact-ledger";
-import {
-  buildGoldenPathCapabilityGoalSatisfactionEvaluation,
-  buildGoldenPathCapabilityPlan,
-} from "../capability-contract";
+import { buildGoldenPathCapabilityTypedFailurePayload } from "../capability-failure";
 import { buildGoldenPathCapabilityTerminalObservationSuccessPayload } from "../capability-terminal-observation-success";
 import {
-  HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
   HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
   readHelixAskGoldenPathPrompt,
   readRecord,
@@ -17,14 +9,6 @@ import {
   readStringArray,
   type RecordLike,
 } from "../core";
-import {
-  buildGoldenPathTerminalAuthorityProjection,
-  buildGoldenPathTypedFailureResponseProjection,
-  buildGoldenPathTypedFailureTerminalResult,
-} from "../terminal-envelope";
-import { buildGoldenPathSolverTrace } from "../solver-trace";
-import { buildGoldenPathRuntimeStatus } from "../runtime-status";
-import { buildGoldenPathCapabilityDebugMirror } from "../debug-mirror";
 
 export type HelixAskGoldenPathDocsLocateDependencies = {
   now: () => Date;
@@ -156,105 +140,32 @@ export const buildHelixAskGoldenPathDocsLocatePayload = (args: {
     brokenRail: "argument_extraction" | "observation";
     missingRequirement: string;
     text: string;
-  }): RecordLike => {
-    const terminalArtifactId = `${turnId}:typed_failure`;
-    const canonicalGoalFrame = {
-      schema: "helix.ask_canonical_goal_frame.v1",
-      turn_id: turnId,
-      goal_kind: goalKind,
-      answer_scope: "current_turn",
-      required_terminal_kind: requiredTerminalKind,
-      classifier_reasons: ["explicit_docs_locate_request"],
-      assistant_answer: false,
-      raw_content_included: false,
-    };
-    const goalSatisfactionEvaluation = buildGoldenPathCapabilityGoalSatisfactionEvaluation({
+  }): RecordLike =>
+    buildGoldenPathCapabilityTypedFailurePayload({
       turnId,
-      goalKind,
+      traceId,
+      sessionId,
+      threadId,
+      promptText,
+      createdAtMs,
+      routeGateArtifactId,
+      terminalResultId,
       requiredTerminalKind,
-      satisfaction: "not_satisfied",
-      selectedTerminalArtifactKind: "typed_failure",
-      missingRequirements: [params.missingRequirement],
-      firstBrokenRail: params.brokenRail,
-    });
-    const goalHash = args.deps.hashGoalFrame(canonicalGoalFrame);
-    const terminalResult = buildGoldenPathTypedFailureTerminalResult({
-      resultId: terminalResultId,
-      artifactId: terminalArtifactId,
+      goalKind,
+      classifierReasons: ["explicit_docs_locate_request"],
+      requestedCapability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+      sourceTarget: "docs_viewer",
+      family: "docs_viewer",
+      planArgs: { doc_path: docPath, query },
+      requiredObservationKinds,
+      status: "docs_locate_failed",
+      route: "golden_path_runtime / docs_locate_in_doc",
+      errorCode: params.errorCode,
+      brokenRail: params.brokenRail,
+      missingRequirement: params.missingRequirement,
       text: params.text,
-      supportRefs: [routeGateArtifactId],
+      hashGoalFrame: args.deps.hashGoalFrame,
     });
-    return {
-      ok: false,
-      mode: "read",
-      schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
-      turn_id: turnId,
-      trace_id: traceId,
-      session_id: sessionId,
-      thread_id: threadId,
-      prompt_text: promptText,
-      ...buildGoldenPathTypedFailureResponseProjection({
-        terminalResult,
-        terminalErrorCode: params.errorCode,
-      }),
-      golden_path_runtime: buildGoldenPathRuntimeStatus({
-        status: "docs_locate_failed",
-        requestedCapability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-        selectedCapability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-        executedCapability: null,
-        firstBrokenRail: params.brokenRail,
-      }),
-      canonical_goal_frame: canonicalGoalFrame,
-      capability_plan: buildGoldenPathCapabilityPlan({
-        requestedCapability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-        executedCapability: null,
-        sourceTarget: "docs_viewer",
-        family: "docs_viewer",
-        planArgs: { doc_path: docPath, query },
-        requiredObservationKinds,
-        requiredTerminalKind,
-      }),
-      goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-      ...buildGoldenPathTerminalAuthorityProjection({
-        terminalResult,
-        route: "golden_path_runtime / docs_locate_in_doc",
-      }),
-      ask_turn_solver_trace: buildGoldenPathSolverTrace({
-        completedSolverPath: false,
-        requestedCapability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-        selectedCapability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-        executedCapability: null,
-        firstBrokenRail: params.brokenRail,
-        terminalArtifactKind: "typed_failure",
-      }),
-      current_turn_artifact_ledger: [
-        buildGoldenPathRouteGateLedgerArtifact({
-          artifactId: routeGateArtifactId,
-          turnId,
-          createdAtMs,
-          goalHash,
-          requestedCapability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-        }),
-        buildGoldenPathTypedFailureLedgerArtifact({
-          artifactId: terminalArtifactId,
-          turnId,
-          createdAtMs,
-          goalHash,
-          terminalResult,
-          errorCode: params.errorCode,
-          firstBrokenRail: params.brokenRail,
-        }),
-      ],
-      debug: buildGoldenPathCapabilityDebugMirror({
-        requestedCapability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-        selectedCapability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-        executedCapability: null,
-        terminalResult,
-        firstBrokenRail: params.brokenRail,
-        terminalErrorCode: params.errorCode,
-      }),
-    };
-  };
 
   if (!query) {
     return makeFailurePayload({
