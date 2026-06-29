@@ -1,9 +1,6 @@
 import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfaction-artifact";
 import { HELIX_INTERNET_SEARCH_OBSERVATION_SCHEMA } from "../../../../../shared/helix-internet-search-observation";
 import {
-  buildGoldenPathAnswerLedgerArtifact,
-  buildGoldenPathObservationLedgerArtifact,
-  buildGoldenPathPayloadLedgerArtifact,
   buildGoldenPathTypedFailureLedgerArtifact,
   buildGoldenPathRouteGateLedgerArtifact,
 } from "../artifact-ledger";
@@ -11,6 +8,7 @@ import {
   buildGoldenPathCapabilityGoalSatisfactionEvaluation,
   buildGoldenPathCapabilityPlan,
 } from "../capability-contract";
+import { buildGoldenPathCapabilitySuccessPayload } from "../capability-success";
 import { buildGoldenPathCapabilityDebugMirror } from "../debug-mirror";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
@@ -26,9 +24,7 @@ import {
 } from "../core";
 import {
   buildGoldenPathTerminalAuthorityProjection,
-  buildGoldenPathTerminalResponseProjection,
   buildGoldenPathTypedFailureResponseProjection,
-  buildGoldenPathTerminalResult,
   buildGoldenPathTypedFailureTerminalResult,
 } from "../terminal-envelope";
 import { buildGoldenPathSolverTrace } from "../solver-trace";
@@ -290,149 +286,44 @@ export const buildHelixAskGoldenPathInternetSearchPayload = (args: {
     "This answer is grounded in compact web metadata supplied to the current turn; provider lookup is not run inside the golden path.",
   ];
   const answerText = answerLines.join("\n");
-  const canonicalGoalFrame = {
-    schema: "helix.ask_canonical_goal_frame.v1",
-    turn_id: turnId,
-    goal_kind: goalKind,
-    answer_scope: "external_internet_search",
-    required_terminal_kind: requiredTerminalKind,
-    allows_workspace_context: true,
-    allows_prior_artifacts: false,
-    classifier_reasons: ["explicit_internet_search_request"],
-    assistant_answer: false,
-    raw_content_included: false,
-  };
-  const goalSatisfactionEvaluation = buildGoldenPathCapabilityGoalSatisfactionEvaluation({
+  return buildGoldenPathCapabilitySuccessPayload({
     turnId,
-    goalKind,
-    requiredTerminalKind,
-  });
-  const goalHash = args.deps.hashGoalFrame(canonicalGoalFrame);
-  const goalSatisfactionArtifact = args.deps.buildGoalSatisfactionEvaluationArtifact({
-    turnId,
-    goalHash,
-    evaluation: goalSatisfactionEvaluation,
+    traceId,
+    sessionId,
+    threadId,
+    promptText,
     createdAtMs,
+    routeGateArtifactId,
+    observationArtifactId,
+    terminalArtifactId,
+    terminalResultId,
+    requiredTerminalKind,
+    goalKind,
+    answerScope: "external_internet_search",
+    sourceTarget: "internet_search",
+    family: "internet_search",
+    planArgs: { query },
+    classifierReasons: ["explicit_internet_search_request"],
+    allowsWorkspaceContext: true,
+    requestedCapability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
+    selectedCapability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
+    executedCapability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
+    observedArtifactKind: "internet_search_observation",
+    observationPayload: observation,
+    observationProducerItemId: HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
+    terminalPayloadField: "internet_search_answer",
+    terminalPayloadSchema: "helix.internet_search_answer.v1",
+    terminalPayloadExtra: { result_count: normalizedResults.length },
+    answerText,
+    status: "internet_search_lookup",
+    route: "golden_path_runtime / internet_search_lookup",
+    requiredObservationKinds,
+    routeGateTerminalEligible: false,
+    answerProducerItemId: "golden_path_internet_search_synthesis",
+    answerLedgerExtraPayload: { result_count: normalizedResults.length },
+    hashGoalFrame: args.deps.hashGoalFrame,
+    buildGoalSatisfactionEvaluationArtifact: args.deps.buildGoalSatisfactionEvaluationArtifact,
   });
-  const terminalResult = buildGoldenPathTerminalResult({
-    resultId: terminalResultId,
-    artifactId: terminalArtifactId,
-    artifactKind: requiredTerminalKind,
-    finalAnswerSource: requiredTerminalKind,
-    text: answerText,
-    supportRefs: [observationArtifactId, routeGateArtifactId, goalSatisfactionArtifact.artifact_id],
-  });
-
-  return {
-    ok: true,
-    mode: "read",
-    schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
-    turn_id: turnId,
-    trace_id: traceId,
-    session_id: sessionId,
-    thread_id: threadId,
-    prompt_text: promptText,
-    ...buildGoldenPathTerminalResponseProjection({ terminalResult }),
-    internet_search_observation: observation,
-    internet_search_answer: {
-      schema: "helix.internet_search_answer.v1",
-      text: terminalResult.text,
-      answer_text: terminalResult.text,
-      support_refs: terminalResult.support_refs,
-      result_count: normalizedResults.length,
-      assistant_answer: false,
-      raw_content_included: false,
-    },
-    golden_path_runtime: buildGoldenPathRuntimeStatus({
-      status: "internet_search_lookup",
-      requestedCapability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
-      selectedCapability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
-      executedCapability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
-      observedArtifactKind: "internet_search_observation",
-      observedArtifactRef: observationArtifactId,
-      terminalArtifactRef: terminalArtifactId,
-      terminalResultId,
-      legacyFallbackPossibleWhenUnhandled: true,
-      routeGate: "enabled_explicit_request",
-    }),
-    canonical_goal_frame: canonicalGoalFrame,
-    capability_plan: buildGoldenPathCapabilityPlan({
-      requestedCapability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
-      selectedCapability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
-      sourceTarget: "internet_search",
-      family: "internet_search",
-      planArgs: { query },
-      requiredObservationKinds,
-      requiredTerminalKind,
-    }),
-    goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-    ...buildGoldenPathTerminalAuthorityProjection({
-      terminalResult,
-      route: "golden_path_runtime / internet_search_lookup",
-    }),
-    ask_turn_solver_trace: buildGoldenPathSolverTrace({
-      completedSolverPath: true,
-      routeAuthorityOk: true,
-      terminalAuthorityOk: true,
-      goalSatisfaction: "satisfied",
-      requestedCapability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
-      selectedCapability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
-      executedCapability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
-      observedArtifactKind: "internet_search_observation",
-      observedArtifactRef: observationArtifactId,
-      terminalArtifactKind: terminalResult.artifact_kind,
-      extra: {
-        solver_risk_flags: [],
-        solver_short_circuit_flags: [],
-      },
-    }),
-    current_turn_artifact_ledger: [
-      buildGoldenPathRouteGateLedgerArtifact({
-        artifactId: routeGateArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        terminalEligible: false,
-        promptText,
-        requestedCapability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
-        goalSatisfactionArtifact,
-        goalSatisfactionEvaluation,
-      }),
-      buildGoldenPathObservationLedgerArtifact({
-        artifactId: observationArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        producerItemId: HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
-        kind: "internet_search_observation",
-        payload: observation,
-      }),
-      buildGoldenPathAnswerLedgerArtifact({
-        artifactId: terminalArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        producerItemId: "golden_path_internet_search_synthesis",
-        kind: requiredTerminalKind,
-        payloadSchema: "helix.internet_search_answer.v1",
-        terminalResult,
-        extraPayload: {
-          result_count: normalizedResults.length,
-        },
-      }),
-    ],
-    debug: buildGoldenPathCapabilityDebugMirror({
-      status: "internet_search_lookup",
-      privateRuntimeLoopEntered: false,
-      requestedCapability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
-      selectedCapability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
-      executedCapability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
-      observedArtifactKind: "internet_search_observation",
-      observedArtifactRef: observationArtifactId,
-      terminalResult,
-      goalSatisfactionEvaluation,
-    }),
-  };
 };
 
 export const requiredObservationKinds = ["internet_search_observation"] as const;

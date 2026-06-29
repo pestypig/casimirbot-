@@ -45,6 +45,8 @@ export const buildGoldenPathCapabilitySuccessPayload = (args: {
   classifierReasons: readonly string[];
   allowsWorkspaceContext: boolean;
   requestedCapability: string;
+  selectedCapability?: string;
+  executedCapability?: string;
   observedArtifactKind: string;
   observationPayload: RecordLike;
   observationProducerItemId?: string;
@@ -62,6 +64,8 @@ export const buildGoldenPathCapabilitySuccessPayload = (args: {
   hashGoalFrame: (value: unknown) => string;
   buildGoalSatisfactionEvaluationArtifact: BuildGoalSatisfactionArtifact;
 }): RecordLike => {
+  const selectedCapability = args.selectedCapability ?? args.requestedCapability;
+  const executedCapability = args.executedCapability ?? selectedCapability;
   const canonicalGoalFrame = {
     schema: "helix.ask_canonical_goal_frame.v1",
     turn_id: args.turnId,
@@ -108,8 +112,8 @@ export const buildGoldenPathCapabilitySuccessPayload = (args: {
     golden_path_runtime: buildGoldenPathRuntimeStatus({
       status: args.status,
       requestedCapability: args.requestedCapability,
-      selectedCapability: args.requestedCapability,
-      executedCapability: args.requestedCapability,
+      selectedCapability,
+      executedCapability,
       observedArtifactKind: args.observedArtifactKind,
       observedArtifactRef: args.observationArtifactId,
       terminalArtifactRef: args.terminalArtifactId,
@@ -130,6 +134,7 @@ export const buildGoldenPathCapabilitySuccessPayload = (args: {
     },
     capability_plan: buildGoldenPathCapabilityPlan({
       requestedCapability: args.requestedCapability,
+      ...(args.selectedCapability ? { selectedCapability } : {}),
       sourceTarget: args.sourceTarget,
       family: args.family,
       ...(args.planArgs ? { planArgs: args.planArgs } : {}),
@@ -147,8 +152,8 @@ export const buildGoldenPathCapabilitySuccessPayload = (args: {
       terminalAuthorityOk: true,
       goalSatisfaction: "satisfied",
       requestedCapability: args.requestedCapability,
-      selectedCapability: args.requestedCapability,
-      executedCapability: args.requestedCapability,
+      selectedCapability,
+      executedCapability,
       observedArtifactKind: args.observedArtifactKind,
       observedArtifactRef: args.observationArtifactId,
       terminalArtifactKind: terminalResult.artifact_kind,
@@ -196,8 +201,8 @@ export const buildGoldenPathCapabilitySuccessPayload = (args: {
       status: args.status,
       privateRuntimeLoopEntered: false,
       requestedCapability: args.requestedCapability,
-      selectedCapability: args.requestedCapability,
-      executedCapability: args.requestedCapability,
+      selectedCapability,
+      executedCapability,
       observedArtifactKind: args.observedArtifactKind,
       observedArtifactRef: args.observationArtifactId,
       terminalResult,
