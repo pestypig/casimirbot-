@@ -193,6 +193,7 @@ export const buildHelixAskGoldenPathRuntimeContractPayload = (args: {
         modelPacketRef,
         goalSatisfactionArtifact,
         goalSatisfactionEvaluation,
+        reusedExtractedHelpers: ["S275", "S276", "S277"],
       }),
       buildGoldenPathTerminalLedgerArtifact({
         artifactId,

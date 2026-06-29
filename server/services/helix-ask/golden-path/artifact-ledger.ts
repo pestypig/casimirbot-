@@ -5,10 +5,12 @@ export const buildGoldenPathRouteGateLedgerArtifact = (args: {
   turnId: string;
   createdAtMs: number;
   goalHash: string;
-  promptText: string;
-  modelPacketRef: string;
-  goalSatisfactionArtifact: RecordLike;
-  goalSatisfactionEvaluation: RecordLike;
+  promptText?: string;
+  requestedCapability?: string;
+  modelPacketRef?: string;
+  goalSatisfactionArtifact?: RecordLike;
+  goalSatisfactionEvaluation?: RecordLike;
+  reusedExtractedHelpers?: string[];
 }): RecordLike => ({
   artifact_id: args.artifactId,
   turn_id: args.turnId,
@@ -20,11 +22,12 @@ export const buildGoldenPathRouteGateLedgerArtifact = (args: {
   payload: {
     schema: "helix.golden_path_route_gate.v1",
     route_gate: "enabled_explicit_request",
-    prompt_text: args.promptText,
-    model_turn_packet_ref: args.modelPacketRef,
-    goal_satisfaction_artifact: args.goalSatisfactionArtifact,
-    goal_satisfaction_evaluation: args.goalSatisfactionEvaluation,
-    reused_extracted_helpers: ["S275", "S276", "S277"],
+    ...(args.promptText ? { prompt_text: args.promptText } : {}),
+    ...(args.requestedCapability ? { requested_capability: args.requestedCapability } : {}),
+    ...(args.modelPacketRef ? { model_turn_packet_ref: args.modelPacketRef } : {}),
+    ...(args.goalSatisfactionArtifact ? { goal_satisfaction_artifact: args.goalSatisfactionArtifact } : {}),
+    ...(args.goalSatisfactionEvaluation ? { goal_satisfaction_evaluation: args.goalSatisfactionEvaluation } : {}),
+    ...(args.reusedExtractedHelpers ? { reused_extracted_helpers: args.reusedExtractedHelpers } : {}),
     assistant_answer: false,
     raw_content_included: false,
   },
