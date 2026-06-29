@@ -285,6 +285,107 @@ describe("Helix Ask golden path runtime", () => {
     expect(terminalLedgerEntries(body)).toHaveLength(1);
   });
 
+  it("handles internet research plus theory reflection as an ordered compound contract", () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+
+    const decision = runHelixAskGoldenPathRuntime({
+      now: new Date("2026-06-28T12:27:45.000Z"),
+      body: {
+        turn_id: "ask:golden:internet-reflection-compound",
+        prompt:
+          "helix_ask_golden_path_runtime use internet_search.web_research and helix_ask.reflect_theory_context",
+        goldenPathRuntime: true,
+        requested_capabilities: [
+          HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
+          HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
+        ],
+        internet_search_query: "OpenAI Codex tool call lifecycle",
+        internet_search_results: [
+          {
+            result_id: "web:codex-lifecycle",
+            title: "OpenAI Codex tool call lifecycle",
+            url: "https://platform.openai.com/docs/codex",
+            snippet: "Codex executes requested tool calls and returns tool outputs before finalizing.",
+            source_provider: "tavily",
+            rank: 1,
+            evidence_refs: ["tavily:codex-lifecycle"],
+            confidence: "high",
+          },
+        ],
+        topic: "Codex parity for Helix Ask observations",
+        anchors: ["tool outputs re-enter reasoning", "receipts are observations"],
+      },
+    });
+
+    expect(decision.handled).toBe(true);
+    if (!decision.handled) throw new Error("golden path should handle research+reflection compound");
+    const body = decision.payload;
+
+    expect(body).toMatchObject({
+      final_status: "final_answer",
+      terminal_artifact_kind: "compound_evidence_synthesis_answer",
+      final_answer_source: "compound_evidence_synthesis_answer",
+      terminal_error_code: null,
+      internet_search_observation: {
+        schema: "helix.internet_search_observation.v1",
+        capability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
+        query: "OpenAI Codex tool call lifecycle",
+      },
+      helix_theory_context_reflection_tool_receipt: {
+        schema: "helix.theory_context_reflection_tool_receipt.v1",
+        capability_key: HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
+        topic: "Codex parity for Helix Ask observations",
+        source_refs: expect.arrayContaining(["ask:golden:internet-reflection-compound:internet_search_observation"]),
+      },
+      compound_capability_contract: {
+        satisfaction: "satisfied",
+        ordered_subgoals: [
+          {
+            requested_capability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
+            selected_capability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
+            executed_capability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
+            observation_kind: "internet_search_observation",
+            terminal_contribution_kind: "internet_search_answer",
+            satisfaction: "satisfied",
+          },
+          {
+            requested_capability: HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
+            selected_capability: HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
+            executed_capability: HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
+            observation_kind: "helix_theory_context_reflection_tool_receipt",
+            terminal_contribution_kind: "theory_context_reflection_answer",
+            satisfaction: "satisfied",
+          },
+        ],
+      },
+      capability_plan: {
+        requested_capability: "compound_capability_contract",
+        selected_capability: "compound_capability_contract",
+        executed_capability: "compound_capability_contract",
+        required_observation_kinds: ["internet_search_observation", "helix_theory_context_reflection_tool_receipt"],
+        required_terminal_kind: "compound_evidence_synthesis_answer",
+      },
+      ask_turn_solver_trace: {
+        completed_solver_path: true,
+        requested_capability: "compound_capability_contract",
+        selected_capability: "compound_capability_contract",
+        executed_capability: "compound_capability_contract",
+        observed_artifact_kind: "compound_subgoal_observations",
+        terminal_artifact_kind: "compound_evidence_synthesis_answer",
+        compound_subgoal_count: 2,
+      },
+    });
+    expect(body.selected_final_answer).toContain("Compound research/reflection synthesis completed");
+    expect(body.selected_final_answer).toContain("Codex parity for Helix Ask observations");
+    expect(readLedger(body).map((artifact) => artifact.kind)).toEqual([
+      "golden_path_route_gate",
+      "internet_search_observation",
+      "helix_theory_context_reflection_tool_receipt",
+      "compound_evidence_synthesis_answer",
+    ]);
+    expect(terminalLedgerEntries(body)).toHaveLength(1);
+  });
+
   it("handles compact scholarly research evidence as a scholarly answer", () => {
     process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
 
