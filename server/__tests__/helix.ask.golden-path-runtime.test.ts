@@ -142,6 +142,30 @@ describe("Helix Ask golden path runtime", () => {
     }
   });
 
+  it("keeps golden-path runtime status centralized in the shared helper", () => {
+    const modulePaths = [capabilityDir, compoundDir].flatMap((directory) =>
+      readdirSync(directory)
+        .filter((fileName) => fileName.endsWith(".ts"))
+        .map((fileName) => `${directory}/${fileName}`),
+    );
+
+    expect(modulePaths.length).toBeGreaterThan(0);
+    for (const modulePath of modulePaths) {
+      const source = readFileSync(modulePath, "utf8");
+      if (source.includes("golden_path_runtime:")) {
+        expect(source, `${modulePath} must build runtime status through the shared helper`).toContain(
+          "buildGoldenPathRuntimeStatus",
+        );
+        expect(source, `${modulePath} must not inline golden_path_runtime object ownership`).not.toContain(
+          "golden_path_runtime: {",
+        );
+        expect(source, `${modulePath} must not own the raw golden-path runtime flag`).not.toContain(
+          "HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG",
+        );
+      }
+    }
+  });
+
   it("keeps every dispatch-owned golden-path module imported and ordered exactly once", () => {
     const dispatchSource = readFileSync(dispatchPath, "utf8");
     const dispatchModules = [
