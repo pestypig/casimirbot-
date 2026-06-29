@@ -156,6 +156,56 @@ describe("Helix Ask golden path runtime", () => {
     expect(body.answer).toContain("contract-only");
   });
 
+  it("handles capability catalog as a single explicit capability", () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+
+    const decision = runHelixAskGoldenPathRuntime({
+      now: new Date("2026-06-28T12:30:00.000Z"),
+      body: {
+        turn_id: "ask:golden:capability-catalog",
+        prompt: "helix_ask_golden_path_runtime use helix_ask.inspect_capability_catalog",
+        goldenPathRuntime: true,
+        requested_capability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
+      },
+    });
+
+    expect(decision.handled).toBe(true);
+    if (!decision.handled) throw new Error("golden path should handle capability catalog");
+    const body = decision.payload;
+
+    expect(body).toMatchObject({
+      final_status: "final_answer",
+      terminal_artifact_kind: "capability_help_summary",
+      final_answer_source: "capability_help_summary",
+      terminal_error_code: null,
+      capability_registry: {
+        capability_key: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
+      },
+      capability_plan: {
+        requested_capability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
+        executed_capability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
+        required_observation_kinds: ["capability_registry"],
+        required_terminal_kind: "capability_help_summary",
+      },
+      ask_turn_solver_trace: {
+        completed_solver_path: true,
+        requested_capability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
+        executed_capability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
+        observed_artifact_kind: "capability_registry",
+        terminal_artifact_kind: "capability_help_summary",
+      },
+    });
+    expect(body.selected_final_answer).toContain("Capability catalog inspection completed");
+    expect(readLedger(body).map((artifact) => artifact.kind)).toEqual([
+      "golden_path_route_gate",
+      "capability_registry",
+      "capability_help_summary",
+    ]);
+    expect(terminalLedgerEntries(body)).toHaveLength(1);
+  });
+
   it("handles capability catalog plus workspace status as an ordered compound contract", () => {
     process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
 
