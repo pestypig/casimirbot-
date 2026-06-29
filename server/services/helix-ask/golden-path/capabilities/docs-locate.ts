@@ -1,6 +1,5 @@
 import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfaction-artifact";
 import {
-  buildGoldenPathObservationLedgerArtifact,
   buildGoldenPathPayloadLedgerArtifact,
   buildGoldenPathTypedFailureLedgerArtifact,
   buildGoldenPathRouteGateLedgerArtifact,
@@ -9,6 +8,7 @@ import {
   buildGoldenPathCapabilityGoalSatisfactionEvaluation,
   buildGoldenPathCapabilityPlan,
 } from "../capability-contract";
+import { buildGoldenPathCapabilityTerminalObservationSuccessPayload } from "../capability-terminal-observation-success";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
   HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
@@ -20,9 +20,7 @@ import {
 } from "../core";
 import {
   buildGoldenPathTerminalAuthorityProjection,
-  buildGoldenPathTerminalResponseProjection,
   buildGoldenPathTypedFailureResponseProjection,
-  buildGoldenPathTerminalResult,
   buildGoldenPathTypedFailureTerminalResult,
 } from "../terminal-envelope";
 import { buildGoldenPathSolverTrace } from "../solver-trace";
@@ -286,7 +284,6 @@ export const buildHelixAskGoldenPathDocsLocatePayload = (args: {
   }
 
   const observationArtifactId = `${turnId}:doc_location_matches`;
-  const terminalArtifactId = observationArtifactId;
   const answerText = [
     `Located ${matches.length} document evidence match${matches.length === 1 ? "" : "es"} for: ${query}`,
     docPath ? `Document: ${docPath}` : null,
@@ -294,30 +291,6 @@ export const buildHelixAskGoldenPathDocsLocatePayload = (args: {
   ]
     .filter((line): line is string => Boolean(line))
     .join("\n");
-  const canonicalGoalFrame = {
-    schema: "helix.ask_canonical_goal_frame.v1",
-    turn_id: turnId,
-    goal_kind: goalKind,
-    answer_scope: "current_turn",
-    required_terminal_kind: requiredTerminalKind,
-    allows_workspace_context: true,
-    allows_prior_artifacts: false,
-    classifier_reasons: ["explicit_docs_locate_request"],
-    assistant_answer: false,
-    raw_content_included: false,
-  };
-  const goalSatisfactionEvaluation = buildGoldenPathCapabilityGoalSatisfactionEvaluation({
-    turnId,
-    goalKind,
-    requiredTerminalKind,
-  });
-  const goalHash = args.deps.hashGoalFrame(canonicalGoalFrame);
-  const goalSatisfactionArtifact = args.deps.buildGoalSatisfactionEvaluationArtifact({
-    turnId,
-    goalHash,
-    evaluation: goalSatisfactionEvaluation,
-    createdAtMs,
-  });
   const docLocationMatches = {
     schema: "helix.doc_location_matches.v1",
     capability_key: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
@@ -328,99 +301,36 @@ export const buildHelixAskGoldenPathDocsLocatePayload = (args: {
     assistant_answer: false,
     raw_content_included: false,
   };
-  const terminalResult = buildGoldenPathTerminalResult({
-    resultId: terminalResultId,
-    artifactId: terminalArtifactId,
-    artifactKind: requiredTerminalKind,
-    finalAnswerSource: requiredTerminalKind,
-    text: answerText,
-    supportRefs: [observationArtifactId, routeGateArtifactId, goalSatisfactionArtifact.artifact_id],
-  });
 
-  return {
-    ok: true,
-    mode: "read",
-    schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
-    turn_id: turnId,
-    trace_id: traceId,
-    session_id: sessionId,
-    thread_id: threadId,
-    prompt_text: promptText,
-    ...buildGoldenPathTerminalResponseProjection({ terminalResult }),
-    doc_location_matches: docLocationMatches,
-    golden_path_runtime: buildGoldenPathRuntimeStatus({
-      status: "docs_locate_in_doc",
-      requestedCapability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-      selectedCapability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-      executedCapability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-      observedArtifactKind: "doc_location_matches",
-      observedArtifactRef: observationArtifactId,
-      terminalArtifactRef: terminalArtifactId,
-      terminalResultId,
-    }),
-    canonical_goal_frame: canonicalGoalFrame,
-    capability_plan: buildGoldenPathCapabilityPlan({
-      requestedCapability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-      sourceTarget: "docs_viewer",
-      family: "docs_viewer",
-      planArgs: { doc_path: docPath, query },
-      requiredObservationKinds,
-      requiredTerminalKind,
-    }),
-    goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-    ...buildGoldenPathTerminalAuthorityProjection({
-      terminalResult,
-      route: "golden_path_runtime / docs_locate_in_doc",
-    }),
-    ask_turn_solver_trace: buildGoldenPathSolverTrace({
-      completedSolverPath: true,
-      routeAuthorityOk: true,
-      terminalAuthorityOk: true,
-      goalSatisfaction: "satisfied",
-      requestedCapability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-      selectedCapability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-      executedCapability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-      observedArtifactKind: "doc_location_matches",
-      observedArtifactRef: observationArtifactId,
-      terminalArtifactKind: terminalResult.artifact_kind,
-      extra: {
-        solver_risk_flags: [],
-        solver_short_circuit_flags: [],
-      },
-    }),
-    current_turn_artifact_ledger: [
-      buildGoldenPathRouteGateLedgerArtifact({
-        artifactId: routeGateArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        promptText,
-        requestedCapability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-        goalSatisfactionArtifact,
-        goalSatisfactionEvaluation,
-      }),
-      buildGoldenPathObservationLedgerArtifact({
-        artifactId: observationArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        kind: "doc_location_matches",
-        payload: docLocationMatches,
-        terminalEligible: true,
-      }),
-    ],
-    debug: buildGoldenPathCapabilityDebugMirror({
-      status: "docs_locate_in_doc",
-      privateRuntimeLoopEntered: false,
-      requestedCapability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-      selectedCapability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-      executedCapability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-      observedArtifactKind: "doc_location_matches",
-      observedArtifactRef: observationArtifactId,
-      terminalResult,
-      goalSatisfactionEvaluation,
-    }),
-  };
+  return buildGoldenPathCapabilityTerminalObservationSuccessPayload({
+    turnId,
+    traceId,
+    sessionId,
+    threadId,
+    promptText,
+    createdAtMs,
+    routeGateArtifactId,
+    observationArtifactId,
+    terminalResultId,
+    requiredTerminalKind,
+    goalKind,
+    sourceTarget: "docs_viewer",
+    family: "docs_viewer",
+    planArgs: { doc_path: docPath, query },
+    classifierReasons: ["explicit_docs_locate_request"],
+    allowsWorkspaceContext: true,
+    requestedCapability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+    observedArtifactKind: "doc_location_matches",
+    observationPayload: docLocationMatches,
+    answerText,
+    status: "docs_locate_in_doc",
+    route: "golden_path_runtime / docs_locate_in_doc",
+    requiredObservationKinds,
+    includeRuntimeRouteGate: false,
+    includeRuntimeLegacyFallbackPossibleWhenUnhandled: false,
+    hashGoalFrame: args.deps.hashGoalFrame,
+    buildGoalSatisfactionEvaluationArtifact: args.deps.buildGoalSatisfactionEvaluationArtifact,
+  });
 };
 
 
