@@ -21,8 +21,7 @@ import {
   type RecordLike,
 } from "../core";
 import {
-  buildGoldenPathTerminalAnswerAuthority,
-  buildGoldenPathTerminalAuthoritySingleWriter,
+  buildGoldenPathTerminalAuthorityProjection,
   buildGoldenPathTerminalResult,
   buildGoldenPathTypedFailureTerminalResult,
 } from "../terminal-envelope";
@@ -185,12 +184,11 @@ export const buildHelixAskGoldenPathInternetSearchPayload = (args: {
         requiredTerminalKind,
       }),
       goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-      terminal_answer_authority: buildGoldenPathTerminalAnswerAuthority({
+      ...buildGoldenPathTerminalAuthorityProjection({
         terminalResult,
         route: "golden_path_runtime / internet_search_lookup",
         firstBrokenRail: params.brokenRail,
       }),
-      terminal_authority_single_writer: buildGoldenPathTerminalAuthoritySingleWriter({ terminalResult }),
       ask_turn_solver_trace: buildGoldenPathSolverTrace({
         completedSolverPath: false,
         requestedCapability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
@@ -401,11 +399,10 @@ export const buildHelixAskGoldenPathInternetSearchPayload = (args: {
       requiredTerminalKind,
     }),
     goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-    terminal_answer_authority: buildGoldenPathTerminalAnswerAuthority({
+    ...buildGoldenPathTerminalAuthorityProjection({
       terminalResult,
       route: "golden_path_runtime / internet_search_lookup",
     }),
-    terminal_authority_single_writer: buildGoldenPathTerminalAuthoritySingleWriter({ terminalResult }),
     ask_turn_solver_trace: buildGoldenPathSolverTrace({
       completedSolverPath: true,
       routeAuthorityOk: true,

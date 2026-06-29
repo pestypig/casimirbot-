@@ -33,8 +33,7 @@ import {
   buildGoldenPathRouteGateLedgerArtifact,
 } from "../artifact-ledger";
 import {
-  buildGoldenPathTerminalAnswerAuthority,
-  buildGoldenPathTerminalAuthoritySingleWriter,
+  buildGoldenPathTerminalAuthorityProjection,
   buildGoldenPathTerminalResult,
   buildGoldenPathTypedFailureTerminalResult,
 } from "../terminal-envelope";
@@ -149,12 +148,11 @@ export const buildHelixAskGoldenPathDocsCalculatorCompoundPayload = (args: {
         requiredTerminalKind,
       }),
       goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-      terminal_answer_authority: buildGoldenPathTerminalAnswerAuthority({
+      ...buildGoldenPathTerminalAuthorityProjection({
         terminalResult,
         route: "golden_path_runtime / docs_calculator_compound",
         firstBrokenRail: params.brokenRail,
       }),
-      terminal_authority_single_writer: buildGoldenPathTerminalAuthoritySingleWriter({ terminalResult }),
       ask_turn_solver_trace: buildGoldenPathSolverTrace({
         completedSolverPath: false,
         requestedCapability: "compound_capability_contract",
@@ -374,11 +372,10 @@ export const buildHelixAskGoldenPathDocsCalculatorCompoundPayload = (args: {
       requiredTerminalKind,
     }),
     goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-    terminal_answer_authority: buildGoldenPathTerminalAnswerAuthority({
+    ...buildGoldenPathTerminalAuthorityProjection({
       terminalResult,
       route: "golden_path_runtime / docs_calculator_compound",
     }),
-    terminal_authority_single_writer: buildGoldenPathTerminalAuthoritySingleWriter({ terminalResult }),
     ask_turn_solver_trace: buildGoldenPathSolverTrace({
       completedSolverPath: true,
       routeAuthorityOk: true,

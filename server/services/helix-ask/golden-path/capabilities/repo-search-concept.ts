@@ -20,8 +20,7 @@ import {
   type RecordLike,
 } from "../core";
 import {
-  buildGoldenPathTerminalAnswerAuthority,
-  buildGoldenPathTerminalAuthoritySingleWriter,
+  buildGoldenPathTerminalAuthorityProjection,
   buildGoldenPathTerminalResult,
   buildGoldenPathTypedFailureTerminalResult,
 } from "../terminal-envelope";
@@ -294,11 +293,10 @@ export const buildHelixAskGoldenPathRepoSearchConceptPayload = (args: {
         requiredTerminalKind,
       }),
       goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-      terminal_answer_authority: buildGoldenPathTerminalAnswerAuthority({
+      ...buildGoldenPathTerminalAuthorityProjection({
         terminalResult,
         route: "golden_path_runtime / repo_search_concept",
       }),
-      terminal_authority_single_writer: buildGoldenPathTerminalAuthoritySingleWriter({ terminalResult }),
       ask_turn_solver_trace: buildGoldenPathSolverTrace({
         completedSolverPath: false,
         requestedCapability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
@@ -482,11 +480,10 @@ export const buildHelixAskGoldenPathRepoSearchConceptPayload = (args: {
       requiredTerminalKind,
     }),
     goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-    terminal_answer_authority: buildGoldenPathTerminalAnswerAuthority({
+    ...buildGoldenPathTerminalAuthorityProjection({
       terminalResult,
       route: "golden_path_runtime / repo_search_concept",
     }),
-    terminal_authority_single_writer: buildGoldenPathTerminalAuthoritySingleWriter({ terminalResult }),
     ask_turn_solver_trace: buildGoldenPathSolverTrace({
       completedSolverPath: true,
       routeAuthorityOk: true,

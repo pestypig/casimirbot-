@@ -71,3 +71,15 @@ export const buildGoldenPathTerminalAuthoritySingleWriter = (args: {
   assistant_answer: false,
   raw_content_included: false,
 });
+
+export const buildGoldenPathTerminalAuthorityProjection = (args: {
+  terminalResult: HelixAskGoldenPathRuntimeTerminalResult;
+  route: string;
+  completedSolverPath?: boolean;
+  firstBrokenRail?: string;
+}): RecordLike => ({
+  terminal_answer_authority: buildGoldenPathTerminalAnswerAuthority(args),
+  terminal_authority_single_writer: buildGoldenPathTerminalAuthoritySingleWriter({
+    terminalResult: args.terminalResult,
+  }),
+});

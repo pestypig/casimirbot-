@@ -25,8 +25,7 @@ import {
   type RecordLike,
 } from "../core";
 import {
-  buildGoldenPathTerminalAnswerAuthority,
-  buildGoldenPathTerminalAuthoritySingleWriter,
+  buildGoldenPathTerminalAuthorityProjection,
   buildGoldenPathTerminalResult,
 } from "../terminal-envelope";
 import { buildGoldenPathSolverTrace } from "../solver-trace";
@@ -172,11 +171,10 @@ export const buildHelixAskGoldenPathCatalogWorkspaceCompoundPayload = (args: {
       requiredTerminalKind,
     }),
     goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-    terminal_answer_authority: buildGoldenPathTerminalAnswerAuthority({
+    ...buildGoldenPathTerminalAuthorityProjection({
       terminalResult,
       route: "golden_path_runtime / catalog_workspace_compound",
     }),
-    terminal_authority_single_writer: buildGoldenPathTerminalAuthoritySingleWriter({ terminalResult }),
     ask_turn_solver_trace: buildGoldenPathSolverTrace({
       completedSolverPath: true,
       routeAuthorityOk: true,
