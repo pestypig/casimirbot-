@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import type { HelixAgentProvider, HelixAgentRunResult } from "./types";
+import type { HelixAgentStepObservationPacket } from "@shared/helix-agent-step-observation-packet";
 import {
   callWorkstationGatewayCapability,
 } from "../workstation-tool-gateway/registry";
@@ -88,6 +89,31 @@ const readNumber = (value: unknown): number | null => {
 };
 
 const readArray = (value: unknown): unknown[] => Array.isArray(value) ? value : [];
+
+const buildCurrentTurnArtifactLedgerFromGatewayPackets = (input: {
+  turnId: string;
+  packets: HelixAgentStepObservationPacket[];
+}): Array<Record<string, unknown>> =>
+  input.packets.map((packet, index) => {
+    const firstProducedRef = packet.produced_artifact_refs.find((ref) => ref.trim().length > 0);
+    const artifactId =
+      firstProducedRef ??
+      `${input.turnId}:provider_gateway_observation:${packet.capability_key}:${index + 1}`;
+    return {
+      schema: "helix.current_turn_artifact.v1",
+      artifact_id: artifactId,
+      producer_item_id: packet.call_id,
+      kind: "provider_gateway_observation_packet",
+      observation_kind: packet.capability_key,
+      turn_id: input.turnId,
+      capability_key: packet.capability_key,
+      produced_artifact_refs: packet.produced_artifact_refs,
+      payload: packet,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+  });
 
 type CodexBinaryResolution = {
   launchable: boolean;
@@ -1247,6 +1273,10 @@ export const codexProvider: HelixAgentProvider = {
       gatewayCallResults: evidenceGatewayCallResults,
     });
     const gatewayObservationPackets = gatewayCallResults.map((result) => result.observation_packet);
+    const currentTurnArtifactLedger = buildCurrentTurnArtifactLedgerFromGatewayPackets({
+      turnId,
+      packets: gatewayObservationPackets,
+    });
     const gatewayLifecycleTraces = gatewayCallResults.map((result) => result.tool_lifecycle_trace);
     const gatewayFollowupDecisions = gatewayCallResults.map((result) => result.tool_followup_decision);
     const initialTranscriptEvents = buildCodexProviderTurnTranscriptEvents({
@@ -1286,6 +1316,7 @@ export const codexProvider: HelixAgentProvider = {
         workstation_actions: hostWorkstationAffordances.workstation_actions,
         support_refs: hostWorkstationAffordances.support_refs,
         tool_output_refs: hostWorkstationAffordances.tool_output_refs,
+        current_turn_artifact_ledger: currentTurnArtifactLedger,
         debug: {
           agent_runtime: "codex",
           agent_runtime_adapter_contract: adapterContract,
@@ -1300,6 +1331,7 @@ export const codexProvider: HelixAgentProvider = {
           ),
           workstation_gateway_call_results: gatewayCallResults,
           workstation_gateway_observation_packets: gatewayObservationPackets,
+          current_turn_artifact_ledger: currentTurnArtifactLedger,
           tool_lifecycle_traces: gatewayLifecycleTraces,
           tool_followup_decisions: gatewayFollowupDecisions,
           workstation_gateway_reentry_status: runtimeSelectionTrace.evidence_reentry_status,
@@ -1399,7 +1431,6 @@ export const codexProvider: HelixAgentProvider = {
       gatewayCallResults,
     });
     const processOk = result.exitCode === 0 && text.length > 0;
-    const ok = processOk && gatewayCallsSucceeded(gatewayCallResults);
     const providerReentry = buildHelixProviderReasoningReentry({
       runtime: "codex",
       providerLabel: codexProvider.label,
@@ -1407,9 +1438,17 @@ export const codexProvider: HelixAgentProvider = {
       threadId,
       route: request.route,
       gatewayCallResults,
+      normalizedObservationPackets: gatewayObservationPackets,
       providerText: gatewayGuardedText,
       ok: processOk,
+      solverCompleted: false,
+      goalSatisfied: false,
     });
+    const providerTerminalAuthorized = Boolean(providerReentry.terminalAnswerAuthority);
+    const ok = processOk && gatewayCallsSucceeded(gatewayCallResults) && providerTerminalAuthorized;
+    const projectedText = providerTerminalAuthorized
+      ? gatewayGuardedText
+      : "I could not complete this Codex provider turn because Helix observation re-entry is required before provider text can become terminal authority.";
     const providerGatewayDebugSummary = buildProviderGatewayDebugSummary({
       body: request.body,
       runtime: "codex",
@@ -1438,7 +1477,7 @@ export const codexProvider: HelixAgentProvider = {
       providerLabel: codexProvider.label,
       body: request.body,
       gatewayCallResults,
-      providerText: gatewayGuardedText,
+      providerText: projectedText,
       finalStatus: ok ? "completed" : "final_failure",
     });
 
@@ -1447,9 +1486,9 @@ export const codexProvider: HelixAgentProvider = {
       runtime: "codex",
       response_type: ok ? "final_answer" : "final_failure",
       final_status: ok ? "completed" : "final_failure",
-      text: gatewayGuardedText,
-      answer: gatewayGuardedText,
-      selected_final_answer: gatewayGuardedText,
+      text: projectedText,
+      answer: projectedText,
+      selected_final_answer: projectedText,
       turn_transcript_events: turnTranscriptEvents,
       turn_transcript_event_count: turnTranscriptEvents.length,
       turn_transcript_source: "codex_provider_gateway_projection",
@@ -1457,12 +1496,15 @@ export const codexProvider: HelixAgentProvider = {
       workstation_actions: hostWorkstationAffordances.workstation_actions,
       support_refs: hostWorkstationAffordances.support_refs,
       tool_output_refs: hostWorkstationAffordances.tool_output_refs,
+      current_turn_artifact_ledger: currentTurnArtifactLedger,
       debug: {
         agent_runtime: "codex",
         agent_runtime_adapter_contract: adapterContract,
         agent_runtime_selection_trace: runtimeSelectionTrace,
         permission_profile: codexProvider.permissionProfile,
-        fail_reason: result.failReason ?? (ok ? null : "codex_process_failed"),
+        fail_reason:
+          result.failReason ??
+          (ok ? null : providerTerminalAuthorized ? "codex_process_failed" : "helix_observation_reentry_required"),
         codex_exit_code: result.exitCode,
         codex_timed_out: result.timedOut,
         codex_process_killed: result.killed,
@@ -1481,6 +1523,7 @@ export const codexProvider: HelixAgentProvider = {
         ),
         workstation_gateway_call_results: gatewayCallResults,
         workstation_gateway_observation_packets: gatewayObservationPackets,
+        current_turn_artifact_ledger: currentTurnArtifactLedger,
         tool_lifecycle_traces: gatewayLifecycleTraces,
         tool_followup_decisions: gatewayFollowupDecisions,
         provider_terminal_candidate: providerReentry.providerTerminalCandidate,
