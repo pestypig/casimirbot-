@@ -11,6 +11,7 @@ import {
   buildGoldenPathCompoundCanonicalGoalFrame,
   buildGoldenPathCompoundCapabilityContract,
   buildGoldenPathCompoundEvidenceSynthesisAnswer,
+  buildGoldenPathCompoundGoalSatisfactionEvaluation,
   isHelixAskGoldenPathCatalogWorkspaceCompoundRequested,
 } from "../compound-contract";
 import {
@@ -101,17 +102,10 @@ export const buildHelixAskGoldenPathCatalogWorkspaceCompoundPayload = (args: {
     classifierReasons: ["explicit_catalog_workspace_compound_request"],
     includeWorkspaceContextFields: true,
   });
-  const goalSatisfactionEvaluation = {
-    schema: "helix.goal_satisfaction_evaluation.v1",
-    turn_id: turnId,
-    satisfaction: "satisfied",
-    goal_kind: "compound_capability_contract",
-    required_terminal_kind: requiredTerminalKind,
-    selected_terminal_artifact_kind: requiredTerminalKind,
-    missing_requirements: [],
-    assistant_answer: false,
-    raw_content_included: false,
-  };
+  const goalSatisfactionEvaluation = buildGoldenPathCompoundGoalSatisfactionEvaluation({
+    turnId,
+    requiredTerminalKind,
+  });
   const goalHash = deps.hashGoalFrame(canonicalGoalFrame);
   const goalSatisfactionArtifact = deps.buildGoalSatisfactionEvaluationArtifact({
     turnId,

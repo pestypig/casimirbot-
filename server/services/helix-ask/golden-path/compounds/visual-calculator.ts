@@ -11,6 +11,7 @@ import {
   buildGoldenPathCompoundCanonicalGoalFrame,
   buildGoldenPathCompoundCapabilityContract,
   buildGoldenPathCompoundEvidenceSynthesisAnswer,
+  buildGoldenPathCompoundGoalSatisfactionEvaluation,
   isHelixAskGoldenPathVisualCalculatorCompoundRequested,
 } from "../compound-contract";
 import {
@@ -98,18 +99,14 @@ export const buildHelixAskGoldenPathVisualCalculatorCompoundPayload = (args: {
       requiredTerminalKind,
       classifierReasons: ["explicit_visual_calculator_compound_request"],
     });
-    const goalSatisfactionEvaluation = {
-      schema: "helix.goal_satisfaction_evaluation.v1",
-      turn_id: turnId,
+    const goalSatisfactionEvaluation = buildGoldenPathCompoundGoalSatisfactionEvaluation({
+      turnId,
+      requiredTerminalKind,
       satisfaction: "not_satisfied",
-      goal_kind: "compound_capability_contract",
-      required_terminal_kind: requiredTerminalKind,
-      selected_terminal_artifact_kind: "typed_failure",
-      missing_requirements: [params.missingRequirement],
-      first_broken_rail: params.brokenRail,
-      assistant_answer: false,
-      raw_content_included: false,
-    };
+      selectedTerminalArtifactKind: "typed_failure",
+      missingRequirements: [params.missingRequirement],
+      firstBrokenRail: params.brokenRail,
+    });
     const goalHash = deps.hashGoalFrame(canonicalGoalFrame);
     const terminalResult = buildGoldenPathTypedFailureTerminalResult({
       resultId: terminalResultId,
@@ -341,17 +338,10 @@ export const buildHelixAskGoldenPathVisualCalculatorCompoundPayload = (args: {
     classifierReasons: ["explicit_visual_calculator_compound_request"],
     includeWorkspaceContextFields: true,
   });
-  const goalSatisfactionEvaluation = {
-    schema: "helix.goal_satisfaction_evaluation.v1",
-    turn_id: turnId,
-    satisfaction: "satisfied",
-    goal_kind: "compound_capability_contract",
-    required_terminal_kind: requiredTerminalKind,
-    selected_terminal_artifact_kind: requiredTerminalKind,
-    missing_requirements: [],
-    assistant_answer: false,
-    raw_content_included: false,
-  };
+  const goalSatisfactionEvaluation = buildGoldenPathCompoundGoalSatisfactionEvaluation({
+    turnId,
+    requiredTerminalKind,
+  });
   const goalHash = deps.hashGoalFrame(canonicalGoalFrame);
   const goalSatisfactionArtifact = deps.buildGoalSatisfactionEvaluationArtifact({
     turnId,
