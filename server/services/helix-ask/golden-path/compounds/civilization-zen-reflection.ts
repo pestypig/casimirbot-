@@ -26,6 +26,7 @@ import {
   buildGoldenPathTerminalResult,
   buildGoldenPathTypedFailureTerminalResult,
 } from "../terminal-envelope";
+import { buildGoldenPathSolverTrace } from "../solver-trace";
 
 export type HelixAskGoldenPathCivilizationBoundsZenReflectionCompoundDependencies = {
   now: () => Date;
@@ -187,21 +188,16 @@ export const buildHelixAskGoldenPathCivilizationBoundsZenReflectionCompoundPaylo
         assistant_answer: false,
         raw_content_included: false,
       },
-      ask_turn_solver_trace: {
-        schema: "helix.ask_turn_solver_trace.v1",
-        completed_solver_path: false,
-        golden_path_runtime: true,
-        private_runtime_loop_entered: false,
-        requested_capability: "compound_capability_contract",
-        selected_capability: "compound_capability_contract",
-        executed_capability: null,
-        terminal_artifact_kind: "typed_failure",
-        first_broken_rail: "observation",
-        terminal_error_code: params.errorCode,
-        compound_subgoal_count: 2,
-        assistant_answer: false,
-        raw_content_included: false,
-      },
+      ask_turn_solver_trace: buildGoldenPathSolverTrace({
+        completedSolverPath: false,
+        requestedCapability: "compound_capability_contract",
+        selectedCapability: "compound_capability_contract",
+        executedCapability: null,
+        terminalArtifactKind: "typed_failure",
+        firstBrokenRail: "observation",
+        terminalErrorCode: params.errorCode,
+        extra: { compound_subgoal_count: 2 },
+      }),
       current_turn_artifact_ledger: [
         buildGoldenPathRouteGateLedgerArtifact({
           artifactId: routeGateArtifactId,
