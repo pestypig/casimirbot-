@@ -8,6 +8,7 @@ import {
   HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
   HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
   HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+  HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
   HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
   HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY,
   HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
@@ -161,6 +162,123 @@ describe("Helix Ask golden path runtime", () => {
       },
     });
     expect(body.selected_final_answer).toContain("no processed live-source mail packet");
+    expect(readLedger(body).map((artifact) => artifact.kind)).toEqual(["golden_path_route_gate", "typed_failure"]);
+    expect(terminalLedgerEntries(body)).toHaveLength(1);
+  });
+
+  it("handles compact scholarly research evidence as a scholarly answer", () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+
+    const decision = runHelixAskGoldenPathRuntime({
+      now: new Date("2026-06-28T12:28:00.000Z"),
+      body: {
+        turn_id: "ask:golden:scholarly-research",
+        prompt: "helix_ask_golden_path_runtime use scholarly-research.lookup_papers for Casimir cavity force papers",
+        goldenPathRuntime: true,
+        requested_capability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+        scholarly_query: "Casimir cavity force measurements",
+        scholarly_papers: [
+          {
+            result_id: "paper:casimir-1948",
+            title: "On the attraction between two perfectly conducting plates",
+            authors: [{ name: "H. B. G. Casimir" }],
+            year: 1948,
+            venue: "Proceedings of the Royal Netherlands Academy of Arts and Sciences",
+            identifiers: { doi: "10.1007/978-3-7091-9385-0_24" },
+            evidence_refs: ["crossref:10.1007/978-3-7091-9385-0_24"],
+            source_providers: ["crossref"],
+            confidence: "high",
+          },
+        ],
+      },
+    });
+
+    expect(decision.handled).toBe(true);
+    if (!decision.handled) throw new Error("golden path should handle compact scholarly evidence");
+    const body = decision.payload;
+
+    expect(body).toMatchObject({
+      final_status: "final_answer",
+      terminal_artifact_kind: "scholarly_research_answer",
+      final_answer_source: "scholarly_research_answer",
+      terminal_error_code: null,
+      scholarly_research_observation: {
+        schema: "helix.scholarly_research_observation.v1",
+        capability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+        query: "Casimir cavity force measurements",
+        papers: [
+          {
+            result_id: "paper:casimir-1948",
+            title: "On the attraction between two perfectly conducting plates",
+            year: 1948,
+          },
+        ],
+      },
+      scholarly_research_answer: {
+        paper_count: 1,
+      },
+      capability_plan: {
+        requested_capability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+        executed_capability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+        required_observation_kinds: ["scholarly_research_observation"],
+        required_terminal_kind: "scholarly_research_answer",
+      },
+      ask_turn_solver_trace: {
+        completed_solver_path: true,
+        requested_capability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+        executed_capability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+        observed_artifact_kind: "scholarly_research_observation",
+        terminal_artifact_kind: "scholarly_research_answer",
+      },
+    });
+    expect(body.selected_final_answer).toContain("Scholarly research lookup completed");
+    expect(body.selected_final_answer).toContain("On the attraction between two perfectly conducting plates");
+    expect(readLedger(body).map((artifact) => artifact.kind)).toEqual([
+      "golden_path_route_gate",
+      "scholarly_research_observation",
+      "scholarly_research_answer",
+    ]);
+    expect(terminalLedgerEntries(body)).toHaveLength(1);
+  });
+
+  it("fails closed when scholarly research lacks compact paper evidence", () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+
+    const decision = runHelixAskGoldenPathRuntime({
+      now: new Date("2026-06-28T12:28:30.000Z"),
+      body: {
+        turn_id: "ask:golden:scholarly-research-missing",
+        prompt: "helix_ask_golden_path_runtime use scholarly-research.lookup_papers for Casimir force papers",
+        goldenPathRuntime: true,
+        requested_capability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+        scholarly_query: "Casimir force papers",
+      },
+    });
+
+    expect(decision.handled).toBe(true);
+    if (!decision.handled) throw new Error("golden path should handle missing scholarly evidence as typed failure");
+    const body = decision.payload;
+
+    expect(body).toMatchObject({
+      final_status: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      terminal_error_code: "missing_compact_scholarly_evidence",
+      goal_satisfaction_evaluation: {
+        satisfaction: "not_satisfied",
+        first_broken_rail: "observation",
+      },
+      ask_turn_solver_trace: {
+        completed_solver_path: false,
+        requested_capability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+        executed_capability: null,
+        first_broken_rail: "observation",
+      },
+    });
+    expect(body.selected_final_answer).toContain("no compact scholarly paper evidence");
     expect(readLedger(body).map((artifact) => artifact.kind)).toEqual(["golden_path_route_gate", "typed_failure"]);
     expect(terminalLedgerEntries(body)).toHaveLength(1);
   });
