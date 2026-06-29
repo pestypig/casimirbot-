@@ -1997,6 +1997,15 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(combined).toContain("Tool observation: scientific-calculator.solve_expression observed 8*9 = 72.");
     expect(combined).toContain("Model re-entry: Codex received the workstation observation packet");
     expect(combined).toContain("The result is 72.");
+    expect(rows.map((row) => row.label)).toEqual([
+      "Runtime",
+      "Action Request",
+      "Action Observation",
+      "Tool Request",
+      "Tool Observation",
+      "Model Re-entry",
+      "Final",
+    ]);
   });
 
   it("admits Codex provider calculator open/focus action envelopes when backed by action receipts", () => {
@@ -2050,6 +2059,50 @@ describe("HelixAskPill mic-first surface contract", () => {
         "scientific-calculator.open_panel",
         "scientific-calculator.focus_panel",
       ]),
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(result.executableEnvelope).toBe(actionEnvelope);
+  });
+
+  it("admits Codex provider docs open-doc action envelopes when backed by action receipts", () => {
+    const actionEnvelope = {
+      schema: "helix.ask.action_envelope.v1",
+      governance: {
+        dispatch: "allow",
+        reason: "admitted_non_mutating_codex_workstation_action",
+      },
+      workstation_actions: [
+        {
+          schema_version: "helix.workstation.action/v1",
+          action: "run_panel_action",
+          panel_id: "docs-viewer",
+          action_id: "open_doc",
+          args: {
+            path: "docs/helix-ask-api-parity-matrix.md",
+          },
+        },
+      ],
+    } as never;
+    const agentStepLoop = {
+      schema: "helix.agent_step_loop.v1",
+      iterations: [
+        {
+          next_step: "workstation_action",
+          chosen_capability: "docs-viewer.open_doc",
+          selected_capability: "docs-viewer.open_doc",
+          observed_artifact_refs: ["ask:test:docs-viewer.open_doc:observation"],
+        },
+      ],
+    };
+
+    const result = buildHelixActionEnvelopeRuntimeAuthority(actionEnvelope, { agent_step_loop: agentStepLoop });
+
+    expect(result.audit).toMatchObject({
+      allowed: true,
+      reason: "agent_step_decision_backed",
+      selected_capabilities: expect.arrayContaining(["docs-viewer.open_doc"]),
+      envelope_action_keys: expect.arrayContaining(["docs-viewer.open_doc"]),
       assistant_answer: false,
       raw_content_included: false,
     });

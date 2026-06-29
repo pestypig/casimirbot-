@@ -27,6 +27,63 @@ Codex and Helix Ask overlap in agent vocabulary, but they should not overlap in
 ownership. Codex owns the generic agent runtime. Helix Ask owns the domain
 evidence loop.
 
+## Agent Runtime Adapter Boundary
+
+Selectable runtimes such as Helix Ask Native, Codex Workstation Mode, and future
+agent wrappers must meet Helix through a provider adapter boundary. Each runtime
+speaks differently: one may be a CLI process, another an SDK, another an HTTP
+agent, and another an MCP-capable runtime. Adapter-specific glue is therefore
+expected for launch, streaming, tool-request translation, cancellation, and final
+output normalization.
+
+That glue must stay at the adapter edge. Do not spread runtime-specific protocol
+handling through `server/routes/agi.plan.ts`, golden-path capability modules,
+workstation panel code, or terminal-authority writers. A provider adapter may
+translate between the runtime's native protocol and Helix's shared contracts,
+but Helix remains the owner of:
+
+```txt
+capability manifests
+permission profiles
+tool/action admission
+workstation gateway calls
+action receipts
+observation packets
+evidence re-entry records
+goal satisfaction
+terminal authority
+debug export mirrors
+visible trace projection
+```
+
+Adding an agent should normally require a thin provider implementation, not a
+repository-wide graft of the agent's source code or runtime internals. The
+provider may expose `id`, `label`, `enabled`, `supports`, `runTurn`, and
+`streamTurn` behavior, plus narrow protocol translation. It must not bypass
+Helix source admission, mutate workstation state outside admitted actions, write
+files, run shell commands, or promote receipts/panel projections/debug metadata
+into answers.
+
+The shared workstation view for every selected runtime is:
+
+```txt
+provider selected
+-> capability/action manifest
+-> requested capability/action
+-> Helix admission or block
+-> executed capability/action
+-> observation or receipt
+-> observation re-entry
+-> runtime final candidate
+-> Helix terminal authority
+-> visible/debug projection
+```
+
+Future agent onboarding should improve this shared contract instead of adding
+private side channels. If a new provider needs more workstation affordances,
+extend the Helix gateway/action manifest and admission policy first, then teach
+the adapter to translate the runtime's native request format into that contract.
+
 The compared Codex files reinforce that split:
 
 - `turn.rs` runs the sampling loop: prompt/history assembly, model response

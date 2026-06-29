@@ -1,14 +1,13 @@
 import crypto from "node:crypto";
 import type { HelixAgentProvider, HelixAgentRunResult } from "./types";
-import { listWorkstationGatewayCapabilities } from "../workstation-tool-gateway/registry";
 import type { HelixWorkstationCapabilityManifest } from "../workstation-tool-gateway/types";
-import { buildHelixAgentRuntimeSelectionTrace } from "./runtime-debug";
 import {
   readHelixAgentTurnId,
   runExplicitWorkstationGatewayCalls,
 } from "./explicit-workstation-gateway";
 import { buildHelixProviderGatewayObservationPayload } from "./workstation-gateway-observation";
 import { buildProviderGatewayDebugSummary } from "./provider-gateway-debug-summary";
+import { buildHelixAgentRuntimeAdapterContract } from "./runtime-adapter-contract";
 
 const enabled = (): boolean => process.env.ENABLE_FUTURE_AGENT === "1";
 
@@ -56,16 +55,14 @@ export const futureProvider: HelixAgentProvider = {
   async runTurn(request): Promise<HelixAgentRunResult> {
     const question = readQuestion(request.body);
     const turnId = readTurnId(request.body);
-    const gatewayManifest = listWorkstationGatewayCapabilities({
-      agentRuntime: "future",
-      mode: "observe",
-    });
-    const runtimeSelectionTrace = buildHelixAgentRuntimeSelectionTrace({
+    const adapterContract = buildHelixAgentRuntimeAdapterContract({
       route: request.route,
       requestedRuntime: request.runtime,
       provider: futureProvider,
-      gatewayManifest,
+      gatewayMode: "observe",
     });
+    const gatewayManifest = adapterContract.workstation_gateway_manifest;
+    const runtimeSelectionTrace = adapterContract.runtime_selection_trace;
     const gatewayCallResults = await runExplicitFutureWorkstationGatewayCalls({
       body: request.body,
       turnId,
@@ -76,6 +73,7 @@ export const futureProvider: HelixAgentProvider = {
         provider: futureProvider,
         turnId,
         body: request.body,
+        adapterContract,
         runtimeSelectionTrace,
         gatewayManifest,
         gatewayCallResults,
@@ -109,6 +107,7 @@ export const futureProvider: HelixAgentProvider = {
         turn_id: turnId,
         agent_runtime: "future",
         fail_reason: question ? "future_provider_adapter_not_configured" : "missing_question",
+        agent_runtime_adapter_contract: adapterContract,
         agent_runtime_selection_trace: runtimeSelectionTrace,
         selected_agent_provider: runtimeSelectionTrace.selected_agent_provider,
         workstation_gateway_manifest: gatewayManifest,

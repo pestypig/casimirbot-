@@ -11,6 +11,7 @@ const CALCULATOR_SOLVE_EXPRESSION_CAPABILITY = "scientific-calculator.solve_expr
 const CALCULATOR_ACTIVE_CONTEXT_CAPABILITY = "scientific-calculator.active_context" as const;
 const REPO_SEARCH_CAPABILITY = "repo.search" as const;
 const DOCS_SEARCH_CAPABILITY = "docs.search" as const;
+const DOCS_OPEN_DOC_CAPABILITY = "docs-viewer.open_doc" as const;
 
 const readRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
@@ -247,14 +248,30 @@ export const buildStructuredAdmissionWorkstationGatewayCallRequests = (
   for (const admission of collectStructuredAdmissionRecords(body)) {
     const selectedCapability = readCapabilitySelection(admission);
     if (!selectedCapability) continue;
-    const query = readGatewayQuery(body, admission);
-    if (!query) continue;
     const paths = readGatewayPaths(admission);
     const sourceTargetIntent = {
       ...admission,
       source: "helix_structured_source_target_admission",
       selected_capability: selectedCapability,
     };
+    if (selectedCapability === "docs-viewer.open_doc" || selectedCapability === "docs-viewer.open_doc_by_path") {
+      const key = `${DOCS_OPEN_DOC_CAPABILITY}:${paths[0] ?? "missing_path"}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      requests.push({
+        schema: "helix.workstation_gateway.structured_admission_call_request.v1",
+        derivation_source: "helix_structured_source_target_admission",
+        capability_id: DOCS_OPEN_DOC_CAPABILITY,
+        mode: "act",
+        arguments: {
+          ...(paths[0] ? { path: paths[0] } : {}),
+          source_target_intent: sourceTargetIntent,
+        },
+      });
+      continue;
+    }
+    const query = readGatewayQuery(body, admission);
+    if (!query) continue;
     if (selectedCapability === "repo-code.search_concept") {
       const key = `${REPO_SEARCH_CAPABILITY}:${query}`;
       if (seen.has(key)) continue;

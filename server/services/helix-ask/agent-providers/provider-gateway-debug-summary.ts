@@ -24,6 +24,11 @@ const unique = (values: string[]): string[] =>
 const readPrompt = (body: Record<string, unknown>): string | null =>
   readString(body.question) ?? readString(body.prompt) ?? readString(body.raw_user_prompt);
 
+const isWorkstationActionReceipt = (result: HelixWorkstationGatewayCallResult): boolean => {
+  const observation = readRecord(result.observation);
+  return observation?.schema === "helix.workstation_ui_action_receipt.v1";
+};
+
 export const buildProviderGatewayDebugSummary = (input: {
   body: Record<string, unknown>;
   runtime: HelixAgentRuntimeId;
@@ -64,6 +69,8 @@ export const buildProviderGatewayDebugSummary = (input: {
   const executedCapabilities = input.gatewayCallResults
     .filter((result) => result.ok)
     .map((result) => result.capability_id);
+  const actionReceiptResults = input.gatewayCallResults.filter(isWorkstationActionReceipt);
+  const evidenceObservationResults = input.gatewayCallResults.filter((result) => !isWorkstationActionReceipt(result));
   const observationRefs = unique(input.gatewayCallResults.flatMap((result) => result.artifact_refs));
 
   return {
@@ -84,7 +91,11 @@ export const buildProviderGatewayDebugSummary = (input: {
     blocked_capabilities: blockedCapabilities,
     executed_capabilities: unique(executedCapabilities),
     gateway_call_count: input.gatewayCallResults.length,
-    gateway_observation_count: input.gatewayCallResults.length,
+    gateway_action_receipt_count: actionReceiptResults.length,
+    gateway_successful_action_receipt_count: actionReceiptResults.filter((result) => result.ok).length,
+    gateway_tool_observation_count: evidenceObservationResults.length,
+    gateway_successful_tool_observation_count: evidenceObservationResults.filter((result) => result.ok).length,
+    gateway_observation_count: evidenceObservationResults.length,
     observation_refs: observationRefs,
     observation_packet_refs: observationRefs,
     observation_packet_invariants: input.gatewayCallResults.map((result) => ({

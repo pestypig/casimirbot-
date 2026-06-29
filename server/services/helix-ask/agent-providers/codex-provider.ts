@@ -5,15 +5,14 @@ import path from "node:path";
 import type { HelixAgentProvider, HelixAgentRunResult } from "./types";
 import {
   callWorkstationGatewayCapability,
-  listWorkstationGatewayCapabilities,
 } from "../workstation-tool-gateway/registry";
 import type { HelixWorkstationGatewayCallResult } from "../workstation-tool-gateway/types";
-import { buildHelixAgentRuntimeSelectionTrace } from "./runtime-debug";
 import { buildHelixProviderReasoningReentry } from "./provider-terminal-authority";
 import {
   runExplicitWorkstationGatewayCalls,
 } from "./explicit-workstation-gateway";
 import { buildProviderGatewayDebugSummary } from "./provider-gateway-debug-summary";
+import { buildHelixAgentRuntimeAdapterContract } from "./runtime-adapter-contract";
 
 const WORKSTATION_ACTIVE_CONTEXT_CAPABILITY = "workstation.active_context" as const;
 const CALCULATOR_SOLVE_EXPRESSION_CAPABILITY = "scientific-calculator.solve_expression" as const;
@@ -459,10 +458,15 @@ const buildCodexAgentStepLoopFromReceipts = (input: {
 
 const isDeicticDocumentContentQuestion = (text: string): boolean => {
   if (/\bbackground\s+only\b/i.test(text)) return false;
+  const unquotedText = text.replace(/"[^"]*"|'[^']*'|`[^`]*`/g, " ");
+  const asksForDocumentContent =
+    /\b(?:summari[sz]e|explain|what\s+is|what'?s|about|key\s+(?:points|findings)|caveats?|read)\b/i.test(unquotedText);
+  const explicitDocsPath = /\bdocs\/[^\s)]+\.(?:md|mdx|txt)\b/i.test(unquotedText);
+  if (explicitDocsPath && asksForDocumentContent) return true;
   return (
-    (/\b(?:this|current|open|active|visible)\s+(?:doc|document|paper|white\s*paper|whitepaper)\b/i.test(text) ||
-      /\b(?:doc|document|paper|white\s*paper|whitepaper)\s+(?:on\s+screen|in\s+(?:the\s+)?docs?\s+viewer|I'?m\s+viewing|we'?re\s+viewing)\b/i.test(text)) &&
-    /\b(?:summari[sz]e|explain|what\s+is|what'?s|about|key\s+(?:points|findings)|caveats?|read)\b/i.test(text)
+    (/\b(?:this|current|open|active|visible)\s+(?:doc|document|paper|white\s*paper|whitepaper)\b/i.test(unquotedText) ||
+      /\b(?:doc|document|paper|white\s*paper|whitepaper)\s+(?:on\s+screen|in\s+(?:the\s+)?docs?\s+viewer|I'?m\s+viewing|we'?re\s+viewing)\b/i.test(unquotedText)) &&
+    asksForDocumentContent
   );
 };
 
@@ -545,6 +549,31 @@ const applyWorkstationContextAuthorityGuard = (input: {
   return [
     "I cannot answer the current workstation panel state from this turn because no workstation context observation packet was materialized.",
     "Attach workspace context or ask again from the workstation so Helix can create a bounded active/open panel observation first.",
+  ].join("\n");
+};
+
+const gatewayCallsSucceeded = (gatewayCallResults: HelixWorkstationGatewayCallResult[]): boolean =>
+  gatewayCallResults.length === 0 || gatewayCallResults.every((result) => result.ok === true);
+
+const applyGatewayFailureAuthorityGuard = (input: {
+  text: string;
+  gatewayCallResults: HelixWorkstationGatewayCallResult[];
+}): string => {
+  const failed = input.gatewayCallResults.filter((result) => result.ok !== true);
+  if (failed.length === 0) return input.text;
+  const descriptions = failed
+    .slice(0, 3)
+    .map((result) => {
+      const reason =
+        result.gateway_admission.blocked_reason ??
+        result.error ??
+        result.gateway_admission.admission_reason ??
+        "gateway_call_failed";
+      return `${result.gateway_admission.requested_capability}: ${reason}`;
+    });
+  return [
+    "I cannot claim the requested workstation tool or UI action ran because Helix did not produce a successful observation or action receipt for every gateway request.",
+    `Blocked or failed gateway request${descriptions.length === 1 ? "" : "s"}: ${descriptions.join("; ")}.`,
   ].join("\n");
 };
 
@@ -864,16 +893,14 @@ export const codexProvider: HelixAgentProvider = {
     const question = readQuestion(request.body);
     const turnId = readTurnId(request.body);
     const threadId = readThreadId(request.body);
-    const gatewayManifest = listWorkstationGatewayCapabilities({
-      agentRuntime: "codex",
-      mode: "act",
-    });
-    const runtimeSelectionTrace = buildHelixAgentRuntimeSelectionTrace({
+    const adapterContract = buildHelixAgentRuntimeAdapterContract({
       route: request.route,
       requestedRuntime: request.runtime,
       provider: codexProvider,
-      gatewayManifest,
+      gatewayMode: "act",
     });
+    const gatewayManifest = adapterContract.workstation_gateway_manifest;
+    const runtimeSelectionTrace = adapterContract.runtime_selection_trace;
     const evidenceGatewayCallResults = await runExplicitCodexWorkstationGatewayCalls({
       body: request.body,
       turnId,
@@ -934,6 +961,7 @@ export const codexProvider: HelixAgentProvider = {
         action_envelope: actionEnvelope,
         debug: {
           agent_runtime: "codex",
+          agent_runtime_adapter_contract: adapterContract,
           agent_runtime_selection_trace: runtimeSelectionTrace,
           fail_reason: "missing_question",
           permission_profile: codexProvider.permissionProfile,
@@ -961,8 +989,8 @@ export const codexProvider: HelixAgentProvider = {
 
     const prompt = [
       "You are running inside Helix Codex Workstation Mode.",
-      "Do not mutate files or run shell commands. The current Helix workstation gateway allows read/observe tools plus admitted non-mutating UI actions only.",
-      "Do not claim that a workstation tool or UI action ran unless a Helix observation packet or action receipt is present in the request context.",
+      ...adapterContract.prompt_policy_lines,
+      "The current Helix workstation gateway allows read/observe tools plus admitted non-mutating UI actions only.",
       `Provider permission profile: ${JSON.stringify(codexProvider.permissionProfile)}`,
       "Answer the user request using the provided context.",
       "",
@@ -1017,7 +1045,12 @@ export const codexProvider: HelixAgentProvider = {
       text: finalText,
       gatewayCallResults,
     });
-    const ok = result.exitCode === 0 && text.length > 0;
+    const gatewayGuardedText = applyGatewayFailureAuthorityGuard({
+      text: workstationGuardedText,
+      gatewayCallResults,
+    });
+    const processOk = result.exitCode === 0 && text.length > 0;
+    const ok = processOk && gatewayCallsSucceeded(gatewayCallResults);
     const providerReentry = buildHelixProviderReasoningReentry({
       runtime: "codex",
       providerLabel: codexProvider.label,
@@ -1025,8 +1058,8 @@ export const codexProvider: HelixAgentProvider = {
       threadId,
       route: request.route,
       gatewayCallResults,
-      providerText: workstationGuardedText,
-      ok,
+      providerText: gatewayGuardedText,
+      ok: processOk,
     });
     const providerGatewayDebugSummary = buildProviderGatewayDebugSummary({
       body: request.body,
@@ -1055,7 +1088,7 @@ export const codexProvider: HelixAgentProvider = {
       turnId,
       providerLabel: codexProvider.label,
       gatewayCallResults,
-      providerText: workstationGuardedText,
+      providerText: gatewayGuardedText,
       finalStatus: ok ? "completed" : "final_failure",
     });
 
@@ -1064,15 +1097,16 @@ export const codexProvider: HelixAgentProvider = {
       runtime: "codex",
       response_type: ok ? "final_answer" : "final_failure",
       final_status: ok ? "completed" : "final_failure",
-      text: workstationGuardedText,
-      answer: workstationGuardedText,
-      selected_final_answer: workstationGuardedText,
+      text: gatewayGuardedText,
+      answer: gatewayGuardedText,
+      selected_final_answer: gatewayGuardedText,
       turn_transcript_events: turnTranscriptEvents,
       turn_transcript_event_count: turnTranscriptEvents.length,
       turn_transcript_source: "codex_provider_gateway_projection",
       action_envelope: actionEnvelope,
       debug: {
         agent_runtime: "codex",
+        agent_runtime_adapter_contract: adapterContract,
         agent_runtime_selection_trace: runtimeSelectionTrace,
         permission_profile: codexProvider.permissionProfile,
         fail_reason: result.failReason ?? (ok ? null : "codex_process_failed"),
@@ -1084,8 +1118,8 @@ export const codexProvider: HelixAgentProvider = {
         codex_args: result.args,
         codex_runtime_status: resolveCodexBinary(),
         codex_stderr_preview: result.stderr.slice(0, 2000),
-        workstation_tools_enabled: false,
-        code_mutation_enabled: false,
+        workstation_tools_enabled: codexProvider.supports.workstationTools,
+        code_mutation_enabled: codexProvider.supports.codeMutation,
         workstation_gateway_manifest: gatewayManifest,
         workstation_gateway_manifest_schema: gatewayManifest.schema,
         workstation_gateway_manifest_version: gatewayManifest.manifest_version,

@@ -16,6 +16,7 @@ export const buildHelixProviderGatewayObservationPayload = (input: {
   provider: HelixAgentProvider;
   turnId: string;
   body: Record<string, unknown>;
+  adapterContract?: Record<string, unknown> | null;
   runtimeSelectionTrace: Record<string, unknown>;
   gatewayManifest: HelixWorkstationGatewayListResult;
   gatewayCallResults: HelixWorkstationGatewayCallResult[];
@@ -81,6 +82,7 @@ export const buildHelixProviderGatewayObservationPayload = (input: {
   const sharedDebug = {
     turn_id: input.turnId,
     agent_runtime: input.provider.id,
+    agent_runtime_adapter_contract: input.adapterContract ?? null,
     agent_runtime_selection_trace: input.runtimeSelectionTrace,
     selected_agent_provider: selectedAgentProvider,
     workstation_gateway_manifest: input.gatewayManifest,

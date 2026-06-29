@@ -12,6 +12,10 @@ export type HelixWorkstationCapabilityManifest = {
   capability_id: string;
   label: string;
   description: string;
+  panel_id: string | null;
+  action_id: string;
+  dynamic_panel_id_arg?: string | null;
+  allowed_panel_ids?: string[];
   mode: HelixWorkstationGatewayMode;
   mutating: false;
   code_mutation: false;

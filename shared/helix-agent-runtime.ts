@@ -3,7 +3,7 @@ export const HELIX_AGENT_RUNTIME_IDS = ["helix", "codex", "future"] as const;
 export type HelixAgentRuntimeId = (typeof HELIX_AGENT_RUNTIME_IDS)[number];
 
 export type HelixAgentPermissionProfile = {
-  id: "helix-native" | "read-observe";
+  id: "helix-native" | "read-observe" | "read-observe-act";
   label: string;
   allows: {
     observe: boolean;

@@ -51,6 +51,8 @@ describe("Helix workstation tool gateway", () => {
     expect(manifest.capabilities).toContainEqual(
       expect.objectContaining({
         capability_id: HELIX_WORKSPACE_OS_STATUS_CAPABILITY,
+        panel_id: "workspace-os",
+        action_id: "status",
         mode: "observe",
         mutating: false,
         code_mutation: false,
@@ -64,6 +66,8 @@ describe("Helix workstation tool gateway", () => {
     expect(manifest.capabilities).toContainEqual(
       expect.objectContaining({
         capability_id: WORKSTATION_ACTIVE_CONTEXT_CAPABILITY,
+        panel_id: "workstation",
+        action_id: "active_context",
         mode: "read",
         mutating: false,
         code_mutation: false,
@@ -78,6 +82,8 @@ describe("Helix workstation tool gateway", () => {
     expect(manifest.capabilities).toContainEqual(
       expect.objectContaining({
         capability_id: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+        panel_id: "scientific-calculator",
+        action_id: "solve_expression",
         mode: "read",
         mutating: false,
         code_mutation: false,
@@ -92,6 +98,8 @@ describe("Helix workstation tool gateway", () => {
     expect(manifest.capabilities).toContainEqual(
       expect.objectContaining({
         capability_id: CALCULATOR_ACTIVE_CONTEXT_CAPABILITY,
+        panel_id: "scientific-calculator",
+        action_id: "active_context",
         mode: "read",
         mutating: false,
         code_mutation: false,
@@ -106,6 +114,8 @@ describe("Helix workstation tool gateway", () => {
     expect(manifest.capabilities).toContainEqual(
       expect.objectContaining({
         capability_id: REPO_SEARCH_CAPABILITY,
+        panel_id: "repo-evidence",
+        action_id: "search",
         mode: "read",
         mutating: false,
         code_mutation: false,
@@ -121,6 +131,8 @@ describe("Helix workstation tool gateway", () => {
     expect(manifest.capabilities).toContainEqual(
       expect.objectContaining({
         capability_id: CALCULATOR_OPEN_PANEL_CAPABILITY,
+        panel_id: "scientific-calculator",
+        action_id: "open_panel",
         mode: "act",
         mutating: false,
         code_mutation: false,
@@ -135,6 +147,8 @@ describe("Helix workstation tool gateway", () => {
     expect(manifest.capabilities).toContainEqual(
       expect.objectContaining({
         capability_id: DOCS_OPEN_DOC_CAPABILITY,
+        panel_id: "docs-viewer",
+        action_id: "open_doc",
         mode: "act",
         mutating: false,
         code_mutation: false,
@@ -150,6 +164,10 @@ describe("Helix workstation tool gateway", () => {
     expect(manifest.capabilities).toContainEqual(
       expect.objectContaining({
         capability_id: WORKSTATION_OPEN_PANEL_CAPABILITY,
+        panel_id: null,
+        action_id: "open_panel",
+        dynamic_panel_id_arg: "panel_id",
+        allowed_panel_ids: expect.arrayContaining(["docs-viewer", "scientific-calculator", "workstation-process-graph"]),
         mode: "act",
         mutating: false,
         code_mutation: false,
@@ -164,6 +182,8 @@ describe("Helix workstation tool gateway", () => {
     expect(manifest.capabilities).toContainEqual(
       expect.objectContaining({
         capability_id: DOCS_SEARCH_CAPABILITY,
+        panel_id: "docs-viewer",
+        action_id: "search_docs",
         mode: "read",
         mutating: false,
         code_mutation: false,

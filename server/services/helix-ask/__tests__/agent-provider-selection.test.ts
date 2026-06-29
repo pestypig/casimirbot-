@@ -876,6 +876,15 @@ describe("Helix Ask agent provider selection", () => {
     expect(result.turn_transcript_events?.some((event: any) =>
       /Tool observation: scientific-calculator\.solve_expression observed 8 \* 9 = 72\./.test(String(event.text)),
     )).toBe(true);
+    expect((result.debug as any)?.provider_gateway_debug_summary).toMatchObject({
+      gateway_call_count: 3,
+      gateway_action_receipt_count: 2,
+      gateway_successful_action_receipt_count: 2,
+      gateway_tool_observation_count: 1,
+      gateway_successful_tool_observation_count: 1,
+      gateway_observation_count: 1,
+      terminal_authority_result: "authorized_by_helix_provider_candidate_bridge",
+    });
     expect((result.debug as any)?.turn_transcript_events).toEqual(result.turn_transcript_events);
   });
 
@@ -924,6 +933,53 @@ describe("Helix Ask agent provider selection", () => {
       /Action observation: docs-viewer\.open_doc admitted open_doc for docs-viewer\./.test(String(event.text)),
     )).toBe(true);
     expect(result.text).not.toContain("Action observation:");
+  });
+
+  it("does not answer explicit docs-path content from an open-doc action receipt without a docs observation", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "The API parity matrix says live server probes are complete.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:codex-docs-open-doc-no-content-authority",
+        agent_runtime: "codex",
+        question: "Open docs/helix-ask-api-parity-matrix.md in the docs viewer and summarize it.",
+        workstation_gateway_call: {
+          capability_id: "docs-viewer.open_doc",
+          mode: "act",
+          arguments: {
+            path: "docs/helix-ask-api-parity-matrix.md",
+          },
+        },
+      },
+      headers: {},
+    });
+
+    expect((result.action_envelope as any)?.workstation_actions).toEqual([
+      {
+        schema_version: "helix.workstation.action/v1",
+        action: "run_panel_action",
+        panel_id: "docs-viewer",
+        action_id: "open_doc",
+        args: {
+          path: "docs/helix-ask-api-parity-matrix.md",
+        },
+      },
+    ]);
+    expect(result.text).toContain("no docs observation packet was materialized");
+    expect(result.text).not.toContain("API parity matrix says");
+    expect(result.turn_transcript_events?.some((event: any) =>
+      event.source_event_type === "action_observation" &&
+      /docs-viewer\.open_doc admitted open_doc for docs-viewer/i.test(String(event.text)),
+    )).toBe(true);
+    expect(result.turn_transcript_events?.find((event: any) => event.source_event_type === "terminal_answer"))
+      .toMatchObject({
+        text: result.text,
+        assistant_answer: false,
+        raw_content_included: false,
+      });
   });
 
   it("projects explicit Codex safe workstation open-panel gateway calls as action receipts", async () => {
@@ -987,6 +1043,56 @@ describe("Helix Ask agent provider selection", () => {
     expect(result.text).toBe("72");
     expect(result.text).not.toContain("scientific-calculator.solve_expression");
     expect(result.turn_transcript_events?.some((event: any) => event.source_event_type === "tool_observation")).toBe(false);
+  });
+
+  it("does not publish Codex claims when a requested gateway action was blocked", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "I wrote the requested file.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:codex-blocked-gateway-visible-claim",
+        agent_runtime: "codex",
+        question: "Write blocked content into server/routes/agi.plan.ts.",
+        workstation_gateway_call: {
+          capability_id: "filesystem.write_file",
+          mode: "act",
+          arguments: {
+            path: "server/routes/agi.plan.ts",
+            text: "blocked",
+          },
+        },
+      },
+      headers: {},
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.response_type).toBe("final_failure");
+    expect(result.final_status).toBe("final_failure");
+    expect(result.text).toContain("cannot claim the requested workstation tool or UI action ran");
+    expect(result.text).toContain("filesystem.write_file: capability_not_registered");
+    expect(result.text).not.toContain("I wrote the requested file");
+    expect((result.debug as any)?.terminal_authority_status).toBe("blocked_by_gateway_observation_state");
+    expect((result.debug as any)?.terminal_answer_authority).toBeNull();
+    expect((result.debug as any)?.provider_gateway_debug_summary).toMatchObject({
+      blocked_capabilities: [
+        expect.objectContaining({
+          requested_capability: "filesystem.write_file",
+          blocked_reason: "capability_not_registered",
+        }),
+      ],
+      terminal_authority_granted: false,
+      final_visible_answer_authorized: false,
+    });
+    expect(result.turn_transcript_events?.find((event: any) => event.source_event_type === "terminal_answer"))
+      .toMatchObject({
+        status: "final_failure",
+        text: result.text,
+        assistant_answer: false,
+        raw_content_included: false,
+      });
   });
 
   it("materializes active calculator context as a bounded observation for Codex", async () => {
@@ -1352,6 +1458,142 @@ describe("Helix Ask agent provider selection", () => {
       observation: {
         schema: "helix.docs_search_observation.v1",
         query: "Helix Ask / Codex Loop Discipline",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+  });
+
+  it("derives docs open-doc gateway action requests from structured source-target admission records", async () => {
+    const body = {
+      turn_id: "ask:test:structured-docs-open-doc-gateway",
+      question: "Open docs/helix-ask-codex-loop-discipline.md in the docs viewer.",
+      route_metadata: {
+        schema: "helix.ask.route_metadata.v1",
+        source_target: "docs_viewer",
+        source_target_intent: {
+          schema: "helix.ask_source_target_intent.v1",
+          source_target: "docs_viewer",
+          target_source: "docs_viewer",
+          mandatory_next_tool: {
+            tool_name: "docs-viewer.open_doc",
+            selected_capability: "docs-viewer.open_doc",
+            args: {
+              path: "docs/helix-ask-codex-loop-discipline.md",
+            },
+          },
+        },
+      },
+    };
+
+    expect(buildStructuredAdmissionWorkstationGatewayCallRequests(body)).toEqual([
+      expect.objectContaining({
+        schema: "helix.workstation_gateway.structured_admission_call_request.v1",
+        derivation_source: "helix_structured_source_target_admission",
+        capability_id: "docs-viewer.open_doc",
+        mode: "act",
+        arguments: expect.objectContaining({
+          path: "docs/helix-ask-codex-loop-discipline.md",
+          source_target_intent: expect.objectContaining({
+            source: "helix_structured_source_target_admission",
+            selected_capability: "docs-viewer.open_doc",
+          }),
+        }),
+      }),
+    ]);
+
+    const results = await runExplicitWorkstationGatewayCalls({
+      body: {
+        ...body,
+        agent_runtime: "codex",
+      },
+      agentRuntime: "codex",
+    });
+
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({
+      ok: true,
+      agent_runtime: "codex",
+      capability_id: "docs-viewer.open_doc",
+      gateway_admission: {
+        selected_agent_provider: "codex",
+        permission_profile: "act",
+        admission_status: "admitted",
+      },
+      observation: {
+        schema: "helix.workstation_ui_action_receipt.v1",
+        action_kind: "open_doc",
+        panel_id: "docs-viewer",
+        path: "docs/helix-ask-codex-loop-discipline.md",
+        workstation_action: {
+          schema_version: "helix.workstation.action/v1",
+          action: "run_panel_action",
+          panel_id: "docs-viewer",
+          action_id: "open_doc",
+          args: {
+            path: "docs/helix-ask-codex-loop-discipline.md",
+          },
+        },
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+  });
+
+  it("keeps structured docs open-doc requests governed when the admitted path is missing", async () => {
+    const body = {
+      turn_id: "ask:test:structured-docs-open-doc-missing-path",
+      question: "Open the selected doc in the docs viewer.",
+      agent_runtime: "codex",
+      route_metadata: {
+        source_target_intent: {
+          mandatory_next_tool: {
+            tool_name: "docs-viewer.open_doc",
+            selected_capability: "docs-viewer.open_doc",
+            args: {},
+          },
+        },
+      },
+    };
+
+    expect(buildStructuredAdmissionWorkstationGatewayCallRequests(body)).toEqual([
+      expect.objectContaining({
+        capability_id: "docs-viewer.open_doc",
+        mode: "act",
+        arguments: expect.not.objectContaining({
+          path: expect.any(String),
+        }),
+      }),
+    ]);
+
+    const results = await runExplicitWorkstationGatewayCalls({
+      body,
+      agentRuntime: "codex",
+    });
+
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({
+      ok: false,
+      capability_id: "docs-viewer.open_doc",
+      error: "docs_open_doc_path_missing_or_unsafe",
+      gateway_admission: {
+        permission_profile: "act",
+        admission_status: "blocked",
+        blocked_reason: "docs_open_doc_path_missing_or_unsafe",
+      },
+      observation_packet: {
+        status: "blocked",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.workstation_ui_action_receipt.v1",
+        status: "blocked",
+        dispatch_status: "blocked",
+        workstation_action: null,
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,

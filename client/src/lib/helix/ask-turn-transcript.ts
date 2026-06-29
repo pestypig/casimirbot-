@@ -95,6 +95,31 @@ function resolveHelixTranscriptActionLabel(event: Record<string, unknown>): stri
   return toolName || null;
 }
 
+function resolveHelixTranscriptRowLabel(event: Record<string, unknown>): string {
+  const sourceEventType = coerceText(event.source_event_type).trim();
+  if (sourceEventType === "runtime_selected") return "Runtime";
+  if (sourceEventType === "action_request") return "Action Request";
+  if (sourceEventType === "action_observation") return "Action Observation";
+  if (sourceEventType === "tool_request") return "Tool Request";
+  if (sourceEventType === "tool_observation") return "Tool Observation";
+  if (sourceEventType === "model_reentry") return "Model Re-entry";
+  if (sourceEventType === "terminal_answer") return "Final";
+
+  const type = String(event.type ?? "event");
+  const status = String(event.status ?? "");
+  if (type === "public_commentary") return "Thinking";
+  if (type === "plan") return "Plan";
+  if (type === "model_decision") return status === "running" ? "Thinking" : "Decision";
+  if (type === "step_started") return "Working";
+  if (type === "receipt_pending") return "Working";
+  if (type === "receipt_observed") return "Observation";
+  if (type === "tool_result") return "Observation";
+  if (type === "observation") return "Recorded";
+  if (type === "decision") return "Decision";
+  if (type === "final_answer") return "Final";
+  return "Agent";
+}
+
 export function normalizeHelixVisibleEventText(value: unknown): string {
   return coerceText(value).replace(/\s+/g, " ").trim().toLowerCase();
 }
@@ -487,34 +512,10 @@ export function buildHelixTurnTranscriptRows(reply: HelixAskTranscriptReply): He
           actionLabel && !eventText.includes(actionLabel)
             ? `${actionLabel}: ${eventText || type}`
             : eventText;
-        const label =
-          type === "public_commentary"
-            ? "Thinking"
-          : type === "plan"
-            ? "Plan"
-            : type === "model_decision"
-              ? status === "running"
-                ? "Thinking"
-                : "Decision"
-            : type === "step_started"
-              ? "Working"
-              : type === "receipt_pending"
-                ? "Working"
-              : type === "receipt_observed"
-                ? "Observation"
-              : type === "tool_result"
-                ? "Observation"
-                : type === "observation"
-                  ? "Recorded"
-                  : type === "decision"
-                    ? "Decision"
-                    : type === "final_answer"
-                      ? "Final"
-                      : "Agent";
         return {
           key: `${reply.id}-transcript-event-${index}`,
           role,
-          label,
+          label: resolveHelixTranscriptRowLabel(event),
           text: rowText,
           meta: [String(event.lane ?? ""), String(event.step_id ?? ""), actionLabel ?? "", status]
             .filter(Boolean)

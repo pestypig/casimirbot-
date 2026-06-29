@@ -462,6 +462,8 @@ const workspaceOsStatusManifest: HelixWorkstationCapabilityManifest = {
   label: "Workspace OS status",
   description:
     "Reads sanitized workspace capability, binding, fallback, and runtime-memory status. It does not execute browser, clipboard, shell, filesystem, or workstation actions.",
+  panel_id: "workspace-os",
+  action_id: "status",
   mode: "observe",
   mutating: false,
   code_mutation: false,
@@ -493,6 +495,8 @@ const workstationActiveContextManifest: HelixWorkstationCapabilityManifest = {
   label: "Workstation active context",
   description:
     "Reads bounded active/open workstation panel identity supplied by the Ask turn context snapshot. It is observation-only and cannot mutate or answer.",
+  panel_id: "workstation",
+  action_id: "active_context",
   mode: "read",
   mutating: false,
   code_mutation: false,
@@ -522,6 +526,8 @@ const calculatorSolveExpressionManifest: HelixWorkstationCapabilityManifest = {
   label: "Scientific Calculator solve expression",
   description:
     "Evaluates a simple arithmetic expression as read-only calculator evidence. It does not run shell code, mutate files, or become a final answer.",
+  panel_id: "scientific-calculator",
+  action_id: "solve_expression",
   mode: "read",
   mutating: false,
   code_mutation: false,
@@ -552,6 +558,8 @@ const calculatorActiveContextManifest: HelixWorkstationCapabilityManifest = {
   label: "Scientific Calculator active context",
   description:
     "Reads bounded active Scientific Calculator panel state supplied by the workstation context snapshot. It is observation-only and cannot solve, mutate, or answer.",
+  panel_id: "scientific-calculator",
+  action_id: "active_context",
   mode: "read",
   mutating: false,
   code_mutation: false,
@@ -584,6 +592,8 @@ const makeCalculatorPanelActionManifest = (
   label: action === "open_panel" ? "Scientific Calculator open panel" : "Scientific Calculator focus panel",
   description:
     "Requests a governed, non-mutating workstation UI action for the Scientific Calculator panel. It is a non-terminal action receipt and cannot answer the user.",
+  panel_id: "scientific-calculator",
+  action_id: action,
   mode: "act",
   mutating: false,
   code_mutation: false,
@@ -625,6 +635,10 @@ const makeWorkstationPanelActionManifest = (
   label: action === "open_panel" ? "Workstation open panel" : "Workstation focus panel",
   description:
     "Requests a governed, non-mutating workstation UI action for a safe read/observe panel allowlist. It is a non-terminal action receipt and cannot answer the user.",
+  panel_id: null,
+  action_id: action,
+  dynamic_panel_id_arg: "panel_id",
+  allowed_panel_ids: [...SAFE_WORKSTATION_PANEL_ACTION_IDS],
   mode: "act",
   mutating: false,
   code_mutation: false,
@@ -665,6 +679,8 @@ const docsOpenDocManifest: HelixWorkstationCapabilityManifest = {
   label: "Docs Viewer open document",
   description:
     "Requests a governed, non-mutating Docs Viewer UI action to open a safe docs/ path. It produces an action receipt only and cannot answer document content.",
+  panel_id: "docs-viewer",
+  action_id: "open_doc",
   mode: "act",
   mutating: false,
   code_mutation: false,
@@ -697,6 +713,8 @@ const repoSearchManifest: HelixWorkstationCapabilityManifest = {
   label: "Repo search",
   description:
     "Searches bounded repository paths for current code or documentation evidence. It returns non-terminal evidence observations and cannot write files or run shell commands for the agent.",
+  panel_id: "repo-evidence",
+  action_id: "search",
   mode: "read",
   mutating: false,
   code_mutation: false,
@@ -729,6 +747,8 @@ const docsSearchManifest: HelixWorkstationCapabilityManifest = {
   label: "Docs search",
   description:
     "Searches bounded workspace documentation paths for current document evidence. It returns non-terminal evidence observations and cannot open files, write files, or execute shell commands for the agent.",
+  panel_id: "docs-viewer",
+  action_id: "search_docs",
   mode: "read",
   mutating: false,
   code_mutation: false,

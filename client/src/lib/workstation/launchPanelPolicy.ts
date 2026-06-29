@@ -17,6 +17,7 @@ const USER_LAUNCH_PANEL_IDS = new Set<string>([
   "fruition-calculator",
   "stage-play-badge-graph",
   "civilization-bounds-roadmap",
+  "mission-ethos",
 ]);
 
 const LEGACY_DEBUG_PANEL_IDS = new Set<string>([

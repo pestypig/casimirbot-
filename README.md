@@ -21,6 +21,7 @@ those lanes without treating any receipt as a final answer by itself.
 | Area | Why it matters | Entry points |
 | --- | --- | --- |
 | Helix Ask + Live Answer loop | Primary user and agent interface. Handles prompt interpretation, tool admission, evidence re-entry, terminal authority, streamed debug, and the visible answer. | `server/routes/agi.plan.ts`, `docs/helix-ask-agentic-loop-current-overview.md`, `docs/helix-ask-codex-loop-discipline.md`, `npm run helix:ask:regression:light` |
+| Agent runtime adapters | Provider edge for Codex Workstation Mode and future selectable agents. Keeps each runtime's invocation/protocol glue outside Helix Ask policy and workstation truth. | `server/services/helix-ask/agent-providers/`, `server/services/helix-ask/workstation-tool-gateway/`, `shared/helix-agent-runtime.ts`, `docs/helix-ask-codex-loop-discipline.md` |
 | Workstation launch panels | User-facing capability surfaces. Launch panels expose docs, calculators, theory maps, stellar/solar simulators, NHM2 panels, notes, process graphs, and runtime diagnostics. | `client/src/pages/desktop.tsx`, `client/src/pages/helix-core.panels.ts`, `docs/helix-desktop-panels.md` |
 | Workstation tool calls | Deterministic actions Helix Ask can request. Tools open panels, inspect docs, search repo evidence, run calculator paths, update notes, build context packs, and return typed observations. | `client/src/lib/workstation/panelCapabilities.ts`, `client/src/lib/workstation/panelActionAdapters.ts`, `client/src/store/useWorkstationActionExecutionStore.ts` |
 | Theory congruence network | Canonical math architecture from first principles to laws, derived relations, runtime presets, calculator payloads, evidence refs, and claim boundaries. | `docs/architecture/theory-badge-graph-contract.md`, `shared/theory/helix-theory-badge-graph.ts`, `client/src/components/panels/TheoryBadgeGraphPanel.tsx` |
@@ -161,12 +162,31 @@ The Live Answer path is replacing older observation-first surfaces as the place
 where users see the answer lifecycle: progress events, tool receipts, debug
 exports, and the final terminal artifact selected by authority gates.
 
+Selectable agent runtimes must enter through provider adapters, not through
+route-local grafts or workstation-specific forks. Each runtime speaks a
+different protocol, so some adapter-specific glue is expected for launch,
+streaming, tool-request translation, and final output normalization. Keep that
+glue at the adapter edge. The shared Helix contract remains the source of truth:
+capability manifests, permission/admission decisions, workstation gateway
+observations, action receipts, evidence re-entry, terminal authority, debug
+exports, and visible trace projection.
+
+Adding another agent should normally mean adding a thin provider under
+`server/services/helix-ask/agent-providers/` that consumes the same workstation
+gateway contract. It should not require copying Helix Ask solver policy into the
+agent, importing `server/routes/agi.plan.ts`, or giving the agent direct access
+to panel internals, filesystem mutation, shell execution, or final-answer
+authority.
+
 Important paths:
 
 - `server/routes/agi.plan.ts`
 - `server/services/helix-ask/`
+- `server/services/helix-ask/agent-providers/`
+- `server/services/helix-ask/workstation-tool-gateway/`
 - `client/src/components/helix/HelixAskPill.tsx`
 - `shared/helix-ask-*.ts`
+- `shared/helix-agent-runtime.ts`
 - `docs/helix-ask-turn-solver-spine.md`
 - `docs/helix-ask-codex-loop-discipline.md`
 
