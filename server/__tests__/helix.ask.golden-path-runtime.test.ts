@@ -25,6 +25,7 @@ import { HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY } from "../services/helix-
 
 const routePath = "server/routes/agi.plan.ts";
 const servicePath = "server/services/helix-ask/golden-path-runtime.ts";
+const dependencyPath = "server/services/helix-ask/golden-path/runtime-dependencies.ts";
 
 const readLedger = (body: Record<string, any>): any[] =>
   Array.isArray(body.current_turn_artifact_ledger) ? body.current_turn_artifact_ledger : [];
@@ -40,16 +41,22 @@ describe("Helix Ask golden path runtime", () => {
   it("keeps the golden path runtime service route-free and dependency-owned", () => {
     const routeSource = readFileSync(routePath, "utf8");
     const serviceSource = readFileSync(servicePath, "utf8");
+    const dependencySource = readFileSync(dependencyPath, "utf8");
 
     expect(routeSource).toContain("../services/helix-ask/golden-path-runtime");
-    expect(serviceSource).toContain("export type HelixAskGoldenPathRuntimeDependencies");
-    expect(serviceSource).toContain("buildHelixGoalSatisfactionEvaluationArtifact");
-    expect(serviceSource).toContain("buildStagePlayAskCheckpointReceiptPayload");
-    expect(serviceSource).toContain("buildAskTurnCompositeHandoffDecision");
-    expect(serviceSource).toContain("buildAskTurnCompositeFollowupAudit");
+    expect(serviceSource).toContain("type HelixAskGoldenPathRuntimeDependencies");
+    expect(serviceSource).toContain("./golden-path/runtime-dependencies");
+    expect(dependencySource).toContain("export type HelixAskGoldenPathRuntimeDependencies");
+    expect(dependencySource).toContain("buildHelixGoalSatisfactionEvaluationArtifact");
+    expect(dependencySource).toContain("buildStagePlayAskCheckpointReceiptPayload");
+    expect(dependencySource).toContain("buildAskTurnCompositeHandoffDecision");
+    expect(dependencySource).toContain("buildAskTurnCompositeFollowupAudit");
     expect(serviceSource).not.toContain("server/routes/agi.plan");
     expect(serviceSource).not.toContain("../routes/agi.plan");
     expect(serviceSource).not.toContain("../../routes/agi.plan");
+    expect(dependencySource).not.toContain("server/routes/agi.plan");
+    expect(dependencySource).not.toContain("../routes/agi.plan");
+    expect(dependencySource).not.toContain("../../routes/agi.plan");
   });
 
   it("declines when the flag is disabled or the request is not explicit", () => {

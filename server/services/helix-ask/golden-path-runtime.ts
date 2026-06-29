@@ -1,4 +1,3 @@
-import { buildHelixGoalSatisfactionEvaluationArtifact } from "./goal-satisfaction-artifact";
 import {
   buildHelixAskGoldenPathCalculatorSolvePayload,
   isHelixAskGoldenPathCalculatorSolveRequested,
@@ -40,10 +39,6 @@ import {
   isHelixAskGoldenPathProcessedLiveSourceMailRequested,
 } from "./golden-path/capabilities/processed-live-source-mail";
 import {
-  buildAskTurnCompositeFollowupAudit,
-  buildAskTurnCompositeHandoffDecision,
-} from "./composite-followup-helpers";
-import {
   isHelixAskGoldenPathCatalogWorkspaceCompoundRequested,
   isHelixAskGoldenPathCivilizationBoundsZenReflectionCompoundRequested,
   isHelixAskGoldenPathDocsCalculatorCompoundRequested,
@@ -73,10 +68,10 @@ import {
   buildHelixAskGoldenPathRuntimeContractPayload,
 } from "./golden-path/runtime-contract-payload";
 import {
-  buildStagePlayAskCheckpointReceiptPayload,
-} from "./live-source/stage-play-checkpoint-receipt";
+  createHelixAskGoldenPathRuntimeDependencies,
+  type HelixAskGoldenPathRuntimeDependencies,
+} from "./golden-path/runtime-dependencies";
 import {
-  defaultHashGoalFrame,
   flagEnabled,
   HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
   readRecord,
@@ -124,26 +119,10 @@ export {
   type HelixAskGoldenPathRuntimeTerminalResult,
 } from "./golden-path/core";
 
-export type HelixAskGoldenPathRuntimeDependencies = {
-  now: () => Date;
-  hashGoalFrame: (value: unknown) => string;
-  buildGoalSatisfactionEvaluationArtifact: typeof buildHelixGoalSatisfactionEvaluationArtifact;
-  buildCompositeHandoffDecision: typeof buildAskTurnCompositeHandoffDecision;
-  buildCompositeFollowupAudit: typeof buildAskTurnCompositeFollowupAudit;
-  buildStagePlayCheckpointReceiptPayload: typeof buildStagePlayAskCheckpointReceiptPayload;
-};
-
-export const createHelixAskGoldenPathRuntimeDependencies = (
-  overrides: Partial<HelixAskGoldenPathRuntimeDependencies> = {},
-): HelixAskGoldenPathRuntimeDependencies => ({
-  now: () => new Date(),
-  hashGoalFrame: defaultHashGoalFrame,
-  buildGoalSatisfactionEvaluationArtifact: buildHelixGoalSatisfactionEvaluationArtifact,
-  buildCompositeHandoffDecision: buildAskTurnCompositeHandoffDecision,
-  buildCompositeFollowupAudit: buildAskTurnCompositeFollowupAudit,
-  buildStagePlayCheckpointReceiptPayload: buildStagePlayAskCheckpointReceiptPayload,
-  ...overrides,
-});
+export {
+  createHelixAskGoldenPathRuntimeDependencies,
+  type HelixAskGoldenPathRuntimeDependencies,
+} from "./golden-path/runtime-dependencies";
 
 export const isHelixAskGoldenPathRuntimeEnabled = (
   env: Record<string, string | undefined> = process.env,
