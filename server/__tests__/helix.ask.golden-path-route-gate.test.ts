@@ -392,6 +392,37 @@ describe("Helix Ask golden-path route gate", () => {
     expect(response.body.current_turn_artifact_ledger?.filter((artifact: { kind?: string }) => artifact.kind === expectedTerminalKind)).toHaveLength(1);
   });
 
+  it("routes matched capability prompts without the explicit scaffold marker when the flag is enabled", async () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+    const app = createApp();
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        turn_id: "ask:test:golden-route-no-marker-calculator",
+        prompt: "Use scientific-calculator.solve_expression with expression: 2 + 2",
+      })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      final_status: "final_answer",
+      terminal_artifact_kind: "workstation_tool_evaluation",
+      final_answer_source: "workstation_tool_evaluation",
+      terminal_error_code: null,
+      debug: {
+        golden_path_runtime: expect.objectContaining({
+          legacy_route_bypassed: true,
+        }),
+      },
+      capability_plan: {
+        requested_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+        executed_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+      },
+    });
+    expectExplicitCapabilityRails(response.body, "calculator_receipt", "workstation_tool_evaluation");
+  });
+
   it("routes a docs plus calculator compound turn through the golden-path runtime", async () => {
     process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
     const app = createApp();

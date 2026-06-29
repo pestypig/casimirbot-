@@ -281,7 +281,7 @@ describe("Helix Ask golden path runtime", () => {
     }
   });
 
-  it("declines when the flag is disabled or the request is not explicit", () => {
+  it("declines when the flag is disabled or no golden-path module matches", () => {
     expect(
       runHelixAskGoldenPathRuntime({
         env: {},
@@ -295,6 +295,31 @@ describe("Helix Ask golden path runtime", () => {
         body: { prompt: "ordinary prompt" },
       }),
     ).toEqual({ handled: false, reason: "not_requested" });
+  });
+
+  it("handles matched golden-path capability prompts without the explicit scaffold marker", () => {
+    const decision = runHelixAskGoldenPathRuntime({
+      env: { [HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG]: "1" },
+      now: new Date("2026-06-28T12:29:00.000Z"),
+      body: {
+        turn_id: "ask:golden:calculator-no-marker",
+        prompt: "Use scientific-calculator.solve_expression with expression: 2 + 2",
+      },
+    });
+
+    expect(decision.handled).toBe(true);
+    if (!decision.handled) throw new Error("golden path should handle a matched capability without marker");
+    expect(decision.payload).toMatchObject({
+      final_status: "final_answer",
+      terminal_artifact_kind: "workstation_tool_evaluation",
+      final_answer_source: "workstation_tool_evaluation",
+      terminal_error_code: null,
+      capability_plan: {
+        requested_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+        executed_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+      },
+    });
   });
 
   it("handles processed live-source mail as a golden-path capability with observation re-entry", () => {

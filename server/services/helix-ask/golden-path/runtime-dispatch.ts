@@ -10,6 +10,7 @@ export const dispatchHelixAskGoldenPathRuntime = (args: {
   body: RecordLike;
   deps?: Partial<HelixAskGoldenPathRuntimeDependencies>;
   now?: Date;
+  allowContractFallback?: boolean;
 }): HelixAskGoldenPathRuntimeDecision => {
   const body = readRecord(args.body) ?? {};
   const deps = createHelixAskGoldenPathRuntimeDependencies({
@@ -24,6 +25,8 @@ export const dispatchHelixAskGoldenPathRuntime = (args: {
       payload: dispatchModule.buildPayload({ body, deps }),
     };
   }
+
+  if (!args.allowContractFallback) return { handled: false, reason: "not_requested" };
 
   return {
     handled: true,

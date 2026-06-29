@@ -64,6 +64,11 @@ export const runHelixAskGoldenPathRuntime = (args: {
   now?: Date;
 }): HelixAskGoldenPathRuntimeDecision => {
   if (!isHelixAskGoldenPathRuntimeEnabled(args.env)) return { handled: false, reason: "flag_disabled" };
-  if (!isHelixAskGoldenPathRequested(args.body)) return { handled: false, reason: "not_requested" };
-  return dispatchHelixAskGoldenPathRuntime({ body: args.body, deps: args.deps, now: args.now });
+  const explicitGoldenPathRequest = isHelixAskGoldenPathRequested(args.body);
+  return dispatchHelixAskGoldenPathRuntime({
+    body: args.body,
+    deps: args.deps,
+    now: args.now,
+    allowContractFallback: explicitGoldenPathRequest,
+  });
 };
