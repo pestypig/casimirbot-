@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
+  HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
   HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
   HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,
   buildHelixAskGoldenPathRuntimePayload,
@@ -273,6 +274,110 @@ describe("Helix Ask golden path runtime", () => {
       "workspace_os_status_observation",
       "workspace_status_answer",
     ]);
+    expect(terminalLedgerEntries(body)).toHaveLength(1);
+  });
+
+  it("handles scientific calculator solves as receipt-backed workstation evaluations", () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+
+    const decision = runHelixAskGoldenPathRuntime({
+      now: new Date("2026-06-28T12:25:00.000Z"),
+      body: {
+        turn_id: "ask:golden:calculator",
+        prompt:
+          "helix_ask_golden_path_runtime call scientific-calculator.solve_expression with this exact expression: ((sqrt(81)+ln(e^3))*7-5^2)/2",
+        goldenPathRuntime: true,
+        requested_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+      },
+    });
+
+    expect(decision.handled).toBe(true);
+    if (!decision.handled) throw new Error("golden path should handle calculator solve");
+    const body = decision.payload;
+
+    expect(body).toMatchObject({
+      final_status: "final_answer",
+      terminal_artifact_kind: "workstation_tool_evaluation",
+      final_answer_source: "workstation_tool_evaluation",
+      terminal_error_code: null,
+      calculator_receipt: {
+        capability_key: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+        expression: "((sqrt(81)+ln(e^3))*7-5^2)/2",
+        result: 29.5,
+      },
+      workstation_tool_evaluation: {
+        capability_key: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+        expression: "((sqrt(81)+ln(e^3))*7-5^2)/2",
+        result: 29.5,
+      },
+      capability_plan: {
+        requested_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+        executed_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+        required_observation_kinds: ["calculator_receipt", "workstation_tool_evaluation"],
+        required_terminal_kind: "workstation_tool_evaluation",
+      },
+      ask_turn_solver_trace: {
+        completed_solver_path: true,
+        requested_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+        executed_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+        observed_artifact_kind: "calculator_receipt",
+        terminal_artifact_kind: "workstation_tool_evaluation",
+      },
+    });
+    expect(body.selected_final_answer).toContain("Result: 29.5");
+    expect(readLedger(body).map((artifact) => artifact.kind)).toEqual([
+      "golden_path_route_gate",
+      "calculator_receipt",
+      "workstation_tool_evaluation",
+    ]);
+    expect(terminalLedgerEntries(body)).toHaveLength(1);
+  });
+
+  it("fails closed when calculator solve has no expression", () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+
+    const decision = runHelixAskGoldenPathRuntime({
+      now: new Date("2026-06-28T12:26:00.000Z"),
+      body: {
+        turn_id: "ask:golden:calculator-missing",
+        prompt: "helix_ask_golden_path_runtime scientific-calculator.solve_expression",
+        goldenPathRuntime: true,
+        requested_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+      },
+    });
+
+    expect(decision.handled).toBe(true);
+    if (!decision.handled) throw new Error("golden path should handle missing calculator args");
+    const body = decision.payload;
+
+    expect(body).toMatchObject({
+      final_status: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      terminal_error_code: "missing_calculator_expression",
+      goal_satisfaction_evaluation: {
+        satisfaction: "not_satisfied",
+        first_broken_rail: "argument_extraction",
+      },
+      capability_plan: {
+        requested_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+        executed_capability: null,
+        required_observation_kinds: ["calculator_receipt", "workstation_tool_evaluation"],
+        required_terminal_kind: "workstation_tool_evaluation",
+      },
+      ask_turn_solver_trace: {
+        completed_solver_path: false,
+        requested_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+        executed_capability: null,
+        first_broken_rail: "argument_extraction",
+      },
+    });
+    expect(body.selected_final_answer).toContain("no calculator expression");
+    expect(readLedger(body).map((artifact) => artifact.kind)).toEqual(["golden_path_route_gate", "typed_failure"]);
     expect(terminalLedgerEntries(body)).toHaveLength(1);
   });
 
