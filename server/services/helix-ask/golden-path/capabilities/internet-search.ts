@@ -8,7 +8,6 @@ import {
 } from "../artifact-ledger";
 import { buildGoldenPathCapabilityPlan } from "../capability-contract";
 import {
-  HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
   HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
   HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
@@ -27,6 +26,7 @@ import {
   buildGoldenPathTypedFailureTerminalResult,
 } from "../terminal-envelope";
 import { buildGoldenPathSolverTrace } from "../solver-trace";
+import { buildGoldenPathRuntimeStatus } from "../runtime-status";
 
 export type HelixAskGoldenPathInternetSearchDependencies = {
   now: () => Date;
@@ -165,21 +165,14 @@ export const buildHelixAskGoldenPathInternetSearchPayload = (args: {
       selected_terminal_result_id: terminalResult.result_id,
       terminal_result: terminalResult,
       terminal_results: [terminalResult],
-      golden_path_runtime: {
-        schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
+      golden_path_runtime: buildGoldenPathRuntimeStatus({
         status: "internet_search_lookup_failed",
-        flag: HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
-        requested_capability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
-        selected_capability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
-        executed_capability: null,
-        terminal_result_count: 1,
-        first_broken_rail: params.brokenRail,
-        legacy_route_bypassed: true,
-        private_runtime_loop_entered: false,
-        route_gate: "enabled_explicit_request",
-        assistant_answer: false,
-        raw_content_included: false,
-      },
+        requestedCapability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
+        selectedCapability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
+        executedCapability: null,
+        firstBrokenRail: params.brokenRail,
+        routeGate: "enabled_explicit_request",
+      }),
       canonical_goal_frame: canonicalGoalFrame,
       capability_plan: buildGoldenPathCapabilityPlan({
         requestedCapability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
@@ -389,25 +382,18 @@ export const buildHelixAskGoldenPathInternetSearchPayload = (args: {
       assistant_answer: false,
       raw_content_included: false,
     },
-    golden_path_runtime: {
-      schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
+    golden_path_runtime: buildGoldenPathRuntimeStatus({
       status: "internet_search_lookup",
-      flag: HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
-      requested_capability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
-      selected_capability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
-      executed_capability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
-      observed_artifact_kind: "internet_search_observation",
-      observed_artifact_ref: observationArtifactId,
-      terminal_artifact_ref: terminalArtifactId,
-      terminal_result_id: terminalResultId,
-      legacy_route_bypassed: true,
-      legacy_fallback_possible_when_unhandled: true,
-      private_runtime_loop_entered: false,
-      route_gate: "enabled_explicit_request",
-      terminal_result_count: 1,
-      assistant_answer: false,
-      raw_content_included: false,
-    },
+      requestedCapability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
+      selectedCapability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
+      executedCapability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
+      observedArtifactKind: "internet_search_observation",
+      observedArtifactRef: observationArtifactId,
+      terminalArtifactRef: terminalArtifactId,
+      terminalResultId,
+      legacyFallbackPossibleWhenUnhandled: true,
+      routeGate: "enabled_explicit_request",
+    }),
     canonical_goal_frame: canonicalGoalFrame,
     capability_plan: buildGoldenPathCapabilityPlan({
       requestedCapability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,

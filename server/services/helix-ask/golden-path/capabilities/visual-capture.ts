@@ -7,7 +7,6 @@ import {
 } from "../artifact-ledger";
 import { buildGoldenPathCapabilityPlan } from "../capability-contract";
 import {
-  HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
   HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY,
   HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
@@ -23,6 +22,7 @@ import {
   buildGoldenPathTerminalResult,
 } from "../terminal-envelope";
 import { buildGoldenPathSolverTrace } from "../solver-trace";
+import { buildGoldenPathRuntimeStatus } from "../runtime-status";
 
 export type HelixAskGoldenPathVisualCaptureDependencies = {
   now: () => Date;
@@ -147,24 +147,17 @@ export const buildHelixAskGoldenPathVisualCapturePayload = (args: {
       selected_terminal_result_id: terminalResult.result_id,
       terminal_result: terminalResult,
       terminal_results: [terminalResult],
-      golden_path_runtime: {
-        schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
+      golden_path_runtime: buildGoldenPathRuntimeStatus({
         status: "visual_capture_missing_evidence",
-        flag: HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
-        requested_capability: requestedCapability,
-        selected_capability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
-        executed_capability: null,
-        observed_artifact_kind: null,
-        observed_artifact_ref: null,
-        terminal_artifact_ref: terminalResult.artifact_id,
-        terminal_result_id: terminalResultId,
-        legacy_route_bypassed: true,
-        private_runtime_loop_entered: false,
-        route_gate: "enabled_explicit_request",
-        terminal_result_count: 1,
-        assistant_answer: false,
-        raw_content_included: false,
-      },
+        requestedCapability,
+        selectedCapability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
+        executedCapability: null,
+        observedArtifactKind: null,
+        observedArtifactRef: null,
+        terminalArtifactRef: terminalResult.artifact_id,
+        terminalResultId,
+        routeGate: "enabled_explicit_request",
+      }),
       canonical_goal_frame: canonicalGoalFrame,
       capability_plan: buildGoldenPathCapabilityPlan({
         requestedCapability,
@@ -351,25 +344,18 @@ export const buildHelixAskGoldenPathVisualCapturePayload = (args: {
     selected_terminal_result_id: terminalResult.result_id,
     terminal_result: terminalResult,
     terminal_results: [terminalResult],
-    golden_path_runtime: {
-      schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
+    golden_path_runtime: buildGoldenPathRuntimeStatus({
       status: "visual_capture",
-      flag: HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
-      requested_capability: requestedCapability,
-      selected_capability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
-      executed_capability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
-      observed_artifact_kind: "visual_frame_evidence",
-      observed_artifact_ref: observationArtifactId,
-      terminal_artifact_ref: terminalArtifactId,
-      terminal_result_id: terminalResultId,
-      legacy_route_bypassed: true,
-      legacy_fallback_possible_when_unhandled: true,
-      private_runtime_loop_entered: false,
-      route_gate: "enabled_explicit_request",
-      terminal_result_count: 1,
-      assistant_answer: false,
-      raw_content_included: false,
-    },
+      requestedCapability,
+      selectedCapability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
+      executedCapability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
+      observedArtifactKind: "visual_frame_evidence",
+      observedArtifactRef: observationArtifactId,
+      terminalArtifactRef: terminalArtifactId,
+      terminalResultId,
+      legacyFallbackPossibleWhenUnhandled: true,
+      routeGate: "enabled_explicit_request",
+    }),
     canonical_goal_frame: canonicalGoalFrame,
     visual_frame_evidence: evidence,
     situation_context_pack: situationContextPack,

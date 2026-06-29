@@ -9,8 +9,8 @@ export const buildGoldenPathRuntimeStatus = (args: {
   requestedCapability?: string;
   selectedCapability?: string;
   executedCapability?: string | null;
-  observedArtifactKind?: string;
-  observedArtifactRef?: string;
+  observedArtifactKind?: string | null;
+  observedArtifactRef?: string | null;
   terminalArtifactRef?: string;
   terminalResultId?: string;
   terminalResultCount?: number;
@@ -29,8 +29,8 @@ export const buildGoldenPathRuntimeStatus = (args: {
   ...(args.requestedCapability ? { requested_capability: args.requestedCapability } : {}),
   ...(args.selectedCapability ? { selected_capability: args.selectedCapability } : {}),
   ...(args.executedCapability !== undefined ? { executed_capability: args.executedCapability } : {}),
-  ...(args.observedArtifactKind ? { observed_artifact_kind: args.observedArtifactKind } : {}),
-  ...(args.observedArtifactRef ? { observed_artifact_ref: args.observedArtifactRef } : {}),
+  ...(args.observedArtifactKind !== undefined ? { observed_artifact_kind: args.observedArtifactKind } : {}),
+  ...(args.observedArtifactRef !== undefined ? { observed_artifact_ref: args.observedArtifactRef } : {}),
   ...(args.modelTurnPacketRef ? { model_turn_packet_ref: args.modelTurnPacketRef } : {}),
   ...(args.routeGateArtifactRef ? { route_gate_artifact_ref: args.routeGateArtifactRef } : {}),
   ...(args.terminalArtifactRef ? { terminal_artifact_ref: args.terminalArtifactRef } : {}),
