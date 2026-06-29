@@ -24,6 +24,7 @@ import {
   buildGoldenPathTerminalAuthoritySingleWriter,
   buildGoldenPathTerminalResult,
 } from "./terminal-envelope";
+import { buildGoldenPathSolverTrace } from "./solver-trace";
 
 export type HelixAskGoldenPathRuntimeContractPayloadDependencies = {
   now: () => Date;
@@ -170,19 +171,16 @@ export const buildHelixAskGoldenPathRuntimeContractPayload = (args: {
       route: "golden_path_runtime / contract_only",
     }),
     terminal_authority_single_writer: buildGoldenPathTerminalAuthoritySingleWriter({ terminalResult }),
-    ask_turn_solver_trace: {
-      schema: "helix.ask_turn_solver_trace.v1",
-      completed_solver_path: true,
-      route_authority_ok: true,
-      terminal_authority_ok: true,
-      goal_satisfaction: "satisfied",
-      golden_path_runtime: true,
-      private_runtime_loop_entered: false,
-      solver_risk_flags: [],
-      solver_short_circuit_flags: [],
-      assistant_answer: false,
-      raw_content_included: false,
-    },
+    ask_turn_solver_trace: buildGoldenPathSolverTrace({
+      completedSolverPath: true,
+      routeAuthorityOk: true,
+      terminalAuthorityOk: true,
+      goalSatisfaction: "satisfied",
+      extra: {
+        solver_risk_flags: [],
+        solver_short_circuit_flags: [],
+      },
+    }),
     current_turn_artifact_ledger: [
       buildGoldenPathRouteGateLedgerArtifact({
         artifactId: routeGateArtifactId,
