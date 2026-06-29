@@ -12,6 +12,7 @@ import {
   HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
   HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
   HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
+  HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
   HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY,
   HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
   HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,
@@ -601,6 +602,90 @@ describe("Helix Ask golden path runtime", () => {
     });
     expect(body.selected_final_answer).toContain("no reflection topic");
     expect(readLedger(body).map((artifact) => artifact.kind)).toEqual(["golden_path_route_gate", "typed_failure"]);
+    expect(terminalLedgerEntries(body)).toHaveLength(1);
+  });
+
+  it("handles compact civilization bounds evidence as a reflection answer", () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+
+    const decision = runHelixAskGoldenPathRuntime({
+      now: new Date("2026-06-28T12:29:45.000Z"),
+      body: {
+        turn_id: "ask:golden:civilization-bounds",
+        prompt: "helix_ask_golden_path_runtime use helix_ask.reflect_civilization_bounds",
+        goldenPathRuntime: true,
+        requested_capability: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+        civilization_bounds_tool_result: {
+          roadmap: {
+            roadmapId: "civilization-bounds:test",
+            title: "Civilization Bounds Roadmap",
+            systems: [{ systemId: "energy", label: "Energy system" }],
+            badges: [{ badgeId: "badge:energy", label: "Energy budget unknown" }],
+            collaborationBounds: [{ boundId: "bound:review", limitingFactor: "governance_review" }],
+            missingEvidence: ["source_backed_capacity_measurements"],
+            authority: {
+              assistant_answer: false,
+              terminal_eligible: false,
+              agent_executable: false,
+              prediction_finality: false,
+              policy_finality: false,
+              moral_finality: false,
+              execution_permission: false,
+            },
+          },
+          bridgeContext: {
+            systemIds: ["energy"],
+            missingEvidence: ["source_backed_capacity_measurements"],
+          },
+        },
+      },
+    });
+
+    expect(decision.handled).toBe(true);
+    if (!decision.handled) throw new Error("golden path should handle civilization bounds reflection");
+    const body = decision.payload;
+
+    expect(body).toMatchObject({
+      final_status: "final_answer",
+      terminal_artifact_kind: "civilization_bounds_reflection_answer",
+      final_answer_source: "civilization_bounds_reflection_answer",
+      terminal_error_code: null,
+      helix_civilization_bounds_tool_result: {
+        kind: "helix_civilization_bounds_tool_result",
+        tool_id: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+      },
+      civilization_bounds_reflection_answer: {
+        roadmap_id: "civilization-bounds:test",
+        title: "Civilization Bounds Roadmap",
+      },
+      capability_plan: {
+        requested_capability: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+        executed_capability: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+        required_observation_kinds: ["helix_civilization_bounds_tool_result"],
+        required_terminal_kind: "civilization_bounds_reflection_answer",
+      },
+      ask_turn_solver_trace: {
+        completed_solver_path: true,
+        requested_capability: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+        executed_capability: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+        observed_artifact_kind: "helix_civilization_bounds_tool_result",
+        terminal_artifact_kind: "civilization_bounds_reflection_answer",
+      },
+      terminal_answer_authority: {
+        server_authoritative: true,
+        terminal_artifact_kind: "civilization_bounds_reflection_answer",
+        final_answer_source: "civilization_bounds_reflection_answer",
+      },
+    });
+    expect(body.selected_final_answer).toContain("Civilization bounds reflection completed");
+    expect(body.selected_final_answer).toContain("does not grant prediction, policy, moral, or execution authority");
+    expect(readLedger(body).map((artifact) => artifact.kind)).toEqual([
+      "golden_path_route_gate",
+      "helix_civilization_bounds_tool_result",
+      "civilization_bounds_reflection_answer",
+    ]);
     expect(terminalLedgerEntries(body)).toHaveLength(1);
   });
 
