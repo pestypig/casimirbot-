@@ -21,6 +21,21 @@ export const buildGoldenPathTerminalResult = (args: {
   raw_content_included: false,
 });
 
+export const buildGoldenPathTypedFailureTerminalResult = (args: {
+  resultId: string;
+  artifactId: string;
+  text: string;
+  supportRefs: string[];
+}): HelixAskGoldenPathRuntimeTerminalResult =>
+  buildGoldenPathTerminalResult({
+    resultId: args.resultId,
+    artifactId: args.artifactId,
+    artifactKind: "typed_failure",
+    finalAnswerSource: "typed_failure",
+    text: args.text,
+    supportRefs: args.supportRefs,
+  });
+
 export const buildGoldenPathTerminalAnswerAuthority = (args: {
   terminalResult: HelixAskGoldenPathRuntimeTerminalResult;
   route: string;
