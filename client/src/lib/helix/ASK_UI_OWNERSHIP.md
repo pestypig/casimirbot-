@@ -27,7 +27,7 @@ This map keeps the `HelixAskPill.tsx` split readable while the component is bein
 | `ask-stage-play-ledger.ts` | Stage Play chat ledger display events. | Stage Play runtime or chat persistence. |
 | `ask-status-classnames.ts` | Procedural and causal trace row class-name mapping. | React rendering, timeline construction. |
 | `ask-steering-queue-display.ts` | Steering queue item normalization and classes. | Auto-wake execution, mailbox mutation, workstation actions. |
-| `ask-terminal-projection.ts` | Typed visible final-answer projection helpers. | Model sampling, terminal completion, server-side authority. |
+| `ask-terminal-projection.ts` | Typed visible final-answer projection helpers and terminal answer text normalization/invalid-placeholder detection. | Model sampling, terminal completion, server-side authority. |
 | `ask-turn-transcript.ts` | Runtime transcript and causal trace row building. | Tool execution, live source materialization, terminal decisions. |
 | `ask-voice-text-display.ts` | Voice/read-aloud text cleanup, citation stripping, artifact-spill display cleanup, and compact debug summaries. | TTS transport, playback scheduling, audio graph behavior, voice capture, route decisions. |
 | `ask-voice-copy-display.ts` | Voice command labels, input status labels, reasoning lifecycle copy, brief copy joining, and timeline prompt display text. | Voice dispatch, lifecycle policy, auto-speak scheduling, retry policy, mic capture. |

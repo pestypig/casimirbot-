@@ -54,13 +54,13 @@ function readAgentLoopAuditRecord(value: unknown): RecordLike | null {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as RecordLike) : null;
 }
 
-function normalizeTerminalAnswerText(value: string | null | undefined): string {
+export function normalizeTerminalAnswerText(value: string | null | undefined): string {
   return String(value ?? "")
     .replace(/\u00a0/g, " ")
     .trim();
 }
 
-function isInvalidTerminalAnswerText(value: string | null | undefined): boolean {
+export function isInvalidTerminalAnswerText(value: string | null | undefined): boolean {
   const normalized = normalizeTerminalAnswerText(value);
   if (!normalized) return true;
   return (

@@ -44,10 +44,14 @@ describe("Helix Ask voice ownership boundaries", () => {
     expect(pill).toContain('from "@/lib/helix/ask-terminal-projection"');
     expect(pill).not.toMatch(/export function buildVisibleResolvedTurn\s*\(/);
     expect(pill).not.toMatch(/export function chooseVisibleFinalText\s*\(/);
+    expect(pill).not.toMatch(/export function normalizeTerminalAnswerText\s*\(/);
+    expect(pill).not.toMatch(/export function isInvalidTerminalAnswerText\s*\(/);
     expect(pill).not.toMatch(/export function readHelixAskFinalAnswerSourceLabel\s*\(/);
     expect(pill).not.toMatch(/export function resolveHelixAskFinalAnswerPresentation\s*\(/);
     expect(projection).toMatch(/export function buildVisibleResolvedTurn\s*\(/);
     expect(projection).toMatch(/export function chooseVisibleFinalText\s*\(/);
+    expect(projection).toMatch(/export function normalizeTerminalAnswerText\s*\(/);
+    expect(projection).toMatch(/export function isInvalidTerminalAnswerText\s*\(/);
     expect(projection).toMatch(/export function readHelixAskFinalAnswerSourceLabel\s*\(/);
     expect(projection).toMatch(/export function resolveHelixAskFinalAnswerPresentation\s*\(/);
     expect(projection).not.toMatch(/from ["']react["']/);

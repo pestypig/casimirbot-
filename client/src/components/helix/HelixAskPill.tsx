@@ -313,6 +313,8 @@ export type {
 import {
   buildVisibleResolvedTurn,
   chooseVisibleFinalText,
+  isInvalidTerminalAnswerText,
+  normalizeTerminalAnswerText,
   readHelixAskFinalAnswerSourceLabel,
   renderTypedFailureFallback,
   resolveHelixAskFinalAnswerPresentation,
@@ -322,6 +324,8 @@ import {
 export {
   buildVisibleResolvedTurn,
   chooseVisibleFinalText,
+  isInvalidTerminalAnswerText,
+  normalizeTerminalAnswerText,
   readHelixAskFinalAnswerSourceLabel,
   renderTypedFailureFallback,
   resolveHelixAskFinalAnswerPresentation,
@@ -1012,22 +1016,6 @@ export function isWorkstationTurnTransitionPendingRequest(args: {
   const currentTurnId = String(args.current_turn_id ?? "").trim();
   if (!pendingTurnId || !currentTurnId) return false;
   return pendingTurnId !== currentTurnId;
-}
-
-export function normalizeTerminalAnswerText(value: string | null | undefined): string {
-  return String(value ?? "")
-    .replace(/\u00a0/g, " ")
-    .trim();
-}
-
-export function isInvalidTerminalAnswerText(value: string | null | undefined): boolean {
-  const normalized = normalizeTerminalAnswerText(value);
-  if (!normalized) return true;
-  return (
-    /^no final answer returned\.?$/i.test(normalized) ||
-    /^I could not produce a substantive direct answer for this background-only turn\.?$/i.test(normalized) ||
-    /^I couldn't produce a final answer for that turn\. Please retry once\.?$/i.test(normalized)
-  );
 }
 
 export function registerTurnTerminalOutcome(args: {
