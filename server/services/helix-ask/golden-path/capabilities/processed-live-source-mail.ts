@@ -1,9 +1,6 @@
 import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfaction-artifact";
 import { STAGE_PLAY_PROCESSED_MAIL_PACKET_SCHEMA } from "../../../../../shared/contracts/stage-play-live-source-mail.v1";
 import {
-  buildGoldenPathAnswerLedgerArtifact,
-  buildGoldenPathObservationLedgerArtifact,
-  buildGoldenPathPayloadLedgerArtifact,
   buildGoldenPathTypedFailureTerminalErrorLedgerArtifact,
   buildGoldenPathRouteGateLedgerArtifact,
 } from "../artifact-ledger";
@@ -11,6 +8,7 @@ import {
   buildGoldenPathCapabilityGoalSatisfactionEvaluation,
   buildGoldenPathCapabilityPlan,
 } from "../capability-contract";
+import { buildGoldenPathCapabilitySuccessPayload } from "../capability-success";
 import { buildGoldenPathCapabilityDebugMirror } from "../debug-mirror";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
@@ -19,14 +17,11 @@ import {
   readRecord,
   readString,
   readStringArray,
-  type HelixAskGoldenPathRuntimeTerminalResult,
   type RecordLike,
 } from "../core";
 import {
   buildGoldenPathTerminalAuthorityProjection,
-  buildGoldenPathTerminalResponseProjection,
   buildGoldenPathTypedFailureResponseProjection,
-  buildGoldenPathTerminalResult,
 } from "../terminal-envelope";
 import { buildGoldenPathSolverTrace } from "../solver-trace";
 import { buildGoldenPathRuntimeStatus } from "../runtime-status";
@@ -260,159 +255,61 @@ export const buildHelixAskGoldenPathProcessedLiveSourceMailPayload = (args: {
     uncertainties.length ? `Uncertainties: ${uncertainties.join("; ")}.` : "Uncertainties: none supplied.",
     `Recommended next: ${recommendedNext}.`,
   ].join("\n");
-  const canonicalGoalFrame = {
-    schema: "helix.ask_canonical_goal_frame.v1",
-    turn_id: turnId,
-    goal_kind: goalKind,
-    answer_scope: "current_turn",
-    required_terminal_kind: requiredTerminalKind,
-    allows_workspace_context: false,
-    allows_prior_artifacts: false,
-    classifier_reasons: ["explicit_processed_live_source_mail_request"],
-    assistant_answer: false,
-    raw_content_included: false,
-  };
-  const goalSatisfactionEvaluation = buildGoldenPathCapabilityGoalSatisfactionEvaluation({
-    turnId,
-    goalKind,
-    requiredTerminalKind,
-  });
-  const goalHash = args.deps.hashGoalFrame(canonicalGoalFrame);
-  const goalSatisfactionArtifact = args.deps.buildGoalSatisfactionEvaluationArtifact({
-    turnId,
-    goalHash,
-    evaluation: goalSatisfactionEvaluation,
-    createdAtMs,
-  });
-  const terminalResult = buildGoldenPathTerminalResult({
-    resultId: terminalResultId,
-    artifactId: terminalArtifactId,
-    artifactKind: requiredTerminalKind,
-    finalAnswerSource: requiredTerminalKind,
-    text: answerText,
-    supportRefs: [observationArtifactId, routeGateArtifactId, goalSatisfactionArtifact.artifact_id],
-  });
 
-  return {
-    ok: true,
-    mode: "read",
-    schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
-    turn_id: turnId,
-    trace_id: traceId,
-    session_id: sessionId,
-    thread_id: threadId,
-    prompt_text: promptText,
-    ...buildGoldenPathTerminalResponseProjection({ terminalResult }),
-    golden_path_runtime: buildGoldenPathRuntimeStatus({
-      status: "processed_live_source_mail",
-      requestedCapability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
-      selectedCapability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
-      executedCapability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
-      observedArtifactKind: "stage_play_processed_mail_packet",
-      observedArtifactRef: observationArtifactId,
-      terminalArtifactRef: terminalArtifactId,
-      terminalResultId,
-      legacyFallbackPossibleWhenUnhandled: true,
-      routeGate: "enabled_explicit_request",
-    }),
-    canonical_goal_frame: canonicalGoalFrame,
-    stage_play_processed_mail_packet: packetPayload,
-    model_synthesized_answer: {
-      schema: "helix.model_synthesized_answer.v1",
-      text: terminalResult.text,
-      answer_text: terminalResult.text,
-      support_refs: terminalResult.support_refs,
-      assistant_answer: false,
-      raw_content_included: false,
-    },
-    model_turn_input: {
-      schema: "helix.ask_model_turn_input.v1",
-      turn_id: turnId,
-      prompt_text: promptText,
-      available_capabilities: [HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY],
-      function_call_outputs: [
-        {
-          call_id: `${turnId}:call:read_processed_live_source_mail`,
-          name: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
-          output_ref: observationArtifactId,
-          output_kind: "stage_play_processed_mail_packet",
+  return buildGoldenPathCapabilitySuccessPayload({
+    turnId,
+    traceId,
+    sessionId,
+    threadId,
+    promptText,
+    createdAtMs,
+    routeGateArtifactId,
+    observationArtifactId,
+    terminalArtifactId,
+    terminalResultId,
+    requiredTerminalKind,
+    goalKind,
+    sourceTarget: "live_source_mailbox",
+    family: "live_environment",
+    classifierReasons: ["explicit_processed_live_source_mail_request"],
+    allowsWorkspaceContext: false,
+    requestedCapability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+    observedArtifactKind: "stage_play_processed_mail_packet",
+    observationPayload: packetPayload,
+    terminalPayloadField: "model_synthesized_answer",
+    terminalPayloadSchema: "helix.model_synthesized_answer.v1",
+    answerText,
+    status: "processed_live_source_mail",
+    route: "golden_path_runtime / processed_live_source_mail",
+    requiredObservationKinds: ["stage_play_processed_mail_packet"],
+    includeRouteGatePromptText: false,
+    includeRouteGateGoalSatisfactionEvaluation: false,
+    additionalTopLevelFields: ({ goalSatisfactionArtifact }) => ({
+      model_turn_input: {
+        schema: "helix.ask_model_turn_input.v1",
+        turn_id: turnId,
+        prompt_text: promptText,
+        available_capabilities: [HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY],
+        function_call_outputs: [
+          {
+            call_id: `${turnId}:call:read_processed_live_source_mail`,
+            name: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+            output_ref: observationArtifactId,
+            output_kind: "stage_play_processed_mail_packet",
+          },
+        ],
+        model_visible_artifacts: [observationArtifactId, goalSatisfactionArtifact.artifact_id],
+        loop_policy: {
+          max_model_steps: 1,
+          private_runtime_loop_entered: false,
         },
-      ],
-      model_visible_artifacts: [observationArtifactId, goalSatisfactionArtifact.artifact_id],
-      loop_policy: {
-        max_model_steps: 1,
-        private_runtime_loop_entered: false,
-      },
-      assistant_answer: false,
-      raw_content_included: false,
-    },
-    capability_plan: buildGoldenPathCapabilityPlan({
-      requestedCapability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
-      sourceTarget: "live_source_mailbox",
-      family: "live_environment",
-      requiredObservationKinds: ["stage_play_processed_mail_packet"],
-      requiredTerminalKind,
-    }),
-    goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-    ...buildGoldenPathTerminalAuthorityProjection({
-      terminalResult,
-      route: "golden_path_runtime / processed_live_source_mail",
-    }),
-    ask_turn_solver_trace: buildGoldenPathSolverTrace({
-      completedSolverPath: true,
-      routeAuthorityOk: true,
-      terminalAuthorityOk: true,
-      goalSatisfaction: "satisfied",
-      requestedCapability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
-      selectedCapability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
-      executedCapability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
-      observedArtifactKind: "stage_play_processed_mail_packet",
-      observedArtifactRef: observationArtifactId,
-      terminalArtifactKind: terminalResult.artifact_kind,
-      extra: {
-        solver_risk_flags: [],
-        solver_short_circuit_flags: [],
+        assistant_answer: false,
+        raw_content_included: false,
       },
     }),
-    current_turn_artifact_ledger: [
-      buildGoldenPathRouteGateLedgerArtifact({
-        artifactId: routeGateArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        requestedCapability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
-        goalSatisfactionArtifact,
-      }),
-      buildGoldenPathObservationLedgerArtifact({
-        artifactId: observationArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        kind: "stage_play_processed_mail_packet",
-        payload: packetPayload,
-      }),
-      buildGoldenPathAnswerLedgerArtifact({
-        artifactId: terminalArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        kind: requiredTerminalKind,
-        payloadSchema: "helix.model_synthesized_answer.v1",
-        terminalResult,
-      }),
-    ],
-    debug: buildGoldenPathCapabilityDebugMirror({
-      status: "processed_live_source_mail",
-      privateRuntimeLoopEntered: false,
-      requestedCapability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
-      selectedCapability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
-      executedCapability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
-      observedArtifactKind: "stage_play_processed_mail_packet",
-      observedArtifactRef: observationArtifactId,
-      terminalResult,
-      goalSatisfactionEvaluation,
-    }),
-  };
+    hashGoalFrame: args.deps.hashGoalFrame,
+    buildGoalSatisfactionEvaluationArtifact: args.deps.buildGoalSatisfactionEvaluationArtifact,
+  });
 };
 
 export const requiredObservationKinds = ["stage_play_processed_mail_packet"] as const;
