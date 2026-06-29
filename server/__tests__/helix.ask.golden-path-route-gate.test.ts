@@ -423,8 +423,7 @@ describe("Helix Ask golden-path route gate", () => {
     expectExplicitCapabilityRails(response.body, "calculator_receipt", "workstation_tool_evaluation");
   });
 
-  it("lets Helix-mode matched prompts enter golden path before legacy gateway observations", async () => {
-    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+  it("lets Helix-mode matched prompts enter golden path by default before legacy gateway observations", async () => {
     const app = createApp();
 
     const response = await request(app)

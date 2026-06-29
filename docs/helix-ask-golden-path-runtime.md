@@ -8,34 +8,43 @@ Helix Ask policy path can produce a terminal-authority-backed response without
 continuing to extract thousands of route-local helpers before the new spine can
 be reviewed.
 
-This path is a gated replacement candidate for normal Ask turns, not a default
-replacement for the legacy route. It now covers the contract-only fallback,
-explicit capability families, and representative compound workflows through
-owned modules under `server/services/helix-ask/golden-path/`.
+This path is the default first-refusal runtime for normal Ask turns that match a
+golden-path capability or compound module. It now covers the contract-only
+fallback, explicit capability families, and representative compound workflows
+through owned modules under `server/services/helix-ask/golden-path/`.
 
-## Feature Gate
+## Activation
 
-The runtime is disabled unless both conditions are true:
+The runtime is enabled by default. Operators can explicitly opt out with:
 
-- `HELIX_ASK_GOLDEN_PATH_RUNTIME` is enabled.
-- The request explicitly opts in with a golden-path marker, such as
-  `goldenPathRuntime: true`, `golden_path_runtime: true`,
-  `helixAskGoldenPathRuntime: true`, `helix_ask_golden_path_runtime`, or
-  `helix ask golden path runtime`.
+- `HELIX_ASK_GOLDEN_PATH_RUNTIME=0`
+- `HELIX_ASK_GOLDEN_PATH_RUNTIME=false`
+- `HELIX_ASK_GOLDEN_PATH_RUNTIME=disabled`
+- `HELIX_ASK_GOLDEN_PATH_RUNTIME=off`
+
+When enabled, a request enters golden path if an ordered capability or compound
+module matches the prompt/body. Unmatched prompts fall through to the legacy
+route unless the request explicitly opts into the contract-only scaffold with a
+golden-path marker, such as `goldenPathRuntime: true`,
+`golden_path_runtime: true`, `helixAskGoldenPathRuntime: true`,
+`helix_ask_golden_path_runtime`, or `helix ask golden path runtime`.
 
 ## Legacy Fallback Boundary
 
-When the flag is disabled or the request does not explicitly opt in,
-`runHelixAskGoldenPathRuntime` returns an unhandled decision and `/ask/turn`
-continues through the legacy route. The golden path must not become the default
-route without a later activation change and separate evidence.
+When the runtime is explicitly disabled or no capability/compound module
+matches, `runHelixAskGoldenPathRuntime` returns an unhandled decision and
+`/ask/turn` continues through the legacy route. Contract-only golden-path
+responses still require an explicit marker so ordinary unmatched prompts are
+not swallowed by the scaffold.
 
 ## Minimum Request Contract
 
-A minimum golden-path request is a normal Ask turn body plus one explicit
-golden-path opt-in marker. The runtime accepts `turn_id`, `trace_id`,
-`session_id`, `thread_id`, and prompt fields when present, but it does not
-require live keys, external tools, or the legacy private runtime loop.
+A minimum golden-path capability request is a normal Ask turn body whose prompt
+or request fields match a golden-path capability or compound module. A
+contract-only scaffold request requires an explicit golden-path marker. The
+runtime accepts `turn_id`, `trace_id`, `session_id`, `thread_id`, and prompt
+fields when present, but it does not require live keys, external tools, or the
+legacy private runtime loop.
 
 ## Response Envelope Contract
 

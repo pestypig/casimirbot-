@@ -7,7 +7,6 @@ import {
 } from "./golden-path/runtime-dependencies";
 import { dispatchHelixAskGoldenPathRuntime } from "./golden-path/runtime-dispatch";
 import {
-  flagEnabled,
   HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
   isHelixAskGoldenPathRequested,
   type HelixAskGoldenPathRuntimeDecision,
@@ -44,7 +43,12 @@ export {
 
 export const isHelixAskGoldenPathRuntimeEnabled = (
   env: Record<string, string | undefined> = process.env,
-): boolean => flagEnabled(env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG]);
+): boolean => {
+  const value = env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG];
+  if (value === undefined || value === null || String(value).trim() === "") return true;
+  const normalized = String(value).trim().toLowerCase();
+  return !(normalized === "0" || normalized === "false" || normalized === "disabled" || normalized === "off");
+};
 
 export const buildHelixAskGoldenPathRuntimePayload = (args: {
   body: RecordLike;

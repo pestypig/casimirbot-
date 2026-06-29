@@ -281,17 +281,17 @@ describe("Helix Ask golden path runtime", () => {
     }
   });
 
-  it("declines when the flag is disabled or no golden-path module matches", () => {
+  it("declines when explicitly disabled or no golden-path module matches", () => {
     expect(
       runHelixAskGoldenPathRuntime({
-        env: {},
+        env: { [HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG]: "0" },
         body: { goldenPathRuntime: true, prompt: "helix_ask_golden_path_runtime" },
       }),
     ).toEqual({ handled: false, reason: "flag_disabled" });
 
     expect(
       runHelixAskGoldenPathRuntime({
-        env: { [HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG]: "1" },
+        env: {},
         body: { prompt: "ordinary prompt" },
       }),
     ).toEqual({ handled: false, reason: "not_requested" });
@@ -299,7 +299,7 @@ describe("Helix Ask golden path runtime", () => {
 
   it("handles matched golden-path capability prompts without the explicit scaffold marker", () => {
     const decision = runHelixAskGoldenPathRuntime({
-      env: { [HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG]: "1" },
+      env: {},
       now: new Date("2026-06-28T12:29:00.000Z"),
       body: {
         turn_id: "ask:golden:calculator-no-marker",
