@@ -25,6 +25,7 @@ import {
   buildGoldenPathTerminalResult,
   buildGoldenPathTypedFailureTerminalResult,
 } from "../terminal-envelope";
+import { buildGoldenPathSolverTrace } from "../solver-trace";
 
 export type HelixAskGoldenPathRepoSearchConceptDependencies = {
   now: () => Date;
@@ -327,19 +328,14 @@ export const buildHelixAskGoldenPathRepoSearchConceptPayload = (args: {
         assistant_answer: false,
         raw_content_included: false,
       },
-      ask_turn_solver_trace: {
-        schema: "helix.ask_turn_solver_trace.v1",
-        completed_solver_path: false,
-        golden_path_runtime: true,
-        requested_capability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
-        selected_capability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
-        executed_capability: null,
-        first_broken_rail: params.brokenRail,
-        terminal_artifact_kind: "typed_failure",
-        private_runtime_loop_entered: false,
-        assistant_answer: false,
-        raw_content_included: false,
-      },
+      ask_turn_solver_trace: buildGoldenPathSolverTrace({
+        completedSolverPath: false,
+        requestedCapability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+        selectedCapability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+        executedCapability: null,
+        firstBrokenRail: params.brokenRail,
+        terminalArtifactKind: "typed_failure",
+      }),
       current_turn_artifact_ledger: [
         buildGoldenPathRouteGateLedgerArtifact({
           artifactId: routeGateArtifactId,
@@ -537,25 +533,22 @@ export const buildHelixAskGoldenPathRepoSearchConceptPayload = (args: {
       route: "golden_path_runtime / repo_search_concept",
     }),
     terminal_authority_single_writer: buildGoldenPathTerminalAuthoritySingleWriter({ terminalResult }),
-    ask_turn_solver_trace: {
-      schema: "helix.ask_turn_solver_trace.v1",
-      completed_solver_path: true,
-      route_authority_ok: true,
-      terminal_authority_ok: true,
-      goal_satisfaction: "satisfied",
-      golden_path_runtime: true,
-      private_runtime_loop_entered: false,
-      requested_capability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
-      selected_capability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
-      executed_capability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
-      observed_artifact_kind: "repo_code_evidence_observation",
-      observed_artifact_ref: observationArtifactId,
-      terminal_artifact_kind: terminalResult.artifact_kind,
-      solver_risk_flags: [],
-      solver_short_circuit_flags: [],
-      assistant_answer: false,
-      raw_content_included: false,
-    },
+    ask_turn_solver_trace: buildGoldenPathSolverTrace({
+      completedSolverPath: true,
+      routeAuthorityOk: true,
+      terminalAuthorityOk: true,
+      goalSatisfaction: "satisfied",
+      requestedCapability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+      selectedCapability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+      executedCapability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+      observedArtifactKind: "repo_code_evidence_observation",
+      observedArtifactRef: observationArtifactId,
+      terminalArtifactKind: terminalResult.artifact_kind,
+      extra: {
+        solver_risk_flags: [],
+        solver_short_circuit_flags: [],
+      },
+    }),
     current_turn_artifact_ledger: [
       buildGoldenPathRouteGateLedgerArtifact({
         artifactId: routeGateArtifactId,

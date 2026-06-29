@@ -24,6 +24,7 @@ import {
   buildGoldenPathTerminalAuthoritySingleWriter,
   buildGoldenPathTerminalResult,
 } from "../terminal-envelope";
+import { buildGoldenPathSolverTrace } from "../solver-trace";
 
 export type HelixAskGoldenPathCapabilityCatalogDependencies = {
   now: () => Date;
@@ -189,25 +190,22 @@ export const buildHelixAskGoldenPathCapabilityCatalogPayload = (args: {
       route: "golden_path_runtime / capability_catalog",
     }),
     terminal_authority_single_writer: buildGoldenPathTerminalAuthoritySingleWriter({ terminalResult }),
-    ask_turn_solver_trace: {
-      schema: "helix.ask_turn_solver_trace.v1",
-      completed_solver_path: true,
-      route_authority_ok: true,
-      terminal_authority_ok: true,
-      goal_satisfaction: "satisfied",
-      golden_path_runtime: true,
-      private_runtime_loop_entered: false,
-      requested_capability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
-      selected_capability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
-      executed_capability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
-      observed_artifact_kind: "capability_registry",
-      observed_artifact_ref: observationArtifactId,
-      terminal_artifact_kind: terminalResult.artifact_kind,
-      solver_risk_flags: [],
-      solver_short_circuit_flags: [],
-      assistant_answer: false,
-      raw_content_included: false,
-    },
+    ask_turn_solver_trace: buildGoldenPathSolverTrace({
+      completedSolverPath: true,
+      routeAuthorityOk: true,
+      terminalAuthorityOk: true,
+      goalSatisfaction: "satisfied",
+      requestedCapability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
+      selectedCapability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
+      executedCapability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
+      observedArtifactKind: "capability_registry",
+      observedArtifactRef: observationArtifactId,
+      terminalArtifactKind: terminalResult.artifact_kind,
+      extra: {
+        solver_risk_flags: [],
+        solver_short_circuit_flags: [],
+      },
+    }),
     current_turn_artifact_ledger: [
       {
         ...buildGoldenPathRouteGateLedgerArtifact({
