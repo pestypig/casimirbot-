@@ -21,6 +21,7 @@ import {
 } from "../core";
 import {
   buildGoldenPathTerminalAuthorityProjection,
+  buildGoldenPathTerminalResponseProjection,
   buildGoldenPathTerminalResult,
   buildGoldenPathTypedFailureTerminalResult,
 } from "../terminal-envelope";
@@ -435,19 +436,7 @@ export const buildHelixAskGoldenPathRepoSearchConceptPayload = (args: {
     session_id: sessionId,
     thread_id: threadId,
     prompt_text: promptText,
-    response_type: "final_answer",
-    final_status: "final_answer",
-    final_answer_source: terminalResult.final_answer_source,
-    terminal_artifact_kind: terminalResult.artifact_kind,
-    terminal_artifact_id: terminalResult.artifact_id,
-    terminal_error_code: null,
-    answer: terminalResult.text,
-    text: terminalResult.text,
-    assistant_answer: terminalResult.text,
-    selected_final_answer: terminalResult.text,
-    selected_terminal_result_id: terminalResult.result_id,
-    terminal_result: terminalResult,
-    terminal_results: [terminalResult],
+    ...buildGoldenPathTerminalResponseProjection({ terminalResult }),
     repo_code_evidence_observation: repoEvidenceObservation,
     repo_evidence_relevance_gate: repoEvidenceRelevanceGate,
     repo_code_evidence_answer: {

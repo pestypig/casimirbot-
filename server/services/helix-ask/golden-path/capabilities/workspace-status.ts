@@ -17,6 +17,7 @@ import {
 } from "../core";
 import {
   buildGoldenPathTerminalAuthorityProjection,
+  buildGoldenPathTerminalResponseProjection,
   buildGoldenPathTerminalResult,
 } from "../terminal-envelope";
 import { buildGoldenPathSolverTrace } from "../solver-trace";
@@ -142,19 +143,7 @@ export const buildHelixAskGoldenPathWorkspaceStatusPayload = (args: {
     session_id: sessionId,
     thread_id: threadId,
     prompt_text: promptText,
-    response_type: "final_answer",
-    final_status: "final_answer",
-    final_answer_source: terminalResult.final_answer_source,
-    terminal_artifact_kind: terminalResult.artifact_kind,
-    terminal_artifact_id: terminalResult.artifact_id,
-    terminal_error_code: null,
-    answer: terminalResult.text,
-    text: terminalResult.text,
-    assistant_answer: terminalResult.text,
-    selected_final_answer: terminalResult.text,
-    selected_terminal_result_id: terminalResult.result_id,
-    terminal_result: terminalResult,
-    terminal_results: [terminalResult],
+    ...buildGoldenPathTerminalResponseProjection({ terminalResult }),
     golden_path_runtime: buildGoldenPathRuntimeStatus({
       status: "workspace_status",
       requestedCapability: HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,

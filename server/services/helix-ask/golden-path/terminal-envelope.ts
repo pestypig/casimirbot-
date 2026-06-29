@@ -83,3 +83,22 @@ export const buildGoldenPathTerminalAuthorityProjection = (args: {
     terminalResult: args.terminalResult,
   }),
 });
+
+export const buildGoldenPathTerminalResponseProjection = (args: {
+  terminalResult: HelixAskGoldenPathRuntimeTerminalResult;
+  terminalErrorCode?: string | null;
+}): RecordLike => ({
+  response_type: "final_answer",
+  final_status: "final_answer",
+  final_answer_source: args.terminalResult.final_answer_source,
+  terminal_artifact_kind: args.terminalResult.artifact_kind,
+  terminal_artifact_id: args.terminalResult.artifact_id,
+  terminal_error_code: args.terminalErrorCode ?? null,
+  answer: args.terminalResult.text,
+  text: args.terminalResult.text,
+  assistant_answer: args.terminalResult.text,
+  selected_final_answer: args.terminalResult.text,
+  selected_terminal_result_id: args.terminalResult.result_id,
+  terminal_result: args.terminalResult,
+  terminal_results: [args.terminalResult],
+});
