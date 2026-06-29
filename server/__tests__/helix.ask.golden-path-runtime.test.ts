@@ -206,6 +206,76 @@ describe("Helix Ask golden path runtime", () => {
     expect(terminalLedgerEntries(body)).toHaveLength(1);
   });
 
+  it("handles workspace status as a single explicit capability", () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+
+    const decision = runHelixAskGoldenPathRuntime({
+      now: new Date("2026-06-28T12:32:00.000Z"),
+      body: {
+        turn_id: "ask:golden:workspace-status",
+        prompt: "helix_ask_golden_path_runtime use workspace_os.status",
+        goldenPathRuntime: true,
+        requested_capability: HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,
+        workspace_os_status: {
+          status: "available",
+          counts: {
+            total: 34,
+            available: 18,
+            degraded: 1,
+            blocked: 3,
+            error: 0,
+            unknown: 12,
+          },
+        },
+      },
+    });
+
+    expect(decision.handled).toBe(true);
+    if (!decision.handled) throw new Error("golden path should handle workspace status");
+    const body = decision.payload;
+
+    expect(body).toMatchObject({
+      final_status: "final_answer",
+      terminal_artifact_kind: "workspace_status_answer",
+      final_answer_source: "workspace_status_answer",
+      terminal_error_code: null,
+      workspace_os_status_observation: {
+        capability_key: HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,
+        capability_counts: {
+          total: 34,
+          available: 18,
+          degraded: 1,
+          blocked: 3,
+          error: 0,
+          unknown: 12,
+        },
+      },
+      capability_plan: {
+        requested_capability: HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,
+        executed_capability: HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,
+        required_observation_kinds: ["workspace_os_status_observation"],
+        required_terminal_kind: "workspace_status_answer",
+      },
+      ask_turn_solver_trace: {
+        completed_solver_path: true,
+        requested_capability: HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,
+        executed_capability: HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,
+        observed_artifact_kind: "workspace_os_status_observation",
+        terminal_artifact_kind: "workspace_status_answer",
+      },
+    });
+    expect(body.selected_final_answer).toContain("Workspace OS status completed");
+    expect(body.selected_final_answer).toContain("34 total, 18 available, 1 degraded");
+    expect(readLedger(body).map((artifact) => artifact.kind)).toEqual([
+      "golden_path_route_gate",
+      "workspace_os_status_observation",
+      "workspace_status_answer",
+    ]);
+    expect(terminalLedgerEntries(body)).toHaveLength(1);
+  });
+
   it("handles capability catalog plus workspace status as an ordered compound contract", () => {
     process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
 
