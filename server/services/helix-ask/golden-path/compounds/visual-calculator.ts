@@ -7,24 +7,15 @@ import {
 } from "../capabilities/calculator";
 import { readVisualCaptureSummary } from "../capabilities/visual-capture";
 import {
-  buildGoldenPathCompoundCapabilityPlan,
-  buildGoldenPathCompoundCanonicalGoalFrame,
   buildGoldenPathCompoundCapabilityContract,
-  buildGoldenPathCompoundEvidenceSynthesisAnswer,
-  buildGoldenPathCompoundGoalSatisfactionEvaluation,
   isHelixAskGoldenPathVisualCalculatorCompoundRequested,
 } from "../compound-contract";
 import { buildGoldenPathCompoundTypedFailurePayload } from "../compound-failure";
 import { buildGoldenPathCompoundSuccessPayload } from "../compound-success";
 import {
-  buildGoldenPathAnswerLedgerArtifact,
   buildGoldenPathObservationLedgerArtifact,
-  buildGoldenPathPayloadLedgerArtifact,
-  buildGoldenPathTypedFailureLedgerArtifact,
-  buildGoldenPathRouteGateLedgerArtifact,
 } from "../artifact-ledger";
 import {
-  HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
   HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
   HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY,
   HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
@@ -33,16 +24,6 @@ import {
   readStringArray,
   type RecordLike,
 } from "../core";
-import {
-  buildGoldenPathTerminalAuthorityProjection,
-  buildGoldenPathTerminalResponseProjection,
-  buildGoldenPathTypedFailureResponseProjection,
-  buildGoldenPathTerminalResult,
-  buildGoldenPathTypedFailureTerminalResult,
-} from "../terminal-envelope";
-import { buildGoldenPathSolverTrace } from "../solver-trace";
-import { buildGoldenPathCompoundRuntimeStatus } from "../runtime-status";
-import { buildGoldenPathCompoundDebugMirror } from "../debug-mirror";
 
 export type HelixAskGoldenPathVisualCalculatorCompoundDependencies = {
   now: () => Date;

@@ -1,25 +1,14 @@
 import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfaction-artifact";
-import {
-  buildGoldenPathAnswerLedgerArtifact,
-  buildGoldenPathObservationLedgerArtifact,
-  buildGoldenPathPayloadLedgerArtifact,
-  buildGoldenPathTypedFailureLedgerArtifact,
-  buildGoldenPathRouteGateLedgerArtifact,
-} from "../artifact-ledger";
+import { buildGoldenPathObservationLedgerArtifact } from "../artifact-ledger";
 import { readCompactCivilizationBoundsToolResult } from "../capabilities/civilization-bounds-reflection";
 import { readCompactZenGraphReflectionToolResult } from "../capabilities/zen-graph-reflection";
 import {
-  buildGoldenPathCompoundCapabilityPlan,
-  buildGoldenPathCompoundCanonicalGoalFrame,
   buildGoldenPathCompoundCapabilityContract,
-  buildGoldenPathCompoundEvidenceSynthesisAnswer,
-  buildGoldenPathCompoundGoalSatisfactionEvaluation,
   isHelixAskGoldenPathCivilizationBoundsZenReflectionCompoundRequested,
 } from "../compound-contract";
 import { buildGoldenPathCompoundTypedFailurePayload } from "../compound-failure";
 import { buildGoldenPathCompoundSuccessPayload } from "../compound-success";
 import {
-  HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
   HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
   HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
   readArray,
@@ -29,16 +18,6 @@ import {
   readStringArray,
   type RecordLike,
 } from "../core";
-import {
-  buildGoldenPathTerminalAuthorityProjection,
-  buildGoldenPathTerminalResponseProjection,
-  buildGoldenPathTypedFailureResponseProjection,
-  buildGoldenPathTerminalResult,
-  buildGoldenPathTypedFailureTerminalResult,
-} from "../terminal-envelope";
-import { buildGoldenPathSolverTrace } from "../solver-trace";
-import { buildGoldenPathCompoundRuntimeStatus } from "../runtime-status";
-import { buildGoldenPathCompoundDebugMirror } from "../debug-mirror";
 
 export type HelixAskGoldenPathCivilizationBoundsZenReflectionCompoundDependencies = {
   now: () => Date;

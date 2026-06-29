@@ -2,21 +2,14 @@ import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfa
 import { buildGoldenPathCapabilityCatalogObservation } from "../capabilities/capability-catalog";
 import { buildGoldenPathWorkspaceStatusObservation } from "../capabilities/workspace-status";
 import {
-  buildGoldenPathAnswerLedgerArtifact,
   buildGoldenPathObservationLedgerArtifact,
-  buildGoldenPathRouteGateLedgerArtifact,
 } from "../artifact-ledger";
 import {
-  buildGoldenPathCompoundCapabilityPlan,
-  buildGoldenPathCompoundCanonicalGoalFrame,
   buildGoldenPathCompoundCapabilityContract,
-  buildGoldenPathCompoundEvidenceSynthesisAnswer,
-  buildGoldenPathCompoundGoalSatisfactionEvaluation,
   isHelixAskGoldenPathCatalogWorkspaceCompoundRequested,
 } from "../compound-contract";
 import { buildGoldenPathCompoundSuccessPayload } from "../compound-success";
 import {
-  HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
   HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
   HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,
   readHelixAskGoldenPathPrompt,
@@ -25,14 +18,6 @@ import {
   readString,
   type RecordLike,
 } from "../core";
-import {
-  buildGoldenPathTerminalAuthorityProjection,
-  buildGoldenPathTerminalResponseProjection,
-  buildGoldenPathTerminalResult,
-} from "../terminal-envelope";
-import { buildGoldenPathSolverTrace } from "../solver-trace";
-import { buildGoldenPathCompoundRuntimeStatus } from "../runtime-status";
-import { buildGoldenPathCompoundDebugMirror } from "../debug-mirror";
 
 export type HelixAskGoldenPathCatalogWorkspaceCompoundDependencies = {
   now: () => Date;
