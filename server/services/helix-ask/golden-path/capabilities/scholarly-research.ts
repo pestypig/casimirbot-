@@ -1,17 +1,8 @@
 import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfaction-artifact";
 import { HELIX_SCHOLARLY_RESEARCH_OBSERVATION_SCHEMA } from "../../../../../shared/helix-scholarly-research-observation";
-import {
-  buildGoldenPathTypedFailureLedgerArtifact,
-  buildGoldenPathRouteGateLedgerArtifact,
-} from "../artifact-ledger";
-import {
-  buildGoldenPathCapabilityGoalSatisfactionEvaluation,
-  buildGoldenPathCapabilityPlan,
-} from "../capability-contract";
 import { buildGoldenPathCapabilitySuccessPayload } from "../capability-success";
-import { buildGoldenPathCapabilityDebugMirror } from "../debug-mirror";
+import { buildGoldenPathCapabilityTypedFailurePayload } from "../capability-failure";
 import {
-  HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
   HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
   readArray,
   readHelixAskGoldenPathPrompt,
@@ -21,13 +12,6 @@ import {
   readStringArray,
   type RecordLike,
 } from "../core";
-import {
-  buildGoldenPathTerminalAuthorityProjection,
-  buildGoldenPathTypedFailureResponseProjection,
-  buildGoldenPathTypedFailureTerminalResult,
-} from "../terminal-envelope";
-import { buildGoldenPathSolverTrace } from "../solver-trace";
-import { buildGoldenPathRuntimeStatus } from "../runtime-status";
 
 export type HelixAskGoldenPathScholarlyResearchDependencies = {
   now: () => Date;
@@ -110,109 +94,38 @@ export const buildHelixAskGoldenPathScholarlyResearchPayload = (args: {
     brokenRail: "argument_extraction" | "observation";
     missingRequirement: string;
     text: string;
-  }): RecordLike => {
-    const canonicalGoalFrame = {
-      schema: "helix.ask_canonical_goal_frame.v1",
-      turn_id: turnId,
-      goal_kind: goalKind,
-      answer_scope: "external_scholarly_research",
-      required_terminal_kind: requiredTerminalKind,
-      classifier_reasons: ["explicit_scholarly_research_lookup_request"],
-      assistant_answer: false,
-      raw_content_included: false,
-    };
-    const goalSatisfactionEvaluation = buildGoldenPathCapabilityGoalSatisfactionEvaluation({
+  }): RecordLike =>
+    buildGoldenPathCapabilityTypedFailurePayload({
       turnId,
-      goalKind,
+      traceId,
+      sessionId,
+      threadId,
+      promptText,
+      createdAtMs,
+      routeGateArtifactId,
+      terminalResultId,
       requiredTerminalKind,
-      satisfaction: "not_satisfied",
-      selectedTerminalArtifactKind: "typed_failure",
-      missingRequirements: [params.missingRequirement],
-      firstBrokenRail: params.brokenRail,
-    });
-    const goalHash = args.deps.hashGoalFrame(canonicalGoalFrame);
-    const terminalResult = buildGoldenPathTypedFailureTerminalResult({
-      resultId: terminalResultId,
-      artifactId: `${turnId}:typed_failure`,
+      answerScope: "external_scholarly_research",
+      goalKind,
+      classifierReasons: ["explicit_scholarly_research_lookup_request"],
+      requestedCapability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+      sourceTarget: "scholarly_research",
+      family: "scholarly_research",
+      requiredObservationKinds: ["scholarly_research_observation"],
+      status: "scholarly_research_lookup_failed",
+      route: "golden_path_runtime / scholarly_research_lookup",
+      errorCode: params.errorCode,
+      brokenRail: params.brokenRail,
+      missingRequirement: params.missingRequirement,
       text: params.text,
-      supportRefs: [routeGateArtifactId],
+      routeGate: "enabled_explicit_request",
+      debugStatus: "scholarly_research_lookup_failed",
+      includeGoalSatisfactionInDebug: true,
+      includeLedgerSupportRefs: true,
+      includeTerminalErrorCodeInSolverTrace: true,
+      includeFirstBrokenRailInTerminalAuthority: true,
+      hashGoalFrame: args.deps.hashGoalFrame,
     });
-    return {
-      ok: false,
-      mode: "read",
-      schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
-      turn_id: turnId,
-      trace_id: traceId,
-      session_id: sessionId,
-      thread_id: threadId,
-      prompt_text: promptText,
-      ...buildGoldenPathTypedFailureResponseProjection({
-        terminalResult,
-        terminalErrorCode: params.errorCode,
-      }),
-      golden_path_runtime: buildGoldenPathRuntimeStatus({
-        status: "scholarly_research_lookup_failed",
-        requestedCapability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
-        selectedCapability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
-        executedCapability: null,
-        firstBrokenRail: params.brokenRail,
-        routeGate: "enabled_explicit_request",
-      }),
-      canonical_goal_frame: canonicalGoalFrame,
-      capability_plan: buildGoldenPathCapabilityPlan({
-        requestedCapability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
-        sourceTarget: "scholarly_research",
-        family: "scholarly_research",
-        executedCapability: null,
-        requiredObservationKinds: ["scholarly_research_observation"],
-        requiredTerminalKind,
-      }),
-      goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-      ...buildGoldenPathTerminalAuthorityProjection({
-        terminalResult,
-        route: "golden_path_runtime / scholarly_research_lookup",
-        firstBrokenRail: params.brokenRail,
-      }),
-      ask_turn_solver_trace: buildGoldenPathSolverTrace({
-        completedSolverPath: false,
-        requestedCapability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
-        selectedCapability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
-        executedCapability: null,
-        terminalArtifactKind: "typed_failure",
-        firstBrokenRail: params.brokenRail,
-        terminalErrorCode: params.errorCode,
-      }),
-      current_turn_artifact_ledger: [
-        buildGoldenPathRouteGateLedgerArtifact({
-          artifactId: routeGateArtifactId,
-          turnId,
-          createdAtMs,
-          goalHash,
-          requestedCapability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
-        }),
-        buildGoldenPathTypedFailureLedgerArtifact({
-          artifactId: terminalResult.artifact_id,
-          turnId,
-          createdAtMs,
-          goalHash,
-          terminalResult,
-          errorCode: params.errorCode,
-          firstBrokenRail: params.brokenRail,
-          includeSupportRefs: true,
-        }),
-      ],
-      debug: buildGoldenPathCapabilityDebugMirror({
-        status: "scholarly_research_lookup_failed",
-        requestedCapability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
-        selectedCapability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
-        executedCapability: null,
-        terminalResult,
-        firstBrokenRail: params.brokenRail,
-        terminalErrorCode: params.errorCode,
-        goalSatisfactionEvaluation,
-      }),
-    };
-  };
 
   if (!query) {
     return makeFailurePayload({
