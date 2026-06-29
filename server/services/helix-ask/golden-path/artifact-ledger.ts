@@ -5,6 +5,7 @@ export const buildGoldenPathRouteGateLedgerArtifact = (args: {
   turnId: string;
   createdAtMs: number;
   goalHash: string;
+  terminalEligible?: boolean;
   promptText?: string;
   requestedCapability?: string;
   modelPacketRef?: string;
@@ -16,6 +17,7 @@ export const buildGoldenPathRouteGateLedgerArtifact = (args: {
   turn_id: args.turnId,
   producer_item_id: "golden_path_runtime",
   kind: "golden_path_route_gate",
+  ...(typeof args.terminalEligible === "boolean" ? { terminal_eligible: args.terminalEligible } : {}),
   created_at_ms: args.createdAtMs,
   source_scope: "current_turn",
   goal_hash: args.goalHash,
@@ -66,11 +68,12 @@ export const buildGoldenPathObservationLedgerArtifact = (args: {
   goalHash: string;
   kind: string;
   payload: RecordLike;
+  producerItemId?: string;
   terminalEligible?: boolean;
 }): RecordLike => ({
   artifact_id: args.artifactId,
   turn_id: args.turnId,
-  producer_item_id: "golden_path_runtime",
+  producer_item_id: args.producerItemId ?? "golden_path_runtime",
   kind: args.kind,
   terminal_eligible: args.terminalEligible ?? false,
   created_at_ms: args.createdAtMs,
@@ -87,11 +90,12 @@ export const buildGoldenPathAnswerLedgerArtifact = (args: {
   kind: string;
   payloadSchema: string;
   terminalResult: HelixAskGoldenPathRuntimeTerminalResult;
+  producerItemId?: string;
   extraPayload?: RecordLike;
 }): RecordLike => ({
   artifact_id: args.artifactId,
   turn_id: args.turnId,
-  producer_item_id: "golden_path_runtime",
+  producer_item_id: args.producerItemId ?? "golden_path_runtime",
   kind: args.kind,
   terminal_eligible: true,
   created_at_ms: args.createdAtMs,
