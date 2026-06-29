@@ -21,6 +21,12 @@ export type HelixAgentRuntimeDescriptor = {
   enabled: boolean;
   experimental: boolean;
   permission_profile: HelixAgentPermissionProfile;
+  runtime_status?: {
+    launchable: boolean;
+    reason: string | null;
+    resolved_bin: string | null;
+    args: string[];
+  };
   supports: {
     streaming: boolean;
     workstationTools: boolean;

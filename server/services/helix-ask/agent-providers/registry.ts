@@ -19,6 +19,7 @@ export function listHelixAgentProviders(): HelixAgentRuntimeDescriptor[] {
     enabled: provider.enabled(),
     experimental: provider.id !== "helix",
     permission_profile: provider.permissionProfile,
+    ...(provider.runtimeStatus ? { runtime_status: provider.runtimeStatus() } : {}),
     supports: provider.supports,
   }));
 }

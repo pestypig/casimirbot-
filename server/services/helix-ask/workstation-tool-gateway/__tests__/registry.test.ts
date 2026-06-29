@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { HELIX_WORKSPACE_OS_STATUS_CAPABILITY } from "../../workspace-os-status-intent";
 import {
   callWorkstationGatewayCapability,
@@ -10,6 +10,24 @@ const REPO_SEARCH_CAPABILITY = "repo.search";
 const DOCS_SEARCH_CAPABILITY = "docs.search";
 
 describe("Helix workstation tool gateway", () => {
+  const originalEnv = {
+    RG_BIN: process.env.RG_BIN,
+    PATH: process.env.PATH,
+    Path: process.env.Path,
+  };
+
+  beforeEach(() => {
+    process.env.RG_BIN = originalEnv.RG_BIN;
+    process.env.PATH = originalEnv.PATH;
+    process.env.Path = originalEnv.Path;
+  });
+
+  afterEach(() => {
+    process.env.RG_BIN = originalEnv.RG_BIN;
+    process.env.PATH = originalEnv.PATH;
+    process.env.Path = originalEnv.Path;
+  });
+
   it("lists read-only non-terminal workstation capabilities", () => {
     const manifest = listWorkstationGatewayCapabilities({
       agentRuntime: "codex",
@@ -317,6 +335,45 @@ describe("Helix workstation tool gateway", () => {
     expect((result.observation as { hit_count?: number }).hit_count).toBeGreaterThan(0);
   });
 
+  it("falls back to bounded Node repo search when ripgrep is unavailable", async () => {
+    process.env.RG_BIN = "__helix_missing_rg_binary__";
+    process.env.PATH = "";
+    process.env.Path = "";
+
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: REPO_SEARCH_CAPABILITY,
+      arguments: {
+        query: "workspace_os.status",
+        paths: ["server/services/helix-ask"],
+        max_hits: 3,
+      },
+      turnId: "ask:test:gateway-repo-search-node-fallback",
+      iteration: 3,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      error: undefined,
+      observation_packet: {
+        status: "succeeded",
+      },
+      observation: {
+        schema: "helix.repo_search_observation.v1",
+        query: "workspace_os.status",
+        status: "succeeded",
+        search_backend: "node_fallback",
+        search_backend_bin: null,
+        search_backend_reason: "ripgrep_not_found",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    expect((result.observation as { hit_count?: number }).hit_count).toBeGreaterThan(0);
+  });
+
   it("blocks missing repo.search query as a non-terminal observation", async () => {
     const result = await callWorkstationGatewayCapability({
       agentRuntime: "codex",
@@ -351,7 +408,7 @@ describe("Helix workstation tool gateway", () => {
       mode: "read",
       capabilityId: DOCS_SEARCH_CAPABILITY,
       arguments: {
-        query: "Helix Ask",
+        query: "Helix Ask remains the grounded reasoning surface",
         paths: ["docs"],
         max_hits: 3,
       },
@@ -386,7 +443,46 @@ describe("Helix workstation tool gateway", () => {
       },
       observation: {
         schema: "helix.docs_search_observation.v1",
-        query: "Helix Ask",
+        query: "Helix Ask remains the grounded reasoning surface",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    expect((result.observation as { hit_count?: number }).hit_count).toBeGreaterThan(0);
+  });
+
+  it("falls back to bounded Node docs search when ripgrep is unavailable", async () => {
+    process.env.RG_BIN = "__helix_missing_rg_binary__";
+    process.env.PATH = "";
+    process.env.Path = "";
+
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: DOCS_SEARCH_CAPABILITY,
+      arguments: {
+        query: "Helix Ask remains the grounded reasoning surface",
+        paths: ["docs"],
+        max_hits: 3,
+      },
+      turnId: "ask:test:gateway-docs-search-node-fallback",
+      iteration: 4,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      error: undefined,
+      observation_packet: {
+        status: "succeeded",
+      },
+      observation: {
+        schema: "helix.docs_search_observation.v1",
+        query: "Helix Ask remains the grounded reasoning surface",
+        status: "succeeded",
+        search_backend: "node_fallback",
+        search_backend_bin: null,
+        search_backend_reason: "ripgrep_not_found",
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,

@@ -1,9 +1,15 @@
 import { afterEach, describe, expect, it } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { listHelixAgentProviders, resolveHelixAgentProvider } from "../agent-providers/registry";
 import { selectHelixAgentRuntime } from "../agent-providers/runtime-select";
 import { buildHelixAgentRuntimeSelectionTrace } from "../agent-providers/runtime-debug";
 import {
   codexProvider,
+  readCodexArgs,
+  resolveCodexBinary,
+  runCodexProcess,
   runExplicitCodexWorkstationGatewayCalls,
 } from "../agent-providers/codex-provider";
 import {
@@ -22,6 +28,15 @@ const ENV_KEYS = [
   "HELIX_ASK_AGENT_RUNTIME",
   "ENABLE_CODEX_AGENT",
   "ENABLE_FUTURE_AGENT",
+  "CODEX_BIN",
+  "CODEX_ARGS",
+  "CODEX_AGENT_TIMEOUT_MS",
+  "CODEX_APPX_INSTALL_LOCATION",
+  "CODEX_DISABLE_LOCAL_PACKAGE_BIN",
+  "CODEX_WINDOWS_APPS_DIR",
+  "PATH",
+  "Path",
+  "PATHEXT",
   "CODEX_AGENT_FAKE_STDOUT",
   "CODEX_AGENT_FAKE_STDERR",
   "CODEX_AGENT_FAKE_EXIT_CODE",
@@ -79,7 +94,7 @@ describe("Helix Ask agent provider selection", () => {
   });
 
   it("falls back to Helix when Codex is requested but disabled", () => {
-    delete process.env.ENABLE_CODEX_AGENT;
+    process.env.ENABLE_CODEX_AGENT = "0";
 
     expect(resolveHelixAgentProvider({ body: { agent_runtime: "codex" } }).id).toBe("helix");
   });
@@ -91,8 +106,8 @@ describe("Helix Ask agent provider selection", () => {
     expect(resolveHelixAgentProvider({ body: { agent_runtime: "future" } }).id).toBe("helix");
   });
 
-  it("selects Codex when requested and enabled", () => {
-    process.env.ENABLE_CODEX_AGENT = "1";
+  it("selects Codex when requested by default", () => {
+    delete process.env.ENABLE_CODEX_AGENT;
 
     const provider = resolveHelixAgentProvider({ body: { agentRuntime: "codex" } });
 
@@ -111,6 +126,212 @@ describe("Helix Ask agent provider selection", () => {
         write: false,
         shell: false,
         codeMutation: false,
+      },
+    });
+  });
+
+  it("uses safe non-interactive read-only Codex CLI args by default", () => {
+    delete process.env.CODEX_ARGS;
+
+    expect(readCodexArgs()).toEqual([
+      "exec",
+      "--sandbox",
+      "read-only",
+      "--skip-git-repo-check",
+      "--color",
+      "never",
+    ]);
+  });
+
+  it("allows Codex CLI args to be overridden from env", () => {
+    process.env.CODEX_ARGS = "exec --json --sandbox read-only";
+
+    expect(readCodexArgs()).toEqual(["exec", "--json", "--sandbox", "read-only"]);
+  });
+
+  it("uses CODEX_BIN when it points to a launchable binary", () => {
+    process.env.CODEX_BIN = process.execPath;
+
+    expect(resolveCodexBinary()).toMatchObject({
+      launchable: true,
+      reason: null,
+      resolved_bin: process.execPath,
+    });
+  });
+
+  it("prefers the repo-local npm Codex package before PATH aliases", () => {
+    delete process.env.CODEX_BIN;
+    delete process.env.CODEX_DISABLE_LOCAL_PACKAGE_BIN;
+    process.env.PATH = "";
+    process.env.Path = "";
+
+    const resolved = resolveCodexBinary();
+
+    expect(resolved).toMatchObject({
+      launchable: true,
+      reason: null,
+    });
+    expect(resolved.resolved_bin).toContain(path.join("node_modules", "@openai", "codex", "bin", "codex.js"));
+  });
+
+  it("resolves Codex from PATH when CODEX_BIN is not set", () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "helix-codex-path-"));
+    const filename = process.platform === "win32" ? "codex.exe" : "codex";
+    const candidate = path.join(tempDir, filename);
+    fs.copyFileSync(process.execPath, candidate);
+    delete process.env.CODEX_BIN;
+    process.env.CODEX_DISABLE_LOCAL_PACKAGE_BIN = "1";
+    process.env.PATH = tempDir;
+    process.env.Path = tempDir;
+    process.env.PATHEXT = ".EXE";
+
+    expect(resolveCodexBinary()).toMatchObject({
+      launchable: true,
+      reason: null,
+      resolved_bin: candidate,
+    });
+  });
+
+  it("resolves Codex from a WindowsApps-style install directory", () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "helix-codex-windowsapps-"));
+    const resourcesDir = path.join(tempDir, "OpenAI.Codex_test", "app", "resources");
+    fs.mkdirSync(resourcesDir, { recursive: true });
+    const candidate = path.join(resourcesDir, "codex.exe");
+    fs.copyFileSync(process.execPath, candidate);
+    delete process.env.CODEX_BIN;
+    process.env.CODEX_DISABLE_LOCAL_PACKAGE_BIN = "1";
+    process.env.PATH = "";
+    process.env.Path = "";
+    process.env.CODEX_WINDOWS_APPS_DIR = tempDir;
+
+    expect(resolveCodexBinary()).toMatchObject({
+      launchable: true,
+      reason: null,
+      resolved_bin: candidate,
+    });
+  });
+
+  it("resolves Codex from a packaged app install location before requiring WindowsApps directory listing", () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "helix-codex-appx-"));
+    const resourcesDir = path.join(tempDir, "app", "resources");
+    fs.mkdirSync(resourcesDir, { recursive: true });
+    const candidate = path.join(resourcesDir, "codex.exe");
+    fs.copyFileSync(process.execPath, candidate);
+    delete process.env.CODEX_BIN;
+    process.env.CODEX_DISABLE_LOCAL_PACKAGE_BIN = "1";
+    process.env.PATH = "";
+    process.env.Path = "";
+    process.env.CODEX_WINDOWS_APPS_DIR = path.join(tempDir, "missing-windowsapps");
+    process.env.CODEX_APPX_INSTALL_LOCATION = tempDir;
+
+    expect(resolveCodexBinary()).toMatchObject({
+      launchable: true,
+      reason: null,
+      resolved_bin: candidate,
+    });
+  });
+
+  it("reports a typed missing-binary status instead of throwing", () => {
+    process.env.CODEX_BIN = path.join(os.tmpdir(), "helix-missing-codex-bin.exe");
+
+    expect(resolveCodexBinary()).toMatchObject({
+      launchable: false,
+      reason: "codex_binary_not_found",
+      resolved_bin: null,
+    });
+  });
+
+  it("reports a typed non-spawnable binary status instead of treating file existence as launchability", () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "helix-codex-unspawnable-"));
+    const candidate = path.join(tempDir, process.platform === "win32" ? "codex.exe" : "codex");
+    fs.writeFileSync(candidate, "not a real executable");
+    process.env.CODEX_BIN = candidate;
+
+    expect(resolveCodexBinary()).toMatchObject({
+      launchable: false,
+      reason: "codex_binary_not_spawnable",
+      resolved_bin: candidate,
+    });
+  });
+
+  it("returns a timeout result instead of hanging when the Codex process does not exit", async () => {
+    process.env.CODEX_BIN = process.execPath;
+    process.env.CODEX_ARGS = "-e setInterval(()=>{},1000)";
+    process.env.CODEX_AGENT_TIMEOUT_MS = "25";
+
+    const startedAt = Date.now();
+    const result = await runCodexProcess({ prompt: "check" });
+
+    expect(Date.now() - startedAt).toBeLessThan(2_000);
+    expect(result).toMatchObject({
+      exitCode: null,
+      timedOut: true,
+      killed: true,
+    });
+    expect(result.stderr).toContain("Codex process timed out after 25ms.");
+  });
+
+  it("returns Codex missing-binary failures with provider debug metadata", async () => {
+    process.env.CODEX_BIN = path.join(os.tmpdir(), "helix-missing-codex-bin.exe");
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:codex-missing-binary",
+        question: "check",
+      },
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      runtime: "codex",
+      response_type: "final_failure",
+      final_status: "final_failure",
+      answer: "Codex runtime is enabled but no launchable Codex CLI binary was found.",
+      debug: {
+        agent_runtime: "codex",
+        fail_reason: "codex_binary_not_found",
+        codex_bin: null,
+        codex_runtime_status: {
+          launchable: false,
+          reason: "codex_binary_not_found",
+          resolved_bin: null,
+        },
+      },
+    });
+  });
+
+  it("returns Codex non-spawnable binary failures with provider debug metadata", async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "helix-codex-provider-unspawnable-"));
+    const candidate = path.join(tempDir, process.platform === "win32" ? "codex.exe" : "codex");
+    fs.writeFileSync(candidate, "not a real executable");
+    process.env.CODEX_BIN = candidate;
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:codex-unspawnable-binary",
+        question: "check",
+      },
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      runtime: "codex",
+      response_type: "final_failure",
+      final_status: "final_failure",
+      answer: "Codex runtime is enabled but the resolved Codex CLI binary could not be spawned.",
+      debug: {
+        agent_runtime: "codex",
+        fail_reason: "codex_binary_not_spawnable",
+        codex_bin: candidate,
+        codex_runtime_status: {
+          launchable: false,
+          reason: "codex_binary_not_spawnable",
+          resolved_bin: candidate,
+        },
       },
     });
   });
@@ -139,7 +360,7 @@ describe("Helix Ask agent provider selection", () => {
     });
   });
 
-  it("lists Helix as enabled and experimental providers as disabled by default", () => {
+  it("lists Helix and Codex as enabled and keeps future providers disabled by default", () => {
     delete process.env.ENABLE_CODEX_AGENT;
     delete process.env.ENABLE_FUTURE_AGENT;
 
@@ -158,7 +379,7 @@ describe("Helix Ask agent provider selection", () => {
     expect(providers).toContainEqual(
       expect.objectContaining({
         id: "codex",
-        enabled: false,
+        enabled: true,
         experimental: true,
         permission_profile: expect.objectContaining({
           id: "read-observe",

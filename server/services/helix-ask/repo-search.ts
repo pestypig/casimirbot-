@@ -69,6 +69,9 @@ export type RepoSearchResult = {
   hits: RepoSearchHit[];
   truncated: boolean;
   error?: string;
+  search_backend?: "ripgrep" | "node_fallback";
+  search_backend_bin?: string | null;
+  search_backend_reason?: string;
   stage0?: Stage0Telemetry;
   stage0_candidates?: string[];
 };
@@ -422,6 +425,28 @@ const EXCLUDE_GLOBS: string[] = [
   "!**/.git/**",
   "!**/server/_generated/**",
 ];
+
+const REPO_SEARCH_FALLBACK_MAX_FILES = Math.max(
+  100,
+  Number(process.env.HELIX_ASK_REPO_SEARCH_FALLBACK_MAX_FILES ?? 10000),
+);
+const REPO_SEARCH_FALLBACK_MAX_FILE_BYTES = Math.max(
+  16 * 1024,
+  Number(process.env.HELIX_ASK_REPO_SEARCH_FALLBACK_MAX_FILE_BYTES ?? 1024 * 1024),
+);
+const REPO_SEARCH_FALLBACK_SKIP_DIRS = new Set([
+  ".git",
+  "node_modules",
+  "dist",
+  "build",
+  "coverage",
+  ".next",
+  ".turbo",
+  "_generated",
+]);
+
+const REPO_SEARCH_FALLBACK_SKIP_FILE_RE =
+  /\.(?:png|jpe?g|gif|webp|ico|bmp|avif|pdf|zip|gz|tgz|7z|rar|wasm|woff2?|ttf|eot|mp[34]|mov|avi|sqlite|db|bin|exe|dll|pyd|so|dylib)$/i;
 
 const sanitizeSearchTerm = (value: string): string => {
   const cleaned = value
@@ -1168,12 +1193,135 @@ const parseRgJsonLine = (
   };
 };
 
+const resolveRipgrepBinary = (): string => {
+  const configured = String(process.env.RG_BIN ?? "").trim();
+  if (configured) return configured;
+  const localBin = path.resolve(
+    process.cwd(),
+    "node_modules",
+    ".bin",
+    process.platform === "win32" ? "rg.cmd" : "rg",
+  );
+  if (fs.existsSync(localBin)) return localBin;
+  return "rg";
+};
+
+const isWithinRepoRoot = (absolutePath: string): boolean => {
+  const root = path.resolve(process.cwd());
+  const relative = path.relative(root, absolutePath);
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+};
+
+const shouldSkipFallbackFile = (absolutePath: string): boolean => {
+  const relative = normalizeRepoPath(path.relative(process.cwd(), absolutePath));
+  if (!relative) return true;
+  if (relative.split("/").some((part) => REPO_SEARCH_FALLBACK_SKIP_DIRS.has(part))) return true;
+  if (/\.test\.[^/]+$/i.test(relative) || /\.spec\.[^/]+$/i.test(relative)) return true;
+  if (/\.snap$/i.test(relative) || /\.map$/i.test(relative)) return true;
+  return REPO_SEARCH_FALLBACK_SKIP_FILE_RE.test(relative);
+};
+
+const collectFallbackSearchFiles = async (targetPaths: string[]): Promise<{
+  files: string[];
+  truncated: boolean;
+}> => {
+  const files: string[] = [];
+  let truncated = false;
+  const queue = targetPaths
+    .map((entry) => path.resolve(process.cwd(), entry))
+    .filter((entry) => isWithinRepoRoot(entry) && fs.existsSync(entry));
+
+  while (queue.length > 0) {
+    if (files.length >= REPO_SEARCH_FALLBACK_MAX_FILES) {
+      truncated = true;
+      break;
+    }
+    const current = queue.shift();
+    if (!current || shouldSkipFallbackFile(current)) continue;
+    let stat: fs.Stats;
+    try {
+      stat = await fs.promises.stat(current);
+    } catch {
+      continue;
+    }
+    if (stat.isDirectory()) {
+      let entries: fs.Dirent[];
+      try {
+        entries = await fs.promises.readdir(current, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+        if (REPO_SEARCH_FALLBACK_SKIP_DIRS.has(entry.name)) continue;
+        queue.push(path.join(current, entry.name));
+      }
+      continue;
+    }
+    if (!stat.isFile()) continue;
+    if (stat.size > REPO_SEARCH_FALLBACK_MAX_FILE_BYTES) continue;
+    files.push(current);
+  }
+
+  return { files, truncated };
+};
+
+const runNodeFallbackRepoSearch = async (
+  terms: string[],
+  targetPaths: string[],
+): Promise<Pick<RepoSearchResult, "hits" | "truncated">> => {
+  const hits: RepoSearchHit[] = [];
+  const collected = await collectFallbackSearchFiles(targetPaths);
+  let truncated = collected.truncated;
+  const lowerTerms = terms.map((term) => term.toLowerCase());
+  const hitsByTerm = new Map<string, number>();
+
+  for (const absolutePath of collected.files) {
+    if (hits.length >= REPO_SEARCH_MAX_TOTAL) {
+      truncated = true;
+      break;
+    }
+    let content: string;
+    try {
+      content = await fs.promises.readFile(absolutePath, "utf8");
+    } catch {
+      continue;
+    }
+    const lines = content.split(/\r?\n/);
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index] ?? "";
+      const lowerLine = line.toLowerCase();
+      for (let termIndex = 0; termIndex < terms.length; termIndex += 1) {
+        const lowerTerm = lowerTerms[termIndex] ?? "";
+        const term = terms[termIndex] ?? lowerTerm;
+        if ((hitsByTerm.get(term) ?? 0) >= REPO_SEARCH_MAX_PER_TERM) continue;
+        if (!lowerTerm || !lowerLine.includes(lowerTerm)) continue;
+        hits.push({
+          filePath: normalizeRepoPath(path.relative(process.cwd(), absolutePath)),
+          line: index + 1,
+          text: clipLine(line),
+          term,
+        });
+        hitsByTerm.set(term, (hitsByTerm.get(term) ?? 0) + 1);
+        if (hits.length >= REPO_SEARCH_MAX_TOTAL) {
+          truncated = true;
+          break;
+        }
+      }
+      if (truncated) break;
+    }
+    if (truncated) break;
+  }
+
+  return { hits, truncated };
+};
+
 export async function runRepoSearch(plan: RepoSearchPlan): Promise<RepoSearchResult> {
   const hits: RepoSearchHit[] = [];
   let truncated = false;
   const stage0Prefilter = await resolveRepoSearchStage0Prefilter(plan);
   const stage0Active = stage0Prefilter.telemetry.used && stage0Prefilter.candidates.length > 0;
   const targetPaths = stage0Active ? stage0Prefilter.candidates : plan.paths;
+  const rgBin = resolveRipgrepBinary();
   const baseArgs = [
     "--json",
     "-n",
@@ -1190,7 +1338,7 @@ export async function runRepoSearch(plan: RepoSearchPlan): Promise<RepoSearchRes
     }
     const args = [...baseArgs, "--", term, ...targetPaths];
     try {
-      const { stdout } = await execFileAsync("rg", args, {
+      const { stdout } = await execFileAsync(rgBin, args, {
         cwd: process.cwd(),
         timeout: REPO_SEARCH_TIMEOUT_MS,
         maxBuffer: 2 * 1024 * 1024,
@@ -1205,11 +1353,27 @@ export async function runRepoSearch(plan: RepoSearchPlan): Promise<RepoSearchRes
         hits.push(...termHits);
         continue;
       }
-      const message = error?.code === "ENOENT" ? "rg_not_found" : "rg_failed";
+      if (error?.code === "ENOENT") {
+        const fallback = await runNodeFallbackRepoSearch(plan.terms, targetPaths);
+        return {
+          hits: fallback.hits,
+          truncated: truncated || fallback.truncated,
+          search_backend: "node_fallback",
+          search_backend_bin: null,
+          search_backend_reason: "ripgrep_not_found",
+          stage0: applyStage0HitRate(
+            stage0Prefilter.telemetry,
+            stage0Prefilter.candidates.map((filePath) => ({ filePath })),
+            fallback.hits,
+          ),
+        };
+      }
       return {
         hits,
         truncated,
-        error: message,
+        error: "rg_failed",
+        search_backend: "ripgrep",
+        search_backend_bin: rgBin,
         stage0: applyStage0HitRate(
           stage0Prefilter.telemetry,
           stage0Prefilter.candidates.map((filePath) => ({ filePath })),
@@ -1221,6 +1385,8 @@ export async function runRepoSearch(plan: RepoSearchPlan): Promise<RepoSearchRes
   return {
     hits,
     truncated,
+    search_backend: "ripgrep",
+    search_backend_bin: rgBin,
     stage0: applyStage0HitRate(
       stage0Prefilter.telemetry,
       stage0Prefilter.candidates.map((filePath) => ({ filePath })),

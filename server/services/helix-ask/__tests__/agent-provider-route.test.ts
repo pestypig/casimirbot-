@@ -34,7 +34,7 @@ const createApp = (): express.Express => {
 
 describe("AGI agent provider route", () => {
   it("lists provider descriptors and resolves the default through provider availability", async () => {
-    process.env.HELIX_ASK_AGENT_RUNTIME = "codex";
+    delete process.env.HELIX_ASK_AGENT_RUNTIME;
     delete process.env.ENABLE_CODEX_AGENT;
     delete process.env.ENABLE_FUTURE_AGENT;
 
@@ -60,7 +60,7 @@ describe("AGI agent provider route", () => {
     expect(response.body.providers).toContainEqual(
       expect.objectContaining({
         id: "codex",
-        enabled: false,
+        enabled: true,
         experimental: true,
         permission_profile: expect.objectContaining({
           id: "read-observe",
@@ -70,6 +70,10 @@ describe("AGI agent provider route", () => {
             shell: false,
             codeMutation: false,
           }),
+        }),
+        runtime_status: expect.objectContaining({
+          launchable: expect.any(Boolean),
+          args: expect.any(Array),
         }),
       }),
     );
@@ -87,7 +91,7 @@ describe("AGI agent provider route", () => {
 
   it("advertises enabled Codex and Future defaults only when their providers are enabled", async () => {
     process.env.HELIX_ASK_AGENT_RUNTIME = "codex";
-    process.env.ENABLE_CODEX_AGENT = "1";
+    delete process.env.ENABLE_CODEX_AGENT;
 
     const codexResponse = await request(createApp())
       .get("/api/agi/agent-providers")
@@ -105,7 +109,6 @@ describe("AGI agent provider route", () => {
     );
 
     process.env.HELIX_ASK_AGENT_RUNTIME = "future";
-    delete process.env.ENABLE_CODEX_AGENT;
     process.env.ENABLE_FUTURE_AGENT = "1";
 
     const futureResponse = await request(createApp())

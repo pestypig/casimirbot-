@@ -42,6 +42,12 @@ export type HelixAgentProvider = {
   label: string;
   permissionProfile: HelixAgentPermissionProfile;
   enabled(): boolean;
+  runtimeStatus?(): {
+    launchable: boolean;
+    reason: string | null;
+    resolved_bin: string | null;
+    args: string[];
+  };
   supports: {
     streaming: boolean;
     workstationTools: boolean;

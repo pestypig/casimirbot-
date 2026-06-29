@@ -1,4 +1,7 @@
 import express from "express";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import request from "supertest";
 import { afterEach, describe, expect, it } from "vitest";
 import { planRouter } from "../routes/agi.plan";
@@ -8,6 +11,7 @@ const originalEnableFutureAgent = process.env.ENABLE_FUTURE_AGENT;
 const originalCodexFakeStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
 const originalCodexFakeStderr = process.env.CODEX_AGENT_FAKE_STDERR;
 const originalCodexFakeExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+const originalCodexBin = process.env.CODEX_BIN;
 
 afterEach(() => {
   if (originalEnableCodexAgent === undefined) {
@@ -34,6 +38,11 @@ afterEach(() => {
     delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
   } else {
     process.env.CODEX_AGENT_FAKE_EXIT_CODE = originalCodexFakeExitCode;
+  }
+  if (originalCodexBin === undefined) {
+    delete process.env.CODEX_BIN;
+  } else {
+    process.env.CODEX_BIN = originalCodexBin;
   }
 });
 
@@ -70,6 +79,72 @@ const parseSseEvents = (text: string): Array<{ event: string; data: Record<strin
     });
 
 describe("Helix Ask agent provider route metadata", () => {
+  it("promotes Codex launch failures into the visible response debug envelope", async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "helix-codex-route-unspawnable-"));
+    const candidate = path.join(tempDir, process.platform === "win32" ? "codex.exe" : "codex");
+    fs.writeFileSync(candidate, "not a real executable");
+    process.env.ENABLE_CODEX_AGENT = "1";
+    process.env.CODEX_BIN = candidate;
+
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        agent_runtime: "codex",
+        turn_id: "ask:test:codex-provider-launch-failure-debug",
+        question: "Codex launch failure debug smoke test.",
+      })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      ok: false,
+      runtime: "codex",
+      agent_runtime: "codex",
+      response_type: "final_failure",
+      final_status: "final_failure",
+      answer: "Codex runtime is enabled but the resolved Codex CLI binary could not be spawned.",
+      fail_reason: "codex_binary_not_spawnable",
+      codex_bin: candidate,
+      codex_runtime_status: {
+        launchable: false,
+        reason: "codex_binary_not_spawnable",
+        resolved_bin: candidate,
+      },
+      debug: {
+        agent_runtime: "codex",
+        fail_reason: "codex_binary_not_spawnable",
+        codex_bin: candidate,
+        codex_runtime_status: {
+          launchable: false,
+          reason: "codex_binary_not_spawnable",
+          resolved_bin: candidate,
+        },
+      },
+    });
+    expect(response.body.debug_export_ref).toMatchObject({
+      endpoint: "/api/agi/ask/turn/ask%3Atest%3Acodex-provider-launch-failure-debug/debug-export",
+      turn_id: "ask:test:codex-provider-launch-failure-debug",
+    });
+
+    const debugExport = await request(app)
+      .get("/api/agi/ask/turn/ask%3Atest%3Acodex-provider-launch-failure-debug/debug-export")
+      .expect(200);
+    expect(debugExport.body).toMatchObject({
+      ok: true,
+      payload: {
+        active_turn_id: "ask:test:codex-provider-launch-failure-debug",
+        agent_runtime: "codex",
+        fail_reason: "codex_binary_not_spawnable",
+        codex_bin: candidate,
+        codex_runtime_status: {
+          launchable: false,
+          reason: "codex_binary_not_spawnable",
+          resolved_bin: candidate,
+        },
+      },
+    });
+  });
+
   it("returns Helix Native gateway observations without promoting them to terminal answers", async () => {
     const app = createApp();
     const response = await request(app)

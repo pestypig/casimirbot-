@@ -140,6 +140,18 @@ export const createHelixAskLiveDebugSlimBuilder = (
       trace_id: payload.trace_id ?? payload.traceId ?? debug.trace_id ?? null,
       session_id: payload.session_id ?? payload.sessionId ?? debug.session_id ?? null,
       agent_runtime: payload.agent_runtime ?? debug.agent_runtime ?? null,
+      fail_reason: payload.fail_reason ?? debug.fail_reason ?? null,
+      codex_exit_code: payload.codex_exit_code ?? debug.codex_exit_code ?? null,
+      codex_timed_out: payload.codex_timed_out ?? debug.codex_timed_out ?? null,
+      codex_process_killed:
+        payload.codex_process_killed ?? debug.codex_process_killed ?? null,
+      codex_timeout_ms: payload.codex_timeout_ms ?? debug.codex_timeout_ms ?? null,
+      codex_bin: payload.codex_bin ?? debug.codex_bin ?? null,
+      codex_args: payload.codex_args ?? debug.codex_args ?? null,
+      codex_runtime_status:
+        payload.codex_runtime_status ?? debug.codex_runtime_status ?? null,
+      codex_stderr_preview:
+        payload.codex_stderr_preview ?? debug.codex_stderr_preview ?? null,
       agent_runtime_selection_trace:
         payload.agent_runtime_selection_trace ?? debug.agent_runtime_selection_trace ?? null,
       selected_agent_provider:
