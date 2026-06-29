@@ -14,6 +14,7 @@ import {
   buildGoldenPathTerminalAnswerAuthority,
   buildGoldenPathTerminalAuthoritySingleWriter,
   buildGoldenPathTerminalResult,
+  buildGoldenPathTypedFailureTerminalResult,
 } from "../terminal-envelope";
 
 export type HelixAskGoldenPathStagePlayReflectionDependencies = {
@@ -113,19 +114,12 @@ export const buildHelixAskGoldenPathStagePlayReflectionPayload = (args: {
       evaluation: goalSatisfactionEvaluation,
       createdAtMs,
     });
-    const terminalResult: HelixAskGoldenPathRuntimeTerminalResult = {
-      schema: "helix.ask_golden_path_terminal_result.v1",
-      result_id: terminalResultId,
-      artifact_id: terminalArtifactId,
-      artifact_kind: "typed_failure",
-      final_answer_source: "typed_failure",
+    const terminalResult = buildGoldenPathTypedFailureTerminalResult({
+      resultId: terminalResultId,
+      artifactId: terminalArtifactId,
       text: failureText,
-      support_refs: [routeGateArtifactId, goalSatisfactionArtifact.artifact_id],
-      terminal_authority_ok: true,
-      route_authority_ok: true,
-      assistant_answer: false,
-      raw_content_included: false,
-    };
+      supportRefs: [routeGateArtifactId, goalSatisfactionArtifact.artifact_id],
+    });
     return {
       ok: true,
       mode: "read",

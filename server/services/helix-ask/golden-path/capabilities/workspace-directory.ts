@@ -9,13 +9,13 @@ import {
   readHelixAskGoldenPathPrompt,
   readString,
   readStringArray,
-  type HelixAskGoldenPathRuntimeTerminalResult,
   type RecordLike,
 } from "../core";
 import {
   buildGoldenPathTerminalAnswerAuthority,
   buildGoldenPathTerminalAuthoritySingleWriter,
   buildGoldenPathTerminalResult,
+  buildGoldenPathTypedFailureTerminalResult,
 } from "../terminal-envelope";
 
 export type HelixAskGoldenPathWorkspaceDirectoryDependencies = {
@@ -105,19 +105,12 @@ export const buildHelixAskGoldenPathWorkspaceDirectoryPayload = (args: {
       raw_content_included: false,
     };
     const goalHash = args.deps.hashGoalFrame(canonicalGoalFrame);
-    const terminalResult: HelixAskGoldenPathRuntimeTerminalResult = {
-      schema: "helix.ask_golden_path_terminal_result.v1",
-      result_id: terminalResultId,
-      artifact_id: terminalArtifactId,
-      artifact_kind: "typed_failure",
-      final_answer_source: "typed_failure",
+    const terminalResult = buildGoldenPathTypedFailureTerminalResult({
+      resultId: terminalResultId,
+      artifactId: terminalArtifactId,
       text: failureText,
-      support_refs: [routeGateArtifactId],
-      terminal_authority_ok: true,
-      route_authority_ok: true,
-      assistant_answer: false,
-      raw_content_included: false,
-    };
+      supportRefs: [routeGateArtifactId],
+    });
     return {
       ok: false,
       mode: "read",
