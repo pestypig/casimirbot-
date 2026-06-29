@@ -13,9 +13,13 @@ import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
   readHelixAskGoldenPathPrompt,
   readString,
-  type HelixAskGoldenPathRuntimeTerminalResult,
   type RecordLike,
 } from "./core";
+import {
+  buildGoldenPathTerminalAnswerAuthority,
+  buildGoldenPathTerminalAuthoritySingleWriter,
+  buildGoldenPathTerminalResult,
+} from "./terminal-envelope";
 
 export type HelixAskGoldenPathRuntimeContractPayloadDependencies = {
   now: () => Date;
@@ -75,19 +79,14 @@ export const buildHelixAskGoldenPathRuntimeContractPayload = (args: {
     createdAtMs,
   });
   const compositeDebug = buildGoldenPathCompositeDebug({ deps, turnId });
-  const terminalResult: HelixAskGoldenPathRuntimeTerminalResult = {
-    schema: "helix.ask_golden_path_terminal_result.v1",
-    result_id: terminalResultId,
-    artifact_id: artifactId,
-    artifact_kind: "golden_path_contract_answer",
-    final_answer_source: "helix_ask_golden_path_runtime",
+  const terminalResult = buildGoldenPathTerminalResult({
+    resultId: terminalResultId,
+    artifactId,
+    artifactKind: "golden_path_contract_answer",
+    finalAnswerSource: "helix_ask_golden_path_runtime",
     text: answerText,
-    support_refs: [routeGateArtifactId, modelPacketRef, goalSatisfactionArtifact.artifact_id],
-    terminal_authority_ok: true,
-    route_authority_ok: true,
-    assistant_answer: false,
-    raw_content_included: false,
-  };
+    supportRefs: [routeGateArtifactId, modelPacketRef, goalSatisfactionArtifact.artifact_id],
+  });
   const stagePlayCheckpointReceiptPayload = deps.buildStagePlayCheckpointReceiptPayload({
     payload: {
       ask_turn_solver_trace: { schema: "helix.ask_turn_solver_trace.v1" },
@@ -162,31 +161,11 @@ export const buildHelixAskGoldenPathRuntimeContractPayload = (args: {
       raw_content_included: false,
     },
     goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-    terminal_answer_authority: {
-      schema: "helix.terminal_answer_authority.v1",
-      selected_terminal_artifact_kind: terminalResult.artifact_kind,
-      terminal_artifact_kind: terminalResult.artifact_kind,
-      selected_terminal_artifact_id: terminalResult.artifact_id,
-      terminal_artifact_id: terminalResult.artifact_id,
-      selected_terminal_result_id: terminalResult.result_id,
-      selected_final_answer: terminalResult.text,
-      final_answer_source: terminalResult.final_answer_source,
-      terminal_authority_ok: true,
+    terminal_answer_authority: buildGoldenPathTerminalAnswerAuthority({
+      terminalResult,
       route: "golden_path_runtime / contract_only",
-      server_authoritative: true,
-      assistant_answer: false,
-      raw_content_included: false,
-    },
-    terminal_authority_single_writer: {
-      schema: "helix.terminal_authority_single_writer.v1",
-      selected_terminal_artifact_kind: terminalResult.artifact_kind,
-      selected_terminal_artifact_id: terminalResult.artifact_id,
-      selected_terminal_result_id: terminalResult.result_id,
-      visible_text: terminalResult.text,
-      source: terminalResult.final_answer_source,
-      assistant_answer: false,
-      raw_content_included: false,
-    },
+    }),
+    terminal_authority_single_writer: buildGoldenPathTerminalAuthoritySingleWriter({ terminalResult }),
     ask_turn_solver_trace: {
       schema: "helix.ask_turn_solver_trace.v1",
       completed_solver_path: true,
