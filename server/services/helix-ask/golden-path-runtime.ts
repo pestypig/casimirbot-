@@ -16,6 +16,7 @@ import {
   HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
   executeWorkspaceDirectoryResolveTool,
 } from "./workspace-directory-resolver";
+import { STAGE_PLAY_PROCESSED_MAIL_PACKET_SCHEMA } from "../../../shared/contracts/stage-play-live-source-mail.v1";
 
 type RecordLike = Record<string, unknown>;
 
@@ -28,6 +29,8 @@ export const HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY =
 export const HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY = "docs-viewer.locate_in_doc" as const;
 export const HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY = "repo-code.search_concept" as const;
 export const HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY = "workspace_os.status" as const;
+export const HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY =
+  "live_env.read_processed_live_source_mail" as const;
 
 export type HelixAskGoldenPathRuntimeTerminalResult = {
   schema: "helix.ask_golden_path_terminal_result.v1";
@@ -41,6 +44,7 @@ export type HelixAskGoldenPathRuntimeTerminalResult = {
     | "workstation_tool_evaluation"
     | "workspace_directory_resolution"
     | "workspace_status_answer"
+    | "model_synthesized_answer"
     | "typed_failure"
     | "compound_evidence_synthesis_answer";
   final_answer_source:
@@ -51,6 +55,7 @@ export type HelixAskGoldenPathRuntimeTerminalResult = {
     | "workstation_tool_evaluation"
     | "workspace_directory_resolution"
     | "workspace_status_answer"
+    | "model_synthesized_answer"
     | "typed_failure"
     | "compound_evidence_synthesis_answer";
   text: string;
@@ -210,6 +215,71 @@ const readWorkspaceDirectoryQuery = (body: RecordLike): string | null => {
   if (docPathMatch?.[0]) return docPathMatch[0].replace(/[),.;:!?]+$/g, "");
   const forMatch = prompt.match(/\b(?:for|resolve|locate|find)\s+([A-Za-z0-9._/\\:-]{4,})/i);
   return forMatch?.[1]?.replace(/[),.;:!?]+$/g, "") ?? null;
+};
+
+const isHelixAskGoldenPathProcessedLiveSourceMailRequested = (body: RecordLike): boolean => {
+  const requestedCapabilities = readStringArray(body.requested_capabilities ?? body.requestedCapabilities);
+  if (requestedCapabilities.includes(HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY)) return true;
+  const requestedCapability =
+    readString(body.requested_capability) ??
+    readString(body.requestedCapability) ??
+    readString(body.capability) ??
+    readString(body.tool_name) ??
+    readString(body.toolName);
+  if (requestedCapability === HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY) return true;
+  const prompt = readHelixAskGoldenPathPrompt(body).toLowerCase();
+  return (
+    prompt.includes(HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY) ||
+    /\bread[_\s-]?processed[_\s-]?live[_\s-]?source[_\s-]?mail\b/.test(prompt) ||
+    /\bprocessed\s+live[-\s]?source\s+mail\b/.test(prompt)
+  );
+};
+
+const readProcessedMailPacketInput = (body: RecordLike): RecordLike | null =>
+  readRecord(body.processed_mail_packet) ??
+  readRecord(body.processedMailPacket) ??
+  readRecord(body.stage_play_processed_mail_packet) ??
+  readRecord(body.stagePlayProcessedMailPacket) ??
+  null;
+
+const readProcessedMailPacketStringArray = (packet: RecordLike, camelKey: string, snakeKey: string): string[] =>
+  readStringArray(packet[camelKey] ?? packet[snakeKey]);
+
+const buildProcessedMailPacketPayload = (args: {
+  body: RecordLike;
+  turnId: string;
+  createdAtMs: number;
+}): RecordLike | null => {
+  const input = readProcessedMailPacketInput(args.body);
+  if (!input) return null;
+  const packetId =
+    readString(input.packetId) ??
+    readString(input.packet_id) ??
+    readString(input.artifactId) ??
+    readString(input.artifact_id) ??
+    `${args.turnId}:stage_play_processed_mail_packet`;
+  const evidenceRefs = readProcessedMailPacketStringArray(input, "evidenceRefs", "evidence_refs");
+  return {
+    artifactId: "stage_play_processed_mail_packet",
+    schemaVersion: STAGE_PLAY_PROCESSED_MAIL_PACKET_SCHEMA,
+    packetId,
+    jobId: readString(input.jobId) ?? readString(input.job_id) ?? `${args.turnId}:live_source_job`,
+    sourceId: readString(input.sourceId) ?? readString(input.source_id) ?? "golden_path_compact_mail_source",
+    mailIds: readProcessedMailPacketStringArray(input, "mailIds", "mail_ids"),
+    observedFacts: readProcessedMailPacketStringArray(input, "observedFacts", "observed_facts"),
+    inferredFacts: readProcessedMailPacketStringArray(input, "inferredFacts", "inferred_facts"),
+    uncertainties: readProcessedMailPacketStringArray(input, "uncertainties", "uncertainties"),
+    sceneTags: readProcessedMailPacketStringArray(input, "sceneTags", "scene_tags"),
+    visualEvidenceRefs: readProcessedMailPacketStringArray(input, "visualEvidenceRefs", "visual_evidence_refs"),
+    recommendedNext: readString(input.recommendedNext) ?? readString(input.recommended_next) ?? "inspect_if_needed",
+    watchNext: readProcessedMailPacketStringArray(input, "watchNext", "watch_next"),
+    resolutionState: readString(input.resolutionState) ?? readString(input.resolution_state) ?? "processed",
+    microReasonerRunRefs: readProcessedMailPacketStringArray(input, "microReasonerRunRefs", "micro_reasoner_run_refs"),
+    evidenceRefs: evidenceRefs.length ? evidenceRefs : [packetId],
+    createdAt: readString(input.createdAt) ?? new Date(args.createdAtMs).toISOString(),
+    assistant_answer: false,
+    terminal_eligible: false,
+  };
 };
 
 const isHelixAskGoldenPathCalculatorSolveRequested = (body: RecordLike): boolean => {
@@ -3167,6 +3237,483 @@ const buildHelixAskGoldenPathWorkspaceDirectoryPayload = (args: {
   };
 };
 
+const buildHelixAskGoldenPathProcessedLiveSourceMailPayload = (args: {
+  body: RecordLike;
+  deps?: Partial<HelixAskGoldenPathRuntimeDependencies>;
+  now?: Date;
+}): RecordLike => {
+  const deps = createHelixAskGoldenPathRuntimeDependencies({
+    ...args.deps,
+    ...(args.now ? { now: () => args.now as Date } : {}),
+  });
+  const now = deps.now();
+  const createdAtMs = now.getTime();
+  const turnId =
+    readString(args.body.turn_id) ?? readString(args.body.turnId) ?? `ask:golden-processed-mail:${createdAtMs}`;
+  const traceId = readString(args.body.trace_id) ?? readString(args.body.traceId) ?? turnId;
+  const sessionId = readString(args.body.session_id) ?? readString(args.body.sessionId);
+  const threadId = readString(args.body.thread_id) ?? readString(args.body.threadId);
+  const promptText = readHelixAskGoldenPathPrompt(args.body);
+  const packetPayload = buildProcessedMailPacketPayload({ body: args.body, turnId, createdAtMs });
+  const routeGateArtifactId = `${turnId}:golden_path_route_gate`;
+  const observationArtifactId = readString(packetPayload?.packetId) ?? `${turnId}:stage_play_processed_mail_packet`;
+  const terminalArtifactId = `${turnId}:model_synthesized_answer`;
+  const terminalResultId = `${turnId}:golden_path_terminal_result`;
+  const requiredTerminalKind = "model_synthesized_answer";
+  const goalKind = "processed_live_source_mail_read";
+
+  if (!packetPayload) {
+    const failureText =
+      "I could not complete this golden-path Ask turn because no processed live-source mail packet was provided.";
+    const terminalResult = {
+      schema: "helix.ask_golden_path_terminal_result.v1",
+      result_id: terminalResultId,
+      artifact_id: `${turnId}:typed_failure`,
+      artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      text: failureText,
+      support_refs: [routeGateArtifactId],
+      terminal_authority_ok: true,
+      route_authority_ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const canonicalGoalFrame = {
+      schema: "helix.ask_canonical_goal_frame.v1",
+      turn_id: turnId,
+      goal_kind: goalKind,
+      answer_scope: "current_turn",
+      required_terminal_kind: requiredTerminalKind,
+      allows_workspace_context: false,
+      allows_prior_artifacts: false,
+      classifier_reasons: ["explicit_processed_live_source_mail_request"],
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const goalSatisfactionEvaluation = {
+      schema: "helix.goal_satisfaction_evaluation.v1",
+      turn_id: turnId,
+      satisfaction: "not_satisfied",
+      goal_kind: goalKind,
+      required_terminal_kind: requiredTerminalKind,
+      selected_terminal_artifact_kind: "typed_failure",
+      missing_requirements: ["stage_play_processed_mail_packet"],
+      first_broken_rail: "observation",
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+
+    return {
+      ok: false,
+      mode: "read",
+      schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
+      turn_id: turnId,
+      trace_id: traceId,
+      session_id: sessionId,
+      thread_id: threadId,
+      prompt_text: promptText,
+      response_type: "typed_failure",
+      final_status: "typed_failure",
+      final_answer_source: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      terminal_artifact_id: terminalResult.artifact_id,
+      terminal_error_code: "missing_processed_live_source_mail_packet",
+      answer: failureText,
+      text: failureText,
+      assistant_answer: failureText,
+      selected_final_answer: failureText,
+      selected_terminal_result_id: terminalResult.result_id,
+      terminal_result: terminalResult,
+      terminal_results: [terminalResult],
+      golden_path_runtime: {
+        schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
+        status: "processed_live_source_mail_missing_packet",
+        flag: HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
+        requested_capability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+        executed_capability: null,
+        observed_artifact_kind: null,
+        observed_artifact_ref: null,
+        terminal_artifact_ref: terminalResult.artifact_id,
+        terminal_result_id: terminalResultId,
+        legacy_route_bypassed: true,
+        private_runtime_loop_entered: false,
+        route_gate: "enabled_explicit_request",
+        terminal_result_count: 1,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      canonical_goal_frame: canonicalGoalFrame,
+      capability_plan: {
+        schema: "helix.ask_capability_plan.v1",
+        requested_capability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+        executed_capability: null,
+        source_target: "live_source_mailbox",
+        family: "live_environment",
+        required_observation_kinds: ["stage_play_processed_mail_packet"],
+        required_terminal_kind: requiredTerminalKind,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      goal_satisfaction_evaluation: goalSatisfactionEvaluation,
+      terminal_answer_authority: {
+        schema: "helix.terminal_answer_authority.v1",
+        completed_solver_path: false,
+        selected_terminal_artifact_kind: "typed_failure",
+        terminal_artifact_kind: "typed_failure",
+        selected_terminal_artifact_id: terminalResult.artifact_id,
+        terminal_artifact_id: terminalResult.artifact_id,
+        selected_terminal_result_id: terminalResult.result_id,
+        selected_final_answer: failureText,
+        final_answer_source: "typed_failure",
+        first_broken_rail: "observation",
+        terminal_authority_ok: true,
+        route: "golden_path_runtime / processed_live_source_mail",
+        server_authoritative: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_authority_single_writer: {
+        schema: "helix.terminal_authority_single_writer.v1",
+        selected_terminal_artifact_kind: "typed_failure",
+        selected_terminal_artifact_id: terminalResult.artifact_id,
+        selected_terminal_result_id: terminalResult.result_id,
+        visible_text: failureText,
+        source: "typed_failure",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      ask_turn_solver_trace: {
+        schema: "helix.ask_turn_solver_trace.v1",
+        completed_solver_path: false,
+        route_authority_ok: true,
+        terminal_authority_ok: true,
+        goal_satisfaction: "not_satisfied",
+        golden_path_runtime: true,
+        private_runtime_loop_entered: false,
+        requested_capability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+        executed_capability: null,
+        observed_artifact_kind: null,
+        observed_artifact_ref: null,
+        terminal_artifact_kind: "typed_failure",
+        first_broken_rail: "observation",
+        terminal_error_code: "missing_processed_live_source_mail_packet",
+        solver_risk_flags: [],
+        solver_short_circuit_flags: [],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: routeGateArtifactId,
+          turn_id: turnId,
+          producer_item_id: "golden_path_runtime",
+          kind: "golden_path_route_gate",
+          terminal_eligible: false,
+          created_at_ms: createdAtMs,
+          source_scope: "current_turn",
+          payload: {
+            schema: "helix.golden_path_route_gate.v1",
+            route_gate: "enabled_explicit_request",
+            requested_capability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+        {
+          artifact_id: terminalResult.artifact_id,
+          turn_id: turnId,
+          producer_item_id: "golden_path_runtime",
+          kind: "typed_failure",
+          terminal_eligible: true,
+          created_at_ms: createdAtMs,
+          source_scope: "current_turn",
+          payload: {
+            schema: "helix.typed_failure.v1",
+            text: failureText,
+            answer_text: failureText,
+            terminal_error_code: "missing_processed_live_source_mail_packet",
+            first_broken_rail: "observation",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      ],
+      debug: {
+        schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
+        golden_path_runtime: true,
+        golden_path_runtime_status: "processed_live_source_mail_missing_packet",
+        private_runtime_loop_entered: false,
+        requested_capability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+        executed_capability: null,
+        terminal_artifact_kind: "typed_failure",
+        terminal_result_count: 1,
+        final_answer_source: "typed_failure",
+        terminal_error_code: "missing_processed_live_source_mail_packet",
+        goal_satisfaction_evaluation: goalSatisfactionEvaluation,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+  }
+
+  const observedFacts = readStringArray(packetPayload.observedFacts);
+  const inferredFacts = readStringArray(packetPayload.inferredFacts);
+  const uncertainties = readStringArray(packetPayload.uncertainties);
+  const recommendedNext = readString(packetPayload.recommendedNext) ?? "inspect_if_needed";
+  const answerText = [
+    `Processed live-source mail packet read: ${observationArtifactId}.`,
+    observedFacts.length ? `Observed facts: ${observedFacts.join("; ")}.` : "Observed facts: none supplied.",
+    inferredFacts.length ? `Inferred facts: ${inferredFacts.join("; ")}.` : "Inferred facts: none supplied.",
+    uncertainties.length ? `Uncertainties: ${uncertainties.join("; ")}.` : "Uncertainties: none supplied.",
+    `Recommended next: ${recommendedNext}.`,
+  ].join("\n");
+  const canonicalGoalFrame = {
+    schema: "helix.ask_canonical_goal_frame.v1",
+    turn_id: turnId,
+    goal_kind: goalKind,
+    answer_scope: "current_turn",
+    required_terminal_kind: requiredTerminalKind,
+    allows_workspace_context: false,
+    allows_prior_artifacts: false,
+    classifier_reasons: ["explicit_processed_live_source_mail_request"],
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  const goalSatisfactionEvaluation = {
+    schema: "helix.goal_satisfaction_evaluation.v1",
+    turn_id: turnId,
+    satisfaction: "satisfied",
+    goal_kind: goalKind,
+    required_terminal_kind: requiredTerminalKind,
+    selected_terminal_artifact_kind: requiredTerminalKind,
+    missing_requirements: [],
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  const goalHash = deps.hashGoalFrame(canonicalGoalFrame);
+  const goalSatisfactionArtifact = deps.buildGoalSatisfactionEvaluationArtifact({
+    turnId,
+    goalHash,
+    evaluation: goalSatisfactionEvaluation,
+    createdAtMs,
+  });
+  const terminalResult: HelixAskGoldenPathRuntimeTerminalResult = {
+    schema: "helix.ask_golden_path_terminal_result.v1",
+    result_id: terminalResultId,
+    artifact_id: terminalArtifactId,
+    artifact_kind: requiredTerminalKind,
+    final_answer_source: requiredTerminalKind,
+    text: answerText,
+    support_refs: [observationArtifactId, routeGateArtifactId, goalSatisfactionArtifact.artifact_id],
+    terminal_authority_ok: true,
+    route_authority_ok: true,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+
+  return {
+    ok: true,
+    mode: "read",
+    schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
+    turn_id: turnId,
+    trace_id: traceId,
+    session_id: sessionId,
+    thread_id: threadId,
+    prompt_text: promptText,
+    response_type: "final_answer",
+    final_status: "final_answer",
+    final_answer_source: terminalResult.final_answer_source,
+    terminal_artifact_kind: terminalResult.artifact_kind,
+    terminal_artifact_id: terminalResult.artifact_id,
+    terminal_error_code: null,
+    answer: terminalResult.text,
+    text: terminalResult.text,
+    assistant_answer: terminalResult.text,
+    selected_final_answer: terminalResult.text,
+    selected_terminal_result_id: terminalResult.result_id,
+    terminal_result: terminalResult,
+    terminal_results: [terminalResult],
+    golden_path_runtime: {
+      schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
+      status: "processed_live_source_mail",
+      flag: HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
+      requested_capability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+      selected_capability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+      executed_capability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+      observed_artifact_kind: "stage_play_processed_mail_packet",
+      observed_artifact_ref: observationArtifactId,
+      terminal_artifact_ref: terminalArtifactId,
+      terminal_result_id: terminalResultId,
+      legacy_route_bypassed: true,
+      legacy_fallback_possible_when_unhandled: true,
+      private_runtime_loop_entered: false,
+      route_gate: "enabled_explicit_request",
+      terminal_result_count: 1,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    canonical_goal_frame: canonicalGoalFrame,
+    stage_play_processed_mail_packet: packetPayload,
+    model_synthesized_answer: {
+      schema: "helix.model_synthesized_answer.v1",
+      text: terminalResult.text,
+      answer_text: terminalResult.text,
+      support_refs: terminalResult.support_refs,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    model_turn_input: {
+      schema: "helix.ask_model_turn_input.v1",
+      turn_id: turnId,
+      prompt_text: promptText,
+      available_capabilities: [HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY],
+      function_call_outputs: [
+        {
+          call_id: `${turnId}:call:read_processed_live_source_mail`,
+          name: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+          output_ref: observationArtifactId,
+          output_kind: "stage_play_processed_mail_packet",
+        },
+      ],
+      model_visible_artifacts: [observationArtifactId, goalSatisfactionArtifact.artifact_id],
+      loop_policy: {
+        max_model_steps: 1,
+        private_runtime_loop_entered: false,
+      },
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    capability_plan: {
+      schema: "helix.ask_capability_plan.v1",
+      requested_capability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+      selected_capability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+      executed_capability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+      source_target: "live_source_mailbox",
+      family: "live_environment",
+      required_observation_kinds: ["stage_play_processed_mail_packet"],
+      required_terminal_kind: requiredTerminalKind,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    goal_satisfaction_evaluation: goalSatisfactionEvaluation,
+    terminal_answer_authority: {
+      schema: "helix.terminal_answer_authority.v1",
+      selected_terminal_artifact_kind: terminalResult.artifact_kind,
+      terminal_artifact_kind: terminalResult.artifact_kind,
+      selected_terminal_artifact_id: terminalResult.artifact_id,
+      terminal_artifact_id: terminalResult.artifact_id,
+      selected_terminal_result_id: terminalResult.result_id,
+      selected_final_answer: terminalResult.text,
+      final_answer_source: terminalResult.final_answer_source,
+      terminal_authority_ok: true,
+      route: "golden_path_runtime / processed_live_source_mail",
+      server_authoritative: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    terminal_authority_single_writer: {
+      schema: "helix.terminal_authority_single_writer.v1",
+      selected_terminal_artifact_kind: terminalResult.artifact_kind,
+      selected_terminal_artifact_id: terminalResult.artifact_id,
+      selected_terminal_result_id: terminalResult.result_id,
+      visible_text: terminalResult.text,
+      source: terminalResult.final_answer_source,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    ask_turn_solver_trace: {
+      schema: "helix.ask_turn_solver_trace.v1",
+      completed_solver_path: true,
+      route_authority_ok: true,
+      terminal_authority_ok: true,
+      goal_satisfaction: "satisfied",
+      golden_path_runtime: true,
+      private_runtime_loop_entered: false,
+      requested_capability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+      selected_capability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+      executed_capability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+      observed_artifact_kind: "stage_play_processed_mail_packet",
+      observed_artifact_ref: observationArtifactId,
+      terminal_artifact_kind: terminalResult.artifact_kind,
+      solver_risk_flags: [],
+      solver_short_circuit_flags: [],
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    current_turn_artifact_ledger: [
+      {
+        artifact_id: routeGateArtifactId,
+        turn_id: turnId,
+        producer_item_id: "golden_path_runtime",
+        kind: "golden_path_route_gate",
+        terminal_eligible: false,
+        created_at_ms: createdAtMs,
+        source_scope: "current_turn",
+        goal_hash: goalHash,
+        payload: {
+          schema: "helix.golden_path_route_gate.v1",
+          route_gate: "enabled_explicit_request",
+          requested_capability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+          goal_satisfaction_artifact: goalSatisfactionArtifact,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+      {
+        artifact_id: observationArtifactId,
+        turn_id: turnId,
+        producer_item_id: "golden_path_runtime",
+        kind: "stage_play_processed_mail_packet",
+        terminal_eligible: false,
+        created_at_ms: createdAtMs,
+        source_scope: "current_turn",
+        goal_hash: goalHash,
+        payload: packetPayload,
+      },
+      {
+        artifact_id: terminalArtifactId,
+        turn_id: turnId,
+        producer_item_id: "golden_path_runtime",
+        kind: requiredTerminalKind,
+        terminal_eligible: true,
+        created_at_ms: createdAtMs,
+        source_scope: "current_turn",
+        goal_hash: goalHash,
+        payload: {
+          schema: "helix.model_synthesized_answer.v1",
+          text: terminalResult.text,
+          answer_text: terminalResult.text,
+          terminal_result_id: terminalResult.result_id,
+          support_refs: terminalResult.support_refs,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    ],
+    debug: {
+      schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
+      golden_path_runtime: true,
+      golden_path_runtime_status: "processed_live_source_mail",
+      private_runtime_loop_entered: false,
+      requested_capability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+      selected_capability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+      executed_capability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+      observed_artifact_kind: "stage_play_processed_mail_packet",
+      observed_artifact_ref: observationArtifactId,
+      terminal_artifact_kind: terminalResult.artifact_kind,
+      terminal_result_count: 1,
+      final_answer_source: terminalResult.final_answer_source,
+      goal_satisfaction_evaluation: goalSatisfactionEvaluation,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+  };
+};
+
 const buildHelixAskGoldenPathCatalogWorkspaceCompoundPayload = (args: {
   body: RecordLike;
   deps?: Partial<HelixAskGoldenPathRuntimeDependencies>;
@@ -3486,6 +4033,16 @@ export const runHelixAskGoldenPathRuntime = (args: {
     return {
       handled: true,
       payload: buildHelixAskGoldenPathCatalogWorkspaceCompoundPayload({
+        body,
+        deps: args.deps,
+        now: args.now,
+      }),
+    };
+  }
+  if (isHelixAskGoldenPathProcessedLiveSourceMailRequested(body)) {
+    return {
+      handled: true,
+      payload: buildHelixAskGoldenPathProcessedLiveSourceMailPayload({
         body,
         deps: args.deps,
         now: args.now,

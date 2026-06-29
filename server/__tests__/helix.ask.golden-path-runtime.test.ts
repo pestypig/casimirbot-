@@ -6,6 +6,7 @@ import {
   HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
   HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
   HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+  HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
   HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
   HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,
   buildHelixAskGoldenPathRuntimePayload,
@@ -56,6 +57,109 @@ describe("Helix Ask golden path runtime", () => {
         body: { prompt: "ordinary prompt" },
       }),
     ).toEqual({ handled: false, reason: "not_requested" });
+  });
+
+  it("handles processed live-source mail as a golden-path capability with observation re-entry", () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+
+    const decision = runHelixAskGoldenPathRuntime({
+      now: new Date("2026-06-28T12:30:00.000Z"),
+      body: {
+        turn_id: "ask:golden:processed-mail",
+        prompt: "helix_ask_golden_path_runtime use live_env.read_processed_live_source_mail",
+        goldenPathRuntime: true,
+        requested_capability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+        processed_mail_packet: {
+          packetId: "stage_play_processed_mail_packet:golden-mail",
+          jobId: "stage_play_live_source_job:golden",
+          sourceId: "screen_summary:golden",
+          mailIds: ["stage_play_live_source_mail_item:1"],
+          observedFacts: ["The UI shows a pending action banner", "The operator is focused on Docs Viewer"],
+          inferredFacts: ["The turn should summarize the live-source packet before advising"],
+          uncertainties: ["No audio transcript was included"],
+          sceneTags: ["docs-viewer"],
+          recommendedNext: "draft_text_answer",
+          evidenceRefs: ["visual_frame:golden", "stage_play_live_source_mail_item:1"],
+        },
+      },
+    });
+
+    expect(decision.handled).toBe(true);
+    if (!decision.handled) throw new Error("golden path should handle processed live-source mail");
+    const body = decision.payload;
+
+    expect(body).toMatchObject({
+      final_status: "final_answer",
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "model_synthesized_answer",
+      terminal_error_code: null,
+      capability_plan: {
+        requested_capability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+        executed_capability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+        required_observation_kinds: ["stage_play_processed_mail_packet"],
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      ask_turn_solver_trace: {
+        completed_solver_path: true,
+        requested_capability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+        executed_capability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+        observed_artifact_kind: "stage_play_processed_mail_packet",
+        terminal_artifact_kind: "model_synthesized_answer",
+      },
+      terminal_answer_authority: {
+        server_authoritative: true,
+        terminal_artifact_kind: "model_synthesized_answer",
+        final_answer_source: "model_synthesized_answer",
+      },
+    });
+    expect(body.selected_final_answer).toContain("Processed live-source mail packet read");
+    expect(body.selected_final_answer).toContain("The UI shows a pending action banner");
+    expect(readLedger(body).map((artifact) => artifact.kind)).toEqual([
+      "golden_path_route_gate",
+      "stage_play_processed_mail_packet",
+      "model_synthesized_answer",
+    ]);
+    expect(terminalLedgerEntries(body)).toHaveLength(1);
+  });
+
+  it("fails closed when processed live-source mail is requested without packet evidence", () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+
+    const decision = runHelixAskGoldenPathRuntime({
+      now: new Date("2026-06-28T12:31:00.000Z"),
+      body: {
+        turn_id: "ask:golden:processed-mail-missing",
+        prompt: "helix_ask_golden_path_runtime live_env.read_processed_live_source_mail",
+        goldenPathRuntime: true,
+      },
+    });
+
+    expect(decision.handled).toBe(true);
+    if (!decision.handled) throw new Error("golden path should handle missing processed mail as typed failure");
+    const body = decision.payload;
+
+    expect(body).toMatchObject({
+      final_status: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      terminal_error_code: "missing_processed_live_source_mail_packet",
+      goal_satisfaction_evaluation: {
+        satisfaction: "not_satisfied",
+        first_broken_rail: "observation",
+      },
+      ask_turn_solver_trace: {
+        completed_solver_path: false,
+        requested_capability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+        executed_capability: null,
+        first_broken_rail: "observation",
+      },
+    });
+    expect(body.selected_final_answer).toContain("no processed live-source mail packet");
+    expect(readLedger(body).map((artifact) => artifact.kind)).toEqual(["golden_path_route_gate", "typed_failure"]);
+    expect(terminalLedgerEntries(body)).toHaveLength(1);
   });
 
   it("builds a contract-only terminal payload without entering the private loop", () => {
