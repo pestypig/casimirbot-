@@ -25,6 +25,7 @@ import {
   buildGoldenPathTerminalResult,
   buildGoldenPathTypedFailureTerminalResult,
 } from "../terminal-envelope";
+import { buildGoldenPathSolverTrace } from "../solver-trace";
 
 export type HelixAskGoldenPathInternetSearchDependencies = {
   now: () => Date;
@@ -218,20 +219,15 @@ export const buildHelixAskGoldenPathInternetSearchPayload = (args: {
         assistant_answer: false,
         raw_content_included: false,
       },
-      ask_turn_solver_trace: {
-        schema: "helix.ask_turn_solver_trace.v1",
-        completed_solver_path: false,
-        golden_path_runtime: true,
-        private_runtime_loop_entered: false,
-        requested_capability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
-        selected_capability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
-        executed_capability: null,
-        terminal_artifact_kind: "typed_failure",
-        first_broken_rail: params.brokenRail,
-        terminal_error_code: params.errorCode,
-        assistant_answer: false,
-        raw_content_included: false,
-      },
+      ask_turn_solver_trace: buildGoldenPathSolverTrace({
+        completedSolverPath: false,
+        requestedCapability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
+        selectedCapability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
+        executedCapability: null,
+        terminalArtifactKind: "typed_failure",
+        firstBrokenRail: params.brokenRail,
+        terminalErrorCode: params.errorCode,
+      }),
       current_turn_artifact_ledger: [
         buildGoldenPathRouteGateLedgerArtifact({
           artifactId: routeGateArtifactId,
@@ -454,25 +450,22 @@ export const buildHelixAskGoldenPathInternetSearchPayload = (args: {
       route: "golden_path_runtime / internet_search_lookup",
     }),
     terminal_authority_single_writer: buildGoldenPathTerminalAuthoritySingleWriter({ terminalResult }),
-    ask_turn_solver_trace: {
-      schema: "helix.ask_turn_solver_trace.v1",
-      completed_solver_path: true,
-      route_authority_ok: true,
-      terminal_authority_ok: true,
-      goal_satisfaction: "satisfied",
-      golden_path_runtime: true,
-      private_runtime_loop_entered: false,
-      requested_capability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
-      selected_capability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
-      executed_capability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
-      observed_artifact_kind: "internet_search_observation",
-      observed_artifact_ref: observationArtifactId,
-      terminal_artifact_kind: terminalResult.artifact_kind,
-      solver_risk_flags: [],
-      solver_short_circuit_flags: [],
-      assistant_answer: false,
-      raw_content_included: false,
-    },
+    ask_turn_solver_trace: buildGoldenPathSolverTrace({
+      completedSolverPath: true,
+      routeAuthorityOk: true,
+      terminalAuthorityOk: true,
+      goalSatisfaction: "satisfied",
+      requestedCapability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
+      selectedCapability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
+      executedCapability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
+      observedArtifactKind: "internet_search_observation",
+      observedArtifactRef: observationArtifactId,
+      terminalArtifactKind: terminalResult.artifact_kind,
+      extra: {
+        solver_risk_flags: [],
+        solver_short_circuit_flags: [],
+      },
+    }),
     current_turn_artifact_ledger: [
       buildGoldenPathRouteGateLedgerArtifact({
         artifactId: routeGateArtifactId,
