@@ -6,6 +6,7 @@ import {
   buildGoldenPathPayloadLedgerArtifact,
   buildGoldenPathRouteGateLedgerArtifact,
 } from "../artifact-ledger";
+import { buildGoldenPathCapabilityPlan } from "../capability-contract";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
@@ -175,18 +176,14 @@ export const buildHelixAskGoldenPathScholarlyResearchPayload = (args: {
         raw_content_included: false,
       },
       canonical_goal_frame: canonicalGoalFrame,
-      capability_plan: {
-        schema: "helix.ask_capability_plan.v1",
-        requested_capability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
-        selected_capability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
-        executed_capability: null,
-        source_target: "scholarly_research",
+      capability_plan: buildGoldenPathCapabilityPlan({
+        requestedCapability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+        sourceTarget: "scholarly_research",
         family: "scholarly_research",
-        required_observation_kinds: ["scholarly_research_observation"],
-        required_terminal_kind: requiredTerminalKind,
-        assistant_answer: false,
-        raw_content_included: false,
-      },
+        executedCapability: null,
+        requiredObservationKinds: ["scholarly_research_observation"],
+        requiredTerminalKind,
+      }),
       goal_satisfaction_evaluation: goalSatisfactionEvaluation,
       terminal_answer_authority: {
         schema: "helix.terminal_answer_authority.v1",
@@ -424,19 +421,14 @@ export const buildHelixAskGoldenPathScholarlyResearchPayload = (args: {
       raw_content_included: false,
     },
     canonical_goal_frame: canonicalGoalFrame,
-    capability_plan: {
-      schema: "helix.ask_capability_plan.v1",
-      requested_capability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
-      selected_capability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
-      executed_capability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
-      source_target: "scholarly_research",
+    capability_plan: buildGoldenPathCapabilityPlan({
+      requestedCapability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+      sourceTarget: "scholarly_research",
       family: "scholarly_research",
-      args: { query },
-      required_observation_kinds: ["scholarly_research_observation"],
-      required_terminal_kind: requiredTerminalKind,
-      assistant_answer: false,
-      raw_content_included: false,
-    },
+      planArgs: { query },
+      requiredObservationKinds: ["scholarly_research_observation"],
+      requiredTerminalKind,
+    }),
     goal_satisfaction_evaluation: goalSatisfactionEvaluation,
     terminal_answer_authority: buildGoldenPathTerminalAnswerAuthority({
       terminalResult,

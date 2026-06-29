@@ -9,6 +9,7 @@ import {
   buildGoldenPathPayloadLedgerArtifact,
   buildGoldenPathRouteGateLedgerArtifact,
 } from "../artifact-ledger";
+import { buildGoldenPathCapabilityPlan } from "../capability-contract";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
@@ -289,19 +290,15 @@ export const buildHelixAskGoldenPathRepoSearchConceptPayload = (args: {
         raw_content_included: false,
       },
       canonical_goal_frame: canonicalGoalFrame,
-      capability_plan: {
-        schema: "helix.ask_capability_plan.v1",
-        requested_capability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
-        selected_capability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
-        executed_capability: null,
-        source_target: "repo_code",
+      capability_plan: buildGoldenPathCapabilityPlan({
+        requestedCapability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+        sourceTarget: "repo_code",
         family: "repo_code",
-        args: { concept },
-        required_observation_kinds: ["repo_code_evidence_observation", "repo_evidence_relevance_gate"],
-        required_terminal_kind: requiredTerminalKind,
-        assistant_answer: false,
-        raw_content_included: false,
-      },
+        executedCapability: null,
+        planArgs: { concept },
+        requiredObservationKinds: ["repo_code_evidence_observation", "repo_evidence_relevance_gate"],
+        requiredTerminalKind,
+      }),
       goal_satisfaction_evaluation: goalSatisfactionEvaluation,
       terminal_answer_authority: {
         schema: "helix.terminal_answer_authority.v1",
@@ -514,19 +511,14 @@ export const buildHelixAskGoldenPathRepoSearchConceptPayload = (args: {
       raw_content_included: false,
     },
     canonical_goal_frame: canonicalGoalFrame,
-    capability_plan: {
-      schema: "helix.ask_capability_plan.v1",
-      requested_capability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
-      selected_capability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
-      executed_capability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
-      source_target: "repo_code",
+    capability_plan: buildGoldenPathCapabilityPlan({
+      requestedCapability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+      sourceTarget: "repo_code",
       family: "repo_code",
-      args: { concept },
-      required_observation_kinds: ["repo_code_evidence_observation", "repo_evidence_relevance_gate"],
-      required_terminal_kind: requiredTerminalKind,
-      assistant_answer: false,
-      raw_content_included: false,
-    },
+      planArgs: { concept },
+      requiredObservationKinds: ["repo_code_evidence_observation", "repo_evidence_relevance_gate"],
+      requiredTerminalKind,
+    }),
     goal_satisfaction_evaluation: goalSatisfactionEvaluation,
     terminal_answer_authority: buildGoldenPathTerminalAnswerAuthority({
       terminalResult,

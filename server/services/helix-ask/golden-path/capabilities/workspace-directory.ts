@@ -8,6 +8,7 @@ import {
   buildGoldenPathPayloadLedgerArtifact,
   buildGoldenPathRouteGateLedgerArtifact,
 } from "../artifact-ledger";
+import { buildGoldenPathCapabilityPlan } from "../capability-contract";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
@@ -140,18 +141,14 @@ export const buildHelixAskGoldenPathWorkspaceDirectoryPayload = (args: {
       terminal_result: terminalResult,
       terminal_results: [terminalResult],
       canonical_goal_frame: canonicalGoalFrame,
-      capability_plan: {
-        schema: "helix.ask_capability_plan.v1",
-        requested_capability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
-        selected_capability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
-        executed_capability: null,
-        source_target: "workspace_directory",
+      capability_plan: buildGoldenPathCapabilityPlan({
+        requestedCapability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
+        sourceTarget: "workspace_directory",
         family: "workspace_directory",
-        required_observation_kinds: ["workspace_directory_resolution"],
-        required_terminal_kind: requiredTerminalKind,
-        assistant_answer: false,
-        raw_content_included: false,
-      },
+        executedCapability: null,
+        requiredObservationKinds: ["workspace_directory_resolution"],
+        requiredTerminalKind,
+      }),
       goal_satisfaction_evaluation: goalSatisfactionEvaluation,
       terminal_answer_authority: {
         schema: "helix.terminal_answer_authority.v1",
@@ -323,18 +320,13 @@ export const buildHelixAskGoldenPathWorkspaceDirectoryPayload = (args: {
       raw_content_included: false,
     },
     canonical_goal_frame: canonicalGoalFrame,
-    capability_plan: {
-      schema: "helix.ask_capability_plan.v1",
-      requested_capability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
-      selected_capability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
-      executed_capability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
-      source_target: "workspace_directory",
+    capability_plan: buildGoldenPathCapabilityPlan({
+      requestedCapability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
+      sourceTarget: "workspace_directory",
       family: "workspace_directory",
-      required_observation_kinds: ["workspace_directory_resolution"],
-      required_terminal_kind: requiredTerminalKind,
-      assistant_answer: false,
-      raw_content_included: false,
-    },
+      requiredObservationKinds: ["workspace_directory_resolution"],
+      requiredTerminalKind,
+    }),
     goal_satisfaction_evaluation: goalSatisfactionEvaluation,
     terminal_answer_authority: buildGoldenPathTerminalAnswerAuthority({
       terminalResult,
