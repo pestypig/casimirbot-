@@ -50,6 +50,7 @@ export const buildGoldenPathCapabilitySuccessPayload = (args: {
   planArgs?: RecordLike;
   classifierReasons: readonly string[];
   allowsWorkspaceContext: boolean;
+  includeWorkspaceContextFields?: boolean;
   requestedCapability: string;
   selectedCapability?: string;
   executedCapability?: string;
@@ -79,8 +80,12 @@ export const buildGoldenPathCapabilitySuccessPayload = (args: {
     goal_kind: args.goalKind,
     answer_scope: args.answerScope ?? "current_turn",
     required_terminal_kind: args.requiredTerminalKind,
-    allows_workspace_context: args.allowsWorkspaceContext,
-    allows_prior_artifacts: false,
+    ...(args.includeWorkspaceContextFields === false
+      ? {}
+      : {
+          allows_workspace_context: args.allowsWorkspaceContext,
+          allows_prior_artifacts: false,
+        }),
     classifier_reasons: args.classifierReasons,
     assistant_answer: false,
     raw_content_included: false,
