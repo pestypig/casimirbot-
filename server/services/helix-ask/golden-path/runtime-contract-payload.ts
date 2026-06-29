@@ -14,10 +14,13 @@ import {
 } from "./artifact-ledger";
 import { buildGoldenPathCapabilityGoalSatisfactionEvaluation } from "./capability-contract";
 import {
+  buildHelixAskGoldenPathContractAnswerArtifactId,
+  buildHelixAskGoldenPathModelTurnPacketRef,
+  buildHelixAskGoldenPathRouteGateArtifactId,
+  buildHelixAskGoldenPathTerminalResultId,
   HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
-  readHelixAskGoldenPathPrompt,
-  readString,
+  readHelixAskGoldenPathTurnContext,
   type RecordLike,
 } from "./core";
 import {
@@ -40,17 +43,16 @@ export const buildHelixAskGoldenPathRuntimeContractPayload = (args: {
   deps: HelixAskGoldenPathRuntimeContractPayloadDependencies;
 }): RecordLike => {
   const deps = args.deps;
-  const now = deps.now();
-  const createdAtMs = now.getTime();
-  const turnId = readString(args.body.turn_id) ?? readString(args.body.turnId) ?? `ask:golden-path:${createdAtMs}`;
-  const traceId = readString(args.body.trace_id) ?? readString(args.body.traceId) ?? turnId;
-  const sessionId = readString(args.body.session_id) ?? readString(args.body.sessionId);
-  const threadId = readString(args.body.thread_id) ?? readString(args.body.threadId);
-  const promptText = readHelixAskGoldenPathPrompt(args.body);
-  const modelPacketRef = `${turnId}:golden_path_model_turn_packet`;
-  const routeGateArtifactId = `${turnId}:golden_path_route_gate`;
-  const artifactId = `${turnId}:golden_path_contract_answer`;
-  const terminalResultId = `${turnId}:golden_path_terminal_result`;
+  const context = readHelixAskGoldenPathTurnContext({
+    body: args.body,
+    now: deps.now(),
+    fallbackTurnIdPrefix: "ask:golden-path",
+  });
+  const { now, createdAtMs, turnId, traceId, sessionId, threadId, promptText } = context;
+  const modelPacketRef = buildHelixAskGoldenPathModelTurnPacketRef(turnId);
+  const routeGateArtifactId = buildHelixAskGoldenPathRouteGateArtifactId(turnId);
+  const artifactId = buildHelixAskGoldenPathContractAnswerArtifactId(turnId);
+  const terminalResultId = buildHelixAskGoldenPathTerminalResultId(turnId);
   const answerText =
     "Helix Ask golden path runtime returned a contract-only final answer. This scaffold verifies routing, ledger, and terminal-source invariants without entering a private runtime loop.";
 

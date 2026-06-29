@@ -135,6 +135,12 @@ export const isHelixAskGoldenPathCapabilityNamedInRequest = (
 export const buildHelixAskGoldenPathRouteGateArtifactId = (turnId: string): string =>
   `${turnId}:golden_path_route_gate`;
 
+export const buildHelixAskGoldenPathModelTurnPacketRef = (turnId: string): string =>
+  `${turnId}:golden_path_model_turn_packet`;
+
+export const buildHelixAskGoldenPathContractAnswerArtifactId = (turnId: string): string =>
+  `${turnId}:golden_path_contract_answer`;
+
 export const buildHelixAskGoldenPathTerminalResultId = (turnId: string): string =>
   `${turnId}:golden_path_terminal_result`;
 
