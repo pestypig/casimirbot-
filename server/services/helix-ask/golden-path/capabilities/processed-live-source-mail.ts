@@ -4,6 +4,7 @@ import {
   buildGoldenPathAnswerLedgerArtifact,
   buildGoldenPathObservationLedgerArtifact,
   buildGoldenPathPayloadLedgerArtifact,
+  buildGoldenPathTypedFailureTerminalErrorLedgerArtifact,
   buildGoldenPathRouteGateLedgerArtifact,
 } from "../artifact-ledger";
 import {
@@ -225,21 +226,13 @@ export const buildHelixAskGoldenPathProcessedLiveSourceMailPayload = (args: {
           createdAtMs,
           requestedCapability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
         }),
-        buildGoldenPathPayloadLedgerArtifact({
+        buildGoldenPathTypedFailureTerminalErrorLedgerArtifact({
           artifactId: terminalResult.artifact_id,
           turnId,
           createdAtMs,
-          kind: "typed_failure",
-          terminalEligible: true,
-          payload: {
-            schema: "helix.typed_failure.v1",
-            text: failureText,
-            answer_text: failureText,
-            terminal_error_code: "missing_processed_live_source_mail_packet",
-            first_broken_rail: "observation",
-            assistant_answer: false,
-            raw_content_included: false,
-          },
+          terminalResult,
+          terminalErrorCode: "missing_processed_live_source_mail_packet",
+          firstBrokenRail: "observation",
         }),
       ],
       debug: buildGoldenPathCapabilityDebugMirror({

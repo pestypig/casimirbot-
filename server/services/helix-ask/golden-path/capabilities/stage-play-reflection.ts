@@ -3,6 +3,7 @@ import {
   buildGoldenPathAnswerLedgerArtifact,
   buildGoldenPathObservationLedgerArtifact,
   buildGoldenPathPayloadLedgerArtifact,
+  buildGoldenPathTypedFailureTerminalErrorLedgerArtifact,
   buildGoldenPathRouteGateLedgerArtifact,
 } from "../artifact-ledger";
 import {
@@ -198,22 +199,14 @@ export const buildHelixAskGoldenPathStagePlayReflectionPayload = (args: {
           requestedCapability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
           goalSatisfactionArtifact,
         }),
-        buildGoldenPathPayloadLedgerArtifact({
+        buildGoldenPathTypedFailureTerminalErrorLedgerArtifact({
           artifactId: terminalResult.artifact_id,
           turnId,
           createdAtMs,
           goalHash,
-          kind: "typed_failure",
-          terminalEligible: true,
-          payload: {
-            schema: "helix.typed_failure.v1",
-            text: failureText,
-            answer_text: failureText,
-            terminal_error_code: "missing_stage_play_reflection_result",
-            first_broken_rail: "observation",
-            assistant_answer: false,
-            raw_content_included: false,
-          },
+          terminalResult,
+          terminalErrorCode: "missing_stage_play_reflection_result",
+          firstBrokenRail: "observation",
         }),
       ],
       debug: buildGoldenPathCapabilityDebugMirror({

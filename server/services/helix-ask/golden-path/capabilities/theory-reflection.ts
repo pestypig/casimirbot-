@@ -3,6 +3,7 @@ import {
   buildGoldenPathAnswerLedgerArtifact,
   buildGoldenPathObservationLedgerArtifact,
   buildGoldenPathPayloadLedgerArtifact,
+  buildGoldenPathTypedFailureTerminalErrorLedgerArtifact,
   buildGoldenPathRouteGateLedgerArtifact,
 } from "../artifact-ledger";
 import {
@@ -210,22 +211,14 @@ export const buildHelixAskGoldenPathTheoryReflectionPayload = (args: {
           terminalEligible: false,
           requestedCapability: HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
         }),
-        buildGoldenPathPayloadLedgerArtifact({
+        buildGoldenPathTypedFailureTerminalErrorLedgerArtifact({
           artifactId: terminalResult.artifact_id,
           turnId,
           createdAtMs,
-          kind: "typed_failure",
-          terminalEligible: true,
-          payload: {
-            schema: "helix.typed_failure.v1",
-            text: failureText,
-            answer_text: failureText,
-            terminal_error_code: "missing_theory_reflection_topic",
-            first_broken_rail: "argument_extraction",
-            support_refs: terminalResult.support_refs,
-            assistant_answer: false,
-            raw_content_included: false,
-          },
+          terminalResult,
+          terminalErrorCode: "missing_theory_reflection_topic",
+          firstBrokenRail: "argument_extraction",
+          includeSupportRefs: true,
         }),
       ],
       debug: buildGoldenPathCapabilityDebugMirror({

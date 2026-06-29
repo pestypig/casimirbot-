@@ -3,6 +3,7 @@ import { HELIX_VISUAL_FRAME_EVIDENCE_SCHEMA } from "../../../../../shared/helix-
 import {
   buildGoldenPathObservationLedgerArtifact,
   buildGoldenPathPayloadLedgerArtifact,
+  buildGoldenPathTypedFailureTerminalErrorLedgerArtifact,
   buildGoldenPathRouteGateLedgerArtifact,
 } from "../artifact-ledger";
 import {
@@ -194,22 +195,14 @@ export const buildHelixAskGoldenPathVisualCapturePayload = (args: {
           terminalEligible: false,
           requestedCapability,
         }),
-        buildGoldenPathPayloadLedgerArtifact({
+        buildGoldenPathTypedFailureTerminalErrorLedgerArtifact({
           artifactId: terminalResult.artifact_id,
           turnId,
           createdAtMs,
-          kind: "typed_failure",
-          terminalEligible: true,
-          payload: {
-            schema: "helix.typed_failure.v1",
-            text: failureText,
-            answer_text: failureText,
-            terminal_error_code: "missing_compact_visual_evidence",
-            first_broken_rail: "observation",
-            support_refs: terminalResult.support_refs,
-            assistant_answer: false,
-            raw_content_included: false,
-          },
+          terminalResult,
+          terminalErrorCode: "missing_compact_visual_evidence",
+          firstBrokenRail: "observation",
+          includeSupportRefs: true,
         }),
       ],
       debug: buildGoldenPathCapabilityDebugMirror({

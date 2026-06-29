@@ -3,6 +3,7 @@ import {
   buildGoldenPathAnswerLedgerArtifact,
   buildGoldenPathObservationLedgerArtifact,
   buildGoldenPathPayloadLedgerArtifact,
+  buildGoldenPathTypedFailureTerminalErrorLedgerArtifact,
   buildGoldenPathRouteGateLedgerArtifact,
 } from "../artifact-ledger";
 import {
@@ -188,22 +189,14 @@ export const buildHelixAskGoldenPathCivilizationBoundsReflectionPayload = (args:
           terminalEligible: false,
           requestedCapability: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
         }),
-        buildGoldenPathPayloadLedgerArtifact({
+        buildGoldenPathTypedFailureTerminalErrorLedgerArtifact({
           artifactId: terminalResult.artifact_id,
           turnId,
           createdAtMs,
-          kind: "typed_failure",
-          terminalEligible: true,
-          payload: {
-            schema: "helix.typed_failure.v1",
-            text: failureText,
-            answer_text: failureText,
-            terminal_error_code: "missing_civilization_bounds_tool_result",
-            first_broken_rail: "observation",
-            support_refs: terminalResult.support_refs,
-            assistant_answer: false,
-            raw_content_included: false,
-          },
+          terminalResult,
+          terminalErrorCode: "missing_civilization_bounds_tool_result",
+          firstBrokenRail: "observation",
+          includeSupportRefs: true,
         }),
       ],
       debug: buildGoldenPathCapabilityDebugMirror({
