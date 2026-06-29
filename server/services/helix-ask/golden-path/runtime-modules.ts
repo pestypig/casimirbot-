@@ -18,6 +18,7 @@ import * as DocsCalculator from "./compounds/docs-calculator";
 import * as InternetTheoryReflection from "./compounds/internet-theory-reflection";
 import * as RepoDocs from "./compounds/repo-docs";
 import * as VisualCalculator from "./compounds/visual-calculator";
+import * as CompoundItinerary from "./itinerary/compound-itinerary";
 import type { RecordLike } from "./core";
 import type { HelixAskGoldenPathRuntimeDependencies } from "./runtime-dependencies";
 
@@ -34,6 +35,7 @@ export type GoldenPathDispatchModule = {
 export const orderedDispatchModules: readonly GoldenPathDispatchModule[] = [
   CatalogWorkspace,
   VisualCalculator,
+  CompoundItinerary,
   DocsCalculator,
   RepoDocs,
   InternetTheoryReflection,

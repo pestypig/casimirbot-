@@ -15,6 +15,7 @@ import {
   type RecordLike,
 } from "../core";
 import { buildHelixReflectionObservationLayers } from "../reflection-answer-guidance";
+import { buildGoldenPathPromptCivilizationBoundsToolResult } from "../reflection-prompt-evidence";
 
 export type HelixAskGoldenPathCivilizationBoundsReflectionDependencies = {
   now: () => Date;
@@ -59,7 +60,9 @@ export const buildHelixAskGoldenPathCivilizationBoundsReflectionPayload = (args:
   const terminalResultId = buildHelixAskGoldenPathTerminalResultId(turnId);
   const requiredTerminalKind = "civilization_bounds_reflection_answer";
   const goalKind = "civilization_bounds_reflection";
-  const compactResult = readCompactCivilizationBoundsToolResult(args.body);
+  const compactResult =
+    readCompactCivilizationBoundsToolResult(args.body) ??
+    buildGoldenPathPromptCivilizationBoundsToolResult(promptText);
   const roadmap = readRecord(compactResult?.roadmap);
 
   if (!compactResult || !roadmap) {

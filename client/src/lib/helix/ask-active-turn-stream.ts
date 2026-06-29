@@ -333,7 +333,7 @@ export function buildAskLiveAgenticEventRows(
       return {
         key: `${event.id}:agentic:${index}`,
         ...classified,
-        text: buildAskLiveAgenticEventText(event),
+        text: classified.tone === "final" ? coerceText(event.text).trim() : buildAskLiveAgenticEventText(event),
         meta: [timestamp, duration].filter(Boolean).join(" / "),
       };
     })
@@ -373,14 +373,15 @@ export function buildHelixActiveTurnStreamRows(args: {
     });
   }
   args.eventRows.forEach((row) => {
+    const tone = toneForAskLiveAgenticEventRow(row);
     rows.push({
       key: `${row.key}-active-stream`,
-      source: "agent_work",
+      source: tone === "final" ? "final" : "agent_work",
       label: row.label,
       text: row.text,
       meta: row.meta,
       status: row.tone,
-      tone: toneForAskLiveAgenticEventRow(row),
+      tone,
       evidenceRefs: [],
     });
   });

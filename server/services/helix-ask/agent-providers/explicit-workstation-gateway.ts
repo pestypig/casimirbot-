@@ -112,7 +112,7 @@ const isActiveDocsViewerDeicticPrompt = (prompt: string): boolean => {
   if (/\b(?:before|after|if|when)\b.{0,80}\b(?:open|focus|use|show|read|summari[sz]e)\b.{0,50}\b(?:doc|document|paper|white\s*paper|whitepaper)\b/i.test(unquotedPrompt)) return false;
   if (/\b(?:previous|last|earlier|historical)\b.{0,80}\b(?:doc|document|paper|white\s*paper|whitepaper)\b/i.test(unquotedPrompt)) return false;
   const mentionsCurrentDoc =
-    /\b(?:this|current|open|active|visible)\s+(?:doc|document|paper|white\s*paper|whitepaper)\b/i.test(unquotedPrompt) ||
+    /\b(?:this|current|open|active|visible)\b[\s\S]{0,80}\b(?:doc|document|paper|white\s*paper|whitepaper)\b/i.test(unquotedPrompt) ||
     /\b(?:doc|document|paper|white\s*paper|whitepaper)\s+(?:on\s+screen|in\s+(?:the\s+)?docs?\s+viewer|I'?m\s+viewing|we'?re\s+viewing)\b/i.test(unquotedPrompt);
   const asksForContent = /\b(?:summari[sz]e|synthesi[sz]e|explain|what\s+is|what'?s|about|key\s+(?:points|findings)|main\s+claim|claim\s+boundary|caveats?|read|use|include|observation)\b/i.test(unquotedPrompt);
   return mentionsCurrentDoc && asksForContent;
@@ -577,6 +577,59 @@ export const buildPlannerDerivedWorkstationGatewayCallRequests = (
   return requests.slice(0, 10);
 };
 
+const cleanCalculatorExpression = (value: string | null | undefined): string | null => {
+  if (!value) return null;
+  const expression = value
+    .replace(/(?:then|and)\s+[\s\S]*$/i, "")
+    .replace(/[.,;:!?]+$/g, "")
+    .replace(/\s+/g, "")
+    .trim();
+  if (!expression || expression.length > 80) return null;
+  if (!/\d/.test(expression) || !/[+\-*/^%]/.test(expression)) return null;
+  if (!/^[0-9.+\-*/^%()[\]]+$/.test(expression)) return null;
+  return expression;
+};
+
+const extractCalculatorExpressionFromPrompt = (prompt: string): string | null => {
+  if (hasNegatedToolInstruction(prompt, /\b(?:calculator|calculate|compute|evaluate|solve|expression)\b/i)) {
+    return null;
+  }
+  const unquoted = unquotePrompt(prompt);
+  const explicitCapability =
+    unquoted.match(/\bscientific-calculator\.solve_expression\b[\s\S]{0,80}\b(?:for|with|expression|calculate|evaluate|solve|compute)?\s*:?\s*([0-9][0-9\s.+\-*/^%()[\]]{1,80})/i)?.[1] ??
+    unquoted.match(/\b(?:scientific\s+calculator|calculator|calc)\b[\s\S]{0,100}\b(?:calculate|evaluate|solve|compute|expression)\s*:?\s*([0-9][0-9\s.+\-*/^%()[\]]{1,80})/i)?.[1] ??
+    null;
+  if (explicitCapability) return cleanCalculatorExpression(explicitCapability);
+  const direct =
+    unquoted.match(/\b(?:calculate|evaluate|compute|solve)\s+([0-9][0-9\s.+\-*/^%()[\]]{1,80})/i)?.[1] ??
+    null;
+  return cleanCalculatorExpression(direct);
+};
+
+export const buildPromptDerivedCalculatorSolveGatewayCallRequests = (
+  body: Record<string, unknown>,
+): Record<string, unknown>[] => {
+  const prompt = readPrompt(body);
+  if (!prompt) return [];
+  const expression = extractCalculatorExpressionFromPrompt(prompt);
+  if (!expression) return [];
+  return [{
+    schema: "helix.workstation_gateway.prompt_derived_calculator_solve_call_request.v1",
+    derivation_source: "helix_prompt_derived_calculator_solve",
+    capability_id: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+    mode: "read",
+    arguments: {
+      expression,
+      source_target_intent: {
+        source: "helix_prompt_derived_calculator_solve",
+        target_source: "scientific_calculator",
+        target_kind: "calculator_solve",
+        expression,
+      },
+    },
+  }];
+};
+
 const extractRepoSearchQueryFromPrompt = (prompt: string): string | null => {
   if (hasNegatedToolInstruction(prompt, /\b(?:repo|repository|code|source|implementation|search)\b/i)) return null;
   const unquoted = unquotePrompt(prompt);
@@ -732,6 +785,7 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   const activeWorkstationContext = buildActiveWorkstationContextGatewayCallRequests(input.body);
   appendDedupe(requests, seen, activeWorkstationContext);
   appendDedupe(requests, seen, buildPromptDerivedWorkspaceStatusGatewayCallRequests(input.body));
+  appendDedupe(requests, seen, buildPromptDerivedCalculatorSolveGatewayCallRequests(input.body));
   appendDedupe(requests, seen, buildPlannerDerivedWorkstationGatewayCallRequests(input.body));
   appendDedupe(requests, seen, buildPromptDerivedScholarlyResearchGatewayCallRequests(input.body));
   appendDedupe(requests, seen, buildPromptDerivedInternetSearchGatewayCallRequests(input.body));

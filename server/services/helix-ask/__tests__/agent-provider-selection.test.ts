@@ -1696,6 +1696,94 @@ describe("Helix Ask agent provider selection", () => {
     ]));
   });
 
+  it("derives the Codex workstation acceptance prompt into docs, calculator, scholarly, theory, and civ observations", async () => {
+    const providerAnswer = [
+      "The observations support a bounded synthesis across the current NHM2 document, the calculator result, paper lookup, theory reflection, and civilization-bounds reflection.",
+      "They do not prove physical viability, transport authority, or full-document coverage beyond the materialized observation packets.",
+    ].join("\n");
+    process.env.CODEX_AGENT_FAKE_STDOUT = providerAnswer;
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => [
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+        "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
+        "<entry>",
+        "<id>https://arxiv.org/abs/2606.00001</id>",
+        "<title>Quantum inequalities for warp constraints</title>",
+        "<summary>Bounded abstract about QEI and warp metrics.</summary>",
+        "<published>2026-06-01T00:00:00Z</published>",
+        "<author><name>A. Researcher</name></author>",
+        "</entry>",
+        "</feed>",
+      ].join(""),
+    })) as typeof fetch;
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:codex-natural-acceptance-compound-itinerary",
+        agent_runtime: "codex",
+        question:
+          "use this current NHM2 document, calculate 6*7, search research papers on arXiv for quantum inequalities and warp constraints, reflect QEI margin through theory badge graph, and reflect civilization bounds",
+        workspace_context_snapshot: {
+          activePanel: "scientific-calculator",
+          focusedPanel: "scientific-calculator",
+          openPanels: ["docs-viewer", "scientific-calculator"],
+          activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          hasDocContext: true,
+        },
+      },
+      headers: {},
+    });
+
+    expect(result.text).toBe(providerAnswer);
+    const capabilityIds = (result.debug as any)?.workstation_gateway_call_results?.map((entry: any) => entry.capability_id);
+    expect(capabilityIds).toEqual(expect.arrayContaining([
+      "docs.search",
+      "scientific-calculator.solve_expression",
+      "scholarly-research.lookup_papers",
+      "theory-badge-graph.reflect_discussion_context",
+      "civilization-bounds.reflect_system_bounds",
+    ]));
+    expect(capabilityIds.slice(0, 5)).toEqual([
+      "docs.search",
+      "scientific-calculator.solve_expression",
+      "theory-badge-graph.reflect_discussion_context",
+      "civilization-bounds.reflect_system_bounds",
+      "scholarly-research.lookup_papers",
+    ]);
+    expect(result.turn_transcript_events?.[0]).toMatchObject({
+      source_event_type: "runtime_selected",
+    });
+    expect(String(result.turn_transcript_events?.[0]?.text)).toContain("Codex Workstation Mode");
+    for (const capabilityId of [
+      "docs.search",
+      "scientific-calculator.solve_expression",
+      "scholarly-research.lookup_papers",
+      "theory-badge-graph.reflect_discussion_context",
+      "civilization-bounds.reflect_system_bounds",
+    ]) {
+      expect(result.turn_transcript_events?.some((event: any) =>
+        event.source_event_type === "tool_request" &&
+        event.capability_id === capabilityId,
+      )).toBe(true);
+      expect(result.turn_transcript_events?.some((event: any) =>
+        event.source_event_type === "tool_observation" &&
+        event.capability_id === capabilityId &&
+        event.status === "completed",
+      )).toBe(true);
+    }
+    expect(result.turn_transcript_events?.filter((event: any) => event.source_event_type === "model_reentry"))
+      .toHaveLength(1);
+    expect(result.turn_transcript_events?.find((event: any) => event.source_event_type === "terminal_answer"))
+      .toMatchObject({
+        text: providerAnswer,
+      });
+  });
+
   it("fails closed when one compound Codex gateway observation is missing", async () => {
     process.env.CODEX_AGENT_FAKE_STDOUT = "The calculator and reflection both ran successfully.";
     process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";

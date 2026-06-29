@@ -390,4 +390,43 @@ describe("explicit workstation gateway derived calls", () => {
       },
     });
   });
+
+  it("keeps the Codex workstation acceptance prompt as a multi-tool itinerary", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "use this current NHM2 document, calculate 6*7, search research papers on arXiv for quantum inequalities and warp constraints, reflect QEI margin through theory badge graph, and reflect civilization bounds",
+        workspace_context_snapshot: {
+          activePanel: "scientific-calculator",
+          focusedPanel: "scientific-calculator",
+          openPanels: ["docs-viewer", "scientific-calculator"],
+          activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          hasDocContext: true,
+        },
+      },
+    });
+
+    expect(capabilities(requests)).toEqual([
+      "docs.search",
+      "scientific-calculator.solve_expression",
+      "theory-badge-graph.reflect_discussion_context",
+      "civilization-bounds.reflect_system_bounds",
+      "scholarly-research.lookup_papers",
+    ]);
+    expect(requests.find((request) => request.capability_id === "docs.search")).toMatchObject({
+      arguments: {
+        paths: ["docs/research/nhm2-current-status-whitepaper-2026-05-02.md"],
+        source_target_intent: expect.objectContaining({
+          retained_source_context: true,
+        }),
+      },
+    });
+    expect(requests.find((request) => request.capability_id === "scientific-calculator.solve_expression")).toMatchObject({
+      arguments: {
+        expression: "6*7",
+      },
+    });
+  });
 });

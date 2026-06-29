@@ -51,7 +51,7 @@ const maxOutputBytes = (): number => {
 
 const codexTimeoutMs = (): number => {
   const parsed = Number(process.env.CODEX_AGENT_TIMEOUT_MS);
-  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 20_000;
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 120_000;
 };
 
 const DEFAULT_CODEX_ARGS = [

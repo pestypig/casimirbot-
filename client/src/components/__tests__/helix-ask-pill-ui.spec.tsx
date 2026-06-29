@@ -496,7 +496,32 @@ describe("HelixAskPill mic-first surface contract", () => {
 
     expect(lowSignalRows).toHaveLength(0);
     expect(debugRows).toHaveLength(1);
-    expect(activeRows.map((row) => row.source)).toEqual(["question", "agent_work"]);
+    expect(activeRows.map((row) => row.source)).toEqual(["question", "final"]);
+  });
+
+  it("does not clip active-stream final answer rows in the console", () => {
+    const longFinal = `Final answer: ${"runtime-owned answer ".repeat(80)}done.`;
+    const eventRows = buildAskLiveAgenticEventRows([
+      {
+        id: "final-answer",
+        text: longFinal,
+        tool: "agent",
+        meta: {
+          stage: "terminal_answer",
+          source_event_type: "terminal_answer",
+          turn_id: "ask:test",
+        },
+      },
+    ] as any, { includeLowSignalRows: true });
+    const activeRows = buildHelixActiveTurnStreamRows({
+      question: "Give me the full answer.",
+      eventRows,
+    });
+    const finalRow = activeRows.find((row) => row.source === "final");
+
+    expect(finalRow).toBeTruthy();
+    expect(finalRow?.text).toBe(longFinal);
+    expect(finalRow?.text.endsWith("done.")).toBe(true);
   });
 
   it("initializes Helix console stream ingress debug with deterministic counters", () => {
@@ -1528,9 +1553,10 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain('const latestFinalAnswerTestId = isLatestReply ? "helix-ask-latest-final-answer"');
     expect(source).toContain("isFinalRow");
     expect(source).toContain("? latestFinalAnswerTestId");
-    expect(source).toContain("latestCodexAnswerPreservesProviderText");
-    expect(source).toContain("answerExpandedForDisplay = expanded || latestCodexAnswerPreservesProviderText");
-    expect(source).toContain("clipForDisplay(\n              finalAnswerRawText,\n              HELIX_ASK_MAX_RENDER_CHARS,\n              answerExpandedForDisplay");
+    expect(source).toContain("const transcriptAnswer = finalAnswerRawText");
+    expect(source).toContain("const visibleText = isFinalRow ? row.text : clipText(row.text, row.detailLimit ?? 360)");
+    expect(source).not.toContain("clipForDisplay(");
+    expect(source).not.toContain("HELIX_ASK_MAX_RENDER_CHARS");
     expect(compactSource).toContain("data-final-answer-text={isFinalRow ? finalAnswerRawText : undefined}");
     expect(compactSource).toContain("data-visible-terminal-source={ isFinalRow ? finalAnswerPresentation.sourceLabel || finalAnswerSourceLabel || transcriptTerminal.source : undefined }");
     expect(compactSource).toContain("data-backend-terminal-answer={isFinalRow ? transcriptTerminal.backendTerminalText ?? \"\" : undefined}");

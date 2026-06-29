@@ -536,6 +536,8 @@ type RunAskTurnPayload = {
   question: string;
   agentRuntime?: HelixAgentRuntimeId;
   agent_runtime?: HelixAgentRuntimeId;
+  goldenPathRuntime?: boolean;
+  golden_path_runtime?: boolean;
   sessionId?: string;
   traceId?: string;
   turnId?: string;
@@ -1873,11 +1875,18 @@ export async function runConversationTurn(
 }
 
 const buildRunAskTurnBody = (payload: RunAskTurnPayload): Record<string, unknown> => {
+  const selectedRuntime = payload.agentRuntime ?? payload.agent_runtime;
   const body: Record<string, unknown> = {
     question: payload.question,
   };
   if (payload.agentRuntime) body.agent_runtime = payload.agentRuntime;
   if (payload.agent_runtime) body.agent_runtime = payload.agent_runtime;
+  if (typeof payload.goldenPathRuntime === "boolean") body.goldenPathRuntime = payload.goldenPathRuntime;
+  if (typeof payload.golden_path_runtime === "boolean") body.golden_path_runtime = payload.golden_path_runtime;
+  if (selectedRuntime === "helix") {
+    body.goldenPathRuntime = true;
+    body.golden_path_runtime = true;
+  }
   if (payload.sessionId?.trim()) body.sessionId = payload.sessionId.trim();
   if (payload.traceId?.trim()) body.traceId = payload.traceId.trim();
   if (payload.turnId?.trim()) body.turnId = payload.turnId.trim();

@@ -31,6 +31,7 @@ const runtimeModulesPath = "server/services/helix-ask/golden-path/runtime-module
 const goldenPathDir = "server/services/helix-ask/golden-path";
 const capabilityDir = "server/services/helix-ask/golden-path/capabilities";
 const compoundDir = "server/services/helix-ask/golden-path/compounds";
+const itineraryDir = "server/services/helix-ask/golden-path/itinerary";
 
 const readLedger = (body: Record<string, any>): any[] =>
   Array.isArray(body.current_turn_artifact_ledger) ? body.current_turn_artifact_ledger : [];
@@ -211,6 +212,7 @@ describe("Helix Ask golden path runtime", () => {
       ["InternetTheoryReflection", "./compounds/internet-theory-reflection"],
       ["RepoDocs", "./compounds/repo-docs"],
       ["VisualCalculator", "./compounds/visual-calculator"],
+      ["CompoundItinerary", "./itinerary/compound-itinerary"],
     ] as const;
 
     for (const [moduleName, modulePath] of dispatchModules) {
@@ -225,6 +227,24 @@ describe("Helix Ask golden path runtime", () => {
         countOccurrences(runtimeModulesSource, new RegExp(`^\\s*${moduleName},\\s*$`, "gm")),
         `${moduleName} must be listed in orderedDispatchModules exactly once`,
       ).toBe(1);
+    }
+  });
+
+  it("keeps itinerary ownership outside use-case compound dispatch", () => {
+    const runtimeModulesSource = readFileSync(runtimeModulesPath, "utf8");
+    const itineraryFiles = listTypeScriptFiles(itineraryDir);
+    expect(itineraryFiles).toEqual(
+      expect.arrayContaining([
+        "server/services/helix-ask/golden-path/itinerary/capability-adapters.ts",
+        "server/services/helix-ask/golden-path/itinerary/compound-itinerary.ts",
+      ]),
+    );
+    expect(runtimeModulesSource).toContain("./itinerary/compound-itinerary");
+    expect(runtimeModulesSource).not.toContain("docs-calculator-reflection-research");
+    for (const file of itineraryFiles) {
+      const source = readFileSync(file, "utf8");
+      expect(source, `${file} must not import the legacy route`).not.toContain("server/routes/agi.plan");
+      expect(source, `${file} must not import the legacy route relatively`).not.toContain("agi.plan");
     }
   });
 
@@ -1033,6 +1053,44 @@ describe("Helix Ask golden path runtime", () => {
     expect(body.selected_final_answer).toContain("capacity, material inventory, fairness, and explicit review ownership");
     expect(body.selected_final_answer).toContain("cannot grant prediction, policy, moral, execution, or implementation authority");
     expect(body.selected_final_answer).not.toContain("Systems:");
+    expect(readLedger(body).map((artifact) => artifact.kind)).toEqual([
+      "golden_path_route_gate",
+      "helix_civilization_bounds_tool_result",
+      "civilization_bounds_reflection_answer",
+    ]);
+    expect(terminalLedgerEntries(body)).toHaveLength(1);
+  });
+
+  it("uses prompt-produced civilization bounds evidence when no compact roadmap is supplied", () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+
+    const decision = runHelixAskGoldenPathRuntime({
+      now: new Date("2026-06-28T12:36:00.000Z"),
+      body: {
+        turn_id: "ask:golden:civilization-bounds-prompt",
+        prompt:
+          "helix_ask_golden_path_runtime reflect civilization bounds for a diagnostic-only claim boundary",
+        goldenPathRuntime: true,
+      },
+    });
+
+    expect(decision.handled).toBe(true);
+    if (!decision.handled) throw new Error("golden path should produce bounded civilization evidence");
+    const body = decision.payload;
+
+    expect(body).toMatchObject({
+      terminal_artifact_kind: "civilization_bounds_reflection_answer",
+      final_answer_source: "civilization_bounds_reflection_answer",
+      terminal_error_code: null,
+      helix_civilization_bounds_tool_result: {
+        kind: "helix_civilization_bounds_tool_result",
+        roadmap: {
+          roadmapId: "civilization-bounds:prompt-produced",
+        },
+        terminal_eligible: false,
+      },
+    });
+    expect(body.selected_final_answer).toContain("bounded hypothesis");
     expect(readLedger(body).map((artifact) => artifact.kind)).toEqual([
       "golden_path_route_gate",
       "helix_civilization_bounds_tool_result",
@@ -2026,6 +2084,109 @@ describe("Helix Ask golden path runtime", () => {
         ],
       },
     });
+    expect(terminalLedgerEntries(body)).toHaveLength(1);
+  });
+
+  it("handles broad docs calculator reflection and scholarly prompts through the generic itinerary", () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+
+    const decision = runHelixAskGoldenPathRuntime({
+      now: new Date("2026-06-28T12:44:00.000Z"),
+      body: {
+        turn_id: "ask:golden:broad-itinerary",
+        prompt:
+          "helix_ask_golden_path_runtime use docs-viewer.locate_in_doc, scientific-calculator.solve_expression, theory badge graph reflection, civilization bounds, and scholarly research papers to explain the diagnostic claim boundary. Calculate 6*7.",
+        goldenPathRuntime: true,
+        requested_capabilities: [
+          HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+          HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+          HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
+          HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+          HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+        ],
+        doc_path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        doc_content: [
+          "# NHM2 Current Status",
+          "The Casimir tile generation table reports internal normal attraction and stack force values for diagnostic comparison.",
+          "These figures are diagnostic proxies and do not establish propulsion, transport, or implementation readiness.",
+        ].join("\n"),
+        calculator_expression: "6*7",
+      },
+    });
+
+    expect(decision.handled).toBe(true);
+    if (!decision.handled) throw new Error("golden path should handle broad itinerary compound");
+    const body = decision.payload;
+
+    expect(body).toMatchObject({
+      terminal_artifact_kind: "compound_evidence_synthesis_answer",
+      final_answer_source: "compound_evidence_synthesis_answer",
+      terminal_error_code: null,
+      calculator_receipt: {
+        expression: "6*7",
+        result: 42,
+      },
+      scholarly_research_observation: {
+        missing_requirements: ["provider_backed_scholarly_results"],
+        relevance_summary: expect.stringContaining("No provider-backed scholarly results"),
+      },
+      capability_plan: {
+        required_terminal_kind: "compound_evidence_synthesis_answer",
+        required_observation_kinds: [
+          "doc_location_matches",
+          "calculator_receipt",
+          "helix_theory_context_reflection_tool_receipt",
+          "helix_civilization_bounds_tool_result",
+          "scholarly_research_observation",
+        ],
+      },
+      ask_turn_solver_trace: {
+        completed_solver_path: true,
+        requested_capability: "compound_capability_contract",
+        selected_capability: "compound_capability_contract",
+        executed_capability: "compound_capability_contract",
+        compound_subgoal_count: 5,
+      },
+    });
+    expect(body.compound_capability_contract.ordered_subgoals).toEqual([
+      expect.objectContaining({
+        requested_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+        observation_kind: "doc_location_matches",
+        satisfaction: "satisfied",
+      }),
+      expect.objectContaining({
+        requested_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+        observation_kind: "calculator_receipt",
+        satisfaction: "satisfied",
+      }),
+      expect.objectContaining({
+        requested_capability: HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
+        observation_kind: "helix_theory_context_reflection_tool_receipt",
+        satisfaction: "satisfied",
+      }),
+      expect.objectContaining({
+        requested_capability: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+        observation_kind: "helix_civilization_bounds_tool_result",
+        satisfaction: "satisfied",
+      }),
+      expect.objectContaining({
+        requested_capability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+        observation_kind: "scholarly_research_observation",
+        satisfaction: "satisfied",
+      }),
+    ]);
+    expect(body.selected_final_answer).toContain("Calculator result: 6*7 = 42");
+    expect(body.selected_final_answer).toContain("Scholarly support: no provider-backed paper results");
+    expect(body.selected_final_answer).toContain("They do not by themselves prove physical viability");
+    expect(readLedger(body).map((artifact) => artifact.kind)).toEqual([
+      "golden_path_route_gate",
+      "doc_location_matches",
+      "calculator_receipt",
+      "helix_theory_context_reflection_tool_receipt",
+      "helix_civilization_bounds_tool_result",
+      "scholarly_research_observation",
+      "compound_evidence_synthesis_answer",
+    ]);
     expect(terminalLedgerEntries(body)).toHaveLength(1);
   });
 

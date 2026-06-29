@@ -426,8 +426,6 @@ function syncHelixAskVisualCaptureRoutePreference(includeAudio: boolean): HelixA
   return routes;
 }
 
-
-const HELIX_ASK_ANSWER_EXPANSION_STORAGE_KEY = "helix.ask.answerExpansion.v1";
 const HELIX_ASK_CONTEXT_RESUME_FRAME_STORAGE_KEY = "helix.ask.contextResumeFrame.v1";
 const HELIX_ASK_DURABLE_TRANSCRIPT_LIMIT = 80;
 const HELIX_ASK_PROGRESS_PLACEHOLDER_TEXT = "Reasoning in progress...";
@@ -436,25 +434,6 @@ export type ReadAloudPlaybackState = "idle" | "requesting" | "playing" | "dry-ru
 
 export function resolveInitialMicArmState(persisted: string | null | undefined): MicArmState {
   return persisted === "off" ? "off" : "on";
-}
-
-function readStoredHelixAskExpansionState(storageKey: string): Record<string, boolean> {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = window.localStorage.getItem(storageKey);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
-    return Object.fromEntries(
-      Object.entries(parsed).filter(([, value]) => typeof value === "boolean"),
-    ) as Record<string, boolean>;
-  } catch {
-    return {};
-  }
-}
-
-function readStoredHelixAskAnswerExpansion(): Record<string, boolean> {
-  return readStoredHelixAskExpansionState(HELIX_ASK_ANSWER_EXPANSION_STORAGE_KEY);
 }
 
 export function transitionReadAloudState(
@@ -10982,15 +10961,6 @@ function readHelixAskDebugContextFromMeta(meta: Record<string, unknown>): Record
   };
 }
 
-function clipForDisplay(value: string, limit: number, expanded: boolean): string {
-  if (expanded || value.length <= limit) return value;
-  return `${value.slice(0, limit)}...`;
-}
-
-function hasLongText(value: unknown, limit: number): boolean {
-  return coerceText(value).length > limit;
-}
-
 function safeJsonStringify(value: unknown, fallback = "Unable to render debug payload."): string {
   const normalize = (input: unknown, stack: WeakSet<object>): unknown => {
     if (typeof input === "bigint") return input.toString();
@@ -11170,11 +11140,6 @@ const HELIX_ASK_CONTEXT_TOKENS = clampNumber(
   readNumber((import.meta as any)?.env?.VITE_HELIX_ASK_CONTEXT_TOKENS, 2048),
   512,
   8192,
-);
-const HELIX_ASK_MAX_RENDER_CHARS = clampNumber(
-  readNumber((import.meta as any)?.env?.VITE_HELIX_ASK_MAX_RENDER_CHARS, 6000),
-  1200,
-  24000,
 );
 const HELIX_ASK_MAX_PROMPT_LINES = 10;
 const HELIX_ASK_LIVE_EVENT_LIMIT = 28;
@@ -18374,9 +18339,6 @@ export function HelixAskPill({
     () => resolveVoiceNoiseHandlingProfile(voiceNoisyEnvironmentMode),
     [voiceNoisyEnvironmentMode],
   );
-  const [askExpandedByReply, setAskExpandedByReply] = useState<Record<string, boolean>>(
-    () => readStoredHelixAskAnswerExpansion(),
-  );
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 
   useEffect(() => {
@@ -18387,20 +18349,6 @@ export function HelixAskPill({
     media.addEventListener?.("change", update);
     return () => media.removeEventListener?.("change", update);
   }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (askReplies.length === 0) return;
-    try {
-      const liveIds = new Set(askReplies.map((reply) => reply.id));
-      const pruned = Object.fromEntries(
-        Object.entries(askExpandedByReply).filter(([replyId]) => liveIds.has(replyId)),
-      );
-      window.localStorage.setItem(HELIX_ASK_ANSWER_EXPANSION_STORAGE_KEY, JSON.stringify(pruned));
-    } catch {
-      // Ignore storage failures; expansion controls should still work for the session.
-    }
-  }, [askReplies, askExpandedByReply]);
 
   useEffect(() => {
     pendingWorkstationUserInputRef.current = pendingWorkstationUserInput;
@@ -20389,7 +20337,7 @@ export function HelixAskPill({
   );
 
   const renderEnvelopeSections = useCallback(
-    (sections: HelixAskResponseEnvelope["sections"], hideTitle?: string, expanded?: boolean) => {
+    (sections: HelixAskResponseEnvelope["sections"], hideTitle?: string) => {
       if (!sections || sections.length === 0) return null;
       const hidden = hideTitle?.toLowerCase();
       return (
@@ -20405,13 +20353,7 @@ export function HelixAskPill({
                 ) : null;
               })()}
               <p className="mt-1 whitespace-pre-wrap leading-relaxed">
-                {renderHelixAskContent(
-                  clipForDisplay(
-                    coerceText(section.body),
-                    HELIX_ASK_MAX_RENDER_CHARS,
-                    Boolean(expanded),
-                  ),
-                )}
+                {renderHelixAskContent(coerceText(section.body))}
               </p>
               {section.layer === "proof" && normalizeCitations(section.citations).length > 0 ? (
                 <p className="mt-1 text-[11px] text-slate-400">
@@ -20464,12 +20406,7 @@ export function HelixAskPill({
       const extensionCitations = normalizeCitations(extension?.citations);
       const extensionAvailable = Boolean(extension?.available && extensionBody);
       const extensionOpen = Boolean(askExtensionOpenByReply[reply.id]);
-      const expanded = reply.id === latestAskReplyId || Boolean(askExpandedByReply[reply.id]);
-      const answerText = clipForDisplay(
-        coerceText(envelopeAnswer || fallbackAnswer),
-        HELIX_ASK_MAX_RENDER_CHARS,
-        expanded,
-      );
+      const answerText = coerceText(envelopeAnswer || fallbackAnswer);
       const hasRenderableMathContent =
         hasHelixAskRenderableMath(answerText) ||
         sections.some((section) => hasHelixAskRenderableMath(section.body)) ||
@@ -20479,10 +20416,6 @@ export function HelixAskPill({
         hasRenderableMath: hasRenderableMathContent,
         debug: reply.debug,
       });
-      const hasLongContent =
-        hasLongText(envelopeAnswer || fallbackAnswer, HELIX_ASK_MAX_RENDER_CHARS) ||
-        hasLongText(extensionBody, HELIX_ASK_MAX_RENDER_CHARS) ||
-        sections.some((section) => hasLongText(section.body, HELIX_ASK_MAX_RENDER_CHARS));
       return (
         <div className="space-y-3">
           {renderHelixAskFinalAnswerContent(answerText)}
@@ -20493,20 +20426,6 @@ export function HelixAskPill({
               onClick={() => openPanelById(HELIX_ASK_EQUATION_CALCULATOR_PANEL_ID)}
             >
               Open Calculator Panel
-            </button>
-          ) : null}
-          {hasLongContent ? (
-            <button
-              type="button"
-              className="text-[10px] uppercase tracking-[0.2em] text-slate-400 hover:text-slate-200"
-              onClick={() =>
-                setAskExpandedByReply((prev) => ({
-                  ...prev,
-                  [reply.id]: !expanded,
-                }))
-              }
-            >
-              {expanded ? "Show Less" : "Show Full Answer"}
             </button>
           ) : null}
           {extensionAvailable ? (
@@ -20526,9 +20445,7 @@ export function HelixAskPill({
               {extensionOpen ? (
                 <div className="mt-2 space-y-1">
                   <p className="whitespace-pre-wrap leading-relaxed">
-                    {renderHelixAskContent(
-                      clipForDisplay(extensionBody, HELIX_ASK_MAX_RENDER_CHARS, expanded),
-                    )}
+                    {renderHelixAskContent(extensionBody)}
                   </p>
                   {extensionCitations.length > 0 ? (
                     <p className="text-[11px] text-slate-400">
@@ -20548,7 +20465,7 @@ export function HelixAskPill({
                 Details
               </summary>
               <div className="mt-2">
-                {renderEnvelopeSections(detailSections, "Details", expanded)}
+                {renderEnvelopeSections(detailSections, "Details")}
               </div>
             </details>
           ) : null}
@@ -20561,7 +20478,7 @@ export function HelixAskPill({
                 Proof
               </summary>
               <div className="mt-2">
-                {renderEnvelopeSections(proofSections, "Proof", expanded)}
+                {renderEnvelopeSections(proofSections, "Proof")}
               </div>
             </details>
           ) : null}
@@ -20569,9 +20486,7 @@ export function HelixAskPill({
       );
     },
     [
-      askExpandedByReply,
       askExtensionOpenByReply,
-      latestAskReplyId,
       openPanelById,
       renderEnvelopeSections,
       renderHelixAskFinalAnswerContent,
@@ -35839,9 +35754,10 @@ export function HelixAskPill({
       <div className="relative space-y-3 before:absolute before:left-[0.72rem] before:top-2 before:h-[calc(100%-1rem)] before:w-px before:bg-slate-600/45">
         {visibleActiveTurnStreamRows.map((row, index) => {
           const isQuestionRow = row.source === "question";
+          const isFinalRow = row.source === "final";
           const rowClass = readHelixContinuousTurnStreamRowClass(row.tone);
           const dotClass = readHelixContinuousTurnStreamDotClass(row.tone);
-          const visibleText = clipText(row.text, row.detailLimit ?? 360);
+          const visibleText = isFinalRow ? row.text : clipText(row.text, row.detailLimit ?? 360);
           const isLatestActiveRow = index === visibleActiveTurnStreamRows.length - 1;
           return (
             <div
@@ -35872,7 +35788,9 @@ export function HelixAskPill({
                     {isQuestionRow ? "user prompt" : row.source.replace(/_/g, " ")}
                   </span>
                 </div>
-                <p className="mt-1 whitespace-pre-wrap break-words leading-relaxed">{visibleText}</p>
+                <div className="mt-1 whitespace-pre-wrap break-words leading-relaxed">
+                  {isFinalRow ? renderHelixAskFinalAnswerContent(visibleText) : visibleText}
+                </div>
                 <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-slate-400/80">
                   {row.meta || row.status}
                 </p>
@@ -36980,7 +36898,6 @@ export function HelixAskPill({
             const jobReadyLinks = resolveHelixAskVisibleJobReadyLinks(reply);
             const replyConvergence = resolveReplyConvergenceSnapshot(reply, replyEvents);
             const isLatestReply = reply.id === transcriptLatestAskReplyId;
-            const expanded = isLatestReply || Boolean(askExpandedByReply[reply.id]);
             const transcriptTerminal = resolveHelixAskVisibleTerminal(reply, reply.content);
             const finalAnswerSourceLabel = readHelixAskFinalAnswerSourceLabel(
               replyDebugRecord,
@@ -37032,16 +36949,7 @@ export function HelixAskPill({
               ? transcriptFinalRowText ?? chosenVisibleFinalText
               : chosenVisibleFinalText;
             const actualAgentProviderLabel = resolveHelixAskActualAgentProviderLabel(reply, agentRuntimeProviders);
-            const latestCodexAnswerPreservesProviderText =
-              isLatestReply && /codex/i.test(actualAgentProviderLabel ?? "");
-            const answerExpandedForDisplay = expanded || latestCodexAnswerPreservesProviderText;
-            const finalAnswerIsLong = hasLongText(finalAnswerRawText, HELIX_ASK_MAX_RENDER_CHARS);
-            const finalAnswerIsCollapsedPreview = finalAnswerIsLong && !answerExpandedForDisplay;
-            const transcriptAnswer = clipForDisplay(
-              finalAnswerRawText,
-              HELIX_ASK_MAX_RENDER_CHARS,
-              answerExpandedForDisplay,
-            );
+            const transcriptAnswer = finalAnswerRawText;
             const terminalMismatchForReply = Boolean(
               transcriptTerminal.backendTerminalText &&
                 transcriptTerminal.text &&
@@ -37117,7 +37025,7 @@ export function HelixAskPill({
                           const isQuestionRow = row.source === "question";
                           const rowClass = readHelixContinuousTurnStreamRowClass(row.tone);
                           const dotClass = readHelixContinuousTurnStreamDotClass(row.tone);
-                          const visibleText = clipText(row.text, row.detailLimit ?? 360);
+                          const visibleText = isFinalRow ? row.text : clipText(row.text, row.detailLimit ?? 360);
                           return (
                             <div
                               key={row.key}
@@ -37166,14 +37074,6 @@ export function HelixAskPill({
                                     {row.source.replace(/_/g, " ")}
                                   </span>
                                 </div>
-                                {isFinalRow && finalAnswerIsCollapsedPreview ? (
-                                  <div
-                                    className="mt-2 rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-2.5 py-1.5 text-[10px] uppercase tracking-[0.14em] text-cyan-100"
-                                    data-testid={isLatestReply ? "helix-ask-latest-final-answer-collapsed" : undefined}
-                                  >
-                                    Preview collapsed. Full backend answer is available.
-                                  </div>
-                                ) : null}
                                 <div className="mt-1 break-words leading-relaxed">
                                   {isFinalRow ? renderHelixAskFinalAnswerContent(transcriptAnswer) : (
                                     <p className="whitespace-pre-wrap">{visibleText}</p>
@@ -37331,21 +37231,6 @@ export function HelixAskPill({
                                           );
                                         })}
                                       </div>
-                                    ) : null}
-                                    {finalAnswerIsLong ? (
-                                      <button
-                                        type="button"
-                                        className="mt-2 rounded-full border border-cyan-300/30 bg-cyan-400/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] text-cyan-200 hover:border-cyan-200/60 hover:text-cyan-100"
-                                        aria-expanded={expanded}
-                                        onClick={() =>
-                                          setAskExpandedByReply((prev) => ({
-                                            ...prev,
-                                            [reply.id]: !expanded,
-                                          }))
-                                        }
-                                      >
-                                        {expanded ? "Collapse Answer" : "Show Full Answer"}
-                                      </button>
                                     ) : null}
                                   </>
                                 ) : null}
