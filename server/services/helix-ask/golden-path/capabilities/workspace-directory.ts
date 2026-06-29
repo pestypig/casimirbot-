@@ -22,6 +22,7 @@ import {
 import {
   buildGoldenPathTerminalAuthorityProjection,
   buildGoldenPathTerminalResponseProjection,
+  buildGoldenPathTypedFailureResponseProjection,
   buildGoldenPathTerminalResult,
   buildGoldenPathTypedFailureTerminalResult,
 } from "../terminal-envelope";
@@ -128,19 +129,10 @@ export const buildHelixAskGoldenPathWorkspaceDirectoryPayload = (args: {
       session_id: sessionId,
       thread_id: threadId,
       prompt_text: promptText,
-      response_type: "typed_failure",
-      final_status: "typed_failure",
-      final_answer_source: "typed_failure",
-      terminal_artifact_kind: "typed_failure",
-      terminal_artifact_id: terminalArtifactId,
-      terminal_error_code: "missing_workspace_directory_query",
-      answer: failureText,
-      text: failureText,
-      assistant_answer: failureText,
-      selected_final_answer: failureText,
-      selected_terminal_result_id: terminalResult.result_id,
-      terminal_result: terminalResult,
-      terminal_results: [terminalResult],
+      ...buildGoldenPathTypedFailureResponseProjection({
+        terminalResult,
+        terminalErrorCode: "missing_workspace_directory_query",
+      }),
       canonical_goal_frame: canonicalGoalFrame,
       capability_plan: buildGoldenPathCapabilityPlan({
         requestedCapability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,

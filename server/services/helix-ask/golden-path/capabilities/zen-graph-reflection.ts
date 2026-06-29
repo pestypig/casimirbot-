@@ -23,6 +23,7 @@ import {
 import {
   buildGoldenPathTerminalAuthorityProjection,
   buildGoldenPathTerminalResponseProjection,
+  buildGoldenPathTypedFailureResponseProjection,
   buildGoldenPathTerminalResult,
 } from "../terminal-envelope";
 import { buildGoldenPathSolverTrace } from "../solver-trace";
@@ -131,19 +132,10 @@ export const buildHelixAskGoldenPathZenGraphReflectionPayload = (args: {
       session_id: sessionId,
       thread_id: threadId,
       prompt_text: promptText,
-      response_type: "typed_failure",
-      final_status: "typed_failure",
-      final_answer_source: "typed_failure",
-      terminal_artifact_kind: "typed_failure",
-      terminal_artifact_id: terminalResult.artifact_id,
-      terminal_error_code: "missing_zen_graph_reflection_tool_result",
-      answer: failureText,
-      text: failureText,
-      assistant_answer: failureText,
-      selected_final_answer: failureText,
-      selected_terminal_result_id: terminalResult.result_id,
-      terminal_result: terminalResult,
-      terminal_results: [terminalResult],
+      ...buildGoldenPathTypedFailureResponseProjection({
+        terminalResult,
+        terminalErrorCode: "missing_zen_graph_reflection_tool_result",
+      }),
       golden_path_runtime: buildGoldenPathRuntimeStatus({
         status: "ideology_context_reflection_missing_result",
         requestedCapability: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,

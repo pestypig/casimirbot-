@@ -24,6 +24,7 @@ import {
 import {
   buildGoldenPathTerminalAuthorityProjection,
   buildGoldenPathTerminalResponseProjection,
+  buildGoldenPathTypedFailureResponseProjection,
   buildGoldenPathTerminalResult,
 } from "../terminal-envelope";
 import { buildGoldenPathSolverTrace } from "../solver-trace";
@@ -168,19 +169,10 @@ export const buildHelixAskGoldenPathProcessedLiveSourceMailPayload = (args: {
       session_id: sessionId,
       thread_id: threadId,
       prompt_text: promptText,
-      response_type: "typed_failure",
-      final_status: "typed_failure",
-      final_answer_source: "typed_failure",
-      terminal_artifact_kind: "typed_failure",
-      terminal_artifact_id: terminalResult.artifact_id,
-      terminal_error_code: "missing_processed_live_source_mail_packet",
-      answer: failureText,
-      text: failureText,
-      assistant_answer: failureText,
-      selected_final_answer: failureText,
-      selected_terminal_result_id: terminalResult.result_id,
-      terminal_result: terminalResult,
-      terminal_results: [terminalResult],
+      ...buildGoldenPathTypedFailureResponseProjection({
+        terminalResult,
+        terminalErrorCode: "missing_processed_live_source_mail_packet",
+      }),
       golden_path_runtime: buildGoldenPathRuntimeStatus({
         status: "processed_live_source_mail_missing_packet",
         requestedCapability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,

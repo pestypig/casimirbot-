@@ -26,6 +26,7 @@ import {
 import {
   buildGoldenPathTerminalAuthorityProjection,
   buildGoldenPathTerminalResponseProjection,
+  buildGoldenPathTypedFailureResponseProjection,
   buildGoldenPathTerminalResult,
   buildGoldenPathTypedFailureTerminalResult,
 } from "../terminal-envelope";
@@ -153,19 +154,10 @@ export const buildHelixAskGoldenPathInternetSearchPayload = (args: {
       session_id: sessionId,
       thread_id: threadId,
       prompt_text: promptText,
-      response_type: "typed_failure",
-      final_status: "typed_failure",
-      final_answer_source: "typed_failure",
-      terminal_artifact_kind: "typed_failure",
-      terminal_artifact_id: terminalResult.artifact_id,
-      terminal_error_code: params.errorCode,
-      answer: params.text,
-      text: params.text,
-      assistant_answer: params.text,
-      selected_final_answer: params.text,
-      selected_terminal_result_id: terminalResult.result_id,
-      terminal_result: terminalResult,
-      terminal_results: [terminalResult],
+      ...buildGoldenPathTypedFailureResponseProjection({
+        terminalResult,
+        terminalErrorCode: params.errorCode,
+      }),
       golden_path_runtime: buildGoldenPathRuntimeStatus({
         status: "internet_search_lookup_failed",
         requestedCapability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
