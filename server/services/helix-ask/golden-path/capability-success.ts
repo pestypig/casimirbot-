@@ -38,19 +38,27 @@ export const buildGoldenPathCapabilitySuccessPayload = (args: {
   terminalResultId: string;
   requiredTerminalKind: string;
   goalKind: string;
+  answerScope?: string;
   sourceTarget: string;
   family: string;
+  planArgs?: RecordLike;
   classifierReasons: readonly string[];
   allowsWorkspaceContext: boolean;
   requestedCapability: string;
   observedArtifactKind: string;
   observationPayload: RecordLike;
+  observationProducerItemId?: string;
   terminalPayloadField: string;
   terminalPayloadSchema: string;
+  terminalPayloadExtra?: RecordLike;
   answerText: string;
   status: string;
   route: string;
   requiredObservationKinds: readonly string[];
+  routeGateTerminalEligible?: boolean;
+  includeRouteGatePromptText?: boolean;
+  answerProducerItemId?: string;
+  answerLedgerExtraPayload?: RecordLike;
   hashGoalFrame: (value: unknown) => string;
   buildGoalSatisfactionEvaluationArtifact: BuildGoalSatisfactionArtifact;
 }): RecordLike => {
@@ -58,7 +66,7 @@ export const buildGoldenPathCapabilitySuccessPayload = (args: {
     schema: "helix.ask_canonical_goal_frame.v1",
     turn_id: args.turnId,
     goal_kind: args.goalKind,
-    answer_scope: "current_turn",
+    answer_scope: args.answerScope ?? "current_turn",
     required_terminal_kind: args.requiredTerminalKind,
     allows_workspace_context: args.allowsWorkspaceContext,
     allows_prior_artifacts: false,
@@ -116,6 +124,7 @@ export const buildGoldenPathCapabilitySuccessPayload = (args: {
       text: terminalResult.text,
       answer_text: terminalResult.text,
       support_refs: terminalResult.support_refs,
+      ...(args.terminalPayloadExtra ?? {}),
       assistant_answer: false,
       raw_content_included: false,
     },
@@ -123,6 +132,7 @@ export const buildGoldenPathCapabilitySuccessPayload = (args: {
       requestedCapability: args.requestedCapability,
       sourceTarget: args.sourceTarget,
       family: args.family,
+      ...(args.planArgs ? { planArgs: args.planArgs } : {}),
       requiredObservationKinds: args.requiredObservationKinds,
       requiredTerminalKind: args.requiredTerminalKind,
     }),
@@ -154,7 +164,8 @@ export const buildGoldenPathCapabilitySuccessPayload = (args: {
           turnId: args.turnId,
           createdAtMs: args.createdAtMs,
           goalHash,
-          promptText: args.promptText,
+          terminalEligible: args.routeGateTerminalEligible,
+          ...(args.includeRouteGatePromptText === false ? {} : { promptText: args.promptText }),
           requestedCapability: args.requestedCapability,
           goalSatisfactionArtifact,
           goalSatisfactionEvaluation,
@@ -166,6 +177,7 @@ export const buildGoldenPathCapabilitySuccessPayload = (args: {
         createdAtMs: args.createdAtMs,
         goalHash,
         kind: args.observedArtifactKind,
+        producerItemId: args.observationProducerItemId,
         payload: args.observationPayload,
       }),
       buildGoldenPathAnswerLedgerArtifact({
@@ -174,8 +186,10 @@ export const buildGoldenPathCapabilitySuccessPayload = (args: {
         createdAtMs: args.createdAtMs,
         goalHash,
         kind: args.requiredTerminalKind,
+        producerItemId: args.answerProducerItemId,
         payloadSchema: args.terminalPayloadSchema,
         terminalResult,
+        extraPayload: args.answerLedgerExtraPayload,
       }),
     ],
     debug: buildGoldenPathCapabilityDebugMirror({

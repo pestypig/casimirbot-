@@ -1,9 +1,6 @@
 import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfaction-artifact";
 import { HELIX_SCHOLARLY_RESEARCH_OBSERVATION_SCHEMA } from "../../../../../shared/helix-scholarly-research-observation";
 import {
-  buildGoldenPathAnswerLedgerArtifact,
-  buildGoldenPathObservationLedgerArtifact,
-  buildGoldenPathPayloadLedgerArtifact,
   buildGoldenPathTypedFailureLedgerArtifact,
   buildGoldenPathRouteGateLedgerArtifact,
 } from "../artifact-ledger";
@@ -11,6 +8,7 @@ import {
   buildGoldenPathCapabilityGoalSatisfactionEvaluation,
   buildGoldenPathCapabilityPlan,
 } from "../capability-contract";
+import { buildGoldenPathCapabilitySuccessPayload } from "../capability-success";
 import { buildGoldenPathCapabilityDebugMirror } from "../debug-mirror";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
@@ -25,9 +23,7 @@ import {
 } from "../core";
 import {
   buildGoldenPathTerminalAuthorityProjection,
-  buildGoldenPathTerminalResponseProjection,
   buildGoldenPathTypedFailureResponseProjection,
-  buildGoldenPathTerminalResult,
   buildGoldenPathTypedFailureTerminalResult,
 } from "../terminal-envelope";
 import { buildGoldenPathSolverTrace } from "../solver-trace";
@@ -282,148 +278,42 @@ export const buildHelixAskGoldenPathScholarlyResearchPayload = (args: {
     "This answer is grounded in compact scholarly metadata supplied to the current turn; provider lookup is not run inside the golden path.",
   ];
   const answerText = answerLines.join("\n");
-  const canonicalGoalFrame = {
-    schema: "helix.ask_canonical_goal_frame.v1",
-    turn_id: turnId,
-    goal_kind: goalKind,
-    answer_scope: "external_scholarly_research",
-    required_terminal_kind: requiredTerminalKind,
-    allows_workspace_context: true,
-    allows_prior_artifacts: false,
-    classifier_reasons: ["explicit_scholarly_research_lookup_request"],
-    assistant_answer: false,
-    raw_content_included: false,
-  };
-  const goalSatisfactionEvaluation = buildGoldenPathCapabilityGoalSatisfactionEvaluation({
+  return buildGoldenPathCapabilitySuccessPayload({
     turnId,
-    goalKind,
-    requiredTerminalKind,
-  });
-  const goalHash = args.deps.hashGoalFrame(canonicalGoalFrame);
-  const goalSatisfactionArtifact = args.deps.buildGoalSatisfactionEvaluationArtifact({
-    turnId,
-    goalHash,
-    evaluation: goalSatisfactionEvaluation,
+    traceId,
+    sessionId,
+    threadId,
+    promptText,
     createdAtMs,
+    routeGateArtifactId,
+    observationArtifactId,
+    terminalArtifactId,
+    terminalResultId,
+    requiredTerminalKind,
+    goalKind,
+    answerScope: "external_scholarly_research",
+    sourceTarget: "scholarly_research",
+    family: "scholarly_research",
+    planArgs: { query },
+    classifierReasons: ["explicit_scholarly_research_lookup_request"],
+    allowsWorkspaceContext: true,
+    requestedCapability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+    observedArtifactKind: "scholarly_research_observation",
+    observationPayload: observation,
+    observationProducerItemId: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+    terminalPayloadField: "scholarly_research_answer",
+    terminalPayloadSchema: "helix.scholarly_research_answer.v1",
+    terminalPayloadExtra: { paper_count: normalizedPapers.length },
+    answerText,
+    status: "scholarly_research_lookup",
+    route: "golden_path_runtime / scholarly_research_lookup",
+    requiredObservationKinds: ["scholarly_research_observation"],
+    routeGateTerminalEligible: false,
+    answerProducerItemId: "golden_path_scholarly_research_synthesis",
+    answerLedgerExtraPayload: { paper_count: normalizedPapers.length },
+    hashGoalFrame: args.deps.hashGoalFrame,
+    buildGoalSatisfactionEvaluationArtifact: args.deps.buildGoalSatisfactionEvaluationArtifact,
   });
-  const terminalResult = buildGoldenPathTerminalResult({
-    resultId: terminalResultId,
-    artifactId: terminalArtifactId,
-    artifactKind: requiredTerminalKind,
-    finalAnswerSource: requiredTerminalKind,
-    text: answerText,
-    supportRefs: [observationArtifactId, routeGateArtifactId, goalSatisfactionArtifact.artifact_id],
-  });
-
-  return {
-    ok: true,
-    mode: "read",
-    schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
-    turn_id: turnId,
-    trace_id: traceId,
-    session_id: sessionId,
-    thread_id: threadId,
-    prompt_text: promptText,
-    ...buildGoldenPathTerminalResponseProjection({ terminalResult }),
-    scholarly_research_observation: observation,
-    scholarly_research_answer: {
-      schema: "helix.scholarly_research_answer.v1",
-      text: terminalResult.text,
-      answer_text: terminalResult.text,
-      support_refs: terminalResult.support_refs,
-      paper_count: normalizedPapers.length,
-      assistant_answer: false,
-      raw_content_included: false,
-    },
-    golden_path_runtime: buildGoldenPathRuntimeStatus({
-      status: "scholarly_research_lookup",
-      requestedCapability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
-      selectedCapability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
-      executedCapability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
-      observedArtifactKind: "scholarly_research_observation",
-      observedArtifactRef: observationArtifactId,
-      terminalArtifactRef: terminalArtifactId,
-      terminalResultId,
-      legacyFallbackPossibleWhenUnhandled: true,
-      routeGate: "enabled_explicit_request",
-    }),
-    canonical_goal_frame: canonicalGoalFrame,
-    capability_plan: buildGoldenPathCapabilityPlan({
-      requestedCapability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
-      sourceTarget: "scholarly_research",
-      family: "scholarly_research",
-      planArgs: { query },
-      requiredObservationKinds: ["scholarly_research_observation"],
-      requiredTerminalKind,
-    }),
-    goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-    ...buildGoldenPathTerminalAuthorityProjection({
-      terminalResult,
-      route: "golden_path_runtime / scholarly_research_lookup",
-    }),
-    ask_turn_solver_trace: buildGoldenPathSolverTrace({
-      completedSolverPath: true,
-      routeAuthorityOk: true,
-      terminalAuthorityOk: true,
-      goalSatisfaction: "satisfied",
-      requestedCapability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
-      selectedCapability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
-      executedCapability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
-      observedArtifactKind: "scholarly_research_observation",
-      observedArtifactRef: observationArtifactId,
-      terminalArtifactKind: terminalResult.artifact_kind,
-      extra: {
-        solver_risk_flags: [],
-        solver_short_circuit_flags: [],
-      },
-    }),
-    current_turn_artifact_ledger: [
-      buildGoldenPathRouteGateLedgerArtifact({
-        artifactId: routeGateArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        terminalEligible: false,
-        promptText,
-        requestedCapability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
-        goalSatisfactionArtifact,
-        goalSatisfactionEvaluation,
-      }),
-      buildGoldenPathObservationLedgerArtifact({
-        artifactId: observationArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        producerItemId: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
-        kind: "scholarly_research_observation",
-        payload: observation,
-      }),
-      buildGoldenPathAnswerLedgerArtifact({
-        artifactId: terminalArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        producerItemId: "golden_path_scholarly_research_synthesis",
-        kind: requiredTerminalKind,
-        payloadSchema: "helix.scholarly_research_answer.v1",
-        terminalResult,
-        extraPayload: {
-          paper_count: normalizedPapers.length,
-        },
-      }),
-    ],
-    debug: buildGoldenPathCapabilityDebugMirror({
-      status: "scholarly_research_lookup",
-      privateRuntimeLoopEntered: false,
-      requestedCapability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
-      selectedCapability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
-      executedCapability: HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
-      observedArtifactKind: "scholarly_research_observation",
-      observedArtifactRef: observationArtifactId,
-      terminalResult,
-      goalSatisfactionEvaluation,
-    }),
-  };
 };
 
 export const requiredObservationKinds = ["scholarly_research_observation"] as const;
