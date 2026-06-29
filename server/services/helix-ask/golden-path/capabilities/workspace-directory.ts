@@ -10,7 +10,6 @@ import {
 } from "../artifact-ledger";
 import { buildGoldenPathCapabilityPlan } from "../capability-contract";
 import {
-  HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
   readHelixAskGoldenPathPrompt,
   readString,
@@ -24,6 +23,7 @@ import {
   buildGoldenPathTypedFailureTerminalResult,
 } from "../terminal-envelope";
 import { buildGoldenPathSolverTrace } from "../solver-trace";
+import { buildGoldenPathRuntimeStatus } from "../runtime-status";
 
 export type HelixAskGoldenPathWorkspaceDirectoryDependencies = {
   now: () => Date;
@@ -282,23 +282,16 @@ export const buildHelixAskGoldenPathWorkspaceDirectoryPayload = (args: {
     terminal_result: terminalResult,
     terminal_results: [terminalResult],
     workspace_directory_resolution: resolution,
-    golden_path_runtime: {
-      schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
+    golden_path_runtime: buildGoldenPathRuntimeStatus({
       status: "workspace_directory_resolution",
-      flag: HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
-      requested_capability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
-      selected_capability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
-      executed_capability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
-      observed_artifact_kind: "workspace_directory_resolution",
-      observed_artifact_ref: resolution.artifact_id,
-      terminal_artifact_ref: resolution.artifact_id,
-      terminal_result_id: terminalResultId,
-      legacy_route_bypassed: true,
-      private_runtime_loop_entered: false,
-      terminal_result_count: 1,
-      assistant_answer: false,
-      raw_content_included: false,
-    },
+      requestedCapability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
+      selectedCapability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
+      executedCapability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
+      observedArtifactKind: "workspace_directory_resolution",
+      observedArtifactRef: resolution.artifact_id,
+      terminalArtifactRef: resolution.artifact_id,
+      terminalResultId,
+    }),
     canonical_goal_frame: canonicalGoalFrame,
     capability_plan: buildGoldenPathCapabilityPlan({
       requestedCapability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,

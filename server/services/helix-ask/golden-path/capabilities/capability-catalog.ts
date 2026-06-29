@@ -6,7 +6,6 @@ import {
 } from "../artifact-ledger";
 import { buildGoldenPathCapabilityPlan } from "../capability-contract";
 import {
-  HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
   HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
   HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
@@ -26,6 +25,7 @@ import {
   buildGoldenPathTerminalResult,
 } from "../terminal-envelope";
 import { buildGoldenPathSolverTrace } from "../solver-trace";
+import { buildGoldenPathRuntimeStatus } from "../runtime-status";
 
 export type HelixAskGoldenPathCapabilityCatalogDependencies = {
   now: () => Date;
@@ -144,25 +144,18 @@ export const buildHelixAskGoldenPathCapabilityCatalogPayload = (args: {
     selected_terminal_result_id: terminalResult.result_id,
     terminal_result: terminalResult,
     terminal_results: [terminalResult],
-    golden_path_runtime: {
-      schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
+    golden_path_runtime: buildGoldenPathRuntimeStatus({
       status: "capability_catalog",
-      flag: HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
-      requested_capability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
-      selected_capability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
-      executed_capability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
-      observed_artifact_kind: "capability_registry",
-      observed_artifact_ref: observationArtifactId,
-      terminal_artifact_ref: terminalArtifactId,
-      terminal_result_id: terminalResultId,
-      legacy_route_bypassed: true,
-      legacy_fallback_possible_when_unhandled: true,
-      private_runtime_loop_entered: false,
-      route_gate: "enabled_explicit_request",
-      terminal_result_count: 1,
-      assistant_answer: false,
-      raw_content_included: false,
-    },
+      requestedCapability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
+      selectedCapability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
+      executedCapability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
+      observedArtifactKind: "capability_registry",
+      observedArtifactRef: observationArtifactId,
+      terminalArtifactRef: terminalArtifactId,
+      terminalResultId,
+      legacyFallbackPossibleWhenUnhandled: true,
+      routeGate: "enabled_explicit_request",
+    }),
     canonical_goal_frame: canonicalGoalFrame,
     capability_registry: catalogObservation,
     capability_help_summary: {

@@ -7,7 +7,6 @@ import {
 } from "../artifact-ledger";
 import { buildGoldenPathCapabilityPlan } from "../capability-contract";
 import {
-  HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
   HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
   readHelixAskGoldenPathPrompt,
@@ -22,6 +21,7 @@ import {
   buildGoldenPathTypedFailureTerminalResult,
 } from "../terminal-envelope";
 import { buildGoldenPathSolverTrace } from "../solver-trace";
+import { buildGoldenPathRuntimeStatus } from "../runtime-status";
 
 export type HelixAskGoldenPathCalculatorDependencies = {
   now: () => Date;
@@ -169,20 +169,13 @@ export const buildHelixAskGoldenPathCalculatorSolvePayload = (args: {
       selected_terminal_result_id: terminalResult.result_id,
       terminal_result: terminalResult,
       terminal_results: [terminalResult],
-      golden_path_runtime: {
-        schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
+      golden_path_runtime: buildGoldenPathRuntimeStatus({
         status: "calculator_solve_failed",
-        flag: HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
-        requested_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
-        selected_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
-        executed_capability: null,
-        terminal_result_count: 1,
-        first_broken_rail: params.brokenRail,
-        legacy_route_bypassed: true,
-        private_runtime_loop_entered: false,
-        assistant_answer: false,
-        raw_content_included: false,
-      },
+        requestedCapability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+        selectedCapability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+        executedCapability: null,
+        firstBrokenRail: params.brokenRail,
+      }),
       canonical_goal_frame: canonicalGoalFrame,
       capability_plan: buildGoldenPathCapabilityPlan({
         requestedCapability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
@@ -361,23 +354,16 @@ export const buildHelixAskGoldenPathCalculatorSolvePayload = (args: {
       assistant_answer: false,
       raw_content_included: false,
     },
-    golden_path_runtime: {
-      schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
+    golden_path_runtime: buildGoldenPathRuntimeStatus({
       status: "calculator_solve",
-      flag: HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
-      requested_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
-      selected_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
-      executed_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
-      observed_artifact_kind: "calculator_receipt",
-      observed_artifact_ref: observationArtifactId,
-      terminal_artifact_ref: terminalArtifactId,
-      terminal_result_id: terminalResultId,
-      legacy_route_bypassed: true,
-      private_runtime_loop_entered: false,
-      terminal_result_count: 1,
-      assistant_answer: false,
-      raw_content_included: false,
-    },
+      requestedCapability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+      selectedCapability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+      executedCapability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+      observedArtifactKind: "calculator_receipt",
+      observedArtifactRef: observationArtifactId,
+      terminalArtifactRef: terminalArtifactId,
+      terminalResultId,
+    }),
     canonical_goal_frame: canonicalGoalFrame,
     capability_plan: buildGoldenPathCapabilityPlan({
       requestedCapability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
