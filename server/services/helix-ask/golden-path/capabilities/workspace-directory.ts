@@ -3,7 +3,11 @@ import {
   HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
   executeWorkspaceDirectoryResolveTool,
 } from "../../workspace-directory-resolver";
-import { buildGoldenPathRouteGateLedgerArtifact } from "../artifact-ledger";
+import {
+  buildGoldenPathObservationLedgerArtifact,
+  buildGoldenPathPayloadLedgerArtifact,
+  buildGoldenPathRouteGateLedgerArtifact,
+} from "../artifact-ledger";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
@@ -194,15 +198,13 @@ export const buildHelixAskGoldenPathWorkspaceDirectoryPayload = (args: {
           goalHash,
           requestedCapability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
         }),
-        {
-          artifact_id: terminalArtifactId,
-          turn_id: turnId,
-          producer_item_id: "golden_path_runtime",
+        buildGoldenPathPayloadLedgerArtifact({
+          artifactId: terminalArtifactId,
+          turnId,
+          createdAtMs,
+          goalHash,
           kind: "typed_failure",
-          terminal_eligible: true,
-          created_at_ms: createdAtMs,
-          source_scope: "current_turn",
-          goal_hash: goalHash,
+          terminalEligible: true,
           payload: {
             schema: "helix.typed_failure.v1",
             text: terminalResult.text,
@@ -212,7 +214,7 @@ export const buildHelixAskGoldenPathWorkspaceDirectoryPayload = (args: {
             assistant_answer: false,
             raw_content_included: false,
           },
-        },
+        }),
       ],
       debug: {
         schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
@@ -373,17 +375,15 @@ export const buildHelixAskGoldenPathWorkspaceDirectoryPayload = (args: {
         goalSatisfactionArtifact,
         goalSatisfactionEvaluation,
       }),
-      {
-        artifact_id: resolution.artifact_id,
-        turn_id: turnId,
-        producer_item_id: "golden_path_runtime",
+      buildGoldenPathObservationLedgerArtifact({
+        artifactId: resolution.artifact_id,
+        turnId,
+        createdAtMs,
+        goalHash,
         kind: "workspace_directory_resolution",
-        terminal_eligible: true,
-        created_at_ms: createdAtMs,
-        source_scope: "current_turn",
-        goal_hash: goalHash,
+        terminalEligible: true,
         payload: resolution,
-      },
+      }),
     ],
     debug: {
       schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,

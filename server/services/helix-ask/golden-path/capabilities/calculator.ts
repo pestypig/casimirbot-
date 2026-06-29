@@ -1,5 +1,10 @@
 import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfaction-artifact";
-import { buildGoldenPathRouteGateLedgerArtifact } from "../artifact-ledger";
+import {
+  buildGoldenPathAnswerLedgerArtifact,
+  buildGoldenPathObservationLedgerArtifact,
+  buildGoldenPathPayloadLedgerArtifact,
+  buildGoldenPathRouteGateLedgerArtifact,
+} from "../artifact-ledger";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
@@ -236,15 +241,13 @@ export const buildHelixAskGoldenPathCalculatorSolvePayload = (args: {
           goalHash,
           requestedCapability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
         }),
-        {
-          artifact_id: terminalArtifactId,
-          turn_id: turnId,
-          producer_item_id: "golden_path_runtime",
+        buildGoldenPathPayloadLedgerArtifact({
+          artifactId: terminalArtifactId,
+          turnId,
+          createdAtMs,
+          goalHash,
           kind: "typed_failure",
-          terminal_eligible: true,
-          created_at_ms: createdAtMs,
-          source_scope: "current_turn",
-          goal_hash: goalHash,
+          terminalEligible: true,
           payload: {
             schema: "helix.typed_failure.v1",
             text: terminalResult.text,
@@ -255,7 +258,7 @@ export const buildHelixAskGoldenPathCalculatorSolvePayload = (args: {
             assistant_answer: false,
             raw_content_included: false,
           },
-        },
+        }),
       ],
       debug: {
         schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
@@ -452,39 +455,29 @@ export const buildHelixAskGoldenPathCalculatorSolvePayload = (args: {
         goalSatisfactionArtifact,
         goalSatisfactionEvaluation,
       }),
-      {
-        artifact_id: observationArtifactId,
-        turn_id: turnId,
-        producer_item_id: "golden_path_runtime",
+      buildGoldenPathObservationLedgerArtifact({
+        artifactId: observationArtifactId,
+        turnId,
+        createdAtMs,
+        goalHash,
         kind: "calculator_receipt",
-        terminal_eligible: false,
-        created_at_ms: createdAtMs,
-        source_scope: "current_turn",
-        goal_hash: goalHash,
+        terminalEligible: false,
         payload: calculatorReceipt,
-      },
-      {
-        artifact_id: terminalArtifactId,
-        turn_id: turnId,
-        producer_item_id: "golden_path_runtime",
+      }),
+      buildGoldenPathAnswerLedgerArtifact({
+        artifactId: terminalArtifactId,
+        turnId,
+        createdAtMs,
+        goalHash,
         kind: requiredTerminalKind,
-        terminal_eligible: true,
-        created_at_ms: createdAtMs,
-        source_scope: "current_turn",
-        goal_hash: goalHash,
-        payload: {
-          schema: "helix.workstation_tool_evaluation.v1",
-          text: terminalResult.text,
-          answer_text: terminalResult.text,
-          terminal_result_id: terminalResult.result_id,
+        payloadSchema: "helix.workstation_tool_evaluation.v1",
+        terminalResult,
+        extraPayload: {
           expression,
           result,
           result_text: resultText,
-          support_refs: terminalResult.support_refs,
-          assistant_answer: false,
-          raw_content_included: false,
         },
-      },
+      }),
     ],
     debug: {
       schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
