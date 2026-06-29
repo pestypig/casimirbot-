@@ -10,6 +10,7 @@ import {
   readGoldenPathDocLocateQuery,
   readGoldenPathDocPath,
 } from "../capabilities/docs-locate";
+import { isHelixAskGoldenPathDocsCalculatorCompoundRequested } from "../compound-contract";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
@@ -26,6 +27,19 @@ export type HelixAskGoldenPathDocsCalculatorCompoundDependencies = {
   hashGoalFrame: (value: unknown) => string;
   buildGoalSatisfactionEvaluationArtifact: typeof buildHelixGoalSatisfactionEvaluationArtifact;
 };
+export const requiredObservationKinds = ["doc_location_matches", "calculator_receipt"] as const;
+export const requiredTerminalKinds = ["compound_evidence_synthesis_answer"] as const;
+export const orderedSubgoalContract = [
+  {
+    requested_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+    observation_kind: "doc_location_matches",
+  },
+  {
+    requested_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+    observation_kind: "calculator_receipt",
+  },
+] as const;
+export const isRequested = isHelixAskGoldenPathDocsCalculatorCompoundRequested;
 export const buildHelixAskGoldenPathDocsCalculatorCompoundPayload = (args: {
   body: RecordLike;
   deps: HelixAskGoldenPathDocsCalculatorCompoundDependencies;
@@ -595,4 +609,4 @@ export const buildHelixAskGoldenPathDocsCalculatorCompoundPayload = (args: {
     },
   };
 };
-
+export const buildPayload = buildHelixAskGoldenPathDocsCalculatorCompoundPayload;

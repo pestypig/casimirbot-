@@ -1,6 +1,7 @@
 import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfaction-artifact";
 import { buildGoldenPathCapabilityCatalogObservation } from "../capabilities/capability-catalog";
 import { buildGoldenPathWorkspaceStatusObservation } from "../capabilities/workspace-status";
+import { isHelixAskGoldenPathCatalogWorkspaceCompoundRequested } from "../compound-contract";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
@@ -19,6 +20,19 @@ export type HelixAskGoldenPathCatalogWorkspaceCompoundDependencies = {
   hashGoalFrame: (value: unknown) => string;
   buildGoalSatisfactionEvaluationArtifact: typeof buildHelixGoalSatisfactionEvaluationArtifact;
 };
+export const requiredObservationKinds = ["capability_registry", "workspace_os_status_observation"] as const;
+export const requiredTerminalKinds = ["compound_evidence_synthesis_answer"] as const;
+export const orderedSubgoalContract = [
+  {
+    requested_capability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
+    observation_kind: "capability_registry",
+  },
+  {
+    requested_capability: HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,
+    observation_kind: "workspace_os_status_observation",
+  },
+] as const;
+export const isRequested = isHelixAskGoldenPathCatalogWorkspaceCompoundRequested;
 export const buildHelixAskGoldenPathCatalogWorkspaceCompoundPayload = (args: {
   body: RecordLike;
   deps: HelixAskGoldenPathCatalogWorkspaceCompoundDependencies;
@@ -320,4 +334,5 @@ export const buildHelixAskGoldenPathCatalogWorkspaceCompoundPayload = (args: {
     },
   };
 };
+export const buildPayload = buildHelixAskGoldenPathCatalogWorkspaceCompoundPayload;
 

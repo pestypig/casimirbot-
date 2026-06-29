@@ -8,6 +8,7 @@ import {
   readTheoryReflectionAnchors,
   readTheoryReflectionTopic,
 } from "../capabilities/theory-reflection";
+import { isHelixAskGoldenPathInternetResearchReflectionCompoundRequested } from "../compound-contract";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
@@ -27,6 +28,26 @@ export type HelixAskGoldenPathInternetResearchReflectionCompoundDependencies = {
   hashGoalFrame: (value: unknown) => string;
   buildGoalSatisfactionEvaluationArtifact: typeof buildHelixGoalSatisfactionEvaluationArtifact;
 };
+export const requiredObservationKinds = [
+  "internet_search_observation",
+  "helix_theory_context_reflection_tool_receipt",
+] as const;
+export const requiredTerminalKinds = ["compound_evidence_synthesis_answer"] as const;
+export const orderedSubgoalContract = [
+  {
+    requested_capability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
+    allowed_requested_capabilities: [
+      HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
+      HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
+    ],
+    observation_kind: "internet_search_observation",
+  },
+  {
+    requested_capability: HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
+    observation_kind: "helix_theory_context_reflection_tool_receipt",
+  },
+] as const;
+export const isRequested = isHelixAskGoldenPathInternetResearchReflectionCompoundRequested;
 export const buildHelixAskGoldenPathInternetResearchReflectionCompoundPayload = (args: {
   body: RecordLike;
   deps: HelixAskGoldenPathInternetResearchReflectionCompoundDependencies;
@@ -603,3 +624,4 @@ export const buildHelixAskGoldenPathInternetResearchReflectionCompoundPayload = 
     },
   };
 };
+export const buildPayload = buildHelixAskGoldenPathInternetResearchReflectionCompoundPayload;

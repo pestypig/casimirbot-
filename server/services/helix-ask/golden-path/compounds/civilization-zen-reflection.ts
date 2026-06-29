@@ -1,6 +1,7 @@
 import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfaction-artifact";
 import { readCompactCivilizationBoundsToolResult } from "../capabilities/civilization-bounds-reflection";
 import { readCompactZenGraphReflectionToolResult } from "../capabilities/zen-graph-reflection";
+import { isHelixAskGoldenPathCivilizationBoundsZenReflectionCompoundRequested } from "../compound-contract";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
@@ -20,6 +21,22 @@ export type HelixAskGoldenPathCivilizationBoundsZenReflectionCompoundDependencie
   hashGoalFrame: (value: unknown) => string;
   buildGoalSatisfactionEvaluationArtifact: typeof buildHelixGoalSatisfactionEvaluationArtifact;
 };
+export const requiredObservationKinds = [
+  "helix_civilization_bounds_tool_result",
+  "helix_zen_graph_reflection_tool_result",
+] as const;
+export const requiredTerminalKinds = ["compound_evidence_synthesis_answer"] as const;
+export const orderedSubgoalContract = [
+  {
+    requested_capability: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+    observation_kind: "helix_civilization_bounds_tool_result",
+  },
+  {
+    requested_capability: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
+    observation_kind: "helix_zen_graph_reflection_tool_result",
+  },
+] as const;
+export const isRequested = isHelixAskGoldenPathCivilizationBoundsZenReflectionCompoundRequested;
 export const buildHelixAskGoldenPathCivilizationBoundsZenReflectionCompoundPayload = (args: {
   body: RecordLike;
   deps: HelixAskGoldenPathCivilizationBoundsZenReflectionCompoundDependencies;
@@ -591,3 +608,4 @@ export const buildHelixAskGoldenPathCivilizationBoundsZenReflectionCompoundPaylo
     },
   };
 };
+export const buildPayload = buildHelixAskGoldenPathCivilizationBoundsZenReflectionCompoundPayload;

@@ -10,6 +10,7 @@ import {
   readGoldenPathRepoSearchFiles,
   readRepoSearchConcept,
 } from "../capabilities/repo-search-concept";
+import { isHelixAskGoldenPathRepoDocsCompoundRequested } from "../compound-contract";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
@@ -26,6 +27,19 @@ export type HelixAskGoldenPathRepoDocsCompoundDependencies = {
   hashGoalFrame: (value: unknown) => string;
   buildGoalSatisfactionEvaluationArtifact: typeof buildHelixGoalSatisfactionEvaluationArtifact;
 };
+export const requiredObservationKinds = ["repo_code_evidence_observation", "doc_location_matches"] as const;
+export const requiredTerminalKinds = ["compound_evidence_synthesis_answer"] as const;
+export const orderedSubgoalContract = [
+  {
+    requested_capability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+    observation_kind: "repo_code_evidence_observation",
+  },
+  {
+    requested_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+    observation_kind: "doc_location_matches",
+  },
+] as const;
+export const isRequested = isHelixAskGoldenPathRepoDocsCompoundRequested;
 export const buildHelixAskGoldenPathRepoDocsCompoundPayload = (args: {
   body: RecordLike;
   deps: HelixAskGoldenPathRepoDocsCompoundDependencies;
@@ -620,4 +634,4 @@ export const buildHelixAskGoldenPathRepoDocsCompoundPayload = (args: {
     },
   };
 };
-
+export const buildPayload = buildHelixAskGoldenPathRepoDocsCompoundPayload;

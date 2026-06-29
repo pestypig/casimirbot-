@@ -6,6 +6,7 @@ import {
   readCalculatorExpression,
 } from "../capabilities/calculator";
 import { readVisualCaptureSummary } from "../capabilities/visual-capture";
+import { isHelixAskGoldenPathVisualCalculatorCompoundRequested } from "../compound-contract";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
@@ -24,6 +25,23 @@ export type HelixAskGoldenPathVisualCalculatorCompoundDependencies = {
   hashGoalFrame: (value: unknown) => string;
   buildGoalSatisfactionEvaluationArtifact: typeof buildHelixGoalSatisfactionEvaluationArtifact;
 };
+export const requiredObservationKinds = ["visual_frame_evidence", "calculator_receipt"] as const;
+export const requiredTerminalKinds = ["compound_evidence_synthesis_answer"] as const;
+export const orderedSubgoalContract = [
+  {
+    requested_capability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
+    allowed_requested_capabilities: [
+      HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
+      HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY,
+    ],
+    observation_kind: "visual_frame_evidence",
+  },
+  {
+    requested_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+    observation_kind: "calculator_receipt",
+  },
+] as const;
+export const isRequested = isHelixAskGoldenPathVisualCalculatorCompoundRequested;
 export const buildHelixAskGoldenPathVisualCalculatorCompoundPayload = (args: {
   body: RecordLike;
   deps: HelixAskGoldenPathVisualCalculatorCompoundDependencies;
@@ -586,3 +604,4 @@ export const buildHelixAskGoldenPathVisualCalculatorCompoundPayload = (args: {
     },
   };
 };
+export const buildPayload = buildHelixAskGoldenPathVisualCalculatorCompoundPayload;
