@@ -18,6 +18,7 @@ import {
 } from "../artifact-ledger";
 import {
   buildGoldenPathCompoundCapabilityContract,
+  buildGoldenPathCompoundEvidenceSynthesisAnswer,
   isHelixAskGoldenPathRepoDocsCompoundRequested,
 } from "../compound-contract";
 import {
@@ -450,15 +451,11 @@ export const buildHelixAskGoldenPathRepoDocsCompoundPayload = (args: {
     repo_code_evidence_observation: repoEvidenceObservation,
     repo_evidence_relevance_gate: repoEvidenceRelevanceGate,
     doc_location_matches: docLocationMatches,
-    compound_evidence_synthesis_answer: {
-      schema: "helix.compound_evidence_synthesis_answer.v1",
+    compound_evidence_synthesis_answer: buildGoldenPathCompoundEvidenceSynthesisAnswer({
       text: terminalResult.text,
-      answer_text: terminalResult.text,
-      support_refs: terminalResult.support_refs,
-      satisfied_subgoal_count: 2,
-      assistant_answer: false,
-      raw_content_included: false,
-    },
+      supportRefs: terminalResult.support_refs,
+      satisfiedSubgoalCount: 2,
+    }),
     capability_plan: {
       schema: "helix.ask_capability_plan.v1",
       requested_capability: "compound_capability_contract",
