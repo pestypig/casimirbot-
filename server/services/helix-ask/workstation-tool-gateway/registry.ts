@@ -36,17 +36,34 @@ import type {
 const DEFAULT_MODE: HelixWorkstationGatewayMode = "observe";
 const WORKSTATION_GATEWAY_SCHEMA = "helix.workstation_tool_gateway.v1" as const;
 const WORKSTATION_GATEWAY_MANIFEST_VERSION = "read-observe-act.v1" as const;
+const WORKSTATION_ACTIVE_CONTEXT_CAPABILITY = "workstation.active_context" as const;
+const WORKSTATION_ACTIVE_CONTEXT_OBSERVATION_SCHEMA = "helix.workstation_active_context_observation.v1" as const;
 const CALCULATOR_SOLVE_EXPRESSION_CAPABILITY = "scientific-calculator.solve_expression" as const;
 const CALCULATOR_SOLVE_OBSERVATION_SCHEMA = "helix.calculator_solve_observation.v1" as const;
+const CALCULATOR_ACTIVE_CONTEXT_CAPABILITY = "scientific-calculator.active_context" as const;
+const CALCULATOR_ACTIVE_CONTEXT_OBSERVATION_SCHEMA = "helix.calculator_active_context_observation.v1" as const;
 const CALCULATOR_OPEN_PANEL_CAPABILITY = "scientific-calculator.open_panel" as const;
 const CALCULATOR_FOCUS_PANEL_CAPABILITY = "scientific-calculator.focus_panel" as const;
+const WORKSTATION_OPEN_PANEL_CAPABILITY = "workstation.open_panel" as const;
+const WORKSTATION_FOCUS_PANEL_CAPABILITY = "workstation.focus_panel" as const;
 const WORKSTATION_UI_ACTION_RECEIPT_SCHEMA = "helix.workstation_ui_action_receipt.v1" as const;
 const REPO_SEARCH_CAPABILITY = "repo.search" as const;
 const REPO_SEARCH_OBSERVATION_SCHEMA = "helix.repo_search_observation.v1" as const;
 const DOCS_SEARCH_CAPABILITY = "docs.search" as const;
 const DOCS_SEARCH_OBSERVATION_SCHEMA = "helix.docs_search_observation.v1" as const;
+const DOCS_OPEN_DOC_CAPABILITY = "docs-viewer.open_doc" as const;
 const REPO_SEARCH_DEFAULT_PATHS = ["server", "shared", "client/src", "docs"] as const;
 const DOCS_SEARCH_DEFAULT_PATHS = ["docs"] as const;
+const SAFE_WORKSTATION_PANEL_ACTION_IDS = [
+  "docs-viewer",
+  "scientific-calculator",
+  "image-lens",
+  "document-image-lens",
+  "workstation-process-graph",
+  "workstation-task-manager",
+  "workstation-storage-map",
+  "workstation-workflow-timeline",
+] as const;
 const REPO_SEARCH_ALLOWED_PATH_PREFIXES = [
   "server",
   "shared",
@@ -103,6 +120,38 @@ const modeAllowsManifest = (
 
 const readArguments = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+
+const readRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+
+const readSafeWorkstationPanelId = (value: unknown): string | null => {
+  const panelId = cleanString(value).replace(/[^a-z0-9_-]/gi, "").trim();
+  return SAFE_WORKSTATION_PANEL_ACTION_IDS.some((allowed) => allowed === panelId) ? panelId : null;
+};
+
+const readBoundedPanelIdArray = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? value
+        .map((entry) => cleanString(entry).replace(/[^a-z0-9_-]/gi, "").trim())
+        .filter(Boolean)
+        .slice(0, 24)
+    : [];
+
+const readBoundedWorkspaceActiveContext = (value: unknown): {
+  active_panel: string | null;
+  active_group_id: string | null;
+  group_count: number | null;
+  open_panels: string[];
+} => {
+  const record = readRecord(value) ?? {};
+  const groupCount = Number(record.groupCount ?? record.group_count);
+  return {
+    active_panel: cleanString(record.activePanel ?? record.active_panel) || null,
+    active_group_id: cleanString(record.activeGroupId ?? record.active_group_id) || null,
+    group_count: Number.isFinite(groupCount) ? Math.max(0, Math.min(Math.floor(groupCount), 32)) : null,
+    open_panels: readBoundedPanelIdArray(record.openPanels ?? record.open_panels),
+  };
+};
 
 const normalizeNumberText = (value: number): string => {
   if (!Number.isFinite(value)) return String(value);
@@ -181,6 +230,59 @@ const readDocsSearchPaths = (value: unknown): string[] => {
     .filter(isSafeRelativeDocsPath)
     .slice(0, 8);
   return requested.length > 0 ? requested : [...DOCS_SEARCH_DEFAULT_PATHS];
+};
+
+const readDocsActionPath = (value: unknown): string | null => {
+  const path = cleanString(value).replace(/\\/g, "/").replace(/^\/+/, "").trim();
+  return isSafeRelativeDocsPath(path) ? path : null;
+};
+
+const readDocsActionAnchor = (value: unknown): string | null => {
+  const anchor = cleanString(value).replace(/[\r\n]/g, " ").trim();
+  return anchor ? anchor.slice(0, 180) : null;
+};
+
+const clipObservationText = (value: unknown, maxChars = 800): string | null => {
+  const text = cleanString(value).replace(/\s+/g, " ");
+  return text ? text.slice(0, maxChars).trim() : null;
+};
+
+const readBoundedCalculatorActiveContext = (value: unknown): {
+  current_latex: string | null;
+  last_result_text: string | null;
+  last_normalized_expression: string | null;
+  last_trace_id: string | null;
+  last_ok: boolean | null;
+  step_count: number | null;
+  recent_debug_events: Record<string, unknown>[];
+} => {
+  const record = readRecord(value) ?? {};
+  const stepCount = Number(record.step_count ?? record.stepCount);
+  const recentDebugEventsValue = record.recent_debug_events ?? record.recentDebugEvents;
+  const recentDebugEvents = Array.isArray(recentDebugEventsValue)
+    ? recentDebugEventsValue
+        .map(readRecord)
+        .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+        .slice(0, 5)
+        .map((entry) => ({
+          action_id: clipObservationText(entry.action_id, 120),
+          ok: typeof entry.ok === "boolean" ? entry.ok : null,
+          input_latex: clipObservationText(entry.input_latex, 400),
+          result_text: clipObservationText(entry.result_text, 400),
+          normalized_expression: clipObservationText(entry.normalized_expression, 400),
+          message: clipObservationText(entry.message, 240),
+          ts: clipObservationText(entry.ts, 120),
+        }))
+    : [];
+  return {
+    current_latex: clipObservationText(record.current_latex ?? record.currentLatex),
+    last_result_text: clipObservationText(record.last_result_text ?? record.lastResultText),
+    last_normalized_expression: clipObservationText(record.last_normalized_expression ?? record.lastNormalizedExpression),
+    last_trace_id: clipObservationText(record.last_trace_id ?? record.lastTraceId, 240),
+    last_ok: typeof record.last_ok === "boolean" ? record.last_ok : typeof record.lastOk === "boolean" ? record.lastOk : null,
+    step_count: Number.isFinite(stepCount) ? Math.max(0, Math.min(Math.floor(stepCount), 200)) : null,
+    recent_debug_events: recentDebugEvents,
+  };
 };
 
 const normalizeDocsObservationLine = (line: string): string => {
@@ -385,6 +487,35 @@ const workspaceOsStatusManifest: HelixWorkstationCapabilityManifest = {
   raw_content_included: false,
 };
 
+const workstationActiveContextManifest: HelixWorkstationCapabilityManifest = {
+  schema: "helix.workstation_tool_gateway.capability.v1",
+  capability_id: WORKSTATION_ACTIVE_CONTEXT_CAPABILITY,
+  label: "Workstation active context",
+  description:
+    "Reads bounded active/open workstation panel identity supplied by the Ask turn context snapshot. It is observation-only and cannot mutate or answer.",
+  mode: "read",
+  mutating: false,
+  code_mutation: false,
+  shell_access: false,
+  requires_confirmation: false,
+  requires_source: false,
+  terminal_eligible: false,
+  permission_profile_required: "read",
+  post_tool_model_step_required: true,
+  input_schema: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      workspace_context: { type: "object" },
+    },
+  },
+  output_observation_schema: WORKSTATION_ACTIVE_CONTEXT_OBSERVATION_SCHEMA,
+  observation_schema: WORKSTATION_ACTIVE_CONTEXT_OBSERVATION_SCHEMA,
+  safety_tags: ["read_or_observe", "workstation_context", "active_context", "non_terminal", "no_shell", "no_code_mutation"],
+  assistant_answer: false,
+  raw_content_included: false,
+};
+
 const calculatorSolveExpressionManifest: HelixWorkstationCapabilityManifest = {
   schema: "helix.workstation_tool_gateway.capability.v1",
   capability_id: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
@@ -411,6 +542,35 @@ const calculatorSolveExpressionManifest: HelixWorkstationCapabilityManifest = {
   output_observation_schema: CALCULATOR_SOLVE_OBSERVATION_SCHEMA,
   observation_schema: CALCULATOR_SOLVE_OBSERVATION_SCHEMA,
   safety_tags: ["read_or_observe", "calculator", "non_terminal", "no_shell", "no_code_mutation"],
+  assistant_answer: false,
+  raw_content_included: false,
+};
+
+const calculatorActiveContextManifest: HelixWorkstationCapabilityManifest = {
+  schema: "helix.workstation_tool_gateway.capability.v1",
+  capability_id: CALCULATOR_ACTIVE_CONTEXT_CAPABILITY,
+  label: "Scientific Calculator active context",
+  description:
+    "Reads bounded active Scientific Calculator panel state supplied by the workstation context snapshot. It is observation-only and cannot solve, mutate, or answer.",
+  mode: "read",
+  mutating: false,
+  code_mutation: false,
+  shell_access: false,
+  requires_confirmation: false,
+  requires_source: false,
+  terminal_eligible: false,
+  permission_profile_required: "read",
+  post_tool_model_step_required: true,
+  input_schema: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      active_context: { type: "object" },
+    },
+  },
+  output_observation_schema: CALCULATOR_ACTIVE_CONTEXT_OBSERVATION_SCHEMA,
+  observation_schema: CALCULATOR_ACTIVE_CONTEXT_OBSERVATION_SCHEMA,
+  safety_tags: ["read_or_observe", "calculator", "active_context", "non_terminal", "no_shell", "no_code_mutation"],
   assistant_answer: false,
   raw_content_included: false,
 };
@@ -455,6 +615,81 @@ const calculatorFocusPanelManifest = makeCalculatorPanelActionManifest(
   CALCULATOR_FOCUS_PANEL_CAPABILITY,
   "focus_panel",
 );
+
+const makeWorkstationPanelActionManifest = (
+  capabilityId: typeof WORKSTATION_OPEN_PANEL_CAPABILITY | typeof WORKSTATION_FOCUS_PANEL_CAPABILITY,
+  action: "open_panel" | "focus_panel",
+): HelixWorkstationCapabilityManifest => ({
+  schema: "helix.workstation_tool_gateway.capability.v1",
+  capability_id: capabilityId,
+  label: action === "open_panel" ? "Workstation open panel" : "Workstation focus panel",
+  description:
+    "Requests a governed, non-mutating workstation UI action for a safe read/observe panel allowlist. It is a non-terminal action receipt and cannot answer the user.",
+  mode: "act",
+  mutating: false,
+  code_mutation: false,
+  shell_access: false,
+  requires_confirmation: false,
+  requires_source: false,
+  terminal_eligible: false,
+  permission_profile_required: "act",
+  post_tool_model_step_required: true,
+  input_schema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["panel_id"],
+    properties: {
+      panel_id: { type: "string" },
+      reason: { type: "string" },
+    },
+  },
+  output_observation_schema: WORKSTATION_UI_ACTION_RECEIPT_SCHEMA,
+  observation_schema: WORKSTATION_UI_ACTION_RECEIPT_SCHEMA,
+  safety_tags: ["non_mutating_ui_action", "workstation_panel", "panel_action", "action_receipt", "non_terminal", "no_shell", "no_code_mutation"],
+  assistant_answer: false,
+  raw_content_included: false,
+});
+
+const workstationOpenPanelManifest = makeWorkstationPanelActionManifest(
+  WORKSTATION_OPEN_PANEL_CAPABILITY,
+  "open_panel",
+);
+const workstationFocusPanelManifest = makeWorkstationPanelActionManifest(
+  WORKSTATION_FOCUS_PANEL_CAPABILITY,
+  "focus_panel",
+);
+
+const docsOpenDocManifest: HelixWorkstationCapabilityManifest = {
+  schema: "helix.workstation_tool_gateway.capability.v1",
+  capability_id: DOCS_OPEN_DOC_CAPABILITY,
+  label: "Docs Viewer open document",
+  description:
+    "Requests a governed, non-mutating Docs Viewer UI action to open a safe docs/ path. It produces an action receipt only and cannot answer document content.",
+  mode: "act",
+  mutating: false,
+  code_mutation: false,
+  shell_access: false,
+  requires_confirmation: false,
+  requires_source: true,
+  terminal_eligible: false,
+  permission_profile_required: "act",
+  post_tool_model_step_required: true,
+  input_schema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["path"],
+    properties: {
+      path: { type: "string" },
+      anchor: { type: "string" },
+      reason: { type: "string" },
+    },
+  },
+  output_observation_schema: WORKSTATION_UI_ACTION_RECEIPT_SCHEMA,
+  observation_schema: WORKSTATION_UI_ACTION_RECEIPT_SCHEMA,
+  safety_tags: ["non_mutating_ui_action", "docs_viewer", "open_doc", "action_receipt", "non_terminal", "no_shell", "no_code_mutation"],
+  assistant_answer: false,
+  raw_content_included: false,
+};
 
 const repoSearchManifest: HelixWorkstationCapabilityManifest = {
   schema: "helix.workstation_tool_gateway.capability.v1",
@@ -522,9 +757,14 @@ const docsSearchManifest: HelixWorkstationCapabilityManifest = {
 
 const capabilities = new Map<string, HelixWorkstationCapabilityManifest>([
   [workspaceOsStatusManifest.capability_id, workspaceOsStatusManifest],
+  [workstationActiveContextManifest.capability_id, workstationActiveContextManifest],
   [calculatorSolveExpressionManifest.capability_id, calculatorSolveExpressionManifest],
+  [calculatorActiveContextManifest.capability_id, calculatorActiveContextManifest],
   [calculatorOpenPanelManifest.capability_id, calculatorOpenPanelManifest],
   [calculatorFocusPanelManifest.capability_id, calculatorFocusPanelManifest],
+  [workstationOpenPanelManifest.capability_id, workstationOpenPanelManifest],
+  [workstationFocusPanelManifest.capability_id, workstationFocusPanelManifest],
+  [docsOpenDocManifest.capability_id, docsOpenDocManifest],
   [repoSearchManifest.capability_id, repoSearchManifest],
   [docsSearchManifest.capability_id, docsSearchManifest],
 ]);
@@ -677,6 +917,77 @@ export const callWorkstationGatewayCapability = async (
     };
   }
 
+  if (manifest.capability_id === WORKSTATION_ACTIVE_CONTEXT_CAPABILITY) {
+    const args = readArguments(input.arguments);
+    const activeContext = readBoundedWorkspaceActiveContext(args.workspace_context ?? args.workspaceContext);
+    const hasContext = Boolean(activeContext.active_panel || activeContext.open_panels.length > 0);
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: hasContext ? "admitted" : "blocked",
+      reason: hasContext ? "read_only_gateway_capability" : "workstation_active_context_missing",
+      blockedReason: hasContext ? undefined : "workstation_active_context_missing",
+      sourceTargetIntent: args.source_target_intent,
+    });
+    const observation = {
+      schema: WORKSTATION_ACTIVE_CONTEXT_OBSERVATION_SCHEMA,
+      capability_key: manifest.capability_id,
+      status: hasContext ? "succeeded" : "blocked",
+      blocked_reason: hasContext ? null : "workstation_active_context_missing",
+      ...activeContext,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const summary = hasContext
+      ? `Workstation active context observed active panel ${activeContext.active_panel ?? "unknown"} with ${activeContext.open_panels.length} open panel(s).`
+      : "Workstation active context was requested but no bounded panel state was supplied.";
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: "workstation",
+      action: "active_context",
+      status: hasContext ? "succeeded" : "blocked",
+      summary,
+      observation,
+      missingRequirements: hasContext ? [] : [{
+        code: "workstation_active_context_missing",
+        message: "Attach workspace context with active/open panel identity before asking about the current workstation layout.",
+        repair_action: "ask_user",
+      }],
+    });
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error: hasContext ? undefined : "workstation_active_context_missing",
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: hasContext,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      error: hasContext ? undefined : "workstation_active_context_missing",
+    };
+  }
+
   if (manifest.capability_id === HELIX_WORKSPACE_OS_STATUS_CAPABILITY) {
     const args = readArguments(input.arguments);
     const admission = buildAdmission({
@@ -800,6 +1111,83 @@ export const callWorkstationGatewayCapability = async (
     };
   }
 
+  if (manifest.capability_id === CALCULATOR_ACTIVE_CONTEXT_CAPABILITY) {
+    const args = readArguments(input.arguments);
+    const activeContext = readBoundedCalculatorActiveContext(args.active_context ?? args.activeContext);
+    const hasContext = Boolean(
+      activeContext.current_latex ||
+      activeContext.last_result_text ||
+      activeContext.last_normalized_expression ||
+      activeContext.recent_debug_events.length > 0
+    );
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: hasContext ? "admitted" : "blocked",
+      reason: hasContext ? "read_only_gateway_capability" : "calculator_active_context_missing",
+      blockedReason: hasContext ? undefined : "calculator_active_context_missing",
+      sourceTargetIntent: args.source_target_intent,
+    });
+    const observation = {
+      schema: CALCULATOR_ACTIVE_CONTEXT_OBSERVATION_SCHEMA,
+      capability_key: manifest.capability_id,
+      panel_id: "scientific-calculator",
+      status: hasContext ? "succeeded" : "blocked",
+      blocked_reason: hasContext ? null : "calculator_active_context_missing",
+      ...activeContext,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const summary = hasContext
+      ? `Calculator active context observed${activeContext.current_latex ? ` expression ${activeContext.current_latex}` : ""}${activeContext.last_result_text ? ` with result ${activeContext.last_result_text}` : ""}.`
+      : "Calculator active context was requested but no bounded calculator state was supplied.";
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: "scientific-calculator",
+      action: "active_context",
+      status: hasContext ? "succeeded" : "blocked",
+      summary,
+      observation,
+      missingRequirements: hasContext ? [] : [{
+        code: "calculator_active_context_missing",
+        message: "Focus the Scientific Calculator panel with an active expression or result before asking about the current calculation.",
+        repair_action: "ask_user",
+      }],
+    });
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error: hasContext ? undefined : "calculator_active_context_missing",
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: hasContext,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      error: hasContext ? undefined : "calculator_active_context_missing",
+    };
+  }
+
   if (
     manifest.capability_id === CALCULATOR_OPEN_PANEL_CAPABILITY ||
     manifest.capability_id === CALCULATOR_FOCUS_PANEL_CAPABILITY
@@ -866,6 +1254,177 @@ export const callWorkstationGatewayCapability = async (
       post_tool_model_step_required: true,
       assistant_answer: false,
       raw_content_included: false,
+    };
+  }
+
+  if (
+    manifest.capability_id === WORKSTATION_OPEN_PANEL_CAPABILITY ||
+    manifest.capability_id === WORKSTATION_FOCUS_PANEL_CAPABILITY
+  ) {
+    const args = readArguments(input.arguments);
+    const action = manifest.capability_id === WORKSTATION_OPEN_PANEL_CAPABILITY ? "open_panel" : "focus_panel";
+    const panelId = readSafeWorkstationPanelId(args.panel_id ?? args.panelId ?? args.target_panel_id ?? args.targetPanelId);
+    const hasPanel = Boolean(panelId);
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: hasPanel ? "admitted" : "blocked",
+      reason: hasPanel ? "non_mutating_workstation_ui_action" : "workstation_panel_not_in_safe_allowlist",
+      blockedReason: hasPanel ? undefined : "workstation_panel_not_in_safe_allowlist",
+      sourceTargetIntent: args.source_target_intent,
+    });
+    const workstationAction = hasPanel
+      ? {
+          schema_version: "helix.workstation.action/v1",
+          action,
+          panel_id: panelId,
+        }
+      : null;
+    const observation = {
+      schema: WORKSTATION_UI_ACTION_RECEIPT_SCHEMA,
+      capability_key: manifest.capability_id,
+      action_kind: action,
+      panel_id: panelId,
+      status: hasPanel ? "succeeded" : "blocked",
+      dispatch_status: hasPanel ? "admitted" : "blocked",
+      workstation_action: workstationAction,
+      allowed_panel_ids: [...SAFE_WORKSTATION_PANEL_ACTION_IDS],
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: panelId ?? "workstation",
+      action,
+      status: hasPanel ? "succeeded" : "blocked",
+      summary: hasPanel
+        ? `Admitted non-mutating workstation ${action.replace(/_/g, " ")} action for ${panelId}.`
+        : "Workstation panel action was blocked because the panel is not in the safe allowlist.",
+      observation,
+      missingRequirements: hasPanel ? [] : [{
+        code: "workstation_panel_not_in_safe_allowlist",
+        message: "Provide a safe read/observe workstation panel id.",
+        repair_action: "ask_user",
+      }],
+    });
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error: hasPanel ? undefined : "workstation_panel_not_in_safe_allowlist",
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: hasPanel,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      error: hasPanel ? undefined : "workstation_panel_not_in_safe_allowlist",
+    };
+  }
+
+  if (manifest.capability_id === DOCS_OPEN_DOC_CAPABILITY) {
+    const args = readArguments(input.arguments);
+    const path = readDocsActionPath(args.path ?? args.doc_path ?? args.target);
+    const anchor = readDocsActionAnchor(args.anchor);
+    const hasPath = Boolean(path);
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: hasPath ? "admitted" : "blocked",
+      reason: hasPath ? "non_mutating_workstation_ui_action" : "docs_open_doc_path_missing_or_unsafe",
+      blockedReason: hasPath ? undefined : "docs_open_doc_path_missing_or_unsafe",
+      sourceTargetIntent: args.source_target_intent,
+    });
+    const workstationAction = hasPath
+      ? {
+          schema_version: "helix.workstation.action/v1",
+          action: "run_panel_action",
+          panel_id: "docs-viewer",
+          action_id: "open_doc",
+          args: {
+            path,
+            ...(anchor ? { anchor } : {}),
+          },
+        }
+      : null;
+    const observation = {
+      schema: WORKSTATION_UI_ACTION_RECEIPT_SCHEMA,
+      capability_key: manifest.capability_id,
+      action_kind: "open_doc",
+      panel_id: "docs-viewer",
+      status: hasPath ? "succeeded" : "blocked",
+      dispatch_status: hasPath ? "admitted" : "blocked",
+      path,
+      anchor,
+      workstation_action: workstationAction,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: "docs-viewer",
+      action: "open_doc",
+      status: hasPath ? "succeeded" : "blocked",
+      summary: hasPath
+        ? `Docs Viewer open document action admitted for ${path}.`
+        : "Docs Viewer open document action was blocked because no safe docs path was supplied.",
+      observation,
+      missingRequirements: hasPath ? [] : [{
+        code: "docs_open_doc_path_missing_or_unsafe",
+        message: "Provide a relative docs/ path to open in the Docs Viewer.",
+        repair_action: "ask_user",
+      }],
+    });
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error: hasPath ? undefined : "docs_open_doc_path_missing_or_unsafe",
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: hasPath,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      error: hasPath ? undefined : "docs_open_doc_path_missing_or_unsafe",
     };
   }
 

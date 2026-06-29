@@ -1026,6 +1026,23 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("provider_terminal_authority_bridge: providerTerminalAuthorityBridge");
   });
 
+  it("includes active scientific calculator context in backend Ask turn snapshots", () => {
+    const source = fs.readFileSync(pillPath, "utf8");
+    expect(source).toContain("useScientificCalculatorStore.getState()");
+    expect(source).toContain("activeCalculatorContext");
+    expect(source).toContain("hasCalculatorContext");
+    expect(source).toContain("last_result_text");
+    expect(source).toContain("recent_debug_events");
+  });
+
+  it("includes bounded active/open panel identity in backend Ask turn snapshots", () => {
+    const source = fs.readFileSync(pillPath, "utf8");
+    expect(source).toContain("openPanelIds");
+    expect(source).toContain("activeGroupId: layoutState.activeGroupId");
+    expect(source).toContain("openPanels: [...new Set(openPanelIds)]");
+    expect(source).toContain("groupCount: Object.keys(layoutState.groups).length");
+  });
+
   it("labels console responses from backend provider metadata, not client selection", () => {
     expect(
       resolveHelixAskActualAgentProviderLabel({

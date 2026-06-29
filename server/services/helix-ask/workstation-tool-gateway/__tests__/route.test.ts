@@ -4,7 +4,10 @@ import { describe, expect, it } from "vitest";
 import { workstationToolGatewayRouter } from "../../../../routes/agi.workstation-tool-gateway";
 import { HELIX_WORKSPACE_OS_STATUS_CAPABILITY } from "../../workspace-os-status-intent";
 
+const WORKSTATION_ACTIVE_CONTEXT_CAPABILITY = "workstation.active_context";
 const CALCULATOR_SOLVE_EXPRESSION_CAPABILITY = "scientific-calculator.solve_expression";
+const WORKSTATION_OPEN_PANEL_CAPABILITY = "workstation.open_panel";
+const DOCS_OPEN_DOC_CAPABILITY = "docs-viewer.open_doc";
 const REPO_SEARCH_CAPABILITY = "repo.search";
 const DOCS_SEARCH_CAPABILITY = "docs.search";
 
@@ -63,12 +66,45 @@ describe("AGI workstation tool gateway route", () => {
     );
     expect(response.body.capabilities).toContainEqual(
       expect.objectContaining({
+        capability_id: WORKSTATION_ACTIVE_CONTEXT_CAPABILITY,
+        mode: "read",
+        mutating: false,
+        code_mutation: false,
+        shell_access: false,
+        output_observation_schema: "helix.workstation_active_context_observation.v1",
+        terminal_eligible: false,
+      }),
+    );
+    expect(response.body.capabilities).toContainEqual(
+      expect.objectContaining({
         capability_id: DOCS_SEARCH_CAPABILITY,
         mode: "read",
         mutating: false,
         code_mutation: false,
         shell_access: false,
         output_observation_schema: "helix.docs_search_observation.v1",
+        terminal_eligible: false,
+      }),
+    );
+    expect(response.body.capabilities).toContainEqual(
+      expect.objectContaining({
+        capability_id: DOCS_OPEN_DOC_CAPABILITY,
+        mode: "act",
+        mutating: false,
+        code_mutation: false,
+        shell_access: false,
+        output_observation_schema: "helix.workstation_ui_action_receipt.v1",
+        terminal_eligible: false,
+      }),
+    );
+    expect(response.body.capabilities).toContainEqual(
+      expect.objectContaining({
+        capability_id: WORKSTATION_OPEN_PANEL_CAPABILITY,
+        mode: "act",
+        mutating: false,
+        code_mutation: false,
+        shell_access: false,
+        output_observation_schema: "helix.workstation_ui_action_receipt.v1",
         terminal_eligible: false,
       }),
     );
@@ -100,13 +136,13 @@ describe("AGI workstation tool gateway route", () => {
         mutating: false,
         code_mutation: false,
         shell_access: false,
-        output_observation_schema: expect.stringMatching(/^helix\..+_observation\.v1$/),
+        output_observation_schema: expect.stringMatching(/^helix\..+(?:_observation|_receipt)\.v1$/),
         terminal_eligible: false,
         post_tool_model_step_required: true,
         assistant_answer: false,
         raw_content_included: false,
       });
-      expect(["observe", "read"]).toContain(capability.mode);
+      expect(["observe", "read", "act"]).toContain(capability.mode);
     }
   });
 
@@ -186,6 +222,53 @@ describe("AGI workstation tool gateway route", () => {
     });
   });
 
+  it("calls workstation.active_context through the gateway route", async () => {
+    const response = await request(createApp())
+      .post("/api/agi/workstation-tool-gateway/call")
+      .send({
+        agent_runtime: "codex",
+        mode: "read",
+        capability_id: WORKSTATION_ACTIVE_CONTEXT_CAPABILITY,
+        turn_id: "ask:test:gateway-route-workstation-active-context",
+        iteration: 3,
+        arguments: {
+          workspace_context: {
+            activePanel: "workstation-process-graph",
+            openPanels: ["docs-viewer", "workstation-process-graph"],
+          },
+        },
+      })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      ok: true,
+      agent_runtime: "codex",
+      capability_id: WORKSTATION_ACTIVE_CONTEXT_CAPABILITY,
+      gateway_admission: {
+        selected_agent_provider: "codex",
+        permission_profile: "read",
+        admission_status: "admitted",
+      },
+      observation: {
+        schema: "helix.workstation_active_context_observation.v1",
+        active_panel: "workstation-process-graph",
+        open_panels: ["docs-viewer", "workstation-process-graph"],
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation_packet: {
+        capability_key: WORKSTATION_ACTIVE_CONTEXT_CAPABILITY,
+        panel_id: "workstation",
+        action: "active_context",
+        status: "succeeded",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+  });
+
   it("calls read-only capabilities for a future provider through the same admission path", async () => {
     const response = await request(createApp())
       .post("/api/agi/workstation-tool-gateway/call")
@@ -234,6 +317,112 @@ describe("AGI workstation tool gateway route", () => {
       post_tool_model_step_required: true,
       assistant_answer: false,
       raw_content_included: false,
+    });
+  });
+
+  it("calls docs-viewer.open_doc through the gateway route as a non-terminal action receipt", async () => {
+    const response = await request(createApp())
+      .post("/api/agi/workstation-tool-gateway/call")
+      .send({
+        agent_runtime: "codex",
+        mode: "act",
+        capability_id: DOCS_OPEN_DOC_CAPABILITY,
+        turn_id: "ask:test:gateway-route-docs-open-doc",
+        iteration: 4,
+        arguments: {
+          path: "docs/helix-ask-api-parity-matrix.md",
+        },
+      })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      ok: true,
+      agent_runtime: "codex",
+      capability_id: DOCS_OPEN_DOC_CAPABILITY,
+      gateway_admission: {
+        selected_agent_provider: "codex",
+        permission_profile: "act",
+        admission_status: "admitted",
+      },
+      observation: {
+        schema: "helix.workstation_ui_action_receipt.v1",
+        action_kind: "open_doc",
+        panel_id: "docs-viewer",
+        status: "succeeded",
+        dispatch_status: "admitted",
+        workstation_action: {
+          schema_version: "helix.workstation.action/v1",
+          action: "run_panel_action",
+          panel_id: "docs-viewer",
+          action_id: "open_doc",
+          args: {
+            path: "docs/helix-ask-api-parity-matrix.md",
+          },
+        },
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation_packet: {
+        capability_key: DOCS_OPEN_DOC_CAPABILITY,
+        panel_id: "docs-viewer",
+        action: "open_doc",
+        status: "succeeded",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+  });
+
+  it("calls workstation.open_panel through the gateway route as a non-terminal action receipt", async () => {
+    const response = await request(createApp())
+      .post("/api/agi/workstation-tool-gateway/call")
+      .send({
+        agent_runtime: "codex",
+        mode: "act",
+        capability_id: WORKSTATION_OPEN_PANEL_CAPABILITY,
+        turn_id: "ask:test:gateway-route-workstation-open-panel",
+        iteration: 5,
+        arguments: {
+          panel_id: "workstation-task-manager",
+        },
+      })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      ok: true,
+      agent_runtime: "codex",
+      capability_id: WORKSTATION_OPEN_PANEL_CAPABILITY,
+      gateway_admission: {
+        selected_agent_provider: "codex",
+        permission_profile: "act",
+        admission_status: "admitted",
+      },
+      observation: {
+        schema: "helix.workstation_ui_action_receipt.v1",
+        action_kind: "open_panel",
+        panel_id: "workstation-task-manager",
+        status: "succeeded",
+        dispatch_status: "admitted",
+        workstation_action: {
+          schema_version: "helix.workstation.action/v1",
+          action: "open_panel",
+          panel_id: "workstation-task-manager",
+        },
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation_packet: {
+        capability_key: WORKSTATION_OPEN_PANEL_CAPABILITY,
+        panel_id: "workstation-task-manager",
+        action: "open_panel",
+        status: "succeeded",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
     });
   });
 

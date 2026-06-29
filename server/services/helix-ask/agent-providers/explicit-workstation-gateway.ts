@@ -6,7 +6,9 @@ import {
 import type { HelixWorkstationGatewayCallResult } from "../workstation-tool-gateway/types";
 import { planWorkstationToolUse } from "../workstation-tool-planner";
 
+const WORKSTATION_ACTIVE_CONTEXT_CAPABILITY = "workstation.active_context" as const;
 const CALCULATOR_SOLVE_EXPRESSION_CAPABILITY = "scientific-calculator.solve_expression" as const;
+const CALCULATOR_ACTIVE_CONTEXT_CAPABILITY = "scientific-calculator.active_context" as const;
 const REPO_SEARCH_CAPABILITY = "repo.search" as const;
 const DOCS_SEARCH_CAPABILITY = "docs.search" as const;
 
@@ -92,6 +94,86 @@ export const buildActiveDocsContextWorkstationGatewayCallRequests = (
         target_kind: "active_doc",
         active_panel: activePanel,
         active_doc_path: activeDocPath,
+        deictic_prompt: true,
+      },
+    },
+  }];
+};
+
+const isActiveCalculatorDeicticPrompt = (prompt: string): boolean => {
+  if (/\bbackground\s+only\b/i.test(prompt)) return false;
+  const unquotedPrompt = prompt.replace(/"[^"]*"|'[^']*'|`[^`]*`/g, " ");
+  if (/\b(?:not|don'?t|do\s+not)\s+(?:asking\s+about|ask|answer|use|read|explain|interpret|summari[sz]e)\b.{0,80}\b(?:this|current|open|active|visible)\s+(?:calculation|calculator|expression|equation|result|answer)\b/i.test(unquotedPrompt)) return false;
+  if (/\b(?:before|after|if|when)\b.{0,80}\b(?:open|focus|use|show)\b.{0,40}\b(?:calculator|calculation|expression|equation|result)\b/i.test(unquotedPrompt)) return false;
+  if (/\b(?:previous|last|earlier|historical)\b.{0,80}\b(?:calculator|calculation|expression|equation|result|answer)\b/i.test(unquotedPrompt)) return false;
+  const mentionsCurrentCalculator =
+    /\b(?:this|current|open|active|visible)\s+(?:calculation|calculator|expression|equation|result|answer)\b/i.test(unquotedPrompt) ||
+    /\b(?:calculation|calculator|expression|equation|result|answer)\s+(?:on\s+screen|in\s+(?:the\s+)?calculator|I'?m\s+viewing|we'?re\s+viewing)\b/i.test(unquotedPrompt);
+  const asksForContent = /\b(?:what\s+is|what'?s|explain|summari[sz]e|interpret|use|read|tell\s+me|mean|means|result|answer)\b/i.test(unquotedPrompt);
+  return mentionsCurrentCalculator && asksForContent;
+};
+
+export const buildActiveCalculatorContextWorkstationGatewayCallRequests = (
+  body: Record<string, unknown>,
+): Record<string, unknown>[] => {
+  const prompt = readPrompt(body);
+  if (!prompt || !isActiveCalculatorDeicticPrompt(prompt)) return [];
+  const workspaceSnapshot = readWorkspaceSnapshot(body);
+  const activePanel = readString(workspaceSnapshot?.activePanel ?? workspaceSnapshot?.active_panel);
+  const activeCalculatorContext = readRecord(
+    workspaceSnapshot?.activeCalculatorContext ?? workspaceSnapshot?.active_calculator_context,
+  );
+  if (activePanel !== "scientific-calculator" || !activeCalculatorContext) return [];
+  return [{
+    schema: "helix.workstation_gateway.active_calculator_context_call_request.v1",
+    derivation_source: "helix_active_scientific_calculator_context",
+    capability_id: CALCULATOR_ACTIVE_CONTEXT_CAPABILITY,
+    mode: "read",
+    arguments: {
+      active_context: activeCalculatorContext,
+      source_target_intent: {
+        source: "helix_active_scientific_calculator_context",
+        target_source: "active_calculator",
+        target_kind: "active_calculator",
+        active_panel: activePanel,
+        deictic_prompt: true,
+      },
+    },
+  }];
+};
+
+const isActiveWorkstationContextPrompt = (prompt: string): boolean => {
+  if (/\bbackground\s+only\b/i.test(prompt)) return false;
+  const unquotedPrompt = prompt.replace(/"[^"]*"|'[^']*'|`[^`]*`/g, " ");
+  if (/\b(?:not|don'?t|do\s+not)\s+(?:asking\s+about|ask|answer|use|read|explain|inspect)\b.{0,80}\b(?:current|active|open|visible)\s+(?:panel|panels|workspace|workstation|layout)\b/i.test(unquotedPrompt)) return false;
+  if (/\b(?:before|after|if|when)\b.{0,80}\b(?:open|focus|switch|show)\b.{0,40}\b(?:panel|workspace|workstation)\b/i.test(unquotedPrompt)) return false;
+  if (/\b(?:previous|last|earlier|historical)\b.{0,80}\b(?:panel|panels|workspace|workstation|layout)\b/i.test(unquotedPrompt)) return false;
+  const mentionsPanelContext =
+    /\b(?:current|active|open|visible)\s+(?:panel|panels|workspace|workstation|layout)\b/i.test(unquotedPrompt) ||
+    /\b(?:panel|panels)\s+(?:open|active|visible|on\s+screen|in\s+(?:the\s+)?workspace)\b/i.test(unquotedPrompt) ||
+    /\bwhat\s+(?:panel|panels)\s+(?:is|are)\s+(?:open|active|visible)\b/i.test(unquotedPrompt);
+  const asksForContext = /\b(?:what|which|where|list|show|tell\s+me|identify|inspect|read)\b/i.test(unquotedPrompt);
+  return mentionsPanelContext && asksForContext;
+};
+
+export const buildActiveWorkstationContextGatewayCallRequests = (
+  body: Record<string, unknown>,
+): Record<string, unknown>[] => {
+  const prompt = readPrompt(body);
+  if (!prompt || !isActiveWorkstationContextPrompt(prompt)) return [];
+  const workspaceSnapshot = readWorkspaceSnapshot(body);
+  if (!workspaceSnapshot) return [];
+  return [{
+    schema: "helix.workstation_gateway.active_workstation_context_call_request.v1",
+    derivation_source: "helix_active_workstation_context",
+    capability_id: WORKSTATION_ACTIVE_CONTEXT_CAPABILITY,
+    mode: "read",
+    arguments: {
+      workspace_context: workspaceSnapshot,
+      source_target_intent: {
+        source: "helix_active_workstation_context",
+        target_source: "active_workstation",
+        target_kind: "active_workstation",
         deictic_prompt: true,
       },
     },
@@ -257,6 +339,10 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   if (structured.length > 0) return structured;
   const activeDocsContext = buildActiveDocsContextWorkstationGatewayCallRequests(input.body);
   if (activeDocsContext.length > 0) return activeDocsContext;
+  const activeCalculatorContext = buildActiveCalculatorContextWorkstationGatewayCallRequests(input.body);
+  if (activeCalculatorContext.length > 0) return activeCalculatorContext;
+  const activeWorkstationContext = buildActiveWorkstationContextGatewayCallRequests(input.body);
+  if (activeWorkstationContext.length > 0) return activeWorkstationContext;
   return buildPlannerDerivedWorkstationGatewayCallRequests(input.body);
 };
 

@@ -17,7 +17,9 @@ import {
   runExplicitFutureWorkstationGatewayCalls,
 } from "../agent-providers/future-provider";
 import {
+  buildActiveCalculatorContextWorkstationGatewayCallRequests,
   buildActiveDocsContextWorkstationGatewayCallRequests,
+  buildActiveWorkstationContextGatewayCallRequests,
   buildStructuredAdmissionWorkstationGatewayCallRequests,
   buildPlannerDerivedWorkstationGatewayCallRequests,
   runExplicitWorkstationGatewayCalls,
@@ -877,6 +879,96 @@ describe("Helix Ask agent provider selection", () => {
     expect((result.debug as any)?.turn_transcript_events).toEqual(result.turn_transcript_events);
   });
 
+  it("projects explicit Codex docs-viewer open-doc gateway calls as action receipts", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "Opened the requested document.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:codex-docs-open-doc-action-receipt",
+        agent_runtime: "codex",
+        question: "Open docs/helix-ask-api-parity-matrix.md in the docs viewer and tell me when the action receipt is available.",
+        workstation_gateway_call: {
+          capability_id: "docs-viewer.open_doc",
+          mode: "act",
+          arguments: {
+            path: "docs/helix-ask-api-parity-matrix.md",
+          },
+        },
+      },
+      headers: {},
+    });
+
+    expect(result.text).toBe("Opened the requested document.");
+    expect((result.action_envelope as any)?.workstation_actions).toEqual([
+      {
+        schema_version: "helix.workstation.action/v1",
+        action: "run_panel_action",
+        panel_id: "docs-viewer",
+        action_id: "open_doc",
+        args: {
+          path: "docs/helix-ask-api-parity-matrix.md",
+        },
+      },
+    ]);
+    expect(result.turn_transcript_events?.map((event: any) => event.source_event_type)).toEqual([
+      "runtime_selected",
+      "action_request",
+      "action_observation",
+      "model_reentry",
+      "terminal_answer",
+    ]);
+    expect(result.turn_transcript_events?.some((event: any) =>
+      /Action observation: docs-viewer\.open_doc admitted open_doc for docs-viewer\./.test(String(event.text)),
+    )).toBe(true);
+    expect(result.text).not.toContain("Action observation:");
+  });
+
+  it("projects explicit Codex safe workstation open-panel gateway calls as action receipts", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "Opened the process graph panel.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:codex-workstation-open-panel-action-receipt",
+        agent_runtime: "codex",
+        question: "Open the workstation process graph panel and answer normally after the receipt.",
+        workstation_gateway_call: {
+          capability_id: "workstation.open_panel",
+          mode: "act",
+          arguments: {
+            panel_id: "workstation-process-graph",
+          },
+        },
+      },
+      headers: {},
+    });
+
+    expect(result.text).toBe("Opened the process graph panel.");
+    expect((result.action_envelope as any)?.workstation_actions).toEqual([
+      {
+        schema_version: "helix.workstation.action/v1",
+        action: "open_panel",
+        panel_id: "workstation-process-graph",
+      },
+    ]);
+    expect(result.turn_transcript_events?.map((event: any) => event.source_event_type)).toEqual([
+      "runtime_selected",
+      "action_request",
+      "action_observation",
+      "model_reentry",
+      "terminal_answer",
+    ]);
+    expect(result.turn_transcript_events?.some((event: any) =>
+      /Action observation: workstation\.open_panel admitted open_panel for workstation-process-graph\./.test(String(event.text)),
+    )).toBe(true);
+    expect(result.text).not.toContain("Action observation:");
+  });
+
   it("does not add calculator provenance when no calculator observation exists", async () => {
     process.env.CODEX_AGENT_FAKE_STDOUT = "72";
     process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
@@ -895,6 +987,228 @@ describe("Helix Ask agent provider selection", () => {
     expect(result.text).toBe("72");
     expect(result.text).not.toContain("scientific-calculator.solve_expression");
     expect(result.turn_transcript_events?.some((event: any) => event.source_event_type === "tool_observation")).toBe(false);
+  });
+
+  it("materializes active calculator context as a bounded observation for Codex", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "The calculator is showing 8 * 9 = 72.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const body = {
+      turn_id: "ask:test:codex-active-calculator-context",
+      agent_runtime: "codex",
+      question: "What is this calculator result?",
+      workspace_context_snapshot: {
+        activePanel: "scientific-calculator",
+        activeCalculatorContext: {
+          current_latex: "8 * 9",
+          last_result_text: "72",
+          last_normalized_expression: "8*9",
+          last_ok: true,
+          step_count: 1,
+          recent_debug_events: [{
+            action_id: "solve_expression",
+            ok: true,
+            input_latex: "8 * 9",
+            result_text: "72",
+            normalized_expression: "8*9",
+            message: "solve_completed",
+            ts: "2026-06-28T00:00:00.000Z",
+          }],
+        },
+      },
+    };
+
+    expect(buildActiveCalculatorContextWorkstationGatewayCallRequests(body)).toEqual([
+      expect.objectContaining({
+        schema: "helix.workstation_gateway.active_calculator_context_call_request.v1",
+        derivation_source: "helix_active_scientific_calculator_context",
+        capability_id: "scientific-calculator.active_context",
+        mode: "read",
+        arguments: expect.objectContaining({
+          active_context: expect.objectContaining({
+            current_latex: "8 * 9",
+            last_result_text: "72",
+          }),
+          source_target_intent: expect.objectContaining({
+            target_source: "active_calculator",
+            target_kind: "active_calculator",
+            active_panel: "scientific-calculator",
+            deictic_prompt: true,
+          }),
+        }),
+      }),
+    ]);
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body,
+      headers: {},
+    });
+
+    expect(result.text).toBe("The calculator is showing 8 * 9 = 72.");
+    expect((result.debug as any)?.workstation_gateway_call_results?.map((entry: any) => entry.capability_id))
+      .toEqual(["scientific-calculator.active_context"]);
+    expect(result.turn_transcript_events?.some((event: any) =>
+      event.source_event_type === "tool_observation" &&
+      /scientific-calculator\.active_context materialized active calculator context for 8 \* 9 with result 72/i.test(String(event.text)),
+    )).toBe(true);
+    expect(result.turn_transcript_events?.some((event: any) =>
+      event.source_event_type === "model_reentry" &&
+      /received the workstation observation packet/i.test(String(event.text)),
+    )).toBe(true);
+  });
+
+  it("does not derive active calculator context from contextual or quoted deictic mentions", () => {
+    const baseBody = {
+      turn_id: "ask:test:codex-active-calculator-context-adversarial",
+      agent_runtime: "codex",
+      workspace_context_snapshot: {
+        activePanel: "scientific-calculator",
+        activeCalculatorContext: {
+          current_latex: "8 * 9",
+          last_result_text: "72",
+        },
+      },
+    };
+    const prompts = [
+      "I am not asking about this calculator result; explain what a calculator result means in general.",
+      "Before I open the calculator, explain how results should be checked.",
+      "The previous answer mentioned this calculator result; explain why that was not enough evidence.",
+      "The screen shows a label that says \"What is this calculator result?\" Explain why that label is confusing.",
+      "If we later focus the calculator, explain what evidence would be needed.",
+    ];
+
+    prompts.forEach((question) => {
+      expect(buildActiveCalculatorContextWorkstationGatewayCallRequests({
+        ...baseBody,
+        question,
+      })).toEqual([]);
+    });
+  });
+
+  it("does not answer current calculator content when no calculator observation exists", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "The current calculator result is 72.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:codex-active-calculator-no-observation",
+        agent_runtime: "codex",
+        question: "What is this calculator result?",
+        workspace_context_snapshot: {
+          activePanel: "scientific-calculator",
+        },
+      },
+      headers: {},
+    });
+
+    expect(result.text).toContain("no calculator observation packet was materialized");
+    expect(result.text).not.toContain("72");
+    expect(result.turn_transcript_events?.some((event: any) =>
+      event.source_event_type === "tool_observation",
+    )).toBe(false);
+  });
+
+  it("materializes active workstation panel context as a bounded observation for Codex", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "The active panel is docs-viewer, with the calculator also open.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const body = {
+      turn_id: "ask:test:codex-active-workstation-context",
+      agent_runtime: "codex",
+      question: "What panels are open and which panel is active?",
+      workspace_context_snapshot: {
+        activePanel: "docs-viewer",
+        activeGroupId: "main",
+        groupCount: 1,
+        openPanels: ["docs-viewer", "scientific-calculator"],
+      },
+    };
+
+    expect(buildActiveWorkstationContextGatewayCallRequests(body)).toEqual([
+      expect.objectContaining({
+        schema: "helix.workstation_gateway.active_workstation_context_call_request.v1",
+        derivation_source: "helix_active_workstation_context",
+        capability_id: "workstation.active_context",
+        mode: "read",
+        arguments: expect.objectContaining({
+          workspace_context: expect.objectContaining({
+            activePanel: "docs-viewer",
+            openPanels: ["docs-viewer", "scientific-calculator"],
+          }),
+          source_target_intent: expect.objectContaining({
+            target_source: "active_workstation",
+            target_kind: "active_workstation",
+            deictic_prompt: true,
+          }),
+        }),
+      }),
+    ]);
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body,
+      headers: {},
+    });
+
+    expect(result.text).toBe("The active panel is docs-viewer, with the calculator also open.");
+    expect((result.debug as any)?.workstation_gateway_call_results?.map((entry: any) => entry.capability_id))
+      .toEqual(["workstation.active_context"]);
+    expect(result.turn_transcript_events?.some((event: any) =>
+      event.source_event_type === "tool_observation" &&
+      /workstation\.active_context materialized active workstation context with active panel docs-viewer and 2 open panel/i.test(String(event.text)),
+    )).toBe(true);
+  });
+
+  it("does not derive active workstation context from contextual or quoted panel mentions", () => {
+    const baseBody = {
+      turn_id: "ask:test:codex-active-workstation-context-adversarial",
+      agent_runtime: "codex",
+      workspace_context_snapshot: {
+        activePanel: "docs-viewer",
+        openPanels: ["docs-viewer", "scientific-calculator"],
+      },
+    };
+    const prompts = [
+      "I am not asking about the current open panels; explain what a panel means in general.",
+      "Before I open a panel, explain what evidence would be needed.",
+      "The previous answer mentioned which panel was active; explain why that was insufficient.",
+      "The screen shows text that says \"what panels are open\"; explain the wording.",
+      "If we later switch panels, tell me what observation would be needed.",
+    ];
+
+    prompts.forEach((question) => {
+      expect(buildActiveWorkstationContextGatewayCallRequests({
+        ...baseBody,
+        question,
+      })).toEqual([]);
+    });
+  });
+
+  it("does not answer current workstation panel state when no workstation observation exists", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "The docs viewer is active.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:codex-active-workstation-no-observation",
+        agent_runtime: "codex",
+        question: "What panels are open and which panel is active?",
+      },
+      headers: {},
+    });
+
+    expect(result.text).toContain("no workstation context observation packet was materialized");
+    expect(result.text).not.toContain("docs viewer is active");
+    expect(result.turn_transcript_events?.some((event: any) =>
+      event.source_event_type === "tool_observation",
+    )).toBe(false);
   });
 
   it("does not answer current document content when no docs observation exists", async () => {

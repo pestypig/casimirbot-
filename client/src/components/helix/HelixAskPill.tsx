@@ -359,6 +359,7 @@ import {
 import { useStandbyVoiceDeliveryStore } from "@/store/useStandbyVoiceDeliveryStore";
 import { deliverStandbyVoiceCallout } from "@/lib/helix/standbyVoiceDelivery";
 import { useDocViewerStore } from "@/store/useDocViewerStore";
+import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
 import { useSituationRoomStore } from "@/store/useSituationRoomStore";
 import {
   selectSituationRoomAskContextSnapshot,
@@ -7167,7 +7168,9 @@ function normalizeHelixAgentProvider(value: unknown): HelixAgentRuntimeDescripto
     enabled: record.enabled === true,
     experimental: record.experimental === true,
     permission_profile: {
-      id: permissionProfile?.id === "read-observe" || permissionProfile?.id === "helix-native"
+      id: permissionProfile?.id === "read-observe" ||
+        permissionProfile?.id === "read-observe-act" ||
+        permissionProfile?.id === "helix-native"
         ? permissionProfile.id
         : fallbackPermissionProfile.id,
       label: coerceText(permissionProfile?.label).trim() || fallbackPermissionProfile.label,
@@ -12641,6 +12644,7 @@ function readWorkstationLayoutDebugSnapshot(): Record<string, unknown> {
 function buildAskTurnWorkspaceContextSnapshot(sessionId: string | null | undefined): Record<string, unknown> {
   const layoutState = useWorkstationLayoutStore.getState();
   const notesState = useWorkstationNotesStore.getState();
+  const calculatorState = useScientificCalculatorStore.getState();
   const clipNoteBodyForAskTurn = (value: unknown): string | null => {
     if (typeof value !== "string") return null;
     const trimmed = value.trim();
@@ -12648,6 +12652,36 @@ function buildAskTurnWorkspaceContextSnapshot(sessionId: string | null | undefin
   };
   const activeGroup = layoutState.groups[layoutState.activeGroupId] ?? null;
   const activePanel = activeGroup?.activePanelId ?? null;
+  const openPanelIds = Object.values(layoutState.groups)
+    .flatMap((group) => group.panelIds)
+    .filter((panelId): panelId is string => typeof panelId === "string" && panelId.trim().length > 0)
+    .slice(0, 24);
+  const clipCalculatorTextForAskTurn = (value: unknown, max = 800): string | null => {
+    if (typeof value !== "string") return null;
+    const trimmed = value.trim();
+    return trimmed ? trimmed.slice(0, max) : null;
+  };
+  const calculatorRecentDebugEvents = calculatorState.debugEvents.slice(0, 5).map((event) => ({
+    action_id: event.action_id,
+    ok: event.ok,
+    input_latex: clipCalculatorTextForAskTurn(event.input_latex, 400),
+    result_text: clipCalculatorTextForAskTurn(event.result_text, 400),
+    normalized_expression: clipCalculatorTextForAskTurn(event.normalized_expression, 400),
+    message: clipCalculatorTextForAskTurn(event.message, 240),
+    ts: event.ts,
+  }));
+  const activeCalculatorContext = {
+    schema: "helix.scientific_calculator_active_context.v1",
+    panel_id: "scientific-calculator",
+    active_panel: activePanel === "scientific-calculator",
+    current_latex: clipCalculatorTextForAskTurn(calculatorState.currentLatex),
+    last_result_text: clipCalculatorTextForAskTurn(calculatorState.lastSolve?.result_text),
+    last_normalized_expression: clipCalculatorTextForAskTurn(calculatorState.lastSolve?.normalized_expression),
+    last_trace_id: clipCalculatorTextForAskTurn(calculatorState.lastSolve?.trace?.traceId, 240),
+    last_ok: calculatorState.lastSolve?.ok ?? null,
+    step_count: calculatorState.steps.length,
+    recent_debug_events: calculatorRecentDebugEvents,
+  };
   const docContext = resolveAskTurnDocViewerSnapshotPath();
   const currentPath = docContext.path;
   const docContextSource = docContext.source;
@@ -12679,6 +12713,15 @@ function buildAskTurnWorkspaceContextSnapshot(sessionId: string | null | undefin
   return {
     sessionId: sessionId ?? "helix-ui",
     activePanel,
+    activeGroupId: layoutState.activeGroupId,
+    groupCount: Object.keys(layoutState.groups).length,
+    openPanels: [...new Set(openPanelIds)].sort((a, b) => a.localeCompare(b)),
+    activeCalculatorContext,
+    hasCalculatorContext: activePanel === "scientific-calculator" && (
+      Boolean(activeCalculatorContext.current_latex) ||
+      Boolean(activeCalculatorContext.last_result_text) ||
+      calculatorRecentDebugEvents.length > 0
+    ),
     activeDocPath: currentPath,
     source: docContextSource,
     hasDocContext: Boolean(currentPath),

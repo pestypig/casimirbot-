@@ -15,7 +15,9 @@ import {
 } from "./explicit-workstation-gateway";
 import { buildProviderGatewayDebugSummary } from "./provider-gateway-debug-summary";
 
+const WORKSTATION_ACTIVE_CONTEXT_CAPABILITY = "workstation.active_context" as const;
 const CALCULATOR_SOLVE_EXPRESSION_CAPABILITY = "scientific-calculator.solve_expression" as const;
+const CALCULATOR_ACTIVE_CONTEXT_CAPABILITY = "scientific-calculator.active_context" as const;
 const CALCULATOR_OPEN_PANEL_CAPABILITY = "scientific-calculator.open_panel" as const;
 const CALCULATOR_FOCUS_PANEL_CAPABILITY = "scientific-calculator.focus_panel" as const;
 const WORKSTATION_UI_ACTION_RECEIPT_SCHEMA = "helix.workstation_ui_action_receipt.v1" as const;
@@ -485,6 +487,67 @@ const applyDocumentObservationAuthorityGuard = (input: {
   ].join("\n");
 };
 
+const isDeicticCalculatorContextQuestion = (text: string): boolean => {
+  if (/\bbackground\s+only\b/i.test(text)) return false;
+  const unquotedText = text.replace(/"[^"]*"|'[^']*'|`[^`]*`/g, " ");
+  if (/\b(?:not|don'?t|do\s+not)\s+(?:asking\s+about|ask|answer|use|read|explain|interpret|summari[sz]e)\b.{0,80}\b(?:this|current|open|active|visible)\s+(?:calculation|calculator|expression|equation|result|answer)\b/i.test(unquotedText)) return false;
+  if (/\b(?:before|after|if|when)\b.{0,80}\b(?:open|focus|use|show)\b.{0,40}\b(?:calculator|calculation|expression|equation|result)\b/i.test(unquotedText)) return false;
+  if (/\b(?:previous|last|earlier|historical)\b.{0,80}\b(?:calculator|calculation|expression|equation|result|answer)\b/i.test(unquotedText)) return false;
+  const mentionsCurrentCalculator =
+    /\b(?:this|current|open|active|visible)\s+(?:calculation|calculator|expression|equation|result|answer)\b/i.test(unquotedText) ||
+    /\b(?:calculation|calculator|expression|equation|result|answer)\s+(?:on\s+screen|in\s+(?:the\s+)?calculator|I'?m\s+viewing|we'?re\s+viewing)\b/i.test(unquotedText);
+  const asksForContent = /\b(?:what\s+is|what'?s|explain|summari[sz]e|interpret|use|read|tell\s+me|mean|means|result|answer)\b/i.test(unquotedText);
+  return mentionsCurrentCalculator && asksForContent;
+};
+
+const hasCalculatorContextObservation = (gatewayCallResults: HelixWorkstationGatewayCallResult[]): boolean =>
+  gatewayCallResults.some((result) => result.ok === true && result.capability_id === CALCULATOR_ACTIVE_CONTEXT_CAPABILITY);
+
+const applyCalculatorObservationAuthorityGuard = (input: {
+  question: string;
+  text: string;
+  gatewayCallResults: HelixWorkstationGatewayCallResult[];
+}): string => {
+  if (!isDeicticCalculatorContextQuestion(input.question)) return input.text;
+  if (hasCalculatorContextObservation(input.gatewayCallResults) || input.gatewayCallResults.some(isCalculatorSolveObservation)) {
+    return input.text;
+  }
+  return [
+    "I cannot answer the current calculator content from this turn because no calculator observation packet was materialized.",
+    "Focus the Scientific Calculator with an active expression or result, or provide the expression explicitly so Helix can create a bounded calculator observation first.",
+  ].join("\n");
+};
+
+const isDeicticWorkstationContextQuestion = (text: string): boolean => {
+  if (/\bbackground\s+only\b/i.test(text)) return false;
+  const unquotedText = text.replace(/"[^"]*"|'[^']*'|`[^`]*`/g, " ");
+  if (/\b(?:not|don'?t|do\s+not)\s+(?:asking\s+about|ask|answer|use|read|explain|inspect)\b.{0,80}\b(?:current|active|open|visible)\s+(?:panel|panels|workspace|workstation|layout)\b/i.test(unquotedText)) return false;
+  if (/\b(?:before|after|if|when)\b.{0,80}\b(?:open|focus|switch|show)\b.{0,40}\b(?:panel|workspace|workstation)\b/i.test(unquotedText)) return false;
+  if (/\b(?:previous|last|earlier|historical)\b.{0,80}\b(?:panel|panels|workspace|workstation|layout)\b/i.test(unquotedText)) return false;
+  const mentionsPanelContext =
+    /\b(?:current|active|open|visible)\s+(?:panel|panels|workspace|workstation|layout)\b/i.test(unquotedText) ||
+    /\b(?:panel|panels)\s+(?:open|active|visible|on\s+screen|in\s+(?:the\s+)?workspace)\b/i.test(unquotedText) ||
+    /\bwhat\s+(?:panel|panels)\s+(?:is|are)\s+(?:open|active|visible)\b/i.test(unquotedText);
+  const asksForContext = /\b(?:what|which|where|list|show|tell\s+me|identify|inspect|read)\b/i.test(unquotedText);
+  return mentionsPanelContext && asksForContext;
+};
+
+const hasWorkstationContextObservation = (gatewayCallResults: HelixWorkstationGatewayCallResult[]): boolean =>
+  gatewayCallResults.some((result) => result.ok === true && result.capability_id === WORKSTATION_ACTIVE_CONTEXT_CAPABILITY);
+
+const applyWorkstationContextAuthorityGuard = (input: {
+  question: string;
+  text: string;
+  gatewayCallResults: HelixWorkstationGatewayCallResult[];
+}): string => {
+  if (!isDeicticWorkstationContextQuestion(input.question)) return input.text;
+  if (hasWorkstationContextObservation(input.gatewayCallResults)) return input.text;
+  return [
+    "I cannot answer the current workstation panel state from this turn because no workstation context observation packet was materialized.",
+    "Attach workspace context or ask again from the workstation so Helix can create a bounded active/open panel observation first.",
+  ].join("\n");
+};
+
 const buildCodexProviderTurnTranscriptEvents = (input: {
   turnId: string;
   providerLabel: string;
@@ -516,13 +579,21 @@ const buildCodexProviderTurnTranscriptEvents = (input: {
     const panelId = readString(observation?.panel_id);
     const expression = readString(observation?.expression);
     const resultValue = readString(observation?.result);
+    const currentLatex = readString(observation?.current_latex);
+    const lastResultText = readString(observation?.last_result_text);
+    const activePanel = readString(observation?.active_panel);
+    const openPanels = Array.isArray(observation?.open_panels) ? observation.open_panels.filter((entry) => typeof entry === "string") : [];
     const activeDocumentObservation = readGatewayObservationRecord(observation?.active_document_observation);
     const docPath = readString(activeDocumentObservation?.path);
     const toolObservationText =
       isActionReceipt && actionKind && panelId
         ? `Action observation: ${result.capability_id} admitted ${actionKind} for ${panelId}.`
+        : result.capability_id === WORKSTATION_ACTIVE_CONTEXT_CAPABILITY && (activePanel || openPanels.length > 0)
+          ? `Tool observation: ${result.capability_id} materialized active workstation context${activePanel ? ` with active panel ${activePanel}` : ""}${openPanels.length > 0 ? ` and ${openPanels.length} open panel(s)` : ""}.`
         : result.capability_id === CALCULATOR_SOLVE_EXPRESSION_CAPABILITY && expression && resultValue
         ? `Tool observation: ${result.capability_id} observed ${expression} = ${resultValue}.`
+        : result.capability_id === CALCULATOR_ACTIVE_CONTEXT_CAPABILITY && (currentLatex || lastResultText)
+          ? `Tool observation: ${result.capability_id} materialized active calculator context${currentLatex ? ` for ${currentLatex}` : ""}${lastResultText ? ` with result ${lastResultText}` : ""}.`
         : docPath
           ? `Tool observation: ${result.capability_id} materialized a bounded document excerpt from ${docPath}.`
           : `Tool observation: ${result.observation_packet.observation_summary}`;
@@ -815,7 +886,11 @@ export const codexProvider: HelixAgentProvider = {
       ...actionReceiptResults,
       ...evidenceGatewayCallResults,
     ];
-    const actionEnvelope = buildCodexActionEnvelopeFromReceipts(actionReceiptResults);
+    const projectedActionReceiptResults = [
+      ...actionReceiptResults,
+      ...evidenceGatewayCallResults.filter(isWorkstationActionReceipt),
+    ];
+    const actionEnvelope = buildCodexActionEnvelopeFromReceipts(projectedActionReceiptResults);
     const agentStepLoop = buildCodexAgentStepLoopFromReceipts({
       turnId,
       actionReceiptResults,
@@ -898,6 +973,8 @@ export const codexProvider: HelixAgentProvider = {
       JSON.stringify(gatewayCallResults, null, 2),
       "",
       "Use calculator observations when present, but do not force a special answer format unless the user asked for one.",
+      "For current-calculator turns, answer only from the provided calculator observation packet or explicit calculator solve observation.",
+      "For current-workstation panel/layout turns, answer only from the provided workstation active-context observation packet.",
       "For any document-backed turn, answer only from the provided docs observation packet. If no docs observation packet exists, say the document content is not available from this turn.",
       "",
       "User request:",
@@ -925,9 +1002,19 @@ export const codexProvider: HelixAgentProvider = {
       result.stdout.trim() ||
       result.stderr.trim() ||
       "Codex runtime did not return output before the provider adapter stopped waiting.";
-    const finalText = applyDocumentObservationAuthorityGuard({
+    const documentGuardedText = applyDocumentObservationAuthorityGuard({
       question,
       text,
+      gatewayCallResults,
+    });
+    const finalText = applyCalculatorObservationAuthorityGuard({
+      question,
+      text: documentGuardedText,
+      gatewayCallResults,
+    });
+    const workstationGuardedText = applyWorkstationContextAuthorityGuard({
+      question,
+      text: finalText,
       gatewayCallResults,
     });
     const ok = result.exitCode === 0 && text.length > 0;
@@ -938,7 +1025,7 @@ export const codexProvider: HelixAgentProvider = {
       threadId,
       route: request.route,
       gatewayCallResults,
-      providerText: finalText,
+      providerText: workstationGuardedText,
       ok,
     });
     const providerGatewayDebugSummary = buildProviderGatewayDebugSummary({
@@ -968,7 +1055,7 @@ export const codexProvider: HelixAgentProvider = {
       turnId,
       providerLabel: codexProvider.label,
       gatewayCallResults,
-      providerText: finalText,
+      providerText: workstationGuardedText,
       finalStatus: ok ? "completed" : "final_failure",
     });
 
@@ -977,9 +1064,9 @@ export const codexProvider: HelixAgentProvider = {
       runtime: "codex",
       response_type: ok ? "final_answer" : "final_failure",
       final_status: ok ? "completed" : "final_failure",
-      text: finalText,
-      answer: finalText,
-      selected_final_answer: finalText,
+      text: workstationGuardedText,
+      answer: workstationGuardedText,
+      selected_final_answer: workstationGuardedText,
       turn_transcript_events: turnTranscriptEvents,
       turn_transcript_event_count: turnTranscriptEvents.length,
       turn_transcript_source: "codex_provider_gateway_projection",
