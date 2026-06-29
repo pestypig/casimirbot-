@@ -14,6 +14,7 @@ import {
   buildGoldenPathCompoundGoalSatisfactionEvaluation,
   isHelixAskGoldenPathCatalogWorkspaceCompoundRequested,
 } from "../compound-contract";
+import { buildGoldenPathCompoundSuccessPayload } from "../compound-success";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
   HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
@@ -97,102 +98,32 @@ export const buildHelixAskGoldenPathCatalogWorkspaceCompoundPayload = (args: {
     "Capability catalog observation completed.",
     workspaceSummary,
   ].join("\n");
-  const canonicalGoalFrame = buildGoldenPathCompoundCanonicalGoalFrame({
+  return buildGoldenPathCompoundSuccessPayload({
     turnId,
+    traceId,
+    sessionId,
+    threadId,
+    promptText,
+    createdAtMs,
+    routeGateArtifactId,
+    terminalResultId,
+    terminalArtifactId,
     requiredTerminalKind,
     classifierReasons: ["explicit_catalog_workspace_compound_request"],
     includeWorkspaceContextFields: true,
-  });
-  const goalSatisfactionEvaluation = buildGoldenPathCompoundGoalSatisfactionEvaluation({
-    turnId,
-    requiredTerminalKind,
-  });
-  const goalHash = deps.hashGoalFrame(canonicalGoalFrame);
-  const goalSatisfactionArtifact = deps.buildGoalSatisfactionEvaluationArtifact({
-    turnId,
-    goalHash,
-    evaluation: goalSatisfactionEvaluation,
-    createdAtMs,
-  });
-  const terminalResult = buildGoldenPathTerminalResult({
-    resultId: terminalResultId,
-    artifactId: terminalArtifactId,
-    artifactKind: requiredTerminalKind,
-    finalAnswerSource: requiredTerminalKind,
-    text: answerText,
-    supportRefs: [
-      catalogObservationArtifactId,
-      workspaceObservationArtifactId,
-      routeGateArtifactId,
-      goalSatisfactionArtifact.artifact_id,
-    ],
-  });
-
-  return {
-    ok: true,
-    mode: "read",
-    schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
-    turn_id: turnId,
-    trace_id: traceId,
-    session_id: sessionId,
-    thread_id: threadId,
-    prompt_text: promptText,
-    ...buildGoldenPathTerminalResponseProjection({ terminalResult }),
-    golden_path_runtime: buildGoldenPathCompoundRuntimeStatus({
-      status: "catalog_workspace_compound",
-      executed: true,
-      observedArtifactRef: catalogObservationArtifactId,
-      terminalArtifactRef: terminalArtifactId,
-      terminalResultId,
-      legacyFallbackPossibleWhenUnhandled: true,
-    }),
-    canonical_goal_frame: canonicalGoalFrame,
-    compound_capability_contract: compoundCapabilityContract,
-    capability_registry: catalogObservation,
-    workspace_os_status_observation: workspaceObservation,
-    compound_evidence_synthesis_answer: buildGoldenPathCompoundEvidenceSynthesisAnswer({
-      text: terminalResult.text,
-      supportRefs: terminalResult.support_refs,
-      satisfiedSubgoalCount: 2,
-    }),
-    capability_plan: buildGoldenPathCompoundCapabilityPlan({
-      requiredObservationKinds,
-      requiredTerminalKind,
-    }),
-    goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-    ...buildGoldenPathTerminalAuthorityProjection({
-      terminalResult,
-      route: "golden_path_runtime / catalog_workspace_compound",
-    }),
-    ask_turn_solver_trace: buildGoldenPathSolverTrace({
-      completedSolverPath: true,
-      routeAuthorityOk: true,
-      terminalAuthorityOk: true,
-      goalSatisfaction: "satisfied",
-      requestedCapability: "compound_capability_contract",
-      selectedCapability: "compound_capability_contract",
-      executedCapability: "compound_capability_contract",
-      observedArtifactKind: "compound_subgoal_observations",
-      observedArtifactRef: catalogObservationArtifactId,
-      terminalArtifactKind: terminalResult.artifact_kind,
-      extra: {
-        compound_subgoal_count: 2,
-        solver_risk_flags: [],
-        solver_short_circuit_flags: [],
-      },
-    }),
-    current_turn_artifact_ledger: [
-      buildGoldenPathRouteGateLedgerArtifact({
-        artifactId: routeGateArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        promptText,
-        requestedCapability: "compound_capability_contract",
-        compoundCapabilityContract,
-        goalSatisfactionArtifact,
-        goalSatisfactionEvaluation,
-      }),
+    hashGoalFrame: deps.hashGoalFrame,
+    buildGoalSatisfactionEvaluationArtifact: deps.buildGoalSatisfactionEvaluationArtifact,
+    answerText,
+    supportArtifactRefs: [catalogObservationArtifactId, workspaceObservationArtifactId],
+    status: "catalog_workspace_compound",
+    route: "golden_path_runtime / catalog_workspace_compound",
+    observedArtifactRef: catalogObservationArtifactId,
+    requiredObservationKinds,
+    observationFields: {
+      capability_registry: catalogObservation,
+      workspace_os_status_observation: workspaceObservation,
+    },
+    observationLedgerArtifacts: ({ goalHash }) => [
       buildGoldenPathObservationLedgerArtifact({
         artifactId: catalogObservationArtifactId,
         turnId,
@@ -211,25 +142,9 @@ export const buildHelixAskGoldenPathCatalogWorkspaceCompoundPayload = (args: {
         terminalEligible: false,
         payload: workspaceObservation,
       }),
-      buildGoldenPathAnswerLedgerArtifact({
-        artifactId: terminalArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        kind: requiredTerminalKind,
-        payloadSchema: "helix.compound_evidence_synthesis_answer.v1",
-        terminalResult,
-        extraPayload: { satisfied_subgoal_count: 2 },
-      }),
     ],
-    debug: buildGoldenPathCompoundDebugMirror({
-      status: "catalog_workspace_compound",
-      executed: true,
-      terminalResult,
-      compoundCapabilityContract,
-      goalSatisfactionEvaluation,
-    }),
-  };
+    compoundCapabilityContract,
+  });
 };
 export const buildPayload = buildHelixAskGoldenPathCatalogWorkspaceCompoundPayload;
 

@@ -26,6 +26,7 @@ import {
   isHelixAskGoldenPathRepoDocsCompoundRequested,
 } from "../compound-contract";
 import { buildGoldenPathCompoundTypedFailurePayload } from "../compound-failure";
+import { buildGoldenPathCompoundSuccessPayload } from "../compound-success";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
   HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
@@ -226,105 +227,33 @@ export const buildHelixAskGoldenPathRepoDocsCompoundPayload = (args: {
     `Top document evidence: line ${matches[0]?.line ?? "unknown"} - ${matches[0]?.snippet ?? ""}`,
     "The repo evidence, relevance gate, and document matches are support artifacts; synthesis is terminal authority only after both subgoals are satisfied.",
   ].filter(Boolean).join("\n");
-  const canonicalGoalFrame = buildGoldenPathCompoundCanonicalGoalFrame({
+  return buildGoldenPathCompoundSuccessPayload({
     turnId,
+    traceId,
+    sessionId,
+    threadId,
+    promptText,
+    createdAtMs,
+    routeGateArtifactId,
+    terminalResultId,
+    terminalArtifactId,
     requiredTerminalKind,
     classifierReasons: ["explicit_repo_docs_compound_request"],
     includeWorkspaceContextFields: true,
-  });
-  const goalSatisfactionEvaluation = buildGoldenPathCompoundGoalSatisfactionEvaluation({
-    turnId,
-    requiredTerminalKind,
-  });
-  const goalHash = deps.hashGoalFrame(canonicalGoalFrame);
-  const goalSatisfactionArtifact = deps.buildGoalSatisfactionEvaluationArtifact({
-    turnId,
-    goalHash,
-    evaluation: goalSatisfactionEvaluation,
-    createdAtMs,
-  });
-  const terminalResult = buildGoldenPathTerminalResult({
-    resultId: terminalResultId,
-    artifactId: terminalArtifactId,
-    artifactKind: requiredTerminalKind,
-    finalAnswerSource: requiredTerminalKind,
-    text: answerText,
-    supportRefs: [
-      repoObservationArtifactId,
-      relevanceGateArtifactId,
-      docObservationArtifactId,
-      routeGateArtifactId,
-      goalSatisfactionArtifact.artifact_id,
-    ],
-  });
-
-  return {
-    ok: true,
-    mode: "read",
-    schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
-    turn_id: turnId,
-    trace_id: traceId,
-    session_id: sessionId,
-    thread_id: threadId,
-    prompt_text: promptText,
-    ...buildGoldenPathTerminalResponseProjection({ terminalResult }),
-    golden_path_runtime: buildGoldenPathCompoundRuntimeStatus({
-      status: "repo_docs_compound",
-      executed: true,
-      observedArtifactRef: repoObservationArtifactId,
-      terminalArtifactRef: terminalArtifactId,
-      terminalResultId,
-      legacyFallbackPossibleWhenUnhandled: true,
-    }),
-    canonical_goal_frame: canonicalGoalFrame,
-    compound_capability_contract: compoundCapabilityContract,
-    repo_code_evidence_observation: repoEvidenceObservation,
-    repo_evidence_relevance_gate: repoEvidenceRelevanceGate,
-    doc_location_matches: docLocationMatches,
-    compound_evidence_synthesis_answer: buildGoldenPathCompoundEvidenceSynthesisAnswer({
-      text: terminalResult.text,
-      supportRefs: terminalResult.support_refs,
-      satisfiedSubgoalCount: 2,
-    }),
-    capability_plan: buildGoldenPathCompoundCapabilityPlan({
-      requiredObservationKinds: ["repo_code_evidence_observation", "repo_evidence_relevance_gate", "doc_location_matches"],
-      requiredTerminalKind,
-    }),
-    goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-    ...buildGoldenPathTerminalAuthorityProjection({
-      terminalResult,
-      route: "golden_path_runtime / repo_docs_compound",
-    }),
-    ask_turn_solver_trace: buildGoldenPathSolverTrace({
-      completedSolverPath: true,
-      routeAuthorityOk: true,
-      terminalAuthorityOk: true,
-      goalSatisfaction: "satisfied",
-      requestedCapability: "compound_capability_contract",
-      selectedCapability: "compound_capability_contract",
-      executedCapability: "compound_capability_contract",
-      observedArtifactKind: "compound_subgoal_observations",
-      observedArtifactRef: repoObservationArtifactId,
-      terminalArtifactKind: terminalResult.artifact_kind,
-      extra: {
-        compound_subgoal_count: 2,
-        solver_risk_flags: [],
-        solver_short_circuit_flags: [],
-      },
-    }),
-    current_turn_artifact_ledger: [
-      buildGoldenPathRouteGateLedgerArtifact({
-        artifactId: routeGateArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        terminalEligible: false,
-        promptText,
-        requestedCapability: "compound_capability_contract",
-        compoundCapabilityContract,
-        goalSatisfactionArtifact,
-        goalSatisfactionEvaluation,
-      }),
+    hashGoalFrame: deps.hashGoalFrame,
+    buildGoalSatisfactionEvaluationArtifact: deps.buildGoalSatisfactionEvaluationArtifact,
+    answerText,
+    supportArtifactRefs: [repoObservationArtifactId, relevanceGateArtifactId, docObservationArtifactId],
+    status: "repo_docs_compound",
+    route: "golden_path_runtime / repo_docs_compound",
+    observedArtifactRef: repoObservationArtifactId,
+    requiredObservationKinds: ["repo_code_evidence_observation", "repo_evidence_relevance_gate", "doc_location_matches"],
+    observationFields: {
+      repo_code_evidence_observation: repoEvidenceObservation,
+      repo_evidence_relevance_gate: repoEvidenceRelevanceGate,
+      doc_location_matches: docLocationMatches,
+    },
+    observationLedgerArtifacts: ({ goalHash }) => [
       buildGoldenPathObservationLedgerArtifact({
         artifactId: repoObservationArtifactId,
         turnId,
@@ -355,25 +284,10 @@ export const buildHelixAskGoldenPathRepoDocsCompoundPayload = (args: {
         terminalEligible: false,
         payload: docLocationMatches,
       }),
-      buildGoldenPathAnswerLedgerArtifact({
-        artifactId: terminalArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        kind: requiredTerminalKind,
-        producerItemId: "golden_path_compound_synthesis",
-        payloadSchema: "helix.compound_evidence_synthesis_answer.v1",
-        terminalResult,
-        extraPayload: { satisfied_subgoal_count: 2 },
-      }),
     ],
-    debug: buildGoldenPathCompoundDebugMirror({
-      status: "repo_docs_compound",
-      executed: true,
-      terminalResult,
-      compoundCapabilityContract,
-      goalSatisfactionEvaluation,
-    }),
-  };
+    compoundCapabilityContract,
+    routeGateTerminalEligible: false,
+    answerProducerItemId: "golden_path_compound_synthesis",
+  });
 };
 export const buildPayload = buildHelixAskGoldenPathRepoDocsCompoundPayload;

@@ -17,6 +17,7 @@ import {
   isHelixAskGoldenPathCivilizationBoundsZenReflectionCompoundRequested,
 } from "../compound-contract";
 import { buildGoldenPathCompoundTypedFailurePayload } from "../compound-failure";
+import { buildGoldenPathCompoundSuccessPayload } from "../compound-success";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
   HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
@@ -207,102 +208,32 @@ export const buildHelixAskGoldenPathCivilizationBoundsZenReflectionCompoundPaylo
     `Procedural classifications: ${proceduralClassifications.length}; badge locator matches: ${locatorMatches.length}.`,
     "Both receipts are evidence-only; synthesis is terminal authority only after the civilization-bounds and ideology-reflection subgoals are satisfied.",
   ].join("\n");
-  const canonicalGoalFrame = buildGoldenPathCompoundCanonicalGoalFrame({
+  return buildGoldenPathCompoundSuccessPayload({
     turnId,
+    traceId,
+    sessionId,
+    threadId,
+    promptText,
+    createdAtMs,
+    routeGateArtifactId,
+    terminalResultId,
+    terminalArtifactId,
     requiredTerminalKind,
     classifierReasons: ["explicit_civilization_bounds_zen_reflection_compound_request"],
     includeWorkspaceContextFields: true,
-  });
-  const goalSatisfactionEvaluation = buildGoldenPathCompoundGoalSatisfactionEvaluation({
-    turnId,
-    requiredTerminalKind,
-  });
-  const goalHash = deps.hashGoalFrame(canonicalGoalFrame);
-  const goalSatisfactionArtifact = deps.buildGoalSatisfactionEvaluationArtifact({
-    turnId,
-    goalHash,
-    evaluation: goalSatisfactionEvaluation,
-    createdAtMs,
-  });
-  const terminalResult = buildGoldenPathTerminalResult({
-    resultId: terminalResultId,
-    artifactId: terminalArtifactId,
-    artifactKind: requiredTerminalKind,
-    finalAnswerSource: requiredTerminalKind,
-    text: answerText,
-    supportRefs: [
-      civilizationObservationArtifactId,
-      zenObservationArtifactId,
-      routeGateArtifactId,
-      goalSatisfactionArtifact.artifact_id,
-    ],
-  });
-
-  return {
-    ok: true,
-    mode: "read",
-    schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
-    turn_id: turnId,
-    trace_id: traceId,
-    session_id: sessionId,
-    thread_id: threadId,
-    prompt_text: promptText,
-    ...buildGoldenPathTerminalResponseProjection({ terminalResult }),
-    golden_path_runtime: buildGoldenPathCompoundRuntimeStatus({
-      status: "civilization_bounds_zen_reflection_compound",
-      executed: true,
-      observedArtifactRef: civilizationObservationArtifactId,
-      terminalArtifactRef: terminalArtifactId,
-      terminalResultId,
-      legacyFallbackPossibleWhenUnhandled: true,
-    }),
-    canonical_goal_frame: canonicalGoalFrame,
-    compound_capability_contract: compoundCapabilityContract,
-    helix_civilization_bounds_tool_result: civilizationReceipt,
-    helix_zen_graph_reflection_tool_result: zenReceipt,
-    compound_evidence_synthesis_answer: buildGoldenPathCompoundEvidenceSynthesisAnswer({
-      text: terminalResult.text,
-      supportRefs: terminalResult.support_refs,
-      satisfiedSubgoalCount: 2,
-    }),
-    capability_plan: buildGoldenPathCompoundCapabilityPlan({
-      requiredObservationKinds,
-      requiredTerminalKind,
-    }),
-    goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-    ...buildGoldenPathTerminalAuthorityProjection({
-      terminalResult,
-      route: "golden_path_runtime / civilization_bounds_zen_reflection_compound",
-    }),
-    ask_turn_solver_trace: buildGoldenPathSolverTrace({
-      completedSolverPath: true,
-      routeAuthorityOk: true,
-      terminalAuthorityOk: true,
-      goalSatisfaction: "satisfied",
-      requestedCapability: "compound_capability_contract",
-      selectedCapability: "compound_capability_contract",
-      executedCapability: "compound_capability_contract",
-      observedArtifactKind: "compound_subgoal_observations",
-      observedArtifactRef: civilizationObservationArtifactId,
-      terminalArtifactKind: terminalResult.artifact_kind,
-      extra: {
-        compound_subgoal_count: 2,
-        solver_risk_flags: [],
-        solver_short_circuit_flags: [],
-      },
-    }),
-    current_turn_artifact_ledger: [
-      buildGoldenPathRouteGateLedgerArtifact({
-        artifactId: routeGateArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        terminalEligible: false,
-        requestedCapability: "compound_capability_contract",
-        compoundCapabilityContract,
-        goalSatisfactionArtifact,
-        goalSatisfactionEvaluation,
-      }),
+    hashGoalFrame: deps.hashGoalFrame,
+    buildGoalSatisfactionEvaluationArtifact: deps.buildGoalSatisfactionEvaluationArtifact,
+    answerText,
+    supportArtifactRefs: [civilizationObservationArtifactId, zenObservationArtifactId],
+    status: "civilization_bounds_zen_reflection_compound",
+    route: "golden_path_runtime / civilization_bounds_zen_reflection_compound",
+    observedArtifactRef: civilizationObservationArtifactId,
+    requiredObservationKinds,
+    observationFields: {
+      helix_civilization_bounds_tool_result: civilizationReceipt,
+      helix_zen_graph_reflection_tool_result: zenReceipt,
+    },
+    observationLedgerArtifacts: ({ goalHash }) => [
       buildGoldenPathObservationLedgerArtifact({
         artifactId: civilizationObservationArtifactId,
         turnId,
@@ -323,24 +254,10 @@ export const buildHelixAskGoldenPathCivilizationBoundsZenReflectionCompoundPaylo
         terminalEligible: false,
         payload: zenReceipt,
       }),
-      buildGoldenPathAnswerLedgerArtifact({
-        artifactId: terminalArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        kind: requiredTerminalKind,
-        payloadSchema: "helix.compound_evidence_synthesis_answer.v1",
-        terminalResult,
-        extraPayload: { satisfied_subgoal_count: 2 },
-      }),
     ],
-    debug: buildGoldenPathCompoundDebugMirror({
-      status: "civilization_bounds_zen_reflection_compound",
-      executed: true,
-      terminalResult,
-      compoundCapabilityContract,
-      goalSatisfactionEvaluation,
-    }),
-  };
+    compoundCapabilityContract,
+    routeGateTerminalEligible: false,
+    includeRouteGatePromptText: false,
+  });
 };
 export const buildPayload = buildHelixAskGoldenPathCivilizationBoundsZenReflectionCompoundPayload;
