@@ -797,4 +797,56 @@ describe("askLocal lane parity default", () => {
       terminal_forbidden: true,
     });
   });
+
+  it("enables golden-path runtime markers when runAskTurn uses Helix runtime", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          text: "Golden path accepted.",
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await runAskTurn({
+      question: "Use Helix to answer from the current document.",
+      agentRuntime: "helix",
+    });
+
+    const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const body = JSON.parse(String(requestInit.body ?? "{}")) as Record<string, any>;
+    expect(body.agent_runtime).toBe("helix");
+    expect(body.goldenPathRuntime).toBe(true);
+    expect(body.golden_path_runtime).toBe(true);
+  });
+
+  it("does not enable golden-path runtime markers when runAskTurn uses Codex runtime", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          text: "Codex provider accepted.",
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await runAskTurn({
+      question: "Use Codex mode to answer from the current document.",
+      agentRuntime: "codex",
+    });
+
+    const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const body = JSON.parse(String(requestInit.body ?? "{}")) as Record<string, any>;
+    expect(body.agent_runtime).toBe("codex");
+    expect(body.goldenPathRuntime).toBeUndefined();
+    expect(body.golden_path_runtime).toBeUndefined();
+  });
 });
