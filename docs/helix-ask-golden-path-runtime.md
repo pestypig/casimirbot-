@@ -8,7 +8,10 @@ Helix Ask policy path can produce a terminal-authority-backed response without
 continuing to extract thousands of route-local helpers before the new spine can
 be reviewed.
 
-This path is a scaffold, not a default replacement for the legacy route.
+This path is a gated replacement candidate for normal Ask turns, not a default
+replacement for the legacy route. It now covers the contract-only fallback,
+explicit capability families, and representative compound workflows through
+owned modules under `server/services/helix-ask/golden-path/`.
 
 ## Feature Gate
 
@@ -36,7 +39,8 @@ require live keys, external tools, or the legacy private runtime loop.
 
 ## Response Envelope Contract
 
-The response envelope must identify a contract-only terminal result:
+For the contract-only fallback, the response envelope must identify a
+contract-only terminal result:
 
 - `schema = "helix.ask_golden_path_runtime.v1"`
 - `response_type = "final_answer"`
@@ -45,6 +49,21 @@ The response envelope must identify a contract-only terminal result:
 - `terminal_artifact_kind = "golden_path_contract_answer"`
 - `terminal_error_code = null`
 - `terminal_results` contains one terminal result.
+
+For explicit capabilities and compound workflows, the same envelope invariants
+apply, but the terminal artifact kind is owned by the selected capability or
+compound module. Examples include:
+
+- `workstation_tool_evaluation`
+- `capability_help_summary`
+- `doc_location_matches`
+- `repo_code_evidence_answer`
+- `workspace_status_answer`
+- `internet_search_answer`
+- `scholarly_research_answer`
+- `theory_context_reflection_answer`
+- `situation_context_pack`
+- `compound_evidence_synthesis_answer`
 
 ## Terminal Artifact Invariants
 
@@ -61,22 +80,77 @@ allowed to override the selected terminal artifact.
 
 ## Artifact Ledger Invariants
 
-The current-turn ledger records the golden route gate and the selected
-`golden_path_contract_answer`. The terminal artifact is marked terminal-eligible
-and carries support refs from the golden-path model packet and goal-satisfaction
-artifact.
+The current-turn ledger records the golden route gate, each required
+observation artifact, and the selected terminal artifact. The terminal artifact
+is marked terminal-eligible and carries support refs from the relevant
+observation or compound subgoal artifacts.
 
 The route-gate artifact may include non-authoritative debug material, but it is
 not terminal authority.
 
 ## Final-Answer Source Rules
 
-The final answer source is stable:
+For the contract-only fallback, the final answer source is stable:
 
 `helix_ask_golden_path_runtime`
 
-That source is valid only for the gated, explicit golden-path request. Legacy
-turns must continue to use their existing final-answer source rules.
+That source is valid only for the gated, explicit golden-path contract request.
+For explicit capability and compound turns, `final_answer_source` must match the
+selected terminal artifact kind. Legacy turns must continue to use their
+existing final-answer source rules.
+
+## Current Owned Capability Coverage
+
+Golden-path explicit capability modules currently cover:
+
+- calculator
+- capability catalog
+- docs locate / docs viewer alias
+- repo search / repo code alias
+- workspace status
+- workspace directory resolution
+- processed live-source mail read-only packet summaries
+- Stage Play reflection summaries
+- theory/context reflection
+- civilization-bounds reflection
+- Zen graph / ideology reflection
+- visual capture / image lens inspection
+- scholarly research lookup
+- internet/web research lookup
+
+Each capability module exposes:
+
+- `requiredObservationKinds`
+- `requiredTerminalKinds`
+- `isRequested(body)`
+- `buildPayload({ body, deps })`
+
+## Current Owned Compound Coverage
+
+Golden-path compound modules currently cover:
+
+- docs + calculator
+- capability catalog + workspace status
+- repo search + docs locate
+- internet/web research + theory reflection
+- visual capture + calculator
+- civilization bounds + Zen graph reflection
+
+Each compound module owns ordered subgoals, required observation kinds,
+required terminal kind, request detection, payload construction, and support
+refs covering all mandatory subgoals.
+
+## HTTP Route-Gate Evidence
+
+Deterministic route-gate tests prove golden-path delegation for:
+
+- `/api/agi/ask/turn` explicit capability turns
+- `/api/agi/ask/turn` compound turns
+- `/api/agi/ask/turn/stream` explicit capability turns
+- `/api/agi/ask/turn/stream` compound turns
+
+Both route surfaces preserve legacy fallback when the flag is disabled or the
+explicit golden-path marker is absent.
 
 ## Conflicting Legacy Paths Bypassed
 
@@ -116,7 +190,9 @@ Activation should remain staged:
 
 ## Deferred Risks
 
-- The golden path is contract-only and not yet a full tool-capability runtime.
+- The golden path is still gated and not default-on.
+- The golden path consumes compact deterministic evidence; keyed provider/tool
+  execution remains a later activation phase.
 - Legacy route fallback still contains conflicting writers.
 - Keyed live validation remains separate.
 - API parity matrix hangs should be investigated independently.
