@@ -20,6 +20,7 @@ export const buildGoldenPathCapabilityTypedFailurePayload = (args: {
   routeGateArtifactId: string;
   terminalResultId: string;
   requiredTerminalKind: string;
+  answerScope?: string;
   goalKind: string;
   classifierReasons: readonly string[];
   requestedCapability: string;
@@ -34,6 +35,12 @@ export const buildGoldenPathCapabilityTypedFailurePayload = (args: {
   brokenRail: string;
   missingRequirement: string;
   text: string;
+  routeGate?: string;
+  debugStatus?: string;
+  includeGoalSatisfactionInDebug?: boolean;
+  includeLedgerSupportRefs?: boolean;
+  includeTerminalErrorCodeInSolverTrace?: boolean;
+  includeFirstBrokenRailInTerminalAuthority?: boolean;
   hashGoalFrame: (value: unknown) => string;
 }): RecordLike => {
   const selectedCapability = args.selectedCapability ?? args.requestedCapability;
@@ -42,7 +49,7 @@ export const buildGoldenPathCapabilityTypedFailurePayload = (args: {
     schema: "helix.ask_canonical_goal_frame.v1",
     turn_id: args.turnId,
     goal_kind: args.goalKind,
-    answer_scope: "current_turn",
+    answer_scope: args.answerScope ?? "current_turn",
     required_terminal_kind: args.requiredTerminalKind,
     classifier_reasons: args.classifierReasons,
     assistant_answer: false,
@@ -84,6 +91,7 @@ export const buildGoldenPathCapabilityTypedFailurePayload = (args: {
       selectedCapability,
       executedCapability: null,
       firstBrokenRail: args.brokenRail,
+      routeGate: args.routeGate,
     }),
     canonical_goal_frame: canonicalGoalFrame,
     capability_plan: buildGoldenPathCapabilityPlan({
@@ -100,6 +108,7 @@ export const buildGoldenPathCapabilityTypedFailurePayload = (args: {
     ...buildGoldenPathTerminalAuthorityProjection({
       terminalResult,
       route: args.route,
+      ...(args.includeFirstBrokenRailInTerminalAuthority ? { firstBrokenRail: args.brokenRail } : {}),
     }),
     ask_turn_solver_trace: buildGoldenPathSolverTrace({
       completedSolverPath: false,
@@ -108,6 +117,7 @@ export const buildGoldenPathCapabilityTypedFailurePayload = (args: {
       executedCapability: null,
       firstBrokenRail: args.brokenRail,
       terminalArtifactKind: "typed_failure",
+      ...(args.includeTerminalErrorCodeInSolverTrace ? { terminalErrorCode: args.errorCode } : {}),
     }),
     current_turn_artifact_ledger: [
       buildGoldenPathRouteGateLedgerArtifact({
@@ -125,15 +135,18 @@ export const buildGoldenPathCapabilityTypedFailurePayload = (args: {
         terminalResult,
         errorCode: args.errorCode,
         firstBrokenRail: args.brokenRail,
+        includeSupportRefs: args.includeLedgerSupportRefs,
       }),
     ],
     debug: buildGoldenPathCapabilityDebugMirror({
+      status: args.debugStatus,
       requestedCapability: args.requestedCapability,
       selectedCapability,
       executedCapability: null,
       terminalResult,
       firstBrokenRail: args.brokenRail,
       terminalErrorCode: args.errorCode,
+      ...(args.includeGoalSatisfactionInDebug ? { goalSatisfactionEvaluation } : {}),
     }),
   };
 };
