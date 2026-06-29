@@ -58,3 +58,52 @@ export const buildGoldenPathTerminalLedgerArtifact = (args: {
     raw_content_included: false,
   },
 });
+
+export const buildGoldenPathObservationLedgerArtifact = (args: {
+  artifactId: string;
+  turnId: string;
+  createdAtMs: number;
+  goalHash: string;
+  kind: string;
+  payload: RecordLike;
+}): RecordLike => ({
+  artifact_id: args.artifactId,
+  turn_id: args.turnId,
+  producer_item_id: "golden_path_runtime",
+  kind: args.kind,
+  terminal_eligible: false,
+  created_at_ms: args.createdAtMs,
+  source_scope: "current_turn",
+  goal_hash: args.goalHash,
+  payload: args.payload,
+});
+
+export const buildGoldenPathAnswerLedgerArtifact = (args: {
+  artifactId: string;
+  turnId: string;
+  createdAtMs: number;
+  goalHash: string;
+  kind: string;
+  payloadSchema: string;
+  terminalResult: HelixAskGoldenPathRuntimeTerminalResult;
+  extraPayload?: RecordLike;
+}): RecordLike => ({
+  artifact_id: args.artifactId,
+  turn_id: args.turnId,
+  producer_item_id: "golden_path_runtime",
+  kind: args.kind,
+  terminal_eligible: true,
+  created_at_ms: args.createdAtMs,
+  source_scope: "current_turn",
+  goal_hash: args.goalHash,
+  payload: {
+    schema: args.payloadSchema,
+    text: args.terminalResult.text,
+    answer_text: args.terminalResult.text,
+    terminal_result_id: args.terminalResult.result_id,
+    support_refs: args.terminalResult.support_refs,
+    ...(args.extraPayload ?? {}),
+    assistant_answer: false,
+    raw_content_included: false,
+  },
+});

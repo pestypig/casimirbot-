@@ -1,5 +1,9 @@
 import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfaction-artifact";
-import { buildGoldenPathRouteGateLedgerArtifact } from "../artifact-ledger";
+import {
+  buildGoldenPathAnswerLedgerArtifact,
+  buildGoldenPathObservationLedgerArtifact,
+  buildGoldenPathRouteGateLedgerArtifact,
+} from "../artifact-ledger";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
@@ -217,36 +221,23 @@ export const buildHelixAskGoldenPathCapabilityCatalogPayload = (args: {
           goalSatisfactionEvaluation,
         }),
       },
-      {
-        artifact_id: observationArtifactId,
-        turn_id: turnId,
-        producer_item_id: "golden_path_runtime",
+      buildGoldenPathObservationLedgerArtifact({
+        artifactId: observationArtifactId,
+        turnId,
+        createdAtMs,
+        goalHash,
         kind: "capability_registry",
-        terminal_eligible: false,
-        created_at_ms: createdAtMs,
-        source_scope: "current_turn",
-        goal_hash: goalHash,
         payload: catalogObservation,
-      },
-      {
-        artifact_id: terminalArtifactId,
-        turn_id: turnId,
-        producer_item_id: "golden_path_runtime",
+      }),
+      buildGoldenPathAnswerLedgerArtifact({
+        artifactId: terminalArtifactId,
+        turnId,
+        createdAtMs,
+        goalHash,
         kind: requiredTerminalKind,
-        terminal_eligible: true,
-        created_at_ms: createdAtMs,
-        source_scope: "current_turn",
-        goal_hash: goalHash,
-        payload: {
-          schema: "helix.capability_help_summary.v1",
-          text: terminalResult.text,
-          answer_text: terminalResult.text,
-          terminal_result_id: terminalResult.result_id,
-          support_refs: terminalResult.support_refs,
-          assistant_answer: false,
-          raw_content_included: false,
-        },
-      },
+        payloadSchema: "helix.capability_help_summary.v1",
+        terminalResult,
+      }),
     ],
     debug: {
       schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
