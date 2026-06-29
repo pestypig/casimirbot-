@@ -4,7 +4,10 @@ import {
   buildGoldenPathObservationLedgerArtifact,
   buildGoldenPathRouteGateLedgerArtifact,
 } from "../artifact-ledger";
-import { buildGoldenPathCapabilityPlan } from "../capability-contract";
+import {
+  buildGoldenPathCapabilityGoalSatisfactionEvaluation,
+  buildGoldenPathCapabilityPlan,
+} from "../capability-contract";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
   HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
@@ -96,17 +99,11 @@ export const buildHelixAskGoldenPathCapabilityCatalogPayload = (args: {
     assistant_answer: false,
     raw_content_included: false,
   };
-  const goalSatisfactionEvaluation = {
-    schema: "helix.goal_satisfaction_evaluation.v1",
-    turn_id: turnId,
-    satisfaction: "satisfied",
-    goal_kind: "capability_catalog_runtime",
-    required_terminal_kind: requiredTerminalKind,
-    selected_terminal_artifact_kind: requiredTerminalKind,
-    missing_requirements: [],
-    assistant_answer: false,
-    raw_content_included: false,
-  };
+  const goalSatisfactionEvaluation = buildGoldenPathCapabilityGoalSatisfactionEvaluation({
+    turnId,
+    goalKind: "capability_catalog_runtime",
+    requiredTerminalKind,
+  });
   const goalHash = args.deps.hashGoalFrame(canonicalGoalFrame);
   const goalSatisfactionArtifact = args.deps.buildGoalSatisfactionEvaluationArtifact({
     turnId,
