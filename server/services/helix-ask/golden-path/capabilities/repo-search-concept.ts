@@ -6,6 +6,7 @@ import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfa
 import {
   buildGoldenPathAnswerLedgerArtifact,
   buildGoldenPathObservationLedgerArtifact,
+  buildGoldenPathPayloadLedgerArtifact,
   buildGoldenPathRouteGateLedgerArtifact,
 } from "../artifact-ledger";
 import {
@@ -340,31 +341,20 @@ export const buildHelixAskGoldenPathRepoSearchConceptPayload = (args: {
         raw_content_included: false,
       },
       current_turn_artifact_ledger: [
-        {
-          artifact_id: routeGateArtifactId,
-          turn_id: turnId,
-          producer_item_id: "golden_path_runtime",
-          kind: "golden_path_route_gate",
-          created_at_ms: createdAtMs,
-          source_scope: "current_turn",
-          goal_hash: goalHash,
-          payload: {
-            schema: "helix.golden_path_route_gate.v1",
-            route_gate: "enabled_explicit_request",
-            requested_capability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
-            assistant_answer: false,
-            raw_content_included: false,
-          },
-        },
-        {
-          artifact_id: terminalArtifactIdForFailure,
-          turn_id: turnId,
-          producer_item_id: "golden_path_runtime",
+        buildGoldenPathRouteGateLedgerArtifact({
+          artifactId: routeGateArtifactId,
+          turnId,
+          createdAtMs,
+          goalHash,
+          requestedCapability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+        }),
+        buildGoldenPathPayloadLedgerArtifact({
+          artifactId: terminalArtifactIdForFailure,
+          turnId,
+          createdAtMs,
+          goalHash,
           kind: "typed_failure",
-          terminal_eligible: true,
-          created_at_ms: createdAtMs,
-          source_scope: "current_turn",
-          goal_hash: goalHash,
+          terminalEligible: true,
           payload: {
             schema: "helix.typed_failure.v1",
             text: terminalResult.text,
@@ -375,7 +365,7 @@ export const buildHelixAskGoldenPathRepoSearchConceptPayload = (args: {
             assistant_answer: false,
             raw_content_included: false,
           },
-        },
+        }),
       ],
       debug: {
         schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
