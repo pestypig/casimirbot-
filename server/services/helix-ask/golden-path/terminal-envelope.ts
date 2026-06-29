@@ -39,8 +39,11 @@ export const buildGoldenPathTypedFailureTerminalResult = (args: {
 export const buildGoldenPathTerminalAnswerAuthority = (args: {
   terminalResult: HelixAskGoldenPathRuntimeTerminalResult;
   route: string;
+  completedSolverPath?: boolean;
+  firstBrokenRail?: string;
 }): RecordLike => ({
   schema: "helix.terminal_answer_authority.v1",
+  ...(typeof args.completedSolverPath === "boolean" ? { completed_solver_path: args.completedSolverPath } : {}),
   selected_terminal_artifact_kind: args.terminalResult.artifact_kind,
   terminal_artifact_kind: args.terminalResult.artifact_kind,
   selected_terminal_artifact_id: args.terminalResult.artifact_id,
@@ -48,6 +51,7 @@ export const buildGoldenPathTerminalAnswerAuthority = (args: {
   selected_terminal_result_id: args.terminalResult.result_id,
   selected_final_answer: args.terminalResult.text,
   final_answer_source: args.terminalResult.final_answer_source,
+  ...(args.firstBrokenRail ? { first_broken_rail: args.firstBrokenRail } : {}),
   terminal_authority_ok: true,
   route: args.route,
   server_authoritative: true,
