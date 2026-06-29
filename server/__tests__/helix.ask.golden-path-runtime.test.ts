@@ -166,6 +166,25 @@ describe("Helix Ask golden path runtime", () => {
     }
   });
 
+  it("keeps compound debug mirrors centralized in the shared helper", () => {
+    const compoundModulePaths = readdirSync(compoundDir)
+      .filter((fileName) => fileName.endsWith(".ts"))
+      .map((fileName) => `${compoundDir}/${fileName}`);
+
+    expect(compoundModulePaths.length).toBeGreaterThan(0);
+    for (const modulePath of compoundModulePaths) {
+      const source = readFileSync(modulePath, "utf8");
+      if (source.includes("debug:")) {
+        expect(source, `${modulePath} must build compound debug through the shared helper`).toContain(
+          "buildGoldenPathCompoundDebugMirror",
+        );
+        expect(source, `${modulePath} must not inline compound debug mirror ownership`).not.toMatch(
+          /debug:\s*\{\s*schema:\s*HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA/,
+        );
+      }
+    }
+  });
+
   it("keeps every dispatch-owned golden-path module imported and ordered exactly once", () => {
     const dispatchSource = readFileSync(dispatchPath, "utf8");
     const dispatchModules = [

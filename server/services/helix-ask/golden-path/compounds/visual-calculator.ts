@@ -38,6 +38,7 @@ import {
 } from "../terminal-envelope";
 import { buildGoldenPathSolverTrace } from "../solver-trace";
 import { buildGoldenPathCompoundRuntimeStatus } from "../runtime-status";
+import { buildGoldenPathCompoundDebugMirror } from "../debug-mirror";
 
 export type HelixAskGoldenPathVisualCalculatorCompoundDependencies = {
   now: () => Date;
@@ -193,21 +194,14 @@ export const buildHelixAskGoldenPathVisualCalculatorCompoundPayload = (args: {
           },
         }),
       ],
-      debug: {
-        schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
-        golden_path_runtime: true,
-        golden_path_runtime_status: "visual_calculator_compound_failed",
-        requested_capability: "compound_capability_contract",
-        selected_capability: "compound_capability_contract",
-        executed_capability: null,
-        terminal_artifact_kind: "typed_failure",
-        final_answer_source: "typed_failure",
-        first_broken_rail: params.brokenRail,
-        terminal_error_code: params.errorCode,
-        goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-        assistant_answer: false,
-        raw_content_included: false,
-      },
+      debug: buildGoldenPathCompoundDebugMirror({
+        status: "visual_calculator_compound_failed",
+        executed: false,
+        terminalResult,
+        firstBrokenRail: params.brokenRail,
+        terminalErrorCode: params.errorCode,
+        goalSatisfactionEvaluation,
+      }),
     };
   };
 
@@ -444,22 +438,13 @@ export const buildHelixAskGoldenPathVisualCalculatorCompoundPayload = (args: {
         extraPayload: { satisfied_subgoal_count: 2 },
       }),
     ],
-    debug: {
-      schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
-      golden_path_runtime: true,
-      golden_path_runtime_status: "visual_calculator_compound",
-      private_runtime_loop_entered: false,
-      requested_capability: "compound_capability_contract",
-      selected_capability: "compound_capability_contract",
-      executed_capability: "compound_capability_contract",
-      terminal_artifact_kind: terminalResult.artifact_kind,
-      terminal_result_count: 1,
-      final_answer_source: terminalResult.final_answer_source,
-      compound_capability_contract: compoundCapabilityContract,
-      goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-      assistant_answer: false,
-      raw_content_included: false,
-    },
+    debug: buildGoldenPathCompoundDebugMirror({
+      status: "visual_calculator_compound",
+      executed: true,
+      terminalResult,
+      compoundCapabilityContract,
+      goalSatisfactionEvaluation,
+    }),
   };
 };
 export const buildPayload = buildHelixAskGoldenPathVisualCalculatorCompoundPayload;

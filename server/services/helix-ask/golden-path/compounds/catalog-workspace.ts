@@ -31,6 +31,7 @@ import {
 } from "../terminal-envelope";
 import { buildGoldenPathSolverTrace } from "../solver-trace";
 import { buildGoldenPathCompoundRuntimeStatus } from "../runtime-status";
+import { buildGoldenPathCompoundDebugMirror } from "../debug-mirror";
 
 export type HelixAskGoldenPathCatalogWorkspaceCompoundDependencies = {
   now: () => Date;
@@ -234,22 +235,13 @@ export const buildHelixAskGoldenPathCatalogWorkspaceCompoundPayload = (args: {
         extraPayload: { satisfied_subgoal_count: 2 },
       }),
     ],
-    debug: {
-      schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
-      golden_path_runtime: true,
-      golden_path_runtime_status: "catalog_workspace_compound",
-      private_runtime_loop_entered: false,
-      requested_capability: "compound_capability_contract",
-      selected_capability: "compound_capability_contract",
-      executed_capability: "compound_capability_contract",
-      terminal_artifact_kind: terminalResult.artifact_kind,
-      terminal_result_count: 1,
-      final_answer_source: terminalResult.final_answer_source,
-      compound_capability_contract: compoundCapabilityContract,
-      goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-      assistant_answer: false,
-      raw_content_included: false,
-    },
+    debug: buildGoldenPathCompoundDebugMirror({
+      status: "catalog_workspace_compound",
+      executed: true,
+      terminalResult,
+      compoundCapabilityContract,
+      goalSatisfactionEvaluation,
+    }),
   };
 };
 export const buildPayload = buildHelixAskGoldenPathCatalogWorkspaceCompoundPayload;
