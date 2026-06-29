@@ -22,6 +22,32 @@ const createApp = (): express.Express => {
   return app;
 };
 
+const parseSseEvents = (text: string): Array<{ event: string; data: Record<string, unknown> }> =>
+  text
+    .split(/\n\n+/)
+    .map((block) => block.trim())
+    .filter(Boolean)
+    .map((block) => {
+      const event =
+        block
+          .split(/\n/)
+          .find((line) => line.startsWith("event:"))
+          ?.slice("event:".length)
+          .trim() ?? "";
+      const dataText = block
+        .split(/\n/)
+        .filter((line) => line.startsWith("data:"))
+        .map((line) => line.slice("data:".length).trim())
+        .join("\n");
+      let data: Record<string, unknown> = {};
+      try {
+        data = JSON.parse(dataText);
+      } catch {
+        data = {};
+      }
+      return { event, data };
+    });
+
 afterEach(() => {
   resetHelixAskDebugPayloadCacheForTests();
   if (originalGoldenPathFlag === undefined) {
@@ -198,5 +224,41 @@ describe("Helix Ask golden-path route gate", () => {
     expect(response.body.compound_capability_contract?.ordered_subgoals).toHaveLength(2);
     expect(response.body.current_turn_artifact_ledger?.map((artifact: { kind?: string }) => artifact.kind)).toContain("doc_location_matches");
     expect(response.body.current_turn_artifact_ledger?.map((artifact: { kind?: string }) => artifact.kind)).toContain("calculator_receipt");
+  });
+
+  it("routes stream turns through the golden-path runtime before legacy carryover", async () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+    const app = createApp();
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn/stream")
+      .send({
+        turn_id: "ask:test:golden-stream-calculator",
+        prompt: "helix_ask_golden_path_runtime use scientific-calculator.solve_expression",
+        goldenPathRuntime: true,
+        requested_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+        calculator_expression: "5 * 6",
+      })
+      .expect(200);
+    const finalEvent = parseSseEvents(response.text).find((event) => event.event === "turn_final");
+
+    expect(finalEvent?.data).toMatchObject({
+      final_status: "final_answer",
+      terminal_artifact_kind: "workstation_tool_evaluation",
+      final_answer_source: "workstation_tool_evaluation",
+      terminal_error_code: null,
+      stream_used: true,
+      stream_mode: "golden_path_runtime",
+      ask_turn_solver_trace: {
+        completed_solver_path: true,
+        observed_artifact_kind: "calculator_receipt",
+        terminal_artifact_kind: "workstation_tool_evaluation",
+      },
+    });
+    expect((finalEvent?.data.debug as { golden_path_runtime?: unknown } | undefined)?.golden_path_runtime).toEqual(
+      expect.objectContaining({
+        legacy_route_bypassed: true,
+      }),
+    );
   });
 });
