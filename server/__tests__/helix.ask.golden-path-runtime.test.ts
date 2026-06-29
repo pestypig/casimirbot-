@@ -9,6 +9,7 @@ import {
   HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
   HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
   HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+  HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
   HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
   HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
   HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
@@ -167,6 +168,84 @@ describe("Helix Ask golden path runtime", () => {
     });
     expect(body.selected_final_answer).toContain("no processed live-source mail packet");
     expect(readLedger(body).map((artifact) => artifact.kind)).toEqual(["golden_path_route_gate", "typed_failure"]);
+    expect(terminalLedgerEntries(body)).toHaveLength(1);
+  });
+
+  it("handles compact Stage Play reflection evidence through a delegated capability module", () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+
+    const decision = runHelixAskGoldenPathRuntime({
+      now: new Date("2026-06-28T12:26:30.000Z"),
+      body: {
+        turn_id: "ask:golden:stage-play-reflection",
+        prompt: "helix_ask_golden_path_runtime use live_env.reflect_stage_play_context",
+        goldenPathRuntime: true,
+        requested_capability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
+        stage_play_reflection_result: {
+          schema: "stage_play_reflection_result/v1",
+          graph: {
+            graphId: "stage_play_badge_graph:test",
+            missingEvidence: ["model_reviewed_checkpoint"],
+          },
+          liveAnswerProjection: {
+            projected: true,
+            projectedLineKeys: ["risk", "unknowns"],
+            changedLineKeys: ["risk", "unknowns"],
+            skippedLineKeys: ["answer_snapshot"],
+            reason: "compact_fixture",
+          },
+          debugReceipt: {
+            graphId: "stage_play_badge_graph:test",
+            sourceRefs: ["visual_evidence:test"],
+            checkpointFreshness: { reviewed: false },
+            checkpointOnlySkipped: ["answer_snapshot"],
+          },
+        },
+      },
+    });
+
+    expect(decision.handled).toBe(true);
+    if (!decision.handled) throw new Error("golden path should handle Stage Play reflection");
+    const body = decision.payload;
+
+    expect(body).toMatchObject({
+      final_status: "final_answer",
+      terminal_artifact_kind: "stage_play_reflection_answer",
+      final_answer_source: "stage_play_reflection_answer",
+      terminal_error_code: null,
+      stage_play_reflection_result: {
+        kind: "stage_play_reflection_result",
+        tool_id: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
+        projected: true,
+      },
+      capability_plan: {
+        requested_capability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
+        executed_capability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
+        required_observation_kinds: ["stage_play_reflection_result"],
+        required_terminal_kind: "stage_play_reflection_answer",
+      },
+      ask_turn_solver_trace: {
+        completed_solver_path: true,
+        requested_capability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
+        executed_capability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
+        observed_artifact_kind: "stage_play_reflection_result",
+        terminal_artifact_kind: "stage_play_reflection_answer",
+      },
+      terminal_answer_authority: {
+        server_authoritative: true,
+        terminal_artifact_kind: "stage_play_reflection_answer",
+        final_answer_source: "stage_play_reflection_answer",
+      },
+    });
+    expect(body.selected_final_answer).toContain("Stage Play reflection completed");
+    expect(body.selected_final_answer).toContain("did not start capture");
+    expect(readLedger(body).map((artifact) => artifact.kind)).toEqual([
+      "golden_path_route_gate",
+      "stage_play_reflection_result",
+      "stage_play_reflection_answer",
+    ]);
     expect(terminalLedgerEntries(body)).toHaveLength(1);
   });
 

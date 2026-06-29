@@ -1,0 +1,592 @@
+import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfaction-artifact";
+import {
+  HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
+  HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
+  HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
+  readBoolean,
+  readHelixAskGoldenPathPrompt,
+  readRecord,
+  readString,
+  readStringArray,
+  type HelixAskGoldenPathRuntimeTerminalResult,
+  type RecordLike,
+} from "../core";
+
+export type HelixAskGoldenPathStagePlayReflectionDependencies = {
+  now: () => Date;
+  hashGoalFrame: (value: unknown) => string;
+  buildGoalSatisfactionEvaluationArtifact: typeof buildHelixGoalSatisfactionEvaluationArtifact;
+};
+
+export const isHelixAskGoldenPathStagePlayReflectionRequested = (body: RecordLike): boolean => {
+  const requestedCapabilities = readStringArray(body.requested_capabilities ?? body.requestedCapabilities);
+  if (requestedCapabilities.includes(HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY)) return true;
+  const requestedCapability =
+    readString(body.requested_capability) ??
+    readString(body.requestedCapability) ??
+    readString(body.capability) ??
+    readString(body.tool_name) ??
+    readString(body.toolName);
+  if (requestedCapability === HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY) return true;
+  const prompt = readHelixAskGoldenPathPrompt(body).toLowerCase();
+  return (
+    prompt.includes(HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY) ||
+    /\b(?:reflect_stage_play_context|stage\s*play\s*badge\s*graph|live\s+interpretation|stage\s*play\s+reflection|stage_play_reflection_result)\b/.test(
+      prompt,
+    )
+  );
+};
+
+export const readCompactStagePlayReflectionResult = (body: RecordLike): RecordLike | null => {
+  const direct =
+    readRecord(body.stage_play_reflection_result) ??
+    readRecord(body.stagePlayReflectionResult) ??
+    readRecord(body.stage_play_reflection_tool_result) ??
+    readRecord(body.stagePlayReflectionToolResult);
+  if (direct) return direct;
+  const observation = readRecord(body.live_environment_tool_observation) ?? readRecord(body.liveEnvironmentToolObservation);
+  if (observation) {
+    const nested = readRecord(observation.observation);
+    if (readString(nested?.schema) === "stage_play_reflection_result/v1") return nested;
+    if (readString(observation.schema) === "stage_play_reflection_result/v1") return observation;
+  }
+  const graph = readRecord(body.stage_play_badge_graph) ?? readRecord(body.stagePlayBadgeGraph);
+  return graph ? { schema: "stage_play_reflection_result/v1", graph } : null;
+};
+
+export const buildHelixAskGoldenPathStagePlayReflectionPayload = (args: {
+  body: RecordLike;
+  deps: HelixAskGoldenPathStagePlayReflectionDependencies;
+}): RecordLike => {
+  const now = args.deps.now();
+  const createdAtMs = now.getTime();
+  const turnId =
+    readString(args.body.turn_id) ?? readString(args.body.turnId) ?? `ask:golden-stage-play-reflection:${createdAtMs}`;
+  const traceId = readString(args.body.trace_id) ?? readString(args.body.traceId) ?? turnId;
+  const sessionId = readString(args.body.session_id) ?? readString(args.body.sessionId);
+  const threadId = readString(args.body.thread_id) ?? readString(args.body.threadId);
+  const promptText = readHelixAskGoldenPathPrompt(args.body);
+  const routeGateArtifactId = `${turnId}:golden_path_route_gate`;
+  const observationArtifactId = `${turnId}:stage_play_reflection_result`;
+  const terminalArtifactId = `${turnId}:stage_play_reflection_answer`;
+  const terminalResultId = `${turnId}:golden_path_terminal_result`;
+  const requiredTerminalKind = "stage_play_reflection_answer";
+  const goalKind = "stage_play_reflection";
+  const observation = readCompactStagePlayReflectionResult(args.body);
+
+  const makeFailurePayload = (): RecordLike => {
+    const failureText =
+      "I could not complete this golden-path Stage Play reflection turn because no compact Stage Play reflection result was provided.";
+    const canonicalGoalFrame = {
+      schema: "helix.ask_canonical_goal_frame.v1",
+      turn_id: turnId,
+      goal_kind: goalKind,
+      answer_scope: "current_turn",
+      required_terminal_kind: requiredTerminalKind,
+      allows_workspace_context: true,
+      allows_prior_artifacts: false,
+      classifier_reasons: ["explicit_stage_play_reflection_request"],
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const goalSatisfactionEvaluation = {
+      schema: "helix.goal_satisfaction_evaluation.v1",
+      turn_id: turnId,
+      satisfaction: "not_satisfied",
+      goal_kind: goalKind,
+      required_terminal_kind: requiredTerminalKind,
+      selected_terminal_artifact_kind: "typed_failure",
+      missing_requirements: ["stage_play_reflection_result"],
+      first_broken_rail: "observation",
+      repair_target: "stage_play_reflection_input",
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const goalHash = args.deps.hashGoalFrame(canonicalGoalFrame);
+    const goalSatisfactionArtifact = args.deps.buildGoalSatisfactionEvaluationArtifact({
+      turnId,
+      goalHash,
+      evaluation: goalSatisfactionEvaluation,
+      createdAtMs,
+    });
+    const terminalResult: HelixAskGoldenPathRuntimeTerminalResult = {
+      schema: "helix.ask_golden_path_terminal_result.v1",
+      result_id: terminalResultId,
+      artifact_id: terminalArtifactId,
+      artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      text: failureText,
+      support_refs: [routeGateArtifactId, goalSatisfactionArtifact.artifact_id],
+      terminal_authority_ok: true,
+      route_authority_ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    return {
+      ok: true,
+      mode: "read",
+      schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
+      turn_id: turnId,
+      trace_id: traceId,
+      session_id: sessionId,
+      thread_id: threadId,
+      prompt_text: promptText,
+      response_type: "typed_failure",
+      final_status: "typed_failure",
+      final_answer_source: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      terminal_artifact_id: terminalResult.artifact_id,
+      terminal_error_code: "missing_stage_play_reflection_result",
+      answer: failureText,
+      text: failureText,
+      assistant_answer: failureText,
+      selected_final_answer: failureText,
+      selected_terminal_result_id: terminalResult.result_id,
+      terminal_result: terminalResult,
+      terminal_results: [terminalResult],
+      golden_path_runtime: {
+        schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
+        status: "stage_play_reflection_missing_result",
+        flag: HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
+        requested_capability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
+        executed_capability: null,
+        observed_artifact_kind: null,
+        observed_artifact_ref: null,
+        terminal_artifact_ref: terminalResult.artifact_id,
+        terminal_result_id: terminalResult.result_id,
+        legacy_route_bypassed: true,
+        private_runtime_loop_entered: false,
+        route_gate: "enabled_explicit_request",
+        terminal_result_count: 1,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      canonical_goal_frame: canonicalGoalFrame,
+      capability_plan: {
+        schema: "helix.ask_capability_plan.v1",
+        requested_capability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
+        executed_capability: null,
+        source_target: "stage_play",
+        family: "live_environment",
+        required_observation_kinds: ["stage_play_reflection_result"],
+        required_terminal_kind: requiredTerminalKind,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      goal_satisfaction_evaluation: goalSatisfactionEvaluation,
+      terminal_answer_authority: {
+        schema: "helix.terminal_answer_authority.v1",
+        completed_solver_path: false,
+        selected_terminal_artifact_kind: "typed_failure",
+        terminal_artifact_kind: "typed_failure",
+        selected_terminal_artifact_id: terminalResult.artifact_id,
+        terminal_artifact_id: terminalResult.artifact_id,
+        selected_terminal_result_id: terminalResult.result_id,
+        selected_final_answer: failureText,
+        final_answer_source: "typed_failure",
+        first_broken_rail: "observation",
+        terminal_authority_ok: true,
+        route: "golden_path_runtime / stage_play_reflection",
+        server_authoritative: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_authority_single_writer: {
+        schema: "helix.terminal_authority_single_writer.v1",
+        selected_terminal_artifact_kind: "typed_failure",
+        selected_terminal_artifact_id: terminalResult.artifact_id,
+        selected_terminal_result_id: terminalResult.result_id,
+        visible_text: failureText,
+        source: "typed_failure",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      ask_turn_solver_trace: {
+        schema: "helix.ask_turn_solver_trace.v1",
+        completed_solver_path: false,
+        route_authority_ok: true,
+        terminal_authority_ok: true,
+        goal_satisfaction: "not_satisfied",
+        golden_path_runtime: true,
+        private_runtime_loop_entered: false,
+        requested_capability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
+        executed_capability: null,
+        observed_artifact_kind: null,
+        observed_artifact_ref: null,
+        terminal_artifact_kind: "typed_failure",
+        first_broken_rail: "observation",
+        terminal_error_code: "missing_stage_play_reflection_result",
+        solver_risk_flags: [],
+        solver_short_circuit_flags: [],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: routeGateArtifactId,
+          turn_id: turnId,
+          producer_item_id: "golden_path_runtime",
+          kind: "golden_path_route_gate",
+          terminal_eligible: false,
+          created_at_ms: createdAtMs,
+          source_scope: "current_turn",
+          goal_hash: goalHash,
+          payload: {
+            schema: "helix.golden_path_route_gate.v1",
+            route_gate: "enabled_explicit_request",
+            requested_capability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
+            goal_satisfaction_artifact: goalSatisfactionArtifact,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+        {
+          artifact_id: terminalResult.artifact_id,
+          turn_id: turnId,
+          producer_item_id: "golden_path_runtime",
+          kind: "typed_failure",
+          terminal_eligible: true,
+          created_at_ms: createdAtMs,
+          source_scope: "current_turn",
+          goal_hash: goalHash,
+          payload: {
+            schema: "helix.typed_failure.v1",
+            text: failureText,
+            answer_text: failureText,
+            terminal_error_code: "missing_stage_play_reflection_result",
+            first_broken_rail: "observation",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      ],
+      debug: {
+        schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
+        golden_path_runtime: true,
+        golden_path_runtime_status: "stage_play_reflection_missing_result",
+        private_runtime_loop_entered: false,
+        requested_capability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
+        executed_capability: null,
+        terminal_artifact_kind: "typed_failure",
+        terminal_result_count: 1,
+        final_answer_source: "typed_failure",
+        terminal_error_code: "missing_stage_play_reflection_result",
+        goal_satisfaction_evaluation: goalSatisfactionEvaluation,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+  };
+
+  if (!observation) return makeFailurePayload();
+
+  const graph = readRecord(observation.graph) ?? {};
+  const liveAnswerProjection =
+    readRecord(observation.liveAnswerProjection) ?? readRecord(observation.live_answer_projection) ?? {};
+  const debugReceipt = readRecord(observation.debugReceipt) ?? readRecord(observation.debug_receipt) ?? {};
+  const checkpointFreshness =
+    readRecord(debugReceipt.checkpointFreshness) ?? readRecord(debugReceipt.checkpoint_freshness) ?? {};
+  const graphId =
+    readString(debugReceipt.graphId) ??
+    readString(debugReceipt.graph_id) ??
+    readString(graph.graphId) ??
+    readString(graph.graph_id) ??
+    "stage_play_badge_graph:compact";
+  const sourceRefs = readStringArray(debugReceipt.sourceRefs ?? debugReceipt.source_refs);
+  const projectedLineKeys = readStringArray(
+    liveAnswerProjection.projectedLineKeys ?? liveAnswerProjection.projected_line_keys,
+  );
+  const changedLineKeys = readStringArray(liveAnswerProjection.changedLineKeys ?? liveAnswerProjection.changed_line_keys);
+  const skippedLineKeys = readStringArray(liveAnswerProjection.skippedLineKeys ?? liveAnswerProjection.skipped_line_keys);
+  const checkpointOnlySkipped = readStringArray(
+    liveAnswerProjection.checkpointOnlySkipped ??
+      liveAnswerProjection.checkpoint_only_skipped ??
+      debugReceipt.checkpointOnlySkipped ??
+      debugReceipt.checkpoint_only_skipped,
+  );
+  const projected = readBoolean(liveAnswerProjection.projected) === true;
+  const reason = readString(liveAnswerProjection.reason);
+  const checkpointReviewed =
+    readBoolean(checkpointFreshness.reviewed) ?? readBoolean(checkpointFreshness.modelReviewed) ?? false;
+  const missingEvidence = readStringArray(
+    graph.missingEvidence ?? graph.missing_evidence ?? debugReceipt.missingEvidence ?? debugReceipt.missing_evidence,
+  );
+  const projectedKeys = projectedLineKeys.length ? projectedLineKeys : changedLineKeys;
+  const evidenceRefs = [graphId, ...sourceRefs].filter((ref, index, refs) => refs.indexOf(ref) === index).slice(0, 8);
+  const stagePlayReceipt = {
+    schema: "stage_play_reflection_result/v1",
+    kind: "stage_play_reflection_result",
+    tool_id: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
+    graph,
+    liveAnswerProjection,
+    debugReceipt,
+    projected,
+    reason,
+    source_refs: sourceRefs,
+    evidence_refs: evidenceRefs,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  const answerText = [
+    "Stage Play reflection completed.",
+    `Graph: ${graphId}.`,
+    projected
+      ? `Projected live interpretation: ${projectedKeys.length ? projectedKeys.join(", ") : "projection selected"}.`
+      : `No live interpretation projection was selected${reason ? ` (${reason})` : ""}.`,
+    skippedLineKeys.length ? `Skipped lines: ${skippedLineKeys.join(", ")}.` : null,
+    checkpointOnlySkipped.length ? `Checkpoint-only skipped lines: ${checkpointOnlySkipped.join(", ")}.` : null,
+    `Checkpoint reviewed: ${checkpointReviewed ? "true" : "false"}.`,
+    missingEvidence.length ? `Missing evidence: ${missingEvidence.join(", ")}.` : null,
+    "The Stage Play graph and projection are evidence-only; this answer is a synthesis summary and did not start capture, request checkpoints, or execute world actions.",
+  ]
+    .filter((line): line is string => Boolean(line))
+    .join("\n");
+  const canonicalGoalFrame = {
+    schema: "helix.ask_canonical_goal_frame.v1",
+    turn_id: turnId,
+    goal_kind: goalKind,
+    answer_scope: "current_turn",
+    required_terminal_kind: requiredTerminalKind,
+    allows_workspace_context: true,
+    allows_prior_artifacts: false,
+    classifier_reasons: ["explicit_stage_play_reflection_request"],
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  const goalSatisfactionEvaluation = {
+    schema: "helix.goal_satisfaction_evaluation.v1",
+    turn_id: turnId,
+    satisfaction: "satisfied",
+    goal_kind: goalKind,
+    required_terminal_kind: requiredTerminalKind,
+    selected_terminal_artifact_kind: requiredTerminalKind,
+    missing_requirements: [],
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  const goalHash = args.deps.hashGoalFrame(canonicalGoalFrame);
+  const goalSatisfactionArtifact = args.deps.buildGoalSatisfactionEvaluationArtifact({
+    turnId,
+    goalHash,
+    evaluation: goalSatisfactionEvaluation,
+    createdAtMs,
+  });
+  const terminalResult: HelixAskGoldenPathRuntimeTerminalResult = {
+    schema: "helix.ask_golden_path_terminal_result.v1",
+    result_id: terminalResultId,
+    artifact_id: terminalArtifactId,
+    artifact_kind: requiredTerminalKind,
+    final_answer_source: requiredTerminalKind,
+    text: answerText,
+    support_refs: [observationArtifactId, routeGateArtifactId, goalSatisfactionArtifact.artifact_id, ...sourceRefs],
+    terminal_authority_ok: true,
+    route_authority_ok: true,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+
+  return {
+    ok: true,
+    mode: "read",
+    schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
+    turn_id: turnId,
+    trace_id: traceId,
+    session_id: sessionId,
+    thread_id: threadId,
+    prompt_text: promptText,
+    response_type: "final_answer",
+    final_status: "final_answer",
+    final_answer_source: terminalResult.final_answer_source,
+    terminal_artifact_kind: terminalResult.artifact_kind,
+    terminal_artifact_id: terminalResult.artifact_id,
+    terminal_error_code: null,
+    answer: terminalResult.text,
+    text: terminalResult.text,
+    assistant_answer: terminalResult.text,
+    selected_final_answer: terminalResult.text,
+    selected_terminal_result_id: terminalResult.result_id,
+    terminal_result: terminalResult,
+    terminal_results: [terminalResult],
+    golden_path_runtime: {
+      schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
+      status: "stage_play_reflection",
+      flag: HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
+      requested_capability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
+      selected_capability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
+      executed_capability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
+      observed_artifact_kind: "stage_play_reflection_result",
+      observed_artifact_ref: observationArtifactId,
+      terminal_artifact_ref: terminalArtifactId,
+      terminal_result_id: terminalResultId,
+      legacy_route_bypassed: true,
+      legacy_fallback_possible_when_unhandled: true,
+      private_runtime_loop_entered: false,
+      route_gate: "enabled_explicit_request",
+      terminal_result_count: 1,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    canonical_goal_frame: canonicalGoalFrame,
+    stage_play_reflection_result: stagePlayReceipt,
+    stage_play_reflection_answer: {
+      schema: "helix.stage_play_reflection_answer.v1",
+      graph_id: graphId,
+      text: terminalResult.text,
+      answer_text: terminalResult.text,
+      support_refs: terminalResult.support_refs,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    model_turn_input: {
+      schema: "helix.ask_model_turn_input.v1",
+      turn_id: turnId,
+      prompt_text: promptText,
+      available_capabilities: [HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY],
+      function_call_outputs: [
+        {
+          call_id: `${turnId}:call:reflect_stage_play_context`,
+          name: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
+          output_ref: observationArtifactId,
+          output_kind: "stage_play_reflection_result",
+        },
+      ],
+      model_visible_artifacts: [observationArtifactId, goalSatisfactionArtifact.artifact_id],
+      loop_policy: {
+        max_model_steps: 1,
+        private_runtime_loop_entered: false,
+      },
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    capability_plan: {
+      schema: "helix.ask_capability_plan.v1",
+      requested_capability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
+      selected_capability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
+      executed_capability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
+      source_target: "stage_play",
+      family: "live_environment",
+      required_observation_kinds: ["stage_play_reflection_result"],
+      required_terminal_kind: requiredTerminalKind,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    goal_satisfaction_evaluation: goalSatisfactionEvaluation,
+    terminal_answer_authority: {
+      schema: "helix.terminal_answer_authority.v1",
+      selected_terminal_artifact_kind: terminalResult.artifact_kind,
+      terminal_artifact_kind: terminalResult.artifact_kind,
+      selected_terminal_artifact_id: terminalResult.artifact_id,
+      terminal_artifact_id: terminalResult.artifact_id,
+      selected_terminal_result_id: terminalResult.result_id,
+      selected_final_answer: terminalResult.text,
+      final_answer_source: terminalResult.final_answer_source,
+      terminal_authority_ok: true,
+      route: "golden_path_runtime / stage_play_reflection",
+      server_authoritative: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    terminal_authority_single_writer: {
+      schema: "helix.terminal_authority_single_writer.v1",
+      selected_terminal_artifact_kind: terminalResult.artifact_kind,
+      selected_terminal_artifact_id: terminalResult.artifact_id,
+      selected_terminal_result_id: terminalResult.result_id,
+      visible_text: terminalResult.text,
+      source: terminalResult.final_answer_source,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    ask_turn_solver_trace: {
+      schema: "helix.ask_turn_solver_trace.v1",
+      completed_solver_path: true,
+      route_authority_ok: true,
+      terminal_authority_ok: true,
+      goal_satisfaction: "satisfied",
+      golden_path_runtime: true,
+      private_runtime_loop_entered: false,
+      requested_capability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
+      selected_capability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
+      executed_capability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
+      observed_artifact_kind: "stage_play_reflection_result",
+      observed_artifact_ref: observationArtifactId,
+      terminal_artifact_kind: terminalResult.artifact_kind,
+      solver_risk_flags: [],
+      solver_short_circuit_flags: [],
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    current_turn_artifact_ledger: [
+      {
+        artifact_id: routeGateArtifactId,
+        turn_id: turnId,
+        producer_item_id: "golden_path_runtime",
+        kind: "golden_path_route_gate",
+        terminal_eligible: false,
+        created_at_ms: createdAtMs,
+        source_scope: "current_turn",
+        goal_hash: goalHash,
+        payload: {
+          schema: "helix.golden_path_route_gate.v1",
+          route_gate: "enabled_explicit_request",
+          requested_capability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
+          goal_satisfaction_artifact: goalSatisfactionArtifact,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+      {
+        artifact_id: observationArtifactId,
+        turn_id: turnId,
+        producer_item_id: "golden_path_runtime",
+        kind: "stage_play_reflection_result",
+        terminal_eligible: false,
+        created_at_ms: createdAtMs,
+        source_scope: "current_turn",
+        goal_hash: goalHash,
+        payload: stagePlayReceipt,
+      },
+      {
+        artifact_id: terminalArtifactId,
+        turn_id: turnId,
+        producer_item_id: "golden_path_runtime",
+        kind: requiredTerminalKind,
+        terminal_eligible: true,
+        created_at_ms: createdAtMs,
+        source_scope: "current_turn",
+        goal_hash: goalHash,
+        payload: {
+          schema: "helix.stage_play_reflection_answer.v1",
+          graph_id: graphId,
+          text: terminalResult.text,
+          answer_text: terminalResult.text,
+          terminal_result_id: terminalResult.result_id,
+          support_refs: terminalResult.support_refs,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    ],
+    debug: {
+      schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
+      golden_path_runtime: true,
+      golden_path_runtime_status: "stage_play_reflection",
+      private_runtime_loop_entered: false,
+      requested_capability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
+      selected_capability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
+      executed_capability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
+      observed_artifact_kind: "stage_play_reflection_result",
+      observed_artifact_ref: observationArtifactId,
+      terminal_artifact_kind: terminalResult.artifact_kind,
+      terminal_result_count: 1,
+      final_answer_source: terminalResult.final_answer_source,
+      goal_satisfaction_evaluation: goalSatisfactionEvaluation,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+  };
+};
+
