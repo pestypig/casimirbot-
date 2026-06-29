@@ -14,7 +14,10 @@ import {
   buildGoldenPathPayloadLedgerArtifact,
   buildGoldenPathRouteGateLedgerArtifact,
 } from "../artifact-ledger";
-import { isHelixAskGoldenPathInternetResearchReflectionCompoundRequested } from "../compound-contract";
+import {
+  buildGoldenPathCompoundCapabilityContract,
+  isHelixAskGoldenPathInternetResearchReflectionCompoundRequested,
+} from "../compound-contract";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
@@ -330,37 +333,29 @@ export const buildHelixAskGoldenPathInternetResearchReflectionCompoundPayload = 
     assistant_answer: false,
     raw_content_included: false,
   };
-  const compoundCapabilityContract = {
-    schema: "helix.compound_capability_contract.v1",
-    turn_id: turnId,
-    ordered_subgoals: [
+  const compoundCapabilityContract = buildGoldenPathCompoundCapabilityContract({
+    turnId,
+    subgoals: [
       {
-        subgoal_id: `${turnId}:subgoal:internet_search`,
-        requested_capability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
-        selected_capability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
-        executed_capability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
+        subgoalIdSuffix: "internet_search",
+        requestedCapability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
+        selectedCapability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
+        executedCapability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
         args: { query },
-        observation_kind: "internet_search_observation",
-        observation_ref: internetObservationArtifactId,
-        terminal_contribution_kind: "internet_search_answer",
-        satisfaction: "satisfied",
+        observationKind: "internet_search_observation",
+        observationRef: internetObservationArtifactId,
+        terminalContributionKind: "internet_search_answer",
       },
       {
-        subgoal_id: `${turnId}:subgoal:theory_reflection`,
-        requested_capability: HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
-        selected_capability: HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
-        executed_capability: HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
+        subgoalIdSuffix: "theory_reflection",
+        requestedCapability: HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
         args: { topic, anchors },
-        observation_kind: "helix_theory_context_reflection_tool_receipt",
-        observation_ref: reflectionObservationArtifactId,
-        terminal_contribution_kind: "theory_context_reflection_answer",
-        satisfaction: "satisfied",
+        observationKind: "helix_theory_context_reflection_tool_receipt",
+        observationRef: reflectionObservationArtifactId,
+        terminalContributionKind: "theory_context_reflection_answer",
       },
     ],
-    satisfaction: "satisfied",
-    assistant_answer: false,
-    raw_content_included: false,
-  };
+  });
   const answerText = [
     "Compound research/reflection synthesis completed.",
     `Research query: ${query}`,
