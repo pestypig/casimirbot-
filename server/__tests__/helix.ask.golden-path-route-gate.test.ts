@@ -546,4 +546,53 @@ describe("Helix Ask golden-path route gate", () => {
       }),
     );
   });
+
+  it("routes stream compound turns through the golden-path runtime before legacy carryover", async () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+    const app = createApp();
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn/stream")
+      .send({
+        turn_id: "ask:test:golden-stream-docs-calculator",
+        prompt: "helix_ask_golden_path_runtime use docs-viewer.locate_in_doc and scientific-calculator.solve_expression",
+        goldenPathRuntime: true,
+        requested_capabilities: [
+          HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+          HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+        ],
+        doc_path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        query: "Casimir tile newtons load bearing",
+        doc_content: "The Casimir tile generation table reports a load bearing force of 10 newtons per tile.",
+        calculator_expression: "10 * 0.224809",
+      })
+      .expect(200);
+    const finalEvent = parseSseEvents(response.text).find((event) => event.event === "turn_final");
+    const ledgerKinds =
+      (finalEvent?.data.current_turn_artifact_ledger as Array<{ kind?: string }> | undefined)?.map((artifact) => artifact.kind) ?? [];
+
+    expect(finalEvent?.data).toMatchObject({
+      final_status: "final_answer",
+      terminal_artifact_kind: "compound_evidence_synthesis_answer",
+      final_answer_source: "compound_evidence_synthesis_answer",
+      terminal_error_code: null,
+      stream_used: true,
+      stream_mode: "golden_path_runtime",
+      ask_turn_solver_trace: {
+        completed_solver_path: true,
+        requested_capability: "compound_capability_contract",
+        observed_artifact_kind: "compound_subgoal_observations",
+        terminal_artifact_kind: "compound_evidence_synthesis_answer",
+        compound_subgoal_count: 2,
+      },
+    });
+    expect((finalEvent?.data.debug as { golden_path_runtime?: unknown } | undefined)?.golden_path_runtime).toEqual(
+      expect.objectContaining({
+        legacy_route_bypassed: true,
+      }),
+    );
+    expect(ledgerKinds).toContain("doc_location_matches");
+    expect(ledgerKinds).toContain("calculator_receipt");
+    expect(ledgerKinds.filter((kind) => kind === "compound_evidence_synthesis_answer")).toHaveLength(1);
+  });
 });
