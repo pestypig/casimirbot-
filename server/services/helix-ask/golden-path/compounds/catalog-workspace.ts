@@ -15,7 +15,6 @@ import {
   isHelixAskGoldenPathCatalogWorkspaceCompoundRequested,
 } from "../compound-contract";
 import {
-  HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
   HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
   HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,
@@ -31,6 +30,7 @@ import {
   buildGoldenPathTerminalResult,
 } from "../terminal-envelope";
 import { buildGoldenPathSolverTrace } from "../solver-trace";
+import { buildGoldenPathRuntimeStatus } from "../runtime-status";
 
 export type HelixAskGoldenPathCatalogWorkspaceCompoundDependencies = {
   now: () => Date;
@@ -149,25 +149,18 @@ export const buildHelixAskGoldenPathCatalogWorkspaceCompoundPayload = (args: {
     selected_terminal_result_id: terminalResult.result_id,
     terminal_result: terminalResult,
     terminal_results: [terminalResult],
-    golden_path_runtime: {
-      schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
+    golden_path_runtime: buildGoldenPathRuntimeStatus({
       status: "catalog_workspace_compound",
-      flag: HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
-      requested_capability: "compound_capability_contract",
-      selected_capability: "compound_capability_contract",
-      executed_capability: "compound_capability_contract",
-      observed_artifact_kind: "compound_subgoal_observations",
-      observed_artifact_ref: catalogObservationArtifactId,
-      terminal_artifact_ref: terminalArtifactId,
-      terminal_result_id: terminalResultId,
-      legacy_route_bypassed: true,
-      legacy_fallback_possible_when_unhandled: true,
-      private_runtime_loop_entered: false,
-      route_gate: "enabled_explicit_request",
-      terminal_result_count: 1,
-      assistant_answer: false,
-      raw_content_included: false,
-    },
+      requestedCapability: "compound_capability_contract",
+      selectedCapability: "compound_capability_contract",
+      executedCapability: "compound_capability_contract",
+      observedArtifactKind: "compound_subgoal_observations",
+      observedArtifactRef: catalogObservationArtifactId,
+      terminalArtifactRef: terminalArtifactId,
+      terminalResultId,
+      legacyFallbackPossibleWhenUnhandled: true,
+      routeGate: "enabled_explicit_request",
+    }),
     canonical_goal_frame: canonicalGoalFrame,
     compound_capability_contract: compoundCapabilityContract,
     capability_registry: catalogObservation,
