@@ -5,10 +5,16 @@ import {
 } from "../workstation-tool-gateway/registry";
 import type { HelixWorkstationGatewayCallResult } from "../workstation-tool-gateway/types";
 import { planWorkstationToolUse } from "../workstation-tool-planner";
+import {
+  HELIX_WORKSPACE_OS_STATUS_CAPABILITY,
+  isWorkspaceOsStatusPrompt,
+  workspaceOsStatusReasonCodes,
+} from "../workspace-os-status-intent";
 
 const WORKSTATION_ACTIVE_CONTEXT_CAPABILITY = "workstation.active_context" as const;
 const CALCULATOR_SOLVE_EXPRESSION_CAPABILITY = "scientific-calculator.solve_expression" as const;
 const CALCULATOR_ACTIVE_CONTEXT_CAPABILITY = "scientific-calculator.active_context" as const;
+const WORKSPACE_OS_STATUS_CAPABILITY = HELIX_WORKSPACE_OS_STATUS_CAPABILITY;
 const REPO_SEARCH_CAPABILITY = "repo.search" as const;
 const DOCS_SEARCH_CAPABILITY = "docs.search" as const;
 const DOCS_OPEN_DOC_CAPABILITY = "docs-viewer.open_doc" as const;
@@ -51,8 +57,11 @@ const unquotePrompt = (prompt: string): string => prompt.replace(/"[^"]*"|'[^']*
 
 const hasNegatedToolInstruction = (prompt: string, toolPattern: RegExp): boolean => {
   const unquoted = unquotePrompt(prompt);
-  const negated = /\b(?:do\s+not|don't|dont|without|no\s+need\s+to|not\s+asking\s+to|avoid)\b[\s\S]{0,100}/i;
-  return negated.test(unquoted) && toolPattern.test(unquoted);
+  const negated = /\b(?:do\s+not|don't|dont|without|no\s+need\s+to|not\s+asking\s+to|avoid)\b[\s\S]{0,100}/gi;
+  for (const match of unquoted.matchAll(negated)) {
+    if (toolPattern.test(match[0] ?? "")) return true;
+  }
+  return false;
 };
 
 const requestKey = (request: Record<string, unknown>): string => {
@@ -387,6 +396,20 @@ export const buildStructuredAdmissionWorkstationGatewayCallRequests = (
         },
       });
     }
+    if (selectedCapability === WORKSPACE_OS_STATUS_CAPABILITY) {
+      const key = `${WORKSPACE_OS_STATUS_CAPABILITY}:${query}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      requests.push({
+        schema: "helix.workstation_gateway.structured_admission_call_request.v1",
+        derivation_source: "helix_structured_source_target_admission",
+        capability_id: WORKSPACE_OS_STATUS_CAPABILITY,
+        mode: "observe",
+        arguments: {
+          source_target_intent: sourceTargetIntent,
+        },
+      });
+    }
   }
   return requests.slice(0, 6);
 };
@@ -514,13 +537,30 @@ const extractRepoSearchQueryFromPrompt = (prompt: string): string | null => {
   const exact =
     unquoted.match(/\b(?:search|grep|look\s+(?:in|through)|find)\s+(?:the\s+)?(?:repo|repository|codebase|source|code)\s+(?:for|about)\s+([A-Za-z0-9_.:/\\-]{3,80})/i)?.[1] ??
     unquoted.match(/\b(?:repo|repository|codebase|source|code)\s+(?:search|grep)\s+(?:for|about)\s+([A-Za-z0-9_.:/\\-]{3,80})/i)?.[1] ??
+    unquoted.match(/\b(?:find|locate)\s+([A-Za-z0-9_.:/\\-]{3,80})\s+in\s+(?:the\s+)?(?:repo|repository|codebase|source|code)\b/i)?.[1] ??
     null;
   if (exact) return exact.replace(/[.,;:!?)]*$/g, "").trim();
   if (!/\b(?:repo|repository|codebase|source|implementation|where\s+(?:is|are).+\b(?:implemented|defined|handled))\b/i.test(unquoted)) {
     return null;
   }
   const fallback = unquoted.match(/\b([A-Za-z][A-Za-z0-9_.-]{2,80})\b(?=[^.!?]*\b(?:repo|repository|codebase|source|implementation)\b)/i)?.[1];
-  return fallback?.trim() ?? null;
+  const normalizedFallback = fallback?.trim() ?? null;
+  if (
+    normalizedFallback &&
+    /^(?:search|grep|look|find|locate|show|tell|use|check|inspect|scan)$/i.test(normalizedFallback)
+  ) {
+    return null;
+  }
+  return normalizedFallback;
+};
+
+const hasAffirmativeRepoSearchIntent = (prompt: string): boolean => {
+  if (hasNegatedToolInstruction(prompt, /\b(?:repo|repository|code|source|implementation|search)\b/i)) return false;
+  const unquoted = unquotePrompt(prompt);
+  return (
+    /\b(?:search|grep|look\s+(?:in|through)|find|locate)\s+(?:the\s+)?(?:repo|repository|codebase|source|code)\b/i.test(unquoted) ||
+    /\b(?:repo|repository|codebase|source|code)\s+(?:search|grep|lookup|look\s*up)\b/i.test(unquoted)
+  );
 };
 
 export const buildPromptDerivedRepoSearchGatewayCallRequests = (
@@ -529,19 +569,40 @@ export const buildPromptDerivedRepoSearchGatewayCallRequests = (
   const prompt = readPrompt(body);
   if (!prompt) return [];
   const query = extractRepoSearchQueryFromPrompt(prompt);
-  if (!query) return [];
+  if (!query && !hasAffirmativeRepoSearchIntent(prompt)) return [];
   return [{
     schema: "helix.workstation_gateway.prompt_derived_repo_search_call_request.v1",
     derivation_source: "helix_prompt_derived_repo_search",
     capability_id: REPO_SEARCH_CAPABILITY,
     mode: "read",
     arguments: {
-      query,
+      ...(query ? { query } : {}),
       source_target_intent: {
         source: "helix_prompt_derived_repo_search",
         target_source: "repo_code",
         target_kind: "repo_search",
-        query,
+        ...(query ? { query } : { blocked_reason: "missing_query" }),
+      },
+    },
+  }];
+};
+
+export const buildPromptDerivedWorkspaceStatusGatewayCallRequests = (
+  body: Record<string, unknown>,
+): Record<string, unknown>[] => {
+  const prompt = readPrompt(body);
+  if (!prompt || !isWorkspaceOsStatusPrompt(prompt)) return [];
+  return [{
+    schema: "helix.workstation_gateway.prompt_derived_workspace_status_call_request.v1",
+    derivation_source: "helix_prompt_derived_workspace_status",
+    capability_id: WORKSPACE_OS_STATUS_CAPABILITY,
+    mode: "observe",
+    arguments: {
+      source_target_intent: {
+        source: "helix_prompt_derived_workspace_status",
+        target_source: "workspace_os",
+        target_kind: "workspace_status",
+        reason_codes: workspaceOsStatusReasonCodes(prompt),
       },
     },
   }];
@@ -564,6 +625,7 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   appendDedupe(requests, seen, activeCalculatorContext);
   const activeWorkstationContext = buildActiveWorkstationContextGatewayCallRequests(input.body);
   appendDedupe(requests, seen, activeWorkstationContext);
+  appendDedupe(requests, seen, buildPromptDerivedWorkspaceStatusGatewayCallRequests(input.body));
   appendDedupe(requests, seen, buildPlannerDerivedWorkstationGatewayCallRequests(input.body));
   appendDedupe(requests, seen, buildPromptDerivedRepoSearchGatewayCallRequests(input.body));
   return requests.slice(0, 6);

@@ -1368,6 +1368,23 @@ export async function runRepoSearch(plan: RepoSearchPlan): Promise<RepoSearchRes
           ),
         };
       }
+      try {
+        const fallback = await runNodeFallbackRepoSearch(plan.terms, targetPaths);
+        return {
+          hits: fallback.hits,
+          truncated: truncated || fallback.truncated,
+          search_backend: "node_fallback",
+          search_backend_bin: null,
+          search_backend_reason: "ripgrep_failed",
+          stage0: applyStage0HitRate(
+            stage0Prefilter.telemetry,
+            stage0Prefilter.candidates.map((filePath) => ({ filePath })),
+            fallback.hits,
+          ),
+        };
+      } catch {
+        // Preserve the original ripgrep failure when the bounded fallback cannot complete.
+      }
       return {
         hits,
         truncated,

@@ -64,6 +64,14 @@ function firstRecord(...values: unknown[]): RecordLike | null {
   return null;
 }
 
+function firstRecordFromArray(value: unknown): RecordLike | null {
+  for (const entry of readArray(value)) {
+    const record = readRecord(entry);
+    if (record) return record;
+  }
+  return null;
+}
+
 function firstText(...values: unknown[]): string {
   for (const value of values) {
     const text = normalizeTerminalText(value);
@@ -287,6 +295,12 @@ export function resolveHelixVisibleTerminal(
   const envelope = firstRecord(record?.terminal_answer_envelope, debug?.terminal_answer_envelope, agentLoop?.terminal_answer_envelope);
   const authority = firstRecord(record?.terminal_answer_authority, debug?.terminal_answer_authority, agentLoop?.terminal_answer_authority);
   const presentation = firstRecord(record?.terminal_presentation, debug?.terminal_presentation, agentLoop?.terminal_presentation);
+  const terminalResult = firstRecord(
+    record?.terminal_result,
+    debug?.terminal_result,
+    firstRecordFromArray(record?.terminal_results),
+    firstRecordFromArray(debug?.terminal_results),
+  );
   const summary = firstRecord(record?.resolved_turn_summary, debug?.resolved_turn_summary);
   const sourceCapabilityTurn = isSourceOrCapabilityTurn({ record, debug, agentLoop });
   const recoveredModelDirectAnswer =
@@ -304,6 +318,8 @@ export function resolveHelixVisibleTerminal(
       singleWriter?.selectedArtifactKind,
       authority?.terminal_artifact_kind,
       envelope?.terminal_artifact_kind,
+      terminalResult?.terminal_artifact_kind,
+      terminalResult?.artifact_kind,
       presentation?.terminal_artifact_kind,
       record?.terminal_artifact_kind,
       debug?.terminal_artifact_kind,
@@ -314,12 +330,14 @@ export function resolveHelixVisibleTerminal(
       singleWriter?.source,
       authority?.final_answer_source,
       envelope?.final_answer_source,
+      terminalResult?.final_answer_source,
       record?.final_answer_source,
       debug?.final_answer_source,
     ) ||
     null;
   const finalAnswerSource = normalizeFinalAnswerSourceForTerminalKind(rawFinalAnswerSource, terminalArtifactKind);
   const envelopeText = firstText(envelope?.terminal_text);
+  const terminalResultText = firstText(terminalResult?.text, terminalResult?.answer_text);
   const terminalAuthorityIndicatesSuccess =
     Boolean(authority?.server_authoritative === true) &&
     readString(authority?.terminal_kind) !== "failure" &&
@@ -337,8 +355,15 @@ export function resolveHelixVisibleTerminal(
     readString(envelope?.terminal_kind) !== "failure" &&
     readString(envelope?.final_answer_source) !== "typed_failure" &&
     readString(envelope?.terminal_artifact_kind) !== "typed_failure";
+  const terminalResultIndicatesSuccess =
+    Boolean(terminalResultText) &&
+    readString(terminalResult?.artifact_kind) !== "typed_failure" &&
+    readString(terminalResult?.terminal_artifact_kind) !== "typed_failure" &&
+    readString(terminalResult?.final_answer_source) !== "typed_failure" &&
+    terminalResult?.terminal_authority_ok !== false &&
+    terminalResult?.route_authority_ok !== false;
   const terminalErrorCode =
-    envelopeIndicatesSuccess || terminalAuthorityIndicatesSuccess || singleWriterIndicatesSuccess
+    envelopeIndicatesSuccess || terminalAuthorityIndicatesSuccess || singleWriterIndicatesSuccess || terminalResultIndicatesSuccess
       ? null
       : firstTerminalErrorCode(record?.terminal_error_code, debug?.terminal_error_code, summary?.terminal_error_code) || null;
   const effectiveFinalAnswerSource = finalAnswerSource || (terminalErrorCode ? "typed_failure" : null);
@@ -361,6 +386,20 @@ export function resolveHelixVisibleTerminal(
       finalAnswerSource: effectiveFinalAnswerSource,
       terminalErrorCode,
       authorityVerified,
+      usedLegacyShadow: false,
+    };
+  }
+
+  if (terminalResultText && terminalResultIndicatesSuccess) {
+    return {
+      text: terminalResultText,
+      source: "golden_path_terminal_result",
+      backendTerminalText: terminalResultText,
+      terminalKind,
+      terminalArtifactKind,
+      finalAnswerSource: effectiveFinalAnswerSource,
+      terminalErrorCode,
+      authorityVerified: true,
       usedLegacyShadow: false,
     };
   }

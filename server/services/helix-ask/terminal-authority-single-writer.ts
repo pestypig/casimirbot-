@@ -598,6 +598,23 @@ export function syncHelixTypedFailureAuthorityPublicMirrors(
   };
   writeCompoundSubgoalRailFailureDetails(payload, compoundSubgoalRailFailure);
 
+  const routeAuthority = readRecord(payload.route_authority_audit);
+  const routeAuthorityViolations = Array.isArray(routeAuthority?.violation_codes)
+    ? routeAuthority.violation_codes
+    : [];
+  const typedFailureHasNoRouteViolation = routeAuthority && routeAuthorityViolations.length === 0;
+  if (typedFailureHasNoRouteViolation) {
+    payload.route_authority_audit = {
+      ...routeAuthority,
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      terminal_artifact_allowed: true,
+      route_authority_ok: true,
+      primary_violation_code: null,
+      route_authority_violation_code: null,
+    };
+  }
+
   const resolvedTurnSummary = readRecord(payload.resolved_turn_summary);
   if (resolvedTurnSummary) {
     payload.resolved_turn_summary = {
@@ -654,6 +671,7 @@ export function syncHelixTypedFailureAuthorityPublicMirrors(
     debug.assistant_answer = failureText;
     debug.typed_failure = payload.typed_failure;
     debug.terminal_answer_authority = payload.terminal_answer_authority;
+    if (payload.route_authority_audit) debug.route_authority_audit = payload.route_authority_audit;
     if (payload.terminal_presentation) debug.terminal_presentation = payload.terminal_presentation;
     if (Array.isArray(payload.current_turn_artifact_ledger)) {
       debug.current_turn_artifact_ledger = payload.current_turn_artifact_ledger;

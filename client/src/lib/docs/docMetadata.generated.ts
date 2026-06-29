@@ -3029,7 +3029,7 @@ export const DOC_FILE_METADATA: Record<string, DocFileMetadata> = {
   "docs/helix-ask-flow.md": {"mtimeMs":1773003691447,"mtimeIso":"2026-03-08T21:01:31.447Z","sizeBytes":6779},
   "docs/helix-ask-follow-up-patch-instructions.md": {"mtimeMs":1777311987487,"mtimeIso":"2026-04-27T17:46:27.487Z","sizeBytes":9025},
   "docs/helix-ask-future-implementation-roadmap.md": {"mtimeMs":1776828121481,"mtimeIso":"2026-04-22T03:22:01.481Z","sizeBytes":10358},
-  "docs/helix-ask-golden-path-runtime.md": {"mtimeMs":1782706773529,"mtimeIso":"2026-06-29T04:19:33.529Z","sizeBytes":7158},
+  "docs/helix-ask-golden-path-runtime.md": {"mtimeMs":1782742811293,"mtimeIso":"2026-06-29T14:20:11.293Z","sizeBytes":7632},
   "docs/helix-ask-home-stretch-deep-research-prompt-2026-03-23.md": {"mtimeMs":1774302385691,"mtimeIso":"2026-03-23T21:46:25.691Z","sizeBytes":5903},
   "docs/helix-ask-home-stretch-plan.md": {"mtimeMs":1774304344024,"mtimeIso":"2026-03-23T22:19:04.024Z","sizeBytes":43759},
   "docs/helix-ask-ladder.md": {"mtimeMs":1772212003008,"mtimeIso":"2026-02-27T17:06:43.008Z","sizeBytes":6244},

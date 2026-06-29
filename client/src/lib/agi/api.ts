@@ -250,6 +250,15 @@ export type LocalAskResponse = {
   terminal_artifact_kind?: string | null;
   terminal_artifact_id?: string | null;
   terminal_artifact_owner_turn_id?: string | null;
+  terminal_result?: Record<string, unknown> | null;
+  terminal_results?: unknown[];
+  debug_export_ref?: Record<string, unknown> | null;
+  backend_debug_response_ref?: Record<string, unknown> | null;
+  golden_path_runtime?: Record<string, unknown> | null;
+  golden_path_runtime_status?: string | null;
+  stream_mode?: string | null;
+  server_build_commit?: string | null;
+  server_build_started_at_ms?: number | null;
   final_artifact_scope?: string | null;
   satisfaction_report?: Record<string, unknown> | null;
   current_turn_artifact_ledger?: unknown[];

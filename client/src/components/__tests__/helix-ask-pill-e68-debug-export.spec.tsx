@@ -332,6 +332,30 @@ describe("helix ask pill E68 debug export envelope", () => {
             raw_content_included: false,
           },
         ],
+        turn_transcript_events: [
+          {
+            source_event_type: "runtime_selected",
+            text: "Runtime selected: Codex Workstation Mode.",
+          },
+          {
+            source_event_type: "tool_request",
+            capability_id: "scientific-calculator.solve_expression",
+            text: "Tool request: scientific-calculator.solve_expression.",
+          },
+          {
+            source_event_type: "tool_observation",
+            capability_id: "scientific-calculator.solve_expression",
+            text: "Tool observation: scientific-calculator.solve_expression observed 6*7 = 42.",
+          },
+          {
+            source_event_type: "model_reentry",
+            text: "Model re-entry: Codex received the workstation observation packet(s) before final answer.",
+          },
+          {
+            source_event_type: "terminal_answer",
+            text: "The calculator observation reports 42.",
+          },
+        ],
         provider_reasoning_reentry: {
           schema: "helix.provider_reasoning_reentry.v1",
           status: "completed",
@@ -387,6 +411,17 @@ describe("helix ask pill E68 debug export envelope", () => {
       post_tool_model_step_required: true,
       assistant_answer: false,
       raw_content_included: false,
+    });
+    expect(parsed.turn_transcript_events.map((event: any) => event.source_event_type)).toEqual([
+      "runtime_selected",
+      "tool_request",
+      "tool_observation",
+      "model_reentry",
+      "terminal_answer",
+    ]);
+    expect(parsed.turn_transcript_events[2]).toMatchObject({
+      capability_id: "scientific-calculator.solve_expression",
+      text: "Tool observation: scientific-calculator.solve_expression observed 6*7 = 42.",
     });
     expect(parsed.provider_reasoning_reentry).toMatchObject({
       status: "completed",

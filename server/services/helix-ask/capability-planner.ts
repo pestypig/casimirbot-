@@ -84,6 +84,9 @@ const isAffirmativeAgentGoalSessionCommand = (promptText: string): boolean => {
   );
 };
 
+const isProcedureMemoryPrompt = (promptText: string): boolean =>
+  /\b(?:compare|compared|changed|difference|different)\b[\s\S]{0,140}\b(?:last|previous|prior)\s+(?:scene|epoch|frame|visual|screen|capture)\b|\b(?:last|previous|prior)\s+(?:scene|epoch|frame|visual|screen|capture)\b[\s\S]{0,140}\b(?:compare|compared|changed|difference|different|running)\b|\bscene\s+epoch\b/i.test(promptText);
+
 const classifySourceFamily = (input: {
   promptText: string;
   sourceTarget: string;
@@ -178,11 +181,12 @@ const classifySourceFamily = (input: {
   ) {
     return "live_environment";
   }
-  if (input.sourceTarget === "visual_capture" || /\b(?:screen|visual|capture|screenshot|frame)\b/.test(prompt)) {
-    return "visual_capture";
-  }
   if (input.sourceTarget === "procedure_memory" || input.sourceTarget === "situation_epoch" || input.targetKind === "situation_epoch") {
     return "procedure_memory";
+  }
+  if (isProcedureMemoryPrompt(input.promptText)) return "procedure_memory";
+  if (input.sourceTarget === "visual_capture" || /\b(?:screen|visual|capture|screenshot|frame)\b/.test(prompt)) {
+    return "visual_capture";
   }
   if (input.sourceTarget === "repo_code" || input.admittedFamilies.includes("repo_code")) return "repo_evidence";
   if (input.sourceTarget === "process_graph" || input.admittedFamilies.includes("process_graph")) return "process_graph";
@@ -699,6 +703,7 @@ export const buildCapabilityPlan = (input: {
     (requiresAgentGoalSessionSetup ? "live_environment" : "") ||
     (requiresCapabilityCatalog ? "runtime_evidence" : "") ||
     (requiresRepoConceptEvidence ? "repo_code" : "") ||
+    (isProcedureMemoryPrompt(input.promptText) ? "procedure_memory" : "") ||
     sourceTargetIntentFallback ||
     (explicitDocsPathOperation ? "" : routeMetadataSourceTarget(routeMetadata)) ||
     readString(routeProductContract?.source_target) ||

@@ -4,7 +4,9 @@ import {
   buildPlannerDerivedWorkstationGatewayCallRequests,
   buildStructuredAdmissionWorkstationGatewayCallRequests,
   buildPromptDerivedRepoSearchGatewayCallRequests,
+  buildPromptDerivedWorkspaceStatusGatewayCallRequests,
   readWorkstationGatewayCallRequestsForTurn,
+  runExplicitWorkstationGatewayCalls,
 } from "../explicit-workstation-gateway";
 
 const docSnapshot = {
@@ -94,6 +96,34 @@ describe("explicit workstation gateway derived calls", () => {
     ]);
     expect(requests[2]).toMatchObject({
       capability_id: "repo.search",
+      arguments: {
+        query: "workstation_gateway",
+      },
+    });
+  });
+
+  it("keeps the live Codex compound wording as docs, calculator, and repo requests", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "Use the current document, calculate 6*7, search the repo for workstation_gateway, then summarize what the observations prove and do not prove.",
+        workspace_context_snapshot: docSnapshot,
+      },
+    });
+
+    expect(capabilities(requests)).toEqual([
+      "docs.search",
+      "scientific-calculator.solve_expression",
+      "repo.search",
+    ]);
+    expect(requests.find((request) => request.capability_id === "scientific-calculator.solve_expression")).toMatchObject({
+      arguments: {
+        expression: "6*7",
+      },
+    });
+    expect(requests.find((request) => request.capability_id === "repo.search")).toMatchObject({
       arguments: {
         query: "workstation_gateway",
       },
@@ -220,5 +250,144 @@ describe("explicit workstation gateway derived calls", () => {
     });
 
     expect(requests).toEqual([]);
+  });
+
+  it("maps natural repo search variants named in the contract", () => {
+    const prompts = [
+      "Find workstation_gateway in the repository.",
+      "Look in the codebase for workstation_gateway.",
+    ];
+
+    for (const question of prompts) {
+      expect(buildPromptDerivedRepoSearchGatewayCallRequests({
+        agent_runtime: "codex",
+        question,
+      })).toEqual([
+        expect.objectContaining({
+          capability_id: "repo.search",
+          mode: "read",
+          arguments: expect.objectContaining({
+            query: "workstation_gateway",
+          }),
+        }),
+      ]);
+    }
+  });
+
+  it("keeps underspecified affirmative repo search as an explicit blocked-capable request", () => {
+    const requests = buildPromptDerivedRepoSearchGatewayCallRequests({
+      agent_runtime: "codex",
+      question: "Search the repo and tell me what you find.",
+    });
+
+    expect(requests).toEqual([
+      expect.objectContaining({
+        capability_id: "repo.search",
+        mode: "read",
+        arguments: expect.objectContaining({
+          source_target_intent: expect.objectContaining({
+            target_source: "repo_code",
+            target_kind: "repo_search",
+            blocked_reason: "missing_query",
+          }),
+        }),
+      }),
+    ]);
+    expect((requests[0].arguments as Record<string, unknown>).query).toBeUndefined();
+  });
+
+  it("turns underspecified repo search into a typed gateway block instead of silently dropping it", async () => {
+    const results = await runExplicitWorkstationGatewayCalls({
+      agentRuntime: "codex",
+      body: {
+        agent_runtime: "codex",
+        question: "Search the repo and tell me what you find.",
+      },
+      turnId: "ask:test:repo-search-missing-query",
+    });
+
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({
+      ok: false,
+      capability_id: "repo.search",
+      error: "missing_query",
+      gateway_admission: {
+        admission_status: "blocked",
+        blocked_reason: "missing_query",
+      },
+      observation_packet: {
+        status: "blocked",
+        terminal_eligible: false,
+        assistant_answer: false,
+      },
+    });
+  });
+
+  it("maps workspace status prompts to workspace_os.status observations", () => {
+    const requests = buildPromptDerivedWorkspaceStatusGatewayCallRequests({
+      agent_runtime: "codex",
+      question: "Check the workspace OS status and tell me which capabilities are available.",
+    });
+
+    expect(requests).toEqual([
+      expect.objectContaining({
+        capability_id: "workspace_os.status",
+        mode: "observe",
+        arguments: {
+          source_target_intent: expect.objectContaining({
+            target_source: "workspace_os",
+            target_kind: "workspace_status",
+            reason_codes: expect.arrayContaining(["workspace_os_phrase"]),
+          }),
+        },
+      }),
+    ]);
+  });
+
+  it("keeps workspace status in a compound read-only itinerary", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "Use the current document, check workspace OS status, calculate 6*7, and search the repo for workstation_gateway.",
+        workspace_context_snapshot: docSnapshot,
+      },
+    });
+
+    expect(capabilities(requests)).toEqual([
+      "docs.search",
+      "workspace_os.status",
+      "scientific-calculator.solve_expression",
+      "repo.search",
+    ]);
+  });
+
+  it("keeps reflection and repo search together in compound prompts", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "Reflect QEI margin against the theory badge graph and search the repo for workstation_gateway before answering.",
+      },
+    });
+
+    expect(capabilities(requests)).toEqual([
+      "theory-badge-graph.reflect_discussion_context",
+      "repo.search",
+    ]);
+    expect(requests[0]).toMatchObject({
+      capability_id: "theory-badge-graph.reflect_discussion_context",
+      arguments: {
+        prompt: expect.stringContaining("QEI margin"),
+      },
+    });
+    expect(requests[1]).toMatchObject({
+      capability_id: "repo.search",
+      arguments: {
+        query: "workstation_gateway",
+      },
+    });
   });
 });

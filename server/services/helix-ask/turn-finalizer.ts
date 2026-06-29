@@ -349,6 +349,54 @@ export const createHelixAskTurnFinalizer = (dependencies: HelixAskTurnFinalizerD
       threadId: args.threadId,
       routeMetadata: payloadStagePlayMailWakeRouteMetadata,
     });
+    if (
+      /\bwhat\s+changed\s+since\s+(?:the\s+)?(?:last|previous|prior)\s+(?:scene|epoch|frame|visual|screen|capture)\b/i.test(args.prompt) ||
+      /\b(?:compare|compared|changed|difference|different)\b[\s\S]{0,140}\b(?:last|previous|prior)\s+(?:scene|epoch|frame|visual|screen|capture)\b|\b(?:last|previous|prior)\s+(?:scene|epoch|frame|visual|screen|capture)\b[\s\S]{0,140}\b(?:compare|compared|changed|difference|different|running)\b|\bscene\s+epoch\b/i.test(args.prompt)
+    ) {
+      const originalSourceTarget =
+        sourceTargetIntent && typeof sourceTargetIntent === "object" && !Array.isArray(sourceTargetIntent)
+          ? (sourceTargetIntent as Record<string, unknown>)
+          : {};
+      const originalReasons = Array.isArray(originalSourceTarget.reasons)
+        ? originalSourceTarget.reasons.filter((entry): entry is string => typeof entry === "string")
+        : [];
+      const originalRequestedOutputs = Array.isArray(originalSourceTarget.requested_outputs)
+        ? originalSourceTarget.requested_outputs.filter((entry): entry is string => typeof entry === "string")
+        : [];
+      const originalSuppressedRoutes = Array.isArray(originalSourceTarget.suppressed_routes)
+        ? originalSourceTarget.suppressed_routes.filter((entry): entry is string => typeof entry === "string")
+        : [];
+      sourceTargetIntent = {
+        ...originalSourceTarget,
+        target_source: "procedure_memory",
+        target_kind: "situation_epoch",
+        targetSource: "procedure_memory",
+        targetKind: "situation_epoch",
+        strength: "hard",
+        reasons: uniqueAskTurnStrings([
+          ...originalReasons,
+          "procedure_memory_delta_prompt",
+        ]),
+        requested_outputs: uniqueAskTurnStrings([
+          ...originalRequestedOutputs,
+          "procedure_epoch_replay",
+          "visual_scene_comparison_result",
+          "typed_failure",
+        ]),
+        suppressed_routes: uniqueAskTurnStrings([
+          ...originalSuppressedRoutes,
+          "visual_capture_describe",
+          "visual_frame_evidence",
+          "situation_context_question",
+        ]),
+        precedence_reason: "procedure_memory_delta_prompt",
+        must_enter_backend_ask: true,
+        allow_client_shortcut: false,
+        allow_no_tool_direct: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+    }
     if ((readAskTurnString(payload.route_reason_code) ?? readAskTurnString(payload.route) ?? args.route) === "live_environment_binding_diagnosis") {
       const originalSourceTarget =
         sourceTargetIntent && typeof sourceTargetIntent === "object" && !Array.isArray(sourceTargetIntent)

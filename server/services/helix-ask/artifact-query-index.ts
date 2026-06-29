@@ -1025,10 +1025,22 @@ const terminalAuthorityKind = (payload: RecordLike): string | null => {
 const visibleTerminalEvidence = (payload: RecordLike): { kind: string | null; source: string | null; proven: boolean } => {
   const presentation = readRecord(payload.terminal_presentation);
   const resolvedSummary = readRecord(payload.resolved_turn_summary);
+  const payloadVisibleText = firstString(
+    payload.selected_final_answer,
+    payload.finalAnswer,
+    payload.answer,
+    payload.text,
+  );
   const candidates: Array<{ kind: unknown; source: string; proven: boolean }> = [
     { kind: presentation?.terminal_artifact_kind, source: "terminal_presentation.terminal_artifact_kind", proven: true },
     { kind: resolvedSummary?.terminal_artifact_kind, source: "resolved_turn_summary.terminal_artifact_kind", proven: true },
-    { kind: payload.terminal_artifact_kind, source: "payload.terminal_artifact_kind", proven: false },
+    {
+      kind: payload.terminal_artifact_kind,
+      source: payloadVisibleText
+        ? "payload.terminal_artifact_kind+visible_answer_text"
+        : "payload.terminal_artifact_kind",
+      proven: Boolean(payloadVisibleText),
+    },
   ];
   for (const candidate of candidates) {
     const kind = readString(candidate.kind);

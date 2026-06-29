@@ -1127,6 +1127,14 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("workspaceContextSnapshotForTurn");
   });
 
+  it("preserves retained docs-viewer URL context in Ask workspace snapshots", () => {
+    const source = fs.readFileSync(pillPath, "utf8");
+    expect(source).toContain("readDocViewerPathFromDesktopUrlForAskSnapshot");
+    expect(source).toContain('params.get("doc")');
+    expect(source).toContain('source: "desktop_url_doc_param"');
+    expect(source).toContain('normalized.startsWith("docs/")');
+  });
+
   it("routes voice lite prompts through normal-turn lane without queued reasoning", () => {
     const source = fs.readFileSync(pillPath, "utf8");
     expect(source).toContain("voice normal turn lane (no queued reasoning)");
@@ -2021,6 +2029,84 @@ describe("HelixAskPill mic-first surface contract", () => {
       "Model Re-entry",
       "Final",
     ]);
+  });
+
+  it("renders Codex provider blocked gateway observations in the latest turn rows", () => {
+    const rows = buildHelixTurnTranscriptRows({
+      id: "reply-codex-gateway-blocked-trace",
+      question: "Search the repo and tell me what you find.",
+      content:
+        "I cannot claim the requested workstation tool or UI action ran because Helix did not produce a successful observation or action receipt for every gateway request.",
+      debug: {
+        agent_runtime: "codex",
+        selected_agent_provider: {
+          id: "codex",
+          label: "Codex Workstation Mode",
+        },
+        turn_transcript_events: [
+          {
+            role: "system",
+            type: "plan",
+            status: "completed",
+            text: "Runtime selected: Codex Workstation Mode.",
+            lane: "agent_runtime",
+            step_id: "runtime_selected",
+            source_event_type: "runtime_selected",
+          },
+          {
+            role: "agent",
+            type: "model_decision",
+            status: "completed",
+            text: "Tool request: repo.search.",
+            lane: "workstation_gateway",
+            step_id: "workstation_gateway_1",
+            source_event_type: "tool_request",
+          },
+          {
+            role: "tool",
+            type: "tool_result",
+            status: "failed",
+            text: "Tool observation: Repo search gateway blocked query: missing_query.",
+            detail: "Repo search gateway blocked query: missing_query.",
+            lane: "repo.search",
+            step_id: "workstation_gateway_1",
+            source_event_type: "tool_observation",
+            capability_id: "repo.search",
+          },
+          {
+            role: "agent",
+            type: "model_decision",
+            status: "completed",
+            text: "Model re-entry: Codex received the workstation observation packet(s) before final answer.",
+            lane: "codex_provider",
+            step_id: "model_reentry",
+            source_event_type: "model_reentry",
+          },
+          {
+            role: "assistant",
+            type: "final_answer",
+            status: "final_failure",
+            text: "Blocked or failed gateway request: repo.search: missing_query.",
+            lane: "codex_provider",
+            step_id: "final_answer",
+            source_event_type: "terminal_answer",
+          },
+        ],
+      },
+    } as never);
+
+    const combined = rows.map((row) => `${row.label}: ${row.text} ${row.meta}`).join("\n");
+    expect(rows.map((row) => row.label)).toEqual([
+      "Runtime",
+      "Tool Request",
+      "Tool Observation",
+      "Model Re-entry",
+      "Final",
+    ]);
+    expect(combined).toContain("Runtime selected: Codex Workstation Mode.");
+    expect(combined).toContain("Tool request: repo.search.");
+    expect(combined).toContain("Repo search gateway blocked query: missing_query.");
+    expect(combined).toContain("Blocked or failed gateway request: repo.search: missing_query.");
   });
 
   it("admits Codex provider calculator open/focus action envelopes when backed by action receipts", () => {

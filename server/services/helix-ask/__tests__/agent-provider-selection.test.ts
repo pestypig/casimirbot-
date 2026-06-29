@@ -606,6 +606,39 @@ describe("Helix Ask agent provider selection", () => {
     });
   });
 
+  it("derives natural Codex workspace status prompts into workspace_os.status observations", async () => {
+    const providerAnswer = "The workspace status observation is available for the final answer.";
+    process.env.CODEX_AGENT_FAKE_STDOUT = providerAnswer;
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:codex-natural-workspace-status",
+        agent_runtime: "codex",
+        question: "Check the workspace OS status and tell me which capabilities are available.",
+      },
+      headers: {},
+    });
+
+    expect(result.text).toBe(providerAnswer);
+    expect((result.debug as any)?.workstation_gateway_call_results?.map((entry: any) => entry.capability_id))
+      .toEqual(["workspace_os.status"]);
+    expect(result.turn_transcript_events?.map((event: any) => event.source_event_type)).toEqual([
+      "runtime_selected",
+      "tool_request",
+      "tool_observation",
+      "model_reentry",
+      "terminal_answer",
+    ]);
+    expect(result.turn_transcript_events?.some((event: any) =>
+      event.source_event_type === "tool_observation" &&
+      event.capability_id === "workspace_os.status" &&
+      /Workspace OS status returned/i.test(String(event.text)),
+    )).toBe(true);
+  });
+
   it("runs future provider workstation gateway calls through the same shared admission", async () => {
     const results = await runExplicitFutureWorkstationGatewayCalls({
       body: {
@@ -1295,7 +1328,7 @@ describe("Helix Ask agent provider selection", () => {
         turn_id: "ask:test:codex-natural-compound-docs-calculator-repo",
         agent_runtime: "codex",
         question:
-          "Use the open document, calculate 8*9, search the repo for workstation_gateway, then synthesize the implication.",
+          "Use the current document, calculate 6*7, search the repo for workstation_gateway, then summarize what the observations prove and do not prove.",
         workspace_context_snapshot: {
           activePanel: "scientific-calculator",
           focusedPanel: "scientific-calculator",
@@ -1343,7 +1376,7 @@ describe("Helix Ask agent provider selection", () => {
     expect(result.turn_transcript_events?.some((event: any) =>
       event.source_event_type === "tool_observation" &&
       event.capability_id === "scientific-calculator.solve_expression" &&
-      /8\*9 = 72|8 \* 9 = 72/i.test(String(event.text)),
+      /6\*7 = 42|6 \* 7 = 42/i.test(String(event.text)),
     )).toBe(true);
     expect(result.turn_transcript_events?.some((event: any) =>
       event.source_event_type === "tool_observation" &&
@@ -1605,6 +1638,74 @@ describe("Helix Ask agent provider selection", () => {
       terminal_authority_granted: false,
       final_visible_answer_authorized: false,
     });
+    expect(result.turn_transcript_events?.find((event: any) => event.source_event_type === "terminal_answer"))
+      .toMatchObject({
+        status: "final_failure",
+        text: result.text,
+        assistant_answer: false,
+        raw_content_included: false,
+      });
+  });
+
+  it("does not publish Codex repo claims when natural repo search is missing a query", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "I searched the repo and found the answer.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:codex-natural-repo-search-missing-query",
+        agent_runtime: "codex",
+        question: "Search the repo and tell me what you find.",
+      },
+      headers: {},
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.response_type).toBe("final_failure");
+    expect(result.final_status).toBe("final_failure");
+    expect(result.text).toContain("cannot claim the requested workstation tool or UI action ran");
+    expect(result.text).toContain("repo.search: missing_query");
+    expect(result.text).not.toContain("I searched the repo and found the answer");
+    expect((result.debug as any)?.workstation_gateway_call_results?.map((entry: any) => ({
+      capability_id: entry.capability_id,
+      ok: entry.ok,
+      error: entry.error,
+      blocked_reason: entry.gateway_admission?.blocked_reason,
+    }))).toEqual([
+      {
+        capability_id: "repo.search",
+        ok: false,
+        error: "missing_query",
+        blocked_reason: "missing_query",
+      },
+    ]);
+    expect((result.debug as any)?.provider_gateway_debug_summary).toMatchObject({
+      requested_capabilities: ["repo.search"],
+      blocked_capabilities: [
+        expect.objectContaining({
+          requested_capability: "repo.search",
+          blocked_reason: "missing_query",
+        }),
+      ],
+      terminal_authority_granted: false,
+      final_visible_answer_authorized: false,
+    });
+    expect(result.turn_transcript_events?.map((event: any) => event.source_event_type)).toEqual([
+      "runtime_selected",
+      "tool_request",
+      "tool_observation",
+      "model_reentry",
+      "terminal_answer",
+    ]);
+    expect(result.turn_transcript_events?.find((event: any) => event.source_event_type === "tool_observation"))
+      .toMatchObject({
+        capability_id: "repo.search",
+        status: "failed",
+        assistant_answer: false,
+        raw_content_included: false,
+      });
     expect(result.turn_transcript_events?.find((event: any) => event.source_event_type === "terminal_answer"))
       .toMatchObject({
         status: "final_failure",

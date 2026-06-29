@@ -12503,8 +12503,9 @@ let helixAskLastKnownDocViewerPath: string | null = null;
 
 function normalizeDocViewerPathForAskSnapshot(value: unknown): string | null {
   if (typeof value !== "string") return null;
-  const normalized = value.trim().replace(/\\/g, "/");
-  return normalized.length > 0 ? normalized : null;
+  const normalized = value.trim().replace(/\\/g, "/").replace(/^\/+/, "");
+  if (!normalized || normalized.includes("..") || /^[a-z]:\//i.test(normalized)) return null;
+  return normalized.startsWith("docs/") ? normalized : null;
 }
 
 function rememberDocViewerPathForAskSnapshot(value: unknown): string | null {
@@ -12514,6 +12515,16 @@ function rememberDocViewerPathForAskSnapshot(value: unknown): string | null {
     return normalized;
   }
   return helixAskLastKnownDocViewerPath;
+}
+
+function readDocViewerPathFromDesktopUrlForAskSnapshot(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return normalizeDocViewerPathForAskSnapshot(params.get("doc"));
+  } catch {
+    return null;
+  }
 }
 
 function readDocViewerDebugSnapshot(): Record<string, unknown> {
@@ -12540,6 +12551,11 @@ function resolveAskTurnDocViewerSnapshotPath(): { path: string | null; source: s
   if (debugPath) {
     rememberDocViewerPathForAskSnapshot(debugPath);
     return { path: debugPath, source: "doc_viewer_debug_snapshot" };
+  }
+  const urlPath = readDocViewerPathFromDesktopUrlForAskSnapshot();
+  if (urlPath) {
+    rememberDocViewerPathForAskSnapshot(urlPath);
+    return { path: urlPath, source: "desktop_url_doc_param" };
   }
   const rememberedPath = rememberDocViewerPathForAskSnapshot(null);
   return rememberedPath
@@ -13523,6 +13539,66 @@ function buildFallbackReplyMasterDebugExport(reply: HelixAskReply, reason: strin
   });
 }
 
+function buildReplyScopedDebugExportFromRenderedReply(reply: HelixAskReply, reason: string): string {
+  const visibleTerminal = resolveHelixAskVisibleTerminal(reply, reply.content);
+  const visibleAnswerText = visibleTerminal.text || reply.content || "";
+  const replyRecord = reply as Record<string, unknown>;
+  return buildHelixDebugExportEnvelopeFromMasterPayload(reply, {
+    schema: "helix.ask.master_event_clock.v2",
+    exportedAt: new Date().toISOString(),
+    debug_export_rebuild_reason: reason,
+    selectedDebugTurnId: reply.id,
+    selectedDebugQuestion: reply.question ?? null,
+    selectedDebugFinalAnswer: clientProgressPlaceholderExport ? "" : visibleAnswerText,
+    selectedDebugSource: "rendered_reply",
+    reply: {
+      id: reply.id,
+      mode: reply.mode ?? null,
+      question: reply.question ?? null,
+      sourceCount: reply.sources?.length ?? 0,
+    },
+    debug: reply.debug ?? null,
+    active_prompt: reply.question ?? null,
+    selected_final_answer: clientProgressPlaceholderExport ? "" : visibleAnswerText,
+    final_answer_source: replyRecord.final_answer_source ?? reply.debug?.final_answer_source ?? visibleTerminal.finalAnswerSource ?? null,
+    terminal_artifact_kind:
+      replyRecord.terminal_artifact_kind ?? reply.debug?.terminal_artifact_kind ?? visibleTerminal.terminalArtifactKind ?? null,
+    terminal_result: replyRecord.terminal_result ?? reply.debug?.terminal_result ?? null,
+    terminal_results: replyRecord.terminal_results ?? reply.debug?.terminal_results ?? [],
+    debug_export_ref: replyRecord.debug_export_ref ?? reply.debug?.debug_export_ref ?? null,
+    backend_debug_response_ref: replyRecord.backend_debug_response_ref ?? reply.debug?.backend_debug_response_ref ?? null,
+    golden_path_runtime: replyRecord.golden_path_runtime ?? reply.debug?.golden_path_runtime ?? null,
+    golden_path_runtime_status: replyRecord.golden_path_runtime_status ?? reply.debug?.golden_path_runtime_status ?? null,
+    server_build_commit: replyRecord.server_build_commit ?? reply.debug?.server_build_commit ?? null,
+    server_build_started_at_ms: replyRecord.server_build_started_at_ms ?? reply.debug?.server_build_started_at_ms ?? null,
+  });
+}
+
+function normalizedDebugReplyText(value: unknown): string {
+  return coerceText(value).replace(/\s+/g, " ").trim();
+}
+
+function debugPayloadMatchesRenderedReply(reply: HelixAskReply, parsed: Record<string, unknown>): boolean {
+  const expectedQuestion = normalizedDebugReplyText(reply.question);
+  if (!expectedQuestion) return true;
+  const parsedDebug = readAgentLoopAuditRecord(parsed.debug);
+  const parsedReply = readAgentLoopAuditRecord(parsed.reply);
+  const parsedCurrentTurn = readAgentLoopAuditRecord(parsed.currentTurn);
+  const candidates = [
+    parsed.selectedDebugQuestion,
+    parsed.active_prompt,
+    parsed.prompt,
+    parsed.user_prompt,
+    parsedReply?.question,
+    parsedCurrentTurn?.question,
+    parsedDebug?.active_prompt,
+  ]
+    .map(normalizedDebugReplyText)
+    .filter(Boolean);
+  if (candidates.length === 0) return true;
+  return candidates.some((candidate) => candidate === expectedQuestion);
+}
+
 function classifyCompactToolTraceAction(panelId: string | null, actionId: string | null) {
   const panel = (panelId ?? "").toLowerCase();
   const action = (actionId ?? "").toLowerCase();
@@ -13681,11 +13757,17 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
   const terminalAuthorityForDebug = readAgentLoopAuditRecord(
     payload.terminal_answer_authority ?? debug?.terminal_answer_authority ?? agentLoop?.terminal_answer_authority,
   );
+  const terminalResultForDebug = readAgentLoopAuditRecord(
+    payload.terminal_result ?? debug?.terminal_result ?? agentLoop?.terminal_result,
+  );
   const terminalArtifactKind =
+    coerceText(payload.terminal_artifact_kind).trim() ||
     coerceText(agentLoop?.terminal_artifact_kind).trim() ||
     coerceText(debug?.terminal_artifact_kind).trim() ||
     coerceText(resolvedTurnSummary?.terminal_artifact_kind).trim() ||
     coerceText(terminalAuthorityForDebug?.terminal_artifact_kind).trim() ||
+    coerceText(terminalResultForDebug?.terminal_artifact_kind).trim() ||
+    coerceText(terminalResultForDebug?.artifact_kind).trim() ||
     null;
   const terminalErrorCode =
     coerceText(agentLoop?.terminal_error_code).trim() ||
@@ -13694,10 +13776,11 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
     coerceText(typedFailure?.error_code).trim() ||
     null;
   const finalAnswerSource =
+    coerceText(payload.final_answer_source).trim() ||
     coerceText(agentLoop?.final_answer_source).trim() ||
     coerceText(debug?.final_answer_source).trim() ||
-    coerceText(payload.final_answer_source).trim() ||
     coerceText(terminalAuthorityForDebug?.final_answer_source).trim() ||
+    coerceText(terminalResultForDebug?.final_answer_source).trim() ||
     (terminalErrorCode ? "typed_failure" : null);
   const terminalAuthorityText = coerceText(terminalAuthorityForDebug?.terminal_text_preview).trim();
   const terminalIsTypedFailure =
@@ -13718,7 +13801,11 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
   const selectedFinalAnswerCandidateRaw =
     terminalIsTypedFailure
       ? typedFailureText
-      : coerceText(payload.selectedDebugFinalAnswer).trim() ||
+      : coerceText(payload.selected_final_answer).trim() ||
+        coerceText(payload.answer).trim() ||
+        coerceText(payload.assistant_answer).trim() ||
+        coerceText(terminalResultForDebug?.text).trim() ||
+        coerceText(payload.selectedDebugFinalAnswer).trim() ||
         coerceText(payload.finalAnswer).trim() ||
         coerceText(agentLoop?.selected_final_answer).trim() ||
         coerceText(debug?.selected_final_answer).trim() ||
@@ -14321,10 +14408,13 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
 
 function normalizeReplyMasterDebugPayload(reply: HelixAskReply, payload: string | null | undefined): string {
   const trimmed = typeof payload === "string" ? payload.trim() : "";
-  if (!trimmed) return buildFallbackReplyMasterDebugExport(reply, "empty_payload");
+  if (!trimmed) return buildReplyScopedDebugExportFromRenderedReply(reply, "empty_payload");
   try {
     const parsed = JSON.parse(trimmed) as Record<string, unknown>;
     if (parsed && typeof parsed === "object") {
+      if (!debugPayloadMatchesRenderedReply(reply, parsed)) {
+        return buildReplyScopedDebugExportFromRenderedReply(reply, "payload_reply_mismatch");
+      }
       const canceledPendingTurn = isHelixCanceledPendingTurn(reply, reply.debug, parsed, parsed.debug, parsed.agentLoop);
       if (canceledPendingTurn) {
         const parsedAgentLoop = readAgentLoopAuditRecord(parsed.agentLoop);
@@ -14364,7 +14454,7 @@ function normalizeReplyMasterDebugPayload(reply: HelixAskReply, payload: string 
     }
     return trimmed;
   } catch {
-    return buildFallbackReplyMasterDebugExport(reply, "invalid_json_payload");
+    return buildReplyScopedDebugExportFromRenderedReply(reply, "invalid_json_payload");
   }
 }
 
@@ -14795,6 +14885,12 @@ function copyHelixRailCriticalDebugFieldsForUi(
     "agent_step_decision",
     "agent_step_loop",
     "calculator_tool_answer_support",
+    "terminal_result",
+    "terminal_results",
+    "golden_path_runtime",
+    "golden_path_runtime_status",
+    "debug_export_ref",
+    "backend_debug_response_ref",
   ].forEach((key) => assign(key, source[key] ?? debug?.[key]));
   const ledgerSource = source.current_turn_artifact_ledger ?? debug?.current_turn_artifact_ledger;
   if (Array.isArray(ledgerSource)) target.current_turn_artifact_ledger = summarizeHelixDebugArtifactsForCopy(ledgerSource);
@@ -32919,6 +33015,18 @@ export function HelixAskPill({
                         },
                       }
                     : {}),
+                  debug_export_ref: localResponse.debug_export_ref ?? localResponse.debug?.debug_export_ref ?? null,
+                  backend_debug_response_ref:
+                    localResponse.backend_debug_response_ref ?? localResponse.debug?.backend_debug_response_ref ?? null,
+                  terminal_result: localResponse.terminal_result ?? localResponse.debug?.terminal_result ?? null,
+                  terminal_results: localResponse.terminal_results ?? localResponse.debug?.terminal_results ?? [],
+                  golden_path_runtime: localResponse.golden_path_runtime ?? localResponse.debug?.golden_path_runtime ?? null,
+                  golden_path_runtime_status:
+                    localResponse.golden_path_runtime_status ?? localResponse.debug?.golden_path_runtime_status ?? null,
+                  stream_mode: localResponse.stream_mode ?? localResponse.debug?.stream_mode ?? null,
+                  server_build_commit: localResponse.server_build_commit ?? localResponse.debug?.server_build_commit ?? null,
+                  server_build_started_at_ms:
+                    localResponse.server_build_started_at_ms ?? localResponse.debug?.server_build_started_at_ms ?? null,
                 }
               : undefined;
           timelineDebugContext = buildHelixAskDebugContextSummary(
@@ -32949,6 +33057,12 @@ export function HelixAskPill({
               ? Boolean(
                   localResponseRecord.debug_export_ref ||
                     localResponse.debug?.debug_export_ref ||
+                    localResponseRecord.terminal_result ||
+                    localResponse.debug?.terminal_result ||
+                    (Array.isArray(localResponseRecord.terminal_results) && localResponseRecord.terminal_results.length > 0) ||
+                    (Array.isArray(localResponse.debug?.terminal_results) && localResponse.debug.terminal_results.length > 0) ||
+                    localResponseRecord.golden_path_runtime ||
+                    localResponse.debug?.golden_path_runtime ||
                     localResponseRecord.ask_turn_solver_trace ||
                     localResponse.debug?.ask_turn_solver_trace ||
                     localResponseRecord.agent_runtime_loop ||
@@ -33372,6 +33486,12 @@ export function HelixAskPill({
             Boolean(
               responseDebugPayload?.debug_export_ref ||
                 localResponseRecord.debug_export_ref ||
+                responseDebugPayload?.terminal_result ||
+                localResponseRecord.terminal_result ||
+                (Array.isArray(responseDebugPayload?.terminal_results) && responseDebugPayload.terminal_results.length > 0) ||
+                (Array.isArray(localResponseRecord.terminal_results) && localResponseRecord.terminal_results.length > 0) ||
+                responseDebugPayload?.golden_path_runtime ||
+                localResponseRecord.golden_path_runtime ||
                 responseDebugPayload?.ask_turn_solver_trace ||
                 responseDebugPayload?.agent_runtime_loop ||
                 responseDebugPayload?.canonical_goal_frame ||

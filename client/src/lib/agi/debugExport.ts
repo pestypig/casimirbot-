@@ -774,6 +774,10 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     payload.workstation_gateway_observation_packets ??
     debug?.workstation_gateway_observation_packets ??
     agentLoop?.workstation_gateway_observation_packets;
+  const turnTranscriptEvents =
+    payload.turn_transcript_events ??
+    debug?.turn_transcript_events ??
+    agentLoop?.turn_transcript_events;
   const providerTerminalCandidate = asRecord(
     payload.provider_terminal_candidate ??
       debug?.provider_terminal_candidate ??
@@ -1132,6 +1136,7 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
       agentLoop?.terminal_authority_status,
     workstation_gateway_call_results: workstationGatewayCallResults,
     workstation_gateway_observation_packets: workstationGatewayObservationPackets,
+    turn_transcript_events: Array.isArray(turnTranscriptEvents) ? turnTranscriptEvents : [],
     provider_terminal_candidate: providerTerminalCandidate,
     provider_reasoning_reentry: providerReasoningReentry,
     terminal_authority_candidate_review: terminalAuthorityCandidateReview,

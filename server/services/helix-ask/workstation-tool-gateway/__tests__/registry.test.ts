@@ -1124,6 +1124,43 @@ describe("Helix workstation tool gateway", () => {
     expect((result.observation as { hit_count?: number }).hit_count).toBeGreaterThan(0);
   });
 
+  it("falls back to bounded Node repo search when ripgrep execution fails", async () => {
+    process.env.RG_BIN = process.execPath;
+
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: REPO_SEARCH_CAPABILITY,
+      arguments: {
+        query: "workspace_os.status",
+        paths: ["server/services/helix-ask"],
+        max_hits: 3,
+      },
+      turnId: "ask:test:gateway-repo-search-rg-failure-fallback",
+      iteration: 3,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      error: undefined,
+      observation_packet: {
+        status: "succeeded",
+      },
+      observation: {
+        schema: "helix.repo_search_observation.v1",
+        query: "workspace_os.status",
+        status: "succeeded",
+        search_backend: "node_fallback",
+        search_backend_bin: null,
+        search_backend_reason: "ripgrep_failed",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    expect((result.observation as { hit_count?: number }).hit_count).toBeGreaterThan(0);
+  });
+
   it("blocks missing repo.search query as a non-terminal observation", async () => {
     const result = await callWorkstationGatewayCapability({
       agentRuntime: "codex",
