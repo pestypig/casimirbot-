@@ -366,6 +366,151 @@ describe("Helix Ask golden-path route gate", () => {
     expect(response.body.current_turn_artifact_ledger?.map((artifact: { kind?: string }) => artifact.kind)).toContain("calculator_receipt");
   });
 
+  it.each([
+    {
+      name: "catalog plus workspace status",
+      body: {
+        turn_id: "ask:test:golden-route-catalog-workspace",
+        prompt: "helix_ask_golden_path_runtime use helix_ask.inspect_capability_catalog and workspace_os.status",
+        goldenPathRuntime: true,
+        requested_capabilities: [
+          HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
+          HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,
+        ],
+        workspace_os_status: {
+          counts: { total: 34, available: 18, degraded: 1, blocked: 3, error: 0, unknown: 12 },
+        },
+      },
+      expectedStatus: "catalog_workspace_compound",
+      expectedObservationKinds: ["capability_registry", "workspace_os_status_observation"],
+    },
+    {
+      name: "repo search plus docs locate",
+      body: {
+        turn_id: "ask:test:golden-route-repo-docs",
+        prompt: "helix_ask_golden_path_runtime use repo-code.search_concept and docs-viewer.locate_in_doc",
+        goldenPathRuntime: true,
+        requested_capabilities: [
+          HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+          HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+        ],
+        concept: "terminal authority",
+        repo_files: [
+          {
+            path: "server/services/helix-ask/runtime-authority-contract.ts",
+            content: "terminal authority selects the final answer only after runtime evidence exists.",
+          },
+        ],
+        doc_path: "docs/helix-ask-turn-solver-spine.md",
+        query: "completed solver path terminal authority",
+        doc_content: "The completed solver path gates terminal authority and visible projection.",
+      },
+      expectedStatus: "repo_docs_compound",
+      expectedObservationKinds: ["repo_code_evidence_observation", "repo_evidence_relevance_gate", "doc_location_matches"],
+    },
+    {
+      name: "internet research plus theory reflection",
+      body: {
+        turn_id: "ask:test:golden-route-internet-theory",
+        prompt: "helix_ask_golden_path_runtime use internet_search.web_research and helix_ask.reflect_theory_context",
+        goldenPathRuntime: true,
+        requested_capabilities: [
+          HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
+          HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
+        ],
+        internet_search_query: "OpenAI Codex tool call lifecycle",
+        internet_search_results: [
+          {
+            result_id: "web:codex-lifecycle",
+            title: "OpenAI Codex tool call lifecycle",
+            url: "https://platform.openai.com/docs/codex",
+            snippet: "Codex executes requested tool calls before finalizing.",
+            rank: 1,
+          },
+        ],
+        topic: "Codex parity for Helix Ask observations",
+      },
+      expectedStatus: "internet_research_reflection_compound",
+      expectedObservationKinds: ["internet_search_observation", "helix_theory_context_reflection_tool_receipt"],
+    },
+    {
+      name: "visual capture plus calculator",
+      body: {
+        turn_id: "ask:test:golden-route-visual-calculator",
+        prompt: "helix_ask_golden_path_runtime use image_lens.inspect and scientific-calculator.solve_expression",
+        goldenPathRuntime: true,
+        requested_capabilities: [
+          HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY,
+          HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+        ],
+        visual_summary: "The current screen shows Docs Viewer and a calculator panel.",
+        detected_objects: ["Docs Viewer", "scientific calculator"],
+        calculator_expression: "6 * 7",
+      },
+      expectedStatus: "visual_calculator_compound",
+      expectedObservationKinds: ["visual_frame_evidence", "calculator_receipt"],
+    },
+    {
+      name: "civilization bounds plus zen graph reflection",
+      body: {
+        turn_id: "ask:test:golden-route-civilization-zen",
+        prompt: "helix_ask_golden_path_runtime use helix_ask.reflect_civilization_bounds and helix_ask.reflect_ideology_context",
+        goldenPathRuntime: true,
+        requested_capabilities: [
+          HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+          HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
+        ],
+        civilization_bounds_tool_result: {
+          roadmap: {
+            roadmapId: "civilization-bounds:route-compound",
+            title: "Civilization Bounds Roadmap",
+            systems: [{ systemId: "energy", label: "Energy system" }],
+            missingEvidence: ["source_backed_capacity_measurements"],
+          },
+        },
+        helix_zen_graph_reflection_tool_result: {
+          reflection: {
+            reflectionId: "ideology-context-reflection:route-compound",
+            input: { summary: "Relate civilization bounds to two-key review." },
+            authority: { terminal_eligible: false, context_role: "tool_policy" },
+          },
+        },
+      },
+      expectedStatus: "civilization_bounds_zen_reflection_compound",
+      expectedObservationKinds: ["helix_civilization_bounds_tool_result", "helix_zen_graph_reflection_tool_result"],
+    },
+  ])("routes $name compound turns through the golden-path runtime", async ({ body, expectedStatus, expectedObservationKinds }) => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+    const app = createApp();
+
+    const response = await request(app).post("/api/agi/ask/turn").send(body).expect(200);
+    const ledgerKinds = response.body.current_turn_artifact_ledger?.map((artifact: { kind?: string }) => artifact.kind) ?? [];
+
+    expect(response.body).toMatchObject({
+      final_status: "final_answer",
+      terminal_artifact_kind: "compound_evidence_synthesis_answer",
+      final_answer_source: "compound_evidence_synthesis_answer",
+      terminal_error_code: null,
+      debug: {
+        golden_path_runtime: expect.objectContaining({
+          legacy_route_bypassed: true,
+        }),
+        golden_path_runtime_status: expectedStatus,
+      },
+      ask_turn_solver_trace: {
+        completed_solver_path: true,
+        requested_capability: "compound_capability_contract",
+        observed_artifact_kind: "compound_subgoal_observations",
+        terminal_artifact_kind: "compound_evidence_synthesis_answer",
+        compound_subgoal_count: 2,
+      },
+    });
+    for (const expectedKind of expectedObservationKinds) {
+      expect(ledgerKinds).toContain(expectedKind);
+    }
+    expect(response.body.current_turn_artifact_ledger?.filter((artifact: { kind?: string }) => artifact.kind === "compound_evidence_synthesis_answer")).toHaveLength(1);
+  });
+
   it("routes stream turns through the golden-path runtime before legacy carryover", async () => {
     process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
     const app = createApp();
