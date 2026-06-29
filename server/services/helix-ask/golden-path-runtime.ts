@@ -18,6 +18,10 @@ import {
 } from "./workspace-directory-resolver";
 import { STAGE_PLAY_PROCESSED_MAIL_PACKET_SCHEMA } from "../../../shared/contracts/stage-play-live-source-mail.v1";
 import { HELIX_VISUAL_FRAME_EVIDENCE_SCHEMA } from "../../../shared/helix-visual-frame-evidence";
+import {
+  HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+  HELIX_SCHOLARLY_RESEARCH_OBSERVATION_SCHEMA,
+} from "../../../shared/helix-scholarly-research-observation";
 
 type RecordLike = Record<string, unknown>;
 
@@ -37,6 +41,8 @@ export const HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY =
 export const HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY = "image_lens.inspect" as const;
 export const HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY =
   "situation-room.describe_visual_capture" as const;
+export const HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY =
+  HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY;
 
 export type HelixAskGoldenPathRuntimeTerminalResult = {
   schema: "helix.ask_golden_path_terminal_result.v1";
@@ -52,6 +58,7 @@ export type HelixAskGoldenPathRuntimeTerminalResult = {
     | "workspace_directory_resolution"
     | "workspace_status_answer"
     | "model_synthesized_answer"
+    | "scholarly_research_answer"
     | "theory_context_reflection_answer"
     | "typed_failure"
     | "compound_evidence_synthesis_answer";
@@ -65,6 +72,7 @@ export type HelixAskGoldenPathRuntimeTerminalResult = {
     | "workspace_directory_resolution"
     | "workspace_status_answer"
     | "model_synthesized_answer"
+    | "scholarly_research_answer"
     | "theory_context_reflection_answer"
     | "typed_failure"
     | "compound_evidence_synthesis_answer";
@@ -100,6 +108,8 @@ const readNumber = (value: unknown): number | null =>
 
 const readRecord = (value: unknown): RecordLike | null =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as RecordLike) : null;
+
+const readArray = (value: unknown): unknown[] => Array.isArray(value) ? value : [];
 
 const readStringArray = (value: unknown): string[] => {
   if (!Array.isArray(value)) return [];
@@ -345,6 +355,55 @@ const readTheoryReflectionAnchors = (body: RecordLike): string[] => {
     .map((line) => line.trim())
     .filter(Boolean)
     .slice(0, 6);
+};
+
+const isHelixAskGoldenPathScholarlyResearchRequested = (body: RecordLike): boolean => {
+  const requestedCapabilities = readStringArray(body.requested_capabilities ?? body.requestedCapabilities);
+  if (requestedCapabilities.includes(HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY)) return true;
+  const requestedCapability =
+    readString(body.requested_capability) ??
+    readString(body.requestedCapability) ??
+    readString(body.capability) ??
+    readString(body.tool_name) ??
+    readString(body.toolName);
+  if (requestedCapability === HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY) return true;
+  const prompt = readHelixAskGoldenPathPrompt(body).toLowerCase();
+  return (
+    prompt.includes(HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY) ||
+    /\b(?:scholarly\s+research|research\s+papers?|paper\s+metadata|peer[-\s]?reviewed|literature|preprints?|arxiv|crossref|openalex|semantic\s+scholar)\b/.test(prompt)
+  );
+};
+
+const readScholarlyResearchQuery = (body: RecordLike): string | null => {
+  const direct =
+    readString(body.scholarly_query) ??
+    readString(body.scholarlyQuery) ??
+    readString(body.research_query) ??
+    readString(body.researchQuery) ??
+    readString(body.query);
+  if (direct) return direct;
+  const cleaned = readHelixAskGoldenPathPrompt(body)
+    .replace(/helix_ask_golden_path_runtime/gi, "")
+    .replace(/scholarly-research\.lookup_papers/gi, "")
+    .replace(/\b(?:use|run|call|lookup|look\s+up|search|find|research|papers?|scholarly|literature|metadata|for|about)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned || null;
+};
+
+const readCompactScholarlyPapers = (body: RecordLike): RecordLike[] => {
+  const observation =
+    readRecord(body.scholarly_research_observation) ??
+    readRecord(body.scholarlyResearchObservation) ??
+    readRecord(body.compact_scholarly_research_observation) ??
+    readRecord(body.compactScholarlyResearchObservation);
+  const observedPapers = observation
+    ? readArray(observation.papers).map(readRecord).filter((paper): paper is RecordLike => Boolean(paper))
+    : [];
+  if (observedPapers.length > 0) return observedPapers;
+  return readArray(body.scholarly_papers ?? body.scholarlyPapers ?? body.papers)
+    .map(readRecord)
+    .filter((paper): paper is RecordLike => Boolean(paper));
 };
 
 const isHelixAskGoldenPathVisualCaptureRequested = (body: RecordLike): boolean => {
@@ -706,6 +765,7 @@ const buildGoldenPathCapabilityCatalogObservation = (): RecordLike => ({
   available_capabilities: [
     HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
     HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,
+    HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
   ],
   assistant_answer: false,
   raw_content_included: false,
