@@ -1745,7 +1745,9 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("buildReplyScopedDebugExportFromRenderedButton");
     expect(source).toContain("selectedDebugTurnId: reply.id");
     expect(source).toContain('selectedDebugSource: "rendered_reply_dom"');
-    expect(source).toContain("debug_export_ref: replyRecord.debug_export_ref ?? replyDebugRecord?.debug_export_ref ?? null");
+    expect(source).toContain(
+      "debug_export_ref: renderedMatchesReply ? replyRecord.debug_export_ref ?? replyDebugRecord?.debug_export_ref ?? null : null",
+    );
     expect(source.indexOf("buildReplyScopedDebugExportFromRenderedButton")).toBeLessThan(
       source.indexOf('title="Unified Debug Copy"'),
     );

@@ -9,6 +9,13 @@ export type AskLiveEventEntry = {
   meta?: Record<string, unknown>;
 };
 
+export type AskLiveEventIdentity = {
+  turnId: string | null;
+  traceId: string | null;
+};
+
+export const HELIX_ASK_PROGRESS_PLACEHOLDER_TEXT = "Reasoning in progress...";
+
 function summarizeVoiceDebugText(source: string, maxChars = 220): string {
   const text = source.replace(/\s+/g, " ").trim();
   if (!text) return "";
@@ -41,11 +48,17 @@ function safeJsonStringify(value: unknown, fallback = "Unable to render debug pa
   }
 }
 
-function parseTimestampMs(value: unknown): number | null {
+export function parseAskLiveEventTimestampMs(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
+    return Math.trunc(value);
   }
   if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const numeric = Number(trimmed);
+    if (Number.isFinite(numeric)) {
+      return Math.trunc(numeric);
+    }
     const parsed = Date.parse(value);
     if (Number.isFinite(parsed)) {
       return parsed;
@@ -56,9 +69,9 @@ function parseTimestampMs(value: unknown): number | null {
 
 export function resolveAskLiveEventTimestampMs(event: AskLiveEventEntry): number | null {
   if (typeof event.tsMs === "number" && Number.isFinite(event.tsMs)) {
-    return event.tsMs;
+    return Math.trunc(event.tsMs);
   }
-  return parseTimestampMs(event.ts);
+  return parseAskLiveEventTimestampMs(event.ts);
 }
 
 export function formatAskLiveEventLogLine(event: AskLiveEventEntry): string {
@@ -126,7 +139,48 @@ export function readEventMetaString(
   return null;
 }
 
+export function readAskLiveEventIdentity(event: AskLiveEventEntry): AskLiveEventIdentity {
+  return {
+    turnId:
+      readEventMetaString(event.meta, ["turn_id", "turnId", "active_turn_id", "activeTurnId", "ask_turn_id", "askTurnId"]) ??
+      null,
+    traceId: readEventMetaString(event.meta, ["trace_id", "traceId", "ask_trace_id", "askTraceId"]) ?? null,
+  };
+}
+
 export function parseHelixAskQueuedQuestionsInput(value: string): string[] {
   const normalized = value.replace(/\r\n/g, "\n").trim();
   return normalized ? [normalized] : [];
+}
+
+function coerceDisplayText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return "";
+}
+
+export function cleanHelixRenderedQuestionText(value: unknown): string | null {
+  const cleaned = coerceDisplayText(value)
+    .replace(/^\s*\d*\s*Question\s*question\s*/i, "")
+    .replace(/\s*user prompt\s*$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned || null;
+}
+
+export function cleanHelixRenderedFinalAnswerText(value: unknown): string | null {
+  const cleaned = coerceDisplayText(value)
+    .replace(/^\s*\d*\s*Final answer\s*final\s*/i, "")
+    .replace(/\s*(?:typed failure|chat final answer|compound evidence synthesis answer|workstation tool evaluation)\s*$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned || null;
+}
+
+export function normalizedDebugReplyText(value: unknown): string {
+  return coerceDisplayText(value).replace(/\s+/g, " ").trim();
+}
+
+export function isHelixAskProgressPlaceholderText(value: string | null | undefined): boolean {
+  return coerceDisplayText(value).trim().toLowerCase() === HELIX_ASK_PROGRESS_PLACEHOLDER_TEXT.toLowerCase();
 }

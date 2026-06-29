@@ -49,6 +49,7 @@ import { HELIX_SETTINGS_OPEN_STATE_EVENT } from "@/hooks/useHelixSettingsDialog"
 import { classifyMoodFromWhisper } from "@/lib/luma-mood-spectrum";
 import { LUMA_MOOD_ORDER, resolveMoodAsset, type LumaMood } from "@/lib/luma-moods";
 import { broadcastLumaMood } from "@/lib/luma-mood-theme";
+import { LUMA_MOOD_PALETTE } from "@/lib/helix/ask-luma-mood-display";
 import { reportClientError } from "@/lib/observability/client-error";
 import {
   HELIX_ASK_PROMPT_EVENT,
@@ -183,8 +184,15 @@ export type {
 import {
   buildAskLiveEventLogDetailPayload,
   buildAskLiveEventLogExport,
+  cleanHelixRenderedFinalAnswerText,
+  cleanHelixRenderedQuestionText,
   formatAskLiveEventLogLine,
+  HELIX_ASK_PROGRESS_PLACEHOLDER_TEXT,
+  isHelixAskProgressPlaceholderText,
+  normalizedDebugReplyText,
+  parseAskLiveEventTimestampMs,
   parseHelixAskQueuedQuestionsInput,
+  readAskLiveEventIdentity,
   readEventMetaString,
   resolveAskLiveEventTimestampMs,
   type AskLiveEventEntry,
@@ -199,7 +207,10 @@ import {
   readHelixCausalTraceRowClass,
   readProceduralStatusClass,
 } from "@/lib/helix/ask-status-classnames";
-import { readProceduralActionLabel } from "@/lib/helix/ask-procedural-display";
+import {
+  formatWorkstationIntentStageDetail,
+  readProceduralActionLabel,
+} from "@/lib/helix/ask-procedural-display";
 import {
   SESSION_CAPSULE_CONFIDENCE_LABEL,
   buildContextCapsuleCopyText,
@@ -462,6 +473,12 @@ import {
   REASONING_THEATER_MEDAL_LABEL,
   REASONING_THEATER_PHASE_LABEL,
   REASONING_THEATER_STANCE_META,
+  buildReasoningTheaterParticlesFromMirekArtifact,
+  buildReasoningTheaterFrontierParticles,
+  mirekCellGridClassName,
+  mirekCellParticleClassName,
+  type ReasoningTheaterParticle,
+  type ReasoningTheaterFrontierParticleNode,
 } from "@/lib/helix/ask-reasoning-theater-display";
 import {
   deriveConvergenceStripState,
@@ -526,29 +543,10 @@ import type {
   HelixAgentRuntimeDescriptor,
   HelixAgentRuntimeId,
 } from "@shared/helix-agent-runtime";
-import type { KnowledgeProjectExport } from "@shared/knowledge";
 import type { HelixAskResponseEnvelope } from "@shared/helix-ask-envelope";
 import type { SituationContextPack } from "@shared/helix-situation-context-pack";
 import type { LiveSituationArtifact } from "@shared/helix-live-situation-artifact";
 import type { LiveAnswerEnvironment } from "@shared/helix-live-answer-environment";
-import { DEFAULT_MINECRAFT_STANDBY_VOICE_POLICY } from "@shared/helix-standby-voice-policy";
-import { LiveSituationArtifactCard } from "@/components/helix/LiveSituationArtifactCard";
-import { LiveAnswerEnvironmentCard } from "@/components/helix/LiveAnswerEnvironmentCard";
-import {
-  selectActiveLiveSituationArtifact,
-  selectLiveSituationDeltas,
-  useLiveSituationArtifactStore,
-  type LiveSituationArtifactState,
-} from "@/store/useLiveSituationArtifactStore";
-import {
-  selectActiveLiveAnswerEnvironment,
-  selectLiveAnswerEnvironmentById,
-  selectLiveAnswerEnvironmentDeltas,
-  useLiveAnswerEnvironmentStore,
-  type LiveAnswerEnvironmentState,
-} from "@/store/useLiveAnswerEnvironmentStore";
-import { useStandbyVoiceDeliveryStore } from "@/store/useStandbyVoiceDeliveryStore";
-import { deliverStandbyVoiceCallout } from "@/lib/helix/standbyVoiceDelivery";
 import { useDocViewerStore } from "@/store/useDocViewerStore";
 import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
 import { useSituationRoomStore } from "@/store/useSituationRoomStore";
@@ -619,200 +617,6 @@ function syncHelixAskVisualCaptureRoutePreference(includeAudio: boolean): HelixA
 
 const HELIX_ASK_CONTEXT_RESUME_FRAME_STORAGE_KEY = "helix.ask.contextResumeFrame.v1";
 const HELIX_ASK_DURABLE_TRANSCRIPT_LIMIT = 80;
-const HELIX_ASK_PROGRESS_PLACEHOLDER_TEXT = "Reasoning in progress...";
-
-function HelixAskLiveSituationProjection({
-  threadId,
-  initialArtifact,
-  onAskHelix,
-  onOpenSituation,
-}: {
-  threadId: string;
-  initialArtifact?: LiveSituationArtifact | null;
-  onAskHelix?: (prompt: string) => void;
-  onOpenSituation?: () => void;
-}) {
-  const upsertReadResponse = useLiveSituationArtifactStore(
-    (state: LiveSituationArtifactState) => state.upsertReadResponse,
-  );
-  const loadLiveArtifact = useLiveSituationArtifactStore(
-    (state: LiveSituationArtifactState) => state.loadLiveArtifact,
-  );
-  const artifact = useLiveSituationArtifactStore((state: LiveSituationArtifactState) =>
-    selectActiveLiveSituationArtifact(state, threadId),
-  );
-  const renderedArtifact = artifact ?? initialArtifact ?? null;
-  const deltas = useLiveSituationArtifactStore((state: LiveSituationArtifactState) =>
-    selectLiveSituationDeltas(state, renderedArtifact?.artifact_id),
-  );
-  const diagnostics = useLiveSituationArtifactStore(
-    (state: LiveSituationArtifactState) => state.diagnosticsByThread[threadId] ?? null,
-  );
-  const addVoiceReceipt = useStandbyVoiceDeliveryStore((state) => state.addReceipt);
-  const setVoiceError = useStandbyVoiceDeliveryStore((state) => state.setError);
-
-  useEffect(() => {
-    if (!initialArtifact) return;
-    upsertReadResponse(threadId, {
-      ok: true,
-      artifact: initialArtifact,
-      deltas: [],
-      debug: {
-        thread_id: threadId,
-        artifact_id: initialArtifact.artifact_id,
-        delta_count: 0,
-        last_delta_id: null,
-        last_next_hash: null,
-        raw_transcript_included: false,
-        raw_audio_included: false,
-        deterministic_content_role: "observation_not_assistant_answer",
-      },
-    });
-  }, [initialArtifact, threadId, upsertReadResponse]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const load = () => {
-      if (!cancelled) void loadLiveArtifact(threadId, 30);
-    };
-    load();
-    const interval = window.setInterval(load, 5000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
-  }, [loadLiveArtifact, threadId]);
-
-  if (!renderedArtifact) return null;
-
-  return (
-    <LiveSituationArtifactCard
-      artifact={renderedArtifact}
-      deltas={deltas}
-      stale={diagnostics?.stale === true}
-      speakable={renderedArtifact.mode === "voice_on_confirm"}
-      onAskHelix={onAskHelix}
-      onOpenSituation={onOpenSituation}
-      onGoToLog={onOpenSituation}
-      onSuppress={() => setVoiceError(null)}
-      onSpeak={async () => {
-        try {
-          const receipt = await deliverStandbyVoiceCallout({
-            proposalId: renderedArtifact.latest_evaluation?.evaluation_id ?? renderedArtifact.artifact_id,
-            text: renderedArtifact.latest_evaluation?.summary ?? renderedArtifact.current_state_lines.risk,
-            priority:
-              renderedArtifact.latest_evaluation?.trigger === "risk_update" ||
-              renderedArtifact.latest_evaluation?.trigger === "goal_blocked"
-                ? "critical"
-                : "warn",
-            evidenceRefs: renderedArtifact.latest_evaluation?.evidence_refs ?? renderedArtifact.evidence_refs,
-            policy: {
-              ...DEFAULT_MINECRAFT_STANDBY_VOICE_POLICY,
-              voice_output_enabled: true,
-              standby_voice_mode: renderedArtifact.mode,
-              requires_confirmation: false,
-              last_user_granted_voice_output_at: new Date().toISOString(),
-            },
-            requiresConfirmation: false,
-            dedupeKey: renderedArtifact.latest_evaluation?.evaluation_id ?? renderedArtifact.artifact_id,
-            traceId: renderedArtifact.created_turn_id,
-          });
-          addVoiceReceipt(receipt);
-          setVoiceError(null);
-        } catch (error) {
-          setVoiceError(error instanceof Error ? error.message : "standby_voice_delivery_failed");
-        }
-      }}
-    />
-  );
-}
-
-function HelixAskLiveAnswerEnvironmentProjection({
-  threadId,
-  initialEnvironment,
-  onAskHelix,
-  onOpenSituation,
-}: {
-  threadId: string;
-  initialEnvironment?: LiveAnswerEnvironment | null;
-  onAskHelix?: (prompt: string) => void;
-  onOpenSituation?: () => void;
-}) {
-  const upsertReadResponse = useLiveAnswerEnvironmentStore(
-    (state: LiveAnswerEnvironmentState) => state.upsertReadResponse,
-  );
-  const loadEnvironment = useLiveAnswerEnvironmentStore(
-    (state: LiveAnswerEnvironmentState) => state.loadLiveAnswerEnvironment,
-  );
-  const loadEnvironmentById = useLiveAnswerEnvironmentStore(
-    (state: LiveAnswerEnvironmentState) => state.loadLiveAnswerEnvironmentById,
-  );
-  const activeThreadEnvironment = useLiveAnswerEnvironmentStore((state: LiveAnswerEnvironmentState) =>
-    selectActiveLiveAnswerEnvironment(state, threadId),
-  );
-  const pinnedEnvironment = useLiveAnswerEnvironmentStore((state: LiveAnswerEnvironmentState) =>
-    selectLiveAnswerEnvironmentById(state, initialEnvironment?.environment_id),
-  );
-  const renderedEnvironment =
-    initialEnvironment
-      ? pinnedEnvironment ?? initialEnvironment
-      : activeThreadEnvironment ?? null;
-  const deltas = useLiveAnswerEnvironmentStore((state: LiveAnswerEnvironmentState) =>
-    selectLiveAnswerEnvironmentDeltas(state, renderedEnvironment?.environment_id),
-  );
-  const diagnostics = useLiveAnswerEnvironmentStore(
-    (state: LiveAnswerEnvironmentState) => state.diagnosticsByThread[threadId] ?? null,
-  );
-
-  useEffect(() => {
-    if (!initialEnvironment) return;
-    upsertReadResponse(threadId, {
-      ok: true,
-      environment: initialEnvironment,
-      deltas: [],
-      debug: {
-        thread_id: threadId,
-        environment_id: initialEnvironment.environment_id,
-        delta_count: 0,
-        last_delta_id: null,
-        last_next_hash: null,
-        raw_transcript_included: false,
-        raw_audio_included: false,
-        deterministic_content_role: "observation_not_assistant_answer",
-      },
-    });
-  }, [initialEnvironment, threadId, upsertReadResponse]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const load = () => {
-      if (cancelled) return;
-      if (initialEnvironment?.environment_id) {
-        void loadEnvironmentById(threadId, initialEnvironment.environment_id, 30);
-        return;
-      }
-      void loadEnvironment(threadId, 30);
-    };
-    load();
-    const interval = window.setInterval(load, 5000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
-  }, [initialEnvironment?.environment_id, loadEnvironment, loadEnvironmentById, threadId]);
-
-  if (!renderedEnvironment) return null;
-
-  return (
-    <LiveAnswerEnvironmentCard
-      environment={renderedEnvironment}
-      deltas={deltas}
-      stale={diagnostics?.stale === true}
-      onAskHelix={onAskHelix}
-      onOpenSituation={onOpenSituation}
-    />
-  );
-}
 
 const VOICE_AUTO_SPEAK_UTTERANCE_ID_MAX_CHARS = 180;
 const MOBILE_AUDIO_UNLOCK_DATA_URI =
@@ -1635,25 +1439,6 @@ export function resolvePendingWorkstationUserInput(args: {
   };
 }
 
-function formatWorkstationIntentStageDetail(result: WorkstationIntentClassificationResult): string {
-  const prefix = result.action
-    ? "workstation_intent_stage | action_resolved"
-    : "workstation_intent_stage | no_action_match";
-  const outcomeLabelMap: Record<WorkstationIntentClassificationOutcome, string> = {
-    command_parse: "command_parse",
-    classifier_match: "classifier_match",
-    deterministic_match: "deterministic_match",
-    fallback_timeout_match: "timeout_fallback",
-    fallback_classifier_error_match: "classifier_error_fallback",
-    fallback_low_confidence_match: "low_confidence_fallback",
-    no_match_timeout: "timeout_fallback",
-    no_match_classifier_error: "classifier_error",
-    no_match_low_confidence: "low_confidence",
-    no_match_not_probed: "not_probed",
-  };
-  return `${prefix} | ${outcomeLabelMap[result.outcome]}`;
-}
-
 function resolveWorkstationRouterFailId(
   result: WorkstationIntentClassificationResult,
 ): "RF_NO_ACTION_NOT_PROBED" | "RF_CLASSIFIER_TIMEOUT" | "RF_CLASSIFIER_ERROR" | "RF_LOW_CONFIDENCE" | null {
@@ -1693,10 +1478,6 @@ function resolveExternalPromptClaimId(pending: PendingHelixAskPrompt | null, que
   if (promptId) return promptId;
   const createdAt = typeof pending?.createdAt === "number" ? pending.createdAt : 0;
   return `${createdAt}:${question.trim().toLowerCase()}`;
-}
-
-function isHelixAskProgressPlaceholderText(value: string | null | undefined): boolean {
-  return coerceText(value).trim().toLowerCase() === HELIX_ASK_PROGRESS_PLACEHOLDER_TEXT.toLowerCase();
 }
 
 function isStagePlayMailboxWakePromptText(question: string): boolean {
@@ -3266,7 +3047,6 @@ const MIC_PLAYBACK_BARGE_RMS_MULTIPLIER = 1.35;
 const MIC_PLAYBACK_BARGE_RMS_MULTIPLIER_NOISY = 1.75;
 const VOICE_TRANSCRIPTION_BREATH_WINDOW_MS = 2600;
 const VOICE_TURN_CLOSE_SILENCE_MS = 3200;
-const VOICE_TURN_HASH_STABLE_DWELL_MS = 900;
 const VOICE_TURN_SEAL_POLL_MS = clampNumber(
   readNumber((import.meta as any)?.env?.VITE_HELIX_VOICE_TURN_SEAL_POLL_MS, 140),
   60,
@@ -5049,12 +4829,6 @@ type ExplorationLadderDecision = {
   reasonCode: string;
 };
 
-function inferExplorationTopicKey(packet: ConversationExplorationPacket | null | undefined, prompt: string): string {
-  const raw = (packet?.topic?.trim() || prompt.trim() || "unknown").toLowerCase();
-  const normalized = raw.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
-  return normalized || "unknown";
-}
-
 function buildExplorationEscalationPrompt(args: {
   mode: "verify" | "act";
   prompt: string;
@@ -5953,7 +5727,7 @@ function buildHelixAskTextAttachmentTurnInputItem(attachment: HelixAskTextAttach
     content_base64: attachment.contentBase64,
     content_sha256: attachment.contentSha256,
     preview: attachment.preview,
-    raw_content_included: true,
+    raw_content_included: false,
     raw_content_scope: "turn_input_only",
     assistant_answer: false,
   };
@@ -6678,48 +6452,6 @@ function incrementHelixAskConsoleDropReason(
     [key]: (droppedReasons[key] ?? 0) + 1,
   };
 }
-
-type HelixAskObjectiveUnknownBlockTrace = {
-  unknown: string;
-  why: string;
-  whatIChecked: string[];
-  nextRetrieval: string;
-};
-
-type HelixAskObjectiveReasoningTrace = {
-  objectiveId: string;
-  objectiveLabel: string;
-  finalStatus: string;
-  plainReasoning: string;
-  transitionTail: string[];
-  unknownBlock: HelixAskObjectiveUnknownBlockTrace | null;
-  usedTelemetry: {
-    requiredSlots: string[];
-    matchedSlots: string[];
-    missingSlots: string[];
-    retrievalConfidence: number | null;
-    evidenceRefs: string[];
-    evidenceRefCount: number | null;
-    retrievalPassCount: number | null;
-    scopedRetrievalObserved: boolean | null;
-    objectiveOesScore: number | null;
-    objectiveOesThreshold: number | null;
-    objectiveOesPass: boolean | null;
-    miniCriticReason: string | null;
-    terminalizationReason: string | null;
-    blockedReason: string | null;
-  };
-};
-
-type HelixAskObjectiveTelemetryUsedSummary = {
-  coverageUnresolvedCount: number | null;
-  coverageUnresolvedObjectiveIds: string[];
-  unknownBlockCount: number | null;
-  unresolvedWithoutUnknownBlockCount: number | null;
-  missingScopedRetrievalCount: number | null;
-  finalizeGateMode: string | null;
-  finalizeGatePassed: boolean | null;
-};
 
 function isHelixAskContextCompactionPauseText(text: string | null | undefined): boolean {
   return /\b(?:context_compaction|context\s+is\s+compacting|active\s+context\s+page\s+file|pasted_text_attachment_resume_frame)\b/i.test(
@@ -7487,35 +7219,6 @@ function collectHelixAgentSelectedCapabilities(...sources: unknown[]): string[] 
   return [...selected].filter(Boolean);
 }
 
-function readLatestHelixRuntimeChosenCapability(...sources: unknown[]): string | null {
-  for (const source of sources) {
-    const record = readAgentLoopAuditRecord(source);
-    if (!record) continue;
-    const debug = readAgentLoopAuditRecord(record.debug);
-    const loops = [record.agent_runtime_loop, debug?.agent_runtime_loop, record.agent_step_loop, debug?.agent_step_loop];
-    for (const loop of loops) {
-      const loopRecord = readAgentLoopAuditRecord(loop);
-      const iterations = Array.isArray(loopRecord?.iterations)
-        ? loopRecord.iterations
-        : Array.isArray(loopRecord?.steps)
-          ? loopRecord.steps
-          : [];
-      for (const iteration of [...iterations].reverse()) {
-        const iterationRecord = readAgentLoopAuditRecord(iteration);
-        const chosen = coerceText(iterationRecord?.chosen_capability).trim();
-        if (chosen) return chosen;
-      }
-    }
-    const direct = coerceText(
-      readAgentLoopAuditRecord(record.agent_step_decision)?.chosen_capability ??
-        readAgentLoopAuditRecord(debug?.agent_step_decision)?.chosen_capability ??
-        record.chosen_capability,
-    ).trim();
-    if (direct) return direct;
-  }
-  return null;
-}
-
 function readHelixWorkstationActionRuntimeKeys(action: HelixWorkstationAction | Record<string, unknown>): string[] {
   const record = readAgentLoopAuditRecord(action);
   if (!record) return [];
@@ -7758,12 +7461,6 @@ type HelixAskVisibleTerminalResolution = {
   source: string;
   backendTerminalText: string | null;
 };
-
-function readHelixAskTerminalText(record: Record<string, unknown> | null | undefined): string | null {
-  if (!record) return null;
-  const text = typeof record.text === "string" ? record.text.trim() : "";
-  return text.length > 0 ? text : null;
-}
 
 const stableHelixProjectionHash = (value: string): string => {
   let hash = 2166136261;
@@ -9230,14 +8927,6 @@ class HelixAskErrorBoundary extends Component<{ children: ReactNode }, HelixAskE
   }
 }
 
-function ensureFinalMarker(value: string): string {
-  if (!value.trim()) return "ANSWER_START\nANSWER_END";
-  if (value.includes("ANSWER_START") || value.includes("FINAL:")) {
-    return value;
-  }
-  return `${value.trimEnd()}\n\nANSWER_START\nANSWER_END`;
-}
-
 const HELIX_ASK_ANSWER_BOUNDARY_PREFIX_RE = /^\s*ANSWER_(?:START|END)\b\s*/i;
 const HELIX_ASK_ANSWER_MARKER_SPLIT_RE = /\b(?:ANSWER_START|ANSWER_END)\b/gi;
 
@@ -9251,16 +8940,6 @@ const stripAnswerBoundaryPrefix = (value: string): string => {
   return cursor;
 };
 
-const HELIX_ASK_CONTEXT_FILES = clampNumber(
-  readNumber((import.meta as any)?.env?.VITE_HELIX_ASK_CONTEXT_FILES, 18),
-  4,
-  48,
-);
-const HELIX_ASK_CONTEXT_CHARS = clampNumber(
-  readNumber((import.meta as any)?.env?.VITE_HELIX_ASK_CONTEXT_CHARS, 2200),
-  120,
-  2400,
-);
 const HELIX_ASK_MAX_TOKENS = clampNumber(
   readNumber((import.meta as any)?.env?.VITE_HELIX_ASK_MAX_TOKENS, 2048),
   64,
@@ -9335,118 +9014,6 @@ const HELIX_REASONING_TIMEOUT_RETRY_MIN_TOKENS = clampNumber(
   256,
   4096,
 );
-type LumaMoodPalette = {
-  ring: string;
-  aura: string;
-  surfaceBorder: string;
-  surfaceTint: string;
-  surfaceHalo: string;
-  liveBorder: string;
-  replyBorder: string;
-  replyTint: string;
-};
-
-const LUMA_MOOD_PALETTE: Record<LumaMood, LumaMoodPalette> = {
-  mad: {
-    ring: "ring-rose-400/60",
-    aura:
-      "border-rose-300/45 bg-rose-500/[0.08] shadow-[0_0_40px_rgba(244,63,94,0.45)]",
-    surfaceBorder: "border-rose-300/35",
-    surfaceTint:
-      "bg-[radial-gradient(120%_170%_at_6%_12%,rgba(244,63,94,0.22)_0%,rgba(15,23,42,0)_68%)]",
-    surfaceHalo:
-      "bg-[radial-gradient(120%_140%_at_94%_16%,rgba(244,63,94,0.12)_0%,rgba(15,23,42,0)_72%)]",
-    liveBorder: "border-rose-300/25",
-    replyBorder: "border-rose-300/30",
-    replyTint:
-      "bg-[radial-gradient(120%_160%_at_12%_16%,rgba(244,63,94,0.12)_0%,rgba(15,23,42,0.68)_72%)]",
-  },
-  upset: {
-    ring: "ring-amber-300/55",
-    aura:
-      "border-amber-200/45 bg-amber-400/[0.08] shadow-[0_0_40px_rgba(251,191,36,0.42)]",
-    surfaceBorder: "border-amber-200/35",
-    surfaceTint:
-      "bg-[radial-gradient(120%_170%_at_6%_12%,rgba(251,191,36,0.2)_0%,rgba(15,23,42,0)_68%)]",
-    surfaceHalo:
-      "bg-[radial-gradient(120%_140%_at_94%_16%,rgba(251,191,36,0.1)_0%,rgba(15,23,42,0)_72%)]",
-    liveBorder: "border-amber-200/25",
-    replyBorder: "border-amber-200/30",
-    replyTint:
-      "bg-[radial-gradient(120%_160%_at_12%_16%,rgba(251,191,36,0.12)_0%,rgba(15,23,42,0.68)_72%)]",
-  },
-  shock: {
-    ring: "ring-yellow-300/60",
-    aura:
-      "border-yellow-200/50 bg-yellow-300/[0.09] shadow-[0_0_42px_rgba(253,224,71,0.45)]",
-    surfaceBorder: "border-yellow-200/35",
-    surfaceTint:
-      "bg-[radial-gradient(120%_170%_at_6%_12%,rgba(253,224,71,0.22)_0%,rgba(15,23,42,0)_68%)]",
-    surfaceHalo:
-      "bg-[radial-gradient(120%_140%_at_94%_16%,rgba(253,224,71,0.12)_0%,rgba(15,23,42,0)_72%)]",
-    liveBorder: "border-yellow-200/25",
-    replyBorder: "border-yellow-200/30",
-    replyTint:
-      "bg-[radial-gradient(120%_160%_at_12%_16%,rgba(253,224,71,0.12)_0%,rgba(15,23,42,0.7)_72%)]",
-  },
-  question: {
-    ring: "ring-sky-300/55",
-    aura:
-      "border-sky-300/40 bg-sky-400/[0.07] shadow-[0_0_40px_rgba(125,211,252,0.45)]",
-    surfaceBorder: "border-sky-300/30",
-    surfaceTint:
-      "bg-[radial-gradient(120%_170%_at_6%_12%,rgba(125,211,252,0.22)_0%,rgba(15,23,42,0)_68%)]",
-    surfaceHalo:
-      "bg-[radial-gradient(120%_140%_at_94%_16%,rgba(125,211,252,0.1)_0%,rgba(15,23,42,0)_72%)]",
-    liveBorder: "border-sky-300/25",
-    replyBorder: "border-sky-300/28",
-    replyTint:
-      "bg-[radial-gradient(120%_160%_at_12%_16%,rgba(125,211,252,0.12)_0%,rgba(15,23,42,0.7)_72%)]",
-  },
-  happy: {
-    ring: "ring-emerald-300/60",
-    aura:
-      "border-emerald-200/45 bg-emerald-400/[0.08] shadow-[0_0_40px_rgba(110,231,183,0.42)]",
-    surfaceBorder: "border-emerald-200/35",
-    surfaceTint:
-      "bg-[radial-gradient(120%_170%_at_6%_12%,rgba(110,231,183,0.2)_0%,rgba(15,23,42,0)_68%)]",
-    surfaceHalo:
-      "bg-[radial-gradient(120%_140%_at_94%_16%,rgba(110,231,183,0.1)_0%,rgba(15,23,42,0)_72%)]",
-    liveBorder: "border-emerald-200/25",
-    replyBorder: "border-emerald-200/30",
-    replyTint:
-      "bg-[radial-gradient(120%_160%_at_12%_16%,rgba(110,231,183,0.12)_0%,rgba(15,23,42,0.68)_72%)]",
-  },
-  friend: {
-    ring: "ring-teal-300/60",
-    aura:
-      "border-teal-200/45 bg-teal-400/[0.08] shadow-[0_0_40px_rgba(94,234,212,0.44)]",
-    surfaceBorder: "border-teal-200/35",
-    surfaceTint:
-      "bg-[radial-gradient(120%_170%_at_6%_12%,rgba(94,234,212,0.2)_0%,rgba(15,23,42,0)_68%)]",
-    surfaceHalo:
-      "bg-[radial-gradient(120%_140%_at_94%_16%,rgba(94,234,212,0.1)_0%,rgba(15,23,42,0)_72%)]",
-    liveBorder: "border-teal-200/25",
-    replyBorder: "border-teal-200/30",
-    replyTint:
-      "bg-[radial-gradient(120%_160%_at_12%_16%,rgba(94,234,212,0.12)_0%,rgba(15,23,42,0.68)_72%)]",
-  },
-  love: {
-    ring: "ring-pink-300/60",
-    aura:
-      "border-pink-200/45 bg-pink-400/[0.08] shadow-[0_0_42px_rgba(249,168,212,0.45)]",
-    surfaceBorder: "border-pink-200/35",
-    surfaceTint:
-      "bg-[radial-gradient(120%_170%_at_6%_12%,rgba(249,168,212,0.22)_0%,rgba(15,23,42,0)_68%)]",
-    surfaceHalo:
-      "bg-[radial-gradient(120%_140%_at_94%_16%,rgba(249,168,212,0.12)_0%,rgba(15,23,42,0)_72%)]",
-    liveBorder: "border-pink-200/25",
-    replyBorder: "border-pink-200/30",
-    replyTint:
-      "bg-[radial-gradient(120%_160%_at_12%_16%,rgba(249,168,212,0.12)_0%,rgba(15,23,42,0.68)_72%)]",
-  },
-};
-
 type ReasoningTheaterStance = "winning" | "contested" | "losing" | "fail_closed";
 type ReasoningTheaterArchetype =
   | "ambiguity"
@@ -9526,17 +9093,6 @@ type ReasoningTheaterMedalPulse = ReasoningTheaterMedalEvent & {
 
 type ReasoningTheaterClockSource = "local" | "event_ts" | "event_seq";
 
-type ReasoningTheaterParticle = {
-  id: string;
-  leftPct: number;
-  topPct: number;
-  sizePx: number;
-  opacity: number;
-  delayS: number;
-  durationS: number;
-  kind: MirekCellKind;
-};
-
 type MirekReasoningDisplayGridCell = {
   id: string;
   x: number;
@@ -9551,12 +9107,6 @@ type MirekReasoningDisplayGrid = {
   width: number;
   height: number;
   cells: MirekReasoningDisplayGridCell[];
-};
-
-type ReasoningTheaterFrontierParticleNode = {
-  id: string;
-  phaseOffsetMs: number;
-  baseRadiusPx: number;
 };
 
 const REASONING_THEATER_MEDAL_VISIBLE_MS = 4200;
@@ -9596,17 +9146,6 @@ function clamp01(value: number): number {
   return clampNumber(value, 0, 1);
 }
 
-function parseTimestampMs(value: unknown): number | null {
-  if (typeof value === "number" && Number.isFinite(value)) return Math.trunc(value);
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  const numeric = Number(trimmed);
-  if (Number.isFinite(numeric)) return Math.trunc(numeric);
-  const parsed = Date.parse(trimmed);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
 function buildAskLiveEventFromTurnTranscriptRecord(
   record: Record<string, unknown>,
   fallbackId: string,
@@ -9624,7 +9163,7 @@ function buildAskLiveEventFromTurnTranscriptRecord(
     text: clipText(text, HELIX_ASK_LIVE_EVENT_MAX_CHARS),
     tool: coerceText(record.role).trim() || "agent",
     ts,
-    tsMs: atMs ?? parseTimestampMs(record.ts) ?? undefined,
+    tsMs: atMs ?? parseAskLiveEventTimestampMs(record.ts) ?? undefined,
     seq,
     durationMs:
       typeof record.durationMs === "number" && Number.isFinite(record.durationMs)
@@ -9642,19 +9181,6 @@ function buildAskLiveEventFromTurnTranscriptRecord(
       reconstructed: record.reconstructed === true,
       stream_event: "turn_transcript_event",
     },
-  };
-}
-
-function readAskLiveEventIdentity(event: AskLiveEventEntry): {
-  turnId: string | null;
-  traceId: string | null;
-} {
-  const meta = asObjectRecord(event.meta ?? null);
-  return {
-    turnId:
-      readEventMetaString(meta ?? undefined, ["turn_id", "turnId", "active_turn_id", "activeTurnId", "ask_turn_id", "askTurnId"]) ??
-      null,
-    traceId: readEventMetaString(meta ?? undefined, ["trace_id", "traceId", "ask_trace_id", "askTraceId"]) ?? null,
   };
 }
 
@@ -9786,126 +9312,6 @@ function renderReasoningBattleStage(input: {
       </div>
     </div>
   );
-}
-
-function resolveObjectiveReasoningTrace(
-  debug: HelixAskReply["debug"] | undefined,
-): HelixAskObjectiveReasoningTrace[] {
-  const debugRecord = asObjectRecord(debug as unknown);
-  if (!debugRecord) return [];
-  const traceRows = Array.isArray(debugRecord.objective_reasoning_trace)
-    ? debugRecord.objective_reasoning_trace
-    : [];
-  const out: HelixAskObjectiveReasoningTrace[] = [];
-  const readString = (value: unknown): string | null =>
-    typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-  const readNumber = (value: unknown): number | null =>
-    typeof value === "number" && Number.isFinite(value) ? value : null;
-  const readBoolean = (value: unknown): boolean | null => (typeof value === "boolean" ? value : null);
-  for (const row of traceRows) {
-    const record = asObjectRecord(row);
-    if (!record) continue;
-    const objectiveId = readString(record.objective_id) ?? "unknown_objective";
-    const objectiveLabel = readString(record.objective_label) ?? objectiveId;
-    const finalStatus = readString(record.final_status) ?? "unknown";
-    const plainReasoning = readString(record.plain_reasoning) ?? `Status ${finalStatus}.`;
-    const transitionTail = asStringArray(record.transition_tail).slice(0, 8);
-    const unknownBlockRecord = asObjectRecord(record.unknown_block);
-    const unknownBlock = unknownBlockRecord
-      ? {
-          unknown: readString(unknownBlockRecord.unknown) ?? "unknown",
-          why: readString(unknownBlockRecord.why) ?? "unknown",
-          whatIChecked: asStringArray(unknownBlockRecord.what_i_checked).slice(0, 16),
-          nextRetrieval: readString(unknownBlockRecord.next_retrieval) ?? "n/a",
-        }
-      : null;
-    const telemetryRecord = asObjectRecord(record.used_telemetry);
-    out.push({
-      objectiveId,
-      objectiveLabel,
-      finalStatus,
-      plainReasoning,
-      transitionTail,
-      unknownBlock,
-      usedTelemetry: {
-        requiredSlots: asStringArray(telemetryRecord?.required_slots).slice(0, 16),
-        matchedSlots: asStringArray(telemetryRecord?.matched_slots).slice(0, 16),
-        missingSlots: asStringArray(telemetryRecord?.missing_slots).slice(0, 16),
-        retrievalConfidence: readNumber(telemetryRecord?.retrieval_confidence),
-        evidenceRefs: asStringArray(telemetryRecord?.evidence_refs).slice(0, 16),
-        evidenceRefCount: readNumber(telemetryRecord?.evidence_ref_count),
-        retrievalPassCount: readNumber(telemetryRecord?.retrieval_pass_count),
-        scopedRetrievalObserved: readBoolean(telemetryRecord?.scoped_retrieval_observed),
-        objectiveOesScore: readNumber(telemetryRecord?.objective_oes_score),
-        objectiveOesThreshold: readNumber(telemetryRecord?.objective_oes_threshold),
-        objectiveOesPass: readBoolean(telemetryRecord?.objective_oes_pass),
-        miniCriticReason: readString(telemetryRecord?.mini_critic_reason),
-        terminalizationReason: readString(telemetryRecord?.terminalization_reason),
-        blockedReason: readString(telemetryRecord?.blocked_reason),
-      },
-    });
-    if (out.length >= 12) break;
-  }
-  return out;
-}
-
-function resolveObjectiveTelemetryUsedSummary(
-  debug: HelixAskReply["debug"] | undefined,
-): HelixAskObjectiveTelemetryUsedSummary | null {
-  const debugRecord = asObjectRecord(debug as unknown);
-  if (!debugRecord) return null;
-  const telemetryRecord =
-    asObjectRecord(debugRecord.objective_telemetry_used) ??
-    asObjectRecord(debugRecord.objectiveTelemetryUsed);
-  const readNumber = (value: unknown): number | null =>
-    typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : null;
-  const readBoolean = (value: unknown): boolean | null => (typeof value === "boolean" ? value : null);
-  const readString = (value: unknown): string | null =>
-    typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-  const coverageUnresolvedCount =
-    readNumber(telemetryRecord?.objective_coverage_unresolved_count) ??
-    readNumber(debugRecord.objective_coverage_unresolved_count);
-  const coverageUnresolvedObjectiveIds = dedupeStrings(
-    [
-      ...asStringArray(telemetryRecord?.objective_coverage_unresolved_objective_ids),
-      ...asStringArray(debugRecord.objective_coverage_unresolved_objective_ids),
-    ].filter(Boolean),
-  ).slice(0, 16);
-  const unknownBlockCount =
-    readNumber(telemetryRecord?.objective_unknown_block_count) ??
-    readNumber(debugRecord.objective_unknown_block_count);
-  const unresolvedWithoutUnknownBlockCount =
-    readNumber(telemetryRecord?.objective_unresolved_without_unknown_block_count) ??
-    readNumber(debugRecord.objective_unresolved_without_unknown_block_count);
-  const missingScopedRetrievalCount = readNumber(
-    telemetryRecord?.objective_missing_scoped_retrieval_count ?? debugRecord.objective_missing_scoped_retrieval_count,
-  );
-  const finalizeGateMode =
-    readString(telemetryRecord?.objective_finalize_gate_mode) ??
-    readString(debugRecord.objective_finalize_gate_mode);
-  const finalizeGatePassed =
-    readBoolean(telemetryRecord?.objective_finalize_gate_passed) ??
-    readBoolean(debugRecord.objective_finalize_gate_passed);
-  if (
-    coverageUnresolvedCount === null &&
-    unknownBlockCount === null &&
-    unresolvedWithoutUnknownBlockCount === null &&
-    missingScopedRetrievalCount === null &&
-    finalizeGateMode === null &&
-    finalizeGatePassed === null &&
-    coverageUnresolvedObjectiveIds.length === 0
-  ) {
-    return null;
-  }
-  return {
-    coverageUnresolvedCount,
-    coverageUnresolvedObjectiveIds,
-    unknownBlockCount,
-    unresolvedWithoutUnknownBlockCount,
-    missingScopedRetrievalCount,
-    finalizeGateMode,
-    finalizeGatePassed,
-  };
 }
 
 type UnifiedDebugEventRow = {
@@ -11103,40 +10509,6 @@ function buildReplyMasterEventClockExport(args: {
   return buildHelixDebugExportEnvelopeFromMasterPayload(args.reply, payload);
 }
 
-function buildFallbackReplyMasterDebugExport(reply: HelixAskReply, reason: string): string {
-  const visibleTerminal = resolveHelixAskVisibleTerminal(reply, reply.content);
-  const visibleAnswerText = visibleTerminal.text || reply.content || "";
-  const suppressVisibleAnswer = isHelixAskProgressPlaceholderText(visibleAnswerText);
-  const canceledPendingTurn = isHelixCanceledPendingTurn(reply, reply.debug);
-  return safeJsonStringify({
-    schema: "helix.ask.unified_debug.v1",
-    exportedAt: new Date().toISOString(),
-    error: {
-      kind: "debug_export_incomplete",
-      message: "Unified debug state was unavailable for the current turn.",
-      reason,
-    },
-    currentTurn: {
-      id: reply.id,
-      mode: reply.mode ?? null,
-      question: reply.question ?? null,
-    },
-    visibleAnswerState: {
-      question: reply.question ?? null,
-      finalAnswer: suppressVisibleAnswer ? "" : visibleAnswerText,
-      terminalSource: visibleTerminal.source,
-      backendTerminalAnswer: visibleTerminal.backendTerminalText,
-    },
-    finalAnswer: suppressVisibleAnswer ? "" : visibleAnswerText,
-    plannerContract: readAgentLoopAuditRecord(reply.debug?.planner_contract),
-    executionTrace: Array.isArray(reply.debug?.execution_trace) ? reply.debug.execution_trace : [],
-    stepResults: Array.isArray(reply.debug?.step_results) ? reply.debug.step_results : [],
-    turnEvents: Array.isArray(reply.debug?.turn_events) ? reply.debug.turn_events : [],
-    pendingServerRequest: canceledPendingTurn ? null : readAgentLoopAuditRecord(reply.debug?.pending_request),
-    pendingCanceled: canceledPendingTurn,
-  });
-}
-
 function buildReplyScopedDebugExportFromRenderedReply(reply: HelixAskReply, reason: string): string {
   const visibleTerminal = resolveHelixAskVisibleTerminal(reply, reply.content);
   const visibleAnswerText = visibleTerminal.text || reply.content || "";
@@ -11183,6 +10555,29 @@ function extractHelixRenderedTurnDebugFromButton(sourceElement: HTMLElement | nu
   if (!sourceElement) return null;
   let node: HTMLElement | null = sourceElement;
   for (let depth = 0; node && depth < 10; depth += 1, node = node.parentElement) {
+    const questionNode = node.querySelector<HTMLElement>('[data-stream-row-source="question"], [data-testid="helix-ask-latest-question"]');
+    const finalNode = node.querySelector<HTMLElement>('[data-stream-row-source="final"], [data-testid="helix-ask-latest-final-answer"]');
+    const renderedQuestion = cleanHelixRenderedQuestionText(questionNode?.innerText || questionNode?.textContent || "");
+    const renderedFinalAnswer =
+      cleanHelixRenderedFinalAnswerText(finalNode?.getAttribute("data-final-answer-text")) ??
+      cleanHelixRenderedFinalAnswerText(finalNode?.innerText || finalNode?.textContent || "");
+    if (renderedQuestion || renderedFinalAnswer) {
+      const terminalSource = coerceText(finalNode?.getAttribute("data-visible-terminal-source")).trim();
+      const terminalArtifactKind = /compound evidence synthesis answer/i.test(terminalSource)
+        ? "compound_evidence_synthesis_answer"
+        : /workstation tool evaluation/i.test(terminalSource)
+          ? "workstation_tool_evaluation"
+          : /typed failure/i.test(terminalSource)
+            ? "typed_failure"
+            : /COMPOUND EVIDENCE SYNTHESIS ANSWER/i.test(renderedFinalAnswer || "")
+              ? "compound_evidence_synthesis_answer"
+              : /WORKSTATION TOOL EVALUATION/i.test(renderedFinalAnswer || "")
+                ? "workstation_tool_evaluation"
+                : /TYPED FAILURE/i.test(renderedFinalAnswer || "")
+                  ? "typed_failure"
+                  : null;
+      return { question: renderedQuestion, finalAnswer: renderedFinalAnswer, terminalArtifactKind };
+    }
     const text = (node.innerText || "").trim();
     if (!text || !/\bQuestion\b/i.test(text) || !/\bFinal answer\b/i.test(text)) continue;
     const questionMatch = text.match(/Question\s+QUESTION\s+([\s\S]*?)\s+USER PROMPT/i);
@@ -11210,54 +10605,60 @@ function buildReplyScopedDebugExportFromRenderedButton(
   const rendered = extractHelixRenderedTurnDebugFromButton(sourceElement);
   if (!rendered || (!rendered.question && !rendered.finalAnswer)) return null;
   const visibleTerminal = resolveHelixAskVisibleTerminal(reply, reply.content);
+  const renderedMatchesReply =
+    (!rendered.question || normalizedDebugReplyText(rendered.question) === normalizedDebugReplyText(reply.question)) &&
+    (!rendered.finalAnswer || normalizedDebugReplyText(rendered.finalAnswer) === normalizedDebugReplyText(visibleTerminal.text || reply.content));
   const replyRecord = reply as Record<string, unknown>;
-  const replyDebugRecord = readAgentLoopAuditRecord(reply.debug);
+  const replyDebugRecord = renderedMatchesReply ? readAgentLoopAuditRecord(reply.debug) : null;
   return buildHelixDebugExportEnvelopeFromMasterPayload(reply, {
     schema: "helix.ask.master_event_clock.v2",
     exportedAt: new Date().toISOString(),
     debug_export_rebuild_reason: reason,
     debug_export_source: "rendered_reply_dom",
     backend_debug_response_status: "not_advertised",
-    active_turn_id: reply.id,
+    active_turn_id: renderedMatchesReply ? reply.id : null,
     client_active_turn_id: reply.id,
-    selectedDebugTurnId: reply.id,
+    selectedDebugTurnId: renderedMatchesReply ? reply.id : null,
     selectedDebugQuestion: rendered.question ?? reply.question ?? null,
     selectedDebugFinalAnswer: rendered.finalAnswer ?? "",
     selectedDebugSource: "rendered_reply_dom",
     reply: {
-      id: reply.id,
+      id: renderedMatchesReply ? reply.id : null,
+      client_id: reply.id,
       mode: reply.mode ?? null,
       question: rendered.question ?? reply.question ?? null,
       sourceCount: reply.sources?.length ?? 0,
     },
-    debug: reply.debug ?? null,
+    debug: renderedMatchesReply ? reply.debug ?? null : null,
     active_prompt: rendered.question ?? reply.question ?? null,
     selected_final_answer: rendered.finalAnswer ?? "",
     final_answer_source:
       rendered.terminalArtifactKind ??
-      replyRecord.final_answer_source ??
-      reply.debug?.final_answer_source ??
+      (renderedMatchesReply ? replyRecord.final_answer_source : null) ??
+      replyDebugRecord?.final_answer_source ??
       visibleTerminal.finalAnswerSource ??
       null,
     terminal_artifact_kind:
       rendered.terminalArtifactKind ??
-      replyRecord.terminal_artifact_kind ??
-      reply.debug?.terminal_artifact_kind ??
+      (renderedMatchesReply ? replyRecord.terminal_artifact_kind : null) ??
+      replyDebugRecord?.terminal_artifact_kind ??
       visibleTerminal.terminalArtifactKind ??
       null,
-    terminal_result: replyRecord.terminal_result ?? replyDebugRecord?.terminal_result ?? null,
-    terminal_results: replyRecord.terminal_results ?? replyDebugRecord?.terminal_results ?? [],
-    debug_export_ref: replyRecord.debug_export_ref ?? replyDebugRecord?.debug_export_ref ?? null,
-    backend_debug_response_ref: replyRecord.backend_debug_response_ref ?? replyDebugRecord?.backend_debug_response_ref ?? null,
-    golden_path_runtime: replyRecord.golden_path_runtime ?? replyDebugRecord?.golden_path_runtime ?? null,
-    golden_path_runtime_status: replyRecord.golden_path_runtime_status ?? replyDebugRecord?.golden_path_runtime_status ?? null,
-    server_build_commit: replyRecord.server_build_commit ?? replyDebugRecord?.server_build_commit ?? null,
-    server_build_started_at_ms: replyRecord.server_build_started_at_ms ?? replyDebugRecord?.server_build_started_at_ms ?? null,
+    terminal_result: renderedMatchesReply ? replyRecord.terminal_result ?? replyDebugRecord?.terminal_result ?? null : null,
+    terminal_results: renderedMatchesReply ? replyRecord.terminal_results ?? replyDebugRecord?.terminal_results ?? [] : [],
+    debug_export_ref: renderedMatchesReply ? replyRecord.debug_export_ref ?? replyDebugRecord?.debug_export_ref ?? null : null,
+    backend_debug_response_ref: renderedMatchesReply
+      ? replyRecord.backend_debug_response_ref ?? replyDebugRecord?.backend_debug_response_ref ?? null
+      : null,
+    golden_path_runtime: renderedMatchesReply ? replyRecord.golden_path_runtime ?? replyDebugRecord?.golden_path_runtime ?? null : null,
+    golden_path_runtime_status: renderedMatchesReply
+      ? replyRecord.golden_path_runtime_status ?? replyDebugRecord?.golden_path_runtime_status ?? null
+      : null,
+    server_build_commit: renderedMatchesReply ? replyRecord.server_build_commit ?? replyDebugRecord?.server_build_commit ?? null : null,
+    server_build_started_at_ms: renderedMatchesReply
+      ? replyRecord.server_build_started_at_ms ?? replyDebugRecord?.server_build_started_at_ms ?? null
+      : null,
   });
-}
-
-function normalizedDebugReplyText(value: unknown): string {
-  return coerceText(value).replace(/\s+/g, " ").trim();
 }
 
 function debugPayloadMatchesRenderedReply(reply: HelixAskReply, parsed: Record<string, unknown>): boolean {
@@ -11279,6 +10680,51 @@ function debugPayloadMatchesRenderedReply(reply: HelixAskReply, parsed: Record<s
     .filter(Boolean);
   if (candidates.length === 0) return true;
   return candidates.some((candidate) => candidate === expectedQuestion);
+}
+
+function debugPayloadMatchesRenderedTurnPayload(
+  payload: string | null | undefined,
+  sourceElement: HTMLElement | null | undefined,
+): boolean {
+  const rendered = extractHelixRenderedTurnDebugFromButton(sourceElement);
+  if (!rendered) return true;
+  const trimmed = typeof payload === "string" ? payload.trim() : "";
+  if (!trimmed) return false;
+  try {
+    const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+    const parsedReply = readAgentLoopAuditRecord(parsed.reply);
+    const parsedCurrentTurn = readAgentLoopAuditRecord(parsed.currentTurn);
+    const visibleAnswerState = readAgentLoopAuditRecord(parsed.visibleAnswerState);
+    const answerCandidates = [
+      parsed.selected_final_answer,
+      parsed.selectedDebugFinalAnswer,
+      parsed.finalAnswer,
+      visibleAnswerState?.finalAnswer,
+    ]
+      .map(normalizedDebugReplyText)
+      .filter(Boolean);
+    if (rendered.finalAnswer && answerCandidates.length > 0) {
+      const expectedAnswer = normalizedDebugReplyText(rendered.finalAnswer);
+      if (!answerCandidates.some((candidate) => candidate === expectedAnswer)) return false;
+    }
+    const questionCandidates = [
+      parsed.selectedDebugQuestion,
+      parsed.active_prompt,
+      parsed.prompt,
+      parsed.user_prompt,
+      parsedReply?.question,
+      parsedCurrentTurn?.question,
+    ]
+      .map(normalizedDebugReplyText)
+      .filter(Boolean);
+    if (rendered.question && questionCandidates.length > 0) {
+      const expectedQuestion = normalizedDebugReplyText(rendered.question);
+      if (!questionCandidates.some((candidate) => candidate === expectedQuestion)) return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function classifyCompactToolTraceAction(panelId: string | null, actionId: string | null) {
@@ -11638,12 +11084,15 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
   const calculatorPanelStateForDebug = readAgentLoopAuditRecord(
     payload.calculator_panel_state ?? debug?.calculator_panel_state ?? agentLoop?.calculator_panel_state,
   );
+  const isRenderedDomProjectionWithoutTurn =
+    coerceText(payload.debug_export_source).trim() === "rendered_reply_dom" &&
+    !coerceText(payload.active_turn_id).trim();
   const activeTurnId =
     coerceText(agentLoop?.terminal_artifact_owner_turn_id).trim() ||
     coerceText(debug?.turn_id).trim() ||
     coerceText(canonicalGoalFrame?.turn_id).trim() ||
     coerceText(turnTruthTable?.turn_id).trim() ||
-    reply.id;
+    (isRenderedDomProjectionWithoutTurn ? "" : reply.id);
   const canonicalActiveTurnId = coerceText(terminalAuthorityForDebug?.turn_id).trim() || activeTurnId;
   const clientActiveTurnId = reply.id && reply.id !== canonicalActiveTurnId ? reply.id : null;
   const activePrompt = reply.question ?? coerceText(payload.selectedDebugQuestion).trim() ?? "";
@@ -11808,9 +11257,12 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
       : firstBrokenRail === "backend_ask_entrypoint" || firstBrokenRail === "prompt_submit_entrypoint"
         ? "prompt_submit_entrypoint"
         : null);
-  const toolTraceDisclosureForDebug = buildCompactToolTraceDisclosure(actionEnvelopeForDebug, canonicalActiveTurnId);
+  const toolTraceDisclosureForDebug = buildCompactToolTraceDisclosure(
+    actionEnvelopeForDebug,
+    canonicalActiveTurnId || "client_rendered_reply_dom",
+  );
   const voicePlaybackReconciliation = buildVoicePlaybackReconciliationDebug({
-    activeTurnId: canonicalActiveTurnId,
+    activeTurnId: canonicalActiveTurnId || null,
     selectedFinalAnswer,
     source: payload,
   });
@@ -11823,8 +11275,8 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
   const envelopeWithoutHash = {
     schema: "helix.ask.debug_export.v1",
     exported_at_ms: Date.now(),
-    active_turn_id: canonicalActiveTurnId,
-    backend_turn_id: canonicalActiveTurnId,
+    active_turn_id: canonicalActiveTurnId || null,
+    backend_turn_id: canonicalActiveTurnId || null,
     client_active_turn_id: clientActiveTurnId,
     active_prompt: activePrompt,
     active_prompt_hash: stableHelixProjectionHash(activePrompt),
@@ -11858,7 +11310,7 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
     situation_context_pack: situationContextPackForDebug,
     live_environment_turn_relevance: liveEnvironmentRelevanceForDebug,
     resolved_turn_summary: {
-      turn_id: canonicalActiveTurnId,
+      turn_id: canonicalActiveTurnId || null,
       final_status:
         (clientProgressPlaceholderExport ? "in_progress" : null) ||
         (liveEnvironmentAnswerApplied ? "final_answer" : null) ||
@@ -12923,17 +12375,6 @@ function hash32(value: string): number {
   return hash >>> 0;
 }
 
-function mulberry32(seed: number): () => number {
-  let state = seed >>> 0;
-  return () => {
-    state += 0x6d2b79f5;
-    let t = state;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
 function resolveReasoningTheaterSuppressionReason(
   text: string,
 ): ReasoningTheaterSuppressionReason | null {
@@ -13479,34 +12920,6 @@ function deriveReasoningTheaterState(input: {
   };
 }
 
-function buildReasoningTheaterParticlesFromMirekArtifact(
-  artifact: MirekReasoningArtifactV1,
-): ReasoningTheaterParticle[] {
-  const width = Math.max(1, artifact.grid.width);
-  const height = Math.max(1, artifact.grid.height);
-  return artifact.grid.cells.map((cell, index) => {
-    const roleSize =
-      cell.kind === "objective" || cell.kind === "proof" || cell.kind === "blocked"
-        ? 4.4
-        : cell.kind === "evidence"
-          ? 3.8
-          : cell.kind === "support"
-            ? 2.8
-            : 2.2;
-    const jitter = (hash32(`${artifact.finalFrameHash}:${cell.id}:${index}`) % 9) / 10;
-    return {
-      id: cell.id,
-      leftPct: Math.round(((cell.x + 0.5) / width) * 1000) / 10,
-      topPct: Math.round(((cell.y + 0.5) / height) * 1000) / 10,
-      sizePx: roleSize + jitter,
-      opacity: clamp01(cell.opacity),
-      delayS: ((hash32(`${cell.id}:delay`) % 900) / 1000),
-      durationS: 1.2 + ((hash32(`${cell.id}:duration`) % 1800) / 1000),
-      kind: cell.kind,
-    };
-  });
-}
-
 const MIREK_EVIDENCE_PATH_KEYS = [
   "path",
   "source_path",
@@ -13603,56 +13016,6 @@ function calculateMirekSharedExactPathRatio(
     if (previousPaths.has(path)) shared += 1;
   }
   return clamp01(shared / Math.max(1, currentPaths.size));
-}
-
-function mirekCellParticleClassName(kind: MirekCellKind): string {
-  switch (kind) {
-    case "objective":
-      return "bg-white/90 shadow-[0_0_10px_rgba(255,255,255,0.5)]";
-    case "evidence":
-      return "bg-emerald-200/85 shadow-[0_0_10px_rgba(110,231,183,0.45)]";
-    case "support":
-      return "bg-cyan-200/80 shadow-[0_0_8px_rgba(103,232,249,0.4)]";
-    case "gap":
-      return "bg-amber-200/85 shadow-[0_0_10px_rgba(252,211,77,0.45)]";
-    case "conflict":
-      return "bg-orange-300/85 shadow-[0_0_10px_rgba(253,186,116,0.45)]";
-    case "proof":
-      return "bg-violet-200/90 shadow-[0_0_12px_rgba(221,214,254,0.55)]";
-    case "blocked":
-      return "bg-rose-300/90 shadow-[0_0_12px_rgba(253,164,175,0.55)]";
-    case "afterglow":
-      return "bg-slate-300/45";
-    case "context":
-    case "empty":
-    default:
-      return "bg-sky-200/65 shadow-[0_0_8px_rgba(186,230,253,0.28)]";
-  }
-}
-
-function mirekCellGridClassName(kind: MirekCellKind): string {
-  switch (kind) {
-    case "proof":
-      return "bg-white shadow-[0_0_12px_rgba(255,255,255,0.7)]";
-    case "objective":
-      return "bg-white/95 shadow-[0_0_10px_rgba(255,255,255,0.55)]";
-    case "evidence":
-      return "bg-white/85 shadow-[0_0_9px_rgba(209,250,229,0.5)]";
-    case "support":
-      return "bg-cyan-100/80 shadow-[0_0_8px_rgba(207,250,254,0.45)]";
-    case "gap":
-      return "bg-amber-100/80 shadow-[0_0_8px_rgba(254,243,199,0.45)]";
-    case "conflict":
-      return "bg-orange-100/80 shadow-[0_0_9px_rgba(255,237,213,0.45)]";
-    case "blocked":
-      return "bg-rose-100/85 shadow-[0_0_10px_rgba(255,228,230,0.5)]";
-    case "afterglow":
-      return "bg-white/35 shadow-[0_0_6px_rgba(255,255,255,0.25)]";
-    case "context":
-    case "empty":
-    default:
-      return "bg-white/55 shadow-[0_0_6px_rgba(255,255,255,0.3)]";
-  }
 }
 
 function mirekReasoningDisplayDensity(
@@ -13776,22 +13139,6 @@ function buildMirekReasoningDisplayGrid(
   return { width, height, cells };
 }
 
-function buildReasoningTheaterFrontierParticles(
-  seed: number,
-  count: number,
-): ReasoningTheaterFrontierParticleNode[] {
-  const rng = mulberry32(seed ^ 0xa5a5a5a5);
-  const nodes: ReasoningTheaterFrontierParticleNode[] = [];
-  for (let i = 0; i < count; i += 1) {
-    nodes.push({
-      id: `frontier-particle-${i}`,
-      phaseOffsetMs: Math.round(rng() * 1200),
-      baseRadiusPx: 2 + rng() * 2.4,
-    });
-  }
-  return nodes;
-}
-
 const HELIX_ASK_OUTPUT_TOKENS = clampNumber(
   readNumber(
     (import.meta as any)?.env?.VITE_HELIX_ASK_OUTPUT_TOKENS,
@@ -13810,21 +13157,11 @@ const HELIX_ASK_TURN_CLIENT_WATCHDOG_MS = clampNumber(
 );
 const HELIX_ASK_PATH_REGEX =
   /(?:[A-Za-z0-9_.-]+[\\/])+[A-Za-z0-9_.-]+\.(?:tsx|ts|jsx|js|md|json|cjs|mjs|py|yml|yaml)/g;
-const HELIX_ASK_CORE_FOCUS = /(helix ask|helix|ask system|ask pipeline|ask mode)/i;
-const HELIX_ASK_CORE_PATH_BOOST =
-  /(docs\/helix-ask-flow\.md|client\/src\/components\/helix\/HelixAskPill\.tsx|client\/src\/pages\/desktop\.tsx|server\/routes\/agi\.plan\.ts|server\/skills\/llm\.local|asklocal)/i;
-const HELIX_ASK_CORE_NOISE =
-  /(docs\/SMOKE\.md|docs\/V0\.1-SIGNOFF\.md|docs\/ESSENCE-CONSOLE|docs\/TRACE-API\.md|HullMetricsVisPanel|shared\/schema\.ts|server\/db\/)/i;
 const HELIX_ASK_METHOD_TRIGGER = /(scientific method|methodology|method\b)/i;
 const HELIX_ASK_STEP_TRIGGER =
   /(how to|how does|how do|steps?|step-by-step|procedure|process|workflow|pipeline|implement|implementation|configure|setup|set up|troubleshoot|debug|fix|resolve)/i;
 const HELIX_ASK_COMPARE_TRIGGER =
   /(compare|versus|vs\.?|difference|better|worse|more accurate|accuracy|tradeoffs|advantages|what is|what's|why is|why are|how is|how are)/i;
-const HELIX_ASK_REPO_HINT =
-  /(helix|helix ask|ask system|ask pipeline|ask mode|this system|this repo|repository|repo\b|code|codebase|file|path|component|module|endpoint|api|server|client|ui|panel|pipeline|trace|essence|casimir|warp|alcubierre|resonance|code lattice|lattice|smoke test|smoke\.md|bug|error|crash|config|env|settings|docs\/)/i;
-const HELIX_ASK_FILE_HINT =
-  /(?:[A-Za-z0-9_.-]+[\\/])+[A-Za-z0-9_.-]+\.(?:ts|tsx|js|jsx|md|json|yml|yaml|mjs|cjs|py|rs|go|java|kt|swift|cpp|c|h)/i;
-
 type HelixAskFormat = "steps" | "compare" | "brief";
 
 function decideHelixAskFormat(question?: string): { format: HelixAskFormat; stageTags: boolean } {
@@ -13849,13 +13186,6 @@ function decideHelixAskFormat(question?: string): { format: HelixAskFormat; stag
   return { format: "brief", stageTags: false };
 }
 
-function isHelixAskRepoQuestion(question: string): boolean {
-  const trimmed = question.trim();
-  if (!trimmed) return true;
-  if (HELIX_ASK_FILE_HINT.test(trimmed)) return true;
-  return HELIX_ASK_REPO_HINT.test(trimmed);
-}
-
 function stripStageTags(value: string): string {
   if (!value) return value;
   return value
@@ -13864,10 +13194,6 @@ function stripStageTags(value: string): string {
     .join("\n")
     .trim();
 }
-const HELIX_ASK_WARP_FOCUS = /(warp|bubble|alcubierre|natario)/i;
-const HELIX_ASK_WARP_PATH_BOOST =
-  /(modules\/warp|client\/src\/lib\/warp-|warp-module|natario-warp|warp-theta|energy-pipeline)/i;
-
 const HELIX_PANEL_ALIASES: Array<{ id: PanelDefinition["id"]; aliases: string[] }> = [
   { id: "helix-noise-gens", aliases: ["noise gens", "noise generators", "noise generator"] },
   { id: "alcubierre-viewer", aliases: ["warp bubble", "warp viewer", "alcubierre", "warp visualizer"] },
@@ -13879,15 +13205,6 @@ const HELIX_PANEL_ALIASES: Array<{ id: PanelDefinition["id"]; aliases: string[] 
   { id: "agi-essence-console", aliases: ["essence console", "legacy essence console"] },
 ];
 
-const HELIX_FILE_PANEL_HINTS: Array<{ pattern: RegExp; panelId: PanelDefinition["id"] }> = [
-  { pattern: /(modules\/warp|client\/src\/components\/warp|client\/src\/lib\/warp-|warp-bubble)/i, panelId: "alcubierre-viewer" },
-  { pattern: /(energy-pipeline|warp-pipeline-adapter|pipeline)/i, panelId: "live-energy" },
-  { pattern: /(helix-core\.ts|server\/helix-core|\/helix\/pipeline)/i, panelId: "live-energy" },
-  { pattern: /(code-lattice|resonance)/i, panelId: "resonance-orchestra" },
-  { pattern: /(workflow-timeline|training-trace|tool-trace|trace|timeline)/i, panelId: "workstation-workflow-timeline" },
-  { pattern: /(agi\.plan|essence)/i, panelId: "agi-essence-console" },
-  { pattern: /(docs\/|\.md$)/i, panelId: "docs-viewer" },
-];
 const HELIX_DOC_TOPIC_PATH_HINTS: Array<{ pattern: RegExp; path: string }> = [
   {
     pattern: /\bnhm2\b/i,
@@ -14900,127 +14217,6 @@ export function parseWorkstationActionCommand(value: string): HelixWorkstationAc
   return null;
 }
 
-function buildHelixAskSearchQueries(question: string): string[] {
-  const base = question.trim();
-  if (!base) return [];
-  const normalized = base.toLowerCase();
-  const queries = [base];
-  const seen = new Set([base.toLowerCase()]);
-  const push = (value: string) => {
-    const trimmed = value.trim();
-    if (!trimmed) return;
-    const key = trimmed.toLowerCase();
-    if (seen.has(key)) return;
-    seen.add(key);
-    queries.push(trimmed);
-  };
-
-  if (/(scientific method|ask|assistant|llm|prompt|context|plan|execute|trace|code lattice|resonance)/i.test(normalized)) {
-    push("/api/agi/ask");
-    push("docs/helix-ask-flow.md");
-    push("helix ask");
-    push("helix ask flow");
-    push("helix ask pipeline");
-    push("buildGroundedAskPrompt");
-    push("buildGroundedPrompt");
-    push("askLocal");
-    push("server/routes/agi.plan.ts");
-    push("client/src/pages/desktop.tsx");
-    push("client/src/components/helix/HelixAskPill.tsx");
-    push("client/src/lib/agi/api.ts");
-    push("server/skills/llm.local.spawn.ts");
-  }
-  if (normalized.includes("warp") || normalized.includes("alcubierre") || normalized.includes("bubble")) {
-    push("warp bubble");
-    push("modules/warp/warp-module.ts");
-    push("calculateNatarioWarpBubble");
-    push("warp pipeline");
-    push("energy-pipeline warp");
-  }
-  if (normalized.includes("solve") || normalized.includes("solver")) {
-    push("warp solver");
-    push("constraint gate");
-    push("gr evaluation");
-  }
-
-  return queries.slice(0, 6);
-}
-
-function buildGroundedPrompt(question: string, context: string): string {
-  const formatSpec = decideHelixAskFormat(question);
-  const lines = [
-    "You are Helix Ask, a repo-grounded assistant.",
-    "Use only the evidence in the context below. Cite file paths when referencing code.",
-    "If the context is insufficient, say what is missing and ask a concise follow-up.",
-    "When the context includes solver or calculation functions, summarize the inputs, outputs, and flow before UI details.",
-  ];
-  if (formatSpec.format === "steps") {
-    lines.push("Start directly with a numbered list using `1.` style; use 6-9 steps and no preamble.");
-    lines.push("Each step should be 2-3 sentences and grounded in repo details; cite file paths when relevant.");
-    if (formatSpec.stageTags) {
-      lines.push("Tag each step with the stage in parentheses (observe, hypothesis, experiment, analysis, explain).");
-    } else {
-      lines.push("Do not include stage tags or parenthetical labels unless explicitly requested.");
-    }
-    lines.push("After the steps, add a short paragraph starting with \"In practice,\" (2-3 sentences).");
-  } else if (formatSpec.format === "compare") {
-    lines.push("Answer in 2-3 short paragraphs; do not use numbered steps.");
-    lines.push("If the question is comparative, include a short bullet list (3-5 items) of concrete differences grounded in repo details.");
-    lines.push("Do not include stage tags or parenthetical labels unless explicitly requested.");
-    lines.push("End with a short paragraph starting with \"In practice,\" (2-3 sentences).");
-  } else {
-    lines.push("Answer in 2-3 short paragraphs; do not use numbered steps unless explicitly requested.");
-    lines.push("Do not include stage tags or parenthetical labels unless explicitly requested.");
-    lines.push("End with a short paragraph starting with \"In practice,\" (2-3 sentences).");
-  }
-  lines.push("Avoid repetition; do not repeat any sentence or paragraph.");
-  lines.push("Do not include the words \"Question:\" or \"Context sources\".");
-  lines.push("Keep paragraphs short (2-3 sentences) and separate sections with blank lines.");
-  lines.push("Do not repeat the question or include headings like Question, Context, or Resonance patch.");
-  lines.push("Do not output tool logs, certificates, command transcripts, or repeat the prompt/context.");
-  lines.push('Respond with only the answer and prefix it with "FINAL:".');
-  lines.push("");
-  lines.push(`Question: ${question}`);
-  lines.push("");
-  lines.push("Context:");
-  lines.push(context || "No repo context was attached to this request.");
-  lines.push("");
-  lines.push("FINAL:");
-  return lines.join("\n");
-}
-
-function buildGeneralPrompt(question: string): string {
-  const formatSpec = decideHelixAskFormat(question);
-  const lines = [
-    "You are Helix Ask.",
-    "Answer using general knowledge; do not cite file paths or repo details.",
-  ];
-  if (formatSpec.format === "steps") {
-    lines.push("Start directly with a numbered list using `1.` style; use 4-6 steps and no preamble.");
-    lines.push("Each step should be 1-2 sentences.");
-    if (formatSpec.stageTags) {
-      lines.push("Tag each step with the stage in parentheses (observe, hypothesis, experiment, analysis, explain).");
-    } else {
-      lines.push("Do not include stage tags or parenthetical labels unless explicitly requested.");
-    }
-    lines.push("After the steps, add a short paragraph starting with \"In practice,\" (1-2 sentences).");
-  } else if (formatSpec.format === "compare") {
-    lines.push("Answer in 1-2 short paragraphs; do not use numbered steps.");
-    lines.push("If the question is comparative, include a short bullet list (2-4 items) of concrete differences.");
-    lines.push("End with a short paragraph starting with \"In practice,\" (1-2 sentences).");
-  } else {
-    lines.push("Answer in 1-2 short paragraphs; do not use numbered steps unless explicitly requested.");
-    lines.push("End with a short paragraph starting with \"In practice,\" (1-2 sentences).");
-  }
-  lines.push("Avoid repetition; do not repeat the question.");
-  lines.push('Respond with only the answer and prefix it with "FINAL:".');
-  lines.push("");
-  lines.push(`Question: ${question}`);
-  lines.push("");
-  lines.push("FINAL:");
-  return lines.join("\n");
-}
-
 function normalizeQuestionMatch(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
@@ -15255,53 +14451,6 @@ function stripEvidencePromptBlock(value: string): string {
   if (answerIndex < 0) return value;
   const pruned = [...lines.slice(0, evidenceIndex), ...lines.slice(answerIndex + 1)];
   return pruned.join("\n").trim();
-}
-
-function parseSearchScore(preview: string | undefined): number {
-  if (!preview) return 0;
-  const match = preview.match(/score=([0-9.]+)/i);
-  if (!match) return 0;
-  const parsed = Number(match[1]);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function buildContextFromBundles(bundles: KnowledgeProjectExport[], question: string): string {
-  const files = bundles.flatMap((bundle) => bundle.files ?? []);
-  const helixAskFocus = HELIX_ASK_CORE_FOCUS.test(question);
-  const scored = files
-    .map((file) => {
-      const label = file.path || file.name || "";
-      const preview = file.preview ?? "";
-      let score = parseSearchScore(preview);
-      if (helixAskFocus) {
-        if (HELIX_ASK_CORE_PATH_BOOST.test(label)) {
-          score += 10;
-        }
-        if (HELIX_ASK_CORE_NOISE.test(label)) {
-          score -= 6;
-        }
-      }
-      if (HELIX_ASK_WARP_FOCUS.test(question) && HELIX_ASK_WARP_PATH_BOOST.test(label)) {
-        score += 8;
-      }
-      return { file, label, preview, score };
-    })
-    .filter((entry) => entry.label && entry.preview && entry.score > 0)
-    .sort((a, b) => b.score - a.score);
-
-  const seen = new Set<string>();
-  const lines: string[] = [];
-  for (const entry of scored) {
-    if (seen.has(entry.label)) continue;
-    const preview = clipText(entry.preview, HELIX_ASK_CONTEXT_CHARS);
-    if (!preview) continue;
-    lines.push(`${entry.label}\n${preview}`);
-    seen.add(entry.label);
-    if (lines.length >= HELIX_ASK_CONTEXT_FILES) {
-      return lines.join("\n\n");
-    }
-  }
-  return lines.join("\n\n");
 }
 
 export function HelixAskPill({
@@ -18105,9 +17254,14 @@ export function HelixAskPill({
       debugCopyInFlightRef.current = true;
       setDebugExportDrawer(null);
       try {
-        const localExportPayload =
-          buildReplyScopedDebugExportFromRenderedButton(reply, sourceElement, "rendered_button_scope") ??
-          normalizeReplyMasterDebugPayload(reply, payload);
+        const hasProvidedPayload = typeof payload === "string" && payload.trim().length > 0;
+        const normalizedPayload = normalizeReplyMasterDebugPayload(reply, payload);
+        const providedPayloadMatchesRenderedTurn =
+          hasProvidedPayload && debugPayloadMatchesRenderedTurnPayload(payload, sourceElement);
+        const localExportPayload = providedPayloadMatchesRenderedTurn
+          ? normalizedPayload
+          : buildReplyScopedDebugExportFromRenderedButton(reply, sourceElement, "rendered_button_scope") ??
+            normalizedPayload;
         const exportPayload = boundHelixDebugExportTextForUi(
           await resolveAuthoritativeDebugExportPayload(localExportPayload),
         );
@@ -22801,7 +21955,7 @@ export function HelixAskPill({
               text = event.detail ? `${event.stage}: ${event.detail}` : event.stage;
             }
             if (!text) return;
-            const eventTs = parseTimestampMs(event.ts);
+            const eventTs = parseAskLiveEventTimestampMs(event.ts);
             const nextEvent: AskLiveEventEntry = {
               id: event.id ?? String(event.seq ?? Date.now()),
               text: clipText(text, HELIX_ASK_LIVE_EVENT_MAX_CHARS),
@@ -28527,7 +27681,7 @@ export function HelixAskPill({
       if (!isHelixTool && hasSessionFilter && !isLocalTool && event.sessionId !== askLiveSessionId) {
         return;
       }
-      const eventTs = parseTimestampMs(event.ts);
+      const eventTs = parseAskLiveEventTimestampMs(event.ts);
       if (typeof eventTs === "number" && Number.isFinite(eventTs) && eventTs < startedAt - 500) {
         return;
       }
@@ -28644,7 +27798,7 @@ export function HelixAskPill({
       })) {
         return;
       }
-      const eventTs = parseTimestampMs(detail.entry.ts);
+      const eventTs = parseAskLiveEventTimestampMs(detail.entry.ts);
       setAskStatus(text);
       setAskLiveEvents((prev) => {
         if (prev.some((entry) => entry.id === detail.entry.id)) return prev;
@@ -29158,7 +28312,7 @@ export function HelixAskPill({
         text,
         tool: entry.tool,
         ts: entry.ts,
-        tsMs: parseTimestampMs(entry.ts) ?? undefined,
+        tsMs: parseAskLiveEventTimestampMs(entry.ts) ?? undefined,
         durationMs: entry.durationMs,
         meta:
           entry.meta && typeof entry.meta === "object" && !Array.isArray(entry.meta)
@@ -34690,7 +33844,13 @@ export function HelixAskPill({
                                       {userSettings.showHelixAskDebug ? (
                                         <button
                                           type="button"
-                                          onClick={(event) => void handleCopyReplyMasterDebug(reply, null, event.currentTarget)}
+                                          onClick={(event) =>
+                                            void handleCopyReplyMasterDebug(
+                                              reply,
+                                              replyMasterEventClockPayload,
+                                              event.currentTarget,
+                                            )
+                                          }
                                           disabled={typeof window === "undefined"}
                                           className="rounded-full border border-white/10 bg-white/5 p-1.5 text-slate-400 transition hover:border-cyan-300/40 hover:bg-cyan-400/10 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-50"
                                           aria-label="Debug copy"

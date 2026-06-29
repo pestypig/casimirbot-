@@ -2,8 +2,15 @@ import { describe, expect, it } from "vitest";
 import {
   buildAskLiveEventLogDetailPayload,
   buildAskLiveEventLogExport,
+  cleanHelixRenderedFinalAnswerText,
+  cleanHelixRenderedQuestionText,
   formatAskLiveEventLogLine,
+  HELIX_ASK_PROGRESS_PLACEHOLDER_TEXT,
+  isHelixAskProgressPlaceholderText,
+  normalizedDebugReplyText,
+  parseAskLiveEventTimestampMs,
   parseHelixAskQueuedQuestionsInput,
+  readAskLiveEventIdentity,
   readEventMetaString,
   resolveAskLiveEventTimestampMs,
   type AskLiveEventEntry,
@@ -75,11 +82,28 @@ describe("Helix Ask debug event display", () => {
   it("reads timestamp and metadata aliases without defaulting to UI state", () => {
     expect(resolveAskLiveEventTimestampMs({ id: "event-4", text: "", tsMs: 42 })).toBe(42);
     expect(resolveAskLiveEventTimestampMs({ id: "event-5", text: "", ts: "bad" })).toBeNull();
+    expect(parseAskLiveEventTimestampMs(42.8)).toBe(42);
+    expect(parseAskLiveEventTimestampMs(" 42.8 ")).toBe(42);
+    expect(parseAskLiveEventTimestampMs("2026-01-02T03:04:05.000Z")).toBe(Date.UTC(2026, 0, 2, 3, 4, 5));
     expect(readEventMetaString({ trace_id: " trace-1 ", traceId: "trace-2" }, ["traceId", "trace_id"])).toBe(
       "trace-2",
     );
     expect(readEventMetaString({ trace_id: " trace-1 " }, ["traceId", "trace_id"])).toBe("trace-1");
     expect(readEventMetaString(undefined, ["traceId"])).toBeNull();
+    expect(
+      readAskLiveEventIdentity({
+        id: "event-identity",
+        text: "identity",
+        meta: {
+          active_turn_id: " turn-active ",
+          ask_trace_id: " trace-active ",
+        },
+      }),
+    ).toEqual({ turnId: "turn-active", traceId: "trace-active" });
+    expect(readAskLiveEventIdentity({ id: "event-no-identity", text: "identity" })).toEqual({
+      turnId: null,
+      traceId: null,
+    });
   });
 
   it("preserves queued prompt input as a single normalized turn", () => {
@@ -89,5 +113,29 @@ describe("Helix Ask debug event display", () => {
       "First instruction\n\n---\nQuestion 2: keep this as content",
     ]);
     expect(parseHelixAskQueuedQuestionsInput("   \n")).toEqual([]);
+  });
+
+  it("cleans rendered debug question and final-answer labels without choosing the debug target", () => {
+    expect(cleanHelixRenderedQuestionText("2 Question QUESTION Current whitepaper? USER PROMPT")).toBe(
+      "Current whitepaper?",
+    );
+    expect(cleanHelixRenderedQuestionText("   ")).toBeNull();
+    expect(
+      cleanHelixRenderedFinalAnswerText(
+        "Final answer FINAL Compound answer body COMPOUND EVIDENCE SYNTHESIS ANSWER",
+      ),
+    ).toBe("Compound answer body");
+    expect(cleanHelixRenderedFinalAnswerText("Final answer final 3 + 5 = 8 workstation tool evaluation")).toBe(
+      "3 + 5 = 8",
+    );
+    expect(normalizedDebugReplyText("  A\n\n  compact\tanswer  ")).toBe("A compact answer");
+    expect(normalizedDebugReplyText(42)).toBe("42");
+  });
+
+  it("recognizes the shared in-progress placeholder without owning reply lifecycle behavior", () => {
+    expect(HELIX_ASK_PROGRESS_PLACEHOLDER_TEXT).toBe("Reasoning in progress...");
+    expect(isHelixAskProgressPlaceholderText(" reasoning in progress... ")).toBe(true);
+    expect(isHelixAskProgressPlaceholderText("Reasoning complete.")).toBe(false);
+    expect(isHelixAskProgressPlaceholderText(null)).toBe(false);
   });
 });

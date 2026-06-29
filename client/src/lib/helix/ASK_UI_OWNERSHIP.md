@@ -11,18 +11,19 @@ This map keeps the `HelixAskPill.tsx` split readable while the component is bein
 | `ask-context-capsule-display.ts` | Context-capsule token cleanup, palette selection, compact copy text, stamp image projection, and session-capsule confidence labels. | Capsule commit creation, automaton stepping, confidence derivation, ledger ranking, prompt admission. |
 | `ask-convergence-display.ts` | Context-capsule convergence source/proof/maturity display labels. | Convergence state derivation, proof gates, capsule commits, collapse events. |
 | `ask-continuous-turn-display.ts` | Continuous turn rows and live-answer bridge class/state projection. | Live answer runtime, mailbox wake decisions. |
-| `ask-debug-event-display.ts` | Live event log lines, debug detail payload formatting, queued prompt normalization. | Debug export authority, active-turn admission, fetches. |
+| `ask-debug-event-display.ts` | Live event log lines, timestamp parsing, event identity display parsing, debug detail payload formatting, queued prompt normalization, rendered debug text cleanup, and shared in-progress placeholder display recognition. | Debug export authority, active-turn admission, active-turn event filtering, reply selection, reply lifecycle hiding, DOM traversal, fetches. |
 | `ask-display-text.ts` | Shared deterministic display text normalization for Ask event labels. | Classification, routing, execution decisions. |
 | `ask-envelope-copy.ts` | Response-envelope copy text and citation display normalization. | Response selection, envelope authority, fallback construction. |
 | `ask-goal-pill-display.ts` | Goal-pill label and cadence text formatting. | Goal session transport, edits, pause/resume/stop actions. |
 | `ask-live-source-display.ts` | Live-source mail transcript and turn stream display rows. | Mailbox reads, source admission, decision wakes. |
+| `ask-luma-mood-display.ts` | Ask shell Luma mood palette class projection. | Mood classification, mood randomization, theme broadcasts, asset selection, state updates. |
 | `ask-observer-commentary-display.ts` | Observer lane user-facing commentary text. | Workstation dispatch, observer execution, user-input requests. |
 | `ask-observer-events.ts` | Observer lifecycle event object builders. | Event publication, runtime execution. |
-| `ask-procedural-display.ts` | Procedural timeline/debug-copy action label formatting. | Timeline rendering, route selection, tool execution. |
+| `ask-procedural-display.ts` | Procedural timeline/debug-copy action label formatting and workstation intent-stage detail copy. | Timeline rendering, route selection, router fail IDs, workstation dispatch, tool execution. |
 | `ask-read-aloud-display.ts` | Read-aloud button labels and deterministic mic/read-aloud UI state transitions. | TTS transport, audio playback, audio graph behavior, voice diagnostics. |
 | `ask-reasoning-battle-display.ts` | Reasoning battle visual class names, deterministic positions/styles, and answer tint palette projection. | Battle event construction, reasoning state, JSX rendering, terminal authority. |
 | `ask-reasoning-frontier-display.ts` | Reasoning frontier action labels and floating action text/class projection. | Frontier tracker state updates, timers, rendering, route/terminal decisions. |
-| `ask-reasoning-theater-display.ts` | Reasoning theater labels, stance meter classes, suppression copy, and medal asset paths. | Theater state derivation, hard-failure interpretation, timers, refs, JSX rendering, route/terminal decisions. |
+| `ask-reasoning-theater-display.ts` | Reasoning theater labels, stance meter classes, suppression copy, medal asset paths, Mirek cell visual classes, Mirek artifact particle projection, and frontier particle node projection. | Theater state derivation, hard-failure interpretation, Mirek evidence-anchor collection, Mirek grid density/simulation, frontier tracker updates, timers, refs, JSX rendering, route/terminal decisions. |
 | `ask-stage-play-ledger.ts` | Stage Play chat ledger display events. | Stage Play runtime or chat persistence. |
 | `ask-status-classnames.ts` | Procedural and causal trace row class-name mapping. | React rendering, timeline construction. |
 | `ask-steering-queue-display.ts` | Steering queue item normalization and classes. | Auto-wake execution, mailbox mutation, workstation actions. |
@@ -51,7 +52,7 @@ These are the major `HelixAskPill.tsx` clusters that still need either behavior-
 
 | Local cluster | Representative anchors | Current boundary |
 | --- | --- | --- |
-| Visual/audio capture preferences and live projections | `readHelixAskVisualCaptureAudioPreference`, `syncHelixAskVisualCaptureRoutePreference`, `HelixAskLiveSituationProjection`, `HelixAskLiveAnswerEnvironmentProjection` | Reads browser state/stores or renders React projections; keep local until a UI/runtime boundary is designed. |
+| Visual/audio capture preferences | `readHelixAskVisualCaptureAudioPreference`, `syncHelixAskVisualCaptureRoutePreference` | Reads browser state/stores and mutates capture route preferences; stale live projection components were removed instead of preserved. |
 | Prompt interpretation and planner policy | `classifyHelixReasoningIntent`, `deriveHelixPlannerContract`, `evaluateEvidenceFinalizationGate`, `resolveHelixDispatchPolicyAtTurnStart` | Route admission and terminal/finalization policy; behavior-goal only. |
 | Workstation pending input and dispatch arbitration | `buildWorkstationUserInputRequest`, `resolvePendingWorkstationUserInput`, `parseWorkstationActionCommand`, `syncDocViewerStateFromWorkstationAction` | User-input state, panel actions, docs-viewer handoff, and workstation mutation; behavior-goal only. |
 | Voice capture, STT, confirmation, continuation, and auto-dispatch | `resolveTranscriptConfirmPolicy`, `evaluateVoiceAutoDispatchGovernance`, `shouldMergeVoiceContinuationTurn`, `buildVoiceReasoningDispatchPrompt`, `deriveVoiceTimelineSuppressionMeta` | Mic/STT/runtime control, transcript lifecycle, and dispatch policy; do not move as display. |
@@ -62,7 +63,7 @@ These are the major `HelixAskPill.tsx` clusters that still need either behavior-
 | Visible terminal and route authority | `resolveHelixAskVisibleTerminal`, `buildHelixRuntimeAskLiveEvents`, `resolveHelixAskHardPromptProjectionGuard`, `requiresHelixAskBackendEntrypoint` | Terminal projection, route/product authority, and backend-entrypoint guard behavior. |
 | Debug export and clipboard authority | `buildReplyScopedDebugExportFromRenderedReply`, `buildReplyScopedDebugExportFromRenderedButton`, `resolveAuthoritativeDebugExportPayload`, `copyDebugPayloadToClipboard` | Reply-scoped debug binding, backend debug export materialization, fallback bounding, and clipboard readback. |
 | Reasoning theater state and simulation | `deriveReasoningTheaterState`, `readReasoningTheaterHardFailureSignals`, `buildMirekReasoningDisplayGrid`, `buildReasoningTheaterFrontierParticles` | State derivation, hard-failure interpretation, cellular-grid simulation, timers, and React rendering; display labels/classes are already extracted. |
-| Legacy local Ask fallback | `buildHelixAskSearchQueries`, `buildGroundedPrompt`, `buildGeneralPrompt`, `stripPromptEcho`, `extractAnswerBlock` | Legacy/local fallback prompt construction and output cleanup; do not expand while backend Ask is authoritative. |
+| Legacy local Ask fallback output cleanup | `stripPromptEcho`, `extractAnswerBlock`, `stripEvidencePromptBlock` | Legacy/local fallback prompt construction; dead prompt/query/context builders were removed instead of preserved while backend Ask is authoritative. |
 
 ## Behavior-Sensitive Queue
 

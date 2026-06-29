@@ -166,11 +166,35 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(ledger).not.toContain("runAskTurn");
   });
 
-  it("keeps timeline lifecycle behavior local and removes unused timeline label trap doors", () => {
+  it("keeps lifecycle behavior local and removes unused local trap doors", () => {
     const pill = read("client/src/components/helix/HelixAskPill.tsx");
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
 
     expect(pill).not.toContain("const HELIX_TIMELINE_TYPE_LABEL");
+    expect(pill).not.toContain("const HELIX_FILE_PANEL_HINTS");
+    expect(pill).not.toContain("function ensureFinalMarker");
+    expect(pill).not.toContain("const VOICE_TURN_HASH_STABLE_DWELL_MS");
+    expect(pill).not.toContain("function readLatestHelixRuntimeChosenCapability");
+    expect(pill).not.toContain("function readHelixAskTerminalText");
+    expect(pill).not.toContain("function resolveObjectiveReasoningTrace");
+    expect(pill).not.toContain("type HelixAskObjectiveReasoningTrace");
+    expect(pill).not.toContain("function inferExplorationTopicKey");
+    expect(pill).not.toContain("function buildFallbackReplyMasterDebugExport");
+    expect(pill).not.toContain("function isHelixAskRepoQuestion");
+    expect(pill).not.toContain("function parseSearchScore");
+    expect(pill).not.toContain("KnowledgeProjectExport");
+    expect(pill).not.toContain("function HelixAskLiveSituationProjection");
+    expect(pill).not.toContain("function HelixAskLiveAnswerEnvironmentProjection");
+    expect(pill).not.toContain("LiveSituationArtifactCard");
+    expect(pill).not.toContain("LiveAnswerEnvironmentCard");
+    for (const symbol of [
+      "buildHelixAskSearchQueries",
+      "buildGroundedPrompt",
+      "buildGeneralPrompt",
+      "buildContextFromBundles",
+    ]) {
+      expect(pill).not.toContain(`function ${symbol}`);
+    }
     expect(pill).toContain("const addHelixTimelineEntry = useCallback");
     expect(pill).toContain("const patchHelixTimelineEntry = useCallback");
     expect(map).toContain("Timeline entry creation, ordering, patching, filtering, and feed state");
@@ -190,7 +214,7 @@ describe("Helix Ask UI ownership boundaries", () => {
       "resolveHelixAskVisibleTerminal",
       "resolveAuthoritativeDebugExportPayload",
       "deriveReasoningTheaterState",
-      "buildHelixAskSearchQueries",
+      "stripPromptEcho",
     ]) {
       expect(pill).toContain(localAnchor);
       expect(map).toContain(localAnchor);
@@ -345,12 +369,31 @@ describe("Helix Ask UI ownership boundaries", () => {
       "buildAskLiveEventLogExport",
       "buildAskLiveEventLogDetailPayload",
       "readEventMetaString",
+      "readAskLiveEventIdentity",
       "resolveAskLiveEventTimestampMs",
+      "parseAskLiveEventTimestampMs",
       "parseHelixAskQueuedQuestionsInput",
+      "cleanHelixRenderedQuestionText",
+      "cleanHelixRenderedFinalAnswerText",
+      "normalizedDebugReplyText",
+      "isHelixAskProgressPlaceholderText",
     ]) {
       expect(pill).not.toContain(`function ${symbol}`);
       expect(pill).not.toContain(`export function ${symbol}`);
       expect(debugDisplay).toContain(`export function ${symbol}`);
+    }
+    expect(pill).not.toContain('const HELIX_ASK_PROGRESS_PLACEHOLDER_TEXT = "Reasoning in progress..."');
+    expect(debugDisplay).toContain('export const HELIX_ASK_PROGRESS_PLACEHOLDER_TEXT = "Reasoning in progress..."');
+    for (const localAnchor of [
+      "extractHelixRenderedTurnDebugFromButton",
+      "buildReplyScopedDebugExportFromRenderedButton",
+      "resolveAuthoritativeDebugExportPayload",
+      "isHelixAskProgressPlaceholderReply",
+      "shouldHideHelixAskTranscriptReply",
+      "askLiveEventBelongsToActiveTurn",
+    ]) {
+      expect(pill).toContain(`function ${localAnchor}`);
+      expect(debugDisplay).not.toContain(localAnchor);
     }
     expect(pill).not.toContain("type AskLiveEventEntry =");
     expect(debugDisplay).toContain("export type AskLiveEventEntry");
@@ -425,8 +468,12 @@ describe("Helix Ask UI ownership boundaries", () => {
     const procedural = read("client/src/lib/helix/ask-procedural-display.ts");
 
     expect(pill).toContain('from "@/lib/helix/ask-procedural-display"');
-    expect(pill).not.toContain("function readProceduralActionLabel");
-    expect(procedural).toContain("export function readProceduralActionLabel");
+    for (const symbol of ["readProceduralActionLabel", "formatWorkstationIntentStageDetail"]) {
+      expect(pill).not.toContain(`function ${symbol}`);
+      expect(procedural).toContain(`export function ${symbol}`);
+    }
+    expect(pill).toContain("function resolveWorkstationRouterFailId");
+    expect(procedural).not.toContain("resolveWorkstationRouterFailId");
     expect(procedural).not.toMatch(/from ["']react["']/);
     expect(procedural).not.toContain("@/store/");
     expect(procedural).not.toContain("@/components/helix/HelixAskPill");
@@ -434,6 +481,24 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(procedural).not.toContain("enqueueVoicePlaybackIntent");
     expect(procedural).not.toContain("runAskTurn");
     expect(procedural).not.toContain("fetch(");
+  });
+
+  it("keeps Luma mood palette classes in the non-React mood display module", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const moodDisplay = read("client/src/lib/helix/ask-luma-mood-display.ts");
+
+    expect(pill).toContain('from "@/lib/helix/ask-luma-mood-display"');
+    expect(pill).not.toContain("type LumaMoodPalette");
+    expect(pill).not.toContain("const LUMA_MOOD_PALETTE");
+    expect(moodDisplay).toContain("export type LumaMoodPalette");
+    expect(moodDisplay).toContain("export const LUMA_MOOD_PALETTE");
+    expect(moodDisplay).not.toMatch(/from ["']react["']/);
+    expect(moodDisplay).not.toContain("@/store/");
+    expect(moodDisplay).not.toContain("@/components/helix/HelixAskPill");
+    expect(moodDisplay).not.toContain("broadcastLumaMood");
+    expect(moodDisplay).not.toContain("setAskMood");
+    expect(moodDisplay).not.toContain("resolveMoodAsset");
+    expect(moodDisplay).not.toContain("fetch(");
   });
 
   it("keeps read-aloud labels and UI state transitions in the non-React read-aloud display module", () => {
@@ -581,7 +646,21 @@ describe("Helix Ask UI ownership boundaries", () => {
       expect(theaterDisplay).toContain(`export const ${symbol}`);
     }
     expect(theaterDisplay).toContain("REASONING_THEATER_SUPPRESSION_LABEL");
+    for (const symbol of ["mirekCellParticleClassName", "mirekCellGridClassName"]) {
+      expect(pill).not.toContain(`function ${symbol}`);
+      expect(theaterDisplay).toContain(`export function ${symbol}`);
+    }
+    expect(pill).not.toContain("function buildReasoningTheaterFrontierParticles");
+    expect(theaterDisplay).toContain("export function buildReasoningTheaterFrontierParticles");
+    expect(theaterDisplay).toContain("export type ReasoningTheaterFrontierParticleNode");
+    expect(pill).not.toContain("function buildReasoningTheaterParticlesFromMirekArtifact");
+    expect(theaterDisplay).toContain("export function buildReasoningTheaterParticlesFromMirekArtifact");
+    expect(theaterDisplay).toContain("export type ReasoningTheaterParticle");
     expect(pill).toContain("function deriveReasoningTheaterState");
+    expect(pill).toContain("function collectMirekEvidencePathsFromLiveEvents");
+    expect(pill).toContain("function mirekReasoningDisplayDensity");
+    expect(pill).toContain("function buildMirekReasoningDisplayGrid");
+    expect(pill).toContain("advanceReasoningTheaterFrontierTracker");
     expect(pill).toContain("const REASONING_THEATER_SUPPRESSION_PATTERNS");
     expect(pill).toContain("function resolveReasoningTheaterPhase");
     expect(theaterDisplay).not.toMatch(/from ["']react["']/);

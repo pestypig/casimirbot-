@@ -58,6 +58,21 @@ describe("Helix Ask E63 debug copy atomicity", () => {
     expect(source).not.toContain("onPointerDown={() => void handleCopyReplyMasterDebug");
   });
 
+  it("binds scoped debug copy to the rendered reply event-clock payload", () => {
+    const source = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/components/helix/HelixAskPill.tsx"),
+      "utf8",
+    );
+
+    expect(source).toContain("replyMasterEventClockPayload = buildReplyMasterEventClockExport");
+    expect(source).toMatch(/handleCopyReplyMasterDebug\(\s*reply,\s*replyMasterEventClockPayload/);
+    expect(source).toContain("const hasProvidedPayload = typeof payload === \"string\" && payload.trim().length > 0");
+    expect(source).toContain("const providedPayloadMatchesRenderedTurn =");
+    expect(source).toContain("const localExportPayload = providedPayloadMatchesRenderedTurn");
+    expect(source).toContain(": buildReplyScopedDebugExportFromRenderedButton");
+    expect(source).toContain("isRenderedDomProjectionWithoutTurn ? \"\" : reply.id");
+  });
+
   it("preserves rail-critical fields when debug copy compacts an oversized payload", async () => {
     const originalNavigator = globalThis.navigator;
     const writes: string[] = [];

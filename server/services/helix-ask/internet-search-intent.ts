@@ -41,6 +41,8 @@ export type ToolUseRestatementV1 = {
 
 const hasLocalWorkspaceScopeCue = (promptText: string): boolean =>
   /\b(?:docs?\s+viewer|documents?\s+viewer|current\s+(?:doc|document)|active\s+(?:doc|document)|repo|repository|codebase|working\s+tree|workspace|local\s+files?|our\s+docs?|from\s+(?:our|local|the\s+)?docs?)\b/i.test(promptText) ||
+  /\b(?:current\s+)?(?:NHM[-\s]?2\s+)?(?:white\s*paper|whitepaper|doc(?:ument)?|paper)\b[\s\S]{0,120}\b(?:document\s+)?evidence\b/i.test(promptText) ||
+  /\b(?:use|consult|check|read|inspect|apply|ground|base)\b[\s\S]{0,120}\b(?:NHM[-\s]?2\s+)?(?:white\s*paper|whitepaper|doc(?:ument)?|paper)\b/i.test(promptText) ||
   /\b(?:summari[sz]e|summary|overview|takeaways?|explain|describe|gist)\b[\s\S]{0,80}\bdocs?\s+about\b/i.test(promptText) ||
   /(?:^|[\s"'(])(?:\/docs\/|docs[\\/])\S+/i.test(promptText);
 
@@ -246,16 +248,17 @@ export const detectInternetSearchIntent = (promptText: string): HelixInternetSea
   const scholarlyScope = hasScholarlyScopeCue(prompt);
   const domains = extractDomains(prompt);
   const recencyDays = extractRecencyDays(prompt);
+  const explicitWebSearchCue = /\b(?:search\s+(?:the\s+)?(?:web|internet)|look\s+up\s+online|check\s+online|google\s+it|google\s+search)\b/i.test(prompt);
   const searchRequested =
     restatement.requiredToolFamilies.includes("internet_search") ||
     !isExplanatoryOnlyPrompt(prompt) &&
     !hasExplicitNoBrowseConstraint(prompt) &&
     !isSuppliedTextOnlyTask(prompt) &&
-    !scholarlyScope &&
+    (!scholarlyScope || explicitProviderCue || explicitWebSearchCue) &&
     (
       explicitProviderCue ||
       (searchAction && currentWebCue) ||
-      /\b(?:search\s+(?:the\s+)?(?:web|internet)|look\s+up\s+online|check\s+online|google\s+it|google\s+search)\b/i.test(prompt) ||
+      explicitWebSearchCue ||
       (domains.length > 0 && searchAction)
     ) &&
     (!localScope || explicitProviderCue || /\b(?:web|internet|online|google)\b/i.test(prompt)) &&

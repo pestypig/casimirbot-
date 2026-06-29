@@ -150,6 +150,95 @@ describe("explicit workstation gateway derived calls", () => {
     });
   });
 
+  it("admits prompt-named docs, calculator, and theory capabilities in one Codex itinerary", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "Codex workstation focused retest: use exactly these workstation observations before answering: docs.search for docs/research/nhm2-current-status-whitepaper-2026-05-02.md with query claim boundary; scientific-calculator.solve_expression with expression 8*9; theory-badge-graph.reflect_discussion_context for NHM2 claim boundary. Answer what those observations support and what remains unproven.",
+        workspace_context_snapshot: docSnapshot,
+      },
+    });
+
+    expect(capabilities(requests)).toEqual([
+      "docs.search",
+      "scientific-calculator.solve_expression",
+      "theory-badge-graph.reflect_discussion_context",
+    ]);
+    expect(requests.find((request) => request.capability_id === "docs.search")).toMatchObject({
+      derivation_source: "helix_prompt_named_capability",
+      arguments: {
+        query: "claim boundary",
+        paths: ["docs/research/nhm2-current-status-whitepaper-2026-05-02.md"],
+      },
+    });
+    expect(requests.find((request) => request.capability_id === "scientific-calculator.solve_expression")).toMatchObject({
+      arguments: {
+        expression: "8*9",
+      },
+    });
+    expect(requests.find((request) => request.capability_id === "theory-badge-graph.reflect_discussion_context")).toMatchObject({
+      derivation_source: "helix_prompt_named_capability",
+      arguments: {
+        prompt: "NHM2 claim boundary",
+      },
+    });
+  });
+
+  it("does not admit internet search from local current-whitepaper evidence wording", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "Codex workstation API debug retest: use the current NHM2 whitepaper as bounded document evidence, calculate 8 * 9 with scientific-calculator.solve_expression, and reflect through the theory badge graph for the claim boundary. Answer what the evidence supports and what remains unproven.",
+        workspace_context_snapshot: docSnapshot,
+      },
+    });
+
+    expect(capabilities(requests)).toEqual([
+      "docs.search",
+      "scientific-calculator.solve_expression",
+      "theory-badge-graph.reflect_discussion_context",
+    ]);
+    expect(capabilities(requests)).not.toContain("internet-search.search_web");
+    expect(requests.find((request) => request.capability_id === "theory-badge-graph.reflect_discussion_context")).toMatchObject({
+      derivation_source: "helix_prompt_derived_theory_reflection",
+      arguments: {
+        prompt: "the claim boundary",
+      },
+    });
+  });
+
+  it("admits explicitly named scholarly and internet capabilities without inferring either from prose", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "Use scholarly-research.lookup_papers for quantum inequality sampling, and internet-search.search_web for public corroboration.",
+      },
+    });
+
+    expect(capabilities(requests)).toEqual([
+      "scholarly-research.lookup_papers",
+      "internet-search.search_web",
+    ]);
+    expect(requests[0]).toMatchObject({
+      derivation_source: "helix_prompt_named_capability",
+      arguments: {
+        query: "quantum inequality sampling",
+      },
+    });
+    expect(requests[1]).toMatchObject({
+      derivation_source: "helix_prompt_named_capability",
+      arguments: {
+        query: "public corroboration",
+      },
+    });
+  });
+
   it("does not let sentence-leading words leak into mixed prompt calculator expressions", () => {
     const requests = readWorkstationGatewayCallRequestsForTurn({
       includePlannerDerived: true,

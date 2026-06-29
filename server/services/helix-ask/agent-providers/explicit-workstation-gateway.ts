@@ -26,6 +26,15 @@ const INTERNET_SEARCH_CAPABILITY = HELIX_INTERNET_SEARCH_CAPABILITY;
 const SCHOLARLY_RESEARCH_SEARCH_CAPABILITY = HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY;
 const THEORY_CONTEXT_REFLECTION_CAPABILITY = "theory-badge-graph.reflect_discussion_context" as const;
 const CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY = "civilization-bounds.reflect_system_bounds" as const;
+const PROMPT_NAMED_CAPABILITIES = [
+  DOCS_SEARCH_CAPABILITY,
+  REPO_SEARCH_CAPABILITY,
+  CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+  THEORY_CONTEXT_REFLECTION_CAPABILITY,
+  CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+  SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+  INTERNET_SEARCH_CAPABILITY,
+] as const;
 
 const readRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
@@ -73,6 +82,14 @@ const hasNegatedToolInstruction = (prompt: string, toolPattern: RegExp): boolean
 const requestKey = (request: Record<string, unknown>): string => {
   const args = readRecord(request.arguments ?? request.args) ?? {};
   const capability = readString(request.capability_id) ?? readString(request.capabilityId) ?? "";
+  if (
+    capability === THEORY_CONTEXT_REFLECTION_CAPABILITY ||
+    capability === CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY ||
+    capability === SCHOLARLY_RESEARCH_SEARCH_CAPABILITY ||
+    capability === INTERNET_SEARCH_CAPABILITY
+  ) {
+    return capability;
+  }
   const expression = readString(args.expression) ?? readString(args.latex);
   const query = readString(args.query) ?? readString(args.prompt) ?? readString(args.text);
   const pathList = Array.isArray(args.paths)
@@ -92,6 +109,70 @@ const appendDedupe = (
     seen.add(key);
     requests.push(request);
   }
+};
+
+const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const promptNamedCapabilityPattern = (capabilityId: string): RegExp =>
+  new RegExp(`(?:^|[^A-Za-z0-9_.-])${escapeRegExp(capabilityId)}(?=$|[^A-Za-z0-9_.-])`, "i");
+
+const hasPromptNamedCapability = (prompt: string, capabilityId: string): boolean =>
+  promptNamedCapabilityPattern(capabilityId).test(unquotePrompt(prompt));
+
+const readPromptNamedCapabilitySegment = (prompt: string, capabilityId: string): string | null => {
+  const unquoted = unquotePrompt(prompt);
+  const pattern = promptNamedCapabilityPattern(capabilityId);
+  const match = pattern.exec(unquoted);
+  if (!match) return null;
+  const matchText = match[0] ?? "";
+  const capabilityOffset = matchText.toLowerCase().indexOf(capabilityId.toLowerCase());
+  const start = match.index + Math.max(0, capabilityOffset);
+  const afterCapability = start + capabilityId.length;
+  const after = unquoted.slice(afterCapability);
+  let end = after.length;
+  const semicolonIndex = after.search(/[;\n]/);
+  if (semicolonIndex >= 0) end = Math.min(end, semicolonIndex);
+  for (const nextCapability of PROMPT_NAMED_CAPABILITIES) {
+    if (nextCapability === capabilityId) continue;
+    const nextMatch = promptNamedCapabilityPattern(nextCapability).exec(after);
+    if (nextMatch && nextMatch.index >= 0) end = Math.min(end, nextMatch.index);
+  }
+  return after.slice(0, end).trim();
+};
+
+const cleanNamedCapabilityArgumentText = (value: string | null | undefined): string | null => {
+  if (!value) return null;
+  const cleaned = value
+    .replace(/\b(?:before|then|and\s+then)\b[\s\S]*$/i, "")
+    .replace(/\.\s+(?:answer|give|explain|summari[sz]e|tell)\b[\s\S]*$/i, "")
+    .replace(/\s+/g, " ")
+    .replace(/^[\s:,-]+/g, "")
+    .replace(/(?:,?\s+and|,?\s+or)$/i, "")
+    .replace(/[.,;:!?)]*$/g, "")
+    .trim();
+  return cleaned && cleaned.length <= 240 ? cleaned : null;
+};
+
+const extractNamedDocsPath = (segment: string): string | null => {
+  const rawPath = segment.match(/\bdocs[\\/][^\s;,)]+/i)?.[0];
+  return normalizeDocPath(rawPath?.replace(/[.,;:!?)]*$/g, ""));
+};
+
+const extractNamedCapabilityQuery = (segment: string | null, fallback: string): string => {
+  const cleanFallback = cleanNamedCapabilityArgumentText(fallback) ?? fallback;
+  if (!segment) return cleanFallback;
+  const withQuery = cleanNamedCapabilityArgumentText(
+    segment.match(/\bwith\s+query\s+([\s\S]+)/i)?.[1] ??
+      segment.match(/\bquery\s*:?\s*([\s\S]+)/i)?.[1] ??
+      null,
+  );
+  if (withQuery) return withQuery;
+  const afterFor = cleanNamedCapabilityArgumentText(segment.match(/\b(?:for|about|on)\s+([\s\S]+)/i)?.[1] ?? null);
+  if (afterFor) {
+    const withoutPath = cleanNamedCapabilityArgumentText(afterFor.replace(/\bdocs[\\/][^\s;,)]+/gi, " "));
+    if (withoutPath) return withoutPath;
+  }
+  return cleanNamedCapabilityArgumentText(segment.replace(/\bdocs[\\/][^\s;,)]+/gi, " ")) ?? cleanFallback;
 };
 
 const normalizeDocPath = (value: unknown): string | null => {
@@ -578,6 +659,152 @@ export const buildPlannerDerivedWorkstationGatewayCallRequests = (
   return requests.slice(0, 10);
 };
 
+export const buildPromptNamedCapabilityGatewayCallRequests = (
+  body: Record<string, unknown>,
+): Record<string, unknown>[] => {
+  const prompt = readPrompt(body);
+  if (!prompt) return [];
+  const requests: Record<string, unknown>[] = [];
+  const seen = new Set<string>();
+  const addNamedRequest = (
+    capabilityId: string,
+    mode: "read" | "observe",
+    args: Record<string, unknown>,
+  ): void => appendDedupe(requests, seen, [{
+    schema: "helix.workstation_gateway.prompt_named_capability_call_request.v1",
+    derivation_source: "helix_prompt_named_capability",
+    capability_id: capabilityId,
+    mode,
+    arguments: {
+      ...args,
+      source_target_intent: {
+        source: "helix_prompt_named_capability",
+        target_kind: capabilityId,
+        selected_capability: capabilityId,
+        explicit_capability: true,
+        ...(readRecord(args.source_target_intent) ?? {}),
+      },
+    },
+  }]);
+
+  if (
+    hasPromptNamedCapability(prompt, DOCS_SEARCH_CAPABILITY) &&
+    !hasNegatedToolInstruction(prompt, /\bdocs\.search\b/i)
+  ) {
+    const segment = readPromptNamedCapabilitySegment(prompt, DOCS_SEARCH_CAPABILITY);
+    const path = segment ? extractNamedDocsPath(segment) : null;
+    const query = extractNamedCapabilityQuery(segment, prompt);
+    addNamedRequest(DOCS_SEARCH_CAPABILITY, "read", {
+      query,
+      ...(path ? { paths: [path] } : {}),
+      source_target_intent: {
+        target_source: "docs",
+        target_kind: "docs_search",
+        ...(path ? { requested_doc_path: path } : {}),
+      },
+    });
+  }
+
+  if (
+    hasPromptNamedCapability(prompt, REPO_SEARCH_CAPABILITY) &&
+    !hasNegatedToolInstruction(prompt, /\brepo\.search\b/i)
+  ) {
+    const segment = readPromptNamedCapabilitySegment(prompt, REPO_SEARCH_CAPABILITY);
+    addNamedRequest(REPO_SEARCH_CAPABILITY, "read", {
+      query: extractNamedCapabilityQuery(segment, prompt),
+      source_target_intent: {
+        target_source: "repo_code",
+        target_kind: "repo_search",
+      },
+    });
+  }
+
+  if (
+    hasPromptNamedCapability(prompt, CALCULATOR_SOLVE_EXPRESSION_CAPABILITY) &&
+    !hasNegatedToolInstruction(prompt, /\bscientific-calculator\.solve_expression\b/i)
+  ) {
+    const expression = extractCalculatorExpressionFromPrompt(prompt);
+    if (expression) {
+      addNamedRequest(CALCULATOR_SOLVE_EXPRESSION_CAPABILITY, "read", {
+        expression,
+        source_target_intent: {
+          target_source: "scientific_calculator",
+          target_kind: "calculator_solve",
+          expression,
+        },
+      });
+    }
+  }
+
+  if (
+    hasPromptNamedCapability(prompt, THEORY_CONTEXT_REFLECTION_CAPABILITY) &&
+    !hasNegatedToolInstruction(prompt, /\btheory-badge-graph\.reflect_discussion_context\b/i)
+  ) {
+    const segment = readPromptNamedCapabilitySegment(prompt, THEORY_CONTEXT_REFLECTION_CAPABILITY);
+    addNamedRequest(THEORY_CONTEXT_REFLECTION_CAPABILITY, "read", {
+      prompt: extractNamedCapabilityQuery(segment, prompt),
+      conversation_context: prompt,
+      build_explanation_plan: true,
+      source_target_intent: {
+        target_source: "theory_badge_graph",
+        target_kind: "theory_context_reflection",
+      },
+    });
+  }
+
+  if (
+    hasPromptNamedCapability(prompt, CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY) &&
+    !hasNegatedToolInstruction(prompt, /\bcivilization-bounds\.reflect_system_bounds\b/i)
+  ) {
+    const segment = readPromptNamedCapabilitySegment(prompt, CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY);
+    addNamedRequest(CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY, "read", {
+      prompt: extractNamedCapabilityQuery(segment, prompt),
+      include_bridge_context: true,
+      include_collaboration_bounds: true,
+      include_falsification_hooks: true,
+      source_target_intent: {
+        target_source: "civilization_bounds",
+        target_kind: "civilization_bounds_reflection",
+      },
+    });
+  }
+
+  if (
+    hasPromptNamedCapability(prompt, SCHOLARLY_RESEARCH_SEARCH_CAPABILITY) &&
+    !hasNegatedToolInstruction(prompt, /\bscholarly-research\.lookup_papers\b/i)
+  ) {
+    const segment = readPromptNamedCapabilitySegment(prompt, SCHOLARLY_RESEARCH_SEARCH_CAPABILITY);
+    addNamedRequest(SCHOLARLY_RESEARCH_SEARCH_CAPABILITY, "read", {
+      query: extractNamedCapabilityQuery(segment, prompt),
+      mode: "search",
+      source_target_intent: {
+        target_source: "scholarly_research",
+        target_kind: "research_paper_search",
+        strength: "hard",
+        explicit_cues: ["prompt_named_capability"],
+      },
+    });
+  }
+
+  if (
+    hasPromptNamedCapability(prompt, INTERNET_SEARCH_CAPABILITY) &&
+    !hasNegatedToolInstruction(prompt, /\binternet-search\.search_web\b/i)
+  ) {
+    const segment = readPromptNamedCapabilitySegment(prompt, INTERNET_SEARCH_CAPABILITY);
+    addNamedRequest(INTERNET_SEARCH_CAPABILITY, "read", {
+      query: extractNamedCapabilityQuery(segment, prompt),
+      source_target_intent: {
+        target_source: "internet",
+        target_kind: "internet_search",
+        strength: "hard",
+        explicit_cues: ["prompt_named_capability"],
+      },
+    });
+  }
+
+  return requests.slice(0, 10);
+};
+
 const cleanCalculatorExpression = (value: string | null | undefined): string | null => {
   if (!value) return null;
   const expression = value
@@ -626,6 +853,45 @@ export const buildPromptDerivedCalculatorSolveGatewayCallRequests = (
         target_source: "scientific_calculator",
         target_kind: "calculator_solve",
         expression,
+      },
+    },
+  }];
+};
+
+export const buildPromptDerivedTheoryReflectionGatewayCallRequests = (
+  body: Record<string, unknown>,
+): Record<string, unknown>[] => {
+  const prompt = readPrompt(body);
+  if (!prompt) return [];
+  if (hasPromptNamedCapability(prompt, THEORY_CONTEXT_REFLECTION_CAPABILITY)) return [];
+  if (hasNegatedToolInstruction(prompt, /\b(?:reflect|reflection|theory\s+badge\s+graph|theory\s+graph|badge\s+graph)\b/i)) {
+    return [];
+  }
+  const unquoted = unquotePrompt(prompt);
+  const wantsTheoryReflection =
+    /\breflect\b[\s\S]{0,120}\b(?:theory\s+badge\s+graph|theory\s+graph|badge\s+graph)\b/i.test(unquoted) ||
+    /\b(?:theory\s+badge\s+graph|theory\s+graph|badge\s+graph)\b[\s\S]{0,120}\breflect(?:ion)?\b/i.test(unquoted);
+  if (!wantsTheoryReflection) return [];
+  const focusedPrompt =
+    cleanNamedCapabilityArgumentText(
+      unquoted.match(/\breflect\s+(.{3,160}?)\s+(?:against|through|via|with)\s+(?:the\s+)?(?:theory\s+badge\s+graph|theory\s+graph|badge\s+graph)\b/i)?.[1] ??
+        unquoted.match(/\b(?:reflect|reflection)\b[\s\S]{0,120}\b(?:for|about|on)\s+([^.;\n]+)/i)?.[1] ??
+        unquoted.match(/\b(?:for|about|on)\s+([^.;\n]+)\b[\s\S]{0,80}\b(?:theory\s+badge\s+graph|theory\s+graph|badge\s+graph)\b/i)?.[1] ??
+        null,
+    ) ?? prompt;
+  return [{
+    schema: "helix.workstation_gateway.prompt_derived_theory_reflection_call_request.v1",
+    derivation_source: "helix_prompt_derived_theory_reflection",
+    capability_id: THEORY_CONTEXT_REFLECTION_CAPABILITY,
+    mode: "read",
+    arguments: {
+      prompt: focusedPrompt,
+      conversation_context: prompt,
+      build_explanation_plan: true,
+      source_target_intent: {
+        source: "helix_prompt_derived_theory_reflection",
+        target_source: "theory_badge_graph",
+        target_kind: "theory_context_reflection",
       },
     },
   }];
@@ -779,14 +1045,22 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   const seen = new Set<string>();
   const structured = buildStructuredAdmissionWorkstationGatewayCallRequests(input.body);
   appendDedupe(requests, seen, structured);
-  const activeDocsContext = buildActiveDocsContextWorkstationGatewayCallRequests(input.body);
-  appendDedupe(requests, seen, activeDocsContext);
+  const promptNamed = buildPromptNamedCapabilityGatewayCallRequests(input.body);
+  const hasNamedDocsSearch = promptNamed.some((request) => readString(request.capability_id) === DOCS_SEARCH_CAPABILITY);
+  if (hasNamedDocsSearch) {
+    appendDedupe(requests, seen, promptNamed);
+  } else {
+    const activeDocsContext = buildActiveDocsContextWorkstationGatewayCallRequests(input.body);
+    appendDedupe(requests, seen, activeDocsContext);
+    appendDedupe(requests, seen, promptNamed);
+  }
   const activeCalculatorContext = buildActiveCalculatorContextWorkstationGatewayCallRequests(input.body);
   appendDedupe(requests, seen, activeCalculatorContext);
   const activeWorkstationContext = buildActiveWorkstationContextGatewayCallRequests(input.body);
   appendDedupe(requests, seen, activeWorkstationContext);
   appendDedupe(requests, seen, buildPromptDerivedWorkspaceStatusGatewayCallRequests(input.body));
   appendDedupe(requests, seen, buildPromptDerivedCalculatorSolveGatewayCallRequests(input.body));
+  appendDedupe(requests, seen, buildPromptDerivedTheoryReflectionGatewayCallRequests(input.body));
   appendDedupe(requests, seen, buildPlannerDerivedWorkstationGatewayCallRequests(input.body));
   appendDedupe(requests, seen, buildPromptDerivedScholarlyResearchGatewayCallRequests(input.body));
   appendDedupe(requests, seen, buildPromptDerivedInternetSearchGatewayCallRequests(input.body));
