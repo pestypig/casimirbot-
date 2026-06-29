@@ -8,7 +8,7 @@ import { buildGoldenPathCapabilityTerminalObservationSuccessPayload } from "../c
 import {
   buildHelixAskGoldenPathRouteGateArtifactId,
   buildHelixAskGoldenPathTerminalResultId,
-  isHelixAskGoldenPathCapabilityExplicitlyRequested,
+  isHelixAskGoldenPathCapabilityNamedInRequest,
   readHelixAskGoldenPathPrompt,
   readHelixAskGoldenPathTurnContext,
   readString,
@@ -22,10 +22,9 @@ export type HelixAskGoldenPathWorkspaceDirectoryDependencies = {
 };
 
 export const isHelixAskGoldenPathWorkspaceDirectoryRequested = (body: RecordLike): boolean => {
-  if (isHelixAskGoldenPathCapabilityExplicitlyRequested(body, [HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY])) return true;
+  if (isHelixAskGoldenPathCapabilityNamedInRequest(body, [HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY])) return true;
   const prompt = readHelixAskGoldenPathPrompt(body).toLowerCase();
   return (
-    prompt.includes(HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY) ||
     /\bworkspace[_\s-]?directory(?:[_\s-]?resolve|[_\s-]?resolution)?\b/.test(prompt)
   );
 };

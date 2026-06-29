@@ -5,7 +5,7 @@ import { buildGoldenPathCapabilityTerminalPayloadSuccessPayload } from "../capab
 import {
   buildHelixAskGoldenPathRouteGateArtifactId,
   buildHelixAskGoldenPathTerminalResultId,
-  isHelixAskGoldenPathCapabilityExplicitlyRequested,
+  isHelixAskGoldenPathCapabilityNamedInRequest,
   HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY,
   HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
   readHelixAskGoldenPathPrompt,
@@ -23,7 +23,13 @@ export type HelixAskGoldenPathVisualCaptureDependencies = {
 };
 
 export const isHelixAskGoldenPathVisualCaptureRequested = (body: RecordLike): boolean => {
-  if (isHelixAskGoldenPathCapabilityExplicitlyRequested(body, [HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY, HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY])) return true;
+  if (
+    isHelixAskGoldenPathCapabilityNamedInRequest(body, [
+      HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY,
+      HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
+    ])
+  )
+    return true;
   const prompt = readHelixAskGoldenPathPrompt(body);
   return (
     /\bimage_lens\.inspect\b/i.test(prompt) ||
