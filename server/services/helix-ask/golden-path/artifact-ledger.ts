@@ -135,3 +135,33 @@ export const buildGoldenPathPayloadLedgerArtifact = (args: {
   ...(args.goalHash ? { goal_hash: args.goalHash } : {}),
   payload: args.payload,
 });
+
+export const buildGoldenPathTypedFailureLedgerArtifact = (args: {
+  artifactId: string;
+  turnId: string;
+  createdAtMs: number;
+  goalHash: string;
+  terminalResult: HelixAskGoldenPathRuntimeTerminalResult;
+  errorCode: string;
+  firstBrokenRail: string;
+  includeSupportRefs?: boolean;
+}): RecordLike =>
+  buildGoldenPathPayloadLedgerArtifact({
+    artifactId: args.artifactId,
+    turnId: args.turnId,
+    createdAtMs: args.createdAtMs,
+    goalHash: args.goalHash,
+    kind: "typed_failure",
+    terminalEligible: true,
+    payload: {
+      schema: "helix.typed_failure.v1",
+      text: args.terminalResult.text,
+      answer_text: args.terminalResult.text,
+      terminal_result_id: args.terminalResult.result_id,
+      error_code: args.errorCode,
+      first_broken_rail: args.firstBrokenRail,
+      ...(args.includeSupportRefs ? { support_refs: args.terminalResult.support_refs } : {}),
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+  });

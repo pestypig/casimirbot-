@@ -2,6 +2,7 @@ import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfa
 import {
   buildGoldenPathObservationLedgerArtifact,
   buildGoldenPathPayloadLedgerArtifact,
+  buildGoldenPathTypedFailureLedgerArtifact,
   buildGoldenPathRouteGateLedgerArtifact,
 } from "../artifact-ledger";
 import {
@@ -237,23 +238,14 @@ export const buildHelixAskGoldenPathDocsLocatePayload = (args: {
           goalHash,
           requestedCapability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
         }),
-        buildGoldenPathPayloadLedgerArtifact({
+        buildGoldenPathTypedFailureLedgerArtifact({
           artifactId: terminalArtifactId,
           turnId,
           createdAtMs,
           goalHash,
-          kind: "typed_failure",
-          terminalEligible: true,
-          payload: {
-            schema: "helix.typed_failure.v1",
-            text: terminalResult.text,
-            answer_text: terminalResult.text,
-            terminal_result_id: terminalResult.result_id,
-            error_code: params.errorCode,
-            first_broken_rail: params.brokenRail,
-            assistant_answer: false,
-            raw_content_included: false,
-          },
+          terminalResult,
+          errorCode: params.errorCode,
+          firstBrokenRail: params.brokenRail,
         }),
       ],
       debug: buildGoldenPathCapabilityDebugMirror({

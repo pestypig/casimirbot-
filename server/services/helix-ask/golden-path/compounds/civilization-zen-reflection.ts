@@ -3,6 +3,7 @@ import {
   buildGoldenPathAnswerLedgerArtifact,
   buildGoldenPathObservationLedgerArtifact,
   buildGoldenPathPayloadLedgerArtifact,
+  buildGoldenPathTypedFailureLedgerArtifact,
   buildGoldenPathRouteGateLedgerArtifact,
 } from "../artifact-ledger";
 import { readCompactCivilizationBoundsToolResult } from "../capabilities/civilization-bounds-reflection";
@@ -157,24 +158,15 @@ export const buildHelixAskGoldenPathCivilizationBoundsZenReflectionCompoundPaylo
           terminalEligible: false,
           requestedCapability: "compound_capability_contract",
         }),
-        buildGoldenPathPayloadLedgerArtifact({
+        buildGoldenPathTypedFailureLedgerArtifact({
           artifactId: terminalResult.artifact_id,
           turnId,
           createdAtMs,
           goalHash,
-          kind: "typed_failure",
-          terminalEligible: true,
-          payload: {
-            schema: "helix.typed_failure.v1",
-            text: terminalResult.text,
-            answer_text: terminalResult.text,
-            terminal_result_id: terminalResult.result_id,
-            error_code: params.errorCode,
-            first_broken_rail: "observation",
-            support_refs: terminalResult.support_refs,
-            assistant_answer: false,
-            raw_content_included: false,
-          },
+          terminalResult,
+          errorCode: params.errorCode,
+          firstBrokenRail: "observation",
+          includeSupportRefs: true,
         }),
       ],
       debug: buildGoldenPathCompoundDebugMirror({

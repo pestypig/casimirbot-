@@ -4,6 +4,7 @@ import {
   buildGoldenPathAnswerLedgerArtifact,
   buildGoldenPathObservationLedgerArtifact,
   buildGoldenPathPayloadLedgerArtifact,
+  buildGoldenPathTypedFailureLedgerArtifact,
   buildGoldenPathRouteGateLedgerArtifact,
 } from "../artifact-ledger";
 import {
@@ -199,24 +200,15 @@ export const buildHelixAskGoldenPathInternetSearchPayload = (args: {
           goalHash,
           requestedCapability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
         }),
-        buildGoldenPathPayloadLedgerArtifact({
+        buildGoldenPathTypedFailureLedgerArtifact({
           artifactId: terminalResult.artifact_id,
           turnId,
           createdAtMs,
           goalHash,
-          kind: "typed_failure",
-          terminalEligible: true,
-          payload: {
-            schema: "helix.typed_failure.v1",
-            text: terminalResult.text,
-            answer_text: terminalResult.text,
-            terminal_result_id: terminalResult.result_id,
-            error_code: params.errorCode,
-            first_broken_rail: params.brokenRail,
-            support_refs: terminalResult.support_refs,
-            assistant_answer: false,
-            raw_content_included: false,
-          },
+          terminalResult,
+          errorCode: params.errorCode,
+          firstBrokenRail: params.brokenRail,
+          includeSupportRefs: true,
         }),
       ],
       debug: buildGoldenPathCapabilityDebugMirror({
