@@ -1,4 +1,8 @@
-import { buildGoldenPathRouteGateLedgerArtifact, buildGoldenPathTypedFailureLedgerArtifact } from "./artifact-ledger";
+import {
+  buildGoldenPathRouteGateLedgerArtifact,
+  buildGoldenPathTypedFailureLedgerArtifact,
+  buildGoldenPathTypedFailureTerminalErrorLedgerArtifact,
+} from "./artifact-ledger";
 import { buildGoldenPathCapabilityGoalSatisfactionEvaluation, buildGoldenPathCapabilityPlan } from "./capability-contract";
 import { HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA, type RecordLike } from "./core";
 import { buildGoldenPathCapabilityDebugMirror } from "./debug-mirror";
@@ -36,11 +40,24 @@ export const buildGoldenPathCapabilityTypedFailurePayload = (args: {
   missingRequirement: string;
   text: string;
   routeGate?: string;
+  routeGateTerminalEligible?: boolean;
+  includeRouteGateGoalHash?: boolean;
   debugStatus?: string;
+  debugPrivateRuntimeLoopEntered?: boolean;
+  observedArtifactKind?: string | null;
+  observedArtifactRef?: string | null;
+  terminalArtifactRef?: string;
+  terminalResultIdInRuntimeStatus?: string;
+  completedSolverPath?: boolean;
+  goalSatisfaction?: string;
+  routeAuthorityOk?: boolean;
+  terminalAuthorityOk?: boolean;
+  solverTraceExtra?: RecordLike;
   includeGoalSatisfactionInDebug?: boolean;
   includeLedgerSupportRefs?: boolean;
   includeTerminalErrorCodeInSolverTrace?: boolean;
   includeFirstBrokenRailInTerminalAuthority?: boolean;
+  useTerminalErrorLedgerArtifact?: boolean;
   hashGoalFrame: (value: unknown) => string;
 }): RecordLike => {
   const selectedCapability = args.selectedCapability ?? args.requestedCapability;
@@ -90,6 +107,10 @@ export const buildGoldenPathCapabilityTypedFailurePayload = (args: {
       requestedCapability: args.requestedCapability,
       selectedCapability,
       executedCapability: null,
+      ...(typeof args.observedArtifactKind !== "undefined" ? { observedArtifactKind: args.observedArtifactKind } : {}),
+      ...(typeof args.observedArtifactRef !== "undefined" ? { observedArtifactRef: args.observedArtifactRef } : {}),
+      terminalArtifactRef: args.terminalArtifactRef,
+      terminalResultId: args.terminalResultIdInRuntimeStatus,
       firstBrokenRail: args.brokenRail,
       routeGate: args.routeGate,
     }),
@@ -108,41 +129,62 @@ export const buildGoldenPathCapabilityTypedFailurePayload = (args: {
     ...buildGoldenPathTerminalAuthorityProjection({
       terminalResult,
       route: args.route,
+      ...(typeof args.completedSolverPath === "boolean" ? { completedSolverPath: args.completedSolverPath } : {}),
       ...(args.includeFirstBrokenRailInTerminalAuthority ? { firstBrokenRail: args.brokenRail } : {}),
     }),
     ask_turn_solver_trace: buildGoldenPathSolverTrace({
-      completedSolverPath: false,
+      completedSolverPath: args.completedSolverPath ?? false,
+      routeAuthorityOk: args.routeAuthorityOk,
+      terminalAuthorityOk: args.terminalAuthorityOk,
+      goalSatisfaction: args.goalSatisfaction,
       requestedCapability: args.requestedCapability,
       selectedCapability,
       executedCapability: null,
+      ...(typeof args.observedArtifactKind !== "undefined" ? { observedArtifactKind: args.observedArtifactKind } : {}),
+      ...(typeof args.observedArtifactRef !== "undefined" ? { observedArtifactRef: args.observedArtifactRef } : {}),
       firstBrokenRail: args.brokenRail,
       terminalArtifactKind: "typed_failure",
       ...(args.includeTerminalErrorCodeInSolverTrace ? { terminalErrorCode: args.errorCode } : {}),
+      extra: args.solverTraceExtra,
     }),
     current_turn_artifact_ledger: [
       buildGoldenPathRouteGateLedgerArtifact({
         artifactId: args.routeGateArtifactId,
         turnId: args.turnId,
         createdAtMs: args.createdAtMs,
-        goalHash,
+        terminalEligible: args.routeGateTerminalEligible,
+        ...(args.includeRouteGateGoalHash === false ? {} : { goalHash }),
         requestedCapability: args.requestedCapability,
       }),
-      buildGoldenPathTypedFailureLedgerArtifact({
-        artifactId: terminalArtifactId,
-        turnId: args.turnId,
-        createdAtMs: args.createdAtMs,
-        goalHash,
-        terminalResult,
-        errorCode: args.errorCode,
-        firstBrokenRail: args.brokenRail,
-        includeSupportRefs: args.includeLedgerSupportRefs,
-      }),
+      args.useTerminalErrorLedgerArtifact
+        ? buildGoldenPathTypedFailureTerminalErrorLedgerArtifact({
+            artifactId: terminalArtifactId,
+            turnId: args.turnId,
+            createdAtMs: args.createdAtMs,
+            terminalResult,
+            terminalErrorCode: args.errorCode,
+            firstBrokenRail: args.brokenRail,
+            includeSupportRefs: args.includeLedgerSupportRefs,
+          })
+        : buildGoldenPathTypedFailureLedgerArtifact({
+            artifactId: terminalArtifactId,
+            turnId: args.turnId,
+            createdAtMs: args.createdAtMs,
+            goalHash,
+            terminalResult,
+            errorCode: args.errorCode,
+            firstBrokenRail: args.brokenRail,
+            includeSupportRefs: args.includeLedgerSupportRefs,
+          }),
     ],
     debug: buildGoldenPathCapabilityDebugMirror({
       status: args.debugStatus,
+      privateRuntimeLoopEntered: args.debugPrivateRuntimeLoopEntered,
       requestedCapability: args.requestedCapability,
       selectedCapability,
       executedCapability: null,
+      ...(typeof args.observedArtifactKind !== "undefined" ? { observedArtifactKind: args.observedArtifactKind ?? undefined } : {}),
+      ...(typeof args.observedArtifactRef !== "undefined" ? { observedArtifactRef: args.observedArtifactRef ?? undefined } : {}),
       terminalResult,
       firstBrokenRail: args.brokenRail,
       terminalErrorCode: args.errorCode,
