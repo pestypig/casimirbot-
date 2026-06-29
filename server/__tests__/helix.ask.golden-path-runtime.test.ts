@@ -26,6 +26,7 @@ import { HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY } from "../services/helix-
 const routePath = "server/routes/agi.plan.ts";
 const servicePath = "server/services/helix-ask/golden-path-runtime.ts";
 const dependencyPath = "server/services/helix-ask/golden-path/runtime-dependencies.ts";
+const dispatchPath = "server/services/helix-ask/golden-path/runtime-dispatch.ts";
 const capabilityDir = "server/services/helix-ask/golden-path/capabilities";
 const compoundDir = "server/services/helix-ask/golden-path/compounds";
 
@@ -76,6 +77,23 @@ describe("Helix Ask golden path runtime", () => {
     expect(serviceSource).not.toContain("buildGoldenPathTerminalEnvelope");
     expect(serviceSource).not.toContain("buildCapabilityLedger");
     expect(serviceSource).not.toContain("buildCompoundCapabilityContract");
+  });
+
+  it("keeps golden path dispatch as an ordered table instead of a payload owner", () => {
+    const dispatchSource = readFileSync(dispatchPath, "utf8");
+
+    expect(dispatchSource).toContain("const orderedDispatchModules");
+    expect(dispatchSource).toContain("for (const dispatchModule of orderedDispatchModules)");
+    expect(dispatchSource).toContain("dispatchModule.isRequested(body)");
+    expect(dispatchSource).toContain("dispatchModule.buildPayload({ body, deps })");
+    expect(dispatchSource).toContain("buildHelixAskGoldenPathRuntimeContractPayload");
+    expect(dispatchSource).not.toContain("terminal_artifact_kind");
+    expect(dispatchSource).not.toContain("current_turn_artifact_ledger");
+    expect(dispatchSource).not.toContain("selected_final_answer");
+    expect(dispatchSource).not.toContain("terminal_answer_authority");
+    expect(dispatchSource).not.toContain("buildGoldenPathTerminalEnvelope");
+    expect(dispatchSource).not.toContain("buildGoldenPathLedger");
+    expect(dispatchSource).not.toContain("buildCompoundCapabilityContract");
   });
 
   it("keeps every golden-path capability and compound module on the standard dispatch surface", () => {
