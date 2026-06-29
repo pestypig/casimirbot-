@@ -27,6 +27,7 @@ const routePath = "server/routes/agi.plan.ts";
 const servicePath = "server/services/helix-ask/golden-path-runtime.ts";
 const dependencyPath = "server/services/helix-ask/golden-path/runtime-dependencies.ts";
 const dispatchPath = "server/services/helix-ask/golden-path/runtime-dispatch.ts";
+const runtimeModulesPath = "server/services/helix-ask/golden-path/runtime-modules.ts";
 const goldenPathDir = "server/services/helix-ask/golden-path";
 const capabilityDir = "server/services/helix-ask/golden-path/capabilities";
 const compoundDir = "server/services/helix-ask/golden-path/compounds";
@@ -91,12 +92,14 @@ describe("Helix Ask golden path runtime", () => {
 
   it("keeps golden path dispatch as an ordered table instead of a payload owner", () => {
     const dispatchSource = readFileSync(dispatchPath, "utf8");
+    const runtimeModulesSource = readFileSync(runtimeModulesPath, "utf8");
 
-    expect(dispatchSource).toContain("const orderedDispatchModules");
+    expect(dispatchSource).toContain("orderedDispatchModules");
     expect(dispatchSource).toContain("for (const dispatchModule of orderedDispatchModules)");
     expect(dispatchSource).toContain("dispatchModule.isRequested(body)");
     expect(dispatchSource).toContain("dispatchModule.buildPayload({ body, deps })");
     expect(dispatchSource).toContain("buildHelixAskGoldenPathRuntimeContractPayload");
+    expect(runtimeModulesSource).toContain("const orderedDispatchModules");
     expect(dispatchSource).not.toContain("terminal_artifact_kind");
     expect(dispatchSource).not.toContain("current_turn_artifact_ledger");
     expect(dispatchSource).not.toContain("selected_final_answer");
@@ -186,7 +189,7 @@ describe("Helix Ask golden path runtime", () => {
   });
 
   it("keeps every dispatch-owned golden-path module imported and ordered exactly once", () => {
-    const dispatchSource = readFileSync(dispatchPath, "utf8");
+    const runtimeModulesSource = readFileSync(runtimeModulesPath, "utf8");
     const dispatchModules = [
       ["Calculator", "./capabilities/calculator"],
       ["CapabilityCatalog", "./capabilities/capability-catalog"],
@@ -213,13 +216,13 @@ describe("Helix Ask golden path runtime", () => {
     for (const [moduleName, modulePath] of dispatchModules) {
       expect(
         countOccurrences(
-          dispatchSource,
+          runtimeModulesSource,
           new RegExp(`import \\* as ${moduleName} from "${modulePath.replace(/\//g, "\\/")}";`, "g"),
         ),
         `${moduleName} must be imported exactly once`,
       ).toBe(1);
       expect(
-        countOccurrences(dispatchSource, new RegExp(`^\\s*${moduleName},\\s*$`, "gm")),
+        countOccurrences(runtimeModulesSource, new RegExp(`^\\s*${moduleName},\\s*$`, "gm")),
         `${moduleName} must be listed in orderedDispatchModules exactly once`,
       ).toBe(1);
     }
