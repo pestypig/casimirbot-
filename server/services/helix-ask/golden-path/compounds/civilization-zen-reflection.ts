@@ -9,6 +9,7 @@ import { readCompactCivilizationBoundsToolResult } from "../capabilities/civiliz
 import { readCompactZenGraphReflectionToolResult } from "../capabilities/zen-graph-reflection";
 import {
   buildGoldenPathCompoundCapabilityContract,
+  buildGoldenPathCompoundEvidenceSynthesisAnswer,
   isHelixAskGoldenPathCivilizationBoundsZenReflectionCompoundRequested,
 } from "../compound-contract";
 import {
@@ -433,15 +434,11 @@ export const buildHelixAskGoldenPathCivilizationBoundsZenReflectionCompoundPaylo
     compound_capability_contract: compoundCapabilityContract,
     helix_civilization_bounds_tool_result: civilizationReceipt,
     helix_zen_graph_reflection_tool_result: zenReceipt,
-    compound_evidence_synthesis_answer: {
-      schema: "helix.compound_evidence_synthesis_answer.v1",
+    compound_evidence_synthesis_answer: buildGoldenPathCompoundEvidenceSynthesisAnswer({
       text: terminalResult.text,
-      answer_text: terminalResult.text,
-      support_refs: terminalResult.support_refs,
-      satisfied_subgoal_count: 2,
-      assistant_answer: false,
-      raw_content_included: false,
-    },
+      supportRefs: terminalResult.support_refs,
+      satisfiedSubgoalCount: 2,
+    }),
     capability_plan: {
       schema: "helix.ask_capability_plan.v1",
       requested_capability: "compound_capability_contract",
