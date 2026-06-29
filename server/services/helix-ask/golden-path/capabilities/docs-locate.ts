@@ -564,6 +564,6 @@ export const buildHelixAskGoldenPathDocsLocatePayload = (args: {
 
 
 export const requiredObservationKinds = ["doc_location_matches"] as const;
-export const requiredTerminalKinds = ["doc_location_result"] as const;
+export const requiredTerminalKinds = ["doc_location_matches"] as const;
 export const isRequested = isHelixAskGoldenPathDocsLocateRequested;
 export const buildPayload = buildHelixAskGoldenPathDocsLocatePayload;
