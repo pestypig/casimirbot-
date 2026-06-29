@@ -36,6 +36,7 @@ export const buildGoldenPathCapabilityGoalSatisfactionEvaluation = (args: {
   selectedTerminalArtifactKind?: string;
   missingRequirements?: readonly string[];
   firstBrokenRail?: string;
+  repairTarget?: string;
 }): RecordLike => ({
   schema: "helix.goal_satisfaction_evaluation.v1",
   turn_id: args.turnId,
@@ -45,6 +46,7 @@ export const buildGoldenPathCapabilityGoalSatisfactionEvaluation = (args: {
   selected_terminal_artifact_kind: args.selectedTerminalArtifactKind ?? args.requiredTerminalKind,
   missing_requirements: [...(args.missingRequirements ?? [])],
   ...(args.firstBrokenRail ? { first_broken_rail: args.firstBrokenRail } : {}),
+  ...(args.repairTarget ? { repair_target: args.repairTarget } : {}),
   assistant_answer: false,
   raw_content_included: false,
 });

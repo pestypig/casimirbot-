@@ -238,18 +238,15 @@ export const buildHelixAskGoldenPathRepoSearchConceptPayload = (args: {
       assistant_answer: false,
       raw_content_included: false,
     };
-    const goalSatisfactionEvaluation = {
-      schema: "helix.goal_satisfaction_evaluation.v1",
-      turn_id: turnId,
+    const goalSatisfactionEvaluation = buildGoldenPathCapabilityGoalSatisfactionEvaluation({
+      turnId,
+      goalKind,
+      requiredTerminalKind,
       satisfaction: "not_satisfied",
-      goal_kind: goalKind,
-      required_terminal_kind: requiredTerminalKind,
-      selected_terminal_artifact_kind: "typed_failure",
-      missing_requirements: [params.missingRequirement],
-      first_broken_rail: params.brokenRail,
-      assistant_answer: false,
-      raw_content_included: false,
-    };
+      selectedTerminalArtifactKind: "typed_failure",
+      missingRequirements: [params.missingRequirement],
+      firstBrokenRail: params.brokenRail,
+    });
     const goalHash = args.deps.hashGoalFrame(canonicalGoalFrame);
     const terminalResult = buildGoldenPathTypedFailureTerminalResult({
       resultId: terminalResultId,

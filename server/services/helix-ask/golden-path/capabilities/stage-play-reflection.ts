@@ -106,19 +106,16 @@ export const buildHelixAskGoldenPathStagePlayReflectionPayload = (args: {
       assistant_answer: false,
       raw_content_included: false,
     };
-    const goalSatisfactionEvaluation = {
-      schema: "helix.goal_satisfaction_evaluation.v1",
-      turn_id: turnId,
+    const goalSatisfactionEvaluation = buildGoldenPathCapabilityGoalSatisfactionEvaluation({
+      turnId,
+      goalKind,
+      requiredTerminalKind,
       satisfaction: "not_satisfied",
-      goal_kind: goalKind,
-      required_terminal_kind: requiredTerminalKind,
-      selected_terminal_artifact_kind: "typed_failure",
-      missing_requirements: ["stage_play_reflection_result"],
-      first_broken_rail: "observation",
-      repair_target: "stage_play_reflection_input",
-      assistant_answer: false,
-      raw_content_included: false,
-    };
+      selectedTerminalArtifactKind: "typed_failure",
+      missingRequirements: ["stage_play_reflection_result"],
+      firstBrokenRail: "observation",
+      repairTarget: "stage_play_reflection_input",
+    });
     const goalHash = args.deps.hashGoalFrame(canonicalGoalFrame);
     const goalSatisfactionArtifact = args.deps.buildGoalSatisfactionEvaluationArtifact({
       turnId,
