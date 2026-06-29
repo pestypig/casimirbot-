@@ -25,6 +25,12 @@ type BuildGoalSatisfactionArtifact = (args: {
   createdAtMs: number;
 }) => RecordLike;
 
+type BuildCapabilitySuccessAdditionalFields = (args: {
+  terminalResult: HelixAskGoldenPathRuntimeTerminalResult;
+  goalSatisfactionArtifact: RecordLike;
+  goalSatisfactionEvaluation: RecordLike;
+}) => RecordLike;
+
 export const buildGoldenPathCapabilitySuccessPayload = (args: {
   turnId: string;
   traceId: string;
@@ -59,6 +65,7 @@ export const buildGoldenPathCapabilitySuccessPayload = (args: {
   requiredObservationKinds: readonly string[];
   routeGateTerminalEligible?: boolean;
   includeRouteGatePromptText?: boolean;
+  additionalTopLevelFields?: BuildCapabilitySuccessAdditionalFields;
   answerProducerItemId?: string;
   answerLedgerExtraPayload?: RecordLike;
   hashGoalFrame: (value: unknown) => string;
@@ -132,6 +139,11 @@ export const buildGoldenPathCapabilitySuccessPayload = (args: {
       assistant_answer: false,
       raw_content_included: false,
     },
+    ...(args.additionalTopLevelFields?.({
+      terminalResult,
+      goalSatisfactionArtifact,
+      goalSatisfactionEvaluation,
+    }) ?? {}),
     capability_plan: buildGoldenPathCapabilityPlan({
       requestedCapability: args.requestedCapability,
       ...(args.selectedCapability ? { selectedCapability } : {}),
