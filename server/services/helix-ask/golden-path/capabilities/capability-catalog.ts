@@ -1,15 +1,6 @@
 import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfaction-artifact";
+import { buildGoldenPathCapabilitySuccessPayload } from "../capability-success";
 import {
-  buildGoldenPathAnswerLedgerArtifact,
-  buildGoldenPathObservationLedgerArtifact,
-  buildGoldenPathRouteGateLedgerArtifact,
-} from "../artifact-ledger";
-import {
-  buildGoldenPathCapabilityGoalSatisfactionEvaluation,
-  buildGoldenPathCapabilityPlan,
-} from "../capability-contract";
-import {
-  HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
   HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
   HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
   HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
@@ -22,14 +13,6 @@ import {
   readStringArray,
   type RecordLike,
 } from "../core";
-import {
-  buildGoldenPathTerminalAuthorityProjection,
-  buildGoldenPathTerminalResponseProjection,
-  buildGoldenPathTerminalResult,
-} from "../terminal-envelope";
-import { buildGoldenPathSolverTrace } from "../solver-trace";
-import { buildGoldenPathRuntimeStatus } from "../runtime-status";
-import { buildGoldenPathCapabilityDebugMirror } from "../debug-mirror";
 
 export type HelixAskGoldenPathCapabilityCatalogDependencies = {
   now: () => Date;
@@ -87,142 +70,35 @@ export const buildHelixAskGoldenPathCapabilityCatalogPayload = (args: {
   const requiredTerminalKind = "capability_help_summary";
   const catalogObservation = buildGoldenPathCapabilityCatalogObservation();
   const answerText = capabilityCatalogSummaryText(catalogObservation);
-  const canonicalGoalFrame = {
-    schema: "helix.ask_canonical_goal_frame.v1",
-    turn_id: turnId,
-    goal_kind: "capability_catalog_runtime",
-    answer_scope: "current_turn",
-    required_terminal_kind: requiredTerminalKind,
-    allows_workspace_context: false,
-    allows_prior_artifacts: false,
-    classifier_reasons: ["explicit_capability_catalog_request"],
-    assistant_answer: false,
-    raw_content_included: false,
-  };
-  const goalSatisfactionEvaluation = buildGoldenPathCapabilityGoalSatisfactionEvaluation({
+  return buildGoldenPathCapabilitySuccessPayload({
     turnId,
-    goalKind: "capability_catalog_runtime",
-    requiredTerminalKind,
-  });
-  const goalHash = args.deps.hashGoalFrame(canonicalGoalFrame);
-  const goalSatisfactionArtifact = args.deps.buildGoalSatisfactionEvaluationArtifact({
-    turnId,
-    goalHash,
-    evaluation: goalSatisfactionEvaluation,
+    traceId,
+    sessionId,
+    threadId,
+    promptText,
     createdAtMs,
+    routeGateArtifactId,
+    observationArtifactId,
+    terminalArtifactId,
+    terminalResultId,
+    requiredTerminalKind,
+    goalKind: "capability_catalog_runtime",
+    sourceTarget: "capability_catalog",
+    family: "capability_catalog",
+    classifierReasons: ["explicit_capability_catalog_request"],
+    allowsWorkspaceContext: false,
+    requestedCapability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
+    observedArtifactKind: "capability_registry",
+    observationPayload: catalogObservation,
+    terminalPayloadField: "capability_help_summary",
+    terminalPayloadSchema: "helix.capability_help_summary.v1",
+    answerText,
+    status: "capability_catalog",
+    route: "golden_path_runtime / capability_catalog",
+    requiredObservationKinds,
+    hashGoalFrame: args.deps.hashGoalFrame,
+    buildGoalSatisfactionEvaluationArtifact: args.deps.buildGoalSatisfactionEvaluationArtifact,
   });
-  const terminalResult = buildGoldenPathTerminalResult({
-    resultId: terminalResultId,
-    artifactId: terminalArtifactId,
-    artifactKind: requiredTerminalKind,
-    finalAnswerSource: requiredTerminalKind,
-    text: answerText,
-    supportRefs: [observationArtifactId, routeGateArtifactId, goalSatisfactionArtifact.artifact_id],
-  });
-
-  return {
-    ok: true,
-    mode: "read",
-    schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
-    turn_id: turnId,
-    trace_id: traceId,
-    session_id: sessionId,
-    thread_id: threadId,
-    prompt_text: promptText,
-    ...buildGoldenPathTerminalResponseProjection({ terminalResult }),
-    golden_path_runtime: buildGoldenPathRuntimeStatus({
-      status: "capability_catalog",
-      requestedCapability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
-      selectedCapability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
-      executedCapability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
-      observedArtifactKind: "capability_registry",
-      observedArtifactRef: observationArtifactId,
-      terminalArtifactRef: terminalArtifactId,
-      terminalResultId,
-      legacyFallbackPossibleWhenUnhandled: true,
-      routeGate: "enabled_explicit_request",
-    }),
-    canonical_goal_frame: canonicalGoalFrame,
-    capability_registry: catalogObservation,
-    capability_help_summary: {
-      schema: "helix.capability_help_summary.v1",
-      text: terminalResult.text,
-      answer_text: terminalResult.text,
-      support_refs: terminalResult.support_refs,
-      assistant_answer: false,
-      raw_content_included: false,
-    },
-    capability_plan: buildGoldenPathCapabilityPlan({
-      requestedCapability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
-      sourceTarget: "capability_catalog",
-      family: "capability_catalog",
-      requiredObservationKinds,
-      requiredTerminalKind,
-    }),
-    goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-    ...buildGoldenPathTerminalAuthorityProjection({
-      terminalResult,
-      route: "golden_path_runtime / capability_catalog",
-    }),
-    ask_turn_solver_trace: buildGoldenPathSolverTrace({
-      completedSolverPath: true,
-      routeAuthorityOk: true,
-      terminalAuthorityOk: true,
-      goalSatisfaction: "satisfied",
-      requestedCapability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
-      selectedCapability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
-      executedCapability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
-      observedArtifactKind: "capability_registry",
-      observedArtifactRef: observationArtifactId,
-      terminalArtifactKind: terminalResult.artifact_kind,
-      extra: {
-        solver_risk_flags: [],
-        solver_short_circuit_flags: [],
-      },
-    }),
-    current_turn_artifact_ledger: [
-      {
-        ...buildGoldenPathRouteGateLedgerArtifact({
-          artifactId: routeGateArtifactId,
-          turnId,
-          createdAtMs,
-          goalHash,
-          promptText,
-          requestedCapability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
-          goalSatisfactionArtifact,
-          goalSatisfactionEvaluation,
-        }),
-      },
-      buildGoldenPathObservationLedgerArtifact({
-        artifactId: observationArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        kind: "capability_registry",
-        payload: catalogObservation,
-      }),
-      buildGoldenPathAnswerLedgerArtifact({
-        artifactId: terminalArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        kind: requiredTerminalKind,
-        payloadSchema: "helix.capability_help_summary.v1",
-        terminalResult,
-      }),
-    ],
-    debug: buildGoldenPathCapabilityDebugMirror({
-      status: "capability_catalog",
-      privateRuntimeLoopEntered: false,
-      requestedCapability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
-      selectedCapability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
-      executedCapability: HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
-      observedArtifactKind: "capability_registry",
-      observedArtifactRef: observationArtifactId,
-      terminalResult,
-      goalSatisfactionEvaluation,
-    }),
-  };
 };
 
 
