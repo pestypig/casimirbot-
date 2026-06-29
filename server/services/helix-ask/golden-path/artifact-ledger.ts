@@ -4,7 +4,7 @@ export const buildGoldenPathRouteGateLedgerArtifact = (args: {
   artifactId: string;
   turnId: string;
   createdAtMs: number;
-  goalHash: string;
+  goalHash?: string;
   terminalEligible?: boolean;
   promptText?: string;
   requestedCapability?: string;
@@ -20,7 +20,7 @@ export const buildGoldenPathRouteGateLedgerArtifact = (args: {
   ...(typeof args.terminalEligible === "boolean" ? { terminal_eligible: args.terminalEligible } : {}),
   created_at_ms: args.createdAtMs,
   source_scope: "current_turn",
-  goal_hash: args.goalHash,
+  ...(args.goalHash ? { goal_hash: args.goalHash } : {}),
   payload: {
     schema: "helix.golden_path_route_gate.v1",
     route_gate: "enabled_explicit_request",
@@ -39,7 +39,7 @@ export const buildGoldenPathTerminalLedgerArtifact = (args: {
   artifactId: string;
   turnId: string;
   createdAtMs: number;
-  goalHash: string;
+  goalHash?: string;
   terminalResult: HelixAskGoldenPathRuntimeTerminalResult;
 }): RecordLike => ({
   artifact_id: args.artifactId,
@@ -78,7 +78,7 @@ export const buildGoldenPathObservationLedgerArtifact = (args: {
   terminal_eligible: args.terminalEligible ?? false,
   created_at_ms: args.createdAtMs,
   source_scope: "current_turn",
-  goal_hash: args.goalHash,
+  ...(args.goalHash ? { goal_hash: args.goalHash } : {}),
   payload: args.payload,
 });
 
@@ -86,7 +86,7 @@ export const buildGoldenPathAnswerLedgerArtifact = (args: {
   artifactId: string;
   turnId: string;
   createdAtMs: number;
-  goalHash: string;
+  goalHash?: string;
   kind: string;
   payloadSchema: string;
   terminalResult: HelixAskGoldenPathRuntimeTerminalResult;
@@ -100,7 +100,7 @@ export const buildGoldenPathAnswerLedgerArtifact = (args: {
   terminal_eligible: true,
   created_at_ms: args.createdAtMs,
   source_scope: "current_turn",
-  goal_hash: args.goalHash,
+  ...(args.goalHash ? { goal_hash: args.goalHash } : {}),
   payload: {
     schema: args.payloadSchema,
     text: args.terminalResult.text,
@@ -111,4 +111,25 @@ export const buildGoldenPathAnswerLedgerArtifact = (args: {
     assistant_answer: false,
     raw_content_included: false,
   },
+});
+
+export const buildGoldenPathPayloadLedgerArtifact = (args: {
+  artifactId: string;
+  turnId: string;
+  createdAtMs: number;
+  kind: string;
+  payload: RecordLike;
+  goalHash?: string;
+  producerItemId?: string;
+  terminalEligible?: boolean;
+}): RecordLike => ({
+  artifact_id: args.artifactId,
+  turn_id: args.turnId,
+  producer_item_id: args.producerItemId ?? "golden_path_runtime",
+  kind: args.kind,
+  terminal_eligible: args.terminalEligible ?? false,
+  created_at_ms: args.createdAtMs,
+  source_scope: "current_turn",
+  ...(args.goalHash ? { goal_hash: args.goalHash } : {}),
+  payload: args.payload,
 });
