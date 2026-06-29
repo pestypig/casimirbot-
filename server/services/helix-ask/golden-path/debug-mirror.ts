@@ -31,3 +31,37 @@ export const buildGoldenPathCompoundDebugMirror = (args: {
   assistant_answer: false,
   raw_content_included: false,
 });
+
+export const buildGoldenPathCapabilityDebugMirror = (args: {
+  status?: string;
+  requestedCapability: string;
+  selectedCapability: string;
+  executedCapability: string | null;
+  terminalResult: HelixAskGoldenPathRuntimeTerminalResult;
+  goalSatisfactionEvaluation?: RecordLike;
+  observedArtifactKind?: string;
+  observedArtifactRef?: string;
+  firstBrokenRail?: string;
+  terminalErrorCode?: string;
+  privateRuntimeLoopEntered?: boolean;
+}): RecordLike => ({
+  schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
+  golden_path_runtime: true,
+  ...(args.status ? { golden_path_runtime_status: args.status } : {}),
+  ...(typeof args.privateRuntimeLoopEntered === "boolean"
+    ? { private_runtime_loop_entered: args.privateRuntimeLoopEntered }
+    : {}),
+  requested_capability: args.requestedCapability,
+  selected_capability: args.selectedCapability,
+  executed_capability: args.executedCapability,
+  ...(args.observedArtifactKind ? { observed_artifact_kind: args.observedArtifactKind } : {}),
+  ...(args.observedArtifactRef ? { observed_artifact_ref: args.observedArtifactRef } : {}),
+  terminal_artifact_kind: args.terminalResult.artifact_kind,
+  ...(args.executedCapability ? { terminal_result_count: 1 } : {}),
+  final_answer_source: args.terminalResult.final_answer_source,
+  ...(args.firstBrokenRail ? { first_broken_rail: args.firstBrokenRail } : {}),
+  ...(args.terminalErrorCode ? { terminal_error_code: args.terminalErrorCode } : {}),
+  ...(args.goalSatisfactionEvaluation ? { goal_satisfaction_evaluation: args.goalSatisfactionEvaluation } : {}),
+  assistant_answer: false,
+  raw_content_included: false,
+});
