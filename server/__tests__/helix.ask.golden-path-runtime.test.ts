@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
@@ -26,6 +26,8 @@ import { HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY } from "../services/helix-
 const routePath = "server/routes/agi.plan.ts";
 const servicePath = "server/services/helix-ask/golden-path-runtime.ts";
 const dependencyPath = "server/services/helix-ask/golden-path/runtime-dependencies.ts";
+const capabilityDir = "server/services/helix-ask/golden-path/capabilities";
+const compoundDir = "server/services/helix-ask/golden-path/compounds";
 
 const readLedger = (body: Record<string, any>): any[] =>
   Array.isArray(body.current_turn_artifact_ledger) ? body.current_turn_artifact_ledger : [];
@@ -57,6 +59,29 @@ describe("Helix Ask golden path runtime", () => {
     expect(dependencySource).not.toContain("server/routes/agi.plan");
     expect(dependencySource).not.toContain("../routes/agi.plan");
     expect(dependencySource).not.toContain("../../routes/agi.plan");
+  });
+
+  it("keeps every golden-path capability and compound module on the standard dispatch surface", () => {
+    const modulePaths = [capabilityDir, compoundDir].flatMap((directory) =>
+      readdirSync(directory)
+        .filter((fileName) => fileName.endsWith(".ts"))
+        .map((fileName) => `${directory}/${fileName}`),
+    );
+
+    expect(modulePaths.length).toBeGreaterThan(0);
+    for (const modulePath of modulePaths) {
+      const source = readFileSync(modulePath, "utf8");
+      for (const symbolName of [
+        "requiredObservationKinds",
+        "requiredTerminalKinds",
+        "isRequested",
+        "buildPayload",
+      ]) {
+        expect(source, `${modulePath} must expose ${symbolName}`).toMatch(
+          new RegExp(`export\\s+(?:const\\s+${symbolName}|\\{[\\s\\S]*\\b${symbolName}\\b[\\s\\S]*\\}\\s+from)`),
+        );
+      }
+    }
   });
 
   it("declines when the flag is disabled or the request is not explicit", () => {
