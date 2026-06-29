@@ -4,7 +4,7 @@ import {
   executeWorkspaceDirectoryResolveTool,
 } from "../../workspace-directory-resolver";
 import {
-  buildGoldenPathPayloadLedgerArtifact,
+  buildGoldenPathTypedFailureTerminalErrorLedgerArtifact,
   buildGoldenPathRouteGateLedgerArtifact,
 } from "../artifact-ledger";
 import {
@@ -161,22 +161,14 @@ export const buildHelixAskGoldenPathWorkspaceDirectoryPayload = (args: {
           goalHash,
           requestedCapability: HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY,
         }),
-        buildGoldenPathPayloadLedgerArtifact({
+        buildGoldenPathTypedFailureTerminalErrorLedgerArtifact({
           artifactId: terminalArtifactId,
           turnId,
           createdAtMs,
           goalHash,
-          kind: "typed_failure",
-          terminalEligible: true,
-          payload: {
-            schema: "helix.typed_failure.v1",
-            text: terminalResult.text,
-            answer_text: terminalResult.text,
-            terminal_result_id: terminalResult.result_id,
-            terminal_error_code: "missing_workspace_directory_query",
-            assistant_answer: false,
-            raw_content_included: false,
-          },
+          terminalResult,
+          terminalErrorCode: "missing_workspace_directory_query",
+          firstBrokenRail: "argument_extraction",
         }),
       ],
       debug: buildGoldenPathCapabilityDebugMirror({
