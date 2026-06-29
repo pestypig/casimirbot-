@@ -66,12 +66,13 @@ export const buildGoldenPathObservationLedgerArtifact = (args: {
   goalHash: string;
   kind: string;
   payload: RecordLike;
+  terminalEligible?: boolean;
 }): RecordLike => ({
   artifact_id: args.artifactId,
   turn_id: args.turnId,
   producer_item_id: "golden_path_runtime",
   kind: args.kind,
-  terminal_eligible: false,
+  terminal_eligible: args.terminalEligible ?? false,
   created_at_ms: args.createdAtMs,
   source_scope: "current_turn",
   goal_hash: args.goalHash,

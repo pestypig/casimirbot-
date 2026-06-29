@@ -1,5 +1,9 @@
 import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfaction-artifact";
 import {
+  buildGoldenPathObservationLedgerArtifact,
+  buildGoldenPathRouteGateLedgerArtifact,
+} from "../artifact-ledger";
+import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
   HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
@@ -484,36 +488,25 @@ export const buildHelixAskGoldenPathDocsLocatePayload = (args: {
       raw_content_included: false,
     },
     current_turn_artifact_ledger: [
-      {
-        artifact_id: routeGateArtifactId,
-        turn_id: turnId,
-        producer_item_id: "golden_path_runtime",
-        kind: "golden_path_route_gate",
-        created_at_ms: createdAtMs,
-        source_scope: "current_turn",
-        goal_hash: goalHash,
-        payload: {
-          schema: "helix.golden_path_route_gate.v1",
-          route_gate: "enabled_explicit_request",
-          prompt_text: promptText,
-          requested_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-          goal_satisfaction_artifact: goalSatisfactionArtifact,
-          goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-          assistant_answer: false,
-          raw_content_included: false,
-        },
-      },
-      {
-        artifact_id: observationArtifactId,
-        turn_id: turnId,
-        producer_item_id: "golden_path_runtime",
+      buildGoldenPathRouteGateLedgerArtifact({
+        artifactId: routeGateArtifactId,
+        turnId,
+        createdAtMs,
+        goalHash,
+        promptText,
+        requestedCapability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+        goalSatisfactionArtifact,
+        goalSatisfactionEvaluation,
+      }),
+      buildGoldenPathObservationLedgerArtifact({
+        artifactId: observationArtifactId,
+        turnId,
+        createdAtMs,
+        goalHash,
         kind: "doc_location_matches",
-        terminal_eligible: true,
-        created_at_ms: createdAtMs,
-        source_scope: "current_turn",
-        goal_hash: goalHash,
         payload: docLocationMatches,
-      },
+        terminalEligible: true,
+      }),
     ],
     debug: {
       schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
