@@ -554,3 +554,8 @@ export const buildHelixAskGoldenPathZenGraphReflectionPayload = (args: {
     },
   };
 };
+
+export const requiredObservationKinds = ["helix_zen_graph_reflection_tool_result"] as const;
+export const requiredTerminalKinds = ["zen_graph_reflection_answer"] as const;
+export const isRequested = isHelixAskGoldenPathZenGraphReflectionRequested;
+export const buildPayload = buildHelixAskGoldenPathZenGraphReflectionPayload;

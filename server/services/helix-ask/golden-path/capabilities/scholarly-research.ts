@@ -571,3 +571,8 @@ export const buildHelixAskGoldenPathScholarlyResearchPayload = (args: {
     },
   };
 };
+
+export const requiredObservationKinds = ["scholarly_research_observation"] as const;
+export const requiredTerminalKinds = ["scholarly_research_answer"] as const;
+export const isRequested = isHelixAskGoldenPathScholarlyResearchRequested;
+export const buildPayload = buildHelixAskGoldenPathScholarlyResearchPayload;

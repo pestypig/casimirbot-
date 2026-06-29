@@ -672,3 +672,8 @@ export const buildHelixAskGoldenPathRepoSearchConceptPayload = (args: {
   };
 };
 
+
+export const requiredObservationKinds = ["repo_code_evidence_observation"] as const;
+export const requiredTerminalKinds = ["repo_code_evidence_answer"] as const;
+export const isRequested = isHelixAskGoldenPathRepoSearchConceptRequested;
+export const buildPayload = buildHelixAskGoldenPathRepoSearchConceptPayload;

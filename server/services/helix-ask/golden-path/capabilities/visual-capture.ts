@@ -527,3 +527,8 @@ export const buildHelixAskGoldenPathVisualCapturePayload = (args: {
     },
   };
 };
+
+export const requiredObservationKinds = ["visual_frame_evidence"] as const;
+export const requiredTerminalKinds = ["visual_capture_answer"] as const;
+export const isRequested = isHelixAskGoldenPathVisualCaptureRequested;
+export const buildPayload = buildHelixAskGoldenPathVisualCapturePayload;

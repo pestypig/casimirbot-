@@ -552,3 +552,8 @@ export const buildHelixAskGoldenPathTheoryReflectionPayload = (args: {
     },
   };
 };
+
+export const requiredObservationKinds = ["helix_theory_context_reflection_tool_receipt"] as const;
+export const requiredTerminalKinds = ["theory_context_reflection_answer"] as const;
+export const isRequested = isHelixAskGoldenPathTheoryReflectionRequested;
+export const buildPayload = buildHelixAskGoldenPathTheoryReflectionPayload;

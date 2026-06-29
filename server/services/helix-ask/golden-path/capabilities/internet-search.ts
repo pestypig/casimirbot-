@@ -578,3 +578,8 @@ export const buildHelixAskGoldenPathInternetSearchPayload = (args: {
     },
   };
 };
+
+export const requiredObservationKinds = ["internet_search_observation"] as const;
+export const requiredTerminalKinds = ["internet_search_answer"] as const;
+export const isRequested = isHelixAskGoldenPathInternetSearchRequested;
+export const buildPayload = buildHelixAskGoldenPathInternetSearchPayload;

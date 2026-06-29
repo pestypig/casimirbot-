@@ -540,3 +540,8 @@ export const buildHelixAskGoldenPathCivilizationBoundsReflectionPayload = (args:
     },
   };
 };
+
+export const requiredObservationKinds = ["helix_civilization_bounds_tool_result"] as const;
+export const requiredTerminalKinds = ["civilization_bounds_reflection_answer"] as const;
+export const isRequested = isHelixAskGoldenPathCivilizationBoundsReflectionRequested;
+export const buildPayload = buildHelixAskGoldenPathCivilizationBoundsReflectionPayload;

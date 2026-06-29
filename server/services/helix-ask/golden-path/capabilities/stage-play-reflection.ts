@@ -590,3 +590,8 @@ export const buildHelixAskGoldenPathStagePlayReflectionPayload = (args: {
   };
 };
 
+
+export const requiredObservationKinds = ["stage_play_reflection_result"] as const;
+export const requiredTerminalKinds = ["stage_play_reflection_answer"] as const;
+export const isRequested = isHelixAskGoldenPathStagePlayReflectionRequested;
+export const buildPayload = buildHelixAskGoldenPathStagePlayReflectionPayload;

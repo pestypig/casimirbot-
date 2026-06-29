@@ -295,3 +295,8 @@ export const buildHelixAskGoldenPathCapabilityCatalogPayload = (args: {
   };
 };
 
+
+export const requiredObservationKinds = ["capability_registry"] as const;
+export const requiredTerminalKinds = ["capability_help_summary"] as const;
+export const isRequested = isHelixAskGoldenPathCapabilityCatalogRequested;
+export const buildPayload = buildHelixAskGoldenPathCapabilityCatalogPayload;

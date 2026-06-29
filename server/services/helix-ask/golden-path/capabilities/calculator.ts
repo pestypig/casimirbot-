@@ -550,3 +550,8 @@ export const buildHelixAskGoldenPathCalculatorSolvePayload = (args: {
   };
 };
 
+
+export const requiredObservationKinds = ["calculator_receipt"] as const;
+export const requiredTerminalKinds = ["workstation_tool_evaluation"] as const;
+export const isRequested = isHelixAskGoldenPathCalculatorSolveRequested;
+export const buildPayload = buildHelixAskGoldenPathCalculatorSolvePayload;

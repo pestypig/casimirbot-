@@ -448,3 +448,8 @@ export const buildHelixAskGoldenPathWorkspaceDirectoryPayload = (args: {
     },
   };
 };
+
+export const requiredObservationKinds = ["workspace_directory_observation"] as const;
+export const requiredTerminalKinds = ["workspace_directory_answer"] as const;
+export const isRequested = isHelixAskGoldenPathWorkspaceDirectoryRequested;
+export const buildPayload = buildHelixAskGoldenPathWorkspaceDirectoryPayload;

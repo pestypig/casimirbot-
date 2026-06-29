@@ -555,3 +555,8 @@ export const buildHelixAskGoldenPathProcessedLiveSourceMailPayload = (args: {
     },
   };
 };
+
+export const requiredObservationKinds = ["stage_play_processed_mail_packet"] as const;
+export const requiredTerminalKinds = ["model_synthesized_answer"] as const;
+export const isRequested = isHelixAskGoldenPathProcessedLiveSourceMailRequested;
+export const buildPayload = buildHelixAskGoldenPathProcessedLiveSourceMailPayload;

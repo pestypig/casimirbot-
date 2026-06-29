@@ -306,3 +306,8 @@ export const buildHelixAskGoldenPathWorkspaceStatusPayload = (args: {
   };
 };
 
+
+export const requiredObservationKinds = ["workspace_os_status_observation"] as const;
+export const requiredTerminalKinds = ["workspace_status_answer"] as const;
+export const isRequested = isHelixAskGoldenPathWorkspaceStatusRequested;
+export const buildPayload = buildHelixAskGoldenPathWorkspaceStatusPayload;
