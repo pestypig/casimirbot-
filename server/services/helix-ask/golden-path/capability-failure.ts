@@ -45,6 +45,7 @@ export const buildGoldenPathCapabilityTypedFailurePayload = (args: {
   includeRouteGateGoalHash?: boolean;
   debugStatus?: string;
   debugPrivateRuntimeLoopEntered?: boolean;
+  debugTerminalResultCount?: number;
   observedArtifactKind?: string | null;
   observedArtifactRef?: string | null;
   terminalArtifactRef?: string;
@@ -182,6 +183,7 @@ export const buildGoldenPathCapabilityTypedFailurePayload = (args: {
     debug: buildGoldenPathCapabilityDebugMirror({
       status: args.debugStatus,
       privateRuntimeLoopEntered: args.debugPrivateRuntimeLoopEntered,
+      terminalResultCount: args.debugTerminalResultCount,
       requestedCapability: args.requestedCapability,
       selectedCapability,
       executedCapability: null,
