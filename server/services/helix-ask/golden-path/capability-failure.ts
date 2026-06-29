@@ -25,6 +25,7 @@ export const buildGoldenPathCapabilityTypedFailurePayload = (args: {
   terminalResultId: string;
   requiredTerminalKind: string;
   answerScope?: string;
+  canonicalGoalFrameExtra?: RecordLike;
   goalKind: string;
   classifierReasons: readonly string[];
   requestedCapability: string;
@@ -68,6 +69,7 @@ export const buildGoldenPathCapabilityTypedFailurePayload = (args: {
     goal_kind: args.goalKind,
     answer_scope: args.answerScope ?? "current_turn",
     required_terminal_kind: args.requiredTerminalKind,
+    ...(args.canonicalGoalFrameExtra ?? {}),
     classifier_reasons: args.classifierReasons,
     assistant_answer: false,
     raw_content_included: false,
