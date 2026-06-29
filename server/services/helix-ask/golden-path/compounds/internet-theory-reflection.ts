@@ -23,7 +23,6 @@ import {
   isHelixAskGoldenPathInternetResearchReflectionCompoundRequested,
 } from "../compound-contract";
 import {
-  HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
   HELIX_GOLDEN_PATH_INTERNET_SEARCH_EXECUTE_CAPABILITY,
   HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
@@ -41,6 +40,7 @@ import {
   buildGoldenPathTypedFailureTerminalResult,
 } from "../terminal-envelope";
 import { buildGoldenPathSolverTrace } from "../solver-trace";
+import { buildGoldenPathRuntimeStatus } from "../runtime-status";
 
 export type HelixAskGoldenPathInternetResearchReflectionCompoundDependencies = {
   now: () => Date;
@@ -142,21 +142,14 @@ export const buildHelixAskGoldenPathInternetResearchReflectionCompoundPayload = 
       selected_terminal_result_id: terminalResult.result_id,
       terminal_result: terminalResult,
       terminal_results: [terminalResult],
-      golden_path_runtime: {
-        schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
+      golden_path_runtime: buildGoldenPathRuntimeStatus({
         status: "internet_research_reflection_compound_failed",
-        flag: HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
-        requested_capability: "compound_capability_contract",
-        selected_capability: "compound_capability_contract",
-        executed_capability: null,
-        terminal_result_count: 1,
-        first_broken_rail: params.brokenRail,
-        legacy_route_bypassed: true,
-        private_runtime_loop_entered: false,
-        route_gate: "enabled_explicit_request",
-        assistant_answer: false,
-        raw_content_included: false,
-      },
+        requestedCapability: "compound_capability_contract",
+        selectedCapability: "compound_capability_contract",
+        executedCapability: null,
+        firstBrokenRail: params.brokenRail,
+        routeGate: "enabled_explicit_request",
+      }),
       canonical_goal_frame: canonicalGoalFrame,
       capability_plan: buildGoldenPathCompoundCapabilityPlan({
         executedCapability: null,
@@ -385,25 +378,18 @@ export const buildHelixAskGoldenPathInternetResearchReflectionCompoundPayload = 
     selected_terminal_result_id: terminalResult.result_id,
     terminal_result: terminalResult,
     terminal_results: [terminalResult],
-    golden_path_runtime: {
-      schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
+    golden_path_runtime: buildGoldenPathRuntimeStatus({
       status: "internet_research_reflection_compound",
-      flag: HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
-      requested_capability: "compound_capability_contract",
-      selected_capability: "compound_capability_contract",
-      executed_capability: "compound_capability_contract",
-      observed_artifact_kind: "compound_subgoal_observations",
-      observed_artifact_ref: internetObservationArtifactId,
-      terminal_artifact_ref: terminalArtifactId,
-      terminal_result_id: terminalResultId,
-      legacy_route_bypassed: true,
-      legacy_fallback_possible_when_unhandled: true,
-      private_runtime_loop_entered: false,
-      route_gate: "enabled_explicit_request",
-      terminal_result_count: 1,
-      assistant_answer: false,
-      raw_content_included: false,
-    },
+      requestedCapability: "compound_capability_contract",
+      selectedCapability: "compound_capability_contract",
+      executedCapability: "compound_capability_contract",
+      observedArtifactKind: "compound_subgoal_observations",
+      observedArtifactRef: internetObservationArtifactId,
+      terminalArtifactRef: terminalArtifactId,
+      terminalResultId,
+      legacyFallbackPossibleWhenUnhandled: true,
+      routeGate: "enabled_explicit_request",
+    }),
     canonical_goal_frame: canonicalGoalFrame,
     compound_capability_contract: compoundCapabilityContract,
     internet_search_observation: internetObservation,
