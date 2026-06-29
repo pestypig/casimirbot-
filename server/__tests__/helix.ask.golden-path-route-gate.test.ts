@@ -7,9 +7,17 @@ import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
   HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
   HELIX_GOLDEN_PATH_CAPABILITY_CATALOG_CAPABILITY,
+  HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
   HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+  HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY,
+  HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
+  HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+  HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
   HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
   HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+  HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
+  HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,
+  HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
 } from "../services/helix-ask/golden-path-runtime";
 import { HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY } from "../services/helix-ask/workspace-directory-resolver";
 
@@ -153,6 +161,138 @@ describe("Helix Ask golden-path route gate", () => {
       },
       expectedTerminalKind: "workspace_directory_resolution",
       expectedObservationKind: "workspace_directory_resolution",
+    },
+    {
+      name: "workspace status",
+      body: {
+        turn_id: "ask:test:golden-route-workspace-status",
+        prompt: "helix_ask_golden_path_runtime use workspace_os.status",
+        goldenPathRuntime: true,
+        requested_capability: HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,
+        workspace_status_records: [
+          { capability_id: "docs-viewer.locate_in_doc", status: "available" },
+          { capability_id: "scientific-calculator.solve_expression", status: "available" },
+        ],
+      },
+      expectedTerminalKind: "workspace_status_answer",
+      expectedObservationKind: "workspace_os_status_observation",
+    },
+    {
+      name: "processed live-source mail",
+      body: {
+        turn_id: "ask:test:golden-route-processed-mail",
+        prompt: "helix_ask_golden_path_runtime use live_env.read_processed_live_source_mail",
+        goldenPathRuntime: true,
+        requested_capability: HELIX_GOLDEN_PATH_READ_PROCESSED_LIVE_SOURCE_MAIL_CAPABILITY,
+        processed_mail_packet: {
+          packetId: "stage_play_processed_mail_packet:route",
+          observedFacts: ["The UI shows a pending action banner"],
+          inferredFacts: ["The turn should summarize the live-source packet before advising"],
+          evidenceRefs: ["visual_frame:route"],
+        },
+      },
+      expectedTerminalKind: "model_synthesized_answer",
+      expectedObservationKind: "stage_play_processed_mail_packet",
+    },
+    {
+      name: "stage play reflection",
+      body: {
+        turn_id: "ask:test:golden-route-stage-play",
+        prompt: "helix_ask_golden_path_runtime use live_env.reflect_stage_play_context",
+        goldenPathRuntime: true,
+        requested_capability: HELIX_GOLDEN_PATH_REFLECT_STAGE_PLAY_CONTEXT_CAPABILITY,
+        stage_play_reflection_result: {
+          graph: { graphId: "stage_play_badge_graph:route", missingEvidence: ["model_reviewed_checkpoint"] },
+          liveAnswerProjection: { projected: true, projectedLineKeys: ["risk"], changedLineKeys: ["risk"] },
+          debugReceipt: { graphId: "stage_play_badge_graph:route", sourceRefs: ["visual_evidence:route"] },
+        },
+      },
+      expectedTerminalKind: "stage_play_reflection_answer",
+      expectedObservationKind: "stage_play_reflection_result",
+    },
+    {
+      name: "internet search",
+      body: {
+        turn_id: "ask:test:golden-route-internet",
+        prompt: "helix_ask_golden_path_runtime use internet_search.web_research",
+        goldenPathRuntime: true,
+        requested_capability: HELIX_GOLDEN_PATH_INTERNET_SEARCH_WEB_RESEARCH_CAPABILITY,
+        internet_search_query: "OpenAI Codex documentation",
+        internet_search_results: [
+          {
+            result_id: "web:codex-docs",
+            title: "OpenAI Codex documentation",
+            url: "https://platform.openai.com/docs/codex",
+            snippet: "Codex documentation for agentic coding workflows.",
+            rank: 1,
+          },
+        ],
+      },
+      expectedTerminalKind: "internet_search_answer",
+      expectedObservationKind: "internet_search_observation",
+    },
+    {
+      name: "theory reflection",
+      body: {
+        turn_id: "ask:test:golden-route-theory",
+        prompt: "helix_ask_golden_path_runtime use helix_ask.reflect_theory_context",
+        goldenPathRuntime: true,
+        requested_capability: HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
+        topic: "Casimir tile duty budget",
+        anchors: ["Casimir Cavities and Curvature"],
+      },
+      expectedTerminalKind: "theory_context_reflection_answer",
+      expectedObservationKind: "helix_theory_context_reflection_tool_receipt",
+    },
+    {
+      name: "civilization bounds reflection",
+      body: {
+        turn_id: "ask:test:golden-route-civilization",
+        prompt: "helix_ask_golden_path_runtime use helix_ask.reflect_civilization_bounds",
+        goldenPathRuntime: true,
+        requested_capability: HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+        civilization_bounds_tool_result: {
+          roadmap: {
+            roadmapId: "civilization-bounds:route",
+            title: "Civilization Bounds Roadmap",
+            systems: [{ systemId: "energy", label: "Energy system" }],
+            missingEvidence: ["source_backed_capacity_measurements"],
+          },
+        },
+      },
+      expectedTerminalKind: "civilization_bounds_reflection_answer",
+      expectedObservationKind: "helix_civilization_bounds_tool_result",
+    },
+    {
+      name: "zen graph reflection",
+      body: {
+        turn_id: "ask:test:golden-route-zen",
+        prompt: "helix_ask_golden_path_runtime use helix_ask.reflect_ideology_context",
+        goldenPathRuntime: true,
+        requested_capability: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
+        helix_zen_graph_reflection_tool_result: {
+          reflection: {
+            reflectionId: "ideology-context-reflection:route",
+            input: { summary: "Reflect right speech as an evidence-only lens." },
+            authority: { terminal_eligible: false, context_role: "tool_policy" },
+          },
+        },
+      },
+      expectedTerminalKind: "ideology_context_reflection_answer",
+      expectedObservationKind: "helix_zen_graph_reflection_tool_result",
+    },
+    {
+      name: "visual capture",
+      body: {
+        turn_id: "ask:test:golden-route-visual",
+        prompt: "helix_ask_golden_path_runtime use image_lens.inspect",
+        goldenPathRuntime: true,
+        requested_capability: HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY,
+        visual_summary: "The Docs Viewer is focused on the NHM2 whitepaper.",
+        detected_objects: ["Docs Viewer", "NHM2 whitepaper"],
+      },
+      expectedTerminalKind: "situation_context_pack",
+      expectedObservationKind: "visual_frame_evidence",
     },
   ])("routes explicit $name turns through the golden-path runtime", async ({ body, expectedTerminalKind, expectedObservationKind }) => {
     process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
