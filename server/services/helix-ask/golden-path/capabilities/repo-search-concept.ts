@@ -4,9 +4,6 @@ import path from "node:path";
 
 import { buildHelixGoalSatisfactionEvaluationArtifact } from "../../goal-satisfaction-artifact";
 import {
-  buildGoldenPathAnswerLedgerArtifact,
-  buildGoldenPathObservationLedgerArtifact,
-  buildGoldenPathPayloadLedgerArtifact,
   buildGoldenPathTypedFailureLedgerArtifact,
   buildGoldenPathRouteGateLedgerArtifact,
 } from "../artifact-ledger";
@@ -14,6 +11,7 @@ import {
   buildGoldenPathCapabilityGoalSatisfactionEvaluation,
   buildGoldenPathCapabilityPlan,
 } from "../capability-contract";
+import { buildGoldenPathCapabilityEvidenceAnswerSuccessPayload } from "../capability-evidence-answer-success";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
   HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
@@ -25,9 +23,7 @@ import {
 } from "../core";
 import {
   buildGoldenPathTerminalAuthorityProjection,
-  buildGoldenPathTerminalResponseProjection,
   buildGoldenPathTypedFailureResponseProjection,
-  buildGoldenPathTerminalResult,
   buildGoldenPathTypedFailureTerminalResult,
 } from "../terminal-envelope";
 import { buildGoldenPathSolverTrace } from "../solver-trace";
@@ -351,30 +347,6 @@ export const buildHelixAskGoldenPathRepoSearchConceptPayload = (args: {
     `Repo evidence answer for: ${concept}`,
     ...evidence.slice(0, 5).map((entry, index) => `${index + 1}. ${entry.file_path}:${entry.line} - ${entry.snippet}`),
   ].join("\n");
-  const canonicalGoalFrame = {
-    schema: "helix.ask_canonical_goal_frame.v1",
-    turn_id: turnId,
-    goal_kind: goalKind,
-    answer_scope: "current_turn",
-    required_terminal_kind: requiredTerminalKind,
-    allows_workspace_context: true,
-    allows_prior_artifacts: false,
-    classifier_reasons: ["explicit_repo_search_concept_request"],
-    assistant_answer: false,
-    raw_content_included: false,
-  };
-  const goalSatisfactionEvaluation = buildGoldenPathCapabilityGoalSatisfactionEvaluation({
-    turnId,
-    goalKind,
-    requiredTerminalKind,
-  });
-  const goalHash = args.deps.hashGoalFrame(canonicalGoalFrame);
-  const goalSatisfactionArtifact = args.deps.buildGoalSatisfactionEvaluationArtifact({
-    turnId,
-    goalHash,
-    evaluation: goalSatisfactionEvaluation,
-    createdAtMs,
-  });
   const repoEvidenceObservation = {
     schema: "helix.repo_code_evidence_observation.v1",
     capability_key: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
@@ -396,130 +368,64 @@ export const buildHelixAskGoldenPathRepoSearchConceptPayload = (args: {
     assistant_answer: false,
     raw_content_included: false,
   };
-  const terminalResult = buildGoldenPathTerminalResult({
-    resultId: terminalResultId,
-    artifactId: terminalArtifactId,
-    artifactKind: requiredTerminalKind,
-    finalAnswerSource: requiredTerminalKind,
-    text: answerText,
-    supportRefs: [observationArtifactId, relevanceGateArtifactId, routeGateArtifactId, goalSatisfactionArtifact.artifact_id],
-  });
 
-  return {
-    ok: true,
-    mode: "read",
-    schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
-    turn_id: turnId,
-    trace_id: traceId,
-    session_id: sessionId,
-    thread_id: threadId,
-    prompt_text: promptText,
-    ...buildGoldenPathTerminalResponseProjection({ terminalResult }),
-    repo_code_evidence_observation: repoEvidenceObservation,
-    repo_evidence_relevance_gate: repoEvidenceRelevanceGate,
-    repo_code_evidence_answer: {
+  return buildGoldenPathCapabilityEvidenceAnswerSuccessPayload({
+    turnId,
+    traceId,
+    sessionId,
+    threadId,
+    promptText,
+    createdAtMs,
+    routeGateArtifactId,
+    terminalArtifactId,
+    terminalResultId,
+    requiredTerminalKind,
+    goalKind,
+    answerScope: "current_turn",
+    sourceTarget: "repo_code",
+    family: "repo_code",
+    planArgs: { concept },
+    classifierReasons: ["explicit_repo_search_concept_request"],
+    allowsWorkspaceContext: true,
+    requestedCapability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+    selectedCapability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+    executedCapability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+    observations: [
+      {
+        artifactId: observationArtifactId,
+        kind: "repo_code_evidence_observation",
+        payload: repoEvidenceObservation,
+      },
+      {
+        artifactId: relevanceGateArtifactId,
+        kind: "repo_evidence_relevance_gate",
+        payload: repoEvidenceRelevanceGate,
+      },
+    ],
+    primaryObservedArtifactKind: "repo_code_evidence_observation",
+    primaryObservedArtifactRef: observationArtifactId,
+    terminalPayloadSchema: "helix.repo_code_evidence_answer.v1",
+    terminalPayload: {
       schema: "helix.repo_code_evidence_answer.v1",
       concept,
-      text: terminalResult.text,
-      answer_text: terminalResult.text,
-      support_refs: terminalResult.support_refs,
       selected_paths: selectedPaths,
       assistant_answer: false,
       raw_content_included: false,
     },
-    golden_path_runtime: buildGoldenPathRuntimeStatus({
-      status: "repo_search_concept",
-      requestedCapability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
-      selectedCapability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
-      executedCapability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
-      observedArtifactKind: "repo_code_evidence_observation",
-      observedArtifactRef: observationArtifactId,
-      terminalArtifactRef: terminalArtifactId,
-      terminalResultId,
-    }),
-    canonical_goal_frame: canonicalGoalFrame,
-    capability_plan: buildGoldenPathCapabilityPlan({
-      requestedCapability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
-      sourceTarget: "repo_code",
-      family: "repo_code",
-      planArgs: { concept },
-      requiredObservationKinds: ["repo_code_evidence_observation", "repo_evidence_relevance_gate"],
-      requiredTerminalKind,
-    }),
-    goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-    ...buildGoldenPathTerminalAuthorityProjection({
-      terminalResult,
-      route: "golden_path_runtime / repo_search_concept",
-    }),
-    ask_turn_solver_trace: buildGoldenPathSolverTrace({
-      completedSolverPath: true,
-      routeAuthorityOk: true,
-      terminalAuthorityOk: true,
-      goalSatisfaction: "satisfied",
-      requestedCapability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
-      selectedCapability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
-      executedCapability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
-      observedArtifactKind: "repo_code_evidence_observation",
-      observedArtifactRef: observationArtifactId,
-      terminalArtifactKind: terminalResult.artifact_kind,
-      extra: {
-        solver_risk_flags: [],
-        solver_short_circuit_flags: [],
-      },
-    }),
-    current_turn_artifact_ledger: [
-      buildGoldenPathRouteGateLedgerArtifact({
-        artifactId: routeGateArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        promptText,
-        requestedCapability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
-        goalSatisfactionArtifact,
-        goalSatisfactionEvaluation,
-      }),
-      buildGoldenPathObservationLedgerArtifact({
-        artifactId: observationArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        kind: "repo_code_evidence_observation",
-        payload: repoEvidenceObservation,
-      }),
-      buildGoldenPathObservationLedgerArtifact({
-        artifactId: relevanceGateArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        kind: "repo_evidence_relevance_gate",
-        payload: repoEvidenceRelevanceGate,
-      }),
-      buildGoldenPathAnswerLedgerArtifact({
-        artifactId: terminalArtifactId,
-        turnId,
-        createdAtMs,
-        goalHash,
-        kind: requiredTerminalKind,
-        payloadSchema: "helix.repo_code_evidence_answer.v1",
-        terminalResult,
-        extraPayload: {
-          concept,
-          selected_paths: selectedPaths,
-        },
-      }),
-    ],
-    debug: buildGoldenPathCapabilityDebugMirror({
-      status: "repo_search_concept",
-      privateRuntimeLoopEntered: false,
-      requestedCapability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
-      selectedCapability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
-      executedCapability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
-      observedArtifactKind: "repo_code_evidence_observation",
-      observedArtifactRef: observationArtifactId,
-      terminalResult,
-      goalSatisfactionEvaluation,
-    }),
-  };
+    terminalExtraPayload: {
+      concept,
+      selected_paths: selectedPaths,
+    },
+    answerText,
+    status: "repo_search_concept",
+    route: "golden_path_runtime / repo_search_concept",
+    requiredObservationKinds: ["repo_code_evidence_observation", "repo_evidence_relevance_gate"],
+    includeRuntimeLegacyFallbackPossibleWhenUnhandled: false,
+    includeRuntimeRouteGate: false,
+    includePromptTextInRouteGate: true,
+    hashGoalFrame: args.deps.hashGoalFrame,
+    buildGoalSatisfactionEvaluationArtifact: args.deps.buildGoalSatisfactionEvaluationArtifact,
+  });
 };
 
 
