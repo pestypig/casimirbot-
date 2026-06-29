@@ -1,5 +1,9 @@
 import { buildGoldenPathCapabilityTerminalObservationLedgerArtifacts } from "./artifact-ledger";
-import { buildGoldenPathCapabilityGoalSatisfactionEvaluation, buildGoldenPathCapabilityPlan } from "./capability-contract";
+import {
+  buildGoldenPathCapabilityCanonicalGoalFrame,
+  buildGoldenPathCapabilityGoalSatisfactionEvaluation,
+  buildGoldenPathCapabilityPlan,
+} from "./capability-contract";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
   type HelixAskGoldenPathRuntimeTerminalResult,
@@ -54,18 +58,13 @@ export const buildGoldenPathCapabilityTerminalObservationSuccessPayload = (args:
 }): RecordLike => {
   const selectedCapability = args.selectedCapability ?? args.requestedCapability;
   const executedCapability = args.executedCapability ?? selectedCapability;
-  const canonicalGoalFrame = {
-    schema: "helix.ask_canonical_goal_frame.v1",
-    turn_id: args.turnId,
-    goal_kind: args.goalKind,
-    answer_scope: "current_turn",
-    required_terminal_kind: args.requiredTerminalKind,
-    allows_workspace_context: args.allowsWorkspaceContext,
-    allows_prior_artifacts: false,
-    classifier_reasons: args.classifierReasons,
-    assistant_answer: false,
-    raw_content_included: false,
-  };
+  const canonicalGoalFrame = buildGoldenPathCapabilityCanonicalGoalFrame({
+    turnId: args.turnId,
+    goalKind: args.goalKind,
+    requiredTerminalKind: args.requiredTerminalKind,
+    allowsWorkspaceContext: args.allowsWorkspaceContext,
+    classifierReasons: args.classifierReasons,
+  });
   const goalSatisfactionEvaluation = buildGoldenPathCapabilityGoalSatisfactionEvaluation({
     turnId: args.turnId,
     goalKind: args.goalKind,

@@ -1,5 +1,32 @@
 import type { RecordLike } from "./core";
 
+export const buildGoldenPathCapabilityCanonicalGoalFrame = (args: {
+  turnId: string;
+  goalKind: string;
+  requiredTerminalKind: string;
+  classifierReasons: readonly string[];
+  answerScope?: string;
+  allowsWorkspaceContext: boolean;
+  includeWorkspaceContextFields?: boolean;
+  extraFields?: RecordLike;
+}): RecordLike => ({
+  schema: "helix.ask_canonical_goal_frame.v1",
+  turn_id: args.turnId,
+  goal_kind: args.goalKind,
+  answer_scope: args.answerScope ?? "current_turn",
+  required_terminal_kind: args.requiredTerminalKind,
+  ...(args.includeWorkspaceContextFields === false
+    ? {}
+    : {
+        allows_workspace_context: args.allowsWorkspaceContext,
+        allows_prior_artifacts: false,
+      }),
+  ...(args.extraFields ?? {}),
+  classifier_reasons: args.classifierReasons,
+  assistant_answer: false,
+  raw_content_included: false,
+});
+
 export const buildGoldenPathCapabilityPlan = (args: {
   requestedCapability: string;
   sourceTarget: string;
