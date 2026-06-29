@@ -5,6 +5,7 @@ import {
   buildGoldenPathPayloadLedgerArtifact,
   buildGoldenPathRouteGateLedgerArtifact,
 } from "../artifact-ledger";
+import { buildGoldenPathCapabilityPlan } from "../capability-contract";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG,
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
@@ -161,18 +162,14 @@ export const buildHelixAskGoldenPathZenGraphReflectionPayload = (args: {
         raw_content_included: false,
       },
       canonical_goal_frame: canonicalGoalFrame,
-      capability_plan: {
-        schema: "helix.ask_capability_plan.v1",
-        requested_capability: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
-        selected_capability: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
-        executed_capability: null,
-        source_target: "zen_graph",
+      capability_plan: buildGoldenPathCapabilityPlan({
+        requestedCapability: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
+        sourceTarget: "zen_graph",
         family: "ideology_context_reflection",
-        required_observation_kinds: ["helix_zen_graph_reflection_tool_result"],
-        required_terminal_kind: requiredTerminalKind,
-        assistant_answer: false,
-        raw_content_included: false,
-      },
+        executedCapability: null,
+        requiredObservationKinds: ["helix_zen_graph_reflection_tool_result"],
+        requiredTerminalKind,
+      }),
       goal_satisfaction_evaluation: goalSatisfactionEvaluation,
       terminal_answer_authority: {
         schema: "helix.terminal_answer_authority.v1",
@@ -417,19 +414,14 @@ export const buildHelixAskGoldenPathZenGraphReflectionPayload = (args: {
       assistant_answer: false,
       raw_content_included: false,
     },
-    capability_plan: {
-      schema: "helix.ask_capability_plan.v1",
-      requested_capability: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
-      selected_capability: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
-      executed_capability: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
-      source_target: "zen_graph",
+    capability_plan: buildGoldenPathCapabilityPlan({
+      requestedCapability: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
+      sourceTarget: "zen_graph",
       family: "ideology_context_reflection",
-      args: { reflection_id: reflectionId, input_summary: inputSummary },
-      required_observation_kinds: ["helix_zen_graph_reflection_tool_result"],
-      required_terminal_kind: requiredTerminalKind,
-      assistant_answer: false,
-      raw_content_included: false,
-    },
+      planArgs: { reflection_id: reflectionId, input_summary: inputSummary },
+      requiredObservationKinds: ["helix_zen_graph_reflection_tool_result"],
+      requiredTerminalKind,
+    }),
     goal_satisfaction_evaluation: goalSatisfactionEvaluation,
     terminal_answer_authority: buildGoldenPathTerminalAnswerAuthority({
       terminalResult,
