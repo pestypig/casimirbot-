@@ -1,4 +1,4 @@
-import { buildGoldenPathObservationLedgerArtifact, buildGoldenPathRouteGateLedgerArtifact } from "./artifact-ledger";
+import { buildGoldenPathCapabilityTerminalObservationLedgerArtifacts } from "./artifact-ledger";
 import { buildGoldenPathCapabilityGoalSatisfactionEvaluation, buildGoldenPathCapabilityPlan } from "./capability-contract";
 import {
   HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
@@ -143,27 +143,19 @@ export const buildGoldenPathCapabilityTerminalObservationSuccessPayload = (args:
         solver_short_circuit_flags: [],
       },
     }),
-    current_turn_artifact_ledger: [
-      buildGoldenPathRouteGateLedgerArtifact({
-        artifactId: args.routeGateArtifactId,
-        turnId: args.turnId,
-        createdAtMs: args.createdAtMs,
-        goalHash,
-        promptText: args.promptText,
-        requestedCapability: args.requestedCapability,
-        goalSatisfactionArtifact,
-        goalSatisfactionEvaluation,
-      }),
-      buildGoldenPathObservationLedgerArtifact({
-        artifactId: args.observationArtifactId,
-        turnId: args.turnId,
-        createdAtMs: args.createdAtMs,
-        goalHash,
-        kind: args.observedArtifactKind,
-        terminalEligible: true,
-        payload: args.observationPayload,
-      }),
-    ],
+    current_turn_artifact_ledger: buildGoldenPathCapabilityTerminalObservationLedgerArtifacts({
+      turnId: args.turnId,
+      createdAtMs: args.createdAtMs,
+      goalHash,
+      routeGateArtifactId: args.routeGateArtifactId,
+      routeGatePromptText: args.promptText,
+      requestedCapability: args.requestedCapability,
+      goalSatisfactionArtifact,
+      goalSatisfactionEvaluation,
+      observationArtifactId: args.observationArtifactId,
+      observedArtifactKind: args.observedArtifactKind,
+      observationPayload: args.observationPayload,
+    }),
     debug: buildGoldenPathCapabilityDebugMirror({
       status: args.status,
       privateRuntimeLoopEntered: false,

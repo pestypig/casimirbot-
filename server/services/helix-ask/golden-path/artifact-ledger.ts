@@ -194,3 +194,93 @@ export const buildGoldenPathTypedFailureTerminalErrorLedgerArtifact = (args: {
       raw_content_included: false,
     },
   });
+
+export const buildGoldenPathCapabilitySuccessLedgerArtifacts = (args: {
+  turnId: string;
+  createdAtMs: number;
+  goalHash: string;
+  routeGateArtifactId: string;
+  requestedCapability: string;
+  goalSatisfactionArtifact: RecordLike;
+  goalSatisfactionEvaluation?: RecordLike;
+  routeGateTerminalEligible?: boolean;
+  routeGatePromptText?: string;
+  observationArtifactId: string;
+  observedArtifactKind: string;
+  observationPayload: RecordLike;
+  observationProducerItemId?: string;
+  observationTerminalEligible?: boolean;
+  terminalArtifactId: string;
+  terminalArtifactKind: string;
+  terminalPayloadSchema: string;
+  terminalResult: HelixAskGoldenPathRuntimeTerminalResult;
+  terminalProducerItemId?: string;
+  terminalExtraPayload?: RecordLike;
+}): RecordLike[] => [
+  buildGoldenPathRouteGateLedgerArtifact({
+    artifactId: args.routeGateArtifactId,
+    turnId: args.turnId,
+    createdAtMs: args.createdAtMs,
+    goalHash: args.goalHash,
+    terminalEligible: args.routeGateTerminalEligible,
+    ...(args.routeGatePromptText ? { promptText: args.routeGatePromptText } : {}),
+    requestedCapability: args.requestedCapability,
+    goalSatisfactionArtifact: args.goalSatisfactionArtifact,
+    ...(args.goalSatisfactionEvaluation ? { goalSatisfactionEvaluation: args.goalSatisfactionEvaluation } : {}),
+  }),
+  buildGoldenPathObservationLedgerArtifact({
+    artifactId: args.observationArtifactId,
+    turnId: args.turnId,
+    createdAtMs: args.createdAtMs,
+    goalHash: args.goalHash,
+    kind: args.observedArtifactKind,
+    producerItemId: args.observationProducerItemId,
+    terminalEligible: args.observationTerminalEligible,
+    payload: args.observationPayload,
+  }),
+  buildGoldenPathAnswerLedgerArtifact({
+    artifactId: args.terminalArtifactId,
+    turnId: args.turnId,
+    createdAtMs: args.createdAtMs,
+    goalHash: args.goalHash,
+    kind: args.terminalArtifactKind,
+    producerItemId: args.terminalProducerItemId,
+    payloadSchema: args.terminalPayloadSchema,
+    terminalResult: args.terminalResult,
+    extraPayload: args.terminalExtraPayload,
+  }),
+];
+
+export const buildGoldenPathCapabilityTerminalObservationLedgerArtifacts = (args: {
+  turnId: string;
+  createdAtMs: number;
+  goalHash: string;
+  routeGateArtifactId: string;
+  requestedCapability: string;
+  goalSatisfactionArtifact: RecordLike;
+  goalSatisfactionEvaluation?: RecordLike;
+  observationArtifactId: string;
+  observedArtifactKind: string;
+  observationPayload: RecordLike;
+  routeGatePromptText?: string;
+}): RecordLike[] => [
+  buildGoldenPathRouteGateLedgerArtifact({
+    artifactId: args.routeGateArtifactId,
+    turnId: args.turnId,
+    createdAtMs: args.createdAtMs,
+    goalHash: args.goalHash,
+    ...(args.routeGatePromptText ? { promptText: args.routeGatePromptText } : {}),
+    requestedCapability: args.requestedCapability,
+    goalSatisfactionArtifact: args.goalSatisfactionArtifact,
+    ...(args.goalSatisfactionEvaluation ? { goalSatisfactionEvaluation: args.goalSatisfactionEvaluation } : {}),
+  }),
+  buildGoldenPathObservationLedgerArtifact({
+    artifactId: args.observationArtifactId,
+    turnId: args.turnId,
+    createdAtMs: args.createdAtMs,
+    goalHash: args.goalHash,
+    kind: args.observedArtifactKind,
+    terminalEligible: true,
+    payload: args.observationPayload,
+  }),
+];
