@@ -22,6 +22,7 @@ import {
 } from "../terminal-envelope";
 import { buildGoldenPathSolverTrace } from "../solver-trace";
 import { buildGoldenPathRuntimeStatus } from "../runtime-status";
+import { buildGoldenPathCapabilityDebugMirror } from "../debug-mirror";
 
 export type HelixAskGoldenPathDocsLocateDependencies = {
   now: () => Date;
@@ -264,19 +265,14 @@ export const buildHelixAskGoldenPathDocsLocatePayload = (args: {
           },
         }),
       ],
-      debug: {
-        schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
-        golden_path_runtime: true,
-        requested_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-        selected_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-        executed_capability: null,
-        terminal_artifact_kind: "typed_failure",
-        final_answer_source: "typed_failure",
-        first_broken_rail: params.brokenRail,
-        terminal_error_code: params.errorCode,
-        assistant_answer: false,
-        raw_content_included: false,
-      },
+      debug: buildGoldenPathCapabilityDebugMirror({
+        requestedCapability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+        selectedCapability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+        executedCapability: null,
+        terminalResult,
+        firstBrokenRail: params.brokenRail,
+        terminalErrorCode: params.errorCode,
+      }),
     };
   };
 
@@ -449,23 +445,17 @@ export const buildHelixAskGoldenPathDocsLocatePayload = (args: {
         terminalEligible: true,
       }),
     ],
-    debug: {
-      schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
-      golden_path_runtime: true,
-      golden_path_runtime_status: "docs_locate_in_doc",
-      private_runtime_loop_entered: false,
-      requested_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-      selected_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-      executed_capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
-      observed_artifact_kind: "doc_location_matches",
-      observed_artifact_ref: observationArtifactId,
-      terminal_artifact_kind: terminalResult.artifact_kind,
-      terminal_result_count: 1,
-      final_answer_source: terminalResult.final_answer_source,
-      goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-      assistant_answer: false,
-      raw_content_included: false,
-    },
+    debug: buildGoldenPathCapabilityDebugMirror({
+      status: "docs_locate_in_doc",
+      privateRuntimeLoopEntered: false,
+      requestedCapability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+      selectedCapability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+      executedCapability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
+      observedArtifactKind: "doc_location_matches",
+      observedArtifactRef: observationArtifactId,
+      terminalResult,
+      goalSatisfactionEvaluation,
+    }),
   };
 };
 

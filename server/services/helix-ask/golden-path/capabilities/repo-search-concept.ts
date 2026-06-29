@@ -27,6 +27,7 @@ import {
 } from "../terminal-envelope";
 import { buildGoldenPathSolverTrace } from "../solver-trace";
 import { buildGoldenPathRuntimeStatus } from "../runtime-status";
+import { buildGoldenPathCapabilityDebugMirror } from "../debug-mirror";
 
 export type HelixAskGoldenPathRepoSearchConceptDependencies = {
   now: () => Date;
@@ -333,19 +334,14 @@ export const buildHelixAskGoldenPathRepoSearchConceptPayload = (args: {
           },
         }),
       ],
-      debug: {
-        schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
-        golden_path_runtime: true,
-        requested_capability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
-        selected_capability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
-        executed_capability: null,
-        terminal_artifact_kind: "typed_failure",
-        final_answer_source: "typed_failure",
-        first_broken_rail: params.brokenRail,
-        terminal_error_code: params.errorCode,
-        assistant_answer: false,
-        raw_content_included: false,
-      },
+      debug: buildGoldenPathCapabilityDebugMirror({
+        requestedCapability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+        selectedCapability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+        executedCapability: null,
+        terminalResult,
+        firstBrokenRail: params.brokenRail,
+        terminalErrorCode: params.errorCode,
+      }),
     };
   };
 
@@ -548,23 +544,17 @@ export const buildHelixAskGoldenPathRepoSearchConceptPayload = (args: {
         },
       }),
     ],
-    debug: {
-      schema: HELIX_ASK_GOLDEN_PATH_RUNTIME_SCHEMA,
-      golden_path_runtime: true,
-      golden_path_runtime_status: "repo_search_concept",
-      private_runtime_loop_entered: false,
-      requested_capability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
-      selected_capability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
-      executed_capability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
-      observed_artifact_kind: "repo_code_evidence_observation",
-      observed_artifact_ref: observationArtifactId,
-      terminal_artifact_kind: terminalResult.artifact_kind,
-      terminal_result_count: 1,
-      final_answer_source: terminalResult.final_answer_source,
-      goal_satisfaction_evaluation: goalSatisfactionEvaluation,
-      assistant_answer: false,
-      raw_content_included: false,
-    },
+    debug: buildGoldenPathCapabilityDebugMirror({
+      status: "repo_search_concept",
+      privateRuntimeLoopEntered: false,
+      requestedCapability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+      selectedCapability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+      executedCapability: HELIX_GOLDEN_PATH_REPO_SEARCH_CONCEPT_CAPABILITY,
+      observedArtifactKind: "repo_code_evidence_observation",
+      observedArtifactRef: observationArtifactId,
+      terminalResult,
+      goalSatisfactionEvaluation,
+    }),
   };
 };
 
