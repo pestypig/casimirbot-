@@ -1107,6 +1107,94 @@ describe("Helix Ask golden path runtime", () => {
     expect(terminalLedgerEntries(body)).toHaveLength(1);
   });
 
+  it("handles visual capture plus calculator as an ordered compound contract", () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+
+    const decision = runHelixAskGoldenPathRuntime({
+      now: new Date("2026-06-28T12:36:00.000Z"),
+      body: {
+        turn_id: "ask:golden:visual-calculator-compound",
+        prompt:
+          "helix_ask_golden_path_runtime use image_lens.inspect and scientific-calculator.solve_expression with expression: 6 * 7",
+        goldenPathRuntime: true,
+        requested_capabilities: [
+          HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY,
+          HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+        ],
+        visual_summary: "The current screen shows Docs Viewer focused on the NHM2 whitepaper and a calculator panel.",
+        detected_objects: ["Docs Viewer", "NHM2 whitepaper", "scientific calculator"],
+        detected_scene_relations: ["Docs Viewer is the active panel", "calculator is available for numeric cuts"],
+        calculator_expression: "6 * 7",
+      },
+    });
+
+    expect(decision.handled).toBe(true);
+    if (!decision.handled) throw new Error("golden path should handle visual+calculator compound");
+    const body = decision.payload;
+
+    expect(body).toMatchObject({
+      final_status: "final_answer",
+      terminal_artifact_kind: "compound_evidence_synthesis_answer",
+      final_answer_source: "compound_evidence_synthesis_answer",
+      terminal_error_code: null,
+      visual_frame_evidence: {
+        summary: "The current screen shows Docs Viewer focused on the NHM2 whitepaper and a calculator panel.",
+      },
+      calculator_receipt: {
+        capability_key: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+        expression: "6 * 7",
+        result: 42,
+        result_text: "42",
+      },
+      compound_capability_contract: {
+        satisfaction: "satisfied",
+        ordered_subgoals: [
+          {
+            requested_capability: HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY,
+            selected_capability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
+            executed_capability: HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
+            observation_kind: "visual_frame_evidence",
+            terminal_contribution_kind: "situation_context_pack",
+            satisfaction: "satisfied",
+          },
+          {
+            requested_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+            selected_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+            executed_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+            observation_kind: "calculator_receipt",
+            terminal_contribution_kind: "workstation_tool_evaluation",
+            satisfaction: "satisfied",
+          },
+        ],
+      },
+      capability_plan: {
+        requested_capability: "compound_capability_contract",
+        selected_capability: "compound_capability_contract",
+        executed_capability: "compound_capability_contract",
+        required_observation_kinds: ["visual_frame_evidence", "calculator_receipt"],
+        required_terminal_kind: "compound_evidence_synthesis_answer",
+      },
+      ask_turn_solver_trace: {
+        completed_solver_path: true,
+        requested_capability: "compound_capability_contract",
+        selected_capability: "compound_capability_contract",
+        executed_capability: "compound_capability_contract",
+        observed_artifact_kind: "compound_subgoal_observations",
+        terminal_artifact_kind: "compound_evidence_synthesis_answer",
+        compound_subgoal_count: 2,
+      },
+    });
+    expect(body.selected_final_answer).toContain("Compound visual/calculator synthesis completed");
+    expect(body.selected_final_answer).toContain("Calculator result: 42");
+    expect(readLedger(body).map((artifact) => artifact.kind)).toEqual([
+      "golden_path_route_gate",
+      "visual_frame_evidence",
+      "calculator_receipt",
+      "compound_evidence_synthesis_answer",
+    ]);
+    expect(terminalLedgerEntries(body)).toHaveLength(1);
+  });
+
   it("wires the route through a thin hook without importing the route from the service", () => {
     const routeSource = readFileSync(routePath, "utf8");
     const serviceSource = readFileSync(servicePath, "utf8");
