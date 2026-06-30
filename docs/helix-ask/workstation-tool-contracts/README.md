@@ -9,6 +9,11 @@ capability participates in an Ask turn.
 They are intentionally not runtime prompts. They are development contracts for
 future tool, reflection, and panel patches.
 
+For provider-wide catalog availability, graduation order, and Helix-only versus
+Codex/provider gateway classification, also read:
+
+- [Helix Ask Provider Capability Contracts](../../helix-ask-provider-capability-contracts.md)
+
 ## Maturity Labels
 
 | Label | Meaning |
