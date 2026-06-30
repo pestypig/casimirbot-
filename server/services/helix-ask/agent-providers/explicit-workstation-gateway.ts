@@ -27,6 +27,7 @@ const SCHOLARLY_RESEARCH_SEARCH_CAPABILITY = HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAP
 const THEORY_CONTEXT_REFLECTION_CAPABILITY = "theory-badge-graph.reflect_discussion_context" as const;
 const CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY = "civilization-bounds.reflect_system_bounds" as const;
 const PROMPT_NAMED_CAPABILITIES = [
+  WORKSPACE_OS_STATUS_CAPABILITY,
   DOCS_SEARCH_CAPABILITY,
   REPO_SEARCH_CAPABILITY,
   CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
@@ -118,6 +119,12 @@ const promptNamedCapabilityPattern = (capabilityId: string): RegExp =>
 
 const hasPromptNamedCapability = (prompt: string, capabilityId: string): boolean =>
   promptNamedCapabilityPattern(capabilityId).test(unquotePrompt(prompt));
+
+const isWorkspaceOsStatusSelection = (capabilityId: string): boolean =>
+  capabilityId === WORKSPACE_OS_STATUS_CAPABILITY ||
+  capabilityId === "workspace_diagnostic" ||
+  capabilityId === "workspace_status" ||
+  capabilityId === "workspace_os_status";
 
 const readPromptNamedCapabilitySegment = (prompt: string, capabilityId: string): string | null => {
   const unquoted = unquotePrompt(prompt);
@@ -524,7 +531,7 @@ export const buildStructuredAdmissionWorkstationGatewayCallRequests = (
         },
       });
     }
-    if (selectedCapability === WORKSPACE_OS_STATUS_CAPABILITY) {
+    if (isWorkspaceOsStatusSelection(selectedCapability)) {
       const key = `${WORKSPACE_OS_STATUS_CAPABILITY}:${query}`;
       if (seen.has(key)) continue;
       seen.add(key);
@@ -686,6 +693,19 @@ export const buildPromptNamedCapabilityGatewayCallRequests = (
       },
     },
   }]);
+
+  if (
+    hasPromptNamedCapability(prompt, WORKSPACE_OS_STATUS_CAPABILITY) &&
+    !hasNegatedToolInstruction(prompt, /\bworkspace_os\.status\b/i)
+  ) {
+    addNamedRequest(WORKSPACE_OS_STATUS_CAPABILITY, "observe", {
+      source_target_intent: {
+        target_source: "workspace_os",
+        target_kind: "workspace_status",
+        reason_codes: ["prompt_named_capability"],
+      },
+    });
+  }
 
   if (
     hasPromptNamedCapability(prompt, DOCS_SEARCH_CAPABILITY) &&

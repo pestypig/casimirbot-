@@ -3,6 +3,7 @@ import {
   buildVoiceInputStatusLabel,
   composeVoiceBriefWithDecision,
   describeVoiceCommandAction,
+  describeVoiceInputError,
   formatVoiceDecisionSentence,
   resolveReasoningAttemptTimelineText,
 } from "../ask-voice-copy-display";
@@ -23,6 +24,22 @@ describe("ask voice copy display helpers", () => {
       "Microphone permission denied.",
     );
     expect(buildVoiceInputStatusLabel("on", "error", null)).toBe("Voice input unavailable.");
+  });
+
+  it("formats voice input errors without owning retry or capture behavior", () => {
+    expect(describeVoiceInputError(new Error("STT HTTP 401: bad key"))).toBe(
+      "OpenAI STT unauthorized (401). Check OPENAI_API_KEY on server :5050.",
+    );
+    expect(describeVoiceInputError(new Error("fetch failed"))).toBe(
+      "STT network/allowlist failure. Verify outbound host allowlist includes api.openai.com.",
+    );
+    const denied = new Error("");
+    denied.name = "NotAllowedError";
+    expect(describeVoiceInputError(denied)).toBe("Microphone permission denied.");
+    const busy = new Error("");
+    busy.name = "NotReadableError";
+    expect(describeVoiceInputError(busy)).toBe("Microphone is busy.");
+    expect(describeVoiceInputError(null)).toBe("Voice input unavailable.");
   });
 
   it("formats voice decision sentences without owning lifecycle policy", () => {

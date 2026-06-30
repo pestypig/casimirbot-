@@ -12,6 +12,7 @@ import {
   buildReasoningTheaterFrontierParticles,
   mirekCellGridClassName,
   mirekCellParticleClassName,
+  resolveReasoningTheaterCertaintyClass,
 } from "@/lib/helix/ask-reasoning-theater-display";
 import type { MirekReasoningArtifactV1 } from "@shared/helix-reasoning-mirek";
 
@@ -36,6 +37,49 @@ describe("ask reasoning theater display", () => {
     expect(REASONING_THEATER_SUPPRESSION_LABEL.agi_overload_admission_control).toBe(
       "agi overload admission control",
     );
+  });
+
+  it("resolves certainty class display buckets from text and hit counts", () => {
+    expect(
+      resolveReasoningTheaterCertaintyClass({
+        allText: "verdict: pass integrity: ok",
+        suppressionReason: null,
+        passHits: 0,
+        failHits: 0,
+        evidenceHits: 0,
+        ambiguityHits: 0,
+      }),
+    ).toBe("confirmed");
+    expect(
+      resolveReasoningTheaterCertaintyClass({
+        allText: "candidate hypothesis",
+        suppressionReason: null,
+        passHits: 3,
+        failHits: 0,
+        evidenceHits: 1,
+        ambiguityHits: 0,
+      }),
+    ).toBe("hypothesis");
+    expect(
+      resolveReasoningTheaterCertaintyClass({
+        allText: "evidence received",
+        suppressionReason: null,
+        passHits: 0,
+        failHits: 0,
+        evidenceHits: 1,
+        ambiguityHits: 0,
+      }),
+    ).toBe("reasoned");
+    expect(
+      resolveReasoningTheaterCertaintyClass({
+        allText: "missing source",
+        suppressionReason: "missing_evidence",
+        passHits: 10,
+        failHits: 0,
+        evidenceHits: 10,
+        ambiguityHits: 0,
+      }),
+    ).toBe("unknown");
   });
 
   it("formats medal labels and asset paths", () => {

@@ -63,6 +63,38 @@ export const REASONING_THEATER_CERTAINTY_LABEL: Record<string, string> = {
   unknown: "unknown",
 };
 
+export type ReasoningTheaterCertaintyClass =
+  | "confirmed"
+  | "reasoned"
+  | "hypothesis"
+  | "unknown";
+
+export function resolveReasoningTheaterCertaintyClass(input: {
+  allText: string;
+  suppressionReason: string | null;
+  passHits: number;
+  failHits: number;
+  evidenceHits: number;
+  ambiguityHits: number;
+}): ReasoningTheaterCertaintyClass {
+  if (input.suppressionReason === "missing_evidence" || input.suppressionReason === "contract_violation") {
+    return "unknown";
+  }
+  if (/\b(confirmed|finalized|verdict:\s*pass|integrity:\s*ok|certificate:\s*[a-f0-9]{8,})\b/i.test(input.allText)) {
+    return "confirmed";
+  }
+  if (/\b(hypothes|maybe|possible|candidate|speculat)\w*/i.test(input.allText)) {
+    return "hypothesis";
+  }
+  if (input.evidenceHits > 0 || input.passHits > input.failHits) {
+    return "reasoned";
+  }
+  if (input.ambiguityHits > 0 || input.failHits > 0) {
+    return "unknown";
+  }
+  return "reasoned";
+}
+
 export const REASONING_THEATER_SUPPRESSION_LABEL: Record<string, string> = {
   context_ineligible: "context ineligible",
   dedupe_cooldown: "dedupe cooldown",

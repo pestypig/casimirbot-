@@ -192,6 +192,37 @@ export function composeVoiceBriefWithDecision(baseBrief: string, decisionSentenc
   return clipText(`${brief}${separator}${decision}`, 640);
 }
 
+export function describeVoiceInputError(error: unknown): string {
+  if (error instanceof Error) {
+    const msg = error.message.trim();
+    if (/STT HTTP 401/i.test(msg)) {
+      return "OpenAI STT unauthorized (401). Check OPENAI_API_KEY on server :5050.";
+    }
+    if (/STT HTTP 403/i.test(msg)) {
+      return "OpenAI STT forbidden (403). Check key permissions and organization/project access.";
+    }
+    if (/STT HTTP 429/i.test(msg)) {
+      return "OpenAI STT rate-limited (429). Retry shortly or adjust limits.";
+    }
+    if (/HULL|not allowed|ENOTFOUND|EAI_AGAIN|ECONN|network|fetch/i.test(msg)) {
+      return "STT network/allowlist failure. Verify outbound host allowlist includes api.openai.com.";
+    }
+    if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
+      return "Microphone permission denied.";
+    }
+    if (error.name === "NotFoundError" || error.name === "DevicesNotFoundError") {
+      return "No microphone available.";
+    }
+    if (error.name === "NotReadableError" || error.name === "TrackStartError") {
+      return "Microphone is busy.";
+    }
+    if (msg) {
+      return msg;
+    }
+  }
+  return "Voice input unavailable.";
+}
+
 export function buildVoiceInputStatusLabel(
   micArmState: "off" | "on",
   state: "listening" | "transcribing" | "cooldown" | "error",

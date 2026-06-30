@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildActiveDocsContextWorkstationGatewayCallRequests,
   buildPlannerDerivedWorkstationGatewayCallRequests,
+  buildPromptNamedCapabilityGatewayCallRequests,
   buildStructuredAdmissionWorkstationGatewayCallRequests,
   buildPromptDerivedRepoSearchGatewayCallRequests,
   buildPromptDerivedWorkspaceStatusGatewayCallRequests,
@@ -303,6 +304,30 @@ describe("explicit workstation gateway derived calls", () => {
     });
   });
 
+  it("normalizes structured workspace_diagnostic admission to workspace_os.status execution", () => {
+    const requests = buildStructuredAdmissionWorkstationGatewayCallRequests({
+      agent_runtime: "codex",
+      question: "Use workspace_os.status to inspect workstation status.",
+      source_target_intent: {
+        selected_capability: "workspace_diagnostic",
+        target_source: "workspace_diagnostic",
+        target_kind: "workspace_diagnostic",
+      },
+    });
+
+    expect(requests).toEqual([
+      expect.objectContaining({
+        capability_id: "workspace_os.status",
+        mode: "observe",
+        arguments: {
+          source_target_intent: expect.objectContaining({
+            selected_capability: "workspace_diagnostic",
+          }),
+        },
+      }),
+    ]);
+  });
+
   it("maps theory reflection planner steps into the workstation gateway", () => {
     const requests = buildPlannerDerivedWorkstationGatewayCallRequests({
       agent_runtime: "codex",
@@ -431,6 +456,36 @@ describe("explicit workstation gateway derived calls", () => {
         },
       }),
     ]);
+  });
+
+  it("maps named workspace_os.status capability prompts to observations", () => {
+    const requests = buildPromptNamedCapabilityGatewayCallRequests({
+      agent_runtime: "codex",
+      question: "Use workspace_os.status to inspect workstation status. Answer only from that observation.",
+    });
+
+    expect(requests).toEqual([
+      expect.objectContaining({
+        capability_id: "workspace_os.status",
+        mode: "observe",
+        arguments: {
+          source_target_intent: expect.objectContaining({
+            target_source: "workspace_os",
+            target_kind: "workspace_status",
+            reason_codes: expect.arrayContaining(["prompt_named_capability"]),
+          }),
+        },
+      }),
+    ]);
+  });
+
+  it("does not map negated named workspace_os.status capability prompts", () => {
+    const requests = buildPromptNamedCapabilityGatewayCallRequests({
+      agent_runtime: "codex",
+      question: "Do not use workspace_os.status; explain what that capability would observe later.",
+    });
+
+    expect(requests).toEqual([]);
   });
 
   it("keeps workspace status in a compound read-only itinerary", () => {

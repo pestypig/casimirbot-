@@ -18,6 +18,21 @@ const RUNTIME_FALLBACK_FETCH_FAILED_RE = /\bruntime fallback:\s*fetch failed\.?/
 const RUNTIME_FALLBACK_FETCH_FAILED_TEST_RE = /\bruntime fallback:\s*fetch failed\.?/i;
 const HELPER_TIMEOUT_FALLBACK_RE = /\bhelper[_\s-]?timeout[_\s-]?fallback\b/i;
 
+function clipVoiceText(value: string | undefined, limit: number): string {
+  if (!value) return "";
+  if (limit <= 0) return "";
+  return value.length <= limit ? value : `${value.slice(0, Math.max(0, limit - 1)).trimEnd()}...`;
+}
+
+export function sanitizeConversationBriefTextForVoice(value: string, maxChars = 560): string {
+  const normalized = value
+    .replace(/\?/g, ".")
+    .replace(/\s+/g, " ")
+    .replace(/\.\.+/g, ".")
+    .trim();
+  return clipVoiceText(normalized, maxChars);
+}
+
 export function stripVoiceCitationArtifacts(source: string): string {
   if (!source) return "";
   const normalized = source

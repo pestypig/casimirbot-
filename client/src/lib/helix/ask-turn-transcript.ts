@@ -4,6 +4,7 @@ import type {
 } from "@shared/helix-causal-turn-timeline";
 import type { StagePlayLiveSourceMailTranscriptEntryV1 } from "@shared/contracts/stage-play-live-source-mail.v1";
 import { humanizeAskLiveEventToken } from "@/lib/helix/ask-display-text";
+import type { AskLiveEventEntry } from "@/lib/helix/ask-debug-event-display";
 
 type HelixAskTranscriptReply = {
   id: string;
@@ -41,6 +42,13 @@ function readAgentLoopAuditRecord(value: unknown): Record<string, unknown> | nul
 
 function readAgentLoopAuditArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
+}
+
+function readFirstAgentLoopAuditArray(...values: unknown[]): unknown[] {
+  for (const value of values) {
+    if (Array.isArray(value) && value.length > 0) return value;
+  }
+  return [];
 }
 
 function dedupeStrings(values: string[]): string[] {
@@ -181,6 +189,217 @@ function summarizeHelixRuntimeArtifactRefs(refs: string[]): string {
   return unique.length > 5 ? `${visible}, +${unique.length - 5} more` : visible;
 }
 
+function readHelixGatewayProjectionSources(reply: HelixAskTranscriptReply): {
+  replyRecord: Record<string, unknown> | null;
+  debugRecord: Record<string, unknown> | null;
+  agentLoopRecord: Record<string, unknown> | null;
+  debugExportRecord: Record<string, unknown> | null;
+} {
+  const replyRecord = readAgentLoopAuditRecord(reply);
+  const debugRecord = readAgentLoopAuditRecord(reply.debug);
+  const agentLoopRecord = readAgentLoopAuditRecord(
+    replyRecord?.agent_runtime_loop ??
+      debugRecord?.agent_runtime_loop ??
+      replyRecord?.agent_loop_audit ??
+      debugRecord?.agent_loop_audit,
+  );
+  const debugExportRecord = readAgentLoopAuditRecord(
+    debugRecord?.debug_export ?? replyRecord?.debug_export,
+  );
+  return { replyRecord, debugRecord, agentLoopRecord, debugExportRecord };
+}
+
+function readHelixWorkstationGatewayCallResults(reply: HelixAskTranscriptReply): Record<string, unknown>[] {
+  const { replyRecord, debugRecord, agentLoopRecord, debugExportRecord } = readHelixGatewayProjectionSources(reply);
+  return readFirstAgentLoopAuditArray(
+    replyRecord?.workstation_gateway_call_results,
+    replyRecord?.workstation_gateway_results,
+    debugRecord?.workstation_gateway_call_results,
+    debugRecord?.workstation_gateway_results,
+    agentLoopRecord?.workstation_gateway_call_results,
+    agentLoopRecord?.workstation_gateway_results,
+    debugExportRecord?.workstation_gateway_call_results,
+    debugExportRecord?.workstation_gateway_results,
+  )
+    .map((entry) => readAgentLoopAuditRecord(entry))
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+}
+
+function readHelixWorkstationGatewayObservationPackets(reply: HelixAskTranscriptReply): Record<string, unknown>[] {
+  const { replyRecord, debugRecord, agentLoopRecord, debugExportRecord } = readHelixGatewayProjectionSources(reply);
+  return readFirstAgentLoopAuditArray(
+    replyRecord?.workstation_gateway_observation_packets,
+    debugRecord?.workstation_gateway_observation_packets,
+    agentLoopRecord?.workstation_gateway_observation_packets,
+    debugExportRecord?.workstation_gateway_observation_packets,
+  )
+    .map((entry) => readAgentLoopAuditRecord(entry))
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+}
+
+function readHelixGatewayCapabilityId(record: Record<string, unknown>): string {
+  const admission = readAgentLoopAuditRecord(record.gateway_admission);
+  return (
+    coerceText(record.capability_id).trim() ||
+    coerceText(record.capabilityId).trim() ||
+    coerceText(record.capability_key).trim() ||
+    coerceText(record.capabilityKey).trim() ||
+    coerceText(admission?.requested_capability).trim()
+  );
+}
+
+function readHelixGatewayObservationPacketForCall(
+  call: Record<string, unknown>,
+  packets: Record<string, unknown>[],
+): Record<string, unknown> | null {
+  const directPacket = readAgentLoopAuditRecord(call.observation_packet);
+  if (directPacket) return directPacket;
+  const capability = readHelixGatewayCapabilityId(call);
+  const callId = coerceText(call.call_id ?? call.callId).trim();
+  return packets.find((packet) => {
+    const packetCapability =
+      coerceText(packet.capability_key).trim() ||
+      coerceText(packet.capability_id).trim() ||
+      coerceText(packet.capabilityId).trim();
+    const packetCallId = coerceText(packet.call_id ?? packet.callId).trim();
+    return Boolean(
+      (capability && packetCapability === capability) ||
+        (callId && packetCallId === callId),
+    );
+  }) ?? null;
+}
+
+function readNestedGatewayValue(value: unknown, keys: string[]): string {
+  const visit = (entry: unknown, depth: number): string => {
+    if (depth > 4) return "";
+    const text = coerceText(entry).trim();
+    if (text && typeof entry !== "object") return "";
+    const record = readAgentLoopAuditRecord(entry);
+    if (!record) return "";
+    for (const key of keys) {
+      const candidate = coerceText(record[key]).trim();
+      if (candidate) return candidate;
+    }
+    for (const nestedKey of ["observation", "result", "output", "payload", "raw", "args", "arguments"]) {
+      const candidate = visit(record[nestedKey], depth + 1);
+      if (candidate) return candidate;
+    }
+    return "";
+  };
+  return visit(value, 0);
+}
+
+function formatHelixGatewayObservationText(args: {
+  capabilityId: string;
+  call: Record<string, unknown>;
+  packet: Record<string, unknown> | null;
+  ok: boolean;
+}): string {
+  const explicitText =
+    coerceText(args.call.text).trim() ||
+    coerceText(args.call.observation_text).trim() ||
+    coerceText(args.call.observationText).trim();
+  if (/^(?:Tool|Action) observation:/i.test(explicitText)) return explicitText;
+
+  const expression = readNestedGatewayValue(args.call, [
+    "expression",
+    "normalized_expression",
+    "expression_text",
+    "latex",
+  ]);
+  const result = readNestedGatewayValue(args.call, ["result", "answer", "value"]);
+  if (args.capabilityId === "scientific-calculator.solve_expression" && expression && result) {
+    return `Tool observation: ${args.capabilityId} observed ${expression} = ${result}.`;
+  }
+
+  const summary =
+    coerceText(args.packet?.observation_summary).trim() ||
+    coerceText(args.call.observation_summary).trim() ||
+    coerceText(args.call.summary).trim() ||
+    coerceText(args.call.error).trim();
+  if (summary) {
+    const cleanSummary = summary.replace(/\.$/, "");
+    return `${args.ok ? "Tool observation" : "Tool observation"}: ${args.capabilityId} ${args.ok ? "observed" : "blocked"} ${cleanSummary}.`;
+  }
+  return args.ok
+    ? `Tool observation: ${args.capabilityId} produced a workstation observation packet.`
+    : `Tool observation: ${args.capabilityId} did not produce a successful workstation observation packet.`;
+}
+
+function isHelixGatewayActionCapability(capabilityId: string, call: Record<string, unknown>): boolean {
+  const mode = coerceText(call.mode).trim().toLowerCase();
+  if (mode === "act") return true;
+  return /\.(?:open_panel|show_gateway_solve|show|focus|open_doc)$/i.test(capabilityId);
+}
+
+function hasSucceededHelixGatewayPacket(packet: Record<string, unknown> | null, call: Record<string, unknown>): boolean {
+  if (call.ok !== true) return false;
+  const status = coerceText(packet?.status).trim().toLowerCase();
+  return status !== "blocked" && status !== "failed" && status !== "missing_input" && status !== "needs_confirmation";
+}
+
+export function buildHelixWorkstationGatewayTranscriptEvents(reply: HelixAskTranscriptReply): Record<string, unknown>[] {
+  const calls = readHelixWorkstationGatewayCallResults(reply);
+  if (calls.length === 0) return [];
+  const packets = readHelixWorkstationGatewayObservationPackets(reply);
+  const turnId = coerceText(reply.turn_id ?? reply.debug?.turn_id ?? reply.id).trim();
+  const events: Record<string, unknown>[] = [];
+  let successfulPacketPresent = false;
+  calls.slice(0, 10).forEach((call, index) => {
+    const capabilityId = readHelixGatewayCapabilityId(call);
+    if (!capabilityId) return;
+    const packet = readHelixGatewayObservationPacketForCall(call, packets);
+    const ok = hasSucceededHelixGatewayPacket(packet, call);
+    successfulPacketPresent = successfulPacketPresent || ok;
+    const stepId = `workstation_gateway_${index + 1}`;
+    const isAction = isHelixGatewayActionCapability(capabilityId, call);
+    events.push({
+      id: `${reply.id}-workstation-gateway-${index}-request`,
+      role: "agent",
+      type: "model_decision",
+      status: "completed",
+      text: `${isAction ? "Action" : "Tool"} request: ${capabilityId}.`,
+      detail: capabilityId,
+      lane: "workstation_gateway",
+      step_id: stepId,
+      turn_id: turnId,
+      capability_id: capabilityId,
+      event_source: "workstation_gateway_call_results",
+      source_event_type: isAction ? "action_request" : "tool_request",
+    });
+    events.push({
+      id: `${reply.id}-workstation-gateway-${index}-observation`,
+      role: "tool",
+      type: "tool_result",
+      status: ok ? "completed" : "failed",
+      text: formatHelixGatewayObservationText({ capabilityId, call, packet, ok }),
+      detail: coerceText(packet?.observation_summary).trim() || coerceText(call.error).trim() || capabilityId,
+      lane: capabilityId,
+      step_id: stepId,
+      turn_id: turnId,
+      capability_id: capabilityId,
+      event_source: "workstation_gateway_call_results",
+      source_event_type: isAction ? "action_observation" : "tool_observation",
+    });
+  });
+  if (successfulPacketPresent) {
+    events.push({
+      id: `${reply.id}-workstation-gateway-model-reentry`,
+      role: "agent",
+      type: "model_decision",
+      status: "completed",
+      text: "Model re-entry: Codex received the workstation observation packet(s) before final answer.",
+      detail: "workstation_gateway_observation_packets",
+      lane: "codex_provider",
+      step_id: "model_reentry",
+      turn_id: turnId,
+      event_source: "workstation_gateway_call_results",
+      source_event_type: "model_reentry",
+    });
+  }
+  return events;
+}
+
 export function buildHelixRuntimeTranscriptEvents(reply: HelixAskTranscriptReply): Record<string, unknown>[] {
   const replyRecord = readAgentLoopAuditRecord(reply);
   const debugRecord = readAgentLoopAuditRecord(reply.debug);
@@ -270,6 +489,29 @@ export function buildHelixRuntimeTranscriptEvents(reply: HelixAskTranscriptReply
   return events;
 }
 
+export function buildHelixRuntimeAskLiveEvents(reply: HelixAskTranscriptReply): AskLiveEventEntry[] {
+  const events = [
+    ...buildHelixRuntimeTranscriptEvents(reply),
+    ...buildHelixWorkstationGatewayTranscriptEvents(reply),
+  ];
+  return events.map((event, index) => ({
+    id: coerceText(event.id).trim() || `${reply.id}-runtime-event-${index}`,
+    text: coerceText(event.text).trim() || "Helix Ask runtime update",
+    tool: coerceText(event.role).trim() || "agent",
+    seq: index,
+    meta: {
+      stage: coerceText(event.type).trim() || "runtime",
+      detail: coerceText(event.detail).trim() || null,
+      status: coerceText(event.status).trim() || "completed",
+      traceId: coerceText(event.trace_id).trim() || null,
+      turnKey: coerceText(event.turn_id).trim() || null,
+      stepId: coerceText(event.step_id).trim() || null,
+      lane: coerceText(event.lane).trim() || null,
+      event_source: coerceText(event.event_source).trim() || "agent_runtime_loop",
+    },
+  }));
+}
+
 export function resolveHelixTurnTranscriptEvents(reply: HelixAskTranscriptReply): Record<string, unknown>[] {
   const replyRecord = readAgentLoopAuditRecord(reply);
   const debugRecord = readAgentLoopAuditRecord(reply.debug);
@@ -302,19 +544,46 @@ export function resolveHelixTurnTranscriptEvents(reply: HelixAskTranscriptReply)
       : records;
     return dedupeHelixVisibleTranscriptEvents(visible);
   };
-  const runtimeEvents = buildHelixRuntimeTranscriptEvents(reply);
-  if (runtimeEvents.length > 0) {
+  const gatewayEvents = buildHelixWorkstationGatewayTranscriptEvents(reply);
+  const gatewayEventsPresent = gatewayEvents.length > 0;
+  const mergeGatewayProjectionEvents = (events: Record<string, unknown>[]): Record<string, unknown>[] => {
+    if (!gatewayEventsPresent) return events;
+    const filtered = events.filter((event) => {
+      const sourceEventType = coerceText(event.source_event_type).trim();
+      return ![
+        "tool_request",
+        "tool_observation",
+        "action_request",
+        "action_observation",
+        "model_reentry",
+      ].includes(sourceEventType);
+    });
+    const firstTerminalIndex = filtered.findIndex((event) => {
+      const sourceEventType = coerceText(event.source_event_type).trim();
+      const type = coerceText(event.type).trim();
+      return sourceEventType === "terminal_answer" || type === "final_answer";
+    });
+    if (firstTerminalIndex < 0) return [...filtered, ...gatewayEvents];
+    return [
+      ...filtered.slice(0, firstTerminalIndex),
+      ...gatewayEvents,
+      ...filtered.slice(firstTerminalIndex),
+    ];
+  };
+  const baseRuntimeEvents = buildHelixRuntimeTranscriptEvents(reply);
+  const runtimeEvents = mergeGatewayProjectionEvents(baseRuntimeEvents);
+  if (baseRuntimeEvents.length > 0) {
     return normalizeEvents(runtimeEvents);
   }
   const directEvents = Array.isArray(reply.debug?.turn_transcript_events)
     ? reply.debug.turn_transcript_events
     : [];
   if (directEvents.length > 0) {
-    return normalizeEvents(directEvents);
+    return normalizeEvents(mergeGatewayProjectionEvents(directEvents as Record<string, unknown>[]));
   }
   const audit = readAgentLoopAuditRecord(reply.debug?.agent_loop_audit);
   const auditEvents = Array.isArray(audit?.turn_transcript_events) ? audit.turn_transcript_events : [];
-  return normalizeEvents(auditEvents);
+  return normalizeEvents(mergeGatewayProjectionEvents(auditEvents as Record<string, unknown>[]));
 }
 
 function readHelixPublicCommentaryEvents(reply: HelixAskTranscriptReply): Record<string, unknown>[] {

@@ -2096,6 +2096,89 @@ describe("HelixAskPill mic-first surface contract", () => {
     ]);
   });
 
+  it("renders structured Codex gateway fields in latest-turn rows before final answer", () => {
+    const rows = buildHelixTurnTranscriptRows({
+      id: "reply-codex-gateway-structured-fields",
+      question:
+        "Codex UI gateway smoke 2026-06-29: use the Helix workstation gateway capability scientific-calculator.solve_expression with expression 8*9. Answer with the observed expression and result.",
+      content: "Observed expression: 8*9\nResult: 72",
+      debug: {
+        agent_runtime: "codex",
+        selected_agent_provider: {
+          id: "codex",
+          label: "Codex Workstation Mode",
+        },
+        workstation_gateway_call_results: [
+          {
+            schema: "helix.workstation_tool_gateway.call_result.v1",
+            ok: true,
+            capability_id: "scientific-calculator.solve_expression",
+            mode: "read",
+            gateway_admission: {
+              requested_capability: "scientific-calculator.solve_expression",
+              selected_agent_provider: "codex",
+              admission_status: "admitted",
+            },
+            observation: {
+              expression: "8*9",
+              result: "72",
+            },
+            observation_packet: {
+              schema: "helix.agent_step_observation_packet.v1",
+              turn_id: "turn-codex-gateway-structured-fields",
+              capability_key: "scientific-calculator.solve_expression",
+              status: "succeeded",
+              observation_summary: "8*9 = 72",
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+          },
+        ],
+        turn_transcript_events: [
+          {
+            role: "system",
+            type: "plan",
+            status: "completed",
+            text: "Runtime selected: Codex Workstation Mode.",
+            lane: "agent_runtime",
+            step_id: "runtime_selected",
+            source_event_type: "runtime_selected",
+          },
+          {
+            role: "agent",
+            type: "model_decision",
+            status: "completed",
+            text: "Model re-entry: no workstation observation packet was available for this Codex turn.",
+            lane: "codex_provider",
+            step_id: "model_reentry",
+            source_event_type: "model_reentry",
+          },
+          {
+            role: "assistant",
+            type: "final_answer",
+            status: "completed",
+            text: "Observed expression: 8*9\nResult: 72",
+            lane: "codex_provider",
+            step_id: "final_answer",
+            source_event_type: "terminal_answer",
+          },
+        ],
+      },
+    } as never);
+
+    const combined = rows.map((row) => `${row.label}: ${row.text} ${row.meta}`).join("\n");
+    const labels = rows.map((row) => row.label);
+    expect(combined).toContain("Runtime selected: Codex Workstation Mode.");
+    expect(combined).toContain("Tool request: scientific-calculator.solve_expression.");
+    expect(combined).toContain("Tool observation: scientific-calculator.solve_expression observed 8*9 = 72.");
+    expect(combined).toContain("Model re-entry: Codex received the workstation observation packet");
+    expect(combined).toContain("Observed expression: 8*9\nResult: 72");
+    expect(combined).not.toContain("no workstation observation packet was available");
+    expect(labels.indexOf("Tool Request")).toBeLessThan(labels.indexOf("Final"));
+    expect(labels.indexOf("Tool Observation")).toBeLessThan(labels.indexOf("Final"));
+    expect(labels.indexOf("Model Re-entry")).toBeLessThan(labels.indexOf("Final"));
+  });
+
   it("renders Codex provider blocked gateway observations in the latest turn rows", () => {
     const rows = buildHelixTurnTranscriptRows({
       id: "reply-codex-gateway-blocked-trace",

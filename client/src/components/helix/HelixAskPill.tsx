@@ -184,6 +184,7 @@ export type {
 import {
   buildAskLiveEventLogDetailPayload,
   buildAskLiveEventLogExport,
+  buildCompactToolTraceDisclosure,
   cleanHelixRenderedFinalAnswerText,
   cleanHelixRenderedQuestionText,
   formatAskLiveEventLogLine,
@@ -208,7 +209,11 @@ import {
   readProceduralStatusClass,
 } from "@/lib/helix/ask-status-classnames";
 import {
+  buildWorkstationInterpretingReceiptText,
   formatWorkstationIntentStageDetail,
+  getWorkstationExecutedReplyText,
+  getWorkstationExecutingStatusText,
+  getWorkstationInterpretingStatusText,
   readProceduralActionLabel,
 } from "@/lib/helix/ask-procedural-display";
 import {
@@ -251,6 +256,7 @@ import {
   cleanReasoningDisplayArtifacts,
   hasRuntimeFallbackArtifactSpill,
   isArtifactDominatedReasoningText,
+  sanitizeConversationBriefTextForVoice,
   sanitizeReasoningOutputText,
   stripVoiceCitationArtifacts,
   summarizeVoiceDebugText,
@@ -258,6 +264,7 @@ import {
 import {
   buildVoiceInputStatusLabel,
   composeVoiceBriefWithDecision,
+  describeVoiceInputError,
   describeVoiceCommandAction,
   formatVoiceDecisionSentence,
   laneLabelForConversationMode,
@@ -282,6 +289,7 @@ export {
 export type { VoiceDecisionLifecycle } from "@/lib/helix/ask-voice-copy-display";
 import {
   buildHelixCausalTurnTraceRows,
+  buildHelixRuntimeAskLiveEvents,
   buildHelixRuntimeTranscriptEvents,
   buildHelixTurnTranscriptRows,
   isDurableHelixAskMailTranscriptGroup,
@@ -292,6 +300,7 @@ import {
 } from "@/lib/helix/ask-turn-transcript";
 export {
   buildHelixCausalTurnTraceRows,
+  buildHelixRuntimeAskLiveEvents,
   buildHelixRuntimeTranscriptEvents,
   buildHelixTurnTranscriptRows,
   isDurableHelixAskMailTranscriptGroup,
@@ -315,7 +324,9 @@ import {
   chooseVisibleFinalText,
   isInvalidTerminalAnswerText,
   normalizeTerminalAnswerText,
+  readHelixTopLevelPendingServerRequest,
   readHelixAskFinalAnswerSourceLabel,
+  renderLiveAnswerEnvironmentContextPackAnswer,
   renderTypedFailureFallback,
   resolveHelixAskFinalAnswerPresentation,
   type HelixAskFinalAnswerPresentation,
@@ -481,6 +492,7 @@ import {
   buildReasoningTheaterFrontierParticles,
   mirekCellGridClassName,
   mirekCellParticleClassName,
+  resolveReasoningTheaterCertaintyClass,
   type ReasoningTheaterParticle,
   type ReasoningTheaterFrontierParticleNode,
 } from "@/lib/helix/ask-reasoning-theater-display";
@@ -2751,54 +2763,6 @@ const resolveVoiceResponseLanguage = (args: {
   return undefined;
 };
 
-const getWorkstationInterpretingStatusText = (languageTag: string | null | undefined): string => {
-  const normalized = normalizeVoiceLanguageTag(languageTag);
-  if (!normalized) return "Interpreting workstation request...";
-  if (normalized.startsWith("zh")) return "æ­£åœ¨è§£æžå·¥ä½œåŒºè¯·æ±‚...";
-  if (normalized.startsWith("ja")) return "ãƒ¯ãƒ¼ã‚¯ã‚¹ãƒšãƒ¼ã‚¹ã®ä¾é ¼ã‚’è§£æžä¸­ã§ã™...";
-  if (normalized.startsWith("ko")) return "ì›Œí¬ìŠ¤íŽ˜ì´ìŠ¤ ìš”ì²­ì„ í•´ì„ ì¤‘ìž…ë‹ˆë‹¤...";
-  if (normalized.startsWith("ar")) return "Ø¬Ø§Ø±ÙŠ ØªÙØ³ÙŠØ± Ø·Ù„Ø¨ Ù…Ø³Ø§Ø­Ø© Ø§Ù„Ø¹Ù…Ù„...";
-  if (normalized.startsWith("ru")) return "Ð Ð°Ð·Ð±Ð¸Ñ€Ð°ÑŽ Ð·Ð°Ð¿Ñ€Ð¾Ñ Ðº Ñ€Ð°Ð±Ð¾Ñ‡ÐµÐ¼Ñƒ Ð¿Ñ€Ð¾ÑÑ‚Ñ€Ð°Ð½ÑÑ‚Ð²Ñƒ...";
-  if (normalized.startsWith("es")) return "Interpretando solicitud del espacio de trabajo...";
-  if (normalized.startsWith("fr")) return "InterprÃ©tation de la demande de lâ€™espace de travail...";
-  if (normalized.startsWith("de")) return "Arbeitsbereich-Anfrage wird interpretiert...";
-  if (normalized.startsWith("pt")) return "Interpretando solicitaÃ§Ã£o do espaÃ§o de trabalho...";
-  if (normalized.startsWith("it")) return "Interpretazione della richiesta dell'area di lavoro...";
-  return "Interpreting workstation request...";
-};
-
-const getWorkstationExecutingStatusText = (languageTag: string | null | undefined): string => {
-  const normalized = normalizeVoiceLanguageTag(languageTag);
-  if (!normalized) return "Executing workstation action...";
-  if (normalized.startsWith("zh")) return "æ­£åœ¨æ‰§è¡Œå·¥ä½œåŒºæ“ä½œ...";
-  if (normalized.startsWith("ja")) return "ãƒ¯ãƒ¼ã‚¯ã‚¹ãƒšãƒ¼ã‚¹æ“ä½œã‚’å®Ÿè¡Œä¸­ã§ã™...";
-  if (normalized.startsWith("ko")) return "ì›Œí¬ìŠ¤íŽ˜ì´ìŠ¤ ìž‘ì—…ì„ ì‹¤í–‰ ì¤‘ìž…ë‹ˆë‹¤...";
-  if (normalized.startsWith("ar")) return "Ø¬Ø§Ø±ÙŠ ØªÙ†ÙÙŠØ° Ø¥Ø¬Ø±Ø§Ø¡ Ù…Ø³Ø§Ø­Ø© Ø§Ù„Ø¹Ù…Ù„...";
-  if (normalized.startsWith("ru")) return "Ð’Ñ‹Ð¿Ð¾Ð»Ð½ÑÑŽ Ð´ÐµÐ¹ÑÑ‚Ð²Ð¸Ðµ Ñ€Ð°Ð±Ð¾Ñ‡ÐµÐ³Ð¾ Ð¿Ñ€Ð¾ÑÑ‚Ñ€Ð°Ð½ÑÑ‚Ð²Ð°...";
-  if (normalized.startsWith("es")) return "Ejecutando acciÃ³n del espacio de trabajo...";
-  if (normalized.startsWith("fr")) return "ExÃ©cution de lâ€™action de lâ€™espace de travail...";
-  if (normalized.startsWith("de")) return "Arbeitsbereichsaktion wird ausgefÃ¼hrt...";
-  if (normalized.startsWith("pt")) return "Executando aÃ§Ã£o do espaÃ§o de trabalho...";
-  if (normalized.startsWith("it")) return "Esecuzione dell'azione dell'area di lavoro...";
-  return "Executing workstation action...";
-};
-
-const getWorkstationExecutedReplyText = (languageTag: string | null | undefined): string => {
-  const normalized = normalizeVoiceLanguageTag(languageTag);
-  if (!normalized) return "Executed workstation action.";
-  if (normalized.startsWith("zh")) return "å·²æ‰§è¡Œå·¥ä½œåŒºæ“ä½œã€‚";
-  if (normalized.startsWith("ja")) return "ãƒ¯ãƒ¼ã‚¯ã‚¹ãƒšãƒ¼ã‚¹æ“ä½œã‚’å®Ÿè¡Œã—ã¾ã—ãŸã€‚";
-  if (normalized.startsWith("ko")) return "ì›Œí¬ìŠ¤íŽ˜ì´ìŠ¤ ìž‘ì—…ì„ ì‹¤í–‰í–ˆìŠµë‹ˆë‹¤.";
-  if (normalized.startsWith("ar")) return "ØªÙ… ØªÙ†ÙÙŠØ° Ø¥Ø¬Ø±Ø§Ø¡ Ù…Ø³Ø§Ø­Ø© Ø§Ù„Ø¹Ù…Ù„.";
-  if (normalized.startsWith("ru")) return "Ð”ÐµÐ¹ÑÑ‚Ð²Ð¸Ðµ Ñ€Ð°Ð±Ð¾Ñ‡ÐµÐ³Ð¾ Ð¿Ñ€Ð¾ÑÑ‚Ñ€Ð°Ð½ÑÑ‚Ð²Ð° Ð²Ñ‹Ð¿Ð¾Ð»Ð½ÐµÐ½Ð¾.";
-  if (normalized.startsWith("es")) return "AcciÃ³n del espacio de trabajo ejecutada.";
-  if (normalized.startsWith("fr")) return "Action de lâ€™espace de travail exÃ©cutÃ©e.";
-  if (normalized.startsWith("de")) return "Arbeitsbereichsaktion ausgefÃ¼hrt.";
-  if (normalized.startsWith("pt")) return "AÃ§Ã£o do espaÃ§o de trabalho executada.";
-  if (normalized.startsWith("it")) return "Azione dell'area di lavoro eseguita.";
-  return "Executed workstation action.";
-};
-
 const readWorkstationActionArgText = (
   action: HelixWorkstationAction,
   keys: string[],
@@ -2888,22 +2852,6 @@ const getWorkstationFastPathReplyText = (
     : null;
   if (promptOnlyCalculatorReply) return promptOnlyCalculatorReply;
   return getWorkstationExecutedReplyText(languageTag);
-};
-
-const buildWorkstationInterpretingReceiptText = (requestText: string, languageTag: string | null | undefined): string => {
-  const normalized = normalizeVoiceLanguageTag(languageTag);
-  if (!normalized) return `Interpreting workstation request: ${requestText}`;
-  if (normalized.startsWith("zh")) return `æ­£åœ¨è§£æžå·¥ä½œåŒºè¯·æ±‚ï¼š${requestText}`;
-  if (normalized.startsWith("ja")) return `ãƒ¯ãƒ¼ã‚¯ã‚¹ãƒšãƒ¼ã‚¹ã®ä¾é ¼ã‚’è§£æžä¸­: ${requestText}`;
-  if (normalized.startsWith("ko")) return `ì›Œí¬ìŠ¤íŽ˜ì´ìŠ¤ ìš”ì²­ í•´ì„ ì¤‘: ${requestText}`;
-  if (normalized.startsWith("ar")) return `Ø¬Ø§Ø±ÙŠ ØªÙØ³ÙŠØ± Ø·Ù„Ø¨ Ù…Ø³Ø§Ø­Ø© Ø§Ù„Ø¹Ù…Ù„: ${requestText}`;
-  if (normalized.startsWith("ru")) return `Ð Ð°Ð·Ð±Ð¸Ñ€Ð°ÑŽ Ð·Ð°Ð¿Ñ€Ð¾Ñ Ðº Ñ€Ð°Ð±Ð¾Ñ‡ÐµÐ¼Ñƒ Ð¿Ñ€Ð¾ÑÑ‚Ñ€Ð°Ð½ÑÑ‚Ð²Ñƒ: ${requestText}`;
-  if (normalized.startsWith("es")) return `Interpretando solicitud del espacio de trabajo: ${requestText}`;
-  if (normalized.startsWith("fr")) return `InterprÃ©tation de la demande de lâ€™espace de travailÂ : ${requestText}`;
-  if (normalized.startsWith("de")) return `Arbeitsbereich-Anfrage wird interpretiert: ${requestText}`;
-  if (normalized.startsWith("pt")) return `Interpretando solicitaÃ§Ã£o do espaÃ§o de trabalho: ${requestText}`;
-  if (normalized.startsWith("it")) return `Interpretazione della richiesta dell'area di lavoro: ${requestText}`;
-  return `Interpreting workstation request: ${requestText}`;
 };
 
 function isHighRiskTranslationContext(args: {
@@ -5075,15 +5023,6 @@ function buildConversationFallbackBrief(args: {
   return `I heard: "${snippet}". I will continue with one precise next step while preserving context continuity.`;
 }
 
-function sanitizeConversationBriefTextForVoice(value: string, maxChars = 560): string {
-  const normalized = value
-    .replace(/\?/g, ".")
-    .replace(/\s+/g, " ")
-    .replace(/\.\.+/g, ".")
-    .trim();
-  return clipText(normalized, maxChars);
-}
-
 function normalizeBriefComparableText(value: string): string {
   return value
     .toLowerCase()
@@ -6006,37 +5945,6 @@ function buildSuppressedVoiceSpeechText(args: {
     selected.push(decision);
   }
   return clipText(sanitizeConversationBriefTextForVoice(selected.join(" "), 360), 360);
-}
-
-function describeVoiceInputError(error: unknown): string {
-  if (error instanceof Error) {
-    const msg = error.message.trim();
-    if (/STT HTTP 401/i.test(msg)) {
-      return "OpenAI STT unauthorized (401). Check OPENAI_API_KEY on server :5050.";
-    }
-    if (/STT HTTP 403/i.test(msg)) {
-      return "OpenAI STT forbidden (403). Check key permissions and organization/project access.";
-    }
-    if (/STT HTTP 429/i.test(msg)) {
-      return "OpenAI STT rate-limited (429). Retry shortly or adjust limits.";
-    }
-    if (/HULL|not allowed|ENOTFOUND|EAI_AGAIN|ECONN|network|fetch/i.test(msg)) {
-      return "STT network/allowlist failure. Verify outbound host allowlist includes api.openai.com.";
-    }
-    if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
-      return "Microphone permission denied.";
-    }
-    if (error.name === "NotFoundError" || error.name === "DevicesNotFoundError") {
-      return "No microphone available.";
-    }
-    if (error.name === "NotReadableError" || error.name === "TrackStartError") {
-      return "Microphone is busy.";
-    }
-    if (msg) {
-      return msg;
-    }
-  }
-  return "Voice input unavailable.";
 }
 
 function isVoiceMemoryPressureError(error: unknown): boolean {
@@ -7459,127 +7367,6 @@ const stableHelixProjectionHash = (value: string): string => {
   return (hash >>> 0).toString(16).padStart(8, "0");
 };
 
-const readHelixResolvedTurnSummary = (reply?: HelixAskReply | null): Record<string, unknown> | null => {
-  const record = readAgentLoopAuditRecord(reply);
-  const debugRecord = readAgentLoopAuditRecord(reply?.debug);
-  const turnTruthTable = readAgentLoopAuditRecord(record?.turn_truth_table ?? debugRecord?.turn_truth_table);
-  return readAgentLoopAuditRecord(record?.resolved_turn_summary ?? debugRecord?.resolved_turn_summary ?? turnTruthTable?.resolved_turn_summary);
-};
-
-const readHelixCanonicalGoalKind = (reply?: HelixAskReply | null): string => {
-  const record = readAgentLoopAuditRecord(reply);
-  const debugRecord = readAgentLoopAuditRecord(reply?.debug);
-  const canonical = readAgentLoopAuditRecord(record?.canonical_goal_frame ?? debugRecord?.canonical_goal_frame);
-  return coerceText(canonical?.goal_kind).trim() || "unknown";
-};
-
-const readHelixTopLevelPendingServerRequest = (reply?: HelixAskReply | null): Record<string, unknown> | null => {
-  const record = readAgentLoopAuditRecord(reply);
-  return readHelixPendingInputRecord(record?.pending_server_request);
-};
-
-const readLatestAuthoritativeFinalLiveEventText = (reply?: HelixAskReply | null): string | null => {
-  const replyRecord = readAgentLoopAuditRecord(reply);
-  const debugRecord = readAgentLoopAuditRecord(reply?.debug);
-  const auditRecord = readAgentLoopAuditRecord(debugRecord?.agent_loop_audit);
-  const events = [
-    ...(Array.isArray(reply?.liveEvents) ? reply.liveEvents : []),
-    ...(Array.isArray(replyRecord?.live_events) ? replyRecord.live_events : []),
-    ...(Array.isArray(debugRecord?.live_events) ? debugRecord.live_events : []),
-    ...(Array.isArray(debugRecord?.turn_transcript_events) ? debugRecord.turn_transcript_events : []),
-    ...(Array.isArray(auditRecord?.turn_transcript_events) ? auditRecord.turn_transcript_events : []),
-  ];
-  for (let index = events.length - 1; index >= 0; index -= 1) {
-    const event = readAgentLoopAuditRecord(events[index]);
-    if (!event || typeof event !== "object") continue;
-    const rawText = coerceText(event.text).trim();
-    const tool = coerceText(event.tool).trim().toLowerCase();
-    const type = coerceText(event.type).trim().toLowerCase();
-    const meta = readAgentLoopAuditRecord(event.meta);
-    const stage = coerceText(meta?.stage ?? meta?.event_stage).trim().toLowerCase();
-    const status = coerceText(meta?.status ?? meta?.terminal_status).trim().toLowerCase();
-    const isFinalEvent =
-      tool === "final" ||
-      type === "final_answer" ||
-      stage === "final_answer" ||
-      status === "final_answer" ||
-      /\bfinal_answer\b/i.test(coerceText(event.id)) ||
-      /^Final:\s*/i.test(rawText);
-    if (!isFinalEvent) continue;
-    const text = rawText.replace(/^Final:\s*/i, "").trim();
-    if (text && !isInvalidTerminalAnswerText(text)) return text;
-  }
-  return null;
-};
-
-const normalizeVisibleDocPath = (value: string): string | null => {
-  const path = value.trim().replace(/:(?:L)?\d+(?:-L?\d+)?$/i, "");
-  return path.startsWith("/") ? path : null;
-};
-
-const renderDocOpenTerminalFromLocationText = (args: {
-  text: string;
-  goalKind: string;
-  terminalKind: string;
-}): string | null => {
-  if (args.terminalKind !== "doc_open_receipt") return null;
-  if (args.goalKind !== "latest_doc_navigation" && args.goalKind !== "doc_open_best") return null;
-  if (!/^\s*Locations?:/i.test(args.text)) return null;
-  const pathMatch = args.text.match(/\bPath:\s*(\/[^\s]+?\.md)(?::L?\d+(?:-L?\d+)?)?/i);
-  const path = pathMatch?.[1] ? normalizeVisibleDocPath(pathMatch[1]) : null;
-  if (!path) return null;
-  const titleMatch = args.text.match(/^\s*-\s+(.+?),\s+L\d+/m);
-  const title = titleMatch?.[1]?.trim() || path.split(/[\\/]/).pop() || path;
-  const heading = args.goalKind === "latest_doc_navigation" ? "Opened latest verified document:" : "Opened document:";
-  return [heading, "Document:", `- ${title}`, `  Path: ${path}`].join("\n");
-};
-
-const renderLiveAnswerEnvironmentContextPackAnswer = (contextPack: unknown): string | null => {
-  const pack = readAgentLoopAuditRecord(contextPack);
-  const environment = readAgentLoopAuditRecord(pack?.live_answer_environment);
-  if (!environment) return null;
-  const summary = coerceText(environment.latest_summary).trim();
-  const utilityHypotheses = Array.isArray(pack?.utility_hypotheses) ? pack.utility_hypotheses : [];
-  const utilityLines = utilityHypotheses
-    .map((entry) => readAgentLoopAuditRecord(entry))
-    .slice(-3)
-    .map((hypothesis) => {
-      const utilityLabel = coerceText(hypothesis?.utility_label).trim();
-      if (!utilityLabel) return "";
-      const status = coerceText(hypothesis?.status).trim() || "unknown";
-      const confidence = typeof hypothesis?.confidence === "number" && Number.isFinite(hypothesis.confidence)
-        ? `confidence ${hypothesis.confidence.toFixed(2)}`
-        : "confidence unknown";
-      const displayLabel = utilityLabel.replace(new RegExp(`^${status}\\s+`, "i"), "");
-      return `Hypothesis: ${status} ${displayLabel} (${confidence}).`;
-    })
-    .filter(Boolean);
-  const missingEvidence = Array.isArray(pack?.missing_evidence_notes)
-    ? pack.missing_evidence_notes.map((entry) => coerceText(entry).trim()).filter(Boolean).slice(0, 6)
-    : [];
-  const missingEvidenceLines = missingEvidence.length > 0
-    ? [`Missing evidence: ${missingEvidence.join("; ")}.`]
-    : [];
-  const semanticConfidence = Array.isArray(pack?.semantic_confidence_ladder)
-    ? pack.semantic_confidence_ladder.map((entry) => coerceText(entry).trim()).filter(Boolean).slice(-3)
-    : [];
-  const semanticLines = semanticConfidence.length > 0
-    ? [`Semantic confidence: ${semanticConfidence.join("; ")}.`]
-    : [];
-  const lines = Array.isArray(environment.lines) ? environment.lines : [];
-  const renderedLines = lines
-    .map((line) => readAgentLoopAuditRecord(line))
-    .filter((line): line is Record<string, unknown> => Boolean(line && line.visibility === "answer_card"))
-    .map((line) => {
-      const label = coerceText(line.label).trim() || coerceText(line.key).trim() || "Line";
-      const value = coerceText(line.value).trim();
-      return value ? `${label}: ${value}` : "";
-    })
-    .filter(Boolean);
-  const text = [summary, ...utilityLines, ...missingEvidenceLines, ...semanticLines, ...renderedLines].filter(Boolean).join("\n").trim();
-  return text || null;
-};
-
 function resolveHelixAskVisibleTerminal(value: unknown, fallbackContent?: string | null): HelixAskVisibleTerminalResolution {
   const terminal = resolveHelixVisibleTerminalCore(value, fallbackContent);
   return {
@@ -7591,25 +7378,6 @@ function resolveHelixAskVisibleTerminal(value: unknown, fallbackContent?: string
 
 function readAgentLoopAuditArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
-}
-
-function buildHelixRuntimeAskLiveEvents(reply: HelixAskReply): AskLiveEventEntry[] {
-  return buildHelixRuntimeTranscriptEvents(reply).map((event, index) => ({
-    id: coerceText(event.id).trim() || `${reply.id}-runtime-event-${index}`,
-    text: coerceText(event.text).trim() || "Helix Ask runtime update",
-    tool: coerceText(event.role).trim() || "agent",
-    seq: index,
-    meta: {
-      stage: coerceText(event.type).trim() || "runtime",
-      detail: coerceText(event.detail).trim() || null,
-      status: coerceText(event.status).trim() || "completed",
-      traceId: coerceText(event.trace_id).trim() || null,
-      turnKey: coerceText(event.turn_id).trim() || null,
-      stepId: coerceText(event.step_id).trim() || null,
-      lane: coerceText(event.lane).trim() || null,
-      event_source: "agent_runtime_loop",
-    },
-  }));
 }
 
 function renderProceduralTurnTimeline(reply: HelixAskReply): React.ReactNode {
@@ -10715,117 +10483,6 @@ function debugPayloadMatchesRenderedTurnPayload(
   }
 }
 
-function classifyCompactToolTraceAction(panelId: string | null, actionId: string | null) {
-  const panel = (panelId ?? "").toLowerCase();
-  const action = (actionId ?? "").toLowerCase();
-  const tool = `${panelId}.${actionId}`;
-  if (tool === "theory-badge-graph.reflect_discussion_context") {
-    return { role: "context_locator", authority: "evidence_only", summary: "Located the prompt in theory graph space." };
-  }
-  if (tool === "theory-badge-graph.explain_reflected_context") {
-    return { role: "context_route_builder", authority: "evidence_only", summary: "Built a first-principles context route from the reflection." };
-  }
-  if (tool === "scientific-calculator.solve_expression" || tool === "scientific-calculator.solve_with_steps") {
-    return { role: "scalar_solver", authority: "numeric_observation", summary: "Computed the scalar result in the Scientific Calculator." };
-  }
-  if (action === "open" || action === "focus" || action === "show" || action === "switch_to") {
-    return { role: "ui_navigation", authority: "ui_state", summary: "Opened or focused a workstation panel." };
-  }
-  if (
-    panel.includes("doc") ||
-    panel.includes("paper") ||
-    panel.includes("source") ||
-    action.includes("search") ||
-    action.includes("lookup") ||
-    action.includes("read") ||
-    action.includes("open_doc") ||
-    action.includes("retrieve")
-  ) {
-    return { role: "source_lookup", authority: "source_evidence", summary: "Retrieved source or reference evidence." };
-  }
-  if (action.includes("runtime") || action.includes("trace") || action.includes("receipt")) {
-    return { role: "runtime_observer", authority: "runtime_observation", summary: "Returned runtime or trace observation evidence." };
-  }
-  if (
-    action.includes("create") ||
-    action.includes("update") ||
-    action.includes("delete") ||
-    action.includes("append") ||
-    action.includes("save") ||
-    action.includes("load") ||
-    action.includes("clear") ||
-    action.includes("set_")
-  ) {
-    return { role: "state_mutation", authority: "mutation_receipt", summary: "Changed workstation panel state." };
-  }
-  return { role: "panel_state", authority: "ui_state", summary: "Updated workstation panel state." };
-}
-
-function answerNoteForCompactToolTraceItems(items: Array<{ role: string }>): string | null {
-  const hasTheoryReflection = items.some((item) => item.role === "context_locator" || item.role === "context_route_builder");
-  const hasScalarSolver = items.some((item) => item.role === "scalar_solver");
-  const hasRuntimeObserver = items.some((item) => item.role === "runtime_observer");
-  const hasSourceLookup = items.some((item) => item.role === "source_lookup");
-  const hasStateMutation = items.some((item) => item.role === "state_mutation");
-  if (hasTheoryReflection && hasScalarSolver) {
-    return "Evidence note: theory graph reflection supplied context; Scientific Calculator receipts supplied the numeric result.";
-  }
-  if (hasTheoryReflection && hasRuntimeObserver) {
-    return "Evidence note: theory graph reflection supplied context; runtime receipts supplied system-level observations.";
-  }
-  if (hasTheoryReflection) return "Evidence note: theory graph reflection supplied context only; it is not a solve.";
-  if (hasScalarSolver && hasRuntimeObserver) {
-    return "Evidence note: calculator receipts supplied scalar results; runtime receipts supplied system-level observations.";
-  }
-  if (hasSourceLookup && hasScalarSolver) {
-    return "Evidence note: source lookup supplied evidence; Scientific Calculator receipts supplied the numeric result.";
-  }
-  if (hasSourceLookup) return "Evidence note: workstation source lookup supplied evidence only; it is not a solve.";
-  if (hasStateMutation) {
-    return "Evidence note: workstation mutation receipts confirm panel state changes; they are not factual support by themselves.";
-  }
-  return null;
-}
-
-function buildCompactToolTraceDisclosure(actionEnvelope: Record<string, unknown> | null, turnId: string) {
-  const workstationActions = Array.isArray(actionEnvelope?.workstation_actions)
-    ? actionEnvelope.workstation_actions
-        .map((entry) => readAgentLoopAuditRecord(entry))
-        .filter((entry): entry is Record<string, unknown> => Boolean(entry))
-        .map((entry) => {
-          const action = coerceText(entry.action).trim();
-          if (action === "restore_view_state") {
-            return {
-              panel_id: "workstation",
-              action_id: "restore_view_state",
-            };
-          }
-          return {
-            panel_id: coerceText(entry.panel_id).trim() || null,
-            action_id: coerceText(entry.action_id).trim() || null,
-          };
-        })
-        .filter((entry) => Boolean(entry.panel_id && entry.action_id))
-    : [];
-  if (workstationActions.length === 0) return null;
-  const actionKeys = workstationActions.map((action) => `${action.panel_id}.${action.action_id}`);
-  const items = workstationActions.map((action) => ({
-    tool: `${action.panel_id}.${action.action_id}`,
-    ...classifyCompactToolTraceAction(action.panel_id, action.action_id),
-  }));
-  return {
-    schema: "helix.ask_tool_trace_disclosure.v1",
-    disclosureId: `${turnId}:tool_trace_disclosure`,
-    turnId,
-    action_keys: actionKeys,
-    items,
-    workstation_actions: workstationActions,
-    answerNote: answerNoteForCompactToolTraceItems(items),
-    assistant_answer: false,
-    terminal_eligible: false,
-  };
-}
-
 export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskReply, payload: Record<string, unknown>): string {
   const debug = readAgentLoopAuditRecord(payload.debug);
   const agentLoop = readAgentLoopAuditRecord(payload.agentLoop);
@@ -12402,32 +12059,6 @@ function resolveReasoningTheaterPhase(
     return "plan";
   }
   return "observe";
-}
-
-function resolveReasoningTheaterCertaintyClass(input: {
-  allText: string;
-  suppressionReason: ReasoningTheaterSuppressionReason | null;
-  passHits: number;
-  failHits: number;
-  evidenceHits: number;
-  ambiguityHits: number;
-}): ReasoningTheaterCertaintyClass {
-  if (input.suppressionReason === "missing_evidence" || input.suppressionReason === "contract_violation") {
-    return "unknown";
-  }
-  if (/\b(confirmed|finalized|verdict:\s*pass|integrity:\s*ok|certificate:\s*[a-f0-9]{8,})\b/i.test(input.allText)) {
-    return "confirmed";
-  }
-  if (/\b(hypothes|maybe|possible|candidate|speculat)\w*/i.test(input.allText)) {
-    return "hypothesis";
-  }
-  if (input.evidenceHits > 0 || input.passHits > input.failHits) {
-    return "reasoned";
-  }
-  if (input.ambiguityHits > 0 || input.failHits > 0) {
-    return "unknown";
-  }
-  return "reasoned";
 }
 
 const REASONING_THEATER_SUPPRESSION_REASON_SET = new Set<ReasoningTheaterSuppressionReason>([

@@ -3,6 +3,7 @@ import {
   buildSpeakText,
   cleanReasoningDisplayArtifacts,
   isArtifactDominatedReasoningText,
+  sanitizeConversationBriefTextForVoice,
   sanitizeReasoningOutputText,
   stripVoiceCitationArtifacts,
   summarizeVoiceDebugText,
@@ -35,6 +36,14 @@ describe("ask voice text display helpers", () => {
     expect(speakText.length).toBeLessThanOrEqual(600);
     expect(speakText.endsWith("...")).toBe(true);
     expect(buildSpeakText("   ")).toBe("");
+  });
+
+  it("sanitizes conversation brief text for voice playback display", () => {
+    expect(sanitizeConversationBriefTextForVoice("  Why now??   Because  context... matters.  ", 200)).toBe(
+      "Why now. Because context. matters.",
+    );
+    expect(sanitizeConversationBriefTextForVoice("abcdef", 4)).toBe("abc...");
+    expect(sanitizeConversationBriefTextForVoice("abcdef", 0)).toBe("");
   });
 
   it("detects and sanitizes artifact-dominated reasoning text", () => {

@@ -99,7 +99,9 @@ const readHelixCanonicalGoalKind = (reply?: HelixAskTerminalProjectionReply | nu
   return coerceText(canonical?.goal_kind).trim() || "unknown";
 };
 
-const readHelixTopLevelPendingServerRequest = (reply?: HelixAskTerminalProjectionReply | null): RecordLike | null => {
+export const readHelixTopLevelPendingServerRequest = (
+  reply?: HelixAskTerminalProjectionReply | null,
+): RecordLike | null => {
   const record = readAgentLoopAuditRecord(reply);
   return readHelixPendingInputRecord(record?.pending_server_request);
 };
@@ -158,6 +160,55 @@ const renderDocOpenTerminalFromLocationText = (args: {
   const title = titleMatch?.[1]?.trim() || path.split(/[\\/]/).pop() || path;
   const heading = args.goalKind === "latest_doc_navigation" ? "Opened latest verified document:" : "Opened document:";
   return [heading, "Document:", `- ${title}`, `  Path: ${path}`].join("\n");
+};
+
+export const renderLiveAnswerEnvironmentContextPackAnswer = (contextPack: unknown): string | null => {
+  const pack = readAgentLoopAuditRecord(contextPack);
+  const environment = readAgentLoopAuditRecord(pack?.live_answer_environment);
+  if (!environment) return null;
+  const summary = coerceText(environment.latest_summary).trim();
+  const utilityHypotheses = Array.isArray(pack?.utility_hypotheses) ? pack.utility_hypotheses : [];
+  const utilityLines = utilityHypotheses
+    .map((entry) => readAgentLoopAuditRecord(entry))
+    .slice(-3)
+    .map((hypothesis) => {
+      const utilityLabel = coerceText(hypothesis?.utility_label).trim();
+      if (!utilityLabel) return "";
+      const status = coerceText(hypothesis?.status).trim() || "unknown";
+      const confidence = typeof hypothesis?.confidence === "number" && Number.isFinite(hypothesis.confidence)
+        ? `confidence ${hypothesis.confidence.toFixed(2)}`
+        : "confidence unknown";
+      const displayLabel = utilityLabel.replace(new RegExp(`^${status}\\s+`, "i"), "");
+      return `Hypothesis: ${status} ${displayLabel} (${confidence}).`;
+    })
+    .filter(Boolean);
+  const missingEvidence = Array.isArray(pack?.missing_evidence_notes)
+    ? pack.missing_evidence_notes.map((entry) => coerceText(entry).trim()).filter(Boolean).slice(0, 6)
+    : [];
+  const missingEvidenceLines = missingEvidence.length > 0
+    ? [`Missing evidence: ${missingEvidence.join("; ")}.`]
+    : [];
+  const semanticConfidence = Array.isArray(pack?.semantic_confidence_ladder)
+    ? pack.semantic_confidence_ladder.map((entry) => coerceText(entry).trim()).filter(Boolean).slice(-3)
+    : [];
+  const semanticLines = semanticConfidence.length > 0
+    ? [`Semantic confidence: ${semanticConfidence.join("; ")}.`]
+    : [];
+  const lines = Array.isArray(environment.lines) ? environment.lines : [];
+  const renderedLines = lines
+    .map((line) => readAgentLoopAuditRecord(line))
+    .filter((line): line is RecordLike => Boolean(line && line.visibility === "answer_card"))
+    .map((line) => {
+      const label = coerceText(line.label).trim() || coerceText(line.key).trim() || "Line";
+      const value = coerceText(line.value).trim();
+      return value ? `${label}: ${value}` : "";
+    })
+    .filter(Boolean);
+  const text = [summary, ...utilityLines, ...missingEvidenceLines, ...semanticLines, ...renderedLines]
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+  return text || null;
 };
 
 export const renderTypedFailureFallback = (code?: string | null): string => {

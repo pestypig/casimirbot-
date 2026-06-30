@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildVisibleResolvedTurn,
   isInvalidTerminalAnswerText,
   normalizeTerminalAnswerText,
+  readHelixTopLevelPendingServerRequest,
+  renderLiveAnswerEnvironmentContextPackAnswer,
 } from "@/lib/helix/ask-terminal-projection";
 
 describe("Helix Ask terminal projection", () => {
@@ -14,5 +17,90 @@ describe("Helix Ask terminal projection", () => {
     );
     expect(isInvalidTerminalAnswerText("I couldn't produce a final answer for that turn. Please retry once.")).toBe(true);
     expect(isInvalidTerminalAnswerText("  grounded answer ready  ")).toBe(false);
+  });
+
+  it("reads unresolved top-level pending server requests", () => {
+    expect(
+      readHelixTopLevelPendingServerRequest({
+        id: "reply-1",
+        pending_server_request: {
+          request_id: "req-1",
+          prompt: "Which file should I open?",
+          required_fields: ["path"],
+        },
+      }),
+    ).toMatchObject({ request_id: "req-1" });
+    expect(
+      readHelixTopLevelPendingServerRequest({
+        id: "reply-2",
+        pending_server_request: {
+          request_id: "req-2",
+          prompt: "Resolved",
+          status: "resolved",
+        },
+      }),
+    ).toBeNull();
+  });
+
+  it("renders live-answer environment context-pack answer copy", () => {
+    expect(
+      renderLiveAnswerEnvironmentContextPackAnswer({
+        live_answer_environment: {
+          latest_summary: "The current environment summary.",
+          lines: [
+            { visibility: "answer_card", label: "State", value: "ready" },
+            { visibility: "debug", label: "Hidden", value: "ignored" },
+          ],
+        },
+        utility_hypotheses: [
+          { utility_label: "useful source", status: "candidate", confidence: 0.42 },
+        ],
+        missing_evidence_notes: ["need source citation"],
+        semantic_confidence_ladder: ["low", "medium"],
+      }),
+    ).toBe(
+      [
+        "The current environment summary.",
+        "Hypothesis: candidate useful source (confidence 0.42).",
+        "Missing evidence: need source citation.",
+        "Semantic confidence: low; medium.",
+        "State: ready",
+      ].join("\n"),
+    );
+    expect(renderLiveAnswerEnvironmentContextPackAnswer({})).toBeNull();
+  });
+
+  it("lets successful Codex workstation terminal authority outrank stale typed-failure projection fields", () => {
+    const visible = buildVisibleResolvedTurn({
+      id: "reply-codex-workstation-success",
+      turn_id: "turn-codex-workstation-success",
+      ok: true,
+      selected_final_answer: "I don't have a scientific-calculator.solve_expression observation packet for 8*9.",
+      final_answer_source: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      terminal_error_code: "calculator_gateway_solve_observation_missing",
+      debug: {
+        terminal_answer_authority: {
+          schema: "helix.turn_terminal_authority.v1",
+          turn_id: "turn-codex-workstation-success",
+          server_authoritative: true,
+          terminal_text_preview: "Observed expression: 8*9\nResult: 72",
+          final_answer_source: "agent_provider_terminal_candidate",
+          terminal_artifact_kind: "agent_provider_terminal_candidate",
+        },
+        terminal_result: {
+          terminal_authority_ok: true,
+          route_authority_ok: true,
+          text: "Observed expression: 8*9\nResult: 72",
+          final_answer_source: "agent_provider_terminal_candidate",
+          terminal_artifact_kind: "agent_provider_terminal_candidate",
+        },
+      },
+    });
+
+    expect(visible.primary_terminal_label).toBe("final_answer");
+    expect(visible.primary_source_label).not.toBe("typed failure");
+    expect(visible.terminal_error_code).toBeNull();
+    expect(visible.selected_final_answer).toBe("Observed expression: 8*9\nResult: 72");
   });
 });

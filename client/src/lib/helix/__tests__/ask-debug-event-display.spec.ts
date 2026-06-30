@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  answerNoteForCompactToolTraceItems,
   buildAskLiveEventLogDetailPayload,
   buildAskLiveEventLogExport,
+  buildCompactToolTraceDisclosure,
   cleanHelixRenderedFinalAnswerText,
   cleanHelixRenderedQuestionText,
+  classifyCompactToolTraceAction,
   formatAskLiveEventLogLine,
   HELIX_ASK_PROGRESS_PLACEHOLDER_TEXT,
   isHelixAskProgressPlaceholderText,
@@ -137,5 +140,46 @@ describe("Helix Ask debug event display", () => {
     expect(isHelixAskProgressPlaceholderText(" reasoning in progress... ")).toBe(true);
     expect(isHelixAskProgressPlaceholderText("Reasoning complete.")).toBe(false);
     expect(isHelixAskProgressPlaceholderText(null)).toBe(false);
+  });
+
+  it("builds compact tool trace disclosure copy without owning debug export authority", () => {
+    expect(classifyCompactToolTraceAction("scientific-calculator", "solve_expression")).toMatchObject({
+      role: "scalar_solver",
+      authority: "numeric_observation",
+    });
+    expect(classifyCompactToolTraceAction("docs-viewer", "lookup_source")).toMatchObject({
+      role: "source_lookup",
+      authority: "source_evidence",
+    });
+    expect(
+      answerNoteForCompactToolTraceItems([
+        { role: "source_lookup" },
+        { role: "scalar_solver" },
+      ]),
+    ).toBe("Evidence note: source lookup supplied evidence; Scientific Calculator receipts supplied the numeric result.");
+
+    expect(
+      buildCompactToolTraceDisclosure(
+        {
+          workstation_actions: [
+            { panel_id: "docs-viewer", action_id: "lookup_source" },
+            { panel_id: "scientific-calculator", action_id: "solve_expression" },
+            { action: "restore_view_state" },
+          ],
+        },
+        "turn-1",
+      ),
+    ).toMatchObject({
+      schema: "helix.ask_tool_trace_disclosure.v1",
+      disclosureId: "turn-1:tool_trace_disclosure",
+      turnId: "turn-1",
+      action_keys: [
+        "docs-viewer.lookup_source",
+        "scientific-calculator.solve_expression",
+        "workstation.restore_view_state",
+      ],
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
   });
 });
