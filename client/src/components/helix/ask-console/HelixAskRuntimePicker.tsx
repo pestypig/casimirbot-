@@ -2,9 +2,10 @@ import type { HelixAgentRuntimeDescriptor, HelixAgentRuntimeId } from "@shared/h
 import { formatHelixAgentRuntimeShortLabel } from "@/lib/helix/ask-agent-runtime-display";
 
 export type HelixAskRuntimePickerProps = {
-  value: HelixAgentRuntimeId;
-  providers: HelixAgentRuntimeDescriptor[];
-  onChange: (value: HelixAgentRuntimeId) => void;
+  model: HelixAskRuntimePickerModel;
+  menuOpen: boolean;
+  onPrimaryClick: () => void;
+  onSelect: (value: HelixAgentRuntimeId) => void;
 };
 
 export type HelixAskRuntimePickerItem = {
@@ -53,26 +54,71 @@ export function buildHelixAskRuntimePickerModel(args: {
   };
 }
 
-export function HelixAskRuntimePicker({ value, providers, onChange }: HelixAskRuntimePickerProps) {
-  const model = buildHelixAskRuntimePickerModel({
-    selectedRuntime: value,
-    providers,
-  });
+export function HelixAskRuntimePicker({
+  model,
+  menuOpen,
+  onPrimaryClick,
+  onSelect,
+}: HelixAskRuntimePickerProps) {
   return (
-    <div className="inline-flex rounded-full border border-white/10 bg-black/20 p-0.5" role="group" aria-label="Choose Ask agent runtime">
-      {model.items.map((provider) => (
-        <button
-          key={provider.id}
-          type="button"
-          className={`rounded-full px-2.5 py-1 text-xs ${
-            provider.selected ? "bg-cyan-400/20 text-cyan-100" : "text-slate-400"
-          }`}
-          disabled={!provider.enabled}
-          onClick={() => onChange(provider.id)}
+    <>
+      <button
+        type="button"
+        data-helix-ask-action-item="true"
+        aria-label="Choose Ask agent runtime"
+        aria-haspopup="menu"
+        aria-expanded={menuOpen}
+        title="Choose Ask agent runtime"
+        className="inline-flex h-10 shrink-0 snap-center items-center justify-center rounded-full border border-white/10 bg-white/5 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-cyan-100 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
+        onClick={onPrimaryClick}
+      >
+        {model.selectedLabel}
+      </button>
+      {menuOpen ? (
+        <div
+          role="menu"
+          aria-label="Ask agent runtime"
+          className="absolute right-10 top-12 z-30 min-w-52 rounded-lg border border-white/10 bg-slate-950/95 p-1.5 text-xs text-slate-100 shadow-[0_18px_48px_rgba(0,0,0,0.45)] backdrop-blur"
         >
-          {provider.shortLabel}
-        </button>
-      ))}
-    </div>
+          {model.items.map((provider) => (
+            <button
+              key={provider.id}
+              type="button"
+              role="menuitemradio"
+              aria-checked={provider.selected}
+              disabled={!provider.enabled}
+              className={`flex w-full items-center justify-between gap-3 rounded-md px-2.5 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 ${
+                provider.selected
+                  ? "bg-cyan-400/15 text-cyan-100"
+                  : provider.enabled
+                    ? "text-slate-100 hover:bg-white/10"
+                    : "cursor-not-allowed text-slate-500 opacity-70"
+              }`}
+              onMouseDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onSelect(provider.id);
+              }}
+            >
+              <span>
+                <span className="block text-[11px] font-semibold uppercase tracking-[0.12em]">
+                  {provider.shortLabel}
+                </span>
+                <span className="mt-0.5 block text-[10px] text-slate-400">
+                  {provider.label}
+                </span>
+              </span>
+              <span className="text-[9px] uppercase tracking-[0.14em] text-slate-400">
+                {provider.statusLabel}
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </>
   );
 }

@@ -469,8 +469,18 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(menuModel.primaryButtonMode).toBe("menu");
 
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
+    const runtimePicker = read("client/src/components/helix/ask-console/HelixAskRuntimePicker.tsx");
     expect(legacyPill).toContain("buildHelixAskRuntimePickerModel");
-    expect(legacyPill).toContain("agentRuntimePickerModel.items.map");
+    expect(legacyPill).toContain("<HelixAskRuntimePicker");
+    expect(legacyPill).toContain("model={agentRuntimePickerModel}");
+    expect(legacyPill).toContain("onPrimaryClick={handleAgentRuntimeButtonClick}");
+    expect(legacyPill).toContain("onSelect={handleAgentRuntimeSelect}");
+    expect(legacyPill).not.toContain("agentRuntimePickerModel.items.map");
+    expect(runtimePicker).toContain("model.items.map");
+    expect(runtimePicker).toContain('aria-label="Choose Ask agent runtime"');
+    expect(runtimePicker).toContain('aria-label="Ask agent runtime"');
+    expect(runtimePicker).toContain("disabled={!provider.enabled}");
+    expect(runtimePicker).not.toContain('fetch("/api/agi/agent-providers"');
   });
 
   it("owns prompt composer display state without submit-stream behavior", () => {

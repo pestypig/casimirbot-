@@ -1041,16 +1041,22 @@ describe("HelixAskPill mic-first surface contract", () => {
 
   it("renders an agent runtime picker sourced from the backend provider scaffold", () => {
     const source = fs.readFileSync(pillPath, "utf8");
+    const runtimePickerSource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/components/helix/ask-console/HelixAskRuntimePicker.tsx"),
+      "utf8",
+    );
     expect(source).toContain('fetch("/api/agi/agent-providers"');
-    expect(source).toContain('aria-label="Choose Ask agent runtime"');
-    expect(source).toContain('aria-label="Ask agent runtime"');
     expect(source).toContain("buildHelixAskRuntimePickerModel");
-    expect(source).toContain("agentRuntimePickerModel.items.map");
-    expect(source).toContain("disabled={!provider.enabled}");
-    expect(source).toContain("{selectedAgentRuntimeLabel}");
+    expect(source).toContain("<HelixAskRuntimePicker");
+    expect(source).toContain("model={agentRuntimePickerModel}");
+    expect(runtimePickerSource).toContain('aria-label="Choose Ask agent runtime"');
+    expect(runtimePickerSource).toContain('aria-label="Ask agent runtime"');
+    expect(runtimePickerSource).toContain("model.items.map");
+    expect(runtimePickerSource).toContain("disabled={!provider.enabled}");
+    expect(runtimePickerSource).toContain("{model.selectedLabel}");
     expect(source).toContain("resolveNextSelectableHelixAgentRuntime(selectedAgentRuntime, agentRuntimeProviders)");
-    expect(source).toContain("onClick={handleAgentRuntimeButtonClick}");
-    expect(source).toContain("event.stopPropagation();");
+    expect(source).toContain("onPrimaryClick={handleAgentRuntimeButtonClick}");
+    expect(runtimePickerSource).toContain("event.stopPropagation();");
   });
 
   it("normalizes Helix, Codex, and Future providers from the mocked agent provider response", () => {

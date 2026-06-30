@@ -591,7 +591,7 @@ describe("Helix Ask UI ownership boundaries", () => {
       "agentRuntimeProviders",
       "selectedAgentRuntime",
       "agentRuntimePickerModel",
-      "selectedAgentRuntimeLabel",
+      "HelixAskRuntimePicker",
       "handleAgentRuntimeSelect",
       "fetch(\"/api/agi/agent-providers\"",
       "setAgentRuntimeProviders",
