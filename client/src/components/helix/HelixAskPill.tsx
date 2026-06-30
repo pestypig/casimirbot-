@@ -219,6 +219,7 @@ import {
   readEventMetaString,
   readHelixAskDebugContextFromMeta,
   resolveAskLiveEventTimestampMs,
+  safeJsonStringify,
   type AskLiveEventEntry,
 } from "@/lib/helix/ask-debug-event-display";
 export { parseHelixAskQueuedQuestionsInput };
@@ -8266,31 +8267,6 @@ function buildHelixAskDebugContextSummary(
     server_selected_action: asObjectRecord(debug?.server_selected_action ?? null),
   };
   return summary;
-}
-
-function safeJsonStringify(value: unknown, fallback = "Unable to render debug payload."): string {
-  const normalize = (input: unknown, stack: WeakSet<object>): unknown => {
-    if (typeof input === "bigint") return input.toString();
-    if (!input || typeof input !== "object") return input;
-    if (stack.has(input)) return "[Circular]";
-    stack.add(input);
-    if (Array.isArray(input)) {
-      const out = input.map((entry) => normalize(entry, stack));
-      stack.delete(input);
-      return out;
-    }
-    const out: Record<string, unknown> = {};
-    Object.entries(input as Record<string, unknown>).forEach(([key, entry]) => {
-      out[key] = normalize(entry, stack);
-    });
-    stack.delete(input);
-    return out;
-  };
-  try {
-    return JSON.stringify(normalize(value, new WeakSet<object>()), null, 2);
-  } catch {
-    return fallback;
-  }
 }
 
 type HelixAskErrorBoundaryState = { hasError: boolean; error?: Error };

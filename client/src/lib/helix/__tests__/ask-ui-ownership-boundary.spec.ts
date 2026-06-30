@@ -506,6 +506,7 @@ describe("Helix Ask UI ownership boundaries", () => {
       "normalizedDebugReplyText",
       "isHelixAskProgressPlaceholderText",
       "readHelixAskDebugContextFromMeta",
+      "safeJsonStringify",
       "classifyCompactToolTraceAction",
       "answerNoteForCompactToolTraceItems",
       "buildCompactToolTraceDisclosure",

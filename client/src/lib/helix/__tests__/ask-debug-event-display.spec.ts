@@ -17,6 +17,7 @@ import {
   readEventMetaString,
   readHelixAskDebugContextFromMeta,
   resolveAskLiveEventTimestampMs,
+  safeJsonStringify,
   type AskLiveEventEntry,
 } from "@/lib/helix/ask-debug-event-display";
 
@@ -81,6 +82,16 @@ describe("Helix Ask debug event display", () => {
       text: "payload",
     });
     expect(detail.meta).toMatchObject({ stage: "loop", self: "[Circular]" });
+  });
+
+  it("stringifies debug payloads with circular references and bigints without owning export authority", () => {
+    const payload: Record<string, unknown> = { count: 3n };
+    payload.self = payload;
+
+    expect(JSON.parse(safeJsonStringify(payload))).toEqual({
+      count: "3",
+      self: "[Circular]",
+    });
   });
 
   it("reads timestamp and metadata aliases without defaulting to UI state", () => {
