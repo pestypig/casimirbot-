@@ -21,6 +21,7 @@ describe("Helix Ask UI ownership boundaries", () => {
       "ask-envelope-copy.ts",
       "../agi/debugExport.ts",
       "ask-goal-pill-display.ts",
+      "ask-interim-voice-callout.ts",
       "ask-live-source-display.ts",
       "ask-observer-commentary-display.ts",
       "ask-observer-events.ts",
@@ -41,6 +42,9 @@ describe("Helix Ask UI ownership boundaries", () => {
       "ask-voice-barge-policy.ts",
       "ask-voice-brief-policy.ts",
       "ask-voice-copy-display.ts",
+      "ask-voice-diagnostics-export.ts",
+      "ask-voice-playback-intent.ts",
+      "ask-voice-turn-scoring.ts",
       "ask-voice-confirmation-command.ts",
       "ask-voice-transcript-confidence.ts",
       "ask-voice-continuation-lexical.ts",
@@ -558,7 +562,6 @@ describe("Helix Ask UI ownership boundaries", () => {
       "shouldRestartExplorationLadderOnSupersede",
       "isLikelyContinuationAddendum",
       "isLikelyContinuationTailFragment",
-      "scoreIntentShift",
     ]) {
       expect(pill).toContain(`export function ${anchor}`);
       expect(map).toContain(anchor);
@@ -598,7 +601,6 @@ describe("Helix Ask UI ownership boundaries", () => {
       "shouldRestartExplorationLadderOnSupersede",
       "isLikelyContinuationAddendum",
       "isLikelyContinuationTailFragment",
-      "scoreIntentShift",
     ]) {
       expect(pill).toContain(localAnchor);
       expect(lexical).not.toContain(localAnchor);
@@ -610,6 +612,43 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(lexical).not.toContain("navigator.clipboard");
     expect(lexical).not.toContain("runAskTurn");
     expect(lexical).not.toContain("speakVoice");
+  });
+
+  it("keeps deterministic voice turn scoring in the non-React turn scoring owner", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
+    const scoring = read("client/src/lib/helix/ask-voice-turn-scoring.ts");
+    const lexical = read("client/src/lib/helix/ask-voice-continuation-lexical.ts");
+
+    expect(map).toContain("ask-voice-turn-scoring.ts");
+    expect(map).toContain("Deterministic voice conversation completion");
+    expect(pill).toContain('from "@/lib/helix/ask-voice-turn-scoring"');
+    for (const symbol of [
+      "scoreConversationCompletion",
+      "scoreVoiceTurnComplete",
+      "scoreIntentShift",
+    ]) {
+      expect(scoring).toContain(`export function ${symbol}`);
+      expect(pill).not.toContain(`function ${symbol}`);
+      expect(lexical).not.toContain(symbol);
+    }
+    for (const localAnchor of [
+      "shouldMergeVoiceContinuationInFlight",
+      "shouldRestartExplorationLadderOnSupersede",
+      "isLikelyContinuationAddendum",
+      "isLikelyContinuationTailFragment",
+      "voiceTranscribeQueueRef",
+      "voiceConfirmedTurnQueueRef",
+    ]) {
+      expect(pill).toContain(localAnchor);
+      expect(scoring).not.toContain(localAnchor);
+    }
+    expect(scoring).not.toMatch(/from ["']react["']/);
+    expect(scoring).not.toContain("@/store/");
+    expect(scoring).not.toContain("@/components/helix/HelixAskPill");
+    expect(scoring).not.toContain("fetch(");
+    expect(scoring).not.toContain("AudioContext");
+    expect(scoring).not.toContain("speakVoice");
   });
 
   it("documents voice language and workstation fast-path policy as local behavior", () => {
@@ -1219,6 +1258,40 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(voiceText).not.toContain("fetch(");
   });
 
+  it("keeps deterministic voice diagnostics export projection in the non-React diagnostics owner", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
+    const diagnosticsExport = read("client/src/lib/helix/ask-voice-diagnostics-export.ts");
+
+    expect(map).toContain("ask-voice-diagnostics-export.ts");
+    expect(map).toContain("Deterministic voice diagnostics export projection");
+    expect(pill).toContain('from "@/lib/helix/ask-voice-diagnostics-export"');
+    for (const symbol of [
+      "summarizeVoiceSegments",
+      "sanitizeVoiceDiagnosticsForExport",
+    ]) {
+      expect(diagnosticsExport).toContain(`export function ${symbol}`);
+      expect(pill).not.toContain(`function ${symbol}`);
+    }
+    for (const localAnchor of [
+      "buildCurrentVoiceDiagnosticsSnapshot",
+      "publishVoiceCaptureDiagnosticsSnapshot",
+      "getVoiceCaptureDiagnosticsSnapshot",
+      "voiceTranscribeQueueRef",
+      "voiceAutoSpeakQueueRef",
+    ]) {
+      expect(pill).toContain(localAnchor);
+      expect(diagnosticsExport).not.toContain(localAnchor);
+    }
+    expect(diagnosticsExport).not.toMatch(/from ["']react["']/);
+    expect(diagnosticsExport).not.toContain("@/store/");
+    expect(diagnosticsExport).not.toContain("@/components/helix/HelixAskPill");
+    expect(diagnosticsExport).not.toContain("fetch(");
+    expect(diagnosticsExport).not.toContain("AudioContext");
+    expect(diagnosticsExport).not.toContain("speakVoice");
+    expect(diagnosticsExport).not.toContain("runAskTurn");
+  });
+
   it("keeps deterministic voice brief policy helpers in the non-React brief policy owner", () => {
     const pill = read("client/src/components/helix/HelixAskPill.tsx");
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
@@ -1634,5 +1707,84 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(parser).not.toContain("dispatchHelixWorkstationAction");
     expect(parser).not.toContain("dispatchHelixWorkstationActions");
     expect(parser).not.toContain("useDocViewerStore");
+  });
+
+  it("keeps interim voice callout artifact parsing out of the playback runtime", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
+    const interimVoice = read("client/src/lib/helix/ask-interim-voice-callout.ts");
+
+    expect(map).toContain("ask-interim-voice-callout.ts");
+    expect(map).toContain("Structured interim voice callout artifact parsing");
+    expect(pill).toContain('from "@/lib/helix/ask-interim-voice-callout"');
+    for (const symbol of [
+      "buildInterimVoiceReceiptPlaybackIntent",
+      "collectInterimVoiceCalloutPlaybackIntents",
+    ]) {
+      expect(interimVoice).toContain(symbol);
+    }
+    for (const localAnchor of [
+      "enqueueInterimVoiceCalloutsFromAskArtifacts",
+      "interimVoiceSpokenReceiptKeysRef",
+      "interimVoiceSpokenImmediateAckTurnKeysRef",
+      "enqueueVoiceAutoSpeakTask",
+      "speakVoice",
+    ]) {
+      expect(pill).toContain(localAnchor);
+      expect(interimVoice).not.toContain(localAnchor);
+    }
+    for (const forbidden of [
+      /from ["']react["']/,
+      /@\/store\//,
+      /@\/components\/helix\/HelixAskPill/,
+      /fetch\(/,
+      /navigator\.clipboard/,
+      /document\./,
+      /window\./,
+      /AudioContext/,
+    ]) {
+      expect(interimVoice).not.toMatch(forbidden);
+    }
+  });
+
+  it("keeps voice playback intent/task projection out of the playback runtime", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
+    const playbackIntent = read("client/src/lib/helix/ask-voice-playback-intent.ts");
+
+    expect(map).toContain("ask-voice-playback-intent.ts");
+    expect(map).toContain("Deterministic voice playback intent/task projection");
+    expect(pill).toContain('from "@/lib/helix/ask-voice-playback-intent"');
+    for (const symbol of [
+      "VoiceAutoSpeakTask",
+      "VoicePlaybackUtteranceIntent",
+      "buildManualReadAloudVoiceIntent",
+      "mapVoicePlaybackIntentToTask",
+    ]) {
+      expect(playbackIntent).toContain(symbol);
+    }
+    for (const localAnchor of [
+      "enqueueVoiceAutoSpeakTask",
+      "voiceAutoSpeakQueueRef",
+      "speakVoice",
+      "createVoicePlaybackUtterance",
+      "updateVoicePlaybackLifecycleDiagnosticFromAudio",
+    ]) {
+      expect(pill).toContain(localAnchor);
+      expect(playbackIntent).not.toContain(localAnchor);
+    }
+    for (const forbidden of [
+      /from ["']react["']/,
+      /@\/store\//,
+      /@\/components\/helix\/HelixAskPill/,
+      /fetch\(/,
+      /navigator\.clipboard/,
+      /document\./,
+      /window\./,
+      /AudioContext/,
+      /HTMLAudioElement/,
+    ]) {
+      expect(playbackIntent).not.toMatch(forbidden);
+    }
   });
 });

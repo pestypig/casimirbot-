@@ -3861,6 +3861,43 @@ describe("HelixAskPill mic helper behavior", () => {
     expect(decision.reason).toBeNull();
   });
 
+  it("does not retrieval-gate quoted translation payload claims", () => {
+    const decision = evaluateEvidenceFinalizationGate({
+      question:
+        'translate to japanese "I don’t see a voice/speak-out-loud tool admitted for this turn. None of the listed capabilities is a voice callout or text-to-speech action where I can submit text to be spoken aloud. I can’t invoke it or claim anything was said out loud unless Helix exposes a voice capability and returns an action receipt/observation for it."',
+      mode: "read",
+      debug: {
+        selected_final_answer:
+          "このターンでは、音声／読み上げツールが許可されているようには見えません。",
+        workstation_gateway_call_results: [],
+        workstation_gateway_observation_packets: [],
+      } as never,
+      proof: undefined,
+    });
+
+    expect(decision.blocked).toBe(false);
+    expect(decision.hard_claim).toBe(false);
+    expect(decision.reason).toBeNull();
+  });
+
+  it("still retrieval-gates quoted translation prompts when verification is requested outside the quote", () => {
+    const decision = evaluateEvidenceFinalizationGate({
+      question:
+        'translate to japanese "I don’t see a voice tool" and verify whether that claim is true in the current runtime',
+      mode: "read",
+      debug: {
+        selected_final_answer: "音声ツールは見えません。",
+        workstation_gateway_call_results: [],
+        workstation_gateway_observation_packets: [],
+      } as never,
+      proof: undefined,
+    });
+
+    expect(decision.blocked).toBe(true);
+    expect(decision.hard_claim).toBe(true);
+    expect(decision.reason).toBe("hard_claim_without_evidence_refs");
+  });
+
   it("still retrieval-gates quoted tool-name prompts when they ask for proof claims", () => {
     const decision = evaluateEvidenceFinalizationGate({
       question:

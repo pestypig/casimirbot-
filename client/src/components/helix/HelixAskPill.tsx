@@ -362,6 +362,15 @@ import {
   shouldSuppressVoiceForTerminalState,
 } from "@/lib/helix/ask-voice-brief-policy";
 import {
+  scoreConversationCompletion,
+  scoreIntentShift,
+  scoreVoiceTurnComplete,
+  type CompletionScore,
+  type IntentShiftBand,
+  type IntentShiftScore,
+  type TurnCompleteScore,
+} from "@/lib/helix/ask-voice-turn-scoring";
+import {
   buildVoiceSteeringClientRequest,
   classifyVoiceSteeringClientTranscript,
   isVoiceSteeringDuringToolCall,
@@ -388,6 +397,9 @@ export {
   shouldRetryVoicePlaybackDirectAttempt,
   shouldRetryVoicePlaybackWithDirectFallback,
   shouldTreatVoicePlaybackErrorAsEnded,
+  scoreConversationCompletion,
+  scoreIntentShift,
+  scoreVoiceTurnComplete,
 };
 export type {
   TranscriptConfirmationVoiceCommand,
@@ -395,6 +407,12 @@ export type {
 export type {
   VoiceBargeHardCutReason,
 } from "@/lib/helix/ask-voice-barge-policy";
+export type {
+  CompletionScore,
+  IntentShiftBand,
+  IntentShiftScore,
+  TurnCompleteScore,
+} from "@/lib/helix/ask-voice-turn-scoring";
 export type {
   VoiceSteeringClientClassification,
   VoiceSteeringClientRequest,
@@ -430,6 +448,14 @@ import {
   type VoiceNoiseHandlingProfile,
 } from "@/lib/helix/ask-voice-capture-display";
 import {
+  VOICE_CAPTURE_CHECKPOINT_LABEL,
+  VOICE_CAPTURE_CHECKPOINT_ORDER,
+  createVoiceCaptureCheckpointMap,
+  type VoiceCaptureCheckpoint,
+  type VoiceCaptureCheckpointKey,
+  type VoiceCaptureCheckpointStatus,
+} from "@/lib/helix/ask-voice-capture-checkpoints";
+import {
   buildVoiceInputStatusLabel,
   composeVoiceBriefWithDecision,
   describeVoiceInputError,
@@ -463,6 +489,11 @@ export {
   smoothVoiceLevel,
 };
 export type { VoiceNoiseHandlingProfile } from "@/lib/helix/ask-voice-capture-display";
+export type {
+  VoiceCaptureCheckpoint,
+  VoiceCaptureCheckpointKey,
+  VoiceCaptureCheckpointStatus,
+} from "@/lib/helix/ask-voice-capture-checkpoints";
 export type { VoiceDecisionLifecycle } from "@/lib/helix/ask-voice-copy-display";
 import {
   buildHelixCausalTurnTraceRows,
@@ -633,11 +664,33 @@ import {
   getVoiceCaptureDiagnosticsSnapshot,
   publishVoiceCaptureDiagnosticsSnapshot,
   type VoiceCaptureDiagnosticsSnapshot,
-  type VoiceCaptureSegmentSnapshot,
   type VoiceLaneTimelineDebugEvent,
   type VoicePlaybackOutcomeReceipt,
   type VoicePlaybackOutcomeStatus,
 } from "@/lib/helix/voice-capture-diagnostics";
+import {
+  sanitizeVoiceDiagnosticsForExport,
+} from "@/lib/helix/ask-voice-diagnostics-export";
+import {
+  buildManualReadAloudVoiceIntent,
+  mapVoicePlaybackIntentToTask,
+  type VoiceAutoSpeakTask,
+  type VoicePlaybackUtteranceIntent,
+} from "@/lib/helix/ask-voice-playback-intent";
+export {
+  buildManualReadAloudVoiceIntent,
+  mapVoicePlaybackIntentToTask,
+};
+export type {
+  VoiceAutoSpeakTask,
+  VoicePlaybackUtteranceIntent,
+};
+import {
+  collectInterimVoiceCalloutPlaybackIntents,
+  type InterimVoiceCalloutPlaybackIntent,
+} from "@/lib/helix/ask-interim-voice-callout";
+export { collectInterimVoiceCalloutPlaybackIntents };
+export type { InterimVoiceCalloutPlaybackIntent };
 import {
   getVoiceCallDiagnosticsSnapshot,
   subscribeVoiceCallDiagnostics,
@@ -1265,6 +1318,23 @@ const HELIX_EVIDENCE_GATE_HARD_CLAIM_RE =
 const HELIX_LITERAL_TOOL_TEXT_ONLY_RE =
   /(?:\btext\s+says\b|`[^`\n]+(?:\.[^`\n]+)+`)[\s\S]{0,180}\b(?:text\s+only|plain\s+text|literal(?:ly)?|do\s+not\s+run|don't\s+run|without\s+running)\b/i;
 
+const HELIX_EVIDENCE_GATE_TRANSFORM_TASK_RE =
+  /^\s*(?:please\s+)?(?:translate|rewrite|rephrase|paraphrase|convert|render)\b/i;
+
+function stripQuotedPayloadsForEvidenceGate(text: string): string {
+  return text
+    .replace(/"[\s\S]*?"/g, " quoted payload ")
+    .replace(/'[\s\S]*?'/g, " quoted payload ");
+}
+
+function isQuotedTransformOnlyForEvidenceGate(question: string): boolean {
+  if (!HELIX_EVIDENCE_GATE_TRANSFORM_TASK_RE.test(question)) return false;
+  if (!/"[\s\S]+"/.test(question) && !/'[\s\S]+'/.test(question)) return false;
+  const instructionText = stripQuotedPayloadsForEvidenceGate(question);
+  return !HELIX_EVIDENCE_GATE_HARD_CLAIM_RE.test(instructionText) &&
+    !HELIX_ASK_COMPARE_TRIGGER.test(instructionText);
+}
+
 type EvidenceFinalizationGateDecision = {
   blocked: boolean;
   hard_claim: boolean;
@@ -1297,13 +1367,17 @@ export function evaluateEvidenceFinalizationGate(input: {
   proof?: HelixAskReply["proof"] | null;
 }): EvidenceFinalizationGateDecision {
   const normalizedQuestion = input.question.trim();
+  const quotedTransformOnlyQuestion =
+    input.mode !== "verify" && isQuotedTransformOnlyForEvidenceGate(normalizedQuestion);
   const literalToolTextOnlyQuestion =
     input.mode !== "verify" &&
+    !quotedTransformOnlyQuestion &&
     HELIX_LITERAL_TOOL_TEXT_ONLY_RE.test(normalizedQuestion) &&
     !/\b(?:verify|verification|prove|proof|audit|compare|contrast|difference|tradeoff|synthesi[sz]e|integrity|evidence|claim)\b/i.test(
       normalizedQuestion,
     );
   const hardClaim =
+    !quotedTransformOnlyQuestion &&
     !literalToolTextOnlyQuestion &&
     (
       input.mode === "verify" ||
@@ -1768,29 +1842,6 @@ export type TurnState =
   | "bot_full"
   | "interrupted";
 
-export type CompletionRoute = "ask_more" | "mirror_clarify" | "answer";
-
-export type CompletionScore = {
-  score: number;
-  route: CompletionRoute;
-};
-
-export type TurnCompleteBand = "low" | "medium" | "high";
-
-export type TurnCompleteScore = {
-  score: number;
-  band: TurnCompleteBand;
-  reason: string;
-};
-
-export type IntentShiftBand = "continuation" | "shift";
-
-export type IntentShiftScore = {
-  score: number;
-  band: IntentShiftBand;
-  reason: string;
-};
-
 export type NarrativeSpine = {
   objective: string | null;
   phase: "observe" | "plan" | "retrieve" | "gate" | "synthesize" | "verify" | "execute" | "debrief";
@@ -1893,39 +1944,6 @@ export type HelixTimelineEntry = {
 };
 
 export type VoiceCaptureWarningCode = "loopback_source" | "flat_signal" | "recorder_stalled";
-
-export type VoiceCaptureCheckpointKey =
-  | "track_live"
-  | "signal_detected"
-  | "segment_cut"
-  | "stt_request_started"
-  | "stt_response_ok"
-  | "stt_response_error"
-  | "confirm_auto_started"
-  | "confirm_auto_fired"
-  | "confirm_auto_cancelled"
-  | "confirm_blocked_reason"
-  | "command_detected"
-  | "command_suppressed"
-  | "command_confirm_started"
-  | "command_confirm_fired"
-  | "command_executed"
-  | "command_cancelled"
-  | "translated"
-  | "draft_appended"
-  | "dispatch_queued"
-  | "dispatch_suppressed"
-  | "dispatch_completed";
-
-export type VoiceCaptureCheckpointStatus = "idle" | "ok" | "warn" | "error";
-
-export type VoiceCaptureCheckpoint = {
-  key: VoiceCaptureCheckpointKey;
-  status: VoiceCaptureCheckpointStatus;
-  message: string | null;
-  lastAtMs: number | null;
-  latencyMs: number | null;
-};
 
 export type VoiceCaptureHealthSnapshot = {
   rmsRaw: number;
@@ -2173,253 +2191,6 @@ export function evaluateVoiceAutoDispatchGovernance(args: {
     output_authority: "admission_trace",
     instruction_authority: "none",
   };
-}
-
-export type VoiceAutoSpeakTask = {
-  key: string;
-  kind: VoicePlaybackUtteranceKind;
-  turnKey: string;
-  revision: number;
-  text: string;
-  traceId?: string;
-  eventId: string;
-  authority?: VoicePlaybackIntentAuthority;
-  source?: VoicePlaybackIntentSource;
-  replyId?: string;
-  allowMicOffPlayback?: boolean;
-  interimVoiceRequestId?: string;
-  interimVoiceReceiptId?: string;
-  interimVoiceReceiptKey?: string;
-  interimVoiceCalloutKind?: string;
-  briefSource?: "llm" | "none";
-  finalSource?: "normal_reasoning" | "strict_gate_override";
-};
-
-export type VoicePlaybackUtteranceIntent = {
-  kind: VoicePlaybackUtteranceKind;
-  authority: VoicePlaybackIntentAuthority;
-  turnKey: string;
-  revision: number;
-  text: string;
-  traceId?: string;
-  eventId: string;
-  replyId?: string;
-  allowMicOffPlayback?: boolean;
-  interimVoiceRequestId?: string;
-  interimVoiceReceiptId?: string;
-  interimVoiceReceiptKey?: string;
-  interimVoiceCalloutKind?: string;
-  source: VoicePlaybackIntentSource;
-  briefSource?: "llm" | "none";
-  finalSource?: "normal_reasoning" | "strict_gate_override";
-};
-
-export function buildManualReadAloudVoiceIntent(input: {
-  text: string;
-  replyId: string;
-  traceId?: string | null;
-  turnKey?: string | null;
-}): VoicePlaybackUtteranceIntent {
-  const turnKey = input.turnKey?.trim() || `manual:${input.replyId}`;
-  return {
-    kind: "manual_read_aloud",
-    authority: "final",
-    turnKey,
-    revision: 1,
-    text: input.text,
-    traceId: input.traceId?.trim() || undefined,
-    eventId: input.replyId,
-    replyId: input.replyId,
-    source: "manual",
-  };
-}
-
-export function mapVoicePlaybackIntentToTask(intent: VoicePlaybackUtteranceIntent): VoiceAutoSpeakTask {
-  return {
-    key: buildVoiceAutoSpeakUtteranceId([
-      intent.kind,
-      intent.traceId ?? intent.turnKey,
-      intent.eventId,
-      intent.replyId,
-    ]),
-    kind: intent.kind,
-    turnKey: intent.turnKey,
-    revision: intent.revision,
-    text: intent.text,
-    traceId: intent.traceId,
-    eventId: intent.eventId,
-    authority: intent.authority,
-    source: intent.source,
-    replyId: intent.replyId,
-    allowMicOffPlayback: intent.allowMicOffPlayback,
-    interimVoiceRequestId: intent.interimVoiceRequestId,
-    interimVoiceReceiptId: intent.interimVoiceReceiptId,
-    interimVoiceReceiptKey: intent.interimVoiceReceiptKey,
-    interimVoiceCalloutKind: intent.interimVoiceCalloutKind,
-    briefSource: intent.briefSource,
-    finalSource: intent.finalSource,
-  };
-}
-
-type InterimVoiceCalloutKind =
-  | "immediate_ack"
-  | "tool_started"
-  | "tool_progress"
-  | "tool_result"
-  | "waiting_for_evidence"
-  | "memory_pressure"
-  | "clarifying_status"
-  | "steering_ack"
-  | "translation_relay"
-  | "narrator_read"
-  | "panel_narration";
-
-export type InterimVoiceCalloutPlaybackIntent = VoicePlaybackUtteranceIntent & {
-  requestId: string;
-  receiptId: string;
-  receiptKey: string;
-  calloutKind: InterimVoiceCalloutKind;
-};
-
-const INTERIM_VOICE_CALLOUT_TOOL_RESULT_SCHEMA = "helix.interim_voice_callout_tool_result.v1";
-
-const INTERIM_VOICE_CALLOUT_KINDS = new Set<InterimVoiceCalloutKind>([
-  "immediate_ack",
-  "tool_started",
-  "tool_progress",
-  "tool_result",
-  "waiting_for_evidence",
-  "memory_pressure",
-  "clarifying_status",
-  "steering_ack",
-  "translation_relay",
-  "narrator_read",
-  "panel_narration",
-]);
-
-const INTERIM_VOICE_CALLOUT_PLAYABLE_STATUSES = new Set([
-  "awaiting_client_playback",
-  "queued",
-  "delivered",
-]);
-
-const readInterimVoiceRecord = (value: unknown): Record<string, unknown> | null =>
-  value && typeof value === "object" && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : null;
-
-const readInterimVoiceString = (value: unknown): string | null =>
-  typeof value === "string" && value.trim() ? value.trim() : null;
-
-const isInterimVoiceAuthoritySafe = (record: Record<string, unknown>): boolean =>
-  record.assistant_answer === false &&
-  record.terminal_eligible === false &&
-  record.raw_content_included === false;
-
-const readInterimVoiceCalloutKind = (value: unknown): InterimVoiceCalloutKind | null => {
-  const kind = readInterimVoiceString(value);
-  return kind && INTERIM_VOICE_CALLOUT_KINDS.has(kind as InterimVoiceCalloutKind)
-    ? kind as InterimVoiceCalloutKind
-    : null;
-};
-
-const buildInterimVoiceReceiptPlaybackIntent = (
-  value: unknown,
-): InterimVoiceCalloutPlaybackIntent | null => {
-  const result = readInterimVoiceRecord(value);
-  if (!result || result.schema !== INTERIM_VOICE_CALLOUT_TOOL_RESULT_SCHEMA) return null;
-  const request = readInterimVoiceRecord(result.request);
-  const receipt = readInterimVoiceRecord(result.receipt);
-  if (!request || !receipt) return null;
-  if (!isInterimVoiceAuthoritySafe(request) || !isInterimVoiceAuthoritySafe(receipt)) return null;
-  if (request.authority !== "provisional") return null;
-  const status = readInterimVoiceString(receipt.status);
-  if (!status || !INTERIM_VOICE_CALLOUT_PLAYABLE_STATUSES.has(status)) return null;
-  const calloutKind = readInterimVoiceCalloutKind(request.kind);
-  if (!calloutKind) return null;
-  const text = readInterimVoiceString(request.text);
-  const turnKey = readInterimVoiceString(request.turnId) ?? readInterimVoiceString(request.turn_id);
-  const requestId = readInterimVoiceString(request.requestId) ?? readInterimVoiceString(request.request_id);
-  const receiptId = readInterimVoiceString(receipt.receiptId) ?? readInterimVoiceString(receipt.receipt_id);
-  if (!text || !turnKey || !requestId || !receiptId) return null;
-  const delivery = readInterimVoiceRecord(receipt.delivery);
-  const utteranceId = readInterimVoiceString(delivery?.utteranceId) ?? readInterimVoiceString(delivery?.utterance_id);
-  const receiptKey = utteranceId ?? receiptId;
-  const requestedPlaybackKind = readInterimVoiceString(request.voicePlaybackKind);
-  const playbackKind =
-    requestedPlaybackKind === "translation_relay" || calloutKind === "translation_relay"
-      ? "translation_relay"
-      : requestedPlaybackKind === "narrator_read" || calloutKind === "narrator_read"
-        ? "narrator_read"
-        : requestedPlaybackKind === "panel_narration" || calloutKind === "panel_narration"
-          ? "panel_narration"
-          : "tool_receipt";
-  return {
-    kind: playbackKind,
-    authority: "provisional",
-    source: "agent_loop",
-    turnKey,
-    revision: 1,
-    text,
-    traceId: turnKey,
-    eventId: receiptId,
-    requestId,
-    receiptId,
-    receiptKey,
-    calloutKind,
-    interimVoiceRequestId: requestId,
-    interimVoiceReceiptId: receiptId,
-    interimVoiceReceiptKey: receiptKey,
-    interimVoiceCalloutKind: calloutKind,
-  };
-};
-
-export function collectInterimVoiceCalloutPlaybackIntents(input: {
-  artifacts: unknown[];
-  spokenReceiptKeys?: Iterable<string>;
-  spokenImmediateAckTurnKeys?: Iterable<string>;
-}): InterimVoiceCalloutPlaybackIntent[] {
-  const spokenReceiptKeys = new Set(input.spokenReceiptKeys ?? []);
-  const spokenImmediateAckTurnKeys = new Set(input.spokenImmediateAckTurnKeys ?? []);
-  const emittedReceiptKeys = new Set<string>();
-  const emittedImmediateAckTurnKeys = new Set<string>();
-  const intents: InterimVoiceCalloutPlaybackIntent[] = [];
-  const visited = new WeakSet<object>();
-
-  const visit = (value: unknown) => {
-    if (!value || typeof value !== "object") return;
-    if (visited.has(value)) return;
-    visited.add(value);
-    const intent = buildInterimVoiceReceiptPlaybackIntent(value);
-    if (intent) {
-      const receiptKnown =
-        spokenReceiptKeys.has(intent.receiptKey) ||
-        spokenReceiptKeys.has(intent.receiptId) ||
-        emittedReceiptKeys.has(intent.receiptKey) ||
-        emittedReceiptKeys.has(intent.receiptId);
-      const immediateAckKnown =
-        intent.calloutKind === "immediate_ack" &&
-        (spokenImmediateAckTurnKeys.has(intent.turnKey) || emittedImmediateAckTurnKeys.has(intent.turnKey));
-      if (!receiptKnown && !immediateAckKnown) {
-        intents.push(intent);
-        emittedReceiptKeys.add(intent.receiptKey);
-        emittedReceiptKeys.add(intent.receiptId);
-        if (intent.calloutKind === "immediate_ack") {
-          emittedImmediateAckTurnKeys.add(intent.turnKey);
-        }
-      }
-    }
-    if (Array.isArray(value)) {
-      value.forEach(visit);
-      return;
-    }
-    for (const child of Object.values(value as Record<string, unknown>)) {
-      visit(child);
-    }
-  };
-
-  input.artifacts.forEach(visit);
-  return intents;
 }
 
 function canPlayVoiceUtteranceWithMicOff(
@@ -2828,54 +2599,6 @@ type ExplorationRuntimeState = {
   updatedAtMs: number;
 };
 
-const VOICE_CAPTURE_CHECKPOINT_ORDER: VoiceCaptureCheckpointKey[] = [
-  "track_live",
-  "signal_detected",
-  "segment_cut",
-  "stt_request_started",
-  "stt_response_ok",
-  "stt_response_error",
-  "confirm_auto_started",
-  "confirm_auto_fired",
-  "confirm_auto_cancelled",
-  "confirm_blocked_reason",
-  "command_detected",
-  "command_suppressed",
-  "command_confirm_started",
-  "command_confirm_fired",
-  "command_executed",
-  "command_cancelled",
-  "translated",
-  "draft_appended",
-  "dispatch_queued",
-  "dispatch_suppressed",
-  "dispatch_completed",
-];
-
-const VOICE_CAPTURE_CHECKPOINT_LABEL: Record<VoiceCaptureCheckpointKey, string> = {
-  track_live: "track live",
-  signal_detected: "signal",
-  segment_cut: "segment",
-  stt_request_started: "stt request",
-  stt_response_ok: "stt ok",
-  stt_response_error: "stt error",
-  confirm_auto_started: "confirm auto start",
-  confirm_auto_fired: "confirm auto fire",
-  confirm_auto_cancelled: "confirm auto cancel",
-  confirm_blocked_reason: "confirm block reason",
-  command_detected: "command detected",
-  command_suppressed: "command suppressed",
-  command_confirm_started: "command confirm start",
-  command_confirm_fired: "command confirm fire",
-  command_executed: "command executed",
-  command_cancelled: "command cancelled",
-  translated: "translated",
-  draft_appended: "draft append",
-  dispatch_queued: "dispatch queued",
-  dispatch_suppressed: "dispatch suppressed",
-  dispatch_completed: "dispatch completed",
-};
-
 const MIC_PERSIST_KEY = "helix.ask.micCaptureEnabled.v1";
 const MIC_SPEECH_START_MS = 120;
 const MIC_SOFT_PAUSE_MS = 450;
@@ -2914,8 +2637,6 @@ const MIC_LEVEL_MIN_THRESHOLD = 0.008;
 const MIC_LEVEL_FLOOR_ALPHA = 0.92;
 const MIC_LEVEL_FLOOR_MULTIPLIER = 2.4;
 const VOICE_STT_TRANSLATION_CONFIRM_THRESHOLD = 0.68;
-const VOICE_TURN_COMPLETE_HIGH_THRESHOLD = 0.72;
-const VOICE_TURN_COMPLETE_MEDIUM_THRESHOLD = 0.5;
 const VOICE_TURN_COMPLETE_MEDIUM_HOLD_MS = 420;
 const VOICE_TURN_COMPLETE_LOW_HOLD_MS = 680;
 const VOICE_PREEMPT_BOUNDARY_TIMEOUT_MS = 1200;
@@ -2938,22 +2659,6 @@ const HELIX_VOICE_AUTO_SPEAK_PROVIDER = "elevenlabs";
 const HELIX_VOICE_AUTO_SPEAK_QUEUE_MAX = 8;
 const HELIX_VOICE_AUTO_SPEAK_TEXT_MAX_CHARS = 2400;
 const HELIX_VOICE_DEBUG_TIMELINE_LIMIT = 280;
-
-function createVoiceCaptureCheckpointMap(): Record<VoiceCaptureCheckpointKey, VoiceCaptureCheckpoint> {
-  return VOICE_CAPTURE_CHECKPOINT_ORDER.reduce(
-    (acc, key) => {
-      acc[key] = {
-        key,
-        status: "idle",
-        message: null,
-        lastAtMs: null,
-        latencyMs: null,
-      };
-      return acc;
-    },
-    {} as Record<VoiceCaptureCheckpointKey, VoiceCaptureCheckpoint>,
-  );
-}
 
 const CONTEXT_CAPSULE_PROOF_POSTURE_SCORE: Record<ContextCapsuleConvergence["proofPosture"], number> = {
   confirmed: 5,
@@ -3454,27 +3159,6 @@ export function shouldFlushHeldTranscriptFromWatchdog(args: {
   });
 }
 
-export function scoreConversationCompletion(input: {
-  transcript: string;
-  pauseMs: number;
-  stability: number;
-}): CompletionScore {
-  const text = input.transcript.trim();
-  const stability = Math.max(0, Math.min(1, input.stability));
-  let score = 0.2 + stability * 0.45;
-  if (/[.!?]$/.test(text)) score += 0.18;
-  if (/\b(and|but|or|because|so)\s*$/i.test(text)) score -= 0.16;
-  if (/\b(this|that|it|they|those|these)\b/i.test(text) && !/\b(is|are|means|does)\b/i.test(text)) {
-    score -= 0.08;
-  }
-  if (input.pauseMs >= MIC_SOFT_PAUSE_MS) score += 0.06;
-  if (input.pauseMs >= MIC_END_TURN_MS) score += 0.12;
-  score = Math.max(0, Math.min(1, score));
-  if (score < 0.45) return { score, route: "ask_more" };
-  if (score < 0.75) return { score, route: "mirror_clarify" };
-  return { score, route: "answer" };
-}
-
 function normalizeVoiceConfirmDispatchState(
   dispatchState?: "auto" | "confirm" | "blocked" | null,
 ): "auto" | "confirm" | "blocked" {
@@ -3747,66 +3431,6 @@ export function normalizeVoiceCommandLaneEnvelope(
     confirm_required: payload.confirm_required === true,
     utterance_id: utteranceId,
   };
-}
-
-export function scoreVoiceTurnComplete(input: {
-  transcript: string;
-  pauseMs: number;
-  stability: number;
-}): TurnCompleteScore {
-  const text = input.transcript.trim();
-  const completion = scoreConversationCompletion({
-    transcript: text,
-    pauseMs: input.pauseMs,
-    stability: input.stability,
-  });
-  let score = completion.score;
-  const hasTerminalPunctuation = /[.!?]["')\]]?$/.test(text);
-  const trailingConnector = /\b(and|but|or|because|so|which|that|if|when|while|to)\s*$/i.test(text);
-  const trailingQuestionStem =
-    /\b(how|why|what|where|when|who)\s+(does|do|is|are|can|could|would|will|did)?\s*$/i.test(text);
-  const unresolvedReferent =
-    /\b(this|that|it|they|those|these)\b/i.test(text) && !/\b(is|are|was|were|means|refers|comes)\b/i.test(text);
-  const shortTurn = text.split(/\s+/).filter(Boolean).length < 5;
-  if (hasTerminalPunctuation) score += 0.05;
-  if (trailingConnector) score -= 0.12;
-  if (trailingQuestionStem) score -= 0.16;
-  if (unresolvedReferent) score -= 0.08;
-  if (shortTurn) score -= 0.08;
-  score = clamp01(score);
-  if (score >= VOICE_TURN_COMPLETE_HIGH_THRESHOLD) {
-    return { score, band: "high", reason: "lexical_closure_high" };
-  }
-  if (score >= VOICE_TURN_COMPLETE_MEDIUM_THRESHOLD) {
-    return { score, band: "medium", reason: "likely_continuation_hold" };
-  }
-  return { score, band: "low", reason: "incomplete_turn_hold" };
-}
-
-export function scoreIntentShift(args: {
-  activePrompt: string;
-  nextTranscript: string;
-}): IntentShiftScore {
-  const prevTerms = new Set(extractIntentTerms(args.activePrompt, 16));
-  const nextTerms = new Set(extractIntentTerms(args.nextTranscript, 16));
-  if (nextTerms.size === 0) {
-    return { score: 0, band: "continuation", reason: "no_terms" };
-  }
-  let overlap = 0;
-  for (const term of nextTerms) {
-    if (prevTerms.has(term)) overlap += 1;
-  }
-  const union = new Set([...prevTerms, ...nextTerms]).size || 1;
-  const jaccard = overlap / union;
-  const explicitShift =
-    /\b(new topic|different topic|switch|instead|unrelated|another question)\b/i.test(
-      args.nextTranscript.trim().toLowerCase(),
-    );
-  const score = clamp01((1 - jaccard) * 0.82 + (explicitShift ? 0.26 : 0));
-  if (score >= 0.56) {
-    return { score, band: "shift", reason: explicitShift ? "explicit_topic_shift" : "semantic_shift" };
-  }
-  return { score, band: "continuation", reason: "semantic_continuation" };
 }
 
 function resolveVoiceAuthoritySuppression(
@@ -8072,169 +7696,6 @@ type AskLiveAgenticEventRow = {
   meta: string;
   tone: "default" | "thinking" | "observation" | "decision" | "warning" | "final";
 };
-
-function summarizeVoiceSegments(segments: VoiceCaptureSegmentSnapshot[] | undefined): {
-  total: number;
-  dispatchCompleted: number;
-  dispatchQueued: number;
-  dispatchSuppressed: number;
-  sttErrors: number;
-} {
-  if (!Array.isArray(segments) || segments.length === 0) {
-    return {
-      total: 0,
-      dispatchCompleted: 0,
-      dispatchQueued: 0,
-      dispatchSuppressed: 0,
-      sttErrors: 0,
-    };
-  }
-  let dispatchCompleted = 0;
-  let dispatchQueued = 0;
-  let dispatchSuppressed = 0;
-  let sttErrors = 0;
-  segments.forEach((segment) => {
-    if (segment.dispatch === "completed") dispatchCompleted += 1;
-    if (segment.dispatch === "queued") dispatchQueued += 1;
-    if (segment.dispatch === "suppressed") dispatchSuppressed += 1;
-    if (segment.status === "stt_error") sttErrors += 1;
-  });
-  return {
-    total: segments.length,
-    dispatchCompleted,
-    dispatchQueued,
-    dispatchSuppressed,
-    sttErrors,
-  };
-}
-
-function sanitizeVoiceDiagnosticsForExport(
-  snapshot: VoiceCaptureDiagnosticsSnapshot | null,
-): Record<string, unknown> | null {
-  if (!snapshot) return null;
-  const timeline = Array.isArray(snapshot.timelineEvents) ? snapshot.timelineEvents.slice(-160) : [];
-  return {
-    updatedAtMs: snapshot.updatedAtMs,
-    micArmState: snapshot.micArmState,
-    voiceInputState: snapshot.voiceInputState,
-    voiceSignalState: snapshot.voiceSignalState,
-    warnings: [...snapshot.warnings],
-    monitor: {
-      level: Number(snapshot.voiceMonitorLevel.toFixed(6)),
-      threshold: Number(snapshot.voiceMonitorThreshold.toFixed(6)),
-      rmsDb: Number(snapshot.rmsDb.toFixed(3)),
-      chunksPerSecond: Number(snapshot.chunksPerSecond.toFixed(3)),
-      lastRoundtripMs: snapshot.lastRoundtripMs ?? null,
-    },
-    segments: summarizeVoiceSegments(snapshot.segments),
-    playback: snapshot.playback
-      ? {
-          utteranceId: snapshot.playback.utteranceId,
-          turnKey: snapshot.playback.turnKey,
-          kind: snapshot.playback.kind,
-          authority: snapshot.playback.authority ?? null,
-          source: snapshot.playback.source ?? null,
-          replyId: snapshot.playback.replyId ?? null,
-          chunkCount: snapshot.playback.chunkCount,
-          enqueueToFirstAudioMs: snapshot.playback.enqueueToFirstAudioMs ?? null,
-          totalPlaybackMs: snapshot.playback.totalPlaybackMs ?? null,
-          cancelReason: snapshot.playback.cancelReason ?? null,
-          cacheHitCount: snapshot.playback.cacheHitCount,
-          cacheMissCount: snapshot.playback.cacheMissCount,
-          providerHeader: snapshot.playback.providerHeader ?? null,
-          profileHeader: snapshot.playback.profileHeader ?? null,
-        }
-      : null,
-    playbackOutput: snapshot.playbackOutput
-      ? {
-          expectedPath: snapshot.playbackOutput.expectedPath,
-          currentUtterancePath: snapshot.playbackOutput.currentUtterancePath ?? null,
-          currentUtteranceDirectFallback: snapshot.playbackOutput.currentUtteranceDirectFallback ?? null,
-          graphBypassActive: snapshot.playbackOutput.graphBypassActive ?? null,
-          graphFailureStreak: snapshot.playbackOutput.graphFailureStreak ?? null,
-          fallbackCount: snapshot.playbackOutput.fallbackCount ?? null,
-          lastFallbackReason: snapshot.playbackOutput.lastFallbackReason ?? null,
-          audioUnlocked: snapshot.playbackOutput.audioUnlocked,
-          audioGraphAttached: snapshot.playbackOutput.audioGraphAttached,
-        }
-      : null,
-    playbackReceipts: Array.isArray(snapshot.playbackReceipts)
-      ? snapshot.playbackReceipts.slice(-80).map((receipt) => ({
-          schema: receipt.schema,
-          receiptId: receipt.receiptId,
-          sourceReceiptId: receipt.sourceReceiptId,
-          sourceReceiptKey: receipt.sourceReceiptKey,
-          requestId: receipt.requestId,
-          calloutKind: receipt.calloutKind,
-          utteranceId: receipt.utteranceId,
-          turnKey: receipt.turnKey,
-          kind: receipt.kind,
-          status: receipt.status,
-          atMs: receipt.atMs,
-          providerHeader: receipt.providerHeader,
-          profileHeader: receipt.profileHeader,
-          cacheHitCount: receipt.cacheHitCount,
-          cacheMissCount: receipt.cacheMissCount,
-          totalPlaybackMs: receipt.totalPlaybackMs,
-          cancelReason: receipt.cancelReason,
-          error: receipt.error,
-          audioUnlocked: receipt.audioUnlocked,
-          playbackPath: receipt.playbackPath,
-          assistant_answer: false,
-          terminal_eligible: false,
-          raw_content_included: false,
-          output_authority: "playback_observation",
-        }))
-      : [],
-    voiceCalls: Array.isArray(snapshot.voiceCalls)
-      ? snapshot.voiceCalls.slice(-80).map((call) => ({
-          id: call.id,
-          kind: call.kind,
-          endpoint: call.endpoint,
-          startedAtMs: call.startedAtMs,
-          endedAtMs: call.endedAtMs,
-          durationMs: call.durationMs,
-          ok: call.ok,
-          status: call.status,
-          responseKind: call.responseKind,
-          contentType: call.contentType,
-          traceId: call.traceId,
-          missionId: call.missionId,
-          eventId: call.eventId ?? null,
-          utteranceId: call.utteranceId ?? null,
-          turnKey: call.turnKey ?? null,
-          mode: call.mode ?? null,
-          priority: call.priority ?? null,
-          providerHeader: call.providerHeader ?? null,
-          profileHeader: call.profileHeader ?? null,
-          cacheHeader: call.cacheHeader ?? null,
-          textLength: call.textLength ?? null,
-          textHash: call.textHash ?? null,
-          audioBytes: call.audioBytes ?? null,
-          audioMimeType: call.audioMimeType ?? null,
-          audioDurationMs: call.audioDurationMs ?? null,
-          error: call.error ?? null,
-        }))
-      : [],
-    timelineEvents: timeline.map((event) => ({
-      id: event.id,
-      atMs: event.atMs,
-      source: event.source,
-      kind: event.kind,
-      status: event.status ?? null,
-      traceId: event.traceId ?? null,
-      turnKey: event.turnKey ?? null,
-      attemptId: event.attemptId ?? null,
-      utteranceId: event.utteranceId ?? null,
-      utteranceAuthority: event.utteranceAuthority ?? null,
-      utteranceSource: event.utteranceSource ?? null,
-      replyId: event.replyId ?? null,
-      detail: event.detail ?? null,
-      text: event.text ?? null,
-      debugContext: event.debugContext ?? null,
-    })),
-  };
-}
 
 let helixAskLastKnownDocViewerPath: string | null = null;
 
