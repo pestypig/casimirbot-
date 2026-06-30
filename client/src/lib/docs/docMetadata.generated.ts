@@ -3023,7 +3023,7 @@ export const DOC_FILE_METADATA: Record<string, DocFileMetadata> = {
   "docs/helix-ask-codex-loop-discipline.md": {"mtimeMs":1782730989880,"mtimeIso":"2026-06-29T11:03:09.880Z","sizeBytes":53681},
   "docs/helix-ask-codex-methodology-debug-patch-plan.md": {"mtimeMs":1782165188322,"mtimeIso":"2026-06-22T21:53:08.322Z","sizeBytes":17664},
   "docs/helix-ask-codex-workstation-live-debug-evidence-2026-06-29.md": {"mtimeMs":1782735749441,"mtimeIso":"2026-06-29T12:22:29.441Z","sizeBytes":14485},
-  "docs/helix-ask-codex-workstation-release-validation-2026-06-29.md": {"mtimeMs":1782776165461,"mtimeIso":"2026-06-29T23:36:05.461Z","sizeBytes":4615},
+  "docs/helix-ask-codex-workstation-release-validation-2026-06-29.md": {"mtimeMs":1782786803393,"mtimeIso":"2026-06-30T02:33:23.393Z","sizeBytes":5152},
   "docs/helix-ask-deep-research-prompt-objective-loop-verb-composition.md": {"mtimeMs":1774362277292,"mtimeIso":"2026-03-24T14:24:37.292Z","sizeBytes":3635},
   "docs/helix-ask-dottie-grounding-deep-research-2026-03-03.md": {"mtimeMs":1772515810664,"mtimeIso":"2026-03-03T05:30:10.664Z","sizeBytes":21408},
   "docs/helix-ask-final-resolution-implementation-evidence.md": {"mtimeMs":1774321256084,"mtimeIso":"2026-03-24T03:00:56.084Z","sizeBytes":12739},
