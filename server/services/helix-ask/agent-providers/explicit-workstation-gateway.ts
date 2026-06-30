@@ -38,6 +38,7 @@ const DOCS_SEARCH_CAPABILITY = "docs.search" as const;
 const DOCS_READ_VISIBLE_SURFACE_CAPABILITY = "docs-viewer.read_visible_surface" as const;
 const DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY = "docs-viewer.read_active_translation" as const;
 const DOCS_OPEN_DOC_CAPABILITY = "docs-viewer.open_doc" as const;
+const CALCULATOR_READ_VISIBLE_RESULT_CAPABILITY = "scientific-calculator.read_visible_result" as const;
 const DOCS_SEARCH_ALIAS_CAPABILITIES = [
   "docs-viewer.search_docs",
   "docs-viewer.locate_in_doc",
@@ -415,6 +416,138 @@ const isActiveCalculatorDeicticPrompt = (prompt: string): boolean => {
     /\b(?:calculation|calculator|expression|equation|result|answer)\s+(?:on\s+screen|in\s+(?:the\s+)?calculator|I'?m\s+viewing|we'?re\s+viewing)\b/i.test(unquotedPrompt);
   const asksForContent = /\b(?:what\s+is|what'?s|explain|summari[sz]e|interpret|use|read|tell\s+me|mean|means|result|answer)\b/i.test(unquotedPrompt);
   return mentionsCurrentCalculator && asksForContent;
+};
+
+const hasNegatedSurfaceReadInstruction = (prompt: string): boolean =>
+  hasNegatedToolInstruction(
+    prompt,
+    /\b(?:read|translate|summari[sz]e|narrat(?:e|or)|speak|surface|selected|hovered|visible|current|panel|doc|document|calculator|result)\b/i,
+  );
+
+const isContextualSurfaceReadMention = (prompt: string): boolean => {
+  const unquoted = unquotePrompt(prompt);
+  return (
+    /\b(?:text|sentence|phrase|quote|screen|page|button|label|ui)\b[\s\S]{0,140}\b(?:says|shows|reads|contains|mentions|labeled|labelled|called|named)\b[\s\S]{0,140}\b(?:read|translate|summari[sz]e|surface|selected|hovered|visible|current\s+panel)\b/i.test(unquoted) ||
+    /\b(?:explain|describe|what\s+does|what\s+is|what\s+are)\b[\s\S]{0,140}\b(?:read|translate|summari[sz]e|surface|selected|hovered|visible|current\s+panel)\b[\s\S]{0,140}\b(?:mean|means|do|does|is|are|would)\b/i.test(unquoted) ||
+    /\b(?:future|later|eventually|hypothetically|would|could|might)\b[\s\S]{0,160}\b(?:read|translate|summari[sz]e|surface|selected|hovered|visible|current\s+panel)\b/i.test(unquoted)
+  );
+};
+
+const buildPromptDerivedReadableSurfaceGatewayCallRequests = (
+  body: Record<string, unknown>,
+): Record<string, unknown>[] => {
+  const prompt = readPrompt(body);
+  if (!prompt) return [];
+  if (hasNegatedSurfaceReadInstruction(prompt) || isContextualSurfaceReadMention(prompt)) return [];
+  if (/\b(?:read\s+aloud|speak(?:\s+out\s+loud)?|narrat(?:e|or)|voice\s+(?:read|say|speak)|say\s+out\s+loud)\b/i.test(unquotePrompt(prompt))) {
+    return [];
+  }
+  const unquoted = unquotePrompt(prompt);
+  const asksTranslate = /\b(?:translate|translated|translation)\b[\s\S]{0,120}\b(?:visible|current|selected|hovered|doc|document|surface|section|block)\b/i.test(unquoted);
+  const asksSummarize = /\b(?:summari[sz]e|overview|brief)\b[\s\S]{0,120}\b(?:visible|current|selected|hovered|doc|document|surface|section|block|calculator\s+result)\b/i.test(unquoted);
+  const asksRead =
+    /\b(?:read|inspect|observe)\b[\s\S]{0,120}\b(?:selected|hovered|visible|current|active)\b[\s\S]{0,80}\b(?:paragraph|section|block|surface|doc|document|calculator\s+result|result)\b/i.test(unquoted) ||
+    /\b(?:selected|hovered|visible|current|active)\b[\s\S]{0,80}\b(?:paragraph|section|block|surface|doc|document|calculator\s+result|result)\b[\s\S]{0,80}\b(?:read|inspect|observe|say)\b/i.test(unquoted);
+  if (!asksTranslate && !asksSummarize && !asksRead) return [];
+
+  const workspaceSnapshot = readWorkspaceSnapshot(body);
+  const activePanel = readString(
+    workspaceSnapshot?.activePanel ??
+      workspaceSnapshot?.active_panel ??
+      workspaceSnapshot?.focusedPanel ??
+      workspaceSnapshot?.focused_panel,
+  );
+  const activeDocPath = normalizeDocPath(
+    workspaceSnapshot?.activeDocPath ??
+      workspaceSnapshot?.active_doc_path ??
+      workspaceSnapshot?.docContextPath ??
+      workspaceSnapshot?.doc_context_path,
+  );
+  const selectedText = readString(
+    workspaceSnapshot?.selectedText ??
+      workspaceSnapshot?.selected_text ??
+      workspaceSnapshot?.selectedDocText ??
+      workspaceSnapshot?.selected_doc_text,
+  );
+  const hoveredText = readString(
+    workspaceSnapshot?.hoveredText ??
+      workspaceSnapshot?.hovered_text ??
+      workspaceSnapshot?.hoveredDocText ??
+      workspaceSnapshot?.hovered_doc_text,
+  );
+  const selectionRef = readString(
+    workspaceSnapshot?.selectionRef ??
+      workspaceSnapshot?.selection_ref ??
+      workspaceSnapshot?.narratorSourceId ??
+      workspaceSnapshot?.narrator_source_id ??
+      workspaceSnapshot?.selectedNarratorSourceId ??
+      workspaceSnapshot?.selected_narrator_source_id,
+  );
+  const translationBlocks =
+    Array.isArray(workspaceSnapshot?.active_translation_blocks)
+      ? workspaceSnapshot.active_translation_blocks
+      : Array.isArray(workspaceSnapshot?.activeTranslationBlocks)
+        ? workspaceSnapshot.activeTranslationBlocks
+        : undefined;
+  const translatedText = readString(workspaceSnapshot?.active_translation_text ?? workspaceSnapshot?.activeTranslationText);
+  const calculatorContext =
+    readRecord(workspaceSnapshot?.calculator_active_context) ??
+    readRecord(workspaceSnapshot?.calculatorActiveContext) ??
+    readRecord(workspaceSnapshot?.scientific_calculator) ??
+    readRecord(workspaceSnapshot?.scientificCalculator);
+  const mentionsCalculator = /\b(?:calculator|calculation|result)\b/i.test(unquoted) && activePanel === "scientific-calculator";
+  const capabilityId = mentionsCalculator
+    ? CALCULATOR_READ_VISIBLE_RESULT_CAPABILITY
+    : asksTranslate
+      ? DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY
+      : DOCS_READ_VISIBLE_SURFACE_CAPABILITY;
+  const selectionKind = /\bhovered\b/i.test(unquoted) ? "hovered" : /\bselected|highlighted\b/i.test(unquoted) ? "selected" : undefined;
+  const surfaceOutcome = asksTranslate ? "translate_visible_surface" : asksSummarize ? "summarize_visible_surface" : "read_visible_surface";
+  return [{
+    schema: "helix.workstation_gateway.prompt_derived_readable_surface_call_request.v1",
+    derivation_source: "helix_prompt_derived_readable_surface",
+    surface_outcome: surfaceOutcome,
+    capability_id: capabilityId,
+    mode: "read",
+    arguments: {
+      label: mentionsCalculator
+        ? "current calculator result"
+        : asksTranslate
+          ? "visible translated document surface"
+          : selectionKind
+            ? `${selectionKind} document paragraph`
+            : "visible document surface",
+      surface: selectionKind ?? (asksTranslate ? "active_translation" : mentionsCalculator ? "calculator_visible_result" : "visible_document"),
+      source_doc_path: activeDocPath ?? undefined,
+      selected_text: selectedText ?? undefined,
+      hovered_text: hoveredText ?? undefined,
+      selection_ref: selectionRef ?? undefined,
+      selection_kind: selectionKind,
+      text: asksTranslate ? translatedText : undefined,
+      translation_blocks: translationBlocks,
+      active_context: calculatorContext ?? undefined,
+      source_target_intent: {
+        source: "helix_prompt_derived_readable_surface",
+        target_source: mentionsCalculator ? "scientific_calculator" : "docs_viewer",
+        target_kind: mentionsCalculator
+          ? "calculator_visible_result"
+          : asksTranslate
+            ? "docs_active_translation_surface"
+            : selectionKind
+              ? "docs_selected_or_hovered_surface"
+              : "docs_visible_surface",
+        surface_outcome: surfaceOutcome,
+        required_observation_kind: "helix.workstation_readable_surface_observation.v1",
+        focused_panel: activePanel,
+        active_doc_path: activeDocPath,
+        selection_required: Boolean(selectionKind),
+        narrator_requested: false,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    },
+  }];
 };
 
 export const buildActiveCalculatorContextWorkstationGatewayCallRequests = (
@@ -1786,6 +1919,7 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   appendDedupe(requests, seen, activeCalculatorContext);
   const activeWorkstationContext = buildActiveWorkstationContextGatewayCallRequests(input.body);
   appendDedupe(requests, seen, activeWorkstationContext);
+  appendDedupe(requests, seen, buildPromptDerivedReadableSurfaceGatewayCallRequests(input.body));
   if (!promptNamedCapabilities.has(WORKSPACE_OS_STATUS_CAPABILITY)) {
     appendDedupe(requests, seen, buildPromptDerivedWorkspaceStatusGatewayCallRequests(input.body));
   }
