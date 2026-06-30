@@ -84,17 +84,25 @@ Live UI smoke result:
 - Latest turn displayed `Runtime selected: Codex Workstation Mode`.
 - Explicit calculator gateway prompt:
   `scientific-calculator.solve_expression` with expression `8*9`.
-- UI latest-turn trace reported:
-  `Model re-entry: no workstation observation packet was available for this
-  Codex turn.`
-- UI final displayed `Observed expression: 8*9` and `Result: 72`, but the turn
-  was labeled `TYPED FAILURE | PROVIDER: CODEX WORKSTATION MODE`.
+- UI latest-turn trace displayed tool request, tool observation, calculator
+  panel projection action receipts, model re-entry, and final answer.
+- UI final displayed `Observed expression: 8*9` and `Observed result: 72`
+  without a typed-failure label.
+- The negative quoted internet prompt produced no gateway calls and no stale
+  retrieval fallback. The structured UI final-answer attributes matched the
+  backend-selected literal-text answer for the same debug turn id.
+- The no-key scholarly lookup path produced bounded
+  `scholarly-research.lookup_papers` observations. General
+  `internet-search.search_web` remains a separate provider-missing warning.
 
 Release classification:
 
 - API-backed Codex Workstation Mode release matrix: release-confidence `WARN`.
-- UI latest-turn Codex workstation trace: release-blocking mismatch until the UI
-  path shows the same gateway observation/re-entry contract as the API path.
+- UI latest-turn Codex workstation trace: parity confirmed for representative
+  calculator, docs+repo, theory+civilization, negative quoted internet, and
+  scholarly lookup prompts.
+- Remaining release warning: general `internet-search.search_web` provider is
+  still missing where explicitly requested.
 
 ## Coverage Requirements
 

@@ -38,9 +38,14 @@ describe("Helix Ask UI ownership boundaries", () => {
       "ask-turn-transcript.ts",
       "ask-value-normalization.ts",
       "ask-voice-capture-display.ts",
+      "ask-voice-barge-policy.ts",
+      "ask-voice-brief-policy.ts",
       "ask-voice-copy-display.ts",
+      "ask-voice-confirmation-command.ts",
+      "ask-voice-transcript-confidence.ts",
       "ask-voice-continuation-lexical.ts",
       "ask-voice-playback-classification.ts",
+      "ask-voice-steering-client.ts",
       "ask-voice-text-display.ts",
     ]) {
       expect(map).toContain(moduleName);
@@ -291,6 +296,7 @@ describe("Helix Ask UI ownership boundaries", () => {
 
   it("keeps rendered-button debug copy scoped to the matched reply turn only", () => {
     const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const normalizedPill = pill.replace(/\r\n/g, "\n");
 
     expect(pill).toContain("const renderedMatchesReply =");
     expect(pill).toContain("debug: renderedMatchesReply ? reply.debug ?? null : null");
@@ -298,10 +304,10 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(pill).toContain(
       "debug_export_ref: renderedMatchesReply ? replyRecord.debug_export_ref ?? replyDebugRecord?.debug_export_ref ?? null : null",
     );
-    expect(pill).toContain(
+    expect(normalizedPill).toContain(
       "backend_debug_response_ref: renderedMatchesReply\n      ? replyRecord.backend_debug_response_ref ?? replyDebugRecord?.backend_debug_response_ref ?? null\n      : null",
     );
-    expect(pill).toContain(
+    expect(normalizedPill).toContain(
       "const providedPayloadMatchesRenderedTurn =\n          hasProvidedPayload && debugPayloadMatchesRenderedTurnPayload(payload, sourceElement)",
     );
     expect(pill).toContain("const localExportPayload = providedPayloadMatchesRenderedTurn");
@@ -1200,16 +1206,8 @@ describe("Helix Ask UI ownership boundaries", () => {
       expect(pill).not.toContain(`export function ${symbol}`);
       expect(voiceText).toContain(`export function ${symbol}`);
     }
-    for (const localAnchor of [
-      "isGenericRunningVoiceStatus",
-      "isPinnedVoiceBriefCandidate",
-      "buildSuppressedVoiceSpeechText",
-      "normalizeConversationBriefSource",
-      "shouldSuppressVoiceForTerminalState",
-    ]) {
-      expect(pill).toContain(`function ${localAnchor}`);
-      expect(voiceText).not.toContain(localAnchor);
-    }
+    expect(voiceText).not.toContain("isPinnedVoiceBriefCandidate");
+    expect(voiceText).not.toContain("buildSuppressedVoiceSpeechText");
     expect(pill).not.toContain("const FILE_PATH_CITATION_SEGMENT");
     expect(voiceText).not.toMatch(/from ["']react["']/);
     expect(voiceText).not.toContain("@/store/");
@@ -1219,6 +1217,49 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(voiceText).not.toContain("enqueueVoicePlaybackIntent");
     expect(voiceText).not.toContain("runAskTurn");
     expect(voiceText).not.toContain("fetch(");
+  });
+
+  it("keeps deterministic voice brief policy helpers in the non-React brief policy owner", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
+    const briefPolicy = read("client/src/lib/helix/ask-voice-brief-policy.ts");
+    const voiceText = read("client/src/lib/helix/ask-voice-text-display.ts");
+
+    expect(map).toContain("ask-voice-brief-policy.ts");
+    expect(map).toContain("Deterministic voice brief/status predicates");
+    expect(pill).toContain('from "@/lib/helix/ask-voice-brief-policy"');
+    for (const symbol of [
+      "normalizeBriefComparableText",
+      "isBriefEchoingTranscript",
+      "isReasoningTimeoutReason",
+      "isVoiceTurnSupersededReason",
+      "shouldSuppressVoiceForTerminalState",
+      "isGenericQueuedVoiceAcknowledgement",
+      "isGenericRunningVoiceStatus",
+      "isPinnedVoiceBriefCandidate",
+      "normalizeConversationBriefSource",
+      "buildSuppressedVoiceSpeechText",
+    ]) {
+      expect(briefPolicy).toContain(`export function ${symbol}`);
+      expect(pill).not.toContain(`function ${symbol}`);
+      expect(voiceText).not.toContain(symbol);
+    }
+    for (const localAnchor of [
+      "voiceAutoSpeakQueueRef",
+      "enqueueVoicePlaybackIntent",
+      "stopReadAloud",
+      "shouldKeepHelixReplyInBriefLane",
+      "handleReadAloud",
+    ]) {
+      expect(pill).toContain(localAnchor);
+      expect(briefPolicy).not.toContain(localAnchor);
+    }
+    expect(briefPolicy).not.toMatch(/from ["']react["']/);
+    expect(briefPolicy).not.toContain("@/store/");
+    expect(briefPolicy).not.toContain("@/components/helix/HelixAskPill");
+    expect(briefPolicy).not.toContain("fetch(");
+    expect(briefPolicy).not.toContain("AudioContext");
+    expect(briefPolicy).not.toContain("speakVoice");
   });
 
   it("keeps voice labels and lifecycle copy formatting in the non-React voice copy display module", () => {
@@ -1291,6 +1332,136 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(playbackClassification).not.toContain("speakVoice");
     expect(playbackClassification).not.toContain("navigator.");
     expect(playbackClassification).not.toContain("import.meta");
+  });
+
+  it("keeps deterministic voice steering client helpers in the non-React steering owner", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
+    const steering = read("client/src/lib/helix/ask-voice-steering-client.ts");
+
+    expect(map).toContain("ask-voice-steering-client.ts");
+    expect(map).toContain("active-turn voice steering transcript classification");
+    expect(pill).toContain('from "@/lib/helix/ask-voice-steering-client"');
+    for (const symbol of [
+      "classifyVoiceSteeringClientTranscript",
+      "buildVoiceSteeringClientRequest",
+      "isVoiceSteeringDuringToolCall",
+    ]) {
+      expect(steering).toContain(`export function ${symbol}`);
+      expect(pill).not.toContain(`function ${symbol}`);
+    }
+    for (const localAnchor of [
+      "buildVoiceSteeringReservation",
+      'toolName: "live_env.record_voice_steering"',
+      "active_turn_completed_before_stt_final",
+      "activeVoiceSteeringTurnId",
+    ]) {
+      expect(pill).toContain(localAnchor);
+      expect(steering).not.toContain(localAnchor);
+    }
+    expect(steering).not.toMatch(/from ["']react["']/);
+    expect(steering).not.toContain("@/store/");
+    expect(steering).not.toContain("@/components/helix/HelixAskPill");
+    expect(steering).not.toContain("fetch(");
+    expect(steering).not.toContain("navigator.");
+    expect(steering).not.toContain("localStorage");
+  });
+
+  it("keeps deterministic transcript confirmation command parsing in the non-React voice confirmation owner", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
+    const confirmation = read("client/src/lib/helix/ask-voice-confirmation-command.ts");
+
+    expect(map).toContain("ask-voice-confirmation-command.ts");
+    expect(map).toContain("Deterministic parsing of short transcript confirmation voice commands");
+    expect(pill).toContain('from "@/lib/helix/ask-voice-confirmation-command"');
+    expect(confirmation).toContain("export function parseTranscriptConfirmationVoiceCommand");
+    expect(pill).not.toContain("function parseTranscriptConfirmationVoiceCommand");
+    for (const localAnchor of [
+      "resolveTranscriptConfirmPolicy",
+      "shouldAutoConfirmTranscriptPrompt",
+      "normalizeVoiceCommandLaneEnvelope",
+      "shouldIgnoreLowQualityTranscriptBargeIn",
+    ]) {
+      expect(pill).toContain(localAnchor);
+      expect(confirmation).not.toContain(localAnchor);
+    }
+    expect(confirmation).not.toMatch(/from ["']react["']/);
+    expect(confirmation).not.toContain("@/store/");
+    expect(confirmation).not.toContain("@/components/helix/HelixAskPill");
+    expect(confirmation).not.toContain("fetch(");
+    expect(confirmation).not.toContain("crypto.");
+    expect(confirmation).not.toContain("navigator.");
+  });
+
+  it("keeps deterministic transcript confidence helpers in the non-React voice confidence owner", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
+    const confidence = read("client/src/lib/helix/ask-voice-transcript-confidence.ts");
+
+    expect(map).toContain("ask-voice-transcript-confidence.ts");
+    expect(map).toContain("Deterministic STT transcript confidence derivation");
+    expect(pill).toContain('from "@/lib/helix/ask-voice-transcript-confidence"');
+    for (const symbol of [
+      "deriveTranscriptConfidence",
+      "shouldRequireTranscriptConfirmation",
+    ]) {
+      expect(confidence).toContain(`export function ${symbol}`);
+      expect(pill).not.toContain(`function ${symbol}`);
+    }
+    expect(confidence).toContain("export const VOICE_STT_CONFIRM_THRESHOLD");
+    for (const localAnchor of [
+      "resolveTranscriptConfirmPolicy",
+      "shouldAutoConfirmTranscriptPrompt",
+      "normalizeVoiceCommandLaneEnvelope",
+      "shouldIgnoreLowQualityTranscriptBargeIn",
+    ]) {
+      expect(pill).toContain(localAnchor);
+      expect(confidence).not.toContain(localAnchor);
+    }
+    expect(confidence).not.toMatch(/from ["']react["']/);
+    expect(confidence).not.toContain("@/store/");
+    expect(confidence).not.toContain("@/components/helix/HelixAskPill");
+    expect(confidence).not.toContain("fetch(");
+    expect(confidence).not.toContain("crypto.");
+    expect(confidence).not.toContain("navigator.");
+  });
+
+  it("keeps deterministic voice barge policy helpers in the non-React barge owner", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
+    const barge = read("client/src/lib/helix/ask-voice-barge-policy.ts");
+
+    expect(map).toContain("ask-voice-barge-policy.ts");
+    expect(map).toContain("Deterministic voice barge hard-cut reason resolution");
+    expect(pill).toContain('from "@/lib/helix/ask-voice-barge-policy"');
+    for (const symbol of [
+      "resolveVoiceBargeHardCutReason",
+      "shouldResumeBargeHeldPlayback",
+      "shouldInterruptForSupersededReason",
+      "mapVoicePreemptPolicyToCancelReason",
+    ]) {
+      expect(barge).toContain(`export function ${symbol}`);
+      expect(pill).not.toContain(`function ${symbol}`);
+    }
+    expect(barge).toContain("export const VOICE_BARGE_HARD_CUT_PERSIST_MS");
+    for (const localAnchor of [
+      "stopReadAloud",
+      "voiceAutoSpeakQueueRef",
+      "enqueueVoicePlaybackIntent",
+      "canPlayVoiceUtteranceWithMicOff",
+      "shouldTreatMicSignalAsSpeech",
+    ]) {
+      expect(pill).toContain(localAnchor);
+      expect(barge).not.toContain(localAnchor);
+    }
+    expect(barge).not.toMatch(/from ["']react["']/);
+    expect(barge).not.toContain("@/store/");
+    expect(barge).not.toContain("@/components/helix/HelixAskPill");
+    expect(barge).not.toContain("fetch(");
+    expect(barge).not.toContain("AudioContext");
+    expect(barge).not.toContain("HTMLAudioElement");
+    expect(barge).not.toContain("navigator.");
   });
 
   it("keeps reasoning battle visual projection helpers in the non-React reasoning battle display module", () => {

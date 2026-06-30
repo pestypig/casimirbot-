@@ -333,16 +333,72 @@ import {
   shouldRetryVoicePlaybackWithDirectFallback,
   shouldTreatVoicePlaybackErrorAsEnded,
 } from "@/lib/helix/ask-voice-playback-classification";
+import {
+  parseTranscriptConfirmationVoiceCommand,
+  type TranscriptConfirmationVoiceCommand,
+} from "@/lib/helix/ask-voice-confirmation-command";
+import {
+  VOICE_STT_CONFIRM_THRESHOLD,
+  deriveTranscriptConfidence,
+  shouldRequireTranscriptConfirmation,
+} from "@/lib/helix/ask-voice-transcript-confidence";
+import {
+  mapVoicePreemptPolicyToCancelReason,
+  resolveVoiceBargeHardCutReason,
+  shouldInterruptForSupersededReason,
+  shouldResumeBargeHeldPlayback,
+  type VoiceBargeHardCutReason,
+} from "@/lib/helix/ask-voice-barge-policy";
+import {
+  buildSuppressedVoiceSpeechText,
+  isBriefEchoingTranscript,
+  isGenericQueuedVoiceAcknowledgement,
+  isGenericRunningVoiceStatus,
+  isPinnedVoiceBriefCandidate,
+  isReasoningTimeoutReason,
+  isVoiceTurnSupersededReason,
+  normalizeBriefComparableText,
+  normalizeConversationBriefSource,
+  shouldSuppressVoiceForTerminalState,
+} from "@/lib/helix/ask-voice-brief-policy";
+import {
+  buildVoiceSteeringClientRequest,
+  classifyVoiceSteeringClientTranscript,
+  isVoiceSteeringDuringToolCall,
+  type VoiceSteeringClientClassification,
+  type VoiceSteeringClientRequest,
+} from "@/lib/helix/ask-voice-steering-client";
 export {
+  buildVoiceSteeringClientRequest,
+  classifyVoiceSteeringClientTranscript,
+  deriveTranscriptConfidence,
   extractLatestContinuationQuestionFocus,
   hasDanglingTurnTail,
   isRetryableVoiceChunkSynthesisError,
+  isVoiceSteeringDuringToolCall,
   isLikelyNearTurnContinuation,
   isLowInformationTailTranscript,
+  isGenericQueuedVoiceAcknowledgement,
+  parseTranscriptConfirmationVoiceCommand,
+  resolveVoiceBargeHardCutReason,
+  shouldRequireTranscriptConfirmation,
+  shouldSuppressVoiceForTerminalState,
+  shouldInterruptForSupersededReason,
+  shouldResumeBargeHeldPlayback,
   shouldRetryVoicePlaybackDirectAttempt,
   shouldRetryVoicePlaybackWithDirectFallback,
   shouldTreatVoicePlaybackErrorAsEnded,
 };
+export type {
+  TranscriptConfirmationVoiceCommand,
+} from "@/lib/helix/ask-voice-confirmation-command";
+export type {
+  VoiceBargeHardCutReason,
+} from "@/lib/helix/ask-voice-barge-policy";
+export type {
+  VoiceSteeringClientClassification,
+  VoiceSteeringClientRequest,
+} from "@/lib/helix/ask-voice-steering-client";
 import {
   buildSpeakText,
   cleanReasoningDisplayArtifacts,
@@ -381,7 +437,6 @@ import {
   formatVoiceDecisionSentence,
   laneLabelForConversationMode,
   normalizeConversationRouteReasonCode,
-  normalizeVoiceFailureReasonText,
   resolveReasoningAttemptTimelineText,
   type VoiceDecisionLifecycle,
 } from "@/lib/helix/ask-voice-copy-display";
@@ -2042,116 +2097,6 @@ export type VoiceAutoDispatchGovernance = {
   instruction_authority: "none";
 };
 
-export type VoiceSteeringClientClassification =
-  | "on_topic_additive"
-  | "constraint"
-  | "correction"
-  | "off_topic_new_goal"
-  | "cancel_or_stop"
-  | "ambient";
-
-export type VoiceSteeringClientRequest = {
-  thread_id: string;
-  turn_id: string;
-  expected_turn_id: string;
-  transcript_text: string;
-  source: "voice_capture";
-  timing: "during_reasoning" | "during_tool_call";
-  classification: VoiceSteeringClientClassification;
-  queue_decision:
-    | "queued_for_safe_boundary"
-    | "deferred_to_new_turn"
-    | "cancel_requested"
-    | "ambient_ignored";
-  evidence_refs: string[];
-  reason_codes: string[];
-};
-
-export function classifyVoiceSteeringClientTranscript(transcript: string): {
-  classification: VoiceSteeringClientClassification;
-  queueDecision: VoiceSteeringClientRequest["queue_decision"];
-  reasonCodes: string[];
-} {
-  const text = transcript.trim();
-  if (!text || text.length < 3) {
-    return {
-      classification: "ambient",
-      queueDecision: "ambient_ignored",
-      reasonCodes: ["too_short_or_empty"],
-    };
-  }
-  if (/\b(stop|cancel|abort|pause|never mind|nevermind)\b/i.test(text)) {
-    return {
-      classification: "cancel_or_stop",
-      queueDecision: "cancel_requested",
-      reasonCodes: ["explicit_cancel_phrase"],
-    };
-  }
-  if (/\b(actually|correction|i meant|not that|use .* instead)\b/i.test(text)) {
-    return {
-      classification: "correction",
-      queueDecision: "queued_for_safe_boundary",
-      reasonCodes: ["correction_phrase"],
-    };
-  }
-  if (/\b(do not|don't|dont|only|never|make sure|must|instead)\b/i.test(text)) {
-    return {
-      classification: "constraint",
-      queueDecision: "queued_for_safe_boundary",
-      reasonCodes: ["constraint_phrase"],
-    };
-  }
-  if (/\b(also|while you|check|look at|remember|include)\b/i.test(text)) {
-    return {
-      classification: "on_topic_additive",
-      queueDecision: "queued_for_safe_boundary",
-      reasonCodes: ["additive_phrase"],
-    };
-  }
-  return {
-    classification: "off_topic_new_goal",
-    queueDecision: "deferred_to_new_turn",
-    reasonCodes: ["default_active_turn_new_goal"],
-  };
-}
-
-export function buildVoiceSteeringClientRequest(args: {
-  threadId: string;
-  turnId: string;
-  expectedTurnId?: string | null;
-  transcriptText: string;
-  timing: "during_reasoning" | "during_tool_call";
-  evidenceRefs?: string[];
-}): VoiceSteeringClientRequest {
-  const classified = classifyVoiceSteeringClientTranscript(args.transcriptText);
-  return {
-    thread_id: args.threadId,
-    turn_id: args.turnId,
-    expected_turn_id: args.expectedTurnId?.trim() || args.turnId,
-    transcript_text: args.transcriptText.trim(),
-    source: "voice_capture",
-    timing: args.timing,
-    classification: classified.classification,
-    queue_decision: classified.queueDecision,
-    evidence_refs: Array.from(new Set(args.evidenceRefs ?? [])),
-    reason_codes: classified.reasonCodes,
-  };
-}
-
-export function isVoiceSteeringDuringToolCall(events: Array<{ tool?: unknown; status?: unknown; type?: unknown }>): boolean {
-  return events.some((event) => {
-    const status = String(event.status ?? "").toLowerCase();
-    const type = String(event.type ?? "").toLowerCase();
-    const tool = String(event.tool ?? "").trim();
-    return Boolean(tool) && (
-      status === "running" ||
-      status === "queued" ||
-      type.includes("tool") ||
-      type.includes("action")
-    );
-  });
-}
-
 function isExplicitVoiceAskTurnCandidate(transcript: string): boolean {
   const text = transcript.trim();
   if (!text) return false;
@@ -2938,7 +2883,6 @@ const MIC_END_TURN_MS = 1200;
 const MIC_MAX_SEGMENT_MS = 12_000;
 const MIC_POST_TRANSCRIBE_COOLDOWN_MS = 600;
 const VOICE_BARGE_RESUME_GRACE_MS = 2800;
-const VOICE_BARGE_HARD_CUT_PERSIST_MS = 700;
 const VOICE_BARGE_TRAFFIC_BUFFER_MS = 2600;
 const MIC_PLAYBACK_BARGE_THRESHOLD_MULTIPLIER_MOBILE = 1.5;
 const VOICE_TRANSCRIPTION_BREATH_WINDOW_MS = 2600;
@@ -2969,7 +2913,6 @@ const MIC_LEVEL_THRESHOLD = 0.03;
 const MIC_LEVEL_MIN_THRESHOLD = 0.008;
 const MIC_LEVEL_FLOOR_ALPHA = 0.92;
 const MIC_LEVEL_FLOOR_MULTIPLIER = 2.4;
-const VOICE_STT_CONFIRM_THRESHOLD = 0.58;
 const VOICE_STT_TRANSLATION_CONFIRM_THRESHOLD = 0.68;
 const VOICE_TURN_COMPLETE_HIGH_THRESHOLD = 0.72;
 const VOICE_TURN_COMPLETE_MEDIUM_THRESHOLD = 0.5;
@@ -3426,60 +3369,6 @@ export function isLikelyContinuationTailFragment(transcript: string): boolean {
   );
 }
 
-export type VoiceBargeHardCutReason =
-  | "speech_persisted"
-  | "stt_queue"
-  | "stt_busy"
-  | "pending_confirmation";
-
-export function resolveVoiceBargeHardCutReason(args: {
-  holdActive: boolean;
-  holdStartedAtMs: number | null;
-  nowMs: number;
-  transcribeQueueLength: number;
-  transcribeBusy: boolean;
-  pendingConfirmation: boolean;
-  speechActive: boolean;
-  persistMs?: number;
-}): VoiceBargeHardCutReason | null {
-  if (!args.holdActive) return null;
-  if (args.pendingConfirmation) return "pending_confirmation";
-  // Only escalate to an STT-queue hard cut while speech is actively present.
-  // Queue growth by itself can happen during normal segment rollover and should
-  // not suppress upcoming brief playback.
-  if (args.transcribeQueueLength > 0 && args.speechActive) return "stt_queue";
-  if (args.transcribeBusy) return "stt_busy";
-  const persistMs = args.persistMs ?? VOICE_BARGE_HARD_CUT_PERSIST_MS;
-  if (
-    args.speechActive &&
-    args.holdStartedAtMs !== null &&
-    args.nowMs - args.holdStartedAtMs >= Math.max(0, persistMs)
-  ) {
-    return "speech_persisted";
-  }
-  return null;
-}
-
-export function shouldResumeBargeHeldPlayback(args: {
-  holdActive: boolean;
-  resumeNotBeforeMs: number | null;
-  nowMs: number;
-  transcribeQueueLength: number;
-  transcribeBusy: boolean;
-  pendingConfirmation: boolean;
-  speechActive: boolean;
-  micArmed: boolean;
-  segmentFlushPending: boolean;
-  trafficQuietUntilMs: number | null;
-}): boolean {
-  if (!args.holdActive) return false;
-  if (args.resumeNotBeforeMs === null || args.nowMs < args.resumeNotBeforeMs) return false;
-  if (args.transcribeBusy || args.transcribeQueueLength > 0 || args.pendingConfirmation) return false;
-  if (args.speechActive || !args.micArmed || args.segmentFlushPending) return false;
-  if (args.trafficQuietUntilMs !== null && args.nowMs < args.trafficQuietUntilMs) return false;
-  return true;
-}
-
 export function shouldTreatMicSignalAsSpeech(args: {
   speakingNow: boolean;
   voiceOutputActive: boolean;
@@ -3584,62 +3473,6 @@ export function scoreConversationCompletion(input: {
   if (score < 0.45) return { score, route: "ask_more" };
   if (score < 0.75) return { score, route: "mirror_clarify" };
   return { score, route: "answer" };
-}
-
-export function deriveTranscriptConfidence(args: {
-  transcript: string;
-  providerConfidence?: number | null;
-  segments?: Array<{ confidence?: number }>;
-}): { confidence: number; reason: string } {
-  const provider = typeof args.providerConfidence === "number" && Number.isFinite(args.providerConfidence)
-    ? clamp01(args.providerConfidence)
-    : null;
-  if (provider !== null) {
-    return { confidence: provider, reason: "provider_reported" };
-  }
-  const segmentConfidenceValues = (args.segments ?? [])
-    .map((segment) =>
-      typeof segment?.confidence === "number" && Number.isFinite(segment.confidence)
-        ? clamp01(segment.confidence)
-        : null,
-    )
-    .filter((value): value is number => value !== null);
-  if (segmentConfidenceValues.length > 0) {
-    const avg =
-      segmentConfidenceValues.reduce((sum, value) => sum + value, 0) / segmentConfidenceValues.length;
-    return { confidence: clamp01(avg), reason: "segment_average" };
-  }
-  const text = args.transcript.trim();
-  if (!text) return { confidence: 0, reason: "empty_text" };
-  let score = 0.5;
-  if (text.length >= 20) score += 0.12;
-  if (text.length >= 56) score += 0.12;
-  if (/[.!?]["')\]]?$/.test(text)) score += 0.08;
-  if (/\b(and|but|or|because|so)\s*$/i.test(text)) score -= 0.08;
-  if (/[\u0000-\u001Fï¿½]/.test(text)) score -= 0.24;
-  const normalized = text.replace(/\s+/g, "");
-  if (normalized.length > 0) {
-    const alnum = (normalized.match(/[A-Za-z0-9]/g) ?? []).length;
-    const ratio = alnum / normalized.length;
-    if (ratio < 0.45) score -= 0.12;
-    if (ratio > 0.85) score += 0.04;
-  }
-  return { confidence: clamp01(score), reason: "heuristic_text_quality" };
-}
-
-export function shouldRequireTranscriptConfirmation(args: {
-  confidence: number;
-  translationUncertain: boolean;
-  providerNeedsConfirmation?: boolean;
-  minConfidence?: number;
-}): boolean {
-  if (args.providerNeedsConfirmation === true) return true;
-  if (args.translationUncertain) return true;
-  const minConfidence =
-    typeof args.minConfidence === "number" && Number.isFinite(args.minConfidence)
-      ? clamp01(args.minConfidence)
-      : VOICE_STT_CONFIRM_THRESHOLD;
-  return args.confidence < minConfidence;
 }
 
 function normalizeVoiceConfirmDispatchState(
@@ -3864,47 +3697,6 @@ function resolveSpeakerFromSessionProfiles(args: {
     speakerConfidence: 0.54,
     profileIndex: -1,
   };
-}
-
-export function parseTranscriptConfirmationVoiceCommand(
-  transcript: string,
-): "confirm" | "retry" | "cancel" | null {
-  const normalized = transcript
-    .toLowerCase()
-    .replace(/[^a-z0-9'\s]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  if (!normalized) return null;
-  const tokenCount = normalized.split(" ").filter(Boolean).length;
-  if (tokenCount > 4) return null;
-  if (
-    normalized === "confirm" ||
-    normalized === "yes" ||
-    normalized === "yeah" ||
-    normalized === "yep" ||
-    normalized === "correct" ||
-    normalized === "thats right" ||
-    normalized === "that's right" ||
-    normalized === "proceed"
-  ) {
-    return "confirm";
-  }
-  if (
-    normalized === "retry" ||
-    normalized === "again" ||
-    normalized === "redo" ||
-    normalized === "try again" ||
-    normalized === "no" ||
-    normalized === "nope" ||
-    normalized === "wrong" ||
-    normalized === "not that"
-  ) {
-    return "retry";
-  }
-  if (normalized === "cancel" || normalized === "dismiss" || normalized === "stop") {
-    return "cancel";
-  }
-  return null;
 }
 
 export function normalizeVoiceCommandLaneEnvelope(
@@ -4748,42 +4540,6 @@ function buildConversationFallbackBrief(args: {
   return `I heard: "${snippet}". I will continue with one precise next step while preserving context continuity.`;
 }
 
-function normalizeBriefComparableText(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function isBriefEchoingTranscript(briefText: string, transcript: string): boolean {
-  const brief = normalizeBriefComparableText(briefText);
-  const source = normalizeBriefComparableText(transcript);
-  if (!brief || !source) return false;
-  if (brief === source) return true;
-  if (brief.startsWith(source) && brief.length <= source.length + 24) return true;
-  return false;
-}
-
-function isReasoningTimeoutReason(reason?: string | null): boolean {
-  const trimmed = reason?.trim();
-  if (!trimmed) return false;
-  return /\breasoning_timeout\b|\bhelix_ask_timeout\b|\brequest timed out\b|\btimed out\b/i.test(
-    trimmed,
-  );
-}
-
-function isVoiceTurnSupersededReason(reason?: string | null): boolean {
-  const trimmed = reason?.trim();
-  if (!trimmed) return false;
-  if (normalizeVoiceFailureReasonText(trimmed) === "the run was interrupted by a newer turn") {
-    return true;
-  }
-  return /\bvoice_turn_(continuation_merged|response_stale|superseded_by_newer_attempt|superseded_by_newer_intent_revision)\b/i.test(
-    trimmed,
-  );
-}
-
 type AskLocalOptions = Parameters<typeof askLocal>[1];
 type AskLocalMode = NonNullable<AskLocalOptions>["mode"];
 type AskLocalResult = Awaited<ReturnType<typeof askLocal>>;
@@ -5548,104 +5304,6 @@ export function shouldPreserveAuthoritativeTerminalOverEvidenceGate(args: {
     return true;
   }
   return args.dispatchPolicy === "direct_answer_only" && args.routeReasonCode === "conversation:simple";
-}
-
-export function shouldSuppressVoiceForTerminalState(args: {
-  dispatchPolicy?: string | null;
-  routeReasonCode?: string | null;
-  terminalKind?: string | null;
-  finalAnswerSource?: string | null;
-  hasPendingRequest?: boolean;
-}): boolean {
-  if (args.hasPendingRequest) return true;
-  if (args.dispatchPolicy === "needs_user_input") return true;
-  if (args.routeReasonCode?.startsWith("clarify:")) return true;
-  if (args.terminalKind === "final_failure" || args.terminalKind === "typed_failure") return true;
-  if (args.finalAnswerSource === "typed_failure") return true;
-  return false;
-}
-
-export function isGenericQueuedVoiceAcknowledgement(text: string): boolean {
-  const normalized = text.trim().toLowerCase();
-  if (!normalized) return false;
-  return (
-    normalized === "got it. i am thinking through this in the background." ||
-    normalized === "got it. thinking in the background." ||
-    normalized === "i am thinking through this in the background." ||
-    normalized === "reasoning is running in the background." ||
-    /^reasoning is running in [a-z ]+ mode\.$/.test(normalized) ||
-    normalized ===
-      "got it. i will run a short observe reasoning pass in the background so we can keep talking while it loads."
-  );
-}
-
-function isGenericRunningVoiceStatus(text: string): boolean {
-  const normalized = text.trim().toLowerCase();
-  if (!normalized) return false;
-  if (normalized === "reasoning is running in the background.") return true;
-  return /^reasoning is running in [a-z ]+ mode\.$/.test(normalized);
-}
-
-function isPinnedVoiceBriefCandidate(text: string): boolean {
-  const normalized = sanitizeConversationBriefTextForVoice(text, 560);
-  if (!normalized) return false;
-  if (isGenericQueuedVoiceAcknowledgement(normalized)) return false;
-  if (/^i heard:\s*"/i.test(normalized)) return false;
-  return normalized.split(/\s+/).filter(Boolean).length >= 9;
-}
-
-export function shouldInterruptForSupersededReason(
-  reason: VoicePlaybackCancelReason | null,
-  hasActiveAudio: boolean,
-): boolean {
-  if (!reason) return false;
-  if (reason === "superseded_same_turn") {
-    // Prefer boundary handoff for same-turn brief/final refreshes to avoid audible hard cuts.
-    return false;
-  }
-  if (reason === "preempted_by_final" && !hasActiveAudio) {
-    return false;
-  }
-  return true;
-}
-
-function mapVoicePreemptPolicyToCancelReason(
-  policy: Exclude<VoicePreemptPolicy, "none">,
-): VoicePlaybackCancelReason {
-  return policy === "pending_final" ? "preempted_by_final" : "superseded_same_turn";
-}
-
-function normalizeConversationBriefSource(value: unknown): "llm" | "none" {
-  return value === "llm" ? "llm" : "none";
-}
-
-function buildSuppressedVoiceSpeechText(args: {
-  entryText: string;
-  decisionSentence: string;
-  routeReasonCode?: string | null;
-  failReasonRaw?: string | null;
-}): string {
-  const combinedReason = `${args.routeReasonCode ?? ""} ${args.failReasonRaw ?? ""}`.trim();
-  if (isVoiceTurnSupersededReason(combinedReason)) {
-    return sanitizeConversationBriefTextForVoice(args.decisionSentence || "Switched to your newer request.", 240);
-  }
-  const normalized = sanitizeConversationBriefTextForVoice(args.entryText, 560);
-  if (!normalized) {
-    return "";
-  }
-  const reasonCode = normalizeConversationRouteReasonCode(args.routeReasonCode);
-  const sentenceBudget = reasonCode === "suppressed:filler" || reasonCode === "suppressed:low_salience" ? 2 : 1;
-  const sentences = normalized
-    .split(/(?<=[.!])\s+/)
-    .map((entry) => entry.trim())
-    .filter(Boolean);
-  const selected = sentences.slice(0, sentenceBudget);
-  const selectedLower = selected.map((entry) => entry.toLowerCase());
-  const decision = sanitizeConversationBriefTextForVoice(args.decisionSentence, 220);
-  if (decision && !selectedLower.includes(decision.toLowerCase())) {
-    selected.push(decision);
-  }
-  return clipText(sanitizeConversationBriefTextForVoice(selected.join(" "), 360), 360);
 }
 
 type HelixAskReply = {
