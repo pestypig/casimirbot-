@@ -750,12 +750,7 @@ const HELIX_VOICE_LIMITER_KNEE_DB = 1;
 const HELIX_VOICE_LIMITER_RATIO = 20;
 const HELIX_VOICE_LIMITER_ATTACK_S = 0.001;
 const HELIX_VOICE_LIMITER_RELEASE_S = 0.08;
-const VOICE_PLAYBACK_DIRECT_RETRY_MAX = 1;
 const VOICE_PLAYBACK_DIRECT_RETRY_DELAY_MS = 120;
-const VOICE_PLAYBACK_ERROR_RECOVER_MIN_SECONDS = 0.65;
-const VOICE_PLAYBACK_ERROR_RECOVER_MIN_SECONDS_NO_DURATION = 1.2;
-const VOICE_PLAYBACK_ERROR_RECOVER_DURATION_RATIO = 0.35;
-const VOICE_PLAYBACK_ERROR_RECOVER_DIRECT_FALLBACK_MIN_SECONDS = 0.3;
 const VOICE_PLAYBACK_GRAPH_FAILURE_STREAK_FOR_BYPASS = 2;
 const VOICE_PLAYBACK_GRAPH_BYPASS_MS = 90_000;
 const VOICE_PLAYBACK_NO_PROGRESS_TIMEOUT_MS = 3_500;
@@ -1660,50 +1655,6 @@ export function shouldUseVoicePlaybackAudioGraph(userAgent?: string): boolean {
     return !HELIX_VOICE_FORCE_DIRECT_MOBILE;
   }
   return true;
-}
-
-export function shouldRetryVoicePlaybackWithDirectFallback(params: {
-  graphAttached: boolean;
-  directFallbackAttempted: boolean;
-}): boolean {
-  return params.graphAttached && !params.directFallbackAttempted;
-}
-
-export function shouldRetryVoicePlaybackDirectAttempt(params: {
-  graphAttached: boolean;
-  directFallbackAttempted: boolean;
-  directRetryCount: number;
-}): boolean {
-  return (
-    !params.graphAttached &&
-    params.directFallbackAttempted &&
-    params.directRetryCount < VOICE_PLAYBACK_DIRECT_RETRY_MAX
-  );
-}
-
-export function shouldTreatVoicePlaybackErrorAsEnded(params: {
-  playedSeconds: number;
-  durationSeconds: number | null;
-  directFallbackAttempted?: boolean;
-}): boolean {
-  if (!Number.isFinite(params.playedSeconds)) return false;
-  const playedSeconds = Math.max(0, params.playedSeconds);
-  if (
-    params.directFallbackAttempted &&
-    playedSeconds >= VOICE_PLAYBACK_ERROR_RECOVER_DIRECT_FALLBACK_MIN_SECONDS
-  ) {
-    return true;
-  }
-  if (playedSeconds < VOICE_PLAYBACK_ERROR_RECOVER_MIN_SECONDS) return false;
-  const durationSeconds =
-    typeof params.durationSeconds === "number" && Number.isFinite(params.durationSeconds)
-      ? params.durationSeconds
-      : null;
-  if (!durationSeconds || durationSeconds <= 0) {
-    return playedSeconds >= VOICE_PLAYBACK_ERROR_RECOVER_MIN_SECONDS_NO_DURATION;
-  }
-  const ratio = playedSeconds / Math.max(durationSeconds, 1e-6);
-  return ratio >= VOICE_PLAYBACK_ERROR_RECOVER_DURATION_RATIO;
 }
 
 export function resolveVoicePlaybackAttemptPath(params: {
@@ -5658,30 +5609,6 @@ export function shouldInterruptForSupersededReason(
   return true;
 }
 
-export function isRetryableVoiceChunkSynthesisError(error: unknown): boolean {
-  const err = error as {
-    status?: unknown;
-    name?: unknown;
-    message?: unknown;
-  } | null;
-  const status = typeof err?.status === "number" && Number.isFinite(err.status) ? err.status : null;
-  const name = typeof err?.name === "string" ? err.name.toLowerCase() : "";
-  const message =
-    error instanceof Error
-      ? error.message.toLowerCase()
-      : typeof err?.message === "string"
-        ? err.message.toLowerCase()
-        : String(error ?? "").toLowerCase();
-  if (message.startsWith("voice_auto_speak_suppressed:")) return false;
-  if (name === "aborterror" || /\babort(ed)?\b/.test(message)) return false;
-  if (status !== null && (status === 408 || status === 425 || status === 429 || status >= 500)) {
-    return true;
-  }
-  return /\b(failed to fetch|networkerror|network request failed|load failed|fetch failed|timeout|timed out|temporarily unavailable)\b/.test(
-    message,
-  );
-}
-
 function mapVoicePreemptPolicyToCancelReason(
   policy: Exclude<VoicePreemptPolicy, "none">,
 ): VoicePlaybackCancelReason {
@@ -5719,15 +5646,6 @@ function buildSuppressedVoiceSpeechText(args: {
     selected.push(decision);
   }
   return clipText(sanitizeConversationBriefTextForVoice(selected.join(" "), 360), 360);
-}
-
-function isVoiceMemoryPressureError(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
-  const status = (error as { status?: unknown }).status;
-  return (
-    status === 503 &&
-    /voice_memory_pressure|memory pressure|temporarily paused/i.test(error.message)
-  );
 }
 
 type HelixAskReply = {
