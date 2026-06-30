@@ -40,6 +40,7 @@ describe("Helix Ask UI ownership boundaries", () => {
       "ask-voice-capture-display.ts",
       "ask-voice-copy-display.ts",
       "ask-voice-continuation-lexical.ts",
+      "ask-voice-playback-classification.ts",
       "ask-voice-text-display.ts",
     ]) {
       expect(map).toContain(moduleName);
@@ -1237,7 +1238,7 @@ describe("Helix Ask UI ownership boundaries", () => {
       expect(pill).not.toContain(`export function ${symbol}`);
       expect(voiceCopy).toContain(`export function ${symbol}`);
     }
-    expect(pill).toContain("function isVoiceMemoryPressureError");
+    expect(pill).not.toContain("function isVoiceMemoryPressureError");
     expect(voiceCopy).not.toContain("isVoiceMemoryPressureError");
     expect(voiceCopy).not.toMatch(/from ["']react["']/);
     expect(voiceCopy).not.toContain("@/store/");
@@ -1248,6 +1249,48 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(voiceCopy).not.toContain("shouldAutoSpeakVoiceDecisionLifecycle");
     expect(voiceCopy).not.toContain("runAskTurn");
     expect(voiceCopy).not.toContain("fetch(");
+  });
+
+  it("keeps deterministic voice playback retry and error classification in the non-React playback classification owner", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
+    const playbackClassification = read("client/src/lib/helix/ask-voice-playback-classification.ts");
+    const readAloud = read("client/src/lib/helix/ask-read-aloud-display.ts");
+    const voiceCopy = read("client/src/lib/helix/ask-voice-copy-display.ts");
+
+    expect(map).toContain("ask-voice-playback-classification.ts");
+    expect(map).toContain("user-agent/env playback policy");
+    expect(pill).toContain('from "@/lib/helix/ask-voice-playback-classification"');
+    for (const symbol of [
+      "shouldRetryVoicePlaybackWithDirectFallback",
+      "shouldRetryVoicePlaybackDirectAttempt",
+      "shouldTreatVoicePlaybackErrorAsEnded",
+      "isRetryableVoiceChunkSynthesisError",
+      "isVoiceMemoryPressureError",
+    ]) {
+      expect(playbackClassification).toContain(`export function ${symbol}`);
+      expect(pill).not.toContain(`function ${symbol}`);
+      expect(readAloud).not.toContain(symbol);
+      expect(voiceCopy).not.toContain(symbol);
+    }
+    for (const localAnchor of [
+      "resolveVoicePlaybackGain",
+      "shouldUseVoicePlaybackAudioGraph",
+      "resolveVoicePlaybackAttemptPath",
+      "shouldBypassVoicePlaybackGraph",
+      "isActivePlayback",
+    ]) {
+      expect(pill).toContain(localAnchor);
+      expect(playbackClassification).not.toContain(localAnchor);
+    }
+    expect(playbackClassification).not.toMatch(/from ["']react["']/);
+    expect(playbackClassification).not.toContain("@/store/");
+    expect(playbackClassification).not.toContain("@/components/helix/HelixAskPill");
+    expect(playbackClassification).not.toContain("fetch(");
+    expect(playbackClassification).not.toContain("AudioContext");
+    expect(playbackClassification).not.toContain("speakVoice");
+    expect(playbackClassification).not.toContain("navigator.");
+    expect(playbackClassification).not.toContain("import.meta");
   });
 
   it("keeps reasoning battle visual projection helpers in the non-React reasoning battle display module", () => {
