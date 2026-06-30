@@ -38,6 +38,7 @@ describe("Helix Ask UI ownership boundaries", () => {
       "ask-terminal-projection.ts",
       "ask-turn-transcript.ts",
       "ask-value-normalization.ts",
+      "ask-voice-capture-checkpoints.ts",
       "ask-voice-capture-display.ts",
       "ask-voice-barge-policy.ts",
       "ask-voice-brief-policy.ts",
@@ -1256,6 +1257,51 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(voiceText).not.toContain("enqueueVoicePlaybackIntent");
     expect(voiceText).not.toContain("runAskTurn");
     expect(voiceText).not.toContain("fetch(");
+  });
+
+  it("keeps voice-capture checkpoint schema in the non-React checkpoint owner", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
+    const checkpoints = read("client/src/lib/helix/ask-voice-capture-checkpoints.ts");
+
+    expect(map).toContain("ask-voice-capture-checkpoints.ts");
+    expect(map).toContain("Deterministic voice-capture checkpoint schema");
+    expect(pill).toContain('from "@/lib/helix/ask-voice-capture-checkpoints"');
+    for (const symbol of [
+      "VOICE_CAPTURE_CHECKPOINT_ORDER",
+      "VOICE_CAPTURE_CHECKPOINT_LABEL",
+      "createVoiceCaptureCheckpointMap",
+      "VoiceCaptureCheckpointKey",
+      "VoiceCaptureCheckpointStatus",
+      "VoiceCaptureCheckpoint",
+    ]) {
+      expect(checkpoints).toContain(symbol);
+    }
+    for (const localAnchor of [
+      "setVoiceCaptureCheckpoints",
+      "publishVoiceCaptureDiagnosticsSnapshot",
+      "transcribeVoice",
+      "voiceRecorderRef",
+      "voiceTranscribeQueueRef",
+    ]) {
+      expect(pill).toContain(localAnchor);
+      expect(checkpoints).not.toContain(localAnchor);
+    }
+    for (const forbidden of [
+      /from ["']react["']/,
+      /@\/store\//,
+      /@\/components\/helix\/HelixAskPill/,
+      /fetch\(/,
+      /navigator\.clipboard/,
+      /document\./,
+      /window\./,
+      /MediaRecorder/,
+      /AudioContext/,
+      /transcribeVoice/,
+      /speakVoice/,
+    ]) {
+      expect(checkpoints).not.toMatch(forbidden);
+    }
   });
 
   it("keeps deterministic voice diagnostics export projection in the non-React diagnostics owner", () => {
