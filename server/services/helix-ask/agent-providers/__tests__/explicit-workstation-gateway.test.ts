@@ -395,6 +395,29 @@ describe("explicit workstation gateway derived calls", () => {
     });
   });
 
+  it("maps safe theory frontier conjecture aliases onto the canonical workbench gateway", () => {
+    const requests = buildPromptNamedCapabilityGatewayCallRequests({
+      agent_runtime: "codex",
+      question:
+        "Use propose_frontier_conjectures for missing badge bridges between QEI margin and source residual.",
+    });
+
+    expect(capabilities(requests)).toEqual(["theory-badge-graph.propose_frontier_conjectures"]);
+    expect(requests[0]).toMatchObject({
+      capability_id: "theory-badge-graph.propose_frontier_conjectures",
+      mode: "read",
+      arguments: {
+        prompt: "missing badge bridges between QEI margin and source residual",
+        build_explanation_plan: true,
+        source_target_intent: expect.objectContaining({
+          target_source: "theory_badge_graph",
+          target_kind: "theory_frontier_conjecture_workbench",
+          alias_capability: "propose_frontier_conjectures",
+        }),
+      },
+    });
+  });
+
   it("maps structured theory and civilization route aliases onto canonical reflection gateways", () => {
     const requests = buildStructuredAdmissionWorkstationGatewayCallRequests({
       question: "Use reflection aliases.",
@@ -444,6 +467,22 @@ describe("explicit workstation gateway derived calls", () => {
       "Do not run helix_ask.reflect_theory_context for QEI margin; explain what it would do.",
       "The UI label contains helix_ask.reflect_civilization_bounds.",
       "In the future we might use helix_ask.reflect_civilization_bounds for this.",
+    ];
+
+    for (const question of prompts) {
+      expect(buildPromptNamedCapabilityGatewayCallRequests({
+        agent_runtime: "codex",
+        question,
+      })).toEqual([]);
+    }
+  });
+
+  it("does not map quoted, negated, future, or UI-label frontier conjecture prompts", () => {
+    const prompts = [
+      "The text says propose_frontier_conjectures; explain that phrase only.",
+      "Do not run theory-badge-graph.propose_frontier_conjectures for QEI margin.",
+      "The UI label contains frontier_conjecture_workbench.",
+      "In the future we might use theory_frontier_conjectures for this.",
     ];
 
     for (const question of prompts) {
@@ -1422,5 +1461,74 @@ describe("explicit workstation gateway derived calls", () => {
         }),
       },
     });
+  });
+
+  it("blocks mutating live_env controls embedded in otherwise safe compound prompts", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "Use this current document, calculate 6*7, search research papers on arXiv for quantum inequalities, reflect the claim boundary through the theory badge graph, then use live_env.pause_workstation_loop and live_env.repair_workstation_source before answering.",
+        workspace_context_snapshot: {
+          activePanel: "docs-viewer",
+          focusedPanel: "docs-viewer",
+          openPanels: ["docs-viewer", "scientific-calculator"],
+          activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          hasDocContext: true,
+        },
+      },
+    });
+
+    expect(capabilities(requests)).toEqual([
+      "docs.search",
+      "scientific-calculator.solve_expression",
+      "theory-badge-graph.reflect_discussion_context",
+      "scholarly-research.lookup_papers",
+    ]);
+    expect(capabilities(requests)).not.toContain("live_env.pause_workstation_loop");
+    expect(capabilities(requests)).not.toContain("live_env.repair_workstation_source");
+  });
+
+  it("keeps read-only live_env context queries available inside mixed compound prompts", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "Use this current document, calculate 6*7, run live_env.query_trace_memory, live_env.query_narrator_events, and live_env.query_audio_transcripts, then use live_env.pause_workstation_loop only if it is safe.",
+        workspace_context_snapshot: {
+          activePanel: "docs-viewer",
+          focusedPanel: "docs-viewer",
+          openPanels: ["docs-viewer", "scientific-calculator"],
+          activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          hasDocContext: true,
+        },
+      },
+    });
+
+    expect(capabilities(requests)).toEqual([
+      "docs.search",
+      "scientific-calculator.solve_expression",
+      "live_env.query_audio_transcripts",
+      "live_env.query_trace_memory",
+      "live_env.query_narrator_events",
+    ]);
+    expect(capabilities(requests)).not.toContain("live_env.pause_workstation_loop");
+    for (const capabilityId of [
+      "live_env.query_trace_memory",
+      "live_env.query_narrator_events",
+      "live_env.query_audio_transcripts",
+    ]) {
+      expect(requests.find((request) => request.capability_id === capabilityId)).toMatchObject({
+        mode: "read",
+        arguments: {
+          source_target_intent: expect.objectContaining({
+            target_source: "live_environment_context_feed",
+            target_kind: capabilityId,
+          }),
+        },
+      });
+    }
   });
 });

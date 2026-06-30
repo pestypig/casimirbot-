@@ -51,6 +51,10 @@ workspace_os.status
 workstation.active_context
 scientific-calculator.solve_expression
 scientific-calculator.active_context
+workstation.readable_surface.observe
+docs-viewer.read_visible_surface
+docs-viewer.read_active_translation
+scientific-calculator.read_visible_result
 scientific-calculator.open_panel
 scientific-calculator.focus_panel
 scientific-calculator.show_gateway_solve
@@ -63,6 +67,7 @@ internet-search.search_web
 scholarly-research.lookup_papers
 civilization-bounds.reflect_system_bounds
 theory-badge-graph.reflect_discussion_context
+theory-badge-graph.propose_frontier_conjectures
 live_env.request_interim_voice_callout
 live_env.narrator_say
 live_env.query_visual_summaries
@@ -141,6 +146,7 @@ capability uses:
 | `helix.workstation_active_context_observation.v1` | Active workstation focus/context observations. |
 | `helix.calculator_solve_observation.v1` | Calculator solve observations. |
 | `helix.calculator_active_context_observation.v1` | Active calculator expression/result context observations. |
+| `helix.workstation_readable_surface_observation.v1` | Registered readable workstation surface observations for docs, translations, calculator results, and future safe surfaces. |
 | `helix.workstation_ui_action_receipt.v1` | Host-side panel/open/focus/autofill projection receipts. |
 | `helix.repo_search_observation.v1` | Repository search observations. |
 | `helix.docs_search_observation.v1` | Documentation search observations. |
@@ -148,6 +154,7 @@ capability uses:
 | `helix.scholarly_research_observation.v1` | Scholarly paper lookup observations. |
 | `helix.civilization_bounds_reflection_observation.v1` | Civilization-bounds reflection observations. |
 | `helix.theory_context_reflection_observation.v1` | Theory badge graph reflection observations. |
+| `helix.theory_frontier_conjecture_observation.v1` | Theory badge graph frontier conjecture workbench observations. |
 | `helix.interim_voice_callout_tool_result.v1` | Voice/narrator request receipts and host playback projections. |
 | `helix.live_environment_tool_observation.v1` | Graduated live-environment read/dry-run observations. |
 
@@ -170,6 +177,7 @@ capabilities with non-empty `input_schema.required`:
 | `scholarly-research.lookup_papers` | `query` |
 | `civilization-bounds.reflect_system_bounds` | `prompt` |
 | `theory-badge-graph.reflect_discussion_context` | `prompt` |
+| `theory-badge-graph.propose_frontier_conjectures` | `prompt` |
 | `live_env.request_interim_voice_callout` | `text` |
 | `live_env.narrator_say` | `text` |
 

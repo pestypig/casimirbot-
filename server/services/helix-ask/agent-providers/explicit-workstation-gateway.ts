@@ -15,6 +15,12 @@ import { HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY } from "@shared/helix-schola
 import { detectInternetSearchIntent } from "../internet-search-intent";
 import { detectScholarlyResearchIntent } from "../scholarly-research-intent";
 import { WORKSTATION_CONTEXT_FEED_QUERY_CAPABILITIES } from "../workstation-context-feed-query-tool-contracts";
+import {
+  buildCompoundCapabilityDependencyGatewayCallRequests,
+  buildCompoundDependencyRailStatus,
+  buildDependentCompoundCapabilityGatewayCallRequest,
+  buildTurnCompoundDependencyPlan,
+} from "./provider-compound-capability-planner";
 
 const WORKSTATION_ACTIVE_CONTEXT_CAPABILITY = "workstation.active_context" as const;
 const CALCULATOR_SOLVE_EXPRESSION_CAPABILITY = "scientific-calculator.solve_expression" as const;
@@ -29,6 +35,8 @@ const REPO_SEARCH_ALIAS_CAPABILITIES = [
   "repo-code.search_concept",
 ] as const;
 const DOCS_SEARCH_CAPABILITY = "docs.search" as const;
+const DOCS_READ_VISIBLE_SURFACE_CAPABILITY = "docs-viewer.read_visible_surface" as const;
+const DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY = "docs-viewer.read_active_translation" as const;
 const DOCS_OPEN_DOC_CAPABILITY = "docs-viewer.open_doc" as const;
 const DOCS_SEARCH_ALIAS_CAPABILITIES = [
   "docs-viewer.search_docs",
@@ -48,6 +56,12 @@ const SCHOLARLY_RESEARCH_SEARCH_CAPABILITY = HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAP
 const THEORY_CONTEXT_REFLECTION_CAPABILITY = "theory-badge-graph.reflect_discussion_context" as const;
 const THEORY_CONTEXT_REFLECTION_ALIAS_CAPABILITIES = [
   "helix_ask.reflect_theory_context",
+] as const;
+const THEORY_FRONTIER_CONJECTURE_CAPABILITY = "theory-badge-graph.propose_frontier_conjectures" as const;
+const THEORY_FRONTIER_CONJECTURE_ALIAS_CAPABILITIES = [
+  "propose_frontier_conjectures",
+  "frontier_conjecture_workbench",
+  "theory_frontier_conjectures",
 ] as const;
 const CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY = "civilization-bounds.reflect_system_bounds" as const;
 const CIVILIZATION_BOUNDS_REFLECTION_ALIAS_CAPABILITIES = [
@@ -99,11 +113,13 @@ const PROMPT_NAMED_CAPABILITIES = [
   CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
   ...CALCULATOR_SOLVE_ALIAS_CAPABILITIES,
   THEORY_CONTEXT_REFLECTION_CAPABILITY,
+  THEORY_FRONTIER_CONJECTURE_CAPABILITY,
   CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
   SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
   INTERNET_SEARCH_CAPABILITY,
   ...INTERNET_SEARCH_ALIAS_CAPABILITIES,
   ...THEORY_CONTEXT_REFLECTION_ALIAS_CAPABILITIES,
+  ...THEORY_FRONTIER_CONJECTURE_ALIAS_CAPABILITIES,
   ...CIVILIZATION_BOUNDS_REFLECTION_ALIAS_CAPABILITIES,
   VOICE_INTERIM_CALLOUT_CAPABILITY,
   VOICE_NARRATOR_SAY_CAPABILITY,
@@ -883,6 +899,37 @@ export const buildPlannerDerivedWorkstationGatewayCallRequests = (
         },
       });
     }
+    if (
+      step.tool_id === THEORY_FRONTIER_CONJECTURE_CAPABILITY ||
+      (step.kind === "run_panel_action" &&
+        step.panel_id === "theory-badge-graph" &&
+        step.action_id === "propose_frontier_conjectures")
+    ) {
+      const args = readRecord(step.args) ?? {};
+      const frontierPrompt = readString(args.prompt) ?? readString(args.query) ?? prompt;
+      addPlannerRequest({
+        schema: "helix.workstation_gateway.planner_derived_call_request.v1",
+        derivation_source: "helix_workstation_tool_planner",
+        planner_intent: planned.intent,
+        planner_reason: planned.reason,
+        capability_id: THEORY_FRONTIER_CONJECTURE_CAPABILITY,
+        mode: "read",
+        arguments: {
+          prompt: frontierPrompt,
+          conversation_context: prompt,
+          frontier_search_seed: readString(args.frontier_search_seed ?? args.frontierSearchSeed) ?? undefined,
+          source_target_intent: {
+            source: "helix_workstation_tool_planner",
+            intent: planned.intent,
+            step_id: step.step_id,
+            tool_id: step.tool_id ?? null,
+            panel_id: step.panel_id ?? null,
+            action_id: step.action_id ?? null,
+            tool_plan_id: planned.tool_plan?.plan_id ?? null,
+          },
+        },
+      });
+    }
     if (step.tool_id === "helix_ask.reflect_civilization_bounds") {
       const args = readRecord(step.args) ?? {};
       const reflectionPrompt = readString(args.prompt) ?? prompt;
@@ -1097,6 +1144,40 @@ export const buildPromptNamedCapabilityGatewayCallRequests = (
         target_source: "theory_badge_graph",
         target_kind: "theory_context_reflection",
         alias_capability: promptNamedTheoryReflectionAlias,
+      },
+    });
+  }
+
+  if (
+    hasPromptNamedCapability(prompt, THEORY_FRONTIER_CONJECTURE_CAPABILITY) &&
+    !hasNegatedToolInstruction(prompt, /\btheory-badge-graph\.propose_frontier_conjectures\b/i)
+  ) {
+    const segment = readPromptNamedCapabilitySegment(prompt, THEORY_FRONTIER_CONJECTURE_CAPABILITY);
+    addNamedRequest(THEORY_FRONTIER_CONJECTURE_CAPABILITY, "read", {
+      prompt: extractNamedCapabilityQuery(segment, prompt),
+      conversation_context: prompt,
+      build_explanation_plan: true,
+      source_target_intent: {
+        target_source: "theory_badge_graph",
+        target_kind: "theory_frontier_conjecture_workbench",
+      },
+    });
+  }
+
+  const promptNamedTheoryFrontierAlias = THEORY_FRONTIER_CONJECTURE_ALIAS_CAPABILITIES.find((capabilityId) =>
+    hasPromptNamedCapability(prompt, capabilityId) &&
+    !hasNegatedToolInstruction(prompt, promptNamedCapabilityPattern(capabilityId)),
+  );
+  if (promptNamedTheoryFrontierAlias) {
+    const segment = readPromptNamedCapabilitySegment(prompt, promptNamedTheoryFrontierAlias);
+    addNamedRequest(THEORY_FRONTIER_CONJECTURE_CAPABILITY, "read", {
+      prompt: extractNamedCapabilityQuery(segment, prompt),
+      conversation_context: prompt,
+      build_explanation_plan: true,
+      source_target_intent: {
+        target_source: "theory_badge_graph",
+        target_kind: "theory_frontier_conjecture_workbench",
+        alias_capability: promptNamedTheoryFrontierAlias,
       },
     });
   }
@@ -1674,6 +1755,13 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   const seen = new Set<string>();
   const structured = buildStructuredAdmissionWorkstationGatewayCallRequests(input.body);
   appendDedupe(requests, seen, structured);
+  const compoundDependencyRequests = buildCompoundCapabilityDependencyGatewayCallRequests(input.body);
+  appendDedupe(requests, seen, compoundDependencyRequests);
+  const compoundDependencyCapabilities = new Set(
+    compoundDependencyRequests
+      .map((request) => readString(request.capability_id) ?? readString(request.capabilityId))
+      .filter((capability): capability is string => Boolean(capability)),
+  );
   const promptNamed = buildPromptNamedCapabilityGatewayCallRequests(input.body);
   const promptNamedCapabilities = new Set(
     promptNamed
@@ -1684,8 +1772,14 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   if (hasNamedDocsSearch) {
     appendDedupe(requests, seen, promptNamed);
   } else {
-    const activeDocsContext = buildActiveDocsContextWorkstationGatewayCallRequests(input.body);
-    appendDedupe(requests, seen, activeDocsContext);
+    if (
+      !compoundDependencyCapabilities.has(DOCS_SEARCH_CAPABILITY) &&
+      !compoundDependencyCapabilities.has(DOCS_READ_VISIBLE_SURFACE_CAPABILITY) &&
+      !compoundDependencyCapabilities.has(DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY)
+    ) {
+      const activeDocsContext = buildActiveDocsContextWorkstationGatewayCallRequests(input.body);
+      appendDedupe(requests, seen, activeDocsContext);
+    }
     appendDedupe(requests, seen, promptNamed);
   }
   const activeCalculatorContext = buildActiveCalculatorContextWorkstationGatewayCallRequests(input.body);
@@ -1716,7 +1810,7 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   if (!promptNamedCapabilities.has(INTERNET_SEARCH_CAPABILITY)) {
     appendDedupe(requests, seen, buildPromptDerivedInternetSearchGatewayCallRequests(input.body));
   }
-  if (!promptNamedCapabilities.has(REPO_SEARCH_CAPABILITY)) {
+  if (!promptNamedCapabilities.has(REPO_SEARCH_CAPABILITY) && !compoundDependencyCapabilities.has(REPO_SEARCH_CAPABILITY)) {
     appendDedupe(requests, seen, buildPromptDerivedRepoSearchGatewayCallRequests(input.body));
   }
   return requests.slice(0, 10);
@@ -1739,7 +1833,7 @@ export const runExplicitWorkstationGatewayCalls = async (input: {
   const turnId = input.turnId ?? readHelixAgentTurnId(input.body);
   const results: HelixWorkstationGatewayCallResult[] = [];
   for (const [index, request] of requests.entries()) {
-    results.push(await callWorkstationGatewayCapability({
+    const result = await callWorkstationGatewayCapability({
       agentRuntime: input.agentRuntime,
       mode: readString(request.mode),
       capabilityId: readString(request.capability_id) ?? readString(request.capabilityId) ?? "",
@@ -1747,7 +1841,56 @@ export const runExplicitWorkstationGatewayCalls = async (input: {
       approvalToken: readString(request.approval_token) ?? readString(request.approvalToken),
       turnId,
       iteration: typeof request.iteration === "number" ? request.iteration : index + 1,
-    }));
+    });
+    results.push(result);
+    const dependentVoiceRequest = buildDependentCompoundCapabilityGatewayCallRequest({
+      request,
+      result,
+      turnId,
+    });
+    const dependencyRailStatus = buildCompoundDependencyRailStatus({
+      request,
+      result,
+      dependentRequest: dependentVoiceRequest,
+    });
+    if (dependencyRailStatus) {
+      const observation = readRecord(result.observation);
+      if (observation) {
+        observation.compound_dependency_plan = dependencyRailStatus;
+      }
+      result.observation_packet.state_delta = {
+        ...(readRecord(result.observation_packet.state_delta) ?? {}),
+        compound_dependency_plan: dependencyRailStatus,
+      };
+    }
+    if (dependentVoiceRequest) {
+      results.push(await callWorkstationGatewayCapability({
+        agentRuntime: input.agentRuntime,
+        mode: readString(dependentVoiceRequest.mode),
+        capabilityId: readString(dependentVoiceRequest.capability_id) ?? "",
+        arguments: readRecord(dependentVoiceRequest.arguments) ?? {},
+        turnId,
+        iteration: results.length + 1,
+      }));
+    }
+  }
+  const turnCompoundDependencyPlan = buildTurnCompoundDependencyPlan({
+    turnId,
+    results,
+  });
+  if (turnCompoundDependencyPlan) {
+    for (const result of results) {
+      const sourceTargetIntent = readRecord(result.gateway_admission.source_target_intent);
+      if (!readString(sourceTargetIntent?.compound_outcome)) continue;
+      const observation = readRecord(result.observation);
+      if (observation) {
+        observation.compound_dependency_turn_plan = turnCompoundDependencyPlan;
+      }
+      result.observation_packet.state_delta = {
+        ...(readRecord(result.observation_packet.state_delta) ?? {}),
+        compound_dependency_turn_plan: turnCompoundDependencyPlan,
+      };
+    }
   }
   return results;
 };

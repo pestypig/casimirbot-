@@ -75,13 +75,18 @@ export function buildAskLiveEventFromTurnTranscriptRecord(
   if (!text) return null;
   const type = coerceText(record.type).trim() || coerceText(record.source_event_type).trim() || "turn_transcript_event";
   const sourceEventType = coerceText(record.source_event_type).trim();
+  const isTerminalAnswerEvent =
+    sourceEventType === "terminal_answer" ||
+    sourceEventType === "final_answer" ||
+    type === "terminal_answer" ||
+    type === "final_answer";
   const turnId = coerceText(record.turn_id ?? record.turnId ?? record.active_turn_id).trim();
   const atMs = typeof record.at_ms === "number" && Number.isFinite(record.at_ms) ? Math.trunc(record.at_ms) : null;
   const ts = atMs ? new Date(atMs).toISOString() : undefined;
   const seq = typeof record.seq === "number" && Number.isFinite(record.seq) ? Math.trunc(record.seq) : undefined;
   return {
     id: coerceText(record.id).trim() || fallbackId,
-    text: clipText(text, maxChars),
+    text: isTerminalAnswerEvent ? text : clipText(text, maxChars),
     tool: coerceText(record.role).trim() || "agent",
     ts,
     tsMs: atMs ?? parseAskLiveEventTimestampMs(record.ts) ?? undefined,
@@ -144,6 +149,7 @@ function resolveHelixTranscriptRowLabel(event: Record<string, unknown>): string 
   if (sourceEventType === "action_observation") return "Action Observation";
   if (sourceEventType === "tool_request") return "Tool Request";
   if (sourceEventType === "tool_observation") return "Tool Observation";
+  if (sourceEventType === "compound_itinerary") return "Itinerary";
   if (sourceEventType === "model_reentry") return "Model Re-entry";
   if (sourceEventType === "terminal_answer") return "Final";
 
@@ -383,6 +389,47 @@ function hasSucceededHelixGatewayPacket(packet: Record<string, unknown> | null, 
   return status !== "blocked" && status !== "failed" && status !== "missing_input" && status !== "needs_confirmation";
 }
 
+function readHelixCompoundDependencyTurnPlan(
+  call: Record<string, unknown>,
+  packet: Record<string, unknown> | null,
+): Record<string, unknown> | null {
+  const observation = readAgentLoopAuditRecord(call.observation);
+  const stateDelta = readAgentLoopAuditRecord(packet?.state_delta);
+  return readAgentLoopAuditRecord(observation?.compound_dependency_turn_plan) ??
+    readAgentLoopAuditRecord(stateDelta?.compound_dependency_turn_plan);
+}
+
+function formatHelixCompoundDependencyTurnPlan(plan: Record<string, unknown>): string {
+  const outcomes = Array.isArray(plan.compound_outcomes)
+    ? plan.compound_outcomes.map((entry) => coerceText(entry).trim()).filter(Boolean)
+    : [];
+  const label = outcomes.length > 0 ? outcomes.join(", ") : "compound capability";
+  const subgoals = readAgentLoopAuditArray(plan.ordered_subgoals)
+    .map((entry) => readAgentLoopAuditRecord(entry))
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  const satisfiedCount =
+    typeof plan.satisfied_subgoal_count === "number" && Number.isFinite(plan.satisfied_subgoal_count)
+      ? Math.trunc(plan.satisfied_subgoal_count)
+      : subgoals.filter((subgoal) => subgoal.satisfied === true).length;
+  const subgoalCount =
+    typeof plan.subgoal_count === "number" && Number.isFinite(plan.subgoal_count)
+      ? Math.trunc(plan.subgoal_count)
+      : subgoals.length;
+  const firstBroken = readAgentLoopAuditRecord(plan.first_broken_rail);
+  const railStatus = coerceText(plan.rail_status).trim() || (firstBroken ? "blocked" : "satisfied");
+  if (firstBroken) {
+    const subgoalId = coerceText(firstBroken.subgoal_id).trim() || "unknown subgoal";
+    const capability =
+      coerceText(firstBroken.requested_capability).trim() ||
+      coerceText(firstBroken.selected_capability).trim() ||
+      coerceText(firstBroken.executed_capability).trim() ||
+      "unknown capability";
+    const reason = coerceText(firstBroken.reason ?? firstBroken.error ?? firstBroken.rail_status).trim();
+    return `Compound itinerary: ${label} ${railStatus} at ${subgoalId} (${capability})${reason ? `: ${reason}` : ""}.`;
+  }
+  return `Compound itinerary: ${label} ${railStatus} with ${satisfiedCount}/${subgoalCount} subgoals satisfied.`;
+}
+
 export function buildHelixWorkstationGatewayTranscriptEvents(reply: HelixAskTranscriptReply): Record<string, unknown>[] {
   const calls = readHelixWorkstationGatewayCallResults(reply);
   if (calls.length === 0) return [];
@@ -390,6 +437,7 @@ export function buildHelixWorkstationGatewayTranscriptEvents(reply: HelixAskTran
   const turnId = coerceText(reply.turn_id ?? reply.debug?.turn_id ?? reply.id).trim();
   const events: Record<string, unknown>[] = [];
   let successfulPacketPresent = false;
+  const compoundPlanEvents = new Map<string, Record<string, unknown>>();
   calls.slice(0, 10).forEach((call, index) => {
     const capabilityId = readHelixGatewayCapabilityId(call);
     if (!capabilityId) return;
@@ -426,7 +474,29 @@ export function buildHelixWorkstationGatewayTranscriptEvents(reply: HelixAskTran
       event_source: "workstation_gateway_call_results",
       source_event_type: isAction ? "action_observation" : "tool_observation",
     });
+    const compoundPlan = readHelixCompoundDependencyTurnPlan(call, packet);
+    if (compoundPlan) {
+      const planKey =
+        coerceText(compoundPlan.turn_id).trim() ||
+        JSON.stringify(compoundPlan.compound_outcomes ?? compoundPlan.ordered_subgoals ?? index);
+      if (!compoundPlanEvents.has(planKey)) {
+        compoundPlanEvents.set(planKey, {
+          id: `${reply.id}-workstation-gateway-compound-itinerary-${compoundPlanEvents.size}`,
+          role: "agent",
+          type: "decision",
+          status: coerceText(compoundPlan.rail_status).trim() === "blocked" ? "blocked" : "completed",
+          text: formatHelixCompoundDependencyTurnPlan(compoundPlan),
+          detail: "compound_dependency_turn_plan",
+          lane: "helix_compound_capability_dependency_planner",
+          step_id: "compound_itinerary",
+          turn_id: turnId,
+          event_source: "workstation_gateway_call_results",
+          source_event_type: "compound_itinerary",
+        });
+      }
+    }
   });
+  events.push(...compoundPlanEvents.values());
   if (successfulPacketPresent) {
     events.push({
       id: `${reply.id}-workstation-gateway-model-reentry`,

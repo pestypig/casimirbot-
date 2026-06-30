@@ -94,6 +94,10 @@ Each capability contract should define:
 | `workstation.active_context` | [workstation.active_context.md](workstation.active_context.md) | `draft` |
 | `scientific-calculator.solve_expression` | [scientific-calculator.solve_expression.md](scientific-calculator.solve_expression.md) | `candidate` |
 | `scientific-calculator.active_context` | [scientific-calculator.active_context.md](scientific-calculator.active_context.md) | `draft` |
+| `workstation.readable_surface.observe` | [workstation.readable_surface.observe.md](workstation.readable_surface.observe.md) | `draft` |
+| `docs-viewer.read_visible_surface` | [workstation.readable_surface.observe.md](workstation.readable_surface.observe.md) | `draft` |
+| `docs-viewer.read_active_translation` | [workstation.readable_surface.observe.md](workstation.readable_surface.observe.md) | `draft` |
+| `scientific-calculator.read_visible_result` | [workstation.readable_surface.observe.md](workstation.readable_surface.observe.md) | `draft` |
 | `scientific-calculator.open_panel` | [workstation.panel_actions.md](workstation.panel_actions.md) | `draft` |
 | `scientific-calculator.focus_panel` | [workstation.panel_actions.md](workstation.panel_actions.md) | `draft` |
 | `scientific-calculator.show_gateway_solve` | [workstation.panel_actions.md](workstation.panel_actions.md) | `draft` |
@@ -103,6 +107,7 @@ Each capability contract should define:
 | `docs.search` | [docs.search.md](docs.search.md) | `draft` |
 | `repo.search` | [repo.search.md](repo.search.md) | `draft` |
 | `theory-badge-graph.reflect_discussion_context` | [theory-badge-graph.reflect_discussion_context.md](theory-badge-graph.reflect_discussion_context.md) | `candidate` |
+| `theory-badge-graph.propose_frontier_conjectures` | [theory-badge-graph.propose_frontier_conjectures.md](theory-badge-graph.propose_frontier_conjectures.md) | `draft` |
 | `civilization-bounds.reflect_system_bounds` | [civilization-bounds.reflect_system_bounds.md](civilization-bounds.reflect_system_bounds.md) | `candidate` |
 | `scholarly-research.lookup_papers` | [scholarly-research.lookup_papers.md](scholarly-research.lookup_papers.md) | `draft` |
 | `internet-search.search_web` | [internet-search.search_web.md](internet-search.search_web.md) | `draft` |

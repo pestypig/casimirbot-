@@ -53,6 +53,10 @@ import {
   type CivilizationLayerModeV1,
 } from "@shared/civilization-bounds-roadmap";
 import { buildNhm2TheoryBadgeGraphV1 } from "@shared/theory/nhm2-theory-badges";
+import {
+  buildTheoryFrontierConjectureWorkbenchV1,
+  theoryFrontierConjectureForbiddenClaimNotes,
+} from "@shared/theory/theory-frontier-conjecture-workbench";
 import { runHelixTheoryContextReflectionTool } from "@shared/theory/theory-context-reflection-tool";
 import { runHelixAskCivilizationBoundsTool } from "../../../skills/helix-ask.civilization-bounds-roadmap";
 import type {
@@ -79,6 +83,11 @@ const CALCULATOR_SOLVE_EXPRESSION_CAPABILITY = "scientific-calculator.solve_expr
 const CALCULATOR_SOLVE_OBSERVATION_SCHEMA = "helix.calculator_solve_observation.v1" as const;
 const CALCULATOR_ACTIVE_CONTEXT_CAPABILITY = "scientific-calculator.active_context" as const;
 const CALCULATOR_ACTIVE_CONTEXT_OBSERVATION_SCHEMA = "helix.calculator_active_context_observation.v1" as const;
+const READABLE_SURFACE_OBSERVE_CAPABILITY = "workstation.readable_surface.observe" as const;
+const READABLE_SURFACE_OBSERVATION_SCHEMA = "helix.workstation_readable_surface_observation.v1" as const;
+const DOCS_READ_VISIBLE_SURFACE_CAPABILITY = "docs-viewer.read_visible_surface" as const;
+const DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY = "docs-viewer.read_active_translation" as const;
+const CALCULATOR_READ_VISIBLE_RESULT_CAPABILITY = "scientific-calculator.read_visible_result" as const;
 const CALCULATOR_OPEN_PANEL_CAPABILITY = "scientific-calculator.open_panel" as const;
 const CALCULATOR_FOCUS_PANEL_CAPABILITY = "scientific-calculator.focus_panel" as const;
 const CALCULATOR_SHOW_GATEWAY_SOLVE_CAPABILITY = "scientific-calculator.show_gateway_solve" as const;
@@ -99,6 +108,9 @@ const CIVILIZATION_BOUNDS_REFLECTION_OBSERVATION_SCHEMA =
   "helix.civilization_bounds_reflection_observation.v1" as const;
 const THEORY_CONTEXT_REFLECTION_CAPABILITY = "theory-badge-graph.reflect_discussion_context" as const;
 const THEORY_CONTEXT_REFLECTION_OBSERVATION_SCHEMA = "helix.theory_context_reflection_observation.v1" as const;
+const THEORY_FRONTIER_CONJECTURE_CAPABILITY = "theory-badge-graph.propose_frontier_conjectures" as const;
+const THEORY_FRONTIER_CONJECTURE_OBSERVATION_SCHEMA =
+  "helix.theory_frontier_conjecture_observation.v1" as const;
 const VOICE_INTERIM_CALLOUT_CAPABILITY = "live_env.request_interim_voice_callout" as const;
 const VOICE_NARRATOR_SAY_CAPABILITY = "live_env.narrator_say" as const;
 const VOICE_INTERIM_TOOL_RESULT_SCHEMA = "helix.interim_voice_callout_tool_result.v1" as const;
@@ -600,6 +612,166 @@ const readBoundedDocsExcerpt = (paths: string[]): {
   };
 };
 
+const readBoundedTranslationBlocks = (value: unknown): Array<Record<string, unknown>> => {
+  const entries = Array.isArray(value) ? value : [];
+  return entries
+    .map(readRecord)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+    .slice(0, 12)
+    .map((entry) => ({
+      unit_id: clipObservationText(entry.unit_id ?? entry.unitId, 160),
+      source_unit_id: clipObservationText(entry.source_unit_id ?? entry.sourceUnitId ?? entry.unit_id ?? entry.unitId, 160),
+      source_text: clipObservationText(entry.source_text ?? entry.sourceText, 700),
+      translated_text: clipObservationText(entry.translated_text ?? entry.translatedText ?? entry.text, 900),
+      locale: clipObservationText(entry.locale ?? entry.target_locale ?? entry.targetLocale, 80),
+      status: clipObservationText(entry.status, 80),
+    }))
+    .filter((entry) => Boolean(entry.translated_text));
+};
+
+const readSurfaceTextFromArgs = (args: Record<string, unknown>): string | null =>
+  clipObservationText(
+    args.text ??
+      args.surface_text ??
+      args.surfaceText ??
+      args.visible_text ??
+      args.visibleText ??
+      args.selected_text ??
+      args.selectedText ??
+      args.hovered_text ??
+      args.hoveredText ??
+      args.translated_text ??
+      args.translatedText,
+    1200,
+  );
+
+const buildReadableSurfacePayload = (input: {
+  capabilityId: string;
+  args: Record<string, unknown>;
+  fallbackPanelId: string;
+  fallbackActionId: string;
+}): {
+  observation: Record<string, unknown>;
+  ok: boolean;
+  blockedReason?: string;
+  summaryText: string;
+  panelId: string;
+  actionId: string;
+} => {
+  const args = input.args;
+  const requestedSurface = cleanString(args.surface ?? args.surface_id ?? args.surfaceId ?? args.label);
+  const panelId = cleanString(args.panel_id ?? args.panelId, input.fallbackPanelId);
+  const actionId = cleanString(args.action_id ?? args.actionId, input.fallbackActionId);
+  const sourceDocPath = readDocsActionPath(args.source_doc_path ?? args.sourceDocPath ?? args.path);
+  const activeDocExcerpt = sourceDocPath ? readBoundedDocsExcerpt([sourceDocPath]) : null;
+  const translationBlocks = readBoundedTranslationBlocks(args.translation_blocks ?? args.translationBlocks);
+  const activeContext = readBoundedCalculatorActiveContext(args.active_context ?? args.activeContext);
+  const visibleResult = clipObservationText(
+    args.result ??
+      args.visible_result ??
+      args.visibleResult ??
+      activeContext.last_result_text,
+    700,
+  );
+  const expression = clipObservationText(
+    args.expression ??
+      args.current_expression ??
+      args.currentExpression ??
+      activeContext.last_normalized_expression ??
+      activeContext.current_latex,
+    700,
+  );
+  const translatedBlocksText = translationBlocks
+    .map((entry) => optionalString(entry.translated_text))
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+  const translatedText = readSurfaceTextFromArgs(args) ?? (translatedBlocksText || null);
+  const surfaceText =
+    input.capabilityId === CALCULATOR_READ_VISIBLE_RESULT_CAPABILITY
+      ? visibleResult
+      : input.capabilityId === DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY
+        ? translatedText
+        : readSurfaceTextFromArgs(args) ?? activeDocExcerpt?.excerpt ?? translatedText ?? visibleResult;
+  const missingReason =
+    input.capabilityId === DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY && !surfaceText
+      ? "translation_surface_missing"
+      : input.capabilityId === CALCULATOR_READ_VISIBLE_RESULT_CAPABILITY && !visibleResult
+        ? "calculator_visible_result_missing"
+        : !surfaceText
+          ? "registered_surface_text_missing"
+          : null;
+  const sourceRefs = readStringArray(args.source_refs ?? args.sourceRefs);
+  const unitRefs = readStringArray(args.unit_refs ?? args.unitRefs);
+  const lineRefs = readStringArray(args.line_refs ?? args.lineRefs);
+  const locale = clipObservationText(args.locale ?? args.target_locale ?? args.targetLocale, 80);
+  const observation = {
+    schema: READABLE_SURFACE_OBSERVATION_SCHEMA,
+    capability_key: input.capabilityId,
+    canonical_capability_key: READABLE_SURFACE_OBSERVE_CAPABILITY,
+    panel_id: panelId,
+    action_id: actionId,
+    surface_id: requestedSurface || `${panelId}:${actionId}`,
+    label: clipObservationText(args.label ?? requestedSurface, 180),
+    status: missingReason ? "blocked" : "succeeded",
+    blocked_reason: missingReason,
+    text: surfaceText,
+    text_char_count: surfaceText?.length ?? 0,
+    max_chars: 1200,
+    truncated: Boolean(surfaceText && surfaceText.length >= 1200),
+    source_refs: sourceRefs,
+    line_refs: lineRefs,
+    unit_refs: unitRefs,
+    source_doc_path: sourceDocPath ?? activeDocExcerpt?.path ?? null,
+    source_excerpt_available: Boolean(activeDocExcerpt),
+    translation: input.capabilityId === DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY
+      ? {
+          locale,
+          status: missingReason ? "missing" : "ready",
+          blocks: translationBlocks,
+          missing_unit_info: readStringArray(args.missing_unit_info ?? args.missingUnitInfo),
+          source_unit_ids: translationBlocks.map((entry) => optionalString(entry.source_unit_id)).filter(Boolean),
+        }
+      : null,
+    calculator: input.capabilityId === CALCULATOR_READ_VISIBLE_RESULT_CAPABILITY
+      ? {
+          expression,
+          result: visibleResult,
+          result_source: visibleResult ? "visible_result_region" : null,
+          draft_input_distinguished: true,
+        }
+      : null,
+    sensitive_blocked: false,
+    observation_role: "evidence_not_assistant_answer",
+    terminal_eligible: false,
+    post_tool_model_step_required: true,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  return {
+    observation,
+    ok: !missingReason,
+    blockedReason: missingReason ?? undefined,
+    summaryText: missingReason
+      ? `Readable surface observation blocked: ${missingReason}.`
+      : `Readable surface observation materialized ${surfaceText?.length ?? 0} bounded character(s) from ${panelId}.`,
+    panelId,
+    actionId,
+  };
+};
+
+const readCompoundReadAloudResolvedDocsPath = (
+  sourceTargetIntent: unknown,
+  documentCandidates: Array<{ path?: string }>,
+): string | null => {
+  const intent = readRecord(sourceTargetIntent);
+  if (intent?.compound_outcome !== "read_aloud_doc_excerpt" && intent?.compound_outcome !== "read_aloud_surface") return null;
+  const pathCandidate = documentCandidates
+    .map((candidate) => cleanString(candidate.path))
+    .find((candidate) => /^docs\/.+\.md$/i.test(candidate));
+  return pathCandidate ?? null;
+};
+
 const clipRepoSearchHit = (hit: RepoSearchHit): RepoSearchHit => ({
   ...hit,
   filePath: hit.filePath.replace(/\\/g, "/"),
@@ -827,6 +999,113 @@ const calculatorActiveContextManifest: HelixWorkstationCapabilityManifest = {
   assistant_answer: false,
   raw_content_included: false,
 };
+
+const makeReadableSurfaceManifest = (input: {
+  capabilityId: typeof READABLE_SURFACE_OBSERVE_CAPABILITY |
+    typeof DOCS_READ_VISIBLE_SURFACE_CAPABILITY |
+    typeof DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY |
+    typeof CALCULATOR_READ_VISIBLE_RESULT_CAPABILITY;
+  label: string;
+  description: string;
+  panelId: string | null;
+  actionId: string;
+}): HelixWorkstationCapabilityManifest => ({
+  schema: "helix.workstation_tool_gateway.capability.v1",
+  capability_id: input.capabilityId,
+  label: input.label,
+  description: input.description,
+  panel_id: input.panelId,
+  action_id: input.actionId,
+  mode: "read",
+  mutating: false,
+  code_mutation: false,
+  shell_access: false,
+  requires_confirmation: false,
+  requires_source: true,
+  terminal_eligible: false,
+  permission_profile_required: "read",
+  post_tool_model_step_required: true,
+  input_schema: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      surface: { type: "string" },
+      surface_id: { type: "string" },
+      panel_id: { type: "string" },
+      action_id: { type: "string" },
+      label: { type: "string" },
+      text: { type: "string" },
+      surface_text: { type: "string" },
+      visible_text: { type: "string" },
+      selected_text: { type: "string" },
+      hovered_text: { type: "string" },
+      translated_text: { type: "string" },
+      translation_blocks: { type: "array", items: { type: "object" } },
+      missing_unit_info: { type: "array", items: { type: "string" } },
+      locale: { type: "string" },
+      target_locale: { type: "string" },
+      source_doc_path: { type: "string" },
+      path: { type: "string" },
+      source_refs: { type: "array", items: { type: "string" } },
+      line_refs: { type: "array", items: { type: "string" } },
+      unit_refs: { type: "array", items: { type: "string" } },
+      expression: { type: "string" },
+      result: { type: "string" },
+      visible_result: { type: "string" },
+      active_context: { type: "object" },
+      source_target_intent: { type: "object" },
+    },
+  },
+  output_observation_schema: READABLE_SURFACE_OBSERVATION_SCHEMA,
+  observation_schema: READABLE_SURFACE_OBSERVATION_SCHEMA,
+  safety_tags: [
+    "read_or_observe",
+    "readable_surface",
+    "bounded_observation",
+    "no_dom_scrape",
+    "non_terminal",
+    "no_shell",
+    "no_code_mutation",
+  ],
+  assistant_answer: false,
+  raw_content_included: false,
+});
+
+const readableSurfaceObserveManifest = makeReadableSurfaceManifest({
+  capabilityId: READABLE_SURFACE_OBSERVE_CAPABILITY,
+  label: "Readable workstation surface observation",
+  description:
+    "Resolves a registered user-facing workstation surface into a bounded observation packet. It never reads arbitrary DOM, exposes secrets, or becomes terminal answer authority.",
+  panelId: null,
+  actionId: "observe",
+});
+
+const docsReadVisibleSurfaceManifest = makeReadableSurfaceManifest({
+  capabilityId: DOCS_READ_VISIBLE_SURFACE_CAPABILITY,
+  label: "Docs Viewer readable visible surface",
+  description:
+    "Reads a registered visible, selected, hovered, or narrator-source Docs Viewer surface as bounded document evidence with source refs.",
+  panelId: "docs-viewer",
+  actionId: "read_visible_surface",
+});
+
+const docsReadActiveTranslationManifest = makeReadableSurfaceManifest({
+  capabilityId: DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY,
+  label: "Docs Viewer active translation surface",
+  description:
+    "Reads registered active inline translation blocks from the Docs Viewer as bounded translated text with source unit ids and locale metadata.",
+  panelId: "docs-viewer",
+  actionId: "read_active_translation",
+});
+
+const calculatorReadVisibleResultManifest = makeReadableSurfaceManifest({
+  capabilityId: CALCULATOR_READ_VISIBLE_RESULT_CAPABILITY,
+  label: "Scientific Calculator visible result",
+  description:
+    "Reads the current visible calculator result region as bounded evidence and distinguishes solver result from draft input.",
+  panelId: "scientific-calculator",
+  actionId: "read_visible_result",
+});
 
 const makeCalculatorPanelActionManifest = (
   capabilityId: typeof CALCULATOR_OPEN_PANEL_CAPABILITY | typeof CALCULATOR_FOCUS_PANEL_CAPABILITY,
@@ -1206,6 +1485,55 @@ const theoryContextReflectionManifest: HelixWorkstationCapabilityManifest = {
   output_observation_schema: THEORY_CONTEXT_REFLECTION_OBSERVATION_SCHEMA,
   observation_schema: THEORY_CONTEXT_REFLECTION_OBSERVATION_SCHEMA,
   safety_tags: ["read_or_observe", "theory_badge_graph", "reflection", "non_terminal", "no_shell", "no_code_mutation"],
+  assistant_answer: false,
+  raw_content_included: false,
+};
+
+const theoryFrontierConjectureManifest: HelixWorkstationCapabilityManifest = {
+  schema: "helix.workstation_tool_gateway.capability.v1",
+  capability_id: THEORY_FRONTIER_CONJECTURE_CAPABILITY,
+  label: "Theory Badge Graph propose frontier conjectures",
+  description:
+    "Builds bounded frontier conjecture candidates from theory badge graph, biome, probability, and frontier-search evidence. It returns evidence-only obligations and cannot validate, promote, or become a final answer.",
+  panel_id: "theory-badge-graph",
+  action_id: "propose_frontier_conjectures",
+  mode: "read",
+  mutating: false,
+  code_mutation: false,
+  shell_access: false,
+  requires_confirmation: false,
+  requires_source: true,
+  terminal_eligible: false,
+  permission_profile_required: "read",
+  post_tool_model_step_required: true,
+  input_schema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["prompt"],
+    properties: {
+      prompt: { type: "string" },
+      query: { type: "string" },
+      text: { type: "string" },
+      conversation_context: { type: "string" },
+      mentioned_equations: { type: "array", items: { type: "string" } },
+      mentioned_symbols: { type: "array", items: { type: "string" } },
+      mentioned_domains: { type: "array", items: { type: "string" } },
+      frontier_search_seed: { type: "string" },
+      build_explanation_plan: { type: "boolean" },
+      limit: { type: "number" },
+    },
+  },
+  output_observation_schema: THEORY_FRONTIER_CONJECTURE_OBSERVATION_SCHEMA,
+  observation_schema: THEORY_FRONTIER_CONJECTURE_OBSERVATION_SCHEMA,
+  safety_tags: [
+    "read_or_observe",
+    "theory_badge_graph",
+    "frontier_conjecture",
+    "non_terminal",
+    "no_shell",
+    "no_code_mutation",
+    "no_auto_promotion",
+  ],
   assistant_answer: false,
   raw_content_included: false,
 };
@@ -1843,6 +2171,10 @@ const capabilities = new Map<string, HelixWorkstationCapabilityManifest>([
   [workstationActiveContextManifest.capability_id, workstationActiveContextManifest],
   [calculatorSolveExpressionManifest.capability_id, calculatorSolveExpressionManifest],
   [calculatorActiveContextManifest.capability_id, calculatorActiveContextManifest],
+  [readableSurfaceObserveManifest.capability_id, readableSurfaceObserveManifest],
+  [docsReadVisibleSurfaceManifest.capability_id, docsReadVisibleSurfaceManifest],
+  [docsReadActiveTranslationManifest.capability_id, docsReadActiveTranslationManifest],
+  [calculatorReadVisibleResultManifest.capability_id, calculatorReadVisibleResultManifest],
   [calculatorOpenPanelManifest.capability_id, calculatorOpenPanelManifest],
   [calculatorFocusPanelManifest.capability_id, calculatorFocusPanelManifest],
   [calculatorShowGatewaySolveManifest.capability_id, calculatorShowGatewaySolveManifest],
@@ -1855,6 +2187,7 @@ const capabilities = new Map<string, HelixWorkstationCapabilityManifest>([
   [scholarlyResearchSearchManifest.capability_id, scholarlyResearchSearchManifest],
   [civilizationBoundsReflectionManifest.capability_id, civilizationBoundsReflectionManifest],
   [theoryContextReflectionManifest.capability_id, theoryContextReflectionManifest],
+  [theoryFrontierConjectureManifest.capability_id, theoryFrontierConjectureManifest],
   [voiceInterimCalloutManifest.capability_id, voiceInterimCalloutManifest],
   [voiceNarratorSayManifest.capability_id, voiceNarratorSayManifest],
   ...contextFeedQueryGatewayManifests.map((manifest) => [manifest.capability_id, manifest] as const),
@@ -2284,6 +2617,72 @@ export const callWorkstationGatewayCapability = async (
       assistant_answer: false,
       raw_content_included: false,
       error: hasContext ? undefined : "calculator_active_context_missing",
+    };
+  }
+
+  if (
+    manifest.capability_id === READABLE_SURFACE_OBSERVE_CAPABILITY ||
+    manifest.capability_id === DOCS_READ_VISIBLE_SURFACE_CAPABILITY ||
+    manifest.capability_id === DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY ||
+    manifest.capability_id === CALCULATOR_READ_VISIBLE_RESULT_CAPABILITY
+  ) {
+    const args = readArguments(input.arguments);
+    const surface = buildReadableSurfacePayload({
+      capabilityId: manifest.capability_id,
+      args,
+      fallbackPanelId: manifest.panel_id ?? "workstation",
+      fallbackActionId: manifest.action_id,
+    });
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: surface.ok ? "admitted" : "blocked",
+      reason: surface.ok ? "read_only_gateway_capability" : "readable_surface_missing",
+      blockedReason: surface.blockedReason,
+      sourceTargetIntent: args.source_target_intent,
+    });
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: surface.panelId,
+      action: surface.actionId,
+      status: surface.ok ? "succeeded" : "blocked",
+      summary: surface.summaryText,
+      observation: surface.observation,
+      missingRequirements: surface.ok ? [] : [{
+        code: surface.blockedReason ?? "registered_surface_text_missing",
+        message: "Provide a registered readable surface reference with bounded visible text or surface state.",
+        repair_action: "ask_user",
+      }],
+    });
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error: surface.blockedReason,
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: surface.ok,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation: surface.observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      error: surface.blockedReason,
     };
   }
 
@@ -2887,7 +3286,12 @@ export const callWorkstationGatewayCapability = async (
     const hits = rankedHits.slice(0, maxHits).map(clipRepoSearchHit);
     const documentCandidates = buildDocsSearchDocumentCandidates(rankedHits, query, maxHits);
     const truncated = result.truncated || rankedHits.length > hits.length;
-    const activeDocumentObservation = readBoundedDocsExcerpt(paths);
+    const compoundReadAloudResolvedPath = readCompoundReadAloudResolvedDocsPath(
+      args.source_target_intent,
+      documentCandidates,
+    );
+    const activeDocumentObservation = readBoundedDocsExcerpt(paths) ??
+      (compoundReadAloudResolvedPath ? readBoundedDocsExcerpt([compoundReadAloudResolvedPath]) : null);
     const evidence = formatRepoSearchEvidence(
       {
         ...result,
@@ -4351,6 +4755,179 @@ export const callWorkstationGatewayCapability = async (
       post_tool_model_step_required: true,
       assistant_answer: false,
       raw_content_included: false,
+    };
+  }
+
+  if (manifest.capability_id === THEORY_FRONTIER_CONJECTURE_CAPABILITY) {
+    const args = readArguments(input.arguments);
+    const prompt = cleanString(args.prompt ?? args.query ?? args.text);
+    const conversationContext = optionalString(args.conversation_context ?? args.conversationContext);
+    const limitRaw = Number(args.limit);
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.floor(limitRaw), 12) : undefined;
+    const hasPrompt = Boolean(prompt);
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: hasPrompt ? "admitted" : "blocked",
+      reason: hasPrompt ? "read_only_gateway_capability" : "theory_frontier_conjecture_prompt_missing",
+      blockedReason: hasPrompt ? undefined : "theory_frontier_conjecture_prompt_missing",
+      sourceTargetIntent: args.source_target_intent,
+    });
+    if (!hasPrompt) {
+      const observation = {
+        schema: THEORY_FRONTIER_CONJECTURE_OBSERVATION_SCHEMA,
+        capability_key: manifest.capability_id,
+        status: "blocked",
+        blocked_reason: "theory_frontier_conjecture_prompt_missing",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+      const observationPacket = buildWorkstationGatewayObservationPacket({
+        turnId,
+        iteration,
+        capabilityId: manifest.capability_id,
+        panelId: "theory-badge-graph",
+        action: "propose_frontier_conjectures",
+        status: "blocked",
+        summary: "Theory Badge Graph conjecture workbench was blocked because no prompt was supplied.",
+        observation,
+        missingRequirements: [{
+          code: "theory_frontier_conjecture_prompt_missing",
+          message: "Provide a prompt or discussion context before proposing frontier conjecture candidates.",
+          repair_action: "ask_user",
+        }],
+      });
+      const trace = buildGatewayTrace({
+        turnId,
+        capabilityId: manifest.capability_id,
+        agentRuntime,
+        admission,
+        observationPacket,
+        error: "theory_frontier_conjecture_prompt_missing",
+      });
+      return {
+        schema: "helix.workstation_tool_gateway.call_result.v1",
+        manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+        ok: false,
+        agent_runtime: agentRuntime,
+        capability_id: manifest.capability_id,
+        mode,
+        gateway_admission: admission,
+        observation_packet: observationPacket,
+        tool_lifecycle_trace: trace.tool_lifecycle_trace,
+        tool_followup_decision: trace.tool_followup_decision,
+        observation,
+        artifact_refs: observationPacket.produced_artifact_refs,
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+        error: "theory_frontier_conjecture_prompt_missing",
+      };
+    }
+
+    const receipt = runHelixTheoryContextReflectionTool({
+      graph: buildNhm2TheoryBadgeGraphV1(),
+      turnId,
+      threadId: optionalString(args.thread_id ?? args.threadId),
+      prompt,
+      conversationContext,
+      mentionedEquations: readStringArray(args.mentioned_equations ?? args.mentionedEquations),
+      mentionedSymbols: readStringArray(args.mentioned_symbols ?? args.mentionedSymbols),
+      mentionedDomains: readStringArray(args.mentioned_domains ?? args.mentionedDomains),
+      limit,
+      buildExplanationPlan: args.build_explanation_plan !== false && args.buildExplanationPlan !== false,
+      buildFrontierSearch: true,
+      frontierSearchSeed: optionalString(args.frontier_search_seed ?? args.frontierSearchSeed),
+      panelSync: {
+        requested: false,
+        applied: false,
+        openPanel: false,
+        overlayMode: "none",
+      },
+    });
+    const frontierSearch = receipt.frontierSearchV1;
+    const forbiddenClaimNotes = theoryFrontierConjectureForbiddenClaimNotes(prompt);
+    const workbench = frontierSearch
+      ? buildTheoryFrontierConjectureWorkbenchV1(frontierSearch, receipt.recommendedNextActions, forbiddenClaimNotes)
+      : null;
+    const observation = {
+      schema: THEORY_FRONTIER_CONJECTURE_OBSERVATION_SCHEMA,
+      capability_key: manifest.capability_id,
+      panel_id: "theory-badge-graph",
+      action_id: "propose_frontier_conjectures",
+      status: workbench ? "succeeded" : "blocked",
+      prompt,
+      conversation_context_included: Boolean(conversationContext),
+      reflection_id: receipt.reflectionV1.reflectionId,
+      search_id: workbench?.search_id ?? null,
+      graph_id: workbench?.graph_id ?? receipt.reflectionV1.graphId,
+      frontier_candidate_count: workbench?.candidates.length ?? 0,
+      candidates: workbench?.candidates ?? [],
+      candidate_status_counts: workbench?.candidate_status_counts ?? {},
+      top_candidate_id: workbench?.top_candidate_id ?? null,
+      scholarly_lookup_request_count: workbench?.scholarly_lookup_request_count ?? 0,
+      exact_verification_result_count: receipt.frontierExactVerificationResultsV1.length,
+      probability_terrain: workbench?.probability_terrain ?? null,
+      claim_boundary_notes: receipt.reflectionV1.evidenceForAsk.claimBoundaries.slice(0, 12),
+      forbidden_claim_scan_notes: forbiddenClaimNotes,
+      recommended_action_ids: receipt.recommendedNextActions.map((action) => action.actionId).slice(0, 12),
+      recommended_actions_solve: false,
+      receipt_schema: receipt.schemaVersion,
+      authority: receipt.authority,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: "theory-badge-graph",
+      action: "propose_frontier_conjectures",
+      status: workbench ? "succeeded" : "blocked",
+      summary: workbench
+        ? `Theory Badge Graph conjecture workbench produced ${workbench.candidates.length} bounded frontier candidate(s).`
+        : "Theory Badge Graph conjecture workbench did not produce frontier candidates.",
+      observation,
+      missingRequirements: workbench
+        ? undefined
+        : [{
+            code: "theory_frontier_conjecture_no_candidates",
+            message: "No frontier conjecture candidates were produced for the prompt.",
+            repair_action: "ask_user",
+          }],
+    });
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error: workbench ? undefined : "theory_frontier_conjecture_no_candidates",
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: Boolean(workbench),
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      ...(workbench ? {} : { error: "theory_frontier_conjecture_no_candidates" }),
     };
   }
 

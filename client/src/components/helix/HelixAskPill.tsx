@@ -7338,7 +7338,7 @@ function rememberDocViewerPathForAskSnapshot(value: unknown): string | null {
   return helixAskLastKnownDocViewerPath;
 }
 
-function readDocViewerPathFromDesktopUrlForAskSnapshot(): string | null {
+export function readDocViewerPathFromDesktopUrlForAskSnapshot(): string | null {
   if (typeof window === "undefined") return null;
   try {
     const params = new URLSearchParams(window.location.search);
@@ -7438,6 +7438,21 @@ function resolveDocsViewerAnchorPathForQuestion(
   if (!currentPath) return null;
   const normalizedPath = normalizeDocsViewerAnchorPath(currentPath);
   return normalizedPath.length > 0 ? normalizedPath : null;
+}
+
+export function buildHelixAskContextFilesForTurn(
+  docsViewerAnchorPath: string | null | undefined,
+  workspaceContextSnapshot: Record<string, unknown> | null | undefined,
+): string[] | undefined {
+  const candidates = [
+    docsViewerAnchorPath,
+    workspaceContextSnapshot?.activeDocPath,
+    workspaceContextSnapshot?.docContextPath,
+  ]
+    .map((value) => normalizeDocsViewerAnchorPath(coerceText(value)))
+    .filter(Boolean);
+  const unique = dedupeStrings(candidates);
+  return unique.length > 0 ? unique : undefined;
 }
 
 function readWorkstationLayoutDebugSnapshot(): Record<string, unknown> {
@@ -8472,7 +8487,7 @@ function debugPayloadMatchesRenderedReply(reply: HelixAskReply, parsed: Record<s
   return candidates.some((candidate) => candidate === expectedQuestion);
 }
 
-function debugPayloadMatchesRenderedTurnPayload(
+export function debugPayloadMatchesRenderedTurnPayload(
   payload: string | null | undefined,
   sourceElement: HTMLElement | null | undefined,
 ): boolean {
@@ -8567,36 +8582,51 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
   const terminalResultForDebug = readAgentLoopAuditRecord(
     payload.terminal_result ?? debug?.terminal_result ?? agentLoop?.terminal_result,
   );
+  const terminalAuthorityTrustedForDebug =
+    terminalAuthorityForDebug?.schema === "helix.turn_terminal_authority.v1" &&
+    terminalAuthorityForDebug.server_authoritative === true;
+  const terminalAuthorityText = coerceText(terminalAuthorityForDebug?.terminal_text_preview).trim();
+  const trustedTerminalAuthorityKind = terminalAuthorityTrustedForDebug
+    ? coerceText(terminalAuthorityForDebug?.terminal_artifact_kind).trim()
+    : "";
+  const trustedTerminalAuthoritySource = terminalAuthorityTrustedForDebug
+    ? coerceText(terminalAuthorityForDebug?.final_answer_source).trim()
+    : "";
+  const terminalAuthoritySuccessForDebug =
+    terminalAuthorityTrustedForDebug &&
+    Boolean(terminalAuthorityText) &&
+    trustedTerminalAuthorityKind !== "typed_failure" &&
+    trustedTerminalAuthoritySource !== "typed_failure";
   const terminalArtifactKind =
+    (terminalAuthoritySuccessForDebug ? trustedTerminalAuthorityKind : "") ||
     coerceText(payload.terminal_artifact_kind).trim() ||
     coerceText(agentLoop?.terminal_artifact_kind).trim() ||
     coerceText(debug?.terminal_artifact_kind).trim() ||
     coerceText(resolvedTurnSummary?.terminal_artifact_kind).trim() ||
-    coerceText(terminalAuthorityForDebug?.terminal_artifact_kind).trim() ||
+    trustedTerminalAuthorityKind ||
     coerceText(terminalResultForDebug?.terminal_artifact_kind).trim() ||
     coerceText(terminalResultForDebug?.artifact_kind).trim() ||
     null;
   const terminalErrorCode =
-    coerceText(agentLoop?.terminal_error_code).trim() ||
-    coerceText(debug?.terminal_error_code).trim() ||
-    coerceText(typedFailure?.terminal_error_code).trim() ||
-    coerceText(typedFailure?.error_code).trim() ||
-    null;
+    terminalAuthoritySuccessForDebug
+      ? null
+      : coerceText(agentLoop?.terminal_error_code).trim() ||
+        coerceText(debug?.terminal_error_code).trim() ||
+        coerceText(typedFailure?.terminal_error_code).trim() ||
+        coerceText(typedFailure?.error_code).trim() ||
+        null;
   const finalAnswerSource =
+    (terminalAuthoritySuccessForDebug ? trustedTerminalAuthoritySource : "") ||
     coerceText(payload.final_answer_source).trim() ||
     coerceText(agentLoop?.final_answer_source).trim() ||
     coerceText(debug?.final_answer_source).trim() ||
-    coerceText(terminalAuthorityForDebug?.final_answer_source).trim() ||
+    trustedTerminalAuthoritySource ||
     coerceText(terminalResultForDebug?.final_answer_source).trim() ||
     (terminalErrorCode ? "typed_failure" : null);
-  const terminalAuthorityText = coerceText(terminalAuthorityForDebug?.terminal_text_preview).trim();
   const terminalIsTypedFailure =
     terminalArtifactKind === "typed_failure" ||
     finalAnswerSource === "typed_failure" ||
     Boolean(terminalErrorCode);
-  const terminalAuthorityTrustedForDebug =
-    terminalAuthorityForDebug?.schema === "helix.turn_terminal_authority.v1" &&
-    terminalAuthorityForDebug.server_authoritative === true;
   const typedFailureText =
     coerceText(payload.terminal_failure_text).trim() ||
     coerceText(typedFailure?.message).trim() ||
@@ -8606,7 +8636,9 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
     terminalAuthorityText ||
     renderTypedFailureFallback(terminalErrorCode);
   const selectedFinalAnswerCandidateRaw =
-    terminalIsTypedFailure
+    terminalAuthoritySuccessForDebug
+      ? terminalAuthorityText
+      : terminalIsTypedFailure
       ? typedFailureText
       : coerceText(payload.selected_final_answer).trim() ||
         coerceText(payload.answer).trim() ||
@@ -9217,6 +9249,35 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
     ui_debug_parity_harness: uiDebugParityHarness,
     payload_hash: stableHelixProjectionHash(safeJsonStringify(envelopeWithoutHash)),
   });
+}
+
+export function buildHelixAskReplyCopyText(reply: HelixAskReply): string {
+  if (!reply) return "";
+  const terminal = resolveHelixAskVisibleTerminal(reply, reply.content);
+  if (terminal.backendTerminalText && terminal.text) return terminal.text;
+  if (!reply.envelope) return terminal.text || reply.content;
+  const sections = reply.envelope.sections ?? [];
+  const detailSections = sections.filter((section) => section.layer !== "proof");
+  const proofSections = sections.filter((section) => section.layer === "proof");
+  const chunks: string[] = [coerceText(reply.envelope.answer)];
+  const extensionBody = coerceText(reply.envelope.extension?.body).trim();
+  if (extensionBody) {
+    chunks.push(`Additional Repo Context\n${extensionBody}`);
+  }
+  if (detailSections.length > 0) {
+    const detailText = formatEnvelopeSectionsForCopy(detailSections, "Details");
+    if (detailText) {
+      chunks.push(`Details\n${detailText}`);
+    }
+  }
+  if (proofSections.length > 0) {
+    const proofText = formatEnvelopeSectionsForCopy(proofSections, "Proof");
+    if (proofText) {
+      chunks.push(`Proof\n${proofText}`);
+    }
+  }
+  const envelopeText = chunks.filter(Boolean).join("\n\n").trim();
+  return envelopeText || terminal.text || reply.content;
 }
 
 function normalizeReplyMasterDebugPayload(reply: HelixAskReply, payload: string | null | undefined): string {
@@ -13960,31 +14021,7 @@ export function HelixAskPill({
   );
 
   const buildCopyText = useCallback((reply: HelixAskReply): string => {
-    if (!reply) return "";
-    const terminal = resolveHelixAskVisibleTerminal(reply, reply.content);
-    if (terminal.text) return terminal.text;
-    if (!reply.envelope) return reply.content;
-    const sections = reply.envelope.sections ?? [];
-    const detailSections = sections.filter((section) => section.layer !== "proof");
-    const proofSections = sections.filter((section) => section.layer === "proof");
-    const chunks: string[] = [coerceText(reply.envelope.answer)];
-    const extensionBody = coerceText(reply.envelope.extension?.body).trim();
-    if (extensionBody) {
-      chunks.push(`Additional Repo Context\n${extensionBody}`);
-    }
-    if (detailSections.length > 0) {
-      const detailText = formatEnvelopeSectionsForCopy(detailSections, "Details");
-      if (detailText) {
-        chunks.push(`Details\n${detailText}`);
-      }
-    }
-    if (proofSections.length > 0) {
-      const proofText = formatEnvelopeSectionsForCopy(proofSections, "Proof");
-      if (proofText) {
-        chunks.push(`Proof\n${proofText}`);
-      }
-    }
-    return chunks.filter(Boolean).join("\n\n").trim();
+    return buildHelixAskReplyCopyText(reply);
   }, []);
 
   const handleCopyReply = useCallback(
@@ -26351,6 +26388,10 @@ export function HelixAskPill({
                   process_graph_context_pack: processGraphContextPackForTurn,
                 }
               : workspaceContextWithAmbientVisualCapability;
+          const contextFilesForTurn = buildHelixAskContextFilesForTurn(
+            docsViewerAnchorPath,
+            workspaceContextSnapshotForTurn,
+          );
           let localResponse: AskLocalResult;
           let downgradedFromMode: AskLocalMode | undefined;
           if (useBackendAskTurnEntrypoint) {
@@ -26361,7 +26402,7 @@ export function HelixAskPill({
               turnId: runAskTurnId,
               maxTokens: HELIX_ASK_OUTPUT_TOKENS,
               question: trimmed,
-              contextFiles: docsViewerAnchorPath ? [docsViewerAnchorPath] : undefined,
+              contextFiles: contextFilesForTurn,
               responseLanguage: preferredResponseLanguage,
               preferredResponseLanguage: preferredResponseLanguage,
               lang_schema_version: "helix.lang.v1",
@@ -26486,7 +26527,7 @@ export function HelixAskPill({
               traceId,
               maxTokens: HELIX_ASK_OUTPUT_TOKENS,
               question: trimmed,
-              contextFiles: docsViewerAnchorPath ? [docsViewerAnchorPath] : undefined,
+              contextFiles: contextFilesForTurn,
               responseLanguage: preferredResponseLanguage,
               preferredResponseLanguage: preferredResponseLanguage,
               lang_schema_version: "helix.lang.v1",

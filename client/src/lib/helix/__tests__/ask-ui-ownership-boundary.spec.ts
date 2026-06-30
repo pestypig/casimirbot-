@@ -106,6 +106,7 @@ describe("Helix Ask UI ownership boundaries", () => {
       "Backend entrypoint and runtime authority guards",
       "Visible terminal and route authority",
       "Debug export and clipboard authority",
+      "buildHelixAskReplyCopyText",
       "Legacy local Ask fallback",
     ]) {
       expect(map).toContain(remainingCluster);

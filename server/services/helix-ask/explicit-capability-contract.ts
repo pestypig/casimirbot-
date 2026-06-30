@@ -193,6 +193,7 @@ const requiredArgsForCapability = (capability: string): string[] => {
     case "live_env.route_micro_reasoner_prompt":
       return ["source_summary"];
     case "helix_ask.reflect_theory_context":
+    case "theory-badge-graph.propose_frontier_conjectures":
       return ["prompt"];
     case "helix.theory.frontierVectorFieldTrace":
       return ["query"];
@@ -300,6 +301,22 @@ const optionalArgsForCapability = (capability: string): string[] => {
       return ["text", "message", "callout_text", "evidence_refs", "wake_request_id", "mailbox_thread_id", "route_metadata", "kind", "max_chars"];
     case "helix_ask.reflect_theory_context":
       return ["source_ref", "source_refs", "refs", "question", "topic"];
+    case "theory-badge-graph.propose_frontier_conjectures":
+      return [
+        "source_ref",
+        "source_refs",
+        "refs",
+        "question",
+        "query",
+        "text",
+        "topic",
+        "conversation_context",
+        "mentioned_equations",
+        "mentioned_symbols",
+        "mentioned_domains",
+        "frontier_search_seed",
+        "limit",
+      ];
     case "helix.theory.frontierVectorFieldTrace":
       return ["question", "prompt", "topic"];
     case "helix_ask.reflect_live_synthetic_data":
@@ -1253,6 +1270,30 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
     required_observation_kinds: [
       "helix_theory_frontier_vector_field_tool_receipt",
       "theory_frontier_vector_field",
+    ],
+    required_terminal_kind: "theory_context_reflection_answer",
+    allowed_substitutions: [],
+    forbidden_nearby_capabilities: ["model.direct_answer"],
+  },
+  {
+    schema: "helix.explicit_capability_contract.v1",
+    capability: "theory-badge-graph.propose_frontier_conjectures",
+    aliases: [
+      "propose_frontier_conjectures",
+      "theory_frontier_conjectures",
+      "frontier_conjecture_workbench",
+      "bounded_conjecture_workbench",
+      "theory_badge_graph_conjecture_workbench",
+    ],
+    capability_family: "theory_locator",
+    plan_family: "theory_locator",
+    source_target: "theory_locator",
+    admission_families: ["theory_locator"],
+    required_observation_kinds: [
+      "theory_frontier_conjecture_observation",
+      "theory_frontier_search",
+      "theory_frontier_candidate",
+      "helix_theory_context_reflection_tool_receipt",
     ],
     required_terminal_kind: "theory_context_reflection_answer",
     allowed_substitutions: [],

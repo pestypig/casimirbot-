@@ -63,6 +63,28 @@ describe("Helix Ask turn transcript projection", () => {
     ).toBeNull();
   });
 
+  it("does not clip terminal answer transcript events in the console stream", () => {
+    const longFinal = `Final answer starts.\n${"agent-output ".repeat(80)}\nFinal answer ends.`;
+
+    const event = buildAskLiveEventFromTurnTranscriptRecord(
+      {
+        id: "terminal-answer-1",
+        text: longFinal,
+        role: "assistant",
+        type: "final_answer",
+        source_event_type: "terminal_answer",
+        status: "completed",
+        turn_id: "turn-long-final",
+      },
+      "fallback",
+      80,
+    );
+
+    expect(event?.text).toBe(longFinal);
+    expect(event?.text).toContain("Final answer ends.");
+    expect(event?.text).not.toContain("...");
+  });
+
   it("projects runtime transcript events into Ask live-event rows", () => {
     const events = buildHelixRuntimeAskLiveEvents({
       id: "reply-1",
@@ -343,6 +365,178 @@ describe("Helix Ask turn transcript projection", () => {
       role: "tool",
       status: "completed",
     });
+  });
+
+  it("projects compound docs-to-narrator itinerary status from structured gateway state", () => {
+    const rows = buildHelixTurnTranscriptRows({
+      id: "reply-codex-compound-read-aloud",
+      turn_id: "turn-codex-compound-read-aloud",
+      debug: {
+        turn_id: "turn-codex-compound-read-aloud",
+        agent_runtime: "codex",
+        workstation_gateway_call_results: [
+          {
+            schema: "helix.workstation_tool_gateway.call_result.v1",
+            ok: true,
+            capability_id: "docs.search",
+            mode: "read",
+            gateway_admission: {
+              requested_capability: "docs.search",
+              admission_status: "admitted",
+              source_target_intent: {
+                compound_outcome: "read_aloud_doc_excerpt",
+                subgoal_id: "read_aloud_doc_excerpt:docs_excerpt",
+              },
+            },
+            observation: {
+              schema: "helix.docs_search_observation.v1",
+              compound_dependency_turn_plan: {
+                schema: "helix.compound_capability_dependency_turn_plan.v1",
+                turn_id: "turn-codex-compound-read-aloud",
+                compound_outcomes: ["read_aloud_doc_excerpt"],
+                rail_status: "satisfied",
+                subgoal_count: 2,
+                satisfied_subgoal_count: 2,
+                ordered_subgoals: [
+                  {
+                    subgoal_id: "read_aloud_doc_excerpt:docs_excerpt",
+                    requested_capability: "docs.search",
+                    executed_capability: "docs.search",
+                    satisfied: true,
+                  },
+                  {
+                    subgoal_id: "read_aloud_doc_excerpt:narrator_receipt",
+                    requested_capability: "live_env.narrator_say",
+                    executed_capability: "live_env.narrator_say",
+                    required_receipt_kind: "helix.interim_voice_callout_tool_result.v1",
+                    satisfied: true,
+                  },
+                ],
+              },
+            },
+            observation_packet: {
+              schema: "helix.agent_step_observation_packet.v1",
+              turn_id: "turn-codex-compound-read-aloud",
+              capability_key: "docs.search",
+              status: "succeeded",
+              observation_summary: "docs.search materialized a bounded document excerpt",
+            },
+          },
+          {
+            schema: "helix.workstation_tool_gateway.call_result.v1",
+            ok: true,
+            capability_id: "live_env.narrator_say",
+            mode: "act",
+            gateway_admission: {
+              requested_capability: "live_env.narrator_say",
+              admission_status: "admitted",
+              source_target_intent: {
+                compound_outcome: "read_aloud_doc_excerpt",
+                subgoal_id: "read_aloud_doc_excerpt:narrator_receipt",
+                depends_on_subgoal_id: "read_aloud_doc_excerpt:docs_excerpt",
+              },
+            },
+            observation: {
+              schema: "helix.interim_voice_callout_tool_result.v1",
+              assistant_answer: false,
+              terminal_eligible: false,
+              raw_content_included: false,
+            },
+            observation_packet: {
+              schema: "helix.agent_step_observation_packet.v1",
+              turn_id: "turn-codex-compound-read-aloud",
+              capability_key: "live_env.narrator_say",
+              status: "succeeded",
+              observation_summary: "Narrator voice playback request queued",
+            },
+          },
+        ],
+      },
+    });
+
+    const combined = rows.map((row) => `${row.label}: ${row.text} ${row.status}`).join("\n");
+    expect(combined).toContain("Tool request: docs.search.");
+    expect(combined).toContain("Tool observation: docs.search observed docs.search materialized a bounded document excerpt.");
+    expect(combined).toContain("Action request: live_env.narrator_say.");
+    expect(combined).toContain("Action observation: live_env.narrator_say observed Narrator voice playback request queued.");
+    expect(combined).toContain("Itinerary: Compound itinerary: read_aloud_doc_excerpt satisfied with 2/2 subgoals satisfied.");
+    expect(combined).toContain("Model re-entry: Codex received the workstation observation packet");
+  });
+
+  it("projects blocked compound downstream tools without faking action execution", () => {
+    const rows = buildHelixTurnTranscriptRows({
+      id: "reply-codex-compound-read-aloud-blocked",
+      turn_id: "turn-codex-compound-read-aloud-blocked",
+      debug: {
+        turn_id: "turn-codex-compound-read-aloud-blocked",
+        agent_runtime: "codex",
+        workstation_gateway_call_results: [
+          {
+            schema: "helix.workstation_tool_gateway.call_result.v1",
+            ok: true,
+            capability_id: "docs.search",
+            mode: "read",
+            gateway_admission: {
+              requested_capability: "docs.search",
+              admission_status: "admitted",
+              source_target_intent: {
+                compound_outcome: "read_aloud_doc_excerpt",
+                subgoal_id: "read_aloud_doc_excerpt:docs_excerpt",
+              },
+            },
+            observation: {
+              schema: "helix.docs_search_observation.v1",
+              hit_count: 0,
+              compound_dependency_turn_plan: {
+                schema: "helix.compound_capability_dependency_turn_plan.v1",
+                turn_id: "turn-codex-compound-read-aloud-blocked",
+                compound_outcomes: ["read_aloud_doc_excerpt"],
+                rail_status: "blocked",
+                subgoal_count: 2,
+                satisfied_subgoal_count: 1,
+                first_broken_rail: {
+                  subgoal_id: "read_aloud_doc_excerpt:narrator_receipt",
+                  requested_capability: "live_env.narrator_say",
+                  rail_status: "blocked_by_dependency",
+                  reason: "upstream_docs_excerpt_missing",
+                  satisfied: false,
+                },
+                ordered_subgoals: [
+                  {
+                    subgoal_id: "read_aloud_doc_excerpt:docs_excerpt",
+                    requested_capability: "docs.search",
+                    executed_capability: "docs.search",
+                    satisfied: true,
+                  },
+                  {
+                    subgoal_id: "read_aloud_doc_excerpt:narrator_receipt",
+                    requested_capability: "live_env.narrator_say",
+                    executed_capability: null,
+                    satisfied: false,
+                    rail_status: "blocked_by_dependency",
+                  },
+                ],
+              },
+            },
+            observation_packet: {
+              schema: "helix.agent_step_observation_packet.v1",
+              turn_id: "turn-codex-compound-read-aloud-blocked",
+              capability_key: "docs.search",
+              status: "succeeded",
+              observation_summary: "docs.search returned no document excerpt",
+            },
+          },
+        ],
+      },
+    });
+
+    const combined = rows.map((row) => `${row.label}: ${row.text} ${row.status}`).join("\n");
+    expect(combined).toContain("Tool request: docs.search.");
+    expect(combined).toContain(
+      "Itinerary: Compound itinerary: read_aloud_doc_excerpt blocked at read_aloud_doc_excerpt:narrator_receipt (live_env.narrator_say): upstream_docs_excerpt_missing.",
+    );
+    expect(combined).not.toContain("Action request: live_env.narrator_say.");
+    expect(combined).not.toContain("Action observation: live_env.narrator_say");
   });
 
   it("does not create gateway observations from final prose alone", () => {

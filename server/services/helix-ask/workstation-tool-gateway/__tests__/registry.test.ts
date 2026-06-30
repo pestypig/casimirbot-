@@ -8,6 +8,10 @@ import {
 const WORKSTATION_ACTIVE_CONTEXT_CAPABILITY = "workstation.active_context";
 const CALCULATOR_SOLVE_EXPRESSION_CAPABILITY = "scientific-calculator.solve_expression";
 const CALCULATOR_ACTIVE_CONTEXT_CAPABILITY = "scientific-calculator.active_context";
+const READABLE_SURFACE_OBSERVE_CAPABILITY = "workstation.readable_surface.observe";
+const DOCS_READ_VISIBLE_SURFACE_CAPABILITY = "docs-viewer.read_visible_surface";
+const DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY = "docs-viewer.read_active_translation";
+const CALCULATOR_READ_VISIBLE_RESULT_CAPABILITY = "scientific-calculator.read_visible_result";
 const CALCULATOR_OPEN_PANEL_CAPABILITY = "scientific-calculator.open_panel";
 const CALCULATOR_SHOW_GATEWAY_SOLVE_CAPABILITY = "scientific-calculator.show_gateway_solve";
 const WORKSTATION_OPEN_PANEL_CAPABILITY = "workstation.open_panel";
@@ -19,6 +23,7 @@ const INTERNET_SEARCH_CAPABILITY = "internet-search.search_web";
 const SCHOLARLY_RESEARCH_SEARCH_CAPABILITY = "scholarly-research.lookup_papers";
 const CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY = "civilization-bounds.reflect_system_bounds";
 const THEORY_CONTEXT_REFLECTION_CAPABILITY = "theory-badge-graph.reflect_discussion_context";
+const THEORY_FRONTIER_CONJECTURE_CAPABILITY = "theory-badge-graph.propose_frontier_conjectures";
 const VOICE_INTERIM_CALLOUT_CAPABILITY = "live_env.request_interim_voice_callout";
 const VOICE_NARRATOR_SAY_CAPABILITY = "live_env.narrator_say";
 const CONTEXT_FEED_QUERY_CAPABILITIES = [
@@ -169,6 +174,30 @@ describe("Helix workstation tool gateway", () => {
         raw_content_included: false,
       }),
     );
+    for (const [capabilityId, panelId, actionId] of [
+      [READABLE_SURFACE_OBSERVE_CAPABILITY, null, "observe"],
+      [DOCS_READ_VISIBLE_SURFACE_CAPABILITY, "docs-viewer", "read_visible_surface"],
+      [DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY, "docs-viewer", "read_active_translation"],
+      [CALCULATOR_READ_VISIBLE_RESULT_CAPABILITY, "scientific-calculator", "read_visible_result"],
+    ] as const) {
+      expect(manifest.capabilities).toContainEqual(
+        expect.objectContaining({
+          capability_id: capabilityId,
+          panel_id: panelId,
+          action_id: actionId,
+          mode: "read",
+          mutating: false,
+          code_mutation: false,
+          shell_access: false,
+          requires_source: true,
+          permission_profile_required: "read",
+          output_observation_schema: "helix.workstation_readable_surface_observation.v1",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        }),
+      );
+    }
     expect(manifest.capabilities).toContainEqual(
       expect.objectContaining({
         capability_id: REPO_SEARCH_CAPABILITY,
@@ -317,6 +346,23 @@ describe("Helix workstation tool gateway", () => {
         requires_source: true,
         permission_profile_required: "read",
         output_observation_schema: "helix.theory_context_reflection_observation.v1",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    );
+    expect(manifest.capabilities).toContainEqual(
+      expect.objectContaining({
+        capability_id: THEORY_FRONTIER_CONJECTURE_CAPABILITY,
+        panel_id: "theory-badge-graph",
+        action_id: "propose_frontier_conjectures",
+        mode: "read",
+        mutating: false,
+        code_mutation: false,
+        shell_access: false,
+        requires_source: true,
+        permission_profile_required: "read",
+        output_observation_schema: "helix.theory_frontier_conjecture_observation.v1",
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
@@ -2766,6 +2812,236 @@ describe("Helix workstation tool gateway", () => {
     });
   });
 
+  it("calls theory frontier conjecture workbench as non-terminal evidence", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: THEORY_FRONTIER_CONJECTURE_CAPABILITY,
+      arguments: {
+        prompt:
+          "Where might a useful missing badge or conjectural bridge live between QEI margin, source residual, and tensor authority?",
+        mentioned_symbols: ["QEI", "source residual"],
+        mentioned_domains: ["warp metrics", "claim boundaries"],
+        frontier_search_seed: "gateway-frontier-conjecture-test",
+        limit: 4,
+      },
+      turnId: "ask:test:gateway-theory-frontier-conjecture",
+      iteration: 7,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      agent_runtime: "codex",
+      capability_id: THEORY_FRONTIER_CONJECTURE_CAPABILITY,
+      gateway_admission: {
+        requested_capability: THEORY_FRONTIER_CONJECTURE_CAPABILITY,
+        selected_agent_provider: "codex",
+        permission_profile: "read",
+        admission_status: "admitted",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      observation_packet: {
+        capability_key: THEORY_FRONTIER_CONJECTURE_CAPABILITY,
+        panel_id: "theory-badge-graph",
+        action: "propose_frontier_conjectures",
+        status: "succeeded",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.theory_frontier_conjecture_observation.v1",
+        capability_key: THEORY_FRONTIER_CONJECTURE_CAPABILITY,
+        panel_id: "theory-badge-graph",
+        action_id: "propose_frontier_conjectures",
+        status: "succeeded",
+        prompt:
+          "Where might a useful missing badge or conjectural bridge live between QEI margin, source residual, and tensor authority?",
+        conversation_context_included: false,
+        receipt_schema: "helix_theory_context_reflection_tool_receipt/v1",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+        authority: expect.objectContaining({
+          assistant_answer: false,
+          terminal_eligible: false,
+          deterministic_content_role: "observation_not_assistant_answer",
+        }),
+      },
+      tool_followup_decision: {
+        next_action: "continue_reasoning",
+        evidence_reentered: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    const observation = result.observation as {
+      reflection_id?: string;
+      search_id?: string;
+      frontier_candidate_count?: number;
+      candidates?: Array<Record<string, unknown>>;
+      recommended_actions_solve?: boolean;
+      scholarly_lookup_request_count?: number;
+      exact_verification_result_count?: number;
+    };
+    expect(String(observation.reflection_id ?? "")).toMatch(/^theory-context-reflection:/);
+    expect(String(observation.search_id ?? "")).toMatch(/^(?:frontier_search|theory-frontier-search):/);
+    expect(observation.frontier_candidate_count ?? 0).toBeGreaterThan(0);
+    expect(observation.scholarly_lookup_request_count ?? 0).toBeGreaterThan(0);
+    expect(observation.exact_verification_result_count ?? 0).toBe(observation.frontier_candidate_count);
+    expect(observation.recommended_actions_solve).toBe(false);
+
+    const firstCandidate = observation.candidates?.[0];
+    expect(firstCandidate).toMatchObject({
+      candidate_id: expect.any(String),
+      candidate_kind: expect.stringMatching(/candidate_connection|missing_intermediate_badge|unresolved_semantic_region/),
+      status: expect.stringMatching(
+        /coarse_candidate|exact_verification_pending|needs_observable|needs_scholarly_evidence|blocked_by_boundary/,
+      ),
+      title: expect.any(String),
+      summary: expect.any(String),
+      nearby_badge_ids: expect.any(Array),
+      proposed_relation_or_missing_badge: expect.any(String),
+      biome_region: expect.any(Object),
+      scale_bands: expect.any(Array),
+      render_chunk_ids: expect.any(Array),
+      semantic_chunk_ids: expect.any(Array),
+      congruence_score: expect.any(Number),
+      information_gain_bits: expect.any(Number),
+      calculator_probe_available: expect.any(Boolean),
+      recommended_next_actions: expect.any(Array),
+      required_observables: expect.any(Array),
+      required_artifacts: expect.any(Array),
+      source_references: expect.any(Array),
+      falsification_checks: expect.any(Array),
+      claim_boundary_notes: expect.any(Array),
+      promotion_allowed: false,
+      terminal_eligible: false,
+      assistant_answer: false,
+      post_tool_model_step_required: true,
+    });
+  });
+
+  it("blocks theory frontier conjecture workbench without prompt as a missing observation", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: THEORY_FRONTIER_CONJECTURE_CAPABILITY,
+      arguments: {},
+      turnId: "ask:test:gateway-theory-frontier-conjecture-blocked",
+      iteration: 8,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      capability_id: THEORY_FRONTIER_CONJECTURE_CAPABILITY,
+      error: "theory_frontier_conjecture_prompt_missing",
+      gateway_admission: {
+        admission_status: "blocked",
+        blocked_reason: "theory_frontier_conjecture_prompt_missing",
+      },
+      observation_packet: {
+        status: "blocked",
+        missing_requirements: [
+          expect.objectContaining({
+            code: "theory_frontier_conjecture_prompt_missing",
+            repair_action: "ask_user",
+          }),
+        ],
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.theory_frontier_conjecture_observation.v1",
+        status: "blocked",
+        blocked_reason: "theory_frontier_conjecture_prompt_missing",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+  });
+
+  it("boundary-marks physical viability overclaims in frontier conjecture observations", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: THEORY_FRONTIER_CONJECTURE_CAPABILITY,
+      arguments: {
+        prompt:
+          "Use graph placement and calculator output to prove physical viability of the warp drive candidate.",
+        frontier_search_seed: "gateway-frontier-conjecture-overclaim-test",
+      },
+      turnId: "ask:test:gateway-theory-frontier-conjecture-overclaim",
+      iteration: 9,
+    });
+
+    expect(result.ok).toBe(true);
+    const observation = result.observation as {
+      forbidden_claim_scan_notes?: string[];
+      candidate_status_counts?: Record<string, number>;
+      candidates?: Array<{
+        status?: string;
+        promotion_allowed?: boolean;
+        terminal_eligible?: boolean;
+        assistant_answer?: boolean;
+        claim_boundary_notes?: string[];
+      }>;
+    };
+    expect(observation.forbidden_claim_scan_notes?.length ?? 0).toBeGreaterThan(0);
+    expect(observation.candidate_status_counts).toEqual({
+      blocked_by_boundary: observation.candidates?.length ?? 0,
+    });
+    expect(observation.candidates?.length ?? 0).toBeGreaterThan(0);
+    expect(observation.candidates?.every((candidate) => candidate.status === "blocked_by_boundary")).toBe(true);
+    expect(observation.candidates?.every((candidate) => candidate.promotion_allowed === false)).toBe(true);
+    expect(observation.candidates?.every((candidate) => candidate.terminal_eligible === false)).toBe(true);
+    expect(observation.candidates?.every((candidate) => candidate.assistant_answer === false)).toBe(true);
+    expect(observation.candidates?.[0]?.claim_boundary_notes).toEqual(
+      expect.arrayContaining(observation.forbidden_claim_scan_notes ?? []),
+    );
+  });
+
+  it("keeps ambiguous frontier conjecture prompts in broad uncertainty", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: THEORY_FRONTIER_CONJECTURE_CAPABILITY,
+      arguments: {
+        prompt: "Compare this idea with the other one and find possible bridge regions.",
+        frontier_search_seed: "gateway-frontier-conjecture-ambiguous-test",
+      },
+      turnId: "ask:test:gateway-theory-frontier-conjecture-ambiguous",
+      iteration: 10,
+    });
+
+    expect(result.ok).toBe(true);
+    const observation = result.observation as {
+      probability_terrain?: {
+        uncertaintyMode?: string;
+        interpretation?: string;
+        placementCertainty?: number;
+      };
+      candidates?: Array<{ terminal_eligible?: boolean; assistant_answer?: boolean }>;
+    };
+    expect(observation.probability_terrain).toMatchObject({
+      uncertaintyMode: "broad",
+      interpretation: "placement_probability_not_truth_claim",
+    });
+    expect(observation.probability_terrain?.placementCertainty ?? 1).toBeLessThan(0.1);
+    expect(observation.candidates?.length ?? 0).toBeGreaterThan(0);
+    expect(observation.candidates?.every((candidate) => candidate.terminal_eligible === false)).toBe(true);
+    expect(observation.candidates?.every((candidate) => candidate.assistant_answer === false)).toBe(true);
+  });
+
   it("calls interim voice callout as a host-projected non-terminal receipt", async () => {
     const result = await callWorkstationGatewayCapability({
       agentRuntime: "codex",
@@ -2903,6 +3179,133 @@ describe("Helix workstation tool gateway", () => {
           terminal_eligible: false,
           raw_content_included: false,
         },
+      },
+    });
+  });
+
+  it("observes active translated docs surface as bounded non-terminal evidence", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY,
+      arguments: {
+        label: "visible translated section",
+        source_doc_path: "docs/helix-ask-api-parity-matrix.md",
+        translation_blocks: [{
+          unit_id: "doc-unit:1",
+          source_text: "Original sentence.",
+          translated_text: "Translated sentence.",
+          locale: "es",
+          status: "ready",
+        }],
+      },
+      turnId: "ask:test:gateway-readable-translation",
+      iteration: 11,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      capability_id: DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY,
+      observation_packet: {
+        capability_key: DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY,
+        panel_id: "docs-viewer",
+        action: "read_active_translation",
+        status: "succeeded",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.workstation_readable_surface_observation.v1",
+        capability_key: DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY,
+        canonical_capability_key: READABLE_SURFACE_OBSERVE_CAPABILITY,
+        panel_id: "docs-viewer",
+        status: "succeeded",
+        text: "Translated sentence.",
+        source_doc_path: "docs/helix-ask-api-parity-matrix.md",
+        translation: expect.objectContaining({
+          locale: null,
+          status: "ready",
+          source_unit_ids: ["doc-unit:1"],
+        }),
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+  });
+
+  it("blocks missing readable surfaces before narrator delivery", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY,
+      arguments: {
+        label: "visible translated section",
+      },
+      turnId: "ask:test:gateway-readable-translation-missing",
+      iteration: 12,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      capability_id: DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY,
+      error: "translation_surface_missing",
+      gateway_admission: {
+        admission_status: "blocked",
+        blocked_reason: "translation_surface_missing",
+      },
+      observation_packet: {
+        status: "blocked",
+        missing_requirements: [
+          expect.objectContaining({
+            code: "translation_surface_missing",
+            repair_action: "ask_user",
+          }),
+        ],
+      },
+      observation: {
+        schema: "helix.workstation_readable_surface_observation.v1",
+        status: "blocked",
+        blocked_reason: "translation_surface_missing",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+  });
+
+  it("observes calculator visible result separately from draft input", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "future",
+      mode: "read",
+      capabilityId: CALCULATOR_READ_VISIBLE_RESULT_CAPABILITY,
+      arguments: {
+        active_context: {
+          current_latex: "6*7",
+          last_result_text: "42",
+          last_normalized_expression: "6*7",
+        },
+      },
+      turnId: "ask:test:gateway-readable-calculator",
+      iteration: 13,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      capability_id: CALCULATOR_READ_VISIBLE_RESULT_CAPABILITY,
+      observation: {
+        schema: "helix.workstation_readable_surface_observation.v1",
+        text: "42",
+        calculator: {
+          expression: "6*7",
+          result: "42",
+          result_source: "visible_result_region",
+          draft_input_distinguished: true,
+        },
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
       },
     });
   });

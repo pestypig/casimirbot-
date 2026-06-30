@@ -23,6 +23,8 @@ export type RunClientTheoryContextReflectionToolInput = {
   threadId?: string | null;
   turnId: string;
   buildExplanationPlan?: boolean;
+  buildFrontierSearch?: boolean;
+  frontierSearchSeed?: string;
   syncPanel?: boolean;
   openPanel?: boolean;
   overlayMode?: HelixTheoryContextReflectionPanelSyncOverlayMode;
@@ -71,6 +73,8 @@ export function runClientTheoryContextReflectionTool(
     turnId: input.turnId,
     source: input.source ?? "workstation_action",
     buildExplanationPlan: input.buildExplanationPlan ?? false,
+    buildFrontierSearch: input.buildFrontierSearch ?? false,
+    frontierSearchSeed: input.frontierSearchSeed,
     panelSync: {
       requested,
       applied: false,

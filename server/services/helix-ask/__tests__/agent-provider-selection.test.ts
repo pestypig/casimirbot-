@@ -29,6 +29,7 @@ import {
   readWorkstationGatewayCallRequestsForTurn,
   runExplicitWorkstationGatewayCalls,
 } from "../agent-providers/explicit-workstation-gateway";
+import { buildCompoundCapabilityDependencyGatewayCallRequests } from "../agent-providers/provider-compound-capability-planner";
 import { buildHelixProviderReasoningReentry } from "../agent-providers/provider-terminal-authority";
 import {
   listWorkstationGatewayCapabilities,
@@ -1056,6 +1057,289 @@ describe("Helix Ask agent provider selection", () => {
     ]);
   });
 
+  it("plans implicit document-plus-repo evidence as a compound outcome without adjacent tools", () => {
+    const body = {
+      agent_runtime: "codex",
+      question:
+        "Compare the current document evidence with repo implementation evidence for workstation_gateway, and distinguish what the document claims from what the code proves.",
+      workspace_context_snapshot: {
+        activePanel: "docs-viewer",
+        focusedPanel: "docs-viewer",
+        openPanels: ["docs-viewer", "scientific-calculator"],
+        activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        hasDocContext: true,
+      },
+    };
+
+    const planned = buildCompoundCapabilityDependencyGatewayCallRequests(body);
+    expect(planned.map((request) => (request as any).capability_id)).toEqual([
+      "docs.search",
+      "repo.search",
+    ]);
+    expect(planned.map((request) => (request as any).compound_outcome)).toEqual([
+      "inspect_repo_and_doc",
+      "inspect_repo_and_doc",
+    ]);
+
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body,
+    });
+
+    expect(requests.map((request) => (request as any).capability_id)).toEqual([
+      "docs.search",
+      "repo.search",
+    ]);
+    expect(requests.map((request) => (request as any).derivation_source)).toEqual([
+      "helix_compound_capability_dependency_planner",
+      "helix_compound_capability_dependency_planner",
+    ]);
+    expect((requests[0] as any).arguments.source_target_intent).toMatchObject({
+      compound_outcome: "inspect_repo_and_doc",
+      subgoal_id: "inspect_repo_and_doc:docs_evidence",
+      required_observation_kind: "helix.docs_search_observation.v1",
+    });
+    expect((requests[1] as any).arguments.source_target_intent).toMatchObject({
+      compound_outcome: "inspect_repo_and_doc",
+      subgoal_id: "inspect_repo_and_doc:repo_evidence",
+      required_observation_kind: "helix.repo_search_observation.v1",
+    });
+  });
+
+  it("executes implicit document-plus-repo compound evidence with per-subgoal rail metadata", async () => {
+    const body = {
+      turn_id: "ask:test:compound-inspect-repo-and-doc",
+      agent_runtime: "codex",
+      question:
+        "Compare the current document evidence with repo implementation evidence for workstation_gateway, and distinguish what the document claims from what the code proves.",
+      workspace_context_snapshot: {
+        activePanel: "docs-viewer",
+        focusedPanel: "docs-viewer",
+        activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        hasDocContext: true,
+      },
+    };
+
+    const results = await runExplicitWorkstationGatewayCalls({
+      body,
+      agentRuntime: "codex",
+      turnId: "ask:test:compound-inspect-repo-and-doc",
+    });
+
+    expect(results.map((result) => result.capability_id)).toEqual([
+      "docs.search",
+      "repo.search",
+    ]);
+    expect(results.every((result) => result.ok)).toBe(true);
+    expect((results[0].observation as any).compound_dependency_plan).toMatchObject({
+      schema: "helix.compound_capability_dependency_plan.v1",
+      compound_outcome: "inspect_repo_and_doc",
+      rail_status: "satisfied",
+      subgoals: [{
+        subgoal_id: "inspect_repo_and_doc:docs_evidence",
+        requested_capability: "docs.search",
+        required_observation_kind: "helix.docs_search_observation.v1",
+        satisfied: true,
+      }],
+    });
+    expect((results[1].observation as any).compound_dependency_plan).toMatchObject({
+      schema: "helix.compound_capability_dependency_plan.v1",
+      compound_outcome: "inspect_repo_and_doc",
+      rail_status: "satisfied",
+      subgoals: [{
+        subgoal_id: "inspect_repo_and_doc:repo_evidence",
+        requested_capability: "repo.search",
+        required_observation_kind: "helix.repo_search_observation.v1",
+        satisfied: true,
+      }],
+    });
+    expect((results[0].observation_packet.state_delta as any).compound_dependency_turn_plan).toMatchObject({
+      schema: "helix.compound_capability_dependency_turn_plan.v1",
+      compound_outcomes: ["inspect_repo_and_doc"],
+      rail_status: "satisfied",
+      ordered_subgoals: [
+        {
+          subgoal_id: "inspect_repo_and_doc:docs_evidence",
+          requested_capability: "docs.search",
+          executed_capability: "docs.search",
+          satisfied: true,
+        },
+        {
+          subgoal_id: "inspect_repo_and_doc:repo_evidence",
+          requested_capability: "repo.search",
+          executed_capability: "repo.search",
+          satisfied: true,
+        },
+      ],
+    });
+  });
+
+  it("does not admit implicit docs-plus-repo tools from quoted or future mentions", () => {
+    const prompts = [
+      'The text says "compare repo and document evidence"; explain the phrase only.',
+      "Later we might compare repo implementation evidence with the document, but not now.",
+      "Do not search the repo or docs; explain what such a comparison would mean.",
+    ];
+
+    for (const question of prompts) {
+      const body = {
+        agent_runtime: "codex",
+        question,
+        workspace_context_snapshot: {
+          activePanel: "docs-viewer",
+          activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          hasDocContext: true,
+        },
+      };
+      expect(buildCompoundCapabilityDependencyGatewayCallRequests(body)).toEqual([]);
+    }
+  });
+
+  it("plans implicit document-plus-calculator evidence as an ordered compound outcome", async () => {
+    const body = {
+      turn_id: "ask:test:compound-summarize-and-calculate",
+      agent_runtime: "codex",
+      question:
+        "Use this document as evidence, calculate 6 * 7 as a scalar sanity check, then summarize what the two observations support.",
+      workspace_context_snapshot: {
+        activePanel: "docs-viewer",
+        focusedPanel: "docs-viewer",
+        activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        hasDocContext: true,
+      },
+    };
+
+    const planned = buildCompoundCapabilityDependencyGatewayCallRequests(body);
+    expect(planned.map((request) => (request as any).capability_id)).toEqual([
+      "docs.search",
+      "scientific-calculator.solve_expression",
+    ]);
+    expect(planned.map((request) => (request as any).compound_outcome)).toEqual([
+      "summarize_and_calculate",
+      "summarize_and_calculate",
+    ]);
+
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      body,
+      includePlannerDerived: true,
+    });
+    expect(requests.map((request) => (request as any).capability_id)).toEqual([
+      "docs.search",
+      "scientific-calculator.solve_expression",
+    ]);
+
+    const results = await runExplicitWorkstationGatewayCalls({
+      body,
+      agentRuntime: "codex",
+      turnId: "ask:test:compound-summarize-and-calculate",
+    });
+
+    expect(results.map((result) => result.capability_id)).toEqual([
+      "docs.search",
+      "scientific-calculator.solve_expression",
+    ]);
+    expect((results[0].observation as any).compound_dependency_plan).toMatchObject({
+      schema: "helix.compound_capability_dependency_plan.v1",
+      compound_outcome: "summarize_and_calculate",
+      rail_status: "satisfied",
+      subgoals: [{
+        subgoal_id: "summarize_and_calculate:docs_evidence",
+        requested_capability: "docs.search",
+        required_observation_kind: "helix.docs_search_observation.v1",
+        satisfied: true,
+      }],
+    });
+    expect((results[1].observation as any).compound_dependency_plan).toMatchObject({
+      schema: "helix.compound_capability_dependency_plan.v1",
+      compound_outcome: "summarize_and_calculate",
+      rail_status: "satisfied",
+      subgoals: [{
+        subgoal_id: "summarize_and_calculate:calculator_scalar",
+        requested_capability: "scientific-calculator.solve_expression",
+        required_observation_kind: "helix.calculator_solve_observation.v1",
+        satisfied: true,
+      }],
+    });
+    expect((results[1].observation_packet.state_delta as any).compound_dependency_turn_plan).toMatchObject({
+      schema: "helix.compound_capability_dependency_turn_plan.v1",
+      compound_outcomes: ["summarize_and_calculate"],
+      rail_status: "satisfied",
+      ordered_subgoals: [
+        {
+          subgoal_id: "summarize_and_calculate:docs_evidence",
+          requested_capability: "docs.search",
+          executed_capability: "docs.search",
+          satisfied: true,
+        },
+        {
+          subgoal_id: "summarize_and_calculate:calculator_scalar",
+          requested_capability: "scientific-calculator.solve_expression",
+          executed_capability: "scientific-calculator.solve_expression",
+          satisfied: true,
+        },
+      ],
+      dependency_edges: [{
+        from: "summarize_and_calculate:docs_evidence",
+        to: "summarize_and_calculate:calculator_scalar",
+      }],
+    });
+  });
+
+  it("plans research-plus-calculator-plus-reflection compound evidence without one-off route files", () => {
+    const body = {
+      turn_id: "ask:test:compound-research-quantify-reflect",
+      agent_runtime: "codex",
+      question:
+        "Retrieve research papers and web evidence for quantum inequality margins, calculate 6 * 7 as a small scalar estimate, reflect the claim boundary through the theory badge graph, and apply civilization bounds for social, energy, and material conditions.",
+    };
+
+    const planned = buildCompoundCapabilityDependencyGatewayCallRequests(body);
+    expect(planned.map((request) => (request as any).capability_id)).toEqual([
+      "scholarly-research.lookup_papers",
+      "internet-search.search_web",
+      "scientific-calculator.solve_expression",
+      "theory-badge-graph.reflect_discussion_context",
+      "civilization-bounds.reflect_system_bounds",
+    ]);
+    expect(planned.every((request) => (request as any).compound_outcome === "research_quantify_reflect")).toBe(true);
+
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      body,
+      includePlannerDerived: true,
+    });
+    expect(requests.map((request) => (request as any).capability_id)).toEqual([
+      "scholarly-research.lookup_papers",
+      "internet-search.search_web",
+      "scientific-calculator.solve_expression",
+      "theory-badge-graph.reflect_discussion_context",
+      "civilization-bounds.reflect_system_bounds",
+    ]);
+    expect((requests[0] as any).arguments.source_target_intent).toMatchObject({
+      compound_outcome: "research_quantify_reflect",
+      subgoal_id: "research_quantify_reflect:scholarly_evidence",
+      required_observation_kind: "helix.scholarly_research_observation.v1",
+    });
+    expect((requests[4] as any).arguments.source_target_intent).toMatchObject({
+      compound_outcome: "research_quantify_reflect",
+      subgoal_id: "research_quantify_reflect:civilization_bounds",
+      required_observation_kind: "helix.civilization_bounds_reflection_observation.v1",
+    });
+  });
+
+  it("does not admit research compound tools from quoted, negated, or future mentions", () => {
+    const prompts = [
+      'The text says "retrieve research papers, calculate 6 * 7, and reflect through civilization bounds"; explain the sentence only.',
+      "Do not retrieve research papers, calculate, or reflect; describe what that workflow would require.",
+      "Later we might retrieve papers, calculate an estimate, and reflect through the theory badge graph, but not now.",
+    ];
+    for (const question of prompts) {
+      expect(buildCompoundCapabilityDependencyGatewayCallRequests({
+        agent_runtime: "codex",
+        question,
+      })).toEqual([]);
+    }
+  });
+
   it("materializes active docs-viewer context as a bounded docs observation for Codex", async () => {
     const body = {
       turn_id: "ask:test:codex-active-doc-context",
@@ -1981,6 +2265,121 @@ describe("Helix Ask agent provider selection", () => {
       });
   });
 
+  it("does not publish Codex read-aloud claims when docs evidence exists but narrator receipt is blocked", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "I read the document aloud.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:codex-compound-read-aloud-voice-blocked",
+        agent_runtime: "codex",
+        question: "Use the explicit workstation gateway calls to read aloud the document excerpt, then answer.",
+        workstation_gateway_calls: [
+          {
+            capability_id: "docs-viewer.read_visible_surface",
+            mode: "read",
+            arguments: {
+              label: "document excerpt",
+              source_doc_path: "docs/needle-hull-mainframe.md",
+              source_target_intent: {
+                source: "helix_compound_capability_dependency_planner",
+                compound_outcome: "read_aloud_surface",
+                subgoal_id: "read_aloud_surface:surface_observation",
+                subgoal_ordinal: 1,
+                target_source: "docs_viewer",
+                target_kind: "docs_visible_surface",
+                required_observation_kind: "helix.workstation_readable_surface_observation.v1",
+                dependency_edges: [{
+                  from: "read_aloud_surface:surface_observation",
+                  to: "read_aloud_surface:narrator_receipt",
+                  binding: "surface_observation_to_voice_text",
+                }],
+              },
+            },
+          },
+          {
+            capability_id: "live_env.narrator_say",
+            mode: "act",
+            arguments: {
+              text: "Needle hull document excerpt.",
+              kind: "narrator_read",
+              requires_confirmation: true,
+              source_target_intent: {
+                source: "helix_compound_capability_dependency_planner",
+                compound_outcome: "read_aloud_surface",
+                subgoal_id: "read_aloud_surface:narrator_receipt",
+                subgoal_ordinal: 2,
+                target_source: "voice_delivery",
+                target_kind: "narrator_say",
+                required_receipt_kind: "helix.interim_voice_callout_tool_result.v1",
+                depends_on_subgoal_id: "read_aloud_surface:surface_observation",
+                depends_on_capability_id: "docs-viewer.read_visible_surface",
+                dependency_binding: "surface_observation_to_voice_text",
+              },
+            },
+          },
+        ],
+      },
+      headers: {},
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.text).toContain("I cannot claim the requested workstation tool or UI action ran");
+    expect(result.text).toContain("live_env.narrator_say: blocked_policy");
+    expect(result.text).not.toContain("I read the document aloud");
+    expect((result.debug as any)?.workstation_gateway_call_results?.map((entry: any) => ({
+      capability_id: entry.capability_id,
+      ok: entry.ok,
+      status: entry.observation_packet?.status,
+      blocked_reason: entry.gateway_admission?.blocked_reason,
+    }))).toEqual([
+      {
+        capability_id: "docs-viewer.read_visible_surface",
+        ok: true,
+        status: "succeeded",
+        blocked_reason: undefined,
+      },
+      {
+        capability_id: "live_env.narrator_say",
+        ok: false,
+        status: "blocked",
+        blocked_reason: "blocked_policy",
+      },
+    ]);
+    expect((result.debug as any)?.workstation_gateway_call_results?.[0]?.observation_packet?.state_delta)
+      .toMatchObject({
+        compound_dependency_turn_plan: {
+          schema: "helix.compound_capability_dependency_turn_plan.v1",
+          compound_outcomes: ["read_aloud_surface"],
+          rail_status: "blocked",
+          first_broken_rail: {
+            subgoal_id: "read_aloud_surface:narrator_receipt",
+            requested_capability: "live_env.narrator_say",
+            satisfied: false,
+            error: "blocked_policy",
+          },
+          ordered_subgoals: [
+            {
+              subgoal_id: "read_aloud_surface:surface_observation",
+              requested_capability: "docs-viewer.read_visible_surface",
+              executed_capability: "docs-viewer.read_visible_surface",
+              satisfied: true,
+            },
+            {
+              subgoal_id: "read_aloud_surface:narrator_receipt",
+              requested_capability: "live_env.narrator_say",
+              executed_capability: null,
+              required_receipt_kind: "helix.interim_voice_callout_tool_result.v1",
+              satisfied: false,
+              rail_status: "missing_observation",
+            },
+          ],
+        },
+      });
+  });
+
   it("projects explicit Codex docs-viewer open-doc gateway calls as action receipts", async () => {
     process.env.CODEX_AGENT_FAKE_STDOUT = "Opened the requested document.";
     process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
@@ -2544,6 +2943,303 @@ describe("Helix Ask agent provider selection", () => {
       event.source_event_type === "action_request" &&
       event.capability_id === "live_env.request_interim_voice_callout",
     )).toBe(false);
+  });
+
+  it("plans and executes readable surface observation before narrator receipt for read-aloud current document", async () => {
+    const body = {
+      turn_id: "ask:test:compound-read-aloud-current-doc",
+      agent_runtime: "codex",
+      question: "Read aloud parts of this document.",
+      workspace_context_snapshot: {
+        activePanel: "docs-viewer",
+        activeDocPath: "docs/needle-hull-mainframe.md",
+      },
+    };
+
+    const planned = buildCompoundCapabilityDependencyGatewayCallRequests(body);
+    expect(planned).toHaveLength(1);
+    expect(planned[0]).toMatchObject({
+      compound_outcome: "read_aloud_surface",
+      capability_id: "docs-viewer.read_visible_surface",
+      dependent_capability_id: "live_env.narrator_say",
+      arguments: {
+        source_doc_path: "docs/needle-hull-mainframe.md",
+        source_target_intent: {
+          dependency_edges: [{
+            from: "read_aloud_surface:surface_observation",
+            to: "read_aloud_surface:narrator_receipt",
+            binding: "surface_observation_to_voice_text",
+          }],
+        },
+      },
+    });
+
+    const results = await runExplicitWorkstationGatewayCalls({
+      body,
+      agentRuntime: "codex",
+      turnId: "ask:test:compound-read-aloud-current-doc",
+    });
+
+    expect(results.map((result) => result.capability_id)).toEqual([
+      "docs-viewer.read_visible_surface",
+      "live_env.narrator_say",
+    ]);
+    expect(results[0].ok).toBe(true);
+    expect(results[0].observation_packet.status).toBe("succeeded");
+    expect(results[1].ok).toBe(true);
+    expect(results[1].observation).toMatchObject({
+      schema: "helix.interim_voice_callout_tool_result.v1",
+      status: "succeeded",
+      receipt: {
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      host_projection: {
+        kind: "voice_playback_request",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    expect((results[1].observation as any).request.text).toContain("docs/needle-hull-mainframe.md");
+    expect((results[1].gateway_admission.source_target_intent as any).depends_on_capability_id).toBe("docs-viewer.read_visible_surface");
+    expect((results[1].gateway_admission.source_target_intent as any).dependency_binding).toBe("surface_observation_to_voice_text");
+    expect((results[0].observation as any).compound_dependency_plan).toMatchObject({
+      schema: "helix.compound_capability_dependency_plan.v1",
+      compound_outcome: "read_aloud_surface",
+      rail_status: "planned",
+      first_broken_rail: null,
+      dependency_edges: [{
+        from: "read_aloud_surface:surface_observation",
+        to: "read_aloud_surface:narrator_receipt",
+        status: "planned",
+      }],
+    });
+    expect((results[1].observation_packet.state_delta as any).compound_dependency_turn_plan).toMatchObject({
+      schema: "helix.compound_capability_dependency_turn_plan.v1",
+      compound_outcomes: ["read_aloud_surface"],
+      rail_status: "satisfied",
+      ordered_subgoals: [
+        {
+          subgoal_id: "read_aloud_surface:surface_observation",
+          requested_capability: "docs-viewer.read_visible_surface",
+          executed_capability: "docs-viewer.read_visible_surface",
+          satisfied: true,
+        },
+        {
+          subgoal_id: "read_aloud_surface:narrator_receipt",
+          requested_capability: "live_env.narrator_say",
+          executed_capability: "live_env.narrator_say",
+          required_receipt_kind: "helix.interim_voice_callout_tool_result.v1",
+          satisfied: true,
+        },
+      ],
+      dependency_edges: [{
+        from: "read_aloud_surface:surface_observation",
+        to: "read_aloud_surface:narrator_receipt",
+      }],
+    });
+  });
+
+  it("routes read-aloud visible translated doc block through surface observation before narrator", async () => {
+    const body = {
+      turn_id: "ask:test:compound-read-aloud-translated-doc",
+      agent_runtime: "codex",
+      question: "Read aloud the visible translated section of this document.",
+      workspace_context_snapshot: {
+        activePanel: "docs-viewer",
+        activeDocPath: "docs/helix-ask-flow.md",
+        activeTranslationBlocks: [{
+          unit_id: "unit:flow:1",
+          source_text: "Helix Ask flow",
+          translated_text: "Flujo de Helix Ask",
+          locale: "es",
+          status: "ready",
+        }],
+      },
+    };
+
+    const results = await runExplicitWorkstationGatewayCalls({
+      body,
+      agentRuntime: "codex",
+      turnId: "ask:test:compound-read-aloud-translated-doc",
+    });
+
+    expect(results.map((result) => result.capability_id)).toEqual([
+      "docs-viewer.read_active_translation",
+      "live_env.narrator_say",
+    ]);
+    expect(results[0]).toMatchObject({
+      ok: true,
+      observation: {
+        schema: "helix.workstation_readable_surface_observation.v1",
+        text: "Flujo de Helix Ask",
+        translation: expect.objectContaining({
+          status: "ready",
+          source_unit_ids: ["unit:flow:1"],
+        }),
+      },
+    });
+    expect((results[1].observation as any).request.text).toContain("Flujo de Helix Ask");
+    expect((results[1].gateway_admission.source_target_intent as any).depends_on_capability_id)
+      .toBe("docs-viewer.read_active_translation");
+  });
+
+  it("routes read-aloud current calculator result through surface observation before narrator", async () => {
+    const body = {
+      turn_id: "ask:test:compound-read-aloud-calculator-result",
+      agent_runtime: "future",
+      question: "Read aloud the current calculator result.",
+      workspace_context_snapshot: {
+        activePanel: "scientific-calculator",
+        calculatorActiveContext: {
+          current_latex: "9*8",
+          last_result_text: "72",
+          last_normalized_expression: "9*8",
+        },
+      },
+    };
+
+    const results = await runExplicitWorkstationGatewayCalls({
+      body,
+      agentRuntime: "future",
+      turnId: "ask:test:compound-read-aloud-calculator-result",
+    });
+
+    expect(results.map((result) => result.capability_id)).toEqual([
+      "scientific-calculator.read_visible_result",
+      "live_env.narrator_say",
+    ]);
+    expect(results[0]).toMatchObject({
+      ok: true,
+      observation: {
+        schema: "helix.workstation_readable_surface_observation.v1",
+        text: "72",
+        calculator: expect.objectContaining({
+          expression: "9*8",
+          result: "72",
+          draft_input_distinguished: true,
+        }),
+      },
+    });
+    expect((results[1].observation as any).request.text).toContain("72");
+    expect((results[1].gateway_admission.source_target_intent as any).depends_on_capability_id)
+      .toBe("scientific-calculator.read_visible_result");
+  });
+
+  it("resolves named document surface before narrator admission for read-aloud document prompts", async () => {
+    const body = {
+      turn_id: "ask:test:compound-read-aloud-named-doc",
+      agent_runtime: "codex",
+      question: "Ok can you read aloud parts of the Helix Ask flow document?",
+      workspace_context_snapshot: {
+        activePanel: "docs-viewer",
+        activeDocPath: "docs/helix-ask-flow.md",
+      },
+    };
+
+    const planned = buildCompoundCapabilityDependencyGatewayCallRequests(body);
+    expect(planned).toHaveLength(1);
+    expect(planned[0]).toMatchObject({
+      compound_outcome: "read_aloud_surface",
+      capability_id: "docs-viewer.read_visible_surface",
+      dependent_capability_id: "live_env.narrator_say",
+    });
+
+    const results = await runExplicitWorkstationGatewayCalls({
+      body,
+      agentRuntime: "codex",
+      turnId: "ask:test:compound-read-aloud-named-doc",
+    });
+
+    expect(results.map((result) => result.capability_id)).toEqual([
+      "docs-viewer.read_visible_surface",
+      "live_env.narrator_say",
+    ]);
+    expect((results[0].observation as any).schema).toBe("helix.workstation_readable_surface_observation.v1");
+    expect((results[1].observation as any).request.text).toMatch(/Helix Ask/i);
+    expect((results[1].observation as any).request.text).not.toMatch(/Document title\/path match/i);
+  });
+
+  it("does not run narrator when read-aloud document resolution has no evidence", async () => {
+    const body = {
+      turn_id: "ask:test:compound-read-aloud-missing-doc",
+      agent_runtime: "codex",
+      question: "Read aloud parts of the zzzmissing helixtest document.",
+    };
+
+    const results = await runExplicitWorkstationGatewayCalls({
+      body,
+      agentRuntime: "codex",
+      turnId: "ask:test:compound-read-aloud-missing-doc",
+    });
+
+    expect(results.map((result) => result.capability_id)).toEqual(["docs-viewer.read_visible_surface"]);
+    expect((results[0].observation as any).compound_dependency_plan).toMatchObject({
+      schema: "helix.compound_capability_dependency_plan.v1",
+      compound_outcome: "read_aloud_surface",
+      rail_status: "blocked",
+      first_broken_rail: {
+        subgoal_id: "read_aloud_surface:surface_observation",
+        capability_id: "docs-viewer.read_visible_surface",
+        reason: "registered_surface_text_missing",
+      },
+      dependency_edges: [{
+        from: "read_aloud_surface:surface_observation",
+        to: "read_aloud_surface:narrator_receipt",
+        status: "blocked",
+      }],
+    });
+    expect((results[0].observation_packet.state_delta as any).compound_dependency_turn_plan).toMatchObject({
+      schema: "helix.compound_capability_dependency_turn_plan.v1",
+      compound_outcomes: ["read_aloud_surface"],
+      rail_status: "blocked",
+      first_broken_rail: {
+        subgoal_id: "read_aloud_surface:surface_observation",
+        requested_capability: "docs-viewer.read_visible_surface",
+        satisfied: false,
+      },
+      ordered_subgoals: [
+        {
+          subgoal_id: "read_aloud_surface:surface_observation",
+          requested_capability: "docs-viewer.read_visible_surface",
+          executed_capability: null,
+          satisfied: false,
+        },
+        {
+          subgoal_id: "read_aloud_surface:narrator_receipt",
+          requested_capability: "live_env.narrator_say",
+          executed_capability: null,
+          satisfied: false,
+          rail_status: "blocked_by_dependency",
+        },
+      ],
+    });
+  });
+
+  it("does not admit read-aloud dependency tools from quoted or explanatory mentions", () => {
+    const prompts = [
+      'The text says "read aloud parts of this document"; explain that phrase only.',
+      "Do not read aloud the current document; just explain what a narrator action would do.",
+      "Later we might read aloud parts of this document, but not now.",
+    ];
+    for (const question of prompts) {
+      const body = {
+        turn_id: "ask:test:compound-read-aloud-negative",
+        agent_runtime: "codex",
+        question,
+        workspace_context_snapshot: {
+          activePanel: "docs-viewer",
+          activeDocPath: "docs/needle-hull-mainframe.md",
+        },
+      };
+      expect(buildCompoundCapabilityDependencyGatewayCallRequests(body)).toEqual([]);
+      expect(readWorkstationGatewayCallRequestsForTurn({
+        body,
+        includePlannerDerived: true,
+      }).map((request) => (request as any).capability_id)).not.toContain("live_env.narrator_say");
+    }
   });
 
   it("does not answer repository content when no repo search observation exists", async () => {

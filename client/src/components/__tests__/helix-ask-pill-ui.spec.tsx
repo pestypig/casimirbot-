@@ -113,6 +113,11 @@ let resolveNextSelectableHelixAgentRuntime: typeof import("@/components/helix/He
 let resolveHelixAskActualAgentProviderLabel: typeof import("@/components/helix/HelixAskPill").resolveHelixAskActualAgentProviderLabel;
 let parseHelixAskFinalAnswerBulletLine: typeof import("@/lib/helix/ask-answer-rendering").parseHelixAskFinalAnswerBulletLine;
 let buildHelixActionEnvelopeRuntimeAuthority: typeof import("@/components/helix/HelixAskPill").buildHelixActionEnvelopeRuntimeAuthority;
+let buildHelixAskContextFilesForTurn: typeof import("@/components/helix/HelixAskPill").buildHelixAskContextFilesForTurn;
+let buildHelixDebugExportEnvelopeFromMasterPayload: typeof import("@/components/helix/HelixAskPill").buildHelixDebugExportEnvelopeFromMasterPayload;
+let buildHelixAskReplyCopyText: typeof import("@/components/helix/HelixAskPill").buildHelixAskReplyCopyText;
+let debugPayloadMatchesRenderedTurnPayload: typeof import("@/components/helix/HelixAskPill").debugPayloadMatchesRenderedTurnPayload;
+let readDocViewerPathFromDesktopUrlForAskSnapshot: typeof import("@/components/helix/HelixAskPill").readDocViewerPathFromDesktopUrlForAskSnapshot;
 
 beforeAll(async () => {
   (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
@@ -226,6 +231,11 @@ beforeAll(async () => {
     resolveNextSelectableHelixAgentRuntime,
     resolveHelixAskActualAgentProviderLabel,
     buildHelixActionEnvelopeRuntimeAuthority,
+    buildHelixAskContextFilesForTurn,
+    buildHelixDebugExportEnvelopeFromMasterPayload,
+    buildHelixAskReplyCopyText,
+    debugPayloadMatchesRenderedTurnPayload,
+    readDocViewerPathFromDesktopUrlForAskSnapshot,
   } = await import("@/components/helix/HelixAskPill"));
   ({ parseHelixAskFinalAnswerBulletLine } = await import("@/lib/helix/ask-answer-rendering"));
 });
@@ -328,6 +338,96 @@ describe("HelixAskPill mic-first surface contract", () => {
       createdAt: 1_000,
     }, question)).toBe(false);
     expect(shouldBlockStagePlayMailboxWakePromptWithoutRouteMetadata(null, "Quote this prompt: Review the latest Stage Play live-source mailbox finding.")).toBe(false);
+  });
+
+  it("includes active docs-viewer context files even when no prompt anchor path was resolved", () => {
+    expect(buildHelixAskContextFilesForTurn(null, {
+      activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+      docContextPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+    })).toEqual(["docs/research/nhm2-current-status-whitepaper-2026-05-02.md"]);
+
+    expect(buildHelixAskContextFilesForTurn(
+      "docs/research/explicit.md",
+      {
+        activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+      },
+    )).toEqual([
+      "docs/research/explicit.md",
+      "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+    ]);
+  });
+
+  it("feeds docs-viewer doc URL parameters into Ask request context files", () => {
+    const originalWindow = (globalThis as Record<string, unknown>).window;
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {
+        location: {
+          search: "?doc=docs%2Fresearch%2Fnhm2-current-status-whitepaper-2026-05-02.md",
+        },
+      },
+    });
+    try {
+      const urlDocPath = readDocViewerPathFromDesktopUrlForAskSnapshot();
+      expect(urlDocPath).toBe("docs/research/nhm2-current-status-whitepaper-2026-05-02.md");
+      expect(buildHelixAskContextFilesForTurn(null, {
+        activeDocPath: urlDocPath,
+      })).toEqual(["docs/research/nhm2-current-status-whitepaper-2026-05-02.md"]);
+    } finally {
+      if (originalWindow === undefined) {
+        delete (globalThis as Record<string, unknown>).window;
+      } else {
+        Object.defineProperty(globalThis, "window", {
+          configurable: true,
+          value: originalWindow,
+        });
+      }
+    }
+  });
+
+  it("copies long terminal answers without UI ellipsis truncation", () => {
+    const longAnswer = `Final answer starts.\n${"agent-output ".repeat(120)}\nFinal answer ends.`;
+
+    const copied = buildHelixAskReplyCopyText({
+      id: "reply-long-answer",
+      content: longAnswer,
+      question: "Return a long answer.",
+      debug: {
+        selected_final_answer: longAnswer,
+        final_answer_source: "model_direct_answer",
+      },
+    } as any);
+
+    expect(copied).toBe(longAnswer);
+    expect(copied).toContain("Final answer ends.");
+    expect(copied).not.toContain("...");
+  });
+
+  it("copies envelope answers and sections without preview-only truncation", () => {
+    const answer = `Envelope answer starts.\n${"section-output ".repeat(90)}\nEnvelope answer ends.`;
+    const detail = `Detail starts.\n${"detail-output ".repeat(60)}\nDetail ends.`;
+
+    const copied = buildHelixAskReplyCopyText({
+      id: "reply-envelope-long-answer",
+      content: "fallback should not win",
+      question: "Return an envelope answer.",
+      envelope: {
+        answer,
+        sections: [
+          {
+            title: "Details",
+            layer: "detail",
+            body: detail,
+          },
+        ],
+      },
+    } as any);
+
+    expect(copied).toContain(answer);
+    expect(copied).toContain(detail);
+    expect(copied).toContain("Envelope answer ends.");
+    expect(copied).toContain("Detail ends.");
+    expect(copied).not.toContain("...");
   });
 
   it("hides the active stream only once the same turn has a durable reply", () => {
@@ -1168,7 +1268,9 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("HELIX_ACTIVE_DOC_VIEWER_ARTIFACT_CUE_RE");
     expect(source).toContain("white\\s*paper|whitepaper");
     expect(source).toContain("resolveAskTurnDocViewerSnapshotPath().path");
-    expect(source).toContain("contextFiles: docsViewerAnchorPath ? [docsViewerAnchorPath] : undefined");
+    expect(source).toContain("buildHelixAskContextFilesForTurn");
+    expect(source).toContain("workspaceContextSnapshot?.activeDocPath");
+    expect(source).toContain("contextFiles: contextFilesForTurn");
   });
 
   it("advertises backend debug export lookup for chat-scoped Ask turn ids", () => {
@@ -1185,6 +1287,53 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain('rebuildReason === "rendered_button_scope"');
     expect(source).toContain("matchingBackendRef ??");
     expect(source).toContain("(isReplyScopedRebuild ? null : refCandidates[0])");
+  });
+
+  it("rejects stale debug payloads that do not match the clicked visible reply", () => {
+    const questionNode = {
+      innerText: "Question QUESTION Latest calculator prompt USER PROMPT",
+      textContent: "Question QUESTION Latest calculator prompt USER PROMPT",
+      getAttribute: () => null,
+    };
+    const finalNode = {
+      innerText: "Final answer FINAL Observed expression: 8*9\nResult: 72",
+      textContent: "Final answer FINAL Observed expression: 8*9\nResult: 72",
+      getAttribute: (name: string) =>
+        name === "data-final-answer-text" ? "Observed expression: 8*9\nResult: 72" : null,
+    };
+    const debugButton = {
+      innerText: "",
+      textContent: "",
+      parentElement: null,
+      querySelector: (selector: string) => {
+        if (selector.includes("question")) return questionNode;
+        if (selector.includes("final")) return finalNode;
+        return null;
+      },
+    } as unknown as HTMLElement;
+
+    const stalePayload = JSON.stringify({
+      active_turn_id: "turn-old-calculator",
+      selectedDebugQuestion: "Old calculator prompt",
+      selected_final_answer: "3 + 5 = 8",
+      selectedDebugFinalAnswer: "3 + 5 = 8",
+      reply: {
+        id: "reply-old-calculator",
+        question: "Old calculator prompt",
+      },
+      debug_export_ref: {
+        endpoint: "/api/agi/ask/turn/turn-old-calculator/debug-export",
+        turn_id: "turn-old-calculator",
+      },
+    });
+
+    expect(debugPayloadMatchesRenderedTurnPayload(stalePayload, debugButton)).toBe(false);
+    expect(debugPayloadMatchesRenderedTurnPayload(JSON.stringify({
+      active_turn_id: "turn-latest-calculator",
+      selectedDebugQuestion: "Latest calculator prompt",
+      selected_final_answer: "Observed expression: 8*9\nResult: 72",
+      selectedDebugFinalAnswer: "Observed expression: 8*9\nResult: 72",
+    }), debugButton)).toBe(true);
   });
 
   it("routes voice lite prompts through normal-turn lane without queued reasoning", () => {
@@ -1239,6 +1388,41 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("resolved_turn_summary");
     expect(source).toContain("resolvedRouteLabel");
     expect(source).toContain("Route: ${resolvedRouteLabel}");
+  });
+
+  it("keeps trusted terminal authority ahead of stale typed-failure fields in debug exports", () => {
+    const payload = JSON.parse(buildHelixDebugExportEnvelopeFromMasterPayload(
+      {
+        id: "reply-codex-workstation-success",
+        turn_id: "turn-codex-workstation-success",
+        content: "Observed expression: 8*9\nResult: 72",
+        question: "Use scientific-calculator.solve_expression for 8*9.",
+      } as any,
+      {
+        selected_final_answer: "I do not have a workstation observation packet.",
+        final_answer_source: "typed_failure",
+        terminal_artifact_kind: "typed_failure",
+        terminal_error_code: "calculator_gateway_solve_observation_missing",
+        terminal_answer_authority: {
+          schema: "helix.turn_terminal_authority.v1",
+          turn_id: "turn-codex-workstation-success",
+          server_authoritative: true,
+          terminal_text_preview: "Observed expression: 8*9\nResult: 72",
+          final_answer_source: "agent_provider_terminal_candidate",
+          terminal_artifact_kind: "agent_provider_terminal_candidate",
+        },
+      },
+    ));
+
+    expect(payload.selected_final_answer).toBe("Observed expression: 8*9\nResult: 72");
+    expect(payload.final_answer_source).toBe("agent_provider_terminal_candidate");
+    expect(payload.terminal_artifact_kind).toBe("agent_provider_terminal_candidate");
+    expect(payload.terminal_error_code).toBeNull();
+    expect(payload.resolved_turn_summary).toMatchObject({
+      final_status: "final_answer",
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      terminal_error_code: null,
+    });
   });
 
   it("builds a visible Stage Play chat ledger from tool receipts and graph artifacts", () => {
@@ -1569,11 +1753,16 @@ describe("HelixAskPill mic-first surface contract", () => {
   it("exposes UI/debug parity hooks without making clipboard copy part of prompt submission", () => {
     const source = fs.readFileSync(pillPath, "utf8");
     const compactSource = source.replace(/\s+/g, " ");
+    const finalRendererStart = source.indexOf("const renderHelixAskFinalAnswerContent = useCallback");
+    const finalRendererEnd = source.indexOf("const renderEnvelopeSections = useCallback", finalRendererStart);
+    const finalRendererSource = source.slice(finalRendererStart, finalRendererEnd);
     expect(source).toContain('const latestFinalAnswerTestId = isLatestReply ? "helix-ask-latest-final-answer"');
     expect(source).toContain("isFinalRow");
     expect(source).toContain("? latestFinalAnswerTestId");
     expect(source).toContain("const transcriptAnswer = finalAnswerRawText");
     expect(source).toContain("const visibleText = isFinalRow ? row.text : clipText(row.text, row.detailLimit ?? 360)");
+    expect(finalRendererSource).toContain('className="mt-2 space-y-1.5 leading-relaxed"');
+    expect(finalRendererSource).not.toMatch(/\b(?:line-clamp|max-h-|overflow-hidden|truncate|text-ellipsis|whitespace-nowrap)\b/);
     expect(source).not.toContain("clipForDisplay(");
     expect(source).not.toContain("HELIX_ASK_MAX_RENDER_CHARS");
     expect(compactSource).toContain("data-final-answer-text={isFinalRow ? finalAnswerRawText : undefined}");

@@ -2278,6 +2278,64 @@ describe("panelActionAdapters", () => {
       expect(useScientificCalculatorStore.getState().lastTheoryLoadout).toBeNull();
     });
 
+    it("proposes frontier conjectures as non-terminal workbench evidence", () => {
+      const result = executeHelixPanelAction(
+        {
+          panel_id: "theory-badge-graph",
+          action_id: "propose_frontier_conjectures",
+          args: {
+            prompt:
+              "Find missing badge bridges between Einstein tensor source residual, QEI margin, and tensor authority.",
+            mentioned_symbols: ["G_mu_nu", "R_source", "qei_margin"],
+            mentioned_domains: ["warp_gr_nhm2", "qei_stress_energy"],
+            frontier_search_seed: "panel-frontier-conjecture-test",
+            overlay: false,
+            open_panel: false,
+          },
+        },
+        actionContext(),
+      );
+
+      expect(result.ok).toBe(true);
+      expect(result.artifact?.kind).toBe("theory_frontier_conjecture_workbench");
+      expect(result.artifact?.schemaVersion).toBe("theory_frontier_conjecture_workbench/v1");
+      expect(isHelixTheoryContextReflectionToolReceiptV1(result.artifact?.tool_receipt_v1)).toBe(true);
+      expect(result.artifact).toMatchObject({
+        graph_id: expect.any(String),
+        candidate_count: expect.any(Number),
+        assistant_answer: false,
+        raw_content_included: false,
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+      });
+      expect(result.artifact?.candidate_count).toBeGreaterThan(0);
+      expect(result.artifact?.frontier_search_v1).toMatchObject({
+        interpretation: expect.objectContaining({
+          noTheoryValidation: true,
+          noAutomaticEdgePromotion: true,
+        }),
+      });
+      expect(result.artifact?.candidates?.[0]).toMatchObject({
+        candidate_id: expect.any(String),
+        candidate_kind: expect.stringMatching(/candidate_connection|missing_intermediate_badge|unresolved_semantic_region/),
+        status: expect.stringMatching(
+          /coarse_candidate|exact_verification_pending|needs_observable|needs_scholarly_evidence|blocked_by_boundary/,
+        ),
+        nearby_badge_ids: expect.any(Array),
+        proposed_relation_or_missing_badge: expect.any(String),
+        congruence_score: expect.any(Number),
+        information_gain_bits: expect.any(Number),
+        calculator_probe_available: expect.any(Boolean),
+        promotion_allowed: false,
+        terminal_eligible: false,
+        assistant_answer: false,
+        post_tool_model_step_required: true,
+      });
+      expect(useScientificCalculatorStore.getState().currentLatex).toBe("");
+      expect(useScientificCalculatorStore.getState().lastSolve).toBeNull();
+      expect(useScientificCalculatorStore.getState().lastTheoryLoadout).toBeNull();
+    });
+
     it("does not open the theory panel when reflection open_panel is false", () => {
       const openPanel = vi.fn();
       const focusPanel = vi.fn();
@@ -2389,6 +2447,19 @@ describe("panelActionAdapters", () => {
       });
       expect(capabilities.safe_actions).toContain("reflect_discussion_context");
       expect(capabilities.returns_artifact_actions).toContain("reflect_discussion_context");
+    });
+
+    it("declares propose_frontier_conjectures as a low-risk artifact action", () => {
+      const capabilities = WORKSTATION_V1_PANEL_CAPABILITIES["theory-badge-graph"];
+      const action = capabilities.actions.find((candidate) => candidate.id === "propose_frontier_conjectures");
+
+      expect(action).toMatchObject({
+        title: "Propose Frontier Conjectures",
+        risk: "low",
+        returns_artifact: true,
+      });
+      expect(capabilities.safe_actions).toContain("propose_frontier_conjectures");
+      expect(capabilities.returns_artifact_actions).toContain("propose_frontier_conjectures");
     });
 
     it("exposes physics atlas blocks and can select the solar lens", () => {

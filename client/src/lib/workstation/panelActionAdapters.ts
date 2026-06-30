@@ -73,6 +73,11 @@ import {
 } from "@shared/theory/theory-calculator-loadout";
 import { buildTheoryCompoundRun } from "@shared/theory/theory-compound-run-builder";
 import {
+  buildTheoryFrontierConjectureWorkbenchV1,
+  THEORY_FRONTIER_CONJECTURE_WORKBENCH_SCHEMA_VERSION,
+  theoryFrontierConjectureForbiddenClaimNotes,
+} from "@shared/theory/theory-frontier-conjecture-workbench";
+import {
   HELIX_PHYSICS_CALCULATION_INTENTS,
   type HelixPhysicsCalculationIntent,
 } from "@shared/contracts/helix-physics-calculation-context-plan.v1";
@@ -5770,6 +5775,80 @@ export function executeHelixPanelAction(
           context_role: "tool_evidence",
           ask_context_policy: "evidence_only",
           deterministic_content_role: "observation_not_assistant_answer",
+        },
+      };
+    }
+
+    if (actionId === "propose_frontier_conjectures") {
+      const prompt = asNonEmptyString(args.prompt ?? args.query ?? args.text);
+      if (!prompt) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "theory-badge-graph.propose_frontier_conjectures requires a prompt, query, or text.",
+        };
+      }
+
+      const receipt = runClientTheoryContextReflectionTool({
+        prompt,
+        conversationContext: asNonEmptyString(args.conversation_context ?? args.conversationContext) ?? null,
+        mentionedEquations: asStringArray(args.mentioned_equations ?? args.mentionedEquations),
+        mentionedSymbols: asStringArray(args.mentioned_symbols ?? args.mentionedSymbols),
+        mentionedDomains: asStringArray(args.mentioned_domains ?? args.mentionedDomains),
+        confidenceMode: asTheoryContextReflectionConfidenceMode(args.confidence_mode ?? args.confidenceMode),
+        source: asTheoryContextReflectionSource(args.source),
+        limit: asNumber(args.limit) ?? undefined,
+        turnId: asNonEmptyString(args.turn_id ?? args.turnId) ?? `panel:${Date.now()}`,
+        threadId: asNonEmptyString(args.thread_id ?? args.threadId) ?? "helix-ask:desktop",
+        buildExplanationPlan: true,
+        buildFrontierSearch: true,
+        frontierSearchSeed: asNonEmptyString(args.frontier_search_seed ?? args.frontierSearchSeed),
+        syncPanel: asBoolean(args.overlay) ?? true,
+        overlayMode: "discussion_zone",
+        openPanel: asBoolean(args.open_panel ?? args.openPanel) ?? true,
+        openPanelHandler: (targetPanelId: string) => context.openPanel(targetPanelId, undefined),
+        focusPanelHandler: (targetPanelId: string) => context.focusPanel(targetPanelId, undefined),
+      });
+      const frontierSearch = receipt.frontierSearchV1;
+      if (!frontierSearch) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "Theory frontier search did not produce a workbench artifact.",
+        };
+      }
+      const forbiddenClaimNotes = theoryFrontierConjectureForbiddenClaimNotes(prompt);
+      const workbench = buildTheoryFrontierConjectureWorkbenchV1(
+        frontierSearch,
+        receipt.recommendedNextActions,
+        forbiddenClaimNotes,
+      );
+
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "theory_frontier_conjecture_workbench",
+          schemaVersion: THEORY_FRONTIER_CONJECTURE_WORKBENCH_SCHEMA_VERSION,
+          artifact_v1: workbench,
+          frontier_search_v1: frontierSearch,
+          tool_receipt_v1: receipt,
+          graph_id: graph.graphId,
+          candidates: workbench.candidates,
+          candidate_count: workbench.candidates.length,
+          candidate_status_counts: workbench.candidate_status_counts,
+          top_candidate_id: workbench.top_candidate_id,
+          scholarly_lookup_requests: frontierSearch.scholarlyLookupRequests,
+          exact_verification_results: receipt.frontierExactVerificationResultsV1,
+          probability_terrain: workbench.probability_terrain,
+          forbidden_claim_scan_notes: forbiddenClaimNotes,
+          assistant_answer: false,
+          raw_content_included: false,
+          terminal_eligible: false,
+          post_tool_model_step_required: true,
         },
       };
     }

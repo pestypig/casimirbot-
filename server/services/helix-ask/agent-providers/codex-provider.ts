@@ -30,6 +30,7 @@ const COMPOUND_NORMALIZABLE_CAPABILITIES = new Set<string>([
   "docs.search",
   CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
   "theory-badge-graph.reflect_discussion_context",
+  "theory-badge-graph.propose_frontier_conjectures",
   "civilization-bounds.reflect_system_bounds",
   SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
 ]);
@@ -130,6 +131,9 @@ const typedObservationKindForGatewayCapability = (capabilityId: string): string 
   if (capabilityId === "theory-badge-graph.reflect_discussion_context") {
     return "helix_theory_context_reflection_tool_receipt";
   }
+  if (capabilityId === "theory-badge-graph.propose_frontier_conjectures") {
+    return "theory_frontier_conjecture_observation";
+  }
   if (capabilityId === "civilization-bounds.reflect_system_bounds") {
     return "helix_civilization_bounds_tool_result";
   }
@@ -146,6 +150,9 @@ const schemaForTypedObservationKind = (kind: string): string => {
   if (kind === "calculator_receipt") return "helix.calculator_receipt.v1";
   if (kind === "helix_theory_context_reflection_tool_receipt") {
     return "helix_theory_context_reflection_tool_receipt/v1";
+  }
+  if (kind === "theory_frontier_conjecture_observation") {
+    return "helix.theory_frontier_conjecture_observation.v1";
   }
   if (kind === "helix_civilization_bounds_tool_result") {
     return "helix_civilization_bounds_tool_result/v1";

@@ -402,6 +402,31 @@ export const WORKSTATION_V1_PANEL_CAPABILITIES: Record<string, WorkstationPanelC
         returns_artifact: true,
       },
       {
+        id: "propose_frontier_conjectures",
+        title: "Propose Frontier Conjectures",
+        description:
+          "Locate unresolved badge bridges and missing intermediate regions from graph, biome, probability, and frontier-search evidence. Returns evidence only; does not validate, promote, solve, or mutate calculator state.",
+        risk: "low",
+        optional_args: [
+          "prompt",
+          "query",
+          "text",
+          "conversation_context",
+          "mentioned_equations",
+          "mentioned_symbols",
+          "mentioned_domains",
+          "confidence_mode",
+          "source",
+          "overlay",
+          "open_panel",
+          "turn_id",
+          "thread_id",
+          "frontier_search_seed",
+          "limit",
+        ],
+        returns_artifact: true,
+      },
+      {
         id: "explain_reflected_context",
         title: "Explain Reflected Context",
         description:
