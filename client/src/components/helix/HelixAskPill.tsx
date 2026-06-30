@@ -11,7 +11,7 @@ import React, {
 } from "react";
 import { renderToString as renderKatexToString } from "katex";
 import "katex/dist/katex.min.css";
-import { BrainCircuit, ChevronDown, FileText, Headphones, Image as ImageIcon, Mic, PauseCircle, Pencil, PlayCircle, Plus, Radio, RotateCcw, Search, Square, Trash2, X } from "lucide-react";
+import { ChevronDown, PauseCircle, Pencil, PlayCircle, Radio, Trash2 } from "lucide-react";
 import { panelRegistry, getPanelDef, type PanelDefinition } from "@/lib/desktop/panelRegistry";
 import {
   findBestDocForTopic,
@@ -75,7 +75,15 @@ import {
   hasSuccessfulWorkstationTerminalTranscriptRows,
   resolveHelixAskConsoleFinalAnswerSourceLabel,
 } from "@/components/helix/ask-console/HelixAskFinalProjection";
-import { buildHelixAskFinalAnswerBlocks } from "@/components/helix/ask-console/HelixAskFinalAnswer";
+import {
+  HelixAskFinalAnswer,
+} from "@/components/helix/ask-console/HelixAskFinalAnswer";
+import { HelixAskActiveTurnStreamPanel } from "@/components/helix/ask-console/HelixAskActiveTurnStreamPanel";
+import { HelixAskActionToolbar } from "@/components/helix/ask-console/HelixAskActionToolbar";
+import { HelixAskMoodAvatar } from "@/components/helix/ask-console/HelixAskMoodAvatar";
+import { HelixAskReplyCard } from "@/components/helix/ask-console/HelixAskReplyCard";
+import { HelixAskSurfaceFrame } from "@/components/helix/ask-console/HelixAskSurfaceFrame";
+import { HelixAskTurnStreamPanel } from "@/components/helix/ask-console/HelixAskTurnStreamPanel";
 import { selectHelixAskConsoleTurnTranscriptRowsForStream } from "@/components/helix/ask-console/HelixAskWorkstationTraceRows";
 import {
   HelixAskRuntimePicker,
@@ -83,6 +91,8 @@ import {
 } from "@/components/helix/ask-console/HelixAskRuntimePicker";
 import {
   HELIX_ASK_CONSOLE_MAX_PROMPT_LINES,
+  HelixAskComposerSubmitButton,
+  HelixAskComposerTextarea,
   buildHelixAskComposerViewModel,
 } from "@/components/helix/ask-console/HelixAskComposer";
 import { buildHelixAskSubmitAdmission } from "@/components/helix/ask-console/HelixAskSubmitAdmission";
@@ -101,8 +111,29 @@ import {
   buildHelixAskConsoleChatMessagePayload,
   buildHelixAskConsoleChatTurnPayloads,
 } from "@/components/helix/ask-console/HelixAskChatPersistence";
-import { HelixAskTurnControls } from "@/components/helix/ask-console/HelixAskTurnControls";
 import { HelixAskDebugDrawer } from "@/components/helix/ask-console/HelixAskDebugDrawer";
+import { HelixAskTurnList } from "@/components/helix/ask-console/HelixAskTurnList";
+import { HelixAskAttachmentStrip } from "@/components/helix/ask-console/HelixAskAttachmentStrip";
+import {
+  HelixAskContextMemoryStatusLine,
+  HelixAskErrorLine,
+  HelixAskVoiceStatusPill,
+} from "@/components/helix/ask-console/HelixAskStatusLine";
+import { HelixAskVoiceLevelMonitor } from "@/components/helix/ask-console/HelixAskVoiceLevelMonitor";
+import {
+  HelixAskContextChooserPanel,
+  HelixAskConversationBriefPanel,
+  HelixAskObserverLanePanel,
+} from "@/components/helix/ask-console/HelixAskObserverLane";
+import { HelixAskSteeringQueuePanel } from "@/components/helix/ask-console/HelixAskSteeringQueuePanel";
+import {
+  HelixAskContextCapsulePreview,
+} from "@/components/helix/ask-console/HelixAskContextCapsulePreview";
+import { HelixAskSituationRoomSourcePanel } from "@/components/helix/ask-console/HelixAskSituationRoomSourcePanel";
+import {
+  HelixAskTranscriptConfirmationPanel,
+  HelixAskVoiceCommandConfirmationPanel,
+} from "@/components/helix/ask-console/HelixAskVoiceConfirmationPanel";
 export { hasSuccessfulWorkstationTerminalTranscriptRows };
 export {
   DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS,
@@ -229,15 +260,11 @@ export type { HelixMailLoopTranscriptRow } from "@/lib/helix/ask-live-source-dis
 import {
   HELIX_ASK_STEERING_QUEUE_MAX_ITEMS,
   buildHelixAskSteeringQueueItems,
-  readHelixSteeringQueueDotClass,
-  readHelixSteeringQueueItemClass,
   shouldAutoWakeHelixMailboxQueueItem,
 } from "@/lib/helix/ask-steering-queue-display";
 export {
   HELIX_ASK_STEERING_QUEUE_MAX_ITEMS,
   buildHelixAskSteeringQueueItems,
-  readHelixSteeringQueueDotClass,
-  readHelixSteeringQueueItemClass,
   shouldAutoWakeHelixMailboxQueueItem,
 };
 export type {
@@ -301,7 +328,6 @@ import {
 import {
   SESSION_CAPSULE_CONFIDENCE_LABEL,
   buildContextCapsuleCopyText,
-  buildContextCapsuleStampDataUri,
   resolveContextCapsulePalette,
   stripContextCapsuleTokensFromText,
 } from "@/lib/helix/ask-context-capsule-display";
@@ -844,9 +870,6 @@ import {
   type ConvergenceStripState,
 } from "@/lib/helix/reasoning-theater-convergence";
 import {
-  CONVERGENCE_MATURITY_LABEL,
-  CONVERGENCE_PROOF_LABEL,
-  CONVERGENCE_SOURCE_LABEL,
   buildConvergenceDebugSnapshot,
   hasConvergenceStateChanged,
 } from "@/lib/helix/ask-convergence-display";
@@ -13650,40 +13673,7 @@ export function HelixAskPill({
     (content: unknown): ReactNode => {
       const text = coerceText(content);
       if (!text) return null;
-      const blocks = buildHelixAskFinalAnswerBlocks(text);
-      return (
-        <div className="mt-2 space-y-1.5 leading-relaxed">
-          {blocks.map((block) => {
-            if (block.kind === "blank") {
-              return <div key={block.key} className="h-2" aria-hidden="true" />;
-            }
-            if (block.kind === "bullet") {
-              return (
-                <div key={block.key} className="flex gap-2 pl-2">
-                  <span className="mt-[0.15rem] text-cyan-300/80" aria-hidden="true">
-                    -
-                  </span>
-                  <span
-                    className="min-w-0 flex-1"
-                    data-narrator-source-id={`helix-${block.key}`}
-                  >
-                    {renderHelixAskContent(block.text)}
-                  </span>
-                </div>
-              );
-            }
-            return (
-              <div
-                key={block.key}
-                className={block.isSectionHeader ? "pt-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-100" : ""}
-                data-narrator-source-id={`helix-${block.key}`}
-              >
-                {renderHelixAskContent(block.text)}
-              </div>
-            );
-          })}
-        </div>
-      );
+      return <HelixAskFinalAnswer text={text} renderContent={renderHelixAskContent} />;
     },
     [renderHelixAskContent],
   );
@@ -28395,6 +28385,8 @@ export function HelixAskPill({
     (displayAudioStatus === "active" || displayAudioStatus === "transcribing") &&
     displayAudioSourceSnapshot?.status !== "stopped" &&
     displayAudioSourceSnapshot?.status !== "error";
+  const showSituationRoomSourcePanel =
+    visualSituationSourceStatus !== "idle" || displayAudioStatus !== "idle" || situationRoomState.recentEvents.length > 0;
   const [voiceCallDiagnostics, setVoiceCallDiagnostics] = useState<VoiceCallDiagnosticSnapshot[]>(() =>
     getVoiceCallDiagnosticsSnapshot(),
   );
@@ -29092,676 +29084,181 @@ export function HelixAskPill({
     voiceNoisyEnvironmentMode,
   ]);
 
-  const activeTurnStreamPanel = visibleActiveTurnStreamRows.length > 0 ? (
-    <div
-      ref={activeTurnStreamPanelRef}
-      className="relative px-1 py-1 text-xs text-slate-100"
-      aria-label="Active turn stream"
-      data-testid="helix-ask-active-turn-stream"
-      data-turn-stream-lines={visibleActiveTurnStreamRows.length}
-      data-active-row-count={visibleActiveTurnStreamRows.length}
-      data-active-turn-id={activeAskTurnIdRef.current ?? undefined}
-      data-active-trace-id={askLiveTraceId ?? undefined}
-      data-render-placement="after_completed_replies"
-    >
-      {userSettings.showHelixAskConsoleDebug ? (
-        <p className="mb-2 text-[10px] uppercase tracking-[0.2em] text-cyan-200">Active turn stream</p>
-      ) : null}
-      <div className="relative space-y-3 before:absolute before:left-[0.72rem] before:top-2 before:h-[calc(100%-1rem)] before:w-px before:bg-slate-600/45">
-        {visibleActiveTurnStreamRows.map((row, index) => {
-          const isQuestionRow = row.source === "question";
-          const isFinalRow = row.source === "final";
-          const rowClass = readHelixContinuousTurnStreamRowClass(row.tone);
-          const dotClass = readHelixContinuousTurnStreamDotClass(row.tone);
-          const visibleText = isFinalRow ? row.text : clipText(row.text, row.detailLimit ?? 360);
-          const isLatestActiveRow = index === visibleActiveTurnStreamRows.length - 1;
-          return (
-            <div
-              key={row.key}
-              className={`relative flex items-start gap-3 border-l pl-7 ${rowClass} ${
-                isLatestActiveRow ? "helix-ask-turn-line-enter" : ""
-              }`}
-              data-testid="helix-ask-active-turn-stream-row"
-              data-active-latest-line={isLatestActiveRow ? "true" : undefined}
-              data-stream-row-source={row.source}
-            >
-              {isLatestActiveRow ? (
-                <span className="sr-only" data-testid="helix-ask-active-turn-latest-line">
-                  Latest active turn line
-                </span>
-              ) : null}
-              <span
-                className={`absolute left-0 top-1.5 h-3 w-3 rounded-full border-2 shadow-[0_0_0_3px_rgba(2,6,23,0.9)] ${dotClass}`}
-                aria-hidden
-              />
-              <span className="mt-0.5 min-w-6 text-right text-[10px] tabular-nums text-slate-400">
-                {index + 1}
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="break-words font-semibold">{row.label}</p>
-                  <span className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.12em] text-slate-300">
-                    {isQuestionRow ? "user prompt" : row.source.replace(/_/g, " ")}
-                  </span>
-                </div>
-                <div className="mt-1 whitespace-pre-wrap break-words leading-relaxed">
-                  {isFinalRow ? renderHelixAskFinalAnswerContent(visibleText) : visibleText}
-                </div>
-                <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-slate-400/80">
-                  {row.meta || row.status}
-                </p>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  ) : null;
+  const activeTurnStreamPanel = (
+    <HelixAskActiveTurnStreamPanel
+      rows={visibleActiveTurnStreamRows}
+      activeTurnId={activeAskTurnIdRef.current}
+      activeTraceId={askLiveTraceId}
+      showDebugLabel={userSettings.showHelixAskConsoleDebug}
+      panelRef={activeTurnStreamPanelRef}
+      clipText={clipText}
+      renderFinalAnswerContent={renderHelixAskFinalAnswerContent}
+      readRowClass={readHelixContinuousTurnStreamRowClass}
+      readDotClass={readHelixContinuousTurnStreamDotClass}
+    />
+  );
 
   return (
     <HelixAskErrorBoundary>
-      <div className={[className, layoutVariant === "dock" ? "min-h-0" : ""].filter(Boolean).join(" ")}>
-        <form
-          className={`w-full ${maxWidthClass} transition-[max-width] duration-300 ease-out`}
-          style={formMaxWidthStyle}
-          onSubmit={handleAskSubmit}
-          onPointerDownCapture={() => {
-            void primeVoiceAudioPlayback();
-          }}
-          onTouchStartCapture={() => {
-            void primeVoiceAudioPlayback();
-          }}
-          onClickCapture={() => {
-            void primeVoiceAudioPlayback();
-          }}
-        >
-        <div
-          className={`relative overflow-visible rounded-3xl border bg-slate-950/80 shadow-[0_24px_60px_rgba(0,0,0,0.55)] backdrop-blur ${moodPalette.surfaceBorder}`}
-        >
-          <div
-            className={`pointer-events-none absolute inset-0 rounded-3xl ${moodPalette.surfaceTint}`}
-            aria-hidden
-          />
-          <div
-            className={`pointer-events-none absolute inset-0 rounded-3xl ${moodPalette.surfaceHalo}`}
-            aria-hidden
-          />
-          <div className="relative">
-            {isOffline ? (
-              <div className="px-4 pt-3 text-[10px] uppercase tracking-[0.22em] text-amber-200/80">
-                Offline - reconnecting
-              </div>
-            ) : null}
-            <div
-              ref={voiceMonitorAnchorRef}
-              aria-hidden={!showTopInputLevelMonitor}
-              className={`absolute inset-x-4 bottom-full z-20 overflow-hidden transition-all duration-300 ease-out ${
-                showTopInputLevelMonitor
-                  ? "mb-2 translate-y-0 opacity-100"
-                  : "pointer-events-none mb-0 max-h-0 translate-y-1 opacity-0"
-              }`}
-              style={
-                showTopInputLevelMonitor ? { maxHeight: `${Math.max(0, voiceMonitorMaxHeightPx)}px` } : undefined
-              }
-            >
-              <div className="rounded-2xl border border-cyan-200/15 bg-slate-950/55 px-2 py-1.5 shadow-[0_10px_32px_rgba(8,47,73,0.34)] backdrop-blur-xl">
-                <div
-                  className="grid gap-0.5 rounded-xl border border-white/10 bg-black/35 p-1 shadow-inner shadow-cyan-950/40"
-                  style={{ gridTemplateColumns: "repeat(16, minmax(0, 1fr))" }}
-                  aria-label={`Voice input level meter: ${
-                    voiceSignalState === "speech"
-                      ? "speech-level signal"
-                      : voiceSignalState === "low"
-                        ? "low-level signal"
-                        : "waiting for device audio"
-                  }`}
-                >
-                  {Array.from({ length: 16 }).map((_, index) => {
-                    const threshold = (index + 1) / 16;
-                    const active = voiceMonitorLevel >= threshold;
-                    return (
-                      <span
-                        key={`voice-level-${index}`}
-                        className={`h-2.5 rounded-full transition-colors duration-150 ${
-                          active
-                            ? voiceMonitorLevel >= 0.75
-                              ? "bg-emerald-300 shadow-[0_0_10px_rgba(110,231,183,0.85)]"
-                              : voiceMonitorLevel >= 0.45
-                                ? "bg-cyan-300 shadow-[0_0_10px_rgba(103,232,249,0.72)]"
-                                : "bg-sky-300 shadow-[0_0_8px_rgba(125,211,252,0.62)]"
-                            : "bg-slate-700/60"
-                        }`}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
+      <HelixAskSurfaceFrame
+        className={className}
+        layoutVariant={layoutVariant}
+        maxWidthClassName={maxWidthClass}
+        maxWidthStyle={formMaxWidthStyle}
+        surfaceBorderClassName={moodPalette.surfaceBorder}
+        surfaceTintClassName={moodPalette.surfaceTint}
+        surfaceHaloClassName={moodPalette.surfaceHalo}
+        isOffline={isOffline}
+        onSubmit={handleAskSubmit}
+        onPrimeInteraction={() => {
+          void primeVoiceAudioPlayback();
+        }}
+      >
+            <HelixAskVoiceLevelMonitor
+              visible={showTopInputLevelMonitor}
+              maxHeightPx={voiceMonitorMaxHeightPx}
+              level={voiceMonitorLevel}
+              signalState={voiceSignalState}
+              anchorRef={voiceMonitorAnchorRef}
+            />
             <div className="flex flex-col gap-2 px-4 py-3">
               <div className="flex flex-wrap items-center gap-3">
-                <div
-                  className={`flex h-12 w-12 items-center justify-center rounded-full border ${moodPalette.aura}`}
-                >
-                  <div
-                    className={`flex h-10 w-10 items-center justify-center rounded-full bg-black/45 ring-1 ring-inset ${moodRingClass}`}
-                  >
-                    {moodSrc ? (
-                      <img
-                        src={moodSrc}
-                        alt={`${moodLabel} mood`}
-                        className="h-9 w-9 object-contain"
-                        loading="lazy"
-                        onError={() => setAskMoodBroken(true)}
-                      />
-                    ) : (
-                      <BrainCircuit
-                        className="h-5 w-5 text-slate-100/90"
-                        strokeWidth={2.25}
-                        aria-hidden
-                      />
-                    )}
-                  </div>
-                </div>
-                <div className="relative min-w-0 flex-1">
-                  <button
-                    type="button"
-                    aria-label="Scroll Ask controls left"
-                    className={`absolute inset-y-0 left-0 z-10 w-12 rounded-l-full bg-gradient-to-r from-slate-950/95 via-slate-950/50 to-transparent transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 ${
-                      askActionCarouselEdges.canScrollLeft ? "opacity-100" : "pointer-events-none opacity-0"
-                    }`}
-                    onClick={() => scrollAskActionCarousel("left")}
-                    disabled={!askActionCarouselEdges.canScrollLeft}
-                  />
-                  <div
-                    ref={askActionCarouselRef}
-                    className="flex min-w-0 snap-x snap-mandatory items-center justify-end gap-2 overflow-x-auto scroll-smooth px-12 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                  >
-                  <input
-                    ref={askImageInputRef}
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onChange={handleAskImageSelect}
-                  />
-                  <HelixAskRuntimePicker
-                    model={agentRuntimePickerModel}
-                    menuOpen={agentRuntimeMenuOpen}
-                    onPrimaryClick={handleAgentRuntimeButtonClick}
-                    onSelect={handleAgentRuntimeSelect}
-                  />
-                  <button
-                    type="button"
-                    data-helix-ask-action-item="true"
-                    aria-label="Attach image"
-                    title="Attach image"
-                    className={`inline-flex h-10 w-10 shrink-0 snap-center items-center justify-center rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60 ${
-                      hasReadyAskAttachment
-                        ? "border-violet-300/50 bg-violet-400/15 text-violet-100 hover:bg-violet-400/20"
-                        : askAttachments.length > 0
-                          ? "border-amber-300/45 bg-amber-400/12 text-amber-100 hover:bg-amber-400/20"
-                          : "border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
-                    }`}
-                    onClick={() => {
-                      triggerAskActionHaptic();
-                      askImageInputRef.current?.click();
-                    }}
-                    disabled={askBusy}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    data-helix-ask-action-item="true"
-                    aria-label={micArmState === "on" ? "Disable microphone" : "Enable microphone"}
-                    aria-pressed={micArmState === "on"}
-                    title={micArmState === "on" ? "Disable microphone" : "Enable microphone"}
-                    className={`inline-flex h-10 w-10 shrink-0 snap-center items-center justify-center rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60 ${
-                      micArmState === "on"
-                        ? voiceInputState === "transcribing"
-                          ? "border-cyan-300/45 bg-cyan-400/12 text-cyan-100"
-                          : "border-emerald-300/55 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/20"
-                        : "border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
-                    }`}
-                    onClick={() => {
-                      triggerAskActionHaptic();
-                      handleVoiceInputToggle();
-                    }}
-                  >
-                    <Mic
-                      className={`h-4 w-4 ${
-                        micArmState === "on" || voiceInputState === "transcribing" ? "animate-pulse" : ""
-                      }`}
+                <HelixAskMoodAvatar
+                  auraClassName={moodPalette.aura}
+                  ringClassName={moodRingClass}
+                  moodSrc={moodSrc}
+                  moodLabel={moodLabel}
+                  onImageError={() => setAskMoodBroken(true)}
+                />
+                <HelixAskActionToolbar
+                  carouselRef={askActionCarouselRef}
+                  imageInputRef={askImageInputRef}
+                  canScrollLeft={askActionCarouselEdges.canScrollLeft}
+                  canScrollRight={askActionCarouselEdges.canScrollRight}
+                  onScrollLeft={() => scrollAskActionCarousel("left")}
+                  onScrollRight={() => scrollAskActionCarousel("right")}
+                  onImageSelect={handleAskImageSelect}
+                  onAttachImage={() => {
+                    triggerAskActionHaptic();
+                    askImageInputRef.current?.click();
+                  }}
+                  attachDisabled={askBusy}
+                  hasReadyAttachment={hasReadyAskAttachment}
+                  hasAnyAttachment={askAttachments.length > 0}
+                  micEnabled={micArmState === "on"}
+                  voiceTranscribing={voiceInputState === "transcribing"}
+                  onToggleMic={() => {
+                    triggerAskActionHaptic();
+                    handleVoiceInputToggle();
+                  }}
+                  showRetryVoiceSample={Boolean(voiceRetainedTranscriptionRetry)}
+                  retryVoiceSampleDisabled={micArmState !== "on" || voiceTranscribeBusyRef.current}
+                  onRetryVoiceSample={() => {
+                    triggerAskActionHaptic();
+                    handleRetainedVoiceTranscriptionRetry();
+                  }}
+                  visualSituationSourceStatus={visualSituationSourceStatus}
+                  onCaptureVisualSource={() => {
+                    triggerAskActionHaptic();
+                    handleVisualSituationSourceCapture();
+                  }}
+                  visualSituationIncludeAudio={visualSituationIncludeAudio}
+                  displayAudioStatus={displayAudioStatus}
+                  visualAudioToggleDisabled={visualSituationSourceStatus === "requesting"}
+                  onToggleVisualAudio={() => {
+                    triggerAskActionHaptic();
+                    handleVisualSituationAudioPreferenceToggle();
+                  }}
+                  runtimePicker={
+                    <HelixAskRuntimePicker
+                      model={agentRuntimePickerModel}
+                      menuOpen={agentRuntimeMenuOpen}
+                      onPrimaryClick={handleAgentRuntimeButtonClick}
+                      onSelect={handleAgentRuntimeSelect}
                     />
-                  </button>
-                  {voiceRetainedTranscriptionRetry ? (
-                    <button
-                      type="button"
-                      data-helix-ask-action-item="true"
-                      aria-label="Retry saved voice sample"
-                      title="Retry saved voice sample"
-                      className="inline-flex h-10 w-10 shrink-0 snap-center items-center justify-center rounded-full border border-amber-300/45 bg-amber-400/12 text-amber-100 transition hover:bg-amber-400/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200/70 disabled:opacity-60"
-                      onClick={() => {
+                  }
+                  submitButton={
+                    <HelixAskComposerSubmitButton
+                      viewModel={composerViewModel}
+                      onSubmitIntent={() => triggerAskActionHaptic()}
+                      onStop={() => {
                         triggerAskActionHaptic();
-                        handleRetainedVoiceTranscriptionRetry();
+                        handleStop();
                       }}
-                      disabled={micArmState !== "on" || voiceTranscribeBusyRef.current}
-                    >
-                      <RotateCcw className="h-4 w-4" />
-                    </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    data-helix-ask-action-item="true"
-                    aria-label="Capture visual source for Situation Room"
-                    aria-pressed={visualSituationSourceStatus === "active"}
-                    title="Capture visual source"
-                    className={`inline-flex h-10 w-10 shrink-0 snap-center items-center justify-center rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60 ${
-                      visualSituationSourceStatus === "active"
-                        ? "border-cyan-300/50 bg-cyan-400/15 text-cyan-100 hover:bg-cyan-400/20"
-                        : visualSituationSourceStatus === "requesting"
-                          ? "border-amber-300/45 bg-amber-400/12 text-amber-100"
-                          : visualSituationSourceStatus === "error"
-                            ? "border-rose-300/45 bg-rose-400/12 text-rose-100 hover:bg-rose-400/20"
-                            : "border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
-                    }`}
-                    onClick={() => {
-                      triggerAskActionHaptic();
-                      handleVisualSituationSourceCapture();
-                    }}
-                  >
-                    <ImageIcon
-                      className={`h-4 w-4 ${visualSituationSourceStatus === "active" ? "animate-pulse" : ""}`}
                     />
-                  </button>
-                  <button
-                    type="button"
-                    data-helix-ask-action-item="true"
-                    aria-label={visualSituationIncludeAudio ? "Disable tab audio for visual capture" : "Enable tab audio for visual capture"}
-                    aria-pressed={visualSituationIncludeAudio}
-                    title={visualSituationIncludeAudio ? "Disable tab audio for visual capture" : "Enable tab audio for visual capture"}
-                    className={`inline-flex h-10 w-10 shrink-0 snap-center items-center justify-center rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60 ${
-                      visualSituationIncludeAudio
-                        ? displayAudioStatus === "error"
-                          ? "border-rose-300/45 bg-rose-400/12 text-rose-100 hover:bg-rose-400/20"
-                          : "border-teal-300/50 bg-teal-400/15 text-teal-100 hover:bg-teal-400/20"
-                        : "border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
-                    }`}
-                    onClick={() => {
-                      triggerAskActionHaptic();
-                      handleVisualSituationAudioPreferenceToggle();
-                    }}
-                    disabled={visualSituationSourceStatus === "requesting"}
-                  >
-                    <Headphones
-                      className={`h-4 w-4 ${visualSituationIncludeAudio && displayAudioStatus !== "error" ? "animate-pulse" : ""}`}
-                    />
-                  </button>
-                  <button
-                    data-helix-ask-action-item="true"
-                    aria-label={composerViewModel.submitAriaLabel}
-                    title={composerViewModel.submitTitle}
-                    className="inline-flex h-10 w-10 shrink-0 snap-center items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-100 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60"
-                    onClick={
-                      composerViewModel.submitMode === "stop"
-                        ? () => {
-                            triggerAskActionHaptic();
-                            handleStop();
-                          }
-                        : () => triggerAskActionHaptic()
-                    }
-                    type={composerViewModel.submitButtonType}
-                  >
-                    {composerViewModel.submitIcon === "square" ? (
-                      <Square className="h-4 w-4" />
-                    ) : (
-                      <Search className="h-4 w-4" />
-                    )}
-                  </button>
-                  </div>
-                  <button
-                    type="button"
-                    aria-label="Scroll Ask controls right"
-                    className={`absolute inset-y-0 right-0 z-10 w-12 rounded-r-full bg-gradient-to-l from-slate-950/95 via-slate-950/50 to-transparent transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 ${
-                      askActionCarouselEdges.canScrollRight ? "opacity-100" : "pointer-events-none opacity-0"
-                    }`}
-                    onClick={() => scrollAskActionCarousel("right")}
-                    disabled={!askActionCarouselEdges.canScrollRight}
-                  />
-                </div>
+                  }
+                />
               </div>
-              <textarea
-                aria-label="Ask Helix"
-                aria-disabled={askBusy}
+              <HelixAskComposerTextarea
+                ariaDisabled={askBusy}
                 className={composerViewModel.textareaClassName}
                 ref={askInputRef}
                 placeholder={currentPlaceholder}
-                rows={1}
                 onPaste={handleAskPaste}
-                onInput={(event) =>
-                  syncAskDraftValue(event.currentTarget.value, {
-                    target: event.currentTarget,
+                onInputValue={(value, target) =>
+                  syncAskDraftValue(value, {
+                    target,
                   })
                 }
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey) {
-                    event.preventDefault();
-                    (event.currentTarget.form as HTMLFormElement | null)?.requestSubmit?.();
-                  }
-                }}
+                onSubmitRequested={(form) => form?.requestSubmit?.()}
               />
           </div>
-            {askAttachments.length > 0 ? (
-              <div className="-mt-1 px-4 pb-2 text-[10px] text-slate-300">
-                <div className="flex flex-wrap gap-2">
-                  {askAttachmentCommitChecks.map(({ attachment, check }) => (
-                    <div
-                      key={attachment.id}
-                      className={`flex min-w-0 max-w-[260px] items-center gap-2 rounded-lg border px-2 py-1.5 ${
-                        check?.can_submit
-                          ? "border-violet-300/25 bg-violet-950/20"
-                          : "border-amber-300/30 bg-amber-950/20"
-                      }`}
-                    >
-                      {attachment.kind === "image" ? (
-                        <img
-                          src={attachment.previewUrl}
-                          alt=""
-                          className="h-9 w-9 rounded-md border border-white/10 object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-black/25">
-                          <FileText className="h-4 w-4 text-cyan-100" aria-hidden />
-                        </div>
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-[11px] text-violet-100">{attachment.fileName}</div>
-                        <div className={`text-[10px] ${check?.can_submit ? "text-violet-200/70" : "text-amber-100/80"}`}>
-                          {attachment.status === "error"
-                            ? attachment.error ?? "attachment failed"
-                            : check?.can_submit
-                              ? attachment.kind === "image"
-                                ? "image ready"
-                                : "text ready"
-                              : attachment.kind === "image"
-                                ? "image needs reattach"
-                                : "text needs reattach"}
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        aria-label={`Remove ${attachment.fileName}`}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-200 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
-                        onClick={() => removeAskAttachment(attachment.id)}
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
+            <HelixAskAttachmentStrip items={askAttachmentCommitChecks} onRemove={removeAskAttachment} />
+            <HelixAskContextCapsulePreview
+              preview={activeContextCapsulePreview}
+              autoApplied={Boolean(sessionCapsuleState)}
+            />
+            <HelixAskVoiceStatusPill label={voiceInputStatusLabel} state={voiceInputState} />
+            <HelixAskSituationRoomSourcePanel
+              visible={showSituationRoomSourcePanel}
+              label={situationSourceDisplayLabel}
+              status={situationSourceDisplayStatus}
+              sourceCount={situationSourceDisplayCount}
+              visualError={visualSituationSourceError}
+              audioError={displayAudioError}
+              visualSourceActive={visualSituationSourceActive}
+              transcriptPreview={situationTranscriptPreview}
+              displayAudioActive={displayAudioActive}
+              onStopDisplayAudio={stopDisplayAudioCapture}
+              clipText={clipText}
+            />
+            <HelixAskVoiceCommandConfirmationPanel
+              visible={!transcriptConfirmState && Boolean(commandConfirmState)}
+              actionLabel={commandConfirmState ? describeVoiceCommandAction(commandConfirmState.action) : ""}
+              transcript={commandConfirmState?.transcript ?? ""}
+              countdownSec={commandConfirmAutoCountdownSec}
+              onAccept={handleCommandConfirmationAccept}
+              onCancel={handleCommandConfirmationCancel}
+              clipText={clipText}
+            />
+            <HelixAskTranscriptConfirmationPanel
+              visible={Boolean(transcriptConfirmState)}
+              transcript={transcriptConfirmState?.transcript ?? ""}
+              sourceText={transcriptConfirmState?.sourceText}
+              sourceLanguage={transcriptConfirmState?.sourceLanguage}
+              translationUncertain={transcriptConfirmState?.translationUncertain}
+              countdownSec={transcriptConfirmAutoCountdownSec}
+              onAccept={handleTranscriptConfirmationAccept}
+              onRetry={handleTranscriptConfirmationRetry}
+              clipText={clipText}
+            />
+            <HelixAskContextChooserPanel
+              visible={Boolean(askContextChooser)}
+              autoContextMode={askContextChooser?.autoContextMode}
+              countdownSec={askContextChooserCountdownSec}
+              onRunAttached={handleAskContextChooserRunAttached}
+              onRunIsolated={handleAskContextChooserRunIsolated}
+              onCancel={dismissAskContextChooser}
+            />
+            {userSettings.showHelixAskObserverLane ? (
+              <HelixAskConversationBriefPanel text={latestConversationBrief?.text} />
             ) : null}
-            {activeContextCapsulePreview ? (
-              <div className="-mt-1 px-4 pb-2 text-[10px] text-slate-300">
-                <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-cyan-300/25 bg-cyan-950/20 px-2 py-1">
-                  <span className="uppercase tracking-[0.18em] text-cyan-200/90">capsule</span>
-                  {activeContextCapsulePreview.summary ? (
-                    <img
-                      src={buildContextCapsuleStampDataUri(activeContextCapsulePreview.summary.stamp)}
-                      alt="Context capsule fingerprint"
-                      className="h-7 w-32 rounded border border-cyan-300/40 bg-cyan-950/30 object-fill"
-                      style={{ imageRendering: "pixelated" }}
-                      loading="lazy"
-                    />
-                  ) : (
-                    <span className="rounded border border-cyan-300/40 bg-cyan-400/10 px-1.5 py-0.5 font-mono text-[10px] text-cyan-100">
-                      visual key detected
-                    </span>
-                  )}
-                  {activeContextCapsulePreview.loading ? (
-                    <span className="text-cyan-100/80">loading...</span>
-                  ) : activeContextCapsulePreview.error ? (
-                    <span className="text-rose-200/90">unavailable</span>
-                  ) : activeContextCapsulePreview.convergence ? (
-                    <span className="text-cyan-100/85">
-                      {CONVERGENCE_SOURCE_LABEL[activeContextCapsulePreview.convergence.source]} /{" "}
-                      {CONVERGENCE_PROOF_LABEL[activeContextCapsulePreview.convergence.proofPosture]} /{" "}
-                      {CONVERGENCE_MATURITY_LABEL[activeContextCapsulePreview.convergence.maturity]}
-                    </span>
-                  ) : null}
-                  {sessionCapsuleState ? (
-                    <span className="rounded border border-emerald-300/45 bg-emerald-400/12 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.14em] text-emerald-100">
-                      auto-applied
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-            ) : null}
-            {voiceInputStatusLabel ? (
-              <div className="-mt-1 px-4 pb-2 text-[10px]">
-                <div
-                  className={`inline-flex items-center rounded-full border px-2.5 py-1 uppercase tracking-[0.18em] ${
-                    voiceInputState === "listening"
-                      ? "border-emerald-300/40 bg-emerald-500/10 text-emerald-100"
-                      : voiceInputState === "transcribing"
-                        ? "border-cyan-300/35 bg-cyan-400/10 text-cyan-100"
-                        : voiceInputState === "cooldown"
-                          ? "border-indigo-300/35 bg-indigo-400/10 text-indigo-100"
-                          : "border-amber-300/35 bg-amber-400/10 text-amber-100"
-                  }`}
-                >
-                  {voiceInputStatusLabel}
-                </div>
-              </div>
-            ) : null}
-            {(visualSituationSourceStatus !== "idle" || displayAudioStatus !== "idle" || situationRoomState.recentEvents.length > 0) ? (
-              <div className="-mt-1 px-4 pb-2 text-[11px]">
-                <div className="rounded-lg border border-cyan-300/25 bg-cyan-500/10 px-2.5 py-2 text-cyan-50/95">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-[9px] uppercase tracking-[0.16em] text-cyan-100/90">
-                        Situation Room Source
-                      </p>
-                      <p className="mt-1 truncate text-[11px] text-cyan-50">
-                        {situationSourceDisplayLabel} / {situationSourceDisplayStatus}
-                      </p>
-                    </div>
-                    <span className="shrink-0 rounded border border-cyan-300/35 bg-black/20 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.14em] text-cyan-100">
-                      {situationSourceDisplayCount} source{situationSourceDisplayCount === 1 ? "" : "s"}
-                    </span>
-                  </div>
-                  {visualSituationSourceError ? (
-                    <p className="mt-1 whitespace-pre-wrap break-words text-[10px] text-rose-100">
-                      {visualSituationSourceError}
-                    </p>
-                  ) : displayAudioError ? (
-                    <p className="mt-1 whitespace-pre-wrap break-words text-[10px] text-rose-100">
-                      {displayAudioError}
-                    </p>
-                  ) : visualSituationSourceActive ? (
-                    <p className="mt-1 text-[10px] text-cyan-100/70">
-                      Visual frame captured as compact evidence. Open Live Answer to capture another frame or inspect source fidelity.
-                    </p>
-                  ) : situationTranscriptPreview ? (
-                    <p className="mt-1 whitespace-pre-wrap break-words text-[10px] text-cyan-100/85">
-                      {clipText(situationTranscriptPreview, 360)}
-                    </p>
-                  ) : (
-                    <p className="mt-1 text-[10px] text-cyan-100/70">
-                      Awaiting transcript chunks.
-                    </p>
-                  )}
-                  {displayAudioActive ? (
-                    <div className="mt-2">
-                      <button
-                        type="button"
-                        className="inline-flex items-center rounded-md border border-cyan-300/40 bg-cyan-500/15 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-cyan-100 transition hover:bg-cyan-500/25"
-                        onClick={stopDisplayAudioCapture}
-                      >
-                        Stop source
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            ) : null}
-            {!transcriptConfirmState && commandConfirmState ? (
-              <div className="-mt-1 px-4 pb-2 text-[11px]">
-                <div className="rounded-lg border border-cyan-300/30 bg-cyan-500/10 px-2.5 py-2 text-cyan-50/95">
-                  <p className="text-[9px] uppercase tracking-[0.16em] text-cyan-100/90">Voice command</p>
-                  <p className="mt-1 whitespace-pre-wrap break-words text-[11px]">
-                    Detected: {describeVoiceCommandAction(commandConfirmState.action)}
-                  </p>
-                  <p className="mt-1 whitespace-pre-wrap break-words text-[10px] text-cyan-100/85">
-                    Heard: &quot;{clipText(commandConfirmState.transcript, 220)}&quot;
-                  </p>
-                  {commandConfirmAutoCountdownSec !== null ? (
-                    <p className="mt-1 text-[10px] text-cyan-100/90">
-                      Auto-confirming in {commandConfirmAutoCountdownSec}s. Say &quot;cancel&quot; to stop.
-                    </p>
-                  ) : null}
-                  <div className="mt-2 flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      className="inline-flex items-center rounded-md border border-cyan-300/40 bg-cyan-500/15 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-cyan-100 transition hover:bg-cyan-500/25"
-                      onClick={handleCommandConfirmationAccept}
-                    >
-                      Execute
-                    </button>
-                    <button
-                      type="button"
-                      className="inline-flex items-center rounded-md border border-slate-300/35 bg-black/20 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-slate-200 transition hover:bg-black/35"
-                      onClick={handleCommandConfirmationCancel}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-            {transcriptConfirmState ? (
-              <div className="-mt-1 px-4 pb-2 text-[11px]">
-                <div className="rounded-lg border border-amber-300/30 bg-amber-500/10 px-2.5 py-2 text-amber-50/95">
-                  <p className="text-[9px] uppercase tracking-[0.16em] text-amber-100/90">Confirm transcript</p>
-                  <p className="mt-1 whitespace-pre-wrap break-words text-[11px]">
-                    Heard: &quot;{clipText(transcriptConfirmState.transcript, 320)}&quot;
-                  </p>
-                  {transcriptConfirmState.translationUncertain &&
-                  transcriptConfirmState.sourceText &&
-                  transcriptConfirmState.sourceText.trim() &&
-                  transcriptConfirmState.sourceText.trim() !== transcriptConfirmState.transcript.trim() ? (
-                    <p className="mt-1 whitespace-pre-wrap break-words text-[10px] text-amber-100/90">
-                      Source ({transcriptConfirmState.sourceLanguage ?? "unknown"}): &quot;
-                      {clipText(transcriptConfirmState.sourceText, 320)}&quot;
-                    </p>
-                  ) : null}
-                  {transcriptConfirmAutoCountdownSec !== null ? (
-                    <p className="mt-1 text-[10px] text-amber-100/90">
-                      Auto-confirming in {transcriptConfirmAutoCountdownSec}s. Say &quot;retry&quot; or
-                      &quot;cancel&quot; to stop.
-                    </p>
-                  ) : null}
-                  <div className="mt-2 flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      className="inline-flex items-center rounded-md border border-emerald-300/40 bg-emerald-500/15 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-emerald-100 transition hover:bg-emerald-500/25"
-                      onClick={handleTranscriptConfirmationAccept}
-                    >
-                      Confirm
-                    </button>
-                    <button
-                      type="button"
-                      className="inline-flex items-center rounded-md border border-amber-300/35 bg-black/20 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-amber-100 transition hover:bg-black/35"
-                      onClick={handleTranscriptConfirmationRetry}
-                    >
-                      Retry
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-            {askContextChooser ? (
-              <div className="-mt-1 px-4 pb-2 text-[11px]">
-                <div className="rounded-lg border border-cyan-300/30 bg-cyan-500/10 px-2.5 py-2 text-cyan-50/95">
-                  <p className="text-[9px] uppercase tracking-[0.16em] text-cyan-100/90">
-                    Reasoning context
-                  </p>
-                  <p className="mt-1 whitespace-pre-wrap break-words text-[11px]">
-                    Attach current workspace context to this reasoning turn?
-                  </p>
-                  {askContextChooserCountdownSec !== null ? (
-                    <p className="mt-1 text-[10px] text-cyan-100/90">
-                      {askContextChooser.autoContextMode === "isolated"
-                        ? `Auto-running isolated in ${askContextChooserCountdownSec}s.`
-                        : `Auto-attaching context in ${askContextChooserCountdownSec}s.`}
-                    </p>
-                  ) : null}
-                  <div className="mt-2 flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      className="inline-flex items-center rounded-md border border-cyan-300/40 bg-cyan-500/15 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-cyan-100 transition hover:bg-cyan-500/25"
-                      onClick={handleAskContextChooserRunAttached}
-                    >
-                      Attach context
-                    </button>
-                    <button
-                      type="button"
-                      className="inline-flex items-center rounded-md border border-indigo-300/35 bg-indigo-500/15 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-indigo-100 transition hover:bg-indigo-500/25"
-                      onClick={handleAskContextChooserRunIsolated}
-                    >
-                      Run isolated
-                    </button>
-                    <button
-                      type="button"
-                      className="inline-flex items-center rounded-md border border-slate-300/35 bg-black/20 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-slate-200 transition hover:bg-black/35"
-                      onClick={dismissAskContextChooser}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-            {latestConversationBrief && userSettings.showHelixAskObserverLane ? (
-              <div className="-mt-1 px-4 pb-2 text-[11px]">
-                <p className="text-[9px] uppercase tracking-[0.14em] text-cyan-300/80">brief</p>
-                <p className="mt-0.5 whitespace-pre-wrap text-cyan-100/90">{latestConversationBrief.text}</p>
-              </div>
-            ) : null}
-            {userSettings.showHelixAskObserverLane && (askBusy || observerLaneEvents.length > 0) ? (
-              <div className="-mt-1 px-4 pb-2 text-[11px]">
-                <div className="rounded border border-cyan-400/25 bg-cyan-950/20 p-2">
-                  <p className="text-[10px] uppercase tracking-[0.2em] text-cyan-200">Observer lane</p>
-                  {observerLaneEvents.length > 0 ? (
-                    <div className="mt-1 max-h-28 space-y-1 overflow-y-auto font-mono text-[10px] leading-5 text-cyan-50">
-                      {observerLaneEvents.map((event) => (
-                        <div key={event.id} className="rounded border border-cyan-400/20 bg-black/25 px-1.5 py-1">
-                          <p className="whitespace-pre-wrap break-words">{event.text}</p>
-                          <p className="mt-0.5 text-[9px] uppercase tracking-[0.12em] text-cyan-200/80">
-                            {event.tsMs !== null
-                              ? new Date(event.tsMs).toLocaleTimeString([], {
-                                  hour12: false,
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                  second: "2-digit",
-                                })
-                              : "--:--:--"}
-                            {event.traceId ? ` | ${clipText(event.traceId, 64)}` : ""}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="mt-1 text-[11px] text-cyan-100/75">Waiting for observer events...</p>
-                  )}
-                </div>
-              </div>
-            ) : null}
-            {contextMemoryStatusText ? (
-              <div className="-mt-1 px-4 pb-2 text-[9px] uppercase tracking-[0.14em] text-emerald-200/85">
-                {contextMemoryStatusText}
-              </div>
-            ) : null}
+            <HelixAskObserverLanePanel
+              visible={userSettings.showHelixAskObserverLane && (askBusy || observerLaneEvents.length > 0)}
+              events={observerLaneEvents}
+              clipText={clipText}
+            />
+            <HelixAskContextMemoryStatusLine text={contextMemoryStatusText} />
           {askBusy ? (
             <div
               className={`relative overflow-hidden border-t px-4 py-2 text-[11px] text-slate-300 ${moodPalette.liveBorder}`}
@@ -30038,9 +29535,7 @@ export function HelixAskPill({
               </div>
             </div>
           ) : null}
-        </div>
-        </div>
-        </form>
+      </HelixAskSurfaceFrame>
         {askGoalSession ? (
           <HelixAskGoalPill
             session={askGoalSession}
@@ -30051,109 +29546,22 @@ export function HelixAskPill({
             onAction={handleAskGoalSessionAction}
           />
         ) : null}
-        {steeringQueueItems.length > 0 ? (
-          <section
-            className="mt-2 rounded-2xl border border-white/10 bg-slate-950/55 px-2.5 py-1.5 text-xs text-slate-100 shadow-[0_18px_50px_rgba(0,0,0,0.18)]"
-            aria-label="Helix Ask steering queue"
-            data-testid="helix-ask-steering-queue"
-            data-active-steering-count={activeSteeringQueueCount}
-            data-expanded={steeringQueueExpanded ? "true" : "false"}
-          >
-            <button
-              type="button"
-              aria-expanded={steeringQueueExpanded}
-              aria-controls="helix-ask-steering-queue-items"
-              onClick={() => setSteeringQueueExpanded((current) => !current)}
-              className="flex w-full items-center justify-between gap-2 rounded-xl px-1 py-0.5 text-left hover:bg-white/5"
-            >
-              <span className="min-w-0 truncate text-[11px] font-semibold text-slate-200">
-                {steeringQueueItems[0]?.label ?? "Queue"}
-                {steeringQueueItems[0]?.detail ? (
-                  <span className="ml-2 font-normal text-slate-400">
-                    {clipText(steeringQueueItems[0].detail, 92)}
-                  </span>
-                ) : null}
-              </span>
-              <span
-                className={`shrink-0 rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] ${
-                  activeSteeringQueueCount > 0
-                    ? "border-amber-300/35 bg-amber-400/10 text-amber-100"
-                    : "border-emerald-300/25 bg-emerald-400/10 text-emerald-100"
-                }`}
-              >
-                {activeSteeringQueueCount > 0
-                  ? `${activeSteeringQueueCount} active`
-                  : "settled"}
-              </span>
-              <span className="shrink-0 text-[10px] uppercase tracking-[0.14em] text-slate-500">
-                {steeringQueueExpanded ? "Hide" : "Show"}
-              </span>
-            </button>
-            {steeringQueueExpanded ? (
-              <div id="helix-ask-steering-queue-items" className="mt-2 max-h-[11rem] space-y-1.5 overflow-y-auto pr-1">
-                {steeringQueueItems.map((item, index) => {
-                  const itemClass = readHelixSteeringQueueItemClass(item);
-                  const dotClass = readHelixSteeringQueueDotClass(item);
-                  return (
-                    <div
-                      key={item.key}
-                      className={`grid grid-cols-[auto_auto_minmax(0,1fr)] items-start gap-2 rounded-lg border px-2.5 py-2 ${itemClass}`}
-                      data-testid={index === 0 ? "helix-ask-steering-queue-next" : undefined}
-                      data-steering-status={item.status}
-                    >
-                      <span className="mt-1 text-[10px] tabular-nums text-current/55">{index + 1}</span>
-                      <span
-                        className={`mt-1 h-2.5 w-2.5 rounded-full shadow-[0_0_16px_currentColor] ${dotClass}`}
-                        aria-hidden
-                      />
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <p className="min-w-0 break-words font-semibold leading-4">{item.label}</p>
-                          <span className="rounded border border-white/10 bg-black/15 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.12em] text-current/70">
-                            {item.status.replace(/_/g, " ")}
-                          </span>
-                        </div>
-                        <p className="mt-1 break-words text-[11px] leading-4 text-current/85">
-                          {clipText(item.detail, 220)}
-                        </p>
-                        <p className="mt-1 truncate text-[9px] uppercase tracking-[0.12em] text-current/50">
-                          {item.meta}
-                          {item.evidenceRefs.length > 0 ? ` | ${item.evidenceRefs.slice(0, 2).join(" | ")}` : ""}
-                          {item.evidenceRefs.length > 2 ? " | ..." : ""}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : null}
-          </section>
-        ) : null}
-        {askError ? (
-          <p className="mt-3 text-xs text-rose-200">{askError}</p>
-        ) : null}
-        <style>
-          {`@keyframes helixAskTurnFadeIn{0%{opacity:0;transform:translate3d(0,8px,0)}100%{opacity:1;transform:translate3d(0,0,0)}}@keyframes helixAskTurnLineFadeIn{0%{opacity:0;transform:translate3d(0,5px,0)}100%{opacity:1;transform:translate3d(0,0,0)}}.helix-ask-turn-enter{animation:helixAskTurnFadeIn 220ms ease-out both}.helix-ask-turn-line-enter{animation:helixAskTurnLineFadeIn 180ms ease-out both}@media (prefers-reduced-motion:reduce){.helix-ask-turn-enter,.helix-ask-turn-line-enter{animation:none}}`}
-        </style>
+        <HelixAskSteeringQueuePanel
+          items={steeringQueueItems}
+          activeCount={activeSteeringQueueCount}
+          expanded={steeringQueueExpanded}
+          onToggleExpanded={() => setSteeringQueueExpanded((current) => !current)}
+        />
+        <HelixAskErrorLine message={askError} />
         {chronologicalAskReplies.length > 0 || visibleActiveTurnStreamRows.length > 0 ? (
-          <div
+          <HelixAskTurnList
             ref={askReplyListRef}
             className={replyListClassNameResolved}
             onScroll={handleAskReplyListScroll}
+            consoleDebugSnapshot={helixAskConsoleDebugSnapshot}
+            activeTurnStreamPanel={activeTurnStreamPanel}
+            bottomRef={askReplyListBottomRef}
           >
-            {helixAskConsoleDebugSnapshot ? (
-              <details
-                className="rounded-lg border border-cyan-300/25 bg-cyan-950/15 px-3 py-2 text-xs text-cyan-50"
-                data-testid="helix-ask-console-debug"
-              >
-                <summary className="cursor-pointer select-none text-[10px] uppercase tracking-[0.2em] text-cyan-200">
-                  Console assembly debug
-                </summary>
-                <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap break-words rounded border border-cyan-300/15 bg-black/30 p-2 font-mono text-[10px] leading-4 text-cyan-50">
-                  {JSON.stringify(helixAskConsoleDebugSnapshot, null, 2)}
-                </pre>
-              </details>
-            ) : null}
           {chronologicalAskReplies.map((reply) => {
             const replyEvents = resolveReplyEvents(reply);
             const replyEventsChronological = [...replyEvents].sort((left, right) => {
@@ -30298,270 +29706,69 @@ export function HelixAskPill({
               finalAnswerText: finalAnswerRawText,
             });
             const replyCard = (
-              <div
-                  className={`relative px-1 py-1 text-sm text-slate-100 ${isLatestReply ? "helix-ask-turn-enter" : ""}`}
-                  data-testid={latestTurnBinding.turnTestId}
-                >
-                  <div
-                    className={`pointer-events-none absolute inset-0 opacity-0 ${moodPalette.replyTint}`}
-                    aria-hidden
+              <HelixAskReplyCard
+                turnTestId={latestTurnBinding.turnTestId}
+                isLatestReply={isLatestReply}
+                tintClassName={moodPalette.replyTint}
+                contextCapsule={reply.contextCapsule}
+                promptIngested={reply.promptIngested}
+              >
+                  <HelixAskTurnStreamPanel
+                    rows={turnStreamRows}
+                    isLatestReply={isLatestReply}
+                    workLogTestId={latestTurnBinding.workLogTestId}
+                    questionTestId={latestTurnBinding.questionTestId}
+                    finalAnswerTestId={latestTurnBinding.finalAnswerTestId}
+                    stagePlayEventCount={stagePlayChatLedgerEvents.length}
+                    finalAnswerRawText={finalAnswerRawText}
+                    finalAnswerSourceLabel={
+                      finalAnswerPresentation.sourceLabel || finalAnswerSourceLabel || transcriptTerminal.source
+                    }
+                    backendTerminalAnswer={transcriptTerminal.backendTerminalText}
+                    finalAnswerAuthority={
+                      finalAnswerPresentation.isDeterministicReceiptFallback
+                        ? "receipt_fallback_not_reviewed"
+                        : "terminal"
+                    }
+                    answerTint={replyBattleAnswerTint}
+                    actualAgentProviderLabel={actualAgentProviderLabel}
+                    actualAgentModelLabel={actualAgentModelLabel}
+                    liveBridgeStatus={liveAnswerTurnBridge?.status}
+                    renderFinalAnswer={() => renderHelixAskFinalAnswerContent(transcriptAnswer)}
+                    clipText={clipText}
+                    readRowClassName={readHelixContinuousTurnStreamRowClass}
+                    readDotClassName={readHelixContinuousTurnStreamDotClass}
+                    readPillClassName={readLiveAnswerTurnBridgePillClassName}
+                    onCopyFinal={() => void handleCopyReply(reply, latestTurnBinding.finalAnswerText)}
+                    onDebugCopy={(event) =>
+                      void handleCopyReplyMasterDebug(
+                        reply,
+                        replyMasterEventClockPayload,
+                        event.currentTarget,
+                      )
+                    }
+                    onReadAloud={() => void handleReadAloud(reply, latestTurnBinding.finalAnswerText)}
+                    showDebugCopy={userSettings.showHelixAskDebug}
+                    debugCopyDisabled={typeof window === "undefined"}
+                    copyFinalTestId={latestTurnBinding.copyFinalTestId}
+                    debugCopyTestId={latestTurnBinding.debugCopyTestId}
+                    readAloudTestId={latestTurnBinding.readAloudTestId}
+                    readAloudActive={shouldStopReadAloudOnButtonPress(readAloudByReply[reply.id] ?? "idle")}
+                    readAloudAriaLabel={
+                      shouldStopReadAloudOnButtonPress(readAloudByReply[reply.id] ?? "idle")
+                        ? "Stop reading"
+                        : "Read aloud"
+                    }
+                    readAloudTitle={formatReadAloudButtonLabel(readAloudByReply[reply.id] ?? "idle")}
+                    proofTrace={(replyDebugRecord as Record<string, unknown> | null | undefined)?.workstation_reasoning_trace}
+                    jobReadyLinks={jobReadyLinks}
+                    onRunJobReadyLink={runJobReadyLink}
                   />
-                  <div className="relative">
-                {reply.contextCapsule ? (
-                  <div className="mb-2 w-full rounded-lg border border-cyan-400/20 bg-cyan-950/20 px-3 py-2 text-left text-xs text-cyan-100">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-[10px] uppercase tracking-[0.2em] text-cyan-300">Context capsule</p>
-                        <img
-                          src={buildContextCapsuleStampDataUri(reply.contextCapsule.stamp)}
-                          alt="Context capsule fingerprint"
-                          className="mt-1 h-10 w-44 rounded border border-cyan-300/40 bg-cyan-950/30 object-fill"
-                          style={{ imageRendering: "pixelated" }}
-                          loading="lazy"
-                        />
-                      </div>
-                      <span className="shrink-0 rounded border border-cyan-300/35 bg-cyan-400/10 px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] text-cyan-100">
-                        auto
-                      </span>
-                    </div>
-                  </div>
-                ) : null}
-                <div className="space-y-3">
-                  {turnStreamRows.length > 0 ? (
-                    <div
-                      className="px-1 py-1 text-xs text-slate-100"
-                      aria-label="Turn stream"
-                      data-testid={latestTurnBinding.workLogTestId}
-                      data-latest-turn-stream={isLatestReply ? "true" : undefined}
-                      data-turn-stream-lines={turnStreamRows.length}
-                      data-stage-play-events={stagePlayChatLedgerEvents.length}
-                    >
-                      <div className="relative space-y-3 before:absolute before:left-[0.72rem] before:top-2 before:h-[calc(100%-1rem)] before:w-px before:bg-slate-600/45">
-                        {turnStreamRows.map((row, index) => {
-                          const isFinalRow = row.source === "final";
-                          const isQuestionRow = row.source === "question";
-                          const rowClass = readHelixContinuousTurnStreamRowClass(row.tone);
-                          const dotClass = readHelixContinuousTurnStreamDotClass(row.tone);
-                          const visibleText = isFinalRow ? row.text : clipText(row.text, row.detailLimit ?? 360);
-                          return (
-                            <div
-                              key={row.key}
-                              className={`group/streamrow relative flex items-start gap-3 border-l pl-7 ${rowClass} ${
-                                isLatestReply && isFinalRow ? "helix-ask-turn-line-enter" : ""
-                              }`}
-                              style={isFinalRow ? replyBattleAnswerTint?.style : undefined}
-                              data-testid={
-                                isQuestionRow
-                                  ? latestTurnBinding.questionTestId
-                                  : isFinalRow
-                                    ? latestTurnBinding.finalAnswerTestId
-                                    : isLatestReply
-                                      ? "helix-ask-latest-turn-stream-row"
-                                      : undefined
-                              }
-                              data-stream-row-source={row.source}
-                              data-final-answer-text={isFinalRow ? finalAnswerRawText : undefined}
-                              data-reasoning-stage-palette={isFinalRow ? replyBattleAnswerTint?.palette ?? "" : undefined}
-                              data-reasoning-stage-balance={isFinalRow ? replyBattleAnswerTint?.label ?? "" : undefined}
-                              data-visible-terminal-source={
-                                isFinalRow
-                                  ? finalAnswerPresentation.sourceLabel || finalAnswerSourceLabel || transcriptTerminal.source
-                                  : undefined
-                              }
-                              data-backend-terminal-answer={isFinalRow ? transcriptTerminal.backendTerminalText ?? "" : undefined}
-                              data-final-answer-authority={
-                                isFinalRow
-                                  ? finalAnswerPresentation.isDeterministicReceiptFallback
-                                    ? "receipt_fallback_not_reviewed"
-                                    : "terminal"
-                                  : undefined
-                              }
-                            >
-                              <span
-                                className={`absolute left-0 top-1.5 h-3 w-3 rounded-full border-2 shadow-[0_0_0_3px_rgba(2,6,23,0.9)] ${dotClass}`}
-                                aria-hidden
-                              />
-                              <span className="mt-0.5 min-w-6 text-right text-[10px] tabular-nums text-slate-400">
-                                {index + 1}
-                              </span>
-                              <div className="min-w-0 flex-1">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <p className="break-words font-semibold">{row.label}</p>
-                                  <span className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.12em] text-slate-300">
-                                    {row.source.replace(/_/g, " ")}
-                                  </span>
-                                </div>
-                                <div className="mt-1 break-words leading-relaxed">
-                                  {isFinalRow ? renderHelixAskFinalAnswerContent(transcriptAnswer) : (
-                                    <p className="whitespace-pre-wrap">{visibleText}</p>
-                                  )}
-                                </div>
-                                {row.bridgePills?.length ? (
-                                  <div
-                                    className="mt-2 flex max-w-full flex-wrap gap-1"
-                                    data-testid={isLatestReply ? "helix-ask-latest-live-turn-bridge" : undefined}
-                                    data-live-turn-bridge-status={liveAnswerTurnBridge?.status}
-                                  >
-                                    {row.bridgePills.map((pill) => (
-                                      <span
-                                        key={`${row.key}-${pill.label}`}
-                                        className={`rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] ${readLiveAnswerTurnBridgePillClassName(pill.tone)}`}
-                                      >
-                                        {pill.label}
-                                      </span>
-                                    ))}
-                                  </div>
-                                ) : null}
-                                <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-slate-400/80">
-                                  {row.meta}
-                                  {isFinalRow && actualAgentProviderLabel ? ` | ${actualAgentProviderLabel}` : ""}
-                                  {isFinalRow && actualAgentModelLabel ? ` | ${actualAgentModelLabel}` : ""}
-                                  {row.evidenceRefs.length > 0 ? ` | refs ${row.evidenceRefs.length}` : ""}
-                                </p>
-                                {row.evidenceRefs.length > 0 ? (
-                                  <p className="mt-1 break-words font-mono text-[10px] normal-case tracking-normal text-slate-400/80">
-                                    {row.evidenceRefs.slice(0, 4).join(" | ")}
-                                    {row.evidenceRefs.length > 4 ? " | ..." : ""}
-                                  </p>
-                                ) : null}
-                                {row.actions?.length ? (
-                                  <div className="mt-2 flex flex-wrap gap-1">
-                                    {row.actions.map((action) => (
-                                      <button
-                                        key={`${row.key}-${action}`}
-                                        type="button"
-                                        disabled
-                                        title="Use the Stage Play graph checkpoint controls for this v1 action."
-                                        className="rounded border border-amber-300/30 bg-black/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-100/70 disabled:cursor-not-allowed disabled:opacity-70"
-                                        data-testid={
-                                          isLatestReply
-                                            ? `helix-ask-latest-stage-play-${action.toLowerCase().replace(/\s+/g, "-")}`
-                                            : undefined
-                                        }
-                                      >
-                                        {action}
-                                      </button>
-                                    ))}
-                                  </div>
-                                ) : null}
-                                {isFinalRow ? (
-                                  <>
-                                    <HelixAskTurnControls
-                                      onCopyFinal={() => void handleCopyReply(reply, latestTurnBinding.finalAnswerText)}
-                                      onDebugCopy={(event) =>
-                                        void handleCopyReplyMasterDebug(
-                                          reply,
-                                          replyMasterEventClockPayload,
-                                          event.currentTarget,
-                                        )
-                                      }
-                                      onReadAloud={() => void handleReadAloud(reply, latestTurnBinding.finalAnswerText)}
-                                      showDebugCopy={userSettings.showHelixAskDebug}
-                                      debugCopyDisabled={typeof window === "undefined"}
-                                      copyFinalTestId={latestTurnBinding.copyFinalTestId}
-                                      debugCopyTestId={latestTurnBinding.debugCopyTestId}
-                                      readAloudTestId={latestTurnBinding.readAloudTestId}
-                                      readAloudActive={shouldStopReadAloudOnButtonPress(readAloudByReply[reply.id] ?? "idle")}
-                                      readAloudAriaLabel={
-                                        shouldStopReadAloudOnButtonPress(readAloudByReply[reply.id] ?? "idle")
-                                          ? "Stop reading"
-                                          : "Read aloud"
-                                      }
-                                      readAloudTitle={formatReadAloudButtonLabel(readAloudByReply[reply.id] ?? "idle")}
-                                    />
-                                    {(() => {
-                                      const trace = (replyDebugRecord as Record<string, any> | null | undefined)?.workstation_reasoning_trace;
-                                      if (!trace || typeof trace !== "object") return null;
-                                      const steps = Array.isArray(trace.compact_steps) ? trace.compact_steps : [];
-                                      const caveats = Array.isArray(trace.caveats) ? trace.caveats : [];
-                                      return (
-                                        <details className="mt-3 rounded-lg border border-amber-300/25 bg-amber-950/15 px-3 py-2 text-xs text-amber-50">
-                                          <summary className="cursor-pointer select-none text-[10px] uppercase tracking-[0.2em] text-amber-200">
-                                            Proof trace
-                                            {typeof trace.proof_status === "string" ? (
-                                              <span className="ml-2 rounded border border-amber-300/30 bg-black/20 px-2 py-0.5 text-[9px] uppercase tracking-[0.14em]">
-                                                {trace.proof_status}
-                                              </span>
-                                            ) : null}
-                                          </summary>
-                                          <div className="mt-2 space-y-1.5">
-                                            {steps.slice(0, 6).map((step: any, stepIndex: number) => (
-                                              <p key={`${String(step?.label ?? "step")}-${stepIndex}`} className="leading-relaxed">
-                                                <span className="text-amber-200/80">{String(step?.label ?? `Step ${stepIndex + 1}`)}: </span>
-                                                {clipText(String(step?.summary ?? ""), 260)}
-                                              </p>
-                                            ))}
-                                            {typeof trace.scope_match === "string" ? (
-                                              <p className="text-[10px] uppercase tracking-[0.14em] text-amber-100/70">
-                                                Scope: {String(trace.requested_extraction_scope ?? "unknown")}{" -> "}
-                                                {String(trace.actual_extraction_scope ?? "unknown")} ({trace.scope_match})
-                                              </p>
-                                            ) : null}
-                                            {caveats.length > 0 ? (
-                                              <p className="text-amber-100/80">Caveats: {caveats.slice(0, 3).map(String).join(" | ")}</p>
-                                            ) : null}
-                                          </div>
-                                        </details>
-                                      );
-                                    })()}
-                                    {jobReadyLinks.length > 0 ? (
-                                      <div className="mt-3 flex flex-wrap gap-2">
-                                        {jobReadyLinks.slice(0, 6).map((link, linkIndex) => {
-                                          const label =
-                                            typeof link.label === "string" && link.label.trim()
-                                              ? link.label.trim()
-                                              : `${String(link.panel_id)}.${String(link.action_id)}`;
-                                          const source =
-                                            typeof link.source_artifact_kind === "string" && link.source_artifact_kind.trim()
-                                              ? link.source_artifact_kind.trim()
-                                              : typeof link.source === "string"
-                                                ? link.source
-                                                : "artifact";
-                                          return (
-                                            <button
-                                              key={`${String(link.type ?? "link")}-${String(link.panel_id)}-${String(link.action_id)}-${linkIndex}`}
-                                              type="button"
-                                              className="rounded-full border border-cyan-300/35 bg-cyan-400/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-cyan-100 hover:border-cyan-200/60 hover:bg-cyan-300/15"
-                                              onClick={() => runJobReadyLink(link)}
-                                              title={`From ${source}`}
-                                            >
-                                              {label}
-                                            </button>
-                                          );
-                                        })}
-                                      </div>
-                                    ) : null}
-                                  </>
-                                ) : null}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              {isLatestReply ? (
-              <div className="mt-2 text-[10px] uppercase tracking-[0.14em] text-slate-500">
-                <span>
-                  In Helix Console
-                  {reply.promptIngested ? " | Prompt ingested" : ""}
-                </span>
-              </div>
-              ) : null}
-                </div>
-              </div>
+              </HelixAskReplyCard>
               );
             return <div key={reply.id}>{replyCard}</div>;
             })}
-            {activeTurnStreamPanel}
-            <div
-              ref={askReplyListBottomRef}
-              className="h-px w-full"
-              aria-hidden
-              data-testid="helix-ask-reply-list-bottom"
-            />
-          </div>
+          </HelixAskTurnList>
         ) : null}
         {debugExportDrawer ? (
           <HelixAskDebugDrawer
@@ -30572,7 +29779,6 @@ export function HelixAskPill({
             onClose={() => setDebugExportDrawer(null)}
           />
         ) : null}
-      </div>
     </HelixAskErrorBoundary>
   );
 }

@@ -8,11 +8,23 @@ const helixAskPillSource = () =>
     "utf8",
   );
 
+const steeringQueuePanelSource = () =>
+  fs.readFileSync(
+    path.resolve(__dirname, "../helix/ask-console/HelixAskSteeringQueuePanel.tsx"),
+    "utf8",
+  );
+
+const steeringQueueDisplaySource = () =>
+  fs.readFileSync(
+    path.resolve(__dirname, "../../lib/helix/ask-steering-queue-display.ts"),
+    "utf8",
+  );
+
 describe("HelixAskPill steering queue collapse", () => {
   it("renders a compact goal-session pill above the steering queue", () => {
     const source = helixAskPillSource();
     const goalIndex = source.indexOf('data-testid="helix-ask-goal-pill"');
-    const queueIndex = source.indexOf('data-testid="helix-ask-steering-queue"');
+    const queueIndex = source.indexOf("<HelixAskSteeringQueuePanel");
 
     expect(goalIndex).toBeGreaterThan(0);
     expect(queueIndex).toBeGreaterThan(goalIndex);
@@ -27,11 +39,15 @@ describe("HelixAskPill steering queue collapse", () => {
 
   it("renders the steering queue as a collapsible compact strip", () => {
     const source = helixAskPillSource();
+    const panel = steeringQueuePanelSource();
 
     expect(source).toContain("steeringQueueExpanded");
-    expect(source).toContain('aria-controls="helix-ask-steering-queue-items"');
-    expect(source).toContain('data-expanded={steeringQueueExpanded ? "true" : "false"}');
-    expect(source).toContain('{steeringQueueExpanded ? "Hide" : "Show"}');
+    expect(source).toContain("<HelixAskSteeringQueuePanel");
+    expect(source).toContain("expanded={steeringQueueExpanded}");
+    expect(source).toContain("onToggleExpanded={() => setSteeringQueueExpanded((current) => !current)}");
+    expect(panel).toContain('aria-controls="helix-ask-steering-queue-items"');
+    expect(panel).toContain('data-expanded={expanded ? "true" : "false"}');
+    expect(panel).toContain('{expanded ? "Hide" : "Show"}');
   });
 
   it("does not render the old steering queue title and description", () => {
@@ -42,7 +58,7 @@ describe("HelixAskPill steering queue collapse", () => {
   });
 
   it("separates raw observer backlog from Ask-ready micro-reasoner findings", () => {
-    const source = helixAskPillSource();
+    const source = steeringQueueDisplaySource();
 
     expect(source).not.toContain('label: "Unread mail waiting"');
     expect(source).toContain('label: "Observer backlog"');

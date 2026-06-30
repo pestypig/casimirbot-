@@ -1,3 +1,11 @@
+import {
+  forwardRef,
+  type ClipboardEventHandler,
+  type FormEventHandler,
+  type KeyboardEventHandler,
+} from "react";
+import { Search, Square } from "lucide-react";
+
 export type HelixAskComposerProps = {
   value: string;
   disabled?: boolean;
@@ -40,6 +48,81 @@ export function buildHelixAskComposerViewModel(args: {
     submitButtonType: args.busy ? "button" : "submit",
     submitIcon: args.busy ? "square" : "search",
   };
+}
+
+export type HelixAskComposerTextareaProps = {
+  ariaDisabled?: boolean;
+  className: string;
+  placeholder: string;
+  onPaste?: ClipboardEventHandler<HTMLTextAreaElement>;
+  onInputValue: (value: string, target: HTMLTextAreaElement) => void;
+  onSubmitRequested: (form: HTMLFormElement | null) => void;
+};
+
+export const HelixAskComposerTextarea = forwardRef<HTMLTextAreaElement, HelixAskComposerTextareaProps>(
+  function HelixAskComposerTextarea(
+    {
+      ariaDisabled = false,
+      className,
+      placeholder,
+      onPaste,
+      onInputValue,
+      onSubmitRequested,
+    },
+    ref,
+  ) {
+    const handleInput: FormEventHandler<HTMLTextAreaElement> = (event) => {
+      onInputValue(event.currentTarget.value, event.currentTarget);
+    };
+    const handleKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = (event) => {
+      if (event.key !== "Enter" || event.shiftKey) return;
+      event.preventDefault();
+      onSubmitRequested(event.currentTarget.form);
+    };
+
+    return (
+      <textarea
+        aria-label="Ask Helix"
+        aria-disabled={ariaDisabled}
+        className={className}
+        ref={ref}
+        placeholder={placeholder}
+        rows={1}
+        onPaste={onPaste}
+        onInput={handleInput}
+        onKeyDown={handleKeyDown}
+      />
+    );
+  },
+);
+
+export type HelixAskComposerSubmitButtonProps = {
+  viewModel: HelixAskComposerViewModel;
+  onSubmitIntent: () => void;
+  onStop: () => void;
+};
+
+export function HelixAskComposerSubmitButton({
+  viewModel,
+  onSubmitIntent,
+  onStop,
+}: HelixAskComposerSubmitButtonProps) {
+  return (
+    <button
+      data-helix-ask-action-item="true"
+      aria-label={viewModel.submitAriaLabel}
+      title={viewModel.submitTitle}
+      className="inline-flex h-10 w-10 shrink-0 snap-center items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-100 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60"
+      onClick={viewModel.submitMode === "stop" ? onStop : onSubmitIntent}
+      type={viewModel.submitButtonType}
+    >
+      {viewModel.submitIcon === "square" ? (
+        <Square className="h-4 w-4" />
+      ) : (
+        <Search className="h-4 w-4" />
+      )}
+    </button>
+  );
 }
 
 export function HelixAskComposer({

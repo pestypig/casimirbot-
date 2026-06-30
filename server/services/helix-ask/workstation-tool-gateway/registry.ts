@@ -376,12 +376,30 @@ const normalizeNumberText = (value: number): string => {
   return Number.isInteger(value) ? String(value) : String(Number(value.toPrecision(12)));
 };
 
+const normalizeCalculatorExpressionForGateway = (expression: string): string => {
+  const trimmed = expression.trim();
+  if (!trimmed) return "";
+  const phrase = trimmed
+    .replace(/[?]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const percentOf = phrase.match(
+    /^(?:what\s+is\s+)?(-?\d+(?:\.\d+)?)\s*(?:%|percent)\s+of\s+(-?\d+(?:\.\d+)?(?:e[+-]?\d+)?)$/i,
+  );
+  if (percentOf) {
+    return `(${percentOf[1]} / 100) * ${percentOf[2]}`;
+  }
+  return expression;
+};
+
 const solveSafeArithmeticExpression = (expression: string): {
   ok: boolean;
   result?: string;
+  normalized_expression?: string;
   blocked_reason?: string;
 } => {
-  const normalized = expression.replace(/\s+/g, "");
+  const normalizedExpression = normalizeCalculatorExpressionForGateway(expression);
+  const normalized = normalizedExpression.replace(/\s+/g, "");
   if (!normalized) return { ok: false, blocked_reason: "missing_expression" };
   if (normalized.length > 240) return { ok: false, blocked_reason: "expression_too_long" };
   if (!/^[\deE.+\-*/^()%]+$/.test(normalized)) {
@@ -395,7 +413,11 @@ const solveSafeArithmeticExpression = (expression: string): {
     if (typeof value !== "number" || !Number.isFinite(value)) {
       return { ok: false, blocked_reason: "expression_result_not_finite" };
     }
-    return { ok: true, result: normalizeNumberText(value) };
+    return {
+      ok: true,
+      result: normalizeNumberText(value),
+      normalized_expression: normalizedExpression,
+    };
   } catch {
     return { ok: false, blocked_reason: "expression_evaluation_failed" };
   }
@@ -2517,6 +2539,7 @@ export const callWorkstationGatewayCapability = async (
       schema: CALCULATOR_SOLVE_OBSERVATION_SCHEMA,
       capability_key: manifest.capability_id,
       expression: expression || null,
+      normalized_expression: solved.normalized_expression ?? (expression || null),
       result: solved.result ?? null,
       status: solved.ok ? "succeeded" : "blocked",
       blocked_reason: solved.blocked_reason,

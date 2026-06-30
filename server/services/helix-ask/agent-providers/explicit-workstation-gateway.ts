@@ -582,6 +582,11 @@ export const buildActiveCalculatorContextWorkstationGatewayCallRequests = (
 const isActiveWorkstationContextPrompt = (prompt: string): boolean => {
   if (/\bbackground\s+only\b/i.test(prompt)) return false;
   const unquotedPrompt = prompt.replace(/"[^"]*"|'[^']*'|`[^`]*`/g, " ");
+  if (
+    /\b(?:do\s+not|don'?t|no)\b.{0,80}\b(?:run|call|use|execute)\s+(?:any\s+)?(?:tools?|workstation\s+tools?|gateway\s+calls?)\b/i.test(unquotedPrompt)
+  ) {
+    return false;
+  }
   if (/\b(?:not|don'?t|do\s+not)\s+(?:asking\s+about|ask|answer|use|read|explain|inspect)\b.{0,80}\b(?:current|active|open|visible)\s+(?:panel|panels|workspace|workstation|layout)\b/i.test(unquotedPrompt)) return false;
   if (/\b(?:before|after|if|when)\b.{0,80}\b(?:open|focus|switch|show)\b.{0,40}\b(?:panel|workspace|workstation)\b/i.test(unquotedPrompt)) return false;
   if (/\b(?:previous|last|earlier|historical)\b.{0,80}\b(?:panel|panels|workspace|workstation|layout)\b/i.test(unquotedPrompt)) return false;
@@ -1621,6 +1626,14 @@ const extractCalculatorMathTokenSequence = (value: string | null | undefined): s
   return cleanCalculatorExpression(candidate);
 };
 
+const extractCalculatorPercentOfExpression = (value: string | null | undefined): string | null => {
+  if (!value) return null;
+  const match = value.match(
+    /(?:what\s+is\s+|calculate\s+|evaluate\s+|compute\s+|solve\s+)?(-?\d+(?:\.\d+)?)\s*(?:%|percent)\s+of\s+(-?\d+(?:\.\d+)?(?:e[+-]?\d+)?)/i,
+  );
+  return match ? `${match[1]}% of ${match[2]}` : null;
+};
+
 const extractCalculatorExpressionFromPrompt = (prompt: string): string | null => {
   if (hasNegatedToolInstruction(prompt, /\b(?:calculator|calculate|compute|evaluate|solve|expression)\b/i)) {
     return null;
@@ -1635,6 +1648,8 @@ const extractCalculatorExpressionFromPrompt = (prompt: string): string | null =>
     const boundedExpression = extractCalculatorMathTokenSequence(explicitExpression ?? segment);
     if (boundedExpression) return boundedExpression;
   }
+  const percentOfExpression = extractCalculatorPercentOfExpression(unquoted);
+  if (percentOfExpression) return percentOfExpression;
   const explicitCapability =
     unquoted.match(/\bscientific-calculator\.(?:solve_expression|solve_with_steps|solve)\b[\s\S]{0,80}\b(?:for|with|expression|calculate|evaluate|solve|compute)?\s*:?\s*([0-9][0-9\s.+\-*/^%()[\]]{1,80})/i)?.[1] ??
     unquoted.match(/\b(?:scientific\s+calculator|calculator|calc)\b[\s\S]{0,100}\b(?:calculate|evaluate|solve|compute|expression)\s*:?\s*([0-9][0-9\s.+\-*/^%()[\]]{1,80})/i)?.[1] ??

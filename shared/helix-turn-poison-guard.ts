@@ -83,6 +83,7 @@ export type HelixTerminalAuthority = {
   authority_origin?:
     | "terminal_presentation"
     | "selected_final_answer"
+    | "codex_no_tool_direct_answer"
     | "request_user_input"
     | "typed_failure"
     | "tool_receipt"

@@ -3,12 +3,17 @@ import type { HelixAgentProvider } from "../types";
 import { buildHelixAgentRuntimeAdapterContract } from "../runtime-adapter-contract";
 
 const buildProvider = (input: {
-  id: "codex" | "future";
-  permissionProfileId: "read-observe" | "read-observe-act";
+  id: "helix" | "codex" | "future";
+  permissionProfileId: "helix-native" | "read-observe" | "read-observe-act";
   act: boolean;
 }): HelixAgentProvider => ({
   id: input.id,
-  label: input.id === "codex" ? "Codex Workstation Mode" : "Future Agent Wrapper",
+  label:
+    input.id === "helix"
+      ? "Helix Ask Native"
+      : input.id === "codex"
+        ? "Codex Workstation Mode"
+        : "Future Agent Wrapper",
   permissionProfile: {
     id: input.permissionProfileId,
     label: input.act ? "Read/observe plus non-mutating workstation action" : "Read/observe only",
@@ -64,7 +69,23 @@ describe("agent runtime adapter contract", () => {
     expect(contract.workstation_gateway_admitted_capability_ids).toContain("scientific-calculator.open_panel");
     expect(contract.workstation_gateway_projection_receipt_capability_ids).toContain("scientific-calculator.open_panel");
     expect(contract.workstation_gateway_blocked_capability_ids).toEqual([]);
+    expect(contract.capability_lane_manifest.schema).toBe("helix.capability_lane_manifest.v1");
+    expect(contract.capability_lane_manifest.selected_runtime_agent_provider).toBe("codex");
+    expect(contract.capability_lane_ids).toContain("utility_text");
+    expect(contract.capability_lane_ids).toContain("live_translation");
+    expect(contract.capability_lane_ids).toContain("workstation_tool_reference");
+    expect(contract.capability_lane_statuses.workstation_tool_reference).toBe("available");
+    expect(contract.capability_lane_resolve_trace_shape).toMatchObject({
+      schema: "helix.capability_lane_resolve_trace.v1",
+      selected_runtime_agent_provider: "codex",
+      admission_status: "blocked",
+      blocked_reason: "missing_capability_lane",
+      execution_status: "not_executed_shadow_only",
+    });
     expect(contract.adapter_invariants.helix_owns_tool_admission).toBe(true);
+    expect(contract.adapter_invariants.helix_owns_capability_lane_admission).toBe(true);
+    expect(contract.adapter_invariants.capability_lanes_are_not_root_agents).toBe(true);
+    expect(contract.adapter_invariants.capability_lane_execution_enabled).toBe(false);
     expect(contract.adapter_invariants.helix_owns_observation_packets).toBe(true);
     expect(contract.adapter_invariants.helix_owns_terminal_authority).toBe(true);
     expect(contract.adapter_invariants.receipts_are_not_answers).toBe(true);
@@ -75,7 +96,40 @@ describe("agent runtime adapter contract", () => {
     expect(contract.adapter_invariants.file_mutation_enabled).toBe(false);
     expect(contract.adapter_invariants.code_mutation_enabled).toBe(false);
     expect(contract.prompt_policy_lines.join("\n")).toContain("Runtime-specific protocol glue stays inside");
+    expect(contract.prompt_policy_lines.join("\n")).toContain("Capability lanes are shadow/read-only");
     expect(contract.prompt_policy_lines.join("\n")).toContain("does not rewrite, shorten, bulletize");
+  });
+
+  it("exposes the same provider-neutral lane definitions for Helix Native and Codex", () => {
+    const helix = buildHelixAgentRuntimeAdapterContract({
+      route: "/ask/turn",
+      requestedRuntime: "helix",
+      provider: buildProvider({
+        id: "helix",
+        permissionProfileId: "helix-native",
+        act: true,
+      }),
+      gatewayMode: "act",
+    });
+    const codex = buildHelixAgentRuntimeAdapterContract({
+      route: "/ask/turn",
+      requestedRuntime: "codex",
+      provider: buildProvider({
+        id: "codex",
+        permissionProfileId: "read-observe-act",
+        act: true,
+      }),
+      gatewayMode: "act",
+    });
+
+    expect(helix.capability_lane_ids).toEqual(codex.capability_lane_ids);
+    expect(helix.capability_lane_manifest.lanes.map((lane) => lane.lane_id)).toEqual(
+      codex.capability_lane_manifest.lanes.map((lane) => lane.lane_id),
+    );
+    expect(helix.selected_runtime).toBe("helix");
+    expect(codex.selected_runtime).toBe("codex");
+    expect(helix.capability_lane_manifest.lanes.every((lane) => lane.shadow_only)).toBe(true);
+    expect(codex.capability_lane_manifest.lanes.every((lane) => lane.terminal_eligible === false)).toBe(true);
   });
 
   it("keeps observation-only providers on the same contract while blocking action capabilities", () => {

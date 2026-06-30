@@ -1,11 +1,20 @@
 import type { HelixAgentRunRoute, HelixAgentProvider } from "./types";
 import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
 import type {
+  HelixCapabilityLaneDescriptor,
+  HelixCapabilityLaneManifest,
+  HelixCapabilityLaneResolveTrace,
+} from "@shared/helix-capability-lane";
+import type {
   HelixWorkstationCapabilityManifest,
   HelixWorkstationGatewayMode,
   HelixWorkstationGatewayListResult,
 } from "../workstation-tool-gateway/types";
 import { listWorkstationGatewayCapabilities } from "../workstation-tool-gateway/registry";
+import {
+  listHelixCapabilityLanes,
+  resolveHelixCapabilityLaneRequest,
+} from "../capability-lanes/registry";
 import {
   buildHelixAgentRuntimeSelectionTrace,
   type HelixAgentRuntimeSelectionTrace,
@@ -39,19 +48,19 @@ const admittedCapabilityIds = (
   provider: HelixAgentProvider,
 ): string[] =>
   manifest.capabilities
-    .filter((capability) => {
+    .filter((capability: HelixWorkstationCapabilityManifest) => {
       const requiredRank = permissionRank[capability.permission_profile_required];
       return modeRank[manifest.mode] >= requiredRank && providerPermissionRank(provider) >= requiredRank;
     })
-    .map((capability) => capability.capability_id);
+    .map((capability: HelixWorkstationCapabilityManifest) => capability.capability_id);
 
 const projectionReceiptCapabilityIds = (manifest: HelixWorkstationGatewayListResult): string[] =>
   manifest.capabilities
-    .filter((capability) =>
+    .filter((capability: HelixWorkstationCapabilityManifest) =>
       capability.permission_profile_required === "act" &&
       Boolean(capability.panel_id || capability.action_id),
     )
-    .map((capability) => capability.capability_id);
+    .map((capability: HelixWorkstationCapabilityManifest) => capability.capability_id);
 
 const blockedCapabilityIds = (
   manifest: HelixWorkstationGatewayListResult,
@@ -60,8 +69,8 @@ const blockedCapabilityIds = (
   const admitted = new Set(admittedCapabilityIds(manifest, provider));
   const projectionReceipts = new Set(projectionReceiptCapabilityIds(manifest));
   return manifest.capabilities
-    .map((capability) => capability.capability_id)
-    .filter((capabilityId) => !admitted.has(capabilityId) && !projectionReceipts.has(capabilityId));
+    .map((capability: HelixWorkstationCapabilityManifest) => capability.capability_id)
+    .filter((capabilityId: string) => !admitted.has(capabilityId) && !projectionReceipts.has(capabilityId));
 };
 
 export type HelixAgentRuntimeAdapterContract = {
@@ -81,10 +90,17 @@ export type HelixAgentRuntimeAdapterContract = {
   workstation_gateway_admitted_capability_ids: string[];
   workstation_gateway_projection_receipt_capability_ids: string[];
   workstation_gateway_blocked_capability_ids: string[];
+  capability_lane_manifest: HelixCapabilityLaneManifest;
+  capability_lane_ids: HelixCapabilityLaneManifest["lane_ids"];
+  capability_lane_statuses: Record<string, string>;
+  capability_lane_resolve_trace_shape: HelixCapabilityLaneResolveTrace;
   runtime_selection_trace: HelixAgentRuntimeSelectionTrace;
   adapter_invariants: {
     runtime_glue_owned_by_provider: true;
     helix_owns_tool_admission: true;
+    helix_owns_capability_lane_admission: true;
+    capability_lanes_are_not_root_agents: true;
+    capability_lane_execution_enabled: false;
     helix_owns_observation_packets: true;
     helix_owns_terminal_authority: true;
     receipts_are_not_answers: true;
@@ -113,6 +129,13 @@ export const buildHelixAgentRuntimeAdapterContract = (input: {
     agentRuntime: input.provider.id,
     mode: input.gatewayMode,
   });
+  const capabilityLaneManifest = listHelixCapabilityLanes({
+    provider: input.provider,
+  });
+  const capabilityLaneTraceShape = resolveHelixCapabilityLaneRequest({
+    provider: input.provider,
+    requestedLane: null,
+  });
   const runtimeSelectionTrace = buildHelixAgentRuntimeSelectionTrace({
     route: input.route,
     requestedRuntime: input.requestedRuntime,
@@ -135,14 +158,25 @@ export const buildHelixAgentRuntimeAdapterContract = (input: {
     selected_runtime: input.provider.id,
     selected_agent_provider: selectedProvider,
     workstation_gateway_manifest: gatewayManifest,
-    workstation_gateway_capability_ids: gatewayManifest.capabilities.map((capability) => capability.capability_id),
+    workstation_gateway_capability_ids: gatewayManifest.capabilities.map(
+      (capability: HelixWorkstationCapabilityManifest) => capability.capability_id,
+    ),
     workstation_gateway_admitted_capability_ids: admittedCapabilityIds(gatewayManifest, input.provider),
     workstation_gateway_projection_receipt_capability_ids: projectionReceiptCapabilityIds(gatewayManifest),
     workstation_gateway_blocked_capability_ids: blockedCapabilityIds(gatewayManifest, input.provider),
+    capability_lane_manifest: capabilityLaneManifest,
+    capability_lane_ids: capabilityLaneManifest.lane_ids,
+    capability_lane_statuses: Object.fromEntries(
+      capabilityLaneManifest.lanes.map((lane: HelixCapabilityLaneDescriptor) => [lane.lane_id, lane.status]),
+    ),
+    capability_lane_resolve_trace_shape: capabilityLaneTraceShape,
     runtime_selection_trace: runtimeSelectionTrace,
     adapter_invariants: {
       runtime_glue_owned_by_provider: true,
       helix_owns_tool_admission: true,
+      helix_owns_capability_lane_admission: true,
+      capability_lanes_are_not_root_agents: true,
+      capability_lane_execution_enabled: false,
       helix_owns_observation_packets: true,
       helix_owns_terminal_authority: true,
       receipts_are_not_answers: true,
@@ -158,7 +192,10 @@ export const buildHelixAgentRuntimeAdapterContract = (input: {
       "Adapter boundary: helix_agent_provider_edge.",
       "Runtime-specific protocol glue stays inside the selected provider adapter.",
       "Use only Helix workstation gateway capabilities admitted for this turn.",
+      "Capability lanes are shadow/read-only catalog entries in this patch; do not execute lane calls from this contract.",
+      "A capability lane may be requested by purpose, but Helix resolves backend provider/service policy and keeps the selected runtime agent provider unchanged.",
       "Do not claim a workstation tool or UI action ran unless a Helix observation packet or action receipt is present.",
+      "Do not claim an AI service lane ran unless a Helix lane observation or receipt is present.",
       "Receipts and observations are not final answers; they must re-enter provider reasoning before any terminal candidate.",
       "Helix gates answer authority but does not rewrite, shorten, bulletize, or otherwise impose answer style on the provider terminal candidate.",
       "Do not mutate files, run shell commands, or perform code mutation through this adapter contract.",

@@ -142,6 +142,8 @@ export const createHelixAskLiveDebugSlimBuilder = (
       golden_path_runtime_status: payload.golden_path_runtime_status ?? debug.golden_path_runtime_status ?? null,
       session_id: payload.session_id ?? payload.sessionId ?? debug.session_id ?? null,
       agent_runtime: payload.agent_runtime ?? debug.agent_runtime ?? null,
+      agent_runtime_adapter_contract:
+        payload.agent_runtime_adapter_contract ?? debug.agent_runtime_adapter_contract ?? null,
       fail_reason: payload.fail_reason ?? debug.fail_reason ?? null,
       codex_exit_code: payload.codex_exit_code ?? debug.codex_exit_code ?? null,
       codex_timed_out: payload.codex_timed_out ?? debug.codex_timed_out ?? null,
@@ -158,6 +160,14 @@ export const createHelixAskLiveDebugSlimBuilder = (
         payload.agent_runtime_selection_trace ?? debug.agent_runtime_selection_trace ?? null,
       selected_agent_provider:
         payload.selected_agent_provider ?? debug.selected_agent_provider ?? null,
+      capability_lane_manifest:
+        payload.capability_lane_manifest ?? debug.capability_lane_manifest ?? null,
+      capability_lane_ids:
+        payload.capability_lane_ids ?? debug.capability_lane_ids ?? null,
+      capability_lane_statuses:
+        payload.capability_lane_statuses ?? debug.capability_lane_statuses ?? null,
+      capability_lane_resolve_trace_shape:
+        payload.capability_lane_resolve_trace_shape ?? debug.capability_lane_resolve_trace_shape ?? null,
       workstation_gateway_manifest:
         payload.workstation_gateway_manifest ?? debug.workstation_gateway_manifest ?? null,
       workstation_gateway_manifest_version:

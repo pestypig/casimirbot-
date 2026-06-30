@@ -1348,6 +1348,45 @@ describe("Helix workstation tool gateway", () => {
     });
   });
 
+  it("normalizes percent-of calculator phrases before solving", async () => {
+    const cases = [
+      ["12.5% of 54176", "(12.5 / 100) * 54176"],
+      ["12.5 percent of 54176", "(12.5 / 100) * 54176"],
+      ["what is 12.5% of 54176?", "(12.5 / 100) * 54176"],
+    ] as const;
+
+    for (const [expression, normalizedExpression] of cases) {
+      const result = await callWorkstationGatewayCapability({
+        agentRuntime: "codex",
+        mode: "read",
+        capabilityId: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+        arguments: {
+          expression,
+        },
+        turnId: "ask:test:gateway-calculator-percent-normalization",
+        iteration: 4,
+      });
+
+      expect(result).toMatchObject({
+        ok: true,
+        capability_id: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+        gateway_admission: {
+          admission_status: "admitted",
+          blocked_reason: undefined,
+        },
+        observation: {
+          schema: "helix.calculator_solve_observation.v1",
+          expression,
+          normalized_expression: normalizedExpression,
+          result: "6772",
+          status: "succeeded",
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      });
+    }
+  });
+
   it("calls scientific-calculator.active_context as bounded active-panel observation", async () => {
     const result = await callWorkstationGatewayCapability({
       agentRuntime: "codex",

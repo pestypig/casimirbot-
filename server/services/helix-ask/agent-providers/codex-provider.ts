@@ -4,6 +4,10 @@ import fs from "node:fs";
 import path from "node:path";
 import type { HelixAgentProvider, HelixAgentRunResult } from "./types";
 import type { HelixAgentStepObservationPacket } from "@shared/helix-agent-step-observation-packet";
+import type {
+  HelixToolFollowupDecision,
+  HelixToolLifecycleTrace,
+} from "@shared/helix-tool-lifecycle";
 import {
   callWorkstationGatewayCapability,
 } from "../workstation-tool-gateway/registry";
@@ -220,6 +224,7 @@ const buildCodexNormalizedObservationArtifacts = (input: {
   const missingNormalizationFailures: string[] = [];
   input.gatewayCallResults.forEach((result, index) => {
     if (isWorkstationActionReceipt(result)) return;
+    if (result.ok !== true) return;
     const normalized = normalizeGatewayObservationForHelix({
       turnId: input.turnId,
       result,
@@ -272,7 +277,9 @@ const buildCodexCompoundSubgoalLedger = (input: {
     const capability = readString(artifact.capability_key) ?? "unknown";
     const observationKind = readString(artifact.kind) ?? "unknown";
     const observationRef = readString(artifact.artifact_id) ?? null;
-    const sourceResult = input.gatewayCallResults.find((result) => result.capability_id === capability);
+    const sourceResult =
+      input.gatewayCallResults.find((result) => result.capability_id === capability && result.ok === true) ??
+      input.gatewayCallResults.find((result) => result.capability_id === capability);
     return {
       schema: "helix.compound_capability_subgoal.v1",
       subgoal_id: `${input.turnId}:codex_compound_subgoal:${index + 1}`,
@@ -1105,6 +1112,7 @@ const applyCalculatorObservationAuthorityGuard = (input: {
 const isDeicticWorkstationContextQuestion = (text: string): boolean => {
   if (/\bbackground\s+only\b/i.test(text)) return false;
   const unquotedText = text.replace(/"[^"]*"|'[^']*'|`[^`]*`/g, " ");
+  if (/\b(?:provider|adapter\s+boundary|capability\s+manifest|workstation\s+capability\s+manifest|runtime\s+agent)\b/i.test(unquotedText)) return false;
   if (/\b(?:not|don'?t|do\s+not)\s+(?:asking\s+about|ask|answer|use|read|explain|inspect)\b.{0,80}\b(?:current|active|open|visible)\s+(?:panel|panels|workspace|workstation|layout)\b/i.test(unquotedText)) return false;
   if (/\b(?:before|after|if|when)\b.{0,80}\b(?:open|focus|switch|show)\b.{0,40}\b(?:panel|workspace|workstation)\b/i.test(unquotedText)) return false;
   if (/\b(?:previous|last|earlier|historical)\b.{0,80}\b(?:panel|panels|workspace|workstation|layout)\b/i.test(unquotedText)) return false;
@@ -1133,18 +1141,210 @@ const applyWorkstationContextAuthorityGuard = (input: {
 };
 
 const gatewayCallsSucceeded = (gatewayCallResults: HelixWorkstationGatewayCallResult[]): boolean =>
-  gatewayCallResults.length === 0 || gatewayCallResults.every((result) => result.ok === true);
+  gatewayCallResults.length === 0 ||
+  gatewayCallResults.every((result, index) =>
+    result.ok === true || hasSuccessfulCalculatorSolveForFailedCapability(gatewayCallResults, index)
+  );
 
-const hasLaterSuccessfulCalculatorSolve = (
+const isSuccessfulEvidenceGatewayResult = (result: HelixWorkstationGatewayCallResult): boolean =>
+  result.ok === true && !isWorkstationActionReceipt(result);
+
+const selectRailReentryGatewayResult = (
+  gatewayCallResults: HelixWorkstationGatewayCallResult[],
+): HelixWorkstationGatewayCallResult | null => {
+  const successfulEvidenceResults = gatewayCallResults.filter(isSuccessfulEvidenceGatewayResult);
+  return (
+    successfulEvidenceResults.find((result) => result.capability_id === CALCULATOR_SOLVE_EXPRESSION_CAPABILITY) ??
+    successfulEvidenceResults.find((result) => result.capability_id === "docs.search") ??
+    successfulEvidenceResults[0] ??
+    gatewayCallResults.find((result) => result.ok === true) ??
+    null
+  );
+};
+
+const buildCodexProviderRailReentryProjection = (input: {
+  turnId: string;
+  gatewayCallResults: HelixWorkstationGatewayCallResult[];
+  providerTerminalAuthorized: boolean;
+}): {
+  toolLifecycleTrace: HelixToolLifecycleTrace | null;
+  toolFollowupDecision: HelixToolFollowupDecision | null;
+} => {
+  if (!input.providerTerminalAuthorized) {
+    return {
+      toolLifecycleTrace: null,
+      toolFollowupDecision: null,
+    };
+  }
+  const selected = selectRailReentryGatewayResult(input.gatewayCallResults);
+  if (!selected) {
+    return {
+      toolLifecycleTrace: null,
+      toolFollowupDecision: null,
+    };
+  }
+  const observationRefs = selected.artifact_refs.length > 0
+    ? selected.artifact_refs
+    : selected.observation_packet.produced_artifact_refs;
+  return {
+    toolLifecycleTrace: {
+      ...selected.tool_lifecycle_trace,
+      lifecycle_stage: "reentered_solver",
+      status: "completed",
+      observation_refs: observationRefs,
+      evidence_refs: observationRefs,
+      failure_reason: null,
+      retry_recommendation: "allow_terminal",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    toolFollowupDecision: {
+      ...selected.tool_followup_decision,
+      next_action: "terminal_answer",
+      reason: "provider_terminal_candidate_authorized_after_gateway_observation_reentry",
+      external_change_required: false,
+      terminal_blockers: [],
+      required_surface_satisfied: true,
+      evidence_reentered: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+  };
+};
+
+const buildCodexProviderRailContractProjection = (input: {
+  turnId: string;
+  gatewayCallResults: HelixWorkstationGatewayCallResult[];
+  terminalArtifactKind: string | null;
+}): {
+  toolCallAdmissionDecision: Record<string, unknown> | null;
+  routeProductContract: Record<string, unknown> | null;
+  canonicalGoalFrame: Record<string, unknown> | null;
+  operationalCapabilityTrace: Record<string, unknown> | null;
+  runtimeToolCall: Record<string, unknown> | null;
+  capabilityResult: Record<string, unknown> | null;
+} => {
+  const selected = selectRailReentryGatewayResult(input.gatewayCallResults);
+  const terminalArtifactKind = input.terminalArtifactKind ?? "agent_provider_terminal_candidate";
+  if (!selected) {
+    return {
+      toolCallAdmissionDecision: null,
+      routeProductContract: null,
+      canonicalGoalFrame: null,
+      operationalCapabilityTrace: null,
+      runtimeToolCall: null,
+      capabilityResult: null,
+    };
+  }
+  const requestedCapability =
+    readString(selected.gateway_admission.requested_capability) ??
+    selected.capability_id;
+  const admittedCapability =
+    readString(selected.gateway_admission.admitted_capability) ??
+    selected.capability_id;
+  const observationRefs = selected.artifact_refs.length > 0
+    ? selected.artifact_refs
+    : selected.observation_packet.produced_artifact_refs;
+  return {
+    toolCallAdmissionDecision: {
+      schema: "helix.tool_call_admission_decision.v1",
+      turn_id: input.turnId,
+      requested_capability: requestedCapability,
+      admitted_capability: admittedCapability,
+      selected_capability: selected.capability_id,
+      admission_status: selected.gateway_admission.admission_status,
+      admission_reason: selected.gateway_admission.admission_reason,
+      admitted_tool_families: ["workstation_tool_gateway"],
+      required_observation_kinds_for_requested_capability: [
+        typedObservationKindForGatewayCapability(selected.capability_id),
+      ].filter(Boolean),
+      source: "codex_provider_workstation_gateway_admission_projection",
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    routeProductContract: {
+      schema: "helix.route_product_contract.v1",
+      turn_id: input.turnId,
+      source_target: "agent_provider_gateway_turn",
+      required_terminal_artifact_kind: terminalArtifactKind,
+      required_terminal_kind: terminalArtifactKind,
+      allowed_terminal_artifact_kinds: [
+        terminalArtifactKind,
+        "typed_failure",
+      ],
+      source: "codex_provider_terminal_authority_bridge",
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    canonicalGoalFrame: {
+      schema: "helix.canonical_goal_frame.v1",
+      turn_id: input.turnId,
+      goal_kind: "agent_provider_gateway_turn",
+      requested_capability: requestedCapability,
+      required_terminal_kind: terminalArtifactKind,
+      source: "codex_provider_workstation_gateway_projection",
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    operationalCapabilityTrace: {
+      schema: "helix.operational_capability_trace.v1",
+      turn_id: input.turnId,
+      model_proposed_capability: requestedCapability,
+      policy_admitted_capability: admittedCapability,
+      executed_capability: selected.ok === true ? selected.capability_id : null,
+      source: "codex_provider_workstation_gateway_projection",
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    runtimeToolCall: {
+      schema: "helix.runtime_tool_call.v1",
+      turn_id: input.turnId,
+      tool_call_id: selected.observation_packet.call_id,
+      capability_key: selected.capability_id,
+      status: selected.ok === true ? "completed" : "failed",
+      source: "codex_provider_workstation_gateway_projection",
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    capabilityResult: {
+      schema: "helix.capability_result.v1",
+      turn_id: input.turnId,
+      capability_plan_id: `${input.turnId}:codex_provider:${selected.capability_id}:capability_result`,
+      capability_key: selected.capability_id,
+      requested_capability: requestedCapability,
+      admitted_capability: admittedCapability,
+      executed_capability: selected.ok === true ? selected.capability_id : null,
+      status: selected.ok === true ? "succeeded" : "failed",
+      reentered_solver: selected.ok === true,
+      observation_refs: observationRefs,
+      evidence_refs: observationRefs,
+      failure_reason:
+        selected.ok === true
+          ? null
+          : readString(selected.error) ??
+            readString(selected.gateway_admission.blocked_reason) ??
+            "gateway_call_failed",
+      source: "codex_provider_workstation_gateway_reentry_projection",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+  };
+};
+
+const hasSuccessfulCalculatorSolveForFailedCapability = (
   gatewayCallResults: HelixWorkstationGatewayCallResult[],
   failedIndex: number,
 ): boolean => {
   const failed = gatewayCallResults[failedIndex];
+  if (failed?.ok === true) return false;
   const failedCapability =
     failed?.gateway_admission.requested_capability ||
     failed?.capability_id;
   if (failedCapability !== CALCULATOR_SOLVE_EXPRESSION_CAPABILITY) return false;
-  return gatewayCallResults.slice(failedIndex + 1).some((candidate) => {
+  return gatewayCallResults.some((candidate, index) => {
+    if (index === failedIndex) return false;
     const candidateCapability =
       candidate.gateway_admission.requested_capability ||
       candidate.capability_id;
@@ -1157,7 +1357,7 @@ export const applyGatewayFailureAuthorityGuard = (input: {
   gatewayCallResults: HelixWorkstationGatewayCallResult[];
 }): string => {
   const failed = input.gatewayCallResults.filter((result, index) =>
-    result.ok !== true && !hasLaterSuccessfulCalculatorSolve(input.gatewayCallResults, index),
+    result.ok !== true && !hasSuccessfulCalculatorSolveForFailedCapability(input.gatewayCallResults, index),
   );
   if (failed.length === 0) return input.text;
   const descriptions = failed
@@ -1578,8 +1778,8 @@ export const codexProvider: HelixAgentProvider = {
       packets: gatewayObservationPackets,
     });
     const currentTurnArtifactLedger = [
-      ...providerGatewayPacketLedger,
       ...normalizedObservationArtifacts,
+      ...providerGatewayPacketLedger,
     ];
     const codexCompoundSubgoalLedger = buildCodexCompoundSubgoalLedger({
       turnId,
@@ -1630,6 +1830,10 @@ export const codexProvider: HelixAgentProvider = {
           agent_runtime: "codex",
           agent_runtime_adapter_contract: adapterContract,
           agent_runtime_selection_trace: runtimeSelectionTrace,
+          capability_lane_manifest: adapterContract.capability_lane_manifest,
+          capability_lane_ids: adapterContract.capability_lane_ids,
+          capability_lane_statuses: adapterContract.capability_lane_statuses,
+          capability_lane_resolve_trace_shape: adapterContract.capability_lane_resolve_trace_shape,
           fail_reason: "missing_question",
           permission_profile: codexProvider.permissionProfile,
           workstation_gateway_manifest: gatewayManifest,
@@ -1666,6 +1870,9 @@ export const codexProvider: HelixAgentProvider = {
 
     const prompt = [
       "You are running inside Helix Codex Workstation Mode.",
+      "When asked what runtime agent provider you are using, answer: codex / Codex Workstation Mode.",
+      "When asked what adapter boundary you are using, answer separately: helix_agent_provider_edge.",
+      "Do not describe helix_agent_provider_edge as the runtime agent provider; it is the adapter boundary.",
       ...adapterContract.prompt_policy_lines,
       "The current Helix workstation gateway gives Codex read/observe evidence only. Helix may separately project non-mutating UI action receipts from those observations.",
       `Provider permission profile: ${JSON.stringify(codexProvider.permissionProfile)}`,
@@ -1858,6 +2065,48 @@ export const codexProvider: HelixAgentProvider = {
       : directTerminalAuthority
         ? "authorized_no_gateway_tool_required"
         : providerReentry.terminalAuthorityStatus;
+    const terminalAnswerAuthority =
+      compoundTerminalAuthority ?? directTerminalAuthority ?? providerReentry.terminalAnswerAuthority;
+    const terminalPresentation = compoundTerminalAuthority
+      ? {
+          schema: "helix.terminal_presentation.v1",
+          turn_id: turnId,
+          concise_text: projectedText,
+          terminal_artifact_kind: "compound_evidence_synthesis_answer",
+          final_answer_source: "compound_evidence_synthesis_answer",
+          terminal_authority_ref: readString(compoundAnswer?.answer_id),
+          selected_observation_refs: compoundAnswer?.support_refs,
+          presentation_policy: "preserve_provider_text",
+          helix_style_rewrite_applied: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        }
+      : directTerminalAuthority
+        ? {
+            schema: "helix.terminal_presentation.v1",
+            turn_id: turnId,
+            concise_text: projectedText,
+            terminal_artifact_kind: "agent_provider_terminal_candidate",
+            final_answer_source: "agent_provider_terminal_candidate",
+            terminal_authority_ref: readString(directTerminalAuthority.terminal_item_id),
+            selected_observation_refs: [],
+            presentation_policy: "preserve_provider_text",
+            helix_style_rewrite_applied: false,
+            assistant_answer: false,
+            raw_content_included: false,
+        }
+      : providerReentry.terminalPresentation;
+    const railContractProjection = buildCodexProviderRailContractProjection({
+      turnId,
+      gatewayCallResults,
+      terminalArtifactKind,
+    });
+    const railReentryProjection = buildCodexProviderRailReentryProjection({
+      turnId,
+      gatewayCallResults,
+      providerTerminalAuthorized:
+        compoundTerminalAuthorized || providerTerminalAuthorized || directTerminalAuthorized,
+    });
 
     return {
       ok,
@@ -1869,6 +2118,26 @@ export const codexProvider: HelixAgentProvider = {
       selected_final_answer: projectedText,
       final_answer_source: finalAnswerSource,
       terminal_artifact_kind: terminalArtifactKind,
+      terminal_answer_authority: terminalAnswerAuthority,
+      terminal_presentation: terminalPresentation,
+      ...(railContractProjection.toolCallAdmissionDecision
+        ? { tool_call_admission_decision: railContractProjection.toolCallAdmissionDecision }
+        : {}),
+      ...(railContractProjection.routeProductContract
+        ? { route_product_contract: railContractProjection.routeProductContract }
+        : {}),
+      ...(railContractProjection.canonicalGoalFrame
+        ? { canonical_goal_frame: railContractProjection.canonicalGoalFrame }
+        : {}),
+      ...(railContractProjection.operationalCapabilityTrace
+        ? { operational_capability_trace: railContractProjection.operationalCapabilityTrace }
+        : {}),
+      ...(railContractProjection.runtimeToolCall
+        ? { runtime_tool_call: railContractProjection.runtimeToolCall }
+        : {}),
+      ...(railContractProjection.capabilityResult
+        ? { capability_result: railContractProjection.capabilityResult }
+        : {}),
       turn_transcript_events: turnTranscriptEvents,
       turn_transcript_event_count: turnTranscriptEvents.length,
       turn_transcript_source: "codex_provider_gateway_projection",
@@ -1877,12 +2146,22 @@ export const codexProvider: HelixAgentProvider = {
       support_refs: hostWorkstationAffordances.support_refs,
       tool_output_refs: hostWorkstationAffordances.tool_output_refs,
       current_turn_artifact_ledger: currentTurnArtifactLedger,
+      ...(railReentryProjection.toolLifecycleTrace
+        ? { tool_lifecycle_trace: railReentryProjection.toolLifecycleTrace }
+        : {}),
+      ...(railReentryProjection.toolFollowupDecision
+        ? { tool_followup_decision: railReentryProjection.toolFollowupDecision }
+        : {}),
       ...(compoundAnswer ? { compound_evidence_synthesis_answer: compoundAnswer } : {}),
       ...(codexCompoundSubgoalLedger ? { compound_capability_contract: codexCompoundSubgoalLedger } : {}),
       debug: {
         agent_runtime: "codex",
         agent_runtime_adapter_contract: adapterContract,
         agent_runtime_selection_trace: runtimeSelectionTrace,
+        capability_lane_manifest: adapterContract.capability_lane_manifest,
+        capability_lane_ids: adapterContract.capability_lane_ids,
+        capability_lane_statuses: adapterContract.capability_lane_statuses,
+        capability_lane_resolve_trace_shape: adapterContract.capability_lane_resolve_trace_shape,
         permission_profile: codexProvider.permissionProfile,
         fail_reason:
           normalizationFailures[0] ??
@@ -1914,45 +2193,25 @@ export const codexProvider: HelixAgentProvider = {
         normalized_provider_observation_artifacts: normalizedObservationArtifacts,
         normalized_provider_observation_packets: normalizedObservationPackets,
         provider_observation_normalization_failures: normalizationFailures,
+        tool_call_admission_decision: railContractProjection.toolCallAdmissionDecision,
+        route_product_contract: railContractProjection.routeProductContract,
+        canonical_goal_frame: railContractProjection.canonicalGoalFrame,
+        operational_capability_trace: railContractProjection.operationalCapabilityTrace,
+        runtime_tool_call: railContractProjection.runtimeToolCall,
+        capability_result: railContractProjection.capabilityResult,
         compound_capability_contract: codexCompoundSubgoalLedger,
         compound_evidence_synthesis_answer: compoundAnswer,
         current_turn_artifact_ledger: currentTurnArtifactLedger,
+        tool_lifecycle_trace: railReentryProjection.toolLifecycleTrace,
+        tool_followup_decision: railReentryProjection.toolFollowupDecision,
         tool_lifecycle_traces: gatewayLifecycleTraces,
         tool_followup_decisions: gatewayFollowupDecisions,
         provider_terminal_candidate: providerReentry.providerTerminalCandidate,
         provider_reasoning_reentry: providerReentry.providerReasoningReentry,
         terminal_authority_candidate_review: providerReentry.terminalAuthorityCandidateReview,
         provider_terminal_authority_bridge: providerReentry.providerTerminalAuthorityBridge,
-        terminal_answer_authority: compoundTerminalAuthority ?? directTerminalAuthority ?? providerReentry.terminalAnswerAuthority,
-        terminal_presentation: compoundTerminalAuthority
-          ? {
-              schema: "helix.terminal_presentation.v1",
-              turn_id: turnId,
-              concise_text: projectedText,
-              terminal_artifact_kind: "compound_evidence_synthesis_answer",
-              final_answer_source: "compound_evidence_synthesis_answer",
-              terminal_authority_ref: readString(compoundAnswer?.answer_id),
-              selected_observation_refs: compoundAnswer?.support_refs,
-              presentation_policy: "preserve_provider_text",
-              helix_style_rewrite_applied: false,
-              assistant_answer: false,
-              raw_content_included: false,
-            }
-          : directTerminalAuthority
-            ? {
-                schema: "helix.terminal_presentation.v1",
-                turn_id: turnId,
-                concise_text: projectedText,
-                terminal_artifact_kind: "agent_provider_terminal_candidate",
-                final_answer_source: "agent_provider_terminal_candidate",
-                terminal_authority_ref: readString(directTerminalAuthority.terminal_item_id),
-                selected_observation_refs: [],
-                presentation_policy: "preserve_provider_text",
-                helix_style_rewrite_applied: false,
-                assistant_answer: false,
-                raw_content_included: false,
-              }
-          : providerReentry.terminalPresentation,
+        terminal_answer_authority: terminalAnswerAuthority,
+        terminal_presentation: terminalPresentation,
         final_answer_source: finalAnswerSource,
         terminal_artifact_kind: terminalArtifactKind,
         workstation_gateway_reentry_status: providerReentry.workstationGatewayReentryStatus,

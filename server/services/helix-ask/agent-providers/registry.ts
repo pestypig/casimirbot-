@@ -5,6 +5,7 @@ import { selectHelixAgentRuntime } from "./runtime-select";
 import { helixNativeProvider } from "./helix-native-provider";
 import { codexProvider } from "./codex-provider";
 import { futureProvider } from "./future-provider";
+import { listHelixCapabilityLanes } from "../capability-lanes/registry";
 
 const providers = new Map<string, HelixAgentProvider>([
   [helixNativeProvider.id, helixNativeProvider],
@@ -20,6 +21,7 @@ export function listHelixAgentProviders(): HelixAgentRuntimeDescriptor[] {
     experimental: provider.id !== "helix",
     permission_profile: provider.permissionProfile,
     ...(provider.runtimeStatus ? { runtime_status: provider.runtimeStatus() } : {}),
+    capability_lane_manifest: listHelixCapabilityLanes({ provider }),
     supports: provider.supports,
   }));
 }

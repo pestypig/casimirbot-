@@ -1,3 +1,5 @@
+import type { HelixCapabilityLaneManifest } from "./helix-capability-lane";
+
 export const HELIX_AGENT_RUNTIME_IDS = ["helix", "codex", "future"] as const;
 
 export type HelixAgentRuntimeId = (typeof HELIX_AGENT_RUNTIME_IDS)[number];
@@ -27,6 +29,7 @@ export type HelixAgentRuntimeDescriptor = {
     resolved_bin: string | null;
     args: string[];
   };
+  capability_lane_manifest?: HelixCapabilityLaneManifest;
   supports: {
     streaming: boolean;
     workstationTools: boolean;

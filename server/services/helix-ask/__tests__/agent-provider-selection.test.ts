@@ -32,6 +32,8 @@ import {
 } from "../agent-providers/explicit-workstation-gateway";
 import { buildCompoundCapabilityDependencyGatewayCallRequests } from "../agent-providers/provider-compound-capability-planner";
 import { buildHelixProviderReasoningReentry } from "../agent-providers/provider-terminal-authority";
+import { buildArtifactQueryIndex } from "../artifact-query-index";
+import { refreshToolLifecycleRecords } from "../tool-lifecycle-trace";
 import {
   listWorkstationGatewayCapabilities,
   normalizeDocsObservationExcerptText,
@@ -1085,6 +1087,24 @@ describe("Helix Ask agent provider selection", () => {
     });
   });
 
+  it("derives percent-of calculator phrases for Codex gateway normalization", () => {
+    const body = {
+      turn_id: "ask:test:codex-percent-of-calculator-prompt",
+      agent_runtime: "codex",
+      question:
+        "Use the current document as context, then use the calculator to compute 12.5% of 54176.",
+    };
+
+    expect(buildPromptDerivedCalculatorSolveGatewayCallRequests(body)).toEqual([
+      expect.objectContaining({
+        capability_id: "scientific-calculator.solve_expression",
+        arguments: expect.objectContaining({
+          expression: "12.5% of 54176",
+        }),
+      }),
+    ]);
+  });
+
   it("keeps explicit Codex docs.search plus repo.search prompts from admitting duplicate or adjacent tools", () => {
     const requests = readWorkstationGatewayCallRequestsForTurn({
       includePlannerDerived: true,
@@ -1522,6 +1542,50 @@ describe("Helix Ask agent provider selection", () => {
     ]));
     expect((result.debug as any)?.codex_host_workstation_affordances?.workstation_actions)
       .toEqual(result.workstation_actions);
+
+    const artifactQueryIndex = buildArtifactQueryIndex({
+      turnId: "ask:test:codex-retained-doc-context-after-calculator-focus",
+      payload: {
+        ...result,
+        turn_id: "ask:test:codex-retained-doc-context-after-calculator-focus",
+      } as any,
+    });
+    expect(artifactQueryIndex.codex_parity_agent_spine_rail_table).toMatchObject({
+      requested_capability: "docs.search",
+      selected_capability: "docs.search",
+      executed_capability: "docs.search",
+      rail_status: "complete",
+      codex_parity_class: "complete",
+    });
+    expect(artifactQueryIndex.tool_turn_chain_audit).toMatchObject({
+      requested_capability: "docs.search",
+      executed_capability: "docs.search",
+      reentry_executed: true,
+      rail_status: "complete",
+      rail_failure_code: null,
+    });
+
+    const debugExportPayload = {
+      ...result,
+      turn_id: "ask:test:codex-retained-doc-context-after-calculator-focus",
+    } as any;
+    refreshToolLifecycleRecords({
+      turnId: "ask:test:codex-retained-doc-context-after-calculator-focus",
+      payload: debugExportPayload,
+    });
+    const refreshedArtifactQueryIndex = buildArtifactQueryIndex({
+      turnId: "ask:test:codex-retained-doc-context-after-calculator-focus",
+      payload: debugExportPayload,
+    });
+    expect(refreshedArtifactQueryIndex.codex_parity_agent_spine_rail_table).toMatchObject({
+      requested_capability: "docs.search",
+      selected_capability: "docs.search",
+      executed_capability: "docs.search",
+      reentry_status: "reentered",
+      rail_status: "complete",
+      codex_parity_class: "complete",
+      rail_failure_code: null,
+    });
   });
 
   it("normalizes docs observation excerpt transport without dropping provenance", () => {
@@ -1722,7 +1786,48 @@ describe("Helix Ask agent provider selection", () => {
       gateway_observation_count: 1,
       terminal_authority_result: "authorized_by_helix_provider_candidate_bridge",
     });
+    expect((result as any).tool_lifecycle_trace).toMatchObject({
+      schema: "helix.tool_lifecycle_trace.v1",
+      requested_capability: "scientific-calculator.solve_expression",
+      admitted_capability: "scientific-calculator.solve_expression",
+      executed_capability: "scientific-calculator.solve_expression",
+      lifecycle_stage: "reentered_solver",
+      status: "completed",
+      observation_refs: expect.arrayContaining([
+        expect.stringContaining("scientific-calculator.solve_expression"),
+      ]),
+    });
+    expect((result as any).tool_followup_decision).toMatchObject({
+      schema: "helix.tool_followup_decision.v1",
+      next_action: "terminal_answer",
+      required_surface_satisfied: true,
+      evidence_reentered: true,
+    });
+    expect((result.debug as any)?.tool_lifecycle_trace).toEqual((result as any).tool_lifecycle_trace);
+    expect((result.debug as any)?.tool_followup_decision).toEqual((result as any).tool_followup_decision);
     expect((result.debug as any)?.turn_transcript_events).toEqual(result.turn_transcript_events);
+
+    const artifactQueryIndex = buildArtifactQueryIndex({
+      turnId: "ask:test:codex-calculator-visible-trace",
+      payload: {
+        ...result,
+        turn_id: "ask:test:codex-calculator-visible-trace",
+      } as any,
+    });
+    expect(artifactQueryIndex.codex_parity_agent_spine_rail_table).toMatchObject({
+      rail_status: "complete",
+      codex_parity_class: "complete",
+    });
+    expect(artifactQueryIndex.tool_turn_chain_audit).toMatchObject({
+      requested_capability: "scientific-calculator.solve_expression",
+      executed_capability: "scientific-calculator.solve_expression",
+      reentry_executed: true,
+      rail_status: "complete",
+      rail_failure_code: null,
+    });
+    expect(artifactQueryIndex.active_terminal_rail_status).toMatchObject({
+      rail_status: "complete",
+    });
   });
 
   it("preserves detailed Codex provider answers without Helix shortening or style rewrite", async () => {
@@ -2144,6 +2249,74 @@ describe("Helix Ask agent provider selection", () => {
       schema: "helix.compound_capability_contract.v1",
       rail_status: "satisfied",
       satisfied_subgoal_count: 3,
+    });
+  });
+
+  it("completes mixed Codex docs plus percent calculator turns with normalized calculator evidence", async () => {
+    const providerAnswer = "The document context is retained and the calculation is 6772.";
+    process.env.CODEX_AGENT_FAKE_STDOUT = providerAnswer;
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const turnId = "ask:test:codex-mixed-doc-percent-calculator";
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: turnId,
+        agent_runtime: "codex",
+        question:
+          "Use the current document as context, then use the calculator to compute 12.5% of 54176. Give a short final answer with both the document-context note and the calculation.",
+        workspace_context_snapshot: {
+          activePanel: "scientific-calculator",
+          focusedPanel: "scientific-calculator",
+          openPanels: ["docs-viewer", "scientific-calculator"],
+          activeDocPath: "/docs/helix-ask-flow.md",
+          hasDocContext: true,
+        },
+      },
+      headers: {},
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.text).toBe(providerAnswer);
+    expect((result as any).terminal_artifact_kind).toBe("compound_evidence_synthesis_answer");
+    const calculatorResults = ((result.debug as any)?.workstation_gateway_call_results ?? [])
+      .filter((entry: any) => entry.capability_id === "scientific-calculator.solve_expression");
+    expect(calculatorResults).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        ok: true,
+        observation: expect.objectContaining({
+          expression: "12.5% of 54176",
+          normalized_expression: "(12.5 / 100) * 54176",
+          result: "6772",
+          status: "succeeded",
+        }),
+      }),
+    ]));
+    expect((result.debug as any)?.compound_capability_contract).toMatchObject({
+      schema: "helix.compound_capability_contract.v1",
+      rail_status: "satisfied",
+      satisfied_subgoal_count: 2,
+    });
+
+    const artifactQueryIndex = buildArtifactQueryIndex({
+      turnId,
+      payload: {
+        ...result,
+        turn_id: turnId,
+      } as any,
+    });
+    expect(artifactQueryIndex.codex_parity_agent_spine_rail_table).toMatchObject({
+      requested_capability: "scientific-calculator.solve_expression",
+      selected_capability: "scientific-calculator.solve_expression",
+      executed_capability: "scientific-calculator.solve_expression",
+      reentry_status: "reentered",
+      goal_satisfaction: "completed",
+      selected_terminal_kind: "compound_evidence_synthesis_answer",
+      visible_terminal_kind: "compound_evidence_synthesis_answer",
+      rail_status: "complete",
+      codex_parity_class: "complete",
+      rail_failure_code: null,
     });
   });
 
@@ -2883,6 +3056,40 @@ describe("Helix Ask agent provider selection", () => {
       event.source_event_type === "tool_observation" &&
       /workstation\.active_context materialized active workstation context with active panel docs-viewer and 2 open panel/i.test(String(event.text)),
     )).toBe(true);
+  });
+
+  it("does not derive active workstation context when the prompt explicitly forbids tools", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT =
+      "I am using codex / Codex Workstation Mode through the helix_agent_provider_edge adapter boundary.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const body = {
+      turn_id: "ask:test:codex-no-tool-provider-identity",
+      agent_runtime: "codex",
+      question: "Do not open panels or run tools. Just tell me which provider you are using and whether you can see the workstation capability manifest.",
+      workspace_context_snapshot: {
+        activePanel: "docs-viewer",
+        activeGroupId: "main",
+        groupCount: 1,
+        openPanels: ["docs-viewer", "scientific-calculator"],
+      },
+    };
+
+    expect(buildActiveWorkstationContextGatewayCallRequests(body)).toEqual([]);
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body,
+      headers: {},
+    });
+
+    expect(result.text).toContain("codex / Codex Workstation Mode");
+    expect(result.text).toContain("helix_agent_provider_edge");
+    expect((result.debug as any)?.workstation_gateway_call_results).toEqual([]);
+    expect(result.turn_transcript_events?.some((event: any) =>
+      event.source_event_type === "tool_request" || event.source_event_type === "tool_observation",
+    )).toBe(false);
   });
 
   it("does not derive active workstation context from contextual or quoted panel mentions", () => {

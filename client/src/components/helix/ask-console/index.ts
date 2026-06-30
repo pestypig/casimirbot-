@@ -32,11 +32,46 @@ export {
 } from "./HelixAskChatPersistence";
 export { HelixAskRuntimePicker } from "./HelixAskRuntimePicker";
 export { buildHelixAskRuntimePickerModel } from "./HelixAskRuntimePicker";
+export { HelixAskMoodAvatar } from "./HelixAskMoodAvatar";
+export { HelixAskActionToolbar } from "./HelixAskActionToolbar";
+export { HelixAskSurfaceFrame } from "./HelixAskSurfaceFrame";
 export { HelixAskTurnList } from "./HelixAskTurnList";
+export { HelixAskReplyCard } from "./HelixAskReplyCard";
+export { HelixAskTurnStreamPanel } from "./HelixAskTurnStreamPanel";
 export { HelixAskFinalAnswer } from "./HelixAskFinalAnswer";
 export { buildHelixAskFinalAnswerBlocks } from "./HelixAskFinalAnswer";
+export {
+  HelixAskLiveBridgePillStrip,
+  HelixAskJobReadyLinkStrip,
+  HelixAskProofTraceDetails,
+  HelixAskReplyStatusFooter,
+  HelixAskStagePlayActionButtons,
+} from "./HelixAskFinalExtras";
+export { HelixAskActiveTurnStreamPanel } from "./HelixAskActiveTurnStreamPanel";
 export { HelixAskTurnControls } from "./HelixAskTurnControls";
 export { HelixAskDebugDrawer } from "./HelixAskDebugDrawer";
+export { HelixAskAttachmentStrip } from "./HelixAskAttachmentStrip";
+export {
+  HelixAskContextMemoryStatusLine,
+  HelixAskErrorLine,
+  HelixAskVoiceStatusPill,
+} from "./HelixAskStatusLine";
+export { HelixAskVoiceLevelMonitor } from "./HelixAskVoiceLevelMonitor";
+export {
+  HelixAskContextChooserPanel,
+  HelixAskConversationBriefPanel,
+  HelixAskObserverLanePanel,
+} from "./HelixAskObserverLane";
+export { HelixAskSteeringQueuePanel } from "./HelixAskSteeringQueuePanel";
+export {
+  HelixAskContextCapsulePreview,
+  HelixAskReplyContextCapsuleCard,
+} from "./HelixAskContextCapsulePreview";
+export { HelixAskSituationRoomSourcePanel } from "./HelixAskSituationRoomSourcePanel";
+export {
+  HelixAskTranscriptConfirmationPanel,
+  HelixAskVoiceCommandConfirmationPanel,
+} from "./HelixAskVoiceConfirmationPanel";
 export {
   buildHelixAskContextBridgeSnapshot,
   readDocPathFromDesktopUrl,
@@ -73,6 +108,15 @@ export type { HelixAskContextBridgeSnapshot } from "./HelixAskContextBridge";
 export type { HelixAskConsoleRequestEnvelope } from "./HelixAskRequestEnvelope";
 export type { HelixAskFinalAnswerBlock, HelixAskFinalAnswerProps } from "./HelixAskFinalAnswer";
 export type {
+  HelixAskLiveBridgePill,
+  HelixAskLiveBridgePillStripProps,
+  HelixAskJobReadyLinkStripProps,
+  HelixAskProofTraceDetailsProps,
+  HelixAskReplyStatusFooterProps,
+  HelixAskStagePlayActionButtonsProps,
+} from "./HelixAskFinalExtras";
+export type { HelixAskActiveTurnStreamPanelProps } from "./HelixAskActiveTurnStreamPanel";
+export type {
   HelixAskComposerSubmitMode,
   HelixAskComposerViewModel,
   HelixAskComposerProps,
@@ -101,8 +145,48 @@ export type {
   HelixAskRuntimePickerModel,
   HelixAskRuntimePickerProps,
 } from "./HelixAskRuntimePicker";
+export type { HelixAskMoodAvatarProps } from "./HelixAskMoodAvatar";
+export type { HelixAskActionToolbarProps } from "./HelixAskActionToolbar";
+export type { HelixAskSurfaceFrameProps } from "./HelixAskSurfaceFrame";
 export type {
   HelixAskLatestTurnBinding,
   HelixAskLatestTurnCandidate,
 } from "./HelixAskLatestTurnBinding";
+export type { HelixAskReplyCardProps } from "./HelixAskReplyCard";
+export type {
+  HelixAskTurnStreamAnswerTint,
+  HelixAskTurnStreamPanelProps,
+} from "./HelixAskTurnStreamPanel";
 export type { HelixAskConsoleFinalProjectionOptions } from "./HelixAskFinalProjection";
+export type {
+  HelixAskAttachmentStripAttachment,
+  HelixAskAttachmentStripCommitCheck,
+  HelixAskAttachmentStripProps,
+} from "./HelixAskAttachmentStrip";
+export type {
+  HelixAskContextMemoryStatusLineProps,
+  HelixAskErrorLineProps,
+  HelixAskVoiceInputStatus,
+  HelixAskVoiceStatusPillProps,
+} from "./HelixAskStatusLine";
+export type {
+  HelixAskVoiceLevelMonitorProps,
+  HelixAskVoiceSignalState,
+} from "./HelixAskVoiceLevelMonitor";
+export type {
+  HelixAskContextChooserPanelProps,
+  HelixAskConversationBriefPanelProps,
+  HelixAskObserverLaneEvent,
+  HelixAskObserverLanePanelProps,
+} from "./HelixAskObserverLane";
+export type { HelixAskSteeringQueuePanelProps } from "./HelixAskSteeringQueuePanel";
+export type {
+  HelixAskContextCapsulePreviewModel,
+  HelixAskContextCapsulePreviewProps,
+  HelixAskReplyContextCapsuleCardProps,
+} from "./HelixAskContextCapsulePreview";
+export type { HelixAskSituationRoomSourcePanelProps } from "./HelixAskSituationRoomSourcePanel";
+export type {
+  HelixAskTranscriptConfirmationPanelProps,
+  HelixAskVoiceCommandConfirmationPanelProps,
+} from "./HelixAskVoiceConfirmationPanel";

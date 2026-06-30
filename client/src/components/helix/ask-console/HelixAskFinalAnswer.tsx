@@ -78,7 +78,12 @@ export function HelixAskFinalAnswer({ text, meta, renderContent }: HelixAskFinal
                 <span className="mt-[0.15rem] text-cyan-300/80" aria-hidden="true">
                   -
                 </span>
-                <span className="min-w-0 flex-1">{renderText(block.text)}</span>
+                <span
+                  className="min-w-0 flex-1"
+                  data-narrator-source-id={`helix-${block.key}`}
+                >
+                  {renderText(block.text)}
+                </span>
               </div>
             );
           }
@@ -86,6 +91,7 @@ export function HelixAskFinalAnswer({ text, meta, renderContent }: HelixAskFinal
             <div
               key={block.key}
               className={block.isSectionHeader ? "pt-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-100" : ""}
+              data-narrator-source-id={`helix-${block.key}`}
             >
               {renderText(block.text)}
             </div>
