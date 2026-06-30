@@ -772,6 +772,19 @@ describe("provider-agent capability contract catalog", () => {
     expect(unindexed).toEqual([]);
   });
 
+  it("keeps every shared gateway capability represented in the workstation contract index", () => {
+    const contractIndex = fs.readFileSync(workstationToolContractReadmePath, "utf8");
+    const gatewayCapabilityIds = listWorkstationGatewayCapabilities({
+      agentRuntime: "codex",
+      mode: "act",
+    }).capabilities.map((capability) => capability.capability_id);
+    const missing = gatewayCapabilityIds
+      .filter((capabilityId) => !contractIndex.includes(`\`${capabilityId}\``))
+      .sort();
+
+    expect(missing).toEqual([]);
+  });
+
   it("keeps workstation tool contracts on the shared lifecycle template", () => {
     const contractIndex = fs.readFileSync(workstationToolContractReadmePath, "utf8");
     const contractDir = path.dirname(workstationToolContractReadmePath);
