@@ -118,6 +118,9 @@ let buildHelixDebugExportEnvelopeFromMasterPayload: typeof import("@/components/
 let buildHelixAskReplyCopyText: typeof import("@/components/helix/HelixAskPill").buildHelixAskReplyCopyText;
 let debugPayloadMatchesRenderedTurnPayload: typeof import("@/components/helix/HelixAskPill").debugPayloadMatchesRenderedTurnPayload;
 let readDocViewerPathFromDesktopUrlForAskSnapshot: typeof import("@/components/helix/HelixAskPill").readDocViewerPathFromDesktopUrlForAskSnapshot;
+let buildReplyScopedDebugExportFromRenderedButton: typeof import("@/components/helix/HelixAskPill").buildReplyScopedDebugExportFromRenderedButton;
+let hasSuccessfulWorkstationTerminalTranscriptRows: typeof import("@/components/helix/HelixAskPill").hasSuccessfulWorkstationTerminalTranscriptRows;
+let copyHelixAskPlainTextToClipboard: typeof import("@/components/helix/HelixAskPill").copyHelixAskPlainTextToClipboard;
 
 beforeAll(async () => {
   (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
@@ -236,12 +239,27 @@ beforeAll(async () => {
     buildHelixAskReplyCopyText,
     debugPayloadMatchesRenderedTurnPayload,
     readDocViewerPathFromDesktopUrlForAskSnapshot,
+    buildReplyScopedDebugExportFromRenderedButton,
+    hasSuccessfulWorkstationTerminalTranscriptRows,
+    copyHelixAskPlainTextToClipboard,
   } = await import("@/components/helix/HelixAskPill"));
   ({ parseHelixAskFinalAnswerBulletLine } = await import("@/lib/helix/ask-answer-rendering"));
 });
 
 const pillPath = path.resolve(process.cwd(), "client/src/components/helix/HelixAskPill.tsx");
 const docsViewerContextPath = path.resolve(process.cwd(), "client/src/lib/helix/ask-doc-viewer-context.ts");
+const askConsoleContextBridgePath = path.resolve(
+  process.cwd(),
+  "client/src/components/helix/ask-console/HelixAskContextBridge.ts",
+);
+const askConsoleRequestEnvelopePath = path.resolve(
+  process.cwd(),
+  "client/src/components/helix/ask-console/HelixAskRequestEnvelope.ts",
+);
+const askConsoleLatestTurnBindingPath = path.resolve(
+  process.cwd(),
+  "client/src/components/helix/ask-console/HelixAskLatestTurnBinding.ts",
+);
 
 describe("HelixAskPill mic-first surface contract", () => {
   it("keeps completed Ask answers in timestamp order after stale active rows arrive", () => {
@@ -932,7 +950,7 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain('title={micArmState === "on" ? "Disable microphone" : "Enable microphone"}');
     expect(source).toContain('title="Capture visual source"');
     expect(source).toContain('title={visualSituationIncludeAudio ? "Disable tab audio for visual capture" : "Enable tab audio for visual capture"}');
-    expect(source).toContain('title={askBusy ? "Stop generation" : "Submit prompt"}');
+    expect(source).toContain("title={composerViewModel.submitTitle}");
   });
 
   it("routes finalized voice into active-turn steering before normal Ask dispatch", () => {
@@ -1017,8 +1035,8 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("snap-x snap-mandatory");
     expect(source).toContain("[scrollbar-width:none]");
     expect(source).toContain("Scroll Ask controls right");
-    expect(source).toContain("helix-ask-textarea w-full min-w-0 resize-none");
-    expect(source).toContain("const HELIX_ASK_MAX_PROMPT_LINES = 10;");
+    expect(source).toContain("composerViewModel.textareaClassName");
+    expect(source).toContain("HELIX_ASK_CONSOLE_MAX_PROMPT_LINES");
   });
 
   it("renders an agent runtime picker sourced from the backend provider scaffold", () => {
@@ -1026,7 +1044,8 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain('fetch("/api/agi/agent-providers"');
     expect(source).toContain('aria-label="Choose Ask agent runtime"');
     expect(source).toContain('aria-label="Ask agent runtime"');
-    expect(source).toContain("agentRuntimeProviders.map");
+    expect(source).toContain("buildHelixAskRuntimePickerModel");
+    expect(source).toContain("agentRuntimePickerModel.items.map");
     expect(source).toContain("disabled={!provider.enabled}");
     expect(source).toContain("{selectedAgentRuntimeLabel}");
     expect(source).toContain("resolveNextSelectableHelixAgentRuntime(selectedAgentRuntime, agentRuntimeProviders)");
@@ -1255,9 +1274,11 @@ describe("HelixAskPill mic-first surface contract", () => {
 
   it("preserves retained docs-viewer URL context in Ask workspace snapshots", () => {
     const source = fs.readFileSync(pillPath, "utf8");
+    const contextBridgeSource = fs.readFileSync(askConsoleContextBridgePath, "utf8");
     const docsContextSource = fs.readFileSync(docsViewerContextPath, "utf8");
     expect(source).toContain("readDocViewerPathFromDesktopUrlForAskSnapshot");
-    expect(source).toContain('params.get("doc")');
+    expect(source).toContain("readDocPathFromDesktopUrl");
+    expect(contextBridgeSource).toContain('searchParams.get("doc")');
     expect(source).toContain('source: "desktop_url_doc_param"');
     expect(source).toContain("normalizeDocViewerPathForAskSnapshot");
     expect(docsContextSource).toContain('normalized.startsWith("docs/")');
@@ -1265,11 +1286,13 @@ describe("HelixAskPill mic-first surface contract", () => {
 
   it("promotes current whitepaper prompts to the retained docs-viewer path", () => {
     const source = fs.readFileSync(pillPath, "utf8");
+    const requestEnvelopeSource = fs.readFileSync(askConsoleRequestEnvelopePath, "utf8");
     expect(source).toContain("HELIX_ACTIVE_DOC_VIEWER_ARTIFACT_CUE_RE");
     expect(source).toContain("white\\s*paper|whitepaper");
     expect(source).toContain("resolveAskTurnDocViewerSnapshotPath().path");
     expect(source).toContain("buildHelixAskContextFilesForTurn");
-    expect(source).toContain("workspaceContextSnapshot?.activeDocPath");
+    expect(source).toContain("buildHelixAskConsoleContextFiles");
+    expect(requestEnvelopeSource).toContain("workspaceContextSnapshot?.activeDocPath");
     expect(source).toContain("contextFiles: contextFilesForTurn");
   });
 
@@ -1334,6 +1357,59 @@ describe("HelixAskPill mic-first surface contract", () => {
       selected_final_answer: "Observed expression: 8*9\nResult: 72",
       selectedDebugFinalAnswer: "Observed expression: 8*9\nResult: 72",
     }), debugButton)).toBe(true);
+  });
+
+  it("keeps rendered-button debug copy bound when the visible final comes from terminal transcript rows", () => {
+    const questionText = "Codex UI gateway smoke 2026-06-29: use scientific-calculator.solve_expression with expression 8*9.";
+    const finalText =
+      "I cannot claim the requested workstation tool or UI action ran because Helix did not produce a successful observation or action receipt for every gateway request.\n" +
+      "Blocked or failed gateway request: scientific-calculator.solve_expression: expression_evaluation_failed.";
+    const questionNode = {
+      innerText: `1Questionquestion${questionText}user prompt`,
+      textContent: `1Questionquestion${questionText}user prompt`,
+      getAttribute: () => null,
+    };
+    const finalNode = {
+      innerText: `15Final answerfinal${finalText}typed failure | Provider: Codex Workstation Mode`,
+      textContent: `15Final answerfinal${finalText}typed failure | Provider: Codex Workstation Mode`,
+      getAttribute: (name: string) => name === "data-final-answer-text" ? finalText : null,
+    };
+    const debugButton = {
+      innerText: "",
+      textContent: "",
+      parentElement: null,
+      querySelector: (selector: string) => {
+        if (selector.includes("question")) return questionNode;
+        if (selector.includes("final")) return finalNode;
+        return null;
+      },
+    } as unknown as HTMLElement;
+
+    const exportText = buildReplyScopedDebugExportFromRenderedButton({
+      id: "reply-live-debug-binding",
+      question: questionText,
+      content: "Backend Ask was reached, but no server terminal artifact or debug artifact was materialized for this turn.",
+      debug: {
+        turn_transcript_events: [
+          {
+            source_event_type: "terminal_answer",
+            type: "final_answer",
+            text: finalText,
+          },
+        ],
+        debug_export_ref: {
+          endpoint: "/api/agi/ask/turn/turn-live-debug-binding/debug-export",
+          turn_id: "turn-live-debug-binding",
+        },
+      },
+    } as any, debugButton, "rendered_button_scope");
+
+    expect(exportText).toBeTruthy();
+    const parsed = JSON.parse(exportText ?? "{}");
+    expect(parsed.active_turn_id).toBe("reply-live-debug-binding");
+    expect(parsed.selected_final_answer.replace(/\s+/g, " ").trim()).toBe(
+      finalText.replace(/\s+/g, " ").trim(),
+    );
   });
 
   it("routes voice lite prompts through normal-turn lane without queued reasoning", () => {
@@ -1750,15 +1826,49 @@ describe("HelixAskPill mic-first surface contract", () => {
     });
   });
 
+  it("copies plain final-answer text through the response clipboard helper", async () => {
+    const originalNavigator = globalThis.navigator;
+    const writes: string[] = [];
+    Object.defineProperty(globalThis, "navigator", {
+      configurable: true,
+      value: {
+        clipboard: {
+          writeText: vi.fn(async (text: string) => {
+            writes.push(text);
+          }),
+          readText: vi.fn(async () => writes.at(-1) ?? ""),
+        },
+      },
+    });
+
+    await expect(copyHelixAskPlainTextToClipboard("plain final answer")).resolves.toBe(true);
+    expect(writes).toEqual(["plain final answer"]);
+
+    Object.defineProperty(globalThis, "navigator", {
+      configurable: true,
+      value: originalNavigator,
+    });
+  });
+
   it("exposes UI/debug parity hooks without making clipboard copy part of prompt submission", () => {
     const source = fs.readFileSync(pillPath, "utf8");
     const compactSource = source.replace(/\s+/g, " ");
     const finalRendererStart = source.indexOf("const renderHelixAskFinalAnswerContent = useCallback");
     const finalRendererEnd = source.indexOf("const renderEnvelopeSections = useCallback", finalRendererStart);
     const finalRendererSource = source.slice(finalRendererStart, finalRendererEnd);
-    expect(source).toContain('const latestFinalAnswerTestId = isLatestReply ? "helix-ask-latest-final-answer"');
+    const latestTurnBindingSource = fs.readFileSync(askConsoleLatestTurnBindingPath, "utf8");
+    const turnControlsSource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/components/helix/ask-console/HelixAskTurnControls.tsx"),
+      "utf8",
+    );
+    const debugDrawerSource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/components/helix/ask-console/HelixAskDebugDrawer.tsx"),
+      "utf8",
+    );
+    expect(source).toContain("buildHelixAskLatestTurnBinding");
+    expect(latestTurnBindingSource).toContain('finalAnswerTestId: "helix-ask-latest-final-answer"');
     expect(source).toContain("isFinalRow");
-    expect(source).toContain("? latestFinalAnswerTestId");
+    expect(source).toContain("? latestTurnBinding.finalAnswerTestId");
     expect(source).toContain("const transcriptAnswer = finalAnswerRawText");
     expect(source).toContain("const visibleText = isFinalRow ? row.text : clipText(row.text, row.detailLimit ?? 360)");
     expect(finalRendererSource).toContain('className="mt-2 space-y-1.5 leading-relaxed"');
@@ -1772,6 +1882,10 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("__HELIX_LAST_UNIFIED_DEBUG_COPY__");
     expect(source).toContain("__HELIX_LAST_UNIFIED_DEBUG_COPY_FALLBACK__");
     expect(source).toContain("clipboard_debug_copy_required_for_prompt_submission: false");
+    expect(source).toContain("<HelixAskTurnControls");
+    expect(turnControlsSource).toContain("relative z-20 mt-2 flex max-w-fit items-center gap-1");
+    expect(source).toContain("<HelixAskDebugDrawer");
+    expect(debugDrawerSource).toContain("relative z-0 mt-3 rounded-lg border border-cyan-300/30");
   });
 
   it("renders Live Answer as an inline turn bridge before terminal output", () => {
@@ -1932,8 +2046,13 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("helix-ask-turn-enter");
     expect(source).toContain("helix-ask-turn-line-enter");
     expect(source).toContain("@keyframes helixAskTurnFadeIn");
-    expect(source).toContain('title="Copy response"');
-    expect(source).toContain('title="Unified Debug Copy"');
+    const turnControlsSource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/components/helix/ask-console/HelixAskTurnControls.tsx"),
+      "utf8",
+    );
+    expect(source).toContain("<HelixAskTurnControls");
+    expect(turnControlsSource).toContain('title="Copy response"');
+    expect(turnControlsSource).toContain('title="Unified Debug Copy"');
     expect(source).toContain("buildReplyScopedDebugExportFromRenderedButton");
     expect(source).toContain("selectedDebugTurnId: reply.id");
     expect(source).toContain('selectedDebugSource: "rendered_reply_dom"');
@@ -1941,7 +2060,7 @@ describe("HelixAskPill mic-first surface contract", () => {
       "debug_export_ref: renderedMatchesReply ? replyRecord.debug_export_ref ?? replyDebugRecord?.debug_export_ref ?? null : null",
     );
     expect(source.indexOf("buildReplyScopedDebugExportFromRenderedButton")).toBeLessThan(
-      source.indexOf('title="Unified Debug Copy"'),
+      source.indexOf("<HelixAskTurnControls"),
     );
     expect(source).toContain("formatReadAloudButtonLabel");
     expect(source).not.toContain("Copy Capsule");
@@ -2068,6 +2187,14 @@ describe("HelixAskPill mic-first surface contract", () => {
 
   it("keeps wake mail transcript rows out of the durable chat projection", () => {
     const source = fs.readFileSync(pillPath, "utf8");
+    const chatProjectionSource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/components/helix/ask-console/HelixAskChatProjection.ts"),
+      "utf8",
+    );
+    const replyLifecycleSource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/components/helix/ask-console/HelixAskReplyLifecycle.ts"),
+      "utf8",
+    );
     expect(source).toContain("fetchStagePlayLiveSourceMailTranscript");
     expect(source).toContain("/api/helix/stage-play/live-source-mail/transcript?");
     expect(source).toContain("/api/helix/stage-play/live-source-mail/wake/cycle");
@@ -2075,6 +2202,7 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("helix_ask_steering_queue_auto_wake");
     expect(source).toContain("mailboxThreadId: HELIX_ASK_LIVE_SOURCE_MAIL_THREAD_ID");
     expect(source).toContain("buildHelixAskRepliesFromChatSession");
+    expect(source).toContain("buildHelixAskRepliesFromChatSessionProjection");
     expect(source).toContain("durable_chat_projection");
     expect(source).toContain("The mailbox transcript is operational history.");
     expect(source).not.toContain("groupStagePlayMailTranscriptEntries(entries)");
@@ -2085,17 +2213,17 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("chronologicalAskRepliesForState");
     expect(source).toContain("chronologicalAskRepliesForTranscript");
     expect(source).toContain("shouldHideHelixAskTranscriptReply");
-    expect(source).toContain("isHelixAskProgressPlaceholderText(answer)");
+    expect(chatProjectionSource).toContain("policy.isProgressPlaceholderText(answer)");
     expect(source).toContain("const latestAskReply = chronologicalAskRepliesForTranscript.at(-1) ?? null");
     expect(source).toContain("chronologicalAskReplies.map");
     expect(source).toContain("const transcriptLatestAskReplyId = chronologicalAskReplies.at(-1)?.id ?? latestAskReplyId");
     expect(source).toContain("reply.id === transcriptLatestAskReplyId");
-    expect(source).toContain("parseChatMessageTimeMs");
-    expect(source).toContain("buildHelixAskChatProjectionId");
-    expect(source).toContain(".sort((left, right) => {");
-    expect(source).toContain("return left.orderMs - right.orderMs;");
-    expect(source).toContain("reply.createdAtMs");
-    expect(source).toContain('final_answer_source: "durable_chat_session"');
+    expect(chatProjectionSource).toContain("parseHelixAskChatMessageTimeMs");
+    expect(chatProjectionSource).toContain("buildHelixAskChatProjectionId");
+    expect(chatProjectionSource).toContain(".sort((left, right) => {");
+    expect(replyLifecycleSource).toContain("return left.orderMs - right.orderMs;");
+    expect(replyLifecycleSource).toContain("reply.createdAtMs");
+    expect(chatProjectionSource).toContain('final_answer_source: "durable_chat_session"');
   });
 
   it("marks poisoned or contract-invalid terminal answers as hard theater failures", () => {
@@ -2292,6 +2420,171 @@ describe("HelixAskPill mic-first surface contract", () => {
     ]);
   });
 
+  it("renders latest-turn readable surface observation and narrator receipt rows", () => {
+    const rows = buildHelixTurnTranscriptRows({
+      id: "reply-codex-readable-surface-ui",
+      question: "Read aloud the visible section of this document.",
+      content: "I sent the visible section to the narrator.",
+      debug: {
+        agent_runtime: "codex",
+        turn_transcript_events: [
+          {
+            role: "system",
+            type: "plan",
+            status: "completed",
+            text: "Runtime selected: Codex Workstation Mode.",
+            lane: "agent_runtime",
+            step_id: "runtime_selected",
+            source_event_type: "runtime_selected",
+          },
+          {
+            role: "agent",
+            type: "model_decision",
+            status: "completed",
+            text: "Tool request: docs-viewer.read_visible_surface.",
+            lane: "workstation_gateway",
+            step_id: "workstation_gateway_1",
+            source_event_type: "tool_request",
+          },
+          {
+            role: "tool",
+            type: "tool_result",
+            status: "completed",
+            text: "Tool observation: docs-viewer.read_visible_surface observed surface observation ready.",
+            lane: "docs-viewer.read_visible_surface",
+            step_id: "workstation_gateway_1",
+            source_event_type: "tool_observation",
+          },
+          {
+            role: "agent",
+            type: "decision",
+            status: "completed",
+            text: "Compound itinerary: read_aloud_surface satisfied with 2/2 subgoals satisfied.",
+            lane: "helix_compound_capability_dependency_planner",
+            step_id: "compound_itinerary",
+            source_event_type: "compound_itinerary",
+          },
+          {
+            role: "agent",
+            type: "model_decision",
+            status: "completed",
+            text: "Action request: live_env.narrator_say.",
+            lane: "workstation_gateway",
+            step_id: "workstation_gateway_2",
+            source_event_type: "action_request",
+          },
+          {
+            role: "tool",
+            type: "tool_result",
+            status: "completed",
+            text: "Action observation: live_env.narrator_say observed Narrator voice playback request queued.",
+            lane: "live_env.narrator_say",
+            step_id: "workstation_gateway_2",
+            source_event_type: "action_observation",
+          },
+          {
+            role: "agent",
+            type: "model_decision",
+            status: "completed",
+            text: "Model re-entry: Codex received the workstation observation packet(s) before final answer.",
+            lane: "codex_provider",
+            step_id: "model_reentry",
+            source_event_type: "model_reentry",
+          },
+          {
+            role: "assistant",
+            type: "final_answer",
+            status: "completed",
+            text: "I sent the visible section to the narrator.",
+            lane: "codex_provider",
+            step_id: "final_answer",
+            source_event_type: "terminal_answer",
+          },
+        ],
+        workstation_gateway_call_results: [
+          {
+            ok: true,
+            capability_id: "docs-viewer.read_visible_surface",
+            mode: "read",
+            gateway_admission: {
+              requested_capability: "docs-viewer.read_visible_surface",
+              admission_status: "admitted",
+              source_target_intent: {
+                compound_outcome: "read_aloud_surface",
+                subgoal_id: "read_aloud_surface:surface_observation",
+              },
+            },
+            observation: {
+              schema: "helix.workstation_readable_surface_observation.v1",
+              text: "Visible document surface text.",
+              compound_dependency_turn_plan: {
+                schema: "helix.compound_capability_dependency_turn_plan.v1",
+                compound_outcomes: ["read_aloud_surface"],
+                rail_status: "satisfied",
+                subgoal_count: 2,
+                satisfied_subgoal_count: 2,
+                ordered_subgoals: [
+                  {
+                    subgoal_id: "read_aloud_surface:surface_observation",
+                    requested_capability: "docs-viewer.read_visible_surface",
+                    executed_capability: "docs-viewer.read_visible_surface",
+                    satisfied: true,
+                  },
+                  {
+                    subgoal_id: "read_aloud_surface:narrator_receipt",
+                    requested_capability: "live_env.narrator_say",
+                    executed_capability: "live_env.narrator_say",
+                    satisfied: true,
+                  },
+                ],
+              },
+            },
+            observation_packet: {
+              capability_key: "docs-viewer.read_visible_surface",
+              status: "succeeded",
+              observation_summary: "surface observation ready",
+            },
+          },
+          {
+            ok: true,
+            capability_id: "live_env.narrator_say",
+            mode: "act",
+            gateway_admission: {
+              requested_capability: "live_env.narrator_say",
+              admission_status: "admitted",
+              source_target_intent: {
+                compound_outcome: "read_aloud_surface",
+                subgoal_id: "read_aloud_surface:narrator_receipt",
+                depends_on_capability_id: "docs-viewer.read_visible_surface",
+              },
+            },
+            observation: {
+              schema: "helix.interim_voice_callout_tool_result.v1",
+              assistant_answer: false,
+              terminal_eligible: false,
+              raw_content_included: false,
+            },
+            observation_packet: {
+              capability_key: "live_env.narrator_say",
+              status: "succeeded",
+              observation_summary: "Narrator voice playback request queued",
+            },
+          },
+        ],
+      },
+    } as never);
+
+    const combined = rows.map((row) => `${row.label}: ${row.text} ${row.status}`).join("\n");
+    expect(combined).toContain("Tool request: docs-viewer.read_visible_surface.");
+    expect(combined).toContain("Tool observation: docs-viewer.read_visible_surface observed surface observation ready.");
+    expect(combined).toContain("Action request: live_env.narrator_say.");
+    expect(combined).toContain("Action observation: live_env.narrator_say observed Narrator voice playback request queued.");
+    expect(combined).toContain("Itinerary: Compound itinerary: read_aloud_surface satisfied with 2/2 subgoals satisfied.");
+    expect(combined).toContain("Model re-entry: Codex received the workstation observation packet");
+    expect(combined).toContain("Final: I sent the visible section to the narrator.");
+    expect(combined).not.toContain("client.read_aloud");
+  });
+
   it("renders structured Codex gateway fields in latest-turn rows before final answer", () => {
     const rows = buildHelixTurnTranscriptRows({
       id: "reply-codex-gateway-structured-fields",
@@ -2373,6 +2666,43 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(labels.indexOf("Tool Request")).toBeLessThan(labels.indexOf("Final"));
     expect(labels.indexOf("Tool Observation")).toBeLessThan(labels.indexOf("Final"));
     expect(labels.indexOf("Model Re-entry")).toBeLessThan(labels.indexOf("Final"));
+  });
+
+  it("classifies successful workstation transcript rows as terminal workstation output", () => {
+    expect(hasSuccessfulWorkstationTerminalTranscriptRows([
+      {
+        key: "request",
+        role: "agent",
+        label: "Tool Request",
+        text: "Tool request: scientific-calculator.solve_expression.",
+        meta: "workstation_gateway | workstation_gateway_1 | completed",
+        status: "completed",
+      },
+      {
+        key: "observation",
+        role: "tool",
+        label: "Tool Observation",
+        text: "Tool observation: scientific-calculator.solve_expression observed 8*9 = 72.",
+        meta: "scientific-calculator.solve_expression | workstation_gateway_1 | completed",
+        status: "completed",
+      },
+      {
+        key: "reentry",
+        role: "agent",
+        label: "Model Re-entry",
+        text: "Model re-entry: Codex received the workstation observation packet(s) before final answer.",
+        meta: "codex_provider | model_reentry | completed",
+        status: "completed",
+      },
+      {
+        key: "final",
+        role: "assistant",
+        label: "Final",
+        text: "Observed expression: `8*9`\n\nResult: `72`",
+        meta: "",
+        status: "completed",
+      },
+    ])).toBe(true);
   });
 
   it("renders Codex provider blocked gateway observations in the latest turn rows", () => {

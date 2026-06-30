@@ -899,13 +899,27 @@ export function buildHelixTurnTranscriptRows(reply: HelixAskTranscriptReply): He
           status,
         };
       });
+    const rowsWithFinal =
+      lifecycleRows.some((row) => row.label === "Final") || !String(reply.content ?? "").trim()
+        ? lifecycleRows
+        : [
+            ...lifecycleRows,
+            {
+              key: `${reply.id}-transcript-content-final`,
+              role: "agent",
+              label: "Final",
+              text: String(reply.content ?? "").trim(),
+              meta: "",
+              status: "completed",
+            },
+          ];
     if (publicCommentaryRows.length > 0) {
-      const lifecycleWithoutGenericCompletions = lifecycleRows.filter((row) =>
+      const lifecycleWithoutGenericCompletions = rowsWithFinal.filter((row) =>
         !/^Completed step\b/i.test(row.text),
       );
       return [...publicCommentaryRows, ...lifecycleWithoutGenericCompletions].slice(-14);
     }
-    return lifecycleRows;
+    return rowsWithFinal.slice(-14);
   }
   if (publicCommentaryRows.length > 0) return publicCommentaryRows.slice(-14);
   const plannerContract = readAgentLoopAuditRecord(reply.debug?.planner_contract);

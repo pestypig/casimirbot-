@@ -177,3 +177,116 @@ export function resolveHelixAskActualAgentProviderLabel(
         : "Helix Ask Native";
   return `Provider: ${provider?.label || fallbackLabel}`;
 }
+
+function readModelFromCodexArgs(value: unknown): string | null {
+  const args = Array.isArray(value) ? value.map(coerceText) : [];
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index]?.trim();
+    if (!arg) continue;
+    if (arg === "-m" || arg === "--model") {
+      const next = args[index + 1]?.trim();
+      if (next) return next;
+    }
+    const equalsMatch = arg.match(/^(?:--model|-m)=(.+)$/);
+    if (equalsMatch?.[1]?.trim()) return equalsMatch[1].trim();
+  }
+  return null;
+}
+
+function collectRuntimeLoopModels(value: unknown): string[] {
+  const record = readRecord(value);
+  if (!record) return [];
+  const candidates: unknown[] = [
+    record.llm_http_model_configured,
+    record.llm_model,
+    record.model,
+    record.model_id,
+    record.selected_model,
+    record.openai_model,
+    readModelFromCodexArgs(record.codex_args),
+  ];
+  const arrays = [
+    record.iterations,
+    record.steps,
+    record.objective_step_transcripts,
+    record.model_calls,
+    record.sampling_events,
+  ];
+  for (const arrayValue of arrays) {
+    if (!Array.isArray(arrayValue)) continue;
+    for (const item of arrayValue) {
+      const itemRecord = readRecord(item);
+      if (!itemRecord) continue;
+      candidates.push(
+        itemRecord.llm_http_model_configured,
+        itemRecord.llm_model,
+        itemRecord.model,
+        itemRecord.model_id,
+        itemRecord.selected_model,
+        itemRecord.openai_model,
+        readModelFromCodexArgs(itemRecord.codex_args),
+      );
+    }
+  }
+  return candidates.map((entry) => coerceText(entry).trim()).filter(Boolean);
+}
+
+export function resolveHelixAskModelUsageLabel(response: unknown): string | null {
+  const record = readRecord(response);
+  const debug = readRecord(record?.debug);
+  const agentLoop = readRecord(record?.agent_loop ?? record?.agentLoop ?? debug?.agent_loop ?? debug?.agentLoop);
+  const agentRuntimeLoop = readRecord(
+    record?.agent_runtime_loop ??
+      record?.agentRuntimeLoop ??
+      debug?.agent_runtime_loop ??
+      debug?.agentRuntimeLoop,
+  );
+  const selectedProvider = readRecord(record?.selected_agent_provider) ?? readRecord(debug?.selected_agent_provider);
+  const selectedProviderId = selectedProvider?.id;
+  const runtime = isHelixAgentRuntimeId(record?.agent_runtime)
+    ? record.agent_runtime
+    : isHelixAgentRuntimeId(debug?.agent_runtime)
+      ? debug.agent_runtime
+      : isHelixAgentRuntimeId(selectedProviderId)
+        ? selectedProviderId
+        : null;
+  const candidates = [
+    record?.llm_http_model_configured,
+    debug?.llm_http_model_configured,
+    agentLoop?.llm_http_model_configured,
+    agentRuntimeLoop?.llm_http_model_configured,
+    record?.llm_model,
+    debug?.llm_model,
+    agentLoop?.llm_model,
+    agentRuntimeLoop?.llm_model,
+    record?.model,
+    debug?.model,
+    agentLoop?.model,
+    agentRuntimeLoop?.model,
+    record?.model_id,
+    debug?.model_id,
+    agentLoop?.model_id,
+    agentRuntimeLoop?.model_id,
+    record?.selected_model,
+    debug?.selected_model,
+    agentLoop?.selected_model,
+    agentRuntimeLoop?.selected_model,
+    record?.openai_model,
+    debug?.openai_model,
+    agentLoop?.openai_model,
+    agentRuntimeLoop?.openai_model,
+    selectedProvider?.model,
+    selectedProvider?.model_id,
+    readModelFromCodexArgs(record?.codex_args),
+    readModelFromCodexArgs(debug?.codex_args),
+    readModelFromCodexArgs(agentLoop?.codex_args),
+    readModelFromCodexArgs(agentRuntimeLoop?.codex_args),
+    ...collectRuntimeLoopModels(record?.agent_runtime_loop),
+    ...collectRuntimeLoopModels(debug?.agent_runtime_loop),
+  ];
+  const models = Array.from(new Set(candidates.map((entry) => coerceText(entry).trim()).filter(Boolean)));
+  if (models.length === 0) {
+    return runtime === "codex" ? "Model: Codex default (not reported)" : null;
+  }
+  return `Model${models.length > 1 ? "s" : ""}: ${models.slice(0, 3).join(", ")}`;
+}

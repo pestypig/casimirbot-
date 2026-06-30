@@ -232,7 +232,7 @@ export function HelixWorkstationShell({
 
   return (
     <div
-      className="relative z-10 grid h-full min-h-0 w-full"
+      className="fixed inset-0 z-10 grid min-h-0 w-full"
       style={{
         gridTemplateColumns: `minmax(0, 1fr) 0.375rem ${visibleWidth}px`,
         gridTemplateRows: "3.5rem minmax(0, 1fr)",

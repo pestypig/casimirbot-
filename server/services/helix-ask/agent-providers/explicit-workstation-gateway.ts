@@ -443,11 +443,11 @@ const buildPromptDerivedReadableSurfaceGatewayCallRequests = (
     return [];
   }
   const unquoted = unquotePrompt(prompt);
-  const asksTranslate = /\b(?:translate|translated|translation)\b[\s\S]{0,120}\b(?:visible|current|selected|hovered|doc|document|surface|section|block)\b/i.test(unquoted);
-  const asksSummarize = /\b(?:summari[sz]e|overview|brief)\b[\s\S]{0,120}\b(?:visible|current|selected|hovered|doc|document|surface|section|block|calculator\s+result)\b/i.test(unquoted);
+  const asksTranslate = /\b(?:translate|translated|translation)\b[\s\S]{0,120}\b(?:visible|selected|hovered|surface|section|block)\b/i.test(unquoted);
+  const asksSummarize = /\b(?:summari[sz]e|overview|brief)\b[\s\S]{0,120}\b(?:visible|selected|hovered|surface|section|block|calculator\s+result)\b/i.test(unquoted);
   const asksRead =
-    /\b(?:read|inspect|observe)\b[\s\S]{0,120}\b(?:selected|hovered|visible|current|active)\b[\s\S]{0,80}\b(?:paragraph|section|block|surface|doc|document|calculator\s+result|result)\b/i.test(unquoted) ||
-    /\b(?:selected|hovered|visible|current|active)\b[\s\S]{0,80}\b(?:paragraph|section|block|surface|doc|document|calculator\s+result|result)\b[\s\S]{0,80}\b(?:read|inspect|observe|say)\b/i.test(unquoted);
+    /\b(?:read|inspect|observe)\b[\s\S]{0,120}\b(?:selected|hovered|visible|active)\b[\s\S]{0,80}\b(?:paragraph|section|block|surface|calculator\s+result|result)\b/i.test(unquoted) ||
+    /\b(?:selected|hovered|visible|active)\b[\s\S]{0,80}\b(?:paragraph|section|block|surface|calculator\s+result|result)\b[\s\S]{0,80}\b(?:read|inspect|observe|say)\b/i.test(unquoted);
   if (!asksTranslate && !asksSummarize && !asksRead) return [];
 
   const workspaceSnapshot = readWorkspaceSnapshot(body);

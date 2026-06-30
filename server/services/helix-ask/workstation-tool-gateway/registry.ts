@@ -676,9 +676,11 @@ const buildReadableSurfacePayload = (input: {
       args.selectedText ??
       args.hovered_text ??
       args.hoveredText ??
-      /\b(?:selected|hovered|highlighted|narrator[-_\s]?source)\b/i.test(requestedSurface) ||
-      selectionKind === "selected" ||
-      selectionKind === "hovered",
+      (
+        /\b(?:selected|hovered|highlighted|narrator[-_\s]?source)\b/i.test(requestedSurface) ||
+        selectionKind === "selected" ||
+        selectionKind === "hovered"
+      ),
   );
   const sourceDocPath = readDocsActionPath(args.source_doc_path ?? args.sourceDocPath ?? args.path);
   const activeDocExcerpt = sourceDocPath ? readBoundedDocsExcerpt([sourceDocPath]) : null;

@@ -6,6 +6,7 @@ import { listHelixAgentProviders, resolveHelixAgentProvider } from "../agent-pro
 import { selectHelixAgentRuntime } from "../agent-providers/runtime-select";
 import { buildHelixAgentRuntimeSelectionTrace } from "../agent-providers/runtime-debug";
 import {
+  applyGatewayFailureAuthorityGuard,
   codexProvider,
   readCodexArgs,
   resolveCodexBinary,
@@ -75,6 +76,60 @@ afterEach(() => {
 });
 
 describe("Helix Ask agent provider selection", () => {
+  it("does not fail terminal text for a superseded calculator solve extraction failure", () => {
+    const guarded = applyGatewayFailureAuthorityGuard({
+      text: "Observed expression: 8*9\nResult: 72",
+      gatewayCallResults: [
+        {
+          ok: false,
+          capability_id: "scientific-calculator.solve_expression",
+          gateway_admission: {
+            requested_capability: "scientific-calculator.solve_expression",
+            blocked_reason: "expression_evaluation_failed",
+          },
+          error: "expression_evaluation_failed",
+        },
+        {
+          ok: true,
+          capability_id: "scientific-calculator.solve_expression",
+          gateway_admission: {
+            requested_capability: "scientific-calculator.solve_expression",
+            admission_reason: "admitted",
+          },
+          observation: {
+            expression: "8*9",
+            result: "72",
+          },
+          observation_packet: {
+            observation_summary: "8*9 = 72",
+          },
+        },
+      ] as any,
+    });
+
+    expect(guarded).toBe("Observed expression: 8*9\nResult: 72");
+  });
+
+  it("keeps unsuperseded failed gateway requests as terminal failures", () => {
+    const guarded = applyGatewayFailureAuthorityGuard({
+      text: "Repo answer draft",
+      gatewayCallResults: [
+        {
+          ok: false,
+          capability_id: "repo.search",
+          gateway_admission: {
+            requested_capability: "repo.search",
+            blocked_reason: "missing_query",
+          },
+          error: "missing_query",
+        },
+      ] as any,
+    });
+
+    expect(guarded).toContain("I cannot claim the requested workstation tool or UI action ran");
+    expect(guarded).toContain("Blocked or failed gateway request: repo.search: missing_query.");
+  });
+
   it("defaults to the native Helix runtime", () => {
     delete process.env.HELIX_ASK_AGENT_RUNTIME;
 
@@ -3239,6 +3294,180 @@ describe("Helix Ask agent provider selection", () => {
         body,
         includePlannerDerived: true,
       }).map((request) => (request as any).capability_id)).not.toContain("live_env.narrator_say");
+    }
+  });
+
+  it("fails closed for selected docs surface reads without a registered surface ref", async () => {
+    const body = {
+      turn_id: "ask:test:selected-surface-missing-ref",
+      agent_runtime: "codex",
+      question: "Read the selected paragraph in the docs viewer.",
+      workspace_context_snapshot: {
+        activePanel: "docs-viewer",
+        activeDocPath: "docs/helix-ask-flow.md",
+        selectedText: "Selected paragraph text.",
+      },
+    };
+
+    const planned = readWorkstationGatewayCallRequestsForTurn({
+      body,
+      includePlannerDerived: true,
+    });
+    expect(planned.map((request) => (request as any).capability_id)).toContain("docs-viewer.read_visible_surface");
+    expect(planned.map((request) => (request as any).capability_id)).not.toContain("live_env.narrator_say");
+
+    const results = await runExplicitWorkstationGatewayCalls({
+      body,
+      agentRuntime: "codex",
+      turnId: "ask:test:selected-surface-missing-ref",
+    });
+
+    const surface = results.find((result) => result.capability_id === "docs-viewer.read_visible_surface");
+    expect(surface).toBeTruthy();
+    expect(surface).toMatchObject({
+      ok: false,
+      error: "registered_surface_ref_missing",
+      observation: {
+        schema: "helix.workstation_readable_surface_observation.v1",
+        status: "blocked",
+        blocked_reason: "registered_surface_ref_missing",
+        selection_ref: null,
+        selection_kind: "selected",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    expect(results.map((result) => result.capability_id)).not.toContain("live_env.narrator_say");
+  });
+
+  it("observes selected docs surface reads when the selected surface is registered", async () => {
+    const body = {
+      turn_id: "ask:test:selected-surface-ref",
+      agent_runtime: "codex",
+      question: "Read the selected paragraph in the docs viewer.",
+      workspace_context_snapshot: {
+        activePanel: "docs-viewer",
+        activeDocPath: "docs/helix-ask-flow.md",
+        selectedText: "Selected paragraph text.",
+        selectionRef: "docs-viewer:selection:unit-42",
+      },
+    };
+
+    const results = await runExplicitWorkstationGatewayCalls({
+      body,
+      agentRuntime: "codex",
+      turnId: "ask:test:selected-surface-ref",
+    });
+
+    const surface = results.find((result) => result.capability_id === "docs-viewer.read_visible_surface");
+    expect(surface).toBeTruthy();
+    expect(surface).toMatchObject({
+      ok: true,
+      observation: {
+        schema: "helix.workstation_readable_surface_observation.v1",
+        text: "Selected paragraph text.",
+        selection_ref: "docs-viewer:selection:unit-42",
+        selection_kind: "selected",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    expect(results.map((result) => result.capability_id)).not.toContain("live_env.narrator_say");
+  });
+
+  it("plans translation and summary prompts through readable surface observations without narrator delivery", async () => {
+    const translateBody = {
+      turn_id: "ask:test:translate-visible-surface",
+      agent_runtime: "codex",
+      question: "Translate the visible section of this document.",
+      workspace_context_snapshot: {
+        activePanel: "docs-viewer",
+        activeDocPath: "docs/helix-ask-flow.md",
+        activeTranslationBlocks: [{
+          unit_id: "doc-unit:1",
+          source_text: "Original sentence.",
+          translated_text: "Translated sentence.",
+          locale: "es",
+          status: "ready",
+        }],
+      },
+    };
+    const translateResults = await runExplicitWorkstationGatewayCalls({
+      body: translateBody,
+      agentRuntime: "codex",
+      turnId: "ask:test:translate-visible-surface",
+    });
+    const translationSurface = translateResults.find((result) => result.capability_id === "docs-viewer.read_active_translation");
+    expect(translationSurface).toBeTruthy();
+    expect((translationSurface?.gateway_admission.source_target_intent as any)).toMatchObject({
+      surface_outcome: "translate_visible_surface",
+      required_observation_kind: "helix.workstation_readable_surface_observation.v1",
+      narrator_requested: false,
+      terminal_eligible: false,
+    });
+    expect((translationSurface?.observation as any).text).toBe("Translated sentence.");
+    expect(translateResults.map((result) => result.capability_id)).not.toContain("live_env.narrator_say");
+
+    const summarizeBody = {
+      turn_id: "ask:test:summarize-visible-surface",
+      agent_runtime: "codex",
+      question: "Summarize the visible section of this document.",
+      workspace_context_snapshot: {
+        activePanel: "docs-viewer",
+        activeDocPath: "docs/helix-ask-flow.md",
+      },
+    };
+    const summarizeResults = await runExplicitWorkstationGatewayCalls({
+      body: summarizeBody,
+      agentRuntime: "codex",
+      turnId: "ask:test:summarize-visible-surface",
+    });
+    const summarySurface = summarizeResults.find((result) => result.capability_id === "docs-viewer.read_visible_surface");
+    expect(summarySurface).toBeTruthy();
+    expect((summarySurface?.gateway_admission.source_target_intent as any)).toMatchObject({
+      surface_outcome: "summarize_visible_surface",
+      required_observation_kind: "helix.workstation_readable_surface_observation.v1",
+      narrator_requested: false,
+      terminal_eligible: false,
+    });
+    expect((summarySurface?.observation as any).schema).toBe("helix.workstation_readable_surface_observation.v1");
+    expect(summarizeResults.map((result) => result.capability_id)).not.toContain("live_env.narrator_say");
+  });
+
+  it("does not admit prompt-derived surface observations from negated or contextual mentions", () => {
+    const prompts = [
+      'The text says "read the selected paragraph"; explain the phrase only.',
+      "Do not read the selected paragraph; just explain the surface tool.",
+      "Later we might translate the visible section, but not now.",
+    ];
+    for (const question of prompts) {
+      const body = {
+        turn_id: "ask:test:surface-negative",
+        agent_runtime: "codex",
+        question,
+        workspace_context_snapshot: {
+          activePanel: "docs-viewer",
+          activeDocPath: "docs/helix-ask-flow.md",
+          selectedText: "Selected paragraph text.",
+          selectionRef: "docs-viewer:selection:unit-42",
+          activeTranslationBlocks: [{
+            unit_id: "doc-unit:1",
+            translated_text: "Translated sentence.",
+          }],
+        },
+      };
+      expect(readWorkstationGatewayCallRequestsForTurn({
+        body,
+        includePlannerDerived: true,
+      }).map((request) => (request as any).capability_id)).not.toEqual(
+        expect.arrayContaining([
+          "docs-viewer.read_visible_surface",
+          "docs-viewer.read_active_translation",
+          "scientific-calculator.read_visible_result",
+        ]),
+      );
     }
   });
 

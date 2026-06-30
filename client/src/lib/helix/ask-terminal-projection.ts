@@ -54,6 +54,69 @@ function readAgentLoopAuditRecord(value: unknown): RecordLike | null {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as RecordLike) : null;
 }
 
+function readAgentLoopAuditArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function isBackendEntrypointFailureText(value: unknown): boolean {
+  const text = coerceText(value).trim();
+  return text === HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT || text === HELIX_ASK_BACKEND_DEBUG_MATERIALIZATION_TEXT;
+}
+
+function readStructuredWorkstationFinalText(...sources: unknown[]): string {
+  for (const source of sources) {
+    const record = readAgentLoopAuditRecord(source);
+    if (!record) continue;
+    for (const candidate of [
+      record.selected_final_answer,
+      record.assistant_answer,
+      record.answer,
+      record.text,
+      record.content,
+    ]) {
+      const text = coerceText(candidate).trim();
+      if (text && !isBackendEntrypointFailureText(text) && !isInvalidTerminalAnswerText(text)) return text;
+    }
+  }
+  return "";
+}
+
+function hasStructuredSuccessfulWorkstationGatewayEvidence(...sources: unknown[]): boolean {
+  for (const source of sources) {
+    const record = readAgentLoopAuditRecord(source);
+    if (!record) continue;
+    const debug = readAgentLoopAuditRecord(record.debug);
+    const agentLoop = readAgentLoopAuditRecord(record.agent_loop ?? record.agentLoop ?? debug?.agent_loop ?? debug?.agentLoop);
+    const callResults = [
+      ...readAgentLoopAuditArray(record.workstation_gateway_call_results),
+      ...readAgentLoopAuditArray(debug?.workstation_gateway_call_results),
+      ...readAgentLoopAuditArray(agentLoop?.workstation_gateway_call_results),
+    ];
+    if (callResults.some((entry) => {
+      const result = readAgentLoopAuditRecord(entry);
+      if (!result || result.ok !== true) return false;
+      const observationPacket = readAgentLoopAuditRecord(result.observation_packet);
+      const observationStatus = coerceText(observationPacket?.status ?? result.status).trim().toLowerCase();
+      return !observationStatus || observationStatus === "succeeded" || observationStatus === "completed";
+    })) {
+      return true;
+    }
+    const observationPackets = [
+      ...readAgentLoopAuditArray(record.workstation_gateway_observation_packets),
+      ...readAgentLoopAuditArray(debug?.workstation_gateway_observation_packets),
+      ...readAgentLoopAuditArray(agentLoop?.workstation_gateway_observation_packets),
+    ];
+    if (observationPackets.some((entry) => {
+      const packet = readAgentLoopAuditRecord(entry);
+      const status = coerceText(packet?.status).trim().toLowerCase();
+      return Boolean(packet) && (status === "succeeded" || status === "completed");
+    })) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function normalizeTerminalAnswerText(value: string | null | undefined): string {
   return String(value ?? "")
     .replace(/\u00a0/g, " ")
@@ -240,6 +303,10 @@ export function buildVisibleResolvedTurn(reply: HelixAskTerminalProjectionReply)
     terminalAuthorityRecord.server_authoritative === true;
   const summary = readHelixResolvedTurnSummary(reply);
   const terminalResolution = resolveHelixVisibleTerminalCore(reply);
+  const structuredWorkstationGatewaySuccess = hasStructuredSuccessfulWorkstationGatewayEvidence(replyRecord, debugRecord);
+  const structuredWorkstationFinalText = structuredWorkstationGatewaySuccess
+    ? readStructuredWorkstationFinalText(replyRecord, debugRecord, reply)
+    : "";
   const terminalResolutionIsFinalAnswer =
     Boolean(terminalResolution.backendTerminalText) &&
     terminalResolution.source !== "typed_failure" &&
@@ -249,10 +316,11 @@ export function buildVisibleResolvedTurn(reply: HelixAskTerminalProjectionReply)
     terminalResolution.terminalKind !== "failure" &&
     terminalResolution.terminalKind !== "request_user_input" &&
     terminalResolution.terminalArtifactKind !== "typed_failure";
+  const terminalIsFinalAnswer = terminalResolutionIsFinalAnswer || Boolean(structuredWorkstationFinalText);
   const pendingRequest = readHelixTopLevelPendingServerRequest(reply);
-  const pendingPresent = Boolean(pendingRequest) && !terminalResolutionIsFinalAnswer;
+  const pendingPresent = Boolean(pendingRequest) && !terminalIsFinalAnswer;
   const statusCandidate =
-    terminalResolutionIsFinalAnswer
+    terminalIsFinalAnswer
       ? "final_answer"
       : coerceText(summary?.final_status).trim() ||
         coerceText(readAgentLoopAuditRecord(replyRecord?.satisfaction_report ?? debugRecord?.satisfaction_report)?.terminal_kind).trim() ||
@@ -264,7 +332,7 @@ export function buildVisibleResolvedTurn(reply: HelixAskTerminalProjectionReply)
         ? "final_failure"
         : "final_answer";
   const terminalErrorCode =
-    terminalResolutionIsFinalAnswer
+    terminalIsFinalAnswer
       ? null
       : terminalResolution.terminalErrorCode ||
         coerceText(replyRecord?.terminal_error_code).trim() ||
@@ -290,16 +358,21 @@ export function buildVisibleResolvedTurn(reply: HelixAskTerminalProjectionReply)
     coerceText(debugRecord?.final_answer_source).trim() ||
     coerceText(terminalAuthorityRecord?.final_answer_source).trim();
   const finalAnswerSource =
-    explicitFinalAnswerSource ||
+    (structuredWorkstationFinalText && explicitFinalAnswerSource === "typed_failure"
+      ? "workstation_tool_evaluation"
+      : explicitFinalAnswerSource) ||
     (terminalErrorCode ? "typed_failure" : "unknown");
   const explicitTypedFailureSignal =
-    explicitFinalAnswerSource === "typed_failure" ||
-    terminalResolution.terminalKind === "failure" ||
-    terminalResolution.terminalArtifactKind === "typed_failure" ||
-    coerceText(summary?.terminal_artifact_kind).trim() === "typed_failure" ||
-    coerceText(replyRecord?.terminal_artifact_kind).trim() === "typed_failure" ||
-    coerceText(debugRecord?.terminal_artifact_kind).trim() === "typed_failure" ||
-    coerceText(terminalAuthorityRecord?.terminal_artifact_kind).trim() === "typed_failure";
+    !structuredWorkstationGatewaySuccess &&
+    (
+      explicitFinalAnswerSource === "typed_failure" ||
+      terminalResolution.terminalKind === "failure" ||
+      terminalResolution.terminalArtifactKind === "typed_failure" ||
+      coerceText(summary?.terminal_artifact_kind).trim() === "typed_failure" ||
+      coerceText(replyRecord?.terminal_artifact_kind).trim() === "typed_failure" ||
+      coerceText(debugRecord?.terminal_artifact_kind).trim() === "typed_failure" ||
+      coerceText(terminalAuthorityRecord?.terminal_artifact_kind).trim() === "typed_failure"
+    );
   const isTypedFailure = finalAnswerSource === "typed_failure" || Boolean(terminalErrorCode);
   const liveFinalAnswer = readLatestAuthoritativeFinalLiveEventText(reply);
   const terminalAuthorityText = coerceText(terminalAuthorityRecord?.terminal_text_preview).trim();
@@ -325,7 +398,15 @@ export function buildVisibleResolvedTurn(reply: HelixAskTerminalProjectionReply)
         : "";
   const canonicalGoalKind = readHelixCanonicalGoalKind(reply);
   const terminalArtifactKind =
-    coerceText(terminalResolution.terminalArtifactKind).trim() ||
+    structuredWorkstationFinalText &&
+    (
+      terminalResolution.terminalArtifactKind === "typed_failure" ||
+      coerceText(summary?.terminal_artifact_kind).trim() === "typed_failure" ||
+      coerceText(replyRecord?.terminal_artifact_kind).trim() === "typed_failure" ||
+      coerceText(debugRecord?.terminal_artifact_kind).trim() === "typed_failure"
+    )
+      ? "workstation_tool_evaluation"
+      : coerceText(terminalResolution.terminalArtifactKind).trim() ||
     coerceText(summary?.terminal_artifact_kind).trim() ||
     coerceText(replyRecord?.terminal_artifact_kind).trim() ||
     coerceText(debugRecord?.terminal_artifact_kind).trim() ||
@@ -350,7 +431,9 @@ export function buildVisibleResolvedTurn(reply: HelixAskTerminalProjectionReply)
         )
       : "";
   const selectedFinalAnswerRaw =
-    terminalResolutionIsFinalAnswer
+    structuredWorkstationFinalText
+      ? structuredWorkstationFinalText
+      : terminalResolutionIsFinalAnswer
       ? terminalResolution.text
       : canonicalSelectedFinalAnswer
       ? canonicalSelectedFinalAnswer
@@ -480,6 +563,26 @@ const readTerminalSourceLabelCandidate = (
 };
 
 export function readHelixAskFinalAnswerSourceLabel(...sources: unknown[]): string | null {
+  const structuredWorkstationGatewaySuccess = hasStructuredSuccessfulWorkstationGatewayEvidence(...sources);
+  const structuredWorkstationFinalText = structuredWorkstationGatewaySuccess
+    ? readStructuredWorkstationFinalText(...sources)
+    : "";
+  const hasStaleTypedFailureSource = sources.some((source) => {
+    const record = readAgentLoopAuditRecord(source);
+    if (!record) return false;
+    return (
+      coerceText(record.final_answer_source).trim() === "typed_failure" ||
+      coerceText(record.terminal_artifact_kind).trim() === "typed_failure" ||
+      coerceText(readAgentLoopAuditRecord(record.debug)?.final_answer_source).trim() === "typed_failure" ||
+      coerceText(readAgentLoopAuditRecord(record.debug)?.terminal_artifact_kind).trim() === "typed_failure"
+    );
+  });
+  if (structuredWorkstationGatewaySuccess && structuredWorkstationFinalText && hasStaleTypedFailureSource) {
+    return formatHelixVisibleTerminalSourceLabel({
+      terminalArtifactKind: "workstation_tool_evaluation",
+      finalAnswerSource: "workstation_tool_evaluation",
+    });
+  }
   for (const source of sources) {
     const record = readAgentLoopAuditRecord(source);
     if (!record) continue;
@@ -495,6 +598,7 @@ export function readHelixAskFinalAnswerSourceLabel(...sources: unknown[]): strin
       typeof record.final_answer_source === "string" && record.final_answer_source.trim()
         ? record.final_answer_source.trim()
         : null;
+    const structuredWorkstationGatewaySuccess = hasStructuredSuccessfulWorkstationGatewayEvidence(record);
     const resolvedSummary = readAgentLoopAuditRecord(record.resolved_turn_summary);
     const terminalAuthorityRecord = readTerminalAnswerAuthorityRecord(record.terminal_answer_authority);
     const terminalAuthoritySingleWriterRecord = readAgentLoopAuditRecord(record.terminal_authority_single_writer);
@@ -517,6 +621,22 @@ export function readHelixAskFinalAnswerSourceLabel(...sources: unknown[]): strin
       typeof record.terminal_artifact_kind === "string" && record.terminal_artifact_kind.trim()
         ? record.terminal_artifact_kind.trim()
         : null;
+    if (
+      structuredWorkstationGatewaySuccess &&
+      (directSource === "typed_failure" || directTerminalKind === "typed_failure") &&
+      readStructuredWorkstationFinalText(record)
+    ) {
+      return formatHelixVisibleTerminalSourceLabel({
+        terminalArtifactKind: "workstation_tool_evaluation",
+        finalAnswerSource: "workstation_tool_evaluation",
+      });
+    }
+    if (
+      structuredWorkstationGatewaySuccess &&
+      (directSource === "typed_failure" || directTerminalKind === "typed_failure")
+    ) {
+      continue;
+    }
     if (directSource || directTerminalKind) {
       return formatHelixVisibleTerminalSourceLabel({
         terminalArtifactKind: directTerminalKind,

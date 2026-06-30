@@ -463,6 +463,113 @@ describe("Helix Ask turn transcript projection", () => {
     expect(combined).toContain("Model re-entry: Codex received the workstation observation packet");
   });
 
+  it("projects readable surface observation and narrator receipt trace rows", () => {
+    const rows = buildHelixTurnTranscriptRows({
+      id: "reply-codex-readable-surface",
+      turn_id: "turn-codex-readable-surface",
+      content: "I read the visible section aloud.",
+      debug: {
+        turn_id: "turn-codex-readable-surface",
+        agent_runtime: "codex",
+        workstation_gateway_call_results: [
+          {
+            schema: "helix.workstation_tool_gateway.call_result.v1",
+            ok: true,
+            capability_id: "docs-viewer.read_visible_surface",
+            mode: "read",
+            gateway_admission: {
+              requested_capability: "docs-viewer.read_visible_surface",
+              admission_status: "admitted",
+              source_target_intent: {
+                compound_outcome: "read_aloud_surface",
+                subgoal_id: "read_aloud_surface:surface_observation",
+              },
+            },
+            observation: {
+              schema: "helix.workstation_readable_surface_observation.v1",
+              status: "succeeded",
+              text: "Visible section text.",
+              terminal_eligible: false,
+              assistant_answer: false,
+              raw_content_included: false,
+              compound_dependency_turn_plan: {
+                schema: "helix.compound_capability_dependency_turn_plan.v1",
+                turn_id: "turn-codex-readable-surface",
+                compound_outcomes: ["read_aloud_surface"],
+                rail_status: "satisfied",
+                subgoal_count: 2,
+                satisfied_subgoal_count: 2,
+                ordered_subgoals: [
+                  {
+                    subgoal_id: "read_aloud_surface:surface_observation",
+                    requested_capability: "docs-viewer.read_visible_surface",
+                    executed_capability: "docs-viewer.read_visible_surface",
+                    required_observation_kind: "helix.workstation_readable_surface_observation.v1",
+                    satisfied: true,
+                  },
+                  {
+                    subgoal_id: "read_aloud_surface:narrator_receipt",
+                    requested_capability: "live_env.narrator_say",
+                    executed_capability: "live_env.narrator_say",
+                    required_receipt_kind: "helix.interim_voice_callout_tool_result.v1",
+                    satisfied: true,
+                  },
+                ],
+              },
+            },
+            observation_packet: {
+              schema: "helix.agent_step_observation_packet.v1",
+              turn_id: "turn-codex-readable-surface",
+              capability_key: "docs-viewer.read_visible_surface",
+              status: "succeeded",
+              observation_summary: "docs-viewer.read_visible_surface observed bounded visible document surface",
+            },
+          },
+          {
+            schema: "helix.workstation_tool_gateway.call_result.v1",
+            ok: true,
+            capability_id: "live_env.narrator_say",
+            mode: "act",
+            gateway_admission: {
+              requested_capability: "live_env.narrator_say",
+              admission_status: "admitted",
+              source_target_intent: {
+                compound_outcome: "read_aloud_surface",
+                subgoal_id: "read_aloud_surface:narrator_receipt",
+                depends_on_subgoal_id: "read_aloud_surface:surface_observation",
+                depends_on_capability_id: "docs-viewer.read_visible_surface",
+              },
+            },
+            observation: {
+              schema: "helix.interim_voice_callout_tool_result.v1",
+              assistant_answer: false,
+              terminal_eligible: false,
+              raw_content_included: false,
+            },
+            observation_packet: {
+              schema: "helix.agent_step_observation_packet.v1",
+              turn_id: "turn-codex-readable-surface",
+              capability_key: "live_env.narrator_say",
+              status: "succeeded",
+              observation_summary: "Narrator voice playback request queued",
+            },
+          },
+        ],
+      },
+    });
+
+    const combined = rows.map((row) => `${row.label}: ${row.text} ${row.status}`).join("\n");
+    expect(combined).toContain("Tool request: docs-viewer.read_visible_surface.");
+    expect(combined).toContain(
+      "Tool observation: docs-viewer.read_visible_surface observed docs-viewer.read_visible_surface observed bounded visible document surface.",
+    );
+    expect(combined).toContain("Action request: live_env.narrator_say.");
+    expect(combined).toContain("Action observation: live_env.narrator_say observed Narrator voice playback request queued.");
+    expect(combined).toContain("Itinerary: Compound itinerary: read_aloud_surface satisfied with 2/2 subgoals satisfied.");
+    expect(combined).toContain("Model re-entry: Codex received the workstation observation packet");
+    expect(combined).not.toContain("client.read_aloud");
+  });
+
   it("projects blocked compound downstream tools without faking action execution", () => {
     const rows = buildHelixTurnTranscriptRows({
       id: "reply-codex-compound-read-aloud-blocked",

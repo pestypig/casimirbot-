@@ -1,4 +1,4 @@
-import { HelixAskPill } from "@/components/helix/HelixAskPill";
+import { HelixAskConsole } from "@/components/helix/ask-console";
 import { HELIX_ASK_CONTEXT_ID } from "@/lib/helix/voice-surface-contract";
 import type { PanelDefinition } from "@/lib/desktop/panelRegistry";
 
@@ -39,7 +39,7 @@ export function HelixAskDock({
         />
         {!collapsed ? (
           <>
-            <HelixAskPill
+            <HelixAskConsole
               key={contextId}
               className="flex h-full min-h-0 w-full flex-col"
               contextId={contextId}

@@ -102,7 +102,7 @@ describe("Helix Ask UI ownership boundaries", () => {
       "Docs-viewer and workspace context snapshots",
       "Agent runtime/provider controller wiring",
       "Context compaction resume-frame handoff",
-      "Chat projection and reply lifecycle",
+      "Chat projection, persistence payloads, and reply lifecycle",
       "Backend entrypoint and runtime authority guards",
       "Visible terminal and route authority",
       "Debug export and clipboard authority",
@@ -590,7 +590,7 @@ describe("Helix Ask UI ownership boundaries", () => {
       "agentRuntimeMenuOpen",
       "agentRuntimeProviders",
       "selectedAgentRuntime",
-      "selectedAgentRuntimeProvider",
+      "agentRuntimePickerModel",
       "selectedAgentRuntimeLabel",
       "handleAgentRuntimeSelect",
       "fetch(\"/api/agi/agent-providers\"",
@@ -713,20 +713,19 @@ describe("Helix Ask UI ownership boundaries", () => {
 
   it("keeps Stage Play wake admission and generated projection suppression local", () => {
     const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const chatProjection = read("client/src/components/helix/ask-console/HelixAskChatProjection.ts");
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
     const ledger = read("client/src/lib/helix/ask-stage-play-ledger.ts");
     const liveSourceDisplay = read("client/src/lib/helix/ask-live-source-display.ts");
     const turnTranscript = read("client/src/lib/helix/ask-turn-transcript.ts");
 
     expect(map).toContain("Stage Play generated wake admission and projection suppression");
-    expect(map).toContain("Route-metadata admission and chat projection filtering");
+    expect(map).toContain("Route-metadata admission remains in the legacy bridge");
+    expect(map).toContain("Generated durable-chat projection suppression is recrowned");
     for (const symbol of [
       "isStagePlayMailboxWakePromptText",
       "hasStagePlayMailboxWakeRouteMetadata",
       "shouldBlockStagePlayMailboxWakePromptWithoutRouteMetadata",
-      "isGeneratedStagePlayMailWakePrompt",
-      "isGeneratedStagePlayMailWakeAssistantProjection",
-      "shouldSuppressGeneratedStagePlayMailWakeChatProjection",
     ]) {
       expect(pill).toContain(symbol);
       expect(map).toContain(symbol);
@@ -734,8 +733,20 @@ describe("Helix Ask UI ownership boundaries", () => {
       expect(liveSourceDisplay).not.toContain(symbol);
       expect(turnTranscript).not.toContain(symbol);
     }
-    expect(pill).toContain("STAGE_PLAY_MAIL_WAKE_PROMPT_PATTERNS");
-    expect(pill).toContain("STAGE_PLAY_MAIL_WAKE_ASSISTANT_PATTERNS");
+    for (const symbol of [
+      "isGeneratedStagePlayMailWakePrompt",
+      "isGeneratedStagePlayMailWakeAssistantProjection",
+      "shouldSuppressGeneratedStagePlayMailWakeChatProjection",
+    ]) {
+      expect(chatProjection).toContain(symbol);
+      expect(map).toContain(symbol);
+      expect(ledger).not.toContain(symbol);
+      expect(liveSourceDisplay).not.toContain(symbol);
+      expect(turnTranscript).not.toContain(symbol);
+    }
+    expect(chatProjection).toContain("STAGE_PLAY_MAIL_WAKE_PROMPT_PATTERNS");
+    expect(chatProjection).toContain("STAGE_PLAY_MAIL_WAKE_ASSISTANT_PATTERNS");
+    expect(pill).not.toContain("STAGE_PLAY_MAIL_WAKE_PROMPT_PATTERNS");
     expect(ledger).not.toContain("STAGE_PLAY_MAIL_WAKE_PROMPT_PATTERNS");
     expect(liveSourceDisplay).not.toContain("STAGE_PLAY_MAIL_WAKE_PROMPT_PATTERNS");
     expect(turnTranscript).not.toContain("STAGE_PLAY_MAIL_WAKE_PROMPT_PATTERNS");
@@ -917,7 +928,7 @@ describe("Helix Ask UI ownership boundaries", () => {
       expect(owner).not.toContain("sessionStorage");
       expect(owner).not.toContain("HELIX_ASK_CONTEXT_RESUME_FRAME_STORAGE_KEY");
     }
-    expect(map).toContain("generated wake assistant projections");
+    expect(map).toContain("Generated durable-chat projection suppression is recrowned");
   });
 
   it("documents voice continuation and intent-shift policy as local behavior", () => {
@@ -1526,43 +1537,81 @@ describe("Helix Ask UI ownership boundaries", () => {
 
   it("keeps chat projection and reply lifecycle behavior local to HelixAskPill", () => {
     const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const chatProjection = read("client/src/components/helix/ask-console/HelixAskChatProjection.ts");
+    const replyLifecycle = read("client/src/components/helix/ask-console/HelixAskReplyLifecycle.ts");
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
     const debugDisplay = read("client/src/lib/helix/ask-debug-event-display.ts");
     const activeStream = read("client/src/lib/helix/ask-active-turn-stream.ts");
     const transcript = read("client/src/lib/helix/ask-turn-transcript.ts");
     const terminalProjection = read("client/src/lib/helix/ask-terminal-projection.ts");
 
-    expect(map).toContain("Chat projection and reply lifecycle");
-    expect(map).toContain("durable projection guards");
+    const chatPersistence = read("client/src/components/helix/ask-console/HelixAskChatPersistence.ts");
+    expect(map).toContain("Chat projection, persistence payloads, and reply lifecycle");
+    expect(map).toContain("Pure durable chat-session projection is recrowned");
+    expect(map).toContain("Pure chat persistence payload shaping is recrowned");
+    expect(map).toContain("Pure reply lifecycle projection");
     expect(map).toContain("active-turn stream visibility");
     expect(map).toContain("brief-lane retention");
     expect(map).toContain("transcript hiding");
     for (const symbol of [
-      "parseChatMessageTimeMs",
       "buildHelixAskChatProjectionId",
-      "buildHelixAskRepliesFromChatSession",
-      "resolveHelixAskReplyCanonicalKey",
-      "resolveHelixAskReplyOrderMs",
-      "mergeHelixAskReplyPreservingOrder",
-      "mergeHelixAskRepliesByCanonicalTurn",
-      "sortHelixAskRepliesChronologically",
-      "limitHelixAskRepliesChronologically",
-      "appendHelixAskReplyChronologically",
-      "isHelixAskProgressPlaceholderReply",
-      "shouldRenderHelixAskActiveTurnStream",
-      "shouldKeepHelixReplyInBriefLane",
-      "shouldHideHelixAskTranscriptReply",
+      "buildHelixAskRepliesFromChatSessionProjection",
     ]) {
-      expect(pill).toContain(symbol);
+      expect(chatProjection).toContain(symbol);
+      expect(map).toContain(symbol);
+      expect(pill).toContain("buildHelixAskRepliesFromChatSessionProjection");
+      for (const owner of [debugDisplay, activeStream, transcript, terminalProjection]) {
+        expect(owner).not.toContain(symbol);
+      }
+    }
+    expect(chatProjection).toContain("parseHelixAskChatMessageTimeMs");
+    expect(map).toContain("parseHelixAskChatMessageTimeMs");
+    for (const symbol of [
+      "buildHelixAskConsoleChatMessagePayload",
+      "buildHelixAskConsoleChatTurnPayloads",
+    ]) {
+      expect(chatPersistence).toContain(symbol);
+      expect(map).toContain(symbol);
+      expect(chatPersistence).not.toContain("addMessage");
+      expect(chatPersistence).not.toContain("setActive");
+      expect(chatPersistence).not.toContain("ensureContextSession");
+    }
+    for (const symbol of [
+      "resolveHelixAskConsoleReplyCanonicalKey",
+      "resolveHelixAskConsoleReplyOrderMs",
+      "mergeHelixAskConsoleReplyPreservingOrder",
+      "mergeHelixAskConsoleRepliesByCanonicalTurn",
+      "sortHelixAskConsoleRepliesChronologically",
+      "limitHelixAskConsoleRepliesChronologically",
+      "appendHelixAskConsoleReplyChronologically",
+      "isHelixAskConsoleProgressPlaceholderReply",
+      "shouldRenderHelixAskConsoleActiveTurnStream",
+      "shouldKeepHelixAskConsoleReplyInBriefLane",
+      "shouldHideHelixAskConsoleTranscriptReply",
+    ]) {
+      expect(replyLifecycle).toContain(symbol);
       expect(map).toContain(symbol);
       for (const owner of [debugDisplay, activeStream, transcript, terminalProjection]) {
         expect(owner).not.toContain(symbol);
       }
     }
+    for (const bridgeWrapper of [
+      "buildHelixAskRepliesFromChatSession",
+      "resolveHelixAskReplyCanonicalKey",
+      "resolveHelixAskReplyOrderMs",
+      "sortHelixAskRepliesChronologically",
+      "appendHelixAskReplyChronologically",
+      "shouldRenderHelixAskActiveTurnStream",
+      "shouldKeepHelixReplyInBriefLane",
+      "shouldHideHelixAskTranscriptReply",
+    ]) {
+      expect(pill).toContain(bridgeWrapper);
+      expect(map).toContain(bridgeWrapper);
+    }
     for (const localAnchor of [
       "shouldSuppressGeneratedStagePlayMailWakeChatProjection",
     ]) {
-      expect(pill).toContain(localAnchor);
+      expect(chatProjection).toContain(localAnchor);
       for (const owner of [debugDisplay, activeStream, transcript, terminalProjection]) {
         expect(owner).not.toContain(localAnchor);
       }

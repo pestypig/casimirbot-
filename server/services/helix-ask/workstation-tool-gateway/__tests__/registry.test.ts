@@ -3310,6 +3310,124 @@ describe("Helix workstation tool gateway", () => {
     });
   });
 
+  it("blocks selected readable docs surfaces without a registered surface ref", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: DOCS_READ_VISIBLE_SURFACE_CAPABILITY,
+      arguments: {
+        label: "selected document paragraph",
+        surface: "selected",
+        selected_text: "Selected paragraph text.",
+        selection_kind: "selected",
+      },
+      turnId: "ask:test:gateway-readable-selected-missing-ref",
+      iteration: 14,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      capability_id: DOCS_READ_VISIBLE_SURFACE_CAPABILITY,
+      error: "registered_surface_ref_missing",
+      gateway_admission: {
+        admission_status: "blocked",
+        blocked_reason: "registered_surface_ref_missing",
+      },
+      observation_packet: {
+        status: "blocked",
+        missing_requirements: [
+          expect.objectContaining({
+            code: "registered_surface_ref_missing",
+            repair_action: "ask_user",
+          }),
+        ],
+      },
+      observation: {
+        schema: "helix.workstation_readable_surface_observation.v1",
+        status: "blocked",
+        blocked_reason: "registered_surface_ref_missing",
+        text: "Selected paragraph text.",
+        selection_ref: null,
+        selection_kind: "selected",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+  });
+
+  it("observes selected readable docs surfaces when a registered surface ref is present", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: DOCS_READ_VISIBLE_SURFACE_CAPABILITY,
+      arguments: {
+        label: "selected document paragraph",
+        surface: "selected",
+        selected_text: "Selected paragraph text.",
+        selection_ref: "docs-viewer:selection:unit-42",
+        selection_kind: "selected",
+      },
+      turnId: "ask:test:gateway-readable-selected-ref",
+      iteration: 15,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      capability_id: DOCS_READ_VISIBLE_SURFACE_CAPABILITY,
+      observation_packet: {
+        status: "succeeded",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.workstation_readable_surface_observation.v1",
+        status: "succeeded",
+        text: "Selected paragraph text.",
+        selection_ref: "docs-viewer:selection:unit-42",
+        selection_kind: "selected",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+  });
+
+  it("exposes readable surface observations through the Helix Native runtime lane", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "helix-native",
+      mode: "read",
+      capabilityId: DOCS_READ_VISIBLE_SURFACE_CAPABILITY,
+      arguments: {
+        label: "visible document section",
+        surface: "visible_document",
+        visible_text: "Helix Native visible surface text.",
+        source_doc_path: "docs/helix-ask-flow.md",
+      },
+      turnId: "ask:test:gateway-readable-helix-native",
+      iteration: 16,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      agent_runtime: "helix-native",
+      capability_id: DOCS_READ_VISIBLE_SURFACE_CAPABILITY,
+      gateway_admission: {
+        selected_agent_provider: "helix-native",
+        admission_status: "admitted",
+      },
+      observation: {
+        schema: "helix.workstation_readable_surface_observation.v1",
+        text: "Helix Native visible surface text.",
+        source_doc_path: "docs/helix-ask-flow.md",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+  });
+
   it("calls narrator say through the same non-terminal voice receipt contract", async () => {
     const result = await callWorkstationGatewayCapability({
       agentRuntime: "future",

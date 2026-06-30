@@ -11,7 +11,7 @@ import React, {
 } from "react";
 import { renderToString as renderKatexToString } from "katex";
 import "katex/dist/katex.min.css";
-import { BrainCircuit, Bug, ChevronDown, Copy, FileText, Headphones, Image as ImageIcon, Mic, PauseCircle, Pencil, PlayCircle, Plus, Radio, RotateCcw, Search, Square, Trash2, Volume2, X } from "lucide-react";
+import { BrainCircuit, ChevronDown, FileText, Headphones, Image as ImageIcon, Mic, PauseCircle, Pencil, PlayCircle, Plus, Radio, RotateCcw, Search, Square, Trash2, X } from "lucide-react";
 import { panelRegistry, getPanelDef, type PanelDefinition } from "@/lib/desktop/panelRegistry";
 import {
   findBestDocForTopic,
@@ -61,15 +61,53 @@ import {
   isHelixAgentRuntimeId,
   normalizeHelixAgentProvidersResponse,
   resolveHelixAskActualAgentProviderLabel,
+  resolveHelixAskModelUsageLabel,
   resolveNextSelectableHelixAgentRuntime,
   resolveSelectedHelixAgentRuntime,
 } from "@/lib/helix/ask-agent-runtime-display";
+import {
+  buildHelixAskConsoleBackendTurnPayloadCore,
+  buildHelixAskConsoleContextFiles,
+} from "@/components/helix/ask-console/HelixAskRequestEnvelope";
+import { readDocPathFromDesktopUrl } from "@/components/helix/ask-console/HelixAskContextBridge";
+import { buildHelixAskLatestTurnBinding } from "@/components/helix/ask-console/HelixAskLatestTurnBinding";
+import {
+  hasSuccessfulWorkstationTerminalTranscriptRows,
+  resolveHelixAskConsoleFinalAnswerSourceLabel,
+} from "@/components/helix/ask-console/HelixAskFinalProjection";
+import { buildHelixAskFinalAnswerBlocks } from "@/components/helix/ask-console/HelixAskFinalAnswer";
+import { selectHelixAskConsoleTurnTranscriptRowsForStream } from "@/components/helix/ask-console/HelixAskWorkstationTraceRows";
+import { buildHelixAskRuntimePickerModel } from "@/components/helix/ask-console/HelixAskRuntimePicker";
+import {
+  HELIX_ASK_CONSOLE_MAX_PROMPT_LINES,
+  buildHelixAskComposerViewModel,
+} from "@/components/helix/ask-console/HelixAskComposer";
+import { buildHelixAskSubmitAdmission } from "@/components/helix/ask-console/HelixAskSubmitAdmission";
+import { buildHelixAskRepliesFromChatSessionProjection } from "@/components/helix/ask-console/HelixAskChatProjection";
+import {
+  appendHelixAskConsoleReplyChronologically,
+  limitHelixAskConsoleRepliesChronologically,
+  resolveHelixAskConsoleReplyCanonicalKey,
+  resolveHelixAskConsoleReplyOrderMs,
+  shouldHideHelixAskConsoleTranscriptReply,
+  shouldKeepHelixAskConsoleReplyInBriefLane,
+  shouldRenderHelixAskConsoleActiveTurnStream,
+  sortHelixAskConsoleRepliesChronologically,
+} from "@/components/helix/ask-console/HelixAskReplyLifecycle";
+import {
+  buildHelixAskConsoleChatMessagePayload,
+  buildHelixAskConsoleChatTurnPayloads,
+} from "@/components/helix/ask-console/HelixAskChatPersistence";
+import { HelixAskTurnControls } from "@/components/helix/ask-console/HelixAskTurnControls";
+import { HelixAskDebugDrawer } from "@/components/helix/ask-console/HelixAskDebugDrawer";
+export { hasSuccessfulWorkstationTerminalTranscriptRows };
 export {
   DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS,
   formatHelixAgentRuntimeShortLabel,
   isHelixAgentRuntimeId,
   normalizeHelixAgentProvidersResponse,
   resolveHelixAskActualAgentProviderLabel,
+  resolveHelixAskModelUsageLabel,
   resolveNextSelectableHelixAgentRuntime,
   resolveSelectedHelixAgentRuntime,
 };
@@ -158,7 +196,6 @@ import {
   hasHelixAskRenderableMath,
   isHelixAskEquationFamilyDebug,
   isLikelyCodeStyleMathToken,
-  parseHelixAskFinalAnswerBulletLine,
   shouldShowHelixAskCalculatorPanel,
   tokenizeHelixAskMathTokens,
   type HelixAskMathToken,
@@ -168,7 +205,6 @@ export {
   hasHelixAskRenderableMath,
   isHelixAskEquationFamilyDebug,
   isLikelyCodeStyleMathToken,
-  parseHelixAskFinalAnswerBulletLine,
   shouldShowHelixAskCalculatorPanel,
   tokenizeHelixAskMathTokens,
 };
@@ -5096,6 +5132,30 @@ type HelixAskPillProps = {
   replyListClassName?: string;
 };
 
+type HelixAskLegacyChatAddMessage = (
+  sessionId: string,
+  msg: Omit<ChatMessage, "id" | "at" | "tokens"> & { tokens?: number },
+) => ChatMessage;
+
+function addHelixAskLegacyChatMessage(
+  addMessage: HelixAskLegacyChatAddMessage,
+  sessionId: string | null | undefined,
+  args: Parameters<typeof buildHelixAskConsoleChatMessagePayload>[0],
+) {
+  if (!sessionId) return null;
+  const payload = buildHelixAskConsoleChatMessagePayload(args);
+  return payload ? addMessage(sessionId, payload) : null;
+}
+
+function addHelixAskLegacyChatTurnMessages(
+  addMessage: HelixAskLegacyChatAddMessage,
+  sessionId: string | null | undefined,
+  args: Parameters<typeof buildHelixAskConsoleChatTurnPayloads>[0],
+) {
+  if (!sessionId) return [];
+  return buildHelixAskConsoleChatTurnPayloads(args).map((payload) => addMessage(sessionId, payload));
+}
+
 function readStoredHelixAskAgentRuntime(): HelixAgentRuntimeId {
   if (typeof window === "undefined") return "helix";
   try {
@@ -5113,64 +5173,6 @@ function persistHelixAskAgentRuntime(value: HelixAgentRuntimeId): void {
   } catch {
     // Local storage can be unavailable in embedded or test contexts.
   }
-}
-
-function parseChatMessageTimeMs(message: ChatMessage): number | null {
-  const parsed = Date.parse(message.at);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function buildHelixAskChatProjectionId(
-  session: ChatSession,
-  userMessage: ChatMessage | null,
-  assistantMessage: ChatMessage,
-): string {
-  const traceId = assistantMessage.traceId?.trim() || userMessage?.traceId?.trim();
-  if (traceId) return `helix-chat-turn:${session.id}:${traceId}`;
-  return `helix-chat-turn:${session.id}:${userMessage?.id ?? "standalone"}:${assistantMessage.id}`;
-}
-
-const STAGE_PLAY_MAIL_WAKE_PROMPT_PATTERNS = [
-  /\bstage_play_live_source_mail_wake:/i,
-  /^\s*use\s+live_env\.(?:read_live_source_mail|read_processed_live_source_mail|record_live_source_mail_decision|request_interim_voice_callout)\b/i,
-  /^\s*read the active stage play live-source mailbox and use the latest processed micro-reasoner finding\b/i,
-  /^\s*review the latest stage play live-source mailbox finding\.\s*use the structured mailbox route metadata attached to this turn\b/i,
-  /^\s*review the latest stage play live-source mailbox finding\.[\s\S]*?\bmicro-reasoner recommendation:\s*(?:record\s+interpretation|request\s+voice\s+callout|request\s+more\s+evidence|request\s+stage\s+play\s+checkpoint|draft\s+text\s+answer)\b[\s\S]*?\bstructured mailbox route metadata attached\b/i,
-  /^\s*review the latest stage play live-source mailbox finding\.[\s\S]*?\bmicro-reasoner recommendation:\s*request\s+voice\s+callout\b[\s\S]*?\bstructured mailbox route metadata attached\b/i,
-  /\bui bridge reason:\s*(?:backend wake admission deferred|micro-reasoner (?:wake|interrupt) candidate|operator opened queued (?:wake|interrupt))/i,
-];
-
-const STAGE_PLAY_MAIL_WAKE_ASSISTANT_PATTERNS = [
-  /\bi could not complete this live-source turn\b/i,
-  /\bthe live-source mailbox route completed\b/i,
-  /\bthe interim voice callout\b/i,
-  /\bsolver authority failed\b/i,
-  /\bselected:\s*live_env\./i,
-  /\bphase:\s*(?:terminal_checkpoint|record_decision|request_voice_after_decision)\b/i,
-  /\bvoice callout request\b/i,
-];
-
-function isGeneratedStagePlayMailWakePrompt(message: ChatMessage | null): boolean {
-  if (!message || message.role !== "user") return false;
-  const text = message.content.trim();
-  if (!text) return false;
-  return STAGE_PLAY_MAIL_WAKE_PROMPT_PATTERNS.some((pattern) => pattern.test(text));
-}
-
-function isGeneratedStagePlayMailWakeAssistantProjection(message: ChatMessage | null): boolean {
-  if (!message || message.role !== "assistant") return false;
-  const text = message.content.trim();
-  if (!text) return false;
-  return STAGE_PLAY_MAIL_WAKE_ASSISTANT_PATTERNS.some((pattern) => pattern.test(text));
-}
-
-function shouldSuppressGeneratedStagePlayMailWakeChatProjection(
-  userMessage: ChatMessage | null,
-  assistantMessage: ChatMessage,
-): boolean {
-  if (!isGeneratedStagePlayMailWakePrompt(userMessage)) return false;
-  if (isGeneratedStagePlayMailWakeAssistantProjection(assistantMessage)) return true;
-  return false;
 }
 
 export const HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE = "backend_ask_entry_required";
@@ -5319,146 +5321,17 @@ export function hasHelixAskBackendEntrypointTurnId(turnId: string | null | undef
 }
 
 export function buildHelixAskRepliesFromChatSession(session: ChatSession): HelixAskReply[] {
-  const messages = [...(session.messages ?? [])].sort((left, right) => {
-    const leftMs = parseChatMessageTimeMs(left);
-    const rightMs = parseChatMessageTimeMs(right);
-    if (leftMs !== null && rightMs !== null && leftMs !== rightMs) return leftMs - rightMs;
-    if (leftMs !== null && rightMs === null) return -1;
-    if (leftMs === null && rightMs !== null) return 1;
-    return left.id.localeCompare(right.id);
-  });
-  const replies: HelixAskReply[] = [];
-  let pendingUser: ChatMessage | null = null;
-  for (const message of messages) {
-    if (message.role === "user") {
-      pendingUser = message;
-      continue;
-    }
-    if (message.role !== "assistant") continue;
-    const answer = message.content.trim();
-    if (!answer) continue;
-    if (isHelixAskProgressPlaceholderText(answer)) {
-      pendingUser = null;
-      continue;
-    }
-    if (shouldSuppressGeneratedStagePlayMailWakeChatProjection(pendingUser, message)) {
-      pendingUser = null;
-      continue;
-    }
-    const createdAtMs = parseChatMessageTimeMs(message) ?? parseChatMessageTimeMs(pendingUser ?? message) ?? Date.now();
-    const turnId = message.traceId?.trim() || pendingUser?.traceId?.trim() || null;
-    const question = pendingUser?.content ?? "";
-    const askEntrypointRequired = requiresHelixAskBackendEntrypoint(question);
-    const askEntrypointObserved = false;
-    const invalidDurableTerminalAnswer = isInvalidTerminalAnswerText(answer);
-    if (askEntrypointRequired && !askEntrypointObserved) {
-      replies.push({
-        id: buildHelixAskChatProjectionId(session, pendingUser, message),
-        createdAtMs,
-        content: HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT,
-        question,
-        turn_id: turnId,
-        ok: false,
-        final_answer_source: "typed_failure",
-        terminal_artifact_kind: "typed_failure",
-        terminal_error_code: HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE,
-        debug: {
-          durable_chat_projection: true,
-          ask_entrypoint_required: true,
-          ask_entrypoint_observed: false,
-          ask_entrypoint_failure_code: HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE,
-          blocked_projection_kind: "durable_chat_session",
-          session_id: session.id,
-          user_message_id: pendingUser?.id ?? null,
-          assistant_message_id: message.id,
-          created_at_ms: createdAtMs,
-          turn_id: turnId,
-          selected_final_answer: HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT,
-          final_answer_source: "typed_failure",
-          terminal_artifact_kind: "typed_failure",
-          terminal_error_code: HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE,
-          typed_failure: {
-            schema: "helix.ask.typed_failure.v1",
-            code: HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE,
-            message: HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT,
-          },
-          resolved_turn_summary: {
-            final_status: "final_failure",
-            terminal_artifact_kind: "typed_failure",
-            terminal_error_code: HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE,
-          },
-        } as HelixAskReply["debug"],
-      });
-      pendingUser = null;
-      continue;
-    }
-    if (invalidDurableTerminalAnswer) {
-      const failureText = renderTypedFailureFallback("terminal_authority_missing");
-      replies.push({
-        id: buildHelixAskChatProjectionId(session, pendingUser, message),
-        createdAtMs,
-        content: failureText,
-        question,
-        turn_id: turnId,
-        ok: false,
-        final_answer_source: "typed_failure",
-        terminal_artifact_kind: "typed_failure",
-        terminal_error_code: "terminal_authority_missing",
-        debug: {
-          durable_chat_projection: true,
-          ask_entrypoint_required: askEntrypointRequired,
-          ask_entrypoint_observed: askEntrypointObserved,
-          ask_entrypoint_failure_code: "terminal_authority_missing",
-          blocked_projection_kind: "durable_chat_session",
-          session_id: session.id,
-          user_message_id: pendingUser?.id ?? null,
-          assistant_message_id: message.id,
-          created_at_ms: createdAtMs,
-          turn_id: turnId,
-          selected_final_answer: failureText,
-          final_answer_source: "typed_failure",
-          terminal_artifact_kind: "typed_failure",
-          terminal_error_code: "terminal_authority_missing",
-          typed_failure: {
-            schema: "helix.ask.typed_failure.v1",
-            code: "terminal_authority_missing",
-            message: failureText,
-          },
-          resolved_turn_summary: {
-            final_status: "final_failure",
-            terminal_artifact_kind: "typed_failure",
-            terminal_error_code: "terminal_authority_missing",
-          },
-        } as HelixAskReply["debug"],
-      });
-      pendingUser = null;
-      continue;
-    }
-    replies.push({
-      id: buildHelixAskChatProjectionId(session, pendingUser, message),
-      createdAtMs,
-      content: answer,
-      question,
-      turn_id: turnId,
-      ok: true,
-      final_answer_source: "durable_chat_session",
-      terminal_artifact_kind: "chat_final_answer",
-      debug: {
-        durable_chat_projection: true,
-        ask_entrypoint_required: askEntrypointRequired,
-        ask_entrypoint_observed: askEntrypointObserved,
-        ask_entrypoint_failure_code: null,
-        blocked_projection_kind: null,
-        session_id: session.id,
-        user_message_id: pendingUser?.id ?? null,
-        assistant_message_id: message.id,
-        created_at_ms: createdAtMs,
-        turn_id: turnId,
-      } as HelixAskReply["debug"],
-    });
-    pendingUser = null;
-  }
-  return replies;
+  return buildHelixAskRepliesFromChatSessionProjection({
+    session,
+    policy: {
+      backendEntrypointRequiredErrorCode: HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE,
+      backendEntrypointRequiredText: HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT,
+      isProgressPlaceholderText: isHelixAskProgressPlaceholderText,
+      requiresBackendEntrypoint: requiresHelixAskBackendEntrypoint,
+      isInvalidTerminalAnswerText,
+      renderTypedFailureFallback,
+    },
+  }) as HelixAskReply[];
 }
 
 function readAgentLoopAuditRecord(value: unknown): Record<string, unknown> | null {
@@ -6290,25 +6163,6 @@ function HelixAskGoalPill({
 }
 
 function resolveHelixAskReplyOrderMs(reply: HelixAskReply): number | null {
-  const record = readAgentLoopAuditRecord(reply);
-  const debug = readAgentLoopAuditRecord(reply.debug);
-  const candidates = [
-    reply.createdAtMs,
-    record?.created_at_ms,
-    record?.createdAtMs,
-    record?.created_at,
-    record?.createdAt,
-    debug?.created_at_ms,
-    debug?.createdAtMs,
-    debug?.exported_at_ms,
-  ];
-  for (const value of candidates) {
-    if (typeof value === "number" && Number.isFinite(value)) return value;
-    if (typeof value === "string") {
-      const parsed = Date.parse(value);
-      if (Number.isFinite(parsed)) return parsed;
-    }
-  }
   const transcriptEvents = resolveHelixTurnTranscriptEvents(reply)
     .map((entry, index) =>
       buildAskLiveEventFromTurnTranscriptRecord(entry, `${reply.id}-order-${index}`, HELIX_ASK_LIVE_EVENT_MAX_CHARS),
@@ -6321,27 +6175,11 @@ function resolveHelixAskReplyOrderMs(reply: HelixAskReply): number | null {
   ]
     .map(resolveAskLiveEventTimestampMs)
     .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
-  return events.length > 0 ? Math.min(...events) : null;
+  return resolveHelixAskConsoleReplyOrderMs(reply, events.length > 0 ? [Math.min(...events)] : []);
 }
 
 function resolveHelixAskReplyCanonicalKey(reply: HelixAskReply): string {
-  const replyRecord = readAgentLoopAuditRecord(reply);
-  const debugRecord = readAgentLoopAuditRecord(reply.debug);
-  const candidates = [
-    reply.turn_id,
-    replyRecord?.turn_id,
-    replyRecord?.turnId,
-    debugRecord?.turn_id,
-    debugRecord?.turnId,
-    debugRecord?.active_turn_id,
-    debugRecord?.activeTurnId,
-    reply.id,
-  ];
-  for (const value of candidates) {
-    const normalized = coerceText(value).trim();
-    if (normalized) return normalized;
-  }
-  return reply.id;
+  return resolveHelixAskConsoleReplyCanonicalKey(reply);
 }
 
 function isHelixAskProgressPlaceholderReply(reply: HelixAskReply | null | undefined): boolean {
@@ -6353,72 +6191,21 @@ function shouldHideHelixAskTranscriptReply(args: {
   askBusy: boolean;
   activeTurnId?: string | null;
 }): boolean {
-  if (!isHelixAskProgressPlaceholderReply(args.reply)) return false;
-  const activeTurnId = coerceText(args.activeTurnId).trim();
-  const replyKey = resolveHelixAskReplyCanonicalKey(args.reply);
-  if (args.askBusy && activeTurnId && replyKey === activeTurnId) return true;
-  return true;
-}
-
-function mergeHelixAskReplyPreservingOrder(
-  existing: HelixAskReply,
-  incoming: HelixAskReply,
-): HelixAskReply {
-  const existingOrderMs = resolveHelixAskReplyOrderMs(existing);
-  const incomingOrderMs = resolveHelixAskReplyOrderMs(incoming);
-  const createdAtMs =
-    typeof existing.createdAtMs === "number" && Number.isFinite(existing.createdAtMs)
-      ? existing.createdAtMs
-      : existingOrderMs !== null
-        ? existingOrderMs
-        : typeof incoming.createdAtMs === "number" && Number.isFinite(incoming.createdAtMs)
-          ? incoming.createdAtMs
-          : incomingOrderMs ?? undefined;
-  return {
-    ...existing,
-    ...incoming,
-    id: existing.id || incoming.id,
-    createdAtMs,
-  };
-}
-
-function mergeHelixAskRepliesByCanonicalTurn(
-  replies: HelixAskReply[],
-): HelixAskReply[] {
-  const merged: HelixAskReply[] = [];
-  const indexByKey = new Map<string, number>();
-  for (const reply of replies) {
-    const key = resolveHelixAskReplyCanonicalKey(reply);
-    const existingIndex = indexByKey.get(key);
-    if (existingIndex === undefined) {
-      indexByKey.set(key, merged.length);
-      merged.push(reply);
-      continue;
-    }
-    merged[existingIndex] = mergeHelixAskReplyPreservingOrder(merged[existingIndex], reply);
-  }
-  return merged;
+  return shouldHideHelixAskConsoleTranscriptReply({
+    ...args,
+    isProgressPlaceholderText: isHelixAskProgressPlaceholderText,
+  });
 }
 
 export function sortHelixAskRepliesChronologically(replies: HelixAskReply[]): HelixAskReply[] {
-  return mergeHelixAskRepliesByCanonicalTurn(replies)
-    .map((reply, index) => ({ reply, index, orderMs: resolveHelixAskReplyOrderMs(reply) }))
-    .sort((left, right) => {
-      if (left.orderMs !== null && right.orderMs !== null && left.orderMs !== right.orderMs) {
-        return left.orderMs - right.orderMs;
-      }
-      if (left.orderMs !== null && right.orderMs === null) return -1;
-      if (left.orderMs === null && right.orderMs !== null) return 1;
-      return left.index - right.index;
-    })
-    .map((entry) => entry.reply);
+  return sortHelixAskConsoleRepliesChronologically(replies, resolveHelixAskReplyOrderMs);
 }
 
 function limitHelixAskRepliesChronologically(
   replies: HelixAskReply[],
   limit = HELIX_ASK_DURABLE_TRANSCRIPT_LIMIT,
 ): HelixAskReply[] {
-  return sortHelixAskRepliesChronologically(replies).slice(-limit);
+  return limitHelixAskConsoleRepliesChronologically(replies, limit, resolveHelixAskReplyOrderMs);
 }
 
 export function appendHelixAskReplyChronologically(
@@ -6426,15 +6213,7 @@ export function appendHelixAskReplyChronologically(
   reply: HelixAskReply,
   limit = HELIX_ASK_DURABLE_TRANSCRIPT_LIMIT,
 ): HelixAskReply[] {
-  const incomingKey = resolveHelixAskReplyCanonicalKey(reply);
-  const next = [...replies];
-  const existingIndex = next.findIndex((existing) => resolveHelixAskReplyCanonicalKey(existing) === incomingKey);
-  if (existingIndex >= 0) {
-    next[existingIndex] = mergeHelixAskReplyPreservingOrder(next[existingIndex], reply);
-  } else {
-    next.push(reply);
-  }
-  return limitHelixAskRepliesChronologically(next, limit);
+  return appendHelixAskConsoleReplyChronologically(replies, reply, limit, resolveHelixAskReplyOrderMs);
 }
 
 export function shouldRenderHelixAskActiveTurnStream(input: {
@@ -6443,39 +6222,14 @@ export function shouldRenderHelixAskActiveTurnStream(input: {
   activeStartedAtMs?: number | null;
   latestReply?: HelixAskReply | null;
 }): boolean {
-  if (!input.askBusy) return false;
-  const activeTurnId = coerceText(input.activeTurnId).trim();
-  const latestReply = input.latestReply ?? null;
-  if (!latestReply) return true;
-  if (activeTurnId) {
-    return resolveHelixAskReplyCanonicalKey(latestReply) !== activeTurnId;
-  }
-  const activeStartedAtMs =
-    typeof input.activeStartedAtMs === "number" && Number.isFinite(input.activeStartedAtMs)
-      ? input.activeStartedAtMs
-      : null;
-  const latestReplyOrderMs = resolveHelixAskReplyOrderMs(latestReply);
-  if (activeStartedAtMs !== null && latestReplyOrderMs !== null && activeStartedAtMs <= latestReplyOrderMs) {
-    return false;
-  }
-  if (!activeTurnId && activeStartedAtMs === null) return false;
-  return true;
+  return shouldRenderHelixAskConsoleActiveTurnStream({
+    ...input,
+    resolveOrderMs: resolveHelixAskReplyOrderMs,
+  });
 }
 
 export function shouldKeepHelixReplyInBriefLane(debug: HelixAskReply["debug"] | undefined): boolean {
-  const record = asObjectRecord(debug);
-  if (!record) return false;
-  if (record.smalltalk_fast_path_applied === true) return true;
-  const fallbackReasonTaxonomy =
-    typeof record.fallback_reason_taxonomy === "string"
-      ? record.fallback_reason_taxonomy.trim().toLowerCase()
-      : "";
-  if (fallbackReasonTaxonomy === "smalltalk_fast_path") return true;
-  const fallbackReason =
-    typeof record.fallback_reason === "string" ? record.fallback_reason.trim().toLowerCase() : "";
-  if (fallbackReason === "smalltalk_fast_path") return true;
-  const answerPath = asStringArray(record.answer_path).map((step) => step.toLowerCase());
-  return answerPath.includes("forcedanswer:smalltalk_fast_path");
+  return shouldKeepHelixAskConsoleReplyInBriefLane(debug);
 }
 
 function buildHelixAskDebugContextSummary(
@@ -7054,7 +6808,7 @@ const HELIX_ASK_CONTEXT_TOKENS = clampNumber(
   512,
   8192,
 );
-const HELIX_ASK_MAX_PROMPT_LINES = 10;
+const HELIX_ASK_MAX_PROMPT_LINES = HELIX_ASK_CONSOLE_MAX_PROMPT_LINES;
 const HELIX_ASK_LIVE_EVENT_LIMIT = 28;
 const HELIX_ASK_QUEUE_LIMIT = 12;
 const HELIX_ASK_LIVE_EVENT_MAX_CHARS = clampNumber(
@@ -7340,12 +7094,13 @@ function rememberDocViewerPathForAskSnapshot(value: unknown): string | null {
 
 export function readDocViewerPathFromDesktopUrlForAskSnapshot(): string | null {
   if (typeof window === "undefined") return null;
-  try {
-    const params = new URLSearchParams(window.location.search);
-    return normalizeDocViewerPathForAskSnapshot(params.get("doc"));
-  } catch {
-    return null;
-  }
+  const location = window.location;
+  const url = typeof location.href === "string" && location.href
+    ? location.href
+    : typeof location.search === "string"
+      ? location.search
+      : "";
+  return normalizeDocViewerPathForAskSnapshot(readDocPathFromDesktopUrl(url));
 }
 
 function readDocViewerDebugSnapshot(): Record<string, unknown> {
@@ -7444,15 +7199,10 @@ export function buildHelixAskContextFilesForTurn(
   docsViewerAnchorPath: string | null | undefined,
   workspaceContextSnapshot: Record<string, unknown> | null | undefined,
 ): string[] | undefined {
-  const candidates = [
+  return buildHelixAskConsoleContextFiles({
     docsViewerAnchorPath,
-    workspaceContextSnapshot?.activeDocPath,
-    workspaceContextSnapshot?.docContextPath,
-  ]
-    .map((value) => normalizeDocsViewerAnchorPath(coerceText(value)))
-    .filter(Boolean);
-  const unique = dedupeStrings(candidates);
-  return unique.length > 0 ? unique : undefined;
+    workspaceContextSnapshot,
+  });
 }
 
 function readWorkstationLayoutDebugSnapshot(): Record<string, unknown> {
@@ -8352,6 +8102,43 @@ function buildReplyScopedDebugExportFromRenderedReply(reply: HelixAskReply, reas
   });
 }
 
+function collectHelixReplyTerminalTranscriptTexts(reply: HelixAskReply): string[] {
+  const replyRecord = reply as Record<string, unknown>;
+  const debug = readAgentLoopAuditRecord(reply.debug);
+  const agentLoop = readAgentLoopAuditRecord(replyRecord.agentLoop ?? replyRecord.agent_loop ?? debug?.agentLoop ?? debug?.agent_loop);
+  const candidates = [
+    replyRecord.turn_transcript_events,
+    replyRecord.turnTranscriptEvents,
+    replyRecord.transcript_events,
+    debug?.turn_transcript_events,
+    debug?.turnTranscriptEvents,
+    debug?.transcript_events,
+    agentLoop?.turn_transcript_events,
+    agentLoop?.turnTranscriptEvents,
+    agentLoop?.transcript_events,
+  ];
+  const texts: string[] = [];
+  candidates.forEach((candidate) => {
+    readAgentLoopAuditArray(candidate).forEach((entry) => {
+      const record = readAgentLoopAuditRecord(entry);
+      if (!record) return;
+      const sourceEventType = coerceText(record.source_event_type).trim();
+      const type = coerceText(record.type).trim();
+      if (
+        sourceEventType !== "terminal_answer" &&
+        sourceEventType !== "final_answer" &&
+        type !== "terminal_answer" &&
+        type !== "final_answer"
+      ) {
+        return;
+      }
+      const text = cleanHelixRenderedFinalAnswerText(coerceText(record.text));
+      if (text) texts.push(text);
+    });
+  });
+  return dedupeStrings(texts);
+}
+
 function extractHelixRenderedTurnDebugFromButton(sourceElement: HTMLElement | null | undefined): {
   question: string | null;
   finalAnswer: string | null;
@@ -8402,7 +8189,7 @@ function extractHelixRenderedTurnDebugFromButton(sourceElement: HTMLElement | nu
   return null;
 }
 
-function buildReplyScopedDebugExportFromRenderedButton(
+export function buildReplyScopedDebugExportFromRenderedButton(
   reply: HelixAskReply,
   sourceElement: HTMLElement | null | undefined,
   reason: string,
@@ -8410,9 +8197,16 @@ function buildReplyScopedDebugExportFromRenderedButton(
   const rendered = extractHelixRenderedTurnDebugFromButton(sourceElement);
   if (!rendered || (!rendered.question && !rendered.finalAnswer)) return null;
   const visibleTerminal = resolveHelixAskVisibleTerminal(reply, reply.content);
+  const replyTerminalTranscriptTexts = collectHelixReplyTerminalTranscriptTexts(reply);
+  const renderedFinalMatchesReply =
+    !rendered.finalAnswer ||
+    [visibleTerminal.text, reply.content, ...replyTerminalTranscriptTexts]
+      .map(normalizedDebugReplyText)
+      .filter(Boolean)
+      .some((candidate) => candidate === normalizedDebugReplyText(rendered.finalAnswer));
   const renderedMatchesReply =
     (!rendered.question || normalizedDebugReplyText(rendered.question) === normalizedDebugReplyText(reply.question)) &&
-    (!rendered.finalAnswer || normalizedDebugReplyText(rendered.finalAnswer) === normalizedDebugReplyText(visibleTerminal.text || reply.content));
+    renderedFinalMatchesReply;
   const replyRecord = reply as Record<string, unknown>;
   const replyDebugRecord = renderedMatchesReply ? readAgentLoopAuditRecord(reply.debug) : null;
   return buildHelixDebugExportEnvelopeFromMasterPayload(reply, {
@@ -9278,6 +9072,38 @@ export function buildHelixAskReplyCopyText(reply: HelixAskReply): string {
   }
   const envelopeText = chunks.filter(Boolean).join("\n\n").trim();
   return envelopeText || terminal.text || reply.content;
+}
+
+export async function copyHelixAskPlainTextToClipboard(text: string): Promise<boolean> {
+  const value = coerceText(text);
+  if (!value) return false;
+  if (typeof navigator !== "undefined" && typeof navigator.clipboard?.writeText === "function") {
+    try {
+      await navigator.clipboard.writeText(value);
+      if (typeof navigator.clipboard.readText !== "function") return true;
+      const readback = await navigator.clipboard.readText().catch(() => "");
+      if (readback === value) return true;
+    } catch {
+      // Fall through to textarea copy.
+    }
+  }
+  if (typeof document === "undefined") return false;
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.setAttribute("readonly", "true");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  textarea.style.top = "0";
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  try {
+    return document.execCommand("copy");
+  } catch {
+    return false;
+  } finally {
+    textarea.remove();
+  }
 }
 
 function normalizeReplyMasterDebugPayload(reply: HelixAskReply, payload: string | null | undefined): string {
@@ -11400,13 +11226,15 @@ export function HelixAskPill({
       cancelled = true;
     };
   }, []);
-  const selectedAgentRuntimeProvider = useMemo(
+  const agentRuntimePickerModel = useMemo(
     () =>
-      agentRuntimeProviders.find((provider) => provider.id === selectedAgentRuntime) ??
-      DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS[0],
+      buildHelixAskRuntimePickerModel({
+        selectedRuntime: selectedAgentRuntime,
+        providers: agentRuntimeProviders,
+      }),
     [agentRuntimeProviders, selectedAgentRuntime],
   );
-  const selectedAgentRuntimeLabel = formatHelixAgentRuntimeShortLabel(selectedAgentRuntimeProvider);
+  const selectedAgentRuntimeLabel = agentRuntimePickerModel.selectedLabel;
   const handleAgentRuntimeSelect = useCallback((runtime: HelixAgentRuntimeId) => {
     const validated = resolveSelectedHelixAgentRuntime(runtime, agentRuntimeProviders);
     if (validated !== runtime) {
@@ -11422,8 +11250,7 @@ export function HelixAskPill({
   }, [agentRuntimeProviders, triggerAskActionHaptic]);
   const handleAgentRuntimeButtonClick = useCallback(() => {
     triggerAskActionHaptic();
-    const enabledProviderCount = agentRuntimeProviders.filter((provider) => provider.enabled).length;
-    if (enabledProviderCount <= 2) {
+    if (agentRuntimePickerModel.primaryButtonMode === "cycle") {
       const nextRuntime = resolveNextSelectableHelixAgentRuntime(selectedAgentRuntime, agentRuntimeProviders);
       setSelectedAgentRuntime(nextRuntime);
       persistHelixAskAgentRuntime(nextRuntime);
@@ -11431,7 +11258,7 @@ export function HelixAskPill({
       return;
     }
     setAgentRuntimeMenuOpen((current) => !current);
-  }, [agentRuntimeProviders, selectedAgentRuntime, triggerAskActionHaptic]);
+  }, [agentRuntimePickerModel.primaryButtonMode, agentRuntimeProviders, selectedAgentRuntime, triggerAskActionHaptic]);
   useEffect(() => {
     askRepliesRef.current = askReplies;
   }, [askReplies]);
@@ -13821,38 +13648,35 @@ export function HelixAskPill({
     (content: unknown): ReactNode => {
       const text = coerceText(content);
       if (!text) return null;
-      const lines = text.replace(/\r\n/g, "\n").split("\n");
+      const blocks = buildHelixAskFinalAnswerBlocks(text);
       return (
         <div className="mt-2 space-y-1.5 leading-relaxed">
-          {lines.map((line, index) => {
-            const trimmed = line.trim();
-            if (!trimmed) {
-              return <div key={`final-answer-blank-${index}`} className="h-2" aria-hidden="true" />;
+          {blocks.map((block) => {
+            if (block.kind === "blank") {
+              return <div key={block.key} className="h-2" aria-hidden="true" />;
             }
-            const bulletText = parseHelixAskFinalAnswerBulletLine(trimmed);
-            if (bulletText) {
+            if (block.kind === "bullet") {
               return (
-                <div key={`final-answer-bullet-${index}`} className="flex gap-2 pl-2">
+                <div key={block.key} className="flex gap-2 pl-2">
                   <span className="mt-[0.15rem] text-cyan-300/80" aria-hidden="true">
                     -
                   </span>
                   <span
                     className="min-w-0 flex-1"
-                    data-narrator-source-id={`helix-final-answer-bullet-${index}`}
+                    data-narrator-source-id={`helix-${block.key}`}
                   >
-                    {renderHelixAskContent(bulletText)}
+                    {renderHelixAskContent(block.text)}
                   </span>
                 </div>
               );
             }
-            const isSectionHeader = /:$/.test(trimmed) && trimmed.length <= 80;
             return (
               <div
-                key={`final-answer-line-${index}`}
-                className={isSectionHeader ? "pt-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-100" : ""}
-                data-narrator-source-id={`helix-final-answer-line-${index}`}
+                key={block.key}
+                className={block.isSectionHeader ? "pt-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-100" : ""}
+                data-narrator-source-id={`helix-${block.key}`}
               >
-                {renderHelixAskContent(trimmed)}
+                {renderHelixAskContent(block.text)}
               </div>
             );
           })}
@@ -14025,16 +13849,9 @@ export function HelixAskPill({
   }, []);
 
   const handleCopyReply = useCallback(
-    async (reply: HelixAskReply) => {
-      const text = buildCopyText(reply);
-      if (!text || typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
-        return;
-      }
-      try {
-        await navigator.clipboard.writeText(text);
-      } catch {
-        // ignore clipboard failures
-      }
+    async (reply: HelixAskReply, textOverride?: string | null) => {
+      const text = coerceText(textOverride).trim() || buildCopyText(reply);
+      await copyHelixAskPlainTextToClipboard(text);
     },
     [buildCopyText],
   );
@@ -16539,7 +16356,7 @@ export function HelixAskPill({
   );
 
   const handleReadAloud = useCallback(
-    async (reply: HelixAskReply) => {
+    async (reply: HelixAskReply, textOverride?: string | null) => {
       const currentState = readAloudByReply[reply.id] ?? "idle";
       if (shouldStopReadAloudOnButtonPress(currentState)) {
         voiceAutoSpeakQueueRef.current = voiceAutoSpeakQueueRef.current.filter(
@@ -16552,7 +16369,7 @@ export function HelixAskPill({
         }));
         return;
       }
-      const text = buildCopyText(reply);
+      const text = coerceText(textOverride).trim() || buildCopyText(reply);
       if (!text) {
         setReadAloudByReply((prev) => ({
           ...prev,
@@ -20096,9 +19913,11 @@ export function HelixAskPill({
                 traceId: attempt.traceId,
               }),
             );
-            if (sessionId) {
-              addMessage(sessionId, { role: "assistant", content: outputText, traceId: attempt.traceId });
-            }
+            addHelixAskLegacyChatMessage(addMessage, sessionId, {
+              role: "assistant",
+              content: outputText,
+              traceId: attempt.traceId,
+            });
             if (attempt.explorationTopicKey) {
               const existing = explorationRuntimeByTopicRef.current[attempt.explorationTopicKey];
               explorationRuntimeByTopicRef.current[attempt.explorationTopicKey] = {
@@ -21079,17 +20898,14 @@ export function HelixAskPill({
           patchVoiceSegmentAttempt(input.segmentId, { dispatch: "completed" });
           if (!resolvedVoiceDispatchPlan.should_dispatch_reasoning) {
             rememberConversationTurn("dottie: On it.");
-            if (sessionId) {
-              addMessage(sessionId, { role: "user", content: transcript });
-              addMessage(sessionId, {
-                role: "assistant",
-                content: getWorkstationFastPathReplyText(
-                  selectWorkstationFastPathReplyAction(voiceDispatchSequence),
-                  workstationLanguageTag,
-                  transcript,
-                ),
-              });
-            }
+            addHelixAskLegacyChatTurnMessages(addMessage, sessionId, {
+              userContent: transcript,
+              assistantContent: getWorkstationFastPathReplyText(
+                selectWorkstationFastPathReplyAction(voiceDispatchSequence),
+                workstationLanguageTag,
+                transcript,
+              ),
+            });
             return;
           }
           forceReasoningAfterWorkstation = true;
@@ -21118,10 +20934,10 @@ export function HelixAskPill({
               traceId: input.traceId,
             }),
           );
-          if (sessionId) {
-            addMessage(sessionId, { role: "user", content: transcript });
-            addMessage(sessionId, { role: "assistant", content: resolvedVoiceDispatchPlan.observer_ack });
-          }
+          addHelixAskLegacyChatTurnMessages(addMessage, sessionId, {
+            userContent: transcript,
+            assistantContent: resolvedVoiceDispatchPlan.observer_ack,
+          });
         }
         if (!workstationCommand) {
           patchHelixTimelineEntry(stagedWorkstationIntentEntry.id, {
@@ -21319,10 +21135,10 @@ export function HelixAskPill({
         markVoiceCheckpoint("dispatch_completed", "ok", "Voice normal-turn response completed.");
         patchVoiceSegmentAttempt(input.segmentId, { dispatch: "completed" });
         rememberConversationTurn(`dottie: ${directReply}`);
-        if (sessionId) {
-          addMessage(sessionId, { role: "user", content: transcript });
-          addMessage(sessionId, { role: "assistant", content: directReply });
-        }
+        addHelixAskLegacyChatTurnMessages(addMessage, sessionId, {
+          userContent: transcript,
+          assistantContent: directReply,
+        });
         return;
       }
       if (!dispatchHint) {
@@ -25376,9 +25192,10 @@ export function HelixAskPill({
               HELIX_ASK_DURABLE_TRANSCRIPT_LIMIT,
             ),
           );
-          if (sessionId) {
-            addMessage(sessionId, { role: "assistant", content: responseText });
-          }
+          addHelixAskLegacyChatMessage(addMessage, sessionId, {
+            role: "assistant",
+            content: responseText,
+          });
         }
       } finally {
         if (askTurnWatchdogId !== null) {
@@ -25652,8 +25469,10 @@ export function HelixAskPill({
         askDraftRef.current = "";
         if (sessionId) {
           setActive(sessionId);
-          addMessage(sessionId, { role: "user", content: trimmed });
-          addMessage(sessionId, { role: "assistant", content: overviewText });
+          addHelixAskLegacyChatTurnMessages(addMessage, sessionId, {
+            userContent: trimmed,
+            assistantContent: overviewText,
+          });
         }
         addHelixTimelineEntry({
           type: "conversation_brief",
@@ -25828,8 +25647,10 @@ export function HelixAskPill({
             );
             if (routerSessionId) {
               setActive(routerSessionId);
-              addMessage(routerSessionId, { role: "user", content: trimmed });
-              addMessage(routerSessionId, { role: "assistant", content: clarifyText });
+              addHelixAskLegacyChatTurnMessages(addMessage, routerSessionId, {
+                userContent: trimmed,
+                assistantContent: clarifyText,
+              });
             }
             addHelixTimelineEntry({
               type: "conversation_brief",
@@ -25943,7 +25764,10 @@ export function HelixAskPill({
           const sessionId = getHelixAskSessionId();
           if (sessionId) {
             setActive(sessionId);
-            addMessage(sessionId, { role: "user", content: trimmed });
+            addHelixAskLegacyChatMessage(addMessage, sessionId, {
+              role: "user",
+              content: trimmed,
+            });
             userMessageCommitted = true;
           }
           setAskStatus(getWorkstationExecutingStatusText(typedPromptLanguageTag));
@@ -26004,9 +25828,10 @@ export function HelixAskPill({
                 HELIX_ASK_DURABLE_TRANSCRIPT_LIMIT,
               ),
             );
-            if (sessionId) {
-              addMessage(sessionId, { role: "assistant", content: responseText });
-            }
+            addHelixAskLegacyChatMessage(addMessage, sessionId, {
+              role: "assistant",
+              content: responseText,
+            });
             return;
           }
           addHelixTimelineEntry({
@@ -26033,9 +25858,10 @@ export function HelixAskPill({
             }),
           );
           reasoningPlanPreEmitted = true;
-          if (sessionId) {
-            addMessage(sessionId, { role: "assistant", content: resolvedDispatchPlan.observer_ack });
-          }
+          addHelixAskLegacyChatMessage(addMessage, sessionId, {
+            role: "assistant",
+            content: resolvedDispatchPlan.observer_ack,
+          });
         }
         patchHelixTimelineEntry(stagedWorkstationIntentEntry.id, {
           status: "suppressed",
@@ -26285,7 +26111,11 @@ export function HelixAskPill({
       if (sessionId) {
         setActive(sessionId);
         if (!userMessageCommitted) {
-          addMessage(sessionId, { role: "user", content: trimmed, traceId });
+          addHelixAskLegacyChatMessage(addMessage, sessionId, {
+            role: "user",
+            content: trimmed,
+            traceId,
+          });
         }
       }
 
@@ -26396,13 +26226,15 @@ export function HelixAskPill({
           let downgradedFromMode: AskLocalMode | undefined;
           if (useBackendAskTurnEntrypoint) {
             const askTurnPayload = {
-              sessionId: sessionId ?? undefined,
-              agentRuntime: selectedAgentRuntime,
-              traceId,
-              turnId: runAskTurnId,
-              maxTokens: HELIX_ASK_OUTPUT_TOKENS,
-              question: trimmed,
-              contextFiles: contextFilesForTurn,
+              ...buildHelixAskConsoleBackendTurnPayloadCore({
+                sessionId,
+                agentRuntime: selectedAgentRuntime,
+                traceId,
+                turnId: runAskTurnId,
+                maxTokens: HELIX_ASK_OUTPUT_TOKENS,
+                question: trimmed,
+                contextFiles: contextFilesForTurn,
+              }),
               responseLanguage: preferredResponseLanguage,
               preferredResponseLanguage: preferredResponseLanguage,
               lang_schema_version: "helix.lang.v1",
@@ -27462,9 +27294,11 @@ export function HelixAskPill({
               finalSource: "normal_reasoning",
             });
           }
-          if (sessionId) {
-            addMessage(sessionId, { role: "assistant", content: responseText, traceId });
-          }
+          addHelixAskLegacyChatMessage(addMessage, sessionId, {
+            role: "assistant",
+            content: responseText,
+            traceId,
+          });
           if (manualAttempt) {
             const detailMode =
               responseMode === "observe" || responseMode === "act" || responseMode === "verify"
@@ -28083,7 +27917,6 @@ export function HelixAskPill({
         const stripped = stripContextCapsuleTokensFromText(entry);
         return stripped || entry.trim();
       });
-      const singleEntry = normalizedEntries.length === 1 ? normalizedEntries[0] : null;
       const asksForPastedTextResumeFrame = normalizedEntries.some((entry) =>
         HELIX_ASK_PASTED_TEXT_RESUME_RECALL_PROMPT_PATTERN.test(entry.trim()),
       );
@@ -28100,8 +27933,19 @@ export function HelixAskPill({
             extractLatestHelixAskContextCompactionResumeFrameFromReplies(askReplies) ??
             readStoredHelixAskContextCompactionResumeFrame()
         : null;
-      const shouldQueueForAskHandoff =
-        askBusy || compactionPausePending || Boolean(asksForPastedTextResumeFrame && latestContextCompactionResumeFrameForSubmit);
+      const submitAdmission = buildHelixAskSubmitAdmission({
+        entries: normalizedEntries,
+        askBusy,
+        compactionPausePending,
+        hasPastedTextResumeFrameForSubmit: Boolean(
+          asksForPastedTextResumeFrame && latestContextCompactionResumeFrameForSubmit,
+        ),
+        attachmentKinds: askAttachmentsRef.current.map((attachment) => attachment.kind),
+        allEntriesArePastedTextResumeRecallPrompt: normalizedEntries.every((entry) =>
+          isHelixAskPastedTextResumeRecallPrompt(entry),
+        ),
+      });
+      const singleEntry = submitAdmission.singleEntry;
       const submitTurnId = pendingWorkstationUserInputRef.current?.turn_id ?? `submit:${crypto.randomUUID()}`;
       if (singleEntry) {
         cancelPendingWorkstationRequestForTurnTransition({
@@ -28157,7 +28001,10 @@ export function HelixAskPill({
         const sessionId = getHelixAskSessionId();
         if (sessionId) {
           setActive(sessionId);
-          addMessage(sessionId, { role: "user", content: normalizedEntries[0] ?? entries[0] });
+          addHelixAskLegacyChatMessage(addMessage, sessionId, {
+            role: "user",
+            content: normalizedEntries[0] ?? entries[0],
+          });
         }
         if (panelDef) {
           openPanelById(panelCommand);
@@ -28170,27 +28017,24 @@ export function HelixAskPill({
               HELIX_ASK_DURABLE_TRANSCRIPT_LIMIT,
             ),
           );
-          if (sessionId) {
-            addMessage(sessionId, { role: "assistant", content: responseText });
-          }
+          addHelixAskLegacyChatMessage(addMessage, sessionId, {
+            role: "assistant",
+            content: responseText,
+          });
         } else {
           setAskError("Panel not found.");
-          if (sessionId) {
-            addMessage(sessionId, { role: "assistant", content: "Error: Panel not found." });
-          }
+          addHelixAskLegacyChatMessage(addMessage, sessionId, {
+            role: "assistant",
+            content: "Error: Panel not found.",
+          });
         }
         return;
       }
-      const shouldReleaseConsumedPastedTextAttachmentForResume =
-        compactionPausePending &&
-        askAttachmentsRef.current.length > 0 &&
-        askAttachmentsRef.current.every((attachment) => attachment.kind === "text") &&
-        normalizedEntries.every((entry) => isHelixAskPastedTextResumeRecallPrompt(entry));
-      if (shouldQueueForAskHandoff && askAttachmentsRef.current.length > 0 && !shouldReleaseConsumedPastedTextAttachmentForResume) {
+      if (submitAdmission.shouldBlockQueuedAttachments) {
         setAskError("Wait for the current Helix Ask turn before sending attachments.");
         return;
       }
-      if (shouldReleaseConsumedPastedTextAttachmentForResume) {
+      if (submitAdmission.shouldReleaseConsumedPastedTextAttachmentForResume) {
         clearAskAttachments();
       }
       if (askInputRef.current) {
@@ -28199,7 +28043,7 @@ export function HelixAskPill({
       }
       askDraftRef.current = "";
       setContextCapsuleDetectedId(null);
-      if (shouldQueueForAskHandoff) {
+      if (submitAdmission.shouldQueueForAskHandoff) {
         const contextResumeFrameForQueuedTurn = latestContextCompactionResumeFrameForSubmit;
         setAskQueue((prev) => {
           const combined = [
@@ -28208,7 +28052,7 @@ export function HelixAskPill({
               buildQueuedAskTurn({
                 question: entry,
                 capsuleIds: selectedCapsuleIds,
-                reason: compactionPausePending ? "compaction_pause" : "busy",
+                reason: submitAdmission.queueReason ?? "busy",
                 contextResumeFrame: contextResumeFrameForQueuedTurn,
               }),
             ),
@@ -28217,9 +28061,8 @@ export function HelixAskPill({
         });
         return;
       }
-      const [firstRaw, ...restRaw] = normalizedEntries;
-      let first = firstRaw?.trim() || normalizedEntries[0] || entries[0];
-      const rest = restRaw.map((entry) => entry.trim()).filter(Boolean);
+      let first = submitAdmission.firstEntry || normalizedEntries[0] || entries[0];
+      const rest = submitAdmission.restEntries;
       if (rest.length > 0) {
         setAskQueue((prev) => {
           const combined = [
@@ -28497,15 +28340,23 @@ export function HelixAskPill({
     visualSituationSourceStatus,
     voiceRetainedTranscriptionRetry,
   ]);
-  const inputPlaceholder = placeholder ?? "Ask anything about this system";
+  const composerViewModel = useMemo(
+    () =>
+      buildHelixAskComposerViewModel({
+        busy: askBusy,
+        placeholder,
+      }),
+    [askBusy, placeholder],
+  );
+  const inputPlaceholder = composerViewModel.inputPlaceholder;
   const replyListClassNameResolved =
     replyListClassName ??
     (layoutVariant === "dock"
-      ? "mt-4 min-h-0 flex-1 space-y-5 overflow-y-auto pr-2"
-      : "mt-4 max-h-[52vh] space-y-5 overflow-y-auto pr-2");
+      ? "relative z-10 mt-4 min-h-0 flex-1 space-y-5 overflow-y-auto pr-2"
+      : "relative z-10 mt-4 max-h-[52vh] space-y-5 overflow-y-auto pr-2");
   const chronologicalAskReplies = chronologicalAskRepliesForTranscript;
   const transcriptLatestAskReplyId = chronologicalAskReplies.at(-1)?.id ?? latestAskReplyId;
-  const currentPlaceholder = askBusy ? "Add another question..." : inputPlaceholder;
+  const currentPlaceholder = composerViewModel.currentPlaceholder;
   const voiceInputStatusLabel = buildVoiceInputStatusLabel(
     micArmState,
     voiceInputState,
@@ -29552,20 +29403,24 @@ export function HelixAskPill({
                   </button>
                   <button
                     data-helix-ask-action-item="true"
-                    aria-label={askBusy ? "Stop generation" : "Submit prompt"}
-                    title={askBusy ? "Stop generation" : "Submit prompt"}
+                    aria-label={composerViewModel.submitAriaLabel}
+                    title={composerViewModel.submitTitle}
                     className="inline-flex h-10 w-10 shrink-0 snap-center items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-100 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60"
                     onClick={
-                      askBusy
+                      composerViewModel.submitMode === "stop"
                         ? () => {
                             triggerAskActionHaptic();
                             handleStop();
                           }
                         : () => triggerAskActionHaptic()
                     }
-                    type={askBusy ? "button" : "submit"}
+                    type={composerViewModel.submitButtonType}
                   >
-                    {askBusy ? <Square className="h-4 w-4" /> : <Search className="h-4 w-4" />}
+                    {composerViewModel.submitIcon === "square" ? (
+                      <Square className="h-4 w-4" />
+                    ) : (
+                      <Search className="h-4 w-4" />
+                    )}
                   </button>
                   </div>
                   <button
@@ -29583,18 +29438,16 @@ export function HelixAskPill({
                       aria-label="Ask agent runtime"
                       className="absolute right-10 top-12 z-30 min-w-52 rounded-lg border border-white/10 bg-slate-950/95 p-1.5 text-xs text-slate-100 shadow-[0_18px_48px_rgba(0,0,0,0.45)] backdrop-blur"
                     >
-                      {agentRuntimeProviders.map((provider) => {
-                        const selected = provider.id === selectedAgentRuntime;
-                        const shortLabel = formatHelixAgentRuntimeShortLabel(provider);
+                      {agentRuntimePickerModel.items.map((provider) => {
                         return (
                           <button
                             key={provider.id}
                             type="button"
                             role="menuitemradio"
-                            aria-checked={selected}
+                            aria-checked={provider.selected}
                             disabled={!provider.enabled}
                             className={`flex w-full items-center justify-between gap-3 rounded-md px-2.5 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 ${
-                              selected
+                              provider.selected
                                 ? "bg-cyan-400/15 text-cyan-100"
                                 : provider.enabled
                                   ? "text-slate-100 hover:bg-white/10"
@@ -29612,14 +29465,14 @@ export function HelixAskPill({
                           >
                             <span>
                               <span className="block text-[11px] font-semibold uppercase tracking-[0.12em]">
-                                {shortLabel}
+                                {provider.shortLabel}
                               </span>
                               <span className="mt-0.5 block text-[10px] text-slate-400">
                                 {provider.label}
                               </span>
                             </span>
                             <span className="text-[9px] uppercase tracking-[0.14em] text-slate-400">
-                              {provider.enabled ? (provider.experimental ? "exp" : "on") : "off"}
+                              {provider.statusLabel}
                             </span>
                           </button>
                         );
@@ -29631,7 +29484,7 @@ export function HelixAskPill({
               <textarea
                 aria-label="Ask Helix"
                 aria-disabled={askBusy}
-                className="helix-ask-textarea w-full min-w-0 resize-none bg-transparent text-[16px] leading-6 text-slate-100 placeholder:text-slate-500 focus:outline-none sm:text-sm"
+                className={composerViewModel.textareaClassName}
                 ref={askInputRef}
                 placeholder={currentPlaceholder}
                 rows={1}
@@ -30402,14 +30255,25 @@ export function HelixAskPill({
             const replyConvergence = resolveReplyConvergenceSnapshot(reply, replyEvents);
             const isLatestReply = reply.id === transcriptLatestAskReplyId;
             const transcriptTerminal = resolveHelixAskVisibleTerminal(reply, reply.content);
-            const finalAnswerSourceLabel = readHelixAskFinalAnswerSourceLabel(
+            const rawFinalAnswerSourceLabel = readHelixAskFinalAnswerSourceLabel(
               replyDebugRecord,
               agentLoopAudit,
               runtimeSummary,
               reply,
             ) ?? visibleResolvedTurn.primary_source_label;
-            const finalAnswerPresentation = resolveHelixAskFinalAnswerPresentation(finalAnswerSourceLabel);
             const turnTranscriptRows = buildHelixTurnTranscriptRows(reply);
+            const finalAnswerSourceLabel = resolveHelixAskConsoleFinalAnswerSourceLabel({
+              rawFinalAnswerSourceLabel,
+              turnTranscriptRows,
+              options: {
+                isInvalidTerminalAnswerText,
+                excludedFinalTexts: [
+                  HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT,
+                  HELIX_ASK_BACKEND_DEBUG_MATERIALIZATION_TEXT,
+                ],
+              },
+            });
+            const finalAnswerPresentation = resolveHelixAskFinalAnswerPresentation(finalAnswerSourceLabel);
             const stagePlayChatLedgerEvents = buildStagePlayChatLedgerEvents(reply);
             const replyCausalTurnTimeline = readHelixCausalTurnTimeline(reply);
             const replyReasoningTheaterState = coerceReasoningTheaterStateV1(reply.debug?.reasoning_theater_state_v1);
@@ -30453,6 +30317,7 @@ export function HelixAskPill({
               : chosenVisibleFinalText;
             const actualAgentProviderLabel = resolveHelixAskActualAgentProviderLabel(reply, agentRuntimeProviders);
             const transcriptAnswer = finalAnswerRawText;
+            const actualAgentModelLabel = resolveHelixAskModelUsageLabel(reply);
             const terminalMismatchForReply = Boolean(
               transcriptTerminal.backendTerminalText &&
                 transcriptTerminal.text &&
@@ -30465,10 +30330,11 @@ export function HelixAskPill({
               finalAnswerPresentation,
             });
             const mailLoopRows = collectHelixMailLoopTranscriptRows(reply);
+            const turnTranscriptRowsForStream = selectHelixAskConsoleTurnTranscriptRowsForStream(turnTranscriptRows);
             const turnStreamRows = buildHelixContinuousTurnStreamRows({
               replyId: reply.id,
               question: reply.question,
-              turnTranscriptRows,
+              turnTranscriptRows: turnTranscriptRowsForStream,
               mailLoopRows,
               stagePlayEvents: stagePlayChatLedgerEvents,
               liveAnswerTurnBridge,
@@ -30477,16 +30343,15 @@ export function HelixAskPill({
               finalAnswerSourceLabel: finalAnswerPresentation.sourceLabel || finalAnswerSourceLabel || transcriptTerminal.source,
               terminalMismatch: terminalMismatchForReply,
             });
-            const latestTurnTestId = isLatestReply ? "helix-ask-latest-turn" : undefined;
-            const latestQuestionTestId = isLatestReply ? "helix-ask-latest-question" : undefined;
-            const latestWorkLogTestId = isLatestReply ? "helix-ask-latest-work-log" : undefined;
-            const latestFinalAnswerTestId = isLatestReply ? "helix-ask-latest-final-answer" : undefined;
-            const latestCopyFinalTestId = isLatestReply ? "helix-ask-latest-copy-final" : undefined;
-            const latestDebugCopyTestId = isLatestReply ? "helix-ask-latest-debug-copy" : undefined;
+            const latestTurnBinding = buildHelixAskLatestTurnBinding({
+              replyId: reply.id,
+              latestReplyId: transcriptLatestAskReplyId,
+              finalAnswerText: finalAnswerRawText,
+            });
             const replyCard = (
               <div
                   className={`relative px-1 py-1 text-sm text-slate-100 ${isLatestReply ? "helix-ask-turn-enter" : ""}`}
-                  data-testid={latestTurnTestId}
+                  data-testid={latestTurnBinding.turnTestId}
                 >
                   <div
                     className={`pointer-events-none absolute inset-0 opacity-0 ${moodPalette.replyTint}`}
@@ -30517,7 +30382,7 @@ export function HelixAskPill({
                     <div
                       className="px-1 py-1 text-xs text-slate-100"
                       aria-label="Turn stream"
-                      data-testid={latestWorkLogTestId}
+                      data-testid={latestTurnBinding.workLogTestId}
                       data-latest-turn-stream={isLatestReply ? "true" : undefined}
                       data-turn-stream-lines={turnStreamRows.length}
                       data-stage-play-events={stagePlayChatLedgerEvents.length}
@@ -30538,9 +30403,9 @@ export function HelixAskPill({
                               style={isFinalRow ? replyBattleAnswerTint?.style : undefined}
                               data-testid={
                                 isQuestionRow
-                                  ? latestQuestionTestId
+                                  ? latestTurnBinding.questionTestId
                                   : isFinalRow
-                                    ? latestFinalAnswerTestId
+                                    ? latestTurnBinding.finalAnswerTestId
                                     : isLatestReply
                                       ? "helix-ask-latest-turn-stream-row"
                                       : undefined
@@ -30601,6 +30466,7 @@ export function HelixAskPill({
                                 <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-slate-400/80">
                                   {row.meta}
                                   {isFinalRow && actualAgentProviderLabel ? ` | ${actualAgentProviderLabel}` : ""}
+                                  {isFinalRow && actualAgentModelLabel ? ` | ${actualAgentModelLabel}` : ""}
                                   {row.evidenceRefs.length > 0 ? ` | refs ${row.evidenceRefs.length}` : ""}
                                 </p>
                                 {row.evidenceRefs.length > 0 ? (
@@ -30631,54 +30497,29 @@ export function HelixAskPill({
                                 ) : null}
                                 {isFinalRow ? (
                                   <>
-                                    <div className="mt-2 flex max-w-fit items-center gap-1 opacity-100 transition-opacity duration-150">
-                                      <button
-                                        type="button"
-                                        onClick={() => void handleCopyReply(reply)}
-                                        className="rounded-full border border-white/10 bg-white/5 p-1.5 text-slate-400 transition hover:border-cyan-300/40 hover:bg-cyan-400/10 hover:text-cyan-100"
-                                        aria-label="Copy response"
-                                        title="Copy response"
-                                        data-testid={latestCopyFinalTestId}
-                                      >
-                                        <Copy className="h-3.5 w-3.5" aria-hidden />
-                                      </button>
-                                      {userSettings.showHelixAskDebug ? (
-                                        <button
-                                          type="button"
-                                          onClick={(event) =>
-                                            void handleCopyReplyMasterDebug(
-                                              reply,
-                                              replyMasterEventClockPayload,
-                                              event.currentTarget,
-                                            )
-                                          }
-                                          disabled={typeof window === "undefined"}
-                                          className="rounded-full border border-white/10 bg-white/5 p-1.5 text-slate-400 transition hover:border-cyan-300/40 hover:bg-cyan-400/10 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-50"
-                                          aria-label="Debug copy"
-                                          title="Unified Debug Copy"
-                                          data-testid={latestDebugCopyTestId}
-                                        >
-                                          <Bug className="h-3.5 w-3.5" aria-hidden />
-                                        </button>
-                                      ) : null}
-                                      <button
-                                        type="button"
-                                        onClick={() => void handleReadAloud(reply)}
-                                        className={`rounded-full border p-1.5 transition ${
-                                          shouldStopReadAloudOnButtonPress(readAloudByReply[reply.id] ?? "idle")
-                                            ? "border-amber-300/40 bg-amber-400/10 text-amber-100 hover:bg-amber-400/20"
-                                            : "border-white/10 bg-white/5 text-slate-400 hover:border-cyan-300/40 hover:bg-cyan-400/10 hover:text-cyan-100"
-                                        }`}
-                                        aria-label={
-                                          shouldStopReadAloudOnButtonPress(readAloudByReply[reply.id] ?? "idle")
-                                            ? "Stop reading"
-                                            : "Read aloud"
-                                        }
-                                        title={formatReadAloudButtonLabel(readAloudByReply[reply.id] ?? "idle")}
-                                      >
-                                        <Volume2 className="h-3.5 w-3.5" aria-hidden />
-                                      </button>
-                                    </div>
+                                    <HelixAskTurnControls
+                                      onCopyFinal={() => void handleCopyReply(reply, latestTurnBinding.finalAnswerText)}
+                                      onDebugCopy={(event) =>
+                                        void handleCopyReplyMasterDebug(
+                                          reply,
+                                          replyMasterEventClockPayload,
+                                          event.currentTarget,
+                                        )
+                                      }
+                                      onReadAloud={() => void handleReadAloud(reply, latestTurnBinding.finalAnswerText)}
+                                      showDebugCopy={userSettings.showHelixAskDebug}
+                                      debugCopyDisabled={typeof window === "undefined"}
+                                      copyFinalTestId={latestTurnBinding.copyFinalTestId}
+                                      debugCopyTestId={latestTurnBinding.debugCopyTestId}
+                                      readAloudTestId={latestTurnBinding.readAloudTestId}
+                                      readAloudActive={shouldStopReadAloudOnButtonPress(readAloudByReply[reply.id] ?? "idle")}
+                                      readAloudAriaLabel={
+                                        shouldStopReadAloudOnButtonPress(readAloudByReply[reply.id] ?? "idle")
+                                          ? "Stop reading"
+                                          : "Read aloud"
+                                      }
+                                      readAloudTitle={formatReadAloudButtonLabel(readAloudByReply[reply.id] ?? "idle")}
+                                    />
                                     {(() => {
                                       const trace = (replyDebugRecord as Record<string, any> | null | undefined)?.workstation_reasoning_trace;
                                       if (!trace || typeof trace !== "object") return null;
@@ -30774,44 +30615,13 @@ export function HelixAskPill({
           </div>
         ) : null}
         {debugExportDrawer ? (
-          <section
-            className="mt-3 rounded-lg border border-cyan-300/30 bg-slate-950/95 p-3 text-xs text-slate-100"
-            aria-label="Debug Export drawer"
-            data-testid="helix-debug-export-drawer"
-          >
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="text-[10px] uppercase tracking-[0.2em] text-cyan-200">Debug Export</p>
-                <p className="mt-1 text-[10px] text-slate-400">
-                  Clipboard readback: {debugExportDrawer.result.readback_match} | hash {debugExportDrawer.payloadHash}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <a
-                  href={`data:application/json;charset=utf-8,${encodeURIComponent(debugExportDrawer.payload)}`}
-                  download={`helix-debug-${debugExportDrawer.replyId}.json`}
-                  className="rounded border border-cyan-300/40 bg-cyan-400/15 px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-cyan-100"
-                >
-                  Download JSON
-                </a>
-                <button
-                  type="button"
-                  onClick={() => setDebugExportDrawer(null)}
-                  className="rounded border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-slate-300"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-            <textarea
-              readOnly
-              value={debugExportDrawer.payload}
-              className="mt-3 h-48 w-full resize-y rounded border border-slate-700 bg-black/40 p-2 font-mono text-[10px] leading-4 text-cyan-50"
-              aria-label="Debug Export JSON"
-              data-testid="helix-debug-export-json"
-              onFocus={(event) => event.currentTarget.select()}
-            />
-          </section>
+          <HelixAskDebugDrawer
+            payload={debugExportDrawer.payload}
+            payloadHash={debugExportDrawer.payloadHash}
+            readbackMatch={debugExportDrawer.result.readback_match}
+            replyId={debugExportDrawer.replyId}
+            onClose={() => setDebugExportDrawer(null)}
+          />
         ) : null}
       </div>
     </HelixAskErrorBoundary>

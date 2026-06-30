@@ -7,7 +7,7 @@ import { HelixWorkstationShell } from "@/components/workstation/HelixWorkstation
 import { Dialog } from "@/components/ui/dialog";
 import { HelixSettingsDialogContent } from "@/components/HelixSettingsDialogContent";
 import SplashCursor from "@/components/SplashCursor";
-import { HelixAskPill } from "@/components/helix/HelixAskPill";
+import { HelixAskConsole } from "@/components/helix/ask-console";
 import {
   PROFILE_STORAGE_KEY,
   useHelixStartSettings,
@@ -897,7 +897,7 @@ export default function DesktopPage({
         ) : (
           <>
             <div className="pointer-events-none absolute inset-x-0 top-[18%] z-10 flex flex-col items-center px-6">
-              <HelixAskPill
+              <HelixAskConsole
                 className="pointer-events-auto w-full"
                 contextId={HELIX_ASK_CONTEXT_ID.desktop}
                 maxWidthClassName="max-w-4xl mx-auto"

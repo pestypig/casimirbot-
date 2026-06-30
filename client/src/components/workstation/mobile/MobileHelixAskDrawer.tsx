@@ -1,7 +1,7 @@
 import { useMemo, useRef } from "react";
 import { MessageCircle } from "lucide-react";
 import type { PanelDefinition } from "@/lib/desktop/panelRegistry";
-import { HelixAskPill } from "@/components/helix/HelixAskPill";
+import { HelixAskConsole } from "@/components/helix/ask-console";
 import { HELIX_ASK_CONTEXT_ID } from "@/lib/helix/voice-surface-contract";
 import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
 
@@ -98,7 +98,7 @@ export function MobileHelixAskDrawer({
       </div>
 
       <div className="min-h-0 flex-1 overflow-hidden px-3 pb-3">
-        <HelixAskPill
+        <HelixAskConsole
           className={`w-full ${drawer.open ? "flex h-full min-h-0 flex-col" : "h-0 min-h-0 overflow-hidden opacity-0"}`}
           contextId={HELIX_ASK_CONTEXT_ID.mobile}
           maxWidthClassName="max-w-none"

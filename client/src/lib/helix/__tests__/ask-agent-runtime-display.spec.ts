@@ -4,6 +4,7 @@ import {
   formatHelixAgentRuntimeShortLabel,
   normalizeHelixAgentProvidersResponse,
   resolveHelixAskActualAgentProviderLabel,
+  resolveHelixAskModelUsageLabel,
   resolveNextSelectableHelixAgentRuntime,
   resolveSelectedHelixAgentRuntime,
 } from "@/lib/helix/ask-agent-runtime-display";
@@ -148,5 +149,73 @@ describe("Helix Ask agent runtime display", () => {
         },
       }),
     ).toBeNull();
+  });
+
+  it("labels configured model metadata from response/debug fields and Codex args", () => {
+    expect(
+      resolveHelixAskModelUsageLabel({
+        debug: {
+          llm_http_model_configured: "gpt-5",
+        },
+      }),
+    ).toBe("Model: gpt-5");
+    expect(
+      resolveHelixAskModelUsageLabel({
+        codex_args: ["--model", "gpt-5-codex"],
+      }),
+    ).toBe("Model: gpt-5-codex");
+    expect(
+      resolveHelixAskModelUsageLabel({
+        debug: {
+          selected_agent_provider: {
+            id: "codex",
+            label: "Codex Workstation Mode",
+            model: "gpt-5-codex",
+          },
+        },
+      }),
+    ).toBe("Model: gpt-5-codex");
+  });
+
+  it("labels models from Codex agent runtime loop metadata", () => {
+    expect(
+      resolveHelixAskModelUsageLabel({
+        debug: {
+          agent_runtime_loop: {
+            schema: "helix.agent_runtime_loop.v1",
+            iterations: [
+              {
+                chosen_capability: "scientific-calculator.solve_expression",
+                llm_model: "gpt-5-codex",
+              },
+            ],
+          },
+        },
+      }),
+    ).toBe("Model: gpt-5-codex");
+    expect(
+      resolveHelixAskModelUsageLabel({
+        debug: {
+          agent_runtime_loop: {
+            codex_args: ["--sandbox", "read-only", "--model=gpt-5-codex"],
+          },
+        },
+      }),
+    ).toBe("Model: gpt-5-codex");
+  });
+
+  it("shows an honest Codex default label when the provider omits concrete model metadata", () => {
+    expect(
+      resolveHelixAskModelUsageLabel({
+        debug: {
+          agent_runtime: "codex",
+          selected_agent_provider: {
+            id: "codex",
+            label: "Codex Workstation Mode",
+          },
+          codex_args: ["exec", "--sandbox", "read-only"],
+        },
+      }),
+    ).toBe("Model: Codex default (not reported)");
   });
 });

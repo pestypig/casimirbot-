@@ -1135,11 +1135,30 @@ const applyWorkstationContextAuthorityGuard = (input: {
 const gatewayCallsSucceeded = (gatewayCallResults: HelixWorkstationGatewayCallResult[]): boolean =>
   gatewayCallResults.length === 0 || gatewayCallResults.every((result) => result.ok === true);
 
-const applyGatewayFailureAuthorityGuard = (input: {
+const hasLaterSuccessfulCalculatorSolve = (
+  gatewayCallResults: HelixWorkstationGatewayCallResult[],
+  failedIndex: number,
+): boolean => {
+  const failed = gatewayCallResults[failedIndex];
+  const failedCapability =
+    failed?.gateway_admission.requested_capability ||
+    failed?.capability_id;
+  if (failedCapability !== CALCULATOR_SOLVE_EXPRESSION_CAPABILITY) return false;
+  return gatewayCallResults.slice(failedIndex + 1).some((candidate) => {
+    const candidateCapability =
+      candidate.gateway_admission.requested_capability ||
+      candidate.capability_id;
+    return candidate.ok === true && candidateCapability === CALCULATOR_SOLVE_EXPRESSION_CAPABILITY;
+  });
+};
+
+export const applyGatewayFailureAuthorityGuard = (input: {
   text: string;
   gatewayCallResults: HelixWorkstationGatewayCallResult[];
 }): string => {
-  const failed = input.gatewayCallResults.filter((result) => result.ok !== true);
+  const failed = input.gatewayCallResults.filter((result, index) =>
+    result.ok !== true && !hasLaterSuccessfulCalculatorSolve(input.gatewayCallResults, index),
+  );
   if (failed.length === 0) return input.text;
   const descriptions = failed
     .slice(0, 3)

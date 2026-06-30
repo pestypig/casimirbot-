@@ -3,6 +3,7 @@ import {
   buildVisibleResolvedTurn,
   isInvalidTerminalAnswerText,
   normalizeTerminalAnswerText,
+  readHelixAskFinalAnswerSourceLabel,
   readHelixTopLevelPendingServerRequest,
   renderLiveAnswerEnvironmentContextPackAnswer,
   resolveHelixAskVisibleJobReadyLinks,
@@ -106,6 +107,78 @@ describe("Helix Ask terminal projection", () => {
     expect(visible.primary_source_label).not.toBe("typed failure");
     expect(visible.terminal_error_code).toBeNull();
     expect(visible.selected_final_answer).toBe("Observed expression: 8*9\nResult: 72");
+  });
+
+  it("lets structured workstation gateway success outrank stale typed-failure labels", () => {
+    const reply = {
+      id: "reply-codex-workstation-live-stale-failure",
+      turn_id: "turn-codex-workstation-live-stale-failure",
+      ok: true,
+      content: "Observed expression: `8*9`\n\nResult: `72`",
+      final_answer_source: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      debug: {
+        final_answer_source: "typed_failure",
+        terminal_artifact_kind: "typed_failure",
+        workstation_gateway_call_results: [
+          {
+            ok: false,
+            capability_id: "scientific-calculator.solve_expression",
+            error: "expression_evaluation_failed",
+            observation_packet: {
+              status: "failed",
+            },
+          },
+          {
+            ok: true,
+            capability_id: "scientific-calculator.solve_expression",
+            observation: {
+              expression: "8*9",
+              result: "72",
+            },
+            observation_packet: {
+              capability_key: "scientific-calculator.solve_expression",
+              status: "succeeded",
+              observation_summary: "8*9 = 72",
+            },
+          },
+        ],
+      },
+    };
+
+    const visible = buildVisibleResolvedTurn(reply);
+
+    expect(visible.primary_terminal_label).toBe("final_answer");
+    expect(visible.primary_source_label).toBe("workstation tool evaluation");
+    expect(visible.terminal_error_code).toBeNull();
+    expect(visible.selected_final_answer).toBe("Observed expression: `8*9`\n\nResult: `72`");
+    expect(readHelixAskFinalAnswerSourceLabel(reply)).toBe("workstation tool evaluation");
+    expect(readHelixAskFinalAnswerSourceLabel(reply.debug, reply)).toBe("workstation tool evaluation");
+  });
+
+  it("keeps typed failure when workstation gateway success has no usable final answer", () => {
+    const visible = buildVisibleResolvedTurn({
+      id: "reply-codex-workstation-no-final",
+      ok: true,
+      content: "Backend Ask was reached, but no server terminal artifact or debug artifact was materialized for this turn.",
+      final_answer_source: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      debug: {
+        workstation_gateway_call_results: [
+          {
+            ok: true,
+            capability_id: "scientific-calculator.solve_expression",
+            observation_packet: {
+              status: "succeeded",
+              observation_summary: "8*9 = 72",
+            },
+          },
+        ],
+      },
+    });
+
+    expect(visible.primary_source_label).toBe("typed failure");
+    expect(visible.terminal_error_code).toBeTruthy();
   });
 
   it("projects backend-selected quoted tool-name explanations instead of stale retrieval fallbacks", () => {

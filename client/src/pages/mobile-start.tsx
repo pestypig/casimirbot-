@@ -18,7 +18,7 @@ import { recordPanelActivity } from "@/lib/essence/activityReporter";
 import { SurfaceStack } from "@/components/surface/SurfaceStack";
 import { generateSurfaceRecipe } from "@/lib/surfacekit/generateSurface";
 import { ProcessGraphSurfaceLayer } from "@/components/workstation/ProcessGraphSurfaceLayer";
-import { HelixAskPill } from "@/components/helix/HelixAskPill";
+import { HelixAskConsole } from "@/components/helix/ask-console";
 import { useLumaMoodTheme } from "@/lib/luma-mood-theme";
 import { Dialog } from "@/components/ui/dialog";
 import { HelixSettingsDialogContent } from "@/components/HelixSettingsDialogContent";
@@ -672,7 +672,7 @@ export default function MobileStartPage() {
               paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 24px)",
             }}
           >
-            <HelixAskPill
+            <HelixAskConsole
               className="w-full max-w-md"
               contextId={HELIX_ASK_CONTEXT_ID.mobile}
               maxWidthClassName="max-w-md"
