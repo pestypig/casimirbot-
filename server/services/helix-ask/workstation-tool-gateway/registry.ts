@@ -662,6 +662,24 @@ const buildReadableSurfacePayload = (input: {
   const requestedSurface = cleanString(args.surface ?? args.surface_id ?? args.surfaceId ?? args.label);
   const panelId = cleanString(args.panel_id ?? args.panelId, input.fallbackPanelId);
   const actionId = cleanString(args.action_id ?? args.actionId, input.fallbackActionId);
+  const selectionRef = optionalString(
+    args.selection_ref ??
+      args.selectionRef ??
+      args.narrator_source_id ??
+      args.narratorSourceId ??
+      args.source_id ??
+      args.sourceId,
+  );
+  const selectionKind = cleanString(args.selection_kind ?? args.selectionKind).toLowerCase();
+  const selectedOrHoveredRequested = Boolean(
+    args.selected_text ??
+      args.selectedText ??
+      args.hovered_text ??
+      args.hoveredText ??
+      /\b(?:selected|hovered|highlighted|narrator[-_\s]?source)\b/i.test(requestedSurface) ||
+      selectionKind === "selected" ||
+      selectionKind === "hovered",
+  );
   const sourceDocPath = readDocsActionPath(args.source_doc_path ?? args.sourceDocPath ?? args.path);
   const activeDocExcerpt = sourceDocPath ? readBoundedDocsExcerpt([sourceDocPath]) : null;
   const translationBlocks = readBoundedTranslationBlocks(args.translation_blocks ?? args.translationBlocks);
@@ -694,7 +712,9 @@ const buildReadableSurfacePayload = (input: {
         ? translatedText
         : readSurfaceTextFromArgs(args) ?? activeDocExcerpt?.excerpt ?? translatedText ?? visibleResult;
   const missingReason =
-    input.capabilityId === DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY && !surfaceText
+    input.capabilityId === DOCS_READ_VISIBLE_SURFACE_CAPABILITY && selectedOrHoveredRequested && !selectionRef
+      ? "registered_surface_ref_missing"
+      : input.capabilityId === DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY && !surfaceText
       ? "translation_surface_missing"
       : input.capabilityId === CALCULATOR_READ_VISIBLE_RESULT_CAPABILITY && !visibleResult
         ? "calculator_visible_result_missing"
@@ -722,6 +742,8 @@ const buildReadableSurfacePayload = (input: {
     source_refs: sourceRefs,
     line_refs: lineRefs,
     unit_refs: unitRefs,
+    selection_ref: selectionRef,
+    selection_kind: selectedOrHoveredRequested ? selectionKind || "selected_or_hovered" : null,
     source_doc_path: sourceDocPath ?? activeDocExcerpt?.path ?? null,
     source_excerpt_available: Boolean(activeDocExcerpt),
     translation: input.capabilityId === DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY
@@ -1039,6 +1061,10 @@ const makeReadableSurfaceManifest = (input: {
       visible_text: { type: "string" },
       selected_text: { type: "string" },
       hovered_text: { type: "string" },
+      selection_ref: { type: "string" },
+      selection_kind: { type: "string" },
+      narrator_source_id: { type: "string" },
+      source_id: { type: "string" },
       translated_text: { type: "string" },
       translation_blocks: { type: "array", items: { type: "object" } },
       missing_unit_info: { type: "array", items: { type: "string" } },
