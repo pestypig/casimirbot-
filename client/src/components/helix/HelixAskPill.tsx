@@ -326,11 +326,22 @@ import {
   isLikelyNearTurnContinuation,
   isLowInformationTailTranscript,
 } from "@/lib/helix/ask-voice-continuation-lexical";
+import {
+  isRetryableVoiceChunkSynthesisError,
+  isVoiceMemoryPressureError,
+  shouldRetryVoicePlaybackDirectAttempt,
+  shouldRetryVoicePlaybackWithDirectFallback,
+  shouldTreatVoicePlaybackErrorAsEnded,
+} from "@/lib/helix/ask-voice-playback-classification";
 export {
   extractLatestContinuationQuestionFocus,
   hasDanglingTurnTail,
+  isRetryableVoiceChunkSynthesisError,
   isLikelyNearTurnContinuation,
   isLowInformationTailTranscript,
+  shouldRetryVoicePlaybackDirectAttempt,
+  shouldRetryVoicePlaybackWithDirectFallback,
+  shouldTreatVoicePlaybackErrorAsEnded,
 };
 import {
   buildSpeakText,
