@@ -2505,6 +2505,47 @@ describe("Helix Ask agent provider selection", () => {
     )).toBe(true);
   });
 
+  it("authorizes no-tool Codex explanations for quoted or negated voice capability mentions", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT =
+      "`live_env.request_interim_voice_callout` is a voice request capability name. In this prompt it is text only, and I did not run or request a voice tool.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:codex-quoted-voice-no-tool-final",
+        agent_runtime: "codex",
+        question:
+          "The text says live_env.request_interim_voice_callout; explain that phrase as text only. Do not speak or run any voice tool.",
+      },
+      headers: {},
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.response_type).toBe("final_answer");
+    expect(result.final_status).toBe("completed");
+    expect(result.final_answer_source).toBe("agent_provider_terminal_candidate");
+    expect(result.terminal_artifact_kind).toBe("agent_provider_terminal_candidate");
+    expect(result.text).toContain("text only");
+    expect(result.text).toContain("did not run");
+    expect((result.debug as any)?.terminal_answer_authority).toMatchObject({
+      schema: "helix.turn_terminal_authority.v1",
+      final_answer_source: "agent_provider_terminal_candidate",
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      server_authoritative: true,
+      terminal_eligible: true,
+      assistant_answer: false,
+    });
+    expect((result.debug as any)?.terminal_authority_status).toBe("authorized_no_gateway_tool_required");
+    expect((result.debug as any)?.workstation_gateway_call_results).toEqual([]);
+    expect((result.debug as any)?.workstation_gateway_observation_packets).toEqual([]);
+    expect(result.turn_transcript_events?.some((event: any) =>
+      event.source_event_type === "action_request" &&
+      event.capability_id === "live_env.request_interim_voice_callout",
+    )).toBe(false);
+  });
+
   it("does not answer repository content when no repo search observation exists", async () => {
     process.env.CODEX_AGENT_FAKE_STDOUT = "The repo shows workstation_gateway is fully wired.";
     process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";

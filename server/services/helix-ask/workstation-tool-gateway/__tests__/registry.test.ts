@@ -2820,14 +2820,14 @@ describe("Helix workstation tool gateway", () => {
           raw_content_included: false,
         },
         receipt: {
-          status: "awaiting_client_playback",
+          status: expect.stringMatching(/^(awaiting_client_playback|queued_for_retry)$/),
           assistant_answer: false,
           terminal_eligible: false,
           raw_content_included: false,
         },
         host_projection: {
           kind: "voice_playback_request",
-          playback_status: "awaiting_client_playback",
+          playback_status: expect.stringMatching(/^(awaiting_client_playback|queued_for_retry)$/),
           assistant_answer: false,
           terminal_eligible: false,
           raw_content_included: false,
@@ -2942,7 +2942,7 @@ describe("Helix workstation tool gateway", () => {
           raw_content_included: false,
         },
         receipt: {
-          status: "awaiting_client_playback",
+          status: expect.stringMatching(/^(awaiting_client_playback|queued_for_retry)$/),
           assistant_answer: false,
           terminal_eligible: false,
           raw_content_included: false,

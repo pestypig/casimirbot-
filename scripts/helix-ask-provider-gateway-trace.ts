@@ -13,6 +13,9 @@ type Scenario = {
   expectedOk: boolean;
   expectedObservationSchema?: string;
   expectedError?: string;
+  mode?: "read" | "observe" | "act" | "verify";
+  expectedCallResultCount?: number;
+  expectedObservationPacketCount?: number;
 };
 
 const OUT_DIR = process.env.HELIX_ASK_PROVIDER_GATEWAY_TRACE_OUT ?? "artifacts/helix-ask-provider-gateway-trace";
@@ -34,6 +37,8 @@ const scenarios: Scenario[] = [
     args: { expression: "8 * 9" },
     expectedOk: true,
     expectedObservationSchema: "helix.calculator_solve_observation.v1",
+    expectedCallResultCount: 4,
+    expectedObservationPacketCount: 4,
   },
   {
     id: "repo_search",
@@ -50,9 +55,161 @@ const scenarios: Scenario[] = [
     expectedObservationSchema: "helix.docs_search_observation.v1",
   },
   {
+    id: "context_feed_trace_memory",
+    capabilityId: "live_env.query_trace_memory",
+    args: { source_id: "provider-gateway-trace-source", source_ref: "provider-gateway-trace-source", limit: 2 },
+    expectedOk: true,
+    expectedObservationSchema: "helix.live_environment_tool_observation.v1",
+  },
+  {
+    id: "context_feed_narrator_events",
+    capabilityId: "live_env.query_narrator_events",
+    args: { source_id: "provider-gateway-trace-source", source_ref: "provider-gateway-trace-source", limit: 2 },
+    expectedOk: true,
+    expectedObservationSchema: "helix.live_environment_tool_observation.v1",
+  },
+  {
+    id: "context_feed_audio_transcripts",
+    capabilityId: "live_env.query_audio_transcripts",
+    args: { source_id: "provider-gateway-trace-source", source_ref: "provider-gateway-trace-source", limit: 2 },
+    expectedOk: true,
+    expectedObservationSchema: "helix.live_environment_tool_observation.v1",
+  },
+  {
+    id: "context_feed_live_answer_state",
+    capabilityId: "live_env.query_live_answer_state",
+    args: { source_id: "provider-gateway-trace-source", source_ref: "provider-gateway-trace-source", limit: 2 },
+    expectedOk: true,
+    expectedObservationSchema: "helix.live_environment_tool_observation.v1",
+  },
+  {
+    id: "context_feed_route_evidence",
+    capabilityId: "live_env.query_route_evidence",
+    args: { source_id: "provider-gateway-trace-source", source_ref: "provider-gateway-trace-source", limit: 2 },
+    expectedOk: true,
+    expectedObservationSchema: "helix.live_environment_tool_observation.v1",
+  },
+  {
+    id: "source_health",
+    capabilityId: "live_env.query_source_health",
+    args: { source_id: "provider-gateway-trace-source", source_ref: "provider-gateway-trace-source", limit: 2 },
+    expectedOk: true,
+    expectedObservationSchema: "helix.live_environment_tool_observation.v1",
+  },
+  {
+    id: "loop_health",
+    capabilityId: "live_env.query_live_source_loop_health",
+    args: {
+      source_id: "provider-gateway-trace-source",
+      source_ref: "provider-gateway-trace-source",
+      expected_cadence_ms: 10000,
+    },
+    expectedOk: true,
+    expectedObservationSchema: "helix.live_environment_tool_observation.v1",
+  },
+  {
+    id: "live_source_state",
+    capabilityId: "live_env.query_live_source_quality",
+    args: { source_id: "provider-gateway-trace-source", source_ref: "provider-gateway-trace-source", limit: 2 },
+    expectedOk: true,
+    expectedObservationSchema: "helix.live_environment_tool_observation.v1",
+  },
+  {
+    id: "mailbox_read",
+    capabilityId: "live_env.check_live_source_mail",
+    args: {
+      source_id: "provider-gateway-trace-source",
+      source_ref: "provider-gateway-trace-source",
+      limit: 2,
+      read_only: true,
+    },
+    expectedOk: true,
+    expectedObservationSchema: "helix.live_environment_tool_observation.v1",
+  },
+  {
+    id: "interpreter_prediction_blocked",
+    capabilityId: "live_env.predict_live_source_immediate",
+    args: { source_id: "provider-gateway-trace-source", source_ref: "provider-gateway-trace-source", limit: 2 },
+    expectedOk: false,
+    expectedObservationSchema: "helix.live_environment_tool_observation.v1",
+  },
+  {
+    id: "stage_builder_read",
+    capabilityId: "live_env.describe_stage_builder",
+    args: { limit: 2 },
+    expectedOk: true,
+    expectedObservationSchema: "helix.live_environment_tool_observation.v1",
+  },
+  {
+    id: "micro_reasoner_presets",
+    capabilityId: "live_env.query_micro_reasoner_presets",
+    args: { source_id: "provider-gateway-trace-source", source_ref: "provider-gateway-trace-source", limit: 2 },
+    expectedOk: true,
+    expectedObservationSchema: "helix.live_environment_tool_observation.v1",
+  },
+  {
+    id: "micro_reasoner_test_prompt",
+    capabilityId: "live_env.test_micro_reasoner_prompt",
+    args: {
+      source_id: "provider-gateway-trace-source",
+      source_ref: "provider-gateway-trace-source",
+      role: "claim_extractor",
+      prompt: "Extract bounded claims from this provider gateway trace check.",
+    },
+    expectedOk: true,
+    expectedObservationSchema: "helix.live_environment_tool_observation.v1",
+  },
+  {
+    id: "visual_observer_profiles",
+    capabilityId: "live_env.query_visual_observer_profiles",
+    args: { source_id: "provider-gateway-trace-source", source_ref: "provider-gateway-trace-source", limit: 2 },
+    expectedOk: true,
+    expectedObservationSchema: "helix.live_environment_tool_observation.v1",
+  },
+  {
+    id: "visual_observer_test_blocked",
+    capabilityId: "live_env.test_visual_observer_profile",
+    args: { source_id: "provider-gateway-trace-source", source_ref: "provider-gateway-trace-source", limit: 2 },
+    expectedOk: false,
+    expectedObservationSchema: "helix.live_environment_tool_observation.v1",
+  },
+  {
+    id: "narrator_say",
+    capabilityId: "live_env.narrator_say",
+    args: {
+      text: "provider gateway narrator check",
+      kind: "narrator_read",
+      evidence_refs: ["ask:provider-gateway-trace:narrator_say"],
+    },
+    expectedOk: true,
+    expectedObservationSchema: "helix.interim_voice_callout_tool_result.v1",
+    mode: "act",
+  },
+  {
+    id: "internet_search_missing_provider",
+    capabilityId: "internet-search.search_web",
+    args: { query: "Alcubierre metric energy requirements", limit: 2 },
+    expectedOk: false,
+    expectedObservationSchema: "helix.internet_search_observation.v1",
+  },
+  {
+    id: "scholarly_research",
+    capabilityId: "scholarly-research.lookup_papers",
+    args: { query: "Alcubierre metric energy requirements", providers: ["arxiv"], limit: 2 },
+    expectedOk: true,
+    expectedObservationSchema: "helix.scholarly_research_observation.v1",
+  },
+  {
     id: "blocked_mutation",
     capabilityId: "filesystem.write_file",
     args: { path: "server/routes/agi.plan.ts", text: "blocked" },
+    expectedOk: false,
+    expectedError: "capability_not_registered",
+  },
+  {
+    id: "held_back_live_control",
+    capabilityId: "live_env.pause_workstation_loop",
+    args: { reason: "provider gateway trace must not expose held-back live controls" },
     expectedOk: false,
     expectedError: "capability_not_registered",
   },
@@ -73,6 +230,23 @@ const readStringArray = (value: unknown): string[] =>
   Array.isArray(value)
     ? value.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
     : [];
+
+const expectedCallResultCountForScenario = (
+  scenario: Scenario,
+  providerId: "helix" | "codex" | "future" = "codex",
+): number =>
+  providerId === "codex" ? scenario.expectedCallResultCount ?? 1 : 1;
+
+const expectedObservationPacketCountForScenario = (
+  scenario: Scenario,
+  providerId: "helix" | "codex" | "future" = "codex",
+): number =>
+  providerId === "codex"
+    ? scenario.expectedObservationPacketCount ?? expectedCallResultCountForScenario(scenario, providerId)
+    : 1;
+
+const expectedCodexReentryStatusForScenario = (scenario: Scenario): string =>
+  scenario.expectedOk ? "completed" : "pending_helix_solver_reentry";
 
 const writeJson = async (filePath: string, value: unknown) => {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
@@ -130,7 +304,11 @@ const addProviderGatewaySummaryFailures = (input: {
     const blockedCapabilityIds = blockedCapabilities
       .map((entry) => readString(entry.capability_id))
       .filter((entry): entry is string => Boolean(entry));
-    if (!blockedCapabilityIds.includes(input.expectedCapabilityId)) {
+    const capabilityWasStillTracked =
+      requestedCapabilities.includes(input.expectedCapabilityId) ||
+      admittedCapabilities.includes(input.expectedCapabilityId) ||
+      executedCapabilities.includes(input.expectedCapabilityId);
+    if (!blockedCapabilityIds.includes(input.expectedCapabilityId) && !capabilityWasStillTracked) {
       input.failures.push(`${input.prefix}_summary_blocked_capability_missing:${input.expectedCapabilityId}`);
     }
   }
@@ -329,6 +507,9 @@ const runRouteDebugExportProbe = async (input: {
   const debugExport = readRecord(debugResponse?.body) ?? null;
   const debugPayload = readRecord(debugExport?.payload);
   const routeFailures: string[] = [];
+  const expectedCallResultCount = expectedCallResultCountForScenario(input.scenario, "codex");
+  const expectedObservationPacketCount = expectedObservationPacketCountForScenario(input.scenario, "codex");
+  const expectedReentryStatus = expectedCodexReentryStatusForScenario(input.scenario);
   if (response.status !== 200) routeFailures.push(`route_status:${response.status}`);
   if (!endpoint) routeFailures.push("route_debug_export_ref_missing");
   if (endpoint && debugResponse?.status !== 200) routeFailures.push(`route_debug_export_status:${debugResponse?.status ?? "missing"}`);
@@ -336,8 +517,10 @@ const runRouteDebugExportProbe = async (input: {
   if (readString(ask.workstation_gateway_manifest_version) !== "read-observe-act.v1") {
     routeFailures.push("route_manifest_version_missing");
   }
-  if (readString(ask.workstation_gateway_reentry_status) !== "completed") {
-    routeFailures.push(`route_reentry_status:${readString(ask.workstation_gateway_reentry_status) ?? "missing"}!=completed`);
+  if (readString(ask.workstation_gateway_reentry_status) !== expectedReentryStatus) {
+    routeFailures.push(
+      `route_reentry_status:${readString(ask.workstation_gateway_reentry_status) ?? "missing"}!=${expectedReentryStatus}`,
+    );
   }
   if (input.scenario.expectedOk) {
     if (readString(ask.terminal_authority_status) !== "authorized_by_helix_provider_candidate_bridge") {
@@ -354,15 +537,21 @@ const runRouteDebugExportProbe = async (input: {
     if (readString(debugPayload.workstation_gateway_manifest_version) !== "read-observe-act.v1") {
       routeFailures.push("debug_manifest_version_missing");
     }
-    if (readRecordArray(debugPayload.workstation_gateway_call_results).length !== 1) {
-      routeFailures.push(`debug_gateway_call_result_count:${readRecordArray(debugPayload.workstation_gateway_call_results).length}`);
+    if (readRecordArray(debugPayload.workstation_gateway_call_results).length !== expectedCallResultCount) {
+      routeFailures.push(
+        `debug_gateway_call_result_count:${readRecordArray(debugPayload.workstation_gateway_call_results).length}`,
+      );
     }
-    if (readRecordArray(debugPayload.workstation_gateway_observation_packets).length !== 1) {
-      routeFailures.push(`debug_observation_packet_count:${readRecordArray(debugPayload.workstation_gateway_observation_packets).length}`);
+    if (readRecordArray(debugPayload.workstation_gateway_observation_packets).length !== expectedObservationPacketCount) {
+      routeFailures.push(
+        `debug_observation_packet_count:${readRecordArray(debugPayload.workstation_gateway_observation_packets).length}`,
+      );
     }
     if (input.scenario.expectedOk) {
-      if (readString(debugPayload.workstation_gateway_reentry_status) !== "completed") {
-        routeFailures.push(`debug_reentry_status:${readString(debugPayload.workstation_gateway_reentry_status) ?? "missing"}!=completed`);
+      if (readString(debugPayload.workstation_gateway_reentry_status) !== expectedReentryStatus) {
+        routeFailures.push(
+          `debug_reentry_status:${readString(debugPayload.workstation_gateway_reentry_status) ?? "missing"}!=${expectedReentryStatus}`,
+        );
       }
       if (readString(debugPayload.terminal_authority_status) !== "authorized_by_helix_provider_candidate_bridge") {
         routeFailures.push(`debug_terminal_authority_status:${readString(debugPayload.terminal_authority_status) ?? "missing"}`);
@@ -379,7 +568,7 @@ const runRouteDebugExportProbe = async (input: {
     expectedProvider: "codex",
     expectedCapabilityId: input.scenario.capabilityId,
     expectedOk: input.scenario.expectedOk,
-    expectedReentryStatus: "completed",
+    expectedReentryStatus,
     expectedTerminalAuthorityStatus: input.scenario.expectedOk
       ? "authorized_by_helix_provider_candidate_bridge"
       : "blocked_by_gateway_observation_state",
@@ -392,7 +581,7 @@ const runRouteDebugExportProbe = async (input: {
     expectedProvider: "codex",
     expectedCapabilityId: input.scenario.capabilityId,
     expectedOk: input.scenario.expectedOk,
-    expectedReentryStatus: "completed",
+    expectedReentryStatus,
     expectedTerminalAuthorityStatus: input.scenario.expectedOk
       ? "authorized_by_helix_provider_candidate_bridge"
       : "blocked_by_gateway_observation_state",
@@ -450,6 +639,8 @@ const runHelixRouteDebugExportProbe = async (input: {
   const debugExport = readRecord(debugResponse?.body) ?? null;
   const debugPayload = readRecord(debugExport?.payload);
   const routeFailures: string[] = [];
+  const expectedCallResultCount = expectedCallResultCountForScenario(input.scenario, "helix");
+  const expectedObservationPacketCount = expectedObservationPacketCountForScenario(input.scenario, "helix");
   if (response.status !== 200) routeFailures.push(`helix_route_status:${response.status}`);
   if (!endpoint) routeFailures.push("helix_route_debug_export_ref_missing");
   if (endpoint && debugResponse?.status !== 200) {
@@ -481,12 +672,12 @@ const runHelixRouteDebugExportProbe = async (input: {
     if (readString(debugPayload.workstation_gateway_manifest_version) !== "read-observe-act.v1") {
       routeFailures.push("helix_debug_manifest_version_missing");
     }
-    if (readRecordArray(debugPayload.workstation_gateway_call_results).length !== 1) {
+    if (readRecordArray(debugPayload.workstation_gateway_call_results).length !== expectedCallResultCount) {
       routeFailures.push(
         `helix_debug_gateway_call_result_count:${readRecordArray(debugPayload.workstation_gateway_call_results).length}`,
       );
     }
-    if (readRecordArray(debugPayload.workstation_gateway_observation_packets).length !== 1) {
+    if (readRecordArray(debugPayload.workstation_gateway_observation_packets).length !== expectedObservationPacketCount) {
       routeFailures.push(
         `helix_debug_observation_packet_count:${readRecordArray(debugPayload.workstation_gateway_observation_packets).length}`,
       );
@@ -579,6 +770,8 @@ const runFutureRouteDebugExportProbe = async (input: {
   const debugExport = readRecord(debugResponse?.body) ?? null;
   const debugPayload = readRecord(debugExport?.payload);
   const routeFailures: string[] = [];
+  const expectedCallResultCount = expectedCallResultCountForScenario(input.scenario, "future");
+  const expectedObservationPacketCount = expectedObservationPacketCountForScenario(input.scenario, "future");
   if (response.status !== 200) routeFailures.push(`future_route_status:${response.status}`);
   if (!endpoint) routeFailures.push("future_route_debug_export_ref_missing");
   if (endpoint && debugResponse?.status !== 200) {
@@ -610,12 +803,12 @@ const runFutureRouteDebugExportProbe = async (input: {
     if (readString(debugPayload.workstation_gateway_manifest_version) !== "read-observe-act.v1") {
       routeFailures.push("future_debug_manifest_version_missing");
     }
-    if (readRecordArray(debugPayload.workstation_gateway_call_results).length !== 1) {
+    if (readRecordArray(debugPayload.workstation_gateway_call_results).length !== expectedCallResultCount) {
       routeFailures.push(
         `future_debug_gateway_call_result_count:${readRecordArray(debugPayload.workstation_gateway_call_results).length}`,
       );
     }
-    if (readRecordArray(debugPayload.workstation_gateway_observation_packets).length !== 1) {
+    if (readRecordArray(debugPayload.workstation_gateway_observation_packets).length !== expectedObservationPacketCount) {
       routeFailures.push(
         `future_debug_observation_packet_count:${readRecordArray(debugPayload.workstation_gateway_observation_packets).length}`,
       );
@@ -718,7 +911,7 @@ const runStreamRouteDebugExportProbe = async (input: {
   const debugPayload = readRecord(debugExport?.payload);
   const routeFailures: string[] = [];
   const expectedReentryStatus = input.providerId === "codex"
-    ? "completed"
+    ? expectedCodexReentryStatusForScenario(input.scenario)
     : "pending_helix_solver_reentry";
   const expectedTerminalAuthorityStatus = input.providerId === "codex"
     ? input.scenario.expectedOk
@@ -743,12 +936,14 @@ const runStreamRouteDebugExportProbe = async (input: {
   if (readString(finalPayload.workstation_gateway_manifest_version) !== "read-observe-act.v1") {
     routeFailures.push(`${input.providerId}_stream_manifest_version_missing`);
   }
-  if (readRecordArray(finalPayload.workstation_gateway_call_results).length !== 1) {
+  const expectedCallResultCount = expectedCallResultCountForScenario(input.scenario, input.providerId);
+  const expectedObservationPacketCount = expectedObservationPacketCountForScenario(input.scenario, input.providerId);
+  if (readRecordArray(finalPayload.workstation_gateway_call_results).length !== expectedCallResultCount) {
     routeFailures.push(
       `${input.providerId}_stream_gateway_call_result_count:${readRecordArray(finalPayload.workstation_gateway_call_results).length}`,
     );
   }
-  if (readRecordArray(finalPayload.workstation_gateway_observation_packets).length !== 1) {
+  if (readRecordArray(finalPayload.workstation_gateway_observation_packets).length !== expectedObservationPacketCount) {
     routeFailures.push(
       `${input.providerId}_stream_observation_packet_count:${readRecordArray(finalPayload.workstation_gateway_observation_packets).length}`,
     );
@@ -777,12 +972,12 @@ const runStreamRouteDebugExportProbe = async (input: {
     if (readString(debugPayload.workstation_gateway_manifest_version) !== "read-observe-act.v1") {
       routeFailures.push(`${input.providerId}_stream_debug_manifest_version_missing`);
     }
-    if (readRecordArray(debugPayload.workstation_gateway_call_results).length !== 1) {
+    if (readRecordArray(debugPayload.workstation_gateway_call_results).length !== expectedCallResultCount) {
       routeFailures.push(
         `${input.providerId}_stream_debug_gateway_call_result_count:${readRecordArray(debugPayload.workstation_gateway_call_results).length}`,
       );
     }
-    if (readRecordArray(debugPayload.workstation_gateway_observation_packets).length !== 1) {
+    if (readRecordArray(debugPayload.workstation_gateway_observation_packets).length !== expectedObservationPacketCount) {
       routeFailures.push(
         `${input.providerId}_stream_debug_observation_packet_count:${readRecordArray(debugPayload.workstation_gateway_observation_packets).length}`,
       );
@@ -909,18 +1104,21 @@ const runScenario = async (scenario: Scenario, routeTraceApp: ReturnType<typeof 
     workstation_gateway_call: {
       capability_id: scenario.capabilityId,
       arguments: scenario.args,
+      mode: scenario.mode ?? "read",
     },
+    mode: scenario.mode ?? "read",
   };
   const body: Record<string, unknown> = {
     agent_runtime: "codex",
     turn_id: turnId,
+    mode: scenario.mode ?? "read",
     question: `Use the provided Helix workstation gateway observation for ${scenario.id}.`,
     workstation_gateway_call: seed.workstation_gateway_call,
   };
 
   const helixGatewayResult = await callWorkstationGatewayCapability({
     agentRuntime: "helix",
-    mode: "read",
+    mode: scenario.mode ?? "read",
     capabilityId: scenario.capabilityId,
     arguments: scenario.args,
     turnId: `${turnId}:helix`,
@@ -1101,7 +1299,7 @@ const runScenario = async (scenario: Scenario, routeTraceApp: ReturnType<typeof 
     failures.push(`manifest_capability_missing:${scenario.capabilityId}`);
   }
   if (manifestSummary.capability_id) {
-    if (!["read", "observe"].includes(manifestSummary.mode ?? "")) {
+    if (!["read", "observe", "act"].includes(manifestSummary.mode ?? "")) {
       failures.push(`manifest_capability_mode:${manifestSummary.mode ?? "missing"}`);
     }
     if (manifestSummary.output_observation_schema !== manifestSummary.observation_schema) {
@@ -1121,12 +1319,16 @@ const runScenario = async (scenario: Scenario, routeTraceApp: ReturnType<typeof 
       if (manifestSummary[field] !== expected) failures.push(`manifest_${field}_not_${String(expected)}`);
     }
   }
-  if (callResults.length !== 1) failures.push(`gateway_call_result_count:${callResults.length}`);
+  const expectedCallResultCount = expectedCallResultCountForScenario(scenario);
+  if (callResults.length !== expectedCallResultCount) failures.push(`gateway_call_result_count:${callResults.length}`);
   if (!candidateSummary.candidate_present) failures.push("provider_terminal_candidate_missing");
   if (candidateSummary.candidate_terminal_eligible !== false) failures.push("provider_terminal_candidate_terminal_eligible_not_false");
   if (candidateSummary.candidate_assistant_answer !== false) failures.push("provider_terminal_candidate_assistant_answer_not_false");
   if (candidateSummary.candidate_raw_content_included !== false) failures.push("provider_terminal_candidate_raw_content_included_not_false");
-  if (candidateSummary.reentry_status !== "completed") failures.push(`provider_reentry_status:${candidateSummary.reentry_status ?? "missing"}`);
+  const expectedProviderReentryStatus = expectedCodexReentryStatusForScenario(scenario);
+  if (candidateSummary.reentry_status !== expectedProviderReentryStatus) {
+    failures.push(`provider_reentry_status:${candidateSummary.reentry_status ?? "missing"}`);
+  }
   const expectedAuthorityStatus = scenario.expectedOk
     ? "authorized_by_helix_provider_candidate_bridge"
     : "blocked_by_gateway_observation_state";
@@ -1272,11 +1474,14 @@ const runLiveScenario = async (scenario: Scenario) => {
     workstation_gateway_call: {
       capability_id: scenario.capabilityId,
       arguments: scenario.args,
+      mode: scenario.mode ?? "read",
     },
+    mode: scenario.mode ?? "read",
   };
   const body: Record<string, unknown> = {
     agent_runtime: "codex",
     turn_id: turnId,
+    mode: scenario.mode ?? "read",
     question: `Use the provided Helix workstation gateway observation for ${scenario.id}.`,
     workstation_gateway_call: seed.workstation_gateway_call,
   };
@@ -1304,17 +1509,19 @@ const runLiveScenario = async (scenario: Scenario) => {
   if (readString(ask.workstation_gateway_manifest_version) !== "read-observe-act.v1") {
     failures.push("manifest_version_missing");
   }
-  if (callResults.length !== 1) failures.push(`gateway_call_result_count:${callResults.length}`);
+  const expectedCallResultCount = expectedCallResultCountForScenario(scenario);
+  const expectedObservationPacketCount = expectedObservationPacketCountForScenario(scenario);
+  if (callResults.length !== expectedCallResultCount) failures.push(`gateway_call_result_count:${callResults.length}`);
   addGatewayInvariantFailures({ failures, prefix: "codex", result: firstResult, scenario });
   if (!debugExport.ok) failures.push(`debug_export_unavailable:${debugExport.status || debugExport.error || "missing"}`);
   if (debugExport.ok) {
     if (readString(debugPayload?.agent_runtime) !== "codex") {
       failures.push(`debug_agent_runtime:${readString(debugPayload?.agent_runtime) ?? "missing"}!=codex`);
     }
-    if (readRecordArray(debugPayload?.workstation_gateway_call_results).length !== 1) {
+    if (readRecordArray(debugPayload?.workstation_gateway_call_results).length !== expectedCallResultCount) {
       failures.push(`debug_gateway_call_result_count:${readRecordArray(debugPayload?.workstation_gateway_call_results).length}`);
     }
-    if (readRecordArray(debugPayload?.workstation_gateway_observation_packets).length !== 1) {
+    if (readRecordArray(debugPayload?.workstation_gateway_observation_packets).length !== expectedObservationPacketCount) {
       failures.push(`debug_observation_packet_count:${readRecordArray(debugPayload?.workstation_gateway_observation_packets).length}`);
     }
   }

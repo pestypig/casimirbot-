@@ -356,6 +356,30 @@ const buildCodexCompoundTerminalAuthority = (input: {
   });
 };
 
+const buildCodexDirectTerminalAuthority = (input: {
+  turnId: string;
+  threadId: string;
+  route?: string | null;
+  text: string;
+}) => {
+  const text = input.text.trim();
+  if (!text) return null;
+  return buildHelixTurnTerminalAuthority({
+    thread_id: input.threadId,
+    turn_id: input.turnId,
+    route: input.route || "/ask/turn",
+    final_answer_source: "agent_provider_terminal_candidate",
+    terminal_artifact_kind: "agent_provider_terminal_candidate",
+    terminal_text: text,
+    terminal_item_id: `${input.turnId}:codex_direct_terminal_candidate`,
+    terminal_kind: "answer",
+    authority_origin: "codex_no_tool_direct_answer",
+    server_authoritative: true,
+    terminal_eligible: true,
+    assistant_answer: false,
+  });
+};
+
 type CodexBinaryResolution = {
   launchable: boolean;
   reason: string | null;
@@ -1728,6 +1752,20 @@ export const codexProvider: HelixAgentProvider = {
     const compoundTerminalAuthorized = Boolean(compoundTerminalAuthority);
     const providerTerminalAuthorized = Boolean(providerReentry.terminalAnswerAuthority);
     const normalizationFailures = normalizedObservationResult.missingNormalizationFailures;
+    const directTerminalAuthority =
+      !compoundTerminalAuthorized &&
+      !providerTerminalAuthorized &&
+      gatewayCallResults.length === 0 &&
+      processOk &&
+      gatewayGuardedText.trim() === text.trim()
+        ? buildCodexDirectTerminalAuthority({
+            turnId,
+            threadId,
+            route: request.route,
+            text: gatewayGuardedText,
+          })
+        : null;
+    const directTerminalAuthorized = Boolean(directTerminalAuthority);
     const normalizationFailureText = normalizationFailures[0]
       ? `I cannot complete this Codex provider turn because Helix could not normalize a provider gateway result: ${normalizationFailures[0]}.`
       : null;
@@ -1735,7 +1773,7 @@ export const codexProvider: HelixAgentProvider = {
       processOk &&
       normalizationFailures.length === 0 &&
       gatewayCallsSucceeded(gatewayCallResults) &&
-      (compoundTerminalAuthorized || providerTerminalAuthorized);
+      (compoundTerminalAuthorized || providerTerminalAuthorized || directTerminalAuthorized);
     const projectedText =
       normalizationFailureText ??
       (gatewayGuardedText ||
@@ -1753,21 +1791,23 @@ export const codexProvider: HelixAgentProvider = {
       providerTerminalCandidate: providerReentry.providerTerminalCandidate,
       providerTerminalAuthorityBridge: providerReentry.providerTerminalAuthorityBridge,
       terminalAuthorityCandidateReview: providerReentry.terminalAuthorityCandidateReview,
-      terminalAnswerAuthority: providerReentry.terminalAnswerAuthority,
+      terminalAnswerAuthority: directTerminalAuthority ?? providerReentry.terminalAnswerAuthority,
       finalAnswerSource: compoundTerminalAuthority
         ? "compound_evidence_synthesis_answer"
-        : providerReentry.terminalAnswerAuthority
+        : providerReentry.terminalAnswerAuthority || directTerminalAuthority
           ? "agent_provider_terminal_candidate"
           : null,
       terminalArtifactKind: compoundTerminalAuthority
         ? "compound_evidence_synthesis_answer"
-        : providerReentry.terminalAnswerAuthority
+        : providerReentry.terminalAnswerAuthority || directTerminalAuthority
           ? "agent_provider_terminal_candidate"
           : null,
       evidenceReentryStatus: providerReentry.workstationGatewayReentryStatus,
       terminalAuthorityStatus: compoundTerminalAuthority
         ? "authorized_by_codex_provider_compound_synthesis"
-        : providerReentry.terminalAuthorityStatus,
+        : directTerminalAuthority
+          ? "authorized_no_gateway_tool_required"
+          : providerReentry.terminalAuthorityStatus,
     });
     const turnTranscriptEvents = buildCodexProviderTurnTranscriptEvents({
       turnId,
@@ -1779,17 +1819,19 @@ export const codexProvider: HelixAgentProvider = {
     });
     const finalAnswerSource = compoundTerminalAuthority
       ? "compound_evidence_synthesis_answer"
-      : providerReentry.terminalAnswerAuthority
+      : providerReentry.terminalAnswerAuthority || directTerminalAuthority
         ? "agent_provider_terminal_candidate"
         : null;
     const terminalArtifactKind = compoundTerminalAuthority
       ? "compound_evidence_synthesis_answer"
-      : providerReentry.terminalAnswerAuthority
+      : providerReentry.terminalAnswerAuthority || directTerminalAuthority
         ? "agent_provider_terminal_candidate"
         : null;
     const terminalAuthorityStatus = compoundTerminalAuthority
       ? "authorized_by_codex_provider_compound_synthesis"
-      : providerReentry.terminalAuthorityStatus;
+      : directTerminalAuthority
+        ? "authorized_no_gateway_tool_required"
+        : providerReentry.terminalAuthorityStatus;
 
     return {
       ok,
@@ -1855,7 +1897,7 @@ export const codexProvider: HelixAgentProvider = {
         provider_reasoning_reentry: providerReentry.providerReasoningReentry,
         terminal_authority_candidate_review: providerReentry.terminalAuthorityCandidateReview,
         provider_terminal_authority_bridge: providerReentry.providerTerminalAuthorityBridge,
-        terminal_answer_authority: compoundTerminalAuthority ?? providerReentry.terminalAnswerAuthority,
+        terminal_answer_authority: compoundTerminalAuthority ?? directTerminalAuthority ?? providerReentry.terminalAnswerAuthority,
         terminal_presentation: compoundTerminalAuthority
           ? {
               schema: "helix.terminal_presentation.v1",
@@ -1870,6 +1912,20 @@ export const codexProvider: HelixAgentProvider = {
               assistant_answer: false,
               raw_content_included: false,
             }
+          : directTerminalAuthority
+            ? {
+                schema: "helix.terminal_presentation.v1",
+                turn_id: turnId,
+                concise_text: projectedText,
+                terminal_artifact_kind: "agent_provider_terminal_candidate",
+                final_answer_source: "agent_provider_terminal_candidate",
+                terminal_authority_ref: readString(directTerminalAuthority.terminal_item_id),
+                selected_observation_refs: [],
+                presentation_policy: "preserve_provider_text",
+                helix_style_rewrite_applied: false,
+                assistant_answer: false,
+                raw_content_included: false,
+              }
           : providerReentry.terminalPresentation,
         final_answer_source: finalAnswerSource,
         terminal_artifact_kind: terminalArtifactKind,
