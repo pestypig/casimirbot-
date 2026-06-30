@@ -127,6 +127,105 @@ export function buildAskLiveEventLogDetailPayload(event: AskLiveEventEntry): str
   return safeJsonStringify(payload);
 }
 
+export function summarizeHelixDebugObservationForCopy(value: unknown): Record<string, unknown> | null {
+  const record = readDisplayRecord(value);
+  if (!record) return null;
+  const payload = readDisplayRecord(record.payload);
+  const observation = readDisplayRecord(record.observation);
+  return {
+    artifact_id:
+      coerceDisplayText(record.artifact_id).trim() ||
+      coerceDisplayText(record.observation_id).trim() ||
+      coerceDisplayText(payload?.artifact_id).trim() ||
+      null,
+    kind: coerceDisplayText(record.kind).trim() || coerceDisplayText(payload?.kind).trim() || null,
+    schema:
+      coerceDisplayText(record.schema).trim() ||
+      coerceDisplayText(payload?.schema).trim() ||
+      coerceDisplayText(observation?.schema).trim() ||
+      null,
+    status: coerceDisplayText(record.status).trim() || coerceDisplayText(payload?.status).trim() || null,
+    ok:
+      typeof record.ok === "boolean"
+        ? record.ok
+        : typeof payload?.ok === "boolean"
+          ? payload.ok
+          : null,
+  };
+}
+
+export function summarizeHelixDebugArtifactsForCopy(value: unknown): Record<string, unknown>[] {
+  const entries = Array.isArray(value) ? value : [];
+  return entries.slice(0, 40).map((entry, index) => {
+    const record = readDisplayRecord(entry) ?? {};
+    const payload = readDisplayRecord(record.payload);
+    const text = coerceDisplayText(payload?.text || payload?.answer_text || payload?.summary).trim();
+    return {
+      artifact_id: coerceDisplayText(record.artifact_id).trim() || `artifact:${index}`,
+      kind: coerceDisplayText(record.kind).trim() || null,
+      source_scope: coerceDisplayText(record.source_scope).trim() || null,
+      payload_schema: coerceDisplayText(payload?.schema).trim() || null,
+      tool_name:
+        coerceDisplayText(record.tool_name).trim() ||
+        coerceDisplayText(payload?.tool_name).trim() ||
+        coerceDisplayText(payload?.toolName).trim() ||
+        null,
+      capability_key:
+        coerceDisplayText(record.capability_key).trim() ||
+        coerceDisplayText(payload?.capability_key).trim() ||
+        coerceDisplayText(payload?.chosen_capability).trim() ||
+        null,
+      status: coerceDisplayText(record.status).trim() || coerceDisplayText(payload?.status).trim() || null,
+      ok:
+        typeof record.ok === "boolean"
+          ? record.ok
+          : typeof payload?.ok === "boolean"
+            ? payload.ok
+            : null,
+      supports_goal:
+        typeof payload?.supports_goal === "boolean"
+          ? payload.supports_goal
+          : coerceDisplayText(payload?.supports_goal).trim() || null,
+      expression: coerceDisplayText(payload?.expression || payload?.input).trim() || null,
+      result: coerceDisplayText(payload?.result || payload?.value || payload?.computed_result).trim() || null,
+      text_preview: text ? summarizeVoiceDebugText(text, 240) : null,
+    };
+  });
+}
+
+export function summarizeHelixAgentRuntimeLoopForCopy(value: unknown): Record<string, unknown> | null {
+  const record = readDisplayRecord(value);
+  if (!record) return null;
+  const iterations = Array.isArray(record.iterations) ? record.iterations : [];
+  return {
+    schema: coerceDisplayText(record.schema).trim() || "helix.agent_runtime_loop.v1",
+    status: coerceDisplayText(record.status).trim() || null,
+    selected_capability: coerceDisplayText(record.selected_capability).trim() || null,
+    executed_tool_call_count:
+      typeof record.executed_tool_call_count === "number" ? record.executed_tool_call_count : null,
+    iteration_count: iterations.length,
+    iterations: iterations.slice(0, 16).map((entry, index) => {
+      const iteration = readDisplayRecord(entry) ?? {};
+      return {
+        iteration: typeof iteration.iteration === "number" ? iteration.iteration : index + 1,
+        decision_id: coerceDisplayText(iteration.decision_id).trim() || null,
+        chosen_capability: coerceDisplayText(iteration.chosen_capability).trim() || null,
+        executed_action_key: coerceDisplayText(iteration.executed_action_key).trim() || null,
+        next_step: coerceDisplayText(iteration.next_step).trim() || null,
+        decision_timing: coerceDisplayText(iteration.decision_timing).trim() || null,
+        decision_authority: coerceDisplayText(iteration.decision_authority).trim() || null,
+        observation_role: coerceDisplayText(iteration.observation_role).trim() || null,
+        observed_artifact_refs: Array.isArray(iteration.observed_artifact_refs)
+          ? iteration.observed_artifact_refs.slice(0, 8)
+          : Array.isArray(iteration.artifact_refs)
+            ? iteration.artifact_refs.slice(0, 8)
+            : [],
+        tool_observation: summarizeHelixDebugObservationForCopy(iteration.tool_observation),
+      };
+    }),
+  };
+}
+
 export function readEventMetaString(
   meta: Record<string, unknown> | undefined,
   keys: string[],

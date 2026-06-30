@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   describeMediaErrorCode,
+  getMicRecorderMimeCandidates,
   isFlatVoiceSignal,
   isLikelyLoopbackDeviceLabel,
   isLowAudioQualitySignal,
   isRecorderStalled,
   resolveVoiceNoiseHandlingProfile,
   shouldPrimeSegmentWithContainerHeader,
+  shouldTreatMicSignalAsSpeech,
   smoothVoiceLevel,
 } from "../ask-voice-capture-display";
 
@@ -78,6 +80,20 @@ describe("ask voice capture display helpers", () => {
     ).toBe(false);
   });
 
+  it("orders mic recorder MIME candidates from explicit user agent strings", () => {
+    const iosUa =
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1";
+    const desktopUa =
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/125.0 Safari/537.36";
+    const desktopModeIosUa =
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1";
+
+    expect(getMicRecorderMimeCandidates(iosUa)[0]).toBe("audio/mp4;codecs=mp4a.40.2");
+    expect(getMicRecorderMimeCandidates(desktopModeIosUa)[0]).toBe("audio/mp4;codecs=mp4a.40.2");
+    expect(getMicRecorderMimeCandidates(desktopUa)[0]).toBe("audio/webm;codecs=opus");
+    expect(new Set(getMicRecorderMimeCandidates(desktopUa)).size).toBe(getMicRecorderMimeCandidates(desktopUa).length);
+  });
+
   it("resolves noisy-environment thresholds and low-quality signal flags deterministically", () => {
     const normal = resolveVoiceNoiseHandlingProfile(false);
     const noisy = resolveVoiceNoiseHandlingProfile(true);
@@ -110,5 +126,41 @@ describe("ask voice capture display helpers", () => {
     expect(describeMediaErrorCode(4)).toBe("media_err_src_not_supported");
     expect(describeMediaErrorCode(null)).toBe("media_err_unknown");
     expect(describeMediaErrorCode(99)).toBe("media_err_unknown");
+  });
+
+  it("qualifies barge-in speech without browser or queue state", () => {
+    expect(
+      shouldTreatMicSignalAsSpeech({
+        speakingNow: true,
+        voiceOutputActive: true,
+        localAudioGateActive: true,
+        speechProbability: 0.34,
+        snrDb: 3.2,
+        rms: 0.022,
+        speechTriggerThreshold: 0.018,
+      }),
+    ).toBe(false);
+    expect(
+      shouldTreatMicSignalAsSpeech({
+        speakingNow: true,
+        voiceOutputActive: false,
+        localAudioGateActive: true,
+        speechProbability: 0.25,
+        snrDb: 2.8,
+        rms: 0.02,
+        speechTriggerThreshold: 0.018,
+      }),
+    ).toBe(true);
+    expect(
+      shouldTreatMicSignalAsSpeech({
+        speakingNow: true,
+        voiceOutputActive: true,
+        localAudioGateActive: true,
+        speechProbability: 0.72,
+        snrDb: 9.1,
+        rms: 0.03,
+        speechTriggerThreshold: 0.018,
+      }),
+    ).toBe(true);
   });
 });

@@ -21,6 +21,7 @@ export type ProviderAgentCapabilityClassification = {
   capability_id: string;
   surface:
     | "workstation_gateway"
+    | "explicit_contract"
     | "live_environment"
     | "live_environment_alias"
     | "dynamic_panel"
@@ -32,6 +33,7 @@ export type ProviderAgentCapabilityClassification = {
     codex_workstation: boolean;
     future_provider: boolean;
   };
+  provider_gateway_alias_target?: string;
   required_contract_before_gateway: string[];
   notes: string;
 };
@@ -100,74 +102,161 @@ const live = (
   notes: input.notes,
 });
 
+const explicit = (
+  capabilityId: string,
+  input: {
+    availability: ProviderAgentCapabilityAvailability;
+    permissionClass: ProviderAgentPermissionClass;
+    requiredContractBeforeGateway: string[];
+    notes: string;
+  },
+): ProviderAgentCapabilityClassification => ({
+  capability_id: capabilityId,
+  surface: "explicit_contract",
+  availability: input.availability,
+  permission_class: input.permissionClass,
+  provider_availability: helixOnlyProviderAvailability,
+  required_contract_before_gateway: input.requiredContractBeforeGateway,
+  notes: input.notes,
+});
+
+const sharedExplicitAlias = (
+  capabilityId: string,
+  input: {
+    permissionClass: ProviderAgentPermissionClass;
+    gatewayAliasTarget: string;
+    notes: string;
+  },
+): ProviderAgentCapabilityClassification => ({
+  capability_id: capabilityId,
+  surface: "explicit_contract",
+  availability: "shared_gateway_now",
+  permission_class: input.permissionClass,
+  provider_availability: sharedProviderAvailability,
+  provider_gateway_alias_target: input.gatewayAliasTarget,
+  required_contract_before_gateway: [],
+  notes: input.notes,
+});
+
 export const PROVIDER_AGENT_CAPABILITY_CLASSIFICATIONS: readonly ProviderAgentCapabilityClassification[] = [
   ...[
-    "live_env.query_trace_memory",
-    "live_env.query_narrator_events",
-    "live_env.query_audio_transcripts",
-    "live_env.query_live_answer_state",
-    "live_env.query_route_evidence",
-    "live_env.query_visual_summaries",
-    "live_env.query_translation_segments",
-    "live_env.query_microdeck_outputs",
-    "live_env.query_packet_traces",
-    "live_env.query_automation_policies",
+    "repo-code.search_concept",
   ].map((capabilityId) =>
-    live(capabilityId, {
-      availability: "safe_to_graduate_next",
+    sharedExplicitAlias(capabilityId, {
       permissionClass: "read_observe",
-      requiredContractBeforeGateway: readOnlyContextFeedGraduationChecklist,
-      notes: "Read-only context feed query; candidate for provider gateway after bounded observation and projection tests.",
+      gatewayAliasTarget: "repo.search",
+      notes: "Provider-shared explicit route alias admitted onto the canonical repo.search gateway; alias is preserved in source_target_intent.alias_capability.",
     }),
   ),
   ...[
-    "live_env.query_source_health",
-    "live_env.query_live_source_loop_health",
-    "live_env.query_live_source_quality",
-    "live_env.summarize_live_source_current_state",
-    "live_env.query_constructs",
-    "live_env.query_job_evidence",
-    "live_env.query_event_log",
-    "live_env.query_world_events",
-    "live_env.query_navigation_state",
-    "live_env.query_stage_sources",
-    "live_env.query_workstation_goal_context",
+    "internet_search.web_research",
   ].map((capabilityId) =>
-    live(capabilityId, {
+    sharedExplicitAlias(capabilityId, {
+      permissionClass: "read_observe",
+      gatewayAliasTarget: "internet-search.search_web",
+      notes: "Provider-shared explicit route alias admitted onto the canonical internet-search.search_web gateway; alias is preserved in source_target_intent.alias_capability.",
+    }),
+  ),
+  ...[
+    "helix_ask.reflect_theory_context",
+  ].map((capabilityId) =>
+    sharedExplicitAlias(capabilityId, {
+      permissionClass: "read_observe",
+      gatewayAliasTarget: "theory-badge-graph.reflect_discussion_context",
+      notes: "Provider-shared explicit route alias admitted onto the canonical theory-badge-graph.reflect_discussion_context gateway; alias is preserved in source_target_intent.alias_capability.",
+    }),
+  ),
+  ...[
+    "helix_ask.reflect_civilization_bounds",
+  ].map((capabilityId) =>
+    sharedExplicitAlias(capabilityId, {
+      permissionClass: "read_observe",
+      gatewayAliasTarget: "civilization-bounds.reflect_system_bounds",
+      notes: "Provider-shared explicit route alias admitted onto the canonical civilization-bounds.reflect_system_bounds gateway; alias is preserved in source_target_intent.alias_capability.",
+    }),
+  ),
+  ...[
+    "scientific-calculator.solve_with_steps",
+    "scientific-calculator.solve",
+  ].map((capabilityId) =>
+    sharedExplicitAlias(capabilityId, {
+      permissionClass: "read_observe",
+      gatewayAliasTarget: "scientific-calculator.solve_expression",
+      notes: "Provider-shared explicit route alias admitted onto the canonical scientific-calculator.solve_expression gateway; alias is preserved in source_target_intent.alias_capability.",
+    }),
+  ),
+  ...[
+    "docs-viewer.search_docs",
+    "docs-viewer.locate_in_doc",
+    "docs-viewer.summarize_doc",
+    "docs-viewer.doc_equation_context",
+  ].map((capabilityId) =>
+    sharedExplicitAlias(capabilityId, {
+      permissionClass: "read_observe",
+      gatewayAliasTarget: "docs.search",
+      notes: "Provider-shared explicit route alias admitted onto the canonical docs.search gateway; alias is preserved in source_target_intent.alias_capability.",
+    }),
+  ),
+  ...[
+    "docs-viewer.open",
+    "docs-viewer.open_doc_by_path",
+  ].map((capabilityId) =>
+    sharedExplicitAlias(capabilityId, {
+      permissionClass: "ui_projection",
+      gatewayAliasTarget: "docs-viewer.open_doc",
+      notes: "Provider-shared explicit route alias admitted onto the canonical docs-viewer.open_doc gateway receipt; alias is preserved in source_target_intent.alias_capability.",
+    }),
+  ),
+  ...[
+    "helix_ask.inspect_capability_catalog",
+    "helix_ask.reflect_workstation_tool_alignment",
+    "workspace-directory.resolve",
+    "scholarly-research.fetch_full_text",
+    "helix.theory.frontierVectorFieldTrace",
+    "helix_ask.reflect_live_synthetic_data",
+    "helix_ask.reflect_context_attachments",
+    "helix_ask.reflect_ideology_context",
+    "helix_ask.bridge_theory_ideology_context",
+    "helix_ask.build_civilization_scenario_frame",
+    "image_lens.inspect",
+    "situation-room.describe_visual_capture",
+    "docs-viewer.identify_current_doc",
+    "docs-viewer.validate_doc_candidates",
+  ].map((capabilityId) =>
+    explicit(capabilityId, {
       availability: "safe_to_graduate_next",
       permissionClass: "read_observe",
       requiredContractBeforeGateway: readOnlyContextFeedGraduationChecklist,
-      notes: "Read-only live-environment query; not in Codex gateway until observation identity and projection tests exist.",
+      notes: "Explicit route contract exists, but this exact capability id is not a provider gateway manifest id; graduate only with an explicit gateway alias/observation contract.",
+    }),
+  ),
+  ...[
+    "scientific-calculator.open",
+    "scientific-calculator.start_equation_live_source",
+    "workstation-notes.append_to_note",
+    "workstation-notes.create_note",
+    "workstation-notes.create",
+    "workstation-notes.open",
+  ].map((capabilityId) =>
+    explicit(capabilityId, {
+      availability: "blocked_pending_contract",
+      permissionClass: "user_confirmed_side_effect",
+      requiredContractBeforeGateway: sideEffectGraduationChecklist,
+      notes: "Explicit side-effecting workstation route contract exists; keep out of provider gateway until confirmation, receipt, and projection tests exist.",
     }),
   ),
   ...[
     "live_env.read_card",
-    "live_env.describe_stage_builder",
     "live_env.reflect_stage_play_context",
-    "live_env.check_live_source_mail",
-    "live_env.read_live_source_mail",
-    "live_env.read_processed_live_source_mail",
-    "live_env.reflect_live_source_mail_loop",
-    "live_env.query_micro_reasoner_prompts",
-    "live_env.query_micro_reasoner_presets",
-    "live_env.query_visual_observer_profiles",
-    "live_env.test_micro_reasoner_prompt",
-    "live_env.test_visual_observer_profile",
-    "live_env.compare_visual_observer_profiles",
-    "live_env.compare_mail_to_interpreter_profile",
-    "live_env.compare_live_source_prediction",
-    "live_env.validate_live_source_prediction",
   ].map((capabilityId) =>
     live(capabilityId, {
-      availability: "helix_native_only",
-      permissionClass: "read_observe",
-      requiredContractBeforeGateway: readOnlyContextFeedGraduationChecklist,
-      notes: "Helix-native read/evaluation capability; provider gateway graduation requires a bounded observation contract.",
+      availability: "requires_confirmation_contract",
+      permissionClass: "user_confirmed_side_effect",
+      requiredContractBeforeGateway: sideEffectGraduationChecklist,
+      notes: "Helix-native evidence/projection capability that can write goal-context or Live Answer projection receipts; provider gateway graduation requires an explicit side-effect receipt contract.",
     }),
   ),
   ...[
-    "live_env.request_interim_voice_callout",
-    "live_env.narrator_say",
     "live_env.record_voice_steering",
   ].map((capabilityId) =>
     live(capabilityId, {
@@ -205,8 +294,6 @@ export const PROVIDER_AGENT_CAPABILITY_CLASSIFICATIONS: readonly ProviderAgentCa
   ...[
     "live_env.process_live_source_mail",
     "live_env.draft_stage_play_graph",
-    "live_env.validate_stage_play_graph",
-    "live_env.plan_stage_play_job",
     "live_env.request_stage_play_checkpoint",
     "live_env.draft_micro_reasoner_preset",
     "live_env.route_micro_reasoner_prompt",
@@ -216,19 +303,27 @@ export const PROVIDER_AGENT_CAPABILITY_CLASSIFICATIONS: readonly ProviderAgentCa
     "live_env.configure_visual_observer_profile",
     "live_env.apply_visual_observer_profile",
     "live_env.request_visual_action_replay",
-    "live_env.predict_live_source_immediate",
     "live_env.project_live_source_narrative",
     "live_env.update_live_source_immersion_state",
     "live_env.record_live_source_mail_decision",
-    "live_env.request_probe",
-    "live_env.record_commentary",
-    "live_env.evaluate_goal_satisfaction",
   ].map((capabilityId) =>
     live(capabilityId, {
       availability: "helix_native_only",
       permissionClass: "ui_projection",
       requiredContractBeforeGateway: readOnlyContextFeedGraduationChecklist,
       notes: "Helix procedure/evidence capability; keep Helix-owned until provider gateway receipt and terminal-authority tests exist.",
+    }),
+  ),
+  ...[
+    "live_env.request_probe",
+    "live_env.record_commentary",
+    "live_env.evaluate_goal_satisfaction",
+  ].map((capabilityId) =>
+    live(capabilityId, {
+      availability: "requires_confirmation_contract",
+      permissionClass: "user_confirmed_side_effect",
+      requiredContractBeforeGateway: sideEffectGraduationChecklist,
+      notes: "Helix-native evidence writer; provider gateway graduation requires an explicit affirmative command, structured write receipt, and terminal-authority tests.",
     }),
   ),
   ...[
@@ -279,23 +374,39 @@ const explicitClassificationByCapability = new Map(
   ]),
 );
 
-const currentGatewayCapabilityIds = new Set(
-  listWorkstationGatewayCapabilities({ agentRuntime: "codex", mode: "observe" })
-    .capabilities
-    .map((capability) => capability.capability_id),
+const currentGatewayCapabilities = listWorkstationGatewayCapabilities({
+  agentRuntime: "codex",
+  mode: "observe",
+}).capabilities;
+
+const currentGatewayCapabilityById = new Map(
+  currentGatewayCapabilities.map((capability) => [
+    capability.capability_id,
+    capability,
+  ]),
 );
+
+const permissionClassForSharedGatewayCapability = (
+  capability: (typeof currentGatewayCapabilities)[number],
+): ProviderAgentPermissionClass => {
+  if (capability.mutating) return "mutating_control";
+  if (capability.requires_confirmation) return "user_confirmed_side_effect";
+  if (capability.mode === "act") return "ui_projection";
+  return "read_observe";
+};
 
 export const classifyProviderAgentCapability = (
   capabilityId: string | null | undefined,
 ): ProviderAgentCapabilityClassification | null => {
   const normalized = String(capabilityId ?? "").trim();
   if (!normalized) return null;
-  if (currentGatewayCapabilityIds.has(normalized)) {
+  const currentGatewayCapability = currentGatewayCapabilityById.get(normalized);
+  if (currentGatewayCapability) {
     return {
       capability_id: normalized,
       surface: "workstation_gateway",
       availability: "shared_gateway_now",
-      permission_class: "read_observe",
+      permission_class: permissionClassForSharedGatewayCapability(currentGatewayCapability),
       provider_availability: sharedProviderAvailability,
       required_contract_before_gateway: [],
       notes: "Already exposed through the shared workstation gateway manifest.",

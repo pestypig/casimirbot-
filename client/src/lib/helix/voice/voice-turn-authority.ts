@@ -48,6 +48,73 @@ export type VoiceReasoningResponseAuthorityDecision = {
   restart: boolean;
 };
 
+export type VoiceAuthoritySuppressionProjection = {
+  suppressionReason: string;
+  suppressionCause: string;
+  restartDetail: string;
+};
+
+export function resolveVoiceAuthoritySuppression(
+  reason: VoiceReasoningResponseAuthorityDecision["reason"],
+): VoiceAuthoritySuppressionProjection {
+  switch (reason) {
+    case "ok":
+      return {
+        suppressionReason: "voice_turn_response_inactive_attempt",
+        suppressionCause: "inactive_attempt",
+        restartDetail: "inactive_attempt; restarting",
+      };
+    case "continuation_merged":
+      return {
+        suppressionReason: "voice_turn_continuation_merged",
+        suppressionCause: "dispatch_hash_mismatch",
+        restartDetail: "dispatch_hash_mismatch; restarting",
+      };
+    case "phase_not_sealed":
+      return {
+        suppressionReason: "voice_turn_response_phase_not_sealed",
+        suppressionCause: "phase_not_sealed",
+        restartDetail: "phase_not_sealed; restarting",
+      };
+    case "seal_token_mismatch":
+      return {
+        suppressionReason: "voice_turn_response_seal_token_mismatch",
+        suppressionCause: "seal_token_mismatch",
+        restartDetail: "seal_token_mismatch; restarting",
+      };
+    case "sealed_revision_mismatch":
+      return {
+        suppressionReason: "voice_turn_response_sealed_revision_mismatch",
+        suppressionCause: "sealed_revision_mismatch",
+        restartDetail: "sealed_revision_mismatch; restarting",
+      };
+    case "dispatch_hash_mismatch":
+      return {
+        suppressionReason: "voice_turn_response_dispatch_hash_mismatch",
+        suppressionCause: "dispatch_hash_mismatch",
+        restartDetail: "dispatch_hash_mismatch; restarting",
+      };
+    case "stale_prompt":
+      return {
+        suppressionReason: "voice_turn_response_stale_prompt",
+        suppressionCause: "dispatch_hash_mismatch",
+        restartDetail: "dispatch_hash_mismatch; restarting",
+      };
+    case "inactive_attempt":
+      return {
+        suppressionReason: "voice_turn_response_inactive_attempt",
+        suppressionCause: "inactive_attempt",
+        restartDetail: "inactive_attempt; restarting",
+      };
+    default:
+      return {
+        suppressionReason: "voice_turn_response_suppressed",
+        suppressionCause: "inactive_attempt",
+        restartDetail: "inactive_attempt; restarting",
+      };
+  }
+}
+
 export function evaluateVoiceReasoningResponseAuthority(args: {
   source: ReasoningAttemptSource;
   continuationRestartRequested: boolean;

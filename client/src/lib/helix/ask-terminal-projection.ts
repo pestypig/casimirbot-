@@ -66,7 +66,8 @@ export function isInvalidTerminalAnswerText(value: string | null | undefined): b
   return (
     /^no final answer returned\.?$/i.test(normalized) ||
     /^I could not produce a substantive direct answer for this background-only turn\.?$/i.test(normalized) ||
-    /^I couldn't produce a final answer for that turn\. Please retry once\.?$/i.test(normalized)
+    /^I couldn't produce a final answer for that turn\. Please retry once\.?$/i.test(normalized) ||
+    /^I need retrieval before finalizing this claim\. I do not yet have grounded evidence references for it\.?$/i.test(normalized)
   );
 }
 

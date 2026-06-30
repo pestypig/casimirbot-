@@ -36,10 +36,21 @@ Optional:
 - `include_collaboration_bounds`
 - `include_falsification_hooks`
 
+Explicit route alias:
+
+- `helix_ask.reflect_civilization_bounds`
+
+This alias is not a separate provider gateway tool. It may be admitted only as
+an alias that executes the canonical
+`civilization-bounds.reflect_system_bounds` gateway capability, with the
+requested alias recorded as `source_target_intent.alias_capability`.
+
 Blocked:
 
 - missing prompt
 - prompt asking the tool name as text only
+- quoted, negated, future, or UI-label mentions of
+  `helix_ask.reflect_civilization_bounds`
 - attempts to use the reflection as proof of feasibility, deployment readiness,
   national capacity, or transport authority
 

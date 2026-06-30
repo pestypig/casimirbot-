@@ -336,6 +336,7 @@ function formatHelixGatewayObservationText(args: {
   call: Record<string, unknown>;
   packet: Record<string, unknown> | null;
   ok: boolean;
+  isAction?: boolean;
 }): string {
   const explicitText =
     coerceText(args.call.text).trim() ||
@@ -361,11 +362,13 @@ function formatHelixGatewayObservationText(args: {
     coerceText(args.call.error).trim();
   if (summary) {
     const cleanSummary = summary.replace(/\.$/, "");
-    return `${args.ok ? "Tool observation" : "Tool observation"}: ${args.capabilityId} ${args.ok ? "observed" : "blocked"} ${cleanSummary}.`;
+    const prefix = args.isAction ? "Action observation" : "Tool observation";
+    return `${prefix}: ${args.capabilityId} ${args.ok ? "observed" : "blocked"} ${cleanSummary}.`;
   }
+  const prefix = args.isAction ? "Action observation" : "Tool observation";
   return args.ok
-    ? `Tool observation: ${args.capabilityId} produced a workstation observation packet.`
-    : `Tool observation: ${args.capabilityId} did not produce a successful workstation observation packet.`;
+    ? `${prefix}: ${args.capabilityId} produced a workstation observation packet.`
+    : `${prefix}: ${args.capabilityId} did not produce a successful workstation observation packet.`;
 }
 
 function isHelixGatewayActionCapability(capabilityId: string, call: Record<string, unknown>): boolean {
@@ -414,7 +417,7 @@ export function buildHelixWorkstationGatewayTranscriptEvents(reply: HelixAskTran
       role: "tool",
       type: "tool_result",
       status: ok ? "completed" : "failed",
-      text: formatHelixGatewayObservationText({ capabilityId, call, packet, ok }),
+      text: formatHelixGatewayObservationText({ capabilityId, call, packet, ok, isAction }),
       detail: coerceText(packet?.observation_summary).trim() || coerceText(call.error).trim() || capabilityId,
       lane: capabilityId,
       step_id: stepId,

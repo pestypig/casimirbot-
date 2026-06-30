@@ -4,6 +4,7 @@ import {
   composeVoiceBriefWithDecision,
   describeVoiceCommandAction,
   describeVoiceInputError,
+  formatReasoningAttemptDetail,
   formatVoiceDecisionSentence,
   resolveReasoningAttemptTimelineText,
 } from "../ask-voice-copy-display";
@@ -85,5 +86,12 @@ describe("ask voice copy display helpers", () => {
     expect(resolveReasoningAttemptTimelineText({ source: "voice_auto", prompt, recordedText: "recorded" })).toBe(
       "recorded",
     );
+  });
+
+  it("formats reasoning attempt details without owning timeline mutation", () => {
+    expect(formatReasoningAttemptDetail({ mode: "verify" }, null)).toBe("mode:verify");
+    expect(formatReasoningAttemptDetail({ mode: "act" }, "running")).toBe("mode:act");
+    expect(formatReasoningAttemptDetail({ mode: null }, "running")).toBe("running");
+    expect(formatReasoningAttemptDetail({}, null)).toBeNull();
   });
 });

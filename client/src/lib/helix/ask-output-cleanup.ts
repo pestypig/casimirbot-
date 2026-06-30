@@ -2,6 +2,35 @@ const HELIX_ASK_ANSWER_BOUNDARY_PREFIX_RE = /^\s*ANSWER_(?:START|END)\b\s*/i;
 export const HELIX_ASK_ANSWER_MARKER_SPLIT_RE = /\b(?:ANSWER_START|ANSWER_END)\b/gi;
 
 const QUESTION_PREFIX = /^question\s*:\s*/i;
+const HELIX_ASK_METHOD_TRIGGER = /(scientific method|methodology|method\b)/i;
+const HELIX_ASK_STEP_TRIGGER =
+  /(how to|how does|how do|steps?|step-by-step|procedure|process|workflow|pipeline|implement|implementation|configure|setup|set up|troubleshoot|debug|fix|resolve)/i;
+const HELIX_ASK_COMPARE_TRIGGER =
+  /(compare|versus|vs\.?|difference|better|worse|more accurate|accuracy|tradeoffs|advantages|what is|what's|why is|why are|how is|how are)/i;
+
+export type HelixAskFormat = "steps" | "compare" | "brief";
+
+export function decideHelixAskFormat(question?: string): { format: HelixAskFormat; stageTags: boolean } {
+  const normalized = question?.trim().toLowerCase() ?? "";
+  if (!normalized) {
+    return { format: "brief", stageTags: false };
+  }
+  if (HELIX_ASK_METHOD_TRIGGER.test(normalized)) {
+    return { format: "steps", stageTags: true };
+  }
+  if (HELIX_ASK_STEP_TRIGGER.test(normalized)) {
+    return { format: "steps", stageTags: false };
+  }
+  if (
+    HELIX_ASK_COMPARE_TRIGGER.test(normalized) ||
+    normalized.startsWith("why ") ||
+    normalized.startsWith("what is") ||
+    normalized.startsWith("what's")
+  ) {
+    return { format: "compare", stageTags: false };
+  }
+  return { format: "brief", stageTags: false };
+}
 
 export function stripAnswerBoundaryPrefix(value: string): string {
   let cursor = value.trimStart();

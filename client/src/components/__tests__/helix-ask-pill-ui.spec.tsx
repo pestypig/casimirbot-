@@ -231,6 +231,7 @@ beforeAll(async () => {
 });
 
 const pillPath = path.resolve(process.cwd(), "client/src/components/helix/HelixAskPill.tsx");
+const docsViewerContextPath = path.resolve(process.cwd(), "client/src/lib/helix/ask-doc-viewer-context.ts");
 
 describe("HelixAskPill mic-first surface contract", () => {
   it("keeps completed Ask answers in timestamp order after stale active rows arrive", () => {
@@ -1154,10 +1155,12 @@ describe("HelixAskPill mic-first surface contract", () => {
 
   it("preserves retained docs-viewer URL context in Ask workspace snapshots", () => {
     const source = fs.readFileSync(pillPath, "utf8");
+    const docsContextSource = fs.readFileSync(docsViewerContextPath, "utf8");
     expect(source).toContain("readDocViewerPathFromDesktopUrlForAskSnapshot");
     expect(source).toContain('params.get("doc")');
     expect(source).toContain('source: "desktop_url_doc_param"');
-    expect(source).toContain('normalized.startsWith("docs/")');
+    expect(source).toContain("normalizeDocViewerPathForAskSnapshot");
+    expect(docsContextSource).toContain('normalized.startsWith("docs/")');
   });
 
   it("promotes current whitepaper prompts to the retained docs-viewer path", () => {
@@ -1765,7 +1768,11 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("helixReasoningFloatingText");
     expect(source).toContain("readReasoningTheaterHardFailureSignals");
     expect(source).toContain("applyReasoningTheaterFailureOverride");
-    expect(source).toContain("terminal_artifact_forbidden_by_route_contract");
+    const hardFailureSource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/lib/helix/ask-reasoning-theater-hard-failure.ts"),
+      "utf8",
+    );
+    expect(hardFailureSource).toContain("terminal_artifact_forbidden_by_route_contract");
     expect(source).toContain("buildReasoningBattleAmbientState");
     expect(source).toContain("buildReasoningBattleAnswerTint");
     expect(source).toContain("buildReasoningBattleBeats");
@@ -3873,6 +3880,44 @@ describe("HelixAskPill mic helper behavior", () => {
         workstation_gateway_observation_packets: [],
       } as never,
       proof: undefined,
+    });
+
+    expect(decision.blocked).toBe(false);
+    expect(decision.hard_claim).toBe(false);
+    expect(decision.reason).toBeNull();
+  });
+
+  it("does not retrieval-gate multiline quoted translation payloads with tool contract text", () => {
+    const decision = evaluateEvidenceFinalizationGate({
+      question:
+        'translate to japanese "I donâ€™t see a voice/speak-out-loud tool admitted for this turn.\nThe available Helix workstation capabilities here include things like calculator, docs/search, repo search, web search, panel open/focus, and status/context observation. None of the listed capabilities is a voice callout or text-to-speech action where I can submit text to be spoken aloud.\nSo for this turn: I can reason about the intended voice-tool contract, but I canâ€™t invoke it or claim anything was said out loud unless Helix exposes a voice capability and returns an action receipt/observation for it."',
+      mode: "read",
+      debug: {
+        selected_final_answer:
+          "ã“ã®ã‚¿ãƒ¼ãƒ³ã§ã¯ã€éŸ³å£°ï¼èª­ã¿ä¸Šã’ãƒ„ãƒ¼ãƒ«ãŒè¨±å¯ã•ã‚Œã¦ã„ã‚‹ã‚ˆã†ã«ã¯è¦‹ãˆã¾ã›ã‚“ã€‚",
+        workstation_gateway_call_results: [],
+        workstation_gateway_observation_packets: [],
+      } as never,
+      proof: undefined,
+    });
+
+    expect(decision.blocked).toBe(false);
+    expect(decision.hard_claim).toBe(false);
+    expect(decision.reason).toBeNull();
+  });
+
+  it("does not retrieval-gate quoted translation payloads when local mode classification says verify", () => {
+    const decision = evaluateEvidenceFinalizationGate({
+      question:
+        'translate to japanese "I donâ€™t see a voice/speak-out-loud tool admitted for this turn.\nThe available Helix workstation capabilities here include calculator, docs/search, repo search, web search, panel open/focus, and status/context observation. I canâ€™t claim anything was said out loud unless Helix exposes a voice capability and returns an action receipt/observation for it."',
+      mode: "verify",
+      debug: {
+        selected_final_answer:
+          "このターンでは、音声/読み上げツールが許可されているようには見えません。",
+        workstation_gateway_call_results: [],
+        workstation_gateway_observation_packets: [],
+      } as never,
+      proof: { artifacts: [] } as never,
     });
 
     expect(decision.blocked).toBe(false);

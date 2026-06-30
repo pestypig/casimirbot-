@@ -30,12 +30,22 @@ Optional:
 - `limit`
 - `source_target_intent`
 
+Explicit route alias:
+
+- `internet_search.web_research`
+
+This alias is not a separate provider gateway tool. It may be admitted only as
+an alias that executes the canonical `internet-search.search_web` gateway
+capability, with the requested alias recorded as
+`source_target_intent.alias_capability`.
+
 Blocked:
 
 - missing query
 - query too broad
 - quoted, negated, historical, future, or screen-visible tool mentions
 - prompt asking what the text `internet-search.search_web` means
+- prompt asking what the text `internet_search.web_research` means
 
 ## Observation
 

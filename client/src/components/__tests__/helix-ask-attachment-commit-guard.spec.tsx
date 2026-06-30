@@ -82,7 +82,8 @@ describe("Helix Ask attachment commit guard", () => {
     expect(source).toContain('allow_client_shortcut: false');
     expect(source).toContain('suppressed_routes: ["conversation:simple", "model_only_concept", "workspace_diagnostic"]');
     expect(source).toContain("options?.bypassWorkstationDispatch === true || backendOwnedPastedTextResumeRecall");
-    expect(source).toContain("!backendOwnedPastedTextResumeRecall && isSimpleConversationTurnCandidate(trimmed)");
+    expect(source).toContain("const simpleConversationTurnLane =");
+    expect(source).toContain("isSimpleConversationTurnCandidate(trimmed)");
     expect(source).toContain("!backendOwnedPastedTextResumeRecall &&");
     expect(source).toContain("routeMetadata: routeMetadataForTurn");
   });
@@ -149,6 +150,7 @@ describe("Helix Ask attachment commit guard", () => {
     expect(source).toContain('args.finalAnswerSource === "artifact_synthesis" && args.terminalArtifactKind === "doc_summary"');
     expect(source).toContain('args.finalAnswerSource === "artifact_synthesis" && args.routeReasonCode?.includes("active_doc_summary")');
     expect(source).toContain('!["unknown", "typed_failure", "legacy_fallback"].includes(args.finalAnswerSource)');
-    expect(source).toContain("terminalAuthorityRecord?.final_answer_source");
+    expect(source).toContain("shouldPreserveAuthoritativeTerminalOverEvidenceGate({");
+    expect(source).toContain("finalAnswerSource:");
   });
 });

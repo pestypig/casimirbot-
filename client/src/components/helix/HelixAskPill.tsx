@@ -44,6 +44,7 @@ import {
 } from "@/lib/agi/api";
 import {
   buildDebugExportDrawerFallbackResult,
+  hashDebugExportText,
   type DebugExportUiResult,
 } from "@/lib/agi/debugExport";
 import { buildHelixAskClientBypassAudit, buildWorkspaceActionClientAckSnapshot } from "@/lib/agi/workspaceActionAck";
@@ -222,6 +223,9 @@ import {
   readHelixAskDebugContextFromMeta,
   resolveAskLiveEventTimestampMs,
   safeJsonStringify,
+  summarizeHelixAgentRuntimeLoopForCopy,
+  summarizeHelixDebugArtifactsForCopy,
+  summarizeHelixDebugObservationForCopy,
   type AskLiveEventEntry,
 } from "@/lib/helix/ask-debug-event-display";
 export { parseHelixAskQueuedQuestionsInput };
@@ -247,6 +251,7 @@ import {
 import {
   HELIX_ASK_ANSWER_MARKER_SPLIT_RE,
   cleanPromptLine,
+  decideHelixAskFormat,
   normalizeQuestionMatch,
   stripAnswerBoundaryPrefix,
   stripInlineQuestionLine,
@@ -258,11 +263,30 @@ import {
   SESSION_CAPSULE_CONFIDENCE_LABEL,
   buildContextCapsuleCopyText,
   buildContextCapsuleStampDataUri,
-  resolveSessionCapsuleConfidenceBand,
   resolveContextCapsulePalette,
   stripContextCapsuleTokensFromText,
-  type SessionCapsuleConfidenceBand,
 } from "@/lib/helix/ask-context-capsule-display";
+import {
+  HELIX_CONTEXT_CAPSULE_MAX_IDS,
+  buildLatestWinsContextCapsuleIds,
+  buildSelectedContextCapsuleIds,
+  compareContextCapsuleSummariesByRank,
+  deriveSessionCapsuleState,
+  upsertContextCapsuleLedger,
+  type ContextCapsuleLedgerEntry,
+  type SessionCapsuleState,
+} from "@/lib/helix/ask-context-capsule-ledger";
+export {
+  buildLatestWinsContextCapsuleIds,
+  buildSelectedContextCapsuleIds,
+  compareContextCapsuleSummariesByRank,
+  deriveSessionCapsuleState,
+  upsertContextCapsuleLedger,
+};
+export type {
+  ContextCapsuleLedgerEntry,
+  SessionCapsuleState,
+};
 import {
   formatEnvelopeSectionsForCopy,
   normalizeHelixAskEnvelopeCitations,
@@ -270,23 +294,38 @@ import {
 import {
   extractExplicitDocsViewerPath,
   normalizeDocPathForDebugCompare,
+  normalizeDocViewerPathForAskSnapshot,
   normalizeDocsViewerAnchorPath,
 } from "@/lib/helix/ask-doc-viewer-context";
 import {
   formatGoalPillCadence,
   labelizeGoalPillValue,
 } from "@/lib/helix/ask-goal-pill-display";
+import { isAgibotPreflightScopeError } from "@/lib/helix/ask-agibot-preflight-error";
+export { isAgibotPreflightScopeError };
+import {
+  isLikelyIdeologyDomainLeak,
+  isMultilangConfidenceGateResponse,
+} from "@/lib/helix/ask-local-fallback-classification";
 import { humanizeAskLiveEventToken } from "@/lib/helix/ask-display-text";
 import { hash32, stableHelixProjectionHash } from "@/lib/helix/ask-stable-hash";
+import {
+  readHelixEnvBoolean,
+  readHelixEnvEnabledUnlessExactZero,
+  readHelixEnvEnabledUnlessZero,
+  readHelixEnvNumber,
+  readHelixEnvOneFlag,
+  readHelixEnvPercent,
+} from "@/lib/helix/ask-env-config";
 import {
   asNonEmptyString,
   asObjectRecord,
   asStringArray,
+  clamp01,
   clampNumber,
   clipText,
   coerceText,
   dedupeStrings,
-  readNumber,
 } from "@/lib/helix/ask-value-normalization";
 import {
   buildVoiceAutoSpeakUtteranceId,
@@ -428,22 +467,20 @@ import {
   summarizeVoiceDebugText,
 } from "@/lib/helix/ask-voice-text-display";
 import {
-  MIC_PLAYBACK_BARGE_MIN_SNR_DB,
-  MIC_PLAYBACK_BARGE_MIN_SPEECH_PROBABILITY,
-  MIC_PLAYBACK_BARGE_RMS_MULTIPLIER,
-  MIC_PLAYBACK_BARGE_STRONG_SPEECH_PROBABILITY,
   VOICE_FLAT_SIGNAL_VARIANCE_THRESHOLD,
   VOICE_FLAT_SIGNAL_WINDOW_MS,
   VOICE_LOCAL_AUDIO_GATE_MIN_DURATION_MS,
   VOICE_LOCAL_AUDIO_GATE_MIN_SNR_DB,
   VOICE_LOCAL_AUDIO_GATE_MIN_SPEECH_PROBABILITY,
   describeMediaErrorCode,
-  isLikelyLoopbackDeviceLabel,
+  getMicRecorderMimeCandidates,
   isFlatVoiceSignal,
+  isLikelyLoopbackDeviceLabel,
   isLowAudioQualitySignal,
   isRecorderStalled,
   resolveVoiceNoiseHandlingProfile,
   shouldPrimeSegmentWithContainerHeader,
+  shouldTreatMicSignalAsSpeech,
   smoothVoiceLevel,
   type VoiceNoiseHandlingProfile,
 } from "@/lib/helix/ask-voice-capture-display";
@@ -460,6 +497,7 @@ import {
   composeVoiceBriefWithDecision,
   describeVoiceInputError,
   describeVoiceCommandAction,
+  formatReasoningAttemptDetail,
   formatVoiceDecisionSentence,
   laneLabelForConversationMode,
   normalizeConversationRouteReasonCode,
@@ -472,6 +510,7 @@ export {
   cleanReasoningDisplayArtifacts,
   composeVoiceBriefWithDecision,
   describeVoiceCommandAction,
+  formatReasoningAttemptDetail,
   formatVoiceDecisionSentence,
   hasRuntimeFallbackArtifactSpill,
   isArtifactDominatedReasoningText,
@@ -480,12 +519,14 @@ export {
   stripVoiceCitationArtifacts,
 };
 export {
+  getMicRecorderMimeCandidates,
   isLikelyLoopbackDeviceLabel,
   isFlatVoiceSignal,
   isLowAudioQualitySignal,
   isRecorderStalled,
   resolveVoiceNoiseHandlingProfile,
   shouldPrimeSegmentWithContainerHeader,
+  shouldTreatMicSignalAsSpeech,
   smoothVoiceLevel,
 };
 export type { VoiceNoiseHandlingProfile } from "@/lib/helix/ask-voice-capture-display";
@@ -577,9 +618,7 @@ import {
 import {
   evaluateVoiceReasoningResponseAuthority,
   evaluateVoiceTurnSealGate,
-  type ReasoningAttemptSource,
-  type ReasoningAttemptStatus,
-  type VoiceReasoningResponseAuthorityDecision,
+  resolveVoiceAuthoritySuppression,
 } from "@/lib/helix/voice/voice-turn-authority";
 export {
   mergeVoiceTranscriptDraft,
@@ -588,6 +627,7 @@ export {
 export {
   evaluateVoiceReasoningResponseAuthority,
   evaluateVoiceTurnSealGate,
+  resolveVoiceAuthoritySuppression,
 };
 export type {
   VoiceDispatchTranscriptSource,
@@ -669,6 +709,8 @@ import {
   type VoicePlaybackOutcomeStatus,
 } from "@/lib/helix/voice-capture-diagnostics";
 import {
+  buildVoicePlaybackReconciliationDebug,
+  resolveVoiceTimelineClientBuildStamp as resolveVoiceTimelineClientBuildStampFromInputs,
   sanitizeVoiceDiagnosticsForExport,
 } from "@/lib/helix/ask-voice-diagnostics-export";
 import {
@@ -721,15 +763,42 @@ import {
   REASONING_THEATER_MEDAL_ASSET,
   REASONING_THEATER_MEDAL_LABEL,
   REASONING_THEATER_PHASE_LABEL,
+  REASONING_THEATER_SUPPRESSION_REASONS,
   REASONING_THEATER_STANCE_META,
+  buildMirekReasoningDisplayGrid,
   buildReasoningTheaterParticlesFromMirekArtifact,
   buildReasoningTheaterFrontierParticles,
   mirekCellGridClassName,
   mirekCellParticleClassName,
   resolveReasoningTheaterCertaintyClass,
+  resolveReasoningTheaterMedal,
+  resolveReasoningTheaterPhase,
+  resolveReasoningTheaterSuppressionReason,
+  type ReasoningTheaterCertaintyClass,
+  type ReasoningTheaterMedal,
+  type ReasoningTheaterMedalEvent,
+  type ReasoningTheaterPhase,
   type ReasoningTheaterParticle,
   type ReasoningTheaterFrontierParticleNode,
+  type ReasoningTheaterSuppressionReason,
+  type MirekReasoningDisplayGrid,
 } from "@/lib/helix/ask-reasoning-theater-display";
+import {
+  readReasoningTheaterHardFailureSignals,
+  type ReasoningTheaterHardFailureSignals,
+} from "@/lib/helix/ask-reasoning-theater-hard-failure";
+import {
+  buildMirekEvidenceAnchors,
+  calculateMirekSharedExactPathRatio,
+  collectMirekEvidencePathsFromLiveEvents,
+  collectMirekEvidencePathsFromValue,
+} from "@/lib/helix/ask-reasoning-theater-evidence";
+export {
+  readReasoningTheaterHardFailureSignals,
+};
+export type {
+  ReasoningTheaterHardFailureSignals,
+};
 import {
   deriveConvergenceStripState,
   type ConvergenceCollapseEvent,
@@ -784,8 +853,6 @@ import {
 } from "@shared/helix-context-capsule";
 import {
   buildMirekReasoningArtifact,
-  type MirekAnchorInput,
-  type MirekCellKind,
   type MirekReasoningArtifactV1,
   type MirekReasoningCanonicalStateV1,
 } from "@shared/helix-reasoning-mirek";
@@ -865,41 +932,58 @@ const VOICE_PLAYBACK_NO_PROGRESS_TIMEOUT_MS = 3_500;
 const VOICE_PLAYBACK_UNKNOWN_DURATION_TIMEOUT_MS = 15_000;
 const VOICE_PLAYBACK_DURATION_TIMEOUT_PAD_MS = 4_000;
 const VOICE_PLAYBACK_DURATION_TIMEOUT_MAX_MS = 60_000;
-const HELIX_VOICE_FORCE_DIRECT_MOBILE =
-  String((import.meta as any)?.env?.VITE_HELIX_VOICE_FORCE_DIRECT_MOBILE ?? "").trim() === "1";
-const HELIX_VOICE_CONFIRM_V2_ENABLED = parseVoiceEnvBoolean("VITE_HELIX_VOICE_CONFIRM_V2_ENABLED", true);
-const HELIX_VOICE_CONFIRM_V2_SHADOW = parseVoiceEnvBoolean("VITE_HELIX_VOICE_CONFIRM_V2_SHADOW", false);
-const HELIX_VOICE_CONFIRM_V2_ACTIVE_PERCENT = parseVoiceEnvPercent(
+const HELIX_VOICE_FORCE_DIRECT_MOBILE = readHelixEnvOneFlag(
+  (import.meta as any)?.env,
+  "VITE_HELIX_VOICE_FORCE_DIRECT_MOBILE",
+  false,
+);
+const HELIX_VOICE_CONFIRM_V2_ENABLED = readHelixEnvBoolean(
+  (import.meta as any)?.env,
+  "VITE_HELIX_VOICE_CONFIRM_V2_ENABLED",
+  true,
+);
+const HELIX_VOICE_CONFIRM_V2_SHADOW = readHelixEnvBoolean(
+  (import.meta as any)?.env,
+  "VITE_HELIX_VOICE_CONFIRM_V2_SHADOW",
+  false,
+);
+const HELIX_VOICE_CONFIRM_V2_ACTIVE_PERCENT = readHelixEnvPercent(
+  (import.meta as any)?.env,
   "VITE_HELIX_VOICE_CONFIRM_V2_ACTIVE_PERCENT",
   100,
 );
-const HELIX_VOICE_CONFIRM_V2_KILL_SWITCH = parseVoiceEnvBoolean(
+const HELIX_VOICE_CONFIRM_V2_KILL_SWITCH = readHelixEnvBoolean(
+  (import.meta as any)?.env,
   "VITE_HELIX_VOICE_CONFIRM_V2_KILL_SWITCH",
   false,
 );
-const HELIX_VOICE_LOCAL_AUDIO_GATE_ENABLED = parseVoiceEnvBoolean(
+const HELIX_VOICE_LOCAL_AUDIO_GATE_ENABLED = readHelixEnvBoolean(
+  (import.meta as any)?.env,
   "VITE_HELIX_VOICE_LOCAL_AUDIO_GATE_ENABLED",
   true,
 );
-const HELIX_VOICE_SESSION_SPEAKER_ENABLED = parseVoiceEnvBoolean(
+const HELIX_VOICE_SESSION_SPEAKER_ENABLED = readHelixEnvBoolean(
+  (import.meta as any)?.env,
   "VITE_HELIX_VOICE_SESSION_SPEAKER_ENABLED",
   true,
 );
-const HELIX_VOICE_MULTISPEAKER_UI_ENABLED = parseVoiceEnvBoolean(
+const HELIX_VOICE_MULTISPEAKER_UI_ENABLED = readHelixEnvBoolean(
+  (import.meta as any)?.env,
   "VITE_HELIX_VOICE_MULTISPEAKER_UI_ENABLED",
   false,
 );
-const HELIX_VOICE_COMMAND_LANE_ENABLED = parseVoiceEnvBoolean(
+const HELIX_VOICE_COMMAND_LANE_ENABLED = readHelixEnvBoolean(
+  (import.meta as any)?.env,
   "VITE_HELIX_VOICE_COMMAND_LANE_ENABLED",
   false,
 );
 const HELIX_VOICE_TRANSCRIBE_QUEUE_MAX = Math.max(
   1,
-  Math.floor(readNumber((import.meta as any)?.env?.VITE_HELIX_VOICE_TRANSCRIBE_QUEUE_MAX, 4)),
+  Math.floor(readHelixEnvNumber((import.meta as any)?.env, "VITE_HELIX_VOICE_TRANSCRIBE_QUEUE_MAX", 4)),
 );
 const HELIX_VOICE_AUTO_DISPATCH_MAX_PER_MINUTE = Math.max(
   1,
-  Math.floor(readNumber((import.meta as any)?.env?.VITE_HELIX_VOICE_AUTO_DISPATCH_MAX_PER_MINUTE, 3)),
+  Math.floor(readHelixEnvNumber((import.meta as any)?.env, "VITE_HELIX_VOICE_AUTO_DISPATCH_MAX_PER_MINUTE", 3)),
 );
 const HELIX_VOICE_AUTO_DISPATCH_WINDOW_MS = 60_000;
 const HELIX_VOICE_AUTO_DISPATCH_CONFIDENCE_FLOOR = 0.5;
@@ -975,27 +1059,39 @@ const HELIX_STRONG_REASONING_REQUEST_RE =
 const HELIX_SIMPLE_CONVERSATION_RE =
   /^(?:hi|hello|hey|yo|sup|howdy|good morning|good afternoon|good evening|thanks|thank you|thx|ok|okay|cool|sounds good|great|awesome|nice|how are you|what's up|whats up|all good)(?:[.!?]+)?$/i;
 export const HELIX_E1_SINGLE_TURN_CONTRACT_FLAG =
-  String((import.meta as { env?: Record<string, string | boolean | undefined> }).env?.HELIX_E1_SINGLE_TURN_CONTRACT ?? "1")
-    .trim()
-    .toLowerCase() !== "0";
+  readHelixEnvEnabledUnlessZero(
+    (import.meta as { env?: Record<string, string | boolean | undefined> }).env,
+    "HELIX_E1_SINGLE_TURN_CONTRACT",
+    true,
+  );
 export const HELIX_E2_TRANSITION_ERRORS_FLAG =
-  String((import.meta as { env?: Record<string, string | boolean | undefined> }).env?.HELIX_E2_TRANSITION_ERRORS ?? "0")
-    .trim()
-    .toLowerCase() === "1";
+  readHelixEnvOneFlag(
+    (import.meta as { env?: Record<string, string | boolean | undefined> }).env,
+    "HELIX_E2_TRANSITION_ERRORS",
+    false,
+  );
 export const HELIX_E3_TERMINAL_GUARANTEE_FLAG =
-  String((import.meta as { env?: Record<string, string | boolean | undefined> }).env?.HELIX_E3_TERMINAL_GUARANTEE ?? "0")
-    .trim()
-    .toLowerCase() === "1";
+  readHelixEnvOneFlag(
+    (import.meta as { env?: Record<string, string | boolean | undefined> }).env,
+    "HELIX_E3_TERMINAL_GUARANTEE",
+    false,
+  );
 export const HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG =
-  String((import.meta as { env?: Record<string, string | boolean | undefined> }).env?.HELIX_E6_ASK_TURN_MANUAL_CANARY ?? "1")
-    .trim()
-    .toLowerCase() !== "0";
+  readHelixEnvEnabledUnlessZero(
+    (import.meta as { env?: Record<string, string | boolean | undefined> }).env,
+    "HELIX_E6_ASK_TURN_MANUAL_CANARY",
+    true,
+  );
 export const HELIX_E6_ASK_TURN_VOICE_PARITY_FLAG =
   true;
 export const HELIX_VOICE_LEGACY_DISPATCH_FALLBACK_FLAG =
-  String((import.meta as { env?: Record<string, string | boolean | undefined> }).env?.HELIX_VOICE_LEGACY_DISPATCH_FALLBACK ?? "0")
-    .trim()
-    .toLowerCase() === "1";
+  readHelixEnvOneFlag(
+    (import.meta as { env?: Record<string, string | boolean | undefined> }).env,
+    "HELIX_VOICE_LEGACY_DISPATCH_FALLBACK",
+    false,
+  );
+const HELIX_ASK_COMPARE_TRIGGER =
+  /(compare|versus|vs\.?|difference|better|worse|more accurate|accuracy|tradeoffs|advantages|what is|what's|why is|why are|how is|how are)/i;
 
 function hasExplicitWorkspaceThenReasoningCue(question: string): boolean {
   const text = question.trim().toLowerCase();
@@ -1367,8 +1463,7 @@ export function evaluateEvidenceFinalizationGate(input: {
   proof?: HelixAskReply["proof"] | null;
 }): EvidenceFinalizationGateDecision {
   const normalizedQuestion = input.question.trim();
-  const quotedTransformOnlyQuestion =
-    input.mode !== "verify" && isQuotedTransformOnlyForEvidenceGate(normalizedQuestion);
+  const quotedTransformOnlyQuestion = isQuotedTransformOnlyForEvidenceGate(normalizedQuestion);
   const literalToolTextOnlyQuestion =
     input.mode !== "verify" &&
     !quotedTransformOnlyQuestion &&
@@ -1683,22 +1778,6 @@ function resolveWorkstationRouterFailId(
   }
 }
 
-function parseVoiceEnvBoolean(key: string, fallback: boolean): boolean {
-  const raw = String((import.meta as any)?.env?.[key] ?? "").trim().toLowerCase();
-  if (!raw) return fallback;
-  if (raw === "1" || raw === "true" || raw === "yes") return true;
-  if (raw === "0" || raw === "false" || raw === "no") return false;
-  return fallback;
-}
-
-function parseVoiceEnvPercent(key: string, fallback: number): number {
-  const raw = String((import.meta as any)?.env?.[key] ?? "").trim();
-  if (!raw) return Math.max(0, Math.min(100, fallback));
-  const parsed = Number(raw);
-  if (!Number.isFinite(parsed)) return Math.max(0, Math.min(100, fallback));
-  return Math.max(0, Math.min(100, Math.round(parsed)));
-}
-
 function resolveExternalPromptClaimId(pending: PendingHelixAskPrompt | null, question: string): string {
   const promptId = pending?.promptId?.trim();
   if (promptId) return promptId;
@@ -1800,32 +1879,6 @@ export function shouldBypassVoicePlaybackGraph(params: {
 }): boolean {
   if (params.bypassUntilMs === null) return false;
   return params.nowMs < params.bypassUntilMs;
-}
-
-function isLikelyIdeologyDomainLeak(args: {
-  promptText?: string;
-  outputText: string;
-}): boolean {
-  const prompt = (args.promptText ?? "").trim();
-  const output = args.outputText.trim();
-  if (!prompt || !output) return false;
-  if (
-    !/\b(?:mission ethos|ideology scope|warp vessel|radiance to the sun|stewardship policy)\b/i.test(output)
-  ) {
-    return false;
-  }
-  if (/\b(?:mission ethos|ideology|ethos|warp bubble|warp drive|alcubierre|natario)\b/i.test(prompt)) {
-    return false;
-  }
-  const promptTerms = new Set(extractIntentTerms(prompt, 18));
-  if (promptTerms.size === 0) return true;
-  let overlap = 0;
-  for (const term of extractIntentTerms(output, 24)) {
-    if (!promptTerms.has(term)) continue;
-    overlap += 1;
-    if (overlap >= 2) return false;
-  }
-  return true;
 }
 
 export function isActivePlayback(audio: HTMLAudioElement | null, active: HTMLAudioElement): boolean {
@@ -2611,7 +2664,7 @@ const MIC_PLAYBACK_BARGE_THRESHOLD_MULTIPLIER_MOBILE = 1.5;
 const VOICE_TRANSCRIPTION_BREATH_WINDOW_MS = 2600;
 const VOICE_TURN_CLOSE_SILENCE_MS = 3200;
 const VOICE_TURN_SEAL_POLL_MS = clampNumber(
-  readNumber((import.meta as any)?.env?.VITE_HELIX_VOICE_TURN_SEAL_POLL_MS, 140),
+  readHelixEnvNumber((import.meta as any)?.env, "VITE_HELIX_VOICE_TURN_SEAL_POLL_MS", 140),
   60,
   1500,
 );
@@ -2625,7 +2678,7 @@ const VOICE_CHUNK_SYNTH_RETRY_MAX_MS = 4000;
 // One artifact restart, then ask for clarification to avoid repeated restart loops.
 const VOICE_ARTIFACT_RESTART_MAX_ATTEMPTS = 2;
 const VOICE_PHASE_NOT_SEALED_RETRY_MAX_ATTEMPTS = clampNumber(
-  readNumber((import.meta as any)?.env?.VITE_HELIX_VOICE_PHASE_NOT_SEALED_RETRY_MAX_ATTEMPTS, 40),
+  readHelixEnvNumber((import.meta as any)?.env, "VITE_HELIX_VOICE_PHASE_NOT_SEALED_RETRY_MAX_ATTEMPTS", 40),
   8,
   120,
 );
@@ -2651,7 +2704,6 @@ const VOICE_TRANSCRIPT_AUTO_CONFIRM_DELAY_MS = 3000;
 const VOICE_TRANSCRIPT_AUTO_CONFIRM_BLOCK_PIVOT_CONFIDENCE = 0.68;
 const VOICE_SESSION_SPEAKER_MATCH_DISTANCE = 0.42;
 const VOICE_SESSION_SPEAKER_MAX_PROFILES = 3;
-const HELIX_CONTEXT_CAPSULE_MAX_IDS = 12;
 const HELIX_CONTEXT_CAPSULE_AUTO_APPLY_IDS_VOICE = HELIX_CONTEXT_CAPSULE_MAX_IDS;
 const HELIX_CONTEXT_CAPSULE_AUTO_APPLY_IDS_MANUAL = HELIX_CONTEXT_CAPSULE_MAX_IDS;
 const HELIX_VOICE_AUTO_SPEAK_DEFAULT_PROFILE_ID = "vU0dJF9WOwsWEUfX1Aqw";
@@ -2659,263 +2711,6 @@ const HELIX_VOICE_AUTO_SPEAK_PROVIDER = "elevenlabs";
 const HELIX_VOICE_AUTO_SPEAK_QUEUE_MAX = 8;
 const HELIX_VOICE_AUTO_SPEAK_TEXT_MAX_CHARS = 2400;
 const HELIX_VOICE_DEBUG_TIMELINE_LIMIT = 280;
-
-const CONTEXT_CAPSULE_PROOF_POSTURE_SCORE: Record<ContextCapsuleConvergence["proofPosture"], number> = {
-  confirmed: 5,
-  reasoned: 4,
-  hypothesis: 3,
-  unknown: 2,
-  fail_closed: 1,
-};
-
-const CONTEXT_CAPSULE_MATURITY_SCORE: Record<ContextCapsuleConvergence["maturity"], number> = {
-  certified: 4,
-  diagnostic: 3,
-  reduced_order: 2,
-  exploratory: 1,
-};
-
-const CONTEXT_CAPSULE_PROOF_VERDICT_SCORE: Record<ContextCapsuleSummary["commit"]["proof_verdict"], number> = {
-  PASS: 3,
-  UNKNOWN: 2,
-  FAIL: 1,
-};
-
-export function deriveSessionCapsuleState(
-  entries: ContextCapsuleLedgerEntry[],
-): SessionCapsuleState | null {
-  if (!Array.isArray(entries) || entries.length === 0) return null;
-  const latest = [...entries].sort((a, b) => {
-    const touchedDelta = b.touchedAtMs - a.touchedAtMs;
-    if (touchedDelta !== 0) return touchedDelta;
-    const createdDelta = b.summary.createdAtTsMs - a.summary.createdAtTsMs;
-    if (createdDelta !== 0) return createdDelta;
-    return a.id.localeCompare(b.id);
-  })[0];
-  return {
-    id: latest.id,
-    summary: latest.summary,
-    confidenceBand: resolveSessionCapsuleConfidenceBand(latest.summary),
-  };
-}
-
-function resolveContextCapsuleLedgerId(
-  summary: Pick<ContextCapsuleSummary, "fingerprint" | "capsuleId">,
-): string | null {
-  return (
-    normalizeContextCapsuleId(summary.fingerprint) ??
-    normalizeContextCapsuleId(summary.capsuleId)
-  );
-}
-
-export function compareContextCapsuleSummariesByRank(
-  a: ContextCapsuleSummary,
-  b: ContextCapsuleSummary,
-): number {
-  const proofPostureDelta =
-    CONTEXT_CAPSULE_PROOF_POSTURE_SCORE[b.convergence.proofPosture] -
-    CONTEXT_CAPSULE_PROOF_POSTURE_SCORE[a.convergence.proofPosture];
-  if (proofPostureDelta !== 0) return proofPostureDelta;
-
-  const maturityDelta =
-    CONTEXT_CAPSULE_MATURITY_SCORE[b.convergence.maturity] -
-    CONTEXT_CAPSULE_MATURITY_SCORE[a.convergence.maturity];
-  if (maturityDelta !== 0) return maturityDelta;
-
-  const proofVerdictDelta =
-    CONTEXT_CAPSULE_PROOF_VERDICT_SCORE[b.commit.proof_verdict] -
-    CONTEXT_CAPSULE_PROOF_VERDICT_SCORE[a.commit.proof_verdict];
-  if (proofVerdictDelta !== 0) return proofVerdictDelta;
-
-  const integrityScoreA =
-    a.commit.certificate_integrity_ok === true ? 2 : a.commit.certificate_integrity_ok === false ? 0 : 1;
-  const integrityScoreB =
-    b.commit.certificate_integrity_ok === true ? 2 : b.commit.certificate_integrity_ok === false ? 0 : 1;
-  const integrityDelta = integrityScoreB - integrityScoreA;
-  if (integrityDelta !== 0) return integrityDelta;
-
-  const createdAtDelta = b.createdAtTsMs - a.createdAtTsMs;
-  if (createdAtDelta !== 0) return createdAtDelta;
-
-  return a.fingerprint.localeCompare(b.fingerprint);
-}
-
-function compareContextCapsuleLedgerEntriesByRank(
-  a: ContextCapsuleLedgerEntry,
-  b: ContextCapsuleLedgerEntry,
-): number {
-  if (a.pinned !== b.pinned) {
-    return a.pinned ? -1 : 1;
-  }
-  return compareContextCapsuleSummariesByRank(a.summary, b.summary);
-}
-
-function compareContextCapsuleLedgerEntriesForSelection(
-  a: ContextCapsuleLedgerEntry,
-  b: ContextCapsuleLedgerEntry,
-): number {
-  if (a.pinned !== b.pinned) {
-    return a.pinned ? -1 : 1;
-  }
-  const touchedDelta = b.touchedAtMs - a.touchedAtMs;
-  if (touchedDelta !== 0) return touchedDelta;
-  if (a.pinnedAtMs !== b.pinnedAtMs) {
-    return (b.pinnedAtMs ?? 0) - (a.pinnedAtMs ?? 0);
-  }
-  return compareContextCapsuleSummariesByRank(a.summary, b.summary);
-}
-
-export function upsertContextCapsuleLedger(args: {
-  entries: ContextCapsuleLedgerEntry[];
-  summary: ContextCapsuleSummary;
-  pin?: boolean;
-  maxEntries?: number;
-  nowMs?: number;
-}): ContextCapsuleLedgerEntry[] {
-  const maxEntries = Math.max(
-    1,
-    Math.min(args.maxEntries ?? HELIX_CONTEXT_CAPSULE_MAX_IDS, HELIX_CONTEXT_CAPSULE_MAX_IDS),
-  );
-  const nowMs = args.nowMs ?? Date.now();
-  const capsuleId = resolveContextCapsuleLedgerId(args.summary);
-  if (!capsuleId) {
-    return [...args.entries].sort(compareContextCapsuleLedgerEntriesByRank).slice(0, maxEntries);
-  }
-
-  const existingIndex = args.entries.findIndex((entry) => entry.id === capsuleId);
-  const pin = args.pin === true;
-  const nextEntries = [...args.entries];
-  if (existingIndex >= 0) {
-    const existing = nextEntries[existingIndex];
-    nextEntries[existingIndex] = {
-      ...existing,
-      summary: args.summary,
-      pinned: existing.pinned || pin,
-      pinnedAtMs: existing.pinnedAtMs ?? (pin ? nowMs : null),
-      touchedAtMs: nowMs,
-    };
-  } else {
-    nextEntries.push({
-      id: capsuleId,
-      summary: args.summary,
-      pinned: pin,
-      pinnedAtMs: pin ? nowMs : null,
-      touchedAtMs: nowMs,
-    });
-  }
-
-  while (nextEntries.length > maxEntries) {
-    const evictionPool = nextEntries.some((entry) => !entry.pinned)
-      ? nextEntries.filter((entry) => !entry.pinned)
-      : nextEntries;
-    const lowest = [...evictionPool]
-      .sort((a, b) => compareContextCapsuleSummariesByRank(a.summary, b.summary))
-      .at(-1);
-    if (!lowest) break;
-    const dropIndex = nextEntries.findIndex((entry) => entry.id === lowest.id);
-    if (dropIndex < 0) break;
-    nextEntries.splice(dropIndex, 1);
-  }
-
-  return nextEntries.sort(compareContextCapsuleLedgerEntriesByRank).slice(0, maxEntries);
-}
-
-export function buildSelectedContextCapsuleIds(args: {
-  ledgerEntries: ContextCapsuleLedgerEntry[];
-  prompt?: string;
-  inlineCapsuleIds?: string[];
-  maxIds?: number;
-}): string[] {
-  const maxIds = Math.max(
-    1,
-    Math.min(args.maxIds ?? HELIX_CONTEXT_CAPSULE_MAX_IDS, HELIX_CONTEXT_CAPSULE_MAX_IDS),
-  );
-  const seen = new Set<string>();
-  const out: string[] = [];
-  const push = (value: string | null | undefined) => {
-    const normalized = normalizeContextCapsuleId(value ?? null);
-    if (!normalized || seen.has(normalized)) return;
-    seen.add(normalized);
-    out.push(normalized);
-  };
-
-  const inlineIds = args.inlineCapsuleIds ?? extractContextCapsuleIdsFromText(args.prompt ?? "");
-  for (const inlineId of inlineIds) {
-    push(inlineId);
-    if (out.length >= maxIds) return out;
-  }
-
-  const orderedLedger = [...args.ledgerEntries].sort(compareContextCapsuleLedgerEntriesForSelection);
-  for (const entry of orderedLedger) {
-    push(entry.id);
-    if (out.length >= maxIds) return out;
-  }
-
-  return out;
-}
-
-export function buildLatestWinsContextCapsuleIds(args: {
-  ledgerEntries: ContextCapsuleLedgerEntry[];
-  prompt?: string;
-  inlineCapsuleIds?: string[];
-  maxIds?: number;
-}): string[] {
-  const maxIds = Math.max(
-    1,
-    Math.min(args.maxIds ?? HELIX_CONTEXT_CAPSULE_MAX_IDS, HELIX_CONTEXT_CAPSULE_MAX_IDS),
-  );
-  const inlineIds = args.inlineCapsuleIds ?? extractContextCapsuleIdsFromText(args.prompt ?? "");
-  const seen = new Set<string>();
-  const out: string[] = [];
-  const push = (value: string | null | undefined) => {
-    const normalized = normalizeContextCapsuleId(value ?? null);
-    if (!normalized || seen.has(normalized)) return;
-    seen.add(normalized);
-    out.push(normalized);
-  };
-  for (const inlineId of inlineIds) {
-    push(inlineId);
-    if (out.length >= maxIds) return out;
-  }
-  const recencySorted = [...args.ledgerEntries].sort(compareContextCapsuleLedgerEntriesForSelection);
-  const confidenceSorted = [...args.ledgerEntries].sort(compareContextCapsuleLedgerEntriesByRank);
-  let recencyIndex = 0;
-  let confidenceIndex = 0;
-  while (out.length < maxIds && (recencyIndex < recencySorted.length || confidenceIndex < confidenceSorted.length)) {
-    for (let step = 0; step < 2 && recencyIndex < recencySorted.length && out.length < maxIds; step += 1) {
-      push(recencySorted[recencyIndex]?.id);
-      recencyIndex += 1;
-    }
-    if (confidenceIndex < confidenceSorted.length && out.length < maxIds) {
-      push(confidenceSorted[confidenceIndex]?.id);
-      confidenceIndex += 1;
-    }
-  }
-  return out.slice(0, maxIds);
-}
-
-export function getMicRecorderMimeCandidates(userAgent?: string): string[] {
-  const ua =
-    (userAgent ?? (typeof navigator !== "undefined" ? navigator.userAgent : ""))
-      .trim()
-      .toLowerCase();
-  const iosLike = IOS_AUDIO_USER_AGENT_PATTERN.test(ua) || isLikelyIOSDesktopModeUserAgent(ua);
-  const ordered = iosLike
-    ? [
-        "audio/mp4;codecs=mp4a.40.2",
-        "audio/mp4",
-        "audio/webm;codecs=opus",
-        "audio/webm",
-        "audio/ogg;codecs=opus",
-      ]
-    : [
-        "audio/webm;codecs=opus",
-        "audio/webm",
-        "audio/ogg;codecs=opus",
-        "audio/mp4",
-      ];
-  return [...new Set(ordered)];
-}
 
 export function pickSupportedMicRecorderMimeType(params: {
   userAgent?: string;
@@ -3072,35 +2867,6 @@ export function isLikelyContinuationTailFragment(transcript: string): boolean {
   return /\b(this|that|it|they|them|those|these|happens?|effect|result|probability|because|within)\b/.test(
     normalized,
   );
-}
-
-export function shouldTreatMicSignalAsSpeech(args: {
-  speakingNow: boolean;
-  voiceOutputActive: boolean;
-  localAudioGateActive: boolean;
-  speechProbability: number;
-  snrDb: number;
-  rms: number;
-  speechTriggerThreshold: number;
-  bargeMinSpeechProbability?: number;
-  bargeStrongSpeechProbability?: number;
-  bargeMinSnrDb?: number;
-  bargeRmsMultiplier?: number;
-}): boolean {
-  if (!args.speakingNow) return false;
-  if (!args.voiceOutputActive || !args.localAudioGateActive) return true;
-  const threshold = Math.max(args.speechTriggerThreshold, MIC_LEVEL_MIN_THRESHOLD);
-  const bargeMinSpeechProbability = args.bargeMinSpeechProbability ?? MIC_PLAYBACK_BARGE_MIN_SPEECH_PROBABILITY;
-  const bargeStrongSpeechProbability =
-    args.bargeStrongSpeechProbability ?? MIC_PLAYBACK_BARGE_STRONG_SPEECH_PROBABILITY;
-  const bargeMinSnrDb = args.bargeMinSnrDb ?? MIC_PLAYBACK_BARGE_MIN_SNR_DB;
-  const bargeRmsMultiplier = args.bargeRmsMultiplier ?? MIC_PLAYBACK_BARGE_RMS_MULTIPLIER;
-  const highProbability = args.speechProbability >= bargeMinSpeechProbability;
-  const decisiveProbability = args.speechProbability >= bargeStrongSpeechProbability;
-  const highSnr = args.snrDb >= bargeMinSnrDb;
-  const strongAmplitude = args.rms >= threshold * bargeRmsMultiplier;
-  const signalCount = Number(highProbability) + Number(highSnr) + Number(strongAmplitude);
-  return decisiveProbability || signalCount >= 2;
 }
 
 export function shouldRecoverHeldTranscriptAfterNoTranscript(args: {
@@ -3431,71 +3197,6 @@ export function normalizeVoiceCommandLaneEnvelope(
     confirm_required: payload.confirm_required === true,
     utterance_id: utteranceId,
   };
-}
-
-function resolveVoiceAuthoritySuppression(
-  reason: VoiceReasoningResponseAuthorityDecision["reason"],
-): {
-  suppressionReason: string;
-  suppressionCause: string;
-  restartDetail: string;
-} {
-  switch (reason) {
-    case "ok":
-      return {
-        suppressionReason: "voice_turn_response_inactive_attempt",
-        suppressionCause: "inactive_attempt",
-        restartDetail: "inactive_attempt; restarting",
-      };
-    case "continuation_merged":
-      return {
-        suppressionReason: "voice_turn_continuation_merged",
-        suppressionCause: "dispatch_hash_mismatch",
-        restartDetail: "dispatch_hash_mismatch; restarting",
-      };
-    case "phase_not_sealed":
-      return {
-        suppressionReason: "voice_turn_response_phase_not_sealed",
-        suppressionCause: "phase_not_sealed",
-        restartDetail: "phase_not_sealed; restarting",
-      };
-    case "seal_token_mismatch":
-      return {
-        suppressionReason: "voice_turn_response_seal_token_mismatch",
-        suppressionCause: "seal_token_mismatch",
-        restartDetail: "seal_token_mismatch; restarting",
-      };
-    case "sealed_revision_mismatch":
-      return {
-        suppressionReason: "voice_turn_response_sealed_revision_mismatch",
-        suppressionCause: "sealed_revision_mismatch",
-        restartDetail: "sealed_revision_mismatch; restarting",
-      };
-    case "dispatch_hash_mismatch":
-      return {
-        suppressionReason: "voice_turn_response_dispatch_hash_mismatch",
-        suppressionCause: "dispatch_hash_mismatch",
-        restartDetail: "dispatch_hash_mismatch; restarting",
-      };
-    case "stale_prompt":
-      return {
-        suppressionReason: "voice_turn_response_stale_prompt",
-        suppressionCause: "dispatch_hash_mismatch",
-        restartDetail: "dispatch_hash_mismatch; restarting",
-      };
-    case "inactive_attempt":
-      return {
-        suppressionReason: "voice_turn_response_inactive_attempt",
-        suppressionCause: "inactive_attempt",
-        restartDetail: "inactive_attempt; restarting",
-      };
-    default:
-      return {
-        suppressionReason: "voice_turn_response_suppressed",
-        suppressionCause: "inactive_attempt",
-        restartDetail: "inactive_attempt; restarting",
-      };
-  }
 }
 
 export function shouldDispatchReasoningAttempt(transcript: string): boolean {
@@ -3854,12 +3555,16 @@ type VoiceTimelineBuildInfo = {
   error: string | null;
 };
 
-function resolveVoiceTimelineClientBuildStamp(): string {
-  if (typeof window === "undefined") return "unknown";
-  const win = window as Window & { __APP_WARP_BUILD?: string };
-  const stamped = typeof win.__APP_WARP_BUILD === "string" ? win.__APP_WARP_BUILD.trim() : "";
-  if (stamped) return stamped;
-  return import.meta.env?.DEV ? "dev" : "prod";
+function readVoiceTimelineClientBuildStamp(): string {
+  const win =
+    typeof window === "undefined"
+      ? null
+      : (window as Window & { __APP_WARP_BUILD?: string });
+  return resolveVoiceTimelineClientBuildStampFromInputs({
+    stampedBuild: win?.__APP_WARP_BUILD ?? null,
+    isDev: import.meta.env?.DEV === true,
+    hasWindow: Boolean(win),
+  });
 }
 
 export function buildVoiceReasoningDispatchPrompt(args: {
@@ -4168,23 +3873,6 @@ type AskLocalOptions = Parameters<typeof askLocal>[1];
 type AskLocalMode = NonNullable<AskLocalOptions>["mode"];
 type AskLocalResult = Awaited<ReturnType<typeof askLocal>>;
 
-const AGIBOT_PREFLIGHT_SCOPE_ERROR_RE =
-  /\bDESKTOP_JOINT_SCOPE_REQUIRED\b|desktop joint scope is required|mission interface blocked by bring-up preflight gate|preflight_gate/i;
-
-export function isAgibotPreflightScopeError(error: unknown): boolean {
-  if (!error) return false;
-  const rawMessage =
-    typeof error === "string"
-      ? error
-      : error instanceof Error
-        ? error.message
-        : typeof (error as { message?: unknown }).message === "string"
-          ? String((error as { message?: unknown }).message)
-          : "";
-  if (!rawMessage) return false;
-  return AGIBOT_PREFLIGHT_SCOPE_ERROR_RE.test(rawMessage);
-}
-
 type AskLocalWithFallbackResult = {
   response: AskLocalResult;
   downgradedFromMode?: AskLocalMode;
@@ -4352,6 +4040,7 @@ const resolveHelixAskHardBackendEntrypointFamily = (
 } | null => {
   const normalized = value.trim();
   if (!normalized) return null;
+  if (isQuotedTransformOnlyForEvidenceGate(normalized)) return null;
   if (/\b(?:scientific-calculator\.solve_expression|scientific-calculator\.solve_with_steps|scientific\s+calculator|calculator_receipt|calculator\s+tool)\b/i.test(normalized)) {
     return {
       family: "calculator",
@@ -4763,20 +4452,6 @@ function buildHelixAskTextAttachmentTurnInputItem(attachment: HelixAskTextAttach
     raw_content_scope: "turn_input_only",
     assistant_answer: false,
   };
-}
-
-function isMultilangConfidenceGateResponse(response: AskLocalResult): boolean {
-  const failReason = String(response.fail_reason ?? "").trim();
-  const failClass = String(response.fail_class ?? "").trim();
-  return Boolean(
-    response.ok === false &&
-      (
-        response.error === "multilang_dispatch_blocked" ||
-        response.error === "multilang_confirmation_required" ||
-        failClass === "multilang_confidence_gate" ||
-        /^HELIX_(?:INTERPRETER|MULTILANG)_/i.test(failReason)
-      ),
-  );
 }
 
 async function askLocalWithMultilangFailOpenFallback(
@@ -5409,20 +5084,6 @@ type ContextCapsulePreview = {
   convergence?: ContextCapsuleConvergence;
 };
 
-export type ContextCapsuleLedgerEntry = {
-  id: string;
-  summary: ContextCapsuleSummary;
-  pinned: boolean;
-  pinnedAtMs: number | null;
-  touchedAtMs: number;
-};
-
-export type SessionCapsuleState = {
-  id: string;
-  summary: ContextCapsuleSummary;
-  confidenceBand: SessionCapsuleConfidenceBand;
-};
-
 type HelixAskPillProps = {
   contextId: string;
   className?: string;
@@ -5527,6 +5188,7 @@ const HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_PROMPT_RE =
 export function requiresHelixAskBackendEntrypoint(question: string | null | undefined): boolean {
   const normalized = coerceText(question).trim();
   if (!normalized) return false;
+  if (isQuotedTransformOnlyForEvidenceGate(normalized)) return false;
   return HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_PROMPT_RE.test(normalized);
 }
 
@@ -5688,6 +5350,7 @@ export function buildHelixAskRepliesFromChatSession(session: ChatSession): Helix
     const question = pendingUser?.content ?? "";
     const askEntrypointRequired = requiresHelixAskBackendEntrypoint(question);
     const askEntrypointObserved = false;
+    const invalidDurableTerminalAnswer = isInvalidTerminalAnswerText(answer);
     if (askEntrypointRequired && !askEntrypointObserved) {
       replies.push({
         id: buildHelixAskChatProjectionId(session, pendingUser, message),
@@ -5723,6 +5386,48 @@ export function buildHelixAskRepliesFromChatSession(session: ChatSession): Helix
             final_status: "final_failure",
             terminal_artifact_kind: "typed_failure",
             terminal_error_code: HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE,
+          },
+        } as HelixAskReply["debug"],
+      });
+      pendingUser = null;
+      continue;
+    }
+    if (invalidDurableTerminalAnswer) {
+      const failureText = renderTypedFailureFallback("terminal_authority_missing");
+      replies.push({
+        id: buildHelixAskChatProjectionId(session, pendingUser, message),
+        createdAtMs,
+        content: failureText,
+        question,
+        turn_id: turnId,
+        ok: false,
+        final_answer_source: "typed_failure",
+        terminal_artifact_kind: "typed_failure",
+        terminal_error_code: "terminal_authority_missing",
+        debug: {
+          durable_chat_projection: true,
+          ask_entrypoint_required: askEntrypointRequired,
+          ask_entrypoint_observed: askEntrypointObserved,
+          ask_entrypoint_failure_code: "terminal_authority_missing",
+          blocked_projection_kind: "durable_chat_session",
+          session_id: session.id,
+          user_message_id: pendingUser?.id ?? null,
+          assistant_message_id: message.id,
+          created_at_ms: createdAtMs,
+          turn_id: turnId,
+          selected_final_answer: failureText,
+          final_answer_source: "typed_failure",
+          terminal_artifact_kind: "typed_failure",
+          terminal_error_code: "terminal_authority_missing",
+          typed_failure: {
+            schema: "helix.ask.typed_failure.v1",
+            code: "terminal_authority_missing",
+            message: failureText,
+          },
+          resolved_turn_summary: {
+            final_status: "final_failure",
+            terminal_artifact_kind: "typed_failure",
+            terminal_error_code: "terminal_authority_missing",
           },
         } as HelixAskReply["debug"],
       });
@@ -7340,12 +7045,12 @@ class HelixAskErrorBoundary extends Component<{ children: ReactNode }, HelixAskE
 }
 
 const HELIX_ASK_MAX_TOKENS = clampNumber(
-  readNumber((import.meta as any)?.env?.VITE_HELIX_ASK_MAX_TOKENS, 2048),
+  readHelixEnvNumber((import.meta as any)?.env, "VITE_HELIX_ASK_MAX_TOKENS", 2048),
   64,
   8192,
 );
 const HELIX_ASK_CONTEXT_TOKENS = clampNumber(
-  readNumber((import.meta as any)?.env?.VITE_HELIX_ASK_CONTEXT_TOKENS, 2048),
+  readHelixEnvNumber((import.meta as any)?.env, "VITE_HELIX_ASK_CONTEXT_TOKENS", 2048),
   512,
   8192,
 );
@@ -7353,36 +7058,38 @@ const HELIX_ASK_MAX_PROMPT_LINES = 10;
 const HELIX_ASK_LIVE_EVENT_LIMIT = 28;
 const HELIX_ASK_QUEUE_LIMIT = 12;
 const HELIX_ASK_LIVE_EVENT_MAX_CHARS = clampNumber(
-  readNumber((import.meta as any)?.env?.VITE_HELIX_ASK_LIVE_EVENT_MAX_CHARS, 560),
+  readHelixEnvNumber((import.meta as any)?.env, "VITE_HELIX_ASK_LIVE_EVENT_MAX_CHARS", 560),
   160,
   2400,
 );
 const HELIX_MOOD_HINT_MIN_INTERVAL_MS = clampNumber(
-  readNumber((import.meta as any)?.env?.VITE_HELIX_MOOD_HINT_MIN_INTERVAL_MS, 1200),
+  readHelixEnvNumber((import.meta as any)?.env, "VITE_HELIX_MOOD_HINT_MIN_INTERVAL_MS", 1200),
   600,
   12_000,
 );
 const HELIX_MOOD_HINT_CONFIDENCE = clampNumber(
-  readNumber((import.meta as any)?.env?.VITE_HELIX_MOOD_HINT_CONFIDENCE, 0.58),
+  readHelixEnvNumber((import.meta as any)?.env, "VITE_HELIX_MOOD_HINT_CONFIDENCE", 0.58),
   0.2,
   1,
 );
 const HELIX_MOOD_HINT_MAX_TEXT_CHARS = clampNumber(
-  readNumber((import.meta as any)?.env?.VITE_HELIX_MOOD_HINT_MAX_TEXT_CHARS, 720),
+  readHelixEnvNumber((import.meta as any)?.env, "VITE_HELIX_MOOD_HINT_MAX_TEXT_CHARS", 720),
   160,
   2400,
 );
 const HELIX_REASONING_ATTEMPT_IDLE_TIMEOUT_MS = clampNumber(
-  readNumber(
-    (import.meta as any)?.env?.VITE_HELIX_REASONING_ATTEMPT_IDLE_TIMEOUT_MS,
-    readNumber((import.meta as any)?.env?.VITE_HELIX_REASONING_ATTEMPT_TIMEOUT_MS, 120_000),
+  readHelixEnvNumber(
+    (import.meta as any)?.env,
+    "VITE_HELIX_REASONING_ATTEMPT_IDLE_TIMEOUT_MS",
+    readHelixEnvNumber((import.meta as any)?.env, "VITE_HELIX_REASONING_ATTEMPT_TIMEOUT_MS", 120_000),
   ),
   15_000,
   10 * 60_000,
 );
 const HELIX_REASONING_ATTEMPT_HARD_TIMEOUT_MS = clampNumber(
-  readNumber(
-    (import.meta as any)?.env?.VITE_HELIX_REASONING_ATTEMPT_HARD_TIMEOUT_MS,
+  readHelixEnvNumber(
+    (import.meta as any)?.env,
+    "VITE_HELIX_REASONING_ATTEMPT_HARD_TIMEOUT_MS",
     Math.max(
       HELIX_REASONING_ATTEMPT_IDLE_TIMEOUT_MS + 30_000,
       Math.round(HELIX_REASONING_ATTEMPT_IDLE_TIMEOUT_MS * 2),
@@ -7394,22 +7101,22 @@ const HELIX_REASONING_ATTEMPT_HARD_TIMEOUT_MS = clampNumber(
 
 const HELIX_REASONING_ATTEMPT_TIMEOUT_MS = HELIX_REASONING_ATTEMPT_IDLE_TIMEOUT_MS;
 const HELIX_REASONING_TIMEOUT_RETRY_MAX_ATTEMPTS = clampNumber(
-  readNumber((import.meta as any)?.env?.VITE_HELIX_REASONING_TIMEOUT_RETRY_MAX_ATTEMPTS, 1),
+  readHelixEnvNumber((import.meta as any)?.env, "VITE_HELIX_REASONING_TIMEOUT_RETRY_MAX_ATTEMPTS", 1),
   0,
   3,
 );
 const HELIX_REASONING_TIMEOUT_RETRY_BACKOFF_MS = clampNumber(
-  readNumber((import.meta as any)?.env?.VITE_HELIX_REASONING_TIMEOUT_RETRY_BACKOFF_MS, 240),
+  readHelixEnvNumber((import.meta as any)?.env, "VITE_HELIX_REASONING_TIMEOUT_RETRY_BACKOFF_MS", 240),
   0,
   5_000,
 );
 const HELIX_REASONING_TIMEOUT_RETRY_TOKEN_FACTOR = clampNumber(
-  readNumber((import.meta as any)?.env?.VITE_HELIX_REASONING_TIMEOUT_RETRY_TOKEN_FACTOR, 0.66),
+  readHelixEnvNumber((import.meta as any)?.env, "VITE_HELIX_REASONING_TIMEOUT_RETRY_TOKEN_FACTOR", 0.66),
   0.35,
   1,
 );
 const HELIX_REASONING_TIMEOUT_RETRY_MIN_TOKENS = clampNumber(
-  readNumber((import.meta as any)?.env?.VITE_HELIX_REASONING_TIMEOUT_RETRY_MIN_TOKENS, 640),
+  readHelixEnvNumber((import.meta as any)?.env, "VITE_HELIX_REASONING_TIMEOUT_RETRY_MIN_TOKENS", 640),
   256,
   4096,
 );
@@ -7420,44 +7127,6 @@ type ReasoningTheaterArchetype =
   | "coverage_gap"
   | "contradiction"
   | "overload";
-type ReasoningTheaterSuppressionReason =
-  | "context_ineligible"
-  | "dedupe_cooldown"
-  | "mission_rate_limited"
-  | "voice_rate_limited"
-  | "voice_budget_exceeded"
-  | "voice_backend_error"
-  | "missing_evidence"
-  | "contract_violation"
-  | "agi_overload_admission_control";
-type ReasoningTheaterPhase =
-  | "observe"
-  | "plan"
-  | "retrieve"
-  | "gate"
-  | "synthesize"
-  | "verify"
-  | "execute"
-  | "debrief";
-type ReasoningTheaterCertaintyClass =
-  | "confirmed"
-  | "reasoned"
-  | "hypothesis"
-  | "unknown";
-type ReasoningTheaterMedal =
-  | "scout"
-  | "anchor"
-  | "lattice"
-  | "prism"
-  | "fracture"
-  | "stitch"
-  | "relay"
-  | "gate"
-  | "seal"
-  | "lantern"
-  | "valve"
-  | "crown";
-
 type ReasoningTheaterState = {
   stance: ReasoningTheaterStance;
   archetype: ReasoningTheaterArchetype;
@@ -7478,11 +7147,6 @@ type ReasoningTheaterState = {
   seed: number;
 };
 
-type ReasoningTheaterMedalEvent = {
-  medal: ReasoningTheaterMedal;
-  reason: string;
-};
-
 type ReasoningTheaterMedalPulse = ReasoningTheaterMedalEvent & {
   token: string;
   startedAt: number;
@@ -7491,22 +7155,6 @@ type ReasoningTheaterMedalPulse = ReasoningTheaterMedalEvent & {
 };
 
 type ReasoningTheaterClockSource = "local" | "event_ts" | "event_seq";
-
-type MirekReasoningDisplayGridCell = {
-  id: string;
-  x: number;
-  y: number;
-  kind: MirekCellKind;
-  active: boolean;
-  semantic: boolean;
-  intensity: number;
-};
-
-type MirekReasoningDisplayGrid = {
-  width: number;
-  height: number;
-  cells: MirekReasoningDisplayGridCell[];
-};
 
 const REASONING_THEATER_MEDAL_VISIBLE_MS = 4200;
 const REASONING_THEATER_MEDAL_FADE_MS = 900;
@@ -7518,32 +7166,14 @@ const REASONING_THEATER_METER_LOSS_ALPHA = 0.24;
 const REASONING_THEATER_METER_EPSILON = 0.05;
 const REASONING_THEATER_FRONTIER_CURSOR_PULSE_MS = 420;
 const REASONING_THEATER_FRONTIER_PARTICLE_COUNT = 8;
-const REASONING_THEATER_FRONTIER_ACTIONS_ENABLED = (() => {
-  const raw = (import.meta as any)?.env?.VITE_HELIX_THEATER_FRONTIER_ACTIONS;
-  return raw === undefined ? true : String(raw) !== "0";
-})();
+const REASONING_THEATER_FRONTIER_ACTIONS_ENABLED = readHelixEnvEnabledUnlessExactZero(
+  (import.meta as any)?.env,
+  "VITE_HELIX_THEATER_FRONTIER_ACTIONS",
+  true,
+);
 const CONTEXT_CAPSULE_GRID_WIDTH = 80;
 const CONTEXT_CAPSULE_GRID_HEIGHT = 16;
 const CONTEXT_CAPSULE_SIM_TICK_MS = 50;
-
-const REASONING_THEATER_SUPPRESSION_PATTERNS: Array<{
-  reason: ReasoningTheaterSuppressionReason;
-  pattern: RegExp;
-}> = [
-  { reason: "context_ineligible", pattern: /context[_\s-]?ineligible|voice_context_ineligible/i },
-  { reason: "dedupe_cooldown", pattern: /dedupe[_\s-]?cooldown/i },
-  { reason: "mission_rate_limited", pattern: /mission[_\s-]?rate[_\s-]?limited/i },
-  { reason: "voice_rate_limited", pattern: /voice[_\s-]?rate[_\s-]?limited/i },
-  { reason: "voice_budget_exceeded", pattern: /voice[_\s-]?budget[_\s-]?exceeded/i },
-  { reason: "voice_backend_error", pattern: /voice[_\s-]?backend[_\s-]?error/i },
-  { reason: "missing_evidence", pattern: /missing[_\s-]?evidence/i },
-  { reason: "contract_violation", pattern: /contract[_\s-]?violation/i },
-  { reason: "agi_overload_admission_control", pattern: /agi[_\s-]?overload[_\s-]?admission[_\s-]?control/i },
-];
-
-function clamp01(value: number): number {
-  return clampNumber(value, 0, 1);
-}
 
 function askLiveEventBelongsToActiveTurn(args: {
   event: AskLiveEventEntry;
@@ -7698,13 +7328,6 @@ type AskLiveAgenticEventRow = {
 };
 
 let helixAskLastKnownDocViewerPath: string | null = null;
-
-function normalizeDocViewerPathForAskSnapshot(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  const normalized = value.trim().replace(/\\/g, "/").replace(/^\/+/, "");
-  if (!normalized || normalized.includes("..") || /^[a-z]:\//i.test(normalized)) return null;
-  return normalized.startsWith("docs/") ? normalized : null;
-}
 
 function rememberDocViewerPathForAskSnapshot(value: unknown): string | null {
   const normalized = normalizeDocViewerPathForAskSnapshot(value);
@@ -9666,8 +9289,6 @@ type DebugExportDrawerState = {
   result: DebugExportUiResult;
 } | null;
 
-const hashDebugExportText = (text: string): string => stableHelixProjectionHash(text);
-
 function isBackendAskTurnDebugExportEligibleTurnId(turnId: string): boolean {
   const trimmed = turnId.trim();
   return Boolean(trimmed && (trimmed.startsWith("ask:") || /(?:^|:)ask:[^:]+/i.test(trimmed)));
@@ -9716,114 +9337,6 @@ function buildClientProjectionDebugFields(localPayload: Record<string, unknown>)
     });
   }
   return clientProjection;
-}
-
-function buildVoicePlaybackReconciliationDebug(input: {
-  activeTurnId: string | null;
-  selectedFinalAnswer: string | null;
-  source: Record<string, unknown>;
-}): Record<string, unknown> {
-  const clientProjection = readAgentLoopAuditRecord(input.source.client_debug_projection);
-  const clientVoice = readAgentLoopAuditRecord(input.source.client_voice_debug ?? clientProjection?.voice);
-  const receiptSources = [
-    input.source.client_voice_playback_receipts,
-    clientProjection?.voice_playback_receipts,
-    clientVoice?.playbackReceipts,
-  ];
-  const receipts = receiptSources
-    .flatMap((source) => (Array.isArray(source) ? source : []))
-    .map((receipt) => readAgentLoopAuditRecord(receipt))
-    .filter((receipt): receipt is Record<string, unknown> => Boolean(receipt));
-  const receiptKeyForReconciliation = (receipt: Record<string, unknown>): string => {
-    const candidates = [
-      receipt.receiptId,
-      receipt.sourceReceiptId,
-      receipt.sourceReceiptKey,
-      receipt.utteranceId,
-      receipt.requestId,
-    ].map((value) => coerceText(value).trim()).filter(Boolean);
-    return candidates.join("|") || JSON.stringify(receipt).slice(0, 120);
-  };
-  const receiptsByKey = new Map<string, Record<string, unknown>>();
-  for (const receipt of receipts) {
-    const key = receiptKeyForReconciliation(receipt);
-    const existing = receiptsByKey.get(key);
-    if (!existing || coerceText(existing.status).trim() !== "delivered") {
-      receiptsByKey.set(key, receipt);
-    }
-  }
-  const uniqueReceipts = Array.from(receiptsByKey.values());
-  const voiceCallSources = [input.source.client_voice_calls, clientProjection?.voice_calls, clientVoice?.voiceCalls];
-  const voiceCalls = voiceCallSources
-    .flatMap((source) => (Array.isArray(source) ? source : []))
-    .map((call) => readAgentLoopAuditRecord(call))
-    .filter((call): call is Record<string, unknown> => Boolean(call));
-  const voiceCallKeyForReconciliation = (call: Record<string, unknown>): string => {
-    const candidates = [
-      call.id,
-      call.utteranceId,
-      call.eventId,
-      call.traceId,
-      call.textHash,
-    ].map((value) => coerceText(value).trim()).filter(Boolean);
-    return candidates.join("|") || JSON.stringify(call).slice(0, 120);
-  };
-  const voiceCallsByKey = new Map<string, Record<string, unknown>>();
-  for (const call of voiceCalls) {
-    voiceCallsByKey.set(voiceCallKeyForReconciliation(call), call);
-  }
-  const uniqueVoiceCalls = Array.from(voiceCallsByKey.values());
-  const activeTurnId = input.activeTurnId?.trim() ?? "";
-  const isActiveTurnReceipt = (receipt: Record<string, unknown>): boolean => {
-    if (!activeTurnId) return true;
-    return [
-      receipt.turnKey,
-      receipt.utteranceId,
-      receipt.sourceReceiptId,
-      receipt.sourceReceiptKey,
-      receipt.requestId,
-    ].some((value) => coerceText(value).includes(activeTurnId));
-  };
-  const deliveredReceipts = uniqueReceipts.filter(
-    (receipt) => coerceText(receipt.status).trim() === "delivered" && isActiveTurnReceipt(receipt),
-  );
-  const deliveredUtteranceIds = Array.from(
-    new Set(deliveredReceipts.map((receipt) => coerceText(receipt.utteranceId).trim()).filter(Boolean)),
-  );
-  const audioBytesObserved = uniqueVoiceCalls
-    .filter((call) => {
-      const utteranceId = coerceText(call.utteranceId).trim();
-      return deliveredUtteranceIds.length === 0 || deliveredUtteranceIds.includes(utteranceId);
-    })
-    .reduce((total, call) => {
-      const bytes = typeof call.audioBytes === "number" && Number.isFinite(call.audioBytes) ? call.audioBytes : 0;
-      return total + Math.max(0, bytes);
-    }, 0);
-  const selectedText = input.selectedFinalAnswer ?? "";
-  const selectedFinalAnswerClaim = /browser playback confirmation is still pending|playback confirmation is still pending/i.test(selectedText)
-    ? "pending_client_playback"
-    : "none";
-  const playbackConfirmation = deliveredReceipts.length > 0 ? "delivered" : "not_observed";
-  const correctedStatusText =
-    selectedFinalAnswerClaim === "pending_client_playback" && playbackConfirmation === "delivered"
-      ? "Client playback receipt confirms delivered audio after the final answer was composed."
-      : null;
-  return {
-    schema: "helix.voice_playback_reconciliation.v1",
-    source: "client_playback_receipts",
-    active_turn_id: activeTurnId || null,
-    selected_final_answer_claim: selectedFinalAnswerClaim,
-    playback_confirmation: playbackConfirmation,
-    delivered_receipt_count: deliveredReceipts.length,
-    delivered_utterance_ids: deliveredUtteranceIds,
-    audio_bytes_observed: audioBytesObserved,
-    corrected_status_text: correctedStatusText,
-    terminal_answer_mutated: false,
-    assistant_answer: false,
-    terminal_eligible: false,
-    raw_content_included: false,
-    output_authority: "client_playback_observation",
-  };
 }
 
 async function resolveAuthoritativeDebugExportPayload(localPayload: string): Promise<string> {
@@ -9938,105 +9451,6 @@ async function resolveAuthoritativeDebugExportPayload(localPayload: string): Pro
 }
 
 const HELIX_DEBUG_EXPORT_MAX_UI_CHARS = 750_000;
-
-function summarizeHelixDebugObservationForCopy(value: unknown): Record<string, unknown> | null {
-  const record = readAgentLoopAuditRecord(value);
-  if (!record) return null;
-  const payload = readAgentLoopAuditRecord(record.payload);
-  const observation = readAgentLoopAuditRecord(record.observation);
-  return {
-    artifact_id:
-      coerceText(record.artifact_id).trim() ||
-      coerceText(record.observation_id).trim() ||
-      coerceText(payload?.artifact_id).trim() ||
-      null,
-    kind: coerceText(record.kind).trim() || coerceText(payload?.kind).trim() || null,
-    schema:
-      coerceText(record.schema).trim() ||
-      coerceText(payload?.schema).trim() ||
-      coerceText(observation?.schema).trim() ||
-      null,
-    status: coerceText(record.status).trim() || coerceText(payload?.status).trim() || null,
-    ok:
-      typeof record.ok === "boolean"
-        ? record.ok
-        : typeof payload?.ok === "boolean"
-          ? payload.ok
-          : null,
-  };
-}
-
-function summarizeHelixDebugArtifactsForCopy(value: unknown): Record<string, unknown>[] {
-  const entries = Array.isArray(value) ? value : [];
-  return entries.slice(0, 40).map((entry, index) => {
-    const record = readAgentLoopAuditRecord(entry) ?? {};
-    const payload = readAgentLoopAuditRecord(record.payload);
-    const text = coerceText(payload?.text || payload?.answer_text || payload?.summary).trim();
-    return {
-      artifact_id: coerceText(record.artifact_id).trim() || `artifact:${index}`,
-      kind: coerceText(record.kind).trim() || null,
-      source_scope: coerceText(record.source_scope).trim() || null,
-      payload_schema: coerceText(payload?.schema).trim() || null,
-      tool_name:
-        coerceText(record.tool_name).trim() ||
-        coerceText(payload?.tool_name).trim() ||
-        coerceText(payload?.toolName).trim() ||
-        null,
-      capability_key:
-        coerceText(record.capability_key).trim() ||
-        coerceText(payload?.capability_key).trim() ||
-        coerceText(payload?.chosen_capability).trim() ||
-        null,
-      status: coerceText(record.status).trim() || coerceText(payload?.status).trim() || null,
-      ok:
-        typeof record.ok === "boolean"
-          ? record.ok
-          : typeof payload?.ok === "boolean"
-            ? payload.ok
-            : null,
-      supports_goal:
-        typeof payload?.supports_goal === "boolean"
-          ? payload.supports_goal
-          : coerceText(payload?.supports_goal).trim() || null,
-      expression: coerceText(payload?.expression || payload?.input).trim() || null,
-      result: coerceText(payload?.result || payload?.value || payload?.computed_result).trim() || null,
-      text_preview: text ? clipText(text, 240) : null,
-    };
-  });
-}
-
-function summarizeHelixAgentRuntimeLoopForCopy(value: unknown): Record<string, unknown> | null {
-  const record = readAgentLoopAuditRecord(value);
-  if (!record) return null;
-  const iterations = Array.isArray(record.iterations) ? record.iterations : [];
-  return {
-    schema: coerceText(record.schema).trim() || "helix.agent_runtime_loop.v1",
-    status: coerceText(record.status).trim() || null,
-    selected_capability: coerceText(record.selected_capability).trim() || null,
-    executed_tool_call_count:
-      typeof record.executed_tool_call_count === "number" ? record.executed_tool_call_count : null,
-    iteration_count: iterations.length,
-    iterations: iterations.slice(0, 16).map((entry, index) => {
-      const iteration = readAgentLoopAuditRecord(entry) ?? {};
-      return {
-        iteration: typeof iteration.iteration === "number" ? iteration.iteration : index + 1,
-        decision_id: coerceText(iteration.decision_id).trim() || null,
-        chosen_capability: coerceText(iteration.chosen_capability).trim() || null,
-        executed_action_key: coerceText(iteration.executed_action_key).trim() || null,
-        next_step: coerceText(iteration.next_step).trim() || null,
-        decision_timing: coerceText(iteration.decision_timing).trim() || null,
-        decision_authority: coerceText(iteration.decision_authority).trim() || null,
-        observation_role: coerceText(iteration.observation_role).trim() || null,
-        observed_artifact_refs: Array.isArray(iteration.observed_artifact_refs)
-          ? iteration.observed_artifact_refs.slice(0, 8)
-          : Array.isArray(iteration.artifact_refs)
-            ? iteration.artifact_refs.slice(0, 8)
-            : [],
-        tool_observation: summarizeHelixDebugObservationForCopy(iteration.tool_observation),
-      };
-    }),
-  };
-}
 
 function copyHelixRailCriticalDebugFieldsForUi(
   target: Record<string, unknown>,
@@ -10369,64 +9783,6 @@ export async function copyDebugPayloadToClipboard(payload: string): Promise<Debu
   };
 }
 
-function resolveReasoningTheaterSuppressionReason(
-  text: string,
-): ReasoningTheaterSuppressionReason | null {
-  for (const entry of REASONING_THEATER_SUPPRESSION_PATTERNS) {
-    if (entry.pattern.test(text)) return entry.reason;
-  }
-  return null;
-}
-
-function resolveReasoningTheaterPhase(
-  allText: string,
-  events: AskLiveEventEntry[],
-): ReasoningTheaterPhase {
-  const toolText = events
-    .map((event) => event.tool ?? "")
-    .join(" ")
-    .toLowerCase();
-  if (/\b(debrief|wrap[-\s]?up|final summary|final answer)\b/i.test(allText) || /\bdebrief\b/.test(toolText)) {
-    return "debrief";
-  }
-  if (/\b(execute|run tool|action required|apply now)\b/i.test(allText) || /\bexecute\b/.test(toolText)) {
-    return "execute";
-  }
-  if (/\b(verify|verification|proof|certificate|integrity)\b/i.test(allText) || /\bverify\b/.test(toolText)) {
-    return "verify";
-  }
-  if (/\b(gate|gating|threshold)\b/i.test(allText) || /\bgate\b/.test(toolText)) {
-    return "gate";
-  }
-  if (/\b(synthes|compose|assemble|combine answer)\w*/i.test(allText) || /\bsynthes/i.test(toolText)) {
-    return "synthesize";
-  }
-  if (/\b(retrieve|search|lookup|resonance|context files?)\b/i.test(allText) || /\bretrieve|search/.test(toolText)) {
-    return "retrieve";
-  }
-  if (/\b(plan|intent|router|strategy)\b/i.test(allText) || /\bplan|intent/.test(toolText)) {
-    return "plan";
-  }
-  return "observe";
-}
-
-const REASONING_THEATER_SUPPRESSION_REASON_SET = new Set<ReasoningTheaterSuppressionReason>([
-  "context_ineligible",
-  "dedupe_cooldown",
-  "mission_rate_limited",
-  "voice_rate_limited",
-  "voice_budget_exceeded",
-  "voice_backend_error",
-  "missing_evidence",
-  "contract_violation",
-  "agi_overload_admission_control",
-]);
-
-export type ReasoningTheaterHardFailureSignals = {
-  failed: boolean;
-  reasons: string[];
-};
-
 function coerceReasoningTheaterStateV1(value: unknown): HelixAskReasoningTheaterStateV1 | null {
   const record = asObjectRecord(value);
   if (!record) return null;
@@ -10441,137 +9797,6 @@ function coerceReasoningTheaterStateV1(value: unknown): HelixAskReasoningTheater
   const stance = String(record.stance ?? "").trim() as ReasoningTheaterStance;
   if (!(stance in REASONING_THEATER_STANCE_META)) return null;
   return record as unknown as HelixAskReasoningTheaterStateV1;
-}
-
-function pushReasoningTheaterHardFailureReason(reasons: string[], reason: string | null | undefined): void {
-  const normalized = (reason ?? "").trim();
-  if (!normalized || reasons.includes(normalized)) return;
-  reasons.push(normalized);
-}
-
-function collectReasoningTheaterAuditFailureReasons(
-  record: Record<string, unknown>,
-  key: string,
-  reasons: string[],
-): void {
-  const audit = asObjectRecord(record[key]);
-  if (!audit) return;
-  if (audit.ok === false) {
-    pushReasoningTheaterHardFailureReason(reasons, `${key}.ok_false`);
-  }
-  const violations = Array.isArray(audit.violations) ? audit.violations : [];
-  for (const violation of violations) {
-    const violationRecord = asObjectRecord(violation);
-    if (!violationRecord) continue;
-    const kind = coerceText(violationRecord.kind).trim();
-    const summary = coerceText(violationRecord.summary).trim();
-    pushReasoningTheaterHardFailureReason(reasons, kind || summary || `${key}.violation`);
-  }
-}
-
-function collectReasoningTheaterHardFailureReasonsFromRecord(
-  record: Record<string, unknown>,
-  reasons: string[],
-): void {
-  collectReasoningTheaterAuditFailureReasons(record, "poison_audit", reasons);
-  collectReasoningTheaterAuditFailureReasons(record, "prompt_poison_audit", reasons);
-
-  const visibleProjectionInvariant = asObjectRecord(record.visible_projection_invariant);
-  const visibleProjectionViolations = Array.isArray(visibleProjectionInvariant?.violations)
-    ? visibleProjectionInvariant.violations
-    : [];
-  for (const violation of visibleProjectionViolations) {
-    const text = coerceText(violation).trim();
-    pushReasoningTheaterHardFailureReason(reasons, text || "visible_projection_invariant.violation");
-  }
-
-  const resolvedTurnSummary = asObjectRecord(record.resolved_turn_summary);
-  const terminalErrorCode = coerceText(resolvedTurnSummary?.terminal_error_code ?? record.terminal_error_code).trim();
-  if (terminalErrorCode) {
-    pushReasoningTheaterHardFailureReason(reasons, terminalErrorCode);
-  }
-  const resolvedFinalStatus = coerceText(resolvedTurnSummary?.final_status).trim();
-  if (/^(failed|error|fail_closed)$/i.test(resolvedFinalStatus)) {
-    pushReasoningTheaterHardFailureReason(reasons, `resolved_turn_summary.${resolvedFinalStatus}`);
-  }
-
-  const observationReview = asObjectRecord(record.observation_review);
-  const reviewNextAction = coerceText(observationReview?.runtime_next_action ?? observationReview?.next_action).trim();
-  if (/^fail_closed$/i.test(reviewNextAction)) {
-    pushReasoningTheaterHardFailureReason(reasons, "observation_review.fail_closed");
-  }
-  const reviewReason = [
-    observationReview?.reason,
-    observationReview?.missing_piece,
-    observationReview?.observed_artifact_kind,
-  ]
-    .map((value) => coerceText(value).trim())
-    .filter(Boolean)
-    .join(" ");
-  if (/\b(direct_answer_unavailable|terminal_error|contract|forbidden|poison|fail_closed)\b/i.test(reviewReason)) {
-    pushReasoningTheaterHardFailureReason(reasons, reviewReason);
-  }
-
-  const routeHistoryDebug = asObjectRecord(record.route_history_debug);
-  const terminalRoute = coerceText(routeHistoryDebug?.terminal_route).trim();
-  if (/\b(typed_failure|direct_answer_unavailable|forbidden|fail_closed)\b/i.test(terminalRoute)) {
-    pushReasoningTheaterHardFailureReason(reasons, terminalRoute);
-  }
-
-  const currentTurnEvents = Array.isArray(record.current_turn_events) ? record.current_turn_events : [];
-  for (const event of currentTurnEvents) {
-    const eventRecord = asObjectRecord(event);
-    if (!eventRecord) continue;
-    const type = coerceText(eventRecord.type).trim();
-    const status = coerceText(eventRecord.status).trim();
-    const errorCode = coerceText(eventRecord.error_code).trim();
-    const reason = coerceText(eventRecord.reason).trim();
-    if (
-      /^(failed|error|fail_closed|blocked)$/i.test(status) &&
-      /\b(turn_completed|terminal|final|authority|audit)\b/i.test(type)
-    ) {
-      pushReasoningTheaterHardFailureReason(reasons, `event.${type || "unknown"}.${status}`);
-    }
-    if (/\b(direct_answer_unavailable|terminal_error|contract|forbidden|poison|fail_closed)\b/i.test(`${errorCode} ${reason}`)) {
-      pushReasoningTheaterHardFailureReason(reasons, `${type || "event"} ${errorCode || reason}`.trim());
-    }
-  }
-}
-
-export function readReasoningTheaterHardFailureSignals(
-  debug: unknown,
-  askLiveEvents: readonly unknown[] = [],
-): ReasoningTheaterHardFailureSignals {
-  const reasons: string[] = [];
-  const debugRecord = asObjectRecord(debug);
-  if (debugRecord) {
-    collectReasoningTheaterHardFailureReasonsFromRecord(debugRecord, reasons);
-  }
-  for (const event of askLiveEvents) {
-    const eventRecord = asObjectRecord(event);
-    if (!eventRecord) continue;
-    const eventText = [
-      eventRecord.type,
-      eventRecord.status,
-      eventRecord.text,
-      eventRecord.reason,
-      eventRecord.error_code,
-    ]
-      .map((value) => coerceText(value).trim())
-      .filter(Boolean)
-      .join(" ");
-    if (/\b(terminal_artifact_forbidden_by_route_contract|direct_answer_unavailable|fail_closed|poison_audit|turn_completed failed)\b/i.test(eventText)) {
-      pushReasoningTheaterHardFailureReason(reasons, eventText);
-    }
-    const eventMeta = asObjectRecord(eventRecord.meta);
-    if (eventMeta) {
-      collectReasoningTheaterHardFailureReasonsFromRecord(eventMeta, reasons);
-    }
-  }
-  return {
-    failed: reasons.length > 0,
-    reasons: reasons.slice(0, 8),
-  };
 }
 
 function resolveReasoningTheaterFailureOverrideArchetype(
@@ -10614,7 +9839,7 @@ function deriveReasoningTheaterStateFromCanonical(
 ): ReasoningTheaterState {
   const suppressionRaw = canonical.suppression_reason;
   const suppressionReason =
-    suppressionRaw && REASONING_THEATER_SUPPRESSION_REASON_SET.has(suppressionRaw)
+    suppressionRaw && REASONING_THEATER_SUPPRESSION_REASONS.has(suppressionRaw)
       ? suppressionRaw
       : null;
   const momentum = clamp01(canonical.indices.momentum);
@@ -10681,80 +9906,6 @@ function deriveReasoningTheaterStateFromCanonical(
     symbolicLine,
     seed,
   };
-}
-
-function resolveReasoningTheaterMedal(input: {
-  current: ReasoningTheaterState;
-  previous: ReasoningTheaterState | null;
-}): ReasoningTheaterMedalEvent | null {
-  const { current, previous } = input;
-  if (!previous) {
-    if (current.phase === "retrieve") {
-      return { medal: "scout", reason: "Retrieval/search engaged." };
-    }
-    if (current.phase === "observe" && (current.certaintyClass === "unknown" || current.certaintyClass === "hypothesis")) {
-      return { medal: "lantern", reason: "Uncertainty surfaced explicitly." };
-    }
-    return null;
-  }
-
-  if (
-    (previous.suppressionReason !== current.suppressionReason && current.suppressionReason) ||
-    (previous.stance !== "fail_closed" && current.stance === "fail_closed")
-  ) {
-    return { medal: "seal", reason: "Constraint block/fail-closed activated." };
-  }
-  if (previous.archetype !== "contradiction" && current.archetype === "contradiction") {
-    return { medal: "fracture", reason: "Contradiction surfaced." };
-  }
-  if (previous.archetype === "contradiction" && current.archetype !== "contradiction") {
-    return { medal: "stitch", reason: "Contradiction reconciled." };
-  }
-  if (previous.archetype !== "overload" && current.archetype === "overload") {
-    return { medal: "valve", reason: "Pressure handling/rate control engaged." };
-  }
-  if (previous.phase !== current.phase && current.phase === "retrieve") {
-    return { medal: "scout", reason: "Moved into retrieval phase." };
-  }
-  if (
-    current.evidenceHits >= previous.evidenceHits + 2 ||
-    (previous.archetype === "missing_evidence" && current.archetype !== "missing_evidence")
-  ) {
-    return { medal: "anchor", reason: "Grounding/evidence improved." };
-  }
-  if (previous.archetype === "coverage_gap" && current.archetype !== "coverage_gap") {
-    return { medal: "lattice", reason: "Coverage gap reduced." };
-  }
-  if (current.ambiguityPressure + 0.12 < previous.ambiguityPressure && current.archetype === "ambiguity") {
-    return { medal: "prism", reason: "Ambiguity resolving into distinction." };
-  }
-  if (previous.phase !== current.phase && (current.phase === "gate" || current.phase === "verify")) {
-    return { medal: "gate", reason: "Verification threshold encountered." };
-  }
-  if (current.passHits > previous.passHits && (current.phase === "gate" || current.phase === "verify")) {
-    return { medal: "gate", reason: "Gate/verification progress recorded." };
-  }
-  if (previous.phase !== current.phase && (current.phase === "synthesize" || current.phase === "execute")) {
-    return { medal: "relay", reason: "Reasoning relayed into next stage." };
-  }
-  if (
-    (previous.certaintyClass !== "confirmed" &&
-      current.certaintyClass === "confirmed" &&
-      current.stance === "winning") ||
-    (previous.phase !== "debrief" &&
-      current.phase === "debrief" &&
-      current.certaintyClass === "confirmed")
-  ) {
-    return { medal: "crown", reason: "Verified conclusion reached." };
-  }
-  if (
-    previous.phase !== "observe" &&
-    current.phase === "observe" &&
-    (current.certaintyClass === "unknown" || current.certaintyClass === "hypothesis")
-  ) {
-    return { medal: "lantern", reason: "Observation uncertainty surfaced." };
-  }
-  return null;
 }
 
 function deriveReasoningTheaterState(input: {
@@ -10888,228 +10039,10 @@ function deriveReasoningTheaterState(input: {
   };
 }
 
-const MIREK_EVIDENCE_PATH_KEYS = [
-  "path",
-  "source_path",
-  "sourcePath",
-  "file",
-  "filePath",
-  "href",
-  "uri",
-  "ref",
-];
-
-const MIREK_EVIDENCE_ARRAY_KEYS = [
-  "context_files",
-  "prompt_context_files",
-  "evidence_refs",
-  "selected_validation_refs",
-  "contextFiles",
-  "evidenceRefs",
-  "sources",
-  "citations",
-  "retrieval_paths",
-  "retrievalPaths",
-];
-
-function isMirekEvidencePath(value: string): boolean {
-  const trimmed = value.trim();
-  if (!trimmed || trimmed.length > 260) return false;
-  return (
-    /[\\/]/.test(trimmed) ||
-    /\.(?:md|mdx|txt|json|jsonl|ts|tsx|js|jsx|py|html|css|ya?ml|pdf|csv)$/i.test(trimmed) ||
-    /^(?:client|server|shared|docs|tests|scripts|configs|public)\b/i.test(trimmed)
-  );
-}
-
-function collectMirekEvidencePathsFromValue(value: unknown, depth = 0): string[] {
-  if (depth > 3 || value == null) return [];
-  if (typeof value === "string") {
-    return isMirekEvidencePath(value) ? [value.trim()] : [];
-  }
-  if (Array.isArray(value)) {
-    return value.flatMap((entry) => collectMirekEvidencePathsFromValue(entry, depth + 1));
-  }
-  const record = asObjectRecord(value);
-  if (!record) return [];
-  const paths: string[] = [];
-  for (const key of MIREK_EVIDENCE_PATH_KEYS) {
-    paths.push(...collectMirekEvidencePathsFromValue(record[key], depth + 1));
-  }
-  for (const key of MIREK_EVIDENCE_ARRAY_KEYS) {
-    paths.push(...collectMirekEvidencePathsFromValue(record[key], depth + 1));
-  }
-  return paths;
-}
-
-function collectMirekEvidencePathsFromLiveEvents(events: AskLiveEventEntry[]): string[] {
-  return dedupeStrings(
-    events.flatMap((event) => [
-      ...collectMirekEvidencePathsFromValue(event.meta),
-      ...collectMirekEvidencePathsFromValue(event.text),
-    ]),
-  );
-}
-
-function buildMirekEvidenceAnchors(paths: string[]): MirekAnchorInput[] {
-  return dedupeStrings(paths)
-    .slice(0, 12)
-    .map((path, index) => ({
-      id: `evidence:${hash32(path).toString(16)}:${index}`,
-      role: "evidence",
-      path,
-      weight: clamp01(1 - index * 0.045),
-      exact: true,
-    }));
-}
-
-function calculateMirekSharedExactPathRatio(
-  anchors: MirekAnchorInput[],
-  previousArtifact: MirekReasoningArtifactV1 | null,
-): number {
-  const currentPaths = new Set(
-    anchors
-      .filter((anchor) => anchor.role === "evidence" && anchor.exact && anchor.path)
-      .map((anchor) => anchor.path!.toLowerCase()),
-  );
-  if (currentPaths.size === 0 || !previousArtifact) return 0;
-  const previousPaths = new Set(
-    previousArtifact.anchors
-      .filter((anchor) => anchor.role === "evidence" && anchor.exact && anchor.path)
-      .map((anchor) => anchor.path!.toLowerCase()),
-  );
-  if (previousPaths.size === 0) return 0;
-  let shared = 0;
-  for (const path of currentPaths) {
-    if (previousPaths.has(path)) shared += 1;
-  }
-  return clamp01(shared / Math.max(1, currentPaths.size));
-}
-
-function mirekReasoningDisplayDensity(
-  artifact: MirekReasoningArtifactV1,
-  theater: ReasoningTheaterState,
-): number {
-  const provenanceBase =
-    artifact.source.provenanceMode === "strict_exact"
-      ? 0.36
-      : artifact.source.provenanceMode === "derived"
-        ? 0.31
-        : 0.25;
-  const phaseBoost =
-    artifact.state.phase === "retrieve" || artifact.state.phase === "synthesize"
-      ? 0.07
-      : artifact.state.phase === "verify" || artifact.state.phase === "execute"
-        ? 0.04
-        : 0.02;
-  const pressureBoost = theater.stance === "contested" ? 0.06 : theater.stance === "fail_closed" ? -0.04 : 0;
-  return clampNumber(
-    provenanceBase + phaseBoost + pressureBoost + theater.momentum * 0.08 - theater.ambiguityPressure * 0.03,
-    0.22,
-    0.48,
-  );
-}
-
-function countMirekAliveNeighbors(cells: Uint8Array, width: number, height: number, x: number, y: number): number {
-  let count = 0;
-  for (let dy = -1; dy <= 1; dy += 1) {
-    for (let dx = -1; dx <= 1; dx += 1) {
-      if (dx === 0 && dy === 0) continue;
-      const nx = x + dx;
-      const ny = y + dy;
-      if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
-      count += cells[ny * width + nx] ?? 0;
-    }
-  }
-  return count;
-}
-
-function buildMirekReasoningDisplayGrid(
-  artifact: MirekReasoningArtifactV1,
-  theater: ReasoningTheaterState,
-): MirekReasoningDisplayGrid {
-  const width = artifact.grid.width;
-  const height = artifact.grid.height;
-  const total = width * height;
-  const alive = new Uint8Array(total);
-  const intensity = new Float32Array(total);
-  const kinds: MirekCellKind[] = Array.from({ length: total }, () => "context");
-  const semantic = new Uint8Array(total);
-  const density = mirekReasoningDisplayDensity(artifact, theater);
-  for (let index = 0; index < total; index += 1) {
-    const seedRatio = (hash32(`${artifact.finalFrameHash}:display:${index}`) % 10_000) / 10_000;
-    const active = seedRatio < density;
-    alive[index] = active ? 1 : 0;
-    intensity[index] = active ? 0.24 + seedRatio * 0.38 : 0.05;
-  }
-  for (const cell of artifact.grid.cells) {
-    const index = cell.y * width + cell.x;
-    if (index < 0 || index >= total) continue;
-    alive[index] = 1;
-    semantic[index] = 1;
-    kinds[index] = cell.kind;
-    intensity[index] = Math.max(intensity[index] ?? 0, clamp01(0.52 + cell.opacity * 0.48));
-    for (let dy = -1; dy <= 1; dy += 1) {
-      for (let dx = -1; dx <= 1; dx += 1) {
-        const nx = cell.x + dx;
-        const ny = cell.y + dy;
-        if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
-        const neighborIndex = ny * width + nx;
-        alive[neighborIndex] = 1;
-        intensity[neighborIndex] = Math.max(intensity[neighborIndex] ?? 0, 0.28 + cell.opacity * 0.22);
-      }
-    }
-  }
-
-  const survive =
-    artifact.state.certaintyClass === "confirmed" || artifact.state.certaintyClass === "reasoned"
-      ? new Set([2, 3, 4])
-      : new Set([2, 3]);
-  const born =
-    artifact.state.phase === "retrieve" || artifact.state.phase === "synthesize"
-      ? new Set([3, 6])
-      : artifact.state.phase === "verify" || artifact.state.phase === "execute"
-        ? new Set([3, 4])
-        : new Set([3]);
-  const ticks = clampNumber(Math.round(5 + theater.momentum * 4 + theater.ambiguityPressure * 2), 4, 10);
-  for (let tick = 0; tick < ticks; tick += 1) {
-    const next = new Uint8Array(total);
-    const nextIntensity = new Float32Array(total);
-    for (let y = 0; y < height; y += 1) {
-      for (let x = 0; x < width; x += 1) {
-        const index = y * width + x;
-        const neighbors = countMirekAliveNeighbors(alive, width, height, x, y);
-        const keepSemantic = semantic[index] === 1;
-        const willLive = keepSemantic || (alive[index] ? survive.has(neighbors) : born.has(neighbors));
-        next[index] = willLive ? 1 : 0;
-        const neighborGlow = clamp01(neighbors / 8);
-        nextIntensity[index] = willLive
-          ? clamp01((intensity[index] ?? 0.2) * 0.78 + 0.16 + neighborGlow * 0.18)
-          : clamp01((intensity[index] ?? 0.05) * 0.55);
-      }
-    }
-    alive.set(next);
-    intensity.set(nextIntensity);
-  }
-
-  const cells: MirekReasoningDisplayGridCell[] = [];
-  for (let index = 0; index < total; index += 1) {
-    cells.push({
-      id: `mirek-display-${index}`,
-      x: index % width,
-      y: Math.floor(index / width),
-      kind: kinds[index] ?? "context",
-      active: alive[index] === 1,
-      semantic: semantic[index] === 1,
-      intensity: clamp01(intensity[index] ?? 0),
-    });
-  }
-  return { width, height, cells };
-}
-
 const HELIX_ASK_OUTPUT_TOKENS = clampNumber(
-  readNumber(
-    (import.meta as any)?.env?.VITE_HELIX_ASK_OUTPUT_TOKENS,
+  readHelixEnvNumber(
+    (import.meta as any)?.env,
+    "VITE_HELIX_ASK_OUTPUT_TOKENS",
     Math.min(
       HELIX_ASK_MAX_TOKENS,
       Math.max(64, Math.floor(HELIX_ASK_CONTEXT_TOKENS * 0.5)),
@@ -11119,40 +10052,12 @@ const HELIX_ASK_OUTPUT_TOKENS = clampNumber(
   HELIX_ASK_MAX_TOKENS,
 );
 const HELIX_ASK_TURN_CLIENT_WATCHDOG_MS = clampNumber(
-  readNumber((import.meta as any)?.env?.VITE_HELIX_ASK_TURN_CLIENT_WATCHDOG_MS, 45_000),
+  readHelixEnvNumber((import.meta as any)?.env, "VITE_HELIX_ASK_TURN_CLIENT_WATCHDOG_MS", 45_000),
   5_000,
   180_000,
 );
 const HELIX_ASK_PATH_REGEX =
   /(?:[A-Za-z0-9_.-]+[\\/])+[A-Za-z0-9_.-]+\.(?:tsx|ts|jsx|js|md|json|cjs|mjs|py|yml|yaml)/g;
-const HELIX_ASK_METHOD_TRIGGER = /(scientific method|methodology|method\b)/i;
-const HELIX_ASK_STEP_TRIGGER =
-  /(how to|how does|how do|steps?|step-by-step|procedure|process|workflow|pipeline|implement|implementation|configure|setup|set up|troubleshoot|debug|fix|resolve)/i;
-const HELIX_ASK_COMPARE_TRIGGER =
-  /(compare|versus|vs\.?|difference|better|worse|more accurate|accuracy|tradeoffs|advantages|what is|what's|why is|why are|how is|how are)/i;
-type HelixAskFormat = "steps" | "compare" | "brief";
-
-function decideHelixAskFormat(question?: string): { format: HelixAskFormat; stageTags: boolean } {
-  const normalized = question?.trim().toLowerCase() ?? "";
-  if (!normalized) {
-    return { format: "brief", stageTags: false };
-  }
-  if (HELIX_ASK_METHOD_TRIGGER.test(normalized)) {
-    return { format: "steps", stageTags: true };
-  }
-  if (HELIX_ASK_STEP_TRIGGER.test(normalized)) {
-    return { format: "steps", stageTags: false };
-  }
-  if (
-    HELIX_ASK_COMPARE_TRIGGER.test(normalized) ||
-    normalized.startsWith("why ") ||
-    normalized.startsWith("what is") ||
-    normalized.startsWith("what's")
-  ) {
-    return { format: "compare", stageTags: false };
-  }
-  return { format: "brief", stageTags: false };
-}
 
 const HELIX_PANEL_ALIASES: Array<{ id: PanelDefinition["id"]; aliases: string[] }> = [
   { id: "helix-noise-gens", aliases: ["noise gens", "noise generators", "noise generator"] },
@@ -12849,7 +11754,7 @@ export function HelixAskPill({
   const [askMood, setAskMood] = useState<LumaMood>("question");
   const [askMoodBroken, setAskMoodBroken] = useState(false);
   const [voiceTimelineBuildInfo, setVoiceTimelineBuildInfo] = useState<VoiceTimelineBuildInfo>(() => ({
-    clientBuild: resolveVoiceTimelineClientBuildStamp(),
+    clientBuild: readVoiceTimelineClientBuildStamp(),
     clientMode: import.meta.env?.DEV ? "dev" : "prod",
     serverService: null,
     serverVersion: null,
@@ -18277,18 +17182,6 @@ export function HelixAskPill({
     [addHelixTimelineEntry, askActiveQuestion],
   );
 
-  const formatReasoningAttemptDetail = useCallback(
-    (attempt: Pick<ReasoningAttempt, "mode">, fallback: string | null): string | null => {
-      const parts: string[] = [];
-      if (attempt.mode) {
-        parts.push(`mode:${attempt.mode}`);
-      }
-      if (parts.length > 0) return parts.join(" | ");
-      return fallback;
-    },
-    [],
-  );
-
   const ensureReasoningTimelineEntry = useCallback(
     (attempt: ReasoningAttempt, status?: HelixTimelineEntry["status"]) => {
       const existingId = reasoningTimelineEntryByAttemptIdRef.current[attempt.id];
@@ -18333,7 +17226,7 @@ export function HelixAskPill({
       reasoningTimelineEntryByAttemptIdRef.current[attempt.id] = timelineEntry.id;
       return timelineEntry.id;
     },
-    [addHelixTimelineEntry, formatReasoningAttemptDetail, getVoiceTurnAssemblerState, patchHelixTimelineEntry],
+    [addHelixTimelineEntry, getVoiceTurnAssemblerState, patchHelixTimelineEntry],
   );
 
   const buildReasoningTimelineMeta = useCallback(
@@ -21453,7 +20346,6 @@ export function HelixAskPill({
     enqueueReasoningAttempt,
     enqueueVoicePlaybackIntent,
     ensureReasoningTimelineEntry,
-    formatReasoningAttemptDetail,
     getHelixAskSessionId,
     getVoiceTurnAssemblerState,
     markVoiceCheckpoint,
@@ -28757,7 +27649,6 @@ export function HelixAskPill({
       enqueueInterimVoiceCalloutsFromAskArtifacts,
       enqueueVoicePlaybackIntent,
       enqueueReasoningAttempt,
-      formatReasoningAttemptDetail,
       getHelixAskSessionId,
       getPinnedContextCapsuleCount,
       launchAtomicViewer,

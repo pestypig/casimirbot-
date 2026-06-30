@@ -12,6 +12,10 @@ export type VoiceReasoningAttemptTimelineInput = {
   recordedText?: string | null;
 };
 
+export type VoiceReasoningAttemptDetailInput = {
+  mode?: string | null;
+};
+
 const clipText = (value: string | undefined, limit: number): string => {
   if (!value) return "";
   if (value.length <= limit) return value;
@@ -126,6 +130,18 @@ export function resolveReasoningAttemptTimelineText(
   if (attempt.source !== "voice_auto") return prompt;
   if (!isExplorationArtifactRetryPrompt(prompt)) return prompt;
   return extractOriginalTurnFromExplorationArtifactRetryPrompt(prompt) ?? prompt;
+}
+
+export function formatReasoningAttemptDetail(
+  attempt: VoiceReasoningAttemptDetailInput,
+  fallback: string | null,
+): string | null {
+  const parts: string[] = [];
+  if (attempt.mode) {
+    parts.push(`mode:${attempt.mode}`);
+  }
+  if (parts.length > 0) return parts.join(" | ");
+  return fallback;
 }
 
 export function formatVoiceDecisionSentence(args: {

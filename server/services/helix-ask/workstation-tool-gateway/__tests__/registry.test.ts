@@ -19,6 +19,45 @@ const INTERNET_SEARCH_CAPABILITY = "internet-search.search_web";
 const SCHOLARLY_RESEARCH_SEARCH_CAPABILITY = "scholarly-research.lookup_papers";
 const CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY = "civilization-bounds.reflect_system_bounds";
 const THEORY_CONTEXT_REFLECTION_CAPABILITY = "theory-badge-graph.reflect_discussion_context";
+const VOICE_INTERIM_CALLOUT_CAPABILITY = "live_env.request_interim_voice_callout";
+const VOICE_NARRATOR_SAY_CAPABILITY = "live_env.narrator_say";
+const CONTEXT_FEED_QUERY_CAPABILITIES = [
+  ["live_env.query_visual_summaries", "query_visual_summaries"],
+  ["live_env.query_trace_memory", "query_trace_memory"],
+  ["live_env.query_narrator_events", "query_narrator_events"],
+  ["live_env.query_audio_transcripts", "query_audio_transcripts"],
+  ["live_env.query_translation_segments", "query_translation_segments"],
+  ["live_env.query_microdeck_outputs", "query_microdeck_outputs"],
+  ["live_env.query_live_answer_state", "query_live_answer_state"],
+  ["live_env.query_packet_traces", "query_packet_traces"],
+  ["live_env.query_route_evidence", "query_route_evidence"],
+  ["live_env.query_automation_policies", "query_automation_policies"],
+  ["live_env.query_source_health", "query_source_health"],
+] as const;
+const LIVE_SOURCE_LOOP_HEALTH_CAPABILITY = "live_env.query_live_source_loop_health";
+const LIVE_SOURCE_STATE_READ_CAPABILITIES = [
+  ["live_env.query_live_source_quality", "query_live_source_quality"],
+  ["live_env.query_workstation_goal_context", "query_workstation_goal_context"],
+  ["live_env.summarize_live_source_current_state", "summarize_live_source_current_state"],
+] as const;
+const SITUATION_STAGE_STATE_READ_CAPABILITIES = [
+  ["live_env.query_event_log", "query_event_log"],
+  ["live_env.query_world_events", "query_world_events"],
+  ["live_env.query_navigation_state", "query_navigation_state"],
+  ["live_env.query_stage_sources", "query_stage_sources"],
+  ["live_env.query_constructs", "query_constructs"],
+  ["live_env.query_job_evidence", "query_job_evidence"],
+] as const;
+const MICRO_REASONER_READ_CAPABILITIES = [
+  ["live_env.query_micro_reasoner_presets", "query_micro_reasoner_presets"],
+  ["live_env.query_micro_reasoner_prompts", "query_micro_reasoner_prompts"],
+  ["live_env.test_micro_reasoner_prompt", "test_micro_reasoner_prompt"],
+] as const;
+const VISUAL_OBSERVER_READ_CAPABILITIES = [
+  ["live_env.query_visual_observer_profiles", "query_visual_observer_profiles"],
+  ["live_env.test_visual_observer_profile", "test_visual_observer_profile"],
+  ["live_env.compare_visual_observer_profiles", "compare_visual_observer_profiles"],
+] as const;
 
 describe("Helix workstation tool gateway", () => {
   const originalEnv = {
@@ -300,6 +339,118 @@ describe("Helix workstation tool gateway", () => {
         raw_content_included: false,
       }),
     );
+    for (const [capabilityId, actionId] of CONTEXT_FEED_QUERY_CAPABILITIES) {
+      expect(manifest.capabilities).toContainEqual(
+        expect.objectContaining({
+          capability_id: capabilityId,
+          panel_id: "live-answer-environment",
+          action_id: actionId,
+          mode: "read",
+          mutating: false,
+          code_mutation: false,
+          shell_access: false,
+          requires_source: false,
+          permission_profile_required: "read",
+          output_observation_schema: "helix.live_environment_tool_observation.v1",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        }),
+      );
+    }
+    expect(manifest.capabilities).toContainEqual(
+      expect.objectContaining({
+        capability_id: LIVE_SOURCE_LOOP_HEALTH_CAPABILITY,
+        panel_id: "live-answer-environment",
+        action_id: "query_live_source_loop_health",
+        mode: "read",
+        mutating: false,
+        code_mutation: false,
+        shell_access: false,
+        requires_source: false,
+        permission_profile_required: "read",
+        output_observation_schema: "helix.live_environment_tool_observation.v1",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    );
+    for (const [capabilityId, actionId] of LIVE_SOURCE_STATE_READ_CAPABILITIES) {
+      expect(manifest.capabilities).toContainEqual(
+        expect.objectContaining({
+          capability_id: capabilityId,
+          panel_id: "live-answer-environment",
+          action_id: actionId,
+          mode: "read",
+          mutating: false,
+          code_mutation: false,
+          shell_access: false,
+          requires_source: false,
+          permission_profile_required: "read",
+          output_observation_schema: "helix.live_environment_tool_observation.v1",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        }),
+      );
+    }
+    for (const [capabilityId, actionId] of SITUATION_STAGE_STATE_READ_CAPABILITIES) {
+      expect(manifest.capabilities).toContainEqual(
+        expect.objectContaining({
+          capability_id: capabilityId,
+          panel_id: "live-answer-environment",
+          action_id: actionId,
+          mode: "read",
+          mutating: false,
+          code_mutation: false,
+          shell_access: false,
+          requires_source: false,
+          permission_profile_required: "read",
+          output_observation_schema: "helix.live_environment_tool_observation.v1",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        }),
+      );
+    }
+    for (const [capabilityId, actionId] of MICRO_REASONER_READ_CAPABILITIES) {
+      expect(manifest.capabilities).toContainEqual(
+        expect.objectContaining({
+          capability_id: capabilityId,
+          panel_id: "live-answer-environment",
+          action_id: actionId,
+          mode: "read",
+          mutating: false,
+          code_mutation: false,
+          shell_access: false,
+          requires_source: false,
+          permission_profile_required: "read",
+          output_observation_schema: "helix.live_environment_tool_observation.v1",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        }),
+      );
+    }
+    for (const [capabilityId, actionId] of VISUAL_OBSERVER_READ_CAPABILITIES) {
+      expect(manifest.capabilities).toContainEqual(
+        expect.objectContaining({
+          capability_id: capabilityId,
+          panel_id: "live-answer-environment",
+          action_id: actionId,
+          mode: "read",
+          mutating: false,
+          code_mutation: false,
+          shell_access: false,
+          requires_source: false,
+          permission_profile_required: "read",
+          output_observation_schema: "helix.live_environment_tool_observation.v1",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        }),
+      );
+    }
   });
 
   it("calls workspace_os.status as an observation packet, not an answer", async () => {
@@ -477,6 +628,625 @@ describe("Helix workstation tool gateway", () => {
         raw_content_included: false,
       },
     });
+  });
+
+  it("calls read-only live environment context feeds as non-terminal gateway observations", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: "live_env.query_visual_summaries",
+      arguments: {
+        thread_id: "helix-ask:test-context-feed",
+        limit: 2,
+      },
+      turnId: "ask:test:gateway-context-feed",
+      iteration: 4,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      agent_runtime: "codex",
+      capability_id: "live_env.query_visual_summaries",
+      gateway_admission: {
+        requested_capability: "live_env.query_visual_summaries",
+        selected_agent_provider: "codex",
+        permission_profile: "read",
+        admission_status: "admitted",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation_packet: {
+        schema: "helix.agent_step_observation_packet.v1",
+        turn_id: "ask:test:gateway-context-feed",
+        iteration: 4,
+        capability_key: "live_env.query_visual_summaries",
+        panel_id: "live-answer-environment",
+        action: "query_visual_summaries",
+        status: "succeeded",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.live_environment_tool_observation.v1",
+        thread_id: "helix-ask:test-context-feed",
+        tool_name: "live_env.query_visual_summaries",
+        ok: true,
+        context_role: "tool_evidence",
+        ask_context_policy: "evidence_only",
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        observation: {
+          schema: "stage_play_workstation_context_feed_query_result/v1",
+          feedKind: "visual_summaries",
+          status: "read",
+          post_tool_model_step_required: true,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+      },
+      tool_lifecycle_trace: {
+        requested_capability: "live_env.query_visual_summaries",
+        admitted_capability: "live_env.query_visual_summaries",
+        executed_capability: "live_env.query_visual_summaries",
+        lifecycle_stage: "completed",
+        status: "completed",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      tool_followup_decision: {
+        next_action: "continue_reasoning",
+        terminal_blockers: ["post_tool_model_step_required", "terminal_authority_not_evaluated"],
+        required_surface_satisfied: true,
+        evidence_reentered: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
+  it("calls source health as a read-only non-terminal gateway observation", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: "live_env.query_source_health",
+      arguments: {
+        thread_id: "helix-ask:test-source-health",
+      },
+      turnId: "ask:test:gateway-source-health",
+      iteration: 5,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      capability_id: "live_env.query_source_health",
+      gateway_admission: {
+        admission_status: "admitted",
+        permission_profile: "read",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation_packet: {
+        capability_key: "live_env.query_source_health",
+        panel_id: "live-answer-environment",
+        action: "query_source_health",
+        status: "succeeded",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.live_environment_tool_observation.v1",
+        thread_id: "helix-ask:test-source-health",
+        tool_name: "live_env.query_source_health",
+        ok: true,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        observation: {
+          schema: "helix.situation_source_capability_read.v1",
+          status: "read",
+          requiredActuator: "query_source_health",
+          post_tool_model_step_required: true,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+      },
+      tool_followup_decision: {
+        next_action: "continue_reasoning",
+        terminal_blockers: ["post_tool_model_step_required", "terminal_authority_not_evaluated"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
+  it("calls live-source loop health as a read-only non-terminal gateway observation", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "future",
+      mode: "read",
+      capabilityId: LIVE_SOURCE_LOOP_HEALTH_CAPABILITY,
+      arguments: {
+        thread_id: "helix-ask:test-loop-health",
+        expected_cadence_ms: 1000,
+      },
+      turnId: "ask:test:gateway-loop-health",
+      iteration: 6,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      agent_runtime: "future",
+      capability_id: LIVE_SOURCE_LOOP_HEALTH_CAPABILITY,
+      gateway_admission: {
+        requested_capability: LIVE_SOURCE_LOOP_HEALTH_CAPABILITY,
+        selected_agent_provider: "future",
+        permission_profile: "read",
+        admission_status: "admitted",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation_packet: {
+        capability_key: LIVE_SOURCE_LOOP_HEALTH_CAPABILITY,
+        panel_id: "live-answer-environment",
+        action: "query_live_source_loop_health",
+        status: "succeeded",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.live_environment_tool_observation.v1",
+        thread_id: "helix-ask:test-loop-health",
+        tool_name: LIVE_SOURCE_LOOP_HEALTH_CAPABILITY,
+        ok: true,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        observation: {
+          schema: "stage_play_live_source_loop_health/v1",
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+      },
+      tool_lifecycle_trace: {
+        requested_capability: LIVE_SOURCE_LOOP_HEALTH_CAPABILITY,
+        admitted_capability: LIVE_SOURCE_LOOP_HEALTH_CAPABILITY,
+        executed_capability: LIVE_SOURCE_LOOP_HEALTH_CAPABILITY,
+        lifecycle_stage: "completed",
+        status: "completed",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
+  it("calls live-source state reads as read-only non-terminal gateway observations", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: "live_env.query_live_source_quality",
+      arguments: {
+        thread_id: "helix-ask:test-live-source-quality",
+        source_ref: "live-source:test-quality",
+      },
+      turnId: "ask:test:gateway-live-source-quality",
+      iteration: 7,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      agent_runtime: "codex",
+      capability_id: "live_env.query_live_source_quality",
+      gateway_admission: {
+        requested_capability: "live_env.query_live_source_quality",
+        selected_agent_provider: "codex",
+        permission_profile: "read",
+        admission_status: "admitted",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation_packet: {
+        capability_key: "live_env.query_live_source_quality",
+        panel_id: "live-answer-environment",
+        action: "query_live_source_quality",
+        status: "succeeded",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.live_environment_tool_observation.v1",
+        thread_id: "helix-ask:test-live-source-quality",
+        tool_name: "live_env.query_live_source_quality",
+        ok: true,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        observation: {
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+      tool_lifecycle_trace: {
+        requested_capability: "live_env.query_live_source_quality",
+        admitted_capability: "live_env.query_live_source_quality",
+        executed_capability: "live_env.query_live_source_quality",
+        lifecycle_stage: "completed",
+        status: "completed",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
+  it("calls situation/stage state reads as read-only non-terminal gateway observations", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: "live_env.query_event_log",
+      arguments: {
+        thread_id: "helix-ask:test-event-log",
+        source_ref: "live-env:event-log",
+        limit: 2,
+      },
+      turnId: "ask:test:gateway-event-log",
+      iteration: 8,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      agent_runtime: "codex",
+      capability_id: "live_env.query_event_log",
+      gateway_admission: {
+        requested_capability: "live_env.query_event_log",
+        selected_agent_provider: "codex",
+        permission_profile: "read",
+        admission_status: "admitted",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation_packet: {
+        capability_key: "live_env.query_event_log",
+        panel_id: "live-answer-environment",
+        action: "query_event_log",
+        status: "succeeded",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.live_environment_tool_observation.v1",
+        thread_id: "helix-ask:test-event-log",
+        tool_name: "live_env.query_event_log",
+        ok: true,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+      tool_lifecycle_trace: {
+        requested_capability: "live_env.query_event_log",
+        admitted_capability: "live_env.query_event_log",
+        executed_capability: "live_env.query_event_log",
+        lifecycle_stage: "completed",
+        status: "completed",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
+  it("calls micro-reasoner preset query as a read-only non-terminal gateway observation", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: "live_env.query_micro_reasoner_presets",
+      arguments: {
+        thread_id: "helix-ask:test-micro-presets",
+        source_id: "workstation-source:microdeck-test",
+      },
+      turnId: "ask:test:gateway-micro-presets",
+      iteration: 7,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      capability_id: "live_env.query_micro_reasoner_presets",
+      gateway_admission: {
+        admission_status: "admitted",
+        permission_profile: "read",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation_packet: {
+        capability_key: "live_env.query_micro_reasoner_presets",
+        panel_id: "live-answer-environment",
+        action: "query_micro_reasoner_presets",
+        status: "succeeded",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.live_environment_tool_observation.v1",
+        thread_id: "helix-ask:test-micro-presets",
+        tool_name: "live_env.query_micro_reasoner_presets",
+        ok: true,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        observation: {
+          schema: "stage_play_micro_reasoner_prompt_preset_query_result/v1",
+          post_tool_model_step_required: true,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+      },
+      tool_followup_decision: {
+        next_action: "continue_reasoning",
+        terminal_blockers: ["post_tool_model_step_required", "terminal_authority_not_evaluated"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
+  it("calls micro-reasoner prompt test as a dry-run non-terminal gateway observation", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "future",
+      mode: "read",
+      capabilityId: "live_env.test_micro_reasoner_prompt",
+      arguments: {
+        thread_id: "helix-ask:test-micro-prompt-test",
+        source_id: "workstation-source:microdeck-test",
+        role: "claim_extractor",
+        limit: 1,
+      },
+      turnId: "ask:test:gateway-micro-prompt-test",
+      iteration: 8,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      agent_runtime: "future",
+      capability_id: "live_env.test_micro_reasoner_prompt",
+      observation_packet: {
+        capability_key: "live_env.test_micro_reasoner_prompt",
+        panel_id: "live-answer-environment",
+        action: "test_micro_reasoner_prompt",
+        status: "succeeded",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.live_environment_tool_observation.v1",
+        thread_id: "helix-ask:test-micro-prompt-test",
+        tool_name: "live_env.test_micro_reasoner_prompt",
+        ok: true,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        observation: {
+          schema: "stage_play_micro_reasoner_prompt_test_result/v1",
+          activated: false,
+          post_tool_model_step_required: true,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+      },
+      tool_lifecycle_trace: {
+        requested_capability: "live_env.test_micro_reasoner_prompt",
+        admitted_capability: "live_env.test_micro_reasoner_prompt",
+        executed_capability: "live_env.test_micro_reasoner_prompt",
+        lifecycle_stage: "completed",
+        status: "completed",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
+  it("calls visual observer profile query as a read-only non-terminal gateway observation", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: "live_env.query_visual_observer_profiles",
+      arguments: {
+        thread_id: "helix-ask:test-visual-observer-query",
+        source_id: "workstation-source:visual-observer-test",
+        limit: 3,
+      },
+      turnId: "ask:test:gateway-visual-observer-query",
+      iteration: 9,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      capability_id: "live_env.query_visual_observer_profiles",
+      gateway_admission: {
+        admission_status: "admitted",
+        permission_profile: "read",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation_packet: {
+        capability_key: "live_env.query_visual_observer_profiles",
+        panel_id: "live-answer-environment",
+        action: "query_visual_observer_profiles",
+        status: "succeeded",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.live_environment_tool_observation.v1",
+        thread_id: "helix-ask:test-visual-observer-query",
+        tool_name: "live_env.query_visual_observer_profiles",
+        ok: true,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        observation: {
+          schema: "stage_play_visual_observer_profile_list_response/v1",
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+      },
+      tool_followup_decision: {
+        next_action: "continue_reasoning",
+        terminal_blockers: ["post_tool_model_step_required", "terminal_authority_not_evaluated"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
+  it("calls visual observer profile test as a dry-run non-terminal gateway observation", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "future",
+      mode: "read",
+      capabilityId: "live_env.test_visual_observer_profile",
+      arguments: {
+        thread_id: "helix-ask:test-visual-observer-test",
+        source_id: "workstation-source:visual-observer-test",
+        profile_id: "stage_play_visual_observer_profile:generic:v1",
+        generic_summary: "{\"summary\":\"generic frame summary\"}",
+        profile_summary: "{\"summary\":\"profile frame summary\"}",
+      },
+      turnId: "ask:test:gateway-visual-observer-test",
+      iteration: 10,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      agent_runtime: "future",
+      capability_id: "live_env.test_visual_observer_profile",
+      observation_packet: {
+        capability_key: "live_env.test_visual_observer_profile",
+        panel_id: "live-answer-environment",
+        action: "test_visual_observer_profile",
+        status: "succeeded",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.live_environment_tool_observation.v1",
+        thread_id: "helix-ask:test-visual-observer-test",
+        tool_name: "live_env.test_visual_observer_profile",
+        ok: true,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        observation: {
+          schema: "stage_play_visual_observer_profile_test_result/v1",
+          enqueuedAsMail: false,
+          enqueued_as_mail: false,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+      },
+      tool_lifecycle_trace: {
+        requested_capability: "live_env.test_visual_observer_profile",
+        admitted_capability: "live_env.test_visual_observer_profile",
+        executed_capability: "live_env.test_visual_observer_profile",
+        lifecycle_stage: "completed",
+        status: "completed",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
+  it("does not expose mutating visual observer controls through the provider gateway", async () => {
+    const gatewayIds = listWorkstationGatewayCapabilities({
+      agentRuntime: "codex",
+      mode: "act",
+    }).capabilities.map((capability) => capability.capability_id);
+
+    for (const capabilityId of [
+      "live_env.configure_visual_observer_profile",
+      "live_env.apply_visual_observer_profile",
+      "live_env.request_visual_action_replay",
+    ]) {
+      expect(gatewayIds).not.toContain(capabilityId);
+      const result = await callWorkstationGatewayCapability({
+        agentRuntime: "codex",
+        mode: "act",
+        capabilityId,
+        turnId: `ask:test:gateway-visual-observer-held-back:${capabilityId}`,
+      });
+      expect(result).toMatchObject({
+        ok: false,
+        capability_id: capabilityId,
+        error: "capability_not_registered",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      });
+    }
   });
 
   it("calls scientific-calculator.solve_expression as read-only non-terminal evidence", async () => {
@@ -1993,6 +2763,195 @@ describe("Helix workstation tool gateway", () => {
         assistant_answer: false,
         raw_content_included: false,
       },
+    });
+  });
+
+  it("calls interim voice callout as a host-projected non-terminal receipt", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "act",
+      capabilityId: VOICE_INTERIM_CALLOUT_CAPABILITY,
+      arguments: {
+        text: "checking now",
+        thread_id: "helix-ask:test:voice",
+        kind: "tool_progress",
+        evidence_refs: ["ask:test:voice-positive"],
+      },
+      turnId: "ask:test:gateway-voice-callout",
+      iteration: 8,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      agent_runtime: "codex",
+      capability_id: VOICE_INTERIM_CALLOUT_CAPABILITY,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      gateway_admission: {
+        requested_capability: VOICE_INTERIM_CALLOUT_CAPABILITY,
+        selected_agent_provider: "codex",
+        permission_profile: "act",
+        admission_status: "admitted",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation_packet: {
+        capability_key: VOICE_INTERIM_CALLOUT_CAPABILITY,
+        panel_id: "voice-delivery",
+        action: "request_interim_voice_callout",
+        status: "succeeded",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.interim_voice_callout_tool_result.v1",
+        capability_key: VOICE_INTERIM_CALLOUT_CAPABILITY,
+        status: "succeeded",
+        request: {
+          text: "checking now",
+          authority: "provisional",
+          requiresConfirmation: false,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+        receipt: {
+          status: "awaiting_client_playback",
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+        host_projection: {
+          kind: "voice_playback_request",
+          playback_status: "awaiting_client_playback",
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+      tool_followup_decision: {
+        next_action: "continue_reasoning",
+        evidence_reentered: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    const observation = result.observation as {
+      request?: { requestId?: string };
+      receipt?: { receiptId?: string };
+    };
+    expect(observation.request?.requestId).toMatch(/^helix_interim_voice_callout_request:/);
+    expect(observation.receipt?.receiptId).toMatch(/^helix_interim_voice_callout_receipt:/);
+  });
+
+  it("blocks interim voice callout when confirmation is required, without making a final answer", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "act",
+      capabilityId: VOICE_INTERIM_CALLOUT_CAPABILITY,
+      arguments: {
+        text: "confirm before speaking",
+        thread_id: "helix-ask:test:voice",
+        requires_confirmation: true,
+      },
+      turnId: "ask:test:gateway-voice-confirmation-blocked",
+      iteration: 9,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      capability_id: VOICE_INTERIM_CALLOUT_CAPABILITY,
+      error: "blocked_policy",
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      gateway_admission: {
+        admission_status: "blocked",
+        blocked_reason: "blocked_policy",
+      },
+      observation_packet: {
+        status: "blocked",
+        missing_requirements: [
+          expect.objectContaining({
+            code: "blocked_policy",
+            repair_action: "repair",
+          }),
+        ],
+      },
+      observation: {
+        schema: "helix.interim_voice_callout_tool_result.v1",
+        status: "blocked",
+        blocked_reason: "blocked_policy",
+        request: {
+          requiresConfirmation: true,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+        receipt: {
+          status: "blocked_policy",
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+      },
+    });
+  });
+
+  it("calls narrator say through the same non-terminal voice receipt contract", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "future",
+      mode: "act",
+      capabilityId: VOICE_NARRATOR_SAY_CAPABILITY,
+      arguments: {
+        text: "Narrator check.",
+        thread_id: "helix-ask:test:narrator",
+      },
+      turnId: "ask:test:gateway-narrator-say",
+      iteration: 10,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      agent_runtime: "future",
+      capability_id: VOICE_NARRATOR_SAY_CAPABILITY,
+      observation_packet: {
+        capability_key: VOICE_NARRATOR_SAY_CAPABILITY,
+        panel_id: "voice-delivery",
+        action: "narrator_say",
+        status: "succeeded",
+      },
+      observation: {
+        schema: "helix.interim_voice_callout_tool_result.v1",
+        capability_key: VOICE_NARRATOR_SAY_CAPABILITY,
+        request: {
+          kind: "narrator_read",
+          voicePlaybackKind: "narrator_read",
+          text: "Narrator check.",
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+        receipt: {
+          status: "awaiting_client_playback",
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+      },
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
     });
   });
 

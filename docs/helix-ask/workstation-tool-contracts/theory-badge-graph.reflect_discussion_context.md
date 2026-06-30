@@ -31,10 +31,21 @@ Optional:
 - `build_explanation_plan`
 - `limit`
 
+Explicit route alias:
+
+- `helix_ask.reflect_theory_context`
+
+This alias is not a separate provider gateway tool. It may be admitted only as
+an alias that executes the canonical
+`theory-badge-graph.reflect_discussion_context` gateway capability, with the
+requested alias recorded as `source_target_intent.alias_capability`.
+
 Blocked:
 
 - missing prompt
 - prompts that only quote or discuss the capability name
+- quoted, negated, future, or UI-label mentions of
+  `helix_ask.reflect_theory_context`
 - claims that ask the reflection itself to validate physical viability
 
 ## Observation

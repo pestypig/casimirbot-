@@ -182,6 +182,169 @@ describe("Helix Ask turn transcript projection", () => {
     expect(combined).not.toContain("no workstation observation packet was available");
   });
 
+  it("projects structured Codex voice gateway receipts as non-terminal tool observations", () => {
+    const rows = buildHelixTurnTranscriptRows({
+      id: "reply-codex-voice-gateway",
+      turn_id: "turn-codex-voice-gateway",
+      content: "I requested the voice lane to say checking now.",
+      debug: {
+        turn_id: "turn-codex-voice-gateway",
+        agent_runtime: "codex",
+        turn_transcript_events: [
+          {
+            role: "system",
+            type: "plan",
+            status: "completed",
+            text: "Runtime selected: Codex Workstation Mode.",
+            source_event_type: "runtime_selected",
+          },
+          {
+            role: "agent",
+            type: "model_decision",
+            status: "completed",
+            text: "Model re-entry: no workstation observation packet was available for this Codex turn.",
+            source_event_type: "model_reentry",
+          },
+          {
+            role: "assistant",
+            type: "final_answer",
+            status: "completed",
+            text: "I requested the voice lane to say checking now.",
+            source_event_type: "terminal_answer",
+          },
+        ],
+        workstation_gateway_call_results: [
+          {
+            schema: "helix.workstation_tool_gateway.call_result.v1",
+            ok: true,
+            capability_id: "live_env.request_interim_voice_callout",
+            mode: "act",
+            gateway_admission: {
+              requested_capability: "live_env.request_interim_voice_callout",
+              admission_status: "admitted",
+            },
+            observation: {
+              schema: "helix.interim_voice_callout_tool_result.v1",
+              post_tool_model_step_required: true,
+              assistant_answer: false,
+              terminal_eligible: false,
+              raw_content_included: false,
+              request: {
+                text: "checking now",
+                assistant_answer: false,
+                terminal_eligible: false,
+                raw_content_included: false,
+              },
+              receipt: {
+                status: "awaiting_client_playback",
+                assistant_answer: false,
+                terminal_eligible: false,
+                raw_content_included: false,
+              },
+            },
+            observation_packet: {
+              schema: "helix.agent_step_observation_packet.v1",
+              turn_id: "turn-codex-voice-gateway",
+              capability_key: "live_env.request_interim_voice_callout",
+              status: "succeeded",
+              observation_summary: "Voice callout request queued for host playback",
+              assistant_answer: false,
+              terminal_eligible: false,
+              raw_content_included: false,
+            },
+          },
+        ],
+      },
+    });
+
+    const combined = rows.map((row) => `${row.label}: ${row.text} ${row.status}`).join("\n");
+    expect(combined).toContain("Runtime selected: Codex Workstation Mode.");
+    expect(combined).toContain("Action request: live_env.request_interim_voice_callout.");
+    expect(combined).toContain(
+      "Action observation: live_env.request_interim_voice_callout observed Voice callout request queued for host playback.",
+    );
+    expect(combined).toContain("Model re-entry: Codex received the workstation observation packet");
+    expect(combined).toContain("I requested the voice lane to say checking now.");
+    expect(combined).not.toContain("no workstation observation packet was available");
+    expect(rows.find((row) => row.label === "Action Observation")).toMatchObject({
+      role: "tool",
+      status: "completed",
+    });
+    expect(rows.find((row) => row.label === "Final")).toMatchObject({
+      role: "assistant",
+      status: "completed",
+    });
+  });
+
+  it("does not promote a structured voice receipt into a final answer row", () => {
+    const rows = buildHelixTurnTranscriptRows({
+      id: "reply-codex-voice-receipt-only",
+      turn_id: "turn-codex-voice-receipt-only",
+      debug: {
+        turn_id: "turn-codex-voice-receipt-only",
+        agent_runtime: "codex",
+        workstation_gateway_call_results: [
+          {
+            schema: "helix.workstation_tool_gateway.call_result.v1",
+            ok: true,
+            capability_id: "live_env.narrator_say",
+            mode: "act",
+            gateway_admission: {
+              requested_capability: "live_env.narrator_say",
+              admission_status: "admitted",
+            },
+            observation: {
+              schema: "helix.interim_voice_callout_tool_result.v1",
+              post_tool_model_step_required: true,
+              assistant_answer: false,
+              terminal_eligible: false,
+              raw_content_included: false,
+              request: {
+                text: "checking now",
+                assistant_answer: false,
+                terminal_eligible: false,
+                raw_content_included: false,
+              },
+              receipt: {
+                status: "awaiting_client_playback",
+                assistant_answer: false,
+                terminal_eligible: false,
+                raw_content_included: false,
+              },
+              host_projection: {
+                kind: "voice_playback_request",
+                playback_status: "awaiting_client_playback",
+                assistant_answer: false,
+                terminal_eligible: false,
+                raw_content_included: false,
+              },
+            },
+            observation_packet: {
+              schema: "helix.agent_step_observation_packet.v1",
+              turn_id: "turn-codex-voice-receipt-only",
+              capability_key: "live_env.narrator_say",
+              status: "succeeded",
+              observation_summary: "Narrator voice playback request queued",
+              assistant_answer: false,
+              terminal_eligible: false,
+              raw_content_included: false,
+            },
+          },
+        ],
+      },
+    });
+
+    const combined = rows.map((row) => `${row.label}: ${row.text} ${row.status}`).join("\n");
+    expect(combined).toContain("Action request: live_env.narrator_say.");
+    expect(combined).toContain("Action observation: live_env.narrator_say observed Narrator voice playback request queued.");
+    expect(combined).toContain("Model re-entry: Codex received the workstation observation packet");
+    expect(rows.some((row) => row.label === "Final")).toBe(false);
+    expect(rows.find((row) => row.label === "Action Observation")).toMatchObject({
+      role: "tool",
+      status: "completed",
+    });
+  });
+
   it("does not create gateway observations from final prose alone", () => {
     const events = buildHelixWorkstationGatewayTranscriptEvents({
       id: "reply-prose-only",

@@ -26,11 +26,20 @@ Optional:
 - `paths`
 - `max_hits`
 
+Explicit route alias:
+
+- `repo-code.search_concept`
+
+This alias is not a separate provider gateway tool. It may be admitted only as
+an alias that executes the canonical `repo.search` gateway capability, with the
+requested alias recorded as `source_target_intent.alias_capability`.
+
 Blocked:
 
 - missing query
 - mutation or shell requests
 - quoted/historical mentions of `repo.search`
+- quoted, negated, future, or UI-label mentions of `repo-code.search_concept`
 - prompt asking what the tool name means rather than requesting a repo search
 
 ## Observation

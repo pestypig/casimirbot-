@@ -32,7 +32,18 @@ import {
 } from "@shared/helix-scholarly-research-observation";
 import { runInternetSearch } from "../retrieval/internet-search";
 import { runScholarlyResearchLookup } from "../retrieval/scholarly-research-lookup";
+import { recordInterimVoiceCalloutRequest } from "../interim-voice-callout-store";
+import { executeLiveEnvironmentTool } from "../live-environment-tool-adapter";
+import {
+  WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS,
+  workstationContextFeedQuerySpecForCapability,
+  type WorkstationContextFeedQueryToolContractSpec,
+} from "../workstation-context-feed-query-tool-contracts";
 import { buildWorkstationGatewayObservationPacket } from "./observation-packet";
+import {
+  HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
+  type HelixLiveEnvironmentToolName,
+} from "@shared/helix-live-agent-step";
 import {
   HELIX_TOOL_FOLLOWUP_DECISION_SCHEMA,
   HELIX_TOOL_LIFECYCLE_TRACE_SCHEMA,
@@ -88,6 +99,112 @@ const CIVILIZATION_BOUNDS_REFLECTION_OBSERVATION_SCHEMA =
   "helix.civilization_bounds_reflection_observation.v1" as const;
 const THEORY_CONTEXT_REFLECTION_CAPABILITY = "theory-badge-graph.reflect_discussion_context" as const;
 const THEORY_CONTEXT_REFLECTION_OBSERVATION_SCHEMA = "helix.theory_context_reflection_observation.v1" as const;
+const VOICE_INTERIM_CALLOUT_CAPABILITY = "live_env.request_interim_voice_callout" as const;
+const VOICE_NARRATOR_SAY_CAPABILITY = "live_env.narrator_say" as const;
+const VOICE_INTERIM_TOOL_RESULT_SCHEMA = "helix.interim_voice_callout_tool_result.v1" as const;
+const SHARED_CONTEXT_FEED_QUERY_CAPABILITIES = new Set<string>([
+  "live_env.query_visual_summaries",
+  "live_env.query_trace_memory",
+  "live_env.query_narrator_events",
+  "live_env.query_audio_transcripts",
+  "live_env.query_translation_segments",
+  "live_env.query_microdeck_outputs",
+  "live_env.query_live_answer_state",
+  "live_env.query_packet_traces",
+  "live_env.query_route_evidence",
+  "live_env.query_automation_policies",
+  "live_env.query_source_health",
+] as const);
+const LIVE_SOURCE_STATE_READ_CAPABILITIES = [
+  ["live_env.query_live_source_quality", "query_live_source_quality", "Query live-source quality"],
+  ["live_env.query_workstation_goal_context", "query_workstation_goal_context", "Query workstation goal context"],
+  [
+    "live_env.summarize_live_source_current_state",
+    "summarize_live_source_current_state",
+    "Summarize live-source current state",
+  ],
+] as const;
+const SHARED_LIVE_SOURCE_STATE_READ_CAPABILITIES = new Set<string>(
+  LIVE_SOURCE_STATE_READ_CAPABILITIES.map(([capabilityId]) => capabilityId),
+);
+const SITUATION_STAGE_STATE_READ_CAPABILITIES = [
+  ["live_env.query_event_log", "query_event_log", "Query live event log"],
+  ["live_env.query_world_events", "query_world_events", "Query world events"],
+  ["live_env.query_navigation_state", "query_navigation_state", "Query navigation state"],
+  ["live_env.query_stage_sources", "query_stage_sources", "Query stage sources"],
+  ["live_env.query_constructs", "query_constructs", "Query situation constructs"],
+  ["live_env.query_job_evidence", "query_job_evidence", "Query live job evidence"],
+] as const;
+const SHARED_SITUATION_STAGE_STATE_READ_CAPABILITIES = new Set<string>(
+  SITUATION_STAGE_STATE_READ_CAPABILITIES.map(([capabilityId]) => capabilityId),
+);
+const LIVE_SOURCE_LOOP_HEALTH_CAPABILITY = "live_env.query_live_source_loop_health" as const;
+const LIVE_SOURCE_MAILBOX_READ_CAPABILITIES = [
+  ["live_env.check_live_source_mail", "check_live_source_mail", "Check live-source mail"],
+  ["live_env.read_live_source_mail", "read_live_source_mail", "Read live-source mail"],
+  [
+    "live_env.read_processed_live_source_mail",
+    "read_processed_live_source_mail",
+    "Read processed live-source mail",
+  ],
+  [
+    "live_env.reflect_live_source_mail_loop",
+    "reflect_live_source_mail_loop",
+    "Reflect live-source mail loop",
+  ],
+] as const;
+const SHARED_LIVE_SOURCE_MAILBOX_READ_CAPABILITIES = new Set<string>(
+  LIVE_SOURCE_MAILBOX_READ_CAPABILITIES.map(([capabilityId]) => capabilityId),
+);
+const LIVE_SOURCE_INTERPRETER_PREDICTION_READ_CAPABILITIES = [
+  [
+    "live_env.compare_mail_to_interpreter_profile",
+    "compare_mail_to_interpreter_profile",
+    "Compare mail to interpreter profile",
+  ],
+  [
+    "live_env.validate_live_source_prediction",
+    "validate_live_source_prediction",
+    "Validate live-source prediction",
+  ],
+  [
+    "live_env.predict_live_source_immediate",
+    "predict_live_source_immediate",
+    "Predict live-source immediate state",
+  ],
+  [
+    "live_env.compare_live_source_prediction",
+    "compare_live_source_prediction",
+    "Compare live-source prediction",
+  ],
+] as const;
+const SHARED_LIVE_SOURCE_INTERPRETER_PREDICTION_READ_CAPABILITIES = new Set<string>(
+  LIVE_SOURCE_INTERPRETER_PREDICTION_READ_CAPABILITIES.map(([capabilityId]) => capabilityId),
+);
+const STAGE_PLAY_BUILDER_READ_CAPABILITIES = [
+  ["live_env.describe_stage_builder", "describe_stage_builder", "Describe Stage Builder"],
+  ["live_env.validate_stage_play_graph", "validate_stage_play_graph", "Validate Stage Play graph"],
+  ["live_env.plan_stage_play_job", "plan_stage_play_job", "Plan Stage Play job"],
+] as const;
+const SHARED_STAGE_PLAY_BUILDER_READ_CAPABILITIES = new Set<string>(
+  STAGE_PLAY_BUILDER_READ_CAPABILITIES.map(([capabilityId]) => capabilityId),
+);
+const MICRO_REASONER_QUERY_PRESETS_CAPABILITY = "live_env.query_micro_reasoner_presets" as const;
+const MICRO_REASONER_QUERY_PROMPTS_CAPABILITY = "live_env.query_micro_reasoner_prompts" as const;
+const MICRO_REASONER_TEST_PROMPT_CAPABILITY = "live_env.test_micro_reasoner_prompt" as const;
+const SHARED_MICRO_REASONER_READ_CAPABILITIES = new Set<string>([
+  MICRO_REASONER_QUERY_PRESETS_CAPABILITY,
+  MICRO_REASONER_QUERY_PROMPTS_CAPABILITY,
+  MICRO_REASONER_TEST_PROMPT_CAPABILITY,
+] as const);
+const VISUAL_OBSERVER_QUERY_PROFILES_CAPABILITY = "live_env.query_visual_observer_profiles" as const;
+const VISUAL_OBSERVER_TEST_PROFILE_CAPABILITY = "live_env.test_visual_observer_profile" as const;
+const VISUAL_OBSERVER_COMPARE_PROFILES_CAPABILITY = "live_env.compare_visual_observer_profiles" as const;
+const SHARED_VISUAL_OBSERVER_READ_CAPABILITIES = new Set<string>([
+  VISUAL_OBSERVER_QUERY_PROFILES_CAPABILITY,
+  VISUAL_OBSERVER_TEST_PROFILE_CAPABILITY,
+  VISUAL_OBSERVER_COMPARE_PROFILES_CAPABILITY,
+] as const);
 const REPO_SEARCH_DEFAULT_PATHS = ["server", "shared", "client/src", "docs"] as const;
 const DOCS_SEARCH_DEFAULT_PATHS = ["docs"] as const;
 const INTERNET_SEARCH_PROVIDERS = ["tavily", "exa", "google_custom_search"] as const;
@@ -142,6 +259,20 @@ const readStringArray = (value: unknown): string[] =>
   Array.isArray(value)
     ? value.map((entry) => cleanString(entry)).filter(Boolean).slice(0, 32)
     : [];
+
+const readBoolean = (value: unknown, fallback = false): boolean => {
+  if (typeof value === "boolean") return value;
+  if (typeof value !== "string") return fallback;
+  const normalized = value.trim().toLowerCase();
+  if (["true", "1", "yes", "y"].includes(normalized)) return true;
+  if (["false", "0", "no", "n"].includes(normalized)) return false;
+  return fallback;
+};
+
+const readFiniteNumber = (value: unknown): number | null => {
+  const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
+  return Number.isFinite(parsed) ? parsed : null;
+};
 
 const readCivilizationLayerMode = (value: unknown): CivilizationLayerModeV1 | undefined => {
   const cleaned = cleanString(value);
@@ -1079,6 +1210,634 @@ const theoryContextReflectionManifest: HelixWorkstationCapabilityManifest = {
   raw_content_included: false,
 };
 
+const makeVoiceGatewayManifest = (
+  capabilityId: typeof VOICE_INTERIM_CALLOUT_CAPABILITY | typeof VOICE_NARRATOR_SAY_CAPABILITY,
+): HelixWorkstationCapabilityManifest => ({
+  schema: "helix.workstation_tool_gateway.capability.v1",
+  capability_id: capabilityId,
+  label: capabilityId === VOICE_NARRATOR_SAY_CAPABILITY ? "Narrator say request" : "Interim voice callout request",
+  description:
+    "Creates a structured, non-terminal voice request/receipt for host-side playback projection. It does not play audio directly, scrape final prose, mutate files, run shell commands, or become a final answer.",
+  panel_id: "voice-delivery",
+  action_id: capabilityId === VOICE_NARRATOR_SAY_CAPABILITY ? "narrator_say" : "request_interim_voice_callout",
+  mode: "act",
+  mutating: false,
+  code_mutation: false,
+  shell_access: false,
+  requires_confirmation: true,
+  requires_source: false,
+  terminal_eligible: false,
+  permission_profile_required: "act",
+  post_tool_model_step_required: true,
+  input_schema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["text"],
+    properties: {
+      text: { type: "string" },
+      message: { type: "string" },
+      thread_id: { type: "string" },
+      turn_id: { type: "string" },
+      kind: { type: "string" },
+      source: { type: "string" },
+      max_chars: { type: "number" },
+      maxChars: { type: "number" },
+      timing_hint_ms: { type: "number" },
+      timingHintMs: { type: "number" },
+      voice_playback_kind: { type: "string" },
+      voicePlaybackKind: { type: "string" },
+      requires_confirmation: { type: "boolean" },
+      requiresConfirmation: { type: "boolean" },
+      evidence_refs: { type: "array", items: { type: "string" } },
+      evidenceRefs: { type: "array", items: { type: "string" } },
+      reason_codes: { type: "array", items: { type: "string" } },
+      reasonCodes: { type: "array", items: { type: "string" } },
+      source_target_intent: { type: "object" },
+    },
+  },
+  output_observation_schema: VOICE_INTERIM_TOOL_RESULT_SCHEMA,
+  observation_schema: VOICE_INTERIM_TOOL_RESULT_SCHEMA,
+  safety_tags: [
+    "voice_delivery",
+    "host_side_projection",
+    "action_receipt",
+    "requires_confirmation",
+    "non_terminal",
+    "no_shell",
+    "no_code_mutation",
+  ],
+  assistant_answer: false,
+  raw_content_included: false,
+});
+
+const voiceInterimCalloutManifest = makeVoiceGatewayManifest(VOICE_INTERIM_CALLOUT_CAPABILITY);
+const voiceNarratorSayManifest = makeVoiceGatewayManifest(VOICE_NARRATOR_SAY_CAPABILITY);
+
+const makeContextFeedQueryGatewayManifest = (
+  spec: WorkstationContextFeedQueryToolContractSpec,
+): HelixWorkstationCapabilityManifest => ({
+  schema: "helix.workstation_tool_gateway.capability.v1",
+  capability_id: spec.capability,
+  label: `Query ${spec.label}`,
+  description:
+    "Queries an existing Helix live-environment context feed as bounded, read-only workstation evidence. It returns an observation packet only and cannot mutate workstation state, run shell commands, or become a final answer.",
+  panel_id: "live-answer-environment",
+  action_id: spec.actuator,
+  mode: "read",
+  mutating: false,
+  code_mutation: false,
+  shell_access: false,
+  requires_confirmation: false,
+  requires_source: false,
+  terminal_eligible: false,
+  permission_profile_required: "read",
+  post_tool_model_step_required: true,
+  input_schema: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      thread_id: { type: "string" },
+      environment_id: { type: "string" },
+      room_id: { type: "string" },
+      source_id: { type: "string" },
+      sourceId: { type: "string" },
+      source_ref: { type: "string" },
+      sourceRef: { type: "string" },
+      goal_id: { type: "string" },
+      goalId: { type: "string" },
+      freshness_status: { type: "string" },
+      freshnessStatus: { type: "string" },
+      freshness: { type: "string" },
+      limit: { type: "number" },
+      mail_limit: { type: "number" },
+      mailLimit: { type: "number" },
+      source_target_intent: { type: "object" },
+    },
+  },
+  output_observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
+  observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
+  safety_tags: [
+    "read_or_observe",
+    "live_environment",
+    "context_feed",
+    spec.feedKind,
+    "non_terminal",
+    "no_shell",
+    "no_code_mutation",
+  ],
+  assistant_answer: false,
+  raw_content_included: false,
+});
+
+const contextFeedQueryGatewayManifests = WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS
+  .filter((spec) => SHARED_CONTEXT_FEED_QUERY_CAPABILITIES.has(spec.capability))
+  .map(makeContextFeedQueryGatewayManifest);
+
+const liveSourceLoopHealthManifest: HelixWorkstationCapabilityManifest = {
+  schema: "helix.workstation_tool_gateway.capability.v1",
+  capability_id: LIVE_SOURCE_LOOP_HEALTH_CAPABILITY,
+  label: "Query live-source loop health",
+  description:
+    "Queries the existing Helix live-source loop health observation as bounded, read-only workstation evidence. It returns an observation packet only and cannot configure, repair, pause, resume, or mutate any live-source loop.",
+  panel_id: "live-answer-environment",
+  action_id: "query_live_source_loop_health",
+  mode: "read",
+  mutating: false,
+  code_mutation: false,
+  shell_access: false,
+  requires_confirmation: false,
+  requires_source: false,
+  terminal_eligible: false,
+  permission_profile_required: "read",
+  post_tool_model_step_required: true,
+  input_schema: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      thread_id: { type: "string" },
+      environment_id: { type: "string" },
+      room_id: { type: "string" },
+      source_id: { type: "string" },
+      sourceId: { type: "string" },
+      source_ref: { type: "string" },
+      sourceRef: { type: "string" },
+      expected_cadence_ms: { type: "number" },
+      expectedCadenceMs: { type: "number" },
+      source_target_intent: { type: "object" },
+    },
+  },
+  output_observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
+  observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
+  safety_tags: [
+    "read_or_observe",
+    "live_environment",
+    "source_health",
+    "loop_health",
+    "non_terminal",
+    "no_shell",
+    "no_code_mutation",
+  ],
+  assistant_answer: false,
+  raw_content_included: false,
+};
+
+const liveSourceStateReadManifests: HelixWorkstationCapabilityManifest[] =
+  LIVE_SOURCE_STATE_READ_CAPABILITIES.map(([capabilityId, actionId, label]) => ({
+    schema: "helix.workstation_tool_gateway.capability.v1",
+    capability_id: capabilityId,
+    label,
+    description:
+      "Runs an existing Helix live-source state read as bounded workstation evidence. It returns an observation packet only and cannot configure, repair, pause, resume, bind, unbind, or mutate any live-source loop.",
+    panel_id: "live-answer-environment",
+    action_id: actionId,
+    mode: "read",
+    mutating: false,
+    code_mutation: false,
+    shell_access: false,
+    requires_confirmation: false,
+    requires_source: false,
+    terminal_eligible: false,
+    permission_profile_required: "read",
+    post_tool_model_step_required: true,
+    input_schema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        thread_id: { type: "string" },
+        environment_id: { type: "string" },
+        room_id: { type: "string" },
+        source_id: { type: "string" },
+        sourceId: { type: "string" },
+        source_ref: { type: "string" },
+        sourceRef: { type: "string" },
+        goal_id: { type: "string" },
+        goalId: { type: "string" },
+        limit: { type: "number" },
+        mail_limit: { type: "number" },
+        mailLimit: { type: "number" },
+        include_sessions: { type: "boolean" },
+        includeSessions: { type: "boolean" },
+        include_updates: { type: "boolean" },
+        includeUpdates: { type: "boolean" },
+        freshness_status: { type: "string" },
+        freshnessStatus: { type: "string" },
+        expected_cadence_ms: { type: "number" },
+        expectedCadenceMs: { type: "number" },
+        source_target_intent: { type: "object" },
+      },
+    },
+    output_observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
+    observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
+    safety_tags: [
+      "read_or_observe",
+      "live_environment",
+      "live_source_state",
+      "non_terminal",
+      "no_shell",
+      "no_code_mutation",
+    ],
+    assistant_answer: false,
+    raw_content_included: false,
+  }));
+
+const situationStageStateReadManifests: HelixWorkstationCapabilityManifest[] =
+  SITUATION_STAGE_STATE_READ_CAPABILITIES.map(([capabilityId, actionId, label]) => ({
+    schema: "helix.workstation_tool_gateway.capability.v1",
+    capability_id: capabilityId,
+    label,
+    description:
+      "Runs an existing Helix situation/stage state read as bounded workstation evidence. It returns an observation packet only and cannot configure watches, enqueue jobs, process mail, or mutate live workstation state.",
+    panel_id: "live-answer-environment",
+    action_id: actionId,
+    mode: "read",
+    mutating: false,
+    code_mutation: false,
+    shell_access: false,
+    requires_confirmation: false,
+    requires_source: false,
+    terminal_eligible: false,
+    permission_profile_required: "read",
+    post_tool_model_step_required: true,
+    input_schema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        thread_id: { type: "string" },
+        environment_id: { type: "string" },
+        room_id: { type: "string" },
+        source_id: { type: "string" },
+        sourceId: { type: "string" },
+        source_ref: { type: "string" },
+        sourceRef: { type: "string" },
+        route_id: { type: "string" },
+        routeId: { type: "string" },
+        job_id: { type: "string" },
+        jobId: { type: "string" },
+        stage_id: { type: "string" },
+        stageId: { type: "string" },
+        construct_id: { type: "string" },
+        constructId: { type: "string" },
+        since_ms: { type: "number" },
+        sinceMs: { type: "number" },
+        limit: { type: "number" },
+        source_target_intent: { type: "object" },
+      },
+    },
+    output_observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
+    observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
+    safety_tags: [
+      "read_or_observe",
+      "live_environment",
+      "situation_stage_state",
+      "non_terminal",
+      "no_shell",
+      "no_code_mutation",
+    ],
+    assistant_answer: false,
+    raw_content_included: false,
+  }));
+
+const liveSourceMailboxReadManifests: HelixWorkstationCapabilityManifest[] =
+  LIVE_SOURCE_MAILBOX_READ_CAPABILITIES.map(([capabilityId, actionId, label]) => ({
+    schema: "helix.workstation_tool_gateway.capability.v1",
+    capability_id: capabilityId,
+    label,
+    description:
+      "Reads existing Helix live-source mailbox state as bounded workstation evidence. It returns an observation packet only and cannot process new mail, mutate live-source state, speak aloud, or become a final answer.",
+    panel_id: "live-answer-environment",
+    action_id: actionId,
+    mode: "read",
+    mutating: false,
+    code_mutation: false,
+    shell_access: false,
+    requires_confirmation: false,
+    requires_source: false,
+    terminal_eligible: false,
+    permission_profile_required: "read",
+    post_tool_model_step_required: true,
+    input_schema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        thread_id: { type: "string" },
+        environment_id: { type: "string" },
+        room_id: { type: "string" },
+        ui_thread_id: { type: "string" },
+        uiThreadId: { type: "string" },
+        source_id: { type: "string" },
+        sourceId: { type: "string" },
+        source_ref: { type: "string" },
+        sourceRef: { type: "string" },
+        source_kind: { type: "string" },
+        sourceKind: { type: "string" },
+        mail_ids: { type: "array", items: { type: "string" } },
+        mailIds: { type: "array", items: { type: "string" } },
+        limit: { type: "number" },
+        batch_cap: { type: "number" },
+        batchCap: { type: "number" },
+        include_read: { type: "boolean" },
+        includeRead: { type: "boolean" },
+        read_only: { type: "boolean" },
+        readOnly: { type: "boolean" },
+        source_target_intent: { type: "object" },
+      },
+    },
+    output_observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
+    observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
+    safety_tags: [
+      "read_or_observe",
+      "live_environment",
+      "live_source_mailbox",
+      "non_terminal",
+      "no_shell",
+      "no_code_mutation",
+    ],
+    assistant_answer: false,
+    raw_content_included: false,
+  }));
+
+const liveSourceInterpreterPredictionReadManifests: HelixWorkstationCapabilityManifest[] =
+  LIVE_SOURCE_INTERPRETER_PREDICTION_READ_CAPABILITIES.map(([capabilityId, actionId, label]) => ({
+    schema: "helix.workstation_tool_gateway.capability.v1",
+    capability_id: capabilityId,
+    label,
+    description:
+      "Reads or compares existing live-source interpreter/prediction evidence as a bounded workstation observation. It cannot configure interpreter profiles, record mailbox decisions, project narrative state, mutate live-source state, or become a final answer.",
+    panel_id: "live-answer-environment",
+    action_id: actionId,
+    mode: "read",
+    mutating: false,
+    code_mutation: false,
+    shell_access: false,
+    requires_confirmation: false,
+    requires_source: false,
+    terminal_eligible: false,
+    permission_profile_required: "read",
+    post_tool_model_step_required: true,
+    input_schema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        thread_id: { type: "string" },
+        environment_id: { type: "string" },
+        room_id: { type: "string" },
+        ui_thread_id: { type: "string" },
+        uiThreadId: { type: "string" },
+        source_id: { type: "string" },
+        sourceId: { type: "string" },
+        source_ref: { type: "string" },
+        sourceRef: { type: "string" },
+        source_kind: { type: "string" },
+        sourceKind: { type: "string" },
+        mailbox_thread_id: { type: "string" },
+        mailboxThreadId: { type: "string" },
+        mail_ids: { type: "array", items: { type: "string" } },
+        mailIds: { type: "array", items: { type: "string" } },
+        profile_id: { type: "string" },
+        profileId: { type: "string" },
+        job_id: { type: "string" },
+        jobId: { type: "string" },
+        policy_id: { type: "string" },
+        policyId: { type: "string" },
+        current_scene_summary: { type: "string" },
+        currentSceneSummary: { type: "string" },
+        running_story_summary: { type: "string" },
+        runningStorySummary: { type: "string" },
+        limit: { type: "number" },
+        read_only: { type: "boolean" },
+        readOnly: { type: "boolean" },
+        source_target_intent: { type: "object" },
+      },
+    },
+    output_observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
+    observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
+    safety_tags: [
+      "read_or_observe",
+      "live_environment",
+      "live_source_interpreter_prediction",
+      "non_terminal",
+      "no_shell",
+      "no_code_mutation",
+    ],
+    assistant_answer: false,
+    raw_content_included: false,
+  }));
+
+const stagePlayBuilderReadManifests: HelixWorkstationCapabilityManifest[] =
+  STAGE_PLAY_BUILDER_READ_CAPABILITIES.map(([capabilityId, actionId, label]) => ({
+    schema: "helix.workstation_tool_gateway.capability.v1",
+    capability_id: capabilityId,
+    label,
+    description:
+      "Reads, validates, or plans Stage Play builder structure as bounded workstation evidence. It cannot queue checkpoints, mutate live-source state, update live answer projections, or become a final answer.",
+    panel_id: "stage-play-badge-graph",
+    action_id: actionId,
+    mode: "read",
+    mutating: false,
+    code_mutation: false,
+    shell_access: false,
+    requires_confirmation: false,
+    requires_source: false,
+    terminal_eligible: false,
+    permission_profile_required: "read",
+    post_tool_model_step_required: true,
+    input_schema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        thread_id: { type: "string" },
+        environment_id: { type: "string" },
+        room_id: { type: "string" },
+        source_id: { type: "string" },
+        sourceId: { type: "string" },
+        source_ref: { type: "string" },
+        sourceRef: { type: "string" },
+        objective: { type: "string" },
+        user_intent: { type: "string" },
+        intent: { type: "string" },
+        draft: { type: "object" },
+        source_target_intent: { type: "object" },
+      },
+    },
+    output_observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
+    observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
+    safety_tags: [
+      "read_or_observe",
+      "live_environment",
+      "stage_play_builder",
+      "non_terminal",
+      "no_shell",
+      "no_code_mutation",
+    ],
+    assistant_answer: false,
+    raw_content_included: false,
+  }));
+
+const makeMicroReasonerReadManifest = (
+  capabilityId:
+    | typeof MICRO_REASONER_QUERY_PRESETS_CAPABILITY
+    | typeof MICRO_REASONER_QUERY_PROMPTS_CAPABILITY
+    | typeof MICRO_REASONER_TEST_PROMPT_CAPABILITY,
+): HelixWorkstationCapabilityManifest => {
+  const actionId =
+    capabilityId === MICRO_REASONER_QUERY_PRESETS_CAPABILITY
+      ? "query_micro_reasoner_presets"
+      : capabilityId === MICRO_REASONER_QUERY_PROMPTS_CAPABILITY
+        ? "query_micro_reasoner_prompts"
+        : "test_micro_reasoner_prompt";
+  const label =
+    capabilityId === MICRO_REASONER_QUERY_PRESETS_CAPABILITY
+      ? "Query MicroDeck presets"
+      : capabilityId === MICRO_REASONER_QUERY_PROMPTS_CAPABILITY
+        ? "Query MicroDeck prompts"
+        : "Dry-run MicroDeck prompt test";
+  return {
+    schema: "helix.workstation_tool_gateway.capability.v1",
+    capability_id: capabilityId,
+    label,
+    description:
+      "Runs the existing Helix MicroDeck read/evaluation tool as bounded workstation evidence. It returns an observation packet only and cannot create, apply, update, or route MicroDeck presets/prompts.",
+    panel_id: "live-answer-environment",
+    action_id: actionId,
+    mode: "read",
+    mutating: false,
+    code_mutation: false,
+    shell_access: false,
+    requires_confirmation: false,
+    requires_source: false,
+    terminal_eligible: false,
+    permission_profile_required: "read",
+    post_tool_model_step_required: true,
+    input_schema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        thread_id: { type: "string" },
+        environment_id: { type: "string" },
+        room_id: { type: "string" },
+        source_id: { type: "string" },
+        sourceId: { type: "string" },
+        source_ids: { type: "array", items: { type: "string" } },
+        sourceIds: { type: "array", items: { type: "string" } },
+        source_kind: { type: "string" },
+        sourceKind: { type: "string" },
+        role: { type: "string" },
+        limit: { type: "number" },
+        goal_id: { type: "string" },
+        goalId: { type: "string" },
+        source_target_intent: { type: "object" },
+      },
+    },
+    output_observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
+    observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
+    safety_tags: [
+      "read_or_observe",
+      "live_environment",
+      "micro_reasoner",
+      "microdeck",
+      capabilityId === MICRO_REASONER_TEST_PROMPT_CAPABILITY ? "dry_run_evaluation" : "catalog_read",
+      "non_terminal",
+      "no_shell",
+      "no_code_mutation",
+    ],
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
+const microReasonerReadManifests = [
+  makeMicroReasonerReadManifest(MICRO_REASONER_QUERY_PRESETS_CAPABILITY),
+  makeMicroReasonerReadManifest(MICRO_REASONER_QUERY_PROMPTS_CAPABILITY),
+  makeMicroReasonerReadManifest(MICRO_REASONER_TEST_PROMPT_CAPABILITY),
+];
+
+const makeVisualObserverReadManifest = (
+  capabilityId:
+    | typeof VISUAL_OBSERVER_QUERY_PROFILES_CAPABILITY
+    | typeof VISUAL_OBSERVER_TEST_PROFILE_CAPABILITY
+    | typeof VISUAL_OBSERVER_COMPARE_PROFILES_CAPABILITY,
+): HelixWorkstationCapabilityManifest => {
+  const actionId =
+    capabilityId === VISUAL_OBSERVER_QUERY_PROFILES_CAPABILITY
+      ? "query_visual_observer_profiles"
+      : capabilityId === VISUAL_OBSERVER_TEST_PROFILE_CAPABILITY
+        ? "test_visual_observer_profile"
+        : "compare_visual_observer_profiles";
+  const label =
+    capabilityId === VISUAL_OBSERVER_QUERY_PROFILES_CAPABILITY
+      ? "Query visual observer profiles"
+      : capabilityId === VISUAL_OBSERVER_TEST_PROFILE_CAPABILITY
+        ? "Dry-run visual observer profile test"
+        : "Compare visual observer profile output";
+  return {
+    schema: "helix.workstation_tool_gateway.capability.v1",
+    capability_id: capabilityId,
+    label,
+    description:
+      "Runs the existing Helix visual observer read/evaluation tool as bounded workstation evidence. It returns an observation packet only and cannot configure/apply visual observer profiles, request replay, capture frames, or enqueue live-source mail.",
+    panel_id: "live-answer-environment",
+    action_id: actionId,
+    mode: "read",
+    mutating: false,
+    code_mutation: false,
+    shell_access: false,
+    requires_confirmation: false,
+    requires_source: false,
+    terminal_eligible: false,
+    permission_profile_required: "read",
+    post_tool_model_step_required: true,
+    input_schema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        thread_id: { type: "string" },
+        environment_id: { type: "string" },
+        room_id: { type: "string" },
+        source_id: { type: "string" },
+        sourceId: { type: "string" },
+        source_ids: { type: "array", items: { type: "string" } },
+        sourceIds: { type: "array", items: { type: "string" } },
+        profile_id: { type: "string" },
+        profileId: { type: "string" },
+        domain: { type: "string" },
+        status: { type: "string" },
+        include_presets: { type: "boolean" },
+        includePresets: { type: "boolean" },
+        generic_summary: { type: "string" },
+        genericSummary: { type: "string" },
+        profile_summary: { type: "string" },
+        profileSummary: { type: "string" },
+        generic_output: { type: "object" },
+        genericOutput: { type: "object" },
+        profile_output: { type: "object" },
+        profileOutput: { type: "object" },
+        summary: { type: "string" },
+        limit: { type: "number" },
+        source_target_intent: { type: "object" },
+      },
+    },
+    output_observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
+    observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
+    safety_tags: [
+      "read_or_observe",
+      "live_environment",
+      "visual_observer",
+      capabilityId === VISUAL_OBSERVER_QUERY_PROFILES_CAPABILITY ? "catalog_read" : "dry_run_evaluation",
+      "non_terminal",
+      "no_shell",
+      "no_code_mutation",
+    ],
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
+const visualObserverReadManifests = [
+  makeVisualObserverReadManifest(VISUAL_OBSERVER_QUERY_PROFILES_CAPABILITY),
+  makeVisualObserverReadManifest(VISUAL_OBSERVER_TEST_PROFILE_CAPABILITY),
+  makeVisualObserverReadManifest(VISUAL_OBSERVER_COMPARE_PROFILES_CAPABILITY),
+];
+
 const capabilities = new Map<string, HelixWorkstationCapabilityManifest>([
   [workspaceOsStatusManifest.capability_id, workspaceOsStatusManifest],
   [workstationActiveContextManifest.capability_id, workstationActiveContextManifest],
@@ -1096,6 +1855,17 @@ const capabilities = new Map<string, HelixWorkstationCapabilityManifest>([
   [scholarlyResearchSearchManifest.capability_id, scholarlyResearchSearchManifest],
   [civilizationBoundsReflectionManifest.capability_id, civilizationBoundsReflectionManifest],
   [theoryContextReflectionManifest.capability_id, theoryContextReflectionManifest],
+  [voiceInterimCalloutManifest.capability_id, voiceInterimCalloutManifest],
+  [voiceNarratorSayManifest.capability_id, voiceNarratorSayManifest],
+  ...contextFeedQueryGatewayManifests.map((manifest) => [manifest.capability_id, manifest] as const),
+  [liveSourceLoopHealthManifest.capability_id, liveSourceLoopHealthManifest],
+  ...liveSourceStateReadManifests.map((manifest) => [manifest.capability_id, manifest] as const),
+  ...situationStageStateReadManifests.map((manifest) => [manifest.capability_id, manifest] as const),
+  ...liveSourceMailboxReadManifests.map((manifest) => [manifest.capability_id, manifest] as const),
+  ...liveSourceInterpreterPredictionReadManifests.map((manifest) => [manifest.capability_id, manifest] as const),
+  ...stagePlayBuilderReadManifests.map((manifest) => [manifest.capability_id, manifest] as const),
+  ...microReasonerReadManifests.map((manifest) => [manifest.capability_id, manifest] as const),
+  ...visualObserverReadManifests.map((manifest) => [manifest.capability_id, manifest] as const),
 ]);
 
 export const listWorkstationGatewayCapabilities = (
@@ -2363,6 +3133,763 @@ export const callWorkstationGatewayCapability = async (
       tool_lifecycle_trace: trace.tool_lifecycle_trace,
       tool_followup_decision: trace.tool_followup_decision,
       observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      error,
+    };
+  }
+
+  if (
+    manifest.capability_id === VOICE_INTERIM_CALLOUT_CAPABILITY ||
+    manifest.capability_id === VOICE_NARRATOR_SAY_CAPABILITY
+  ) {
+    const args = readArguments(input.arguments);
+    const text = cleanString(args.text ?? args.message);
+    const explicitThreadId = cleanString(args.thread_id ?? args.threadId);
+    const effectiveThreadId = explicitThreadId || "helix-ask:desktop";
+    const requiresConfirmation = readBoolean(args.requires_confirmation ?? args.requiresConfirmation, false);
+    const result = recordInterimVoiceCalloutRequest({
+      turnId: cleanString(args.turn_id ?? args.turnId, turnId),
+      threadId: effectiveThreadId,
+      source: cleanString(args.source, "ask_tool_loop"),
+      kind: manifest.capability_id === VOICE_NARRATOR_SAY_CAPABILITY
+        ? "narrator_read"
+        : cleanString(args.kind, "tool_progress"),
+      text,
+      maxChars: readFiniteNumber(args.max_chars ?? args.maxChars),
+      timingHintMs: readFiniteNumber(args.timing_hint_ms ?? args.timingHintMs),
+      voicePlaybackKind: manifest.capability_id === VOICE_NARRATOR_SAY_CAPABILITY
+        ? "narrator_read"
+        : cleanString(args.voice_playback_kind ?? args.voicePlaybackKind),
+      requiresConfirmation,
+      evidenceRefs: [
+        ...readStringArray(args.evidence_refs),
+        ...readStringArray(args.evidenceRefs),
+      ],
+      reasonCodes: [
+        "provider_gateway_voice_request",
+        ...readStringArray(args.reason_codes ?? args.reasonCodes),
+      ],
+    });
+    const ok =
+      result.receipt.status === "awaiting_client_playback" ||
+      result.receipt.status === "queued" ||
+      result.receipt.status === "queued_for_retry" ||
+      result.receipt.status === "delivered";
+    const blockedReason = ok ? null : result.receipt.status;
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: ok ? "admitted" : "blocked",
+      reason: ok ? "voice_gateway_receipt_created" : "voice_gateway_receipt_blocked",
+      blockedReason: blockedReason ?? undefined,
+      sourceTargetIntent: args.source_target_intent,
+    });
+    const observation = {
+      schema: VOICE_INTERIM_TOOL_RESULT_SCHEMA,
+      capability_key: manifest.capability_id,
+      capability: manifest.capability_id,
+      status: ok ? "succeeded" : "blocked",
+      blocked_reason: blockedReason,
+      request: result.request,
+      receipt: result.receipt,
+      host_projection: {
+        kind: "voice_playback_request",
+        request_id: result.request.requestId,
+        receipt_id: result.receipt.receiptId,
+        playback_status: result.receipt.status,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    };
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: "voice-delivery",
+      action: manifest.action_id,
+      status: ok ? "succeeded" : "blocked",
+      summary: ok
+        ? `Voice gateway created ${result.receipt.status} receipt ${result.receipt.receiptId}.`
+        : `Voice gateway blocked request: ${blockedReason ?? "unknown"}.`,
+      observation,
+      missingRequirements: ok ? [] : [{
+        code: blockedReason ?? "voice_gateway_blocked",
+        message: result.receipt.delivery?.message ?? "Voice request did not produce a playable receipt.",
+        repair_action: blockedReason === "blocked_missing_text" ? "ask_user" : "repair",
+      }],
+    });
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error: blockedReason ?? undefined,
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      error: blockedReason ?? undefined,
+    };
+  }
+
+  const contextFeedQuerySpec = workstationContextFeedQuerySpecForCapability(manifest.capability_id);
+  if (contextFeedQuerySpec && SHARED_CONTEXT_FEED_QUERY_CAPABILITIES.has(manifest.capability_id)) {
+    const args = readArguments(input.arguments);
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: "admitted",
+      reason: "read_only_gateway_capability",
+      sourceTargetIntent: args.source_target_intent,
+    });
+    const threadIdForTool = optionalString(args.thread_id) ?? turnId;
+    const suppliedSourceRef =
+      optionalString(args.source_ref) ??
+      optionalString(args.sourceRef) ??
+      optionalString(args.source_id) ??
+      optionalString(args.sourceId);
+    const toolArgs = suppliedSourceRef
+      ? args
+      : {
+          ...args,
+          source_ref: `workstation_gateway:${threadIdForTool}:${manifest.capability_id}`,
+        };
+    const liveObservation = executeLiveEnvironmentTool({
+      tool_name: manifest.capability_id as HelixLiveEnvironmentToolName,
+      thread_id: threadIdForTool,
+      environment_id: optionalString(args.environment_id),
+      args: toolArgs,
+    });
+    const nestedObservation = readRecord(liveObservation.observation);
+    const missingRequirements = readStringArray(
+      nestedObservation?.missing_requirements ?? nestedObservation?.missingRequirements,
+    ).map((requirement) => ({
+      code: requirement,
+      message: `Context feed query ${manifest.capability_id} requires ${requirement}.`,
+      repair_action: "ask_user" as const,
+    }));
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: manifest.panel_id ?? "live-answer-environment",
+      action: contextFeedQuerySpec.actuator,
+      status: liveObservation.ok ? "succeeded" : "blocked",
+      summary: liveObservation.summary,
+      observation: liveObservation,
+      missingRequirements,
+    });
+    const error = liveObservation.ok ? undefined : "context_feed_query_unavailable";
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error,
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: liveObservation.ok,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation: liveObservation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      error,
+    };
+  }
+
+  if (manifest.capability_id === LIVE_SOURCE_LOOP_HEALTH_CAPABILITY) {
+    const args = readArguments(input.arguments);
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: "admitted",
+      reason: "read_only_gateway_capability",
+      sourceTargetIntent: args.source_target_intent,
+    });
+    const threadIdForTool = optionalString(args.thread_id) ?? turnId;
+    const suppliedSourceRef =
+      optionalString(args.source_ref) ??
+      optionalString(args.sourceRef) ??
+      optionalString(args.source_id) ??
+      optionalString(args.sourceId);
+    const toolArgs = suppliedSourceRef
+      ? args
+      : {
+          ...args,
+          source_ref: `workstation_gateway:${threadIdForTool}:${manifest.capability_id}`,
+        };
+    const liveObservation = executeLiveEnvironmentTool({
+      tool_name: LIVE_SOURCE_LOOP_HEALTH_CAPABILITY as HelixLiveEnvironmentToolName,
+      thread_id: threadIdForTool,
+      environment_id: optionalString(args.environment_id),
+      args: toolArgs,
+    });
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: manifest.panel_id ?? "live-answer-environment",
+      action: manifest.action_id,
+      status: liveObservation.ok ? "succeeded" : "blocked",
+      summary: liveObservation.summary,
+      observation: liveObservation,
+    });
+    const error = liveObservation.ok ? undefined : "live_source_loop_health_unavailable";
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error,
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: liveObservation.ok,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation: liveObservation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      error,
+    };
+  }
+
+  if (SHARED_LIVE_SOURCE_STATE_READ_CAPABILITIES.has(manifest.capability_id)) {
+    const args = readArguments(input.arguments);
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: "admitted",
+      reason: "read_only_gateway_capability",
+      sourceTargetIntent: args.source_target_intent,
+    });
+    const threadIdForTool = optionalString(args.thread_id) ?? turnId;
+    const suppliedSourceRef =
+      optionalString(args.source_ref) ??
+      optionalString(args.sourceRef) ??
+      optionalString(args.source_id) ??
+      optionalString(args.sourceId);
+    const toolArgs = suppliedSourceRef
+      ? args
+      : {
+          ...args,
+          source_ref: `workstation_gateway:${threadIdForTool}:${manifest.capability_id}`,
+        };
+    const liveObservation = executeLiveEnvironmentTool({
+      tool_name: manifest.capability_id as HelixLiveEnvironmentToolName,
+      thread_id: threadIdForTool,
+      environment_id: optionalString(args.environment_id),
+      args: toolArgs,
+    });
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: manifest.panel_id ?? "live-answer-environment",
+      action: manifest.action_id,
+      status: liveObservation.ok ? "succeeded" : "blocked",
+      summary: liveObservation.summary,
+      observation: liveObservation,
+    });
+    const error = liveObservation.ok ? undefined : "live_source_state_read_unavailable";
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error,
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: liveObservation.ok,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation: liveObservation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      error,
+    };
+  }
+
+  if (SHARED_SITUATION_STAGE_STATE_READ_CAPABILITIES.has(manifest.capability_id)) {
+    const args = readArguments(input.arguments);
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: "admitted",
+      reason: "read_only_gateway_capability",
+      sourceTargetIntent: args.source_target_intent,
+    });
+    const threadIdForTool = optionalString(args.thread_id) ?? turnId;
+    const suppliedSourceRef =
+      optionalString(args.source_ref) ??
+      optionalString(args.sourceRef) ??
+      optionalString(args.source_id) ??
+      optionalString(args.sourceId);
+    const toolArgs = suppliedSourceRef
+      ? args
+      : {
+          ...args,
+          source_ref: `workstation_gateway:${threadIdForTool}:${manifest.capability_id}`,
+        };
+    const liveObservation = executeLiveEnvironmentTool({
+      tool_name: manifest.capability_id as HelixLiveEnvironmentToolName,
+      thread_id: threadIdForTool,
+      environment_id: optionalString(args.environment_id),
+      args: toolArgs,
+    });
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: manifest.panel_id ?? "live-answer-environment",
+      action: manifest.action_id,
+      status: liveObservation.ok ? "succeeded" : "blocked",
+      summary: liveObservation.summary,
+      observation: liveObservation,
+    });
+    const error = liveObservation.ok ? undefined : "situation_stage_state_read_unavailable";
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error,
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: liveObservation.ok,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation: liveObservation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      error,
+    };
+  }
+
+  if (SHARED_LIVE_SOURCE_MAILBOX_READ_CAPABILITIES.has(manifest.capability_id)) {
+    const args = readArguments(input.arguments);
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: "admitted",
+      reason: "read_only_gateway_capability",
+      sourceTargetIntent: args.source_target_intent,
+    });
+    const threadIdForTool = optionalString(args.thread_id) ?? turnId;
+    const suppliedSourceRef =
+      optionalString(args.source_ref) ??
+      optionalString(args.sourceRef) ??
+      optionalString(args.source_id) ??
+      optionalString(args.sourceId);
+    const toolArgs = suppliedSourceRef
+      ? {
+          ...args,
+          read_only: true,
+          readOnly: true,
+        }
+      : {
+          ...args,
+          source_ref: `workstation_gateway:${threadIdForTool}:${manifest.capability_id}`,
+          read_only: true,
+          readOnly: true,
+        };
+    const liveObservation = executeLiveEnvironmentTool({
+      tool_name: manifest.capability_id as HelixLiveEnvironmentToolName,
+      thread_id: threadIdForTool,
+      environment_id: optionalString(args.environment_id),
+      args: toolArgs,
+    });
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: manifest.panel_id ?? "live-answer-environment",
+      action: manifest.action_id,
+      status: liveObservation.ok ? "succeeded" : "blocked",
+      summary: liveObservation.summary,
+      observation: liveObservation,
+    });
+    const error = liveObservation.ok ? undefined : "live_source_mailbox_read_unavailable";
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error,
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: liveObservation.ok,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation: liveObservation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      error,
+    };
+  }
+
+  if (SHARED_LIVE_SOURCE_INTERPRETER_PREDICTION_READ_CAPABILITIES.has(manifest.capability_id)) {
+    const args = readArguments(input.arguments);
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: "admitted",
+      reason: "read_only_gateway_capability",
+      sourceTargetIntent: args.source_target_intent,
+    });
+    const threadIdForTool = optionalString(args.thread_id) ?? turnId;
+    const suppliedSourceRef =
+      optionalString(args.source_ref) ??
+      optionalString(args.sourceRef) ??
+      optionalString(args.source_id) ??
+      optionalString(args.sourceId);
+    const toolArgs = suppliedSourceRef
+      ? {
+          ...args,
+          read_only: true,
+          readOnly: true,
+        }
+      : {
+          ...args,
+          source_ref: `workstation_gateway:${threadIdForTool}:${manifest.capability_id}`,
+          read_only: true,
+          readOnly: true,
+        };
+    const liveObservation = executeLiveEnvironmentTool({
+      tool_name: manifest.capability_id as HelixLiveEnvironmentToolName,
+      thread_id: threadIdForTool,
+      environment_id: optionalString(args.environment_id),
+      args: toolArgs,
+    });
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: manifest.panel_id ?? "live-answer-environment",
+      action: manifest.action_id,
+      status: liveObservation.ok ? "succeeded" : "blocked",
+      summary: liveObservation.summary,
+      observation: liveObservation,
+    });
+    const error = liveObservation.ok ? undefined : "live_source_interpreter_prediction_read_unavailable";
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error,
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: liveObservation.ok,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation: liveObservation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      error,
+    };
+  }
+
+  if (SHARED_STAGE_PLAY_BUILDER_READ_CAPABILITIES.has(manifest.capability_id)) {
+    const args = readArguments(input.arguments);
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: "admitted",
+      reason: "read_only_gateway_capability",
+      sourceTargetIntent: args.source_target_intent,
+    });
+    const threadIdForTool = optionalString(args.thread_id) ?? turnId;
+    const suppliedSourceRef =
+      optionalString(args.source_ref) ??
+      optionalString(args.sourceRef) ??
+      optionalString(args.source_id) ??
+      optionalString(args.sourceId);
+    const toolArgs = suppliedSourceRef
+      ? {
+          ...args,
+          read_only: true,
+          readOnly: true,
+        }
+      : {
+          ...args,
+          source_ref: `workstation_gateway:${threadIdForTool}:${manifest.capability_id}`,
+          read_only: true,
+          readOnly: true,
+        };
+    const liveObservation = executeLiveEnvironmentTool({
+      tool_name: manifest.capability_id as HelixLiveEnvironmentToolName,
+      thread_id: threadIdForTool,
+      environment_id: optionalString(args.environment_id),
+      args: toolArgs,
+    });
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: manifest.panel_id ?? "stage-play-badge-graph",
+      action: manifest.action_id,
+      status: liveObservation.ok ? "succeeded" : "blocked",
+      summary: liveObservation.summary,
+      observation: liveObservation,
+    });
+    const error = liveObservation.ok ? undefined : "stage_play_builder_read_unavailable";
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error,
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: liveObservation.ok,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation: liveObservation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      error,
+    };
+  }
+
+  if (SHARED_MICRO_REASONER_READ_CAPABILITIES.has(manifest.capability_id)) {
+    const args = readArguments(input.arguments);
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: "admitted",
+      reason: "read_only_gateway_capability",
+      sourceTargetIntent: args.source_target_intent,
+    });
+    const threadIdForTool = optionalString(args.thread_id) ?? turnId;
+    const suppliedSourceId =
+      optionalString(args.source_id) ??
+      optionalString(args.sourceId) ??
+      optionalString(args.source_ref) ??
+      optionalString(args.sourceRef);
+    const toolArgs = suppliedSourceId
+      ? args
+      : {
+          ...args,
+          source_id: `workstation_gateway:${threadIdForTool}:${manifest.capability_id}`,
+        };
+    const liveObservation = executeLiveEnvironmentTool({
+      tool_name: manifest.capability_id as HelixLiveEnvironmentToolName,
+      thread_id: threadIdForTool,
+      environment_id: optionalString(args.environment_id),
+      args: toolArgs,
+    });
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: manifest.panel_id ?? "live-answer-environment",
+      action: manifest.action_id,
+      status: liveObservation.ok ? "succeeded" : "blocked",
+      summary: liveObservation.summary,
+      observation: liveObservation,
+    });
+    const error = liveObservation.ok ? undefined : "micro_reasoner_read_unavailable";
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error,
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: liveObservation.ok,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation: liveObservation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      error,
+    };
+  }
+
+  if (SHARED_VISUAL_OBSERVER_READ_CAPABILITIES.has(manifest.capability_id)) {
+    const args = readArguments(input.arguments);
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: "admitted",
+      reason: "read_only_gateway_capability",
+      sourceTargetIntent: args.source_target_intent,
+    });
+    const threadIdForTool = optionalString(args.thread_id) ?? turnId;
+    const suppliedSourceId =
+      optionalString(args.source_id) ??
+      optionalString(args.sourceId) ??
+      optionalString(args.source_ref) ??
+      optionalString(args.sourceRef);
+    const toolArgs = suppliedSourceId
+      ? args
+      : {
+          ...args,
+          source_id: `workstation_gateway:${threadIdForTool}:${manifest.capability_id}`,
+        };
+    const liveObservation = executeLiveEnvironmentTool({
+      tool_name: manifest.capability_id as HelixLiveEnvironmentToolName,
+      thread_id: threadIdForTool,
+      environment_id: optionalString(args.environment_id),
+      args: toolArgs,
+    });
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: manifest.panel_id ?? "live-answer-environment",
+      action: manifest.action_id,
+      status: liveObservation.ok ? "succeeded" : "blocked",
+      summary: liveObservation.summary,
+      observation: liveObservation,
+    });
+    const error = liveObservation.ok ? undefined : "visual_observer_read_unavailable";
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error,
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: liveObservation.ok,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation: liveObservation,
       artifact_refs: observationPacket.produced_artifact_refs,
       terminal_eligible: false,
       post_tool_model_step_required: true,

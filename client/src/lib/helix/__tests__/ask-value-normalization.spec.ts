@@ -4,6 +4,7 @@ import {
   asObjectRecord,
   asNonEmptyString,
   asStringArray,
+  clamp01,
   clampNumber,
   clipText,
   coerceText,
@@ -23,6 +24,12 @@ describe("ask value normalization", () => {
     expect(clampNumber(-1, 0, 10)).toBe(0);
     expect(clampNumber(4, 0, 10)).toBe(4);
     expect(clampNumber(12, 0, 10)).toBe(10);
+  });
+
+  it("clamps ratios to the inclusive unit interval", () => {
+    expect(clamp01(-0.2)).toBe(0);
+    expect(clamp01(0.42)).toBe(0.42);
+    expect(clamp01(1.5)).toBe(1);
   });
 
   it("clips text with the existing ellipsis convention", () => {

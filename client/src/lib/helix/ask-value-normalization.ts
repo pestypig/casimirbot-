@@ -7,6 +7,10 @@ export function clampNumber(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
+export function clamp01(value: number): number {
+  return clampNumber(value, 0, 1);
+}
+
 export function clipText(value: string | undefined, limit: number): string {
   if (!value) return "";
   if (value.length <= limit) return value;

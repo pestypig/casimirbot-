@@ -58,6 +58,35 @@ describe("Helix Ask backend entrypoint projection guard", () => {
     expect(requiresHelixAskBackendEntrypoint("What should I cook for dinner tonight?")).toBe(false);
   });
 
+  it("does not treat tool-like quoted translation payloads as backend tool requests", () => {
+    const prompt =
+      'translate to japanese "I don\'t see a voice/speak-out-loud tool admitted for this turn. The available Helix workstation capabilities include live_env.request_interim_voice_callout, calculator, docs/search, repo search, web search, panel open/focus, and status/context observation."';
+
+    expect(requiresHelixAskBackendEntrypoint(prompt)).toBe(false);
+    expect(
+      buildHelixAskHardBackendEntrypointRouteMetadata({
+        question: prompt,
+        turnId: "ask:quoted-translation",
+        threadId: "session-quoted-translation",
+      }),
+    ).toBeNull();
+  });
+
+  it("keeps backend entrypoint admission when verification is requested outside a quoted translation payload", () => {
+    const prompt =
+      'translate to japanese "I don\'t see live_env.request_interim_voice_callout" and verify whether that capability is available in this runtime';
+
+    expect(requiresHelixAskBackendEntrypoint(prompt)).toBe(true);
+    const metadata = buildHelixAskHardBackendEntrypointRouteMetadata({
+      question: prompt,
+      turnId: "ask:quoted-translation-verify",
+      threadId: "session-quoted-translation-verify",
+    }) as Record<string, unknown>;
+
+    expect(metadata.source).toBe("hard_tool_backend_entrypoint");
+    expect(metadata.requiredToolFamily).toBe("live_env");
+  });
+
   it("builds hard backend Ask route metadata for explicit calculator tool prompts", () => {
     const metadata = buildHelixAskHardBackendEntrypointRouteMetadata({
       question: hardCalculatorPrompt,
@@ -281,6 +310,43 @@ describe("Helix Ask backend entrypoint projection guard", () => {
     expect(reply.ok).toBe(true);
     expect(reply.final_answer_source).toBe("durable_chat_session");
     expect(reply.debug?.ask_entrypoint_required).toBe(false);
+  });
+
+  it("does not project stale retrieval fallback as a quoted translation answer", () => {
+    const prompt =
+      'translate to japanese "I don\'t see a voice/speak-out-loud tool admitted for this turn. The available Helix workstation capabilities include live_env.request_interim_voice_callout, calculator, docs/search, repo search, web search, panel open/focus, and status/context observation."';
+    const [reply] = buildHelixAskRepliesFromChatSession({
+      id: "session-quoted-translation-stale-fallback",
+      title: "Helix Ask",
+      createdAt: "2026-06-16T00:00:00.000Z",
+      updatedAt: "2026-06-16T00:00:01.000Z",
+      personaId: "default",
+      messages: [
+        {
+          id: "user-1",
+          role: "user",
+          content: prompt,
+          at: "2026-06-16T00:00:00.000Z",
+          tokens: 1,
+        },
+        {
+          id: "assistant-1",
+          role: "assistant",
+          content: "I need retrieval before finalizing this claim. I do not yet have grounded evidence references for it.",
+          at: "2026-06-16T00:00:01.000Z",
+          tokens: 1,
+        },
+      ],
+    } as never);
+
+    expect(requiresHelixAskBackendEntrypoint(prompt)).toBe(false);
+    expect(reply.content).toBe("I could not complete that turn.\nCause: terminal_authority_missing.");
+    expect(reply.ok).toBe(false);
+    expect(reply.final_answer_source).toBe("typed_failure");
+    expect(reply.terminal_artifact_kind).toBe("typed_failure");
+    expect(reply.terminal_error_code).toBe("terminal_authority_missing");
+    expect(reply.debug?.blocked_projection_kind).toBe("durable_chat_session");
+    expect(reply.content).not.toContain("I need retrieval before finalizing this claim");
   });
 
   it("does not treat an ask-shaped durable chat trace id as backend entrypoint evidence", () => {

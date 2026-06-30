@@ -6,13 +6,20 @@ import {
   REASONING_THEATER_MEDAL_ASSET,
   REASONING_THEATER_MEDAL_LABEL,
   REASONING_THEATER_PHASE_LABEL,
+  REASONING_THEATER_SUPPRESSION_REASONS,
   REASONING_THEATER_STANCE_META,
   REASONING_THEATER_SUPPRESSION_LABEL,
+  buildMirekReasoningDisplayGrid,
   buildReasoningTheaterParticlesFromMirekArtifact,
   buildReasoningTheaterFrontierParticles,
   mirekCellGridClassName,
   mirekCellParticleClassName,
+  mirekReasoningDisplayDensity,
   resolveReasoningTheaterCertaintyClass,
+  resolveReasoningTheaterMedal,
+  resolveReasoningTheaterPhase,
+  resolveReasoningTheaterSuppressionReason,
+  type ReasoningTheaterMedalStateSnapshot,
 } from "@/lib/helix/ask-reasoning-theater-display";
 import type { MirekReasoningArtifactV1 } from "@shared/helix-reasoning-mirek";
 
@@ -80,6 +87,79 @@ describe("ask reasoning theater display", () => {
         ambiguityHits: 0,
       }),
     ).toBe("unknown");
+  });
+
+  it("resolves suppression reasons from deterministic display text patterns", () => {
+    expect(resolveReasoningTheaterSuppressionReason("voice_context_ineligible")).toBe(
+      "context_ineligible",
+    );
+    expect(resolveReasoningTheaterSuppressionReason("mission rate limited")).toBe(
+      "mission_rate_limited",
+    );
+    expect(resolveReasoningTheaterSuppressionReason("AGI overload admission control")).toBe(
+      "agi_overload_admission_control",
+    );
+    expect(resolveReasoningTheaterSuppressionReason("ordinary reasoning progress")).toBeNull();
+    expect(REASONING_THEATER_SUPPRESSION_REASONS.has("contract_violation")).toBe(true);
+  });
+
+  it("resolves reasoning theater phase from text and structured tool labels", () => {
+    expect(resolveReasoningTheaterPhase("final answer is ready", [])).toBe("debrief");
+    expect(resolveReasoningTheaterPhase("checking certificate integrity", [])).toBe("verify");
+    expect(resolveReasoningTheaterPhase("need context files", [])).toBe("retrieve");
+    expect(resolveReasoningTheaterPhase("ordinary observation", [{ tool: "search.retrieve" }])).toBe(
+      "retrieve",
+    );
+    expect(resolveReasoningTheaterPhase("ordinary observation", [{ tool: "route.plan" }])).toBe(
+      "plan",
+    );
+    expect(resolveReasoningTheaterPhase("ordinary observation", [])).toBe("observe");
+  });
+
+  it("resolves theater medal events from deterministic state transitions", () => {
+    const base: ReasoningTheaterMedalStateSnapshot = {
+      stance: "contested",
+      archetype: "ambiguity",
+      phase: "observe",
+      certaintyClass: "reasoned",
+      suppressionReason: null,
+      ambiguityPressure: 0.5,
+      passHits: 1,
+      evidenceHits: 1,
+    };
+
+    expect(resolveReasoningTheaterMedal({ current: { ...base, phase: "retrieve" }, previous: null })).toEqual({
+      medal: "scout",
+      reason: "Retrieval/search engaged.",
+    });
+    expect(
+      resolveReasoningTheaterMedal({
+        current: { ...base, stance: "fail_closed", suppressionReason: "contract_violation" },
+        previous: base,
+      }),
+    ).toEqual({
+      medal: "seal",
+      reason: "Constraint block/fail-closed activated.",
+    });
+    expect(
+      resolveReasoningTheaterMedal({
+        current: { ...base, evidenceHits: 4 },
+        previous: base,
+      }),
+    ).toEqual({
+      medal: "anchor",
+      reason: "Grounding/evidence improved.",
+    });
+    expect(
+      resolveReasoningTheaterMedal({
+        current: { ...base, stance: "winning", certaintyClass: "confirmed" },
+        previous: base,
+      }),
+    ).toEqual({
+      medal: "crown",
+      reason: "Verified conclusion reached.",
+    });
+    expect(resolveReasoningTheaterMedal({ current: base, previous: base })).toBeNull();
   });
 
   it("formats medal labels and asset paths", () => {
@@ -163,6 +243,69 @@ describe("ask reasoning theater display", () => {
         durationS: 2.093,
         kind: "support",
       },
+    ]);
+  });
+
+  it("builds deterministic Mirek display grids from artifact and theater snapshots", () => {
+    const artifact = {
+      finalFrameHash: "grid-frame-123",
+      source: {
+        provenanceMode: "strict_exact",
+      },
+      state: {
+        phase: "retrieve",
+        certaintyClass: "reasoned",
+      },
+      grid: {
+        width: 4,
+        height: 3,
+        cells: [
+          { id: "objective:1", x: 1, y: 1, kind: "objective", opacity: 0.9 },
+          { id: "proof:1", x: 3, y: 2, kind: "proof", opacity: 0.7 },
+        ],
+      },
+    } as MirekReasoningArtifactV1;
+    const theater = {
+      stance: "contested",
+      momentum: 0.6,
+      ambiguityPressure: 0.2,
+    };
+
+    expect(mirekReasoningDisplayDensity(artifact, theater)).toBe(0.48);
+
+    const grid = buildMirekReasoningDisplayGrid(artifact, theater);
+    expect(grid.width).toBe(4);
+    expect(grid.height).toBe(3);
+    expect(grid.cells).toHaveLength(12);
+    expect(grid.cells.filter((cell) => cell.semantic)).toEqual([
+      expect.objectContaining({
+        id: "mirek-display-5",
+        x: 1,
+        y: 1,
+        kind: "objective",
+        active: true,
+      }),
+      expect.objectContaining({
+        id: "mirek-display-11",
+        x: 3,
+        y: 2,
+        kind: "proof",
+        active: true,
+      }),
+    ]);
+    expect(grid.cells.map((cell) => Number(cell.intensity.toFixed(3)))).toEqual([
+      0.648,
+      0.839,
+      0.758,
+      0.007,
+      0.091,
+      1,
+      0.027,
+      0.756,
+      0.648,
+      0.847,
+      0.907,
+      0.909,
     ]);
   });
 });

@@ -91,13 +91,103 @@ Each capability contract should define:
 | Capability | Contract | Maturity |
 | --- | --- | --- |
 | `workspace_os.status` | [workspace_os.status.md](workspace_os.status.md) | `draft` |
+| `workstation.active_context` | [workstation.active_context.md](workstation.active_context.md) | `draft` |
 | `scientific-calculator.solve_expression` | [scientific-calculator.solve_expression.md](scientific-calculator.solve_expression.md) | `candidate` |
+| `scientific-calculator.active_context` | [scientific-calculator.active_context.md](scientific-calculator.active_context.md) | `draft` |
+| `scientific-calculator.open_panel` | [workstation.panel_actions.md](workstation.panel_actions.md) | `draft` |
+| `scientific-calculator.focus_panel` | [workstation.panel_actions.md](workstation.panel_actions.md) | `draft` |
+| `scientific-calculator.show_gateway_solve` | [workstation.panel_actions.md](workstation.panel_actions.md) | `draft` |
+| `workstation.open_panel` | [workstation.panel_actions.md](workstation.panel_actions.md) | `draft` |
+| `workstation.focus_panel` | [workstation.panel_actions.md](workstation.panel_actions.md) | `draft` |
+| `docs-viewer.open_doc` | [docs-viewer.open_doc.md](docs-viewer.open_doc.md) | `draft` |
 | `docs.search` | [docs.search.md](docs.search.md) | `draft` |
 | `repo.search` | [repo.search.md](repo.search.md) | `draft` |
 | `theory-badge-graph.reflect_discussion_context` | [theory-badge-graph.reflect_discussion_context.md](theory-badge-graph.reflect_discussion_context.md) | `candidate` |
 | `civilization-bounds.reflect_system_bounds` | [civilization-bounds.reflect_system_bounds.md](civilization-bounds.reflect_system_bounds.md) | `candidate` |
 | `scholarly-research.lookup_papers` | [scholarly-research.lookup_papers.md](scholarly-research.lookup_papers.md) | `draft` |
 | `internet-search.search_web` | [internet-search.search_web.md](internet-search.search_web.md) | `draft` |
+| `live_env.request_interim_voice_callout` | [live_env.request_interim_voice_callout.md](live_env.request_interim_voice_callout.md) | `draft` |
+| `live_env.narrator_say` | [live_env.narrator_say.md](live_env.narrator_say.md) | `draft` |
+| `live_env.query_trace_memory` | [live_env.context_feed_queries.md](live_env.context_feed_queries.md) | `draft` |
+| `live_env.query_narrator_events` | [live_env.context_feed_queries.md](live_env.context_feed_queries.md) | `draft` |
+| `live_env.query_audio_transcripts` | [live_env.context_feed_queries.md](live_env.context_feed_queries.md) | `draft` |
+| `live_env.query_visual_summaries` | [live_env.context_feed_queries.md](live_env.context_feed_queries.md) | `draft` |
+| `live_env.query_translation_segments` | [live_env.context_feed_queries.md](live_env.context_feed_queries.md) | `draft` |
+| `live_env.query_microdeck_outputs` | [live_env.context_feed_queries.md](live_env.context_feed_queries.md) | `draft` |
+| `live_env.query_live_answer_state` | [live_env.context_feed_queries.md](live_env.context_feed_queries.md) | `draft` |
+| `live_env.query_packet_traces` | [live_env.context_feed_queries.md](live_env.context_feed_queries.md) | `draft` |
+| `live_env.query_route_evidence` | [live_env.context_feed_queries.md](live_env.context_feed_queries.md) | `draft` |
+| `live_env.query_automation_policies` | [live_env.context_feed_queries.md](live_env.context_feed_queries.md) | `draft` |
+| `live_env.query_source_health` | [live_env.context_feed_queries.md](live_env.context_feed_queries.md) | `draft` |
+| `live_env.query_live_source_loop_health` | [live_env.query_live_source_loop_health.md](live_env.query_live_source_loop_health.md) | `draft` |
+| `live_env.query_live_source_quality` | [live_env.live_source_state_reads.md](live_env.live_source_state_reads.md) | `draft` |
+| `live_env.query_workstation_goal_context` | [live_env.live_source_state_reads.md](live_env.live_source_state_reads.md) | `draft` |
+| `live_env.summarize_live_source_current_state` | [live_env.live_source_state_reads.md](live_env.live_source_state_reads.md) | `draft` |
+| `live_env.query_event_log` | [live_env.situation_stage_state_reads.md](live_env.situation_stage_state_reads.md) | `draft` |
+| `live_env.query_world_events` | [live_env.situation_stage_state_reads.md](live_env.situation_stage_state_reads.md) | `draft` |
+| `live_env.query_navigation_state` | [live_env.situation_stage_state_reads.md](live_env.situation_stage_state_reads.md) | `draft` |
+| `live_env.query_stage_sources` | [live_env.situation_stage_state_reads.md](live_env.situation_stage_state_reads.md) | `draft` |
+| `live_env.query_constructs` | [live_env.situation_stage_state_reads.md](live_env.situation_stage_state_reads.md) | `draft` |
+| `live_env.query_job_evidence` | [live_env.situation_stage_state_reads.md](live_env.situation_stage_state_reads.md) | `draft` |
+| `live_env.check_live_source_mail` | [live_env.live_source_mailbox_reads.md](live_env.live_source_mailbox_reads.md) | `draft` |
+| `live_env.read_live_source_mail` | [live_env.live_source_mailbox_reads.md](live_env.live_source_mailbox_reads.md) | `draft` |
+| `live_env.read_processed_live_source_mail` | [live_env.live_source_mailbox_reads.md](live_env.live_source_mailbox_reads.md) | `draft` |
+| `live_env.reflect_live_source_mail_loop` | [live_env.live_source_mailbox_reads.md](live_env.live_source_mailbox_reads.md) | `draft` |
+| `live_env.compare_mail_to_interpreter_profile` | [live_env.interpreter_prediction_reads.md](live_env.interpreter_prediction_reads.md) | `draft` |
+| `live_env.validate_live_source_prediction` | [live_env.interpreter_prediction_reads.md](live_env.interpreter_prediction_reads.md) | `draft` |
+| `live_env.predict_live_source_immediate` | [live_env.interpreter_prediction_reads.md](live_env.interpreter_prediction_reads.md) | `draft` |
+| `live_env.compare_live_source_prediction` | [live_env.interpreter_prediction_reads.md](live_env.interpreter_prediction_reads.md) | `draft` |
+| `live_env.describe_stage_builder` | [live_env.stage_play_builder_reads.md](live_env.stage_play_builder_reads.md) | `draft` |
+| `live_env.validate_stage_play_graph` | [live_env.stage_play_builder_reads.md](live_env.stage_play_builder_reads.md) | `draft` |
+| `live_env.plan_stage_play_job` | [live_env.stage_play_builder_reads.md](live_env.stage_play_builder_reads.md) | `draft` |
+| `live_env.query_micro_reasoner_presets` | [live_env.micro_reasoner_read_tools.md](live_env.micro_reasoner_read_tools.md) | `draft` |
+| `live_env.query_micro_reasoner_prompts` | [live_env.micro_reasoner_read_tools.md](live_env.micro_reasoner_read_tools.md) | `draft` |
+| `live_env.test_micro_reasoner_prompt` | [live_env.micro_reasoner_read_tools.md](live_env.micro_reasoner_read_tools.md) | `draft` |
+| `live_env.query_visual_observer_profiles` | [live_env.visual_observer_read_tools.md](live_env.visual_observer_read_tools.md) | `draft` |
+| `live_env.test_visual_observer_profile` | [live_env.visual_observer_read_tools.md](live_env.visual_observer_read_tools.md) | `draft` |
+| `live_env.compare_visual_observer_profiles` | [live_env.visual_observer_read_tools.md](live_env.visual_observer_read_tools.md) | `draft` |
+
+## Held-Back Contract Boundaries
+
+These capabilities have reusable contract notes, but they are not provider
+gateway tools yet. They stay absent from the Codex/provider gateway until a
+permission, receipt, re-entry, and projection contract is implemented and
+tested.
+
+| Capability | Contract | Status |
+| --- | --- | --- |
+| `live_env.read_card` | [live_env.side_effect_evidence_projection.md](live_env.side_effect_evidence_projection.md) | `requires_confirmation_contract` |
+| `live_env.reflect_stage_play_context` | [live_env.side_effect_evidence_projection.md](live_env.side_effect_evidence_projection.md) | `requires_confirmation_contract` |
+| `live_env.request_probe` | [live_env.side_effect_evidence_projection.md](live_env.side_effect_evidence_projection.md) | `requires_confirmation_contract` |
+| `live_env.record_commentary` | [live_env.side_effect_evidence_projection.md](live_env.side_effect_evidence_projection.md) | `requires_confirmation_contract` |
+| `live_env.evaluate_goal_satisfaction` | [live_env.side_effect_evidence_projection.md](live_env.side_effect_evidence_projection.md) | `requires_confirmation_contract` |
+| `live_env.start_agent_goal_session` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
+| `live_env.change_workstation_preset` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
+| `live_env.set_visual_preset` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
+| `live_env.set_audio_preset` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
+| `live_env.bind_workstation_source` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
+| `live_env.unbind_workstation_source` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
+| `live_env.pause_workstation_loop` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
+| `live_env.resume_workstation_loop` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
+| `live_env.set_workstation_loop_state` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
+| `live_env.repair_loop` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
+| `live_env.repair_workstation_source` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
+| `live_env.update_live_answer_projection` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
+| `live_env.focus_process_graph` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
+| `live_env.configure_route_watch` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
+| `live_env.configure_live_source_watch_job` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
+| `live_env.configure_interpreter_profile` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
+| `live_env.spawn_field_worker` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
+| `scientific-calculator.open` | [workstation.explicit_side_effect_boundaries.md](workstation.explicit_side_effect_boundaries.md) | `blocked_pending_contract` |
+| `scientific-calculator.start_equation_live_source` | [workstation.explicit_side_effect_boundaries.md](workstation.explicit_side_effect_boundaries.md) | `blocked_pending_contract` |
+| `workstation-notes.append_to_note` | [workstation.explicit_side_effect_boundaries.md](workstation.explicit_side_effect_boundaries.md) | `blocked_pending_contract` |
+| `workstation-notes.create_note` | [workstation.explicit_side_effect_boundaries.md](workstation.explicit_side_effect_boundaries.md) | `blocked_pending_contract` |
+| `workstation-notes.create` | [workstation.explicit_side_effect_boundaries.md](workstation.explicit_side_effect_boundaries.md) | `blocked_pending_contract` |
+| `workstation-notes.open` | [workstation.explicit_side_effect_boundaries.md](workstation.explicit_side_effect_boundaries.md) | `blocked_pending_contract` |
+| `client.read_aloud` | [client.read_aloud.md](client.read_aloud.md) | `client_projection_only` |
+| `workstation.dynamic_panel_actions` | [workstation.dynamic_panel_action_boundaries.md](workstation.dynamic_panel_action_boundaries.md) | `panel_owned_boundary` |
+| `workstation.explicit_route_aliases` | [workstation.explicit_route_alias_boundaries.md](workstation.explicit_route_alias_boundaries.md) | mixed: `shared_gateway_now` with `provider_gateway_alias_target`, or `safe_to_graduate_next` |
+| `live_env.helix_native_procedures` | [live_env.helix_native_procedure_boundaries.md](live_env.helix_native_procedure_boundaries.md) | `helix_owned_boundary` |
 
 ## Implementation Anchors
 

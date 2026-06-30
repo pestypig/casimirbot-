@@ -25,12 +25,24 @@ Required:
 Accepted aliases in adapter paths may include `latex`, `query`, or prompt text,
 but normalization must produce a bounded expression before execution.
 
+Explicit route aliases:
+
+- `scientific-calculator.solve`
+- `scientific-calculator.solve_with_steps`
+
+These aliases are not separate gateway tools. They may be admitted only as
+aliases that execute the canonical `scientific-calculator.solve_expression`
+gateway capability, with the requested alias recorded as
+`source_target_intent.alias_capability`.
+
 Blocked:
 
 - empty expression
 - prose with no bounded math expression
 - quoted or historical mentions such as "the last answer said
   scientific-calculator.solve_expression"
+- quoted, negated, future, or UI-label mentions of
+  `scientific-calculator.solve` or `scientific-calculator.solve_with_steps`
 - requests that ask about the capability as text only
 
 ## Observation

@@ -18,6 +18,9 @@ import {
   readHelixAskDebugContextFromMeta,
   resolveAskLiveEventTimestampMs,
   safeJsonStringify,
+  summarizeHelixAgentRuntimeLoopForCopy,
+  summarizeHelixDebugArtifactsForCopy,
+  summarizeHelixDebugObservationForCopy,
   type AskLiveEventEntry,
 } from "@/lib/helix/ask-debug-event-display";
 
@@ -208,6 +211,104 @@ describe("Helix Ask debug event display", () => {
       ],
       assistant_answer: false,
       terminal_eligible: false,
+    });
+  });
+
+  it("summarizes debug observations and artifacts without selecting a debug target", () => {
+    expect(
+      summarizeHelixDebugObservationForCopy({
+        artifact_id: "artifact-1",
+        kind: "tool_observation",
+        status: "ok",
+        ok: true,
+        payload: { schema: "helix.observation.v1" },
+      }),
+    ).toEqual({
+      artifact_id: "artifact-1",
+      kind: "tool_observation",
+      schema: "helix.observation.v1",
+      status: "ok",
+      ok: true,
+    });
+
+    expect(
+      summarizeHelixDebugArtifactsForCopy([
+        {
+          artifact_id: "artifact-2",
+          kind: "calculator",
+          source_scope: "workstation",
+          payload: {
+            schema: "helix.calc.v1",
+            toolName: "scientific-calculator.solve_expression",
+            expression: "8*9",
+            result: "72",
+            supports_goal: true,
+            text: `result ${"x".repeat(260)}`,
+          },
+        },
+      ])[0],
+    ).toMatchObject({
+      artifact_id: "artifact-2",
+      kind: "calculator",
+      source_scope: "workstation",
+      payload_schema: "helix.calc.v1",
+      tool_name: "scientific-calculator.solve_expression",
+      expression: "8*9",
+      result: "72",
+      supports_goal: true,
+    });
+  });
+
+  it("summarizes agent runtime loop iterations with bounded observations", () => {
+    expect(
+      summarizeHelixAgentRuntimeLoopForCopy({
+        schema: "helix.agent_runtime_loop.v1",
+        status: "complete",
+        selected_capability: "scientific-calculator.solve_expression",
+        executed_tool_call_count: 1,
+        iterations: [
+          {
+            iteration: 3,
+            decision_id: "decision-1",
+            chosen_capability: "scientific-calculator.solve_expression",
+            executed_action_key: "calculator:solve",
+            observed_artifact_refs: Array.from({ length: 10 }, (_, index) => `artifact-${index}`),
+            tool_observation: {
+              artifact_id: "artifact-result",
+              payload: { schema: "helix.calc.result.v1", ok: true },
+            },
+          },
+        ],
+      }),
+    ).toMatchObject({
+      schema: "helix.agent_runtime_loop.v1",
+      status: "complete",
+      selected_capability: "scientific-calculator.solve_expression",
+      executed_tool_call_count: 1,
+      iteration_count: 1,
+      iterations: [
+        {
+          iteration: 3,
+          decision_id: "decision-1",
+          chosen_capability: "scientific-calculator.solve_expression",
+          executed_action_key: "calculator:solve",
+          observed_artifact_refs: [
+            "artifact-0",
+            "artifact-1",
+            "artifact-2",
+            "artifact-3",
+            "artifact-4",
+            "artifact-5",
+            "artifact-6",
+            "artifact-7",
+          ],
+          tool_observation: {
+            artifact_id: "artifact-result",
+            schema: "helix.calc.result.v1",
+            ok: true,
+          },
+        },
+      ],
     });
   });
 });

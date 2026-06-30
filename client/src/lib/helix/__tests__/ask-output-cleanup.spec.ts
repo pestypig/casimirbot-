@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   cleanPromptLine,
+  decideHelixAskFormat,
   normalizeQuestionMatch,
   stripAnswerBoundaryPrefix,
   stripInlineQuestionLine,
@@ -42,5 +43,21 @@ describe("ask output cleanup", () => {
   it("removes leading echoed question scaffolding", () => {
     const response = ["Question: What is 3+5?", "Context: calculator", "", "8"].join("\n");
     expect(stripLeadingQuestion(response, "What is 3+5?")).toBe("8");
+  });
+
+  it("classifies answer cleanup format hints deterministically", () => {
+    expect(decideHelixAskFormat()).toEqual({ format: "brief", stageTags: false });
+    expect(decideHelixAskFormat("Use the scientific method on this claim")).toEqual({
+      format: "steps",
+      stageTags: true,
+    });
+    expect(decideHelixAskFormat("How do I troubleshoot this pipeline?")).toEqual({
+      format: "steps",
+      stageTags: false,
+    });
+    expect(decideHelixAskFormat("Compare these two approaches")).toEqual({
+      format: "compare",
+      stageTags: false,
+    });
   });
 });

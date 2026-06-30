@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   extractExplicitDocsViewerPath,
   normalizeDocPathForDebugCompare,
+  normalizeDocViewerPathForAskSnapshot,
   normalizeDocsViewerAnchorPath,
 } from "../ask-doc-viewer-context";
 
@@ -10,6 +11,16 @@ describe("ask docs-viewer context helpers", () => {
     expect(normalizeDocsViewerAnchorPath("\\docs\\research\\paper.md")).toBe("docs/research/paper.md");
     expect(normalizeDocsViewerAnchorPath("/docs/research/paper.md")).toBe("docs/research/paper.md");
     expect(normalizeDocsViewerAnchorPath("C:\\repo\\docs\\paper.md")).toBe("C:/repo/docs/paper.md");
+  });
+
+  it("normalizes retained Ask snapshot paths to safe docs-relative paths", () => {
+    expect(normalizeDocViewerPathForAskSnapshot("\\docs\\research\\paper.md")).toBe("docs/research/paper.md");
+    expect(normalizeDocViewerPathForAskSnapshot("/docs/research/paper.md")).toBe("docs/research/paper.md");
+    expect(normalizeDocViewerPathForAskSnapshot("docs/research/paper.md")).toBe("docs/research/paper.md");
+    expect(normalizeDocViewerPathForAskSnapshot("client/src/App.tsx")).toBeNull();
+    expect(normalizeDocViewerPathForAskSnapshot("../docs/research/paper.md")).toBeNull();
+    expect(normalizeDocViewerPathForAskSnapshot("C:\\repo\\docs\\paper.md")).toBeNull();
+    expect(normalizeDocViewerPathForAskSnapshot(null)).toBeNull();
   });
 
   it("extracts explicit document path lines before generic path tokens", () => {

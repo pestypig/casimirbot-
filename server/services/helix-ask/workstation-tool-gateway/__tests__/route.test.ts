@@ -10,6 +10,7 @@ const WORKSTATION_OPEN_PANEL_CAPABILITY = "workstation.open_panel";
 const DOCS_OPEN_DOC_CAPABILITY = "docs-viewer.open_doc";
 const REPO_SEARCH_CAPABILITY = "repo.search";
 const DOCS_SEARCH_CAPABILITY = "docs.search";
+const VOICE_INTERIM_CALLOUT_CAPABILITY = "live_env.request_interim_voice_callout";
 
 const createApp = (): express.Express => {
   const app = express();
@@ -136,7 +137,7 @@ describe("AGI workstation tool gateway route", () => {
         mutating: false,
         code_mutation: false,
         shell_access: false,
-        output_observation_schema: expect.stringMatching(/^helix\..+(?:_observation|_receipt)\.v1$/),
+        output_observation_schema: expect.stringMatching(/^helix\..+(?:_observation|_receipt|_tool_result)\.v1$/),
         terminal_eligible: false,
         post_tool_model_step_required: true,
         assistant_answer: false,
@@ -423,6 +424,137 @@ describe("AGI workstation tool gateway route", () => {
         assistant_answer: false,
         raw_content_included: false,
       },
+    });
+  });
+
+  it("calls interim voice callout through the gateway route as a host-projected non-terminal receipt", async () => {
+    const response = await request(createApp())
+      .post("/api/agi/workstation-tool-gateway/call")
+      .send({
+        agent_runtime: "codex",
+        mode: "act",
+        capability_id: VOICE_INTERIM_CALLOUT_CAPABILITY,
+        turn_id: "ask:test:gateway-route-voice-callout",
+        iteration: 6,
+        arguments: {
+          text: "checking now",
+          kind: "tool_progress",
+          evidence_refs: ["ask:test:voice-route"],
+        },
+      })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      ok: true,
+      agent_runtime: "codex",
+      capability_id: VOICE_INTERIM_CALLOUT_CAPABILITY,
+      gateway_admission: {
+        selected_agent_provider: "codex",
+        permission_profile: "act",
+        admission_status: "admitted",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.interim_voice_callout_tool_result.v1",
+        capability_key: VOICE_INTERIM_CALLOUT_CAPABILITY,
+        status: "succeeded",
+        request: {
+          text: "checking now",
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+        receipt: {
+          status: "awaiting_client_playback",
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+        host_projection: {
+          kind: "voice_playback_request",
+          playback_status: "awaiting_client_playback",
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+      observation_packet: {
+        capability_key: VOICE_INTERIM_CALLOUT_CAPABILITY,
+        panel_id: "voice-delivery",
+        action: "request_interim_voice_callout",
+        status: "succeeded",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
+  it("returns a typed non-terminal voice receipt block when confirmation is required", async () => {
+    const response = await request(createApp())
+      .post("/api/agi/workstation-tool-gateway/call")
+      .send({
+        agent_runtime: "codex",
+        mode: "act",
+        capability_id: VOICE_INTERIM_CALLOUT_CAPABILITY,
+        turn_id: "ask:test:gateway-route-voice-confirmation-blocked",
+        iteration: 7,
+        arguments: {
+          text: "confirm before speaking",
+          requires_confirmation: true,
+        },
+      })
+      .expect(400);
+
+    expect(response.body).toMatchObject({
+      ok: false,
+      capability_id: VOICE_INTERIM_CALLOUT_CAPABILITY,
+      error: "blocked_policy",
+      gateway_admission: {
+        admission_status: "blocked",
+        blocked_reason: "blocked_policy",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.interim_voice_callout_tool_result.v1",
+        status: "blocked",
+        blocked_reason: "blocked_policy",
+        request: {
+          text: "confirm before speaking",
+          requiresConfirmation: true,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+        receipt: {
+          status: "blocked_policy",
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+      },
+      observation_packet: {
+        status: "blocked",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
     });
   });
 

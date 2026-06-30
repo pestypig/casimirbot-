@@ -4,6 +4,13 @@ export function normalizeDocsViewerAnchorPath(value: string): string {
   return normalized.replace(/^\/+/, "");
 }
 
+export function normalizeDocViewerPathForAskSnapshot(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().replace(/\\/g, "/").replace(/^\/+/, "");
+  if (!normalized || normalized.includes("..") || /^[a-z]:\//i.test(normalized)) return null;
+  return normalized.startsWith("docs/") ? normalized : null;
+}
+
 export function extractExplicitDocsViewerPath(question: string): string | null {
   const lineMatch = question.match(/document path:\s*([^\n\r]+)/i);
   const inlinePath = lineMatch?.[1]?.trim();

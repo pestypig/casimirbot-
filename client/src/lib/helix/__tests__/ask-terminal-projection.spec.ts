@@ -17,6 +17,9 @@ describe("Helix Ask terminal projection", () => {
       true,
     );
     expect(isInvalidTerminalAnswerText("I couldn't produce a final answer for that turn. Please retry once.")).toBe(true);
+    expect(
+      isInvalidTerminalAnswerText("I need retrieval before finalizing this claim. I do not yet have grounded evidence references for it."),
+    ).toBe(true);
     expect(isInvalidTerminalAnswerText("  grounded answer ready  ")).toBe(false);
   });
 

@@ -15,6 +15,7 @@ export const MIC_PLAYBACK_BARGE_MIN_SNR_DB = 8;
 export const MIC_PLAYBACK_BARGE_MIN_SNR_DB_NOISY = 13;
 export const MIC_PLAYBACK_BARGE_RMS_MULTIPLIER = 1.35;
 export const MIC_PLAYBACK_BARGE_RMS_MULTIPLIER_NOISY = 1.75;
+export const MIC_LEVEL_MIN_THRESHOLD = 0.008;
 export const VOICE_LOCAL_AUDIO_GATE_MIN_SPEECH_PROBABILITY = 0.3;
 export const VOICE_LOCAL_AUDIO_GATE_MIN_SPEECH_PROBABILITY_NOISY = 0.44;
 export const VOICE_LOCAL_AUDIO_GATE_MIN_SNR_DB = 4.5;
@@ -25,6 +26,9 @@ export const VOICE_LOCAL_AUDIO_GATE_LOW_QUALITY_SPEECH_PROBABILITY = 0.42;
 export const VOICE_LOCAL_AUDIO_GATE_LOW_QUALITY_SPEECH_PROBABILITY_NOISY = 0.56;
 export const VOICE_LOCAL_AUDIO_GATE_LOW_QUALITY_SNR_DB = 7;
 export const VOICE_LOCAL_AUDIO_GATE_LOW_QUALITY_SNR_DB_NOISY = 10.5;
+
+const IOS_AUDIO_USER_AGENT_PATTERN = /(iphone|ipad|ipod)/i;
+const DESKTOP_STYLE_APPLE_AUDIO_USER_AGENT_PATTERN = /macintosh/i;
 
 export type VoiceNoiseHandlingProfile = {
   bargeStartMsDesktop: number;
@@ -97,6 +101,30 @@ export function shouldPrimeSegmentWithContainerHeader(params: {
   return normalized.includes("webm") || normalized.includes("ogg");
 }
 
+export function getMicRecorderMimeCandidates(userAgent?: string): string[] {
+  const ua = (userAgent ?? "").trim().toLowerCase();
+  const iosDesktopMode =
+    DESKTOP_STYLE_APPLE_AUDIO_USER_AGENT_PATTERN.test(ua) &&
+    /\bmobile\//i.test(ua) &&
+    /\bsafari\b/i.test(ua);
+  const iosLike = IOS_AUDIO_USER_AGENT_PATTERN.test(ua) || iosDesktopMode;
+  const ordered = iosLike
+    ? [
+        "audio/mp4;codecs=mp4a.40.2",
+        "audio/mp4",
+        "audio/webm;codecs=opus",
+        "audio/webm",
+        "audio/ogg;codecs=opus",
+      ]
+    : [
+        "audio/webm;codecs=opus",
+        "audio/webm",
+        "audio/ogg;codecs=opus",
+        "audio/mp4",
+      ];
+  return [...new Set(ordered)];
+}
+
 export function resolveVoiceNoiseHandlingProfile(noisyEnvironmentMode: boolean): VoiceNoiseHandlingProfile {
   if (noisyEnvironmentMode) {
     return {
@@ -139,6 +167,35 @@ export function isLowAudioQualitySignal(args: {
       args.speechProbability < args.lowQualitySpeechProbability) ||
     (typeof args.snrDb === "number" && args.snrDb < args.lowQualitySnrDb)
   );
+}
+
+export function shouldTreatMicSignalAsSpeech(args: {
+  speakingNow: boolean;
+  voiceOutputActive: boolean;
+  localAudioGateActive: boolean;
+  speechProbability: number;
+  snrDb: number;
+  rms: number;
+  speechTriggerThreshold: number;
+  bargeMinSpeechProbability?: number;
+  bargeStrongSpeechProbability?: number;
+  bargeMinSnrDb?: number;
+  bargeRmsMultiplier?: number;
+}): boolean {
+  if (!args.speakingNow) return false;
+  if (!args.voiceOutputActive || !args.localAudioGateActive) return true;
+  const threshold = Math.max(args.speechTriggerThreshold, MIC_LEVEL_MIN_THRESHOLD);
+  const bargeMinSpeechProbability = args.bargeMinSpeechProbability ?? MIC_PLAYBACK_BARGE_MIN_SPEECH_PROBABILITY;
+  const bargeStrongSpeechProbability =
+    args.bargeStrongSpeechProbability ?? MIC_PLAYBACK_BARGE_STRONG_SPEECH_PROBABILITY;
+  const bargeMinSnrDb = args.bargeMinSnrDb ?? MIC_PLAYBACK_BARGE_MIN_SNR_DB;
+  const bargeRmsMultiplier = args.bargeRmsMultiplier ?? MIC_PLAYBACK_BARGE_RMS_MULTIPLIER;
+  const highProbability = args.speechProbability >= bargeMinSpeechProbability;
+  const decisiveProbability = args.speechProbability >= bargeStrongSpeechProbability;
+  const highSnr = args.snrDb >= bargeMinSnrDb;
+  const strongAmplitude = args.rms >= threshold * bargeRmsMultiplier;
+  const signalCount = Number(highProbability) + Number(highSnr) + Number(strongAmplitude);
+  return decisiveProbability || signalCount >= 2;
 }
 
 export function describeMediaErrorCode(code: number | null): string {

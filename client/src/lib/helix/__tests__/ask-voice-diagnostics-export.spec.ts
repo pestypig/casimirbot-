@@ -1,12 +1,25 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildVoicePlaybackReconciliationDebug,
+  resolveVoiceTimelineClientBuildStamp,
   sanitizeVoiceDiagnosticsForExport,
   summarizeVoiceSegments,
 } from "@/lib/helix/ask-voice-diagnostics-export";
 import type { VoiceCaptureDiagnosticsSnapshot } from "@/lib/helix/voice-capture-diagnostics";
 
 describe("ask-voice-diagnostics-export", () => {
+  it("resolves client build stamps from browser stamp and dev mode inputs", () => {
+    expect(resolveVoiceTimelineClientBuildStamp({ stampedBuild: "  build-123  ", isDev: false, hasWindow: true })).toBe(
+      "build-123",
+    );
+    expect(resolveVoiceTimelineClientBuildStamp({ stampedBuild: "", isDev: true, hasWindow: true })).toBe("dev");
+    expect(resolveVoiceTimelineClientBuildStamp({ stampedBuild: null, isDev: false, hasWindow: true })).toBe("prod");
+    expect(resolveVoiceTimelineClientBuildStamp({ stampedBuild: "build-123", isDev: true, hasWindow: false })).toBe(
+      "unknown",
+    );
+  });
+
   it("summarizes segment dispatch and STT status counts", () => {
     expect(summarizeVoiceSegments(undefined)).toEqual({
       total: 0,
@@ -117,5 +130,101 @@ describe("ask-voice-diagnostics-export", () => {
 
   it("returns null for missing diagnostics snapshots", () => {
     expect(sanitizeVoiceDiagnosticsForExport(null)).toBeNull();
+  });
+
+  it("builds playback reconciliation from client receipts without mutating terminal answer", () => {
+    expect(
+      buildVoicePlaybackReconciliationDebug({
+        activeTurnId: "turn-1",
+        selectedFinalAnswer: "Browser playback confirmation is still pending.",
+        source: {
+          client_voice_playback_receipts: [
+            {
+              receiptId: "receipt-1",
+              utteranceId: "utt-turn-1",
+              turnKey: "turn-1",
+              status: "queued",
+            },
+            {
+              receiptId: "receipt-1",
+              utteranceId: "utt-turn-1",
+              turnKey: "turn-1",
+              status: "delivered",
+            },
+          ],
+          client_voice_calls: [
+            {
+              id: "call-1",
+              utteranceId: "utt-turn-1",
+              audioBytes: 512,
+            },
+          ],
+        },
+      }),
+    ).toEqual({
+      schema: "helix.voice_playback_reconciliation.v1",
+      source: "client_playback_receipts",
+      active_turn_id: "turn-1",
+      selected_final_answer_claim: "pending_client_playback",
+      playback_confirmation: "delivered",
+      delivered_receipt_count: 1,
+      delivered_utterance_ids: ["utt-turn-1"],
+      audio_bytes_observed: 512,
+      corrected_status_text: "Client playback receipt confirms delivered audio after the final answer was composed.",
+      terminal_answer_mutated: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      output_authority: "client_playback_observation",
+    });
+  });
+
+  it("reads nested client projection voice playback records and filters by active turn", () => {
+    expect(
+      buildVoicePlaybackReconciliationDebug({
+        activeTurnId: "turn-2",
+        selectedFinalAnswer: "Final answer delivered.",
+        source: {
+          client_debug_projection: {
+            voice: {
+              playbackReceipts: [
+                {
+                  receiptId: "receipt-other",
+                  utteranceId: "utt-other",
+                  turnKey: "turn-other",
+                  status: "delivered",
+                },
+                {
+                  receiptId: "receipt-2",
+                  utteranceId: "utt-turn-2",
+                  requestId: "turn-2:voice",
+                  status: "delivered",
+                },
+              ],
+              voiceCalls: [
+                {
+                  id: "call-other",
+                  utteranceId: "utt-other",
+                  audioBytes: 2000,
+                },
+                {
+                  id: "call-2",
+                  utteranceId: "utt-turn-2",
+                  audioBytes: 300,
+                },
+              ],
+            },
+          },
+        },
+      }),
+    ).toMatchObject({
+      active_turn_id: "turn-2",
+      selected_final_answer_claim: "none",
+      playback_confirmation: "delivered",
+      delivered_receipt_count: 1,
+      delivered_utterance_ids: ["utt-turn-2"],
+      audio_bytes_observed: 300,
+      corrected_status_text: null,
+    });
   });
 });
