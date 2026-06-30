@@ -17,12 +17,14 @@ describe("Helix Ask UI ownership boundaries", () => {
       "ask-continuous-turn-display.ts",
       "ask-debug-event-display.ts",
       "ask-display-text.ts",
+      "ask-doc-viewer-context.ts",
       "ask-envelope-copy.ts",
       "../agi/debugExport.ts",
       "ask-goal-pill-display.ts",
       "ask-live-source-display.ts",
       "ask-observer-commentary-display.ts",
       "ask-observer-events.ts",
+      "ask-output-cleanup.ts",
       "ask-procedural-display.ts",
       "ask-read-aloud-display.ts",
       "ask-reasoning-battle-display.ts",
@@ -30,11 +32,14 @@ describe("Helix Ask UI ownership boundaries", () => {
       "ask-reasoning-theater-display.ts",
       "ask-stage-play-ledger.ts",
       "ask-status-classnames.ts",
+      "ask-stable-hash.ts",
       "ask-steering-queue-display.ts",
       "ask-terminal-projection.ts",
       "ask-turn-transcript.ts",
+      "ask-value-normalization.ts",
       "ask-voice-capture-display.ts",
       "ask-voice-copy-display.ts",
+      "ask-voice-continuation-lexical.ts",
       "ask-voice-text-display.ts",
     ]) {
       expect(map).toContain(moduleName);
@@ -56,12 +61,18 @@ describe("Helix Ask UI ownership boundaries", () => {
       "Prompt interpretation and planner policy",
       "Stage Play generated wake projection suppression",
       "Voice capture, STT, confirmation, continuation, and auto-dispatch",
+      "Workstation command lexicon and panel resolution",
+      "Pending input and cancellation terminal visibility",
+      "Voice continuation and intent-shift policy",
+      "Voice language and workstation fast-path policy",
       "Voice playback audio runtime",
       "Voice recorder runtime and MIME handling",
       "Voice brief pinning and speech suppression",
+      "Exploration ladder and context chooser policy",
       "Ask request construction and attachment admission",
       "Docs-viewer and workspace context snapshots",
       "Agent runtime/provider controller wiring",
+      "Context compaction resume-frame handoff",
       "Backend entrypoint and runtime authority guards",
       "Visible terminal and route authority",
       "Debug export and clipboard authority",
@@ -84,6 +95,58 @@ describe("Helix Ask UI ownership boundaries", () => {
     ]) {
       expect(map).toContain(behaviorQueueItem);
     }
+  });
+
+  it("keeps runtime authority and pending terminal lifecycle helpers quarantined in HelixAskPill", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
+    const displayOwners = {
+      terminalProjection: read("client/src/lib/helix/ask-terminal-projection.ts"),
+      turnTranscript: read("client/src/lib/helix/ask-turn-transcript.ts"),
+      debugEventDisplay: read("client/src/lib/helix/ask-debug-event-display.ts"),
+      proceduralDisplay: read("client/src/lib/helix/ask-procedural-display.ts"),
+      valueNormalization: read("client/src/lib/helix/ask-value-normalization.ts"),
+    };
+
+    expect(map).toContain("Pending input and cancellation terminal visibility");
+    expect(map).toContain("debug authority attachment");
+    for (const symbol of [
+      "readAgentLoopAuditRecord",
+      "extractAskLevelTheoryReflection",
+      "normalizeHelixRuntimeActionKey",
+      "readHelixDecisionCapabilityKeys",
+      "readHelixGatewayCapabilityKeys",
+      "collectHelixAgentSelectedCapabilities",
+      "readHelixWorkstationActionRuntimeKeys",
+      "buildHelixActionEnvelopeRuntimeAuthority",
+      "attachHelixActionEnvelopeRuntimeAuthorityDebug",
+      "readHelixPendingInputRecord",
+      "normalizeHelixPendingTransitionMarker",
+      "readHelixPendingTransitionTrace",
+      "hasHelixPendingCancellationMarker",
+      "isHelixCanceledPendingTurn",
+      "resolveHelixPendingInputRecord",
+      "resolveHelixVisibleTerminalKind",
+    ]) {
+      expect(pill).toContain(symbol);
+      expect(map).toContain(symbol);
+    }
+    for (const symbol of [
+      "normalizeHelixRuntimeActionKey",
+      "readHelixDecisionCapabilityKeys",
+      "readHelixGatewayCapabilityKeys",
+      "collectHelixAgentSelectedCapabilities",
+      "readHelixWorkstationActionRuntimeKeys",
+      "buildHelixActionEnvelopeRuntimeAuthority",
+      "attachHelixActionEnvelopeRuntimeAuthorityDebug",
+      "resolveHelixVisibleTerminalKind",
+    ]) {
+      for (const owner of Object.values(displayOwners)) {
+        expect(owner).not.toContain(symbol);
+      }
+    }
+    expect(displayOwners.terminalProjection).toContain("readHelixPendingInputRecord");
+    expect(map).toContain("pending-input request reading");
   });
 
   it("keeps pure debug drawer fallback formatting in the shared debug export module", () => {
@@ -111,6 +174,137 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(debugExport).not.toContain(".readText(");
     expect(debugExport).not.toContain("document.querySelector");
     expect(debugExport).not.toContain("fetch(");
+  });
+
+  it("keeps deterministic fallback output cleanup primitives in the non-React cleanup owner", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const outputCleanup = read("client/src/lib/helix/ask-output-cleanup.ts");
+    const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
+
+    expect(map).toContain("ask-output-cleanup.ts");
+    expect(map).toContain("Fallback answer selection");
+    expect(pill).toContain('from "@/lib/helix/ask-output-cleanup"');
+    for (const symbol of [
+      "stripAnswerBoundaryPrefix",
+      "stripStageTags",
+      "normalizeQuestionMatch",
+      "stripInlineQuestionLine",
+      "stripQuestionPrefixText",
+      "cleanPromptLine",
+      "stripLeadingQuestion",
+    ]) {
+      expect(outputCleanup).toContain(`export function ${symbol}`);
+      expect(pill).not.toContain(`function ${symbol}`);
+      expect(pill).not.toContain(`const ${symbol} =`);
+    }
+    expect(outputCleanup).toContain("export const HELIX_ASK_ANSWER_MARKER_SPLIT_RE");
+    expect(pill).not.toContain("const HELIX_ASK_ANSWER_BOUNDARY_PREFIX_RE");
+    expect(pill).not.toContain("const HELIX_ASK_ANSWER_MARKER_SPLIT_RE");
+    for (const localAnchor of [
+      "stripPromptEcho",
+      "extractAnswerBlock",
+      "stripEvidencePromptBlock",
+      "decideHelixAskFormat",
+    ]) {
+      expect(pill).toContain(localAnchor);
+      expect(outputCleanup).not.toContain(localAnchor);
+    }
+    expect(outputCleanup).not.toMatch(/from ["']react["']/);
+    expect(outputCleanup).not.toContain("@/store/");
+    expect(outputCleanup).not.toContain("@/components/helix/HelixAskPill");
+    expect(outputCleanup).not.toContain("fetch(");
+    expect(outputCleanup).not.toContain("navigator.clipboard");
+    expect(outputCleanup).not.toContain("runAskTurn");
+  });
+
+  it("keeps deterministic docs-viewer path parsing in the non-React docs context owner", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
+    const docsContext = read("client/src/lib/helix/ask-doc-viewer-context.ts");
+
+    expect(map).toContain("ask-doc-viewer-context.ts");
+    expect(map).toContain("HASK-BSQ-001 handoff behavior remains quarantined");
+    expect(pill).toContain('from "@/lib/helix/ask-doc-viewer-context"');
+    for (const symbol of [
+      "normalizeDocsViewerAnchorPath",
+      "extractExplicitDocsViewerPath",
+      "normalizeDocPathForDebugCompare",
+    ]) {
+      expect(docsContext).toContain(`export function ${symbol}`);
+      expect(pill).not.toContain(`function ${symbol}`);
+    }
+    for (const localAnchor of [
+      "resolveAskTurnDocViewerSnapshotPath",
+      "readDocViewerPathFromDesktopUrlForAskSnapshot",
+      "rememberDocViewerPathForAskSnapshot",
+      "resolveDocsViewerAnchorPathForQuestion",
+      "buildAskTurnWorkspaceContextSnapshot",
+    ]) {
+      expect(pill).toContain(localAnchor);
+      expect(map).toContain(localAnchor);
+      expect(docsContext).not.toContain(localAnchor);
+    }
+    expect(docsContext).not.toMatch(/from ["']react["']/);
+    expect(docsContext).not.toContain("@/store/");
+    expect(docsContext).not.toContain("@/components/helix/HelixAskPill");
+    expect(docsContext).not.toContain("fetch(");
+    expect(docsContext).not.toContain("window.");
+    expect(docsContext).not.toContain("localStorage");
+    expect(docsContext).not.toContain("sessionStorage");
+  });
+
+  it("keeps reply-scoped debug export envelope and clipboard authority helpers local", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
+    const debugExport = read("client/src/lib/agi/debugExport.ts");
+
+    for (const symbol of [
+      "base64FromText",
+      "sha256TextHex",
+      "buildReplyMasterEventClockExport",
+      "extractHelixRenderedTurnDebugFromButton",
+      "debugPayloadMatchesRenderedReply",
+      "debugPayloadMatchesRenderedTurnPayload",
+      "normalizeReplyMasterDebugPayload",
+      "buildClientProjectionDebugFields",
+      "summarizeHelixDebugObservationForCopy",
+      "summarizeHelixDebugArtifactsForCopy",
+      "summarizeHelixAgentRuntimeLoopForCopy",
+      "copyHelixRailCriticalDebugFieldsForUi",
+      "boundHelixDebugExportTextForUi",
+      "buildReplyScopedDebugExportFromRenderedReply",
+      "buildReplyScopedDebugExportFromRenderedButton",
+      "resolveAuthoritativeDebugExportPayload",
+      "copyDebugPayloadToClipboard",
+    ]) {
+      expect(pill).toContain(symbol);
+      expect(map).toContain(symbol);
+      expect(debugExport).not.toContain(symbol);
+    }
+    expect(pill).toContain("buildHelixDebugExportEnvelopeFromMasterPayload");
+    expect(debugExport).toContain("buildHelixDebugExportEnvelopeFromMasterPayload");
+    expect(map).toContain("buildHelixDebugExportEnvelopeFromMasterPayload");
+    expect(map).toContain("rendered-button turn matching");
+    expect(map).toContain("payload hashing/encoding");
+  });
+
+  it("keeps rendered-button debug copy scoped to the matched reply turn only", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+
+    expect(pill).toContain("const renderedMatchesReply =");
+    expect(pill).toContain("debug: renderedMatchesReply ? reply.debug ?? null : null");
+    expect(pill).toContain("active_turn_id: renderedMatchesReply ? reply.id : null");
+    expect(pill).toContain(
+      "debug_export_ref: renderedMatchesReply ? replyRecord.debug_export_ref ?? replyDebugRecord?.debug_export_ref ?? null : null",
+    );
+    expect(pill).toContain(
+      "backend_debug_response_ref: renderedMatchesReply\n      ? replyRecord.backend_debug_response_ref ?? replyDebugRecord?.backend_debug_response_ref ?? null\n      : null",
+    );
+    expect(pill).toContain(
+      "const providedPayloadMatchesRenderedTurn =\n          hasProvidedPayload && debugPayloadMatchesRenderedTurnPayload(payload, sourceElement)",
+    );
+    expect(pill).toContain("const localExportPayload = providedPayloadMatchesRenderedTurn");
+    expect(pill).toContain(": buildReplyScopedDebugExportFromRenderedButton(reply, sourceElement, \"rendered_button_scope\") ??");
   });
 
   it("keeps agent runtime provider display helpers in the non-React runtime display module", () => {
@@ -179,6 +373,7 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(pill).toContain('from "@/lib/helix/ask-active-turn-stream"');
     for (const symbol of [
       "createHelixAskConsoleStreamIngressDebug",
+      "incrementHelixAskConsoleDropReason",
       "attachHelixAskClientTraceToLiveEvent",
       "buildAskLiveAgenticEventRows",
       "buildHelixActiveTurnStreamRows",
@@ -296,6 +491,7 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(pill).not.toContain("function resolveObjectiveReasoningTrace");
     expect(pill).not.toContain("type HelixAskObjectiveReasoningTrace");
     expect(pill).not.toContain("function inferExplorationTopicKey");
+    expect(pill).not.toContain("const uniqueTextValues");
     expect(pill).not.toContain("function buildFallbackReplyMasterDebugExport");
     expect(pill).not.toContain("function isHelixAskRepoQuestion");
     expect(pill).not.toContain("function parseSearchScore");
@@ -341,6 +537,175 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(map).toContain("behavior-goal only");
     expect(map).toContain("do not move as display");
     expect(map).toContain("backend Ask is authoritative");
+  });
+
+  it("documents voice continuation and intent-shift policy as local behavior", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
+    const valueNormalization = read("client/src/lib/helix/ask-value-normalization.ts");
+    const voiceCopy = read("client/src/lib/helix/ask-voice-copy-display.ts");
+    const voiceText = read("client/src/lib/helix/ask-voice-text-display.ts");
+
+    for (const anchor of [
+      "shouldMergeVoiceContinuationInFlight",
+      "shouldRestartExplorationLadderOnSupersede",
+      "isLikelyContinuationAddendum",
+      "isLikelyContinuationTailFragment",
+      "scoreIntentShift",
+    ]) {
+      expect(pill).toContain(`export function ${anchor}`);
+      expect(map).toContain(anchor);
+      expect(valueNormalization).not.toContain(anchor);
+      expect(voiceCopy).not.toContain(anchor);
+      expect(voiceText).not.toContain(anchor);
+    }
+    expect(map).toContain("Latest-turn continuation semantics");
+    expect(map).toContain("voice intent arbitration");
+  });
+
+  it("keeps deterministic voice continuation lexical predicates in the non-React lexical owner", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
+    const lexical = read("client/src/lib/helix/ask-voice-continuation-lexical.ts");
+    const voiceCopy = read("client/src/lib/helix/ask-voice-copy-display.ts");
+    const voiceText = read("client/src/lib/helix/ask-voice-text-display.ts");
+
+    expect(map).toContain("ask-voice-continuation-lexical.ts");
+    expect(map).toContain("in-flight merge and restart policy remain behavior-sensitive");
+    expect(pill).toContain('from "@/lib/helix/ask-voice-continuation-lexical"');
+    for (const symbol of [
+      "extractIntentTerms",
+      "hasDanglingTurnTail",
+      "isLowInformationTailTranscript",
+      "extractLatestContinuationQuestionFocus",
+      "hasSufficientLexicalCarryover",
+      "isLikelyNearTurnContinuation",
+    ]) {
+      expect(lexical).toContain(`export function ${symbol}`);
+      expect(pill).not.toContain(`function ${symbol}`);
+      expect(voiceCopy).not.toContain(symbol);
+      expect(voiceText).not.toContain(symbol);
+    }
+    for (const localAnchor of [
+      "shouldMergeVoiceContinuationInFlight",
+      "shouldRestartExplorationLadderOnSupersede",
+      "isLikelyContinuationAddendum",
+      "isLikelyContinuationTailFragment",
+      "scoreIntentShift",
+    ]) {
+      expect(pill).toContain(localAnchor);
+      expect(lexical).not.toContain(localAnchor);
+    }
+    expect(lexical).not.toMatch(/from ["']react["']/);
+    expect(lexical).not.toContain("@/store/");
+    expect(lexical).not.toContain("@/components/helix/HelixAskPill");
+    expect(lexical).not.toContain("fetch(");
+    expect(lexical).not.toContain("navigator.clipboard");
+    expect(lexical).not.toContain("runAskTurn");
+    expect(lexical).not.toContain("speakVoice");
+  });
+
+  it("documents voice language and workstation fast-path policy as local behavior", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
+    const procedural = read("client/src/lib/helix/ask-procedural-display.ts");
+    const voiceCopy = read("client/src/lib/helix/ask-voice-copy-display.ts");
+    const valueNormalization = read("client/src/lib/helix/ask-value-normalization.ts");
+
+    for (const anchor of [
+      "resolveVoiceSourceLanguage",
+      "resolveVoiceResponseLanguage",
+      "isHighRiskTranslationContext",
+      "getWorkstationFastPathReplyText",
+      "renderCalculatorFastPathReply",
+      "selectWorkstationFastPathReplyAction",
+    ]) {
+      expect(pill).toContain(anchor);
+      expect(map).toContain(anchor);
+      expect(procedural).not.toContain(anchor);
+      expect(voiceCopy).not.toContain(anchor);
+      expect(valueNormalization).not.toContain(anchor);
+    }
+    expect(pill).toContain("runScientificSolve");
+    expect(procedural).not.toContain("runScientificSolve");
+    expect(map).toContain("Translation uncertainty handling");
+    expect(map).toContain("calculator fast-path solve execution");
+  });
+
+  it("documents workstation command lexicon and panel resolution as local behavior", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
+    const procedural = read("client/src/lib/helix/ask-procedural-display.ts");
+    const valueNormalization = read("client/src/lib/helix/ask-value-normalization.ts");
+
+    for (const anchor of [
+      "normalizePanelQuery",
+      "resolvePanelIdFromText",
+      "resolvePanelIdFromPath",
+      "parseOpenPanelCommand",
+      "restateWorkstationSubgoal",
+      "normalizeWorkstationCommandText",
+      "resolveCapabilityAliasPanelAction",
+      "parseWorkstationLexiconAction",
+    ]) {
+      expect(pill).toContain(anchor);
+      expect(map).toContain(anchor);
+      expect(procedural).not.toContain(anchor);
+      expect(valueNormalization).not.toContain(anchor);
+    }
+    expect(map).toContain("panel capability matching");
+    expect(map).toContain("HelixWorkstationAction");
+  });
+
+  it("documents exploration ladder and context chooser policy as local behavior", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
+    const terminalProjection = read("client/src/lib/helix/ask-terminal-projection.ts");
+    const voiceCopy = read("client/src/lib/helix/ask-voice-copy-display.ts");
+    const valueNormalization = read("client/src/lib/helix/ask-value-normalization.ts");
+
+    for (const anchor of [
+      "decideExplorationLadderAction",
+      "buildExplorationEscalationPrompt",
+      "buildExplorationArtifactRetryPrompt",
+      "buildConversationFallbackBrief",
+      "resolveAskContextChooserAutoMode",
+      "isRepoCodeEvidencePrompt",
+    ]) {
+      expect(pill).toContain(anchor);
+      expect(map).toContain(anchor);
+      expect(terminalProjection).not.toContain(anchor);
+      expect(voiceCopy).not.toContain(anchor);
+      expect(valueNormalization).not.toContain(anchor);
+    }
+    expect(map).toContain("Retry/escalation prompts");
+    expect(map).toContain("context/source chooser policy");
+  });
+
+  it("documents context compaction resume-frame handoff as local behavior", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
+    const debugDisplay = read("client/src/lib/helix/ask-debug-event-display.ts");
+    const valueNormalization = read("client/src/lib/helix/ask-value-normalization.ts");
+    const terminalProjection = read("client/src/lib/helix/ask-terminal-projection.ts");
+
+    for (const anchor of [
+      "isHelixAskContextCompactionPauseText",
+      "extractHelixAskContextCompactionResumeFrame",
+      "extractLatestHelixAskContextCompactionResumeFrameFromReplies",
+      "readStoredHelixAskContextCompactionResumeFrame",
+      "writeStoredHelixAskContextCompactionResumeFrame",
+      "isHelixAskContextCompactionPausePendingReply",
+    ]) {
+      expect(pill).toContain(anchor);
+      expect(map).toContain(anchor);
+      expect(debugDisplay).not.toContain(anchor);
+      expect(valueNormalization).not.toContain(anchor);
+      expect(terminalProjection).not.toContain(anchor);
+    }
+    expect(pill).toContain("sessionStorage");
+    expect(map).toContain("Session-storage resume-frame cache");
+    expect(map).toContain("request metadata handoff");
   });
 
   it("keeps live-source mail transcript display builders in the non-React live-source display module", () => {
@@ -681,6 +1046,81 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(readAloud).not.toContain("fetch(");
   });
 
+  it("keeps deterministic stable hash helpers in the non-React hash owner module", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const stableHash = read("client/src/lib/helix/ask-stable-hash.ts");
+    const battleDisplay = read("client/src/lib/helix/ask-reasoning-battle-display.ts");
+    const theaterDisplay = read("client/src/lib/helix/ask-reasoning-theater-display.ts");
+    const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
+
+    expect(map).toContain("ask-stable-hash.ts");
+    expect(map).toContain("cryptographic integrity");
+    expect(pill).toContain('from "@/lib/helix/ask-stable-hash"');
+    expect(battleDisplay).toContain('from "@/lib/helix/ask-stable-hash"');
+    expect(theaterDisplay).toContain('from "@/lib/helix/ask-stable-hash"');
+    expect(stableHash).toContain("export function hash32");
+    expect(stableHash).toContain("export function stableHelixProjectionHash");
+    expect(pill).not.toContain("const stableHelixProjectionHash =");
+    expect(pill).not.toContain("function hash32(value: string)");
+    expect(battleDisplay).not.toContain("function hash32(value: string)");
+    expect(theaterDisplay).not.toContain("function hash32(value: string)");
+    expect(stableHash).not.toMatch(/from ["']react["']/);
+    expect(stableHash).not.toContain("@/store/");
+    expect(stableHash).not.toContain("@/components/helix/HelixAskPill");
+    expect(stableHash).not.toContain("navigator.clipboard");
+    expect(stableHash).not.toContain("fetch(");
+    expect(stableHash).not.toContain("runAskTurn");
+    expect(stableHash).not.toContain("crypto.");
+  });
+
+  it("keeps generic value normalization helpers in the non-React value owner module", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const valueNormalization = read("client/src/lib/helix/ask-value-normalization.ts");
+    const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
+
+    expect(map).toContain("ask-value-normalization.ts");
+    expect(map).toContain("Env policy");
+    expect(pill).toContain('from "@/lib/helix/ask-value-normalization"');
+    for (const symbol of [
+      "readNumber",
+      "clampNumber",
+      "clipText",
+      "coerceText",
+      "asNonEmptyString",
+      "asObjectRecord",
+      "asStringArray",
+      "dedupeStrings",
+    ]) {
+      expect(valueNormalization).toContain(`export function ${symbol}`);
+      expect(pill).not.toContain(`function ${symbol}`);
+    }
+    expect(pill).not.toContain("function asPlainRecord");
+    expect(pill).not.toContain("function asNonEmptyArgString");
+    expect(pill).not.toContain("asPlainRecord(");
+    expect(pill).not.toContain("asNonEmptyArgString(");
+    expect(pill).not.toContain("const asRecord =");
+    for (const localAnchor of [
+      "parseVoiceEnvBoolean",
+      "parseVoiceEnvPercent",
+      "buildQueuedAskTurn",
+      "resolveHelixAskVisibleTerminal",
+      "resolveAuthoritativeDebugExportPayload",
+      "shouldKeepHelixReplyInBriefLane",
+      "deriveReasoningTheaterState",
+    ]) {
+      expect(pill).toContain(localAnchor);
+      expect(valueNormalization).not.toContain(localAnchor);
+    }
+    expect(valueNormalization).not.toMatch(/from ["']react["']/);
+    expect(valueNormalization).not.toContain("@/store/");
+    expect(valueNormalization).not.toContain("@/components/helix/HelixAskPill");
+    expect(valueNormalization).not.toContain("localStorage");
+    expect(valueNormalization).not.toContain("navigator.clipboard");
+    expect(valueNormalization).not.toContain("fetch(");
+    expect(valueNormalization).not.toContain("runAskTurn");
+    expect(valueNormalization).not.toContain("speakVoice");
+  });
+
   it("keeps deterministic voice-capture signal predicates in the non-React voice capture display module", () => {
     const pill = read("client/src/components/helix/HelixAskPill.tsx");
     const voiceCapture = read("client/src/lib/helix/ask-voice-capture-display.ts");
@@ -692,6 +1132,9 @@ describe("Helix Ask UI ownership boundaries", () => {
       "isRecorderStalled",
       "isLikelyLoopbackDeviceLabel",
       "shouldPrimeSegmentWithContainerHeader",
+      "resolveVoiceNoiseHandlingProfile",
+      "isLowAudioQualitySignal",
+      "describeMediaErrorCode",
     ]) {
       expect(pill).not.toContain(`function ${symbol}`);
       expect(pill).not.toContain(`export function ${symbol}`);
@@ -703,16 +1146,26 @@ describe("Helix Ask UI ownership boundaries", () => {
       "VOICE_FLAT_SIGNAL_WINDOW_MS",
       "VOICE_FLAT_SIGNAL_VARIANCE_THRESHOLD",
       "VOICE_RECORDER_STALL_MS",
+      "MIC_PLAYBACK_BARGE_MIN_SPEECH_PROBABILITY",
+      "MIC_PLAYBACK_BARGE_STRONG_SPEECH_PROBABILITY",
+      "MIC_PLAYBACK_BARGE_MIN_SNR_DB",
+      "MIC_PLAYBACK_BARGE_RMS_MULTIPLIER",
+      "VOICE_LOCAL_AUDIO_GATE_MIN_SPEECH_PROBABILITY",
+      "VOICE_LOCAL_AUDIO_GATE_MIN_SNR_DB",
+      "VOICE_LOCAL_AUDIO_GATE_MIN_DURATION_MS",
     ]) {
       expect(pill).not.toContain(`const ${symbol}`);
       expect(voiceCapture).toContain(`export const ${symbol}`);
     }
+    expect(pill).not.toContain("type VoiceNoiseHandlingProfile =");
+    expect(voiceCapture).toContain("export type VoiceNoiseHandlingProfile");
     for (const localAnchor of [
       "getMicRecorderMimeCandidates",
       "pickSupportedMicRecorderMimeType",
       "pickMicRecorderMimeType",
       "MediaRecorder",
       "transcribeVoice",
+      "shouldTreatMicSignalAsSpeech",
     ]) {
       expect(pill).toContain(localAnchor);
       expect(voiceCapture).not.toContain(localAnchor);

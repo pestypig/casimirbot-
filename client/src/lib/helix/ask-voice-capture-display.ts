@@ -3,6 +3,42 @@ export const VOICE_LEVEL_RELEASE_ALPHA = 0.18;
 export const VOICE_FLAT_SIGNAL_WINDOW_MS = 3000;
 export const VOICE_FLAT_SIGNAL_VARIANCE_THRESHOLD = 0.0016;
 export const VOICE_RECORDER_STALL_MS = 1200;
+export const MIC_PLAYBACK_BARGE_START_MS_DESKTOP = 260;
+export const MIC_PLAYBACK_BARGE_START_MS_DESKTOP_NOISY = 560;
+export const MIC_PLAYBACK_BARGE_START_MS_MOBILE = 320;
+export const MIC_PLAYBACK_BARGE_START_MS_MOBILE_NOISY = 680;
+export const MIC_PLAYBACK_BARGE_MIN_SPEECH_PROBABILITY = 0.52;
+export const MIC_PLAYBACK_BARGE_MIN_SPEECH_PROBABILITY_NOISY = 0.74;
+export const MIC_PLAYBACK_BARGE_STRONG_SPEECH_PROBABILITY = 0.68;
+export const MIC_PLAYBACK_BARGE_STRONG_SPEECH_PROBABILITY_NOISY = 0.86;
+export const MIC_PLAYBACK_BARGE_MIN_SNR_DB = 8;
+export const MIC_PLAYBACK_BARGE_MIN_SNR_DB_NOISY = 13;
+export const MIC_PLAYBACK_BARGE_RMS_MULTIPLIER = 1.35;
+export const MIC_PLAYBACK_BARGE_RMS_MULTIPLIER_NOISY = 1.75;
+export const VOICE_LOCAL_AUDIO_GATE_MIN_SPEECH_PROBABILITY = 0.3;
+export const VOICE_LOCAL_AUDIO_GATE_MIN_SPEECH_PROBABILITY_NOISY = 0.44;
+export const VOICE_LOCAL_AUDIO_GATE_MIN_SNR_DB = 4.5;
+export const VOICE_LOCAL_AUDIO_GATE_MIN_SNR_DB_NOISY = 8.5;
+export const VOICE_LOCAL_AUDIO_GATE_MIN_DURATION_MS = 320;
+export const VOICE_LOCAL_AUDIO_GATE_MIN_DURATION_MS_NOISY = 440;
+export const VOICE_LOCAL_AUDIO_GATE_LOW_QUALITY_SPEECH_PROBABILITY = 0.42;
+export const VOICE_LOCAL_AUDIO_GATE_LOW_QUALITY_SPEECH_PROBABILITY_NOISY = 0.56;
+export const VOICE_LOCAL_AUDIO_GATE_LOW_QUALITY_SNR_DB = 7;
+export const VOICE_LOCAL_AUDIO_GATE_LOW_QUALITY_SNR_DB_NOISY = 10.5;
+
+export type VoiceNoiseHandlingProfile = {
+  bargeStartMsDesktop: number;
+  bargeStartMsMobile: number;
+  bargeMinSpeechProbability: number;
+  bargeStrongSpeechProbability: number;
+  bargeMinSnrDb: number;
+  bargeRmsMultiplier: number;
+  localGateMinSpeechProbability: number;
+  localGateMinSnrDb: number;
+  localGateMinDurationMs: number;
+  localGateLowQualitySpeechProbability: number;
+  localGateLowQualitySnrDb: number;
+};
 
 const clampNumber = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
@@ -59,4 +95,63 @@ export function shouldPrimeSegmentWithContainerHeader(params: {
   // WebM/Ogg slices can lose container init data and benefit from header priming.
   // MP4-family slices are more fragile when concatenated with a primed header.
   return normalized.includes("webm") || normalized.includes("ogg");
+}
+
+export function resolveVoiceNoiseHandlingProfile(noisyEnvironmentMode: boolean): VoiceNoiseHandlingProfile {
+  if (noisyEnvironmentMode) {
+    return {
+      bargeStartMsDesktop: MIC_PLAYBACK_BARGE_START_MS_DESKTOP_NOISY,
+      bargeStartMsMobile: MIC_PLAYBACK_BARGE_START_MS_MOBILE_NOISY,
+      bargeMinSpeechProbability: MIC_PLAYBACK_BARGE_MIN_SPEECH_PROBABILITY_NOISY,
+      bargeStrongSpeechProbability: MIC_PLAYBACK_BARGE_STRONG_SPEECH_PROBABILITY_NOISY,
+      bargeMinSnrDb: MIC_PLAYBACK_BARGE_MIN_SNR_DB_NOISY,
+      bargeRmsMultiplier: MIC_PLAYBACK_BARGE_RMS_MULTIPLIER_NOISY,
+      localGateMinSpeechProbability: VOICE_LOCAL_AUDIO_GATE_MIN_SPEECH_PROBABILITY_NOISY,
+      localGateMinSnrDb: VOICE_LOCAL_AUDIO_GATE_MIN_SNR_DB_NOISY,
+      localGateMinDurationMs: VOICE_LOCAL_AUDIO_GATE_MIN_DURATION_MS_NOISY,
+      localGateLowQualitySpeechProbability: VOICE_LOCAL_AUDIO_GATE_LOW_QUALITY_SPEECH_PROBABILITY_NOISY,
+      localGateLowQualitySnrDb: VOICE_LOCAL_AUDIO_GATE_LOW_QUALITY_SNR_DB_NOISY,
+    };
+  }
+  return {
+    bargeStartMsDesktop: MIC_PLAYBACK_BARGE_START_MS_DESKTOP,
+    bargeStartMsMobile: MIC_PLAYBACK_BARGE_START_MS_MOBILE,
+    bargeMinSpeechProbability: MIC_PLAYBACK_BARGE_MIN_SPEECH_PROBABILITY,
+    bargeStrongSpeechProbability: MIC_PLAYBACK_BARGE_STRONG_SPEECH_PROBABILITY,
+    bargeMinSnrDb: MIC_PLAYBACK_BARGE_MIN_SNR_DB,
+    bargeRmsMultiplier: MIC_PLAYBACK_BARGE_RMS_MULTIPLIER,
+    localGateMinSpeechProbability: VOICE_LOCAL_AUDIO_GATE_MIN_SPEECH_PROBABILITY,
+    localGateMinSnrDb: VOICE_LOCAL_AUDIO_GATE_MIN_SNR_DB,
+    localGateMinDurationMs: VOICE_LOCAL_AUDIO_GATE_MIN_DURATION_MS,
+    localGateLowQualitySpeechProbability: VOICE_LOCAL_AUDIO_GATE_LOW_QUALITY_SPEECH_PROBABILITY,
+    localGateLowQualitySnrDb: VOICE_LOCAL_AUDIO_GATE_LOW_QUALITY_SNR_DB,
+  };
+}
+
+export function isLowAudioQualitySignal(args: {
+  speechProbability: number | null | undefined;
+  snrDb: number | null | undefined;
+  lowQualitySpeechProbability: number;
+  lowQualitySnrDb: number;
+}): boolean {
+  return (
+    (typeof args.speechProbability === "number" &&
+      args.speechProbability < args.lowQualitySpeechProbability) ||
+    (typeof args.snrDb === "number" && args.snrDb < args.lowQualitySnrDb)
+  );
+}
+
+export function describeMediaErrorCode(code: number | null): string {
+  switch (code) {
+    case 1:
+      return "media_err_aborted";
+    case 2:
+      return "media_err_network";
+    case 3:
+      return "media_err_decode";
+    case 4:
+      return "media_err_src_not_supported";
+    default:
+      return "media_err_unknown";
+  }
 }

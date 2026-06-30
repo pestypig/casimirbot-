@@ -1,4 +1,5 @@
 import type { MirekCellKind, MirekReasoningArtifactV1 } from "@shared/helix-reasoning-mirek";
+import { hash32 } from "@/lib/helix/ask-stable-hash";
 
 export type ReasoningTheaterParticle = {
   id: string;
@@ -145,15 +146,6 @@ export type ReasoningTheaterFrontierParticleNode = {
 
 function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value));
-}
-
-function hash32(value: string): number {
-  let hash = 2166136261;
-  for (let i = 0; i < value.length; i += 1) {
-    hash ^= value.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
 }
 
 function mulberry32(seed: number): () => number {

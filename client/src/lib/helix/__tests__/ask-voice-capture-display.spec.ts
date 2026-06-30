@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  describeMediaErrorCode,
   isFlatVoiceSignal,
   isLikelyLoopbackDeviceLabel,
+  isLowAudioQualitySignal,
   isRecorderStalled,
+  resolveVoiceNoiseHandlingProfile,
   shouldPrimeSegmentWithContainerHeader,
   smoothVoiceLevel,
 } from "../ask-voice-capture-display";
@@ -73,5 +76,39 @@ describe("ask voice capture display helpers", () => {
         hasHeaderChunk: true,
       }),
     ).toBe(false);
+  });
+
+  it("resolves noisy-environment thresholds and low-quality signal flags deterministically", () => {
+    const normal = resolveVoiceNoiseHandlingProfile(false);
+    const noisy = resolveVoiceNoiseHandlingProfile(true);
+
+    expect(noisy.bargeStartMsDesktop).toBeGreaterThan(normal.bargeStartMsDesktop);
+    expect(noisy.bargeMinSpeechProbability).toBeGreaterThan(normal.bargeMinSpeechProbability);
+    expect(noisy.localGateMinDurationMs).toBeGreaterThan(normal.localGateMinDurationMs);
+    expect(
+      isLowAudioQualitySignal({
+        speechProbability: noisy.localGateLowQualitySpeechProbability - 0.01,
+        snrDb: noisy.localGateLowQualitySnrDb + 5,
+        lowQualitySpeechProbability: noisy.localGateLowQualitySpeechProbability,
+        lowQualitySnrDb: noisy.localGateLowQualitySnrDb,
+      }),
+    ).toBe(true);
+    expect(
+      isLowAudioQualitySignal({
+        speechProbability: noisy.localGateLowQualitySpeechProbability + 0.01,
+        snrDb: noisy.localGateLowQualitySnrDb + 5,
+        lowQualitySpeechProbability: noisy.localGateLowQualitySpeechProbability,
+        lowQualitySnrDb: noisy.localGateLowQualitySnrDb,
+      }),
+    ).toBe(false);
+  });
+
+  it("describes media error codes as stable debug labels", () => {
+    expect(describeMediaErrorCode(1)).toBe("media_err_aborted");
+    expect(describeMediaErrorCode(2)).toBe("media_err_network");
+    expect(describeMediaErrorCode(3)).toBe("media_err_decode");
+    expect(describeMediaErrorCode(4)).toBe("media_err_src_not_supported");
+    expect(describeMediaErrorCode(null)).toBe("media_err_unknown");
+    expect(describeMediaErrorCode(99)).toBe("media_err_unknown");
   });
 });

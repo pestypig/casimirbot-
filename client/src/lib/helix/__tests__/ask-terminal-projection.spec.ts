@@ -105,6 +105,33 @@ describe("Helix Ask terminal projection", () => {
     expect(visible.selected_final_answer).toBe("Observed expression: 8*9\nResult: 72");
   });
 
+  it("projects backend-selected quoted tool-name explanations instead of stale retrieval fallbacks", () => {
+    const answer =
+      "`internet-search.search_web` is a capability or tool identifier. It names an internet-search module/action that would perform a web search if invoked. In this request, it is just text: the phrase is being discussed literally, not executed.";
+    const staleFallback = "I need retrieval before finalizing this claim. I do not yet have grounded evidence references for it.";
+
+    const visible = buildVisibleResolvedTurn({
+      id: "reply-negative-quoted-internet",
+      turn_id: "ask:negative-quoted-internet",
+      ok: false,
+      content: staleFallback,
+      text: staleFallback,
+      selected_final_answer: answer,
+      final_answer_source: "model_direct_answer",
+      debug: {
+        selected_final_answer: answer,
+        final_answer_source: "model_direct_answer",
+        workstation_gateway_call_results: [],
+        workstation_gateway_observation_packets: [],
+      },
+    });
+
+    expect(visible.primary_terminal_label).toBe("final_answer");
+    expect(visible.terminal_error_code).toBeNull();
+    expect(visible.selected_final_answer).toBe(answer);
+    expect(visible.selected_final_answer).not.toBe(staleFallback);
+  });
+
   it("hides job-ready links on failure terminals and keeps valid links on successful turns", () => {
     const link = {
       label: "Open note: Stage Play Live-Source Findings",

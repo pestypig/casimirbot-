@@ -3842,6 +3842,43 @@ describe("HelixAskPill mic helper behavior", () => {
     expect(decision.evidence_refs).toEqual([]);
   });
 
+  it("does not turn literal quoted tool-name explanations into retrieval-gated hard claims", () => {
+    const decision = evaluateEvidenceFinalizationGate({
+      question:
+        "The text says `internet-search.search_web`; explain that phrase as text only. Do not run internet search.",
+      mode: "read",
+      debug: {
+        selected_final_answer:
+          "`internet-search.search_web` is a capability or tool identifier, not an executed search in this prompt.",
+        workstation_gateway_call_results: [],
+        workstation_gateway_observation_packets: [],
+      } as never,
+      proof: undefined,
+    });
+
+    expect(decision.blocked).toBe(false);
+    expect(decision.hard_claim).toBe(false);
+    expect(decision.reason).toBeNull();
+  });
+
+  it("still retrieval-gates quoted tool-name prompts when they ask for proof claims", () => {
+    const decision = evaluateEvidenceFinalizationGate({
+      question:
+        "The text says `internet-search.search_web`; as text only, prove whether this claim has current public evidence.",
+      mode: "read",
+      debug: {
+        selected_final_answer: "This is only a tool identifier.",
+        workstation_gateway_call_results: [],
+        workstation_gateway_observation_packets: [],
+      } as never,
+      proof: undefined,
+    });
+
+    expect(decision.blocked).toBe(true);
+    expect(decision.hard_claim).toBe(true);
+    expect(decision.reason).toBe("hard_claim_without_evidence_refs");
+  });
+
   it("blocks hard-claim finalization when evidence gate is not satisfied", () => {
     const decision = evaluateEvidenceFinalizationGate({
       question: "verify this theory against the current docs",

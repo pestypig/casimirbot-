@@ -1558,22 +1558,28 @@ describe("Helix workstation tool gateway", () => {
   });
 
   it("calls scholarly-research.lookup_papers as read-only paper evidence, not an answer", async () => {
-    globalThis.fetch = vi.fn(async () => ({
-      ok: true,
-      status: 200,
-      text: async () => [
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
-        "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
-        "<entry>",
-        "<id>https://arxiv.org/abs/2606.00001</id>",
-        "<title>Quantum inequalities for warp constraints</title>",
-        "<summary>Bounded abstract about quantum inequality margins and warp metrics.</summary>",
-        "<published>2026-06-01T00:00:00Z</published>",
-        "<author><name>A. Researcher</name></author>",
-        "</entry>",
-        "</feed>",
-      ].join(""),
-    })) as typeof fetch;
+    const calledUrls: string[] = [];
+    globalThis.fetch = vi.fn(async (url) => {
+      const urlText = String(url);
+      calledUrls.push(urlText);
+      expect(urlText).toContain("export.arxiv.org/api/query");
+      return {
+        ok: true,
+        status: 200,
+        text: async () => [
+          "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+          "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
+          "<entry>",
+          "<id>https://arxiv.org/abs/2606.00001</id>",
+          "<title>Quantum inequalities for warp constraints</title>",
+          "<summary>Bounded abstract about quantum inequality margins and warp metrics.</summary>",
+          "<published>2026-06-01T00:00:00Z</published>",
+          "<author><name>A. Researcher</name></author>",
+          "</entry>",
+          "</feed>",
+        ].join(""),
+      };
+    }) as typeof fetch;
 
     const result = await callWorkstationGatewayCapability({
       agentRuntime: "codex",
@@ -1641,6 +1647,77 @@ describe("Helix workstation tool gateway", () => {
     expect(observation.evidence_refs?.[0]).toMatchObject({
       provider: "arxiv",
       url: "https://arxiv.org/abs/2606.00001",
+    });
+    expect(calledUrls).toHaveLength(1);
+    expect(calledUrls.some((url) => /internet-search|search_web|tavily|serpapi|google/i.test(url))).toBe(false);
+  });
+
+  it("returns missing scholarly provider evidence as an observation, not proof", async () => {
+    globalThis.fetch = vi.fn(async () => ({
+      ok: false,
+      status: 429,
+      text: async () => "",
+    })) as typeof fetch;
+
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+      arguments: {
+        query: "quantum inequalities warp drive",
+        providers: ["arxiv"],
+        limit: 1,
+      },
+      turnId: "ask:test:gateway-scholarly-search-rate-limited",
+      iteration: 7,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      capability_id: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+      gateway_admission: {
+        admission_status: "admitted",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation_packet: {
+        capability_key: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+        panel_id: "scholarly-research",
+        action: "lookup_papers",
+        status: "failed",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+        missing_requirements: [
+          expect.objectContaining({
+            code: "arxiv_http_429",
+            repair_action: "repair",
+          }),
+          expect.objectContaining({
+            code: "no_scholarly_results_returned",
+            repair_action: "repair",
+          }),
+        ],
+      },
+      observation: {
+        schema: "helix.scholarly_research_observation.v1",
+        capability_key: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+        query: "quantum inequalities warp drive",
+        providers_considered: ["arxiv"],
+        providers_called: ["arxiv"],
+        papers: [],
+        missing_requirements: ["arxiv_http_429", "no_scholarly_results_returned"],
+        selected_for_answer: false,
+        status: "failed",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      error: "arxiv_http_429",
     });
   });
 

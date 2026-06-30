@@ -132,6 +132,17 @@ export function createHelixAskConsoleStreamIngressDebug(input?: {
   };
 }
 
+export function incrementHelixAskConsoleDropReason(
+  droppedReasons: Record<string, number>,
+  reason: string,
+): Record<string, number> {
+  const key = reason.trim() || "unknown";
+  return {
+    ...droppedReasons,
+    [key]: (droppedReasons[key] ?? 0) + 1,
+  };
+}
+
 export function attachHelixAskClientTraceToLiveEvent(
   event: AskLiveEventEntry,
   input: {
