@@ -1,0 +1,100 @@
+# civilization-bounds.reflect_system_bounds
+
+Maturity: `candidate`
+
+## Purpose
+
+Reflect a prompt through Civilization Bounds to describe social, energy,
+material, collaboration, and falsification constraints that would have to be
+true for a scenario. This is bounded scenario context, not permission to make
+technology-readiness or transport claims.
+
+## Owner
+
+- Capability id: `civilization-bounds.reflect_system_bounds`
+- Panel: `civilization-bounds-roadmap`
+- Action id: `reflect_system_bounds`
+- Permission profile: `read`
+- Mode: read/observe
+
+## Inputs
+
+Required:
+
+- `prompt`
+
+Optional:
+
+- `scenario_id`
+- `phase_id`
+- `layer_mode`
+- `selected_system_ids`
+- `selected_badge_ids`
+- `theory_reflection_ref`
+- `ideology_reflection_ref`
+- `include_bridge_context`
+- `include_collaboration_bounds`
+- `include_falsification_hooks`
+
+Blocked:
+
+- missing prompt
+- prompt asking the tool name as text only
+- attempts to use the reflection as proof of feasibility, deployment readiness,
+  national capacity, or transport authority
+
+## Observation
+
+Required observation fields:
+
+- `schema`: civilization bounds reflection observation schema
+- `capability_key`: `civilization-bounds.reflect_system_bounds`
+- `panel_id`: `civilization-bounds-roadmap`
+- `action_id`: `reflect_system_bounds`
+- `roadmap_id`
+- `scenario_id`
+- `parameter_scope_kinds`
+- `action_channel_kinds`
+- `missing_evidence`
+- `bridge_context_included`
+- `procedural_scaffold_id`
+- `authority`
+- `terminal_eligible=false`
+- `post_tool_model_step_required=true`
+- `assistant_answer=false`
+- `raw_content_included=false`
+
+## Host Projection
+
+Allowed metadata:
+
+```txt
+workstation_actions.kind=inspect_workstation_receipt
+receipt_ref
+support_refs
+tool_output_refs
+```
+
+Future panel affordances may focus roadmap systems or scenario phases when
+structured ids are present.
+
+## Visible Trace
+
+```txt
+Tool request: civilization-bounds.reflect_system_bounds
+Tool observation: Civilization Bounds returned bounded system constraints
+Model re-entry
+Final answer
+```
+
+## Tests
+
+Candidate evidence currently includes a UI/API theory+civilization compound pass.
+
+Required stable tests:
+
+- standalone civilization-bounds reflection does not fail only because compact
+  roadmap input is absent
+- theory+civilization compound still executes both capabilities
+- missing prompt blocks cleanly
+- final answer marks missing evidence as missing, not as proof

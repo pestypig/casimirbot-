@@ -23,7 +23,7 @@ those lanes without treating any receipt as a final answer by itself.
 | Helix Ask + Live Answer loop | Primary user and agent interface. Handles prompt interpretation, tool admission, evidence re-entry, terminal authority, streamed debug, and the visible answer. | `server/routes/agi.plan.ts`, `docs/helix-ask-agentic-loop-current-overview.md`, `docs/helix-ask-codex-loop-discipline.md`, `npm run helix:ask:regression:light` |
 | Agent runtime adapters | Provider edge for Codex Workstation Mode and future selectable agents. Keeps each runtime's invocation/protocol glue outside Helix Ask policy and workstation truth. | `server/services/helix-ask/agent-providers/`, `server/services/helix-ask/workstation-tool-gateway/`, `shared/helix-agent-runtime.ts`, `docs/helix-ask-codex-loop-discipline.md` |
 | Workstation launch panels | User-facing capability surfaces. Launch panels expose docs, calculators, theory maps, stellar/solar simulators, NHM2 panels, notes, process graphs, and runtime diagnostics. | `client/src/pages/desktop.tsx`, `client/src/pages/helix-core.panels.ts`, `docs/helix-desktop-panels.md` |
-| Workstation tool calls | Deterministic actions Helix Ask can request. Tools open panels, inspect docs, search repo evidence, run calculator paths, update notes, build context packs, and return typed observations. | `client/src/lib/workstation/panelCapabilities.ts`, `client/src/lib/workstation/panelActionAdapters.ts`, `client/src/store/useWorkstationActionExecutionStore.ts` |
+| Workstation tool calls | Deterministic actions Helix Ask can request. Tools open panels, inspect docs, search repo evidence, run calculator paths, update notes, build context packs, and return typed observations. | `docs/helix-ask/workstation-tool-contracts/README.md`, `client/src/lib/workstation/panelCapabilities.ts`, `client/src/lib/workstation/panelActionAdapters.ts`, `client/src/store/useWorkstationActionExecutionStore.ts` |
 | Theory congruence network | Canonical math architecture from first principles to laws, derived relations, runtime presets, calculator payloads, evidence refs, and claim boundaries. | `docs/architecture/theory-badge-graph-contract.md`, `shared/theory/helix-theory-badge-graph.ts`, `client/src/components/panels/TheoryBadgeGraphPanel.tsx` |
 | Physics and observational presets | Simulation surfaces Helix Ask and the workstation can reason from, including stellar, solar, tokamak, Alcubierre/NHM2, Casimir, and equation-visualizer lanes. | `client/src/pages/helix-core.panels.ts`, `server/modules/starsim/`, `tools/`, `simulations/` |
 | Verification gates | Hard checks for math maturity, physics guardrails, Casimir verification, trace export, and certificate integrity. | `WARP_AGENTS.md`, `MATH_STATUS.md`, `npm run math:validate`, `npm run casimir:verify` |
@@ -231,6 +231,7 @@ Current job-ready capability families include:
 
 Implementation anchors:
 
+- `docs/helix-ask/workstation-tool-contracts/README.md`
 - `client/src/lib/workstation/panelCapabilities.ts`
 - `client/src/lib/workstation/panelActionAdapters.ts`
 - `client/src/lib/workstation/launchPanelPolicy.ts`

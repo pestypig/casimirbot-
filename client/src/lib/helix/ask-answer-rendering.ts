@@ -240,6 +240,9 @@ export function isLikelyCodeStyleMathToken(token: Extract<HelixAskMathToken, { k
 export function parseHelixAskFinalAnswerBulletLine(line: string): string | null {
   const trimmed = coerceText(line).trim();
   const bulletMatch = trimmed.match(/^[-*]\s*(\S.+)$/);
+  if (!bulletMatch?.[1]) return null;
+  const content = bulletMatch[1];
+  if (/^\*[^*][\s\S]*\*\*$/.test(content)) return `*${content}`;
   return bulletMatch?.[1] ?? null;
 }
 

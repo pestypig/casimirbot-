@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildVoiceAutoSpeakUtteranceId,
   formatReadAloudButtonLabel,
+  hashVoiceUtteranceKey,
+  isInterimVoicePlaybackUtteranceKind,
+  isManualVoicePlaybackUtterance,
+  isMissionVoiceOutputModeEnabled,
   resolveInitialMicArmState,
+  shouldEnableVoiceRollout,
   shouldStopReadAloudOnButtonPress,
   transitionReadAloudState,
 } from "../ask-read-aloud-display";
@@ -33,5 +39,38 @@ describe("ask read-aloud display helpers", () => {
     expect(formatReadAloudButtonLabel("playing")).toBe("Stop reading (playing)");
     expect(formatReadAloudButtonLabel("dry-run")).toBe("Read aloud (dry-run)");
     expect(formatReadAloudButtonLabel("error")).toBe("Read aloud (error)");
+  });
+
+  it("builds stable voice utterance IDs and hashes without owning playback scheduling", () => {
+    expect(hashVoiceUtteranceKey("voice:turn:one")).toBe(hashVoiceUtteranceKey("voice:turn:one"));
+    expect(hashVoiceUtteranceKey("voice:turn:one")).not.toBe(hashVoiceUtteranceKey("voice:turn:two"));
+    expect(buildVoiceAutoSpeakUtteranceId([" reply-1 ", null, " final "])).toBe("reply-1:final");
+
+    const longId = buildVoiceAutoSpeakUtteranceId(["x".repeat(220)]);
+    expect(longId.length).toBeLessThanOrEqual(180);
+    expect(longId).toMatch(/:[a-f0-9]{8}$/);
+  });
+
+  it("classifies voice utterance display predicates structurally", () => {
+    expect(isManualVoicePlaybackUtterance({ kind: "manual_read_aloud" })).toBe(true);
+    expect(isManualVoicePlaybackUtterance({ source: "manual" })).toBe(true);
+    expect(isManualVoicePlaybackUtterance({ kind: "auto_brief", source: "auto" })).toBe(false);
+    expect(isInterimVoicePlaybackUtteranceKind("tool_receipt")).toBe(true);
+    expect(isInterimVoicePlaybackUtteranceKind("panel_narration")).toBe(true);
+    expect(isInterimVoicePlaybackUtteranceKind("final_answer")).toBe(false);
+    expect(isMissionVoiceOutputModeEnabled("normal")).toBe(true);
+    expect(isMissionVoiceOutputModeEnabled("muted")).toBe(false);
+  });
+
+  it("evaluates voice rollout gates deterministically", () => {
+    expect(shouldEnableVoiceRollout({ enabled: false, killSwitch: false, activePercent: 100, key: "a" })).toBe(false);
+    expect(shouldEnableVoiceRollout({ enabled: true, killSwitch: true, activePercent: 100, key: "a" })).toBe(false);
+    expect(shouldEnableVoiceRollout({ enabled: true, killSwitch: false, activePercent: 0, key: "a" })).toBe(false);
+    expect(shouldEnableVoiceRollout({ enabled: true, killSwitch: false, activePercent: 100, key: "a" })).toBe(true);
+    expect(
+      shouldEnableVoiceRollout({ enabled: true, killSwitch: false, activePercent: 37, key: "stable-key" }),
+    ).toBe(
+      shouldEnableVoiceRollout({ enabled: true, killSwitch: false, activePercent: 37, key: "stable-key" }),
+    );
   });
 });

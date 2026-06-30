@@ -1786,7 +1786,7 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("turn_transcript_events");
     expect(source).toContain("buildAskLiveEventFromTurnTranscriptRecord");
     expect(source).toContain('source_event_type === "public_commentary"');
-    expect(source).toContain('stream_event: "turn_transcript_event"');
+    expect(transcriptSource).toContain('stream_event: "turn_transcript_event"');
     expect(source).toContain("appendSyntheticLiveEvent(tracedLiveEvent)");
     expect(source).toContain("console_stream_ingress_debug");
     expect(source).toContain("rawStreamPacketCount");
@@ -1797,7 +1797,7 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("replayHelixAskTurnTranscriptEventsToConsole");
     expect(source).toContain("attachHelixAskClientTraceToLiveEvent");
     expect(source).toContain("backend_turn_id");
-    expect(source).toContain("record.turn_id ?? record.turnId ?? record.active_turn_id");
+    expect(transcriptSource).toContain("record.turn_id ?? record.turnId ?? record.active_turn_id");
     expect(source).toContain("targetTurnId");
     expect(source).toContain("resolveHelixAskReplyCanonicalKey(reply) !== targetTurnId");
     expect(source).toContain("turn_transcript_source");
@@ -2453,6 +2453,8 @@ describe("HelixAskPill mic-first surface contract", () => {
   it("parses compact Codex Markdown bullets through the final-answer renderer contract", () => {
     expect(parseHelixAskFinalAnswerBulletLine("-NHM2 remains claim-bounded.")).toBe("NHM2 remains claim-bounded.");
     expect(parseHelixAskFinalAnswerBulletLine("- NHM2 remains claim-bounded.")).toBe("NHM2 remains claim-bounded.");
+    expect(parseHelixAskFinalAnswerBulletLine("-**Document Evidence**")).toBe("**Document Evidence**");
+    expect(parseHelixAskFinalAnswerBulletLine("- **Document Evidence**")).toBe("**Document Evidence**");
     expect(parseHelixAskFinalAnswerBulletLine("NHM2 remains claim-bounded.")).toBeNull();
   });
 

@@ -406,6 +406,48 @@ export function chooseVisibleFinalText(reply: HelixAskTerminalProjectionReply): 
   return visible.selected_final_answer || "";
 }
 
+export function resolveHelixAskVisibleJobReadyLinks(reply: unknown): RecordLike[] {
+  const replyRecord = readAgentLoopAuditRecord(reply);
+  const debugRecord = readAgentLoopAuditRecord(replyRecord?.debug);
+  const summary =
+    readAgentLoopAuditRecord(replyRecord?.resolved_turn_summary) ??
+    readAgentLoopAuditRecord(debugRecord?.resolved_turn_summary);
+  const terminalAuthority =
+    readAgentLoopAuditRecord(replyRecord?.terminal_answer_authority) ??
+    readAgentLoopAuditRecord(debugRecord?.terminal_answer_authority);
+  const finalAnswerSource =
+    coerceText(replyRecord?.final_answer_source).trim() ||
+    coerceText(debugRecord?.final_answer_source).trim() ||
+    coerceText(terminalAuthority?.final_answer_source).trim();
+  const terminalArtifactKind =
+    coerceText(replyRecord?.terminal_artifact_kind).trim() ||
+    coerceText(debugRecord?.terminal_artifact_kind).trim() ||
+    coerceText(summary?.terminal_artifact_kind).trim() ||
+    coerceText(terminalAuthority?.terminal_artifact_kind).trim();
+  const terminalErrorCode =
+    coerceText(replyRecord?.terminal_error_code).trim() ||
+    coerceText(debugRecord?.terminal_error_code).trim() ||
+    coerceText(summary?.terminal_error_code).trim();
+  const finalStatus =
+    coerceText(replyRecord?.final_status).trim() ||
+    coerceText(debugRecord?.final_status).trim() ||
+    coerceText(summary?.final_status).trim();
+  const isFailureTerminal =
+    finalAnswerSource === "typed_failure" ||
+    terminalArtifactKind === "typed_failure" ||
+    finalStatus === "final_failure" ||
+    Boolean(terminalErrorCode);
+  if (isFailureTerminal) return [];
+  const rawLinks = Array.isArray(debugRecord?.job_ready_links)
+    ? debugRecord.job_ready_links
+    : Array.isArray(replyRecord?.job_ready_links)
+      ? replyRecord.job_ready_links
+      : [];
+  return rawLinks
+    .map((entry) => readAgentLoopAuditRecord(entry))
+    .filter((entry): entry is RecordLike => Boolean(entry?.panel_id && entry?.action_id));
+}
+
 const readTerminalAnswerAuthorityRecord = (value: unknown): RecordLike | null => {
   const record = readAgentLoopAuditRecord(value);
   return record?.schema === "helix.turn_terminal_authority.v1" && record.server_authoritative === true

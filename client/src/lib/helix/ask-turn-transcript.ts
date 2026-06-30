@@ -4,7 +4,10 @@ import type {
 } from "@shared/helix-causal-turn-timeline";
 import type { StagePlayLiveSourceMailTranscriptEntryV1 } from "@shared/contracts/stage-play-live-source-mail.v1";
 import { humanizeAskLiveEventToken } from "@/lib/helix/ask-display-text";
-import type { AskLiveEventEntry } from "@/lib/helix/ask-debug-event-display";
+import {
+  parseAskLiveEventTimestampMs,
+  type AskLiveEventEntry,
+} from "@/lib/helix/ask-debug-event-display";
 
 type HelixAskTranscriptReply = {
   id: string;
@@ -61,6 +64,45 @@ function dedupeStrings(values: string[]): string[] {
     out.push(value);
   }
   return out;
+}
+
+export function buildAskLiveEventFromTurnTranscriptRecord(
+  record: Record<string, unknown>,
+  fallbackId: string,
+  maxChars = 560,
+): AskLiveEventEntry | null {
+  const text = coerceText(record.text).trim();
+  if (!text) return null;
+  const type = coerceText(record.type).trim() || coerceText(record.source_event_type).trim() || "turn_transcript_event";
+  const sourceEventType = coerceText(record.source_event_type).trim();
+  const turnId = coerceText(record.turn_id ?? record.turnId ?? record.active_turn_id).trim();
+  const atMs = typeof record.at_ms === "number" && Number.isFinite(record.at_ms) ? Math.trunc(record.at_ms) : null;
+  const ts = atMs ? new Date(atMs).toISOString() : undefined;
+  const seq = typeof record.seq === "number" && Number.isFinite(record.seq) ? Math.trunc(record.seq) : undefined;
+  return {
+    id: coerceText(record.id).trim() || fallbackId,
+    text: clipText(text, maxChars),
+    tool: coerceText(record.role).trim() || "agent",
+    ts,
+    tsMs: atMs ?? parseAskLiveEventTimestampMs(record.ts) ?? undefined,
+    seq,
+    durationMs:
+      typeof record.durationMs === "number" && Number.isFinite(record.durationMs)
+        ? Math.max(0, Math.round(record.durationMs))
+        : undefined,
+    meta: {
+      stage: type,
+      detail: coerceText(record.detail).trim() || null,
+      status: coerceText(record.status).trim() || null,
+      stepId: coerceText(record.step_id).trim() || null,
+      lane: coerceText(record.lane).trim() || null,
+      source_event_type: sourceEventType || type,
+      event_source: coerceText(record.event_source).trim() || "live",
+      turn_id: turnId || null,
+      reconstructed: record.reconstructed === true,
+      stream_event: "turn_transcript_event",
+    },
+  };
 }
 
 function resolveHelixTranscriptActionLabel(event: Record<string, unknown>): string | null {

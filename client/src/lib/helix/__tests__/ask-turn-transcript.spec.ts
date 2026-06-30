@@ -1,12 +1,68 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildAskLiveEventFromTurnTranscriptRecord,
   buildHelixRuntimeAskLiveEvents,
   buildHelixTurnTranscriptRows,
   buildHelixWorkstationGatewayTranscriptEvents,
 } from "@/lib/helix/ask-turn-transcript";
 
 describe("Helix Ask turn transcript projection", () => {
+  it("projects individual turn transcript records into live-event entries", () => {
+    expect(
+      buildAskLiveEventFromTurnTranscriptRecord(
+        {
+          id: "transcript-1",
+          text: `Working ${"x".repeat(24)}`,
+          role: "tool",
+          type: "tool_result",
+          source_event_type: "tool_observation",
+          status: "completed",
+          detail: "calculator",
+          step_id: "step-1",
+          lane: "scientific-calculator.solve_expression",
+          turn_id: "turn-1",
+          at_ms: Date.UTC(2026, 0, 2, 3, 4, 5, 678),
+          seq: 4.8,
+          durationMs: 12.6,
+          reconstructed: true,
+        },
+        "fallback",
+        18,
+      ),
+    ).toEqual({
+      id: "transcript-1",
+      text: "Working xxxxxxxxx...",
+      tool: "tool",
+      ts: "2026-01-02T03:04:05.678Z",
+      tsMs: Date.UTC(2026, 0, 2, 3, 4, 5, 678),
+      seq: 4,
+      durationMs: 13,
+      meta: {
+        stage: "tool_result",
+        detail: "calculator",
+        status: "completed",
+        stepId: "step-1",
+        lane: "scientific-calculator.solve_expression",
+        source_event_type: "tool_observation",
+        event_source: "live",
+        turn_id: "turn-1",
+        reconstructed: true,
+        stream_event: "turn_transcript_event",
+      },
+    });
+
+    expect(
+      buildAskLiveEventFromTurnTranscriptRecord(
+        {
+          text: "  ",
+          ts: "2026-01-02T03:04:05.000Z",
+        },
+        "empty",
+      ),
+    ).toBeNull();
+  });
+
   it("projects runtime transcript events into Ask live-event rows", () => {
     const events = buildHelixRuntimeAskLiveEvents({
       id: "reply-1",

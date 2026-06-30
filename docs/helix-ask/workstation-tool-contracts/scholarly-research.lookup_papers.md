@@ -1,0 +1,93 @@
+# scholarly-research.lookup_papers
+
+Maturity: `draft`
+
+## Purpose
+
+Look up scholarly paper metadata, abstracts, identifiers, and source refs as
+bounded research-paper evidence. This capability does not fetch hidden full text
+and does not prove a scientific claim by itself.
+
+## Owner
+
+- Capability id: `scholarly-research.lookup_papers`
+- Panel: `scholarly-research`
+- Action id: `lookup_papers`
+- Permission profile: `read`
+- Mode: read/observe
+
+## Inputs
+
+Required:
+
+- `query`
+
+Optional:
+
+- `mode`
+- `providers`
+- `limit`
+- `source_target_intent`
+- DOI or arXiv id aliases when the adapter supports them
+
+Blocked:
+
+- missing query
+- query too broad
+- prompt asking about the phrase `scholarly-research.lookup_papers`
+- claims that require paper full text when only metadata/abstracts are present
+
+## Observation
+
+Required observation fields:
+
+- `schema`: `helix.scholarly_research_observation.v1`
+- `capability_key`: `scholarly-research.lookup_papers`
+- `capability`: `scholarly-research.lookup_papers`
+- `query`
+- `intent`
+- `providers_considered`
+- `providers_called`
+- `evidence_refs`
+- `papers`
+- `missing_requirements`
+- `selected_for_answer`
+- `terminal_eligible=false`
+- `post_tool_model_step_required=true`
+- `assistant_answer=false`
+- `raw_content_included=false`
+
+Provider gaps must appear as missing/blocked evidence, not as proof.
+
+## Host Projection
+
+Allowed metadata:
+
+```txt
+support_refs
+tool_output_refs
+```
+
+Future panel affordances may open a paper result only when a structured paper id,
+DOI, arXiv id, URL, or evidence ref is present.
+
+## Visible Trace
+
+```txt
+Tool request: scholarly-research.lookup_papers
+Tool observation: scholarly lookup returned bounded paper evidence or missing-provider evidence
+Model re-entry
+Final answer or typed failure
+```
+
+## Tests
+
+Required stable tests:
+
+- specific query returns non-terminal paper evidence or a clear provider/missing
+  rail
+- missing query asks for a specific search target, DOI, or arXiv id
+- metadata-only results are not treated as full-text evidence
+- compound prompts can combine docs, calculator, theory, civilization, repo, and
+  scholarly observations without collapsing missing scholarly evidence into
+  proof

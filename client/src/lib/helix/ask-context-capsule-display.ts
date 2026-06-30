@@ -13,6 +13,36 @@ export const SESSION_CAPSULE_CONFIDENCE_LABEL: Record<SessionCapsuleConfidenceBa
   uncertain: "uncertain",
 };
 
+export function resolveSessionCapsuleConfidenceBand(
+  summary: ContextCapsuleSummary,
+): SessionCapsuleConfidenceBand {
+  if (
+    summary.convergence.proofPosture === "fail_closed" ||
+    summary.commit.proof_verdict === "FAIL" ||
+    summary.commit.certificate_integrity_ok === false
+  ) {
+    return "uncertain";
+  }
+  if (summary.convergence.proofPosture === "confirmed") {
+    return "reinforcing";
+  }
+  if (
+    summary.convergence.proofPosture === "reasoned" &&
+    (summary.commit.proof_verdict === "PASS" || summary.convergence.maturity === "certified")
+  ) {
+    return "reinforcing";
+  }
+  if (
+    summary.convergence.proofPosture === "reasoned" ||
+    summary.convergence.proofPosture === "hypothesis" ||
+    summary.convergence.maturity === "diagnostic" ||
+    summary.convergence.maturity === "certified"
+  ) {
+    return "building";
+  }
+  return "uncertain";
+}
+
 export function stripContextCapsuleTokensFromText(value: string): string {
   const ids = extractContextCapsuleIdsFromText(value);
   if (ids.length === 0) return value.trim();

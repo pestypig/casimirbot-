@@ -1,3 +1,5 @@
+import type { AskLiveEventEntry } from "@/lib/helix/ask-debug-event-display";
+
 function readRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   return value as Record<string, unknown>;
@@ -117,4 +119,32 @@ export function buildWorkstationInterpretingReceiptText(requestText: string, lan
   if (normalized.startsWith("pt")) return `Interpretando solicitaÃ§Ã£o do espaÃ§o de trabalho: ${requestText}`;
   if (normalized.startsWith("it")) return `Interpretazione della richiesta dell'area di lavoro: ${requestText}`;
   return `Interpreting workstation request: ${requestText}`;
+}
+
+export function isWorkstationLifecycleEvent(entry: AskLiveEventEntry): boolean {
+  const tool = (entry.tool ?? "").trim().toLowerCase();
+  if (!tool) return false;
+  if (tool === "helix.ask.fast_path") return true;
+  if (tool === "helix.observer.plan") return true;
+  if (tool.startsWith("workstation.")) return true;
+  const meta = readRecord(entry.meta ?? null);
+  const kind = typeof meta?.kind === "string" ? meta.kind.trim().toLowerCase() : "";
+  if (!kind) return false;
+  return kind.startsWith("workstation_") || kind.startsWith("job_") || kind.startsWith("observer_plan_");
+}
+
+export function buildObservationGroundedReplyText(entry: AskLiveEventEntry): { text: string; ok: boolean } | null {
+  const raw = String(entry.text ?? "").trim();
+  if (!raw) return null;
+  const failureMatch = raw.match(/^fail:\s*run panel action\s+[\w.-]+(?:\s*-\s*(.+))?$/i);
+  if (failureMatch) {
+    const message = failureMatch[1]?.trim() || "The workspace action failed.";
+    return { text: `Could not complete that workspace action: ${message}`, ok: false };
+  }
+  const successMatch = raw.match(/^ok:\s*run panel action\s+[\w.-]+(?:\s*-\s*(.+))?$/i);
+  if (successMatch) {
+    const message = successMatch[1]?.trim();
+    if (message) return { text: message, ok: true };
+  }
+  return null;
 }

@@ -23,7 +23,7 @@ function summarizeVoiceDebugText(source: string, maxChars = 220): string {
   return `${text.slice(0, Math.max(0, maxChars - 3)).trimEnd()}...`;
 }
 
-function safeJsonStringify(value: unknown, fallback = "Unable to render debug payload."): string {
+export function safeJsonStringify(value: unknown, fallback = "Unable to render debug payload."): string {
   const normalize = (input: unknown, stack: WeakSet<object>): unknown => {
     if (typeof input === "bigint") return input.toString();
     if (!input || typeof input !== "object") return input;
@@ -163,6 +163,23 @@ function readDisplayRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 }
 
+function readDisplayStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0);
+}
+
+function dedupeDisplayStrings(values: string[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const value of values) {
+    const key = value.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(value);
+  }
+  return out;
+}
+
 export function cleanHelixRenderedQuestionText(value: unknown): string | null {
   const cleaned = coerceDisplayText(value)
     .replace(/^\s*\d*\s*Question\s*question\s*/i, "")
@@ -187,6 +204,20 @@ export function normalizedDebugReplyText(value: unknown): string {
 
 export function isHelixAskProgressPlaceholderText(value: string | null | undefined): boolean {
   return coerceDisplayText(value).trim().toLowerCase() === HELIX_ASK_PROGRESS_PLACEHOLDER_TEXT.toLowerCase();
+}
+
+export function readHelixAskDebugContextFromMeta(meta: Record<string, unknown>): Record<string, unknown> | null {
+  const fromEnvelope = readDisplayRecord(meta.helixDebugContext);
+  if (fromEnvelope) return fromEnvelope;
+  const contextFiles = dedupeDisplayStrings([
+    ...readDisplayStringArray(meta.contextFiles),
+    ...readDisplayStringArray(meta.evidenceRefs),
+  ]);
+  if (contextFiles.length === 0) return null;
+  return {
+    contextFiles,
+    contextFileCount: contextFiles.length,
+  };
 }
 
 export function classifyCompactToolTraceAction(panelId: string | null, actionId: string | null) {

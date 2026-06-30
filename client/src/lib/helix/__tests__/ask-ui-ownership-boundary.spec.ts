@@ -9,6 +9,7 @@ describe("Helix Ask UI ownership boundaries", () => {
   it("keeps a human-readable ownership map for extracted modules and quarantined behavior", () => {
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
     for (const moduleName of [
+      "ask-agent-runtime-display.ts",
       "ask-answer-rendering.ts",
       "ask-active-turn-stream.ts",
       "ask-convergence-display.ts",
@@ -17,6 +18,7 @@ describe("Helix Ask UI ownership boundaries", () => {
       "ask-debug-event-display.ts",
       "ask-display-text.ts",
       "ask-envelope-copy.ts",
+      "../agi/debugExport.ts",
       "ask-goal-pill-display.ts",
       "ask-live-source-display.ts",
       "ask-observer-commentary-display.ts",
@@ -31,6 +33,7 @@ describe("Helix Ask UI ownership boundaries", () => {
       "ask-steering-queue-display.ts",
       "ask-terminal-projection.ts",
       "ask-turn-transcript.ts",
+      "ask-voice-capture-display.ts",
       "ask-voice-copy-display.ts",
       "ask-voice-text-display.ts",
     ]) {
@@ -51,9 +54,15 @@ describe("Helix Ask UI ownership boundaries", () => {
     for (const remainingCluster of [
       "Remaining Local Cluster Map",
       "Prompt interpretation and planner policy",
+      "Stage Play generated wake projection suppression",
       "Voice capture, STT, confirmation, continuation, and auto-dispatch",
+      "Voice playback audio runtime",
+      "Voice recorder runtime and MIME handling",
       "Voice brief pinning and speech suppression",
       "Ask request construction and attachment admission",
+      "Docs-viewer and workspace context snapshots",
+      "Agent runtime/provider controller wiring",
+      "Backend entrypoint and runtime authority guards",
       "Visible terminal and route authority",
       "Debug export and clipboard authority",
       "Legacy local Ask fallback",
@@ -75,6 +84,68 @@ describe("Helix Ask UI ownership boundaries", () => {
     ]) {
       expect(map).toContain(behaviorQueueItem);
     }
+  });
+
+  it("keeps pure debug drawer fallback formatting in the shared debug export module", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const debugExport = read("client/src/lib/agi/debugExport.ts");
+
+    expect(pill).toContain('from "@/lib/agi/debugExport"');
+    expect(pill).not.toContain("export function buildDebugExportDrawerFallbackResult");
+    expect(pill).not.toContain("type DebugExportUiResult =");
+    expect(debugExport).toContain("export function buildDebugExportDrawerFallbackResult");
+    expect(debugExport).toContain("export type DebugExportUiResult");
+    for (const localAnchor of [
+      "buildReplyScopedDebugExportFromRenderedReply",
+      "buildReplyScopedDebugExportFromRenderedButton",
+      "resolveAuthoritativeDebugExportPayload",
+      "copyDebugPayloadToClipboard",
+    ]) {
+      expect(pill).toContain(localAnchor);
+    }
+    expect(debugExport).not.toMatch(/from ["']react["']/);
+    expect(debugExport).not.toContain("@/store/");
+    expect(debugExport).not.toContain("@/components/helix/HelixAskPill");
+    expect(debugExport).not.toContain("navigator.clipboard.");
+    expect(debugExport).not.toContain(".writeText(");
+    expect(debugExport).not.toContain(".readText(");
+    expect(debugExport).not.toContain("document.querySelector");
+    expect(debugExport).not.toContain("fetch(");
+  });
+
+  it("keeps agent runtime provider display helpers in the non-React runtime display module", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const runtimeDisplay = read("client/src/lib/helix/ask-agent-runtime-display.ts");
+
+    expect(pill).toContain('from "@/lib/helix/ask-agent-runtime-display"');
+    for (const symbol of [
+      "DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS",
+      "formatHelixAgentRuntimeShortLabel",
+      "isHelixAgentRuntimeId",
+      "normalizeHelixAgentProvidersResponse",
+      "resolveHelixAskActualAgentProviderLabel",
+      "resolveNextSelectableHelixAgentRuntime",
+      "resolveSelectedHelixAgentRuntime",
+    ]) {
+      expect(runtimeDisplay).toContain(`export ${symbol.startsWith("DEFAULT_") ? "const" : "function"} ${symbol}`);
+    }
+    for (const localAnchor of [
+      "readStoredHelixAskAgentRuntime",
+      "persistHelixAskAgentRuntime",
+      "fetch(\"/api/agi/agent-providers\"",
+      "handleAgentRuntimeButtonClick",
+    ]) {
+      expect(pill).toContain(localAnchor);
+      expect(runtimeDisplay).not.toContain(localAnchor);
+    }
+    expect(runtimeDisplay).not.toMatch(/from ["']react["']/);
+    expect(runtimeDisplay).not.toContain("@/store/");
+    expect(runtimeDisplay).not.toContain("@/components/helix/HelixAskPill");
+    expect(runtimeDisplay).not.toContain("fetch(");
+    expect(runtimeDisplay).not.toContain("localStorage");
+    expect(runtimeDisplay).not.toContain("navigator.clipboard");
+    expect(runtimeDisplay).not.toContain("speakVoice");
+    expect(runtimeDisplay).not.toContain("runAskTurn");
   });
 
   it("keeps observer lifecycle event builders in the non-React observer event module", () => {
@@ -132,6 +203,7 @@ describe("Helix Ask UI ownership boundaries", () => {
 
     expect(pill).toContain('from "@/lib/helix/ask-turn-transcript"');
     for (const symbol of [
+      "buildAskLiveEventFromTurnTranscriptRecord",
       "buildHelixCausalTurnTraceRows",
       "buildHelixRuntimeAskLiveEvents",
       "buildHelixRuntimeTranscriptEvents",
@@ -185,6 +257,7 @@ describe("Helix Ask UI ownership boundaries", () => {
       "renderLiveAnswerEnvironmentContextPackAnswer",
       "renderTypedFailureFallback",
       "resolveHelixAskFinalAnswerPresentation",
+      "resolveHelixAskVisibleJobReadyLinks",
     ]) {
       expect(pill).not.toContain(`function ${symbol}`);
       expect(pill).not.toContain(`const ${symbol} =`);
@@ -328,6 +401,7 @@ describe("Helix Ask UI ownership boundaries", () => {
     for (const symbol of [
       "stripContextCapsuleTokensFromText",
       "resolveContextCapsulePalette",
+      "resolveSessionCapsuleConfidenceBand",
       "buildContextCapsuleCopyText",
       "buildContextCapsuleStampDataUri",
     ]) {
@@ -335,11 +409,12 @@ describe("Helix Ask UI ownership boundaries", () => {
       expect(contextCapsule).toContain(`export function ${symbol}`);
     }
     expect(pill).not.toContain("const SESSION_CAPSULE_CONFIDENCE_LABEL");
-    expect(pill).toContain("function resolveSessionCapsuleConfidenceBand");
     expect(contextCapsule).toContain("export const SESSION_CAPSULE_CONFIDENCE_LABEL");
     expect(contextCapsule).toContain("export type SessionCapsuleConfidenceBand");
-    expect(contextCapsule).not.toContain("resolveSessionCapsuleConfidenceBand");
     expect(contextCapsule).not.toContain("deriveSessionCapsuleState");
+    expect(pill).toContain("export function deriveSessionCapsuleState");
+    expect(pill).toContain("export function upsertContextCapsuleLedger");
+    expect(pill).toContain("export function buildSelectedContextCapsuleIds");
     expect(contextCapsule).not.toMatch(/from ["']react["']/);
     expect(contextCapsule).not.toContain("@/store/");
     expect(contextCapsule).not.toContain("@/components/helix/HelixAskPill");
@@ -360,8 +435,15 @@ describe("Helix Ask UI ownership boundaries", () => {
       "CONVERGENCE_MATURITY_LABEL",
     ]) {
       expect(pill).not.toContain(`const ${symbol}`);
+      expect(pill).not.toContain(`function ${symbol}`);
       expect(convergenceDisplay).toContain(`export const ${symbol}`);
     }
+    for (const symbol of ["buildConvergenceDebugSnapshot", "hasConvergenceStateChanged"]) {
+      expect(pill).not.toContain(`function ${symbol}`);
+      expect(convergenceDisplay).toContain(`export function ${symbol}`);
+    }
+    expect(convergenceDisplay).toContain("export function buildConvergenceDebugSnapshot");
+    expect(convergenceDisplay).toContain("export function hasConvergenceStateChanged");
     expect(pill).not.toContain("const CONVERGENCE_PHASE_ORDER");
     expect(pill).not.toContain("const CONVERGENCE_PHASE_LABEL");
     expect(pill).not.toContain("const CONVERGENCE_COLLAPSE_LABEL");
@@ -423,6 +505,7 @@ describe("Helix Ask UI ownership boundaries", () => {
       "cleanHelixRenderedFinalAnswerText",
       "normalizedDebugReplyText",
       "isHelixAskProgressPlaceholderText",
+      "readHelixAskDebugContextFromMeta",
       "classifyCompactToolTraceAction",
       "answerNoteForCompactToolTraceItems",
       "buildCompactToolTraceDisclosure",
@@ -525,6 +608,8 @@ describe("Helix Ask UI ownership boundaries", () => {
       "getWorkstationExecutingStatusText",
       "getWorkstationExecutedReplyText",
       "buildWorkstationInterpretingReceiptText",
+      "isWorkstationLifecycleEvent",
+      "buildObservationGroundedReplyText",
     ]) {
       expect(pill).not.toContain(`function ${symbol}`);
       expect(procedural).toContain(`export function ${symbol}`);
@@ -568,15 +653,23 @@ describe("Helix Ask UI ownership boundaries", () => {
 
     expect(pill).toContain('from "@/lib/helix/ask-read-aloud-display"');
     for (const symbol of [
+      "buildVoiceAutoSpeakUtteranceId",
       "resolveInitialMicArmState",
       "transitionReadAloudState",
       "shouldStopReadAloudOnButtonPress",
       "formatReadAloudButtonLabel",
+      "hashVoiceUtteranceKey",
+      "isInterimVoicePlaybackUtteranceKind",
+      "isManualVoicePlaybackUtterance",
+      "isMissionVoiceOutputModeEnabled",
+      "shouldEnableVoiceRollout",
     ]) {
       expect(pill).not.toContain(`function ${symbol}`);
       expect(pill).not.toContain(`export function ${symbol}`);
       expect(readAloud).toContain(`export function ${symbol}`);
     }
+    expect(pill).not.toContain("const VOICE_AUTO_SPEAK_UTTERANCE_ID_MAX_CHARS");
+    expect(readAloud).toContain("export const VOICE_AUTO_SPEAK_UTTERANCE_ID_MAX_CHARS");
     expect(readAloud).not.toMatch(/from ["']react["']/);
     expect(readAloud).not.toContain("@/store/");
     expect(readAloud).not.toContain("@/components/helix/HelixAskPill");
@@ -585,6 +678,52 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(readAloud).not.toContain("enqueueVoicePlaybackIntent");
     expect(readAloud).not.toContain("runAskTurn");
     expect(readAloud).not.toContain("fetch(");
+  });
+
+  it("keeps deterministic voice-capture signal predicates in the non-React voice capture display module", () => {
+    const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const voiceCapture = read("client/src/lib/helix/ask-voice-capture-display.ts");
+
+    expect(pill).toContain('from "@/lib/helix/ask-voice-capture-display"');
+    for (const symbol of [
+      "smoothVoiceLevel",
+      "isFlatVoiceSignal",
+      "isRecorderStalled",
+      "isLikelyLoopbackDeviceLabel",
+      "shouldPrimeSegmentWithContainerHeader",
+    ]) {
+      expect(pill).not.toContain(`function ${symbol}`);
+      expect(pill).not.toContain(`export function ${symbol}`);
+      expect(voiceCapture).toContain(`export function ${symbol}`);
+    }
+    for (const symbol of [
+      "VOICE_LEVEL_ATTACK_ALPHA",
+      "VOICE_LEVEL_RELEASE_ALPHA",
+      "VOICE_FLAT_SIGNAL_WINDOW_MS",
+      "VOICE_FLAT_SIGNAL_VARIANCE_THRESHOLD",
+      "VOICE_RECORDER_STALL_MS",
+    ]) {
+      expect(pill).not.toContain(`const ${symbol}`);
+      expect(voiceCapture).toContain(`export const ${symbol}`);
+    }
+    for (const localAnchor of [
+      "getMicRecorderMimeCandidates",
+      "pickSupportedMicRecorderMimeType",
+      "pickMicRecorderMimeType",
+      "MediaRecorder",
+      "transcribeVoice",
+    ]) {
+      expect(pill).toContain(localAnchor);
+      expect(voiceCapture).not.toContain(localAnchor);
+    }
+    expect(voiceCapture).not.toMatch(/from ["']react["']/);
+    expect(voiceCapture).not.toContain("@/store/");
+    expect(voiceCapture).not.toContain("@/components/helix/HelixAskPill");
+    expect(voiceCapture).not.toContain("navigator");
+    expect(voiceCapture).not.toContain("MediaRecorder");
+    expect(voiceCapture).not.toContain("fetch(");
+    expect(voiceCapture).not.toContain("speakVoice");
+    expect(voiceCapture).not.toContain("transcribeVoice");
   });
 
   it("keeps voice text cleanup and speech-copy formatting in the non-React voice text display module", () => {

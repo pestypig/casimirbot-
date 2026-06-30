@@ -20,10 +20,13 @@ import {
   buildActiveCalculatorContextWorkstationGatewayCallRequests,
   buildActiveDocsContextWorkstationGatewayCallRequests,
   buildActiveWorkstationContextGatewayCallRequests,
+  buildPromptDerivedCalculatorSolveGatewayCallRequests,
   buildPromptDerivedInternetSearchGatewayCallRequests,
   buildPromptDerivedScholarlyResearchGatewayCallRequests,
+  buildPromptNamedCapabilityGatewayCallRequests,
   buildStructuredAdmissionWorkstationGatewayCallRequests,
   buildPlannerDerivedWorkstationGatewayCallRequests,
+  readWorkstationGatewayCallRequestsForTurn,
   runExplicitWorkstationGatewayCalls,
 } from "../agent-providers/explicit-workstation-gateway";
 import { buildHelixProviderReasoningReentry } from "../agent-providers/provider-terminal-authority";
@@ -967,6 +970,90 @@ describe("Helix Ask agent provider selection", () => {
         raw_content_included: false,
       },
     });
+  });
+
+  it("derives prompt-named Codex calculator gateway calls before trailing answer instructions", async () => {
+    const body = {
+      turn_id: "ask:test:codex-prompt-named-calculator-smoke",
+      agent_runtime: "codex",
+      question:
+        "Codex UI validation smoke 2026-06-29 20:09: use the Helix workstation gateway capability scientific-calculator.solve_expression with expression 8*9. Answer with the observed expression and result.",
+    };
+
+    expect(buildPromptNamedCapabilityGatewayCallRequests(body)).toEqual([
+      expect.objectContaining({
+        schema: "helix.workstation_gateway.prompt_named_capability_call_request.v1",
+        derivation_source: "helix_prompt_named_capability",
+        capability_id: "scientific-calculator.solve_expression",
+        mode: "read",
+        arguments: expect.objectContaining({
+          expression: "8*9",
+          source_target_intent: expect.objectContaining({
+            target_source: "scientific_calculator",
+            target_kind: "calculator_solve",
+            expression: "8*9",
+          }),
+        }),
+      }),
+    ]);
+    expect(buildPromptDerivedCalculatorSolveGatewayCallRequests(body)).toEqual([
+      expect.objectContaining({
+        capability_id: "scientific-calculator.solve_expression",
+        arguments: expect.objectContaining({
+          expression: "8*9",
+        }),
+      }),
+    ]);
+
+    const results = await runExplicitWorkstationGatewayCalls({
+      body,
+      agentRuntime: "codex",
+    });
+
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({
+      ok: true,
+      agent_runtime: "codex",
+      capability_id: "scientific-calculator.solve_expression",
+      observation: {
+        schema: "helix.calculator_solve_observation.v1",
+        expression: "8*9",
+        result: "72",
+      },
+      observation_packet: {
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+  });
+
+  it("keeps explicit Codex docs.search plus repo.search prompts from admitting duplicate or adjacent tools", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "Use docs.search for docs/research/nhm2-current-status-whitepaper-2026-05-02.md with query claim boundary, then use repo.search for workstation_gateway. Distinguish document evidence from implementation evidence.",
+        workspace_context_snapshot: {
+          activePanel: "scientific-calculator",
+          focusedPanel: "scientific-calculator",
+          openPanels: ["docs-viewer", "scientific-calculator"],
+          activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          hasDocContext: true,
+        },
+      },
+    });
+
+    expect(requests.map((request) => (request as any).capability_id)).toEqual([
+      "docs.search",
+      "repo.search",
+    ]);
+    expect(requests.map((request) => (request as any).derivation_source)).toEqual([
+      "helix_prompt_named_capability",
+      "helix_prompt_named_capability",
+    ]);
   });
 
   it("materializes active docs-viewer context as a bounded docs observation for Codex", async () => {

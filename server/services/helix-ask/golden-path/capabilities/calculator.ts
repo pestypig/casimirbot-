@@ -30,6 +30,57 @@ export const isHelixAskGoldenPathCalculatorSolveRequested = (body: RecordLike): 
 const normalizeCalculatorExpression = (value: string): string =>
   value.trim().replace(/[;,.!?]+$/g, "").replace(/\s+/g, " ");
 
+const extractCalculatorMathTokenSequence = (value: string): string | null => {
+  const source = value.trim();
+  let start = -1;
+  for (let index = 0; index < source.length; index += 1) {
+    const rest = source.slice(index);
+    if (
+      /^[\d(]/.test(rest) ||
+      /^\.\d/.test(rest) ||
+      /^(?:sqrt|ln|log|sin|cos|tan|pi|e)\b/i.test(rest)
+    ) {
+      start = index;
+      break;
+    }
+  }
+  if (start < 0) return null;
+  let index = start;
+  let candidate = "";
+  while (index < source.length) {
+    const rest = source.slice(index);
+    const numberMatch = rest.match(/^\d+(?:\.\d+)?(?:e[+\-]?\d+)?|^\.\d+(?:e[+\-]?\d+)?/i);
+    if (numberMatch?.[0]) {
+      candidate += numberMatch[0];
+      index += numberMatch[0].length;
+      continue;
+    }
+    const wordMatch = rest.match(/^(?:sqrt|ln|log|sin|cos|tan|pi|e)\b/i);
+    if (wordMatch?.[0]) {
+      candidate += wordMatch[0];
+      index += wordMatch[0].length;
+      continue;
+    }
+    const char = source[index] ?? "";
+    if (/[()+\-*/^%,]/.test(char)) {
+      candidate += char;
+      index += 1;
+      continue;
+    }
+    if (/\s/.test(char)) {
+      candidate += char;
+      index += 1;
+      continue;
+    }
+    break;
+  }
+  const expression = normalizeCalculatorExpression(candidate);
+  return /\d|\b(?:sqrt|ln|log|sin|cos|tan|pi|e)\b/i.test(expression) &&
+    /[+\-*/^%()]|\b(?:sqrt|ln|log|sin|cos|tan)\b/i.test(expression)
+    ? expression
+    : null;
+};
+
 const extractNaturalCalculatorExpression = (value: string): string | null => {
   const normalized = normalizeCalculatorExpression(value)
     .replace(/\bhelix_ask_golden_path_runtime\b/gi, " ")
@@ -37,11 +88,19 @@ const extractNaturalCalculatorExpression = (value: string): string | null => {
     .replace(/\bscientific-calculator\.solve_expression\b/gi, " ")
     .replace(/\b(?:please|can you|could you|would you)\b/gi, " ")
     .trim();
+  const cueMatch = normalized.match(
+    /\b(?:with\s+this\s+exact\s+expression|with\s+expression|this\s+exact\s+expression|expression\s+is|calculate|evaluate|compute|solve|expression|with)\b\s*:?\s*([\s\S]+)$/i,
+  );
+  const boundedCueExpression = cueMatch?.[1] ? extractCalculatorMathTokenSequence(cueMatch[1]) : null;
+  if (boundedCueExpression) return boundedCueExpression;
+  const boundedExpression = extractCalculatorMathTokenSequence(normalized);
+  if (boundedExpression) return boundedExpression;
   const afterIntent = normalized.match(
     /\b(?:calculate|evaluate|compute|solve|expression(?:\s+is)?|with)\b\s*:?\s*([0-9eEpiPI().+\-*/^%,\s]+)$/i,
   );
   const candidate = afterIntent?.[1] ?? normalized.match(/([0-9eEpiPI().+\-*/^%,\s]{3,})$/i)?.[1];
-  return candidate ? normalizeCalculatorExpression(candidate) : null;
+  if (candidate) return normalizeCalculatorExpression(candidate);
+  return null;
 };
 
 export const readCalculatorExpression = (body: RecordLike): string | null => {
@@ -54,7 +113,9 @@ export const readCalculatorExpression = (body: RecordLike): string | null => {
   if (direct) return normalizeCalculatorExpression(direct);
   const prompt = readHelixAskGoldenPathPrompt(body);
   const exactMatch = prompt.match(/\b(?:exact\s+)?expression\s*:\s*([^\n\r]+)/i);
-  if (exactMatch?.[1]) return normalizeCalculatorExpression(exactMatch[1]);
+  if (exactMatch?.[1]) {
+    return extractNaturalCalculatorExpression(exactMatch[1]) ?? normalizeCalculatorExpression(exactMatch[1]);
+  }
   const capabilityMatch = prompt.match(
     /scientific-calculator\.solve_expression(?:\s+with)?(?:\s+this\s+exact\s+expression)?\s*:?\s*([^\n\r]+)/i,
   );

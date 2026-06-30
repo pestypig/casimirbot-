@@ -3,6 +3,7 @@ import {
   SESSION_CAPSULE_CONFIDENCE_LABEL,
   buildContextCapsuleCopyText,
   buildContextCapsuleStampDataUri,
+  resolveSessionCapsuleConfidenceBand,
   resolveContextCapsulePalette,
   stripContextCapsuleTokensFromText,
 } from "@/lib/helix/ask-context-capsule-display";
@@ -39,6 +40,46 @@ describe("Helix Ask context capsule display", () => {
       building: "building",
       uncertain: "uncertain",
     });
+  });
+
+  it("resolves session capsule confidence bands from proof posture and certificate state", () => {
+    const summary = {
+      convergence: {
+        proofPosture: "confirmed",
+        maturity: "diagnostic",
+      },
+      commit: {
+        proof_verdict: "UNKNOWN",
+        certificate_integrity_ok: null,
+      },
+    } as ContextCapsuleSummary;
+
+    expect(resolveSessionCapsuleConfidenceBand(summary)).toBe("reinforcing");
+    expect(
+      resolveSessionCapsuleConfidenceBand({
+        ...summary,
+        convergence: { ...summary.convergence, proofPosture: "reasoned" },
+        commit: { ...summary.commit, proof_verdict: "PASS" },
+      } as ContextCapsuleSummary),
+    ).toBe("reinforcing");
+    expect(
+      resolveSessionCapsuleConfidenceBand({
+        ...summary,
+        convergence: { ...summary.convergence, proofPosture: "hypothesis" },
+      } as ContextCapsuleSummary),
+    ).toBe("building");
+    expect(
+      resolveSessionCapsuleConfidenceBand({
+        ...summary,
+        convergence: { ...summary.convergence, proofPosture: "fail_closed" },
+      } as ContextCapsuleSummary),
+    ).toBe("uncertain");
+    expect(
+      resolveSessionCapsuleConfidenceBand({
+        ...summary,
+        commit: { ...summary.commit, certificate_integrity_ok: false },
+      } as ContextCapsuleSummary),
+    ).toBe("uncertain");
   });
 
   it("builds compact context capsule copy text from stamp and convergence summary", () => {

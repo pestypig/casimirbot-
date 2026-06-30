@@ -15,6 +15,7 @@ import {
   parseHelixAskQueuedQuestionsInput,
   readAskLiveEventIdentity,
   readEventMetaString,
+  readHelixAskDebugContextFromMeta,
   resolveAskLiveEventTimestampMs,
   type AskLiveEventEntry,
 } from "@/lib/helix/ask-debug-event-display";
@@ -140,6 +141,22 @@ describe("Helix Ask debug event display", () => {
     expect(isHelixAskProgressPlaceholderText(" reasoning in progress... ")).toBe(true);
     expect(isHelixAskProgressPlaceholderText("Reasoning complete.")).toBe(false);
     expect(isHelixAskProgressPlaceholderText(null)).toBe(false);
+  });
+
+  it("reads debug context from event metadata without choosing a debug export target", () => {
+    const envelope = { contextFiles: ["docs/current.md"], contextFileCount: 1, source: "server" };
+
+    expect(readHelixAskDebugContextFromMeta({ helixDebugContext: envelope })).toBe(envelope);
+    expect(
+      readHelixAskDebugContextFromMeta({
+        contextFiles: ["docs/current.md", "docs/current.md", "docs/Other.md"],
+        evidenceRefs: ["docs/current.md", "docs/other.md", 42],
+      }),
+    ).toEqual({
+      contextFiles: ["docs/current.md", "docs/Other.md"],
+      contextFileCount: 2,
+    });
+    expect(readHelixAskDebugContextFromMeta({ contextFiles: [], evidenceRefs: [42] })).toBeNull();
   });
 
   it("builds compact tool trace disclosure copy without owning debug export authority", () => {

@@ -5,6 +5,7 @@ import {
   normalizeTerminalAnswerText,
   readHelixTopLevelPendingServerRequest,
   renderLiveAnswerEnvironmentContextPackAnswer,
+  resolveHelixAskVisibleJobReadyLinks,
 } from "@/lib/helix/ask-terminal-projection";
 
 describe("Helix Ask terminal projection", () => {
@@ -102,5 +103,36 @@ describe("Helix Ask terminal projection", () => {
     expect(visible.primary_source_label).not.toBe("typed failure");
     expect(visible.terminal_error_code).toBeNull();
     expect(visible.selected_final_answer).toBe("Observed expression: 8*9\nResult: 72");
+  });
+
+  it("hides job-ready links on failure terminals and keeps valid links on successful turns", () => {
+    const link = {
+      label: "Open note: Stage Play Live-Source Findings",
+      panel_id: "workstation-notes",
+      action_id: "set_active_note",
+      args: { title: "Stage Play Live-Source Findings" },
+    };
+
+    expect(
+      resolveHelixAskVisibleJobReadyLinks({
+        id: "turn-note-link-typed-failure",
+        final_answer_source: "typed_failure",
+        terminal_artifact_kind: "typed_failure",
+        debug: {
+          job_ready_links: [link],
+        },
+      }),
+    ).toEqual([]);
+
+    expect(
+      resolveHelixAskVisibleJobReadyLinks({
+        id: "turn-note-link-success",
+        final_answer_source: "final_answer_draft",
+        terminal_artifact_kind: "model_synthesized_answer",
+        debug: {
+          job_ready_links: [link, { panel_id: "missing-action" }, "ignored"],
+        },
+      }),
+    ).toEqual([link]);
   });
 });

@@ -42,6 +42,10 @@ import {
   type VoiceCommandLaneEnvelope,
   type ToolLogEvent,
 } from "@/lib/agi/api";
+import {
+  buildDebugExportDrawerFallbackResult,
+  type DebugExportUiResult,
+} from "@/lib/agi/debugExport";
 import { buildHelixAskClientBypassAudit, buildWorkspaceActionClientAckSnapshot } from "@/lib/agi/workspaceActionAck";
 import { useAgiChatStore, type ChatMessage, type ChatSession } from "@/store/useAgiChatStore";
 import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
@@ -50,6 +54,24 @@ import { classifyMoodFromWhisper } from "@/lib/luma-mood-spectrum";
 import { LUMA_MOOD_ORDER, resolveMoodAsset, type LumaMood } from "@/lib/luma-moods";
 import { broadcastLumaMood } from "@/lib/luma-mood-theme";
 import { LUMA_MOOD_PALETTE } from "@/lib/helix/ask-luma-mood-display";
+import {
+  DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS,
+  formatHelixAgentRuntimeShortLabel,
+  isHelixAgentRuntimeId,
+  normalizeHelixAgentProvidersResponse,
+  resolveHelixAskActualAgentProviderLabel,
+  resolveNextSelectableHelixAgentRuntime,
+  resolveSelectedHelixAgentRuntime,
+} from "@/lib/helix/ask-agent-runtime-display";
+export {
+  DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS,
+  formatHelixAgentRuntimeShortLabel,
+  isHelixAgentRuntimeId,
+  normalizeHelixAgentProvidersResponse,
+  resolveHelixAskActualAgentProviderLabel,
+  resolveNextSelectableHelixAgentRuntime,
+  resolveSelectedHelixAgentRuntime,
+};
 import { reportClientError } from "@/lib/observability/client-error";
 import {
   HELIX_ASK_PROMPT_EVENT,
@@ -195,6 +217,7 @@ import {
   parseHelixAskQueuedQuestionsInput,
   readAskLiveEventIdentity,
   readEventMetaString,
+  readHelixAskDebugContextFromMeta,
   resolveAskLiveEventTimestampMs,
   type AskLiveEventEntry,
 } from "@/lib/helix/ask-debug-event-display";
@@ -210,16 +233,19 @@ import {
 } from "@/lib/helix/ask-status-classnames";
 import {
   buildWorkstationInterpretingReceiptText,
+  buildObservationGroundedReplyText,
   formatWorkstationIntentStageDetail,
   getWorkstationExecutedReplyText,
   getWorkstationExecutingStatusText,
   getWorkstationInterpretingStatusText,
+  isWorkstationLifecycleEvent,
   readProceduralActionLabel,
 } from "@/lib/helix/ask-procedural-display";
 import {
   SESSION_CAPSULE_CONFIDENCE_LABEL,
   buildContextCapsuleCopyText,
   buildContextCapsuleStampDataUri,
+  resolveSessionCapsuleConfidenceBand,
   resolveContextCapsulePalette,
   stripContextCapsuleTokensFromText,
   type SessionCapsuleConfidenceBand,
@@ -234,16 +260,28 @@ import {
 } from "@/lib/helix/ask-goal-pill-display";
 import { humanizeAskLiveEventToken } from "@/lib/helix/ask-display-text";
 import {
+  buildVoiceAutoSpeakUtteranceId,
   formatReadAloudButtonLabel,
+  hashVoiceUtteranceKey,
+  isInterimVoicePlaybackUtteranceKind,
+  isManualVoicePlaybackUtterance,
+  isMissionVoiceOutputModeEnabled,
   resolveInitialMicArmState,
+  shouldEnableVoiceRollout,
   shouldStopReadAloudOnButtonPress,
   transitionReadAloudState,
   type MicArmState,
   type ReadAloudPlaybackState,
 } from "@/lib/helix/ask-read-aloud-display";
 export {
+  buildVoiceAutoSpeakUtteranceId,
   formatReadAloudButtonLabel,
+  hashVoiceUtteranceKey,
+  isInterimVoicePlaybackUtteranceKind,
+  isManualVoicePlaybackUtterance,
+  isMissionVoiceOutputModeEnabled,
   resolveInitialMicArmState,
+  shouldEnableVoiceRollout,
   shouldStopReadAloudOnButtonPress,
   transitionReadAloudState,
 };
@@ -261,6 +299,15 @@ import {
   stripVoiceCitationArtifacts,
   summarizeVoiceDebugText,
 } from "@/lib/helix/ask-voice-text-display";
+import {
+  VOICE_FLAT_SIGNAL_VARIANCE_THRESHOLD,
+  VOICE_FLAT_SIGNAL_WINDOW_MS,
+  isLikelyLoopbackDeviceLabel,
+  isFlatVoiceSignal,
+  isRecorderStalled,
+  shouldPrimeSegmentWithContainerHeader,
+  smoothVoiceLevel,
+} from "@/lib/helix/ask-voice-capture-display";
 import {
   buildVoiceInputStatusLabel,
   composeVoiceBriefWithDecision,
@@ -286,9 +333,17 @@ export {
   sanitizeReasoningOutputText,
   stripVoiceCitationArtifacts,
 };
+export {
+  isLikelyLoopbackDeviceLabel,
+  isFlatVoiceSignal,
+  isRecorderStalled,
+  shouldPrimeSegmentWithContainerHeader,
+  smoothVoiceLevel,
+};
 export type { VoiceDecisionLifecycle } from "@/lib/helix/ask-voice-copy-display";
 import {
   buildHelixCausalTurnTraceRows,
+  buildAskLiveEventFromTurnTranscriptRecord,
   buildHelixRuntimeAskLiveEvents,
   buildHelixRuntimeTranscriptEvents,
   buildHelixTurnTranscriptRows,
@@ -299,6 +354,7 @@ import {
   type HelixTurnTranscriptRow,
 } from "@/lib/helix/ask-turn-transcript";
 export {
+  buildAskLiveEventFromTurnTranscriptRecord,
   buildHelixCausalTurnTraceRows,
   buildHelixRuntimeAskLiveEvents,
   buildHelixRuntimeTranscriptEvents,
@@ -328,6 +384,7 @@ import {
   readHelixAskFinalAnswerSourceLabel,
   renderLiveAnswerEnvironmentContextPackAnswer,
   renderTypedFailureFallback,
+  resolveHelixAskVisibleJobReadyLinks,
   resolveHelixAskFinalAnswerPresentation,
   type HelixAskFinalAnswerPresentation,
   type VisibleResolvedTurn,
@@ -338,6 +395,7 @@ export {
   isInvalidTerminalAnswerText,
   normalizeTerminalAnswerText,
   readHelixAskFinalAnswerSourceLabel,
+  resolveHelixAskVisibleJobReadyLinks,
   renderTypedFailureFallback,
   resolveHelixAskFinalAnswerPresentation,
 };
@@ -499,13 +557,14 @@ import {
 import {
   deriveConvergenceStripState,
   type ConvergenceCollapseEvent,
-  type ConvergenceDebug,
   type ConvergenceStripState,
 } from "@/lib/helix/reasoning-theater-convergence";
 import {
   CONVERGENCE_MATURITY_LABEL,
   CONVERGENCE_PROOF_LABEL,
   CONVERGENCE_SOURCE_LABEL,
+  buildConvergenceDebugSnapshot,
+  hasConvergenceStateChanged,
 } from "@/lib/helix/ask-convergence-display";
 import {
   buildReasoningBattleAmbientState,
@@ -576,31 +635,6 @@ import { useWorkstationNotesStore } from "@/store/useWorkstationNotesStore";
 type HelixAskVisualCaptureRoute = "live_answer" | "image_lens" | "audio_transcript";
 
 const HELIX_ASK_AGENT_RUNTIME_STORAGE_KEY = "helix.ask.agentRuntime.v1";
-const DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS: HelixAgentRuntimeDescriptor[] = [
-  {
-    id: "helix",
-    label: "Helix Ask Native",
-    enabled: true,
-    experimental: false,
-    permission_profile: {
-      id: "helix-native",
-      label: "Helix native governed runtime",
-      allows: {
-        observe: true,
-        read: true,
-        act: true,
-        write: false,
-        shell: false,
-        codeMutation: false,
-      },
-    },
-    supports: {
-      streaming: true,
-      workstationTools: true,
-      codeMutation: false,
-    },
-  },
-];
 const HELIX_LIVE_ANSWER_VISUAL_CAPTURE_ROUTE_STORAGE_KEY = "helix.liveAnswer.visualCaptureRoutes.v1";
 const HELIX_LIVE_ANSWER_VISUAL_CAPTURE_ROUTE_SYNC_EVENT = "helix:live-answer:visual-capture-routes";
 const HELIX_ASK_THREAD_ID = "helix-ask:desktop";
@@ -634,7 +668,6 @@ function syncHelixAskVisualCaptureRoutePreference(includeAudio: boolean): HelixA
 const HELIX_ASK_CONTEXT_RESUME_FRAME_STORAGE_KEY = "helix.ask.contextResumeFrame.v1";
 const HELIX_ASK_DURABLE_TRANSCRIPT_LIMIT = 80;
 
-const VOICE_AUTO_SPEAK_UTTERANCE_ID_MAX_CHARS = 180;
 const MOBILE_AUDIO_UNLOCK_DATA_URI =
   "data:audio/wav;base64,UklGRsQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YaAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 const MOBILE_AUDIO_USER_AGENT_PATTERN =
@@ -1525,24 +1558,6 @@ function claimExternalPromptSingleFlight(claimId: string): boolean {
   return true;
 }
 
-export function shouldEnableVoiceRollout(args: {
-  enabled: boolean;
-  killSwitch: boolean;
-  activePercent: number;
-  key: string;
-}): boolean {
-  if (!args.enabled || args.killSwitch) return false;
-  const percent = Math.max(0, Math.min(100, Math.round(args.activePercent)));
-  if (percent <= 0) return false;
-  if (percent >= 100) return true;
-  let hash = 2166136261;
-  for (let i = 0; i < args.key.length; i += 1) {
-    hash ^= args.key.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return (hash >>> 0) % 100 < percent;
-}
-
 function isLikelyIOSDesktopModeUserAgent(userAgent?: string): boolean {
   const ua = (userAgent ?? "").trim();
   if (!ua) return false;
@@ -1677,31 +1692,6 @@ function isLikelyIdeologyDomainLeak(args: {
     if (overlap >= 2) return false;
   }
   return true;
-}
-
-function hashVoiceUtteranceKey(source: string): string {
-  let hash = 2166136261;
-  for (let i = 0; i < source.length; i += 1) {
-    hash ^= source.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return (hash >>> 0).toString(16).padStart(8, "0");
-}
-
-function buildVoiceAutoSpeakUtteranceId(parts: Array<string | undefined | null>): string {
-  const normalized = parts
-    .map((part) => (part ?? "").trim())
-    .filter(Boolean)
-    .join(":");
-  if (!normalized) {
-    return `utt:${crypto.randomUUID()}`;
-  }
-  if (normalized.length <= VOICE_AUTO_SPEAK_UTTERANCE_ID_MAX_CHARS) {
-    return normalized;
-  }
-  const digest = hashVoiceUtteranceKey(normalized);
-  const headMax = Math.max(24, VOICE_AUTO_SPEAK_UTTERANCE_ID_MAX_CHARS - digest.length - 1);
-  return `${normalized.slice(0, headMax)}:${digest}`;
 }
 
 export function isActivePlayback(audio: HTMLAudioElement | null, active: HTMLAudioElement): boolean {
@@ -2482,27 +2472,10 @@ export function collectInterimVoiceCalloutPlaybackIntents(input: {
   return intents;
 }
 
-function isManualVoicePlaybackUtterance(utterance: Pick<VoicePlaybackUtterance, "kind" | "source"> | null | undefined): boolean {
-  return utterance?.kind === "manual_read_aloud" || utterance?.source === "manual";
-}
-
-function isInterimVoicePlaybackUtteranceKind(kind: VoicePlaybackUtteranceKind): boolean {
-  return (
-    kind === "tool_receipt" ||
-    kind === "translation_relay" ||
-    kind === "narrator_read" ||
-    kind === "panel_narration"
-  );
-}
-
 function canPlayVoiceUtteranceWithMicOff(
   utterance: Pick<VoicePlaybackUtterance, "kind" | "source" | "allowMicOffPlayback"> | null | undefined,
 ): boolean {
   return isManualVoicePlaybackUtterance(utterance) || utterance?.allowMicOffPlayback === true;
-}
-
-function isMissionVoiceOutputModeEnabled(voiceMode: string | null | undefined): boolean {
-  return voiceMode === "normal";
 }
 
 type VoiceUtteranceTimelineMeta = {
@@ -2953,12 +2926,6 @@ const VOICE_CAPTURE_CHECKPOINT_LABEL: Record<VoiceCaptureCheckpointKey, string> 
   dispatch_completed: "dispatch completed",
 };
 
-const VOICE_LEVEL_ATTACK_ALPHA = 0.55;
-const VOICE_LEVEL_RELEASE_ALPHA = 0.18;
-const VOICE_FLAT_SIGNAL_WINDOW_MS = 3000;
-const VOICE_FLAT_SIGNAL_VARIANCE_THRESHOLD = 0.0016;
-const VOICE_RECORDER_STALL_MS = 1200;
-
 const MIC_PERSIST_KEY = "helix.ask.micCaptureEnabled.v1";
 const MIC_SPEECH_START_MS = 120;
 const MIC_SOFT_PAUSE_MS = 450;
@@ -3140,36 +3107,6 @@ const CONTEXT_CAPSULE_PROOF_VERDICT_SCORE: Record<ContextCapsuleSummary["commit"
   UNKNOWN: 2,
   FAIL: 1,
 };
-
-function resolveSessionCapsuleConfidenceBand(
-  summary: ContextCapsuleSummary,
-): SessionCapsuleConfidenceBand {
-  if (
-    summary.convergence.proofPosture === "fail_closed" ||
-    summary.commit.proof_verdict === "FAIL" ||
-    summary.commit.certificate_integrity_ok === false
-  ) {
-    return "uncertain";
-  }
-  if (summary.convergence.proofPosture === "confirmed") {
-    return "reinforcing";
-  }
-  if (
-    summary.convergence.proofPosture === "reasoned" &&
-    (summary.commit.proof_verdict === "PASS" || summary.convergence.maturity === "certified")
-  ) {
-    return "reinforcing";
-  }
-  if (
-    summary.convergence.proofPosture === "reasoned" ||
-    summary.convergence.proofPosture === "hypothesis" ||
-    summary.convergence.maturity === "diagnostic" ||
-    summary.convergence.maturity === "certified"
-  ) {
-    return "building";
-  }
-  return "uncertain";
-}
 
 export function deriveSessionCapsuleState(
   entries: ContextCapsuleLedgerEntry[],
@@ -3382,59 +3319,6 @@ export function buildLatestWinsContextCapsuleIds(args: {
     }
   }
   return out.slice(0, maxIds);
-}
-
-export function smoothVoiceLevel(
-  previous: number,
-  nextRaw: number,
-  attack = VOICE_LEVEL_ATTACK_ALPHA,
-  release = VOICE_LEVEL_RELEASE_ALPHA,
-): number {
-  const prev = clamp01(previous);
-  const next = clamp01(nextRaw);
-  const alpha = clampNumber(next >= prev ? attack : release, 0, 1);
-  return clamp01(prev + (next - prev) * alpha);
-}
-
-export function isFlatVoiceSignal(
-  variance: number,
-  elapsedMs: number,
-  threshold = VOICE_FLAT_SIGNAL_VARIANCE_THRESHOLD,
-  windowMs = VOICE_FLAT_SIGNAL_WINDOW_MS,
-): boolean {
-  return variance <= threshold && elapsedMs >= windowMs;
-}
-
-export function isRecorderStalled(params: {
-  recorderActive: boolean;
-  nowMs: number;
-  recorderStartedAtMs: number | null;
-  lastChunkAtMs: number | null;
-  stallMs?: number;
-}): boolean {
-  const stallMs = params.stallMs ?? VOICE_RECORDER_STALL_MS;
-  if (!params.recorderActive) return false;
-  const referenceMs = params.lastChunkAtMs ?? params.recorderStartedAtMs;
-  if (referenceMs === null) return false;
-  return params.nowMs - referenceMs >= stallMs;
-}
-
-export function isLikelyLoopbackDeviceLabel(label: string): boolean {
-  return /\b(output|loopback|stereo mix|vb-audio|voicemeeter|what u hear)\b/i.test(label.trim());
-}
-
-export function shouldPrimeSegmentWithContainerHeader(params: {
-  segmentStartIndex: number;
-  mimeType?: string | null;
-  hasHeaderChunk: boolean;
-}): boolean {
-  if (!params.hasHeaderChunk) return false;
-  if (params.segmentStartIndex <= 0) return false;
-  const normalized = (params.mimeType ?? "").trim().toLowerCase();
-  if (!normalized) return false;
-  // WebM/Ogg slices can lose container init data and benefit from header priming.
-  // MP4-family slices are more fragile when concatenated with a primed header.
-  return normalized.includes("webm") || normalized.includes("ogg");
 }
 
 export function getMicRecorderMimeCandidates(userAgent?: string): string[] {
@@ -6499,10 +6383,6 @@ function coerceText(value: unknown): string {
   }
 }
 
-function isHelixAgentRuntimeId(value: unknown): value is HelixAgentRuntimeId {
-  return value === "helix" || value === "codex" || value === "future";
-}
-
 function readStoredHelixAskAgentRuntime(): HelixAgentRuntimeId {
   if (typeof window === "undefined") return "helix";
   try {
@@ -6520,177 +6400,6 @@ function persistHelixAskAgentRuntime(value: HelixAgentRuntimeId): void {
   } catch {
     // Local storage can be unavailable in embedded or test contexts.
   }
-}
-
-function normalizeHelixAgentProvider(value: unknown): HelixAgentRuntimeDescriptor | null {
-  const record = readAgentLoopAuditRecord(value);
-  if (!record || !isHelixAgentRuntimeId(record.id)) return null;
-  const supports = readAgentLoopAuditRecord(record.supports);
-  const permissionProfile = readAgentLoopAuditRecord(record.permission_profile);
-  const permissionAllows = readAgentLoopAuditRecord(permissionProfile?.allows);
-  const fallbackPermissionProfile = record.id === "codex" || record.id === "future"
-    ? {
-        id: "read-observe" as const,
-        label: "Read/observe only",
-        allows: {
-          observe: true,
-          read: true,
-          act: false,
-          write: false,
-          shell: false,
-          codeMutation: false,
-        },
-    }
-    : DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS[0].permission_profile;
-  const fallbackLabel =
-    record.id === "codex"
-      ? "Codex Workstation Mode"
-      : record.id === "future"
-        ? "Future Agent Wrapper"
-        : "Helix Ask Native";
-  return {
-    id: record.id,
-    label: coerceText(record.label).trim() || fallbackLabel,
-    enabled: record.enabled === true,
-    experimental: record.experimental === true,
-    permission_profile: {
-      id: permissionProfile?.id === "read-observe" ||
-        permissionProfile?.id === "read-observe-act" ||
-        permissionProfile?.id === "helix-native"
-        ? permissionProfile.id
-        : fallbackPermissionProfile.id,
-      label: coerceText(permissionProfile?.label).trim() || fallbackPermissionProfile.label,
-      allows: {
-        observe: typeof permissionAllows?.observe === "boolean" ? permissionAllows.observe : fallbackPermissionProfile.allows.observe,
-        read: typeof permissionAllows?.read === "boolean" ? permissionAllows.read : fallbackPermissionProfile.allows.read,
-        act: typeof permissionAllows?.act === "boolean" ? permissionAllows.act : fallbackPermissionProfile.allows.act,
-        write: typeof permissionAllows?.write === "boolean" ? permissionAllows.write : fallbackPermissionProfile.allows.write,
-        shell: typeof permissionAllows?.shell === "boolean" ? permissionAllows.shell : fallbackPermissionProfile.allows.shell,
-        codeMutation: typeof permissionAllows?.codeMutation === "boolean"
-          ? permissionAllows.codeMutation
-          : fallbackPermissionProfile.allows.codeMutation,
-      },
-    },
-    supports: {
-      streaming: supports?.streaming === true,
-      workstationTools: supports?.workstationTools === true,
-      codeMutation: supports?.codeMutation === true,
-    },
-  };
-}
-
-export function normalizeHelixAgentProvidersResponse(value: unknown): HelixAgentRuntimeDescriptor[] {
-  const record = readAgentLoopAuditRecord(value);
-  const rawProviders: unknown[] = Array.isArray(record?.providers)
-    ? record.providers
-    : Array.isArray(value)
-      ? value
-      : [];
-  const providers = rawProviders
-    .map((entry: unknown) => normalizeHelixAgentProvider(entry))
-    .filter((entry: HelixAgentRuntimeDescriptor | null): entry is HelixAgentRuntimeDescriptor => Boolean(entry));
-  const hasHelix = providers.some((provider: HelixAgentRuntimeDescriptor) => provider.id === "helix");
-  return hasHelix ? providers : [...DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS, ...providers];
-}
-
-export function resolveSelectedHelixAgentRuntime(
-  requested: unknown,
-  providers: HelixAgentRuntimeDescriptor[],
-): HelixAgentRuntimeId {
-  const candidate = isHelixAgentRuntimeId(requested) ? requested : "helix";
-  const provider = providers.find((entry: HelixAgentRuntimeDescriptor) => entry.id === candidate);
-  if (provider?.enabled) return provider.id;
-  return "helix";
-}
-
-export function resolveNextSelectableHelixAgentRuntime(
-  current: unknown,
-  providers: HelixAgentRuntimeDescriptor[],
-): HelixAgentRuntimeId {
-  const enabledProviders = providers.filter((provider) => provider.enabled);
-  if (enabledProviders.length === 0) return "helix";
-  const currentRuntime = resolveSelectedHelixAgentRuntime(current, providers);
-  const currentIndex = enabledProviders.findIndex((provider) => provider.id === currentRuntime);
-  const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % enabledProviders.length : 0;
-  return enabledProviders[nextIndex]?.id ?? "helix";
-}
-
-export function formatHelixAgentRuntimeShortLabel(provider: HelixAgentRuntimeDescriptor | null | undefined): string {
-  if (provider?.id === "codex") return "Codex";
-  if (provider?.id === "future") return "Future";
-  return "Helix";
-}
-
-export function resolveHelixAskActualAgentProviderLabel(
-  response: unknown,
-  fallbackProviders: HelixAgentRuntimeDescriptor[] = DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS,
-): string | null {
-  const record = readAgentLoopAuditRecord(response);
-  const debug = readAgentLoopAuditRecord(record?.debug);
-  const selectedProvider =
-    readAgentLoopAuditRecord(record?.selected_agent_provider) ??
-    readAgentLoopAuditRecord(debug?.selected_agent_provider);
-  const selectedProviderId = selectedProvider?.id;
-  const runtime = isHelixAgentRuntimeId(record?.agent_runtime)
-    ? record?.agent_runtime
-    : isHelixAgentRuntimeId(debug?.agent_runtime)
-      ? debug?.agent_runtime
-      : isHelixAgentRuntimeId(selectedProviderId)
-        ? selectedProviderId
-        : null;
-  if (!runtime) return null;
-  const explicitLabel = coerceText(selectedProvider?.label).trim();
-  if (explicitLabel) return `Provider: ${explicitLabel}`;
-  const provider = fallbackProviders.find((entry: HelixAgentRuntimeDescriptor) => entry.id === runtime);
-  const fallbackLabel =
-    runtime === "codex"
-      ? "Codex Workstation Mode"
-      : runtime === "future"
-        ? "Future Agent Wrapper"
-        : "Helix Ask Native";
-  return `Provider: ${provider?.label || fallbackLabel}`;
-}
-
-export function resolveHelixAskVisibleJobReadyLinks(reply: unknown): Record<string, unknown>[] {
-  const replyRecord = readAgentLoopAuditRecord(reply);
-  const debugRecord = readAgentLoopAuditRecord(replyRecord?.debug);
-  const summary =
-    readAgentLoopAuditRecord(replyRecord?.resolved_turn_summary) ??
-    readAgentLoopAuditRecord(debugRecord?.resolved_turn_summary);
-  const terminalAuthority =
-    readAgentLoopAuditRecord(replyRecord?.terminal_answer_authority) ??
-    readAgentLoopAuditRecord(debugRecord?.terminal_answer_authority);
-  const finalAnswerSource =
-    coerceText(replyRecord?.final_answer_source).trim() ||
-    coerceText(debugRecord?.final_answer_source).trim() ||
-    coerceText(terminalAuthority?.final_answer_source).trim();
-  const terminalArtifactKind =
-    coerceText(replyRecord?.terminal_artifact_kind).trim() ||
-    coerceText(debugRecord?.terminal_artifact_kind).trim() ||
-    coerceText(summary?.terminal_artifact_kind).trim() ||
-    coerceText(terminalAuthority?.terminal_artifact_kind).trim();
-  const terminalErrorCode =
-    coerceText(replyRecord?.terminal_error_code).trim() ||
-    coerceText(debugRecord?.terminal_error_code).trim() ||
-    coerceText(summary?.terminal_error_code).trim();
-  const finalStatus =
-    coerceText(replyRecord?.final_status).trim() ||
-    coerceText(debugRecord?.final_status).trim() ||
-    coerceText(summary?.final_status).trim();
-  const isFailureTerminal =
-    finalAnswerSource === "typed_failure" ||
-    terminalArtifactKind === "typed_failure" ||
-    finalStatus === "final_failure" ||
-    Boolean(terminalErrorCode);
-  if (isFailureTerminal) return [];
-  const rawLinks = Array.isArray(debugRecord?.job_ready_links)
-    ? debugRecord.job_ready_links
-    : Array.isArray(replyRecord?.job_ready_links)
-      ? replyRecord.job_ready_links
-      : [];
-  return rawLinks
-    .map((entry) => readAgentLoopAuditRecord(entry))
-    .filter((entry): entry is Record<string, unknown> => Boolean(entry?.panel_id && entry?.action_id));
 }
 
 function parseChatMessageTimeMs(message: ChatMessage): number | null {
@@ -7856,7 +7565,9 @@ function resolveHelixAskReplyOrderMs(reply: HelixAskReply): number | null {
     }
   }
   const transcriptEvents = resolveHelixTurnTranscriptEvents(reply)
-    .map((entry, index) => buildAskLiveEventFromTurnTranscriptRecord(entry, `${reply.id}-order-${index}`))
+    .map((entry, index) =>
+      buildAskLiveEventFromTurnTranscriptRecord(entry, `${reply.id}-order-${index}`, HELIX_ASK_LIVE_EVENT_MAX_CHARS),
+    )
     .filter((event): event is AskLiveEventEntry => event !== null);
   const events = [
     ...(Array.isArray(reply.liveEvents) ? reply.liveEvents : []),
@@ -8557,20 +8268,6 @@ function buildHelixAskDebugContextSummary(
   return summary;
 }
 
-function readHelixAskDebugContextFromMeta(meta: Record<string, unknown>): Record<string, unknown> | null {
-  const fromEnvelope = asObjectRecord(meta.helixDebugContext);
-  if (fromEnvelope) return fromEnvelope;
-  const contextFiles = dedupeStrings([
-    ...asStringArray(meta.contextFiles),
-    ...asStringArray(meta.evidenceRefs),
-  ]);
-  if (contextFiles.length === 0) return null;
-  return {
-    contextFiles,
-    contextFileCount: contextFiles.length,
-  };
-}
-
 function safeJsonStringify(value: unknown, fallback = "Unable to render debug payload."): string {
   const normalize = (input: unknown, stack: WeakSet<object>): unknown => {
     if (typeof input === "bigint") return input.toString();
@@ -8594,37 +8291,6 @@ function safeJsonStringify(value: unknown, fallback = "Unable to render debug pa
   } catch {
     return fallback;
   }
-}
-
-function buildConvergenceDebugSnapshot(
-  debug: HelixAskReply["debug"] | undefined,
-): ConvergenceDebug | undefined {
-  if (!debug) return undefined;
-  return {
-    intent_domain: debug.intent_domain,
-    intent_id: debug.intent_id,
-    arbiter_mode: debug.arbiter_mode,
-    claim_tier: typeof debug.claim_tier === "string" ? debug.claim_tier : undefined,
-    math_solver_maturity: debug.math_solver_maturity,
-    helix_ask_fail_reason:
-      typeof debug.helix_ask_fail_reason === "string" ? debug.helix_ask_fail_reason : undefined,
-  };
-}
-
-function hasConvergenceStateChanged(
-  previous: ConvergenceStripState | null,
-  next: ConvergenceStripState,
-): boolean {
-  if (!previous) return true;
-  return (
-    previous.source !== next.source ||
-    previous.proof !== next.proof ||
-    previous.maturity !== next.maturity ||
-    previous.phase !== next.phase ||
-    previous.openWorldActive !== next.openWorldActive ||
-    previous.caption !== next.caption ||
-    previous.deltaPct !== next.deltaPct
-  );
 }
 
 type HelixAskErrorBoundaryState = { hasError: boolean; error?: Error };
@@ -8900,44 +8566,6 @@ const REASONING_THEATER_SUPPRESSION_PATTERNS: Array<{
 
 function clamp01(value: number): number {
   return clampNumber(value, 0, 1);
-}
-
-function buildAskLiveEventFromTurnTranscriptRecord(
-  record: Record<string, unknown>,
-  fallbackId: string,
-): AskLiveEventEntry | null {
-  const text = coerceText(record.text).trim();
-  if (!text) return null;
-  const type = coerceText(record.type).trim() || coerceText(record.source_event_type).trim() || "turn_transcript_event";
-  const sourceEventType = coerceText(record.source_event_type).trim();
-  const turnId = coerceText(record.turn_id ?? record.turnId ?? record.active_turn_id).trim();
-  const atMs = typeof record.at_ms === "number" && Number.isFinite(record.at_ms) ? Math.trunc(record.at_ms) : null;
-  const ts = atMs ? new Date(atMs).toISOString() : undefined;
-  const seq = typeof record.seq === "number" && Number.isFinite(record.seq) ? Math.trunc(record.seq) : undefined;
-  return {
-    id: coerceText(record.id).trim() || fallbackId,
-    text: clipText(text, HELIX_ASK_LIVE_EVENT_MAX_CHARS),
-    tool: coerceText(record.role).trim() || "agent",
-    ts,
-    tsMs: atMs ?? parseAskLiveEventTimestampMs(record.ts) ?? undefined,
-    seq,
-    durationMs:
-      typeof record.durationMs === "number" && Number.isFinite(record.durationMs)
-        ? Math.max(0, Math.round(record.durationMs))
-        : undefined,
-    meta: {
-      stage: type,
-      detail: coerceText(record.detail).trim() || null,
-      status: coerceText(record.status).trim() || null,
-      stepId: coerceText(record.step_id).trim() || null,
-      lane: coerceText(record.lane).trim() || null,
-      source_event_type: sourceEventType || type,
-      event_source: coerceText(record.event_source).trim() || "live",
-      turn_id: turnId || null,
-      reconstructed: record.reconstructed === true,
-      stream_event: "turn_transcript_event",
-    },
-  };
 }
 
 function askLiveEventBelongsToActiveTurn(args: {
@@ -11248,14 +10876,6 @@ export type DebugClipboardCopyResult = {
   error?: string;
 };
 
-type DebugExportUiResult = Required<Pick<DebugClipboardCopyResult, "ok" | "copied_text_length" | "method">> & {
-  attempted_payload_hash: string;
-  copied_payload_hash?: string;
-  readback_match: "exact" | "unavailable" | "mismatch" | "empty";
-  fallback_presented: boolean;
-  error?: string;
-};
-
 type DebugExportDrawerState = {
   replyId: string;
   payload: string;
@@ -11268,23 +10888,6 @@ const hashDebugExportText = (text: string): string => stableHelixProjectionHash(
 function isBackendAskTurnDebugExportEligibleTurnId(turnId: string): boolean {
   const trimmed = turnId.trim();
   return Boolean(trimmed && (trimmed.startsWith("ask:") || /(?:^|:)ask:[^:]+/i.test(trimmed)));
-}
-
-export function buildDebugExportDrawerFallbackResult(args: {
-  attemptedPayloadHash: string;
-  copiedTextLength: number;
-  readbackMatch?: "exact" | "unavailable" | "mismatch" | "empty";
-  error?: string;
-}): DebugExportUiResult {
-  return {
-    ok: true,
-    attempted_payload_hash: args.attemptedPayloadHash,
-    copied_text_length: args.copiedTextLength,
-    method: "debug_drawer",
-    readback_match: args.readbackMatch ?? "unavailable",
-    fallback_presented: true,
-    ...(args.error ? { error: args.error } : {}),
-  };
 }
 
 const waitForDebugClipboardReadback = async (attempt: number): Promise<void> => {
@@ -11981,34 +11584,6 @@ export async function copyDebugPayloadToClipboard(payload: string): Promise<Debu
     fallback_presented: false,
     error: "clipboard_write_failed",
   };
-}
-
-function isWorkstationLifecycleEvent(entry: AskLiveEventEntry): boolean {
-  const tool = (entry.tool ?? "").trim().toLowerCase();
-  if (!tool) return false;
-  if (tool === "helix.ask.fast_path") return true;
-  if (tool === "helix.observer.plan") return true;
-  if (tool.startsWith("workstation.")) return true;
-  const meta = asObjectRecord(entry.meta ?? null);
-  const kind = typeof meta?.kind === "string" ? meta.kind.trim().toLowerCase() : "";
-  if (!kind) return false;
-  return kind.startsWith("workstation_") || kind.startsWith("job_") || kind.startsWith("observer_plan_");
-}
-
-function buildObservationGroundedReplyText(entry: AskLiveEventEntry): { text: string; ok: boolean } | null {
-  const raw = String(entry.text ?? "").trim();
-  if (!raw) return null;
-  const failureMatch = raw.match(/^fail:\s*run panel action\s+[\w.-]+(?:\s*-\s*(.+))?$/i);
-  if (failureMatch) {
-    const message = failureMatch[1]?.trim() || "The workspace action failed.";
-    return { text: `Could not complete that workspace action: ${message}`, ok: false };
-  }
-  const successMatch = raw.match(/^ok:\s*run panel action\s+[\w.-]+(?:\s*-\s*(.+))?$/i);
-  if (successMatch) {
-    const message = successMatch[1]?.trim();
-    if (message) return { text: message, ok: true };
-  }
-  return null;
 }
 
 function hash32(value: string): number {
@@ -20206,6 +19781,7 @@ export function HelixAskPill({
         const liveEvent = buildAskLiveEventFromTurnTranscriptRecord(
           { ...record, reconstructed: record.reconstructed === true || reason === "final_response_replay" },
           `replay:${traceId}:${sourceEventType}:${coerceText(record.seq).trim() || coerceText(record.at_ms).trim() || index}`,
+          HELIX_ASK_LIVE_EVENT_MAX_CHARS,
         );
         if (!liveEvent || existingIds.has(liveEvent.id)) return;
         const tracedLiveEvent = attachHelixAskClientTraceToLiveEvent(liveEvent, {
@@ -27838,7 +27414,11 @@ export function HelixAskPill({
       .map((entry, index): AskLiveEventEntry | null => {
         const record = readAgentLoopAuditRecord(entry);
         if (!record) return null;
-        const event = buildAskLiveEventFromTurnTranscriptRecord(record, `${reply.id}-transcript-${index}`);
+        const event = buildAskLiveEventFromTurnTranscriptRecord(
+          record,
+          `${reply.id}-transcript-${index}`,
+          HELIX_ASK_LIVE_EVENT_MAX_CHARS,
+        );
         if (!event) return null;
         event.meta = {
           ...(event.meta ?? {}),
@@ -29297,6 +28877,7 @@ export function HelixAskPill({
                 const liveEvent = buildAskLiveEventFromTurnTranscriptRecord(
                   record,
                   `stream:${traceId}:${sourceEventType}:${coerceText(record.seq).trim() || coerceText(record.at_ms).trim() || Date.now()}`,
+                  HELIX_ASK_LIVE_EVENT_MAX_CHARS,
                 );
                 if (!liveEvent) {
                   updateHelixAskConsoleStreamIngressDebug((current) => ({

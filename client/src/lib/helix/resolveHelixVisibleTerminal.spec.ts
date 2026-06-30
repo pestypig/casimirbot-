@@ -454,6 +454,31 @@ describe("resolveHelixVisibleTerminal", () => {
     expect(terminal.source).toBe("model_direct_answer_artifact");
     expect(terminal.usedLegacyShadow).toBe(false);
   });
+
+  it("uses backend-selected model-only text for quoted tool-name explanations without tool observations", () => {
+    const answer =
+      "`internet-search.search_web` is a capability or tool identifier.\n\nIt names an internet-search module/action that would perform a web search if invoked. In this request, it is just text: the phrase is being discussed literally, not executed.";
+
+    const terminal = resolveHelixVisibleTerminal({
+      selected_final_answer: answer,
+      response_type: "final_failure",
+      final_status: "final_failure",
+      debug: {
+        selected_final_answer: answer,
+        response_type: "final_failure",
+        final_status: "final_failure",
+        artifact_query_index: {
+          tool_family: "model",
+          capability: "model_only",
+        },
+      },
+    });
+
+    expect(terminal.text).toBe(answer);
+    expect(terminal.source).toBe("selected_final_answer");
+    expect(terminal.terminalErrorCode).toBeNull();
+    expect(terminal.usedLegacyShadow).toBe(false);
+  });
 });
 
 describe("formatHelixVisibleTerminalSourceLabel", () => {

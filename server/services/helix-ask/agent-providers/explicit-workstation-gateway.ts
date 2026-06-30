@@ -828,6 +828,7 @@ export const buildPromptNamedCapabilityGatewayCallRequests = (
 const cleanCalculatorExpression = (value: string | null | undefined): string | null => {
   if (!value) return null;
   const expression = value
+    .trim()
     .replace(/(?:then|and)\s+[\s\S]*$/i, "")
     .replace(/[.,;:!?]+$/g, "")
     .replace(/\s+/g, "")
@@ -838,20 +839,58 @@ const cleanCalculatorExpression = (value: string | null | undefined): string | n
   return expression;
 };
 
+const extractCalculatorMathTokenSequence = (value: string | null | undefined): string | null => {
+  if (!value) return null;
+  const source = value.trim();
+  let start = -1;
+  for (let index = 0; index < source.length; index += 1) {
+    if (/[\d(]/.test(source[index] ?? "")) {
+      start = index;
+      break;
+    }
+  }
+  if (start < 0) return null;
+  let candidate = "";
+  for (let index = start; index < source.length; index += 1) {
+    const char = source[index] ?? "";
+    if (/[0-9.+\-*/^%()[\]\s]/.test(char)) {
+      candidate += char;
+      continue;
+    }
+    break;
+  }
+  return cleanCalculatorExpression(candidate);
+};
+
 const extractCalculatorExpressionFromPrompt = (prompt: string): string | null => {
   if (hasNegatedToolInstruction(prompt, /\b(?:calculator|calculate|compute|evaluate|solve|expression)\b/i)) {
     return null;
   }
   const unquoted = unquotePrompt(prompt);
+  const promptForMath = prompt.replace(/"[^"]*"|'[^']*'/g, " ");
+  const promptNamedCapability = promptNamedCapabilityPattern(CALCULATOR_SOLVE_EXPRESSION_CAPABILITY).exec(promptForMath);
+  if (promptNamedCapability) {
+    const capabilityText = promptNamedCapability[0] ?? "";
+    const capabilityOffset = capabilityText.toLowerCase().indexOf(CALCULATOR_SOLVE_EXPRESSION_CAPABILITY.toLowerCase());
+    const capabilityStart = promptNamedCapability.index + Math.max(0, capabilityOffset);
+    const afterCapability = promptForMath.slice(capabilityStart + CALCULATOR_SOLVE_EXPRESSION_CAPABILITY.length);
+    const segmentEnd = afterCapability.search(/[;\n]/);
+    const segment = segmentEnd >= 0 ? afterCapability.slice(0, segmentEnd) : afterCapability;
+    const explicitExpression = segment.match(
+      /\b(?:with\s+this\s+exact\s+expression|with\s+expression|this\s+exact\s+expression|expression\s+is|expression|with|for|calculate|evaluate|solve|compute)\b\s*:?\s*([\s\S]{1,160})/i,
+    )?.[1];
+    const boundedExpression = extractCalculatorMathTokenSequence(explicitExpression ?? segment);
+    if (boundedExpression) return boundedExpression;
+  }
   const explicitCapability =
     unquoted.match(/\bscientific-calculator\.solve_expression\b[\s\S]{0,80}\b(?:for|with|expression|calculate|evaluate|solve|compute)?\s*:?\s*([0-9][0-9\s.+\-*/^%()[\]]{1,80})/i)?.[1] ??
     unquoted.match(/\b(?:scientific\s+calculator|calculator|calc)\b[\s\S]{0,100}\b(?:calculate|evaluate|solve|compute|expression)\s*:?\s*([0-9][0-9\s.+\-*/^%()[\]]{1,80})/i)?.[1] ??
     null;
-  if (explicitCapability) return cleanCalculatorExpression(explicitCapability);
+  if (explicitCapability) return extractCalculatorMathTokenSequence(explicitCapability);
   const direct =
     unquoted.match(/\b(?:calculate|evaluate|compute|solve)\s+([0-9][0-9\s.+\-*/^%()[\]]{1,80})/i)?.[1] ??
     null;
-  return cleanCalculatorExpression(direct);
+  return extractCalculatorMathTokenSequence(direct);
 };
 
 export const buildPromptDerivedCalculatorSolveGatewayCallRequests = (
@@ -1066,6 +1105,11 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   const structured = buildStructuredAdmissionWorkstationGatewayCallRequests(input.body);
   appendDedupe(requests, seen, structured);
   const promptNamed = buildPromptNamedCapabilityGatewayCallRequests(input.body);
+  const promptNamedCapabilities = new Set(
+    promptNamed
+      .map((request) => readString(request.capability_id) ?? readString(request.capabilityId))
+      .filter((capability): capability is string => Boolean(capability)),
+  );
   const hasNamedDocsSearch = promptNamed.some((request) => readString(request.capability_id) === DOCS_SEARCH_CAPABILITY);
   if (hasNamedDocsSearch) {
     appendDedupe(requests, seen, promptNamed);
@@ -1078,13 +1122,27 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   appendDedupe(requests, seen, activeCalculatorContext);
   const activeWorkstationContext = buildActiveWorkstationContextGatewayCallRequests(input.body);
   appendDedupe(requests, seen, activeWorkstationContext);
-  appendDedupe(requests, seen, buildPromptDerivedWorkspaceStatusGatewayCallRequests(input.body));
-  appendDedupe(requests, seen, buildPromptDerivedCalculatorSolveGatewayCallRequests(input.body));
-  appendDedupe(requests, seen, buildPromptDerivedTheoryReflectionGatewayCallRequests(input.body));
-  appendDedupe(requests, seen, buildPlannerDerivedWorkstationGatewayCallRequests(input.body));
-  appendDedupe(requests, seen, buildPromptDerivedScholarlyResearchGatewayCallRequests(input.body));
-  appendDedupe(requests, seen, buildPromptDerivedInternetSearchGatewayCallRequests(input.body));
-  appendDedupe(requests, seen, buildPromptDerivedRepoSearchGatewayCallRequests(input.body));
+  if (!promptNamedCapabilities.has(WORKSPACE_OS_STATUS_CAPABILITY)) {
+    appendDedupe(requests, seen, buildPromptDerivedWorkspaceStatusGatewayCallRequests(input.body));
+  }
+  if (!promptNamedCapabilities.has(CALCULATOR_SOLVE_EXPRESSION_CAPABILITY)) {
+    appendDedupe(requests, seen, buildPromptDerivedCalculatorSolveGatewayCallRequests(input.body));
+  }
+  if (!promptNamedCapabilities.has(THEORY_CONTEXT_REFLECTION_CAPABILITY)) {
+    appendDedupe(requests, seen, buildPromptDerivedTheoryReflectionGatewayCallRequests(input.body));
+  }
+  if (promptNamedCapabilities.size === 0) {
+    appendDedupe(requests, seen, buildPlannerDerivedWorkstationGatewayCallRequests(input.body));
+  }
+  if (!promptNamedCapabilities.has(SCHOLARLY_RESEARCH_SEARCH_CAPABILITY)) {
+    appendDedupe(requests, seen, buildPromptDerivedScholarlyResearchGatewayCallRequests(input.body));
+  }
+  if (!promptNamedCapabilities.has(INTERNET_SEARCH_CAPABILITY)) {
+    appendDedupe(requests, seen, buildPromptDerivedInternetSearchGatewayCallRequests(input.body));
+  }
+  if (!promptNamedCapabilities.has(REPO_SEARCH_CAPABILITY)) {
+    appendDedupe(requests, seen, buildPromptDerivedRepoSearchGatewayCallRequests(input.body));
+  }
   return requests.slice(0, 10);
 };
 

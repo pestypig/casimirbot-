@@ -1586,6 +1586,44 @@ describe("Helix Ask golden path runtime", () => {
     expect(terminalLedgerEntries(body)).toHaveLength(1);
   });
 
+  it("bounds calculator expression extraction before trailing answer instructions", () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+
+    const decision = runHelixAskGoldenPathRuntime({
+      now: new Date("2026-06-28T12:25:30.000Z"),
+      body: {
+        turn_id: "ask:golden:calculator-trailing-instructions",
+        prompt:
+          "Codex UI validation smoke 2026-06-29 20:09: use the Helix workstation gateway capability scientific-calculator.solve_expression with expression 8*9. Answer with the observed expression and result.",
+        goldenPathRuntime: true,
+        requested_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+      },
+    });
+
+    expect(decision.handled).toBe(true);
+    if (!decision.handled) throw new Error("golden path should handle calculator solve");
+    const body = decision.payload;
+
+    expect(body).toMatchObject({
+      final_status: "final_answer",
+      terminal_artifact_kind: "workstation_tool_evaluation",
+      terminal_error_code: null,
+      calculator_receipt: {
+        capability_key: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+        expression: "8*9",
+        result: 72,
+      },
+      workstation_tool_evaluation: {
+        capability_key: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+        expression: "8*9",
+        result: 72,
+      },
+    });
+    expect(body.selected_final_answer).toContain("Expression: 8*9");
+    expect(body.selected_final_answer).toContain("Result: 72");
+    expect(body.selected_final_answer).not.toContain("Answer with the observed expression");
+  });
+
   it("fails closed when calculator solve has no expression", () => {
     process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
 

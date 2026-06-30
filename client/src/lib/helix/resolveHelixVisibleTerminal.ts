@@ -375,6 +375,24 @@ export function resolveHelixVisibleTerminal(
     effectiveFinalAnswerSource === "final_answer_draft" &&
     (!sourceCapabilityTurn || terminalAuthorityIndicatesSuccess || singleWriterIndicatesSuccess) &&
     Boolean(selectedFinalAnswer);
+  const selectedFinalAnswerIsBackendSelectedModelOnlyText =
+    !terminalErrorCode &&
+    !sourceCapabilityTurn &&
+    !envelope &&
+    !terminalResultText &&
+    !(
+      authority?.server_authoritative === true &&
+      firstText(
+        presentation?.concise_text,
+        record?.selected_final_answer,
+        debug?.selected_final_answer,
+        authority?.terminal_text,
+        authority?.terminal_text_preview,
+      )
+    ) &&
+    !firstText(singleWriter?.visible_text) &&
+    !firstText(presentation?.concise_text) &&
+    Boolean(selectedFinalAnswer);
 
   if (envelopeText) {
     return {
@@ -413,6 +431,20 @@ export function resolveHelixVisibleTerminal(
       terminalArtifactKind,
       finalAnswerSource: effectiveFinalAnswerSource,
       terminalErrorCode,
+      authorityVerified,
+      usedLegacyShadow: false,
+    };
+  }
+
+  if (selectedFinalAnswerIsBackendSelectedModelOnlyText) {
+    return {
+      text: selectedFinalAnswer,
+      source: "selected_final_answer",
+      backendTerminalText: selectedFinalAnswer,
+      terminalKind,
+      terminalArtifactKind,
+      finalAnswerSource: effectiveFinalAnswerSource ?? "model_direct_answer",
+      terminalErrorCode: null,
       authorityVerified,
       usedLegacyShadow: false,
     };
