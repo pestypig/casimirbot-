@@ -27,11 +27,17 @@ import {
 import {
   HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
   HELIX_SCHOLARLY_RESEARCH_OBSERVATION_SCHEMA,
+  HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+  HELIX_SCHOLARLY_FULL_TEXT_OBSERVATION_SCHEMA,
+  HELIX_SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY,
+  HELIX_SCHOLARLY_NUMERIC_PARAMETER_OBSERVATION_SCHEMA,
   type HelixScholarlyResearchIntentMode,
   type HelixScholarlyResearchProvider,
 } from "@shared/helix-scholarly-research-observation";
 import { runInternetSearch } from "../retrieval/internet-search";
 import { runScholarlyResearchLookup } from "../retrieval/scholarly-research-lookup";
+import { runScholarlyFullTextFetch } from "../retrieval/scholarly-full-text-fetch";
+import { runScholarlyNumericParameterExtraction } from "../retrieval/scholarly-numeric-parameters";
 import { recordInterimVoiceCalloutRequest } from "../interim-voice-callout-store";
 import { executeLiveEnvironmentTool } from "../live-environment-tool-adapter";
 import {
@@ -107,6 +113,10 @@ const INTERNET_SEARCH_CAPABILITY = HELIX_INTERNET_SEARCH_CAPABILITY;
 const INTERNET_SEARCH_OBSERVATION_SCHEMA = HELIX_INTERNET_SEARCH_OBSERVATION_SCHEMA;
 const SCHOLARLY_RESEARCH_SEARCH_CAPABILITY = HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY;
 const SCHOLARLY_RESEARCH_OBSERVATION_SCHEMA = HELIX_SCHOLARLY_RESEARCH_OBSERVATION_SCHEMA;
+const SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY = HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY;
+const SCHOLARLY_FULL_TEXT_OBSERVATION_SCHEMA = HELIX_SCHOLARLY_FULL_TEXT_OBSERVATION_SCHEMA;
+const SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY = HELIX_SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY;
+const SCHOLARLY_NUMERIC_PARAMETER_OBSERVATION_SCHEMA = HELIX_SCHOLARLY_NUMERIC_PARAMETER_OBSERVATION_SCHEMA;
 const CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY = "civilization-bounds.reflect_system_bounds" as const;
 const CIVILIZATION_BOUNDS_REFLECTION_OBSERVATION_SCHEMA =
   "helix.civilization_bounds_reflection_observation.v1" as const;
@@ -287,6 +297,12 @@ const manifestProducesAffordances = (capabilityId: string): HelixWorkstationType
     return ["source_ref", "text_evidence", "citation_evidence", "numeric_value_evidence"];
   }
   if (capabilityId === INTERNET_SEARCH_CAPABILITY || capabilityId === SCHOLARLY_RESEARCH_SEARCH_CAPABILITY) {
+    return ["source_ref", "text_evidence", "citation_evidence"];
+  }
+  if (capabilityId === SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY) {
+    return ["source_ref", "text_evidence", "citation_evidence"];
+  }
+  if (capabilityId === SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY) {
     return ["source_ref", "text_evidence", "citation_evidence", "numeric_value_evidence"];
   }
   if (capabilityId === THEORY_CONTEXT_REFLECTION_CAPABILITY) {
@@ -332,6 +348,8 @@ const manifestConsumesAffordances = (capabilityId: string): HelixWorkstationType
   if (capabilityId === CALCULATOR_SOLVE_EXPRESSION_CAPABILITY) {
     return ["bound_calculator_expression", "calculator_expression_template", "numeric_value_evidence"];
   }
+  if (capabilityId === SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY) return ["source_ref"];
+  if (capabilityId === SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY) return ["text_evidence", "citation_evidence"];
   if (capabilityId === CALCULATOR_SHOW_GATEWAY_SOLVE_CAPABILITY) return ["calculator_result"];
   if (capabilityId === DOCS_OPEN_DOC_CAPABILITY) return ["doc_path_ref", "source_ref"];
   if (
