@@ -1,4 +1,5 @@
 import type { HelixToolRuntimeShape } from "./helix-tool-surface";
+import type { HelixCapabilityLaneBackendSelectionDecision } from "./helix-capability-lane";
 
 export const HELIX_AGENT_STEP_DECISION_V2_SCHEMA = "helix.agent_step_decision.v2" as const;
 export const HELIX_RUNTIME_TOOL_CALL_V1_SCHEMA = "helix.runtime_tool_call.v1" as const;
@@ -148,12 +149,36 @@ export type HelixAgentStepObservationPacket = {
     normalized_expression?: string | null;
     required_affordance_kind?: HelixWorkstationTypedAffordanceKind | null;
   }>;
+  backend_selection_decision?: HelixCapabilityLaneBackendSelectionDecision | null;
   state_delta: {
     opened_panels?: string[];
     focused_panel?: string;
     attached_sources?: string[];
     created_constructs?: string[];
     updated_notes?: string[];
+    live_translation_chunk?: {
+      lane_session_id: string | null;
+      source_id: string;
+      chunk_id: string;
+      chunk_index: number | null;
+      dedupe_key: string;
+      source_event_ms: number | null;
+      observed_at_ms: number;
+      freshness_status: "fresh" | "stale" | "unknown";
+      projection_target:
+        | "ask_turn"
+        | "docs_hover"
+        | "docs_selection"
+        | "docs_chunk"
+        | "audio_chunk"
+        | "account_language"
+        | "unknown";
+      cancel_requested: boolean;
+      observation_ref: string;
+      terminal_eligible: false;
+      assistant_answer: false;
+      raw_content_included: false;
+    };
   };
   suggested_next_steps: Array<"answer" | "ask_user" | "use_another_tool" | "repair" | "fail_closed">;
   produced_affordances?: HelixWorkstationTypedAffordance[];

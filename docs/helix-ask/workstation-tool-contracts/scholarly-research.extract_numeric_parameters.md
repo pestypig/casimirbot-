@@ -21,21 +21,34 @@ instead of inventing substitutions.
 
 Required:
 
-- `requested_variables`
 - `full_text_observation` or `text_evidence`
 
 Optional:
 
+- `requested_variables`
+- `variables`
+- `extraction_mode`
 - `source_ref`
 - `paper`
 - `source_target_intent`
 
 Blocked:
 
-- no requested variables
 - no text evidence
-- all requested values missing
+- all requested values missing when `extraction_mode` is
+  `requested_variables`
+- no supported numeric values found when `extraction_mode` is
+  `open_supported_parameters`
 - value has no unit, ambiguous unit, unsupported unit, or no citation/source cue
+
+Modes:
+
+- `requested_variables`: bind only requested formula variables and fail closed
+  if any requested variable is missing.
+- `open_supported_parameters`: extract any supported cited numeric parameters
+  from the bounded paper evidence without treating absent `n_m3`, `T_eV`, or
+  `B_T` as a failure. This mode is for exploratory paper inspection, not
+  calculator binding.
 
 ## Observation
 
@@ -51,6 +64,7 @@ Required observation fields:
 - `rejected_candidates`
 - `missing_requirements`
 - `selected_for_answer`
+- `extraction_mode`
 - `terminal_eligible=false`
 - `post_tool_model_step_required=true`
 - `assistant_answer=false`
@@ -111,3 +125,7 @@ Typed binder emits bound_calculator_expression or blocks calculator solve
 - extracts values and normalizes units from text/table fixtures
 - rejects missing, ambiguous, uncited, or incompatible candidates
 - calculator is blocked until all required variables have cited numeric evidence
+- bare `B` from B-meson or branching-fraction prose is not accepted as `B_T`;
+  magnetic-field extraction requires magnetic-field context and compatible units
+- open extraction reports supported cited paper parameters without requiring a
+  fixed variable set

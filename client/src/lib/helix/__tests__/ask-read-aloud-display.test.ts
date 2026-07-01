@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildVoiceAutoSpeakUtteranceId,
+  canPlayVoiceUtteranceWithMicOff,
   formatReadAloudButtonLabel,
   hashVoiceUtteranceKey,
   isInterimVoicePlaybackUtteranceKind,
@@ -55,6 +56,11 @@ describe("ask read-aloud display helpers", () => {
     expect(isManualVoicePlaybackUtterance({ kind: "manual_read_aloud" })).toBe(true);
     expect(isManualVoicePlaybackUtterance({ source: "manual" })).toBe(true);
     expect(isManualVoicePlaybackUtterance({ kind: "auto_brief", source: "auto" })).toBe(false);
+    expect(canPlayVoiceUtteranceWithMicOff({ kind: "manual_read_aloud" })).toBe(true);
+    expect(canPlayVoiceUtteranceWithMicOff({ source: "manual" })).toBe(true);
+    expect(canPlayVoiceUtteranceWithMicOff({ source: "auto", allowMicOffPlayback: true })).toBe(true);
+    expect(canPlayVoiceUtteranceWithMicOff({ source: "auto", allowMicOffPlayback: false })).toBe(false);
+    expect(canPlayVoiceUtteranceWithMicOff(null)).toBe(false);
     expect(isInterimVoicePlaybackUtteranceKind("tool_receipt")).toBe(true);
     expect(isInterimVoicePlaybackUtteranceKind("panel_narration")).toBe(true);
     expect(isInterimVoicePlaybackUtteranceKind("final_answer")).toBe(false);

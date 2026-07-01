@@ -7,15 +7,18 @@ describe("Helix Ask attachment commit guard", () => {
 
   it("validates image payload before constructing native image turn items", () => {
     const source = fs.readFileSync(sourcePath, "utf8");
+    const attachmentCommitSource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/components/helix/ask-console/HelixAskAttachmentCommit.ts"),
+      "utf8",
+    );
 
     expect(source).toContain("validateHelixAskImageAttachmentForSubmit");
-    expect(source).toContain("image needs reattach");
-    expect(source).toContain("Image attachment is stale. Reattach the image before sending.");
     expect(source).toContain("runImageAttachmentLensRun");
     expect(source).toContain("ui_image_attachment_lens_run");
     expect(source).toContain("validateHelixAskAttachmentForSubmit");
     expect(source).toContain("typedAttachmentItems");
-    expect(source).toContain("raw_image_scope: \"turn_input_only\"");
+    expect(attachmentCommitSource).toContain("Image attachment is stale. Reattach the image before sending.");
+    expect(attachmentCommitSource).toContain('raw_image_scope: hasImageBase64 ? "turn_input_only" : null');
   });
 
   it("blocks visual prompts with stale attachment state before posting the turn", () => {
@@ -29,6 +32,14 @@ describe("Helix Ask attachment commit guard", () => {
 
   it("supports multiple image chips and large-paste text attachment promotion", () => {
     const source = fs.readFileSync(sourcePath, "utf8");
+    const textAttachmentSource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/components/helix/ask-console/HelixAskTextAttachment.ts"),
+      "utf8",
+    );
+    const attachmentPromptPolicySource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/lib/helix/ask-attachment-prompt-policy.ts"),
+      "utf8",
+    );
 
     expect(source).toContain("const [askAttachments, setAskAttachments]");
     expect(source).toContain("HELIX_ASK_MAX_ATTACHMENTS");
@@ -42,37 +53,51 @@ describe("Helix Ask attachment commit guard", () => {
     expect(source).toContain('first = "Use the attached pasted text."');
     expect(source).toContain("attachmentContextPackForTurn");
     expect(source).toContain("attachment_context_pack");
-    expect(source).toContain("pasted-text-");
     expect(source).toContain("buildHelixAskTextAttachmentTurnInputItem");
-    expect(source).toContain('type: "attachment"');
-    expect(source).toContain('raw_content_scope: "turn_input_only"');
+    expect(source).toContain("from \"@/components/helix/ask-console/HelixAskTextAttachment\"");
+    expect(source).not.toContain("function buildHelixAskTextAttachmentFromText");
+    expect(source).not.toContain("function buildHelixAskTextAttachmentTurnInputItem");
+    expect(textAttachmentSource).toContain("pasted-text-");
+    expect(textAttachmentSource).toContain('type: "attachment"');
+    expect(textAttachmentSource).toContain('raw_content_scope: "turn_input_only"');
+    expect(textAttachmentSource).toContain("assistant_answer: false");
     expect(source).toContain("promotedPastedTextTurnInputItems");
     expect(source).toContain("turnInputItems: promotedPastedTextTurnInputItems");
     expect(source).toContain("explicitTurnInputItemsForTurn");
     expect(source).toContain("latestPastedTextAttachmentRef");
     expect(source).toContain("hasSubmittedTextAttachment");
     expect(source).toContain("isHelixAskUsePastedTextAttachmentPrompt(first)");
-    expect(source).toContain("HELIX_ASK_USE_PASTED_TEXT_ATTACHMENT_PROMPT_PATTERN");
-    expect(source).toContain("memo|note|document");
+    expect(source).toContain("from \"@/lib/helix/ask-attachment-prompt-policy\"");
+    expect(attachmentPromptPolicySource).toContain("HELIX_ASK_USE_PASTED_TEXT_ATTACHMENT_PROMPT_PATTERN");
+    expect(attachmentPromptPolicySource).toContain("memo|note|document");
     expect(source).toContain("Use the attached pasted text.");
     expect(source).toContain("The pasted text attachment is not available for this turn.");
   });
 
   it("keeps pasted text attachment prompts out of the visual-input classifier", () => {
     const source = fs.readFileSync(sourcePath, "utf8");
+    const attachmentPromptPolicySource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/lib/helix/ask-attachment-prompt-policy.ts"),
+      "utf8",
+    );
 
-    expect(source).toContain("HELIX_ASK_TEXT_ATTACHMENT_PROMPT_PATTERN");
-    expect(source).toContain("HELIX_ASK_TEXT_ATTACHMENT_PROMPT_PATTERN.test(normalized)");
-    expect(source).toContain("(?:text|memo|note|document)");
-    expect(source).toContain("return false;");
+    expect(source).toContain("isHelixAskVisualPrompt(first)");
+    expect(attachmentPromptPolicySource).toContain("HELIX_ASK_TEXT_ATTACHMENT_PROMPT_PATTERN");
+    expect(attachmentPromptPolicySource).toContain("HELIX_ASK_TEXT_ATTACHMENT_PROMPT_PATTERN.test(normalized)");
+    expect(attachmentPromptPolicySource).toContain("(?:text|memo|note|document)");
+    expect(attachmentPromptPolicySource).toContain("return false;");
   });
 
   it("routes pasted-text resume recall through backend conversation memory instead of local shortcuts", () => {
     const source = fs.readFileSync(sourcePath, "utf8");
+    const attachmentPromptPolicySource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/lib/helix/ask-attachment-prompt-policy.ts"),
+      "utf8",
+    );
 
-    expect(source).toContain("HELIX_ASK_PASTED_TEXT_RESUME_RECALL_PROMPT_PATTERN");
-    expect(source).toContain("pasted\\s+(?:text|memo|note|document)");
-    expect(source).toContain("who|when|where");
+    expect(attachmentPromptPolicySource).toContain("HELIX_ASK_PASTED_TEXT_RESUME_RECALL_PROMPT_PATTERN");
+    expect(attachmentPromptPolicySource).toContain("pasted\\s+(?:text|memo|note|document)");
+    expect(attachmentPromptPolicySource).toContain("who|when|where");
     expect(source).toContain("isHelixAskPastedTextResumeRecallPrompt(trimmed)");
     expect(source).toContain("backendOwnedPastedTextResumeRecall");
     expect(source).toContain("buildHelixAskPastedTextResumeRecallRouteMetadata");
@@ -97,18 +122,18 @@ describe("Helix Ask attachment commit guard", () => {
     expect(source).not.toContain("const [askQueue, setAskQueue] = useState<string[]>([])");
     expect(source).toContain("const contextCompactionPausePendingRef = useRef(false)");
     expect(source).toContain("const latestContextCompactionResumeFrameRef = useRef<Record<string, unknown> | null>(null)");
-    expect(source).toContain("function extractHelixAskContextCompactionResumeFrame");
+    expect(source).toContain("extractHelixAskContextCompactionResumeFrame,");
     expect(source).toContain("setContextCompactionPausePendingState(true)");
     expect(source).toContain("const extractedContextCompactionResumeFrame = extractHelixAskContextCompactionResumeFrame");
     expect(source).toContain("latestContextCompactionResumeFrameRef.current = extractedContextCompactionResumeFrame");
     expect(source).toContain("const latestContextCompactionResumeFrameForSubmit = compactionPausePending");
     expect(source).toContain("extractHelixAskContextCompactionResumeFrame(latestAskReply, latestAskReply?.debug)");
-    expect(source).toContain("function extractLatestHelixAskContextCompactionResumeFrameFromReplies");
+    expect(source).toContain("extractLatestHelixAskContextCompactionResumeFrameFromReplies,");
     expect(source).toContain("const askRepliesRef = useRef<HelixAskReply[]>([])");
     expect(source).toContain("askRepliesRef.current = askReplies");
     expect(source).toContain("extractLatestHelixAskContextCompactionResumeFrameFromReplies(askRepliesRef.current)");
     expect(source).toContain("extractLatestHelixAskContextCompactionResumeFrameFromReplies(askReplies)");
-    expect(source).toContain("HELIX_ASK_CONTEXT_RESUME_FRAME_STORAGE_KEY");
+    expect(source).toContain("from \"@/components/helix/ask-console/HelixAskContextCompactionResumeFrameStorage\"");
     expect(source).toContain("writeStoredHelixAskContextCompactionResumeFrame(extractedContextCompactionResumeFrame)");
     expect(source).toContain("readStoredHelixAskContextCompactionResumeFrame()");
     expect(source).toContain("asksForPastedTextResumeFrame && latestContextCompactionResumeFrameForSubmit");
@@ -125,19 +150,22 @@ describe("Helix Ask attachment commit guard", () => {
     expect(source).toContain("void runAsk(next.question, next.capsuleIds");
     expect(source).toContain("...(next.options ?? {})");
     expect(source).toContain("buildQueuedAskTurn({");
-    expect(source).toContain("function isHelixAskContextCompactionPausePendingReply");
-    expect(source).toContain("context\\s+is\\s+compacting\\s+before\\s+the\\s+next\\s+ask\\s+turn");
+    expect(source).toContain("isHelixAskContextCompactionPausePendingReply,");
+    expect(source).not.toContain("function isHelixAskContextCompactionPausePendingReply");
     expect(source).toContain("contextCompactionPausePendingRef.current ||");
     expect(source).toContain("contextCompactionPausePending ||");
     expect(source).toContain("isHelixAskContextCompactionPausePendingReply(latestAskReply)");
-    expect(source).toContain("askBusy || compactionPausePending || Boolean(asksForPastedTextResumeFrame && latestContextCompactionResumeFrameForSubmit)");
+    expect(source).toContain("askBusy,");
+    expect(source).toContain("compactionPausePending,");
+    expect(source).toContain("hasPastedTextResumeFrameForSubmit: Boolean(");
+    expect(source).toContain("asksForPastedTextResumeFrame && latestContextCompactionResumeFrameForSubmit");
     expect(source).toContain("shouldReleaseConsumedPastedTextAttachmentForResume");
-    expect(source).toContain("askAttachmentsRef.current.every((attachment) => attachment.kind === \"text\")");
-    expect(source).toContain("normalizedEntries.every((entry) => isHelixAskPastedTextResumeRecallPrompt(entry))");
+    expect(source).toContain("attachmentKinds: askAttachmentsRef.current.map((attachment) => attachment.kind)");
+    expect(source).toContain("allEntriesArePastedTextResumeRecallPrompt: normalizedEntries.every((entry) =>");
     expect(source).toContain("clearAskAttachments()");
     expect(source).toContain('if (next.reason !== "compaction_pause") return');
     expect(source).toContain("setContextCompactionPausePendingState(false)");
-    expect(source).toContain('reason: compactionPausePending ? "compaction_pause" : "busy"');
+    expect(source).toContain('reason: submitAdmission.queueReason ?? "busy"');
   });
 
   it("preserves server-authoritative proof recall and workstation terminals over evidence-gate fallback text", () => {

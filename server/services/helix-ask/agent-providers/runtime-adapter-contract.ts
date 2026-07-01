@@ -85,6 +85,7 @@ export type HelixAgentRuntimeAdapterContract = {
     permission_profile: HelixAgentProvider["permissionProfile"];
     supports: HelixAgentProvider["supports"];
   };
+  supports: HelixAgentProvider["supports"];
   workstation_gateway_manifest: HelixWorkstationGatewayListResult;
   workstation_gateway_capability_ids: string[];
   workstation_gateway_admitted_capability_ids: string[];
@@ -100,7 +101,7 @@ export type HelixAgentRuntimeAdapterContract = {
     helix_owns_tool_admission: true;
     helix_owns_capability_lane_admission: true;
     capability_lanes_are_not_root_agents: true;
-    capability_lane_execution_enabled: false;
+    capability_lane_one_shot_execution_enabled: true;
     helix_owns_observation_packets: true;
     helix_owns_terminal_authority: true;
     receipts_are_not_answers: true;
@@ -157,6 +158,7 @@ export const buildHelixAgentRuntimeAdapterContract = (input: {
     requested_runtime: input.requestedRuntime,
     selected_runtime: input.provider.id,
     selected_agent_provider: selectedProvider,
+    supports: input.provider.supports,
     workstation_gateway_manifest: gatewayManifest,
     workstation_gateway_capability_ids: gatewayManifest.capabilities.map(
       (capability: HelixWorkstationCapabilityManifest) => capability.capability_id,
@@ -176,7 +178,7 @@ export const buildHelixAgentRuntimeAdapterContract = (input: {
       helix_owns_tool_admission: true,
       helix_owns_capability_lane_admission: true,
       capability_lanes_are_not_root_agents: true,
-      capability_lane_execution_enabled: false,
+      capability_lane_one_shot_execution_enabled: true,
       helix_owns_observation_packets: true,
       helix_owns_terminal_authority: true,
       receipts_are_not_answers: true,
@@ -192,7 +194,7 @@ export const buildHelixAgentRuntimeAdapterContract = (input: {
       "Adapter boundary: helix_agent_provider_edge.",
       "Runtime-specific protocol glue stays inside the selected provider adapter.",
       "Use only Helix workstation gateway capabilities admitted for this turn.",
-      "Capability lanes are shadow/read-only catalog entries in this patch; do not execute lane calls from this contract.",
+      "Capability lanes may execute only through Helix-governed one-shot lane calls or lane sessions admitted for this turn.",
       "A capability lane may be requested by purpose, but Helix resolves backend provider/service policy and keeps the selected runtime agent provider unchanged.",
       "Do not claim a workstation tool or UI action ran unless a Helix observation packet or action receipt is present.",
       "Do not claim an AI service lane ran unless a Helix lane observation or receipt is present.",

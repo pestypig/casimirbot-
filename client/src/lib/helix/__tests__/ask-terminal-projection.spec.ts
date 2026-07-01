@@ -109,6 +109,35 @@ describe("Helix Ask terminal projection", () => {
     expect(visible.selected_final_answer).toBe("Observed expression: 8*9\nResult: 72");
   });
 
+  it("blocks workstation evaluation projection when the backend Ask entrypoint is missing", () => {
+    const visible = buildVisibleResolvedTurn({
+      id: "reply-client-projection-scholar-fetch",
+      ok: true,
+      selected_final_answer:
+        "I cannot claim the requested workstation tool or UI action ran because Helix did not produce a successful observation or action receipt for every gateway request. Blocked or failed gateway request: scholarly-research.fetch_full_text: fetchable_paper_identity_required.",
+      final_answer_source: "workstation_tool_evaluation",
+      terminal_artifact_kind: "workstation_tool_evaluation",
+      ask_entrypoint_required: true,
+      ask_entrypoint_observed: false,
+      ask_entrypoint_failure_code: "backend_ask_entry_required",
+      debug: {
+        ask_entrypoint_required: true,
+        ask_entrypoint_observed: false,
+        selected_final_answer:
+          "I cannot claim the requested workstation tool or UI action ran because Helix did not produce a successful observation or action receipt for every gateway request. Blocked or failed gateway request: scholarly-research.fetch_full_text: fetchable_paper_identity_required.",
+        final_answer_source: "workstation_tool_evaluation",
+        terminal_artifact_kind: "workstation_tool_evaluation",
+      },
+    });
+
+    expect(visible.primary_terminal_label).toBe("final_failure");
+    expect(visible.primary_source_label).toBe("typed failure");
+    expect(visible.terminal_error_code).toBe("backend_ask_entry_required");
+    expect(visible.selected_final_answer).toBe(
+      "This prompt requires the backend Ask solver path before a final answer can be shown.",
+    );
+  });
+
   it("lets structured workstation gateway success outrank stale typed-failure labels", () => {
     const reply = {
       id: "reply-codex-workstation-live-stale-failure",

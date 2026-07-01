@@ -9,6 +9,7 @@ import type { HelixAskMinimalRuntimeSubmitPlan } from "./HelixAskMinimalRuntimeS
 export type HelixAskMinimalRuntimeTurnPayload = {
   sessionId?: string;
   agentRuntime: HelixAgentRuntimeId;
+  agent_runtime: HelixAgentRuntimeId;
   traceId: string;
   turnId: string;
   maxTokens: number;

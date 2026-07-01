@@ -132,6 +132,62 @@ describe("Helix Ask agent provider selection", () => {
     expect(guarded).toContain("Blocked or failed gateway request: repo.search: missing_query.");
   });
 
+  it("explains fail-closed scholarly numeric extraction instead of claiming the tool did not run", () => {
+    const guarded = applyGatewayFailureAuthorityGuard({
+      text: "All requested tools ran.",
+      gatewayCallResults: [
+        {
+          ok: true,
+          capability_id: "scholarly-research.lookup_papers",
+          gateway_admission: {
+            requested_capability: "scholarly-research.lookup_papers",
+            admission_reason: "admitted",
+          },
+        },
+        {
+          ok: true,
+          capability_id: "scholarly-research.fetch_full_text",
+          gateway_admission: {
+            requested_capability: "scholarly-research.fetch_full_text",
+            admission_reason: "admitted",
+          },
+        },
+        {
+          ok: false,
+          capability_id: "scholarly-research.extract_numeric_parameters",
+          error: "missing_requested_numeric_variables",
+          gateway_admission: {
+            requested_capability: "scholarly-research.extract_numeric_parameters",
+            admission_reason: "admitted",
+          },
+          observation: {
+            schema: "helix.scholarly_numeric_parameter_observation.v1",
+            paper: {
+              title: "Tokamak shape-control paper",
+              url: "https://example.test/tokamak-control",
+            },
+            requested_variables: ["n_m3", "T_eV", "B_T"],
+            parameters: [],
+            missing_variables: ["n_m3", "T_eV", "B_T"],
+            rejected_candidates: [
+              { variable: "T_eV", reason: "missing_unit", text: "T = 4" },
+            ],
+            missing_requirements: ["missing_requested_numeric_variables"],
+            selected_for_answer: false,
+          },
+        },
+      ] as any,
+    });
+
+    expect(guarded).not.toContain("I cannot claim the requested workstation tool or UI action ran");
+    expect(guarded).toContain("I found and fetched scholarly paper evidence");
+    expect(guarded).toContain("Fetched paper: Tokamak shape-control paper");
+    expect(guarded).toContain("Requested variables: n_m3, T_eV, B_T.");
+    expect(guarded).toContain("Missing variables: n_m3, T_eV, B_T.");
+    expect(guarded).toContain("Rejected candidates: T_eV: missing_unit.");
+    expect(guarded).toContain("without fabricating values or claiming a calculator result");
+  });
+
   it("defaults to the native Helix runtime", () => {
     delete process.env.HELIX_ASK_AGENT_RUNTIME;
 
@@ -188,6 +244,9 @@ describe("Helix Ask agent provider selection", () => {
     expect(provider.supports).toEqual({
       streaming: false,
       workstationTools: true,
+      capabilityLanes: true,
+      capabilityLaneOneShot: true,
+      capabilityLaneSessions: false,
       codeMutation: false,
     });
     expect(provider.permissionProfile).toMatchObject({
@@ -418,6 +477,9 @@ describe("Helix Ask agent provider selection", () => {
     expect(provider.supports).toEqual({
       streaming: false,
       workstationTools: true,
+      capabilityLanes: true,
+      capabilityLaneOneShot: false,
+      capabilityLaneSessions: false,
       codeMutation: false,
     });
     expect(provider.permissionProfile).toMatchObject({
@@ -1489,7 +1551,7 @@ describe("Helix Ask agent provider selection", () => {
       turn_id: "ask:test:compound-theory-paper-bound-calculator",
       agent_runtime: "codex",
       question:
-        "Retrieve research papers for tokamak thermal pressure values, calculate the tokamak thermal pressure proxy from the theory badge graph for n_m3 and T_eV, and reflect the claim boundary through the theory badge graph.",
+        "Retrieve research papers for tokamak thermal pressure values, then use scholarly-research.fetch_full_text and scholarly-research.extract_numeric_parameters for n_m3 and T_eV, calculate the tokamak thermal pressure proxy from the theory badge graph, and reflect the claim boundary through the theory badge graph.",
     };
 
     const planned = buildCompoundCapabilityDependencyGatewayCallRequests(body);
@@ -1497,6 +1559,7 @@ describe("Helix Ask agent provider selection", () => {
       "scholarly-research.lookup_papers",
       "theory-badge-graph.reflect_discussion_context",
     ]);
+    expect((planned[0].arguments as any).allow_scholarly_dependent_chain).toBe(true);
 
     const results = await runExplicitWorkstationGatewayCalls({
       body,
@@ -1561,6 +1624,319 @@ describe("Helix Ask agent provider selection", () => {
     });
   });
 
+  it("plans scholarly lookup from formula variable meanings instead of literal placeholders", () => {
+    const body = {
+      turn_id: "ask:test:compound-variable-source-plan",
+      agent_runtime: "codex",
+      question:
+        "Use scholarly-research.lookup_papers to find an accessible tokamak plasma beta or transport paper that reports the data needed to bind the theory badge graph formula inputs. Then use scholarly-research.fetch_full_text and scholarly-research.extract_numeric_parameters with cited units before any calculator step.",
+    };
+
+    const planned = buildCompoundCapabilityDependencyGatewayCallRequests(body);
+    expect(planned.map((request) => (request as any).capability_id)).toEqual([
+      "scholarly-research.lookup_papers",
+      "theory-badge-graph.reflect_discussion_context",
+    ]);
+    const lookupArguments = planned[0].arguments as any;
+    expect(lookupArguments.requested_variables).toEqual(["n_m3", "T_eV", "B_T"]);
+    expect(lookupArguments.query).toContain("electron density");
+    expect(lookupArguments.query).toContain("electron temperature");
+    expect(lookupArguments.query).toContain("toroidal magnetic field");
+    expect(lookupArguments.query).toContain("parameter table");
+    expect(lookupArguments.source_requirement_plan).toMatchObject({
+      schema: "helix.source_requirement_plan.v1",
+      source_target: "scholarly_research",
+      assistant_answer: false,
+      raw_content_included: false,
+      reasoning_order: [
+        "interpret_user_goal",
+        "identify_claim_or_calculation",
+        "derive_evidence_requirements",
+        "build_retrieval_strategy",
+        "model_selects_next_admitted_tool_step",
+        "normalize_observations",
+        "reenter_model_with_evidence",
+        "answer_or_fail_closed_after_terminal_authority",
+      ],
+      retrieval_strategy: {
+        schema: "helix.retrieval_strategy.v1",
+        avoid_literal_placeholders_only: true,
+        fallback_behavior: "explain_missing_evidence_or_requery",
+        prefer_sources_with: expect.arrayContaining(["unit-bearing values", "parameter table", "operating point"]),
+      },
+      reentry_requirements: {
+        observation_reentry_required: true,
+        model_followup_required_before_terminal: true,
+        calculator_requires_bound_expression: true,
+        fail_closed_before_claim_without_required_evidence: true,
+      },
+      hard_gates: expect.arrayContaining([
+        "tools_produce_observations_not_answers",
+        "calculator_requires_fully_bound_source_backed_expression",
+        "terminal_answer_requires_post_observation_reasoning",
+      ]),
+      evidence_requirements: expect.arrayContaining([
+        expect.objectContaining({
+          requirement_id: "retrieved_source_evidence",
+          terminal_eligible: false,
+        }),
+        expect.objectContaining({
+          requirement_id: "formula_variable_numeric_evidence",
+          required_observation_kind: "helix.scholarly_numeric_parameter_observation.v1",
+          required_affordance_kinds: expect.arrayContaining(["numeric_value_evidence"]),
+          terminal_eligible: false,
+        }),
+      ]),
+    });
+    expect(lookupArguments.variable_source_plan).toMatchObject({
+      schema: "helix.variable_source_plan.v1",
+      formula_variables: ["n_m3", "T_eV", "B_T"],
+      assistant_answer: false,
+      raw_content_included: false,
+      entries: expect.arrayContaining([
+        expect.objectContaining({
+          variable: "n_m3",
+          canonical_quantity: "electron_or_plasma_number_density",
+          expected_unit: "m^-3",
+          source_classes: expect.arrayContaining(["plasma parameter table", "density profile diagnostics"]),
+          extraction_aliases: expect.arrayContaining(["electron density", "plasma density"]),
+        }),
+        expect.objectContaining({
+          variable: "T_eV",
+          canonical_quantity: "electron_temperature_energy",
+          expected_unit: "eV",
+          source_classes: expect.arrayContaining(["temperature profile diagnostics"]),
+          extraction_aliases: expect.arrayContaining(["electron temperature"]),
+        }),
+        expect.objectContaining({
+          variable: "B_T",
+          canonical_quantity: "toroidal_or_background_magnetic_field",
+          expected_unit: "T",
+          source_classes: expect.arrayContaining(["machine parameter table", "magnetic confinement parameters"]),
+          extraction_aliases: expect.arrayContaining(["toroidal magnetic field"]),
+        }),
+      ]),
+    });
+    expect(lookupArguments.allow_scholarly_dependent_chain).toBe(true);
+    expect(lookupArguments.source_target_intent).toMatchObject({
+      source_requirement_plan: {
+        schema: "helix.source_requirement_plan.v1",
+        reentry_requirements: {
+          model_followup_required_before_terminal: true,
+        },
+      },
+      query_plan: {
+        schema: "helix.scholarly_variable_source_query_plan.v1",
+        formula_variables: ["n_m3", "T_eV", "B_T"],
+        source_classes: expect.arrayContaining([
+          "plasma parameter table",
+          "temperature profile diagnostics",
+          "machine parameter table",
+        ]),
+      },
+    });
+  });
+
+  it("does not auto-fetch or extract after relevant lookup unless the prompt explicitly requests the full-text numeric chain", async () => {
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => [
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+        "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
+        "<entry>",
+        "<id>https://arxiv.org/abs/2606.00006</id>",
+        "<title>Tokamak plasma thermal pressure operating point</title>",
+        "<summary>Tokamak plasma paper discussing electron density, electron temperature, and magnetic confinement parameters.</summary>",
+        "<published>2026-06-06T00:00:00Z</published>",
+        "<author><name>D. Plasma Researcher</name></author>",
+        "</entry>",
+        "</feed>",
+      ].join(""),
+    })) as typeof fetch;
+
+    const body = {
+      turn_id: "ask:test:default-research-does-not-auto-dependent-chain",
+      agent_runtime: "codex",
+      question:
+        "Retrieve research papers for tokamak thermal pressure values, calculate the tokamak thermal pressure proxy from the theory badge graph for n_m3 and T_eV, and reflect the claim boundary through the theory badge graph.",
+    };
+
+    const planned = buildCompoundCapabilityDependencyGatewayCallRequests(body);
+    expect((planned[0].arguments as any).allow_scholarly_dependent_chain).toBe(false);
+
+    const results = await runExplicitWorkstationGatewayCalls({
+      body,
+      agentRuntime: "codex",
+      turnId: "ask:test:default-research-does-not-auto-dependent-chain",
+    });
+
+    expect(results.map((result) => result.capability_id)).toEqual([
+      "scholarly-research.lookup_papers",
+      "theory-badge-graph.reflect_discussion_context",
+    ]);
+    expect(results.map((result) => result.capability_id)).not.toContain("scholarly-research.fetch_full_text");
+    expect(results.map((result) => result.capability_id)).not.toContain("scholarly-research.extract_numeric_parameters");
+  });
+
+  it("admits explicitly named scholarly full-text and numeric extraction as a dependent research chain", async () => {
+    globalThis.fetch = vi.fn(async (url) => {
+      const urlText = String(url);
+      if (urlText.includes("export.arxiv.org/api/query")) {
+        return {
+          ok: true,
+          status: 200,
+          text: async () => [
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+            "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
+            "<entry>",
+            "<id>https://arxiv.org/abs/2606.00004</id>",
+            "<title>Plasma magnetic confinement operating point</title>",
+            "<summary>Metadata only; operating point values require full text.</summary>",
+            "<published>2026-06-04T00:00:00Z</published>",
+            "<author><name>C. Plasma Researcher</name></author>",
+            "</entry>",
+            "</feed>",
+          ].join(""),
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: (name: string) => name.toLowerCase() === "content-type" ? "text/html" : null },
+        arrayBuffer: async () => new TextEncoder().encode([
+          "<html><body>",
+          "<p>The cited density is n_m3 = 2.26e18 m^-3 [7].</p>",
+          "<p>The cited electron temperature is T_eV = 164.8 eV [7].</p>",
+          "</body></html>",
+        ].join(" ")).buffer,
+      };
+    }) as typeof fetch;
+
+    const body = {
+      turn_id: "ask:test:explicit-scholarly-full-text-numeric-chain",
+      agent_runtime: "codex",
+      question:
+        "Use scholarly-research.lookup_papers for magnetic confinement plasma density and temperature values, then use scholarly-research.fetch_full_text, then use scholarly-research.extract_numeric_parameters for n_m3 and T_eV from cited text, then use scientific-calculator.solve_expression with expression 6*7. Answer only from the observations.",
+    };
+
+    const planned = buildCompoundCapabilityDependencyGatewayCallRequests(body);
+    expect(planned.map((request) => (request as any).capability_id)).toEqual([
+      "scholarly-research.lookup_papers",
+      "scientific-calculator.solve_expression",
+    ]);
+
+    const results = await runExplicitWorkstationGatewayCalls({
+      body,
+      agentRuntime: "codex",
+      turnId: "ask:test:explicit-scholarly-full-text-numeric-chain",
+    });
+
+    expect(results.map((result) => result.capability_id)).toEqual([
+      "scholarly-research.lookup_papers",
+      "scholarly-research.fetch_full_text",
+      "scholarly-research.extract_numeric_parameters",
+      "scientific-calculator.solve_expression",
+    ]);
+    expect((results[2].gateway_admission.source_target_intent as any)).toMatchObject({
+      source_requirement_plan: {
+        schema: "helix.source_requirement_plan.v1",
+        reentry_requirements: {
+          observation_reentry_required: true,
+          model_followup_required_before_terminal: true,
+        },
+      },
+      variable_source_plan: {
+        schema: "helix.variable_source_plan.v1",
+        formula_variables: ["n_m3", "T_eV"],
+      },
+      source_classes: expect.arrayContaining(["plasma parameter table", "temperature profile diagnostics"]),
+      extraction_aliases: expect.arrayContaining(["electron density", "electron temperature"]),
+    });
+    expect((results[2].observation as any)).toMatchObject({
+      schema: "helix.scholarly_numeric_parameter_observation.v1",
+      selected_for_answer: true,
+      missing_variables: [],
+      parameters: expect.arrayContaining([
+        expect.objectContaining({
+          variable: "n_m3",
+          normalized_value: 2260000000000000000,
+          normalized_unit: "m^-3",
+        }),
+        expect.objectContaining({
+          variable: "T_eV",
+          normalized_value: 164.8,
+          normalized_unit: "eV",
+        }),
+      ]),
+    });
+    expect((results[3].observation as any)).toMatchObject({
+      expression: "6*7",
+      result: "42",
+      status: "succeeded",
+    });
+  });
+
+  it("does not auto-fetch or extract from irrelevant scholarly lookup results", async () => {
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => [
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+        "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
+        "<entry>",
+        "<id>https://arxiv.org/abs/2606.00005</id>",
+        "<title>Test of lepton flavour universality using B0 decays</title>",
+        "<summary>Measurements of branching fractions in B meson decays from collider data.</summary>",
+        "<published>2026-06-05T00:00:00Z</published>",
+        "<author><name>C. Collider Researcher</name></author>",
+        "</entry>",
+        "</feed>",
+      ].join(""),
+    })) as typeof fetch;
+
+    const body = {
+      turn_id: "ask:test:irrelevant-scholarly-lookup-stops-dependent-chain",
+      agent_runtime: "codex",
+      question:
+        "Use scholarly-research.lookup_papers for DIII-D or EAST tokamak operating parameters: electron density, electron temperature, toroidal magnetic field, plasma current, and confinement/transport parameter table. Then use scholarly-research.fetch_full_text on the best accessible tokamak paper and scholarly-research.extract_numeric_parameters only if the paper is relevant. Reflect the theory badge graph and calculate beta only after cited values are bound.",
+    };
+
+    const results = await runExplicitWorkstationGatewayCalls({
+      body,
+      agentRuntime: "codex",
+      turnId: "ask:test:irrelevant-scholarly-lookup-stops-dependent-chain",
+    });
+
+    expect(results.map((result) => result.capability_id)).toEqual([
+      "scholarly-research.lookup_papers",
+      "theory-badge-graph.reflect_discussion_context",
+    ]);
+    expect(results.map((result) => result.capability_id)).not.toContain("scholarly-research.fetch_full_text");
+    expect(results.map((result) => result.capability_id)).not.toContain("scholarly-research.extract_numeric_parameters");
+    expect((results[0].observation as any)).toMatchObject({
+      lookup_relevance_gate: {
+        schema: "helix.scholarly_lookup_relevance_gate.v1",
+        status: "blocked",
+        code: "lookup_result_irrelevant",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      missing_requirements: expect.arrayContaining(["lookup_result_irrelevant"]),
+      selected_for_answer: false,
+    });
+    expect((results[0].observation_packet.state_delta as any).compound_dependency_plan).toMatchObject({
+      first_broken_rail: {
+        subgoal_id: "research_quantify_reflect:scholarly_full_text",
+        capability_id: "scholarly-research.fetch_full_text",
+        reason: "lookup_result_irrelevant",
+      },
+      rail_status: "blocked",
+    });
+  });
+
   it("fails closed with typed missing variables when paper evidence cannot bind a theory calculator template", async () => {
     globalThis.fetch = vi.fn(async (url) => {
       const urlText = String(url);
@@ -1594,7 +1970,7 @@ describe("Helix Ask agent provider selection", () => {
       turn_id: "ask:test:compound-theory-paper-missing-calculator-values",
       agent_runtime: "codex",
       question:
-        "Retrieve research papers for tokamak thermal pressure values, calculate the tokamak thermal pressure proxy from the theory badge graph for n_m3 and T_eV, and reflect the claim boundary through the theory badge graph.",
+        "Retrieve research papers for tokamak thermal pressure values, then use scholarly-research.fetch_full_text and scholarly-research.extract_numeric_parameters for n_m3 and T_eV, calculate the tokamak thermal pressure proxy from the theory badge graph, and reflect the claim boundary through the theory badge graph.",
     };
 
     const results = await runExplicitWorkstationGatewayCalls({
@@ -3027,7 +3403,7 @@ describe("Helix Ask agent provider selection", () => {
     expect(result.text).toContain("cannot claim the requested workstation tool or UI action ran");
     expect(result.text).toContain("filesystem.write_file: capability_not_registered");
     expect(result.text).not.toContain("I wrote the requested file");
-    expect((result.debug as any)?.terminal_authority_status).toBe("blocked_by_gateway_observation_state");
+    expect((result.debug as any)?.terminal_authority_status).toBe("blocked_by_observation_state");
     expect((result.debug as any)?.terminal_answer_authority).toBeNull();
     expect((result.debug as any)?.provider_gateway_debug_summary).toMatchObject({
       blocked_capabilities: [
@@ -4476,7 +4852,7 @@ describe("Helix Ask agent provider selection", () => {
       },
       terminalAuthorityCandidateReview: {
         schema: "helix.provider_terminal_authority_candidate_review.v1",
-        terminal_authority_status: "blocked_by_gateway_observation_state",
+        terminal_authority_status: "blocked_by_observation_state",
         terminal_authority_granted: false,
         final_visible_answer_authorized: false,
         blockers: ["gateway_observation_missing_or_failed"],
@@ -4484,7 +4860,7 @@ describe("Helix Ask agent provider selection", () => {
       providerTerminalAuthorityBridge: {
         schema: "helix.provider_terminal_authority_bridge.v1",
         route_authority_status: "not_authorized",
-        terminal_authority_status: "blocked_by_gateway_observation_state",
+        terminal_authority_status: "blocked_by_observation_state",
         terminal_authority_granted: false,
         final_visible_answer_authorized: false,
         final_answer_source: null,
@@ -4494,7 +4870,7 @@ describe("Helix Ask agent provider selection", () => {
       },
       terminalAnswerAuthority: null,
       terminalPresentation: null,
-      terminalAuthorityStatus: "blocked_by_gateway_observation_state",
+      terminalAuthorityStatus: "blocked_by_observation_state",
     });
     expect(gatewayResults[0]).toMatchObject({
       ok: false,

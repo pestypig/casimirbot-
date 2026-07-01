@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  deriveVoiceSegmentLocalAnalysis,
   describeMediaErrorCode,
   getMicRecorderMimeCandidates,
   isFlatVoiceSignal,
   isLikelyLoopbackDeviceLabel,
   isLowAudioQualitySignal,
   isRecorderStalled,
+  pickSupportedMicRecorderMimeType,
+  resolveSpeakerFromSessionProfiles,
   resolveVoiceNoiseHandlingProfile,
   shouldPrimeSegmentWithContainerHeader,
   shouldTreatMicSignalAsSpeech,
@@ -94,6 +97,36 @@ describe("ask voice capture display helpers", () => {
     expect(new Set(getMicRecorderMimeCandidates(desktopUa)).size).toBe(getMicRecorderMimeCandidates(desktopUa).length);
   });
 
+  it("selects the first supported recorder MIME type and continues after support-check errors", () => {
+    const iosUa =
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1";
+    const checked: string[] = [];
+
+    expect(
+      pickSupportedMicRecorderMimeType({
+        userAgent: iosUa,
+        isTypeSupported: (mimeType) => {
+          checked.push(mimeType);
+          if (mimeType === "audio/mp4;codecs=mp4a.40.2") {
+            throw new Error("unsupported probe");
+          }
+          return mimeType === "audio/webm;codecs=opus";
+        },
+      }),
+    ).toBe("audio/webm;codecs=opus");
+    expect(checked).toEqual([
+      "audio/mp4;codecs=mp4a.40.2",
+      "audio/mp4",
+      "audio/webm;codecs=opus",
+    ]);
+    expect(
+      pickSupportedMicRecorderMimeType({
+        userAgent: iosUa,
+        isTypeSupported: () => false,
+      }),
+    ).toBeUndefined();
+  });
+
   it("resolves noisy-environment thresholds and low-quality signal flags deterministically", () => {
     const normal = resolveVoiceNoiseHandlingProfile(false);
     const noisy = resolveVoiceNoiseHandlingProfile(true);
@@ -117,6 +150,94 @@ describe("ask voice capture display helpers", () => {
         lowQualitySnrDb: noisy.localGateLowQualitySnrDb,
       }),
     ).toBe(false);
+  });
+
+  it("derives local segment analysis from numeric accumulators", () => {
+    expect(
+      deriveVoiceSegmentLocalAnalysis({
+        sampleCount: 0,
+        speechProbabilitySum: 0,
+        snrDbSum: 0,
+        centroidSum: 0,
+        zcrSum: 0,
+        rmsDbSum: 0,
+        durationMs: 500,
+      }),
+    ).toMatchObject({
+      speechProbability: 0,
+      snrDb: -20,
+      lowQuality: true,
+    });
+    expect(
+      deriveVoiceSegmentLocalAnalysis({
+        sampleCount: 2,
+        speechProbabilitySum: 1.6,
+        snrDbSum: 18,
+        centroidSum: 1,
+        zcrSum: 0.4,
+        rmsDbSum: -70,
+        durationMs: 500,
+      }),
+    ).toEqual({
+      speechProbability: 0.8,
+      snrDb: 9,
+      centroid: 0.5,
+      zcr: 0.2,
+      rmsDb: -35,
+      lowQuality: false,
+    });
+    expect(
+      deriveVoiceSegmentLocalAnalysis({
+        sampleCount: 2,
+        speechProbabilitySum: 0.2,
+        snrDbSum: 4,
+        centroidSum: 1,
+        zcrSum: 0.4,
+        rmsDbSum: -70,
+        durationMs: 500,
+      }).lowQuality,
+    ).toBe(true);
+  });
+
+  it("resolves speaker profiles from segment analysis without profile state mutation", () => {
+    const profiles = [
+      { id: "speaker_a", sampleCount: 4, centroidMean: 0.2, zcrMean: 0.1, rmsDbMean: -45, snrDbMean: 8 },
+      { id: "speaker_b", sampleCount: 4, centroidMean: 0.72, zcrMean: 0.34, rmsDbMean: -30, snrDbMean: 12 },
+    ];
+    expect(
+      resolveSpeakerFromSessionProfiles({
+        analysis: {
+          speechProbability: 0.9,
+          snrDb: 11,
+          centroid: 0.7,
+          zcr: 0.35,
+          rmsDb: -31,
+          lowQuality: false,
+        },
+        profiles,
+      }),
+    ).toMatchObject({
+      speakerId: "speaker_b",
+      profileIndex: 1,
+    });
+    expect(
+      resolveSpeakerFromSessionProfiles({
+        analysis: {
+          speechProbability: 0.9,
+          snrDb: 20,
+          centroid: 0.95,
+          zcr: 0.95,
+          rmsDb: -5,
+          lowQuality: false,
+        },
+        profiles,
+        matchDistance: 0.05,
+      }),
+    ).toEqual({
+      speakerId: "speaker_3",
+      speakerConfidence: 0.54,
+      profileIndex: -1,
+    });
   });
 
   it("describes media error codes as stable debug labels", () => {

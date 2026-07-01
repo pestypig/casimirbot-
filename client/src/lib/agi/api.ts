@@ -1879,8 +1879,10 @@ const buildRunAskTurnBody = (payload: RunAskTurnPayload): Record<string, unknown
   const body: Record<string, unknown> = {
     question: payload.question,
   };
-  if (payload.agentRuntime) body.agent_runtime = payload.agentRuntime;
-  if (payload.agent_runtime) body.agent_runtime = payload.agent_runtime;
+  if (selectedRuntime) {
+    body.agentRuntime = selectedRuntime;
+    body.agent_runtime = selectedRuntime;
+  }
   if (typeof payload.goldenPathRuntime === "boolean") body.goldenPathRuntime = payload.goldenPathRuntime;
   if (typeof payload.golden_path_runtime === "boolean") body.golden_path_runtime = payload.golden_path_runtime;
   if (selectedRuntime === "helix") {

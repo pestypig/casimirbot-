@@ -62,6 +62,15 @@ export function isManualVoicePlaybackUtterance(
   return utterance?.kind === "manual_read_aloud" || utterance?.source === "manual";
 }
 
+export function canPlayVoiceUtteranceWithMicOff(
+  utterance:
+    | { kind?: string | null; source?: string | null; allowMicOffPlayback?: boolean | null }
+    | null
+    | undefined,
+): boolean {
+  return isManualVoicePlaybackUtterance(utterance) || utterance?.allowMicOffPlayback === true;
+}
+
 export function isInterimVoicePlaybackUtteranceKind(kind: string | null | undefined): boolean {
   return (
     kind === "tool_receipt" ||

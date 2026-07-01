@@ -319,6 +319,13 @@ const observationKindBelongsToCapability = (
     return /scholarly_full_text|fetch_full_text/i.test(text) ||
       /^scholarly_full_text_observation$/i.test(kind);
   }
+  if (
+    capability === "scholarly-research.extract_numeric_parameters" ||
+    runtimeCapability === "scholarly-research.extract_numeric_parameters"
+  ) {
+    return /scholarly_numeric_parameter|extract_numeric_parameters|numeric_parameter_extraction/i.test(text) ||
+      /^scholarly_numeric_parameter_observation$/i.test(kind);
+  }
   if (capability === "helix_ask.reflect_theory_context" || runtimeCapability === "helix_ask.reflect_theory_context") {
     return /helix_theory_context_reflection_tool_receipt|theory_context_reflection/i.test(text) ||
       /^(?:helix_theory_context_reflection_tool_receipt|theory_context_reflection)$/i.test(kind);

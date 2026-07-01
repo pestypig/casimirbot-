@@ -15,18 +15,38 @@ export const buildHelixProviderReasoningReentry = (input: {
   threadId?: string | null;
   route?: HelixAgentRunRoute | string | null;
   gatewayCallResults: HelixWorkstationGatewayCallResult[];
+  capabilityLaneObservationPackets?: HelixAgentStepObservationPacket[];
   normalizedObservationPackets?: HelixAgentStepObservationPacket[];
   providerText: string;
   ok: boolean;
   solverCompleted?: boolean;
   goalSatisfied?: boolean;
 }) => {
-  const observationRefs = input.gatewayCallResults.flatMap((result) => result.artifact_refs);
-  const successfulObservationRefs = input.gatewayCallResults
+  const capabilityLaneObservationPackets = input.capabilityLaneObservationPackets ?? [];
+  const successfulCapabilityLaneObservationPackets = capabilityLaneObservationPackets.filter((packet) => {
+    const status = packet.status.trim().toLowerCase();
+    return status !== "blocked" && status !== "failed" && status !== "missing_input" && status !== "needs_confirmation";
+  });
+  const capabilityLaneObservationRefs = capabilityLaneObservationPackets.flatMap((packet) => packet.produced_artifact_refs);
+  const successfulCapabilityLaneObservationRefs =
+    successfulCapabilityLaneObservationPackets.flatMap((packet) => packet.produced_artifact_refs);
+  const gatewayObservationRefs = input.gatewayCallResults.flatMap((result) => result.artifact_refs);
+  const observationRefs = [
+    ...gatewayObservationRefs,
+    ...capabilityLaneObservationRefs,
+  ];
+  const successfulGatewayObservationRefs = input.gatewayCallResults
     .filter((result) => result.ok === true)
     .flatMap((result) => result.artifact_refs);
+  const successfulObservationRefs = [
+    ...successfulGatewayObservationRefs,
+    ...successfulCapabilityLaneObservationRefs,
+  ];
   const normalizedObservationPackets =
-    input.normalizedObservationPackets ?? input.gatewayCallResults.map((result) => result.observation_packet);
+    input.normalizedObservationPackets ?? [
+      ...input.gatewayCallResults.map((result) => result.observation_packet),
+      ...capabilityLaneObservationPackets,
+    ];
   const normalizedObservationRefs = Array.from(
     new Set(
       normalizedObservationPackets
@@ -35,11 +55,17 @@ export const buildHelixProviderReasoningReentry = (input: {
     ),
   );
   const allGatewayCallsSucceeded =
-    input.gatewayCallResults.length > 0 &&
+    input.gatewayCallResults.length === 0 ||
     input.gatewayCallResults.every((result) => result.ok === true);
+  const allCapabilityLaneObservationsSucceeded =
+    capabilityLaneObservationPackets.length === 0 ||
+    successfulCapabilityLaneObservationPackets.length === capabilityLaneObservationPackets.length;
+  const evidenceSourceCount = input.gatewayCallResults.length + capabilityLaneObservationPackets.length;
+  const allEvidenceSucceeded = allGatewayCallsSucceeded && allCapabilityLaneObservationsSucceeded;
   const normalizedObservationsReady =
-    allGatewayCallsSucceeded &&
-    normalizedObservationPackets.length === input.gatewayCallResults.length &&
+    evidenceSourceCount > 0 &&
+    allEvidenceSucceeded &&
+    normalizedObservationPackets.length >= evidenceSourceCount &&
     normalizedObservationPackets.length > 0;
   const solverAuthoritySatisfied = input.solverCompleted === true && input.goalSatisfied !== false;
   const candidateId = input.ok && input.providerText.trim()
@@ -49,8 +75,8 @@ export const buildHelixProviderReasoningReentry = (input: {
     Boolean(candidateId && normalizedObservationsReady && solverAuthoritySatisfied);
   const terminalAuthorityStatus = terminalAuthorityMayUseProviderText
     ? "authorized_by_helix_provider_candidate_bridge"
-    : candidateId && !allGatewayCallsSucceeded
-      ? "blocked_by_gateway_observation_state"
+    : candidateId && !allEvidenceSucceeded
+      ? "blocked_by_observation_state"
       : candidateId && !normalizedObservationsReady
         ? "blocked_by_missing_normalized_observations"
         : candidateId
@@ -61,6 +87,8 @@ export const buildHelixProviderReasoningReentry = (input: {
       ? []
       : !allGatewayCallsSucceeded
         ? ["gateway_observation_missing_or_failed"]
+        : !allCapabilityLaneObservationsSucceeded
+          ? ["capability_lane_observation_missing_or_failed"]
         : !normalizedObservationsReady
           ? ["normalized_observation_packet_missing"]
           : ["helix_solver_completion_required"]
@@ -79,7 +107,7 @@ export const buildHelixProviderReasoningReentry = (input: {
         candidate_text_preview: input.providerText.slice(0, 4000),
         grounded_in_observation_refs: observationRefs,
         normalized_observation_refs: normalizedObservationRefs,
-        evidence_reentry_required: input.gatewayCallResults.length > 0,
+        evidence_reentry_required: evidenceSourceCount > 0,
         provider_reasoning_completed: true,
         assistant_answer: false,
         terminal_eligible: false,
@@ -102,6 +130,7 @@ export const buildHelixProviderReasoningReentry = (input: {
     input_observation_refs: observationRefs,
     normalized_observation_refs: normalizedObservationRefs,
     normalized_observation_packet_count: normalizedObservationPackets.length,
+    capability_lane_observation_packet_count: capabilityLaneObservationPackets.length,
     provider_terminal_candidate_ref: candidateId,
     provider_terminal_candidate_present: Boolean(candidateId),
     post_tool_model_step_required: Boolean(candidateId && !terminalAuthorityMayUseProviderText),
@@ -125,6 +154,7 @@ export const buildHelixProviderReasoningReentry = (input: {
     blockers: terminalAuthorityBlockers,
     selected_observation_refs: successfulObservationRefs,
     normalized_observation_refs: normalizedObservationRefs,
+    capability_lane_observation_refs: successfulCapabilityLaneObservationRefs,
     assistant_answer: false,
     terminal_eligible: false,
     raw_content_included: false,
@@ -169,11 +199,16 @@ export const buildHelixProviderReasoningReentry = (input: {
     selected_agent_provider: input.runtime,
     provider_label: input.providerLabel,
     provider_terminal_candidate_ref: candidateId,
-    gateway_observation_refs: observationRefs,
-    successful_gateway_observation_refs: successfulObservationRefs,
+    gateway_observation_refs: gatewayObservationRefs,
+    successful_gateway_observation_refs: successfulGatewayObservationRefs,
+    capability_lane_observation_refs: capabilityLaneObservationRefs,
+    successful_capability_lane_observation_refs: successfulCapabilityLaneObservationRefs,
     normalized_observation_refs: normalizedObservationRefs,
     normalized_observation_packet_count: normalizedObservationPackets.length,
+    capability_lane_observation_packet_count: capabilityLaneObservationPackets.length,
     all_gateway_calls_succeeded: allGatewayCallsSucceeded,
+    all_capability_lane_observations_succeeded: allCapabilityLaneObservationsSucceeded,
+    all_observations_succeeded: allEvidenceSucceeded,
     normalized_observations_ready: normalizedObservationsReady,
     solver_completed: input.solverCompleted === true,
     goal_satisfaction_compatible: input.goalSatisfied === true,

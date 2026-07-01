@@ -26,6 +26,9 @@ export const DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS: HelixAgentRuntimeDescriptor[
     supports: {
       streaming: true,
       workstationTools: true,
+      capabilityLanes: true,
+      capabilityLaneOneShot: true,
+      capabilityLaneSessions: false,
       codeMutation: false,
     },
   },
@@ -101,6 +104,9 @@ function normalizeHelixAgentProvider(value: unknown): HelixAgentRuntimeDescripto
     supports: {
       streaming: supports?.streaming === true,
       workstationTools: supports?.workstationTools === true,
+      capabilityLanes: supports?.capabilityLanes === true,
+      capabilityLaneOneShot: supports?.capabilityLaneOneShot === true,
+      capabilityLaneSessions: supports?.capabilityLaneSessions === true,
       codeMutation: supports?.codeMutation === true,
     },
   };

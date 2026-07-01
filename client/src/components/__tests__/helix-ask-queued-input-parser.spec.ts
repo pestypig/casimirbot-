@@ -55,6 +55,11 @@ describe("Helix Ask backend entrypoint projection guard", () => {
 
   it("classifies explicit tool-family prompts as backend Ask entrypoint required", () => {
     expect(requiresHelixAskBackendEntrypoint(hardCalculatorPrompt)).toBe(true);
+    expect(
+      requiresHelixAskBackendEntrypoint(
+        "Run scholarly-research.lookup_papers, fetch_full_text, and extract_numeric_parameters for Alcubierre metric energy estimates.",
+      ),
+    ).toBe(true);
     expect(requiresHelixAskBackendEntrypoint("What should I cook for dinner tonight?")).toBe(false);
   });
 
@@ -119,6 +124,38 @@ describe("Helix Ask backend entrypoint projection guard", () => {
       required_tool_family: "calculator",
       terminal_forbidden: true,
       missing_required_evidence: "calculator_receipt",
+    });
+  });
+
+  it("builds hard backend Ask route metadata for scholarly research tool-chain prompts", () => {
+    const metadata = buildHelixAskHardBackendEntrypointRouteMetadata({
+      question:
+        "Run scholarly-research.lookup_papers, scholarly-research.fetch_full_text, and scholarly-research.extract_numeric_parameters for Alcubierre metric energy estimates.",
+      turnId: "ask:scholarly-turn",
+      threadId: "session-scholarly",
+    }) as Record<string, any>;
+
+    expect(metadata.source).toBe("hard_tool_backend_entrypoint");
+    expect(metadata.sourceTarget).toBe("scholarly_research");
+    expect(metadata.requiredToolFamily).toBe("scholarly_research");
+    expect(metadata.source_target_intent).toMatchObject({
+      target_source: "scholarly_research",
+      target_kind: "scholarly_research",
+      must_enter_backend_ask: true,
+      allow_client_shortcut: false,
+      allow_no_tool_direct: false,
+    });
+    expect(metadata.source_target_intent.requested_outputs).toEqual(
+      expect.arrayContaining([
+        "scholarly_paper_evidence",
+        "full_text_observation",
+        "numeric_parameter_observation",
+      ]),
+    );
+    expect(metadata.mandatory_next_tool).toMatchObject({
+      tool_name: "scholarly-research.lookup_papers",
+      required_tool_family: "scholarly_research",
+      terminal_forbidden: true,
     });
   });
 
@@ -474,5 +511,49 @@ describe("Helix Ask backend entrypoint projection guard", () => {
     expect(debugExport.ask_entrypoint_failure_code).toBe("backend_ask_entry_required");
     expect(debugExport.blocked_projection_kind).toBe("durable_chat_session");
     expect((debugExport.ui_debug_parity_harness as Record<string, unknown>).ui_answer_equals_selected_final_answer).toBe(true);
+  });
+
+  it("does not project scholarly workstation evaluation text when backend Ask entrypoint is missing", () => {
+    const scholarlyPrompt =
+      'Continue the demo from the selected strongest candidate, "Correlation of the L-mode density limit with edge collisionality". Use scholarly-research.fetch_full_text for that paper if a source_ref is available.';
+    const staleEvaluation =
+      "I cannot claim the requested workstation tool or UI action ran because Helix did not produce a successful observation or action receipt for every gateway request. Blocked or failed gateway request: scholarly-research.fetch_full_text: pdf_or_full_text_url_required.";
+    const payload = {
+      id: "helix-chat-turn:client-only",
+      question: scholarlyPrompt,
+      content: staleEvaluation,
+      selected_final_answer: staleEvaluation,
+      final_answer_source: "workstation_tool_evaluation",
+      terminal_artifact_kind: "workstation_tool_evaluation",
+      ask_entrypoint_required: true,
+      ask_entrypoint_observed: false,
+      blocked_projection_kind: "client_projection",
+    } as Record<string, unknown>;
+
+    const reusableDebugExport = JSON.parse(
+      buildHelixDebugExportEnvelopeFromMasterPayload(
+        { id: "helix-chat-turn:client-only", question: scholarlyPrompt, content: staleEvaluation },
+        payload,
+      ),
+    ) as Record<string, unknown>;
+    const pillDebugExport = JSON.parse(
+      buildHelixPillDebugExportEnvelopeFromMasterPayload(
+        { id: "helix-chat-turn:client-only", question: scholarlyPrompt, content: staleEvaluation } as never,
+        payload,
+      ),
+    ) as Record<string, unknown>;
+
+    for (const debugExport of [reusableDebugExport, pillDebugExport]) {
+      expect(debugExport.selected_final_answer).toBe(
+        "This prompt requires the backend Ask solver path before a final answer can be shown.",
+      );
+      expect(debugExport.final_answer_source).toBe("typed_failure");
+      expect(debugExport.terminal_artifact_kind).toBe("typed_failure");
+      expect(debugExport.terminal_error_code).toBe("backend_ask_entry_required");
+      expect(debugExport.ask_entrypoint_required).toBe(true);
+      expect(debugExport.ask_entrypoint_observed).toBe(false);
+      expect(debugExport.first_broken_rail).toBe("backend_ask_entrypoint");
+      expect(debugExport.selected_final_answer).not.toContain("pdf_or_full_text_url_required");
+    }
   });
 });

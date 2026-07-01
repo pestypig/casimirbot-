@@ -1,10 +1,10 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
-let inferAskMode: typeof import("@/components/helix/HelixAskPill").inferAskMode;
+let inferAskMode: typeof import("@/lib/helix/ask-exploration-policy").inferAskMode;
 
 beforeAll(async () => {
   (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
-  ({ inferAskMode } = await import("@/components/helix/HelixAskPill"));
+  ({ inferAskMode } = await import("@/lib/helix/ask-exploration-policy"));
 });
 
 describe("inferAskMode", () => {

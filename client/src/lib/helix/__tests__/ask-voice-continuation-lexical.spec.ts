@@ -4,8 +4,13 @@ import {
   extractLatestContinuationQuestionFocus,
   hasDanglingTurnTail,
   hasSufficientLexicalCarryover,
+  isLikelyContinuationAddendum,
+  isLikelyContinuationTailFragment,
   isLikelyNearTurnContinuation,
   isLowInformationTailTranscript,
+  shouldMergeVoiceContinuationInFlight,
+  shouldMergeVoiceContinuationTurn,
+  shouldRestartExplorationLadderOnSupersede,
 } from "../ask-voice-continuation-lexical";
 
 describe("ask voice continuation lexical helpers", () => {
@@ -49,5 +54,72 @@ describe("ask voice continuation lexical helpers", () => {
       }),
     ).toBe(true);
     expect(isLikelyNearTurnContinuation({ transcript: "new unrelated topic", priorUserTurn: "explain energy density" })).toBe(false);
+  });
+
+  it("merges nearby voice continuation turns without accepting stale fragments", () => {
+    expect(
+      shouldMergeVoiceContinuationTurn({
+        previousPrompt: "Explain the Casimir setup",
+        nextTranscript: "and compare the energy density",
+        gapMs: 800,
+      }),
+    ).toBe(true);
+    expect(
+      shouldMergeVoiceContinuationTurn({
+        previousPrompt: "Explain the Casimir setup",
+        nextTranscript: "new unrelated request",
+        gapMs: 12_000,
+      }),
+    ).toBe(false);
+    expect(
+      shouldMergeVoiceContinuationTurn({
+        previousPrompt: "Explain the Casimir setup.",
+        nextTranscript: "Short fragment",
+        gapMs: 800,
+      }),
+    ).toBe(false);
+  });
+
+  it("merges active in-flight continuations by window or lexical continuity", () => {
+    expect(shouldMergeVoiceContinuationInFlight({ gapMs: 500, lexicalContinuation: false })).toBe(true);
+    expect(shouldMergeVoiceContinuationInFlight({ gapMs: 30_000, lexicalContinuation: true })).toBe(true);
+    expect(shouldMergeVoiceContinuationInFlight({ gapMs: 30_000, lexicalContinuation: false })).toBe(false);
+  });
+
+  it("keeps supersede restart policy deterministic", () => {
+    expect(
+      shouldRestartExplorationLadderOnSupersede({
+        hasContinuityCandidate: true,
+        forceTailContinuationMerge: false,
+        shortContinuationAddendum: false,
+        canMergeContinuation: false,
+        intentShiftBand: "shift",
+      }),
+    ).toBe(true);
+    expect(
+      shouldRestartExplorationLadderOnSupersede({
+        hasContinuityCandidate: true,
+        forceTailContinuationMerge: true,
+        shortContinuationAddendum: false,
+        canMergeContinuation: false,
+        intentShiftBand: "shift",
+      }),
+    ).toBe(false);
+    expect(
+      shouldRestartExplorationLadderOnSupersede({
+        hasContinuityCandidate: true,
+        forceTailContinuationMerge: false,
+        shortContinuationAddendum: false,
+        canMergeContinuation: true,
+        intentShiftBand: "continuation",
+      }),
+    ).toBe(false);
+  });
+
+  it("classifies addendum and tail fragments without treating questions as tails", () => {
+    expect(isLikelyContinuationAddendum("So gravity is like where this converges.")).toBe(true);
+    expect(isLikelyContinuationAddendum("Define a system from scratch with examples.")).toBe(false);
+    expect(isLikelyContinuationTailFragment("probability that happens in the Casimir effect.")).toBe(true);
+    expect(isLikelyContinuationTailFragment("What is the Casimir effect?")).toBe(false);
   });
 });

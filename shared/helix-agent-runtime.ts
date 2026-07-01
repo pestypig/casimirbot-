@@ -33,6 +33,9 @@ export type HelixAgentRuntimeDescriptor = {
   supports: {
     streaming: boolean;
     workstationTools: boolean;
+    capabilityLanes?: boolean;
+    capabilityLaneOneShot?: boolean;
+    capabilityLaneSessions?: boolean;
     codeMutation: boolean;
   };
 };

@@ -478,6 +478,22 @@ const readRecordArray = (value: unknown): Array<Record<string, unknown>> =>
     ? value.map(readRecord).filter((entry): entry is Record<string, unknown> => Boolean(entry))
     : [];
 
+const isLikelyScholarlyFullTextUrl = (value: unknown): boolean => {
+  const url = optionalString(value);
+  return Boolean(url && /^https?:\/\//i.test(url) && (/\.(?:pdf|html?|txt)(?:[?#].*)?$/i.test(url) || /arxiv\.org\/(?:pdf|abs)\//i.test(url)));
+};
+
+const hasFetchableScholarlyPaperIdentity = (paper: Record<string, unknown> | null): boolean => {
+  if (!paper) return false;
+  const identifiers = readRecord(paper.identifiers);
+  return Boolean(
+    isLikelyScholarlyFullTextUrl(identifiers?.pdf_url) ||
+      isLikelyScholarlyFullTextUrl(identifiers?.full_text_url) ||
+      isLikelyScholarlyFullTextUrl(identifiers?.url) ||
+      optionalString(identifiers?.arxiv_id),
+  );
+};
+
 const readSafeWorkstationPanelId = (value: unknown): string | null => {
   const panelId = cleanString(value).replace(/[^a-z0-9_-]/gi, "").trim();
   return SAFE_WORKSTATION_PANEL_ACTION_IDS.some((allowed) => allowed === panelId) ? panelId : null;
@@ -1832,10 +1848,11 @@ const scholarlyNumericParameterExtractManifest: HelixWorkstationCapabilityManife
   input_schema: {
     type: "object",
     additionalProperties: false,
-    required: ["requested_variables"],
+    required: [],
     properties: {
       requested_variables: { type: "array", items: { type: "string" } },
       variables: { type: "array", items: { type: "string" } },
+      extraction_mode: { type: "string" },
       full_text_observation: { type: "object" },
       text_evidence: { type: "string" },
       source_ref: { type: "string" },
@@ -4965,8 +4982,23 @@ export const callWorkstationGatewayCapability = async (
     const paperResultId = optionalString(args.paper_result_id ?? args.paperResultId ?? args.source_ref ?? args.sourceRef);
     const paper = readRecord(args.paper);
     const papers = readArray(args.papers).map(readRecord).filter((entry): entry is Record<string, unknown> => Boolean(entry));
-    const blockedReason = !sourceUrl && !paper && papers.length === 0
-      ? "paper_result_or_source_required"
+    const hasFetchableSource =
+      Boolean(sourceUrl) ||
+      hasFetchableScholarlyPaperIdentity(paper) ||
+      papers.some((entry) => {
+        if (!paperResultId) return hasFetchableScholarlyPaperIdentity(entry);
+        const identifiers = readRecord(entry.identifiers);
+        return (
+          (optionalString(entry.result_id) === paperResultId ||
+            optionalString(identifiers?.doi) === paperResultId ||
+            optionalString(identifiers?.arxiv_id) === paperResultId) &&
+          hasFetchableScholarlyPaperIdentity(entry)
+        );
+      });
+    const blockedReason = !hasFetchableSource
+      ? paperResultId || paper || papers.length > 0
+        ? "fetchable_paper_identity_required"
+        : "paper_result_or_source_required"
       : null;
     const admission = buildAdmission({
       capabilityId: manifest.capability_id,
@@ -5005,11 +5037,15 @@ export const callWorkstationGatewayCapability = async (
         panelId: "scholarly-research",
         action: "fetch_full_text",
         status: "blocked",
-        summary: "Scholarly full-text fetch was blocked because no paper ref or source URL was supplied.",
+        summary: blockedReason === "fetchable_paper_identity_required"
+          ? "Scholarly full-text fetch was blocked because the paper identity was not fetchable from the current turn evidence."
+          : "Scholarly full-text fetch was blocked because no paper ref or source URL was supplied.",
         observation,
         missingRequirements: [{
           code: blockedReason,
-          message: "Provide a paper result, paper_result_id with papers, or an accessible source_url.",
+          message: blockedReason === "fetchable_paper_identity_required"
+            ? "Provide a paper result or source_ref from a lookup observation that includes a DOI/arXiv/PDF/full-text URL, or run lookup_papers again for the target title."
+            : "Provide a paper result, paper_result_id with papers, or an accessible source_url.",
           repair_action: "ask_user",
         }],
       });
@@ -5106,12 +5142,13 @@ export const callWorkstationGatewayCapability = async (
   if (manifest.capability_id === SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY) {
     const args = readArguments(input.arguments);
     const requestedVariables = readStringArray(args.requested_variables ?? args.requestedVariables ?? args.variables);
+    const extractionMode = cleanString(args.extraction_mode ?? args.extractionMode) === "open_supported_parameters" || requestedVariables.length === 0
+      ? "open_supported_parameters"
+      : "requested_variables";
     const fullTextObservation = readRecord(args.full_text_observation ?? args.fullTextObservation);
     const textEvidence = optionalString(args.text_evidence ?? args.textEvidence ?? args.text);
     const sourceRef = optionalString(args.source_ref ?? args.sourceRef);
-    const blockedReason = requestedVariables.length === 0
-      ? "requested_variables_required"
-      : !fullTextObservation && !textEvidence
+    const blockedReason = !fullTextObservation && !textEvidence
         ? "text_evidence_required"
         : null;
     const admission = buildAdmission({
@@ -5134,10 +5171,11 @@ export const callWorkstationGatewayCapability = async (
           paper: {},
           requested_variables: requestedVariables,
           parameters: [],
-          missing_variables: requestedVariables,
+          missing_variables: extractionMode === "open_supported_parameters" ? [] : requestedVariables,
           rejected_candidates: [],
           missing_requirements: [blockedReason],
           selected_for_answer: false,
+          extraction_mode: extractionMode,
           status: "blocked",
           blocked_reason: blockedReason,
           terminal_eligible: false,
@@ -5150,6 +5188,7 @@ export const callWorkstationGatewayCapability = async (
             turnId,
             callId: `${turnId}:workstation_gateway:${manifest.capability_id}:${iteration}`,
             requestedVariables,
+            extractionMode,
             fullTextObservation: fullTextObservation as never,
             textEvidence,
             sourceRef,

@@ -1,4 +1,5 @@
 import type { AskLiveEventEntry } from "@/lib/helix/ask-observer-events";
+import { readAskLiveEventIdentity } from "@/lib/helix/ask-debug-event-display";
 import { humanizeAskLiveEventToken } from "@/lib/helix/ask-display-text";
 
 export type HelixAskConsoleStreamIngressDebug = {
@@ -441,6 +442,32 @@ export function shouldAdmitHelixAskExternalLiveEventToActiveStream(input: {
     eventTraceId: input.eventTraceId,
     eventMeta: input.eventMeta,
   }).some((key) => activeKeys.has(key));
+}
+
+export function askLiveEventBelongsToActiveTurn(args: {
+  event: AskLiveEventEntry;
+  activeTurnId?: string | null;
+  activeTraceId?: string | null;
+  activeStartedAtMs?: number | null;
+}): boolean {
+  const activeIds = new Set(
+    [args.activeTurnId, args.activeTraceId]
+      .map((value) => String(value ?? "").trim())
+      .filter(Boolean),
+  );
+  const identity = readAskLiveEventIdentity(args.event);
+  const eventIds = [identity.turnId, identity.traceId].filter((value): value is string => Boolean(value));
+  if (eventIds.length > 0) return eventIds.some((value) => activeIds.has(value));
+  const eventTs = resolveAskLiveEventTimestampMs(args.event);
+  if (
+    typeof eventTs === "number" &&
+    Number.isFinite(eventTs) &&
+    typeof args.activeStartedAtMs === "number" &&
+    Number.isFinite(args.activeStartedAtMs)
+  ) {
+    return eventTs >= args.activeStartedAtMs - 500;
+  }
+  return true;
 }
 
 export function filterHelixAskActiveTurnStreamRows(

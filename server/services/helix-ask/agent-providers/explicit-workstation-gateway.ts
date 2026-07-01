@@ -1759,11 +1759,20 @@ const hasAffirmativeRepoSearchIntent = (prompt: string): boolean => {
   );
 };
 
+const hasExplicitScholarlyFullTextNumericChainIntent = (prompt: string): boolean => {
+  const unquoted = unquotePrompt(prompt);
+  return (
+    /\bscholarly-research\.(?:fetch_full_text|extract_numeric_parameters)\b/i.test(unquoted) ||
+    /\b(?:fetch\s+full\s+text|full[-\s]?text|extract\s+numeric\s+parameters?|numeric\s+parameter\s+extraction|cited\s+numeric\s+values?)\b/i.test(unquoted)
+  );
+};
+
 export const buildPromptDerivedRepoSearchGatewayCallRequests = (
   body: Record<string, unknown>,
 ): Record<string, unknown>[] => {
   const prompt = readPrompt(body);
   if (!prompt) return [];
+  if (hasExplicitScholarlyFullTextNumericChainIntent(prompt)) return [];
   const query = extractRepoSearchQueryFromPrompt(prompt);
   if (!query && !hasAffirmativeRepoSearchIntent(prompt)) return [];
   return [{
@@ -1924,10 +1933,14 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
       .map((request) => readString(request.capability_id) ?? readString(request.capabilityId))
       .filter((capability): capability is string => Boolean(capability)),
   );
+  const promptNamedForAppend = promptNamed.filter((request) => {
+    const capability = readString(request.capability_id) ?? readString(request.capabilityId);
+    return !capability || !compoundDependencyCapabilities.has(capability);
+  });
   const hasNamedDocsSearch = promptNamed.some((request) => readString(request.capability_id) === DOCS_SEARCH_CAPABILITY);
   const activeDocsContext = buildActiveDocsContextWorkstationGatewayCallRequests(input.body);
   if (hasNamedDocsSearch) {
-    appendDedupe(requests, seen, promptNamed);
+    appendDedupe(requests, seen, promptNamedForAppend);
   } else {
     if (
       !compoundDependencyCapabilities.has(DOCS_SEARCH_CAPABILITY) &&
@@ -1936,7 +1949,7 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
     ) {
       appendDedupe(requests, seen, activeDocsContext);
     }
-    appendDedupe(requests, seen, promptNamed);
+    appendDedupe(requests, seen, promptNamedForAppend);
   }
   const activeCalculatorContext = buildActiveCalculatorContextWorkstationGatewayCallRequests(input.body);
   appendDedupe(requests, seen, activeCalculatorContext);

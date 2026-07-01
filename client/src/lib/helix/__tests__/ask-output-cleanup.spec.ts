@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   cleanPromptLine,
   decideHelixAskFormat,
+  extractAnswerBlock,
   normalizeQuestionMatch,
   stripAnswerBoundaryPrefix,
+  stripEvidencePromptBlock,
   stripInlineQuestionLine,
   stripLeadingQuestion,
+  stripPromptEcho,
   stripQuestionPrefixText,
   stripStageTags,
 } from "../ask-output-cleanup";
@@ -43,6 +46,35 @@ describe("ask output cleanup", () => {
   it("removes leading echoed question scaffolding", () => {
     const response = ["Question: What is 3+5?", "Context: calculator", "", "8"].join("\n");
     expect(stripLeadingQuestion(response, "What is 3+5?")).toBe("8");
+  });
+
+  it("extracts the most useful answer block from marker-heavy fallback output", () => {
+    expect(extractAnswerBlock("ANSWER_START\nshort\nANSWER_END\nANSWER_START\nlonger final\nANSWER_END")).toBe(
+      "longer final",
+    );
+    expect(extractAnswerBlock("noise\nFINAL ANSWER: terminal answer")).toBe("noise\nFINAL ANSWER: terminal answer");
+  });
+
+  it("removes scaffold evidence prompt blocks before fallback display", () => {
+    expect(stripEvidencePromptBlock(["Intro", "Evidence:", "- source A", "Answer:", "Final text"].join("\n"))).toBe(
+      "Intro\nFinal text",
+    );
+    expect(stripEvidencePromptBlock("Evidence:\n- source A")).toBe("Evidence:\n- source A");
+  });
+
+  it("strips echoed fallback prompt scaffolds without changing answer authority", () => {
+    const fallback = [
+      "Question: What is 3+5?",
+      "ANSWER_START",
+      "8 (explain)",
+      "ANSWER_END",
+    ].join("\n");
+    expect(stripPromptEcho(fallback, "What is 3+5?")).toBe("8 (explain)");
+  });
+
+  it("preserves stage tags for method-format fallback answers", () => {
+    const fallback = ["ANSWER_START", "Step one (observe)", "ANSWER_END"].join("\n");
+    expect(stripPromptEcho(fallback, "Use the scientific method here")).toBe("Step one (observe)");
   });
 
   it("classifies answer cleanup format hints deterministically", () => {

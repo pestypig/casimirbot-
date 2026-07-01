@@ -162,6 +162,210 @@ describe("HelixAskMinimalRuntimeShell", () => {
     expect(useAgiChatStore.getState().activeId).toBe("session-existing");
   });
 
+  it("renders runtime provider, lane, backend, tool, terminal, and debug projection for the latest turn", async () => {
+    vi.spyOn(globalThis.crypto, "randomUUID").mockReturnValue("runtime-provider-summary-turn");
+    const runTurn = vi.fn(async (payload) => ({
+      selected_final_answer: "The result is 72.",
+      turn_id: payload.turnId,
+      agent_runtime: "codex",
+      selected_agent_provider: {
+        id: "codex",
+        label: "Codex Workstation Mode",
+      },
+      agent_runtime_selection_trace: {
+        adapter_boundary: "helix_agent_provider_edge",
+      },
+      capability_lane_manifest: {
+        schema: "helix.capability_lane_manifest.v1",
+        selected_runtime_agent_provider: "codex",
+        lanes: [
+          {
+            lane_id: "workstation_tool_reference",
+            status: "available",
+            backend_family: "helix_workstation_gateway",
+          },
+          {
+            lane_id: "live_translation",
+            status: "unconfigured",
+            backend_family: "google_gemini",
+          },
+        ],
+        lane_ids: ["workstation_tool_reference", "live_translation"],
+      },
+      capability_lane_statuses: {
+        workstation_tool_reference: "available",
+        live_translation: "unconfigured",
+      },
+      capability_lane_resolve_trace_shape: {
+        schema: "helix.capability_lane_resolve_trace.v1",
+        requested_lane: "live_translation",
+        lane_status: "unconfigured",
+        resolved_backend_provider: null,
+        resolved_model_or_service: null,
+        blocked_reason: "backend_provider_key_or_endpoint_not_configured",
+      },
+      workstation_gateway_call_results: [
+        {
+          ok: true,
+          capability_id: "scientific-calculator.solve_expression",
+          gateway_admission: {
+            requested_capability: "scientific-calculator.solve_expression",
+          },
+        },
+      ],
+      capability_lane_call_results: [
+        {
+          ok: true,
+          capability: "live_translation.translate_text",
+          translated_text: "hola",
+          observation: {
+            observation_ref: "ask:runtime-provider-summary-turn:live-translation:obs",
+            target_language: "es",
+            source_id: "docs:current",
+            chunk_id: "chunk-1",
+            freshness_status: "fresh",
+            projection_target: "docs_chunk",
+            translated_text: "hola",
+            cancel_requested: false,
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+          observation_packet: {
+            status: "succeeded",
+            observation_ref: "ask:runtime-provider-summary-turn:live-translation:obs",
+            state_delta: {
+              live_translation_chunk: {
+                source_id: "docs:current",
+                chunk_id: "chunk-1",
+                freshness_status: "fresh",
+                projection_target: "docs_chunk",
+                cancel_requested: false,
+                terminal_eligible: false,
+                assistant_answer: false,
+                raw_content_included: false,
+              },
+            },
+          },
+        },
+        {
+          ok: true,
+          capability: "utility_text.normalize_text",
+          normalized_text: "hello workstation",
+          observation: {
+            observation_ref: "ask:runtime-provider-summary-turn:utility-text:obs",
+            normalization_mode: "lowercase",
+            normalized_text: "hello workstation",
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+          observation_packet: {
+            status: "succeeded",
+            observation_ref: "ask:runtime-provider-summary-turn:utility-text:obs",
+            observation_summary: "Utility text normalization ready: lowercase.",
+          },
+        },
+        {
+          ok: true,
+          capability: "workstation_tool_reference.list_capabilities",
+          capability_count: 42,
+          observation: {
+            observation_ref: "ask:runtime-provider-summary-turn:workstation-tool-reference:obs",
+            gateway_mode: "act",
+            capability_count: 42,
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+          observation_packet: {
+            status: "succeeded",
+            observation_ref: "ask:runtime-provider-summary-turn:workstation-tool-reference:obs",
+            observation_summary: "Workstation gateway catalog ready: 42 capabilities.",
+          },
+        },
+      ],
+      capability_lane_goal_binding_debug_summaries: [
+        {
+          schema: "helix.capability_lane.goal_binding_debug_summary.v1",
+          goal_binding_id: "goal-binding-runtime-provider-summary",
+          goal_id: "goal:translate-docs",
+          lane_session_id: "lane-session-runtime-provider-summary",
+          lane_id: "live_translation",
+          selected_runtime_agent_provider: "codex",
+          selected_backend_provider: "live_translation.local_runtime",
+          session_status: "running",
+          session_health: "healthy",
+          source_id: "docs:current",
+          last_observation_ref: "ask:runtime-provider-summary-turn:live-translation:goal-obs",
+          binding_status: "bound",
+          terminal_authority_status: "pending_helix_terminal_authority",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      ],
+      terminal_artifact_kind: "workstation_tool_evaluation",
+      debug_export_ref: "ask:runtime-provider-summary-turn:debug-export",
+      debug: {},
+    }));
+
+    render(
+      <HelixAskMinimalRuntimeShell
+        contextId="ctx"
+        runTurn={runTurn}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Ask Helix"), {
+      target: { value: "Use the calculator for 8*9" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Submit prompt" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("The result is 72.")).toBeTruthy();
+    });
+
+    const summary = screen.getByTestId("helix-ask-minimal-runtime-provider-summary");
+    expect(summary).toHaveTextContent("Runtime trace");
+    expect(summary).toHaveTextContent("codex / Codex Workstation Mode");
+    expect(summary).toHaveTextContent("helix_agent_provider_edge");
+    expect(summary).toHaveTextContent("workstation_tool_reference: available (helix_workstation_gateway)");
+    expect(summary).toHaveTextContent("live_translation: unconfigured (google_gemini)");
+    expect(summary).toHaveTextContent("lane live_translation");
+    expect(summary).toHaveTextContent("status unconfigured");
+    expect(summary).toHaveTextContent("backend_provider_key_or_endpoint_not_configured");
+    expect(summary).toHaveTextContent("scientific-calculator.solve_expression (ok)");
+    expect(summary).toHaveTextContent("live_translation");
+    expect(summary).toHaveTextContent("target docs_chunk");
+    expect(summary).toHaveTextContent("language es");
+    expect(summary).toHaveTextContent("source docs:current");
+    expect(summary).toHaveTextContent("chunk chunk-1");
+    expect(summary).toHaveTextContent("freshness fresh");
+    expect(summary).toHaveTextContent("text hola");
+    expect(summary).toHaveTextContent("ask:runtime-provider-summary-turn:live-translation:obs");
+    expect(summary).toHaveTextContent("utility_text");
+    expect(summary).toHaveTextContent("normalize_text");
+    expect(summary).toHaveTextContent("mode lowercase");
+    expect(summary).toHaveTextContent("text hello workstation");
+    expect(summary).toHaveTextContent("ask:runtime-provider-summary-turn:utility-text:obs");
+    expect(summary).toHaveTextContent("workstation_tool_reference");
+    expect(summary).toHaveTextContent("list_capabilities");
+    expect(summary).toHaveTextContent("mode act");
+    expect(summary).toHaveTextContent("count 42");
+    expect(summary).toHaveTextContent("ask:runtime-provider-summary-turn:workstation-tool-reference:obs");
+    expect(summary).toHaveTextContent("Goal-bound lanes");
+    expect(summary).toHaveTextContent("goal goal:translate-docs");
+    expect(summary).toHaveTextContent("session lane-session-runtime-provider-summary");
+    expect(summary).toHaveTextContent("status bound/running");
+    expect(summary).toHaveTextContent("backend live_translation.local_runtime");
+    expect(summary).toHaveTextContent("observation ask:runtime-provider-summary-turn:live-translation:goal-obs");
+    expect(summary).toHaveTextContent("authority pending_helix_terminal_authority");
+    expect(summary).toHaveTextContent("observation-only");
+    expect(summary).toHaveTextContent("workstation_tool_evaluation");
+    expect(summary).toHaveTextContent("ask:runtime-provider-summary-turn:debug-export");
+  });
+
   it("submits through the runtime shell minimal implementation without rendering the legacy bridge", async () => {
     window.history.pushState({}, "", "/desktop?doc=docs/current.md");
     vi.spyOn(globalThis.crypto, "randomUUID").mockReturnValue("runtime-shell-turn");

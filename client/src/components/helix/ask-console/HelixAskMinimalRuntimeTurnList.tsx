@@ -5,6 +5,10 @@ import {
   resolveHelixAskActualAgentProviderLabel,
   resolveHelixAskModelUsageLabel,
 } from "@/lib/helix/ask-agent-runtime-display";
+import {
+  buildHelixAskRuntimeTurnSummary,
+  type HelixAskRuntimeTurnSummaryRow,
+} from "@/lib/helix/ask-runtime-turn-summary";
 import { buildHelixTurnTranscriptRows } from "@/lib/helix/ask-turn-transcript";
 
 import { HelixAskFinalAnswer } from "./HelixAskFinalAnswer";
@@ -26,6 +30,7 @@ export type HelixAskMinimalRuntimeTurnView = {
   answerText: string;
   meta: string | null;
   isLatest: boolean;
+  runtimeSummaryRows: HelixAskRuntimeTurnSummaryRow[];
   workstationTraceRows: Array<{
     key: string;
     label: string;
@@ -77,6 +82,7 @@ export function buildHelixAskMinimalRuntimeTurnViews(args: {
       meta: row.meta,
       status: row.status,
     }));
+    const runtimeSummary = buildHelixAskRuntimeTurnSummary(projectionSource, providers);
     return {
       id: reply.id,
       turnId: reply.turn_id,
@@ -84,6 +90,7 @@ export function buildHelixAskMinimalRuntimeTurnViews(args: {
       answerText: reply.content,
       meta: [providerLabel, modelLabel].filter(Boolean).join(" | ") || null,
       isLatest: latestReply?.turn_id === reply.turn_id,
+      runtimeSummaryRows: runtimeSummary?.rows ?? [],
       workstationTraceRows,
     };
   });
@@ -119,6 +126,33 @@ export function HelixAskMinimalRuntimeTurnList({
               <p className="mt-1 break-words text-xs text-slate-300 [overflow-wrap:anywhere]">
                 {view.question}
               </p>
+              {view.runtimeSummaryRows.length > 0 ? (
+                <div
+                  className="mt-3 rounded-lg border border-cyan-300/15 bg-cyan-950/15 px-2.5 py-2 text-xs text-slate-200"
+                  data-testid={view.isLatest ? "helix-ask-minimal-runtime-provider-summary" : undefined}
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200">
+                      Runtime trace
+                    </p>
+                    <span className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.12em] text-slate-400">
+                      provider/lane/terminal
+                    </span>
+                  </div>
+                  <dl className="mt-2 space-y-1.5">
+                    {view.runtimeSummaryRows.map((row) => (
+                      <div key={row.key} className="grid gap-1 sm:grid-cols-[8rem_minmax(0,1fr)]">
+                        <dt className="text-[10px] uppercase tracking-[0.12em] text-slate-500">
+                          {row.label}
+                        </dt>
+                        <dd className="break-words text-slate-200 [overflow-wrap:anywhere]">
+                          {row.value}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              ) : null}
               {view.workstationTraceRows.length > 0 ? (
                 <div
                   className="mt-3 space-y-2"

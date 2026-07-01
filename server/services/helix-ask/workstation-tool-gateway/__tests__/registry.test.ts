@@ -2710,6 +2710,42 @@ describe("Helix workstation tool gateway", () => {
     expect(observation.selected_chunks?.[0]?.citation_ref).toBe("paper#page=1");
   });
 
+  it("blocks scholarly full-text fetch when the paper identity has no fetchable source", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+      arguments: {
+        query: "Correlation of the L-mode density limit with edge collisionality",
+        source_ref: "Correlation of the L-mode density limit with edge collisionality",
+      },
+      turnId: "ask:test:gateway-scholarly-full-text-missing-source",
+      iteration: 9,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      capability_id: SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+      error: "fetchable_paper_identity_required",
+      observation_packet: {
+        capability_key: SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+        action: "fetch_full_text",
+        status: "blocked",
+      },
+      observation: {
+        schema: "helix.scholarly_full_text_observation.v1",
+        status: "blocked",
+        blocked_reason: "fetchable_paper_identity_required",
+        missing_requirements: ["fetchable_paper_identity_required"],
+        selected_for_answer: false,
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+  });
+
   it("extracts cited numeric parameters with units and rejects missing variables", async () => {
     const result = await callWorkstationGatewayCapability({
       agentRuntime: "codex",
@@ -2776,6 +2812,263 @@ describe("Helix workstation tool gateway", () => {
       }),
     ]));
     expect(observation.rejected_candidates ?? []).toEqual(expect.any(Array));
+  });
+
+  it("extracts alias-matched numeric parameters from table-like scholarly evidence", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY,
+      arguments: {
+        requested_variables: ["n_m3", "T_eV", "B_T", "e_charge", "mu0"],
+        source_ref: "paper:tokamak#page=7",
+        paper: {
+          title: "Tokamak parameter table",
+          doi: "10.0000/table",
+          url: "https://example.test/tokamak-table",
+        },
+        text_evidence: [
+          "Table 2. Experimental parameters from Smith et al. (2024).",
+          "| quantity | symbol | value | unit |",
+          "| electron density | n_e | 1.2 | 10^20 m^-3 |",
+          "| electron temperature | T_e | 4.5 | keV |",
+          "| toroidal magnetic field | B_t | 2.1 | T |",
+          "| elementary charge | e | 1.602176634 x 10^-19 | C |",
+          "| vacuum permeability | mu_0 | 4 pi x 10^-7 | H/m |",
+        ].join("\n"),
+      },
+      turnId: "ask:test:gateway-scholarly-numeric-table",
+      iteration: 10,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      capability_id: SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY,
+      observation_packet: {
+        action: "extract_numeric_parameters",
+        status: "succeeded",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.scholarly_numeric_parameter_observation.v1",
+        missing_variables: [],
+        selected_for_answer: true,
+      },
+    });
+    const observation = result.observation as {
+      parameters?: Array<{
+        variable?: string;
+        normalized_value?: number;
+        normalized_unit?: string;
+        source_snippet?: string;
+        evidence_ref?: string;
+        table?: string | null;
+        confidence?: string;
+      }>;
+    };
+    expect(observation.parameters).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        variable: "n_m3",
+        normalized_value: 1.2e20,
+        normalized_unit: "m^-3",
+        evidence_ref: expect.stringContaining("scholarly-numeric:"),
+        confidence: "medium",
+      }),
+      expect.objectContaining({
+        variable: "T_eV",
+        normalized_value: 4500,
+        normalized_unit: "eV",
+      }),
+      expect.objectContaining({
+        variable: "B_T",
+        normalized_value: 2.1,
+        normalized_unit: "T",
+      }),
+      expect.objectContaining({
+        variable: "e_charge",
+        normalized_value: 1.602176634e-19,
+        normalized_unit: "C",
+      }),
+      expect.objectContaining({
+        variable: "mu0",
+        normalized_value: expect.closeTo(4 * Math.PI * 1e-7, 16),
+        normalized_unit: "H/m",
+      }),
+    ]));
+    expect(observation.parameters?.every((parameter) =>
+      Boolean(parameter.source_snippet && parameter.evidence_ref && parameter.table)
+    )).toBe(true);
+  });
+
+  it("does not treat bare B in particle-physics prose as B_T magnetic-field evidence", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY,
+      arguments: {
+        requested_variables: ["B_T"],
+        source_ref: "paper:b-physics#page=2",
+        paper: {
+          title: "B meson branching fraction evidence",
+          url: "https://example.test/b-physics",
+        },
+        text_evidence: "Table 1 reports B = 2.1 T [8] for a branching-fraction fit label, not a magnetic field.",
+      },
+      turnId: "ask:test:gateway-scholarly-numeric-bare-b-not-field",
+      iteration: 10,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      capability_id: SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY,
+      observation: {
+        requested_variables: ["B_T"],
+        parameters: [],
+        missing_variables: ["B_T"],
+        selected_for_answer: false,
+      },
+      error: "missing_requested_numeric_variables",
+    });
+  });
+
+  it("supports exploratory extraction of any cited supported numeric parameters", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY,
+      arguments: {
+        extraction_mode: "open_supported_parameters",
+        source_ref: "paper:tokamak#page=3",
+        paper: {
+          title: "Tokamak exploratory operating point",
+          url: "https://example.test/tokamak-open",
+        },
+        text_evidence: [
+          "Table 1 reports electron density n_e = 2.0e19 m^-3 [3].",
+          "The electron temperature T_e = 1.5 keV [3].",
+        ].join(" "),
+      },
+      turnId: "ask:test:gateway-scholarly-numeric-open-extraction",
+      iteration: 10,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      capability_id: SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY,
+      observation_packet: {
+        action: "extract_numeric_parameters",
+        status: "succeeded",
+      },
+      observation: {
+        requested_variables: [],
+        missing_variables: [],
+        extraction_mode: "open_supported_parameters",
+        selected_for_answer: true,
+      },
+    });
+    const observation = result.observation as {
+      parameters?: Array<{ variable?: string; normalized_value?: number; normalized_unit?: string }>;
+    };
+    expect(observation.parameters).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        variable: "n_m3",
+        normalized_value: 2.0e19,
+        normalized_unit: "m^-3",
+      }),
+      expect.objectContaining({
+        variable: "T_eV",
+        normalized_value: 1500,
+        normalized_unit: "eV",
+      }),
+    ]));
+  });
+
+  it("fails closed for uncited, missing-unit, and unsupported numeric candidates", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY,
+      arguments: {
+        requested_variables: ["n_m3", "T_eV", "B_T"],
+        text_evidence: [
+          "The electron density n_e = 8.0e19 cm^-3 [4].",
+          "The electron temperature T_e = 3500 [4].",
+          "The toroidal magnetic field B_t = 2.7 T was used in the discharge.",
+        ].join(" "),
+      },
+      turnId: "ask:test:gateway-scholarly-numeric-rejections",
+      iteration: 11,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      capability_id: SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY,
+      observation_packet: {
+        action: "extract_numeric_parameters",
+        status: "failed",
+      },
+      observation: {
+        requested_variables: ["n_m3", "T_eV", "B_T"],
+        parameters: [],
+        missing_variables: ["n_m3", "T_eV", "B_T"],
+        selected_for_answer: false,
+        missing_requirements: ["text_evidence_required", "missing_requested_numeric_variables"],
+      },
+      error: "text_evidence_required",
+    });
+  });
+
+  it("reports typed numeric candidate rejection reasons when source evidence is present", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY,
+      arguments: {
+        requested_variables: ["n_m3", "T_eV", "B_T"],
+        source_ref: "paper:tokamak",
+        text_evidence: [
+          "Table 3 reports electron density n_e = 8.0e19 cm^-3 [4].",
+          "Table 3 reports electron temperature T_e = 3 T [4].",
+          "This intervening sentence is deliberately long enough to keep the previous citation outside the bounded source snippet used for the field candidate. ".repeat(4),
+          "The toroidal magnetic field B_t = 2.7 T was used in the discharge.",
+        ].join(" "),
+      },
+      turnId: "ask:test:gateway-scholarly-numeric-typed-rejections",
+      iteration: 12,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      capability_id: SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY,
+      observation_packet: {
+        action: "extract_numeric_parameters",
+        status: "failed",
+      },
+      observation: {
+        requested_variables: ["n_m3", "T_eV", "B_T"],
+        missing_variables: ["T_eV", "B_T"],
+        selected_for_answer: false,
+      },
+      error: "missing_requested_numeric_variables",
+    });
+    const observation = result.observation as {
+      parameters?: Array<{ variable?: string; normalized_value?: number; normalized_unit?: string }>;
+      rejected_candidates?: Array<{ variable?: string; reason?: string; text?: string }>;
+    };
+    expect(observation.parameters).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        variable: "n_m3",
+        normalized_value: 8.0e25,
+        normalized_unit: "m^-3",
+      }),
+    ]));
+    expect(observation.rejected_candidates).toEqual(expect.arrayContaining([
+      expect.objectContaining({ variable: "T_eV", reason: "unsupported_unit" }),
+      expect.objectContaining({ variable: "B_T", reason: "uncited_value" }),
+    ]));
   });
 
   it("accepts research-papers.search as an explicit alias for the canonical scholarly gateway capability", async () => {

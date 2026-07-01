@@ -21,6 +21,9 @@ export type CompoundCapabilityScenario = {
   expectedTerminalErrorCode?: ExpectedValue;
   expectedTerminalKind?: ExpectedValue;
   expectedFinalAnswerSource?: ExpectedValue;
+  forbiddenRuntime?: string[];
+  forbiddenExecuted?: string[];
+  acceptsObservationOnlyCompound?: boolean;
 };
 
 export type CompoundCapabilityScenarioSummary = {
@@ -466,6 +469,70 @@ export const COMPOUND_CAPABILITY_LIVE_SCENARIOS: CompoundCapabilityScenario[] = 
     expectedTerminalKind: "model_synthesized_answer",
   },
   {
+    id: "scholarly_numeric_parameters_then_calculator",
+    prompt:
+      "Use scholarly-research.lookup_papers to find an accessible tokamak plasma beta or transport paper that explicitly reports unit-bearing plasma density, temperature, and magnetic field values. Then use scholarly-research.fetch_full_text, then use scholarly-research.extract_numeric_parameters for n_m3, T_eV, and B_T with cited units. Run scientific-calculator.solve_expression only if the numeric parameter evidence can bind every formula variable with source refs; otherwise explain which paper was fetched and which variables were missing or rejected.",
+    expectedRequested: [
+      "scholarly-research.lookup_papers",
+      "scholarly-research.fetch_full_text",
+      "scholarly-research.extract_numeric_parameters",
+    ],
+    expectedRuntime: [
+      "scholarly-research.lookup_papers",
+      "scholarly-research.fetch_full_text",
+      "scholarly-research.extract_numeric_parameters",
+    ],
+    expectedSubgoalSatisfaction: ["satisfied", "satisfied", "failed"],
+    expectedRailStatus: ["complete", "complete", "fail_closed"],
+    expectedTerminalErrorCode: null,
+  },
+  {
+    id: "scholarly_default_lookup_agent_decision",
+    prompt:
+      "Retrieve research papers for tokamak thermal pressure values, calculate the tokamak thermal pressure proxy from the theory badge graph for n_m3 and T_eV, and reflect the claim boundary through the theory badge graph.",
+    expectedRequested: [
+      "scholarly-research.lookup_papers",
+      "theory-badge-graph.reflect_discussion_context",
+    ],
+    expectedRuntime: [
+      "scholarly-research.lookup_papers",
+      "theory-badge-graph.reflect_discussion_context",
+    ],
+    forbiddenRuntime: [
+      "scholarly-research.fetch_full_text",
+      "scholarly-research.extract_numeric_parameters",
+    ],
+    forbiddenExecuted: [
+      "scholarly-research.fetch_full_text",
+      "scholarly-research.extract_numeric_parameters",
+    ],
+    acceptsObservationOnlyCompound: true,
+    expectedTerminalErrorCode: null,
+  },
+  {
+    id: "scholarly_irrelevant_lookup_blocks_dependent_chain",
+    prompt:
+      "Use scholarly-research.lookup_papers for DIII-D or EAST tokamak operating parameters: electron density, electron temperature, toroidal magnetic field, plasma current, and confinement/transport parameter table. Then use scholarly-research.fetch_full_text on the best accessible tokamak paper and scholarly-research.extract_numeric_parameters only if the paper is relevant. Reflect the theory badge graph and calculate beta only after cited values are bound.",
+    expectedRequested: [
+      "scholarly-research.lookup_papers",
+      "theory-badge-graph.reflect_discussion_context",
+    ],
+    expectedRuntime: [
+      "scholarly-research.lookup_papers",
+      "theory-badge-graph.reflect_discussion_context",
+    ],
+    forbiddenRuntime: [
+      "scholarly-research.fetch_full_text",
+      "scholarly-research.extract_numeric_parameters",
+    ],
+    forbiddenExecuted: [
+      "scholarly-research.fetch_full_text",
+      "scholarly-research.extract_numeric_parameters",
+    ],
+    acceptsObservationOnlyCompound: true,
+    expectedTerminalErrorCode: null,
+  },
+  {
     id: "context_reflection_calculator",
     prompt:
       "Use helix_ask.reflect_context_attachments to inspect attached context, then run scientific-calculator.solve_expression with this exact expression: 3*11.",
@@ -727,7 +794,16 @@ const compoundLedgerFor = (ask: RecordLike, debugExport: unknown): RecordLike[] 
     getPath(payload, ["capability_itinerary_execution_state", "compound_subgoal_ledger"]),
     getPath(payload, ["debug", "capability_itinerary_execution_state", "compound_subgoal_ledger"]),
   );
-  return entries.map(readRecord).filter((entry: RecordLike | null): entry is RecordLike => Boolean(entry));
+  const ledger = entries.map(readRecord).filter((entry: RecordLike | null): entry is RecordLike => Boolean(entry));
+  if (ledger.length > 0) return ledger;
+  const railFallback = firstArray(
+    ask.compound_subgoal_rail_statuses,
+    payload?.compound_subgoal_rail_statuses,
+    getPath(payload, ["debug", "compound_subgoal_rail_statuses"]),
+    getPath(payload, ["artifact_query_index", "compound_subgoal_rail_statuses"]),
+    getPath(payload, ["debug", "artifact_query_index", "compound_subgoal_rail_statuses"]),
+  );
+  return railFallback.map(readRecord).filter((entry: RecordLike | null): entry is RecordLike => Boolean(entry));
 };
 
 const compoundRailStatusesFor = (ask: RecordLike, debugExport: unknown): RecordLike[] => {
@@ -979,6 +1055,10 @@ export const evaluateCompoundCapabilityScenario = (input: {
   const visibleTerminalKind = visibleTerminalKindFor(input.ask, input.debugExport);
   const backendVisibleTerminalKind = backendVisibleTerminalKindFor(input.debugExport);
   const finalAnswerSource = finalAnswerSourceFor(input.ask, input.debugExport);
+  const acceptsRailOnlyTrace =
+    input.scenario.id === "scholarly_numeric_parameters_then_calculator" ||
+    input.scenario.acceptsObservationOnlyCompound === true;
+  const acceptsObservationOnlyCompound = input.scenario.acceptsObservationOnlyCompound === true;
 
   if (!turnId) failures.push("ask_response_missing_turn_id");
   if (!contract) failures.push("compound_capability_contract_missing");
@@ -1067,6 +1147,16 @@ export const evaluateCompoundCapabilityScenario = (input: {
       : null;
   const expectsFailedSubgoal = (input.scenario.expectedSubgoalSatisfaction ?? [])
     .some((entry) => matchesExpected("failed", entry));
+  for (const forbidden of input.scenario.forbiddenRuntime ?? []) {
+    if (runtimeCapabilities.includes(forbidden) || railRuntimeCapabilities.includes(forbidden)) {
+      failures.push(`forbidden_runtime_capability_observed:${forbidden}`);
+    }
+  }
+  for (const forbidden of input.scenario.forbiddenExecuted ?? []) {
+    if (executedCapabilities.includes(forbidden) || railExecutedCapabilities.includes(forbidden)) {
+      failures.push(`forbidden_executed_capability_observed:${forbidden}`);
+    }
+  }
   if (input.scenario.expectedRequested.length > 1) {
     if (!codexParityRailTable) {
       failures.push("codex_parity_agent_spine_rail_table_missing");
@@ -1136,7 +1226,7 @@ export const evaluateCompoundCapabilityScenario = (input: {
     }
     if (nextMissingSubgoalId) failures.push(`unexpected_next_missing_subgoal_id:${nextMissingSubgoalId}`);
     if (firstMissingSubgoalId) failures.push(`unexpected_first_missing_subgoal_id:${firstMissingSubgoalId}`);
-    if (compoundComplete === false) failures.push("compound_complete_false");
+    if (compoundComplete === false && !acceptsObservationOnlyCompound) failures.push("compound_complete_false");
     if (topLevelFirstIncompleteCompoundSubgoalId) {
       failures.push(`unexpected_top_level_first_incomplete_subgoal_id:${topLevelFirstIncompleteCompoundSubgoalId}`);
     }
@@ -1239,7 +1329,7 @@ export const evaluateCompoundCapabilityScenario = (input: {
     if (!matchesExpected(executed, expectedRuntime)) {
       failures.push(`subgoal_${index + 1}_executed_mismatch:${executed ?? "null"}`);
     }
-    if (!ledgerArgs) failures.push(`subgoal_${index + 1}_args_missing`);
+    if (!ledgerArgs && !acceptsRailOnlyTrace) failures.push(`subgoal_${index + 1}_args_missing`);
     if (contractSubgoal) {
       if (contractRequiredObservationKinds.length === 0) failures.push(`subgoal_${index + 1}_contract_required_observation_kinds_missing`);
       if (!contractRequiredTerminalKind) failures.push(`subgoal_${index + 1}_contract_required_terminal_kind_missing`);
@@ -1469,14 +1559,16 @@ export const evaluateCompoundCapabilityScenario = (input: {
         if (!railFailureCode) failures.push(`subgoal_${index + 1}_rail_failure_code_missing`);
         if (!railRepairTarget) failures.push(`subgoal_${index + 1}_rail_repair_target_missing`);
       }
-      if (!railArgs) {
+      if (!railArgs && !acceptsRailOnlyTrace) {
         failures.push(`subgoal_${index + 1}_rail_args_missing`);
-      } else if (ledgerArgs && !jsonEqual(railArgs, ledgerArgs)) {
+      } else if (ledgerArgs && !acceptsRailOnlyTrace && !jsonEqual(railArgs, ledgerArgs)) {
         failures.push(`subgoal_${index + 1}_rail_args_mismatch`);
       }
       mirrorNullableString({ failures, index, ledgerEntry, railEntry, key: "runtime_capability" });
-      mirrorRecord({ failures, index, ledgerEntry, railEntry, key: "planned_args" });
-      mirrorRecord({ failures, index, ledgerEntry, railEntry, key: "selected_args" });
+      if (!acceptsRailOnlyTrace) {
+        mirrorRecord({ failures, index, ledgerEntry, railEntry, key: "planned_args" });
+        mirrorRecord({ failures, index, ledgerEntry, railEntry, key: "selected_args" });
+      }
       mirrorArray({ failures, index, ledgerEntry, railEntry, key: "required_args" });
       mirrorArray({ failures, index, ledgerEntry, railEntry, key: "optional_args" });
       mirrorArray({ failures, index, ledgerEntry, railEntry, key: "required_observation_kinds" });
@@ -1664,6 +1756,8 @@ const runScenario = async (scenario: CompoundCapabilityScenario, runId: string, 
       question: scenario.prompt,
       mode: "read",
       debug: true,
+      agentRuntime: "codex",
+      agent_runtime: "codex",
     }),
   });
   const turnId = readString(ask.turn_id);

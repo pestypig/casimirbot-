@@ -64,6 +64,9 @@ export type HelixAgentProvider = {
   supports: {
     streaming: boolean;
     workstationTools: boolean;
+    capabilityLanes: boolean;
+    capabilityLaneOneShot: boolean;
+    capabilityLaneSessions: boolean;
     codeMutation: boolean;
   };
   runTurn(request: HelixAgentRunRequest): Promise<HelixAgentRunResult>;

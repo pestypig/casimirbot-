@@ -12,6 +12,7 @@ describe("Helix Ask UI ownership boundaries", () => {
       "ask-agibot-preflight-error.ts",
       "ask-agent-runtime-display.ts",
       "ask-answer-rendering.ts",
+      "ask-attachment-prompt-policy.ts",
       "ask-active-turn-stream.ts",
       "ask-convergence-display.ts",
       "ask-context-capsule-display.ts",
@@ -22,6 +23,8 @@ describe("Helix Ask UI ownership boundaries", () => {
       "ask-doc-viewer-context.ts",
       "ask-env-config.ts",
       "ask-envelope-copy.ts",
+      "ask-exploration-policy.ts",
+      "ask-external-prompt-claim.ts",
       "../agi/debugExport.ts",
       "ask-goal-pill-display.ts",
       "ask-interim-voice-callout.ts",
@@ -31,6 +34,7 @@ describe("Helix Ask UI ownership boundaries", () => {
       "ask-observer-commentary-display.ts",
       "ask-observer-events.ts",
       "ask-output-cleanup.ts",
+      "ask-pending-input-readers.ts",
       "ask-procedural-display.ts",
       "ask-read-aloud-display.ts",
       "ask-reasoning-battle-display.ts",
@@ -38,6 +42,7 @@ describe("Helix Ask UI ownership boundaries", () => {
       "ask-reasoning-theater-hard-failure.ts",
       "ask-reasoning-theater-display.ts",
       "ask-reasoning-theater-evidence.ts",
+      "ask-runtime-authority-readers.ts",
       "ask-stage-play-ledger.ts",
       "ask-status-classnames.ts",
       "ask-stable-hash.ts",
@@ -45,6 +50,7 @@ describe("Helix Ask UI ownership boundaries", () => {
       "ask-terminal-projection.ts",
       "ask-turn-transcript.ts",
       "ask-value-normalization.ts",
+      "ask-visual-evidence-readers.ts",
       "ask-voice-capture-checkpoints.ts",
       "ask-voice-capture-display.ts",
       "ask-voice-barge-policy.ts",
@@ -56,11 +62,17 @@ describe("Helix Ask UI ownership boundaries", () => {
       "ask-voice-confirmation-command.ts",
       "ask-voice-transcript-confidence.ts",
       "ask-voice-continuation-lexical.ts",
+      "ask-voice-language-policy.ts",
       "ask-voice-playback-classification.ts",
+      "ask-voice-playback-runtime.ts",
       "ask-voice-steering-client.ts",
       "ask-voice-text-display.ts",
+      "ask-workstation-command-text.ts",
+      "ask-workstation-fast-path.ts",
+      "ask-workstation-pending-input.ts",
       "voice/voice-transcript.ts",
       "voice/voice-turn-authority.ts",
+      "HelixAskAttachmentCommit.ts",
     ]) {
       expect(map).toContain(moduleName);
     }
@@ -79,9 +91,9 @@ describe("Helix Ask UI ownership boundaries", () => {
     for (const remainingCluster of [
       "Remaining Local Cluster Map",
       "Visual/audio capture preferences",
-      "readHelixAskVisualCaptureAudioPreference",
+      "HelixAskVisualCapturePreference",
       "Prompt interpretation and planner policy",
-      "inferAskMode",
+      "mode inference",
       "Stage Play generated wake admission and projection suppression",
       "Voice capture, STT, confirmation, continuation, and auto-dispatch",
       "Workstation command lexicon and panel resolution",
@@ -138,6 +150,8 @@ describe("Helix Ask UI ownership boundaries", () => {
       proceduralDisplay: read("client/src/lib/helix/ask-procedural-display.ts"),
       valueNormalization: read("client/src/lib/helix/ask-value-normalization.ts"),
     };
+    const runtimeReaders = read("client/src/lib/helix/ask-runtime-authority-readers.ts");
+    const pendingInputReaders = read("client/src/lib/helix/ask-pending-input-readers.ts");
 
     expect(map).toContain("Pending input and cancellation terminal visibility");
     expect(map).toContain("Backend entrypoint and runtime authority guards");
@@ -146,23 +160,11 @@ describe("Helix Ask UI ownership boundaries", () => {
     for (const symbol of [
       "requiresHelixAskBackendEntrypoint",
       "shouldUseHelixAskBackendTurnEntrypoint",
-      "hasHelixAskBackendEntrypointTurnId",
       "buildHelixAskBackendEntrypointRuntimeFingerprint",
-      "readAgentLoopAuditRecord",
-      "readAgentLoopAuditArray",
-      "extractAskLevelTheoryReflection",
-      "normalizeHelixRuntimeActionKey",
-      "readHelixDecisionCapabilityKeys",
-      "readHelixGatewayCapabilityKeys",
-      "collectHelixAgentSelectedCapabilities",
-      "readHelixWorkstationActionRuntimeKeys",
       "buildHelixActionEnvelopeRuntimeAuthority",
       "attachHelixActionEnvelopeRuntimeAuthorityDebug",
       "isWorkstationTurnTransitionPendingRequest",
       "registerTurnTerminalOutcome",
-      "readHelixPendingInputRecord",
-      "normalizeHelixPendingTransitionMarker",
-      "readHelixPendingTransitionTrace",
       "hasHelixPendingCancellationMarker",
       "isHelixCanceledPendingTurn",
       "resolveHelixPendingInputRecord",
@@ -172,15 +174,55 @@ describe("Helix Ask UI ownership boundaries", () => {
       expect(map).toContain(symbol);
     }
     for (const symbol of [
-      "requiresHelixAskBackendEntrypoint",
-      "shouldUseHelixAskBackendTurnEntrypoint",
+      "readHelixPendingInputRecord",
+      "normalizeHelixPendingTransitionMarker",
+      "readHelixPendingTransitionTrace",
+    ]) {
+      expect(pill).toContain(symbol);
+      expect(pill).not.toContain(`function ${symbol}`);
+      expect(pendingInputReaders).toContain(`export function ${symbol}`);
+      expect(map).toContain(symbol);
+    }
+    expect(pill).toContain('from "@/lib/helix/ask-pending-input-readers"');
+    expect(pendingInputReaders).not.toMatch(/from ["']react["']/);
+    expect(pendingInputReaders).not.toContain("@/store/");
+    expect(pendingInputReaders).not.toContain("@/components/helix/HelixAskPill");
+    expect(pendingInputReaders).not.toContain("resolveHelixVisibleTerminalKind");
+    expect(pendingInputReaders).not.toContain("isHelixCanceledPendingTurn");
+    expect(pendingInputReaders).not.toContain("runAskTurn");
+    expect(pendingInputReaders).not.toContain("fetch(");
+    expect(map).toContain("ask-pending-input-readers.ts");
+    expect(map).toContain("visible terminal-kind selection");
+    for (const symbol of [
+      "readAgentLoopAuditRecord",
+      "readAgentLoopAuditArray",
       "hasHelixAskBackendEntrypointTurnId",
-      "buildHelixAskBackendEntrypointRuntimeFingerprint",
+      "extractAskLevelTheoryReflection",
       "normalizeHelixRuntimeActionKey",
       "readHelixDecisionCapabilityKeys",
       "readHelixGatewayCapabilityKeys",
       "collectHelixAgentSelectedCapabilities",
       "readHelixWorkstationActionRuntimeKeys",
+    ]) {
+      expect(pill).toContain(symbol);
+      expect(pill).not.toContain(`function ${symbol}`);
+      expect(runtimeReaders).toContain(`export function ${symbol}`);
+      expect(map).toContain(symbol);
+    }
+    expect(pill).toContain('from "@/lib/helix/ask-runtime-authority-readers"');
+    expect(runtimeReaders).not.toMatch(/from ["']react["']/);
+    expect(runtimeReaders).not.toContain("@/store/");
+    expect(runtimeReaders).not.toContain("@/components/helix/HelixAskPill");
+    expect(runtimeReaders).not.toContain("dispatchHelixWorkstationAction");
+    expect(runtimeReaders).not.toContain("runAskTurn");
+    expect(runtimeReaders).not.toContain("fetch(");
+    expect(map).toContain("ask-runtime-authority-readers.ts");
+    expect(map).toContain("action-envelope allow/deny authority");
+    for (const symbol of [
+      "requiresHelixAskBackendEntrypoint",
+      "shouldUseHelixAskBackendTurnEntrypoint",
+      "hasHelixAskBackendEntrypointTurnId",
+      "buildHelixAskBackendEntrypointRuntimeFingerprint",
       "buildHelixActionEnvelopeRuntimeAuthority",
       "attachHelixActionEnvelopeRuntimeAuthorityDebug",
       "isWorkstationTurnTransitionPendingRequest",
@@ -195,8 +237,9 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(map).toContain("pending-input request reading");
   });
 
-  it("keeps visual/audio capture preference syncing local to the controller", () => {
+  it("recrowns visual/audio capture preference syncing while capture runtime stays local", () => {
     const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const visualPreference = read("client/src/components/helix/ask-console/HelixAskVisualCapturePreference.ts");
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
     const displayOwners = {
       activeTurnStream: read("client/src/lib/helix/ask-active-turn-stream.ts"),
@@ -207,12 +250,22 @@ describe("Helix Ask UI ownership boundaries", () => {
     };
 
     expect(map).toContain("Visual/audio capture preferences");
-    expect(map).toContain("Reads browser state/stores and mutates capture route preferences");
-    expect(pill).toContain("function readHelixAskVisualCaptureAudioPreference");
-    expect(pill).toContain("function syncHelixAskVisualCaptureRoutePreference");
-    expect(pill).toContain("window.localStorage.getItem(HELIX_LIVE_ANSWER_VISUAL_CAPTURE_ROUTE_STORAGE_KEY)");
-    expect(pill).toContain("window.localStorage.setItem(HELIX_LIVE_ANSWER_VISUAL_CAPTURE_ROUTE_STORAGE_KEY");
-    expect(pill).toContain("window.dispatchEvent(new CustomEvent(HELIX_LIVE_ANSWER_VISUAL_CAPTURE_ROUTE_SYNC_EVENT");
+    expect(map).toContain("Preference storage/sync is recrowned in `ask-console/`");
+    expect(map).toContain("capture route controller and media/audio transcript runtime stay local");
+    expect(pill).toContain('from "@/components/helix/ask-console/HelixAskVisualCapturePreference"');
+    expect(pill).toContain("readHelixAskVisualCaptureAudioPreference()");
+    expect(pill).toContain("syncHelixAskVisualCaptureRoutePreference(");
+    expect(pill).toContain("attachDisplayAudioSource(");
+    expect(pill).not.toContain("function readHelixAskVisualCaptureAudioPreference");
+    expect(pill).not.toContain("function syncHelixAskVisualCaptureRoutePreference");
+    expect(pill).not.toContain("const HELIX_LIVE_ANSWER_VISUAL_CAPTURE_ROUTE_STORAGE_KEY");
+    expect(visualPreference).toContain("export function readHelixAskVisualCaptureAudioPreference");
+    expect(visualPreference).toContain("export function syncHelixAskVisualCaptureRoutePreference");
+    expect(visualPreference).toContain("HELIX_LIVE_ANSWER_VISUAL_CAPTURE_ROUTE_STORAGE_KEY");
+    expect(visualPreference).toContain("HELIX_LIVE_ANSWER_VISUAL_CAPTURE_ROUTE_SYNC_EVENT");
+    expect(visualPreference).not.toContain("attachDisplayAudioSource");
+    expect(visualPreference).not.toContain("postHelixAskAudioTranscriptChunk");
+    expect(visualPreference).not.toContain("navigator.mediaDevices");
 
     for (const owner of Object.values(displayOwners)) {
       expect(owner).not.toContain("readHelixAskVisualCaptureAudioPreference");
@@ -224,16 +277,21 @@ describe("Helix Ask UI ownership boundaries", () => {
     }
   });
 
-  it("keeps mode inference, auto-speak eligibility, and terminal-preservation policy local", () => {
+  it("keeps auto-speak eligibility and terminal-preservation policy local while mode inference is recrowned", () => {
     const pill = read("client/src/components/helix/HelixAskPill.tsx");
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
     const outputCleanup = read("client/src/lib/helix/ask-output-cleanup.ts");
+    const explorationPolicy = read("client/src/lib/helix/ask-exploration-policy.ts");
     const voiceBrief = read("client/src/lib/helix/ask-voice-brief-policy.ts");
     const readAloud = read("client/src/lib/helix/ask-read-aloud-display.ts");
     const terminalProjection = read("client/src/lib/helix/ask-terminal-projection.ts");
 
+    expect(pill).toContain("inferAskMode");
+    expect(pill).not.toContain("export function inferAskMode");
+    expect(explorationPolicy).toContain("export function inferAskMode");
+    expect(map).toContain("Observe/act/verify mode inference is recrowned");
+
     for (const symbol of [
-      "inferAskMode",
       "shouldAutoSpeakVoiceDecisionLifecycle",
       "shouldAutoSpeakAnswerForTurn",
       "shouldPreserveAuthoritativeTerminalOverEvidenceGate",
@@ -244,16 +302,17 @@ describe("Helix Ask UI ownership boundaries", () => {
         expect(owner).not.toContain(symbol);
       }
     }
-    expect(map).toContain("Observe/act/verify mode inference");
     expect(map).toContain("auto-speak eligibility");
     expect(map).toContain("authoritative-terminal preservation");
   });
 
-  it("keeps source-admission prompt classifiers and voice language policy local", () => {
+  it("keeps source-admission prompt classifiers recrowned and voice language policy recrowned", () => {
     const pill = read("client/src/components/helix/HelixAskPill.tsx");
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
     const outputCleanup = read("client/src/lib/helix/ask-output-cleanup.ts");
     const docContext = read("client/src/lib/helix/ask-doc-viewer-context.ts");
+    const attachmentPolicy = read("client/src/lib/helix/ask-attachment-prompt-policy.ts");
+    const languagePolicy = read("client/src/lib/helix/ask-voice-language-policy.ts");
     const attachmentOwners = [outputCleanup, docContext];
 
     for (const symbol of [
@@ -263,10 +322,18 @@ describe("Helix Ask UI ownership boundaries", () => {
     ]) {
       expect(pill).toContain(symbol);
       expect(map).toContain(symbol);
+      expect(attachmentPolicy).toContain(`export function ${symbol}`);
+      expect(pill).not.toContain(`const ${symbol} =`);
       for (const owner of attachmentOwners) {
         expect(owner).not.toContain(symbol);
       }
     }
+    expect(pill).toContain('from "@/lib/helix/ask-attachment-prompt-policy"');
+    expect(attachmentPolicy).not.toMatch(/from ["']react["']/);
+    expect(attachmentPolicy).not.toContain("@/store/");
+    expect(attachmentPolicy).not.toContain("@/components/helix/HelixAskPill");
+    expect(attachmentPolicy).not.toContain("runAskTurn");
+    expect(attachmentPolicy).not.toContain("fetch(");
     for (const symbol of [
       "normalizeVoiceLanguageTag",
       "resolveVoiceSourceLanguage",
@@ -274,12 +341,14 @@ describe("Helix Ask UI ownership boundaries", () => {
     ]) {
       expect(pill).toContain(symbol);
       expect(map).toContain(symbol);
+      expect(languagePolicy).toContain(symbol);
+      expect(pill).not.toContain(`const ${symbol} =`);
       expect(outputCleanup).not.toContain(symbol);
       expect(docContext).not.toContain(symbol);
     }
-    expect(map).toContain("source admission");
+    expect(map).toContain("source admission authority");
     expect(map).toContain("pasted-text recall admission");
-    expect(map).toContain("Translation uncertainty handling");
+    expect(map).toContain("high-risk translation-context detection");
   });
 
   it("keeps pure debug drawer fallback formatting in the shared debug export module", () => {
@@ -334,13 +403,18 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(outputCleanup).toContain("export const HELIX_ASK_ANSWER_MARKER_SPLIT_RE");
     expect(pill).not.toContain("const HELIX_ASK_ANSWER_BOUNDARY_PREFIX_RE");
     expect(pill).not.toContain("const HELIX_ASK_ANSWER_MARKER_SPLIT_RE");
-    for (const localAnchor of [
+    for (const symbol of [
       "stripPromptEcho",
       "extractAnswerBlock",
       "stripEvidencePromptBlock",
     ]) {
-      expect(pill).toContain(localAnchor);
-      expect(outputCleanup).not.toContain(localAnchor);
+      expect(outputCleanup).toContain(`export function ${symbol}`);
+      expect(pill).not.toContain(`function ${symbol}`);
+    }
+    for (const bridgeUse of [
+      "stripPromptEcho",
+    ]) {
+      expect(pill).toContain(bridgeUse);
     }
     expect(outputCleanup).not.toMatch(/from ["']react["']/);
     expect(outputCleanup).not.toContain("@/store/");
@@ -428,30 +502,69 @@ describe("Helix Ask UI ownership boundaries", () => {
     const pill = read("client/src/components/helix/HelixAskPill.tsx");
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
     const docsContext = read("client/src/lib/helix/ask-doc-viewer-context.ts");
+    const workspaceSnapshot = read("client/src/lib/helix/ask-workspace-context-snapshot.ts");
 
     expect(map).toContain("ask-doc-viewer-context.ts");
-    expect(map).toContain("HASK-BSQ-001 handoff behavior remains quarantined");
+    expect(map).toContain("ask-workspace-context-snapshot.ts");
+    expect(map).toContain("HASK-BSQ-001 handoff behavior still needs parity proof");
     expect(pill).toContain('from "@/lib/helix/ask-doc-viewer-context"');
     for (const symbol of [
       "normalizeDocsViewerAnchorPath",
       "normalizeDocViewerPathForAskSnapshot",
+      "resolveDocViewerSnapshotPathCandidate",
+      "resolveDocsViewerAnchorPathCandidate",
       "extractExplicitDocsViewerPath",
       "normalizeDocPathForDebugCompare",
     ]) {
       expect(docsContext).toContain(`export function ${symbol}`);
       expect(pill).not.toContain(`function ${symbol}`);
     }
+    expect(pill).toContain("resolveDocViewerSnapshotPathCandidate({");
+    expect(pill).toContain("resolveDocsViewerAnchorPathCandidate({");
+    expect(pill).not.toContain("HELIX_ACTIVE_DOC_VIEWER_ARTIFACT_CUE_RE");
+    expect(map).toContain("Ask snapshot path source precedence");
+    expect(map).toContain("docs-viewer debug snapshot projection");
+    expect(map).toContain("current-doc/current-whitepaper/docs-viewer anchor-path cue resolution");
+    expect(map).toContain("workstation layout debug snapshot projection");
+    expect(map).toContain("Ask turn workspace context snapshot shaping");
+    expect(map).toContain("last-known cache mutation");
+    expect(workspaceSnapshot).toContain("export function buildWorkstationLayoutDebugSnapshotFromState");
+    expect(docsContext).toContain("export function buildDocViewerDebugSnapshotFromState");
+    expect(pill).toContain("buildDocViewerDebugSnapshotFromState(state, currentPath)");
+    expect(pill).toContain("useDocViewerStore.getState()");
+    expect(pill).toContain("rememberDocViewerPathForAskSnapshot(state.currentPath)");
+    expect(pill).not.toContain("recentCount: Array.isArray(state.recent)");
+    expect(workspaceSnapshot).toContain("export function buildAskTurnWorkspaceContextSnapshotFromState");
+    expect(pill).toContain("buildWorkstationLayoutDebugSnapshotFromState(state)");
+    expect(pill).toContain("buildAskTurnWorkspaceContextSnapshotFromState({");
+    expect(pill).toContain("useWorkstationLayoutStore.getState()");
+    expect(pill).toContain("useWorkstationNotesStore.getState()");
+    expect(pill).toContain("useScientificCalculatorStore.getState()");
+    expect(pill).toContain("useSituationRoomStore.getState()");
+    expect(pill).toContain("Date.now()");
     for (const localAnchor of [
       "resolveAskTurnDocViewerSnapshotPath",
       "readDocViewerPathFromDesktopUrlForAskSnapshot",
       "rememberDocViewerPathForAskSnapshot",
       "resolveDocsViewerAnchorPathForQuestion",
-      "buildAskTurnWorkspaceContextSnapshot",
     ]) {
       expect(pill).toContain(localAnchor);
       expect(map).toContain(localAnchor);
       expect(docsContext).not.toContain(localAnchor);
+      expect(workspaceSnapshot).not.toContain(localAnchor);
     }
+    expect(pill).toContain("function buildAskTurnWorkspaceContextSnapshot");
+    expect(map).toContain("buildAskTurnWorkspaceContextSnapshot");
+    expect(docsContext).not.toContain("buildAskTurnWorkspaceContextSnapshot");
+    expect(workspaceSnapshot).not.toContain("function buildAskTurnWorkspaceContextSnapshot(");
+    expect(workspaceSnapshot).not.toContain("@/store/");
+    expect(workspaceSnapshot).not.toContain("useWorkstationLayoutStore");
+    expect(workspaceSnapshot).not.toContain("useWorkstationNotesStore");
+    expect(workspaceSnapshot).not.toContain("useScientificCalculatorStore");
+    expect(workspaceSnapshot).not.toContain("useSituationRoomStore");
+    expect(workspaceSnapshot).not.toContain("Date.now");
+    expect(workspaceSnapshot).not.toContain("resolveAskTurnDocViewerSnapshotPath");
+    expect(workspaceSnapshot).not.toContain("selectSituationRoomAskContextSnapshot");
     expect(docsContext).not.toMatch(/from ["']react["']/);
     expect(docsContext).not.toContain("@/store/");
     expect(docsContext).not.toContain("@/components/helix/HelixAskPill");
@@ -459,6 +572,12 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(docsContext).not.toContain("window.");
     expect(docsContext).not.toContain("localStorage");
     expect(docsContext).not.toContain("sessionStorage");
+    expect(workspaceSnapshot).not.toMatch(/from ["']react["']/);
+    expect(workspaceSnapshot).not.toContain("@/components/helix/HelixAskPill");
+    expect(workspaceSnapshot).not.toContain("fetch(");
+    expect(workspaceSnapshot).not.toContain("window.");
+    expect(workspaceSnapshot).not.toContain("localStorage");
+    expect(workspaceSnapshot).not.toContain("sessionStorage");
   });
 
   it("keeps Ask request construction and attachment admission local", () => {
@@ -468,36 +587,126 @@ describe("Helix Ask UI ownership boundaries", () => {
     const outputCleanup = read("client/src/lib/helix/ask-output-cleanup.ts");
     const terminalProjection = read("client/src/lib/helix/ask-terminal-projection.ts");
     const valueNormalization = read("client/src/lib/helix/ask-value-normalization.ts");
+    const attachmentPolicy = read("client/src/lib/helix/ask-attachment-prompt-policy.ts");
+    const visualEvidenceReaders = read("client/src/lib/helix/ask-visual-evidence-readers.ts");
+    const attachmentCommit = read("client/src/components/helix/ask-console/HelixAskAttachmentCommit.ts");
+    const textAttachment = read("client/src/components/helix/ask-console/HelixAskTextAttachment.ts");
+    const backendEntrypointPolicy = read(
+      "client/src/components/helix/ask-console/HelixAskBackendEntrypointPolicy.ts",
+    );
     const requestDisplayOwners = [docsContext, outputCleanup, terminalProjection, valueNormalization];
 
     expect(map).toContain("Ask request construction and attachment admission");
-    expect(map).toContain("Request envelope, route metadata, source admission");
+    expect(map).toContain("deterministic backend-entrypoint family detection and hard route metadata");
+    expect(map).toContain("request envelope, source admission authority");
     for (const symbol of [
-      "isHelixAskVisualPrompt",
-      "isHelixAskPastedTextResumeRecallPrompt",
-      "isHelixAskUsePastedTextAttachmentPrompt",
       "buildHelixAskPastedTextResumeRecallRouteMetadata",
       "resolveHelixAskHardBackendEntrypointFamily",
       "buildHelixAskHardBackendEntrypointRouteMetadata",
-      "buildHelixAskTextAttachmentTurnInputItem",
       "buildQueuedAskTurn",
-      "validateHelixAskAttachmentForSubmit",
-      "readVisualEvidenceSummary",
-      "isDiagnosticVisualEvidence",
       "buildAskTurnWorkspaceContextSnapshot",
     ]) {
       expect(pill).toContain(symbol);
       expect(map).toContain(symbol);
+      if (symbol === "buildHelixAskHardBackendEntrypointRouteMetadata") {
+        expect(backendEntrypointPolicy).toContain(`export function ${symbol}`);
+      }
       for (const owner of requestDisplayOwners) {
         expect(owner).not.toContain(symbol);
       }
     }
-    expect(pill).toContain("HELIX_ASK_VISUAL_SURFACE_PROMPT_PATTERN");
-    expect(pill).toContain("HELIX_ASK_USE_PASTED_TEXT_ATTACHMENT_PROMPT_PATTERN");
+    for (const symbol of [
+      "validateHelixAskAttachmentForSubmit",
+      "validateHelixAskImageAttachmentForSubmit",
+    ]) {
+      expect(pill).toContain(symbol);
+      expect(map).toContain(symbol);
+      expect(attachmentCommit).toContain(`export function ${symbol}`);
+      expect(pill).not.toContain(`function ${symbol}`);
+      for (const owner of requestDisplayOwners) {
+        expect(owner).not.toContain(symbol);
+      }
+    }
+    expect(map).toContain("validateHelixAskTextAttachmentForSubmit");
+    expect(attachmentCommit).toContain("export function validateHelixAskTextAttachmentForSubmit");
+    expect(pill).not.toContain("function validateHelixAskTextAttachmentForSubmit");
+    expect(pill).toContain('from "@/components/helix/ask-console/HelixAskAttachmentCommit"');
+    expect(map).toContain("HelixAskAttachmentCommit.ts");
+    expect(map).toContain("attachment commit validation");
+    expect(attachmentCommit).toContain("export type HelixAskImageAttachment");
+    expect(attachmentCommit).toContain("export type HelixAskAttachment");
+    expect(attachmentCommit).not.toMatch(/from ["']react["']/);
+    expect(attachmentCommit).not.toContain("@/store/");
+    expect(attachmentCommit).not.toContain("@/components/helix/HelixAskPill");
+    expect(attachmentCommit).not.toContain("buildQueuedAskTurn");
+    expect(attachmentCommit).not.toContain("runAskTurn");
+    expect(attachmentCommit).not.toContain("fetch(");
+    expect(attachmentCommit).not.toContain("source_target_intent");
+    expect(attachmentCommit).not.toContain("visualSituationEvidenceForTurn");
+    for (const symbol of ["readVisualEvidenceSummary", "isDiagnosticVisualEvidence"]) {
+      expect(pill).toContain(symbol);
+      expect(map).toContain(symbol);
+      expect(visualEvidenceReaders).toContain(`export function ${symbol}`);
+      expect(pill).not.toContain(`function ${symbol}`);
+      for (const owner of requestDisplayOwners) {
+        expect(owner).not.toContain(symbol);
+      }
+    }
+    expect(pill).toContain('from "@/lib/helix/ask-visual-evidence-readers"');
+    expect(visualEvidenceReaders).not.toMatch(/from ["']react["']/);
+    expect(visualEvidenceReaders).not.toContain("@/store/");
+    expect(visualEvidenceReaders).not.toContain("@/components/helix/HelixAskPill");
+    expect(visualEvidenceReaders).not.toContain("validateHelixAskAttachmentForSubmit");
+    expect(visualEvidenceReaders).not.toContain("buildQueuedAskTurn");
+    expect(visualEvidenceReaders).not.toContain("runAskTurn");
+    expect(visualEvidenceReaders).not.toContain("fetch(");
+    expect(map).toContain("ask-visual-evidence-readers.ts");
+    expect(map).toContain("diagnostic vision-provider summary");
+    for (const symbol of [
+      "isHelixAskVisualPrompt",
+      "isHelixAskPastedTextResumeRecallPrompt",
+      "isHelixAskUsePastedTextAttachmentPrompt",
+    ]) {
+      expect(pill).toContain(symbol);
+      expect(map).toContain(symbol);
+      expect(attachmentPolicy).toContain(`export function ${symbol}`);
+      expect(pill).not.toContain(`const ${symbol} =`);
+      for (const owner of requestDisplayOwners) {
+        expect(owner).not.toContain(symbol);
+      }
+    }
+    for (const symbol of [
+      "base64FromText",
+      "sha256TextHex",
+      "buildHelixAskTextAttachmentFromText",
+      "buildHelixAskTextAttachmentTurnInputItem",
+    ]) {
+      const functionPrefix =
+        symbol === "sha256TextHex" || symbol === "buildHelixAskTextAttachmentFromText"
+          ? "export async function"
+          : "export function";
+      expect(textAttachment).toContain(`${functionPrefix} ${symbol}`);
+      expect(pill).not.toContain(`function ${symbol}`);
+      expect(map).toContain(symbol);
+    }
+    expect(pill).toContain("buildHelixAskTextAttachmentFromText(text)");
+    expect(pill).toContain("buildHelixAskTextAttachmentTurnInputItem(attachment)");
+    expect(textAttachment).toContain("HELIX_ASK_TEXT_ATTACHMENT_MAX_BYTES");
+    expect(textAttachment).toContain("HELIX_ASK_TEXT_ATTACHMENT_PREVIEW_CHARS");
+    expect(textAttachment).not.toContain("validateHelixAskAttachmentForSubmit");
+    expect(textAttachment).not.toContain("validateHelixAskImageAttachmentForSubmit");
+    expect(textAttachment).not.toContain("validateHelixAskTextAttachmentForSubmit");
+    expect(textAttachment).not.toContain("buildQueuedAskTurn");
+    expect(textAttachment).not.toContain("runAskTurn");
+    expect(textAttachment).not.toContain("fetch(");
+    expect(attachmentPolicy).toContain("HELIX_ASK_VISUAL_SURFACE_PROMPT_PATTERN");
+    expect(attachmentPolicy).toContain("HELIX_ASK_USE_PASTED_TEXT_ATTACHMENT_PROMPT_PATTERN");
+    expect(pill).not.toContain("const HELIX_ASK_VISUAL_SURFACE_PROMPT_PATTERN");
+    expect(pill).not.toContain("const HELIX_ASK_USE_PASTED_TEXT_ATTACHMENT_PROMPT_PATTERN");
     expect(pill).toContain("source_target_intent");
     expect(pill).toContain("visualSituationEvidenceForTurn");
     expect(pill).toContain("validateHelixAskAttachmentForSubmit(attachment)");
-    expect(map).toContain("turn input item construction");
+    expect(map).toContain("text turn-input item shaping");
     for (const owner of requestDisplayOwners) {
       expect(owner).not.toContain("HELIX_ASK_VISUAL_SURFACE_PROMPT_PATTERN");
       expect(owner).not.toContain("HELIX_ASK_USE_PASTED_TEXT_ATTACHMENT_PROMPT_PATTERN");
@@ -510,10 +719,7 @@ describe("Helix Ask UI ownership boundaries", () => {
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
     const debugExport = read("client/src/lib/agi/debugExport.ts");
 
-    for (const symbol of [
-      "base64FromText",
-      "sha256TextHex",
-      "isBackendAskTurnDebugExportEligibleTurnId",
+    for (const localSymbol of [
       "buildReplyMasterEventClockExport",
       "extractHelixRenderedTurnDebugFromButton",
       "debugPayloadMatchesRenderedReply",
@@ -527,20 +733,38 @@ describe("Helix Ask UI ownership boundaries", () => {
       "resolveAuthoritativeDebugExportPayload",
       "copyDebugPayloadToClipboard",
     ]) {
-      expect(pill).toContain(symbol);
-      expect(map).toContain(symbol);
-      expect(debugExport).not.toContain(symbol);
+      expect(pill).toContain(localSymbol);
+      expect(map).toContain(localSymbol);
+      expect(debugExport).not.toContain(localSymbol);
+    }
+    const controls = read("client/src/components/helix/ask-console/HelixAskLegacyTurnControls.ts");
+    for (const recrownedSymbol of [
+      "isHelixAskLegacyBackendDebugExportEligibleTurnId",
+      "resolveHelixAskLegacyDebugExportBackendTarget",
+    ]) {
+      expect(pill).toContain(recrownedSymbol);
+      expect(controls).toContain(`export function ${recrownedSymbol}`);
+      expect(map).toContain(recrownedSymbol);
+      expect(debugExport).not.toContain(recrownedSymbol);
     }
     expect(pill).not.toContain("const hashDebugExportText =");
-    expect(pill).toContain('hashDebugExportText,\n  type DebugExportUiResult');
+    expect(pill).toContain("hashDebugExportText");
+    expect(pill).toContain("buildHelixAskDebugDrawerCopyProjection");
+    expect(pill).toContain("type HelixAskDebugExportDrawerState");
     expect(debugExport).toContain("export const hashDebugExportText");
+    const drawerState = read("client/src/components/helix/ask-console/HelixAskDebugDrawerState.ts");
+    expect(drawerState).toContain("type DebugExportUiResult");
+    expect(drawerState).toContain("buildDebugExportDrawerFallbackResult");
+    expect(drawerState).toContain("export function buildHelixAskDebugDrawerCopyProjection");
     expect(map).toContain("deterministic debug payload hashing");
-    expect(map).toContain("backend Ask turn debug-ref eligibility");
+    expect(map).toContain("copy-result-to-drawer-state projection");
+    expect(map).toContain("Backend Ask turn debug-ref eligibility");
+    expect(map).toContain("backend-target selection");
     expect(pill).toContain("buildHelixDebugExportEnvelopeFromMasterPayload");
     expect(debugExport).toContain("buildHelixDebugExportEnvelopeFromMasterPayload");
     expect(map).toContain("buildHelixDebugExportEnvelopeFromMasterPayload");
     expect(map).toContain("rendered-button turn matching");
-    expect(map).toContain("payload encoding");
+    expect(map).toContain("final-answer copy text selection");
   });
 
   it("keeps rendered-button debug copy scoped to the matched reply turn only", () => {
@@ -559,18 +783,27 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(normalizedPill).toContain(
       "const providedPayloadMatchesRenderedTurn =\n          hasProvidedPayload && debugPayloadMatchesRenderedTurnPayload(payload, sourceElement)",
     );
-    expect(pill).toContain("const localExportPayload = providedPayloadMatchesRenderedTurn");
-    expect(pill).toContain(": buildReplyScopedDebugExportFromRenderedButton(reply, sourceElement, \"rendered_button_scope\") ??");
+    expect(pill).toContain("selectHelixAskLegacyDebugCopyLocalPayload");
+    expect(pill).toContain("buildReplyScopedDebugExportFromRenderedButton(");
+    expect(pill).toContain("resolveAuthoritativeDebugExportPayload(localExportPayload)");
+    const controls = read("client/src/components/helix/ask-console/HelixAskLegacyTurnControls.ts");
+    expect(controls).toContain("selectHelixAskLegacyDebugCopyLocalPayload");
+    expect(controls).not.toContain("buildReplyScopedDebugExportFromRenderedButton");
+    expect(controls).not.toContain("resolveAuthoritativeDebugExportPayload");
+    expect(controls).not.toContain("copyDebugPayloadToClipboard");
   });
 
   it("keeps agent runtime provider display helpers in the non-React runtime display module", () => {
     const pill = read("client/src/components/helix/HelixAskPill.tsx");
     const runtimeDisplay = read("client/src/lib/helix/ask-agent-runtime-display.ts");
+    const runtimePreference = read("client/src/components/helix/ask-console/HelixAskRuntimePreference.ts");
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
 
     expect(pill).toContain('from "@/lib/helix/ask-agent-runtime-display"');
+    expect(pill).toContain('from "@/components/helix/ask-console/HelixAskRuntimePreference"');
     expect(map).toContain("Agent runtime/provider controller wiring");
-    expect(map).toContain("Runtime storage, backend provider fetch transport");
+    expect(map).toContain("Runtime preference storage is recrowned in `ask-console/`");
+    expect(map).toContain("backend provider fetch transport, selected runtime state");
     expect(map).toContain("request payload wiring stay local");
     for (const symbol of [
       "DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS",
@@ -583,10 +816,15 @@ describe("Helix Ask UI ownership boundaries", () => {
     ]) {
       expect(runtimeDisplay).toContain(`export ${symbol.startsWith("DEFAULT_") ? "const" : "function"} ${symbol}`);
     }
-    for (const localAnchor of [
+    for (const preferenceAnchor of [
       "readStoredHelixAskAgentRuntime",
       "persistHelixAskAgentRuntime",
       "HELIX_ASK_AGENT_RUNTIME_STORAGE_KEY",
+    ]) {
+      expect(runtimePreference).toContain(preferenceAnchor);
+      expect(runtimeDisplay).not.toContain(preferenceAnchor);
+    }
+    for (const localAnchor of [
       "agentRuntimeMenuOpen",
       "agentRuntimeProviders",
       "selectedAgentRuntime",
@@ -601,7 +839,11 @@ describe("Helix Ask UI ownership boundaries", () => {
     ]) {
       expect(pill).toContain(localAnchor);
       expect(runtimeDisplay).not.toContain(localAnchor);
+      expect(runtimePreference).not.toContain(localAnchor);
     }
+    expect(pill).not.toContain("const HELIX_ASK_AGENT_RUNTIME_STORAGE_KEY");
+    expect(pill).not.toContain("function readStoredHelixAskAgentRuntime");
+    expect(pill).not.toContain("function persistHelixAskAgentRuntime");
     expect(runtimeDisplay).not.toMatch(/from ["']react["']/);
     expect(runtimeDisplay).not.toContain("@/store/");
     expect(runtimeDisplay).not.toContain("@/components/helix/HelixAskPill");
@@ -610,6 +852,13 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(runtimeDisplay).not.toContain("navigator.clipboard");
     expect(runtimeDisplay).not.toContain("speakVoice");
     expect(runtimeDisplay).not.toContain("runAskTurn");
+    expect(runtimePreference).not.toMatch(/from ["']react["']/);
+    expect(runtimePreference).not.toContain("@/store/");
+    expect(runtimePreference).not.toContain("@/components/helix/HelixAskPill");
+    expect(runtimePreference).not.toContain("fetch(");
+    expect(runtimePreference).not.toContain("navigator.clipboard");
+    expect(runtimePreference).not.toContain("speakVoice");
+    expect(runtimePreference).not.toContain("runAskTurn");
   });
 
   it("keeps observer lifecycle event builders in the non-React observer event module", () => {
@@ -648,6 +897,7 @@ describe("Helix Ask UI ownership boundaries", () => {
       "buildAskLiveAgenticEventRows",
       "buildHelixActiveTurnStreamRows",
       "shouldAdmitHelixAskExternalLiveEventToActiveStream",
+      "askLiveEventBelongsToActiveTurn",
       "filterHelixAskActiveTurnStreamRows",
     ]) {
       expect(pill).not.toContain(`export function ${symbol}`);
@@ -715,12 +965,13 @@ describe("Helix Ask UI ownership boundaries", () => {
     const pill = read("client/src/components/helix/HelixAskPill.tsx");
     const chatProjection = read("client/src/components/helix/ask-console/HelixAskChatProjection.ts");
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
+    const mailboxWakePolicy = read("client/src/lib/helix/ask-stage-play-mailbox-wake-policy.ts");
     const ledger = read("client/src/lib/helix/ask-stage-play-ledger.ts");
     const liveSourceDisplay = read("client/src/lib/helix/ask-live-source-display.ts");
     const turnTranscript = read("client/src/lib/helix/ask-turn-transcript.ts");
 
     expect(map).toContain("Stage Play generated wake admission and projection suppression");
-    expect(map).toContain("Route-metadata admission remains in the legacy bridge");
+    expect(map).toContain("Deterministic compact wake prompt and route-metadata admission predicates");
     expect(map).toContain("Generated durable-chat projection suppression is recrowned");
     for (const symbol of [
       "isStagePlayMailboxWakePromptText",
@@ -728,11 +979,18 @@ describe("Helix Ask UI ownership boundaries", () => {
       "shouldBlockStagePlayMailboxWakePromptWithoutRouteMetadata",
     ]) {
       expect(pill).toContain(symbol);
+      expect(pill).not.toContain(`function ${symbol}`);
+      expect(mailboxWakePolicy).toContain(`export function ${symbol}`);
       expect(map).toContain(symbol);
       expect(ledger).not.toContain(symbol);
       expect(liveSourceDisplay).not.toContain(symbol);
       expect(turnTranscript).not.toContain(symbol);
     }
+    expect(mailboxWakePolicy).not.toMatch(/from ["']react["']/);
+    expect(mailboxWakePolicy).not.toContain("@/store/");
+    expect(mailboxWakePolicy).not.toContain("@/components/helix/HelixAskPill");
+    expect(mailboxWakePolicy).not.toContain("runAskTurn");
+    expect(mailboxWakePolicy).not.toContain("fetch(");
     for (const symbol of [
       "isGeneratedStagePlayMailWakePrompt",
       "isGeneratedStagePlayMailWakeAssistantProjection",
@@ -868,8 +1126,6 @@ describe("Helix Ask UI ownership boundaries", () => {
       "isQuotedTransformOnlyForEvidenceGate",
       "resolveTranscriptConfirmPolicy",
       "buildQueuedAskTurn",
-      "readVisualEvidenceSummary",
-      "isDiagnosticVisualEvidence",
       "buildAskTurnWorkspaceContextSnapshot",
       "resolveHelixAskVisibleTerminal",
       "resolveAuthoritativeDebugExportPayload",
@@ -880,7 +1136,7 @@ describe("Helix Ask UI ownership boundaries", () => {
       expect(map).toContain(localAnchor);
     }
     expect(map).toContain("behavior-goal only");
-    expect(map).toContain("do not move as display");
+    expect(map).toContain("behavior-sensitive");
     expect(map).toContain("simple-conversation bypass");
     expect(map).toContain("quoted-payload evidence-gate exceptions");
     expect(map).toContain("backend Ask is authoritative");
@@ -888,6 +1144,9 @@ describe("Helix Ask UI ownership boundaries", () => {
 
   it("keeps context compaction resume-frame handoff quarantined in HelixAskPill", () => {
     const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const resumeFrameStorage = read(
+      "client/src/components/helix/ask-console/HelixAskContextCompactionResumeFrameStorage.ts",
+    );
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
     const docViewerContext = read("client/src/lib/helix/ask-doc-viewer-context.ts");
     const debugDisplay = read("client/src/lib/helix/ask-debug-event-display.ts");
@@ -903,25 +1162,39 @@ describe("Helix Ask UI ownership boundaries", () => {
     ];
 
     expect(map).toContain("Context compaction resume-frame handoff");
-    expect(map).toContain("Session-storage resume-frame cache");
+    expect(map).toContain("Deterministic pause text parsing, pause-pending reply classification");
     expect(map).toContain("request metadata handoff");
     for (const symbol of [
       "isHelixAskContextCompactionPauseText",
+      "isHelixAskContextCompactionPausePendingReply",
       "extractHelixAskContextCompactionResumeFrame",
       "extractLatestHelixAskContextCompactionResumeFrameFromReplies",
-      "readStoredHelixAskContextCompactionResumeFrame",
-      "writeStoredHelixAskContextCompactionResumeFrame",
-      "isHelixAskContextCompactionPausePendingReply",
     ]) {
       expect(pill).toContain(symbol);
+      expect(resumeFrameStorage).toContain(symbol);
       expect(map).toContain(symbol);
       for (const owner of displayOwners) {
         expect(owner).not.toContain(symbol);
       }
     }
-    expect(pill).toContain("HELIX_ASK_CONTEXT_RESUME_FRAME_STORAGE_KEY");
-    expect(pill).toContain("window.sessionStorage.getItem");
-    expect(pill).toContain("window.sessionStorage.setItem");
+    expect(pill).not.toContain("function isHelixAskContextCompactionPauseText");
+    expect(pill).not.toContain("function isHelixAskContextCompactionPausePendingReply");
+    expect(pill).not.toContain("function extractHelixAskContextCompactionResumeFrame");
+    expect(pill).not.toContain("function extractLatestHelixAskContextCompactionResumeFrameFromReplies");
+    for (const storageSymbol of [
+      "HELIX_ASK_CONTEXT_RESUME_FRAME_STORAGE_KEY",
+      "readStoredHelixAskContextCompactionResumeFrame",
+      "writeStoredHelixAskContextCompactionResumeFrame",
+    ]) {
+      expect(resumeFrameStorage).toContain(storageSymbol);
+      expect(map).toContain(storageSymbol);
+    }
+    expect(pill).toContain("readStoredHelixAskContextCompactionResumeFrame()");
+    expect(pill).toContain("writeStoredHelixAskContextCompactionResumeFrame(");
+    expect(pill).not.toContain("function readStoredHelixAskContextCompactionResumeFrame");
+    expect(pill).not.toContain("function writeStoredHelixAskContextCompactionResumeFrame");
+    expect(pill).not.toContain("const HELIX_ASK_CONTEXT_RESUME_FRAME_STORAGE_KEY");
+    expect(resumeFrameStorage).toContain("window.sessionStorage");
     expect(pill).toContain("context_resume_frame: args.contextResumeFrame");
     for (const owner of displayOwners) {
       expect(owner).not.toContain("context_resume_frame");
@@ -931,20 +1204,24 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(map).toContain("Generated durable-chat projection suppression is recrowned");
   });
 
-  it("documents voice continuation and intent-shift policy as local behavior", () => {
+  it("documents deterministic voice continuation and intent-shift policy as recrowned lexical behavior", () => {
     const pill = read("client/src/components/helix/HelixAskPill.tsx");
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
+    const lexical = read("client/src/lib/helix/ask-voice-continuation-lexical.ts");
     const valueNormalization = read("client/src/lib/helix/ask-value-normalization.ts");
     const voiceCopy = read("client/src/lib/helix/ask-voice-copy-display.ts");
     const voiceText = read("client/src/lib/helix/ask-voice-text-display.ts");
 
     for (const anchor of [
+      "shouldMergeVoiceContinuationTurn",
       "shouldMergeVoiceContinuationInFlight",
       "shouldRestartExplorationLadderOnSupersede",
       "isLikelyContinuationAddendum",
       "isLikelyContinuationTailFragment",
     ]) {
-      expect(pill).toContain(`export function ${anchor}`);
+      expect(lexical).toContain(`export function ${anchor}`);
+      expect(pill).not.toContain(`export function ${anchor}`);
+      expect(pill).not.toContain(`function ${anchor}`);
       expect(map).toContain(anchor);
       expect(valueNormalization).not.toContain(anchor);
       expect(voiceCopy).not.toContain(anchor);
@@ -954,13 +1231,15 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(map).toContain("voice intent arbitration");
   });
 
-  it("keeps voice reasoning dispatch and suppression rescue policy local", () => {
+  it("keeps deterministic voice suppression rescue policy in the non-React suppression owner", () => {
     const pill = read("client/src/components/helix/HelixAskPill.tsx");
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
     const voiceCopy = read("client/src/lib/helix/ask-voice-copy-display.ts");
     const voiceText = read("client/src/lib/helix/ask-voice-text-display.ts");
     const voiceScoring = read("client/src/lib/helix/ask-voice-turn-scoring.ts");
     const voiceLexical = read("client/src/lib/helix/ask-voice-continuation-lexical.ts");
+    const voiceSuppression = read("client/src/lib/helix/ask-voice-dispatch-suppression.ts");
+    const voiceReasoningPrompt = read("client/src/lib/helix/ask-voice-reasoning-dispatch-prompt.ts");
     const observerCommentary = read("client/src/lib/helix/ask-observer-commentary-display.ts");
     const valueNormalization = read("client/src/lib/helix/ask-value-normalization.ts");
     const extractedOwners = [
@@ -968,32 +1247,48 @@ describe("Helix Ask UI ownership boundaries", () => {
       voiceText,
       voiceScoring,
       voiceLexical,
+      voiceSuppression,
+      voiceReasoningPrompt,
       observerCommentary,
       valueNormalization,
     ];
 
     expect(map).toContain("Voice reasoning dispatch and suppression rescue policy");
-    expect(map).toContain("Reasoning dispatch admission");
-    expect(map).toContain("observer workspace/reasoning arbitration");
-    expect(map).toContain("request submission and in-flight voice lifecycle");
+    expect(map).toContain("ask-voice-dispatch-suppression.ts");
+    expect(map).toContain("ask-voice-reasoning-dispatch-prompt.ts");
+    expect(map).toContain("reasoning-dispatch lexical admission");
+    expect(map).toContain("observer dispatch-plan derivation");
+    expect(map).toContain("Workspace dispatch, reasoning queue mutation, request submission, and in-flight voice lifecycle");
     for (const symbol of [
       "shouldDispatchReasoningAttempt",
       "inferSuppressionCauseFromRouteReason",
       "shouldForceObserveDispatchFromSuppression",
       "resolveSuppressedDispatchRescueTranscript",
       "isStrongQuestionDispatchCandidate",
-      "isSimpleDirectPromptLaneCandidate",
-      "isSimpleTitleOrPathOnlyPrompt",
-      "shouldQueueWorkspaceBackgroundReasoning",
+      "deriveVoiceTimelineSuppressionMeta",
+    ]) {
+      expect(voiceSuppression).toContain(`export function ${symbol}`);
+      expect(pill).not.toContain(`export function ${symbol}`);
+      expect(pill).not.toContain(`function ${symbol}`);
+      expect(map).toContain(symbol);
+      for (const owner of [voiceCopy, voiceText, voiceScoring, voiceLexical, observerCommentary, valueNormalization]) {
+        expect(owner).not.toContain(symbol);
+      }
+    }
+    for (const symbol of [
       "isLikelyContextDependentTurn",
       "extractPriorUserContext",
       "buildVoiceReasoningDispatchPrompt",
+      "isSimpleDirectPromptLaneCandidate",
+      "isSimpleTitleOrPathOnlyPrompt",
+      "shouldQueueWorkspaceBackgroundReasoning",
       "normalizeConversationModeForDispatch",
       "deriveObserverDispatchPlan",
     ]) {
-      expect(pill).toContain(symbol);
+      expect(voiceReasoningPrompt).toContain(`export function ${symbol}`);
+      expect(pill).not.toContain(`function ${symbol}`);
       expect(map).toContain(symbol);
-      for (const owner of extractedOwners) {
+      for (const owner of [voiceCopy, voiceText, voiceScoring, voiceLexical, voiceSuppression, observerCommentary, valueNormalization]) {
         expect(owner).not.toContain(symbol);
       }
     }
@@ -1006,20 +1301,33 @@ describe("Helix Ask UI ownership boundaries", () => {
       }
     }
     expect(map).toContain("document quick-lane detection");
-    expect(map).toContain("background workspace reasoning queue policy");
+    expect(map).toContain("background workspace reasoning queue predicate");
     expect(map).toContain("dispatch-mode normalization");
+    expect(voiceSuppression).not.toMatch(/from ["']react["']/);
+    expect(voiceSuppression).not.toContain("@/store/");
+    expect(voiceSuppression).not.toContain("@/components/helix/HelixAskPill");
+    expect(voiceSuppression).not.toContain("runAskTurn");
+    expect(voiceSuppression).not.toContain("speakVoice");
+    expect(voiceReasoningPrompt).not.toMatch(/from ["']react["']/);
+    expect(voiceReasoningPrompt).not.toContain("@/store/");
+    expect(voiceReasoningPrompt).not.toContain("@/components/helix/HelixAskPill");
+    expect(voiceReasoningPrompt).not.toContain("runAskTurn");
+    expect(voiceReasoningPrompt).not.toContain("speakVoice");
   });
 
   it("keeps deterministic voice continuation lexical predicates in the non-React lexical owner", () => {
     const pill = read("client/src/components/helix/HelixAskPill.tsx");
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
     const lexical = read("client/src/lib/helix/ask-voice-continuation-lexical.ts");
+    const heldTranscriptPolicy = read("client/src/lib/helix/ask-voice-held-transcript-policy.ts");
     const voiceCopy = read("client/src/lib/helix/ask-voice-copy-display.ts");
     const voiceText = read("client/src/lib/helix/ask-voice-text-display.ts");
 
     expect(map).toContain("ask-voice-continuation-lexical.ts");
-    expect(map).toContain("in-flight merge and restart policy remain behavior-sensitive");
+    expect(map).toContain("ask-voice-held-transcript-policy.ts");
+    expect(map).toContain("transcript lifecycle, queue mutation, active-turn cancellation, and request dispatch remain behavior-sensitive");
     expect(pill).toContain('from "@/lib/helix/ask-voice-continuation-lexical"');
+    expect(pill).toContain('from "@/lib/helix/ask-voice-held-transcript-policy"');
     for (const symbol of [
       "extractIntentTerms",
       "hasDanglingTurnTail",
@@ -1027,20 +1335,35 @@ describe("Helix Ask UI ownership boundaries", () => {
       "extractLatestContinuationQuestionFocus",
       "hasSufficientLexicalCarryover",
       "isLikelyNearTurnContinuation",
+      "shouldMergeVoiceContinuationTurn",
+      "shouldMergeVoiceContinuationInFlight",
+      "shouldRestartExplorationLadderOnSupersede",
+      "isLikelyContinuationAddendum",
+      "isLikelyContinuationTailFragment",
     ]) {
       expect(lexical).toContain(`export function ${symbol}`);
       expect(pill).not.toContain(`function ${symbol}`);
       expect(voiceCopy).not.toContain(symbol);
       expect(voiceText).not.toContain(symbol);
     }
+    for (const symbol of [
+      "shouldMergePendingConfirmationTranscript",
+      "shouldRecoverHeldTranscriptAfterNoTranscript",
+      "shouldFlushHeldTranscriptFromWatchdog",
+    ]) {
+      expect(heldTranscriptPolicy).toContain(`export function ${symbol}`);
+      expect(pill).not.toContain(`function ${symbol}`);
+      expect(lexical).not.toContain(symbol);
+      expect(voiceCopy).not.toContain(symbol);
+      expect(voiceText).not.toContain(symbol);
+    }
     for (const localAnchor of [
-      "shouldMergeVoiceContinuationInFlight",
-      "shouldRestartExplorationLadderOnSupersede",
-      "isLikelyContinuationAddendum",
-      "isLikelyContinuationTailFragment",
+      "voiceTranscribeQueueRef",
+      "voiceConfirmedTurnQueueRef",
     ]) {
       expect(pill).toContain(localAnchor);
       expect(lexical).not.toContain(localAnchor);
+      expect(heldTranscriptPolicy).not.toContain(localAnchor);
     }
     expect(lexical).not.toMatch(/from ["']react["']/);
     expect(lexical).not.toContain("@/store/");
@@ -1049,6 +1372,13 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(lexical).not.toContain("navigator.clipboard");
     expect(lexical).not.toContain("runAskTurn");
     expect(lexical).not.toContain("speakVoice");
+    expect(heldTranscriptPolicy).not.toMatch(/from ["']react["']/);
+    expect(heldTranscriptPolicy).not.toContain("@/store/");
+    expect(heldTranscriptPolicy).not.toContain("@/components/helix/HelixAskPill");
+    expect(heldTranscriptPolicy).not.toContain("fetch(");
+    expect(heldTranscriptPolicy).not.toContain("navigator.clipboard");
+    expect(heldTranscriptPolicy).not.toContain("runAskTurn");
+    expect(heldTranscriptPolicy).not.toContain("speakVoice");
   });
 
   it("keeps deterministic voice turn scoring in the non-React turn scoring owner", () => {
@@ -1070,10 +1400,6 @@ describe("Helix Ask UI ownership boundaries", () => {
       expect(lexical).not.toContain(symbol);
     }
     for (const localAnchor of [
-      "shouldMergeVoiceContinuationInFlight",
-      "shouldRestartExplorationLadderOnSupersede",
-      "isLikelyContinuationAddendum",
-      "isLikelyContinuationTailFragment",
       "voiceTranscribeQueueRef",
       "voiceConfirmedTurnQueueRef",
     ]) {
@@ -1088,9 +1414,11 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(scoring).not.toContain("speakVoice");
   });
 
-  it("documents voice language and workstation fast-path policy as local behavior", () => {
+  it("documents voice language policy as recrowned while workstation fast-path execution stays local", () => {
     const pill = read("client/src/components/helix/HelixAskPill.tsx");
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
+    const languagePolicy = read("client/src/lib/helix/ask-voice-language-policy.ts");
+    const workstationFastPath = read("client/src/lib/helix/ask-workstation-fast-path.ts");
     const procedural = read("client/src/lib/helix/ask-procedural-display.ts");
     const voiceCopy = read("client/src/lib/helix/ask-voice-copy-display.ts");
     const valueNormalization = read("client/src/lib/helix/ask-value-normalization.ts");
@@ -1102,24 +1430,73 @@ describe("Helix Ask UI ownership boundaries", () => {
       "resolveVoiceSourceLanguage",
       "resolveVoiceResponseLanguage",
       "isHighRiskTranslationContext",
-      "readWorkstationActionArgText",
-      "extractCalculatorFastPathExpressionFromPrompt",
-      "getWorkstationFastPathReplyText",
-      "renderCalculatorFastPathReply",
-      "selectWorkstationFastPathReplyAction",
     ]) {
       expect(pill).toContain(anchor);
+      expect(pill).not.toContain(`const ${anchor} =`);
+      expect(pill).not.toContain(`function ${anchor}`);
+      expect(languagePolicy).toContain(anchor);
       expect(map).toContain(anchor);
       expect(procedural).not.toContain(anchor);
       expect(voiceCopy).not.toContain(anchor);
       expect(valueNormalization).not.toContain(anchor);
     }
+    for (const anchor of [
+      "readWorkstationActionArgText",
+      "extractCalculatorFastPathExpressionFromPrompt",
+      "selectWorkstationFastPathReplyAction",
+    ]) {
+      expect(pill).toContain(anchor);
+      expect(pill).not.toContain(`const ${anchor} =`);
+      expect(pill).not.toContain(`function ${anchor}`);
+      expect(workstationFastPath).toContain(`export function ${anchor}`);
+      expect(map).toContain(anchor);
+      expect(procedural).not.toContain(anchor);
+      expect(voiceCopy).not.toContain(anchor);
+      expect(valueNormalization).not.toContain(anchor);
+      expect(languagePolicy).not.toContain(anchor);
+    }
+    for (const anchor of [
+      "getWorkstationFastPathReplyText",
+      "renderCalculatorFastPathReply",
+    ]) {
+      expect(pill).toContain(`const ${anchor}`);
+      expect(workstationFastPath).not.toContain(anchor);
+      expect(map).toContain(anchor);
+      expect(procedural).not.toContain(anchor);
+      expect(voiceCopy).not.toContain(anchor);
+      expect(valueNormalization).not.toContain(anchor);
+      expect(languagePolicy).not.toContain(anchor);
+    }
+    expect(pill).toContain('from "@/lib/helix/ask-voice-language-policy"');
+    expect(pill).toContain('from "@/lib/helix/ask-workstation-fast-path"');
     expect(pill).toContain("runScientificSolve");
     expect(procedural).not.toContain("runScientificSolve");
-    expect(map).toContain("Translation uncertainty handling");
+    expect(languagePolicy).not.toMatch(/from ["']react["']/);
+    expect(languagePolicy).not.toContain("@/store/");
+    expect(languagePolicy).not.toContain("@/components/helix/HelixAskPill");
+    expect(languagePolicy).not.toContain("runScientificSolve");
+    expect(languagePolicy).not.toContain("fetch(");
+    expect(workstationFastPath).not.toMatch(/from ["']react["']/);
+    expect(workstationFastPath).not.toContain("@/store/");
+    expect(workstationFastPath).not.toContain("@/components/helix/HelixAskPill");
+    expect(workstationFastPath).not.toContain("runScientificSolve");
+    expect(workstationFastPath).not.toContain("getWorkstationExecutedReplyText");
+    expect(workstationFastPath).not.toContain("dispatchHelixWorkstationAction");
+    expect(workstationFastPath).not.toContain("fetch(");
+    expect(map).toContain("ask-voice-language-policy.ts");
+    expect(map).toContain("ask-workstation-fast-path.ts");
+    expect(map).toContain("Deterministic language normalization");
     expect(map).toContain("lightweight script-based language inference");
     expect(map).toContain("workstation arg reading");
+    expect(map).toContain("docs-viewer workstation action sync");
+    expect(map).toContain("calculator prompt expression extraction");
+    expect(map).toContain("calculator fast-path action selection");
     expect(map).toContain("calculator fast-path solve execution");
+    expect(pill).toContain('readWorkstationActionArgText(action, ["path", "doc_path", "target"])');
+    expect(pill).toContain('readWorkstationActionArgText(action, ["anchor"])');
+    expect(pill).not.toContain("function readWorkstationActionArgString");
+    expect(pill).not.toContain("readWorkstationActionArgString(action");
+    expect(map).toContain("workstation reply text selection");
   });
 
   it("documents workstation command lexicon and panel resolution as local behavior", () => {
@@ -1127,24 +1504,60 @@ describe("Helix Ask UI ownership boundaries", () => {
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
     const procedural = read("client/src/lib/helix/ask-procedural-display.ts");
     const valueNormalization = read("client/src/lib/helix/ask-value-normalization.ts");
+    const commandText = read("client/src/lib/helix/ask-workstation-command-text.ts");
 
     for (const anchor of [
-      "normalizePanelQuery",
-      "resolvePanelIdFromText",
-      "resolvePanelIdFromPath",
-      "parseOpenPanelCommand",
-      "restateWorkstationSubgoal",
-      "normalizeWorkstationCommandText",
       "buildLexiconPanelAction",
-      "normalizeLexiconAlias",
       "resolveCapabilityAliasPanelAction",
       "parseWorkstationLexiconAction",
     ]) {
       expect(pill).toContain(anchor);
+      expect(commandText).not.toContain(anchor);
       expect(map).toContain(anchor);
       expect(procedural).not.toContain(anchor);
       expect(valueNormalization).not.toContain(anchor);
     }
+    for (const anchor of [
+      "resolvePanelIdFromText",
+      "resolvePanelIdFromPath",
+      "parseOpenPanelCommand",
+    ]) {
+      expect(commandText).toContain(`export function ${anchor}`);
+      expect(map).toContain(anchor);
+      expect(procedural).not.toContain(anchor);
+      expect(valueNormalization).not.toContain(anchor);
+    }
+    expect(pill).not.toContain("function resolvePanelIdFromText");
+    expect(pill).not.toContain("function resolvePanelIdFromPath");
+    expect(pill).not.toContain("function parseOpenPanelCommand");
+    expect(pill).toContain("buildWorkstationPanelResolverConfig");
+    expect(pill).toContain("parseOpenPanelCommand(singleEntry, buildWorkstationPanelResolverConfig())");
+    expect(pill).toContain("resolvePanelIdFromPath(matchText,");
+    for (const anchor of [
+      "restateWorkstationSubgoal",
+      "normalizeWorkstationCommandText",
+      "normalizeLexiconAlias",
+    ]) {
+      expect(pill).toContain(anchor);
+      expect(pill).not.toContain(`function ${anchor}`);
+      expect(commandText).toContain(`export function ${anchor}`);
+      expect(map).toContain(anchor);
+      expect(procedural).not.toContain(anchor);
+      expect(valueNormalization).not.toContain(anchor);
+    }
+    expect(pill).not.toContain("function normalizePanelQuery");
+    expect(commandText).toContain("export function normalizePanelQuery");
+    expect(map).toContain("normalizePanelQuery");
+    expect(pill).toContain('from "@/lib/helix/ask-workstation-command-text"');
+    expect(commandText).not.toMatch(/from ["']react["']/);
+    expect(commandText).not.toContain("@/store/");
+    expect(commandText).not.toContain("@/components/helix/HelixAskPill");
+    expect(commandText).not.toContain("getWorkstationPanelCapabilities");
+    expect(commandText).not.toContain("HelixWorkstationAction");
+    expect(commandText).not.toContain("WORKSTATION_V1_PANEL_CAPABILITIES");
+    expect(commandText).not.toContain("fetch(");
+    expect(map).toContain("ask-workstation-command-text.ts");
+    expect(map).toContain("operator subgoal restatement");
     expect(map).toContain("alias normalization");
     expect(map).toContain("panel capability matching");
     expect(map).toContain("HelixWorkstationAction");
@@ -1157,29 +1570,55 @@ describe("Helix Ask UI ownership boundaries", () => {
     const terminalProjection = read("client/src/lib/helix/ask-terminal-projection.ts");
     const debugDisplay = read("client/src/lib/helix/ask-debug-event-display.ts");
     const valueNormalization = read("client/src/lib/helix/ask-value-normalization.ts");
+    const pendingInput = read("client/src/lib/helix/ask-workstation-pending-input.ts");
 
     for (const anchor of [
       "buildWorkstationUserInputRequest",
       "resolvePendingWorkstationUserInput",
       "resolvePanelActionDefinition",
+      "resolveWorkstationRouterFailId",
+      "syncDocViewerStateFromWorkstationAction",
+    ]) {
+      expect(pill).toContain(anchor);
+      expect(map).toContain(anchor);
+      expect(pendingInput).not.toContain(anchor);
+      for (const crownedOwner of [procedural, terminalProjection, debugDisplay, valueNormalization]) {
+        expect(crownedOwner).not.toContain(anchor);
+      }
+    }
+    for (const anchor of [
       "parseWorkstationConfirmationReply",
       "extractPendingArgFromReply",
       "cloneRunPanelActionWithArgs",
       "readDocTopicResolutionMeta",
       "stripDocTopicResolutionMetaFromArgs",
-      "resolveWorkstationRouterFailId",
-      "syncDocViewerStateFromWorkstationAction",
-      "readWorkstationActionArgString",
     ]) {
       expect(pill).toContain(anchor);
+      expect(pill).not.toContain(`function ${anchor}`);
+      expect(pendingInput).toContain(`export function ${anchor}`);
       expect(map).toContain(anchor);
       for (const crownedOwner of [procedural, terminalProjection, debugDisplay, valueNormalization]) {
         expect(crownedOwner).not.toContain(anchor);
       }
     }
+    expect(pill).toContain('from "@/lib/helix/ask-workstation-pending-input"');
+    expect(pendingInput).not.toMatch(/from ["']react["']/);
+    expect(pendingInput).not.toContain("@/store/");
+    expect(pendingInput).not.toContain("@/components/helix/HelixAskPill");
+    expect(pendingInput).not.toContain("crypto.randomUUID");
+    expect(pendingInput).not.toContain("Date.now");
+    expect(pendingInput).not.toContain("dispatchHelixWorkstationAction");
+    expect(pendingInput).not.toContain("syncDocViewerStateFromWorkstationAction");
+    expect(pendingInput).not.toContain("fetch(");
+    expect(map).toContain("ask-workstation-pending-input.ts");
+    expect(map).toContain("pending request creation/state");
     expect(map).toContain("docs-viewer topic clarification");
+    expect(map).toContain("private metadata stripping");
     expect(map).toContain("router fail-id mapping");
-    expect(map).toContain("workstation arg reads");
+    expect(map).toContain("docs-viewer workstation action arg extraction");
+    expect(map).not.toContain("readWorkstationActionArgString");
+    expect(pill).not.toContain("readWorkstationActionArgString");
+    expect(map).toContain("workstation arg reading");
     expect(map).toContain("workstation mutation");
   });
 
@@ -1187,33 +1626,57 @@ describe("Helix Ask UI ownership boundaries", () => {
     const pill = read("client/src/components/helix/HelixAskPill.tsx");
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
     const terminalProjection = read("client/src/lib/helix/ask-terminal-projection.ts");
+    const explorationPolicy = read("client/src/lib/helix/ask-exploration-policy.ts");
     const fallbackClassification = read("client/src/lib/helix/ask-local-fallback-classification.ts");
     const voiceCopy = read("client/src/lib/helix/ask-voice-copy-display.ts");
     const valueNormalization = read("client/src/lib/helix/ask-value-normalization.ts");
 
     for (const anchor of [
       "decideExplorationLadderAction",
-      "buildExplorationEscalationPrompt",
-      "buildExplorationArtifactRetryPrompt",
-      "isRepoFileLocationRequestPrompt",
       "buildConversationFallbackBrief",
-      "resolveAskContextChooserAutoMode",
-      "isRepoCodeEvidencePrompt",
     ]) {
       expect(pill).toContain(anchor);
+      expect(explorationPolicy).not.toContain(anchor);
       expect(map).toContain(anchor);
       expect(terminalProjection).not.toContain(anchor);
       expect(voiceCopy).not.toContain(anchor);
       expect(valueNormalization).not.toContain(anchor);
     }
-    expect(map).toContain("Retry/escalation prompts");
+    for (const anchor of [
+      "inferAskMode",
+      "buildExplorationEscalationPrompt",
+      "buildExplorationArtifactRetryPrompt",
+      "isRepoCodeEvidencePrompt",
+      "resolveAskContextChooserAutoMode",
+    ]) {
+      expect(pill).toContain(anchor);
+      expect(pill).not.toContain(`function ${anchor}`);
+      expect(explorationPolicy).toContain(`export function ${anchor}`);
+      expect(map).toContain(anchor);
+      expect(terminalProjection).not.toContain(anchor);
+      expect(voiceCopy).not.toContain(anchor);
+      expect(valueNormalization).not.toContain(anchor);
+    }
+    expect(pill).toContain("isRepoFileLocationRequestPrompt");
+    expect(pill).not.toContain("function isRepoFileLocationRequestPrompt");
+    expect(explorationPolicy).toContain("export function isRepoFileLocationRequestPrompt");
+    expect(explorationPolicy).not.toMatch(/from [\"']react[\"']/);
+    expect(explorationPolicy).not.toContain("@/store/");
+    expect(explorationPolicy).not.toContain("@/components/helix/HelixAskPill");
+    expect(explorationPolicy).not.toContain("runAskTurn");
+    expect(explorationPolicy).not.toContain("fetch(");
+    expect(map).toContain("ask-exploration-policy.ts");
+    expect(map).toContain("mode inference");
+    expect(map).toContain("escalation prompt construction");
+    expect(map).toContain("artifact-retry prompt construction");
     expect(map).toContain("repo file-location prompt detection");
-    expect(map).toContain("context/source chooser policy");
+    expect(map).toContain("context chooser auto-mode classification");
+    expect(map).toContain("context chooser state");
     expect(map).toContain("Deterministic mission/ideology domain-leak classification");
     expect(fallbackClassification).toContain("export function isLikelyIdeologyDomainLeak");
   });
 
-  it("documents atomic viewer launch suppression as local panel behavior", () => {
+  it("documents atomic viewer launch suppression as docs-context-owned panel predicate", () => {
     const pill = read("client/src/components/helix/HelixAskPill.tsx");
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
     const docContext = read("client/src/lib/helix/ask-doc-viewer-context.ts");
@@ -1222,9 +1685,13 @@ describe("Helix Ask UI ownership boundaries", () => {
 
     expect(map).toContain("Atomic viewer launch suppression");
     expect(map).toContain("shouldSuppressAtomicViewerLaunch");
-    expect(map).toContain("gates panel launch behavior");
-    expect(pill).toContain("const shouldSuppressAtomicViewerLaunch");
-    for (const owner of [docContext, outputCleanup, procedural]) {
+    expect(map).toContain("panel launch side effect remains local");
+    expect(pill).toContain('from "@/lib/helix/ask-doc-viewer-context"');
+    expect(pill).toContain("shouldSuppressAtomicViewerLaunch");
+    expect(pill).not.toContain("const shouldSuppressAtomicViewerLaunch");
+    expect(docContext).toContain("export function shouldSuppressAtomicViewerLaunch");
+    expect(docContext).toContain("HELIX_DOCS_SUMMARY_REQUEST_RE");
+    for (const owner of [outputCleanup, procedural]) {
       expect(owner).not.toContain("shouldSuppressAtomicViewerLaunch");
       expect(owner).not.toContain("HELIX_DOCS_SUMMARY_REQUEST_RE");
     }
@@ -1233,26 +1700,41 @@ describe("Helix Ask UI ownership boundaries", () => {
   it("documents context compaction resume-frame handoff as local behavior", () => {
     const pill = read("client/src/components/helix/HelixAskPill.tsx");
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
+    const resumeFrameStorage = read(
+      "client/src/components/helix/ask-console/HelixAskContextCompactionResumeFrameStorage.ts",
+    );
     const debugDisplay = read("client/src/lib/helix/ask-debug-event-display.ts");
     const valueNormalization = read("client/src/lib/helix/ask-value-normalization.ts");
     const terminalProjection = read("client/src/lib/helix/ask-terminal-projection.ts");
 
     for (const anchor of [
       "isHelixAskContextCompactionPauseText",
+      "isHelixAskContextCompactionPausePendingReply",
       "extractHelixAskContextCompactionResumeFrame",
       "extractLatestHelixAskContextCompactionResumeFrameFromReplies",
-      "readStoredHelixAskContextCompactionResumeFrame",
-      "writeStoredHelixAskContextCompactionResumeFrame",
-      "isHelixAskContextCompactionPausePendingReply",
     ]) {
       expect(pill).toContain(anchor);
+      expect(resumeFrameStorage).toContain(anchor);
       expect(map).toContain(anchor);
       expect(debugDisplay).not.toContain(anchor);
       expect(valueNormalization).not.toContain(anchor);
       expect(terminalProjection).not.toContain(anchor);
     }
-    expect(pill).toContain("sessionStorage");
-    expect(map).toContain("Session-storage resume-frame cache");
+    expect(pill).not.toContain("function isHelixAskContextCompactionPauseText");
+    expect(pill).not.toContain("function isHelixAskContextCompactionPausePendingReply");
+    expect(pill).not.toContain("function extractHelixAskContextCompactionResumeFrame");
+    expect(pill).not.toContain("function extractLatestHelixAskContextCompactionResumeFrameFromReplies");
+    for (const storageAnchor of [
+      "readStoredHelixAskContextCompactionResumeFrame",
+      "writeStoredHelixAskContextCompactionResumeFrame",
+      "HELIX_ASK_CONTEXT_RESUME_FRAME_STORAGE_KEY",
+    ]) {
+      expect(resumeFrameStorage).toContain(storageAnchor);
+      expect(map).toContain(storageAnchor);
+    }
+    expect(pill).not.toContain("window.sessionStorage.getItem(HELIX_ASK_CONTEXT_RESUME_FRAME_STORAGE_KEY)");
+    expect(pill).not.toContain("window.sessionStorage.setItem(HELIX_ASK_CONTEXT_RESUME_FRAME_STORAGE_KEY");
+    expect(map).toContain("Deterministic pause text parsing, pause-pending reply classification");
     expect(map).toContain("request metadata handoff");
   });
 
@@ -1263,20 +1745,41 @@ describe("Helix Ask UI ownership boundaries", () => {
     const terminalProjection = read("client/src/lib/helix/ask-terminal-projection.ts");
     const debugDisplay = read("client/src/lib/helix/ask-debug-event-display.ts");
     const turnTranscript = read("client/src/lib/helix/ask-turn-transcript.ts");
+    const externalPromptClaim = read("client/src/lib/helix/ask-external-prompt-claim.ts");
 
     for (const anchor of [
       "resolveExternalPromptClaimId",
+    ]) {
+      expect(pill).toContain(anchor);
+      expect(pill).not.toContain(`function ${anchor}`);
+      expect(externalPromptClaim).toContain(`export function ${anchor}`);
+      expect(map).toContain(anchor);
+      for (const crownedOwner of [procedural, terminalProjection, debugDisplay, turnTranscript]) {
+        expect(crownedOwner).not.toContain(anchor);
+      }
+    }
+    for (const anchor of [
       "claimExternalPromptSingleFlight",
       "pendingExternalAskPromptRef",
       "consumePendingHelixAskPrompt",
       "clearPendingHelixAskPrompt",
     ]) {
       expect(pill).toContain(anchor);
+      expect(externalPromptClaim).not.toContain(anchor);
       expect(map).toContain(anchor);
       for (const crownedOwner of [procedural, terminalProjection, debugDisplay, turnTranscript]) {
         expect(crownedOwner).not.toContain(anchor);
       }
     }
+    expect(pill).toContain('from "@/lib/helix/ask-external-prompt-claim"');
+    expect(externalPromptClaim).not.toMatch(/from ["']react["']/);
+    expect(externalPromptClaim).not.toContain("@/store/");
+    expect(externalPromptClaim).not.toContain("@/components/helix/HelixAskPill");
+    expect(externalPromptClaim).not.toContain("consumePendingHelixAskPrompt");
+    expect(externalPromptClaim).not.toContain("clearPendingHelixAskPrompt");
+    expect(externalPromptClaim).not.toContain("fetch(");
+    expect(map).toContain("ask-external-prompt-claim.ts");
+    expect(map).toContain("claim-id normalization");
     expect(map).toContain("browser-window claim tracking");
     expect(map).toContain("duplicate dispatch suppression");
   });
@@ -1515,7 +2018,6 @@ describe("Helix Ask UI ownership boundaries", () => {
       "buildHelixAskDebugContextSummary",
       "isHelixAskProgressPlaceholderReply",
       "shouldHideHelixAskTranscriptReply",
-      "askLiveEventBelongsToActiveTurn",
     ]) {
       expect(pill).toContain(`function ${localAnchor}`);
       expect(debugDisplay).not.toContain(localAnchor);
@@ -1700,7 +2202,10 @@ describe("Helix Ask UI ownership boundaries", () => {
     }
     expect(pill).toContain("function resolveWorkstationRouterFailId");
     expect(pill).toContain("const getWorkstationFastPathReplyText");
-    expect(pill).toContain("const readWorkstationActionArgText");
+    expect(pill).not.toContain("const readWorkstationActionArgText");
+    expect(read("client/src/lib/helix/ask-workstation-fast-path.ts")).toContain(
+      "export function readWorkstationActionArgText",
+    );
     expect(map).toContain("resolveWorkstationRouterFailId");
     expect(map).toContain("router fail-id mapping");
     expect(procedural).not.toContain("resolveWorkstationRouterFailId");
@@ -1747,6 +2252,7 @@ describe("Helix Ask UI ownership boundaries", () => {
       "hashVoiceUtteranceKey",
       "isInterimVoicePlaybackUtteranceKind",
       "isManualVoicePlaybackUtterance",
+      "canPlayVoiceUtteranceWithMicOff",
       "isMissionVoiceOutputModeEnabled",
       "shouldEnableVoiceRollout",
     ]) {
@@ -1762,6 +2268,7 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(readAloud).not.toContain("speakVoice");
     expect(readAloud).not.toContain("AudioContext");
     expect(readAloud).not.toContain("enqueueVoicePlaybackIntent");
+    expect(readAloud).not.toContain("micArmStateRef");
     expect(readAloud).not.toContain("runAskTurn");
     expect(readAloud).not.toContain("fetch(");
   });
@@ -1844,7 +2351,6 @@ describe("Helix Ask UI ownership boundaries", () => {
     for (const localAnchor of [
       "VITE_HELIX_VOICE_CONFIRM_V2_ENABLED",
       "VITE_HELIX_VOICE_CONFIRM_V2_ACTIVE_PERCENT",
-      "VITE_HELIX_VOICE_FORCE_DIRECT_MOBILE",
       "HELIX_E1_SINGLE_TURN_CONTRACT",
       "HELIX_E6_ASK_TURN_MANUAL_CANARY",
       "VITE_HELIX_THEATER_FRONTIER_ACTIONS",
@@ -1880,6 +2386,7 @@ describe("Helix Ask UI ownership boundaries", () => {
     const pill = read("client/src/components/helix/HelixAskPill.tsx");
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
     const voiceCapture = read("client/src/lib/helix/ask-voice-capture-display.ts");
+    const voiceTimelineBuildInfo = read("client/src/components/helix/ask-console/HelixAskVoiceTimelineBuildInfo.ts");
 
     expect(pill).toContain('from "@/lib/helix/ask-voice-capture-display"');
     for (const symbol of [
@@ -1893,6 +2400,7 @@ describe("Helix Ask UI ownership boundaries", () => {
       "shouldTreatMicSignalAsSpeech",
       "describeMediaErrorCode",
       "getMicRecorderMimeCandidates",
+      "pickSupportedMicRecorderMimeType",
     ]) {
       expect(pill).not.toContain(`function ${symbol}`);
       expect(pill).not.toContain(`export function ${symbol}`);
@@ -1918,7 +2426,6 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(pill).not.toContain("type VoiceNoiseHandlingProfile =");
     expect(voiceCapture).toContain("export type VoiceNoiseHandlingProfile");
     for (const localAnchor of [
-      "pickSupportedMicRecorderMimeType",
       "pickMicRecorderMimeType",
       "readVoiceTimelineClientBuildStamp",
       "MediaRecorder",
@@ -1926,8 +2433,19 @@ describe("Helix Ask UI ownership boundaries", () => {
     ]) {
       expect(pill).toContain(localAnchor);
       expect(voiceCapture).not.toContain(localAnchor);
+      expect(voiceTimelineBuildInfo).not.toContain(localAnchor);
+    }
+    for (const symbol of [
+      "buildHelixAskVoiceTimelineInitialBuildInfo",
+      "applyHelixAskVoiceTimelineVersionPayload",
+      "applyHelixAskVoiceTimelineVersionError",
+    ]) {
+      expect(pill).toContain(symbol);
+      expect(voiceTimelineBuildInfo).toContain(`export function ${symbol}`);
+      expect(voiceCapture).not.toContain(symbol);
     }
     expect(map).toContain("browser/env build-stamp reads");
+    expect(map).toContain("voice timeline build-info projection");
     expect(map).toContain("diagnostics publication");
     expect(voiceCapture).not.toMatch(/from ["']react["']/);
     expect(voiceCapture).not.toContain("@/store/");
@@ -1937,6 +2455,15 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(voiceCapture).not.toContain("fetch(");
     expect(voiceCapture).not.toContain("speakVoice");
     expect(voiceCapture).not.toContain("transcribeVoice");
+    expect(voiceTimelineBuildInfo).not.toMatch(/from ["']react["']/);
+    expect(voiceTimelineBuildInfo).not.toContain("@/store/");
+    expect(voiceTimelineBuildInfo).not.toContain("@/components/helix/HelixAskPill");
+    expect(voiceTimelineBuildInfo).not.toContain("window");
+    expect(voiceTimelineBuildInfo).not.toContain("navigator");
+    expect(voiceTimelineBuildInfo).not.toContain("MediaRecorder");
+    expect(voiceTimelineBuildInfo).not.toContain("fetch(");
+    expect(voiceTimelineBuildInfo).not.toContain("speakVoice");
+    expect(voiceTimelineBuildInfo).not.toContain("transcribeVoice");
   });
 
   it("keeps voice text cleanup and speech-copy formatting in the non-React voice text display module", () => {
@@ -2133,12 +2660,15 @@ describe("Helix Ask UI ownership boundaries", () => {
     const pill = read("client/src/components/helix/HelixAskPill.tsx");
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
     const playbackClassification = read("client/src/lib/helix/ask-voice-playback-classification.ts");
+    const playbackRuntime = read("client/src/lib/helix/ask-voice-playback-runtime.ts");
     const readAloud = read("client/src/lib/helix/ask-read-aloud-display.ts");
     const voiceCopy = read("client/src/lib/helix/ask-voice-copy-display.ts");
 
     expect(map).toContain("ask-voice-playback-classification.ts");
+    expect(map).toContain("ask-voice-playback-runtime.ts");
     expect(map).toContain("user-agent/env playback policy");
     expect(pill).toContain('from "@/lib/helix/ask-voice-playback-classification"');
+    expect(pill).toContain('from "@/lib/helix/ask-voice-playback-runtime"');
     for (const symbol of [
       "shouldRetryVoicePlaybackWithDirectFallback",
       "shouldRetryVoicePlaybackDirectAttempt",
@@ -2160,10 +2690,19 @@ describe("Helix Ask UI ownership boundaries", () => {
       "shouldBypassVoicePlaybackGraph",
       "isActivePlayback",
     ]) {
-      expect(pill).toContain(localAnchor);
+      if (localAnchor === "isLikelyIOSDesktopModeUserAgent" || localAnchor === "isLikelyMobileAudioUserAgent") {
+        expect(playbackRuntime).toContain(`export function ${localAnchor}`);
+        expect(pill).not.toContain(`function ${localAnchor}`);
+      } else {
+        expect(pill).toContain(localAnchor);
+        expect(playbackRuntime).toContain(`export function ${localAnchor}`);
+        expect(pill).not.toContain(`export function ${localAnchor}`);
+      }
       expect(playbackClassification).not.toContain(localAnchor);
     }
     expect(map).toContain("navigator touch-point checks");
+    expect(playbackRuntime).toContain("VITE_HELIX_VOICE_FORCE_DIRECT_MOBILE");
+    expect(pill).not.toContain("VITE_HELIX_VOICE_FORCE_DIRECT_MOBILE");
     expect(playbackClassification).not.toMatch(/from ["']react["']/);
     expect(playbackClassification).not.toContain("@/store/");
     expect(playbackClassification).not.toContain("@/components/helix/HelixAskPill");
@@ -2172,6 +2711,13 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(playbackClassification).not.toContain("speakVoice");
     expect(playbackClassification).not.toContain("navigator.");
     expect(playbackClassification).not.toContain("import.meta");
+    expect(playbackRuntime).not.toMatch(/from ["']react["']/);
+    expect(playbackRuntime).not.toContain("@/store/");
+    expect(playbackRuntime).not.toContain("@/components/helix/HelixAskPill");
+    expect(playbackRuntime).not.toContain("fetch(");
+    expect(playbackRuntime).not.toContain("AudioContext");
+    expect(playbackRuntime).not.toContain("speakVoice");
+    expect(playbackRuntime).not.toContain("enqueueVoicePlaybackIntent");
   });
 
   it("keeps deterministic voice steering client helpers in the non-React steering owner", () => {
@@ -2218,11 +2764,6 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(confirmation).toContain("export function parseTranscriptConfirmationVoiceCommand");
     expect(pill).not.toContain("function parseTranscriptConfirmationVoiceCommand");
     for (const localAnchor of [
-      "resolveTranscriptConfirmPolicy",
-      "normalizeTranscriptConfirmPolicyReason",
-      "normalizeVoiceConfirmDispatchState",
-      "isLowPivotBlocked",
-      "shouldAutoConfirmTranscriptPrompt",
       "normalizeVoiceCommandLaneEnvelope",
       "shouldIgnoreLowQualityTranscriptBargeIn",
     ]) {
@@ -2248,17 +2789,18 @@ describe("Helix Ask UI ownership boundaries", () => {
     for (const symbol of [
       "deriveTranscriptConfidence",
       "shouldRequireTranscriptConfirmation",
+      "normalizeTranscriptConfirmPolicyReason",
+      "normalizeVoiceConfirmDispatchState",
+      "isLowPivotBlocked",
+      "resolveTranscriptConfirmPolicy",
+      "shouldAutoConfirmTranscriptPrompt",
     ]) {
       expect(confidence).toContain(`export function ${symbol}`);
       expect(pill).not.toContain(`function ${symbol}`);
     }
     expect(confidence).toContain("export const VOICE_STT_CONFIRM_THRESHOLD");
+    expect(confidence).toContain("export const VOICE_TRANSCRIPT_AUTO_CONFIRM_BLOCK_PIVOT_CONFIDENCE");
     for (const localAnchor of [
-      "resolveTranscriptConfirmPolicy",
-      "normalizeTranscriptConfirmPolicyReason",
-      "normalizeVoiceConfirmDispatchState",
-      "isLowPivotBlocked",
-      "shouldAutoConfirmTranscriptPrompt",
       "normalizeVoiceCommandLaneEnvelope",
       "shouldIgnoreLowQualityTranscriptBargeIn",
     ]) {
@@ -2281,42 +2823,151 @@ describe("Helix Ask UI ownership boundaries", () => {
     const steering = read("client/src/lib/helix/ask-voice-steering-client.ts");
     const barge = read("client/src/lib/helix/ask-voice-barge-policy.ts");
     const lexical = read("client/src/lib/helix/ask-voice-continuation-lexical.ts");
+    const heldTranscriptPolicy = read("client/src/lib/helix/ask-voice-held-transcript-policy.ts");
+    const autoDispatchGovernance = read("client/src/lib/helix/ask-voice-auto-dispatch-governance.ts");
+    const commandLanePolicy = read("client/src/lib/helix/ask-voice-command-lane-policy.ts");
     const scoring = read("client/src/lib/helix/ask-voice-turn-scoring.ts");
     const voiceCapture = read("client/src/lib/helix/ask-voice-capture-display.ts");
-    const extractedOwners = [confidence, confirmation, steering, barge, lexical, scoring, voiceCapture];
+    const extractedOwners = [
+      confidence,
+      confirmation,
+      steering,
+      barge,
+      lexical,
+      heldTranscriptPolicy,
+      autoDispatchGovernance,
+      commandLanePolicy,
+      scoring,
+      voiceCapture,
+    ];
 
     expect(map).toContain("Voice capture, STT, confirmation, continuation, and auto-dispatch");
-    expect(map).toContain("Mic/STT/runtime control");
-    expect(map).toContain("dispatch policy; do not move as display");
-    for (const symbol of [
+    expect(map).toContain("mic/STT runtime control");
+    expect(map).toContain("transcript-confirm policy resolution");
+    expect(map).toContain("ask-voice-auto-dispatch-governance.ts");
+    for (const recrownedSymbol of [
       "resolveTranscriptConfirmPolicy",
       "normalizeTranscriptConfirmPolicyReason",
-      "normalizeVoiceConfirmDispatchState",
-      "isLowPivotBlocked",
-      "evaluateVoiceAutoDispatchGovernance",
-      "isExplicitVoiceAskTurnCandidate",
-      "deriveVoiceSegmentLocalAnalysis",
-      "resolveSpeakerFromSessionProfiles",
+      "shouldAutoConfirmTranscriptPrompt",
+    ]) {
+      expect(pill).toContain(recrownedSymbol);
+      expect(confidence).toContain(recrownedSymbol);
+      expect(confirmation).not.toContain(recrownedSymbol);
+      expect(steering).not.toContain(recrownedSymbol);
+      expect(barge).not.toContain(recrownedSymbol);
+      expect(lexical).not.toContain(recrownedSymbol);
+      expect(scoring).not.toContain(recrownedSymbol);
+      expect(voiceCapture).not.toContain(recrownedSymbol);
+    }
+    for (const recrownedContinuationSymbol of [
       "shouldMergeVoiceContinuationTurn",
+      "shouldMergeVoiceContinuationInFlight",
+      "shouldRestartExplorationLadderOnSupersede",
+      "isLikelyContinuationAddendum",
+      "isLikelyContinuationTailFragment",
+    ]) {
+      expect(pill).toContain(recrownedContinuationSymbol);
+      expect(lexical).toContain(recrownedContinuationSymbol);
+      expect(confidence).not.toContain(recrownedContinuationSymbol);
+      expect(confirmation).not.toContain(recrownedContinuationSymbol);
+      expect(steering).not.toContain(recrownedContinuationSymbol);
+      expect(barge).not.toContain(recrownedContinuationSymbol);
+      expect(scoring).not.toContain(recrownedContinuationSymbol);
+      expect(voiceCapture).not.toContain(recrownedContinuationSymbol);
+    }
+    for (const recrownedHeldTranscriptSymbol of [
       "shouldMergePendingConfirmationTranscript",
       "shouldRecoverHeldTranscriptAfterNoTranscript",
       "shouldFlushHeldTranscriptFromWatchdog",
-      "buildVoiceReasoningDispatchPrompt",
-      "deriveVoiceTimelineSuppressionMeta",
-      "shouldAutoConfirmTranscriptPrompt",
+    ]) {
+      expect(pill).toContain(recrownedHeldTranscriptSymbol);
+      expect(heldTranscriptPolicy).toContain(recrownedHeldTranscriptSymbol);
+      expect(confidence).not.toContain(recrownedHeldTranscriptSymbol);
+      expect(confirmation).not.toContain(recrownedHeldTranscriptSymbol);
+      expect(steering).not.toContain(recrownedHeldTranscriptSymbol);
+      expect(barge).not.toContain(recrownedHeldTranscriptSymbol);
+      expect(lexical).not.toContain(recrownedHeldTranscriptSymbol);
+      expect(scoring).not.toContain(recrownedHeldTranscriptSymbol);
+      expect(voiceCapture).not.toContain(recrownedHeldTranscriptSymbol);
+    }
+    for (const recrownedAutoDispatchSymbol of [
+      "evaluateVoiceAutoDispatchGovernance",
+      "isExplicitVoiceAskTurnCandidate",
+    ]) {
+      expect(pill).toContain(recrownedAutoDispatchSymbol);
+      expect(pill).not.toContain(`function ${recrownedAutoDispatchSymbol}`);
+      expect(autoDispatchGovernance).toContain(`export function ${recrownedAutoDispatchSymbol}`);
+      expect(confidence).not.toContain(recrownedAutoDispatchSymbol);
+      expect(confirmation).not.toContain(recrownedAutoDispatchSymbol);
+      expect(steering).not.toContain(recrownedAutoDispatchSymbol);
+      expect(barge).not.toContain(recrownedAutoDispatchSymbol);
+      expect(lexical).not.toContain(recrownedAutoDispatchSymbol);
+      expect(heldTranscriptPolicy).not.toContain(recrownedAutoDispatchSymbol);
+      expect(scoring).not.toContain(recrownedAutoDispatchSymbol);
+      expect(voiceCapture).not.toContain(recrownedAutoDispatchSymbol);
+    }
+    for (const recrownedCaptureSymbol of [
+      "deriveVoiceSegmentLocalAnalysis",
+      "resolveSpeakerFromSessionProfiles",
+    ]) {
+      expect(pill).toContain(recrownedCaptureSymbol);
+      expect(pill).not.toContain(`function ${recrownedCaptureSymbol}`);
+      expect(voiceCapture).toContain(`export function ${recrownedCaptureSymbol}`);
+      expect(confidence).not.toContain(recrownedCaptureSymbol);
+      expect(confirmation).not.toContain(recrownedCaptureSymbol);
+      expect(steering).not.toContain(recrownedCaptureSymbol);
+      expect(barge).not.toContain(recrownedCaptureSymbol);
+      expect(lexical).not.toContain(recrownedCaptureSymbol);
+      expect(heldTranscriptPolicy).not.toContain(recrownedCaptureSymbol);
+      expect(scoring).not.toContain(recrownedCaptureSymbol);
+      expect(autoDispatchGovernance).not.toContain(recrownedCaptureSymbol);
+      expect(commandLanePolicy).not.toContain(recrownedCaptureSymbol);
+    }
+    for (const recrownedCommandLaneSymbol of [
       "normalizeVoiceCommandLaneEnvelope",
       "shouldIgnoreLowQualityTranscriptBargeIn",
+    ]) {
+      expect(pill).toContain(recrownedCommandLaneSymbol);
+      expect(pill).not.toContain(`function ${recrownedCommandLaneSymbol}`);
+      expect(commandLanePolicy).toContain(`export function ${recrownedCommandLaneSymbol}`);
+      expect(confidence).not.toContain(recrownedCommandLaneSymbol);
+      expect(confirmation).not.toContain(recrownedCommandLaneSymbol);
+      expect(steering).not.toContain(recrownedCommandLaneSymbol);
+      expect(barge).not.toContain(recrownedCommandLaneSymbol);
+      expect(lexical).not.toContain(recrownedCommandLaneSymbol);
+      expect(heldTranscriptPolicy).not.toContain(recrownedCommandLaneSymbol);
+      expect(scoring).not.toContain(recrownedCommandLaneSymbol);
+      expect(autoDispatchGovernance).not.toContain(recrownedCommandLaneSymbol);
+      expect(voiceCapture).not.toContain(recrownedCommandLaneSymbol);
+    }
+    for (const ownerInternalSymbol of [
+      "normalizeVoiceConfirmDispatchState",
+      "isLowPivotBlocked",
+    ]) {
+      expect(pill).not.toContain(ownerInternalSymbol);
+      expect(confidence).toContain(ownerInternalSymbol);
+      expect(confirmation).not.toContain(ownerInternalSymbol);
+      expect(steering).not.toContain(ownerInternalSymbol);
+      expect(barge).not.toContain(ownerInternalSymbol);
+      expect(lexical).not.toContain(ownerInternalSymbol);
+      expect(scoring).not.toContain(ownerInternalSymbol);
+      expect(voiceCapture).not.toContain(ownerInternalSymbol);
+    }
+    for (const symbol of [
+      "buildVoiceReasoningDispatchPrompt",
+      "deriveVoiceTimelineSuppressionMeta",
     ]) {
       expect(pill).toContain(symbol);
       for (const owner of extractedOwners) {
         expect(owner).not.toContain(symbol);
       }
     }
-    expect(map).toContain("local audio analysis");
-    expect(map).toContain("speaker profile matching");
-    expect(map).toContain("pending-confirmation merge policy");
-    expect(map).toContain("confirmation/auto-dispatch gates");
-    expect(map).toContain("translation pivot-confidence blocking");
+    expect(map).toContain("local audio segment analysis");
+    expect(map).toContain("speaker-profile matching live in `ask-voice-capture-display.ts`");
+    expect(map).toContain("speaker-profile ref mutation");
+    expect(map).toContain("pending-confirmation merge predicates live in `ask-voice-held-transcript-policy.ts`");
+    expect(map).toContain("confirmation state mutation");
+    expect(map).toContain("low-pivot translation blocking");
     for (const localAnchor of [
       "voiceTranscribeQueueRef",
       "voiceConfirmedTurnQueueRef",
@@ -2353,12 +3004,13 @@ describe("Helix Ask UI ownership boundaries", () => {
       "stopReadAloud",
       "voiceAutoSpeakQueueRef",
       "enqueueVoicePlaybackIntent",
-      "canPlayVoiceUtteranceWithMicOff",
       "shouldTreatMicSignalAsSpeech",
     ]) {
       expect(pill).toContain(localAnchor);
       expect(barge).not.toContain(localAnchor);
     }
+    expect(pill).toContain("canPlayVoiceUtteranceWithMicOff");
+    expect(barge).not.toContain("canPlayVoiceUtteranceWithMicOff");
     expect(barge).not.toMatch(/from ["']react["']/);
     expect(barge).not.toContain("@/store/");
     expect(barge).not.toContain("@/components/helix/HelixAskPill");

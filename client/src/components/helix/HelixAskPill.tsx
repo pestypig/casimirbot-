@@ -37,16 +37,13 @@ import {
   type HelixInterpreterArtifact,
   type HelixAskReasoningTheaterStateV1,
   type PendingHelixAskJob,
-  type VoiceCommandLaneEnvelope,
   type ToolLogEvent,
 } from "@/lib/agi/api";
 import {
-  buildDebugExportDrawerFallbackResult,
   hashDebugExportText,
-  type DebugExportUiResult,
 } from "@/lib/agi/debugExport";
 import { buildHelixAskClientBypassAudit, buildWorkspaceActionClientAckSnapshot } from "@/lib/agi/workspaceActionAck";
-import { useAgiChatStore, type ChatMessage, type ChatSession } from "@/store/useAgiChatStore";
+import { useAgiChatStore, type ChatSession } from "@/store/useAgiChatStore";
 import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
 import { HELIX_SETTINGS_OPEN_STATE_EVENT } from "@/hooks/useHelixSettingsDialog";
 import { classifyMoodFromWhisper } from "@/lib/luma-mood-spectrum";
@@ -67,8 +64,23 @@ import {
   buildHelixAskConsoleBackendTurnPayloadCore,
   buildHelixAskConsoleContextFiles,
 } from "@/components/helix/ask-console/HelixAskRequestEnvelope";
+import {
+  HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE as RECROWNED_HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE,
+  HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT as RECROWNED_HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT,
+  HELIX_ASK_ENTRYPOINT_GUARD_VERSION as RECROWNED_HELIX_ASK_ENTRYPOINT_GUARD_VERSION,
+  buildHelixAskHardBackendEntrypointRouteMetadata as buildRecrownedHelixAskHardBackendEntrypointRouteMetadata,
+  requiresHelixAskBackendEntrypoint as recrownedRequiresHelixAskBackendEntrypoint,
+  shouldUseHelixAskBackendTurnEntrypoint as recrownedShouldUseHelixAskBackendTurnEntrypoint,
+} from "@/components/helix/ask-console/HelixAskBackendEntrypointPolicy";
 import { readDocPathFromDesktopUrl } from "@/components/helix/ask-console/HelixAskContextBridge";
 import { buildHelixAskLatestTurnBinding } from "@/components/helix/ask-console/HelixAskLatestTurnBinding";
+import {
+  buildHelixAskLegacyTurnControlViewModel,
+  isHelixAskLegacyBackendDebugExportEligibleTurnId,
+  resolveHelixAskLegacyDebugExportBackendTarget,
+  resolveHelixAskLegacyTurnControlText,
+  selectHelixAskLegacyDebugCopyLocalPayload,
+} from "@/components/helix/ask-console/HelixAskLegacyTurnControls";
 import {
   hasSuccessfulWorkstationTerminalTranscriptRows,
   resolveHelixAskConsoleFinalAnswerSourceLabel,
@@ -89,6 +101,13 @@ import {
   type HelixAskProceduralTimelineRow,
 } from "@/components/helix/ask-console/HelixAskProceduralTimeline";
 import { HelixAskReplyTurn } from "@/components/helix/ask-console/HelixAskReplyTurn";
+import { resolveHelixAskLegacyReplyFailContext } from "@/components/helix/ask-console/HelixAskLegacyReplyDebugContext";
+import { sortHelixAskLegacyReplyEventsChronologically } from "@/components/helix/ask-console/HelixAskLegacyReplyEventOrder";
+import {
+  hasHelixAskLegacyTerminalMismatch,
+  resolveHelixAskLegacyFinalSourceLabel,
+  selectHelixAskLegacyFinalAnswerText,
+} from "@/components/helix/ask-console/HelixAskLegacyFinalTextSelection";
 import { HelixAskLegacyConsoleView } from "@/components/helix/ask-console/HelixAskLegacyConsoleView";
 import { HelixAskReasoningBattleStage } from "@/components/helix/ask-console/HelixAskReasoningBattleStage";
 import { HelixAskReasoningMirekField } from "@/components/helix/ask-console/HelixAskReasoningMirekField";
@@ -101,6 +120,22 @@ import {
   HelixAskRuntimePicker,
   buildHelixAskRuntimePickerModel,
 } from "@/components/helix/ask-console/HelixAskRuntimePicker";
+import {
+  persistHelixAskAgentRuntime,
+  readStoredHelixAskAgentRuntime,
+} from "@/components/helix/ask-console/HelixAskRuntimePreference";
+import {
+  readHelixAskVisualCaptureAudioPreference,
+  syncHelixAskVisualCaptureRoutePreference,
+} from "@/components/helix/ask-console/HelixAskVisualCapturePreference";
+import {
+  extractHelixAskContextCompactionResumeFrame,
+  extractLatestHelixAskContextCompactionResumeFrameFromReplies,
+  isHelixAskContextCompactionPausePendingReply,
+  isHelixAskContextCompactionPauseText,
+  readStoredHelixAskContextCompactionResumeFrame,
+  writeStoredHelixAskContextCompactionResumeFrame,
+} from "@/components/helix/ask-console/HelixAskContextCompactionResumeFrameStorage";
 import {
   HELIX_ASK_CONSOLE_MAX_PROMPT_LINES,
   HelixAskComposerSubmitButton,
@@ -120,12 +155,34 @@ import {
   sortHelixAskConsoleRepliesChronologically,
 } from "@/components/helix/ask-console/HelixAskReplyLifecycle";
 import {
-  buildHelixAskConsoleChatMessagePayload,
-  buildHelixAskConsoleChatTurnPayloads,
-} from "@/components/helix/ask-console/HelixAskChatPersistence";
+  addHelixAskLegacyChatMessage,
+  addHelixAskLegacyChatTurnMessages,
+} from "@/components/helix/ask-console/HelixAskLegacyChatPersistenceBinding";
 import { HelixAskDebugDrawer } from "@/components/helix/ask-console/HelixAskDebugDrawer";
+import {
+  buildHelixAskDebugDrawerCopyProjection,
+  type HelixAskDebugExportDrawerState,
+} from "@/components/helix/ask-console/HelixAskDebugDrawerState";
 import { HelixAskTurnList } from "@/components/helix/ask-console/HelixAskTurnList";
 import { HelixAskAttachmentStrip } from "@/components/helix/ask-console/HelixAskAttachmentStrip";
+import {
+  validateHelixAskAttachmentForSubmit,
+  validateHelixAskImageAttachmentForSubmit,
+  type HelixAskAttachment,
+  type HelixAskImageAttachment,
+} from "@/components/helix/ask-console/HelixAskAttachmentCommit";
+import {
+  HELIX_ASK_TEXT_ATTACHMENT_MAX_BYTES,
+  buildHelixAskTextAttachmentFromText,
+  buildHelixAskTextAttachmentTurnInputItem,
+  type HelixAskTextAttachment,
+} from "@/components/helix/ask-console/HelixAskTextAttachment";
+import {
+  applyHelixAskVoiceTimelineVersionError,
+  applyHelixAskVoiceTimelineVersionPayload,
+  buildHelixAskVoiceTimelineInitialBuildInfo,
+  type HelixAskVoiceTimelineBuildInfo,
+} from "@/components/helix/ask-console/HelixAskVoiceTimelineBuildInfo";
 import {
   HelixAskContextMemoryStatusLine,
   HelixAskErrorLine,
@@ -187,6 +244,7 @@ import {
 } from "@/lib/helix/ask-observer-events";
 import {
   attachHelixAskClientTraceToLiveEvent,
+  askLiveEventBelongsToActiveTurn,
   buildAskLiveAgenticEventRows,
   buildHelixActiveTurnStreamRows,
   createHelixAskConsoleStreamIngressDebug,
@@ -204,6 +262,7 @@ export {
 };
 export {
   attachHelixAskClientTraceToLiveEvent,
+  askLiveEventBelongsToActiveTurn,
   buildAskLiveAgenticEventRows,
   buildHelixActiveTurnStreamRows,
   createHelixAskConsoleStreamIngressDebug,
@@ -295,7 +354,6 @@ import {
   normalizedDebugReplyText,
   parseAskLiveEventTimestampMs,
   parseHelixAskQueuedQuestionsInput,
-  readAskLiveEventIdentity,
   readEventMetaString,
   readHelixAskDebugContextFromMeta,
   resolveAskLiveEventTimestampMs,
@@ -321,17 +379,53 @@ import {
   isWorkstationLifecycleEvent,
   readProceduralActionLabel,
 } from "@/lib/helix/ask-procedural-display";
+import { resolveExternalPromptClaimId } from "@/lib/helix/ask-external-prompt-claim";
 import {
-  HELIX_ASK_ANSWER_MARKER_SPLIT_RE,
-  cleanPromptLine,
-  decideHelixAskFormat,
-  normalizeQuestionMatch,
-  stripAnswerBoundaryPrefix,
-  stripInlineQuestionLine,
-  stripLeadingQuestion,
-  stripQuestionPrefixText,
-  stripStageTags,
+  HELIX_WORKSTATION_PANEL_ALIASES,
+  normalizeLexiconAlias,
+  normalizeWorkstationCommandText,
+  parseOpenPanelCommand,
+  restateWorkstationSubgoal,
+  resolvePanelIdFromPath,
+  type WorkstationPanelResolverConfig,
+} from "@/lib/helix/ask-workstation-command-text";
+import {
+  extractCalculatorFastPathExpressionFromPrompt,
+  readWorkstationActionArgText,
+  selectWorkstationFastPathReplyAction,
+} from "@/lib/helix/ask-workstation-fast-path";
+import {
+  buildAskTurnWorkspaceContextSnapshotFromState,
+  buildWorkstationLayoutDebugSnapshotFromState,
+} from "@/lib/helix/ask-workspace-context-snapshot";
+import {
+  cloneRunPanelActionWithArgs,
+  extractPendingArgFromReply,
+  parseWorkstationConfirmationReply,
+  readDocTopicResolutionMeta,
+  stripDocTopicResolutionMetaFromArgs,
+} from "@/lib/helix/ask-workstation-pending-input";
+import {
+  inferLanguageTagFromSourceText,
+  isEnglishLikeLanguageTag,
+  isHighRiskTranslationContext,
+  normalizeVoiceLanguageTag,
+  resolveVoiceResponseLanguage,
+  resolveVoiceSourceLanguage,
+} from "@/lib/helix/ask-voice-language-policy";
+import {
+  stripPromptEcho,
 } from "@/lib/helix/ask-output-cleanup";
+import {
+  HELIX_ASK_PASTED_TEXT_RESUME_RECALL_PROMPT_PATTERN,
+  isHelixAskPastedTextResumeRecallPrompt,
+  isHelixAskUsePastedTextAttachmentPrompt,
+  isHelixAskVisualPrompt,
+} from "@/lib/helix/ask-attachment-prompt-policy";
+import {
+  isDiagnosticVisualEvidence,
+  readVisualEvidenceSummary,
+} from "@/lib/helix/ask-visual-evidence-readers";
 import {
   SESSION_CAPSULE_CONFIDENCE_LABEL,
   buildContextCapsuleCopyText,
@@ -364,10 +458,13 @@ import {
   normalizeHelixAskEnvelopeCitations,
 } from "@/lib/helix/ask-envelope-copy";
 import {
-  extractExplicitDocsViewerPath,
+  buildDocViewerDebugSnapshotFromState,
   normalizeDocPathForDebugCompare,
   normalizeDocViewerPathForAskSnapshot,
   normalizeDocsViewerAnchorPath,
+  resolveDocsViewerAnchorPathCandidate,
+  resolveDocViewerSnapshotPathCandidate,
+  shouldSuppressAtomicViewerLaunch,
 } from "@/lib/helix/ask-doc-viewer-context";
 export {
   formatGoalPillCadence,
@@ -379,6 +476,37 @@ import {
   isLikelyIdeologyDomainLeak,
   isMultilangConfidenceGateResponse,
 } from "@/lib/helix/ask-local-fallback-classification";
+import {
+  collectHelixAgentSelectedCapabilities,
+  extractAskLevelTheoryReflection,
+  hasHelixAskBackendEntrypointTurnId,
+  normalizeHelixRuntimeActionKey,
+  readAgentLoopAuditArray,
+  readAgentLoopAuditRecord,
+  readHelixDecisionCapabilityKeys,
+  readHelixGatewayCapabilityKeys,
+  readHelixWorkstationActionRuntimeKeys,
+} from "@/lib/helix/ask-runtime-authority-readers";
+export { hasHelixAskBackendEntrypointTurnId };
+import {
+  normalizeHelixPendingTransitionMarker,
+  readHelixPendingInputRecord,
+  readHelixPendingTransitionTrace,
+} from "@/lib/helix/ask-pending-input-readers";
+import {
+  buildExplorationArtifactRetryPrompt,
+  buildExplorationEscalationPrompt,
+  inferAskMode,
+  isRepoCodeEvidencePrompt,
+  isRepoFileLocationRequestPrompt,
+  resolveAskContextChooserAutoMode,
+} from "@/lib/helix/ask-exploration-policy";
+import {
+  hasStagePlayMailboxWakeRouteMetadata,
+  isStagePlayMailboxWakePromptText,
+  shouldBlockStagePlayMailboxWakePromptWithoutRouteMetadata,
+} from "@/lib/helix/ask-stage-play-mailbox-wake-policy";
+export { shouldBlockStagePlayMailboxWakePromptWithoutRouteMetadata };
 import { humanizeAskLiveEventToken } from "@/lib/helix/ask-display-text";
 import { hash32, stableHelixProjectionHash } from "@/lib/helix/ask-stable-hash";
 import {
@@ -401,6 +529,7 @@ import {
 } from "@/lib/helix/ask-value-normalization";
 import {
   buildVoiceAutoSpeakUtteranceId,
+  canPlayVoiceUtteranceWithMicOff,
   formatReadAloudButtonLabel,
   hashVoiceUtteranceKey,
   isInterimVoicePlaybackUtteranceKind,
@@ -415,6 +544,7 @@ import {
 } from "@/lib/helix/ask-read-aloud-display";
 export {
   buildVoiceAutoSpeakUtteranceId,
+  canPlayVoiceUtteranceWithMicOff,
   formatReadAloudButtonLabel,
   hashVoiceUtteranceKey,
   isInterimVoicePlaybackUtteranceKind,
@@ -434,9 +564,46 @@ import {
   extractLatestContinuationQuestionFocus,
   hasDanglingTurnTail,
   hasSufficientLexicalCarryover,
+  isLikelyContinuationAddendum,
+  isLikelyContinuationTailFragment,
   isLikelyNearTurnContinuation,
   isLowInformationTailTranscript,
+  shouldMergeVoiceContinuationInFlight,
+  shouldMergeVoiceContinuationTurn,
+  shouldRestartExplorationLadderOnSupersede,
 } from "@/lib/helix/ask-voice-continuation-lexical";
+import {
+  HELIX_VOICE_AUTO_DISPATCH_MAX_PER_MINUTE,
+  evaluateVoiceAutoDispatchGovernance,
+  isExplicitVoiceAskTurnCandidate,
+  type VoiceAutoDispatchGovernance,
+  type VoiceAutoDispatchGovernanceReason,
+} from "@/lib/helix/ask-voice-auto-dispatch-governance";
+import {
+  VOICE_HELD_TRANSCRIPT_FLUSH_MS,
+  VOICE_HELD_TRANSCRIPT_MAX_AGE_MS,
+  VOICE_TURN_CLOSE_SILENCE_MS,
+  shouldFlushHeldTranscriptFromWatchdog,
+  shouldMergePendingConfirmationTranscript,
+  shouldRecoverHeldTranscriptAfterNoTranscript,
+  type HeldTranscriptReason,
+} from "@/lib/helix/ask-voice-held-transcript-policy";
+import {
+  deriveVoiceTimelineSuppressionMeta,
+  inferSuppressionCauseFromRouteReason,
+  isStrongQuestionDispatchCandidate,
+  resolveSuppressedDispatchRescueTranscript,
+  shouldDispatchReasoningAttempt,
+  shouldForceObserveDispatchFromSuppression,
+} from "@/lib/helix/ask-voice-dispatch-suppression";
+import {
+  buildVoiceReasoningDispatchPrompt,
+  deriveObserverDispatchPlan,
+  isLikelyContextDependentTurn,
+  isSimpleDirectPromptLaneCandidate,
+  normalizeConversationModeForDispatch,
+  shouldQueueWorkspaceBackgroundReasoning,
+} from "@/lib/helix/ask-voice-reasoning-dispatch-prompt";
 import {
   isRetryableVoiceChunkSynthesisError,
   isVoiceMemoryPressureError,
@@ -445,13 +612,36 @@ import {
   shouldTreatVoicePlaybackErrorAsEnded,
 } from "@/lib/helix/ask-voice-playback-classification";
 import {
+  HELIX_VOICE_FORCE_DIRECT_MOBILE,
+  isActivePlayback,
+  resolveVoicePlaybackAttemptPath,
+  resolveVoicePlaybackGain,
+  shouldBypassVoicePlaybackGraph,
+  shouldUseVoicePlaybackAudioGraph,
+} from "@/lib/helix/ask-voice-playback-runtime";
+export {
+  isActivePlayback,
+  resolveVoicePlaybackAttemptPath,
+  resolveVoicePlaybackGain,
+  shouldBypassVoicePlaybackGraph,
+  shouldUseVoicePlaybackAudioGraph,
+};
+import {
   parseTranscriptConfirmationVoiceCommand,
   type TranscriptConfirmationVoiceCommand,
 } from "@/lib/helix/ask-voice-confirmation-command";
 import {
+  normalizeVoiceCommandLaneEnvelope,
+  shouldIgnoreLowQualityTranscriptBargeIn,
+} from "@/lib/helix/ask-voice-command-lane-policy";
+import {
   VOICE_STT_CONFIRM_THRESHOLD,
   deriveTranscriptConfidence,
+  normalizeTranscriptConfirmPolicyReason,
+  resolveTranscriptConfirmPolicy,
+  shouldAutoConfirmTranscriptPrompt,
   shouldRequireTranscriptConfirmation,
+  type TranscriptConfirmPolicyReason,
 } from "@/lib/helix/ask-voice-transcript-confidence";
 import {
   mapVoicePreemptPolicyToCancelReason,
@@ -491,17 +681,40 @@ import {
 export {
   buildVoiceSteeringClientRequest,
   classifyVoiceSteeringClientTranscript,
+  deriveObserverDispatchPlan,
+  deriveVoiceTimelineSuppressionMeta,
   deriveTranscriptConfidence,
   extractLatestContinuationQuestionFocus,
   hasDanglingTurnTail,
+  inferSuppressionCauseFromRouteReason,
+  isExplicitVoiceAskTurnCandidate,
+  isLikelyContinuationAddendum,
+  isLikelyContinuationTailFragment,
   isRetryableVoiceChunkSynthesisError,
   isVoiceSteeringDuringToolCall,
+  isLikelyContextDependentTurn,
   isLikelyNearTurnContinuation,
   isLowInformationTailTranscript,
   isGenericQueuedVoiceAcknowledgement,
+  isStrongQuestionDispatchCandidate,
+  buildVoiceReasoningDispatchPrompt,
+  normalizeVoiceCommandLaneEnvelope,
   parseTranscriptConfirmationVoiceCommand,
+  resolveSuppressedDispatchRescueTranscript,
   resolveVoiceBargeHardCutReason,
+  resolveTranscriptConfirmPolicy,
+  evaluateVoiceAutoDispatchGovernance,
   shouldRequireTranscriptConfirmation,
+  shouldAutoConfirmTranscriptPrompt,
+  shouldDispatchReasoningAttempt,
+  shouldForceObserveDispatchFromSuppression,
+  shouldMergeVoiceContinuationInFlight,
+  shouldMergeVoiceContinuationTurn,
+  shouldMergePendingConfirmationTranscript,
+  shouldRecoverHeldTranscriptAfterNoTranscript,
+  shouldFlushHeldTranscriptFromWatchdog,
+  shouldIgnoreLowQualityTranscriptBargeIn,
+  shouldRestartExplorationLadderOnSupersede,
   shouldSuppressVoiceForTerminalState,
   shouldInterruptForSupersededReason,
   shouldResumeBargeHeldPlayback,
@@ -512,6 +725,10 @@ export {
   scoreIntentShift,
   scoreVoiceTurnComplete,
 };
+export type {
+  VoiceAutoDispatchGovernance,
+  VoiceAutoDispatchGovernanceReason,
+} from "@/lib/helix/ask-voice-auto-dispatch-governance";
 export type {
   TranscriptConfirmationVoiceCommand,
 } from "@/lib/helix/ask-voice-confirmation-command";
@@ -544,17 +761,22 @@ import {
   VOICE_LOCAL_AUDIO_GATE_MIN_DURATION_MS,
   VOICE_LOCAL_AUDIO_GATE_MIN_SNR_DB,
   VOICE_LOCAL_AUDIO_GATE_MIN_SPEECH_PROBABILITY,
+  deriveVoiceSegmentLocalAnalysis,
   describeMediaErrorCode,
   getMicRecorderMimeCandidates,
   isFlatVoiceSignal,
   isLikelyLoopbackDeviceLabel,
   isLowAudioQualitySignal,
   isRecorderStalled,
+  pickSupportedMicRecorderMimeType,
+  resolveSpeakerFromSessionProfiles,
   resolveVoiceNoiseHandlingProfile,
   shouldPrimeSegmentWithContainerHeader,
   shouldTreatMicSignalAsSpeech,
   smoothVoiceLevel,
   type VoiceNoiseHandlingProfile,
+  type VoiceSegmentLocalAnalysis,
+  type VoiceSessionSpeakerProfile,
 } from "@/lib/helix/ask-voice-capture-display";
 import {
   VOICE_CAPTURE_CHECKPOINT_LABEL,
@@ -592,16 +814,23 @@ export {
 };
 export {
   getMicRecorderMimeCandidates,
+  deriveVoiceSegmentLocalAnalysis,
   isLikelyLoopbackDeviceLabel,
   isFlatVoiceSignal,
   isLowAudioQualitySignal,
   isRecorderStalled,
+  pickSupportedMicRecorderMimeType,
+  resolveSpeakerFromSessionProfiles,
   resolveVoiceNoiseHandlingProfile,
   shouldPrimeSegmentWithContainerHeader,
   shouldTreatMicSignalAsSpeech,
   smoothVoiceLevel,
 };
-export type { VoiceNoiseHandlingProfile } from "@/lib/helix/ask-voice-capture-display";
+export type {
+  VoiceNoiseHandlingProfile,
+  VoiceSegmentLocalAnalysis,
+  VoiceSessionSpeakerProfile,
+} from "@/lib/helix/ask-voice-capture-display";
 export type {
   VoiceCaptureCheckpoint,
   VoiceCaptureCheckpointKey,
@@ -755,11 +984,6 @@ import { useTheoryMapOverlayStore } from "@/store/useTheoryMapOverlayStore";
 import { runScientificSolve } from "@/lib/scientific-calculator/solver";
 import { base64FromFile } from "@/utils/files";
 import type { HelixTurnInputItem } from "@shared/helix-turn-input-item";
-import type { HelixAttachmentCommitCheck } from "@shared/helix-attachment-commit";
-import {
-  isTheoryContextReflectionV1,
-  type TheoryContextReflectionV1,
-} from "@shared/contracts/theory-context-reflection.v1";
 import {
   readMissionContextControls,
   stopDesktopTier1ScreenSession,
@@ -932,11 +1156,6 @@ import {
 import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
 import { useWorkstationNotesStore } from "@/store/useWorkstationNotesStore";
 
-type HelixAskVisualCaptureRoute = "live_answer" | "image_lens" | "audio_transcript";
-
-const HELIX_ASK_AGENT_RUNTIME_STORAGE_KEY = "helix.ask.agentRuntime.v1";
-const HELIX_LIVE_ANSWER_VISUAL_CAPTURE_ROUTE_STORAGE_KEY = "helix.liveAnswer.visualCaptureRoutes.v1";
-const HELIX_LIVE_ANSWER_VISUAL_CAPTURE_ROUTE_SYNC_EVENT = "helix:live-answer:visual-capture-routes";
 const HELIX_ASK_THREAD_ID = "helix-ask:desktop";
 const HELIX_ASK_AUDIO_TRANSCRIPT_SOURCE_ID = `audio_transcript:${HELIX_ASK_THREAD_ID}`;
 const HELIX_ASK_DISPLAY_AUDIO_CONSTRAINTS: MediaTrackConstraints = {
@@ -946,37 +1165,10 @@ const HELIX_ASK_DISPLAY_AUDIO_CONSTRAINTS: MediaTrackConstraints = {
 };
 const HELIX_ASK_DISPLAY_AUDIO_CHUNK_MS = 10_000;
 
-function readHelixAskVisualCaptureAudioPreference(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(HELIX_LIVE_ANSWER_VISUAL_CAPTURE_ROUTE_STORAGE_KEY) ?? "null");
-    return Array.isArray(parsed) && parsed.includes("audio_transcript");
-  } catch {
-    return false;
-  }
-}
-
-function syncHelixAskVisualCaptureRoutePreference(includeAudio: boolean): HelixAskVisualCaptureRoute[] {
-  const routes: HelixAskVisualCaptureRoute[] = includeAudio ? ["live_answer", "audio_transcript"] : ["live_answer"];
-  if (typeof window !== "undefined") {
-    window.localStorage.setItem(HELIX_LIVE_ANSWER_VISUAL_CAPTURE_ROUTE_STORAGE_KEY, JSON.stringify(routes));
-    window.dispatchEvent(new CustomEvent(HELIX_LIVE_ANSWER_VISUAL_CAPTURE_ROUTE_SYNC_EVENT, { detail: { routes } }));
-  }
-  return routes;
-}
-
-const HELIX_ASK_CONTEXT_RESUME_FRAME_STORAGE_KEY = "helix.ask.contextResumeFrame.v1";
 const HELIX_ASK_DURABLE_TRANSCRIPT_LIMIT = 80;
 
 const MOBILE_AUDIO_UNLOCK_DATA_URI =
   "data:audio/wav;base64,UklGRsQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YaAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
-const MOBILE_AUDIO_USER_AGENT_PATTERN =
-  /(iphone|ipad|ipod|android|mobile|silk|kindle|fennec|iemobile|opera mini)/i;
-const IOS_AUDIO_USER_AGENT_PATTERN = /(iphone|ipad|ipod)/i;
-const DESKTOP_STYLE_APPLE_AUDIO_USER_AGENT_PATTERN = /macintosh/i;
-const HELIX_VOICE_PLAYBACK_GAIN_DESKTOP = 1.15;
-const HELIX_VOICE_PLAYBACK_GAIN_MOBILE = 3.6;
-const HELIX_VOICE_PLAYBACK_GAIN_IOS = 5.0;
 const HELIX_VOICE_LIMITER_THRESHOLD_DB = -2.5;
 const HELIX_VOICE_LIMITER_KNEE_DB = 1;
 const HELIX_VOICE_LIMITER_RATIO = 20;
@@ -989,11 +1181,6 @@ const VOICE_PLAYBACK_NO_PROGRESS_TIMEOUT_MS = 3_500;
 const VOICE_PLAYBACK_UNKNOWN_DURATION_TIMEOUT_MS = 15_000;
 const VOICE_PLAYBACK_DURATION_TIMEOUT_PAD_MS = 4_000;
 const VOICE_PLAYBACK_DURATION_TIMEOUT_MAX_MS = 60_000;
-const HELIX_VOICE_FORCE_DIRECT_MOBILE = readHelixEnvOneFlag(
-  (import.meta as any)?.env,
-  "VITE_HELIX_VOICE_FORCE_DIRECT_MOBILE",
-  false,
-);
 const HELIX_VOICE_CONFIRM_V2_ENABLED = readHelixEnvBoolean(
   (import.meta as any)?.env,
   "VITE_HELIX_VOICE_CONFIRM_V2_ENABLED",
@@ -1038,12 +1225,7 @@ const HELIX_VOICE_TRANSCRIBE_QUEUE_MAX = Math.max(
   1,
   Math.floor(readHelixEnvNumber((import.meta as any)?.env, "VITE_HELIX_VOICE_TRANSCRIBE_QUEUE_MAX", 4)),
 );
-const HELIX_VOICE_AUTO_DISPATCH_MAX_PER_MINUTE = Math.max(
-  1,
-  Math.floor(readHelixEnvNumber((import.meta as any)?.env, "VITE_HELIX_VOICE_AUTO_DISPATCH_MAX_PER_MINUTE", 3)),
-);
 const HELIX_VOICE_AUTO_DISPATCH_WINDOW_MS = 60_000;
-const HELIX_VOICE_AUTO_DISPATCH_CONFIDENCE_FLOOR = 0.5;
 const HELIX_VOICE_TRANSCRIBE_PRESSURE_RETRY_DELAY_MS = 2_500;
 const HELIX_WORKSTATION_INTENT_CLASSIFIER_CONFIDENCE_MIN = 0.62;
 const HELIX_WORKSTATION_INTENT_CLASSIFIER_TIMEOUT_MS = 1800;
@@ -1409,62 +1591,6 @@ type WorkstationUserInputResolution =
   | { status: "pending"; pending: PendingWorkstationUserInputRequest }
   | { status: "cancelled" };
 
-export function deriveObserverDispatchPlan(args: {
-  question: string;
-  workstationAction: HelixWorkstationAction | null;
-  forceReasoningDispatch?: boolean;
-}): ObserverDispatchPlan {
-  const trimmed = args.question.trim();
-  const shouldDispatchWorkspace = Boolean(args.workstationAction);
-  const shouldDispatchReasoning =
-    args.forceReasoningDispatch === true || shouldDispatchReasoningAttempt(trimmed);
-  const intentType: ObserverIntentType = shouldDispatchWorkspace
-    ? shouldDispatchReasoning
-      ? "chat_plus_workspace_plus_reasoning"
-      : "chat_plus_workspace"
-    : shouldDispatchReasoning
-      ? "chat_plus_reasoning"
-      : "chat_only";
-  switch (intentType) {
-    case "chat_plus_workspace_plus_reasoning":
-      return {
-        intent_type: intentType,
-        should_dispatch_workspace: true,
-        should_dispatch_reasoning: true,
-        should_stay_conversational: true,
-        dispatch_plan: "workspace+reasoning",
-        observer_ack: "I will run the workspace action now and continue reasoning in the background.",
-      };
-    case "chat_plus_workspace":
-      return {
-        intent_type: intentType,
-        should_dispatch_workspace: true,
-        should_dispatch_reasoning: false,
-        should_stay_conversational: true,
-        dispatch_plan: "workspace",
-        observer_ack: "I will run that workspace action now.",
-      };
-    case "chat_plus_reasoning":
-      return {
-        intent_type: intentType,
-        should_dispatch_workspace: false,
-        should_dispatch_reasoning: true,
-        should_stay_conversational: true,
-        dispatch_plan: "reasoning",
-        observer_ack: "I will reason through this and keep you updated.",
-      };
-    default:
-      return {
-        intent_type: "chat_only",
-        should_dispatch_workspace: false,
-        should_dispatch_reasoning: false,
-        should_stay_conversational: true,
-        dispatch_plan: "chat_only",
-        observer_ack: "I am here with you.",
-      };
-  }
-}
-
 const HELIX_EVIDENCE_GATE_HARD_CLAIM_RE =
   /\b(?:verify|verification|prove|proof|audit|compare|contrast|difference|tradeoff|synthesi[sz]e|explain|why|how|pass\/?fail|integrity|evidence|claim)\b/i;
 
@@ -1591,82 +1717,6 @@ function resolvePanelActionDefinition(action: HelixWorkstationAction): {
   const definition = capabilities?.actions.find((candidate) => candidate.id === actionId);
   if (!definition) return null;
   return { panel_id: panelId, action_id: actionId, definition };
-}
-
-function parseWorkstationConfirmationReply(reply: string): boolean | null {
-  const normalized = reply.trim().toLowerCase();
-  if (!normalized) return null;
-  if (normalized === "true" || normalized === "1") return true;
-  if (normalized === "false" || normalized === "0") return false;
-  if (/^(?:yes|y|confirm|confirmed|proceed|do it|go ahead|ok|okay|sure)\b/.test(normalized)) return true;
-  if (/^(?:no|n|cancel|stop|don'?t|do not)\b/.test(normalized)) return false;
-  return null;
-}
-
-function extractPendingArgFromReply(arg: string, reply: string): string | null {
-  const trimmed = reply.trim();
-  if (!trimmed) return null;
-  const quoted = trimmed.match(/"([^"]+)"/) ?? trimmed.match(/'([^']+)'/);
-  switch (arg) {
-    case "text":
-      return trimmed;
-    case "path": {
-      const pathLike = trimmed.match(/([A-Za-z]:\\[^\s]+|\/[^\s]+|(?:docs|client|server)\/[^\s]+|[^\s]+\.md)\b/);
-      return pathLike?.[1]?.trim() ?? null;
-    }
-    default:
-      return (quoted?.[1] ?? trimmed).trim() || null;
-  }
-}
-
-function cloneRunPanelActionWithArgs(
-  action: HelixWorkstationAction,
-  args: Record<string, unknown>,
-): HelixWorkstationAction {
-  if (action.action !== "run_panel_action") return action;
-  return {
-    ...action,
-    args,
-  };
-}
-
-type PendingDocTopicResolutionMeta = {
-  status: "weak" | "ambiguous";
-  confidence: number;
-  topic: string | null;
-  candidates: string[];
-};
-
-function readDocTopicResolutionMeta(action: HelixWorkstationAction): PendingDocTopicResolutionMeta | null {
-  if (action.action !== "run_panel_action" || action.panel_id !== "docs-viewer") return null;
-  const actionArgs = asObjectRecord(action.args) ?? {};
-  const statusRaw = String(actionArgs._doc_resolution_status ?? "").trim().toLowerCase();
-  const status = statusRaw === "ambiguous" || statusRaw === "weak" ? statusRaw : null;
-  if (!status) return null;
-  const confidenceRaw = Number(actionArgs._doc_resolution_confidence);
-  const confidence = Number.isFinite(confidenceRaw) ? Math.max(0, Math.min(1, confidenceRaw)) : 0;
-  const topic = asNonEmptyString(actionArgs._doc_resolution_topic);
-  const candidates = Array.isArray(actionArgs._doc_resolution_candidates)
-    ? actionArgs._doc_resolution_candidates
-        .map((candidate) => (typeof candidate === "string" ? candidate.trim() : ""))
-        .filter((candidate) => candidate.length > 0)
-        .slice(0, 3)
-    : [];
-  return {
-    status,
-    confidence,
-    topic,
-    candidates,
-  };
-}
-
-function stripDocTopicResolutionMetaFromArgs(args: Record<string, unknown>): Record<string, unknown> {
-  const nextArgs = { ...args };
-  delete nextArgs._doc_resolution_status;
-  delete nextArgs._doc_resolution_confidence;
-  delete nextArgs._doc_resolution_topic;
-  delete nextArgs._doc_resolution_candidates;
-  return nextArgs;
 }
 
 export function buildWorkstationUserInputRequest(args: {
@@ -1835,42 +1885,6 @@ function resolveWorkstationRouterFailId(
   }
 }
 
-function resolveExternalPromptClaimId(pending: PendingHelixAskPrompt | null, question: string): string {
-  const promptId = pending?.promptId?.trim();
-  if (promptId) return promptId;
-  const createdAt = typeof pending?.createdAt === "number" ? pending.createdAt : 0;
-  return `${createdAt}:${question.trim().toLowerCase()}`;
-}
-
-function isStagePlayMailboxWakePromptText(question: string): boolean {
-  const normalized = question.trim();
-  if (!normalized) return false;
-  return (
-    /\bReview\s+the\s+latest\s+Stage\s+Play\s+live[-\s]?source\s+mailbox\s+finding\b/i.test(normalized) &&
-    /\bMicro[-\s]?reasoner\s+recommendation\b/i.test(normalized) &&
-    /\bstructured\s+mailbox\s+route\s+metadata\b/i.test(normalized)
-  );
-}
-
-function hasStagePlayMailboxWakeRouteMetadata(routeMetadata: PendingHelixAskPrompt["routeMetadata"]): boolean {
-  return Boolean(
-    routeMetadata &&
-      routeMetadata.invocationKind === "stage_play_mail_wake" &&
-      routeMetadata.sourceTarget === "live_source_mailbox" &&
-      typeof routeMetadata.wakeRequestId === "string" &&
-      routeMetadata.wakeRequestId.trim() &&
-      typeof routeMetadata.mailboxThreadId === "string" &&
-      routeMetadata.mailboxThreadId.trim(),
-  );
-}
-
-export function shouldBlockStagePlayMailboxWakePromptWithoutRouteMetadata(
-  pending: PendingHelixAskPrompt | null,
-  question: string,
-): boolean {
-  return isStagePlayMailboxWakePromptText(question) && !hasStagePlayMailboxWakeRouteMetadata(pending?.routeMetadata);
-}
-
 function claimExternalPromptSingleFlight(claimId: string): boolean {
   if (typeof window === "undefined") return true;
   const host = window as Window & {
@@ -1885,61 +1899,6 @@ function claimExternalPromptSingleFlight(claimId: string): boolean {
   if (claims.has(claimId)) return false;
   claims.set(claimId, now);
   return true;
-}
-
-function isLikelyIOSDesktopModeUserAgent(userAgent?: string): boolean {
-  const ua = (userAgent ?? "").trim();
-  if (!ua) return false;
-  if (!DESKTOP_STYLE_APPLE_AUDIO_USER_AGENT_PATTERN.test(ua)) return false;
-  if (typeof navigator === "undefined") return false;
-  const touchPoints = typeof navigator.maxTouchPoints === "number" ? navigator.maxTouchPoints : 0;
-  return touchPoints > 1;
-}
-
-function isLikelyMobileAudioUserAgent(userAgent?: string): boolean {
-  const ua = (userAgent ?? "").trim();
-  if (!ua) return false;
-  return MOBILE_AUDIO_USER_AGENT_PATTERN.test(ua) || isLikelyIOSDesktopModeUserAgent(ua);
-}
-
-export function resolveVoicePlaybackGain(userAgent?: string): number {
-  const ua = (userAgent ?? "").trim();
-  if (!ua) return HELIX_VOICE_PLAYBACK_GAIN_DESKTOP;
-  if (isLikelyIOSDesktopModeUserAgent(ua)) return HELIX_VOICE_PLAYBACK_GAIN_IOS;
-  if (IOS_AUDIO_USER_AGENT_PATTERN.test(ua)) return HELIX_VOICE_PLAYBACK_GAIN_IOS;
-  if (isLikelyMobileAudioUserAgent(ua)) return HELIX_VOICE_PLAYBACK_GAIN_MOBILE;
-  return HELIX_VOICE_PLAYBACK_GAIN_DESKTOP;
-}
-
-export function shouldUseVoicePlaybackAudioGraph(userAgent?: string): boolean {
-  const ua = (userAgent ?? "").trim();
-  if (!ua) return true;
-  if (isLikelyMobileAudioUserAgent(ua)) {
-    // Mobile graph is now enabled by default for louder device-side playback.
-    // Set VITE_HELIX_VOICE_FORCE_DIRECT_MOBILE=1 to opt back into direct element playback.
-    return !HELIX_VOICE_FORCE_DIRECT_MOBILE;
-  }
-  return true;
-}
-
-export function resolveVoicePlaybackAttemptPath(params: {
-  graphAttached: boolean;
-  directFallbackAttempted: boolean;
-}): "audio_graph" | "direct_fallback" | "direct_element" {
-  if (params.graphAttached) return "audio_graph";
-  return params.directFallbackAttempted ? "direct_fallback" : "direct_element";
-}
-
-export function shouldBypassVoicePlaybackGraph(params: {
-  bypassUntilMs: number | null;
-  nowMs: number;
-}): boolean {
-  if (params.bypassUntilMs === null) return false;
-  return params.nowMs < params.bypassUntilMs;
-}
-
-export function isActivePlayback(audio: HTMLAudioElement | null, active: HTMLAudioElement): boolean {
-  return audio === active;
 }
 
 export type MicRuntimeState = "listening" | "transcribing" | "cooldown" | "error";
@@ -2104,15 +2063,6 @@ type VoiceSegmentAttempt = {
   confirmBlockReason?: string | null;
 };
 
-type VoiceSegmentLocalAnalysis = {
-  speechProbability: number;
-  snrDb: number;
-  centroid: number;
-  zcr: number;
-  rmsDb: number;
-  lowQuality: boolean;
-};
-
 type VoiceSegmentAnalysisAccumulator = {
   sampleCount: number;
   speechProbabilitySum: number;
@@ -2120,15 +2070,6 @@ type VoiceSegmentAnalysisAccumulator = {
   centroidSum: number;
   zcrSum: number;
   rmsDbSum: number;
-};
-
-type VoiceSessionSpeakerProfile = {
-  id: string;
-  sampleCount: number;
-  centroidMean: number;
-  zcrMean: number;
-  rmsDbMean: number;
-  snrDbMean: number;
 };
 
 type VoiceSteeringReservation = {
@@ -2198,116 +2139,6 @@ type RetainedVoiceTranscriptionRetry = {
   reason: "voice_memory_pressure" | "queue_backpressure";
   message: string;
 };
-
-export type VoiceAutoDispatchGovernanceReason =
-  | "admitted_explicit_user_turn"
-  | "admitted_forced_reasoning"
-  | "empty_transcript"
-  | "mic_not_armed"
-  | "possible_tts_echo"
-  | "blocked_interpreter_dispatch"
-  | "confidence_below_auto_dispatch_floor"
-  | "auto_dispatch_budget_exceeded"
-  | "queue_backpressure"
-  | "observe_only_by_default";
-
-export type VoiceAutoDispatchGovernance = {
-  schema: "helix.voice_auto_dispatch_governance.v1";
-  admitted: boolean;
-  reason: VoiceAutoDispatchGovernanceReason;
-  candidateDispatchHint: boolean;
-  queueDepth: number;
-  activeDispatchCount: number;
-  confidence: number | null;
-  assistant_answer: false;
-  raw_content_included: false;
-  output_authority: "admission_trace";
-  instruction_authority: "none";
-};
-
-function isExplicitVoiceAskTurnCandidate(transcript: string): boolean {
-  const text = transcript.trim();
-  if (!text) return false;
-  if (shouldDispatchReasoningAttempt(text)) return true;
-  if (isSimpleConversationTurnCandidate(text)) return true;
-  return /\b(?:ask|question|tell me|explain|summari[sz]e|review|what|why|how|can you|could you|please|send|submit)\b/i.test(
-    text,
-  );
-}
-
-export function evaluateVoiceAutoDispatchGovernance(args: {
-  transcript: string;
-  micArmState: MicArmState;
-  confidence?: number | null;
-  dispatchState?: VoiceConfirmedTurn["dispatchState"];
-  interpreterDispatchState?: VoiceConfirmedTurn["interpreterDispatchState"];
-  possibleTtsEcho?: boolean;
-  forceReasoningAfterWorkstation?: boolean;
-  queueDepth?: number;
-  activeDispatchCount?: number;
-  maxAutoDispatchPerWindow?: number;
-  maxQueueDepth?: number;
-}): VoiceAutoDispatchGovernance {
-  const transcript = args.transcript.trim();
-  const confidence = typeof args.confidence === "number" && Number.isFinite(args.confidence) ? args.confidence : null;
-  const queueDepth = Math.max(0, Math.floor(args.queueDepth ?? 0));
-  const activeDispatchCount = Math.max(0, Math.floor(args.activeDispatchCount ?? 0));
-  const maxAutoDispatchPerWindow = Math.max(
-    1,
-    Math.floor(args.maxAutoDispatchPerWindow ?? HELIX_VOICE_AUTO_DISPATCH_MAX_PER_MINUTE),
-  );
-  const maxQueueDepth = Math.max(1, Math.floor(args.maxQueueDepth ?? HELIX_VOICE_TRANSCRIBE_QUEUE_MAX));
-  const candidateDispatchHint =
-    args.forceReasoningAfterWorkstation === true || isExplicitVoiceAskTurnCandidate(transcript);
-  let reason: VoiceAutoDispatchGovernanceReason = "admitted_explicit_user_turn";
-  let admitted = true;
-  if (!transcript) {
-    admitted = false;
-    reason = "empty_transcript";
-  } else if (args.micArmState !== "on") {
-    admitted = false;
-    reason = "mic_not_armed";
-  } else if (args.possibleTtsEcho === true) {
-    admitted = false;
-    reason = "possible_tts_echo";
-  } else if (args.dispatchState === "blocked" || args.interpreterDispatchState === "blocked") {
-    admitted = false;
-    reason = "blocked_interpreter_dispatch";
-  } else if (confidence !== null && confidence < HELIX_VOICE_AUTO_DISPATCH_CONFIDENCE_FLOOR) {
-    admitted = false;
-    reason = "confidence_below_auto_dispatch_floor";
-  } else if (queueDepth >= maxQueueDepth) {
-    admitted = false;
-    reason = "queue_backpressure";
-  } else if (activeDispatchCount >= maxAutoDispatchPerWindow) {
-    admitted = false;
-    reason = "auto_dispatch_budget_exceeded";
-  } else if (!candidateDispatchHint) {
-    admitted = false;
-    reason = "observe_only_by_default";
-  } else if (args.forceReasoningAfterWorkstation === true) {
-    reason = "admitted_forced_reasoning";
-  }
-  return {
-    schema: "helix.voice_auto_dispatch_governance.v1",
-    admitted,
-    reason,
-    candidateDispatchHint,
-    queueDepth,
-    activeDispatchCount,
-    confidence,
-    assistant_answer: false,
-    raw_content_included: false,
-    output_authority: "admission_trace",
-    instruction_authority: "none",
-  };
-}
-
-function canPlayVoiceUtteranceWithMicOff(
-  utterance: Pick<VoicePlaybackUtterance, "kind" | "source" | "allowMicOffPlayback"> | null | undefined,
-): boolean {
-  return isManualVoicePlaybackUtterance(utterance) || utterance?.allowMicOffPlayback === true;
-}
 
 type VoiceUtteranceTimelineMeta = {
   briefSource: "llm" | "none" | null;
@@ -2469,135 +2300,6 @@ type VoiceCommandConfirmState = {
   source: "parser" | "evaluator" | "none";
 };
 
-export type TranscriptConfirmPolicyReason =
-  | "dispatch_blocked"
-  | "pivot_low_confidence"
-  | "translation_uncertain_without_pivot"
-  | "dispatch_not_confirm"
-  | "invalid_confidence"
-  | "low_audio_quality"
-  | "live_activity"
-  | "eligible";
-
-export type TranscriptConfirmPolicyDecision = {
-  action: "auto_confirm" | "manual_confirm" | "blocked";
-  reason: TranscriptConfirmPolicyReason;
-  confirmAutoEligible: boolean;
-  confirmBlockReason: TranscriptConfirmPolicyReason | null;
-};
-
-function normalizeTranscriptConfirmPolicyReason(
-  value: string | null | undefined,
-): TranscriptConfirmPolicyReason | null {
-  if (!value) return null;
-  switch (value) {
-    case "dispatch_blocked":
-    case "pivot_low_confidence":
-    case "translation_uncertain_without_pivot":
-    case "dispatch_not_confirm":
-    case "invalid_confidence":
-    case "low_audio_quality":
-    case "live_activity":
-    case "eligible":
-      return value;
-    default:
-      return null;
-  }
-}
-
-const UNKNOWN_LANGUAGE_TAGS = new Set(["unknown", "auto", "und", "none", "null"]);
-
-const normalizeVoiceLanguageTag = (value: string | null | undefined): string | null => {
-  const trimmed = (value ?? "").trim().toLowerCase().replace(/_/g, "-");
-  if (!trimmed || UNKNOWN_LANGUAGE_TAGS.has(trimmed)) return null;
-  return trimmed;
-};
-
-const isEnglishLikeLanguageTag = (value: string | null | undefined): boolean => {
-  const normalized = normalizeVoiceLanguageTag(value);
-  if (!normalized) return false;
-  return normalized === "en" || normalized.startsWith("en-");
-};
-
-const inferLanguageTagFromSourceText = (text: string): string | null => {
-  const trimmed = text.trim();
-  if (!trimmed) return null;
-  if (/[\u3040-\u30ff]/u.test(trimmed)) return "ja";
-  if (/[\uac00-\ud7af]/u.test(trimmed)) return "ko";
-  if (/[\u4e00-\u9fff\u3400-\u4dbf]/u.test(trimmed)) return "zh-hans";
-  if (/[\u0600-\u06ff\u0750-\u077f\u08a0-\u08ff]/u.test(trimmed)) return "ar";
-  if (/[\u0400-\u04ff]/u.test(trimmed)) return "ru";
-  return null;
-};
-
-const resolveVoiceSourceLanguage = (args: {
-  sourceLanguage: string | null | undefined;
-  languageDetected: string | null | undefined;
-  sourceText: string | null | undefined;
-  translated: boolean;
-  sessionLockedLanguage: string | null | undefined;
-}): string | null => {
-  const source = normalizeVoiceLanguageTag(args.sourceLanguage);
-  const detected = normalizeVoiceLanguageTag(args.languageDetected);
-  const locked = normalizeVoiceLanguageTag(args.sessionLockedLanguage);
-  const candidate = source ?? detected;
-  if (candidate && !isEnglishLikeLanguageTag(candidate)) return candidate;
-  if (args.translated) {
-    const inferred = inferLanguageTagFromSourceText(args.sourceText ?? "");
-    if (inferred && !isEnglishLikeLanguageTag(inferred)) return inferred;
-  }
-  if (locked && !isEnglishLikeLanguageTag(locked)) return locked;
-  return candidate ?? locked ?? null;
-};
-
-const resolveVoiceResponseLanguage = (args: {
-  preferredResponseLanguage: string | undefined;
-  sourceLanguage: string | null | undefined;
-  languageDetected: string | null | undefined;
-  sessionLockedLanguage: string | null | undefined;
-}): string | undefined => {
-  const preferred = normalizeVoiceLanguageTag(args.preferredResponseLanguage ?? null);
-  if (preferred) return preferred;
-  const locked = normalizeVoiceLanguageTag(args.sessionLockedLanguage);
-  if (locked) return locked;
-  const source = normalizeVoiceLanguageTag(args.sourceLanguage);
-  if (source) return source;
-  const detected = normalizeVoiceLanguageTag(args.languageDetected);
-  if (detected) return detected;
-  return undefined;
-};
-
-const readWorkstationActionArgText = (
-  action: HelixWorkstationAction,
-  keys: string[],
-): string | null => {
-  const args = action.action === "run_panel_action" && action.args && typeof action.args === "object"
-    ? (action.args as Record<string, unknown>)
-    : {};
-  for (const key of keys) {
-    const value = args[key];
-    if (typeof value === "string" && value.trim()) return value.trim();
-  }
-  return null;
-};
-
-const extractCalculatorFastPathExpressionFromPrompt = (prompt: string | null | undefined): string | null => {
-  const text = String(prompt ?? "").trim();
-  if (!text) return null;
-  const match = text.match(/\b(?:solve|evaluate|compute|calculate|check|verify)\s+(.+)$/i);
-  const raw = match?.[1]?.trim();
-  if (!raw) return null;
-  const cleaned = raw
-    .replace(/^(?:the\s+)?(?:equation|expression|latex|formula)\s+/i, "")
-    .replace(/\s+(?:and\s+)?(?:tell|show|give|report)\s+(?:me|us)?\s*(?:the\s+)?(?:result|answer|value|output)\b[\s\S]*$/i, "")
-    .replace(/\s+(?:and\s+)?(?:return|provide)\s+(?:the\s+)?(?:result|answer|value|output)\b[\s\S]*$/i, "")
-    .replace(/\s+(?:in|with|using)\s+(?:the\s+)?(?:scientific\s+)?calculator\b[\s\S]*$/i, "")
-    .replace(/\s+(?:with\s+)?(?:step|steps|step-by-step|work)\b[\s\S]*$/i, "")
-    .replace(/[.?!,;:]+$/g, "")
-    .trim();
-  return cleaned && /[=^*/+\-()_\\]|\d/.test(cleaned) ? cleaned : null;
-};
-
 const renderCalculatorFastPathReply = (
   action: HelixWorkstationAction,
   prompt?: string | null,
@@ -2631,17 +2333,6 @@ const renderCalculatorFastPathReply = (
   ].filter((line): line is string => Boolean(line)).join("\n");
 };
 
-const selectWorkstationFastPathReplyAction = (
-  actions: HelixWorkstationAction[],
-): HelixWorkstationAction | null => {
-  return actions.find((action) =>
-    action.action === "run_panel_action" &&
-    action.panel_id === "scientific-calculator" &&
-    (action.action_id === "solve_expression" || action.action_id === "solve_with_steps") &&
-    Boolean(readWorkstationActionArgText(action, ["latex", "expression", "text"])),
-  ) ?? actions[0] ?? null;
-};
-
 const getWorkstationFastPathReplyText = (
   action: HelixWorkstationAction | null | undefined,
   languageTag: string | null | undefined,
@@ -2657,23 +2348,6 @@ const getWorkstationFastPathReplyText = (
   if (promptOnlyCalculatorReply) return promptOnlyCalculatorReply;
   return getWorkstationExecutedReplyText(languageTag);
 };
-
-function isHighRiskTranslationContext(args: {
-  translationUncertain: boolean;
-  sourceLanguage?: string | null;
-  sourceText?: string | null;
-  translated?: boolean;
-}): boolean {
-  if (!args.translationUncertain && !args.translated) return false;
-  const normalizedSourceLanguage = normalizeVoiceLanguageTag(args.sourceLanguage ?? null);
-  if (normalizedSourceLanguage && !isEnglishLikeLanguageTag(normalizedSourceLanguage)) {
-    return true;
-  }
-  const inferredSourceLanguage = inferLanguageTagFromSourceText(args.sourceText ?? "");
-  return Boolean(inferredSourceLanguage && !isEnglishLikeLanguageTag(inferredSourceLanguage));
-}
-
-type HeldTranscriptReason = "continuation_hold" | "low_info_tail";
 
 type HeldTranscriptState = {
   transcript: string;
@@ -2719,7 +2393,6 @@ const VOICE_BARGE_RESUME_GRACE_MS = 2800;
 const VOICE_BARGE_TRAFFIC_BUFFER_MS = 2600;
 const MIC_PLAYBACK_BARGE_THRESHOLD_MULTIPLIER_MOBILE = 1.5;
 const VOICE_TRANSCRIPTION_BREATH_WINDOW_MS = 2600;
-const VOICE_TURN_CLOSE_SILENCE_MS = 3200;
 const VOICE_TURN_SEAL_POLL_MS = clampNumber(
   readHelixEnvNumber((import.meta as any)?.env, "VITE_HELIX_VOICE_TURN_SEAL_POLL_MS", 140),
   60,
@@ -2751,15 +2424,7 @@ const VOICE_TURN_COMPLETE_MEDIUM_HOLD_MS = 420;
 const VOICE_TURN_COMPLETE_LOW_HOLD_MS = 680;
 const VOICE_PREEMPT_BOUNDARY_TIMEOUT_MS = 1200;
 const VOICE_PREEMPT_BOUNDARY_TIMEOUT_REGEN_MS = 3000;
-const VOICE_CONTINUATION_MERGE_WINDOW_MS = 9000;
-const VOICE_CONTINUATION_ACTIVE_CHAIN_WINDOW_MS = 18_000;
-const VOICE_CONTINUATION_SHORT_WORD_LIMIT = 14;
-const VOICE_CONTINUATION_ADDENDUM_WORD_LIMIT = 20;
-const VOICE_HELD_TRANSCRIPT_FLUSH_MS = 1800;
-const VOICE_HELD_TRANSCRIPT_MAX_AGE_MS = 30_000;
 const VOICE_TRANSCRIPT_AUTO_CONFIRM_DELAY_MS = 3000;
-const VOICE_TRANSCRIPT_AUTO_CONFIRM_BLOCK_PIVOT_CONFIDENCE = 0.68;
-const VOICE_SESSION_SPEAKER_MATCH_DISTANCE = 0.42;
 const VOICE_SESSION_SPEAKER_MAX_PROFILES = 3;
 const HELIX_CONTEXT_CAPSULE_AUTO_APPLY_IDS_VOICE = HELIX_CONTEXT_CAPSULE_MAX_IDS;
 const HELIX_CONTEXT_CAPSULE_AUTO_APPLY_IDS_MANUAL = HELIX_CONTEXT_CAPSULE_MAX_IDS;
@@ -2768,23 +2433,6 @@ const HELIX_VOICE_AUTO_SPEAK_PROVIDER = "elevenlabs";
 const HELIX_VOICE_AUTO_SPEAK_QUEUE_MAX = 8;
 const HELIX_VOICE_AUTO_SPEAK_TEXT_MAX_CHARS = 2400;
 const HELIX_VOICE_DEBUG_TIMELINE_LIMIT = 280;
-
-export function pickSupportedMicRecorderMimeType(params: {
-  userAgent?: string;
-  isTypeSupported: (mimeType: string) => boolean;
-}): string | undefined {
-  const candidates = getMicRecorderMimeCandidates(params.userAgent);
-  for (const mimeType of candidates) {
-    try {
-      if (params.isTypeSupported(mimeType)) {
-        return mimeType;
-      }
-    } catch {
-      // continue checking the next mime type
-    }
-  }
-  return undefined;
-}
 
 function pickMicRecorderMimeType(): string | undefined {
   if (typeof MediaRecorder === "undefined" || typeof MediaRecorder.isTypeSupported !== "function") {
@@ -2796,821 +2444,6 @@ function pickMicRecorderMimeType(): string | undefined {
     isTypeSupported: MediaRecorder.isTypeSupported.bind(MediaRecorder),
   });
 }
-
-export function inferAskMode(question: string): "observe" | "act" | "verify" | undefined {
-  const normalized = question.trim().toLowerCase();
-  if (!normalized) return undefined;
-
-  if (
-    /\b(verify|verification|prove|proof|validate|validation|integrity|certificate|pass\/fail|pass fail|audit|check)\b/.test(
-      normalized,
-    )
-  ) {
-    return "verify";
-  }
-
-  if (
-    /^(please\s+)?(implement|fix|change|update|remove|add|create|open|start|stop|run|patch|rewrite)\b/.test(
-      normalized,
-    ) ||
-    /\b(next action|take action|fix this|implement this|make this|change this|update this)\b/.test(
-      normalized,
-    )
-  ) {
-    return "act";
-  }
-
-  if (
-    /\b(observe|monitor|watch|track|status|state|what changed|what is happening|inspect|summarize the current)\b/.test(
-      normalized,
-    )
-  ) {
-    return "observe";
-  }
-
-  return undefined;
-}
-
-export function shouldMergeVoiceContinuationTurn(args: {
-  previousPrompt: string;
-  nextTranscript: string;
-  gapMs: number;
-  windowMs?: number;
-}): boolean {
-  const windowMs = args.windowMs ?? VOICE_CONTINUATION_MERGE_WINDOW_MS;
-  if (args.gapMs < 0 || args.gapMs > windowMs) return false;
-  const previous = args.previousPrompt.trim();
-  const next = args.nextTranscript.trim();
-  if (!previous || !next) return false;
-  const nextWords = next.split(/\s+/).filter(Boolean);
-  const nextStartsContinuation =
-    /^[a-z]/.test(next) ||
-    /^(and|but|so|then|because|which|that|who|where|when|while|if|with|for|to|used|using)\b/i.test(
-      next,
-    );
-  if (nextStartsContinuation) return true;
-  const previousLooksIncomplete = !/[.!?]["')\]]?\s*$/.test(previous);
-  return previousLooksIncomplete && nextWords.length <= VOICE_CONTINUATION_SHORT_WORD_LIMIT;
-}
-
-export function shouldMergeVoiceContinuationInFlight(args: {
-  gapMs: number;
-  lexicalContinuation: boolean;
-  activeWindowMs?: number;
-}): boolean {
-  const activeWindowMs = args.activeWindowMs ?? VOICE_CONTINUATION_ACTIVE_CHAIN_WINDOW_MS;
-  if (args.gapMs < 0) return false;
-  if (args.gapMs <= activeWindowMs) return true;
-  return args.lexicalContinuation;
-}
-
-export function shouldRestartExplorationLadderOnSupersede(args: {
-  hasContinuityCandidate: boolean;
-  forceTailContinuationMerge: boolean;
-  shortContinuationAddendum: boolean;
-  canMergeContinuation: boolean;
-  intentShiftBand: IntentShiftBand;
-}): boolean {
-  if (!args.hasContinuityCandidate) return false;
-  if (args.forceTailContinuationMerge || args.shortContinuationAddendum) return false;
-  if (args.canMergeContinuation && args.intentShiftBand === "continuation") return false;
-  return true;
-}
-
-export function shouldIgnoreLowQualityTranscriptBargeIn(args: {
-  lowAudioQuality: boolean;
-  confidence: number;
-  speechProbability: number | null | undefined;
-  snrDb: number | null | undefined;
-  hasActiveVoiceReasoningAttempt: boolean;
-  hasActiveVoicePlayback: boolean;
-  needsConfirmation: boolean;
-}): boolean {
-  if (!args.lowAudioQuality) return false;
-  if (args.needsConfirmation) return false;
-  if (!(args.hasActiveVoiceReasoningAttempt || args.hasActiveVoicePlayback)) return false;
-  const hasQualityTelemetry =
-    typeof args.speechProbability === "number" || typeof args.snrDb === "number";
-  const confidenceThreshold = hasQualityTelemetry
-    ? Math.max(0.82, VOICE_STT_CONFIRM_THRESHOLD + 0.12)
-    : Math.max(0.9, VOICE_STT_CONFIRM_THRESHOLD + 0.18);
-  return args.confidence < confidenceThreshold;
-}
-
-export function isLikelyContinuationAddendum(transcript: string): boolean {
-  const normalized = transcript.trim().toLowerCase();
-  if (!normalized) return false;
-  const words = normalized.split(/\s+/).filter(Boolean);
-  if (words.length > VOICE_CONTINUATION_ADDENDUM_WORD_LIMIT) return false;
-  return /^(and|so|but|then|because|which|that|also|plus|right|yeah|yes|well)\b/.test(normalized);
-}
-
-export function isLikelyContinuationTailFragment(transcript: string): boolean {
-  const trimmed = transcript.trim();
-  if (!trimmed) return false;
-  const normalized = trimmed.toLowerCase();
-  const words = normalized.split(/\s+/).filter(Boolean);
-  if (words.length === 0 || words.length > 14) return false;
-  if (/[?]$/.test(trimmed)) return false;
-  if (
-    /^(what|why|how|when|where|who|which|can|could|would|should|do|does|did|is|are|was|were|explain|define|describe)\b/.test(
-      normalized,
-    )
-  ) {
-    return false;
-  }
-  const startsLower = /^[a-z]/.test(trimmed);
-  if (!startsLower) return false;
-  return /\b(this|that|it|they|them|those|these|happens?|effect|result|probability|because|within)\b/.test(
-    normalized,
-  );
-}
-
-export function shouldRecoverHeldTranscriptAfterNoTranscript(args: {
-  heldTranscript: string;
-  turnCompleteBand: TurnCompleteScore["band"];
-  transcribeQueueLength: number;
-  speechActive: boolean;
-  sinceLastSpeechMs: number;
-}): boolean {
-  const held = args.heldTranscript.trim();
-  if (!held) return false;
-  if (isLowInformationTailTranscript(held)) return false;
-  if (args.transcribeQueueLength > 0) return false;
-  if (args.speechActive) return false;
-  if (args.turnCompleteBand === "high" && args.sinceLastSpeechMs >= VOICE_TURN_CLOSE_SILENCE_MS) {
-    return true;
-  }
-  if (
-    args.turnCompleteBand === "medium" &&
-    !hasDanglingTurnTail(held) &&
-    args.sinceLastSpeechMs >= VOICE_TURN_CLOSE_SILENCE_MS
-  ) {
-    return true;
-  }
-  return false;
-}
-
-export function shouldFlushHeldTranscriptFromWatchdog(args: {
-  heldTranscript: string;
-  holdReason: HeldTranscriptReason;
-  transcribeQueueLength: number;
-  speechActive: boolean;
-  transcribeBusy: boolean;
-  pendingConfirmation: boolean;
-  sinceLastSpeechMs: number;
-  ageMs: number;
-}): boolean {
-  const held = args.heldTranscript.trim();
-  if (!held) return false;
-  if (args.holdReason !== "continuation_hold") return false;
-  if (args.ageMs < VOICE_HELD_TRANSCRIPT_FLUSH_MS) return false;
-  if (args.ageMs > VOICE_HELD_TRANSCRIPT_MAX_AGE_MS) return false;
-  if (args.transcribeQueueLength > 0) return false;
-  if (args.speechActive || args.transcribeBusy || args.pendingConfirmation) return false;
-  const turnComplete = scoreVoiceTurnComplete({
-    transcript: held,
-    pauseMs: Math.max(args.sinceLastSpeechMs, MIC_END_TURN_MS),
-    stability: 0.92,
-  });
-  return shouldRecoverHeldTranscriptAfterNoTranscript({
-    heldTranscript: held,
-    turnCompleteBand: turnComplete.band,
-    transcribeQueueLength: args.transcribeQueueLength,
-    speechActive: args.speechActive,
-    sinceLastSpeechMs: args.sinceLastSpeechMs,
-  });
-}
-
-function normalizeVoiceConfirmDispatchState(
-  dispatchState?: "auto" | "confirm" | "blocked" | null,
-): "auto" | "confirm" | "blocked" {
-  if (dispatchState === "auto" || dispatchState === "blocked" || dispatchState === "confirm") {
-    return dispatchState;
-  }
-  return "confirm";
-}
-
-function isLowPivotBlocked(
-  pivotConfidence?: number | null,
-  translationRiskHigh?: boolean,
-): TranscriptConfirmPolicyReason | null {
-  if (
-    translationRiskHigh &&
-    typeof pivotConfidence === "number" &&
-    Number.isFinite(pivotConfidence) &&
-    pivotConfidence < VOICE_TRANSCRIPT_AUTO_CONFIRM_BLOCK_PIVOT_CONFIDENCE
-  ) {
-    return "pivot_low_confidence";
-  }
-  if (
-    translationRiskHigh &&
-    (typeof pivotConfidence !== "number" ||
-      !Number.isFinite(pivotConfidence) ||
-      pivotConfidence < VOICE_TRANSCRIPT_AUTO_CONFIRM_BLOCK_PIVOT_CONFIDENCE)
-  ) {
-    return "translation_uncertain_without_pivot";
-  }
-  return null;
-}
-
-export function resolveTranscriptConfirmPolicy(args: {
-  dispatchState?: "auto" | "confirm" | "blocked" | null;
-  confidence: number;
-  pivotConfidence?: number | null;
-  translationUncertain: boolean;
-  sourceLanguage?: string | null;
-  sourceText?: string | null;
-  translated?: boolean;
-  lowAudioQuality?: boolean;
-  speechActive?: boolean;
-  queuedSegmentCount?: number;
-}): TranscriptConfirmPolicyDecision {
-  const dispatchState = normalizeVoiceConfirmDispatchState(args.dispatchState);
-  if (dispatchState === "blocked") {
-    return {
-      action: "blocked",
-      reason: "dispatch_blocked",
-      confirmAutoEligible: false,
-      confirmBlockReason: "dispatch_blocked",
-    };
-  }
-  const translationRiskHigh = isHighRiskTranslationContext({
-    translationUncertain: args.translationUncertain,
-    sourceLanguage: args.sourceLanguage ?? null,
-    sourceText: args.sourceText ?? null,
-    translated: args.translated ?? false,
-  });
-  const pivotBlock = isLowPivotBlocked(args.pivotConfidence, translationRiskHigh);
-  if (pivotBlock) {
-    return {
-      action: "blocked",
-      reason: pivotBlock,
-      confirmAutoEligible: false,
-      confirmBlockReason: pivotBlock,
-    };
-  }
-  if (dispatchState !== "confirm") {
-    return {
-      action: "manual_confirm",
-      reason: "dispatch_not_confirm",
-      confirmAutoEligible: false,
-      confirmBlockReason: null,
-    };
-  }
-  if (!(args.confidence > 0)) {
-    return {
-      action: "manual_confirm",
-      reason: "invalid_confidence",
-      confirmAutoEligible: false,
-      confirmBlockReason: null,
-    };
-  }
-  if (args.lowAudioQuality === true) {
-    const strongConfidence = args.confidence >= Math.max(VOICE_STT_CONFIRM_THRESHOLD + 0.16, 0.74);
-    if (translationRiskHigh || !strongConfidence) {
-      return {
-        action: "manual_confirm",
-        reason: "low_audio_quality",
-        confirmAutoEligible: false,
-        confirmBlockReason: null,
-      };
-    }
-  }
-  if (args.speechActive === true || (args.queuedSegmentCount ?? 0) > 0) {
-    return {
-      action: "manual_confirm",
-      reason: "live_activity",
-      confirmAutoEligible: false,
-      confirmBlockReason: null,
-    };
-  }
-  return {
-    action: "auto_confirm",
-    reason: "eligible",
-    confirmAutoEligible: true,
-    confirmBlockReason: null,
-  };
-}
-
-export function shouldAutoConfirmTranscriptPrompt(args: {
-  dispatchState?: "auto" | "confirm" | "blocked" | null;
-  confidence: number;
-  languageConfidence?: number | null;
-  pivotConfidence?: number | null;
-  translationUncertain: boolean;
-  sourceLanguage?: string | null;
-  sourceText?: string | null;
-  translated?: boolean;
-  lowAudioQuality?: boolean;
-  speechActive?: boolean;
-  queuedSegmentCount?: number;
-}): boolean {
-  return resolveTranscriptConfirmPolicy({
-    dispatchState: args.dispatchState,
-    confidence: args.confidence,
-    pivotConfidence: args.pivotConfidence,
-    translationUncertain: args.translationUncertain,
-    sourceLanguage: args.sourceLanguage,
-    sourceText: args.sourceText,
-    translated: args.translated,
-    lowAudioQuality: args.lowAudioQuality,
-    speechActive: args.speechActive,
-    queuedSegmentCount: args.queuedSegmentCount,
-  }).confirmAutoEligible;
-}
-
-function deriveVoiceSegmentLocalAnalysis(args: {
-  sampleCount: number;
-  speechProbabilitySum: number;
-  snrDbSum: number;
-  centroidSum: number;
-  zcrSum: number;
-  rmsDbSum: number;
-  durationMs: number;
-  minDurationMs?: number;
-  minSpeechProbability?: number;
-  minSnrDb?: number;
-}): VoiceSegmentLocalAnalysis {
-  if (args.sampleCount <= 0) {
-    return {
-      speechProbability: 0,
-      snrDb: -20,
-      centroid: 0,
-      zcr: 0,
-      rmsDb: -120,
-      lowQuality: true,
-    };
-  }
-  const speechProbability = clamp01(args.speechProbabilitySum / args.sampleCount);
-  const snrDb = args.snrDbSum / args.sampleCount;
-  const centroid = clamp01(args.centroidSum / args.sampleCount);
-  const zcr = clamp01(args.zcrSum / args.sampleCount);
-  const rmsDb = args.rmsDbSum / args.sampleCount;
-  const minDurationMs = args.minDurationMs ?? VOICE_LOCAL_AUDIO_GATE_MIN_DURATION_MS;
-  const minSpeechProbability = args.minSpeechProbability ?? VOICE_LOCAL_AUDIO_GATE_MIN_SPEECH_PROBABILITY;
-  const minSnrDb = args.minSnrDb ?? VOICE_LOCAL_AUDIO_GATE_MIN_SNR_DB;
-  const hardLowSignal =
-    args.durationMs >= minDurationMs &&
-    (speechProbability < minSpeechProbability || snrDb < minSnrDb);
-  return {
-    speechProbability,
-    snrDb,
-    centroid,
-    zcr,
-    rmsDb,
-    lowQuality: hardLowSignal,
-  };
-}
-
-function resolveSpeakerFromSessionProfiles(args: {
-  analysis: VoiceSegmentLocalAnalysis;
-  profiles: VoiceSessionSpeakerProfile[];
-}): { speakerId: string; speakerConfidence: number; profileIndex: number } {
-  const toVector = (profile: Pick<VoiceSessionSpeakerProfile, "centroidMean" | "zcrMean" | "rmsDbMean">) => ({
-    centroid: profile.centroidMean,
-    zcr: profile.zcrMean,
-    rmsDbNorm: clamp01((profile.rmsDbMean + 80) / 80),
-  });
-  const analysisVector = {
-    centroid: args.analysis.centroid,
-    zcr: args.analysis.zcr,
-    rmsDbNorm: clamp01((args.analysis.rmsDb + 80) / 80),
-  };
-  let bestIndex = -1;
-  let bestDistance = Number.POSITIVE_INFINITY;
-  for (let index = 0; index < args.profiles.length; index += 1) {
-    const profile = args.profiles[index];
-    const vector = toVector(profile);
-    const distance = Math.sqrt(
-      Math.pow(vector.centroid - analysisVector.centroid, 2) * 1.2 +
-        Math.pow(vector.zcr - analysisVector.zcr, 2) * 0.9 +
-        Math.pow(vector.rmsDbNorm - analysisVector.rmsDbNorm, 2),
-    );
-    if (distance < bestDistance) {
-      bestDistance = distance;
-      bestIndex = index;
-    }
-  }
-  if (bestIndex >= 0 && bestDistance <= VOICE_SESSION_SPEAKER_MATCH_DISTANCE) {
-    return {
-      speakerId: args.profiles[bestIndex]!.id,
-      speakerConfidence: clamp01(1 - bestDistance / VOICE_SESSION_SPEAKER_MATCH_DISTANCE),
-      profileIndex: bestIndex,
-    };
-  }
-  return {
-    speakerId: `speaker_${args.profiles.length + 1}`,
-    speakerConfidence: 0.54,
-    profileIndex: -1,
-  };
-}
-
-export function normalizeVoiceCommandLaneEnvelope(
-  payload: VoiceCommandLaneEnvelope | null | undefined,
-): VoiceCommandLaneEnvelope | null {
-  if (!payload || typeof payload !== "object") return null;
-  const decision =
-    payload.decision === "accepted" || payload.decision === "suppressed" || payload.decision === "none"
-      ? payload.decision
-      : null;
-  if (!decision) return null;
-  const action =
-    payload.action === "send" || payload.action === "cancel" || payload.action === "retry"
-      ? payload.action
-      : null;
-  const source =
-    payload.source === "parser" || payload.source === "evaluator" || payload.source === "none"
-      ? payload.source
-      : "none";
-  const suppressionReason =
-    payload.suppression_reason === "disabled" ||
-    payload.suppression_reason === "kill_switch" ||
-    payload.suppression_reason === "rollout_inactive" ||
-    payload.suppression_reason === "audio_quality_low" ||
-    payload.suppression_reason === "strict_prefix_required" ||
-    payload.suppression_reason === "log_only" ||
-    payload.suppression_reason === "non_user_audio_source"
-      ? payload.suppression_reason
-      : null;
-  const confidence =
-    typeof payload.confidence === "number" && Number.isFinite(payload.confidence)
-      ? clamp01(payload.confidence)
-      : null;
-  const utteranceId = typeof payload.utterance_id === "string" && payload.utterance_id.trim()
-    ? payload.utterance_id.trim()
-    : `vcmd:${crypto.randomUUID()}`;
-  return {
-    version:
-      typeof payload.version === "string" && payload.version.trim()
-        ? payload.version.trim()
-        : "helix.voice.command_lane.v1",
-    decision,
-    action,
-    confidence,
-    source,
-    suppression_reason: suppressionReason,
-    strict_prefix_applied: payload.strict_prefix_applied === true,
-    confirm_required: payload.confirm_required === true,
-    utterance_id: utteranceId,
-  };
-}
-
-export function shouldDispatchReasoningAttempt(transcript: string): boolean {
-  const normalized = transcript.trim().toLowerCase();
-  if (!normalized) return false;
-  const text = normalized
-    .replace(/^(?:(?:ok(?:ay)?)|yeah|yep|nope|thanks|thank you|cool|nice|right|well|so|um|uh)\b[,\s:-]*/g, "")
-    .trim();
-  const effective = text || normalized;
-  if (effective.length < 14) return false;
-  if (/^(ok|okay|yeah|yep|nope|thanks|thank you|cool|nice|right)\b$/.test(effective)) return false;
-  const hasCodebaseCue =
-    /\b(codebase|code base|repo|repository|source code|file|files|module|function|class|route|api)\b/.test(
-      effective,
-    );
-  const hasTechnicalTopicCue = /\b(warp bubble|alcubierre|casimir|helix|retrieval)\b/.test(effective);
-  const hasQuestionWordAnywhere = /\b(what|how|why|where|which|who|when)\b/.test(effective);
-  const hasSolveOrDefinitionCue = /\b(full solve|solve|solved|definition|define|defined|explain)\b/.test(
-    effective,
-  );
-  const hasVerificationCue = /\b(verify|prove|check|pass fail|certificate|integrity|evidence|risk|decision)\b/.test(
-    effective,
-  );
-  const hasExecutionCue = /\b(implement|fix|change|update|remove|add|create|run|patch|deploy|execute)\b/.test(
-    effective,
-  );
-  const hasMonitoringCue = /\b(what changed|status|monitor|state|watch)\b/.test(effective);
-  const hasOperationalCue = hasVerificationCue || hasExecutionCue || hasMonitoringCue;
-  if (
-    (hasQuestionWordAnywhere || hasSolveOrDefinitionCue || effective.includes("?")) &&
-    (hasCodebaseCue || hasTechnicalTopicCue)
-  ) {
-    return true;
-  }
-  if (hasOperationalCue) {
-    return true;
-  }
-  const hasReasoningFramingCue = /\b(how|why|explain|define|walk me through|full solve|tell me about|break down|understand)\b/.test(
-    effective,
-  );
-  if (hasReasoningFramingCue && (hasCodebaseCue || hasTechnicalTopicCue || hasSolveOrDefinitionCue)) {
-    return true;
-  }
-  if (
-    effective.includes("?") &&
-    effective.length >= 16 &&
-    (hasCodebaseCue || hasTechnicalTopicCue || hasSolveOrDefinitionCue || hasOperationalCue)
-  ) {
-    return true;
-  }
-  return false;
-}
-
-export function inferSuppressionCauseFromRouteReason(routeReasonCode?: string | null): string | null {
-  const normalized = (routeReasonCode ?? "").trim().toLowerCase();
-  if (!normalized) return null;
-  if (!normalized.startsWith("suppressed:")) return null;
-  const reason = normalized.slice("suppressed:".length).trim();
-  if (!reason) return null;
-  if (reason === "heuristic_low_salience") return "low_salience";
-  if (reason === "clarify_after_attempt1") return "clarifier_requested";
-  if (reason === "multilang_dispatch_blocked") return "multilang_dispatch_blocked";
-  if (reason === "multilang_confirmation_required") return "multilang_confirmation_required";
-  if (reason === "filler") return "filler";
-  if (reason === "low_salience") return "low_salience";
-  return `suppressed_${reason.replace(/[^a-z0-9_:-]+/g, "_")}`;
-}
-
-export function deriveVoiceTimelineSuppressionMeta(args: {
-  status: HelixTimelineEntry["status"];
-  type: HelixTimelineEntryType;
-  detail?: string | null;
-  meta?: Record<string, unknown> | null;
-}): {
-  suppressionCause: string | null;
-  authorityRejectStage: "preflight" | "stream" | "final" | null;
-} {
-  const meta = args.meta ?? {};
-  const detailLower = `${args.detail ?? ""}`.trim().toLowerCase();
-  const explicitSuppressionCause =
-    typeof meta.suppressionCause === "string" && meta.suppressionCause.trim()
-      ? meta.suppressionCause.trim()
-      : null;
-  const routeSuppressionCause = inferSuppressionCauseFromRouteReason(
-    typeof meta.routeReasonCode === "string" ? meta.routeReasonCode : null,
-  );
-  let suppressionCause = explicitSuppressionCause ?? routeSuppressionCause;
-
-  if (!suppressionCause) {
-    if (
-      detailLower.includes("phase_not_sealed") ||
-      detailLower.includes("seal_token_mismatch") ||
-      detailLower.includes("sealed_revision_mismatch") ||
-      detailLower.includes("dispatch_hash_mismatch") ||
-      detailLower.includes("inactive_attempt")
-    ) {
-      if (detailLower.includes("phase_not_sealed")) suppressionCause = "phase_not_sealed";
-      else if (detailLower.includes("seal_token_mismatch")) suppressionCause = "seal_token_mismatch";
-      else if (detailLower.includes("sealed_revision_mismatch")) suppressionCause = "sealed_revision_mismatch";
-      else if (detailLower.includes("dispatch_hash_mismatch")) suppressionCause = "dispatch_hash_mismatch";
-      else suppressionCause = "inactive_attempt";
-    } else if (detailLower.includes("superseded by newer")) {
-      suppressionCause = "inactive_attempt";
-    } else if (detailLower.includes("artifact-dominated") || detailLower.includes("artifact guard")) {
-      suppressionCause = "artifact_guard_restart";
-    } else if (detailLower.includes("clarifier requested")) {
-      suppressionCause = "clarifier_requested";
-    } else if (detailLower.includes("escalat")) {
-      suppressionCause = "escalation_restart";
-    } else if (args.status === "suppressed") {
-      suppressionCause = "suppressed_unspecified";
-    }
-  }
-
-  const explicitAuthorityRejectStage =
-    meta.authorityRejectStage === "preflight" ||
-    meta.authorityRejectStage === "stream" ||
-    meta.authorityRejectStage === "final"
-      ? meta.authorityRejectStage
-      : null;
-  const authorityRejectStage =
-    explicitAuthorityRejectStage ?? (suppressionCause ? (args.type === "reasoning_stream" ? "stream" : "final") : null);
-
-  return {
-    suppressionCause: suppressionCause ?? null,
-    authorityRejectStage,
-  };
-}
-
-export function isStrongQuestionDispatchCandidate(transcript: string): boolean {
-  const normalized = transcript.trim().toLowerCase();
-  if (!normalized || normalized.length < 18) return false;
-  if (isLowInformationTailTranscript(normalized)) return false;
-  const words = normalized.split(/\s+/).filter(Boolean);
-  if (words.length < 5) return false;
-  const normalizedLeadStripped = normalized
-    .replace(/^(?:(?:and|so|then|well|okay|ok)|you know|you found)\b[,\s:-]*/g, "")
-    .trim();
-  const startsWithQuestionWord =
-    /^(what|how|why|where|which|who|when|can|could|would|should|is|are|do|does|did)\b/.test(
-      normalizedLeadStripped || normalized,
-    );
-  const hasQuestionPunctuation = normalized.includes("?");
-  const hasEmbeddedQuestionCue = /\b(what|how|why|where|which|who|when)\b/.test(normalized);
-  const hasSolveOrDefinitionCue = /\b(full solve|solve|solved|definition|define|defined|explain)\b/.test(
-    normalized,
-  );
-  if (!startsWithQuestionWord && !hasQuestionPunctuation && !hasEmbeddedQuestionCue && !hasSolveOrDefinitionCue) {
-    return false;
-  }
-  const hasCodebaseCue =
-    /\b(codebase|code base|repo|repository|source code|file|files|module|function|class|route|api)\b/.test(
-      normalized,
-    );
-  const hasTechnicalTopicCue = /\b(warp bubble|alcubierre|casimir|helix|retrieval)\b/.test(normalized);
-  return hasCodebaseCue || hasTechnicalTopicCue;
-}
-
-function isSimpleDirectPromptLaneCandidate(transcript: string): boolean {
-  const text = String(transcript ?? "").trim().toLowerCase();
-  if (!text) return false;
-  if (text.length > 160) return false;
-  const titleCue =
-    /\b(?:title|name)\b/.test(text) &&
-    /\b(?:paper|doc|document)\b/.test(text);
-  const tinyDocCue =
-    /\b(?:what(?:'s| is)?|show|give|tell)\b/.test(text) &&
-    /\b(?:this|current)\s+(?:paper|doc|document)\b/.test(text) &&
-    /\b(?:title|name|path)\b/.test(text);
-  const quickDocExplainCue =
-    /\b(?:what(?:'s| is)?|tell|give|explain|summar(?:y|ize))\b/.test(text) &&
-    /\b(?:this|current)\s+(?:paper|doc|document)\b/.test(text) &&
-    /\b(?:about|summary|summar(?:y|ize)|explain|mean|contains)\b/.test(text);
-  const heavyReasoningCue =
-    /\b(?:derive|proof|equation|compare|tradeoff|audit|review|call chain|implementation|refactor|design|architecture)\b/
-      .test(text);
-  if (heavyReasoningCue) return false;
-  return titleCue || tinyDocCue || quickDocExplainCue;
-}
-
-function isSimpleTitleOrPathOnlyPrompt(transcript: string): boolean {
-  const text = String(transcript ?? "").trim().toLowerCase();
-  if (!text) return false;
-  const titleCue =
-    /\b(?:title|name)\b/.test(text) &&
-    /\b(?:paper|doc|document)\b/.test(text);
-  const pathCue =
-    /\b(?:what(?:'s| is)?|show|give|tell)\b/.test(text) &&
-    /\b(?:this|current)\s+(?:paper|doc|document)\b/.test(text) &&
-    /\b(?:path)\b/.test(text);
-  const quickTitleCue =
-    /\b(?:what(?:'s| is)?|show|give|tell)\b/.test(text) &&
-    /\b(?:this|current)\s+(?:paper|doc|document)\b/.test(text) &&
-    /\b(?:title|name)\b/.test(text);
-  return titleCue || pathCue || quickTitleCue;
-}
-
-function shouldQueueWorkspaceBackgroundReasoning(args: {
-  transcript: string;
-  docsViewerAnchorPath?: string | null;
-}): boolean {
-  const text = String(args.transcript ?? "").trim().toLowerCase();
-  if (!text) return false;
-  if (isSimpleTitleOrPathOnlyPrompt(text)) return false;
-  if (/\b(?:background|in the background|while you continue)\b/.test(text)) return true;
-  const workspaceCue =
-    Boolean(args.docsViewerAnchorPath) ||
-    /\b(?:docs?\s+viewer|workspace|repo|repository|codebase|source|file|path|paper|doc|document)\b/.test(
-      text,
-    );
-  if (!workspaceCue) return false;
-  const hardReasoningCue =
-    /\b(?:verify|prove|proof|audit|compare|contrast|difference|tradeoff|synthesi[sz]e|integrity|evidence|claim|cross[-\s]?check)\b/.test(
-      text,
-    );
-  return hardReasoningCue;
-}
-
-export function shouldForceObserveDispatchFromSuppression(args: {
-  dispatchHint: boolean;
-  routeReasonCode?: string | null;
-  transcript: string;
-}): boolean {
-  if (args.dispatchHint) return false;
-  const normalizedRoute = (args.routeReasonCode ?? "").trim().toLowerCase();
-  const transcript = args.transcript.trim();
-  if (transcript.length < 20) return false;
-  if (isLowInformationTailTranscript(transcript)) return false;
-  if (transcript.split(/\s+/).filter(Boolean).length < 4) return false;
-  if (
-    normalizedRoute === "suppressed:multilang_dispatch_blocked" ||
-    normalizedRoute === "suppressed:multilang_confirmation_required"
-  ) {
-    const normalizedTranscript = transcript.toLowerCase();
-    const genericSubstantiveQuestion =
-      /^(?:what|how|why|where|which|who|when|can|could|would|should|is|are|do|does|did)\b/.test(
-        normalizedTranscript,
-      ) || normalizedTranscript.includes("?");
-    return (
-      shouldDispatchReasoningAttempt(transcript) ||
-      isStrongQuestionDispatchCandidate(transcript) ||
-      genericSubstantiveQuestion
-    );
-  }
-  if (shouldDispatchReasoningAttempt(transcript)) return true;
-  return isStrongQuestionDispatchCandidate(transcript);
-}
-
-export function resolveSuppressedDispatchRescueTranscript(args: {
-  dispatchHint: boolean;
-  routeReasonCode?: string | null;
-  transcript: string;
-  draftText: string;
-}): string | null {
-  if (args.dispatchHint) return null;
-  const routeReason = (args.routeReasonCode ?? "").trim().toLowerCase();
-  const multilangSuppressed =
-    routeReason === "suppressed:multilang_dispatch_blocked" ||
-    routeReason === "suppressed:multilang_confirmation_required";
-  const transcript = args.transcript.trim();
-  const draftText = args.draftText.trim();
-  if (!transcript || !draftText) return null;
-  const transcriptWords = transcript.split(/\s+/).filter(Boolean).length;
-  if (!isLowInformationTailTranscript(transcript) && transcriptWords >= 4) return null;
-  if (draftText.length <= transcript.length + 8) return null;
-  const transcriptLower = transcript.toLowerCase();
-  const draftLower = draftText.toLowerCase();
-  if (!draftLower.includes(transcriptLower) && !transcriptLower.includes(draftLower)) return null;
-  const focusedDraft = extractLatestContinuationQuestionFocus(draftText) ?? draftText;
-  const normalizedFocusedDraft = focusedDraft.trim();
-  if (!normalizedFocusedDraft || normalizedFocusedDraft.length <= transcript.length + 8) return null;
-  if (multilangSuppressed) {
-    if (
-      shouldDispatchReasoningAttempt(normalizedFocusedDraft) ||
-      isStrongQuestionDispatchCandidate(normalizedFocusedDraft)
-    ) {
-      return clipText(normalizedFocusedDraft, 720);
-    }
-    return null;
-  }
-  if (
-    !shouldDispatchReasoningAttempt(normalizedFocusedDraft) &&
-    !isStrongQuestionDispatchCandidate(normalizedFocusedDraft)
-  ) {
-    return null;
-  }
-  return clipText(normalizedFocusedDraft, 720);
-}
-
-export function shouldMergePendingConfirmationTranscript(args: {
-  pendingTranscript: string;
-  nextTranscript: string;
-  pendingAgeMs: number;
-  windowMs?: number;
-}): boolean {
-  const pending = args.pendingTranscript.trim();
-  const next = args.nextTranscript.trim();
-  if (!pending || !next) return false;
-  const windowMs = args.windowMs ?? VOICE_CONTINUATION_MERGE_WINDOW_MS;
-  const safeGapMs = Number.isFinite(args.pendingAgeMs) ? Math.max(0, args.pendingAgeMs) : Number.POSITIVE_INFINITY;
-  if (
-    shouldMergeVoiceContinuationTurn({
-      previousPrompt: pending,
-      nextTranscript: next,
-      gapMs: safeGapMs,
-      windowMs,
-    })
-  ) {
-    return true;
-  }
-  if (isLowInformationTailTranscript(next)) return true;
-  if (!shouldDispatchReasoningAttempt(next)) return true;
-  return false;
-}
-
-export function isLikelyContextDependentTurn(transcript: string): boolean {
-  const normalized = transcript.trim().toLowerCase();
-  if (!normalized) return false;
-  if (normalized.length > 220) return false;
-  if (
-    /^(where|why|how|what)\s+(is|are|was|were|does|did)\s+(that|this|it|they|those|these)\b/.test(
-      normalized,
-    )
-  ) {
-    return true;
-  }
-  if (/^(and|so|then|also)\b/.test(normalized)) return true;
-  if (/\b(that|this|it|they|those|these)\b/.test(normalized) && normalized.length <= 72) {
-    return true;
-  }
-  return false;
-}
-
-function extractPriorUserContext(recentTurns: string[], currentTranscript?: string): string | null {
-  const currentNormalized = currentTranscript?.trim().toLowerCase() || null;
-  for (let index = recentTurns.length - 1; index >= 0; index -= 1) {
-    const line = recentTurns[index]?.trim() ?? "";
-    if (!line) continue;
-    if (!/^user:/i.test(line)) continue;
-    const text = line.replace(/^user:\s*/i, "").trim();
-    if (!text) continue;
-    if (currentNormalized && text.toLowerCase() === currentNormalized) continue;
-    return text;
-  }
-  return null;
-}
-
-type VoiceTimelineBuildInfo = {
-  clientBuild: string;
-  clientMode: "dev" | "prod";
-  serverService: string | null;
-  serverVersion: string | null;
-  serverGitSha: string | null;
-  serverBuildTime: string | null;
-  fetchedAtMs: number | null;
-  error: string | null;
-};
 
 function readVoiceTimelineClientBuildStamp(): string {
   const win =
@@ -3624,38 +2457,6 @@ function readVoiceTimelineClientBuildStamp(): string {
   });
 }
 
-export function buildVoiceReasoningDispatchPrompt(args: {
-  transcript: string;
-  recentTurns: string[];
-  explorationPacket?: ConversationExplorationPacket | null;
-}): string {
-  const transcript = args.transcript.trim();
-  if (!transcript) return "";
-  if (!isLikelyContextDependentTurn(transcript)) {
-    return transcript;
-  }
-  const priorUser = extractPriorUserContext(args.recentTurns, transcript);
-  if (!isLikelyNearTurnContinuation({ transcript, priorUserTurn: priorUser })) {
-    return transcript;
-  }
-  const topicHint = args.explorationPacket?.topic?.trim() || priorUser || transcript;
-  return [
-    `Follow-up turn: ${transcript}`,
-    `Immediate anchor: ${clipText(topicHint, 220)}`,
-    "Use only this immediate anchor for continuity before answering.",
-    priorUser ? `Prior user turn: ${clipText(priorUser, 220)}` : "",
-  ]
-    .filter(Boolean)
-    .join("\n");
-}
-
-function normalizeConversationModeForDispatch(
-  mode: "observe" | "act" | "verify" | "clarify" | undefined,
-): "observe" | "act" | "verify" | undefined {
-  if (!mode || mode === "clarify") return undefined;
-  return mode;
-}
-
 type ExplorationLadderAction =
   | "finalize"
   | "restart_after_artifact"
@@ -3667,73 +2468,6 @@ type ExplorationLadderDecision = {
   action: ExplorationLadderAction;
   reasonCode: string;
 };
-
-function buildExplorationEscalationPrompt(args: {
-  mode: "verify" | "act";
-  prompt: string;
-  previousOutput: string;
-  packet?: ConversationExplorationPacket | null;
-}): string {
-  const topic = clipText(args.packet?.topic?.trim() || args.prompt.trim(), 140);
-  const previous = clipText(args.previousOutput.trim(), 700);
-  if (args.mode === "verify") {
-    return [
-      `Topic: ${topic}`,
-      "Run verify mode on this exploration thread.",
-      "Return pass/fail with grounded evidence anchors and deterministic fail reason if blocked.",
-      "",
-      "Original user turn:",
-      args.prompt.trim(),
-      "",
-      "Observe attempt output:",
-      previous,
-    ].join("\n");
-  }
-  return [
-    `Topic: ${topic}`,
-    "Run act mode on this exploration thread.",
-    "Return concrete execution steps and expected receipts, bounded by existing safety gates.",
-    "",
-    "Original user turn:",
-    args.prompt.trim(),
-    "",
-    "Observe attempt output:",
-    previous,
-  ].join("\n");
-}
-
-function buildExplorationArtifactRetryPrompt(args: {
-  prompt: string;
-  previousOutput: string;
-  packet?: ConversationExplorationPacket | null;
-}): string {
-  const fileLocationPrompt = isRepoFileLocationRequestPrompt(args.prompt);
-  const topic = clipText(args.packet?.topic?.trim() || args.prompt.trim(), 140);
-  const previous = clipText(args.previousOutput.trim(), 700);
-  return [
-    `Topic: ${topic}`,
-    "Restart observe mode from the top of the reasoning chain.",
-    fileLocationPrompt
-      ? "Avoid artifact-only templates and mission/ethos scaffolds; include concrete file paths only when they directly answer the user request."
-      : "Do not emit repository file lists, mission/ethos scaffolds, or artifact-only templates.",
-    "If the output drifts into mission/ethos ideology content without explicit user request, ask one focused clarifier instead of finalizing.",
-    "Return a plain, grounded explanation aligned to the user turn. If still blocked, ask one focused clarifier.",
-    "",
-    "Original user turn:",
-    args.prompt.trim(),
-    "",
-    "Previous artifact-dominated output (avoid repeating this pattern):",
-    previous,
-  ].join("\n");
-}
-
-function isRepoFileLocationRequestPrompt(promptText: string): boolean {
-  const normalized = promptText.trim().toLowerCase();
-  if (!normalized) return false;
-  return /\b(file|files|filepath|file path|path|paths|codebase|repo|repository|source code|where|located|implemented|define[sd])\b/.test(
-    normalized,
-  );
-}
 
 export function decideExplorationLadderAction(args: {
   explorationAttemptCount: number;
@@ -3971,75 +2705,8 @@ type AskContextChooserState = {
   autoContextReason?: string;
 };
 
-type HelixAskImageAttachment = {
-  kind: "image";
-  id: string;
-  fileName: string;
-  mimeType: string;
-  sizeBytes: number;
-  imageBase64?: string | null;
-  imageRef?: string | null;
-  evidenceRef?: string | null;
-  previewUrl: string;
-  status: "ready" | "error";
-  error?: string | null;
-};
-
-type HelixAskTextAttachment = {
-  kind: "text";
-  id: string;
-  fileName: string;
-  mimeType: string;
-  sizeBytes: number;
-  contentBase64: string;
-  contentSha256: string;
-  preview: string;
-  status: "ready" | "error";
-  error?: string | null;
-};
-
-type HelixAskAttachment = HelixAskImageAttachment | HelixAskTextAttachment;
-
 const HELIX_ASK_MAX_ATTACHMENTS = 6;
 const HELIX_ASK_LARGE_PASTE_THRESHOLD_CHARS = 2400;
-const HELIX_ASK_TEXT_ATTACHMENT_MAX_BYTES = 128 * 1024;
-const HELIX_ASK_TEXT_ATTACHMENT_PREVIEW_CHARS = 1200;
-
-const HELIX_ASK_VISUAL_SURFACE_PROMPT_PATTERN =
-  /\b(?:image|screenshot|screen\s*share|screen\s*sharing|screen|display|window|tab|picture|photo|attached|visual|visible|from this|from the image|hotbar|inventory|chest|container)\b/i;
-const HELIX_ASK_TEXT_ATTACHMENT_PROMPT_PATTERN =
-  /\b(?:attached|pasted|uploaded|included|copied)\s+(?:text|memo|note|document)\b|\b(?:text|memo|note|document)\s+attachment\b|\bpasted\s+(?:text|memo|note|document)\s+attachment\b/i;
-const HELIX_ASK_PASTED_TEXT_RESUME_RECALL_PROMPT_PATTERN =
-  /\b(?:pasted\s+(?:text|memo|note|document)|attached\s+(?:text|memo|note|document)|copied\s+(?:text|memo|note|document)|(?:text|memo|note|document)\s+attachment|previous\s+(?:paste|memo|note|document)|last\s+(?:paste|memo|note|document)|(?:paste|memo|note|document|text)\s+from\s+the\s+previous|pasted\s+(?:text|memo|note|document)\s+from\s+the\s+previous)\b/i;
-const HELIX_ASK_CONTEXT_RESUME_RECALL_OUTPUT_PATTERN =
-  /\b(?:sentinel|marker|exact\s+(?:line|text|phrase|wording)|marker\s+line|top\s+line|first\s+line|appears?\s+at\s+the\s+top|answer\s+only|what|which|who|when|where|summari[sz]e|extract|list|identify|tell\s+me|answer)\b/i;
-const HELIX_ASK_AMBIGUOUS_LIVE_CONTEXT_PROMPT_PATTERN = /\blive\s+(?:source|answer)\b/i;
-const HELIX_ASK_WORKSTATION_LIVE_CONTEXT_PROMPT_PATTERN =
-  /\b(?:(?:scientific\s+)?calculator|equation|prime|computation|workstation)\b[\s\S]{0,80}\blive\s+(?:source|stream|answer)\b|\blive\s+(?:source|stream|answer)\b[\s\S]{0,80}\b(?:(?:scientific\s+)?calculator|equation|prime|computation|workstation)\b/i;
-
-const isHelixAskVisualPrompt = (value: string): boolean => {
-  const normalized = value.trim();
-  if (!normalized) return false;
-  if (HELIX_ASK_TEXT_ATTACHMENT_PROMPT_PATTERN.test(normalized)) return false;
-  if (HELIX_ASK_VISUAL_SURFACE_PROMPT_PATTERN.test(normalized)) return true;
-  if (!HELIX_ASK_AMBIGUOUS_LIVE_CONTEXT_PROMPT_PATTERN.test(normalized)) return false;
-  return !HELIX_ASK_WORKSTATION_LIVE_CONTEXT_PROMPT_PATTERN.test(normalized);
-};
-
-const isHelixAskPastedTextResumeRecallPrompt = (value: string): boolean => {
-  const normalized = value.trim();
-  if (!normalized) return false;
-  return (
-    HELIX_ASK_PASTED_TEXT_RESUME_RECALL_PROMPT_PATTERN.test(normalized) &&
-    HELIX_ASK_CONTEXT_RESUME_RECALL_OUTPUT_PATTERN.test(normalized)
-  );
-};
-
-const HELIX_ASK_USE_PASTED_TEXT_ATTACHMENT_PROMPT_PATTERN =
-  /^\s*(?:use|read|analy[sz]e|summari[sz]e|review|extract\s+from|answer\s+(?:from|using)|treat\s+it\s+as)\s+(?:the\s+)?(?:attached|pasted|uploaded|included|copied)\s+(?:pasted\s+)?(?:text|memo|note|document)(?:[\s\S]{0,160})?\.?\s*$/i;
-
-const isHelixAskUsePastedTextAttachmentPrompt = (value: string): boolean =>
-  HELIX_ASK_USE_PASTED_TEXT_ATTACHMENT_PROMPT_PATTERN.test(value.trim());
 
 function buildHelixAskPastedTextResumeRecallRouteMetadata(args: {
   base?: HelixAskRouteMetadata;
@@ -4216,64 +2883,7 @@ export function buildHelixAskHardBackendEntrypointRouteMetadata(args: {
   turnId: string;
   threadId: string;
 }): HelixAskRouteMetadata | null {
-  const family = resolveHelixAskHardBackendEntrypointFamily(args.question);
-  if (!family) return null;
-  const sourceTargetIntent = {
-    schema: "helix.ask_source_target_intent.v1",
-    turn_id: args.turnId,
-    thread_id: args.threadId,
-    target_source: family.sourceTarget,
-    target_kind: family.targetKind,
-    strength: "hard",
-    explicit_cues: [family.explicitCue],
-    reasons: ["hard_tool_family_prompt", `${family.family}_backend_entrypoint_required`],
-    requested_outputs: Array.from(new Set(family.requestedOutputs)),
-    suppressed_routes: [
-      "conversation:simple",
-      "durable_chat_session",
-      "client_projection",
-      "evidence_finalization_fallback",
-      "model_only_concept",
-      "no_tool_direct",
-    ],
-    precedence_reason: "hard_tool_family_backend_entrypoint_required",
-    must_enter_backend_ask: true,
-    allow_client_shortcut: false,
-    allow_no_tool_direct: false,
-    confidence: 0.97,
-    assistant_answer: false,
-    raw_content_included: false,
-  };
-  const mandatoryNextTool = family.selectedCapability
-    ? {
-        schema: "helix.mandatory_next_tool.v1",
-        phase: "tool_observation",
-        tool_name: family.selectedCapability,
-        required_tool_family: family.requiredToolFamily,
-        selected_capability: family.selectedCapability,
-        terminal_forbidden: true,
-        reason: "hard tool-family prompt requires backend Ask capability observation before terminal authority",
-        missing_required_evidence: family.requestedOutputs.includes("calculator_receipt")
-          ? "calculator_receipt"
-          : "tool_observation",
-        blocking_reasons: ["backend_ask_entry_required", "tool_observation_required"],
-        canonical_goal: family.family,
-        assistant_answer: false,
-        raw_content_included: false,
-      }
-    : undefined;
-  return {
-    ...(args.base ?? {}),
-    schema: "helix.ask.route_metadata.v1",
-    source: "hard_tool_backend_entrypoint",
-    sourceTarget: family.sourceTarget,
-    requiredToolFamily: family.requiredToolFamily,
-    source_target_intent: {
-      ...(args.base?.source_target_intent ?? {}),
-      ...sourceTargetIntent,
-    },
-    ...(mandatoryNextTool ? { mandatory_next_tool: mandatoryNextTool } : {}),
-  };
+  return buildRecrownedHelixAskHardBackendEntrypointRouteMetadata(args);
 }
 
 function buildQueuedAskTurn(args: {
@@ -4315,199 +2925,6 @@ function buildQueuedAskTurn(args: {
     options,
     queuedAtMs: Date.now(),
     reason: args.reason,
-  };
-}
-
-const HELIX_ASK_REPO_CODE_EVIDENCE_PROMPT_PATTERN =
-  /\b(?:repo(?:sitory)?|code|source\s+(?:file|path|tree)|file\s+paths?|line-backed|line\s+(?:number|numbers|source|sources)|cite\s+(?:exact\s+)?(?:file|path|source)|where\s+is\s+(?:that\s+)?(?:enforced|defined|declared|implemented|wired)|contract|schema|module|endpoint|route|symbol|export(?:s|ed)?|import(?:s|ed)?|requestedLaneSchema|server\/|client\/|shared\/|docs\/|[A-Za-z0-9_-]+\.(?:ts|tsx|js|jsx|md|json|py))\b/i;
-
-const isRepoCodeEvidencePrompt = (question: string): boolean =>
-  HELIX_ASK_REPO_CODE_EVIDENCE_PROMPT_PATTERN.test(question.trim());
-
-const resolveAskContextChooserAutoMode = (question: string): {
-  mode: "attached" | "isolated";
-  reason: string;
-} => {
-  const normalized = question.trim();
-  if (
-    isRepoCodeEvidencePrompt(normalized) &&
-    !isHelixAskVisualPrompt(normalized)
-  ) {
-    return {
-      mode: "isolated",
-      reason: "repo_code_evidence_prompt",
-    };
-  }
-  return {
-    mode: "attached",
-    reason: "workspace_context_reasoning_prompt",
-  };
-};
-
-const HELIX_VISUAL_DIAGNOSTIC_SUMMARY_PATTERN =
-  /\b(?:visual\s+frame\s+was\s+recorded|no\s+configured\s+vision\s+provider|configured\s+vision\s+provider\s+did\s+not\s+return|did\s+not\s+return\s+an?\s+image\s+description|did\s+not\s+produce\s+usable\s+visual\s+evidence|waiting\s+for\s+image\s+recognition|vision_provider_[a-z_]+|provider\s+(?:missing|failed|unavailable)|analysis_failed|capture\s+(?:and\s+analyze\s+)?(?:a\s+)?fresh\s+frame|recover\s+the\s+vision\s+provider)\b/i;
-
-function readVisualEvidenceSummary(record: Record<string, unknown> | null | undefined): string | null {
-  const evidence = record?.evidence;
-  const evidenceRecord = evidence && typeof evidence === "object" ? (evidence as Record<string, unknown>) : null;
-  const directSummary = typeof record?.summary === "string" ? record.summary.trim() : "";
-  const nestedSummary = typeof evidenceRecord?.summary === "string" ? evidenceRecord.summary.trim() : "";
-  return directSummary || nestedSummary || null;
-}
-
-function isDiagnosticVisualEvidence(record: Record<string, unknown> | null | undefined): boolean {
-  const summary = readVisualEvidenceSummary(record);
-  return Boolean(summary && HELIX_VISUAL_DIAGNOSTIC_SUMMARY_PATTERN.test(summary));
-}
-
-function validateHelixAskImageAttachmentForSubmit(
-  attachment: HelixAskImageAttachment | null | undefined,
-): HelixAttachmentCommitCheck | null {
-  if (!attachment) return null;
-  const hasImageBase64 = typeof attachment.imageBase64 === "string" && attachment.imageBase64.trim().length > 0;
-  const hasImageRef = typeof attachment.imageRef === "string" && attachment.imageRef.trim().length > 0;
-  const hasEvidenceRef = typeof attachment.evidenceRef === "string" && attachment.evidenceRef.trim().length > 0;
-  const mimeType = typeof attachment.mimeType === "string" ? attachment.mimeType : "";
-  const unsupportedType = mimeType.length > 0 && !mimeType.startsWith("image/");
-  const tooLarge = typeof attachment.sizeBytes === "number" && attachment.sizeBytes > 8 * 1024 * 1024;
-  const hasPayload = hasImageBase64 || hasImageRef || hasEvidenceRef;
-  const status: HelixAttachmentCommitCheck["status"] =
-    attachment.status === "error"
-      ? "missing_payload"
-      : unsupportedType
-        ? "unsupported_type"
-        : tooLarge
-          ? "too_large"
-          : hasPayload
-            ? "ready"
-            : "stale_after_restart";
-  const canSubmit = status === "ready";
-  return {
-    schema: "helix.attachment_commit_check.v1",
-    attachment_id: attachment.id,
-    file_name: attachment.fileName,
-    mime_type: attachment.mimeType,
-    status,
-    can_submit: canSubmit,
-    turn_input_item_preview: hasPayload
-      ? {
-          type: hasEvidenceRef && !hasImageBase64 && !hasImageRef ? "evidence_ref" : "image",
-          has_image_base64: hasImageBase64,
-          has_image_ref: hasImageRef,
-          has_evidence_ref: hasEvidenceRef,
-          raw_image_scope: hasImageBase64 ? "turn_input_only" : null,
-        }
-      : null,
-    reason: canSubmit
-      ? null
-      : status === "stale_after_restart"
-        ? "Image attachment is stale. Reattach the image before sending."
-        : attachment.error ?? "Image attachment is not ready to submit.",
-    assistant_answer: false,
-    raw_content_included: false,
-  };
-}
-
-function validateHelixAskTextAttachmentForSubmit(
-  attachment: HelixAskTextAttachment | null | undefined,
-): HelixAttachmentCommitCheck | null {
-  if (!attachment) return null;
-  const hasPayload = typeof attachment.contentBase64 === "string" && attachment.contentBase64.trim().length > 0;
-  const tooLarge = typeof attachment.sizeBytes === "number" && attachment.sizeBytes > HELIX_ASK_TEXT_ATTACHMENT_MAX_BYTES;
-  const status: HelixAttachmentCommitCheck["status"] =
-    attachment.status === "error"
-      ? "missing_payload"
-      : tooLarge
-        ? "too_large"
-        : hasPayload
-          ? "ready"
-          : "stale_after_restart";
-  const canSubmit = status === "ready";
-  return {
-    schema: "helix.attachment_commit_check.v1",
-    attachment_id: attachment.id,
-    file_name: attachment.fileName,
-    mime_type: attachment.mimeType,
-    status,
-    can_submit: canSubmit,
-    turn_input_item_preview: hasPayload
-      ? {
-          type: "evidence_ref",
-          has_image_base64: false,
-          has_image_ref: false,
-          has_evidence_ref: false,
-          raw_image_scope: null,
-        }
-      : null,
-    reason: canSubmit
-      ? null
-      : status === "stale_after_restart"
-        ? "Text attachment is stale. Reattach or paste it again before sending."
-        : attachment.error ?? "Text attachment is not ready to submit.",
-    assistant_answer: false,
-    raw_content_included: false,
-  };
-}
-
-function validateHelixAskAttachmentForSubmit(
-  attachment: HelixAskAttachment | null | undefined,
-): HelixAttachmentCommitCheck | null {
-  if (!attachment) return null;
-  return attachment.kind === "image"
-    ? validateHelixAskImageAttachmentForSubmit(attachment)
-    : validateHelixAskTextAttachmentForSubmit(attachment);
-}
-
-function base64FromText(value: string): string {
-  const bytes = new TextEncoder().encode(value);
-  let binary = "";
-  const chunkSize = 0x8000;
-  for (let i = 0; i < bytes.byteLength; i += chunkSize) {
-    const sub = bytes.subarray(i, Math.min(i + chunkSize, bytes.byteLength));
-    binary += String.fromCharCode.apply(null, Array.from(sub));
-  }
-  return btoa(binary);
-}
-
-async function sha256TextHex(value: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-async function buildHelixAskTextAttachmentFromText(text: string): Promise<HelixAskTextAttachment> {
-  const encoded = new TextEncoder().encode(text);
-  const now = new Date();
-  const stamp = now.toISOString().replace(/[:.]/g, "-");
-  return {
-    kind: "text",
-    id: crypto.randomUUID(),
-    fileName: `pasted-text-${stamp}.txt`,
-    mimeType: "text/plain",
-    sizeBytes: encoded.byteLength,
-    contentBase64: base64FromText(text),
-    contentSha256: await sha256TextHex(text),
-    preview: text.trim().slice(0, HELIX_ASK_TEXT_ATTACHMENT_PREVIEW_CHARS),
-    status: "ready",
-    error: null,
-  };
-}
-
-function buildHelixAskTextAttachmentTurnInputItem(attachment: HelixAskTextAttachment): HelixTurnInputItem {
-  return {
-    type: "attachment",
-    attachment_id: attachment.id,
-    attachment_kind: "text",
-    mime_type: attachment.mimeType,
-    file_name: attachment.fileName,
-    size_bytes: attachment.sizeBytes,
-    content_base64: attachment.contentBase64,
-    content_sha256: attachment.contentSha256,
-    preview: attachment.preview,
-    raw_content_included: false,
-    raw_content_scope: "turn_input_only",
-    assistant_answer: false,
   };
 }
 
@@ -5044,95 +3461,6 @@ type HelixAskConsoleStreamIngressDebug = {
   lastUpdatedAtMs: number | null;
 };
 
-function isHelixAskContextCompactionPauseText(text: string | null | undefined): boolean {
-  return /\b(?:context_compaction|context\s+is\s+compacting|active\s+context\s+page\s+file|pasted_text_attachment_resume_frame)\b/i.test(
-    text ?? "",
-  );
-}
-
-function extractHelixAskContextCompactionResumeFrame(...values: unknown[]): Record<string, unknown> | null {
-  const candidates: unknown[] = [];
-  for (const value of values) {
-    const record = asObjectRecord(value);
-    if (!record) continue;
-    candidates.push(record.resume_frame);
-    for (const key of ["pending_server_request", "pending_request"]) {
-      const pending = asObjectRecord(record[key]);
-      if (pending) candidates.push(pending.resume_frame);
-    }
-    const debug = asObjectRecord(record.debug);
-    if (debug) {
-      candidates.push(debug.resume_frame);
-      for (const key of ["pending_server_request", "pending_request"]) {
-        const pending = asObjectRecord(debug[key]);
-        if (pending) candidates.push(pending.resume_frame);
-      }
-    }
-  }
-  for (const candidate of candidates) {
-    const frame = asObjectRecord(candidate);
-    if (frame?.schema === "helix.pasted_text_attachment_resume_frame.v1") return frame;
-  }
-  return null;
-}
-
-function extractLatestHelixAskContextCompactionResumeFrameFromReplies(
-  replies: HelixAskReply[],
-): Record<string, unknown> | null {
-  for (let index = replies.length - 1; index >= 0; index -= 1) {
-    const reply = replies[index];
-    const frame = extractHelixAskContextCompactionResumeFrame(reply, reply?.debug, reply?.envelope);
-    if (frame) return frame;
-  }
-  return null;
-}
-
-function readStoredHelixAskContextCompactionResumeFrame(): Record<string, unknown> | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.sessionStorage.getItem(HELIX_ASK_CONTEXT_RESUME_FRAME_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
-    const record = parsed as Record<string, unknown>;
-    return record.schema === "helix.pasted_text_attachment_resume_frame.v1" ? record : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeStoredHelixAskContextCompactionResumeFrame(frame: Record<string, unknown> | null): void {
-  if (typeof window === "undefined" || !frame) return;
-  if (frame.schema !== "helix.pasted_text_attachment_resume_frame.v1") return;
-  try {
-    window.sessionStorage.setItem(HELIX_ASK_CONTEXT_RESUME_FRAME_STORAGE_KEY, JSON.stringify(frame));
-  } catch {
-    // Session storage is a handoff cache only; Ask must continue to use server authority.
-  }
-}
-
-function isHelixAskContextCompactionPausePendingReply(reply: HelixAskReply | null | undefined): boolean {
-  if (!reply) return false;
-  const debug = readAgentLoopAuditRecord(reply.debug);
-  const agentLoop = readAgentLoopAuditRecord(debug?.agentLoop ?? debug?.agent_loop);
-  const contentText = reply.content ?? "";
-  const pendingCandidates = [
-    reply.pending_server_request,
-    debug?.pending_server_request,
-    debug?.pending_request,
-    agentLoop?.pending_request,
-    agentLoop?.pending_server_request,
-  ]
-    .map((value) => readAgentLoopAuditRecord(value))
-    .filter((value): value is Record<string, unknown> => Boolean(value));
-  const pendingText = pendingCandidates.map((value) => safeJsonStringify(value)).join("\n");
-  const replyText = `${contentText}\n${pendingText}`;
-  const hasCompactionPauseText = isHelixAskContextCompactionPauseText(replyText);
-  if (!hasCompactionPauseText) return false;
-  if (pendingCandidates.length > 0) return true;
-  return /\bcontext\s+is\s+compacting\s+before\s+the\s+next\s+ask\s+turn\b/i.test(contentText);
-}
-
 type ContextCapsulePreview = {
   id: string;
   loading: boolean;
@@ -5153,53 +3481,11 @@ type HelixAskPillProps = {
   replyListClassName?: string;
 };
 
-type HelixAskLegacyChatAddMessage = (
-  sessionId: string,
-  msg: Omit<ChatMessage, "id" | "at" | "tokens"> & { tokens?: number },
-) => ChatMessage;
-
-function addHelixAskLegacyChatMessage(
-  addMessage: HelixAskLegacyChatAddMessage,
-  sessionId: string | null | undefined,
-  args: Parameters<typeof buildHelixAskConsoleChatMessagePayload>[0],
-) {
-  if (!sessionId) return null;
-  const payload = buildHelixAskConsoleChatMessagePayload(args);
-  return payload ? addMessage(sessionId, payload) : null;
-}
-
-function addHelixAskLegacyChatTurnMessages(
-  addMessage: HelixAskLegacyChatAddMessage,
-  sessionId: string | null | undefined,
-  args: Parameters<typeof buildHelixAskConsoleChatTurnPayloads>[0],
-) {
-  if (!sessionId) return [];
-  return buildHelixAskConsoleChatTurnPayloads(args).map((payload) => addMessage(sessionId, payload));
-}
-
-function readStoredHelixAskAgentRuntime(): HelixAgentRuntimeId {
-  if (typeof window === "undefined") return "helix";
-  try {
-    const value = window.localStorage.getItem(HELIX_ASK_AGENT_RUNTIME_STORAGE_KEY);
-    return isHelixAgentRuntimeId(value) ? value : "helix";
-  } catch {
-    return "helix";
-  }
-}
-
-function persistHelixAskAgentRuntime(value: HelixAgentRuntimeId): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(HELIX_ASK_AGENT_RUNTIME_STORAGE_KEY, value);
-  } catch {
-    // Local storage can be unavailable in embedded or test contexts.
-  }
-}
-
-export const HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE = "backend_ask_entry_required";
+export const HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE =
+  RECROWNED_HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE;
 export const HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT =
-  "This prompt requires the backend Ask solver path before a final answer can be shown.";
-export const HELIX_ASK_ENTRYPOINT_GUARD_VERSION = "E79";
+  RECROWNED_HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT;
+export const HELIX_ASK_ENTRYPOINT_GUARD_VERSION = RECROWNED_HELIX_ASK_ENTRYPOINT_GUARD_VERSION;
 export const HELIX_ASK_SINGLE_TERMINAL_PROJECTOR_VERSION = "E80";
 export const HELIX_ASK_BACKEND_DEBUG_MATERIALIZATION_ERROR_CODE = "backend_debug_materialization";
 export const HELIX_ASK_BACKEND_DEBUG_MATERIALIZATION_TEXT =
@@ -5209,17 +3495,14 @@ const HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_PROMPT_RE =
   /\b(?:scientific-calculator\.[a-z0-9_.-]+|scientific\s+calculator|calculator_receipt|calculator\s+tool|docs-viewer\.[a-z0-9_.-]+|docs\s+viewer|narrator\.[a-z0-9_.-]+|panel[_\s-]?id\s*(?:=|:)\s*narrator|repo-code\.[a-z0-9_.-]+|repo_code\.[a-z0-9_.-]+|workspace-directory\.[a-z0-9_.-]+|workspace_directory\.[a-z0-9_.-]+|workspace_os\.status|internet_search\.[a-z0-9_.-]+|internet\s+search\s+tool|live_env\.[a-z0-9_.-]+|helix_ask\.[a-z0-9_.-]+|image_lens|visual_capture)\b/i;
 
 export function requiresHelixAskBackendEntrypoint(question: string | null | undefined): boolean {
-  const normalized = coerceText(question).trim();
-  if (!normalized) return false;
-  if (isQuotedTransformOnlyForEvidenceGate(normalized)) return false;
-  return HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_PROMPT_RE.test(normalized);
+  return recrownedRequiresHelixAskBackendEntrypoint(question);
 }
 
 export function shouldUseHelixAskBackendTurnEntrypoint(args: {
   manualCanaryEnabled: boolean;
   hardBackendEntrypointRequired: boolean;
 }): boolean {
-  return args.manualCanaryEnabled || args.hardBackendEntrypointRequired;
+  return recrownedShouldUseHelixAskBackendTurnEntrypoint(args);
 }
 
 export function buildHelixAskBackendEntrypointRuntimeFingerprint(args: {
@@ -5335,12 +3618,6 @@ export function resolveHelixAskHardPromptProjectionGuard(args: {
   };
 }
 
-export function hasHelixAskBackendEntrypointTurnId(turnId: string | null | undefined): boolean {
-  const normalized = coerceText(turnId).trim();
-  if (!normalized) return false;
-  return /^ask[:/]/i.test(normalized) || /(?:^|:)ask:[0-9a-z-]+(?:$|:)/i.test(normalized);
-}
-
 export function buildHelixAskRepliesFromChatSession(session: ChatSession): HelixAskReply[] {
   return buildHelixAskRepliesFromChatSessionProjection({
     session,
@@ -5355,29 +3632,6 @@ export function buildHelixAskRepliesFromChatSession(session: ChatSession): Helix
   }) as HelixAskReply[];
 }
 
-function readAgentLoopAuditRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
-}
-
-function extractAskLevelTheoryReflection(value: unknown): TheoryContextReflectionV1 | null {
-  const record = readAgentLoopAuditRecord(value);
-  if (!record) return null;
-  const directReceipt = readAgentLoopAuditRecord(record.theory_context_reflection_tool_receipt);
-  if (isTheoryContextReflectionV1(directReceipt?.reflectionV1)) return directReceipt.reflectionV1;
-  const directArtifact = readAgentLoopAuditRecord(record.artifact_v1);
-  if (isTheoryContextReflectionV1(directArtifact?.reflectionV1)) return directArtifact.reflectionV1;
-  const ledger = Array.isArray(record.current_turn_artifact_ledger) ? record.current_turn_artifact_ledger : [];
-  for (const item of ledger) {
-    const artifact = readAgentLoopAuditRecord(item);
-    if (!artifact || artifact.kind !== "helix_theory_context_reflection_tool_receipt") continue;
-    const payload = readAgentLoopAuditRecord(artifact.payload);
-    const artifactV1 = readAgentLoopAuditRecord(payload?.artifact_v1);
-    if (isTheoryContextReflectionV1(artifactV1?.reflectionV1)) return artifactV1.reflectionV1;
-    if (isTheoryContextReflectionV1(payload?.reflectionV1)) return payload.reflectionV1;
-  }
-  return null;
-}
-
 type HelixActionEnvelopeRuntimeAuthority = {
   schema: "helix.ui.action_envelope_runtime_authority.v1";
   allowed: boolean;
@@ -5387,122 +3641,6 @@ type HelixActionEnvelopeRuntimeAuthority = {
   assistant_answer: false;
   raw_content_included: false;
 };
-
-function normalizeHelixRuntimeActionKey(value: unknown): string {
-  return coerceText(value).trim().toLowerCase().replace(/[/:]+/g, ".").replace(/\s+/g, "_");
-}
-
-function readHelixDecisionCapabilityKeys(value: unknown): string[] {
-  const record = readAgentLoopAuditRecord(value);
-  if (!record) return [];
-  const directKeys = [
-    record.chosen_capability,
-    record.selected_capability,
-    record.capability_key,
-    record.executed_action_key,
-    record.action_key,
-    record.tool_key,
-    record.tool_name,
-  ]
-    .map(normalizeHelixRuntimeActionKey)
-    .filter(Boolean);
-  const nestedKeys = [
-    record.agent_step_decision,
-    record.initial_agent_step_decision,
-    record.tool_call,
-    record.next_action,
-    record.selected_action,
-    record.action,
-  ].flatMap(readHelixDecisionCapabilityKeys);
-  return [...directKeys, ...nestedKeys];
-}
-
-function readHelixGatewayCapabilityKeys(value: unknown): string[] {
-  const record = readAgentLoopAuditRecord(value);
-  if (!record) return [];
-  const debug = readAgentLoopAuditRecord(record.debug);
-  const gatewayResultSources = [
-    record.workstation_gateway_call_results,
-    record.workstation_gateway_results,
-    debug?.workstation_gateway_call_results,
-    debug?.workstation_gateway_results,
-  ];
-  return gatewayResultSources
-    .flatMap((source) => (Array.isArray(source) ? source : []))
-    .flatMap((entry) => {
-      const result = readAgentLoopAuditRecord(entry);
-      if (result?.ok !== true) return [];
-      return [
-        result?.capability_id,
-        result?.capabilityId,
-        result?.gateway_admission && readAgentLoopAuditRecord(result.gateway_admission)?.requested_capability,
-      ];
-    })
-    .map(normalizeHelixRuntimeActionKey)
-    .filter(Boolean);
-}
-
-function collectHelixAgentSelectedCapabilities(...sources: unknown[]): string[] {
-  const selected = new Set<string>();
-  const add = (value: unknown): void => {
-    readHelixDecisionCapabilityKeys(value).forEach((key) => selected.add(key));
-  };
-  sources.forEach((source) => {
-    const record = readAgentLoopAuditRecord(source);
-    if (!record) return;
-    const debug = readAgentLoopAuditRecord(record.debug);
-    [
-      record.agent_step_decision,
-      record.initial_agent_step_decision,
-      record.observation_review,
-      record.runtime_authority_audit,
-      debug?.agent_step_decision,
-      debug?.initial_agent_step_decision,
-      debug?.observation_review,
-      debug?.runtime_authority_audit,
-    ].forEach(add);
-    [record.agent_runtime_loop, debug?.agent_runtime_loop, record.agent_step_loop, debug?.agent_step_loop].forEach((loop) => {
-      const loopRecord = readAgentLoopAuditRecord(loop);
-      const iterations = Array.isArray(loopRecord?.iterations)
-        ? loopRecord?.iterations
-        : Array.isArray(loopRecord?.steps)
-          ? loopRecord?.steps
-          : [];
-      iterations.forEach(add);
-    });
-    readHelixGatewayCapabilityKeys(record).forEach((key) => selected.add(key));
-  });
-  return [...selected].filter(Boolean);
-}
-
-function readHelixWorkstationActionRuntimeKeys(action: HelixWorkstationAction | Record<string, unknown>): string[] {
-  const record = readAgentLoopAuditRecord(action);
-  if (!record) return [];
-  const panelId = normalizeHelixRuntimeActionKey(record.panel_id);
-  const actionId = normalizeHelixRuntimeActionKey(record.action_id);
-  const actionName = normalizeHelixRuntimeActionKey(record.action);
-  const keys = new Set<string>();
-  if (panelId && actionId) {
-    keys.add(`${panelId}.${actionId}`);
-    keys.add(`${panelId}/${actionId}`);
-  }
-  if (panelId && actionName === "open_panel") {
-    keys.add(`${panelId}.open`);
-    keys.add(`${panelId}.open_panel`);
-  }
-  if (panelId && actionName === "focus_panel") {
-    keys.add(`${panelId}.focus`);
-    keys.add(`${panelId}.focus_panel`);
-  }
-  if (actionName === "restore_view_state") {
-    keys.add("workstation.restore_view_state");
-    keys.add("workstation/restore_view_state");
-  }
-  if (panelId && actionName) keys.add(`${panelId}.${actionName}`);
-  if (actionId) keys.add(actionId);
-  if (actionName) keys.add(actionName);
-  return [...keys].map(normalizeHelixRuntimeActionKey).filter(Boolean);
-}
 
 export function buildHelixActionEnvelopeRuntimeAuthority(
   envelope: HelixActionEnvelope | undefined,
@@ -5570,33 +3708,6 @@ function attachHelixActionEnvelopeRuntimeAuthorityDebug<T extends Record<string,
     action_envelope: authority.allowed /* runtime_authority */ ? envelope ?? null : null,
     suppressed_action_envelope: authority.allowed ? null : envelope ?? null,
   } as T;
-}
-
-function readHelixPendingInputRecord(value: unknown): Record<string, unknown> | null {
-  const record = readAgentLoopAuditRecord(value);
-  if (!record) return null;
-  const status = coerceText(record.status ?? record.state ?? record.resolution_status).trim().toLowerCase();
-  if (status === "resolved" || status === "cancelled" || status === "canceled" || status === "superseded") {
-    return null;
-  }
-  const requestId = coerceText(record.request_id ?? record.requestId ?? record.id).trim();
-  const prompt = coerceText(record.prompt ?? record.message ?? record.text ?? record.question).trim();
-  const requiredFieldsCandidate = record.required_fields ?? record.requiredFields;
-  const requiredFields = Array.isArray(requiredFieldsCandidate) ? requiredFieldsCandidate : [];
-  if (requestId || prompt || requiredFields.length > 0 || record.kind === "request_user_input") return record;
-  return null;
-}
-
-function normalizeHelixPendingTransitionMarker(value: unknown): string {
-  return coerceText(value).trim().toLowerCase().replace(/[\s-]+/g, "_");
-}
-
-function readHelixPendingTransitionTrace(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    return value.map((entry) => normalizeHelixPendingTransitionMarker(entry)).filter(Boolean);
-  }
-  const text = normalizeHelixPendingTransitionMarker(value);
-  return text ? [text] : [];
 }
 
 function hasHelixPendingCancellationMarker(record: Record<string, unknown>): boolean {
@@ -5725,10 +3836,6 @@ function resolveHelixAskVisibleTerminal(value: unknown, fallbackContent?: string
     source: terminal.source,
     backendTerminalText: terminal.backendTerminalText,
   };
-}
-
-function readAgentLoopAuditArray(value: unknown): unknown[] {
-  return Array.isArray(value) ? value : [];
 }
 
 function renderProceduralTurnTimeline(reply: HelixAskReply): React.ReactNode {
@@ -6740,32 +4847,6 @@ const CONTEXT_CAPSULE_GRID_WIDTH = 80;
 const CONTEXT_CAPSULE_GRID_HEIGHT = 16;
 const CONTEXT_CAPSULE_SIM_TICK_MS = 50;
 
-function askLiveEventBelongsToActiveTurn(args: {
-  event: AskLiveEventEntry;
-  activeTurnId?: string | null;
-  activeTraceId?: string | null;
-  activeStartedAtMs?: number | null;
-}): boolean {
-  const activeIds = new Set(
-    [args.activeTurnId, args.activeTraceId]
-      .map((value) => String(value ?? "").trim())
-      .filter(Boolean),
-  );
-  const identity = readAskLiveEventIdentity(args.event);
-  const eventIds = [identity.turnId, identity.traceId].filter((value): value is string => Boolean(value));
-  if (eventIds.length > 0) return eventIds.some((value) => activeIds.has(value));
-  const eventTs = resolveAskLiveEventTimestampMs(args.event);
-  if (
-    typeof eventTs === "number" &&
-    Number.isFinite(eventTs) &&
-    typeof args.activeStartedAtMs === "number" &&
-    Number.isFinite(args.activeStartedAtMs)
-  ) {
-    return eventTs >= args.activeStartedAtMs - 500;
-  }
-  return true;
-}
-
 type UnifiedDebugEventRow = {
   index: number;
   channel: "ask_live" | "voice_timeline" | "voice_call" | "voice_playback_receipt" | "observer_lane";
@@ -6813,55 +4894,20 @@ export function readDocViewerPathFromDesktopUrlForAskSnapshot(): string | null {
 function readDocViewerDebugSnapshot(): Record<string, unknown> {
   const state = useDocViewerStore.getState();
   const currentPath = rememberDocViewerPathForAskSnapshot(state.currentPath);
-  return {
-    mode: state.mode,
-    currentPath,
-    anchor: state.anchor ?? null,
-    pendingAutoReadNonce: state.pendingAutoReadNonce ?? null,
-    recentCount: Array.isArray(state.recent) ? state.recent.length : 0,
-  };
+  return buildDocViewerDebugSnapshotFromState(state, currentPath);
 }
 
 function resolveAskTurnDocViewerSnapshotPath(): { path: string | null; source: string } {
   const state = useDocViewerStore.getState();
-  const storePath = normalizeDocViewerPathForAskSnapshot(state.currentPath);
-  if (storePath) {
-    rememberDocViewerPathForAskSnapshot(storePath);
-    return { path: storePath, source: "doc_viewer_store" };
-  }
   const debugSnapshot = readDocViewerDebugSnapshot();
-  const debugPath = normalizeDocViewerPathForAskSnapshot(debugSnapshot.currentPath);
-  if (debugPath) {
-    rememberDocViewerPathForAskSnapshot(debugPath);
-    return { path: debugPath, source: "doc_viewer_debug_snapshot" };
-  }
-  const urlPath = readDocViewerPathFromDesktopUrlForAskSnapshot();
-  if (urlPath) {
-    rememberDocViewerPathForAskSnapshot(urlPath);
-    return { path: urlPath, source: "desktop_url_doc_param" };
-  }
-  const rememberedPath = rememberDocViewerPathForAskSnapshot(null);
-  return rememberedPath
-    ? { path: rememberedPath, source: "doc_viewer_last_known" }
-    : { path: null, source: "none" };
-}
-
-const HELIX_DOC_VIEWER_DEICTIC_CUE_RE = /\b(?:this|current)\s+doc(?:ument)?\b/i;
-const HELIX_DOC_VIEWER_CONTEXT_CUE_RE = /\b(?:docs?|document)\s+viewer(?:\s+context)?\b/i;
-const HELIX_ACTIVE_DOC_VIEWER_ARTIFACT_CUE_RE =
-  /\b(?:this|current|active|open)\s+(?:[a-z0-9._-]+\s+){0,4}(?:white\s*paper|whitepaper|paper|report|article|manuscript|spec(?:ification)?|brief|research\s+note|markdown|readme|document|doc)\b/i;
-const HELIX_EXPLICIT_PATH_CUE_RE =
-  /(?:\b[a-z0-9_./-]+\.(?:ts|tsx|js|jsx|json|md|mdx|txt|pdf|docx?|ya?ml|py|go|rs)\b|(?:^|[\s(])\/?(?:docs|client|server|modules|shared)\/[^\s)]+)/i;
-
-function readWorkstationActionArgString(action: HelixWorkstationAction, keys: string[]): string | null {
-  if (action.action !== "run_panel_action") return null;
-  const args = asObjectRecord(action.args ?? null);
-  if (!args) return null;
-  for (const key of keys) {
-    const value = args[key];
-    if (typeof value === "string" && value.trim()) return value.trim();
-  }
-  return null;
+  const resolution = resolveDocViewerSnapshotPathCandidate({
+    storePath: state.currentPath,
+    debugSnapshotPath: debugSnapshot.currentPath,
+    desktopUrlDocPath: readDocViewerPathFromDesktopUrlForAskSnapshot(),
+    lastKnownPath: helixAskLastKnownDocViewerPath,
+  });
+  if (resolution.path) rememberDocViewerPathForAskSnapshot(resolution.path);
+  return resolution;
 }
 
 export function syncDocViewerStateFromWorkstationAction(action: HelixWorkstationAction): boolean {
@@ -6875,9 +4921,9 @@ export function syncDocViewerStateFromWorkstationAction(action: HelixWorkstation
   ) {
     return false;
   }
-  const path = readWorkstationActionArgString(action, ["path", "doc_path", "target"]);
+  const path = readWorkstationActionArgText(action, ["path", "doc_path", "target"]);
   if (!path) return false;
-  const anchor = readWorkstationActionArgString(action, ["anchor"]) ?? undefined;
+  const anchor = readWorkstationActionArgText(action, ["anchor"]) ?? undefined;
   rememberDocViewerPathForAskSnapshot(path);
   useDocViewerStore.getState().viewDoc(path, anchor);
   return true;
@@ -6887,19 +4933,11 @@ function resolveDocsViewerAnchorPathForQuestion(
   question: string,
   answerContract?: HelixAskAnswerContract,
 ): string | null {
-  const docsCueDetected =
-    HELIX_DOC_VIEWER_DEICTIC_CUE_RE.test(question) ||
-    HELIX_DOC_VIEWER_CONTEXT_CUE_RE.test(question) ||
-    HELIX_ACTIVE_DOC_VIEWER_ARTIFACT_CUE_RE.test(question) ||
-    answerContract?.source === "docs_viewer";
-  if (!docsCueDetected) return null;
-  const explicitPath = extractExplicitDocsViewerPath(question);
-  if (explicitPath) return explicitPath;
-  if (HELIX_EXPLICIT_PATH_CUE_RE.test(question)) return null;
-  const currentPath = resolveAskTurnDocViewerSnapshotPath().path ?? "";
-  if (!currentPath) return null;
-  const normalizedPath = normalizeDocsViewerAnchorPath(currentPath);
-  return normalizedPath.length > 0 ? normalizedPath : null;
+  return resolveDocsViewerAnchorPathCandidate({
+    question,
+    answerContractSource: answerContract?.source,
+    currentPath: resolveAskTurnDocViewerSnapshotPath().path,
+  });
 }
 
 export function buildHelixAskContextFilesForTurn(
@@ -6914,76 +4952,14 @@ export function buildHelixAskContextFilesForTurn(
 
 function readWorkstationLayoutDebugSnapshot(): Record<string, unknown> {
   const state = useWorkstationLayoutStore.getState();
-  const groupCount = Object.keys(state.groups).length;
-  const panelIds = new Set<string>();
-  Object.values(state.groups).forEach((group) => {
-    group.panelIds.forEach((panelId) => panelIds.add(panelId));
-  });
-  return {
-    mode: state.mode,
-    activeGroupId: state.activeGroupId,
-    groupCount,
-    openPanels: [...panelIds].sort((a, b) => a.localeCompare(b)),
-    chatDock: {
-      collapsed: state.chatDock.collapsed,
-      widthPx: state.chatDock.widthPx,
-      side: state.chatDock.side,
-    },
-    mobileDrawer: {
-      open: state.mobileDrawer.open,
-      snap: state.mobileDrawer.snap,
-    },
-  };
+  return buildWorkstationLayoutDebugSnapshotFromState(state);
 }
 
 function buildAskTurnWorkspaceContextSnapshot(sessionId: string | null | undefined): Record<string, unknown> {
   const layoutState = useWorkstationLayoutStore.getState();
   const notesState = useWorkstationNotesStore.getState();
   const calculatorState = useScientificCalculatorStore.getState();
-  const clipNoteBodyForAskTurn = (value: unknown): string | null => {
-    if (typeof value !== "string") return null;
-    const trimmed = value.trim();
-    return trimmed ? trimmed.slice(0, 12000) : null;
-  };
-  const activeGroup = layoutState.groups[layoutState.activeGroupId] ?? null;
-  const activePanel = activeGroup?.activePanelId ?? null;
-  const openPanelIds = Object.values(layoutState.groups)
-    .flatMap((group) => group.panelIds)
-    .filter((panelId): panelId is string => typeof panelId === "string" && panelId.trim().length > 0)
-    .slice(0, 24);
-  const clipCalculatorTextForAskTurn = (value: unknown, max = 800): string | null => {
-    if (typeof value !== "string") return null;
-    const trimmed = value.trim();
-    return trimmed ? trimmed.slice(0, max) : null;
-  };
-  const calculatorRecentDebugEvents = calculatorState.debugEvents.slice(0, 5).map((event) => ({
-    action_id: event.action_id,
-    ok: event.ok,
-    input_latex: clipCalculatorTextForAskTurn(event.input_latex, 400),
-    result_text: clipCalculatorTextForAskTurn(event.result_text, 400),
-    normalized_expression: clipCalculatorTextForAskTurn(event.normalized_expression, 400),
-    message: clipCalculatorTextForAskTurn(event.message, 240),
-    ts: event.ts,
-  }));
-  const activeCalculatorContext = {
-    schema: "helix.scientific_calculator_active_context.v1",
-    panel_id: "scientific-calculator",
-    active_panel: activePanel === "scientific-calculator",
-    current_latex: clipCalculatorTextForAskTurn(calculatorState.currentLatex),
-    last_result_text: clipCalculatorTextForAskTurn(calculatorState.lastSolve?.result_text),
-    last_normalized_expression: clipCalculatorTextForAskTurn(calculatorState.lastSolve?.normalized_expression),
-    last_trace_id: clipCalculatorTextForAskTurn(calculatorState.lastSolve?.trace?.traceId, 240),
-    last_ok: calculatorState.lastSolve?.ok ?? null,
-    step_count: calculatorState.steps.length,
-    recent_debug_events: calculatorRecentDebugEvents,
-  };
   const docContext = resolveAskTurnDocViewerSnapshotPath();
-  const currentPath = docContext.path;
-  const docContextSource = docContext.source;
-  const activeNoteId = notesState.active_note_id ?? null;
-  const activeNote = activeNoteId ? notesState.notes[activeNoteId] ?? null : null;
-  const lastCreatedNoteId = notesState.order[0] ?? null;
-  const lastCreatedNote = lastCreatedNoteId ? notesState.notes[lastCreatedNoteId] ?? null : null;
   const situationRoomState = useSituationRoomStore.getState();
   const situationRoomJobState = useSituationRoomJobStore.getState();
   const situationRoomContext = selectSituationRoomAskContextSnapshot(
@@ -6992,58 +4968,16 @@ function buildAskTurnWorkspaceContextSnapshot(sessionId: string | null | undefin
     situationRoomJobState.last_attached_job_id,
   );
   const situationCaptureContext = buildSituationRoomCaptureContext(situationRoomState);
-  const recentNotes = notesState.order.slice(0, 8).flatMap((noteId) => {
-    const note = notesState.notes[noteId] ?? null;
-    if (!note?.title) return [];
-    return [{
-      id: note.id,
-      title: note.title,
-      body: clipNoteBodyForAskTurn(note.body),
-    }];
-  });
-  const hasNoteContext =
-    Boolean(activeNote?.title) ||
-    Boolean(lastCreatedNote?.title) ||
-    Object.values(layoutState.groups).some((group) => group.panelIds.includes("workstation-notes"));
-  return {
-    sessionId: sessionId ?? "helix-ui",
-    activePanel,
-    activeGroupId: layoutState.activeGroupId,
-    groupCount: Object.keys(layoutState.groups).length,
-    openPanels: [...new Set(openPanelIds)].sort((a, b) => a.localeCompare(b)),
-    activeCalculatorContext,
-    hasCalculatorContext: activePanel === "scientific-calculator" && (
-      Boolean(activeCalculatorContext.current_latex) ||
-      Boolean(activeCalculatorContext.last_result_text) ||
-      calculatorRecentDebugEvents.length > 0
-    ),
-    activeDocPath: currentPath,
-    source: docContextSource,
-    hasDocContext: Boolean(currentPath),
-    docContextValid: Boolean(currentPath),
-    docContextPath: currentPath,
-    docContextSource: currentPath ? docContextSource : null,
-    docContextFailureReason: currentPath
-      ? null
-      : activePanel === "docs-viewer"
-        ? "docs_panel_open_without_active_doc_path"
-        : "no_docs_panel_or_active_doc_path",
-    activeNoteId,
-    activeNoteTitle: activeNote?.title ?? null,
-    activeNoteBody: clipNoteBodyForAskTurn(activeNote?.body),
-    lastCreatedNoteId,
-    lastCreatedNoteTitle: lastCreatedNote?.title ?? null,
-    lastCreatedNoteBody: clipNoteBodyForAskTurn(lastCreatedNote?.body),
-    recentNotes,
-    hasNoteContext,
+  return buildAskTurnWorkspaceContextSnapshotFromState({
+    sessionId,
+    layoutState,
+    notesState,
+    calculatorState,
+    docContext,
     situationRoomContext,
     situationCaptureContext,
-    hasSituationRoomContext: Boolean(situationRoomContext),
-    hasClipboardContext: Object.values(layoutState.groups).some((group) =>
-      group.panelIds.includes("workstation-clipboard-history"),
-    ),
     lastUpdatedAtMs: Date.now(),
-  };
+  });
 }
 
 function buildReplyMasterEventClockExport(args: {
@@ -8124,18 +6058,35 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
     trustedTerminalAuthoritySource ||
     coerceText(terminalResultForDebug?.final_answer_source).trim() ||
     (terminalErrorCode ? "typed_failure" : null);
+  const projectionBackendEntrypointRequired = requiresHelixAskBackendEntrypoint(
+    reply.question ?? coerceText(payload.selectedDebugQuestion).trim() ?? "",
+  );
+  const projectionBackendEntrypointObserved =
+    typeof agentLoop?.ask_entrypoint_observed === "boolean"
+      ? agentLoop.ask_entrypoint_observed
+      : typeof debug?.ask_entrypoint_observed === "boolean"
+        ? debug.ask_entrypoint_observed
+        : typeof payload.ask_entrypoint_observed === "boolean"
+          ? payload.ask_entrypoint_observed
+          : null;
+  const projectionBackendEntrypointBlocked =
+    projectionBackendEntrypointRequired && projectionBackendEntrypointObserved === false;
+  const effectiveTerminalErrorCode =
+    projectionBackendEntrypointBlocked ? HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE : terminalErrorCode;
+  const effectiveTerminalArtifactKind = projectionBackendEntrypointBlocked ? "typed_failure" : terminalArtifactKind;
+  const effectiveFinalAnswerSource = projectionBackendEntrypointBlocked ? "typed_failure" : finalAnswerSource;
   const terminalIsTypedFailure =
-    terminalArtifactKind === "typed_failure" ||
-    finalAnswerSource === "typed_failure" ||
-    Boolean(terminalErrorCode);
+    effectiveTerminalArtifactKind === "typed_failure" ||
+    effectiveFinalAnswerSource === "typed_failure" ||
+    Boolean(effectiveTerminalErrorCode);
   const typedFailureText =
     coerceText(payload.terminal_failure_text).trim() ||
     coerceText(typedFailure?.message).trim() ||
-    (terminalErrorCode === HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE
+    (effectiveTerminalErrorCode === HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE
       ? HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT
       : null) ||
     terminalAuthorityText ||
-    renderTypedFailureFallback(terminalErrorCode);
+    renderTypedFailureFallback(effectiveTerminalErrorCode);
   const selectedFinalAnswerCandidateRaw =
     terminalAuthoritySuccessForDebug
       ? terminalAuthorityText
@@ -8493,9 +6444,9 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
     active_prompt: activePrompt,
     active_prompt_hash: stableHelixProjectionHash(activePrompt),
     selected_final_answer: selectedFinalAnswer,
-    final_answer_source: clientProgressPlaceholderExport ? null : finalAnswerSource,
-    terminal_artifact_kind: terminalArtifactKind,
-    terminal_error_code: terminalErrorCode,
+    final_answer_source: clientProgressPlaceholderExport ? null : effectiveFinalAnswerSource,
+    terminal_artifact_kind: effectiveTerminalArtifactKind,
+    terminal_error_code: effectiveTerminalErrorCode,
     ask_entrypoint_required: askEntrypointRequired,
     ask_entrypoint_observed: askEntrypointObserved,
     ask_entrypoint_failure_code: askEntrypointFailureCode,
@@ -8534,8 +6485,8 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
         coerceText(resolvedTurnSummary?.resolved_route_label).trim() ||
         coerceText(payload.debugAuditSummary && readAgentLoopAuditRecord(payload.debugAuditSummary)?.route).trim() ||
         "unknown",
-      terminal_artifact_kind: terminalArtifactKind,
-      terminal_error_code: terminalErrorCode,
+      terminal_artifact_kind: effectiveTerminalArtifactKind,
+      terminal_error_code: effectiveTerminalErrorCode,
       pending_server_request_present: Boolean(agentLoop?.pending_request),
     },
     canonical_goal_frame: canonicalGoalFrame,
@@ -8698,7 +6649,7 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
       checks: [
         { check: "projection_only_patch", passed: true, evidence: "debug_export" },
         { check: "no_goal_mutation", passed: true, evidence: coerceText(readAgentLoopAuditRecord(debug?.canonical_goal_frame)?.goal_kind).trim() || "unknown" },
-        { check: "no_terminal_mutation", passed: true, evidence: terminalArtifactKind ?? "none" },
+        { check: "no_terminal_mutation", passed: true, evidence: effectiveTerminalArtifactKind ?? "none" },
         { check: "active_turn_only", passed: true, evidence: canonicalActiveTurnId },
         { check: "no_dom_scrape_source", passed: true, evidence: "reply_payload" },
         { check: "receipt_not_fabricated", passed: true, evidence: receipt ? "current_turn_ledger" : "no_workspace_receipt" },
@@ -8876,17 +6827,7 @@ export type DebugClipboardCopyResult = {
   error?: string;
 };
 
-type DebugExportDrawerState = {
-  replyId: string;
-  payload: string;
-  payloadHash: string;
-  result: DebugExportUiResult;
-} | null;
-
-function isBackendAskTurnDebugExportEligibleTurnId(turnId: string): boolean {
-  const trimmed = turnId.trim();
-  return Boolean(trimmed && (trimmed.startsWith("ask:") || /(?:^|:)ask:[^:]+/i.test(trimmed)));
-}
+const isBackendAskTurnDebugExportEligibleTurnId = isHelixAskLegacyBackendDebugExportEligibleTurnId;
 
 const waitForDebugClipboardReadback = async (attempt: number): Promise<void> => {
   const delayMs = [100, 250, 500, 900][Math.min(attempt, 3)] ?? 900;
@@ -8941,57 +6882,54 @@ async function resolveAuthoritativeDebugExportPayload(localPayload: string): Pro
   } catch {
     return localPayload;
   }
-  const projectionPayload = (status: string, extra: Record<string, unknown> = {}) =>
-    JSON.stringify({
+  const readDebugBoolean = (value: unknown): boolean | null => {
+    if (typeof value === "boolean") return value;
+    const text = coerceText(value).trim().toLowerCase();
+    if (text === "true") return true;
+    if (text === "false") return false;
+    return null;
+  };
+  const projectionPayload = (status: string, extra: Record<string, unknown> = {}) => {
+    const askEntrypointRequired = readDebugBoolean(parsed.ask_entrypoint_required) === true;
+    const askEntrypointObserved = readDebugBoolean(parsed.ask_entrypoint_observed);
+    const askEntrypointFailureCode = coerceText(parsed.ask_entrypoint_failure_code).trim();
+    const backendEntrypointBlocked = askEntrypointRequired && askEntrypointObserved === false;
+    const projected = {
       ...parsed,
       debug_export_source: status === "not_advertised"
         ? "client_projection"
         : "client_projection_backend_unresolved",
       backend_debug_response_status: status,
       ...extra,
-    }, null, 2);
-  const activeTurnId = coerceText(parsed.active_turn_id).trim();
-  const rebuildReason = coerceText(parsed.debug_export_rebuild_reason).trim();
-  const isReplyScopedRebuild =
-    rebuildReason === "empty_payload" ||
-    rebuildReason === "payload_reply_mismatch" ||
-    rebuildReason === "invalid_json_payload" ||
-    rebuildReason === "rendered_reply" ||
-    rebuildReason === "rendered_button_scope";
-  const parsedDebug = readAgentLoopAuditRecord(parsed.debug);
-  const refCandidates = [
-    readAgentLoopAuditRecord(parsed.backend_debug_response_ref),
-    readAgentLoopAuditRecord(parsed.debug_export_ref),
-    readAgentLoopAuditRecord(parsedDebug?.backend_debug_response_ref),
-    readAgentLoopAuditRecord(parsedDebug?.debug_export_ref),
-  ].filter((entry): entry is Record<string, unknown> =>
-    Boolean(entry && coerceText(entry.endpoint).trim().startsWith("/api/agi/ask/turn/")),
-  );
-  const activeTurnFallbackRef = isBackendAskTurnDebugExportEligibleTurnId(activeTurnId)
-    ? {
-        endpoint: `/api/agi/ask/turn/${encodeURIComponent(activeTurnId)}/debug-export`,
-        turn_id: activeTurnId,
-      }
-    : null;
-  const matchingBackendRef = refCandidates.find((entry) => {
-    const candidateTurnId = coerceText(entry.turn_id).trim();
-    return activeTurnId && candidateTurnId === activeTurnId;
-  });
-  if (isReplyScopedRebuild && !matchingBackendRef && !activeTurnFallbackRef) {
+      ...(backendEntrypointBlocked
+        ? {
+            selected_final_answer: HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT,
+            visible_final_answer: HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT,
+            final_answer_source: "typed_failure",
+            terminal_artifact_kind: "typed_failure",
+            terminal_error_code: askEntrypointFailureCode || HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE,
+            ask_entrypoint_required: true,
+            ask_entrypoint_observed: false,
+            ask_entrypoint_failure_code: askEntrypointFailureCode || HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE,
+            blocked_projection_kind: "client_projection",
+            first_broken_rail: "backend_ask_entrypoint",
+            repair_target: "prompt_submit_entrypoint",
+          }
+        : {}),
+    };
+    return JSON.stringify(projected, null, 2);
+  };
+  const backendTarget = resolveHelixAskLegacyDebugExportBackendTarget(parsed);
+  const activeTurnId = backendTarget.activeTurnId;
+  if (backendTarget.status === "not_advertised") {
     return projectionPayload("not_advertised", { backend_debug_response_ref: undefined });
   }
-  const backendRef =
-    matchingBackendRef ??
-    (isReplyScopedRebuild ? null : refCandidates[0]) ??
-    activeTurnFallbackRef;
-  const endpoint = coerceText(backendRef?.endpoint).trim();
-  const backendTurnId = coerceText(backendRef?.turn_id).trim();
-  if (!endpoint || !endpoint.startsWith("/api/agi/ask/turn/")) {
-    return projectionPayload("not_advertised", { backend_debug_response_ref: undefined });
-  }
-  if (backendTurnId && activeTurnId && backendTurnId !== activeTurnId) {
+  const backendRef = backendTarget.backendRef;
+  if (backendTarget.status === "turn_mismatch") {
     return projectionPayload("turn_mismatch", { backend_debug_response_ref: backendRef });
   }
+  const endpoint = backendTarget.endpoint;
+  if (!endpoint) return projectionPayload("not_advertised", { backend_debug_response_ref: undefined });
   try {
     const response = await fetch(endpoint, {
       method: "GET",
@@ -9653,17 +7591,6 @@ const HELIX_ASK_TURN_CLIENT_WATCHDOG_MS = clampNumber(
 const HELIX_ASK_PATH_REGEX =
   /(?:[A-Za-z0-9_.-]+[\\/])+[A-Za-z0-9_.-]+\.(?:tsx|ts|jsx|js|md|json|cjs|mjs|py|yml|yaml)/g;
 
-const HELIX_PANEL_ALIASES: Array<{ id: PanelDefinition["id"]; aliases: string[] }> = [
-  { id: "helix-noise-gens", aliases: ["noise gens", "noise generators", "noise generator"] },
-  { id: "alcubierre-viewer", aliases: ["warp bubble", "warp viewer", "alcubierre", "warp visualizer"] },
-  { id: "live-energy", aliases: ["live energy", "energy pipeline", "pipeline"] },
-  { id: "live-energy", aliases: ["helix core", "core"] },
-  { id: "docs-viewer", aliases: ["docs", "documentation", "papers"] },
-  { id: "resonance-orchestra", aliases: ["resonance", "resonance orchestra"] },
-  { id: "workstation-workflow-timeline", aliases: ["workflow timeline", "tool trace", "helix trace", "helix timeline", "conversation panel"] },
-  { id: "agi-essence-console", aliases: ["essence console", "legacy essence console"] },
-];
-
 const HELIX_DOC_TOPIC_PATH_HINTS: Array<{ pattern: RegExp; path: string }> = [
   {
     pattern: /\bnhm2\b/i,
@@ -9682,137 +7609,19 @@ const HELIX_ASK_EQUATION_CALCULATOR_PANEL_ID: PanelDefinition["id"] = "scientifi
 
 const HELIX_ATOMIC_LAUNCH_EVENT = "helix:atomic-launch";
 const HELIX_ATOMIC_LAUNCH_STORAGE_KEY = "helix.atomic.launch.v1";
-const HELIX_DOCS_SUMMARY_REQUEST_RE =
-  /\b(?:summari[sz]e|summary|explain|describe|tldr|tl;dr)\b[\s\S]*\b(?:doc|docs|document|read(?:ing)?|current)\b/i;
-const HELIX_DOCS_VIEWER_CONTEXT_RE = /\bcurrent\s+docs?\s+viewer\s+context\b/i;
-const HELIX_DOCS_PATH_LITERAL_RE =
-  /\bdocument\s+path:\s*\/?docs\/[^\s]+|\/?docs\/[^\s]+\.(?:md|mdx|txt|rst|adoc)\b/i;
 
-const shouldSuppressAtomicViewerLaunch = (args: {
-  question?: string | null;
-  mode?: "read" | "observe" | "act" | "verify";
-}): boolean => {
-  const question = (args.question ?? "").trim();
-  if (!question) return false;
-  const docsSummaryCue = HELIX_DOCS_SUMMARY_REQUEST_RE.test(question);
-  if (!docsSummaryCue) return false;
-  return HELIX_DOCS_VIEWER_CONTEXT_RE.test(question) || HELIX_DOCS_PATH_LITERAL_RE.test(question);
-};
-
-function normalizePanelQuery(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-}
-
-function resolvePanelIdFromText(value: string): PanelDefinition["id"] | null {
-  const normalized = normalizePanelQuery(value);
-  if (!normalized) return null;
-  for (const entry of HELIX_PANEL_ALIASES) {
-    if (!getPanelDef(entry.id)) continue;
-    if (entry.aliases.some((alias) => normalized.includes(alias))) {
-      return entry.id;
-    }
-  }
-  const tokens = normalized.split(/\s+/).filter(Boolean);
-  let bestId: PanelDefinition["id"] | null = null;
-  let bestScore = 0;
-  for (const panel of panelRegistry) {
-    if (!getPanelDef(panel.id)) continue;
-    const haystack = `${panel.title} ${panel.id} ${(panel.keywords ?? []).join(" ")}`.toLowerCase();
-    let score = 0;
-    for (const token of tokens) {
-      if (haystack.includes(token)) score += 1;
-    }
-    if (score > bestScore) {
-      bestScore = score;
-      bestId = panel.id;
-    }
-  }
-  return bestScore > 0 ? bestId : null;
-}
-
-function resolvePanelIdFromPath(value: string): PanelDefinition["id"] | null {
-  const normalized = value.replace(/\\/g, "/").toLowerCase();
-  if ((/(^|\/)docs\//i.test(normalized) || /\.md$/i.test(normalized)) && getPanelDef("docs-viewer")) {
-    return "docs-viewer";
-  }
-  return null;
-}
-
-function parseOpenPanelCommand(value: string): PanelDefinition["id"] | null {
-  const match = value.trim().match(/^(?:\/open|open|show|launch)\s+(.+)/i);
-  if (!match) return null;
-  const raw = match[1].replace(/^(the|panel|window)\s+/i, "").trim();
-  const lowerRaw = raw.toLowerCase();
-  const conversationalDocIntent =
-    /\b(?:doc|docs|documentation|paper|report|publication|research)\b/.test(lowerRaw) &&
-    /\b(?:about|for|on|regarding)\b/.test(lowerRaw);
-  const readAloudIntent = /\b(?:read|aloud|out loud|speak|narrate|voice)\b/.test(lowerRaw);
-  if (conversationalDocIntent || readAloudIntent) return null;
-  return resolvePanelIdFromText(raw);
-}
-
-function restateWorkstationSubgoal(value: string): string {
-  const cleaned = value
-    .trim()
-    .replace(/^["'\s]+|["'\s]+$/g, "")
-    .replace(/^question\s*:\s*/i, "")
-    .replace(/^(?:hey|hi)\s+(?:helix|dottie)\s*,?\s*/i, "")
-    .replace(/^(?:can|could|would)\s+you\s+/i, "")
-    .replace(/^please\s+/i, "")
-    .trim();
-  const summarizeOrExplainIntent =
-    /\b(?:summari[sz]e|summary|tldr|tl;dr|explain|break\s+down|walk\s+me\s+through|what\s+does)\b/i.test(
-      cleaned,
-    );
-  if (summarizeOrExplainIntent) {
-    return cleaned;
-  }
-  const paperReadTopic =
-    cleaned.match(
-      /\b(?:read|open|show|find|search|look|pick|bring|pull)\b[\s\S]*?\b(?:paper|papers|research|publication|report|doc|document)\b[\s\S]*?\b(?:about|on|for|regarding)\s+(.+?)(?:[.?!]|$)/i,
-    )?.[1]?.trim() ??
-    cleaned.match(/\b(?:paper|papers|doc|document)\s+(?:about|on|for|regarding)\s+(.+?)(?:[.?!]|$)/i)?.[1]?.trim();
-
-  if (paperReadTopic) {
-    return `find a paper about ${paperReadTopic} and open it and read it to me`;
-  }
-  return cleaned;
-}
-
-function normalizeWorkstationCommandText(value: string): string {
-  const normalizedQuotes = value.replace(/[“”]/g, "\"").replace(/[‘’]/g, "'");
-  const collapsedWhitespace = normalizedQuotes.replace(/\s+/g, " ").trim();
-  if (!collapsedWhitespace) return "";
-  return collapsedWhitespace
-    .replace(/\boutloud\b/gi, "out loud")
-    .replace(/\b(?:pull|bring)\s+up\b/gi, "open")
-    .replace(/\bpop\s+open\b/gi, "open")
-    .replace(/\bopen\s+up\b/gi, "open")
-    .replace(/\bjump\s+(?:over\s+)?to\b/gi, "go to")
-    .replace(/\bread\s+(this|current)\s+to\s+me\b/gi, (_match, referent: string) => {
-      return `read ${referent.toLowerCase()} doc to me`;
-    })
-    .replace(/\bread\s+(this|current)\s+(?:aloud|out\s+loud)\b/gi, (_match, referent: string) => {
-      return `read ${referent.toLowerCase()} doc to me`;
-    })
-    .replace(/\bnarrate\s+(this|current)\s+to\s+me\b/gi, (_match, referent: string) => {
-      return `read ${referent.toLowerCase()} doc to me`;
-    })
-    .replace(/\bnarrate\s+(this|current)\s+(?:aloud|out\s+loud)\b/gi, (_match, referent: string) => {
-      return `read ${referent.toLowerCase()} doc to me`;
-    })
-    .replace(/\b(this|current)\s+file\b/gi, (_match, referent: string) => {
-      return `${referent.toLowerCase()} doc`;
-    })
-    .replace(/\bnote\s*pad\b/gi, "note")
-    .replace(/\bnotepad\b/gi, "note")
-    .replace(/\bclip\s*board\b/gi, "clipboard")
-    .replace(/\bcopy\s+that\s+to\s+clipboard\b/gi, "copy this to clipboard")
-    .replace(/\bcopy\s+it\s+to\s+clipboard\b/gi, "copy this to clipboard")
-    .replace(/\bappend\s+that\s+to\s+my\s+note\b/gi, "append this to my note")
-    .replace(/\s+/g, " ")
-    .trim();
-}
+const buildWorkstationPanelResolverConfig = (): WorkstationPanelResolverConfig<PanelDefinition["id"]> => ({
+  panels: panelRegistry.map((panel) => ({
+    id: panel.id,
+    title: panel.title,
+    keywords: panel.keywords,
+  })),
+  hasPanel: (panelId) => Boolean(getPanelDef(panelId)),
+  aliases: HELIX_WORKSTATION_PANEL_ALIASES as readonly {
+    id: PanelDefinition["id"];
+    aliases: readonly string[];
+  }[],
+});
 
 function supportsPanelAction(panelId: string, actionId: string): boolean {
   const capabilities = getWorkstationPanelCapabilities(panelId);
@@ -9832,19 +7641,6 @@ function buildLexiconPanelAction(
     action_id: actionId,
     args,
   };
-}
-
-function normalizeLexiconAlias(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/\bopen\s+up\b/g, "open")
-    .replace(
-      /^(?:ok|okay|please|pls|can\s+you|could\s+you|would\s+you|will\s+you|let'?s|kindly)\b[\s,.-]*/g,
-      "",
-    )
-    .replace(/\b(?:the|my)\b/g, " ")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
 }
 
 function resolveCapabilityAliasPanelAction(source: string): HelixWorkstationAction | null {
@@ -10676,145 +8472,6 @@ export function parseWorkstationActionCommand(value: string): HelixWorkstationAc
   return null;
 }
 
-function stripPromptEcho(response: unknown, question?: string): string {
-  let trimmed = stripQuestionPrefixText(coerceText(response).trim(), question);
-  trimmed = stripLeadingQuestion(trimmed, question);
-  trimmed = stripEvidencePromptBlock(trimmed);
-  trimmed = stripAnswerBoundaryPrefix(trimmed);
-  const answerBlock = extractAnswerBlock(trimmed);
-  if (answerBlock) {
-    return answerBlock;
-  }
-  if (!trimmed) return trimmed;
-  const markers = ["FINAL:", "FINAL ANSWER:", "FINAL_ANSWER:", "Answer:"];
-  for (const marker of markers) {
-    const index = trimmed.lastIndexOf(marker);
-    if (index >= 0) {
-      const after = trimmed.slice(index + marker.length).trim();
-      if (after) return after;
-    }
-  }
-  const isScaffoldLine = (line: string) => {
-    const cleaned = line
-      .trim()
-      .replace(/^[>"'`*#\-\d\.\)\s]+/, "")
-      .trim();
-    if (!cleaned) return true;
-    const lowered = cleaned.toLowerCase();
-    return (
-      lowered.startsWith("you are helix ask") ||
-      lowered.startsWith("use only the evidence") ||
-      lowered.startsWith("use only the evidence steps") ||
-      lowered.startsWith("use only the evidence bullets") ||
-      lowered.startsWith("use general knowledge") ||
-      lowered.startsWith("use only the reasoning") ||
-      lowered.startsWith("revise the answer") ||
-      lowered.startsWith("do not add new claims") ||
-      lowered.startsWith("preserve the format") ||
-      lowered.startsWith("keep the paragraph format") ||
-      lowered.startsWith("keep the numbered step list") ||
-      lowered.startsWith("use only file paths") ||
-      lowered.startsWith("evidence:") ||
-      lowered.startsWith("answer:") ||
-      lowered.startsWith("if the context is insufficient") ||
-      lowered.startsWith("if the question mentions") ||
-      lowered.startsWith("when the context includes") ||
-      lowered.startsWith("if the question is comparative") ||
-      lowered.startsWith("answer in") ||
-      lowered.startsWith("do not use numbered steps") ||
-      lowered.startsWith("start directly with") ||
-      lowered.startsWith("each step should") ||
-      lowered.startsWith("after the steps") ||
-      lowered.startsWith("avoid repetition") ||
-      lowered.startsWith("preserve any stage tags") ||
-      lowered.startsWith("do not include stage tags") ||
-      lowered.startsWith("do not include the words") ||
-      lowered.startsWith("do not output tool logs") ||
-      lowered.startsWith("do not repeat the question") ||
-      lowered.startsWith("end with a short paragraph") ||
-      lowered.startsWith("respond with only the answer between") ||
-      /^answer_(?:start|end)\b/i.test(cleaned) ||
-      lowered.startsWith("no preamble") ||
-      lowered.startsWith("no headings") ||
-      lowered.startsWith("ask debug") ||
-      lowered.startsWith("two-pass:") ||
-      lowered.startsWith("format:") ||
-      lowered.startsWith("stage tags:") ||
-      lowered.startsWith("question:") ||
-      lowered.includes("question:") ||
-      lowered.startsWith("context:") ||
-      lowered.startsWith("prompt context") ||
-      lowered.startsWith("context sources") ||
-      lowered.startsWith("resonance patch:") ||
-      lowered.startsWith("knowledge projects:") ||
-      lowered.startsWith("evidence steps:") ||
-      lowered.startsWith("evidence bullets:") ||
-      lowered.startsWith("reasoning steps:") ||
-      lowered.startsWith("reasoning bullets:") ||
-      lowered.startsWith("final:")
-    );
-  };
-  const cleanedLines = trimmed
-    .split(/\r?\n/)
-    .filter((line) => !isScaffoldLine(line))
-    .map((line) => stripAnswerBoundaryPrefix(line));
-  const cleaned = cleanedLines.join("\n").trim();
-  const formatSpec = decideHelixAskFormat(question);
-  if (cleaned) {
-    return formatSpec.stageTags ? cleaned : stripStageTags(cleaned);
-  }
-  return formatSpec.stageTags
-    ? trimmed
-    : stripStageTags(stripAnswerBoundaryPrefix(trimmed));
-}
-
-function extractAnswerBlock(value: string): string {
-  if (!value) return "";
-  const splitSegments = value
-    .split(HELIX_ASK_ANSWER_MARKER_SPLIT_RE)
-    .map((segment) => stripAnswerBoundaryPrefix(segment).trim())
-    .filter(Boolean);
-  if (splitSegments.length > 0) {
-    const longest = splitSegments.reduce((best, candidate) =>
-      best.length >= candidate.length ? best : candidate,
-    "");
-    if (longest) return longest;
-  }
-  const startIndex = value.lastIndexOf("ANSWER_START");
-  if (startIndex >= 0) {
-    const afterStart = value.slice(startIndex + "ANSWER_START".length);
-    const endIndex = afterStart.lastIndexOf("ANSWER_END");
-    const slice = endIndex >= 0 ? afterStart.slice(0, endIndex) : afterStart;
-    const trimmed = stripAnswerBoundaryPrefix(slice).trim();
-    if (trimmed) return trimmed;
-  }
-  const boundaryTrimmed = stripAnswerBoundaryPrefix(value);
-  if (boundaryTrimmed) {
-    return boundaryTrimmed;
-  }
-  const markers = ["FINAL:", "FINAL ANSWER:", "FINAL_ANSWER:", "Answer:"];
-  for (const marker of markers) {
-    const index = value.lastIndexOf(marker);
-    if (index >= 0) {
-      const after = value.slice(index + marker.length).trim();
-      if (after) return after;
-    }
-  }
-  return "";
-}
-
-function stripEvidencePromptBlock(value: string): string {
-  if (!value) return value;
-  const lines = value.split(/\r?\n/);
-  const cleaned = lines.map((line) => cleanPromptLine(line));
-  const evidenceIndex = cleaned.findIndex((line) => /^evidence\s*:/i.test(line));
-  if (evidenceIndex < 0) return value;
-  const answerIndex = cleaned.findIndex((line, index) => index > evidenceIndex && /^answer\s*:/i.test(line));
-  if (answerIndex < 0) return value;
-  const pruned = [...lines.slice(0, evidenceIndex), ...lines.slice(answerIndex + 1)];
-  return pruned.join("\n").trim();
-}
-
 export function HelixAskPill({
   contextId,
   className,
@@ -10969,7 +8626,7 @@ export function HelixAskPill({
     askRepliesRef.current = askReplies;
   }, [askReplies]);
   const [copiedReplyMasterDebugId, setCopiedReplyMasterDebugId] = useState<string | null>(null);
-  const [debugExportDrawer, setDebugExportDrawer] = useState<DebugExportDrawerState>(null);
+  const [debugExportDrawer, setDebugExportDrawer] = useState<HelixAskDebugExportDrawerState>(null);
   const chronologicalAskRepliesForState = useMemo(
     () => sortHelixAskRepliesChronologically(askReplies),
     [askReplies],
@@ -11347,16 +9004,12 @@ export function HelixAskPill({
   const [askActiveQuestion, setAskActiveQuestion] = useState<string | null>(null);
   const [askMood, setAskMood] = useState<LumaMood>("question");
   const [askMoodBroken, setAskMoodBroken] = useState(false);
-  const [voiceTimelineBuildInfo, setVoiceTimelineBuildInfo] = useState<VoiceTimelineBuildInfo>(() => ({
-    clientBuild: readVoiceTimelineClientBuildStamp(),
-    clientMode: import.meta.env?.DEV ? "dev" : "prod",
-    serverService: null,
-    serverVersion: null,
-    serverGitSha: null,
-    serverBuildTime: null,
-    fetchedAtMs: null,
-    error: null,
-  }));
+  const [voiceTimelineBuildInfo, setVoiceTimelineBuildInfo] = useState<HelixAskVoiceTimelineBuildInfo>(() =>
+    buildHelixAskVoiceTimelineInitialBuildInfo({
+      clientBuild: readVoiceTimelineClientBuildStamp(),
+      isDev: import.meta.env?.DEV === true,
+    }),
+  );
   const voiceTimelineBuildEventAtMsRef = useRef<number>(Date.now());
   const [isOffline, setIsOffline] = useState<boolean>(() => {
     if (typeof navigator === "undefined") return false;
@@ -11790,27 +9443,14 @@ export function HelixAskPill({
           buildTime?: unknown;
         };
         if (cancelled) return;
-        setVoiceTimelineBuildInfo((current) => ({
-          ...current,
-          serverService: typeof payload.service === "string" && payload.service.trim() ? payload.service.trim() : null,
-          serverVersion: typeof payload.version === "string" && payload.version.trim() ? payload.version.trim() : null,
-          serverGitSha: typeof payload.gitSha === "string" && payload.gitSha.trim() ? payload.gitSha.trim() : null,
-          serverBuildTime:
-            typeof payload.buildTime === "string" && payload.buildTime.trim() ? payload.buildTime.trim() : null,
-          fetchedAtMs: Date.now(),
-          error: null,
-        }));
+        setVoiceTimelineBuildInfo((current) =>
+          applyHelixAskVoiceTimelineVersionPayload(current, payload, Date.now()),
+        );
       } catch (error) {
         if (cancelled) return;
-        const message =
-          error instanceof Error && error.message.trim()
-            ? error.message.trim()
-            : "version_unavailable";
-        setVoiceTimelineBuildInfo((current) => ({
-          ...current,
-          fetchedAtMs: Date.now(),
-          error: message,
-        }));
+        setVoiceTimelineBuildInfo((current) =>
+          applyHelixAskVoiceTimelineVersionError(current, error, Date.now()),
+        );
       }
     };
     void fetchBuildInfo();
@@ -13249,7 +10889,10 @@ export function HelixAskPill({
         if (start > lastIndex) {
           parts.push(text.slice(lastIndex, start));
         }
-        const panelId = resolvePanelIdFromPath(matchText);
+        const panelId = resolvePanelIdFromPath(matchText, {
+          docsPanelId: "docs-viewer",
+          hasPanel: (panelId) => Boolean(getPanelDef(panelId)),
+        });
         if (panelId) {
           parts.push(
             <button
@@ -13523,7 +11166,10 @@ export function HelixAskPill({
 
   const handleCopyReply = useCallback(
     async (reply: HelixAskReply, textOverride?: string | null) => {
-      const text = coerceText(textOverride).trim() || buildCopyText(reply);
+      const text = resolveHelixAskLegacyTurnControlText({
+        visibleFinalAnswerText: textOverride,
+        fallbackCopyText: buildCopyText(reply),
+      });
       await copyHelixAskPlainTextToClipboard(text);
     },
     [buildCopyText],
@@ -13553,10 +11199,16 @@ export function HelixAskPill({
         const normalizedPayload = normalizeReplyMasterDebugPayload(reply, payload);
         const providedPayloadMatchesRenderedTurn =
           hasProvidedPayload && debugPayloadMatchesRenderedTurnPayload(payload, sourceElement);
-        const localExportPayload = providedPayloadMatchesRenderedTurn
-          ? normalizedPayload
-          : buildReplyScopedDebugExportFromRenderedButton(reply, sourceElement, "rendered_button_scope") ??
-            normalizedPayload;
+        const { localExportPayload } = selectHelixAskLegacyDebugCopyLocalPayload({
+          providedPayload: payload,
+          normalizedPayload,
+          renderedButtonScopedPayload: buildReplyScopedDebugExportFromRenderedButton(
+            reply,
+            sourceElement,
+            "rendered_button_scope",
+          ),
+          providedPayloadMatchesRenderedTurn,
+        });
         const exportPayload = boundHelixDebugExportTextForUi(
           await resolveAuthoritativeDebugExportPayload(localExportPayload),
         );
@@ -13565,47 +11217,25 @@ export function HelixAskPill({
         }
         publishZenGraphCurrentAnswerFromDebugExport(exportPayload);
         const copyResult = await copyDebugPayloadToClipboard(exportPayload);
-        let finalCopyResult: DebugClipboardCopyResult = copyResult;
         const payloadHash = copyResult.attempted_payload_hash ?? hashDebugExportText(exportPayload);
+        const drawerProjection = buildHelixAskDebugDrawerCopyProjection({
+          replyId: reply.id,
+          exportPayload,
+          payloadHash,
+          copyResult,
+        });
+        const finalCopyResult: DebugClipboardCopyResult = drawerProjection.finalCopyResult;
         if (typeof window !== "undefined") {
           (window as unknown as { __HELIX_LAST_UNIFIED_DEBUG_COPY_RESULT__?: DebugClipboardCopyResult }).__HELIX_LAST_UNIFIED_DEBUG_COPY_RESULT__ =
             copyResult;
         }
-        if (copyResult.ok) {
-          const drawerResult: DebugExportUiResult = {
-            ok: true,
-            attempted_payload_hash: payloadHash,
-            copied_payload_hash: copyResult.copied_payload_hash,
-            copied_text_length: copyResult.copied_text_length,
-            method: copyResult.method,
-            readback_match: copyResult.readback_match ?? "unavailable",
-            fallback_presented: false,
-            error: copyResult.error,
-          };
-          setDebugExportDrawer({
-            replyId: reply.id,
-            payload: exportPayload,
-            payloadHash,
-            result: drawerResult,
-          });
+        setDebugExportDrawer(drawerProjection.drawerState);
+        if (drawerProjection.copied) {
           setCopiedReplyMasterDebugId(reply.id);
           window.setTimeout(() => {
             setCopiedReplyMasterDebugId((current) => (current === reply.id ? null : current));
           }, 1400);
         } else {
-          const fallbackResult = buildDebugExportDrawerFallbackResult({
-            attemptedPayloadHash: payloadHash,
-            copiedTextLength: exportPayload.length,
-            readbackMatch: copyResult.readback_match,
-            error: copyResult.error,
-          });
-          finalCopyResult = fallbackResult;
-          setDebugExportDrawer({
-            replyId: reply.id,
-            payload: exportPayload,
-            payloadHash,
-            result: fallbackResult,
-          });
           if (typeof window !== "undefined") {
             (window as unknown as { __HELIX_LAST_UNIFIED_DEBUG_COPY_ERROR__?: string }).__HELIX_LAST_UNIFIED_DEBUG_COPY_ERROR__ =
               copyResult.error ?? "clipboard_write_failed";
@@ -16042,7 +13672,10 @@ export function HelixAskPill({
         }));
         return;
       }
-      const text = coerceText(textOverride).trim() || buildCopyText(reply);
+      const text = resolveHelixAskLegacyTurnControlText({
+        visibleFinalAnswerText: textOverride,
+        fallbackCopyText: buildCopyText(reply),
+      });
       if (!text) {
         setReadAloudByReply((prev) => ({
           ...prev,
@@ -20276,6 +17909,8 @@ export function HelixAskPill({
           voiceSpeechActiveRef.current === true,
         queueDepth: voiceTranscribeQueueRef.current.length + voiceConfirmedTurnQueueRef.current.length,
         activeDispatchCount: voiceAutoDispatchWindowRef.current.length,
+        maxQueueDepth: HELIX_VOICE_TRANSCRIBE_QUEUE_MAX,
+        isSimpleConversationTurnCandidate,
       });
       if (!governance.admitted) {
         updateVoiceDecisionBrief({
@@ -27658,7 +25293,9 @@ export function HelixAskPill({
         }
       }
       const panelCommand =
-        singleEntry && !HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG ? parseOpenPanelCommand(singleEntry) : null;
+        singleEntry && !HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG
+          ? parseOpenPanelCommand(singleEntry, buildWorkstationPanelResolverConfig())
+          : null;
       if (panelCommand) {
         const panelDef = getPanelDef(panelCommand);
         if (askInputRef.current) {
@@ -29194,37 +26831,14 @@ export function HelixAskPill({
           >
           {chronologicalAskReplies.map((reply) => {
             const replyEvents = resolveReplyEvents(reply);
-            const replyEventsChronological = [...replyEvents].sort((left, right) => {
-              const leftTs = resolveAskLiveEventTimestampMs(left);
-              const rightTs = resolveAskLiveEventTimestampMs(right);
-              if (leftTs !== null && rightTs !== null && leftTs !== rightTs) {
-                return leftTs - rightTs;
-              }
-              if (
-                typeof left.seq === "number" &&
-                Number.isFinite(left.seq) &&
-                typeof right.seq === "number" &&
-                Number.isFinite(right.seq) &&
-                left.seq !== right.seq
-              ) {
-                return left.seq - right.seq;
-              }
-              return left.id.localeCompare(right.id);
-            });
-            const replyDebugContextSummary = buildHelixAskDebugContextSummary(reply.debug, {
-              failReason:
-                typeof reply.debug?.helix_ask_fail_reason === "string"
-                  ? reply.debug.helix_ask_fail_reason
-                  : typeof reply.debug?.fail_reason === "string"
-                    ? reply.debug.fail_reason
-                    : null,
-              failClass:
-                typeof reply.debug?.helix_ask_fail_class === "string"
-                  ? reply.debug.helix_ask_fail_class
-                  : typeof reply.debug?.fail_class === "string"
-                    ? reply.debug.fail_class
-                    : null,
-            });
+            const replyEventsChronological = sortHelixAskLegacyReplyEventsChronologically(
+              replyEvents,
+              resolveAskLiveEventTimestampMs,
+            );
+            const replyDebugContextSummary = buildHelixAskDebugContextSummary(
+              reply.debug,
+              resolveHelixAskLegacyReplyFailContext(reply.debug),
+            );
             const replyMasterEventClockPayload = buildReplyMasterEventClockExport({
               reply,
               events: replyEventsChronological,
@@ -29284,33 +26898,22 @@ export function HelixAskPill({
               beats: replyBattleBeats,
               ambient: replyBattleAmbientState,
             });
-            const transcriptFinalRowText =
-              [...turnTranscriptRows]
-                .reverse()
-                .find((row) => row.label === "Final" && row.text && !isInvalidTerminalAnswerText(row.text))?.text ?? null;
             const chosenVisibleFinalText = chooseVisibleFinalText(reply) || transcriptTerminal.text || reply.content || "";
-            const chosenVisibleFinalIsTypedFailureBoundary =
-              /\bCause:\s*(?:equation_source_unavailable|calculator_evidence_unavailable|synthesis_unavailable)\b/i.test(chosenVisibleFinalText) ||
-              /^I looked for an NHM2 paper\/document with equation-bearing snippets/i.test(chosenVisibleFinalText);
-            const shouldUseTranscriptFinalRow =
-              Boolean(transcriptFinalRowText) &&
-              (
-                chosenVisibleFinalIsTypedFailureBoundary ||
-                visibleResolvedTurn.primary_terminal_label === "final_failure" ||
-                visibleResolvedTurn.primary_source_label.replace(/\s+/g, "_") === "typed_failure"
-              );
-            const finalAnswerRawText = shouldUseTranscriptFinalRow
-              ? transcriptFinalRowText ?? chosenVisibleFinalText
-              : chosenVisibleFinalText;
+            const { finalAnswerRawText } = selectHelixAskLegacyFinalAnswerText({
+              turnTranscriptRows,
+              chosenVisibleFinalText,
+              primaryTerminalLabel: visibleResolvedTurn.primary_terminal_label,
+              primarySourceLabel: visibleResolvedTurn.primary_source_label,
+              isInvalidTerminalAnswerText,
+            });
             const actualAgentProviderLabel = resolveHelixAskActualAgentProviderLabel(reply, agentRuntimeProviders);
             const transcriptAnswer = finalAnswerRawText;
             const actualAgentModelLabel = resolveHelixAskModelUsageLabel(reply);
-            const terminalMismatchForReply = Boolean(
-              transcriptTerminal.backendTerminalText &&
-                transcriptTerminal.text &&
-                normalizeTerminalAnswerText(transcriptTerminal.backendTerminalText) !==
-                  normalizeTerminalAnswerText(transcriptTerminal.text),
-            );
+            const terminalMismatchForReply = hasHelixAskLegacyTerminalMismatch({
+              backendTerminalText: transcriptTerminal.backendTerminalText,
+              visibleTerminalText: transcriptTerminal.text,
+              normalizeTerminalAnswerText,
+            });
             const liveAnswerTurnBridge = buildLiveAnswerTurnBridgeState({
               hasLiveState: stagePlayChatLedgerEvents.length > 0,
               stagePlayEvents: stagePlayChatLedgerEvents,
@@ -29318,6 +26921,11 @@ export function HelixAskPill({
             });
             const mailLoopRows = collectHelixMailLoopTranscriptRows(reply);
             const turnTranscriptRowsForStream = selectHelixAskConsoleTurnTranscriptRowsForStream(turnTranscriptRows);
+            const displayedFinalAnswerSourceLabel = resolveHelixAskLegacyFinalSourceLabel({
+              presentationSourceLabel: finalAnswerPresentation.sourceLabel,
+              finalAnswerSourceLabel,
+              transcriptTerminalSource: transcriptTerminal.source,
+            });
             const turnStreamRows = buildHelixContinuousTurnStreamRows({
               replyId: reply.id,
               question: reply.question,
@@ -29327,13 +26935,19 @@ export function HelixAskPill({
               liveAnswerTurnBridge,
               finalAnswerText: finalAnswerRawText,
               finalAnswerHeading: finalAnswerPresentation.heading,
-              finalAnswerSourceLabel: finalAnswerPresentation.sourceLabel || finalAnswerSourceLabel || transcriptTerminal.source,
+              finalAnswerSourceLabel: displayedFinalAnswerSourceLabel,
               terminalMismatch: terminalMismatchForReply,
             });
             const latestTurnBinding = buildHelixAskLatestTurnBinding({
               replyId: reply.id,
               latestReplyId: transcriptLatestAskReplyId,
               finalAnswerText: finalAnswerRawText,
+            });
+            const turnControlViewModel = buildHelixAskLegacyTurnControlViewModel({
+              latestTurnBinding,
+              showDebugCopy: userSettings.showHelixAskDebug,
+              browserAvailable: typeof window !== "undefined",
+              readAloudState: readAloudByReply[reply.id] ?? "idle",
             });
             return (
               <div key={reply.id}>
@@ -29352,8 +26966,7 @@ export function HelixAskPill({
                     finalAnswerTestId: latestTurnBinding.finalAnswerTestId,
                     stagePlayEventCount: stagePlayChatLedgerEvents.length,
                     finalAnswerRawText,
-                    finalAnswerSourceLabel:
-                      finalAnswerPresentation.sourceLabel || finalAnswerSourceLabel || transcriptTerminal.source,
+                    finalAnswerSourceLabel: displayedFinalAnswerSourceLabel,
                     backendTerminalAnswer: transcriptTerminal.backendTerminalText,
                     finalAnswerAuthority: finalAnswerPresentation.isDeterministicReceiptFallback
                       ? "receipt_fallback_not_reviewed"
@@ -29375,16 +26988,14 @@ export function HelixAskPill({
                         event.currentTarget,
                       ),
                     onReadAloud: () => void handleReadAloud(reply, latestTurnBinding.controlTarget.finalAnswerText),
-                    showDebugCopy: userSettings.showHelixAskDebug,
-                    debugCopyDisabled: typeof window === "undefined",
-                    copyFinalTestId: latestTurnBinding.copyFinalTestId,
-                    debugCopyTestId: latestTurnBinding.debugCopyTestId,
-                    readAloudTestId: latestTurnBinding.readAloudTestId,
-                    readAloudActive: shouldStopReadAloudOnButtonPress(readAloudByReply[reply.id] ?? "idle"),
-                    readAloudAriaLabel: shouldStopReadAloudOnButtonPress(readAloudByReply[reply.id] ?? "idle")
-                      ? "Stop reading"
-                      : "Read aloud",
-                    readAloudTitle: formatReadAloudButtonLabel(readAloudByReply[reply.id] ?? "idle"),
+                    showDebugCopy: turnControlViewModel.showDebugCopy,
+                    debugCopyDisabled: turnControlViewModel.debugCopyDisabled,
+                    copyFinalTestId: turnControlViewModel.copyFinalTestId,
+                    debugCopyTestId: turnControlViewModel.debugCopyTestId,
+                    readAloudTestId: turnControlViewModel.readAloudTestId,
+                    readAloudActive: turnControlViewModel.readAloudActive,
+                    readAloudAriaLabel: turnControlViewModel.readAloudAriaLabel,
+                    readAloudTitle: turnControlViewModel.readAloudTitle,
                     proofTrace: (replyDebugRecord as Record<string, unknown> | null | undefined)
                       ?.workstation_reasoning_trace,
                     jobReadyLinks,

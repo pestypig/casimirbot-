@@ -19,6 +19,9 @@ export const helixNativeProvider: HelixAgentProvider = {
   supports: {
     streaming: true,
     workstationTools: true,
+    capabilityLanes: true,
+    capabilityLaneOneShot: true,
+    capabilityLaneSessions: false,
     codeMutation: false,
   },
   async runTurn() {

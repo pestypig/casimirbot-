@@ -3,6 +3,7 @@ import type { HelixAskContextBridgeSnapshot } from "./HelixAskContextBridge";
 
 export type HelixAskConsoleRequestEnvelope = {
   question: string;
+  agentRuntime: HelixAgentRuntimeId;
   agent_runtime: HelixAgentRuntimeId;
   doc_path?: string;
 };
@@ -57,6 +58,7 @@ export function buildHelixAskConsoleRequestEnvelope(args: {
 }): HelixAskConsoleRequestEnvelope {
   const envelope: HelixAskConsoleRequestEnvelope = {
     question: args.question,
+    agentRuntime: args.agentRuntime,
     agent_runtime: args.agentRuntime,
   };
   if (args.context.activeDocPath) envelope.doc_path = args.context.activeDocPath;
@@ -75,6 +77,7 @@ export function buildHelixAskConsoleBackendTurnPayloadCore(args: {
   return {
     sessionId: args.sessionId ?? undefined,
     agentRuntime: args.agentRuntime,
+    agent_runtime: args.agentRuntime,
     traceId: args.traceId,
     turnId: args.turnId,
     maxTokens: args.maxTokens,

@@ -151,6 +151,17 @@ function resolveHelixTranscriptRowLabel(event: Record<string, unknown>): string 
   if (sourceEventType === "tool_observation") return "Tool Observation";
   if (sourceEventType === "compound_itinerary") return "Itinerary";
   if (sourceEventType === "model_reentry") return "Model Re-entry";
+  if (sourceEventType === "lane_requested") return "Lane Request";
+  if (sourceEventType === "lane_backend_selected") return "Lane Backend";
+  if (sourceEventType === "lane_observation") return "Lane Observation";
+  if (sourceEventType === "lane_reentered") return "Lane Re-entry";
+  if (sourceEventType === "lane_session") return "Lane Session";
+  if (sourceEventType === "lane_mail_loop") return "Lane Mail";
+  if (sourceEventType === "lane_goal_binding") return "Goal Lane";
+  if (sourceEventType === "lane_goal_dispatch_plan") return "Goal Dispatch";
+  if (sourceEventType === "lane_goal_dispatch_admission") return "Goal Admission";
+  if (sourceEventType === "lane_goal_dispatch_readiness") return "Goal Readiness";
+  if (sourceEventType === "terminal_selected") return "Terminal";
   if (sourceEventType === "terminal_answer") return "Final";
 
   const type = String(event.type ?? "event");
@@ -283,6 +294,584 @@ function readHelixWorkstationGatewayObservationPackets(reply: HelixAskTranscript
   )
     .map((entry) => readAgentLoopAuditRecord(entry))
     .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+}
+
+function readHelixCapabilityLaneCallResults(reply: HelixAskTranscriptReply): Record<string, unknown>[] {
+  const { replyRecord, debugRecord, agentLoopRecord, debugExportRecord } = readHelixGatewayProjectionSources(reply);
+  return readFirstAgentLoopAuditArray(
+    replyRecord?.capability_lane_call_results,
+    replyRecord?.capability_lane_results,
+    debugRecord?.capability_lane_call_results,
+    debugRecord?.capability_lane_results,
+    agentLoopRecord?.capability_lane_call_results,
+    agentLoopRecord?.capability_lane_results,
+    debugExportRecord?.capability_lane_call_results,
+    debugExportRecord?.capability_lane_results,
+  )
+    .map((entry) => readAgentLoopAuditRecord(entry))
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+}
+
+function readHelixCapabilityLaneObservationPackets(reply: HelixAskTranscriptReply): Record<string, unknown>[] {
+  const { replyRecord, debugRecord, agentLoopRecord, debugExportRecord } = readHelixGatewayProjectionSources(reply);
+  return readFirstAgentLoopAuditArray(
+    replyRecord?.capability_lane_observation_packets,
+    debugRecord?.capability_lane_observation_packets,
+    agentLoopRecord?.capability_lane_observation_packets,
+    debugExportRecord?.capability_lane_observation_packets,
+  )
+    .map((entry) => readAgentLoopAuditRecord(entry))
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+}
+
+function readHelixCapabilityLaneResolveTraces(reply: HelixAskTranscriptReply): Record<string, unknown>[] {
+  const { replyRecord, debugRecord, agentLoopRecord, debugExportRecord } = readHelixGatewayProjectionSources(reply);
+  const directTrace =
+    readAgentLoopAuditRecord(replyRecord?.capability_lane_resolve_trace) ??
+    readAgentLoopAuditRecord(debugRecord?.capability_lane_resolve_trace) ??
+    readAgentLoopAuditRecord(agentLoopRecord?.capability_lane_resolve_trace) ??
+    readAgentLoopAuditRecord(debugExportRecord?.capability_lane_resolve_trace);
+  const arrayTraces = readFirstAgentLoopAuditArray(
+    replyRecord?.capability_lane_resolve_traces,
+    debugRecord?.capability_lane_resolve_traces,
+    agentLoopRecord?.capability_lane_resolve_traces,
+    debugExportRecord?.capability_lane_resolve_traces,
+  )
+    .map((entry) => readAgentLoopAuditRecord(entry))
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  return directTrace ? [directTrace, ...arrayTraces] : arrayTraces;
+}
+
+function readHelixCapabilityLaneBackendSelections(reply: HelixAskTranscriptReply): Record<string, unknown>[] {
+  const { replyRecord, debugRecord, agentLoopRecord, debugExportRecord } = readHelixGatewayProjectionSources(reply);
+  return readFirstAgentLoopAuditArray(
+    replyRecord?.capability_lane_backend_selections,
+    debugRecord?.capability_lane_backend_selections,
+    agentLoopRecord?.capability_lane_backend_selections,
+    debugExportRecord?.capability_lane_backend_selections,
+  )
+    .map((entry) => readAgentLoopAuditRecord(entry))
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+}
+
+function readHelixCapabilityLaneDebugEvents(reply: HelixAskTranscriptReply): Record<string, unknown>[] {
+  const { replyRecord, debugRecord, agentLoopRecord, debugExportRecord } = readHelixGatewayProjectionSources(reply);
+  return readFirstAgentLoopAuditArray(
+    replyRecord?.capability_lane_debug_events,
+    debugRecord?.capability_lane_debug_events,
+    agentLoopRecord?.capability_lane_debug_events,
+    debugExportRecord?.capability_lane_debug_events,
+  )
+    .map((entry) => readAgentLoopAuditRecord(entry))
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+    .sort((left, right) => {
+      const leftSeq = typeof left.seq === "number" && Number.isFinite(left.seq) ? left.seq : 0;
+      const rightSeq = typeof right.seq === "number" && Number.isFinite(right.seq) ? right.seq : 0;
+      return leftSeq - rightSeq;
+    });
+}
+
+function readHelixCapabilityLaneGoalBindingDebugSummaries(reply: HelixAskTranscriptReply): Record<string, unknown>[] {
+  const { replyRecord, debugRecord, agentLoopRecord, debugExportRecord } = readHelixGatewayProjectionSources(reply);
+  return readFirstAgentLoopAuditArray(
+    replyRecord?.capability_lane_goal_binding_debug_summaries,
+    debugRecord?.capability_lane_goal_binding_debug_summaries,
+    agentLoopRecord?.capability_lane_goal_binding_debug_summaries,
+    debugExportRecord?.capability_lane_goal_binding_debug_summaries,
+  )
+    .map((entry) => readAgentLoopAuditRecord(entry))
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+}
+
+function readHelixCapabilityLaneGoalDispatchPlans(reply: HelixAskTranscriptReply): Record<string, unknown>[] {
+  const { replyRecord, debugRecord, agentLoopRecord, debugExportRecord } = readHelixGatewayProjectionSources(reply);
+  const directPlans = readFirstAgentLoopAuditArray(
+    replyRecord?.capability_lane_goal_dispatch_plans,
+    debugRecord?.capability_lane_goal_dispatch_plans,
+    agentLoopRecord?.capability_lane_goal_dispatch_plans,
+    debugExportRecord?.capability_lane_goal_dispatch_plans,
+  )
+    .map((entry) => readAgentLoopAuditRecord(entry))
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  if (directPlans.length > 0) return directPlans;
+
+  return readHelixCapabilityLaneGoalBindingDebugSummaries(reply)
+    .map((summary) => readAgentLoopAuditRecord(summary.dispatch_plan))
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+}
+
+function readHelixCapabilityLaneGoalDispatchAdmissions(reply: HelixAskTranscriptReply): Record<string, unknown>[] {
+  const { replyRecord, debugRecord, agentLoopRecord, debugExportRecord } = readHelixGatewayProjectionSources(reply);
+  const directAdmissions = readFirstAgentLoopAuditArray(
+    replyRecord?.capability_lane_goal_dispatch_admissions,
+    debugRecord?.capability_lane_goal_dispatch_admissions,
+    agentLoopRecord?.capability_lane_goal_dispatch_admissions,
+    debugExportRecord?.capability_lane_goal_dispatch_admissions,
+  )
+    .map((entry) => readAgentLoopAuditRecord(entry))
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  if (directAdmissions.length > 0) return directAdmissions;
+
+  return readHelixCapabilityLaneGoalBindingDebugSummaries(reply)
+    .map((summary) => readAgentLoopAuditRecord(summary.dispatch_admission))
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+}
+
+function readHelixCapabilityLaneGoalDispatchReadiness(reply: HelixAskTranscriptReply): Record<string, unknown> | null {
+  const { replyRecord, debugRecord, agentLoopRecord, debugExportRecord } = readHelixGatewayProjectionSources(reply);
+  return readAgentLoopAuditRecord(replyRecord?.capability_lane_goal_dispatch_readiness) ??
+    readAgentLoopAuditRecord(debugRecord?.capability_lane_goal_dispatch_readiness) ??
+    readAgentLoopAuditRecord(agentLoopRecord?.capability_lane_goal_dispatch_readiness) ??
+    readAgentLoopAuditRecord(debugExportRecord?.capability_lane_goal_dispatch_readiness);
+}
+
+function readHelixCapabilityLaneSessionDebugSummaries(reply: HelixAskTranscriptReply): Record<string, unknown>[] {
+  const { replyRecord, debugRecord, agentLoopRecord, debugExportRecord } = readHelixGatewayProjectionSources(reply);
+  return readFirstAgentLoopAuditArray(
+    replyRecord?.capability_lane_session_debug_summaries,
+    debugRecord?.capability_lane_session_debug_summaries,
+    agentLoopRecord?.capability_lane_session_debug_summaries,
+    debugExportRecord?.capability_lane_session_debug_summaries,
+  )
+    .map((entry) => readAgentLoopAuditRecord(entry))
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+}
+
+function readHelixCapabilityLaneMailLoopDebugSummaries(reply: HelixAskTranscriptReply): Record<string, unknown>[] {
+  const { replyRecord, debugRecord, agentLoopRecord, debugExportRecord } = readHelixGatewayProjectionSources(reply);
+  return readFirstAgentLoopAuditArray(
+    replyRecord?.capability_lane_mail_loop_debug_summaries,
+    debugRecord?.capability_lane_mail_loop_debug_summaries,
+    agentLoopRecord?.capability_lane_mail_loop_debug_summaries,
+    debugExportRecord?.capability_lane_mail_loop_debug_summaries,
+  )
+    .map((entry) => readAgentLoopAuditRecord(entry))
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+}
+
+function readHelixCapabilityLaneReentryStatus(reply: HelixAskTranscriptReply): string {
+  const { replyRecord, debugRecord, agentLoopRecord, debugExportRecord } = readHelixGatewayProjectionSources(reply);
+  return (
+    coerceText(replyRecord?.capability_lane_reentry_status).trim() ||
+    coerceText(debugRecord?.capability_lane_reentry_status).trim() ||
+    coerceText(agentLoopRecord?.capability_lane_reentry_status).trim() ||
+    coerceText(debugExportRecord?.capability_lane_reentry_status).trim()
+  );
+}
+
+function readHelixCapabilityLaneTerminalKind(reply: HelixAskTranscriptReply): string {
+  const replyRecord = readAgentLoopAuditRecord(reply);
+  const debugRecord = readAgentLoopAuditRecord(reply.debug);
+  return (
+    coerceText(replyRecord?.terminal_artifact_kind).trim() ||
+    coerceText(debugRecord?.terminal_artifact_kind).trim() ||
+    coerceText(readHelixResolvedTurnSummary(reply)?.terminal_artifact_kind).trim() ||
+    coerceText(replyRecord?.final_answer_source).trim() ||
+    coerceText(debugRecord?.final_answer_source).trim()
+  );
+}
+
+function readHelixCapabilityLaneId(record: Record<string, unknown>): string {
+  const trace = readAgentLoopAuditRecord(record.lane_resolve_trace);
+  return (
+    coerceText(record.lane_id).trim() ||
+    coerceText(record.laneId).trim() ||
+    coerceText(record.requested_lane).trim() ||
+    coerceText(trace?.requested_lane).trim() ||
+    coerceText(trace?.selected_lane).trim()
+  );
+}
+
+function readHelixCapabilityLaneCapability(record: Record<string, unknown>): string {
+  const request = readAgentLoopAuditRecord(record.request);
+  return (
+    coerceText(record.capability).trim() ||
+    coerceText(record.capability_id).trim() ||
+    coerceText(record.capability_key).trim() ||
+    coerceText(request?.capability).trim() ||
+    readHelixCapabilityLaneId(record)
+  );
+}
+
+function readHelixCapabilityLaneObservationPacketForCall(
+  call: Record<string, unknown>,
+  packets: Record<string, unknown>[],
+): Record<string, unknown> | null {
+  const directPacket = readAgentLoopAuditRecord(call.observation_packet);
+  if (directPacket) return directPacket;
+  const capability = readHelixCapabilityLaneCapability(call);
+  const laneId = readHelixCapabilityLaneId(call);
+  const observationRef = coerceText(call.observation_ref).trim();
+  return packets.find((packet) => {
+    const packetCapability =
+      coerceText(packet.capability_key).trim() ||
+      coerceText(packet.capability_id).trim() ||
+      coerceText(packet.capability).trim();
+    const packetLane = coerceText(packet.lane_id).trim() || coerceText(packet.lane).trim();
+    const packetRef =
+      coerceText(packet.observation_ref).trim() ||
+      coerceText(packet.artifact_ref).trim() ||
+      coerceText(packet.ref).trim();
+    return Boolean(
+      (capability && packetCapability === capability) ||
+        (laneId && packetLane === laneId) ||
+        (observationRef && packetRef === observationRef),
+    );
+  }) ?? null;
+}
+
+function readHelixCapabilityLaneTraceForCall(
+  call: Record<string, unknown>,
+  traces: Record<string, unknown>[],
+): Record<string, unknown> | null {
+  const directTrace = readAgentLoopAuditRecord(call.lane_resolve_trace);
+  if (directTrace) return directTrace;
+  const laneId = readHelixCapabilityLaneId(call);
+  const capability = readHelixCapabilityLaneCapability(call);
+  return traces.find((trace) => {
+    const traceLane =
+      coerceText(trace.requested_lane).trim() ||
+      coerceText(trace.selected_lane).trim() ||
+      coerceText(trace.lane_id).trim();
+    const traceCapability =
+      coerceText(trace.capability).trim() ||
+      coerceText(trace.capability_id).trim() ||
+      coerceText(trace.capability_key).trim();
+    return Boolean((laneId && traceLane === laneId) || (capability && traceCapability === capability));
+  }) ?? null;
+}
+
+function hasSucceededHelixCapabilityLanePacket(packet: Record<string, unknown> | null, call: Record<string, unknown>): boolean {
+  if (call.ok !== true) return false;
+  const status = coerceText(packet?.status).trim().toLowerCase();
+  return status !== "blocked" && status !== "failed" && status !== "missing_input" && status !== "needs_confirmation";
+}
+
+function readHelixCapabilityLaneSessionId(
+  call: Record<string, unknown>,
+  packet: Record<string, unknown> | null,
+): string {
+  const observation = readAgentLoopAuditRecord(call.observation);
+  const request = readAgentLoopAuditRecord(call.request);
+  const stateDelta = readAgentLoopAuditRecord(packet?.state_delta);
+  const translationChunk = readAgentLoopAuditRecord(stateDelta?.live_translation_chunk);
+  return (
+    coerceText(call.lane_session_id).trim() ||
+    coerceText(observation?.lane_session_id).trim() ||
+    coerceText(request?.lane_session_id).trim() ||
+    coerceText(translationChunk?.lane_session_id).trim()
+  );
+}
+
+function summarizeHelixCapabilityLaneBackend(trace: Record<string, unknown> | null): string {
+  const decision = readAgentLoopAuditRecord(trace?.backend_selection_decision);
+  const selectedBackend =
+    coerceText(trace?.selected_backend_provider).trim() ||
+    coerceText(trace?.backend_provider).trim() ||
+    coerceText(trace?.backend_provider_id).trim();
+  const requestedBackend = coerceText(trace?.requested_backend_provider).trim();
+  const requestedAvailability = coerceText(trace?.requested_backend_availability_status).trim();
+  const requestedPermission = coerceText(trace?.requested_backend_permission_status).trim();
+  const requestedConfiguration = coerceText(trace?.requested_backend_configuration_status).trim();
+  const selectionReason = coerceText(trace?.selection_reason).trim();
+  const decisionOutcome = coerceText(decision?.outcome).trim();
+  const runtimeRootPreserved = decision?.selected_runtime_provider_remains_root === true;
+  const noLiveBackend = decision?.live_backend_execution_enabled === false;
+  const terminalOwner = coerceText(decision?.terminal_authority_owner).trim();
+  const availability = coerceText(trace?.availability_status).trim();
+  const permission = coerceText(trace?.permission_status).trim();
+  const parts = [
+    selectedBackend ? `selected ${selectedBackend}` : "",
+    requestedBackend ? `requested ${requestedBackend}` : "",
+    requestedConfiguration ? `requested configuration ${requestedConfiguration}` : "",
+    requestedAvailability ? `requested availability ${requestedAvailability}` : "",
+    requestedPermission ? `requested permission ${requestedPermission}` : "",
+    decisionOutcome ? `decision ${decisionOutcome}` : "",
+    runtimeRootPreserved ? "runtime root preserved" : "",
+    noLiveBackend ? "no live backend execution" : "",
+    terminalOwner ? `terminal authority ${terminalOwner}` : "",
+    selectionReason ? `reason ${selectionReason}` : "",
+    availability ? `availability ${availability}` : "",
+    permission ? `permission ${permission}` : "",
+  ].filter(Boolean);
+  return parts.join("; ");
+}
+
+function summarizeHelixCapabilityLaneBackendDecision(value: unknown): string[] {
+  const decision = readAgentLoopAuditRecord(value);
+  if (!decision) return [];
+  const decisionOutcome = coerceText(decision.outcome).trim();
+  const terminalOwner = coerceText(decision.terminal_authority_owner).trim();
+  return [
+    decisionOutcome ? `decision ${decisionOutcome}` : "",
+    decision.selected_runtime_provider_remains_root === true ? "runtime root preserved" : "",
+    decision.live_backend_execution_enabled === false ? "no live backend execution" : "",
+    terminalOwner ? `terminal authority ${terminalOwner}` : "",
+  ].filter(Boolean);
+}
+
+function formatHelixCapabilityLaneObservationText(args: {
+  capabilityId: string;
+  call: Record<string, unknown>;
+  packet: Record<string, unknown> | null;
+  ok: boolean;
+}): string {
+  const sessionId = readHelixCapabilityLaneSessionId(args.call, args.packet);
+  const sessionSuffix = sessionId ? ` session ${sessionId}` : "";
+  const summary =
+    coerceText(args.packet?.observation_summary).trim() ||
+    coerceText(args.call.observation_summary).trim() ||
+    coerceText(args.call.summary).trim() ||
+    coerceText(args.call.error).trim();
+  if (summary) {
+    const cleanSummary = summary.replace(/\.$/, "");
+    return `Lane observation: ${args.capabilityId}${sessionSuffix} ${args.ok ? "produced" : "blocked"} ${cleanSummary}.`;
+  }
+  return args.ok
+    ? `Lane observation: ${args.capabilityId}${sessionSuffix} produced a governed observation packet.`
+    : `Lane observation: ${args.capabilityId}${sessionSuffix} did not produce a successful observation packet.`;
+}
+
+function formatHelixCapabilityLaneDebugEventText(event: Record<string, unknown>): string {
+  const stage = coerceText(event.stage).trim();
+  const capability = coerceText(event.capability).trim() || coerceText(event.lane_id).trim() || "capability_lane";
+  const sessionId = coerceText(event.lane_session_id).trim();
+  const sessionSuffix = sessionId ? ` session ${sessionId}` : "";
+  if (stage === "lane_requested") return `Lane requested: ${capability}.`;
+  if (stage === "lane_backend_selected") {
+    const decision = readAgentLoopAuditRecord(event.backend_selection_decision);
+    const selectedBackend = coerceText(event.selected_backend_provider).trim();
+    const requestedBackend = coerceText(event.requested_backend_provider).trim();
+    const requestedConfiguration = coerceText(event.requested_backend_configuration_status).trim();
+    const requestedAvailability = coerceText(event.requested_backend_availability_status).trim();
+    const requestedPermission = coerceText(event.requested_backend_permission_status).trim();
+    const decisionOutcome = coerceText(decision?.outcome).trim();
+    const runtimeRootPreserved = decision?.selected_runtime_provider_remains_root === true;
+    const noLiveBackend = decision?.live_backend_execution_enabled === false;
+    const terminalOwner = coerceText(decision?.terminal_authority_owner).trim();
+    const reason = coerceText(event.selection_reason).trim();
+    const availability = coerceText(event.availability_status).trim();
+    const permission = coerceText(event.permission_status).trim();
+    const parts = [
+      selectedBackend ? `selected ${selectedBackend}` : "",
+      requestedBackend ? `requested ${requestedBackend}` : "",
+      requestedConfiguration ? `requested configuration ${requestedConfiguration}` : "",
+      requestedAvailability ? `requested availability ${requestedAvailability}` : "",
+      requestedPermission ? `requested permission ${requestedPermission}` : "",
+      decisionOutcome ? `decision ${decisionOutcome}` : "",
+      runtimeRootPreserved ? "runtime root preserved" : "",
+      noLiveBackend ? "no live backend execution" : "",
+      terminalOwner ? `terminal authority ${terminalOwner}` : "",
+      reason ? `reason ${reason}` : "",
+      availability ? `availability ${availability}` : "",
+      permission ? `permission ${permission}` : "",
+    ].filter(Boolean);
+    return parts.length
+      ? `Lane backend selected: ${parts.join("; ")}.`
+      : `Lane backend selected for ${capability}.`;
+  }
+  if (stage === "lane_observation") {
+    const status = coerceText(event.status).trim();
+    const verb = status === "completed" ? "produced" : "blocked";
+    const observationRef = coerceText(event.observation_ref).trim();
+    return `Lane observation: ${capability}${sessionSuffix} ${verb} ${observationRef || "a governed observation packet"}.`;
+  }
+  if (stage === "lane_reentered") {
+    const status = coerceText(event.reentry_status).trim();
+    return status === "observation_packet_required_for_provider_reentry"
+      ? "Lane re-entry: observation packet available for provider reasoning before terminal selection."
+      : `Lane re-entry: ${status || "pending"}.`;
+  }
+  return `Lane event: ${capability}.`;
+}
+
+function formatHelixCapabilityLaneGoalBindingSummaryText(summary: Record<string, unknown>): string {
+  const goalId = coerceText(summary.goal_id).trim();
+  const laneId = coerceText(summary.lane_id).trim() || "capability_lane";
+  const sessionId = coerceText(summary.lane_session_id).trim();
+  const bindingStatus = coerceText(summary.binding_status).trim();
+  const sessionStatus = coerceText(summary.session_status).trim();
+  const sessionHealth = coerceText(summary.session_health).trim();
+  const backend = coerceText(summary.selected_backend_provider).trim();
+  const sourceId = coerceText(summary.source_id).trim();
+  const observationRef = coerceText(summary.last_observation_ref).trim();
+  const latestMailLoop = readAgentLoopAuditRecord(summary.latest_mail_loop_summary);
+  const mailLoopRef =
+    coerceText(latestMailLoop?.stage_play_mail_id).trim() ||
+    coerceText(latestMailLoop?.observation_ref).trim();
+  const reportDecision = readAgentLoopAuditRecord(summary.report_decision);
+  const reportAction = coerceText(reportDecision?.action).trim();
+  const reportReason = coerceText(reportDecision?.reason).trim();
+  const dispatchPlan = readAgentLoopAuditRecord(summary.dispatch_plan);
+  const dispatchTarget = coerceText(dispatchPlan?.target).trim();
+  const dispatchStatus = coerceText(dispatchPlan?.status).trim();
+  const decisionParts = summarizeHelixCapabilityLaneBackendDecision(summary.backend_selection_decision);
+  const terminalAuthority = coerceText(summary.terminal_authority_status).trim();
+  const parts = [
+    goalId ? `goal ${goalId}` : "",
+    sessionId ? `session ${sessionId}` : "",
+    bindingStatus ? `binding ${bindingStatus}` : "",
+    sessionStatus || sessionHealth ? `session state ${[sessionStatus, sessionHealth].filter(Boolean).join("/")}` : "",
+    backend ? `backend ${backend}` : "",
+    ...decisionParts,
+    sourceId ? `source ${sourceId}` : "",
+    observationRef ? `last observation ${observationRef}` : "",
+    mailLoopRef ? `latest mail ${mailLoopRef}` : "",
+    reportAction ? `report action ${reportAction}` : "",
+    reportReason ? `report reason ${reportReason}` : "",
+    dispatchTarget ? `dispatch target ${dispatchTarget}` : "",
+    dispatchStatus ? `dispatch ${dispatchStatus}` : "",
+    terminalAuthority ? `terminal authority ${terminalAuthority}` : "",
+  ].filter(Boolean);
+  const suffix = parts.length ? parts.join("; ") : "debug summary available";
+  return `Goal-bound lane session: ${laneId}; ${suffix}; lane output remains observation-only.`;
+}
+
+function formatHelixCapabilityLaneGoalDispatchPlanText(plan: Record<string, unknown>): string {
+  const laneId = coerceText(plan.lane_id).trim() || "capability_lane";
+  const target = coerceText(plan.target).trim() || "none";
+  const status = coerceText(plan.status).trim() || "planned_not_dispatched";
+  const reason = coerceText(plan.reason).trim();
+  const evidenceRef = coerceText(plan.evidence_ref).trim();
+  const mailLoopRef = coerceText(plan.mail_loop_ref).trim();
+  const terminalAuthority = coerceText(plan.terminal_authority_status).trim();
+  const sideEffects = plan.side_effects_executed === true ? "side effects executed" : "no side effects executed";
+  const parts = [
+    `target ${target}`,
+    `status ${status}`,
+    reason ? `reason ${reason}` : "",
+    evidenceRef ? `evidence ${evidenceRef}` : "",
+    mailLoopRef ? `mail ${mailLoopRef}` : "",
+    terminalAuthority ? `terminal authority ${terminalAuthority}` : "",
+    sideEffects,
+  ].filter(Boolean);
+  return `Goal dispatch plan: ${laneId}; ${parts.join("; ")}; lane output remains observation-only.`;
+}
+
+function formatHelixCapabilityLaneGoalDispatchAdmissionText(admission: Record<string, unknown>): string {
+  const laneId = coerceText(admission.lane_id).trim() || "capability_lane";
+  const target = coerceText(admission.target).trim() || "none";
+  const status = coerceText(admission.status).trim() || "blocked";
+  const reason = coerceText(admission.reason).trim();
+  const blockedReason = coerceText(admission.blocked_reason).trim();
+  const evidenceRef = coerceText(admission.evidence_ref).trim();
+  const mailLoopRef = coerceText(admission.mail_loop_ref).trim();
+  const terminalAuthority = coerceText(admission.terminal_authority_status).trim();
+  const parts = [
+    `target ${target}`,
+    `status ${status}`,
+    reason ? `reason ${reason}` : "",
+    blockedReason ? `blocked ${blockedReason}` : "",
+    evidenceRef ? `evidence ${evidenceRef}` : "",
+    mailLoopRef ? `mail ${mailLoopRef}` : "",
+    terminalAuthority ? `terminal authority ${terminalAuthority}` : "",
+    "side effects not allowed",
+  ].filter(Boolean);
+  return `Goal dispatch admission: ${laneId}; ${parts.join("; ")}; lane output remains observation-only.`;
+}
+
+function formatHelixCapabilityLaneGoalDispatchReadinessText(readiness: Record<string, unknown>): string {
+  const totalPlans = coerceText(readiness.total_plans).trim() || "0";
+  const totalAdmissions = coerceText(readiness.total_admissions).trim() || "0";
+  const admittedCount = coerceText(readiness.admitted_count).trim() || "0";
+  const blockedCount = coerceText(readiness.blocked_count).trim() || "0";
+  const pendingWakeCount = coerceText(readiness.pending_wake_count).trim() || "0";
+  const pendingTerminalCount = coerceText(readiness.pending_terminal_authority_count).trim() || "0";
+  const projectionOnlyCount = coerceText(readiness.projection_only_count).trim() || "0";
+  const manualReviewCount = coerceText(readiness.manual_review_count).trim() || "0";
+  const debugOnlyCount = coerceText(readiness.debug_only_count).trim() || "0";
+  const blockedReasons = Array.isArray(readiness.blocked_reasons)
+    ? readiness.blocked_reasons.map(coerceText).filter(Boolean).join(", ")
+    : "";
+  const nextTargets = Array.isArray(readiness.next_dispatch_targets)
+    ? readiness.next_dispatch_targets.map(coerceText).filter(Boolean).join(", ")
+    : "";
+  const nextBindings = Array.isArray(readiness.next_goal_binding_ids)
+    ? readiness.next_goal_binding_ids.map(coerceText).filter(Boolean).join(", ")
+    : "";
+  const parts = [
+    `plans ${totalPlans}`,
+    `admissions ${totalAdmissions}`,
+    `admitted ${admittedCount}`,
+    `blocked ${blockedCount}`,
+    pendingWakeCount !== "0" ? `pending wake ${pendingWakeCount}` : "",
+    pendingTerminalCount !== "0" ? `pending terminal authority ${pendingTerminalCount}` : "",
+    projectionOnlyCount !== "0" ? `projection only ${projectionOnlyCount}` : "",
+    manualReviewCount !== "0" ? `manual review ${manualReviewCount}` : "",
+    debugOnlyCount !== "0" ? `debug only ${debugOnlyCount}` : "",
+    nextTargets ? `next targets ${nextTargets}` : "",
+    nextBindings ? `next goal bindings ${nextBindings}` : "",
+    blockedReasons ? `blocked reasons ${blockedReasons}` : "",
+    "no side effects allowed",
+  ].filter(Boolean);
+  return `Goal dispatch readiness: ${parts.join("; ")}; lane output remains observation-only.`;
+}
+
+function formatHelixCapabilityLaneSessionSummaryText(summary: Record<string, unknown>): string {
+  const laneId = coerceText(summary.lane_id).trim() || "capability_lane";
+  const sessionId = coerceText(summary.lane_session_id).trim();
+  const sessionStatus = coerceText(summary.session_status).trim();
+  const sessionHealth = coerceText(summary.session_health).trim();
+  const backend = coerceText(summary.selected_backend_provider).trim();
+  const sourceId = coerceText(summary.source_id).trim();
+  const sourceKind = coerceText(summary.source_kind).trim();
+  const projectionTarget = coerceText(summary.projection_target).trim();
+  const accountLocale = coerceText(summary.account_locale).trim();
+  const observationRef = coerceText(summary.last_observation_ref).trim();
+  const terminalAuthority = coerceText(summary.terminal_authority_status).trim();
+  const eventCount = coerceText(summary.session_event_count).trim();
+  const decisionParts = summarizeHelixCapabilityLaneBackendDecision(summary.backend_selection_decision);
+  const parts = [
+    sessionId ? `session ${sessionId}` : "",
+    sessionStatus || sessionHealth ? `state ${[sessionStatus, sessionHealth].filter(Boolean).join("/")}` : "",
+    backend ? `backend ${backend}` : "",
+    ...decisionParts,
+    sourceId ? `source ${sourceId}` : "",
+    sourceKind ? `source kind ${sourceKind}` : "",
+    projectionTarget ? `projection ${projectionTarget}` : "",
+    accountLocale ? `locale ${accountLocale}` : "",
+    observationRef ? `last observation ${observationRef}` : "",
+    terminalAuthority ? `terminal authority ${terminalAuthority}` : "",
+    eventCount ? `events ${eventCount}` : "",
+  ].filter(Boolean);
+  const suffix = parts.length ? parts.join("; ") : "debug summary available";
+  return `Lane session: ${laneId}; ${suffix}; lane output remains observation-only.`;
+}
+
+function formatHelixCapabilityLaneMailLoopSummaryText(summary: Record<string, unknown>): string {
+  const laneId = coerceText(summary.lane_id).trim() || "capability_lane";
+  const sessionId = coerceText(summary.lane_session_id).trim();
+  const mailId = coerceText(summary.stage_play_mail_id).trim();
+  const observationRef = coerceText(summary.observation_ref).trim();
+  const sourceId = coerceText(summary.source_id).trim();
+  const sourceKind = coerceText(summary.source_kind).trim();
+  const chunkId = coerceText(summary.chunk_id).trim();
+  const projectionTarget = coerceText(summary.projection_target).trim();
+  const backend = coerceText(summary.selected_backend_provider).trim();
+  const requestedBackend = coerceText(summary.requested_backend_provider).trim();
+  const freshness = coerceText(summary.freshness_status).trim();
+  const blockedReason = coerceText(summary.blocked_reason).trim();
+  const terminalAuthority = coerceText(summary.terminal_authority_status).trim();
+  const decisionParts = summarizeHelixCapabilityLaneBackendDecision(summary.backend_selection_decision);
+  const wakeExpected = summary.stage_play_wake_expected === true ? "wake expected" : "wake not expected";
+  const parts = [
+    sessionId ? `session ${sessionId}` : "",
+    mailId ? `mail ${mailId}` : "",
+    wakeExpected,
+    observationRef ? `observation ${observationRef}` : "",
+    sourceId ? `source ${sourceId}` : "",
+    sourceKind ? `source kind ${sourceKind}` : "",
+    chunkId ? `chunk ${chunkId}` : "",
+    projectionTarget ? `projection ${projectionTarget}` : "",
+    backend ? `backend ${backend}` : "",
+    requestedBackend ? `requested backend ${requestedBackend}` : "",
+    ...decisionParts,
+    freshness ? `freshness ${freshness}` : "",
+    blockedReason ? `blocked ${blockedReason}` : "",
+    terminalAuthority ? `terminal authority ${terminalAuthority}` : "",
+  ].filter(Boolean);
+  const suffix = parts.length ? parts.join("; ") : "debug summary available";
+  return `Lane mail loop: ${laneId}; ${suffix}; mail is evidence-only.`;
 }
 
 function readHelixGatewayCapabilityId(record: Record<string, unknown>): string {
@@ -515,6 +1104,376 @@ export function buildHelixWorkstationGatewayTranscriptEvents(reply: HelixAskTran
   return events;
 }
 
+export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscriptReply): Record<string, unknown>[] {
+  const calls = readHelixCapabilityLaneCallResults(reply);
+  const debugEvents = readHelixCapabilityLaneDebugEvents(reply);
+  const sessionSummaries = readHelixCapabilityLaneSessionDebugSummaries(reply);
+  const mailLoopSummaries = readHelixCapabilityLaneMailLoopDebugSummaries(reply);
+  const goalBindingSummaries = readHelixCapabilityLaneGoalBindingDebugSummaries(reply);
+  const goalDispatchPlans = readHelixCapabilityLaneGoalDispatchPlans(reply);
+  const goalDispatchAdmissions = readHelixCapabilityLaneGoalDispatchAdmissions(reply);
+  const goalDispatchReadiness = readHelixCapabilityLaneGoalDispatchReadiness(reply);
+  const terminalKind = readHelixCapabilityLaneTerminalKind(reply);
+  const turnId = coerceText(reply.turn_id ?? reply.debug?.turn_id ?? reply.id).trim();
+  const sessionEvents = sessionSummaries.slice(0, 10).map((summary, index) => {
+    const laneId = coerceText(summary.lane_id).trim() || "capability_lane";
+    const sessionStatus = coerceText(summary.session_status).trim();
+    const sessionHealth = coerceText(summary.session_health).trim();
+    const status =
+      sessionHealth === "blocked" || sessionStatus === "blocked"
+        ? "failed"
+        : sessionStatus === "running" || sessionStatus === "paused"
+          ? "pending"
+          : "completed";
+    return {
+      id: coerceText(summary.lane_session_id).trim() || `${reply.id}-capability-lane-session-${index}`,
+      role: "system",
+      type: "observation",
+      status,
+      text: formatHelixCapabilityLaneSessionSummaryText(summary),
+      detail:
+        coerceText(summary.lane_session_id).trim() ||
+        coerceText(summary.last_observation_ref).trim() ||
+        laneId,
+      lane: laneId,
+      step_id: "lane_session",
+      turn_id: turnId,
+      capability_id: laneId,
+      event_source: "capability_lane_session_debug_summaries",
+      source_event_type: "lane_session",
+    };
+  });
+  const mailLoopEvents = mailLoopSummaries.slice(0, 10).map((summary, index) => {
+    const laneId = coerceText(summary.lane_id).trim() || "capability_lane";
+    const blockedReason = coerceText(summary.blocked_reason).trim();
+    const status = blockedReason ? "failed" : summary.stage_play_wake_expected === true ? "pending" : "completed";
+    return {
+      id: coerceText(summary.stage_play_mail_id).trim() || `${reply.id}-capability-lane-mail-loop-${index}`,
+      role: "system",
+      type: "observation",
+      status,
+      text: formatHelixCapabilityLaneMailLoopSummaryText(summary),
+      detail:
+        coerceText(summary.stage_play_mail_id).trim() ||
+        coerceText(summary.observation_ref).trim() ||
+        blockedReason ||
+        laneId,
+      lane: laneId,
+      step_id: "lane_mail_loop",
+      turn_id: turnId,
+      capability_id: coerceText(summary.capability).trim() || laneId,
+      event_source: "capability_lane_mail_loop_debug_summaries",
+      source_event_type: "lane_mail_loop",
+    };
+  });
+  const goalBindingEvents = goalBindingSummaries.slice(0, 10).map((summary, index) => {
+    const laneId = coerceText(summary.lane_id).trim() || "capability_lane";
+    const sessionStatus = coerceText(summary.session_status).trim();
+    const sessionHealth = coerceText(summary.session_health).trim();
+    const status =
+      sessionHealth === "blocked" || sessionStatus === "blocked"
+        ? "failed"
+        : sessionStatus === "running" || sessionStatus === "paused"
+          ? "pending"
+          : "completed";
+    return {
+      id: coerceText(summary.goal_binding_id).trim() || `${reply.id}-capability-lane-goal-binding-${index}`,
+      role: "system",
+      type: "observation",
+      status,
+      text: formatHelixCapabilityLaneGoalBindingSummaryText(summary),
+      detail:
+        coerceText(summary.goal_id).trim() ||
+        coerceText(summary.lane_session_id).trim() ||
+        laneId,
+      lane: laneId,
+      step_id: "lane_goal_binding",
+      turn_id: turnId,
+      capability_id: laneId,
+      event_source: "capability_lane_goal_binding_debug_summaries",
+      source_event_type: "lane_goal_binding",
+    };
+  });
+  const goalDispatchEvents = goalDispatchPlans.slice(0, 10).map((plan, index) => {
+    const laneId = coerceText(plan.lane_id).trim() || "capability_lane";
+    const target = coerceText(plan.target).trim();
+    const status =
+      target === "ask_wake" ||
+      target === "terminal_authority_review" ||
+      target === "manual_review"
+        ? "pending"
+        : "completed";
+    return {
+      id:
+        coerceText(plan.goal_binding_id).trim()
+          ? `${coerceText(plan.goal_binding_id).trim()}:dispatch-plan`
+          : `${reply.id}-capability-lane-goal-dispatch-${index}`,
+      role: "system",
+      type: "model_decision",
+      status,
+      text: formatHelixCapabilityLaneGoalDispatchPlanText(plan),
+      detail:
+        target ||
+        coerceText(plan.goal_id).trim() ||
+        coerceText(plan.lane_session_id).trim() ||
+        laneId,
+      lane: laneId,
+      step_id: "lane_goal_dispatch_plan",
+      turn_id: turnId,
+      capability_id: laneId,
+      event_source: "capability_lane_goal_dispatch_plans",
+      source_event_type: "lane_goal_dispatch_plan",
+    };
+  });
+  const goalDispatchAdmissionEvents = goalDispatchAdmissions.slice(0, 10).map((admission, index) => {
+    const laneId = coerceText(admission.lane_id).trim() || "capability_lane";
+    const blockedReason = coerceText(admission.blocked_reason).trim();
+    const status = blockedReason || coerceText(admission.status).trim() === "blocked"
+      ? "failed"
+      : "pending";
+    return {
+      id:
+        coerceText(admission.goal_binding_id).trim()
+          ? `${coerceText(admission.goal_binding_id).trim()}:dispatch-admission`
+          : `${reply.id}-capability-lane-goal-dispatch-admission-${index}`,
+      role: "system",
+      type: "model_decision",
+      status,
+      text: formatHelixCapabilityLaneGoalDispatchAdmissionText(admission),
+      detail:
+        blockedReason ||
+        coerceText(admission.target).trim() ||
+        coerceText(admission.goal_id).trim() ||
+        coerceText(admission.lane_session_id).trim() ||
+        laneId,
+      lane: laneId,
+      step_id: "lane_goal_dispatch_admission",
+      turn_id: turnId,
+      capability_id: laneId,
+      event_source: "capability_lane_goal_dispatch_admissions",
+      source_event_type: "lane_goal_dispatch_admission",
+    };
+  });
+  const goalDispatchReadinessEvents = goalDispatchReadiness
+    ? [
+        {
+          id: `${reply.id}-capability-lane-goal-dispatch-readiness`,
+          role: "system",
+          type: "model_decision",
+          status: coerceText(goalDispatchReadiness.blocked_count).trim() !== "0" ? "failed" : "pending",
+          text: formatHelixCapabilityLaneGoalDispatchReadinessText(goalDispatchReadiness),
+          detail:
+            Array.isArray(goalDispatchReadiness.next_dispatch_targets)
+              ? goalDispatchReadiness.next_dispatch_targets.map(coerceText).filter(Boolean).join(", ")
+              : "dispatch_readiness",
+          lane: "capability_lane_goal_dispatch",
+          step_id: "lane_goal_dispatch_readiness",
+          turn_id: turnId,
+          event_source: "capability_lane_goal_dispatch_readiness",
+          source_event_type: "lane_goal_dispatch_readiness",
+        },
+      ]
+    : [];
+  if (calls.length === 0 && debugEvents.length > 0) {
+    const events = debugEvents.slice(0, 40).map((event, index) => {
+      const stage = coerceText(event.stage).trim();
+      const laneId = coerceText(event.lane_id).trim() || "capability_lane";
+      const capabilityId = coerceText(event.capability).trim() || laneId;
+      const status = coerceText(event.status).trim() || "completed";
+      const sourceEventType =
+        stage === "lane_requested" ||
+        stage === "lane_backend_selected" ||
+        stage === "lane_observation" ||
+        stage === "lane_reentered"
+          ? stage
+          : "lane_observation";
+      return {
+        id: coerceText(event.event_id).trim() || `${reply.id}-capability-lane-debug-${index}`,
+        role: stage === "lane_backend_selected" ? "system" : stage === "lane_observation" ? "tool" : "agent",
+        type: stage === "lane_observation" ? "tool_result" : "model_decision",
+        status: status === "blocked" || status === "failed" ? "failed" : status === "pending" ? "pending" : "completed",
+        text: formatHelixCapabilityLaneDebugEventText(event),
+        detail:
+          coerceText(event.selection_reason).trim() ||
+          coerceText(event.observation_ref).trim() ||
+          capabilityId,
+        lane: laneId,
+        step_id: coerceText(event.stage).trim() || `capability_lane_debug_${index + 1}`,
+        turn_id: turnId,
+        capability_id: capabilityId,
+        event_source: "capability_lane_debug_events",
+        source_event_type: sourceEventType,
+      };
+    });
+    events.push(...sessionEvents);
+    events.push(...mailLoopEvents);
+    events.push(...goalBindingEvents);
+    events.push(...goalDispatchEvents);
+    events.push(...goalDispatchAdmissionEvents);
+    events.push(...goalDispatchReadinessEvents);
+    if (terminalKind) {
+      events.push({
+        id: `${reply.id}-capability-lane-terminal-selected`,
+        role: "agent",
+        type: "decision",
+        status: "completed",
+        text: `Terminal selected: ${terminalKind}.`,
+        detail: terminalKind,
+        lane: "helix_terminal_authority",
+        step_id: "terminal_selected",
+        turn_id: turnId,
+        event_source: "capability_lane_debug_events",
+        source_event_type: "terminal_selected",
+      });
+    }
+    return events;
+  }
+  const backendSelections = readHelixCapabilityLaneBackendSelections(reply);
+  const usingBackendSelectionOnly = calls.length === 0;
+  const rowCalls = calls.length > 0 ? calls : backendSelections;
+  if (rowCalls.length === 0) {
+    const events = [
+      ...sessionEvents,
+      ...mailLoopEvents,
+      ...goalBindingEvents,
+      ...goalDispatchEvents,
+      ...goalDispatchAdmissionEvents,
+      ...goalDispatchReadinessEvents,
+    ];
+    if (terminalKind) {
+      events.push({
+        id: `${reply.id}-capability-lane-terminal-selected`,
+        role: "agent",
+        type: "decision",
+        status: "completed",
+        text: `Terminal selected: ${terminalKind}.`,
+        detail: terminalKind,
+        lane: "helix_terminal_authority",
+        step_id: "terminal_selected",
+        turn_id: turnId,
+        event_source: "capability_lane_session_debug_summaries",
+        source_event_type: "terminal_selected",
+      });
+    }
+    return events;
+  }
+  const packets = readHelixCapabilityLaneObservationPackets(reply);
+  const traces = readHelixCapabilityLaneResolveTraces(reply);
+  const reentryStatus = readHelixCapabilityLaneReentryStatus(reply);
+  const events: Record<string, unknown>[] = [];
+  let successfulPacketPresent = false;
+
+  rowCalls.slice(0, 10).forEach((call, index) => {
+    const capabilityId = readHelixCapabilityLaneCapability(call);
+    if (!capabilityId) return;
+    const laneId = readHelixCapabilityLaneId(call) || capabilityId;
+    const packet = readHelixCapabilityLaneObservationPacketForCall(call, packets);
+    const trace =
+      readHelixCapabilityLaneTraceForCall(call, traces) ??
+      readHelixCapabilityLaneTraceForCall(call, backendSelections);
+    const ok = hasSucceededHelixCapabilityLanePacket(packet, call);
+    successfulPacketPresent = successfulPacketPresent || ok;
+    const stepId = `capability_lane_${index + 1}`;
+    const backendSummary = summarizeHelixCapabilityLaneBackend(trace);
+
+    events.push({
+      id: `${reply.id}-capability-lane-${index}-request`,
+      role: "agent",
+      type: "model_decision",
+      status: "completed",
+      text: `Lane requested: ${capabilityId}.`,
+      detail: capabilityId,
+      lane: laneId,
+      step_id: stepId,
+      turn_id: turnId,
+      capability_id: capabilityId,
+      event_source: "capability_lane_call_results",
+      source_event_type: "lane_requested",
+    });
+
+    if (backendSummary) {
+      events.push({
+        id: `${reply.id}-capability-lane-${index}-backend`,
+        role: "system",
+        type: "decision",
+        status: coerceText(trace?.permission_status).trim() === "permission_blocked" ? "blocked" : "completed",
+        text: `Lane backend selected: ${backendSummary}.`,
+        detail:
+          coerceText(trace?.selected_backend_provider).trim() ||
+          coerceText(trace?.backend_provider).trim() ||
+          laneId,
+        lane: laneId,
+        step_id: stepId,
+        turn_id: turnId,
+        capability_id: capabilityId,
+        event_source: "capability_lane_resolve_traces",
+        source_event_type: "lane_backend_selected",
+      });
+    }
+
+    if (!usingBackendSelectionOnly || packet) {
+      events.push({
+        id: `${reply.id}-capability-lane-${index}-observation`,
+        role: "tool",
+        type: "tool_result",
+        status: ok ? "completed" : "failed",
+        text: formatHelixCapabilityLaneObservationText({ capabilityId, call, packet, ok }),
+        detail: coerceText(packet?.observation_summary).trim() || coerceText(call.error).trim() || capabilityId,
+        lane: laneId,
+        step_id: stepId,
+        turn_id: turnId,
+        capability_id: capabilityId,
+        lane_session_id: readHelixCapabilityLaneSessionId(call, packet) || null,
+        event_source: "capability_lane_call_results",
+        source_event_type: "lane_observation",
+      });
+    }
+  });
+
+  events.push(...sessionEvents);
+  events.push(...mailLoopEvents);
+  if (successfulPacketPresent || reentryStatus) {
+    events.push({
+      id: `${reply.id}-capability-lane-reentry`,
+      role: "agent",
+      type: "model_decision",
+      status: successfulPacketPresent ? "completed" : "pending",
+      text: successfulPacketPresent
+        ? "Lane re-entry: observation packet available for provider reasoning before terminal selection."
+        : `Lane re-entry: ${reentryStatus}.`,
+      detail: reentryStatus || "capability_lane_observation_packets",
+      lane: "capability_lane",
+      step_id: "lane_reentry",
+      turn_id: turnId,
+      event_source: "capability_lane_observation_packets",
+      source_event_type: "lane_reentered",
+    });
+  }
+
+  events.push(...goalBindingEvents);
+  events.push(...goalDispatchEvents);
+  events.push(...goalDispatchAdmissionEvents);
+  events.push(...goalDispatchReadinessEvents);
+
+  if (terminalKind) {
+    events.push({
+      id: `${reply.id}-capability-lane-terminal-selected`,
+      role: "agent",
+      type: "decision",
+      status: "completed",
+      text: `Terminal selected: ${terminalKind}.`,
+      detail: terminalKind,
+      lane: "helix_terminal_authority",
+      step_id: "terminal_selected",
+      turn_id: turnId,
+      event_source: "capability_lane_call_results",
+      source_event_type: "terminal_selected",
+    });
+  }
+
+  return events;
+}
+
 export function buildHelixRuntimeTranscriptEvents(reply: HelixAskTranscriptReply): Record<string, unknown>[] {
   const replyRecord = readAgentLoopAuditRecord(reply);
   const debugRecord = readAgentLoopAuditRecord(reply.debug);
@@ -608,6 +1567,7 @@ export function buildHelixRuntimeAskLiveEvents(reply: HelixAskTranscriptReply): 
   const events = [
     ...buildHelixRuntimeTranscriptEvents(reply),
     ...buildHelixWorkstationGatewayTranscriptEvents(reply),
+    ...buildHelixCapabilityLaneTranscriptEvents(reply),
   ];
   return events.map((event, index) => ({
     id: coerceText(event.id).trim() || `${reply.id}-runtime-event-${index}`,
@@ -661,6 +1621,8 @@ export function resolveHelixTurnTranscriptEvents(reply: HelixAskTranscriptReply)
   };
   const gatewayEvents = buildHelixWorkstationGatewayTranscriptEvents(reply);
   const gatewayEventsPresent = gatewayEvents.length > 0;
+  const laneEvents = buildHelixCapabilityLaneTranscriptEvents(reply);
+  const laneEventsPresent = laneEvents.length > 0;
   const mergeGatewayProjectionEvents = (events: Record<string, unknown>[]): Record<string, unknown>[] => {
     if (!gatewayEventsPresent) return events;
     const filtered = events.filter((event) => {
@@ -685,8 +1647,40 @@ export function resolveHelixTurnTranscriptEvents(reply: HelixAskTranscriptReply)
       ...filtered.slice(firstTerminalIndex),
     ];
   };
+  const mergeLaneProjectionEvents = (events: Record<string, unknown>[]): Record<string, unknown>[] => {
+    if (!laneEventsPresent) return events;
+    const filtered = events.filter((event) => {
+      const sourceEventType = coerceText(event.source_event_type).trim();
+      return ![
+        "lane_requested",
+        "lane_backend_selected",
+        "lane_observation",
+        "lane_reentered",
+        "lane_session",
+        "lane_mail_loop",
+        "lane_goal_binding",
+        "lane_goal_dispatch_plan",
+        "lane_goal_dispatch_admission",
+        "lane_goal_dispatch_readiness",
+        "terminal_selected",
+      ].includes(sourceEventType);
+    });
+    const firstTerminalIndex = filtered.findIndex((event) => {
+      const sourceEventType = coerceText(event.source_event_type).trim();
+      const type = coerceText(event.type).trim();
+      return sourceEventType === "terminal_answer" || type === "final_answer";
+    });
+    if (firstTerminalIndex < 0) return [...filtered, ...laneEvents];
+    return [
+      ...filtered.slice(0, firstTerminalIndex),
+      ...laneEvents,
+      ...filtered.slice(firstTerminalIndex),
+    ];
+  };
+  const mergeProjectionEvents = (events: Record<string, unknown>[]): Record<string, unknown>[] =>
+    mergeLaneProjectionEvents(mergeGatewayProjectionEvents(events));
   const baseRuntimeEvents = buildHelixRuntimeTranscriptEvents(reply);
-  const runtimeEvents = mergeGatewayProjectionEvents(baseRuntimeEvents);
+  const runtimeEvents = mergeProjectionEvents(baseRuntimeEvents);
   if (baseRuntimeEvents.length > 0) {
     return normalizeEvents(runtimeEvents);
   }
@@ -694,11 +1688,11 @@ export function resolveHelixTurnTranscriptEvents(reply: HelixAskTranscriptReply)
     ? reply.debug.turn_transcript_events
     : [];
   if (directEvents.length > 0) {
-    return normalizeEvents(mergeGatewayProjectionEvents(directEvents as Record<string, unknown>[]));
+    return normalizeEvents(mergeProjectionEvents(directEvents as Record<string, unknown>[]));
   }
   const audit = readAgentLoopAuditRecord(reply.debug?.agent_loop_audit);
   const auditEvents = Array.isArray(audit?.turn_transcript_events) ? audit.turn_transcript_events : [];
-  return normalizeEvents(mergeGatewayProjectionEvents(auditEvents as Record<string, unknown>[]));
+  return normalizeEvents(mergeProjectionEvents(auditEvents as Record<string, unknown>[]));
 }
 
 function readHelixPublicCommentaryEvents(reply: HelixAskTranscriptReply): Record<string, unknown>[] {

@@ -19,6 +19,8 @@ import {
 import { buildProviderGatewayDebugSummary } from "./provider-gateway-debug-summary";
 import { buildHelixAgentRuntimeAdapterContract } from "./runtime-adapter-contract";
 import { buildHelixTurnTerminalAuthority } from "../turn-terminal-authority";
+import { buildHelixCapabilityLaneProviderAdapterContext } from "../capability-lanes/provider-adapter-context";
+import { explicitCapabilityContractForCapability } from "../explicit-capability-contract";
 
 const WORKSTATION_ACTIVE_CONTEXT_CAPABILITY = "workstation.active_context" as const;
 const CALCULATOR_SOLVE_EXPRESSION_CAPABILITY = "scientific-calculator.solve_expression" as const;
@@ -28,6 +30,8 @@ const CALCULATOR_FOCUS_PANEL_CAPABILITY = "scientific-calculator.focus_panel" as
 const CALCULATOR_SHOW_GATEWAY_SOLVE_CAPABILITY = "scientific-calculator.show_gateway_solve" as const;
 const INTERNET_SEARCH_CAPABILITY = "internet-search.search_web" as const;
 const SCHOLARLY_RESEARCH_SEARCH_CAPABILITY = "scholarly-research.lookup_papers" as const;
+const SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY = "scholarly-research.fetch_full_text" as const;
+const SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY = "scholarly-research.extract_numeric_parameters" as const;
 const WORKSTATION_UI_ACTION_RECEIPT_SCHEMA = "helix.workstation_ui_action_receipt.v1" as const;
 
 const COMPOUND_NORMALIZABLE_CAPABILITIES = new Set<string>([
@@ -37,6 +41,8 @@ const COMPOUND_NORMALIZABLE_CAPABILITIES = new Set<string>([
   "theory-badge-graph.propose_frontier_conjectures",
   "civilization-bounds.reflect_system_bounds",
   SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+  SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+  SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY,
 ]);
 
 const readBooleanEnv = (value: string | undefined, defaultValue: boolean): boolean => {
@@ -142,6 +148,10 @@ const typedObservationKindForGatewayCapability = (capabilityId: string): string 
     return "helix_civilization_bounds_tool_result";
   }
   if (capabilityId === SCHOLARLY_RESEARCH_SEARCH_CAPABILITY) return "scholarly_research_observation";
+  if (capabilityId === SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY) return "scholarly_full_text_observation";
+  if (capabilityId === SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY) {
+    return "scholarly_numeric_parameter_observation";
+  }
   if (capabilityId === INTERNET_SEARCH_CAPABILITY) return "internet_search_observation";
   if (capabilityId === "repo.search") return "repo_code_evidence_observation";
   if (capabilityId === WORKSTATION_ACTIVE_CONTEXT_CAPABILITY) return "workstation_active_context_observation";
@@ -162,6 +172,10 @@ const schemaForTypedObservationKind = (kind: string): string => {
     return "helix_civilization_bounds_tool_result/v1";
   }
   if (kind === "scholarly_research_observation") return "helix.scholarly_research_observation.v1";
+  if (kind === "scholarly_full_text_observation") return "helix.scholarly_full_text_observation.v1";
+  if (kind === "scholarly_numeric_parameter_observation") {
+    return "helix.scholarly_numeric_parameter_observation.v1";
+  }
   if (kind === "internet_search_observation") return "helix.internet_search_observation.v1";
   if (kind === "repo_code_evidence_observation") return "helix.repo_code_evidence_observation.v1";
   if (kind === "workstation_active_context_observation") return "helix.workstation_active_context_observation.v1";
@@ -224,7 +238,7 @@ const buildCodexNormalizedObservationArtifacts = (input: {
   const missingNormalizationFailures: string[] = [];
   input.gatewayCallResults.forEach((result, index) => {
     if (isWorkstationActionReceipt(result)) return;
-    if (result.ok !== true) return;
+    if (result.ok !== true && !COMPOUND_NORMALIZABLE_CAPABILITIES.has(result.capability_id)) return;
     const normalized = normalizeGatewayObservationForHelix({
       turnId: input.turnId,
       result,
@@ -280,20 +294,44 @@ const buildCodexCompoundSubgoalLedger = (input: {
     const sourceResult =
       input.gatewayCallResults.find((result) => result.capability_id === capability && result.ok === true) ??
       input.gatewayCallResults.find((result) => result.capability_id === capability);
+    const explicitContract = explicitCapabilityContractForCapability(capability);
+    const toolRan = Boolean(sourceResult);
+    const toolSucceeded = sourceResult?.ok === true;
+    const railStatus = toolSucceeded && observationRef ? "satisfied" : "fail_closed";
+    const failureCode = toolSucceeded ? null : readString(sourceResult?.error) ?? "missing_observation";
     return {
       schema: "helix.compound_capability_subgoal.v1",
       subgoal_id: `${input.turnId}:codex_compound_subgoal:${index + 1}`,
       ordinal: index + 1,
       requested_capability: capability,
+      runtime_capability: capability,
       selected_capability: capability,
-      executed_capability: sourceResult?.ok === true ? capability : null,
+      executed_capability: toolRan ? capability : null,
       args: sourceResult?.gateway_admission.source_target_intent ?? null,
-      required_observation_kinds: [observationKind],
+      required_observation_kinds: explicitContract?.required_observation_kinds ?? [observationKind],
+      required_terminal_kind: explicitContract?.required_terminal_kind ?? null,
+      terminal_contribution_kind: explicitContract?.required_terminal_kind ?? null,
+      contribution_role:
+        explicitContract?.capability_family === "calculator"
+          ? "numeric_result"
+          : explicitContract?.capability_family === "scholarly_research"
+            ? "retrieved_evidence"
+            : "tool_observation",
+      allowed_substitutions: explicitContract?.allowed_substitutions ?? [],
+      forbidden_nearby_capabilities: explicitContract?.forbidden_nearby_capabilities ?? [],
       observation_kind: observationKind,
       observation_ref: observationRef,
+      observation_provenance: "codex_provider_observation_normalization",
       provider_gateway_packet_refs: artifact.provider_gateway_packet_refs,
-      satisfied: sourceResult?.ok === true && Boolean(observationRef),
-      rail_status: sourceResult?.ok === true && observationRef ? "satisfied" : "missing_observation",
+      support_refs: observationRef ? [observationRef] : [],
+      bound_input_refs: [],
+      unresolved_input_bindings: [],
+      satisfaction: toolSucceeded && observationRef ? "satisfied" : "failed",
+      satisfied: toolSucceeded && Boolean(observationRef),
+      rail_status: railStatus,
+      first_broken_rail: railStatus === "satisfied" ? null : "capability_execution",
+      rail_failure_code: railStatus === "satisfied" ? null : failureCode,
+      repair_target: railStatus === "satisfied" ? null : "tool_result_reentry",
       assistant_answer: false,
       raw_content_included: false,
     };
@@ -1352,6 +1390,74 @@ const hasSuccessfulCalculatorSolveForFailedCapability = (
   });
 };
 
+const isScholarlyNumericFailClosedGatewayResult = (
+  result: HelixWorkstationGatewayCallResult,
+): boolean => {
+  if (result.ok === true) return false;
+  const capability = result.gateway_admission.requested_capability || result.capability_id;
+  if (capability !== "scholarly-research.extract_numeric_parameters") return false;
+  const observation = readRecord(result.observation);
+  if (!observation) return false;
+  const missingRequirements = readArray(observation.missing_requirements).map(readString).filter(Boolean);
+  const missingVariables = readArray(observation.missing_variables).map(readString).filter(Boolean);
+  return (
+    readString(observation.schema) === "helix.scholarly_numeric_parameter_observation.v1" &&
+    (missingRequirements.includes("missing_requested_numeric_variables") ||
+      result.error === "missing_requested_numeric_variables" ||
+      missingVariables.length > 0)
+  );
+};
+
+const buildScholarlyNumericFailClosedExplanation = (input: {
+  gatewayCallResults: HelixWorkstationGatewayCallResult[];
+  failed: HelixWorkstationGatewayCallResult[];
+}): string | null => {
+  const numericResult = input.failed.find(isScholarlyNumericFailClosedGatewayResult);
+  if (!numericResult) return null;
+  const numericObservation = readRecord(numericResult.observation);
+  if (!numericObservation) return null;
+  const paper = readRecord(numericObservation.paper);
+  const paperTitle = readString(paper?.title);
+  const paperUrl = readString(paper?.url);
+  const requestedVariables = readArray(numericObservation.requested_variables)
+    .map(readString)
+    .filter((entry): entry is string => Boolean(entry));
+  const missingVariables = readArray(numericObservation.missing_variables)
+    .map(readString)
+    .filter((entry): entry is string => Boolean(entry));
+  const rejectedCandidates = readArray(numericObservation.rejected_candidates)
+    .map(readRecord)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+    .slice(0, 3)
+    .map((entry) => {
+      const variable = readString(entry.variable) ?? "unknown_variable";
+      const reason = readString(entry.reason) ?? "rejected";
+      return `${variable}: ${reason}`;
+    });
+  const lookupRan = input.gatewayCallResults.some((result) =>
+    result.ok === true && result.capability_id === "scholarly-research.lookup_papers"
+  );
+  const fullTextRan = input.gatewayCallResults.some((result) =>
+    result.ok === true && result.capability_id === "scholarly-research.fetch_full_text"
+  );
+  const lines = [
+    "I found and fetched scholarly paper evidence, but I did not run the calculator because the numeric extraction did not produce fully cited, unit-bearing values for every requested variable.",
+    paperTitle ? `Fetched paper: ${paperTitle}${paperUrl ? ` (${paperUrl})` : ""}.` : null,
+    requestedVariables.length ? `Requested variables: ${requestedVariables.join(", ")}.` : null,
+    missingVariables.length ? `Missing variables: ${missingVariables.join(", ")}.` : null,
+    rejectedCandidates.length ? `Rejected candidates: ${rejectedCandidates.join("; ")}.` : null,
+    lookupRan || fullTextRan
+      ? `Completed tool steps: ${[
+          lookupRan ? "scholarly-research.lookup_papers" : null,
+          fullTextRan ? "scholarly-research.fetch_full_text" : null,
+          "scholarly-research.extract_numeric_parameters",
+        ].filter(Boolean).join(" -> ")}.`
+      : null,
+    "This is a fail-closed evidence result: it explains the retrieval/extraction mismatch without fabricating values or claiming a calculator result.",
+  ].filter((line): line is string => Boolean(line));
+  return lines.join("\n");
+};
+
 export const applyGatewayFailureAuthorityGuard = (input: {
   text: string;
   gatewayCallResults: HelixWorkstationGatewayCallResult[];
@@ -1370,6 +1476,13 @@ export const applyGatewayFailureAuthorityGuard = (input: {
         "gateway_call_failed";
       return `${result.gateway_admission.requested_capability}: ${reason}`;
     });
+  if (failed.every(isScholarlyNumericFailClosedGatewayResult)) {
+    const explanation = buildScholarlyNumericFailClosedExplanation({
+      gatewayCallResults: input.gatewayCallResults,
+      failed,
+    });
+    if (explanation) return explanation;
+  }
   return [
     "I cannot claim the requested workstation tool or UI action ran because Helix did not produce a successful observation or action receipt for every gateway request.",
     `Blocked or failed gateway request${descriptions.length === 1 ? "" : "s"}: ${descriptions.join("; ")}.`,
@@ -1722,6 +1835,9 @@ export const codexProvider: HelixAgentProvider = {
   supports: {
     streaming: false,
     workstationTools: true,
+    capabilityLanes: true,
+    capabilityLaneOneShot: true,
+    capabilityLaneSessions: false,
     codeMutation: false,
   },
 
@@ -1737,6 +1853,13 @@ export const codexProvider: HelixAgentProvider = {
     });
     const gatewayManifest = adapterContract.workstation_gateway_manifest;
     const runtimeSelectionTrace = adapterContract.runtime_selection_trace;
+    const capabilityLaneContext = buildHelixCapabilityLaneProviderAdapterContext({
+      provider: codexProvider,
+      body: request.body,
+      turnId,
+      env: process.env,
+    });
+    const capabilityLaneDebugProjection = capabilityLaneContext.debug_projection;
     const evidenceGatewayCallResults = await runExplicitCodexWorkstationGatewayCalls({
       body: request.body,
       turnId,
@@ -1780,6 +1903,7 @@ export const codexProvider: HelixAgentProvider = {
     const currentTurnArtifactLedger = [
       ...normalizedObservationArtifacts,
       ...providerGatewayPacketLedger,
+      ...capabilityLaneContext.artifact_ledger,
     ];
     const codexCompoundSubgoalLedger = buildCodexCompoundSubgoalLedger({
       turnId,
@@ -1834,6 +1958,12 @@ export const codexProvider: HelixAgentProvider = {
           capability_lane_ids: adapterContract.capability_lane_ids,
           capability_lane_statuses: adapterContract.capability_lane_statuses,
           capability_lane_resolve_trace_shape: adapterContract.capability_lane_resolve_trace_shape,
+          capability_lane_call_results: capabilityLaneDebugProjection.capability_lane_call_results,
+          capability_lane_observation_packets: capabilityLaneDebugProjection.capability_lane_observation_packets,
+          capability_lane_resolve_traces: capabilityLaneDebugProjection.capability_lane_resolve_traces,
+          capability_lane_backend_selections: capabilityLaneDebugProjection.capability_lane_backend_selections,
+          capability_lane_debug_events: capabilityLaneDebugProjection.capability_lane_debug_events,
+          capability_lane_reentry_status: capabilityLaneDebugProjection.capability_lane_reentry_status,
           fail_reason: "missing_question",
           permission_profile: codexProvider.permissionProfile,
           workstation_gateway_manifest: gatewayManifest,
@@ -1844,6 +1974,7 @@ export const codexProvider: HelixAgentProvider = {
           ),
           workstation_gateway_call_results: gatewayCallResults,
           workstation_gateway_observation_packets: gatewayObservationPackets,
+          capability_lane_packet_artifacts: capabilityLaneContext.artifact_ledger,
           provider_gateway_packet_artifacts: providerGatewayPacketLedger,
           normalized_provider_observation_artifacts: normalizedObservationArtifacts,
           normalized_provider_observation_packets: normalizedObservationPackets,
@@ -1883,6 +2014,11 @@ export const codexProvider: HelixAgentProvider = {
       "",
       "Helix workstation gateway observations already executed for this turn:",
       JSON.stringify(gatewayCallResults, null, 2),
+      "",
+      "Helix capability lane observations already executed for this turn:",
+      capabilityLaneContext.prompt_observation_block,
+      "",
+      "Capability lane outputs are observations or receipts. They are not final answers until Helix terminal authority accepts the provider terminal candidate.",
       "",
       "Use calculator observations when present, but do not force a special answer format unless the user asked for one.",
       "For current-calculator turns, answer only from the provided calculator observation packet or explicit calculator solve observation.",
@@ -1959,13 +2095,16 @@ export const codexProvider: HelixAgentProvider = {
       threadId,
       route: request.route,
       gatewayCallResults,
+      capabilityLaneObservationPackets: capabilityLaneContext.observation_packets,
       normalizedObservationPackets: codexCompoundSubgoalLedger && normalizedObservationPackets.length > 0
-        ? normalizedObservationPackets
-        : gatewayObservationPackets,
+        ? [...normalizedObservationPackets, ...capabilityLaneContext.observation_packets]
+        : [...gatewayObservationPackets, ...capabilityLaneContext.observation_packets],
       providerText: gatewayGuardedText,
       ok: processOk,
       solverCompleted: true,
-      goalSatisfied: gatewayCallsSucceeded(gatewayCallResults),
+      goalSatisfied:
+        gatewayCallsSucceeded(gatewayCallResults) &&
+        capabilityLaneContext.calls_succeeded,
     });
     const compoundAnswer = buildCodexCompoundEvidenceSynthesisAnswer({
       turnId,
@@ -1989,6 +2128,7 @@ export const codexProvider: HelixAgentProvider = {
       !compoundTerminalAuthorized &&
       !providerTerminalAuthorized &&
       gatewayCallResults.length === 0 &&
+      capabilityLaneContext.observation_packets.length === 0 &&
       processOk &&
       gatewayGuardedText.trim() === text.trim()
         ? buildCodexDirectTerminalAuthority({
@@ -2006,6 +2146,7 @@ export const codexProvider: HelixAgentProvider = {
       processOk &&
       normalizationFailures.length === 0 &&
       gatewayCallsSucceeded(gatewayCallResults) &&
+      capabilityLaneContext.calls_succeeded &&
       (compoundTerminalAuthorized || providerTerminalAuthorized || directTerminalAuthorized);
     const projectedText =
       normalizationFailureText ??
@@ -2145,7 +2286,36 @@ export const codexProvider: HelixAgentProvider = {
       workstation_actions: hostWorkstationAffordances.workstation_actions,
       support_refs: hostWorkstationAffordances.support_refs,
       tool_output_refs: hostWorkstationAffordances.tool_output_refs,
+      capability_lane_call_results: capabilityLaneDebugProjection.capability_lane_call_results,
+      capability_lane_observation_packets: capabilityLaneDebugProjection.capability_lane_observation_packets,
+      capability_lane_resolve_traces: capabilityLaneDebugProjection.capability_lane_resolve_traces,
+      capability_lane_backend_selections: capabilityLaneDebugProjection.capability_lane_backend_selections,
+      capability_lane_debug_events: capabilityLaneDebugProjection.capability_lane_debug_events,
+      capability_lane_reentry_status: capabilityLaneDebugProjection.capability_lane_reentry_status,
       current_turn_artifact_ledger: currentTurnArtifactLedger,
+      ...(codexCompoundSubgoalLedger
+        ? {
+            compound_subgoal_ledger: readArray(codexCompoundSubgoalLedger.subgoals),
+            compound_subgoal_missing_summary: {
+              schema: "helix.compound_subgoal_missing_summary.v1",
+              missing_compound_subgoal_ids: readArray(codexCompoundSubgoalLedger.subgoals)
+                .map(readRecord)
+                .filter((subgoal): subgoal is Record<string, unknown> => Boolean(subgoal))
+                .filter((subgoal) => readString(subgoal.satisfaction) !== "satisfied")
+                .map((subgoal) => readString(subgoal.subgoal_id))
+                .filter((subgoalId): subgoalId is string => Boolean(subgoalId)),
+              missing_required_capabilities: readArray(codexCompoundSubgoalLedger.subgoals)
+                .map(readRecord)
+                .filter((subgoal): subgoal is Record<string, unknown> => Boolean(subgoal))
+                .filter((subgoal) => readString(subgoal.satisfaction) !== "satisfied")
+                .map((subgoal) => readString(subgoal.requested_capability))
+                .filter((capability): capability is string => Boolean(capability)),
+              next_missing_subgoal_id:
+                readString(readRecord(codexCompoundSubgoalLedger.first_broken_rail)?.subgoal_id) ?? null,
+              complete: readString(codexCompoundSubgoalLedger.rail_status) === "satisfied",
+            },
+          }
+        : {}),
       ...(railReentryProjection.toolLifecycleTrace
         ? { tool_lifecycle_trace: railReentryProjection.toolLifecycleTrace }
         : {}),
@@ -2162,6 +2332,12 @@ export const codexProvider: HelixAgentProvider = {
         capability_lane_ids: adapterContract.capability_lane_ids,
         capability_lane_statuses: adapterContract.capability_lane_statuses,
         capability_lane_resolve_trace_shape: adapterContract.capability_lane_resolve_trace_shape,
+        capability_lane_call_results: capabilityLaneDebugProjection.capability_lane_call_results,
+        capability_lane_observation_packets: capabilityLaneDebugProjection.capability_lane_observation_packets,
+        capability_lane_resolve_traces: capabilityLaneDebugProjection.capability_lane_resolve_traces,
+        capability_lane_backend_selections: capabilityLaneDebugProjection.capability_lane_backend_selections,
+        capability_lane_debug_events: capabilityLaneDebugProjection.capability_lane_debug_events,
+        capability_lane_reentry_status: capabilityLaneDebugProjection.capability_lane_reentry_status,
         permission_profile: codexProvider.permissionProfile,
         fail_reason:
           normalizationFailures[0] ??
@@ -2189,6 +2365,7 @@ export const codexProvider: HelixAgentProvider = {
         ),
         workstation_gateway_call_results: gatewayCallResults,
         workstation_gateway_observation_packets: gatewayObservationPackets,
+        capability_lane_packet_artifacts: capabilityLaneContext.artifact_ledger,
         provider_gateway_packet_artifacts: providerGatewayPacketLedger,
         normalized_provider_observation_artifacts: normalizedObservationArtifacts,
         normalized_provider_observation_packets: normalizedObservationPackets,

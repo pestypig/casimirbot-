@@ -53,7 +53,7 @@ const readBoolean = (value: unknown): boolean | null =>
   typeof value === "boolean" ? value : null;
 
 const HELIX_DEBUG_BACKEND_ENTRYPOINT_REQUIRED_PROMPT_RE =
-  /\b(?:scientific-calculator\.[a-z0-9_.-]+|scientific\s+calculator|calculator_receipt|calculator\s+tool|docs-viewer\.[a-z0-9_.-]+|docs\s+viewer|repo-code\.[a-z0-9_.-]+|repo_code\.[a-z0-9_.-]+|workspace-directory\.[a-z0-9_.-]+|workspace_directory\.[a-z0-9_.-]+|workspace_os\.status|internet_search\.[a-z0-9_.-]+|internet\s+search\s+tool|live_env\.[a-z0-9_.-]+|helix_ask\.[a-z0-9_.-]+|image_lens|visual_capture)\b/i;
+  /\b(?:scientific-calculator\.[a-z0-9_.-]+|scientific\s+calculator|calculator_receipt|calculator\s+tool|docs-viewer\.[a-z0-9_.-]+|docs\s+viewer|repo-code\.[a-z0-9_.-]+|repo_code\.[a-z0-9_.-]+|workspace-directory\.[a-z0-9_.-]+|workspace_directory\.[a-z0-9_.-]+|workspace_os\.status|internet_search\.[a-z0-9_.-]+|internet\s+search\s+tool|scholarly-research\.[a-z0-9_.-]+|scholarly_research\.[a-z0-9_.-]+|scholarly\s+research\s+tool|lookup_papers|fetch_full_text|extract_numeric_parameters|live_env\.[a-z0-9_.-]+|helix_ask\.[a-z0-9_.-]+|image_lens|visual_capture)\b/i;
 
 const requiresBackendEntrypointForDebugExport = (value: unknown): boolean => {
   const text = readString(value);
@@ -1018,11 +1018,17 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
       : firstBrokenRail === "backend_ask_entrypoint" || firstBrokenRail === "prompt_submit_entrypoint"
         ? "prompt_submit_entrypoint"
         : null);
-  const effectiveTerminalErrorCode = terminalErrorCode ?? askEntrypointFailureCode;
+  const backendEntrypointProjectionBlocked = askEntrypointRequired && askEntrypointObserved === false;
+  const effectiveTerminalErrorCode =
+    backendEntrypointProjectionBlocked ? askEntrypointFailureCode : terminalErrorCode ?? askEntrypointFailureCode;
   const effectiveTerminalArtifactKind =
-    terminalArtifactKind ?? (effectiveTerminalErrorCode ? "typed_failure" : null);
+    backendEntrypointProjectionBlocked
+      ? "typed_failure"
+      : terminalArtifactKind ?? (effectiveTerminalErrorCode ? "typed_failure" : null);
   const effectiveFinalAnswerSource =
-    finalAnswerSource ?? (effectiveTerminalErrorCode ? "typed_failure" : null);
+    backendEntrypointProjectionBlocked
+      ? "typed_failure"
+      : finalAnswerSource ?? (effectiveTerminalErrorCode ? "typed_failure" : null);
   const typedFailure = asRecord(payload.typed_failure ?? debug?.typed_failure ?? agentLoop?.typed_failure);
   const terminalAuthorityText = readString(terminalAuthority?.terminal_text_preview);
   const terminalIsTypedFailure =

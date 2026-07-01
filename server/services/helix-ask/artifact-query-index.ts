@@ -2793,6 +2793,17 @@ export const buildArtifactQueryIndex = (input: {
     const requestedCapability = readNullableString(subgoal.requested_capability);
     const runtimeCapability = readNullableString(subgoal.runtime_capability);
     const observedRuntimeCapability = observedArtifact ? runtimeCapability ?? requestedCapability : null;
+    const explicitSatisfaction = readNullableString(subgoal.satisfaction);
+    const explicitRailStatus = readNullableString(subgoal.rail_status);
+    const explicitFailureCode = readNullableString(subgoal.rail_failure_code);
+    const explicitFirstBrokenRail = readNullableString(subgoal.first_broken_rail);
+    const explicitRepairTarget = readNullableString(subgoal.repair_target);
+    const explicitlyFailed =
+      explicitSatisfaction === "failed" ||
+      explicitRailStatus === "fail_closed" ||
+      Boolean(explicitFailureCode || explicitFirstBrokenRail);
+    const satisfied = observedArtifact && !explicitlyFailed;
+    const fallbackFailureCode = observedArtifact ? "tool_result_failed" : "compound_subgoal_dropped";
     return {
       subgoal_id: readNullableString(subgoal.subgoal_id),
       order: readNumber(subgoal.order),
@@ -2817,13 +2828,13 @@ export const buildArtifactQueryIndex = (input: {
       support_refs: observedRef ? [observedRef] : [],
       bound_input_refs: [],
       unresolved_input_bindings: inputBindings,
-      satisfaction: observedArtifact ? "satisfied" : "missing",
+      satisfaction: explicitSatisfaction ?? (satisfied ? "satisfied" : observedArtifact ? "failed" : "missing"),
       contribution_role: readNullableString(subgoal.contribution_role),
       terminal_contribution_kind: readNullableString(subgoal.terminal_contribution_kind),
-      rail_status: observedArtifact ? "complete" : "fail_closed",
-      first_broken_rail: observedArtifact ? null : "capability_execution",
-      rail_failure_code: observedArtifact ? null : "compound_subgoal_dropped",
-      repair_target: observedArtifact ? null : "agent_step_selection",
+      rail_status: explicitRailStatus === "satisfied" ? "complete" : explicitRailStatus ?? (satisfied ? "complete" : "fail_closed"),
+      first_broken_rail: satisfied ? null : explicitFirstBrokenRail ?? "capability_execution",
+      rail_failure_code: satisfied ? null : explicitFailureCode ?? fallbackFailureCode,
+      repair_target: satisfied ? null : explicitRepairTarget ?? (observedArtifact ? "tool_result_reentry" : "agent_step_selection"),
       assistant_answer: false,
       terminal_eligible: false,
       raw_content_included: false,

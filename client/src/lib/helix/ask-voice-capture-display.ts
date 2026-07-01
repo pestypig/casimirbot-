@@ -44,6 +44,24 @@ export type VoiceNoiseHandlingProfile = {
   localGateLowQualitySnrDb: number;
 };
 
+export type VoiceSegmentLocalAnalysis = {
+  speechProbability: number;
+  snrDb: number;
+  centroid: number;
+  zcr: number;
+  rmsDb: number;
+  lowQuality: boolean;
+};
+
+export type VoiceSessionSpeakerProfile = {
+  id: string;
+  centroidMean: number;
+  zcrMean: number;
+  rmsDbMean: number;
+  snrDbMean: number;
+  sampleCount: number;
+};
+
 const clampNumber = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
 
@@ -125,6 +143,23 @@ export function getMicRecorderMimeCandidates(userAgent?: string): string[] {
   return [...new Set(ordered)];
 }
 
+export function pickSupportedMicRecorderMimeType(params: {
+  userAgent?: string;
+  isTypeSupported: (mimeType: string) => boolean;
+}): string | undefined {
+  const candidates = getMicRecorderMimeCandidates(params.userAgent);
+  for (const mimeType of candidates) {
+    try {
+      if (params.isTypeSupported(mimeType)) {
+        return mimeType;
+      }
+    } catch {
+      // Keep probing later candidates when browser support checks throw.
+    }
+  }
+  return undefined;
+}
+
 export function resolveVoiceNoiseHandlingProfile(noisyEnvironmentMode: boolean): VoiceNoiseHandlingProfile {
   if (noisyEnvironmentMode) {
     return {
@@ -167,6 +202,94 @@ export function isLowAudioQualitySignal(args: {
       args.speechProbability < args.lowQualitySpeechProbability) ||
     (typeof args.snrDb === "number" && args.snrDb < args.lowQualitySnrDb)
   );
+}
+
+export function deriveVoiceSegmentLocalAnalysis(args: {
+  sampleCount: number;
+  speechProbabilitySum: number;
+  snrDbSum: number;
+  centroidSum: number;
+  zcrSum: number;
+  rmsDbSum: number;
+  durationMs: number;
+  minDurationMs?: number;
+  minSpeechProbability?: number;
+  minSnrDb?: number;
+}): VoiceSegmentLocalAnalysis {
+  if (args.sampleCount <= 0) {
+    return {
+      speechProbability: 0,
+      snrDb: -20,
+      centroid: 0,
+      zcr: 0,
+      rmsDb: -120,
+      lowQuality: true,
+    };
+  }
+  const speechProbability = clamp01(args.speechProbabilitySum / args.sampleCount);
+  const snrDb = args.snrDbSum / args.sampleCount;
+  const centroid = clamp01(args.centroidSum / args.sampleCount);
+  const zcr = clamp01(args.zcrSum / args.sampleCount);
+  const rmsDb = args.rmsDbSum / args.sampleCount;
+  const minDurationMs = args.minDurationMs ?? VOICE_LOCAL_AUDIO_GATE_MIN_DURATION_MS;
+  const minSpeechProbability = args.minSpeechProbability ?? VOICE_LOCAL_AUDIO_GATE_MIN_SPEECH_PROBABILITY;
+  const minSnrDb = args.minSnrDb ?? VOICE_LOCAL_AUDIO_GATE_MIN_SNR_DB;
+  const hardLowSignal =
+    args.durationMs >= minDurationMs &&
+    (speechProbability < minSpeechProbability || snrDb < minSnrDb);
+  return {
+    speechProbability,
+    snrDb,
+    centroid,
+    zcr,
+    rmsDb,
+    lowQuality: hardLowSignal,
+  };
+}
+
+export function resolveSpeakerFromSessionProfiles(args: {
+  analysis: VoiceSegmentLocalAnalysis;
+  profiles: VoiceSessionSpeakerProfile[];
+  matchDistance?: number;
+}): { speakerId: string; speakerConfidence: number; profileIndex: number } {
+  const matchDistance = args.matchDistance ?? 0.42;
+  const toVector = (profile: Pick<VoiceSessionSpeakerProfile, "centroidMean" | "zcrMean" | "rmsDbMean">) => ({
+    centroid: profile.centroidMean,
+    zcr: profile.zcrMean,
+    rmsDbNorm: clamp01((profile.rmsDbMean + 80) / 80),
+  });
+  const analysisVector = {
+    centroid: args.analysis.centroid,
+    zcr: args.analysis.zcr,
+    rmsDbNorm: clamp01((args.analysis.rmsDb + 80) / 80),
+  };
+  let bestIndex = -1;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (let index = 0; index < args.profiles.length; index += 1) {
+    const profile = args.profiles[index];
+    const vector = toVector(profile);
+    const distance = Math.sqrt(
+      Math.pow(vector.centroid - analysisVector.centroid, 2) * 1.2 +
+        Math.pow(vector.zcr - analysisVector.zcr, 2) * 0.9 +
+        Math.pow(vector.rmsDbNorm - analysisVector.rmsDbNorm, 2),
+    );
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestIndex = index;
+    }
+  }
+  if (bestIndex >= 0 && bestDistance <= matchDistance) {
+    return {
+      speakerId: args.profiles[bestIndex]!.id,
+      speakerConfidence: clamp01(1 - bestDistance / matchDistance),
+      profileIndex: bestIndex,
+    };
+  }
+  return {
+    speakerId: `speaker_${args.profiles.length + 1}`,
+    speakerConfidence: 0.54,
+    profileIndex: -1,
+  };
 }
 
 export function shouldTreatMicSignalAsSpeech(args: {

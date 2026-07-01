@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   VOICE_STT_CONFIRM_THRESHOLD,
+  VOICE_TRANSCRIPT_AUTO_CONFIRM_BLOCK_PIVOT_CONFIDENCE,
   deriveTranscriptConfidence,
+  isLowPivotBlocked,
+  normalizeTranscriptConfirmPolicyReason,
+  normalizeVoiceConfirmDispatchState,
+  resolveTranscriptConfirmPolicy,
+  shouldAutoConfirmTranscriptPrompt,
   shouldRequireTranscriptConfirmation,
 } from "@/lib/helix/ask-voice-transcript-confidence";
 
@@ -57,5 +63,94 @@ describe("ask-voice-transcript-confidence", () => {
       translationUncertain: false,
       providerNeedsConfirmation: true,
     })).toBe(true);
+  });
+
+  it("normalizes transcript confirm policy reasons and dispatch state", () => {
+    expect(normalizeTranscriptConfirmPolicyReason("eligible")).toBe("eligible");
+    expect(normalizeTranscriptConfirmPolicyReason("pivot_low_confidence")).toBe("pivot_low_confidence");
+    expect(normalizeTranscriptConfirmPolicyReason("not-a-reason")).toBeNull();
+    expect(normalizeTranscriptConfirmPolicyReason(null)).toBeNull();
+    expect(normalizeVoiceConfirmDispatchState("auto")).toBe("auto");
+    expect(normalizeVoiceConfirmDispatchState("blocked")).toBe("blocked");
+    expect(normalizeVoiceConfirmDispatchState(undefined)).toBe("confirm");
+  });
+
+  it("detects low-pivot translation blocks deterministically", () => {
+    expect(VOICE_TRANSCRIPT_AUTO_CONFIRM_BLOCK_PIVOT_CONFIDENCE).toBe(0.68);
+    expect(isLowPivotBlocked(0.4, true)).toBe("pivot_low_confidence");
+    expect(isLowPivotBlocked(null, true)).toBe("translation_uncertain_without_pivot");
+    expect(isLowPivotBlocked(Number.NaN, true)).toBe("translation_uncertain_without_pivot");
+    expect(isLowPivotBlocked(0.9, true)).toBeNull();
+    expect(isLowPivotBlocked(0.4, false)).toBeNull();
+  });
+
+  it("resolves transcript confirm policy without owning voice dispatch side effects", () => {
+    expect(resolveTranscriptConfirmPolicy({
+      dispatchState: "blocked",
+      confidence: 0.9,
+      translationUncertain: false,
+    })).toMatchObject({
+      action: "blocked",
+      reason: "dispatch_blocked",
+      confirmAutoEligible: false,
+      confirmBlockReason: "dispatch_blocked",
+    });
+
+    expect(resolveTranscriptConfirmPolicy({
+      dispatchState: "confirm",
+      confidence: 0.9,
+      pivotConfidence: 0.4,
+      translationUncertain: true,
+      sourceLanguage: "zh-hans",
+    })).toMatchObject({
+      action: "blocked",
+      reason: "pivot_low_confidence",
+    });
+
+    expect(resolveTranscriptConfirmPolicy({
+      dispatchState: "confirm",
+      confidence: 0.62,
+      pivotConfidence: 0.92,
+      translationUncertain: false,
+      lowAudioQuality: true,
+    })).toMatchObject({
+      action: "manual_confirm",
+      reason: "low_audio_quality",
+    });
+
+    expect(resolveTranscriptConfirmPolicy({
+      dispatchState: "confirm",
+      confidence: 0.9,
+      pivotConfidence: 0.92,
+      translationUncertain: false,
+      queuedSegmentCount: 1,
+    })).toMatchObject({
+      action: "manual_confirm",
+      reason: "live_activity",
+    });
+
+    expect(resolveTranscriptConfirmPolicy({
+      dispatchState: "confirm",
+      confidence: 0.9,
+      pivotConfidence: 0.92,
+      translationUncertain: false,
+    })).toMatchObject({
+      action: "auto_confirm",
+      reason: "eligible",
+      confirmAutoEligible: true,
+    });
+  });
+
+  it("projects auto-confirm eligibility through the policy resolver", () => {
+    expect(shouldAutoConfirmTranscriptPrompt({
+      dispatchState: "confirm",
+      confidence: 0.9,
+      translationUncertain: false,
+    })).toBe(true);
+    expect(shouldAutoConfirmTranscriptPrompt({
+      dispatchState: "blocked",
+      confidence: 0.9,
+      translationUncertain: false,
+    })).toBe(false);
   });
 });

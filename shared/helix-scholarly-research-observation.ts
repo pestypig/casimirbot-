@@ -192,6 +192,7 @@ export type HelixScholarlyNumericParameterObservation = {
   rejected_candidates: HelixScholarlyRejectedNumericCandidate[];
   missing_requirements: string[];
   selected_for_answer: boolean;
+  extraction_mode?: "requested_variables" | "open_supported_parameters";
   terminal_eligible: false;
   post_tool_model_step_required: true;
   assistant_answer: false;

@@ -1,4 +1,11 @@
 import type { HelixWorkstationGatewayListResult } from "../workstation-tool-gateway/types";
+import type {
+  HelixCapabilityLaneGoalDispatchAdmission,
+  HelixCapabilityLaneGoalDispatchPlan,
+  HelixCapabilityLaneGoalDispatchReadiness,
+} from "@shared/helix-capability-lane-goal-binding";
+import { buildHelixCapabilityLaneGoalDispatchAdmission } from "../capability-lanes/goal-dispatch-admission";
+import { buildHelixCapabilityLaneGoalDispatchReadiness } from "../capability-lanes/goal-dispatch-readiness";
 import type { HelixAgentRuntimeSelectionTrace } from "./runtime-debug";
 import type { HelixAgentProvider, HelixAgentRunResult } from "./types";
 
@@ -15,6 +22,72 @@ const buildSelectedAgentProviderProjection = (provider: HelixAgentProvider) => (
 const readGatewayCapabilityIds = (gatewayManifest: HelixWorkstationGatewayListResult): string[] =>
   gatewayManifest.capabilities.map((capability) => capability.capability_id);
 
+const readRecordArray = (value: unknown): Record<string, unknown>[] =>
+  Array.isArray(value)
+    ? value.filter((entry): entry is Record<string, unknown> =>
+      Boolean(entry) && typeof entry === "object" && !Array.isArray(entry))
+    : [];
+
+const isGoalDispatchPlan = (value: Record<string, unknown>): value is HelixCapabilityLaneGoalDispatchPlan =>
+  value.schema === "helix.capability_lane.goal_dispatch_plan.v1";
+
+const isGoalDispatchAdmission = (
+  value: Record<string, unknown>,
+): value is HelixCapabilityLaneGoalDispatchAdmission =>
+  value.schema === "helix.capability_lane.goal_dispatch_admission.v1";
+
+const isGoalDispatchReadiness = (
+  value: unknown,
+): value is HelixCapabilityLaneGoalDispatchReadiness =>
+  Boolean(value) &&
+  typeof value === "object" &&
+  !Array.isArray(value) &&
+  (value as Record<string, unknown>).schema === "helix.capability_lane.goal_dispatch_readiness.v1";
+
+const readGoalDispatchPlans = (providerDebug: Record<string, unknown>): Record<string, unknown>[] => {
+  const explicitPlans = readRecordArray(providerDebug.capability_lane_goal_dispatch_plans);
+  if (explicitPlans.length > 0) return explicitPlans;
+
+  return readRecordArray(providerDebug.capability_lane_goal_binding_debug_summaries)
+    .map((summary) => summary.dispatch_plan)
+    .filter((plan): plan is Record<string, unknown> =>
+      Boolean(plan) && typeof plan === "object" && !Array.isArray(plan));
+};
+
+const readGoalDispatchAdmissions = (providerDebug: Record<string, unknown>): Record<string, unknown>[] => {
+  const explicitAdmissions = readRecordArray(providerDebug.capability_lane_goal_dispatch_admissions);
+  if (explicitAdmissions.length > 0) return explicitAdmissions;
+
+  const summaryAdmissions = readRecordArray(providerDebug.capability_lane_goal_binding_debug_summaries)
+    .map((summary) => summary.dispatch_admission)
+    .filter((admission): admission is Record<string, unknown> =>
+      Boolean(admission) && typeof admission === "object" && !Array.isArray(admission));
+  if (summaryAdmissions.length > 0) return summaryAdmissions;
+
+  return readGoalDispatchPlans(providerDebug)
+    .filter(isGoalDispatchPlan)
+    .map(buildHelixCapabilityLaneGoalDispatchAdmission);
+};
+
+const readGoalDispatchReadiness = (
+  providerDebug: Record<string, unknown>,
+  plans: Record<string, unknown>[],
+  admissions: Record<string, unknown>[],
+): HelixCapabilityLaneGoalDispatchReadiness | null => {
+  if (isGoalDispatchReadiness(providerDebug.capability_lane_goal_dispatch_readiness)) {
+    return providerDebug.capability_lane_goal_dispatch_readiness;
+  }
+
+  const typedPlans = plans.filter(isGoalDispatchPlan);
+  const typedAdmissions = admissions.filter(isGoalDispatchAdmission);
+  if (typedPlans.length === 0 && typedAdmissions.length === 0) return null;
+
+  return buildHelixCapabilityLaneGoalDispatchReadiness({
+    plans: typedPlans,
+    admissions: typedAdmissions,
+  });
+};
+
 const buildProviderProjectionFields = (input: {
   provider: HelixAgentProvider;
   providerDebug: Record<string, unknown>;
@@ -23,6 +96,13 @@ const buildProviderProjectionFields = (input: {
 }) => {
   const selectedAgentProvider = buildSelectedAgentProviderProjection(input.provider);
   const gatewayCapabilityIds = readGatewayCapabilityIds(input.gatewayManifest);
+  const goalDispatchPlans = readGoalDispatchPlans(input.providerDebug);
+  const goalDispatchAdmissions = readGoalDispatchAdmissions(input.providerDebug);
+  const goalDispatchReadiness = readGoalDispatchReadiness(
+    input.providerDebug,
+    goalDispatchPlans,
+    goalDispatchAdmissions,
+  );
 
   return {
     agent_runtime: input.provider.id,
@@ -36,6 +116,21 @@ const buildProviderProjectionFields = (input: {
     capability_lane_ids: input.providerDebug.capability_lane_ids ?? [],
     capability_lane_statuses: input.providerDebug.capability_lane_statuses ?? {},
     capability_lane_resolve_trace_shape: input.providerDebug.capability_lane_resolve_trace_shape ?? null,
+    capability_lane_resolve_traces: input.providerDebug.capability_lane_resolve_traces ?? [],
+    capability_lane_backend_selections: input.providerDebug.capability_lane_backend_selections ?? [],
+    capability_lane_call_results: input.providerDebug.capability_lane_call_results ?? [],
+    capability_lane_observation_packets: input.providerDebug.capability_lane_observation_packets ?? [],
+    capability_lane_debug_events: input.providerDebug.capability_lane_debug_events ?? [],
+    capability_lane_session_debug_summaries:
+      input.providerDebug.capability_lane_session_debug_summaries ?? [],
+    capability_lane_mail_loop_debug_summaries:
+      input.providerDebug.capability_lane_mail_loop_debug_summaries ?? [],
+    capability_lane_goal_binding_debug_summaries:
+      input.providerDebug.capability_lane_goal_binding_debug_summaries ?? [],
+    capability_lane_goal_dispatch_plans: goalDispatchPlans,
+    capability_lane_goal_dispatch_admissions: goalDispatchAdmissions,
+    capability_lane_goal_dispatch_readiness: goalDispatchReadiness,
+    capability_lane_reentry_status: input.providerDebug.capability_lane_reentry_status ?? null,
     workstation_gateway_reentry_status:
       input.providerDebug.workstation_gateway_reentry_status ?? input.runtimeSelectionTrace.evidence_reentry_status,
     terminal_authority_status:

@@ -639,6 +639,12 @@ const bindingShapeForConsumer = (
       binding_kind: "source_ref",
     };
   }
+  if (contract.capability === "scholarly-research.extract_numeric_parameters") {
+    return {
+      arg_name: "source_ref",
+      binding_kind: "source_ref",
+    };
+  }
   if (contract.capability_family === "calculator") {
     return {
       arg_name: "support_refs",
@@ -707,6 +713,9 @@ const canBindSourceToConsumer = (
   }
   if (consumer.capability === "scholarly-research.fetch_full_text") {
     return source.capability === "scholarly-research.lookup_papers";
+  }
+  if (consumer.capability === "scholarly-research.extract_numeric_parameters") {
+    return source.capability === "scholarly-research.fetch_full_text";
   }
   if (consumer.capability_family === "scholarly_research") return false;
   if (consumer.capability === "live_env.request_interim_voice_callout") {

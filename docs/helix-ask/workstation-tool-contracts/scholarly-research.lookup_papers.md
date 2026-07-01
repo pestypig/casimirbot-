@@ -60,6 +60,22 @@ Required observation fields:
 
 Provider gaps must appear as missing/blocked evidence, not as proof.
 
+When the lookup participates in a compound scholarly workflow, a relevance gate
+may be attached to the observation:
+
+- `lookup_relevance_gate`
+- `status`: `satisfied` or `blocked`
+- `code`: `lookup_result_irrelevant` when none of the returned papers match the
+  source requirement
+- `required_any`
+- `supporting_any`
+- `selected_result_id`
+- `rejected_result_ids`
+
+The relevance gate is diagnostic evidence for the next model step. It does not
+answer the user and must not silently fetch full text for an irrelevant first
+result.
+
 ## Host Projection
 
 Allowed metadata:
@@ -94,3 +110,7 @@ Required stable tests:
 - compound prompts can combine docs, calculator, theory, civilization, repo, and
   scholarly observations without collapsing missing scholarly evidence into
   proof
+- irrelevant lookup results block dependent full-text fetch with
+  `lookup_result_irrelevant`
+- relevant lookup results still require an explicit full-text/numeric chain or a
+  post-observation model decision before `fetch_full_text`

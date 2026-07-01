@@ -247,6 +247,10 @@ beforeAll(async () => {
 });
 
 const pillPath = path.resolve(process.cwd(), "client/src/components/helix/HelixAskPill.tsx");
+const workspaceContextSnapshotPath = path.resolve(
+  process.cwd(),
+  "client/src/lib/helix/ask-workspace-context-snapshot.ts",
+);
 const docsViewerContextPath = path.resolve(process.cwd(), "client/src/lib/helix/ask-doc-viewer-context.ts");
 const askConsoleContextBridgePath = path.resolve(
   process.cwd(),
@@ -259,6 +263,10 @@ const askConsoleRequestEnvelopePath = path.resolve(
 const askConsoleLatestTurnBindingPath = path.resolve(
   process.cwd(),
   "client/src/components/helix/ask-console/HelixAskLatestTurnBinding.ts",
+);
+const askConsoleLegacyTurnControlsPath = path.resolve(
+  process.cwd(),
+  "client/src/components/helix/ask-console/HelixAskLegacyTurnControls.ts",
 );
 const askConsoleFinalExtrasPath = path.resolve(
   process.cwd(),
@@ -940,10 +948,16 @@ describe("HelixAskPill mic-first surface contract", () => {
   it("lets Helix Ask visual capture request and sync tab audio preference", () => {
     const source = fs.readFileSync(pillPath, "utf8");
     const toolbarSource = fs.readFileSync(askConsoleActionToolbarPath, "utf8");
+    const visualPreferenceSource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/components/helix/ask-console/HelixAskVisualCapturePreference.ts"),
+      "utf8",
+    );
 
     expect(source).toContain("readHelixAskVisualCaptureAudioPreference");
     expect(source).toContain("syncHelixAskVisualCaptureRoutePreference");
-    expect(source).toContain('HELIX_LIVE_ANSWER_VISUAL_CAPTURE_ROUTE_SYNC_EVENT = "helix:live-answer:visual-capture-routes"');
+    expect(visualPreferenceSource).toContain(
+      'HELIX_LIVE_ANSWER_VISUAL_CAPTURE_ROUTE_SYNC_EVENT =\n  "helix:live-answer:visual-capture-routes"',
+    );
     expect(source).toContain('HELIX_ASK_AUDIO_TRANSCRIPT_SOURCE_ID = `audio_transcript:${HELIX_ASK_THREAD_ID}`');
     expect(source).toContain("HELIX_ASK_DISPLAY_AUDIO_CHUNK_MS = 10_000");
     expect(source).toContain("postHelixAskAudioTranscriptChunk");
@@ -1230,19 +1244,24 @@ describe("HelixAskPill mic-first surface contract", () => {
 
   it("includes active scientific calculator context in backend Ask turn snapshots", () => {
     const source = fs.readFileSync(pillPath, "utf8");
+    const workspaceContextSource = fs.readFileSync(workspaceContextSnapshotPath, "utf8");
     expect(source).toContain("useScientificCalculatorStore.getState()");
-    expect(source).toContain("activeCalculatorContext");
-    expect(source).toContain("hasCalculatorContext");
-    expect(source).toContain("last_result_text");
-    expect(source).toContain("recent_debug_events");
+    expect(source).toContain("buildAskTurnWorkspaceContextSnapshotFromState({");
+    expect(workspaceContextSource).toContain("activeCalculatorContext");
+    expect(workspaceContextSource).toContain("hasCalculatorContext");
+    expect(workspaceContextSource).toContain("last_result_text");
+    expect(workspaceContextSource).toContain("recent_debug_events");
   });
 
   it("includes bounded active/open panel identity in backend Ask turn snapshots", () => {
     const source = fs.readFileSync(pillPath, "utf8");
-    expect(source).toContain("openPanelIds");
-    expect(source).toContain("activeGroupId: layoutState.activeGroupId");
-    expect(source).toContain("openPanels: [...new Set(openPanelIds)]");
-    expect(source).toContain("groupCount: Object.keys(layoutState.groups).length");
+    const workspaceContextSource = fs.readFileSync(workspaceContextSnapshotPath, "utf8");
+    expect(source).toContain("buildAskTurnWorkspaceContextSnapshotFromState({");
+    expect(source).toContain("layoutState,");
+    expect(workspaceContextSource).toContain("openPanelIds");
+    expect(workspaceContextSource).toContain("activeGroupId");
+    expect(workspaceContextSource).toContain("openPanels: [...new Set(openPanelIds)]");
+    expect(workspaceContextSource).toContain("groupCount: Object.keys(groups).length");
   });
 
   it("labels console responses from backend provider metadata, not client selection", () => {
@@ -1334,16 +1353,19 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("readDocViewerPathFromDesktopUrlForAskSnapshot");
     expect(source).toContain("readDocPathFromDesktopUrl");
     expect(contextBridgeSource).toContain('searchParams.get("doc")');
-    expect(source).toContain('source: "desktop_url_doc_param"');
+    expect(source).toContain("resolveDocViewerSnapshotPathCandidate");
+    expect(docsContextSource).toContain('source: "desktop_url_doc_param"');
     expect(source).toContain("normalizeDocViewerPathForAskSnapshot");
     expect(docsContextSource).toContain('normalized.startsWith("docs/")');
   });
 
   it("promotes current whitepaper prompts to the retained docs-viewer path", () => {
     const source = fs.readFileSync(pillPath, "utf8");
+    const docsContextSource = fs.readFileSync(docsViewerContextPath, "utf8");
     const requestEnvelopeSource = fs.readFileSync(askConsoleRequestEnvelopePath, "utf8");
-    expect(source).toContain("HELIX_ACTIVE_DOC_VIEWER_ARTIFACT_CUE_RE");
-    expect(source).toContain("white\\s*paper|whitepaper");
+    expect(source).toContain("resolveDocsViewerAnchorPathCandidate");
+    expect(docsContextSource).toContain("HELIX_ACTIVE_DOC_VIEWER_ARTIFACT_CUE_RE");
+    expect(docsContextSource).toContain("white\\s*paper|whitepaper");
     expect(source).toContain("resolveAskTurnDocViewerSnapshotPath().path");
     expect(source).toContain("buildHelixAskContextFilesForTurn");
     expect(source).toContain("buildHelixAskConsoleContextFiles");
@@ -1353,18 +1375,24 @@ describe("HelixAskPill mic-first surface contract", () => {
 
   it("advertises backend debug export lookup for chat-scoped Ask turn ids", () => {
     const source = fs.readFileSync(pillPath, "utf8");
-    expect(source).toContain("isBackendAskTurnDebugExportEligibleTurnId");
-    expect(source).toContain('trimmed.startsWith("ask:")');
-    expect(source).toContain('(?:^|:)ask:[^:]+');
-    expect(source).toContain("const activeTurnFallbackRef = isBackendAskTurnDebugExportEligibleTurnId(activeTurnId)");
+    const controlsSource = fs.readFileSync(askConsoleLegacyTurnControlsPath, "utf8");
+    expect(source).toContain("isHelixAskLegacyBackendDebugExportEligibleTurnId");
+    expect(source).toContain("resolveHelixAskLegacyDebugExportBackendTarget(parsed)");
+    expect(controlsSource).toContain("export function isHelixAskLegacyBackendDebugExportEligibleTurnId");
+    expect(controlsSource).toContain('trimmed.startsWith("ask:")');
+    expect(controlsSource).toContain('(?:^|:)ask:[^:]+');
+    expect(controlsSource).toContain("activeTurnFallbackRef");
   });
 
   it("keeps rendered-button debug copy scoped to the visible reply turn", () => {
     const source = fs.readFileSync(pillPath, "utf8");
+    const controlsSource = fs.readFileSync(askConsoleLegacyTurnControlsPath, "utf8");
     expect(source).toContain('debug_export_rebuild_reason: reason');
-    expect(source).toContain('rebuildReason === "rendered_button_scope"');
-    expect(source).toContain("matchingBackendRef ??");
-    expect(source).toContain("(isReplyScopedRebuild ? null : refCandidates[0])");
+    expect(source).toContain("selectHelixAskLegacyDebugCopyLocalPayload");
+    expect(source).toContain("resolveHelixAskLegacyDebugExportBackendTarget(parsed)");
+    expect(controlsSource).toContain('rebuildReason === "rendered_button_scope"');
+    expect(controlsSource).toContain("matchingBackendRef ??");
+    expect(controlsSource).toContain("(isReplyScopedRebuild ? null : refCandidates[0])");
   });
 
   it("rejects stale debug payloads that do not match the clicked visible reply", () => {
@@ -3325,7 +3353,12 @@ describe("HelixAskPill mic-first surface contract", () => {
 
   it("normalizes jump-over navigation before workstation parsing", () => {
     const source = fs.readFileSync(pillPath, "utf8");
-    expect(source).toContain('.replace(/\\bjump\\s+(?:over\\s+)?to\\b/gi, "go to")');
+    const commandTextSource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/lib/helix/ask-workstation-command-text.ts"),
+      "utf8",
+    );
+    expect(source).toContain('from "@/lib/helix/ask-workstation-command-text"');
+    expect(commandTextSource).toContain('.replace(/\\bjump\\s+(?:over\\s+)?to\\b/gi, "go to")');
   });
 });
 

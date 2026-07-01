@@ -202,7 +202,7 @@ const extractCalculatorExpression = (prompt: string): string | null => {
     unquoted.match(/\b(?:expression|scalar|sanity\s+check)\s+([0-9][0-9\s+*/().^%-]{1,120}[0-9)]?)/i)?.[1] ??
     unquoted.match(/\b([0-9]+(?:\s*[+*/^%-]\s*[0-9]+)+)\b/)?.[1] ??
     null;
-  const cleaned = direct?.replace(/\s+/g, "").replace(/[^0-9+*/().^%-]/g, "") ?? "";
+  const cleaned = direct?.replace(/\s+/g, "").replace(/[^0-9+*/().^%-]/g, "").replace(/[.]+$/g, "") ?? "";
   if (!cleaned || !/[+*/^%-]/.test(cleaned)) return null;
   if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(cleaned)) return null;
   if (!explicitCalculatorCue && !/[+*/^%]/.test(cleaned)) return null;
@@ -214,6 +214,14 @@ const hasDocumentEvidenceIntent = (prompt: string): boolean => {
   return (
     /\b(?:this|current|open|active|visible)\b[\s\S]{0,80}\b(?:doc|document|paper|white\s*paper|whitepaper)\b/i.test(unquoted) ||
     /\b(?:doc|document|paper|white\s*paper|whitepaper|document\s+evidence)\b/i.test(unquoted)
+  );
+};
+
+const hasScholarlyFullTextNumericChainIntent = (prompt: string): boolean => {
+  const unquoted = unquotePrompt(prompt);
+  return (
+    /\bscholarly-research\.(?:fetch_full_text|extract_numeric_parameters)\b/i.test(unquoted) ||
+    /\b(?:fetch\s+full\s+text|full[-\s]?text|extract\s+numeric\s+parameters?|numeric\s+parameter\s+extraction|cited\s+numeric\s+values?)\b/i.test(unquoted)
   );
 };
 
@@ -328,8 +336,7 @@ const buildSummarizeAndCalculateRequests = (body: Record<string, unknown>): Reco
 };
 
 const isResearchQuantifyReflectPrompt = (prompt: string): boolean => {
-  if (hasExplicitCompoundPlannerCapabilityMention(prompt)) return false;
-  if (hasDocumentEvidenceIntent(prompt)) return false;
+  if (hasDocumentEvidenceIntent(prompt) && !hasScholarlyFullTextNumericChainIntent(prompt)) return false;
   const unquoted = unquotePrompt(prompt);
   if (
     hasNegatedToolInstruction(
@@ -346,9 +353,10 @@ const isResearchQuantifyReflectPrompt = (prompt: string): boolean => {
     return false;
   }
   const wantsResearch = /\b(?:research\s+papers?|papers?|arxiv|scholarly|internet|web|sources?|corroborat(?:e|ion)|retrieve\s+evidence|look\s+up)\b/i.test(unquoted);
-  const wantsQuantify = /\b(?:calculate|compute|estimate|quantif(?:y|ication)|scalar|equation|plug\s+into)\b/i.test(unquoted);
+  const wantsQuantify = /\b(?:calculate|compute|estimate|solve|solve_expression|calculator|quantif(?:y|ication)|numeric\s+parameters?|scalar|equation|expression|plug\s+into)\b/i.test(unquoted);
   const wantsReflection = /\b(?:reflect|theory\s+badge\s+graph|theory\s+graph|civilization\s+bounds?|claim\s+boundary|conditions\s+of\s+the\s+civilization|social|energy|material)\b/i.test(unquoted);
-  return wantsResearch && wantsQuantify && wantsReflection;
+  const wantsFullTextNumericChain = hasScholarlyFullTextNumericChainIntent(prompt);
+  return wantsResearch && wantsQuantify && (wantsReflection || wantsFullTextNumericChain);
 };
 
 const requestedFormulaVariablesFromPrompt = (prompt: string): string[] => {
@@ -356,6 +364,356 @@ const requestedFormulaVariablesFromPrompt = (prompt: string): string[] => {
     new RegExp(`\\b${variable.replace(/_/g, "[_\\s-]?")}\\b`, "i").test(prompt)
   );
   return Array.from(new Set(variables));
+};
+
+type VariableSourcePlanEntry = {
+  variable: string;
+  canonical_quantity: string;
+  expected_unit: string | null;
+  role:
+    | "formula_input"
+    | "constant"
+    | "derived_quantity"
+    | "control_parameter"
+    | "geometry"
+    | "metric_requirement"
+    | "source_model";
+  source_classes: string[];
+  search_terms: string[];
+  extraction_aliases: string[];
+};
+
+type VariableSourcePlan = {
+  schema: "helix.variable_source_plan.v1";
+  source: "helix_compound_capability_dependency_planner";
+  formula_variables: string[];
+  entries: VariableSourcePlanEntry[];
+  query_terms: string[];
+  retrieval_intent: string;
+  assistant_answer: false;
+  raw_content_included: false;
+};
+
+type SourceRequirementPlan = {
+  schema: "helix.source_requirement_plan.v1";
+  source: "helix_compound_capability_dependency_planner";
+  compound_outcome: typeof RESEARCH_QUANTIFY_REFLECT_OUTCOME;
+  source_target: "scholarly_research" | "internet" | "mixed_research";
+  reasoning_order: string[];
+  claim_or_task: string;
+  evidence_requirements: Array<{
+    requirement_id: string;
+    kind: string;
+    source_classes: string[];
+    required_observation_kind: string;
+    required_affordance_kinds: string[];
+    terminal_eligible: false;
+  }>;
+  retrieval_strategy: {
+    schema: "helix.retrieval_strategy.v1";
+    query_terms: string[];
+    avoid_literal_placeholders_only: boolean;
+    prefer_sources_with: string[];
+    fallback_behavior: "explain_missing_evidence_or_requery";
+    assistant_answer: false;
+    raw_content_included: false;
+  };
+  reentry_requirements: {
+    observation_reentry_required: true;
+    model_followup_required_before_terminal: true;
+    calculator_requires_bound_expression: true;
+    fail_closed_before_claim_without_required_evidence: true;
+  };
+  hard_gates: string[];
+  variable_source_plan?: VariableSourcePlan;
+  assistant_answer: false;
+  raw_content_included: false;
+};
+
+const variableSourcePlanEntry = (variable: string): VariableSourcePlanEntry => {
+  const normalized = normalizeVariableLabel(variable);
+  if (normalized === "nm3") {
+    return {
+      variable,
+      canonical_quantity: "electron_or_plasma_number_density",
+      expected_unit: "m^-3",
+      role: "formula_input",
+      source_classes: [
+        "tokamak operating parameters",
+        "plasma parameter table",
+        "transport experiment table",
+        "density profile diagnostics",
+      ],
+      search_terms: [
+        "electron density",
+        "plasma density",
+        "number density",
+        "line averaged density",
+        "m^-3",
+        "10^19 m^-3",
+        "10^20 m^-3",
+      ],
+      extraction_aliases: ["n_e", "ne", "density", "electron density", "plasma density", "number density"],
+    };
+  }
+  if (normalized === "tev") {
+    return {
+      variable,
+      canonical_quantity: "electron_temperature_energy",
+      expected_unit: "eV",
+      role: "formula_input",
+      source_classes: [
+        "tokamak operating parameters",
+        "temperature profile diagnostics",
+        "transport experiment table",
+        "plasma parameter table",
+      ],
+      search_terms: ["electron temperature", "ion temperature", "temperature profile", "eV", "keV"],
+      extraction_aliases: ["T_e", "Te", "electron temperature", "temperature", "ion temperature"],
+    };
+  }
+  if (normalized === "bt") {
+    return {
+      variable,
+      canonical_quantity: "toroidal_or_background_magnetic_field",
+      expected_unit: "T",
+      role: "formula_input",
+      source_classes: [
+        "tokamak operating parameters",
+        "machine parameter table",
+        "magnetic confinement parameters",
+      ],
+      search_terms: ["toroidal magnetic field", "magnetic field", "B_t", "B0", "tesla", "T"],
+      extraction_aliases: ["B_T", "Bt", "B_t", "magnetic field", "toroidal magnetic field"],
+    };
+  }
+  if (normalized === "t00wallrequired") {
+    return {
+      variable,
+      canonical_quantity: "required_wall_stress_energy_density",
+      expected_unit: "J/m^3",
+      role: "metric_requirement",
+      source_classes: [
+        "metric ansatz",
+        "Einstein field equation calculation",
+        "NHM2 solve output",
+        "adapter trace reporting required wall energy density",
+      ],
+      search_terms: ["stress energy density", "wall energy density", "metric ansatz", "Einstein field equation"],
+      extraction_aliases: ["T00_wall_required", "T00", "stress energy density", "wall energy density"],
+    };
+  }
+  if (normalized === "t00wallavailable") {
+    return {
+      variable,
+      canonical_quantity: "available_wall_or_source_energy_density",
+      expected_unit: "J/m^3",
+      role: "source_model",
+      source_classes: [
+        "physical source model",
+        "achievable field energy density",
+        "plasma pressure estimate",
+        "magnetic confinement parameters",
+        "Casimir cavity geometry",
+        "pulse duty cycle",
+      ],
+      search_terms: ["field energy density", "plasma pressure", "magnetic pressure", "Casimir cavity", "duty cycle"],
+      extraction_aliases: ["T00_wall_available", "available energy density", "field energy density", "plasma pressure"],
+    };
+  }
+  if (["dburst", "dcycle", "nconcurrent", "nsector"].includes(normalized)) {
+    return {
+      variable,
+      canonical_quantity: "control_or_scheduling_parameter",
+      expected_unit: null,
+      role: "control_parameter",
+      source_classes: ["actuator timing plan", "tile sector layout", "pulse train design", "hardware concurrency limit"],
+      search_terms: ["pulse duration", "duty cycle", "concurrent sectors", "sector layout"],
+      extraction_aliases: [variable, variable.replace(/_/g, " ")],
+    };
+  }
+  if (["l", "r"].includes(normalized)) {
+    return {
+      variable,
+      canonical_quantity: "geometry_or_observation_scale",
+      expected_unit: "m",
+      role: "geometry",
+      source_classes: ["device geometry", "cavity dimension", "observation distance", "experimental setup"],
+      search_terms: ["cavity length", "device geometry", "observation distance", "m"],
+      extraction_aliases: [variable, "length", "radius", "distance"],
+    };
+  }
+  if (["echarge", "mu0", "g", "c", "pi", "e"].includes(normalized)) {
+    return {
+      variable,
+      canonical_quantity: "standard_physical_constant",
+      expected_unit: null,
+      role: "constant",
+      source_classes: ["standard physical constant"],
+      search_terms: [variable],
+      extraction_aliases: [variable],
+    };
+  }
+  return {
+    variable,
+    canonical_quantity: variable,
+    expected_unit: null,
+    role: "formula_input",
+    source_classes: ["paper parameter table", "experiment setup", "simulation input table"],
+    search_terms: [variable.replace(/_/g, " "), variable],
+    extraction_aliases: [variable, variable.replace(/_/g, " ")],
+  };
+};
+
+const defaultFormulaVariablesForPrompt = (prompt: string, requestedVariables: string[], wantsFullTextNumericChain: boolean): string[] => {
+  if (requestedVariables.length > 0) return requestedVariables;
+  const unquoted = unquotePrompt(prompt);
+  const mentionsTokamakPlasmaFormula =
+    /\b(?:tokamak|plasma\s+beta|thermal\s+pressure|magnetic\s+pressure|transport|magnetic\s+confinement)\b/i.test(unquoted);
+  if (wantsFullTextNumericChain && mentionsTokamakPlasmaFormula) return ["n_m3", "T_eV", "B_T"];
+  return [];
+};
+
+const uniqueStrings = (values: string[]): string[] => Array.from(new Set(values.map((entry) => entry.trim()).filter(Boolean)));
+
+const buildVariableSourcePlan = (
+  prompt: string,
+  requestedVariables: string[],
+  wantsFullTextNumericChain: boolean,
+): VariableSourcePlan | null => {
+  const variables = defaultFormulaVariablesForPrompt(prompt, requestedVariables, wantsFullTextNumericChain);
+  if (variables.length === 0) return null;
+  const entries = variables.map(variableSourcePlanEntry);
+  const promptTerms: string[] = [];
+  const unquoted = unquotePrompt(prompt);
+  if (/\btokamak\b/i.test(unquoted)) promptTerms.push("tokamak");
+  if (/\bplasma\s+beta\b/i.test(unquoted)) promptTerms.push("plasma beta");
+  if (/\btransport\b/i.test(unquoted)) promptTerms.push("transport");
+  if (/\b(?:parameter|operating)\s+table\b/i.test(unquoted)) promptTerms.push("parameter table");
+  const sourceClassTerms = entries.flatMap((entry) => entry.source_classes);
+  const primaryQuantityTerms = entries.flatMap((entry) => entry.search_terms.slice(0, 1));
+  const quantityTerms = entries.flatMap((entry) => entry.search_terms);
+  const queryTerms = uniqueStrings([
+    ...promptTerms,
+    "parameter table",
+    "operating point",
+    ...primaryQuantityTerms,
+    ...sourceClassTerms,
+    ...quantityTerms,
+  ]).slice(0, 28);
+  return {
+    schema: "helix.variable_source_plan.v1",
+    source: "helix_compound_capability_dependency_planner",
+    formula_variables: variables,
+    entries,
+    query_terms: queryTerms,
+    retrieval_intent:
+      "Find papers that report unit-bearing physical quantities needed to bind the formula variables, not papers that literally mention the variable placeholders.",
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
+const buildScholarlyVariableSourceQuery = (prompt: string, plan: VariableSourcePlan | null): string => {
+  if (!plan) return cleanArgumentText(prompt) ?? prompt.slice(0, 160);
+  return plan.query_terms.join(" ").slice(0, 240);
+};
+
+const sourceRequirementClaimOrTask = (prompt: string): string =>
+  cleanArgumentText(prompt)?.slice(0, 180) ?? prompt.replace(/\s+/g, " ").trim().slice(0, 180);
+
+const buildSourceRequirementPlan = (input: {
+  prompt: string;
+  outcome: typeof RESEARCH_QUANTIFY_REFLECT_OUTCOME;
+  wantsScholarly: boolean;
+  wantsInternet: boolean;
+  variableSourcePlan: VariableSourcePlan | null;
+}): SourceRequirementPlan | null => {
+  const queryTerms = input.variableSourcePlan?.query_terms ?? uniqueStrings([
+    ...(cleanArgumentText(input.prompt)?.split(/\s+/).slice(0, 18) ?? []),
+    input.wantsScholarly ? "scholarly evidence" : "",
+    input.wantsInternet ? "web source" : "",
+  ]);
+  if (queryTerms.length === 0) return null;
+  const variableSourceClasses = input.variableSourcePlan
+    ? uniqueStrings(input.variableSourcePlan.entries.flatMap((entry) => entry.source_classes))
+    : [];
+  const sourceClasses = variableSourceClasses.length
+    ? variableSourceClasses
+    : input.wantsScholarly
+      ? ["scholarly paper", "accessible full text", "citation evidence"]
+      : ["web source", "online source", "citation evidence"];
+  const sourceTarget = input.wantsScholarly && input.wantsInternet
+    ? "mixed_research"
+    : input.wantsInternet
+      ? "internet"
+      : "scholarly_research";
+  return {
+    schema: "helix.source_requirement_plan.v1",
+    source: "helix_compound_capability_dependency_planner",
+    compound_outcome: input.outcome,
+    source_target: sourceTarget,
+    reasoning_order: [
+      "interpret_user_goal",
+      "identify_claim_or_calculation",
+      "derive_evidence_requirements",
+      "build_retrieval_strategy",
+      "model_selects_next_admitted_tool_step",
+      "normalize_observations",
+      "reenter_model_with_evidence",
+      "answer_or_fail_closed_after_terminal_authority",
+    ],
+    claim_or_task: sourceRequirementClaimOrTask(input.prompt),
+    evidence_requirements: [
+      {
+        requirement_id: "retrieved_source_evidence",
+        kind: input.wantsScholarly ? "scholarly_source_ref" : "source_ref",
+        source_classes: sourceClasses,
+        required_observation_kind: input.wantsScholarly
+          ? "helix.scholarly_research_observation.v1"
+          : "helix.internet_search_observation.v1",
+        required_affordance_kinds: input.wantsScholarly
+          ? ["source_ref", "citation_evidence"]
+          : ["source_ref", "citation_evidence"],
+        terminal_eligible: false,
+      },
+      ...(input.variableSourcePlan ? [{
+        requirement_id: "formula_variable_numeric_evidence",
+        kind: "numeric_value_evidence",
+        source_classes: sourceClasses,
+        required_observation_kind: "helix.scholarly_numeric_parameter_observation.v1",
+        required_affordance_kinds: ["text_evidence", "citation_evidence", "numeric_value_evidence"],
+        terminal_eligible: false as const,
+      }] : []),
+    ],
+    retrieval_strategy: {
+      schema: "helix.retrieval_strategy.v1",
+      query_terms: queryTerms,
+      avoid_literal_placeholders_only: Boolean(input.variableSourcePlan),
+      prefer_sources_with: uniqueStrings([
+        ...(input.variableSourcePlan ? ["unit-bearing values", "parameter table", "operating point"] : []),
+        ...sourceClasses.slice(0, 8),
+      ]),
+      fallback_behavior: "explain_missing_evidence_or_requery",
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    reentry_requirements: {
+      observation_reentry_required: true,
+      model_followup_required_before_terminal: true,
+      calculator_requires_bound_expression: true,
+      fail_closed_before_claim_without_required_evidence: true,
+    },
+    hard_gates: [
+      "tools_produce_observations_not_answers",
+      "retrieval_mismatch_is_not_calculator_evidence",
+      "calculator_requires_fully_bound_source_backed_expression",
+      "terminal_answer_requires_post_observation_reasoning",
+    ],
+    ...(input.variableSourcePlan ? { variable_source_plan: input.variableSourcePlan } : {}),
+    assistant_answer: false,
+    raw_content_included: false,
+  };
 };
 
 const buildResearchQuantifyReflectRequests = (body: Record<string, unknown>): Record<string, unknown>[] => {
@@ -367,7 +725,17 @@ const buildResearchQuantifyReflectRequests = (body: Record<string, unknown>): Re
   const wantsInternet = /\b(?:internet|web|current\s+sources?|online|search\s+the\s+web)\b/i.test(unquoted);
   const wantsTheory = /\b(?:reflect|theory\s+badge\s+graph|theory\s+graph|claim\s+boundary)\b/i.test(unquoted);
   const wantsCivilization = /\b(?:civilization\s+bounds?|civilization|social|energy|material|country|countries|transportation)\b/i.test(unquoted);
+  const wantsFullTextNumericChain = hasScholarlyFullTextNumericChainIntent(prompt);
   const requestedFormulaVariables = requestedFormulaVariablesFromPrompt(prompt);
+  const variableSourcePlan = buildVariableSourcePlan(prompt, requestedFormulaVariables, wantsFullTextNumericChain);
+  const sourceRequirementPlan = buildSourceRequirementPlan({
+    prompt,
+    outcome: RESEARCH_QUANTIFY_REFLECT_OUTCOME,
+    wantsScholarly,
+    wantsInternet,
+    variableSourcePlan,
+  });
+  const plannedFormulaVariables = variableSourcePlan?.formula_variables ?? requestedFormulaVariables;
   const outcome = RESEARCH_QUANTIFY_REFLECT_OUTCOME;
   const { activePanel, activeDocPath } = readActivePanelAndDoc(body);
   const edges = [
@@ -386,20 +754,42 @@ const buildResearchQuantifyReflectRequests = (body: Record<string, unknown>): Re
       capability_id: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
       mode: "read",
       arguments: {
-        query: cleanArgumentText(prompt) ?? prompt.slice(0, 160),
+        query: buildScholarlyVariableSourceQuery(prompt, variableSourcePlan),
         mode: "paper_search",
-        ...(requestedFormulaVariables.length ? { requested_variables: requestedFormulaVariables } : {}),
-        source_target_intent: buildCompoundSourceTargetIntent({
-          outcome,
-          subgoalId: `${outcome}:scholarly_evidence`,
-          targetSource: "scholarly_research",
-          targetKind: "research_paper_search",
-          requiredObservationKind: "helix.scholarly_research_observation.v1",
-          activePanel,
-          activeDocPath,
-          ordinal: requests.length + 1,
-          dependencyEdges: edges,
-        }),
+        ...(plannedFormulaVariables.length ? { requested_variables: plannedFormulaVariables } : {}),
+        ...(variableSourcePlan ? {
+          variable_source_plan: variableSourcePlan,
+          variable_source_query_terms: variableSourcePlan.query_terms,
+        } : {}),
+        ...(sourceRequirementPlan ? { source_requirement_plan: sourceRequirementPlan } : {}),
+        allow_scholarly_dependent_chain: wantsFullTextNumericChain,
+        source_target_intent: {
+          ...buildCompoundSourceTargetIntent({
+            outcome,
+            subgoalId: `${outcome}:scholarly_evidence`,
+            targetSource: "scholarly_research",
+            targetKind: "research_paper_search",
+            requiredObservationKind: "helix.scholarly_research_observation.v1",
+            activePanel,
+            activeDocPath,
+            ordinal: requests.length + 1,
+            dependencyEdges: edges,
+          }),
+          ...(variableSourcePlan ? {
+            variable_source_plan: variableSourcePlan,
+            query_plan: {
+              schema: "helix.scholarly_variable_source_query_plan.v1",
+              source: "helix_compound_capability_dependency_planner",
+              formula_variables: variableSourcePlan.formula_variables,
+              query_terms: variableSourcePlan.query_terms,
+              source_classes: uniqueStrings(variableSourcePlan.entries.flatMap((entry) => entry.source_classes)),
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+          } : {}),
+          ...(sourceRequirementPlan ? { source_requirement_plan: sourceRequirementPlan } : {}),
+          allow_scholarly_dependent_chain: wantsFullTextNumericChain,
+        },
       },
     });
   }
@@ -413,17 +803,21 @@ const buildResearchQuantifyReflectRequests = (body: Record<string, unknown>): Re
       mode: "read",
       arguments: {
         query: cleanArgumentText(prompt) ?? prompt.slice(0, 160),
-        source_target_intent: buildCompoundSourceTargetIntent({
-          outcome,
-          subgoalId: `${outcome}:internet_evidence`,
-          targetSource: "internet",
-          targetKind: "internet_search",
-          requiredObservationKind: "helix.internet_search_observation.v1",
-          activePanel,
-          activeDocPath,
-          ordinal: requests.length + 1,
-          dependencyEdges: edges,
-        }),
+        ...(sourceRequirementPlan ? { source_requirement_plan: sourceRequirementPlan } : {}),
+        source_target_intent: {
+          ...buildCompoundSourceTargetIntent({
+            outcome,
+            subgoalId: `${outcome}:internet_evidence`,
+            targetSource: "internet",
+            targetKind: "internet_search",
+            requiredObservationKind: "helix.internet_search_observation.v1",
+            activePanel,
+            activeDocPath,
+            ordinal: requests.length + 1,
+            dependencyEdges: edges,
+          }),
+          ...(sourceRequirementPlan ? { source_requirement_plan: sourceRequirementPlan } : {}),
+        },
       },
     });
   }
@@ -437,17 +831,21 @@ const buildResearchQuantifyReflectRequests = (body: Record<string, unknown>): Re
       mode: "read",
       arguments: {
         expression,
-        source_target_intent: buildCompoundSourceTargetIntent({
-          outcome,
-          subgoalId: `${outcome}:calculator_estimate`,
-          targetSource: "scientific_calculator",
-          targetKind: "calculator_solve",
-          requiredObservationKind: "helix.calculator_solve_observation.v1",
-          activePanel,
-          activeDocPath,
-          ordinal: requests.length + 1,
-          dependencyEdges: edges,
-        }),
+        ...(sourceRequirementPlan ? { source_requirement_plan: sourceRequirementPlan } : {}),
+        source_target_intent: {
+          ...buildCompoundSourceTargetIntent({
+            outcome,
+            subgoalId: `${outcome}:calculator_estimate`,
+            targetSource: "scientific_calculator",
+            targetKind: "calculator_solve",
+            requiredObservationKind: "helix.calculator_solve_observation.v1",
+            activePanel,
+            activeDocPath,
+            ordinal: requests.length + 1,
+            dependencyEdges: edges,
+          }),
+          ...(sourceRequirementPlan ? { source_requirement_plan: sourceRequirementPlan } : {}),
+        },
       },
     });
   }
@@ -463,17 +861,21 @@ const buildResearchQuantifyReflectRequests = (body: Record<string, unknown>): Re
         prompt,
         conversation_context: prompt,
         build_explanation_plan: true,
-        source_target_intent: buildCompoundSourceTargetIntent({
-          outcome,
-          subgoalId: `${outcome}:theory_reflection`,
-          targetSource: "theory_badge_graph",
-          targetKind: "theory_context_reflection",
-          requiredObservationKind: "helix.theory_context_reflection_observation.v1",
-          activePanel,
-          activeDocPath,
-          ordinal: requests.length + 1,
-          dependencyEdges: edges,
-        }),
+        ...(sourceRequirementPlan ? { source_requirement_plan: sourceRequirementPlan } : {}),
+        source_target_intent: {
+          ...buildCompoundSourceTargetIntent({
+            outcome,
+            subgoalId: `${outcome}:theory_reflection`,
+            targetSource: "theory_badge_graph",
+            targetKind: "theory_context_reflection",
+            requiredObservationKind: "helix.theory_context_reflection_observation.v1",
+            activePanel,
+            activeDocPath,
+            ordinal: requests.length + 1,
+            dependencyEdges: edges,
+          }),
+          ...(sourceRequirementPlan ? { source_requirement_plan: sourceRequirementPlan } : {}),
+        },
       },
     });
   }
@@ -489,21 +891,25 @@ const buildResearchQuantifyReflectRequests = (body: Record<string, unknown>): Re
         prompt,
         include_bridge_context: true,
         include_collaboration_bounds: true,
-        source_target_intent: buildCompoundSourceTargetIntent({
-          outcome,
-          subgoalId: `${outcome}:civilization_bounds`,
-          targetSource: "civilization_bounds",
-          targetKind: "civilization_bounds_reflection",
-          requiredObservationKind: "helix.civilization_bounds_reflection_observation.v1",
-          activePanel,
-          activeDocPath,
-          ordinal: requests.length + 1,
-          dependencyEdges: edges,
-        }),
+        ...(sourceRequirementPlan ? { source_requirement_plan: sourceRequirementPlan } : {}),
+        source_target_intent: {
+          ...buildCompoundSourceTargetIntent({
+            outcome,
+            subgoalId: `${outcome}:civilization_bounds`,
+            targetSource: "civilization_bounds",
+            targetKind: "civilization_bounds_reflection",
+            requiredObservationKind: "helix.civilization_bounds_reflection_observation.v1",
+            activePanel,
+            activeDocPath,
+            ordinal: requests.length + 1,
+            dependencyEdges: edges,
+          }),
+          ...(sourceRequirementPlan ? { source_requirement_plan: sourceRequirementPlan } : {}),
+        },
       },
     });
   }
-  return requests.length >= 2 ? requests : [];
+  return requests.length >= 2 || ((wantsScholarly || !wantsInternet) && wantsFullTextNumericChain) ? requests : [];
 };
 
 const buildReadAloudSurfaceRequests = (body: Record<string, unknown>): Record<string, unknown>[] => {
@@ -1067,6 +1473,115 @@ const readSurfaceObservationForNarrator = (result: HelixWorkstationGatewayCallRe
   };
 };
 
+const normalizedTextForRelevance = (value: unknown): string =>
+  readString(value)?.toLowerCase().replace(/[^a-z0-9+\-. ]+/g, " ").replace(/\s+/g, " ").trim() ?? "";
+
+const scholarlyPaperRelevanceText = (paper: Record<string, unknown>): string =>
+  [
+    normalizedTextForRelevance(paper.title),
+    normalizedTextForRelevance(paper.abstract),
+    normalizedTextForRelevance(paper.summary),
+    normalizedTextForRelevance(paper.venue),
+  ].filter(Boolean).join(" ");
+
+const scholarlyLookupRelevanceRequirement = (
+  query: string,
+  variableSourcePlan: Record<string, unknown> | null,
+): {
+  required_any: string[];
+  supporting_any: string[];
+} => {
+  const queryText = query.toLowerCase();
+  const planTerms = readArray(variableSourcePlan?.query_terms)
+    .map(readString)
+    .filter((entry): entry is string => Boolean(entry))
+    .map((entry) => entry.toLowerCase());
+  const requiredAny = uniqueStrings([
+    ...(queryText.includes("tokamak") ? ["tokamak"] : []),
+    ...(queryText.includes("diii") || queryText.includes("diii-d") ? ["diii-d", "diii"] : []),
+    ...(/\beast\b/i.test(query) ? ["east"] : []),
+    ...(queryText.includes("magnetic confinement") ? ["magnetic confinement"] : []),
+    ...(queryText.includes("plasma") || planTerms.some((term) => term.includes("plasma")) ? ["plasma"] : []),
+  ]);
+  const supportingAny = uniqueStrings([
+    "electron density",
+    "plasma density",
+    "electron temperature",
+    "toroidal magnetic field",
+    "magnetic field",
+    "operating point",
+    "operating",
+    "parameter",
+    "transport",
+    "confinement",
+    "magnetic confinement",
+    "plasma beta",
+    "thermal pressure",
+    "pressure",
+    ...planTerms.filter((term) =>
+      /\b(?:density|temperature|field|tokamak|plasma|transport|parameter|operating|confinement|beta)\b/.test(term)
+    ),
+  ]).slice(0, 32);
+  return { required_any: requiredAny, supporting_any: supportingAny };
+};
+
+const paperSatisfiesScholarlyLookupRelevance = (
+  paper: Record<string, unknown>,
+  requirement: { required_any: string[]; supporting_any: string[] },
+): boolean => {
+  const text = scholarlyPaperRelevanceText(paper);
+  if (!text) return false;
+  const hasRequired = requirement.required_any.length === 0 ||
+    requirement.required_any.some((term) => text.includes(term.toLowerCase()));
+  const hasSupport = requirement.supporting_any.length === 0 ||
+    requirement.supporting_any.some((term) => text.includes(term.toLowerCase()));
+  return hasRequired && hasSupport;
+};
+
+const attachScholarlyLookupRelevanceGate = (input: {
+  result: HelixWorkstationGatewayCallResult;
+  papers: Record<string, unknown>[];
+  query: string;
+  variableSourcePlan: Record<string, unknown> | null;
+}): Record<string, unknown> => {
+  const requirement = scholarlyLookupRelevanceRequirement(input.query, input.variableSourcePlan);
+  const relevantPapers = input.papers.filter((paper) =>
+    paperSatisfiesScholarlyLookupRelevance(paper, requirement)
+  );
+  const gate = {
+    schema: "helix.scholarly_lookup_relevance_gate.v1",
+    status: relevantPapers.length > 0 ? "satisfied" : "blocked",
+    code: relevantPapers.length > 0 ? null : "lookup_result_irrelevant",
+    required_any: requirement.required_any,
+    supporting_any: requirement.supporting_any,
+    selected_result_id: readString(relevantPapers[0]?.result_id) ?? null,
+    rejected_result_ids: input.papers
+      .filter((paper) => !relevantPapers.includes(paper))
+      .map((paper) => readString(paper.result_id))
+      .filter((entry): entry is string => Boolean(entry)),
+    assistant_answer: false,
+    raw_content_included: false,
+    terminal_eligible: false,
+    post_tool_model_step_required: true,
+  };
+  const observation = readRecord(input.result.observation);
+  if (observation) {
+    observation.lookup_relevance_gate = gate;
+    if (gate.status === "blocked") {
+      const missing = readArray(observation.missing_requirements)
+        .map(readString)
+        .filter((entry): entry is string => Boolean(entry));
+      observation.missing_requirements = uniqueStrings([...missing, "lookup_result_irrelevant"]);
+      observation.selected_for_answer = false;
+    }
+  }
+  input.result.observation_packet.state_delta = {
+    ...(readRecord(input.result.observation_packet.state_delta) ?? {}),
+    scholarly_lookup_relevance_gate: gate,
+  };
+  return gate;
+};
+
 const readDocsExcerptForNarrator = (result: HelixWorkstationGatewayCallResult): {
   text: string;
   evidenceRefs: string[];
@@ -1157,6 +1672,21 @@ export const buildDependentCompoundCapabilityGatewayCallRequest = (input: {
     const papers = readArray(observation?.papers).map(readRecord).filter((entry): entry is Record<string, unknown> => Boolean(entry));
     const firstPaper = papers[0];
     const paperResultId = readString(firstPaper?.result_id);
+    const requestArgs = readRecord(input.request.arguments);
+    const variableSourcePlan = readRecord(requestArgs?.variable_source_plan);
+    const sourceRequirementPlan = readRecord(requestArgs?.source_requirement_plan);
+    if (requestArgs?.allow_scholarly_dependent_chain !== true) return null;
+    const query = readString(observation?.query) ?? readString(requestArgs?.query) ?? "paper full text";
+    const relevanceGate = attachScholarlyLookupRelevanceGate({
+      result: input.result,
+      papers,
+      query,
+      variableSourcePlan,
+    });
+    const selectedPaper = papers.find((paper) =>
+      readString(paper.result_id) === readString(relevanceGate.selected_result_id)
+    );
+    if (relevanceGate.status !== "satisfied" || !selectedPaper) return null;
     if (!firstPaper) return null;
     return {
       schema: "helix.workstation_gateway.compound_dependency_bound_call_request.v1",
@@ -1166,13 +1696,15 @@ export const buildDependentCompoundCapabilityGatewayCallRequest = (input: {
       capability_id: SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
       mode: "read",
       arguments: {
-        query: readString(observation?.query) ?? "paper full text",
+        query,
         papers,
-        paper: firstPaper,
-        paper_result_id: paperResultId,
-        requested_variables: readArray(readRecord(input.request.arguments)?.requested_variables)
+        paper: selectedPaper,
+        paper_result_id: readString(selectedPaper.result_id) ?? paperResultId,
+        requested_variables: readArray(requestArgs?.requested_variables)
           .map(readString)
           .filter((entry): entry is string => Boolean(entry)),
+        ...(variableSourcePlan ? { variable_source_plan: variableSourcePlan } : {}),
+        ...(sourceRequirementPlan ? { source_requirement_plan: sourceRequirementPlan } : {}),
         source: "helix_compound_capability_dependency_planner",
         turn_id: input.turnId,
         source_target_intent: {
@@ -1188,6 +1720,8 @@ export const buildDependentCompoundCapabilityGatewayCallRequest = (input: {
           required_affordance_kinds: ["source_ref", "citation_evidence"],
           produced_affordance_kind: "text_evidence",
           source_refs: input.result.observation_packet.produced_artifact_refs,
+          ...(variableSourcePlan ? { variable_source_plan: variableSourcePlan } : {}),
+          ...(sourceRequirementPlan ? { source_requirement_plan: sourceRequirementPlan } : {}),
           terminal_eligible: false,
           assistant_answer: false,
           raw_content_included: false,
@@ -1202,6 +1736,8 @@ export const buildDependentCompoundCapabilityGatewayCallRequest = (input: {
   ) {
     const allResults = input.results?.length ? input.results : [input.result];
     const requestArgs = readRecord(input.request.arguments);
+    const variableSourcePlan = readRecord(requestArgs?.variable_source_plan);
+    const sourceRequirementPlan = readRecord(requestArgs?.source_requirement_plan);
     const carriedVariables = readArray(requestArgs?.requested_variables)
       .map(readString)
       .filter((entry): entry is string => Boolean(entry));
@@ -1224,6 +1760,8 @@ export const buildDependentCompoundCapabilityGatewayCallRequest = (input: {
         requested_variables: requestedVariables,
         full_text_observation: input.result.observation,
         source_ref: input.result.observation_packet.produced_artifact_refs[0],
+        ...(variableSourcePlan ? { variable_source_plan: variableSourcePlan } : {}),
+        ...(sourceRequirementPlan ? { source_requirement_plan: sourceRequirementPlan } : {}),
         source: "helix_compound_capability_dependency_planner",
         turn_id: input.turnId,
         source_target_intent: {
@@ -1239,6 +1777,20 @@ export const buildDependentCompoundCapabilityGatewayCallRequest = (input: {
           required_affordance_kinds: ["text_evidence", "citation_evidence"],
           produced_affordance_kind: "numeric_value_evidence",
           requested_variables: requestedVariables,
+          ...(variableSourcePlan ? {
+            variable_source_plan: variableSourcePlan,
+            source_classes: readArray(variableSourcePlan.entries)
+              .map(readRecord)
+              .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+              .flatMap((entry) => readArray(entry.source_classes).map(readString))
+              .filter((entry): entry is string => Boolean(entry)),
+            extraction_aliases: readArray(variableSourcePlan.entries)
+              .map(readRecord)
+              .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+              .flatMap((entry) => readArray(entry.extraction_aliases).map(readString))
+              .filter((entry): entry is string => Boolean(entry)),
+          } : {}),
+          ...(sourceRequirementPlan ? { source_requirement_plan: sourceRequirementPlan } : {}),
           terminal_eligible: false,
           assistant_answer: false,
           raw_content_included: false,
@@ -1400,6 +1952,11 @@ export const buildCompoundDependencyRailStatus = (input: {
       (capability === THEORY_CONTEXT_REFLECTION_CAPABILITY || capability === SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY)
         ? bindCalculatorExpressionFromResults(input.results?.length ? input.results : [input.result])
         : null;
+    const resultObservation = readRecord(input.result.observation);
+    const lookupRelevanceGate = readRecord(resultObservation?.lookup_relevance_gate);
+    const lookupIrrelevant = outcome === RESEARCH_QUANTIFY_REFLECT_OUTCOME &&
+      capability === SCHOLARLY_RESEARCH_SEARCH_CAPABILITY &&
+      readString(lookupRelevanceGate?.status) === "blocked";
     const boundCalculatorPlanned = Boolean(input.dependentRequest);
     const calculatorSubgoal = calculatorBinding
       ? {
@@ -1427,7 +1984,14 @@ export const buildCompoundDependencyRailStatus = (input: {
           raw_content_included: false,
         }
       : null;
-    const firstBrokenRail = !satisfied
+    const firstBrokenRail = lookupIrrelevant
+      ? {
+          subgoal_id: `${RESEARCH_QUANTIFY_REFLECT_OUTCOME}:scholarly_full_text`,
+          capability_id: SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+          reason: readString(lookupRelevanceGate?.code) ?? "lookup_result_irrelevant",
+          lookup_relevance_gate: lookupRelevanceGate,
+        }
+      : !satisfied
       ? {
           subgoal_id: subgoalId,
           capability_id: capability,

@@ -820,6 +820,7 @@ describe("askLocal lane parity default", () => {
 
     const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
     const body = JSON.parse(String(requestInit.body ?? "{}")) as Record<string, any>;
+    expect(body.agentRuntime).toBe("helix");
     expect(body.agent_runtime).toBe("helix");
     expect(body.goldenPathRuntime).toBe(true);
     expect(body.golden_path_runtime).toBe(true);
@@ -846,6 +847,7 @@ describe("askLocal lane parity default", () => {
 
     const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
     const body = JSON.parse(String(requestInit.body ?? "{}")) as Record<string, any>;
+    expect(body.agentRuntime).toBe("codex");
     expect(body.agent_runtime).toBe("codex");
     expect(body.goldenPathRuntime).toBeUndefined();
     expect(body.golden_path_runtime).toBeUndefined();
@@ -884,6 +886,7 @@ describe("askLocal lane parity default", () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/agi/ask/turn/stream");
     const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
     const body = JSON.parse(String(requestInit.body ?? "{}")) as Record<string, any>;
+    expect(body.agentRuntime).toBe("helix");
     expect(body.agent_runtime).toBe("helix");
     expect(body.goldenPathRuntime).toBe(true);
     expect(body.golden_path_runtime).toBe(true);

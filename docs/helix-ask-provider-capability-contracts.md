@@ -213,7 +213,6 @@ capabilities with non-empty `input_schema.required`:
 | `docs.search` | `query` |
 | `internet-search.search_web` | `query` |
 | `scholarly-research.lookup_papers` | `query` |
-| `scholarly-research.extract_numeric_parameters` | `requested_variables` |
 | `civilization-bounds.reflect_system_bounds` | `prompt` |
 | `theory-badge-graph.reflect_discussion_context` | `prompt` |
 | `theory-badge-graph.propose_frontier_conjectures` | `prompt` |

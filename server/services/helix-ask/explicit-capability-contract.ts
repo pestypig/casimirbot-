@@ -2,6 +2,7 @@ import type { HelixCapabilityFamily } from "@shared/helix-capability-plan";
 import { HELIX_INTERNET_SEARCH_CAPABILITY } from "@shared/helix-internet-search-observation";
 import {
   HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+  HELIX_SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY,
   HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
 } from "@shared/helix-scholarly-research-observation";
 import type { HelixToolCallAdmissionFamily } from "@shared/helix-tool-call-admission";
@@ -188,6 +189,8 @@ const requiredArgsForCapability = (capability: string): string[] => {
       return ["query"];
     case HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY:
       return ["paper_result_or_source"];
+    case HELIX_SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY:
+      return ["text_evidence"];
     case "live_env.draft_micro_reasoner_preset":
       return ["scenario_text"];
     case "live_env.route_micro_reasoner_prompt":
@@ -254,6 +257,8 @@ const optionalArgsForCapability = (capability: string): string[] => {
       return ["doi", "arxiv_id", "arxivId", "title", "journal", "reference", "citation", "limit"];
     case HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY:
       return ["paper_result_id", "paper_id", "result_id", "doi", "arxiv_id", "arxivId", "source_url", "pdf_url", "full_text_url", "url"];
+    case HELIX_SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY:
+      return ["source_ref", "full_text_observation", "requested_variables", "variables"];
     case "live_env.query_micro_reasoner_presets":
       return ["query", "include_presets", "limit", "source_id", "source_ids", "preset_id"];
     case "live_env.draft_micro_reasoner_preset":
@@ -720,6 +725,27 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
     source_target: "scholarly_research",
     admission_families: ["scholarly_research"],
     required_observation_kinds: ["scholarly_full_text_observation"],
+    required_terminal_kind: "scholarly_research_answer",
+    allowed_substitutions: [],
+    forbidden_nearby_capabilities: ["internet_search.web_research", "model.direct_answer"],
+  },
+  {
+    schema: "helix.explicit_capability_contract.v1",
+    capability: HELIX_SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY,
+    aliases: [
+      "scholarly_research.extract_numeric_parameters",
+      "scholarly research extract numeric parameters",
+      "extract_numeric_parameters",
+      "extract numeric parameters",
+      "numeric_parameter_extraction",
+      "numeric parameter extraction",
+      "scholarly numeric parameters",
+    ],
+    capability_family: "scholarly_research",
+    plan_family: "scholarly_research",
+    source_target: "scholarly_research",
+    admission_families: ["scholarly_research"],
+    required_observation_kinds: ["scholarly_numeric_parameter_observation"],
     required_terminal_kind: "scholarly_research_answer",
     allowed_substitutions: [],
     forbidden_nearby_capabilities: ["internet_search.web_research", "model.direct_answer"],

@@ -55,6 +55,32 @@ export {
   buildHelixAskConsoleChatMessagePayload,
   buildHelixAskConsoleChatTurnPayloads,
 } from "./HelixAskChatPersistence";
+export {
+  addHelixAskLegacyChatMessage,
+  addHelixAskLegacyChatTurnMessages,
+} from "./HelixAskLegacyChatPersistenceBinding";
+export {
+  HELIX_ASK_AGENT_RUNTIME_STORAGE_KEY,
+  persistHelixAskAgentRuntime,
+  readStoredHelixAskAgentRuntime,
+} from "./HelixAskRuntimePreference";
+export {
+  HELIX_LIVE_ANSWER_VISUAL_CAPTURE_ROUTE_STORAGE_KEY,
+  HELIX_LIVE_ANSWER_VISUAL_CAPTURE_ROUTE_SYNC_EVENT,
+  readHelixAskVisualCaptureAudioPreference,
+  syncHelixAskVisualCaptureRoutePreference,
+} from "./HelixAskVisualCapturePreference";
+export {
+  HELIX_ASK_CONTEXT_RESUME_FRAME_SCHEMA,
+  HELIX_ASK_CONTEXT_RESUME_FRAME_STORAGE_KEY,
+  extractHelixAskContextCompactionResumeFrame,
+  extractLatestHelixAskContextCompactionResumeFrameFromReplies,
+  isHelixAskContextCompactionResumeFrame,
+  isHelixAskContextCompactionPausePendingReply,
+  isHelixAskContextCompactionPauseText,
+  readStoredHelixAskContextCompactionResumeFrame,
+  writeStoredHelixAskContextCompactionResumeFrame,
+} from "./HelixAskContextCompactionResumeFrameStorage";
 export { HelixAskRuntimePicker } from "./HelixAskRuntimePicker";
 export { buildHelixAskRuntimePickerModel } from "./HelixAskRuntimePicker";
 export { HelixAskBusyReasoningPanel } from "./HelixAskBusyReasoningPanel";
@@ -74,6 +100,13 @@ export { HelixAskSurfaceSupplementStack } from "./HelixAskSurfaceSupplementStack
 export { HelixAskTurnList } from "./HelixAskTurnList";
 export { HelixAskReplyCard } from "./HelixAskReplyCard";
 export { HelixAskReplyTurn } from "./HelixAskReplyTurn";
+export {
+  hasHelixAskLegacyTerminalMismatch,
+  resolveHelixAskLegacyFinalSourceLabel,
+  selectHelixAskLegacyFinalAnswerText,
+} from "./HelixAskLegacyFinalTextSelection";
+export { resolveHelixAskLegacyReplyFailContext } from "./HelixAskLegacyReplyDebugContext";
+export { sortHelixAskLegacyReplyEventsChronologically } from "./HelixAskLegacyReplyEventOrder";
 export { HelixAskTurnStreamPanel } from "./HelixAskTurnStreamPanel";
 export { HelixAskFinalAnswer } from "./HelixAskFinalAnswer";
 export { buildHelixAskFinalAnswerBlocks } from "./HelixAskFinalAnswer";
@@ -87,7 +120,28 @@ export {
 export { HelixAskActiveTurnStreamPanel } from "./HelixAskActiveTurnStreamPanel";
 export { HelixAskTurnControls } from "./HelixAskTurnControls";
 export { HelixAskDebugDrawer } from "./HelixAskDebugDrawer";
+export {
+  buildHelixAskDebugDrawerCopyProjection,
+  buildHelixAskDebugExportDrawerState,
+} from "./HelixAskDebugDrawerState";
+export type {
+  HelixAskDebugClipboardCopyResult,
+  HelixAskDebugExportDrawerState,
+} from "./HelixAskDebugDrawerState";
 export { HelixAskAttachmentStrip } from "./HelixAskAttachmentStrip";
+export {
+  HELIX_ASK_TEXT_ATTACHMENT_MAX_BYTES,
+  HELIX_ASK_TEXT_ATTACHMENT_PREVIEW_CHARS,
+  base64FromText,
+  buildHelixAskTextAttachmentFromText,
+  buildHelixAskTextAttachmentTurnInputItem,
+  sha256TextHex,
+} from "./HelixAskTextAttachment";
+export {
+  validateHelixAskAttachmentForSubmit,
+  validateHelixAskImageAttachmentForSubmit,
+  validateHelixAskTextAttachmentForSubmit,
+} from "./HelixAskAttachmentCommit";
 export {
   HelixAskContextMemoryStatusLine,
   HelixAskErrorLine,
@@ -118,6 +172,15 @@ export {
   buildHelixAskConsoleContextFiles,
   buildHelixAskConsoleRequestEnvelope,
 } from "./HelixAskRequestEnvelope";
+export {
+  HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE,
+  HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT,
+  HELIX_ASK_ENTRYPOINT_GUARD_VERSION,
+  buildHelixAskHardBackendEntrypointRouteMetadata,
+  requiresHelixAskBackendEntrypoint,
+  resolveHelixAskBackendEntrypointFamily,
+  shouldUseHelixAskBackendTurnEntrypoint,
+} from "./HelixAskBackendEntrypointPolicy";
 export { buildHelixAskMinimalRuntimeSubmitPlan } from "./HelixAskMinimalRuntimeSubmitPlan";
 export {
   completeHelixAskMinimalRuntimeTurn,
@@ -140,6 +203,13 @@ export {
   buildHelixAskLatestTurnBinding,
   resolveHelixAskLatestTurnId,
 } from "./HelixAskLatestTurnBinding";
+export {
+  buildHelixAskLegacyTurnControlViewModel,
+  isHelixAskLegacyBackendDebugExportEligibleTurnId,
+  resolveHelixAskLegacyDebugExportBackendTarget,
+  resolveHelixAskLegacyTurnControlText,
+  selectHelixAskLegacyDebugCopyLocalPayload,
+} from "./HelixAskLegacyTurnControls";
 export {
   hasSuccessfulWorkstationTerminalTranscriptRows,
   resolveHelixAskConsoleFinalAnswerSourceLabel,
@@ -252,6 +322,14 @@ export type {
   HelixAskConsoleChatMessagePayload,
   HelixAskConsoleChatRole,
 } from "./HelixAskChatPersistence";
+export type { HelixAskLegacyChatAddMessage } from "./HelixAskLegacyChatPersistenceBinding";
+export type { HelixAskRuntimePreferenceStorage } from "./HelixAskRuntimePreference";
+export type {
+  HelixAskVisualCapturePreferenceStorage,
+  HelixAskVisualCapturePreferenceTarget,
+  HelixAskVisualCaptureRoute,
+} from "./HelixAskVisualCapturePreference";
+export type { HelixAskContextCompactionResumeFrameStorage } from "./HelixAskContextCompactionResumeFrameStorage";
 export type {
   HelixAskRuntimePickerItem,
   HelixAskRuntimePickerModel,
@@ -286,6 +364,18 @@ export type {
   HelixAskLatestTurnCandidate,
 } from "./HelixAskLatestTurnBinding";
 export type { HelixAskReplyCardProps } from "./HelixAskReplyCard";
+export type {
+  HelixAskLegacyFinalTextSelection,
+  HelixAskLegacyFinalTextSelectionInput,
+  HelixAskLegacyFinalSourceLabelInput,
+  HelixAskLegacyTerminalMismatchInput,
+  HelixAskLegacyFinalTextTranscriptRow,
+} from "./HelixAskLegacyFinalTextSelection";
+export type { HelixAskLegacyReplyFailContext } from "./HelixAskLegacyReplyDebugContext";
+export type {
+  HelixAskLegacyReplyEventOrderEvent,
+  HelixAskLegacyReplyEventTimestampResolver,
+} from "./HelixAskLegacyReplyEventOrder";
 export type { HelixAskReplyTurnProps } from "./HelixAskReplyTurn";
 export type {
   HelixAskTurnStreamAnswerTint,
@@ -297,6 +387,14 @@ export type {
   HelixAskAttachmentStripCommitCheck,
   HelixAskAttachmentStripProps,
 } from "./HelixAskAttachmentStrip";
+export type {
+  HelixAskAttachment,
+  HelixAskImageAttachment,
+} from "./HelixAskAttachmentCommit";
+export type {
+  HelixAskTextAttachment,
+  HelixAskTextAttachmentMaterializationDeps,
+} from "./HelixAskTextAttachment";
 export type {
   HelixAskContextMemoryStatusLineProps,
   HelixAskErrorLineProps,

@@ -49,6 +49,9 @@ export const futureProvider: HelixAgentProvider = {
   supports: {
     streaming: false,
     workstationTools: true,
+    capabilityLanes: true,
+    capabilityLaneOneShot: false,
+    capabilityLaneSessions: false,
     codeMutation: false,
   },
 

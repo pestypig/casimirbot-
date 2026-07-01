@@ -58,6 +58,10 @@ function readAgentLoopAuditArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
 }
 
+function readBoolean(value: unknown): boolean | null {
+  return typeof value === "boolean" ? value : null;
+}
+
 function isBackendEntrypointFailureText(value: unknown): boolean {
   const text = coerceText(value).trim();
   return text === HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT || text === HELIX_ASK_BACKEND_DEBUG_MATERIALIZATION_TEXT;
@@ -302,6 +306,27 @@ export function buildVisibleResolvedTurn(reply: HelixAskTerminalProjectionReply)
     terminalAuthorityRecord?.schema === "helix.turn_terminal_authority.v1" &&
     terminalAuthorityRecord.server_authoritative === true;
   const summary = readHelixResolvedTurnSummary(reply);
+  const askEntrypointRequired =
+    readBoolean(replyRecord?.ask_entrypoint_required) ??
+    readBoolean(debugRecord?.ask_entrypoint_required) ??
+    false;
+  const askEntrypointObserved =
+    readBoolean(replyRecord?.ask_entrypoint_observed) ??
+    readBoolean(debugRecord?.ask_entrypoint_observed);
+  if (askEntrypointRequired && askEntrypointObserved === false) {
+    return {
+      active_turn_id: coerceText(reply.turn_id).trim() || coerceText(summary?.turn_id).trim() || reply.id,
+      primary_route_label: "backend_ask_entrypoint / typed_failure",
+      primary_terminal_label: "final_failure",
+      primary_source_label: "typed failure",
+      selected_final_answer: HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT,
+      terminal_error_code:
+        coerceText(replyRecord?.ask_entrypoint_failure_code).trim() ||
+        coerceText(debugRecord?.ask_entrypoint_failure_code).trim() ||
+        HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE,
+      pending_server_request_present: false,
+    };
+  }
   const terminalResolution = resolveHelixVisibleTerminalCore(reply);
   const structuredWorkstationGatewaySuccess = hasStructuredSuccessfulWorkstationGatewayEvidence(replyRecord, debugRecord);
   const structuredWorkstationFinalText = structuredWorkstationGatewaySuccess
