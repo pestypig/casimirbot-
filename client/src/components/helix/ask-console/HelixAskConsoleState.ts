@@ -122,6 +122,7 @@ export const HELIX_ASK_CONSOLE_RECROWNED_DISPLAY_OWNERS = [
   "surface_composer_panel",
   "surface_supplement_stack",
   "busy_reasoning_panel",
+  "legacy_console_view",
   "console_stack",
   "runtime_layout",
   "error_boundary",

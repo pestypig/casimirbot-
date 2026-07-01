@@ -134,6 +134,7 @@ describe("Helix Ask Console recrown boundary", () => {
       "HelixAskGoalPill.tsx",
       "HelixAskProceduralTimeline.tsx",
       "HelixAskConsoleStack.tsx",
+      "HelixAskLegacyConsoleView.tsx",
       "HelixAskConsoleRuntimeLayout.tsx",
       "HelixAskReasoningAnimationStyles.tsx",
       "HelixAskReasoningBattleStage.tsx",
@@ -315,8 +316,8 @@ describe("Helix Ask Console recrown boundary", () => {
       legacyPillLines.findIndex((line) => line.includes("export function HelixAskPill")) + 1;
     const activeRenderLine =
       legacyPillLines.findIndex((line) => line.includes("const activeTurnStreamPanel = (")) + 1;
-    const runtimeLayoutLine =
-      legacyPillLines.findIndex((line) => line.includes("<HelixAskConsoleRuntimeLayout")) + 1;
+    const legacyConsoleViewLine =
+      legacyPillLines.findIndex((line) => line.includes("<HelixAskLegacyConsoleView")) + 1;
 
     expect(HELIX_ASK_LEGACY_CONSOLE_ACTIVE_PATH).toEqual([
       "HelixAskConsole",
@@ -328,7 +329,7 @@ describe("Helix Ask Console recrown boundary", () => {
       file: "client/src/components/helix/HelixAskPill.tsx",
       exportedComponentStartsAtLine: exportedComponentLine,
       liveRenderSliceStartsAtLine: activeRenderLine,
-      liveRuntimeLayoutStartsAtLine: runtimeLayoutLine,
+      liveLegacyConsoleViewStartsAtLine: legacyConsoleViewLine,
     });
     expect(Math.abs(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.lineCountAtInventory - legacyPillLines.length)).toBeLessThanOrEqual(5);
     expect(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.lineCountAtInventory).toBeGreaterThan(29000);
@@ -356,7 +357,7 @@ describe("Helix Ask Console recrown boundary", () => {
       behaviorSensitiveQuarantinedSliceCount: 4,
       unknownTrapDoorSliceCount: 1,
     });
-    expect(legacyPillSource).toContain("<HelixAskConsoleRuntimeLayout");
+    expect(legacyPillSource).toContain("<HelixAskLegacyConsoleView");
     expect(legacyPillSource).toContain("<HelixAskSurfaceComposerPanel");
     expect(legacyPillSource).toContain("<HelixAskSurfaceSupplementStack");
     expect(legacyPillSource).toContain("<HelixAskReplyTurn");
@@ -1332,7 +1333,7 @@ describe("Helix Ask Console recrown boundary", () => {
     const consoleStack = read("client/src/components/helix/ask-console/HelixAskConsoleStack.tsx");
     const surfaceFrame = read("client/src/components/helix/ask-console/HelixAskSurfaceFrame.tsx");
 
-    expect(legacyPill).toContain("<HelixAskConsoleRuntimeLayout");
+    expect(legacyPill).toContain("<HelixAskLegacyConsoleView");
     expect(legacyPill).toContain("<HelixAskSurfaceFrame");
     expect(legacyPill).toContain("maxWidthClassName={maxWidthClass}");
     expect(legacyPill).toContain("maxWidthStyle={formMaxWidthStyle}");
@@ -1369,12 +1370,13 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(surfaceFrame).not.toContain("runAskTurn");
   });
 
-  it("owns runtime layout slot composition while live state stays in the bridge", () => {
+  it("owns legacy console view slot composition while live state stays in the bridge", () => {
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
+    const legacyConsoleView = read("client/src/components/helix/ask-console/HelixAskLegacyConsoleView.tsx");
     const runtimeLayout = read("client/src/components/helix/ask-console/HelixAskConsoleRuntimeLayout.tsx");
     const ownershipMap = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
 
-    expect(legacyPill).toContain("<HelixAskConsoleRuntimeLayout");
+    expect(legacyPill).toContain("<HelixAskLegacyConsoleView");
     expect(legacyPill).toContain("surface={");
     expect(legacyPill).toContain("goalPill={askGoalSession ? (");
     expect(legacyPill).toContain("steeringQueue={");
@@ -1384,6 +1386,13 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(legacyPill).toContain("setAskGoalPillExpanded");
     expect(legacyPill).toContain("setSteeringQueueExpanded");
     expect(legacyPill).toContain("setDebugExportDrawer(null)");
+
+    expect(legacyConsoleView).toContain("export function HelixAskLegacyConsoleView");
+    expect(legacyConsoleView).toContain("<HelixAskConsoleRuntimeLayout {...props} />");
+    expect(legacyConsoleView).not.toContain("useState");
+    expect(legacyConsoleView).not.toContain("fetch(");
+    expect(legacyConsoleView).not.toContain("navigator.clipboard");
+    expect(legacyConsoleView).not.toContain("speechSynthesis");
 
     expect(runtimeLayout).toContain("export function HelixAskConsoleRuntimeLayout");
     expect(runtimeLayout).toContain("<HelixAskErrorBoundary>");
@@ -1510,7 +1519,7 @@ describe("Helix Ask Console recrown boundary", () => {
     const errorBoundary = read("client/src/components/helix/ask-console/HelixAskErrorBoundary.tsx");
     const runtimeLayout = read("client/src/components/helix/ask-console/HelixAskConsoleRuntimeLayout.tsx");
 
-    expect(legacyPill).toContain("<HelixAskConsoleRuntimeLayout");
+    expect(legacyPill).toContain("<HelixAskLegacyConsoleView");
     expect(legacyPill).not.toContain("<HelixAskErrorBoundary>");
     expect(runtimeLayout).toContain("<HelixAskErrorBoundary>");
     expect(runtimeLayout).toContain("</HelixAskErrorBoundary>");
