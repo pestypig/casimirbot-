@@ -93,6 +93,7 @@ describe("Helix Ask Console recrown boundary", () => {
       "HelixAskConsoleRuntimeLayout.tsx",
       "HelixAskReasoningAnimationStyles.tsx",
       "HelixAskReasoningBattleStage.tsx",
+      "HelixAskReasoningMirekField.tsx",
       "HelixAskReasoningStatusMedalStrip.tsx",
       "HelixAskSurfaceComposerPanel.tsx",
       "HelixAskSurfaceFrame.tsx",
@@ -1041,7 +1042,7 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(legacyPill).toContain("visible={askBusy}");
     expect(legacyPill).toContain("liveBorderClassName={moodPalette.liveBorder}");
     expect(legacyPill).toContain("replyTintClassName={moodPalette.replyTint}");
-    expect(legacyPill).toContain("reasoningTheater && mirekReasoningDisplayGrid");
+    expect(legacyPill).toContain("<HelixAskReasoningMirekField");
     expect(legacyPill).toContain("reasoningTheaterMeterFillRef");
     expect(legacyPill).toContain("setReasoningTheaterFrontierIconBrokenByPath");
     expect(legacyPill).not.toContain("HelixAskReasoningAnimationStyles");
@@ -1132,6 +1133,34 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(battleStage).not.toContain("buildReasoningBattleAnswerTint");
     expect(battleStage).not.toContain("runAskTurn");
     expect(battleStage).not.toContain("fetch(");
+  });
+
+  it("owns Mirek reasoning field display while grid derivation stays in the bridge", () => {
+    const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
+    const mirekField = read("client/src/components/helix/ask-console/HelixAskReasoningMirekField.tsx");
+    const ownershipMap = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
+
+    expect(legacyPill).toContain("<HelixAskReasoningMirekField");
+    expect(legacyPill).toContain("grid={reasoningTheater ? mirekReasoningDisplayGrid : null}");
+    expect(legacyPill).toContain("fieldStrength={mirekReasoningFieldStrength}");
+    expect(legacyPill).toContain("buildMirekReasoningDisplayGrid");
+    expect(legacyPill).not.toContain('data-testid="helix-ask-mirek-field"');
+    expect(legacyPill).not.toContain("gridTemplateColumns: `repeat(${mirekReasoningDisplayGrid.width}");
+    expect(legacyPill).not.toContain("mirekReasoningDisplayGrid.cells.map");
+
+    expect(mirekField).toContain("export function HelixAskReasoningMirekField");
+    expect(mirekField).toContain('data-testid="helix-ask-mirek-field"');
+    expect(mirekField).toContain("grid.cells.map((cell, index)");
+    expect(mirekField).toContain("mirekCellGridClassName(cell.kind)");
+    expect(mirekField).toContain("fieldStrength");
+    expect(mirekField).not.toContain("buildMirekReasoningDisplayGrid");
+    expect(mirekField).not.toContain("reasoningTheater");
+    expect(mirekField).not.toContain("setReasoning");
+    expect(mirekField).not.toContain("runAskTurn");
+    expect(mirekField).not.toContain("fetch(");
+    expect(mirekField).not.toContain("navigator.clipboard");
+    expect(ownershipMap).toContain("Mirek reasoning field display");
+    expect(ownershipMap).toContain("HelixAskReasoningMirekField");
   });
 
   it("owns reasoning status and medal strip display while medal state stays in the bridge", () => {
