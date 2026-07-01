@@ -1,5 +1,16 @@
 export { HelixAskConsole } from "./HelixAskConsole";
 export { HelixAskConsoleRuntimeShell } from "./HelixAskConsoleRuntimeShell";
+export { HelixAskMinimalRuntimeShell } from "./HelixAskMinimalRuntimeShell";
+export {
+  buildHelixAskMinimalRuntimeTurnViews,
+  HelixAskMinimalRuntimeTurnList,
+} from "./HelixAskMinimalRuntimeTurnList";
+export {
+  buildHelixAskMinimalRuntimeControlPayload,
+  buildHelixAskMinimalRuntimeDebugCopyText,
+  HELIX_ASK_MINIMAL_RUNTIME_BROWSER_CONTROL_ACTIONS,
+} from "./HelixAskMinimalRuntimeControls";
+export { buildHelixAskMinimalRuntimeRepliesFromChatSession } from "./HelixAskMinimalRuntimeChatSession";
 export {
   HELIX_ASK_CONSOLE_DOCK_REPLY_LIST_CLASS_NAME,
   HELIX_ASK_CONSOLE_HERO_REPLY_LIST_CLASS_NAME,
@@ -100,6 +111,23 @@ export {
   buildHelixAskConsoleContextFiles,
   buildHelixAskConsoleRequestEnvelope,
 } from "./HelixAskRequestEnvelope";
+export { buildHelixAskMinimalRuntimeSubmitPlan } from "./HelixAskMinimalRuntimeSubmitPlan";
+export {
+  completeHelixAskMinimalRuntimeTurn,
+  coerceHelixAskMinimalRuntimeText,
+  createHelixAskMinimalRuntimeInitialState,
+  failHelixAskMinimalRuntimeTurn,
+  resolveHelixAskMinimalRuntimeAnswerText,
+  startHelixAskMinimalRuntimeTurn,
+} from "./HelixAskMinimalRuntimeLifecycle";
+export {
+  buildHelixAskMinimalRuntimeTurnPayload,
+  runHelixAskMinimalRuntimeInjectedTransport,
+} from "./HelixAskMinimalRuntimeTransport";
+export {
+  createHelixAskMinimalRuntimeBackendRunner,
+  runHelixAskMinimalRuntimeBackendTurn,
+} from "./HelixAskMinimalRuntimeBackendRunner";
 export {
   buildHelixAskLatestTurnBinding,
   resolveHelixAskLatestTurnId,
@@ -114,6 +142,9 @@ export {
   selectHelixAskConsoleWorkstationTraceRows,
 } from "./HelixAskWorkstationTraceRows";
 export {
+  HELIX_ASK_CONSOLE_BRIDGE_REPLACEMENT_OPEN_GATES,
+  HELIX_ASK_CONSOLE_BRIDGE_REPLACEMENT_PROVEN_GATES,
+  HELIX_ASK_CONSOLE_BRIDGE_REPLACEMENT_READY,
   HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS,
   HELIX_ASK_CONSOLE_ACTIVE_RECROWN_PHASE,
   HELIX_ASK_CONSOLE_LIVE_SURFACE_REQUIREMENTS,
@@ -126,6 +157,8 @@ export {
   HELIX_ASK_CONSOLE_RUNTIME_SHELL_ACTIVE_OWNERSHIP,
 } from "./HelixAskConsoleState";
 export type {
+  HelixAskConsoleBridgeReplacementOpenGate,
+  HelixAskConsoleBridgeReplacementProvenGate,
   HelixAskConsoleLegacyBridgeStatus,
   HelixAskConsoleLiveSurfaceRequirement,
   HelixAskConsoleMinimalRuntimeShellForbiddenOwnership,
@@ -136,6 +169,27 @@ export type {
 } from "./HelixAskConsoleState";
 export type { HelixAskContextBridgeSnapshot } from "./HelixAskContextBridge";
 export type { HelixAskConsoleRequestEnvelope } from "./HelixAskRequestEnvelope";
+export type { HelixAskMinimalRuntimeSubmitPlan } from "./HelixAskMinimalRuntimeSubmitPlan";
+export type { HelixAskMinimalRuntimeShellProps } from "./HelixAskMinimalRuntimeShell";
+export type {
+  HelixAskMinimalRuntimeTurnListProps,
+  HelixAskMinimalRuntimeTurnView,
+} from "./HelixAskMinimalRuntimeTurnList";
+export type {
+  HelixAskMinimalRuntimeControlActions,
+  HelixAskMinimalRuntimeControlPayload,
+} from "./HelixAskMinimalRuntimeControls";
+export type {
+  HelixAskMinimalRuntimeReply,
+  HelixAskMinimalRuntimeState,
+} from "./HelixAskMinimalRuntimeLifecycle";
+export type {
+  HelixAskMinimalRuntimeStreamEvent,
+  HelixAskMinimalRuntimeTransportResult,
+  HelixAskMinimalRuntimeTurnPayload,
+  HelixAskMinimalRuntimeTurnRunner,
+} from "./HelixAskMinimalRuntimeTransport";
+export type { HelixAskMinimalRuntimeBackendRunnerDeps } from "./HelixAskMinimalRuntimeBackendRunner";
 export type { HelixAskFinalAnswerBlock, HelixAskFinalAnswerProps } from "./HelixAskFinalAnswer";
 export type {
   HelixAskLiveBridgePill,
@@ -199,6 +253,7 @@ export type { HelixAskSurfaceComposerPanelProps } from "./HelixAskSurfaceCompose
 export type { HelixAskSurfaceFrameProps } from "./HelixAskSurfaceFrame";
 export type { HelixAskSurfaceSupplementStackProps } from "./HelixAskSurfaceSupplementStack";
 export type {
+  HelixAskLatestTurnControlTarget,
   HelixAskLatestTurnBinding,
   HelixAskLatestTurnCandidate,
 } from "./HelixAskLatestTurnBinding";

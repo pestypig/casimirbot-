@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import React, { type ReactNode } from "react";
 
 import { HelixAskConsoleStack } from "./HelixAskConsoleStack";
 import { HelixAskErrorBoundary } from "./HelixAskErrorBoundary";

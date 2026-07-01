@@ -153,6 +153,28 @@ describe("explicit workstation gateway derived calls", () => {
     });
   });
 
+  it("preserves scientific notation in prompt-named calculator expressions", () => {
+    const expression = "2.26e18*164.8*1.602176634e-19";
+    const requests = buildPromptNamedCapabilityGatewayCallRequests({
+      agent_runtime: "codex",
+      question:
+        `Use scientific-calculator.solve_expression with expression: ${expression}. Report only from the calculator receipt.`,
+    });
+
+    expect(capabilities(requests)).toEqual(["scientific-calculator.solve_expression"]);
+    expect(requests[0]).toMatchObject({
+      capability_id: "scientific-calculator.solve_expression",
+      arguments: {
+        expression,
+        source_target_intent: expect.objectContaining({
+          target_source: "scientific_calculator",
+          target_kind: "calculator_solve",
+          expression,
+        }),
+      },
+    });
+  });
+
   it("maps safe docs-viewer search aliases onto the canonical docs.search gateway", () => {
     const requests = buildPromptNamedCapabilityGatewayCallRequests({
       agent_runtime: "codex",

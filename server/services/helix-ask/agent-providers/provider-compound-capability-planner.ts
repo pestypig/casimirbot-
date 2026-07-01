@@ -25,6 +25,8 @@ const readRecord = (value: unknown): Record<string, unknown> | null =>
 const readString = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
 
+const readArray = (value: unknown): unknown[] => Array.isArray(value) ? value : [];
+
 const unquotePrompt = (prompt: string): string => prompt.replace(/"[^"]*"|'[^']*'|`[^`]*`/g, " ");
 
 const hasNegatedToolInstruction = (prompt: string, toolPattern: RegExp): boolean => {
@@ -335,6 +337,12 @@ const isResearchQuantifyReflectPrompt = (prompt: string): boolean => {
   ) {
     return false;
   }
+  if (
+    /\b(?:later|future|eventually|hypothetically|might|could|would|not\s+now)\b[\s\S]{0,180}\b(?:research|papers?|arxiv|scholarly|internet|web|calculate|compute|estimate|reflect|theory\s+badge\s+graph|theory\s+graph)\b/i.test(unquoted) ||
+    /\b(?:research|papers?|arxiv|scholarly|internet|web|calculate|compute|estimate|reflect|theory\s+badge\s+graph|theory\s+graph)\b[\s\S]{0,180}\b(?:later|future|eventually|hypothetically|might|could|would|not\s+now)\b/i.test(unquoted)
+  ) {
+    return false;
+  }
   const wantsResearch = /\b(?:research\s+papers?|papers?|arxiv|scholarly|internet|web|sources?|corroborat(?:e|ion)|retrieve\s+evidence|look\s+up)\b/i.test(unquoted);
   const wantsQuantify = /\b(?:calculate|compute|estimate|quantif(?:y|ication)|scalar|equation|plug\s+into)\b/i.test(unquoted);
   const wantsReflection = /\b(?:reflect|theory\s+badge\s+graph|theory\s+graph|civilization\s+bounds?|claim\s+boundary|conditions\s+of\s+the\s+civilization|social|energy|material)\b/i.test(unquoted);
@@ -482,7 +490,7 @@ const buildResearchQuantifyReflectRequests = (body: Record<string, unknown>): Re
       },
     });
   }
-  return requests.length >= 3 ? requests : [];
+  return requests.length >= 2 ? requests : [];
 };
 
 const buildReadAloudSurfaceRequests = (body: Record<string, unknown>): Record<string, unknown>[] => {
@@ -665,6 +673,335 @@ const READABLE_SURFACE_CAPABILITIES = new Set<string>([
   CALCULATOR_READ_VISIBLE_RESULT_CAPABILITY,
 ]);
 
+const CALCULATOR_TEMPLATE_CONSTANTS: Record<string, string> = {
+  e_charge: "1.602176634e-19",
+  mu0: "1.25663706212e-6",
+  pi: "3.141592653589793",
+  e: "2.718281828459045",
+};
+
+const CALCULATOR_FUNCTIONS = new Set(["sqrt", "ln", "log", "sin", "cos", "tan"]);
+
+const calculatorTemplateVariables = (expression: string): string[] => {
+  const rightHandSide = expression.includes("=") ? expression.split("=").slice(1).join("=") : expression;
+  return Array.from(new Set(
+    Array.from(rightHandSide.matchAll(/\b[A-Za-z_][A-Za-z0-9_]*\b/g))
+      .map((match) => match[0])
+      .filter((symbol) => !CALCULATOR_TEMPLATE_CONSTANTS[symbol])
+      .filter((symbol) => !CALCULATOR_FUNCTIONS.has(symbol)),
+  ));
+};
+
+const calculatorExpressionRhs = (expression: string): string =>
+  (expression.includes("=") ? expression.split("=").slice(1).join("=") : expression).trim();
+
+const normalizeVariableLabel = (value: string): string =>
+  value.toLowerCase().replace(/[^a-z0-9]+/g, "");
+
+const aliasesForCalculatorVariable = (variable: string): string[] => {
+  const normalized = normalizeVariableLabel(variable);
+  const aliases = new Set<string>([
+    variable,
+    variable.replace(/_/g, " "),
+    variable.replace(/_/g, ""),
+  ]);
+  if (normalized === "nm3") {
+    aliases.add("n_m3");
+    aliases.add("electron density");
+    aliases.add("number density");
+    aliases.add("density");
+  }
+  if (normalized === "tev") {
+    aliases.add("T_eV");
+    aliases.add("electron temperature");
+    aliases.add("temperature");
+  }
+  if (normalized === "ploss") {
+    aliases.add("P_loss");
+    aliases.add("power loss");
+    aliases.add("loss power");
+  }
+  if (normalized === "taue") {
+    aliases.add("tau_E");
+    aliases.add("energy confinement time");
+    aliases.add("confinement time");
+  }
+  return Array.from(aliases).filter((entry) => entry.trim().length > 0);
+};
+
+const inferredUnitForCalculatorVariable = (variable: string): string | null => {
+  const normalized = normalizeVariableLabel(variable);
+  if (normalized === "nm3") return "m^-3";
+  if (normalized === "tev") return "eV";
+  if (normalized === "ploss") return "W";
+  if (normalized === "taue") return "s";
+  return null;
+};
+
+const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const NUMERIC_TEXT_PATTERN = "[-+]?(?:\\d+(?:\\.\\d+)?|\\.\\d+)(?:e[-+]?\\d+)?";
+
+type CalculatorNumericBinding = {
+  variable: string;
+  value: string;
+  unit: string;
+  source_ref: string;
+  evidence_text: string;
+};
+
+type CalculatorExpressionTemplate = {
+  expression: string;
+  source_refs: string[];
+  required_inputs: string[];
+};
+
+type CalculatorBindingResult = {
+  schema: "helix.compound_typed_affordance_binding.v1";
+  status: "bound" | "blocked";
+  template: CalculatorExpressionTemplate | null;
+  bound_expression: string | null;
+  normalized_expression: string | null;
+  variable_bindings: CalculatorNumericBinding[];
+  missing_variables: string[];
+  selected_affordances: Record<string, unknown>[];
+  rejected_expression: string | null;
+  reason: string | null;
+  assistant_answer: false;
+  raw_content_included: false;
+};
+
+const readProducedAffordanceRecords = (result: HelixWorkstationGatewayCallResult): Record<string, unknown>[] => [
+  ...readArray(result.produced_affordances).map(readRecord).filter((entry): entry is Record<string, unknown> => Boolean(entry)),
+  ...readArray(result.observation_packet.produced_affordances).map(readRecord).filter((entry): entry is Record<string, unknown> => Boolean(entry)),
+];
+
+const calculatorTemplatesFromResult = (result: HelixWorkstationGatewayCallResult): CalculatorExpressionTemplate[] => {
+  const affordanceTemplates = readProducedAffordanceRecords(result)
+    .filter((affordance) => readString(affordance.kind) === "calculator_expression_template")
+    .map((affordance): CalculatorExpressionTemplate | null => {
+      const expression = readString(affordance.expression);
+      if (!expression) return null;
+      const requiredInputs = readArray(affordance.required_inputs)
+        .map(readString)
+        .filter((entry): entry is string => Boolean(entry));
+      return {
+        expression,
+        source_refs: readArray(affordance.source_refs)
+          .map(readString)
+          .filter((entry): entry is string => Boolean(entry)),
+        required_inputs: requiredInputs.length ? requiredInputs : calculatorTemplateVariables(expression),
+      };
+    })
+    .filter((entry): entry is CalculatorExpressionTemplate => Boolean(entry));
+  const observation = readRecord(result.observation);
+  const payloadTemplates = readArray(observation?.calculator_payloads)
+    .map(readRecord)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+    .map((payload): CalculatorExpressionTemplate | null => {
+      const expression = readString(payload.expression);
+      if (!expression) return null;
+      return {
+        expression,
+        source_refs: [
+          readString(payload.badge_id),
+          readString(payload.payload_id),
+        ].filter((entry): entry is string => Boolean(entry)),
+        required_inputs: calculatorTemplateVariables(expression),
+      };
+    })
+    .filter((entry): entry is CalculatorExpressionTemplate => Boolean(entry));
+  const all = [...affordanceTemplates, ...payloadTemplates];
+  const seen = new Set<string>();
+  return all.filter((template) => {
+    const key = template.expression;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return template.required_inputs.length > 0;
+  });
+};
+
+const evidenceSourceRefForRecord = (
+  result: HelixWorkstationGatewayCallResult,
+  record: Record<string, unknown>,
+): string =>
+  readString(record.url) ??
+  readString(record.source_ref) ??
+  readString(record.ref) ??
+  readString(record.paper_id) ??
+  readString(record.id) ??
+  result.observation_packet.produced_artifact_refs[0] ??
+  `${result.capability_id}:observation`;
+
+const textEvidenceRowsFromResult = (result: HelixWorkstationGatewayCallResult): Array<{
+  text: string;
+  source_ref: string;
+}> => {
+  const observation = readRecord(result.observation);
+  if (!observation) return [];
+  const rows: Array<{ text: string; source_ref: string }> = [];
+  const pushRecord = (record: Record<string, unknown> | null): void => {
+    if (!record) return;
+    const parts = [
+      readString(record.title),
+      readString(record.content),
+      readString(record.abstract),
+      readString(record.summary),
+      readString(record.text),
+      readString(record.excerpt),
+      readString(record.snippet),
+    ].filter((entry): entry is string => Boolean(entry));
+    const text = parts.join(" ").replace(/\s+/g, " ").trim();
+    if (!text) return;
+    rows.push({
+      text,
+      source_ref: evidenceSourceRefForRecord(result, record),
+    });
+  };
+  pushRecord(observation);
+  pushRecord(readRecord(observation.active_document_observation));
+  for (const key of ["results", "papers", "hits", "evidence_observations", "document_candidates"]) {
+    for (const entry of readArray(observation[key]).map(readRecord)) {
+      pushRecord(entry);
+      for (const nestedKey of ["best_snippets", "snippets", "matches"]) {
+        for (const nested of readArray(entry?.[nestedKey]).map(readRecord)) pushRecord(nested);
+      }
+    }
+  }
+  return rows.slice(0, 80);
+};
+
+const parseNumericBindingFromText = (
+  variable: string,
+  evidence: { text: string; source_ref: string },
+): CalculatorNumericBinding | null => {
+  const inferredUnit = inferredUnitForCalculatorVariable(variable);
+  for (const alias of aliasesForCalculatorVariable(variable)) {
+    const aliasPattern = escapeRegExp(alias).replace(/\\ /g, "\\s+");
+    const pattern = new RegExp(
+      `(?:\\b${aliasPattern}\\b)\\s*(?:=|:|is|of|was|were|~|≈|about|around)?\\s*(${NUMERIC_TEXT_PATTERN})\\s*([A-Za-zµμ][A-Za-z0-9µμ_./^+-]*)?`,
+      "i",
+    );
+    const match = evidence.text.match(pattern);
+    if (!match?.[1]) continue;
+    const unit = readString(match[2]) ?? inferredUnit;
+    if (!unit) continue;
+    return {
+      variable,
+      value: match[1],
+      unit,
+      source_ref: evidence.source_ref,
+      evidence_text: evidence.text.slice(Math.max(0, match.index ?? 0), Math.min(evidence.text.length, (match.index ?? 0) + 180)),
+    };
+  }
+  return null;
+};
+
+const bindCalculatorExpressionFromResults = (
+  results: HelixWorkstationGatewayCallResult[],
+): CalculatorBindingResult | null => {
+  const templates = results.flatMap(calculatorTemplatesFromResult);
+  if (templates.length === 0) return null;
+  const evidenceRows = results
+    .filter((result) => result.ok === true && result.capability_id !== CALCULATOR_SOLVE_EXPRESSION_CAPABILITY)
+    .flatMap(textEvidenceRowsFromResult);
+  let bestBlocked: CalculatorBindingResult | null = null;
+  for (const template of templates) {
+    const bindings = template.required_inputs
+      .map((variable) => {
+        const binding = evidenceRows
+          .map((evidence) => parseNumericBindingFromText(variable, evidence))
+          .find((entry): entry is CalculatorNumericBinding => Boolean(entry));
+        return binding;
+      })
+      .filter((entry): entry is CalculatorNumericBinding => Boolean(entry));
+    const missingVariables = template.required_inputs.filter((variable) =>
+      !bindings.some((binding) => binding.variable === variable)
+    );
+    if (missingVariables.length > 0) {
+      bestBlocked ??= {
+        schema: "helix.compound_typed_affordance_binding.v1",
+        status: "blocked",
+        template,
+        bound_expression: null,
+        normalized_expression: null,
+        variable_bindings: bindings,
+        missing_variables: missingVariables,
+        selected_affordances: [{
+          kind: "calculator_expression_template",
+          expression: template.expression,
+          source_refs: template.source_refs,
+          required_inputs: template.required_inputs,
+        }],
+        rejected_expression: template.expression,
+        reason: "missing_numeric_value_evidence",
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+      continue;
+    }
+    let boundExpression = calculatorExpressionRhs(template.expression);
+    for (const binding of bindings) {
+      boundExpression = boundExpression.replace(new RegExp(`\\b${escapeRegExp(binding.variable)}\\b`, "g"), binding.value);
+    }
+    for (const [constant, value] of Object.entries(CALCULATOR_TEMPLATE_CONSTANTS)) {
+      boundExpression = boundExpression.replace(new RegExp(`\\b${escapeRegExp(constant)}\\b`, "g"), value);
+    }
+    const normalizedExpression = boundExpression.replace(/\s+/g, "");
+    if (!/^[0-9eE.+\-*/^%()[\]]+$/.test(normalizedExpression)) {
+      bestBlocked ??= {
+        schema: "helix.compound_typed_affordance_binding.v1",
+        status: "blocked",
+        template,
+        bound_expression: null,
+        normalized_expression: normalizedExpression,
+        variable_bindings: bindings,
+        missing_variables: [],
+        selected_affordances: [{
+          kind: "calculator_expression_template",
+          expression: template.expression,
+          source_refs: template.source_refs,
+          required_inputs: template.required_inputs,
+        }],
+        rejected_expression: template.expression,
+        reason: "bound_expression_not_numeric",
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+      continue;
+    }
+    return {
+      schema: "helix.compound_typed_affordance_binding.v1",
+      status: "bound",
+      template,
+      bound_expression: normalizedExpression,
+      normalized_expression: normalizedExpression,
+      variable_bindings: bindings,
+      missing_variables: [],
+      selected_affordances: [
+        {
+          kind: "calculator_expression_template",
+          expression: template.expression,
+          source_refs: template.source_refs,
+          required_inputs: template.required_inputs,
+        },
+        ...bindings.map((binding) => ({
+          kind: "numeric_value_evidence",
+          variable: binding.variable,
+          value: binding.value,
+          unit: binding.unit,
+          source_ref: binding.source_ref,
+        })),
+      ],
+      rejected_expression: null,
+      reason: null,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
+  return bestBlocked;
+};
+
 const readSurfaceObservationForNarrator = (result: HelixWorkstationGatewayCallResult): {
   text: string;
   evidenceRefs: string[];
@@ -759,11 +1096,59 @@ const readDocsExcerptForNarrator = (result: HelixWorkstationGatewayCallResult): 
 export const buildDependentCompoundCapabilityGatewayCallRequest = (input: {
   request: Record<string, unknown>;
   result: HelixWorkstationGatewayCallResult;
+  results?: HelixWorkstationGatewayCallResult[];
   turnId: string;
 }): Record<string, unknown> | null => {
   const outcome = readString(input.request.compound_outcome);
   const dependentCapability =
     readString(input.request.dependent_capability_id) ?? readString(input.request.dependentCapabilityId);
+  if (
+    outcome === RESEARCH_QUANTIFY_REFLECT_OUTCOME &&
+    input.result.capability_id === THEORY_CONTEXT_REFLECTION_CAPABILITY
+  ) {
+    const binding = bindCalculatorExpressionFromResults(input.results?.length ? input.results : [input.result]);
+    if (!binding || binding.status !== "bound" || !binding.bound_expression) return null;
+    const evidenceRefs = binding.variable_bindings.map((entry) => entry.source_ref);
+    return {
+      schema: "helix.workstation_gateway.compound_dependency_bound_call_request.v1",
+      derivation_source: "helix_compound_capability_dependency_planner",
+      compound_outcome: RESEARCH_QUANTIFY_REFLECT_OUTCOME,
+      subgoal_id: `${RESEARCH_QUANTIFY_REFLECT_OUTCOME}:calculator_bound_expression`,
+      capability_id: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+      mode: "read",
+      arguments: {
+        expression: binding.bound_expression,
+        source: "helix_compound_capability_dependency_planner",
+        turn_id: input.turnId,
+        bound_calculator_expression: binding,
+        source_target_intent: {
+          source: "helix_compound_capability_dependency_planner",
+          target_source: "scientific_calculator",
+          target_kind: "calculator_solve",
+          compound_outcome: RESEARCH_QUANTIFY_REFLECT_OUTCOME,
+          subgoal_id: `${RESEARCH_QUANTIFY_REFLECT_OUTCOME}:calculator_bound_expression`,
+          depends_on_subgoal_id: `${RESEARCH_QUANTIFY_REFLECT_OUTCOME}:theory_reflection`,
+          depends_on_capability_id: input.result.capability_id,
+          dependency_binding: "typed_affordance_bound_calculator_expression",
+          required_observation_kind: "helix.calculator_solve_observation.v1",
+          required_affordance_kinds: [
+            "calculator_expression_template",
+            "numeric_value_evidence",
+            "bound_calculator_expression",
+          ],
+          produced_affordance_kind: "bound_calculator_expression",
+          selected_affordances: binding.selected_affordances,
+          variable_bindings: binding.variable_bindings,
+          evidence_refs: evidenceRefs,
+          source_refs: [...(binding.template?.source_refs ?? []), ...evidenceRefs],
+          normalized_expression: binding.normalized_expression,
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    };
+  }
   if (outcome !== READ_ALOUD_DOC_EXCERPT_OUTCOME || dependentCapability !== VOICE_NARRATOR_SAY_CAPABILITY) {
     return null;
   }
@@ -809,6 +1194,7 @@ export const buildDependentCompoundCapabilityGatewayCallRequest = (input: {
 export const buildCompoundDependencyRailStatus = (input: {
   request: Record<string, unknown>;
   result: HelixWorkstationGatewayCallResult;
+  results?: HelixWorkstationGatewayCallResult[];
   dependentRequest: Record<string, unknown> | null;
 }): Record<string, unknown> | null => {
   const outcome = readString(input.request.compound_outcome);
@@ -863,32 +1249,76 @@ export const buildCompoundDependencyRailStatus = (input: {
       ? sourceTargetIntent.subgoal_ordinal
       : 1;
     const satisfied = input.result.ok === true;
+    const calculatorBinding = outcome === RESEARCH_QUANTIFY_REFLECT_OUTCOME &&
+      capability === THEORY_CONTEXT_REFLECTION_CAPABILITY
+        ? bindCalculatorExpressionFromResults(input.results?.length ? input.results : [input.result])
+        : null;
+    const boundCalculatorPlanned = Boolean(input.dependentRequest);
+    const calculatorSubgoal = calculatorBinding
+      ? {
+          subgoal_id: `${RESEARCH_QUANTIFY_REFLECT_OUTCOME}:calculator_bound_expression`,
+          ordinal: ordinal + 1,
+          requested_capability: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+          executed_capability: null,
+          required_observation_kind: "helix.calculator_solve_observation.v1",
+          depends_on_subgoal_id: `${RESEARCH_QUANTIFY_REFLECT_OUTCOME}:theory_reflection`,
+          dependency_binding: "typed_affordance_bound_calculator_expression",
+          required_affordance_kinds: [
+            "calculator_expression_template",
+            "numeric_value_evidence",
+            "bound_calculator_expression",
+          ],
+          selected_affordances: calculatorBinding.selected_affordances,
+          variable_bindings: calculatorBinding.variable_bindings,
+          missing_variables: calculatorBinding.missing_variables,
+          bound_expression: calculatorBinding.bound_expression,
+          normalized_expression: calculatorBinding.normalized_expression,
+          rejected_expression: calculatorBinding.rejected_expression,
+          satisfied: false,
+          rail_status: boundCalculatorPlanned ? "planned_after_dependency" : "blocked_by_dependency",
+          assistant_answer: false,
+          raw_content_included: false,
+        }
+      : null;
+    const firstBrokenRail = !satisfied
+      ? {
+          subgoal_id: subgoalId,
+          capability_id: capability,
+          reason: input.result.error ?? "observation_missing",
+        }
+      : calculatorBinding?.status === "blocked"
+        ? {
+            subgoal_id: `${RESEARCH_QUANTIFY_REFLECT_OUTCOME}:calculator_bound_expression`,
+            capability_id: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+            reason: calculatorBinding.reason ?? "missing_numeric_value_evidence",
+            missing_variables: calculatorBinding.missing_variables,
+            rejected_expression: calculatorBinding.rejected_expression,
+          }
+        : null;
     return {
       schema: "helix.compound_capability_dependency_plan.v1",
       source: "helix_compound_capability_dependency_planner",
       compound_outcome: outcome,
-      subgoals: [{
-        subgoal_id: subgoalId,
-        ordinal,
-        requested_capability: capability,
-        executed_capability: input.result.capability_id === capability ? capability : null,
-        required_observation_kind: requiredObservationKind,
-        satisfied,
-        rail_status: satisfied ? "satisfied" : "missing_observation",
-        assistant_answer: false,
-        raw_content_included: false,
-      }],
+      subgoals: [
+        {
+          subgoal_id: subgoalId,
+          ordinal,
+          requested_capability: capability,
+          executed_capability: input.result.capability_id === capability ? capability : null,
+          required_observation_kind: requiredObservationKind,
+          satisfied,
+          rail_status: satisfied ? "satisfied" : "missing_observation",
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+        ...(calculatorSubgoal ? [calculatorSubgoal] : []),
+      ],
       dependency_edges: Array.isArray(sourceTargetIntent?.dependency_edges)
         ? sourceTargetIntent.dependency_edges
         : [],
-      first_broken_rail: satisfied
-        ? null
-        : {
-            subgoal_id: subgoalId,
-            capability_id: capability,
-            reason: input.result.error ?? "observation_missing",
-          },
-      rail_status: satisfied ? "satisfied" : "blocked",
+      typed_affordance_binding: calculatorBinding,
+      first_broken_rail: firstBrokenRail,
+      rail_status: firstBrokenRail ? "blocked" : boundCalculatorPlanned ? "planned" : "satisfied",
       assistant_answer: false,
       raw_content_included: false,
     };

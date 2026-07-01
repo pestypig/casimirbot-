@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import React, { type ReactNode } from "react";
 import { parseHelixAskFinalAnswerBulletLine } from "@/lib/helix/ask-answer-rendering";
 
 export type HelixAskFinalAnswerBlock =
@@ -67,7 +67,7 @@ export function HelixAskFinalAnswer({ text, meta, renderContent }: HelixAskFinal
   const renderText = renderContent ?? ((value: string) => value);
   return (
     <section className="space-y-2" data-testid="helix-ask-console-final-answer">
-      <div className="mt-2 space-y-1.5 break-words leading-relaxed text-sm text-slate-100">
+      <div className="mt-2 space-y-1.5 whitespace-normal break-words [overflow-wrap:anywhere] leading-relaxed text-sm text-slate-100">
         {blocks.map((block) => {
           if (block.kind === "blank") {
             return <div key={block.key} className="h-2" aria-hidden="true" />;
@@ -79,7 +79,7 @@ export function HelixAskFinalAnswer({ text, meta, renderContent }: HelixAskFinal
                   -
                 </span>
                 <span
-                  className="min-w-0 flex-1"
+                  className="min-w-0 flex-1 break-words [overflow-wrap:anywhere]"
                   data-narrator-source-id={`helix-${block.key}`}
                 >
                   {renderText(block.text)}
@@ -90,7 +90,11 @@ export function HelixAskFinalAnswer({ text, meta, renderContent }: HelixAskFinal
           return (
             <div
               key={block.key}
-              className={block.isSectionHeader ? "pt-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-100" : ""}
+              className={
+                block.isSectionHeader
+                  ? "break-words pt-1 [overflow-wrap:anywhere] text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-100"
+                  : "break-words [overflow-wrap:anywhere]"
+              }
               data-narrator-source-id={`helix-${block.key}`}
             >
               {renderText(block.text)}

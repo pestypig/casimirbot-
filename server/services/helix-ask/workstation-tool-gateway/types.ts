@@ -4,6 +4,10 @@ import type {
   HelixToolFollowupDecision,
   HelixToolLifecycleTrace,
 } from "@shared/helix-tool-lifecycle";
+import type {
+  HelixWorkstationTypedAffordance,
+  HelixWorkstationTypedAffordanceKind,
+} from "@shared/helix-agent-step-observation-packet";
 
 export type HelixWorkstationGatewayMode = "read" | "observe" | "act" | "verify";
 
@@ -28,6 +32,9 @@ export type HelixWorkstationCapabilityManifest = {
   input_schema: Record<string, unknown>;
   output_observation_schema: string;
   observation_schema: string;
+  produces_affordances?: HelixWorkstationTypedAffordanceKind[];
+  consumes_affordances?: HelixWorkstationTypedAffordanceKind[];
+  typed_handoff_role?: "producer" | "consumer" | "producer_consumer" | "none";
   safety_tags: string[];
   assistant_answer: false;
   raw_content_included: false;
@@ -84,6 +91,8 @@ export type HelixWorkstationGatewayCallResult = {
   tool_followup_decision: HelixToolFollowupDecision;
   observation: unknown;
   artifact_refs: string[];
+  produced_affordances?: HelixWorkstationTypedAffordance[];
+  consumed_affordances?: HelixWorkstationTypedAffordance[];
   terminal_eligible: false;
   post_tool_model_step_required: true;
   assistant_answer: false;

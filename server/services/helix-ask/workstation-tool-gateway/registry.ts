@@ -70,6 +70,10 @@ import type {
 } from "./types";
 import type { HelixAgentStepObservationPacket } from "@shared/helix-agent-step-observation-packet";
 import type {
+  HelixWorkstationTypedAffordance,
+  HelixWorkstationTypedAffordanceKind,
+} from "@shared/helix-agent-step-observation-packet";
+import type {
   HelixToolFollowupDecision,
   HelixToolLifecycleTrace,
 } from "@shared/helix-tool-lifecycle";
@@ -256,6 +260,116 @@ const REPO_SEARCH_ALLOWED_PATH_PREFIXES = [
 ] as const;
 const DOCS_SEARCH_ALLOWED_PATH_PREFIXES = ["docs"] as const;
 
+const uniqueAffordanceKinds = (
+  values: Array<HelixWorkstationTypedAffordanceKind | null | undefined>,
+): HelixWorkstationTypedAffordanceKind[] =>
+  Array.from(new Set(values.filter((entry): entry is HelixWorkstationTypedAffordanceKind => Boolean(entry))));
+
+const manifestProducesAffordances = (capabilityId: string): HelixWorkstationTypedAffordanceKind[] => {
+  if (capabilityId === HELIX_WORKSPACE_OS_STATUS_CAPABILITY) return ["system_status", "source_ref"];
+  if (capabilityId === WORKSTATION_ACTIVE_CONTEXT_CAPABILITY || capabilityId === CALCULATOR_ACTIVE_CONTEXT_CAPABILITY) {
+    return ["active_surface_ref", "source_ref"];
+  }
+  if (
+    capabilityId === READABLE_SURFACE_OBSERVE_CAPABILITY ||
+    capabilityId === DOCS_READ_VISIBLE_SURFACE_CAPABILITY ||
+    capabilityId === DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY
+  ) {
+    return ["active_surface_ref", "text_evidence", "numeric_value_evidence", "source_ref"];
+  }
+  if (capabilityId === CALCULATOR_READ_VISIBLE_RESULT_CAPABILITY) {
+    return ["active_surface_ref", "calculator_result", "numeric_value_evidence", "source_ref"];
+  }
+  if (capabilityId === REPO_SEARCH_CAPABILITY) {
+    return ["source_ref", "text_evidence", "citation_evidence"];
+  }
+  if (capabilityId === DOCS_SEARCH_CAPABILITY) {
+    return ["source_ref", "text_evidence", "citation_evidence", "numeric_value_evidence"];
+  }
+  if (capabilityId === INTERNET_SEARCH_CAPABILITY || capabilityId === SCHOLARLY_RESEARCH_SEARCH_CAPABILITY) {
+    return ["source_ref", "text_evidence", "citation_evidence", "numeric_value_evidence"];
+  }
+  if (capabilityId === THEORY_CONTEXT_REFLECTION_CAPABILITY) {
+    return ["theory_context", "calculator_expression_template", "claim_boundary", "source_ref"];
+  }
+  if (capabilityId === THEORY_FRONTIER_CONJECTURE_CAPABILITY) {
+    return ["theory_context", "frontier_candidate", "claim_boundary", "source_ref"];
+  }
+  if (capabilityId === CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY) {
+    return ["theory_context", "claim_boundary", "source_ref"];
+  }
+  if (capabilityId === CALCULATOR_SOLVE_EXPRESSION_CAPABILITY) {
+    return ["calculator_result", "numeric_value_evidence", "source_ref"];
+  }
+  if (
+    capabilityId === CALCULATOR_OPEN_PANEL_CAPABILITY ||
+    capabilityId === CALCULATOR_FOCUS_PANEL_CAPABILITY ||
+    capabilityId === CALCULATOR_SHOW_GATEWAY_SOLVE_CAPABILITY ||
+    capabilityId === WORKSTATION_OPEN_PANEL_CAPABILITY ||
+    capabilityId === WORKSTATION_FOCUS_PANEL_CAPABILITY ||
+    capabilityId === DOCS_OPEN_DOC_CAPABILITY
+  ) {
+    return ["ui_projection_receipt", "source_ref"];
+  }
+  if (capabilityId === VOICE_INTERIM_CALLOUT_CAPABILITY || capabilityId === VOICE_NARRATOR_SAY_CAPABILITY) {
+    return ["ui_projection_receipt", "source_ref"];
+  }
+  if (SHARED_LIVE_SOURCE_MAILBOX_READ_CAPABILITIES.has(capabilityId)) return ["mail_packet_ref", "source_ref", "text_evidence"];
+  if (SHARED_LIVE_SOURCE_INTERPRETER_PREDICTION_READ_CAPABILITIES.has(capabilityId)) return ["prediction_evidence", "source_ref", "text_evidence"];
+  if (SHARED_STAGE_PLAY_BUILDER_READ_CAPABILITIES.has(capabilityId)) return ["stage_plan", "source_ref", "text_evidence"];
+  if (SHARED_MICRO_REASONER_READ_CAPABILITIES.has(capabilityId)) return ["micro_reasoner_eval", "source_ref", "text_evidence"];
+  if (SHARED_VISUAL_OBSERVER_READ_CAPABILITIES.has(capabilityId)) return ["visual_observer_eval", "source_ref", "text_evidence"];
+  if (capabilityId === LIVE_SOURCE_LOOP_HEALTH_CAPABILITY || SHARED_LIVE_SOURCE_STATE_READ_CAPABILITIES.has(capabilityId)) {
+    return ["loop_health_evidence", "source_ref", "text_evidence"];
+  }
+  if (SHARED_CONTEXT_FEED_QUERY_CAPABILITIES.has(capabilityId) || SHARED_SITUATION_STAGE_STATE_READ_CAPABILITIES.has(capabilityId)) {
+    return ["source_ref", "text_evidence", "active_surface_ref"];
+  }
+  return ["source_ref"];
+};
+
+const manifestConsumesAffordances = (capabilityId: string): HelixWorkstationTypedAffordanceKind[] => {
+  if (capabilityId === CALCULATOR_SOLVE_EXPRESSION_CAPABILITY) {
+    return ["bound_calculator_expression", "calculator_expression_template", "numeric_value_evidence"];
+  }
+  if (capabilityId === CALCULATOR_SHOW_GATEWAY_SOLVE_CAPABILITY) return ["calculator_result"];
+  if (capabilityId === DOCS_OPEN_DOC_CAPABILITY) return ["doc_path_ref", "source_ref"];
+  if (
+    capabilityId === CALCULATOR_OPEN_PANEL_CAPABILITY ||
+    capabilityId === CALCULATOR_FOCUS_PANEL_CAPABILITY ||
+    capabilityId === WORKSTATION_OPEN_PANEL_CAPABILITY ||
+    capabilityId === WORKSTATION_FOCUS_PANEL_CAPABILITY
+  ) {
+    return ["active_surface_ref"];
+  }
+  if (capabilityId === VOICE_INTERIM_CALLOUT_CAPABILITY || capabilityId === VOICE_NARRATOR_SAY_CAPABILITY) {
+    return ["voice_text_evidence", "text_evidence", "source_ref"];
+  }
+  if (capabilityId === CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY) {
+    return ["theory_context", "source_ref"];
+  }
+  return [];
+};
+
+const attachManifestAffordanceContract = (
+  manifest: HelixWorkstationCapabilityManifest,
+): HelixWorkstationCapabilityManifest => {
+  const produces = uniqueAffordanceKinds(manifestProducesAffordances(manifest.capability_id));
+  const consumes = uniqueAffordanceKinds(manifestConsumesAffordances(manifest.capability_id));
+  return {
+    ...manifest,
+    produces_affordances: produces,
+    consumes_affordances: consumes,
+    typed_handoff_role: produces.length > 0 && consumes.length > 0
+      ? "producer_consumer"
+      : produces.length > 0
+        ? "producer"
+        : consumes.length > 0
+          ? "consumer"
+          : "none",
+  };
+};
+
 const cleanString = (value: unknown, fallback = ""): string => {
   if (typeof value !== "string") return fallback;
   const trimmed = value.trim();
@@ -339,6 +453,11 @@ const readArguments = (value: unknown): Record<string, unknown> =>
 const readRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 
+const readRecordArray = (value: unknown): Array<Record<string, unknown>> =>
+  Array.isArray(value)
+    ? value.map(readRecord).filter((entry): entry is Record<string, unknown> => Boolean(entry))
+    : [];
+
 const readSafeWorkstationPanelId = (value: unknown): string | null => {
   const panelId = cleanString(value).replace(/[^a-z0-9_-]/gi, "").trim();
   return SAFE_WORKSTATION_PANEL_ACTION_IDS.some((allowed) => allowed === panelId) ? panelId : null;
@@ -421,6 +540,180 @@ const solveSafeArithmeticExpression = (expression: string): {
   } catch {
     return { ok: false, blocked_reason: "expression_evaluation_failed" };
   }
+};
+
+const CALCULATOR_TEMPLATE_CONSTANTS = new Set(["e_charge", "mu0", "pi", "e"]);
+
+const extractCalculatorTemplateVariables = (expression: string): string[] => {
+  const rightHandSide = expression.includes("=") ? expression.split("=").slice(1).join("=") : expression;
+  return Array.from(new Set(
+    Array.from(rightHandSide.matchAll(/\b[A-Za-z_][A-Za-z0-9_]*\b/g))
+      .map((match) => match[0])
+      .filter((symbol) => !CALCULATOR_TEMPLATE_CONSTANTS.has(symbol))
+      .filter((symbol) => !["sqrt", "ln", "log", "sin", "cos", "tan"].includes(symbol)),
+  ));
+};
+
+const typedAffordance = (input: {
+  kind: HelixWorkstationTypedAffordanceKind;
+  role: HelixWorkstationTypedAffordance["role"];
+  capabilityId: string;
+  status?: HelixWorkstationTypedAffordance["status"];
+  expression?: string | null;
+  normalizedExpression?: string | null;
+  result?: string | null;
+  variables?: string[];
+  requiredInputs?: string[];
+  missingInputs?: string[];
+  sourceRefs?: string[];
+  claimBoundary?: string | null;
+}): HelixWorkstationTypedAffordance => ({
+  schema: "helix.workstation_typed_affordance.v1",
+  kind: input.kind,
+  role: input.role,
+  source_capability: input.capabilityId,
+  ...(input.expression ? { expression: input.expression } : {}),
+  ...(input.normalizedExpression ? { normalized_expression: input.normalizedExpression } : {}),
+  ...(input.result !== undefined ? { result: input.result } : {}),
+  ...(input.variables?.length ? { variables: input.variables } : {}),
+  ...(input.requiredInputs?.length ? { required_inputs: input.requiredInputs } : {}),
+  ...(input.missingInputs?.length ? { missing_inputs: input.missingInputs } : {}),
+  ...(input.sourceRefs?.length ? { source_refs: input.sourceRefs } : {}),
+  ...(input.claimBoundary !== undefined ? { claim_boundary: input.claimBoundary } : {}),
+  status: input.status ?? "available",
+  assistant_answer: false,
+  raw_content_included: false,
+});
+
+const buildGatewayProducedAffordances = (input: {
+  capabilityId: string;
+  observation: Record<string, unknown>;
+}): HelixWorkstationTypedAffordance[] => {
+  const status = cleanString(input.observation.status);
+  const available = status !== "blocked" && status !== "failed" && status !== "missing_input";
+  const baseStatus: HelixWorkstationTypedAffordance["status"] = available ? "available" : "blocked";
+  if (input.capabilityId === THEORY_CONTEXT_REFLECTION_CAPABILITY) {
+    const payloads = readRecordArray(input.observation.calculator_payloads).slice(0, 12);
+    return [
+      typedAffordance({
+        kind: "theory_context",
+        role: "producer",
+        capabilityId: input.capabilityId,
+        status: baseStatus,
+        sourceRefs: readStringArray(input.observation.exact_badge_ids).slice(0, 12),
+        claimBoundary: readStringArray(input.observation.claim_boundary_notes)[0] ?? null,
+      }),
+      ...payloads.map((payload): HelixWorkstationTypedAffordance => {
+        const expression = cleanString(payload.expression);
+        const requiredInputs = extractCalculatorTemplateVariables(expression);
+        return typedAffordance({
+          kind: "calculator_expression_template",
+          role: "producer",
+          capabilityId: input.capabilityId,
+          status: expression ? "available" : "missing",
+          expression,
+          variables: requiredInputs,
+          requiredInputs,
+          sourceRefs: [
+            cleanString(payload.badge_id),
+            cleanString(payload.payload_id),
+          ].filter(Boolean),
+          claimBoundary: readStringArray(payload.claim_boundary_notes)[0] ?? null,
+        });
+      }),
+      ...(readStringArray(input.observation.claim_boundary_notes).length > 0
+        ? [typedAffordance({
+            kind: "claim_boundary",
+            role: "producer",
+            capabilityId: input.capabilityId,
+            status: "available",
+            sourceRefs: readStringArray(input.observation.claim_boundary_notes).slice(0, 8),
+            claimBoundary: readStringArray(input.observation.claim_boundary_notes)[0] ?? null,
+          })]
+        : []),
+    ];
+  }
+  if (input.capabilityId === THEORY_FRONTIER_CONJECTURE_CAPABILITY) {
+    return [
+      typedAffordance({ kind: "frontier_candidate", role: "producer", capabilityId: input.capabilityId, status: baseStatus }),
+      typedAffordance({ kind: "claim_boundary", role: "producer", capabilityId: input.capabilityId, status: baseStatus }),
+    ];
+  }
+  if (input.capabilityId === CALCULATOR_SOLVE_EXPRESSION_CAPABILITY) {
+    const expression = cleanString(input.observation.expression);
+    const normalizedExpression = cleanString(input.observation.normalized_expression);
+    const result = cleanString(input.observation.result);
+    return [
+      typedAffordance({
+        kind: "calculator_result",
+        role: "producer",
+        capabilityId: input.capabilityId,
+        status: available ? "available" : "blocked",
+        expression,
+        normalizedExpression,
+        result: result || null,
+      }),
+      ...(available
+        ? [typedAffordance({
+            kind: "numeric_value_evidence",
+            role: "producer",
+            capabilityId: input.capabilityId,
+            expression,
+            normalizedExpression,
+            result,
+          })]
+        : []),
+    ];
+  }
+  return manifestProducesAffordances(input.capabilityId).map((kind) =>
+    typedAffordance({
+      kind,
+      role: "producer",
+      capabilityId: input.capabilityId,
+      status: baseStatus,
+    }),
+  );
+};
+
+const buildGatewayConsumedAffordances = (input: {
+  capabilityId: string;
+  observation: Record<string, unknown>;
+}): HelixWorkstationTypedAffordance[] => {
+  const status = cleanString(input.observation.status);
+  const blocked = status === "blocked" || status === "failed" || status === "missing_input";
+  const consumes = manifestConsumesAffordances(input.capabilityId);
+  if (input.capabilityId === CALCULATOR_SOLVE_EXPRESSION_CAPABILITY) {
+    const expression = cleanString(input.observation.expression);
+    const requiredKinds = /[A-Za-z_]/.test(expression)
+      ? ["bound_calculator_expression" as const]
+      : [];
+    return [
+      ...requiredKinds.map((kind) => typedAffordance({
+        kind,
+        role: "consumer",
+        capabilityId: input.capabilityId,
+        status: blocked ? "missing" : "available",
+        expression,
+        missingInputs: blocked ? [kind] : [],
+      })),
+      ...consumes
+        .filter((kind) => !requiredKinds.includes(kind as "bound_calculator_expression"))
+        .map((kind) => typedAffordance({
+          kind,
+          role: "consumer",
+          capabilityId: input.capabilityId,
+          status: "required",
+        })),
+    ];
+  }
+  return consumes.map((kind) =>
+    typedAffordance({
+      kind,
+      role: "consumer",
+      capabilityId: input.capabilityId,
+      status: "required",
+    }),
+  );
 };
 
 const normalizeRepoSearchQuery = (value: unknown): string => {
@@ -2216,7 +2509,7 @@ const visualObserverReadManifests = [
   makeVisualObserverReadManifest(VISUAL_OBSERVER_COMPARE_PROFILES_CAPABILITY),
 ];
 
-const capabilities = new Map<string, HelixWorkstationCapabilityManifest>([
+const rawCapabilities = new Map<string, HelixWorkstationCapabilityManifest>([
   [workspaceOsStatusManifest.capability_id, workspaceOsStatusManifest],
   [workstationActiveContextManifest.capability_id, workstationActiveContextManifest],
   [calculatorSolveExpressionManifest.capability_id, calculatorSolveExpressionManifest],
@@ -2250,6 +2543,13 @@ const capabilities = new Map<string, HelixWorkstationCapabilityManifest>([
   ...microReasonerReadManifests.map((manifest) => [manifest.capability_id, manifest] as const),
   ...visualObserverReadManifests.map((manifest) => [manifest.capability_id, manifest] as const),
 ]);
+
+const capabilities = new Map<string, HelixWorkstationCapabilityManifest>(
+  Array.from(rawCapabilities.entries()).map(([capabilityId, manifest]) => [
+    capabilityId,
+    attachManifestAffordanceContract(manifest),
+  ]),
+);
 
 export const listWorkstationGatewayCapabilities = (
   input: HelixWorkstationGatewayListInput = {},
@@ -2423,6 +2723,14 @@ export const callWorkstationGatewayCapability = async (
       assistant_answer: false,
       raw_content_included: false,
     };
+    const producedAffordances = buildGatewayProducedAffordances({
+      capabilityId: manifest.capability_id,
+      observation,
+    });
+    const consumedAffordances = buildGatewayConsumedAffordances({
+      capabilityId: manifest.capability_id,
+      observation,
+    });
     const summary = hasContext
       ? `Workstation active context observed active panel ${activeContext.active_panel ?? "unknown"} with ${activeContext.open_panels.length} open panel(s).`
       : "Workstation active context was requested but no bounded panel state was supplied.";
@@ -2440,6 +2748,11 @@ export const callWorkstationGatewayCapability = async (
         message: "Attach workspace context with active/open panel identity before asking about the current workstation layout.",
         repair_action: "ask_user",
       }],
+      producedAffordances,
+      consumedAffordances,
+      requiredAffordanceKinds: manifest.consumes_affordances,
+      producedAffordanceKinds: manifest.produces_affordances,
+      missingAffordanceKinds: hasContext ? [] : manifest.consumes_affordances,
     });
     const trace = buildGatewayTrace({
       turnId,
@@ -2462,6 +2775,8 @@ export const callWorkstationGatewayCapability = async (
       tool_followup_decision: trace.tool_followup_decision,
       observation,
       artifact_refs: observationPacket.produced_artifact_refs,
+      produced_affordances: producedAffordances,
+      consumed_affordances: consumedAffordances,
       terminal_eligible: false,
       post_tool_model_step_required: true,
       assistant_answer: false,
@@ -2540,6 +2855,7 @@ export const callWorkstationGatewayCapability = async (
       capability_key: manifest.capability_id,
       expression: expression || null,
       normalized_expression: solved.normalized_expression ?? (expression || null),
+      rejected_expression: solved.ok ? null : expression || null,
       result: solved.result ?? null,
       status: solved.ok ? "succeeded" : "blocked",
       blocked_reason: solved.blocked_reason,
@@ -2548,6 +2864,14 @@ export const callWorkstationGatewayCapability = async (
       assistant_answer: false,
       raw_content_included: false,
     };
+    const producedAffordances = buildGatewayProducedAffordances({
+      capabilityId: manifest.capability_id,
+      observation,
+    });
+    const consumedAffordances = buildGatewayConsumedAffordances({
+      capabilityId: manifest.capability_id,
+      observation,
+    });
     const observationPacket = buildWorkstationGatewayObservationPacket({
       turnId,
       iteration,
@@ -2563,7 +2887,17 @@ export const callWorkstationGatewayCapability = async (
         code: solved.blocked_reason ?? "calculator_expression_blocked",
         message: "Provide a simple arithmetic expression using numbers and arithmetic operators only.",
         repair_action: "ask_user",
+        rejected_expression: expression || null,
+        normalized_expression: solved.normalized_expression ?? (expression || null),
+        required_affordance_kind: /[A-Za-z_]/.test(expression) ? "bound_calculator_expression" : null,
       }],
+      producedAffordances,
+      consumedAffordances,
+      requiredAffordanceKinds: manifest.consumes_affordances,
+      producedAffordanceKinds: manifest.produces_affordances,
+      missingAffordanceKinds: solved.ok ? [] : consumedAffordances
+        .filter((affordance) => affordance.status === "missing")
+        .map((affordance) => affordance.kind),
     });
     const trace = buildGatewayTrace({
       turnId,
@@ -2586,6 +2920,8 @@ export const callWorkstationGatewayCapability = async (
       tool_followup_decision: trace.tool_followup_decision,
       observation,
       artifact_refs: observationPacket.produced_artifact_refs,
+      produced_affordances: producedAffordances,
+      consumed_affordances: consumedAffordances,
       terminal_eligible: false,
       post_tool_model_step_required: true,
       assistant_answer: false,
@@ -2624,6 +2960,14 @@ export const callWorkstationGatewayCapability = async (
       assistant_answer: false,
       raw_content_included: false,
     };
+    const producedAffordances = buildGatewayProducedAffordances({
+      capabilityId: manifest.capability_id,
+      observation,
+    });
+    const consumedAffordances = buildGatewayConsumedAffordances({
+      capabilityId: manifest.capability_id,
+      observation,
+    });
     const summary = hasContext
       ? `Calculator active context observed${activeContext.current_latex ? ` expression ${activeContext.current_latex}` : ""}${activeContext.last_result_text ? ` with result ${activeContext.last_result_text}` : ""}.`
       : "Calculator active context was requested but no bounded calculator state was supplied.";
@@ -2641,6 +2985,11 @@ export const callWorkstationGatewayCapability = async (
         message: "Focus the Scientific Calculator panel with an active expression or result before asking about the current calculation.",
         repair_action: "ask_user",
       }],
+      producedAffordances,
+      consumedAffordances,
+      requiredAffordanceKinds: manifest.consumes_affordances,
+      producedAffordanceKinds: manifest.produces_affordances,
+      missingAffordanceKinds: hasContext ? [] : manifest.consumes_affordances,
     });
     const trace = buildGatewayTrace({
       turnId,
@@ -2663,6 +3012,8 @@ export const callWorkstationGatewayCapability = async (
       tool_followup_decision: trace.tool_followup_decision,
       observation,
       artifact_refs: observationPacket.produced_artifact_refs,
+      produced_affordances: producedAffordances,
+      consumed_affordances: consumedAffordances,
       terminal_eligible: false,
       post_tool_model_step_required: true,
       assistant_answer: false,
@@ -4762,6 +5113,15 @@ export const callWorkstationGatewayCapability = async (
       likely_badge_ids: reflection.overlay.likelyBadgeIds.slice(0, 12),
       highlighted_badge_ids: reflection.overlay.highlightedBadgeIds.slice(0, 12),
       claim_boundary_notes: reflection.evidenceForAsk.claimBoundaries.slice(0, 8),
+      calculator_payloads: reflection.evidenceForAsk.calculatorPayloads.slice(0, 12).map((payload) => ({
+        badge_id: payload.badgeId,
+        badge_title: payload.badgeTitle,
+        payload_id: payload.payloadId,
+        expression: payload.expression,
+        display_latex: payload.displayLatex,
+        target_variable: payload.targetVariable,
+        claim_boundary_notes: payload.claimBoundaryNotes.slice(0, 4),
+      })),
       recommended_action_ids: receipt.recommendedNextActions.map((action) => action.actionId).slice(0, 12),
       recommended_actions_solve: receipt.recommendedNextActions.some((action) => action.solves === true),
       receipt_schema: receipt.schemaVersion,
@@ -4772,6 +5132,14 @@ export const callWorkstationGatewayCapability = async (
       assistant_answer: false,
       raw_content_included: false,
     };
+    const producedAffordances = buildGatewayProducedAffordances({
+      capabilityId: manifest.capability_id,
+      observation,
+    });
+    const consumedAffordances = buildGatewayConsumedAffordances({
+      capabilityId: manifest.capability_id,
+      observation,
+    });
     const observationPacket = buildWorkstationGatewayObservationPacket({
       turnId,
       iteration,
@@ -4781,6 +5149,10 @@ export const callWorkstationGatewayCapability = async (
       status: "succeeded",
       summary: `Theory Badge Graph reflection produced ${observation.exact_badge_ids.length} exact badge match(es), ${observation.likely_badge_ids.length} likely match(es), and ${observation.claim_boundary_notes.length} claim-boundary note(s).`,
       observation,
+      producedAffordances,
+      consumedAffordances,
+      requiredAffordanceKinds: manifest.consumes_affordances,
+      producedAffordanceKinds: manifest.produces_affordances,
     });
     const trace = buildGatewayTrace({
       turnId,
@@ -4802,6 +5174,8 @@ export const callWorkstationGatewayCapability = async (
       tool_followup_decision: trace.tool_followup_decision,
       observation,
       artifact_refs: observationPacket.produced_artifact_refs,
+      produced_affordances: producedAffordances,
+      consumed_affordances: consumedAffordances,
       terminal_eligible: false,
       post_tool_model_step_required: true,
       assistant_answer: false,

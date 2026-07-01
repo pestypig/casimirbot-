@@ -1,4 +1,4 @@
-import type { MouseEvent } from "react";
+import React, { type MouseEvent } from "react";
 import { Bug, Copy, Volume2 } from "lucide-react";
 
 export type HelixAskTurnControlsProps = {

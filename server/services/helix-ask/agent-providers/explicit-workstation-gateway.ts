@@ -1572,10 +1572,11 @@ const cleanCalculatorExpression = (value: string | null | undefined): string | n
     .replace(/(?:then|and)\s+[\s\S]*$/i, "")
     .replace(/[.,;:!?]+$/g, "")
     .replace(/\s+/g, "")
+    .replace(/(?:[eE][+-]?|\.)+$/g, "")
     .trim();
-  if (!expression || expression.length > 80) return null;
+  if (!expression || expression.length > 120) return null;
   if (!/\d/.test(expression) || !/[+\-*/^%]/.test(expression)) return null;
-  if (!/^[0-9.+\-*/^%()[\]]+$/.test(expression)) return null;
+  if (!/^[0-9eE.+\-*/^%()[\]]+$/.test(expression)) return null;
   return expression;
 };
 
@@ -1619,7 +1620,7 @@ const extractCalculatorMathTokenSequence = (value: string | null | undefined): s
   let candidate = "";
   for (let index = start; index < source.length; index += 1) {
     const char = source[index] ?? "";
-    if (/[0-9.+\-*/^%()[\]\s]/.test(char)) {
+    if (/[0-9eE.+\-*/^%()[\]\s]/.test(char)) {
       candidate += char;
       continue;
     }
@@ -1653,12 +1654,12 @@ const extractCalculatorExpressionFromPrompt = (prompt: string): string | null =>
   const percentOfExpression = extractCalculatorPercentOfExpression(unquoted);
   if (percentOfExpression) return percentOfExpression;
   const explicitCapability =
-    unquoted.match(/\bscientific-calculator\.(?:solve_expression|solve_with_steps|solve)\b[\s\S]{0,80}\b(?:for|with|expression|calculate|evaluate|solve|compute)?\s*:?\s*([0-9][0-9\s.+\-*/^%()[\]]{1,80})/i)?.[1] ??
-    unquoted.match(/\b(?:scientific\s+calculator|calculator|calc)\b[\s\S]{0,100}\b(?:calculate|evaluate|solve|compute|expression)\s*:?\s*([0-9][0-9\s.+\-*/^%()[\]]{1,80})/i)?.[1] ??
+    unquoted.match(/\bscientific-calculator\.(?:solve_expression|solve_with_steps|solve)\b[\s\S]{0,80}\b(?:for|with|expression|calculate|evaluate|solve|compute)?\s*:?\s*([0-9][0-9eE\s.+\-*/^%()[\]]{1,120})/i)?.[1] ??
+    unquoted.match(/\b(?:scientific\s+calculator|calculator|calc)\b[\s\S]{0,100}\b(?:calculate|evaluate|solve|compute|expression)\s*:?\s*([0-9][0-9eE\s.+\-*/^%()[\]]{1,120})/i)?.[1] ??
     null;
   if (explicitCapability) return extractCalculatorMathTokenSequence(explicitCapability);
   const direct =
-    unquoted.match(/\b(?:calculate|evaluate|compute|solve)\s+([0-9][0-9\s.+\-*/^%()[\]]{1,80})/i)?.[1] ??
+    unquoted.match(/\b(?:calculate|evaluate|compute|solve)\s+([0-9][0-9eE\s.+\-*/^%()[\]]{1,120})/i)?.[1] ??
     null;
   return extractCalculatorMathTokenSequence(direct);
 };
@@ -2015,11 +2016,13 @@ export const runExplicitWorkstationGatewayCalls = async (input: {
     const dependentVoiceRequest = buildDependentCompoundCapabilityGatewayCallRequest({
       request,
       result,
+      results,
       turnId,
     });
     const dependencyRailStatus = buildCompoundDependencyRailStatus({
       request,
       result,
+      results,
       dependentRequest: dependentVoiceRequest,
     });
     if (dependencyRailStatus) {

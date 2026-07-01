@@ -711,6 +711,8 @@ describe("Helix workstation tool gateway", () => {
         status: "succeeded",
         terminal_eligible: false,
         post_tool_model_step_required: true,
+        produced_affordances: [],
+        consumed_affordances: [],
         assistant_answer: false,
         raw_content_included: false,
       },
@@ -756,6 +758,35 @@ describe("Helix workstation tool gateway", () => {
       post_tool_model_step_required: true,
       assistant_answer: false,
       raw_content_included: false,
+    });
+  });
+
+  it("preserves scientific notation in exact calculator expressions", async () => {
+    const expression = "2.26e18*164.8*1.602176634e-19";
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+      arguments: { expression },
+      turnId: "ask:test:gateway-calculator-scientific-notation",
+      iteration: 2,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      observation: {
+        expression,
+        normalized_expression: expression,
+        result: "59.672748298",
+        status: "succeeded",
+      },
+      produced_affordances: expect.arrayContaining([
+        expect.objectContaining({
+          kind: "calculator_result",
+          expression,
+          result: "59.672748298",
+        }),
+      ]),
     });
   });
 
@@ -1912,6 +1943,24 @@ describe("Helix workstation tool gateway", () => {
       raw_content_included: false,
       observation_packet: {
         status: "blocked",
+        missing_requirements: [
+          expect.objectContaining({
+            code: "unsupported_expression_syntax",
+            rejected_expression: "process.exit()",
+            normalized_expression: "process.exit()",
+            required_affordance_kind: "bound_calculator_expression",
+          }),
+        ],
+        produced_affordances: expect.arrayContaining([
+          expect.objectContaining({ kind: "calculator_result", status: "blocked" }),
+        ]),
+        consumed_affordances: expect.arrayContaining([
+          expect.objectContaining({
+            kind: "bound_calculator_expression",
+            status: "missing",
+            missing_inputs: ["bound_calculator_expression"],
+          }),
+        ]),
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
@@ -2810,6 +2859,76 @@ describe("Helix workstation tool gateway", () => {
     expect((result.observation as { recommended_actions_solve?: boolean }).recommended_actions_solve).toBe(false);
   });
 
+  it("includes calculator payload expressions in theory badge reflection observations", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: THEORY_CONTEXT_REFLECTION_CAPABILITY,
+      arguments: {
+        prompt:
+          "What equation from the theory badge graph can be solved in the calculator for tokamak thermal pressure and confinement time?",
+        mentioned_symbols: ["p_Pa", "n_m3", "T_eV", "W_th", "P_loss", "tau_E"],
+        mentioned_domains: ["tokamak plasma"],
+        limit: 8,
+      },
+      turnId: "ask:test:gateway-theory-reflection-calculator-payloads",
+      iteration: 6,
+    });
+    const observation = result.observation as {
+      calculator_payloads?: Array<Record<string, unknown>>;
+      recommended_actions_solve?: boolean;
+      terminal_eligible?: boolean;
+      assistant_answer?: boolean;
+    };
+
+    expect(result.ok).toBe(true);
+    expect(observation.calculator_payloads).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          badge_id: "tokamak.plasma.thermal_pressure_proxy",
+          payload_id: "tokamak_thermal_pressure_payload",
+          expression: "p_Pa = n_m3*T_eV*e_charge",
+          target_variable: "p_Pa",
+        }),
+        expect.objectContaining({
+          badge_id: "tokamak.energy.confinement_time_proxy",
+          payload_id: "tokamak_confinement_energy_payload",
+          expression: "W_th = P_loss*tau_E",
+          target_variable: "W_th",
+        }),
+      ]),
+    );
+    expect(observation.recommended_actions_solve).toBe(false);
+    expect(observation.terminal_eligible).toBe(false);
+    expect(observation.assistant_answer).toBe(false);
+    expect(result.observation_packet).toMatchObject({
+      produced_affordances: expect.arrayContaining([
+        expect.objectContaining({
+          kind: "calculator_expression_template",
+          expression: "p_Pa = n_m3*T_eV*e_charge",
+          required_inputs: ["n_m3", "T_eV"],
+          source_refs: expect.arrayContaining([
+            "tokamak.plasma.thermal_pressure_proxy",
+            "tokamak_thermal_pressure_payload",
+          ]),
+          status: "available",
+        }),
+        expect.objectContaining({
+          kind: "claim_boundary",
+          status: "available",
+        }),
+      ]),
+      typed_handoff_contract: expect.objectContaining({
+        produced_affordance_kinds: expect.arrayContaining([
+          "theory_context",
+          "calculator_expression_template",
+          "claim_boundary",
+        ]),
+        required_affordance_kinds: [],
+      }),
+    });
+  });
+
   it("blocks theory-badge reflection without prompt as a missing observation", async () => {
     const result = await callWorkstationGatewayCapability({
       agentRuntime: "codex",
@@ -3047,6 +3166,52 @@ describe("Helix workstation tool gateway", () => {
     expect(observation.candidates?.[0]?.claim_boundary_notes).toEqual(
       expect.arrayContaining(observation.forbidden_claim_scan_notes ?? []),
     );
+  });
+
+  it("declares typed affordance handoff roles for every shared gateway capability", () => {
+    const manifest = listWorkstationGatewayCapabilities({
+      agentRuntime: "codex",
+      mode: "read",
+    });
+
+    expect(manifest.capabilities.length).toBeGreaterThan(50);
+    for (const capability of manifest.capabilities) {
+      expect(capability.produces_affordances, capability.capability_id).toEqual(expect.any(Array));
+      expect(capability.consumes_affordances, capability.capability_id).toEqual(expect.any(Array));
+      expect(capability.typed_handoff_role, capability.capability_id).toMatch(/^(?:producer|consumer|producer_consumer|none)$/);
+      expect(
+        (capability.produces_affordances?.length ?? 0) + (capability.consumes_affordances?.length ?? 0),
+        capability.capability_id,
+      ).toBeGreaterThan(0);
+      if (capability.typed_handoff_role === "producer") {
+        expect(capability.produces_affordances?.length ?? 0, capability.capability_id).toBeGreaterThan(0);
+        expect(capability.consumes_affordances?.length ?? 0, capability.capability_id).toBe(0);
+      }
+      if (capability.typed_handoff_role === "consumer") {
+        expect(capability.produces_affordances?.length ?? 0, capability.capability_id).toBe(0);
+        expect(capability.consumes_affordances?.length ?? 0, capability.capability_id).toBeGreaterThan(0);
+      }
+      if (capability.typed_handoff_role === "producer_consumer") {
+        expect(capability.produces_affordances?.length ?? 0, capability.capability_id).toBeGreaterThan(0);
+        expect(capability.consumes_affordances?.length ?? 0, capability.capability_id).toBeGreaterThan(0);
+      }
+      if (capability.typed_handoff_role === "none") {
+        expect(capability.capability_id, capability.capability_id).toBe("__no_shared_gateway_capability_should_use_none__");
+      }
+    }
+    expect(manifest.capabilities.find((capability) => capability.capability_id === THEORY_CONTEXT_REFLECTION_CAPABILITY)).toMatchObject({
+      produces_affordances: expect.arrayContaining(["theory_context", "calculator_expression_template", "claim_boundary"]),
+      typed_handoff_role: "producer",
+    });
+    expect(manifest.capabilities.find((capability) => capability.capability_id === CALCULATOR_SOLVE_EXPRESSION_CAPABILITY)).toMatchObject({
+      consumes_affordances: expect.arrayContaining([
+        "bound_calculator_expression",
+        "calculator_expression_template",
+        "numeric_value_evidence",
+      ]),
+      produces_affordances: expect.arrayContaining(["calculator_result", "numeric_value_evidence"]),
+      typed_handoff_role: "producer_consumer",
+    });
   });
 
   it("keeps ambiguous frontier conjecture prompts in broad uncertainty", async () => {

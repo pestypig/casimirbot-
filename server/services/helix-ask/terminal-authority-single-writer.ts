@@ -173,11 +173,120 @@ type TerminalBlockingToolRailFailure = {
   repairTarget: string | null;
   selectedCapability: string | null;
   executedCapability: string | null;
+  missingVariables?: string[];
+  requiredAffordanceKinds?: string[];
+  rejectedExpression?: string | null;
+  normalizedExpression?: string | null;
+  boundExpression?: string | null;
+};
+
+const readStringArray = (value: unknown): string[] =>
+  readArray(value)
+    .map((entry) => readString(entry))
+    .filter((entry): entry is string => Boolean(entry));
+
+const findBlockedTypedAffordanceDependencyPlan = (
+  payload: Record<string, unknown>,
+): Record<string, unknown> | null => {
+  const debug = readRecord(payload.debug);
+  const directCandidates = [
+    payload.compound_dependency_turn_plan,
+    payload.compound_dependency_plan,
+    debug?.compound_dependency_turn_plan,
+    debug?.compound_dependency_plan,
+  ];
+  for (const candidate of directCandidates) {
+    const plan = readRecord(candidate);
+    if (plan && readString(plan.rail_status) === "blocked") return plan;
+  }
+
+  const observationPackets = [
+    ...readArray(payload.workstation_gateway_observation_packets),
+    ...readArray(debug?.workstation_gateway_observation_packets),
+  ];
+  for (const packet of observationPackets) {
+    const record = readRecord(packet);
+    const stateDelta = readRecord(record?.state_delta);
+    const plan =
+      readRecord(stateDelta?.compound_dependency_turn_plan) ??
+      readRecord(stateDelta?.compound_dependency_plan);
+    if (plan && readString(plan.rail_status) === "blocked") return plan;
+  }
+
+  const gatewayResults = [
+    ...readArray(payload.workstation_gateway_call_results),
+    ...readArray(debug?.workstation_gateway_call_results),
+  ];
+  for (const result of gatewayResults) {
+    const record = readRecord(result);
+    const observation = readRecord(record?.observation);
+    const packet = readRecord(record?.observation_packet);
+    const stateDelta = readRecord(packet?.state_delta);
+    const plan =
+      readRecord(observation?.compound_dependency_turn_plan) ??
+      readRecord(observation?.compound_dependency_plan) ??
+      readRecord(stateDelta?.compound_dependency_turn_plan) ??
+      readRecord(stateDelta?.compound_dependency_plan);
+    if (plan && readString(plan.rail_status) === "blocked") return plan;
+  }
+  return null;
+};
+
+const readBlockedTypedAffordanceRailFailure = (
+  payload: Record<string, unknown>,
+): TerminalBlockingToolRailFailure | null => {
+  const plan = findBlockedTypedAffordanceDependencyPlan(payload);
+  if (!plan) return null;
+  const binding = readRecord(plan.typed_affordance_binding);
+  const firstBrokenRail = readRecord(plan.first_broken_rail);
+  const orderedSubgoals = readArray(plan.ordered_subgoals);
+  const subgoals = orderedSubgoals.length > 0 ? orderedSubgoals : readArray(plan.subgoals);
+  const blockedSubgoal =
+    subgoals
+      .map(readRecord)
+      .find((entry) => entry && readString(entry.rail_status) !== "satisfied" && entry.satisfied !== true) ??
+    null;
+  const missingVariables = readStringArray(binding?.missing_variables ?? blockedSubgoal?.missing_variables);
+  const requiredAffordanceKinds = readStringArray(
+    blockedSubgoal?.required_affordance_kinds ?? binding?.required_affordance_kinds,
+  );
+  const railFailureCode =
+    readString(firstBrokenRail?.reason) ??
+    readString(binding?.reason) ??
+    (missingVariables.length > 0 ? "missing_numeric_value_evidence" : "typed_affordance_binding_missing");
+  return {
+    railStatus: "fail_closed",
+    railFailureCode,
+    firstBrokenRail: "typed_affordance_binding",
+    repairTarget: "affordance_binder",
+    selectedCapability:
+      readString(blockedSubgoal?.selected_capability) ??
+      readString(blockedSubgoal?.requested_capability) ??
+      readString(firstBrokenRail?.capability_id) ??
+      null,
+    executedCapability: readString(blockedSubgoal?.executed_capability),
+    missingVariables,
+    requiredAffordanceKinds,
+    rejectedExpression:
+      readString(binding?.rejected_expression) ??
+      readString(blockedSubgoal?.rejected_expression) ??
+      null,
+    normalizedExpression:
+      readString(binding?.normalized_expression) ??
+      readString(blockedSubgoal?.normalized_expression) ??
+      null,
+    boundExpression:
+      readString(binding?.bound_expression) ??
+      readString(blockedSubgoal?.bound_expression) ??
+      null,
+  };
 };
 
 const readTerminalBlockingToolRailFailure = (
   payload: Record<string, unknown>,
 ): TerminalBlockingToolRailFailure | null => {
+  const blockedTypedAffordanceFailure = readBlockedTypedAffordanceRailFailure(payload);
+  if (blockedTypedAffordanceFailure) return blockedTypedAffordanceFailure;
   const audit = readRecord(payload.tool_turn_chain_audit);
   const triage = readRecord(payload.tool_rail_failure_triage);
   const railStatus = readString(triage?.rail_status) ?? readString(audit?.rail_status);
@@ -360,6 +469,16 @@ const toolRailFailureTerminalText = (
     )
   ) {
     return existingTypedFailureText;
+  }
+  if (failure.firstBrokenRail === "typed_affordance_binding") {
+    const capability = failure.selectedCapability ?? "a dependent workstation tool";
+    const missingVariables = failure.missingVariables?.length
+      ? failure.missingVariables.join(", ")
+      : "required typed inputs";
+    const rejectedExpression = failure.rejectedExpression
+      ? ` Rejected expression: ${failure.rejectedExpression}.`
+      : "";
+    return `I could not complete this compound turn because ${capability} is missing typed affordance bindings for ${missingVariables}.${rejectedExpression}`;
   }
   return `I could not produce a terminal answer because the requested tool rail did not complete. Cause: ${failure.railFailureCode}.`;
 };
@@ -4070,6 +4189,11 @@ export function applyHelixTerminalAuthoritySingleWriter(
       repair_target: terminalBlockingToolRailFailure.repairTarget,
       selected_capability: terminalBlockingToolRailFailure.selectedCapability,
       executed_capability: terminalBlockingToolRailFailure.executedCapability,
+      missing_variables: terminalBlockingToolRailFailure.missingVariables ?? [],
+      required_affordance_kinds: terminalBlockingToolRailFailure.requiredAffordanceKinds ?? [],
+      rejected_expression: terminalBlockingToolRailFailure.rejectedExpression ?? null,
+      normalized_expression: terminalBlockingToolRailFailure.normalizedExpression ?? null,
+      bound_expression: terminalBlockingToolRailFailure.boundExpression ?? null,
       assistant_answer: false,
       raw_content_included: false,
     };

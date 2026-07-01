@@ -1944,7 +1944,9 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(turnStreamPanelSource).toContain("const isFinalRow = row.source === \"final\"");
     expect(turnStreamPanelSource).toContain("const visibleText = isFinalRow ? row.text : clipText(row.text, row.detailLimit ?? 360)");
     expect(finalRendererSource).toContain("<HelixAskFinalAnswer");
-    expect(finalAnswerSource).toContain('className="mt-2 space-y-1.5 break-words leading-relaxed text-sm text-slate-100"');
+    expect(finalAnswerSource).toContain("whitespace-normal");
+    expect(finalAnswerSource).toContain("break-words");
+    expect(finalAnswerSource).toContain("[overflow-wrap:anywhere]");
     expect(finalRendererSource).not.toMatch(/\b(?:line-clamp|max-h-|overflow-hidden|truncate|text-ellipsis|whitespace-nowrap)\b/);
     expect(source).not.toContain("clipForDisplay(");
     expect(source).not.toContain("HELIX_ASK_MAX_RENDER_CHARS");

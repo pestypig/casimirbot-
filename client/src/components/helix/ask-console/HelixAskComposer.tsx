@@ -1,4 +1,5 @@
 import {
+  default as React,
   forwardRef,
   type ClipboardEventHandler,
   type FormEventHandler,

@@ -25,6 +25,7 @@ export const HELIX_ASK_CONSOLE_LIVE_SURFACE_REQUIREMENTS = [
   "latest_turn_selection",
   "final_answer_rendering",
   "workstation_trace_rows",
+  "provider_model_metadata",
   "copy_final",
   "debug_copy_export",
   "read_aloud",
@@ -56,6 +57,7 @@ export const HELIX_ASK_CONSOLE_RECROWNED_DISPLAY_OWNERS = [
   "reply_card",
   "reply_turn",
   "turn_stream_panel",
+  "minimal_runtime_turn_list",
   "final_answer",
   "final_extras",
   "active_turn_stream_panel",
@@ -83,6 +85,7 @@ export const HELIX_ASK_CONSOLE_MINIMAL_RUNTIME_SHELL_OWNS = [
   "latest_turn_selection",
   "final_answer_rendering",
   "workstation_trace_rows",
+  "provider_model_metadata",
   "copy_final",
   "debug_copy_export",
   "read_aloud",
@@ -115,8 +118,52 @@ export const HELIX_ASK_CONSOLE_RECROWNED_PURE_HELPER_REQUIREMENTS = [
   "latest_turn_selection",
   "final_answer_rendering",
   "workstation_trace_rows",
+  "provider_model_metadata",
   "chat_session_persistence",
 ] as const satisfies readonly HelixAskConsoleLiveSurfaceRequirement[];
+
+export const HELIX_ASK_CONSOLE_BRIDGE_REPLACEMENT_PROVEN_GATES = [
+  "desktop_entrypoints_route_to_console_crown",
+  "legacy_bridge_is_named_and_quarantined",
+  "runtime_shell_owns_safe_layout_defaults",
+  "active_docs_context_has_pure_snapshot_helper",
+  "request_envelope_has_pure_builder",
+  "latest_turn_binding_has_pure_selector",
+  "latest_copy_debug_read_aloud_has_pure_control_target",
+  "final_answer_projection_has_pure_helper",
+  "long_final_answer_has_unclipped_display_contract",
+  "workstation_trace_rows_have_structured_projection",
+  "workstation_no_observation_keeps_typed_failure",
+  "workstation_calculator_gateway_trace_parity",
+  "provider_model_metadata_has_pure_projection",
+  "chat_projection_has_pure_hydration_helper",
+  "chat_persistence_has_pure_payload_helper",
+  "minimal_runtime_shell_surface_scaffold_exists",
+  "minimal_runtime_shell_builds_submit_plan",
+  "minimal_runtime_shell_starts_optimistic_turn",
+  "minimal_runtime_shell_has_injected_transport_seam",
+  "minimal_runtime_shell_completes_injected_turn",
+  "minimal_runtime_shell_has_backend_runner_adapter",
+  "minimal_runtime_shell_renders_local_turns",
+  "minimal_runtime_shell_binds_latest_controls",
+  "minimal_runtime_shell_component_submits_injected_turn",
+  "minimal_runtime_shell_persists_and_hydrates_chat_sessions",
+] as const;
+
+export type HelixAskConsoleBridgeReplacementProvenGate =
+  (typeof HELIX_ASK_CONSOLE_BRIDGE_REPLACEMENT_PROVEN_GATES)[number];
+
+export const HELIX_ASK_CONSOLE_BRIDGE_REPLACEMENT_OPEN_GATES = [
+  "minimal_shell_submits_and_streams_without_legacy_pill",
+  "minimal_shell_materializes_backend_debug_export",
+  "minimal_shell_preserves_active_docs_context_handoff_live",
+  "desktop_entrypoint_swaps_runtime_shell_off_legacy_bridge",
+] as const;
+
+export type HelixAskConsoleBridgeReplacementOpenGate =
+  (typeof HELIX_ASK_CONSOLE_BRIDGE_REPLACEMENT_OPEN_GATES)[number];
+
+export const HELIX_ASK_CONSOLE_BRIDGE_REPLACEMENT_READY = false;
 
 export type HelixAskConsoleProps = {
   contextId: string;
@@ -143,6 +190,9 @@ export type HelixAskConsoleLegacyBridgeStatus = {
   minimalRuntimeShellForbiddenOwnership: readonly HelixAskConsoleMinimalRuntimeShellForbiddenOwnership[];
   runtimeShellActiveOwnership: readonly HelixAskConsoleRuntimeShellActiveOwnership[];
   remainingBehaviorSensitivePaths: readonly HelixAskConsoleLiveSurfaceRequirement[];
+  bridgeReplacementReady: typeof HELIX_ASK_CONSOLE_BRIDGE_REPLACEMENT_READY;
+  bridgeReplacementProvenGates: readonly HelixAskConsoleBridgeReplacementProvenGate[];
+  bridgeReplacementOpenGates: readonly HelixAskConsoleBridgeReplacementOpenGate[];
 };
 
 export const HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS: HelixAskConsoleLegacyBridgeStatus = {
@@ -158,4 +208,7 @@ export const HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS: HelixAskConsoleLegacyBridge
   minimalRuntimeShellForbiddenOwnership: HELIX_ASK_CONSOLE_MINIMAL_RUNTIME_SHELL_FORBIDDEN_OWNERSHIP,
   runtimeShellActiveOwnership: HELIX_ASK_CONSOLE_RUNTIME_SHELL_ACTIVE_OWNERSHIP,
   remainingBehaviorSensitivePaths: HELIX_ASK_CONSOLE_LIVE_SURFACE_REQUIREMENTS,
+  bridgeReplacementReady: HELIX_ASK_CONSOLE_BRIDGE_REPLACEMENT_READY,
+  bridgeReplacementProvenGates: HELIX_ASK_CONSOLE_BRIDGE_REPLACEMENT_PROVEN_GATES,
+  bridgeReplacementOpenGates: HELIX_ASK_CONSOLE_BRIDGE_REPLACEMENT_OPEN_GATES,
 };

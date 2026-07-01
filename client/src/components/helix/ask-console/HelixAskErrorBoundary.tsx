@@ -1,4 +1,4 @@
-import { Component, type ErrorInfo, type ReactNode } from "react";
+import React, { Component, type ErrorInfo, type ReactNode } from "react";
 import { reportClientError } from "@/lib/observability/client-error";
 
 type HelixAskErrorBoundaryState = { hasError: boolean; error?: Error };

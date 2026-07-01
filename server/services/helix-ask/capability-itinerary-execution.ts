@@ -892,6 +892,15 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
     const requiredObservationKinds = readArray(subgoal.required_observation_kinds)
       .map(readString)
       .filter((entry: string | null): entry is string => Boolean(entry));
+    const producedAffordanceKinds = readArray(subgoal.produced_affordance_kinds)
+      .map(readString)
+      .filter((entry: string | null): entry is string => Boolean(entry));
+    const consumedAffordanceKinds = readArray(subgoal.consumed_affordance_kinds)
+      .map(readString)
+      .filter((entry: string | null): entry is string => Boolean(entry));
+    const missingAffordanceKinds = readArray(subgoal.missing_affordance_kinds)
+      .map(readString)
+      .filter((entry: string | null): entry is string => Boolean(entry));
     const requiredArgs = readArray(subgoal.required_args)
       .map(readString)
       .filter((entry: string | null): entry is string => Boolean(entry));
@@ -1005,6 +1014,9 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
       required_args: requiredArgs,
       optional_args: optionalArgs,
       required_observation_kinds: requiredObservationKinds,
+      produced_affordance_kinds: producedAffordanceKinds,
+      consumed_affordance_kinds: consumedAffordanceKinds,
+      missing_affordance_kinds: missingAffordanceKinds,
       required_terminal_kind: readString(subgoal.required_terminal_kind),
       allowed_substitutions: substitutions,
       forbidden_nearby_capabilities: forbiddenNearbyCapabilities,
@@ -1034,6 +1046,16 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
         readString(candidate.subgoal_id) === readString(binding.from_subgoal_id)
       );
       if (!subgoalHasSatisfiedObservation(sourceEntry)) return [];
+      const sourceProducedAffordances = readArray(sourceEntry?.produced_affordance_kinds)
+        .map(readString)
+        .filter((entry: string | null): entry is string => Boolean(entry));
+      const requiredAffordanceKinds = readArray(binding.required_affordance_kinds)
+        .map(readString)
+        .filter((entry: string | null): entry is string => Boolean(entry));
+      const missingAffordanceKinds = requiredAffordanceKinds.filter((kind: string) =>
+        !sourceProducedAffordances.includes(kind)
+      );
+      if (missingAffordanceKinds.length > 0) return [];
       const refs = uniqueStrings([
         readString(sourceEntry?.observation_ref),
         ...readArray(sourceEntry?.support_refs).map(readString),
@@ -1044,6 +1066,8 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
         binding_kind: readString(binding.binding_kind),
         from_subgoal_id: readString(binding.from_subgoal_id),
         from_capability: readString(binding.from_capability),
+        required_affordance_kinds: requiredAffordanceKinds,
+        source_produced_affordance_kinds: sourceProducedAffordances,
         ref,
       }));
     });

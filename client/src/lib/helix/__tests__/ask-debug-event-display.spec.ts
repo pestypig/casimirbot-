@@ -243,6 +243,14 @@ describe("Helix Ask debug event display", () => {
             expression: "8*9",
             result: "72",
             supports_goal: true,
+            compound_dependency_turn_plan: {
+              rail_status: "satisfied",
+              typed_affordance_binding: {
+                status: "bound",
+                bound_expression: "8*9",
+                missing_variables: [],
+              },
+            },
             text: `result ${"x".repeat(260)}`,
           },
         },
@@ -256,6 +264,10 @@ describe("Helix Ask debug event display", () => {
       expression: "8*9",
       result: "72",
       supports_goal: true,
+      compound_rail_status: "satisfied",
+      typed_affordance_binding_status: "bound",
+      bound_calculator_expression: "8*9",
+      missing_calculator_variables: [],
     });
   });
 

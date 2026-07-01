@@ -1451,6 +1451,157 @@ describe("Helix Ask agent provider selection", () => {
     });
   });
 
+  it("binds theory badge calculator templates from sourced numeric paper evidence before running calculator", async () => {
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => [
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+        "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
+        "<entry>",
+        "<id>https://arxiv.org/abs/2606.00002</id>",
+        "<title>Tokamak thermal pressure proxy values</title>",
+        "<summary>For the tokamak thermal pressure proxy, n_m3 = 2.26e18 m^-3 and T_eV = 164.8 eV in the cited operating point.</summary>",
+        "<published>2026-06-02T00:00:00Z</published>",
+        "<author><name>A. Plasma Researcher</name></author>",
+        "</entry>",
+        "</feed>",
+      ].join(""),
+    })) as typeof fetch;
+
+    const body = {
+      turn_id: "ask:test:compound-theory-paper-bound-calculator",
+      agent_runtime: "codex",
+      question:
+        "Retrieve research papers for tokamak thermal pressure values, calculate the tokamak thermal pressure proxy from the theory badge graph for n_m3 and T_eV, and reflect the claim boundary through the theory badge graph.",
+    };
+
+    const planned = buildCompoundCapabilityDependencyGatewayCallRequests(body);
+    expect(planned.map((request) => (request as any).capability_id)).toEqual([
+      "scholarly-research.lookup_papers",
+      "theory-badge-graph.reflect_discussion_context",
+    ]);
+
+    const results = await runExplicitWorkstationGatewayCalls({
+      body,
+      agentRuntime: "codex",
+      turnId: "ask:test:compound-theory-paper-bound-calculator",
+    });
+
+    expect(results.map((result) => result.capability_id)).toEqual([
+      "scholarly-research.lookup_papers",
+      "theory-badge-graph.reflect_discussion_context",
+      "scientific-calculator.solve_expression",
+    ]);
+    expect((results[2].observation as any)).toMatchObject({
+      expression: "2.26e18*164.8*1.602176634e-19",
+      normalized_expression: "2.26e18*164.8*1.602176634e-19",
+      result: "59.672748298",
+      status: "succeeded",
+    });
+    expect((results[2].gateway_admission.source_target_intent as any)).toMatchObject({
+      dependency_binding: "typed_affordance_bound_calculator_expression",
+      required_affordance_kinds: expect.arrayContaining([
+        "calculator_expression_template",
+        "numeric_value_evidence",
+        "bound_calculator_expression",
+      ]),
+      normalized_expression: "2.26e18*164.8*1.602176634e-19",
+      variable_bindings: expect.arrayContaining([
+        expect.objectContaining({
+          variable: "n_m3",
+          value: "2.26e18",
+          unit: "m^-3",
+          source_ref: expect.stringContaining("scholarly-research.lookup_papers"),
+        }),
+        expect.objectContaining({
+          variable: "T_eV",
+          value: "164.8",
+          unit: "eV",
+          source_ref: expect.stringContaining("scholarly-research.lookup_papers"),
+        }),
+      ]),
+    });
+    expect((results[1].observation as any).compound_dependency_plan).toMatchObject({
+      typed_affordance_binding: {
+        status: "bound",
+        bound_expression: "2.26e18*164.8*1.602176634e-19",
+        missing_variables: [],
+      },
+      rail_status: "planned",
+    });
+    expect((results[2].observation_packet.state_delta as any).compound_dependency_turn_plan).toMatchObject({
+      rail_status: "satisfied",
+      ordered_subgoals: expect.arrayContaining([
+        expect.objectContaining({
+          subgoal_id: "research_quantify_reflect:calculator_bound_expression",
+          requested_capability: "scientific-calculator.solve_expression",
+          executed_capability: "scientific-calculator.solve_expression",
+          satisfied: true,
+        }),
+      ]),
+    });
+  });
+
+  it("fails closed with typed missing variables when paper evidence cannot bind a theory calculator template", async () => {
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => [
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+        "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
+        "<entry>",
+        "<id>https://arxiv.org/abs/2606.00003</id>",
+        "<title>Tokamak thermal pressure discussion without operating point</title>",
+        "<summary>This paper discusses tokamak thermal pressure proxies but does not report density or temperature values.</summary>",
+        "<published>2026-06-03T00:00:00Z</published>",
+        "<author><name>B. Plasma Researcher</name></author>",
+        "</entry>",
+        "</feed>",
+      ].join(""),
+    })) as typeof fetch;
+
+    const body = {
+      turn_id: "ask:test:compound-theory-paper-missing-calculator-values",
+      agent_runtime: "codex",
+      question:
+        "Retrieve research papers for tokamak thermal pressure values, calculate the tokamak thermal pressure proxy from the theory badge graph for n_m3 and T_eV, and reflect the claim boundary through the theory badge graph.",
+    };
+
+    const results = await runExplicitWorkstationGatewayCalls({
+      body,
+      agentRuntime: "codex",
+      turnId: "ask:test:compound-theory-paper-missing-calculator-values",
+    });
+
+    expect(results.map((result) => result.capability_id)).toEqual([
+      "scholarly-research.lookup_papers",
+      "theory-badge-graph.reflect_discussion_context",
+    ]);
+    expect((results[1].observation as any).compound_dependency_plan).toMatchObject({
+      typed_affordance_binding: {
+        status: "blocked",
+        reason: "missing_numeric_value_evidence",
+        rejected_expression: "p_Pa = n_m3*T_eV*e_charge",
+        missing_variables: expect.arrayContaining(["n_m3", "T_eV"]),
+      },
+      first_broken_rail: {
+        subgoal_id: "research_quantify_reflect:calculator_bound_expression",
+        capability_id: "scientific-calculator.solve_expression",
+        reason: "missing_numeric_value_evidence",
+        missing_variables: expect.arrayContaining(["n_m3", "T_eV"]),
+      },
+      rail_status: "blocked",
+    });
+    expect((results[1].observation_packet.state_delta as any).compound_dependency_turn_plan).toMatchObject({
+      rail_status: "blocked",
+      first_broken_rail: expect.objectContaining({
+        subgoal_id: "research_quantify_reflect:calculator_bound_expression",
+        missing_variables: expect.arrayContaining(["n_m3", "T_eV"]),
+      }),
+    });
+  });
+
   it("does not admit research compound tools from quoted, negated, or future mentions", () => {
     const prompts = [
       'The text says "retrieve research papers, calculate 6 * 7, and reflect through civilization bounds"; explain the sentence only.',

@@ -3430,4 +3430,119 @@ describe("Helix terminal authority single writer", () => {
       support_refs: expect.arrayContaining([docObservationRef, calculatorObservationRef]),
     });
   });
+
+  it("fails closed with typed affordance diagnostics when calculator bindings are missing", () => {
+    const turnId = "ask:test:typed-affordance-binding-blocked";
+    const hallucinatedSolve = "The calculator result is 59.67 Pa.";
+    const artifacts = [
+      {
+        artifact_id: `${turnId}:draft`,
+        kind: "final_answer_draft",
+        payload: {
+          schema: "helix.final_answer_draft.v1",
+          turn_id: turnId,
+          text: hallucinatedSolve,
+          answer_text: hallucinatedSolve,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      selected_final_answer: hallucinatedSolve,
+      answer: hallucinatedSolve,
+      text: hallucinatedSolve,
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "final_answer_draft",
+      compound_dependency_turn_plan: {
+        schema: "helix.compound_capability_dependency_turn_plan.v1",
+        turn_id: turnId,
+        rail_status: "blocked",
+        ordered_subgoals: [
+          {
+            subgoal_id: "research_quantify_reflect:theory_reflection",
+            ordinal: 1,
+            requested_capability: "theory-badge-graph.reflect_discussion_context",
+            executed_capability: "theory-badge-graph.reflect_discussion_context",
+            satisfied: true,
+            rail_status: "satisfied",
+          },
+          {
+            subgoal_id: "research_quantify_reflect:calculator_bound_expression",
+            ordinal: 2,
+            requested_capability: "scientific-calculator.solve_expression",
+            executed_capability: null,
+            dependency_binding: "typed_affordance_bound_calculator_expression",
+            required_affordance_kinds: [
+              "calculator_expression_template",
+              "numeric_value_evidence",
+              "bound_calculator_expression",
+            ],
+            missing_variables: ["n_m3", "T_eV"],
+            rejected_expression: "p_Pa = n_m3*T_eV*e_charge",
+            satisfied: false,
+            rail_status: "blocked_by_dependency",
+          },
+        ],
+        typed_affordance_binding: {
+          schema: "helix.compound_typed_affordance_binding.v1",
+          status: "blocked",
+          reason: "missing_numeric_value_evidence",
+          rejected_expression: "p_Pa = n_m3*T_eV*e_charge",
+          normalized_expression: "n_m3*T_eV*e_charge",
+          missing_variables: ["n_m3", "T_eV"],
+          selected_affordances: [
+            {
+              kind: "calculator_expression_template",
+              ref: "theory-badge:tokamak.plasma.thermal_pressure_proxy",
+            },
+          ],
+        },
+        first_broken_rail: {
+          subgoal_id: "research_quantify_reflect:calculator_bound_expression",
+          capability_id: "scientific-calculator.solve_expression",
+          reason: "missing_numeric_value_evidence",
+          missing_variables: ["n_m3", "T_eV"],
+          rejected_expression: "p_Pa = n_m3*T_eV*e_charge",
+        },
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      current_turn_artifact_ledger: artifacts,
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.final_answer_source).toBe("typed_failure");
+    expect(payload.terminal_error_code).toBe("missing_numeric_value_evidence");
+    expect(payload.selected_final_answer).toContain("missing typed affordance bindings");
+    expect(payload.selected_final_answer).toContain("n_m3, T_eV");
+    expect(payload.selected_final_answer).not.toBe(hallucinatedSolve);
+    expect(payload.typed_failure).toMatchObject({
+      error_code: "missing_numeric_value_evidence",
+      first_broken_rail: "typed_affordance_binding",
+      repair_target: "affordance_binder",
+      selected_capability: "scientific-calculator.solve_expression",
+      missing_variables: ["n_m3", "T_eV"],
+      required_affordance_kinds: [
+        "calculator_expression_template",
+        "numeric_value_evidence",
+        "bound_calculator_expression",
+      ],
+      rejected_expression: "p_Pa = n_m3*T_eV*e_charge",
+      normalized_expression: "n_m3*T_eV*e_charge",
+    });
+    expect(payload.terminal_presentation).toMatchObject({
+      terminal_artifact_kind: "typed_failure",
+      concise_text: expect.stringContaining("n_m3, T_eV"),
+    });
+  });
 });

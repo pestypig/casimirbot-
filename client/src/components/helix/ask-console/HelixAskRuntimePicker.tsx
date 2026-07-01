@@ -1,3 +1,4 @@
+import React from "react";
 import type { HelixAgentRuntimeDescriptor, HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
 import { formatHelixAgentRuntimeShortLabel } from "@/lib/helix/ask-agent-runtime-display";
 

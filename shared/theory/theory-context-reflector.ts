@@ -4,6 +4,7 @@ import {
   buildTheoryContextReflectionV1,
   type TheoryContextReflectionConfidenceMode,
   type TheoryContextReflectionExplanationDepthHint,
+  type TheoryContextReflectionCalculatorPayloadSummaryV1,
   type TheoryContextReflectionMatchV1,
   type TheoryContextReflectionRecommendedActionV1,
   type TheoryContextReflectionResolutionMode,
@@ -379,6 +380,40 @@ function recommendedActions(args: {
   }
 
   return actions;
+}
+
+function calculatorPayloadSummaries(args: {
+  graph: TheoryBadgeGraphV1;
+  matches: TheoryBadgeLookupMatch[];
+  limit?: number;
+}): TheoryContextReflectionCalculatorPayloadSummaryV1[] {
+  const badges = badgeById(args.graph);
+  const summaries: TheoryContextReflectionCalculatorPayloadSummaryV1[] = [];
+  const seen = new Set<string>();
+  for (const match of args.matches) {
+    const badge = badges.get(match.badgeId);
+    if (!badge || badge.calculatorPayloads.length === 0) continue;
+    for (const payload of badge.calculatorPayloads) {
+      const key = `${badge.id}:${payload.id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      summaries.push({
+        badgeId: badge.id,
+        badgeTitle: badge.title,
+        payloadId: payload.id,
+        expression: payload.expression,
+        displayLatex: payload.displayLatex,
+        targetVariable: payload.targetVariable ?? null,
+        claimBoundaryNotes: match.claimBoundaryWarnings.length
+          ? match.claimBoundaryWarnings
+          : badge.claimBoundary.diagnosticOnly
+            ? ["Calculator payload is diagnostic/proxy evidence only and does not validate or promote a claim."]
+            : [],
+      });
+      if (summaries.length >= (args.limit ?? 12)) return summaries;
+    }
+  }
+  return summaries;
 }
 
 function sanitizeId(value: string): string {
@@ -1085,6 +1120,10 @@ export function buildTheoryContextReflection(
     softRegionBadgeIds.length >= 2 &&
     (confidenceMode === "soft_locator" || exactLookupMatches.some(hasDirectMatchReason));
   const claimBoundaries = claimBoundaryNotes(locatedMatches, trace.claimBoundaryNotes);
+  const calculatorPayloads = calculatorPayloadSummaries({
+    graph: args.graph,
+    matches: locatedMatches,
+  });
   const reflectionId = args.reflectionId ?? `theory-context-reflection:${Date.now().toString(36)}:${Math.random()
     .toString(36)
     .slice(2, 8)}`;
@@ -1158,6 +1197,7 @@ export function buildTheoryContextReflection(
         claimBoundaries,
       }),
       claimBoundaries,
+      calculatorPayloads,
       recommendedNextActions: recommendedActions({
         graph: args.graph,
         selectedBadgeIds: traceTargetIds,

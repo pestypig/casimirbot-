@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import React, { type ReactNode } from "react";
 import type { ContextCapsuleSummary } from "@shared/helix-context-capsule";
 
 import { HelixAskReplyContextCapsuleCard } from "./HelixAskContextCapsulePreview";

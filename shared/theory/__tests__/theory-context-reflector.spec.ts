@@ -180,6 +180,40 @@ describe("theory context reflector", () => {
     )).toBe(false);
   });
 
+  it("exposes calculator payload expressions for matched graph badges", () => {
+    const reflection = buildTheoryContextReflection({
+      graph: buildNhm2TheoryBadgeGraphV1(),
+      prompt: "What equation from the theory badge graph can be solved in the calculator for tokamak thermal pressure and confinement time?",
+      mentionedSymbols: ["p_Pa", "n_m3", "T_eV", "W_th", "P_loss", "tau_E"],
+      mentionedDomains: ["tokamak plasma"],
+      generatedAt: "2026-06-30T00:00:00.000Z",
+      reflectionId: "reflection:tokamak-calculator-payloads",
+      limit: 8,
+    });
+    const payloads = reflection.evidenceForAsk.calculatorPayloads ?? [];
+
+    expect(payloads).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          badgeId: "tokamak.plasma.thermal_pressure_proxy",
+          payloadId: "tokamak_thermal_pressure_payload",
+          expression: "p_Pa = n_m3*T_eV*e_charge",
+          targetVariable: "p_Pa",
+        }),
+        expect.objectContaining({
+          badgeId: "tokamak.energy.confinement_time_proxy",
+          payloadId: "tokamak_confinement_energy_payload",
+          expression: "W_th = P_loss*tau_E",
+          targetVariable: "W_th",
+        }),
+      ]),
+    );
+    expect(reflection.evidenceForAsk.recommendedNextActions.some(
+      (action) => action.actionId === "theory-badge-graph.load_payloads_to_calculator",
+    )).toBe(true);
+    expect(reflection.evidenceForAsk.recommendedNextActions.every((action) => action.solves === false)).toBe(true);
+  });
+
   it("recommends runtime math trace for tensor/reference badges", () => {
     const reflection = buildTheoryContextReflection({
       graph: buildNhm2TheoryBadgeGraphV1(),

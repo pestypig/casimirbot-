@@ -3,6 +3,7 @@ import {
   type ExplicitCapabilityContract,
   type ExtractedExplicitCapabilityContract,
 } from "./explicit-capability-contract";
+import type { HelixWorkstationTypedAffordanceKind } from "../../../shared/helix-agent-step-observation-packet";
 
 type RecordLike = Record<string, unknown>;
 
@@ -22,6 +23,9 @@ export type HelixCompoundCapabilitySubgoal = {
   optional_args: string[];
   args_hint: RecordLike;
   required_observation_kinds: string[];
+  produced_affordance_kinds: HelixWorkstationTypedAffordanceKind[];
+  consumed_affordance_kinds: HelixWorkstationTypedAffordanceKind[];
+  missing_affordance_kinds: HelixWorkstationTypedAffordanceKind[];
   required_terminal_kind: string;
   contribution_role: string;
   terminal_contribution_kind: string;
@@ -44,6 +48,7 @@ export type HelixCompoundCapabilitySubgoal = {
     from_subgoal_id: string;
     from_capability: string;
     required_observation_kinds: string[];
+    required_affordance_kinds: HelixWorkstationTypedAffordanceKind[];
     required: boolean;
     status: "pending";
   }>;
@@ -491,6 +496,9 @@ const argsHintForSubgoal = (input: {
     return internetSearchArgs(input.promptText, input.match, input.ordered);
   }
   if (capability === "image_lens.inspect") return {};
+  if (input.match.contract.required_args.includes("prompt")) {
+    return { prompt: boundedPromptArg() };
+  }
   return {};
 };
 
@@ -513,6 +521,57 @@ const contributionRoleForContract = (contract: ExplicitCapabilityContract): stri
   if (contract.capability_family === "repo_code") return "repo_evidence";
   if (contract.capability_family === "visual_capture") return "visual_evidence";
   return contract.capability_family || "tool_observation";
+};
+
+const producedAffordancesForContract = (contract: ExplicitCapabilityContract): HelixWorkstationTypedAffordanceKind[] => {
+  if (contract.capability_family === "calculator") return ["calculator_result", "numeric_value_evidence", "source_ref"];
+  if (contract.capability_family === "docs_viewer") {
+    return ["source_ref", "text_evidence", "citation_evidence", "numeric_value_evidence", "doc_path_ref"];
+  }
+  if (contract.capability_family === "repo_code") return ["source_ref", "text_evidence", "citation_evidence"];
+  if (contract.capability_family === "internet_search" || contract.capability_family === "scholarly_research") {
+    return ["source_ref", "text_evidence", "citation_evidence", "numeric_value_evidence"];
+  }
+  if (contract.capability_family === "context_reflection" || contract.capability_family === "theory_locator") {
+    return ["theory_context", "calculator_expression_template", "claim_boundary", "frontier_candidate", "source_ref"];
+  }
+  if (contract.capability_family === "civilization_bounds") return ["theory_context", "claim_boundary", "source_ref"];
+  if (contract.capability_family === "workspace_diagnostic" || contract.capability_family === "capability_catalog") {
+    return ["system_status", "source_ref"];
+  }
+  if (contract.capability_family === "live_source_mail") return ["mail_packet_ref", "text_evidence", "source_ref"];
+  if (contract.capability_family === "live_source_decision") return ["prediction_evidence", "source_ref"];
+  if (contract.capability_family === "voice_delivery") return ["ui_projection_receipt", "source_ref"];
+  if (contract.capability_family === "visual_capture") return ["visual_observer_eval", "source_ref", "text_evidence"];
+  return ["source_ref"];
+};
+
+const consumedAffordancesForContract = (contract: ExplicitCapabilityContract): HelixWorkstationTypedAffordanceKind[] => {
+  if (contract.capability_family === "calculator") {
+    return ["bound_calculator_expression", "calculator_expression_template", "numeric_value_evidence"];
+  }
+  if (contract.capability_family === "voice_delivery") return ["voice_text_evidence", "text_evidence", "source_ref"];
+  if (contract.capability_family === "docs_viewer") return ["doc_path_ref", "source_ref"];
+  if (contract.capability_family === "civilization_bounds") return ["theory_context", "source_ref"];
+  return [];
+};
+
+const requiredAffordanceKindsForBinding = (
+  consumer: ExplicitCapabilityContract,
+  source: ExplicitCapabilityContract,
+): HelixWorkstationTypedAffordanceKind[] => {
+  if (consumer.capability_family === "calculator") {
+    if (source.capability_family === "context_reflection" || source.capability_family === "theory_locator") {
+      return ["calculator_expression_template"];
+    }
+    if (source.capability_family === "internet_search" || source.capability_family === "scholarly_research" || source.capability_family === "docs_viewer") {
+      return ["numeric_value_evidence"];
+    }
+    return ["source_ref"];
+  }
+  if (consumer.capability_family === "voice_delivery") return ["voice_text_evidence", "text_evidence"];
+  if (consumer.capability_family === "docs_viewer") return ["doc_path_ref"];
+  return producedAffordancesForContract(source).slice(0, 2);
 };
 
 const requiredObservationKindsForCompoundSubgoal = (
@@ -676,6 +735,7 @@ const inputBindingsForSubgoal = (input: {
     from_subgoal_id: subgoalIdFor(input.turnId, priorIndex + 1, entry.contract.capability),
     from_capability: entry.contract.capability,
     required_observation_kinds: requiredObservationKindsForCompoundSubgoal(entry.contract, input.ordered.length),
+    required_affordance_kinds: requiredAffordanceKindsForBinding(contract, entry.contract),
     required: true,
     status: "pending" as const,
   }));
@@ -715,6 +775,9 @@ export const buildHelixCompoundCapabilityContract = (input: {
         ordered,
       }),
       required_observation_kinds: requiredObservationKindsForCompoundSubgoal(contract, ordered.length),
+      produced_affordance_kinds: producedAffordancesForContract(contract),
+      consumed_affordance_kinds: consumedAffordancesForContract(contract),
+      missing_affordance_kinds: [],
       required_terminal_kind: contract.required_terminal_kind,
       contribution_role: contributionRoleForContract(contract),
       terminal_contribution_kind: contract.required_terminal_kind,

@@ -29367,14 +29367,14 @@ export function HelixAskPill({
                     readRowClassName: readHelixContinuousTurnStreamRowClass,
                     readDotClassName: readHelixContinuousTurnStreamDotClass,
                     readPillClassName: readLiveAnswerTurnBridgePillClassName,
-                    onCopyFinal: () => void handleCopyReply(reply, latestTurnBinding.finalAnswerText),
+                    onCopyFinal: () => void handleCopyReply(reply, latestTurnBinding.controlTarget.finalAnswerText),
                     onDebugCopy: (event) =>
                       void handleCopyReplyMasterDebug(
                         reply,
                         replyMasterEventClockPayload,
                         event.currentTarget,
                       ),
-                    onReadAloud: () => void handleReadAloud(reply, latestTurnBinding.finalAnswerText),
+                    onReadAloud: () => void handleReadAloud(reply, latestTurnBinding.controlTarget.finalAnswerText),
                     showDebugCopy: userSettings.showHelixAskDebug,
                     debugCopyDisabled: typeof window === "undefined",
                     copyFinalTestId: latestTurnBinding.copyFinalTestId,

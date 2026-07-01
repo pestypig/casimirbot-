@@ -73,9 +73,54 @@ export type HelixRawToolResult = {
     code: string;
     message: string;
     repair_action?: string;
+    rejected_expression?: string | null;
+    normalized_expression?: string | null;
+    required_affordance_kind?: HelixWorkstationTypedAffordanceKind | null;
   }>;
   state_delta?: HelixAgentStepObservationPacket["state_delta"];
   raw?: unknown;
+};
+
+export type HelixWorkstationTypedAffordanceKind =
+  | "source_ref"
+  | "text_evidence"
+  | "citation_evidence"
+  | "numeric_value_evidence"
+  | "theory_context"
+  | "calculator_expression_template"
+  | "claim_boundary"
+  | "frontier_candidate"
+  | "active_surface_ref"
+  | "bound_calculator_expression"
+  | "calculator_result"
+  | "doc_path_ref"
+  | "voice_text_evidence"
+  | "mail_packet_ref"
+  | "loop_health_evidence"
+  | "prediction_evidence"
+  | "stage_plan"
+  | "micro_reasoner_eval"
+  | "visual_observer_eval"
+  | "system_status"
+  | "ui_projection_receipt";
+
+export type HelixWorkstationTypedAffordance = {
+  schema: "helix.workstation_typed_affordance.v1";
+  kind: HelixWorkstationTypedAffordanceKind;
+  role: "producer" | "consumer" | "derived";
+  source_capability: string;
+  artifact_ref?: string;
+  expression?: string;
+  normalized_expression?: string;
+  result?: string | null;
+  variables?: string[];
+  required_inputs?: string[];
+  missing_inputs?: string[];
+  source_refs?: string[];
+  claim_boundary?: string | null;
+  status: "available" | "required" | "blocked" | "missing";
+  assistant_answer: false;
+  raw_content_included: false;
 };
 
 export type HelixAgentStepObservationPacket = {
@@ -99,6 +144,9 @@ export type HelixAgentStepObservationPacket = {
     code: string;
     message: string;
     repair_action?: string;
+    rejected_expression?: string | null;
+    normalized_expression?: string | null;
+    required_affordance_kind?: HelixWorkstationTypedAffordanceKind | null;
   }>;
   state_delta: {
     opened_panels?: string[];
@@ -108,6 +156,19 @@ export type HelixAgentStepObservationPacket = {
     updated_notes?: string[];
   };
   suggested_next_steps: Array<"answer" | "ask_user" | "use_another_tool" | "repair" | "fail_closed">;
+  produced_affordances?: HelixWorkstationTypedAffordance[];
+  consumed_affordances?: HelixWorkstationTypedAffordance[];
+  typed_handoff_contract?: {
+    schema: "helix.workstation_typed_handoff_contract.v1";
+    producer_capability: string;
+    consumer_capability?: string | null;
+    required_affordance_kinds: HelixWorkstationTypedAffordanceKind[];
+    produced_affordance_kinds: HelixWorkstationTypedAffordanceKind[];
+    missing_affordance_kinds: HelixWorkstationTypedAffordanceKind[];
+    terminal_eligible: false;
+    assistant_answer: false;
+    raw_content_included: false;
+  };
   terminal_eligible: false;
   post_tool_model_step_required: true;
   assistant_answer: false;

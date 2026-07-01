@@ -1,3 +1,5 @@
+import React from "react";
+
 type RecordLike = Record<string, unknown>;
 
 export type HelixAskProofTraceDetailsProps = {

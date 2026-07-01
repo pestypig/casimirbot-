@@ -159,6 +159,8 @@ export function summarizeHelixDebugArtifactsForCopy(value: unknown): Record<stri
   return entries.slice(0, 40).map((entry, index) => {
     const record = readDisplayRecord(entry) ?? {};
     const payload = readDisplayRecord(record.payload);
+    const compoundPlan = readDisplayRecord(payload?.compound_dependency_turn_plan ?? payload?.compound_dependency_plan);
+    const typedBinding = readDisplayRecord(compoundPlan?.typed_affordance_binding);
     const text = coerceDisplayText(payload?.text || payload?.answer_text || payload?.summary).trim();
     return {
       artifact_id: coerceDisplayText(record.artifact_id).trim() || `artifact:${index}`,
@@ -186,6 +188,13 @@ export function summarizeHelixDebugArtifactsForCopy(value: unknown): Record<stri
         typeof payload?.supports_goal === "boolean"
           ? payload.supports_goal
           : coerceDisplayText(payload?.supports_goal).trim() || null,
+      compound_rail_status: coerceDisplayText(compoundPlan?.rail_status).trim() || null,
+      typed_affordance_binding_status: coerceDisplayText(typedBinding?.status).trim() || null,
+      bound_calculator_expression:
+        coerceDisplayText(typedBinding?.bound_expression || typedBinding?.normalized_expression).trim() || null,
+      missing_calculator_variables: Array.isArray(typedBinding?.missing_variables)
+        ? typedBinding.missing_variables.slice(0, 8)
+        : [],
       expression: coerceDisplayText(payload?.expression || payload?.input).trim() || null,
       result: coerceDisplayText(payload?.result || payload?.value || payload?.computed_result).trim() || null,
       text_preview: text ? summarizeVoiceDebugText(text, 240) : null,

@@ -263,6 +263,15 @@ const stepForCompoundSubgoal = (input: {
     input_bindings: Array.isArray(input.subgoal.input_bindings)
       ? input.subgoal.input_bindings.map(readRecord).filter((entry): entry is RecordLike => Boolean(entry))
       : [],
+    produced_affordance_kinds: Array.isArray(input.subgoal.produced_affordance_kinds)
+      ? input.subgoal.produced_affordance_kinds.map(readString).filter(Boolean)
+      : [],
+    consumed_affordance_kinds: Array.isArray(input.subgoal.consumed_affordance_kinds)
+      ? input.subgoal.consumed_affordance_kinds.map(readString).filter(Boolean)
+      : [],
+    missing_affordance_kinds: Array.isArray(input.subgoal.missing_affordance_kinds)
+      ? input.subgoal.missing_affordance_kinds.map(readString).filter(Boolean)
+      : [],
     purpose: requestedCapability
       ? `Execute explicit compound capability subgoal ${requestedCapability}.`
       : "Execute the explicit compound capability subgoal.",

@@ -4,6 +4,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   HELIX_ASK_CONSOLE_ACTIVE_RECROWN_PHASE,
+  HELIX_ASK_CONSOLE_BRIDGE_REPLACEMENT_OPEN_GATES,
+  HELIX_ASK_CONSOLE_BRIDGE_REPLACEMENT_PROVEN_GATES,
+  HELIX_ASK_CONSOLE_BRIDGE_REPLACEMENT_READY,
   HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS,
   HELIX_ASK_CONSOLE_LIVE_SURFACE_REQUIREMENTS,
   HELIX_ASK_CONSOLE_MINIMAL_RUNTIME_SHELL_FORBIDDEN_OWNERSHIP,
@@ -62,6 +65,29 @@ import {
   buildHelixAskConsoleChatMessagePayload,
   buildHelixAskConsoleChatTurnPayloads,
 } from "@/components/helix/ask-console/HelixAskChatPersistence";
+import {
+  completeHelixAskMinimalRuntimeTurn,
+  createHelixAskMinimalRuntimeInitialState,
+  failHelixAskMinimalRuntimeTurn,
+  startHelixAskMinimalRuntimeTurn,
+} from "@/components/helix/ask-console/HelixAskMinimalRuntimeLifecycle";
+import { buildHelixAskMinimalRuntimeSubmitPlan } from "@/components/helix/ask-console/HelixAskMinimalRuntimeSubmitPlan";
+import {
+  buildHelixAskMinimalRuntimeTurnPayload,
+  runHelixAskMinimalRuntimeInjectedTransport,
+} from "@/components/helix/ask-console/HelixAskMinimalRuntimeTransport";
+import { createHelixAskMinimalRuntimeBackendRunner } from "@/components/helix/ask-console/HelixAskMinimalRuntimeBackendRunner";
+import { buildHelixAskMinimalRuntimeRepliesFromChatSession } from "@/components/helix/ask-console/HelixAskMinimalRuntimeChatSession";
+import {
+  buildHelixAskMinimalRuntimeControlPayload,
+  buildHelixAskMinimalRuntimeDebugCopyText,
+} from "@/components/helix/ask-console/HelixAskMinimalRuntimeControls";
+import { buildHelixAskMinimalRuntimeTurnViews } from "@/components/helix/ask-console/HelixAskMinimalRuntimeTurnList";
+import {
+  resolveHelixAskActualAgentProviderLabel,
+  resolveHelixAskModelUsageLabel,
+} from "@/lib/helix/ask-agent-runtime-display";
+import { buildHelixTurnTranscriptRows } from "@/lib/helix/ask-turn-transcript";
 
 const read = (relativePath: string) =>
   fs.readFileSync(path.resolve(process.cwd(), relativePath), "utf8");
@@ -80,6 +106,7 @@ describe("Helix Ask Console recrown boundary", () => {
     const expectedFiles = [
       "HelixAskConsole.tsx",
       "HelixAskConsoleRuntimeShell.tsx",
+      "HelixAskMinimalRuntimeShell.tsx",
       "HelixAskConsoleRuntimeShellProps.ts",
       "HelixAskBusyReasoningPanel.tsx",
       "HelixAskErrorBoundary.tsx",
@@ -117,6 +144,13 @@ describe("Helix Ask Console recrown boundary", () => {
       "HelixAskVoiceConfirmationPanel.tsx",
       "HelixAskContextBridge.ts",
       "HelixAskRequestEnvelope.ts",
+      "HelixAskMinimalRuntimeLifecycle.ts",
+      "HelixAskMinimalRuntimeSubmitPlan.ts",
+      "HelixAskMinimalRuntimeTransport.ts",
+      "HelixAskMinimalRuntimeBackendRunner.ts",
+      "HelixAskMinimalRuntimeControls.ts",
+      "HelixAskMinimalRuntimeChatSession.ts",
+      "HelixAskMinimalRuntimeTurnList.tsx",
       "HelixAskLatestTurnBinding.ts",
       "HelixAskFinalProjection.ts",
       "HelixAskWorkstationTraceRows.ts",
@@ -141,6 +175,7 @@ describe("Helix Ask Console recrown boundary", () => {
       "latest_turn_selection",
       "final_answer_rendering",
       "workstation_trace_rows",
+      "provider_model_metadata",
       "copy_final",
       "debug_copy_export",
       "read_aloud",
@@ -168,6 +203,40 @@ describe("Helix Ask Console recrown boundary", () => {
       "private_agent_runtime",
       "final_prose_tool_observation_scraping",
       "duplicated_backend_route_authority",
+    ]);
+    expect(HELIX_ASK_CONSOLE_BRIDGE_REPLACEMENT_READY).toBe(false);
+    expect(HELIX_ASK_CONSOLE_BRIDGE_REPLACEMENT_PROVEN_GATES).toEqual([
+      "desktop_entrypoints_route_to_console_crown",
+      "legacy_bridge_is_named_and_quarantined",
+      "runtime_shell_owns_safe_layout_defaults",
+      "active_docs_context_has_pure_snapshot_helper",
+      "request_envelope_has_pure_builder",
+      "latest_turn_binding_has_pure_selector",
+      "latest_copy_debug_read_aloud_has_pure_control_target",
+      "final_answer_projection_has_pure_helper",
+      "long_final_answer_has_unclipped_display_contract",
+      "workstation_trace_rows_have_structured_projection",
+      "workstation_no_observation_keeps_typed_failure",
+      "workstation_calculator_gateway_trace_parity",
+      "provider_model_metadata_has_pure_projection",
+      "chat_projection_has_pure_hydration_helper",
+      "chat_persistence_has_pure_payload_helper",
+      "minimal_runtime_shell_surface_scaffold_exists",
+      "minimal_runtime_shell_builds_submit_plan",
+      "minimal_runtime_shell_starts_optimistic_turn",
+      "minimal_runtime_shell_has_injected_transport_seam",
+      "minimal_runtime_shell_completes_injected_turn",
+      "minimal_runtime_shell_has_backend_runner_adapter",
+      "minimal_runtime_shell_renders_local_turns",
+      "minimal_runtime_shell_binds_latest_controls",
+      "minimal_runtime_shell_component_submits_injected_turn",
+      "minimal_runtime_shell_persists_and_hydrates_chat_sessions",
+    ]);
+    expect(HELIX_ASK_CONSOLE_BRIDGE_REPLACEMENT_OPEN_GATES).toEqual([
+      "minimal_shell_submits_and_streams_without_legacy_pill",
+      "minimal_shell_materializes_backend_debug_export",
+      "minimal_shell_preserves_active_docs_context_handoff_live",
+      "desktop_entrypoint_swaps_runtime_shell_off_legacy_bridge",
     ]);
   });
 
@@ -223,6 +292,19 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.remainingBehaviorSensitivePaths).toEqual(
       HELIX_ASK_CONSOLE_LIVE_SURFACE_REQUIREMENTS,
     );
+    expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.bridgeReplacementReady).toBe(false);
+    expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.bridgeReplacementProvenGates).toBe(
+      HELIX_ASK_CONSOLE_BRIDGE_REPLACEMENT_PROVEN_GATES,
+    );
+    expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.bridgeReplacementOpenGates).toBe(
+      HELIX_ASK_CONSOLE_BRIDGE_REPLACEMENT_OPEN_GATES,
+    );
+    expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.bridgeReplacementOpenGates).toContain(
+      "minimal_shell_submits_and_streams_without_legacy_pill",
+    );
+    expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.bridgeReplacementOpenGates).toContain(
+      "desktop_entrypoint_swaps_runtime_shell_off_legacy_bridge",
+    );
     expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.recrownedDisplayOwners).toContain("composer");
     expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.recrownedDisplayOwners).toContain("runtime_layout");
     expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.recrownedDisplayOwners).toContain("surface_composer_panel");
@@ -231,6 +313,9 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.recrownedDisplayOwners).toContain("reasoning_battle_stage");
     expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.recrownedPureHelperRequirements).toContain("request_envelope");
     expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.recrownedPureHelperRequirements).toContain("latest_turn_selection");
+    expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.recrownedPureHelperRequirements).toContain(
+      "provider_model_metadata",
+    );
     expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.remainingBehaviorSensitivePaths).toContain("submit_stream_handling");
     expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.remainingBehaviorSensitivePaths).toContain("copy_final");
     expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.remainingBehaviorSensitivePaths).toContain("debug_copy_export");
@@ -243,6 +328,8 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(ownershipMap).toContain("minimalRuntimeShellOwns");
     expect(ownershipMap).toContain("minimalRuntimeShellForbiddenOwnership");
     expect(ownershipMap).toContain("remainingBehaviorSensitivePaths");
+    expect(ownershipMap).toContain("bridgeReplacementProvenGates");
+    expect(ownershipMap).toContain("bridgeReplacementOpenGates");
     expect(ownershipMap).toContain("tested minimal runtime shell replaces the bridge");
   });
 
@@ -250,22 +337,50 @@ describe("Helix Ask Console recrown boundary", () => {
     const consoleSource = read("client/src/components/helix/ask-console/HelixAskConsole.tsx");
     const runtimeShellSource = read("client/src/components/helix/ask-console/HelixAskConsoleRuntimeShell.tsx");
     const bridgeSource = read("client/src/components/helix/ask-console/HelixAskLegacyRuntimeBridge.tsx");
+    const minimalShellSource = read("client/src/components/helix/ask-console/HelixAskMinimalRuntimeShell.tsx");
 
     expect(consoleSource).toContain("return <HelixAskConsoleRuntimeShell {...props} />");
     expect(runtimeShellSource).toContain("buildHelixAskConsoleRuntimeBridgeProps(props)");
     expect(runtimeShellSource).toContain("<HelixAskLegacyRuntimeBridge");
     expect(bridgeSource).toContain("return <HelixAskPill {...props} />");
     expect(runtimeShellSource).not.toContain("@/components/helix/HelixAskPill");
+    expect(minimalShellSource).toContain("data-testid=\"helix-ask-minimal-runtime-shell\"");
+    expect(minimalShellSource).toContain("HelixAskConsoleRuntimeLayout");
+    expect(minimalShellSource).toContain("HelixAskRuntimePicker");
+    expect(minimalShellSource).toContain("HelixAskComposer");
+    expect(minimalShellSource).toContain("buildHelixAskMinimalRuntimeSubmitPlan");
+    expect(minimalShellSource).toContain("startHelixAskMinimalRuntimeTurn");
+    expect(minimalShellSource).toContain("completeHelixAskMinimalRuntimeTurn");
+    expect(minimalShellSource).toContain("failHelixAskMinimalRuntimeTurn");
+    expect(minimalShellSource).toContain("buildHelixAskMinimalRuntimeTurnPayload");
+    expect(minimalShellSource).toContain("runHelixAskMinimalRuntimeInjectedTransport");
+    expect(minimalShellSource).toContain("runHelixAskMinimalRuntimeBackendTurn");
+    expect(minimalShellSource).toContain("HelixAskMinimalRuntimeTurnList");
+    expect(minimalShellSource).toContain("useAgiChatStore");
+    expect(minimalShellSource).toContain("buildHelixAskMinimalRuntimeRepliesFromChatSession");
+    expect(minimalShellSource).toContain("resolveHelixAskMinimalRuntimeAnswerText");
+    expect(minimalShellSource).toContain("onSubmitPlan?.(submitPlan)");
+    expect(minimalShellSource).not.toContain("HelixAskLegacyRuntimeBridge");
+    expect(minimalShellSource).not.toContain("@/components/helix/HelixAskPill");
     for (const forbidden of [
       "runAskTurn",
       "runAskTurnStream",
       "navigator.clipboard",
       "speakVoice",
-      "useAgiChatStore",
       "fetch(",
       "terminal_authority",
     ]) {
       expect(runtimeShellSource).not.toContain(forbidden);
+    }
+    for (const forbidden of [
+      "runAskTurn",
+      "runAskTurnStream",
+      "navigator.clipboard",
+      "speakVoice",
+      "fetch(",
+      "terminal_authority",
+    ]) {
+      expect(minimalShellSource).not.toContain(forbidden);
     }
   });
 
@@ -389,6 +504,11 @@ describe("Helix Ask Console recrown boundary", () => {
       finalAnswerText: "old answer",
     })).toEqual({
       isLatest: false,
+      controlTarget: {
+        replyId: "old-turn",
+        isLatest: false,
+        finalAnswerText: "old answer",
+      },
       finalAnswerText: "old answer",
     });
     expect(buildHelixAskLatestTurnBinding({
@@ -397,6 +517,11 @@ describe("Helix Ask Console recrown boundary", () => {
       finalAnswerText: "latest answer",
     })).toEqual({
       isLatest: true,
+      controlTarget: {
+        replyId: "latest-turn",
+        isLatest: true,
+        finalAnswerText: "latest answer",
+      },
       copyFinalTestId: "helix-ask-latest-copy-final",
       debugCopyTestId: "helix-ask-latest-debug-copy",
       finalAnswerTestId: "helix-ask-latest-final-answer",
@@ -408,7 +533,23 @@ describe("Helix Ask Console recrown boundary", () => {
     });
 
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
+    const latestTurnBindingSource = read("client/src/components/helix/ask-console/HelixAskLatestTurnBinding.ts");
     expect(legacyPill).toContain("buildHelixAskLatestTurnBinding");
+    expect(legacyPill).toContain("latestTurnBinding.controlTarget.finalAnswerText");
+    expect(latestTurnBindingSource).toContain("export type HelixAskLatestTurnControlTarget");
+    for (const forbidden of [
+      "navigator.clipboard",
+      "speechSynthesis",
+      "AudioContext",
+      "fetch(",
+      "copyDebugPayloadToClipboard",
+      "handleCopyReply",
+      "handleReadAloud",
+      "runAskTurn",
+      "runAskTurnStream",
+    ]) {
+      expect(latestTurnBindingSource).not.toContain(forbidden);
+    }
   });
 
   it("owns structured workstation success projection without final-prose scraping", () => {
@@ -466,11 +607,169 @@ describe("Helix Ask Console recrown boundary", () => {
       ],
     })).toBe("typed failure");
 
+    const structuredCalculatorRows = buildHelixTurnTranscriptRows({
+      id: "reply-codex-structured-gateway",
+      turn_id: "turn-codex-structured-gateway",
+      content: "Observed expression: 8*9\nResult: 72",
+      debug: {
+        turn_id: "turn-codex-structured-gateway",
+        agent_runtime: "codex",
+        turn_transcript_events: [
+          {
+            role: "agent",
+            type: "model_decision",
+            status: "completed",
+            text: "Model re-entry: no workstation observation packet was available for this Codex turn.",
+            source_event_type: "model_reentry",
+          },
+        ],
+        workstation_gateway_call_results: [
+          {
+            schema: "helix.workstation_tool_gateway.call_result.v1",
+            ok: true,
+            capability_id: "scientific-calculator.solve_expression",
+            mode: "read",
+            gateway_admission: {
+              requested_capability: "scientific-calculator.solve_expression",
+              admission_status: "admitted",
+            },
+            observation: {
+              expression: "8*9",
+              result: "72",
+            },
+            observation_packet: {
+              schema: "helix.agent_step_observation_packet.v1",
+              turn_id: "turn-codex-structured-gateway",
+              capability_key: "scientific-calculator.solve_expression",
+              status: "succeeded",
+              observation_summary: "8*9 = 72",
+            },
+          },
+        ],
+      },
+    });
+    const structuredCalculatorText = structuredCalculatorRows.map((row) => `${row.label}: ${row.text}`).join("\n");
+    expect(structuredCalculatorText).toContain("Tool request: scientific-calculator.solve_expression.");
+    expect(structuredCalculatorText).toContain("Tool observation: scientific-calculator.solve_expression observed 8*9 = 72.");
+    expect(structuredCalculatorText).toContain("Model re-entry: Codex received the workstation observation packet");
+    expect(structuredCalculatorText).not.toContain("no workstation observation packet was available");
+    expect(selectHelixAskConsoleWorkstationTraceRows(structuredCalculatorRows).map((row) => row.label)).toEqual([
+      "Tool Request",
+      "Tool Observation",
+      "Model Re-entry",
+    ]);
+
+    const proseOnlyRows = buildHelixTurnTranscriptRows({
+      id: "reply-prose-only",
+      content: "Observed expression: 8*9\nResult: 72",
+      debug: {
+        turn_id: "turn-prose-only",
+        agent_runtime: "codex",
+      },
+    });
+    expect(proseOnlyRows).toEqual([]);
+    expect(selectHelixAskConsoleWorkstationTraceRows(proseOnlyRows)).toEqual([]);
+
+    const noObservationRows = buildHelixTurnTranscriptRows({
+      id: "reply-codex-no-observation",
+      debug: {
+        agent_runtime: "codex",
+        workstation_gateway_call_results: [
+          {
+            ok: false,
+            capability_id: "scientific-calculator.solve_expression",
+            mode: "read",
+            error: "calculator_gateway_solve_observation_missing",
+            gateway_admission: {
+              requested_capability: "scientific-calculator.solve_expression",
+              admission_status: "blocked",
+              blocked_reason: "calculator_gateway_solve_observation_missing",
+            },
+            observation_packet: {
+              capability_key: "scientific-calculator.solve_expression",
+              status: "blocked",
+              observation_summary: "calculator_gateway_solve_observation_missing",
+            },
+          },
+        ],
+      },
+    });
+    const noObservationText = noObservationRows.map((row) => `${row.label}: ${row.text} ${row.status}`).join("\n");
+    expect(noObservationText).toContain("Tool request: scientific-calculator.solve_expression.");
+    expect(noObservationText).toContain(
+      "Tool observation: scientific-calculator.solve_expression blocked calculator_gateway_solve_observation_missing.",
+    );
+    expect(noObservationText).not.toContain("Codex received the workstation observation packet");
+    expect(hasSuccessfulWorkstationTerminalTranscriptRows(noObservationRows)).toBe(false);
+    expect(resolveHelixAskConsoleFinalAnswerSourceLabel({
+      rawFinalAnswerSourceLabel: "typed failure",
+      turnTranscriptRows: noObservationRows,
+    })).toBe("typed failure");
+
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
     expect(legacyPill).toContain("resolveHelixAskConsoleFinalAnswerSourceLabel");
   });
 
+  it("owns provider and model metadata projection as a pure runtime-display helper", () => {
+    expect(
+      resolveHelixAskActualAgentProviderLabel({
+        agent_runtime: "codex",
+        selected_agent_provider: {
+          id: "codex",
+          label: "Codex Workstation Mode",
+        },
+      }),
+    ).toBe("Provider: Codex Workstation Mode");
+    expect(
+      resolveHelixAskModelUsageLabel({
+        debug: {
+          agent_runtime: "codex",
+          selected_agent_provider: {
+            id: "codex",
+            label: "Codex Workstation Mode",
+          },
+          codex_args: ["exec", "--sandbox", "read-only"],
+        },
+      }),
+    ).toBe("Model: Codex default (not reported)");
+
+    const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
+    const turnStreamPanel = read("client/src/components/helix/ask-console/HelixAskTurnStreamPanel.tsx");
+    const runtimeDisplay = read("client/src/lib/helix/ask-agent-runtime-display.ts");
+
+    expect(legacyPill).toContain("resolveHelixAskActualAgentProviderLabel(reply, agentRuntimeProviders)");
+    expect(legacyPill).toContain("resolveHelixAskModelUsageLabel(reply)");
+    expect(legacyPill).toContain("actualAgentProviderLabel");
+    expect(legacyPill).toContain("actualAgentModelLabel");
+    expect(turnStreamPanel).toContain("actualAgentProviderLabel");
+    expect(turnStreamPanel).toContain("actualAgentModelLabel");
+    expect(turnStreamPanel).toContain("isFinalRow && actualAgentProviderLabel");
+    expect(turnStreamPanel).toContain("isFinalRow && actualAgentModelLabel");
+
+    for (const forbidden of [
+      "fetch(",
+      "navigator.clipboard",
+      "speechSynthesis",
+      "AudioContext",
+      "runAskTurn",
+      "runAskTurnStream",
+      "terminal_authority",
+    ]) {
+      expect(runtimeDisplay).not.toContain(forbidden);
+    }
+  });
+
   it("owns final-answer block rendering policy without UI clipping", () => {
+    const longLine = `Long answer: ${"0123456789abcdef".repeat(320)}`;
+
+    expect(buildHelixAskFinalAnswerBlocks(longLine)).toEqual([
+      {
+        kind: "line",
+        key: "final-answer-line-0",
+        text: longLine,
+        isSectionHeader: false,
+      },
+    ]);
     expect(buildHelixAskFinalAnswerBlocks("Summary:\n- NHM2 remains bounded.\n\nDone.")).toEqual([
       {
         kind: "line",
@@ -498,13 +797,21 @@ describe("Helix Ask Console recrown boundary", () => {
     const finalAnswerSource = read("client/src/components/helix/ask-console/HelixAskFinalAnswer.tsx");
     expect(finalAnswerSource).toContain("buildHelixAskFinalAnswerBlocks");
     expect(finalAnswerSource).toContain("data-narrator-source-id");
+    expect(finalAnswerSource).toContain("[overflow-wrap:anywhere]");
+    expect(finalAnswerSource).toContain("break-words");
     expect(finalAnswerSource).not.toMatch(/\b(?:line-clamp|max-h-|overflow-hidden|truncate|text-ellipsis|whitespace-nowrap)\b/);
+    for (const forbidden of ["clipText(", "slice(", "substring("]) {
+      expect(finalAnswerSource).not.toContain(forbidden);
+    }
 
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
+    const turnStreamPanel = read("client/src/components/helix/ask-console/HelixAskTurnStreamPanel.tsx");
     expect(legacyPill).toContain("<HelixAskFinalAnswer");
     expect(legacyPill).toContain("renderContent={renderHelixAskContent}");
     expect(legacyPill).not.toContain("blocks.map((block)");
     expect(legacyPill).not.toContain("parseHelixAskFinalAnswerBulletLine");
+    expect(turnStreamPanel).toContain("data-final-answer-text={isFinalRow ? finalAnswerRawText : undefined}");
+    expect(turnStreamPanel).toContain("const visibleText = isFinalRow ? row.text : clipText");
   });
 
   it("owns final-row proof trace display while trace selection stays in the bridge", () => {
@@ -1319,6 +1626,545 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(legacyPill).toContain("void runAsk(first, selectedCapsuleIds, runOptions)");
   });
 
+  it("builds a minimal shell submit plan without starting transport", () => {
+    expect(buildHelixAskMinimalRuntimeSubmitPlan({
+      draft: "  summarize current doc  ",
+      selectedRuntime: "codex",
+      desktopUrl: "http://127.0.0.1:1498/desktop?doc=docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+    })).toEqual({
+      admission: {
+        normalizedEntries: ["summarize current doc"],
+        singleEntry: "summarize current doc",
+        shouldQueueForAskHandoff: false,
+        queueReason: null,
+        shouldReleaseConsumedPastedTextAttachmentForResume: false,
+        shouldBlockQueuedAttachments: false,
+        firstEntry: "summarize current doc",
+        restEntries: [],
+      },
+      context: {
+        activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+      },
+      envelope: {
+        question: "summarize current doc",
+        agent_runtime: "codex",
+        doc_path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+      },
+    });
+
+    expect(buildHelixAskMinimalRuntimeSubmitPlan({
+      draft: "   ",
+      selectedRuntime: "helix",
+      desktopUrl: "http://127.0.0.1:1498/desktop",
+    }).envelope).toBeNull();
+
+    const submitPlanSource = read(
+      "client/src/components/helix/ask-console/HelixAskMinimalRuntimeSubmitPlan.ts",
+    );
+    for (const forbidden of [
+      "fetch(",
+      "runAskTurn",
+      "runAskTurnStream",
+      "navigator.clipboard",
+      "speechSynthesis",
+      "AudioContext",
+      "terminal_authority",
+      "HelixAskLegacyRuntimeBridge",
+      "@/components/helix/HelixAskPill",
+    ]) {
+      expect(submitPlanSource).not.toContain(forbidden);
+    }
+  });
+
+  it("starts the minimal runtime optimistic turn lifecycle without backend transport", () => {
+    const submitPlan = buildHelixAskMinimalRuntimeSubmitPlan({
+      draft: "  summarize current doc  ",
+      selectedRuntime: "codex",
+      desktopUrl: "http://127.0.0.1:1498/desktop?doc=docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+    });
+    expect(startHelixAskMinimalRuntimeTurn({
+      state: createHelixAskMinimalRuntimeInitialState(),
+      submitPlan,
+      turnId: "ask:test-turn",
+      startedAtMs: Date.UTC(2026, 5, 29, 12, 0, 0),
+    })).toEqual({
+      askBusy: true,
+      askStatus: "Interpreting prompt...",
+      activeTurnId: "ask:test-turn",
+      activeStartedAtMs: Date.UTC(2026, 5, 29, 12, 0, 0),
+      replies: [
+        {
+          id: "ask:test-turn",
+          turn_id: "ask:test-turn",
+          createdAtMs: Date.UTC(2026, 5, 29, 12, 0, 0),
+          content: "Reasoning in progress...",
+          question: "summarize current doc",
+          mode: "observe",
+          liveEvents: [
+            {
+              id: "turn-start:ask:test-turn",
+              text: "Turn started.",
+              tool: "helix.ask.client",
+              ts: "2026-06-29T12:00:00.000Z",
+              tsMs: Date.UTC(2026, 5, 29, 12, 0, 0),
+              meta: {
+                kind: "client_optimistic_turn_start",
+                turn_id: "ask:test-turn",
+                assistant_answer: false,
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    const lifecycleSource = read(
+      "client/src/components/helix/ask-console/HelixAskMinimalRuntimeLifecycle.ts",
+    );
+    for (const forbidden of [
+      "fetch(",
+      "runAskTurn",
+      "runAskTurnStream",
+      "navigator.clipboard",
+      "speechSynthesis",
+      "AudioContext",
+      "terminal_authority",
+      "HelixAskLegacyRuntimeBridge",
+      "@/components/helix/HelixAskPill",
+    ]) {
+      expect(lifecycleSource).not.toContain(forbidden);
+    }
+  });
+
+  it("builds and runs the minimal runtime transport through an injected runner", async () => {
+    const submitPlan = buildHelixAskMinimalRuntimeSubmitPlan({
+      draft: "  summarize current doc  ",
+      selectedRuntime: "codex",
+      desktopUrl: "http://127.0.0.1:1498/desktop?doc=docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+    });
+    const payload = buildHelixAskMinimalRuntimeTurnPayload({
+      submitPlan,
+      sessionId: "session-1",
+      traceId: "ask:test-turn",
+      turnId: "ask:test-turn",
+      maxTokens: 8192,
+    });
+    expect(payload).toEqual({
+      sessionId: "session-1",
+      agentRuntime: "codex",
+      traceId: "ask:test-turn",
+      turnId: "ask:test-turn",
+      maxTokens: 8192,
+      question: "summarize current doc",
+      contextFiles: ["docs/research/nhm2-current-status-whitepaper-2026-05-02.md"],
+    });
+
+    const seenEvents: unknown[] = [];
+    const result = await runHelixAskMinimalRuntimeInjectedTransport({
+      payload: payload!,
+      onEvent: (event) => seenEvents.push(event),
+      runner: async (runnerPayload, onEvent) => {
+        onEvent?.({ event: "turn_final", data: { ok: true } });
+        return {
+          text: `ok:${runnerPayload.turnId}`,
+          turn_id: runnerPayload.turnId,
+        };
+      },
+    });
+    expect(seenEvents).toEqual([{ event: "turn_final", data: { ok: true } }]);
+    expect(result).toEqual({
+      text: "ok:ask:test-turn",
+      turn_id: "ask:test-turn",
+    });
+
+    const transportSource = read(
+      "client/src/components/helix/ask-console/HelixAskMinimalRuntimeTransport.ts",
+    );
+    for (const forbidden of [
+      "fetch(",
+      "runAskTurn(",
+      "runAskTurnStream(",
+      "navigator.clipboard",
+      "speechSynthesis",
+      "AudioContext",
+      "terminal_authority",
+      "HelixAskLegacyRuntimeBridge",
+      "@/components/helix/HelixAskPill",
+    ]) {
+      expect(transportSource).not.toContain(forbidden);
+    }
+  });
+
+  it("wraps backend stream transport with fallback for the minimal runtime shell", async () => {
+    const payload = {
+      agentRuntime: "codex" as const,
+      traceId: "ask:test-turn",
+      turnId: "ask:test-turn",
+      maxTokens: 8192,
+      question: "summarize current doc",
+      contextFiles: ["docs/research/nhm2-current-status-whitepaper-2026-05-02.md"],
+    };
+    const streamRunner = createHelixAskMinimalRuntimeBackendRunner({
+      runStream: async (runnerPayload, onEvent) => {
+        onEvent?.({ event: "turn_final", data: { ok: true } });
+        return {
+          text: `stream:${runnerPayload.turnId}`,
+          turn_id: runnerPayload.turnId,
+          debug: { stream_used: true },
+        };
+      },
+      runFallback: async () => {
+        throw new Error("fallback should not run");
+      },
+    });
+    const streamEvents: unknown[] = [];
+    await expect(streamRunner(payload, (event) => streamEvents.push(event))).resolves.toEqual({
+      text: "stream:ask:test-turn",
+      turn_id: "ask:test-turn",
+      debug: { stream_used: true },
+    });
+    expect(streamEvents).toEqual([{ event: "turn_final", data: { ok: true } }]);
+
+    const fallbackRunner = createHelixAskMinimalRuntimeBackendRunner({
+      runStream: async () => {
+        throw new Error("stream unavailable");
+      },
+      runFallback: async (runnerPayload) => ({
+        text: `fallback:${runnerPayload.turnId}`,
+        turn_id: runnerPayload.turnId,
+        debug: { stream_used: false },
+      }),
+    });
+    await expect(fallbackRunner(payload)).resolves.toEqual({
+      text: "fallback:ask:test-turn",
+      turn_id: "ask:test-turn",
+      debug: {
+        stream_used: false,
+        stream_fallback_reason: "stream unavailable",
+      },
+    });
+
+    const backendRunnerSource = read(
+      "client/src/components/helix/ask-console/HelixAskMinimalRuntimeBackendRunner.ts",
+    );
+    expect(backendRunnerSource).toContain('await import("@/lib/agi/api")');
+    expect(backendRunnerSource).toContain("runAskTurnStream");
+    expect(backendRunnerSource).toContain("runAskTurn");
+    for (const forbidden of [
+      "fetch(",
+      "navigator.clipboard",
+      "speechSynthesis",
+      "AudioContext",
+      "terminal_authority",
+      "HelixAskLegacyRuntimeBridge",
+      "@/components/helix/HelixAskPill",
+    ]) {
+      expect(backendRunnerSource).not.toContain(forbidden);
+    }
+  });
+
+  it("completes and fails minimal runtime injected turns without backend authority decisions", () => {
+    const started = startHelixAskMinimalRuntimeTurn({
+      state: createHelixAskMinimalRuntimeInitialState(),
+      submitPlan: buildHelixAskMinimalRuntimeSubmitPlan({
+        draft: "summarize current doc",
+        selectedRuntime: "codex",
+        desktopUrl: "http://127.0.0.1:1498/desktop",
+      }),
+      turnId: "ask:test-turn",
+      startedAtMs: Date.UTC(2026, 5, 29, 12, 0, 0),
+    });
+
+    expect(completeHelixAskMinimalRuntimeTurn({
+      state: started,
+      turnId: "ask:test-turn",
+      result: {
+        selected_final_answer: "Grounded final answer.",
+        text: "Fallback text.",
+        debug: { turn_id: "ask:test-turn" },
+      },
+      completedAtMs: Date.UTC(2026, 5, 29, 12, 1, 0),
+    })).toMatchObject({
+      askBusy: false,
+      askStatus: "Final answer ready.",
+      activeTurnId: null,
+      activeStartedAtMs: null,
+      replies: [
+        {
+          turn_id: "ask:test-turn",
+          content: "Grounded final answer.",
+          debug: { turn_id: "ask:test-turn" },
+          liveEvents: [
+            { id: "turn-start:ask:test-turn" },
+            {
+              id: "turn-final:ask:test-turn",
+              text: "Final answer ready.",
+              meta: {
+                kind: "client_transport_turn_final",
+                turn_id: "ask:test-turn",
+                assistant_answer: false,
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(failHelixAskMinimalRuntimeTurn({
+      state: started,
+      turnId: "ask:test-turn",
+      error: new Error("stream unavailable"),
+      failedAtMs: Date.UTC(2026, 5, 29, 12, 2, 0),
+    })).toMatchObject({
+      askBusy: false,
+      askStatus: "Ask turn failed.",
+      activeTurnId: null,
+      activeStartedAtMs: null,
+      replies: [
+        {
+          turn_id: "ask:test-turn",
+          content: "stream unavailable",
+          liveEvents: [
+            { id: "turn-start:ask:test-turn" },
+            {
+              id: "turn-error:ask:test-turn",
+              text: "stream unavailable",
+              meta: {
+                kind: "client_transport_turn_error",
+                turn_id: "ask:test-turn",
+                assistant_answer: false,
+              },
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  it("renders minimal runtime local turns through recrowned final-answer display", () => {
+    const started = startHelixAskMinimalRuntimeTurn({
+      state: createHelixAskMinimalRuntimeInitialState(),
+      submitPlan: buildHelixAskMinimalRuntimeSubmitPlan({
+        draft: "calculate 8*9",
+        selectedRuntime: "codex",
+        desktopUrl: "http://127.0.0.1:1498/desktop",
+      }),
+      turnId: "ask:test-turn",
+      startedAtMs: Date.UTC(2026, 5, 29, 12, 0, 0),
+    });
+    const completed = completeHelixAskMinimalRuntimeTurn({
+      state: started,
+      turnId: "ask:test-turn",
+      result: {
+        selected_final_answer: "Observed expression: 8*9\nResult: 72",
+        text: "fallback",
+        turn_id: "ask:test-turn",
+        agent_runtime: "codex",
+        selected_agent_provider: {
+          id: "codex",
+          label: "Codex Workstation Mode",
+        },
+        model: "gpt-5",
+        debug: {
+          turn_id: "ask:test-turn",
+        },
+      },
+      completedAtMs: Date.UTC(2026, 5, 29, 12, 1, 0),
+    });
+
+    expect(buildHelixAskMinimalRuntimeTurnViews({
+      replies: completed.replies,
+    })).toEqual([
+      {
+        id: "ask:test-turn",
+        turnId: "ask:test-turn",
+        question: "calculate 8*9",
+        answerText: "Observed expression: 8*9\nResult: 72",
+        meta: "Provider: Codex Workstation Mode | Model: gpt-5",
+        isLatest: true,
+      },
+    ]);
+
+    const turnListSource = read(
+      "client/src/components/helix/ask-console/HelixAskMinimalRuntimeTurnList.tsx",
+    );
+    expect(turnListSource).toContain("HelixAskTurnList");
+    expect(turnListSource).toContain("HelixAskReplyCard");
+    expect(turnListSource).toContain("HelixAskFinalAnswer");
+    expect(turnListSource).toContain("HelixAskTurnControls");
+    expect(turnListSource).toContain("buildHelixAskMinimalRuntimeControlPayload");
+    expect(turnListSource).toContain("copyFinalTestId=\"helix-ask-latest-copy-final\"");
+    expect(turnListSource).toContain("debugCopyTestId=\"helix-ask-latest-debug-copy\"");
+    expect(turnListSource).toContain("readAloudTestId=\"helix-ask-latest-read-aloud\"");
+    expect(turnListSource).toContain("resolveHelixAskActualAgentProviderLabel");
+    expect(turnListSource).toContain("resolveHelixAskModelUsageLabel");
+    for (const forbidden of [
+      "fetch(",
+      "runAskTurn",
+      "runAskTurnStream",
+      "navigator.clipboard",
+      "speechSynthesis",
+      "AudioContext",
+      "terminal_authority",
+      "selectHelixAskConsoleWorkstationTraceRows",
+      "HelixAskLegacyRuntimeBridge",
+      "@/components/helix/HelixAskPill",
+    ]) {
+      expect(turnListSource).not.toContain(forbidden);
+    }
+  });
+
+  it("binds minimal runtime copy, debug copy, and read-aloud payloads to the latest visible turn", () => {
+    const started = startHelixAskMinimalRuntimeTurn({
+      state: createHelixAskMinimalRuntimeInitialState(),
+      submitPlan: buildHelixAskMinimalRuntimeSubmitPlan({
+        draft: "calculate 8*9",
+        selectedRuntime: "codex",
+        desktopUrl: "http://127.0.0.1:1498/desktop",
+      }),
+      turnId: "ask:test-turn",
+      startedAtMs: Date.UTC(2026, 5, 29, 12, 0, 0),
+    });
+    const completed = completeHelixAskMinimalRuntimeTurn({
+      state: started,
+      turnId: "ask:test-turn",
+      result: {
+        selected_final_answer: "Observed expression: 8*9\nResult: 72",
+        turn_id: "ask:test-turn",
+        agent_runtime: "codex",
+        debug: {
+          debug_export_ref: "debug:ask:test-turn",
+          turn_id: "ask:test-turn",
+        },
+      },
+      completedAtMs: Date.UTC(2026, 5, 29, 12, 1, 0),
+    });
+    const [view] = buildHelixAskMinimalRuntimeTurnViews({ replies: completed.replies });
+    const [reply] = completed.replies;
+    expect(reply).toBeTruthy();
+    expect(view).toBeTruthy();
+
+    const payload = buildHelixAskMinimalRuntimeControlPayload({
+      reply: reply!,
+      view: view!,
+    });
+    expect(payload).toMatchObject({
+      replyId: "ask:test-turn",
+      turnId: "ask:test-turn",
+      isLatest: true,
+      finalAnswerText: "Observed expression: 8*9\nResult: 72",
+      readAloudText: "Observed expression: 8*9\nResult: 72",
+    });
+    expect(JSON.parse(payload.debugCopyText)).toMatchObject({
+      schema: "helix.ask.minimal_runtime.debug_copy.v1",
+      reply_id: "ask:test-turn",
+      turn_id: "ask:test-turn",
+      is_latest: true,
+      question: "calculate 8*9",
+      final_answer: "Observed expression: 8*9\nResult: 72",
+      debug: {
+        debug_export_ref: "debug:ask:test-turn",
+        turn_id: "ask:test-turn",
+      },
+      result: {
+        turn_id: "ask:test-turn",
+      },
+    });
+    expect(buildHelixAskMinimalRuntimeDebugCopyText({
+      reply: reply!,
+      view: view!,
+    })).toBe(payload.debugCopyText);
+
+    const controlsSource = read(
+      "client/src/components/helix/ask-console/HelixAskMinimalRuntimeControls.ts",
+    );
+    expect(controlsSource).toContain("navigator.clipboard.writeText");
+    expect(controlsSource).toContain("document.execCommand(\"copy\")");
+    expect(controlsSource).toContain("SpeechSynthesisUtterance");
+    expect(controlsSource).toContain("HELIX_ASK_MINIMAL_RUNTIME_BROWSER_CONTROL_ACTIONS");
+    for (const forbidden of [
+      "fetch(",
+      "runAskTurn",
+      "runAskTurnStream",
+      "terminal_authority",
+      "HelixAskLegacyRuntimeBridge",
+      "@/components/helix/HelixAskPill",
+      "useAgiChatStore",
+    ]) {
+      expect(controlsSource).not.toContain(forbidden);
+    }
+  });
+
+  it("hydrates minimal runtime replies from durable chat sessions", () => {
+    expect(buildHelixAskMinimalRuntimeRepliesFromChatSession({
+      id: "session-1",
+      title: "Helix Ask",
+      createdAt: "2026-06-29T12:00:00.000Z",
+      updatedAt: "2026-06-29T12:02:00.000Z",
+      personaId: "default",
+      contextId: "ctx",
+      messages: [
+        {
+          id: "assistant-late",
+          role: "assistant",
+          content: "Hydrated answer.",
+          at: "2026-06-29T12:02:00.000Z",
+          traceId: "turn-1",
+        },
+        {
+          id: "user-early",
+          role: "user",
+          content: "Hydrate this turn",
+          at: "2026-06-29T12:00:00.000Z",
+          traceId: "turn-1",
+        },
+      ],
+    })).toEqual([
+      {
+        id: "helix-chat-turn:session-1:turn-1",
+        turn_id: "turn-1",
+        createdAtMs: Date.parse("2026-06-29T12:02:00.000Z"),
+        content: "Hydrated answer.",
+        question: "Hydrate this turn",
+        mode: "observe",
+        debug: {
+          durable_chat_projection: true,
+          session_id: "session-1",
+          user_message_id: "user-early",
+          assistant_message_id: "assistant-late",
+          turn_id: "turn-1",
+        },
+        result: {
+          selected_final_answer: "Hydrated answer.",
+          turn_id: "turn-1",
+          debug: {
+            durable_chat_projection: true,
+            session_id: "session-1",
+          },
+        },
+        liveEvents: [],
+      },
+    ]);
+
+    const chatSessionSource = read(
+      "client/src/components/helix/ask-console/HelixAskMinimalRuntimeChatSession.ts",
+    );
+    for (const forbidden of [
+      "fetch(",
+      "runAskTurn",
+      "runAskTurnStream",
+      "navigator.clipboard",
+      "speechSynthesis",
+      "AudioContext",
+      "terminal_authority",
+      "HelixAskLegacyRuntimeBridge",
+      "@/components/helix/HelixAskPill",
+      "useAgiChatStore",
+    ]) {
+      expect(chatSessionSource).not.toContain(forbidden);
+    }
+  });
+
   it("owns pure durable chat-session projection while policy stays injected", () => {
     const replies = buildHelixAskRepliesFromChatSessionProjection({
       session: {
@@ -1567,8 +2413,12 @@ describe("Helix Ask Console recrown boundary", () => {
     const turnControls = read("client/src/components/helix/ask-console/HelixAskTurnControls.tsx");
 
     expect(legacyPill).toContain("<HelixAskReplyTurn");
-    expect(legacyPill).toContain("onCopyFinal: () => void handleCopyReply(reply, latestTurnBinding.finalAnswerText)");
-    expect(legacyPill).toContain("onReadAloud: () => void handleReadAloud(reply, latestTurnBinding.finalAnswerText)");
+    expect(legacyPill).toContain(
+      "onCopyFinal: () => void handleCopyReply(reply, latestTurnBinding.controlTarget.finalAnswerText)",
+    );
+    expect(legacyPill).toContain(
+      "onReadAloud: () => void handleReadAloud(reply, latestTurnBinding.controlTarget.finalAnswerText)",
+    );
     expect(legacyPill).toContain("debugCopyTestId: latestTurnBinding.debugCopyTestId");
     expect(legacyPill).not.toContain("<Copy className=");
     expect(legacyPill).not.toContain("<Bug className=");

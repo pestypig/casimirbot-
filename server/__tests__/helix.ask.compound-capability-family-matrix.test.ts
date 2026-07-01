@@ -240,6 +240,12 @@ const completedArtifactsForItinerary = (
     const requiredKinds = Array.isArray(subgoal.required_observation_kinds)
       ? subgoal.required_observation_kinds.map(String)
       : [];
+    const producedAffordanceKinds = Array.isArray(subgoal.produced_affordance_kinds)
+      ? subgoal.produced_affordance_kinds.map(String)
+      : [];
+    const consumedAffordanceKinds = Array.isArray(subgoal.consumed_affordance_kinds)
+      ? subgoal.consumed_affordance_kinds.map(String)
+      : [];
     const observationKind = requiredKinds[0] ?? "runtime_tool_observation";
     const artifactBase = `${turnId}:${sanitize(runtime)}:${index + 1}`;
     return [
@@ -259,6 +265,8 @@ const completedArtifactsForItinerary = (
           capability_key: runtime,
           compound_subgoal_id: subgoalId,
           status: "completed",
+          produced_affordance_kinds: producedAffordanceKinds,
+          consumed_affordance_kinds: consumedAffordanceKinds,
         },
       },
       {
@@ -269,6 +277,8 @@ const completedArtifactsForItinerary = (
           capability_key: runtime,
           compound_subgoal_id: subgoalId,
           status: "completed",
+          produced_affordance_kinds: producedAffordanceKinds,
+          consumed_affordance_kinds: consumedAffordanceKinds,
           ...(runtime === "docs-viewer.locate_in_doc"
             ? {
                 status: "located",
@@ -1022,6 +1032,7 @@ describe("Helix Ask compound capability family matrix", () => {
           binding_kind: "support_ref",
           from_capability: "internet_search.web_research",
           from_subgoal_id: internetSubgoal?.subgoal_id,
+          required_affordance_kinds: expect.arrayContaining(["numeric_value_evidence"]),
           required: true,
         }),
         expect.objectContaining({
@@ -1029,9 +1040,16 @@ describe("Helix Ask compound capability family matrix", () => {
           binding_kind: "support_ref",
           from_capability: "helix_ask.reflect_theory_context",
           from_subgoal_id: theorySubgoal?.subgoal_id,
+          required_affordance_kinds: expect.arrayContaining(["calculator_expression_template"]),
           required: true,
         }),
       ]),
+      consumed_affordance_kinds: expect.arrayContaining([
+        "bound_calculator_expression",
+        "calculator_expression_template",
+        "numeric_value_evidence",
+      ]),
+      produced_affordance_kinds: expect.arrayContaining(["calculator_result", "numeric_value_evidence"]),
     });
   });
 
@@ -1051,6 +1069,8 @@ describe("Helix Ask compound capability family matrix", () => {
       expect(subgoals[0]?.optional_args, contract.capability).toEqual(contract.optional_args);
       expect(subgoals[0]?.required_terminal_kind, contract.capability).toBe(contract.required_terminal_kind);
       expect(subgoals[0]?.required_observation_kinds, contract.capability).toEqual(contract.required_observation_kinds);
+      expect(subgoals[0]?.produced_affordance_kinds.length, contract.capability).toBeGreaterThan(0);
+      expect(subgoals[0]?.missing_affordance_kinds, contract.capability).toEqual([]);
       expect(subgoals[0]?.forbidden_nearby_capabilities, contract.capability)
         .toEqual(contract.forbidden_nearby_capabilities);
       expect(compound?.requires_all_subgoals, contract.capability).toBe(false);

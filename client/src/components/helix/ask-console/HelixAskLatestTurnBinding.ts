@@ -5,6 +5,7 @@ export type HelixAskLatestTurnCandidate = {
 
 export type HelixAskLatestTurnBinding = {
   isLatest: boolean;
+  controlTarget: HelixAskLatestTurnControlTarget;
   copyFinalTestId?: "helix-ask-latest-copy-final";
   debugCopyTestId?: "helix-ask-latest-debug-copy";
   finalAnswerTestId?: "helix-ask-latest-final-answer";
@@ -12,6 +13,12 @@ export type HelixAskLatestTurnBinding = {
   readAloudTestId?: "helix-ask-latest-read-aloud";
   turnTestId?: "helix-ask-latest-turn";
   workLogTestId?: "helix-ask-latest-work-log";
+  finalAnswerText: string;
+};
+
+export type HelixAskLatestTurnControlTarget = {
+  replyId: string;
+  isLatest: boolean;
   finalAnswerText: string;
 };
 
@@ -43,11 +50,21 @@ export function buildHelixAskLatestTurnBinding(args: {
   if (!isLatest) {
     return {
       isLatest: false,
+      controlTarget: {
+        replyId: args.replyId,
+        isLatest: false,
+        finalAnswerText,
+      },
       finalAnswerText,
     };
   }
   return {
     isLatest: true,
+    controlTarget: {
+      replyId: args.replyId,
+      isLatest: true,
+      finalAnswerText,
+    },
     copyFinalTestId: "helix-ask-latest-copy-final",
     debugCopyTestId: "helix-ask-latest-debug-copy",
     finalAnswerTestId: "helix-ask-latest-final-answer",

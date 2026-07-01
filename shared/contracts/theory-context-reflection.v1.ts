@@ -136,6 +136,16 @@ export type TheoryContextReflectionRecommendedActionV1 = {
   solves: boolean;
 };
 
+export type TheoryContextReflectionCalculatorPayloadSummaryV1 = {
+  badgeId: string;
+  badgeTitle: string;
+  payloadId: string;
+  expression: string;
+  displayLatex: string;
+  targetVariable: string | null;
+  claimBoundaryNotes: string[];
+};
+
 export type TheoryContextReflectionResolutionV1 = {
   mode: TheoryContextReflectionResolutionMode;
   roleByBadgeId: Record<string, TheoryContextReflectionResolutionRole>;
@@ -167,6 +177,7 @@ export type TheoryContextReflectionV1 = {
   evidenceForAsk: {
     summary: string;
     claimBoundaries: string[];
+    calculatorPayloads?: TheoryContextReflectionCalculatorPayloadSummaryV1[];
     recommendedNextActions: TheoryContextReflectionRecommendedActionV1[];
   };
   assistant_answer: false;
@@ -405,6 +416,22 @@ function validateRecommendedAction(prefix: string, value: unknown, issues: strin
   if (typeof value.solves !== "boolean") issues.push(`${prefix}.solves must be boolean`);
 }
 
+function validateCalculatorPayloadSummary(prefix: string, value: unknown, issues: string[]): void {
+  if (!isRecord(value)) {
+    issues.push(`${prefix} must be an object`);
+    return;
+  }
+  for (const field of ["badgeId", "badgeTitle", "payloadId", "expression", "displayLatex"] as const) {
+    if (!isNonEmptyString(value[field])) issues.push(`${prefix}.${field} must be a non-empty string`);
+  }
+  if (!isNullableString(value.targetVariable)) {
+    issues.push(`${prefix}.targetVariable must be a string or null`);
+  }
+  if (!isStringArray(value.claimBoundaryNotes)) {
+    issues.push(`${prefix}.claimBoundaryNotes must be an array of strings`);
+  }
+}
+
 function emptyResolution(): TheoryContextReflectionResolutionV1 {
   return {
     mode: "path",
@@ -463,6 +490,15 @@ function validateEvidenceForAsk(value: unknown, issues: string[]): void {
   if (!isNonEmptyString(value.summary)) issues.push("evidenceForAsk.summary must be a non-empty string");
   if (!isStringArray(value.claimBoundaries)) {
     issues.push("evidenceForAsk.claimBoundaries must be an array of strings");
+  }
+  if (value.calculatorPayloads !== undefined) {
+    if (!Array.isArray(value.calculatorPayloads)) {
+      issues.push("evidenceForAsk.calculatorPayloads must be an array when present");
+    } else {
+      (value.calculatorPayloads as unknown[]).forEach((payload: unknown, index: number) =>
+        validateCalculatorPayloadSummary(`evidenceForAsk.calculatorPayloads[${index}]`, payload, issues),
+      );
+    }
   }
   if (!Array.isArray(value.recommendedNextActions)) {
     issues.push("evidenceForAsk.recommendedNextActions must be an array");

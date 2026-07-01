@@ -53,6 +53,62 @@ terminal_eligible=false
 post_tool_model_step_required=true
 ```
 
+## Typed Affordance Handoff
+
+Workstation observations may participate in compound reasoning by declaring
+typed affordances. The declaration is a routing and debug contract only; it does
+not make a receipt terminal.
+
+Required handoff fields:
+
+```txt
+produces_affordances
+consumes_affordances
+typed_handoff_role
+produced_affordances
+consumed_affordances
+typed_handoff_contract
+```
+
+Common affordance kinds include:
+
+```txt
+source_ref
+text_evidence
+citation_evidence
+numeric_value_evidence
+theory_context
+calculator_expression_template
+claim_boundary
+frontier_candidate
+active_surface_ref
+bound_calculator_expression
+calculator_result
+```
+
+Consumer tools must declare required input affordance kinds. Runtime binding may
+materialize dependent calls only when the upstream observations satisfy those
+requirements. Missing required bindings fail closed with typed diagnostics and
+remain visible in debug export and UI trace.
+
+The calculator handoff contract is intentionally strict:
+
+```txt
+theory-badge-graph.reflect_discussion_context
+  produces calculator_expression_template
+research/docs observations
+  produce numeric_value_evidence with units and source refs
+typed binder
+  produces bound_calculator_expression only after all variables are bound
+scientific-calculator.solve_expression
+  consumes the numeric substituted expression
+```
+
+The Scientific Calculator must not solve badge templates containing unresolved
+symbols. If a variable is missing, the compound rail records
+`missing_variables`, the rejected template, selected affordances, and a blocked
+rail status instead of hallucinating a solve.
+
 ## Authority Rules
 
 - Tool names in prompt text are constraints or requests, not execution.

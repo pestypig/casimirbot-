@@ -119,6 +119,40 @@ terminal_eligible=false
 post_tool_model_step_required=true
 ```
 
+Shared gateway observations may also expose typed affordance handoff metadata:
+
+```txt
+produces_affordances
+consumes_affordances
+typed_handoff_role
+produced_affordances
+consumed_affordances
+typed_handoff_contract
+```
+
+These fields are evidence-routing metadata, not answer authority. Producer
+tools may offer affordances such as `source_ref`, `text_evidence`,
+`citation_evidence`, `numeric_value_evidence`, `theory_context`,
+`calculator_expression_template`, `claim_boundary`, `frontier_candidate`, and
+`active_surface_ref`. Consumer tools declare required affordance kinds before
+they can use an upstream observation. Missing required affordances must fail
+closed as typed missing-input diagnostics.
+
+The first graduated compound handoff is:
+
+```txt
+Theory Badge Graph calculator_expression_template
+-> scholarly/docs numeric_value_evidence with units and source refs
+-> typed binder emits bound_calculator_expression
+-> scientific-calculator.solve_expression receives only the substituted numeric expression
+```
+
+The calculator must not receive algebraic badge templates directly. If any
+required variable cannot be bound with a numeric value, unit, and source ref, the
+compound rail remains blocked and the debug export must show the missing
+variables, rejected template expression, selected affordances, and terminal
+authority state.
+
 `shared_gateway_now` does not mean every capability is read-only. The shared
 classifier derives permission class from the gateway manifest:
 
