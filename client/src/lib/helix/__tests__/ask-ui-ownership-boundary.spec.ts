@@ -165,9 +165,6 @@ describe("Helix Ask UI ownership boundaries", () => {
       "attachHelixActionEnvelopeRuntimeAuthorityDebug",
       "isWorkstationTurnTransitionPendingRequest",
       "registerTurnTerminalOutcome",
-      "hasHelixPendingCancellationMarker",
-      "isHelixCanceledPendingTurn",
-      "resolveHelixPendingInputRecord",
       "resolveHelixVisibleTerminalKind",
     ]) {
       expect(pill).toContain(symbol);
@@ -177,6 +174,9 @@ describe("Helix Ask UI ownership boundaries", () => {
       "readHelixPendingInputRecord",
       "normalizeHelixPendingTransitionMarker",
       "readHelixPendingTransitionTrace",
+      "hasHelixPendingCancellationMarker",
+      "isHelixCanceledPendingTurn",
+      "resolveHelixPendingInputRecord",
     ]) {
       expect(pill).toContain(symbol);
       expect(pill).not.toContain(`function ${symbol}`);
@@ -188,7 +188,6 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(pendingInputReaders).not.toContain("@/store/");
     expect(pendingInputReaders).not.toContain("@/components/helix/HelixAskPill");
     expect(pendingInputReaders).not.toContain("resolveHelixVisibleTerminalKind");
-    expect(pendingInputReaders).not.toContain("isHelixCanceledPendingTurn");
     expect(pendingInputReaders).not.toContain("runAskTurn");
     expect(pendingInputReaders).not.toContain("fetch(");
     expect(map).toContain("ask-pending-input-readers.ts");

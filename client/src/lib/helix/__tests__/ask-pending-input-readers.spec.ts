@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  hasHelixPendingCancellationMarker,
+  isHelixCanceledPendingTurn,
   normalizeHelixPendingTransitionMarker,
   readHelixPendingInputRecord,
   readHelixPendingTransitionTrace,
+  resolveHelixPendingInputRecord,
 } from "../ask-pending-input-readers";
 
 describe("ask pending input readers", () => {
@@ -45,5 +48,60 @@ describe("ask pending input readers", () => {
       "request_user_input_canceled",
     ]);
     expect(readHelixPendingTransitionTrace("   ")).toEqual([]);
+  });
+
+  it("detects pending cancellation markers only with pending context", () => {
+    expect(
+      hasHelixPendingCancellationMarker({
+        pending_status_after: "Canceled",
+      }),
+    ).toBe(true);
+    expect(
+      hasHelixPendingCancellationMarker({
+        pending_request: { request_id: "req-1" },
+        pending_transition_reason: "request user input canceled",
+      }),
+    ).toBe(true);
+    expect(
+      hasHelixPendingCancellationMarker({
+        reason: "request user input canceled",
+      }),
+    ).toBe(false);
+  });
+
+  it("walks nested debug/audit records to classify canceled pending turns", () => {
+    const nested = {
+      debug: {
+        agent_loop_audit: {
+          pending_transition_trace: ["pending clarify canceled"],
+        },
+      },
+    };
+    const cyclic: Record<string, unknown> = { debug: nested };
+    cyclic.terminal = cyclic;
+
+    expect(isHelixCanceledPendingTurn(cyclic)).toBe(true);
+    expect(isHelixCanceledPendingTurn({ debug: { reason: "ordinary final" } })).toBe(false);
+  });
+
+  it("resolves direct and nested pending input records but masks canceled pending turns", () => {
+    const direct = { prompt: "Pick a source" };
+    expect(resolveHelixPendingInputRecord(direct)).toBe(direct);
+
+    const nestedPending = { request_id: "req-2", prompt: "Choose panel" };
+    expect(
+      resolveHelixPendingInputRecord({
+        agent_loop_audit: {
+          pending_server_request: nestedPending,
+        },
+      }),
+    ).toBe(nestedPending);
+
+    expect(
+      resolveHelixPendingInputRecord({
+        pending_request: { request_id: "req-3", prompt: "Choose doc" },
+        pending_transition_trace: ["pending clarify canceled"],
+      }),
+    ).toBeNull();
   });
 });
