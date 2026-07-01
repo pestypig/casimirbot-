@@ -1,7 +1,35 @@
-import { HelixAskLegacyRuntimeBridge } from "./HelixAskLegacyRuntimeBridge";
+import React, { Suspense } from "react";
+import {
+  HelixAskMinimalRuntimeShell,
+  type HelixAskMinimalRuntimeShellProps,
+} from "./HelixAskMinimalRuntimeShell";
 import type { HelixAskConsoleProps } from "./HelixAskConsoleState";
 import { buildHelixAskConsoleRuntimeBridgeProps } from "./HelixAskConsoleRuntimeShellProps";
 
-export function HelixAskConsoleRuntimeShell(props: HelixAskConsoleProps) {
-  return <HelixAskLegacyRuntimeBridge {...buildHelixAskConsoleRuntimeBridgeProps(props)} />;
+const HelixAskLegacyRuntimeBridge = React.lazy(async () => {
+  const module = await import("./HelixAskLegacyRuntimeBridge");
+  return { default: module.HelixAskLegacyRuntimeBridge };
+});
+
+export type HelixAskConsoleRuntimeImplementation = "legacy_bridge" | "minimal_runtime_shell";
+
+export type HelixAskConsoleRuntimeShellProps = HelixAskConsoleProps & {
+  runtimeImplementation?: HelixAskConsoleRuntimeImplementation;
+  minimalRuntime?: Pick<HelixAskMinimalRuntimeShellProps, "controlActions" | "onSubmitPlan" | "runTurn">;
+};
+
+export function HelixAskConsoleRuntimeShell({
+  runtimeImplementation = "legacy_bridge",
+  minimalRuntime,
+  ...props
+}: HelixAskConsoleRuntimeShellProps) {
+  if (runtimeImplementation === "minimal_runtime_shell") {
+    return <HelixAskMinimalRuntimeShell {...props} {...minimalRuntime} />;
+  }
+
+  return (
+    <Suspense fallback={null}>
+      <HelixAskLegacyRuntimeBridge {...buildHelixAskConsoleRuntimeBridgeProps(props)} />
+    </Suspense>
+  );
 }

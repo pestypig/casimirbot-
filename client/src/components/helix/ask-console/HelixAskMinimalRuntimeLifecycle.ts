@@ -22,9 +22,14 @@ export type HelixAskMinimalRuntimeReply = {
     ts: string;
     tsMs: number;
     meta: {
-      kind: "client_optimistic_turn_start" | "client_transport_turn_final" | "client_transport_turn_error";
+      kind:
+        | "client_optimistic_turn_start"
+        | "client_transport_stream_event"
+        | "client_transport_turn_final"
+        | "client_transport_turn_error";
       turn_id: string;
       assistant_answer: false;
+      stream_event?: string;
     };
   }>;
 };
@@ -144,6 +149,41 @@ export function completeHelixAskMinimalRuntimeTurn(args: {
             meta: {
               kind: "client_transport_turn_final",
               turn_id: args.turnId,
+              assistant_answer: false,
+            },
+          },
+        ],
+      };
+    }),
+  };
+}
+
+export function recordHelixAskMinimalRuntimeStreamEvent(args: {
+  state: HelixAskMinimalRuntimeState;
+  turnId: string;
+  eventName: string;
+  receivedAtMs: number;
+}): HelixAskMinimalRuntimeState {
+  const eventName = coerceHelixAskMinimalRuntimeText(args.eventName).trim() || "stream_event";
+  const receivedAtIso = new Date(args.receivedAtMs).toISOString();
+  return {
+    ...args.state,
+    replies: args.state.replies.map((reply) => {
+      if (reply.turn_id !== args.turnId) return reply;
+      return {
+        ...reply,
+        liveEvents: [
+          ...reply.liveEvents,
+          {
+            id: `turn-stream:${args.turnId}:${reply.liveEvents.length}`,
+            text: `Stream event: ${eventName}`,
+            tool: "helix.ask.client",
+            ts: receivedAtIso,
+            tsMs: args.receivedAtMs,
+            meta: {
+              kind: "client_transport_stream_event",
+              turn_id: args.turnId,
+              stream_event: eventName,
               assistant_answer: false,
             },
           },

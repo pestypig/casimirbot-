@@ -96,12 +96,21 @@ const readItineraryCalculatorExpression = (body: RecordLike): string | null => {
   return match?.[0]?.replace(/×/g, "*").replace(/\bx\b/gi, "*").trim() ?? null;
 };
 
+const promptRequestsConcreteDocsLookup = (body: RecordLike): boolean => {
+  if (isHelixAskGoldenPathDocsLocateRequested(body)) return true;
+  const prompt = readHelixAskGoldenPathPrompt(body).toLowerCase();
+  if (/\b(?:docs?-viewer\.locate_in_doc|locate\s+(?:in\s+)?(?:the\s+)?(?:doc|document)|open\s+(?:the\s+)?(?:doc|document)|cite\s+(?:the\s+)?(?:doc|document|white\s*paper)|current\s+(?:doc|document)|white\s*paper)\b/.test(prompt)) {
+    return true;
+  }
+  if (/\bdocs\/[^\s,.;:)]+/i.test(prompt)) return true;
+  if (/\.(?:md|pdf|docx?|txt)\b/i.test(prompt)) return true;
+  return false;
+};
+
 const docsAdapter: GoldenPathItineraryAdapter = {
   capability: HELIX_GOLDEN_PATH_DOCS_LOCATE_CAPABILITY,
   order: 10,
-  detectIntent: (body) =>
-    isHelixAskGoldenPathDocsLocateRequested(body) ||
-    promptIncludes(body, /\b(?:docs?|document|white\s*paper|paper|cite|check)\b/),
+  detectIntent: promptRequestsConcreteDocsLookup,
   buildObservation: ({ body, turn }) => {
     const prompt = turn.promptText.toLowerCase();
     const docPath = readGoldenPathDocPath(body);

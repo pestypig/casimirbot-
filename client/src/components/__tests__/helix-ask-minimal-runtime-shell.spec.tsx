@@ -3,6 +3,7 @@ import React from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { HelixAskConsoleRuntimeShell } from "@/components/helix/ask-console/HelixAskConsoleRuntimeShell";
 import { HelixAskMinimalRuntimeShell } from "@/components/helix/ask-console/HelixAskMinimalRuntimeShell";
 import type {
   HelixAskMinimalRuntimeControlActions,
@@ -60,7 +61,7 @@ describe("HelixAskMinimalRuntimeShell", () => {
         question: "Summarize the current whitepaper",
         contextFiles: ["docs/research/nhm2-current-status-whitepaper-2026-05-02.md"],
       }),
-      undefined,
+      expect.any(Function),
     );
 
     fireEvent.click(screen.getByTestId("helix-ask-latest-copy-final"));
@@ -145,5 +146,47 @@ describe("HelixAskMinimalRuntimeShell", () => {
     });
     expect(screen.getByText("What is the current status?")).toBeTruthy();
     expect(useAgiChatStore.getState().activeId).toBe("session-existing");
+  });
+
+  it("submits through the runtime shell minimal implementation without rendering the legacy bridge", async () => {
+    window.history.pushState({}, "", "/desktop?doc=docs/current.md");
+    vi.spyOn(globalThis.crypto, "randomUUID").mockReturnValue("runtime-shell-turn");
+    const runTurn = vi.fn(async (payload, onEvent) => {
+      onEvent?.({ event: "turn_delta", data: { chunk: "working" } });
+      return {
+        selected_final_answer: "Runtime shell minimal answer.",
+        turn_id: payload.turnId,
+        debug: {
+          stream_used: true,
+        },
+      };
+    });
+
+    render(
+      <HelixAskConsoleRuntimeShell
+        contextId="ctx"
+        runtimeImplementation="minimal_runtime_shell"
+        minimalRuntime={{ runTurn }}
+      />,
+    );
+
+    expect(screen.getByTestId("helix-ask-minimal-runtime-shell")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Ask Helix"), {
+      target: { value: "Use the active doc" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Submit prompt" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Runtime shell minimal answer.")).toBeTruthy();
+    });
+    expect(runTurn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        turnId: "ask:runtime-shell-turn",
+        question: "Use the active doc",
+        contextFiles: ["docs/current.md"],
+      }),
+      expect.any(Function),
+    );
+    expect(screen.queryByTestId("helix-ask-pill")).toBeNull();
   });
 });

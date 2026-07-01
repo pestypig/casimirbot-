@@ -187,6 +187,7 @@ export const canonicalGoalKindForExplicitCapability = (capability: string | null
     case "situation-room.describe_visual_capture":
       return "visual_capture_describe";
     case "helix_ask.reflect_theory_context":
+    case "theory-badge-graph.propose_frontier_conjectures":
       return "theory_context_reflection";
     case "helix.theory.frontierVectorFieldTrace":
       return "theory_frontier_vector_field";
@@ -261,6 +262,7 @@ export const answerScopeForExplicitCapability = (capability: string | null | und
     case "situation-room.describe_visual_capture":
       return "visual_capture";
     case "helix_ask.reflect_theory_context":
+    case "theory-badge-graph.propose_frontier_conjectures":
     case "helix.theory.frontierVectorFieldTrace":
       return "theory_context";
     case "helix_ask.reflect_live_synthetic_data":

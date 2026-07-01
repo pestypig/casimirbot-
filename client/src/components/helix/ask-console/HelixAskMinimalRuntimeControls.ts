@@ -1,5 +1,9 @@
 import type { HelixAskMinimalRuntimeReply } from "./HelixAskMinimalRuntimeLifecycle";
 import type { HelixAskMinimalRuntimeTurnView } from "./HelixAskMinimalRuntimeTurnList";
+import {
+  HELIX_ASK_MINIMAL_RUNTIME_BACKEND_DEBUG_EXPORT_MATERIALIZER,
+  materializeHelixAskMinimalRuntimeDebugCopyText,
+} from "./HelixAskMinimalRuntimeDebugExport";
 
 export type HelixAskMinimalRuntimeControlPayload = {
   replyId: string;
@@ -8,6 +12,7 @@ export type HelixAskMinimalRuntimeControlPayload = {
   finalAnswerText: string;
   readAloudText: string;
   debugCopyText: string;
+  debugSource: unknown;
 };
 
 export type HelixAskMinimalRuntimeControlActions = {
@@ -58,6 +63,7 @@ export function buildHelixAskMinimalRuntimeControlPayload(args: {
     finalAnswerText,
     readAloudText: finalAnswerText,
     debugCopyText: buildHelixAskMinimalRuntimeDebugCopyText(args),
+    debugSource: args.reply.result ?? args.reply.debug ?? null,
   };
 }
 
@@ -91,6 +97,12 @@ function speakTextWithBrowserSpeech(text: string): void {
 
 export const HELIX_ASK_MINIMAL_RUNTIME_BROWSER_CONTROL_ACTIONS: HelixAskMinimalRuntimeControlActions = {
   copyFinal: (payload) => writeTextToBrowserClipboard(payload.finalAnswerText),
-  debugCopy: (payload) => writeTextToBrowserClipboard(payload.debugCopyText),
+  debugCopy: async (payload) => {
+    const debugCopyText = await materializeHelixAskMinimalRuntimeDebugCopyText({
+      payload,
+      materializeBackendDebugExport: HELIX_ASK_MINIMAL_RUNTIME_BACKEND_DEBUG_EXPORT_MATERIALIZER,
+    });
+    return writeTextToBrowserClipboard(debugCopyText);
+  },
   readAloud: (payload) => speakTextWithBrowserSpeech(payload.readAloudText),
 };

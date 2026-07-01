@@ -11,6 +11,7 @@ import {
   completeHelixAskMinimalRuntimeTurn,
   createHelixAskMinimalRuntimeInitialState,
   failHelixAskMinimalRuntimeTurn,
+  recordHelixAskMinimalRuntimeStreamEvent,
   resolveHelixAskMinimalRuntimeAnswerText,
   startHelixAskMinimalRuntimeTurn,
 } from "./HelixAskMinimalRuntimeLifecycle";
@@ -148,6 +149,16 @@ export function HelixAskMinimalRuntimeShell({
                   void runHelixAskMinimalRuntimeInjectedTransport({
                     runner: turnRunner,
                     payload,
+                    onEvent: (event) => {
+                      setRuntimeState((state) =>
+                        recordHelixAskMinimalRuntimeStreamEvent({
+                          state,
+                          turnId,
+                          eventName: event.event,
+                          receivedAtMs: Date.now(),
+                        }),
+                      );
+                    },
                   })
                     .then((result) => {
                       if (sessionId) {

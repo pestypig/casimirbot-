@@ -1237,6 +1237,8 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
     schema: "helix.explicit_capability_contract.v1",
     capability: "helix_ask.reflect_theory_context",
     aliases: [
+      "theory-badge-graph.reflect_discussion_context",
+      "reflect_discussion_context",
       "reflect_theory_context",
       "theory_context",
       "theory_context_reflection",

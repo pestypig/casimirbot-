@@ -24,7 +24,8 @@ export const isHelixAskGoldenPathTheoryReflectionRequested = (body: RecordLike):
   if (isHelixAskGoldenPathCapabilityNamedInRequest(body, [HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY])) return true;
   const prompt = readHelixAskGoldenPathPrompt(body).toLowerCase();
   return (
-    /\b(?:reflect|reflection|theory\s+context|concept\s+route|theory\s+badge\s+graph)\b/.test(prompt)
+    /\b(?:reflect|reflection|reflect_discussion_context|theory\s+context|concept\s+route|theory\s+badge\s+graph)\b/.test(prompt) ||
+    /theory-badge-graph\.reflect_discussion_context/i.test(prompt)
   );
 };
 
@@ -40,7 +41,8 @@ export const readTheoryReflectionTopic = (body: RecordLike): string | null => {
   const cleaned = readHelixAskGoldenPathPrompt(body)
     .replace(/helix_ask_golden_path_runtime/gi, "")
     .replace(/helix_ask\.reflect_theory_context/gi, "")
-    .replace(/\b(?:reflect|reflection|theory\s+context|concept\s+route|theory\s+badge\s+graph|on|about|for|use)\b/gi, " ")
+    .replace(/theory-badge-graph\.reflect_discussion_context/gi, "")
+    .replace(/\b(?:reflect|reflection|reflect_discussion_context|theory\s+context|concept\s+route|theory\s+badge\s+graph|on|about|for|use)\b/gi, " ")
     .replace(/\s+/g, " ")
     .trim();
   return cleaned || null;

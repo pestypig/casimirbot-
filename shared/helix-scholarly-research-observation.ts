@@ -10,6 +10,12 @@ export const HELIX_SCHOLARLY_FULL_TEXT_OBSERVATION_SCHEMA =
 export const HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY =
   "scholarly-research.fetch_full_text" as const;
 
+export const HELIX_SCHOLARLY_NUMERIC_PARAMETER_OBSERVATION_SCHEMA =
+  "helix.scholarly_numeric_parameter_observation.v1" as const;
+
+export const HELIX_SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY =
+  "scholarly-research.extract_numeric_parameters" as const;
+
 export const HELIX_MODEL_SYNTHESIZE_FROM_SCHOLARLY_RESEARCH_CAPABILITY =
   "model.synthesize_from_scholarly_research" as const;
 
@@ -140,6 +146,56 @@ export type HelixScholarlyFullTextObservation = {
   assistant_answer: false;
   raw_content_included: false;
   context_policy: "compact_context_pack_only";
+};
+
+export type HelixScholarlyNumericParameterEvidence = {
+  variable: string;
+  value: number;
+  unit: string;
+  normalized_value: number;
+  normalized_unit: string;
+  source_snippet: string;
+  section?: string;
+  page: number | null;
+  table: string | null;
+  confidence: "high" | "medium" | "low";
+  evidence_ref: string;
+};
+
+export type HelixScholarlyRejectedNumericCandidate = {
+  variable: string;
+  text: string;
+  reason:
+    | "ambiguous_unit"
+    | "missing_unit"
+    | "uncited_value"
+    | "unsupported_unit"
+    | "not_numeric";
+};
+
+export type HelixScholarlyNumericParameterObservation = {
+  schema: typeof HELIX_SCHOLARLY_NUMERIC_PARAMETER_OBSERVATION_SCHEMA;
+  artifact_id: string;
+  turn_id: string;
+  capability: typeof HELIX_SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY;
+  capability_key: typeof HELIX_SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY;
+  source_ref: string | null;
+  paper: {
+    title?: string;
+    doi?: string;
+    arxiv_id?: string;
+    url?: string;
+  };
+  requested_variables: string[];
+  parameters: HelixScholarlyNumericParameterEvidence[];
+  missing_variables: string[];
+  rejected_candidates: HelixScholarlyRejectedNumericCandidate[];
+  missing_requirements: string[];
+  selected_for_answer: boolean;
+  terminal_eligible: false;
+  post_tool_model_step_required: true;
+  assistant_answer: false;
+  raw_content_included: false;
 };
 
 export type HelixScholarlyResearchAnswerContract = {

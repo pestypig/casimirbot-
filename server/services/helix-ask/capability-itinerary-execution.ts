@@ -115,11 +115,28 @@ const docLocationArtifactHasConcreteEvidence = (artifact: HelixCapabilityItinera
   if (status === "located") return true;
   const matchCount = Number(payload.match_count);
   if (Number.isFinite(matchCount) && matchCount > 0) return true;
+  if (
+    /^doc_location_matches$/i.test(
+      readString((artifact as Record<string, unknown>).kind) ??
+      readString(payload.kind) ??
+      "",
+    ) &&
+    /agent_runtime.*docs_viewer_locate_in_doc/i.test(
+      readString((artifact as Record<string, unknown>).artifact_id) ??
+      readString(payload.artifact_id) ??
+      "",
+    )
+  ) {
+    return true;
+  }
   return [
     payload.matches,
     payload.snippets,
     payload.locations,
     payload.line_spans,
+    payload.evidence_refs,
+    payload.support_refs,
+    payload.observation_refs,
   ].some((value) => readArray(value).length > 0);
 };
 

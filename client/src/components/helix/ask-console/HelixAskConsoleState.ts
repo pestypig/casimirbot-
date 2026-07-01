@@ -14,7 +14,8 @@ export const HELIX_ASK_CONSOLE_RECROWN_PHASES = [
 
 export type HelixAskConsoleRecrownPhase = (typeof HELIX_ASK_CONSOLE_RECROWN_PHASES)[number];
 
-export const HELIX_ASK_CONSOLE_ACTIVE_RECROWN_PHASE = "build_minimal_runtime_shell" satisfies HelixAskConsoleRecrownPhase;
+export const HELIX_ASK_CONSOLE_ACTIVE_RECROWN_PHASE =
+  "build_minimal_runtime_shell" satisfies HelixAskConsoleRecrownPhase;
 
 export const HELIX_ASK_CONSOLE_LIVE_SURFACE_REQUIREMENTS = [
   "prompt_input",
@@ -34,6 +35,83 @@ export const HELIX_ASK_CONSOLE_LIVE_SURFACE_REQUIREMENTS = [
 
 export type HelixAskConsoleLiveSurfaceRequirement =
   (typeof HELIX_ASK_CONSOLE_LIVE_SURFACE_REQUIREMENTS)[number];
+
+export const HELIX_ASK_CONSOLE_OPERATOR_SURFACE_PARITY_ITEMS = [
+  "prompt_composer_surface",
+  "runtime_picker",
+  "goal_pill",
+  "steering_queue",
+  "attachment_context_strip",
+  "context_source_panels",
+  "observer_panels",
+  "debug_drawer",
+  "copy_debug_read_aloud_controls",
+  "voice_read_aloud_affordances",
+  "visible_stream_progress_status_rows",
+  "final_answer_metadata",
+  "workstation_trace_rows",
+  "layout_position_sizing_dock_behavior",
+  "top_of_console_readable",
+  "long_answer_unclipped",
+] as const;
+
+export type HelixAskConsoleOperatorSurfaceParityItem =
+  (typeof HELIX_ASK_CONSOLE_OPERATOR_SURFACE_PARITY_ITEMS)[number];
+
+export const HELIX_ASK_CONSOLE_OPERATOR_SURFACE_PARITY_PROVEN_ITEMS = [
+  "prompt_composer_surface",
+  "runtime_picker",
+  "copy_debug_read_aloud_controls",
+  "final_answer_metadata",
+  "workstation_trace_rows",
+  "top_of_console_readable",
+  "long_answer_unclipped",
+] as const satisfies readonly HelixAskConsoleOperatorSurfaceParityItem[];
+
+export const HELIX_ASK_CONSOLE_OPERATOR_SURFACE_PARITY_OPEN_ITEMS = [
+  "goal_pill",
+  "steering_queue",
+  "attachment_context_strip",
+  "context_source_panels",
+  "observer_panels",
+  "debug_drawer",
+  "voice_read_aloud_affordances",
+  "visible_stream_progress_status_rows",
+  "layout_position_sizing_dock_behavior",
+] as const satisfies readonly HelixAskConsoleOperatorSurfaceParityItem[];
+
+export const HELIX_ASK_CONSOLE_OPERATOR_SURFACE_PARITY_READY = false;
+
+export const HELIX_ASK_CONSOLE_LEGACY_BEHAVIOR_CLASSIFICATIONS = [
+  {
+    key: "minimum_complete_runtime",
+    classification: "used_must_move",
+    evidence: "minimal runtime shell tests cover submit, stream callback, docs handoff, final answer, trace rows, latest controls, debug export, and chat hydration",
+  },
+  {
+    key: "operator_surface_chrome",
+    classification: "used_must_move",
+    evidence: "goal requires familiar visible console surface before bridge replacement",
+  },
+  {
+    key: "legacy_bridge_default",
+    classification: "used_temporary_adapter",
+    evidence: "minimal shell is missing operator-surface parity; default remains legacy bridge",
+  },
+  {
+    key: "development_fallbacks_and_trap_doors",
+    classification: "unknown_quarantined",
+    evidence: "must be inventoried before deletion; runtime minimalism is not proof of disuse",
+  },
+  {
+    key: "conflicting_legacy_runtime_paths",
+    classification: "conflicting_remove_after_golden_path_proof",
+    evidence: "remove only after current golden path covers expected behavior and live parity passes",
+  },
+] as const;
+
+export type HelixAskConsoleLegacyBehaviorClassification =
+  (typeof HELIX_ASK_CONSOLE_LEGACY_BEHAVIOR_CLASSIFICATIONS)[number]["classification"];
 
 export const HELIX_ASK_CONSOLE_RECROWNED_DISPLAY_OWNERS = [
   "composer",
@@ -144,8 +222,14 @@ export const HELIX_ASK_CONSOLE_BRIDGE_REPLACEMENT_PROVEN_GATES = [
   "minimal_runtime_shell_has_injected_transport_seam",
   "minimal_runtime_shell_completes_injected_turn",
   "minimal_runtime_shell_has_backend_runner_adapter",
+  "minimal_runtime_shell_records_stream_events",
   "minimal_runtime_shell_renders_local_turns",
+  "minimal_runtime_shell_renders_workstation_trace_rows",
   "minimal_runtime_shell_binds_latest_controls",
+  "minimal_runtime_shell_materializes_backend_debug_export",
+  "runtime_shell_can_select_minimal_runtime_without_legacy_pill",
+  "minimal_shell_submits_and_streams_without_legacy_pill",
+  "minimal_shell_preserves_active_docs_context_handoff_live",
   "minimal_runtime_shell_component_submits_injected_turn",
   "minimal_runtime_shell_persists_and_hydrates_chat_sessions",
 ] as const;
@@ -154,9 +238,6 @@ export type HelixAskConsoleBridgeReplacementProvenGate =
   (typeof HELIX_ASK_CONSOLE_BRIDGE_REPLACEMENT_PROVEN_GATES)[number];
 
 export const HELIX_ASK_CONSOLE_BRIDGE_REPLACEMENT_OPEN_GATES = [
-  "minimal_shell_submits_and_streams_without_legacy_pill",
-  "minimal_shell_materializes_backend_debug_export",
-  "minimal_shell_preserves_active_docs_context_handoff_live",
   "desktop_entrypoint_swaps_runtime_shell_off_legacy_bridge",
 ] as const;
 
@@ -193,6 +274,11 @@ export type HelixAskConsoleLegacyBridgeStatus = {
   bridgeReplacementReady: typeof HELIX_ASK_CONSOLE_BRIDGE_REPLACEMENT_READY;
   bridgeReplacementProvenGates: readonly HelixAskConsoleBridgeReplacementProvenGate[];
   bridgeReplacementOpenGates: readonly HelixAskConsoleBridgeReplacementOpenGate[];
+  operatorSurfaceParityReady: typeof HELIX_ASK_CONSOLE_OPERATOR_SURFACE_PARITY_READY;
+  operatorSurfaceParityItems: readonly HelixAskConsoleOperatorSurfaceParityItem[];
+  operatorSurfaceParityProvenItems: readonly HelixAskConsoleOperatorSurfaceParityItem[];
+  operatorSurfaceParityOpenItems: readonly HelixAskConsoleOperatorSurfaceParityItem[];
+  legacyBehaviorClassifications: typeof HELIX_ASK_CONSOLE_LEGACY_BEHAVIOR_CLASSIFICATIONS;
 };
 
 export const HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS: HelixAskConsoleLegacyBridgeStatus = {
@@ -211,4 +297,9 @@ export const HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS: HelixAskConsoleLegacyBridge
   bridgeReplacementReady: HELIX_ASK_CONSOLE_BRIDGE_REPLACEMENT_READY,
   bridgeReplacementProvenGates: HELIX_ASK_CONSOLE_BRIDGE_REPLACEMENT_PROVEN_GATES,
   bridgeReplacementOpenGates: HELIX_ASK_CONSOLE_BRIDGE_REPLACEMENT_OPEN_GATES,
+  operatorSurfaceParityReady: HELIX_ASK_CONSOLE_OPERATOR_SURFACE_PARITY_READY,
+  operatorSurfaceParityItems: HELIX_ASK_CONSOLE_OPERATOR_SURFACE_PARITY_ITEMS,
+  operatorSurfaceParityProvenItems: HELIX_ASK_CONSOLE_OPERATOR_SURFACE_PARITY_PROVEN_ITEMS,
+  operatorSurfaceParityOpenItems: HELIX_ASK_CONSOLE_OPERATOR_SURFACE_PARITY_OPEN_ITEMS,
+  legacyBehaviorClassifications: HELIX_ASK_CONSOLE_LEGACY_BEHAVIOR_CLASSIFICATIONS,
 };

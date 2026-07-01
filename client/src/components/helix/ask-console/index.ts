@@ -10,6 +10,12 @@ export {
   buildHelixAskMinimalRuntimeDebugCopyText,
   HELIX_ASK_MINIMAL_RUNTIME_BROWSER_CONTROL_ACTIONS,
 } from "./HelixAskMinimalRuntimeControls";
+export {
+  buildHelixAskMinimalRuntimeDebugExportRequest,
+  HELIX_ASK_MINIMAL_RUNTIME_BACKEND_DEBUG_EXPORT_MATERIALIZER,
+  materializeHelixAskMinimalRuntimeDebugCopyText,
+  readHelixAskMinimalRuntimeDebugExportRef,
+} from "./HelixAskMinimalRuntimeDebugExport";
 export { buildHelixAskMinimalRuntimeRepliesFromChatSession } from "./HelixAskMinimalRuntimeChatSession";
 export {
   HELIX_ASK_CONSOLE_DOCK_REPLY_LIST_CLASS_NAME,
@@ -117,6 +123,7 @@ export {
   coerceHelixAskMinimalRuntimeText,
   createHelixAskMinimalRuntimeInitialState,
   failHelixAskMinimalRuntimeTurn,
+  recordHelixAskMinimalRuntimeStreamEvent,
   resolveHelixAskMinimalRuntimeAnswerText,
   startHelixAskMinimalRuntimeTurn,
 } from "./HelixAskMinimalRuntimeLifecycle";
@@ -168,6 +175,10 @@ export type {
   HelixAskConsoleRuntimeShellActiveOwnership,
 } from "./HelixAskConsoleState";
 export type { HelixAskContextBridgeSnapshot } from "./HelixAskContextBridge";
+export type {
+  HelixAskConsoleRuntimeImplementation,
+  HelixAskConsoleRuntimeShellProps,
+} from "./HelixAskConsoleRuntimeShell";
 export type { HelixAskConsoleRequestEnvelope } from "./HelixAskRequestEnvelope";
 export type { HelixAskMinimalRuntimeSubmitPlan } from "./HelixAskMinimalRuntimeSubmitPlan";
 export type { HelixAskMinimalRuntimeShellProps } from "./HelixAskMinimalRuntimeShell";
@@ -179,6 +190,11 @@ export type {
   HelixAskMinimalRuntimeControlActions,
   HelixAskMinimalRuntimeControlPayload,
 } from "./HelixAskMinimalRuntimeControls";
+export type {
+  HelixAskMinimalRuntimeDebugExportMaterializer,
+  HelixAskMinimalRuntimeDebugExportRef,
+  HelixAskMinimalRuntimeDebugExportRequest,
+} from "./HelixAskMinimalRuntimeDebugExport";
 export type {
   HelixAskMinimalRuntimeReply,
   HelixAskMinimalRuntimeState,

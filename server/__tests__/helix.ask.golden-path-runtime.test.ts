@@ -1670,6 +1670,35 @@ describe("Helix Ask golden path runtime", () => {
     expect(terminalLedgerEntries(body)).toHaveLength(1);
   });
 
+  it("does not treat conditional solve_expression prose as a calculator expression", () => {
+    process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
+
+    const decision = runHelixAskGoldenPathRuntime({
+      now: new Date("2026-06-28T12:26:30.000Z"),
+      body: {
+        turn_id: "ask:golden:calculator-conditional-prose",
+        prompt:
+          "Run scientific-calculator.solve_expression only if a typed bound_calculator_expression can be created. If numeric values are missing, fail closed with missing variables and the rejected expression instead of solving.",
+        goldenPathRuntime: true,
+        requested_capability: HELIX_GOLDEN_PATH_CALCULATOR_SOLVE_CAPABILITY,
+      },
+    });
+
+    expect(decision.handled).toBe(true);
+    if (!decision.handled) throw new Error("golden path should handle missing conditional calculator args");
+    expect(decision.payload).toMatchObject({
+      final_status: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      terminal_error_code: "missing_calculator_expression",
+      goal_satisfaction_evaluation: {
+        satisfaction: "not_satisfied",
+        first_broken_rail: "argument_extraction",
+      },
+    });
+    expect(decision.payload.selected_final_answer).toContain("no calculator expression");
+    expect(decision.payload.selected_final_answer).not.toContain("only if a typed bound_calculator_expression");
+  });
+
   it("handles docs locate prompts as line-backed document evidence", () => {
     process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
 

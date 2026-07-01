@@ -5,6 +5,7 @@ import {
   resolveHelixAskActualAgentProviderLabel,
   resolveHelixAskModelUsageLabel,
 } from "@/lib/helix/ask-agent-runtime-display";
+import { buildHelixTurnTranscriptRows } from "@/lib/helix/ask-turn-transcript";
 
 import { HelixAskFinalAnswer } from "./HelixAskFinalAnswer";
 import {
@@ -16,6 +17,7 @@ import type { HelixAskMinimalRuntimeReply } from "./HelixAskMinimalRuntimeLifecy
 import { HelixAskReplyCard } from "./HelixAskReplyCard";
 import { HelixAskTurnList } from "./HelixAskTurnList";
 import { HelixAskTurnControls } from "./HelixAskTurnControls";
+import { selectHelixAskConsoleWorkstationTraceRows } from "./HelixAskWorkstationTraceRows";
 
 export type HelixAskMinimalRuntimeTurnView = {
   id: string;
@@ -24,6 +26,13 @@ export type HelixAskMinimalRuntimeTurnView = {
   answerText: string;
   meta: string | null;
   isLatest: boolean;
+  workstationTraceRows: Array<{
+    key: string;
+    label: string;
+    text: string;
+    meta: string;
+    status: string;
+  }>;
 };
 
 export type HelixAskMinimalRuntimeTurnListProps = {
@@ -32,6 +41,12 @@ export type HelixAskMinimalRuntimeTurnListProps = {
   providers?: HelixAgentRuntimeDescriptor[];
   controlActions?: HelixAskMinimalRuntimeControlActions;
 };
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
 
 export function buildHelixAskMinimalRuntimeTurnViews(args: {
   replies: HelixAskMinimalRuntimeReply[];
@@ -43,6 +58,25 @@ export function buildHelixAskMinimalRuntimeTurnViews(args: {
     const projectionSource = reply.result ?? reply;
     const providerLabel = resolveHelixAskActualAgentProviderLabel(projectionSource, providers);
     const modelLabel = resolveHelixAskModelUsageLabel(projectionSource);
+    const resultRecord = asRecord(reply.result);
+    const resultDebugRecord = asRecord(resultRecord?.debug);
+    const transcriptDebugSource = resultRecord
+      ? { ...resultRecord, ...(resultDebugRecord ?? {}) }
+      : reply.debug ?? null;
+    const workstationTraceRows = selectHelixAskConsoleWorkstationTraceRows(
+      buildHelixTurnTranscriptRows({
+        id: reply.id,
+        turn_id: reply.turn_id,
+        content: reply.content,
+        debug: transcriptDebugSource,
+      }),
+    ).map((row) => ({
+      key: row.key,
+      label: row.label,
+      text: row.text,
+      meta: row.meta,
+      status: row.status,
+    }));
     return {
       id: reply.id,
       turnId: reply.turn_id,
@@ -50,6 +84,7 @@ export function buildHelixAskMinimalRuntimeTurnViews(args: {
       answerText: reply.content,
       meta: [providerLabel, modelLabel].filter(Boolean).join(" | ") || null,
       isLatest: latestReply?.turn_id === reply.turn_id,
+      workstationTraceRows,
     };
   });
 }
@@ -84,6 +119,34 @@ export function HelixAskMinimalRuntimeTurnList({
               <p className="mt-1 break-words text-xs text-slate-300 [overflow-wrap:anywhere]">
                 {view.question}
               </p>
+              {view.workstationTraceRows.length > 0 ? (
+                <div
+                  className="mt-3 space-y-2"
+                  data-testid={view.isLatest ? "helix-ask-minimal-runtime-workstation-trace" : undefined}
+                >
+                  {view.workstationTraceRows.map((row) => (
+                    <div
+                      key={row.key}
+                      className="rounded-lg border border-cyan-300/10 bg-cyan-300/5 px-2 py-2 text-xs text-slate-200"
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-semibold">{row.label}</p>
+                        <span className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.12em] text-slate-400">
+                          {row.status}
+                        </span>
+                      </div>
+                      <p className="mt-1 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+                        {row.text}
+                      </p>
+                      {row.meta ? (
+                        <p className="mt-1 break-words text-[10px] uppercase tracking-[0.12em] text-slate-500">
+                          {row.meta}
+                        </p>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
               <HelixAskFinalAnswer text={view.answerText} meta={view.meta} />
               {view.isLatest ? (
                 <HelixAskTurnControls

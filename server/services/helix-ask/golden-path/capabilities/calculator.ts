@@ -120,8 +120,7 @@ export const readCalculatorExpression = (body: RecordLike): string | null => {
     /scientific-calculator\.solve_expression(?:\s+with)?(?:\s+this\s+exact\s+expression)?\s*:?\s*([^\n\r]+)/i,
   );
   if (capabilityMatch?.[1]) {
-    const naturalExpression = extractNaturalCalculatorExpression(capabilityMatch[1]);
-    return naturalExpression ?? normalizeCalculatorExpression(capabilityMatch[1]);
+    return extractNaturalCalculatorExpression(capabilityMatch[1]);
   }
   const naturalExpression = extractNaturalCalculatorExpression(prompt);
   if (naturalExpression) return naturalExpression;
