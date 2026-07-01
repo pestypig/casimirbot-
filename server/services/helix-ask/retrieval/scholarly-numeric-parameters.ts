@@ -54,8 +54,8 @@ const variableAliases = (variable: string): string[] => {
   const normalized = variable.toLowerCase();
   const aliases: Record<string, string[]> = {
     n_m3: ["n_m3", "density", "electron density", "plasma density", "number density", "n_e", "ne", "n"],
-    T_eV: ["T_eV", "temperature", "electron temperature", "ion temperature", "T_e", "Te", "T"],
-    B_T: ["B_T", "magnetic field", "toroidal field", "field strength", "B_T", "B"],
+    t_ev: ["T_eV", "temperature", "electron temperature", "ion temperature", "T_e", "Te", "T"],
+    b_t: ["B_T", "magnetic field", "toroidal field", "field strength", "B_T", "B"],
     e_charge: ["e_charge", "elementary charge", "electron charge", "e"],
     mu0: ["mu0", "mu_0", "permeability of free space", "vacuum permeability"],
   };

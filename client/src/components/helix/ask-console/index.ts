@@ -1,5 +1,6 @@
 export { HelixAskConsole } from "./HelixAskConsole";
 export { HelixAskConsoleRuntimeShell } from "./HelixAskConsoleRuntimeShell";
+export { HelixAskLegacyConsoleView } from "./HelixAskLegacyConsoleView";
 export { HelixAskMinimalRuntimeShell } from "./HelixAskMinimalRuntimeShell";
 export {
   buildHelixAskMinimalRuntimeTurnViews,
@@ -163,6 +164,12 @@ export {
   HELIX_ASK_CONSOLE_RECROWN_VERSION,
   HELIX_ASK_CONSOLE_RUNTIME_SHELL_ACTIVE_OWNERSHIP,
 } from "./HelixAskConsoleState";
+export {
+  HELIX_ASK_LEGACY_CONSOLE_ACTIVE_PATH,
+  HELIX_ASK_LEGACY_CONSOLE_SLICES,
+  HELIX_ASK_LEGACY_CONSOLE_SLICE_PROGRESS,
+  HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT,
+} from "./HelixAskLegacyConsoleInventory";
 export type {
   HelixAskConsoleBridgeReplacementOpenGate,
   HelixAskConsoleBridgeReplacementProvenGate,
@@ -174,11 +181,16 @@ export type {
   HelixAskConsoleRecrownedDisplayOwner,
   HelixAskConsoleRuntimeShellActiveOwnership,
 } from "./HelixAskConsoleState";
+export type {
+  HelixAskLegacyConsoleSlice,
+  HelixAskLegacyConsoleSliceClassification,
+} from "./HelixAskLegacyConsoleInventory";
 export type { HelixAskContextBridgeSnapshot } from "./HelixAskContextBridge";
 export type {
   HelixAskConsoleRuntimeImplementation,
   HelixAskConsoleRuntimeShellProps,
 } from "./HelixAskConsoleRuntimeShell";
+export type { HelixAskLegacyConsoleViewProps } from "./HelixAskLegacyConsoleView";
 export type { HelixAskConsoleRequestEnvelope } from "./HelixAskRequestEnvelope";
 export type { HelixAskMinimalRuntimeSubmitPlan } from "./HelixAskMinimalRuntimeSubmitPlan";
 export type { HelixAskMinimalRuntimeShellProps } from "./HelixAskMinimalRuntimeShell";

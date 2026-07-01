@@ -15,7 +15,10 @@ export type HelixAskConsoleRuntimeImplementation = "legacy_bridge" | "minimal_ru
 
 export type HelixAskConsoleRuntimeShellProps = HelixAskConsoleProps & {
   runtimeImplementation?: HelixAskConsoleRuntimeImplementation;
-  minimalRuntime?: Pick<HelixAskMinimalRuntimeShellProps, "controlActions" | "onSubmitPlan" | "runTurn">;
+  minimalRuntime?: Pick<
+    HelixAskMinimalRuntimeShellProps,
+    "controlActions" | "onSubmitPlan" | "runTurn" | "visibleSurface"
+  >;
 };
 
 export function HelixAskConsoleRuntimeShell({

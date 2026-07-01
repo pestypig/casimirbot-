@@ -211,7 +211,6 @@ export const PROVIDER_AGENT_CAPABILITY_CLASSIFICATIONS: readonly ProviderAgentCa
     "helix_ask.inspect_capability_catalog",
     "helix_ask.reflect_workstation_tool_alignment",
     "workspace-directory.resolve",
-    "scholarly-research.fetch_full_text",
     "helix.theory.frontierVectorFieldTrace",
     "helix_ask.reflect_live_synthetic_data",
     "helix_ask.reflect_context_attachments",

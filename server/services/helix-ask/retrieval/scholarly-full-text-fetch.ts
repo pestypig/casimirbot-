@@ -388,7 +388,8 @@ export async function runScholarlyFullTextFetch(
       } else {
         const bytes = new Uint8Array(await response.arrayBuffer());
         const contentType = response.headers?.get("content-type")?.toLowerCase() ?? "";
-        const looksPdf = isLikelyPdfBytes(bytes) || isLikelyPdfUrl(sourceUrl) || contentType.includes("pdf");
+        const looksText = contentType.includes("html") || contentType.includes("text");
+        const looksPdf = isLikelyPdfBytes(bytes) || contentType.includes("pdf") || (!looksText && isLikelyPdfUrl(sourceUrl));
         if (looksPdf) {
           sourceKind = "pdf";
           cacheIntegrityHash = hashBuffer(bytes);

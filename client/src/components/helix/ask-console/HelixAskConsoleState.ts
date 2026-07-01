@@ -61,23 +61,23 @@ export type HelixAskConsoleOperatorSurfaceParityItem =
 export const HELIX_ASK_CONSOLE_OPERATOR_SURFACE_PARITY_PROVEN_ITEMS = [
   "prompt_composer_surface",
   "runtime_picker",
-  "copy_debug_read_aloud_controls",
-  "final_answer_metadata",
-  "workstation_trace_rows",
-  "top_of_console_readable",
-  "long_answer_unclipped",
-] as const satisfies readonly HelixAskConsoleOperatorSurfaceParityItem[];
-
-export const HELIX_ASK_CONSOLE_OPERATOR_SURFACE_PARITY_OPEN_ITEMS = [
   "goal_pill",
   "steering_queue",
   "attachment_context_strip",
   "context_source_panels",
   "observer_panels",
   "debug_drawer",
-  "voice_read_aloud_affordances",
+  "copy_debug_read_aloud_controls",
+  "final_answer_metadata",
+  "workstation_trace_rows",
   "visible_stream_progress_status_rows",
+  "voice_read_aloud_affordances",
+  "long_answer_unclipped",
+] as const satisfies readonly HelixAskConsoleOperatorSurfaceParityItem[];
+
+export const HELIX_ASK_CONSOLE_OPERATOR_SURFACE_PARITY_OPEN_ITEMS = [
   "layout_position_sizing_dock_behavior",
+  "top_of_console_readable",
 ] as const satisfies readonly HelixAskConsoleOperatorSurfaceParityItem[];
 
 export const HELIX_ASK_CONSOLE_OPERATOR_SURFACE_PARITY_READY = false;
@@ -238,7 +238,7 @@ export type HelixAskConsoleBridgeReplacementProvenGate =
   (typeof HELIX_ASK_CONSOLE_BRIDGE_REPLACEMENT_PROVEN_GATES)[number];
 
 export const HELIX_ASK_CONSOLE_BRIDGE_REPLACEMENT_OPEN_GATES = [
-  "desktop_entrypoint_swaps_runtime_shell_off_legacy_bridge",
+  "operator_surface_live_parity_validation",
 ] as const;
 
 export type HelixAskConsoleBridgeReplacementOpenGate =
@@ -259,12 +259,12 @@ export type HelixAskConsoleProps = {
 };
 
 export type HelixAskConsoleLegacyBridgeStatus = {
-  activeImplementation: "minimal_runtime_shell_scaffold";
+  activeImplementation: "legacy_bridge";
   bridge: "helix_ask_pill_legacy_runtime_bridge";
   activePhase: HelixAskConsoleRecrownPhase;
-  reason: "behavior_sensitive_paths_not_yet_recrowned";
+  reason: "operator_surface_parity_not_live_proven";
   runtimeShell: "helix_ask_console_runtime_shell";
-  replacementTarget: "minimal_runtime_shell_after_parity";
+  replacementTarget: "legacy_pill_retirement_after_proof";
   recrownedDisplayOwners: readonly HelixAskConsoleRecrownedDisplayOwner[];
   recrownedPureHelperRequirements: readonly HelixAskConsoleLiveSurfaceRequirement[];
   minimalRuntimeShellOwns: readonly HelixAskConsoleLiveSurfaceRequirement[];
@@ -282,12 +282,12 @@ export type HelixAskConsoleLegacyBridgeStatus = {
 };
 
 export const HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS: HelixAskConsoleLegacyBridgeStatus = {
-  activeImplementation: "minimal_runtime_shell_scaffold",
+  activeImplementation: "legacy_bridge",
   bridge: "helix_ask_pill_legacy_runtime_bridge",
   activePhase: HELIX_ASK_CONSOLE_ACTIVE_RECROWN_PHASE,
-  reason: "behavior_sensitive_paths_not_yet_recrowned",
+  reason: "operator_surface_parity_not_live_proven",
   runtimeShell: "helix_ask_console_runtime_shell",
-  replacementTarget: "minimal_runtime_shell_after_parity",
+  replacementTarget: "legacy_pill_retirement_after_proof",
   recrownedDisplayOwners: HELIX_ASK_CONSOLE_RECROWNED_DISPLAY_OWNERS,
   recrownedPureHelperRequirements: HELIX_ASK_CONSOLE_RECROWNED_PURE_HELPER_REQUIREMENTS,
   minimalRuntimeShellOwns: HELIX_ASK_CONSOLE_MINIMAL_RUNTIME_SHELL_OWNS,

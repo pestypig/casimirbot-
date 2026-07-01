@@ -1,3 +1,4 @@
+import React from "react";
 import { buildContextCapsuleStampDataUri } from "@/lib/helix/ask-context-capsule-display";
 import {
   CONVERGENCE_MATURITY_LABEL,

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
 import { DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS } from "@/lib/helix/ask-agent-runtime-display";
 import { useAgiChatStore } from "@/store/useAgiChatStore";
@@ -6,6 +6,7 @@ import { useAgiChatStore } from "@/store/useAgiChatStore";
 import { HelixAskComposer } from "./HelixAskComposer";
 import { HelixAskConsoleRuntimeLayout } from "./HelixAskConsoleRuntimeLayout";
 import { buildHelixAskConsoleRuntimeBridgeProps } from "./HelixAskConsoleRuntimeShellProps";
+import { HelixAskDebugDrawer } from "./HelixAskDebugDrawer";
 import type { HelixAskConsoleProps } from "./HelixAskConsoleState";
 import {
   completeHelixAskMinimalRuntimeTurn,
@@ -27,22 +28,56 @@ import {
   type HelixAskMinimalRuntimeTurnRunner,
 } from "./HelixAskMinimalRuntimeTransport";
 import { HelixAskMinimalRuntimeTurnList } from "./HelixAskMinimalRuntimeTurnList";
-import type { HelixAskMinimalRuntimeControlActions } from "./HelixAskMinimalRuntimeControls";
+import {
+  HELIX_ASK_MINIMAL_RUNTIME_BROWSER_CONTROL_ACTIONS,
+  type HelixAskMinimalRuntimeControlActions,
+  type HelixAskMinimalRuntimeControlPayload,
+} from "./HelixAskMinimalRuntimeControls";
 import {
   buildHelixAskRuntimePickerModel,
   HelixAskRuntimePicker,
 } from "./HelixAskRuntimePicker";
+import { HelixAskRuntimeStatusLine } from "./HelixAskStatusLine";
+import {
+  HelixAskSurfaceSupplementStack,
+  type HelixAskSurfaceSupplementStackProps,
+} from "./HelixAskSurfaceSupplementStack";
+
+export type HelixAskMinimalRuntimeVisibleSurfaceSlots = {
+  voiceLevelMonitor?: ReactNode;
+  goalPill?: ReactNode;
+  steeringQueue?: ReactNode;
+  supplementStack?: HelixAskSurfaceSupplementStackProps;
+};
 
 export type HelixAskMinimalRuntimeShellProps = HelixAskConsoleProps & {
   onSubmitPlan?: (submitPlan: HelixAskMinimalRuntimeSubmitPlan) => void;
   runTurn?: HelixAskMinimalRuntimeTurnRunner;
   controlActions?: HelixAskMinimalRuntimeControlActions;
+  visibleSurface?: HelixAskMinimalRuntimeVisibleSurfaceSlots;
 };
+
+type HelixAskMinimalRuntimeDebugDrawerState = {
+  payload: string;
+  payloadHash: string;
+  readbackMatch: string;
+  replyId: string;
+};
+
+function hashHelixAskMinimalRuntimeDebugPayload(text: string): string {
+  let hash = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    hash = Math.imul(31, hash) + text.charCodeAt(index);
+    hash |= 0;
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
 
 export function HelixAskMinimalRuntimeShell({
   onSubmitPlan,
   runTurn,
   controlActions,
+  visibleSurface,
   ...props
 }: HelixAskMinimalRuntimeShellProps) {
   const shellProps = buildHelixAskConsoleRuntimeBridgeProps(props);
@@ -51,12 +86,28 @@ export function HelixAskMinimalRuntimeShell({
   const [runtimeMenuOpen, setRuntimeMenuOpen] = useState(false);
   const [runtimeState, setRuntimeState] = useState(createHelixAskMinimalRuntimeInitialState);
   const [chatSessionId, setChatSessionId] = useState<string | null>(null);
+  const [debugDrawer, setDebugDrawer] = useState<HelixAskMinimalRuntimeDebugDrawerState | null>(null);
   const hydratedChatSessionRef = useRef<string | null>(null);
   const ensureContextSession = useAgiChatStore((state) => state.ensureContextSession);
   const addChatMessage = useAgiChatStore((state) => state.addMessage);
   const setActiveChatSession = useAgiChatStore((state) => state.setActive);
   const chatSession = useAgiChatStore((state) => (chatSessionId ? state.sessions[chatSessionId] : undefined));
   const turnRunner = runTurn ?? runHelixAskMinimalRuntimeBackendTurn;
+  const shellControlActions = useMemo<HelixAskMinimalRuntimeControlActions>(() => {
+    if (controlActions) return controlActions;
+    return {
+      ...HELIX_ASK_MINIMAL_RUNTIME_BROWSER_CONTROL_ACTIONS,
+      debugCopy: async (payload: HelixAskMinimalRuntimeControlPayload) => {
+        await HELIX_ASK_MINIMAL_RUNTIME_BROWSER_CONTROL_ACTIONS.debugCopy(payload);
+        setDebugDrawer({
+          payload: payload.debugCopyText,
+          payloadHash: hashHelixAskMinimalRuntimeDebugPayload(payload.debugCopyText),
+          readbackMatch: "not_checked",
+          replyId: payload.replyId,
+        });
+      },
+    };
+  }, [controlActions]);
 
   const runtimePickerModel = useMemo(
     () =>
@@ -97,6 +148,7 @@ export function HelixAskMinimalRuntimeShell({
           className="relative z-10 w-full rounded-3xl border border-cyan-300/20 bg-slate-950/85 p-4 shadow-[0_18px_60px_rgba(0,0,0,0.45)]"
           data-testid="helix-ask-minimal-runtime-shell"
         >
+          {visibleSurface?.voiceLevelMonitor}
           <div className="mb-3 flex justify-end">
             <HelixAskRuntimePicker
               model={runtimePickerModel}
@@ -201,18 +253,28 @@ export function HelixAskMinimalRuntimeShell({
               setDraft((value) => value.trimStart());
             }}
           />
-          {runtimeState.askStatus ? (
-            <p className="mt-3 text-[10px] uppercase tracking-[0.16em] text-cyan-100/80">
-              {runtimeState.askStatus}
-            </p>
+          {visibleSurface?.supplementStack ? (
+            <HelixAskSurfaceSupplementStack {...visibleSurface.supplementStack} />
           ) : null}
+          <HelixAskRuntimeStatusLine text={runtimeState.askStatus} />
           <HelixAskMinimalRuntimeTurnList
             replies={runtimeState.replies}
             className={shellProps.replyListClassName ?? "relative z-10 mt-4 space-y-5"}
-            controlActions={controlActions}
+            controlActions={shellControlActions}
           />
         </section>
       }
+      goalPill={visibleSurface?.goalPill}
+      steeringQueue={visibleSurface?.steeringQueue}
+      debugDrawer={debugDrawer ? (
+        <HelixAskDebugDrawer
+          payload={debugDrawer.payload}
+          payloadHash={debugDrawer.payloadHash}
+          readbackMatch={debugDrawer.readbackMatch}
+          replyId={debugDrawer.replyId}
+          onClose={() => setDebugDrawer(null)}
+        />
+      ) : null}
     />
   );
 }

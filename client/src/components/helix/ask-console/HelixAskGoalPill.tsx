@@ -1,3 +1,4 @@
+import React from "react";
 import { ChevronDown, PauseCircle, Pencil, PlayCircle, Trash2 } from "lucide-react";
 import type { AgentGoalSessionV1 } from "@shared/contracts/workstation-goal-context.v1";
 import {

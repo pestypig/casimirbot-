@@ -65,6 +65,8 @@ repo.search
 docs.search
 internet-search.search_web
 scholarly-research.lookup_papers
+scholarly-research.fetch_full_text
+scholarly-research.extract_numeric_parameters
 civilization-bounds.reflect_system_bounds
 theory-badge-graph.reflect_discussion_context
 theory-badge-graph.propose_frontier_conjectures
@@ -186,6 +188,8 @@ capability uses:
 | `helix.docs_search_observation.v1` | Documentation search observations. |
 | `helix.internet_search_observation.v1` | Internet search observations. |
 | `helix.scholarly_research_observation.v1` | Scholarly paper lookup observations. |
+| `helix.scholarly_full_text_observation.v1` | Scholarly full-text observations with bounded chunks. |
+| `helix.scholarly_numeric_parameter_observation.v1` | Scholarly numeric parameter observations with cited values and units. |
 | `helix.civilization_bounds_reflection_observation.v1` | Civilization-bounds reflection observations. |
 | `helix.theory_context_reflection_observation.v1` | Theory badge graph reflection observations. |
 | `helix.theory_frontier_conjecture_observation.v1` | Theory badge graph frontier conjecture workbench observations. |
@@ -209,6 +213,7 @@ capabilities with non-empty `input_schema.required`:
 | `docs.search` | `query` |
 | `internet-search.search_web` | `query` |
 | `scholarly-research.lookup_papers` | `query` |
+| `scholarly-research.extract_numeric_parameters` | `requested_variables` |
 | `civilization-bounds.reflect_system_bounds` | `prompt` |
 | `theory-badge-graph.reflect_discussion_context` | `prompt` |
 | `theory-badge-graph.propose_frontier_conjectures` | `prompt` |
@@ -261,7 +266,6 @@ remain diagnostic observations and are not proof or terminal authority.
 helix_ask.inspect_capability_catalog
 helix_ask.reflect_workstation_tool_alignment
 workspace-directory.resolve
-scholarly-research.fetch_full_text
 helix.theory.frontierVectorFieldTrace
 helix_ask.reflect_live_synthetic_data
 helix_ask.reflect_context_attachments

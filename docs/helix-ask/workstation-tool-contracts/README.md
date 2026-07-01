@@ -166,6 +166,8 @@ Each capability contract should define:
 | `theory-badge-graph.propose_frontier_conjectures` | [theory-badge-graph.propose_frontier_conjectures.md](theory-badge-graph.propose_frontier_conjectures.md) | `draft` |
 | `civilization-bounds.reflect_system_bounds` | [civilization-bounds.reflect_system_bounds.md](civilization-bounds.reflect_system_bounds.md) | `candidate` |
 | `scholarly-research.lookup_papers` | [scholarly-research.lookup_papers.md](scholarly-research.lookup_papers.md) | `draft` |
+| `scholarly-research.fetch_full_text` | [scholarly-research.fetch_full_text.md](scholarly-research.fetch_full_text.md) | `draft` |
+| `scholarly-research.extract_numeric_parameters` | [scholarly-research.extract_numeric_parameters.md](scholarly-research.extract_numeric_parameters.md) | `draft` |
 | `internet-search.search_web` | [internet-search.search_web.md](internet-search.search_web.md) | `draft` |
 | `live_env.request_interim_voice_callout` | [live_env.request_interim_voice_callout.md](live_env.request_interim_voice_callout.md) | `draft` |
 | `live_env.narrator_say` | [live_env.narrator_say.md](live_env.narrator_say.md) | `draft` |

@@ -1,3 +1,22 @@
+import React from "react";
+
+export type HelixAskRuntimeStatusLineProps = {
+  text?: string | null;
+};
+
+export function HelixAskRuntimeStatusLine({ text }: HelixAskRuntimeStatusLineProps) {
+  if (!text) return null;
+
+  return (
+    <p
+      className="mt-3 text-[10px] uppercase tracking-[0.16em] text-cyan-100/80"
+      data-testid="helix-ask-runtime-status-line"
+    >
+      {text}
+    </p>
+  );
+}
+
 export type HelixAskErrorLineProps = {
   message?: string | null;
 };

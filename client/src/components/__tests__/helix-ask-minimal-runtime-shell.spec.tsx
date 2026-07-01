@@ -2,9 +2,23 @@
 import React from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { AgentGoalSessionV1 } from "@shared/contracts/workstation-goal-context.v1";
+import { WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS } from "@shared/contracts/workstation-goal-context.v1";
 
+import { HelixAskAttachmentStrip } from "@/components/helix/ask-console/HelixAskAttachmentStrip";
 import { HelixAskConsoleRuntimeShell } from "@/components/helix/ask-console/HelixAskConsoleRuntimeShell";
+import { HelixAskContextCapsulePreview } from "@/components/helix/ask-console/HelixAskContextCapsulePreview";
+import { HelixAskGoalPill } from "@/components/helix/ask-console/HelixAskGoalPill";
 import { HelixAskMinimalRuntimeShell } from "@/components/helix/ask-console/HelixAskMinimalRuntimeShell";
+import { HelixAskObserverLanePanel } from "@/components/helix/ask-console/HelixAskObserverLane";
+import { HelixAskSituationRoomSourcePanel } from "@/components/helix/ask-console/HelixAskSituationRoomSourcePanel";
+import { HelixAskSteeringQueuePanel } from "@/components/helix/ask-console/HelixAskSteeringQueuePanel";
+import {
+  HelixAskTranscriptConfirmationPanel,
+  HelixAskVoiceCommandConfirmationPanel,
+} from "@/components/helix/ask-console/HelixAskVoiceConfirmationPanel";
+import { HelixAskVoiceLevelMonitor } from "@/components/helix/ask-console/HelixAskVoiceLevelMonitor";
+import { HelixAskVoiceStatusPill } from "@/components/helix/ask-console/HelixAskStatusLine";
 import type {
   HelixAskMinimalRuntimeControlActions,
   HelixAskMinimalRuntimeControlPayload,
@@ -151,6 +165,11 @@ describe("HelixAskMinimalRuntimeShell", () => {
   it("submits through the runtime shell minimal implementation without rendering the legacy bridge", async () => {
     window.history.pushState({}, "", "/desktop?doc=docs/current.md");
     vi.spyOn(globalThis.crypto, "randomUUID").mockReturnValue("runtime-shell-turn");
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(window.navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
     const runTurn = vi.fn(async (payload, onEvent) => {
       onEvent?.({ event: "turn_delta", data: { chunk: "working" } });
       return {
@@ -165,12 +184,163 @@ describe("HelixAskMinimalRuntimeShell", () => {
     render(
       <HelixAskConsoleRuntimeShell
         contextId="ctx"
+        layoutVariant="dock"
         runtimeImplementation="minimal_runtime_shell"
-        minimalRuntime={{ runTurn }}
+        minimalRuntime={{
+          runTurn,
+          visibleSurface: {
+            voiceLevelMonitor: (
+              <HelixAskVoiceLevelMonitor
+                visible
+                maxHeightPx={48}
+                level={0.75}
+                signalState="speech"
+              />
+            ),
+            goalPill: (
+              <HelixAskGoalPill
+                session={{
+                  schemaVersion: "helix.agent_goal_session.v1",
+                  goalId: "goal-1",
+                  threadId: "thread-1",
+                  objective: "Keep the operator surface visible while recrowning.",
+                  userVisibleSummary: "Recrown visible console surface",
+                  status: "active",
+                  sourceRefs: [],
+                  loopRefs: [],
+                  constructRefs: [],
+                  contextFeeds: [],
+                  allowedActuators: [],
+                  cadence: { kind: "manual" },
+                  stopConditions: [],
+                  checkpoints: [],
+                  authority: {
+                    assistantAnswer: false,
+                    finalReportsRequireTerminalAuthority: true,
+                    finalReportRequirements: WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS,
+                  },
+                } satisfies AgentGoalSessionV1}
+                expanded={false}
+                busyAction={null}
+                error={null}
+                onToggleExpanded={vi.fn()}
+                onAction={vi.fn()}
+              />
+            ),
+            steeringQueue: (
+              <HelixAskSteeringQueuePanel
+                items={[
+                  {
+                    key: "queue-1",
+                    label: "Docs context handoff",
+                    detail: "Keep active document context attached to the turn.",
+                    meta: "source admission",
+                    status: "next",
+                    tone: "cyan",
+                    evidenceRefs: ["doc:current"],
+                    createdAtMs: 1,
+                  },
+                ]}
+                activeCount={1}
+                expanded={false}
+                onToggleExpanded={vi.fn()}
+              />
+            ),
+            supplementStack: {
+              attachments: (
+                <HelixAskAttachmentStrip
+                  items={[
+                    {
+                      attachment: {
+                        id: "attachment-1",
+                        kind: "text",
+                        fileName: "notes.md",
+                        status: "ready",
+                      },
+                      check: { can_submit: true },
+                    },
+                  ]}
+                  onRemove={vi.fn()}
+                />
+              ),
+              contextCapsule: (
+                <HelixAskContextCapsulePreview
+                  preview={{
+                    id: "capsule-1",
+                    loading: false,
+                  }}
+                  autoApplied
+                />
+              ),
+              situationRoomSource: (
+                <HelixAskSituationRoomSourcePanel
+                  visible
+                  label="docs-viewer"
+                  status="captured"
+                  sourceCount={2}
+                  transcriptPreview="Current document context is ready for the next Ask turn."
+                  onStopDisplayAudio={vi.fn()}
+                  clipText={(text, limit) => (text.length > limit ? `${text.slice(0, limit)}...` : text)}
+                />
+              ),
+              voiceStatus: <HelixAskVoiceStatusPill label="listening" state="listening" />,
+              voiceCommandConfirmation: (
+                <HelixAskVoiceCommandConfirmationPanel
+                  visible
+                  actionLabel="read latest answer"
+                  transcript="read this answer aloud"
+                  countdownSec={3}
+                  onAccept={vi.fn()}
+                  onCancel={vi.fn()}
+                  clipText={(text, limit) => (text.length > limit ? `${text.slice(0, limit)}...` : text)}
+                />
+              ),
+              transcriptConfirmation: (
+                <HelixAskTranscriptConfirmationPanel
+                  visible
+                  transcript="Use the active doc"
+                  countdownSec={2}
+                  onAccept={vi.fn()}
+                  onRetry={vi.fn()}
+                  clipText={(text, limit) => (text.length > limit ? `${text.slice(0, limit)}...` : text)}
+                />
+              ),
+              observerLane: (
+                <HelixAskObserverLanePanel
+                  visible
+                  events={[
+                    {
+                      id: "observer-1",
+                      text: "Observed current desktop focus.",
+                      tsMs: 1,
+                      traceId: "trace-observer",
+                    },
+                  ]}
+                  clipText={(text, limit) => (text.length > limit ? `${text.slice(0, limit)}...` : text)}
+                />
+              ),
+            },
+          },
+        }}
       />,
     );
 
     expect(screen.getByTestId("helix-ask-minimal-runtime-shell")).toBeTruthy();
+    expect(screen.getByTestId("helix-ask-minimal-runtime-shell").parentElement).toHaveClass("min-h-0");
+    expect(screen.getByTestId("helix-ask-goal-pill")).toHaveTextContent("Recrown visible console surface");
+    expect(screen.getByTestId("helix-ask-steering-queue")).toHaveTextContent("Docs context handoff");
+    expect(screen.getByText("notes.md")).toBeTruthy();
+    expect(screen.getByText("capsule")).toBeTruthy();
+    expect(screen.getByText("auto-applied")).toBeTruthy();
+    expect(screen.getByText("Situation Room Source")).toBeTruthy();
+    expect(screen.getByText("docs-viewer / captured")).toBeTruthy();
+    expect(screen.getByLabelText("Voice input level meter: speech-level signal")).toBeTruthy();
+    expect(screen.getByText("listening")).toBeTruthy();
+    expect(screen.getByText("Voice command")).toBeTruthy();
+    expect(screen.getByText("Detected: read latest answer")).toBeTruthy();
+    expect(screen.getByText("Confirm transcript")).toBeTruthy();
+    expect(screen.getByText("Observer lane")).toBeTruthy();
+    expect(screen.getByText("Observed current desktop focus.")).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Ask Helix"), {
       target: { value: "Use the active doc" },
     });
@@ -179,6 +349,8 @@ describe("HelixAskMinimalRuntimeShell", () => {
     await waitFor(() => {
       expect(screen.getByText("Runtime shell minimal answer.")).toBeTruthy();
     });
+    expect(screen.getByTestId("helix-ask-runtime-status-line")).toHaveTextContent("Final answer ready.");
+    expect(screen.getByTestId("helix-ask-reply-list-bottom").parentElement).toHaveClass("min-h-0", "flex-1");
     expect(runTurn).toHaveBeenCalledWith(
       expect.objectContaining({
         turnId: "ask:runtime-shell-turn",
@@ -188,5 +360,15 @@ describe("HelixAskMinimalRuntimeShell", () => {
       expect.any(Function),
     );
     expect(screen.queryByTestId("helix-ask-pill")).toBeNull();
+
+    fireEvent.click(screen.getByTestId("helix-ask-latest-debug-copy"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("helix-debug-export-drawer")).toBeTruthy();
+    });
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('"turn_id": "ask:runtime-shell-turn"'));
+    expect(screen.getByTestId<HTMLTextAreaElement>("helix-debug-export-json").value).toContain(
+      '"turn_id": "ask:runtime-shell-turn"',
+    );
   });
 });

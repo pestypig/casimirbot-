@@ -89,7 +89,7 @@ import {
   type HelixAskProceduralTimelineRow,
 } from "@/components/helix/ask-console/HelixAskProceduralTimeline";
 import { HelixAskReplyTurn } from "@/components/helix/ask-console/HelixAskReplyTurn";
-import { HelixAskConsoleRuntimeLayout } from "@/components/helix/ask-console/HelixAskConsoleRuntimeLayout";
+import { HelixAskLegacyConsoleView } from "@/components/helix/ask-console/HelixAskLegacyConsoleView";
 import { HelixAskReasoningBattleStage } from "@/components/helix/ask-console/HelixAskReasoningBattleStage";
 import { HelixAskReasoningMirekField } from "@/components/helix/ask-console/HelixAskReasoningMirekField";
 import { HelixAskReasoningStatusMedalStrip } from "@/components/helix/ask-console/HelixAskReasoningStatusMedalStrip";
@@ -28780,7 +28780,7 @@ export function HelixAskPill({
   );
 
   return (
-    <HelixAskConsoleRuntimeLayout
+    <HelixAskLegacyConsoleView
       className={className}
       layoutVariant={layoutVariant}
       surface={

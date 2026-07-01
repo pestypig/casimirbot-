@@ -17,6 +17,8 @@ const THEORY_CONTEXT_REFLECTION_CAPABILITY = "theory-badge-graph.reflect_discuss
 const CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY = "civilization-bounds.reflect_system_bounds" as const;
 const INTERNET_SEARCH_CAPABILITY = "internet-search.search_web" as const;
 const SCHOLARLY_RESEARCH_SEARCH_CAPABILITY = "scholarly-research.lookup_papers" as const;
+const SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY = "scholarly-research.fetch_full_text" as const;
+const SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY = "scholarly-research.extract_numeric_parameters" as const;
 const VOICE_NARRATOR_SAY_CAPABILITY = "live_env.narrator_say" as const;
 
 const readRecord = (value: unknown): Record<string, unknown> | null =>
@@ -148,7 +150,7 @@ const hasExplicitDocsOrRepoCapabilityMention = (prompt: string): boolean =>
   );
 
 const hasExplicitCompoundPlannerCapabilityMention = (prompt: string): boolean =>
-  /\b(?:docs\.search|repo\.search|scientific-calculator\.solve_expression|theory-badge-graph\.reflect_discussion_context|civilization-bounds\.reflect_system_bounds|internet-search\.search_web|scholarly-research\.lookup_papers)\b/i.test(
+  /\b(?:docs\.search|repo\.search|scientific-calculator\.solve_expression|theory-badge-graph\.reflect_discussion_context|civilization-bounds\.reflect_system_bounds|internet-search\.search_web|scholarly-research\.(?:lookup_papers|fetch_full_text|extract_numeric_parameters))\b/i.test(
     unquotePrompt(prompt),
   );
 
@@ -349,6 +351,13 @@ const isResearchQuantifyReflectPrompt = (prompt: string): boolean => {
   return wantsResearch && wantsQuantify && wantsReflection;
 };
 
+const requestedFormulaVariablesFromPrompt = (prompt: string): string[] => {
+  const variables = ["n_m3", "T_eV", "B_T"].filter((variable) =>
+    new RegExp(`\\b${variable.replace(/_/g, "[_\\s-]?")}\\b`, "i").test(prompt)
+  );
+  return Array.from(new Set(variables));
+};
+
 const buildResearchQuantifyReflectRequests = (body: Record<string, unknown>): Record<string, unknown>[] => {
   const prompt = readPrompt(body);
   if (!prompt || !isResearchQuantifyReflectPrompt(prompt)) return [];
@@ -358,10 +367,13 @@ const buildResearchQuantifyReflectRequests = (body: Record<string, unknown>): Re
   const wantsInternet = /\b(?:internet|web|current\s+sources?|online|search\s+the\s+web)\b/i.test(unquoted);
   const wantsTheory = /\b(?:reflect|theory\s+badge\s+graph|theory\s+graph|claim\s+boundary)\b/i.test(unquoted);
   const wantsCivilization = /\b(?:civilization\s+bounds?|civilization|social|energy|material|country|countries|transportation)\b/i.test(unquoted);
+  const requestedFormulaVariables = requestedFormulaVariablesFromPrompt(prompt);
   const outcome = RESEARCH_QUANTIFY_REFLECT_OUTCOME;
   const { activePanel, activeDocPath } = readActivePanelAndDoc(body);
   const edges = [
-    { from: `${outcome}:research_evidence`, to: `${outcome}:calculator_estimate`, binding: "research_result_to_numeric_estimate" },
+    { from: `${outcome}:scholarly_evidence`, to: `${outcome}:scholarly_full_text`, binding: "source_ref_to_full_text" },
+    { from: `${outcome}:scholarly_full_text`, to: `${outcome}:numeric_parameters`, binding: "text_evidence_to_numeric_value_evidence" },
+    { from: `${outcome}:numeric_parameters`, to: `${outcome}:calculator_bound_expression`, binding: "numeric_value_evidence_to_bound_calculator_expression" },
     { from: `${outcome}:calculator_estimate`, to: `${outcome}:claim_boundary_reflection`, binding: "estimate_to_claim_boundary_reflection" },
   ];
   const requests: Record<string, unknown>[] = [];
@@ -376,6 +388,7 @@ const buildResearchQuantifyReflectRequests = (body: Record<string, unknown>): Re
       arguments: {
         query: cleanArgumentText(prompt) ?? prompt.slice(0, 160),
         mode: "paper_search",
+        ...(requestedFormulaVariables.length ? { requested_variables: requestedFormulaVariables } : {}),
         source_target_intent: buildCompoundSourceTargetIntent({
           outcome,
           subgoalId: `${outcome}:scholarly_evidence`,
@@ -871,6 +884,34 @@ const textEvidenceRowsFromResult = (result: HelixWorkstationGatewayCallResult): 
   return rows.slice(0, 80);
 };
 
+const numericBindingsFromResult = (result: HelixWorkstationGatewayCallResult): CalculatorNumericBinding[] => {
+  const observation = readRecord(result.observation);
+  if (!observation) return [];
+  return readArray(observation.parameters)
+    .map(readRecord)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+    .map((parameter): CalculatorNumericBinding | null => {
+      const variable = readString(parameter.variable);
+      const value = typeof parameter.normalized_value === "number"
+        ? String(parameter.normalized_value)
+        : readString(parameter.normalized_value) ?? readString(parameter.value);
+      const unit = readString(parameter.normalized_unit) ?? readString(parameter.unit);
+      const sourceRef = readString(parameter.evidence_ref) ??
+        readString(parameter.source_ref) ??
+        result.observation_packet.produced_artifact_refs[0] ??
+        result.capability_id;
+      if (!variable || !value || !unit) return null;
+      return {
+        variable,
+        value,
+        unit,
+        source_ref: sourceRef,
+        evidence_text: readString(parameter.source_snippet) ?? "",
+      };
+    })
+    .filter((entry): entry is CalculatorNumericBinding => Boolean(entry));
+};
+
 const parseNumericBindingFromText = (
   variable: string,
   evidence: { text: string; source_ref: string },
@@ -905,10 +946,15 @@ const bindCalculatorExpressionFromResults = (
   const evidenceRows = results
     .filter((result) => result.ok === true && result.capability_id !== CALCULATOR_SOLVE_EXPRESSION_CAPABILITY)
     .flatMap(textEvidenceRowsFromResult);
+  const typedNumericBindings = results
+    .filter((result) => result.ok === true && result.capability_id !== CALCULATOR_SOLVE_EXPRESSION_CAPABILITY)
+    .flatMap(numericBindingsFromResult);
   let bestBlocked: CalculatorBindingResult | null = null;
   for (const template of templates) {
     const bindings = template.required_inputs
       .map((variable) => {
+        const typedBinding = typedNumericBindings.find((entry) => entry.variable === variable);
+        if (typedBinding) return typedBinding;
         const binding = evidenceRows
           .map((evidence) => parseNumericBindingFromText(variable, evidence))
           .find((entry): entry is CalculatorNumericBinding => Boolean(entry));
@@ -1104,7 +1150,106 @@ export const buildDependentCompoundCapabilityGatewayCallRequest = (input: {
     readString(input.request.dependent_capability_id) ?? readString(input.request.dependentCapabilityId);
   if (
     outcome === RESEARCH_QUANTIFY_REFLECT_OUTCOME &&
-    input.result.capability_id === THEORY_CONTEXT_REFLECTION_CAPABILITY
+    input.result.capability_id === SCHOLARLY_RESEARCH_SEARCH_CAPABILITY &&
+    input.result.ok === true
+  ) {
+    const observation = readRecord(input.result.observation);
+    const papers = readArray(observation?.papers).map(readRecord).filter((entry): entry is Record<string, unknown> => Boolean(entry));
+    const firstPaper = papers[0];
+    const paperResultId = readString(firstPaper?.result_id);
+    if (!firstPaper) return null;
+    return {
+      schema: "helix.workstation_gateway.compound_dependency_bound_call_request.v1",
+      derivation_source: "helix_compound_capability_dependency_planner",
+      compound_outcome: RESEARCH_QUANTIFY_REFLECT_OUTCOME,
+      subgoal_id: `${RESEARCH_QUANTIFY_REFLECT_OUTCOME}:scholarly_full_text`,
+      capability_id: SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+      mode: "read",
+      arguments: {
+        query: readString(observation?.query) ?? "paper full text",
+        papers,
+        paper: firstPaper,
+        paper_result_id: paperResultId,
+        requested_variables: readArray(readRecord(input.request.arguments)?.requested_variables)
+          .map(readString)
+          .filter((entry): entry is string => Boolean(entry)),
+        source: "helix_compound_capability_dependency_planner",
+        turn_id: input.turnId,
+        source_target_intent: {
+          source: "helix_compound_capability_dependency_planner",
+          target_source: "scholarly_research",
+          target_kind: "scholarly_full_text",
+          compound_outcome: RESEARCH_QUANTIFY_REFLECT_OUTCOME,
+          subgoal_id: `${RESEARCH_QUANTIFY_REFLECT_OUTCOME}:scholarly_full_text`,
+          depends_on_subgoal_id: `${RESEARCH_QUANTIFY_REFLECT_OUTCOME}:scholarly_evidence`,
+          depends_on_capability_id: input.result.capability_id,
+          dependency_binding: "source_ref_to_full_text",
+          required_observation_kind: "helix.scholarly_full_text_observation.v1",
+          required_affordance_kinds: ["source_ref", "citation_evidence"],
+          produced_affordance_kind: "text_evidence",
+          source_refs: input.result.observation_packet.produced_artifact_refs,
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    };
+  }
+  if (
+    outcome === RESEARCH_QUANTIFY_REFLECT_OUTCOME &&
+    input.result.capability_id === SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY &&
+    input.result.ok === true
+  ) {
+    const allResults = input.results?.length ? input.results : [input.result];
+    const requestArgs = readRecord(input.request.arguments);
+    const carriedVariables = readArray(requestArgs?.requested_variables)
+      .map(readString)
+      .filter((entry): entry is string => Boolean(entry));
+    const templateVariables = Array.from(new Set(
+      allResults.flatMap(calculatorTemplatesFromResult).flatMap((template) => template.required_inputs),
+    )).filter((variable) => !["e_charge", "mu0"].includes(variable));
+    const requestedVariables = carriedVariables.length
+      ? carriedVariables
+      : templateVariables.length
+        ? templateVariables
+        : ["n_m3", "T_eV", "B_T"];
+    return {
+      schema: "helix.workstation_gateway.compound_dependency_bound_call_request.v1",
+      derivation_source: "helix_compound_capability_dependency_planner",
+      compound_outcome: RESEARCH_QUANTIFY_REFLECT_OUTCOME,
+      subgoal_id: `${RESEARCH_QUANTIFY_REFLECT_OUTCOME}:numeric_parameters`,
+      capability_id: SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY,
+      mode: "read",
+      arguments: {
+        requested_variables: requestedVariables,
+        full_text_observation: input.result.observation,
+        source_ref: input.result.observation_packet.produced_artifact_refs[0],
+        source: "helix_compound_capability_dependency_planner",
+        turn_id: input.turnId,
+        source_target_intent: {
+          source: "helix_compound_capability_dependency_planner",
+          target_source: "scholarly_research",
+          target_kind: "numeric_parameter_extraction",
+          compound_outcome: RESEARCH_QUANTIFY_REFLECT_OUTCOME,
+          subgoal_id: `${RESEARCH_QUANTIFY_REFLECT_OUTCOME}:numeric_parameters`,
+          depends_on_subgoal_id: `${RESEARCH_QUANTIFY_REFLECT_OUTCOME}:scholarly_full_text`,
+          depends_on_capability_id: input.result.capability_id,
+          dependency_binding: "text_evidence_to_numeric_value_evidence",
+          required_observation_kind: "helix.scholarly_numeric_parameter_observation.v1",
+          required_affordance_kinds: ["text_evidence", "citation_evidence"],
+          produced_affordance_kind: "numeric_value_evidence",
+          requested_variables: requestedVariables,
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    };
+  }
+  if (
+    outcome === RESEARCH_QUANTIFY_REFLECT_OUTCOME &&
+    (input.result.capability_id === THEORY_CONTEXT_REFLECTION_CAPABILITY ||
+      input.result.capability_id === SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY)
   ) {
     const binding = bindCalculatorExpressionFromResults(input.results?.length ? input.results : [input.result]);
     if (!binding || binding.status !== "bound" || !binding.bound_expression) return null;
@@ -1127,7 +1272,9 @@ export const buildDependentCompoundCapabilityGatewayCallRequest = (input: {
           target_kind: "calculator_solve",
           compound_outcome: RESEARCH_QUANTIFY_REFLECT_OUTCOME,
           subgoal_id: `${RESEARCH_QUANTIFY_REFLECT_OUTCOME}:calculator_bound_expression`,
-          depends_on_subgoal_id: `${RESEARCH_QUANTIFY_REFLECT_OUTCOME}:theory_reflection`,
+          depends_on_subgoal_id: input.result.capability_id === SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY
+            ? `${RESEARCH_QUANTIFY_REFLECT_OUTCOME}:numeric_parameters`
+            : `${RESEARCH_QUANTIFY_REFLECT_OUTCOME}:theory_reflection`,
           depends_on_capability_id: input.result.capability_id,
           dependency_binding: "typed_affordance_bound_calculator_expression",
           required_observation_kind: "helix.calculator_solve_observation.v1",
@@ -1250,7 +1397,7 @@ export const buildCompoundDependencyRailStatus = (input: {
       : 1;
     const satisfied = input.result.ok === true;
     const calculatorBinding = outcome === RESEARCH_QUANTIFY_REFLECT_OUTCOME &&
-      capability === THEORY_CONTEXT_REFLECTION_CAPABILITY
+      (capability === THEORY_CONTEXT_REFLECTION_CAPABILITY || capability === SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY)
         ? bindCalculatorExpressionFromResults(input.results?.length ? input.results : [input.result])
         : null;
     const boundCalculatorPlanned = Boolean(input.dependentRequest);

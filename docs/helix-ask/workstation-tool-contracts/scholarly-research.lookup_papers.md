@@ -4,9 +4,10 @@ Maturity: `draft`
 
 ## Purpose
 
-Look up scholarly paper metadata, abstracts, identifiers, and source refs as
-bounded research-paper evidence. This capability does not fetch hidden full text
-and does not prove a scientific claim by itself.
+Look up scholarly paper metadata, abstracts, identifiers, full-text candidate
+URLs, and source refs as bounded research-paper evidence. This capability stays
+metadata-only: it does not fetch or parse paper bodies and does not prove a
+scientific claim by itself.
 
 ## Owner
 
@@ -88,6 +89,8 @@ Required stable tests:
   rail
 - missing query asks for a specific search target, DOI, or arXiv id
 - metadata-only results are not treated as full-text evidence
+- metadata-only results produce `source_ref` and `citation_evidence`, not
+  `text_evidence` or `numeric_value_evidence`
 - compound prompts can combine docs, calculator, theory, civilization, repo, and
   scholarly observations without collapsing missing scholarly evidence into
   proof

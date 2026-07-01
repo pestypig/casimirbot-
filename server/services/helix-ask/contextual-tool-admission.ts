@@ -87,7 +87,9 @@ const stripWriteOnlyNegationsForExternalToolMatching = (prompt: string): string 
   });
 
 const scholarlyVerbOrCue = (text: string): string =>
-  /\b(?:pdfs?|full[-\s]?text|paper\s+text|page\s+images?|figures?|tables?|equations?)\b/i.test(text)
+  /\b(?:numeric\s+parameters?|numeric\s+values?|extract\s+(?:numbers?|parameters?|values?)|variables?|units?)\b/i.test(text)
+    ? "scholarly-research.extract_numeric_parameters"
+    : /\b(?:pdfs?|full[-\s]?text|paper\s+text|page\s+images?|figures?|tables?|equations?)\b/i.test(text)
     ? "scholarly-research.fetch_full_text"
     : "scholarly-research.lookup_papers";
 

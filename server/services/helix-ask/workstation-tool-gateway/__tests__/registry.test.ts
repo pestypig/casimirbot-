@@ -21,6 +21,8 @@ const REPO_SEARCH_CAPABILITY = "repo.search";
 const DOCS_SEARCH_CAPABILITY = "docs.search";
 const INTERNET_SEARCH_CAPABILITY = "internet-search.search_web";
 const SCHOLARLY_RESEARCH_SEARCH_CAPABILITY = "scholarly-research.lookup_papers";
+const SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY = "scholarly-research.fetch_full_text";
+const SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY = "scholarly-research.extract_numeric_parameters";
 const CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY = "civilization-bounds.reflect_system_bounds";
 const THEORY_CONTEXT_REFLECTION_CAPABILITY = "theory-badge-graph.reflect_discussion_context";
 const THEORY_FRONTIER_CONJECTURE_CAPABILITY = "theory-badge-graph.propose_frontier_conjectures";
@@ -329,6 +331,32 @@ describe("Helix workstation tool gateway", () => {
         requires_source: true,
         permission_profile_required: "read",
         output_observation_schema: "helix.scholarly_research_observation.v1",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    );
+    expect(manifest.capabilities).toContainEqual(
+      expect.objectContaining({
+        capability_id: SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+        panel_id: "scholarly-research",
+        action_id: "fetch_full_text",
+        mode: "read",
+        permission_profile_required: "read",
+        output_observation_schema: "helix.scholarly_full_text_observation.v1",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    );
+    expect(manifest.capabilities).toContainEqual(
+      expect.objectContaining({
+        capability_id: SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY,
+        panel_id: "scholarly-research",
+        action_id: "extract_numeric_parameters",
+        mode: "read",
+        permission_profile_required: "read",
+        output_observation_schema: "helix.scholarly_numeric_parameter_observation.v1",
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
@@ -2623,6 +2651,131 @@ describe("Helix workstation tool gateway", () => {
       raw_content_included: false,
       error: "arxiv_http_429",
     });
+  });
+
+  it("fetches accessible scholarly full text as bounded non-terminal text evidence", async () => {
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      headers: { get: (name: string) => name.toLowerCase() === "content-type" ? "text/html" : null },
+      arrayBuffer: async () => new TextEncoder().encode([
+        "<html><body>",
+        "<h1>Tokamak beta evidence</h1>",
+        "<p>Table 1 reports electron density n = 1.0e20 m^-3 [12] and electron temperature Te = 5000 eV [12].</p>",
+        "<p>The toroidal magnetic field B = 5 T is listed in the experimental setup [12].</p>",
+        "</body></html>",
+      ].join(" ")).buffer,
+    })) as typeof fetch;
+
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+      arguments: {
+        query: "tokamak beta paper",
+        source_url: "https://example.test/tokamak.html",
+      },
+      turnId: "ask:test:gateway-scholarly-full-text",
+      iteration: 8,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      capability_id: SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+      observation_packet: {
+        capability_key: SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+        panel_id: "scholarly-research",
+        action: "fetch_full_text",
+        status: "succeeded",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.scholarly_full_text_observation.v1",
+        capability_key: SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+        source_kind: "html",
+        pages_parsed: 1,
+        selected_for_answer: true,
+        context_policy: "compact_context_pack_only",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    const observation = result.observation as { selected_chunks?: Array<{ text_excerpt?: string; citation_ref?: string }> };
+    expect(observation.selected_chunks?.[0]?.text_excerpt).toContain("electron density");
+    expect(observation.selected_chunks?.[0]?.citation_ref).toBe("paper#page=1");
+  });
+
+  it("extracts cited numeric parameters with units and rejects missing variables", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY,
+      arguments: {
+        requested_variables: ["n_m3", "T_eV", "B_T"],
+        source_ref: "paper:tokamak#page=4",
+        paper: {
+          title: "Tokamak beta evidence",
+          doi: "10.0000/example",
+          url: "https://example.test/tokamak",
+        },
+        text_evidence: [
+          "Table 1 reports electron density n = 1.0e20 m^-3 [12].",
+          "The electron temperature Te = 5 keV [12].",
+          "A field value is discussed without the requested unit.",
+        ].join(" "),
+      },
+      turnId: "ask:test:gateway-scholarly-numeric",
+      iteration: 9,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      capability_id: SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY,
+      observation_packet: {
+        capability_key: SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY,
+        action: "extract_numeric_parameters",
+        status: "failed",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.scholarly_numeric_parameter_observation.v1",
+        capability_key: SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY,
+        requested_variables: ["n_m3", "T_eV", "B_T"],
+        missing_variables: ["B_T"],
+        selected_for_answer: false,
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      error: "missing_requested_numeric_variables",
+    });
+    const observation = result.observation as {
+      parameters?: Array<{ variable?: string; normalized_value?: number; normalized_unit?: string; evidence_ref?: string }>;
+      rejected_candidates?: Array<{ variable?: string; reason?: string }>;
+    };
+    expect(observation.parameters).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        variable: "n_m3",
+        normalized_value: 1.0e20,
+        normalized_unit: "m^-3",
+        evidence_ref: expect.stringContaining("scholarly-numeric:"),
+      }),
+      expect.objectContaining({
+        variable: "T_eV",
+        normalized_value: 5000,
+        normalized_unit: "eV",
+      }),
+    ]));
+    expect(observation.rejected_candidates ?? []).toEqual(expect.any(Array));
   });
 
   it("accepts research-papers.search as an explicit alias for the canonical scholarly gateway capability", async () => {

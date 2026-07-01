@@ -404,6 +404,8 @@ const readStringArray = (value: unknown): string[] =>
     ? value.map((entry) => cleanString(entry)).filter(Boolean).slice(0, 32)
     : [];
 
+const readArray = (value: unknown): unknown[] => Array.isArray(value) ? value : [];
+
 const readBoolean = (value: unknown, fallback = false): boolean => {
   if (typeof value === "boolean") return value;
   if (typeof value !== "string") return fallback;
@@ -4948,6 +4950,261 @@ export const callWorkstationGatewayCapability = async (
       tool_followup_decision: trace.tool_followup_decision,
       observation,
       artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      error,
+    };
+  }
+
+  if (manifest.capability_id === SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY) {
+    const args = readArguments(input.arguments);
+    const query = normalizeExternalSearchQuery(args.query ?? args.prompt ?? args.paper_result_id ?? args.source_url ?? "paper full text");
+    const sourceUrl = optionalString(args.source_url ?? args.sourceUrl);
+    const paperResultId = optionalString(args.paper_result_id ?? args.paperResultId ?? args.source_ref ?? args.sourceRef);
+    const paper = readRecord(args.paper);
+    const papers = readArray(args.papers).map(readRecord).filter((entry): entry is Record<string, unknown> => Boolean(entry));
+    const blockedReason = !sourceUrl && !paper && papers.length === 0
+      ? "paper_result_or_source_required"
+      : null;
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: blockedReason ? "blocked" : "admitted",
+      reason: blockedReason ? "scholarly_full_text_blocked" : "read_only_gateway_capability",
+      blockedReason: blockedReason ?? undefined,
+      sourceTargetIntent: args.source_target_intent,
+    });
+    if (blockedReason) {
+      const observation = {
+        schema: SCHOLARLY_FULL_TEXT_OBSERVATION_SCHEMA,
+        capability_key: manifest.capability_id,
+        capability: manifest.capability_id,
+        query,
+        source_kind: "unknown",
+        pages_parsed: 0,
+        page_text_refs: [],
+        selected_chunks: [],
+        visual_candidates: [],
+        missing_requirements: [blockedReason],
+        selected_for_answer: false,
+        status: "blocked",
+        blocked_reason: blockedReason,
+        context_policy: "compact_context_pack_only",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+      const observationPacket = buildWorkstationGatewayObservationPacket({
+        turnId,
+        iteration,
+        capabilityId: manifest.capability_id,
+        panelId: "scholarly-research",
+        action: "fetch_full_text",
+        status: "blocked",
+        summary: "Scholarly full-text fetch was blocked because no paper ref or source URL was supplied.",
+        observation,
+        missingRequirements: [{
+          code: blockedReason,
+          message: "Provide a paper result, paper_result_id with papers, or an accessible source_url.",
+          repair_action: "ask_user",
+        }],
+      });
+      const trace = buildGatewayTrace({ turnId, capabilityId: manifest.capability_id, agentRuntime, admission, observationPacket, error: blockedReason });
+      return {
+        schema: "helix.workstation_tool_gateway.call_result.v1",
+        manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+        ok: false,
+        agent_runtime: agentRuntime,
+        capability_id: manifest.capability_id,
+        mode,
+        gateway_admission: admission,
+        observation_packet: observationPacket,
+        tool_lifecycle_trace: trace.tool_lifecycle_trace,
+        tool_followup_decision: trace.tool_followup_decision,
+        observation,
+        artifact_refs: observationPacket.produced_artifact_refs,
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+        error: blockedReason,
+      };
+    }
+    const fullTextObservation = await runScholarlyFullTextFetch({
+      turnId,
+      callId: `${turnId}:workstation_gateway:${manifest.capability_id}:${iteration}`,
+      query,
+      paper: paper as never,
+      papers: papers as never,
+      paperResultId,
+      sourceUrl,
+      maxPages: readFiniteNumber(args.max_pages ?? args.maxPages),
+      maxChunks: readFiniteNumber(args.max_chunks ?? args.maxChunks),
+      cachePdf: false,
+    });
+    const observation = {
+      ...fullTextObservation,
+      capability_key: manifest.capability_id,
+      status: fullTextObservation.selected_for_answer ? "succeeded" : "failed",
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: "scholarly-research",
+      action: "fetch_full_text",
+      status: fullTextObservation.selected_for_answer ? "succeeded" : "failed",
+      summary: fullTextObservation.selected_for_answer
+        ? `Scholarly full-text fetch selected ${fullTextObservation.selected_chunks.length} bounded chunk(s).`
+        : "Scholarly full-text fetch did not produce usable bounded text evidence.",
+      observation,
+      missingRequirements: fullTextObservation.selected_for_answer
+        ? []
+        : fullTextObservation.missing_requirements.map((code) => ({
+            code,
+            message: "Scholarly full text could not be fetched or parsed into bounded text evidence.",
+            repair_action: "repair" as const,
+          })),
+      producedAffordances: buildGatewayProducedAffordances({ capabilityId: manifest.capability_id, observation }),
+      consumedAffordances: buildGatewayConsumedAffordances({ capabilityId: manifest.capability_id, observation }),
+      requiredAffordanceKinds: manifest.consumes_affordances,
+      producedAffordanceKinds: manifest.produces_affordances,
+    });
+    const error = fullTextObservation.selected_for_answer ? undefined : fullTextObservation.missing_requirements[0] ?? "scholarly_full_text_unavailable";
+    const trace = buildGatewayTrace({ turnId, capabilityId: manifest.capability_id, agentRuntime, admission, observationPacket, error });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: fullTextObservation.selected_for_answer,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      produced_affordances: observationPacket.produced_affordances,
+      consumed_affordances: observationPacket.consumed_affordances,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      error,
+    };
+  }
+
+  if (manifest.capability_id === SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY) {
+    const args = readArguments(input.arguments);
+    const requestedVariables = readStringArray(args.requested_variables ?? args.requestedVariables ?? args.variables);
+    const fullTextObservation = readRecord(args.full_text_observation ?? args.fullTextObservation);
+    const textEvidence = optionalString(args.text_evidence ?? args.textEvidence ?? args.text);
+    const sourceRef = optionalString(args.source_ref ?? args.sourceRef);
+    const blockedReason = requestedVariables.length === 0
+      ? "requested_variables_required"
+      : !fullTextObservation && !textEvidence
+        ? "text_evidence_required"
+        : null;
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: blockedReason ? "blocked" : "admitted",
+      reason: blockedReason ? "scholarly_numeric_parameter_blocked" : "read_only_gateway_capability",
+      blockedReason: blockedReason ?? undefined,
+      sourceTargetIntent: args.source_target_intent,
+    });
+    const numericObservation = blockedReason
+      ? {
+          schema: SCHOLARLY_NUMERIC_PARAMETER_OBSERVATION_SCHEMA,
+          artifact_id: `${turnId}:workstation_gateway:${manifest.capability_id}:${iteration}:scholarly_numeric_parameter_observation`,
+          turn_id: turnId,
+          capability: manifest.capability_id,
+          capability_key: manifest.capability_id,
+          source_ref: sourceRef,
+          paper: {},
+          requested_variables: requestedVariables,
+          parameters: [],
+          missing_variables: requestedVariables,
+          rejected_candidates: [],
+          missing_requirements: [blockedReason],
+          selected_for_answer: false,
+          status: "blocked",
+          blocked_reason: blockedReason,
+          terminal_eligible: false,
+          post_tool_model_step_required: true,
+          assistant_answer: false,
+          raw_content_included: false,
+        }
+      : {
+          ...runScholarlyNumericParameterExtraction({
+            turnId,
+            callId: `${turnId}:workstation_gateway:${manifest.capability_id}:${iteration}`,
+            requestedVariables,
+            fullTextObservation: fullTextObservation as never,
+            textEvidence,
+            sourceRef,
+            paper: readRecord(args.paper) as never,
+          }),
+        };
+    const observation = {
+      ...numericObservation,
+      status: numericObservation.selected_for_answer ? "succeeded" : blockedReason ? "blocked" : "failed",
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const status = numericObservation.selected_for_answer ? "succeeded" : blockedReason ? "blocked" : "failed";
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: "scholarly-research",
+      action: "extract_numeric_parameters",
+      status,
+      summary: numericObservation.selected_for_answer
+        ? `Scholarly numeric extraction found ${numericObservation.parameters.length} cited parameter value(s).`
+        : `Scholarly numeric extraction is missing ${numericObservation.missing_variables.length || requestedVariables.length} requested variable(s).`,
+      observation,
+      missingRequirements: numericObservation.selected_for_answer
+        ? []
+        : numericObservation.missing_requirements.map((code) => ({
+            code,
+            message: "Required numeric paper evidence is missing, ambiguous, uncited, or unit-incompatible.",
+            repair_action: blockedReason ? "ask_user" as const : "repair" as const,
+          })),
+      producedAffordances: buildGatewayProducedAffordances({ capabilityId: manifest.capability_id, observation }),
+      consumedAffordances: buildGatewayConsumedAffordances({ capabilityId: manifest.capability_id, observation }),
+      requiredAffordanceKinds: manifest.consumes_affordances,
+      producedAffordanceKinds: manifest.produces_affordances,
+    });
+    const error = numericObservation.selected_for_answer ? undefined : numericObservation.missing_requirements[0] ?? "missing_requested_numeric_variables";
+    const trace = buildGatewayTrace({ turnId, capabilityId: manifest.capability_id, agentRuntime, admission, observationPacket, error });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: numericObservation.selected_for_answer,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      produced_affordances: observationPacket.produced_affordances,
+      consumed_affordances: observationPacket.consumed_affordances,
       terminal_eligible: false,
       post_tool_model_step_required: true,
       assistant_answer: false,

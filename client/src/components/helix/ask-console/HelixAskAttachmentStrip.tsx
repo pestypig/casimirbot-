@@ -1,3 +1,4 @@
+import React from "react";
 import { FileText, X } from "lucide-react";
 
 export type HelixAskAttachmentStripAttachment = {

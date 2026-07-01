@@ -23,6 +23,12 @@ import {
   HELIX_ASK_CONSOLE_RUNTIME_SHELL_ACTIVE_OWNERSHIP,
 } from "@/components/helix/ask-console/HelixAskConsoleState";
 import {
+  HELIX_ASK_LEGACY_CONSOLE_ACTIVE_PATH,
+  HELIX_ASK_LEGACY_CONSOLE_SLICES,
+  HELIX_ASK_LEGACY_CONSOLE_SLICE_PROGRESS,
+  HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT,
+} from "@/components/helix/ask-console/HelixAskLegacyConsoleInventory";
+import {
   HELIX_ASK_CONSOLE_DOCK_REPLY_LIST_CLASS_NAME,
   HELIX_ASK_CONSOLE_HERO_REPLY_LIST_CLASS_NAME,
   buildHelixAskConsoleRuntimeBridgeProps,
@@ -153,6 +159,7 @@ describe("Helix Ask Console recrown boundary", () => {
       "HelixAskContextCapsulePreview.tsx",
       "HelixAskSituationRoomSourcePanel.tsx",
       "HelixAskVoiceConfirmationPanel.tsx",
+      "HelixAskLegacyConsoleInventory.ts",
       "HelixAskContextBridge.ts",
       "HelixAskRequestEnvelope.ts",
       "HelixAskMinimalRuntimeLifecycle.ts",
@@ -251,7 +258,7 @@ describe("Helix Ask Console recrown boundary", () => {
       "minimal_runtime_shell_persists_and_hydrates_chat_sessions",
     ]);
     expect(HELIX_ASK_CONSOLE_BRIDGE_REPLACEMENT_OPEN_GATES).toEqual([
-      "desktop_entrypoint_swaps_runtime_shell_off_legacy_bridge",
+      "operator_surface_live_parity_validation",
     ]);
     expect(HELIX_ASK_CONSOLE_OPERATOR_SURFACE_PARITY_ITEMS).toEqual([
       "prompt_composer_surface",
@@ -275,22 +282,22 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(HELIX_ASK_CONSOLE_OPERATOR_SURFACE_PARITY_PROVEN_ITEMS).toEqual([
       "prompt_composer_surface",
       "runtime_picker",
-      "copy_debug_read_aloud_controls",
-      "final_answer_metadata",
-      "workstation_trace_rows",
-      "top_of_console_readable",
-      "long_answer_unclipped",
-    ]);
-    expect(HELIX_ASK_CONSOLE_OPERATOR_SURFACE_PARITY_OPEN_ITEMS).toEqual([
       "goal_pill",
       "steering_queue",
       "attachment_context_strip",
       "context_source_panels",
       "observer_panels",
       "debug_drawer",
-      "voice_read_aloud_affordances",
+      "copy_debug_read_aloud_controls",
+      "final_answer_metadata",
+      "workstation_trace_rows",
       "visible_stream_progress_status_rows",
+      "voice_read_aloud_affordances",
+      "long_answer_unclipped",
+    ]);
+    expect(HELIX_ASK_CONSOLE_OPERATOR_SURFACE_PARITY_OPEN_ITEMS).toEqual([
       "layout_position_sizing_dock_behavior",
+      "top_of_console_readable",
     ]);
     expect(HELIX_ASK_CONSOLE_LEGACY_BEHAVIOR_CLASSIFICATIONS.map((entry) => entry.classification)).toEqual([
       "used_must_move",
@@ -299,6 +306,61 @@ describe("Helix Ask Console recrown boundary", () => {
       "unknown_quarantined",
       "conflicting_remove_after_golden_path_proof",
     ]);
+  });
+
+  it("tracks the live legacy console slicing inventory before bridge replacement", () => {
+    const legacyPillSource = read("client/src/components/helix/HelixAskPill.tsx");
+    const legacyPillLines = legacyPillSource.trimEnd().split(/\r?\n/);
+    const exportedComponentLine =
+      legacyPillLines.findIndex((line) => line.includes("export function HelixAskPill")) + 1;
+    const activeRenderLine =
+      legacyPillLines.findIndex((line) => line.includes("const activeTurnStreamPanel = (")) + 1;
+    const runtimeLayoutLine =
+      legacyPillLines.findIndex((line) => line.includes("<HelixAskConsoleRuntimeLayout")) + 1;
+
+    expect(HELIX_ASK_LEGACY_CONSOLE_ACTIVE_PATH).toEqual([
+      "HelixAskConsole",
+      "HelixAskConsoleRuntimeShell",
+      "HelixAskLegacyRuntimeBridge",
+      "HelixAskPill",
+    ]);
+    expect(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT).toMatchObject({
+      file: "client/src/components/helix/HelixAskPill.tsx",
+      exportedComponentStartsAtLine: exportedComponentLine,
+      liveRenderSliceStartsAtLine: activeRenderLine,
+      liveRuntimeLayoutStartsAtLine: runtimeLayoutLine,
+    });
+    expect(Math.abs(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.lineCountAtInventory - legacyPillLines.length)).toBeLessThanOrEqual(5);
+    expect(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.lineCountAtInventory).toBeGreaterThan(29000);
+    expect(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.exportedComponentStartsAtLine).toBeGreaterThan(10000);
+    expect(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.liveRenderSliceStartsAtLine).toBeGreaterThan(28000);
+    expect(HELIX_ASK_LEGACY_CONSOLE_SLICES.map((slice) => slice.classification)).toEqual([
+      "live_day_to_day_must_move",
+      "pure_display_already_recrowned",
+      "pure_display_already_recrowned",
+      "pure_display_already_recrowned",
+      "pure_display_already_recrowned",
+      "behavior_sensitive_quarantined",
+      "behavior_sensitive_quarantined",
+      "behavior_sensitive_quarantined",
+      "behavior_sensitive_quarantined",
+      "unknown_trap_door_quarantined",
+    ]);
+    expect(HELIX_ASK_LEGACY_CONSOLE_SLICE_PROGRESS).toMatchObject({
+      activeDefaultImplementation: "legacy_bridge",
+      replacementTarget: "legacy_equivalent_recrowned_runtime",
+      simplifiedMinimalShellIsDefault: false,
+      bridgeReplacementReady: false,
+      liveDayToDaySliceCount: 1,
+      pureDisplayRecrownedSliceCount: 4,
+      behaviorSensitiveQuarantinedSliceCount: 4,
+      unknownTrapDoorSliceCount: 1,
+    });
+    expect(legacyPillSource).toContain("<HelixAskConsoleRuntimeLayout");
+    expect(legacyPillSource).toContain("<HelixAskSurfaceComposerPanel");
+    expect(legacyPillSource).toContain("<HelixAskSurfaceSupplementStack");
+    expect(legacyPillSource).toContain("<HelixAskReplyTurn");
+    expect(legacyPillSource).toContain("<HelixAskDebugDrawer");
   });
 
   it("routes active desktop and workstation entrypoints through the new console crown", () => {
@@ -328,12 +390,12 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(runtimeShellSource).not.toContain("@/components/helix/HelixAskPill");
     expect(bridgeSource).toContain("@/components/helix/HelixAskPill");
     expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS).toMatchObject({
-      activeImplementation: "minimal_runtime_shell_scaffold",
+      activeImplementation: "legacy_bridge",
       bridge: "helix_ask_pill_legacy_runtime_bridge",
       activePhase: "build_minimal_runtime_shell",
-      reason: "behavior_sensitive_paths_not_yet_recrowned",
+      reason: "operator_surface_parity_not_live_proven",
       runtimeShell: "helix_ask_console_runtime_shell",
-      replacementTarget: "minimal_runtime_shell_after_parity",
+      replacementTarget: "legacy_pill_retirement_after_proof",
     });
     expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.recrownedDisplayOwners).toBe(
       HELIX_ASK_CONSOLE_RECROWNED_DISPLAY_OWNERS,
@@ -363,9 +425,9 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.bridgeReplacementProvenGates).toContain(
       "minimal_shell_submits_and_streams_without_legacy_pill",
     );
-    expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.bridgeReplacementOpenGates).toContain(
-      "desktop_entrypoint_swaps_runtime_shell_off_legacy_bridge",
-    );
+    expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.bridgeReplacementOpenGates).toEqual([
+      "operator_surface_live_parity_validation",
+    ]);
     expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.operatorSurfaceParityReady).toBe(false);
     expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.operatorSurfaceParityOpenItems).toEqual(
       HELIX_ASK_CONSOLE_OPERATOR_SURFACE_PARITY_OPEN_ITEMS,
@@ -396,10 +458,10 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(ownershipMap).toContain("bridgeReplacementOpenGates");
     expect(ownershipMap).toContain("operatorSurfaceParityOpenItems");
     expect(ownershipMap).toContain("legacyBehaviorClassifications");
-    expect(ownershipMap).toContain("tested minimal runtime shell replaces the bridge");
+    expect(ownershipMap).toContain("defaults to the legacy bridge");
   });
 
-  it("starts the minimal runtime shell without bypassing the legacy bridge before parity", () => {
+  it("keeps the legacy bridge default while the minimal runtime shell stays explicitly selectable", () => {
     const consoleSource = read("client/src/components/helix/ask-console/HelixAskConsole.tsx");
     const runtimeShellSource = read("client/src/components/helix/ask-console/HelixAskConsoleRuntimeShell.tsx");
     const bridgeSource = read("client/src/components/helix/ask-console/HelixAskLegacyRuntimeBridge.tsx");
@@ -415,7 +477,12 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(runtimeShellSource).not.toContain("@/components/helix/HelixAskPill");
     expect(minimalShellSource).toContain("data-testid=\"helix-ask-minimal-runtime-shell\"");
     expect(minimalShellSource).toContain("HelixAskConsoleRuntimeLayout");
+    expect(minimalShellSource).toContain("HelixAskDebugDrawer");
     expect(minimalShellSource).toContain("HelixAskRuntimePicker");
+    expect(minimalShellSource).toContain("HelixAskRuntimeStatusLine");
+    expect(minimalShellSource).toContain("HelixAskSurfaceSupplementStack");
+    expect(minimalShellSource).toContain("goalPill={visibleSurface?.goalPill}");
+    expect(minimalShellSource).toContain("steeringQueue={visibleSurface?.steeringQueue}");
     expect(minimalShellSource).toContain("HelixAskComposer");
     expect(minimalShellSource).toContain("buildHelixAskMinimalRuntimeSubmitPlan");
     expect(minimalShellSource).toContain("startHelixAskMinimalRuntimeTurn");

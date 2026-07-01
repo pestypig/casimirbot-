@@ -2036,14 +2036,43 @@ export const runExplicitWorkstationGatewayCalls = async (input: {
       };
     }
     if (dependentVoiceRequest) {
-      results.push(await callWorkstationGatewayCapability({
+      let nextDependentRequest: Record<string, unknown> | null = dependentVoiceRequest;
+      let dependentDepth = 0;
+      while (nextDependentRequest && dependentDepth < 4) {
+        dependentDepth += 1;
+        const dependentResult = await callWorkstationGatewayCapability({
         agentRuntime: input.agentRuntime,
-        mode: readString(dependentVoiceRequest.mode),
-        capabilityId: readString(dependentVoiceRequest.capability_id) ?? "",
-        arguments: readRecord(dependentVoiceRequest.arguments) ?? {},
+          mode: readString(nextDependentRequest.mode),
+          capabilityId: readString(nextDependentRequest.capability_id) ?? "",
+          arguments: readRecord(nextDependentRequest.arguments) ?? {},
         turnId,
         iteration: results.length + 1,
-      }));
+        });
+        results.push(dependentResult);
+        const followupDependentRequest = buildDependentCompoundCapabilityGatewayCallRequest({
+          request: nextDependentRequest,
+          result: dependentResult,
+          results,
+          turnId,
+        });
+        const followupRailStatus = buildCompoundDependencyRailStatus({
+          request: nextDependentRequest,
+          result: dependentResult,
+          results,
+          dependentRequest: followupDependentRequest,
+        });
+        if (followupRailStatus) {
+          const dependentObservation = readRecord(dependentResult.observation);
+          if (dependentObservation) {
+            dependentObservation.compound_dependency_plan = followupRailStatus;
+          }
+          dependentResult.observation_packet.state_delta = {
+            ...(readRecord(dependentResult.observation_packet.state_delta) ?? {}),
+            compound_dependency_plan: followupRailStatus,
+          };
+        }
+        nextDependentRequest = followupDependentRequest;
+      }
     }
   }
   const turnCompoundDependencyPlan = buildTurnCompoundDependencyPlan({
