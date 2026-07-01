@@ -1360,6 +1360,56 @@ describe("Helix Ask agent provider selection", () => {
     });
   });
 
+  it("does not plan document-plus-calculator from date-like document paths alone", () => {
+    const body = {
+      turn_id: "ask:test:compound-docs-date-path-no-calculator",
+      agent_runtime: "codex",
+      question:
+        "Search the active document docs/research/nhm2-current-status-whitepaper-2026-05-02.md and summarize NHM2 current status in two bullets.",
+      workspace_context_snapshot: {
+        activePanelId: "docs-viewer",
+        activeDocumentPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        hasDocContext: true,
+      },
+    };
+
+    expect(buildCompoundCapabilityDependencyGatewayCallRequests(body)).toEqual([]);
+    expect(readWorkstationGatewayCallRequestsForTurn({
+      body,
+      includePlannerDerived: true,
+    }).map((request) => (request as any).capability_id)).toEqual(["docs.search"]);
+  });
+
+  it("plans document-plus-percent calculator evidence without treating document dates as expressions", () => {
+    const body = {
+      turn_id: "ask:test:compound-docs-percent-calculator",
+      agent_runtime: "codex",
+      question:
+        "Use the active NHM2 document as context, then use the calculator for 12.5% of 54176 and answer with both pieces.",
+      workspace_context_snapshot: {
+        activePanelId: "docs-viewer",
+        activeDocumentPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        hasDocContext: true,
+      },
+    };
+
+    const planned = buildCompoundCapabilityDependencyGatewayCallRequests(body);
+    expect(planned.map((request) => (request as any).capability_id)).toEqual([
+      "docs.search",
+      "scientific-calculator.solve_expression",
+    ]);
+    expect((planned[1] as any).arguments.expression).toBe("12.5% of 54176");
+
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      body,
+      includePlannerDerived: true,
+    });
+    expect(requests.map((request) => (request as any).capability_id)).toEqual([
+      "docs.search",
+      "scientific-calculator.solve_expression",
+    ]);
+  });
+
   it("plans research-plus-calculator-plus-reflection compound evidence without one-off route files", () => {
     const body = {
       turn_id: "ask:test:compound-research-quantify-reflect",

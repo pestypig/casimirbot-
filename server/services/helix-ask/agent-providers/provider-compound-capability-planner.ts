@@ -63,6 +63,28 @@ const readPrompt = (body: Record<string, unknown>): string | null =>
 const readWorkspaceSnapshot = (body: Record<string, unknown>): Record<string, unknown> | null =>
   readRecord(body.workspace_context_snapshot ?? body.workspaceContextSnapshot);
 
+const readWorkspaceActivePanel = (workspaceSnapshot: Record<string, unknown> | null | undefined): string | null =>
+  readString(
+    workspaceSnapshot?.activePanel ??
+      workspaceSnapshot?.activePanelId ??
+      workspaceSnapshot?.active_panel ??
+      workspaceSnapshot?.active_panel_id ??
+      workspaceSnapshot?.focusedPanel ??
+      workspaceSnapshot?.focusedPanelId ??
+      workspaceSnapshot?.focused_panel ??
+      workspaceSnapshot?.focused_panel_id,
+  );
+
+const readWorkspaceActiveDocPath = (workspaceSnapshot: Record<string, unknown> | null | undefined): string | null =>
+  normalizeDocPath(
+    workspaceSnapshot?.activeDocPath ??
+      workspaceSnapshot?.activeDocumentPath ??
+      workspaceSnapshot?.active_doc_path ??
+      workspaceSnapshot?.active_document_path ??
+      workspaceSnapshot?.docContextPath ??
+      workspaceSnapshot?.doc_context_path,
+  );
+
 const hasNegatedOrContextualReadAloudDocOutcome = (prompt: string): boolean => {
   const unquoted = unquotePrompt(prompt);
   if (
@@ -166,13 +188,21 @@ const extractRepoSearchQuery = (prompt: string): string => {
 const extractCalculatorExpression = (prompt: string): string | null => {
   if (hasNegatedToolInstruction(prompt, /\b(?:calculator|calculate|compute|evaluate|solve|expression)\b/i)) return null;
   const unquoted = unquotePrompt(prompt);
+  const percentOf = unquoted.match(/\b(\d+(?:\.\d+)?)\s*(?:%|percent)\s+of\s+(\d+(?:\.\d+)?)\b/i);
+  if (percentOf?.[1] && percentOf?.[2]) {
+    return `${percentOf[1]}% of ${percentOf[2]}`;
+  }
+  const explicitCalculatorCue = /\b(?:calculator|calculate|compute|evaluate|solve|expression|scalar|sanity\s+check)\b/i.test(unquoted);
   const direct =
     unquoted.match(/\b(?:calculate|compute|evaluate|solve)\s+([0-9][0-9\s+*/().^%-]{1,120}[0-9)]?)/i)?.[1] ??
     unquoted.match(/\b(?:expression|scalar|sanity\s+check)\s+([0-9][0-9\s+*/().^%-]{1,120}[0-9)]?)/i)?.[1] ??
     unquoted.match(/\b([0-9]+(?:\s*[+*/^%-]\s*[0-9]+)+)\b/)?.[1] ??
     null;
   const cleaned = direct?.replace(/\s+/g, "").replace(/[^0-9+*/().^%-]/g, "") ?? "";
-  return cleaned && /[+*/^%-]/.test(cleaned) ? cleaned : null;
+  if (!cleaned || !/[+*/^%-]/.test(cleaned)) return null;
+  if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(cleaned)) return null;
+  if (!explicitCalculatorCue && !/[+*/^%]/.test(cleaned)) return null;
+  return cleaned;
 };
 
 const hasDocumentEvidenceIntent = (prompt: string): boolean => {
@@ -216,18 +246,8 @@ const readActivePanelAndDoc = (body: Record<string, unknown>): {
 } => {
   const workspaceSnapshot = readWorkspaceSnapshot(body);
   return {
-    activePanel: readString(
-      workspaceSnapshot?.activePanel ??
-        workspaceSnapshot?.active_panel ??
-        workspaceSnapshot?.focusedPanel ??
-        workspaceSnapshot?.focused_panel,
-    ),
-    activeDocPath: normalizeDocPath(
-      workspaceSnapshot?.activeDocPath ??
-        workspaceSnapshot?.active_doc_path ??
-        workspaceSnapshot?.docContextPath ??
-        workspaceSnapshot?.doc_context_path,
-    ),
+    activePanel: readWorkspaceActivePanel(workspaceSnapshot),
+    activeDocPath: readWorkspaceActiveDocPath(workspaceSnapshot),
   };
 };
 
@@ -469,18 +489,8 @@ const buildReadAloudSurfaceRequests = (body: Record<string, unknown>): Record<st
   const prompt = readPrompt(body);
   if (!prompt) return [];
   const workspaceSnapshot = readWorkspaceSnapshot(body);
-  const activePanel = readString(
-    workspaceSnapshot?.activePanel ??
-      workspaceSnapshot?.active_panel ??
-      workspaceSnapshot?.focusedPanel ??
-      workspaceSnapshot?.focused_panel,
-  );
-  const activeDocPath = normalizeDocPath(
-    workspaceSnapshot?.activeDocPath ??
-      workspaceSnapshot?.active_doc_path ??
-      workspaceSnapshot?.docContextPath ??
-      workspaceSnapshot?.doc_context_path,
-  );
+  const activePanel = readWorkspaceActivePanel(workspaceSnapshot);
+  const activeDocPath = readWorkspaceActiveDocPath(workspaceSnapshot);
   if (isReadAloudCalculatorSurfacePrompt(prompt)) {
     const calculatorContext =
       readRecord(workspaceSnapshot?.calculator_active_context) ??
@@ -581,18 +591,8 @@ const buildInspectRepoAndDocRequests = (body: Record<string, unknown>): Record<s
   const prompt = readPrompt(body);
   if (!prompt || !isInspectRepoAndDocOutcomePrompt(prompt)) return [];
   const workspaceSnapshot = readWorkspaceSnapshot(body);
-  const activePanel = readString(
-    workspaceSnapshot?.activePanel ??
-      workspaceSnapshot?.active_panel ??
-      workspaceSnapshot?.focusedPanel ??
-      workspaceSnapshot?.focused_panel,
-  );
-  const activeDocPath = normalizeDocPath(
-    workspaceSnapshot?.activeDocPath ??
-      workspaceSnapshot?.active_doc_path ??
-      workspaceSnapshot?.docContextPath ??
-      workspaceSnapshot?.doc_context_path,
-  );
+  const activePanel = readWorkspaceActivePanel(workspaceSnapshot);
+  const activeDocPath = readWorkspaceActiveDocPath(workspaceSnapshot);
   const fileName = activeDocPath?.split("/").pop()?.replace(/\.md$/i, "").replace(/[-_]+/g, " ").trim();
   const docsQuery = fileName ?? cleanArgumentText(prompt) ?? prompt.slice(0, 160);
   const repoQuery = extractRepoSearchQuery(prompt);

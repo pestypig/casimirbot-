@@ -3,10 +3,22 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  HELIX_ASK_CONSOLE_ACTIVE_RECROWN_PHASE,
   HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS,
   HELIX_ASK_CONSOLE_LIVE_SURFACE_REQUIREMENTS,
+  HELIX_ASK_CONSOLE_MINIMAL_RUNTIME_SHELL_FORBIDDEN_OWNERSHIP,
+  HELIX_ASK_CONSOLE_MINIMAL_RUNTIME_SHELL_OWNS,
+  HELIX_ASK_CONSOLE_RECROWN_PHASES,
+  HELIX_ASK_CONSOLE_RECROWNED_DISPLAY_OWNERS,
+  HELIX_ASK_CONSOLE_RECROWNED_PURE_HELPER_REQUIREMENTS,
   HELIX_ASK_CONSOLE_RECROWN_VERSION,
+  HELIX_ASK_CONSOLE_RUNTIME_SHELL_ACTIVE_OWNERSHIP,
 } from "@/components/helix/ask-console/HelixAskConsoleState";
+import {
+  HELIX_ASK_CONSOLE_DOCK_REPLY_LIST_CLASS_NAME,
+  HELIX_ASK_CONSOLE_HERO_REPLY_LIST_CLASS_NAME,
+  buildHelixAskConsoleRuntimeBridgeProps,
+} from "@/components/helix/ask-console/HelixAskConsoleRuntimeShellProps";
 import { buildHelixAskFinalAnswerBlocks } from "@/components/helix/ask-console/HelixAskFinalAnswer";
 import {
   buildHelixAskContextBridgeSnapshot,
@@ -67,13 +79,27 @@ describe("Helix Ask Console recrown boundary", () => {
     const root = path.resolve(process.cwd(), "client/src/components/helix/ask-console");
     const expectedFiles = [
       "HelixAskConsole.tsx",
+      "HelixAskConsoleRuntimeShell.tsx",
+      "HelixAskConsoleRuntimeShellProps.ts",
+      "HelixAskBusyReasoningPanel.tsx",
+      "HelixAskErrorBoundary.tsx",
       "HelixAskComposer.tsx",
       "HelixAskRuntimePicker.tsx",
       "HelixAskMoodAvatar.tsx",
       "HelixAskActionToolbar.tsx",
+      "HelixAskGoalPill.tsx",
+      "HelixAskProceduralTimeline.tsx",
+      "HelixAskConsoleStack.tsx",
+      "HelixAskConsoleRuntimeLayout.tsx",
+      "HelixAskReasoningAnimationStyles.tsx",
+      "HelixAskReasoningBattleStage.tsx",
+      "HelixAskReasoningStatusMedalStrip.tsx",
+      "HelixAskSurfaceComposerPanel.tsx",
       "HelixAskSurfaceFrame.tsx",
+      "HelixAskSurfaceSupplementStack.tsx",
       "HelixAskTurnList.tsx",
       "HelixAskReplyCard.tsx",
+      "HelixAskReplyTurn.tsx",
       "HelixAskTurnStreamPanel.tsx",
       "HelixAskFinalAnswer.tsx",
       "HelixAskFinalExtras.tsx",
@@ -121,6 +147,29 @@ describe("Helix Ask Console recrown boundary", () => {
     ]);
   });
 
+  it("defines the ordered recrown phases and minimal runtime shell contract", () => {
+    expect(HELIX_ASK_CONSOLE_RECROWN_PHASES).toEqual([
+      "stabilize_legacy_bridge",
+      "extract_display_owners",
+      "quarantine_behavior_sensitive_paths",
+      "build_minimal_runtime_shell",
+      "replace_legacy_bridge_after_parity",
+      "retire_legacy_pill_after_proof",
+    ]);
+    expect(HELIX_ASK_CONSOLE_ACTIVE_RECROWN_PHASE).toBe("build_minimal_runtime_shell");
+    expect(HELIX_ASK_CONSOLE_MINIMAL_RUNTIME_SHELL_OWNS).toEqual(
+      HELIX_ASK_CONSOLE_LIVE_SURFACE_REQUIREMENTS,
+    );
+    expect(HELIX_ASK_CONSOLE_MINIMAL_RUNTIME_SHELL_FORBIDDEN_OWNERSHIP).toEqual([
+      "backend_terminal_authority",
+      "model_or_tool_execution",
+      "private_retry_loop",
+      "private_agent_runtime",
+      "final_prose_tool_observation_scraping",
+      "duplicated_backend_route_authority",
+    ]);
+  });
+
   it("routes active desktop and workstation entrypoints through the new console crown", () => {
     const entrypoints = [
       "client/src/components/workstation/HelixAskDock.tsx",
@@ -138,31 +187,138 @@ describe("Helix Ask Console recrown boundary", () => {
 
   it("quarantines the remaining legacy behavior behind a named bridge", () => {
     const consoleSource = read("client/src/components/helix/ask-console/HelixAskConsole.tsx");
+    const runtimeShellSource = read("client/src/components/helix/ask-console/HelixAskConsoleRuntimeShell.tsx");
     const bridgeSource = read("client/src/components/helix/ask-console/HelixAskLegacyRuntimeBridge.tsx");
 
-    expect(consoleSource).toContain("HelixAskLegacyRuntimeBridge");
+    expect(consoleSource).toContain("HelixAskConsoleRuntimeShell");
     expect(consoleSource).not.toContain("@/components/helix/HelixAskPill");
+    expect(consoleSource).not.toContain("HelixAskLegacyRuntimeBridge");
+    expect(runtimeShellSource).toContain("HelixAskLegacyRuntimeBridge");
+    expect(runtimeShellSource).not.toContain("@/components/helix/HelixAskPill");
     expect(bridgeSource).toContain("@/components/helix/HelixAskPill");
     expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS).toMatchObject({
+      activeImplementation: "minimal_runtime_shell_scaffold",
       bridge: "helix_ask_pill_legacy_runtime_bridge",
+      activePhase: "build_minimal_runtime_shell",
       reason: "behavior_sensitive_paths_not_yet_recrowned",
-      recrownedLiveSurfaceRequirements: [
-        "prompt_input",
-        "active_docs_context_handoff",
-        "request_envelope",
-        "runtime_picker",
-        "latest_turn_selection",
-        "final_answer_rendering",
-        "workstation_trace_rows",
-        "copy_final",
-        "debug_copy_export",
-        "read_aloud",
-      ],
-      remainingBehaviorSensitivePaths: [
-        "submit_stream_handling",
-        "chat_session_persistence",
-      ],
+      runtimeShell: "helix_ask_console_runtime_shell",
+      replacementTarget: "minimal_runtime_shell_after_parity",
     });
+    expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.recrownedDisplayOwners).toBe(
+      HELIX_ASK_CONSOLE_RECROWNED_DISPLAY_OWNERS,
+    );
+    expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.recrownedPureHelperRequirements).toBe(
+      HELIX_ASK_CONSOLE_RECROWNED_PURE_HELPER_REQUIREMENTS,
+    );
+    expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.minimalRuntimeShellOwns).toBe(
+      HELIX_ASK_CONSOLE_MINIMAL_RUNTIME_SHELL_OWNS,
+    );
+    expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.minimalRuntimeShellForbiddenOwnership).toBe(
+      HELIX_ASK_CONSOLE_MINIMAL_RUNTIME_SHELL_FORBIDDEN_OWNERSHIP,
+    );
+    expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.runtimeShellActiveOwnership).toBe(
+      HELIX_ASK_CONSOLE_RUNTIME_SHELL_ACTIVE_OWNERSHIP,
+    );
+    expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.remainingBehaviorSensitivePaths).toEqual(
+      HELIX_ASK_CONSOLE_LIVE_SURFACE_REQUIREMENTS,
+    );
+    expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.recrownedDisplayOwners).toContain("composer");
+    expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.recrownedDisplayOwners).toContain("runtime_layout");
+    expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.recrownedDisplayOwners).toContain("surface_composer_panel");
+    expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.recrownedDisplayOwners).toContain("surface_supplement_stack");
+    expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.recrownedDisplayOwners).toContain("busy_reasoning_panel");
+    expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.recrownedDisplayOwners).toContain("reasoning_battle_stage");
+    expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.recrownedPureHelperRequirements).toContain("request_envelope");
+    expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.recrownedPureHelperRequirements).toContain("latest_turn_selection");
+    expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.remainingBehaviorSensitivePaths).toContain("submit_stream_handling");
+    expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.remainingBehaviorSensitivePaths).toContain("copy_final");
+    expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.remainingBehaviorSensitivePaths).toContain("debug_copy_export");
+    expect(HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS.remainingBehaviorSensitivePaths).toContain("read_aloud");
+    const ownershipMap = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
+    expect(ownershipMap).toContain("HelixAskConsoleState.ts");
+    expect(ownershipMap).toContain("HelixAskConsoleRuntimeShell");
+    expect(ownershipMap).toContain("runtimeShellActiveOwnership");
+    expect(ownershipMap).toContain("HELIX_ASK_CONSOLE_RECROWN_PHASES");
+    expect(ownershipMap).toContain("minimalRuntimeShellOwns");
+    expect(ownershipMap).toContain("minimalRuntimeShellForbiddenOwnership");
+    expect(ownershipMap).toContain("remainingBehaviorSensitivePaths");
+    expect(ownershipMap).toContain("tested minimal runtime shell replaces the bridge");
+  });
+
+  it("starts the minimal runtime shell without bypassing the legacy bridge before parity", () => {
+    const consoleSource = read("client/src/components/helix/ask-console/HelixAskConsole.tsx");
+    const runtimeShellSource = read("client/src/components/helix/ask-console/HelixAskConsoleRuntimeShell.tsx");
+    const bridgeSource = read("client/src/components/helix/ask-console/HelixAskLegacyRuntimeBridge.tsx");
+
+    expect(consoleSource).toContain("return <HelixAskConsoleRuntimeShell {...props} />");
+    expect(runtimeShellSource).toContain("buildHelixAskConsoleRuntimeBridgeProps(props)");
+    expect(runtimeShellSource).toContain("<HelixAskLegacyRuntimeBridge");
+    expect(bridgeSource).toContain("return <HelixAskPill {...props} />");
+    expect(runtimeShellSource).not.toContain("@/components/helix/HelixAskPill");
+    for (const forbidden of [
+      "runAskTurn",
+      "runAskTurnStream",
+      "navigator.clipboard",
+      "speakVoice",
+      "useAgiChatStore",
+      "fetch(",
+      "terminal_authority",
+    ]) {
+      expect(runtimeShellSource).not.toContain(forbidden);
+    }
+  });
+
+  it("lets the runtime shell own safe layout defaults before bridge replacement", () => {
+    expect(HELIX_ASK_CONSOLE_RUNTIME_SHELL_ACTIVE_OWNERSHIP).toEqual([
+      "layout_variant_default",
+      "reply_list_class_default",
+    ]);
+    expect(buildHelixAskConsoleRuntimeBridgeProps({
+      contextId: "ctx",
+    })).toMatchObject({
+      contextId: "ctx",
+      layoutVariant: "hero",
+      replyListClassName: HELIX_ASK_CONSOLE_HERO_REPLY_LIST_CLASS_NAME,
+    });
+    expect(buildHelixAskConsoleRuntimeBridgeProps({
+      contextId: "ctx",
+      layoutVariant: "dock",
+    })).toMatchObject({
+      contextId: "ctx",
+      layoutVariant: "dock",
+      replyListClassName: HELIX_ASK_CONSOLE_DOCK_REPLY_LIST_CLASS_NAME,
+    });
+    expect(buildHelixAskConsoleRuntimeBridgeProps({
+      contextId: "ctx",
+      layoutVariant: "dock",
+      replyListClassName: "custom-list",
+      maxWidthClassName: undefined,
+    })).toMatchObject({
+      contextId: "ctx",
+      layoutVariant: "dock",
+      replyListClassName: "custom-list",
+      maxWidthClassName: undefined,
+    });
+    const runtimeShellSource = read("client/src/components/helix/ask-console/HelixAskConsoleRuntimeShell.tsx");
+    const runtimeShellPropsSource = read(
+      "client/src/components/helix/ask-console/HelixAskConsoleRuntimeShellProps.ts",
+    );
+    expect(runtimeShellSource).toContain("buildHelixAskConsoleRuntimeBridgeProps");
+    expect(runtimeShellSource).not.toContain("maxWidthClassName ??");
+    expect(runtimeShellPropsSource).toContain("buildHelixAskConsoleRuntimeBridgeProps");
+    for (const forbidden of [
+      "HelixAskLegacyRuntimeBridge",
+      "HelixAskPill",
+      "runAskTurn",
+      "runAskTurnStream",
+      "navigator.clipboard",
+      "speakVoice",
+      "useAgiChatStore",
+      "fetch(",
+      "terminal_authority",
+    ]) {
+      expect(runtimeShellPropsSource).not.toContain(forbidden);
+    }
   });
 
   it("keeps active document handoff as a pure request-envelope helper", () => {
@@ -353,15 +509,17 @@ describe("Helix Ask Console recrown boundary", () => {
   it("owns final-row proof trace display while trace selection stays in the bridge", () => {
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
     const finalExtras = read("client/src/components/helix/ask-console/HelixAskFinalExtras.tsx");
+    const replyTurn = read("client/src/components/helix/ask-console/HelixAskReplyTurn.tsx");
     const turnStreamPanel = read("client/src/components/helix/ask-console/HelixAskTurnStreamPanel.tsx");
 
-    expect(legacyPill).toContain("<HelixAskTurnStreamPanel");
+    expect(legacyPill).toContain("<HelixAskReplyTurn");
     expect(legacyPill).toContain("workstation_reasoning_trace");
-    expect(legacyPill).toContain("proofTrace={(replyDebugRecord as Record<string, unknown> | null | undefined)?.workstation_reasoning_trace}");
+    expect(legacyPill).toContain("proofTrace: (replyDebugRecord as Record<string, unknown> | null | undefined)");
     expect(legacyPill).not.toContain("<summary className=\"cursor-pointer select-none text-[10px] uppercase tracking-[0.2em] text-amber-200\">");
     expect(legacyPill).not.toContain("trace.compact_steps");
     expect(legacyPill).not.toContain("trace.caveats");
 
+    expect(replyTurn).toContain("<HelixAskTurnStreamPanel");
     expect(turnStreamPanel).toContain("<HelixAskProofTraceDetails trace={proofTrace} clipText={clipText} />");
     expect(finalExtras).toContain("export function HelixAskProofTraceDetails");
     expect(finalExtras).toContain("if (!record) return null");
@@ -376,16 +534,18 @@ describe("Helix Ask Console recrown boundary", () => {
   it("owns job-ready link button display while execution stays in the bridge", () => {
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
     const finalExtras = read("client/src/components/helix/ask-console/HelixAskFinalExtras.tsx");
+    const replyTurn = read("client/src/components/helix/ask-console/HelixAskReplyTurn.tsx");
     const turnStreamPanel = read("client/src/components/helix/ask-console/HelixAskTurnStreamPanel.tsx");
 
-    expect(legacyPill).toContain("<HelixAskTurnStreamPanel");
-    expect(legacyPill).toContain("jobReadyLinks={jobReadyLinks}");
-    expect(legacyPill).toContain("onRunJobReadyLink={runJobReadyLink}");
+    expect(legacyPill).toContain("<HelixAskReplyTurn");
+    expect(legacyPill).toContain("jobReadyLinks,");
+    expect(legacyPill).toContain("onRunJobReadyLink: runJobReadyLink");
     expect(legacyPill).toContain("const jobReadyLinks = resolveHelixAskVisibleJobReadyLinks(reply)");
     expect(legacyPill).toContain("syncDocViewerStateFromWorkstationAction(action)");
     expect(legacyPill).not.toContain("jobReadyLinks.slice(0, 6).map");
     expect(legacyPill).not.toContain("title={`From ${source}`}");
 
+    expect(replyTurn).toContain("<HelixAskTurnStreamPanel");
     expect(turnStreamPanel).toContain("<HelixAskJobReadyLinkStrip links={jobReadyLinks} onRun={onRunJobReadyLink} />");
     expect(finalExtras).toContain("export function HelixAskJobReadyLinkStrip");
     expect(finalExtras).toContain("if (links.length === 0) return null");
@@ -400,15 +560,17 @@ describe("Helix Ask Console recrown boundary", () => {
   it("owns latest reply status footer display while latest selection stays in the bridge", () => {
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
     const replyCard = read("client/src/components/helix/ask-console/HelixAskReplyCard.tsx");
+    const replyTurn = read("client/src/components/helix/ask-console/HelixAskReplyTurn.tsx");
     const finalExtras = read("client/src/components/helix/ask-console/HelixAskFinalExtras.tsx");
 
-    expect(legacyPill).toContain("<HelixAskReplyCard");
-    expect(legacyPill).toContain("promptIngested={reply.promptIngested}");
+    expect(legacyPill).toContain("<HelixAskReplyTurn");
+    expect(legacyPill).toContain("promptIngested: reply.promptIngested");
     expect(legacyPill).toContain("const isLatestReply = reply.id === transcriptLatestAskReplyId");
     expect(legacyPill).not.toContain("<HelixAskReplyStatusFooter");
     expect(legacyPill).not.toContain("In Helix Console");
     expect(legacyPill).not.toContain("{reply.promptIngested ? \" | Prompt ingested\" : \"\"}");
 
+    expect(replyTurn).toContain("<HelixAskReplyCard");
     expect(replyCard).toContain("<HelixAskReplyStatusFooter visible={isLatestReply} promptIngested={promptIngested} />");
     expect(replyCard).not.toContain("transcriptLatestAskReplyId");
     expect(replyCard).not.toContain("reply.id");
@@ -423,16 +585,18 @@ describe("Helix Ask Console recrown boundary", () => {
   it("owns live bridge pill display while bridge state stays in the bridge", () => {
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
     const finalExtras = read("client/src/components/helix/ask-console/HelixAskFinalExtras.tsx");
+    const replyTurn = read("client/src/components/helix/ask-console/HelixAskReplyTurn.tsx");
     const turnStreamPanel = read("client/src/components/helix/ask-console/HelixAskTurnStreamPanel.tsx");
 
-    expect(legacyPill).toContain("<HelixAskTurnStreamPanel");
-    expect(legacyPill).toContain("liveBridgeStatus={liveAnswerTurnBridge?.status}");
-    expect(legacyPill).toContain("readPillClassName={readLiveAnswerTurnBridgePillClassName}");
+    expect(legacyPill).toContain("<HelixAskReplyTurn");
+    expect(legacyPill).toContain("liveBridgeStatus: liveAnswerTurnBridge?.status");
+    expect(legacyPill).toContain("readPillClassName: readLiveAnswerTurnBridgePillClassName");
     expect(legacyPill).toContain("liveAnswerTurnBridge = buildLiveAnswerTurnBridgeState");
     expect(legacyPill).not.toContain("row.bridgePills.map");
     expect(legacyPill).not.toContain("pills={row.bridgePills}");
     expect(legacyPill).not.toContain('data-testid={isLatestReply ? "helix-ask-latest-live-turn-bridge" : undefined}');
 
+    expect(replyTurn).toContain("<HelixAskTurnStreamPanel");
     expect(turnStreamPanel).toContain("<HelixAskLiveBridgePillStrip");
     expect(turnStreamPanel).toContain("pills={row.bridgePills}");
     expect(turnStreamPanel).toContain("status={liveBridgeStatus}");
@@ -448,15 +612,17 @@ describe("Helix Ask Console recrown boundary", () => {
   it("owns disabled Stage Play action button display while action rows stay in the bridge", () => {
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
     const finalExtras = read("client/src/components/helix/ask-console/HelixAskFinalExtras.tsx");
+    const replyTurn = read("client/src/components/helix/ask-console/HelixAskReplyTurn.tsx");
     const turnStreamPanel = read("client/src/components/helix/ask-console/HelixAskTurnStreamPanel.tsx");
 
-    expect(legacyPill).toContain("<HelixAskTurnStreamPanel");
+    expect(legacyPill).toContain("<HelixAskReplyTurn");
     expect(legacyPill).toContain("stagePlayEvents: stagePlayChatLedgerEvents");
-    expect(legacyPill).toContain("stagePlayEventCount={stagePlayChatLedgerEvents.length}");
+    expect(legacyPill).toContain("stagePlayEventCount: stagePlayChatLedgerEvents.length");
     expect(legacyPill).not.toContain("<HelixAskStagePlayActionButtons");
     expect(legacyPill).not.toContain("row.actions.map");
     expect(legacyPill).not.toContain("Use the Stage Play graph checkpoint controls for this v1 action.");
 
+    expect(replyTurn).toContain("<HelixAskTurnStreamPanel");
     expect(turnStreamPanel).toContain("<HelixAskStagePlayActionButtons");
     expect(turnStreamPanel).toContain("actions={row.actions}");
     expect(finalExtras).toContain("export function HelixAskStagePlayActionButtons");
@@ -717,10 +883,11 @@ describe("Helix Ask Console recrown boundary", () => {
 
   it("owns the surface frame display while submit and audio priming stay in the bridge", () => {
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
+    const consoleStack = read("client/src/components/helix/ask-console/HelixAskConsoleStack.tsx");
     const surfaceFrame = read("client/src/components/helix/ask-console/HelixAskSurfaceFrame.tsx");
 
+    expect(legacyPill).toContain("<HelixAskConsoleRuntimeLayout");
     expect(legacyPill).toContain("<HelixAskSurfaceFrame");
-    expect(legacyPill).toContain("layoutVariant={layoutVariant}");
     expect(legacyPill).toContain("maxWidthClassName={maxWidthClass}");
     expect(legacyPill).toContain("maxWidthStyle={formMaxWidthStyle}");
     expect(legacyPill).toContain("surfaceBorderClassName={moodPalette.surfaceBorder}");
@@ -729,12 +896,17 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(legacyPill).toContain("isOffline={isOffline}");
     expect(legacyPill).toContain("onSubmit={handleAskSubmit}");
     expect(legacyPill).toContain("void primeVoiceAudioPlayback()");
-    expect(legacyPill).not.toContain('layoutVariant === "dock" ? "min-h-0" : ""');
     expect(legacyPill).not.toContain("shadow-[0_24px_60px_rgba(0,0,0,0.55)]");
     expect(legacyPill).not.toContain("Offline - reconnecting\n");
 
+    expect(consoleStack).toContain("export function HelixAskConsoleStack");
+    expect(consoleStack).toContain('layoutVariant === "dock" ? "min-h-0" : ""');
+    expect(consoleStack).not.toContain("<form");
+    expect(consoleStack).not.toContain("onSubmit");
+    expect(consoleStack).not.toContain("runAskTurn");
+
     expect(surfaceFrame).toContain("export function HelixAskSurfaceFrame");
-    expect(surfaceFrame).toContain('layoutVariant === "dock" ? "min-h-0" : ""');
+    expect(surfaceFrame).not.toContain('layoutVariant === "dock" ? "min-h-0" : ""');
     expect(surfaceFrame).toContain("transition-[max-width] duration-300 ease-out");
     expect(surfaceFrame).toContain("shadow-[0_24px_60px_rgba(0,0,0,0.55)]");
     expect(surfaceFrame).toContain("surfaceBorderClassName");
@@ -749,6 +921,298 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(surfaceFrame).not.toContain("moodPalette");
     expect(surfaceFrame).not.toContain("setAskReplies");
     expect(surfaceFrame).not.toContain("runAskTurn");
+  });
+
+  it("owns runtime layout slot composition while live state stays in the bridge", () => {
+    const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
+    const runtimeLayout = read("client/src/components/helix/ask-console/HelixAskConsoleRuntimeLayout.tsx");
+    const ownershipMap = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
+
+    expect(legacyPill).toContain("<HelixAskConsoleRuntimeLayout");
+    expect(legacyPill).toContain("surface={");
+    expect(legacyPill).toContain("goalPill={askGoalSession ? (");
+    expect(legacyPill).toContain("steeringQueue={");
+    expect(legacyPill).toContain("errorLine={<HelixAskErrorLine message={askError} />}");
+    expect(legacyPill).toContain("turnList={chronologicalAskReplies.length > 0 || visibleActiveTurnStreamRows.length > 0 ? (");
+    expect(legacyPill).toContain("debugDrawer={debugExportDrawer ? (");
+    expect(legacyPill).toContain("setAskGoalPillExpanded");
+    expect(legacyPill).toContain("setSteeringQueueExpanded");
+    expect(legacyPill).toContain("setDebugExportDrawer(null)");
+
+    expect(runtimeLayout).toContain("export function HelixAskConsoleRuntimeLayout");
+    expect(runtimeLayout).toContain("<HelixAskErrorBoundary>");
+    expect(runtimeLayout).toContain("<HelixAskConsoleStack className={className} layoutVariant={layoutVariant}>");
+    for (const slot of ["{surface}", "{goalPill}", "{steeringQueue}", "{errorLine}", "{turnList}", "{debugDrawer}"]) {
+      expect(runtimeLayout).toContain(slot);
+    }
+    expect(runtimeLayout).not.toContain("askGoalSession");
+    expect(runtimeLayout).not.toContain("chronologicalAskReplies");
+    expect(runtimeLayout).not.toContain("setAskGoalPillExpanded");
+    expect(runtimeLayout).not.toContain("setSteeringQueueExpanded");
+    expect(runtimeLayout).not.toContain("setDebugExportDrawer");
+    expect(runtimeLayout).not.toContain("runAskTurn");
+    expect(runtimeLayout).not.toContain("fetch(");
+    expect(ownershipMap).toContain("Runtime layout slot composition");
+    expect(ownershipMap).toContain("HelixAskConsoleRuntimeLayout");
+    expect(ownershipMap).toContain("copy/debug/read-aloud bindings");
+  });
+
+  it("owns surface composer slot layout while composer behavior stays in the bridge", () => {
+    const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
+    const composerPanel = read("client/src/components/helix/ask-console/HelixAskSurfaceComposerPanel.tsx");
+
+    expect(legacyPill).toContain("<HelixAskSurfaceComposerPanel");
+    expect(legacyPill).toContain("voiceLevelMonitor={");
+    expect(legacyPill).toContain("moodAvatar={");
+    expect(legacyPill).toContain("actionToolbar={");
+    expect(legacyPill).toContain("textarea={");
+    expect(legacyPill).toContain("triggerAskActionHaptic");
+    expect(legacyPill).toContain("handleAskImageSelect");
+    expect(legacyPill).toContain("handleVoiceInputToggle");
+    expect(legacyPill).toContain("syncAskDraftValue");
+    expect(legacyPill).not.toContain('<div className="flex flex-col gap-2 px-4 py-3">');
+
+    expect(composerPanel).toContain("export function HelixAskSurfaceComposerPanel");
+    expect(composerPanel).toContain("{voiceLevelMonitor}");
+    expect(composerPanel).toContain("{moodAvatar}");
+    expect(composerPanel).toContain("{actionToolbar}");
+    expect(composerPanel).toContain("{textarea}");
+    expect(composerPanel).toContain('className="flex flex-col gap-2 px-4 py-3"');
+    expect(composerPanel).not.toContain("triggerAskActionHaptic");
+    expect(composerPanel).not.toContain("handleAskImageSelect");
+    expect(composerPanel).not.toContain("handleVoiceInputToggle");
+    expect(composerPanel).not.toContain("syncAskDraftValue");
+    expect(composerPanel).not.toContain("runAskTurn");
+    expect(composerPanel).not.toContain("fetch(");
+  });
+
+  it("owns surface supplemental slot order while supplemental behavior stays in the bridge", () => {
+    const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
+    const supplementStack = read("client/src/components/helix/ask-console/HelixAskSurfaceSupplementStack.tsx");
+
+    expect(legacyPill).toContain("<HelixAskSurfaceSupplementStack");
+    for (const slot of [
+      "attachments={",
+      "contextCapsule={",
+      "voiceStatus={",
+      "situationRoomSource={",
+      "voiceCommandConfirmation={",
+      "transcriptConfirmation={",
+      "contextChooser={",
+      "conversationBrief={",
+      "observerLane={",
+      "contextMemoryStatus={",
+    ]) {
+      expect(legacyPill).toContain(slot);
+    }
+    expect(legacyPill).toContain("handleCommandConfirmationAccept");
+    expect(legacyPill).toContain("handleTranscriptConfirmationAccept");
+    expect(legacyPill).toContain("handleAskContextChooserRunAttached");
+    expect(legacyPill).toContain("stopDisplayAudioCapture");
+
+    expect(supplementStack).toContain("export function HelixAskSurfaceSupplementStack");
+    for (const slot of [
+      "{attachments}",
+      "{contextCapsule}",
+      "{voiceStatus}",
+      "{situationRoomSource}",
+      "{voiceCommandConfirmation}",
+      "{transcriptConfirmation}",
+      "{contextChooser}",
+      "{conversationBrief}",
+      "{observerLane}",
+      "{contextMemoryStatus}",
+    ]) {
+      expect(supplementStack).toContain(slot);
+    }
+    expect(supplementStack).not.toContain("handleCommandConfirmationAccept");
+    expect(supplementStack).not.toContain("handleTranscriptConfirmationAccept");
+    expect(supplementStack).not.toContain("handleAskContextChooserRunAttached");
+    expect(supplementStack).not.toContain("stopDisplayAudioCapture");
+    expect(supplementStack).not.toContain("runAskTurn");
+    expect(supplementStack).not.toContain("fetch(");
+  });
+
+  it("owns busy reasoning panel chrome while reasoning state stays in the bridge", () => {
+    const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
+    const busyPanel = read("client/src/components/helix/ask-console/HelixAskBusyReasoningPanel.tsx");
+
+    expect(legacyPill).toContain("<HelixAskBusyReasoningPanel");
+    expect(legacyPill).toContain("visible={askBusy}");
+    expect(legacyPill).toContain("liveBorderClassName={moodPalette.liveBorder}");
+    expect(legacyPill).toContain("replyTintClassName={moodPalette.replyTint}");
+    expect(legacyPill).toContain("reasoningTheater && mirekReasoningDisplayGrid");
+    expect(legacyPill).toContain("reasoningTheaterMeterFillRef");
+    expect(legacyPill).toContain("setReasoningTheaterFrontierIconBrokenByPath");
+    expect(legacyPill).not.toContain("HelixAskReasoningAnimationStyles");
+    expect(legacyPill).not.toContain("relative overflow-hidden border-t px-4 py-2 text-[11px] text-slate-300");
+
+    expect(busyPanel).toContain("export function HelixAskBusyReasoningPanel");
+    expect(busyPanel).toContain("if (!visible) return null");
+    expect(busyPanel).toContain("HelixAskReasoningAnimationStyles");
+    expect(busyPanel).toContain("relative overflow-hidden border-t px-4 py-2 text-[11px] text-slate-300");
+    expect(busyPanel).toContain("{children}");
+    expect(busyPanel).not.toContain("reasoningTheater");
+    expect(busyPanel).not.toContain("mirekReasoningDisplayGrid");
+    expect(busyPanel).not.toContain("setReasoningTheater");
+    expect(busyPanel).not.toContain("runAskTurn");
+    expect(busyPanel).not.toContain("fetch(");
+  });
+
+  it("owns render error fallback display outside the legacy bridge", () => {
+    const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
+    const errorBoundary = read("client/src/components/helix/ask-console/HelixAskErrorBoundary.tsx");
+    const runtimeLayout = read("client/src/components/helix/ask-console/HelixAskConsoleRuntimeLayout.tsx");
+
+    expect(legacyPill).toContain("<HelixAskConsoleRuntimeLayout");
+    expect(legacyPill).not.toContain("<HelixAskErrorBoundary>");
+    expect(runtimeLayout).toContain("<HelixAskErrorBoundary>");
+    expect(runtimeLayout).toContain("</HelixAskErrorBoundary>");
+    expect(legacyPill).not.toContain("class HelixAskErrorBoundary");
+    expect(legacyPill).not.toContain("The Helix Ask panel hit a rendering error");
+    expect(legacyPill).not.toContain("reportClientError(error");
+
+    expect(errorBoundary).toContain("export class HelixAskErrorBoundary");
+    expect(errorBoundary).toContain("componentDidCatch(error: Error, info: ErrorInfo)");
+    expect(errorBoundary).toContain('scope: "helix-ask"');
+    expect(errorBoundary).toContain("The Helix Ask panel hit a rendering error");
+    expect(errorBoundary).toContain("this.handleRetry");
+    expect(errorBoundary).toContain("window.location.reload()");
+    expect(errorBoundary).not.toContain("runAskTurn");
+    expect(errorBoundary).not.toContain("setAskReplies");
+    expect(errorBoundary).not.toContain("handleAskSubmit");
+  });
+
+  it("owns procedural timeline display while row projection stays in the bridge", () => {
+    const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
+    const proceduralTimeline = read("client/src/components/helix/ask-console/HelixAskProceduralTimeline.tsx");
+
+    expect(legacyPill).toContain("function renderProceduralTurnTimeline");
+    expect(legacyPill).toContain("reply.debug?.turn_truth_table");
+    expect(legacyPill).toContain("ui_answer_equals_terminal_authority_text");
+    expect(legacyPill).toContain("replyRecord?.agent_runtime_loop");
+    expect(legacyPill).toContain("executed_action_key");
+    expect(legacyPill).toContain("<HelixAskProceduralTimeline");
+    expect(legacyPill).toContain("rows={rows}");
+    expect(legacyPill).toContain("truthMatchesVisible={truthMatchesVisible}");
+    expect(legacyPill).toContain("toolLabel={runtimeActionLabels[0] ?? (selectedTool ? readProceduralActionLabel(selectedTool) : null)}");
+    expect(legacyPill).not.toContain("Procedural workspace timeline");
+    expect(legacyPill).not.toContain("rows.slice(0, 18).map");
+    expect(legacyPill).not.toContain("readProceduralStatusClass(row.status)");
+
+    expect(proceduralTimeline).toContain("export function HelixAskProceduralTimeline");
+    expect(proceduralTimeline).toContain("Procedural workspace timeline");
+    expect(proceduralTimeline).toContain("backend terminal == visible answer");
+    expect(proceduralTimeline).toContain("rows.slice(0, 18).map");
+    expect(proceduralTimeline).toContain("readProceduralStatusClass(row.status)");
+    expect(proceduralTimeline).not.toContain("reply.debug?.turn_truth_table");
+    expect(proceduralTimeline).not.toContain("agent_runtime_loop");
+    expect(proceduralTimeline).not.toContain("buildVisibleResolvedTurn");
+  });
+
+  it("owns reasoning battle stage display while battle state stays in the bridge", () => {
+    const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
+    const battleStage = read("client/src/components/helix/ask-console/HelixAskReasoningBattleStage.tsx");
+
+    expect(legacyPill).toContain("<HelixAskReasoningBattleStage");
+    expect(legacyPill).toContain("buildReasoningBattleBeats({");
+    expect(legacyPill).toContain("buildReasoningBattleAmbientState({");
+    expect(legacyPill).toContain("buildReasoningBattleAnswerTint({");
+    expect(legacyPill).not.toContain("function renderReasoningBattleStage");
+    expect(legacyPill).not.toContain('data-testid="helix-ask-reasoning-battle-stage"');
+    expect(legacyPill).not.toContain("reasoningBattlePrimitiveStyle({ beat, primitive");
+
+    expect(battleStage).toContain("export function HelixAskReasoningBattleStage");
+    expect(battleStage).toContain('data-testid={testId ?? "helix-ask-reasoning-battle-stage"}');
+    expect(battleStage).toContain("reasoningBattleBeatPrimitive(beat)");
+    expect(battleStage).toContain("reasoningBattlePrimitiveStyle({ beat, primitive");
+    expect(battleStage).toContain("reasoningBattleAmbientClassName(ambient, staticMotion)");
+    expect(battleStage).not.toContain("buildReasoningBattleBeats");
+    expect(battleStage).not.toContain("buildReasoningBattleAmbientState");
+    expect(battleStage).not.toContain("buildReasoningBattleAnswerTint");
+    expect(battleStage).not.toContain("runAskTurn");
+    expect(battleStage).not.toContain("fetch(");
+  });
+
+  it("owns reasoning status and medal strip display while medal state stays in the bridge", () => {
+    const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
+    const statusMedalStrip = read(
+      "client/src/components/helix/ask-console/HelixAskReasoningStatusMedalStrip.tsx",
+    );
+    const ownershipMap = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
+
+    expect(legacyPill).toContain("<HelixAskReasoningStatusMedalStrip");
+    expect(legacyPill).toContain("setReasoningTheaterMedalBrokenByToken");
+    expect(legacyPill).toContain("reasoningTheaterMedalQueue.map((medalPulse) => ({");
+    expect(legacyPill).toContain("REASONING_THEATER_STANCE_META[reasoningTheater.stance].badge");
+    expect(legacyPill).not.toContain('alt={`${REASONING_THEATER_MEDAL_LABEL[medalPulse.medal]} medal`}');
+    expect(legacyPill).not.toContain("className=\"h-12 w-12 shrink-0 object-contain");
+
+    expect(statusMedalStrip).toContain("export function HelixAskReasoningStatusMedalStrip");
+    expect(statusMedalStrip).toContain("medals.map((medal)");
+    expect(statusMedalStrip).toContain("alt={`${medal.label} medal`}");
+    expect(statusMedalStrip).toContain("onMedalImageError?.(medal.token");
+    expect(statusMedalStrip).toContain("latestMedal.reason");
+    expect(statusMedalStrip).not.toContain("setReasoningTheaterMedalBrokenByToken");
+    expect(statusMedalStrip).not.toContain("reasoningTheaterMedalQueue");
+    expect(statusMedalStrip).not.toContain("REASONING_THEATER_STANCE_META");
+    expect(statusMedalStrip).not.toContain("REASONING_THEATER_MEDAL_LABEL");
+    expect(statusMedalStrip).not.toContain("runAskTurn");
+    expect(statusMedalStrip).not.toContain("fetch(");
+    expect(statusMedalStrip).not.toContain("navigator.clipboard");
+    expect(ownershipMap).toContain("Reasoning status and medal strip display");
+    expect(ownershipMap).toContain("HelixAskReasoningStatusMedalStrip");
+  });
+
+  it("owns reasoning animation keyframes outside the legacy bridge", () => {
+    const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
+    const busyPanel = read("client/src/components/helix/ask-console/HelixAskBusyReasoningPanel.tsx");
+    const animationStyles = read("client/src/components/helix/ask-console/HelixAskReasoningAnimationStyles.tsx");
+
+    expect(legacyPill).toContain("<HelixAskBusyReasoningPanel");
+    expect(legacyPill).not.toContain("<HelixAskReasoningAnimationStyles />");
+    expect(busyPanel).toContain("<HelixAskReasoningAnimationStyles />");
+    expect(legacyPill).not.toContain("@keyframes helixReasoningFloatingText{");
+    expect(legacyPill).not.toContain("@keyframes helixReasoningBattleBeat{");
+    expect(legacyPill).not.toContain("@keyframes helixReasoningBattlePrimitive{");
+
+    expect(animationStyles).toContain("export function HelixAskReasoningAnimationStyles");
+    expect(animationStyles).toContain("@keyframes helixReasoningFloatingText{");
+    expect(animationStyles).toContain("@keyframes helixReasoningBattleBeat{");
+    expect(animationStyles).toContain("@keyframes helixReasoningBattlePrimitive{");
+    expect(animationStyles).not.toContain("runAskTurn");
+    expect(animationStyles).not.toContain("fetch(");
+    expect(animationStyles).not.toContain("@/store/");
+  });
+
+  it("owns goal-session pill display while goal actions stay in the bridge", () => {
+    const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
+    const goalPill = read("client/src/components/helix/ask-console/HelixAskGoalPill.tsx");
+
+    expect(legacyPill).toContain("<HelixAskGoalPill");
+    expect(legacyPill).toContain("session={askGoalSession}");
+    expect(legacyPill).toContain("expanded={askGoalPillExpanded}");
+    expect(legacyPill).toContain("busyAction={askGoalPillBusyAction}");
+    expect(legacyPill).toContain("error={askGoalPillError}");
+    expect(legacyPill).toContain("onToggleExpanded={() => setAskGoalPillExpanded((current) => !current)}");
+    expect(legacyPill).toContain("onAction={handleAskGoalSessionAction}");
+    expect(legacyPill).toContain("postHelixAskGoalSessionAction");
+    expect(legacyPill).not.toContain('aria-label="Helix Ask goal session"');
+    expect(legacyPill).not.toContain('aria-label="Edit goal prompt"');
+    expect(legacyPill).not.toContain("formatGoalPillCadence(session.cadence)");
+    expect(legacyPill).not.toContain("session.contextFeeds.map");
+
+    expect(goalPill).toContain("export function HelixAskGoalPill");
+    expect(goalPill).toContain('aria-label="Helix Ask goal session"');
+    expect(goalPill).toContain('aria-controls="helix-ask-goal-pill-details"');
+    expect(goalPill).toContain('aria-label="Edit goal prompt"');
+    expect(goalPill).toContain('aria-label={isPaused ? "Resume goal" : "Pause goal"}');
+    expect(goalPill).toContain('aria-label="Archive goal"');
+    expect(goalPill).toContain("formatGoalPillCadence(session.cadence)");
+    expect(goalPill).toContain("session.contextFeeds.map");
+    expect(goalPill).not.toContain("postHelixAskGoalSessionAction");
+    expect(goalPill).not.toContain("setAskGoalPillBusyAction");
+    expect(goalPill).not.toContain("fetch(");
   });
 
   it("owns mood avatar display while mood state stays in the bridge", () => {
@@ -1069,17 +1533,19 @@ describe("Helix Ask Console recrown boundary", () => {
 
   it("owns final-answer control button display while the bridge keeps behavior handlers", () => {
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
+    const replyTurn = read("client/src/components/helix/ask-console/HelixAskReplyTurn.tsx");
     const turnStreamPanel = read("client/src/components/helix/ask-console/HelixAskTurnStreamPanel.tsx");
     const turnControls = read("client/src/components/helix/ask-console/HelixAskTurnControls.tsx");
 
-    expect(legacyPill).toContain("<HelixAskTurnStreamPanel");
-    expect(legacyPill).toContain("onCopyFinal={() => void handleCopyReply(reply, latestTurnBinding.finalAnswerText)}");
-    expect(legacyPill).toContain("onReadAloud={() => void handleReadAloud(reply, latestTurnBinding.finalAnswerText)}");
-    expect(legacyPill).toContain("debugCopyTestId={latestTurnBinding.debugCopyTestId}");
+    expect(legacyPill).toContain("<HelixAskReplyTurn");
+    expect(legacyPill).toContain("onCopyFinal: () => void handleCopyReply(reply, latestTurnBinding.finalAnswerText)");
+    expect(legacyPill).toContain("onReadAloud: () => void handleReadAloud(reply, latestTurnBinding.finalAnswerText)");
+    expect(legacyPill).toContain("debugCopyTestId: latestTurnBinding.debugCopyTestId");
     expect(legacyPill).not.toContain("<Copy className=");
     expect(legacyPill).not.toContain("<Bug className=");
     expect(legacyPill).not.toContain("<Volume2 className=");
 
+    expect(replyTurn).toContain("<HelixAskTurnStreamPanel");
     expect(turnStreamPanel).toContain("<HelixAskTurnControls");
     expect(turnStreamPanel).toContain("onCopyFinal={onCopyFinal}");
     expect(turnStreamPanel).toContain("onDebugCopy={onDebugCopy}");
@@ -1142,17 +1608,28 @@ describe("Helix Ask Console recrown boundary", () => {
   it("owns completed reply card shell display while reply projection stays in the bridge", () => {
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
     const replyCard = read("client/src/components/helix/ask-console/HelixAskReplyCard.tsx");
+    const replyTurn = read("client/src/components/helix/ask-console/HelixAskReplyTurn.tsx");
 
-    expect(legacyPill).toContain("<HelixAskReplyCard");
-    expect(legacyPill).toContain("turnTestId={latestTurnBinding.turnTestId}");
+    expect(legacyPill).toContain("<HelixAskReplyTurn");
+    expect(legacyPill).toContain("turnTestId: latestTurnBinding.turnTestId");
     expect(legacyPill).toContain("isLatestReply={isLatestReply}");
-    expect(legacyPill).toContain("tintClassName={moodPalette.replyTint}");
-    expect(legacyPill).toContain("contextCapsule={reply.contextCapsule}");
-    expect(legacyPill).toContain("promptIngested={reply.promptIngested}");
+    expect(legacyPill).toContain("tintClassName: moodPalette.replyTint");
+    expect(legacyPill).toContain("contextCapsule: reply.contextCapsule");
+    expect(legacyPill).toContain("promptIngested: reply.promptIngested");
     expect(legacyPill).toContain("const isLatestReply = reply.id === transcriptLatestAskReplyId");
     expect(legacyPill).not.toContain("className={`relative px-1 py-1 text-sm text-slate-100 ${isLatestReply ? \"helix-ask-turn-enter\" : \"\"}`}");
     expect(legacyPill).not.toContain("pointer-events-none absolute inset-0 opacity-0 ${moodPalette.replyTint}");
 
+    expect(replyTurn).toContain("export function HelixAskReplyTurn");
+    expect(replyTurn).toContain("<HelixAskReplyCard");
+    expect(replyTurn).toContain("<HelixAskTurnStreamPanel");
+    expect(replyTurn).toContain("isLatestReply={isLatestReply}");
+    expect(replyTurn).toContain("{...card}");
+    expect(replyTurn).toContain("{...stream}");
+    expect(replyTurn).not.toContain("buildHelixTurnTranscriptRows");
+    expect(replyTurn).not.toContain("resolveHelixAskVisibleTerminal");
+    expect(replyTurn).not.toContain("handleCopyReply");
+    expect(replyTurn).not.toContain("transcriptLatestAskReplyId");
     expect(replyCard).toContain("export function HelixAskReplyCard");
     expect(replyCard).toContain('className={`relative px-1 py-1 text-sm text-slate-100 ${isLatestReply ? "helix-ask-turn-enter" : ""}`}');
     expect(replyCard).toContain("data-testid={turnTestId}");
@@ -1418,16 +1895,18 @@ describe("Helix Ask Console recrown boundary", () => {
   it("owns reply context capsule card display while reply state stays in the bridge", () => {
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
     const replyCard = read("client/src/components/helix/ask-console/HelixAskReplyCard.tsx");
+    const replyTurn = read("client/src/components/helix/ask-console/HelixAskReplyTurn.tsx");
     const capsulePreview = read("client/src/components/helix/ask-console/HelixAskContextCapsulePreview.tsx");
 
-    expect(legacyPill).toContain("<HelixAskReplyCard");
-    expect(legacyPill).toContain("contextCapsule={reply.contextCapsule}");
+    expect(legacyPill).toContain("<HelixAskReplyTurn");
+    expect(legacyPill).toContain("contextCapsule: reply.contextCapsule");
     expect(legacyPill).toContain("contextCapsule: responseContextCapsule");
     expect(legacyPill).toContain("buildContextCapsuleCopyText(reply.contextCapsule)");
     expect(legacyPill).not.toContain("<HelixAskReplyContextCapsuleCard");
     expect(legacyPill).not.toContain("buildContextCapsuleStampDataUri(reply.contextCapsule.stamp)");
     expect(legacyPill).not.toContain('alt="Context capsule fingerprint"\\n                          className="mt-1 h-10 w-44');
 
+    expect(replyTurn).toContain("<HelixAskReplyCard");
     expect(replyCard).toContain("<HelixAskReplyContextCapsuleCard capsule={contextCapsule} />");
     expect(replyCard).not.toContain("responseContextCapsule");
     expect(replyCard).not.toContain("buildContextCapsuleCopyText");

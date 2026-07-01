@@ -1,5 +1,12 @@
 export { HelixAskConsole } from "./HelixAskConsole";
+export { HelixAskConsoleRuntimeShell } from "./HelixAskConsoleRuntimeShell";
+export {
+  HELIX_ASK_CONSOLE_DOCK_REPLY_LIST_CLASS_NAME,
+  HELIX_ASK_CONSOLE_HERO_REPLY_LIST_CLASS_NAME,
+  buildHelixAskConsoleRuntimeBridgeProps,
+} from "./HelixAskConsoleRuntimeShellProps";
 export { HelixAskComposer } from "./HelixAskComposer";
+export { HelixAskErrorBoundary } from "./HelixAskErrorBoundary";
 export {
   HELIX_ASK_CONSOLE_MAX_PROMPT_LINES,
   buildHelixAskComposerViewModel,
@@ -32,11 +39,23 @@ export {
 } from "./HelixAskChatPersistence";
 export { HelixAskRuntimePicker } from "./HelixAskRuntimePicker";
 export { buildHelixAskRuntimePickerModel } from "./HelixAskRuntimePicker";
+export { HelixAskBusyReasoningPanel } from "./HelixAskBusyReasoningPanel";
 export { HelixAskMoodAvatar } from "./HelixAskMoodAvatar";
 export { HelixAskActionToolbar } from "./HelixAskActionToolbar";
+export { HelixAskGoalPill } from "./HelixAskGoalPill";
+export { HelixAskProceduralTimeline } from "./HelixAskProceduralTimeline";
+export { HelixAskConsoleStack } from "./HelixAskConsoleStack";
+export { HelixAskConsoleRuntimeLayout } from "./HelixAskConsoleRuntimeLayout";
+export { HelixAskReasoningAnimationStyles } from "./HelixAskReasoningAnimationStyles";
+export { HelixAskReasoningBattleStage } from "./HelixAskReasoningBattleStage";
+export { HelixAskReasoningMirekField } from "./HelixAskReasoningMirekField";
+export { HelixAskReasoningStatusMedalStrip } from "./HelixAskReasoningStatusMedalStrip";
+export { HelixAskSurfaceComposerPanel } from "./HelixAskSurfaceComposerPanel";
 export { HelixAskSurfaceFrame } from "./HelixAskSurfaceFrame";
+export { HelixAskSurfaceSupplementStack } from "./HelixAskSurfaceSupplementStack";
 export { HelixAskTurnList } from "./HelixAskTurnList";
 export { HelixAskReplyCard } from "./HelixAskReplyCard";
+export { HelixAskReplyTurn } from "./HelixAskReplyTurn";
 export { HelixAskTurnStreamPanel } from "./HelixAskTurnStreamPanel";
 export { HelixAskFinalAnswer } from "./HelixAskFinalAnswer";
 export { buildHelixAskFinalAnswerBlocks } from "./HelixAskFinalAnswer";
@@ -96,13 +115,24 @@ export {
 } from "./HelixAskWorkstationTraceRows";
 export {
   HELIX_ASK_CONSOLE_LEGACY_BRIDGE_STATUS,
+  HELIX_ASK_CONSOLE_ACTIVE_RECROWN_PHASE,
   HELIX_ASK_CONSOLE_LIVE_SURFACE_REQUIREMENTS,
+  HELIX_ASK_CONSOLE_MINIMAL_RUNTIME_SHELL_FORBIDDEN_OWNERSHIP,
+  HELIX_ASK_CONSOLE_MINIMAL_RUNTIME_SHELL_OWNS,
+  HELIX_ASK_CONSOLE_RECROWN_PHASES,
+  HELIX_ASK_CONSOLE_RECROWNED_DISPLAY_OWNERS,
+  HELIX_ASK_CONSOLE_RECROWNED_PURE_HELPER_REQUIREMENTS,
   HELIX_ASK_CONSOLE_RECROWN_VERSION,
+  HELIX_ASK_CONSOLE_RUNTIME_SHELL_ACTIVE_OWNERSHIP,
 } from "./HelixAskConsoleState";
 export type {
   HelixAskConsoleLegacyBridgeStatus,
   HelixAskConsoleLiveSurfaceRequirement,
+  HelixAskConsoleMinimalRuntimeShellForbiddenOwnership,
   HelixAskConsoleProps,
+  HelixAskConsoleRecrownPhase,
+  HelixAskConsoleRecrownedDisplayOwner,
+  HelixAskConsoleRuntimeShellActiveOwnership,
 } from "./HelixAskConsoleState";
 export type { HelixAskContextBridgeSnapshot } from "./HelixAskContextBridge";
 export type { HelixAskConsoleRequestEnvelope } from "./HelixAskRequestEnvelope";
@@ -145,14 +175,35 @@ export type {
   HelixAskRuntimePickerModel,
   HelixAskRuntimePickerProps,
 } from "./HelixAskRuntimePicker";
+export type { HelixAskBusyReasoningPanelProps } from "./HelixAskBusyReasoningPanel";
 export type { HelixAskMoodAvatarProps } from "./HelixAskMoodAvatar";
 export type { HelixAskActionToolbarProps } from "./HelixAskActionToolbar";
+export type {
+  HelixAskGoalPillProps,
+  StagePlayGoalSessionAction,
+} from "./HelixAskGoalPill";
+export type {
+  HelixAskProceduralTimelineProps,
+  HelixAskProceduralTimelineRow,
+} from "./HelixAskProceduralTimeline";
+export type { HelixAskConsoleStackProps } from "./HelixAskConsoleStack";
+export type { HelixAskConsoleRuntimeLayoutProps } from "./HelixAskConsoleRuntimeLayout";
+export type { HelixAskReasoningBattleStageProps } from "./HelixAskReasoningBattleStage";
+export type { HelixAskReasoningMirekFieldProps } from "./HelixAskReasoningMirekField";
+export type {
+  HelixAskReasoningLatestMedalView,
+  HelixAskReasoningMedalPulseView,
+  HelixAskReasoningStatusMedalStripProps,
+} from "./HelixAskReasoningStatusMedalStrip";
+export type { HelixAskSurfaceComposerPanelProps } from "./HelixAskSurfaceComposerPanel";
 export type { HelixAskSurfaceFrameProps } from "./HelixAskSurfaceFrame";
+export type { HelixAskSurfaceSupplementStackProps } from "./HelixAskSurfaceSupplementStack";
 export type {
   HelixAskLatestTurnBinding,
   HelixAskLatestTurnCandidate,
 } from "./HelixAskLatestTurnBinding";
 export type { HelixAskReplyCardProps } from "./HelixAskReplyCard";
+export type { HelixAskReplyTurnProps } from "./HelixAskReplyTurn";
 export type {
   HelixAskTurnStreamAnswerTint,
   HelixAskTurnStreamPanelProps,

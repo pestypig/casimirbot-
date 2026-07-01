@@ -178,15 +178,62 @@ agent, importing `server/routes/agi.plan.ts`, or giving the agent direct access
 to panel internals, filesystem mutation, shell execution, or final-answer
 authority.
 
+#### Runtime Agents And Capability Lanes
+
+The selectable Ask runtime is now modeled as a runtime agent provider. The
+runtime provider owns the turn style and final candidate path, while Helix owns
+capability admission, observation normalization, evidence re-entry, terminal
+authority, and debug projection.
+
+Keep these layers separate:
+
+| Layer | Meaning | Current examples |
+| --- | --- | --- |
+| Runtime agent provider | The agent that owns the turn and produces the final candidate. | `helix` / Helix Ask Native, `codex` / Codex Workstation Mode |
+| Capability lane | A governed class of service the runtime may request during a turn. Lane results are observations or receipts, not answers. | `workstation_tool_reference`, `utility_text`, `live_translation`, `visual_analysis` |
+| Backend provider | The implementation that can fulfill a lane when that lane graduates from shadow/catalog mode. | Helix workstation gateway, OpenAI-compatible text/vision, Gemini translation, ElevenLabs voice |
+
+The provider-neutral lane catalog lets Helix expose the same governed capability
+surface to Helix Native, Codex Workstation Mode, and future runtime agents
+without making any lane replace the root agent. A lane can help a runtime
+delegate a subtask, such as translation, narration, visual analysis, or compact
+classification, but its output must re-enter as a structured observation before
+the selected runtime can use it in a final answer.
+
+Current lane catalog:
+
+| Lane | Family | Current status | Notes |
+| --- | --- | --- | --- |
+| `workstation_tool_reference` | Existing workstation gateway | `available` | Reference lane for the live gateway catalog; this is what Codex is using for `docs.search`, calculator, repo search, reflection, and panel projection receipts. |
+| `utility_text` | Text inference | `dry_run` | Cataloged for small classification, extraction, normalization, and compact summary calls. |
+| `interactive_text` | Text inference | `dry_run` | Cataloged for low-latency conversational or tool-backed text inference. |
+| `deliberate_text` | Text inference | `dry_run` | Cataloged for higher-effort synthesis, planning, and consistency review. |
+| `code_text` | Code inference | `dry_run` | Cataloged for code reasoning/review as text; no filesystem mutation authority. |
+| `speech_to_text` | Speech to text | `dry_run` | Cataloged for future governed audio transcript observations. |
+| `text_to_speech` | Text to speech | `dry_run` | Cataloged for narration/callout receipts; playback is not answer authority. |
+| `live_translation` | Live translation | `unconfigured` | Intended for a translation backend such as Gemini realtime translation once keys/endpoints and receipt contracts are configured. |
+| `visual_analysis` | Visual analysis | `dry_run` | Cataloged for future image/screen observations. |
+
+This is intentionally additive. Existing workstation gateway calls continue to
+work without routing through model/service lanes. Lane execution is still
+shadow/catalog-only unless a later patch explicitly graduates a lane with
+permission, backend configuration, observation schema, negative-admission tests,
+and terminal-authority projection.
+
 Important paths:
 
 - `server/routes/agi.plan.ts`
 - `server/services/helix-ask/`
 - `server/services/helix-ask/agent-providers/`
 - `server/services/helix-ask/workstation-tool-gateway/`
+- `server/services/helix-ask/capability-lanes/`
+- `server/services/helix-ask/agent-providers/runtime-adapter-contract.ts`
 - `client/src/components/helix/HelixAskPill.tsx`
+- `shared/helix-capability-lane.ts`
 - `shared/helix-ask-*.ts`
 - `shared/helix-agent-runtime.ts`
+- `docs/helix-ask-provider-capability-contracts.md`
+- `docs/helix-ask/workstation-tool-contracts/README.md`
 - `docs/helix-ask-turn-solver-spine.md`
 - `docs/helix-ask-codex-loop-discipline.md`
 

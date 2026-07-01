@@ -1064,11 +1064,18 @@ describe("HelixAskPill mic-first surface contract", () => {
   it("keeps the prompt textarea below the controls at full composer width", () => {
     const source = fs.readFileSync(pillPath, "utf8");
     const toolbarSource = fs.readFileSync(askConsoleActionToolbarPath, "utf8");
+    const surfaceComposerSource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/components/helix/ask-console/HelixAskSurfaceComposerPanel.tsx"),
+      "utf8",
+    );
     const composerSource = fs.readFileSync(
       path.resolve(process.cwd(), "client/src/components/helix/ask-console/HelixAskComposer.tsx"),
       "utf8",
     );
-    expect(source).toContain('className="flex flex-col gap-2 px-4 py-3"');
+    expect(source).toContain("<HelixAskSurfaceComposerPanel");
+    expect(surfaceComposerSource).toContain('className="flex flex-col gap-2 px-4 py-3"');
+    expect(surfaceComposerSource).toContain("{actionToolbar}");
+    expect(surfaceComposerSource).toContain("{textarea}");
     expect(source).toContain("<HelixAskActionToolbar");
     expect(toolbarSource).toContain('className="relative min-w-0 flex-1"');
     expect(toolbarSource).toContain("snap-x snap-mandatory");
@@ -1923,12 +1930,17 @@ describe("HelixAskPill mic-first surface contract", () => {
       path.resolve(process.cwd(), "client/src/components/helix/ask-console/HelixAskFinalAnswer.tsx"),
       "utf8",
     );
+    const replyTurnSource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/components/helix/ask-console/HelixAskReplyTurn.tsx"),
+      "utf8",
+    );
     const turnStreamPanelSource = fs.readFileSync(askConsoleTurnStreamPanelPath, "utf8");
     expect(source).toContain("buildHelixAskLatestTurnBinding");
     expect(latestTurnBindingSource).toContain('finalAnswerTestId: "helix-ask-latest-final-answer"');
-    expect(source).toContain("<HelixAskTurnStreamPanel");
-    expect(source).toContain("finalAnswerTestId={latestTurnBinding.finalAnswerTestId}");
+    expect(source).toContain("<HelixAskReplyTurn");
+    expect(source).toContain("finalAnswerTestId: latestTurnBinding.finalAnswerTestId");
     expect(source).toContain("const transcriptAnswer = finalAnswerRawText");
+    expect(replyTurnSource).toContain("<HelixAskTurnStreamPanel");
     expect(turnStreamPanelSource).toContain("const isFinalRow = row.source === \"final\"");
     expect(turnStreamPanelSource).toContain("const visibleText = isFinalRow ? row.text : clipText(row.text, row.detailLimit ?? 360)");
     expect(finalRendererSource).toContain("<HelixAskFinalAnswer");
@@ -1952,9 +1964,14 @@ describe("HelixAskPill mic-first surface contract", () => {
   it("renders Live Answer as an inline turn bridge before terminal output", () => {
     const source = fs.readFileSync(pillPath, "utf8");
     const finalExtrasSource = fs.readFileSync(askConsoleFinalExtrasPath, "utf8");
+    const replyTurnSource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/components/helix/ask-console/HelixAskReplyTurn.tsx"),
+      "utf8",
+    );
     const turnStreamPanelSource = fs.readFileSync(askConsoleTurnStreamPanelPath, "utf8");
-    expect(source).toContain("<HelixAskTurnStreamPanel");
-    expect(source).toContain("liveBridgeStatus={liveAnswerTurnBridge?.status}");
+    expect(source).toContain("<HelixAskReplyTurn");
+    expect(source).toContain("liveBridgeStatus: liveAnswerTurnBridge?.status");
+    expect(replyTurnSource).toContain("<HelixAskTurnStreamPanel");
     expect(turnStreamPanelSource).toContain("<HelixAskLiveBridgePillStrip");
     expect(turnStreamPanelSource).toContain("status={liveBridgeStatus}");
     expect(source).not.toContain('data-testid={isLatestReply ? "helix-ask-latest-live-turn-bridge" : undefined}');
@@ -2081,6 +2098,18 @@ describe("HelixAskPill mic-first surface contract", () => {
     );
     const turnStreamPanelSource = fs.readFileSync(askConsoleTurnStreamPanelPath, "utf8");
     const replyCardSource = fs.readFileSync(askConsoleReplyCardPath, "utf8");
+    const reasoningStatusMedalStripSource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/components/helix/ask-console/HelixAskReasoningStatusMedalStrip.tsx"),
+      "utf8",
+    );
+    const reasoningAnimationStylesSource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/components/helix/ask-console/HelixAskReasoningAnimationStyles.tsx"),
+      "utf8",
+    );
+    const battleStageSource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/components/helix/ask-console/HelixAskReasoningBattleStage.tsx"),
+      "utf8",
+    );
     expect(source).toContain("buildHelixTurnTranscriptRows");
     expect(source).toContain("buildHelixContinuousTurnStreamRows");
     expect(source).toContain("buildHelixCausalTurnTraceRows");
@@ -2122,8 +2151,9 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).not.toContain("askLiveStatusText");
     expect(source).toContain("helixAskSessionContextRef.current === normalizedContextId");
     expect(source).toContain("ensureContextSession(normalizedContextId, \"Helix Ask\")");
-    expect(source).toContain("flex min-w-0 flex-nowrap items-center gap-2 overflow-hidden whitespace-nowrap");
-    expect(source).toContain("min-w-0 truncate text-[10px] uppercase tracking-[0.16em] text-slate-300/90");
+    expect(source).toContain("<HelixAskReasoningStatusMedalStrip");
+    expect(reasoningStatusMedalStripSource).toContain("flex min-w-0 flex-nowrap items-center gap-2 overflow-hidden whitespace-nowrap");
+    expect(reasoningStatusMedalStripSource).toContain("min-w-0 truncate text-[10px] uppercase tracking-[0.16em] text-slate-300/90");
     expect(replyCardSource).toContain("helix-ask-turn-enter");
     expect(turnStreamPanelSource).toContain("helix-ask-turn-line-enter");
     expect(turnListSource).toContain("@keyframes helixAskTurnFadeIn");
@@ -2141,7 +2171,7 @@ describe("HelixAskPill mic-first surface contract", () => {
       "debug_export_ref: renderedMatchesReply ? replyRecord.debug_export_ref ?? replyDebugRecord?.debug_export_ref ?? null : null",
     );
     expect(source.indexOf("buildReplyScopedDebugExportFromRenderedButton")).toBeLessThan(
-      source.indexOf("<HelixAskTurnStreamPanel"),
+      source.indexOf("<HelixAskReplyTurn"),
     );
     expect(source).toContain("formatReadAloudButtonLabel");
     expect(source).not.toContain("Copy Capsule");
@@ -2154,7 +2184,13 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("causal_turn_timeline");
     expect(source).toContain("buildReasoningTheaterFloatingActionText");
     expect(source).toContain("helix-ask-reasoning-floating-action-text");
-    expect(source).toContain("helixReasoningFloatingText");
+    const busyReasoningPanelSource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/components/helix/ask-console/HelixAskBusyReasoningPanel.tsx"),
+      "utf8",
+    );
+    expect(source).toContain("<HelixAskBusyReasoningPanel");
+    expect(busyReasoningPanelSource).toContain("<HelixAskReasoningAnimationStyles />");
+    expect(reasoningAnimationStylesSource).toContain("helixReasoningFloatingText");
     expect(source).toContain("readReasoningTheaterHardFailureSignals");
     expect(source).toContain("applyReasoningTheaterFailureOverride");
     const hardFailureSource = fs.readFileSync(
@@ -2165,17 +2201,18 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("buildReasoningBattleAmbientState");
     expect(source).toContain("buildReasoningBattleAnswerTint");
     expect(source).toContain("buildReasoningBattleBeats");
-    expect(source).toContain("helix-ask-reasoning-battle-stage");
-    expect(source).toContain("helix-ask-reasoning-battle-ambient");
+    expect(source).toContain("<HelixAskReasoningBattleStage");
+    expect(battleStageSource).toContain("helix-ask-reasoning-battle-stage");
+    expect(battleStageSource).toContain("helix-ask-reasoning-battle-ambient");
     expect(turnStreamPanelSource).toContain("data-reasoning-stage-palette");
     expect(turnStreamPanelSource).toContain("data-reasoning-stage-balance");
-    expect(source).toContain("helix-ask-reasoning-battle-beat");
-    expect(source).toContain("helix-ask-reasoning-battle-primitive");
-    expect(source).toContain("helix-ask-reasoning-battle-pressure");
-    expect(source).toContain("helixReasoningBattleBeat");
-    expect(source).toContain("helixReasoningBattlePrimitive");
-    expect(source).toContain("reasoningBattleBeatPrimitive");
-    expect(source).toContain("reasoningBattlePrimitiveClassName");
+    expect(battleStageSource).toContain("helix-ask-reasoning-battle-beat");
+    expect(battleStageSource).toContain("helix-ask-reasoning-battle-primitive");
+    expect(battleStageSource).toContain("helix-ask-reasoning-battle-pressure");
+    expect(reasoningAnimationStylesSource).toContain("helixReasoningBattleBeat");
+    expect(reasoningAnimationStylesSource).toContain("helixReasoningBattlePrimitive");
+    expect(battleStageSource).toContain("reasoningBattleBeatPrimitive");
+    expect(battleStageSource).toContain("reasoningBattlePrimitiveClassName");
     expect(source).toContain("prefers-reduced-motion: reduce");
     expect(transcriptSource).toContain('type === "model_decision"');
     expect(source).toContain("Thinking");
@@ -3263,13 +3300,18 @@ describe("HelixAskPill mic-first surface contract", () => {
 
   it("renders a procedural workspace timeline from the turn truth table", () => {
     const source = fs.readFileSync(pillPath, "utf8");
+    const proceduralTimeline = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/components/helix/ask-console/HelixAskProceduralTimeline.tsx"),
+      "utf8",
+    );
     expect(source).toContain("function renderProceduralTurnTimeline");
     expect(source).toContain("reply.debug?.turn_truth_table");
     expect(source).toContain("ui_answer_equals_terminal_authority_text");
     expect(source).toContain("replyRecord?.agent_runtime_loop");
     expect(source).toContain("executed_action_key");
-    expect(source).toContain("Procedural workspace timeline");
-    expect(source).toContain("backend terminal == visible answer");
+    expect(source).toContain("<HelixAskProceduralTimeline");
+    expect(proceduralTimeline).toContain("Procedural workspace timeline");
+    expect(proceduralTimeline).toContain("backend terminal == visible answer");
     expect(source).toContain("Appended step:");
     expect(source).toContain("planned");
     expect(source).toContain("completed");

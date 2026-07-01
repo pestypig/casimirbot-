@@ -1,6 +1,6 @@
-import { HelixAskLegacyRuntimeBridge } from "./HelixAskLegacyRuntimeBridge";
+import { HelixAskConsoleRuntimeShell } from "./HelixAskConsoleRuntimeShell";
 import type { HelixAskConsoleProps } from "./HelixAskConsoleState";
 
 export function HelixAskConsole(props: HelixAskConsoleProps) {
-  return <HelixAskLegacyRuntimeBridge {...props} />;
+  return <HelixAskConsoleRuntimeShell {...props} />;
 }

@@ -1,17 +1,15 @@
 import React, {
-  Component,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
-  type ErrorInfo,
   type FormEvent,
   type ReactNode,
 } from "react";
 import { renderToString as renderKatexToString } from "katex";
 import "katex/dist/katex.min.css";
-import { ChevronDown, PauseCircle, Pencil, PlayCircle, Radio, Trash2 } from "lucide-react";
+import { Radio } from "lucide-react";
 import { panelRegistry, getPanelDef, type PanelDefinition } from "@/lib/desktop/panelRegistry";
 import {
   findBestDocForTopic,
@@ -80,10 +78,24 @@ import {
 } from "@/components/helix/ask-console/HelixAskFinalAnswer";
 import { HelixAskActiveTurnStreamPanel } from "@/components/helix/ask-console/HelixAskActiveTurnStreamPanel";
 import { HelixAskActionToolbar } from "@/components/helix/ask-console/HelixAskActionToolbar";
+import {
+  HelixAskGoalPill,
+  type StagePlayGoalSessionAction,
+} from "@/components/helix/ask-console/HelixAskGoalPill";
+import { HelixAskBusyReasoningPanel } from "@/components/helix/ask-console/HelixAskBusyReasoningPanel";
 import { HelixAskMoodAvatar } from "@/components/helix/ask-console/HelixAskMoodAvatar";
-import { HelixAskReplyCard } from "@/components/helix/ask-console/HelixAskReplyCard";
+import {
+  HelixAskProceduralTimeline,
+  type HelixAskProceduralTimelineRow,
+} from "@/components/helix/ask-console/HelixAskProceduralTimeline";
+import { HelixAskReplyTurn } from "@/components/helix/ask-console/HelixAskReplyTurn";
+import { HelixAskConsoleRuntimeLayout } from "@/components/helix/ask-console/HelixAskConsoleRuntimeLayout";
+import { HelixAskReasoningBattleStage } from "@/components/helix/ask-console/HelixAskReasoningBattleStage";
+import { HelixAskReasoningMirekField } from "@/components/helix/ask-console/HelixAskReasoningMirekField";
+import { HelixAskReasoningStatusMedalStrip } from "@/components/helix/ask-console/HelixAskReasoningStatusMedalStrip";
+import { HelixAskSurfaceComposerPanel } from "@/components/helix/ask-console/HelixAskSurfaceComposerPanel";
 import { HelixAskSurfaceFrame } from "@/components/helix/ask-console/HelixAskSurfaceFrame";
-import { HelixAskTurnStreamPanel } from "@/components/helix/ask-console/HelixAskTurnStreamPanel";
+import { HelixAskSurfaceSupplementStack } from "@/components/helix/ask-console/HelixAskSurfaceSupplementStack";
 import { selectHelixAskConsoleTurnTranscriptRowsForStream } from "@/components/helix/ask-console/HelixAskWorkstationTraceRows";
 import {
   HelixAskRuntimePicker,
@@ -145,7 +157,6 @@ export {
   resolveNextSelectableHelixAgentRuntime,
   resolveSelectedHelixAgentRuntime,
 };
-import { reportClientError } from "@/lib/observability/client-error";
 import {
   HELIX_ASK_PROMPT_EVENT,
   clearPendingHelixAskPrompt,
@@ -301,10 +312,6 @@ import {
 } from "@/lib/helix/ask-observer-commentary-display";
 export { buildObserverCommentaryForRow };
 import {
-  readHelixCausalTraceRowClass,
-  readProceduralStatusClass,
-} from "@/lib/helix/ask-status-classnames";
-import {
   buildWorkstationInterpretingReceiptText,
   buildObservationGroundedReplyText,
   formatWorkstationIntentStageDetail,
@@ -362,7 +369,7 @@ import {
   normalizeDocViewerPathForAskSnapshot,
   normalizeDocsViewerAnchorPath,
 } from "@/lib/helix/ask-doc-viewer-context";
-import {
+export {
   formatGoalPillCadence,
   labelizeGoalPillValue,
 } from "@/lib/helix/ask-goal-pill-display";
@@ -876,20 +883,8 @@ import {
 import {
   buildReasoningBattleAmbientState,
   buildReasoningBattleBeats,
-  reasoningBattleBeatPrimitive,
-  reasoningBattleBeatClassName,
-  type ReasoningBattleAmbientState,
-  type ReasoningBattleBeat,
 } from "@/lib/helix/reasoning-battle-stage";
-import {
-  buildReasoningBattleAnswerTint,
-  reasoningBattleAmbientClassName,
-  reasoningBattleAmbientMarkerClassName,
-  reasoningBattleBeatHeightPx,
-  reasoningBattleBeatPositionPct,
-  reasoningBattlePrimitiveClassName,
-  reasoningBattlePrimitiveStyle,
-} from "@/lib/helix/ask-reasoning-battle-display";
+import { buildReasoningBattleAnswerTint } from "@/lib/helix/ask-reasoning-battle-display";
 import {
   applyLatestWinsVoiceQueue,
   createVoicePlaybackUtterance,
@@ -5794,12 +5789,7 @@ function renderProceduralTurnTimeline(reply: HelixAskReply): React.ReactNode {
     return null;
   }
 
-  const rows: Array<{
-    key: string;
-    label: string;
-    detail: string;
-    status: string;
-  }> = [];
+  const rows: HelixAskProceduralTimelineRow[] = [];
 
   const runtimeActionLabels: string[] = [];
 
@@ -5900,40 +5890,13 @@ function renderProceduralTurnTimeline(reply: HelixAskReply): React.ReactNode {
   }
 
   return (
-    <div className="mt-3 rounded-xl border border-cyan-300/20 bg-cyan-950/15 px-3 py-2 text-xs text-cyan-50">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[10px] uppercase tracking-[0.2em] text-cyan-200">Procedural workspace timeline</p>
-        <p className="text-[10px] uppercase tracking-[0.14em] text-cyan-100/70">
-          Truth: {truthMatchesVisible ? "backend terminal == visible answer" : "backend terminal != visible answer"}
-        </p>
-      </div>
-      <p className="mt-1 text-[11px] text-cyan-100/80">
-        Route: {route}
-        {runtimeActionLabels.length > 0
-          ? ` | Tool: ${runtimeActionLabels[0]}`
-          : selectedTool
-            ? ` | Tool: ${readProceduralActionLabel(selectedTool)}`
-            : ""}
-        {showRuntimeStopReason ? ` | Runtime: ${runtimeStopReason}` : ""}
-      </p>
-      <div className="mt-2 space-y-1.5">
-        {rows.slice(0, 18).map((row, index) => (
-          <div key={row.key} className={`rounded-lg border px-2 py-1.5 ${readProceduralStatusClass(row.status)}`}>
-            <div className="flex items-start gap-2">
-              <span className="mt-0.5 rounded-full bg-black/20 px-1.5 py-0.5 text-[10px] tabular-nums">
-                {index + 1}
-              </span>
-              <div className="min-w-0">
-                <p className="font-medium">{row.label}</p>
-                <p className="mt-0.5 break-words text-[11px] opacity-80">
-                  {row.detail} [{row.status}]
-                </p>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
+    <HelixAskProceduralTimeline
+      rows={rows}
+      truthMatchesVisible={truthMatchesVisible}
+      route={route}
+      toolLabel={runtimeActionLabels[0] ?? (selectedTool ? readProceduralActionLabel(selectedTool) : null)}
+      runtimeStopReason={showRuntimeStopReason ? runtimeStopReason : null}
+    />
   );
 }
 
@@ -5971,14 +5934,6 @@ type StagePlayGoalContextResponse = {
   ok?: boolean;
   agentGoalSessions?: AgentGoalSessionV1[];
 };
-
-type StagePlayGoalSessionAction =
-  | "pause"
-  | "resume"
-  | "edit_objective"
-  | "archive"
-  | "stop"
-  | "mark_satisfied";
 
 type StagePlayGoalSessionActionResponse = {
   ok?: boolean;
@@ -6072,120 +6027,6 @@ async function fetchStagePlayLiveSourceMailTranscript(input: {
     throw new Error(`Stage Play live-source mail transcript failed: ${response.status}`);
   }
   return await response.json() as StagePlayLiveSourceMailTranscriptResponse;
-}
-
-function HelixAskGoalPill({
-  session,
-  expanded,
-  busyAction,
-  error,
-  onToggleExpanded,
-  onAction,
-}: {
-  session: AgentGoalSessionV1;
-  expanded: boolean;
-  busyAction: StagePlayGoalSessionAction | null;
-  error: string | null;
-  onToggleExpanded: () => void;
-  onAction: (action: StagePlayGoalSessionAction) => void;
-}) {
-  const isPaused = session.status === "paused";
-  const latestCheckpoint = session.checkpoints.at(-1);
-  const statusTone =
-    session.status === "blocked"
-      ? "border-amber-300/35 bg-amber-400/10 text-amber-100"
-      : session.status === "paused"
-        ? "border-slate-300/20 bg-slate-300/10 text-slate-100"
-        : "border-emerald-300/25 bg-emerald-400/10 text-emerald-100";
-  const controlsDisabled = Boolean(busyAction);
-  return (
-    <section
-      className="mt-2 rounded-2xl border border-white/10 bg-slate-950/60 px-2.5 py-1.5 text-xs text-slate-100 shadow-[0_18px_50px_rgba(0,0,0,0.18)]"
-      aria-label="Helix Ask goal session"
-      data-testid="helix-ask-goal-pill"
-      data-goal-status={session.status}
-      data-expanded={expanded ? "true" : "false"}
-    >
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          aria-expanded={expanded}
-          aria-controls="helix-ask-goal-pill-details"
-          onClick={onToggleExpanded}
-          className="flex min-w-0 flex-1 items-center gap-2 rounded-xl px-1 py-0.5 text-left hover:bg-white/5"
-        >
-          <span className="shrink-0 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] text-slate-300">
-            {labelizeGoalPillValue(session.status)} goal
-          </span>
-          <span className="min-w-0 truncate text-[11px] font-semibold text-slate-200">
-            {clipText(session.userVisibleSummary || session.objective, 112)}
-          </span>
-          <span className={`hidden shrink-0 rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] sm:inline-flex ${statusTone}`}>
-            {formatGoalPillCadence(session.cadence)}
-          </span>
-        </button>
-        <div className="flex shrink-0 items-center gap-1">
-          <button
-            type="button"
-            aria-label="Edit goal prompt"
-            title="Edit goal prompt"
-            disabled={controlsDisabled}
-            onClick={() => onAction("edit_objective")}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            <Pencil className="h-3.5 w-3.5" aria-hidden />
-          </button>
-          <button
-            type="button"
-            aria-label={isPaused ? "Resume goal" : "Pause goal"}
-            title={isPaused ? "Resume goal" : "Pause goal"}
-            disabled={controlsDisabled}
-            onClick={() => onAction(isPaused ? "resume" : "pause")}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            {isPaused ? <PlayCircle className="h-3.5 w-3.5" aria-hidden /> : <PauseCircle className="h-3.5 w-3.5" aria-hidden />}
-          </button>
-          <button
-            type="button"
-            aria-label="Archive goal"
-            title="Archive goal"
-            disabled={controlsDisabled}
-            onClick={() => onAction("archive")}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            <Trash2 className="h-3.5 w-3.5" aria-hidden />
-          </button>
-          <button
-            type="button"
-            aria-label={expanded ? "Collapse goal details" : "Expand goal details"}
-            title={expanded ? "Collapse goal details" : "Expand goal details"}
-            onClick={onToggleExpanded}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10"
-          >
-            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${expanded ? "rotate-180" : ""}`} aria-hidden />
-          </button>
-        </div>
-      </div>
-      {expanded ? (
-        <div id="helix-ask-goal-pill-details" className="mt-2 grid gap-1.5 rounded-xl border border-white/10 bg-black/20 p-2 text-[11px] text-slate-300">
-          <div className="break-words leading-4 text-slate-200">{session.objective}</div>
-          <div className="grid gap-1 font-mono text-[9px] text-slate-500 sm:grid-cols-2">
-            <div>feeds={session.contextFeeds.map((feed) => labelizeGoalPillValue(feed.sourceKind)).join(", ") || "none"}</div>
-            <div>actuators={session.allowedActuators.slice(0, 8).map(labelizeGoalPillValue).join(", ") || "none"}</div>
-            <div>loops={session.loopRefs.slice(0, 4).join(", ") || "none"}</div>
-            <div>checkpoint={latestCheckpoint?.summary ?? "none"}</div>
-            <div>terminal_authority={String(session.authority.finalReportsRequireTerminalAuthority)}</div>
-            <div>stop={session.stopConditions.slice(0, 2).join(" | ") || "none"}</div>
-          </div>
-        </div>
-      ) : null}
-      {busyAction || error ? (
-        <p className={`mt-1 px-1 text-[10px] ${error ? "text-rose-200" : "text-slate-400"}`}>
-          {error ?? `${labelizeGoalPillValue(busyAction)}...`}
-        </p>
-      ) : null}
-    </section>
-  );
 }
 
 function resolveHelixAskReplyOrderMs(reply: HelixAskReply): number | null {
@@ -6768,62 +6609,6 @@ function buildHelixAskDebugContextSummary(
   return summary;
 }
 
-type HelixAskErrorBoundaryState = { hasError: boolean; error?: Error };
-
-class HelixAskErrorBoundary extends Component<{ children: ReactNode }, HelixAskErrorBoundaryState> {
-  state: HelixAskErrorBoundaryState = { hasError: false };
-
-  static getDerivedStateFromError(error: Error): HelixAskErrorBoundaryState {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error("[helix-ask] render error:", error, info);
-    reportClientError(error, { componentStack: info.componentStack, scope: "helix-ask" });
-  }
-
-  handleRetry = () => {
-    this.setState({ hasError: false, error: undefined });
-  };
-
-  handleReload = () => {
-    if (typeof window === "undefined") return;
-    window.location.reload();
-  };
-
-  render() {
-    if (!this.state.hasError) return this.props.children;
-    const message = this.state.error?.message || "Unexpected Helix Ask error.";
-    return (
-      <div className="pointer-events-auto rounded-2xl border border-amber-200/30 bg-amber-500/10 p-4 text-xs text-amber-100">
-        <p className="text-[11px] uppercase tracking-[0.2em] text-amber-200">Helix Ask paused</p>
-        <p className="mt-2">
-          The Helix Ask panel hit a rendering error. You can retry or reload the page.
-        </p>
-        <pre className="mt-2 max-h-24 overflow-auto rounded bg-black/40 p-2 text-[10px] text-amber-100/80">
-          {message}
-        </pre>
-        <div className="mt-2 flex gap-2">
-          <button
-            className="rounded-full border border-amber-200/40 bg-amber-200/10 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-amber-100 hover:bg-amber-200/20"
-            onClick={this.handleRetry}
-            type="button"
-          >
-            Retry
-          </button>
-          <button
-            className="rounded-full border border-amber-200/40 bg-amber-200/10 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-amber-100 hover:bg-amber-200/20"
-            onClick={this.handleReload}
-            type="button"
-          >
-            Reload
-          </button>
-        </div>
-      </div>
-    );
-  }
-}
-
 const HELIX_ASK_MAX_TOKENS = clampNumber(
   readHelixEnvNumber((import.meta as any)?.env, "VITE_HELIX_ASK_MAX_TOKENS", 2048),
   64,
@@ -6979,110 +6764,6 @@ function askLiveEventBelongsToActiveTurn(args: {
     return eventTs >= args.activeStartedAtMs - 500;
   }
   return true;
-}
-
-function renderReasoningBattleStage(input: {
-  beats: ReasoningBattleBeat[];
-  pressurePct: number;
-  reducedMotion: boolean;
-  ambient?: ReasoningBattleAmbientState | null;
-  replay?: boolean;
-  className?: string;
-  testId?: string;
-}): React.ReactNode {
-  if (input.beats.length === 0 && !input.ambient) return null;
-  const visibleBeats = input.beats.slice(-8);
-  const staticMotion = input.replay || input.reducedMotion;
-  const positiveImpact = visibleBeats.reduce(
-    (total: number, beat: ReasoningBattleBeat) => total + Math.max(0, beat.progress_delta),
-    0,
-  );
-  const negativeImpact = visibleBeats.reduce(
-    (total: number, beat: ReasoningBattleBeat) => total + Math.max(0, beat.pressure_delta),
-    0,
-  );
-  const orbPct = clampNumber(34 + positiveImpact * 6 - negativeImpact * 3, 18, 82);
-  const ambient = input.ambient ?? null;
-  const ambientPct =
-    ambient?.lane === "ambiguity"
-      ? 86
-      : ambient?.lane === "terminal"
-        ? 94
-        : ambient?.lane === "orb"
-          ? clampNumber(orbPct, 18, 78)
-          : 50;
-  const ambientElapsedLabel =
-    ambient && !input.replay && ambient.elapsed_ms >= 1000 ? ` ${Math.floor(ambient.elapsed_ms / 1000)}s` : "";
-  return (
-    <div
-      data-testid={input.testId ?? "helix-ask-reasoning-battle-stage"}
-      className={input.className}
-      aria-hidden="true"
-    >
-      <div className="relative h-2 overflow-visible rounded-full bg-black/45">
-        <div
-          className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-emerald-300/40 via-cyan-200/28 to-transparent"
-          style={{ width: `${orbPct}%` }}
-        />
-        <div
-          data-testid="helix-ask-reasoning-battle-pressure"
-          className="absolute inset-y-0 right-0 rounded-full bg-gradient-to-l from-rose-400/35 via-fuchsia-300/15 to-transparent"
-          style={{ width: `${input.pressurePct}%` }}
-        />
-        {ambient ? (
-          <span
-            data-testid="helix-ask-reasoning-battle-ambient-marker"
-            className={`pointer-events-none absolute top-1/2 z-[3] h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ${reasoningBattleAmbientMarkerClassName(ambient, staticMotion)}`}
-            style={{ left: `${ambientPct}%`, opacity: 0.42 + ambient.intensity * 0.14 }}
-          />
-        ) : null}
-        <div className="pointer-events-none absolute -inset-x-2 -bottom-5 -top-7 z-[5] overflow-visible">
-          {visibleBeats.map((beat) => {
-            const primitive = reasoningBattleBeatPrimitive(beat);
-            const driftPx = ((hash32(`${beat.id}:drift`) % 17) - 8) * (beat.lane === "ambiguity" ? -1 : 1);
-            const yPx = reasoningBattleBeatHeightPx(beat);
-            const displayLabel = `${beat.impact > 0 ? "+" : beat.impact < 0 ? "-" : ""}${beat.label}`;
-            return (
-              <React.Fragment key={beat.id}>
-                <span
-                  data-testid="helix-ask-reasoning-battle-primitive"
-                  className={`pointer-events-none absolute top-1/2 z-[4] block border ${reasoningBattlePrimitiveClassName(primitive)}`}
-                  style={reasoningBattlePrimitiveStyle({ beat, primitive, reducedMotion: staticMotion })}
-                />
-                <span
-                  data-testid="helix-ask-reasoning-battle-beat"
-                  className={`pointer-events-none absolute top-1/2 z-[5] rounded border px-1.5 py-0.5 text-[9px] font-medium uppercase leading-none tracking-[0.12em] shadow-[0_0_12px_rgba(255,255,255,0.12)] backdrop-blur-sm ${reasoningBattleBeatClassName(beat, staticMotion)}`}
-                  style={
-                    {
-                      left: `${reasoningBattleBeatPositionPct(beat)}%`,
-                      transform: staticMotion
-                        ? `translate3d(-50%, ${yPx}px, 0)`
-                        : "translate3d(-50%, 0, 0)",
-                      animation: staticMotion ? undefined : `helixReasoningBattleBeat ${beat.ttl_ms}ms ease-out forwards`,
-                      "--beat-drift": `${driftPx}px`,
-                      "--beat-y": `${yPx}px`,
-                    } as React.CSSProperties & Record<string, string | undefined>
-                  }
-                >
-                  {displayLabel}
-                </span>
-              </React.Fragment>
-            );
-          })}
-        </div>
-        {ambient ? (
-          <span
-            data-testid="helix-ask-reasoning-battle-ambient"
-            className={`pointer-events-none absolute right-0 top-4 z-[6] rounded border px-1.5 py-0.5 text-[9px] font-medium uppercase leading-none tracking-[0.12em] ${reasoningBattleAmbientClassName(ambient, staticMotion)}`}
-            title={ambient.stage}
-          >
-            {ambient.label}
-            {ambientElapsedLabel}
-          </span>
-        ) : null}
-      </div>
-    </div>
-  );
 }
 
 type UnifiedDebugEventRow = {
@@ -29099,96 +28780,102 @@ export function HelixAskPill({
   );
 
   return (
-    <HelixAskErrorBoundary>
-      <HelixAskSurfaceFrame
-        className={className}
-        layoutVariant={layoutVariant}
-        maxWidthClassName={maxWidthClass}
-        maxWidthStyle={formMaxWidthStyle}
-        surfaceBorderClassName={moodPalette.surfaceBorder}
-        surfaceTintClassName={moodPalette.surfaceTint}
-        surfaceHaloClassName={moodPalette.surfaceHalo}
-        isOffline={isOffline}
-        onSubmit={handleAskSubmit}
-        onPrimeInteraction={() => {
-          void primeVoiceAudioPlayback();
-        }}
-      >
-            <HelixAskVoiceLevelMonitor
-              visible={showTopInputLevelMonitor}
-              maxHeightPx={voiceMonitorMaxHeightPx}
-              level={voiceMonitorLevel}
-              signalState={voiceSignalState}
-              anchorRef={voiceMonitorAnchorRef}
-            />
-            <div className="flex flex-col gap-2 px-4 py-3">
-              <div className="flex flex-wrap items-center gap-3">
-                <HelixAskMoodAvatar
-                  auraClassName={moodPalette.aura}
-                  ringClassName={moodRingClass}
-                  moodSrc={moodSrc}
-                  moodLabel={moodLabel}
-                  onImageError={() => setAskMoodBroken(true)}
-                />
-                <HelixAskActionToolbar
-                  carouselRef={askActionCarouselRef}
-                  imageInputRef={askImageInputRef}
-                  canScrollLeft={askActionCarouselEdges.canScrollLeft}
-                  canScrollRight={askActionCarouselEdges.canScrollRight}
-                  onScrollLeft={() => scrollAskActionCarousel("left")}
-                  onScrollRight={() => scrollAskActionCarousel("right")}
-                  onImageSelect={handleAskImageSelect}
-                  onAttachImage={() => {
-                    triggerAskActionHaptic();
-                    askImageInputRef.current?.click();
-                  }}
-                  attachDisabled={askBusy}
-                  hasReadyAttachment={hasReadyAskAttachment}
-                  hasAnyAttachment={askAttachments.length > 0}
-                  micEnabled={micArmState === "on"}
-                  voiceTranscribing={voiceInputState === "transcribing"}
-                  onToggleMic={() => {
-                    triggerAskActionHaptic();
-                    handleVoiceInputToggle();
-                  }}
-                  showRetryVoiceSample={Boolean(voiceRetainedTranscriptionRetry)}
-                  retryVoiceSampleDisabled={micArmState !== "on" || voiceTranscribeBusyRef.current}
-                  onRetryVoiceSample={() => {
-                    triggerAskActionHaptic();
-                    handleRetainedVoiceTranscriptionRetry();
-                  }}
-                  visualSituationSourceStatus={visualSituationSourceStatus}
-                  onCaptureVisualSource={() => {
-                    triggerAskActionHaptic();
-                    handleVisualSituationSourceCapture();
-                  }}
-                  visualSituationIncludeAudio={visualSituationIncludeAudio}
-                  displayAudioStatus={displayAudioStatus}
-                  visualAudioToggleDisabled={visualSituationSourceStatus === "requesting"}
-                  onToggleVisualAudio={() => {
-                    triggerAskActionHaptic();
-                    handleVisualSituationAudioPreferenceToggle();
-                  }}
-                  runtimePicker={
-                    <HelixAskRuntimePicker
-                      model={agentRuntimePickerModel}
-                      menuOpen={agentRuntimeMenuOpen}
-                      onPrimaryClick={handleAgentRuntimeButtonClick}
-                      onSelect={handleAgentRuntimeSelect}
-                    />
-                  }
-                  submitButton={
-                    <HelixAskComposerSubmitButton
-                      viewModel={composerViewModel}
-                      onSubmitIntent={() => triggerAskActionHaptic()}
-                      onStop={() => {
-                        triggerAskActionHaptic();
-                        handleStop();
-                      }}
-                    />
-                  }
-                />
-              </div>
+    <HelixAskConsoleRuntimeLayout
+      className={className}
+      layoutVariant={layoutVariant}
+      surface={
+        <HelixAskSurfaceFrame
+          maxWidthClassName={maxWidthClass}
+          maxWidthStyle={formMaxWidthStyle}
+          surfaceBorderClassName={moodPalette.surfaceBorder}
+          surfaceTintClassName={moodPalette.surfaceTint}
+          surfaceHaloClassName={moodPalette.surfaceHalo}
+          isOffline={isOffline}
+          onSubmit={handleAskSubmit}
+          onPrimeInteraction={() => {
+            void primeVoiceAudioPlayback();
+          }}
+        >
+          <HelixAskSurfaceComposerPanel
+            voiceLevelMonitor={
+              <HelixAskVoiceLevelMonitor
+                visible={showTopInputLevelMonitor}
+                maxHeightPx={voiceMonitorMaxHeightPx}
+                level={voiceMonitorLevel}
+                signalState={voiceSignalState}
+                anchorRef={voiceMonitorAnchorRef}
+              />
+            }
+            moodAvatar={
+              <HelixAskMoodAvatar
+                auraClassName={moodPalette.aura}
+                ringClassName={moodRingClass}
+                moodSrc={moodSrc}
+                moodLabel={moodLabel}
+                onImageError={() => setAskMoodBroken(true)}
+              />
+            }
+            actionToolbar={
+              <HelixAskActionToolbar
+                carouselRef={askActionCarouselRef}
+                imageInputRef={askImageInputRef}
+                canScrollLeft={askActionCarouselEdges.canScrollLeft}
+                canScrollRight={askActionCarouselEdges.canScrollRight}
+                onScrollLeft={() => scrollAskActionCarousel("left")}
+                onScrollRight={() => scrollAskActionCarousel("right")}
+                onImageSelect={handleAskImageSelect}
+                onAttachImage={() => {
+                  triggerAskActionHaptic();
+                  askImageInputRef.current?.click();
+                }}
+                attachDisabled={askBusy}
+                hasReadyAttachment={hasReadyAskAttachment}
+                hasAnyAttachment={askAttachments.length > 0}
+                micEnabled={micArmState === "on"}
+                voiceTranscribing={voiceInputState === "transcribing"}
+                onToggleMic={() => {
+                  triggerAskActionHaptic();
+                  handleVoiceInputToggle();
+                }}
+                showRetryVoiceSample={Boolean(voiceRetainedTranscriptionRetry)}
+                retryVoiceSampleDisabled={micArmState !== "on" || voiceTranscribeBusyRef.current}
+                onRetryVoiceSample={() => {
+                  triggerAskActionHaptic();
+                  handleRetainedVoiceTranscriptionRetry();
+                }}
+                visualSituationSourceStatus={visualSituationSourceStatus}
+                onCaptureVisualSource={() => {
+                  triggerAskActionHaptic();
+                  handleVisualSituationSourceCapture();
+                }}
+                visualSituationIncludeAudio={visualSituationIncludeAudio}
+                displayAudioStatus={displayAudioStatus}
+                visualAudioToggleDisabled={visualSituationSourceStatus === "requesting"}
+                onToggleVisualAudio={() => {
+                  triggerAskActionHaptic();
+                  handleVisualSituationAudioPreferenceToggle();
+                }}
+                runtimePicker={
+                  <HelixAskRuntimePicker
+                    model={agentRuntimePickerModel}
+                    menuOpen={agentRuntimeMenuOpen}
+                    onPrimaryClick={handleAgentRuntimeButtonClick}
+                    onSelect={handleAgentRuntimeSelect}
+                  />
+                }
+                submitButton={
+                  <HelixAskComposerSubmitButton
+                    viewModel={composerViewModel}
+                    onSubmitIntent={() => triggerAskActionHaptic()}
+                    onStop={() => {
+                      triggerAskActionHaptic();
+                      handleStop();
+                    }}
+                  />
+                }
+              />
+            }
+            textarea={
               <HelixAskComposerTextarea
                 ariaDisabled={askBusy}
                 className={composerViewModel.textareaClassName}
@@ -29202,115 +28889,90 @@ export function HelixAskPill({
                 }
                 onSubmitRequested={(form) => form?.requestSubmit?.()}
               />
-          </div>
-            <HelixAskAttachmentStrip items={askAttachmentCommitChecks} onRemove={removeAskAttachment} />
-            <HelixAskContextCapsulePreview
-              preview={activeContextCapsulePreview}
-              autoApplied={Boolean(sessionCapsuleState)}
-            />
-            <HelixAskVoiceStatusPill label={voiceInputStatusLabel} state={voiceInputState} />
-            <HelixAskSituationRoomSourcePanel
-              visible={showSituationRoomSourcePanel}
-              label={situationSourceDisplayLabel}
-              status={situationSourceDisplayStatus}
-              sourceCount={situationSourceDisplayCount}
-              visualError={visualSituationSourceError}
-              audioError={displayAudioError}
-              visualSourceActive={visualSituationSourceActive}
-              transcriptPreview={situationTranscriptPreview}
-              displayAudioActive={displayAudioActive}
-              onStopDisplayAudio={stopDisplayAudioCapture}
-              clipText={clipText}
-            />
-            <HelixAskVoiceCommandConfirmationPanel
-              visible={!transcriptConfirmState && Boolean(commandConfirmState)}
-              actionLabel={commandConfirmState ? describeVoiceCommandAction(commandConfirmState.action) : ""}
-              transcript={commandConfirmState?.transcript ?? ""}
-              countdownSec={commandConfirmAutoCountdownSec}
-              onAccept={handleCommandConfirmationAccept}
-              onCancel={handleCommandConfirmationCancel}
-              clipText={clipText}
-            />
-            <HelixAskTranscriptConfirmationPanel
-              visible={Boolean(transcriptConfirmState)}
-              transcript={transcriptConfirmState?.transcript ?? ""}
-              sourceText={transcriptConfirmState?.sourceText}
-              sourceLanguage={transcriptConfirmState?.sourceLanguage}
-              translationUncertain={transcriptConfirmState?.translationUncertain}
-              countdownSec={transcriptConfirmAutoCountdownSec}
-              onAccept={handleTranscriptConfirmationAccept}
-              onRetry={handleTranscriptConfirmationRetry}
-              clipText={clipText}
-            />
-            <HelixAskContextChooserPanel
-              visible={Boolean(askContextChooser)}
-              autoContextMode={askContextChooser?.autoContextMode}
-              countdownSec={askContextChooserCountdownSec}
-              onRunAttached={handleAskContextChooserRunAttached}
-              onRunIsolated={handleAskContextChooserRunIsolated}
-              onCancel={dismissAskContextChooser}
-            />
-            {userSettings.showHelixAskObserverLane ? (
-              <HelixAskConversationBriefPanel text={latestConversationBrief?.text} />
-            ) : null}
-            <HelixAskObserverLanePanel
-              visible={userSettings.showHelixAskObserverLane && (askBusy || observerLaneEvents.length > 0)}
-              events={observerLaneEvents}
-              clipText={clipText}
-            />
-            <HelixAskContextMemoryStatusLine text={contextMemoryStatusText} />
-          {askBusy ? (
-            <div
-              className={`relative overflow-hidden border-t px-4 py-2 text-[11px] text-slate-300 ${moodPalette.liveBorder}`}
-            >
-              <div
-                className={`pointer-events-none absolute inset-0 opacity-70 ${moodPalette.replyTint}`}
-                aria-hidden
+            }
+          />
+          <HelixAskSurfaceSupplementStack
+            attachments={<HelixAskAttachmentStrip items={askAttachmentCommitChecks} onRemove={removeAskAttachment} />}
+            contextCapsule={
+              <HelixAskContextCapsulePreview
+                preview={activeContextCapsulePreview}
+                autoApplied={Boolean(sessionCapsuleState)}
               />
-              <style>
-                {`@keyframes helixReasoningFloatingText{0%{opacity:0;transform:translate3d(-50%,0,0) scale(.94)}14%{opacity:1}72%{opacity:.82}100%{opacity:0;transform:translate3d(calc(-50% + var(--helix-pop-drift,0px)),var(--helix-pop-y,-28px),0) scale(1.04)}}@keyframes helixReasoningBattleBeat{0%{opacity:0;transform:translate3d(-50%,0,0) scale(.92)}16%{opacity:1}72%{opacity:.86}100%{opacity:0;transform:translate3d(calc(-50% + var(--beat-drift,0px)),var(--beat-y,-28px),0) scale(1.04)}}@keyframes helixReasoningBattlePrimitive{0%{opacity:0;transform:translate3d(-50%,-50%,0) scale(.72)}15%{opacity:1;transform:translate3d(-50%,-50%,0) scale(var(--battle-primitive-scale,1.1))}72%{opacity:.84}100%{opacity:0;transform:translate3d(calc(-50% + var(--battle-primitive-drift,0px)),var(--battle-primitive-y,-12px),0) scale(.86)}}`}
-              </style>
-              {reasoningTheater && mirekReasoningDisplayGrid ? (
-                <div
-                  data-testid="helix-ask-mirek-field"
-                  className="pointer-events-none absolute inset-0 overflow-hidden"
-                  aria-hidden
-                >
-                  <div
-                    className="absolute inset-0 opacity-70"
-                    style={{
-                      background:
-                        "radial-gradient(circle at 18% 50%, rgba(255,255,255,0.12), transparent 32%), radial-gradient(circle at 82% 42%, rgba(34,211,238,0.1), transparent 34%)",
-                    }}
-                  />
-                  <div
-                    className="absolute inset-x-2 bottom-2 top-2 grid gap-[1px] opacity-95 mix-blend-screen"
-                    style={{
-                      gridTemplateColumns: `repeat(${mirekReasoningDisplayGrid.width}, minmax(0, 1fr))`,
-                      gridTemplateRows: `repeat(${mirekReasoningDisplayGrid.height}, minmax(0, 1fr))`,
-                    }}
-                  >
-                    {mirekReasoningDisplayGrid.cells.map((cell, index) => (
-                      <span
-                        key={cell.id}
-                        className={`block h-full w-full rounded-[1px] ${
-                          cell.active ? `animate-pulse ${mirekCellGridClassName(cell.kind)}` : "bg-white/[0.035]"
-                        }`}
-                        style={{
-                          gridColumn: cell.x + 1,
-                          gridRow: cell.y + 1,
-                          opacity:
-                            (cell.active ? Math.max(0.18, cell.intensity) : 0.08) *
-                            (0.52 + reasoningTheater.fogOpacity * 0.24) *
-                            mirekReasoningFieldStrength,
-                          animationDelay: `${((cell.x + cell.y * 1.7 + index * 0.03) % 14) * 0.055}s`,
-                          animationDuration: `${0.95 + ((cell.x + cell.y + index) % 7) * 0.1}s`,
-                        }}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ) : null}
+            }
+            voiceStatus={<HelixAskVoiceStatusPill label={voiceInputStatusLabel} state={voiceInputState} />}
+            situationRoomSource={
+              <HelixAskSituationRoomSourcePanel
+                visible={showSituationRoomSourcePanel}
+                label={situationSourceDisplayLabel}
+                status={situationSourceDisplayStatus}
+                sourceCount={situationSourceDisplayCount}
+                visualError={visualSituationSourceError}
+                audioError={displayAudioError}
+                visualSourceActive={visualSituationSourceActive}
+                transcriptPreview={situationTranscriptPreview}
+                displayAudioActive={displayAudioActive}
+                onStopDisplayAudio={stopDisplayAudioCapture}
+                clipText={clipText}
+              />
+            }
+            voiceCommandConfirmation={
+              <HelixAskVoiceCommandConfirmationPanel
+                visible={!transcriptConfirmState && Boolean(commandConfirmState)}
+                actionLabel={commandConfirmState ? describeVoiceCommandAction(commandConfirmState.action) : ""}
+                transcript={commandConfirmState?.transcript ?? ""}
+                countdownSec={commandConfirmAutoCountdownSec}
+                onAccept={handleCommandConfirmationAccept}
+                onCancel={handleCommandConfirmationCancel}
+                clipText={clipText}
+              />
+            }
+            transcriptConfirmation={
+              <HelixAskTranscriptConfirmationPanel
+                visible={Boolean(transcriptConfirmState)}
+                transcript={transcriptConfirmState?.transcript ?? ""}
+                sourceText={transcriptConfirmState?.sourceText}
+                sourceLanguage={transcriptConfirmState?.sourceLanguage}
+                translationUncertain={transcriptConfirmState?.translationUncertain}
+                countdownSec={transcriptConfirmAutoCountdownSec}
+                onAccept={handleTranscriptConfirmationAccept}
+                onRetry={handleTranscriptConfirmationRetry}
+                clipText={clipText}
+              />
+            }
+            contextChooser={
+              <HelixAskContextChooserPanel
+                visible={Boolean(askContextChooser)}
+                autoContextMode={askContextChooser?.autoContextMode}
+                countdownSec={askContextChooserCountdownSec}
+                onRunAttached={handleAskContextChooserRunAttached}
+                onRunIsolated={handleAskContextChooserRunIsolated}
+                onCancel={dismissAskContextChooser}
+              />
+            }
+            conversationBrief={
+              userSettings.showHelixAskObserverLane ? (
+                <HelixAskConversationBriefPanel text={latestConversationBrief?.text} />
+              ) : null
+            }
+            observerLane={
+              <HelixAskObserverLanePanel
+                visible={userSettings.showHelixAskObserverLane && (askBusy || observerLaneEvents.length > 0)}
+                events={observerLaneEvents}
+                clipText={clipText}
+              />
+            }
+            contextMemoryStatus={<HelixAskContextMemoryStatusLine text={contextMemoryStatusText} />}
+          />
+          <HelixAskBusyReasoningPanel
+            visible={askBusy}
+            liveBorderClassName={moodPalette.liveBorder}
+            replyTintClassName={moodPalette.replyTint}
+          >
+              <HelixAskReasoningMirekField
+                grid={reasoningTheater ? mirekReasoningDisplayGrid : null}
+                fogOpacity={reasoningTheater?.fogOpacity ?? 0}
+                fieldStrength={mirekReasoningFieldStrength}
+              />
               <div className="relative">
                 {reasoningTheater ? (
                   <div
@@ -29339,79 +29001,45 @@ export function HelixAskPill({
                       </div>
                     </div>
                     <div className="relative">
-                      <div className="flex min-w-0 flex-nowrap items-center gap-2 overflow-hidden whitespace-nowrap">
-                        <span
-                          className={`min-w-0 truncate text-[10px] uppercase tracking-[0.18em] ${REASONING_THEATER_STANCE_META[reasoningTheater.stance].badge}`}
-                        >
-                          {REASONING_THEATER_STANCE_META[reasoningTheater.stance].label}
-                        </span>
-                        <span className="min-w-0 truncate text-[10px] uppercase tracking-[0.16em] text-slate-300/90">
-                          {REASONING_THEATER_ARCHETYPE_LABEL[reasoningTheater.archetype]}
-                        </span>
-                        <span className="min-w-0 truncate text-[10px] uppercase tracking-[0.16em] text-slate-300/90">
-                          {REASONING_THEATER_PHASE_LABEL[reasoningTheater.phase]}
-                        </span>
-                        <span className="min-w-0 truncate text-[10px] uppercase tracking-[0.16em] text-slate-300/90">
-                          {REASONING_THEATER_CERTAINTY_LABEL[reasoningTheater.certaintyClass]}
-                        </span>
-                      </div>
-                      {reasoningTheaterMedalQueue.length > 0 ? (
-                        <div className="pointer-events-none mt-1 space-y-1 text-cyan-100/95">
-                          <div className="flex items-end gap-1.5">
-                            {reasoningTheaterMedalQueue.map((medalPulse) => {
-                              const broken = reasoningTheaterMedalBrokenByToken[medalPulse.token] === true;
-                              return (
-                                <div
-                                  key={medalPulse.token}
-                                  className="overflow-hidden transition-[width,opacity,transform] duration-700 ease-out"
-                                  style={{
-                                    width: medalPulse.fading ? 0 : 52,
-                                    opacity: medalPulse.fading ? 0 : 1,
-                                    transform: medalPulse.fading ? "scale(0.86)" : "scale(1)",
-                                  }}
-                                >
-                                  {!broken ? (
-                                    <img
-                                      src={medalPulse.assetPath}
-                                      alt={`${REASONING_THEATER_MEDAL_LABEL[medalPulse.medal]} medal`}
-                                      className="h-12 w-12 shrink-0 object-contain opacity-95 mix-blend-screen drop-shadow-[0_0_16px_rgba(34,211,238,0.5)]"
-                                      loading="lazy"
-                                      onError={() =>
-                                        setReasoningTheaterMedalBrokenByToken((prev) => ({
-                                          ...prev,
-                                          [medalPulse.token]: true,
-                                        }))
-                                      }
-                                    />
-                                  ) : (
-                                    <span className="inline-flex h-12 w-12 items-center justify-center text-[8px] uppercase tracking-[0.18em] text-cyan-100/90">
-                                      {REASONING_THEATER_MEDAL_LABEL[medalPulse.medal]}
-                                    </span>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                          {latestReasoningTheaterMedal ? (
-                            <div className="min-w-0 leading-tight">
-                              <p className="truncate text-[10px] uppercase tracking-[0.2em] text-cyan-200/90">
-                                {REASONING_THEATER_MEDAL_LABEL[latestReasoningTheaterMedal.medal]}
-                              </p>
-                              <p className="truncate text-[10px] text-cyan-100/80">
-                                {latestReasoningTheaterMedal.reason}
-                              </p>
-                            </div>
-                          ) : null}
-                        </div>
-                      ) : null}
+                      <HelixAskReasoningStatusMedalStrip
+                        stanceBadgeClassName={REASONING_THEATER_STANCE_META[reasoningTheater.stance].badge}
+                        stanceLabel={REASONING_THEATER_STANCE_META[reasoningTheater.stance].label}
+                        archetypeLabel={REASONING_THEATER_ARCHETYPE_LABEL[reasoningTheater.archetype]}
+                        phaseLabel={REASONING_THEATER_PHASE_LABEL[reasoningTheater.phase]}
+                        certaintyLabel={REASONING_THEATER_CERTAINTY_LABEL[reasoningTheater.certaintyClass]}
+                        medals={reasoningTheaterMedalQueue.map((medalPulse) => ({
+                          token: medalPulse.token,
+                          label: REASONING_THEATER_MEDAL_LABEL[medalPulse.medal],
+                          assetPath: medalPulse.assetPath,
+                          fading: medalPulse.fading,
+                          broken: reasoningTheaterMedalBrokenByToken[medalPulse.token] === true,
+                        }))}
+                        latestMedal={
+                          latestReasoningTheaterMedal
+                            ? {
+                                label: REASONING_THEATER_MEDAL_LABEL[latestReasoningTheaterMedal.medal],
+                                reason: latestReasoningTheaterMedal.reason,
+                              }
+                            : null
+                        }
+                        onMedalImageError={(token, currentSrc) =>
+                          setReasoningTheaterMedalBrokenByToken((prev) => {
+                            const next = { ...prev, [token]: true };
+                            if (currentSrc) {
+                              next[currentSrc] = true;
+                            }
+                            return next;
+                          })
+                        }
+                      />
                       <div className="mt-2 relative h-1.5 overflow-visible rounded-full bg-black/45">
-                        {renderReasoningBattleStage({
-                          beats: reasoningBattleBeats,
-                          pressurePct: reasoningBattlePressurePct,
-                          reducedMotion: prefersReducedMotion,
-                          ambient: reasoningBattleAmbientState,
-                          className: "pointer-events-none absolute inset-x-0 top-0 z-[5]",
-                        })}
+                        <HelixAskReasoningBattleStage
+                          beats={reasoningBattleBeats}
+                          pressurePct={reasoningBattlePressurePct}
+                          reducedMotion={prefersReducedMotion}
+                          ambient={reasoningBattleAmbientState}
+                          className="pointer-events-none absolute inset-x-0 top-0 z-[5]"
+                        />
                         <div
                           className="pointer-events-none absolute -inset-x-2 -bottom-5 -top-5 overflow-hidden rounded-md"
                           aria-hidden
@@ -29533,10 +29161,10 @@ export function HelixAskPill({
                   </div>
                 ) : null}
               </div>
-            </div>
-          ) : null}
-      </HelixAskSurfaceFrame>
-        {askGoalSession ? (
+          </HelixAskBusyReasoningPanel>
+        </HelixAskSurfaceFrame>
+      }
+      goalPill={askGoalSession ? (
           <HelixAskGoalPill
             session={askGoalSession}
             expanded={askGoalPillExpanded}
@@ -29546,14 +29174,16 @@ export function HelixAskPill({
             onAction={handleAskGoalSessionAction}
           />
         ) : null}
+      steeringQueue={
         <HelixAskSteeringQueuePanel
           items={steeringQueueItems}
           activeCount={activeSteeringQueueCount}
           expanded={steeringQueueExpanded}
           onToggleExpanded={() => setSteeringQueueExpanded((current) => !current)}
         />
-        <HelixAskErrorLine message={askError} />
-        {chronologicalAskReplies.length > 0 || visibleActiveTurnStreamRows.length > 0 ? (
+      }
+      errorLine={<HelixAskErrorLine message={askError} />}
+      turnList={chronologicalAskReplies.length > 0 || visibleActiveTurnStreamRows.length > 0 ? (
           <HelixAskTurnList
             ref={askReplyListRef}
             className={replyListClassNameResolved}
@@ -29705,72 +29335,68 @@ export function HelixAskPill({
               latestReplyId: transcriptLatestAskReplyId,
               finalAnswerText: finalAnswerRawText,
             });
-            const replyCard = (
-              <HelixAskReplyCard
-                turnTestId={latestTurnBinding.turnTestId}
-                isLatestReply={isLatestReply}
-                tintClassName={moodPalette.replyTint}
-                contextCapsule={reply.contextCapsule}
-                promptIngested={reply.promptIngested}
-              >
-                  <HelixAskTurnStreamPanel
-                    rows={turnStreamRows}
-                    isLatestReply={isLatestReply}
-                    workLogTestId={latestTurnBinding.workLogTestId}
-                    questionTestId={latestTurnBinding.questionTestId}
-                    finalAnswerTestId={latestTurnBinding.finalAnswerTestId}
-                    stagePlayEventCount={stagePlayChatLedgerEvents.length}
-                    finalAnswerRawText={finalAnswerRawText}
-                    finalAnswerSourceLabel={
-                      finalAnswerPresentation.sourceLabel || finalAnswerSourceLabel || transcriptTerminal.source
-                    }
-                    backendTerminalAnswer={transcriptTerminal.backendTerminalText}
-                    finalAnswerAuthority={
-                      finalAnswerPresentation.isDeterministicReceiptFallback
-                        ? "receipt_fallback_not_reviewed"
-                        : "terminal"
-                    }
-                    answerTint={replyBattleAnswerTint}
-                    actualAgentProviderLabel={actualAgentProviderLabel}
-                    actualAgentModelLabel={actualAgentModelLabel}
-                    liveBridgeStatus={liveAnswerTurnBridge?.status}
-                    renderFinalAnswer={() => renderHelixAskFinalAnswerContent(transcriptAnswer)}
-                    clipText={clipText}
-                    readRowClassName={readHelixContinuousTurnStreamRowClass}
-                    readDotClassName={readHelixContinuousTurnStreamDotClass}
-                    readPillClassName={readLiveAnswerTurnBridgePillClassName}
-                    onCopyFinal={() => void handleCopyReply(reply, latestTurnBinding.finalAnswerText)}
-                    onDebugCopy={(event) =>
+            return (
+              <div key={reply.id}>
+                <HelixAskReplyTurn
+                  isLatestReply={isLatestReply}
+                  card={{
+                    turnTestId: latestTurnBinding.turnTestId,
+                    tintClassName: moodPalette.replyTint,
+                    contextCapsule: reply.contextCapsule,
+                    promptIngested: reply.promptIngested,
+                  }}
+                  stream={{
+                    rows: turnStreamRows,
+                    workLogTestId: latestTurnBinding.workLogTestId,
+                    questionTestId: latestTurnBinding.questionTestId,
+                    finalAnswerTestId: latestTurnBinding.finalAnswerTestId,
+                    stagePlayEventCount: stagePlayChatLedgerEvents.length,
+                    finalAnswerRawText,
+                    finalAnswerSourceLabel:
+                      finalAnswerPresentation.sourceLabel || finalAnswerSourceLabel || transcriptTerminal.source,
+                    backendTerminalAnswer: transcriptTerminal.backendTerminalText,
+                    finalAnswerAuthority: finalAnswerPresentation.isDeterministicReceiptFallback
+                      ? "receipt_fallback_not_reviewed"
+                      : "terminal",
+                    answerTint: replyBattleAnswerTint,
+                    actualAgentProviderLabel,
+                    actualAgentModelLabel,
+                    liveBridgeStatus: liveAnswerTurnBridge?.status,
+                    renderFinalAnswer: () => renderHelixAskFinalAnswerContent(transcriptAnswer),
+                    clipText,
+                    readRowClassName: readHelixContinuousTurnStreamRowClass,
+                    readDotClassName: readHelixContinuousTurnStreamDotClass,
+                    readPillClassName: readLiveAnswerTurnBridgePillClassName,
+                    onCopyFinal: () => void handleCopyReply(reply, latestTurnBinding.finalAnswerText),
+                    onDebugCopy: (event) =>
                       void handleCopyReplyMasterDebug(
                         reply,
                         replyMasterEventClockPayload,
                         event.currentTarget,
-                      )
-                    }
-                    onReadAloud={() => void handleReadAloud(reply, latestTurnBinding.finalAnswerText)}
-                    showDebugCopy={userSettings.showHelixAskDebug}
-                    debugCopyDisabled={typeof window === "undefined"}
-                    copyFinalTestId={latestTurnBinding.copyFinalTestId}
-                    debugCopyTestId={latestTurnBinding.debugCopyTestId}
-                    readAloudTestId={latestTurnBinding.readAloudTestId}
-                    readAloudActive={shouldStopReadAloudOnButtonPress(readAloudByReply[reply.id] ?? "idle")}
-                    readAloudAriaLabel={
-                      shouldStopReadAloudOnButtonPress(readAloudByReply[reply.id] ?? "idle")
-                        ? "Stop reading"
-                        : "Read aloud"
-                    }
-                    readAloudTitle={formatReadAloudButtonLabel(readAloudByReply[reply.id] ?? "idle")}
-                    proofTrace={(replyDebugRecord as Record<string, unknown> | null | undefined)?.workstation_reasoning_trace}
-                    jobReadyLinks={jobReadyLinks}
-                    onRunJobReadyLink={runJobReadyLink}
-                  />
-              </HelixAskReplyCard>
-              );
-            return <div key={reply.id}>{replyCard}</div>;
+                      ),
+                    onReadAloud: () => void handleReadAloud(reply, latestTurnBinding.finalAnswerText),
+                    showDebugCopy: userSettings.showHelixAskDebug,
+                    debugCopyDisabled: typeof window === "undefined",
+                    copyFinalTestId: latestTurnBinding.copyFinalTestId,
+                    debugCopyTestId: latestTurnBinding.debugCopyTestId,
+                    readAloudTestId: latestTurnBinding.readAloudTestId,
+                    readAloudActive: shouldStopReadAloudOnButtonPress(readAloudByReply[reply.id] ?? "idle"),
+                    readAloudAriaLabel: shouldStopReadAloudOnButtonPress(readAloudByReply[reply.id] ?? "idle")
+                      ? "Stop reading"
+                      : "Read aloud",
+                    readAloudTitle: formatReadAloudButtonLabel(readAloudByReply[reply.id] ?? "idle"),
+                    proofTrace: (replyDebugRecord as Record<string, unknown> | null | undefined)
+                      ?.workstation_reasoning_trace,
+                    jobReadyLinks,
+                    onRunJobReadyLink: runJobReadyLink,
+                  }}
+                />
+              </div>
+            );
             })}
           </HelixAskTurnList>
         ) : null}
-        {debugExportDrawer ? (
+      debugDrawer={debugExportDrawer ? (
           <HelixAskDebugDrawer
             payload={debugExportDrawer.payload}
             payloadHash={debugExportDrawer.payloadHash}
@@ -29779,7 +29405,7 @@ export function HelixAskPill({
             onClose={() => setDebugExportDrawer(null)}
           />
         ) : null}
-    </HelixAskErrorBoundary>
+    />
   );
 }
 

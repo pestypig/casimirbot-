@@ -344,6 +344,28 @@ const normalizeDocPath = (value: unknown): string | null => {
 const readWorkspaceSnapshot = (body: Record<string, unknown>): Record<string, unknown> | null =>
   readRecord(body.workspace_context_snapshot ?? body.workspaceContextSnapshot);
 
+const readWorkspaceActivePanel = (workspaceSnapshot: Record<string, unknown> | null | undefined): string | null =>
+  readString(
+    workspaceSnapshot?.activePanel ??
+      workspaceSnapshot?.activePanelId ??
+      workspaceSnapshot?.active_panel ??
+      workspaceSnapshot?.active_panel_id ??
+      workspaceSnapshot?.focusedPanel ??
+      workspaceSnapshot?.focusedPanelId ??
+      workspaceSnapshot?.focused_panel ??
+      workspaceSnapshot?.focused_panel_id,
+  );
+
+const readWorkspaceActiveDocPath = (workspaceSnapshot: Record<string, unknown> | null | undefined): string | null =>
+  normalizeDocPath(
+    workspaceSnapshot?.activeDocPath ??
+      workspaceSnapshot?.activeDocumentPath ??
+      workspaceSnapshot?.active_doc_path ??
+      workspaceSnapshot?.active_document_path ??
+      workspaceSnapshot?.docContextPath ??
+      workspaceSnapshot?.doc_context_path,
+  );
+
 const isActiveDocsViewerDeicticPrompt = (prompt: string): boolean => {
   if (/\bbackground\s+only\b/i.test(prompt)) return false;
   const unquotedPrompt = unquotePrompt(prompt);
@@ -364,18 +386,8 @@ export const buildActiveDocsContextWorkstationGatewayCallRequests = (
   const prompt = readPrompt(body);
   if (!prompt || !isActiveDocsViewerDeicticPrompt(prompt)) return [];
   const workspaceSnapshot = readWorkspaceSnapshot(body);
-  const activePanel = readString(
-    workspaceSnapshot?.activePanel ??
-      workspaceSnapshot?.active_panel ??
-      workspaceSnapshot?.focusedPanel ??
-      workspaceSnapshot?.focused_panel,
-  );
-  const activeDocPath = normalizeDocPath(
-    workspaceSnapshot?.activeDocPath ??
-      workspaceSnapshot?.active_doc_path ??
-      workspaceSnapshot?.docContextPath ??
-      workspaceSnapshot?.doc_context_path,
-  );
+  const activePanel = readWorkspaceActivePanel(workspaceSnapshot);
+  const activeDocPath = readWorkspaceActiveDocPath(workspaceSnapshot);
   if (!activeDocPath) return [];
   const fileName = activeDocPath.split("/").pop()?.replace(/\.md$/i, "").replace(/[-_]+/g, " ").trim();
   const query = fileName || activeDocPath;
@@ -451,18 +463,8 @@ const buildPromptDerivedReadableSurfaceGatewayCallRequests = (
   if (!asksTranslate && !asksSummarize && !asksRead) return [];
 
   const workspaceSnapshot = readWorkspaceSnapshot(body);
-  const activePanel = readString(
-    workspaceSnapshot?.activePanel ??
-      workspaceSnapshot?.active_panel ??
-      workspaceSnapshot?.focusedPanel ??
-      workspaceSnapshot?.focused_panel,
-  );
-  const activeDocPath = normalizeDocPath(
-    workspaceSnapshot?.activeDocPath ??
-      workspaceSnapshot?.active_doc_path ??
-      workspaceSnapshot?.docContextPath ??
-      workspaceSnapshot?.doc_context_path,
-  );
+  const activePanel = readWorkspaceActivePanel(workspaceSnapshot);
+  const activeDocPath = readWorkspaceActiveDocPath(workspaceSnapshot);
   const selectedText = readString(
     workspaceSnapshot?.selectedText ??
       workspaceSnapshot?.selected_text ??
@@ -556,7 +558,7 @@ export const buildActiveCalculatorContextWorkstationGatewayCallRequests = (
   const prompt = readPrompt(body);
   if (!prompt || !isActiveCalculatorDeicticPrompt(prompt)) return [];
   const workspaceSnapshot = readWorkspaceSnapshot(body);
-  const activePanel = readString(workspaceSnapshot?.activePanel ?? workspaceSnapshot?.active_panel);
+  const activePanel = readWorkspaceActivePanel(workspaceSnapshot);
   const activeCalculatorContext = readRecord(
     workspaceSnapshot?.activeCalculatorContext ?? workspaceSnapshot?.active_calculator_context,
   );
@@ -1901,6 +1903,11 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   if (input.includePlannerDerived !== true) return [];
   const requests: Record<string, unknown>[] = [];
   const seen = new Set<string>();
+  const prompt = readPrompt(input.body) ?? "";
+  const allowsCompoundAdjunctCapabilities =
+    /\b(?:research\s+papers?|papers?|arxiv|scholarly|internet|web|sources?|reflect|reflection|theory\s+badge\s+graph|theory\s+graph|civilization\s+bounds?|civilization)\b/i.test(
+      unquotePrompt(prompt),
+    );
   const structured = buildStructuredAdmissionWorkstationGatewayCallRequests(input.body);
   appendDedupe(requests, seen, structured);
   const compoundDependencyRequests = buildCompoundCapabilityDependencyGatewayCallRequests(input.body);
@@ -1917,6 +1924,7 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
       .filter((capability): capability is string => Boolean(capability)),
   );
   const hasNamedDocsSearch = promptNamed.some((request) => readString(request.capability_id) === DOCS_SEARCH_CAPABILITY);
+  const activeDocsContext = buildActiveDocsContextWorkstationGatewayCallRequests(input.body);
   if (hasNamedDocsSearch) {
     appendDedupe(requests, seen, promptNamed);
   } else {
@@ -1925,7 +1933,6 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
       !compoundDependencyCapabilities.has(DOCS_READ_VISIBLE_SURFACE_CAPABILITY) &&
       !compoundDependencyCapabilities.has(DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY)
     ) {
-      const activeDocsContext = buildActiveDocsContextWorkstationGatewayCallRequests(input.body);
       appendDedupe(requests, seen, activeDocsContext);
     }
     appendDedupe(requests, seen, promptNamed);
@@ -1944,19 +1951,32 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   ) {
     appendDedupe(requests, seen, buildPromptDerivedVoiceGatewayCallRequests(input.body));
   }
-  if (!promptNamedCapabilities.has(CALCULATOR_SOLVE_EXPRESSION_CAPABILITY)) {
+  if (
+    !promptNamedCapabilities.has(CALCULATOR_SOLVE_EXPRESSION_CAPABILITY) &&
+    !compoundDependencyCapabilities.has(CALCULATOR_SOLVE_EXPRESSION_CAPABILITY)
+  ) {
     appendDedupe(requests, seen, buildPromptDerivedCalculatorSolveGatewayCallRequests(input.body));
   }
   if (!promptNamedCapabilities.has(THEORY_CONTEXT_REFLECTION_CAPABILITY)) {
     appendDedupe(requests, seen, buildPromptDerivedTheoryReflectionGatewayCallRequests(input.body));
   }
-  if (promptNamedCapabilities.size === 0) {
+  if (
+    promptNamedCapabilities.size === 0 &&
+    (compoundDependencyCapabilities.size === 0 || allowsCompoundAdjunctCapabilities) &&
+    (activeDocsContext.length === 0 || allowsCompoundAdjunctCapabilities)
+  ) {
     appendDedupe(requests, seen, buildPlannerDerivedWorkstationGatewayCallRequests(input.body));
   }
-  if (!promptNamedCapabilities.has(SCHOLARLY_RESEARCH_SEARCH_CAPABILITY)) {
+  if (
+    !promptNamedCapabilities.has(SCHOLARLY_RESEARCH_SEARCH_CAPABILITY) &&
+    (compoundDependencyCapabilities.size === 0 || allowsCompoundAdjunctCapabilities)
+  ) {
     appendDedupe(requests, seen, buildPromptDerivedScholarlyResearchGatewayCallRequests(input.body));
   }
-  if (!promptNamedCapabilities.has(INTERNET_SEARCH_CAPABILITY)) {
+  if (
+    !promptNamedCapabilities.has(INTERNET_SEARCH_CAPABILITY) &&
+    (compoundDependencyCapabilities.size === 0 || allowsCompoundAdjunctCapabilities)
+  ) {
     appendDedupe(requests, seen, buildPromptDerivedInternetSearchGatewayCallRequests(input.body));
   }
   if (!promptNamedCapabilities.has(REPO_SEARCH_CAPABILITY) && !compoundDependencyCapabilities.has(REPO_SEARCH_CAPABILITY)) {

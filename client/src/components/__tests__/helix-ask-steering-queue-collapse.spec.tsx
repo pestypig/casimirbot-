@@ -14,6 +14,12 @@ const steeringQueuePanelSource = () =>
     "utf8",
   );
 
+const goalPillSource = () =>
+  fs.readFileSync(
+    path.resolve(__dirname, "../helix/ask-console/HelixAskGoalPill.tsx"),
+    "utf8",
+  );
+
 const steeringQueueDisplaySource = () =>
   fs.readFileSync(
     path.resolve(__dirname, "../../lib/helix/ask-steering-queue-display.ts"),
@@ -23,16 +29,17 @@ const steeringQueueDisplaySource = () =>
 describe("HelixAskPill steering queue collapse", () => {
   it("renders a compact goal-session pill above the steering queue", () => {
     const source = helixAskPillSource();
-    const goalIndex = source.indexOf('data-testid="helix-ask-goal-pill"');
+    const goal = goalPillSource();
+    const goalIndex = source.indexOf("<HelixAskGoalPill");
     const queueIndex = source.indexOf("<HelixAskSteeringQueuePanel");
 
     expect(goalIndex).toBeGreaterThan(0);
     expect(queueIndex).toBeGreaterThan(goalIndex);
-    expect(source).toContain('aria-label="Helix Ask goal session"');
-    expect(source).toContain('aria-controls="helix-ask-goal-pill-details"');
-    expect(source).toContain('aria-label="Edit goal prompt"');
-    expect(source).toContain('aria-label={isPaused ? "Resume goal" : "Pause goal"}');
-    expect(source).toContain('aria-label="Archive goal"');
+    expect(goal).toContain('aria-label="Helix Ask goal session"');
+    expect(goal).toContain('aria-controls="helix-ask-goal-pill-details"');
+    expect(goal).toContain('aria-label="Edit goal prompt"');
+    expect(goal).toContain('aria-label={isPaused ? "Resume goal" : "Pause goal"}');
+    expect(goal).toContain('aria-label="Archive goal"');
     expect(source).toContain('postHelixAskGoalSessionAction');
     expect(source).toContain('/api/helix/stage-play/goal-session/action');
   });

@@ -1658,12 +1658,16 @@ describe("Helix Ask UI ownership boundaries", () => {
 
   it("keeps status and transcript class-name helpers in the non-React status class module", () => {
     const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const proceduralTimeline = read("client/src/components/helix/ask-console/HelixAskProceduralTimeline.tsx");
     const statusClasses = read("client/src/lib/helix/ask-status-classnames.ts");
 
-    expect(pill).toContain('from "@/lib/helix/ask-status-classnames"');
+    expect(proceduralTimeline).toContain('from "@/lib/helix/ask-status-classnames"');
+    expect(pill).not.toContain('from "@/lib/helix/ask-status-classnames"');
     for (const symbol of ["readProceduralStatusClass", "readHelixCausalTraceRowClass"]) {
       expect(pill).not.toContain(`function ${symbol}`);
       expect(pill).not.toContain(`export function ${symbol}`);
+      expect(proceduralTimeline).not.toContain(`function ${symbol}`);
+      expect(proceduralTimeline).not.toContain(`export function ${symbol}`);
       expect(statusClasses).toContain(`export function ${symbol}`);
     }
     expect(statusClasses).not.toMatch(/from ["']react["']/);
@@ -2366,9 +2370,14 @@ describe("Helix Ask UI ownership boundaries", () => {
 
   it("keeps reasoning battle visual projection helpers in the non-React reasoning battle display module", () => {
     const pill = read("client/src/components/helix/HelixAskPill.tsx");
+    const busyPanel = read("client/src/components/helix/ask-console/HelixAskBusyReasoningPanel.tsx");
+    const animationStyles = read("client/src/components/helix/ask-console/HelixAskReasoningAnimationStyles.tsx");
+    const battleStage = read("client/src/components/helix/ask-console/HelixAskReasoningBattleStage.tsx");
     const battleDisplay = read("client/src/lib/helix/ask-reasoning-battle-display.ts");
 
-    expect(pill).toContain('from "@/lib/helix/ask-reasoning-battle-display"');
+    expect(pill).toContain('from "@/components/helix/ask-console/HelixAskBusyReasoningPanel"');
+    expect(pill).toContain('from "@/components/helix/ask-console/HelixAskReasoningBattleStage"');
+    expect(busyPanel).toContain('from "./HelixAskReasoningAnimationStyles"');
     for (const symbol of [
       "reasoningBattleBeatPositionPct",
       "reasoningBattleBeatHeightPx",
@@ -2381,15 +2390,35 @@ describe("Helix Ask UI ownership boundaries", () => {
       expect(pill).not.toContain(`function ${symbol}`);
       expect(battleDisplay).toContain(`export function ${symbol}`);
     }
-    expect(pill).toContain("function renderReasoningBattleStage");
+    expect(pill).not.toContain("function renderReasoningBattleStage");
+    expect(pill).toContain("<HelixAskReasoningBattleStage");
+    expect(battleStage).toContain("export function HelixAskReasoningBattleStage");
+    expect(battleStage).toContain('data-testid={testId ?? "helix-ask-reasoning-battle-stage"}');
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
+    expect(map).toContain("Reasoning animation keyframes");
+    expect(map).toContain("HelixAskReasoningAnimationStyles");
+    expect(map).toContain("Busy reasoning panel chrome");
+    expect(map).toContain("HelixAskBusyReasoningPanel");
     expect(map).toContain("Reasoning battle JSX rendering");
-    expect(map).toContain("renderReasoningBattleStage");
+    expect(map).toContain("HelixAskReasoningBattleStage");
+    expect(pill).not.toContain("@keyframes helixReasoningFloatingText{");
+    expect(animationStyles).toContain("@keyframes helixReasoningFloatingText{");
+    expect(animationStyles).toContain("@keyframes helixReasoningBattleBeat{");
+    expect(animationStyles).toContain("@keyframes helixReasoningBattlePrimitive{");
+    expect(animationStyles).not.toContain("@/store/");
+    expect(animationStyles).not.toContain("runAskTurn");
+    expect(animationStyles).not.toContain("fetch(");
     expect(battleDisplay).not.toMatch(/from ["']react["']/);
     expect(battleDisplay).not.toContain("@/store/");
     expect(battleDisplay).not.toContain("@/components/helix/HelixAskPill");
     expect(battleDisplay).not.toContain("runAskTurn");
     expect(battleDisplay).not.toContain("fetch(");
+    expect(battleStage).not.toContain("buildReasoningBattleBeats");
+    expect(battleStage).not.toContain("buildReasoningBattleAmbientState");
+    expect(battleStage).not.toContain("buildReasoningBattleAnswerTint");
+    expect(battleStage).not.toContain("@/store/");
+    expect(battleStage).not.toContain("runAskTurn");
+    expect(battleStage).not.toContain("fetch(");
   });
 
   it("keeps reasoning frontier floating text projection in the non-React frontier display module", () => {
