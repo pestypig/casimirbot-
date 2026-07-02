@@ -948,6 +948,15 @@ function formatHelixCapabilityLaneProjectionReceiptText(receipt: Record<string, 
   const projectionTarget =
     coerceText(receipt.projection_target).trim() ||
     coerceText(payload?.projection_target).trim();
+  const sourceId =
+    coerceText(receipt.source_id).trim() ||
+    coerceText(payload?.source_id).trim();
+  const sourceKind =
+    coerceText(receipt.source_kind).trim() ||
+    coerceText(payload?.source_kind).trim();
+  const accountLocale =
+    coerceText(receipt.account_locale).trim() ||
+    coerceText(payload?.account_locale).trim();
   const projectionStatus =
     coerceText(receipt.projection_status).trim() ||
     coerceText(payload?.projection_status).trim() ||
@@ -959,6 +968,9 @@ function formatHelixCapabilityLaneProjectionReceiptText(receipt: Record<string, 
     capability,
     projectionStatus ? `projection ${projectionStatus}` : "",
     projectionTarget ? `target ${projectionTarget}` : "",
+    sourceId ? `source ${sourceId}` : "",
+    sourceKind ? `source kind ${sourceKind}` : "",
+    accountLocale ? `account locale ${accountLocale}` : "",
     targetLanguage ? `language ${targetLanguage}` : "",
     observationRef ? `observation ${observationRef}` : "",
     receiptRef ? `receipt ${receiptRef}` : "",
@@ -1000,6 +1012,8 @@ function formatHelixLiveTranslationUiProjectionText(projection: HelixLiveTransla
     `target ${projection.projectionTarget}`,
     projection.targetLanguage ? `language ${projection.targetLanguage}` : "",
     projection.sourceId ? `source ${projection.sourceId}` : "",
+    projection.sourceKind ? `source kind ${projection.sourceKind}` : "",
+    projection.accountLocale ? `account locale ${projection.accountLocale}` : "",
     projection.chunkId ? `chunk ${projection.chunkId}` : "",
     projection.chunkIndex !== null ? `index ${projection.chunkIndex}` : "",
     projection.dedupeKey ? `dedupe ${projection.dedupeKey}` : "",
@@ -1687,6 +1701,7 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
   });
   const projectionReceiptEvents = projectionReceipts.slice(0, 10).map((receipt, index) => {
     const laneId = coerceText(receipt.lane_id).trim() || "capability_lane";
+    const payload = readAgentLoopAuditRecord(receipt.payload);
     const capabilityId =
       coerceText(receipt.capability).trim() ||
       coerceText(receipt.capability_key).trim() ||
@@ -1708,6 +1723,11 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
       capability_id: capabilityId,
       receipt_ref: coerceText(receipt.receipt_ref).trim() || null,
       observation_ref: coerceText(receipt.observation_ref).trim() || null,
+      source_id: coerceText(receipt.source_id).trim() || coerceText(payload?.source_id).trim() || null,
+      source_kind: coerceText(receipt.source_kind).trim() || coerceText(payload?.source_kind).trim() || null,
+      account_locale: coerceText(receipt.account_locale).trim() ||
+        coerceText(payload?.account_locale).trim() ||
+        null,
       terminal_eligible: receipt.terminal_eligible === true,
       assistant_answer: receipt.assistant_answer === true,
       raw_content_included: receipt.raw_content_included === true,
@@ -1736,6 +1756,8 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
       receipt_ref: projection.receiptRef,
       observation_ref: projection.observationRef,
       source_id: projection.sourceId,
+      source_kind: projection.sourceKind,
+      account_locale: projection.accountLocale,
       latest_chunk_id: projection.chunkId,
       latest_chunk_index: projection.chunkIndex,
       latest_dedupe_key: projection.dedupeKey,

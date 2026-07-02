@@ -1054,7 +1054,7 @@ describe("explicit workstation gateway derived calls", () => {
       capability_id: "moral-graph.reflect_living_substrate_context",
       arguments: {
         source_target_intent: expect.objectContaining({
-          depends_on: ["reflect_theory_context"],
+          depends_on: [],
         }),
       },
     });

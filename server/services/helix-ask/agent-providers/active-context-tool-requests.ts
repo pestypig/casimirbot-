@@ -649,7 +649,7 @@ export const buildStructuredAdmissionWorkstationGatewayCallRequests = (
         mode: "read",
         arguments: {
           prompt: query,
-          conversation_context: prompt,
+          conversation_context: readPrompt(body) ?? query,
           include_theory_bridge: true,
           include_recommended_actions: true,
           source_target_intent: {
@@ -813,7 +813,19 @@ export const buildPlannerDerivedWorkstationGatewayCallRequests = (
           INTERNET_SEARCH_CAPABILITY,
         ].includes(String(capability ?? ""));
       });
-      return [attachPlannerNextAffordances(moralRequest, affordances), ...retained];
+      const moralArgs = readRecord(moralRequest.arguments) ?? {};
+      const moralSourceTargetIntent = readRecord(moralArgs.source_target_intent) ?? {};
+      const primaryMoralRequest = {
+        ...moralRequest,
+        arguments: {
+          ...moralArgs,
+          source_target_intent: {
+            ...moralSourceTargetIntent,
+            depends_on: [],
+          },
+        },
+      };
+      return [attachPlannerNextAffordances(primaryMoralRequest, affordances), ...retained];
     }
     return nextRequests;
   };
