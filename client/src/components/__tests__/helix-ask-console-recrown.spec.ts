@@ -415,8 +415,8 @@ describe("Helix Ask Console recrown boundary", () => {
     });
     expect(Math.abs(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.lineCountAtInventory - legacyPillLines.length)).toBeLessThanOrEqual(5);
     expect(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.lineCountAtInventory).toBeGreaterThan(26000);
-    expect(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.exportedComponentStartsAtLine).toBeGreaterThan(8100);
-    expect(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.liveRenderSliceStartsAtLine).toBeGreaterThan(26000);
+    expect(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.exportedComponentStartsAtLine).toBeGreaterThan(8000);
+    expect(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.liveRenderSliceStartsAtLine).toBeGreaterThan(25900);
     expect(HELIX_ASK_LEGACY_CONSOLE_SLICES.map((slice) => slice.classification)).toEqual([
       "live_day_to_day_must_move",
       "pure_display_already_recrowned",

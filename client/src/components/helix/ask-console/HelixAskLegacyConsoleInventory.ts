@@ -22,10 +22,10 @@ export const HELIX_ASK_LEGACY_CONSOLE_ACTIVE_PATH = [
 
 export const HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT = {
   file: "client/src/components/helix/HelixAskPill.tsx",
-  lineCountAtInventory: 26609,
-  exportedComponentStartsAtLine: 8050,
-  liveRenderSliceStartsAtLine: 25989,
-  liveLegacyConsoleViewStartsAtLine: 26004,
+  lineCountAtInventory: 26611,
+  exportedComponentStartsAtLine: 8052,
+  liveRenderSliceStartsAtLine: 25991,
+  liveLegacyConsoleViewStartsAtLine: 26006,
   inventoryReason:
     "The active bridge still imports the whole legacy file, but the visible console render path is concentrated near the bottom and now enters the recrowned legacy console view before composing recrowned ask-console display owners.",
 } as const;
