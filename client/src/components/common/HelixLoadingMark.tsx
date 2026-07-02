@@ -8,7 +8,6 @@ type HelixLoadingMarkProps = {
 };
 
 export const HELIX_LOADING_MARK_SRC = "/loading/helix-loading-mark.svg";
-export const HELIX_LOADING_SPINNER_SRC = "/icons/helix-arrow.svg";
 
 export function HelixLoadingMark({
   title = "Loading",
@@ -33,12 +32,11 @@ export function HelixLoadingMark({
       />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(56,189,248,0.16),rgba(2,6,23,0.88)_62%)]" />
       <div className="relative flex flex-col items-center gap-3 px-4 text-center">
-        <img
-          src={HELIX_LOADING_SPINNER_SRC}
-          alt=""
+        <div
+          aria-hidden="true"
           className={cn(
-            "animate-spin drop-shadow-[0_0_28px_rgba(56,189,248,0.35)]",
-            compact ? "h-12 w-12" : "h-16 w-16",
+            "animate-spin rounded-full border-2 border-slate-500/35 border-t-slate-100",
+            compact ? "h-7 w-7" : "h-9 w-9",
           )}
         />
         <div className="space-y-1">

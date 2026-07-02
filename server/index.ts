@@ -20,6 +20,11 @@ import {
 } from "@shared/ideology/ideology-verifiers";
 import { collectIdeologyNodeIdsFromTree } from "../scripts/collect-ideology-node-ids";
 import { resolveStartupConfig } from "./startup-config";
+import {
+  renderRootBootHtml,
+  renderRootRedirectHtml,
+  renderStartupRetryHtml,
+} from "./startup-screen";
 
 type LatticeWatcherHandle = {
   close(): Promise<void>;
@@ -62,6 +67,13 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const docsDir = path.resolve(__dirname, "..", "docs");
 const skyboxDir = path.resolve(__dirname, "..", "public", "skybox");
+const loadingAssetDirs = [
+  path.resolve(__dirname, "..", "client", "public", "loading"),
+  path.resolve(__dirname, "..", "dist", "public", "loading"),
+  path.resolve(process.cwd(), "client", "public", "loading"),
+  path.resolve(process.cwd(), "dist", "public", "loading"),
+  path.resolve(process.cwd(), "public", "loading"),
+];
 
 let appReady = false;
 let healthReady = false;
@@ -580,48 +592,20 @@ app.use('/docs', express.static(docsDir));
 // Serve skybox assets used by the Hull renderer (JSON config + texture) from repo-level public assets.
 app.use('/skybox', express.static(skyboxDir));
 
+// Serve loading artwork before app readiness gates so startup retry pages are not blue-only.
+for (const loadingAssetDir of loadingAssetDirs) {
+  if (fs.existsSync(loadingAssetDir)) {
+    app.use('/loading', express.static(loadingAssetDir));
+  }
+}
+
 // Cache headers for warp engine bundles
 app.use('/warp-engine*.js', (req, res, next) => {
   res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
   next();
 });
 
-const renderRootRedirectHtml = (target: string) => `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta http-equiv="refresh" content="0; url=${target}">
-    <title>CasimirBot</title>
-    <style>
-      :root { color-scheme: dark; }
-      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background:
-        radial-gradient(120% 180% at 10% 10%, rgba(56, 189, 248, 0.18) 0%, transparent 62%),
-        radial-gradient(140% 200% at 90% 8%, rgba(30, 58, 138, 0.2) 0%, transparent 70%),
-        #040915; color: #e2e8f0; font-family: "Segoe UI", system-ui, -apple-system, sans-serif; }
-      .card { width: min(90vw, 480px); border-radius: 18px; border: 1px solid rgba(56, 189, 248, 0.28); background: rgba(15, 23, 42, 0.86); padding: 20px 22px; text-align: center; box-shadow: 0 30px 90px rgba(56, 189, 248, 0.16); }
-      .icon-wrap { width: 58px; height: 58px; border-radius: 14px; margin: 0 auto 12px; display: grid; place-items: center; background: rgba(56, 189, 248, 0.14); box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.25); }
-      .icon { width: 42px; height: 42px; animation: spin 1.5s linear infinite; }
-      h1 { margin: 0 0 8px; font-size: 18px; }
-      p { margin: 0; font-size: 13px; color: #94a3b8; }
-      a { color: #7dd3fc; }
-      @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-    </style>
-  </head>
-  <body>
-    <div class="card" role="status" aria-live="polite">
-      <div class="icon-wrap">
-        <img class="icon" src="/icons/helix-arrow.svg" alt="">
-      </div>
-      <h1>Opening workspace...</h1>
-      <p>Redirecting to <a href="${target}">${target}</a>.</p>
-    </div>
-    <script>
-      window.location.replace(${JSON.stringify(target)});
-    </script>
-  </body>
-</html>`;
-
-app.get(["/desktop", "/mobile", "/start", "/helix-core"], (req: Request, res: Response, next: NextFunction) => {
+app.get(["/desktop", "/mobile"], (req: Request, res: Response, next: NextFunction) => {
   if (appReady) {
     next();
     return;
@@ -636,136 +620,6 @@ app.get(["/desktop", "/mobile", "/start", "/helix-core"], (req: Request, res: Re
   res.setHeader("Retry-After", "8");
   res.send(renderStartupRetryHtml(req.path));
 });
-
-const renderStartupRetryHtml = (target: string) => `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta http-equiv="refresh" content="8">
-    <meta name="robots" content="noindex,nofollow">
-    <title>Starting up...</title>
-    <style>
-      :root { color-scheme: dark; }
-      body { font-family: "Segoe UI", system-ui, -apple-system, sans-serif; background:
-        radial-gradient(120% 180% at 10% 10%, rgba(56, 189, 248, 0.18) 0%, transparent 62%),
-        radial-gradient(140% 200% at 90% 8%, rgba(30, 58, 138, 0.2) 0%, transparent 70%),
-        #040915; color: #e2e8f0; display: flex; min-height: 100vh; margin: 0; }
-      .card { max-width: 520px; margin: auto; padding: 28px 32px; border-radius: 18px; background: rgba(15, 23, 42, 0.86); border: 1px solid rgba(56, 189, 248, 0.28); box-shadow: 0 30px 90px rgba(56, 189, 248, 0.16); }
-      .icon-wrap { width: 62px; height: 62px; border-radius: 14px; margin: 0 auto 14px; display: grid; place-items: center; background: rgba(56, 189, 248, 0.14); box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.25); }
-      .icon { width: 46px; height: 46px; animation: spin 1.5s linear infinite; }
-      h1 { font-size: 18px; margin: 0 0 8px; text-align: center; }
-      p { font-size: 14px; line-height: 1.5; margin: 0 0 10px; }
-      code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
-      .muted { color: #94a3b8; }
-      @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-    </style>
-  </head>
-  <body>
-    <div class="card">
-      <div class="icon-wrap">
-        <img class="icon" src="/icons/helix-arrow.svg" alt="">
-      </div>
-      <h1>Starting up...</h1>
-      <p>The server is still warming up. This page will auto-refresh when it is ready.</p>
-      <p class="muted">Target: <code>${target}</code></p>
-      <p class="muted" id="boot-error" style="display:none;"></p>
-      <p class="muted">If this persists, check the deploy logs for runtime errors.</p>
-    </div>
-    <script>
-      (function retryWhenReady() {
-        function reload() { window.location.replace(${JSON.stringify(target)}); }
-        function poll() {
-          fetch("/api/ready", { cache: "no-store" })
-            .then(function (res) { return res.json ? res.json() : null; })
-            .then(function (payload) {
-              if (payload && payload.ready) {
-                reload();
-                return;
-              }
-              var err = payload && (payload.bootstrapError || payload.artifactsError);
-              if (err) {
-                var el = document.getElementById("boot-error");
-                if (el) {
-                  el.textContent = "Last error: " + err;
-                  el.style.display = "block";
-                }
-              }
-              setTimeout(poll, 2000);
-            })
-            .catch(function () { setTimeout(poll, 2000); });
-        }
-        poll();
-      })();
-    </script>
-  </body>
-</html>`;
-
-const renderRootBootHtml = (target: string) => `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta http-equiv="refresh" content="5">
-    <meta name="robots" content="noindex">
-    <title>CasimirBot</title>
-    <style>
-      :root { color-scheme: dark; }
-      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background:
-        radial-gradient(120% 180% at 10% 10%, rgba(56, 189, 248, 0.18) 0%, transparent 62%),
-        radial-gradient(140% 200% at 90% 8%, rgba(30, 58, 138, 0.2) 0%, transparent 70%),
-        #040915; color: #e2e8f0; font-family: "Segoe UI", system-ui, -apple-system, sans-serif; }
-      .card { width: min(90vw, 520px); border-radius: 18px; border: 1px solid rgba(56, 189, 248, 0.28); background: rgba(15, 23, 42, 0.86); padding: 24px 24px 20px; text-align: center; box-shadow: 0 30px 90px rgba(56, 189, 248, 0.16); }
-      .icon-wrap { width: 62px; height: 62px; border-radius: 14px; margin: 0 auto 14px; display: grid; place-items: center; background: rgba(56, 189, 248, 0.14); box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.25); }
-      .icon { width: 46px; height: 46px; animation: spin 1.5s linear infinite; }
-      h1 { margin: 0 0 8px; font-size: 18px; }
-      p { margin: 0 0 10px; font-size: 14px; line-height: 1.5; color: #94a3b8; }
-      a { color: #7dd3fc; }
-      #boot-error { display: none; font-size: 12px; color: #fca5a5; }
-      @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-    </style>
-  </head>
-  <body>
-    <div class="card" role="status" aria-live="polite">
-      <div class="icon-wrap">
-        <img class="icon" src="/icons/helix-arrow.svg" alt="">
-      </div>
-      <h1>Starting up...</h1>
-      <p>Redirecting to <a href="${target}">${target}</a> once ready.</p>
-      <p id="boot-error"></p>
-    </div>
-    <script>
-      (function() {
-        var target = ${JSON.stringify(target)};
-        var retryMs = 500;
-        function schedule() {
-          setTimeout(check, retryMs);
-        }
-        function check() {
-          fetch("/api/ready", { cache: "no-store" })
-            .then(function(res) {
-              return res.ok ? res.json() : null;
-            })
-            .then(function(payload) {
-              if (payload && payload.ready) {
-                window.location.replace(target);
-                return;
-              }
-              var err = payload && (payload.bootstrapError || payload.artifactsError);
-              if (err) {
-                var el = document.getElementById("boot-error");
-                if (el) {
-                  el.textContent = "Last error: " + err;
-                  el.style.display = "block";
-                }
-              }
-              schedule();
-            })
-            .catch(schedule);
-        }
-        check();
-      })();
-    </script>
-  </body>
-</html>`;
 
 const rootHandler = (req: Request, res: Response) => {
   addProbeHeaders(res, "express-root");

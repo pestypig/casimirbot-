@@ -12,4 +12,15 @@ describe("HelixWorkstationShell layout contract", () => {
     expect(source).toContain('className="fixed inset-0 z-10 grid min-h-0 w-full"');
     expect(source).not.toContain('className="relative z-10 grid h-full min-h-0 w-full"');
   });
+
+  it("waits for persisted chat hydration before creating a fallback Ask session", () => {
+    const source = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/components/workstation/HelixWorkstationShell.tsx"),
+      "utf8",
+    );
+
+    expect(source).toContain("const chatStoreHydrated = useAgiChatStore((state) => state.hydrated)");
+    expect(source).toContain("if (!chatStoreHydrated) return;");
+    expect(source).toContain("ensureContextSession(HELIX_ASK_CONTEXT_ID.desktop");
+  });
 });

@@ -105,19 +105,19 @@ export function resolveHelixAskLegacyTurnControlText(
 export function selectHelixAskLegacyDebugCopyLocalPayload(
   args: HelixAskLegacyDebugCopyLocalPayloadArgs,
 ): HelixAskLegacyDebugCopyLocalPayloadSelection {
-  const providedPayload = coerceControlText(args.providedPayload).trim();
-  if (providedPayload && args.providedPayloadMatchesRenderedTurn) {
-    return {
-      localExportPayload: args.normalizedPayload,
-      source: "provided_rendered_turn_payload",
-    };
-  }
-
   const renderedButtonScopedPayload = coerceControlText(args.renderedButtonScopedPayload).trim();
   if (renderedButtonScopedPayload) {
     return {
       localExportPayload: renderedButtonScopedPayload,
       source: "rendered_button_scope",
+    };
+  }
+
+  const providedPayload = coerceControlText(args.providedPayload).trim();
+  if (providedPayload && args.providedPayloadMatchesRenderedTurn) {
+    return {
+      localExportPayload: providedPayload,
+      source: "provided_rendered_turn_payload",
     };
   }
 

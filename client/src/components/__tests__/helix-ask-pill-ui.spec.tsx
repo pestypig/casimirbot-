@@ -1489,7 +1489,8 @@ describe("HelixAskPill mic-first surface contract", () => {
 
     expect(exportText).toBeTruthy();
     const parsed = JSON.parse(exportText ?? "{}");
-    expect(parsed.active_turn_id).toBe("reply-live-debug-binding");
+    expect(parsed.active_turn_id).toBe("turn-live-debug-binding");
+    expect(parsed.client_active_turn_id).toBe("reply-live-debug-binding");
     expect(parsed.selected_final_answer.replace(/\s+/g, " ").trim()).toBe(
       finalText.replace(/\s+/g, " ").trim(),
     );
@@ -2195,7 +2196,8 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(turnControlsSource).toContain('title="Copy response"');
     expect(turnControlsSource).toContain('title="Unified Debug Copy"');
     expect(source).toContain("buildReplyScopedDebugExportFromRenderedButton");
-    expect(source).toContain("selectedDebugTurnId: reply.id");
+    expect(source).toContain("selectedDebugTurnId: renderedMatchesReply ? activeTurnId : null");
+    expect(source).toContain("resolveHelixAskReplyDebugTurnId(reply)");
     expect(source).toContain('selectedDebugSource: "rendered_reply_dom"');
     expect(source).toContain(
       "debug_export_ref: renderedMatchesReply ? replyRecord.debug_export_ref ?? replyDebugRecord?.debug_export_ref ?? null : null",

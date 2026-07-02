@@ -8,6 +8,8 @@ export type { ChatMessage, ChatRole, ChatSession };
 interface AgiChatStore {
   sessions: Record<string, ChatSession>;
   activeId?: string;
+  hydrated: boolean;
+  setHydrated: (hydrated: boolean) => void;
   newSession: (title?: string, contextId?: string) => string;
   setActive: (id: string) => void;
   addMessage: (
@@ -67,6 +69,8 @@ export const useAgiChatStore = createWithEqualityFn<AgiChatStore>()(
     (set, get) => ({
       sessions: {},
       activeId: undefined,
+      hydrated: false,
+      setHydrated: (hydrated) => set({ hydrated }),
       newSession: (title?: string, contextId?: string) => {
         const id = crypto.randomUUID();
         const now = new Date().toISOString();
@@ -267,6 +271,15 @@ export const useAgiChatStore = createWithEqualityFn<AgiChatStore>()(
         return { tokens, messages: sess.messages.length };
       }
     }),
-    { name: STORAGE_KEY }
+    {
+      name: STORAGE_KEY,
+      partialize: (state) => ({
+        sessions: state.sessions,
+        activeId: state.activeId,
+      }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHydrated(true);
+      },
+    }
   )
 );

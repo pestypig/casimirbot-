@@ -565,6 +565,23 @@ function isConceptualNoCalculatorPrompt(prompt: string): boolean {
   return false;
 }
 
+function isSourceBoundNumericEvidenceCollectionPrompt(prompt: string): boolean {
+  const normalized = normalizePrompt(prompt);
+  if (!normalized) return false;
+  const asksForEvidence =
+    /\b(?:find|grab|get|collect|look\s*up|search|return|suggest)\b[\s\S]{0,180}\b(?:cited|citation|source[-\s]?bound|unit[-\s]?bearing|research[-\s]?papers?|papers?|scholarly|numerical?\s+values?|numeric\s+values?|parameters?)\b/i.test(normalized) ||
+    /\b(?:cited|citation|source[-\s]?bound|unit[-\s]?bearing|research[-\s]?papers?|papers?|scholarly)\b[\s\S]{0,180}\b(?:numerical?\s+values?|numeric\s+values?|parameters?|units?)\b/i.test(normalized);
+  const bindingAsFutureUse =
+    /\b(?:calculator\s+binding|calculator[-\s]?usable|use\s+for\s+(?:the\s+)?calculator|could\s+use|can\s+use|would\s+use|fit\s+to\s+(?:this|the|these)\s+(?:equations?|formulas?))\b/i.test(
+      normalized,
+    );
+  const explicitSolveNow =
+    /\b(?:plug|substitute|insert|bind)\b[\s\S]{0,80}\b(?:into|in)\b[\s\S]{0,60}\b(?:calculator|solve|expression)\b/i.test(normalized) ||
+    /\b(?:run|use)\b[\s\S]{0,80}\b(?:scientific[-\s]?calculator|calculator|scientific-calculator\.solve_expression)\b/i.test(normalized) ||
+    /\b(?:calculate|compute|evaluate|solve)\b[\s\S]{0,80}\b(?:now|result|answer|value|beta|estimate)\b/i.test(normalized);
+  return (asksForEvidence || bindingAsFutureUse) && !explicitSolveNow;
+}
+
 export function isWorkstationToolDiagnosticPrompt(prompt: string): boolean {
   const normalized = normalizePrompt(prompt);
   if (!normalized) return false;
@@ -582,6 +599,7 @@ export function isWorkstationToolDiagnosticPrompt(prompt: string): boolean {
 function isCalculatorPrompt(prompt: string): boolean {
   if (isWorkstationToolDiagnosticPrompt(prompt)) return false;
   if (isConceptualNoCalculatorPrompt(prompt)) return false;
+  if (isSourceBoundNumericEvidenceCollectionPrompt(prompt)) return false;
   const hasConcreteExpression = hasConcreteCalculatorExpression(prompt);
   return /\b(?:calculator|solve|evaluate|compute|calculate|verify|check)\b/i.test(prompt) &&
     (/\b(?:equation|expression|math|numeric|calculation|with\s+steps|show\s+work)\b/i.test(prompt) || hasConcreteExpression);
@@ -2604,10 +2622,39 @@ function hasCivilizationBoundsCue(prompt: string): boolean {
   );
 }
 
+function hasCivilizationComparisonCue(prompt: string): boolean {
+  return /\b(?:compare|comparison|analogy|analogous|like|as\s+(?:a|an)\b|metaphor|similar\s+to|relation\s+between|relationship\s+between)\b/i.test(
+    prompt,
+  );
+}
+
+function hasCivilizationProceduralWorldCue(prompt: string): boolean {
+  return /\b(?:civilization|civilis(?:ation|ed)|societ(?:y|ies)|nation(?:s|al)?|countr(?:y|ies)|state(?:s)?|polity|world\s+map|earth\s+map|planetary|global|geopolitical|borders?|trade\s+routes?|shipping\s+lanes?|ports?|chokepoints?|supply\s+chains?|infrastructure|roads?|rails?|air\s+routes?|dependency\s+(?:edge|edges|graph|analysis)|dependencies|route\s+candidates?|observed\s+flows?|physical\s+substrate|tectonic\s+plates?|weather\s+fronts?|tides?|currents?|seismic|earthquakes?|live\s+(?:sources?|measurements?|data)|historical\s+(?:sources?|measurements?|records?)|source[-\s]?backed|procedural\s+(?:world|evidence|map|atlas|system|order|dependencies)|ground(?:ing|ed)?\s+(?:against|in|to|with)|material\s+base|environmental\s+fields?)\b/i.test(
+    prompt,
+  );
+}
+
+function hasCivilizationGroundingRequestCue(prompt: string): boolean {
+  return /\b(?:ground|anchor|map|plot|trace|reflect|use|through|with|against|relate|connect|tie|show)\b/i.test(prompt);
+}
+
+function materiallyNeedsCivilizationBoundsEvidence(prompt: string): boolean {
+  if (hasCivilizationBoundsCue(prompt)) return true;
+  if (hasTheoryIdeologyBridgePromptCue(prompt) && hasCivilizationProceduralWorldCue(prompt)) return true;
+  if (!hasCivilizationProceduralWorldCue(prompt)) return false;
+  if (hasCivilizationComparisonCue(prompt) && hasCivilizationGroundingRequestCue(prompt)) return true;
+  return (
+    hasCivilizationGroundingRequestCue(prompt) &&
+    /\b(?:dependencies|dependency\s+(?:edge|edges|graph|analysis)|trade\s+routes?|route\s+candidates?|infrastructure|physical\s+substrate|environmental\s+fields?|observed\s+flows?|live\s+(?:sources?|measurements?|data)|historical\s+(?:sources?|measurements?|records?)|source[-\s]?backed|theory\s*(?:badge\s*)?graph|zen\s*(?:badge\s*)?graph|theory\s+zen\s+bridge)\b/i.test(
+      prompt,
+    )
+  );
+}
+
 function isCivilizationBoundsReflectionPrompt(prompt: string): boolean {
   if (!prompt || isWorkstationToolDiagnosticPrompt(prompt)) return false;
   if (userExplicitlyDisallowsPanelsOrTools(prompt)) return false;
-  return hasCivilizationBoundsCue(prompt);
+  return materiallyNeedsCivilizationBoundsEvidence(prompt);
 }
 
 function isTheoryIdeologyBridgeReflectionPrompt(prompt: string): boolean {

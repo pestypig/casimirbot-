@@ -67,6 +67,34 @@ function isBackendEntrypointFailureText(value: unknown): boolean {
   return text === HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT || text === HELIX_ASK_BACKEND_DEBUG_MATERIALIZATION_TEXT;
 }
 
+function hasMaterializedBackendEntrypointTerminal(
+  replyRecord: RecordLike | null,
+  debugRecord: RecordLike | null,
+): boolean {
+  return Boolean(readMaterializedBackendEntrypointTerminalText(replyRecord, debugRecord));
+}
+
+function readMaterializedBackendEntrypointTerminalText(
+  replyRecord: RecordLike | null,
+  debugRecord: RecordLike | null,
+): string {
+  const summary =
+    readAgentLoopAuditRecord(replyRecord?.resolved_turn_summary) ??
+    readAgentLoopAuditRecord(debugRecord?.resolved_turn_summary);
+  const uiDebugParityHarness =
+    readAgentLoopAuditRecord(replyRecord?.ui_debug_parity_harness) ??
+    readAgentLoopAuditRecord(debugRecord?.ui_debug_parity_harness);
+  const visibleFinalAnswer = coerceText(uiDebugParityHarness?.visible_final_answer).trim();
+  const summaryTerminalKind = coerceText(summary?.terminal_artifact_kind).trim();
+  const summaryFinalStatus = coerceText(summary?.final_status).trim();
+  const materialized =
+    (summaryTerminalKind === "workstation_tool_evaluation" || summaryTerminalKind === "model_synthesized_answer") &&
+    summaryFinalStatus !== "typed_failure" &&
+    Boolean(visibleFinalAnswer) &&
+    !isBackendEntrypointFailureText(visibleFinalAnswer);
+  return materialized ? visibleFinalAnswer : "";
+}
+
 function readStructuredWorkstationFinalText(...sources: unknown[]): string {
   for (const source of sources) {
     const record = readAgentLoopAuditRecord(source);
@@ -313,7 +341,11 @@ export function buildVisibleResolvedTurn(reply: HelixAskTerminalProjectionReply)
   const askEntrypointObserved =
     readBoolean(replyRecord?.ask_entrypoint_observed) ??
     readBoolean(debugRecord?.ask_entrypoint_observed);
-  if (askEntrypointRequired && askEntrypointObserved === false) {
+  if (
+    askEntrypointRequired &&
+    askEntrypointObserved === false &&
+    !hasMaterializedBackendEntrypointTerminal(replyRecord, debugRecord)
+  ) {
     return {
       active_turn_id: coerceText(reply.turn_id).trim() || coerceText(summary?.turn_id).trim() || reply.id,
       primary_route_label: "backend_ask_entrypoint / typed_failure",
@@ -328,6 +360,10 @@ export function buildVisibleResolvedTurn(reply: HelixAskTerminalProjectionReply)
     };
   }
   const terminalResolution = resolveHelixVisibleTerminalCore(reply);
+  const materializedBackendEntrypointTerminalText = readMaterializedBackendEntrypointTerminalText(
+    replyRecord,
+    debugRecord,
+  );
   const structuredWorkstationGatewaySuccess = hasStructuredSuccessfulWorkstationGatewayEvidence(replyRecord, debugRecord);
   const structuredWorkstationFinalText = structuredWorkstationGatewaySuccess
     ? readStructuredWorkstationFinalText(replyRecord, debugRecord, reply)
@@ -341,7 +377,10 @@ export function buildVisibleResolvedTurn(reply: HelixAskTerminalProjectionReply)
     terminalResolution.terminalKind !== "failure" &&
     terminalResolution.terminalKind !== "request_user_input" &&
     terminalResolution.terminalArtifactKind !== "typed_failure";
-  const terminalIsFinalAnswer = terminalResolutionIsFinalAnswer || Boolean(structuredWorkstationFinalText);
+  const terminalIsFinalAnswer =
+    terminalResolutionIsFinalAnswer ||
+    Boolean(structuredWorkstationFinalText) ||
+    Boolean(materializedBackendEntrypointTerminalText);
   const pendingRequest = readHelixTopLevelPendingServerRequest(reply);
   const pendingPresent = Boolean(pendingRequest) && !terminalIsFinalAnswer;
   const statusCandidate =
@@ -383,7 +422,8 @@ export function buildVisibleResolvedTurn(reply: HelixAskTerminalProjectionReply)
     coerceText(debugRecord?.final_answer_source).trim() ||
     coerceText(terminalAuthorityRecord?.final_answer_source).trim();
   const finalAnswerSource =
-    (structuredWorkstationFinalText && explicitFinalAnswerSource === "typed_failure"
+    ((structuredWorkstationFinalText || materializedBackendEntrypointTerminalText) &&
+    explicitFinalAnswerSource === "typed_failure"
       ? "workstation_tool_evaluation"
       : explicitFinalAnswerSource) ||
     (terminalErrorCode ? "typed_failure" : "unknown");
@@ -423,7 +463,7 @@ export function buildVisibleResolvedTurn(reply: HelixAskTerminalProjectionReply)
         : "";
   const canonicalGoalKind = readHelixCanonicalGoalKind(reply);
   const terminalArtifactKind =
-    structuredWorkstationFinalText &&
+    (structuredWorkstationFinalText || materializedBackendEntrypointTerminalText) &&
     (
       terminalResolution.terminalArtifactKind === "typed_failure" ||
       coerceText(summary?.terminal_artifact_kind).trim() === "typed_failure" ||
@@ -456,7 +496,9 @@ export function buildVisibleResolvedTurn(reply: HelixAskTerminalProjectionReply)
         )
       : "";
   const selectedFinalAnswerRaw =
-    structuredWorkstationFinalText
+    materializedBackendEntrypointTerminalText
+      ? materializedBackendEntrypointTerminalText
+      : structuredWorkstationFinalText
       ? structuredWorkstationFinalText
       : terminalResolutionIsFinalAnswer
       ? terminalResolution.text

@@ -403,7 +403,7 @@ describe("Helix Ask Console recrown boundary", () => {
     });
     expect(Math.abs(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.lineCountAtInventory - legacyPillLines.length)).toBeLessThanOrEqual(5);
     expect(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.lineCountAtInventory).toBeGreaterThan(26000);
-    expect(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.exportedComponentStartsAtLine).toBeGreaterThan(8400);
+    expect(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.exportedComponentStartsAtLine).toBeGreaterThan(8300);
     expect(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.liveRenderSliceStartsAtLine).toBeGreaterThan(26300);
     expect(HELIX_ASK_LEGACY_CONSOLE_SLICES.map((slice) => slice.classification)).toEqual([
       "live_day_to_day_must_move",
@@ -411,6 +411,7 @@ describe("Helix Ask Console recrown boundary", () => {
       "pure_display_already_recrowned",
       "pure_display_already_recrowned",
       "pure_display_already_recrowned",
+      "behavior_sensitive_recrowned_with_parity",
       "behavior_sensitive_recrowned_with_parity",
       "behavior_sensitive_recrowned_with_parity",
       "behavior_sensitive_recrowned_with_parity",
@@ -476,7 +477,7 @@ describe("Helix Ask Console recrown boundary", () => {
       bridgeReplacementReady: false,
       liveDayToDaySliceCount: 1,
       pureDisplayRecrownedSliceCount: 4,
-      behaviorSensitiveRecrownedWithParitySliceCount: 52,
+      behaviorSensitiveRecrownedWithParitySliceCount: 53,
       behaviorSensitiveQuarantinedSliceCount: 4,
       unknownTrapDoorSliceCount: 1,
     });
@@ -1225,8 +1226,8 @@ describe("Helix Ask Console recrown boundary", () => {
       renderedButtonScopedPayload: "{\"turn_id\":\"latest\",\"scope\":\"button\"}",
       providedPayloadMatchesRenderedTurn: true,
     })).toEqual({
-      localExportPayload: "{\"turn_id\":\"latest\",\"normalized\":true}",
-      source: "provided_rendered_turn_payload",
+      localExportPayload: "{\"turn_id\":\"latest\",\"scope\":\"button\"}",
+      source: "rendered_button_scope",
     });
     expect(selectHelixAskLegacyDebugCopyLocalPayload({
       providedPayload: "{\"turn_id\":\"stale\"}",

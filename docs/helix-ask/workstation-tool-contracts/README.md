@@ -109,6 +109,61 @@ symbols. If a variable is missing, the compound rail records
 `missing_variables`, the rejected template, selected affordances, and a blocked
 rail status instead of hallucinating a solve.
 
+## Formula-Bound Scholarly Validation
+
+For Codex Workstation Mode, the theory-to-scholar-to-calculator workflow is
+validated as an evidence chain, not as a tool-authored answer. A live/debug turn
+that asks for cited numerics for a prior Theory Badge Graph formula must expose
+these structured fields before any final answer is trusted:
+
+```txt
+prior_theory_formula_context
+variable_source_plan
+source_requirement_plan
+scholarly_variable_source_query_plan
+lookup_relevance_gate, scholarly_full_text_recovery_affordance, or scholarly_numeric_recovery_affordance
+provider_reasoning_reentry
+provider_terminal_authority_candidate_review
+```
+
+The canonical regression fixture is the fusion-adjacent theory formula:
+
+```txt
+rate_proxy_m3_s = n1_m3 * n2_m3 * sigma_m2 * v_m_s
+```
+
+The follow-up prompt may say "these equations", but the planner must bind that
+deictic reference to the prior formula context and then map variables to
+physical source classes. The scholarly query must search for source classes
+such as reactant density, fusion cross section, relative velocity, or
+Maxwellian-averaged reactivity. It must not rely on literal placeholder names
+such as `n1_m3` alone.
+
+If lookup results are irrelevant, the lookup observation should block dependent
+full-text fetch and emit `scholarly_lookup_recovery_affordance` with rejected
+paper reasons and narrower recovery queries. If lookup results are plausible
+but the selected paper identity has no fetchable DOI, arXiv id, PDF URL, or
+full-text URL, the full-text observation should emit
+`scholarly_full_text_recovery_affordance` and return to Codex for a narrower
+fetchable-source query. If numeric extraction cannot bind every requested
+variable with citation and unit evidence, the numeric observation should emit
+`scholarly_numeric_recovery_affordance` and the compound rail should block the
+calculator with `missing_numeric_value_evidence`.
+
+A calculator call is valid only when the debug trace contains a
+`bound_calculator_expression` whose variables were replaced by cited,
+unit-bearing `numeric_value_evidence`. Otherwise the expected terminal product
+is Codex's post-reentry explanation of the mismatch or next research step.
+
+After a keyed-server live run, the debug export can be checked with:
+
+```bash
+npm run helix:ask:formula-debug-audit -- --turn-id <turn-id> --strict
+```
+
+Use `--base-url` when the keyed server is not on `http://127.0.0.1:1498`, or
+`--file <debug-export.json>` to audit a saved debug payload.
+
 ## Authority Rules
 
 - Tool names in prompt text are constraints or requests, not execution.

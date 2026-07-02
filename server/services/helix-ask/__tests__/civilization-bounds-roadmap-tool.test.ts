@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { validateCivilizationBoundsRoadmapV1 } from "../../../../shared/civilization-bounds-roadmap";
+import { validateCivilizationTraversabilityAtlasV1 } from "../../../../shared/civilization-traversability-atlas";
 import { planWorkstationToolUse } from "../workstation-tool-planner";
 import { evaluateWorkstationToolReceipt } from "../workstation-tool-evaluator";
 import { evaluateWorkstationToolPlan } from "../workstation-tool-result-evaluator";
@@ -22,15 +23,30 @@ describe("Helix Ask Civilization Bounds Roadmap tool", () => {
     });
 
     expect(validateCivilizationBoundsRoadmapV1(output.roadmap)).toEqual([]);
+    expect(validateCivilizationTraversabilityAtlasV1(output.traversabilityAtlas)).toEqual([]);
     expect(output.roadmap.authority).toMatchObject({
       assistant_answer: false,
       terminal_eligible: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
       agent_executable: false,
       prediction_finality: false,
       policy_finality: false,
       moral_finality: false,
       execution_permission: false,
     });
+    expect(output.authority).toMatchObject(output.roadmap.authority);
+    expect(output.missingEvidenceBoundaries).toEqual(
+      expect.arrayContaining(["source_backed_capacity_measurements"]),
+    );
+    expect(output.analogyBoundaries).toEqual(
+      expect.arrayContaining([
+        "Procedural analogies can suggest flow, dependency, and bottleneck questions; they do not prove organism-level agency.",
+      ]),
+    );
+    expect(output.supportRefs).toEqual(
+      expect.arrayContaining([output.roadmap.roadmapId, output.traversabilityAtlas.atlasId]),
+    );
     expect(output.parameterScopes.map((scope) => scope.kind)).toEqual(
       expect.arrayContaining([
         "material_base",
@@ -47,6 +63,42 @@ describe("Helix Ask Civilization Bounds Roadmap tool", () => {
     );
     expect(output.bridgeContext?.systemIds.length).toBeGreaterThan(0);
     expect(output.bridgeContext?.missingEvidence).toContain("source_backed_capacity_measurements");
+    expect(output.traversabilityContext.routeCandidateIds).toEqual(
+      expect.arrayContaining([
+        "route:atmospheric:sahara-amazon:dust",
+        "route:air:jfk-fra:wind-adjusted",
+      ]),
+    );
+    expect(output.traversabilityContext.evidenceRefs).toContain(output.traversabilityAtlas.atlasId);
+    expect(output.traversabilityContext.routeObjective).toBe("best_observed");
+  });
+
+  it("returns a traversability context ordered by route objective and selected layers", async () => {
+    const output = await runHelixAskCivilizationBoundsTool({
+      prompt: "Reflect planetary traversability for the dust teleconnection.",
+      selectedRouteIds: ["route:atmospheric:sahara-amazon:dust"],
+      selectedFieldLayerIds: ["field:sahara-amazon:dust-phosphorus"],
+      routeObjective: "best_observed",
+      timeCursor: "2026-07-01T00:00:00.000Z",
+    });
+
+    expect(output.traversabilityContext).toMatchObject({
+      routeCandidateIds: ["route:atmospheric:sahara-amazon:dust"],
+      activeFieldLayerIds: ["field:sahara-amazon:dust-phosphorus"],
+      routeObjective: "best_observed",
+      timeCursor: "2026-07-01T00:00:00.000Z",
+    });
+    expect(output.traversabilityContext.infrastructureNodeIds).toEqual([
+      "node:dust:bodele",
+      "node:ecology:amazon-basin",
+    ]);
+    expect(output.traversabilityContext.zenNodeIds).toContain("interbeing-systems");
+    expect(output.traversabilityContext.theoryBadgeIds).toContain(
+      "biophysics.membrane.open_system_entropy_flow",
+    );
+    expect(output.traversabilityContext.missingEvidence).toEqual(
+      expect.arrayContaining(["current_year_plume_observation"]),
+    );
   });
 
   it("can be evaluated as non-terminal civilization-bounds evidence", async () => {
@@ -85,6 +137,47 @@ describe("Helix Ask Civilization Bounds Roadmap tool", () => {
     expect(plan.tool_plan?.steps.map((step) => step.step_id)).toContain("reflect_civilization_bounds");
     expect(plan.tool_plan?.steps.map((step) => step.step_id)).toContain("build_civilization_scenario_frame");
     expect(plan.tool_plan?.steps.some((step) => step.tool_id === HELIX_ASK_CIVILIZATION_BOUNDS_TOOL_NAME)).toBe(true);
+  });
+
+  it("keeps loose metaphors and ordinary concept questions model-led", () => {
+    const prompts = [
+      "Is global trade like a circulatory system?",
+      "Is the internet like a nervous system?",
+      "Can you compare a government to an organism in a short answer?",
+      "What does it mean when people call society an ecosystem?",
+    ];
+
+    for (const prompt of prompts) {
+      const plan = planWorkstationToolUse(prompt);
+      expect(plan.intent).not.toBe("civilization_bounds_reflection");
+      expect(plan.tool_plan?.steps.some((step) => step.step_id === "reflect_civilization_bounds")).not.toBe(true);
+    }
+  });
+
+  it("admits grounded procedural-world comparisons as evidence only", () => {
+    const plan = planWorkstationToolUse(
+      "Ground the global trade as circulatory system comparison against civilization bounds: trade routes, chokepoints, ports, missing evidence, and dependency edges.",
+    );
+
+    expect(plan.intent).toBe("civilization_bounds_reflection");
+    expect(plan.reason).toContain("diagnostic roadmap receipt before synthesis");
+    expect(plan.tool_plan?.steps.map((step) => step.step_id)).toEqual(
+      expect.arrayContaining([
+        "build_civilization_scenario_frame",
+        "reflect_civilization_bounds",
+        "evaluate_civilization_bounds",
+      ]),
+    );
+    expect(plan.tool_plan?.steps.some((step) => step.tool_id === HELIX_ASK_CIVILIZATION_BOUNDS_TOOL_NAME)).toBe(true);
+  });
+
+  it("admits live or source-backed world-map grounding without making the map authoritative", () => {
+    const plan = planWorkstationToolUse(
+      "Map this against the procedural world model using live measurements, tectonic plates, weather fronts, infrastructure routes, and missing source evidence.",
+    );
+
+    expect(plan.intent).toBe("civilization_bounds_reflection");
+    expect(plan.tool_plan?.steps.map((step) => step.step_id)).toContain("reflect_civilization_bounds");
   });
 
   it("keeps Theory-Zen bridge continuity when bounds cues are present", () => {

@@ -10,6 +10,7 @@ import type {
   CivilizationParameterScopeV1,
   CivilizationProceduralScaffoldV1,
   CivilizationBoundsRoadmapV1,
+  CivilizationBoundsRoadmapAuthorityV1,
   CivilizationClaimTierV1,
   CivilizationLayerModeV1,
   CivilizationScopeBoundaryV1,
@@ -19,6 +20,18 @@ import {
   buildCivilizationCollaborationBoundV1,
   validateCivilizationBoundsRoadmapV1,
 } from "@shared/civilization-bounds-roadmap";
+import { buildCivilizationAtlasViewModel } from "@shared/civilization/build-civilization-atlas-view-model";
+import {
+  buildDefaultCivilizationTraversabilityAtlas,
+} from "@shared/civilization/civilization-traversability-fixtures";
+import {
+  isCivilizationRouteObjective,
+  type CivilizationTraversabilityRouteObjectiveV1,
+} from "@shared/civilization/civilization-route-objectives";
+import type {
+  CivilizationTraversabilityAtlasV1,
+  CivilizationTraversabilityContextV1,
+} from "@shared/civilization-traversability-atlas";
 import {
   validateCivilizationScenarioFrameV1,
   type CivilizationConstraintProfileV1,
@@ -41,6 +54,10 @@ const CivilizationBoundsToolInputSchema = z.object({
   layerMode: z.string().optional(),
   selectedSystemIds: z.array(z.string()).optional(),
   selectedBadgeIds: z.array(z.string()).optional(),
+  selectedRouteIds: z.array(z.string()).optional(),
+  selectedFieldLayerIds: z.array(z.string()).optional(),
+  routeObjective: z.string().optional(),
+  timeCursor: z.string().optional(),
   theoryReflectionRef: z.string().optional(),
   ideologyReflectionRef: z.string().optional(),
   scenarioFrame: z.any().optional(),
@@ -61,6 +78,10 @@ export type HelixAskCivilizationBoundsToolInput = {
   layerMode?: CivilizationLayerModeV1;
   selectedSystemIds?: string[];
   selectedBadgeIds?: string[];
+  selectedRouteIds?: string[];
+  selectedFieldLayerIds?: string[];
+  routeObjective?: CivilizationTraversabilityRouteObjectiveV1;
+  timeCursor?: string;
   theoryReflectionRef?: string;
   ideologyReflectionRef?: string;
   scenarioFrame?: CivilizationScenarioFrameV1;
@@ -73,9 +94,15 @@ export type HelixAskCivilizationBoundsToolInput = {
 };
 
 export type HelixAskCivilizationBoundsToolOutput = {
+  authority: CivilizationBoundsRoadmapAuthorityV1;
   roadmap: CivilizationBoundsRoadmapV1;
+  traversabilityAtlas: CivilizationTraversabilityAtlasV1;
+  traversabilityContext: CivilizationTraversabilityContextV1;
   scenarioFrame?: CivilizationScenarioFrameV1;
   bridgeContext?: CivilizationBoundsBridgeContextV1;
+  missingEvidenceBoundaries: string[];
+  analogyBoundaries: string[];
+  supportRefs: string[];
   parameterScopes: CivilizationParameterScopeV1[];
   actionChannels: CivilizationActionChannelV1[];
   dependencyChains: CivilizationDependencyChainV1[];
@@ -800,6 +827,10 @@ function filterRoadmap(
   };
 }
 
+function uniqueStrings(values: Array<string | null | undefined>): string[] {
+  return Array.from(new Set(values.filter((value): value is string => typeof value === "string" && value.length > 0)));
+}
+
 export async function runHelixAskCivilizationBoundsTool(
   input: HelixAskCivilizationBoundsToolInput,
 ): Promise<HelixAskCivilizationBoundsToolOutput> {
@@ -825,23 +856,59 @@ export async function runHelixAskCivilizationBoundsTool(
   if (issues.length > 0) {
     throw new Error(`civilization_bounds_invalid_roadmap:${issues.join("; ")}`);
   }
-  return {
+  const traversabilityAtlas = buildDefaultCivilizationTraversabilityAtlas({
+    scenarioId: filtered.scenarioId,
+    generatedAt: filtered.generatedAt,
+    observedAt: input.timeCursor,
+  });
+  const atlasView = buildCivilizationAtlasViewModel({
     roadmap: filtered,
+    atlas: traversabilityAtlas,
+    selectedRouteIds: input.selectedRouteIds,
+    selectedFieldLayerIds: input.selectedFieldLayerIds,
+    routeObjective: isCivilizationRouteObjective(input.routeObjective)
+      ? input.routeObjective
+      : undefined,
+    timeCursor: input.timeCursor,
+  });
+  const bridgeContext = input.options?.includeBridgeContext === false
+    ? undefined
+    : exportCivilizationBoundsBridgeContext(filtered, input.selectedBadgeIds);
+  const analogyBoundaries = uniqueStrings([
+    ...filtered.proceduralScaffold.blockedInterpretations,
+    ...filtered.actionChannels.flatMap((channel) => channel.blockedUses),
+    ...filtered.comparisonCases.flatMap((comparison) => comparison.blockers),
+    "Procedural analogies can suggest flow, dependency, and bottleneck questions; they do not prove organism-level agency.",
+    "Civilization bounds evidence may be rejected by the final answer when support refs are weak, missing, or mismatched.",
+  ]);
+  const missingEvidenceBoundaries = uniqueStrings([
+    ...filtered.missingEvidence,
+    ...filtered.parameterScopes.flatMap((scope) => scope.missingEvidence),
+    ...atlasView.traversabilityContext.missingEvidence,
+    ...(bridgeContext?.missingEvidence ?? []),
+  ]);
+  const supportRefs = uniqueStrings([
+    filtered.roadmapId,
+    traversabilityAtlas.atlasId,
+    ...atlasView.traversabilityContext.evidenceRefs,
+    ...(bridgeContext?.evidenceRefs ?? []),
+  ]);
+  return {
+    authority: filtered.authority,
+    roadmap: filtered,
+    traversabilityAtlas,
+    traversabilityContext: atlasView.traversabilityContext,
     ...(scenarioFrame ? { scenarioFrame } : {}),
+    missingEvidenceBoundaries,
+    analogyBoundaries,
+    supportRefs,
     parameterScopes: filtered.parameterScopes,
     actionChannels: filtered.actionChannels,
     dependencyChains: filtered.dependencyChains,
     comparisonCases: filtered.comparisonCases,
     hypothesisClaims: filtered.hypothesisClaims,
     proceduralScaffold: filtered.proceduralScaffold,
-    ...(input.options?.includeBridgeContext === false
-      ? {}
-      : {
-          bridgeContext: exportCivilizationBoundsBridgeContext(
-            filtered,
-            input.selectedBadgeIds,
-          ),
-        }),
+    ...(bridgeContext ? { bridgeContext } : {}),
   };
 }
 
@@ -858,6 +925,10 @@ export const civilizationBoundsRoadmapSpec: ToolSpecShape = {
       layerMode: { type: "string" },
       selectedSystemIds: { type: "array", items: { type: "string" } },
       selectedBadgeIds: { type: "array", items: { type: "string" } },
+      selectedRouteIds: { type: "array", items: { type: "string" } },
+      selectedFieldLayerIds: { type: "array", items: { type: "string" } },
+      routeObjective: { type: "string" },
+      timeCursor: { type: "string" },
       theoryReflectionRef: { type: "string" },
       ideologyReflectionRef: { type: "string" },
       scenarioFrame: { type: "object" },
@@ -876,9 +947,15 @@ export const civilizationBoundsRoadmapSpec: ToolSpecShape = {
   outputSchema: {
     type: "object",
     properties: {
+      authority: { type: "object" },
       roadmap: { type: "object" },
+      traversabilityAtlas: { type: "object" },
+      traversabilityContext: { type: "object" },
       scenarioFrame: { type: "object" },
       bridgeContext: { type: "object" },
+      missingEvidenceBoundaries: { type: "array", items: { type: "string" } },
+      analogyBoundaries: { type: "array", items: { type: "string" } },
+      supportRefs: { type: "array", items: { type: "string" } },
       parameterScopes: { type: "array", items: { type: "object" } },
       actionChannels: { type: "array", items: { type: "object" } },
       dependencyChains: { type: "array", items: { type: "object" } },
@@ -887,7 +964,13 @@ export const civilizationBoundsRoadmapSpec: ToolSpecShape = {
       proceduralScaffold: { type: "object" },
     },
     required: [
+      "authority",
       "roadmap",
+      "traversabilityAtlas",
+      "traversabilityContext",
+      "missingEvidenceBoundaries",
+      "analogyBoundaries",
+      "supportRefs",
       "parameterScopes",
       "actionChannels",
       "dependencyChains",
@@ -922,6 +1005,12 @@ export const civilizationBoundsRoadmapHandler: ToolHandler = async (input: unkno
     layerMode: parsed.layerMode as CivilizationLayerModeV1 | undefined,
     selectedSystemIds: parsed.selectedSystemIds,
     selectedBadgeIds: parsed.selectedBadgeIds,
+    selectedRouteIds: parsed.selectedRouteIds,
+    selectedFieldLayerIds: parsed.selectedFieldLayerIds,
+    routeObjective: isCivilizationRouteObjective(parsed.routeObjective)
+      ? parsed.routeObjective
+      : undefined,
+    timeCursor: parsed.timeCursor,
     theoryReflectionRef: parsed.theoryReflectionRef,
     ideologyReflectionRef: parsed.ideologyReflectionRef,
     scenarioFrame: parsed.scenarioFrame as CivilizationScenarioFrameV1 | undefined,

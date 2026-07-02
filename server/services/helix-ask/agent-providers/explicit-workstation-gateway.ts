@@ -214,6 +214,60 @@ const appendDedupe = (
   }
 };
 
+const RESEARCH_QUANTIFY_REFLECT_OUTCOME = "research_quantify_reflect" as const;
+
+const isCodexReasoningDependentRequest = (request: Record<string, unknown> | null): boolean => {
+  if (!request) return false;
+  return readString(request.compound_outcome) === RESEARCH_QUANTIFY_REFLECT_OUTCOME;
+};
+
+export const shouldAutoExecuteDependentCompoundRequest = (request: Record<string, unknown> | null): boolean =>
+  Boolean(request) && !isCodexReasoningDependentRequest(request);
+
+const attachDependentRequestAsNextAffordance = (
+  result: HelixWorkstationGatewayCallResult,
+  request: Record<string, unknown>,
+): void => {
+  const capability = readString(request.capability_id) ?? readString(request.capabilityId);
+  if (!capability) return;
+  const sourceTargetIntent = readRecord(readRecord(request.arguments)?.source_target_intent);
+  const affordance = {
+    schema: "helix.provider_next_affordance.v1",
+    source: "helix_compound_capability_dependency_planner",
+    capability,
+    mode: readString(request.mode) ?? "read",
+    purpose: readString(sourceTargetIntent?.dependency_binding) ?? "codex_selected_followup_tool",
+    reason: "available_after_observation_reentry",
+    subgoal_id: readString(request.subgoal_id) ?? readString(sourceTargetIntent?.subgoal_id),
+    depends_on_subgoal_id: readString(sourceTargetIntent?.depends_on_subgoal_id),
+    required_affordance_kinds: readArray(sourceTargetIntent?.required_affordance_kinds),
+    required_observation_kind: readString(sourceTargetIntent?.required_observation_kind),
+    terminal_eligible: false,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  const observation = readRecord(result.observation);
+  if (observation) {
+    observation.next_affordances = [
+      ...readArray(observation.next_affordances),
+      affordance,
+    ];
+  }
+  const stateDelta = readRecord(result.observation_packet.state_delta) ?? {};
+  result.observation_packet.state_delta = {
+    ...stateDelta,
+    next_affordances: [
+      ...readArray(stateDelta.next_affordances),
+      affordance,
+    ],
+  };
+  result.observation_packet.suggested_next_steps = Array.from(new Set([
+    ...result.observation_packet.suggested_next_steps,
+    "continue_reasoning",
+    "use_another_tool",
+  ])) as HelixWorkstationGatewayCallResult["observation_packet"]["suggested_next_steps"];
+};
+
 const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const promptNamedCapabilityPattern = (capabilityId: string): RegExp =>
@@ -284,6 +338,16 @@ const cleanNamedCapabilityArgumentText = (value: string | null | undefined): str
     .replace(/[.,;:!?)]*$/g, "")
     .trim();
   return cleaned && cleaned.length <= 240 ? cleaned : null;
+};
+
+const hasContextualTheoryReflectionMention = (prompt: string): boolean => {
+  const unquoted = unquotePrompt(prompt);
+  return (
+    /\b(?:not\s+asking\s+(?:you\s+)?to|not\s+asking\s+for|don'?t|do\s+not|never|without)\b[\s\S]{0,100}\b(?:fetch|get|read|show|use|run|call|execute)\b[\s\S]{0,80}\btheory\s+(?:context\s+)?reflection\b/i.test(unquoted) ||
+    /\b(?:text|sentence|phrase|quote|screen|page|button|label|ui)\b[\s\S]{0,120}\b(?:says|shows|reads|contains|mentions|labeled|labelled|called|named)\b[\s\S]{0,120}\btheory\s+(?:context\s+)?reflection\b/i.test(unquoted) ||
+    /\b(?:future|later|eventually|hypothetically|if|when|after|before|would|could|might)\b[\s\S]{0,140}\b(?:fetch|get|read|show|use|run|call|execute)\b[\s\S]{0,80}\btheory\s+(?:context\s+)?reflection\b/i.test(unquoted) ||
+    /\b(?:explain|describe|what\s+does|what\s+is|what\s+are)\b[\s\S]{0,120}\btheory\s+(?:context\s+)?reflection\b[\s\S]{0,120}\b(?:mean|means|do|does|is|are|would)\b/i.test(unquoted)
+  );
 };
 
 const extractVoiceUtteranceTextFromPrompt = (prompt: string): string | null => {
@@ -1694,17 +1758,24 @@ export const buildPromptDerivedTheoryReflectionGatewayCallRequests = (
   const prompt = readPrompt(body);
   if (!prompt) return [];
   if (hasPromptNamedCapability(prompt, THEORY_CONTEXT_REFLECTION_CAPABILITY)) return [];
-  if (hasNegatedToolInstruction(prompt, /\b(?:reflect|reflection|theory\s+badge\s+graph|theory\s+graph|badge\s+graph)\b/i)) {
+  if (
+    hasNegatedToolInstruction(prompt, /\b(?:fetch|get|read|show|use|run|call|execute|reflect|reflection|theory\s+badge\s+graph|theory\s+graph|badge\s+graph|theory\s+context|theory\s+reflection)\b/i) ||
+    hasContextualTheoryReflectionMention(prompt)
+  ) {
     return [];
   }
   const unquoted = unquotePrompt(prompt);
   const wantsTheoryReflection =
     /\breflect\b[\s\S]{0,120}\b(?:theory\s+badge\s+graph|theory\s+graph|badge\s+graph)\b/i.test(unquoted) ||
-    /\b(?:theory\s+badge\s+graph|theory\s+graph|badge\s+graph)\b[\s\S]{0,120}\breflect(?:ion)?\b/i.test(unquoted);
+    /\b(?:theory\s+badge\s+graph|theory\s+graph|badge\s+graph)\b[\s\S]{0,120}\breflect(?:ion)?\b/i.test(unquoted) ||
+    /\b(?:fetch|get|read|show|use|run|call|execute)\b[\s\S]{0,80}\b(?:the\s+)?theory\s+(?:context\s+)?reflection\b/i.test(unquoted) ||
+    /\b(?:theory\s+(?:context\s+)?reflection)\b[\s\S]{0,80}\b(?:for|about|on)\b/i.test(unquoted);
   if (!wantsTheoryReflection) return [];
   const focusedPrompt =
     cleanNamedCapabilityArgumentText(
       unquoted.match(/\breflect\s+(.{3,160}?)\s+(?:against|through|via|with)\s+(?:the\s+)?(?:theory\s+badge\s+graph|theory\s+graph|badge\s+graph)\b/i)?.[1] ??
+        unquoted.match(/\b(?:fetch|get|read|show|use|run|call|execute)\b[\s\S]{0,80}\b(?:the\s+)?theory\s+(?:context\s+)?reflection\s+(?:for|about|on)\s+([^.;\n]+)/i)?.[1] ??
+        unquoted.match(/\b(?:theory\s+(?:context\s+)?reflection)\s+(?:for|about|on)\s+([^.;\n]+)/i)?.[1] ??
         unquoted.match(/\b(?:reflect|reflection)\b[\s\S]{0,120}\b(?:for|about|on)\s+([^.;\n]+)/i)?.[1] ??
         unquoted.match(/\b(?:for|about|on)\s+([^.;\n]+)\b[\s\S]{0,80}\b(?:theory\s+badge\s+graph|theory\s+graph|badge\s+graph)\b/i)?.[1] ??
         null,
@@ -2048,7 +2119,10 @@ export const runExplicitWorkstationGatewayCalls = async (input: {
         compound_dependency_plan: dependencyRailStatus,
       };
     }
-    if (dependentVoiceRequest) {
+    if (dependentVoiceRequest && isCodexReasoningDependentRequest(dependentVoiceRequest)) {
+      attachDependentRequestAsNextAffordance(result, dependentVoiceRequest);
+    }
+    if (shouldAutoExecuteDependentCompoundRequest(dependentVoiceRequest)) {
       let nextDependentRequest: Record<string, unknown> | null = dependentVoiceRequest;
       let dependentDepth = 0;
       while (nextDependentRequest && dependentDepth < 4) {
@@ -2084,7 +2158,12 @@ export const runExplicitWorkstationGatewayCalls = async (input: {
             compound_dependency_plan: followupRailStatus,
           };
         }
-        nextDependentRequest = followupDependentRequest;
+        if (followupDependentRequest && isCodexReasoningDependentRequest(followupDependentRequest)) {
+          attachDependentRequestAsNextAffordance(dependentResult, followupDependentRequest);
+          nextDependentRequest = null;
+        } else {
+          nextDependentRequest = followupDependentRequest;
+        }
       }
     }
   }

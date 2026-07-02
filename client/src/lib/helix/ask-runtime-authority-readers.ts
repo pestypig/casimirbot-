@@ -1,5 +1,8 @@
 import type { TheoryContextReflectionV1 } from "@shared/contracts/theory-context-reflection.v1";
-import { isTheoryContextReflectionV1 } from "@shared/contracts/theory-context-reflection.v1";
+import {
+  buildTheoryContextReflectionV1,
+  isTheoryContextReflectionV1,
+} from "@shared/contracts/theory-context-reflection.v1";
 
 import type { HelixWorkstationAction } from "@/lib/workstation/workstationActionContract";
 import { coerceText } from "@/lib/helix/ask-value-normalization";
@@ -18,6 +21,105 @@ export function hasHelixAskBackendEntrypointTurnId(turnId: string | null | undef
   return /^ask[:/]/i.test(normalized) || /(?:^|:)ask:[0-9a-z-]+(?:$|:)/i.test(normalized);
 }
 
+function readStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.map((entry) => coerceText(entry).trim()).filter(Boolean)
+    : [];
+}
+
+function readFiniteNumber(value: unknown, fallback = 0.5): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function extractTheoryReflectionFromGatewayObservation(value: unknown): TheoryContextReflectionV1 | null {
+  const observation = readAgentLoopAuditRecord(value);
+  if (!observation) return null;
+  const capability = coerceText(observation.capability_key ?? observation.capability ?? observation.capability_id).trim();
+  if (capability !== "theory-badge-graph.reflect_discussion_context") return null;
+  const calculatorPayloads = readAgentLoopAuditArray(observation.calculator_payloads)
+    .map(readAgentLoopAuditRecord)
+    .filter((payload): payload is Record<string, unknown> => Boolean(payload))
+    .map((payload) => ({
+      badgeId: coerceText(payload.badge_id ?? payload.badgeId).trim(),
+      badgeTitle: coerceText(payload.badge_title ?? payload.badgeTitle).trim(),
+      payloadId: coerceText(payload.payload_id ?? payload.payloadId).trim(),
+      expression: coerceText(payload.expression).trim(),
+      displayLatex: coerceText(payload.display_latex ?? payload.displayLatex).trim(),
+      targetVariable: coerceText(payload.target_variable ?? payload.targetVariable).trim() || null,
+      claimBoundaryNotes: readStringArray(payload.claim_boundary_notes ?? payload.claimBoundaryNotes),
+    }))
+    .filter((payload) => payload.badgeId && payload.payloadId && payload.expression);
+  if (calculatorPayloads.length === 0) return null;
+  const payloadByBadgeId = new Map(calculatorPayloads.map((payload) => [payload.badgeId, payload]));
+  const exactBadgeIds = readStringArray(observation.exact_badge_ids ?? observation.exactBadgeIds).slice(0, 12);
+  const likelyBadgeIds = readStringArray(observation.likely_badge_ids ?? observation.likelyBadgeIds).slice(0, 12);
+  const allBadgeIds = Array.from(new Set([...exactBadgeIds, ...likelyBadgeIds, ...calculatorPayloads.map((payload) => payload.badgeId)]));
+  const matchForBadge = (badgeId: string, index: number) => {
+    const payload = payloadByBadgeId.get(badgeId);
+    return {
+      badgeId,
+      title: payload?.badgeTitle || badgeId,
+      score: readFiniteNumber(undefined, Math.max(0.35, 0.9 - index * 0.04)),
+      reasons: ["Ask gateway theory reflection observation"],
+      matchedSymbols: payload?.targetVariable ? [payload.targetVariable] : [],
+      matchedEquationFamilies: payload?.expression ? [payload.expression] : [],
+      matchedRepoPaths: [],
+      claimBoundaryNotes: payload?.claimBoundaryNotes ?? readStringArray(observation.claim_boundary_notes),
+    };
+  };
+  const exactMatches = (exactBadgeIds.length ? exactBadgeIds : calculatorPayloads.map((payload) => payload.badgeId))
+    .slice(0, 8)
+    .map(matchForBadge);
+  const likelyMatches = likelyBadgeIds
+    .filter((badgeId) => !exactMatches.some((match) => match.badgeId === badgeId))
+    .slice(0, 8)
+    .map(matchForBadge);
+  const highlightedBadgeIds = readStringArray(observation.highlighted_badge_ids ?? observation.highlightedBadgeIds);
+  const heatByBadgeId = Object.fromEntries(
+    allBadgeIds.map((badgeId, index) => [badgeId, Math.max(0.25, 0.9 - index * 0.05)]),
+  );
+  return buildTheoryContextReflectionV1({
+    reflectionId: coerceText(observation.reflection_id ?? observation.reflectionId).trim() || undefined,
+    graphId: "nhm2-theory-badge-graph",
+    input: {
+      prompt: coerceText(observation.prompt).trim() || "Ask gateway theory reflection",
+      conversationContext: null,
+      mentionedEquations: calculatorPayloads.map((payload) => payload.expression),
+      mentionedSymbols: calculatorPayloads.map((payload) => payload.targetVariable).filter((value): value is string => Boolean(value)),
+      mentionedDomains: [],
+      source: "helix_ask",
+      confidenceMode: "strict_badge_match",
+    },
+    exactMatches,
+    likelyMatches,
+    inferredDomains: [],
+    overlay: {
+      centerBadgeIds: allBadgeIds.slice(0, 3),
+      highlightedBadgeIds: highlightedBadgeIds.length ? highlightedBadgeIds : allBadgeIds.slice(0, 8),
+      highlightedEdgeIds: [],
+      heatByBadgeId,
+      exactBadgeIds,
+      likelyBadgeIds,
+      softRegion: allBadgeIds.length
+        ? {
+            id: "ask-gateway-theory-reflection",
+            label: "Ask gateway theory reflection",
+            badgeIds: allBadgeIds.slice(0, 8),
+            confidence: 0.7,
+            tone: "green",
+            meaning: "discussion_context_not_proof",
+          }
+        : null,
+    },
+    evidenceForAsk: {
+      summary: coerceText(observation.summary).trim() || "Theory Badge Graph reflection produced formula context.",
+      claimBoundaries: readStringArray(observation.claim_boundary_notes ?? observation.claimBoundaryNotes),
+      calculatorPayloads,
+      recommendedNextActions: [],
+    },
+  });
+}
+
 export function extractAskLevelTheoryReflection(value: unknown): TheoryContextReflectionV1 | null {
   const record = readAgentLoopAuditRecord(value);
   if (!record) return null;
@@ -33,6 +135,22 @@ export function extractAskLevelTheoryReflection(value: unknown): TheoryContextRe
     const artifactV1 = readAgentLoopAuditRecord(payload?.artifact_v1);
     if (isTheoryContextReflectionV1(artifactV1?.reflectionV1)) return artifactV1.reflectionV1;
     if (isTheoryContextReflectionV1(payload?.reflectionV1)) return payload.reflectionV1;
+  }
+  const debug = readAgentLoopAuditRecord(record.debug);
+  const gatewayResultSources = [
+    record.workstation_gateway_call_results,
+    record.workstation_gateway_results,
+    debug?.workstation_gateway_call_results,
+    debug?.workstation_gateway_results,
+  ];
+  for (const source of gatewayResultSources) {
+    if (!Array.isArray(source)) continue;
+    for (const entry of source) {
+      const result = readAgentLoopAuditRecord(entry);
+      const observation = readAgentLoopAuditRecord(result?.observation);
+      const reflection = extractTheoryReflectionFromGatewayObservation(observation);
+      if (reflection) return reflection;
+    }
   }
   return null;
 }

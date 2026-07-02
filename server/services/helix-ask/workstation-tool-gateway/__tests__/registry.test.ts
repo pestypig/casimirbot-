@@ -2718,6 +2718,11 @@ describe("Helix workstation tool gateway", () => {
       arguments: {
         query: "Correlation of the L-mode density limit with edge collisionality",
         source_ref: "Correlation of the L-mode density limit with edge collisionality",
+        variable_source_plan: {
+          schema: "helix.variable_source_plan.v1",
+          formula_variables: ["n1_m3", "n2_m3", "sigma_m2", "v_m_s"],
+          query_terms: ["fusion", "thermonuclear reaction rate", "fusion cross section", "sigma v"],
+        },
       },
       turnId: "ask:test:gateway-scholarly-full-text-missing-source",
       iteration: 9,
@@ -2737,6 +2742,13 @@ describe("Helix workstation tool gateway", () => {
         status: "blocked",
         blocked_reason: "fetchable_paper_identity_required",
         missing_requirements: ["fetchable_paper_identity_required"],
+        scholarly_full_text_recovery_affordance: {
+          schema: "helix.scholarly_full_text_recovery_affordance.v1",
+          reason: "fetchable_paper_identity_required",
+          recommended_next_capability: "scholarly-research.lookup_papers",
+          terminal_eligible: false,
+          assistant_answer: false,
+        },
         selected_for_answer: false,
         terminal_eligible: false,
         post_tool_model_step_required: true,
@@ -2744,6 +2756,13 @@ describe("Helix workstation tool gateway", () => {
         raw_content_included: false,
       },
     });
+    expect(result.observation_packet.state_delta).toMatchObject({
+      scholarly_full_text_recovery_affordance: {
+        schema: "helix.scholarly_full_text_recovery_affordance.v1",
+        reason: "fetchable_paper_identity_required",
+      },
+    });
+    expect(JSON.stringify(result.observation)).toMatch(/accessible pdf|full text|sigma v/i);
   });
 
   it("extracts cited numeric parameters with units and rejects missing variables", async () => {
@@ -2758,6 +2777,20 @@ describe("Helix workstation tool gateway", () => {
           title: "Tokamak beta evidence",
           doi: "10.0000/example",
           url: "https://example.test/tokamak",
+        },
+        variable_source_plan: {
+          schema: "helix.variable_source_plan.v1",
+          entries: [
+            {
+              variable: "B_T",
+              canonical_quantity: "toroidal magnetic field",
+              expected_unit: "T",
+              source_classes: ["tokamak operating parameter table"],
+              search_terms: ["toroidal magnetic field", "magnetic field strength"],
+              extraction_aliases: ["B_T", "toroidal magnetic field", "magnetic field"],
+            },
+          ],
+          query_terms: ["tokamak plasma beta operating parameter table"],
         },
         text_evidence: [
           "Table 1 reports electron density n = 1.0e20 m^-3 [12].",
@@ -2786,6 +2819,23 @@ describe("Helix workstation tool gateway", () => {
         capability_key: SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY,
         requested_variables: ["n_m3", "T_eV", "B_T"],
         missing_variables: ["B_T"],
+        scholarly_numeric_recovery_affordance: {
+          schema: "helix.scholarly_numeric_recovery_affordance.v1",
+          reason: "missing_requested_numeric_variables",
+          missing_variables: ["B_T"],
+          expected_variables: [
+            expect.objectContaining({
+              variable: "B_T",
+              canonical_quantity: "toroidal magnetic field",
+              expected_unit: "T",
+            }),
+          ],
+          expected_source_classes: ["tokamak operating parameter table"],
+          terminal_eligible: false,
+          post_tool_model_step_required: true,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
         selected_for_answer: false,
         terminal_eligible: false,
         post_tool_model_step_required: true,
@@ -2797,6 +2847,10 @@ describe("Helix workstation tool gateway", () => {
     const observation = result.observation as {
       parameters?: Array<{ variable?: string; normalized_value?: number; normalized_unit?: string; evidence_ref?: string }>;
       rejected_candidates?: Array<{ variable?: string; reason?: string }>;
+      scholarly_numeric_recovery_affordance?: {
+        recovery_queries?: string[];
+        variable_source_plan?: Record<string, unknown>;
+      };
     };
     expect(observation.parameters).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -2812,6 +2866,19 @@ describe("Helix workstation tool gateway", () => {
       }),
     ]));
     expect(observation.rejected_candidates ?? []).toEqual(expect.any(Array));
+    expect(observation.scholarly_numeric_recovery_affordance?.recovery_queries).toEqual(
+      expect.arrayContaining([expect.stringMatching(/B_T|toroidal magnetic field|cited values/i)]),
+    );
+    expect(observation.scholarly_numeric_recovery_affordance?.variable_source_plan).toMatchObject({
+      schema: "helix.variable_source_plan.v1",
+    });
+    expect(result.observation_packet.state_delta).toMatchObject({
+      scholarly_numeric_recovery_affordance: expect.objectContaining({
+        schema: "helix.scholarly_numeric_recovery_affordance.v1",
+        missing_variables: ["B_T"],
+      }),
+    });
+    expect(result.observation_packet.suggested_next_steps).toEqual(expect.arrayContaining(["use_another_tool", "ask_user"]));
   });
 
   it("extracts alias-matched numeric parameters from table-like scholarly evidence", async () => {

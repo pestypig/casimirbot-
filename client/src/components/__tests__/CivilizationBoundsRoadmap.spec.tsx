@@ -19,10 +19,19 @@ vi.mock("react-simple-maps", async () => {
         { "data-testid": "mock-geographies" },
         children({ geographies: [{ rsmKey: "earth" }] }),
       ),
-    Geography: ({ geography }: { geography: { rsmKey: string } }) =>
+    Geography: ({
+      geography,
+      style,
+    }: {
+      geography: { rsmKey: string };
+      style?: Record<string, Record<string, unknown>>;
+    }) =>
       ReactActual.createElement("path", {
         "data-testid": "mock-geography",
         "data-rsm-key": geography.rsmKey,
+        "data-default-stroke-width": String(style?.default?.strokeWidth ?? ""),
+        "data-hover-stroke-width": String(style?.hover?.strokeWidth ?? ""),
+        "data-hover-filter": String(style?.hover?.filter ?? ""),
       }),
     Line: ({
       from,
@@ -66,8 +75,11 @@ describe("CivilizationBoundsRoadmap", () => {
 
     expect(screen.getByTestId("mock-civilization-map")).toBeTruthy();
     expect(screen.getAllByTestId("civilization-bounds-badge").length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId("civilization-environmental-flow").length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId("civilization-tectonic-plate-boundary").length).toBeGreaterThan(0);
     expect(screen.queryByTestId("civilization-bounds-country-inspector")).toBeNull();
     expect(screen.queryAllByTestId("civilization-bounds-edge")).toHaveLength(0);
+    expect(screen.queryAllByTestId("civilization-route-candidate")).toHaveLength(0);
 
     expect(screen.queryByText("Civilization Bounds Atlas")).toBeNull();
     expect(screen.queryByRole("button", { name: "Material" })).toBeNull();
@@ -80,6 +92,26 @@ describe("CivilizationBoundsRoadmap", () => {
     expect(screen.queryByText(/Projection map - bubble partners/i)).toBeNull();
     expect(screen.queryByText(/Anchor nm-gap metrology/i)).toBeNull();
     expect(screen.queryByText(/Assumes Casimir/i)).toBeNull();
+  });
+
+  it("renders tectonic plate boundaries bolder than nation borders while preserving country hover glow", () => {
+    render(<CivilizationBoundsRoadmap />);
+
+    const nation = screen.getByTestId("mock-geography");
+    const plateBoundary = screen.getAllByTestId("civilization-tectonic-plate-boundary")[0];
+    const environmentalFlow = screen.getAllByTestId("civilization-environmental-flow")[0];
+
+    expect(Number(plateBoundary.getAttribute("stroke-width"))).toBeGreaterThan(
+      Number(nation.getAttribute("data-default-stroke-width")),
+    );
+    expect(Number(plateBoundary.getAttribute("stroke-width"))).toBeGreaterThan(
+      Number(environmentalFlow.getAttribute("stroke-width")),
+    );
+    expect(Number(nation.getAttribute("data-hover-stroke-width"))).toBeGreaterThan(
+      Number(nation.getAttribute("data-default-stroke-width")),
+    );
+    expect(nation.getAttribute("data-hover-filter")).toContain("drop-shadow");
+    expect(plateBoundary.getAttribute("stroke")).toBe("#facc15");
   });
 
   it("opens a country receipt from a selected nation marker", () => {
@@ -96,6 +128,7 @@ describe("CivilizationBoundsRoadmap", () => {
     expect(inspector.textContent).toContain("missing");
     expect(inspector.textContent).toContain("sources");
     expect(screen.getAllByTestId("civilization-bounds-edge").length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId("civilization-route-candidate").length).toBeGreaterThan(0);
     expect(inspector.textContent).not.toMatch(/Host early|Mass-produce|Build one of the global/i);
   });
 

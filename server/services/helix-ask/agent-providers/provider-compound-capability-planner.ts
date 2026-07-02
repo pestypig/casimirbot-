@@ -221,7 +221,7 @@ const hasScholarlyFullTextNumericChainIntent = (prompt: string): boolean => {
   const unquoted = unquotePrompt(prompt);
   return (
     /\bscholarly-research\.(?:fetch_full_text|extract_numeric_parameters)\b/i.test(unquoted) ||
-    /\b(?:fetch\s+full\s+text|full[-\s]?text|extract\s+numeric\s+parameters?|numeric\s+parameter\s+extraction|cited\s+numeric\s+values?)\b/i.test(unquoted)
+    /\b(?:fetch\s+full\s+text|full[-\s]?text|extract\s+numeric\s+parameters?|numeric\s+parameter\s+extraction|cited\s+(?:numeric|numerical)\s+values?|source[-\s]?bound\s+(?:numeric|numerical)\s+values?|unit[-\s]?bearing\s+(?:numeric|numerical)\s+values?|calculator\s+binding)\b/i.test(unquoted)
   );
 };
 
@@ -335,7 +335,74 @@ const buildSummarizeAndCalculateRequests = (body: Record<string, unknown>): Reco
   ];
 };
 
-const isResearchQuantifyReflectPrompt = (prompt: string): boolean => {
+type PriorTheoryReflectionFormulaContext = {
+  formulas: string[];
+  variables: string[];
+  query_terms: string[];
+  source_ref: string;
+};
+
+const extractVariablesFromFormulaExpression = (expression: string): string[] => {
+  const rhs = expression.includes("=") ? expression.split("=").slice(1).join("=") : expression;
+  return uniqueStrings(
+    Array.from(rhs.matchAll(/\b[A-Za-z_][A-Za-z0-9_]*\b/g))
+      .map((match) => match[0])
+      .filter((symbol) => !["sqrt", "ln", "log", "sin", "cos", "tan", "exp", "abs", "min", "max"].includes(symbol.toLowerCase()))
+      .filter((symbol) => !/^(?:pi|e|c|g|mu0|e_charge)$/i.test(symbol)),
+  );
+};
+
+const readStringArrayField = (value: unknown): string[] =>
+  readArray(value).map(readString).filter((entry): entry is string => Boolean(entry));
+
+const readPriorTheoryReflectionFormulaContext = (body: Record<string, unknown>): PriorTheoryReflectionFormulaContext | null => {
+  const workspaceSnapshot = readWorkspaceSnapshot(body);
+  const context =
+    readRecord(workspaceSnapshot?.latest_theory_reflection_equation_context) ??
+    readRecord(workspaceSnapshot?.latestTheoryReflectionEquationContext) ??
+    readRecord(workspaceSnapshot?.latest_theory_reflection_context) ??
+    readRecord(workspaceSnapshot?.latestTheoryReflectionContext);
+  if (!context) return null;
+  const payloads = readArray(context.calculator_payloads ?? context.calculatorPayloads)
+    .map(readRecord)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  const formulas = uniqueStrings(payloads.map((entry) => readString(entry.expression)).filter((entry): entry is string => Boolean(entry)));
+  if (formulas.length === 0) return null;
+  const matchedBadges = readArray(context.matched_badges ?? context.matchedBadges)
+    .map(readRecord)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  const badgeTerms = uniqueStrings([
+    ...payloads.flatMap((entry) => [
+      readString(entry.badge_title ?? entry.badgeTitle),
+      readString(entry.badge_id ?? entry.badgeId),
+      ...readStringArrayField(entry.claim_boundary_notes ?? entry.claimBoundaryNotes),
+    ]),
+    ...matchedBadges.flatMap((entry) => [
+      readString(entry.title),
+      readString(entry.badge_id ?? entry.badgeId),
+      ...readStringArrayField(entry.matched_equation_families ?? entry.matchedEquationFamilies),
+      ...readStringArrayField(entry.matched_symbols ?? entry.matchedSymbols),
+    ]),
+    readString(context.summary),
+    readString(context.input_prompt ?? context.inputPrompt),
+  ].filter((entry): entry is string => Boolean(entry)));
+  return {
+    formulas,
+    variables: uniqueStrings(formulas.flatMap(extractVariablesFromFormulaExpression)),
+    query_terms: badgeTerms,
+    source_ref: readString(context.reflection_id ?? context.reflectionId) ?? "latest_theory_reflection_equation_context",
+  };
+};
+
+const hasPriorTheoryEquationAnaphora = (prompt: string, body: Record<string, unknown>): boolean => {
+  const unquoted = unquotePrompt(prompt);
+  if (!/\b(?:these|this|that|the|those|above|previous)\s+(?:equations?|expressions?|formulas?|templates?)\b/i.test(unquoted)) {
+    return false;
+  }
+  return Boolean(readPriorTheoryReflectionFormulaContext(body));
+};
+
+const isResearchQuantifyReflectPrompt = (prompt: string, body: Record<string, unknown>): boolean => {
   if (hasDocumentEvidenceIntent(prompt) && !hasScholarlyFullTextNumericChainIntent(prompt)) return false;
   const unquoted = unquotePrompt(prompt);
   if (
@@ -347,16 +414,16 @@ const isResearchQuantifyReflectPrompt = (prompt: string): boolean => {
     return false;
   }
   if (
-    /\b(?:later|future|eventually|hypothetically|might|could|would|not\s+now)\b[\s\S]{0,180}\b(?:research|papers?|arxiv|scholarly|internet|web|calculate|compute|estimate|reflect|theory\s+badge\s+graph|theory\s+graph)\b/i.test(unquoted) ||
-    /\b(?:research|papers?|arxiv|scholarly|internet|web|calculate|compute|estimate|reflect|theory\s+badge\s+graph|theory\s+graph)\b[\s\S]{0,180}\b(?:later|future|eventually|hypothetically|might|could|would|not\s+now)\b/i.test(unquoted)
+    /\b(?:later|future|eventually|hypothetically|not\s+now)\b[\s\S]{0,180}\b(?:research|papers?|arxiv|scholarly|internet|web|calculate|compute|estimate|reflect|theory\s+badge\s+graph|theory\s+graph)\b/i.test(unquoted) ||
+    /\b(?:research|papers?|arxiv|scholarly|internet|web|calculate|compute|estimate|reflect|theory\s+badge\s+graph|theory\s+graph)\b[\s\S]{0,180}\b(?:later|future|eventually|hypothetically|not\s+now)\b/i.test(unquoted)
   ) {
     return false;
   }
-  const wantsResearch = /\b(?:research\s+papers?|papers?|arxiv|scholarly|internet|web|sources?|corroborat(?:e|ion)|retrieve\s+evidence|look\s+up)\b/i.test(unquoted);
-  const wantsQuantify = /\b(?:calculate|compute|estimate|solve|solve_expression|calculator|quantif(?:y|ication)|numeric\s+parameters?|scalar|equation|expression|plug\s+into)\b/i.test(unquoted);
+  const wantsResearch = /\b(?:research[-\s]+papers?|papers?|arxiv|scholarly|internet|web|sources?|corroborat(?:e|ion)|retrieve\s+evidence|look\s+up|cite|cited|source[-\s]?bound)\b/i.test(unquoted);
+  const wantsQuantify = /\b(?:calculate|compute|estimate|solve|solve_expression|calculator|quantif(?:y|ication)|numeric\s+parameters?|numeric\s+values?|numerical\s+values?|scalar|equation|expression|plug\s+into)\b/i.test(unquoted);
   const wantsReflection = /\b(?:reflect|theory\s+badge\s+graph|theory\s+graph|civilization\s+bounds?|claim\s+boundary|conditions\s+of\s+the\s+civilization|social|energy|material)\b/i.test(unquoted);
   const wantsFullTextNumericChain = hasScholarlyFullTextNumericChainIntent(prompt);
-  return wantsResearch && wantsQuantify && (wantsReflection || wantsFullTextNumericChain);
+  return wantsResearch && wantsQuantify && (wantsReflection || wantsFullTextNumericChain || hasPriorTheoryEquationAnaphora(prompt, body));
 };
 
 const requestedFormulaVariablesFromPrompt = (prompt: string): string[] => {
@@ -387,6 +454,16 @@ type VariableSourcePlan = {
   schema: "helix.variable_source_plan.v1";
   source: "helix_compound_capability_dependency_planner";
   formula_variables: string[];
+  prior_theory_formula_context?: {
+    schema: "helix.prior_theory_formula_context.v1";
+    source_ref: string;
+    formulas: string[];
+    variables: string[];
+    query_terms: string[];
+    assistant_answer: false;
+    raw_content_included: false;
+    terminal_eligible: false;
+  };
   entries: VariableSourcePlanEntry[];
   query_terms: string[];
   retrieval_intent: string;
@@ -456,6 +533,29 @@ const variableSourcePlanEntry = (variable: string): VariableSourcePlanEntry => {
       extraction_aliases: ["n_e", "ne", "density", "electron density", "plasma density", "number density"],
     };
   }
+  if (/^n\d*m3$/.test(normalized)) {
+    return {
+      variable,
+      canonical_quantity: "reactant_or_species_number_density",
+      expected_unit: "m^-3",
+      role: "formula_input",
+      source_classes: [
+        "fusion plasma parameter table",
+        "reactant density diagnostic",
+        "thermonuclear reaction rate model",
+        "nuclear reaction experiment setup",
+      ],
+      search_terms: [
+        "reactant number density",
+        "ion density",
+        "plasma density",
+        "fuel density",
+        "m^-3",
+        "fusion plasma parameters",
+      ],
+      extraction_aliases: [variable, "n1", "n2", "reactant density", "ion density", "plasma density", "number density"],
+    };
+  }
   if (normalized === "tev") {
     return {
       variable,
@@ -485,6 +585,52 @@ const variableSourcePlanEntry = (variable: string): VariableSourcePlanEntry => {
       ],
       search_terms: ["toroidal magnetic field", "magnetic field", "B_t", "B0", "tesla", "T"],
       extraction_aliases: ["B_T", "Bt", "B_t", "magnetic field", "toroidal magnetic field"],
+    };
+  }
+  if (normalized === "sigmam2") {
+    return {
+      variable,
+      canonical_quantity: "nuclear_reaction_cross_section",
+      expected_unit: "m^2",
+      role: "formula_input",
+      source_classes: [
+        "fusion cross-section data",
+        "nuclear reaction rate paper",
+        "Maxwellian-averaged reactivity table",
+        "reaction cross-section measurement",
+      ],
+      search_terms: [
+        "fusion cross section",
+        "reaction cross section",
+        "thermonuclear reaction rate",
+        "Maxwellian averaged reactivity",
+        "sigma v",
+        "m^2",
+      ],
+      extraction_aliases: [variable, "sigma", "cross section", "reaction cross section", "fusion cross section"],
+    };
+  }
+  if (normalized === "vms") {
+    return {
+      variable,
+      canonical_quantity: "reactant_relative_velocity",
+      expected_unit: "m/s",
+      role: "formula_input",
+      source_classes: [
+        "thermal velocity model",
+        "fusion reactivity model",
+        "reaction-rate calculation",
+        "plasma kinetic parameter table",
+      ],
+      search_terms: [
+        "relative velocity",
+        "thermal velocity",
+        "reactant velocity",
+        "fusion reactivity",
+        "sigma v",
+        "m/s",
+      ],
+      extraction_aliases: [variable, "v", "relative velocity", "thermal velocity", "reactant velocity"],
     };
   }
   if (normalized === "t00wallrequired") {
@@ -580,6 +726,7 @@ const buildVariableSourcePlan = (
   prompt: string,
   requestedVariables: string[],
   wantsFullTextNumericChain: boolean,
+  priorTheoryFormulaContext?: PriorTheoryReflectionFormulaContext | null,
 ): VariableSourcePlan | null => {
   const variables = defaultFormulaVariablesForPrompt(prompt, requestedVariables, wantsFullTextNumericChain);
   if (variables.length === 0) return null;
@@ -588,6 +735,9 @@ const buildVariableSourcePlan = (
   const unquoted = unquotePrompt(prompt);
   if (/\btokamak\b/i.test(unquoted)) promptTerms.push("tokamak");
   if (/\bplasma\s+beta\b/i.test(unquoted)) promptTerms.push("plasma beta");
+  if (/\bfusion|thermonuclear|nuclear\s+reaction\b/i.test([unquoted, ...(priorTheoryFormulaContext?.query_terms ?? [])].join(" "))) {
+    promptTerms.push("fusion", "thermonuclear reaction rate");
+  }
   if (/\btransport\b/i.test(unquoted)) promptTerms.push("transport");
   if (/\b(?:parameter|operating)\s+table\b/i.test(unquoted)) promptTerms.push("parameter table");
   const sourceClassTerms = entries.flatMap((entry) => entry.source_classes);
@@ -597,6 +747,7 @@ const buildVariableSourcePlan = (
     ...promptTerms,
     "parameter table",
     "operating point",
+    ...(priorTheoryFormulaContext?.query_terms.slice(0, 10) ?? []),
     ...primaryQuantityTerms,
     ...sourceClassTerms,
     ...quantityTerms,
@@ -605,6 +756,18 @@ const buildVariableSourcePlan = (
     schema: "helix.variable_source_plan.v1",
     source: "helix_compound_capability_dependency_planner",
     formula_variables: variables,
+    ...(priorTheoryFormulaContext ? {
+      prior_theory_formula_context: {
+        schema: "helix.prior_theory_formula_context.v1",
+        source_ref: priorTheoryFormulaContext.source_ref,
+        formulas: priorTheoryFormulaContext.formulas,
+        variables: priorTheoryFormulaContext.variables,
+        query_terms: priorTheoryFormulaContext.query_terms,
+        assistant_answer: false,
+        raw_content_included: false,
+        terminal_eligible: false,
+      },
+    } : {}),
     entries,
     query_terms: queryTerms,
     retrieval_intent:
@@ -718,7 +881,7 @@ const buildSourceRequirementPlan = (input: {
 
 const buildResearchQuantifyReflectRequests = (body: Record<string, unknown>): Record<string, unknown>[] => {
   const prompt = readPrompt(body);
-  if (!prompt || !isResearchQuantifyReflectPrompt(prompt)) return [];
+  if (!prompt || !isResearchQuantifyReflectPrompt(prompt, body)) return [];
   const expression = extractCalculatorExpression(prompt);
   const unquoted = unquotePrompt(prompt);
   const wantsScholarly = /\b(?:research\s+papers?|papers?|arxiv|scholarly|doi)\b/i.test(unquoted);
@@ -726,8 +889,19 @@ const buildResearchQuantifyReflectRequests = (body: Record<string, unknown>): Re
   const wantsTheory = /\b(?:reflect|theory\s+badge\s+graph|theory\s+graph|claim\s+boundary)\b/i.test(unquoted);
   const wantsCivilization = /\b(?:civilization\s+bounds?|civilization|social|energy|material|country|countries|transportation)\b/i.test(unquoted);
   const wantsFullTextNumericChain = hasScholarlyFullTextNumericChainIntent(prompt);
-  const requestedFormulaVariables = requestedFormulaVariablesFromPrompt(prompt);
-  const variableSourcePlan = buildVariableSourcePlan(prompt, requestedFormulaVariables, wantsFullTextNumericChain);
+  const priorTheoryFormulaContext = readPriorTheoryReflectionFormulaContext(body);
+  const wantsPriorTheoryEquationContext = hasPriorTheoryEquationAnaphora(prompt, body);
+  const allowScholarlyDependentChain = wantsFullTextNumericChain || wantsPriorTheoryEquationContext;
+  const requestedFormulaVariables = uniqueStrings([
+    ...requestedFormulaVariablesFromPrompt(prompt),
+    ...(wantsPriorTheoryEquationContext ? priorTheoryFormulaContext?.variables ?? [] : []),
+  ]);
+  const variableSourcePlan = buildVariableSourcePlan(
+    prompt,
+    requestedFormulaVariables,
+    allowScholarlyDependentChain,
+    priorTheoryFormulaContext,
+  );
   const sourceRequirementPlan = buildSourceRequirementPlan({
     prompt,
     outcome: RESEARCH_QUANTIFY_REFLECT_OUTCOME,
@@ -762,7 +936,7 @@ const buildResearchQuantifyReflectRequests = (body: Record<string, unknown>): Re
           variable_source_query_terms: variableSourcePlan.query_terms,
         } : {}),
         ...(sourceRequirementPlan ? { source_requirement_plan: sourceRequirementPlan } : {}),
-        allow_scholarly_dependent_chain: wantsFullTextNumericChain,
+        allow_scholarly_dependent_chain: allowScholarlyDependentChain,
         source_target_intent: {
           ...buildCompoundSourceTargetIntent({
             outcome,
@@ -781,6 +955,7 @@ const buildResearchQuantifyReflectRequests = (body: Record<string, unknown>): Re
               schema: "helix.scholarly_variable_source_query_plan.v1",
               source: "helix_compound_capability_dependency_planner",
               formula_variables: variableSourcePlan.formula_variables,
+              prior_theory_formula_context: variableSourcePlan.prior_theory_formula_context ?? null,
               query_terms: variableSourcePlan.query_terms,
               source_classes: uniqueStrings(variableSourcePlan.entries.flatMap((entry) => entry.source_classes)),
               assistant_answer: false,
@@ -788,7 +963,7 @@ const buildResearchQuantifyReflectRequests = (body: Record<string, unknown>): Re
             },
           } : {}),
           ...(sourceRequirementPlan ? { source_requirement_plan: sourceRequirementPlan } : {}),
-          allow_scholarly_dependent_chain: wantsFullTextNumericChain,
+          allow_scholarly_dependent_chain: allowScholarlyDependentChain,
         },
       },
     });
@@ -909,7 +1084,7 @@ const buildResearchQuantifyReflectRequests = (body: Record<string, unknown>): Re
       },
     });
   }
-  return requests.length >= 2 || ((wantsScholarly || !wantsInternet) && wantsFullTextNumericChain) ? requests : [];
+  return requests.length >= 2 || ((wantsScholarly || !wantsInternet) && allowScholarlyDependentChain) ? requests : [];
 };
 
 const buildReadAloudSurfaceRequests = (body: Record<string, unknown>): Record<string, unknown>[] => {
@@ -1500,6 +1675,9 @@ const scholarlyLookupRelevanceRequirement = (
     ...(queryText.includes("tokamak") ? ["tokamak"] : []),
     ...(queryText.includes("diii") || queryText.includes("diii-d") ? ["diii-d", "diii"] : []),
     ...(/\beast\b/i.test(query) ? ["east"] : []),
+    ...(queryText.includes("fusion") || planTerms.some((term) => term.includes("fusion")) ? ["fusion", "thermonuclear"] : []),
+    ...(queryText.includes("thermonuclear") ? ["thermonuclear", "fusion"] : []),
+    ...(queryText.includes("nuclear reaction") || planTerms.some((term) => term.includes("nuclear reaction")) ? ["nuclear reaction", "reaction rate"] : []),
     ...(queryText.includes("magnetic confinement") ? ["magnetic confinement"] : []),
     ...(queryText.includes("plasma") || planTerms.some((term) => term.includes("plasma")) ? ["plasma"] : []),
   ]);
@@ -1518,11 +1696,116 @@ const scholarlyLookupRelevanceRequirement = (
     "plasma beta",
     "thermal pressure",
     "pressure",
+    "fusion cross section",
+    "reaction cross section",
+    "cross section",
+    "sigma v",
+    "reactivity",
+    "maxwellian averaged",
+    "relative velocity",
+    "thermal velocity",
+    "reaction rate",
+    "thermonuclear",
     ...planTerms.filter((term) =>
-      /\b(?:density|temperature|field|tokamak|plasma|transport|parameter|operating|confinement|beta)\b/.test(term)
+      /\b(?:density|temperature|field|tokamak|plasma|transport|parameter|operating|confinement|beta|fusion|cross\s+section|reaction|reactivity|velocity|sigma)\b/.test(term)
     ),
   ]).slice(0, 32);
   return { required_any: requiredAny, supporting_any: supportingAny };
+};
+
+const paperRelevanceRejectionReasons = (
+  paper: Record<string, unknown>,
+  requirement: { required_any: string[]; supporting_any: string[] },
+): string[] => {
+  const text = scholarlyPaperRelevanceText(paper);
+  if (!text) return ["missing_title_abstract_or_summary"];
+  const hasRequired = requirement.required_any.length === 0 ||
+    requirement.required_any.some((term) => text.includes(term.toLowerCase()));
+  const hasSupport = requirement.supporting_any.length === 0 ||
+    requirement.supporting_any.some((term) => text.includes(term.toLowerCase()));
+  return [
+    ...(!hasRequired ? ["missing_required_topic_terms"] : []),
+    ...(!hasSupport ? ["missing_formula_source_terms"] : []),
+  ];
+};
+
+const buildScholarlyLookupRecoveryAffordance = (input: {
+  query: string;
+  variableSourcePlan: Record<string, unknown> | null;
+  requirement: { required_any: string[]; supporting_any: string[] };
+  rejectedResults: Array<{ result_id: string | null; title: string | null; reasons: string[] }>;
+}): Record<string, unknown> => {
+  const entries = readArray(input.variableSourcePlan?.entries)
+    .map(readRecord)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  const formulaVariables = readArray(input.variableSourcePlan?.formula_variables)
+    .map(readString)
+    .filter((entry): entry is string => Boolean(entry));
+  const sourceClasses = uniqueStrings(entries
+    .flatMap((entry) => readArray(entry.source_classes).map(readString))
+    .filter((entry): entry is string => Boolean(entry)));
+  const queryTerms = uniqueStrings([
+    ...input.requirement.required_any,
+    ...input.requirement.supporting_any,
+    ...entries.flatMap((entry) => readArray(entry.search_terms).map(readString))
+      .filter((entry): entry is string => Boolean(entry)),
+  ]);
+  const hasFusionFormula = queryTerms.some((term) =>
+    /\b(?:fusion|thermonuclear|cross\s+section|sigma\s*v|reactivity)\b/i.test(term)
+  );
+  const recoveryQueries = uniqueStrings([
+    ...(hasFusionFormula ? [
+      "deuterium tritium fusion Maxwellian averaged reactivity sigma v cross section table ion density plasma temperature",
+      "Bosch Hale fusion reactivity coefficients D T cross section Maxwellian averaged table",
+      "DT fusion plasma ion density temperature reactivity parameter table",
+    ] : []),
+    queryTerms.join(" "),
+    input.query,
+  ])
+    .map((query) => query.replace(/\s+/g, " ").trim().slice(0, 240))
+    .filter(Boolean)
+    .slice(0, 4);
+  return {
+    schema: "helix.scholarly_lookup_recovery_affordance.v1",
+    status: "available",
+    reason: "lookup_result_irrelevant",
+    failed_query: input.query,
+    recommended_next_capability: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+    recovery_queries: recoveryQueries.map((query, index) => ({
+      query,
+      priority: index + 1,
+      rationale: index === 0 && hasFusionFormula
+        ? "Target sources likely to report fusion reactivity or cross-section tables for the formula variables."
+        : "Reuse the variable source plan terms while avoiding literal placeholder-only retrieval.",
+    })),
+    expected_variables: formulaVariables,
+    expected_source_classes: sourceClasses,
+    rejected_results: input.rejectedResults,
+    next_affordances: [
+      {
+        capability: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+        purpose: "retry_with_refined_query",
+        reason: "low_relevance_results",
+        required_inputs: ["query"],
+      },
+      {
+        capability: SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+        purpose: "fetch_full_text_for_relevant_source",
+        reason: "blocked_until_relevant_source_ref_exists",
+        required_inputs: ["source_ref", "citation_evidence"],
+      },
+      {
+        capability: SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY,
+        purpose: "extract_cited_unit_bearing_values",
+        reason: "blocked_until_text_evidence_exists",
+        required_inputs: ["text_evidence", "citation_evidence"],
+      },
+    ],
+    assistant_answer: false,
+    raw_content_included: false,
+    terminal_eligible: false,
+    post_tool_model_step_required: true,
+  };
 };
 
 const paperSatisfiesScholarlyLookupRelevance = (
@@ -1548,6 +1831,13 @@ const attachScholarlyLookupRelevanceGate = (input: {
   const relevantPapers = input.papers.filter((paper) =>
     paperSatisfiesScholarlyLookupRelevance(paper, requirement)
   );
+  const rejectedResults = input.papers
+    .filter((paper) => !relevantPapers.includes(paper))
+    .map((paper) => ({
+      result_id: readString(paper.result_id),
+      title: readString(paper.title),
+      reasons: paperRelevanceRejectionReasons(paper, requirement),
+    }));
   const gate = {
     schema: "helix.scholarly_lookup_relevance_gate.v1",
     status: relevantPapers.length > 0 ? "satisfied" : "blocked",
@@ -1555,18 +1845,31 @@ const attachScholarlyLookupRelevanceGate = (input: {
     required_any: requirement.required_any,
     supporting_any: requirement.supporting_any,
     selected_result_id: readString(relevantPapers[0]?.result_id) ?? null,
-    rejected_result_ids: input.papers
-      .filter((paper) => !relevantPapers.includes(paper))
-      .map((paper) => readString(paper.result_id))
-      .filter((entry): entry is string => Boolean(entry)),
+    rejected_result_ids: rejectedResults.map((entry) => entry.result_id).filter((entry): entry is string => Boolean(entry)),
+    rejected_results: rejectedResults,
     assistant_answer: false,
     raw_content_included: false,
     terminal_eligible: false,
     post_tool_model_step_required: true,
   };
+  const recoveryAffordance = gate.status === "blocked"
+    ? buildScholarlyLookupRecoveryAffordance({
+        query: input.query,
+        variableSourcePlan: input.variableSourcePlan,
+        requirement,
+        rejectedResults,
+      })
+    : null;
   const observation = readRecord(input.result.observation);
   if (observation) {
     observation.lookup_relevance_gate = gate;
+    if (recoveryAffordance) {
+      observation.scholarly_lookup_recovery_affordance = recoveryAffordance;
+      observation.recovery_affordances = [
+        ...readArray(observation.recovery_affordances),
+        recoveryAffordance,
+      ];
+    }
     if (gate.status === "blocked") {
       const missing = readArray(observation.missing_requirements)
         .map(readString)
@@ -1578,8 +1881,94 @@ const attachScholarlyLookupRelevanceGate = (input: {
   input.result.observation_packet.state_delta = {
     ...(readRecord(input.result.observation_packet.state_delta) ?? {}),
     scholarly_lookup_relevance_gate: gate,
+    ...(recoveryAffordance ? { scholarly_lookup_recovery_affordance: recoveryAffordance } : {}),
   };
+  if (recoveryAffordance) {
+    input.result.observation_packet.suggested_next_steps = uniqueStrings([
+      ...input.result.observation_packet.suggested_next_steps,
+      "use_another_tool",
+      "repair",
+      "fail_closed",
+    ]) as HelixWorkstationGatewayCallResult["observation_packet"]["suggested_next_steps"];
+    input.result.observation_packet.state_delta = {
+      ...(readRecord(input.result.observation_packet.state_delta) ?? {}),
+      recovery_affordances: [
+        ...readArray(readRecord(input.result.observation_packet.state_delta)?.recovery_affordances),
+        recoveryAffordance,
+      ],
+      next_affordances: readArray(recoveryAffordance.next_affordances),
+    };
+  }
   return gate;
+};
+
+const readScholarlyLookupRelevanceGate = (result: HelixWorkstationGatewayCallResult): Record<string, unknown> | null => {
+  const observation = readRecord(result.observation);
+  return readRecord(observation?.lookup_relevance_gate) ??
+    readRecord(readRecord(result.observation_packet.state_delta)?.scholarly_lookup_relevance_gate);
+};
+
+const resultHasRecoveryAffordance = (result: HelixWorkstationGatewayCallResult): boolean => {
+  const observation = readRecord(result.observation);
+  const stateDelta = readRecord(result.observation_packet.state_delta);
+  const hasRecovery = (record: Record<string, unknown> | null): boolean =>
+    Boolean(record &&
+      (readArray(record.recovery_affordances).length > 0 ||
+        readRecord(record.scholarly_lookup_recovery_affordance) ||
+        readRecord(record.scholarly_full_text_recovery_affordance) ||
+        readRecord(record.scholarly_numeric_recovery_affordance)));
+  return hasRecovery(observation) || hasRecovery(stateDelta);
+};
+
+const evidenceQualityForCompoundResult = (
+  outcome: string | null,
+  capability: string,
+  result: HelixWorkstationGatewayCallResult,
+): {
+  evidenceGathered: boolean;
+  evidenceQuality: string;
+  evidenceSatisfied: boolean;
+  failureCode: string | null;
+  nextAffordances: unknown[];
+} => {
+  const stateDelta = readRecord(result.observation_packet.state_delta);
+  const observation = readRecord(result.observation);
+  const nextAffordances = [
+    ...readArray(observation?.next_affordances),
+    ...readArray(stateDelta?.next_affordances),
+    ...readArray(readRecord(observation?.scholarly_lookup_recovery_affordance)?.next_affordances),
+    ...readArray(readRecord(stateDelta?.scholarly_lookup_recovery_affordance)?.next_affordances),
+  ];
+  const lookupRelevanceGate = readScholarlyLookupRelevanceGate(result);
+  const lookupIrrelevant =
+    outcome === RESEARCH_QUANTIFY_REFLECT_OUTCOME &&
+    capability === SCHOLARLY_RESEARCH_SEARCH_CAPABILITY &&
+    readString(lookupRelevanceGate?.status) === "blocked";
+  if (lookupIrrelevant) {
+    return {
+      evidenceGathered: result.ok === true,
+      evidenceQuality: "low_relevance",
+      evidenceSatisfied: false,
+      failureCode: readString(lookupRelevanceGate?.code) ?? "lookup_result_irrelevant",
+      nextAffordances,
+    };
+  }
+  if (resultHasRecoveryAffordance(result)) {
+    return {
+      evidenceGathered: result.ok === true || result.artifact_refs.length > 0,
+      evidenceQuality: result.ok === true ? "partial_recovery_available" : "failed_recovery_available",
+      evidenceSatisfied: false,
+      failureCode: result.error ?? "recovery_affordance_available",
+      nextAffordances,
+    };
+  }
+  return {
+    evidenceGathered: result.ok === true,
+    evidenceQuality: result.ok === true ? "contract_satisfied" : "missing_or_failed",
+    evidenceSatisfied: result.ok === true,
+    failureCode: result.ok === true ? null : result.error ?? "observation_missing",
+    nextAffordances,
+  };
 };
 
 const readDocsExcerptForNarrator = (result: HelixWorkstationGatewayCallResult): {
@@ -1947,7 +2336,7 @@ export const buildCompoundDependencyRailStatus = (input: {
     const ordinal = typeof sourceTargetIntent?.subgoal_ordinal === "number"
       ? sourceTargetIntent.subgoal_ordinal
       : 1;
-    const satisfied = input.result.ok === true;
+    const evidenceQuality = evidenceQualityForCompoundResult(outcome, capability, input.result);
     const calculatorBinding = outcome === RESEARCH_QUANTIFY_REFLECT_OUTCOME &&
       (capability === THEORY_CONTEXT_REFLECTION_CAPABILITY || capability === SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY)
         ? bindCalculatorExpressionFromResults(input.results?.length ? input.results : [input.result])
@@ -1991,11 +2380,11 @@ export const buildCompoundDependencyRailStatus = (input: {
           reason: readString(lookupRelevanceGate?.code) ?? "lookup_result_irrelevant",
           lookup_relevance_gate: lookupRelevanceGate,
         }
-      : !satisfied
+      : !evidenceQuality.evidenceSatisfied
       ? {
           subgoal_id: subgoalId,
           capability_id: capability,
-          reason: input.result.error ?? "observation_missing",
+          reason: evidenceQuality.failureCode ?? "observation_missing",
         }
       : calculatorBinding?.status === "blocked"
         ? {
@@ -2017,8 +2406,13 @@ export const buildCompoundDependencyRailStatus = (input: {
           requested_capability: capability,
           executed_capability: input.result.capability_id === capability ? capability : null,
           required_observation_kind: requiredObservationKind,
-          satisfied,
-          rail_status: satisfied ? "satisfied" : "missing_observation",
+          evidence_gathered: evidenceQuality.evidenceGathered,
+          evidence_quality: evidenceQuality.evidenceQuality,
+          evidence_quality_satisfied: evidenceQuality.evidenceSatisfied,
+          next_affordances: evidenceQuality.nextAffordances,
+          satisfied: evidenceQuality.evidenceSatisfied,
+          rail_status: evidenceQuality.evidenceSatisfied ? "satisfied" : evidenceQuality.evidenceGathered ? "evidence_gathered_not_satisfied" : "missing_observation",
+          rail_failure_code: evidenceQuality.evidenceSatisfied ? null : evidenceQuality.failureCode,
           assistant_answer: false,
           raw_content_included: false,
         },
@@ -2116,21 +2510,27 @@ const readCompoundSubgoalFromResult = (result: HelixWorkstationGatewayCallResult
     : [];
   const requiredObservationKind = readString(intent?.required_observation_kind);
   const requiredReceiptKind = readString(intent?.required_receipt_kind);
-  const satisfied = result.ok === true;
+  const capability = result.gateway_admission.requested_capability || result.capability_id;
+  const evidenceQuality = evidenceQualityForCompoundResult(outcome, capability, result);
   return {
     schema: "helix.compound_capability_subgoal_execution.v1",
     subgoal_id: subgoalId,
     ordinal: ordinal ?? 999,
     requested_capability: result.gateway_admission.requested_capability,
     selected_capability: result.capability_id,
-    executed_capability: satisfied ? result.capability_id : null,
+    executed_capability: evidenceQuality.evidenceGathered ? result.capability_id : null,
     required_observation_kind: requiredObservationKind,
     required_receipt_kind: requiredReceiptKind,
     observation_refs: producedRefs,
     receipt_refs: requiredReceiptKind ? producedRefs : [],
-    satisfied,
-    rail_status: satisfied ? "satisfied" : "missing_observation",
-    error: result.error ?? null,
+    evidence_gathered: evidenceQuality.evidenceGathered,
+    evidence_quality: evidenceQuality.evidenceQuality,
+    evidence_quality_satisfied: evidenceQuality.evidenceSatisfied,
+    next_affordances: evidenceQuality.nextAffordances,
+    satisfied: evidenceQuality.evidenceSatisfied,
+    rail_status: evidenceQuality.evidenceSatisfied ? "satisfied" : evidenceQuality.evidenceGathered ? "evidence_gathered_not_satisfied" : "missing_observation",
+    rail_failure_code: evidenceQuality.evidenceSatisfied ? null : evidenceQuality.failureCode,
+    error: result.error ?? evidenceQuality.failureCode,
     assistant_answer: false,
     raw_content_included: false,
   };

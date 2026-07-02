@@ -54,6 +54,7 @@ export function HelixWorkstationShell({
   const removeLayoutSnapshot = useHelixAskWorkspaceSessionStore((state) => state.removeLayoutSnapshot);
   const sessions = useAgiChatStore((state) => state.sessions);
   const activeChatId = useAgiChatStore((state) => state.activeId);
+  const chatStoreHydrated = useAgiChatStore((state) => state.hydrated);
   const newSession = useAgiChatStore((state) => state.newSession);
   const setActiveChat = useAgiChatStore((state) => state.setActive);
   const deleteLocalSession = useAgiChatStore((state) => state.deleteSession);
@@ -95,6 +96,7 @@ export function HelixWorkstationShell({
   const activeTitle = titleFromSession(activeSession);
 
   useEffect(() => {
+    if (!chatStoreHydrated) return;
     if (activeSession?.id && activeSession.id !== activeChatId) {
       setActiveChat(activeSession.id);
       return;
@@ -104,7 +106,14 @@ export function HelixWorkstationShell({
     if (fallbackId) {
       setActiveChat(fallbackId);
     }
-  }, [activeChatId, activeSession?.contextId, activeSession?.id, ensureContextSession, setActiveChat]);
+  }, [
+    activeChatId,
+    activeSession?.contextId,
+    activeSession?.id,
+    chatStoreHydrated,
+    ensureContextSession,
+    setActiveChat,
+  ]);
 
   const handleSelectSession = useCallback(
     (sessionId: string) => {

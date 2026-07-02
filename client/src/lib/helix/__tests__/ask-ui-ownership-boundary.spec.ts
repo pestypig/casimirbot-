@@ -174,7 +174,6 @@ describe("Helix Ask UI ownership boundaries", () => {
       "readHelixPendingInputRecord",
       "normalizeHelixPendingTransitionMarker",
       "readHelixPendingTransitionTrace",
-      "hasHelixPendingCancellationMarker",
       "isHelixCanceledPendingTurn",
       "resolveHelixPendingInputRecord",
     ]) {
@@ -183,6 +182,9 @@ describe("Helix Ask UI ownership boundaries", () => {
       expect(pendingInputReaders).toContain(`export function ${symbol}`);
       expect(map).toContain(symbol);
     }
+    expect(pill).not.toContain("function hasHelixPendingCancellationMarker");
+    expect(pendingInputReaders).toContain("export function hasHelixPendingCancellationMarker");
+    expect(map).toContain("hasHelixPendingCancellationMarker");
     expect(pill).toContain('from "@/lib/helix/ask-pending-input-readers"');
     expect(pendingInputReaders).not.toMatch(/from ["']react["']/);
     expect(pendingInputReaders).not.toContain("@/store/");
@@ -772,7 +774,8 @@ describe("Helix Ask UI ownership boundaries", () => {
 
     expect(pill).toContain("const renderedMatchesReply =");
     expect(pill).toContain("debug: renderedMatchesReply ? reply.debug ?? null : null");
-    expect(pill).toContain("active_turn_id: renderedMatchesReply ? reply.id : null");
+    expect(pill).toContain("active_turn_id: renderedMatchesReply ? activeTurnId : null");
+    expect(pill).toContain("const activeTurnId = resolveHelixAskReplyDebugTurnId(reply)");
     expect(pill).toContain(
       "debug_export_ref: renderedMatchesReply ? replyRecord.debug_export_ref ?? replyDebugRecord?.debug_export_ref ?? null : null",
     );

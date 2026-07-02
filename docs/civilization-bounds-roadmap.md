@@ -10,6 +10,22 @@ The roadmap is read-only, evidence-only, diagnostic, non-certifying, and non-ter
 
 Receipts are observations, not final answers. The model-facing loop must re-enter evidence before terminal authority can synthesize an answer.
 
+Working rule:
+
+```text
+Tool narrows evidence.
+Agent owns synthesis.
+Receipt is not answer authority.
+```
+
+Admission should stay material rather than lexical. Direct Civilization Bounds
+requests can use the tool. Indirect conceptual prompts should use it only when
+the user asks to ground the concept against the procedural world model:
+civilization comparison, dependency analysis, route or infrastructure grounding,
+live/historical source-backed measurements, or Theory/Zen bridge context. Loose
+metaphors such as "Is global trade like a circulatory system?" should remain
+model-led unless the prompt asks for procedural evidence.
+
 The artifact authority contract requires:
 
 - `assistant_answer: false`
@@ -24,7 +40,13 @@ The artifact authority contract requires:
 
 Theory badge evidence anchors physical bounds: energy budgets, material inventory, manufacturing resolution, entropy sinks, observation channels, conservation constraints, and falsification hooks.
 
-Civilization Bounds Roadmap adds situational capacity context between those physical badges and any downstream procedural reflection.
+Planetary Traversability Atlas is the middle layer after those first-principles
+bounds. It represents planetary fields, natural affordances and hazards, built
+infrastructure, route candidates, observed flows, and missing evidence before
+the roadmap interprets those facts as civilization bounds.
+
+Civilization Bounds Roadmap adds situational capacity context between those
+physical/traversability badges and any downstream procedural reflection.
 
 ## Relation To ZenGraph
 
@@ -39,6 +61,9 @@ The intended bridge continuity is:
 ```text
 Theory badge evidence
   -> physical bounds, materials, energy, entropy, observation
+
+Planetary traversability evidence
+  -> fields, hazards, infrastructure, routes, flows, missing observations
 
 Civilization bounds evidence
   -> capacity, scarcity, dependency, reversibility, governance interface
@@ -112,6 +137,30 @@ The Helix Ask tool `helix_ask.reflect_civilization_bounds` exposes those fields
 both inside `roadmap` and as top-level tool-output fields so downstream tool
 calls can inspect the procedural scopes without treating the roadmap as a final
 answer.
+
+The tool output also exposes `authority`, `missingEvidenceBoundaries`,
+`analogyBoundaries`, and `supportRefs` at the top level. These fields are for
+evidence re-entry and final-answer support checks; they are not terminal answer
+content.
+
+The same tool now emits `traversabilityAtlas` and `traversabilityContext` beside
+the roadmap receipt. That keeps the dependency order explicit:
+
+```text
+Theory bounds -> planetary fields -> source-backed measurements -> natural
+affordances/hazards -> built infrastructure -> route candidates -> observed
+flows -> civilization bounds -> optional ZenGraph procedural reflection ->
+terminal synthesis after evidence re-entry
+```
+
+Directory ownership is documented in
+`docs/architecture/civilization-traversability-atlas-contract.md`.
+
+Live and historical measurements use
+`civilization_source_measurement/v1` before becoming atlas field layers. The
+initial normalizer path is `server/services/civilization-live-sources/`, covering
+USGS earthquakes, NOAA CO-OPS water/current observations, NWS weather
+observations/alerts, and Copernicus Marine point samples.
 
 ## Research Extensions
 

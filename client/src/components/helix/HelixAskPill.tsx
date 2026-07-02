@@ -4659,6 +4659,44 @@ const HELIX_MOOD_HINT_MAX_TEXT_CHARS = clampNumber(
   160,
   2400,
 );
+
+const buildLatestTheoryReflectionEquationContext = (): Record<string, unknown> | null => {
+  const reflection = useTheoryMapOverlayStore.getState().liveAnswerContextReflection;
+  if (!reflection) return null;
+  const calculatorPayloads = (reflection.evidenceForAsk.calculatorPayloads ?? [])
+    .filter((payload) => typeof payload.expression === "string" && payload.expression.trim())
+    .slice(0, 8)
+    .map((payload) => ({
+      badge_id: payload.badgeId,
+      badge_title: payload.badgeTitle,
+      payload_id: payload.payloadId,
+      expression: clipText(payload.expression, 240),
+      target_variable: payload.targetVariable,
+      claim_boundary_notes: payload.claimBoundaryNotes.slice(0, 4).map((note) => clipText(note, 220)),
+    }));
+  if (calculatorPayloads.length === 0) return null;
+  return {
+    schema: "helix.latest_theory_reflection_equation_context.v1",
+    source: "theory_map_overlay_live_answer_context",
+    reflection_id: reflection.reflectionId,
+    generated_at: reflection.generatedAt,
+    input_prompt: clipText(reflection.input.prompt, 240),
+    summary: clipText(reflection.evidenceForAsk.summary, 480),
+    calculator_payloads: calculatorPayloads,
+    matched_badges: [...reflection.exactMatches, ...reflection.likelyMatches].slice(0, 12).map((match) => ({
+      badge_id: match.badgeId,
+      title: match.title,
+      score: match.score,
+      matched_equation_families: match.matchedEquationFamilies.slice(0, 6),
+      matched_symbols: match.matchedSymbols.slice(0, 8),
+    })),
+    assistant_answer: false,
+    raw_content_included: false,
+    terminal_eligible: false,
+    context_role: "tool_evidence",
+    ask_context_policy: "evidence_only",
+  };
+};
 const HELIX_REASONING_ATTEMPT_IDLE_TIMEOUT_MS = clampNumber(
   readHelixEnvNumber(
     (import.meta as any)?.env,
@@ -5620,13 +5658,15 @@ function buildReplyScopedDebugExportFromRenderedReply(reply: HelixAskReply, reas
   const visibleAnswerText = visibleTerminal.text || reply.content || "";
   const suppressVisibleAnswer = isHelixAskProgressPlaceholderText(visibleAnswerText);
   const replyRecord = reply as Record<string, unknown>;
+  const activeTurnId = resolveHelixAskReplyDebugTurnId(reply);
+  const clientTurnId = reply.id && reply.id !== activeTurnId ? reply.id : null;
   return buildHelixDebugExportEnvelopeFromMasterPayload(reply, {
     schema: "helix.ask.master_event_clock.v2",
     exportedAt: new Date().toISOString(),
     debug_export_rebuild_reason: reason,
-    active_turn_id: reply.id,
-    client_active_turn_id: reply.id,
-    selectedDebugTurnId: reply.id,
+    active_turn_id: activeTurnId,
+    client_active_turn_id: clientTurnId,
+    selectedDebugTurnId: activeTurnId,
     selectedDebugQuestion: reply.question ?? null,
     selectedDebugFinalAnswer: suppressVisibleAnswer ? "" : visibleAnswerText,
     selectedDebugSource: "rendered_reply",
@@ -5740,6 +5780,37 @@ function extractHelixRenderedTurnDebugFromButton(sourceElement: HTMLElement | nu
   return null;
 }
 
+function resolveHelixAskReplyDebugTurnId(reply: HelixAskReply): string {
+  const replyRecord = reply as Record<string, unknown>;
+  const replyDebugRecord = readAgentLoopAuditRecord(reply.debug);
+  const resolvedTurnSummary = readAgentLoopAuditRecord(
+    replyRecord.resolved_turn_summary ?? replyDebugRecord?.resolved_turn_summary,
+  );
+  const terminalAuthority = readAgentLoopAuditRecord(
+    replyRecord.terminal_answer_authority ?? replyDebugRecord?.terminal_answer_authority,
+  );
+  const debugExportRef = readAgentLoopAuditRecord(replyRecord.debug_export_ref ?? replyDebugRecord?.debug_export_ref);
+  const backendDebugResponseRef = readAgentLoopAuditRecord(
+    replyRecord.backend_debug_response_ref ?? replyDebugRecord?.backend_debug_response_ref,
+  );
+  const candidates = [
+    replyRecord.turn_id,
+    replyRecord.turnId,
+    replyDebugRecord?.turn_id,
+    replyDebugRecord?.turnId,
+    resolvedTurnSummary?.turn_id,
+    terminalAuthority?.turn_id,
+    debugExportRef?.turn_id,
+    backendDebugResponseRef?.turn_id,
+    reply.id,
+  ];
+  for (const candidate of candidates) {
+    const turnId = coerceText(candidate).trim();
+    if (turnId) return turnId;
+  }
+  return reply.id;
+}
+
 export function buildReplyScopedDebugExportFromRenderedButton(
   reply: HelixAskReply,
   sourceElement: HTMLElement | null | undefined,
@@ -5760,15 +5831,17 @@ export function buildReplyScopedDebugExportFromRenderedButton(
     renderedFinalMatchesReply;
   const replyRecord = reply as Record<string, unknown>;
   const replyDebugRecord = renderedMatchesReply ? readAgentLoopAuditRecord(reply.debug) : null;
+  const activeTurnId = resolveHelixAskReplyDebugTurnId(reply);
+  const clientTurnId = reply.id && reply.id !== activeTurnId ? reply.id : null;
   return buildHelixDebugExportEnvelopeFromMasterPayload(reply, {
     schema: "helix.ask.master_event_clock.v2",
     exportedAt: new Date().toISOString(),
     debug_export_rebuild_reason: reason,
     debug_export_source: "rendered_reply_dom",
     backend_debug_response_status: "not_advertised",
-    active_turn_id: renderedMatchesReply ? reply.id : null,
-    client_active_turn_id: reply.id,
-    selectedDebugTurnId: renderedMatchesReply ? reply.id : null,
+    active_turn_id: renderedMatchesReply ? activeTurnId : null,
+    client_active_turn_id: clientTurnId ?? reply.id,
+    selectedDebugTurnId: renderedMatchesReply ? activeTurnId : null,
     selectedDebugQuestion: rendered.question ?? reply.question ?? null,
     selectedDebugFinalAnswer: rendered.finalAnswer ?? "",
     selectedDebugSource: "rendered_reply_dom",
@@ -5812,11 +5885,31 @@ export function buildReplyScopedDebugExportFromRenderedButton(
 }
 
 function debugPayloadMatchesRenderedReply(reply: HelixAskReply, parsed: Record<string, unknown>): boolean {
-  const expectedQuestion = normalizedDebugReplyText(reply.question);
-  if (!expectedQuestion) return true;
+  const expectedTurnId = resolveHelixAskReplyDebugTurnId(reply);
   const parsedDebug = readAgentLoopAuditRecord(parsed.debug);
   const parsedReply = readAgentLoopAuditRecord(parsed.reply);
   const parsedCurrentTurn = readAgentLoopAuditRecord(parsed.currentTurn);
+  const turnCandidates = [
+    parsed.active_turn_id,
+    parsed.backend_turn_id,
+    parsed.selectedDebugTurnId,
+    parsedReply?.id,
+    parsedCurrentTurn?.turn_id,
+    parsedCurrentTurn?.turnId,
+    parsedDebug?.turn_id,
+    parsedDebug?.turnId,
+  ]
+    .map((candidate) => coerceText(candidate).trim())
+    .filter(Boolean);
+  if (
+    expectedTurnId &&
+    turnCandidates.length > 0 &&
+    !turnCandidates.some((candidate) => candidate === expectedTurnId)
+  ) {
+    return false;
+  }
+  const expectedQuestion = normalizedDebugReplyText(reply.question);
+  if (!expectedQuestion) return true;
   const candidates = [
     parsed.selectedDebugQuestion,
     parsed.active_prompt,
@@ -6163,6 +6256,9 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
   const activeTurnId =
     coerceText(agentLoop?.terminal_artifact_owner_turn_id).trim() ||
     coerceText(debug?.turn_id).trim() ||
+    coerceText(payload.active_turn_id).trim() ||
+    coerceText((reply as Record<string, unknown>).turn_id).trim() ||
+    coerceText((reply as Record<string, unknown>).turnId).trim() ||
     coerceText(canonicalGoalFrame?.turn_id).trim() ||
     coerceText(turnTruthTable?.turn_id).trim() ||
     (isRenderedDomProjectionWithoutTurn ? "" : reply.id);
@@ -6799,11 +6895,34 @@ async function resolveAuthoritativeDebugExportPayload(localPayload: string): Pro
     if (text === "false") return false;
     return null;
   };
+  const readMaterializedTerminal = (): { text: string; terminalArtifactKind: string; finalAnswerSource: string } | null => {
+    const resolvedTurnSummary = readAgentLoopAuditRecord(parsed.resolved_turn_summary);
+    const uiDebugParityHarness = readAgentLoopAuditRecord(parsed.ui_debug_parity_harness);
+    const visibleFinalAnswer = coerceText(uiDebugParityHarness?.visible_final_answer).trim();
+    const summaryTerminalKind = coerceText(resolvedTurnSummary?.terminal_artifact_kind).trim();
+    const summaryFinalAnswerSource = coerceText(resolvedTurnSummary?.final_answer_source).trim();
+    const summaryFinalStatus = coerceText(resolvedTurnSummary?.final_status).trim();
+    if (
+      (summaryTerminalKind === "workstation_tool_evaluation" || summaryTerminalKind === "model_synthesized_answer") &&
+      summaryFinalStatus !== "typed_failure" &&
+      visibleFinalAnswer &&
+      visibleFinalAnswer !== HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT
+    ) {
+      return {
+        text: visibleFinalAnswer,
+        terminalArtifactKind: summaryTerminalKind,
+        finalAnswerSource: summaryFinalAnswerSource || summaryTerminalKind,
+      };
+    }
+    return null;
+  };
   const projectionPayload = (status: string, extra: Record<string, unknown> = {}) => {
     const askEntrypointRequired = readDebugBoolean(parsed.ask_entrypoint_required) === true;
     const askEntrypointObserved = readDebugBoolean(parsed.ask_entrypoint_observed);
     const askEntrypointFailureCode = coerceText(parsed.ask_entrypoint_failure_code).trim();
-    const backendEntrypointBlocked = askEntrypointRequired && askEntrypointObserved === false;
+    const materializedTerminal = readMaterializedTerminal();
+    const backendEntrypointObserved = askEntrypointObserved === true || Boolean(materializedTerminal);
+    const backendEntrypointBlocked = askEntrypointRequired && !backendEntrypointObserved;
     const projected = {
       ...parsed,
       debug_export_source: status === "not_advertised"
@@ -6811,6 +6930,19 @@ async function resolveAuthoritativeDebugExportPayload(localPayload: string): Pro
         : "client_projection_backend_unresolved",
       backend_debug_response_status: status,
       ...extra,
+      ...(materializedTerminal
+        ? {
+            selected_final_answer: materializedTerminal.text,
+            visible_final_answer: materializedTerminal.text,
+            final_answer_source: materializedTerminal.finalAnswerSource,
+            terminal_artifact_kind: materializedTerminal.terminalArtifactKind,
+            terminal_error_code: null,
+            ask_entrypoint_observed: true,
+            ask_entrypoint_failure_code: null,
+            first_broken_rail: null,
+            repair_target: null,
+          }
+        : {}),
       ...(backendEntrypointBlocked
         ? {
             selected_final_answer: HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT,
@@ -8401,6 +8533,7 @@ export function HelixAskPill({
   }, [userSettings.preferredResponseLanguage]);
   const { ensureContextSession, addMessage, setActive } = useAgiChatStore();
   const helixChatSessions = useAgiChatStore((state) => state.sessions);
+  const helixChatStoreHydrated = useAgiChatStore((state) => state.hydrated);
   const helixAskSessionRef = useRef<string | null>(null);
   const helixAskSessionContextRef = useRef<string | null>(null);
   const askInputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -9400,6 +9533,7 @@ export function HelixAskPill({
   }, [contextId, ensureContextSession]);
 
   useEffect(() => {
+    if (!helixChatStoreHydrated) return;
     const sessionId = getHelixAskSessionId();
     if (!sessionId) return;
     const session = helixChatSessions[sessionId];
@@ -9422,7 +9556,7 @@ export function HelixAskPill({
       }
       return next;
     });
-  }, [getHelixAskSessionId, helixChatSessions]);
+  }, [getHelixAskSessionId, helixChatSessions, helixChatStoreHydrated]);
 
   const upsertContextCapsuleSessionLedger = useCallback(
     (summary: ContextCapsuleSummary, pin = false) => {
@@ -23414,9 +23548,17 @@ export function HelixAskPill({
                   attachment_context_pack: attachmentContextPackForTurn,
                 }
               : workspaceContextSnapshot;
-          const workspaceContextSnapshotForTurn = visualEvidenceForTurn
+          const latestTheoryReflectionEquationContext = buildLatestTheoryReflectionEquationContext();
+          const workspaceContextWithLatestTheoryReflection = latestTheoryReflectionEquationContext
             ? {
                 ...workspaceContextWithAmbientVisualCapability,
+                latest_theory_reflection_equation_context: latestTheoryReflectionEquationContext,
+                latestTheoryReflectionEquationContext: latestTheoryReflectionEquationContext,
+              }
+            : workspaceContextWithAmbientVisualCapability;
+          const workspaceContextSnapshotForTurn = visualEvidenceForTurn
+            ? {
+                ...workspaceContextWithLatestTheoryReflection,
                 ...(processGraphContextPackForTurn
                   ? { process_graph_context_pack: processGraphContextPackForTurn }
                   : {}),
@@ -23432,10 +23574,10 @@ export function HelixAskPill({
               }
             : processGraphContextPackForTurn
               ? {
-                  ...workspaceContextWithAmbientVisualCapability,
+                  ...workspaceContextWithLatestTheoryReflection,
                   process_graph_context_pack: processGraphContextPackForTurn,
                 }
-              : workspaceContextWithAmbientVisualCapability;
+              : workspaceContextWithLatestTheoryReflection;
           const contextFilesForTurn = buildHelixAskContextFilesForTurn(
             docsViewerAnchorPath,
             workspaceContextSnapshotForTurn,

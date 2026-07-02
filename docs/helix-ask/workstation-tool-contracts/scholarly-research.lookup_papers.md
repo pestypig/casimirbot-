@@ -76,6 +76,29 @@ The relevance gate is diagnostic evidence for the next model step. It does not
 answer the user and must not silently fetch full text for an irrelevant first
 result.
 
+When the relevance gate blocks a formula-bound workflow, the observation should
+also include `scholarly_lookup_recovery_affordance`:
+
+- `schema`: `helix.scholarly_lookup_recovery_affordance.v1`
+- `reason`: `lookup_result_irrelevant`
+- `failed_query`
+- `expected_variables`
+- `expected_source_classes`
+- `rejected_results` with per-paper reasons
+- `recovery_queries`
+- `recommended_next_capability`: `scholarly-research.lookup_papers`
+- `terminal_eligible=false`
+- `post_tool_model_step_required=true`
+- `assistant_answer=false`
+- `raw_content_included=false`
+
+For the fusion validation fixture, rejected first-pass results should preserve
+why a paper was unusable, for example missing thermonuclear/fusion topic terms
+or missing cross-section/reactivity/source-class terms. The recovery queries
+should point Codex toward sources that can bind the formula variables, such as
+D-T fusion ion density, cross section, relative velocity, or
+Maxwellian-averaged `sigma v` tables.
+
 ## Host Projection
 
 Allowed metadata:

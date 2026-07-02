@@ -8,6 +8,56 @@ import { buildHelixTurnTerminalAuthority } from "../turn-terminal-authority";
 const sha256 = (value: string): string =>
   crypto.createHash("sha256").update(value).digest("hex");
 
+const readRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+
+const readString = (value: unknown): string =>
+  typeof value === "string" ? value.trim() : "";
+
+const readArray = (value: unknown): unknown[] =>
+  Array.isArray(value) ? value : [];
+
+const hasRecoveryAffordanceEvidence = (value: unknown): boolean => {
+  const record = readRecord(value);
+  if (!record) return false;
+  if (readArray(record.recovery_affordances).length > 0) return true;
+  return Boolean(
+    readRecord(record.scholarly_lookup_recovery_affordance) ||
+      readRecord(record.scholarly_numeric_recovery_affordance) ||
+      readRecord(record.scholarly_full_text_recovery_affordance)
+  );
+};
+
+const isGatewayRecoveryAffordanceObservation = (
+  result: HelixWorkstationGatewayCallResult,
+): boolean =>
+  hasRecoveryAffordanceEvidence(result.observation) ||
+  hasRecoveryAffordanceEvidence(result.observation_packet.state_delta);
+
+const isScholarlyNumericMissingVariablesObservation = (
+  result: HelixWorkstationGatewayCallResult,
+): boolean => {
+  const capability = result.gateway_admission.requested_capability || result.capability_id;
+  if (capability !== "scholarly-research.extract_numeric_parameters") return false;
+  const observation = readRecord(result.observation);
+  if (!observation) return false;
+  const missingRequirements = readArray(observation.missing_requirements).map(readString).filter(Boolean);
+  const missingVariables = readArray(observation.missing_variables).map(readString).filter(Boolean);
+  return (
+    readString(observation.schema) === "helix.scholarly_numeric_parameter_observation.v1" &&
+    (missingRequirements.includes("missing_requested_numeric_variables") ||
+      result.error === "missing_requested_numeric_variables" ||
+      missingVariables.length > 0)
+  );
+};
+
+const isGatewayObservationReenteredForProviderReasoning = (
+  result: HelixWorkstationGatewayCallResult,
+): boolean =>
+  result.ok === true ||
+  isScholarlyNumericMissingVariablesObservation(result) ||
+  isGatewayRecoveryAffordanceObservation(result);
+
 export const buildHelixProviderReasoningReentry = (input: {
   runtime: HelixAgentRuntimeId;
   providerLabel: string;
@@ -36,7 +86,7 @@ export const buildHelixProviderReasoningReentry = (input: {
     ...capabilityLaneObservationRefs,
   ];
   const successfulGatewayObservationRefs = input.gatewayCallResults
-    .filter((result) => result.ok === true)
+    .filter(isGatewayObservationReenteredForProviderReasoning)
     .flatMap((result) => result.artifact_refs);
   const successfulObservationRefs = [
     ...successfulGatewayObservationRefs,
@@ -56,7 +106,7 @@ export const buildHelixProviderReasoningReentry = (input: {
   );
   const allGatewayCallsSucceeded =
     input.gatewayCallResults.length === 0 ||
-    input.gatewayCallResults.every((result) => result.ok === true);
+    input.gatewayCallResults.every(isGatewayObservationReenteredForProviderReasoning);
   const allCapabilityLaneObservationsSucceeded =
     capabilityLaneObservationPackets.length === 0 ||
     successfulCapabilityLaneObservationPackets.length === capabilityLaneObservationPackets.length;

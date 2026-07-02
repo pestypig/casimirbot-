@@ -1,11 +1,5 @@
 import React, { useMemo, useState } from "react";
-import {
-  ComposableMap,
-  Geographies,
-  Geography,
-  Line,
-  Marker,
-} from "react-simple-maps";
+import { ComposableMap } from "react-simple-maps";
 import { Info, X } from "lucide-react";
 import {
   CIVILIZATION_NATION_DEPENDENCY_EDGES,
@@ -17,23 +11,21 @@ import {
   type CivilizationNationParameterScope,
   type CivilizationNationStateVector,
 } from "@/data/civilizationNationStateVectors";
+import { buildDefaultCivilizationTraversabilityAtlas } from "@shared/civilization/civilization-traversability-fixtures";
+import {
+  CivilizationCountryLayer,
+  civilizationBalanceScore,
+  parameterColor,
+} from "./civilization/CivilizationCountryLayer";
+import {
+  CivilizationDependencyEdgeLayer,
+  selectedEdgeTone,
+} from "./civilization/CivilizationDependencyEdgeLayer";
+import { CivilizationEnvironmentalFlowLayer } from "./civilization/CivilizationEnvironmentalFlowLayer";
+import { CivilizationRouteCandidateLayer } from "./civilization/CivilizationRouteCandidateLayer";
+import { CivilizationTectonicPlateLayer } from "./civilization/CivilizationTectonicPlateLayer";
 
 const GEO_URL = new URL("../assets/world-countries.json", import.meta.url).href;
-
-const EDGE_COLORS: Record<CivilizationNationDependencyEdge["kind"], string> = {
-  trade_dependency: "#22c55e",
-  logistics_corridor: "#38bdf8",
-  security_exposure: "#ef4444",
-  climate_shared_risk: "#84cc16",
-  institutional_alignment: "#a78bfa",
-};
-
-const SCOPE_RISK_ORIENTED = new Set<CivilizationNationParameterScope>([
-  "security_exposure",
-  "social_cohesion_pressure",
-  "information_legitimacy_pressure",
-  "environmental_pressure",
-]);
 
 function formatSourceRef(ref: string): string {
   return CIVILIZATION_NATION_SOURCE_REFS[
@@ -41,70 +33,9 @@ function formatSourceRef(ref: string): string {
   ] ?? ref;
 }
 
-function parameterColor(scope: CivilizationNationParameterScope, value: number | null): string {
-  if (value === null) return "#64748b";
-  const riskOriented = SCOPE_RISK_ORIENTED.has(scope);
-  if (riskOriented) {
-    if (value >= 0.7) return "#ef4444";
-    if (value >= 0.45) return "#f97316";
-    if (value >= 0.25) return "#eab308";
-    return "#22c55e";
-  }
-  if (value >= 0.7) return "#22c55e";
-  if (value >= 0.45) return "#eab308";
-  if (value >= 0.25) return "#f97316";
-  return "#ef4444";
-}
-
 function parameterLabel(value: number | null): string {
   if (value === null) return "missing";
   return value.toFixed(2);
-}
-
-function civilizationBalanceScore(vector: CivilizationNationStateVector): number {
-  const scores = CIVILIZATION_NATION_PARAMETER_SCOPES.map((scope) => {
-    const value = vector.parameters[scope];
-    if (value === null) return null;
-    return SCOPE_RISK_ORIENTED.has(scope) ? 1 - value : value;
-  }).filter((value): value is number => value !== null);
-
-  if (scores.length === 0) return 0;
-  return scores.reduce((sum, value) => sum + value, 0) / scores.length;
-}
-
-function balanceColor(score: number): string {
-  if (score >= 0.68) return "#22c55e";
-  if (score >= 0.52) return "#eab308";
-  if (score >= 0.36) return "#f97316";
-  return "#ef4444";
-}
-
-function eventPulseScore(vector: CivilizationNationStateVector): number {
-  return Math.max(
-    vector.eventPulse.politicalViolence30d,
-    vector.eventPulse.demonstrations30d,
-    vector.eventPulse.strategicDevelopments30d,
-    vector.eventPulse.activeConflict ? 0.8 : 0,
-  );
-}
-
-function markerRadius(vector: CivilizationNationStateVector): number {
-  return 6 + Math.max(vector.confidence, eventPulseScore(vector) * 0.75) * 8;
-}
-
-function edgeEndpoint(edge: CivilizationNationDependencyEdge, iso3: string) {
-  return CIVILIZATION_NATION_STATE_VECTORS.find((vector) => vector.countryIso3 === iso3);
-}
-
-function selectedEdgeTone(
-  edge: CivilizationNationDependencyEdge,
-  selectedIso3s: string[],
-): "direct" | "comparison" | "hidden" {
-  const fromSelected = selectedIso3s.includes(edge.fromIso3);
-  const toSelected = selectedIso3s.includes(edge.toIso3);
-  if (fromSelected && toSelected) return "comparison";
-  if (fromSelected || toSelected) return "direct";
-  return "hidden";
 }
 
 function scopeSpread(
@@ -145,6 +76,10 @@ export function CivilizationBoundsRoadmap(_props: CivilizationBoundsRoadmapProps
 
   const comparisonEdges = selectedEdges.filter(
     (edge) => selectedEdgeTone(edge, selectedIso3s) === "comparison",
+  );
+  const traversabilityAtlas = useMemo(
+    () => buildDefaultCivilizationTraversabilityAtlas(),
+    [],
   );
 
   const toggleSelectedCountry = (iso3: string) => {
@@ -202,137 +137,22 @@ export function CivilizationBoundsRoadmap(_props: CivilizationBoundsRoadmapProps
         projectionConfig={{ scale: 165 }}
         style={{ width: "100%", height: "100%" }}
       >
-        <Geographies geography={GEO_URL}>
-          {({ geographies }) =>
-            geographies.map((geo) => (
-              <Geography
-                key={geo.rsmKey}
-                geography={geo}
-                style={{
-                  default: {
-                    fill: "#0d1b17",
-                    stroke: "#244136",
-                    strokeWidth: 0.5,
-                    outline: "none",
-                  },
-                  hover: {
-                    fill: "#10231e",
-                    stroke: "#3c6b5a",
-                    strokeWidth: 0.7,
-                    outline: "none",
-                  },
-                  pressed: {
-                    fill: "#10231e",
-                    stroke: "#3c6b5a",
-                    strokeWidth: 0.7,
-                    outline: "none",
-                  },
-                }}
-              />
-            ))
-          }
-        </Geographies>
-
-        {selectedEdges.map((edge) => {
-          const from = edgeEndpoint(edge, edge.fromIso3);
-          const to = edgeEndpoint(edge, edge.toIso3);
-          if (!from || !to) return null;
-          const tone = selectedEdgeTone(edge, selectedIso3s);
-          return (
-            <Line
-              key={edge.edgeId}
-              data-testid="civilization-bounds-edge"
-              from={[from.coordinates.lon, from.coordinates.lat]}
-              to={[to.coordinates.lon, to.coordinates.lat]}
-              stroke={EDGE_COLORS[edge.kind]}
-              strokeWidth={tone === "comparison" ? 2.8 : 1.4}
-              strokeLinecap="round"
-              strokeOpacity={tone === "comparison" ? 0.9 : 0.42}
-            />
-          );
-        })}
-
-        {CIVILIZATION_NATION_STATE_VECTORS.map((vector) => {
-          const selected = selectedIso3s.includes(vector.countryIso3);
-          const pulse = eventPulseScore(vector);
-          const missing = vector.missingObservations.length > 0;
-          const radius = markerRadius(vector);
-          const score = civilizationBalanceScore(vector);
-          const fill = balanceColor(score);
-          return (
-            <Marker
-              key={vector.countryIso3}
-              data-testid="civilization-bounds-badge"
-              data-country-iso={vector.countryIso3}
-              aria-label={`${vector.label} civilization vector`}
-              coordinates={[vector.coordinates.lon, vector.coordinates.lat]}
-              onClick={() => toggleSelectedCountry(vector.countryIso3)}
-              style={{
-                default: { cursor: "pointer" },
-                hover: { cursor: "pointer" },
-                pressed: { cursor: "pointer" },
-              }}
-            >
-              <circle
-                r={radius + (selected ? 4 : 0)}
-                fill="none"
-                stroke={selected ? "#f8fafc" : fill}
-                strokeWidth={selected ? 2.2 : 1.2}
-                strokeDasharray={missing ? "3 2" : undefined}
-                strokeOpacity={selected ? 0.95 : 0.62}
-              />
-              {pulse > 0.55 && (
-                <circle
-                  r={radius + 7}
-                  fill="none"
-                  stroke="#ef4444"
-                  strokeWidth={1.2}
-                  strokeOpacity={0.5}
-                />
-              )}
-              <circle
-                r={radius}
-                fill={fill}
-                fillOpacity={selected ? 0.96 : 0.78}
-                stroke="#03120f"
-                strokeWidth={1}
-              />
-              {selected && (
-                <g transform={`translate(${radius - 1}, ${-radius - 1})`}>
-                  <circle r={5} fill="#f8fafc" stroke="#06110f" strokeWidth={1} />
-                  <text
-                    y={0.5}
-                    textAnchor="middle"
-                    dominantBaseline="central"
-                    style={{
-                      fontFamily: "system-ui, sans-serif",
-                      fontSize: 7,
-                      fontWeight: 800,
-                      fill: "#06110f",
-                      pointerEvents: "none",
-                    }}
-                  >
-                    i
-                  </text>
-                </g>
-              )}
-              <text
-                y={1}
-                textAnchor="middle"
-                dominantBaseline="central"
-                style={{
-                  fontFamily: "system-ui, sans-serif",
-                  fontSize: 7,
-                  fontWeight: 700,
-                  fill: "#06110f",
-                  pointerEvents: "none",
-                }}
-              >
-                {vector.countryIso3}
-              </text>
-            </Marker>
-          );
-        })}
+        <CivilizationCountryLayer
+          geographyUrl={GEO_URL}
+          selectedIso3s={selectedIso3s}
+          onToggleCountry={toggleSelectedCountry}
+        />
+        <CivilizationEnvironmentalFlowLayer />
+        <CivilizationTectonicPlateLayer />
+        <CivilizationDependencyEdgeLayer
+          edges={selectedEdges}
+          selectedIso3s={selectedIso3s}
+        />
+        <CivilizationRouteCandidateLayer
+          routes={traversabilityAtlas.routeCandidates}
+          nodes={traversabilityAtlas.infrastructureNodes}
+          visible={selectedIso3s.length > 0}
+        />
       </ComposableMap>
     </div>
   );

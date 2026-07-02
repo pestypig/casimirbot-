@@ -281,6 +281,61 @@ const buildNormalizedObservationPacketsFromArtifacts = (input: {
     raw_content_included: false,
   }));
 
+const normalizedArtifactHasRecoveryAffordance = (artifact: Record<string, unknown>): boolean => {
+  const payload = readRecord(artifact.payload);
+  if (!payload) return false;
+  if (readArray(payload.recovery_affordances).length > 0) return true;
+  return Boolean(
+    readRecord(payload.scholarly_lookup_recovery_affordance) ||
+      readRecord(payload.scholarly_numeric_recovery_affordance) ||
+      readRecord(payload.scholarly_full_text_recovery_affordance)
+  );
+};
+
+const normalizedArtifactEvidenceQuality = (input: {
+  artifact: Record<string, unknown>;
+  sourceResult?: HelixWorkstationGatewayCallResult | null;
+}): {
+  evidenceGathered: boolean;
+  evidenceQuality: string;
+  evidenceSatisfied: boolean;
+  failureCode: string | null;
+  nextAffordances: unknown[];
+} => {
+  const payload = readRecord(input.artifact.payload);
+  const lookupGate = readRecord(payload?.lookup_relevance_gate);
+  const nextAffordances = [
+    ...readArray(payload?.next_affordances),
+    ...readArray(readRecord(payload?.scholarly_lookup_recovery_affordance)?.next_affordances),
+  ];
+  if (readString(lookupGate?.status) === "blocked") {
+    return {
+      evidenceGathered: input.sourceResult?.ok === true || Boolean(readString(input.artifact.artifact_id)),
+      evidenceQuality: "low_relevance",
+      evidenceSatisfied: false,
+      failureCode: readString(lookupGate?.code) ?? "lookup_result_irrelevant",
+      nextAffordances,
+    };
+  }
+  if (normalizedArtifactHasRecoveryAffordance(input.artifact)) {
+    return {
+      evidenceGathered: input.sourceResult?.ok === true || Boolean(readString(input.artifact.artifact_id)),
+      evidenceQuality: input.sourceResult?.ok === true ? "partial_recovery_available" : "failed_recovery_available",
+      evidenceSatisfied: false,
+      failureCode: readString(input.sourceResult?.error) ?? "recovery_affordance_available",
+      nextAffordances,
+    };
+  }
+  const succeeded = input.sourceResult?.ok === true && Boolean(readString(input.artifact.artifact_id));
+  return {
+    evidenceGathered: succeeded,
+    evidenceQuality: succeeded ? "contract_satisfied" : "missing_or_failed",
+    evidenceSatisfied: succeeded,
+    failureCode: succeeded ? null : readString(input.sourceResult?.error) ?? "missing_observation",
+    nextAffordances,
+  };
+};
+
 const buildCodexCompoundSubgoalLedger = (input: {
   turnId: string;
   normalizedArtifacts: Array<Record<string, unknown>>;
@@ -296,9 +351,13 @@ const buildCodexCompoundSubgoalLedger = (input: {
       input.gatewayCallResults.find((result) => result.capability_id === capability);
     const explicitContract = explicitCapabilityContractForCapability(capability);
     const toolRan = Boolean(sourceResult);
-    const toolSucceeded = sourceResult?.ok === true;
-    const railStatus = toolSucceeded && observationRef ? "satisfied" : "fail_closed";
-    const failureCode = toolSucceeded ? null : readString(sourceResult?.error) ?? "missing_observation";
+    const evidenceQuality = normalizedArtifactEvidenceQuality({ artifact, sourceResult });
+    const railStatus = evidenceQuality.evidenceSatisfied
+      ? "satisfied"
+      : evidenceQuality.evidenceGathered
+        ? "evidence_gathered_not_satisfied"
+        : "fail_closed";
+    const failureCode = evidenceQuality.evidenceSatisfied ? null : evidenceQuality.failureCode;
     return {
       schema: "helix.compound_capability_subgoal.v1",
       subgoal_id: `${input.turnId}:codex_compound_subgoal:${index + 1}`,
@@ -326,8 +385,12 @@ const buildCodexCompoundSubgoalLedger = (input: {
       support_refs: observationRef ? [observationRef] : [],
       bound_input_refs: [],
       unresolved_input_bindings: [],
-      satisfaction: toolSucceeded && observationRef ? "satisfied" : "failed",
-      satisfied: toolSucceeded && Boolean(observationRef),
+      evidence_gathered: evidenceQuality.evidenceGathered,
+      evidence_quality: evidenceQuality.evidenceQuality,
+      evidence_quality_satisfied: evidenceQuality.evidenceSatisfied,
+      next_affordances: evidenceQuality.nextAffordances,
+      satisfaction: evidenceQuality.evidenceSatisfied ? "satisfied" : "not_satisfied",
+      satisfied: evidenceQuality.evidenceSatisfied,
       rail_status: railStatus,
       first_broken_rail: railStatus === "satisfied" ? null : "capability_execution",
       rail_failure_code: railStatus === "satisfied" ? null : failureCode,
@@ -1180,12 +1243,10 @@ const applyWorkstationContextAuthorityGuard = (input: {
 
 const gatewayCallsSucceeded = (gatewayCallResults: HelixWorkstationGatewayCallResult[]): boolean =>
   gatewayCallResults.length === 0 ||
-  gatewayCallResults.every((result, index) =>
-    result.ok === true || hasSuccessfulCalculatorSolveForFailedCapability(gatewayCallResults, index)
-  );
+  gatewayCallResults.every((_, index) => isGatewayResultCompatibleWithProviderReentry(gatewayCallResults, index));
 
 const isSuccessfulEvidenceGatewayResult = (result: HelixWorkstationGatewayCallResult): boolean =>
-  result.ok === true && !isWorkstationActionReceipt(result);
+  (result.ok === true || isScholarlyNumericFailClosedGatewayResult(result)) && !isWorkstationActionReceipt(result);
 
 const selectRailReentryGatewayResult = (
   gatewayCallResults: HelixWorkstationGatewayCallResult[],
@@ -1408,54 +1469,33 @@ const isScholarlyNumericFailClosedGatewayResult = (
   );
 };
 
-const buildScholarlyNumericFailClosedExplanation = (input: {
-  gatewayCallResults: HelixWorkstationGatewayCallResult[];
-  failed: HelixWorkstationGatewayCallResult[];
-}): string | null => {
-  const numericResult = input.failed.find(isScholarlyNumericFailClosedGatewayResult);
-  if (!numericResult) return null;
-  const numericObservation = readRecord(numericResult.observation);
-  if (!numericObservation) return null;
-  const paper = readRecord(numericObservation.paper);
-  const paperTitle = readString(paper?.title);
-  const paperUrl = readString(paper?.url);
-  const requestedVariables = readArray(numericObservation.requested_variables)
-    .map(readString)
-    .filter((entry): entry is string => Boolean(entry));
-  const missingVariables = readArray(numericObservation.missing_variables)
-    .map(readString)
-    .filter((entry): entry is string => Boolean(entry));
-  const rejectedCandidates = readArray(numericObservation.rejected_candidates)
-    .map(readRecord)
-    .filter((entry): entry is Record<string, unknown> => Boolean(entry))
-    .slice(0, 3)
-    .map((entry) => {
-      const variable = readString(entry.variable) ?? "unknown_variable";
-      const reason = readString(entry.reason) ?? "rejected";
-      return `${variable}: ${reason}`;
-    });
-  const lookupRan = input.gatewayCallResults.some((result) =>
-    result.ok === true && result.capability_id === "scholarly-research.lookup_papers"
+const hasGatewayRecoveryAffordanceEvidence = (value: unknown): boolean => {
+  const record = readRecord(value);
+  if (!record) return false;
+  if (readArray(record.recovery_affordances).length > 0) return true;
+  return Boolean(
+    readRecord(record.scholarly_lookup_recovery_affordance) ||
+      readRecord(record.scholarly_numeric_recovery_affordance) ||
+      readRecord(record.scholarly_full_text_recovery_affordance)
   );
-  const fullTextRan = input.gatewayCallResults.some((result) =>
-    result.ok === true && result.capability_id === "scholarly-research.fetch_full_text"
+};
+
+const isGatewayRecoveryAffordanceResult = (result: HelixWorkstationGatewayCallResult): boolean =>
+  hasGatewayRecoveryAffordanceEvidence(result.observation) ||
+  hasGatewayRecoveryAffordanceEvidence(result.observation_packet.state_delta);
+
+const isGatewayResultCompatibleWithProviderReentry = (
+  gatewayCallResults: HelixWorkstationGatewayCallResult[],
+  index: number,
+): boolean => {
+  const result = gatewayCallResults[index];
+  if (!result) return false;
+  return (
+    result.ok === true ||
+    hasSuccessfulCalculatorSolveForFailedCapability(gatewayCallResults, index) ||
+    isScholarlyNumericFailClosedGatewayResult(result) ||
+    isGatewayRecoveryAffordanceResult(result)
   );
-  const lines = [
-    "I found and fetched scholarly paper evidence, but I did not run the calculator because the numeric extraction did not produce fully cited, unit-bearing values for every requested variable.",
-    paperTitle ? `Fetched paper: ${paperTitle}${paperUrl ? ` (${paperUrl})` : ""}.` : null,
-    requestedVariables.length ? `Requested variables: ${requestedVariables.join(", ")}.` : null,
-    missingVariables.length ? `Missing variables: ${missingVariables.join(", ")}.` : null,
-    rejectedCandidates.length ? `Rejected candidates: ${rejectedCandidates.join("; ")}.` : null,
-    lookupRan || fullTextRan
-      ? `Completed tool steps: ${[
-          lookupRan ? "scholarly-research.lookup_papers" : null,
-          fullTextRan ? "scholarly-research.fetch_full_text" : null,
-          "scholarly-research.extract_numeric_parameters",
-        ].filter(Boolean).join(" -> ")}.`
-      : null,
-    "This is a fail-closed evidence result: it explains the retrieval/extraction mismatch without fabricating values or claiming a calculator result.",
-  ].filter((line): line is string => Boolean(line));
-  return lines.join("\n");
 };
 
 export const applyGatewayFailureAuthorityGuard = (input: {
@@ -1463,7 +1503,7 @@ export const applyGatewayFailureAuthorityGuard = (input: {
   gatewayCallResults: HelixWorkstationGatewayCallResult[];
 }): string => {
   const failed = input.gatewayCallResults.filter((result, index) =>
-    result.ok !== true && !hasSuccessfulCalculatorSolveForFailedCapability(input.gatewayCallResults, index),
+    !isGatewayResultCompatibleWithProviderReentry(input.gatewayCallResults, index),
   );
   if (failed.length === 0) return input.text;
   const descriptions = failed
@@ -1476,13 +1516,6 @@ export const applyGatewayFailureAuthorityGuard = (input: {
         "gateway_call_failed";
       return `${result.gateway_admission.requested_capability}: ${reason}`;
     });
-  if (failed.every(isScholarlyNumericFailClosedGatewayResult)) {
-    const explanation = buildScholarlyNumericFailClosedExplanation({
-      gatewayCallResults: input.gatewayCallResults,
-      failed,
-    });
-    if (explanation) return explanation;
-  }
   return [
     "I cannot claim the requested workstation tool or UI action ran because Helix did not produce a successful observation or action receipt for every gateway request.",
     `Blocked or failed gateway request${descriptions.length === 1 ? "" : "s"}: ${descriptions.join("; ")}.`,
@@ -2027,6 +2060,7 @@ export const codexProvider: HelixAgentProvider = {
       "For any repository/codebase-backed turn, answer only from the provided repo.search observation packet. If no repo.search observation packet exists, say repository content is not available from this turn.",
       "For any internet/web-backed turn, answer only from the provided internet-search.search_web observation packet. If no internet search observation packet exists, say web evidence is not available from this turn.",
       "For any scholarly/paper-backed turn, answer only from the provided scholarly-research.lookup_papers observation packet. If no scholarly observation packet exists, say paper evidence is not available from this turn.",
+      "If a scholarly observation includes scholarly_lookup_recovery_affordance, scholarly_full_text_recovery_affordance, scholarly_numeric_recovery_affordance, or recovery_affordances, treat that as non-terminal evidence about a failed or weak retrieval/fetch/extraction. Use it to explain the mismatch, propose a narrower re-query, ask the user, or fail closed; do not claim full-text, numeric extraction, or calculator results from it.",
       "",
       "User request:",
       question,

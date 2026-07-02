@@ -22,10 +22,10 @@ export const HELIX_ASK_LEGACY_CONSOLE_ACTIVE_PATH = [
 
 export const HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT = {
   file: "client/src/components/helix/HelixAskPill.tsx",
-  lineCountAtInventory: 26995,
-  exportedComponentStartsAtLine: 8447,
-  liveRenderSliceStartsAtLine: 26377,
-  liveLegacyConsoleViewStartsAtLine: 26392,
+  lineCountAtInventory: 27029,
+  exportedComponentStartsAtLine: 8479,
+  liveRenderSliceStartsAtLine: 26411,
+  liveLegacyConsoleViewStartsAtLine: 26426,
   inventoryReason:
     "The active bridge still imports the whole legacy file, but the visible console render path is concentrated near the bottom and now enters the recrowned legacy console view before composing recrowned ask-console display owners.",
 } as const;
@@ -295,7 +295,14 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
     classification: "behavior_sensitive_recrowned_with_parity",
     source: "lib/helix",
     evidence:
-      "Deterministic pending-input record detection plus pending-transition marker and trace normalization moved to ask-pending-input-readers with tests while pending-cancellation classification, pending request resolution, visible terminal-kind selection, latest-turn lifecycle, terminal projection, and workstation transition mutation remain in the bridge.",
+      "Deterministic pending-input record detection plus pending-transition marker and trace normalization moved to ask-pending-input-readers with tests while visible terminal-kind selection, latest-turn lifecycle, terminal projection, and workstation transition mutation remain in the bridge.",
+  },
+  {
+    key: "pending_input_cancellation_and_resolution_readers",
+    classification: "behavior_sensitive_recrowned_with_parity",
+    source: "lib/helix",
+    evidence:
+      "Deterministic pending-cancellation marker interpretation, recursive canceled-pending turn classification, and nested pending request resolution now execute through ask-pending-input-readers with tests while turn transition mutation, visible terminal-kind selection, latest-turn lifecycle, terminal projection, and workstation transition mutation remain in the bridge.",
   },
   {
     key: "voice_local_audio_analysis_and_speaker_matching",

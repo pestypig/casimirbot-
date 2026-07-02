@@ -9,7 +9,13 @@ import {
   buildPromptDerivedWorkspaceStatusGatewayCallRequests,
   readWorkstationGatewayCallRequestsForTurn,
   runExplicitWorkstationGatewayCalls,
+  shouldAutoExecuteDependentCompoundRequest,
 } from "../explicit-workstation-gateway";
+import {
+  buildCompoundDependencyRailStatus,
+  buildDependentCompoundCapabilityGatewayCallRequest,
+  buildTurnCompoundDependencyPlan,
+} from "../provider-compound-capability-planner";
 import { PROVIDER_AGENT_CAPABILITY_CLASSIFICATIONS } from "../../provider-agent-capability-contract";
 
 const docSnapshot = {
@@ -639,6 +645,54 @@ describe("explicit workstation gateway derived calls", () => {
         prompt: "the claim boundary",
       },
     });
+  });
+
+  it("admits affirmative natural-language theory reflection fetch prompts", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question: "ok, can you fetch the theory reflection for fusion?",
+      },
+    });
+
+    expect(capabilities(requests)).toEqual(["theory-badge-graph.reflect_discussion_context"]);
+    expect(requests[0]).toMatchObject({
+      schema: "helix.workstation_gateway.prompt_derived_theory_reflection_call_request.v1",
+      derivation_source: "helix_prompt_derived_theory_reflection",
+      capability_id: "theory-badge-graph.reflect_discussion_context",
+      mode: "read",
+      arguments: {
+        prompt: "fusion",
+        build_explanation_plan: true,
+        source_target_intent: expect.objectContaining({
+          source: "helix_prompt_derived_theory_reflection",
+          target_source: "theory_badge_graph",
+          target_kind: "theory_context_reflection",
+        }),
+      },
+    });
+  });
+
+  it("does not admit contextual, negated, future, quoted, UI-label, or mixed non-command theory reflection mentions", () => {
+    const prompts = [
+      "Do not fetch the theory reflection for fusion; explain what that would do.",
+      "In the future we might fetch the theory reflection for fusion.",
+      "The UI label says theory reflection for fusion.",
+      "The phrase is \"fetch the theory reflection for fusion\"; explain it only.",
+      "I am not asking you to fetch the theory reflection for fusion, just define the phrase.",
+      "After you fetch the theory reflection for fusion, what would happen?",
+    ];
+
+    for (const question of prompts) {
+      expect(readWorkstationGatewayCallRequestsForTurn({
+        includePlannerDerived: true,
+        body: {
+          agent_runtime: "codex",
+          question,
+        },
+      })).toEqual([]);
+    }
   });
 
   it("admits explicitly named scholarly and internet capabilities without inferring either from prose", () => {
@@ -1483,6 +1537,501 @@ describe("explicit workstation gateway derived calls", () => {
         }),
       },
     });
+  });
+
+  it("binds anaphoric numeric research follow-ups to the latest theory reflection equation context", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "ok, can you grab numerics that we can use for these equations based on what the equation means? Use research papers to cite",
+        workspace_context_snapshot: {
+          activePanel: "scientific-calculator",
+          focusedPanel: "scientific-calculator",
+          latest_theory_reflection_equation_context: {
+            schema: "helix.latest_theory_reflection_equation_context.v1",
+            source: "theory_map_overlay_live_answer_context",
+            reflection_id: "reflection:fusion",
+            summary:
+              "Theory Badge Graph reflection found physics.nuclear.reaction.thermonuclear_rate_context as a fusion-adjacent calculator template.",
+            calculator_payloads: [{
+              badge_id: "physics.nuclear.reaction.thermonuclear_rate_context",
+              badge_title: "Thermonuclear Rate Context",
+              payload_id: "thermonuclear-rate-context",
+              expression: "rate_proxy_m3_s = n1_m3 * n2_m3 * sigma_m2 * v_m_s",
+              target_variable: "rate_proxy_m3_s",
+              claim_boundary_notes: ["diagnostic/proxy only"],
+            }],
+            matched_badges: [{
+              badge_id: "physics.nuclear.reaction.thermonuclear_rate_context",
+              title: "Thermonuclear Rate Context",
+              matched_equation_families: ["thermonuclear reaction rate", "fusion cross section"],
+              matched_symbols: ["n1_m3", "n2_m3", "sigma_m2", "v_m_s"],
+            }],
+            assistant_answer: false,
+            raw_content_included: false,
+            terminal_eligible: false,
+            context_role: "tool_evidence",
+            ask_context_policy: "evidence_only",
+          },
+        },
+      },
+    });
+
+    const scholarlyRequest = requests.find((request) => request.capability_id === "scholarly-research.lookup_papers");
+    expect(scholarlyRequest).toMatchObject({
+      derivation_source: "helix_compound_capability_dependency_planner",
+      compound_outcome: "research_quantify_reflect",
+      arguments: {
+        allow_scholarly_dependent_chain: true,
+        requested_variables: ["n1_m3", "n2_m3", "sigma_m2", "v_m_s"],
+      },
+    });
+    const args = scholarlyRequest?.arguments as Record<string, unknown>;
+    expect(String(args.query)).toMatch(/thermonuclear reaction rate/i);
+    expect(String(args.query)).toMatch(/fusion cross section/i);
+    expect(String(args.query)).not.toMatch(/genome|sign-language|deformable-object/i);
+    expect(args.variable_source_plan).toMatchObject({
+      formula_variables: ["n1_m3", "n2_m3", "sigma_m2", "v_m_s"],
+      prior_theory_formula_context: {
+        schema: "helix.prior_theory_formula_context.v1",
+        source_ref: "reflection:fusion",
+        formulas: ["rate_proxy_m3_s = n1_m3 * n2_m3 * sigma_m2 * v_m_s"],
+        variables: ["n1_m3", "n2_m3", "sigma_m2", "v_m_s"],
+        assistant_answer: false,
+        raw_content_included: false,
+        terminal_eligible: false,
+      },
+    });
+    expect((args.source_target_intent as Record<string, any>).query_plan).toMatchObject({
+      schema: "helix.scholarly_variable_source_query_plan.v1",
+      prior_theory_formula_context: {
+        formulas: ["rate_proxy_m3_s = n1_m3 * n2_m3 * sigma_m2 * v_m_s"],
+      },
+    });
+  });
+
+  it("treats cited source-bound formula numerics as scholarly evidence collection before calculator binding", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "Based on the prior Theory Badge Graph plasma beta formulas beta = p_Pa / p_B, p_Pa = n_m3 * T_eV * e_charge, and p_B = B_T^2 / (2 * mu0), find cited research-paper numerical values we could use for n_m3, T_eV, and B_T. Return suggestions with units and explain whether they are sufficiently source-bound for calculator binding.",
+        workspace_context_snapshot: {
+          activePanel: "scientific-calculator",
+          focusedPanel: "scientific-calculator",
+        },
+      },
+    });
+
+    expect(capabilities(requests)).not.toContain("scientific-calculator.solve_expression");
+    expect(capabilities(requests)).toContain("scholarly-research.lookup_papers");
+    const scholarlyRequest = requests.find((request) => request.capability_id === "scholarly-research.lookup_papers");
+    expect(scholarlyRequest).toMatchObject({
+      derivation_source: "helix_compound_capability_dependency_planner",
+      compound_outcome: "research_quantify_reflect",
+      arguments: {
+        requested_variables: ["n_m3", "T_eV", "B_T"],
+        allow_scholarly_dependent_chain: true,
+      },
+    });
+    expect(JSON.stringify(scholarlyRequest)).toMatch(/source[-_ ]?bound|calculator binding|unit/i);
+  });
+
+  it("does not auto-execute research-chain dependent requests that Codex should choose after re-entry", () => {
+    expect(shouldAutoExecuteDependentCompoundRequest({
+      compound_outcome: "research_quantify_reflect",
+      capability_id: "scholarly-research.fetch_full_text",
+      mode: "read",
+    })).toBe(false);
+    expect(shouldAutoExecuteDependentCompoundRequest({
+      compound_outcome: "research_quantify_reflect",
+      capability_id: "scholarly-research.extract_numeric_parameters",
+      mode: "read",
+    })).toBe(false);
+    expect(shouldAutoExecuteDependentCompoundRequest({
+      compound_outcome: "research_quantify_reflect",
+      capability_id: "scientific-calculator.solve_expression",
+      mode: "read",
+    })).toBe(false);
+    expect(shouldAutoExecuteDependentCompoundRequest({
+      compound_outcome: "read_aloud_surface",
+      capability_id: "live_env.narrator_say",
+      mode: "act",
+    })).toBe(true);
+  });
+
+  it("emits a scholarly recovery affordance instead of fetching full text for irrelevant formula-bound lookup results", () => {
+    const variableSourcePlan = {
+      schema: "helix.variable_source_plan.v1",
+      source: "helix_compound_capability_dependency_planner",
+      formula_variables: ["n1_m3", "n2_m3", "sigma_m2", "v_m_s"],
+      entries: [
+        {
+          variable: "n1_m3",
+          source_classes: ["fusion plasma parameter table", "reactant density diagnostic"],
+          search_terms: ["reactant number density", "ion density", "fusion plasma parameters"],
+          extraction_aliases: ["n1", "reactant density"],
+        },
+        {
+          variable: "sigma_m2",
+          source_classes: ["fusion cross-section data", "Maxwellian-averaged reactivity table"],
+          search_terms: ["fusion cross section", "Maxwellian averaged reactivity", "sigma v"],
+          extraction_aliases: ["sigma", "cross section"],
+        },
+      ],
+      query_terms: [
+        "fusion",
+        "thermonuclear reaction rate",
+        "fusion cross section",
+        "n1_m3",
+        "n2_m3",
+        "sigma_m2",
+        "v_m_s",
+      ],
+      retrieval_intent:
+        "Find papers that report unit-bearing physical quantities needed to bind the formula variables.",
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const request = {
+      compound_outcome: "research_quantify_reflect",
+      subgoal_id: "research_quantify_reflect:scholarly_evidence",
+      capability_id: "scholarly-research.lookup_papers",
+      arguments: {
+        query: "fusion thermonuclear reaction rate parameter table fusion cross section n1_m3 n2_m3 sigma_m2 v_m_s",
+        allow_scholarly_dependent_chain: true,
+        requested_variables: ["n1_m3", "n2_m3", "sigma_m2", "v_m_s"],
+        variable_source_plan: variableSourcePlan,
+      },
+    };
+    const result = {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: "test",
+      ok: true,
+      agent_runtime: "codex",
+      capability_id: "scholarly-research.lookup_papers",
+      mode: "read",
+      gateway_admission: {
+        schema: "helix.workstation_tool_gateway.admission.v1",
+        requested_capability: "scholarly-research.lookup_papers",
+        selected_agent_provider: "codex",
+        permission_profile: "read",
+        admission_status: "admitted",
+        admission_reason: "test",
+        source_target_intent: {
+          source: "helix_compound_capability_dependency_planner",
+          target_source: "scholarly_research",
+          target_kind: "scholarly_lookup",
+          compound_outcome: "research_quantify_reflect",
+          subgoal_id: "research_quantify_reflect:scholarly_evidence",
+          subgoal_ordinal: 1,
+          required_observation_kind: "helix.scholarly_research_observation.v1",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.scholarly_research_observation.v1",
+        query: "fusion thermonuclear reaction rate parameter table fusion cross section n1_m3 n2_m3 sigma_m2 v_m_s",
+        papers: [{
+          result_id: "paper:genome-remapping",
+          title: "Fast genome remapping with sampling optimization",
+          abstract: "We present a genome assembly polishing method for sequence remapping.",
+        }],
+        assistant_answer: false,
+        raw_content_included: false,
+        terminal_eligible: false,
+      },
+      observation_packet: {
+        schema: "helix.agent_step_observation_packet.v1",
+        turn_id: "turn:scholarly-recovery",
+        iteration: 1,
+        call_id: "call:lookup",
+        decision_id: "decision:lookup",
+        capability_key: "scholarly-research.lookup_papers",
+        panel_id: "scholarly-research",
+        action: "lookup_papers",
+        status: "succeeded",
+        produced_artifact_refs: ["observation:lookup"],
+        observation_summary: "lookup returned irrelevant papers",
+        receipts: [],
+        missing_requirements: [],
+        state_delta: {},
+        suggested_next_steps: ["answer"],
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      tool_lifecycle_trace: {},
+      tool_followup_decision: {},
+      artifact_refs: ["observation:lookup"],
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    } as any;
+
+    const dependent = buildDependentCompoundCapabilityGatewayCallRequest({
+      request,
+      result,
+      turnId: "turn:scholarly-recovery",
+    });
+
+    expect(dependent).toBeNull();
+    expect(result.observation.lookup_relevance_gate).toMatchObject({
+      status: "blocked",
+      code: "lookup_result_irrelevant",
+      rejected_results: [{
+        result_id: "paper:genome-remapping",
+        reasons: expect.arrayContaining(["missing_required_topic_terms", "missing_formula_source_terms"]),
+      }],
+    });
+    expect(result.observation.scholarly_lookup_recovery_affordance).toMatchObject({
+      schema: "helix.scholarly_lookup_recovery_affordance.v1",
+      status: "available",
+      recommended_next_capability: "scholarly-research.lookup_papers",
+      expected_variables: ["n1_m3", "n2_m3", "sigma_m2", "v_m_s"],
+      next_affordances: expect.arrayContaining([
+        expect.objectContaining({
+          capability: "scholarly-research.lookup_papers",
+          purpose: "retry_with_refined_query",
+          reason: "low_relevance_results",
+        }),
+        expect.objectContaining({
+          capability: "scholarly-research.fetch_full_text",
+          reason: "blocked_until_relevant_source_ref_exists",
+        }),
+      ]),
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+    expect(JSON.stringify(result.observation.scholarly_lookup_recovery_affordance)).toMatch(/deuterium tritium fusion/i);
+    expect(JSON.stringify(result.observation.scholarly_lookup_recovery_affordance)).toMatch(/sigma v/i);
+    expect(result.observation_packet.state_delta.scholarly_lookup_recovery_affordance).toBe(
+      result.observation.scholarly_lookup_recovery_affordance,
+    );
+    expect(result.observation_packet.suggested_next_steps).toEqual(
+      expect.arrayContaining(["use_another_tool", "repair", "fail_closed"]),
+    );
+    const railStatus = buildCompoundDependencyRailStatus({
+      request,
+      result,
+      dependentRequest: dependent,
+    });
+    expect(railStatus).toMatchObject({
+      rail_status: "blocked",
+      subgoals: [
+        expect.objectContaining({
+          requested_capability: "scholarly-research.lookup_papers",
+          executed_capability: "scholarly-research.lookup_papers",
+          evidence_gathered: true,
+          evidence_quality: "low_relevance",
+          evidence_quality_satisfied: false,
+          satisfied: false,
+          rail_status: "evidence_gathered_not_satisfied",
+          rail_failure_code: "lookup_result_irrelevant",
+        }),
+      ],
+      first_broken_rail: expect.objectContaining({
+        capability_id: "scholarly-research.fetch_full_text",
+        reason: "lookup_result_irrelevant",
+      }),
+    });
+    const turnPlan = buildTurnCompoundDependencyPlan({
+      turnId: "turn:scholarly-recovery",
+      results: [result],
+    });
+    expect(turnPlan).toMatchObject({
+      schema: "helix.compound_capability_dependency_turn_plan.v1",
+      rail_status: "blocked",
+      satisfied_subgoal_count: 0,
+      ordered_subgoals: [
+        expect.objectContaining({
+          subgoal_id: "research_quantify_reflect:scholarly_evidence",
+          requested_capability: "scholarly-research.lookup_papers",
+          executed_capability: "scholarly-research.lookup_papers",
+          evidence_gathered: true,
+          evidence_quality: "low_relevance",
+          evidence_quality_satisfied: false,
+          satisfied: false,
+          rail_status: "evidence_gathered_not_satisfied",
+          rail_failure_code: "lookup_result_irrelevant",
+        }),
+      ],
+      first_broken_rail: expect.objectContaining({
+        subgoal_id: "research_quantify_reflect:scholarly_evidence",
+        rail_failure_code: "lookup_result_irrelevant",
+      }),
+    });
+  });
+
+  it("blocks calculator planning after formula-bound numeric extraction emits recovery evidence", () => {
+    const variableSourcePlan = {
+      schema: "helix.variable_source_plan.v1",
+      source: "helix_compound_capability_dependency_planner",
+      formula_variables: ["n1_m3", "n2_m3", "sigma_m2", "v_m_s"],
+      prior_theory_formula_context: {
+        schema: "helix.prior_theory_formula_context.v1",
+        source_ref: "reflection:fusion",
+        formulas: ["rate_proxy_m3_s = n1_m3 * n2_m3 * sigma_m2 * v_m_s"],
+        variables: ["n1_m3", "n2_m3", "sigma_m2", "v_m_s"],
+        query_terms: ["thermonuclear reaction rate", "fusion cross section"],
+        assistant_answer: false,
+        raw_content_included: false,
+        terminal_eligible: false,
+      },
+      entries: [
+        {
+          variable: "n1_m3",
+          source_classes: ["fusion plasma parameter table"],
+          search_terms: ["reactant number density", "ion density"],
+          extraction_aliases: ["n1", "reactant density"],
+        },
+        {
+          variable: "n2_m3",
+          source_classes: ["fusion plasma parameter table"],
+          search_terms: ["reactant number density", "ion density"],
+          extraction_aliases: ["n2", "reactant density"],
+        },
+        {
+          variable: "sigma_m2",
+          source_classes: ["fusion cross-section data"],
+          search_terms: ["fusion cross section", "sigma v"],
+          extraction_aliases: ["sigma", "cross section"],
+        },
+        {
+          variable: "v_m_s",
+          source_classes: ["relative velocity model", "Maxwellian-averaged reactivity table"],
+          search_terms: ["relative velocity", "Maxwellian averaged reactivity"],
+          extraction_aliases: ["v", "relative velocity"],
+        },
+      ],
+      query_terms: ["fusion", "thermonuclear reaction rate", "fusion cross section", "sigma v"],
+      retrieval_intent:
+        "Find papers that report unit-bearing physical quantities needed to bind the formula variables.",
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const theoryResult = {
+      ok: true,
+      capability_id: "theory-badge-graph.reflect_discussion_context",
+      gateway_admission: {
+        requested_capability: "theory-badge-graph.reflect_discussion_context",
+      },
+      observation: {
+        calculator_payloads: [{
+          expression: "rate_proxy_m3_s = n1_m3 * n2_m3 * sigma_m2 * v_m_s",
+          badge_id: "physics.nuclear.reaction.thermonuclear_rate_context",
+          payload_id: "thermonuclear-rate-context",
+        }],
+      },
+      observation_packet: {
+        produced_artifact_refs: ["observation:theory"],
+      },
+      artifact_refs: ["observation:theory"],
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    } as any;
+    const numericResult = {
+      ok: false,
+      capability_id: "scholarly-research.extract_numeric_parameters",
+      gateway_admission: {
+        requested_capability: "scholarly-research.extract_numeric_parameters",
+      },
+      observation: {
+        schema: "helix.scholarly_numeric_parameter_observation.v1",
+        requested_variables: ["n1_m3", "n2_m3", "sigma_m2", "v_m_s"],
+        parameters: [],
+        missing_variables: ["n1_m3", "n2_m3", "sigma_m2", "v_m_s"],
+        missing_requirements: ["missing_requested_numeric_variables"],
+        variable_source_plan: variableSourcePlan,
+        scholarly_numeric_recovery_affordance: {
+          schema: "helix.scholarly_numeric_recovery_affordance.v1",
+          status: "available",
+          reason: "missing_requested_numeric_variables",
+          recommended_next_capability: "scholarly-research.lookup_papers",
+          missing_variables: ["n1_m3", "n2_m3", "sigma_m2", "v_m_s"],
+          recovery_queries: [
+            "D-T fusion plasma deuterium tritium number density cross section relative velocity thermonuclear reaction rate",
+          ],
+          variable_source_plan: variableSourcePlan,
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+        selected_for_answer: false,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation_packet: {
+        produced_artifact_refs: ["observation:numeric"],
+        state_delta: {
+          scholarly_numeric_recovery_affordance: {
+            schema: "helix.scholarly_numeric_recovery_affordance.v1",
+            missing_variables: ["n1_m3", "n2_m3", "sigma_m2", "v_m_s"],
+          },
+        },
+      },
+      artifact_refs: ["observation:numeric"],
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      error: "missing_requested_numeric_variables",
+    } as any;
+    const request = {
+      compound_outcome: "research_quantify_reflect",
+      subgoal_id: "research_quantify_reflect:numeric_parameters",
+      capability_id: "scholarly-research.extract_numeric_parameters",
+      arguments: {
+        variable_source_plan: variableSourcePlan,
+        source_target_intent: {
+          required_observation_kind: "helix.scholarly_numeric_parameter_observation.v1",
+          subgoal_ordinal: 3,
+        },
+      },
+    };
+
+    const dependent = buildDependentCompoundCapabilityGatewayCallRequest({
+      request,
+      result: numericResult,
+      results: [theoryResult, numericResult],
+      turnId: "turn:fusion-numeric-recovery",
+    });
+    const railStatus = buildCompoundDependencyRailStatus({
+      request,
+      result: numericResult,
+      results: [theoryResult, numericResult],
+      dependentRequest: dependent,
+    });
+
+    expect(dependent).toBeNull();
+    expect(railStatus).toMatchObject({
+      schema: "helix.compound_capability_dependency_plan.v1",
+      rail_status: "blocked",
+      typed_affordance_binding: {
+        status: "blocked",
+        reason: "missing_numeric_value_evidence",
+        missing_variables: ["n1_m3", "n2_m3", "sigma_m2", "v_m_s"],
+        rejected_expression: "rate_proxy_m3_s = n1_m3 * n2_m3 * sigma_m2 * v_m_s",
+      },
+      first_broken_rail: {
+        capability_id: "scholarly-research.extract_numeric_parameters",
+        reason: "missing_requested_numeric_variables",
+      },
+    });
+    expect(JSON.stringify(railStatus)).toMatch(/scientific-calculator\.solve_expression/);
+    expect(JSON.stringify(railStatus)).toMatch(/missing_numeric_value_evidence/);
+    expect(JSON.stringify(numericResult.observation.scholarly_numeric_recovery_affordance)).toMatch(/D-T fusion plasma/i);
   });
 
   it("blocks mutating live_env controls embedded in otherwise safe compound prompts", () => {

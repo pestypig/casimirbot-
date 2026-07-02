@@ -478,6 +478,166 @@ const readRecordArray = (value: unknown): Array<Record<string, unknown>> =>
     ? value.map(readRecord).filter((entry): entry is Record<string, unknown> => Boolean(entry))
     : [];
 
+const uniqueStrings = (values: Array<string | null | undefined>): string[] => {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values) {
+    const cleaned = cleanString(value).replace(/\s+/g, " ").trim();
+    if (!cleaned) continue;
+    const key = cleaned.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(cleaned);
+  }
+  return result;
+};
+
+const readVariableSourcePlanEntries = (value: unknown): Array<Record<string, unknown>> =>
+  readRecordArray(readRecord(value)?.entries);
+
+const buildScholarlyNumericRecoveryAffordance = (input: {
+  requestedVariables: string[];
+  missingVariables: string[];
+  variableSourcePlan: Record<string, unknown> | null;
+  sourceTargetIntent: Record<string, unknown> | null;
+  sourceRef: string | null;
+  paper: Record<string, unknown> | null;
+  extractionMode: string;
+  blockedReason: string | null;
+}): Record<string, unknown> | null => {
+  if (input.missingVariables.length === 0 && !input.blockedReason) return null;
+  const entries = readVariableSourcePlanEntries(input.variableSourcePlan);
+  const entryForVariable = (variable: string): Record<string, unknown> | null =>
+    entries.find((entry) => cleanString(entry.variable).toLowerCase() === variable.toLowerCase()) ?? null;
+  const expectedSourceClasses = uniqueStrings(
+    input.missingVariables.flatMap((variable) =>
+      readStringArray(entryForVariable(variable)?.source_classes)
+    ),
+  );
+  const extractionAliases = uniqueStrings(
+    input.missingVariables.flatMap((variable) =>
+      readStringArray(entryForVariable(variable)?.extraction_aliases)
+    ),
+  );
+  const searchTerms = uniqueStrings([
+    ...input.missingVariables.flatMap((variable) => readStringArray(entryForVariable(variable)?.search_terms)),
+    ...readStringArray(input.variableSourcePlan?.query_terms),
+    cleanString(input.sourceTargetIntent?.target_kind),
+  ]);
+  const likelyFusionRate = input.missingVariables.some((variable) => /^(?:n1_m3|n2_m3|sigma_m2|v_m_s)$/i.test(variable)) ||
+    searchTerms.some((term) => /\b(?:fusion|thermonuclear|reaction rate|cross section)\b/i.test(term));
+  const recoveryQueries = uniqueStrings([
+    likelyFusionRate
+      ? "D-T fusion plasma deuterium tritium number density cross section relative velocity thermonuclear reaction rate"
+      : null,
+    likelyFusionRate
+      ? "deuterium tritium fusion Maxwellian averaged reactivity sigma v cross section table ion density plasma temperature"
+      : null,
+    searchTerms.length ? searchTerms.slice(0, 12).join(" ") : null,
+    input.missingVariables.length ? `${input.missingVariables.join(" ")} cited values units paper table` : null,
+  ]).slice(0, 4);
+  return {
+    schema: "helix.scholarly_numeric_recovery_affordance.v1",
+    status: "available",
+    reason: input.blockedReason ?? "missing_requested_numeric_variables",
+    recommended_next_capability: "scholarly-research.lookup_papers",
+    followup_mode: "narrow_requery_or_ask_user",
+    source_ref: input.sourceRef,
+    paper: input.paper
+      ? {
+          title: optionalString(input.paper.title),
+          url: optionalString(input.paper.url),
+          doi: optionalString(readRecord(input.paper.identifiers)?.doi ?? input.paper.doi),
+          arxiv_id: optionalString(readRecord(input.paper.identifiers)?.arxiv_id ?? input.paper.arxiv_id),
+        }
+      : null,
+    requested_variables: input.requestedVariables,
+    missing_variables: input.missingVariables,
+    expected_variables: input.missingVariables.map((variable) => {
+      const entry = entryForVariable(variable);
+      return {
+        variable,
+        canonical_quantity: optionalString(entry?.canonical_quantity) ?? variable,
+        expected_unit: optionalString(entry?.expected_unit),
+        source_classes: readStringArray(entry?.source_classes),
+        search_terms: readStringArray(entry?.search_terms),
+        extraction_aliases: readStringArray(entry?.extraction_aliases),
+      };
+    }),
+    expected_source_classes: expectedSourceClasses,
+    extraction_aliases: extractionAliases,
+    recovery_queries: recoveryQueries,
+    variable_source_plan: input.variableSourcePlan,
+    assistant_answer: false,
+    raw_content_included: false,
+    terminal_eligible: false,
+    post_tool_model_step_required: true,
+  };
+};
+
+const buildScholarlyFullTextRecoveryAffordance = (input: {
+  query: string;
+  blockedReason: string;
+  paperResultId: string | null;
+  paper: Record<string, unknown> | null;
+  papers: Record<string, unknown>[];
+  variableSourcePlan: Record<string, unknown> | null;
+  sourceTargetIntent: Record<string, unknown> | null;
+}): Record<string, unknown> => {
+  const entries = readVariableSourcePlanEntries(input.variableSourcePlan);
+  const sourceClasses = uniqueStrings(entries
+    .flatMap((entry) => readStringArray(entry.source_classes)));
+  const queryTerms = uniqueStrings([
+    ...readStringArray(input.variableSourcePlan?.query_terms),
+    ...entries.flatMap((entry) => readStringArray(entry.search_terms)),
+    cleanString(input.sourceTargetIntent?.target_kind),
+    input.query,
+  ]);
+  const likelyFusionRate = queryTerms.some((term) =>
+    /\b(?:fusion|thermonuclear|reaction rate|cross section|sigma\s*v|reactivity)\b/i.test(term)
+  );
+  const candidateTitles = uniqueStrings([
+    optionalString(input.paper?.title),
+    ...input.papers.map((paper) => optionalString(paper.title)),
+    input.paperResultId,
+  ]).slice(0, 5);
+  const recoveryQueries = uniqueStrings([
+    likelyFusionRate
+      ? "deuterium tritium fusion Maxwellian averaged reactivity sigma v cross section table accessible pdf"
+      : null,
+    likelyFusionRate
+      ? "Bosch Hale fusion reactivity coefficients D T cross section full text"
+      : null,
+    candidateTitles.length ? candidateTitles.join(" ") : null,
+    queryTerms.length ? queryTerms.slice(0, 14).join(" ") : null,
+    input.query,
+  ]).slice(0, 4);
+  return {
+    schema: "helix.scholarly_full_text_recovery_affordance.v1",
+    status: "available",
+    reason: input.blockedReason,
+    recommended_next_capability: "scholarly-research.lookup_papers",
+    followup_mode: "narrow_requery_for_fetchable_source",
+    paper_result_id: input.paperResultId,
+    paper: input.paper
+      ? {
+          title: optionalString(input.paper.title),
+          url: optionalString(input.paper.url),
+          doi: optionalString(readRecord(input.paper.identifiers)?.doi ?? input.paper.doi),
+          arxiv_id: optionalString(readRecord(input.paper.identifiers)?.arxiv_id ?? input.paper.arxiv_id),
+        }
+      : null,
+    candidate_titles: candidateTitles,
+    expected_source_classes: sourceClasses,
+    recovery_queries: recoveryQueries,
+    variable_source_plan: input.variableSourcePlan,
+    assistant_answer: false,
+    raw_content_included: false,
+    terminal_eligible: false,
+    post_tool_model_step_required: true,
+  };
+};
+
 const isLikelyScholarlyFullTextUrl = (value: unknown): boolean => {
   const url = optionalString(value);
   return Boolean(url && /^https?:\/\//i.test(url) && (/\.(?:pdf|html?|txt)(?:[?#].*)?$/i.test(url) || /arxiv\.org\/(?:pdf|abs)\//i.test(url)));
@@ -5010,17 +5170,31 @@ export const callWorkstationGatewayCapability = async (
       sourceTargetIntent: args.source_target_intent,
     });
     if (blockedReason) {
+      const variableSourcePlan = readRecord(args.variable_source_plan ?? args.variableSourcePlan);
+      const sourceTargetIntent = readRecord(args.source_target_intent ?? args.sourceTargetIntent);
+      const fullTextRecoveryAffordance = buildScholarlyFullTextRecoveryAffordance({
+        query,
+        blockedReason,
+        paperResultId,
+        paper,
+        papers,
+        variableSourcePlan,
+        sourceTargetIntent,
+      });
       const observation = {
         schema: SCHOLARLY_FULL_TEXT_OBSERVATION_SCHEMA,
         capability_key: manifest.capability_id,
         capability: manifest.capability_id,
         query,
+        ...(variableSourcePlan ? { variable_source_plan: variableSourcePlan } : {}),
         source_kind: "unknown",
         pages_parsed: 0,
         page_text_refs: [],
         selected_chunks: [],
         visual_candidates: [],
         missing_requirements: [blockedReason],
+        scholarly_full_text_recovery_affordance: fullTextRecoveryAffordance,
+        recovery_affordances: [fullTextRecoveryAffordance],
         selected_for_answer: false,
         status: "blocked",
         blocked_reason: blockedReason,
@@ -5049,6 +5223,20 @@ export const callWorkstationGatewayCapability = async (
           repair_action: "ask_user",
         }],
       });
+      observationPacket.state_delta = {
+        ...observationPacket.state_delta,
+        scholarly_full_text_recovery_affordance: fullTextRecoveryAffordance,
+        recovery_affordances: [
+          ...readArray(observationPacket.state_delta?.recovery_affordances),
+          fullTextRecoveryAffordance,
+        ],
+      };
+      observationPacket.suggested_next_steps = Array.from(new Set([
+        ...observationPacket.suggested_next_steps,
+        "use_another_tool",
+        "repair",
+        "ask_user",
+      ]));
       const trace = buildGatewayTrace({ turnId, capabilityId: manifest.capability_id, agentRuntime, admission, observationPacket, error: blockedReason });
       return {
         schema: "helix.workstation_tool_gateway.call_result.v1",
@@ -5148,6 +5336,8 @@ export const callWorkstationGatewayCapability = async (
     const fullTextObservation = readRecord(args.full_text_observation ?? args.fullTextObservation);
     const textEvidence = optionalString(args.text_evidence ?? args.textEvidence ?? args.text);
     const sourceRef = optionalString(args.source_ref ?? args.sourceRef);
+    const variableSourcePlan = readRecord(args.variable_source_plan ?? args.variableSourcePlan);
+    const sourceTargetIntent = readRecord(args.source_target_intent ?? args.sourceTargetIntent);
     const blockedReason = !fullTextObservation && !textEvidence
         ? "text_evidence_required"
         : null;
@@ -5174,6 +5364,7 @@ export const callWorkstationGatewayCapability = async (
           missing_variables: extractionMode === "open_supported_parameters" ? [] : requestedVariables,
           rejected_candidates: [],
           missing_requirements: [blockedReason],
+          variable_source_plan: variableSourcePlan,
           selected_for_answer: false,
           extraction_mode: extractionMode,
           status: "blocked",
@@ -5195,8 +5386,26 @@ export const callWorkstationGatewayCapability = async (
             paper: readRecord(args.paper) as never,
           }),
         };
+    const numericRecoveryAffordance = buildScholarlyNumericRecoveryAffordance({
+      requestedVariables,
+      missingVariables: readStringArray(numericObservation.missing_variables),
+      variableSourcePlan,
+      sourceTargetIntent,
+      sourceRef,
+      paper: readRecord(numericObservation.paper) ?? readRecord(args.paper),
+      extractionMode,
+      blockedReason,
+    });
     const observation = {
       ...numericObservation,
+      ...(variableSourcePlan ? { variable_source_plan: variableSourcePlan } : {}),
+      ...(numericRecoveryAffordance ? {
+        scholarly_numeric_recovery_affordance: numericRecoveryAffordance,
+        recovery_affordances: [
+          ...readArray((numericObservation as Record<string, unknown>).recovery_affordances),
+          numericRecoveryAffordance,
+        ],
+      } : {}),
       status: numericObservation.selected_for_answer ? "succeeded" : blockedReason ? "blocked" : "failed",
       terminal_eligible: false,
       post_tool_model_step_required: true,
@@ -5227,6 +5436,21 @@ export const callWorkstationGatewayCapability = async (
       requiredAffordanceKinds: manifest.consumes_affordances,
       producedAffordanceKinds: manifest.produces_affordances,
     });
+    if (numericRecoveryAffordance) {
+      observationPacket.state_delta = {
+        ...observationPacket.state_delta,
+        scholarly_numeric_recovery_affordance: numericRecoveryAffordance,
+        recovery_affordances: [
+          ...readArray(observationPacket.state_delta?.recovery_affordances),
+          numericRecoveryAffordance,
+        ],
+      };
+      observationPacket.suggested_next_steps = Array.from(new Set([
+        ...observationPacket.suggested_next_steps,
+        "use_another_tool",
+        "ask_user",
+      ]));
+    }
     const error = numericObservation.selected_for_answer ? undefined : numericObservation.missing_requirements[0] ?? "missing_requested_numeric_variables";
     const trace = buildGatewayTrace({ turnId, capabilityId: manifest.capability_id, agentRuntime, admission, observationPacket, error });
     return {

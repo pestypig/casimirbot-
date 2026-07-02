@@ -70,6 +70,29 @@ Required observation fields:
 - `assistant_answer=false`
 - `raw_content_included=false`
 
+When requested variables are missing, blocked, ambiguous, uncited, or
+unit-incompatible, the observation should also include:
+
+- `scholarly_numeric_recovery_affordance`
+- `schema`: `helix.scholarly_numeric_recovery_affordance.v1`
+- `reason`: `missing_requested_numeric_variables`, `text_evidence_required`,
+  or the first applicable extraction gate
+- `requested_variables`
+- `missing_variables`
+- `expected_variables`
+- `expected_source_classes`
+- `extraction_aliases`
+- `recovery_queries`
+- `variable_source_plan` when the compound planner supplied one
+- `terminal_eligible=false`
+- `post_tool_model_step_required=true`
+- `assistant_answer=false`
+- `raw_content_included=false`
+
+This recovery affordance is evidence for Codex after model re-entry. It tells
+the runtime what failed and how to repair the research path; it is not a final
+answer and must not authorize calculator execution.
+
 Each parameter must include:
 
 - `variable`
@@ -125,6 +148,15 @@ Typed binder emits bound_calculator_expression or blocks calculator solve
 - extracts values and normalizes units from text/table fixtures
 - rejects missing, ambiguous, uncited, or incompatible candidates
 - calculator is blocked until all required variables have cited numeric evidence
+- formula-bound missing variables emit
+  `scholarly_numeric_recovery_affordance` with the original
+  `variable_source_plan`, expected source classes, extraction aliases, and
+  recovery queries
+- a failed extraction for
+  `rate_proxy_m3_s = n1_m3 * n2_m3 * sigma_m2 * v_m_s` blocks
+  `scientific-calculator.solve_expression` with
+  `missing_numeric_value_evidence` until all four variables are cited and
+  unit-bearing
 - bare `B` from B-meson or branching-fraction prose is not accepted as `B_T`;
   magnetic-field extraction requires magnetic-field context and compatible units
 - open extraction reports supported cited paper parameters without requiring a

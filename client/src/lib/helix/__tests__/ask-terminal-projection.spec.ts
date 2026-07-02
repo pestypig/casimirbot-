@@ -138,6 +138,37 @@ describe("Helix Ask terminal projection", () => {
     );
   });
 
+  it("does not let stale backend entrypoint flags hide a materialized workstation final", () => {
+    const answer =
+      "The scholarly chain reached a bounded result, but it did not fully bind a calculator expression.";
+    const visible = buildVisibleResolvedTurn({
+      id: "reply-codex-workstation-materialized-final",
+      ok: true,
+      selected_final_answer: "This prompt requires the backend Ask solver path before a final answer can be shown.",
+      final_answer_source: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      ask_entrypoint_required: true,
+      ask_entrypoint_observed: false,
+      ask_entrypoint_failure_code: "backend_ask_entry_required",
+      debug: {
+        ask_entrypoint_required: true,
+        ask_entrypoint_observed: false,
+        resolved_turn_summary: {
+          final_status: "final_answer",
+          terminal_artifact_kind: "workstation_tool_evaluation",
+        },
+        ui_debug_parity_harness: {
+          visible_final_answer: answer,
+        },
+      },
+    });
+
+    expect(visible.primary_terminal_label).toBe("final_answer");
+    expect(visible.primary_source_label).not.toBe("typed failure");
+    expect(visible.terminal_error_code).toBeNull();
+    expect(visible.selected_final_answer).toBe(answer);
+  });
+
   it("lets structured workstation gateway success outrank stale typed-failure labels", () => {
     const reply = {
       id: "reply-codex-workstation-live-stale-failure",
