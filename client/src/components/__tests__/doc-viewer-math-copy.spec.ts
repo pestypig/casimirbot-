@@ -147,6 +147,8 @@ describe("doc viewer math interaction", () => {
     expect(panelSource).toContain("data-doc-translation-dedupe-key");
     expect(panelSource).toContain("data-doc-translation-source-event-id");
     expect(panelSource).toContain("data-doc-translation-freshness-status");
+    expect(panelSource).toContain("data-doc-translation-source-kind");
+    expect(panelSource).toContain("data-doc-translation-account-locale");
     expect(panelSource).toContain("data-doc-translation-projection-target");
     expect(panelSource).toContain("data-doc-translation-target-language");
     expect(panelSource).toContain("data-doc-translation-cancel-requested");

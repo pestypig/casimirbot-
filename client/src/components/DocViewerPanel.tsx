@@ -1726,6 +1726,8 @@ function renderMarkdownWithInlineTranslations(
         typeof state.sourceEventMs === "number" ? `data-doc-translation-source-event-ms="${String(state.sourceEventMs)}"` : "",
         typeof state.observedAtMs === "number" ? `data-doc-translation-observed-at-ms="${String(state.observedAtMs)}"` : "",
         state.freshnessStatus ? `data-doc-translation-freshness-status="${escapeHtml(state.freshnessStatus)}"` : "",
+        state.sourceKind ? `data-doc-translation-source-kind="${escapeHtml(state.sourceKind)}"` : "",
+        state.accountLocale ? `data-doc-translation-account-locale="${escapeHtml(state.accountLocale)}"` : "",
         state.projectionTarget ? `data-doc-translation-projection-target="${escapeHtml(state.projectionTarget)}"` : "",
         state.targetLanguage ? `data-doc-translation-target-language="${escapeHtml(state.targetLanguage)}"` : "",
         typeof state.cancelRequested === "boolean" ? `data-doc-translation-cancel-requested="${String(state.cancelRequested)}"` : "",

@@ -20,6 +20,7 @@ import {
   VOICE_NARRATOR_SAY_CAPABILITY,
   WORKSPACE_OS_STATUS_CAPABILITY,
   hasSelectedHelixAgentRuntime,
+  readArray,
   readExplicitWorkstationGatewayCallRequests,
   readHelixAgentTurnId,
   readPrompt,
@@ -55,6 +56,136 @@ import {
   isPaperBackedNumericBindingPhasePrompt,
   isTheoryFormulaDiscoveryPhasePrompt,
 } from "./prompt-named-tool-requests";
+
+const MORAL_SUBSTRATE_PRIMARY_CAPABILITY = "moral-graph.reflect_living_substrate_context" as const;
+
+const MORAL_SUBSTRATE_DEFERRED_AFFORDANCE_CAPABILITIES = new Set([
+  INTERNET_SEARCH_CAPABILITY,
+  SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+  THEORY_CONTEXT_REFLECTION_CAPABILITY,
+  CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+]);
+
+const isMoralSubstrateRequest = (request: Record<string, unknown>): boolean =>
+  (readString(request.capability_id) ?? readString(request.capabilityId)) === MORAL_SUBSTRATE_PRIMARY_CAPABILITY;
+
+const isMoralSubstrateIntent = (request: Record<string, unknown>): boolean => {
+  const sourceTargetIntent = readRecord(readRecord(request.arguments)?.source_target_intent);
+  return (
+    readString(sourceTargetIntent?.target_kind) === "moral_living_substrate_reflection" ||
+    readString(sourceTargetIntent?.intent) === "moral_living_substrate_reflection"
+  );
+};
+
+const promptExplicitlyRequestsExternalEvidence = (prompt: string): boolean =>
+  /\b(?:also|and|then|with|plus|include|using|use|search|look\s+up|find|cite|citations?|sources?|papers?|research|scholarly|arxiv|web|internet|latest|current|recent)\b[\s\S]{0,120}\b(?:search|look\s+up|find|cite|citations?|sources?|papers?|research|scholarly|arxiv|web|internet|latest|current|recent)\b/i.test(
+    unquotePrompt(prompt),
+  );
+
+const isExplicitExternalResearchRequest = (
+  request: Record<string, unknown>,
+  prompt: string,
+  promptNamedCapabilities: Set<string>,
+): boolean => {
+  const capability = readString(request.capability_id) ?? readString(request.capabilityId);
+  if (!capability) return false;
+  if (promptNamedCapabilities.has(capability)) return true;
+  const derivationSource = readString(request.derivation_source);
+  const sourceTargetIntent = readRecord(readRecord(request.arguments)?.source_target_intent);
+  const explicitCues = Array.isArray(sourceTargetIntent?.explicit_cues)
+    ? sourceTargetIntent.explicit_cues.filter((cue): cue is string => typeof cue === "string")
+    : [];
+  return (
+    derivationSource === "helix_prompt_named_capability" ||
+    explicitCues.includes("prompt_named_capability") ||
+    promptExplicitlyRequestsExternalEvidence(prompt)
+  );
+};
+
+const requestToProviderNextAffordance = (request: Record<string, unknown>): Record<string, unknown> | null => {
+  const capability = readString(request.capability_id) ?? readString(request.capabilityId);
+  if (!capability) return null;
+  const args = readRecord(request.arguments) ?? {};
+  const sourceTargetIntent = readRecord(args.source_target_intent) ?? {};
+  return {
+    schema: "helix.provider_next_affordance.v1",
+    source: "helix_moral_substrate_primary_request_reduction",
+    capability,
+    mode: readString(request.mode) ?? "read",
+    purpose: "codex_selected_followup_tool",
+    reason: "available_after_moral_substrate_observation_reentry",
+    prompt: readString(args.prompt),
+    query: readString(args.query),
+    expression: readString(args.expression) ?? readString(args.latex),
+    source_target_intent: {
+      ...sourceTargetIntent,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    terminal_eligible: false,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
+const attachNextAffordancesToRequest = (
+  request: Record<string, unknown>,
+  affordances: Record<string, unknown>[],
+): Record<string, unknown> => {
+  if (affordances.length === 0) return request;
+  const args = readRecord(request.arguments) ?? {};
+  const sourceTargetIntent = readRecord(args.source_target_intent) ?? {};
+  return {
+    ...request,
+    arguments: {
+      ...args,
+      next_affordances: [
+        ...readArray(args.next_affordances),
+        ...affordances,
+      ],
+      source_target_intent: {
+        ...sourceTargetIntent,
+        next_affordances: [
+          ...readArray(sourceTargetIntent.next_affordances),
+          ...affordances,
+        ],
+      },
+    },
+  };
+};
+
+const reduceMoralSubstrateRequestsToPrimary = (
+  input: {
+    requests: Record<string, unknown>[];
+    prompt: string;
+    promptNamedCapabilities: Set<string>;
+  },
+): Record<string, unknown>[] => {
+  const moralIndex = input.requests.findIndex((request) => isMoralSubstrateRequest(request) && isMoralSubstrateIntent(request));
+  if (moralIndex < 0) return input.requests;
+  const moralRequest = input.requests[moralIndex];
+  const deferredAffordances: Record<string, unknown>[] = [];
+  const retained: Record<string, unknown>[] = [];
+
+  for (const [index, request] of input.requests.entries()) {
+    if (index === moralIndex) continue;
+    const capability = readString(request.capability_id) ?? readString(request.capabilityId);
+    const shouldDefer =
+      capability &&
+      MORAL_SUBSTRATE_DEFERRED_AFFORDANCE_CAPABILITIES.has(capability) &&
+      !isExplicitExternalResearchRequest(request, input.prompt, input.promptNamedCapabilities);
+    if (shouldDefer) {
+      const affordance = requestToProviderNextAffordance(request);
+      if (affordance) deferredAffordances.push(affordance);
+      continue;
+    }
+    retained.push(request);
+  }
+
+  const primary = attachNextAffordancesToRequest(moralRequest, deferredAffordances);
+  return [primary, ...retained];
+};
 
 export {
   hasExplicitWorkstationGatewayCalls,

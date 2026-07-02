@@ -488,6 +488,8 @@ export function ingestDocumentLiveTranslationProjectionFromAskLiveEvent(
         projection_target: projectionTarget,
         projection_status: readString(meta?.projectionStatus ?? meta?.projection_status) || "projected",
         source_id: sourceId,
+        source_kind: readString(meta?.sourceKind ?? meta?.source_kind) || null,
+        account_locale: readString(meta?.accountLocale ?? meta?.account_locale) || null,
         chunk_id: readString(meta?.latestChunkId ?? meta?.latest_chunk_id) || null,
         chunk_index: readNumber(meta?.latestChunkIndex ?? meta?.latest_chunk_index),
         dedupe_key: readString(meta?.latestDedupeKey ?? meta?.latest_dedupe_key) || null,

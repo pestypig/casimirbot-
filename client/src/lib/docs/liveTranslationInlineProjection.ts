@@ -22,6 +22,8 @@ export type DocumentLiveTranslationInlineState = {
   sourceEventMs: number | null;
   observedAtMs: number | null;
   freshnessStatus: string;
+  sourceKind: string | null;
+  accountLocale: string | null;
   projectionTarget: string | null;
   targetLanguage: string | null;
   cancelRequested: boolean;
@@ -47,6 +49,8 @@ export type DocumentInlineTranslationRenderState = {
   sourceEventMs?: number | null;
   observedAtMs?: number | null;
   freshnessStatus?: string;
+  sourceKind?: string | null;
+  accountLocale?: string | null;
   projectionTarget?: string | null;
   targetLanguage?: string | null;
   cancelRequested?: boolean;
@@ -90,6 +94,8 @@ export function sameDocumentInlineTranslationRenderState(
     (left.sourceEventMs ?? null) === (right.sourceEventMs ?? null) &&
     (left.observedAtMs ?? null) === (right.observedAtMs ?? null) &&
     (left.freshnessStatus ?? "") === (right.freshnessStatus ?? "") &&
+    (left.sourceKind ?? "") === (right.sourceKind ?? "") &&
+    (left.accountLocale ?? "") === (right.accountLocale ?? "") &&
     (left.projectionTarget ?? "") === (right.projectionTarget ?? "") &&
     (left.targetLanguage ?? "") === (right.targetLanguage ?? "") &&
     (left.cancelRequested ?? null) === (right.cancelRequested ?? null) &&
@@ -154,6 +160,8 @@ export function buildDocumentLiveTranslationInlineStates(
         sourceEventMs: state.sourceEventMs,
         observedAtMs: state.observedAtMs,
         freshnessStatus: state.freshnessStatus,
+        sourceKind: state.sourceKind,
+        accountLocale: state.accountLocale,
         projectionTarget: state.projectionTarget,
         targetLanguage: state.targetLanguage,
         cancelRequested: state.cancelRequested,
@@ -188,6 +196,8 @@ export function simplifyDocumentLiveTranslationInlineStates(
           sourceEventMs: state.sourceEventMs,
           observedAtMs: state.observedAtMs,
           freshnessStatus: state.freshnessStatus,
+          sourceKind: state.sourceKind,
+          accountLocale: state.accountLocale,
           projectionTarget: state.projectionTarget,
           targetLanguage: state.targetLanguage,
           cancelRequested: state.cancelRequested,
@@ -211,6 +221,8 @@ export function simplifyDocumentLiveTranslationInlineStates(
           sourceEventMs: state.sourceEventMs,
           observedAtMs: state.observedAtMs,
           freshnessStatus: state.freshnessStatus,
+          sourceKind: state.sourceKind,
+          accountLocale: state.accountLocale,
           projectionTarget: state.projectionTarget,
           targetLanguage: state.targetLanguage,
           cancelRequested: state.cancelRequested,

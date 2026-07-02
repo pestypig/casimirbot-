@@ -16,6 +16,8 @@ export type HelixLiveTranslationUiProjection = {
   status: HelixLiveTranslationUiProjectionStatus;
   projectionTarget: string;
   sourceId: string;
+  sourceKind: string | null;
+  accountLocale: string | null;
   chunkId: string;
   chunkIndex: number | null;
   dedupeKey: string | null;
@@ -38,6 +40,8 @@ export type HelixLiveTranslationUiProjection = {
 
 export type HelixLiveTranslationUiProjectionTrafficSummary = {
   sourceId: string;
+  sourceKind: string | null;
+  accountLocale: string | null;
   projectionTarget: string;
   targetLanguage: string;
   chunkCount: number;
@@ -69,6 +73,8 @@ export type HelixLiveTranslationUiProjectionSelection = {
   projection: HelixLiveTranslationUiProjection | null;
   displayText: string | null;
   sourceId: string;
+  sourceKind: string | null;
+  accountLocale: string | null;
   projectionTarget: string | null;
   targetLanguage: string | null;
   observationRef: string | null;
@@ -106,6 +112,8 @@ export type HelixLiveTranslationInlineUnitState = {
   sourceEventMs: number | null;
   observedAtMs: number | null;
   freshnessStatus: string;
+  sourceKind: string | null;
+  accountLocale: string | null;
   projectionTarget: string | null;
   targetLanguage: string | null;
   cancelRequested: boolean;
@@ -218,6 +226,8 @@ const readReceiptsFromCallResults = (results: unknown[]): RecordLike[] =>
         projection_target: observation.projection_target,
         projection_status: observation.freshness_status === "stale" ? "stale" : "projected",
         source_id: observation.source_id,
+        source_kind: observation.source_kind,
+        account_locale: observation.account_locale,
         chunk_id: observation.chunk_id,
         chunk_index: observation.chunk_index,
         dedupe_key: observation.dedupe_key,
@@ -274,6 +284,8 @@ const normalizeProjection = (receipt: RecordLike): HelixLiveTranslationUiProject
     status,
     projectionTarget,
     sourceId,
+    sourceKind: readString(receipt.source_kind) || readString(payload?.source_kind) || null,
+    accountLocale: readString(receipt.account_locale) || readString(payload?.account_locale) || null,
     chunkId,
     chunkIndex: readNumber(receipt.chunk_index) ?? readNumber(payload?.chunk_index),
     dedupeKey: readString(receipt.dedupe_key) || readString(payload?.dedupe_key) || null,
@@ -359,6 +371,8 @@ export function summarizeHelixLiveTranslationUiProjectionTraffic(
     const latest = ordered.at(-1);
     return {
       sourceId: latest?.sourceId ?? "unknown_source",
+      sourceKind: latest?.sourceKind ?? null,
+      accountLocale: latest?.accountLocale ?? null,
       projectionTarget: latest?.projectionTarget ?? "unknown",
       targetLanguage: latest?.targetLanguage ?? "",
       chunkCount: ordered.length,
@@ -413,6 +427,8 @@ export function selectHelixLiveTranslationUiProjection(
       projection: null,
       displayText: null,
       sourceId,
+      sourceKind: null,
+      accountLocale: null,
       projectionTarget,
       targetLanguage,
       observationRef: null,
@@ -437,6 +453,8 @@ export function selectHelixLiveTranslationUiProjection(
     projection,
     displayText: canDisplay ? projection.translatedText : null,
     sourceId: projection.sourceId,
+    sourceKind: projection.sourceKind,
+    accountLocale: projection.accountLocale,
     projectionTarget: projection.projectionTarget,
     targetLanguage: projection.targetLanguage,
     observationRef: projection.observationRef,
@@ -464,6 +482,8 @@ function buildHelixLiveTranslationUiProjectionSelectionFromProjection(
     projection,
     displayText: canDisplay ? projection.translatedText : null,
     sourceId: projection.sourceId,
+    sourceKind: projection.sourceKind,
+    accountLocale: projection.accountLocale,
     projectionTarget: projection.projectionTarget,
     targetLanguage: projection.targetLanguage,
     observationRef: projection.observationRef,
@@ -534,6 +554,8 @@ export function buildHelixLiveTranslationInlineUnitStates(
         sourceEventMs: resolved.projection?.sourceEventMs ?? null,
         observedAtMs: resolved.projection?.observedAtMs ?? null,
         freshnessStatus: resolved.projection?.freshnessStatus ?? "unknown",
+        sourceKind: resolved.projection?.sourceKind ?? null,
+        accountLocale: resolved.projection?.accountLocale ?? null,
         projectionTarget: resolved.projectionTarget,
         targetLanguage: resolved.targetLanguage,
         cancelRequested: resolved.projection?.cancelRequested ?? resolved.status === "cancelled",
@@ -558,6 +580,8 @@ export function buildHelixLiveTranslationInlineUnitStates(
       sourceEventMs: resolved.projection?.sourceEventMs ?? null,
       observedAtMs: resolved.projection?.observedAtMs ?? null,
       freshnessStatus: resolved.projection?.freshnessStatus ?? "unknown",
+      sourceKind: resolved.projection?.sourceKind ?? null,
+      accountLocale: resolved.projection?.accountLocale ?? null,
       projectionTarget: resolved.projectionTarget,
       targetLanguage: resolved.targetLanguage,
       cancelRequested: resolved.projection?.cancelRequested ?? resolved.status === "cancelled",
