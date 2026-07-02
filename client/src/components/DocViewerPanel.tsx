@@ -31,6 +31,8 @@ import {
 import {
   readDocumentLiveTranslationProjectionSnapshot,
   subscribeDocumentLiveTranslationProjectionRegistry,
+  summarizeDocumentLiveTranslationProjectionSnapshot,
+  type DocumentLiveTranslationProjectionSnapshotSummary,
 } from "@/lib/docs/liveTranslationProjectionRegistry";
 import { installDocumentLiveTranslationProjectionEventIngestion } from "@/lib/docs/liveTranslationProjectionEventIngestion";
 import { sameDocumentInlineTranslationRenderState } from "@/lib/docs/liveTranslationInlineProjection";
@@ -322,6 +324,10 @@ export function DocViewerPanel() {
         })
         : EMPTY_LIVE_TRANSLATION_PROJECTION_SNAPSHOT,
     () => EMPTY_LIVE_TRANSLATION_PROJECTION_SNAPSHOT,
+  );
+  const liveTranslationProjectionSummary = React.useMemo(
+    () => summarizeDocumentLiveTranslationProjectionSnapshot(liveTranslationProjectionSnapshot),
+    [liveTranslationProjectionSnapshot],
   );
   const activeTranslationScopeKey = React.useMemo(
     () =>
@@ -1130,6 +1136,7 @@ export function DocViewerPanel() {
             inlineTranslationEnabled={inlineTranslationEnabled}
             translationStatus={translationStatus}
             translationError={translationError}
+            liveTranslationProjectionSummary={liveTranslationProjectionSummary}
             onToggleInlineTranslation={handleToggleInlineTranslation}
             t={t}
           />
@@ -1348,6 +1355,7 @@ type PanelHeaderProps = {
   inlineTranslationEnabled: boolean;
   translationStatus: DocumentTranslationUiStatus;
   translationError: string | null;
+  liveTranslationProjectionSummary: DocumentLiveTranslationProjectionSnapshotSummary;
   onToggleInlineTranslation: () => void;
   t: Translate;
 };
@@ -1370,6 +1378,7 @@ function PanelHeader({
   inlineTranslationEnabled,
   translationStatus,
   translationError,
+  liveTranslationProjectionSummary,
   onToggleInlineTranslation,
   t,
 }: PanelHeaderProps) {
@@ -1466,6 +1475,21 @@ function PanelHeader({
                 ? "text-amber-300"
                 : "text-emerald-200",
             )}
+            data-doc-translation-summary-version={String(liveTranslationProjectionSummary.version)}
+            data-doc-translation-summary-total={String(liveTranslationProjectionSummary.totalCount)}
+            data-doc-translation-summary-ready={String(liveTranslationProjectionSummary.readyCount)}
+            data-doc-translation-summary-error={String(liveTranslationProjectionSummary.errorCount)}
+            data-doc-translation-summary-projected={String(liveTranslationProjectionSummary.projectedCount)}
+            data-doc-translation-summary-stale={String(liveTranslationProjectionSummary.staleCount)}
+            data-doc-translation-summary-cancelled={String(liveTranslationProjectionSummary.cancelledCount)}
+            data-doc-translation-summary-failed={String(liveTranslationProjectionSummary.failedCount)}
+            data-doc-translation-summary-latest-observed-at-ms={liveTranslationProjectionSummary.latestObservedAtMs ?? ""}
+            data-doc-translation-summary-latest-source-event-ms={liveTranslationProjectionSummary.latestSourceEventMs ?? ""}
+            data-doc-translation-summary-latest-observation-ref={liveTranslationProjectionSummary.latestObservationRef ?? ""}
+            data-doc-translation-summary-latest-receipt-ref={liveTranslationProjectionSummary.latestReceiptRef ?? ""}
+            data-doc-translation-summary-terminal-eligible="false"
+            data-doc-translation-summary-assistant-answer="false"
+            data-doc-translation-summary-raw-content-included="false"
           >
             {translationStatusLabel}
           </p>

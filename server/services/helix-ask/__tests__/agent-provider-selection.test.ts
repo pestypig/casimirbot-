@@ -53,6 +53,7 @@ const ENV_KEYS = [
   "Path",
   "PATHEXT",
   "CODEX_AGENT_FAKE_STDOUT",
+  "CODEX_AGENT_FAKE_NATIVE_EVENT_JSONL",
   "CODEX_AGENT_FAKE_STDERR",
   "CODEX_AGENT_FAKE_EXIT_CODE",
   "TAVILY_API_KEY",
@@ -4911,5 +4912,68 @@ describe("Helix Ask agent provider selection", () => {
     expect(streamedEvents.some((event) => event.source_event_type === "model_reentry")).toBe(true);
     expect(streamedEvents.some((event) => event.source_event_type === "terminal_answer")).toBe(false);
     expect(streamedEvents.every((event) => event.event_source === "live")).toBe(true);
+  });
+
+  it("streams normalized Codex native event packets without making them terminal authority", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "Native runtime final text.";
+    process.env.CODEX_AGENT_FAKE_NATIVE_EVENT_JSONL = [
+      JSON.stringify({
+        msg: {
+          ReasoningContentDelta: {
+            turn_id: "ask:test:codex-native-events",
+            delta: "Checking the available context.",
+          },
+        },
+      }),
+      JSON.stringify({
+        msg: {
+          McpToolCallBegin: {
+            turn_id: "ask:test:codex-native-events",
+            tool_name: "docs.search",
+            call_id: "native-tool-1",
+          },
+        },
+      }),
+      JSON.stringify({
+        msg: {
+          McpToolCallEnd: {
+            turn_id: "ask:test:codex-native-events",
+            tool_name: "docs.search",
+            call_id: "native-tool-1",
+            text: "Found two candidate references.",
+          },
+        },
+      }),
+      JSON.stringify({
+        msg: {
+          TurnComplete: {
+            turn_id: "ask:test:codex-native-events",
+            last_agent_message: "Native runtime final text.",
+          },
+        },
+      }),
+    ].join("\n");
+    const streamedEvents: Record<string, unknown>[] = [];
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn/stream",
+      body: {
+        turn_id: "ask:test:codex-native-events",
+        question: "Use native Codex events for visibility.",
+      },
+      onTranscriptEvent: (event) => {
+        streamedEvents.push(event);
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(streamedEvents.some((event) => event.source_event_type === "codex_native_reasoning_delta")).toBe(true);
+    expect(streamedEvents.some((event) => event.source_event_type === "codex_native_tool_request")).toBe(true);
+    expect(streamedEvents.some((event) => event.source_event_type === "codex_native_tool_result")).toBe(true);
+    expect(streamedEvents.some((event) => event.source_event_type === "codex_native_turn_complete")).toBe(true);
+    expect(streamedEvents.every((event) => event.terminal_eligible === false)).toBe(true);
+    expect(streamedEvents.some((event) => event.source_event_type === "terminal_answer")).toBe(false);
+    expect(result.final_answer_source).toBe("agent_provider_terminal_candidate");
   });
 });
