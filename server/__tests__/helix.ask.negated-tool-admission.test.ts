@@ -60,6 +60,29 @@ const availableCapabilities = (keys: string[]) => ({
 });
 
 describe("Helix Ask negated/contextual tool admission", () => {
+  it("does not classify conditional prior-evidence calculator follow-up as an explicit calculator command", () => {
+    const promptText =
+      "If the previous answer has enough cited unit-bearing values, bind the formula into a numeric expression and run the calculator. Then explain what the result means and what the evidence does not prove.";
+
+    const sourceTargetIntent = arbitrateAskSourceTarget({ turnId, threadId, promptText });
+    const admission = buildToolCallAdmissionDecision({ turnId, sourceTargetIntent, promptText });
+
+    expect(sourceTargetIntent.target_source).not.toBe("calculator_stream");
+    expect(admission.source_target).not.toBe("calculator_stream");
+    expect(admission.admitted_tool_families).not.toContain("calculator");
+  });
+
+  it("still admits calculator for conditional prior-evidence follow-up with a concrete expression", () => {
+    const promptText =
+      "If the previous answer has enough cited unit-bearing values, run the calculator with expression: 6.626e-34 * 5e14.";
+
+    const sourceTargetIntent = arbitrateAskSourceTarget({ turnId, threadId, promptText });
+    const admission = buildToolCallAdmissionDecision({ turnId, sourceTargetIntent, promptText });
+
+    expect(admission.source_target).toBe("calculator_stream");
+    expect(admission.admitted_tool_families).toContain("calculator");
+  });
+
   it("suppresses contextual docs-viewer references before tool admission", () => {
     const prompts = [
       "Do not open the docs viewer; just explain what the docs viewer is for.",

@@ -106,6 +106,18 @@ const promptRequiresCalculatorExecution = (promptText: string): boolean => {
   return namesCalculatorTool && affirmativeToolVerb && (receiptOrTerminalCue || exactExpressionCue);
 };
 
+const hasConcreteCalculatorExpression = (prompt: string): boolean =>
+  /\bscientific-calculator\.solve(?:_expression|_with_steps)?\b/i.test(prompt) ||
+  /\b(?:with\s+(?:this\s+exact\s+)?expression|expression\s+is|expression)\s*:?\s*[0-9][0-9eE\s.+\-*/^%()[\]]{1,120}/i.test(prompt);
+
+const isConditionalPriorEvidenceCalculatorFollowup = (prompt: string): boolean => {
+  const conditional = /\b(?:if|when|provided\s+that|only\s+if|assuming)\b/i.test(prompt);
+  const priorEvidence = /\b(?:previous|prior|above|last|earlier)\b[\s\S]{0,100}\b(?:answers?|evidence|result|retrieval|values?|variables?)\b/i.test(prompt);
+  const sufficiencyCheck = /\b(?:enough|sufficient|usable|adequate|complete|fully\s+cited|unit[-\s]?bearing|cited)\b[\s\S]{0,120}\b(?:values?|numbers?|numerics?|parameters?|evidence|citations?|units?)\b/i.test(prompt);
+  const calculatorFollowup = /\b(?:bind|calculate|compute|evaluate|solve|run)\b[\s\S]{0,140}\b(?:formula|expression|calculator|numeric(?:al)?\s+expression|result)\b/i.test(prompt);
+  return conditional && priorEvidence && sufficiencyCheck && calculatorFollowup;
+};
+
 const HARD_SOURCE_TARGETS = new Set([
   "visual_capture",
   "procedure_memory",
@@ -235,6 +247,7 @@ const calculatorSolveRequested = (
 ): boolean => {
   const prompt = promptText.trim();
   if (!prompt) return false;
+  if (isConditionalPriorEvidenceCalculatorFollowup(prompt) && !hasConcreteCalculatorExpression(prompt)) return false;
   const sourceTargetRecord = sourceTargetIntent as Record<string, unknown> | null | undefined;
   const joined = [
     prompt,

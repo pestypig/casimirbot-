@@ -76,6 +76,8 @@ import {
 import {
   buildHelixAskLegacyTurnControlViewModel,
   buildHelixAskReplyCopyText,
+  debugPayloadMatchesHelixAskLegacyRenderedTurnPayload,
+  enforceHelixAskLegacyDebugExportMatchesClickedButton,
   extractHelixAskLegacyClickedTurnDebugScope,
   isHelixAskLegacyBackendDebugExportEligibleTurnId,
   resolveHelixAskLegacyDebugExportBackendTarget,
@@ -1366,6 +1368,38 @@ describe("Helix Ask Console recrown boundary", () => {
       activeTurnId: null,
       clientTurnId: "reply-visible",
     });
+    const scopedLatestDebugPayload = JSON.stringify({
+      active_turn_id: "ask:latest-visible",
+      client_active_turn_id: "reply-visible",
+      selectedDebugQuestion: latestQuestion,
+      selected_final_answer: latestFinal,
+    });
+    const staleDebugPayload = JSON.stringify({
+      active_turn_id: "ask:eaf320-stale",
+      client_active_turn_id: "reply-visible",
+      selectedDebugQuestion: latestQuestion,
+      selected_final_answer: latestFinal,
+    });
+    const latestDebugButton = {
+      innerText: "",
+      textContent: "",
+      parentElement: visibleTurnContainer,
+      getAttribute: (name: string) => {
+        if (name === "data-debug-copy-active-turn-id" || name === "data-turn-control-active-turn-id") return "ask:latest-visible";
+        if (name === "data-debug-copy-client-turn-id" || name === "data-turn-control-client-turn-id") return "reply-visible";
+        if (name === "data-debug-copy-question" || name === "data-turn-control-question") return latestQuestion;
+        if (name === "data-debug-copy-final-answer" || name === "data-turn-control-final-answer") return latestFinal;
+        return null;
+      },
+      querySelector: () => null,
+    } as unknown as HTMLElement;
+    expect(debugPayloadMatchesHelixAskLegacyRenderedTurnPayload(scopedLatestDebugPayload, latestDebugButton)).toBe(true);
+    expect(debugPayloadMatchesHelixAskLegacyRenderedTurnPayload(staleDebugPayload, latestDebugButton)).toBe(false);
+    expect(enforceHelixAskLegacyDebugExportMatchesClickedButton({
+      exportPayload: staleDebugPayload,
+      clickedButtonScopedPayload: scopedLatestDebugPayload,
+      sourceElement: latestDebugButton,
+    })).toBe(scopedLatestDebugPayload);
     expect(resolveHelixAskLegacyReplyDebugTurnId({
       id: "reply-fallback",
       debug: {

@@ -742,8 +742,6 @@ describe("Helix Ask UI ownership boundaries", () => {
     for (const localSymbol of [
       "buildReplyMasterEventClockExport",
       "debugPayloadMatchesRenderedReply",
-      "debugPayloadMatchesRenderedTurnPayload",
-      "enforceDebugExportMatchesClickedButton",
       "normalizeReplyMasterDebugPayload",
       "buildClientProjectionDebugFields",
       "copyHelixRailCriticalDebugFieldsForUi",
@@ -763,6 +761,8 @@ describe("Helix Ask UI ownership boundaries", () => {
       "isHelixAskLegacyBackendDebugExportEligibleTurnId",
       "resolveHelixAskLegacyDebugExportBackendTarget",
       "selectHelixAskLegacyGuardedDebugExportPayload",
+      "debugPayloadMatchesHelixAskLegacyRenderedTurnPayload",
+      "enforceHelixAskLegacyDebugExportMatchesClickedButton",
       "extractHelixAskLegacyClickedTurnDebugScope",
     ]) {
       expect(pill).toContain(recrownedSymbol);
@@ -808,7 +808,8 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(pill).toContain("buildHelixDebugExportEnvelopeFromMasterPayload");
     expect(debugExport).toContain("buildHelixDebugExportEnvelopeFromMasterPayload");
     expect(map).toContain("buildHelixDebugExportEnvelopeFromMasterPayload");
-    expect(map).toContain("rendered-button turn matching");
+    expect(map).toContain("rendered-button fallback export construction");
+    expect(map).toContain("clicked-turn debug payload identity matching");
     expect(map).toContain("final clicked-button payload mismatch guarding");
     expect(map).toContain("final-answer copy text selection");
     expect(map).toContain("Final-answer copy text selection is recrowned");
@@ -844,6 +845,8 @@ describe("Helix Ask UI ownership boundaries", () => {
     const controls = read("client/src/components/helix/ask-console/HelixAskLegacyTurnControls.ts");
     expect(controls).toContain("selectHelixAskLegacyDebugCopyLocalPayload");
     expect(controls).toContain("selectHelixAskLegacyGuardedDebugExportPayload");
+    expect(controls).toContain("export function debugPayloadMatchesHelixAskLegacyRenderedTurnPayload");
+    expect(controls).toContain("export function enforceHelixAskLegacyDebugExportMatchesClickedButton");
     expect(controls).toContain("export function extractHelixAskLegacyClickedTurnDebugScope");
     expect(controls).toContain("export function resolveHelixAskLegacyReplyDebugTurnId");
     expect(controls).toContain("readTurnScopeAttribute(\"data-turn-control-question\", \"data-debug-copy-question\")");

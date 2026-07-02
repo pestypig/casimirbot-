@@ -212,6 +212,8 @@ export {
 export {
   buildHelixAskReplyCopyText,
   buildHelixAskLegacyTurnControlViewModel,
+  debugPayloadMatchesHelixAskLegacyRenderedTurnPayload,
+  enforceHelixAskLegacyDebugExportMatchesClickedButton,
   isHelixAskLegacyBackendDebugExportEligibleTurnId,
   resolveHelixAskLegacyDebugExportBackendTarget,
   resolveHelixAskLegacyTurnControlText,

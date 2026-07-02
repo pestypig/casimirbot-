@@ -83,6 +83,8 @@ import { buildHelixAskLatestTurnBinding } from "@/components/helix/ask-console/H
 import {
   buildHelixAskLegacyTurnControlViewModel,
   buildHelixAskReplyCopyText as buildRecrownedHelixAskReplyCopyText,
+  debugPayloadMatchesHelixAskLegacyRenderedTurnPayload as debugPayloadMatchesRenderedTurnPayload,
+  enforceHelixAskLegacyDebugExportMatchesClickedButton as enforceDebugExportMatchesClickedButton,
   extractHelixAskLegacyClickedTurnDebugScope,
   isHelixAskLegacyBackendDebugExportEligibleTurnId,
   resolveHelixAskLegacyDebugExportBackendTarget,
@@ -5686,65 +5688,6 @@ function debugPayloadMatchesRenderedReply(reply: HelixAskReply, parsed: Record<s
   return candidates.some((candidate) => candidate === expectedQuestion);
 }
 
-export function debugPayloadMatchesRenderedTurnPayload(
-  payload: string | null | undefined,
-  sourceElement: HTMLElement | null | undefined,
-): boolean {
-  const rendered = extractHelixAskLegacyClickedTurnDebugScope(sourceElement);
-  if (!rendered) return true;
-  const trimmed = typeof payload === "string" ? payload.trim() : "";
-  if (!trimmed) return false;
-  try {
-    const parsed = JSON.parse(trimmed) as Record<string, unknown>;
-    const parsedReply = readAgentLoopAuditRecord(parsed.reply);
-    const parsedCurrentTurn = readAgentLoopAuditRecord(parsed.currentTurn);
-    const visibleAnswerState = readAgentLoopAuditRecord(parsed.visibleAnswerState);
-    const answerCandidates = [
-      parsed.selected_final_answer,
-      parsed.selectedDebugFinalAnswer,
-      parsed.finalAnswer,
-      visibleAnswerState?.finalAnswer,
-    ]
-      .map(normalizedDebugReplyText)
-      .filter(Boolean);
-    if (rendered.finalAnswer && answerCandidates.length > 0) {
-      const expectedAnswer = normalizedDebugReplyText(rendered.finalAnswer);
-      if (!answerCandidates.some((candidate) => candidate === expectedAnswer)) return false;
-    }
-    const questionCandidates = [
-      parsed.selectedDebugQuestion,
-      parsed.active_prompt,
-      parsed.prompt,
-      parsed.user_prompt,
-      parsedReply?.question,
-      parsedCurrentTurn?.question,
-    ]
-      .map(normalizedDebugReplyText)
-      .filter(Boolean);
-    if (rendered.question && questionCandidates.length > 0) {
-      const expectedQuestion = normalizedDebugReplyText(rendered.question);
-      if (!questionCandidates.some((candidate) => candidate === expectedQuestion)) return false;
-    }
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function enforceDebugExportMatchesClickedButton(args: {
-  exportPayload: string;
-  clickedButtonScopedPayload: string | null | undefined;
-  sourceElement: HTMLElement | null | undefined;
-}): string {
-  const rendered = extractHelixAskLegacyClickedTurnDebugScope(args.sourceElement);
-  return selectHelixAskLegacyGuardedDebugExportPayload({
-    exportPayload: args.exportPayload,
-    clickedButtonScopedPayload: args.clickedButtonScopedPayload,
-    clickedTurnScope: rendered,
-    payloadMatchesClickedTurn: (payload) => debugPayloadMatchesRenderedTurnPayload(payload, args.sourceElement),
-  });
-}
-
 export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskReply, payload: Record<string, unknown>): string {
   const debug = readAgentLoopAuditRecord(payload.debug);
   const agentLoop = readAgentLoopAuditRecord(payload.agentLoop);
@@ -6512,6 +6455,8 @@ export function buildHelixAskReplyCopyText(reply: HelixAskReply): string {
 export async function copyHelixAskPlainTextToClipboard(text: string): Promise<boolean> {
   return copyRecrownedHelixAskPlainTextToClipboard(text);
 }
+
+export { debugPayloadMatchesRenderedTurnPayload };
 
 function normalizeReplyMasterDebugPayload(reply: HelixAskReply, payload: string | null | undefined): string {
   const trimmed = typeof payload === "string" ? payload.trim() : "";

@@ -22,10 +22,10 @@ export const HELIX_ASK_LEGACY_CONSOLE_ACTIVE_PATH = [
 
 export const HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT = {
   file: "client/src/components/helix/HelixAskPill.tsx",
-  lineCountAtInventory: 26666,
-  exportedComponentStartsAtLine: 8107,
-  liveRenderSliceStartsAtLine: 26046,
-  liveLegacyConsoleViewStartsAtLine: 26061,
+  lineCountAtInventory: 26609,
+  exportedComponentStartsAtLine: 8050,
+  liveRenderSliceStartsAtLine: 25989,
+  liveLegacyConsoleViewStartsAtLine: 26004,
   inventoryReason:
     "The active bridge still imports the whole legacy file, but the visible console render path is concentrated near the bottom and now enters the recrowned legacy console view before composing recrowned ask-console display owners.",
 } as const;
@@ -393,7 +393,7 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
     classification: "behavior_sensitive_recrowned_with_parity",
     source: "ask-console",
     evidence:
-      "Deterministic backend debug-export ref eligibility, matching backend target selection, selected debug turn-id resolution, clicked-button payload mismatch guarding, and clicked DOM turn-scope extraction with stale-attribute visible-row veto moved to HelixAskLegacyTurnControls with tests while backend debug-export materialization/fetch, authoritative payload merging, drawer mutation, clipboard writes, and TTS execution remain in the bridge.",
+      "Deterministic backend debug-export ref eligibility, matching backend target selection, selected debug turn-id resolution, clicked-button payload mismatch guarding, clicked-turn payload identity matching, clicked export fallback guarding, and clicked DOM turn-scope extraction with stale-attribute visible-row veto moved to HelixAskLegacyTurnControls with tests while rendered-button fallback construction, backend debug-export materialization/fetch, authoritative payload merging, drawer mutation, clipboard writes, and TTS execution remain in the bridge.",
   },
   {
     key: "legacy_turn_control_button_state_projection",
@@ -477,7 +477,7 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
     classification: "behavior_sensitive_quarantined",
     source: "HelixAskPill.tsx",
     evidence:
-      "Backend debug-export materialization/fetch, rendered-button fallback construction, selected debug state, drawer mutation, click handlers, copied-id timers, window debug globals, and TTS execution still bind from legacy state after pure target/backend-ref/debug-turn-id/button-state/drawer-state/DOM scope selection plus final-answer/context-capsule/prepared-debug clipboard writes were moved; clicked Debug copy now has a regression guard so visible row text can veto stale button turn attributes before backend export fetch/copy.",
+      "Backend debug-export materialization/fetch, rendered-button fallback construction, selected debug state, drawer mutation, click handlers, copied-id timers, window debug globals, and TTS execution still bind from legacy state after pure target/backend-ref/debug-turn-id/button-state/drawer-state/DOM scope selection plus final-answer/context-capsule/prepared-debug clipboard writes were moved; clicked Debug copy now routes payload identity matching and stale export fallback guarding through HelixAskLegacyTurnControls before backend export fetch/copy.",
   },
   {
     key: "voice_capture_and_command_runtime",

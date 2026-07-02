@@ -45,7 +45,10 @@ export function HelixAskTurnControls({
   };
 
   return (
-    <div className="relative z-20 mt-2 flex max-w-fit items-center gap-1 opacity-100 transition-opacity duration-150">
+    <div
+      className="relative z-20 mt-2 flex max-w-fit items-center gap-1 opacity-100 transition-opacity duration-150"
+      {...turnScopeAttributes}
+    >
       <button
         type="button"
         onClick={onCopyFinal}

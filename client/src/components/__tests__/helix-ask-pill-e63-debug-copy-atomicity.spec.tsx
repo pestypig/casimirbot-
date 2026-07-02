@@ -67,6 +67,10 @@ describe("Helix Ask E63 debug copy atomicity", () => {
       path.resolve(process.cwd(), "client/src/components/helix/ask-console/HelixAskLegacyTurnControls.ts"),
       "utf8",
     );
+    const turnControlsSource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/components/helix/ask-console/HelixAskTurnControls.tsx"),
+      "utf8",
+    );
 
     expect(source).toContain("replyMasterEventClockPayload = buildReplyMasterEventClockExport");
     expect(source).toMatch(/handleCopyReplyMasterDebug\(\s*reply,\s*replyMasterEventClockPayload/);
@@ -83,6 +87,19 @@ describe("Helix Ask E63 debug copy atomicity", () => {
     expect(controlsSource).toContain("staleAttributeMismatch");
     expect(source).toContain("resolveAuthoritativeDebugExportPayload(localExportPayload)");
     expect(source).toContain("enforceDebugExportMatchesClickedButton({");
+    expect(source).toContain(
+      "debugPayloadMatchesHelixAskLegacyRenderedTurnPayload as debugPayloadMatchesRenderedTurnPayload",
+    );
+    expect(source).toContain(
+      "enforceHelixAskLegacyDebugExportMatchesClickedButton as enforceDebugExportMatchesClickedButton",
+    );
+    expect(source).not.toContain("export function debugPayloadMatchesRenderedTurnPayload");
+    expect(controlsSource).toContain("const renderedActiveTurnId = coerceControlText(rendered.activeTurnId).trim()");
+    expect(controlsSource).toContain("const renderedClientTurnId = coerceControlText(rendered.clientTurnId).trim()");
+    expect(controlsSource).toContain("!turnCandidates.some((candidate) => candidate === renderedActiveTurnId)");
+    expect(controlsSource).toContain("!clientTurnCandidates.some((candidate) => candidate === renderedClientTurnId)");
+    expect(controlsSource).toContain("export function enforceHelixAskLegacyDebugExportMatchesClickedButton");
+    expect(turnControlsSource).toContain("{...turnScopeAttributes}");
   });
 
   it("preserves rail-critical fields when debug copy compacts an oversized payload", async () => {

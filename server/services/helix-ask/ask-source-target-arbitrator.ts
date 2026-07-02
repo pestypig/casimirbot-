@@ -206,9 +206,25 @@ const isAffirmativeDocsSearchPrompt = (prompt: string): boolean =>
 const isExplicitProcessGraphPrompt = (prompt: string): boolean =>
   /\b(?:process\s+graph|workstation\s+(?:process\s+)?graph|workstation\s+state|what\s+panels\s+are\s+open|which\s+panels\s+are\s+open|panels\s+open)\b/i.test(prompt);
 
-const isCalculatorSolvePrompt = (prompt: string): boolean =>
-  /\b(?:scientific\s+)?calculator\b/i.test(prompt) &&
-  /\b(?:solve|evaluate|compute|calculate|check|verify)\b[\s\S]{0,160}(?:\d|[=+\-*/^()]|\\frac|\\sqrt|\bequation\b|\bexpression\b|\bformula\b)/i.test(prompt);
+const hasConcreteCalculatorExpression = (prompt: string): boolean =>
+  /\bscientific-calculator\.solve(?:_expression|_with_steps)?\b/i.test(prompt) ||
+  /\b(?:with\s+(?:this\s+exact\s+)?expression|expression\s+is|expression)\s*:?\s*[0-9][0-9eE\s.+\-*/^%()[\]]{1,120}/i.test(prompt);
+
+const isConditionalPriorEvidenceCalculatorFollowup = (prompt: string): boolean => {
+  const conditional = /\b(?:if|when|provided\s+that|only\s+if|assuming)\b/i.test(prompt);
+  const priorEvidence = /\b(?:previous|prior|above|last|earlier)\b[\s\S]{0,100}\b(?:answers?|evidence|result|retrieval|values?|variables?)\b/i.test(prompt);
+  const sufficiencyCheck = /\b(?:enough|sufficient|usable|adequate|complete|fully\s+cited|unit[-\s]?bearing|cited)\b[\s\S]{0,120}\b(?:values?|numbers?|numerics?|parameters?|evidence|citations?|units?)\b/i.test(prompt);
+  const calculatorFollowup = /\b(?:bind|calculate|compute|evaluate|solve|run)\b[\s\S]{0,140}\b(?:formula|expression|calculator|numeric(?:al)?\s+expression|result)\b/i.test(prompt);
+  return conditional && priorEvidence && sufficiencyCheck && calculatorFollowup;
+};
+
+const isCalculatorSolvePrompt = (prompt: string): boolean => {
+  if (isConditionalPriorEvidenceCalculatorFollowup(prompt) && !hasConcreteCalculatorExpression(prompt)) return false;
+  return (
+    /\b(?:scientific\s+)?calculator\b/i.test(prompt) &&
+    /\b(?:run|solve|evaluate|compute|calculate|check|verify)\b[\s\S]{0,160}(?:\d|[=+\-*/^()]|\\frac|\\sqrt|\bequation\b|\bexpression\b|\bformula\b)/i.test(prompt)
+  );
+};
 
 const isLiveAnswerEnvironmentStatePrompt = (prompt: string): boolean => {
   const mentionsLiveAnswer =

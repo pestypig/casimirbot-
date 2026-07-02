@@ -9,6 +9,7 @@ import {
   normalizedDebugReplyText,
 } from "@/lib/helix/ask-debug-event-display";
 import { formatEnvelopeSectionsForCopy } from "@/lib/helix/ask-envelope-copy";
+import { readAgentLoopAuditRecord } from "@/lib/helix/ask-runtime-authority-readers";
 import { resolveHelixVisibleTerminal } from "@/lib/helix/resolveHelixVisibleTerminal";
 import type { HelixAskLatestTurnBinding } from "./HelixAskLatestTurnBinding";
 
@@ -367,6 +368,99 @@ export function extractHelixAskLegacyClickedTurnDebugScope(
     };
   }
   return extractHelixAskLegacyClickedTurnDebugScopeFromAncestor(sourceElement);
+}
+
+export function debugPayloadMatchesHelixAskLegacyRenderedTurnPayload(
+  payload: string | null | undefined,
+  sourceElement: HTMLElement | null | undefined,
+): boolean {
+  const rendered = extractHelixAskLegacyClickedTurnDebugScope(sourceElement);
+  if (!rendered) return true;
+  const trimmed = typeof payload === "string" ? payload.trim() : "";
+  if (!trimmed) return false;
+  try {
+    const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+    const parsedReply = readAgentLoopAuditRecord(parsed.reply);
+    const parsedCurrentTurn = readAgentLoopAuditRecord(parsed.currentTurn);
+    const visibleAnswerState = readAgentLoopAuditRecord(parsed.visibleAnswerState);
+    const renderedActiveTurnId = coerceControlText(rendered.activeTurnId).trim();
+    const renderedClientTurnId = coerceControlText(rendered.clientTurnId).trim();
+    const turnCandidates = [
+      parsed.active_turn_id,
+      parsed.backend_turn_id,
+      parsed.selectedDebugTurnId,
+      parsedCurrentTurn?.turn_id,
+      parsedCurrentTurn?.turnId,
+    ]
+      .map((candidate) => coerceControlText(candidate).trim())
+      .filter(Boolean);
+    if (
+      renderedActiveTurnId &&
+      turnCandidates.length > 0 &&
+      !turnCandidates.some((candidate) => candidate === renderedActiveTurnId)
+    ) {
+      return false;
+    }
+    const clientTurnCandidates = [
+      parsed.client_active_turn_id,
+      parsed.ui_client_active_turn_id,
+      parsedReply?.client_id,
+      parsedReply?.id,
+    ]
+      .map((candidate) => coerceControlText(candidate).trim())
+      .filter(Boolean);
+    if (
+      renderedClientTurnId &&
+      clientTurnCandidates.length > 0 &&
+      !clientTurnCandidates.some((candidate) => candidate === renderedClientTurnId)
+    ) {
+      return false;
+    }
+    const answerCandidates = [
+      parsed.selected_final_answer,
+      parsed.selectedDebugFinalAnswer,
+      parsed.finalAnswer,
+      visibleAnswerState?.finalAnswer,
+    ]
+      .map(normalizedDebugReplyText)
+      .filter(Boolean);
+    if (rendered.finalAnswer && answerCandidates.length > 0) {
+      const expectedAnswer = normalizedDebugReplyText(rendered.finalAnswer);
+      if (!answerCandidates.some((candidate) => candidate === expectedAnswer)) return false;
+    }
+    const questionCandidates = [
+      parsed.selectedDebugQuestion,
+      parsed.active_prompt,
+      parsed.prompt,
+      parsed.user_prompt,
+      parsedReply?.question,
+      parsedCurrentTurn?.question,
+    ]
+      .map(normalizedDebugReplyText)
+      .filter(Boolean);
+    if (rendered.question && questionCandidates.length > 0) {
+      const expectedQuestion = normalizedDebugReplyText(rendered.question);
+      if (!questionCandidates.some((candidate) => candidate === expectedQuestion)) return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function enforceHelixAskLegacyDebugExportMatchesClickedButton(args: {
+  exportPayload: string;
+  clickedButtonScopedPayload: string | null | undefined;
+  sourceElement: HTMLElement | null | undefined;
+}): string {
+  const rendered = extractHelixAskLegacyClickedTurnDebugScope(args.sourceElement);
+  return selectHelixAskLegacyGuardedDebugExportPayload({
+    exportPayload: args.exportPayload,
+    clickedButtonScopedPayload: args.clickedButtonScopedPayload,
+    clickedTurnScope: rendered,
+    payloadMatchesClickedTurn: (payload) =>
+      debugPayloadMatchesHelixAskLegacyRenderedTurnPayload(payload, args.sourceElement),
+  });
 }
 
 export function resolveHelixAskLegacyReplyDebugTurnId(
