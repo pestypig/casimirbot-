@@ -128,7 +128,7 @@ function mapIntentToCategorization(intent: HelixWorkstationToolPlan["intent"]): 
       produced_by: "ideology",
     };
   }
-  if (intent === "zen_graph_reflection") {
+  if (intent === "moral_graph_reflection") {
     return {
       source_family: "ideology",
       category: "motive_framework",
@@ -481,8 +481,8 @@ export function evaluateWorkstationToolPlan(input: EvaluateWorkstationToolPlanIn
         ? "Publish a governed Narrator debug auto-speak probe through the workstation action lane."
       : input.plan.intent === "narrator_control"
         ? "Publish or bind governed Narrator output through the workstation action lane."
-      : input.plan.intent === "zen_graph_reflection"
-        ? "Reflect the prompt through ZenGraph and Fruition as evidence-only procedural state."
+      : input.plan.intent === "moral_graph_reflection"
+        ? "Reflect the prompt through MoralGraph and Fruition as evidence-only procedural state."
       : input.plan.intent === "dottie_observer"
         ? "Attach or inspect Auntie Dottie as a witness-only Situation Room observer."
       : input.plan.intent === "physics_calculation_context"

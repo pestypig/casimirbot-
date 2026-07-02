@@ -18,7 +18,7 @@ import {
   HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
   HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
   HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,
-  HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
+  HELIX_GOLDEN_PATH_MORAL_GRAPH_REFLECTION_CAPABILITY,
 } from "../services/helix-ask/golden-path-runtime";
 import { HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY } from "../services/helix-ask/workspace-directory-resolver";
 import { resetRuntimeMemoryGovernorForTests } from "../services/runtime/runtime-memory-governor";
@@ -343,13 +343,13 @@ describe("Helix Ask golden-path route gate", () => {
       expectedObservationKind: "helix_civilization_bounds_tool_result",
     },
     {
-      name: "zen graph reflection",
+      name: "moral graph reflection",
       body: {
-        turn_id: "ask:test:golden-route-zen",
+        turn_id: "ask:test:golden-route-moral",
         prompt: "helix_ask_golden_path_runtime use helix_ask.reflect_ideology_context",
         goldenPathRuntime: true,
-        requested_capability: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
-        helix_zen_graph_reflection_tool_result: {
+        requested_capability: HELIX_GOLDEN_PATH_MORAL_GRAPH_REFLECTION_CAPABILITY,
+        helix_moral_graph_reflection_tool_result: {
           reflection: {
             reflectionId: "ideology-context-reflection:route",
             input: { summary: "Reflect right speech as an evidence-only lens." },
@@ -358,7 +358,7 @@ describe("Helix Ask golden-path route gate", () => {
         },
       },
       expectedTerminalKind: "ideology_context_reflection_answer",
-      expectedObservationKind: "helix_zen_graph_reflection_tool_result",
+      expectedObservationKind: "helix_moral_graph_reflection_tool_result",
     },
     {
       name: "visual capture",
@@ -654,14 +654,14 @@ describe("Helix Ask golden-path route gate", () => {
       expectedObservationKinds: ["visual_frame_evidence", "calculator_receipt"],
     },
     {
-      name: "civilization bounds plus zen graph reflection",
+      name: "civilization bounds plus moral graph reflection",
       body: {
-        turn_id: "ask:test:golden-route-civilization-zen",
+        turn_id: "ask:test:golden-route-civilization-moral",
         prompt: "helix_ask_golden_path_runtime use helix_ask.reflect_civilization_bounds and helix_ask.reflect_ideology_context",
         goldenPathRuntime: true,
         requested_capabilities: [
           HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
-          HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
+          HELIX_GOLDEN_PATH_MORAL_GRAPH_REFLECTION_CAPABILITY,
         ],
         civilization_bounds_tool_result: {
           roadmap: {
@@ -671,7 +671,7 @@ describe("Helix Ask golden-path route gate", () => {
             missingEvidence: ["source_backed_capacity_measurements"],
           },
         },
-        helix_zen_graph_reflection_tool_result: {
+        helix_moral_graph_reflection_tool_result: {
           reflection: {
             reflectionId: "ideology-context-reflection:route-compound",
             input: { summary: "Relate civilization bounds to two-key review." },
@@ -679,8 +679,8 @@ describe("Helix Ask golden-path route gate", () => {
           },
         },
       },
-      expectedStatus: "civilization_bounds_zen_reflection_compound",
-      expectedObservationKinds: ["helix_civilization_bounds_tool_result", "helix_zen_graph_reflection_tool_result"],
+      expectedStatus: "civilization_bounds_moral_reflection_compound",
+      expectedObservationKinds: ["helix_civilization_bounds_tool_result", "helix_moral_graph_reflection_tool_result"],
     },
   ])("routes $name compound turns through the golden-path runtime", async ({ body, expectedStatus, expectedObservationKinds }) => {
     process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";

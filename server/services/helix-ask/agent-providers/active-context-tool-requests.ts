@@ -144,6 +144,32 @@ export const isContextualSurfaceReadMention = (prompt: string): boolean => {
   );
 };
 
+export const isExistingTranslationSurfaceReadPrompt = (prompt: string): boolean => {
+  const unquoted = unquotePrompt(prompt);
+  if (
+    /\b(?:future|later|eventually|hypothetically|would|could|might|before|after|if|when)\b[\s\S]{0,160}\b(?:translate|translated|translation)\b/i.test(unquoted) ||
+    /\b(?:translate|translating)\b[\s\S]{0,100}\b(?:to|into|as|from)\b/i.test(unquoted) ||
+    /\b(?:use|start|enable|turn\s+on|run|call)\b[\s\S]{0,100}\b(?:translation\s+lane|live_translation|translate(?:\s+text)?)\b/i.test(unquoted)
+  ) {
+    return false;
+  }
+
+  const asksToRead =
+    /\b(?:read(?:\s+aloud)?|inspect|observe|check|show|describe|summari[sz]e)\b/i.test(unquoted) ||
+    /\bwhat(?:'s|\s+is|\s+does|\s+are)?\b[\s\S]{0,80}\b(?:translated\s+text|translation\s+surface|active\s+translation)\b/i.test(unquoted) ||
+    /\bwhat\s+translated\s+text\b/i.test(unquoted);
+  if (!asksToRead) return false;
+
+  const existingTranslationSurface =
+    /\b(?:active|current|visible|existing|rendered|shown|displayed)\b[\s\S]{0,80}\b(?:translation\s+surface|translated\s+(?:surface|text|section|block|paragraph|content)|active\s+translation(?:\s+(?:surface|text|section|block|paragraph|content))?)\b/i.test(unquoted) ||
+    /\b(?:translation\s+surface|translated\s+(?:surface|text|section|block|paragraph|content)|active\s+translation(?:\s+(?:surface|text|section|block|paragraph|content))?)\b[\s\S]{0,80}\b(?:active|current|visible|existing|rendered|shown|displayed)\b/i.test(unquoted) ||
+    /\b(?:translation\s+surface|translated\s+(?:surface|text|section|block|paragraph|content)|active\s+translation(?:\s+(?:surface|text|section|block|paragraph|content))?)\b/i.test(unquoted) ||
+    /\balready[-\s]+translated\b[\s\S]{0,80}\b(?:surface|text|section|block|paragraph|content)\b/i.test(unquoted) ||
+    /\b(?:surface|text|section|block|paragraph|content)\b[\s\S]{0,80}\balready[-\s]+translated\b/i.test(unquoted);
+
+  return existingTranslationSurface;
+};
+
 export const buildPromptDerivedReadableSurfaceGatewayCallRequests = (
   body: Record<string, unknown>,
 ): Record<string, unknown>[] => {
@@ -154,7 +180,7 @@ export const buildPromptDerivedReadableSurfaceGatewayCallRequests = (
     return [];
   }
   const unquoted = unquotePrompt(prompt);
-  const asksTranslate = /\b(?:translate|translated|translation)\b[\s\S]{0,120}\b(?:visible|selected|hovered|surface|section|block)\b/i.test(unquoted);
+  const asksTranslate = isExistingTranslationSurfaceReadPrompt(prompt);
   const asksSummarize = /\b(?:summari[sz]e|overview|brief)\b[\s\S]{0,120}\b(?:visible|selected|hovered|surface|section|block|calculator\s+result)\b/i.test(unquoted);
   const asksRead =
     /\b(?:read|inspect|observe)\b[\s\S]{0,120}\b(?:selected|hovered|visible|active)\b[\s\S]{0,80}\b(?:paragraph|section|block|surface|calculator\s+result|result)\b/i.test(unquoted) ||

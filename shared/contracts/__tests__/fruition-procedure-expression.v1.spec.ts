@@ -11,15 +11,15 @@ const admission = () =>
     prompt: "Reflect right speech before action.",
     sourceReceiptId: "ideology-reflection:test",
     source: {
-      workstation: "zen-graph",
+      workstation: "moral-graph",
       tool: "fruition",
       artifact_type: "ideology_context_reflection",
       artifact_id: "ideology-reflection:test",
     },
     actions: [
       {
-        actionId: "zen-graph.ask_for_missing_evidence",
-        panelId: "zen-graph",
+        actionId: "moral-graph.ask_for_missing_evidence",
+        panelId: "moral-graph",
         label: "Ask for missing evidence",
         mutatesCalculator: false,
         solves: false,
@@ -101,7 +101,7 @@ const expression = () =>
     result: {
       posture: "ask_for_clarification",
       label: "Procedure needs missing checks",
-      recommendedActionIds: ["zen-graph.ask_for_missing_evidence"],
+      recommendedActionIds: ["moral-graph.ask_for_missing_evidence"],
       missingEvidence: ["source_refs"],
       admission: admission(),
       agentExecutable: false,

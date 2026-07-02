@@ -214,7 +214,7 @@
       "requires_math_congruence": false
     },
     {
-      "ticket_id": "TOE-042-zen-ladder-pack-routing-provenance-contract",
+      "ticket_id": "TOE-042-moral-ladder-pack-routing-provenance-contract",
       "next_strict_ready_claim_tier": "reduced-order",
       "requires_verified_pass": true,
       "requires_research_artifact_completion": false,
@@ -228,7 +228,7 @@
       "requires_math_congruence": false
     },
     {
-      "ticket_id": "TOE-044-zen-society-governance-provenance-contract",
+      "ticket_id": "TOE-044-moral-society-governance-provenance-contract",
       "next_strict_ready_claim_tier": "reduced-order",
       "requires_verified_pass": true,
       "requires_research_artifact_completion": false,
@@ -942,13 +942,13 @@
       "result_file": "docs/audits/ticket-results/TOE-041-packages-retrieval-provenance-contract.20260218T041604Z.json"
     },
     {
-      "ticket_id": "TOE-042-zen-ladder-pack-routing-provenance-contract",
+      "ticket_id": "TOE-042-moral-ladder-pack-routing-provenance-contract",
       "claim_tier": "diagnostic",
       "verification_ok": true,
       "score": 0.25,
       "research_gated": false,
       "research_artifact_complete": true,
-      "result_file": "docs/audits/ticket-results/TOE-042-zen-ladder-pack-routing-provenance-contract.2026-02-18T04-44-33Z.json"
+      "result_file": "docs/audits/ticket-results/TOE-042-moral-ladder-pack-routing-provenance-contract.2026-02-18T04-44-33Z.json"
     },
     {
       "ticket_id": "TOE-043-full-program-toe-progress-scoring",
@@ -960,13 +960,13 @@
       "result_file": "docs/audits/ticket-results/TOE-043-full-program-toe-progress-scoring.20260218T044850Z.json"
     },
     {
-      "ticket_id": "TOE-044-zen-society-governance-provenance-contract",
+      "ticket_id": "TOE-044-moral-society-governance-provenance-contract",
       "claim_tier": "diagnostic",
       "verification_ok": true,
       "score": 0.25,
       "research_gated": false,
       "research_artifact_complete": true,
-      "result_file": "docs/audits/ticket-results/TOE-044-zen-society-governance-provenance-contract.20260218T050851Z.json"
+      "result_file": "docs/audits/ticket-results/TOE-044-moral-society-governance-provenance-contract.20260218T050851Z.json"
     },
     {
       "ticket_id": "TOE-045-toe-research-gate-policy-contract",

@@ -47,7 +47,6 @@ export function HelixAskDock({
               layoutVariant="dock"
               onOpenPanel={onOpenPanel}
               onOpenConversation={onOpenConversation}
-              placeholder="Ask Helix about this workspace"
             />
           </>
         ) : null}

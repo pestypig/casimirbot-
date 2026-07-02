@@ -616,7 +616,7 @@ export const COMPOUND_CAPABILITY_LIVE_SCENARIOS: CompoundCapabilityScenario[] = 
     expectedTerminalKind: "model_synthesized_answer",
   },
   {
-    id: "zen_graph_reflection_bridge",
+    id: "moral_graph_reflection_bridge",
     prompt:
       "Call helix_ask.reflect_theory_context for uncertainty in the agent policy, then call helix_ask.reflect_ideology_context for wisdom under uncertainty, then call helix_ask.bridge_theory_ideology_context to bridge the theory and ideology context.",
     expectedRequested: [
@@ -939,7 +939,7 @@ const expressionFor = (args: RecordLike | null): string | null =>
   readString(args?.latex) ?? readString(args?.expression) ?? readString(args?.input);
 
 const NON_MATH_CALCULATOR_ARG_PATTERN =
-  /workspace_os\.status|workspace[-_.]?directory|docs[-_.]?viewer|repo[-_.]?code|situation[-_.]?room|image[_-]?lens|visual\s+capture|internet[_-]?search|scholarly[-_]?research|helix_ask|reflect[_-]?theory|civilization[_-]?bounds|zen[_-]?graph|scientific[-_.]?calculator|then|plus|call|use|run/i;
+  /workspace_os\.status|workspace[-_.]?directory|docs[-_.]?viewer|repo[-_.]?code|situation[-_.]?room|image[_-]?lens|visual\s+capture|internet[_-]?search|scholarly[-_]?research|helix_ask|reflect[_-]?theory|civilization[_-]?bounds|moral[_-]?graph|scientific[-_.]?calculator|then|plus|call|use|run/i;
 
 const RECEIPT_TERMINAL_KINDS = new Set([
   "tool_receipt",

@@ -152,17 +152,17 @@ function runTransformSpec(args: {
   }
 
   if (args.transform.kind === "philosophy_compare") {
-    const framework = cleanText(args.transform.params.framework) ?? "zen";
+    const framework = cleanText(args.transform.params.framework) ?? "moral";
     const summary = summarizeSentence(sourceText);
-    const zenParallel = framework === "zen"
+    const moralParallel = framework === "moral"
       ? "Treat this as a claim to observe directly before adding interpretation."
       : "Compare the statement against discipline, judgment, and what is under control.";
     return {
       ...base,
-      text: `${framework} comparison: ${zenParallel}`,
+      text: `${framework} comparison: ${moralParallel}`,
       lines: {
         current_statement: `Observed statement: ${clip(summary, 100)}`,
-        zen_parallel: zenParallel,
+        moral_parallel: moralParallel,
         tension: "No contradiction flagged in this compact window.",
         practical_reflection: "Keep the interpretation provisional until more source evidence arrives.",
         confidence: confidenceText(0.62),

@@ -56,7 +56,7 @@ function makeEnvelope(id: string, text: string, options?: EnvelopeOptions): TEss
 }
 
 describe("essence theme panels", () => {
-  it("clusters envelopes into theme panels with physics + zen descriptors", () => {
+  it("clusters envelopes into theme panels with physics + moral descriptors", () => {
     const creative = [
       makeEnvelope("creative-1", "Idea sketch about improvisational play and freedom. I want to explore soft systems.", {
         tag: "creative-flow",

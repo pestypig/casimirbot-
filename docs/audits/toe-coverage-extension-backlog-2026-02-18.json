@@ -812,13 +812,13 @@
       ]
     },
     {
-      "id": "TOE-042-zen-ladder-pack-routing-provenance-contract",
-      "tree_owner": "zen-ladder-pack",
+      "id": "TOE-042-moral-ladder-pack-routing-provenance-contract",
+      "tree_owner": "moral-ladder-pack",
       "gap_refs": [
         "F-COV-1",
         "F-COV-5"
       ],
-      "primitive": "Zen ladder pack routing provenance contract primitive",
+      "primitive": "Moral ladder pack routing provenance contract primitive",
       "primary_path_prefix": "server/services/helix-ask/topic.ts",
       "allowed_paths": [
         "server/services/helix-ask/topic.ts",
@@ -832,8 +832,8 @@
         "tests/helix-ask-paths.spec.ts"
       ],
       "done_criteria": [
-        "Zen-ladder prompts map to deterministic routing metadata with conservative provenance defaults",
-        "Strict evidence mode emits deterministic fail_reason when zen-ladder path evidence is missing",
+        "Moral-ladder prompts map to deterministic routing metadata with conservative provenance defaults",
+        "Strict evidence mode emits deterministic fail_reason when moral-ladder path evidence is missing",
         "Topic/path tests verify strict/default behavior and backward compatibility"
       ]
     },
@@ -862,13 +862,13 @@
       ]
     },
     {
-      "id": "TOE-044-zen-society-governance-provenance-contract",
-      "tree_owner": "zen-society",
+      "id": "TOE-044-moral-society-governance-provenance-contract",
+      "tree_owner": "moral-society",
       "gap_refs": [
         "F-COV-1",
         "F-COV-5"
       ],
-      "primitive": "Zen society governance provenance contract primitive",
+      "primitive": "Moral society governance provenance contract primitive",
       "primary_path_prefix": "server/routes/ethos.ts",
       "allowed_paths": [
         "server/routes/ethos.ts",
@@ -884,9 +884,9 @@
         "tests/ideology-telemetry.spec.ts"
       ],
       "done_criteria": [
-        "Zen-society responses include additive provenance_class/claim_tier/certifying metadata",
-        "Strict mode emits deterministic fail_reason ZEN_SOCIETY_PROVENANCE_MISSING when evidence provenance is absent",
-        "Resolver owner coverage marks zen-society as covered_extension and validation remains green"
+        "Moral-society responses include additive provenance_class/claim_tier/certifying metadata",
+        "Strict mode emits deterministic fail_reason MORAL_SOCIETY_PROVENANCE_MISSING when evidence provenance is absent",
+        "Resolver owner coverage marks moral-society as covered_extension and validation remains green"
       ]
     },
     {

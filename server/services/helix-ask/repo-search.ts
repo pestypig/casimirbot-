@@ -203,7 +203,7 @@ const DEFAULT_REPO_SEARCH_PATHS: string[] = ["docs", "server", "modules", "share
 
 const REPO_SEARCH_PATHS_BY_TAG: Record<HelixAskTopicTag, string[]> = {
   ideology: ["docs/ethos", "docs/knowledge/ethos", "server/services/ideology", "shared/ideology"],
-  zen_ladder_pack: ["docs/ethos", "docs/knowledge/ethos", "docs/zen-ladder-pack"],
+  moral_ladder_pack: ["docs/ethos", "docs/knowledge/ethos", "docs/moral-ladder-pack"],
   helix_ask: [
     "server/services/helix-ask",
     "server/routes/agi.plan.ts",

@@ -107,8 +107,8 @@ const explicitVisualInputPatterns: RegExp[] = [
 ];
 
 const explicitTheoryIdeologyBridgeSourcePatterns: RegExp[] = [
-  /\btheory\s+(?:badge\s*)?graph\b[\s\S]{0,180}\b(?:zen\s*(?:badge\s*)?graph|zengraph|fruition|due\s+process|justice|fairness)\b/i,
-  /\b(?:zen\s*(?:badge\s*)?graph|zengraph|fruition)\b[\s\S]{0,180}\b(?:theory\s+(?:badge\s*)?graph|physics\s+(?:badge\s*)?graph|entropy|conservation|self[-\s]?organization|observable\s+physics)\b/i,
+  /\btheory\s+(?:badge\s*)?graph\b[\s\S]{0,180}\b(?:moral\s*(?:badge\s*)?graph|moralgraph|fruition|due\s+process|justice|fairness)\b/i,
+  /\b(?:moral\s*(?:badge\s*)?graph|moralgraph|fruition)\b[\s\S]{0,180}\b(?:theory\s+(?:badge\s*)?graph|physics\s+(?:badge\s*)?graph|entropy|conservation|self[-\s]?organization|observable\s+physics)\b/i,
 ];
 
 const explicitExternalEvidenceSourcePatterns: RegExp[] = [

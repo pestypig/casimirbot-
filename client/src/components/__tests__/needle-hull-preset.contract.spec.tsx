@@ -11,18 +11,18 @@ import {
   NHM2_SIMULATION_CONTROL_DEFAULTS,
 } from "@shared/needle-hull-mark2-cavity-contract";
 
-const { zenLongToastMock } = vi.hoisted(() => ({
-  zenLongToastMock: vi.fn(),
+const { moralLongToastMock } = vi.hoisted(() => ({
+  moralLongToastMock: vi.fn(),
 }));
 
-vi.mock("@/lib/zen-long-toasts", () => ({
-  zenLongToast: zenLongToastMock,
+vi.mock("@/lib/moral-long-toasts", () => ({
+  moralLongToast: moralLongToastMock,
 }));
 
 describe("NeedleHullPreset NHM2 contract wiring", () => {
   afterEach(() => {
     cleanup();
-    zenLongToastMock.mockReset();
+    moralLongToastMock.mockReset();
   });
 
   it("applies NHM2 contract geometry and callback values", () => {
@@ -87,7 +87,7 @@ describe("NeedleHullPreset NHM2 contract wiring", () => {
       gap_nm: NHM2_CAVITY_CONTRACT.geometry.gap_nm,
     });
 
-    expect(zenLongToastMock).toHaveBeenCalledWith("sim:create", {
+    expect(moralLongToastMock).toHaveBeenCalledWith("sim:create", {
       gammaGeo: NHM2_CAVITY_CONTRACT.geometry.gammaGeo,
       qFactor: NHM2_CAVITY_CONTRACT.loss.qCavity,
       duty: NHM2_CAVITY_CONTRACT.loss.dutyShip,

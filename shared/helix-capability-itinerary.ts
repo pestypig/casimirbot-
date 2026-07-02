@@ -9,7 +9,7 @@ export type HelixCapabilityItineraryFamily =
   | "live_source_mail"
   | "live_source_decision"
   | "voice_delivery"
-  | "zen_graph_reflection"
+  | "moral_graph_reflection"
   | "civilization_bounds"
   | "workstation";
 

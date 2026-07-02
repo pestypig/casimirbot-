@@ -250,7 +250,7 @@ Required lines:
 5. `fail_closed`: "Transit capped. The route stops before uncertainty becomes theater."
 6. `confirmed + integrity OK`: mention human-lifetime window status.
 
-## Zen mapping as procedure
+## Moral mapping as procedure
 
 Map states to procedural meaning (not decorative quotes):
 

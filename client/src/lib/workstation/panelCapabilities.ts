@@ -1020,7 +1020,7 @@ export const WORKSTATION_V1_PANEL_CAPABILITIES: Record<string, WorkstationPanelC
         aliases: [
           "create live workstation pipeline",
           "summarize transcript into note",
-          "compare transcript to zen philosophy",
+          "compare transcript to moral philosophy",
           "write methods note from simulation",
         ],
         required_args: ["objective"],

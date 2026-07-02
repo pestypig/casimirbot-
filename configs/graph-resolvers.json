@@ -1119,18 +1119,18 @@
       "weight": 1.1
     },
     {
-      "id": "zen-society",
-      "label": "Zen Society Walk",
-      "path": "docs/knowledge/zen-society-tree.json",
+      "id": "moral-society",
+      "label": "Moral Society Walk",
+      "path": "docs/knowledge/moral-society-tree.json",
       "pathMode": "root_to_leaf",
       "topicTags": [
         "ideology"
       ],
       "matchers": [
-        "zen society",
+        "moral society",
         "governance spine",
         "public safety governance",
-        "zen gates",
+        "moral gates",
         "pillar dignity",
         "signatory registry"
       ],
@@ -1150,14 +1150,14 @@
       "weight": 1
     },
     {
-      "id": "zen-ladder-pack",
-      "label": "Zen Ladder Pack Walk",
-      "path": "docs/knowledge/zen-ladder-pack-tree.json",
+      "id": "moral-ladder-pack",
+      "label": "Moral Ladder Pack Walk",
+      "path": "docs/knowledge/moral-ladder-pack-tree.json",
       "topicTags": [
         "ideology"
       ],
       "matchers": [
-        "zen ladder",
+        "moral ladder",
         "ladder pack",
         "policy memo",
         "deck outline",

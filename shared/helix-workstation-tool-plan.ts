@@ -16,7 +16,9 @@ export type HelixWorkstationToolPlanIntent =
   | "workstation_control"
   | "theory_context_reflection"
   | "physics_calculation_context"
-  | "zen_graph_reflection"
+  | "ideology_compare"
+  | "moral_graph_reflection"
+  | "moral_living_substrate_reflection"
   | "theory_ideology_bridge_reflection"
   | "civilization_bounds_reflection"
   | "direct_answer";

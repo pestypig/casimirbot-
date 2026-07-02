@@ -2344,7 +2344,7 @@
         "bridge-panel-spectrum-tuner-restorative-harm-repair",
         "bridge-panel-spectrum-tuner-integration-ladder",
         "bridge-panel-spectrum-tuner-sdk-integration-tree",
-        "bridge-panel-spectrum-tuner-zen-artifact-integration-ladder"
+        "bridge-panel-spectrum-tuner-moral-artifact-integration-ladder"
       ],
       "links": [
         {
@@ -2373,7 +2373,7 @@
         },
         {
           "rel": "see-also",
-          "to": "zen-artifact-integration-ladder"
+          "to": "moral-artifact-integration-ladder"
         }
       ],
       "summary": "Panel surface for Spectrum Tuner.",
@@ -15504,11 +15504,11 @@
       }
     },
     {
-      "id": "bridge-panel-spectrum-tuner-zen-artifact-integration-ladder",
-      "slug": "bridge-panel-spectrum-tuner-zen-artifact-integration-ladder",
-      "title": "Spectrum Tuner <-> zen-artifact-integration-ladder",
-      "excerpt": "Bridge between panel spectrum-tuner and zen-artifact-integration-ladder.",
-      "bodyMD": "Panel spectrum-tuner links to zen-artifact-integration-ladder via term \"Integration\".",
+      "id": "bridge-panel-spectrum-tuner-moral-artifact-integration-ladder",
+      "slug": "bridge-panel-spectrum-tuner-moral-artifact-integration-ladder",
+      "title": "Spectrum Tuner <-> moral-artifact-integration-ladder",
+      "excerpt": "Bridge between panel spectrum-tuner and moral-artifact-integration-ladder.",
+      "bodyMD": "Panel spectrum-tuner links to moral-artifact-integration-ladder via term \"Integration\".",
       "tags": [
         "bridge",
         "panel",
@@ -15522,7 +15522,7 @@
         },
         {
           "rel": "see-also",
-          "to": "zen-artifact-integration-ladder"
+          "to": "moral-artifact-integration-ladder"
         },
         {
           "rel": "see-also",
@@ -15531,7 +15531,7 @@
       ],
       "bridge": {
         "left": "panel-spectrum-tuner",
-        "right": "zen-artifact-integration-ladder",
+        "right": "moral-artifact-integration-ladder",
         "relation": "Panel cross-concept join"
       },
       "inputs": [],
@@ -15543,7 +15543,7 @@
       "environment": null,
       "dependencies": [
         "panel-spectrum-tuner",
-        "zen-artifact-integration-ladder"
+        "moral-artifact-integration-ladder"
       ],
       "evidence": [
         {

@@ -244,21 +244,21 @@ describe("recommended action admission policy", () => {
     ).toThrow(/Invalid helix recommended action admission/);
   });
 
-  it("lets automation read ZenGraph-style diagnostic admissions without opening execution", () => {
+  it("lets automation read MoralGraph-style diagnostic admissions without opening execution", () => {
     const artifact = buildHelixRecommendedActionAdmissionV1({
-      prompt: "Show ZenGraph warning.",
+      prompt: "Show MoralGraph warning.",
       sourceReceiptId: "ideology-reflection:test",
       source: {
-        workstation: "zen-graph",
-        tool: "zen-graph-reflection",
+        workstation: "moral-graph",
+        tool: "moral-graph-reflection",
         artifact_type: "ideology_context_reflection",
         artifact_id: "ideology-reflection:test",
       },
       evidenceRefs: ["voice:event:1"],
-      reasonCodes: ["zen_graph_reflection", "evidence_only_authority"],
+      reasonCodes: ["moral_graph_reflection", "evidence_only_authority"],
       actions: [
         {
-          actionId: "zen-graph.show_right_speech_warning",
+          actionId: "moral-graph.show_right_speech_warning",
           panelId: "voice",
           label: "Show right speech warning",
           mutatesCalculator: false,
@@ -272,7 +272,7 @@ describe("recommended action admission policy", () => {
           reasonCode: "diagnostic_only_not_executable",
           display_policy: "diagnostic_only",
           evidenceRefs: ["voice:event:1"],
-          reasonCodes: ["zen_graph_reflection", "diagnostic_overlay_only"],
+          reasonCodes: ["moral_graph_reflection", "diagnostic_overlay_only"],
         },
       ],
     });
@@ -282,10 +282,10 @@ describe("recommended action admission policy", () => {
     expect(decision.canShowInUi).toBe(true);
     expect(decision.canExecute).toBe(false);
     expect(canAgentAutomateAdmissionAction(artifact, artifact.actions[0]!)).toBe(false);
-    expect(decision.source?.workstation).toBe("zen-graph");
+    expect(decision.source?.workstation).toBe("moral-graph");
     expect(decision.evidenceRefs).toEqual(["voice:event:1"]);
     expect(decision.reasonCodes).toEqual(
-      expect.arrayContaining(["zen_graph_reflection", "evidence_only_authority", "diagnostic_overlay_only"]),
+      expect.arrayContaining(["moral_graph_reflection", "evidence_only_authority", "diagnostic_overlay_only"]),
     );
     expect(decision.reasons).toEqual(
       expect.arrayContaining([
@@ -304,7 +304,7 @@ describe("recommended action admission policy", () => {
       evidenceRequirements: { missing: ["operator authority"] },
       actions: [
         {
-          actionId: "zen-graph.block_policy_sensitive_action",
+          actionId: "moral-graph.block_policy_sensitive_action",
           panelId: "situation-room",
           label: "Block policy-sensitive action",
           mutatesCalculator: false,

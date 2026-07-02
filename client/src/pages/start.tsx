@@ -24,34 +24,34 @@ type ProfileKey = "optimist" | "engineer" | "diplomat" | "strategist";
 const PROFILES: Record<ProfileKey, {
   icon: string;
   name: string;
-  zen: string;
+  moral: string;
   physics: string;
 }> = {
   optimist: {
     icon: "🌞",
     name: "Radiant Optimist",
-    zen: "\"The light we save today will shine for a billion tomorrows.\"",
+    moral: "\"The light we save today will shine for a billion tomorrows.\"",
     physics:
       "Energy-positivity balance; emphasizes Ford-Roman compliance as a guiding constraint.",
   },
   engineer: {
     icon: "⚙️",
     name: "The Engineer",
-    zen: "\"Every equation is a bridge; every weld, a promise.\"",
+    moral: "\"Every equation is a bridge; every weld, a promise.\"",
     physics:
       "Sector strobing, gamma_geo, gamma_VdB, Q_cavity; trade-offs and tolerances explained.",
   },
   diplomat: {
     icon: "🐼",
     name: "The Diplomat",
-    zen: "\"In harmony, the cosmos folds itself around us.\"",
+    moral: "\"In harmony, the cosmos folds itself around us.\"",
     physics:
       "Time-scale separation (TS); environment & stability cues for the solar rescue.",
   },
   strategist: {
     icon: "🐒",
     name: "The Strategist",
-    zen: "\"Even the smallest stone changes the course of the river.\"",
+    moral: "\"Even the smallest stone changes the course of the river.\"",
     physics:
       "Bubble placement, curvature max, sector optimization & routing visuals.",
   },
@@ -272,7 +272,7 @@ export default function StartPortal() {
                   </h2>
                   {userSettings.showZen && (
                     <p className="mt-1 text-sm text-foreground/92 md:text-[15px]">
-                      {PROFILES[selected].zen}
+                      {PROFILES[selected].moral}
                     </p>
                   )}
                   <p className="mt-2 text-xs leading-relaxed text-muted-foreground/85 md:text-sm">

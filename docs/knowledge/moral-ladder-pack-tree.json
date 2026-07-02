@@ -1,0 +1,860 @@
+{
+  "version": 1,
+  "rootId": "moral-ladder-pack-tree",
+  "nodes": [
+    {
+      "id": "moral-ladder-pack-tree",
+      "slug": "moral-ladder-pack-tree",
+      "title": "Moral Ladder Pack Tree",
+      "excerpt": "Deck, memo, and template artifacts for ladder pack.",
+      "bodyMD": "Moral ladder pack docs and templates.\n\nMinimal artifact: docs/moral-ladder-pack/*.md.",
+      "tags": [
+        "moral",
+        "ladder",
+        "governance"
+      ],
+      "children": [
+        "moral-ladder-core",
+        "moral-ladder-deck",
+        "moral-ladder-memo",
+        "moral-ladder-artifacts",
+        "moral-ladder-receipts",
+        "bridge-moral-ladder-core-moral-ladder-deck"
+      ],
+      "links": [],
+      "summary": "Deck, memo, and template artifacts for ladder pack.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/moral-ladder-pack-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:fda31e688a2a4f57ec6396fee49cfd55ccfb3b72755f77e1c33ed3bce8e04a59"
+        }
+      ]
+    },
+    {
+      "id": "moral-ladder-core",
+      "slug": "moral-ladder-core",
+      "title": "Moral Ladder Core",
+      "excerpt": "Core ladder pack overview.",
+      "bodyMD": "Ladder pack overview (docs/moral-ladder-pack/README.md).\n\nMinimal artifact: ladder overview summary.",
+      "tags": [
+        "moral",
+        "ladder",
+        "core"
+      ],
+      "children": [
+        "moral-ladder-readme"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-ladder-pack-tree"
+        }
+      ],
+      "summary": "Core ladder pack overview.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-ladder-pack/README.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:82dc22a90d64f81990b2cf9300d0991ba29858934803e4cc9840172a4359d672"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-ladder-pack-tree"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-ladder-readme",
+      "slug": "moral-ladder-readme",
+      "title": "Moral Ladder README",
+      "excerpt": "Overview of the ladder pack.",
+      "bodyMD": "Ladder pack README (docs/moral-ladder-pack/README.md).\n\nMinimal artifact: README summary.",
+      "tags": [
+        "moral",
+        "ladder"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-ladder-core"
+        }
+      ],
+      "summary": "Overview of the ladder pack.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-ladder-pack/README.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:82dc22a90d64f81990b2cf9300d0991ba29858934803e4cc9840172a4359d672"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-ladder-core"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-ladder-deck",
+      "slug": "moral-ladder-deck",
+      "title": "Moral Ladder Deck",
+      "excerpt": "Deck outline for ladder pack.",
+      "bodyMD": "Deck outline (docs/moral-ladder-pack/deck/deck-outline.md).\n\nMinimal artifact: deck outline summary.",
+      "tags": [
+        "moral",
+        "ladder",
+        "deck"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-ladder-pack-tree"
+        }
+      ],
+      "summary": "Deck outline for ladder pack.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-ladder-pack/deck/deck-outline.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:65ab40db79cab25d6cc419a10f2d340ec2fb07d58495922c3a493bc6502b6f0f"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-ladder-pack-tree"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-ladder-memo",
+      "slug": "moral-ladder-memo",
+      "title": "Moral Ladder Memo",
+      "excerpt": "Policy memo for ladder pack.",
+      "bodyMD": "Policy memo (docs/moral-ladder-pack/memo/policy-memo.md).\n\nMinimal artifact: memo summary.",
+      "tags": [
+        "moral",
+        "ladder",
+        "memo"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-ladder-pack-tree"
+        }
+      ],
+      "summary": "Policy memo for ladder pack.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-ladder-pack/memo/policy-memo.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ca1d230502c54f508589bba7cad0ff3d81bb95fe2309e86c64e4077c3665303e"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-ladder-pack-tree"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-ladder-artifacts",
+      "slug": "moral-ladder-artifacts",
+      "title": "Moral Ladder Artifacts",
+      "excerpt": "Artifact templates for ladder pack.",
+      "bodyMD": "Artifact templates (docs/moral-ladder-pack/templates/artifacts/*.md).\n\nMinimal artifact: artifact template list.",
+      "tags": [
+        "moral",
+        "ladder",
+        "artifacts"
+      ],
+      "children": [
+        "moral-ladder-coi-disclosure",
+        "moral-ladder-interview-log",
+        "moral-ladder-pilot-log",
+        "moral-ladder-privacy-minimization",
+        "moral-ladder-safety-precheck",
+        "moral-ladder-unit-econ"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-ladder-pack-tree"
+        }
+      ],
+      "summary": "Artifact templates for ladder pack.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-ladder-pack-tree"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/moral-ladder-pack-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:fda31e688a2a4f57ec6396fee49cfd55ccfb3b72755f77e1c33ed3bce8e04a59"
+        }
+      ]
+    },
+    {
+      "id": "moral-ladder-coi-disclosure",
+      "slug": "moral-ladder-coi-disclosure",
+      "title": "Coi Disclosure",
+      "excerpt": "Artifact template for Coi Disclosure.",
+      "bodyMD": "Coi Disclosure artifact template (docs/moral-ladder-pack/templates/artifacts/coi-disclosure.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "moral",
+        "ladder",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-ladder-artifacts"
+        }
+      ],
+      "summary": "Artifact template for Coi Disclosure.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-ladder-pack/templates/artifacts/coi-disclosure.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:6d9b72553328dcff72f9f33d468b0bdc8e8655e7daa03c53a39c8ac9c85ec9dd"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-ladder-artifacts"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-ladder-interview-log",
+      "slug": "moral-ladder-interview-log",
+      "title": "Interview Log",
+      "excerpt": "Artifact template for Interview Log.",
+      "bodyMD": "Interview Log artifact template (docs/moral-ladder-pack/templates/artifacts/interview-log.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "moral",
+        "ladder",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-ladder-artifacts"
+        }
+      ],
+      "summary": "Artifact template for Interview Log.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-ladder-pack/templates/artifacts/interview-log.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:076a84abd9ca2125ba22d67f3b5909b6784c15fe7cbabf2eaa4ce4fe59384f05"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-ladder-artifacts"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-ladder-pilot-log",
+      "slug": "moral-ladder-pilot-log",
+      "title": "Pilot Log",
+      "excerpt": "Artifact template for Pilot Log.",
+      "bodyMD": "Pilot Log artifact template (docs/moral-ladder-pack/templates/artifacts/pilot-log.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "moral",
+        "ladder",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-ladder-artifacts"
+        }
+      ],
+      "summary": "Artifact template for Pilot Log.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-ladder-pack/templates/artifacts/pilot-log.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f06f9b85354ca053ce8fa7d3bf197695b7b2ad3660190784df217ebe5818521e"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-ladder-artifacts"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-ladder-privacy-minimization",
+      "slug": "moral-ladder-privacy-minimization",
+      "title": "Privacy Minimization",
+      "excerpt": "Artifact template for Privacy Minimization.",
+      "bodyMD": "Privacy Minimization artifact template (docs/moral-ladder-pack/templates/artifacts/privacy-minimization.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "moral",
+        "ladder",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-ladder-artifacts"
+        }
+      ],
+      "summary": "Artifact template for Privacy Minimization.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-ladder-pack/templates/artifacts/privacy-minimization.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:69aef0f4a852ddb68e5a1a923840fc45ee9bfb081b654af7656a894fbaa677b8"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-ladder-artifacts"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-ladder-safety-precheck",
+      "slug": "moral-ladder-safety-precheck",
+      "title": "Safety Precheck",
+      "excerpt": "Artifact template for Safety Precheck.",
+      "bodyMD": "Safety Precheck artifact template (docs/moral-ladder-pack/templates/artifacts/safety-precheck.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "moral",
+        "ladder",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-ladder-artifacts"
+        }
+      ],
+      "summary": "Artifact template for Safety Precheck.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-ladder-pack/templates/artifacts/safety-precheck.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:8bd11bac1def72f9de34f652fecd5568ce2da4af61a1b14dacd069d536247c62"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-ladder-artifacts"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-ladder-unit-econ",
+      "slug": "moral-ladder-unit-econ",
+      "title": "Unit Econ",
+      "excerpt": "Artifact template for Unit Econ.",
+      "bodyMD": "Unit Econ artifact template (docs/moral-ladder-pack/templates/artifacts/unit-econ.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "moral",
+        "ladder",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-ladder-artifacts"
+        }
+      ],
+      "summary": "Artifact template for Unit Econ.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-ladder-pack/templates/artifacts/unit-econ.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:bd1c387d431fc19d525a5d80708aa2ee1f011685117a10a9a2344c9dce807e5d"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-ladder-artifacts"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-ladder-receipts",
+      "slug": "moral-ladder-receipts",
+      "title": "Moral Ladder Receipts",
+      "excerpt": "Receipt templates for ladder pack.",
+      "bodyMD": "Receipt templates (docs/moral-ladder-pack/templates/receipts/*.md).\n\nMinimal artifact: receipt template list.",
+      "tags": [
+        "moral",
+        "ladder",
+        "receipts"
+      ],
+      "children": [
+        "moral-ladder-curiosity-receipt",
+        "moral-ladder-rung-decision-receipt"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-ladder-pack-tree"
+        }
+      ],
+      "summary": "Receipt templates for ladder pack.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-ladder-pack-tree"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/moral-ladder-pack-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:fda31e688a2a4f57ec6396fee49cfd55ccfb3b72755f77e1c33ed3bce8e04a59"
+        }
+      ]
+    },
+    {
+      "id": "moral-ladder-curiosity-receipt",
+      "slug": "moral-ladder-curiosity-receipt",
+      "title": "Curiosity Receipt",
+      "excerpt": "Receipt template for Curiosity Receipt.",
+      "bodyMD": "Curiosity Receipt receipt template (docs/moral-ladder-pack/templates/receipts/curiosity-receipt.md).\n\nMinimal artifact: receipt template summary.",
+      "tags": [
+        "moral",
+        "ladder",
+        "receipts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-ladder-receipts"
+        }
+      ],
+      "summary": "Receipt template for Curiosity Receipt.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-ladder-pack/templates/receipts/curiosity-receipt.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:222a515db4263de590f0e1e944a5b07ee47a389f6c72002d19fbbd64a88a77f3"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-ladder-receipts"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-ladder-rung-decision-receipt",
+      "slug": "moral-ladder-rung-decision-receipt",
+      "title": "Rung Decision Receipt",
+      "excerpt": "Receipt template for Rung Decision Receipt.",
+      "bodyMD": "Rung Decision Receipt receipt template (docs/moral-ladder-pack/templates/receipts/rung-decision-receipt.md).\n\nMinimal artifact: receipt template summary.",
+      "tags": [
+        "moral",
+        "ladder",
+        "receipts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-ladder-receipts"
+        }
+      ],
+      "summary": "Receipt template for Rung Decision Receipt.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-ladder-pack/templates/receipts/rung-decision-receipt.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:6956057401a48933fbae827c17c261f0902098e062a6a7eeb7ea25a421a42d3d"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-ladder-receipts"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "bridge-moral-ladder-core-moral-ladder-deck",
+      "title": "Moral Ladder Core <-> Moral Ladder Deck Bridge",
+      "excerpt": "Bridge between Moral Ladder Core and Moral Ladder Deck.",
+      "bodyMD": "Cross-reference between Moral Ladder Core and Moral Ladder Deck within this tree.\n\nMinimal artifact: left/right evidence anchors.",
+      "tags": [
+        "bridge",
+        "moral",
+        "ladder",
+        "core",
+        "deck"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-ladder-pack-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "moral-ladder-core"
+        },
+        {
+          "rel": "see-also",
+          "to": "moral-ladder-deck"
+        }
+      ],
+      "bridge": {
+        "left": "moral-ladder-core",
+        "right": "moral-ladder-deck",
+        "relation": "Cross-reference between Moral Ladder Core and Moral Ladder Deck."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-ladder-core",
+        "moral-ladder-deck"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-ladder-pack/README.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:82dc22a90d64f81990b2cf9300d0991ba29858934803e4cc9840172a4359d672",
+          "scope": "left"
+        },
+        {
+          "type": "doc",
+          "path": "docs/moral-ladder-pack/deck/deck-outline.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:65ab40db79cab25d6cc419a10f2d340ec2fb07d58495922c3a493bc6502b6f0f",
+          "scope": "right"
+        }
+      ],
+      "slug": "bridge-moral-ladder-core-moral-ladder-deck",
+      "summary": "Bridge between Moral Ladder Core and Moral Ladder Deck."
+    }
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
+}

@@ -2,7 +2,7 @@
 import React from "react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { buildZenGraphLaunchReflectionArtifacts } from "@/lib/zen-graph/fruitionLaunchArtifact";
+import { buildMoralGraphLaunchReflectionArtifacts } from "@/lib/moral-graph/fruitionLaunchArtifact";
 import { useFruitionCalculatorStore } from "@/store/useFruitionCalculatorStore";
 import FruitionCalculatorPanel from "../panels/FruitionCalculatorPanel";
 
@@ -28,9 +28,9 @@ describe("FruitionCalculatorPanel", () => {
     expect(screen.getByText(/Executable: false/i)).toBeTruthy();
   });
 
-  it("renders a Zen Badge Graph-loaded expression from the calculator store", () => {
-    const { fruition } = buildZenGraphLaunchReflectionArtifacts();
-    useFruitionCalculatorStore.getState().loadExpression(fruition, { source: "zen_badge_graph" });
+  it("renders a Moral Badge Graph-loaded expression from the calculator store", () => {
+    const { fruition } = buildMoralGraphLaunchReflectionArtifacts();
+    useFruitionCalculatorStore.getState().loadExpression(fruition, { source: "moral_badge_graph" });
 
     render(<FruitionCalculatorPanel />);
 

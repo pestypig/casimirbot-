@@ -22,8 +22,8 @@ import {
   isHelixAskGoldenPathCivilizationBoundsReflectionRequested,
 } from "./capabilities/civilization-bounds-reflection";
 import {
-  isHelixAskGoldenPathZenGraphReflectionRequested,
-} from "./capabilities/zen-graph-reflection";
+  isHelixAskGoldenPathMoralGraphReflectionRequested,
+} from "./capabilities/moral-graph-reflection";
 import {
   isHelixAskGoldenPathVisualCaptureRequested,
 } from "./capabilities/visual-capture";
@@ -189,8 +189,8 @@ export const isHelixAskGoldenPathRepoDocsCompoundRequested = (body: RecordLike):
 export const isHelixAskGoldenPathInternetResearchReflectionCompoundRequested = (body: RecordLike): boolean =>
   isHelixAskGoldenPathInternetSearchRequested(body) && isHelixAskGoldenPathTheoryReflectionRequested(body);
 
-export const isHelixAskGoldenPathCivilizationBoundsZenReflectionCompoundRequested = (body: RecordLike): boolean =>
-  isHelixAskGoldenPathCivilizationBoundsReflectionRequested(body) && isHelixAskGoldenPathZenGraphReflectionRequested(body);
+export const isHelixAskGoldenPathCivilizationBoundsMoralReflectionCompoundRequested = (body: RecordLike): boolean =>
+  isHelixAskGoldenPathCivilizationBoundsReflectionRequested(body) && isHelixAskGoldenPathMoralGraphReflectionRequested(body);
 
 export const buildGoldenPathCompositeDebug = (args: {
   deps: HelixAskGoldenPathCompositeDebugDependencies;

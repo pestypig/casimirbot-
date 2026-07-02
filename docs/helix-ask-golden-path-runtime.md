@@ -122,7 +122,7 @@ Golden-path explicit capability modules currently cover:
 - Stage Play reflection summaries
 - theory/context reflection
 - civilization-bounds reflection
-- Zen graph / ideology reflection
+- Moral graph / ideology reflection
 - visual capture / image lens inspection
 - scholarly research lookup
 - internet/web research lookup
@@ -143,7 +143,7 @@ Golden-path compound modules currently cover:
 - repo search + docs locate
 - internet/web research + theory reflection
 - visual capture + calculator
-- civilization bounds + Zen graph reflection
+- civilization bounds + Moral graph reflection
 
 Each compound module owns ordered subgoals, required observation kinds,
 required terminal kind, request detection, payload construction, and support

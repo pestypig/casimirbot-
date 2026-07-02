@@ -248,7 +248,7 @@ Current panel families include:
 - Agent and operations: Essence Console, Task History, Debate View, Constraint
   Pack Policies, Contribution Workbench.
 - Evidence and reflection: Docs Viewer, Universal Audit Tree, Math Maturity
-  Tree, Theory Badge Graph, Zen Badge Graph.
+  Tree, Theory Badge Graph, Moral Badge Graph.
 - Calculation and theory: Scientific Calculator, Needle MK2 Calculator, NHM2
   Solve State, NHM2 Calibration + Proof, observable/equation tooling.
 - Observational simulation: Star Watcher, Hydrostatic Equilibrium, Solar Globe,
@@ -273,7 +273,7 @@ Current job-ready capability families include:
 | Notes and clipboard | Create notes, append to notes, copy receipts, read or write clipboard state. | Receipts can confirm state changes, but explanations still pass through the solver. |
 | Calculator and equations | Solve expressions, load theory payloads, run compound math traces. | Numeric results are observations until validated and explained. |
 | Theory graph | Locate badges, build reflections, load compound runs, expose claim boundaries. | Reflection identifies relevant theory; it does not prove the final claim alone. |
-| Ideology and ethos | Search ideology nodes, build context packs, compare motives to Zen/mission frameworks. | Context packs advise interpretation; they are not terminal authority. |
+| Ideology and ethos | Search ideology nodes, build context packs, compare motives to Moral/mission frameworks. | Context packs advise interpretation; they are not terminal authority. |
 | Voice and live environment | Propose voice delivery, bind live answer environment, emit callout receipts. | Voice certainty must not exceed text certainty. |
 
 Implementation anchors:

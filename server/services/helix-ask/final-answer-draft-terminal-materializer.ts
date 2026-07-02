@@ -275,7 +275,7 @@ const capabilityFamilyFromCapability = (capability: string | null): string | nul
   if (capability.startsWith("scholarly-research.") || capability.startsWith("scholarly_research.")) return "scholarly_research";
   if (capability === "helix_ask.reflect_theory_context" || capability.includes("theory_context")) return "theory_locator";
   if (capability === "helix_ask.reflect_ideology_context" || capability === "helix_ask.bridge_theory_ideology_context") {
-    return "zen_graph_reflection";
+    return "moral_graph_reflection";
   }
   if (capability === "helix_ask.build_civilization_scenario_frame" || capability === "helix_ask.reflect_civilization_bounds") {
     return "civilization_bounds";
@@ -559,7 +559,7 @@ const compoundTerminalReadinessBlockedReason = (
 const sourceBackedModelSynthesisRouteFamilies = new Set<string>([
   "capability_catalog",
   "context_reflection",
-  "zen_graph_reflection",
+  "moral_graph_reflection",
   "civilization_bounds",
   "workspace_directory",
   "workspace_diagnostic",

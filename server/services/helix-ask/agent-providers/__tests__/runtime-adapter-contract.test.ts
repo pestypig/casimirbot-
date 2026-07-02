@@ -78,6 +78,36 @@ describe("agent runtime adapter contract", () => {
     expect(contract.capability_lane_ids).toContain("live_translation");
     expect(contract.capability_lane_ids).toContain("workstation_tool_reference");
     expect(contract.capability_lane_statuses.workstation_tool_reference).toBe("available");
+    expect(contract.model_visible_capability_lane_manifest).toMatchObject({
+      schema: "helix.agent_model_visible_capability_lane_manifest.v1",
+      selected_runtime_agent_provider: "codex",
+      authority_rules: {
+        helix_owns_backend_selection: true,
+        selected_runtime_provider_remains_root: true,
+        lane_outputs_are_observations_or_receipts: true,
+        lane_outputs_require_reentry: true,
+        lane_outputs_are_not_final_answers: true,
+        terminal_authority_owner: "helix",
+      },
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    const modelVisibleTranslation = contract.model_visible_capability_lane_manifest.lanes
+      .flatMap((lane) => lane.capabilities)
+      .find((capability) => capability.capability_id === "live_translation.translate_text");
+    expect(modelVisibleTranslation).toMatchObject({
+      required_input_fields: ["text", "target_language"],
+      optional_input_fields: expect.arrayContaining(["source_language", "requested_backend_provider", "chunk_id", "source_id"]),
+      result_authority: "observation_or_receipt_only",
+      reentry_required: true,
+      terminal_eligible: false,
+      assistant_answer: false,
+    });
+    expect(modelVisibleTranslation?.when_to_use).toContain("translate");
+    expect(modelVisibleTranslation?.when_not_to_use).toContain("docs-viewer.read_active_translation");
+    expect(JSON.stringify(modelVisibleTranslation?.request_shape_hint)).toContain("capability_lane_call");
+    expect(JSON.stringify(modelVisibleTranslation?.request_shape_hint)).toContain("live_translation.translate_text");
     expect(contract.capability_lane_resolve_trace_shape).toMatchObject({
       schema: "helix.capability_lane_resolve_trace.v1",
       selected_runtime_agent_provider: "codex",
@@ -107,6 +137,8 @@ describe("agent runtime adapter contract", () => {
     expect(contract.prompt_policy_lines.join("\n")).toContain("Capability lanes may execute only through Helix-governed one-shot lane calls");
     expect(contract.prompt_policy_lines.join("\n")).toContain("Lane sessions may start, pause, resume, or stop only through Helix-governed session calls");
     expect(contract.prompt_policy_lines.join("\n")).toContain("keeps the selected runtime agent provider unchanged");
+    expect(contract.prompt_policy_lines.join("\n")).toContain("prefer live_translation.translate_text");
+    expect(contract.prompt_policy_lines.join("\n")).toContain("already-existing translated Docs surfaces");
     expect(contract.prompt_policy_lines.join("\n")).toContain("Do not claim an AI service lane ran unless a Helix lane observation or receipt is present");
     expect(contract.prompt_policy_lines.join("\n")).toContain("does not rewrite, shorten, bulletize");
   });

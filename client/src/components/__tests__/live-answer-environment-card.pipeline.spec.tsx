@@ -12,7 +12,7 @@ describe("LiveAnswerEnvironmentCard pipeline projection", () => {
       environment_id: "live_answer:pipeline",
       thread_id: "helix-ask:test",
       created_turn_id: "turn:pipeline",
-      objective: "Compare this live transcript to Zen philosophy.",
+      objective: "Compare this live transcript to Moral philosophy.",
       preset: "custom",
       status: "active",
       mode: "text_only",
@@ -22,8 +22,8 @@ describe("LiveAnswerEnvironmentCard pipeline projection", () => {
       line_schema: [],
       lines: [
         {
-          key: "zen_parallel",
-          label: "Zen parallel",
+          key: "moral_parallel",
+          label: "Moral parallel",
           value: "Observe directly before adding interpretation.",
           update_policy: "model_reviewed",
           visibility: "answer_card",
@@ -56,7 +56,7 @@ describe("LiveAnswerEnvironmentCard pipeline projection", () => {
       evidence_refs: ["evt:1"],
       created_at: "2026-05-10T12:00:00.000Z",
       updated_at: "2026-05-10T12:00:00.000Z",
-      latest_summary: "Zen comparison updated.",
+      latest_summary: "Moral comparison updated.",
       context_policy: "compact_context_pack_only",
       raw_logs_included: false,
       raw_transcript_included: false,
@@ -66,7 +66,7 @@ describe("LiveAnswerEnvironmentCard pipeline projection", () => {
 
     render(<LiveAnswerEnvironmentCard environment={environment} />);
 
-    expect(screen.getByText(/Zen parallel:/)).toBeTruthy();
+    expect(screen.getByText(/Moral parallel:/)).toBeTruthy();
     expect(screen.getByText(/Observe directly/)).toBeTruthy();
     expect(screen.queryByText(/hidden debug line/)).toBeNull();
   });

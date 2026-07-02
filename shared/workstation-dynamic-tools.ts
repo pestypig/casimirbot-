@@ -1411,7 +1411,7 @@ function argSchema(arg: string): Record<string, unknown> {
       ],
     };
   }
-  if (arg === "framework") return { enum: ["zen", "mission_ethos", "custom"] };
+  if (arg === "framework") return { enum: ["moral", "mission_ethos", "custom"] };
   if (arg === "calculator_setup") {
     const physicalDimensionSchema = {
       type: "object",

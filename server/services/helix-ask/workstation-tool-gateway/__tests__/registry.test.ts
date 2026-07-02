@@ -7,12 +7,16 @@ import {
 
 const WORKSTATION_ACTIVE_CONTEXT_CAPABILITY = "workstation.active_context";
 const CALCULATOR_SOLVE_EXPRESSION_CAPABILITY = "scientific-calculator.solve_expression";
+const CALCULATOR_SOLVE_SCALAR_EXPRESSION_CAPABILITY = "scientific-calculator.solve_scalar_expression";
+const CALCULATOR_CLASSIFY_EXPRESSION_CAPABILITY = "scientific-calculator.classify_expression";
+const CALCULATOR_BIND_VARIABLES_CAPABILITY = "scientific-calculator.bind_variables";
 const CALCULATOR_ACTIVE_CONTEXT_CAPABILITY = "scientific-calculator.active_context";
 const READABLE_SURFACE_OBSERVE_CAPABILITY = "workstation.readable_surface.observe";
 const DOCS_READ_VISIBLE_SURFACE_CAPABILITY = "docs-viewer.read_visible_surface";
 const DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY = "docs-viewer.read_active_translation";
 const CALCULATOR_READ_VISIBLE_RESULT_CAPABILITY = "scientific-calculator.read_visible_result";
 const CALCULATOR_OPEN_PANEL_CAPABILITY = "scientific-calculator.open_panel";
+const CALCULATOR_PREFILL_EXPRESSION_CAPABILITY = "scientific-calculator.prefill_expression";
 const CALCULATOR_SHOW_GATEWAY_SOLVE_CAPABILITY = "scientific-calculator.show_gateway_solve";
 const WORKSTATION_OPEN_PANEL_CAPABILITY = "workstation.open_panel";
 const WORKSTATION_FOCUS_PANEL_CAPABILITY = "workstation.focus_panel";
@@ -25,6 +29,7 @@ const SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY = "scholarly-research.fetch_full_text
 const SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY = "scholarly-research.extract_numeric_parameters";
 const CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY = "civilization-bounds.reflect_system_bounds";
 const THEORY_CONTEXT_REFLECTION_CAPABILITY = "theory-badge-graph.reflect_discussion_context";
+const MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY = "moral-graph.reflect_living_substrate_context";
 const THEORY_FRONTIER_CONJECTURE_CAPABILITY = "theory-badge-graph.propose_frontier_conjectures";
 const VOICE_INTERIM_CALLOUT_CAPABILITY = "live_env.request_interim_voice_callout";
 const VOICE_NARRATOR_SAY_CAPABILITY = "live_env.narrator_say";
@@ -162,6 +167,55 @@ describe("Helix workstation tool gateway", () => {
     );
     expect(manifest.capabilities).toContainEqual(
       expect.objectContaining({
+        capability_id: CALCULATOR_SOLVE_SCALAR_EXPRESSION_CAPABILITY,
+        panel_id: "scientific-calculator",
+        action_id: "solve_scalar_expression",
+        mode: "read",
+        mutating: false,
+        code_mutation: false,
+        shell_access: false,
+        requires_source: true,
+        permission_profile_required: "read",
+        output_observation_schema: "helix.calculator_scalar_solve_observation.v1",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    );
+    expect(manifest.capabilities).toContainEqual(
+      expect.objectContaining({
+        capability_id: CALCULATOR_CLASSIFY_EXPRESSION_CAPABILITY,
+        panel_id: "scientific-calculator",
+        action_id: "classify_expression",
+        mode: "read",
+        mutating: false,
+        code_mutation: false,
+        shell_access: false,
+        permission_profile_required: "read",
+        output_observation_schema: "helix.calculator_expression_classification_observation.v1",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    );
+    expect(manifest.capabilities).toContainEqual(
+      expect.objectContaining({
+        capability_id: CALCULATOR_BIND_VARIABLES_CAPABILITY,
+        panel_id: "scientific-calculator",
+        action_id: "bind_variables",
+        mode: "verify",
+        mutating: false,
+        code_mutation: false,
+        shell_access: false,
+        permission_profile_required: "read",
+        output_observation_schema: "helix.calculator_variable_binding_observation.v1",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    );
+    expect(manifest.capabilities).toContainEqual(
+      expect.objectContaining({
         capability_id: CALCULATOR_ACTIVE_CONTEXT_CAPABILITY,
         panel_id: "scientific-calculator",
         action_id: "active_context",
@@ -243,6 +297,22 @@ describe("Helix workstation tool gateway", () => {
         code_mutation: false,
         shell_access: false,
         requires_source: true,
+        permission_profile_required: "act",
+        output_observation_schema: "helix.workstation_ui_action_receipt.v1",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    );
+    expect(manifest.capabilities).toContainEqual(
+      expect.objectContaining({
+        capability_id: CALCULATOR_PREFILL_EXPRESSION_CAPABILITY,
+        panel_id: "scientific-calculator",
+        action_id: "prefill_expression",
+        mode: "act",
+        mutating: false,
+        code_mutation: false,
+        shell_access: false,
         permission_profile_required: "act",
         output_observation_schema: "helix.workstation_ui_action_receipt.v1",
         terminal_eligible: false,
@@ -375,6 +445,24 @@ describe("Helix workstation tool gateway", () => {
         permission_profile_required: "read",
         output_observation_schema: "helix.theory_context_reflection_observation.v1",
         terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    );
+    expect(manifest.capabilities).toContainEqual(
+      expect.objectContaining({
+        capability_id: MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY,
+        panel_id: "moral-badge-graph",
+        action_id: "reflect_living_substrate_context",
+        mode: "read",
+        mutating: false,
+        code_mutation: false,
+        shell_access: false,
+        requires_source: true,
+        permission_profile_required: "read",
+        output_observation_schema: "helix.moral_living_substrate_reflection_observation.v1",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
         assistant_answer: false,
         raw_content_included: false,
       }),
@@ -1405,6 +1493,461 @@ describe("Helix workstation tool gateway", () => {
         raw_content_included: false,
       },
     });
+  });
+
+  it("blocks symbolic scientific-calculator.solve_expression without producing numeric evidence", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+      arguments: {
+        expression: "E = h * f",
+      },
+      turnId: "ask:test:gateway-calculator-symbolic-solve-blocked",
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      capability_id: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+      error: "unsupported_expression_syntax",
+      observation: {
+        schema: "helix.calculator_solve_observation.v1",
+        status: "blocked",
+        result: null,
+        blocked_reason: "unsupported_expression_syntax",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(result.produced_affordances).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "calculator_result",
+          status: "blocked",
+          result: null,
+        }),
+      ]),
+    );
+    expect(result.produced_affordances).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "numeric_value_evidence",
+        }),
+      ]),
+    );
+  });
+
+  it("solves fully numeric bound scalar expressions as the result-producing calculator lane", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: CALCULATOR_SOLVE_SCALAR_EXPRESSION_CAPABILITY,
+      arguments: {
+        expression: "E = 6.62607015e-34 * 5e14",
+        source_refs: ["paper:eq1", "paper:param:f"],
+      },
+      turnId: "ask:test:gateway-calculator-scalar-solve",
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      capability_id: CALCULATOR_SOLVE_SCALAR_EXPRESSION_CAPABILITY,
+      gateway_admission: {
+        requested_capability: CALCULATOR_SOLVE_SCALAR_EXPRESSION_CAPABILITY,
+        selected_agent_provider: "codex",
+        permission_profile: "read",
+        admission_status: "admitted",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation_packet: {
+        capability_key: CALCULATOR_SOLVE_SCALAR_EXPRESSION_CAPABILITY,
+        panel_id: "scientific-calculator",
+        action: "solve_scalar_expression",
+        status: "succeeded",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.calculator_scalar_solve_observation.v1",
+        expression: "E = 6.62607015e-34 * 5e14",
+        scalar_expression: "6.62607015e-34 * 5e14",
+        result_symbol: "E",
+        result: "3.313035e-19",
+        source_refs: ["paper:eq1", "paper:param:f"],
+        status: "succeeded",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(result.produced_affordances).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "calculator_result",
+          status: "available",
+          expression: "E = 6.62607015e-34 * 5e14",
+          result: "3.313035e-19",
+        }),
+        expect.objectContaining({
+          kind: "numeric_value_evidence",
+          status: "available",
+          result: "3.313035e-19",
+        }),
+      ]),
+    );
+  });
+
+  it("blocks scalar solving when bound expressions still contain symbols", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: CALCULATOR_SOLVE_SCALAR_EXPRESSION_CAPABILITY,
+      arguments: {
+        expression: "E = h * 5e14",
+        source_refs: ["paper:eq1"],
+      },
+      turnId: "ask:test:gateway-calculator-scalar-symbolic-blocked",
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      capability_id: CALCULATOR_SOLVE_SCALAR_EXPRESSION_CAPABILITY,
+      error: "unsupported_expression_syntax",
+      observation: {
+        schema: "helix.calculator_scalar_solve_observation.v1",
+        status: "blocked",
+        expression: "E = h * 5e14",
+        scalar_expression: "h * 5e14",
+        result: null,
+        blocked_reason: "unsupported_expression_syntax",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    expect(result.produced_affordances).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "calculator_result",
+          status: "blocked",
+          result: null,
+        }),
+      ]),
+    );
+    expect(result.produced_affordances).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "numeric_value_evidence" }),
+      ]),
+    );
+  });
+
+  it("blocks scalar solving without source refs before producing numeric evidence", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: CALCULATOR_SOLVE_SCALAR_EXPRESSION_CAPABILITY,
+      arguments: {
+        expression: "E = 6.62607015e-34 * 5e14",
+      },
+      turnId: "ask:test:gateway-calculator-scalar-missing-source",
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      capability_id: CALCULATOR_SOLVE_SCALAR_EXPRESSION_CAPABILITY,
+      error: "missing_source_refs",
+      observation: {
+        schema: "helix.calculator_scalar_solve_observation.v1",
+        status: "blocked",
+        result: null,
+        blocked_reason: "missing_source_refs",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    expect(result.produced_affordances).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "numeric_value_evidence" }),
+      ]),
+    );
+  });
+
+  it("classifies symbolic calculator expressions without solving them", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: CALCULATOR_CLASSIFY_EXPRESSION_CAPABILITY,
+      arguments: {
+        expression: "E = h * f",
+      },
+      turnId: "ask:test:gateway-calculator-classify-symbolic",
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      capability_id: CALCULATOR_CLASSIFY_EXPRESSION_CAPABILITY,
+      observation_packet: {
+        capability_key: CALCULATOR_CLASSIFY_EXPRESSION_CAPABILITY,
+        panel_id: "scientific-calculator",
+        action: "classify_expression",
+        status: "succeeded",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.calculator_expression_classification_observation.v1",
+        status: "succeeded",
+        expression: "E = h * f",
+        calculation_type: "symbolic_equation",
+        detected_symbols: ["f"],
+        missing_variables: ["f"],
+        possible_routes: expect.arrayContaining(["symbolic_solver", "paper_equation_binder"]),
+        blocked_reasons: ["missing_variable_bindings"],
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(result.produced_affordances).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "calculator_expression_template",
+          expression: "E = h * f",
+          missing_inputs: ["f"],
+        }),
+      ]),
+    );
+    expect(result.produced_affordances).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "calculator_result",
+        }),
+      ]),
+    );
+  });
+
+  it("binds calculator variables only from numeric evidence with source refs", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "verify",
+      capabilityId: CALCULATOR_BIND_VARIABLES_CAPABILITY,
+      arguments: {
+        expression: "E = h * f",
+        numeric_evidence: [
+          {
+            symbol: "f",
+            value: "5e14",
+            unit: "Hz",
+            dimension_signature: "T^-1",
+            source_refs: ["paper:eq1"],
+          },
+        ],
+        expected_units: { f: "Hz" },
+        expected_dimensions: { f: "T^-1" },
+      },
+      turnId: "ask:test:gateway-calculator-bind-symbolic",
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      capability_id: CALCULATOR_BIND_VARIABLES_CAPABILITY,
+      observation_packet: {
+        capability_key: CALCULATOR_BIND_VARIABLES_CAPABILITY,
+        panel_id: "scientific-calculator",
+        action: "bind_variables",
+        status: "succeeded",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.calculator_variable_binding_observation.v1",
+        status: "succeeded",
+        expression: "E = h * f",
+        bound_expression: "E = h * 5e14",
+        required_symbols: ["f"],
+        missing_variables: [],
+        blocked_reasons: [],
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(result.produced_affordances).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "bound_calculator_expression",
+          status: "available",
+          normalized_expression: "E = h * 5e14",
+        }),
+      ]),
+    );
+    expect(result.produced_affordances).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "calculator_result" }),
+        expect.objectContaining({ kind: "numeric_value_evidence" }),
+      ]),
+    );
+  });
+
+  it("blocks calculator variable binding when source refs are missing", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "verify",
+      capabilityId: CALCULATOR_BIND_VARIABLES_CAPABILITY,
+      arguments: {
+        expression: "E = h * f",
+        numeric_evidence: [
+          {
+            symbol: "f",
+            value: "5e14",
+            unit: "Hz",
+          },
+        ],
+      },
+      turnId: "ask:test:gateway-calculator-bind-missing-source",
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      capability_id: CALCULATOR_BIND_VARIABLES_CAPABILITY,
+      error: "missing_source_refs",
+      observation: {
+        schema: "helix.calculator_variable_binding_observation.v1",
+        status: "blocked",
+        bound_expression: null,
+        missing_variables: ["f"],
+        blocked_reasons: ["missing_source_refs"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    expect(result.produced_affordances).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "bound_calculator_expression",
+          status: "blocked",
+          missing_inputs: ["f"],
+        }),
+      ]),
+    );
+  });
+
+  it("blocks calculator variable binding for incompatible units", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "verify",
+      capabilityId: CALCULATOR_BIND_VARIABLES_CAPABILITY,
+      arguments: {
+        expression: "E = h * f",
+        numeric_evidence: [
+          {
+            symbol: "f",
+            value: "5e14",
+            unit: "m",
+            source_refs: ["paper:eq1"],
+          },
+        ],
+        expected_units: { f: "Hz" },
+      },
+      turnId: "ask:test:gateway-calculator-bind-incompatible-units",
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      capability_id: CALCULATOR_BIND_VARIABLES_CAPABILITY,
+      error: "incompatible_dimensions",
+      observation: {
+        schema: "helix.calculator_variable_binding_observation.v1",
+        status: "blocked",
+        bound_expression: null,
+        missing_variables: ["f"],
+        blocked_reasons: ["incompatible_dimensions"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+  });
+
+  it("prefills symbolic calculator expressions as UI projection receipts only", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "act",
+      capabilityId: CALCULATOR_PREFILL_EXPRESSION_CAPABILITY,
+      arguments: {
+        expression: "E = h * f",
+        source_refs: ["paper:eq1"],
+      },
+      turnId: "ask:test:gateway-calculator-prefill-symbolic",
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      capability_id: CALCULATOR_PREFILL_EXPRESSION_CAPABILITY,
+      observation_packet: {
+        capability_key: CALCULATOR_PREFILL_EXPRESSION_CAPABILITY,
+        panel_id: "scientific-calculator",
+        action: "prefill_expression",
+        status: "succeeded",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.workstation_ui_action_receipt.v1",
+        action_id: "prefill_expression",
+        expression: "E = h * f",
+        produced_calculator_receipt: false,
+        produced_numeric_value_evidence: false,
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(result.produced_affordances).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "ui_projection_receipt",
+          status: "available",
+        }),
+      ]),
+    );
+    expect(result.produced_affordances).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "calculator_result",
+        }),
+        expect.objectContaining({
+          kind: "numeric_value_evidence",
+        }),
+      ]),
+    );
   });
 
   it("normalizes percent-of calculator phrases before solving", async () => {
@@ -3483,6 +4026,149 @@ describe("Helix workstation tool gateway", () => {
     });
   });
 
+  it("calls Moral Graph living substrate reflection as read-only evidence, not an answer", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY,
+      arguments: {
+        prompt:
+          "Derive moral relevance from organism boundary, sensing, homeostasis, entropy gradient pressure, and non-human living systems.",
+        source_theory_badge_ids: ["biophysics.homeostatic_regulation"],
+        include_theory_bridge: true,
+        include_admissions: true,
+      },
+      turnId: "ask:test:gateway-moral-living-substrate-reflection",
+      iteration: 6,
+    });
+    const observation = result.observation as {
+      exact_substrate_badge_ids?: string[];
+      likely_substrate_badge_ids?: string[];
+      source_theory_badge_ids?: string[];
+      claim_boundary_notes?: string[];
+      recommended_action_ids?: string[];
+      recommended_actions_solve?: boolean;
+      reflection_id?: string;
+    };
+
+    expect(result).toMatchObject({
+      ok: true,
+      agent_runtime: "codex",
+      capability_id: MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY,
+      gateway_admission: {
+        requested_capability: MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY,
+        selected_agent_provider: "codex",
+        permission_profile: "read",
+        admission_status: "admitted",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      observation_packet: {
+        capability_key: MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY,
+        panel_id: "moral-badge-graph",
+        action: "reflect_living_substrate_context",
+        status: "succeeded",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.moral_living_substrate_reflection_observation.v1",
+        capability_key: MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY,
+        panel_id: "moral-badge-graph",
+        action_id: "reflect_living_substrate_context",
+        status: "succeeded",
+        reflection_schema: "moral_living_substrate_reflection/v1",
+        admissions_included: true,
+        admission_reason_codes: expect.arrayContaining(["living_substrate_reflection_request"]),
+        admission_blocking_reason_codes: [],
+        reflection_terminal_eligible: false,
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+        authority: expect.objectContaining({
+          assistant_answer: false,
+          terminal_eligible: false,
+          deterministic_content_role: "observation_not_assistant_answer",
+        }),
+      },
+      tool_followup_decision: {
+        next_action: "continue_reasoning",
+        evidence_reentered: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    expect(String(observation.reflection_id ?? "")).toMatch(/^moral-living-substrate-reflection:/);
+    expect([...(observation.exact_substrate_badge_ids ?? []), ...(observation.likely_substrate_badge_ids ?? [])])
+      .toEqual(expect.arrayContaining([
+        "boundary-before-obligation",
+        "sensing-before-judgment",
+        "maintenance-before-optimization",
+      ]));
+    expect(observation.source_theory_badge_ids).toEqual(
+      expect.arrayContaining([
+        "biophysics.organism_environment_boundary",
+        "biophysics.homeostatic_regulation",
+      ]),
+    );
+    expect(observation.claim_boundary_notes?.join("\n")).toContain("not terminal answer authority");
+    expect(observation.recommended_action_ids).toEqual(
+      expect.arrayContaining([
+        "moral-graph.inspect_living_substrate_badges",
+        "theory-badge-graph.reflect_discussion_context",
+      ]),
+    );
+    expect(observation.recommended_actions_solve).toBe(false);
+  });
+
+  it("blocks Moral Graph living substrate reflection without prompt as a missing observation", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY,
+      arguments: {},
+      turnId: "ask:test:gateway-moral-living-substrate-reflection-blocked",
+      iteration: 7,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      capability_id: MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY,
+      error: "moral_living_substrate_prompt_missing",
+      gateway_admission: {
+        admission_status: "blocked",
+        blocked_reason: "moral_living_substrate_prompt_missing",
+      },
+      observation_packet: {
+        status: "blocked",
+        missing_requirements: [
+          expect.objectContaining({
+            code: "moral_living_substrate_prompt_missing",
+            repair_action: "ask_user",
+          }),
+        ],
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.moral_living_substrate_reflection_observation.v1",
+        status: "blocked",
+        blocked_reason: "moral_living_substrate_prompt_missing",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+  });
+
   it("calls theory frontier conjecture workbench as non-terminal evidence", async () => {
     const result = await callWorkstationGatewayCapability({
       agentRuntime: "codex",
@@ -3717,6 +4403,15 @@ describe("Helix workstation tool gateway", () => {
       typed_handoff_role: "producer",
     });
     expect(manifest.capabilities.find((capability) => capability.capability_id === CALCULATOR_SOLVE_EXPRESSION_CAPABILITY)).toMatchObject({
+      consumes_affordances: expect.arrayContaining([
+        "bound_calculator_expression",
+        "calculator_expression_template",
+        "numeric_value_evidence",
+      ]),
+      produces_affordances: expect.arrayContaining(["calculator_result", "numeric_value_evidence"]),
+      typed_handoff_role: "producer_consumer",
+    });
+    expect(manifest.capabilities.find((capability) => capability.capability_id === CALCULATOR_SOLVE_SCALAR_EXPRESSION_CAPABILITY)).toMatchObject({
       consumes_affordances: expect.arrayContaining([
         "bound_calculator_expression",
         "calculator_expression_template",

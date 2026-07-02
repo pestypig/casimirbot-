@@ -83,7 +83,7 @@ type Rc0Manifest = {
 
 const DEFAULT_INDEX_ROOTS = [
   "docs",
-  "docs/zen-ladder-pack",
+  "docs/moral-ladder-pack",
   "shared",
   "client",
   "server",

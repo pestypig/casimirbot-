@@ -411,7 +411,7 @@ function buildProceduralBindings(profiles: CivilizationConstraintProfileV1[]): C
     ...(profiles.includes("thermal_limited") || profiles.includes("ecological_sink_limited") ? ["entropy_sink_capacity"] : []),
     ...(profiles.includes("compute_limited") || profiles.includes("signal_latency_limited") ? ["compute_signal_limits"] : []),
   ]);
-  const zenBindingHints = unique([
+  const moralBindingHints = unique([
     ...(profiles.includes("governance_limited") ? ["review", "contestability"] : []),
     ...(profiles.includes("consent_limited") ? ["affected_party_consent", "non_harm"] : []),
     ...(profiles.includes("observability_limited") ? ["uncertainty", "direct_observation"] : []),
@@ -419,8 +419,8 @@ function buildProceduralBindings(profiles: CivilizationConstraintProfileV1[]): C
   ]);
   return {
     theoryBindingHints: theoryBindingHints.length > 0 ? theoryBindingHints : ["physical_capacity_bounds"],
-    zenBindingHints,
-    bridgeHooks: ["constraint_profile_to_theory_badges", "evidence_mode_to_claim_tier", "procedural_admissibility_to_zen_nodes"],
+    moralBindingHints,
+    bridgeHooks: ["constraint_profile_to_theory_badges", "evidence_mode_to_claim_tier", "procedural_admissibility_to_moral_nodes"],
   };
 }
 
@@ -433,7 +433,7 @@ function buildEditorList(profiles: CivilizationConstraintProfileV1[]): Civilizat
     "constraint",
     "timeline",
     "evidence",
-    "zen_binding",
+    "moral_binding",
     "theory_binding",
   ];
   if (profiles.includes("governance_limited") || profiles.includes("consent_limited")) {

@@ -25,6 +25,8 @@ export type ScientificCalculatorHistoryEntry = {
 
 export type ScientificCalculatorDebugAction =
   | "ingest_latex"
+  | "prefill_expression"
+  | "classify_expression"
   | "live_workbench_update"
   | "live_solve_step"
   | "solve_expression"
@@ -69,6 +71,7 @@ type ScientificCalculatorState = {
   ingestLatex: (
     latex: string,
     meta?: {
+      actionId?: Extract<ScientificCalculatorDebugAction, "ingest_latex" | "prefill_expression">;
       sourcePath?: string | null;
       anchor?: string | null;
       source?: ScientificCalculatorDebugEvent["source"];
@@ -147,7 +150,7 @@ export const useScientificCalculatorStore = create<ScientificCalculatorState>()(
           ts: new Date().toISOString(),
         };
         const debugEvent = makeDebugEvent({
-          action_id: "ingest_latex",
+          action_id: meta?.actionId ?? "ingest_latex",
           source: meta?.source ?? (entry.sourcePath === "clipboard" ? "clipboard" : "unknown"),
           ok: Boolean(trimmed),
           input_latex: trimmed,

@@ -81,6 +81,7 @@ import {
   HELIX_PHYSICS_CALCULATION_INTENTS,
   type HelixPhysicsCalculationIntent,
 } from "@shared/contracts/helix-physics-calculation-context-plan.v1";
+import { classifyScientificCalculatorExpression } from "@shared/scientific-calculator-workbench";
 import {
   HELIX_GOAL_EVALUATION_RECEIPT_SCHEMA,
   HELIX_LIVE_CONTINUATION_TICK_SCHEMA,
@@ -6401,7 +6402,7 @@ export function executeHelixPanelAction(
     const compoundSubgoalId = asNonEmptyString(args.compound_subgoal_id ?? args.subgoal_id);
     const targetWorkbench = compoundRunId ? "theory" : "scalar";
 
-    if (actionId === "ingest_latex") {
+    if (actionId === "ingest_latex" || actionId === "prefill_expression") {
       const rawLatex = asNonEmptyString(args.latex ?? args.expression ?? args.text);
       let latex = rawLatex === "$clipboard" ? rawLatex : resolveCalculatorActionLatex(rawLatex, calculatorSetup);
       if (rawLatex === "$clipboard" && typeof navigator !== "undefined" && navigator.clipboard?.readText) {
@@ -6431,12 +6432,13 @@ export function executeHelixPanelAction(
           message:
             rawLatex === "$clipboard"
               ? "Attempting clipboard ingest for scientific-calculator."
-              : "scientific-calculator.ingest_latex requires a calculator expression, not prose.",
+              : `scientific-calculator.${actionId} requires a calculator expression, not prose.`,
         };
       }
       const sourcePath = asNonEmptyString(args.source_path ?? args.path ?? args.source);
       const anchor = asNonEmptyString(args.anchor);
       const entry = scientificState.ingestLatex(latex, {
+        actionId: actionId === "prefill_expression" ? "prefill_expression" : "ingest_latex",
         sourcePath,
         anchor,
         source: "workstation_action",
@@ -6455,17 +6457,27 @@ export function executeHelixPanelAction(
       context.focusPanel(panelId, undefined);
       const latestDebugEvents = useScientificCalculatorStore.getState().debugEvents;
       const ingestDebugEvent =
-        latestDebugEvents.find((event) => event.action_id === "ingest_latex" && event.source === "workstation_action") ??
+        latestDebugEvents.find((event) => event.action_id === actionId && event.source === "workstation_action") ??
         latestDebugEvents[0] ??
         null;
+      const classification = classifyScientificCalculatorExpression(entry.latex);
       return {
         ok: true,
         panel_id: panelId,
         action_id: actionId,
         artifact: {
+          kind: actionId === "prefill_expression" ? "calculator_expression_prefill" : "calculator_latex_ingest",
+          schema: actionId === "prefill_expression"
+            ? "helix.calculator_expression_prefill_receipt.v1"
+            : "helix.calculator_latex_ingest_receipt.v1",
           latex: entry.latex,
           source_path: entry.sourcePath,
           anchor: entry.anchor,
+          classification,
+          produced_calculator_receipt: false,
+          produced_numeric_value_evidence: false,
+          terminal_eligible: false,
+          assistant_answer: false,
           calculator_setup: entry.calculatorSetup ?? null,
           history_id: entry.id,
           debug_event: ingestDebugEvent,

@@ -246,8 +246,8 @@ function buildExplanation(
   ideologyLabels: readonly string[],
 ): string {
   const theoryText = theoryLabels.length > 0 ? theoryLabels.join(", ") : "unverified theory counterpart";
-  const ideologyText = ideologyLabels.length > 0 ? ideologyLabels.join(", ") : "unverified Zen counterpart";
-  return `Theory evidence (${theoryText}) is bridged to Zen evidence (${ideologyText}) as ${mapping.relation}; counterpart gaps stay listed as missing evidence.`;
+  const ideologyText = ideologyLabels.length > 0 ? ideologyLabels.join(", ") : "unverified Moral counterpart";
+  return `Theory evidence (${theoryText}) is bridged to Moral evidence (${ideologyText}) as ${mapping.relation}; counterpart gaps stay listed as missing evidence.`;
 }
 
 function makeLink(
@@ -313,7 +313,7 @@ function buildRecommendedActions(
     actions.push({
       id: "bridge-action:request-ideology-reflection",
       type: "ask_for_missing_evidence",
-      label: "Request Zen reflection evidence before strengthening the bridge.",
+      label: "Request Moral reflection evidence before strengthening the bridge.",
       reasonCodes: ["missing_ideology_reflection", "evidence_only_bridge"],
     });
   }

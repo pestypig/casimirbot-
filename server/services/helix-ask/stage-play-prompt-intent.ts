@@ -5,7 +5,7 @@ export const isStagePlayReflectionPrompt = (prompt: string): boolean => {
     /\b(?:do\s+not|don't|without|no)\b[\s\S]{0,80}\b(?:stage\s*play|stage\s*builder|badge\s*graph|procedural\s+bindings?|affordance\s+graph|observer\s*\/?\s*source\s+routing|routed\s+visual\s+source|narrative_stage_play|live\s+interpretation|answer\s+snapshot|perturbation)\b/i.test(normalized) ||
     /\b(?:stage\s*play|stage\s*builder|badge\s*graph|procedural\s+bindings?|affordance\s+graph|observer\s*\/?\s*source\s+routing|routed\s+visual\s+source|narrative_stage_play|live\s+interpretation|answer\s+snapshot|perturbation)\b[\s\S]{0,80}\b(?:do\s+not|don't|without|no)\b/i.test(normalized);
   if (explicitNegative) return false;
-  if (/\b(?:zen\s*(?:badge\s*)?graph|zen\s*batch\s*graph|zengraph|fruition|ideology\s+(?:tree|graph|map)|theory\s+badge\s+graph|theory\s+graph|physics\s+badge\s+graph)\b/i.test(normalized)) {
+  if (/\b(?:moral\s*(?:badge\s*)?graph|moral\s*batch\s*graph|moralgraph|fruition|ideology\s+(?:tree|graph|map)|theory\s+badge\s+graph|theory\s+graph|physics\s+badge\s+graph)\b/i.test(normalized)) {
     return false;
   }
   return (

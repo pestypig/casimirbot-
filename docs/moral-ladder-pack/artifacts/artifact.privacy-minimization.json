@@ -1,0 +1,9 @@
+﻿{
+  "id": "artifact.privacy-minimization",
+  "name": "Privacy minimization plan",
+  "requiredFields": ["dataCollected", "purpose", "retention", "access", "redress"],
+  "evidenceKinds": ["policy", "diagram"],
+  "freshnessDays": 365,
+  "ownerRole": "applicant",
+  "templatePath": "docs/moral-ladder-pack/templates/artifacts/privacy-minimization.md"
+}

@@ -2307,7 +2307,7 @@ useEffect(() => {
       meshMeta
         ? `Mesh ${meshMeta.meshHash ? meshMeta.meshHash.slice(0, 8) : "n/a"} | ${meshMeta.geometrySource ?? "n/a"}${
             meshMeta.lod ? ` (${meshMeta.lod})` : ""
-          }${meshMeta.triangleCount ? ` · ${meshMeta.triangleCount} tris` : ""}${
+          }${meshMeta.triangleCount ? ` ï¿½ ${meshMeta.triangleCount} tris` : ""}${
             meshMeta.clampReasons?.length ? ` clamp: ${meshMeta.clampReasons.join(",")}` : ""
           }`
         : null,
@@ -3478,7 +3478,7 @@ useEffect(() => {
         const warnOnly = !applied && fallback?.mode === "warn";
         toast({
           title: "Geometry fallback",
-          description: `Mode=${fallback.mode} ${reasons ? `· ${reasons}` : ""}`,
+          description: `Mode=${fallback.mode} ${reasons ? `ï¿½ ${reasons}` : ""}`,
           ...(applied ? { variant: "destructive" } : warnOnly ? { variant: "default" } : {}),
         });
       }
@@ -4330,7 +4330,7 @@ useEffect(() => {
                     </div>
                     <div className="mt-1 text-[10px] text-slate-400">
                       {timeLapseRecorder.isProcessing
-                        ? "Finalizing video…"
+                        ? "Finalizing videoï¿½"
                         : `Capturing ${Math.round(timeLapseRecorder.progress * 100)}%`}
                     </div>
                   </div>
@@ -4422,7 +4422,7 @@ useEffect(() => {
                       Three -surfaces (inner/center/outer) bound the wall thickness set by the Natrio bell. Inner curves skew
                       toward compression (orange), outer toward expansion (blue). Violet denotes interior tilt direction.
                     </p>
-                    <div className="font-medium text-cyan-300 mb-1"> Zen</div>
+                    <div className="font-medium text-cyan-300 mb-1"> Moral</div>
                     <p className="text-xs italic">Contours show where space would leanenough to guide, never to tear.</p>
                   </TooltipContent>
                 </Tooltip>
@@ -4516,7 +4516,7 @@ useEffect(() => {
                       The sweep rate across sectors is chosen so no disturbance outruns the grid's tauLC. This timeline compares
                       modulation (Hz), sector period, and light-crossing to ensure the average shell stays GR-valid.
                     </p>
-                    <div className="font-medium text-cyan-300 mb-1">Zen</div>
+                    <div className="font-medium text-cyan-300 mb-1">Moral</div>
                     <p className="text-xs italic">Go slowly enough to remain whole; move steadily enough to arrive.</p>
                   </TooltipContent>
                 </Tooltip>
@@ -4737,7 +4737,7 @@ useEffect(() => {
                       Core operational mode controls power output, exotic matter generation, and sector strobing patterns. Each mode
                       balances performance with Ford-Roman compliance and energy efficiency.
                     </p>
-                    <div className="font-medium text-cyan-300 mb-1"> Zen</div>
+                    <div className="font-medium text-cyan-300 mb-1"> Moral</div>
                     <p className="text-xs italic">Power serves purpose. Choose the mode that serves the moment.</p>
                   </TooltipContent>
                 </Tooltip>
@@ -4760,7 +4760,7 @@ useEffect(() => {
                           Each mode represents a different balance of power output, sector strobing frequency, and exotic matter
                           requirements based on mission requirements.
                         </p>
-                        <div className="font-medium text-cyan-300 mb-1"> Zen</div>
+                        <div className="font-medium text-cyan-300 mb-1"> Moral</div>
                         <p className="text-xs italic">The wise captain chooses not the fastest path, but the path that arrives intact.</p>
                       </TooltipContent>
                     </Tooltip>
@@ -4904,7 +4904,7 @@ useEffect(() => {
                             Negative energy density required to curve spacetime according to the Alcubierre metric. Lower values
                             indicate more feasible warp drives.
                           </p>
-                          <div className="font-medium text-cyan-300 mb-1"> Zen</div>
+                          <div className="font-medium text-cyan-300 mb-1"> Moral</div>
                           <p className="text-xs italic">The mountain that appears impossible to move requires only the gentlest persistent pressure.</p>
                         </TooltipContent>
                       </Tooltip>
@@ -5017,7 +5017,7 @@ useEffect(() => {
                               The fundamental frequency at which Casimir tiles oscillate. Higher frequencies increase power output but
                               require more precise timing control.
                             </p>
-                            <div className="font-medium text-cyan-300 mb-1"> Zen</div>
+                            <div className="font-medium text-cyan-300 mb-1"> Moral</div>
                             <p className="text-xs italic">Resonance is not about powerit's about timing.</p>
                           </TooltipContent>
                         </Tooltip>
@@ -6172,7 +6172,7 @@ useEffect(() => {
                           Interactive navigation system supporting both galactic-scale (parsec) and solar system (AU) mission planning.
                           Routes calculate energy requirements and travel time based on current warp bubble parameters.
                         </p>
-                        <div className="font-medium text-cyan-300 mb-1"> Zen</div>
+                        <div className="font-medium text-cyan-300 mb-1"> Moral</div>
                         <p className="text-xs italic">The path reveals itself to those who take the first step.</p>
                       </TooltipContent>
                     </Tooltip>

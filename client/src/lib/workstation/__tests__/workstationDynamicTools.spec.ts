@@ -165,7 +165,7 @@ describe("workstation dynamic tools", () => {
     });
   });
 
-  it("exposes ideology and Zen framework actions as receipt-backed tools", () => {
+  it("exposes ideology and Moral framework actions as receipt-backed tools", () => {
     const tools = getWorkstationDynamicTools();
     const compare = tools.find((tool) => tool.name === "mission_ethos.compare_motive_to_zen");
 
@@ -181,7 +181,7 @@ describe("workstation dynamic tools", () => {
       required: ["motive"],
       properties: {
         motive: { type: "string" },
-        framework: { enum: ["zen", "mission_ethos", "custom"] },
+        framework: { enum: ["moral", "mission_ethos", "custom"] },
         node_ids: { type: "array", items: { type: "string" } },
       },
     });

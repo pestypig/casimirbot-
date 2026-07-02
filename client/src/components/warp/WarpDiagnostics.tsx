@@ -147,7 +147,7 @@ export function WarpDiagnostics({
             what this term makes available.
             <br />
             <br />
-            <em>Moving Zen:</em> Posture before movement—the quiet stance that makes later action clean.
+            <em>Moving Moral:</em> Posture before movement—the quiet stance that makes later action clean.
           </TooltipContent>
         </Tooltip>
 
@@ -170,7 +170,7 @@ export function WarpDiagnostics({
             The geometric factor raises the static cavity energy to the field posture the hull actually presents to the solver and scheduler.
             <br />
             <br />
-            <em>Moving Zen:</em> Set range before timing (maai); correct form makes outcomes quiet.
+            <em>Moving Moral:</em> Set range before timing (maai); correct form makes outcomes quiet.
           </TooltipContent>
         </Tooltip>
 
@@ -191,7 +191,7 @@ export function WarpDiagnostics({
             Intrinsic tile power before throttles; sensitive to both frequency and the “on” quality factor used in operation.
             <br />
             <br />
-            <em>Moving Zen:</em> Accuracy is final—form before speed.
+            <em>Moving Moral:</em> Accuracy is final—form before speed.
           </TooltipContent>
         </Tooltip>
 
@@ -214,7 +214,7 @@ export function WarpDiagnostics({
             Duty, Q-spoiling, and sectoring set the real cadence the system can sustain without decohering or overheating.
             <br />
             <br />
-            <em>Moving Zen:</em> Breath and step together—distance and timing are interdependent.
+            <em>Moving Moral:</em> Breath and step together—distance and timing are interdependent.
           </TooltipContent>
         </Tooltip>
 
@@ -235,7 +235,7 @@ export function WarpDiagnostics({
             Keeping structural relaxation faster than drive change prevents spurious curvature growth—your stability margin in time.
             <br />
             <br />
-            <em>Moving Zen:</em> Patience is speed in disguise; let structure settle, then move.
+            <em>Moving Moral:</em> Patience is speed in disguise; let structure settle, then move.
           </TooltipContent>
         </Tooltip>
 
@@ -257,7 +257,7 @@ export function WarpDiagnostics({
             manifold.
             <br />
             <br />
-            <em>Moving Zen:</em> Compassion is part of skill—restraint protects crew and mission.
+            <em>Moving Moral:</em> Compassion is part of skill—restraint protects crew and mission.
           </TooltipContent>
         </Tooltip>
       </div>

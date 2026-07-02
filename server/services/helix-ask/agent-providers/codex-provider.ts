@@ -1736,6 +1736,10 @@ export async function runCodexProcess(input: {
 }): Promise<CodexProcessResult> {
   const fakeStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
   if (fakeStdout !== undefined) {
+    const capturePromptPath = readString(process.env.CODEX_AGENT_FAKE_CAPTURE_PROMPT_PATH);
+    if (capturePromptPath) {
+      fs.writeFileSync(capturePromptPath, input.prompt, "utf8");
+    }
     return {
       stdout: fakeStdout,
       stderr: process.env.CODEX_AGENT_FAKE_STDERR ?? "",
@@ -2017,6 +2021,7 @@ export const codexProvider: HelixAgentProvider = {
           agent_runtime_adapter_contract: adapterContract,
           agent_runtime_selection_trace: runtimeSelectionTrace,
           capability_lane_manifest: adapterContract.capability_lane_manifest,
+          model_visible_capability_lane_manifest: adapterContract.model_visible_capability_lane_manifest,
           capability_lane_ids: adapterContract.capability_lane_ids,
           capability_lane_statuses: adapterContract.capability_lane_statuses,
           capability_lane_resolve_trace_shape: adapterContract.capability_lane_resolve_trace_shape,
@@ -2077,6 +2082,9 @@ export const codexProvider: HelixAgentProvider = {
       "",
       "Available Helix workstation gateway capabilities:",
       JSON.stringify(gatewayManifest, null, 2),
+      "",
+      "Model-visible Helix capability lane manifest:",
+      JSON.stringify(adapterContract.model_visible_capability_lane_manifest, null, 2),
       "",
       "Helix workstation gateway observations already executed for this turn:",
       JSON.stringify(gatewayCallResults, null, 2),
@@ -2400,6 +2408,7 @@ export const codexProvider: HelixAgentProvider = {
         agent_runtime_adapter_contract: adapterContract,
         agent_runtime_selection_trace: runtimeSelectionTrace,
         capability_lane_manifest: adapterContract.capability_lane_manifest,
+        model_visible_capability_lane_manifest: adapterContract.model_visible_capability_lane_manifest,
         capability_lane_ids: adapterContract.capability_lane_ids,
         capability_lane_statuses: adapterContract.capability_lane_statuses,
         capability_lane_resolve_trace_shape: adapterContract.capability_lane_resolve_trace_shape,

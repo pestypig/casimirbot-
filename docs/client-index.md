@@ -526,7 +526,7 @@ Files
 - `client/src/lib/whispers/usePanelHashFocus.ts`
 - `client/src/lib/whispers/useScrollHashSync.ts`
 - `client/src/lib/york-time.ts`
-- `client/src/lib/zen-long-toasts.ts`
+- `client/src/lib/moral-long-toasts.ts`
 - `client/src/main.tsx`
 - `client/src/models/star.ts`
 - `client/src/pages/agi-refinery.tsx`

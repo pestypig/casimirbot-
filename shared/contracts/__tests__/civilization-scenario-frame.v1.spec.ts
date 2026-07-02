@@ -34,7 +34,7 @@ describe("civilization_scenario_frame/v1", () => {
       },
       proceduralBindings: {
         theoryBindingHints: ["conservation_accounting"],
-        zenBindingHints: ["review"],
+        moralBindingHints: ["review"],
         bridgeHooks: ["constraint_profile_to_theory_badges"],
       },
       suggestedEditors: ["boundary", "resource", "constraint", "evidence"],
@@ -84,7 +84,7 @@ describe("civilization_scenario_frame/v1", () => {
         blockedMoveKinds: [],
         evidenceRefs: [],
       },
-      proceduralBindings: { theoryBindingHints: [], zenBindingHints: [], bridgeHooks: [] },
+      proceduralBindings: { theoryBindingHints: [], moralBindingHints: [], bridgeHooks: [] },
       suggestedEditors: ["boundary"],
       defaultQuestions: [],
       missingEvidence: [],

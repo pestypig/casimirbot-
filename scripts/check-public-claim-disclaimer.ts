@@ -17,7 +17,7 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-const roots = [path.resolve(process.cwd(), "docs/zen-ladder-pack")];
+const roots = [path.resolve(process.cwd(), "docs/moral-ladder-pack")];
 const files = roots.flatMap((root) => (fs.existsSync(root) ? walk(root) : []));
 files.push(path.resolve(process.cwd(), "docs/pre-brief-academic-rubric-template.md"));
 const unique = Array.from(new Set(files));

@@ -84,7 +84,7 @@ const UNIVERSE = [
   "education",
   "sensor_network",
   "ethics_governance",
-  "citizen_science",
+  "citimoral_science",
 ] as const;
 
 type CostBucket = typeof COST_LEAD | typeof COST_MAJOR | typeof COST_SUPPORT;
@@ -261,7 +261,7 @@ export const IN_ROLE: CountryProgramRole = {
     "open_source_dev",
     "education",
     "sensor_network",
-    "citizen_science",
+    "citimoral_science",
     "power_grid",
   ],
   phases: [
@@ -350,7 +350,7 @@ export const ZA_ROLE: CountryProgramRole = {
     "test_range",
     "sensor_network",
     "education",
-    "citizen_science",
+    "citimoral_science",
   ],
   phases: [
     phaseSlice(
@@ -436,7 +436,7 @@ export const AQ_ROLE: CountryProgramRole = {
     "observatory",
     "sensor_network",
     "ethics_governance",
-    "citizen_science",
+    "citimoral_science",
   ],
   phases: [
     phaseSlice(

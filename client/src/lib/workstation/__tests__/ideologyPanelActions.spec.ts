@@ -22,7 +22,7 @@ const ideologyDoc = {
       slug: "beginners-mind",
       title: "Beginner's Mind",
       excerpt: "Hold a hypothesis lightly.",
-      tags: ["zen", "uncertainty"],
+      tags: ["moral", "uncertainty"],
       children: [],
     },
     {
@@ -30,7 +30,7 @@ const ideologyDoc = {
       slug: "right-speech",
       title: "Right Speech Infrastructure",
       excerpt: "Route communication toward clarity and care.",
-      tags: ["zen", "speech"],
+      tags: ["moral", "speech"],
       children: [],
     },
     {
@@ -89,7 +89,7 @@ describe("ideology panel actions", () => {
     const result = await executeIdeologyPanelAction({
       panel_id: "mission-ethos",
       action_id: "search_nodes",
-      args: { query: "zen clarity", limit: 3 },
+      args: { query: "moral clarity", limit: 3 },
     }, context);
 
     expect(result.ok).toBe(true);
@@ -98,7 +98,7 @@ describe("ideology panel actions", () => {
       schema: HELIX_IDEOLOGY_CONTEXT_RECEIPT_SCHEMA,
       kind: "ideology_context_receipt",
       panel_id: "mission-ethos",
-      query: "zen clarity",
+      query: "moral clarity",
       raw_tree_included: false,
       deterministic_content_role: "observation_not_assistant_answer",
     });
@@ -118,7 +118,7 @@ describe("ideology panel actions", () => {
       action_id: "compare_motive_to_zen",
       args: {
         motive: "They say we must decide immediately because an expert promised profit.",
-        framework: "zen",
+        framework: "moral",
       },
     }, context);
 
@@ -127,7 +127,7 @@ describe("ideology panel actions", () => {
       schema: HELIX_IDEOLOGY_MOTIVE_COMPARISON_RECEIPT_SCHEMA,
       kind: "ideology_motive_comparison_receipt",
       panel_id: "mission-ethos",
-      framework: "zen",
+      framework: "moral",
       raw_tree_included: false,
       model_invoked: false,
       deterministic_content_role: "observation_not_assistant_answer",

@@ -83,7 +83,7 @@ const SOURCE_CAPABILITY_GOAL_KINDS = new Set([
   "workspace_directory_resolution",
   "workspace_status_diagnostic",
   "civilization_bounds_reflection",
-  "zen_graph_reflection",
+  "moral_graph_reflection",
 ]);
 
 const MODEL_DIRECT_ANSWER_GOAL_KINDS = new Set([
@@ -226,7 +226,7 @@ const artifactKindMatchesCapability = (
     return /helix_context_reflection_tool_receipt|context_attachment|bounded_context_reference/i.test(joined);
   }
   if (capability === "helix_ask.reflect_ideology_context") {
-    return /helix_zen_graph_reflection_tool_result|ideology_context_reflection|procedural_zen_classification|zen_badge_locator|fruition_procedure_expression|reflect_ideology_context|workstation_tool_evaluation/i.test(joined);
+    return /helix_moral_graph_reflection_tool_result|ideology_context_reflection|procedural_moral_classification|moral_badge_locator|fruition_procedure_expression|reflect_ideology_context|workstation_tool_evaluation/i.test(joined);
   }
   if (capability === "helix_ask.bridge_theory_ideology_context") {
     return /helix_theory_ideology_bridge_tool_result|theory_ideology_bridge|bridge_theory_ideology_context|workstation_tool_evaluation/i.test(joined);
@@ -387,7 +387,7 @@ const capabilityFamilyForArtifact = (artifact: Record<string, unknown> | null): 
   if (/helix_context_reflection_tool_receipt|bounded_context_reference|live_synthetic_data/i.test(joined)) {
     return "helix_ask.reflect_live_synthetic_data";
   }
-  if (/helix_zen_graph_reflection_tool_result|ideology_context_reflection|procedural_zen_classification|zen_badge_locator|fruition_procedure_expression|reflect_ideology_context/i.test(joined)) {
+  if (/helix_moral_graph_reflection_tool_result|ideology_context_reflection|procedural_moral_classification|moral_badge_locator|fruition_procedure_expression|reflect_ideology_context/i.test(joined)) {
     return "helix_ask.reflect_ideology_context";
   }
   if (/helix_theory_ideology_bridge_tool_result|theory_ideology_bridge|bridge_theory_ideology_context/i.test(joined)) {

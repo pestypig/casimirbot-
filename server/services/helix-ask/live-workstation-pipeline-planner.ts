@@ -27,9 +27,9 @@ const transcriptNoteLines: LiveAnswerLineDefinition[] = [
   answerLine("last_write", "Last write", "episode_based"),
 ];
 
-const zenLines: LiveAnswerLineDefinition[] = [
+const moralLines: LiveAnswerLineDefinition[] = [
   answerLine("current_statement", "Current statement", "episode_based"),
-  answerLine("zen_parallel", "Zen parallel", "model_reviewed"),
+  answerLine("moral_parallel", "Moral parallel", "model_reviewed"),
   answerLine("tension", "Tension / contradiction", "salience_only"),
   answerLine("practical_reflection", "Practical reflection", "model_reviewed"),
   answerLine("confidence", "Confidence", "model_reviewed"),
@@ -116,8 +116,8 @@ export function isLiveWorkstationPipelineIntent(prompt: string): boolean {
     /\blive\s+output\b[\s\S]*\b(?:tracks?|analy[sz]es?|summari[sz]es?)\b/,
     /\b(?:track|watch|analy[sz]e|summari[sz]e)\b[\s\S]*\bprime\s+gaps?\b/,
     /\bsummar(?:ize|ise)\b[\s\S]*\b(?:sentence|transcript)\b[\s\S]*\bnote\b/,
-    /\b(?:zen|stoic|philosophy|philosophical)\b[\s\S]*\b(?:compare|comparison|relate)\b/,
-    /\b(?:compare|relate)\b[\s\S]*\b(?:zen|stoic|philosophy|philosophical)\b/,
+    /\b(?:moral|stoic|philosophy|philosophical)\b[\s\S]*\b(?:compare|comparison|relate)\b/,
+    /\b(?:compare|relate)\b[\s\S]*\b(?:moral|stoic|philosophy|philosophical)\b/,
     /\b(?:simulation|residual|physics)\b[\s\S]*\b(?:methods?\s+note|rolling\s+note|write\s+a\s+note)\b/,
     /\b(?:claim|evidence|contradiction)\b[\s\S]*\b(?:watch|extract|track)\b/,
   ]);
@@ -164,7 +164,7 @@ export function planLiveWorkstationPipeline(args: {
       ? "calculator_stream"
       : hasAny(normalized, [/\bsimulation|residual|physics\b/])
       ? "physics_simulation"
-      : hasAny(normalized, [/\bbrowser|tab|video|transcript|speaker|sentence|zen|philosophy\b/])
+      : hasAny(normalized, [/\bbrowser|tab|video|transcript|speaker|sentence|moral|philosophy\b/])
         ? "browser_audio_transcript"
         : "manual_feed";
 
@@ -199,11 +199,11 @@ export function planLiveWorkstationPipeline(args: {
       objective: text,
       source_requirements: [sourceRequirement],
       missing_bindings: hasSource ? [] : [sourceRequirement],
-      line_schema: zenLines,
+      line_schema: moralLines,
       transforms: [
         transform("sentence_summary", "sentence_summary", "Summarize transcript sentence"),
         transform("philosophy_compare", "philosophy_compare", "Compare window to philosophy", "model_on_window", {
-          framework: hasAny(normalized, [/\bstoic|stoicism\b/]) ? "stoic" : "zen",
+          framework: hasAny(normalized, [/\bstoic|stoicism\b/]) ? "stoic" : "moral",
         }),
       ],
       sinks: [

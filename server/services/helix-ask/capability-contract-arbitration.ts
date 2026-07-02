@@ -195,7 +195,7 @@ export const canonicalGoalKindForExplicitCapability = (capability: string | null
     case "helix_ask.reflect_context_attachments":
       return "context_attachment_reflection";
     case "helix_ask.reflect_ideology_context":
-      return "zen_graph_reflection";
+      return "moral_graph_reflection";
     case "helix_ask.bridge_theory_ideology_context":
       return "theory_ideology_bridge_reflection";
     case "helix_ask.build_civilization_scenario_frame":
@@ -270,7 +270,7 @@ export const answerScopeForExplicitCapability = (capability: string | null | und
       return "context_reflection";
     case "helix_ask.reflect_ideology_context":
     case "helix_ask.bridge_theory_ideology_context":
-      return "zen_graph_reflection";
+      return "moral_graph_reflection";
     case "helix_ask.build_civilization_scenario_frame":
     case "helix_ask.reflect_civilization_bounds":
       return "civilization_bounds";

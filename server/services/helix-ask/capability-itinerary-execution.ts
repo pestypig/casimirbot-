@@ -343,8 +343,8 @@ const observationKindBelongsToCapability = (
       /^(?:helix_context_reflection_tool_receipt\/v1|context_attachment|bounded_context_reference)$/i.test(kind);
   }
   if (capability === "helix_ask.reflect_ideology_context" || runtimeCapability === "helix_ask.reflect_ideology_context") {
-    return /ideology_context_reflection|procedural_zen_classification|helix_zen_graph_reflection/i.test(text) ||
-      /^(?:ideology_context_reflection\/v1|procedural_zen_classification\/v1|helix_zen_graph_reflection_tool_result|workstation_tool_evaluation)$/i.test(kind);
+    return /ideology_context_reflection|procedural_moral_classification|helix_moral_graph_reflection/i.test(text) ||
+      /^(?:ideology_context_reflection\/v1|procedural_moral_classification\/v1|helix_moral_graph_reflection_tool_result|workstation_tool_evaluation)$/i.test(kind);
   }
   if (capability === "helix_ask.bridge_theory_ideology_context" || runtimeCapability === "helix_ask.bridge_theory_ideology_context") {
     return /helix_theory_ideology_bridge_tool_result|theory_ideology_bridge/i.test(text) ||
@@ -798,9 +798,9 @@ export const isHelixCapabilityItineraryFamilyObserved = (
       ].join(" ")),
     );
   }
-  if (family === "zen_graph_reflection") {
+  if (family === "moral_graph_reflection") {
     return artifacts.some((artifact: HelixCapabilityItineraryArtifactLike) =>
-      /ideology_context_reflection|procedural_zen_classification|helix_zen_graph_reflection|theory_ideology_bridge/i.test([
+      /ideology_context_reflection|procedural_moral_classification|helix_moral_graph_reflection|theory_ideology_bridge/i.test([
         artifactKind(artifact),
         artifactSchema(artifact),
         artifactId(artifact),

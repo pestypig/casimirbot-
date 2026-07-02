@@ -6,12 +6,12 @@ import type {
   IdeologyContextReflectionInputKindV1,
   IdeologyContextReflectionV1,
 } from "@shared/ideology-context-reflection";
-import type { ZenBadgeLocatorV1 } from "@shared/zen-badge-locator";
-import { loadIdeologyGraphFromFile } from "@shared/zen-graph/load-ideology-graph";
-import { reflectIdeologyContext } from "@shared/zen-graph/reflect-ideology-context";
-import { mapIdeologyReflectionToRecommendedActionAdmission } from "@shared/zen-graph/map-ideology-recommendations-to-admission";
-import { calculateFruitionFromReflection } from "@shared/zen-graph/calculate-fruition";
-import { locateZenBadges } from "@shared/zen-graph/locate-zen-badges";
+import type { MoralBadgeLocatorV1 } from "@shared/moral-badge-locator";
+import { loadIdeologyGraphFromFile } from "@shared/moral-graph/load-ideology-graph";
+import { reflectIdeologyContext } from "@shared/moral-graph/reflect-ideology-context";
+import { mapIdeologyReflectionToRecommendedActionAdmission } from "@shared/moral-graph/map-ideology-recommendations-to-admission";
+import { calculateFruitionFromReflection } from "@shared/moral-graph/calculate-fruition";
+import { locateMoralBadges } from "@shared/moral-graph/locate-moral-badges";
 
 export const HELIX_ASK_FRUITION_TOOL_NAME = "helix_ask.calculate_fruition" as const;
 
@@ -55,7 +55,7 @@ export type HelixAskFruitionToolInput = {
 
 export type HelixAskFruitionToolOutput = {
   reflection?: IdeologyContextReflectionV1;
-  locator?: ZenBadgeLocatorV1;
+  locator?: MoralBadgeLocatorV1;
   fruition: FruitionProcedureExpressionV1;
   admissions: HelixRecommendedActionAdmissionV1[];
 };
@@ -84,7 +84,7 @@ export async function runHelixAskFruitionTool(
   });
   const locator = input.options?.includeLocator === false
     ? undefined
-    : locateZenBadges(graph, {
+    : locateMoralBadges(graph, {
         kind: input.inputKind,
         text: input.text,
         refs: input.refs,
@@ -102,7 +102,7 @@ export async function runHelixAskFruitionTool(
 
 export const fruitionSpec: ToolSpecShape = {
   name: HELIX_ASK_FRUITION_TOOL_NAME,
-  desc: "Deterministic Fruition procedure calculator over ZenGraph reflection. Produces traceable procedural expressions and evidence-only admissions; never execution authority.",
+  desc: "Deterministic Fruition procedure calculator over MoralGraph reflection. Produces traceable procedural expressions and evidence-only admissions; never execution authority.",
   inputSchema: {
     type: "object",
     properties: {

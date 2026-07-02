@@ -86,14 +86,14 @@ export function composeLiveSourcePipelinePlan(input: {
       line("next_check", "Next Check", ["visual_frame", "world_event"], "situation-room.live-source.run_due_analysis"),
     ];
     missingCapabilities = ["grant_visual_capture_permission", "attach_world_event_source"];
-  } else if (kind === "zen_transcript") {
+  } else if (kind === "moral_transcript") {
     producers = [
-      producer(sourceIdFor(threadId, "audio_transcript", "zen-transcript"), "audio_transcript", "push", true, null),
-      producer(sourceIdFor(threadId, "document_context", "zen-reference"), "document_context", "manual", false, null),
+      producer(sourceIdFor(threadId, "audio_transcript", "moral-transcript"), "audio_transcript", "push", true, null),
+      producer(sourceIdFor(threadId, "document_context", "moral-reference"), "document_context", "manual", false, null),
     ];
     liveCardSchema = [
       line("current_claim", "Current claim", ["audio_transcript"], "situation-room.live-source.query_chunks"),
-      line("zen_comparison", "Zen comparison", ["audio_transcript", "document_context"], "docs-viewer.lookup_reference"),
+      line("moral_comparison", "Moral comparison", ["audio_transcript", "document_context"], "docs-viewer.lookup_reference"),
       line("evidence", "Evidence", ["audio_transcript", "document_context"], "situation-room.live-source.query_analysis_jobs"),
       line("uncertainty", "Uncertainty", ["audio_transcript"], "situation-room.run_agentic_review"),
       line("next_check", "Next Check", ["audio_transcript", "document_context"], "situation-room.live-source.run_due_analysis"),

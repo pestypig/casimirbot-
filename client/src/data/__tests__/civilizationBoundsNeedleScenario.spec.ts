@@ -35,12 +35,12 @@ describe("Needle civilization bounds scenario", () => {
     expect(JSON.stringify(roadmap)).not.toMatch(/historical_observation|source_backed_observation|model_projection/);
   });
 
-  it("exports Theory and Zen bridge context from selected bounds badges", () => {
+  it("exports Theory and Moral bridge context from selected bounds badges", () => {
     const roadmap = buildNeedleCivilizationBoundsScenario({
       generatedAt: "2026-06-08T00:00:00.000Z",
     });
     const boundBadge = roadmap.badges.find(
-      (badge) => (badge.theoryBadgeIds?.length ?? 0) > 0 && (badge.zenNodeIds?.length ?? 0) > 0,
+      (badge) => (badge.theoryBadgeIds?.length ?? 0) > 0 && (badge.moralNodeIds?.length ?? 0) > 0,
     );
     expect(boundBadge).toBeTruthy();
     const context = exportCivilizationBoundsBridgeContext(
@@ -48,7 +48,7 @@ describe("Needle civilization bounds scenario", () => {
       boundBadge ? [boundBadge.badgeId] : [],
     );
     expect(context.theoryBadgeIds.length).toBeGreaterThan(0);
-    expect(context.zenNodeIds.length).toBeGreaterThan(0);
+    expect(context.moralNodeIds.length).toBeGreaterThan(0);
     expect(context.systemIds.length).toBeGreaterThan(0);
     expect(context.missingEvidence).toContain("source_backed_capacity_measurements");
   });

@@ -467,7 +467,7 @@ export function ShiftVectorPanel({ mode, shift }: Props) {
             </div>
 
             <div className="text-xs text-slate-400">
-              Zen note: "Down" is chosen, not imposed. A tiny inclination aligns the cabin with life—just enough to stand, never enough to strain.
+              Moral note: "Down" is chosen, not imposed. A tiny inclination aligns the cabin with life—just enough to stand, never enough to strain.
             </div>
           </>
         )}

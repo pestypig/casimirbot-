@@ -63,7 +63,7 @@ const TOOL_TURN_CHAIN_MATRIX_FAMILIES = [
   "theory_locator",
   "context_reflection",
   "civilization_bounds",
-  "zen_graph_reflection",
+  "moral_graph_reflection",
   "image_lens / visual_capture",
 ] as const;
 
@@ -464,7 +464,7 @@ const capabilityFromArtifacts = (artifacts: RecordLike[]): string | null => {
   if (/helix_ask[-_.:]bridge[-_]theory[-_]ideology[-_]context|helix_theory_ideology_bridge_tool_result|theory_ideology_bridge/.test(haystack)) {
     return "helix_ask.bridge_theory_ideology_context";
   }
-  if (/helix_ask[-_.:]reflect[-_]ideology[-_]context|ideology_context_reflection|procedural_zen_classification|helix_zen_graph_reflection_tool_result/.test(haystack)) {
+  if (/helix_ask[-_.:]reflect[-_]ideology[-_]context|ideology_context_reflection|procedural_moral_classification|helix_moral_graph_reflection_tool_result/.test(haystack)) {
     return "helix_ask.reflect_ideology_context";
   }
   if (/helix_ask[-_.:]build[-_]civilization[-_]scenario[-_]frame|civilization_scenario_frame|helix_civilization_scenario_frame_tool_result/.test(haystack)) {
@@ -773,7 +773,7 @@ const artifactSupportsCapabilityObservation = (artifact: RecordLike, capability:
     return /helix_context_reflection_tool_receipt|context_attachment|bounded_context_reference/.test(text);
   }
   if (normalizedCapability === "helix_ask_reflect_ideology_context") {
-    return /ideology_context_reflection|procedural_zen_classification|helix_zen_graph_reflection_tool_result/.test(text);
+    return /ideology_context_reflection|procedural_moral_classification|helix_moral_graph_reflection_tool_result/.test(text);
   }
   if (normalizedCapability === "helix_ask_bridge_theory_ideology_context") {
     return /helix_theory_ideology_bridge_tool_result|theory_ideology_bridge/.test(text);

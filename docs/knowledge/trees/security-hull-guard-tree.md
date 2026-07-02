@@ -43,7 +43,7 @@ This tree maps security guards, tenant enforcement, and hull safety rails for th
 ### Node: Guardrail Docs
 - id: security-guard-docs
 - type: concept
-- summary: Guardrail references (docs/guarded-casimir-tile-code-mapped.md, docs/qi-guard-consolidation.md, docs/needle-hull-materials.md, docs/needle-hull-mainframe.md, docs/zen-society/templates/artifacts/metric-integrity-guardrail.md, docs/knowledge…
+- summary: Guardrail references (docs/guarded-casimir-tile-code-mapped.md, docs/qi-guard-consolidation.md, docs/needle-hull-materials.md, docs/needle-hull-mainframe.md, docs/moral-society/templates/artifacts/metric-integrity-guardrail.md, docs/knowledge…
 
 ### Node: Concurrency Guard
 - id: security-concurrency

@@ -13,7 +13,7 @@ function baseReflection(
     generatedAt: "2026-06-01T00:00:00.000Z",
     reflectionId: "ideology-reflection:test",
     graph: {
-      graphId: "zen-ideology-graph",
+      graphId: "moral-ideology-graph",
       rootId: "mission-ethos",
       source: "docs/ethos/ideology.json",
     },
@@ -86,7 +86,7 @@ function baseReflection(
     },
     recommended_actions: [
       {
-        id: "zen-graph.locate_lens",
+        id: "moral-graph.locate_lens",
         type: "locate_lens",
         label: "Locate active ethos lens",
         description: "Show relevant ideology nodes and missing checks without judging character.",
@@ -94,7 +94,7 @@ function baseReflection(
       },
     ],
     overlay: {
-      title: "ZenGraph reflection",
+      title: "MoralGraph reflection",
       summary: "Right speech and two-key approval are active lenses.",
       highlightedNodeIds: ["right-speech-infrastructure", "two-key-approval", "skillful-mediation"],
     },
@@ -103,7 +103,7 @@ function baseReflection(
 }
 
 describe("ideology context reflection v1", () => {
-  it("builds a valid evidence-only ZenGraph reflection artifact", () => {
+  it("builds a valid evidence-only MoralGraph reflection artifact", () => {
     const reflection = baseReflection();
 
     expect(validateIdeologyContextReflectionV1(reflection)).toEqual([]);
@@ -147,7 +147,7 @@ describe("ideology context reflection v1", () => {
       avoid_character_judgment: true,
       needs_user_confirmation: true,
     });
-    expect(reflection.recommended_actions[0]?.id).toBe("zen-graph.locate_lens");
+    expect(reflection.recommended_actions[0]?.id).toBe("moral-graph.locate_lens");
   });
 
   it("rejects terminal authority", () => {

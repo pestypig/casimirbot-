@@ -18,6 +18,8 @@ import {
   buildTurnCompoundDependencyPlan,
 } from "../provider-compound-capability-planner";
 import { PROVIDER_AGENT_CAPABILITY_CLASSIFICATIONS } from "../../provider-agent-capability-contract";
+import type { HelixAgentProvider } from "../types";
+import { runHelixCapabilityLaneOneShotRequests } from "../../capability-lanes/one-shot-runner";
 
 const docSnapshot = {
   activePanel: "scientific-calculator",
@@ -26,6 +28,38 @@ const docSnapshot = {
 
 const capabilities = (requests: Record<string, unknown>[]): string[] =>
   requests.map((request) => String(request.capability_id));
+
+const buildTestProvider = (id: "helix" | "codex"): HelixAgentProvider => ({
+  id,
+  label: id === "helix" ? "Helix Ask Native" : "Codex Workstation Mode",
+  permissionProfile: {
+    id: id === "helix" ? "helix-native" : "read-observe-act",
+    label: "Read/observe plus non-mutating workstation action",
+    allows: {
+      observe: true,
+      read: true,
+      act: true,
+      write: false,
+      shell: false,
+      codeMutation: false,
+    },
+  },
+  enabled: () => true,
+  supports: {
+    streaming: id === "helix",
+    workstationTools: true,
+    capabilityLanes: true,
+    capabilityLaneOneShot: true,
+    capabilityLaneSessions: false,
+    codeMutation: false,
+  },
+  runTurn: async () => ({
+    ok: false,
+    runtime: id,
+    response_type: "test",
+    final_status: "test",
+  }),
+});
 
 describe("explicit workstation gateway derived calls", () => {
   it("materializes retained current-document context even when another panel is focused", () => {
@@ -1028,6 +1062,158 @@ describe("explicit workstation gateway derived calls", () => {
         question,
       })).toEqual([]);
     }
+  });
+
+  it("does not treat broad translate prompts as active translation surface reads", () => {
+    const prompts = [
+      "Translate thank you to French.",
+      "Translate this text.",
+      "Translate the visible section of this document.",
+      "Use the translation lane for this text.",
+      "Start translating this document.",
+      "Later we might translate the visible section, but not now.",
+      "Do not translate or read the active translation surface.",
+    ];
+
+    for (const question of prompts) {
+      const requests = readWorkstationGatewayCallRequestsForTurn({
+        includePlannerDerived: true,
+        body: {
+          turn_id: "ask:test:broad-translate-not-surface",
+          agent_runtime: "codex",
+          question,
+          workspace_context_snapshot: {
+            activePanel: "docs-viewer",
+            activeDocPath: "docs/helix-ask-flow.md",
+            activeTranslationBlocks: [{
+              unit_id: "doc-unit:1",
+              translated_text: "Translated sentence.",
+            }],
+          },
+        },
+      });
+
+      expect(capabilities(requests)).not.toContain("docs-viewer.read_active_translation");
+    }
+  });
+
+  it("keeps explicit existing translation surface prompts on the surface reader", () => {
+    const prompts = [
+      "Read the active translation surface.",
+      "Inspect the translated surface.",
+      "What translated text is currently visible?",
+      "Read the visible already-translated section.",
+    ];
+
+    for (const question of prompts) {
+      const requests = readWorkstationGatewayCallRequestsForTurn({
+        includePlannerDerived: true,
+        body: {
+          turn_id: "ask:test:existing-translation-surface",
+          agent_runtime: "codex",
+          question,
+          workspace_context_snapshot: {
+            activePanel: "docs-viewer",
+            activeDocPath: "docs/helix-ask-flow.md",
+            activeTranslationBlocks: [{
+              unit_id: "doc-unit:1",
+              translated_text: "Translated sentence.",
+              status: "ready",
+            }],
+          },
+        },
+      });
+
+      expect(capabilities(requests)).toContain("docs-viewer.read_active_translation");
+    }
+  });
+
+  it("keeps structured live translation lane calls observation-only and separate from surface reads", () => {
+    const body = {
+      turn_id: "ask:test:structured-live-translation-lane",
+      agent_runtime: "codex",
+      question: "Use the structured lane call result, not the docs translation surface.",
+      capability_lane_call: {
+        capability: "live_translation.translate_text",
+        text: "thank you",
+        target_language: "fr",
+        source_language: "en",
+        chunk_id: "chunk:test:thank-you",
+        requested_backend_provider: "live_translation.local_runtime",
+      },
+      workspace_context_snapshot: {
+        activePanel: "docs-viewer",
+        activeDocPath: "docs/helix-ask-flow.md",
+      },
+    };
+
+    const lane = runHelixCapabilityLaneOneShotRequests({
+      provider: buildTestProvider("codex"),
+      body,
+      turnId: "ask:test:structured-live-translation-lane",
+      env: {} as NodeJS.ProcessEnv,
+    });
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      body,
+      includePlannerDerived: true,
+    });
+
+    expect(capabilities(requests)).not.toContain("docs-viewer.read_active_translation");
+    expect(lane.call_results).toHaveLength(1);
+    expect(lane.call_results[0]).toMatchObject({
+      ok: true,
+      capability: "live_translation.translate_text",
+      lane_id: "live_translation",
+      terminal_eligible: false,
+      assistant_answer: false,
+    });
+    expect(lane.observation_packets[0]).toMatchObject({
+      capability_key: "live_translation.translate_text",
+      terminal_eligible: false,
+      assistant_answer: false,
+    });
+  });
+
+  it("still routes read-aloud existing translated surfaces through surface observation before narrator", async () => {
+    const body = {
+      turn_id: "ask:test:read-aloud-existing-translated-surface",
+      agent_runtime: "codex",
+      question: "Read aloud the visible translated section of this document.",
+      workspace_context_snapshot: {
+        activePanel: "docs-viewer",
+        activeDocPath: "docs/helix-ask-flow.md",
+        activeTranslationBlocks: [{
+          unit_id: "doc-unit:1",
+          source_text: "Helix Ask flow",
+          translated_text: "Flujo de Helix Ask",
+          locale: "es",
+          status: "ready",
+        }],
+      },
+    };
+    const planned = buildCompoundCapabilityDependencyGatewayCallRequests(body);
+    expect(planned).toHaveLength(1);
+    expect(planned[0]).toMatchObject({
+      capability_id: "docs-viewer.read_active_translation",
+      dependent_capability_id: "live_env.narrator_say",
+    });
+
+    const results = await runExplicitWorkstationGatewayCalls({
+      agentRuntime: "codex",
+      turnId: "ask:test:read-aloud-existing-translated-surface",
+      body,
+    });
+
+    expect(results.map((result) => result.capability_id)).toEqual(["docs-viewer.read_active_translation"]);
+    expect(results[0]).toMatchObject({
+      ok: true,
+      observation: {
+        schema: "helix.workstation_readable_surface_observation.v1",
+        text: "Flujo de Helix Ask",
+        terminal_eligible: false,
+        assistant_answer: false,
+      },
+    });
   });
 
   it("runs the derived voice gateway request as a non-terminal receipt", async () => {

@@ -94,7 +94,7 @@ const BASE_SEEDS: WhisperSeed[] = [
     title: "Cutoff kissed",
     body:
       "The bowl fits the sky. Geometry set the horizon (lambda_cut = 2*a_eff); hold Q and ports steady while you savor the gain.",
-    tags: ["geometry", "cutoff", "zen"],
+    tags: ["geometry", "cutoff", "moral"],
     when: (ctx) => near(ctx.spectrum?.a_eff_nm, 0.984),
     score: () => 0.9,
   },
@@ -428,7 +428,7 @@ function toWhisper(seed: WhisperSeed): TLumaWhisper {
     hashes: seed.hashes.map((hash) => normalizeHash(hash)),
     severity,
     mode: seed.mode ?? "bubble",
-    zen: seed.title,
+    moral: seed.title,
     body: seed.body,
     action: seed.action,
     score: 0.5,

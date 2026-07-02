@@ -723,8 +723,8 @@ function makeNarrative(A, B, score, diffs) {
     ].join(' ')
 }
 
-// Zen sentences for similarity scoring
-const zenSentences = [
+// Moral sentences for similarity scoring
+const moralSentences = [
   // [90+ range] Almost identical moments
   'Time flows like a river returning to its source.',
   'The cosmos breathes the same breath twice.',
@@ -756,8 +756,8 @@ const zenSentences = [
   'Time begins a fresh chapter in its eternal book.'
 ]
 
-// Zen line generator
-function zenSentence(score, A, B) {
+// Moral line generator
+function moralSentence(score, A, B) {
   const angle = cycDeltaDeg(A.homeAngleDeg, B.homeAngleDeg).toFixed(1)
   const tideDiff = Math.abs(A.states.tides.index0to100 - B.states.tides.index0to100)
   const phaseA = A.states.dayPhase, phaseB = B.states.dayPhase
@@ -1231,13 +1231,13 @@ async function buildRecordFromTimestamp(name, ts, opts={}) {
   }
 
   // Solar tide: relative % and µGal, now with proper alt/az
-  const sunZenF = zenithFactor(sunAlt)
-  const aSunNow = TIDE.A_sun_uGal * Math.pow(TIDE.rSunRef_AU / rSun_AU, 3) * sunZenF
+  const sunMoralF = zenithFactor(sunAlt)
+  const aSunNow = TIDE.A_sun_uGal * Math.pow(TIDE.rSunRef_AU / rSun_AU, 3) * sunMoralF
   const solarRelPct = +((Math.pow(TIDE.rSunRef_AU / rSun_AU, 3) - 1)*100).toFixed(1)
 
   // Lunar tide:
-  const moonZenF = zenithFactor(moonAlt)
-  const aMoonNow = TIDE.A_moon_uGal * Math.pow(TIDE.rMoonRef_km / rMoon_km, 3) * moonZenF
+  const moonMoralF = zenithFactor(moonAlt)
+  const aMoonNow = TIDE.A_moon_uGal * Math.pow(TIDE.rMoonRef_km / rMoon_km, 3) * moonMoralF
 
   // Build a daily sample to normalize index to that day's local max
   const startUTC = Date.UTC(new Date(ts).getUTCFullYear(), new Date(ts).getUTCMonth(), new Date(ts).getUTCDate(), 0,0,0)
@@ -2178,20 +2178,20 @@ function renderStates(){
     // Perihelion data for narrative
     const extraData = { periA: periA, periB: periB }
 
-    // Generate zen sentence based on score
-    const zenIdx = Math.floor(clamp01(score/100) * zenSentences.length)
-    const zenQuote = zenSentences[Math.min(zenIdx, zenSentences.length-1)]
+    // Generate moral sentence based on score
+    const moralIdx = Math.floor(clamp01(score/100) * moralSentences.length)
+    const moralQuote = moralSentences[Math.min(moralIdx, moralSentences.length-1)]
 
-    // Add similarity meter with zen quote
+    // Add similarity meter with moral quote
     const simRow = document.createElement('div')
     simRow.className = 'row'
     simRow.innerHTML = `<b>Similarity</b><span>${score.toFixed(1)}/100 • ${stateLabel}</span>`
     diff.appendChild(simRow)
     
-    const zenRow = document.createElement('div')
-    zenRow.className = 'row'
-    zenRow.innerHTML = `<span style="grid-column:1/-1;color:#9fb0d9;font-style:italic;padding:4px 0;">${zenQuote}</span>`
-    diff.appendChild(zenRow)
+    const moralRow = document.createElement('div')
+    moralRow.className = 'row'
+    moralRow.innerHTML = `<span style="grid-column:1/-1;color:#9fb0d9;font-style:italic;padding:4px 0;">${moralQuote}</span>`
+    diff.appendChild(moralRow)
     
     // Add Complete Story narrative
     const storyRow = document.createElement('div')

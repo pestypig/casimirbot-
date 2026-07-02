@@ -200,7 +200,7 @@ const SEMANTIC_CAPABILITY_ITINERARY_FAMILIES = new Set([
   "live_source_mail",
   "live_source_decision",
   "voice_delivery",
-  "zen_graph_reflection",
+  "moral_graph_reflection",
   "civilization_bounds",
   "workstation",
 ]);
@@ -212,7 +212,7 @@ const admissionEquivalentFamiliesFor = (
   if (family === "live_source_mail") return ["live_environment"];
   if (family === "live_source_decision") return ["live_environment", "workstation_action"];
   if (family === "voice_delivery") return ["live_environment", "workstation_action"];
-  if (family === "zen_graph_reflection") return ["workstation_action"];
+  if (family === "moral_graph_reflection") return ["workstation_action"];
   if (family === "civilization_bounds") return ["workstation_action"];
   if (family === "workstation") return ["workstation_action", "notes"];
   return [];

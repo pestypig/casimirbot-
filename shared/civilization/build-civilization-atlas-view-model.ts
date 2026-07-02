@@ -103,11 +103,11 @@ export function buildCivilizationAtlasViewModel(
         .filter((binding) => selectedBadgeIds.has(binding.badgeId))
         .flatMap((binding) => binding.theoryBadgeIds),
     ]),
-    zenNodeIds: unique([
-      ...routes.flatMap((route) => route.zenNodeIds ?? []),
-      ...input.roadmap.zenBindings
+    moralNodeIds: unique([
+      ...routes.flatMap((route) => route.moralNodeIds ?? []),
+      ...input.roadmap.moralBindings
         .filter((binding) => selectedBadgeIds.has(binding.badgeId))
-        .flatMap((binding) => binding.zenNodeIds),
+        .flatMap((binding) => binding.moralNodeIds),
     ]),
     evidenceRefs: unique([
       input.atlas.atlasId,

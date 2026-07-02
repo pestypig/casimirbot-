@@ -2,7 +2,7 @@ export const PROBABILITY_TERRAIN_SCHEMA_VERSION = "probability_terrain/v1" as co
 
 export const PROBABILITY_TERRAIN_GRAPH_KINDS = [
   "theory_badge_graph",
-  "zen_badge_graph",
+  "moral_badge_graph",
   "generic_graph",
 ] as const;
 

@@ -38,7 +38,7 @@
     "debate:harness": "node --experimental-fetch scripts/debate-harness.mjs",
     "debate:plan-exec": "node --experimental-fetch scripts/plan-exec-with-debate.mjs",
     "ideology:extract": "tsx scripts/extract-ideology.ts",
-    "zen-graph:coverage-audit": "tsx scripts/zen-graph-coverage-audit.ts",
+    "moral-graph:coverage-audit": "tsx scripts/moral-graph-coverage-audit.ts",
     "test:watch": "vitest",
     "test:repo": "vitest --root . --run",
     "gr:loop": "tsx cli/gr-agent-loop.ts",

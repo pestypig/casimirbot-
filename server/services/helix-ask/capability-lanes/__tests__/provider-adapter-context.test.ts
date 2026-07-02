@@ -115,8 +115,35 @@ describe("capability lane provider adapter context", () => {
         raw_content_included: false,
       }),
     ]);
+    expect(codex.model_visible_capability_lane_manifest).toMatchObject({
+      schema: "helix.agent_model_visible_capability_lane_manifest.v1",
+      selected_runtime_agent_provider: "codex",
+      authority_rules: expect.objectContaining({
+        helix_owns_backend_selection: true,
+        lane_outputs_are_not_final_answers: true,
+        terminal_authority_owner: "helix",
+      }),
+    });
+    expect(codex.debug_projection.model_visible_capability_lane_manifest).toEqual(
+      codex.model_visible_capability_lane_manifest,
+    );
+    const promptVisibleTranslation = codex.model_visible_capability_lane_manifest.lanes
+      .flatMap((lane) => lane.capabilities)
+      .find((capability) => capability.capability_id === "live_translation.translate_text");
+    expect(promptVisibleTranslation).toMatchObject({
+      required_input_fields: ["text", "target_language"],
+      result_authority: "observation_or_receipt_only",
+      reentry_required: true,
+      terminal_eligible: false,
+      assistant_answer: false,
+    });
+    expect(promptVisibleTranslation?.when_not_to_use).toContain("docs-viewer.read_active_translation");
     expect(codex.prompt_observation_block).toContain("hello workstation");
     expect(codex.prompt_observation_block).toContain("utility_text.normalize_text");
+    expect(codex.prompt_observation_block).toContain("model_visible_capability_lane_manifest");
+    expect(codex.prompt_observation_block).toContain("live_translation.translate_text");
+    expect(codex.prompt_observation_block).toContain("docs-viewer.read_active_translation");
+    expect(codex.prompt_observation_block).toContain("lane_outputs_are_not_final_answers");
     expect(codex.prompt_observation_block).toContain("capability_lane_observation_packets");
     expect(codex.prompt_observation_block).toContain("capability_lane_backend_selections");
     expect(codex.prompt_observation_block).toContain("capability_lane_session_debug_summaries");

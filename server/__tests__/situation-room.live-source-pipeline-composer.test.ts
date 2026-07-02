@@ -68,16 +68,16 @@ describe("agentic live-source pipeline composer", () => {
     expect(plan.missing_capabilities).toEqual(expect.arrayContaining(["grant_visual_capture_permission", "attach_world_event_source"]));
   });
 
-  it("maps Zen transcript prompt to transcript and reference analysis", () => {
+  it("maps Moral transcript prompt to transcript and reference analysis", () => {
     const plan = composeLiveSourcePipelinePlan({
       threadId,
-      objective: "Compare this tab transcript to Zen as it comes in.",
+      objective: "Compare this tab transcript to Moral as it comes in.",
     });
 
     expect(plan.requested_modalities).toEqual(expect.arrayContaining(["audio_transcript", "document_context"]));
     expect(plan.live_card_schema.map((line) => line.label)).toEqual(expect.arrayContaining([
       "Current claim",
-      "Zen comparison",
+      "Moral comparison",
       "Evidence",
       "Uncertainty",
       "Next Check",
@@ -228,7 +228,7 @@ describe("agentic live-source pipeline composer", () => {
       .post("/api/agi/situation/live-source/pipeline/execute")
       .send({
         thread_id: threadId,
-        objective: "Compare this tab transcript to Zen as it comes in.",
+        objective: "Compare this tab transcript to Moral as it comes in.",
       })
       .expect(200);
     const audioSource = execute.body.plan.producers.find((producer: any) => producer.modality === "audio_transcript").source_id;
@@ -238,7 +238,7 @@ describe("agentic live-source pipeline composer", () => {
         thread_id: threadId,
         source_id: audioSource,
         modality: "audio_transcript",
-        compact_summary: "Helix, compare this claim to Zen: attachment to concepts creates suffering.",
+        compact_summary: "Helix, compare this claim to Moral: attachment to concepts creates suffering.",
       })
       .expect(200);
 

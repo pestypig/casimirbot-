@@ -137,7 +137,7 @@ const CONSTRAINT_THEORY_BINDINGS: Partial<Record<CivilizationConstraintProfileV1
   ecological_sink_limited: ["thermodynamics.entropy_sink_capacity"],
 };
 
-const CONSTRAINT_ZEN_BINDINGS: Partial<Record<CivilizationConstraintProfileV1, string[]>> = {
+const CONSTRAINT_MORAL_BINDINGS: Partial<Record<CivilizationConstraintProfileV1, string[]>> = {
   observability_limited: ["direct_observation", "uncertainty"],
   governance_limited: ["review", "contestability"],
   consent_limited: ["affected_party_consent", "non_harm"],
@@ -514,7 +514,7 @@ function buildSparseRoadmapFromScenarioFrame(
     weight: 0.65,
     confidence: frame.evidenceMode === "source_backed_observation" ? 0.55 : 0.35,
     theoryBadgeIds: CONSTRAINT_THEORY_BINDINGS[profile] ?? [],
-    zenNodeIds: CONSTRAINT_ZEN_BINDINGS[profile] ?? [],
+    moralNodeIds: CONSTRAINT_MORAL_BINDINGS[profile] ?? [],
     missingEvidence: frame.missingEvidence,
     evidenceRefs: frameEvidenceRefs,
     claimTier,
@@ -559,7 +559,7 @@ function buildSparseRoadmapFromScenarioFrame(
       layerMode: "gap_bounds",
       weight: 0.7,
       confidence: 0.3,
-      zenNodeIds: frame.proceduralBindings.zenBindingHints,
+      moralNodeIds: frame.proceduralBindings.moralBindingHints,
       missingEvidence: ["governance_review_record", "affected_party_consent_interface_record"],
       evidenceRefs: frameEvidenceRefs,
       claimTier,
@@ -765,11 +765,11 @@ function buildSparseRoadmapFromScenarioFrame(
       relation: "bounds",
       evidenceRefs: frameEvidenceRefs,
     })),
-    zenBindings: badges
+    moralBindings: badges
       .filter((badge) => badge.kind === "governance_interface" || badge.kind === "observation_gap" || badge.kind === "collaboration_bound")
       .map((badge) => ({
         badgeId: badge.badgeId,
-        zenNodeIds: badge.zenNodeIds?.length ? badge.zenNodeIds : frame.proceduralBindings.zenBindingHints,
+        moralNodeIds: badge.moralNodeIds?.length ? badge.moralNodeIds : frame.proceduralBindings.moralBindingHints,
         proceduralEffect: "Keep generated scenario claims contestable, reviewable, and evidence-tiered.",
         refusesAuthority: ["moral_finality", "policy_finality", "execution_permission"],
         evidenceRefs: frameEvidenceRefs,
@@ -823,7 +823,7 @@ function filterRoadmap(
       ? []
       : roadmap.falsificationHooks,
     theoryBindings: roadmap.theoryBindings.filter((binding) => badgeIds.has(binding.badgeId)),
-    zenBindings: roadmap.zenBindings.filter((binding) => badgeIds.has(binding.badgeId)),
+    moralBindings: roadmap.moralBindings.filter((binding) => badgeIds.has(binding.badgeId)),
   };
 }
 
@@ -915,7 +915,7 @@ export async function runHelixAskCivilizationBoundsTool(
 export const civilizationBoundsRoadmapSpec: ToolSpecShape = {
   name: HELIX_ASK_CIVILIZATION_BOUNDS_TOOL_NAME,
   desc:
-    "Deterministic read-only Civilization Bounds Roadmap reflection. Produces evidence-only system bounds, capability/dependency badges, collaboration constraints, missing checks, and optional Theory/Zen bridge context. Never final authority, prediction certification, policy finality, or execution permission.",
+    "Deterministic read-only Civilization Bounds Roadmap reflection. Produces evidence-only system bounds, capability/dependency badges, collaboration constraints, missing checks, and optional Theory/Moral bridge context. Never final authority, prediction certification, policy finality, or execution permission.",
   inputSchema: {
     type: "object",
     properties: {

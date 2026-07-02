@@ -47,6 +47,10 @@ import {
 } from "../workstation-context-feed-query-tool-contracts";
 import { buildWorkstationGatewayObservationPacket } from "./observation-packet";
 import {
+  buildMoralSubstrateReflectionGatewayObservation,
+  moralLivingSubstrateReflectionManifest,
+} from "./moral-substrate-reflection";
+import {
   HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
   type HelixLiveEnvironmentToolName,
 } from "@shared/helix-live-agent-step";
@@ -54,6 +58,10 @@ import {
   HELIX_TOOL_FOLLOWUP_DECISION_SCHEMA,
   HELIX_TOOL_LIFECYCLE_TRACE_SCHEMA,
 } from "@shared/helix-tool-lifecycle";
+import {
+  bindScientificCalculatorVariables,
+  classifyScientificCalculatorExpression,
+} from "@shared/scientific-calculator-workbench";
 import {
   CIVILIZATION_LAYER_MODES,
   type CivilizationLayerModeV1,
@@ -91,6 +99,13 @@ const WORKSTATION_ACTIVE_CONTEXT_CAPABILITY = "workstation.active_context" as co
 const WORKSTATION_ACTIVE_CONTEXT_OBSERVATION_SCHEMA = "helix.workstation_active_context_observation.v1" as const;
 const CALCULATOR_SOLVE_EXPRESSION_CAPABILITY = "scientific-calculator.solve_expression" as const;
 const CALCULATOR_SOLVE_OBSERVATION_SCHEMA = "helix.calculator_solve_observation.v1" as const;
+const CALCULATOR_SOLVE_SCALAR_EXPRESSION_CAPABILITY = "scientific-calculator.solve_scalar_expression" as const;
+const CALCULATOR_SOLVE_SCALAR_OBSERVATION_SCHEMA = "helix.calculator_scalar_solve_observation.v1" as const;
+const CALCULATOR_CLASSIFY_EXPRESSION_CAPABILITY = "scientific-calculator.classify_expression" as const;
+const CALCULATOR_CLASSIFY_OBSERVATION_SCHEMA = "helix.calculator_expression_classification_observation.v1" as const;
+const CALCULATOR_BIND_VARIABLES_CAPABILITY = "scientific-calculator.bind_variables" as const;
+const CALCULATOR_BIND_VARIABLES_OBSERVATION_SCHEMA = "helix.calculator_variable_binding_observation.v1" as const;
+const CALCULATOR_PREFILL_EXPRESSION_CAPABILITY = "scientific-calculator.prefill_expression" as const;
 const CALCULATOR_ACTIVE_CONTEXT_CAPABILITY = "scientific-calculator.active_context" as const;
 const CALCULATOR_ACTIVE_CONTEXT_OBSERVATION_SCHEMA = "helix.calculator_active_context_observation.v1" as const;
 const READABLE_SURFACE_OBSERVE_CAPABILITY = "workstation.readable_surface.observe" as const;
@@ -290,6 +305,12 @@ const manifestProducesAffordances = (capabilityId: string): HelixWorkstationType
   if (capabilityId === CALCULATOR_READ_VISIBLE_RESULT_CAPABILITY) {
     return ["active_surface_ref", "calculator_result", "numeric_value_evidence", "source_ref"];
   }
+  if (capabilityId === CALCULATOR_CLASSIFY_EXPRESSION_CAPABILITY) {
+    return ["calculator_expression_template", "source_ref"];
+  }
+  if (capabilityId === CALCULATOR_BIND_VARIABLES_CAPABILITY) {
+    return ["bound_calculator_expression", "calculator_expression_template", "source_ref"];
+  }
   if (capabilityId === REPO_SEARCH_CAPABILITY) {
     return ["source_ref", "text_evidence", "citation_evidence"];
   }
@@ -314,12 +335,16 @@ const manifestProducesAffordances = (capabilityId: string): HelixWorkstationType
   if (capabilityId === CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY) {
     return ["theory_context", "claim_boundary", "source_ref"];
   }
-  if (capabilityId === CALCULATOR_SOLVE_EXPRESSION_CAPABILITY) {
+  if (
+    capabilityId === CALCULATOR_SOLVE_EXPRESSION_CAPABILITY ||
+    capabilityId === CALCULATOR_SOLVE_SCALAR_EXPRESSION_CAPABILITY
+  ) {
     return ["calculator_result", "numeric_value_evidence", "source_ref"];
   }
   if (
     capabilityId === CALCULATOR_OPEN_PANEL_CAPABILITY ||
     capabilityId === CALCULATOR_FOCUS_PANEL_CAPABILITY ||
+    capabilityId === CALCULATOR_PREFILL_EXPRESSION_CAPABILITY ||
     capabilityId === CALCULATOR_SHOW_GATEWAY_SOLVE_CAPABILITY ||
     capabilityId === WORKSTATION_OPEN_PANEL_CAPABILITY ||
     capabilityId === WORKSTATION_FOCUS_PANEL_CAPABILITY ||
@@ -345,11 +370,19 @@ const manifestProducesAffordances = (capabilityId: string): HelixWorkstationType
 };
 
 const manifestConsumesAffordances = (capabilityId: string): HelixWorkstationTypedAffordanceKind[] => {
-  if (capabilityId === CALCULATOR_SOLVE_EXPRESSION_CAPABILITY) {
+  if (
+    capabilityId === CALCULATOR_SOLVE_EXPRESSION_CAPABILITY ||
+    capabilityId === CALCULATOR_SOLVE_SCALAR_EXPRESSION_CAPABILITY
+  ) {
     return ["bound_calculator_expression", "calculator_expression_template", "numeric_value_evidence"];
+  }
+  if (capabilityId === CALCULATOR_CLASSIFY_EXPRESSION_CAPABILITY) return ["text_evidence", "source_ref"];
+  if (capabilityId === CALCULATOR_BIND_VARIABLES_CAPABILITY) {
+    return ["calculator_expression_template", "numeric_value_evidence", "source_ref"];
   }
   if (capabilityId === SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY) return ["source_ref"];
   if (capabilityId === SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY) return ["text_evidence", "citation_evidence"];
+  if (capabilityId === CALCULATOR_PREFILL_EXPRESSION_CAPABILITY) return ["calculator_expression_template", "source_ref"];
   if (capabilityId === CALCULATOR_SHOW_GATEWAY_SOLVE_CAPABILITY) return ["calculator_result"];
   if (capabilityId === DOCS_OPEN_DOC_CAPABILITY) return ["doc_path_ref", "source_ref"];
   if (
@@ -738,6 +771,54 @@ const solveSafeArithmeticExpression = (expression: string): {
   }
 };
 
+const extractScalarSolveTarget = (expression: string): {
+  expression: string;
+  scalar_expression: string;
+  result_symbol: string | null;
+  blocked_reason?: string;
+} => {
+  const cleanedExpression = cleanString(expression);
+  if (!cleanedExpression) {
+    return {
+      expression: cleanedExpression,
+      scalar_expression: "",
+      result_symbol: null,
+      blocked_reason: "missing_expression",
+    };
+  }
+  const equationParts = cleanedExpression.split("=");
+  if (equationParts.length === 1) {
+    return {
+      expression: cleanedExpression,
+      scalar_expression: cleanedExpression,
+      result_symbol: null,
+    };
+  }
+  if (equationParts.length !== 2) {
+    return {
+      expression: cleanedExpression,
+      scalar_expression: "",
+      result_symbol: null,
+      blocked_reason: "unsupported_expression_syntax",
+    };
+  }
+  const resultSymbol = cleanString(equationParts[0]);
+  const scalarExpression = cleanString(equationParts[1]);
+  if (!resultSymbol || !scalarExpression) {
+    return {
+      expression: cleanedExpression,
+      scalar_expression: scalarExpression,
+      result_symbol: resultSymbol || null,
+      blocked_reason: "missing_expression",
+    };
+  }
+  return {
+    expression: cleanedExpression,
+    scalar_expression: scalarExpression,
+    result_symbol: resultSymbol,
+  };
+};
+
 const CALCULATOR_TEMPLATE_CONSTANTS = new Set(["e_charge", "mu0", "pi", "e"]);
 
 const extractCalculatorTemplateVariables = (expression: string): string[] => {
@@ -835,7 +916,10 @@ const buildGatewayProducedAffordances = (input: {
       typedAffordance({ kind: "claim_boundary", role: "producer", capabilityId: input.capabilityId, status: baseStatus }),
     ];
   }
-  if (input.capabilityId === CALCULATOR_SOLVE_EXPRESSION_CAPABILITY) {
+  if (
+    input.capabilityId === CALCULATOR_SOLVE_EXPRESSION_CAPABILITY ||
+    input.capabilityId === CALCULATOR_SOLVE_SCALAR_EXPRESSION_CAPABILITY
+  ) {
     const expression = cleanString(input.observation.expression);
     const normalizedExpression = cleanString(input.observation.normalized_expression);
     const result = cleanString(input.observation.result);
@@ -861,6 +945,66 @@ const buildGatewayProducedAffordances = (input: {
         : []),
     ];
   }
+  if (input.capabilityId === CALCULATOR_CLASSIFY_EXPRESSION_CAPABILITY) {
+    const expression = cleanString(input.observation.expression);
+    const normalizedExpression = cleanString(input.observation.normalized_expression);
+    const variables = readStringArray(input.observation.detected_symbols);
+    return [
+      typedAffordance({
+        kind: "calculator_expression_template",
+        role: "producer",
+        capabilityId: input.capabilityId,
+        status: available ? "available" : "blocked",
+        expression,
+        normalizedExpression,
+        variables,
+        requiredInputs: readStringArray(input.observation.missing_variables),
+        missingInputs: readStringArray(input.observation.missing_variables),
+      }),
+      typedAffordance({
+        kind: "source_ref",
+        role: "producer",
+        capabilityId: input.capabilityId,
+        status: available ? "available" : "blocked",
+      }),
+    ];
+  }
+  if (input.capabilityId === CALCULATOR_BIND_VARIABLES_CAPABILITY) {
+    const expression = cleanString(input.observation.expression);
+    const normalizedExpression = cleanString(input.observation.bound_expression ?? input.observation.normalized_expression);
+    const missingInputs = readStringArray(input.observation.missing_variables);
+    const requiredInputs = readStringArray(input.observation.required_symbols);
+    return [
+      typedAffordance({
+        kind: "bound_calculator_expression",
+        role: "producer",
+        capabilityId: input.capabilityId,
+        status: available ? "available" : "blocked",
+        expression,
+        normalizedExpression,
+        variables: requiredInputs,
+        requiredInputs,
+        missingInputs,
+      }),
+      typedAffordance({
+        kind: "calculator_expression_template",
+        role: "producer",
+        capabilityId: input.capabilityId,
+        status: "available",
+        expression,
+        normalizedExpression: cleanString(input.observation.normalized_expression),
+        variables: requiredInputs,
+        requiredInputs,
+        missingInputs,
+      }),
+      typedAffordance({
+        kind: "source_ref",
+        role: "producer",
+        capabilityId: input.capabilityId,
+        status: available ? "available" : "blocked",
+      }),
+    ];
+  }
   return manifestProducesAffordances(input.capabilityId).map((kind) =>
     typedAffordance({
       kind,
@@ -878,9 +1022,12 @@ const buildGatewayConsumedAffordances = (input: {
   const status = cleanString(input.observation.status);
   const blocked = status === "blocked" || status === "failed" || status === "missing_input";
   const consumes = manifestConsumesAffordances(input.capabilityId);
-  if (input.capabilityId === CALCULATOR_SOLVE_EXPRESSION_CAPABILITY) {
+  if (
+    input.capabilityId === CALCULATOR_SOLVE_EXPRESSION_CAPABILITY ||
+    input.capabilityId === CALCULATOR_SOLVE_SCALAR_EXPRESSION_CAPABILITY
+  ) {
     const expression = cleanString(input.observation.expression);
-    const requiredKinds = /[A-Za-z_]/.test(expression)
+    const requiredKinds = input.capabilityId === CALCULATOR_SOLVE_SCALAR_EXPRESSION_CAPABILITY || /[A-Za-z_]/.test(expression)
       ? ["bound_calculator_expression" as const]
       : [];
     return [
@@ -941,6 +1088,32 @@ const readScholarlyResearchMode = (value: unknown): HelixScholarlyResearchIntent
   return (SCHOLARLY_RESEARCH_MODES as readonly string[]).includes(mode)
     ? (mode as HelixScholarlyResearchIntentMode)
     : undefined;
+};
+
+const readCalculatorNumericBindingEvidence = (value: unknown): Array<{
+  symbol: string;
+  value: string | number;
+  unit?: string | null;
+  dimension_signature?: string | null;
+  source_refs?: string[];
+  meaning?: string | null;
+}> =>
+  readRecordArray(value).map((record) => ({
+    symbol: cleanString(record.symbol ?? record.variable ?? record.name),
+    value: typeof record.value === "number" ? record.value : cleanString(record.value ?? record.numeric_value ?? record.result),
+    unit: optionalString(record.unit),
+    dimension_signature: optionalString(record.dimension_signature ?? record.dimension),
+    source_refs: readStringArray(record.source_refs ?? record.sourceRefs ?? record.refs),
+    meaning: optionalString(record.meaning ?? record.quantity),
+  })).filter((entry) => Boolean(entry.symbol));
+
+const readStringRecord = (value: unknown): Record<string, string | null> => {
+  const record = readRecord(value);
+  if (!record) return {};
+  return Object.fromEntries(
+    Object.entries(record)
+      .map(([key, entry]) => [key, optionalString(entry)] as const),
+  );
 };
 
 const readExternalSearchLimit = (value: unknown): number => {
@@ -1504,6 +1677,123 @@ const calculatorSolveExpressionManifest: HelixWorkstationCapabilityManifest = {
   raw_content_included: false,
 };
 
+const calculatorSolveScalarExpressionManifest: HelixWorkstationCapabilityManifest = {
+  schema: "helix.workstation_tool_gateway.capability.v1",
+  capability_id: CALCULATOR_SOLVE_SCALAR_EXPRESSION_CAPABILITY,
+  label: "Scientific Calculator solve scalar expression",
+  description:
+    "Evaluates a fully numeric or already-bound scalar expression as read-only calculator evidence. Symbolic variables must be bound before this capability can produce result evidence.",
+  panel_id: "scientific-calculator",
+  action_id: "solve_scalar_expression",
+  mode: "read",
+  mutating: false,
+  code_mutation: false,
+  shell_access: false,
+  requires_confirmation: false,
+  requires_source: true,
+  terminal_eligible: false,
+  permission_profile_required: "read",
+  post_tool_model_step_required: true,
+  input_schema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["expression"],
+    properties: {
+      expression: { type: "string" },
+      bound_expression: { type: "string" },
+      source_refs: { type: "array", items: { type: "string" } },
+    },
+  },
+  output_observation_schema: CALCULATOR_SOLVE_SCALAR_OBSERVATION_SCHEMA,
+  observation_schema: CALCULATOR_SOLVE_SCALAR_OBSERVATION_SCHEMA,
+  safety_tags: [
+    "read_or_observe",
+    "calculator",
+    "bound_scalar_expression",
+    "non_terminal",
+    "no_shell",
+    "no_code_mutation",
+  ],
+  assistant_answer: false,
+  raw_content_included: false,
+};
+
+const calculatorClassifyExpressionManifest: HelixWorkstationCapabilityManifest = {
+  schema: "helix.workstation_tool_gateway.capability.v1",
+  capability_id: CALCULATOR_CLASSIFY_EXPRESSION_CAPABILITY,
+  label: "Scientific Calculator classify expression",
+  description:
+    "Classifies calculator input for the workbench without solving it. It reports parse status, symbols, routes, assumptions, and blocked reasons as non-terminal observation evidence.",
+  panel_id: "scientific-calculator",
+  action_id: "classify_expression",
+  mode: "read",
+  mutating: false,
+  code_mutation: false,
+  shell_access: false,
+  requires_confirmation: false,
+  requires_source: false,
+  terminal_eligible: false,
+  permission_profile_required: "read",
+  post_tool_model_step_required: true,
+  input_schema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["expression"],
+    properties: {
+      expression: { type: "string" },
+      latex: { type: "string" },
+      text: { type: "string" },
+      source_refs: { type: "array", items: { type: "string" } },
+      paper_context: { type: "object" },
+      source_target_intent: { type: "object" },
+    },
+  },
+  output_observation_schema: CALCULATOR_CLASSIFY_OBSERVATION_SCHEMA,
+  observation_schema: CALCULATOR_CLASSIFY_OBSERVATION_SCHEMA,
+  safety_tags: ["read_or_observe", "calculator", "classification", "non_terminal", "no_shell", "no_code_mutation"],
+  assistant_answer: false,
+  raw_content_included: false,
+};
+
+const calculatorBindVariablesManifest: HelixWorkstationCapabilityManifest = {
+  schema: "helix.workstation_tool_gateway.capability.v1",
+  capability_id: CALCULATOR_BIND_VARIABLES_CAPABILITY,
+  label: "Scientific Calculator bind variables",
+  description:
+    "Binds calculator expression symbols from explicit numeric evidence with units and source refs. It fails closed for missing variables, ambiguous units, incompatible dimensions, missing source refs, or unsupported symbol semantics.",
+  panel_id: "scientific-calculator",
+  action_id: "bind_variables",
+  mode: "verify",
+  mutating: false,
+  code_mutation: false,
+  shell_access: false,
+  requires_confirmation: false,
+  requires_source: true,
+  terminal_eligible: false,
+  permission_profile_required: "read",
+  post_tool_model_step_required: true,
+  input_schema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["expression", "numeric_evidence"],
+    properties: {
+      expression: { type: "string" },
+      latex: { type: "string" },
+      text: { type: "string" },
+      numeric_evidence: { type: "array", items: { type: "object" } },
+      numeric_value_evidence: { type: "array", items: { type: "object" } },
+      expected_units: { type: "object" },
+      expected_dimensions: { type: "object" },
+      source_target_intent: { type: "object" },
+    },
+  },
+  output_observation_schema: CALCULATOR_BIND_VARIABLES_OBSERVATION_SCHEMA,
+  observation_schema: CALCULATOR_BIND_VARIABLES_OBSERVATION_SCHEMA,
+  safety_tags: ["read_or_observe", "calculator", "variable_binding", "typed_affordance", "non_terminal", "no_shell", "no_code_mutation"],
+  assistant_answer: false,
+  raw_content_included: false,
+};
+
 const calculatorActiveContextManifest: HelixWorkstationCapabilityManifest = {
   schema: "helix.workstation_tool_gateway.capability.v1",
   capability_id: CALCULATOR_ACTIVE_CONTEXT_CAPABILITY,
@@ -1722,6 +2012,44 @@ const calculatorShowGatewaySolveManifest: HelixWorkstationCapabilityManifest = {
   output_observation_schema: WORKSTATION_UI_ACTION_RECEIPT_SCHEMA,
   observation_schema: WORKSTATION_UI_ACTION_RECEIPT_SCHEMA,
   safety_tags: ["non_mutating_ui_action", "calculator", "gateway_projection", "action_receipt", "non_terminal", "no_shell", "no_code_mutation"],
+  assistant_answer: false,
+  raw_content_included: false,
+};
+
+const calculatorPrefillExpressionManifest: HelixWorkstationCapabilityManifest = {
+  schema: "helix.workstation_tool_gateway.capability.v1",
+  capability_id: CALCULATOR_PREFILL_EXPRESSION_CAPABILITY,
+  label: "Scientific Calculator prefill expression",
+  description:
+    "Projects a symbolic, incomplete, or numeric expression into the Scientific Calculator workbench input as a governed UI action receipt. It does not solve and cannot produce calculator result evidence.",
+  panel_id: "scientific-calculator",
+  action_id: "prefill_expression",
+  mode: "act",
+  mutating: false,
+  code_mutation: false,
+  shell_access: false,
+  requires_confirmation: false,
+  requires_source: false,
+  terminal_eligible: false,
+  permission_profile_required: "act",
+  post_tool_model_step_required: true,
+  input_schema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["expression"],
+    properties: {
+      expression: { type: "string" },
+      latex: { type: "string" },
+      text: { type: "string" },
+      source_refs: { type: "array", items: { type: "string" } },
+      source_path: { type: "string" },
+      anchor: { type: "string" },
+      source_target_intent: { type: "object" },
+    },
+  },
+  output_observation_schema: WORKSTATION_UI_ACTION_RECEIPT_SCHEMA,
+  observation_schema: WORKSTATION_UI_ACTION_RECEIPT_SCHEMA,
+  safety_tags: ["non_mutating_ui_action", "calculator", "expression_prefill", "action_receipt", "non_terminal", "no_shell", "no_code_mutation"],
   assistant_answer: false,
   raw_content_included: false,
 };
@@ -2788,6 +3116,9 @@ const rawCapabilities = new Map<string, HelixWorkstationCapabilityManifest>([
   [workspaceOsStatusManifest.capability_id, workspaceOsStatusManifest],
   [workstationActiveContextManifest.capability_id, workstationActiveContextManifest],
   [calculatorSolveExpressionManifest.capability_id, calculatorSolveExpressionManifest],
+  [calculatorSolveScalarExpressionManifest.capability_id, calculatorSolveScalarExpressionManifest],
+  [calculatorClassifyExpressionManifest.capability_id, calculatorClassifyExpressionManifest],
+  [calculatorBindVariablesManifest.capability_id, calculatorBindVariablesManifest],
   [calculatorActiveContextManifest.capability_id, calculatorActiveContextManifest],
   [readableSurfaceObserveManifest.capability_id, readableSurfaceObserveManifest],
   [docsReadVisibleSurfaceManifest.capability_id, docsReadVisibleSurfaceManifest],
@@ -2796,6 +3127,7 @@ const rawCapabilities = new Map<string, HelixWorkstationCapabilityManifest>([
   [calculatorOpenPanelManifest.capability_id, calculatorOpenPanelManifest],
   [calculatorFocusPanelManifest.capability_id, calculatorFocusPanelManifest],
   [calculatorShowGatewaySolveManifest.capability_id, calculatorShowGatewaySolveManifest],
+  [calculatorPrefillExpressionManifest.capability_id, calculatorPrefillExpressionManifest],
   [workstationOpenPanelManifest.capability_id, workstationOpenPanelManifest],
   [workstationFocusPanelManifest.capability_id, workstationFocusPanelManifest],
   [docsOpenDocManifest.capability_id, docsOpenDocManifest],
@@ -2808,6 +3140,7 @@ const rawCapabilities = new Map<string, HelixWorkstationCapabilityManifest>([
   [civilizationBoundsReflectionManifest.capability_id, civilizationBoundsReflectionManifest],
   [theoryContextReflectionManifest.capability_id, theoryContextReflectionManifest],
   [theoryFrontierConjectureManifest.capability_id, theoryFrontierConjectureManifest],
+  [moralLivingSubstrateReflectionManifest.capability_id, moralLivingSubstrateReflectionManifest],
   [voiceInterimCalloutManifest.capability_id, voiceInterimCalloutManifest],
   [voiceNarratorSayManifest.capability_id, voiceNarratorSayManifest],
   ...contextFeedQueryGatewayManifests.map((manifest) => [manifest.capability_id, manifest] as const),
@@ -3207,6 +3540,302 @@ export const callWorkstationGatewayCapability = async (
     };
   }
 
+  if (manifest.capability_id === CALCULATOR_SOLVE_SCALAR_EXPRESSION_CAPABILITY) {
+    const args = readArguments(input.arguments);
+    const expression = cleanString(args.bound_expression ?? args.expression);
+    const sourceRefs = readStringArray(args.source_refs);
+    const scalarTarget = extractScalarSolveTarget(expression);
+    const solved = scalarTarget.blocked_reason
+      ? { ok: false as const, blocked_reason: scalarTarget.blocked_reason }
+      : solveSafeArithmeticExpression(scalarTarget.scalar_expression);
+    const missingSourceRefs = sourceRefs.length === 0;
+    const ok = solved.ok && !missingSourceRefs;
+    const primaryBlockedReason = missingSourceRefs
+      ? "missing_source_refs"
+      : solved.blocked_reason ?? "calculator_scalar_expression_blocked";
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: ok ? "admitted" : "blocked",
+      reason: ok ? "read_only_gateway_capability" : "calculator_scalar_expression_blocked",
+      blockedReason: ok ? undefined : primaryBlockedReason,
+      sourceTargetIntent: args.source_target_intent,
+    });
+    const observation = {
+      schema: CALCULATOR_SOLVE_SCALAR_OBSERVATION_SCHEMA,
+      capability_key: manifest.capability_id,
+      expression: expression || null,
+      scalar_expression: scalarTarget.scalar_expression || null,
+      result_symbol: scalarTarget.result_symbol,
+      normalized_expression: solved.normalized_expression ?? (scalarTarget.scalar_expression || expression || null),
+      rejected_expression: ok ? null : expression || null,
+      result: ok ? solved.result ?? null : null,
+      source_refs: sourceRefs,
+      status: ok ? "succeeded" : "blocked",
+      blocked_reason: ok ? null : primaryBlockedReason,
+      blocked_reasons: ok ? [] : [primaryBlockedReason],
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const producedAffordances = buildGatewayProducedAffordances({
+      capabilityId: manifest.capability_id,
+      observation,
+    });
+    const consumedAffordances = buildGatewayConsumedAffordances({
+      capabilityId: manifest.capability_id,
+      observation,
+    });
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: "scientific-calculator",
+      action: "solve_scalar_expression",
+      status: ok ? "succeeded" : "blocked",
+      summary: ok
+        ? `Calculator evaluated bound scalar ${expression} = ${solved.result}.`
+        : `Calculator scalar solve blocked: ${primaryBlockedReason}.`,
+      observation,
+      missingRequirements: ok ? [] : [{
+        code: primaryBlockedReason,
+        message: primaryBlockedReason === "missing_source_refs"
+          ? "Provide source refs for the bound scalar expression before producing result evidence."
+          : "Provide a fully numeric bound scalar expression using numbers and arithmetic operators only.",
+        repair_action: primaryBlockedReason === "missing_source_refs" ? "provide_source_ref" : "bind_variables",
+        rejected_expression: expression || null,
+        normalized_expression: solved.normalized_expression ?? (scalarTarget.scalar_expression || expression || null),
+        required_affordance_kind: primaryBlockedReason === "missing_source_refs"
+          ? "source_ref"
+          : "bound_calculator_expression",
+      }],
+      producedAffordances,
+      consumedAffordances,
+      requiredAffordanceKinds: manifest.consumes_affordances,
+      producedAffordanceKinds: manifest.produces_affordances,
+      missingAffordanceKinds: ok ? [] : consumedAffordances
+        .filter((affordance) => affordance.status === "missing")
+        .map((affordance) => affordance.kind),
+    });
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error: ok ? undefined : primaryBlockedReason,
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      produced_affordances: producedAffordances,
+      consumed_affordances: consumedAffordances,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      error: ok ? undefined : primaryBlockedReason,
+    };
+  }
+
+  if (manifest.capability_id === CALCULATOR_CLASSIFY_EXPRESSION_CAPABILITY) {
+    const args = readArguments(input.arguments);
+    const expression = cleanString(args.expression ?? args.latex ?? args.text);
+    const classification = classifyScientificCalculatorExpression(expression);
+    const ok = classification.parse_status !== "error";
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: ok ? "admitted" : "blocked",
+      reason: ok ? "read_only_gateway_capability" : "calculator_expression_classification_blocked",
+      blockedReason: ok ? undefined : classification.blocked_reasons[0] ?? "calculator_expression_classification_blocked",
+      sourceTargetIntent: args.source_target_intent,
+    });
+    const observation = {
+      capability_key: manifest.capability_id,
+      status: ok ? "succeeded" : "blocked",
+      blocked_reason: ok ? null : classification.blocked_reasons[0] ?? "calculator_expression_classification_blocked",
+      ...classification,
+      schema: CALCULATOR_CLASSIFY_OBSERVATION_SCHEMA,
+      source_refs: readStringArray(args.source_refs),
+      paper_context_supplied: Boolean(readRecord(args.paper_context)),
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const producedAffordances = buildGatewayProducedAffordances({
+      capabilityId: manifest.capability_id,
+      observation,
+    });
+    const consumedAffordances = buildGatewayConsumedAffordances({
+      capabilityId: manifest.capability_id,
+      observation,
+    });
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: "scientific-calculator",
+      action: "classify_expression",
+      status: ok ? "succeeded" : "blocked",
+      summary: ok
+        ? `Calculator classified ${classification.expression} as ${classification.calculation_type}; routes: ${classification.possible_routes.join(", ")}.`
+        : "Calculator classification was blocked because no expression was supplied.",
+      observation,
+      missingRequirements: ok ? [] : [{
+        code: classification.blocked_reasons[0] ?? "missing_expression",
+        message: "Provide a calculator expression to classify.",
+        repair_action: "ask_user",
+      }],
+      producedAffordances,
+      consumedAffordances,
+      requiredAffordanceKinds: manifest.consumes_affordances,
+      producedAffordanceKinds: manifest.produces_affordances,
+      missingAffordanceKinds: ok ? [] : manifest.consumes_affordances,
+    });
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error: ok ? undefined : classification.blocked_reasons[0] ?? "missing_expression",
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      produced_affordances: producedAffordances,
+      consumed_affordances: consumedAffordances,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      error: ok ? undefined : classification.blocked_reasons[0] ?? "missing_expression",
+    };
+  }
+
+  if (manifest.capability_id === CALCULATOR_BIND_VARIABLES_CAPABILITY) {
+    const args = readArguments(input.arguments);
+    const expression = cleanString(args.expression ?? args.latex ?? args.text);
+    const numericEvidence = [
+      ...readCalculatorNumericBindingEvidence(args.numeric_evidence),
+      ...readCalculatorNumericBindingEvidence(args.numeric_value_evidence),
+    ];
+    const binding = bindScientificCalculatorVariables({
+      expression,
+      numericEvidence,
+      expectedUnits: readStringRecord(args.expected_units),
+      expectedDimensions: readStringRecord(args.expected_dimensions),
+    });
+    const ok = binding.status === "succeeded";
+    const primaryBlockedReason = binding.blocked_reasons[0] ?? (expression ? "missing_variables" : "missing_expression");
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: ok ? "admitted" : "blocked",
+      reason: ok ? "read_only_gateway_capability" : "calculator_variable_binding_blocked",
+      blockedReason: ok ? undefined : primaryBlockedReason,
+      sourceTargetIntent: args.source_target_intent,
+    });
+    const observation = {
+      capability_key: manifest.capability_id,
+      status: binding.status,
+      blocked_reason: ok ? null : primaryBlockedReason,
+      ...binding,
+      schema: CALCULATOR_BIND_VARIABLES_OBSERVATION_SCHEMA,
+      evidence_count: numericEvidence.length,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const producedAffordances = buildGatewayProducedAffordances({
+      capabilityId: manifest.capability_id,
+      observation,
+    });
+    const consumedAffordances = buildGatewayConsumedAffordances({
+      capabilityId: manifest.capability_id,
+      observation,
+    });
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: "scientific-calculator",
+      action: "bind_variables",
+      status: ok ? "succeeded" : "blocked",
+      summary: ok
+        ? `Calculator bound ${binding.required_symbols.length} variable(s) for ${binding.expression}.`
+        : `Calculator variable binding blocked: ${binding.blocked_reasons.join(", ") || primaryBlockedReason}.`,
+      observation,
+      missingRequirements: ok ? [] : binding.missing_variables.map((variable) => ({
+        code: primaryBlockedReason,
+        message: `Provide numeric evidence with units and source refs for ${variable}.`,
+        repair_action: "provide_numeric_value_evidence",
+        required_affordance_kind: "numeric_value_evidence",
+      })),
+      producedAffordances,
+      consumedAffordances,
+      requiredAffordanceKinds: manifest.consumes_affordances,
+      producedAffordanceKinds: manifest.produces_affordances,
+      missingAffordanceKinds: ok ? [] : ["numeric_value_evidence"],
+    });
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error: ok ? undefined : primaryBlockedReason,
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      produced_affordances: producedAffordances,
+      consumed_affordances: consumedAffordances,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      error: ok ? undefined : primaryBlockedReason,
+    };
+  }
+
   if (manifest.capability_id === CALCULATOR_ACTIVE_CONTEXT_CAPABILITY) {
     const args = readArguments(input.arguments);
     const activeContext = readBoundedCalculatorActiveContext(args.active_context ?? args.activeContext);
@@ -3431,6 +4060,114 @@ export const callWorkstationGatewayCapability = async (
       post_tool_model_step_required: true,
       assistant_answer: false,
       raw_content_included: false,
+    };
+  }
+
+  if (manifest.capability_id === CALCULATOR_PREFILL_EXPRESSION_CAPABILITY) {
+    const args = readArguments(input.arguments);
+    const expression = cleanString(args.expression ?? args.latex ?? args.text);
+    const hasExpression = Boolean(expression);
+    const classification = classifyScientificCalculatorExpression(expression);
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: hasExpression ? "admitted" : "blocked",
+      reason: hasExpression ? "non_mutating_workstation_ui_action" : "calculator_prefill_expression_missing",
+      blockedReason: hasExpression ? undefined : "calculator_prefill_expression_missing",
+      sourceTargetIntent: args.source_target_intent,
+    });
+    const workstationAction = hasExpression
+      ? {
+          schema_version: "helix.workstation.action/v1",
+          action: "run_panel_action",
+          panel_id: "scientific-calculator",
+          action_id: "prefill_expression",
+          args: {
+            expression,
+            source_path: cleanString(args.source_path ?? args.path ?? args.source) || null,
+            anchor: cleanString(args.anchor) || null,
+            source_refs: readStringArray(args.source_refs),
+            classification,
+          },
+        }
+      : null;
+    const observation = {
+      schema: WORKSTATION_UI_ACTION_RECEIPT_SCHEMA,
+      capability_key: manifest.capability_id,
+      action_kind: "run_panel_action",
+      panel_id: "scientific-calculator",
+      action_id: "prefill_expression",
+      status: hasExpression ? "succeeded" : "blocked",
+      dispatch_status: hasExpression ? "admitted" : "blocked",
+      workstation_action: workstationAction,
+      expression: expression || null,
+      classification,
+      produced_calculator_receipt: false,
+      produced_numeric_value_evidence: false,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const producedAffordances = buildGatewayProducedAffordances({
+      capabilityId: manifest.capability_id,
+      observation,
+    });
+    const consumedAffordances = buildGatewayConsumedAffordances({
+      capabilityId: manifest.capability_id,
+      observation,
+    });
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: "scientific-calculator",
+      action: "prefill_expression",
+      status: hasExpression ? "succeeded" : "blocked",
+      summary: hasExpression
+        ? `Admitted Scientific Calculator expression prefill for ${expression}. No calculation receipt was produced.`
+        : "Scientific Calculator expression prefill was blocked because no expression was supplied.",
+      observation,
+      missingRequirements: hasExpression ? [] : [{
+        code: "calculator_prefill_expression_missing",
+        message: "Provide a calculator expression to load into the workbench.",
+        repair_action: "ask_user",
+      }],
+      producedAffordances,
+      consumedAffordances,
+      requiredAffordanceKinds: manifest.consumes_affordances,
+      producedAffordanceKinds: manifest.produces_affordances,
+      missingAffordanceKinds: hasExpression ? [] : manifest.consumes_affordances,
+    });
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error: hasExpression ? undefined : "calculator_prefill_expression_missing",
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: hasExpression,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      produced_affordances: producedAffordances,
+      consumed_affordances: consumedAffordances,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      error: hasExpression ? undefined : "calculator_prefill_expression_missing",
     };
   }
 
@@ -5798,6 +6535,72 @@ export const callWorkstationGatewayCapability = async (
       post_tool_model_step_required: true,
       assistant_answer: false,
       raw_content_included: false,
+    };
+  }
+
+  if (manifest.capability_id === moralLivingSubstrateReflectionManifest.capability_id) {
+    const args = readArguments(input.arguments);
+    const gatewayResult = buildMoralSubstrateReflectionGatewayObservation(args);
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: gatewayResult.admissionStatus,
+      reason: gatewayResult.admissionReason,
+      blockedReason: gatewayResult.blockedReason,
+      sourceTargetIntent: args.source_target_intent,
+    });
+    const producedAffordances = buildGatewayProducedAffordances({
+      capabilityId: manifest.capability_id,
+      observation: gatewayResult.observation,
+    });
+    const consumedAffordances = buildGatewayConsumedAffordances({
+      capabilityId: manifest.capability_id,
+      observation: gatewayResult.observation,
+    });
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: gatewayResult.panelId,
+      action: gatewayResult.action,
+      status: gatewayResult.observationStatus,
+      summary: gatewayResult.summary,
+      observation: gatewayResult.observation,
+      missingRequirements: gatewayResult.missingRequirements,
+      producedAffordances,
+      consumedAffordances,
+      requiredAffordanceKinds: manifest.consumes_affordances,
+      producedAffordanceKinds: manifest.produces_affordances,
+    });
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error: gatewayResult.error,
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: gatewayResult.ok,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation: gatewayResult.observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      produced_affordances: producedAffordances,
+      consumed_affordances: consumedAffordances,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      ...(gatewayResult.error ? { error: gatewayResult.error } : {}),
     };
   }
 

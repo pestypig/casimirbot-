@@ -26,7 +26,7 @@ export const createAskTurnCapabilityHelpSummaryBuilder = (
   const catalog = deps.buildCapabilityCatalogObservation();
   return [
     "Helix Ask can help you work across the workstation with two kinds of tools:",
-    `- Information reflection: inspect or synthesize evidence from docs, repo/code, internet and scholarly sources, calculator traces, live-source mail, image lens regions, process graph snapshots, Zen/civilization context, and workspace OS status. Active examples include ${catalog.information_reflection.slice(0, 6).join("; ")}.`,
+    `- Information reflection: inspect or synthesize evidence from docs, repo/code, internet and scholarly sources, calculator traces, live-source mail, image lens regions, process graph snapshots, Moral/civilization context, and workspace OS status. Active examples include ${catalog.information_reflection.slice(0, 6).join("; ")}.`,
     `- Utility: change workstation state through panel navigation, notes, clipboard, calculator live-source controls, live-source decisions, voice callout receipts, and restore-view actions. Active examples include ${catalog.utility.slice(0, 6).join("; ")}.`,
     `- Alignment reflection: ${deps.workstationToolAlignmentCapability} maps workstation panels and dynamic actions to tool families, reflection/utility status, admission rules, regression prompts, test coverage, and active/retired state.`,
     `- Live synthetic data reflection: ${deps.liveSyntheticDataReflectionCapability} describes how MicroDeck/MacroDeck-style summaries, processed mail, predictions, narratives, and interpretation state can be parsed over the retained mailbox/frame window.`,

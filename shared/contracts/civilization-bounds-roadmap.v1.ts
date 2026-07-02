@@ -61,7 +61,7 @@ export const CIVILIZATION_BADGE_KINDS = [
   "observation_gap",
   "collaboration_bound",
   "theory_binding",
-  "zen_binding",
+  "moral_binding",
 ] as const;
 
 export const CIVILIZATION_PARAMETER_SCOPE_KINDS = [
@@ -221,7 +221,7 @@ export type CivilizationBoundsBadgeV1 = {
   weight?: number;
   confidence: number;
   theoryBadgeIds?: string[];
-  zenNodeIds?: string[];
+  moralNodeIds?: string[];
   missingEvidence?: string[];
   evidenceRefs: string[];
   claimTier: CivilizationClaimTierV1;
@@ -335,7 +335,7 @@ export type CivilizationProceduralScaffoldV1 = {
 
 export type CivilizationBoundsBridgeContextV1 = {
   theoryBadgeIds: string[];
-  zenNodeIds: string[];
+  moralNodeIds: string[];
   systemIds: string[];
   constraints: string[];
   missingEvidence: string[];
@@ -381,9 +381,9 @@ export type CivilizationBoundsRoadmapV1 = {
     relation: "supports" | "constrains" | "requires" | "bounds" | "analogy_only";
     evidenceRefs: string[];
   }>;
-  zenBindings: Array<{
+  moralBindings: Array<{
     badgeId: string;
-    zenNodeIds: string[];
+    moralNodeIds: string[];
     proceduralEffect: string;
     refusesAuthority: string[];
     evidenceRefs: string[];
@@ -601,7 +601,7 @@ export function buildCivilizationBoundsRoadmapV1(
     hypothesisClaims: input.hypothesisClaims ?? [],
     proceduralScaffold: input.proceduralScaffold ?? DEFAULT_PROCEDURAL_SCAFFOLD,
     theoryBindings: input.theoryBindings,
-    zenBindings: input.zenBindings,
+    moralBindings: input.moralBindings,
     missingEvidence: input.missingEvidence,
     authority: { ...AUTHORITY },
   };
@@ -708,7 +708,7 @@ function validateBadge(prefix: string, value: unknown, issues: string[]): void {
   }
   validateScore(`${prefix}.confidence`, value.confidence, issues);
   if (value.theoryBadgeIds !== undefined) validateStringArray(`${prefix}.theoryBadgeIds`, value.theoryBadgeIds, issues);
-  if (value.zenNodeIds !== undefined) validateStringArray(`${prefix}.zenNodeIds`, value.zenNodeIds, issues);
+  if (value.moralNodeIds !== undefined) validateStringArray(`${prefix}.moralNodeIds`, value.moralNodeIds, issues);
   if (value.missingEvidence !== undefined) validateStringArray(`${prefix}.missingEvidence`, value.missingEvidence, issues);
   validateStringArray(`${prefix}.evidenceRefs`, value.evidenceRefs, issues);
   if (!includes(CIVILIZATION_CLAIM_TIERS, value.claimTier)) {
@@ -1034,17 +1034,17 @@ export function validateCivilizationBoundsRoadmapV1(value: unknown): string[] {
       validateStringArray(`${prefix}.evidenceRefs`, entry.evidenceRefs, issues);
     });
   }
-  if (!Array.isArray(value.zenBindings)) {
-    issues.push("zenBindings must be an array");
+  if (!Array.isArray(value.moralBindings)) {
+    issues.push("moralBindings must be an array");
   } else {
-    value.zenBindings.forEach((entry, index) => {
-      const prefix = `zenBindings[${index}]`;
+    value.moralBindings.forEach((entry, index) => {
+      const prefix = `moralBindings[${index}]`;
       if (!isRecord(entry)) {
         issues.push(`${prefix} must be an object`);
         return;
       }
       if (!isNonEmptyString(entry.badgeId)) issues.push(`${prefix}.badgeId must be a non-empty string`);
-      validateStringArray(`${prefix}.zenNodeIds`, entry.zenNodeIds, issues);
+      validateStringArray(`${prefix}.moralNodeIds`, entry.moralNodeIds, issues);
       if (!isNonEmptyString(entry.proceduralEffect)) {
         issues.push(`${prefix}.proceduralEffect must be a non-empty string`);
       }

@@ -128,7 +128,7 @@ export const CIVILIZATION_SCENARIO_EDITOR_KINDS = [
   "timeline",
   "map_position",
   "evidence",
-  "zen_binding",
+  "moral_binding",
   "theory_binding",
 ] as const;
 
@@ -198,7 +198,7 @@ export type CivilizationScenarioFrameV1 = {
   boundedActorGrammar: CivilizationBoundedActorGrammarV1;
   proceduralBindings: {
     theoryBindingHints: string[];
-    zenBindingHints: string[];
+    moralBindingHints: string[];
     bridgeHooks: string[];
   };
   suggestedEditors: CivilizationScenarioEditorKindV1[];
@@ -377,7 +377,7 @@ export function validateCivilizationScenarioFrameV1(value: unknown): string[] {
     issues.push("proceduralBindings must be an object");
   } else {
     validateStringArray("proceduralBindings.theoryBindingHints", proceduralBindings.theoryBindingHints, issues);
-    validateStringArray("proceduralBindings.zenBindingHints", proceduralBindings.zenBindingHints, issues);
+    validateStringArray("proceduralBindings.moralBindingHints", proceduralBindings.moralBindingHints, issues);
     validateStringArray("proceduralBindings.bridgeHooks", proceduralBindings.bridgeHooks, issues);
   }
 

@@ -167,6 +167,45 @@ describe("Helix Ask prompt interpretation", () => {
     }
   });
 
+  it("records contextual calculator language without executable commands", () => {
+    const cases = [
+      ["Do not open the scientific calculator; just explain what E = h * f is missing.", "negated", "calculator"],
+      ["Before I later put E = h * f into the calculator, tell me what evidence would be needed.", "future", "calculator"],
+      [
+        "Why did the previous turn call scientific-calculator.solve_expression, and was that justified?",
+        "historical",
+        "scientific-calculator.solve_expression",
+      ],
+      ["The screen label says 'open the calculator'; describe what that label means without opening it.", "quoted", "quoted_tool_text"],
+    ] as const;
+
+    for (const [prompt, reason, cue] of cases) {
+      const interpretation = interpretHelixAskPrompt(prompt);
+      expect(interpretation.contextual_tool_mentions).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            verb_or_cue: cue,
+            reason,
+          }),
+        ]),
+      );
+      expect(interpretation.executable_operator_commands).toEqual([]);
+    }
+  });
+
+  it("records without-opening calculator wording as a negative constraint", () => {
+    const interpretation = interpretHelixAskPrompt(
+      "The screen label says 'open the calculator'; describe what that label means without opening it.",
+    );
+
+    expect(interpretation.negative_constraints).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/without opening/i),
+      ]),
+    );
+    expect(interpretation.executable_operator_commands).toEqual([]);
+  });
+
   it("records affirmative visual cadence as an executable operator command", () => {
     const interpretation = interpretHelixAskPrompt("Set the visual capture interval to 10 seconds.");
 

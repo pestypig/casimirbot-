@@ -177,7 +177,7 @@ export function FuelGauge(props: FuelGaugeProps) {
             <strong>Theory</strong><br/>
             Usable negative-energy "fuel" is the throttled Casimir power P<span className="align-[0.1em]">avg</span> times a safe operating window from constraints (ζ, T<sub>s</sub>/T<sub>LC</sub>, Natário, curvature, power cap).<br/>
             Energy/ly = P<span className="align-[0.1em]">avg</span> × hours/ly.  Per-cycle yield ≈ P<span className="align-[0.1em]">avg</span>/f.<br/><br/>
-            <em>Moving Zen:</em> Restraint extends reach; the longest journey is walked by preserving each step.
+            <em>Moving Moral:</em> Restraint extends reach; the longest journey is walked by preserving each step.
           </TooltipContent>
         </Tooltip>
       </CardHeader>

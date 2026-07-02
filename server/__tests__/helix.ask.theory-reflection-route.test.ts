@@ -26,14 +26,14 @@ const parseSseEvents = (text: string): Array<{ event: string; data: any }> =>
     });
 
 describe("Helix Ask theory reflection route", () => {
-  it("routes explicit Theory Graph plus ZenGraph bridge prompts through bridge receipts instead of model-only concept", async () => {
+  it("routes explicit Theory Graph plus MoralGraph bridge prompts through bridge receipts instead of model-only concept", async () => {
     const app = createApp();
 
     const response = await request(app)
       .post("/api/agi/ask/turn")
       .send({
         question:
-          "Reflect fairness and due process through entropy, conservation, and self-organization in the Theory Badge Graph and ZenGraph. Keep it evidence-only and do not treat physics as moral proof.",
+          "Reflect fairness and due process through entropy, conservation, and self-organization in the Theory Badge Graph and MoralGraph. Keep it evidence-only and do not treat physics as moral proof.",
         mode: "read",
         debug: true,
         sessionId: `theory-ideology-bridge-route-${Date.now()}`,
@@ -101,14 +101,14 @@ describe("Helix Ask theory reflection route", () => {
     );
   });
 
-  it("streams explicit Theory Graph plus ZenGraph bridge prompts through bridge receipts", async () => {
+  it("streams explicit Theory Graph plus MoralGraph bridge prompts through bridge receipts", async () => {
     const app = createApp();
 
     const response = await request(app)
       .post("/api/agi/ask/turn/stream")
       .send({
         question:
-          "Reflect fairness and due process through entropy, conservation, and self-organization in the Theory Badge Graph and ZenGraph. Keep it evidence-only and do not treat physics as moral proof.",
+          "Reflect fairness and due process through entropy, conservation, and self-organization in the Theory Badge Graph and MoralGraph. Keep it evidence-only and do not treat physics as moral proof.",
         mode: "read",
         debug: true,
         sessionId: `theory-ideology-bridge-stream-${Date.now()}`,

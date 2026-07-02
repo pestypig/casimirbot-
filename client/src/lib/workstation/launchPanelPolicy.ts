@@ -13,7 +13,7 @@ const USER_LAUNCH_PANEL_IDS = new Set<string>([
   "agi-task-history",
   "scientific-calculator",
   "theory-badge-graph",
-  "zen-graph",
+  "moral-graph",
   "fruition-calculator",
   "stage-play-badge-graph",
   "civilization-bounds-roadmap",

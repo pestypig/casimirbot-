@@ -6,7 +6,7 @@ import {
 } from "../shared/ideology-telemetry";
 import { saveConsoleTelemetry } from "../server/services/console-telemetry/store";
 import { collectPanelSnapshots } from "../server/services/telemetry/panels";
-import { ZEN_SOCIETY_STRICT_FAIL_REASON, searchIdeologyArtifacts } from "../server/services/ideology/artifacts";
+import { MORAL_SOCIETY_STRICT_FAIL_REASON, searchIdeologyArtifacts } from "../server/services/ideology/artifacts";
 import { resolveIdeologyGuidance } from "../server/services/ideology/guidance";
 
 describe("ideology telemetry", () => {
@@ -55,7 +55,7 @@ describe("ideology telemetry", () => {
     expect(base.items[0]?.provenance_class).toBe("inferred");
 
     const strict = searchIdeologyArtifacts({ limit: 1, strictProvenance: true });
-    expect(strict.fail_reason).toBe(ZEN_SOCIETY_STRICT_FAIL_REASON);
+    expect(strict.fail_reason).toBe(MORAL_SOCIETY_STRICT_FAIL_REASON);
   });
 
   it("resolves pressure bundles into deterministic ideology guidance", () => {

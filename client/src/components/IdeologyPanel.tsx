@@ -122,7 +122,7 @@ export function IdeologyPanel({ initialId, className }: IdeologyPanelProps) {
         nodeId,
         panelId: "mission-ethos",
         instanceId: "mission-ethos",
-        title: "Ideology & Zen",
+        title: "Ideology & Moral",
         surface: "ui",
         strings: { surface: "ui" },
       });

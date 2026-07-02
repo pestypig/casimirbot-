@@ -324,9 +324,9 @@ describe("Helix Ask workstation answer synthesizer", () => {
     );
   });
 
-  it("synthesizes a bounded answer from Theory-Zen bridge evidence", () => {
+  it("synthesizes a bounded answer from Theory-Moral bridge evidence", () => {
     const prompt =
-      "Reflect fairness and due process through entropy and conservation in the Theory Badge Graph and ZenGraph.";
+      "Reflect fairness and due process through entropy and conservation in the Theory Badge Graph and MoralGraph.";
     const plan = planWorkstationToolUse(prompt).tool_plan;
 
     expect(plan).toBeTruthy();
@@ -354,7 +354,7 @@ describe("Helix Ask workstation answer synthesizer", () => {
     });
 
     expect(answer).toContain(
-      "I treated the theory side as observable/mathematical constraint evidence and the Zen side as procedural justice evidence.",
+      "I treated the theory side as observable/mathematical constraint evidence and the Moral side as procedural justice evidence.",
     );
     expect(answer).toContain("Bridge links:");
     expect(answer).toContain("- constrains: Require revision triggers and uncertainty-aware next steps.");

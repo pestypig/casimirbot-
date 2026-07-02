@@ -57,7 +57,7 @@ Blocked:
   `helix_ask.reflect_civilization_bounds`
 - loose metaphors or ordinary concept questions that do not ask for
   procedural-world grounding, dependency evidence, route/infrastructure
-  evidence, source-backed measurement comparison, or Theory/Zen bridge context
+  evidence, source-backed measurement comparison, or Theory/Moral bridge context
 - attempts to use the reflection as proof of feasibility, deployment readiness,
   national capacity, or transport authority
 

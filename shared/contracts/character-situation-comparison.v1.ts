@@ -1,8 +1,8 @@
 import type { FruitionProcedureExpressionV1, FruitionResultPostureV1 } from "../fruition-procedure-expression";
-import type { ZenBadgeComparisonPostureV1, ZenBadgeLocatorV1 } from "../zen-badge-locator";
+import type { MoralBadgeComparisonPostureV1, MoralBadgeLocatorV1 } from "../moral-badge-locator";
 
-export const CHARACTER_IDEAL_PROFILE_ARTIFACT_ID = "character_zen_procedural_profile" as const;
-export const CHARACTER_IDEAL_PROFILE_SCHEMA_VERSION = "character_zen_procedural_profile/v1" as const;
+export const CHARACTER_IDEAL_PROFILE_ARTIFACT_ID = "character_moral_procedural_profile" as const;
+export const CHARACTER_IDEAL_PROFILE_SCHEMA_VERSION = "character_moral_procedural_profile/v1" as const;
 export const CHARACTER_SITUATION_COMPARISON_ARTIFACT_ID = "character_situation_comparison" as const;
 export const CHARACTER_SITUATION_COMPARISON_SCHEMA_VERSION = "character_situation_comparison/v1" as const;
 
@@ -39,7 +39,7 @@ export type CharacterDecisionRuleV1 = {
   id: string;
   if: string;
   then: string;
-  posture: ZenBadgeComparisonPostureV1;
+  posture: MoralBadgeComparisonPostureV1;
   risks: string[];
   activates: string[];
   matchTerms: string[];
@@ -71,7 +71,7 @@ export type CharacterIdealProfileV1 = {
     };
   };
   authority: CharacterAuthorityV1;
-  zenBadgeWeights: CharacterIdealProfileBadgeWeightV1[];
+  moralBadgeWeights: CharacterIdealProfileBadgeWeightV1[];
   characterSpecificBadges: CharacterIdealProfileBadgeWeightV1[];
   proceduralDecisionRules: CharacterDecisionRuleV1[];
   situationArchetypes: CharacterSituationArchetypeV1[];
@@ -97,12 +97,12 @@ export type CharacterSituationComparisonV1 = {
   comparisonId: string;
   characterId: string;
   situationText: string;
-  locator: ZenBadgeLocatorV1;
+  locator: MoralBadgeLocatorV1;
   fruition: FruitionProcedureExpressionV1;
   activatedProfileWeights: CharacterSituationActivationV1[];
   matchedRules: Array<{
     id: string;
-    posture: ZenBadgeComparisonPostureV1;
+    posture: MoralBadgeComparisonPostureV1;
     confidence: number;
     risks: string[];
   }>;
@@ -224,7 +224,7 @@ export function validateCharacterIdealProfileV1(value: unknown): string[] {
     }
   }
   validateAuthority("authority", value.authority, issues);
-  validateBadgeArray("zenBadgeWeights", value.zenBadgeWeights, issues);
+  validateBadgeArray("moralBadgeWeights", value.moralBadgeWeights, issues);
   validateBadgeArray("characterSpecificBadges", value.characterSpecificBadges, issues);
   if (!Array.isArray(value.proceduralDecisionRules)) issues.push("proceduralDecisionRules must be an array");
   if (!Array.isArray(value.situationArchetypes)) issues.push("situationArchetypes must be an array");

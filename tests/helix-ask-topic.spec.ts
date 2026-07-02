@@ -154,21 +154,21 @@ describe("Helix Ask topic routing", () => {
     const profile = buildHelixAskTopicProfile(["warp"]);
     expect(profile?.routingMetadata).toBeUndefined();
   });
-  it("tags zen-ladder prompts as zen_ladder_pack", () => {
+  it("tags moral-ladder prompts as moral_ladder_pack", () => {
     const tags = inferHelixAskTopicTags(
-      "Show me the zen-ladder-pack routing and provenance expectations.",
+      "Show me the moral-ladder-pack routing and provenance expectations.",
     );
-    expect(tags).toContain("zen_ladder_pack");
+    expect(tags).toContain("moral_ladder_pack");
   });
 
-  it("adds zen-ladder routing metadata with conservative defaults", () => {
-    const profile = buildHelixAskTopicProfile(["zen_ladder_pack"]);
+  it("adds moral-ladder routing metadata with conservative defaults", () => {
+    const profile = buildHelixAskTopicProfile(["moral_ladder_pack"]);
     expect(profile?.routingMetadata).toEqual({
       provenance_class: "inferred",
       claim_tier: "diagnostic",
       certifying: false,
     });
-    expect(topicMustIncludeSatisfied(["docs/zen-ladder-pack/overview.md"], profile)).toBe(true);
+    expect(topicMustIncludeSatisfied(["docs/moral-ladder-pack/overview.md"], profile)).toBe(true);
   });
 
 

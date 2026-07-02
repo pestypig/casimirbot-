@@ -8,4 +8,4 @@ topicTags: ["ideology"]
 mustIncludeFiles: ["docs/ethos/ideology.json"]
 ---
 Definition: Leadership legitimacy is formed by constrained service before authority is granted.
-Notes: Tags: governance, ladder, constraint, leadership, zen; Focus: graduated visibility during formation, full accountability at authority threshold; Children: citizens-arc-derived-principles.
+Notes: Tags: governance, ladder, constraint, leadership, moral; Focus: graduated visibility during formation, full accountability at authority threshold; Children: citizens-arc-derived-principles.

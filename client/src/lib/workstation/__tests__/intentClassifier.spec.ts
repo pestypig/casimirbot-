@@ -206,6 +206,65 @@ describe("intentClassifier", () => {
     });
   });
 
+  it("does not treat contextual calculator mentions as executable UI actions", () => {
+    const prompts = [
+      "Do not open the scientific calculator; just explain what E = h * f means.",
+      "Before I open the calculator, tell me what variables are missing from E = h * f.",
+      "Why did the previous turn call scientific-calculator.solve_expression?",
+      'The screen text says "open the calculator"; describe what is visible.',
+      "If I later solve 2 + 2 in the calculator, what evidence would you need?",
+    ];
+
+    for (const prompt of prompts) {
+      const deterministic = inferDeterministicWorkstationIntentDecision(prompt);
+      expect(deterministic, prompt).toBeNull();
+
+      const reconciled = reconcileWorkstationIntentDecisionWithPrompt(prompt, {
+        intent: "calculator_open",
+        confidence: 0.91,
+        subgoal: "open scientific calculator",
+        reason: "test_classifier_misfire",
+      });
+      expect(reconciled, prompt).toMatchObject({
+        intent: "none",
+        reason: expect.stringContaining("calculator_mention_not_action"),
+      });
+      expect(coerceWorkstationActionFromIntentDecision(reconciled), prompt).toBeNull();
+    }
+  });
+
+  it("guards model-classified calculator panel actions when calculator wording is quoted or historical", () => {
+    const quotedRunPanel = reconcileWorkstationIntentDecisionWithPrompt(
+      'The visible label reads "solve with the calculator"; what does that label mean?',
+      {
+        intent: "run_panel_action",
+        confidence: 0.87,
+        subgoal: "solve with the calculator",
+        args: {
+          panel_id: "scientific-calculator",
+          action_id: "solve_expression",
+          args: { latex: "2+2" },
+        },
+        reason: "test_classifier_misfire",
+      },
+    );
+    expect(quotedRunPanel.intent).toBe("none");
+    expect(coerceWorkstationActionFromIntentDecision(quotedRunPanel)).toBeNull();
+
+    const historicalOpenPanel = reconcileWorkstationIntentDecisionWithPrompt(
+      "Why was the calculator opened last turn?",
+      {
+        intent: "open_panel",
+        confidence: 0.84,
+        subgoal: "open scientific calculator",
+        args: { panel_id: "scientific-calculator" },
+        reason: "test_classifier_misfire",
+      },
+    );
+    expect(historicalOpenPanel.intent).toBe("none");
+    expect(coerceWorkstationActionFromIntentDecision(historicalOpenPanel)).toBeNull();
+  });
+
   it("reconciles classifier read intent into summarize/explain intent when prompt demands it", () => {
     const summarizeDecision = reconcileWorkstationIntentDecisionWithPrompt(
       "ok summarize a doc about the sun to me",

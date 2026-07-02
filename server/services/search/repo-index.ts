@@ -75,7 +75,7 @@ const DEFAULT_PREVIEW_BYTES = Math.max(
 );
 const DEFAULT_ROOTS = [
   "docs",
-  "docs/zen-ladder-pack",
+  "docs/moral-ladder-pack",
   "shared",
   "client",
   "server",

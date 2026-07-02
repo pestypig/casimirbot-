@@ -1,0 +1,1782 @@
+{
+  "version": 1,
+  "rootId": "moral-society-tree",
+  "nodes": [
+    {
+      "id": "moral-society-tree",
+      "slug": "moral-society-tree",
+      "title": "Moral Society Tree",
+      "excerpt": "Governance spine and artifact templates for moral society.",
+      "bodyMD": "Moral society docs and templates.\n\nMinimal artifact: docs/moral-society/*.md.",
+      "tags": [
+        "moral",
+        "society",
+        "governance"
+      ],
+      "children": [
+        "moral-society-core",
+        "moral-society-templates",
+        "moral-society-artifacts",
+        "bridge-moral-society-core-moral-society-templates"
+      ],
+      "links": [],
+      "summary": "Governance spine and artifact templates for moral society.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/moral-society-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:6ea40222cc8d9c4cf716007022b8f331c478fe1591b101b08aae69fddb91c640"
+        }
+      ]
+    },
+    {
+      "id": "moral-society-core",
+      "slug": "moral-society-core",
+      "title": "Moral Society Core",
+      "excerpt": "Core governance spine and gates.",
+      "bodyMD": "Core moral society docs (docs/moral-society/README.md, docs/moral-society/gates.md, docs/moral-society/public-safety-governance-spine.md).\n\nMinimal artifact: governance spine summary.",
+      "tags": [
+        "moral",
+        "society",
+        "core"
+      ],
+      "children": [
+        "moral-society-readme",
+        "moral-society-gates",
+        "moral-society-spine"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-society-tree"
+        }
+      ],
+      "summary": "Core governance spine and gates.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-society/README.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:70d1ce0b246dc205b751c5b4f2fe241c9a6e6eca10bb6952401d17c168ce7604"
+        },
+        {
+          "type": "doc",
+          "path": "docs/moral-society/gates.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a7299b527e5160c8220ae75b60f12ca8dd070696b98296b93ffcb896d8910b7d"
+        },
+        {
+          "type": "doc",
+          "path": "docs/moral-society/public-safety-governance-spine.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:6a7e0fd43695fb23835d3ad6fb35e8f24a10ae0624c1fa6a9726b8be89f18f51"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-society-tree"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-society-readme",
+      "slug": "moral-society-readme",
+      "title": "Moral Society README",
+      "excerpt": "Overview of moral society docs.",
+      "bodyMD": "Moral society README (docs/moral-society/README.md).\n\nMinimal artifact: README summary.",
+      "tags": [
+        "moral",
+        "society"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-society-core"
+        }
+      ],
+      "summary": "Overview of moral society docs.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-society/README.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:70d1ce0b246dc205b751c5b4f2fe241c9a6e6eca10bb6952401d17c168ce7604"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-society-core"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-society-gates",
+      "slug": "moral-society-gates",
+      "title": "Moral Society Gates",
+      "excerpt": "Gate definitions for moral society governance.",
+      "bodyMD": "Gates overview (docs/moral-society/gates.md).\n\nMinimal artifact: gate checklist.",
+      "tags": [
+        "moral",
+        "society",
+        "gates"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-society-core"
+        }
+      ],
+      "summary": "Gate definitions for moral society governance.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-society/gates.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a7299b527e5160c8220ae75b60f12ca8dd070696b98296b93ffcb896d8910b7d"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-society-core"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-society-spine",
+      "slug": "moral-society-spine",
+      "title": "Governance Spine",
+      "excerpt": "Public safety governance spine.",
+      "bodyMD": "Governance spine doc (docs/moral-society/public-safety-governance-spine.md).\n\nMinimal artifact: spine summary.",
+      "tags": [
+        "moral",
+        "society",
+        "governance"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-society-core"
+        }
+      ],
+      "summary": "Public safety governance spine.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-society/public-safety-governance-spine.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:6a7e0fd43695fb23835d3ad6fb35e8f24a10ae0624c1fa6a9726b8be89f18f51"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-society-core"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-society-templates",
+      "slug": "moral-society-templates",
+      "title": "Moral Society Templates",
+      "excerpt": "Template pillars and logs.",
+      "bodyMD": "Template docs (docs/moral-society/templates/*.md).\n\nMinimal artifact: template checklist.",
+      "tags": [
+        "moral",
+        "society",
+        "templates"
+      ],
+      "children": [
+        "moral-decision-log",
+        "moral-pillar-01-dignity",
+        "moral-pillar-02-services",
+        "moral-pillar-03-contracts",
+        "moral-pillar-04-finance",
+        "moral-pillar-05-consent",
+        "moral-pillar-06-verification",
+        "moral-signatory-registry"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-society-tree"
+        }
+      ],
+      "summary": "Template pillars and logs.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-society-tree"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/moral-society-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:6ea40222cc8d9c4cf716007022b8f331c478fe1591b101b08aae69fddb91c640"
+        }
+      ]
+    },
+    {
+      "id": "moral-decision-log",
+      "slug": "moral-decision-log",
+      "title": "Decision Log",
+      "excerpt": "Template for Decision Log.",
+      "bodyMD": "Decision Log template (docs/moral-society/templates/decision-log.md).\n\nMinimal artifact: template summary.",
+      "tags": [
+        "moral",
+        "templates"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-society-templates"
+        }
+      ],
+      "summary": "Template for Decision Log.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-society/templates/decision-log.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:0ee6cabbcb56d0f75c43c5ead46f2fc851d47f68bc8aa7dc40a5e145e1b766fb"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-society-templates"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-pillar-01-dignity",
+      "slug": "moral-pillar-01-dignity",
+      "title": "Pillar 01 Dignity",
+      "excerpt": "Template for Pillar 01 Dignity.",
+      "bodyMD": "Pillar 01 Dignity template (docs/moral-society/templates/pillar-01-dignity.md).\n\nMinimal artifact: template summary.",
+      "tags": [
+        "moral",
+        "templates"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-society-templates"
+        }
+      ],
+      "summary": "Template for Pillar 01 Dignity.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-society/templates/pillar-01-dignity.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:30524c521919d08126aed69339703543ba4676dcb0ab002a3504a1692c4a0935"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-society-templates"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-pillar-02-services",
+      "slug": "moral-pillar-02-services",
+      "title": "Pillar 02 Services",
+      "excerpt": "Template for Pillar 02 Services.",
+      "bodyMD": "Pillar 02 Services template (docs/moral-society/templates/pillar-02-services.md).\n\nMinimal artifact: template summary.",
+      "tags": [
+        "moral",
+        "templates"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-society-templates"
+        }
+      ],
+      "summary": "Template for Pillar 02 Services.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-society/templates/pillar-02-services.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:146823ec78c3d353ccb2b0bd6bf16b481fc6cc8df017d1888cf42aca8690dbb2"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-society-templates"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-pillar-03-contracts",
+      "slug": "moral-pillar-03-contracts",
+      "title": "Pillar 03 Contracts",
+      "excerpt": "Template for Pillar 03 Contracts.",
+      "bodyMD": "Pillar 03 Contracts template (docs/moral-society/templates/pillar-03-contracts.md).\n\nMinimal artifact: template summary.",
+      "tags": [
+        "moral",
+        "templates"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-society-templates"
+        }
+      ],
+      "summary": "Template for Pillar 03 Contracts.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-society/templates/pillar-03-contracts.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:12c81a29d8d70dcc5a02cfc838d14b0c79304b386b9c0f27acc39ded71793aa5"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-society-templates"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-pillar-04-finance",
+      "slug": "moral-pillar-04-finance",
+      "title": "Pillar 04 Finance",
+      "excerpt": "Template for Pillar 04 Finance.",
+      "bodyMD": "Pillar 04 Finance template (docs/moral-society/templates/pillar-04-finance.md).\n\nMinimal artifact: template summary.",
+      "tags": [
+        "moral",
+        "templates"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-society-templates"
+        }
+      ],
+      "summary": "Template for Pillar 04 Finance.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-society/templates/pillar-04-finance.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ae5e6ac449547632653582cbc1d51f841c6d0ff3e9e1d67c7b72104d2d64c00a"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-society-templates"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-pillar-05-consent",
+      "slug": "moral-pillar-05-consent",
+      "title": "Pillar 05 Consent",
+      "excerpt": "Template for Pillar 05 Consent.",
+      "bodyMD": "Pillar 05 Consent template (docs/moral-society/templates/pillar-05-consent.md).\n\nMinimal artifact: template summary.",
+      "tags": [
+        "moral",
+        "templates"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-society-templates"
+        }
+      ],
+      "summary": "Template for Pillar 05 Consent.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-society/templates/pillar-05-consent.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:1ddde93561d9589b7a9de7ed2677ba84d6d10e185fd5399b20ec54a4bd536840"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-society-templates"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-pillar-06-verification",
+      "slug": "moral-pillar-06-verification",
+      "title": "Pillar 06 Verification",
+      "excerpt": "Template for Pillar 06 Verification.",
+      "bodyMD": "Pillar 06 Verification template (docs/moral-society/templates/pillar-06-verification.md).\n\nMinimal artifact: template summary.",
+      "tags": [
+        "moral",
+        "templates"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-society-templates"
+        }
+      ],
+      "summary": "Template for Pillar 06 Verification.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-society/templates/pillar-06-verification.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:6ee428c1f9c564f3ce2c06b0fa21699cc148af1235972ff91082f20df7371aa5"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-society-templates"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-signatory-registry",
+      "slug": "moral-signatory-registry",
+      "title": "Signatory Registry",
+      "excerpt": "Template for Signatory Registry.",
+      "bodyMD": "Signatory Registry template (docs/moral-society/templates/signatory-registry.md).\n\nMinimal artifact: template summary.",
+      "tags": [
+        "moral",
+        "templates"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-society-templates"
+        }
+      ],
+      "summary": "Template for Signatory Registry.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-society/templates/signatory-registry.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:68741aba819c97cc90a57432d3f6fcdfd04f76ab791744a7b1b577cf7a41963f"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-society-templates"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-society-artifacts",
+      "slug": "moral-society-artifacts",
+      "title": "Moral Society Artifacts",
+      "excerpt": "Artifact templates for governance workflows.",
+      "bodyMD": "Artifact templates (docs/moral-society/templates/artifacts/*.md).\n\nMinimal artifact: artifact template list.",
+      "tags": [
+        "moral",
+        "society",
+        "artifacts"
+      ],
+      "children": [
+        "moral-artifact-access-to-counsel-pathway",
+        "moral-artifact-charter",
+        "moral-artifact-civic-signal-survey",
+        "moral-artifact-dashboard",
+        "moral-artifact-federal-civic-listening-circuit",
+        "moral-artifact-harm-weighted-priority-standard",
+        "moral-artifact-integration-ladder",
+        "moral-artifact-lawful-interface-protocol",
+        "moral-artifact-ledger",
+        "moral-artifact-local-stability-compact",
+        "moral-artifact-metric-integrity-guardrail",
+        "moral-artifact-protocol",
+        "moral-artifact-training-certification-gate",
+        "moral-artifact-civic-oxygen-compact",
+        "moral-artifact-institution-first-recognition-framework",
+        "moral-artifact-election-readiness-ladder",
+        "moral-artifact-survivable-opposition-framework",
+        "moral-artifact-external-support-integrity-framework"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-society-tree"
+        }
+      ],
+      "summary": "Artifact templates for governance workflows.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-society-tree"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/moral-society-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:6ea40222cc8d9c4cf716007022b8f331c478fe1591b101b08aae69fddb91c640"
+        }
+      ]
+    },
+    {
+      "id": "moral-artifact-access-to-counsel-pathway",
+      "slug": "moral-artifact-access-to-counsel-pathway",
+      "title": "Access To Counsel Pathway",
+      "excerpt": "Artifact template for Access To Counsel Pathway.",
+      "bodyMD": "Access To Counsel Pathway artifact template (docs/moral-society/templates/artifacts/access-to-counsel-pathway.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "moral",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-society-artifacts"
+        }
+      ],
+      "summary": "Artifact template for Access To Counsel Pathway.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-society/templates/artifacts/access-to-counsel-pathway.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:441e50e365151c8a6138026a796a8ae589e2d69b7e841cbd772ee082e02cc962"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-society-artifacts"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-artifact-charter",
+      "slug": "moral-artifact-charter",
+      "title": "Charter",
+      "excerpt": "Artifact template for Charter.",
+      "bodyMD": "Charter artifact template (docs/moral-society/templates/artifacts/charter.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "moral",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-society-artifacts"
+        }
+      ],
+      "summary": "Artifact template for Charter.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-society/templates/artifacts/charter.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:1521feceb27f6192f3ee7801755e74bea44ce9c97f2a55ca1fca0045f3fdcc76"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-society-artifacts"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-artifact-civic-signal-survey",
+      "slug": "moral-artifact-civic-signal-survey",
+      "title": "Civic Signal Survey",
+      "excerpt": "Artifact template for Civic Signal Survey.",
+      "bodyMD": "Civic Signal Survey artifact template (docs/moral-society/templates/artifacts/civic-signal-survey.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "moral",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-society-artifacts"
+        }
+      ],
+      "summary": "Artifact template for Civic Signal Survey.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-society/templates/artifacts/civic-signal-survey.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:65e7e2fcb22177aeacd056bbb4de1f8c11cf7666bb5aefbaad6cb85e7fa92e16"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-society-artifacts"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-artifact-dashboard",
+      "slug": "moral-artifact-dashboard",
+      "title": "Dashboard",
+      "excerpt": "Artifact template for Dashboard.",
+      "bodyMD": "Dashboard artifact template (docs/moral-society/templates/artifacts/dashboard.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "moral",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-society-artifacts"
+        }
+      ],
+      "summary": "Artifact template for Dashboard.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-society/templates/artifacts/dashboard.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:e5be8c58f9875816a431649676c68accdf579ff04b8b175011179d4f7476786a"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-society-artifacts"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-artifact-federal-civic-listening-circuit",
+      "slug": "moral-artifact-federal-civic-listening-circuit",
+      "title": "Federal Civic Listening Circuit",
+      "excerpt": "Artifact template for Federal Civic Listening Circuit.",
+      "bodyMD": "Federal Civic Listening Circuit artifact template (docs/moral-society/templates/artifacts/federal-civic-listening-circuit.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "moral",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-society-artifacts"
+        }
+      ],
+      "summary": "Artifact template for Federal Civic Listening Circuit.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-society/templates/artifacts/federal-civic-listening-circuit.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a05d2207c56b92d279a88061cbe8760de03217c626833397601556bb73270568"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-society-artifacts"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-artifact-harm-weighted-priority-standard",
+      "slug": "moral-artifact-harm-weighted-priority-standard",
+      "title": "Harm Weighted Priority Standard",
+      "excerpt": "Artifact template for Harm Weighted Priority Standard.",
+      "bodyMD": "Harm Weighted Priority Standard artifact template (docs/moral-society/templates/artifacts/harm-weighted-priority-standard.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "moral",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-society-artifacts"
+        }
+      ],
+      "summary": "Artifact template for Harm Weighted Priority Standard.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-society/templates/artifacts/harm-weighted-priority-standard.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:b7856ee05fd76c1fdf62e005e4c51890769a04e140590078a60a84a8056e15c3"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-society-artifacts"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-artifact-integration-ladder",
+      "slug": "moral-artifact-integration-ladder",
+      "title": "Integration Ladder",
+      "excerpt": "Artifact template for Integration Ladder.",
+      "bodyMD": "Integration Ladder artifact template (docs/moral-society/templates/artifacts/integration-ladder.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "moral",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-society-artifacts"
+        }
+      ],
+      "summary": "Artifact template for Integration Ladder.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-society/templates/artifacts/integration-ladder.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f2ae87a5bc047f1367701d8a493140baa6a50bdbf287b6104778e5505cfa3790"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-society-artifacts"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-artifact-lawful-interface-protocol",
+      "slug": "moral-artifact-lawful-interface-protocol",
+      "title": "Lawful Interface Protocol",
+      "excerpt": "Artifact template for Lawful Interface Protocol.",
+      "bodyMD": "Lawful Interface Protocol artifact template (docs/moral-society/templates/artifacts/lawful-interface-protocol.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "moral",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-society-artifacts"
+        }
+      ],
+      "summary": "Artifact template for Lawful Interface Protocol.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-society/templates/artifacts/lawful-interface-protocol.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:a836ac5cf2b9bfca472af8b3bf900315a3ba18629a98479b9b96fb57536c22d9"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-society-artifacts"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-artifact-ledger",
+      "slug": "moral-artifact-ledger",
+      "title": "Ledger",
+      "excerpt": "Artifact template for Ledger.",
+      "bodyMD": "Ledger artifact template (docs/moral-society/templates/artifacts/ledger.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "moral",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-society-artifacts"
+        }
+      ],
+      "summary": "Artifact template for Ledger.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-society/templates/artifacts/ledger.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:847fcd683371049b4c11a20bd4b797fe97ef48a3843dee6fac9f3d8d8dcaea18"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-society-artifacts"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-artifact-local-stability-compact",
+      "slug": "moral-artifact-local-stability-compact",
+      "title": "Local Stability Compact",
+      "excerpt": "Artifact template for Local Stability Compact.",
+      "bodyMD": "Local Stability Compact artifact template (docs/moral-society/templates/artifacts/local-stability-compact.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "moral",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-society-artifacts"
+        }
+      ],
+      "summary": "Artifact template for Local Stability Compact.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-society/templates/artifacts/local-stability-compact.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:82b4daadfdb01a2b7ed4d1234ea4059f0fa2ee8f265084e57a9b750c9cdcf7d3"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-society-artifacts"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-artifact-metric-integrity-guardrail",
+      "slug": "moral-artifact-metric-integrity-guardrail",
+      "title": "Metric Integrity Guardrail",
+      "excerpt": "Artifact template for Metric Integrity Guardrail.",
+      "bodyMD": "Metric Integrity Guardrail artifact template (docs/moral-society/templates/artifacts/metric-integrity-guardrail.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "moral",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-society-artifacts"
+        }
+      ],
+      "summary": "Artifact template for Metric Integrity Guardrail.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-society/templates/artifacts/metric-integrity-guardrail.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:08e8318367d52c5d222bd2735fc8bbf62522a016b91fe2abd0d73a3a496549fa"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-society-artifacts"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-artifact-protocol",
+      "slug": "moral-artifact-protocol",
+      "title": "Protocol",
+      "excerpt": "Artifact template for Protocol.",
+      "bodyMD": "Protocol artifact template (docs/moral-society/templates/artifacts/protocol.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "moral",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-society-artifacts"
+        }
+      ],
+      "summary": "Artifact template for Protocol.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-society/templates/artifacts/protocol.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:3039af98b7068b3a9e27a0f7d916d51e04e3922ee98d01ad9e3a86d987b17fd3"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-society-artifacts"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-artifact-training-certification-gate",
+      "slug": "moral-artifact-training-certification-gate",
+      "title": "Training Certification Gate",
+      "excerpt": "Artifact template for Training Certification Gate.",
+      "bodyMD": "Training Certification Gate artifact template (docs/moral-society/templates/artifacts/training-certification-gate.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "moral",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-society-artifacts"
+        }
+      ],
+      "summary": "Artifact template for Training Certification Gate.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-society/templates/artifacts/training-certification-gate.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:698ea9ccfdf4a9daf53d3375c80357d43071166b929ec85c397c9045b9685a65"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-society-artifacts"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-artifact-civic-oxygen-compact",
+      "slug": "moral-artifact-civic-oxygen-compact",
+      "title": "Civic Oxygen Compact",
+      "excerpt": "Artifact template for Civic Oxygen Compact.",
+      "bodyMD": "Civic Oxygen Compact artifact template (docs/moral-society/templates/artifacts/civic-oxygen-compact.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "moral",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-society-artifacts"
+        }
+      ],
+      "summary": "Artifact template for Civic Oxygen Compact.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-society/templates/artifacts/civic-oxygen-compact.md",
+          "repo_rev": "a3e94a3d3ec61aae562a36d30dbfa49c338025b7",
+          "content_hash": "sha256:268d5af07f68915b40e447529e5ea10bbae13eb20dd9b80bfec25deca36705be"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-society-artifacts"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-artifact-institution-first-recognition-framework",
+      "slug": "moral-artifact-institution-first-recognition-framework",
+      "title": "Institution First Recognition Framework",
+      "excerpt": "Artifact template for Institution First Recognition Framework.",
+      "bodyMD": "Institution First Recognition Framework artifact template (docs/moral-society/templates/artifacts/institution-first-recognition-framework.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "moral",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-society-artifacts"
+        }
+      ],
+      "summary": "Artifact template for Institution First Recognition Framework.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-society/templates/artifacts/institution-first-recognition-framework.md",
+          "repo_rev": "a3e94a3d3ec61aae562a36d30dbfa49c338025b7",
+          "content_hash": "sha256:c9d469f0d0c01f1f38a2ebe3f2440a87536a974c35e63ef0cacd0839fc210681"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-society-artifacts"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-artifact-election-readiness-ladder",
+      "slug": "moral-artifact-election-readiness-ladder",
+      "title": "Election Readiness Ladder",
+      "excerpt": "Artifact template for Election Readiness Ladder.",
+      "bodyMD": "Election Readiness Ladder artifact template (docs/moral-society/templates/artifacts/election-readiness-ladder.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "moral",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-society-artifacts"
+        }
+      ],
+      "summary": "Artifact template for Election Readiness Ladder.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-society/templates/artifacts/election-readiness-ladder.md",
+          "repo_rev": "a3e94a3d3ec61aae562a36d30dbfa49c338025b7",
+          "content_hash": "sha256:15d44485d523d9c8a6343cced1eca5d2bbf4efc07ee58addf5873cb46b3e2d17"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-society-artifacts"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-artifact-survivable-opposition-framework",
+      "slug": "moral-artifact-survivable-opposition-framework",
+      "title": "Survivable Opposition Framework",
+      "excerpt": "Artifact template for Survivable Opposition Framework.",
+      "bodyMD": "Survivable Opposition Framework artifact template (docs/moral-society/templates/artifacts/survivable-opposition-framework.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "moral",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-society-artifacts"
+        }
+      ],
+      "summary": "Artifact template for Survivable Opposition Framework.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-society/templates/artifacts/survivable-opposition-framework.md",
+          "repo_rev": "a3e94a3d3ec61aae562a36d30dbfa49c338025b7",
+          "content_hash": "sha256:1cd608baa4a1caf9c5e12249961a0fb33139605849458195eb1e47958d6473a3"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-society-artifacts"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "moral-artifact-external-support-integrity-framework",
+      "slug": "moral-artifact-external-support-integrity-framework",
+      "title": "External Support Integrity Framework",
+      "excerpt": "Artifact template for External Support Integrity Framework.",
+      "bodyMD": "External Support Integrity Framework artifact template (docs/moral-society/templates/artifacts/external-support-integrity-framework.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "moral",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-society-artifacts"
+        }
+      ],
+      "summary": "Artifact template for External Support Integrity Framework.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-society/templates/artifacts/external-support-integrity-framework.md",
+          "repo_rev": "a3e94a3d3ec61aae562a36d30dbfa49c338025b7",
+          "content_hash": "sha256:6f0619f284264fcbcc05f9f655194f9aa8125f4224d41c8adb3c23b1cf8f1581"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-society-artifacts"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "bridge-moral-society-core-moral-society-templates",
+      "title": "Moral Society Core <-> Moral Society Templates Bridge",
+      "excerpt": "Bridge between Moral Society Core and Moral Society Templates.",
+      "bodyMD": "Cross-reference between Moral Society Core and Moral Society Templates within this tree.\n\nMinimal artifact: left/right evidence anchors.",
+      "tags": [
+        "bridge",
+        "moral",
+        "society",
+        "core",
+        "templates"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "moral-society-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "moral-society-core"
+        },
+        {
+          "rel": "see-also",
+          "to": "moral-society-templates"
+        }
+      ],
+      "bridge": {
+        "left": "moral-society-core",
+        "right": "moral-society-templates",
+        "relation": "Cross-reference between Moral Society Core and Moral Society Templates."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "moral-society-core",
+        "moral-society-templates"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/moral-society/README.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:70d1ce0b246dc205b751c5b4f2fe241c9a6e6eca10bb6952401d17c168ce7604",
+          "scope": "left"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/moral-society-tree.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:6ea40222cc8d9c4cf716007022b8f331c478fe1591b101b08aae69fddb91c640",
+          "scope": "right"
+        }
+      ],
+      "slug": "bridge-moral-society-core-moral-society-templates",
+      "summary": "Bridge between Moral Society Core and Moral Society Templates."
+    }
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
+}

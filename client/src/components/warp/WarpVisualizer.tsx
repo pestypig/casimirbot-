@@ -9,7 +9,7 @@
   import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
   import { Button } from '@/components/ui/button'
   import { Play, Pause, RotateCcw } from 'lucide-react'
-  import { zenLongToast } from '@/lib/zen-long-toasts'
+  import { moralLongToast } from '@/lib/moral-long-toasts'
   import { subscribe, unsubscribe, publish } from '@/lib/luma-bus'
   import { mapThetaToDisplay, type DisplayMode } from '@/lib/visual/curvature-display'
   import * as VIS from '@/constants/VIS'
@@ -552,10 +552,10 @@
               </CardDescription>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => { toggleAnimation(); zenLongToast('helix:pulse', { duty: parameters.dutyCycle, freqGHz: 15.0, sectors: parameters.sectorStrobing || 1, frOk: true, natarioOk: true, curvatureOk: true }) }}>
+              <Button variant="outline" size="sm" onClick={() => { toggleAnimation(); moralLongToast('helix:pulse', { duty: parameters.dutyCycle, freqGHz: 15.0, sectors: parameters.sectorStrobing || 1, frOk: true, natarioOk: true, curvatureOk: true }) }}>
                 {isRunning ? <Pause className="w-4 h-4"/> : <Play className="w-4 h-4"/>}
               </Button>
-              <Button variant="outline" size="sm" onClick={() => { resetView(); zenLongToast('helix:diagnostics', { zeta: VIS.zetaDefault, tsRatio: parameters.tsRatio, frOk: true, natarioOk: true, curvatureOk: true }) }}>
+              <Button variant="outline" size="sm" onClick={() => { resetView(); moralLongToast('helix:diagnostics', { zeta: VIS.zetaDefault, tsRatio: parameters.tsRatio, frOk: true, natarioOk: true, curvatureOk: true }) }}>
                 <RotateCcw className="w-4 h-4"/>
               </Button>
             </div>

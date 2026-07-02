@@ -258,7 +258,7 @@ export function buildDefaultCivilizationTraversabilityAtlas(options?: {
         evidenceRefs: ["fixture:route:air:jfk-fra", "source:copernicus-era5-hourly-single-levels"],
         missingEvidence: ["airspace_restriction_receipts", "flight_schedule_receipts"],
         theoryBadgeIds: ["relativity.signal_latency_bound", "thermodynamics.heat_sink_capacity"],
-        zenNodeIds: ["direct-observation-before-claim", "provenance-protocol"],
+        moralNodeIds: ["direct-observation-before-claim", "provenance-protocol"],
       },
       {
         routeId: "route:sea:ny-nj-rotterdam:current-adjusted",
@@ -286,7 +286,7 @@ export function buildDefaultCivilizationTraversabilityAtlas(options?: {
         evidenceRefs: ["fixture:route:sea:ny-nj-rotterdam", "source:copernicus-marine-current-field"],
         missingEvidence: ["vessel_schedule_receipts", "port_capacity_time_slice"],
         theoryBadgeIds: ["physics.symmetry.energy_momentum_conservation"],
-        zenNodeIds: ["interdependence-yin-yang-balance", "feedback-loop-hygiene"],
+        moralNodeIds: ["interdependence-yin-yang-balance", "feedback-loop-hygiene"],
       },
       {
         routeId: "route:rail:rhine-alpine:inland",
@@ -314,7 +314,7 @@ export function buildDefaultCivilizationTraversabilityAtlas(options?: {
         evidenceRefs: ["fixture:route:rail:rhine-alpine"],
         missingEvidence: ["rail_capacity_receipts", "maintenance_window_refs", "border_customs_receipts"],
         theoryBadgeIds: ["physics.symmetry.energy_momentum_conservation"],
-        zenNodeIds: ["fairness-due-process-and-justification"],
+        moralNodeIds: ["fairness-due-process-and-justification"],
       },
       {
         routeId: "route:atmospheric:sahara-amazon:dust",
@@ -342,7 +342,7 @@ export function buildDefaultCivilizationTraversabilityAtlas(options?: {
         evidenceRefs: ["source:nasa-calipso-sahara-amazon-dust"],
         missingEvidence: ["current_year_plume_observation", "nutrient_deposition_uncertainty"],
         theoryBadgeIds: ["biophysics.membrane.open_system_entropy_flow"],
-        zenNodeIds: ["interbeing-systems", "direct-observation-before-claim"],
+        moralNodeIds: ["interbeing-systems", "direct-observation-before-claim"],
       },
       {
         routeId: "route:cable:new-york-uk:transatlantic",
@@ -370,7 +370,7 @@ export function buildDefaultCivilizationTraversabilityAtlas(options?: {
         evidenceRefs: ["fixture:route:cable:new-york-uk"],
         missingEvidence: ["cable_operator_receipts", "latency_measurement_refs", "jurisdictional_routing_refs"],
         theoryBadgeIds: ["relativity.signal_latency_bound"],
-        zenNodeIds: ["provenance-protocol", "integrity-protocols"],
+        moralNodeIds: ["provenance-protocol", "integrity-protocols"],
       },
       {
         routeId: "route:ecological:mycorrhizal-probabilistic-surface",
@@ -397,7 +397,7 @@ export function buildDefaultCivilizationTraversabilityAtlas(options?: {
         evidenceRefs: ["source:spun-underground-atlas-mycorrhizal-biodiversity"],
         missingEvidence: ["local_soil_sample_receipts", "ecosystem_connectivity_validation"],
         theoryBadgeIds: ["biophysics.membrane.open_system_entropy_flow"],
-        zenNodeIds: ["analogy_only", "direct-observation-before-claim"],
+        moralNodeIds: ["analogy_only", "direct-observation-before-claim"],
       },
     ],
     observedFlows: [

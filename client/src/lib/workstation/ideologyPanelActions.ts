@@ -224,7 +224,7 @@ export async function executeIdeologyPanelAction(
   context.focusPanel(PANEL_ID);
 
   if (actionId === "open") {
-    return { ok: true, panel_id: PANEL_ID, action_id: actionId, message: "Opened Ideology & Zen." };
+    return { ok: true, panel_id: PANEL_ID, action_id: actionId, message: "Opened Ideology & Moral." };
   }
 
   try {
@@ -303,7 +303,7 @@ export async function executeIdeologyPanelAction(
 
     if (actionId === "compare_motive_to_zen") {
       const motive = asString(args.motive) ?? "";
-      const framework = (asString(args.framework) ?? "zen") as IdeologyFramework;
+      const framework = (asString(args.framework) ?? "moral") as IdeologyFramework;
       const pressureSignals = [...new Set([...asStringArray(args.active_pressures), ...inferPressureSignals(motive)])];
       const explicitNodes = asStringArray(args.node_ids)
         .map((id) => resolveNode(doc, id))

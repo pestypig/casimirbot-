@@ -2868,23 +2868,23 @@ describe("compound capability synthesis readiness", () => {
     });
   });
 
-  it("materializes civilization bounds plus zen graph reflection as compound evidence synthesis", () => {
-    const turnId = "ask:test:civilization-zen-compound-materializer";
+  it("materializes civilization bounds plus moral graph reflection as compound evidence synthesis", () => {
+    const turnId = "ask:test:civilization-moral-compound-materializer";
     const civilizationSubgoalId =
       `${turnId}:compound_capability_subgoal:1:helix_ask_reflect_civilization_bounds`;
-    const zenSubgoalId =
+    const moralSubgoalId =
       `${turnId}:compound_capability_subgoal:2:helix_ask_reflect_ideology_context`;
     const finalAnswerDraft = {
       artifact_id: `${turnId}:final_answer_draft`,
       kind: "final_answer_draft",
       payload: {
         schema: "helix.final_answer_draft.v1",
-        text: "The civilization bounds roadmap and zen graph reflection jointly support the final synthesis.",
-        answer_text: "The civilization bounds roadmap and zen graph reflection jointly support the final synthesis.",
+        text: "The civilization bounds roadmap and moral graph reflection jointly support the final synthesis.",
+        answer_text: "The civilization bounds roadmap and moral graph reflection jointly support the final synthesis.",
         goal_kind: "compound_evidence_synthesis",
         required_terminal_kind: "compound_evidence_synthesis_answer",
-        support_refs: ["obs:civilization-bounds", "obs:zen-reflection"],
-        artifact_refs: ["obs:civilization-bounds", "obs:zen-reflection"],
+        support_refs: ["obs:civilization-bounds", "obs:moral-reflection"],
+        artifact_refs: ["obs:civilization-bounds", "obs:moral-reflection"],
         authority: "llm_post_observation_compound_synthesis",
       },
     };
@@ -2899,12 +2899,12 @@ describe("compound capability synthesis readiness", () => {
         },
       },
       {
-        artifact_id: "obs:zen-reflection",
-        kind: "helix_zen_graph_reflection_tool_result",
+        artifact_id: "obs:moral-reflection",
+        kind: "helix_moral_graph_reflection_tool_result",
         payload: {
           schema: "helix.ideology_context_reflection_tool_result.v1",
           capability_key: "helix_ask.reflect_ideology_context",
-          compound_subgoal_id: zenSubgoalId,
+          compound_subgoal_id: moralSubgoalId,
         },
       },
       finalAnswerDraft,
@@ -2917,14 +2917,14 @@ describe("compound capability synthesis readiness", () => {
           "model_synthesized_answer",
           "tool_receipt",
           "helix_civilization_bounds_tool_result",
-          "helix_zen_graph_reflection_tool_result",
+          "helix_moral_graph_reflection_tool_result",
         ],
       },
       capability_itinerary: {
         terminal_success_criteria: {
           requires_post_observation_synthesis: true,
           compound_terminal_policy: "synthesize_from_satisfied_subgoal_observations",
-          required_observation_families: ["civilization_bounds", "zen_graph_reflection"],
+          required_observation_families: ["civilization_bounds", "moral_graph_reflection"],
           required_capabilities: [
             "helix_ask.reflect_civilization_bounds",
             "helix_ask.reflect_ideology_context",
@@ -2934,19 +2934,19 @@ describe("compound capability synthesis readiness", () => {
             "model_synthesized_answer",
             "tool_receipt",
             "helix_civilization_bounds_tool_result",
-            "helix_zen_graph_reflection_tool_result",
+            "helix_moral_graph_reflection_tool_result",
           ],
           forbidden_terminal_artifact_kinds: [
             "tool_receipt",
             "helix_civilization_bounds_tool_result",
-            "helix_zen_graph_reflection_tool_result",
+            "helix_moral_graph_reflection_tool_result",
           ],
         },
       },
       compound_capability_synthesis_readiness: {
         applies: true,
         complete: true,
-        support_refs: ["obs:civilization-bounds", "obs:zen-reflection"],
+        support_refs: ["obs:civilization-bounds", "obs:moral-reflection"],
         required_terminal_kind: "compound_evidence_synthesis_answer",
         synthesis_terminal_kind: "compound_evidence_synthesis_answer",
       },
@@ -2966,8 +2966,8 @@ describe("compound capability synthesis readiness", () => {
             mandatory: true,
           },
           {
-            subgoal_id: zenSubgoalId,
-            capability_family: "zen_graph_reflection",
+            subgoal_id: moralSubgoalId,
+            capability_family: "moral_graph_reflection",
             requested_capability: "helix_ask.reflect_ideology_context",
             runtime_capability: "helix_ask.reflect_ideology_context",
             required_observation_kinds: ["ideology_context_reflection/v1"],
@@ -2980,8 +2980,8 @@ describe("compound capability synthesis readiness", () => {
       capability_itinerary_execution_state: {
         applies: true,
         complete: true,
-        required_observation_families: ["civilization_bounds", "zen_graph_reflection"],
-        observed_families: ["civilization_bounds", "zen_graph_reflection"],
+        required_observation_families: ["civilization_bounds", "moral_graph_reflection"],
+        observed_families: ["civilization_bounds", "moral_graph_reflection"],
         compound_subgoal_ledger: [
           {
             subgoal_id: civilizationSubgoalId,
@@ -2998,15 +2998,15 @@ describe("compound capability synthesis readiness", () => {
             terminal_contribution_kind: "model_synthesized_answer",
           },
           {
-            subgoal_id: zenSubgoalId,
+            subgoal_id: moralSubgoalId,
             requested_capability: "helix_ask.reflect_ideology_context",
             runtime_capability: "helix_ask.reflect_ideology_context",
             selected_capability: "helix_ask.reflect_ideology_context",
             executed_capability: "helix_ask.reflect_ideology_context",
             args: { text: "Reflect the review-policy implications." },
-            observation_kind: "helix_zen_graph_reflection_tool_result",
-            observation_ref: "obs:zen-reflection",
-            support_refs: ["obs:zen-reflection"],
+            observation_kind: "helix_moral_graph_reflection_tool_result",
+            observation_ref: "obs:moral-reflection",
+            support_refs: ["obs:moral-reflection"],
             satisfaction: "satisfied",
             rail_status: "complete",
             terminal_contribution_kind: "model_synthesized_answer",
@@ -3031,13 +3031,13 @@ describe("compound capability synthesis readiness", () => {
     expect(result.route_allowed_terminal_artifact_kinds).toContain("compound_evidence_synthesis_answer");
     expect(result.route_allowed_terminal_artifact_kinds).not.toContain("tool_receipt");
     expect(result.route_allowed_terminal_artifact_kinds).not.toContain("helix_civilization_bounds_tool_result");
-    expect(result.route_allowed_terminal_artifact_kinds).not.toContain("helix_zen_graph_reflection_tool_result");
+    expect(result.route_allowed_terminal_artifact_kinds).not.toContain("helix_moral_graph_reflection_tool_result");
     expect(payload.compound_evidence_synthesis_answer).toMatchObject({
-      support_refs: ["obs:civilization-bounds", "obs:zen-reflection"],
+      support_refs: ["obs:civilization-bounds", "obs:moral-reflection"],
       support_refs_count: 2,
-      subgoal_observation_refs: ["obs:civilization-bounds", "obs:zen-reflection"],
+      subgoal_observation_refs: ["obs:civilization-bounds", "obs:moral-reflection"],
       subgoal_observation_refs_count: 2,
-      source_families: ["civilization_bounds", "zen_graph_reflection"],
+      source_families: ["civilization_bounds", "moral_graph_reflection"],
       model_step_capability: "model.synthesize_from_compound_subgoal_observations",
     });
   });

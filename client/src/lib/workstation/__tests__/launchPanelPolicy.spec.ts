@@ -33,8 +33,8 @@ describe("launchPanelPolicy", () => {
     expect(isUserLaunchPanel("theory-badge-graph")).toBe(true);
   });
 
-  it("includes the Zen Badge Graph and Fruition Calculator in launch panels", () => {
-    expect(isUserLaunchPanel("zen-graph")).toBe(true);
+  it("includes the Moral Badge Graph and Fruition Calculator in launch panels", () => {
+    expect(isUserLaunchPanel("moral-graph")).toBe(true);
     expect(isUserLaunchPanel("fruition-calculator")).toBe(true);
   });
 
@@ -52,7 +52,7 @@ describe("launchPanelPolicy", () => {
     expect(isLegacyDebugPanel("agi-essence-console")).toBe(true);
   });
 
-  it("shows the main Ideology & Zen panel but hides its source/debug variant", () => {
+  it("shows the main Ideology & Moral panel but hides its source/debug variant", () => {
     expect(isUserLaunchPanel("mission-ethos")).toBe(true);
     expect(isUnfinishedPanel("mission-ethos")).toBe(false);
     expect(isUserLaunchPanel("mission-ethos-source")).toBe(false);

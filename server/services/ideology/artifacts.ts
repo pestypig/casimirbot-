@@ -5,7 +5,7 @@ import {
   type IdeologyArtifactSearchResponse
 } from "@shared/ideology/ideology-artifacts";
 
-export const ZEN_SOCIETY_STRICT_FAIL_REASON = "ZEN_SOCIETY_PROVENANCE_MISSING";
+export const MORAL_SOCIETY_STRICT_FAIL_REASON = "MORAL_SOCIETY_PROVENANCE_MISSING";
 
 export type EthosKnowledgeProvenance = {
   provenance_class: "inferred";
@@ -38,7 +38,7 @@ const withKnowledgeProvenance = (artifact: IdeologyArtifact): IdeologyArtifactWi
   ...DEFAULT_ETHOS_KNOWLEDGE_PROVENANCE,
 });
 
-const isZenSocietyArtifact = (artifact: IdeologyArtifact): boolean => {
+const isMoralSocietyArtifact = (artifact: IdeologyArtifact): boolean => {
   const tags = (artifact.tags ?? []).map(normalize);
   if (artifact.nodeId === "citizens-arc") return true;
   return tags.includes("society") || tags.includes("governance");
@@ -95,7 +95,7 @@ export const searchIdeologyArtifacts = (
     params.strictProvenance === true &&
     filtered.some(
       (item) =>
-        isZenSocietyArtifact(item) &&
+        isMoralSocietyArtifact(item) &&
         (!hasCompleteKnowledgeProvenance(item as Partial<IdeologyArtifactWithProvenance>) || !hasEvidenceProvenance(item)),
     );
 
@@ -104,7 +104,7 @@ export const searchIdeologyArtifacts = (
     items,
     total: filtered.length,
     filters: { panelId, nodeId, tags },
-    ...(strictMissingProvenance ? { fail_reason: ZEN_SOCIETY_STRICT_FAIL_REASON } : {}),
+    ...(strictMissingProvenance ? { fail_reason: MORAL_SOCIETY_STRICT_FAIL_REASON } : {}),
   };
 };
 

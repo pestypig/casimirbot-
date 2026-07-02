@@ -287,14 +287,14 @@ export function buildRouteProductContract(input: {
   const visualSceneMemoryTarget =
     sourceTarget === "visual_scene_memory" ||
     targetKind === "visual_scene_memory";
-  const zenGraphReflectionTarget =
+  const moralGraphReflectionTarget =
     requestedOutputs.includes("ideology_context_reflection/v1") ||
-    requestedOutputs.includes("procedural_zen_classification/v1") ||
-    requestedOutputs.includes("zen_badge_locator/v1") ||
+    requestedOutputs.includes("procedural_moral_classification/v1") ||
+    requestedOutputs.includes("moral_badge_locator/v1") ||
     requestedOutputs.includes("fruition_procedure_expression/v1") ||
-    /\b(?:zen\s*(?:badge\s*)?graph|zen\s*batch\s*graph|zengraph|procedural\s+zen|inner[-\s]?practice|fruition\s+(?:calculator|solve|expression)|ideology\s+(?:tree|graph|map))\b/i.test(promptText);
+    /\b(?:moral\s*(?:badge\s*)?graph|moral\s*batch\s*graph|moralgraph|procedural\s+moral|inner[-\s]?practice|fruition\s+(?:calculator|solve|expression)|ideology\s+(?:tree|graph|map))\b/i.test(promptText);
 
-  if (zenGraphReflectionTarget && sourceTarget === "workstation_panel") {
+  if (moralGraphReflectionTarget && sourceTarget === "workstation_panel") {
     return makeContract({
       turnId: input.turnId,
       threadId: input.threadId,
@@ -315,12 +315,12 @@ export function buildRouteProductContract(input: {
       ],
       sideArtifactKindsAllowed: [
         "ideology_context_reflection/v1",
-        "procedural_zen_classification/v1",
-        "zen_badge_locator/v1",
+        "procedural_moral_classification/v1",
+        "moral_badge_locator/v1",
         "fruition_procedure_expression/v1",
         "helix_recommended_action_admission/v1",
       ],
-      precedenceReason: "zen_graph_reflection_requires_evidence_reentry_before_terminal_synthesis",
+      precedenceReason: "moral_graph_reflection_requires_evidence_reentry_before_terminal_synthesis",
     });
   }
 

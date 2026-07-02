@@ -14,7 +14,7 @@ const SOURCES = [
 
 type PartialWhisper = {
   id: string;
-  zen: string;
+  moral: string;
   body: string;
   action?: string;
   tags?: string[];
@@ -57,15 +57,15 @@ function toPartial(payload: Record<string, unknown>): PartialWhisper | null {
   if (!id) return null;
 
   const text = isRecord(payload.text) ? payload.text : undefined;
-  const zen =
-    toStringValue(payload.zen) ??
-    (text ? toStringValue(text.zen) ?? toStringValue(text.title) : undefined);
+  const moral =
+    toStringValue(payload.moral) ??
+    (text ? toStringValue(text.moral) ?? toStringValue(text.title) : undefined);
   const body =
     toStringValue(payload.body) ??
     toStringValue(payload.physics) ??
     (text ? toStringValue(text.physics) ?? toStringValue(text.body) : undefined);
 
-  if (!zen || !body) return null;
+  if (!moral || !body) return null;
 
   const rule = isRecord(payload.rule) ? (payload.rule as Record<string, unknown>) : undefined;
   const hashes =
@@ -87,7 +87,7 @@ function toPartial(payload: Record<string, unknown>): PartialWhisper | null {
 
   return {
     id,
-    zen,
+    moral,
     body,
     action: action && action.length ? action : undefined,
     tags,
@@ -181,7 +181,7 @@ async function run() {
       hashes: entry.hashes ?? [],
       severity: entry.severity ?? "hint",
       mode: entry.mode ?? "bubble",
-      zen: entry.zen,
+      moral: entry.moral,
       body: entry.body,
       action: entry.action,
       score:

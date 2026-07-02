@@ -271,8 +271,8 @@ import {
 } from "@/lib/helix/imageAttachmentLensRun";
 import type { ImageAttachmentLensRunV1 } from "@shared/contracts/image-attachment-lens-run.v1";
 import type { AgentGoalSessionV1 } from "@shared/contracts/workstation-goal-context.v1";
-import { shouldUseIsolatedZenGraphAskTurn } from "@/lib/helix/zenGraphAskRouting";
-import { publishZenGraphCurrentAnswerFromDebugExport } from "@/store/useZenGraphCurrentAnswerStore";
+import { shouldUseIsolatedMoralGraphAskTurn } from "@/lib/helix/moralGraphAskRouting";
+import { publishMoralGraphCurrentAnswerFromDebugExport } from "@/store/useMoralGraphCurrentAnswerStore";
 import {
   HELIX_ASK_LIVE_EVENT_BUS_EVENT,
   coerceHelixAskLiveEventBusPayload,
@@ -8562,9 +8562,9 @@ export function HelixAskPill({
   useEffect(() => {
     if (!latestAskReply) return;
     try {
-      publishZenGraphCurrentAnswerFromDebugExport(normalizeReplyMasterDebugPayload(latestAskReply, null));
+      publishMoralGraphCurrentAnswerFromDebugExport(normalizeReplyMasterDebugPayload(latestAskReply, null));
     } catch {
-      // ZenGraph answer blocks are a debug projection; Ask rendering must not depend on them.
+      // MoralGraph answer blocks are a debug projection; Ask rendering must not depend on them.
     }
   }, [latestAskReply?.content, latestAskReply?.debug, latestAskReply?.id]);
   const [askElapsedMs, setAskElapsedMs] = useState<number | null>(null);
@@ -10823,7 +10823,7 @@ export function HelixAskPill({
         if (typeof window !== "undefined") {
           (window as unknown as { __HELIX_LAST_UNIFIED_DEBUG_COPY__?: string }).__HELIX_LAST_UNIFIED_DEBUG_COPY__ = exportPayload;
         }
-        publishZenGraphCurrentAnswerFromDebugExport(exportPayload);
+        publishMoralGraphCurrentAnswerFromDebugExport(exportPayload);
         const copyResult = await copyDebugPayloadToClipboard(exportPayload);
         const payloadHash = copyResult.attempted_payload_hash ?? hashDebugExportText(exportPayload);
         const drawerProjection = buildHelixAskDebugDrawerCopyProjection({
@@ -22919,9 +22919,9 @@ export function HelixAskPill({
               : !manualDispatchHint || inferredMode === "observe"
                 ? undefined
                 : inferredMode;
-          const isolatedZenGraphAskTurn = shouldUseIsolatedZenGraphAskTurn(trimmed);
+          const isolatedMoralGraphAskTurn = shouldUseIsolatedMoralGraphAskTurn(trimmed);
           const reasoningContextModeForTurn: "attached" | "isolated" =
-            options?.contextMode === "isolated" || repoCodeEvidencePrompt || isolatedZenGraphAskTurn
+            options?.contextMode === "isolated" || repoCodeEvidencePrompt || isolatedMoralGraphAskTurn
               ? "isolated"
               : "attached";
           const workspaceContextSnapshot =
@@ -23180,9 +23180,9 @@ export function HelixAskPill({
               ? {
                   ...localResponse.debug,
                   ...(inferredMode ? { client_inferred_mode: inferredMode } : {}),
-                  ...(isolatedZenGraphAskTurn
+                  ...(isolatedMoralGraphAskTurn
                     ? {
-                        client_zen_graph_isolated_ask_turn: true,
+                        client_moral_graph_isolated_ask_turn: true,
                       }
                     : {}),
                   ...(docsViewerAnchorPath
@@ -25114,8 +25114,9 @@ export function HelixAskPill({
       buildHelixAskComposerViewModel({
         busy: askBusy,
         placeholder,
+        runtimeLabel: agentRuntimePickerModel.selectedLabel,
       }),
-    [askBusy, placeholder],
+    [agentRuntimePickerModel.selectedLabel, askBusy, placeholder],
   );
   const inputPlaceholder = composerViewModel.inputPlaceholder;
   const replyListClassNameResolved =

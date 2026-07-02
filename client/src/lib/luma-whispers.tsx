@@ -381,7 +381,7 @@ function useDeliverToOverlay(candidate: OverlayCandidate) {
 function toOverlayText(whisper: TLumaWhisper): string | null {
   if (!whisper) return null;
   if (whisper.action) return whisper.action;
-  if (whisper.zen) return whisper.zen;
+  if (whisper.moral) return whisper.moral;
   if (whisper.body) return whisper.body;
   return null;
 }

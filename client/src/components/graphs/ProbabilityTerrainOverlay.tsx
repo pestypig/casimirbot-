@@ -103,7 +103,7 @@ function graphTone(terrain: ProbabilityTerrainV1): {
   stroke: string;
   contour: string;
 } {
-  if (terrain.graphKind === "zen_badge_graph") {
+  if (terrain.graphKind === "moral_badge_graph") {
     return {
       fill: "rgba(45, 212, 191, 0.22)",
       stroke: "rgba(125, 211, 252, 0.52)",

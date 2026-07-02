@@ -27,7 +27,7 @@ export type HelixContextualToolSuppressionFamily =
   | "internet_search"
   | "theory_locator"
   | "context_reflection"
-  | "zen_graph_reflection"
+  | "moral_graph_reflection"
   | "civilization_bounds"
   | "visual_capture"
   | "situation_run"
@@ -57,7 +57,7 @@ const INTERNET_SEARCH_CUE_RE = /\b(?:browse|browsing|search|find|look\s*up|looku
 const INTERNET_SEARCH_ACTION_RE = /\b(?:browse|search|find|look\s*up|lookup|google|bing|web\s+search|internet\s+search|check\s+online|search\s+online|verify\s+online)\b/i;
 const THEORY_LOCATOR_CUE_RE = /\b(?:helix\.theory\.frontierVectorFieldTrace|frontierVectorFieldTrace|frontier\s+vector\s+field|badge\s+coordinate\s+vectors?|relation\s+tensors?|dimensional\s+connections?|candidate\s+badge\s+connections?|theory\s+frontiers?|theory\s+badge\s+graph|theory_context_reflection|reflect_theory_context)\b/i;
 const CONTEXT_REFLECTION_CUE_RE = /\b(?:helix_ask\.reflect_live_synthetic_data|reflect_live_synthetic_data|live_synthetic_data_reflection|helix_ask\.reflect_context_attachments|reflect_context_attachments|context_reflection(?:\s+attachments)?|context_attachment_reflection|bounded_context_reference|context\s+attachments?|attachment\s+reflection)\b/i;
-const ZEN_GRAPH_CUE_RE = /\b(?:zen_graph_reflection|zen\s+graph|reflect_ideology_context|ideology_context_reflection|procedural_zen_classification|bridge_theory_ideology_context|theory_ideology_bridge|theory\s+ideology\s+bridge|theory\s+zen\s+bridge)\b/i;
+const MORAL_GRAPH_CUE_RE = /\b(?:moral_graph_reflection|moral\s+graph|reflect_ideology_context|ideology_context_reflection|procedural_moral_classification|bridge_theory_ideology_context|theory_ideology_bridge|theory\s+ideology\s+bridge|theory\s+moral\s+bridge)\b/i;
 const CIVILIZATION_BOUNDS_CUE_RE = /\b(?:civilization_bounds|civilization\s+bounds|civilization_bounds_reflection|reflect_civilization_bounds|civilization_bounds_roadmap|build_civilization_scenario_frame|civilization\s+scenario\s+frame)\b/i;
 const VISUAL_CAPTURE_CUE_RE = /\b(?:image_lens|image\s+lens|image-lens|visual_capture|visual\s+capture|situation-room\.describe_visual_capture|situation\s+room\s+visual\s+capture|current\s+visual\s+frame|visual\s+frame|ImageLens)\b/i;
 const WORKSPACE_STATUS_CUE_RE = /\b(?:workspace_os\.status|workspace[_\s-]?os[_\s-]?status|workspace\s+status|workstation\s+status|capability\s+records?)\b/i;
@@ -106,7 +106,7 @@ export function contextualToolSuppressionBlocksFamily(
   if (family === "internet_search") return /internet|web|search|browse|google|bing/i.test(cue);
   if (family === "theory_locator") return /theory|locator|badge|graph|reflection|frontier|tensor|dimensional|candidate/i.test(cue);
   if (family === "context_reflection") return /context|attachment|synthetic|bounded/i.test(cue);
-  if (family === "zen_graph_reflection") return /zen|ideology|theory_ideology|theory\s+ideology|procedural/i.test(cue);
+  if (family === "moral_graph_reflection") return /moral|ideology|theory_ideology|theory\s+ideology|procedural/i.test(cue);
   if (family === "civilization_bounds") return /civilization|bounds|roadmap|scenario/i.test(cue);
   if (family === "visual_capture" || family === "situation_run") return /image[_\s-]?lens|visual|situation[-_. ]?room|frame/i.test(cue);
   if (family === "workspace_diagnostic") return /workspace[_\s-]?os|workspace|workstation|status|capability\s+records?/i.test(cue);
@@ -133,7 +133,7 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
       !INTERNET_SEARCH_CUE_RE.test(prompt) &&
       !THEORY_LOCATOR_CUE_RE.test(prompt) &&
       !CONTEXT_REFLECTION_CUE_RE.test(prompt) &&
-      !ZEN_GRAPH_CUE_RE.test(prompt) &&
+      !MORAL_GRAPH_CUE_RE.test(prompt) &&
       !CIVILIZATION_BOUNDS_CUE_RE.test(prompt) &&
       !VISUAL_CAPTURE_CUE_RE.test(prompt) &&
       !WORKSPACE_STATUS_CUE_RE.test(prompt) &&
@@ -285,7 +285,7 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
   }
 
   const contextualDomainReflection = prompt.match(
-    /\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to|no)\b[\s\S]{0,180}(?:zen_graph_reflection|zen\s+graph|reflect_ideology_context|ideology_context_reflection|procedural_zen_classification|bridge_theory_ideology_context|theory_ideology_bridge|theory\s+ideology\s+bridge|theory\s+zen\s+bridge|civilization_bounds|civilization\s+bounds|civilization_bounds_reflection|reflect_civilization_bounds|civilization_bounds_roadmap|build_civilization_scenario_frame|civilization\s+scenario\s+frame)\b|["'`][^"'`]*(?:zen_graph_reflection|zen\s+graph|reflect_ideology_context|ideology_context_reflection|procedural_zen_classification|bridge_theory_ideology_context|theory_ideology_bridge|theory\s+ideology\s+bridge|theory\s+zen\s+bridge|civilization_bounds|civilization\s+bounds|civilization_bounds_reflection|reflect_civilization_bounds|civilization_bounds_roadmap|build_civilization_scenario_frame|civilization\s+scenario\s+frame)[^"'`]*["'`]|(?:\b(?:if|when|before|after|would|could|might|hypothetically|later|next\s+time|in\s+the\s+future)\b[\s\S]{0,180}(?:zen_graph_reflection|zen\s+graph|reflect_ideology_context|ideology_context_reflection|procedural_zen_classification|bridge_theory_ideology_context|theory_ideology_bridge|theory\s+ideology\s+bridge|theory\s+zen\s+bridge|civilization_bounds|civilization\s+bounds|civilization_bounds_reflection|reflect_civilization_bounds|civilization_bounds_roadmap|build_civilization_scenario_frame|civilization\s+scenario\s+frame))|(?:\b(?:earlier|previously|last\s+turn|historically|already)\b[\s\S]{0,180}(?:zen_graph_reflection|zen\s+graph|reflect_ideology_context|ideology_context_reflection|procedural_zen_classification|bridge_theory_ideology_context|theory_ideology_bridge|theory\s+ideology\s+bridge|theory\s+zen\s+bridge|civilization_bounds|civilization\s+bounds|civilization_bounds_reflection|reflect_civilization_bounds|civilization_bounds_roadmap|build_civilization_scenario_frame|civilization\s+scenario\s+frame))|(?:\b(?:screen|visible|label|button|phrase|text)\b[\s\S]{0,180}(?:zen_graph_reflection|zen\s+graph|reflect_ideology_context|ideology_context_reflection|procedural_zen_classification|bridge_theory_ideology_context|theory_ideology_bridge|theory\s+ideology\s+bridge|theory\s+zen\s+bridge|civilization_bounds|civilization\s+bounds|civilization_bounds_reflection|reflect_civilization_bounds|civilization_bounds_roadmap|build_civilization_scenario_frame|civilization\s+scenario\s+frame))/i,
+    /\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to|no)\b[\s\S]{0,180}(?:moral_graph_reflection|moral\s+graph|reflect_ideology_context|ideology_context_reflection|procedural_moral_classification|bridge_theory_ideology_context|theory_ideology_bridge|theory\s+ideology\s+bridge|theory\s+moral\s+bridge|civilization_bounds|civilization\s+bounds|civilization_bounds_reflection|reflect_civilization_bounds|civilization_bounds_roadmap|build_civilization_scenario_frame|civilization\s+scenario\s+frame)\b|["'`][^"'`]*(?:moral_graph_reflection|moral\s+graph|reflect_ideology_context|ideology_context_reflection|procedural_moral_classification|bridge_theory_ideology_context|theory_ideology_bridge|theory\s+ideology\s+bridge|theory\s+moral\s+bridge|civilization_bounds|civilization\s+bounds|civilization_bounds_reflection|reflect_civilization_bounds|civilization_bounds_roadmap|build_civilization_scenario_frame|civilization\s+scenario\s+frame)[^"'`]*["'`]|(?:\b(?:if|when|before|after|would|could|might|hypothetically|later|next\s+time|in\s+the\s+future)\b[\s\S]{0,180}(?:moral_graph_reflection|moral\s+graph|reflect_ideology_context|ideology_context_reflection|procedural_moral_classification|bridge_theory_ideology_context|theory_ideology_bridge|theory\s+ideology\s+bridge|theory\s+moral\s+bridge|civilization_bounds|civilization\s+bounds|civilization_bounds_reflection|reflect_civilization_bounds|civilization_bounds_roadmap|build_civilization_scenario_frame|civilization\s+scenario\s+frame))|(?:\b(?:earlier|previously|last\s+turn|historically|already)\b[\s\S]{0,180}(?:moral_graph_reflection|moral\s+graph|reflect_ideology_context|ideology_context_reflection|procedural_moral_classification|bridge_theory_ideology_context|theory_ideology_bridge|theory\s+ideology\s+bridge|theory\s+moral\s+bridge|civilization_bounds|civilization\s+bounds|civilization_bounds_reflection|reflect_civilization_bounds|civilization_bounds_roadmap|build_civilization_scenario_frame|civilization\s+scenario\s+frame))|(?:\b(?:screen|visible|label|button|phrase|text)\b[\s\S]{0,180}(?:moral_graph_reflection|moral\s+graph|reflect_ideology_context|ideology_context_reflection|procedural_moral_classification|bridge_theory_ideology_context|theory_ideology_bridge|theory\s+ideology\s+bridge|theory\s+moral\s+bridge|civilization_bounds|civilization\s+bounds|civilization_bounds_reflection|reflect_civilization_bounds|civilization_bounds_roadmap|build_civilization_scenario_frame|civilization\s+scenario\s+frame))/i,
   )?.[0];
   if (contextualDomainReflection) {
     return {
@@ -300,7 +300,7 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
               ? "screen_visible_tool_reference"
               : "hypothetical_tool_reference",
       verb_or_cue:
-        ZEN_GRAPH_CUE_RE.exec(contextualDomainReflection)?.[0] ??
+        MORAL_GRAPH_CUE_RE.exec(contextualDomainReflection)?.[0] ??
         CIVILIZATION_BOUNDS_CUE_RE.exec(contextualDomainReflection)?.[0] ??
         "domain_reflection",
       text: contextualDomainReflection,

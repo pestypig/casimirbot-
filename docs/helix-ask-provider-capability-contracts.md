@@ -50,6 +50,9 @@ The current provider-shared workstation gateway exposes these capabilities:
 workspace_os.status
 workstation.active_context
 scientific-calculator.solve_expression
+scientific-calculator.solve_scalar_expression
+scientific-calculator.classify_expression
+scientific-calculator.bind_variables
 scientific-calculator.active_context
 workstation.readable_surface.observe
 docs-viewer.read_visible_surface
@@ -58,6 +61,7 @@ scientific-calculator.read_visible_result
 scientific-calculator.open_panel
 scientific-calculator.focus_panel
 scientific-calculator.show_gateway_solve
+scientific-calculator.prefill_expression
 workstation.open_panel
 workstation.focus_panel
 docs-viewer.open_doc
@@ -70,6 +74,7 @@ scholarly-research.extract_numeric_parameters
 civilization-bounds.reflect_system_bounds
 theory-badge-graph.reflect_discussion_context
 theory-badge-graph.propose_frontier_conjectures
+moral-graph.reflect_living_substrate_context
 live_env.request_interim_voice_callout
 live_env.narrator_say
 live_env.query_visual_summaries
@@ -181,6 +186,9 @@ capability uses:
 | `helix.workspace_os_status_observation.v1` | Workspace/runtime status observations. |
 | `helix.workstation_active_context_observation.v1` | Active workstation focus/context observations. |
 | `helix.calculator_solve_observation.v1` | Calculator solve observations. |
+| `helix.calculator_scalar_solve_observation.v1` | Scalar calculator solve observations. |
+| `helix.calculator_expression_classification_observation.v1` | Calculator expression classification observations. |
+| `helix.calculator_variable_binding_observation.v1` | Calculator variable-binding observations. |
 | `helix.calculator_active_context_observation.v1` | Active calculator expression/result context observations. |
 | `helix.workstation_readable_surface_observation.v1` | Registered readable workstation surface observations for docs, translations, calculator results, and future safe surfaces. |
 | `helix.workstation_ui_action_receipt.v1` | Host-side panel/open/focus/autofill projection receipts. |
@@ -192,6 +200,7 @@ capability uses:
 | `helix.scholarly_numeric_parameter_observation.v1` | Scholarly numeric parameter observations with cited values and units. |
 | `helix.civilization_bounds_reflection_observation.v1` | Civilization-bounds reflection observations. |
 | `helix.theory_context_reflection_observation.v1` | Theory badge graph reflection observations. |
+| `helix.moral_living_substrate_reflection_observation.v1` | Moral Graph living-substrate reflection observations. |
 | `helix.theory_frontier_conjecture_observation.v1` | Theory badge graph frontier conjecture workbench observations. |
 | `helix.interim_voice_callout_tool_result.v1` | Voice/narrator request receipts and host playback projections. |
 | `helix.live_environment_tool_observation.v1` | Graduated live-environment read/dry-run observations. |
@@ -205,10 +214,15 @@ capabilities with non-empty `input_schema.required`:
 | Capability | Required args |
 | --- | --- |
 | `scientific-calculator.solve_expression` | `expression` |
+| `scientific-calculator.solve_scalar_expression` | `expression` |
+| `scientific-calculator.classify_expression` | `expression` |
+| `scientific-calculator.bind_variables` | `expression`, `numeric_evidence` |
 | `scientific-calculator.show_gateway_solve` | `expression`, `result` |
+| `scientific-calculator.prefill_expression` | `expression` |
 | `workstation.open_panel` | `panel_id` |
 | `workstation.focus_panel` | `panel_id` |
 | `docs-viewer.open_doc` | `path` |
+| `moral-graph.reflect_living_substrate_context` | `prompt` |
 | `repo.search` | `query` |
 | `docs.search` | `query` |
 | `internet-search.search_web` | `query` |

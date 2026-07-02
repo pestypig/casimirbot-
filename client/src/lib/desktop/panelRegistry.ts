@@ -111,7 +111,7 @@ const BASE_PANELS: PanelDefinition[] = [
   },
   {
     id: "mission-ethos",
-    title: "Ideology & Zen",
+    title: "Ideology & Moral",
     loader: load(() => import("@/components/IdeologyPanel"), "IdeologyPanel"),
     defaultSize: { w: 960, h: 680 },
     defaultPosition: { x: 150, y: 130 },

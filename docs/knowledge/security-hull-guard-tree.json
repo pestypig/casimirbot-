@@ -316,7 +316,7 @@
       "slug": "security-guard-docs",
       "title": "Guardrail Docs",
       "excerpt": "Guardrail documentation and operator notes.",
-      "bodyMD": "Guardrail references (docs/guarded-casimir-tile-code-mapped.md, docs/qi-guard-consolidation.md, docs/needle-hull-materials.md, docs/needle-hull-mainframe.md, docs/zen-society/templates/artifacts/metric-integrity-guardrail.md, docs/knowledge/ethos/no-bypass-guardrail.md).\n\nMinimal artifact: guardrail doc index.",
+      "bodyMD": "Guardrail references (docs/guarded-casimir-tile-code-mapped.md, docs/qi-guard-consolidation.md, docs/needle-hull-materials.md, docs/needle-hull-mainframe.md, docs/moral-society/templates/artifacts/metric-integrity-guardrail.md, docs/knowledge/ethos/no-bypass-guardrail.md).\n\nMinimal artifact: guardrail doc index.",
       "tags": [
         "security",
         "docs",
@@ -358,7 +358,7 @@
         },
         {
           "type": "doc",
-          "path": "docs/zen-society/templates/artifacts/metric-integrity-guardrail.md",
+          "path": "docs/moral-society/templates/artifacts/metric-integrity-guardrail.md",
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:08e8318367d52c5d222bd2735fc8bbf62522a016b91fe2abd0d73a3a496549fa"
         },

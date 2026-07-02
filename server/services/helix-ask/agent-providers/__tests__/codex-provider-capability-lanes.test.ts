@@ -1,7 +1,84 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { codexProvider } from "../codex-provider";
 
 describe("Codex provider capability lane adapter", () => {
+  it("exposes requestable capability lanes in ordinary Codex turn debug context", async () => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    const previousCapturePromptPath = process.env.CODEX_AGENT_FAKE_CAPTURE_PROMPT_PATH;
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-provider-prompt-"));
+    const capturePromptPath = path.join(tempDir, "prompt.txt");
+    process.env.CODEX_AGENT_FAKE_STDOUT = "I can use live_translation.translate_text as an observation-only lane.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    process.env.CODEX_AGENT_FAKE_CAPTURE_PROMPT_PATH = capturePromptPath;
+    try {
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-model-visible-lanes",
+          question: "What translation lane/tool can you use?",
+        },
+      });
+      const prompt = fs.readFileSync(capturePromptPath, "utf8");
+      const debug = result.debug as Record<string, any>;
+      const modelVisible = debug.model_visible_capability_lane_manifest;
+      const translation = modelVisible.lanes
+        .flatMap((lane: any) => lane.capabilities)
+        .find((capability: any) => capability.capability_id === "live_translation.translate_text");
+
+      expect(result.ok).toBe(true);
+      expect(modelVisible).toMatchObject({
+        schema: "helix.agent_model_visible_capability_lane_manifest.v1",
+        selected_runtime_agent_provider: "codex",
+        authority_rules: expect.objectContaining({
+          helix_owns_backend_selection: true,
+          selected_runtime_provider_remains_root: true,
+          lane_outputs_are_not_final_answers: true,
+          terminal_authority_owner: "helix",
+        }),
+      });
+      expect(translation).toMatchObject({
+        required_input_fields: ["text", "target_language"],
+        optional_input_fields: expect.arrayContaining(["source_language", "requested_backend_provider"]),
+        result_authority: "observation_or_receipt_only",
+        reentry_required: true,
+        terminal_eligible: false,
+        assistant_answer: false,
+      });
+      expect(translation.when_to_use).toContain("translate");
+      expect(translation.when_not_to_use).toContain("docs-viewer.read_active_translation");
+      expect(JSON.stringify(translation.request_shape_hint)).toContain("capability_lane_call");
+      expect(JSON.stringify(translation.request_shape_hint)).toContain("live_translation.translate_text");
+      expect(debug.agent_runtime_adapter_contract.model_visible_capability_lane_manifest).toEqual(modelVisible);
+      expect(prompt).toContain("Model-visible Helix capability lane manifest:");
+      expect(prompt).toContain("live_translation.translate_text");
+      expect(prompt).toContain("docs-viewer.read_active_translation");
+      expect(prompt).toContain("lane_outputs_are_not_final_answers");
+      expect(prompt).toContain("Capability lane outputs are observations or receipts");
+    } finally {
+      if (previousStdout === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      } else {
+        process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      }
+      if (previousExitCode === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      } else {
+        process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+      }
+      if (previousCapturePromptPath === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_CAPTURE_PROMPT_PATH;
+      } else {
+        process.env.CODEX_AGENT_FAKE_CAPTURE_PROMPT_PATH = previousCapturePromptPath;
+      }
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   it("executes structured one-shot lane calls at the provider adapter edge", async () => {
     const result = await codexProvider.runTurn({
       runtime: "codex",

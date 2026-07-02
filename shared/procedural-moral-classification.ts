@@ -1,0 +1,16 @@
+export {
+  buildProceduralMoralClassificationV1,
+  isProceduralMoralClassificationV1,
+  validateProceduralMoralClassificationV1,
+  PROCEDURAL_MORAL_CLASSIFICATION_ARTIFACT_ID,
+  PROCEDURAL_MORAL_CLASSIFICATION_SCHEMA_VERSION,
+  PROCEDURAL_MORAL_MOVES,
+  PROCEDURAL_MORAL_OBSERVED_PATTERNS,
+  type BuildProceduralMoralClassificationInput,
+  type ProceduralMoralClassificationAuthorityV1,
+  type ProceduralMoralClassificationEntryV1,
+  type ProceduralMoralClassificationV1,
+  type ProceduralMoralMoveV1,
+  type ProceduralMoralObservedPatternV1,
+  type ProceduralMoralRecommendedNextMoveV1,
+} from "./contracts/procedural-moral-classification.v1";

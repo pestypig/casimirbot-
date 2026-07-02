@@ -29,7 +29,7 @@ export function LumaWhisperBubble() {
         <CardContent className="p-3 space-y-2">
           <div className="text-xs uppercase tracking-wide text-slate-400">Luma Whisper</div>
           <div className="text-[13px] leading-5">
-            <div className="italic text-slate-200">{whisper.zen}</div>
+            <div className="italic text-slate-200">{whisper.moral}</div>
             <div className="mt-1 text-slate-300">{whisper.body}</div>
             {whisper.action && <div className="mt-2 text-slate-400">{whisper.action}</div>}
           </div>

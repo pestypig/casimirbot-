@@ -22,7 +22,7 @@ export type FinalAnswerDraftRouteFamily =
   | "internet_search"
   | "theory_locator"
   | "context_reflection"
-  | "zen_graph_reflection"
+  | "moral_graph_reflection"
   | "civilization_bounds"
   | "workspace_directory"
   | "workspace_diagnostic"
@@ -172,8 +172,8 @@ export const inferFinalAnswerDraftRouteFamily = (input: {
   if (/context_reflection|context_attachment|live_synthetic_data/i.test(committedGoalKind ?? "")) {
     return "context_reflection";
   }
-  if (/zen_graph|ideology_context|procedural_zen|theory_ideology_bridge/i.test(committedGoalKind ?? "")) {
-    return "zen_graph_reflection";
+  if (/moral_graph|ideology_context|procedural_moral|theory_ideology_bridge/i.test(committedGoalKind ?? "")) {
+    return "moral_graph_reflection";
   }
   if (/civilization_bounds|civilization_scenario|civilization_roadmap/i.test(committedGoalKind ?? "")) {
     return "civilization_bounds";
@@ -253,8 +253,8 @@ export const inferFinalAnswerDraftRouteFamily = (input: {
   if (sourceTarget === "context_reflection" || /context_reflection|reflect_context_attachments|reflect_live_synthetic_data|bounded_context_reference/i.test(routeText)) {
     return "context_reflection";
   }
-  if (/zen_graph_reflection|ideology_context_reflection|procedural_zen_classification|bridge_theory_ideology_context|theory_ideology_bridge/i.test(routeText)) {
-    return "zen_graph_reflection";
+  if (/moral_graph_reflection|ideology_context_reflection|procedural_moral_classification|bridge_theory_ideology_context|theory_ideology_bridge/i.test(routeText)) {
+    return "moral_graph_reflection";
   }
   if (/civilization_bounds|civilization_scenario_frame|civilization_bounds_roadmap/i.test(routeText)) {
     return "civilization_bounds";
@@ -452,7 +452,7 @@ const docsCalculatorConnectionCovered = (text: string): boolean =>
 const sourceBackedModelSynthesisRouteFamilies = new Set<FinalAnswerDraftRouteFamily>([
   "capability_catalog",
   "context_reflection",
-  "zen_graph_reflection",
+  "moral_graph_reflection",
   "civilization_bounds",
   "workspace_directory",
   "workspace_diagnostic",

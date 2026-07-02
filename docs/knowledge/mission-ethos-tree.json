@@ -1357,7 +1357,7 @@
       "slug": "no-bypass-guardrail",
       "title": "No Bypass Guardrail",
       "excerpt": "Equanimity is not neutrality toward harm; calm language must not delay protection.",
-      "bodyMD": "Zen language can become a dodge. This guardrail prevents calm speech from anesthetizing harm or delaying accountability.\n\nEquanimity is not neutrality toward predation. When credible harm signals appear, the protect and investigate path must start.\n\nSilence in the face of credible harm signals is an action. Withholding information is not neutral; fear fills the gap. Default to timely disclosure with uncertainty markers and correction logs, and document any temporary limits.\n\nAnti-pattern: spiritual bypass, process theater, or staying above it while harm continues.\n\nMinimal artifact: Bypass Checklist. If a credible harm signal appears, start protection and investigation. Silence or delay requires recorded justification and independent review.\n\nSee [[node:values-over-images]], [[node:integrity-protocols]], [[node:restorative-harm-repair]], [[node:voice-integrity]], and [[node:three-tenets-loop]].",
+      "bodyMD": "Moral language can become a dodge. This guardrail prevents calm speech from anesthetizing harm or delaying accountability.\n\nEquanimity is not neutrality toward predation. When credible harm signals appear, the protect and investigate path must start.\n\nSilence in the face of credible harm signals is an action. Withholding information is not neutral; fear fills the gap. Default to timely disclosure with uncertainty markers and correction logs, and document any temporary limits.\n\nAnti-pattern: spiritual bypass, process theater, or staying above it while harm continues.\n\nMinimal artifact: Bypass Checklist. If a credible harm signal appears, start protection and investigation. Silence or delay requires recorded justification and independent review.\n\nSee [[node:values-over-images]], [[node:integrity-protocols]], [[node:restorative-harm-repair]], [[node:voice-integrity]], and [[node:three-tenets-loop]].",
       "tags": [
         "accountability",
         "guardrail",
@@ -2105,7 +2105,7 @@
       "slug": "verification-based-diplomacy",
       "title": "Verification-Based Diplomacy",
       "excerpt": "When trust is low, peace depends on verification, not handshakes.",
-      "bodyMD": "Trust is low. When trust is low, diplomacy cannot rely on handshakes and rhetoric. It must evolve from trust-based diplomacy to verification-based diplomacy.\n\nAn integrity floor is the shared minimum: the question is not who is right but how to prevent trade, money, and logistics from leaking into shadow rails that prolong harm. Zen governance refuses to pretend the rails are neutral.\n\nAnti-pattern: peace by press release while supply rails continue to feed harm.\n\nMinimal artifact: Verification Diplomacy Charter with shared claims, verification steps, audit trails, and rollback triggers.\n\nSee [[node:integrity-protocols]], [[node:verification-checklist]], [[node:interbeing-systems]], [[node:external-interface-integrity]], and [[node:right-speech-infrastructure]].",
+      "bodyMD": "Trust is low. When trust is low, diplomacy cannot rely on handshakes and rhetoric. It must evolve from trust-based diplomacy to verification-based diplomacy.\n\nAn integrity floor is the shared minimum: the question is not who is right but how to prevent trade, money, and logistics from leaking into shadow rails that prolong harm. Moral governance refuses to pretend the rails are neutral.\n\nAnti-pattern: peace by press release while supply rails continue to feed harm.\n\nMinimal artifact: Verification Diplomacy Charter with shared claims, verification steps, audit trails, and rollback triggers.\n\nSee [[node:integrity-protocols]], [[node:verification-checklist]], [[node:interbeing-systems]], [[node:external-interface-integrity]], and [[node:right-speech-infrastructure]].",
       "tags": [
         "diplomacy",
         "verification",
@@ -2345,7 +2345,7 @@
       "slug": "dignified-exit-design",
       "title": "Dignified Exit Design",
       "excerpt": "Off-ramps reduce cornered escalation without rewarding aggression.",
-      "bodyMD": "When a heavily armed state believes there is no dignified exit, pride, fear, and sunk-cost logic can trap actors in escalation loops. A dignified exit is not a reward; it is an off-ramp so peace does not require humiliation as fuel.\n\nNon-attachment (Zen) rejects victory narratives that demand continued harm. Non-forcing (Daoist) avoids cornering an armed state into pride-driven escalation.\n\nAnti-pattern: maximalist demands with no face-saving path.\n\nMinimal artifact: Off-Ramp Package with phased verification, face-saving language, time-bounded security assurances, and review triggers.\n\nSee [[node:koan-governance]], [[node:restorative-harm-repair]], [[node:impermanence-by-design]], [[node:skillful-mediation]], and [[node:no-bypass-guardrail]].",
+      "bodyMD": "When a heavily armed state believes there is no dignified exit, pride, fear, and sunk-cost logic can trap actors in escalation loops. A dignified exit is not a reward; it is an off-ramp so peace does not require humiliation as fuel.\n\nNon-attachment (Moral) rejects victory narratives that demand continued harm. Non-forcing (Daoist) avoids cornering an armed state into pride-driven escalation.\n\nAnti-pattern: maximalist demands with no face-saving path.\n\nMinimal artifact: Off-Ramp Package with phased verification, face-saving language, time-bounded security assurances, and review triggers.\n\nSee [[node:koan-governance]], [[node:restorative-harm-repair]], [[node:impermanence-by-design]], [[node:skillful-mediation]], and [[node:no-bypass-guardrail]].",
       "tags": [
         "off-ramp",
         "non-attachment",
@@ -3079,7 +3079,7 @@
       ],
       "actions": [
         {
-          "label": "Open Zen Mantra Settings",
+          "label": "Open Moral Mantra Settings",
           "action": {
             "kind": "openSettings",
             "tab": "preferences"
@@ -3190,7 +3190,7 @@
       ],
       "actions": [
         {
-          "label": "Open Zen Mantra Settings",
+          "label": "Open Moral Mantra Settings",
           "action": {
             "kind": "openSettings",
             "tab": "preferences"
@@ -3634,7 +3634,7 @@
         "values",
         "image",
         "self",
-        "zen",
+        "moral",
         "constraints",
         "adaptation"
       ],

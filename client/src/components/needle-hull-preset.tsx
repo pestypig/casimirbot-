@@ -7,7 +7,7 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { Rocket } from "lucide-react";
 import { UseFormReturn } from "react-hook-form";
-import { zenLongToast } from "@/lib/zen-long-toasts";
+import { moralLongToast } from "@/lib/moral-long-toasts";
 import { SimulationParameters } from "@shared/schema";
 import {
   buildNeedleHullMark2SimulationParameters,
@@ -43,7 +43,7 @@ export function NeedleHullPreset({
         type="button"
         onClick={() => {
           applyNeedleHullPreset();
-          zenLongToast("sim:create", {
+          moralLongToast("sim:create", {
             gammaGeo: NHM2_CAVITY_CONTRACT.geometry.gammaGeo,
             qFactor: NHM2_CAVITY_CONTRACT.loss.qCavity,
             duty: NHM2_CAVITY_CONTRACT.loss.dutyShip,

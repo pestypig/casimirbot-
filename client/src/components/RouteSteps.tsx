@@ -92,7 +92,7 @@ export function RouteSteps({ bodies, plan, perf, mode = "galactic", etaMode = "m
         <>
           <strong>Theory</strong><br/>
           Heliocentric transfer over {d_au.toFixed(2)} AU ({lightMinutes.toFixed(1)} light-minutes). ETA scales with effective warp velocity v_eff(mode, duty). Energy per leg = (E/ly) × distance; cycles ≈ E_leg / E_cycle.<br/><br/>
-          <em>Moving Zen:</em> Even in near space, posture precedes motion—right trajectory and right timing, without waste.
+          <em>Moving Moral:</em> Even in near space, posture precedes motion—right trajectory and right timing, without waste.
         </>
       );
     }
@@ -100,7 +100,7 @@ export function RouteSteps({ bodies, plan, perf, mode = "galactic", etaMode = "m
       <>
         <strong>Theory</strong><br/>
         Straight-line hop over {leg.d_pc.toFixed(1)} pc. ETA scales with effective warp velocity v_eff(mode, duty). Energy per leg = (E/ly) × distance; cycles ≈ E_leg / E_cycle.<br/><br/>
-        <em>Moving Zen:</em> Navigation is maai at stellar scale—right distance and right moment, repeated without waste.
+        <em>Moving Moral:</em> Navigation is maai at stellar scale—right distance and right moment, repeated without waste.
       </>
     );
   };

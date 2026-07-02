@@ -192,6 +192,24 @@ describe("ScientificCalculatorPanel theory run workbench", () => {
     expect(screen.getByRole("tab", { name: "Scalar Workbench" })).toHaveAttribute("aria-selected", "true");
   });
 
+  it("shows equation intake classification without solving symbolic prefill", async () => {
+    render(<ScientificCalculatorPanel />);
+
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "E = h * f" },
+    });
+
+    const intake = await screen.findByTestId("scientific-calculator-intake");
+    expect(within(intake).getByText("symbolic_equation")).toBeInTheDocument();
+    expect(within(intake).getByText("paper_equation_binder")).toBeInTheDocument();
+    expect(within(intake).getByText("missing_variable_bindings")).toBeInTheDocument();
+    expect(within(intake).getByText("Missing bindings: f")).toBeInTheDocument();
+    expect(within(intake).getByText("Variable binder")).toBeInTheDocument();
+    expect(within(intake).getByText("No numeric evidence bound")).toBeInTheDocument();
+    expect(within(intake).getByText("missing")).toBeInTheDocument();
+    expect(useScientificCalculatorStore.getState().lastSolve).toBeNull();
+  });
+
   it("shows the Theory Run section when a compound theory run is loaded", async () => {
     const run = buildMixedTheoryRun();
     useTheoryCompoundRunStore.getState().loadTheoryRun(run);

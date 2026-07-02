@@ -48,8 +48,8 @@ describe("Helix capability contract arbitration", () => {
       ["helix_ask.reflect_context_attachments", "context_attachment_reflection", "context_reflection"],
       ["image_lens.inspect", "visual_capture_describe", "visual_capture"],
       ["situation-room.describe_visual_capture", "visual_capture_describe", "visual_capture"],
-      ["helix_ask.reflect_ideology_context", "zen_graph_reflection", "zen_graph_reflection"],
-      ["helix_ask.bridge_theory_ideology_context", "theory_ideology_bridge_reflection", "zen_graph_reflection"],
+      ["helix_ask.reflect_ideology_context", "moral_graph_reflection", "moral_graph_reflection"],
+      ["helix_ask.bridge_theory_ideology_context", "theory_ideology_bridge_reflection", "moral_graph_reflection"],
       ["helix_ask.build_civilization_scenario_frame", "civilization_bounds_reflection", "civilization_bounds"],
       ["helix_ask.reflect_civilization_bounds", "civilization_bounds_reflection", "civilization_bounds"],
       ["live_env.check_live_source_mail", "live_source_mailbox_review", "live_source_mail"],
@@ -121,7 +121,7 @@ describe("Helix capability contract arbitration", () => {
       ["live_environment", "live_env.query_workstation_goal_context", "live_environment_tool_observation", "model_synthesized_answer"],
       ["visual_capture", "image_lens.inspect", "situation_context_pack", "situation_context_pack"],
       ["civilization_bounds", "helix_ask.reflect_civilization_bounds", "civilization_bounds_roadmap/v1", "model_synthesized_answer"],
-      ["zen_graph_reflection", "helix_ask.reflect_ideology_context", "ideology_context_reflection/v1", "model_synthesized_answer"],
+      ["moral_graph_reflection", "helix_ask.reflect_ideology_context", "ideology_context_reflection/v1", "model_synthesized_answer"],
     ] as const;
 
     for (const [family, capability, observationKind, terminalKind] of cases) {
@@ -150,7 +150,7 @@ describe("Helix capability contract arbitration", () => {
       ["live_environment", "Call live_env.query_workstation_goal_context to inspect goal context.", "live_env.query_workstation_goal_context"],
       ["visual_capture", "Use situation-room.describe_visual_capture to inspect the current visual frame.", "image_lens.inspect"],
       ["civilization_bounds", "Call helix_ask.reflect_civilization_bounds to reflect collaboration bounds.", "helix_ask.reflect_civilization_bounds"],
-      ["zen_graph_reflection", "Use helix_ask.reflect_ideology_context to reflect the zen graph context.", "helix_ask.reflect_ideology_context"],
+      ["moral_graph_reflection", "Use helix_ask.reflect_ideology_context to reflect the moral graph context.", "helix_ask.reflect_ideology_context"],
     ] as const;
 
     for (const [family, promptText, expectedCapability] of cases) {
@@ -286,7 +286,7 @@ describe("Helix capability contract arbitration", () => {
       [
         "helix_ask.reflect_ideology_context",
         "helix_ask.reflect_ideology_context",
-        "zen_graph_reflection",
+        "moral_graph_reflection",
         "ideology_context_reflection/v1",
         "model_synthesized_answer",
       ],

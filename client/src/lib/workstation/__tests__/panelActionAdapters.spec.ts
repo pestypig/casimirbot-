@@ -242,6 +242,53 @@ describe("panelActionAdapters", () => {
     });
   });
 
+  it("prefills symbolic calculator expressions without creating a solve result", () => {
+    const opened: string[] = [];
+    const result = executeHelixPanelAction(
+      {
+        panel_id: "scientific-calculator",
+        action_id: "prefill_expression",
+        args: {
+          expression: "E = h * f",
+          source_path: "paper:eq1",
+        },
+      },
+      {
+        openPanel: (panelId) => opened.push(`open:${panelId}`),
+        focusPanel: (panelId) => opened.push(`focus:${panelId}`),
+        closePanel: () => undefined,
+        openSettings: () => undefined,
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(opened).toEqual(["open:scientific-calculator", "focus:scientific-calculator"]);
+    expect(result.artifact).toMatchObject({
+      kind: "calculator_expression_prefill",
+      schema: "helix.calculator_expression_prefill_receipt.v1",
+      latex: "E = h * f",
+      source_path: "paper:eq1",
+      produced_calculator_receipt: false,
+      produced_numeric_value_evidence: false,
+      terminal_eligible: false,
+      assistant_answer: false,
+      classification: {
+        calculation_type: "symbolic_equation",
+        missing_variables: ["f"],
+        blocked_reasons: ["missing_variable_bindings"],
+      },
+    });
+    const calculatorState = useScientificCalculatorStore.getState();
+    expect(calculatorState.currentLatex).toBe("E = h * f");
+    expect(calculatorState.lastSolve).toBeNull();
+    expect(calculatorState.debugEvents[0]).toMatchObject({
+      action_id: "prefill_expression",
+      source: "workstation_action",
+      input_latex: "E = h * f",
+      message: "latex_ingested",
+    });
+  });
+
   it("routes narrator source policy and confirm-speak actions as non-answer receipts", () => {
     const policyResult = executeHelixPanelAction(
       {

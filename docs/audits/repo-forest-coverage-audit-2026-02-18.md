@@ -113,7 +113,7 @@ Impact:
 
 ## 5) Missing Tree Owners from Current ToE Map
 
-`analysis-loops`, `atomic-systems`, `brick-lattice-dataflow`, `casimir-tiles`, `certainty-framework`, `concepts`, `debate-specialists`, `dp-collapse`, `essence-luma-noise`, `ethos-knowledge`, `external-integrations`, `hardware-telemetry`, `helix-ask`, `ideology-physics-bridge`, `knowledge-ingestion`, `llm-runtime`, `packages`, `pipeline-ledger`, `queue-orchestration`, `resonance`, `robotics-recollection`, `sdk-integration`, `simulation-systems`, `skills-tooling`, `star-materials-environment`, `stellar-restoration`, `telemetry-console`, `ui-backend-binding`, `ui-components`, `warp-mechanics`, `zen-ladder-pack`, `zen-society`
+`analysis-loops`, `atomic-systems`, `brick-lattice-dataflow`, `casimir-tiles`, `certainty-framework`, `concepts`, `debate-specialists`, `dp-collapse`, `essence-luma-noise`, `ethos-knowledge`, `external-integrations`, `hardware-telemetry`, `helix-ask`, `ideology-physics-bridge`, `knowledge-ingestion`, `llm-runtime`, `packages`, `pipeline-ledger`, `queue-orchestration`, `resonance`, `robotics-recollection`, `sdk-integration`, `simulation-systems`, `skills-tooling`, `star-materials-environment`, `stellar-restoration`, `telemetry-console`, `ui-backend-binding`, `ui-components`, `warp-mechanics`, `moral-ladder-pack`, `moral-society`
 
 ## 6) Planning Recommendation
 

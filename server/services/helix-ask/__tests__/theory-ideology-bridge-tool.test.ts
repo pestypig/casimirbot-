@@ -62,7 +62,7 @@ function ideologyReflection() {
     generatedAt,
     reflectionId: "ideology-context-reflection:tool-test",
     graph: {
-      graphId: "zen-graph:test",
+      graphId: "moral-graph:test",
       rootId: "wisdom-first-principles",
       source: "docs/ethos/ideology.json",
     },
@@ -104,7 +104,7 @@ function ideologyReflection() {
   });
 }
 
-describe("Helix Ask Theory-Zen bridge tool", () => {
+describe("Helix Ask Theory-Moral bridge tool", () => {
   it("returns a valid evidence-only bridge", async () => {
     const output = await runHelixAskTheoryIdeologyBridgeTool({
       prompt: "Bridge entropy, conservation, fairness, and due process.",
@@ -197,7 +197,7 @@ describe("Helix Ask Theory-Zen bridge tool", () => {
 
     expect(evaluation.result).toBe("supports_subgoal");
     expect(evaluation.summary).toContain(
-      "Theory/Zen bridge produced evidence-only procedural constraints",
+      "Theory/Moral bridge produced evidence-only procedural constraints",
     );
     expect(evaluation.model_invoked).toBe(false);
     expect(evaluation.deterministic_gate).toBe(true);

@@ -40,6 +40,8 @@ const CLIPBOARD_WORDS = /\b(?:clipboard|paste)\b/i;
 const COPY_WORDS = /\b(?:copy|clipboard)\b/i;
 const RESULT_WORDS = /\b(?:result|answer|output)\b/i;
 const DEBUG_LOG_WORDS = /\b(?:debug|event\s+log|logs?|trace)\b/i;
+const CALCULATOR_ACTION_WORDS =
+  /\b(?:open|opened|show|shown|launch|launched|call|called|run|ran|use|used|solve|solved|evaluate|evaluated|compute|computed|calculate|calculated|convert|converted|paste|pasted|copy|copied)\b/i;
 
 const WORKSTATION_INTENT_WORDS =
   /\b(open|show|launch|read|paper|doc|docs|documentation|panel|tab|job|run|execute|settings|workspace|workstation|close|shut|dismiss|remove|rid|next|previous|prev|reopen|summarize|summary|tldr|tl;dr|explain|section|calculator|equation|latex|solve|evaluate|compute|convert|conversion|clipboard|paste|copy|result|answer|output|debug|log|trace)\b/i;
@@ -65,6 +67,56 @@ function extractCalculatorExpressionArg(value: string): string | null {
   return /[=^*/+\-()_\\]|\d/.test(cleaned) ? cleaned : null;
 }
 
+function isCalculatorExecutableIntent(intent: WorkstationIntentDecision["intent"]): boolean {
+  return (
+    intent === "calculator_open" ||
+    intent === "calculator_solve" ||
+    intent === "calculator_solve_steps" ||
+    intent === "calculator_ingest_clipboard" ||
+    intent === "calculator_copy_result" ||
+    intent === "calculator_copy_debug_log"
+  );
+}
+
+function decisionTargetsCalculatorAction(decision: WorkstationIntentDecision): boolean {
+  if (isCalculatorExecutableIntent(decision.intent)) return true;
+  if (decision.intent === "open_panel") {
+    return typeof decision.args?.panel_id === "string" && decision.args.panel_id.trim() === "scientific-calculator";
+  }
+  if (decision.intent === "run_panel_action") {
+    return typeof decision.args?.panel_id === "string" && decision.args.panel_id.trim() === "scientific-calculator";
+  }
+  return false;
+}
+
+function hasNonExecutableCalculatorMention(prompt: string): boolean {
+  const normalized = prompt.toLowerCase().replace(/\s+/g, " ").trim();
+  if (!normalized || !CALCULATOR_WORDS.test(normalized)) return false;
+  const calculatorActionNearCue =
+    CALCULATOR_OPEN_WORDS.test(normalized) ||
+    /\bscientific-calculator\./i.test(normalized) ||
+    (CALCULATOR_ACTION_WORDS.test(normalized) && CALCULATOR_WORDS.test(normalized));
+  if (!calculatorActionNearCue) return false;
+  const quotedToolText =
+    /["'`][^"'`]*(?:scientific-calculator|calculator|solve_expression|prefill_expression|open calculator|solve)[^"'`]*["'`]/i
+      .test(prompt);
+  const negatedCommand =
+    /\b(?:do\s+not|don't|dont|never|no\s+need\s+to|without|not\s+now|please\s+don't)\b[\s\S]{0,120}\b(?:open|show|launch|solve|evaluate|compute|calculate|paste|copy|calculator)\b/i
+      .test(normalized) ||
+    /\b(?:open|show|launch|solve|evaluate|compute|calculate|paste|copy)\b[\s\S]{0,80}\b(?:is\s+not|was\s+not|should\s+not|must\s+not)\b/i
+      .test(normalized);
+  const futureOrConditional =
+    /\b(?:before|after|when|if|unless|later|eventually|next\s+time|tomorrow|in\s+a\s+future\s+turn|will|going\s+to)\b[\s\S]{0,120}\b(?:open|show|launch|solve|evaluate|compute|calculate|paste|copy|calculator)\b/i
+      .test(normalized);
+  const historicalMention =
+    /\b(?:last|previous|earlier|already|did|was|were|why\s+did|why\s+was)\b[\s\S]{0,140}\b(?:scientific-calculator|calculator|solve_expression|prefill_expression|open|opened|call|called|run|ran|use|used|solve|solved|evaluate|evaluated|compute|computed|calculate|calculated|paste|pasted|copy|copied)\b/i
+      .test(normalized);
+  const screenOrQuotedMention =
+    quotedToolText &&
+    /\b(?:quote|quoted|says|said|text|label|button|screen|visible|shows|reads|mentions|phrase)\b/i.test(normalized);
+  return negatedCommand || futureOrConditional || historicalMention || screenOrQuotedMention;
+}
+
 export function shouldProbeWorkstationIntentClassifier(prompt: string): boolean {
   return WORKSTATION_INTENT_WORDS.test(prompt.trim());
 }
@@ -78,6 +130,7 @@ export function inferDeterministicWorkstationIntentDecision(prompt: string): Wor
     .replace(/[?.!,;:]+$/g, "")
     .trim();
   if (!normalized) return null;
+  if (hasNonExecutableCalculatorMention(trimmed)) return null;
 
   if (CALCULATOR_OPEN_WORDS.test(normalized)) {
     return {
@@ -194,6 +247,8 @@ export function buildWorkstationIntentClassifierPrompt(prompt: string): string {
     'Use intent="calculator_copy_result" to copy the latest calculator result.',
     'Use intent="calculator_copy_debug_log" to copy calculator debug/event logs.',
     "For calculator_solve/calculator_solve_steps, include args.latex when equation text is present.",
+    "Calculator control words are executable only when the user gives an affirmative current-turn command.",
+    "For negated, contextual, historical, future/conditional, quoted, or screen-visible calculator words, use intent=\"none\" unless there is a separate affirmative current-turn command.",
     'Use close_active_panel, focus_next_panel, focus_previous_panel, or reopen_last_closed_panel for generic tab/panel navigation requests.',
     'Examples for close_active_panel: "get rid of the current tab", "can you shut this panel for me", "close whatever tab I am on".',
     'Use intent="none" when uncertain. Never invent unsupported panel actions.',
@@ -368,6 +423,15 @@ export function reconcileWorkstationIntentDecisionWithPrompt(
 ): WorkstationIntentDecision {
   const trimmedPrompt = prompt.trim();
   if (!trimmedPrompt) return decision;
+  if (decisionTargetsCalculatorAction(decision) && hasNonExecutableCalculatorMention(trimmedPrompt)) {
+    return {
+      intent: "none",
+      confidence: Math.min(decision.confidence, 0.2),
+      subgoal: "Treat the calculator wording as contextual text, not an executable workstation action.",
+      args: undefined,
+      reason: `${decision.reason ?? "classifier_override"} | deterministic_guard:calculator_mention_not_action`,
+    };
+  }
   if (decision.intent !== "docs_read_paper") return decision;
   const wantsSummary = SUMMARY_WORDS.test(trimmedPrompt) && DOC_WORDS.test(trimmedPrompt);
   const wantsSectionSummary = wantsSummary && SUMMARY_SECTION_WORDS.test(trimmedPrompt);

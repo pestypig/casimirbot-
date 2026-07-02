@@ -265,7 +265,7 @@ describe("theory context reflector", () => {
     const reflection = buildTheoryContextReflection({
       graph: buildNhm2TheoryBadgeGraphV1(),
       prompt:
-        "Reflect fairness through entropy in the Theory Badge Graph and ZenGraph. Keep it evidence-only and do not treat physics as moral proof.",
+        "Reflect fairness through entropy in the Theory Badge Graph and MoralGraph. Keep it evidence-only and do not treat physics as moral proof.",
       generatedAt: "2026-05-31T00:00:00.000Z",
       reflectionId: "reflection:no-route-word-noise",
     });
@@ -368,11 +368,11 @@ describe("theory context reflector", () => {
     expect(reflection.evidenceForAsk.recommendedNextActions.every((action) => action.solves === false)).toBe(true);
   });
 
-  it("prioritizes requested physics concepts over atlas-neighborhood noise for Theory/Zen bridge prompts", () => {
+  it("prioritizes requested physics concepts over atlas-neighborhood noise for Theory/Moral bridge prompts", () => {
     const reflection = buildTheoryContextReflection({
       graph: buildNhm2TheoryBadgeGraphV1(),
       prompt:
-        "Reflect fairness and due process through entropy, conservation, and self-organization in the Theory Badge Graph and ZenGraph. Keep it evidence-only and do not treat physics as moral proof.",
+        "Reflect fairness and due process through entropy, conservation, and self-organization in the Theory Badge Graph and MoralGraph. Keep it evidence-only and do not treat physics as moral proof.",
       generatedAt: "2026-05-31T00:00:00.000Z",
       reflectionId: "reflection:bridge-focus-ranking",
     });

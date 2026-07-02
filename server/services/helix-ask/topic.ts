@@ -39,7 +39,7 @@ export type HelixAskTopicTag =
   | "jobs"
   | "ops"
   | "ci"
-  | "zen_ladder_pack";
+  | "moral_ladder_pack";
 
 export type HelixAskTopicProfile = {
   tags: HelixAskTopicTag[];
@@ -67,7 +67,7 @@ const TOPIC_PATTERNS: Record<HelixAskTopicTag, RegExp> = {
   trace: /\b(trace|task trace|tasktrace|trajectory|essence|casimir)\b/i,
   resonance: /\b(resonance|code lattice|lattice)\b/i,
   ideology:
-    /\b(ideology|ethos|mission[-\s]?ethos|ideology tree|ethos tree|two-key approval|stewardship ledger|sun ledger|stellar ledger|tend the sun ledger|tend the stellar ledger|zen society|zen ladder|zen-ladder|zen ladder pack|zen-ladder-pack)\b/i,
+    /\b(ideology|ethos|mission[-\s]?ethos|ideology tree|ethos tree|two-key approval|stewardship ledger|sun ledger|stellar ledger|tend the sun ledger|tend the stellar ledger|moral society|moral ladder|moral-ladder|moral ladder pack|moral-ladder-pack)\b/i,
   concepts:
     /\b(platonic reasoning|platonic method|concept registry|definition lint|belief gate|rattling gate|analysis loop|analysis loops|belief graph loop|morphospace attractors?|morphospace|wavefunction|uncertainty|probability field|boltzmann|langevin|scientific method|verification|falsifiability|falsifiable)\b/i,
   ledger:
@@ -111,7 +111,7 @@ const TOPIC_PATTERNS: Record<HelixAskTopicTag, RegExp> = {
   jobs: /\b(job|jobs|scheduler|orchestration|worker pool)\b/i,
   ops: /\b(ops|operations|deployment|release|runbook|observability|infra|sre)\b/i,
   ci: /\b(ci|cd|github actions|build pipeline|release pipeline)\b/i,
-  zen_ladder_pack: /\b(zen ladder|zen-ladder|zen ladder pack|zen-ladder-pack)\b/i,
+  moral_ladder_pack: /\b(moral ladder|moral-ladder|moral ladder pack|moral-ladder-pack)\b/i,
 };
 
 const HELIX_ASK_CORE_PATHS: RegExp[] = [
@@ -259,8 +259,8 @@ const IDEOLOGY_CORE_FILES: string[] = [
 ];
 
 const IDEOLOGY_EXPANDED_PATHS: RegExp[] = [
-  /docs\/zen-society\//i,
-  /docs\/zen-ladder-pack\//i,
+  /docs\/moral-society\//i,
+  /docs\/moral-ladder-pack\//i,
   /client\/src\/components\/ideology\//i,
   /client\/src\/components\/IdeologyPanel\.tsx/i,
   /client\/src\/components\/MissionEthosSourcePanel\.tsx/i,
@@ -272,9 +272,9 @@ const IDEOLOGY_KNOWLEDGE_PATHS: RegExp[] = [
   /docs\/knowledge\/ethos\//i,
 ];
 
-const ZEN_LADDER_PACK_PATHS: RegExp[] = [/docs\/zen-ladder-pack\//i, /docs\/ethos\/ideology\.json/i];
+const MORAL_LADDER_PACK_PATHS: RegExp[] = [/docs\/moral-ladder-pack\//i, /docs\/ethos\/ideology\.json/i];
 
-const ZEN_LADDER_PACK_FILES: string[] = ["docs/ethos/ideology.json"];
+const MORAL_LADDER_PACK_FILES: string[] = ["docs/ethos/ideology.json"];
 
 const LEDGER_CORE_PATHS: RegExp[] = [
   /docs\/ethos\/ideology\.json/i,
@@ -659,12 +659,12 @@ export function buildHelixAskTopicProfile(tags: HelixAskTopicTag[]): HelixAskTop
     minTierCandidates = Math.max(minTierCandidates, 2);
   }
 
-  if (tags.includes("zen_ladder_pack")) {
-    allowlistTiers.push(ZEN_LADDER_PACK_PATHS);
+  if (tags.includes("moral_ladder_pack")) {
+    allowlistTiers.push(MORAL_LADDER_PACK_PATHS);
     allowlistTiers.push([]);
-    boostPaths.push(...ZEN_LADDER_PACK_PATHS);
-    mustIncludePaths.push(...ZEN_LADDER_PACK_PATHS);
-    mustIncludeFiles.push(...ZEN_LADDER_PACK_FILES);
+    boostPaths.push(...MORAL_LADDER_PACK_PATHS);
+    mustIncludePaths.push(...MORAL_LADDER_PACK_PATHS);
+    mustIncludeFiles.push(...MORAL_LADDER_PACK_FILES);
     deboostPaths.push(...WARP_PATHS, ...ENERGY_PATHS);
     minTierCandidates = Math.max(minTierCandidates, 2);
     routingMetadata = {

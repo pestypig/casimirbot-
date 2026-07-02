@@ -11,6 +11,7 @@ export type HelixAskComposerProps = {
   value: string;
   disabled?: boolean;
   placeholder?: string;
+  runtimeLabel?: string | null;
   onChange: (value: string) => void;
   onSubmit: () => void;
 };
@@ -31,11 +32,25 @@ export type HelixAskComposerViewModel = {
   submitIcon: "search" | "square";
 };
 
+export function buildHelixAskComposerPlaceholder(args: {
+  placeholder?: string | null;
+  runtimeLabel?: string | null;
+}): string {
+  const explicitPlaceholder = args.placeholder?.trim();
+  if (explicitPlaceholder) return explicitPlaceholder;
+  const runtimeLabel = args.runtimeLabel?.trim() || "Helix";
+  return `Ask ${runtimeLabel} about this workspace`;
+}
+
 export function buildHelixAskComposerViewModel(args: {
   busy: boolean;
   placeholder?: string | null;
+  runtimeLabel?: string | null;
 }): HelixAskComposerViewModel {
-  const inputPlaceholder = args.placeholder?.trim() || "Ask anything about this system";
+  const inputPlaceholder = buildHelixAskComposerPlaceholder({
+    placeholder: args.placeholder,
+    runtimeLabel: args.runtimeLabel,
+  });
   const submitMode: HelixAskComposerSubmitMode = args.busy ? "stop" : "submit";
   return {
     inputPlaceholder,
@@ -129,13 +144,15 @@ export function HelixAskComposerSubmitButton({
 export function HelixAskComposer({
   value,
   disabled = false,
-  placeholder = "Ask Helix about this workspace",
+  placeholder,
+  runtimeLabel,
   onChange,
   onSubmit,
 }: HelixAskComposerProps) {
   const viewModel = buildHelixAskComposerViewModel({
     busy: disabled,
     placeholder,
+    runtimeLabel,
   });
   return (
     <form

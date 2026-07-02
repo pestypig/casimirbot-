@@ -218,19 +218,19 @@ describe("Helix Ask evidence target arbitration", () => {
     expect(arbitration.available_capabilities).not.toContain("live-source.set_rate");
   });
 
-  it("keeps ZenGraph reflection primary when research words are quoted conversation context", () => {
+  it("keeps MoralGraph reflection primary when research words are quoted conversation context", () => {
     const arbitration = buildAskEvidenceTargetArbitration({
-      turnId: "turn:zen-contextual-research",
-      threadId: "thread:zen-contextual-research",
+      turnId: "turn:moral-contextual-research",
+      threadId: "thread:moral-contextual-research",
       promptText:
-        "Use the Zen Badge Graph to reflect this conversation and classify procedural next moves. In the conversation someone says they need research papers and data before trusting decisions, but I am not asking you to search external sources.",
+        "Use the Moral Badge Graph to reflect this conversation and classify procedural next moves. In the conversation someone says they need research papers and data before trusting decisions, but I am not asking you to search external sources.",
     });
 
-    expect(arbitration.selected_candidate_id).toBe("workstation_panel.zen_graph_reflection");
+    expect(arbitration.selected_candidate_id).toBe("workstation_panel.moral_graph_reflection");
     expect(arbitration.selected_target_source).toBe("workstation_panel");
     expect(arbitration.reason_codes).toEqual(
       expect.arrayContaining([
-        "zen_graph_reflection_explicit_cue",
+        "moral_graph_reflection_explicit_cue",
         "workstation_tool_plan_capability_candidate",
         "receipt_must_reenter_model_solver",
       ]),
@@ -253,12 +253,12 @@ describe("Helix Ask evidence target arbitration", () => {
     );
   });
 
-  it("lets explicit scholarly search commands outrank ZenGraph as an external evidence target", () => {
+  it("lets explicit scholarly search commands outrank MoralGraph as an external evidence target", () => {
     const arbitration = buildAskEvidenceTargetArbitration({
-      turnId: "turn:zen-explicit-scholar",
-      threadId: "thread:zen-explicit-scholar",
+      turnId: "turn:moral-explicit-scholar",
+      threadId: "thread:moral-explicit-scholar",
       promptText:
-        "Use ZenGraph as context, but search scholarly papers and cite sources about moral guilt, rumination, and Buddhist practice.",
+        "Use MoralGraph as context, but search scholarly papers and cite sources about moral guilt, rumination, and Buddhist practice.",
     });
 
     expect(arbitration.selected_candidate_id).toBe("scholarly_research.external_sources");
@@ -268,12 +268,33 @@ describe("Helix Ask evidence target arbitration", () => {
     );
   });
 
-  it("exposes Theory-Zen bridge as a model-visible candidate when both graph families are requested", () => {
+  it("admits Moral Graph living substrate reflection as a model-visible evidence target", () => {
+    const arbitration = buildAskEvidenceTargetArbitration({
+      turnId: "turn:moral-living-substrate",
+      threadId: "thread:moral-living-substrate",
+      promptText:
+        "Use the Moral Graph to derive moral relevance from organism boundary, sensing, homeostasis, entropy pressure, and how mandates emerge from living systems.",
+    });
+
+    expect(arbitration.selected_candidate_id).toBe("workstation_panel.moral_graph_reflection");
+    expect(arbitration.selected_target_source).toBe("workstation_panel");
+    expect(arbitration.available_capabilities).toContain("moral-graph.reflect_living_substrate_context");
+    expect(arbitration.evidence_target_candidates[0]?.requested_outputs).toEqual(
+      expect.arrayContaining([
+        "ideology_context_reflection",
+        "moral_badge_locator",
+        "moral_living_substrate_reflection",
+        "workstation_tool_evaluation",
+      ]),
+    );
+  });
+
+  it("exposes Theory-Moral bridge as a model-visible candidate when both graph families are requested", () => {
     const arbitration = buildAskEvidenceTargetArbitration({
       turnId: "turn:bridge",
       threadId: "thread:bridge",
       promptText:
-        "Use the Theory Badge Graph and ZenGraph to reflect entropy, conservation, fairness, and due process as an evidence-only procedural bridge.",
+        "Use the Theory Badge Graph and MoralGraph to reflect entropy, conservation, fairness, and due process as an evidence-only procedural bridge.",
     });
 
     expect(arbitration.selected_candidate_id).toBe("workstation_panel.theory_ideology_bridge_reflection");

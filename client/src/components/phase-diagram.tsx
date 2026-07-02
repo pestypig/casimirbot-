@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import MetricsDashboard from './metrics-dashboard';
-import { zenLongToast } from '@/lib/zen-long-toasts';
+import { moralLongToast } from '@/lib/moral-long-toasts';
 import { useEnergyPipeline, MODE_CONFIGS } from '@/hooks/use-energy-pipeline';
 import { PROMOTED_WARP_PROFILE } from '@shared/warp-promoted-profile';
 
@@ -294,7 +294,7 @@ function InteractiveHeatMap({
               onValueChange={(value) => {
                 updateParameter('selectedMode', value);
                 const r = resolveModeNumbers(value, pipeline);
-                zenLongToast("mode:switch", {
+                moralLongToast("mode:switch", {
                   mode: value.charAt(0).toUpperCase() + value.slice(1),
                   duty: r.dutyCycle,
                   powerMW: r.P_avg,
@@ -332,7 +332,7 @@ function InteractiveHeatMap({
                   value={[localParams.gammaGeo]}
                   onValueChange={([value]) => {
                     updateParameter('gammaGeo', value);
-                    zenLongToast("geom:gamma", {
+                    moralLongToast("geom:gamma", {
                       gammaGeo: value,
                       hullReferenceRadiusM: currentHullReferenceRadius,
                       gapNm: 1.0
@@ -364,7 +364,7 @@ function InteractiveHeatMap({
                     onValueChange={([value]) => {
                       const qFactor = Math.min(1e10, Math.max(1e6, Math.pow(10, value)));
                       updateParameter('qCavity', qFactor);
-                      zenLongToast("geom:qfactor", {
+                      moralLongToast("geom:qfactor", {
                         qFactor,
                         powerMW: 83.3,
                         zeta: 0.032

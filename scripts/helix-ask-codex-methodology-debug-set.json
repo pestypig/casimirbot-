@@ -235,11 +235,11 @@
       "id": "atomic_ideology_context_reflection",
       "kind": "atomic",
       "family": "helix_reflection",
-      "prompt": "Use helix_ask.reflect_ideology_context to reflect through the zen graph on this rule: receipts are observations and terminal authority selects the answer.",
+      "prompt": "Use helix_ask.reflect_ideology_context to reflect through the moral graph on this rule: receipts are observations and terminal authority selects the answer.",
       "expected_capabilities": ["helix_ask.reflect_ideology_context"],
       "forbidden_capabilities": [],
       "methodology_refs": ["codex_turn_loop"],
-      "notes": "Ideology/zen graph reflection should not bypass terminal authority."
+      "notes": "Ideology/moral graph reflection should not bypass terminal authority."
     },
     {
       "id": "atomic_workstation_tool_alignment",

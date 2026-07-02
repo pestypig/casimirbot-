@@ -115,6 +115,7 @@ import {
 import { buildHelixAskRuntimePickerModel } from "@/components/helix/ask-console/HelixAskRuntimePicker";
 import {
   HELIX_ASK_CONSOLE_MAX_PROMPT_LINES,
+  buildHelixAskComposerPlaceholder,
   buildHelixAskComposerViewModel,
 } from "@/components/helix/ask-console/HelixAskComposer";
 import { buildHelixAskSubmitAdmission } from "@/components/helix/ask-console/HelixAskSubmitAdmission";
@@ -2504,9 +2505,10 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(buildHelixAskComposerViewModel({
       busy: false,
       placeholder: null,
+      runtimeLabel: "Codex",
     })).toMatchObject({
-      inputPlaceholder: "Ask anything about this system",
-      currentPlaceholder: "Ask anything about this system",
+      inputPlaceholder: "Ask Codex about this workspace",
+      currentPlaceholder: "Ask Codex about this workspace",
       maxPromptLines: 10,
       submitMode: "submit",
       submitAriaLabel: "Submit prompt",
@@ -2514,9 +2516,18 @@ describe("Helix Ask Console recrown boundary", () => {
       submitButtonType: "submit",
       submitIcon: "search",
     });
+    expect(buildHelixAskComposerPlaceholder({
+      placeholder: null,
+      runtimeLabel: "Future",
+    })).toBe("Ask Future about this workspace");
+    expect(buildHelixAskComposerPlaceholder({
+      placeholder: "Ask the active doc",
+      runtimeLabel: "Codex",
+    })).toBe("Ask the active doc");
     expect(buildHelixAskComposerViewModel({
       busy: true,
       placeholder: "Ask the active doc",
+      runtimeLabel: "Codex",
     })).toMatchObject({
       inputPlaceholder: "Ask the active doc",
       currentPlaceholder: "Add another question...",
@@ -2530,7 +2541,11 @@ describe("Helix Ask Console recrown boundary", () => {
 
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
     const composer = read("client/src/components/helix/ask-console/HelixAskComposer.tsx");
+    const minimalShell = read("client/src/components/helix/ask-console/HelixAskMinimalRuntimeShell.tsx");
+    const dock = read("client/src/components/workstation/HelixAskDock.tsx");
+    const mobileDrawer = read("client/src/components/workstation/mobile/MobileHelixAskDrawer.tsx");
     expect(legacyPill).toContain("buildHelixAskComposerViewModel");
+    expect(legacyPill).toContain("runtimeLabel: agentRuntimePickerModel.selectedLabel");
     expect(legacyPill).toContain("<HelixAskComposerTextarea");
     expect(legacyPill).toContain("composerViewModel.textareaClassName");
     expect(legacyPill).toContain("onInputValue={(value, target)");
@@ -2543,7 +2558,11 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(legacyPill).not.toContain("<textarea\n                aria-label=\"Ask Helix\"");
     expect(legacyPill).not.toContain("viewModel.submitButtonType");
     expect(composer).toContain("export const HelixAskComposerTextarea");
+    expect(composer).toContain("export function buildHelixAskComposerPlaceholder");
     expect(composer).toContain("export function HelixAskComposerSubmitButton");
+    expect(composer).toContain("runtimeLabel?: string | null");
+    expect(composer).not.toContain('placeholder = "Ask Helix about this workspace"');
+    expect(minimalShell).toContain("runtimeLabel={runtimePickerModel.selectedLabel}");
     expect(composer).toContain('aria-label="Ask Helix"');
     expect(composer).toContain("onSubmitRequested(event.currentTarget.form)");
     expect(composer).toContain("title={viewModel.submitTitle}");
@@ -2552,6 +2571,10 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(composer).toContain("<Search className=");
     expect(composer).not.toContain("handleAskSubmit");
     expect(composer).not.toContain("runAskTurn");
+    expect(dock).toContain("<HelixAskConsole");
+    expect(mobileDrawer).toContain("<HelixAskConsole");
+    expect(dock).not.toContain('placeholder="Ask Helix about this workspace"');
+    expect(mobileDrawer).not.toContain('placeholder="Ask Helix about this workspace"');
   });
 
   it("owns action toolbar display while input and capture behavior stay in the bridge", () => {

@@ -100,13 +100,13 @@ function buildValidRoadmap(): CivilizationBoundsRoadmapV1 {
         evidenceRefs: ["fixture:theory"],
       },
     ],
-    zenBindings: [
+    moralBindings: [
       {
         badgeId: "badge:a",
-        zenNodeIds: ["fairness-due-process-and-justification"],
+        moralNodeIds: ["fairness-due-process-and-justification"],
         proceduralEffect: "Require review before strengthening the claim.",
         refusesAuthority: ["moral_finality", "policy_finality"],
-        evidenceRefs: ["fixture:zen"],
+        evidenceRefs: ["fixture:moral"],
       },
     ],
     missingEvidence: ["capacity_receipt"],

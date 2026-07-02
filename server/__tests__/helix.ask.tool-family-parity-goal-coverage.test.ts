@@ -452,8 +452,8 @@ const familyLabelCommandPrompts = [
     expectedCapability: "helix_ask.reflect_context_attachments",
   },
   {
-    label: "zen_graph_reflection",
-    prompt: "Use zen graph reflection for Helix Ask parity coverage.",
+    label: "moral_graph_reflection",
+    prompt: "Use moral graph reflection for Helix Ask parity coverage.",
     expectedCapability: "helix_ask.reflect_ideology_context",
   },
   {
@@ -507,7 +507,7 @@ const requiredAcceptanceCompoundScenarioIds = [
   "live_synthetic_data_reflection_calculator",
   "visual_then_calculator",
   "civilization_bounds_reflection",
-  "zen_graph_reflection_bridge",
+  "moral_graph_reflection_bridge",
   "invalid_calculator_args_fail_closed",
   "missing_calculator_args_fail_closed",
 ] as const;
@@ -600,7 +600,7 @@ const objectiveScopeFamilyLabels = [
   "live_env/mailbox",
   "image_lens/visual_capture",
   "civilization_bounds",
-  "zen_graph_reflection",
+  "moral_graph_reflection",
 ] as const;
 
 const objectiveFamilyCoverage = [
@@ -740,8 +740,8 @@ const objectiveFamilyCoverage = [
     ],
   },
   {
-    label: "zen_graph_reflection",
-    contractFamilies: ["zen_graph_reflection"],
+    label: "moral_graph_reflection",
+    contractFamilies: ["moral_graph_reflection"],
     representativeCapabilities: [
       "helix_ask.reflect_ideology_context",
       "helix_ask.bridge_theory_ideology_context",
@@ -1062,10 +1062,10 @@ const objectiveAcceptanceCompoundScenarioCoverage = [
     ],
   },
   {
-    label: "zen graph reflection bridge",
+    label: "moral graph reflection bridge",
     scenarios: [
       {
-        id: "zen_graph_reflection_bridge",
+        id: "moral_graph_reflection_bridge",
         requestedCapabilities: [
           "helix_ask.reflect_theory_context",
           "helix_ask.reflect_ideology_context",
@@ -1629,16 +1629,16 @@ describe("Helix Ask tool-family parity goal coverage", () => {
     expect(plannerSource).toEqual(expect.stringContaining('admittedFamilies.includes("workstation_action")'));
     expect(plannerSource).toEqual(expect.stringContaining('return "theory_locator"'));
     expect(plannerSource).toEqual(expect.stringContaining('if (family === "theory_locator")'));
-    expect(plannerSource).toEqual(expect.stringContaining('if (family === "zen_graph_reflection")'));
+    expect(plannerSource).toEqual(expect.stringContaining('if (family === "moral_graph_reflection")'));
     expect(plannerSource).toEqual(expect.stringContaining('if (family === "civilization_bounds")'));
-    expect(plannerSource).toEqual(expect.stringContaining('contextualToolSuppressionBlocksFamily(suppression, "zen_graph_reflection")'));
+    expect(plannerSource).toEqual(expect.stringContaining('contextualToolSuppressionBlocksFamily(suppression, "moral_graph_reflection")'));
     expect(plannerSource).toEqual(expect.stringContaining('contextualToolSuppressionBlocksFamily(suppression, "civilization_bounds")'));
     expect(plannerSource).toEqual(expect.stringContaining('contextualToolSuppressionBlocksFamily(suppression, "situation_run")'));
     expect(plannerSource).toEqual(expect.stringContaining('contextualToolSuppressionBlocksFamily(suppression, "workspace_diagnostic")'));
     expect(plannerSource).toEqual(expect.stringContaining('contextualToolSuppressionBlocksFamily(suppression, "capability_catalog")'));
     expect(plannerSource).toEqual(expect.stringContaining('contextualToolSuppressionBlocksFamily(suppression, "context_reflection")'));
     expect(planTypeSource).toEqual(expect.stringContaining('| "theory_locator"'));
-    expect(planTypeSource).toEqual(expect.stringContaining('| "zen_graph_reflection"'));
+    expect(planTypeSource).toEqual(expect.stringContaining('| "moral_graph_reflection"'));
     expect(planTypeSource).toEqual(expect.stringContaining('| "civilization_bounds"'));
     expect(sourceTargetIntentSource).toEqual(expect.stringContaining('| "workspace_directory"'));
     expect(sourceTargetIntentSource).toEqual(expect.stringContaining('| "theory_locator"'));
@@ -1648,16 +1648,16 @@ describe("Helix Ask tool-family parity goal coverage", () => {
     expect(routeProductTypeSource).toEqual(expect.stringContaining('| "theory_locator"'));
     expect(routeProductTypeSource).toEqual(expect.stringContaining('| "context_reflection"'));
     expect(explicitContractSource).toEqual(expect.stringContaining('plan_family: "theory_locator"'));
-    expect(explicitContractSource).toEqual(expect.stringContaining('plan_family: "zen_graph_reflection"'));
+    expect(explicitContractSource).toEqual(expect.stringContaining('plan_family: "moral_graph_reflection"'));
     expect(explicitContractSource).toEqual(expect.stringContaining('plan_family: "civilization_bounds"'));
-    expect(contextualAdmissionSource).toEqual(expect.stringContaining('"zen_graph_reflection"'));
+    expect(contextualAdmissionSource).toEqual(expect.stringContaining('"moral_graph_reflection"'));
     expect(contextualAdmissionSource).toEqual(expect.stringContaining('"civilization_bounds"'));
     expect(contextualAdmissionSource).toEqual(expect.stringContaining('"visual_capture"'));
     expect(contextualAdmissionSource).toEqual(expect.stringContaining('"workspace_diagnostic"'));
     expect(contextualAdmissionSource).toEqual(expect.stringContaining('"capability_catalog"'));
     expect(contextualAdmissionSource).toEqual(expect.stringContaining('"context_reflection"'));
     expect(contextualAdmissionSource).toEqual(expect.stringContaining('"live_source_mail"'));
-    expect(contextualAdmissionSource).toEqual(expect.stringContaining("ZEN_GRAPH_CUE_RE"));
+    expect(contextualAdmissionSource).toEqual(expect.stringContaining("MORAL_GRAPH_CUE_RE"));
     expect(contextualAdmissionSource).toEqual(expect.stringContaining("CIVILIZATION_BOUNDS_CUE_RE"));
     expect(contextualAdmissionSource).toEqual(expect.stringContaining("VISUAL_CAPTURE_CUE_RE"));
     expect(contextualAdmissionSource).toEqual(expect.stringContaining("WORKSPACE_STATUS_CUE_RE"));
@@ -1709,14 +1709,14 @@ describe("Helix Ask tool-family parity goal coverage", () => {
     expect(committedRouteSource).toEqual(expect.stringContaining('"workspace_directory"'));
     expect(committedRouteSource).toEqual(expect.stringContaining('"theory_locator"'));
     expect(committedRouteSource).toEqual(expect.stringContaining('"context_reflection"'));
-    expect(committedRouteSource).toEqual(expect.stringContaining('return "zen_graph_reflection"'));
+    expect(committedRouteSource).toEqual(expect.stringContaining('return "moral_graph_reflection"'));
     expect(committedRouteSource).toEqual(expect.stringContaining('return "civilization_bounds"'));
     expect(solverSource).toEqual(expect.stringContaining('"workspace_directory"'));
     expect(solverSource).toEqual(expect.stringContaining('"calculator_stream"'));
     expect(solverSource).toEqual(expect.stringContaining('"live_environment"'));
     expect(solverSource).toEqual(expect.stringContaining('"live_source_mailbox"'));
     expect(solverSource).toEqual(expect.stringContaining('"context_reflection"'));
-    expect(solverSource).toEqual(expect.stringContaining('"zen_graph_reflection"'));
+    expect(solverSource).toEqual(expect.stringContaining('"moral_graph_reflection"'));
     expect(solverSource).toEqual(expect.stringContaining('"civilization_bounds"'));
     expect(solverSource).toEqual(expect.stringContaining('"capability_catalog"'));
     expect(solverSource).toEqual(expect.stringContaining("calculator_stream|docs_viewer"));
@@ -1724,7 +1724,7 @@ describe("Helix Ask tool-family parity goal coverage", () => {
     for (const routeFamily of [
       "theory_locator",
       "context_reflection",
-      "zen_graph_reflection",
+      "moral_graph_reflection",
       "civilization_bounds",
       "workspace_directory",
       "workspace_diagnostic",
@@ -1737,7 +1737,7 @@ describe("Helix Ask tool-family parity goal coverage", () => {
     }
     expect(draftQualityGateSource).toEqual(expect.stringContaining('committedSourceTarget === "theory_locator"'));
     expect(draftQualityGateSource).toEqual(expect.stringContaining("context_attachment|live_synthetic_data"));
-    expect(draftQualityGateSource).toEqual(expect.stringContaining("zen_graph|ideology_context"));
+    expect(draftQualityGateSource).toEqual(expect.stringContaining("moral_graph|ideology_context"));
     expect(draftQualityGateSource).toEqual(expect.stringContaining("civilization_bounds|civilization_scenario"));
     expect(draftQualityGateSource).toEqual(expect.stringContaining('sourceTarget === "workspace_directory"'));
     expect(draftQualityGateSource).toEqual(expect.stringContaining('sourceTarget === "workspace_diagnostic"'));
@@ -1783,7 +1783,7 @@ describe("Helix Ask tool-family parity goal coverage", () => {
     expect(postToolBridgeSource).toEqual(expect.stringContaining('| "workspace_diagnostic"'));
     expect(postToolBridgeSource).toEqual(expect.stringContaining('| "theory_locator"'));
     expect(postToolBridgeSource).toEqual(expect.stringContaining('| "context_reflection"'));
-    expect(postToolBridgeSource).toEqual(expect.stringContaining('| "zen_graph_reflection"'));
+    expect(postToolBridgeSource).toEqual(expect.stringContaining('| "moral_graph_reflection"'));
     expect(postToolBridgeSource).toEqual(expect.stringContaining('| "civilization_bounds"'));
     expect(postToolBridgeSource).toEqual(expect.stringContaining('| "visual_capture"'));
     expect(postToolBridgeSource).toEqual(expect.stringContaining('| "live_environment"'));
@@ -1815,7 +1815,7 @@ describe("Helix Ask tool-family parity goal coverage", () => {
       expect.stringContaining("process_live_source_mail|stage_play_live_source_mail_read_result"),
     );
     expect(postToolBridgeSource).toEqual(expect.stringContaining("helix_theory_context_reflection_tool_receipt"));
-    expect(postToolBridgeSource).toEqual(expect.stringContaining("helix_zen_graph_reflection_tool_result"));
+    expect(postToolBridgeSource).toEqual(expect.stringContaining("helix_moral_graph_reflection_tool_result"));
     expect(postToolBridgeSource).toEqual(expect.stringContaining("civilization_bounds_roadmap"));
     expect(postToolBridgeSource).toEqual(expect.stringContaining("visual_capture_coverage"));
     expect(routeSource).toEqual(expect.stringContaining('capability === "repo-code.search_concept"'));
@@ -1874,7 +1874,7 @@ describe("Helix Ask tool-family parity goal coverage", () => {
       "scholarly_research",
       "theory_locator",
       "context_reflection",
-      "zen_graph_reflection",
+      "moral_graph_reflection",
       "civilization_bounds",
       "visual_capture",
       "situation_run",
@@ -2437,25 +2437,25 @@ describe("Helix Ask tool-family parity goal coverage", () => {
     expect(frontier?.allowedTerminalKinds).toContain("theory_context_reflection_answer");
   });
 
-  it("keeps zen graph reflection capabilities on distinct observation rails", () => {
+  it("keeps moral graph reflection capabilities on distinct observation rails", () => {
     const ideology = resolveToolFamilyContract({ toolName: "helix_ask.reflect_ideology_context" });
-    expect(ideology?.toolFamily).toBe("zen_graph_reflection");
+    expect(ideology?.toolFamily).toBe("moral_graph_reflection");
     expect(ideology?.requiredObservationKinds).toEqual([
       "ideology_context_reflection/v1",
-      "procedural_zen_classification/v1",
-      "helix_zen_graph_reflection_tool_result",
+      "procedural_moral_classification/v1",
+      "helix_moral_graph_reflection_tool_result",
       "workstation_tool_evaluation",
     ]);
     expect(ideology?.requiredObservationKinds).not.toContain("theory_ideology_bridge");
     expect(ideology?.allowedTerminalKinds).toContain("model_synthesized_answer");
 
     const bridge = resolveToolFamilyContract({ toolName: "helix_ask.bridge_theory_ideology_context" });
-    expect(bridge?.toolFamily).toBe("zen_graph_reflection");
+    expect(bridge?.toolFamily).toBe("moral_graph_reflection");
     expect(bridge?.requiredObservationKinds).toEqual([
       "helix_theory_ideology_bridge_tool_result",
       "theory_ideology_bridge",
     ]);
-    expect(bridge?.requiredObservationKinds).not.toContain("procedural_zen_classification/v1");
+    expect(bridge?.requiredObservationKinds).not.toContain("procedural_moral_classification/v1");
     expect(bridge?.allowedTerminalKinds).toContain("model_synthesized_answer");
   });
 
@@ -3446,7 +3446,7 @@ describe("Helix Ask tool-family parity goal coverage", () => {
     }));
   });
 
-  it("binds theory and ideology reflections into their explicit Zen bridge args", () => {
+  it("binds theory and ideology reflections into their explicit Moral bridge args", () => {
     const compound = buildHelixCompoundCapabilityContract({
       turnId: "ask:tool-family-parity:theory-ideology-bridge-bindings",
       promptText:
@@ -3476,7 +3476,7 @@ describe("Helix Ask tool-family parity goal coverage", () => {
     ]));
     expect(subgoals[2]?.args_hint).toEqual(expect.objectContaining({
       theory_reflection_ref: "step:reflect_theory_context",
-      ideology_reflection_ref: "step:reflect_zen_graph_context",
+      ideology_reflection_ref: "step:reflect_moral_graph_context",
     }));
   });
 

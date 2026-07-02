@@ -73,7 +73,7 @@ export async function runHelixAskTheoryIdeologyBridgeTool(
 
 export const theoryIdeologyBridgeSpec: ToolSpecShape = {
   name: HELIX_ASK_THEORY_IDEOLOGY_BRIDGE_TOOL_NAME,
-  desc: "Deterministic evidence-only bridge between Theory graph reflection and ZenGraph reflection. It may relate observable constraints, mathematical structure, and declared/lived context to procedural justice lenses, but must not claim that physics proves morality, that a person is morally approved or failed, or that any action has execution permission. Analogy links remain analogy_only unless both graph receipts supply direct evidence for a stronger procedural relation.",
+  desc: "Deterministic evidence-only bridge between Theory graph reflection and MoralGraph reflection. It may relate observable constraints, mathematical structure, and declared/lived context to procedural justice lenses, but must not claim that physics proves morality, that a person is morally approved or failed, or that any action has execution permission. Analogy links remain analogy_only unless both graph receipts supply direct evidence for a stronger procedural relation.",
   inputSchema: {
     type: "object",
     properties: {

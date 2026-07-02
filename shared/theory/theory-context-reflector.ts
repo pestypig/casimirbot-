@@ -445,8 +445,8 @@ function summaryText(args: {
 const THEORY_IDEOLOGY_BRIDGE_THEORY_CUE =
   /\b(?:theory\s+(?:badge\s*)?graph|physics\s+(?:badge\s*)?graph|observable\s+physics|mathematics|entropy|conservation|self[-\s]?organization|chemistry|first\s+principles|boundary\s+conditions?|feedback\s+loops?|symmetry|invariance)\b/i;
 
-const THEORY_IDEOLOGY_BRIDGE_ZEN_CUE =
-  /\b(?:zen\s*(?:badge\s*)?graph|zengraph|fruition|justice|fairness|due\s+process|morality|moral|ethos|procedural\s+justice|personalization|priorit(?:y|ies)|non[-\s]?harm|right\s+speech)\b/i;
+const THEORY_IDEOLOGY_BRIDGE_MORAL_CUE =
+  /\b(?:moral\s*(?:badge\s*)?graph|moralgraph|fruition|justice|fairness|due\s+process|morality|moral|ethos|procedural\s+justice|personalization|priorit(?:y|ies)|non[-\s]?harm|right\s+speech)\b/i;
 
 const BRIDGE_FOCUS_GROUPS = [
   {
@@ -488,7 +488,7 @@ const BRIDGE_FOCUS_GROUPS = [
 ] as const;
 
 function isTheoryIdeologyBridgePrompt(query: string): boolean {
-  return THEORY_IDEOLOGY_BRIDGE_THEORY_CUE.test(query) && THEORY_IDEOLOGY_BRIDGE_ZEN_CUE.test(query);
+  return THEORY_IDEOLOGY_BRIDGE_THEORY_CUE.test(query) && THEORY_IDEOLOGY_BRIDGE_MORAL_CUE.test(query);
 }
 
 function requestedBridgeFocusGroups(query: string): Array<(typeof BRIDGE_FOCUS_GROUPS)[number]> {

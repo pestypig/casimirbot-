@@ -443,7 +443,7 @@ const argsHintForSubgoal = (input: {
       prompt: boundedPromptArg(),
       refs: ["helix-ask:current-turn"],
       theory_reflection_ref: "step:reflect_theory_context",
-      ideology_reflection_ref: "step:reflect_zen_graph_context",
+      ideology_reflection_ref: "step:reflect_moral_graph_context",
     };
   }
   if (capability === "helix_ask.build_civilization_scenario_frame") {
@@ -599,7 +599,7 @@ const SUBGOAL_BINDING_SOURCE_FAMILIES = new Set([
   "live_source_mail",
   "context_reflection",
   "theory_locator",
-  "zen_graph_reflection",
+  "moral_graph_reflection",
   "civilization_bounds",
 ]);
 
@@ -612,7 +612,7 @@ const SUBGOAL_BINDING_CONSUMER_FAMILIES = new Set([
   "live_source_mail",
   "live_source_decision",
   "voice_delivery",
-  "zen_graph_reflection",
+  "moral_graph_reflection",
   "civilization_bounds",
 ]);
 

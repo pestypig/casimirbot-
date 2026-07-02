@@ -13,7 +13,7 @@ The atlas should let the agent ask, in order:
 5. Which route candidates are possible, blocked, observed, or missing evidence?
 6. Which flows have been observed?
 7. Which civilization bounds become relevant from that evidence?
-8. Which ZenGraph procedural lenses should be invoked for morality, review, consent, and legitimacy?
+8. Which MoralGraph procedural lenses should be invoked for morality, review, consent, and legitimacy?
 9. What terminal synthesis is allowed after evidence re-entry?
 
 This keeps the Earth/map UI subordinate to the evidence order. The panel can zoom, project, and place badges, but the contract defines what the agent is allowed to reason over first.
@@ -49,7 +49,7 @@ This keeps the Earth/map UI subordinate to the evidence order. The panel can zoo
 `shared/civilization/build-civilization-atlas-view-model.ts`
 
 - Composes roadmap evidence and atlas evidence into a focused context for the agent.
-- This is where selected routes, selected field layers, missing evidence, Theory bindings, and ZenGraph hints are gathered.
+- This is where selected routes, selected field layers, missing evidence, Theory bindings, and MoralGraph hints are gathered.
 
 `server/skills/helix-ask.civilization-bounds-roadmap.ts`
 
@@ -91,11 +91,11 @@ Theory bounds
   -> route candidates
   -> observed flows
   -> civilization bounds
-  -> optional ZenGraph procedural reflection
+  -> optional MoralGraph procedural reflection
   -> terminal synthesis after evidence re-entry
 ```
 
-The ZenGraph panel owns the procedural characterization of morality, consent, fairness, and cultural practice. The traversability atlas may attach `zenNodeIds` as hints, but it must not claim moral finality.
+The MoralGraph panel owns the procedural characterization of morality, consent, fairness, and cultural practice. The traversability atlas may attach `moralNodeIds` as hints, but it must not claim moral finality.
 
 ## Live And Historical Source Lifecycle
 

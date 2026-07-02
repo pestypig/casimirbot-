@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { buildZenGraphLaunchReflectionArtifacts } from "@/lib/zen-graph/fruitionLaunchArtifact";
+import { buildMoralGraphLaunchReflectionArtifacts } from "@/lib/moral-graph/fruitionLaunchArtifact";
 import { useFruitionCalculatorStore } from "@/store/useFruitionCalculatorStore";
 import type {
   FruitionProcedureExpressionV1,
@@ -132,7 +132,7 @@ function ExpressionView({ expression }: { expression: FruitionProcedureExpressio
 
 export default function FruitionCalculatorPanel() {
   const { currentExpression, history, loadExpression, clear } = useFruitionCalculatorStore();
-  const demoExpression = useMemo(() => buildZenGraphLaunchReflectionArtifacts().fruition, []);
+  const demoExpression = useMemo(() => buildMoralGraphLaunchReflectionArtifacts().fruition, []);
   const expression = currentExpression ?? demoExpression;
 
   return (
@@ -142,7 +142,7 @@ export default function FruitionCalculatorPanel() {
           <div>
             <h2 className="text-xl font-semibold">Fruition Calculator</h2>
             <p className="mt-1 text-sm text-slate-400">
-              Deterministic procedure expression from Zen Badge Graph reflection.
+              Deterministic procedure expression from Moral Badge Graph reflection.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">

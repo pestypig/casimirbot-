@@ -22,7 +22,7 @@ Admission should stay material rather than lexical. Direct Civilization Bounds
 requests can use the tool. Indirect conceptual prompts should use it only when
 the user asks to ground the concept against the procedural world model:
 civilization comparison, dependency analysis, route or infrastructure grounding,
-live/historical source-backed measurements, or Theory/Zen bridge context. Loose
+live/historical source-backed measurements, or Theory/Moral bridge context. Loose
 metaphors such as "Is global trade like a circulatory system?" should remain
 model-led unless the prompt asks for procedural evidence.
 
@@ -48,13 +48,13 @@ the roadmap interprets those facts as civilization bounds.
 Civilization Bounds Roadmap adds situational capacity context between those
 physical/traversability badges and any downstream procedural reflection.
 
-## Relation To ZenGraph
+## Relation To MoralGraph
 
-ZenGraph remains the procedural justice lens. Civilization bounds can expose review interfaces, consent gaps, observability gaps, reversibility margins, and missing checks that ZenGraph can use as evidence.
+MoralGraph remains the procedural justice lens. Civilization bounds can expose review interfaces, consent gaps, observability gaps, reversibility margins, and missing checks that MoralGraph can use as evidence.
 
 The roadmap does not turn those procedural lenses into a verdict.
 
-## Relation To The Theory-Zen Bridge
+## Relation To The Theory-Moral Bridge
 
 The intended bridge continuity is:
 
@@ -68,7 +68,7 @@ Planetary traversability evidence
 Civilization bounds evidence
   -> capacity, scarcity, dependency, reversibility, governance interface
 
-ZenGraph evidence
+MoralGraph evidence
   -> fairness, review, uncertainty, non-harm, due process
 ```
 
@@ -149,7 +149,7 @@ the roadmap receipt. That keeps the dependency order explicit:
 ```text
 Theory bounds -> planetary fields -> source-backed measurements -> natural
 affordances/hazards -> built infrastructure -> route candidates -> observed
-flows -> civilization bounds -> optional ZenGraph procedural reflection ->
+flows -> civilization bounds -> optional MoralGraph procedural reflection ->
 terminal synthesis after evidence re-entry
 ```
 

@@ -188,7 +188,7 @@ export type CivilizationRouteCandidateV1 = {
   evidenceRefs: string[];
   missingEvidence: string[];
   theoryBadgeIds?: string[];
-  zenNodeIds?: string[];
+  moralNodeIds?: string[];
 };
 
 export type CivilizationObservedFlowV1 = {
@@ -212,7 +212,7 @@ export type CivilizationTraversabilityContextV1 = {
   limitingFactors: string[];
   unavailableAlternatives: string[];
   theoryBadgeIds: string[];
-  zenNodeIds: string[];
+  moralNodeIds: string[];
   evidenceRefs: string[];
   missingEvidence: string[];
   routeObjective?: CivilizationTraversabilityRouteObjectiveV1;
@@ -441,7 +441,7 @@ function validateRouteCandidate(prefix: string, value: unknown, issues: string[]
   validateStringArray(`${prefix}.evidenceRefs`, value.evidenceRefs, issues);
   validateStringArray(`${prefix}.missingEvidence`, value.missingEvidence, issues);
   if (value.theoryBadgeIds !== undefined) validateStringArray(`${prefix}.theoryBadgeIds`, value.theoryBadgeIds, issues);
-  if (value.zenNodeIds !== undefined) validateStringArray(`${prefix}.zenNodeIds`, value.zenNodeIds, issues);
+  if (value.moralNodeIds !== undefined) validateStringArray(`${prefix}.moralNodeIds`, value.moralNodeIds, issues);
   validateClaimTier(`${prefix}.claimTier`, value.claimTier, issues);
 }
 

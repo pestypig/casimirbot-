@@ -133,7 +133,7 @@ export function HelixSettingsDialogContent({
               onChange={(value) => updateSettings({ preferDesktop: value })}
             />
             <PreferenceToggleRow
-              id="show-zen"
+              id="show-moral"
               label="Show mission mantra"
               description="Keep the profile quote visible."
               checked={userSettings.showZen}

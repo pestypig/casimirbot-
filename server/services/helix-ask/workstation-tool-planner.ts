@@ -34,6 +34,10 @@ import {
   type WorkstationContextFeedQueryCapability,
   workstationContextFeedQuerySpecForCapability,
 } from "./workstation-context-feed-query-tool-contracts";
+import {
+  moralGraphPolicyAllowsLivingSubstrateReflection,
+  moralGraphPolicyPrefersTheoryFirst,
+} from "../../../shared/moral-graph/moral-graph-agent-invocation-policy";
 
 export type WorkstationToolIntent =
   | "calculator_verify"
@@ -52,7 +56,8 @@ export type WorkstationToolIntent =
   | "theory_context_reflection"
   | "physics_calculation_context"
   | "ideology_compare"
-  | "zen_graph_reflection"
+  | "moral_graph_reflection"
+  | "moral_living_substrate_reflection"
   | "theory_ideology_bridge_reflection"
   | "civilization_bounds_reflection"
   | "direct_answer";
@@ -616,8 +621,8 @@ function isNoteAppendPrompt(prompt: string): boolean {
 
 function isIdeologyComparePrompt(prompt: string): boolean {
   return (
-    /\b(?:compare|check|evaluate|review|analy[sz]e)\b[\s\S]{0,100}\b(?:motive|intent|intention|goal|behavior|decision|action)\b[\s\S]{0,140}\b(?:zen|ethos|ideology|mission\s+ethos)\b/i.test(prompt) ||
-    /\b(?:zen|ethos|ideology|mission\s+ethos)\b[\s\S]{0,100}\b(?:compare|check|evaluate|review|analy[sz]e)\b[\s\S]{0,100}\b(?:motive|intent|intention|goal|behavior|decision|action)\b/i.test(prompt)
+    /\b(?:compare|check|evaluate|review|analy[sz]e)\b[\s\S]{0,100}\b(?:motive|intent|intention|goal|behavior|decision|action)\b[\s\S]{0,140}\b(?:moral|ethos|ideology|mission\s+ethos)\b/i.test(prompt) ||
+    /\b(?:moral|ethos|ideology|mission\s+ethos)\b[\s\S]{0,100}\b(?:compare|check|evaluate|review|analy[sz]e)\b[\s\S]{0,100}\b(?:motive|intent|intention|goal|behavior|decision|action)\b/i.test(prompt)
   );
 }
 
@@ -627,11 +632,11 @@ function extractIdeologyMotive(prompt: string): string | null {
   if (quoted) return quoted;
   const afterColon = normalized.match(/:\s*(.+)$/)?.[1];
   if (afterColon) return stripOuterPunctuation(afterColon);
-  const afterToZen = normalized.match(/\b(?:to|against|with|through|using)\s+(?:the\s+)?(?:zen|ethos|ideology|mission\s+ethos)(?:\s+framework)?\s*(.+)$/i)?.[1];
+  const afterToZen = normalized.match(/\b(?:to|against|with|through|using)\s+(?:the\s+)?(?:moral|ethos|ideology|mission\s+ethos)(?:\s+framework)?\s*(.+)$/i)?.[1];
   if (afterToZen) return stripOuterPunctuation(afterToZen);
   return normalized
     .replace(/\b(?:compare|check|evaluate|review|analy[sz]e)\b/gi, " ")
-    .replace(/\b(?:this|that|motive|intent|intention|goal|behavior|decision|action|to|against|with|through|using|the|a|an|zen|ethos|ideology|mission)\b/gi, " ")
+    .replace(/\b(?:this|that|motive|intent|intention|goal|behavior|decision|action|to|against|with|through|using|the|a|an|moral|ethos|ideology|mission)\b/gi, " ")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 800) || null;
@@ -2409,9 +2414,9 @@ function makeTheoryReflectionAskToolStep(prompt: string): HelixWorkstationToolPl
   };
 }
 
-function makeZenGraphReflectionAskToolStep(prompt: string): HelixWorkstationToolPlanStep {
+function makeMoralGraphReflectionAskToolStep(prompt: string): HelixWorkstationToolPlanStep {
   return {
-    step_id: "reflect_zen_graph_context",
+    step_id: "reflect_moral_graph_context",
     kind: "run_ask_tool",
     tool_id: "helix_ask.reflect_ideology_context",
     args: {
@@ -2427,8 +2432,29 @@ function makeZenGraphReflectionAskToolStep(prompt: string): HelixWorkstationTool
         includeProceduralClassification: true,
       },
     },
-    expected_receipt_kind: "helix_zen_graph_reflection_tool_result",
-    expected_state_change: { store: "zen-graph", proof_key: "locator" },
+    expected_receipt_kind: "helix_moral_graph_reflection_tool_result",
+    expected_state_change: { store: "moral-graph", proof_key: "locator" },
+    required: true,
+  };
+}
+
+function makeMoralLivingSubstrateReflectionAskToolStep(
+  prompt: string,
+  depends_on: string[] = [],
+): HelixWorkstationToolPlanStep {
+  return {
+    step_id: "reflect_moral_living_substrate_context",
+    kind: "run_ask_tool",
+    tool_id: "moral-graph.reflect_living_substrate_context",
+    args: {
+      prompt,
+      refs: ["helix-ask:current-turn"],
+      include_theory_bridge: true,
+      include_recommended_actions: true,
+    },
+    depends_on,
+    expected_receipt_kind: "moral_living_substrate_reflection",
+    expected_state_change: { store: "moral-graph", proof_key: "livingSubstrateReflection" },
     required: true,
   };
 }
@@ -2442,9 +2468,9 @@ function makeTheoryIdeologyBridgeAskToolStep(prompt: string): HelixWorkstationTo
       prompt,
       refs: ["helix-ask:current-turn"],
       theory_reflection_ref: "step:reflect_theory_context",
-      ideology_reflection_ref: "step:reflect_zen_graph_context",
+      ideology_reflection_ref: "step:reflect_moral_graph_context",
     },
-    depends_on: ["reflect_theory_context", "reflect_zen_graph_context"],
+    depends_on: ["reflect_theory_context", "reflect_moral_graph_context"],
     expected_receipt_kind: "helix_theory_ideology_bridge_tool_result",
     expected_state_change: {
       store: "theory-ideology-bridge",
@@ -2549,7 +2575,7 @@ function isPhysicsCalculationContextPrompt(prompt: string): boolean {
 }
 
 function hasStagePlayReflectionCue(prompt: string): boolean {
-  if (/\b(?:zen\s*(?:badge\s*)?graph|zen\s*batch\s*graph|zengraph|fruition|ideology\s+(?:tree|graph|map)|theory\s+badge\s+graph|theory\s+graph|physics\s+badge\s+graph)\b/i.test(prompt)) {
+  if (/\b(?:moral\s*(?:badge\s*)?graph|moral\s*batch\s*graph|moralgraph|fruition|ideology\s+(?:tree|graph|map)|theory\s+badge\s+graph|theory\s+graph|physics\s+badge\s+graph)\b/i.test(prompt)) {
     return false;
   }
   return /\b(?:stage\s*play|stage\s*builder|narrative_stage_play|procedural\s+bindings?|affordance\s+graph|observer\s*\/?\s*source\s+routing)\b/i.test(prompt);
@@ -2561,8 +2587,8 @@ function userExplicitlyDisallowsPanelsOrTools(prompt: string): boolean {
   );
 }
 
-function userExplicitlyDisallowsZenGraphTools(prompt: string): boolean {
-  return /\b(?:do\s+not|don't|dont|without|no|not\s+asking\s+to)\s+(?:open|use|call|run|plot|map|reflect)\b[\s\S]{0,90}\b(?:zen\s*(?:badge\s*)?graph|zengraph|zen\s*batch\s*graph|fruition|ideology\s+(?:tree|graph|map)|badge\s+graph)\b/i.test(
+function userExplicitlyDisallowsMoralGraphTools(prompt: string): boolean {
+  return /\b(?:do\s+not|don't|dont|without|no|not\s+asking\s+to)\s+(?:open|use|call|run|plot|map|reflect)\b[\s\S]{0,90}\b(?:moral\s*(?:badge\s*)?graph|moralgraph|moral\s*batch\s*graph|fruition|ideology\s+(?:tree|graph|map)|badge\s+graph)\b/i.test(
     prompt,
   );
 }
@@ -2579,12 +2605,12 @@ function userExplicitlyRequestsTheoryGraphPanel(prompt: string): boolean {
   );
 }
 
-function userExplicitlyRequestsZenGraphPanel(prompt: string): boolean {
+function userExplicitlyRequestsMoralGraphPanel(prompt: string): boolean {
   return (
-    /\b(?:open|display|bring\s+up|pull\s+up|show)\b[\s\S]{0,90}\b(?:zen\s*(?:badge\s*)?graph|zengraph|zen\s*batch\s*graph|ideology\s+(?:tree|graph|map))\b/i.test(
+    /\b(?:open|display|bring\s+up|pull\s+up|show)\b[\s\S]{0,90}\b(?:moral\s*(?:badge\s*)?graph|moralgraph|moral\s*batch\s*graph|ideology\s+(?:tree|graph|map))\b/i.test(
       prompt,
     ) ||
-    /\b(?:zen\s*(?:badge\s*)?graph|zengraph|zen\s*batch\s*graph)\b[\s\S]{0,90}\b(?:panel|visible|launch\s+panel)\b/i.test(
+    /\b(?:moral\s*(?:badge\s*)?graph|moralgraph|moral\s*batch\s*graph)\b[\s\S]{0,90}\b(?:panel|visible|launch\s+panel)\b/i.test(
       prompt,
     )
   );
@@ -2596,8 +2622,8 @@ function userExplicitlyRequestsFruitionPanel(prompt: string): boolean {
   );
 }
 
-function hasZenGraphPromptCue(prompt: string): boolean {
-  return /\b(?:zen\s*(?:badge\s*)?graph|zen\s*batch\s*graph|zengraph|fruition\s+(?:calculator|solve|expression)|ideology\s+(?:tree|graph|map)|compare\s+(?:this\s+)?motive\s+to\s+(?:zen|ideology|mission\s+ethos)|procedural\s+(?:zen|language|expression|action|classifier|classification)|inner[-\s]?practice|plot\s+(?:direct\s+observation|right\s+speech|two[-\s]?key)|wisdom\s+first\s+principles|right\s+speech|right\s+effort|middle\s+way|mindful\s+consumption|information\s+diet|identity[-\s]?view|non[-\s]?attachment|rumination|spiritual\s+friendship|equanimity|ignorance\s+is\s+bliss|moral\s+guilt|consideration\s+(?:debt|gap)|unconsidered\s+harm|affected\s+part(?:y|ies)|due\s+care|repair\s+readiness|two[-\s]?key\s+(?:review|approval)|direct\s+observation)\b/i.test(
+function hasMoralGraphPromptCue(prompt: string): boolean {
+  return /\b(?:moral\s*(?:badge\s*)?graph|moral\s*batch\s*graph|moralgraph|fruition\s+(?:calculator|solve|expression)|ideology\s+(?:tree|graph|map)|compare\s+(?:this\s+)?motive\s+to\s+(?:moral|ideology|mission\s+ethos)|procedural\s+(?:moral|language|expression|action|classifier|classification)|inner[-\s]?practice|plot\s+(?:direct\s+observation|right\s+speech|two[-\s]?key)|wisdom\s+first\s+principles|right\s+speech|right\s+effort|middle\s+way|mindful\s+consumption|information\s+diet|identity[-\s]?view|non[-\s]?attachment|rumination|spiritual\s+friendship|equanimity|ignorance\s+is\s+bliss|moral\s+guilt|consideration\s+(?:debt|gap)|unconsidered\s+harm|affected\s+part(?:y|ies)|due\s+care|repair\s+readiness|two[-\s]?key\s+(?:review|approval)|direct\s+observation)\b/i.test(
     prompt,
   );
 }
@@ -2608,12 +2634,12 @@ function hasTheoryIdeologyBridgePromptCue(prompt: string): boolean {
       prompt,
     );
 
-  const hasZenJusticeCue =
-    /\b(?:zen\s*(?:badge\s*)?graph|zengraph|fruition|justice|fairness|due\s+process|morality|moral|ethos|procedural\s+justice|personalization|priorit(?:y|ies)|non[-\s]?harm|right\s+speech)\b/i.test(
+  const hasMoralJusticeCue =
+    /\b(?:moral\s*(?:badge\s*)?graph|moralgraph|fruition|justice|fairness|due\s+process|morality|moral|ethos|procedural\s+justice|personalization|priorit(?:y|ies)|non[-\s]?harm|right\s+speech)\b/i.test(
       prompt,
     );
 
-  return hasTheoryCue && hasZenJusticeCue;
+  return hasTheoryCue && hasMoralJusticeCue;
 }
 
 function hasCivilizationBoundsCue(prompt: string): boolean {
@@ -2645,7 +2671,7 @@ function materiallyNeedsCivilizationBoundsEvidence(prompt: string): boolean {
   if (hasCivilizationComparisonCue(prompt) && hasCivilizationGroundingRequestCue(prompt)) return true;
   return (
     hasCivilizationGroundingRequestCue(prompt) &&
-    /\b(?:dependencies|dependency\s+(?:edge|edges|graph|analysis)|trade\s+routes?|route\s+candidates?|infrastructure|physical\s+substrate|environmental\s+fields?|observed\s+flows?|live\s+(?:sources?|measurements?|data)|historical\s+(?:sources?|measurements?|records?)|source[-\s]?backed|theory\s*(?:badge\s*)?graph|zen\s*(?:badge\s*)?graph|theory\s+zen\s+bridge)\b/i.test(
+    /\b(?:dependencies|dependency\s+(?:edge|edges|graph|analysis)|trade\s+routes?|route\s+candidates?|infrastructure|physical\s+substrate|environmental\s+fields?|observed\s+flows?|live\s+(?:sources?|measurements?|data)|historical\s+(?:sources?|measurements?|records?)|source[-\s]?backed|theory\s*(?:badge\s*)?graph|moral\s*(?:badge\s*)?graph|theory\s+moral\s+bridge)\b/i.test(
       prompt,
     )
   );
@@ -2660,17 +2686,26 @@ function isCivilizationBoundsReflectionPrompt(prompt: string): boolean {
 function isTheoryIdeologyBridgeReflectionPrompt(prompt: string): boolean {
   if (!prompt || isWorkstationToolDiagnosticPrompt(prompt)) return false;
   if (userExplicitlyDisallowsPanelsOrTools(prompt)) return false;
-  if (userExplicitlyDisallowsZenGraphTools(prompt)) return false;
+  if (userExplicitlyDisallowsMoralGraphTools(prompt)) return false;
   return hasTheoryIdeologyBridgePromptCue(prompt);
 }
 
-function isZenGraphReflectionPrompt(prompt: string): boolean {
+function isMoralGraphReflectionPrompt(prompt: string): boolean {
   if (!prompt || isWorkstationToolDiagnosticPrompt(prompt)) return false;
-  if (userExplicitlyDisallowsPanelsOrTools(prompt) || userExplicitlyDisallowsZenGraphTools(prompt)) return false;
-  if (!hasZenGraphPromptCue(prompt)) return false;
+  if (userExplicitlyDisallowsPanelsOrTools(prompt) || userExplicitlyDisallowsMoralGraphTools(prompt)) return false;
+  if (!hasMoralGraphPromptCue(prompt)) return false;
   return /\b(?:use|through|with|plot|map|reflect|compare|classify|locate|show|calculate|solve|assemble|derive|trace|badge|fruition|lens|lenses|procedural)\b/i.test(
     prompt,
   );
+}
+
+function isMoralLivingSubstrateReflectionPrompt(prompt: string): boolean {
+  if (!prompt || isWorkstationToolDiagnosticPrompt(prompt)) return false;
+  if (userExplicitlyDisallowsPanelsOrTools(prompt) || userExplicitlyDisallowsMoralGraphTools(prompt)) return false;
+  return moralGraphPolicyAllowsLivingSubstrateReflection({
+    inputKind: "user_prompt",
+    text: prompt,
+  });
 }
 
 function hasReflectionCue(prompt: string): boolean {
@@ -3081,10 +3116,56 @@ export function planWorkstationToolUse(
     };
   }
 
+  if (isMoralLivingSubstrateReflectionPrompt(normalized) && !isCivilizationBoundsReflectionPrompt(normalized)) {
+    const wantsTheoryFirst = moralGraphPolicyPrefersTheoryFirst({
+      inputKind: "user_prompt",
+      text: normalized,
+    });
+    const steps: HelixWorkstationToolPlanStep[] = [
+      ...(wantsTheoryFirst ? [makeTheoryReflectionAskToolStep(normalized)] : []),
+      makeMoralLivingSubstrateReflectionAskToolStep(
+        normalized,
+        wantsTheoryFirst ? ["reflect_theory_context"] : [],
+      ),
+      {
+        step_id: "evaluate_moral_living_substrate_reflection",
+        kind: "evaluate_result",
+        depends_on: ["reflect_moral_living_substrate_context"],
+        expected_receipt_kind: "helix.workstation_tool_evaluation.v1",
+        required: true,
+      },
+    ];
+    pushScore({
+      affordance_id: "moral-graph.reflect_living_substrate_context",
+      panel_id: "helix_ask",
+      action_id: "reflect_living_substrate_context",
+      score: wantsTheoryFirst ? 0.93 : 0.9,
+      reason:
+        "Prompt asks to translate living-system substrate mechanisms into Moral Graph reflection evidence while preserving theory/calculator ownership of mechanisms.",
+      required_args_missing: [],
+    });
+    return {
+      intent: "moral_living_substrate_reflection",
+      action: null,
+      tool_plan: buildToolPlan({
+        prompt: normalized,
+        intent: "moral_living_substrate_reflection",
+        missing: [],
+        options,
+        steps,
+      }),
+      scores,
+      should_use_tool: true,
+      reason:
+        "Prompt asks for living-system substrate Moral Graph reflection; produce non-terminal substrate evidence before synthesis.",
+      missing_required_args: [],
+    };
+  }
+
   if (isTheoryIdeologyBridgeReflectionPrompt(normalized) && !isCivilizationBoundsReflectionPrompt(normalized)) {
     const steps: HelixWorkstationToolPlanStep[] = [
       makeTheoryReflectionAskToolStep(normalized),
-      makeZenGraphReflectionAskToolStep(normalized),
+      makeMoralGraphReflectionAskToolStep(normalized),
       makeTheoryIdeologyBridgeAskToolStep(normalized),
       {
         step_id: "evaluate_theory_ideology_bridge",
@@ -3101,7 +3182,7 @@ export function planWorkstationToolUse(
       action_id: "bridge_theory_ideology_context",
       score: 0.91,
       reason:
-        "Prompt asks to connect theory/physics constraints with Zen/procedural justice lenses as non-terminal bridge evidence",
+        "Prompt asks to connect theory/physics constraints with Moral/procedural justice lenses as non-terminal bridge evidence",
       required_args_missing: [],
     });
 
@@ -3118,7 +3199,7 @@ export function planWorkstationToolUse(
       scores,
       should_use_tool: true,
       reason:
-        "Prompt asks to reflect theory/physics constraints against Zen/procedural justice lenses; produce bridge evidence before final answer.",
+        "Prompt asks to reflect theory/physics constraints against Moral/procedural justice lenses; produce bridge evidence before final answer.",
       missing_required_args: [],
     };
   }
@@ -3128,16 +3209,16 @@ export function planWorkstationToolUse(
     const wantsTheory = wantsBridge || hasTheoryReflectionDomain(normalized);
     const wantsZen =
       wantsBridge ||
-      hasZenGraphPromptCue(normalized) ||
+      hasMoralGraphPromptCue(normalized) ||
       /\b(?:fairness|due\s+process|review|non[-\s]?harm|governance|procedural)\b/i.test(normalized);
     const steps: HelixWorkstationToolPlanStep[] = [
       makeCivilizationScenarioFrameAskToolStep(normalized),
       ...(wantsTheory ? [makeTheoryReflectionAskToolStep(normalized)] : []),
-      ...(wantsZen ? [makeZenGraphReflectionAskToolStep(normalized)] : []),
+      ...(wantsZen ? [makeMoralGraphReflectionAskToolStep(normalized)] : []),
       makeCivilizationBoundsAskToolStep(normalized, [
         "build_civilization_scenario_frame",
         ...(wantsTheory ? ["reflect_theory_context"] : []),
-        ...(wantsZen ? ["reflect_zen_graph_context"] : []),
+        ...(wantsZen ? ["reflect_moral_graph_context"] : []),
       ]),
       ...(wantsBridge
         ? [
@@ -3145,7 +3226,7 @@ export function planWorkstationToolUse(
               ...makeTheoryIdeologyBridgeAskToolStep(normalized),
               depends_on: [
                 "reflect_theory_context",
-                "reflect_zen_graph_context",
+                "reflect_moral_graph_context",
                 "reflect_civilization_bounds",
               ],
             },
@@ -3197,7 +3278,7 @@ export function planWorkstationToolUse(
       action_id: "compare_motive_to_zen",
       args: {
         motive,
-        framework: "zen",
+        framework: "moral",
       },
     };
     const steps: HelixWorkstationToolPlanStep[] = [
@@ -3226,7 +3307,7 @@ export function planWorkstationToolUse(
       panel_id: "mission-ethos",
       action_id: "compare_motive_to_zen",
       score: 0.88,
-      reason: "Prompt asks to compare a motive or action against Zen/mission ethos guidance.",
+      reason: "Prompt asks to compare a motive or action against Moral/mission ethos guidance.",
       required_args_missing: [],
     });
     return {
@@ -3246,17 +3327,17 @@ export function planWorkstationToolUse(
     };
   }
 
-  if (isZenGraphReflectionPrompt(normalized)) {
-    const wantsVisibleZenGraph = userExplicitlyRequestsZenGraphPanel(normalized);
+  if (isMoralGraphReflectionPrompt(normalized)) {
+    const wantsVisibleMoralGraph = userExplicitlyRequestsMoralGraphPanel(normalized);
     const wantsFruitionPanel = userExplicitlyRequestsFruitionPanel(normalized) || /\bfruition\b/i.test(normalized);
     const steps: HelixWorkstationToolPlanStep[] = [
-      ...(wantsVisibleZenGraph ? [makeOpenStep("zen-badge-graph")] : []),
-      makeZenGraphReflectionAskToolStep(normalized),
-      ...(wantsFruitionPanel ? [makeOpenStep("fruition-calculator", ["reflect_zen_graph_context"])] : []),
+      ...(wantsVisibleMoralGraph ? [makeOpenStep("moral-badge-graph")] : []),
+      makeMoralGraphReflectionAskToolStep(normalized),
+      ...(wantsFruitionPanel ? [makeOpenStep("fruition-calculator", ["reflect_moral_graph_context"])] : []),
       {
-        step_id: "evaluate_zen_graph_reflection",
+        step_id: "evaluate_moral_graph_reflection",
         kind: "evaluate_result",
-        depends_on: ["reflect_zen_graph_context"],
+        depends_on: ["reflect_moral_graph_context"],
         expected_receipt_kind: "helix.workstation_tool_evaluation.v1",
         required: true,
       },
@@ -3266,23 +3347,23 @@ export function planWorkstationToolUse(
       panel_id: "helix_ask",
       action_id: "reflect_ideology_context",
       score: 0.89,
-      reason: "ZenGraph/Fruition prompt can be reflected into badge locator and procedural expression evidence",
+      reason: "MoralGraph/Fruition prompt can be reflected into badge locator and procedural expression evidence",
       required_args_missing: [],
     });
     const toolPlan = buildToolPlan({
       prompt: normalized,
-      intent: "zen_graph_reflection",
+      intent: "moral_graph_reflection",
       missing: [],
       options,
       steps,
     });
     return {
-      intent: "zen_graph_reflection",
+      intent: "moral_graph_reflection",
       action: null,
       tool_plan: toolPlan,
       scores,
       should_use_tool: true,
-      reason: "Prompt asks for ZenGraph/Fruition reflection; produce locator and procedural expression evidence before final answer.",
+      reason: "Prompt asks for MoralGraph/Fruition reflection; produce locator and procedural expression evidence before final answer.",
       missing_required_args: [],
     };
   }

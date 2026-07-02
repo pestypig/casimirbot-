@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { validateFruitionProcedureExpressionV1 } from "../../../../shared/fruition-procedure-expression";
 import { validateHelixRecommendedActionAdmissionV1 } from "../../../../shared/contracts/helix-recommended-action-admission.v1";
-import { buildZenBadgeLocatorV1 } from "../../../../shared/zen-badge-locator";
-import { buildFruitionFromZenBadgeComparisonSeed } from "../../../../shared/zen-graph/build-fruition-from-zen-badge-comparison-seed";
+import { buildMoralBadgeLocatorV1 } from "../../../../shared/moral-badge-locator";
+import { buildFruitionFromMoralBadgeComparisonSeed } from "../../../../shared/moral-graph/build-fruition-from-moral-badge-comparison-seed";
 import {
   fruitionHandler,
   fruitionSpec,
@@ -69,17 +69,17 @@ describe("Helix Ask Fruition tool", () => {
     expect(output.fruition.result.admission.artifactId).toBe("helix_recommended_action_admission");
   });
 
-  it("converts a Zen badge locator comparison seed into a valid Fruition expression", () => {
-    const locator = buildZenBadgeLocatorV1({
+  it("converts a Moral badge locator comparison seed into a valid Fruition expression", () => {
+    const locator = buildMoralBadgeLocatorV1({
       generatedAt: "2026-06-01T00:00:00.000Z",
-      locatorId: "zen-badge-locator:test-seed",
+      locatorId: "moral-badge-locator:test-seed",
       input: {
         kind: "user_prompt",
         summary: "Reflect right speech and two-key review before action.",
         refs: ["turn:seed"],
       },
       graph: {
-        graphId: "zen-graph",
+        graphId: "moral-graph",
         rootId: "wisdom-first-principles",
         source: "docs/ethos/ideology.json",
       },
@@ -128,7 +128,7 @@ describe("Helix Ask Fruition tool", () => {
       },
     });
 
-    const expression = buildFruitionFromZenBadgeComparisonSeed({
+    const expression = buildFruitionFromMoralBadgeComparisonSeed({
       locator,
       objective: "Trace locator seed into Fruition.",
       generatedAt: "2026-06-01T00:00:00.000Z",

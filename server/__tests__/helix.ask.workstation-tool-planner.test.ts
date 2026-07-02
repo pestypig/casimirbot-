@@ -493,20 +493,20 @@ describe("Helix Ask workstation tool planner", () => {
     expect(plan.action).toBeNull();
   });
 
-  it("plans a Theory-Zen bridge before standalone ZenGraph or theory reflection", () => {
+  it("plans a Theory-Moral bridge before standalone MoralGraph or theory reflection", () => {
     const plan = planWorkstationToolUse(
-      "Reflect fairness and due process through entropy, conservation, and self-organization in the Theory Badge Graph and ZenGraph.",
+      "Reflect fairness and due process through entropy, conservation, and self-organization in the Theory Badge Graph and MoralGraph.",
     );
 
     expect(plan.intent).toBe("theory_ideology_bridge_reflection");
     expect(plan.should_use_tool).toBe(true);
     expect(plan.action).toBeNull();
     expect(plan.reason).toBe(
-      "Prompt asks to reflect theory/physics constraints against Zen/procedural justice lenses; produce bridge evidence before final answer.",
+      "Prompt asks to reflect theory/physics constraints against Moral/procedural justice lenses; produce bridge evidence before final answer.",
     );
     expect(plan.tool_plan?.steps.map((step) => step.step_id)).toEqual([
       "reflect_theory_context",
-      "reflect_zen_graph_context",
+      "reflect_moral_graph_context",
       "bridge_theory_ideology_context",
       "evaluate_theory_ideology_bridge",
     ]);
@@ -514,7 +514,7 @@ describe("Helix Ask workstation tool planner", () => {
       expect.objectContaining({
         kind: "run_ask_tool",
         tool_id: "helix_ask.bridge_theory_ideology_context",
-        depends_on: ["reflect_theory_context", "reflect_zen_graph_context"],
+        depends_on: ["reflect_theory_context", "reflect_moral_graph_context"],
         expected_receipt_kind: "helix_theory_ideology_bridge_tool_result",
         expected_state_change: {
           store: "theory-ideology-bridge",
@@ -522,20 +522,20 @@ describe("Helix Ask workstation tool planner", () => {
         },
         args: expect.objectContaining({
           prompt:
-            "Reflect fairness and due process through entropy, conservation, and self-organization in the Theory Badge Graph and ZenGraph.",
+            "Reflect fairness and due process through entropy, conservation, and self-organization in the Theory Badge Graph and MoralGraph.",
           refs: ["helix-ask:current-turn"],
           theory_reflection_ref: "step:reflect_theory_context",
-          ideology_reflection_ref: "step:reflect_zen_graph_context",
+          ideology_reflection_ref: "step:reflect_moral_graph_context",
         }),
       }),
     );
     expect(plan.tool_plan?.steps.map((step) => step.step_id)).not.toContain("open_theory_badge_graph");
-    expect(plan.tool_plan?.steps.map((step) => step.step_id)).not.toContain("open_zen_badge_graph");
+    expect(plan.tool_plan?.steps.map((step) => step.step_id)).not.toContain("open_moral_badge_graph");
   });
 
-  it("does not bridge mixed Theory-Zen terms when tools are explicitly disallowed", () => {
+  it("does not bridge mixed Theory-Moral terms when tools are explicitly disallowed", () => {
     const plan = planWorkstationToolUse(
-      "Do not use tools or panels; discuss entropy, conservation, fairness, and ZenGraph conceptually.",
+      "Do not use tools or panels; discuss entropy, conservation, fairness, and MoralGraph conceptually.",
     );
 
     expect(plan.intent).toBe("direct_answer");
@@ -543,28 +543,28 @@ describe("Helix Ask workstation tool planner", () => {
     expect(plan.tool_plan).toBeNull();
   });
 
-  it("admits ZenGraph reflection and Fruition expression prompts before the scientific calculator", () => {
+  it("admits MoralGraph reflection and Fruition expression prompts before the scientific calculator", () => {
     const plan = planWorkstationToolUse(
-      "Use the Zen Badge Graph to reflect this situation: I need to respond to a teammate who made an uncertain safety claim. Plot direct observation, right speech, and two-key review, then show what Fruition would solve before any action.",
+      "Use the Moral Badge Graph to reflect this situation: I need to respond to a teammate who made an uncertain safety claim. Plot direct observation, right speech, and two-key review, then show what Fruition would solve before any action.",
     );
 
-    expect(plan.intent).toBe("zen_graph_reflection");
+    expect(plan.intent).toBe("moral_graph_reflection");
     expect(plan.should_use_tool).toBe(true);
     expect(plan.action).toBeNull();
     expect(plan.reason).toBe(
-      "Prompt asks for ZenGraph/Fruition reflection; produce locator and procedural expression evidence before final answer.",
+      "Prompt asks for MoralGraph/Fruition reflection; produce locator and procedural expression evidence before final answer.",
     );
     expect(plan.tool_plan?.steps.map((step) => step.step_id)).toEqual([
-      "reflect_zen_graph_context",
+      "reflect_moral_graph_context",
       "open_fruition_calculator",
-      "evaluate_zen_graph_reflection",
+      "evaluate_moral_graph_reflection",
     ]);
-    const reflectStep = plan.tool_plan?.steps.find((step) => step.step_id === "reflect_zen_graph_context");
+    const reflectStep = plan.tool_plan?.steps.find((step) => step.step_id === "reflect_moral_graph_context");
     expect(reflectStep).toEqual(expect.objectContaining({
       kind: "run_ask_tool",
       tool_id: "helix_ask.reflect_ideology_context",
-      expected_receipt_kind: "helix_zen_graph_reflection_tool_result",
-      expected_state_change: { store: "zen-graph", proof_key: "locator" },
+      expected_receipt_kind: "helix_moral_graph_reflection_tool_result",
+      expected_state_change: { store: "moral-graph", proof_key: "locator" },
       args: expect.objectContaining({
         inputKind: "user_prompt",
         options: expect.objectContaining({
@@ -578,19 +578,19 @@ describe("Helix Ask workstation tool planner", () => {
     expect(plan.tool_plan?.steps.map((step) => step.panel_id)).not.toContain("scientific-calculator");
   });
 
-  it("routes procedural inner-practice Zen classifier prompts through ZenGraph", () => {
+  it("routes procedural inner-practice Moral classifier prompts through MoralGraph", () => {
     const plan = planWorkstationToolUse(
-      "Use the procedural Zen classifier to reflect this conversation as inner-practice: rumination, information diet, identity-view, non-attachment, and right effort.",
+      "Use the procedural Moral classifier to reflect this conversation as inner-practice: rumination, information diet, identity-view, non-attachment, and right effort.",
     );
 
-    expect(plan.intent).toBe("zen_graph_reflection");
+    expect(plan.intent).toBe("moral_graph_reflection");
     expect(plan.should_use_tool).toBe(true);
-    const reflectStep = plan.tool_plan?.steps.find((step) => step.step_id === "reflect_zen_graph_context");
+    const reflectStep = plan.tool_plan?.steps.find((step) => step.step_id === "reflect_moral_graph_context");
     expect(reflectStep).toEqual(
       expect.objectContaining({
         kind: "run_ask_tool",
         tool_id: "helix_ask.reflect_ideology_context",
-        expected_receipt_kind: "helix_zen_graph_reflection_tool_result",
+        expected_receipt_kind: "helix_moral_graph_reflection_tool_result",
         args: expect.objectContaining({
           options: expect.objectContaining({
             includeProceduralClassification: true,
@@ -602,19 +602,19 @@ describe("Helix Ask workstation tool planner", () => {
     );
   });
 
-  it("routes moral guilt and missing consideration prompts through ZenGraph", () => {
+  it("routes moral guilt and missing consideration prompts through MoralGraph", () => {
     const plan = planWorkstationToolUse(
-      "Use the procedural Zen classifier to reflect moral guilt, ignorance is bliss, and what missing considerations or affected parties should be researched.",
+      "Use the procedural Moral classifier to reflect moral guilt, ignorance is bliss, and what missing considerations or affected parties should be researched.",
     );
 
-    expect(plan.intent).toBe("zen_graph_reflection");
+    expect(plan.intent).toBe("moral_graph_reflection");
     expect(plan.should_use_tool).toBe(true);
-    const reflectStep = plan.tool_plan?.steps.find((step) => step.step_id === "reflect_zen_graph_context");
+    const reflectStep = plan.tool_plan?.steps.find((step) => step.step_id === "reflect_moral_graph_context");
     expect(reflectStep).toEqual(
       expect.objectContaining({
         kind: "run_ask_tool",
         tool_id: "helix_ask.reflect_ideology_context",
-        expected_receipt_kind: "helix_zen_graph_reflection_tool_result",
+        expected_receipt_kind: "helix_moral_graph_reflection_tool_result",
         args: expect.objectContaining({
           options: expect.objectContaining({
             includeProceduralClassification: true,
@@ -624,24 +624,24 @@ describe("Helix Ask workstation tool planner", () => {
     );
   });
 
-  it("opens the Zen Badge Graph only when explicitly requested", () => {
-    const plan = planWorkstationToolUse("Open the Zen Badge Graph and plot right speech against two-key review.");
+  it("opens the Moral Badge Graph only when explicitly requested", () => {
+    const plan = planWorkstationToolUse("Open the Moral Badge Graph and plot right speech against two-key review.");
 
-    expect(plan.intent).toBe("zen_graph_reflection");
+    expect(plan.intent).toBe("moral_graph_reflection");
     expect(plan.tool_plan?.steps.map((step) => step.step_id)).toEqual([
-      "open_zen_badge_graph",
-      "reflect_zen_graph_context",
-      "evaluate_zen_graph_reflection",
+      "open_moral_badge_graph",
+      "reflect_moral_graph_context",
+      "evaluate_moral_graph_reflection",
     ]);
-    expect(plan.tool_plan?.steps.find((step) => step.step_id === "open_zen_badge_graph")).toEqual(expect.objectContaining({
+    expect(plan.tool_plan?.steps.find((step) => step.step_id === "open_moral_badge_graph")).toEqual(expect.objectContaining({
       kind: "open_panel",
-      panel_id: "zen-badge-graph",
+      panel_id: "moral-badge-graph",
     }));
   });
 
-  it("honors explicit requests not to use ZenGraph tools", () => {
+  it("honors explicit requests not to use MoralGraph tools", () => {
     const plan = planWorkstationToolUse(
-      "Do not use tools or panels; just discuss the phrase 'Zen Badge Graph and Fruition calculator' as a concept.",
+      "Do not use tools or panels; just discuss the phrase 'Moral Badge Graph and Fruition calculator' as a concept.",
     );
 
     expect(plan.intent).toBe("direct_answer");
@@ -649,8 +649,68 @@ describe("Helix Ask workstation tool planner", () => {
     expect(plan.tool_plan).toBeNull();
   });
 
-  it("routes motive/Zen comparisons through mission ethos affordances", () => {
-    const plan = planWorkstationToolUse("Compare this motive to Zen: I am gathering resources to survive.");
+  it("plans Moral Graph living substrate reflection for organism-scale moral relevance prompts", () => {
+    const plan = planWorkstationToolUse(
+      "Use the Moral Graph to derive moral relevance from organism boundary, sensing, homeostasis, entropy pressure, and non-human living systems.",
+    );
+
+    expect(plan.intent).toBe("moral_living_substrate_reflection");
+    expect(plan.should_use_tool).toBe(true);
+    expect(plan.action).toBeNull();
+    expect(plan.tool_plan?.steps.map((step) => step.step_id)).toEqual([
+      "reflect_moral_living_substrate_context",
+      "evaluate_moral_living_substrate_reflection",
+    ]);
+    expect(plan.tool_plan?.steps.find((step) => step.step_id === "reflect_moral_living_substrate_context"))
+      .toEqual(expect.objectContaining({
+        kind: "run_ask_tool",
+        tool_id: "moral-graph.reflect_living_substrate_context",
+        expected_receipt_kind: "moral_living_substrate_reflection",
+        expected_state_change: {
+          store: "moral-graph",
+          proof_key: "livingSubstrateReflection",
+        },
+        args: expect.objectContaining({
+          refs: ["helix-ask:current-turn"],
+          include_theory_bridge: true,
+          include_recommended_actions: true,
+        }),
+      }));
+  });
+
+  it("plans theory reflection before Moral substrate reflection for mechanism-heavy prompts", () => {
+    const plan = planWorkstationToolUse(
+      "Use the Moral Graph with Hameroff Orch OR microtubule physics, organism sensing, homeostasis, and Fourier frequency mapping as the mechanism, then translate living-system dynamics into moral obligations and constraints.",
+    );
+
+    expect(plan.intent).toBe("moral_living_substrate_reflection");
+    expect(plan.should_use_tool).toBe(true);
+    expect(plan.tool_plan?.steps.map((step) => step.step_id)).toEqual([
+      "reflect_theory_context",
+      "reflect_moral_living_substrate_context",
+      "evaluate_moral_living_substrate_reflection",
+    ]);
+    expect(plan.tool_plan?.steps.find((step) => step.step_id === "reflect_moral_living_substrate_context"))
+      .toEqual(expect.objectContaining({
+        depends_on: ["reflect_theory_context"],
+      }));
+  });
+
+  it("does not plan substrate reflection from quoted or future-only capability mentions", () => {
+    for (const prompt of [
+      'The screen shows "moral-graph.reflect_living_substrate_context"; do not run it.',
+      "We might later call moral-graph.reflect_living_substrate_context, but not now.",
+    ]) {
+      const plan = planWorkstationToolUse(prompt);
+
+      expect(plan.intent).toBe("direct_answer");
+      expect(plan.should_use_tool).toBe(false);
+      expect(plan.tool_plan).toBeNull();
+    }
+  });
+
+  it("routes motive/Moral comparisons through mission ethos affordances", () => {
+    const plan = planWorkstationToolUse("Compare this motive to Moral: I am gathering resources to survive.");
 
     expect(plan.intent).toBe("ideology_compare");
     expect(plan.action).toEqual({
@@ -658,7 +718,7 @@ describe("Helix Ask workstation tool planner", () => {
       action_id: "compare_motive_to_zen",
       args: {
         motive: "I am gathering resources to survive",
-        framework: "zen",
+        framework: "moral",
       },
     });
     expect(plan.tool_plan?.steps.map((step) => `${step.panel_id}.${step.action_id}`)).toEqual([

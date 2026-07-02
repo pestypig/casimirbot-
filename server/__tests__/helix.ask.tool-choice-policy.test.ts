@@ -71,17 +71,17 @@ describe("Helix Ask tool-choice policy", () => {
     );
   });
 
-  it("does not hand-write completed solver traces for zen/civilization route terminals", () => {
+  it("does not hand-write completed solver traces for moral/civilization route terminals", () => {
     const agiPlanSource = readFileSync(resolve(__dirname, "../routes/agi.plan.ts"), "utf8");
 
     expect(agiPlanSource).not.toMatch(
-      /ask_turn_solver_trace:\s*\{[^}]*route:\s*"zen_graph_reflection"[^}]*completed_solver_path:\s*true/s,
+      /ask_turn_solver_trace:\s*\{[^}]*route:\s*"moral_graph_reflection"[^}]*completed_solver_path:\s*true/s,
     );
     expect(agiPlanSource).not.toMatch(
       /ask_turn_solver_trace:\s*\{[^}]*route:\s*"civilization_bounds_reflection"[^}]*completed_solver_path:\s*true/s,
     );
     expect(agiPlanSource).toMatch(
-      /selectedRoute:\s*"zen_graph_reflection"[\s\S]{0,420}payload\.ask_turn_solver_trace = buildAskTurnSolverTrace/,
+      /selectedRoute:\s*"moral_graph_reflection"[\s\S]{0,420}payload\.ask_turn_solver_trace = buildAskTurnSolverTrace/,
     );
     expect(agiPlanSource).toMatch(
       /selectedRoute:\s*"civilization_bounds_reflection"[\s\S]{0,420}payload\.ask_turn_solver_trace = buildAskTurnSolverTrace/,
@@ -460,7 +460,7 @@ describe("Helix Ask tool-choice policy", () => {
       /calculator_solve \/ calculator_compound_chain[\s\S]*responseBoundaryCanPromoteRouteDraftProjection[\s\S]*payload\.terminal_artifact_kind = "workstation_tool_evaluation"/,
     );
     expect(agiPlanSource).toMatch(
-      /zen_graph_reflection[\s\S]*responseBoundaryCanPromoteRouteDraftProjection[\s\S]*payload\.terminal_error_code = null/,
+      /moral_graph_reflection[\s\S]*responseBoundaryCanPromoteRouteDraftProjection[\s\S]*payload\.terminal_error_code = null/,
     );
     expect(agiPlanSource).toMatch(
       /route_draft_projection_requires_solver_or_terminal_authority[\s\S]*response_boundary_route_draft_projection_suppressed/,

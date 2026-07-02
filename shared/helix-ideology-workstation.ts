@@ -2,7 +2,7 @@ export const HELIX_IDEOLOGY_CONTEXT_RECEIPT_SCHEMA = "helix.ideology_context_rec
 export const HELIX_IDEOLOGY_MOTIVE_COMPARISON_RECEIPT_SCHEMA =
   "helix.ideology_motive_comparison_receipt.v1" as const;
 
-export type IdeologyFramework = "zen" | "mission_ethos" | "custom";
+export type IdeologyFramework = "moral" | "mission_ethos" | "custom";
 
 export type IdeologyNodeSummary = {
   node_id: string;

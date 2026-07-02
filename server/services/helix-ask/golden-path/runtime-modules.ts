@@ -11,9 +11,9 @@ import * as TheoryReflection from "./capabilities/theory-reflection";
 import * as VisualCapture from "./capabilities/visual-capture";
 import * as WorkspaceDirectory from "./capabilities/workspace-directory";
 import * as WorkspaceStatus from "./capabilities/workspace-status";
-import * as ZenGraphReflection from "./capabilities/zen-graph-reflection";
+import * as MoralGraphReflection from "./capabilities/moral-graph-reflection";
 import * as CatalogWorkspace from "./compounds/catalog-workspace";
-import * as CivilizationZenReflection from "./compounds/civilization-zen-reflection";
+import * as CivilizationMoralReflection from "./compounds/civilization-moral-reflection";
 import * as DocsCalculator from "./compounds/docs-calculator";
 import * as InternetTheoryReflection from "./compounds/internet-theory-reflection";
 import * as RepoDocs from "./compounds/repo-docs";
@@ -39,13 +39,13 @@ export const orderedDispatchModules: readonly GoldenPathDispatchModule[] = [
   DocsCalculator,
   RepoDocs,
   InternetTheoryReflection,
-  CivilizationZenReflection,
+  CivilizationMoralReflection,
   ProcessedLiveSourceMail,
   StagePlayReflection,
   InternetSearch,
   ScholarlyResearch,
   CivilizationBounds,
-  ZenGraphReflection,
+  MoralGraphReflection,
   TheoryReflection,
   VisualCapture,
   Calculator,

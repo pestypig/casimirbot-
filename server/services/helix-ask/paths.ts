@@ -16,13 +16,13 @@ const UI_COMPONENTS_PATH_PATTERNS: RegExp[] = [
   /ui\//i,
 ];
 
-const ZEN_LADDER_PATH_PATTERNS: RegExp[] = [
-  /docs\/zen-ladder-pack\//i,
+const MORAL_LADDER_PATH_PATTERNS: RegExp[] = [
+  /docs\/moral-ladder-pack\//i,
   /docs\/ethos\/ideology\.json/i,
 ];
 
 export const UI_COMPONENTS_PATH_EVIDENCE_MISSING = "UI_COMPONENTS_PATH_EVIDENCE_MISSING" as const;
-export const ZEN_LADDER_PATH_EVIDENCE_MISSING = "ZEN_LADDER_PATH_EVIDENCE_MISSING" as const;
+export const MORAL_LADDER_PATH_EVIDENCE_MISSING = "MORAL_LADDER_PATH_EVIDENCE_MISSING" as const;
 
 export type UiComponentsRoutingMetadata = {
   provenance_class: "inferred";
@@ -36,16 +36,16 @@ export type UiComponentsPathEvidenceGate = {
   routing_metadata?: UiComponentsRoutingMetadata;
 };
 
-export type ZenLadderRoutingMetadata = {
+export type MoralLadderRoutingMetadata = {
   provenance_class: "inferred";
   claim_tier: "diagnostic";
   certifying: false;
 };
 
-export type ZenLadderPathEvidenceGate = {
+export type MoralLadderPathEvidenceGate = {
   ok: boolean;
-  fail_reason?: typeof ZEN_LADDER_PATH_EVIDENCE_MISSING;
-  routing_metadata?: ZenLadderRoutingMetadata;
+  fail_reason?: typeof MORAL_LADDER_PATH_EVIDENCE_MISSING;
+  routing_metadata?: MoralLadderRoutingMetadata;
 };
 
 function normalizePathCandidate(match: string): string {
@@ -73,9 +73,9 @@ function isUiComponentsPath(value: string): boolean {
   return UI_COMPONENTS_PATH_PATTERNS.some((pattern) => pattern.test(normalized));
 }
 
-function isZenLadderPath(value: string): boolean {
+function isMoralLadderPath(value: string): boolean {
   const normalized = value.replace(/\\/g, "/");
-  return ZEN_LADDER_PATH_PATTERNS.some((pattern) => pattern.test(normalized));
+  return MORAL_LADDER_PATH_PATTERNS.some((pattern) => pattern.test(normalized));
 }
 
 export function evaluateUiComponentsPathEvidence(
@@ -100,14 +100,14 @@ export function evaluateUiComponentsPathEvidence(
   };
 }
 
-export function evaluateZenLadderPathEvidence(
+export function evaluateMoralLadderPathEvidence(
   paths: string[],
   options?: { strict?: boolean },
-): ZenLadderPathEvidenceGate {
-  const hasZenLadderEvidence = paths.some((entry) => isZenLadderPath(entry));
-  if (!hasZenLadderEvidence) {
+): MoralLadderPathEvidenceGate {
+  const hasMoralLadderEvidence = paths.some((entry) => isMoralLadderPath(entry));
+  if (!hasMoralLadderEvidence) {
     if (options?.strict === true) {
-      return { ok: false, fail_reason: ZEN_LADDER_PATH_EVIDENCE_MISSING };
+      return { ok: false, fail_reason: MORAL_LADDER_PATH_EVIDENCE_MISSING };
     }
     return { ok: true };
   }

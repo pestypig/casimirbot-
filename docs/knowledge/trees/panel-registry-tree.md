@@ -865,10 +865,10 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - type: bridge
 - summary: Panel spectrum-tuner links to sdk-integration-tree via term "Integration".
 
-### Node: Spectrum Tuner <-> zen-artifact-integration-ladder
-- id: bridge-panel-spectrum-tuner-zen-artifact-integration-ladder
+### Node: Spectrum Tuner <-> moral-artifact-integration-ladder
+- id: bridge-panel-spectrum-tuner-moral-artifact-integration-ladder
 - type: bridge
-- summary: Panel spectrum-tuner links to zen-artifact-integration-ladder via term "Integration".
+- summary: Panel spectrum-tuner links to moral-artifact-integration-ladder via term "Integration".
 
 ### Node: Spectrum Tuner <-> integration-ladder
 - id: bridge-panel-spectrum-tuner-integration-ladder
@@ -2582,9 +2582,9 @@ This tree enumerates Helix panels and their cross-concept joins to keep UI surfa
 - relation: Panel cross-concept join
 - summary: Panel spectrum-tuner links to sdk-integration-tree via term "Integration".
 
-### Bridge: Spectrum Tuner <-> zen-artifact-integration-ladder
+### Bridge: Spectrum Tuner <-> moral-artifact-integration-ladder
 - relation: Panel cross-concept join
-- summary: Panel spectrum-tuner links to zen-artifact-integration-ladder via term "Integration".
+- summary: Panel spectrum-tuner links to moral-artifact-integration-ladder via term "Integration".
 
 ### Bridge: Spectrum Tuner <-> integration-ladder
 - relation: Panel cross-concept join

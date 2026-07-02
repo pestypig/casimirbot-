@@ -86,9 +86,9 @@ describe("Helix Ask model-only concept source guard", () => {
     expect(repoIntent.repoEvidenceRequested).toBe(true);
   });
 
-  it("does not route explicit Theory Graph plus ZenGraph bridge prompts as model-only concepts", () => {
+  it("does not route explicit Theory Graph plus MoralGraph bridge prompts as model-only concepts", () => {
     const prompt =
-      "Reflect fairness and due process through entropy, conservation, and self-organization in the Theory Badge Graph and ZenGraph.";
+      "Reflect fairness and due process through entropy, conservation, and self-organization in the Theory Badge Graph and MoralGraph.";
     const signal = detectModelOnlyConceptSourceSignal(prompt);
 
     expect(signal.applies).toBe(false);

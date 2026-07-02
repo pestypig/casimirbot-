@@ -1,5 +1,8 @@
 import type { HelixAgentStepObservationPacket } from "@shared/helix-agent-step-observation-packet";
 import type { HelixAgentProvider } from "../agent-providers/types";
+import type { HelixAgentModelVisibleCapabilityLaneManifest } from "../agent-providers/runtime-adapter-contract";
+import { buildModelVisibleCapabilityLaneManifest } from "../agent-providers/runtime-adapter-contract";
+import { listHelixCapabilityLanes } from "./registry";
 import {
   runHelixCapabilityLaneOneShotRequests,
   type HelixCapabilityLaneOneShotRunnerResult,
@@ -13,7 +16,9 @@ export type HelixCapabilityLaneProviderAdapterContext = {
   schema: "helix.capability_lane.provider_adapter_context.v1";
   one_shot: HelixCapabilityLaneOneShotRunnerResult;
   sessions: HelixCapabilityLaneSessionRunnerResult;
+  model_visible_capability_lane_manifest: HelixAgentModelVisibleCapabilityLaneManifest;
   debug_projection: HelixCapabilityLaneOneShotRunnerResult["debug_projection"] & {
+    model_visible_capability_lane_manifest: HelixAgentModelVisibleCapabilityLaneManifest;
     capability_lane_projection_receipts: HelixCapabilityLaneProviderAdapterReceipt[];
     capability_lane_session_results: HelixCapabilityLaneSessionRunnerResult["session_results"];
     capability_lane_session_debug_summaries: HelixCapabilityLaneSessionRunnerResult["session_debug_summaries"];
@@ -144,6 +149,10 @@ export const buildHelixCapabilityLaneProviderAdapterContext = (input: {
     body: input.body,
     env: input.env,
   });
+  const modelVisibleCapabilityLaneManifest = buildModelVisibleCapabilityLaneManifest(listHelixCapabilityLanes({
+    provider: input.provider,
+    env: input.env,
+  }));
   const artifactLedger = buildCapabilityLaneArtifactLedger({
     turnId,
     packets: oneShot.observation_packets,
@@ -155,8 +164,10 @@ export const buildHelixCapabilityLaneProviderAdapterContext = (input: {
     schema: "helix.capability_lane.provider_adapter_context.v1",
     one_shot: oneShot,
     sessions,
+    model_visible_capability_lane_manifest: modelVisibleCapabilityLaneManifest,
     debug_projection: {
       ...oneShot.debug_projection,
+      model_visible_capability_lane_manifest: modelVisibleCapabilityLaneManifest,
       capability_lane_projection_receipts: projectionReceipts,
       capability_lane_session_results: sessions.session_results,
       capability_lane_session_debug_summaries: sessions.session_debug_summaries,
@@ -165,6 +176,7 @@ export const buildHelixCapabilityLaneProviderAdapterContext = (input: {
     projection_receipts: projectionReceipts,
     artifact_ledger: artifactLedger,
     prompt_observation_block: JSON.stringify({
+      model_visible_capability_lane_manifest: modelVisibleCapabilityLaneManifest,
       capability_lane_call_results: oneShot.call_results,
       capability_lane_observation_packets: oneShot.observation_packets,
       capability_lane_backend_selections: oneShot.backend_selections,

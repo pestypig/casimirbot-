@@ -94,8 +94,8 @@ describe("Helix Ask workstation multi-action tool plans", () => {
     );
   });
 
-  it("builds Zen motive comparison through the mission-ethos affordance", () => {
-    const prompt = "Compare this motive to Zen: I am gathering resources to survive.";
+  it("builds Moral motive comparison through the mission-ethos affordance", () => {
+    const prompt = "Compare this motive to Moral: I am gathering resources to survive.";
     const result = planWorkstationToolUse(prompt, {
       threadId: "helix-ask:test",
       turnId: "turn:test",
@@ -116,7 +116,7 @@ describe("Helix Ask workstation multi-action tool plans", () => {
     expect(listSyntheticEvidence("helix-ask:test").at(-1)?.produced_by).toBe("ideology");
     expect(listCategorizationEvents("helix-ask:test").at(-1)?.category).toBe("motive_framework");
     expect(synthesizeWorkstationToolAnswer({ prompt, plan: result.tool_plan!, evaluation })).toMatch(
-      /Mission Ethos|Zen|ideology comparison/i,
+      /Mission Ethos|Moral|ideology comparison/i,
     );
   });
 

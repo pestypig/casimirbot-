@@ -16,7 +16,7 @@ function baseBridge(
     sourceIdeologyReflectionId: "ideology-context-reflection:test",
     inputs: {
       prompt:
-        "Reflect entropy, conservation, self-organization, fairness, and Zen due process without overclaiming.",
+        "Reflect entropy, conservation, self-organization, fairness, and Moral due process without overclaiming.",
       objective: "Build an evidence-only procedural bridge.",
       refs: ["turn:test", "theory:entropy", "ideology:fairness"],
     },
@@ -29,7 +29,7 @@ function baseBridge(
         ideologyLabels: ["Direct Observation Before Claim"],
         relation: "requires_evidence",
         explanation:
-          "Incomplete observation on the theory side maps to a Zen requirement to separate observation from interpretation.",
+          "Incomplete observation on the theory side maps to a Moral requirement to separate observation from interpretation.",
         proceduralEffect:
           "Ask for missing evidence and preserve uncertainty before claim formulation.",
         confidence: 0.84,
@@ -118,7 +118,7 @@ describe("theory ideology bridge v1", () => {
     });
   });
 
-  it("represents theory-to-Zen procedural relations and analogy-only warnings", () => {
+  it("represents theory-to-Moral procedural relations and analogy-only warnings", () => {
     const bridge = baseBridge();
 
     expect(bridge.links.map((link) => link.relation)).toEqual([

@@ -20,7 +20,7 @@ export const HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY =
   "helix_ask.reflect_theory_context" as const;
 export const HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY =
   "helix_ask.reflect_civilization_bounds" as const;
-export const HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY =
+export const HELIX_GOLDEN_PATH_MORAL_GRAPH_REFLECTION_CAPABILITY =
   "helix_ask.reflect_ideology_context" as const;
 export const HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY = "image_lens.inspect" as const;
 export const HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY =

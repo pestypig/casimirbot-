@@ -62,7 +62,7 @@ function baseIdeologyReflection(nodeId = "direct-observation-before-claim", labe
     generatedAt,
     reflectionId: "ideology-context-reflection:test",
     graph: {
-      graphId: "zen-graph:test",
+      graphId: "moral-graph:test",
       rootId: "wisdom-first-principles",
       source: "docs/ethos/ideology.json",
     },
@@ -104,7 +104,7 @@ function baseIdeologyReflection(nodeId = "direct-observation-before-claim", labe
 }
 
 describe("buildTheoryIdeologyBridgeFromReflections", () => {
-  it("maps observation and provenance evidence to direct-observation Zen procedures", () => {
+  it("maps observation and provenance evidence to direct-observation Moral procedures", () => {
     const bridge = buildTheoryIdeologyBridgeFromReflections({
       generatedAt,
       bridgeId: "theory-ideology-bridge:observation",
@@ -226,7 +226,7 @@ describe("buildTheoryIdeologyBridgeFromReflections", () => {
     const bridge = buildTheoryIdeologyBridgeFromReflections({
       generatedAt,
       bridgeId: "theory-ideology-bridge:missing-counterpart",
-      prompt: "Use due process and jurisdiction boundaries with ZenGraph.",
+      prompt: "Use due process and jurisdiction boundaries with MoralGraph.",
       theoryReflection: baseTheoryReflection(
         "observation provenance falsifiability",
         "theory.observation-evidence",

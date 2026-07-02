@@ -565,7 +565,7 @@ const inferToolFamily = (toolId: string): string => {
   if (/scholarly[-_.]?research|lookup[_-]?papers|fetch[_-]?full[_-]?text|semantic[-_.]?scholar|openalex|pubmed|crossref/i.test(toolId)) return "scholarly_research";
   if (/scientific[-_.]?calculator|calculator|calculate|compute|solve/i.test(toolId)) return "calculator";
   if (/reflect[_-]?context[_-]?attachments|reflect[_-]?live[_-]?synthetic[_-]?data|context[_-]?reflection/i.test(toolId)) return "context_reflection";
-  if (/reflect[_-]?ideology[_-]?context|bridge[_-]?theory[_-]?ideology|zen[-_.]?graph|ideology_context_reflection/i.test(toolId)) return "zen_graph_reflection";
+  if (/reflect[_-]?ideology[_-]?context|bridge[_-]?theory[_-]?ideology|moral[-_.]?graph|ideology_context_reflection/i.test(toolId)) return "moral_graph_reflection";
   if (/civilization[-_.]?bounds|civilization[-_.]?scenario|reflect[_-]?civilization|build[_-]?civilization/i.test(toolId)) return "civilization_bounds";
   if (/inspect[_-]?capability[_-]?catalog|capability[_-]?catalog|tool[_-]?alignment/i.test(toolId)) return "capability_catalog";
   if (/theory[-_.]?locator|reflect[_-]?theory[_-]?context|theory[_-]?context[_-]?reflection|badge[_-]?graph/i.test(toolId)) return "theory_locator";
@@ -587,7 +587,7 @@ const CONTEXTUAL_TOOL_AUDIT_FAMILIES = [
   "internet_search",
   "theory_locator",
   "context_reflection",
-  "zen_graph_reflection",
+  "moral_graph_reflection",
   "civilization_bounds",
   "capability_catalog",
   "visual_capture",

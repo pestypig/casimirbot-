@@ -192,7 +192,7 @@ function inferDocSubjectLabel(title: string, relativePath: string, folderChain: 
   if (text.includes("stellar") || text.includes("solar") || text.includes("sunquake") || text.includes("star ")) {
     return "Stellar and Solar";
   }
-  if (text.includes("ethos") || text.includes("ideology") || text.includes("citizens arc") || text.includes("zen")) {
+  if (text.includes("ethos") || text.includes("ideology") || text.includes("citizens arc") || text.includes("moral")) {
     return "Ethos and Ideology";
   }
   if (text.includes("knowledge") || text.includes("tree") || text.includes("ingestion")) {

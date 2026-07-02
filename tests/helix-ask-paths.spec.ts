@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   evaluateUiComponentsPathEvidence,
-  evaluateZenLadderPathEvidence,
+  evaluateMoralLadderPathEvidence,
   extractFilePathsFromText,
 } from "../server/services/helix-ask/paths";
 
@@ -41,8 +41,8 @@ describe("Helix Ask path extraction", () => {
     expect(gate).toEqual({ ok: true });
   });
 
-  it("adds zen-ladder routing metadata when zen-ladder evidence paths exist", () => {
-    const gate = evaluateZenLadderPathEvidence(["docs/zen-ladder-pack/contract.md"]);
+  it("adds moral-ladder routing metadata when moral-ladder evidence paths exist", () => {
+    const gate = evaluateMoralLadderPathEvidence(["docs/moral-ladder-pack/contract.md"]);
     expect(gate).toEqual({
       ok: true,
       routing_metadata: {
@@ -53,16 +53,16 @@ describe("Helix Ask path extraction", () => {
     });
   });
 
-  it("returns deterministic strict fail_reason when zen-ladder evidence paths are missing", () => {
-    const gate = evaluateZenLadderPathEvidence(["server/routes/agi.plan.ts"], {
+  it("returns deterministic strict fail_reason when moral-ladder evidence paths are missing", () => {
+    const gate = evaluateMoralLadderPathEvidence(["server/routes/agi.plan.ts"], {
       strict: true,
     });
     expect(gate.ok).toBe(false);
-    expect(gate.fail_reason).toBe("ZEN_LADDER_PATH_EVIDENCE_MISSING");
+    expect(gate.fail_reason).toBe("MORAL_LADDER_PATH_EVIDENCE_MISSING");
   });
 
-  it("keeps zen-ladder non-strict behavior backward compatible when evidence is missing", () => {
-    const gate = evaluateZenLadderPathEvidence(["server/routes/agi.plan.ts"]);
+  it("keeps moral-ladder non-strict behavior backward compatible when evidence is missing", () => {
+    const gate = evaluateMoralLadderPathEvidence(["server/routes/agi.plan.ts"]);
     expect(gate).toEqual({ ok: true });
   });
 });

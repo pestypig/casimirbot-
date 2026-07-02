@@ -36,7 +36,7 @@ const PHASE_ORDER: PhaseId[] = ["P0", "P1", "P2", "P3", "P4"];
 const CAPABILITY_KIND_HINTS: Array<{
   pattern: RegExp;
   theoryBadgeIds: string[];
-  zenNodeIds: string[];
+  moralNodeIds: string[];
   relation: "supports" | "constrains" | "requires" | "bounds" | "analogy_only";
   proceduralEffect: string;
 }> = [
@@ -46,7 +46,7 @@ const CAPABILITY_KIND_HINTS: Array<{
       "physics.symmetry.energy_momentum_conservation",
       "physics.gr.stress_energy_conservation",
     ],
-    zenNodeIds: [
+    moralNodeIds: [
       "impermanence-entropy-and-revision",
       "skillful-action-under-uncertainty",
     ],
@@ -59,7 +59,7 @@ const CAPABILITY_KIND_HINTS: Array<{
       "biophysics.membrane.open_system_entropy_flow",
       "physics.symmetry.energy_momentum_conservation",
     ],
-    zenNodeIds: [
+    moralNodeIds: [
       "direct-observation-before-claim",
       "provenance-protocol",
     ],
@@ -69,7 +69,7 @@ const CAPABILITY_KIND_HINTS: Array<{
   {
     pattern: /(?:governance|ethics|education|citizen|sensor|observatory)/i,
     theoryBadgeIds: ["observation", "provenance", "falsifiability"],
-    zenNodeIds: [
+    moralNodeIds: [
       "fairness-due-process-and-justification",
       "feedback-loop-hygiene",
       "non-harm-and-compassionate-constraint",
@@ -247,11 +247,11 @@ function buildBadgesAndBindings(
 ): {
   badges: CivilizationBoundsBadgeV1[];
   theoryBindings: CivilizationBoundsRoadmapV1["theoryBindings"];
-  zenBindings: CivilizationBoundsRoadmapV1["zenBindings"];
+  moralBindings: CivilizationBoundsRoadmapV1["moralBindings"];
 } {
   const badges: CivilizationBoundsBadgeV1[] = [];
   const theoryBindings: CivilizationBoundsRoadmapV1["theoryBindings"] = [];
-  const zenBindings: CivilizationBoundsRoadmapV1["zenBindings"] = [];
+  const moralBindings: CivilizationBoundsRoadmapV1["moralBindings"] = [];
 
   for (const { role, system } of entries) {
     for (const phase of role.phases) {
@@ -288,7 +288,7 @@ function buildBadgesAndBindings(
           layerMode: LAYER_MODE,
           weight: Math.max(0.1, (phase.costShareEstimate ?? 0.12) * 0.65),
           confidence: 0.35,
-          ...(binding ? { theoryBadgeIds: binding.theoryBadgeIds, zenNodeIds: binding.zenNodeIds } : {}),
+          ...(binding ? { theoryBadgeIds: binding.theoryBadgeIds, moralNodeIds: binding.moralNodeIds } : {}),
           missingEvidence: ["observed_throughput", "source_backed_inventory"],
           evidenceRefs: [capabilityEvidenceRef(system.systemId, capability)],
           claimTier: CLAIM_TIER,
@@ -301,9 +301,9 @@ function buildBadgesAndBindings(
             relation: binding.relation,
             evidenceRefs: capabilityBadge.evidenceRefs,
           });
-          zenBindings.push({
+          moralBindings.push({
             badgeId,
-            zenNodeIds: binding.zenNodeIds,
+            moralNodeIds: binding.moralNodeIds,
             proceduralEffect: binding.proceduralEffect,
             refusesAuthority: [
               "moral_finality",
@@ -318,7 +318,7 @@ function buildBadgesAndBindings(
     }
   }
 
-  return { badges, theoryBindings, zenBindings };
+  return { badges, theoryBindings, moralBindings };
 }
 
 function buildEdgesAndCollaborations(
@@ -511,7 +511,7 @@ export function buildNeedleCivilizationBoundsScenario(options?: {
 }): CivilizationBoundsRoadmapV1 {
   const phases = buildPhases();
   const systemEntries = buildSystems(COUNTRY_PROGRAM_ROLES);
-  const { badges, theoryBindings, zenBindings } = buildBadgesAndBindings(systemEntries);
+  const { badges, theoryBindings, moralBindings } = buildBadgesAndBindings(systemEntries);
   const { edges, collaborationBounds } = buildEdgesAndCollaborations(systemEntries);
   const systemBadgeIds = badges
     .filter((badge) => badge.kind === "system_actor")
@@ -589,7 +589,7 @@ export function buildNeedleCivilizationBoundsScenario(options?: {
     hypothesisClaims,
     proceduralScaffold: buildNeedleProceduralScaffold(),
     theoryBindings,
-    zenBindings,
+    moralBindings,
     missingEvidence: [
       "source_backed_capacity_measurements",
       "observed_material_inventory",
@@ -615,11 +615,11 @@ export function exportCivilizationBoundsBridgeContext(
         .filter((binding) => selectedIds.has(binding.badgeId))
         .flatMap((binding) => binding.theoryBadgeIds),
     ]),
-    zenNodeIds: unique([
-      ...selected.flatMap((badge) => badge.zenNodeIds ?? []),
-      ...roadmap.zenBindings
+    moralNodeIds: unique([
+      ...selected.flatMap((badge) => badge.moralNodeIds ?? []),
+      ...roadmap.moralBindings
         .filter((binding) => selectedIds.has(binding.badgeId))
-        .flatMap((binding) => binding.zenNodeIds),
+        .flatMap((binding) => binding.moralNodeIds),
     ]),
     systemIds: unique(selected.flatMap((badge) => (badge.systemId ? [badge.systemId] : []))),
     constraints: unique([

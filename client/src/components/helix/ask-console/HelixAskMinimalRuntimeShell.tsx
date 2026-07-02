@@ -163,6 +163,7 @@ export function HelixAskMinimalRuntimeShell({
           <HelixAskComposer
             value={draft}
             placeholder={shellProps.placeholder}
+            runtimeLabel={runtimePickerModel.selectedLabel}
             onChange={setDraft}
             onSubmit={() => {
               const submitPlan = buildHelixAskMinimalRuntimeSubmitPlan({

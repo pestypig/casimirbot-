@@ -24,7 +24,7 @@ export type ToolFamily =
   | "live_source_mail"
   | "live_source_decision"
   | "voice_delivery"
-  | "zen_graph_reflection"
+  | "moral_graph_reflection"
   | "theory_locator"
   | "context_reflection"
   | "civilization_bounds"
@@ -310,15 +310,15 @@ export const TOOL_FAMILY_DEFAULT_CONTRACTS: Record<ToolFamily, ToolFamilyContrac
     requiresGoalSatisfaction: true,
     aliases: ["voice_delivery", "voice_output", "request_interim_voice_callout"],
   }),
-  zen_graph_reflection: contract({
-    toolName: "family:zen_graph_reflection",
-    toolFamily: "zen_graph_reflection",
+  moral_graph_reflection: contract({
+    toolName: "family:moral_graph_reflection",
+    toolFamily: "moral_graph_reflection",
     authority: "evidence_only",
     mutating: false,
     requiredObservationKinds: [
       "ideology_context_reflection/v1",
-      "procedural_zen_classification/v1",
-      "helix_zen_graph_reflection_tool_result",
+      "procedural_moral_classification/v1",
+      "helix_moral_graph_reflection_tool_result",
       "helix_theory_ideology_bridge_tool_result",
       "theory_ideology_bridge",
       "workstation_tool_evaluation",
@@ -327,15 +327,15 @@ export const TOOL_FAMILY_DEFAULT_CONTRACTS: Record<ToolFamily, ToolFamilyContrac
     requiredReentry: true,
     requiresGoalSatisfaction: true,
     aliases: [
-      "zen_graph_reflection",
-      "zen_graph",
-      "zengraph",
+      "moral_graph_reflection",
+      "moral_graph",
+      "moralgraph",
       "helix_ask.reflect_ideology_context",
       "helix_ask.bridge_theory_ideology_context",
       "bridge_theory_ideology_context",
       "theory_ideology_bridge",
-      "theory_zen_bridge",
-      "procedural_zen_classification/v1",
+      "theory_moral_bridge",
+      "procedural_moral_classification/v1",
     ],
   }),
   theory_locator: contract({
@@ -1396,13 +1396,13 @@ export const TOOL_FAMILY_CONTRACTS: ToolFamilyContract[] = [
   }),
   contract({
     toolName: "helix_ask.reflect_ideology_context",
-    toolFamily: "zen_graph_reflection",
+    toolFamily: "moral_graph_reflection",
     authority: "evidence_only",
     mutating: false,
     requiredObservationKinds: [
       "ideology_context_reflection/v1",
-      "procedural_zen_classification/v1",
-      "helix_zen_graph_reflection_tool_result",
+      "procedural_moral_classification/v1",
+      "helix_moral_graph_reflection_tool_result",
       "workstation_tool_evaluation",
     ],
     allowedTerminalKinds: [...evidenceOnlyTerminalKinds],
@@ -1411,15 +1411,15 @@ export const TOOL_FAMILY_CONTRACTS: ToolFamilyContract[] = [
     aliases: [
       "reflect_ideology_context",
       "ideology_context_reflection",
-      "zen_graph_reflection",
-      "zen graph reflection",
-      "zen_graph",
-      "zen graph",
+      "moral_graph_reflection",
+      "moral graph reflection",
+      "moral_graph",
+      "moral graph",
     ],
   }),
   contract({
     toolName: "helix_ask.bridge_theory_ideology_context",
-    toolFamily: "zen_graph_reflection",
+    toolFamily: "moral_graph_reflection",
     authority: "evidence_only",
     mutating: false,
     requiredObservationKinds: ["helix_theory_ideology_bridge_tool_result", "theory_ideology_bridge"],
@@ -1432,8 +1432,8 @@ export const TOOL_FAMILY_CONTRACTS: ToolFamilyContract[] = [
       "bridge theory and ideology context",
       "theory_ideology_bridge",
       "theory ideology bridge",
-      "theory_zen_bridge",
-      "theory zen bridge",
+      "theory_moral_bridge",
+      "theory moral bridge",
     ],
   }),
   contract({
@@ -1542,7 +1542,7 @@ const normalizeFamily = (value: unknown): ToolFamily | null => {
   if (/live[-.:]?source[-.:]?mail|mailbox|read-processed-live-source-mail|process-live-source-mail|reflect-live-source-mail-loop|mail-loop-causality|processed-mail-loop/.test(normalized)) return "live_source_mail";
   if (/record-live-source-mail-decision|live[-.:]?source[-.:]?decision/.test(normalized)) return "live_source_decision";
   if (/voice[-.:]?delivery|voice[-.:]?output|request-interim-voice-callout|callout/.test(normalized)) return "voice_delivery";
-  if (/zen[-.:]?graph|zengraph|reflect[-.:]?ideology[-.:]?context|procedural[-.:]?zen[-.:]?classification/.test(normalized)) return "zen_graph_reflection";
+  if (/moral[-.:]?graph|moralgraph|reflect[-.:]?ideology[-.:]?context|procedural[-.:]?moral[-.:]?classification/.test(normalized)) return "moral_graph_reflection";
   if (/theory[-.:]?locator|theory[-.:]?context|reflect[-.:]?theory[-.:]?context|frontiervectorfieldtrace|frontier[-.:]?vector[-.:]?field/.test(normalized)) return "theory_locator";
   if (
     /context[-.:]?reflection|context[-.:]?binding|bounded[-.:]?context|context[-.:]?attachment|dragged[-.:]?cutout|selected[-.:]?ui[-.:]?region|reflect[-.:]?context[-.:]?attachments|live[-.:]?synthetic[-.:]?data|live[-.:]?answer[-.:]?synthetic|microdeck[-.:]?reflection|macro[-.:]?reasoner[-.:]?deck|mail[-.:]?loop[-.:]?synthetic|prediction[-.:]?review/.test(

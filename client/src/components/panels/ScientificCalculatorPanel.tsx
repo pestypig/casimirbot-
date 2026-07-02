@@ -12,6 +12,7 @@ import {
 } from "@/lib/scientific-calculator/events";
 import { formatScientificCalculatorDebugLog } from "@/lib/scientific-calculator/debugLog";
 import { runScientificSolve, type ScientificSolveTrace } from "@/lib/scientific-calculator/solver";
+import { classifyScientificCalculatorExpression } from "@shared/scientific-calculator-workbench";
 import { runTheoryCompoundRunNow, type TheoryCompoundRunSolveScope } from "@/lib/theory/runTheoryCompoundRunNow";
 import { solveTheoryCalculatorLoadoutNow } from "@/lib/theory/theoryCalculatorLoadoutRunner";
 import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
@@ -572,6 +573,7 @@ export default function ScientificCalculatorPanel() {
     [lastSolve?.result_latex],
   );
   const inputPreviewHtml = useMemo(() => renderMathHtml(input, true), [input]);
+  const intakeClassification = useMemo(() => classifyScientificCalculatorExpression(input), [input]);
   const solveTrace = useMemo(() => resolveSolveTrace(lastSolve), [lastSolve]);
   const compoundSolveEvents = useMemo(
     () => {
@@ -1122,6 +1124,92 @@ export default function ScientificCalculatorPanel() {
             <div className="break-words font-mono text-xs text-slate-200">
               {lastSolve?.normalized_expression || t("scientificCalculator.normalized.empty")}
             </div>
+          </div>
+        </div>
+        <div className="rounded-md border border-slate-800 bg-slate-950/50 p-2 text-xs" data-testid="scientific-calculator-intake">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <div className="text-[10px] uppercase tracking-wide text-slate-500">Equation intake</div>
+            <Badge variant="outline" className="border-slate-700 text-slate-200">
+              parse: {intakeClassification.parse_status}
+            </Badge>
+            <Badge variant="outline" className="border-cyan-800/70 text-cyan-100">
+              {intakeClassification.calculation_type}
+            </Badge>
+            {intakeClassification.blocked_reasons.length > 0 ? (
+              <Badge variant="outline" className="border-amber-800/70 text-amber-100">
+                blocked
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="border-emerald-800/70 text-emerald-100">
+                route ready
+              </Badge>
+            )}
+          </div>
+          <div className="grid gap-2 lg:grid-cols-3">
+            <div className="rounded border border-slate-800 bg-slate-900/50 p-2">
+              <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Routes</div>
+              <div className="flex flex-wrap gap-1">
+                {intakeClassification.possible_routes.map((route) => (
+                  <Badge key={`route:${route}`} variant="outline" className="border-slate-700 text-[10px] text-slate-300">
+                    {route}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+            <div className="rounded border border-slate-800 bg-slate-900/50 p-2">
+              <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Symbols</div>
+              {intakeClassification.detected_symbols.length > 0 ? (
+                <div className="flex flex-wrap gap-1">
+                  {intakeClassification.detected_symbols.map((symbol) => (
+                    <Badge key={`symbol:${symbol}`} variant="outline" className="border-slate-700 text-[10px] text-slate-300">
+                      {symbol}
+                    </Badge>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-[11px] text-slate-500">none</div>
+              )}
+            </div>
+            <div className="rounded border border-slate-800 bg-slate-900/50 p-2">
+              <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Blocked by</div>
+              {intakeClassification.blocked_reasons.length > 0 ? (
+                <div className="space-y-1 text-[11px] text-amber-100">
+                  {intakeClassification.blocked_reasons.map((reason) => (
+                    <div key={`blocked:${reason}`}>{reason}</div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-[11px] text-slate-500">none</div>
+              )}
+            </div>
+          </div>
+          {intakeClassification.missing_variables.length > 0 ? (
+            <div className="mt-2 rounded border border-amber-900/60 bg-amber-950/20 p-2 text-[11px] text-amber-100">
+              Missing bindings: {intakeClassification.missing_variables.join(", ")}
+            </div>
+          ) : null}
+          <div className="mt-2 rounded border border-slate-800 bg-slate-900/50 p-2">
+            <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Variable binder</div>
+            {intakeClassification.detected_symbols.length > 0 ? (
+              <div className="grid gap-1">
+                {intakeClassification.detected_symbols.map((symbol) => {
+                  const setupVariable = lastSetup?.variables?.find((variable) => variable.symbol === symbol) ?? null;
+                  return (
+                    <div key={`binder:${symbol}`} className="grid gap-2 rounded border border-slate-800 bg-slate-950/60 px-2 py-1 md:grid-cols-[5rem_1fr_7rem]">
+                      <div className="font-mono text-slate-100">{symbol}</div>
+                      <div className="text-slate-300">
+                        {setupVariable ? setupVariableText(setupVariable) : "No numeric evidence bound"}
+                      </div>
+                      <div className={setupVariable ? "text-emerald-300" : "text-amber-200"}>
+                        {setupVariable ? "bound" : "missing"}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-[11px] text-slate-500">No variables detected.</div>
+            )}
           </div>
         </div>
         {lastSetup ? (

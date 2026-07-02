@@ -27,6 +27,7 @@ export { HelixAskComposer } from "./HelixAskComposer";
 export { HelixAskErrorBoundary } from "./HelixAskErrorBoundary";
 export {
   HELIX_ASK_CONSOLE_MAX_PROMPT_LINES,
+  buildHelixAskComposerPlaceholder,
   buildHelixAskComposerViewModel,
 } from "./HelixAskComposer";
 export { buildHelixAskSubmitAdmission } from "./HelixAskSubmitAdmission";

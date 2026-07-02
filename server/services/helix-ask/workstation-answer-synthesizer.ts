@@ -10,7 +10,7 @@ export type SynthesizeWorkstationAnswerInput = {
   plan: HelixWorkstationToolPlan;
   evaluation?: HelixWorkstationToolEvaluation | null;
   postToolSynthesisPlan?: HelixPostToolSynthesisPlanV1 | null;
-  zenGraphReflectionToolOutput?: unknown;
+  moralGraphReflectionToolOutput?: unknown;
   theoryIdeologyBridgeToolOutput?: unknown;
   civilizationScenarioFrameToolOutput?: unknown;
   civilizationBoundsToolOutput?: unknown;
@@ -511,14 +511,14 @@ function synthesizeTheoryIdeologyBridgeAnswer(
   const formatMissingEvidence = (entry: string): string => {
     const normalized = entry.trim();
     if (normalized === "theory_context_reflection") return "theory reflection receipt";
-    if (normalized === "ideology_context_reflection") return "Zen reflection receipt";
+    if (normalized === "ideology_context_reflection") return "Moral reflection receipt";
     const theoryCounterpart = normalized.match(/^theory_counterpart:(.+)$/i)?.[1];
     if (theoryCounterpart) {
       return `theory counterpart for ${theoryCounterpart.split("+").map((part) => part.replace(/-/g, " ")).join(" + ")}`;
     }
     const ideologyCounterpart = normalized.match(/^ideology_counterpart:(.+)$/i)?.[1];
     if (ideologyCounterpart) {
-      return `Zen counterpart for ${ideologyCounterpart.split("+").map((part) => part.replace(/-/g, " ")).join(" + ")}`;
+      return `Moral counterpart for ${ideologyCounterpart.split("+").map((part) => part.replace(/-/g, " ")).join(" + ")}`;
     }
     return normalized.replace(/_/g, " ");
   };
@@ -536,7 +536,7 @@ function synthesizeTheoryIdeologyBridgeAnswer(
     });
 
   return [
-    "I treated the theory side as observable/mathematical constraint evidence and the Zen side as procedural justice evidence.",
+    "I treated the theory side as observable/mathematical constraint evidence and the Moral side as procedural justice evidence.",
     renderedLinks.length
       ? ["Bridge links:", ...renderedLinks].join("\n")
       : "Bridge links: the bridge receipt did not expose named links, so the safe posture is to preserve uncertainty and ask for missing evidence.",
@@ -548,13 +548,13 @@ function synthesizeTheoryIdeologyBridgeAnswer(
   ].join("\n");
 }
 
-function synthesizeZenGraphReflectionAnswer(input: SynthesizeWorkstationAnswerInput): string {
+function synthesizeMoralGraphReflectionAnswer(input: SynthesizeWorkstationAnswerInput): string {
   const summary = input.evaluation?.summary?.trim();
   const toolOutput =
-    input.zenGraphReflectionToolOutput &&
-    typeof input.zenGraphReflectionToolOutput === "object" &&
-    !Array.isArray(input.zenGraphReflectionToolOutput)
-      ? (input.zenGraphReflectionToolOutput as Record<string, unknown>)
+    input.moralGraphReflectionToolOutput &&
+    typeof input.moralGraphReflectionToolOutput === "object" &&
+    !Array.isArray(input.moralGraphReflectionToolOutput)
+      ? (input.moralGraphReflectionToolOutput as Record<string, unknown>)
       : null;
   const reflection =
     toolOutput?.reflection && typeof toolOutput.reflection === "object" && !Array.isArray(toolOutput.reflection)
@@ -591,9 +591,9 @@ function synthesizeZenGraphReflectionAnswer(input: SynthesizeWorkstationAnswerIn
     : [];
   const proceduralLines = proceduralEntries.map((entry) => {
     const pattern = String(entry.observedPattern ?? "unclear_evidence").replace(/_/g, " ");
-    const root = typeof entry.zenRootLabel === "string" && entry.zenRootLabel.trim()
-      ? entry.zenRootLabel.trim()
-      : String(entry.zenRootId ?? "Zen root");
+    const root = typeof entry.moralRootLabel === "string" && entry.moralRootLabel.trim()
+      ? entry.moralRootLabel.trim()
+      : String(entry.moralRootId ?? "Moral root");
     const move = String(entry.proceduralMove ?? "preserve_uncertainty").replace(/_/g, " ");
     const explanation = typeof entry.explanation === "string" && entry.explanation.trim()
       ? entry.explanation.trim()
@@ -642,8 +642,8 @@ function synthesizeZenGraphReflectionAnswer(input: SynthesizeWorkstationAnswerIn
   });
   const restatedSituation =
     input.prompt.trim().length > 0
-      ? `Restated through ZenGraph: ${input.prompt.trim()}`
-      : "Restated through ZenGraph: reflect the situation as a values-and-evidence question before deciding what action is justified.";
+      ? `Restated through MoralGraph: ${input.prompt.trim()}`
+      : "Restated through MoralGraph: reflect the situation as a values-and-evidence question before deciding what action is justified.";
   const appliedLines = activated.map((entry) => {
     const label = typeof entry.label === "string" && entry.label.trim() ? entry.label.trim() : String(entry.nodeId ?? "unlabeled lens");
     const lower = label.toLowerCase();
@@ -665,7 +665,7 @@ function synthesizeZenGraphReflectionAnswer(input: SynthesizeWorkstationAnswerIn
     return `- ${label}: apply this lens as diagnostic evidence for the situation, not as a verdict.`;
   });
   return [
-    "ZenGraph applied reflection:",
+    "MoralGraph applied reflection:",
     restatedSituation,
     activatedLines.length > 0
       ? ["Activated lenses:", ...activatedLines].join("\n")
@@ -738,7 +738,7 @@ function synthesizeConflictCapacityFallback(input: SynthesizeWorkstationAnswerIn
     "Resource proof boundary: you do not need every resource estimate on Earth. You need the decision-relevant reserve, extraction, refining, manufacturing, transport, substitution, and infrastructure buildout rates with timestamps and uncertainty bounds.",
     `Roadmap constraints: ${constraints.length ? constraints.join(", ") : "not exposed in compact receipt"}.${collaborationText}`,
     `Missing evidence to upgrade the claim tier: ${missingEvidence.length ? missingEvidence.join(", ") : "source-backed capacity measurements and claim-tier receipts"}.`,
-    "Boundary: the roadmap can organize what must be measured and where the Theory/Zen bridge should look; it cannot decide policy, prove prediction finality, or convert physical feasibility into moral permission.",
+    "Boundary: the roadmap can organize what must be measured and where the Theory/Moral bridge should look; it cannot decide policy, prove prediction finality, or convert physical feasibility into moral permission.",
   ].join("\n");
 }
 
@@ -755,7 +755,7 @@ function synthesizeCivilizationBoundsAnswer(input: SynthesizeWorkstationAnswerIn
   const hasTheoryStep = input.plan.steps.some(
     (step) => step.kind === "run_ask_tool" && step.tool_id === "helix_ask.reflect_theory_context",
   );
-  const hasZenStep = input.plan.steps.some(
+  const hasMoralStep = input.plan.steps.some(
     (step) => step.kind === "run_ask_tool" && step.tool_id === "helix_ask.reflect_ideology_context",
   );
   const summary =
@@ -770,12 +770,12 @@ function synthesizeCivilizationBoundsAnswer(input: SynthesizeWorkstationAnswerIn
     hasTheoryStep
       ? "Theory binding: physical badges bound what can be claimed about energy, materials, observation, entropy, and conservation."
       : "Theory binding: no theory reflection step was required by the selected plan.",
-    hasZenStep
-      ? "ZenGraph binding: procedural lenses bound review, uncertainty, non-harm, contestability, and missing checks."
-      : "ZenGraph binding: no ZenGraph reflection step was required by the selected plan.",
+    hasMoralStep
+      ? "MoralGraph binding: procedural lenses bound review, uncertainty, non-harm, contestability, and missing checks."
+      : "MoralGraph binding: no MoralGraph reflection step was required by the selected plan.",
     hasBridgeStep
-      ? "Bridge continuity: civilization bounds supplied the situational layer between Theory and Zen evidence."
-      : "Bridge continuity: the roadmap is ready to export Theory/Zen bridge context, but the selected plan did not require the bridge step.",
+      ? "Bridge continuity: civilization bounds supplied the situational layer between Theory and Moral evidence."
+      : "Bridge continuity: the roadmap is ready to export Theory/Moral bridge context, but the selected plan did not require the bridge step.",
     "Boundary: the roadmap does not decide what should happen, certify predictions, authorize actions, or turn collaborationValue into moral value.",
   ].join("\n");
 }
@@ -821,8 +821,8 @@ export function synthesizeWorkstationToolAnswer(input: SynthesizeWorkstationAnsw
   if (input.plan.intent === "civilization_bounds_reflection") {
     return synthesizeCivilizationBoundsAnswer(input);
   }
-  if (input.plan.intent === "zen_graph_reflection") {
-    return synthesizeZenGraphReflectionAnswer(input);
+  if (input.plan.intent === "moral_graph_reflection") {
+    return synthesizeMoralGraphReflectionAnswer(input);
   }
   return input.evaluation?.summary ?? "Completed workstation tool evaluation.";
 }

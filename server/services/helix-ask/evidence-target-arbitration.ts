@@ -33,6 +33,7 @@ import {
   isExplicitDocsPathLocateSynthesisPrompt,
   isExplicitDocsPathSummaryPrompt,
 } from "./docs-viewer-intent";
+import { decideMoralGraphAgentInvocationPolicyV1 } from "@shared/moral-graph/moral-graph-agent-invocation-policy";
 
 const unique = <T>(values: T[]): T[] => Array.from(new Set(values));
 
@@ -73,8 +74,13 @@ const hasLiveSourceCurrentStateCue = (prompt: string): boolean =>
   /\b(?:what\s+do\s+you\s+know\s+right\s+now|what\s+is\s+the\s+current\s+(?:live\s+source|source|mailbox|watch|observation)\s+state|current\s+live\s+source\s+state|summari[sz]e\s+(?:the\s+)?(?:current\s+)?live\s+source\s+state|source\s+quality|live\s+source\s+quality|is\s+(?:the\s+)?(?:source|visual\s+source|mailbox)\s+(?:fresh|stale|degraded|under\s+pressure)|how\s+fresh\s+is\s+(?:the\s+)?(?:source|visual\s+source)|cadence|backlog|under\s+pressure)\b/i.test(prompt) &&
   /\b(?:live\s+source|visual\s+source|mailbox|mail|summary|summaries|observation|source|watch|quality|fresh|stale|cadence|backlog|pressure)\b/i.test(prompt);
 
-const hasZenGraphReflectionCue = (prompt: string): boolean => {
-  if (!/\b(?:zen\s*(?:badge\s*)?graph|zengraph|zenbridge|fruition|procedural\s+zen|zen\s+classifier|inner[-\s]?practice|zen\s+reflection)\b/i.test(prompt)) {
+const hasMoralGraphReflectionCue = (prompt: string): boolean => {
+  const policy = decideMoralGraphAgentInvocationPolicyV1({
+    inputKind: "user_prompt",
+    text: prompt,
+  });
+  if (policy.eligible) return true;
+  if (!/\b(?:moral\s*(?:badge\s*)?graph|moralgraph|zenbridge|fruition|procedural\s+moral|moral\s+classifier|inner[-\s]?practice|moral\s+reflection)\b/i.test(prompt)) {
     return false;
   }
   return /\b(?:use|reflect|classify|compare|evaluate|plot|map|apply|through|with|using|proper\s+reflection|what\s+kind\s+of\s+output|procedural\s+next\s+moves?)\b/i.test(prompt);
@@ -83,9 +89,9 @@ const hasZenGraphReflectionCue = (prompt: string): boolean => {
 const hasTheoryIdeologyBridgeCue = (prompt: string): boolean => {
   const hasTheoryCue =
     /\b(?:theory\s+(?:badge\s*)?graph|physics\s+(?:badge\s*)?graph|observable\s+physics|mathematics|entropy|conservation|self[-\s]?organization|chemistry|first\s+principles|boundary\s+conditions?|feedback\s+loops?|symmetry|invariance)\b/i.test(prompt);
-  const hasZenCue =
-    /\b(?:zen\s*(?:badge\s*)?graph|zengraph|zenbridge|fruition|justice|fairness|due\s+process|morality|moral|ethos|procedural\s+justice|personalization|priorit(?:y|ies)|non[-\s]?harm|right\s+speech)\b/i.test(prompt);
-  return hasTheoryCue && hasZenCue;
+  const hasMoralCue =
+    /\b(?:moral\s*(?:badge\s*)?graph|moralgraph|zenbridge|fruition|justice|fairness|due\s+process|morality|moral|ethos|procedural\s+justice|personalization|priorit(?:y|ies)|non[-\s]?harm|right\s+speech)\b/i.test(prompt);
+  return hasTheoryCue && hasMoralCue;
 };
 
 const hasNegatedExternalResearchCommand = (prompt: string): boolean =>
@@ -248,12 +254,19 @@ export function buildAskEvidenceTargetArbitration(input: {
   const repoIntent = detectRepoCodeEvidenceIntent(prompt);
   const scholarlyIntent = detectScholarlyResearchIntent(prompt);
   const internetSearchIntent = detectInternetSearchIntent(prompt);
-  const zenGraphReflectionCue = hasZenGraphReflectionCue(prompt);
+  const moralGraphPolicy = decideMoralGraphAgentInvocationPolicyV1({
+    inputKind: "user_prompt",
+    text: prompt,
+  });
+  const moralGraphReflectionCue = hasMoralGraphReflectionCue(prompt);
+  const moralLivingSubstrateCue =
+    moralGraphPolicy.eligible && moralGraphPolicy.reasonCodes.includes("living_substrate_reflection_request");
   const theoryIdeologyBridgeCue = hasTheoryIdeologyBridgeCue(prompt);
+  const selectedTheoryIdeologyBridgeCue = theoryIdeologyBridgeCue && !moralLivingSubstrateCue;
   const explicitExternalResearchCommand = hasExplicitExternalResearchCommand(prompt);
   const contextualScholarlyMentionOnly =
     scholarlyIntent.researchRequested &&
-    zenGraphReflectionCue &&
+    moralGraphReflectionCue &&
     !explicitExternalResearchCommand;
   const stagePlayNegative = hasStagePlayNegativeCue(prompt);
   const stagePlayLexical = hasStagePlayLexicalCue(prompt);
@@ -393,47 +406,57 @@ export function buildAskEvidenceTargetArbitration(input: {
     }));
   }
 
-  if (!suppressesWorkstationAction && zenGraphReflectionCue) {
-    promptIntentCandidates.push(theoryIdeologyBridgeCue ? "theory_ideology_bridge_reflection" : "zen_graph_reflection");
+  if (!suppressesWorkstationAction && moralGraphReflectionCue) {
+    promptIntentCandidates.push(selectedTheoryIdeologyBridgeCue ? "theory_ideology_bridge_reflection" : "moral_graph_reflection");
     candidates.push(makeCandidate({
-      candidateId: theoryIdeologyBridgeCue
+      candidateId: selectedTheoryIdeologyBridgeCue
         ? "workstation_panel.theory_ideology_bridge_reflection"
-        : "workstation_panel.zen_graph_reflection",
+        : "workstation_panel.moral_graph_reflection",
       targetSource: "workstation_panel",
       targetKind: "workstation_panel",
       strength: explicitExternalResearchCommand ? "soft" : "hard",
       score: explicitExternalResearchCommand
-        ? (theoryIdeologyBridgeCue ? 0.82 : 0.78)
-        : (theoryIdeologyBridgeCue ? 0.94 : 0.93),
+        ? (selectedTheoryIdeologyBridgeCue ? 0.82 : 0.78)
+        : (selectedTheoryIdeologyBridgeCue ? 0.94 : 0.93),
       reasonCodes: unique([
-        theoryIdeologyBridgeCue
+        selectedTheoryIdeologyBridgeCue
           ? "theory_ideology_bridge_explicit_cue"
-          : "zen_graph_reflection_explicit_cue",
+          : "moral_graph_reflection_explicit_cue",
         "workstation_tool_plan_capability_candidate",
         "receipt_must_reenter_model_solver",
         contextualScholarlyMentionOnly ? "quoted_or_inline_research_terms_are_contextual" : "",
       ]),
-      requestedOutputs: theoryIdeologyBridgeCue
+      requestedOutputs: selectedTheoryIdeologyBridgeCue
         ? [
             "ideology_context_reflection",
             "theory_ideology_bridge",
             "workstation_tool_evaluation",
             "typed_failure",
           ]
+        : moralLivingSubstrateCue
+          ? [
+              "ideology_context_reflection",
+              "moral_badge_locator",
+              "moral_living_substrate_reflection",
+              "workstation_tool_evaluation",
+              "typed_failure",
+            ]
         : [
             "ideology_context_reflection",
-            "zen_badge_locator",
+            "moral_badge_locator",
             "fruition_procedure_expression",
-            "procedural_zen_classification",
+            "procedural_moral_classification",
             "workstation_tool_evaluation",
             "typed_failure",
           ],
-      capabilityKeys: theoryIdeologyBridgeCue
+      capabilityKeys: selectedTheoryIdeologyBridgeCue
         ? [
             "helix_ask.reflect_theory_context",
             "helix_ask.reflect_ideology_context",
             "helix_ask.bridge_theory_ideology_context",
           ]
+        : moralLivingSubstrateCue
+          ? ["moral-graph.reflect_living_substrate_context"]
         : ["helix_ask.reflect_ideology_context"],
       terminalProductConstraints: [
         "workstation_tool_evaluation",

@@ -239,8 +239,8 @@ const fixtureContractTermsForCapability = (
       return {
         required_observation_kinds: [
           "ideology_context_reflection/v1",
-          "procedural_zen_classification/v1",
-          "helix_zen_graph_reflection_tool_result",
+          "procedural_moral_classification/v1",
+          "helix_moral_graph_reflection_tool_result",
           "workstation_tool_evaluation",
         ],
         required_terminal_kind: "model_synthesized_answer",
@@ -2445,8 +2445,8 @@ const civilizationBoundsReflectionDebug = (overrides: Record<string, unknown> = 
   });
 };
 
-const zenGraphReflectionBridgeDebug = (overrides: Record<string, unknown> = {}) => {
-  const turnId = "ask:test:zen-graph-reflection-bridge";
+const moralGraphReflectionBridgeDebug = (overrides: Record<string, unknown> = {}) => {
+  const turnId = "ask:test:moral-graph-reflection-bridge";
   const theorySubgoalId = `${turnId}:compound_capability_subgoal:1:helix_ask_reflect_theory_context`;
   const ideologySubgoalId = `${turnId}:compound_capability_subgoal:2:helix_ask_reflect_ideology_context`;
   const bridgeSubgoalId = `${turnId}:compound_capability_subgoal:3:helix_ask_bridge_theory_ideology_context`;
@@ -2471,7 +2471,7 @@ const zenGraphReflectionBridgeDebug = (overrides: Record<string, unknown> = {}) 
           prompt: "wisdom under uncertainty",
         },
         observation_kind: "ideology_context_reflection/v1",
-        observation_ref: "obs:zen-reflection",
+        observation_ref: "obs:moral-reflection",
       },
       {
         requested_capability: "helix_ask.bridge_theory_ideology_context",
@@ -2479,7 +2479,7 @@ const zenGraphReflectionBridgeDebug = (overrides: Record<string, unknown> = {}) 
         args: {
           prompt: "bridge theory and ideology context",
           theory_reflection_ref: "obs:theory-reflection",
-          ideology_reflection_ref: "obs:zen-reflection",
+          ideology_reflection_ref: "obs:moral-reflection",
         },
         input_bindings: [
           {
@@ -2503,8 +2503,8 @@ const zenGraphReflectionBridgeDebug = (overrides: Record<string, unknown> = {}) 
             from_capability: "helix_ask.reflect_ideology_context",
             required_observation_kinds: [
               "ideology_context_reflection/v1",
-              "procedural_zen_classification/v1",
-              "helix_zen_graph_reflection_tool_result",
+              "procedural_moral_classification/v1",
+              "helix_moral_graph_reflection_tool_result",
               "workstation_tool_evaluation",
             ],
             required: true,
@@ -2512,7 +2512,7 @@ const zenGraphReflectionBridgeDebug = (overrides: Record<string, unknown> = {}) 
           },
         ],
         observation_kind: "helix_theory_ideology_bridge_tool_result",
-        observation_ref: "obs:theory-zen-bridge",
+        observation_ref: "obs:theory-moral-bridge",
         bound_input_refs: [
           {
             binding_id: theoryBindingId,
@@ -2528,7 +2528,7 @@ const zenGraphReflectionBridgeDebug = (overrides: Record<string, unknown> = {}) 
             binding_kind: "source_ref",
             from_subgoal_id: ideologySubgoalId,
             from_capability: "helix_ask.reflect_ideology_context",
-            ref: "obs:zen-reflection",
+            ref: "obs:moral-reflection",
           },
         ],
       },
@@ -2563,7 +2563,7 @@ const deterministicDebugFixtureByScenarioId = {
   live_synthetic_data_reflection_calculator: liveSyntheticDataReflectionCalculatorDebug,
   visual_then_calculator: visualThenCalculatorDebug,
   civilization_bounds_reflection: civilizationBoundsReflectionDebug,
-  zen_graph_reflection_bridge: zenGraphReflectionBridgeDebug,
+  moral_graph_reflection_bridge: moralGraphReflectionBridgeDebug,
   invalid_calculator_args_fail_closed: invalidCalculatorArgsFailClosedDebug,
   missing_calculator_args_fail_closed: missingCalculatorArgsFailClosedDebug,
 } as const;
@@ -2595,7 +2595,7 @@ describe("Helix Ask compound capability live probe", () => {
     expect(filtered.availableIds).toContain("scholarly_reflection_calculator");
     expect(filtered.availableIds).toContain("scholarly_full_text_reflection_calculator");
     expect(filtered.availableIds).toContain("civilization_bounds_reflection");
-    expect(filtered.availableIds).toContain("zen_graph_reflection_bridge");
+    expect(filtered.availableIds).toContain("moral_graph_reflection_bridge");
   });
 
   it("keeps the active goal representative compound scenarios in the live probe set", () => {
@@ -3536,11 +3536,11 @@ describe("Helix Ask compound capability live probe", () => {
     ]);
   });
 
-  it("accepts zen graph reflection plus theory-ideology bridge with source binding", () => {
-    const { ask, debugExport } = zenGraphReflectionBridgeDebug();
+  it("accepts moral graph reflection plus theory-ideology bridge with source binding", () => {
+    const { ask, debugExport } = moralGraphReflectionBridgeDebug();
 
     const result = evaluateCompoundCapabilityScenario({
-      scenario: scenarioById("zen_graph_reflection_bridge"),
+      scenario: scenarioById("moral_graph_reflection_bridge"),
       ask,
       debugExport,
     });
@@ -3572,7 +3572,7 @@ describe("Helix Ask compound capability live probe", () => {
         ref: "obs:theory-reflection",
       }),
       expect.objectContaining({
-        ref: "obs:zen-reflection",
+        ref: "obs:moral-reflection",
       }),
     ]);
   });
@@ -3728,8 +3728,8 @@ describe("Helix Ask compound capability live probe", () => {
     );
   });
 
-  it("catches zen bridge subgoals that drop required ideology evidence binding", () => {
-    const base = zenGraphReflectionBridgeDebug();
+  it("catches moral bridge subgoals that drop required ideology evidence binding", () => {
+    const base = moralGraphReflectionBridgeDebug();
     const payload = (base.debugExport as any).payload;
     payload.capability_itinerary_execution_state.compound_subgoal_ledger[2].input_bindings =
       payload.capability_itinerary_execution_state.compound_subgoal_ledger[2].input_bindings.filter(
@@ -3741,7 +3741,7 @@ describe("Helix Ask compound capability live probe", () => {
       );
 
     const result = evaluateCompoundCapabilityScenario({
-      scenario: scenarioById("zen_graph_reflection_bridge"),
+      scenario: scenarioById("moral_graph_reflection_bridge"),
       ask: base.ask,
       debugExport: base.debugExport,
     });

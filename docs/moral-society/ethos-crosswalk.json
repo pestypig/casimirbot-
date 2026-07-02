@@ -1,0 +1,486 @@
+{
+  "version": 1,
+  "source": "docs/ethos/ideology.json",
+  "artifacts": [
+    {
+      "artifactId": "pillar-01-dignity",
+      "title": "Protect civilian dignity and prevent predation",
+      "templatePath": "docs/moral-society/templates/pillar-01-dignity.md",
+      "nodeRefs": [
+        "jurisdictional-floor",
+        "right-speech-infrastructure",
+        "restorative-harm-repair",
+        "capture-resistance",
+        "no-bypass-guardrail"
+      ],
+      "requiredChecks": [
+        "reports_ack_48h",
+        "independent_stats_monthly",
+        "predation_prohibitions_explicit"
+      ]
+    },
+    {
+      "artifactId": "pillar-02-services",
+      "title": "Stabilize essential services",
+      "templatePath": "docs/moral-society/templates/pillar-02-services.md",
+      "nodeRefs": [
+        "interbeing-systems",
+        "stewardship-ledger",
+        "capability-ambition-gradient",
+        "right-speech-infrastructure"
+      ],
+      "requiredChecks": [
+        "lifeline_backup_plans",
+        "restoration_schedule_weekly",
+        "spof_risks_owned"
+      ]
+    },
+    {
+      "artifactId": "pillar-03-contracts",
+      "title": "Establish legible, durable authority for contracts",
+      "templatePath": "docs/moral-society/templates/pillar-03-contracts.md",
+      "nodeRefs": [
+        "jurisdictional-floor",
+        "two-key-approval",
+        "provenance-protocol",
+        "civic-memory-continuity",
+        "impermanence-by-design"
+      ],
+      "requiredChecks": [
+        "contract_basis_and_registry",
+        "dispute_sla_visible",
+        "amendment_procedure_followed"
+      ]
+    },
+    {
+      "artifactId": "pillar-04-finance",
+      "title": "Reopen lawful finance and insurance rails",
+      "templatePath": "docs/moral-society/templates/pillar-04-finance.md",
+      "nodeRefs": [
+        "jurisdictional-floor",
+        "external-interface-integrity",
+        "capture-resistance",
+        "provenance-protocol"
+      ],
+      "requiredChecks": [
+        "rail_audit_retention",
+        "sar_path_defined",
+        "compliance_guidance_versioned"
+      ]
+    },
+    {
+      "artifactId": "pillar-05-consent",
+      "title": "Earn local buy-in for a legitimate transition",
+      "templatePath": "docs/moral-society/templates/pillar-05-consent.md",
+      "nodeRefs": [
+        "sangha-architecture",
+        "voice-integrity",
+        "values-over-images",
+        "skillful-mediation",
+        "impermanence-by-design"
+      ],
+      "requiredChecks": [
+        "councils_minutes_published",
+        "civic_access_requirements",
+        "timeline_updates_rationale"
+      ]
+    },
+    {
+      "artifactId": "pillar-06-verification",
+      "title": "Keep verification and accountability loops active",
+      "templatePath": "docs/moral-society/templates/pillar-06-verification.md",
+      "nodeRefs": [
+        "verification-checklist",
+        "feedback-loop-hygiene",
+        "integrity-protocols",
+        "liveness-or-it-didnt-happen",
+        "restorative-harm-repair"
+      ],
+      "requiredChecks": [
+        "indicators_updated_monthly",
+        "investigations_sla_met",
+        "corrections_published"
+      ]
+    },
+    {
+      "artifactId": "artifact-charter",
+      "title": "Charter template",
+      "templatePath": "docs/moral-society/templates/artifacts/charter.md",
+      "nodeRefs": [
+        "values-over-images",
+        "jurisdictional-floor"
+      ],
+      "requiredChecks": [
+        "charter_public",
+        "charter_versioned"
+      ]
+    },
+    {
+      "artifactId": "artifact-protocol",
+      "title": "Protocol template",
+      "templatePath": "docs/moral-society/templates/artifacts/protocol.md",
+      "nodeRefs": [
+        "right-speech-infrastructure",
+        "verification-checklist"
+      ],
+      "requiredChecks": [
+        "protocol_sla_defined",
+        "protocol_revision_logged"
+      ]
+    },
+    {
+      "artifactId": "artifact-ledger",
+      "title": "Ledger template",
+      "templatePath": "docs/moral-society/templates/artifacts/ledger.md",
+      "nodeRefs": [
+        "stewardship-ledger",
+        "provenance-protocol"
+      ],
+      "requiredChecks": [
+        "ledger_auditable",
+        "ledger_update_cadence"
+      ]
+    },
+    {
+      "artifactId": "artifact-dashboard",
+      "title": "Dashboard template",
+      "templatePath": "docs/moral-society/templates/artifacts/dashboard.md",
+      "nodeRefs": [
+        "feedback-loop-hygiene",
+        "liveness-or-it-didnt-happen"
+      ],
+      "requiredChecks": [
+        "dashboard_public",
+        "dashboard_change_log"
+      ]
+    },
+    {
+      "artifactId": "artifact-civic-signal-survey",
+      "title": "Civic signal survey template",
+      "templatePath": "docs/moral-society/templates/artifacts/civic-signal-survey.md",
+      "nodeRefs": [
+        "three-tenets-loop",
+        "civic-signal-loop",
+        "right-speech-infrastructure",
+        "data-dignity",
+        "integrity-protocols",
+        "sangha-architecture",
+        "skillful-mediation",
+        "civic-memory-continuity",
+        "no-bypass-guardrail"
+      ],
+      "requiredChecks": [
+        "survey_scope_declared",
+        "data_minimization_applied",
+        "lawful_boundaries_stated",
+        "response_playbook_defined",
+        "public_summary_cadence"
+      ]
+    },
+    {
+      "artifactId": "artifact-lawful-interface-protocol",
+      "title": "Lawful interface protocol template",
+      "templatePath": "docs/moral-society/templates/artifacts/lawful-interface-protocol.md",
+      "nodeRefs": [
+        "lawful-interface-protocol",
+        "jurisdictional-floor",
+        "two-key-approval",
+        "right-speech-infrastructure",
+        "data-dignity",
+        "integrity-protocols",
+        "restorative-harm-repair",
+        "skillful-mediation",
+        "capture-resistance",
+        "civic-memory-continuity",
+        "external-interface-integrity"
+      ],
+      "requiredChecks": [
+        "cooperation_boundaries_published",
+        "dual_key_approval_required",
+        "lawful_rights_guidance_posted",
+        "non_retaliation_channel_active",
+        "independent_review_defined",
+        "liaison_council_roster_current",
+        "incentives_audited"
+      ]
+    },
+    {
+      "artifactId": "artifact-federal-civic-listening-circuit",
+      "title": "Federal civic listening circuit template",
+      "templatePath": "docs/moral-society/templates/artifacts/federal-civic-listening-circuit.md",
+      "nodeRefs": [
+        "federal-civic-listening-circuit",
+        "right-speech-infrastructure",
+        "civic-memory-continuity",
+        "sangha-architecture",
+        "interbeing-systems",
+        "external-interface-integrity"
+      ],
+      "requiredChecks": [
+        "docket_published",
+        "response_ledger_published",
+        "hearing_cadence_set",
+        "declines_rationale_published"
+      ]
+    },
+    {
+      "artifactId": "artifact-metric-integrity-guardrail",
+      "title": "Metric integrity guardrail template",
+      "templatePath": "docs/moral-society/templates/artifacts/metric-integrity-guardrail.md",
+      "nodeRefs": [
+        "metric-integrity-guardrail",
+        "koan-governance",
+        "integrity-protocols",
+        "capture-resistance",
+        "verification-checklist",
+        "values-over-images"
+      ],
+      "requiredChecks": [
+        "metrics_defined",
+        "quota_prohibited",
+        "invalidators_published",
+        "review_triggers_set",
+        "harm_reduction_metrics_included"
+      ]
+    },
+    {
+      "artifactId": "artifact-harm-weighted-priority-standard",
+      "title": "Harm-weighted priority standard template",
+      "templatePath": "docs/moral-society/templates/artifacts/harm-weighted-priority-standard.md",
+      "nodeRefs": [
+        "harm-weighted-priority-standard",
+        "no-bypass-guardrail",
+        "restorative-harm-repair",
+        "integrity-protocols",
+        "data-dignity",
+        "jurisdictional-floor"
+      ],
+      "requiredChecks": [
+        "priority_tiers_defined",
+        "evidence_thresholds_set",
+        "independent_review_required",
+        "appeal_path_defined",
+        "data_minimized"
+      ]
+    },
+    {
+      "artifactId": "artifact-integration-ladder",
+      "title": "Integration ladder template",
+      "templatePath": "docs/moral-society/templates/artifacts/integration-ladder.md",
+      "nodeRefs": [
+        "integration-ladder",
+        "restorative-harm-repair",
+        "interbeing-systems",
+        "jurisdictional-floor",
+        "data-dignity",
+        "civic-memory-continuity",
+        "scarcity-justice"
+      ],
+      "requiredChecks": [
+        "eligibility_criteria_published",
+        "data_limits_defined",
+        "audit_hooks_defined",
+        "timeline_published",
+        "non_retaliation_clause"
+      ]
+    },
+    {
+      "artifactId": "artifact-local-stability-compact",
+      "title": "Local stability compact template",
+      "templatePath": "docs/moral-society/templates/artifacts/local-stability-compact.md",
+      "nodeRefs": [
+        "local-stability-compact",
+        "interbeing-systems",
+        "scarcity-justice",
+        "sangha-architecture",
+        "civic-memory-continuity",
+        "external-interface-integrity"
+      ],
+      "requiredChecks": [
+        "stability_impact_statement_required",
+        "mitigation_plan_defined",
+        "small_business_supports_listed",
+        "workforce_displacement_monitored",
+        "public_summary_cadence"
+      ]
+    },
+    {
+      "artifactId": "artifact-access-to-counsel-pathway",
+      "title": "Access-to-counsel pathway template",
+      "templatePath": "docs/moral-society/templates/artifacts/access-to-counsel-pathway.md",
+      "nodeRefs": [
+        "access-to-counsel-pathway",
+        "right-speech-infrastructure",
+        "integrity-protocols",
+        "data-dignity",
+        "restorative-harm-repair",
+        "skillful-mediation"
+      ],
+      "requiredChecks": [
+        "referral_path_defined",
+        "language_access_defined",
+        "response_time_targets",
+        "privacy_protections",
+        "appeal_path_defined"
+      ]
+    },
+    {
+      "artifactId": "artifact-training-certification-gate",
+      "title": "Training and certification gate template",
+      "templatePath": "docs/moral-society/templates/artifacts/training-certification-gate.md",
+      "nodeRefs": [
+        "training-certification-gate",
+        "bodhisattva-craft",
+        "integrity-protocols",
+        "verification-checklist",
+        "civic-memory-continuity",
+        "no-bypass-guardrail"
+      ],
+      "requiredChecks": [
+        "training_curriculum_published",
+        "renewal_cadence_set",
+        "incident_review_linked",
+        "certification_registry_current",
+        "waiver_policy_defined"
+      ]
+    },
+    {
+      "artifactId": "artifact-civic-oxygen-compact",
+      "title": "Civic oxygen compact template",
+      "templatePath": "docs/moral-society/templates/artifacts/civic-oxygen-compact.md",
+      "nodeRefs": [
+        "jurisdictional-floor",
+        "right-speech-infrastructure",
+        "data-dignity",
+        "no-bypass-guardrail",
+        "verification-checklist",
+        "truth-convergence-pathways"
+      ],
+      "requiredChecks": [
+        "communications_uptime_published",
+        "shutdown_orders_logged",
+        "assembly_safety_protocol_active",
+        "monitor_access_channels_open",
+        "privacy_preserving_reporting_enabled",
+        "detention_review_sla_defined"
+      ]
+    },
+    {
+      "artifactId": "artifact-institution-first-recognition-framework",
+      "title": "Institution-first recognition framework template",
+      "templatePath": "docs/moral-society/templates/artifacts/institution-first-recognition-framework.md",
+      "nodeRefs": [
+        "verification-based-diplomacy",
+        "external-interface-integrity",
+        "capture-resistance",
+        "two-key-approval",
+        "civic-memory-continuity",
+        "impermanence-by-design"
+      ],
+      "requiredChecks": [
+        "recognition_benchmarks_public",
+        "institution_support_firewalled",
+        "donor_and_foreign_contact_disclosed",
+        "independent_audit_required",
+        "rollback_triggers_defined",
+        "phase_decisions_logged"
+      ]
+    },
+    {
+      "artifactId": "artifact-election-readiness-ladder",
+      "title": "Election readiness ladder template",
+      "templatePath": "docs/moral-society/templates/artifacts/election-readiness-ladder.md",
+      "nodeRefs": [
+        "citizens-arc",
+        "citizens-arc-anti-mutation",
+        "sangha-architecture",
+        "right-speech-infrastructure",
+        "verification-checklist",
+        "impermanence-by-design",
+        "civic-memory-continuity",
+        "skillful-mediation"
+      ],
+      "requiredChecks": [
+        "stage_gate_criteria_published",
+        "municipal_phase_completed_first",
+        "service_baseline_required",
+        "observer_and_dispute_capacity_tested",
+        "advancement_receipt_logged",
+        "rollback_conditions_defined"
+      ]
+    },
+    {
+      "artifactId": "artifact-survivable-opposition-framework",
+      "title": "Survivable opposition framework template",
+      "templatePath": "docs/moral-society/templates/artifacts/survivable-opposition-framework.md",
+      "nodeRefs": [
+        "restorative-harm-repair",
+        "skillful-mediation",
+        "access-to-counsel-pathway",
+        "integration-ladder",
+        "scarcity-justice",
+        "jurisdictional-floor",
+        "data-dignity",
+        "no-bypass-guardrail"
+      ],
+      "requiredChecks": [
+        "grave_abuse_exclusion_rules_defined",
+        "lower_level_reintegration_path_published",
+        "minority_and_dissident_protections_listed",
+        "detention_review_and_counsel_access_active",
+        "nonviolent_dispute_path_defined",
+        "retaliation_monitoring_published"
+      ]
+    },
+    {
+      "artifactId": "artifact-external-support-integrity-framework",
+      "title": "External support integrity framework template",
+      "templatePath": "docs/moral-society/templates/artifacts/external-support-integrity-framework.md",
+      "nodeRefs": [
+        "external-interface-integrity",
+        "capture-resistance",
+        "provenance-protocol",
+        "two-key-approval",
+        "verification-based-diplomacy",
+        "data-dignity",
+        "civic-memory-continuity"
+      ],
+      "requiredChecks": [
+        "donor_registry_public",
+        "foreign_contact_disclosure_versioned",
+        "support_boundaries_published",
+        "subgrant_and_procurement_audits_defined",
+        "recipient_coi_disclosures_current",
+        "termination_and_sunset_terms_defined"
+      ]
+    },
+    {
+      "artifactId": "signatory-registry",
+      "title": "Signatory registry template",
+      "templatePath": "docs/moral-society/templates/signatory-registry.md",
+      "nodeRefs": [
+        "provenance-protocol",
+        "civic-memory-continuity",
+        "jurisdictional-floor"
+      ],
+      "requiredChecks": [
+        "registry_versioned",
+        "contacts_current"
+      ]
+    },
+    {
+      "artifactId": "decision-log",
+      "title": "Decision log template",
+      "templatePath": "docs/moral-society/templates/decision-log.md",
+      "nodeRefs": [
+        "civic-memory-continuity",
+        "provenance-protocol",
+        "impermanence-by-design"
+      ],
+      "requiredChecks": [
+        "decisions_timestamped",
+        "amendments_linked"
+      ]
+    }
+  ]
+}

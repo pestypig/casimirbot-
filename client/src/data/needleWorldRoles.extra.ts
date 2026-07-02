@@ -75,7 +75,7 @@ export const MORE_COUNTRY_PROGRAM_ROLES: CountryProgramRole[] = [
       "power_grid",
       "education",
       "sensor_network",
-      "citizen_science",
+      "citimoral_science",
     ],
     phases: [
       phase(
@@ -108,7 +108,7 @@ export const MORE_COUNTRY_PROGRAM_ROLES: CountryProgramRole[] = [
       "open_source_dev",
       "education",
       "sensor_network",
-      "citizen_science",
+      "citimoral_science",
     ],
     phases: [
       phase(
@@ -166,7 +166,7 @@ export const MORE_COUNTRY_PROGRAM_ROLES: CountryProgramRole[] = [
       "civil_megaprojects",
       "education",
       "sensor_network",
-      "citizen_science",
+      "citimoral_science",
     ],
     phases: [
       phase(
@@ -196,7 +196,7 @@ export const MORE_COUNTRY_PROGRAM_ROLES: CountryProgramRole[] = [
       "test_range",
       "education",
       "sensor_network",
-      "citizen_science",
+      "citimoral_science",
     ],
     phases: [
       phase(
@@ -423,7 +423,7 @@ export const MORE_COUNTRY_PROGRAM_ROLES: CountryProgramRole[] = [
       "civil_megaprojects",
       "education",
       "sensor_network",
-      "citizen_science",
+      "citimoral_science",
     ],
     phases: [
       phase(
@@ -509,7 +509,7 @@ export const MORE_COUNTRY_PROGRAM_ROLES: CountryProgramRole[] = [
       "observatory",
       "education",
       "sensor_network",
-      "citizen_science",
+      "citimoral_science",
     ],
     phases: [
       phase(
@@ -569,7 +569,7 @@ const CAP_EDU_GOV: string[] = [
   "education",
   "sensor_network",
   "ethics_governance",
-  "citizen_science",
+  "citimoral_science",
 ];
 
 const P0_START = PHASE_SPANS.P0.startYear;

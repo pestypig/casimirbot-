@@ -44,7 +44,7 @@ import { grAgentRouter } from "./routes/gr-agent";
 import { trainingTraceRouter } from "./routes/training-trace";
 import { evolutionRouter } from "./routes/evolution";
 import { adapterRouter } from "./routes/agi.adapter";
-import { zenGraphPrototypeRouter } from "./routes/agi.zen-graph";
+import { moralGraphPrototypeRouter } from "./routes/agi.moral-graph";
 import { constraintPacksRouter } from "./routes/agi.constraint-packs";
 import { chatRouter } from "./routes/agi.chat";
 import { demonstrationRouter } from "./routes/agi.demonstration";
@@ -330,7 +330,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     app.use("/api/agi", chatRouter);
     app.use("/api/agi/demonstration", demonstrationRouter);
     app.use("/api/agi", trainingTraceRouter);
-    app.use("/api/agi", zenGraphPrototypeRouter);
+    app.use("/api/agi", moralGraphPrototypeRouter);
     app.use("/api/agi", refineryRouter);
     app.use("/api/agi", constraintPacksRouter);
     app.use("/api/agi/environment", environmentSourceRouter);

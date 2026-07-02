@@ -43,7 +43,7 @@ export type LiveSpineCoverage =
   | "image_lens"
   | "capability_catalog"
   | "civilization_bounds"
-  | "zen_graph_reflection"
+  | "moral_graph_reflection"
   | "negated_contextual_tool_mentions";
 
 export const REQUIRED_LIVE_SPINE_COVERAGE: LiveSpineCoverage[] = [
@@ -60,7 +60,7 @@ export const REQUIRED_LIVE_SPINE_COVERAGE: LiveSpineCoverage[] = [
   "image_lens",
   "capability_catalog",
   "civilization_bounds",
-  "zen_graph_reflection",
+  "moral_graph_reflection",
   "negated_contextual_tool_mentions",
 ];
 
@@ -357,10 +357,10 @@ export const LIVE_SPINE_SMOKE_SCENARIOS: LiveSpineScenario[] = [
     },
   },
   {
-    id: "zen_graph_reflection_explicit",
-    coverage: ["zen_graph_reflection"],
+    id: "moral_graph_reflection_explicit",
+    coverage: ["moral_graph_reflection"],
     prompt:
-      "Use helix_ask.reflect_ideology_context to reflect through the zen graph on this rule: receipts are observations and terminal authority selects the answer.",
+      "Use helix_ask.reflect_ideology_context to reflect through the moral graph on this rule: receipts are observations and terminal authority selects the answer.",
     expected: {
       requestedCapability: "helix_ask.reflect_ideology_context",
       selectedCapability: "helix_ask.reflect_ideology_context",
@@ -368,8 +368,8 @@ export const LIVE_SPINE_SMOKE_SCENARIOS: LiveSpineScenario[] = [
       executedCapability: "helix_ask.reflect_ideology_context",
       observationKind: [
         "ideology_context_reflection/v1",
-        "procedural_zen_classification/v1",
-        "helix_zen_graph_reflection_tool_result",
+        "procedural_moral_classification/v1",
+        "helix_moral_graph_reflection_tool_result",
         "workstation_tool_evaluation",
       ],
       reentryStatus: "reentered",

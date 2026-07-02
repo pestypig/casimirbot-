@@ -124,7 +124,7 @@ const expectedTerminalKindsByFamily: Record<string, string[]> = {
   live_environment: ["direct_answer_text", "workstation_tool_evaluation", "model_synthesized_answer"],
   context_reflection: ["model_synthesized_answer"],
   theory_locator: ["theory_context_reflection_answer"],
-  zen_graph_reflection: ["model_synthesized_answer"],
+  moral_graph_reflection: ["model_synthesized_answer"],
   civilization_bounds: ["model_synthesized_answer"],
   visual_capture: ["situation_context_pack"],
   workstation: ["model_synthesized_answer", "workstation_tool_evaluation"],
@@ -222,7 +222,7 @@ const familyObservationKind = (family: string): string | null => {
   if (family === "runtime_evidence") return "capability_registry";
   if (family === "situation_run") return "situation_context_pack";
   if (family === "visual_capture") return "situation_context_pack";
-  if (family === "zen_graph_reflection") return "helix_zen_graph_reflection_tool_result";
+  if (family === "moral_graph_reflection") return "helix_moral_graph_reflection_tool_result";
   if (family === "civilization_bounds") return "helix_civilization_bounds_tool_result";
   if (family === "workstation") return "note_action_receipt";
   return null;
@@ -591,7 +591,7 @@ describe("Helix Ask compound capability family matrix", () => {
       "live_environment",
       "context_reflection",
       "theory_locator",
-      "zen_graph_reflection",
+      "moral_graph_reflection",
       "civilization_bounds",
       "visual_capture",
       "workstation",
@@ -955,7 +955,7 @@ describe("Helix Ask compound capability family matrix", () => {
       },
       {
         capability: "helix_ask.reflect_ideology_context",
-        family: "zen_graph_reflection",
+        family: "moral_graph_reflection",
         notFamily: "workstation_action",
       },
       {
@@ -1446,7 +1446,7 @@ describe("Helix Ask compound capability family matrix", () => {
       "helix_ask.build_civilization_scenario_frame",
       "helix_ask.reflect_civilization_bounds",
     ], "compound_evidence_synthesis_answer");
-    assertCompletedNamedScenario("zen_graph_reflection_bridge", [
+    assertCompletedNamedScenario("moral_graph_reflection_bridge", [
       "helix_ask.reflect_theory_context",
       "helix_ask.reflect_ideology_context",
       "helix_ask.bridge_theory_ideology_context",
@@ -1493,7 +1493,7 @@ describe("Helix Ask compound capability family matrix", () => {
         source: "repo-code.search_concept",
       },
       {
-        name: "repo_to_zen_reflection",
+        name: "repo_to_moral_reflection",
         capabilities: [
           "repo-code.search_concept",
           "helix_ask.reflect_ideology_context",
@@ -1678,7 +1678,7 @@ describe("Helix Ask compound capability family matrix", () => {
       "helix_ask.reflect_ideology_context",
       "helix_ask.bridge_theory_ideology_context",
     ].map(contractByCapability);
-    const turnId = "ask:named-binding:theory-zen-reflections-to-bridge";
+    const turnId = "ask:named-binding:theory-moral-reflections-to-bridge";
     const compound = buildHelixCompoundCapabilityContract({
       turnId,
       promptText: promptForChain(contracts),

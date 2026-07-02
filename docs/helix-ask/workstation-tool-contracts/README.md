@@ -109,6 +109,34 @@ symbols. If a variable is missing, the compound rail records
 `missing_variables`, the rejected template, selected affordances, and a blocked
 rail status instead of hallucinating a solve.
 
+## Theory Badge Calculator Compatibility
+
+The Theory Badge Graph and Scientific Calculator are transparent to each other
+through typed payloads and typed non-payload rows. Compatibility does not mean
+that every badge is numerically solvable. It means every badge can be projected
+into one of these lanes without ambiguity:
+
+| Lane | Badge requirement | Calculator behavior |
+| --- | --- | --- |
+| Scalar payload | `calculatorPayloads[]` with an expression, units, assumptions, source refs, and setup context when available | May prefill, bind variables, and solve only after required numeric values are present |
+| Runtime context | Runtime, artifact, tensor, gate, or simulation-specific evidence refs | May show context or load a compound run; scalar calculator must not claim the runtime result |
+| Reference context | Laws, definitions, tensor equations, worldline integrals, or noncomputable references | May display or explain the expression; no numeric receipt is allowed |
+| Diagnostic gate | Gate-status equations, pass/fail semantics, or verification requirements | May report gate context; cannot convert gate status into proof without the required verifier receipt |
+| Claim boundary | Explicit limits on validation, physical mechanism, promotion, or proof maturity | Must travel with any loadout, answer, or recommended action |
+
+Adding a researched paper, function, equation, or badge to the Theory Badge
+Graph is acceptable only when the patch declares which lane it occupies. A
+paper-derived scalar formula should provide a calculator payload only if the
+expression can be bound to numeric values with source refs and units. A proof,
+tensor identity, approximation family, simulation method, or diagnostic gate
+should usually enter as reference, runtime, gate, or claim-boundary context
+unless a separate scalar projection is explicitly defined.
+
+The calculator may accept symbolic or incomplete badge expressions through a
+prefill/action lane, but that receipt is a UI action, not a solved result. A
+numeric calculator receipt requires a supported scalar expression whose free
+variables have been replaced by sourced numeric bindings.
+
 ## Formula-Bound Scholarly Validation
 
 For Codex Workstation Mode, the theory-to-scholar-to-calculator workflow is
@@ -204,6 +232,9 @@ Each capability contract should define:
 | `workspace_os.status` | [workspace_os.status.md](workspace_os.status.md) | `draft` |
 | `workstation.active_context` | [workstation.active_context.md](workstation.active_context.md) | `draft` |
 | `scientific-calculator.solve_expression` | [scientific-calculator.solve_expression.md](scientific-calculator.solve_expression.md) | `candidate` |
+| `scientific-calculator.solve_scalar_expression` | [scientific-calculator.solve_expression.md](scientific-calculator.solve_expression.md) | `candidate` |
+| `scientific-calculator.classify_expression` | [scientific-calculator.solve_expression.md](scientific-calculator.solve_expression.md) | `candidate` |
+| `scientific-calculator.bind_variables` | [scientific-calculator.solve_expression.md](scientific-calculator.solve_expression.md) | `candidate` |
 | `scientific-calculator.active_context` | [scientific-calculator.active_context.md](scientific-calculator.active_context.md) | `draft` |
 | `workstation.readable_surface.observe` | [workstation.readable_surface.observe.md](workstation.readable_surface.observe.md) | `draft` |
 | `docs-viewer.read_visible_surface` | [workstation.readable_surface.observe.md](workstation.readable_surface.observe.md) | `draft` |
@@ -212,6 +243,7 @@ Each capability contract should define:
 | `scientific-calculator.open_panel` | [workstation.panel_actions.md](workstation.panel_actions.md) | `draft` |
 | `scientific-calculator.focus_panel` | [workstation.panel_actions.md](workstation.panel_actions.md) | `draft` |
 | `scientific-calculator.show_gateway_solve` | [workstation.panel_actions.md](workstation.panel_actions.md) | `draft` |
+| `scientific-calculator.prefill_expression` | [workstation.panel_actions.md](workstation.panel_actions.md) | `draft` |
 | `workstation.open_panel` | [workstation.panel_actions.md](workstation.panel_actions.md) | `draft` |
 | `workstation.focus_panel` | [workstation.panel_actions.md](workstation.panel_actions.md) | `draft` |
 | `docs-viewer.open_doc` | [docs-viewer.open_doc.md](docs-viewer.open_doc.md) | `draft` |
@@ -219,6 +251,7 @@ Each capability contract should define:
 | `repo.search` | [repo.search.md](repo.search.md) | `draft` |
 | `theory-badge-graph.reflect_discussion_context` | [theory-badge-graph.reflect_discussion_context.md](theory-badge-graph.reflect_discussion_context.md) | `candidate` |
 | `theory-badge-graph.propose_frontier_conjectures` | [theory-badge-graph.propose_frontier_conjectures.md](theory-badge-graph.propose_frontier_conjectures.md) | `draft` |
+| `moral-graph.reflect_living_substrate_context` | [moral-graph.reflect_living_substrate_context.md](moral-graph.reflect_living_substrate_context.md) | `candidate` |
 | `civilization-bounds.reflect_system_bounds` | [civilization-bounds.reflect_system_bounds.md](civilization-bounds.reflect_system_bounds.md) | `candidate` |
 | `scholarly-research.lookup_papers` | [scholarly-research.lookup_papers.md](scholarly-research.lookup_papers.md) | `draft` |
 | `scholarly-research.fetch_full_text` | [scholarly-research.fetch_full_text.md](scholarly-research.fetch_full_text.md) | `draft` |

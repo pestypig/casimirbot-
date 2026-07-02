@@ -1,0 +1,9 @@
+﻿{
+  "id": "artifact.pilot-log",
+  "name": "Pilot log",
+  "requiredFields": ["pilotCount", "outcomes", "issues", "fixes", "customerQuotes"],
+  "evidenceKinds": ["log", "invoice", "contract"],
+  "freshnessDays": 120,
+  "ownerRole": "applicant",
+  "templatePath": "docs/moral-ladder-pack/templates/artifacts/pilot-log.md"
+}

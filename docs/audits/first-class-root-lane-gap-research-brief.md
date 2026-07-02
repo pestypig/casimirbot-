@@ -68,8 +68,8 @@ Tree IDs currently in the forest:
 - `resonance`
 - `trace-system`
 - `helix-ask`
-- `zen-society`
-- `zen-ladder-pack`
+- `moral-society`
+- `moral-ladder-pack`
 - `certainty-framework`
 - `uncertainty-mechanics`
 - `ui-components`
@@ -206,8 +206,8 @@ Input bundle (authoritative for this task):
     "resonance",
     "trace-system",
     "helix-ask",
-    "zen-society",
-    "zen-ladder-pack",
+    "moral-society",
+    "moral-ladder-pack",
     "certainty-framework",
     "uncertainty-mechanics",
     "ui-components",

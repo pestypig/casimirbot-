@@ -14,7 +14,7 @@ import {
   HELIX_GOLDEN_PATH_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
   HELIX_GOLDEN_PATH_THEORY_REFLECTION_CAPABILITY,
   HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
-  HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
+  HELIX_GOLDEN_PATH_MORAL_GRAPH_REFLECTION_CAPABILITY,
   HELIX_GOLDEN_PATH_IMAGE_LENS_INSPECT_CAPABILITY,
   HELIX_GOLDEN_PATH_VISUAL_CAPTURE_DESCRIBE_CAPABILITY,
   HELIX_GOLDEN_PATH_WORKSPACE_OS_STATUS_CAPABILITY,
@@ -205,9 +205,9 @@ describe("Helix Ask golden path runtime", () => {
       ["VisualCapture", "./capabilities/visual-capture"],
       ["WorkspaceDirectory", "./capabilities/workspace-directory"],
       ["WorkspaceStatus", "./capabilities/workspace-status"],
-      ["ZenGraphReflection", "./capabilities/zen-graph-reflection"],
+      ["MoralGraphReflection", "./capabilities/moral-graph-reflection"],
       ["CatalogWorkspace", "./compounds/catalog-workspace"],
-      ["CivilizationZenReflection", "./compounds/civilization-zen-reflection"],
+      ["CivilizationMoralReflection", "./compounds/civilization-moral-reflection"],
       ["DocsCalculator", "./compounds/docs-calculator"],
       ["InternetTheoryReflection", "./compounds/internet-theory-reflection"],
       ["RepoDocs", "./compounds/repo-docs"],
@@ -1099,17 +1099,17 @@ describe("Helix Ask golden path runtime", () => {
     expect(terminalLedgerEntries(body)).toHaveLength(1);
   });
 
-  it("handles compact zen graph ideology evidence as a reflection answer", () => {
+  it("handles compact moral graph ideology evidence as a reflection answer", () => {
     process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
 
     const decision = runHelixAskGoldenPathRuntime({
       now: new Date("2026-06-28T12:30:00.000Z"),
       body: {
-        turn_id: "ask:golden:zen-graph",
+        turn_id: "ask:golden:moral-graph",
         prompt: "helix_ask_golden_path_runtime use helix_ask.reflect_ideology_context",
         goldenPathRuntime: true,
-        requested_capability: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
-        helix_zen_graph_reflection_tool_result: {
+        requested_capability: HELIX_GOLDEN_PATH_MORAL_GRAPH_REFLECTION_CAPABILITY,
+        helix_moral_graph_reflection_tool_result: {
           reflection: {
             artifactId: "ideology_context_reflection",
             reflectionId: "ideology-context-reflection:test",
@@ -1117,7 +1117,7 @@ describe("Helix Ask golden path runtime", () => {
             input: {
               kind: "user_prompt",
               summary: "Reflect right speech and two-key review as evidence-only lenses.",
-              refs: ["turn:zen-graph", "doc:ethos"],
+              refs: ["turn:moral-graph", "doc:ethos"],
             },
             activated_traits: [{ nodeId: "right-speech", label: "Right Speech" }],
             tensions: [{ id: "missing-check", severity: "medium" }],
@@ -1143,7 +1143,7 @@ describe("Helix Ask golden path runtime", () => {
     });
 
     expect(decision.handled).toBe(true);
-    if (!decision.handled) throw new Error("golden path should handle zen graph reflection");
+    if (!decision.handled) throw new Error("golden path should handle moral graph reflection");
     const body = decision.payload;
 
     expect(body).toMatchObject({
@@ -1151,9 +1151,9 @@ describe("Helix Ask golden path runtime", () => {
       terminal_artifact_kind: "ideology_context_reflection_answer",
       final_answer_source: "ideology_context_reflection_answer",
       terminal_error_code: null,
-      helix_zen_graph_reflection_tool_result: {
-        kind: "helix_zen_graph_reflection_tool_result",
-        tool_id: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
+      helix_moral_graph_reflection_tool_result: {
+        kind: "helix_moral_graph_reflection_tool_result",
+        tool_id: HELIX_GOLDEN_PATH_MORAL_GRAPH_REFLECTION_CAPABILITY,
         procedural_receipt: {
           schema: "helix.reflection_procedural_receipt.v1",
           constraints_introduced: expect.arrayContaining([
@@ -1174,18 +1174,18 @@ describe("Helix Ask golden path runtime", () => {
         reflection_id: "ideology-context-reflection:test",
       },
       capability_plan: {
-        requested_capability: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
-        selected_capability: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
-        executed_capability: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
-        required_observation_kinds: ["helix_zen_graph_reflection_tool_result"],
+        requested_capability: HELIX_GOLDEN_PATH_MORAL_GRAPH_REFLECTION_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_MORAL_GRAPH_REFLECTION_CAPABILITY,
+        executed_capability: HELIX_GOLDEN_PATH_MORAL_GRAPH_REFLECTION_CAPABILITY,
+        required_observation_kinds: ["helix_moral_graph_reflection_tool_result"],
         required_terminal_kind: "ideology_context_reflection_answer",
       },
       ask_turn_solver_trace: {
         completed_solver_path: true,
-        requested_capability: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
-        selected_capability: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
-        executed_capability: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
-        observed_artifact_kind: "helix_zen_graph_reflection_tool_result",
+        requested_capability: HELIX_GOLDEN_PATH_MORAL_GRAPH_REFLECTION_CAPABILITY,
+        selected_capability: HELIX_GOLDEN_PATH_MORAL_GRAPH_REFLECTION_CAPABILITY,
+        executed_capability: HELIX_GOLDEN_PATH_MORAL_GRAPH_REFLECTION_CAPABILITY,
+        observed_artifact_kind: "helix_moral_graph_reflection_tool_result",
         terminal_artifact_kind: "ideology_context_reflection_answer",
       },
       terminal_answer_authority: {
@@ -1200,7 +1200,7 @@ describe("Helix Ask golden path runtime", () => {
     expect(body.selected_final_answer).not.toContain("Activated lenses:");
     expect(readLedger(body).map((artifact) => artifact.kind)).toEqual([
       "golden_path_route_gate",
-      "helix_zen_graph_reflection_tool_result",
+      "helix_moral_graph_reflection_tool_result",
       "ideology_context_reflection_answer",
     ]);
     expect(terminalLedgerEntries(body)).toHaveLength(1);
@@ -2373,19 +2373,19 @@ describe("Helix Ask golden path runtime", () => {
     expect(terminalLedgerEntries(body)).toHaveLength(1);
   });
 
-  it("handles civilization bounds plus zen graph reflection as an ordered compound contract", () => {
+  it("handles civilization bounds plus moral graph reflection as an ordered compound contract", () => {
     process.env[HELIX_ASK_GOLDEN_PATH_RUNTIME_FLAG] = "1";
 
     const decision = runHelixAskGoldenPathRuntime({
       now: new Date("2026-06-28T12:34:30.000Z"),
       body: {
-        turn_id: "ask:golden:civilization-zen-compound",
+        turn_id: "ask:golden:civilization-moral-compound",
         prompt:
           "helix_ask_golden_path_runtime use helix_ask.reflect_civilization_bounds and helix_ask.reflect_ideology_context",
         goldenPathRuntime: true,
         requested_capabilities: [
           HELIX_GOLDEN_PATH_CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
-          HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
+          HELIX_GOLDEN_PATH_MORAL_GRAPH_REFLECTION_CAPABILITY,
         ],
         civilization_bounds_tool_result: {
           roadmap: {
@@ -2410,7 +2410,7 @@ describe("Helix Ask golden path runtime", () => {
             missingEvidence: ["source_backed_capacity_measurements"],
           },
         },
-        helix_zen_graph_reflection_tool_result: {
+        helix_moral_graph_reflection_tool_result: {
           reflection: {
             artifactId: "ideology_context_reflection",
             reflectionId: "ideology-context-reflection:compound",
@@ -2418,7 +2418,7 @@ describe("Helix Ask golden path runtime", () => {
             input: {
               kind: "user_prompt",
               summary: "Relate civilization bounds to right speech and two-key review.",
-              refs: ["turn:civilization-zen", "doc:ethos"],
+              refs: ["turn:civilization-moral", "doc:ethos"],
             },
             activated_traits: [{ nodeId: "two-key-review", label: "Two-key review" }],
             tensions: [{ id: "capacity-claim-boundary", severity: "medium" }],
@@ -2444,7 +2444,7 @@ describe("Helix Ask golden path runtime", () => {
     });
 
     expect(decision.handled).toBe(true);
-    if (!decision.handled) throw new Error("golden path should handle civilization+zen compound");
+    if (!decision.handled) throw new Error("golden path should handle civilization+moral compound");
     const body = decision.payload;
 
     expect(body).toMatchObject({
@@ -2480,15 +2480,15 @@ describe("Helix Ask golden path runtime", () => {
         },
         terminal_eligible: false,
       },
-      helix_zen_graph_reflection_tool_result: {
-        kind: "helix_zen_graph_reflection_tool_result",
-        tool_id: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
+      helix_moral_graph_reflection_tool_result: {
+        kind: "helix_moral_graph_reflection_tool_result",
+        tool_id: HELIX_GOLDEN_PATH_MORAL_GRAPH_REFLECTION_CAPABILITY,
         procedural_receipt: {
           schema: "helix.reflection_procedural_receipt.v1",
           selected_nodes: expect.arrayContaining([
             expect.objectContaining({ id: "ideology-context-reflection:compound" }),
           ]),
-          support_refs: expect.arrayContaining(["ideology-context-reflection:compound", "turn:civilization-zen"]),
+          support_refs: expect.arrayContaining(["ideology-context-reflection:compound", "turn:civilization-moral"]),
           constraints_introduced: expect.arrayContaining([
             "Treat activated lenses and tensions as answer-shaping constraints, not terminal moral authority.",
           ]),
@@ -2519,10 +2519,10 @@ describe("Helix Ask golden path runtime", () => {
             satisfaction: "satisfied",
           },
           {
-            requested_capability: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
-            selected_capability: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
-            executed_capability: HELIX_GOLDEN_PATH_ZEN_GRAPH_REFLECTION_CAPABILITY,
-            observation_kind: "helix_zen_graph_reflection_tool_result",
+            requested_capability: HELIX_GOLDEN_PATH_MORAL_GRAPH_REFLECTION_CAPABILITY,
+            selected_capability: HELIX_GOLDEN_PATH_MORAL_GRAPH_REFLECTION_CAPABILITY,
+            executed_capability: HELIX_GOLDEN_PATH_MORAL_GRAPH_REFLECTION_CAPABILITY,
+            observation_kind: "helix_moral_graph_reflection_tool_result",
             terminal_contribution_kind: "ideology_context_reflection_answer",
             satisfaction: "satisfied",
           },
@@ -2534,7 +2534,7 @@ describe("Helix Ask golden path runtime", () => {
         executed_capability: "compound_capability_contract",
         required_observation_kinds: [
           "helix_civilization_bounds_tool_result",
-          "helix_zen_graph_reflection_tool_result",
+          "helix_moral_graph_reflection_tool_result",
         ],
         required_terminal_kind: "compound_evidence_synthesis_answer",
       },
@@ -2557,7 +2557,7 @@ describe("Helix Ask golden path runtime", () => {
     expect(readLedger(body).map((artifact) => artifact.kind)).toEqual([
       "golden_path_route_gate",
       "helix_civilization_bounds_tool_result",
-      "helix_zen_graph_reflection_tool_result",
+      "helix_moral_graph_reflection_tool_result",
       "compound_evidence_synthesis_answer",
     ]);
     expect(terminalLedgerEntries(body)).toHaveLength(1);

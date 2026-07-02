@@ -98,7 +98,7 @@ const recordIdeologyTelemetry = (
       nodeId,
       panelId: IDEOLOGY_PANEL_ID,
       instanceId: IDEOLOGY_PANEL_ID,
-      title: "Ideology & Zen",
+      title: "Ideology & Moral",
       surface,
       strings,
     });
@@ -338,16 +338,16 @@ ethosRouter.get("/artifacts", (req, res) => {
     strictProvenance
   });
 
-  const includesZenSociety = result.items.some((item) =>
+  const includesMoralSociety = result.items.some((item) =>
     item.nodeId === "citizens-arc" || (item.tags ?? []).some((tag) => ["society", "governance"].includes(tag.toLowerCase())),
   );
 
   res.json({
     ...result,
-    ...(includesZenSociety
+    ...(includesMoralSociety
       ? {
-          resolver_owner: "zen-society",
-          provenance_contract: "Zen society governance provenance contract primitive",
+          resolver_owner: "moral-society",
+          provenance_contract: "Moral society governance provenance contract primitive",
         }
       : {}),
   });

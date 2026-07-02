@@ -50,25 +50,25 @@ describe("live transform runner", () => {
     expect(JSON.stringify(results[0])).not.toContain("assistant_text");
   });
 
-  it("produces compact Zen comparison lines without raw transcript flags", () => {
+  it("produces compact Moral comparison lines without raw transcript flags", () => {
     const plan = planLiveWorkstationPipeline({
-      prompt: "Compare this live transcript to Zen philosophy.",
+      prompt: "Compare this live transcript to Moral philosophy.",
       sourceIds: [event.source_id],
-      environmentId: "env:zen",
+      environmentId: "env:moral",
     });
     const { pipeline } = createLiveWorkstationPipeline({
       thread_id: "helix-ask:test",
-      created_turn_id: "turn:zen",
+      created_turn_id: "turn:moral",
       objective: plan.objective,
       source_ids: [event.source_id],
-      environment_id: "env:zen",
+      environment_id: "env:moral",
       plan,
     });
 
     const results = runLiveTransformsForSourceEvent({ pipeline, event });
     const philosophy = results.find((result) => result.kind === "philosophy_compare");
 
-    expect(philosophy?.lines?.zen_parallel).toContain("observe");
+    expect(philosophy?.lines?.moral_parallel).toContain("observe");
     expect(philosophy?.model_invoked).toBe(false);
   });
 });

@@ -92,7 +92,7 @@ describe("Helix Ask Civilization Bounds Roadmap tool", () => {
       "node:dust:bodele",
       "node:ecology:amazon-basin",
     ]);
-    expect(output.traversabilityContext.zenNodeIds).toContain("interbeing-systems");
+    expect(output.traversabilityContext.moralNodeIds).toContain("interbeing-systems");
     expect(output.traversabilityContext.theoryBadgeIds).toContain(
       "biophysics.membrane.open_system_entropy_flow",
     );
@@ -131,7 +131,7 @@ describe("Helix Ask Civilization Bounds Roadmap tool", () => {
     expect(ordinary.intent).not.toBe("civilization_bounds_reflection");
 
     const plan = planWorkstationToolUse(
-      "Reflect this as a civilization bounds roadmap: compare energy budget, material inventory, manufacturing resolution, governance review, and Zen procedural gates.",
+      "Reflect this as a civilization bounds roadmap: compare energy budget, material inventory, manufacturing resolution, governance review, and Moral procedural gates.",
     );
     expect(plan.intent).toBe("civilization_bounds_reflection");
     expect(plan.tool_plan?.steps.map((step) => step.step_id)).toContain("reflect_civilization_bounds");
@@ -180,15 +180,15 @@ describe("Helix Ask Civilization Bounds Roadmap tool", () => {
     expect(plan.tool_plan?.steps.map((step) => step.step_id)).toContain("reflect_civilization_bounds");
   });
 
-  it("keeps Theory-Zen bridge continuity when bounds cues are present", () => {
+  it("keeps Theory-Moral bridge continuity when bounds cues are present", () => {
     const plan = planWorkstationToolUse(
-      "Use the Theory Zen bridge with civilization bounds for entropy, conservation, material inventory, fairness, and review.",
+      "Use the Theory Moral bridge with civilization bounds for entropy, conservation, material inventory, fairness, and review.",
     );
     expect(plan.intent).toBe("civilization_bounds_reflection");
     expect(plan.tool_plan?.steps.map((step) => step.step_id)).toEqual(
       expect.arrayContaining([
         "reflect_theory_context",
-        "reflect_zen_graph_context",
+        "reflect_moral_graph_context",
         "build_civilization_scenario_frame",
         "reflect_civilization_bounds",
         "bridge_theory_ideology_context",
@@ -198,7 +198,7 @@ describe("Helix Ask Civilization Bounds Roadmap tool", () => {
 
   it("synthesizes the receipt as situational bounds rather than a decision", () => {
     const prompt =
-      "Reflect this as a civilization bounds roadmap: compare energy budget, material inventory, manufacturing resolution, governance review, and Zen procedural gates.";
+      "Reflect this as a civilization bounds roadmap: compare energy budget, material inventory, manufacturing resolution, governance review, and Moral procedural gates.";
     const plan = planWorkstationToolUse(prompt).tool_plan;
     expect(plan).toBeTruthy();
     const evaluation = evaluateWorkstationToolPlan({

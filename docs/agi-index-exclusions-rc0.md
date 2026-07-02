@@ -24,7 +24,7 @@ adjusted.
   citations, and re-run the coverage oracle after any index ranking updates.
 
 ## Index Parameters
-- `REPO_SEARCH_ROOTS`: `docs,docs/zen-ladder-pack,shared,client,server,src,modules,packages,sdk,tools,scripts,skills,tests,datasets,configs,public,reports`
+- `REPO_SEARCH_ROOTS`: `docs,docs/moral-ladder-pack,shared,client,server,src,modules,packages,sdk,tools,scripts,skills,tests,datasets,configs,public,reports`
 - `REPO_SEARCH_CODE_ROOTS`: `server,client,shared,src,modules,packages,sdk,cli,tools,scripts,tests`
 - `REPO_SEARCH_MAX_FILES`: `2400`
 - `REPO_SEARCH_MAX_CODE_FILES`: `4000`

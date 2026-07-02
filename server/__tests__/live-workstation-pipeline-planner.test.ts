@@ -18,15 +18,15 @@ describe("live workstation pipeline planner", () => {
     expect(plan.missing_bindings).toEqual([]);
   });
 
-  it("plans Zen comparison as a bounded transform pipeline", () => {
+  it("plans Moral comparison as a bounded transform pipeline", () => {
     const plan = planLiveWorkstationPipeline({
-      prompt: "Watch this live transcript and compare each segment to Zen philosophy.",
+      prompt: "Watch this live transcript and compare each segment to Moral philosophy.",
       sourceIds: ["source:browser-tab-transcript"],
     });
 
     expect(plan.pipeline_recipe_id).toBe("philosophy_compare");
     expect(plan.transforms.map((transform) => transform.kind)).toEqual(["sentence_summary", "philosophy_compare"]);
-    expect(plan.line_schema.map((line) => line.key)).toContain("zen_parallel");
+    expect(plan.line_schema.map((line) => line.key)).toContain("moral_parallel");
     expect(plan.raw_transcript_included).toBeUndefined();
   });
 

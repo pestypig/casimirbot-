@@ -69,7 +69,7 @@ type ThemeAccumulator = {
   constraints: Map<string, { pattern: ConstraintPattern; hits: number; evidence: TThemeEvidence[] }>;
   axisScores: Map<string, number>;
   axisEvidence: Map<string, TThemeEvidence[]>;
-  zenStatements: string[];
+  moralStatements: string[];
   evidence: TThemeEvidence[];
 };
 
@@ -212,7 +212,7 @@ const CONSTRAINT_PATTERNS: ConstraintPattern[] = [
     id: "joy",
     label: "Joy Requirement",
     summary: "Keeping this fun or meaningful is a non-negotiable.",
-    hints: ["joy", "fun", "meaning", "flow", "delight", "zen"],
+    hints: ["joy", "fun", "meaning", "flow", "delight", "moral"],
   },
 ];
 
@@ -298,7 +298,7 @@ export function buildThemeDeckFromEnvelopes(
       accumulator.keywords.set(token, (accumulator.keywords.get(token) ?? 0) + 1);
     }
     accumulator.evidence = appendEvidence(accumulator.evidence, buildEvidence(env, text));
-    accumulator.zenStatements.push(...extractZenStatements(text));
+    accumulator.moralStatements.push(...extractMoralStatements(text));
     for (const force of detectForces(tokens)) {
       const bucket = ensureForceBucket(accumulator.forces, force.pattern);
       bucket.hits += force.weight;
@@ -355,7 +355,7 @@ function ensureAccumulator(map: Map<string, ThemeAccumulator>, key: string, rawL
     constraints: new Map(),
     axisScores: new Map(),
     axisEvidence: new Map(),
-    zenStatements: [],
+    moralStatements: [],
     evidence: [],
   };
   map.set(key, accumulator);
@@ -810,7 +810,7 @@ function formatLabel(label: string): string {
     .join(" ");
 }
 
-function extractZenStatements(text: string): string[] {
+function extractMoralStatements(text: string): string[] {
   const statements: string[] = [];
   const matches = text.match(/i (?:want|need|refuse|aim)[^\.!\n]+/gi);
   if (matches) {

@@ -141,6 +141,7 @@ const negativeConstraintPatterns = [
   /\bopen\s+nothing\b/i,
   /\brun\s+nothing\b/i,
   /\bwithout\s+click(?:ing)?\b/i,
+  /\bwithout\s+open(?:ing)?\b/i,
   /\bwithout\s+run(?:ning)?\b/i,
   /\bwithout\s+(?:pressing|starting|changing|executing)\b/i,
   /\b(?:open|run|click|start|stop|set|change|update|repair|refresh)\s+nothing\b/i,
@@ -193,6 +194,26 @@ const contextualRules: ContextualRule[] = [
     verb_or_cue: "quoted_tool_text",
     reason: "quoted",
     pattern: /["'`][^"'`]*(?:click|open|start|run|repair|refresh|set_rate|interval|cadence)[^"'`]*["'`]/i,
+  },
+  {
+    verb_or_cue: "calculator",
+    reason: "negated",
+    pattern: /\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to)\b[\s\S]{0,120}\b(?:open|opening|show|view|use|run|call|put|feed|load|calculate|compute|solve|evaluate)\b[\s\S]{0,120}\b(?:scientific\s+calculator|calculator|equation|expression|scientific-calculator\.)\b/i,
+  },
+  {
+    verb_or_cue: "calculator",
+    reason: "future",
+    pattern: /\b(?:if|when|before|after|would|could|might|hypothetically|may\s+ask|next\s+time|later)\b[\s\S]{0,140}\b(?:open|opening|show|view|use|run|call|put|feed|load|calculate|compute|solve|evaluate)\b[\s\S]{0,140}\b(?:scientific\s+calculator|calculator|equation|expression|scientific-calculator\.)\b/i,
+  },
+  {
+    verb_or_cue: "scientific-calculator.solve_expression",
+    reason: "historical",
+    pattern: /\b(?:why\s+did|why\s+was|last\s+turn|previous\s+(?:turn|answer)|what\s+called|histor(?:y|ical))\b[\s\S]{0,140}\bscientific-calculator\.solve_expression\b/i,
+  },
+  {
+    verb_or_cue: "calculator",
+    reason: "historical",
+    pattern: /\b(?:why\s+did|why\s+was|last\s+turn|previous\s+(?:turn|answer)|what\s+called|histor(?:y|ical)|earlier|previously|already)\b[\s\S]{0,140}\b(?:scientific\s+calculator|calculator|equation|expression|scientific-calculator\.)\b/i,
   },
   {
     verb_or_cue: "open_run",

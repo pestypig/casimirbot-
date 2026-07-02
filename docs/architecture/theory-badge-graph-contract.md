@@ -201,6 +201,41 @@ Executable dependency paths are constrained by
 `shares_units`, `documents`, and `blocks` are graph context edges, not calculator
 dependency edges.
 
+## Calculator Compatibility Contract
+
+Calculator compatibility is a transparency rule, not a universal solvability
+rule. Every badge must be explicit about whether it is calculator-solvable,
+calculator-projectable, runtime-bound, reference-only, gate-only, or a claim
+boundary.
+
+A badge is calculator-solvable only when it exposes a scalar
+`calculatorPayloads[]` entry with:
+
+- a supported expression;
+- input and output symbols;
+- units or dimension signatures where applicable;
+- assumptions and source refs;
+- setup context when a panel or paper binding is needed;
+- numeric bindings before a solve receipt is claimed.
+
+A badge is calculator-projectable when it can be placed into the calculator UI
+as a symbolic or incomplete expression but cannot yet produce a numeric result.
+This should use the calculator prefill/action lane and must return an action
+receipt, not a solve receipt.
+
+A badge is not scalar-solvable when its core content is a proof obligation,
+tensor identity, worldline integral, runtime artifact, diagnostic gate,
+simulation method, qualitative claim, or claim boundary. Those badges are still
+compatible with the graph/calculator bridge if the loadout emits a typed context
+row and carries the claim-boundary notes forward.
+
+When adding researched papers, functions, or new badges, do not add a
+calculator payload merely because the paper contains math. Add the payload only
+when the expression can be evaluated by the calculator after variables are
+bound. Otherwise, add source refs, equation roles, operator kinds, runtime or
+gate refs, and claim boundaries so Helix Ask can explain why the item is
+contextual rather than numerically solved.
+
 ## Prompt Contract
 
 When adding or revising theory content, use this prompt rule:

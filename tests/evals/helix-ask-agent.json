@@ -26,8 +26,8 @@
       "expect": { "clarify": true }
     },
     {
-      "id": "ambig_zen_governance",
-      "question": "Is an eye for an eye associated with enforcement in zen governance?",
+      "id": "ambig_moral_governance",
+      "question": "Is an eye for an eye associated with enforcement in moral governance?",
       "tags": ["ambiguous", "template:ambigqa"],
       "expect": { "clarify": true }
     },

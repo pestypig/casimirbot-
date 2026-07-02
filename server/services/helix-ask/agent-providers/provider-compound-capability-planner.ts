@@ -1,4 +1,5 @@
 import type { HelixWorkstationGatewayCallResult } from "../workstation-tool-gateway/types";
+import { isExistingTranslationSurfaceReadPrompt } from "./active-context-tool-requests";
 
 export const READ_ALOUD_SURFACE_OUTCOME = "read_aloud_surface" as const;
 export const READ_ALOUD_DOC_EXCERPT_OUTCOME = READ_ALOUD_SURFACE_OUTCOME;
@@ -142,7 +143,7 @@ const isReadAloudCalculatorSurfacePrompt = (prompt: string): boolean => {
 };
 
 const isTranslationSurfacePrompt = (prompt: string): boolean =>
-  /\b(?:translated|translation|inline\s+translation|translated\s+(?:section|block|text))\b/i.test(unquotePrompt(prompt));
+  isExistingTranslationSurfaceReadPrompt(prompt);
 
 const hasExplicitDocsOrRepoCapabilityMention = (prompt: string): boolean =>
   /\b(?:docs\.search|repo\.search|docs-viewer\.(?:search_docs|locate_in_doc|summarize_doc)|repo-code\.search_concept)\b/i.test(

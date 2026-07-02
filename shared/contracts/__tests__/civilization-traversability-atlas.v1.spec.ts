@@ -59,7 +59,7 @@ describe("civilization_traversability_atlas/v1", () => {
       "node:dust:bodele",
       "node:ecology:amazon-basin",
     ]);
-    expect(viewModel.traversabilityContext.zenNodeIds).toContain("interbeing-systems");
+    expect(viewModel.traversabilityContext.moralNodeIds).toContain("interbeing-systems");
     expect(viewModel.traversabilityContext.theoryBadgeIds).toContain(
       "biophysics.membrane.open_system_entropy_flow",
     );

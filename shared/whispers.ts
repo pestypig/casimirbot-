@@ -30,7 +30,7 @@ export const whisperSeedZ = z.object({
 
 export const whisperZ = z.object({
   id: z.string(),
-  zen: z.string(),
+  moral: z.string(),
   body: z.string(),
   action: z.string().optional(),
   hashes: z.array(z.string()).default([]),
@@ -83,7 +83,7 @@ export const LumaWhisper = z.object({
   hashes: z.array(z.string()).default([]),
   severity: z.enum(["hint", "info", "warn"]).default("hint"),
   mode: z.enum(["bubble", "speak", "both"]).default("bubble"),
-  zen: z.string(),
+  moral: z.string(),
   body: z.string(),
   action: z.string().optional(),
   score: z.number().min(0).max(1).default(0.5),

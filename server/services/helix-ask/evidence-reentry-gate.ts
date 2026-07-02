@@ -338,9 +338,9 @@ const capabilityItineraryEvidencePatterns: Array<{ family: string; pattern: RegE
       /helix_context_reflection_tool_receipt|bounded_context_reference|context_attachment|live_synthetic_data/i,
   },
   {
-    family: "zen_graph_reflection",
+    family: "moral_graph_reflection",
     pattern:
-      /ideology_context_reflection|procedural_zen_classification|helix_zen_graph_reflection_tool_result|helix_theory_ideology_bridge_tool_result|theory_ideology_bridge/i,
+      /ideology_context_reflection|procedural_moral_classification|helix_moral_graph_reflection_tool_result|helix_theory_ideology_bridge_tool_result|theory_ideology_bridge/i,
   },
   {
     family: "civilization_bounds",

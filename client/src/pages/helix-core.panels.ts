@@ -130,9 +130,9 @@ const PANEL_KEYWORDS: Record<string, string[]> = {
     "unit signatures",
     "claim boundary"
   ],
-  "zen-graph": [
-    "zen graph",
-    "zen badge graph",
+  "moral-graph": [
+    "moral graph",
+    "moral badge graph",
     "ideology badge graph",
     "ideology reflection",
     "ethos lens",
@@ -146,7 +146,7 @@ const PANEL_KEYWORDS: Record<string, string[]> = {
     "fruition procedure",
     "procedure expression",
     "action expression",
-    "zen calculator",
+    "moral calculator",
     "ideology calculator",
     "evidence only procedure"
   ],
@@ -225,7 +225,7 @@ const PANEL_KEYWORDS: Record<string, string[]> = {
     "feasibility map",
     "resource bounds",
     "procedural atlas",
-    "theory zen bridge",
+    "theory moral bridge",
     "bounded civilization",
   ],
   "civilization-bounds-roadmap": [
@@ -236,7 +236,7 @@ const PANEL_KEYWORDS: Record<string, string[]> = {
     "ideal observed gap",
     "resource bounds",
     "procedural atlas",
-    "theory zen bridge",
+    "theory moral bridge",
     "bounded civilization",
   ],
   "deepmix-solar": ["deep mix solar", "mixing bands", "sector solver", "solar telemetry", "mix heuristics"],
@@ -472,14 +472,14 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     keywords: PANEL_KEYWORDS["theory-badge-graph"]
   },
   {
-    id: "zen-graph",
-    title: "Zen Badge Graph",
+    id: "moral-graph",
+    title: "Moral Badge Graph",
     icon: Shield,
-    loader: lazyPanel(() => import("@/components/panels/ZenGraphLaunchPanel")),
+    loader: lazyPanel(() => import("@/components/panels/MoralGraphLaunchPanel")),
     defaultSize: { w: 1040, h: 720 },
     defaultPosition: { x: 320, y: 200 },
     mobileReady: true,
-    keywords: PANEL_KEYWORDS["zen-graph"]
+    keywords: PANEL_KEYWORDS["moral-graph"]
   },
   {
     id: "fruition-calculator",

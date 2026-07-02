@@ -47,7 +47,7 @@ const environmentKeywords = (environment: LiveAnswerEnvironment): RegExp[] => {
       /\blatest\s+summary\b/,
     ];
   }
-  if (/\b(?:zen|stoic|philosophy|philosophical)\b/.test(objective)) {
+  if (/\b(?:moral|stoic|philosophy|philosophical)\b/.test(objective)) {
     return [
       /\bzen\b/,
       /\bstoic(?:ism)?\b/,

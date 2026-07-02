@@ -27,7 +27,7 @@ const parseSseEvents = (text: string): Array<{ event: string; data: any }> => {
 };
 
 const civilizationBoundsPrompt =
-  "Reflect this as a civilization bounds roadmap: compare energy budget, material inventory, manufacturing resolution, governance review, and Zen procedural gates.";
+  "Reflect this as a civilization bounds roadmap: compare energy budget, material inventory, manufacturing resolution, governance review, and Moral procedural gates.";
 
 describe("Helix Ask Civilization Bounds route", () => {
   it("executes civilization bounds as workstation evidence via ask/turn", async () => {
@@ -156,14 +156,14 @@ describe("Helix Ask Civilization Bounds route", () => {
     }
   }, 60_000);
 
-  it("keeps Theory/Zen bridge continuity from the desktop Ask endpoint", async () => {
+  it("keeps Theory/Moral bridge continuity from the desktop Ask endpoint", async () => {
     const app = createApp();
 
     const response = await request(app)
       .post("/api/agi/ask")
       .send({
         question:
-          "Use the Theory Zen bridge with civilization bounds for entropy, conservation, material inventory, fairness, and review.",
+          "Use the Theory Moral bridge with civilization bounds for entropy, conservation, material inventory, fairness, and review.",
         mode: "read",
         debug: true,
         sessionId: `civilization-bounds-bridge-${Date.now()}`,
@@ -177,7 +177,7 @@ describe("Helix Ask Civilization Bounds route", () => {
     expect(stepIds).toEqual(
       expect.arrayContaining([
         "reflect_theory_context",
-        "reflect_zen_graph_context",
+        "reflect_moral_graph_context",
         "build_civilization_scenario_frame",
         "reflect_civilization_bounds",
         "bridge_theory_ideology_context",
@@ -190,7 +190,7 @@ describe("Helix Ask Civilization Bounds route", () => {
       expect.arrayContaining([
         "helix_civilization_scenario_frame_tool_result",
         "helix_theory_context_reflection_tool_receipt",
-        "helix_zen_graph_reflection_tool_result",
+        "helix_moral_graph_reflection_tool_result",
         "helix_civilization_bounds_tool_result",
         "helix_theory_ideology_bridge_tool_result",
         "workstation_tool_evaluation",
