@@ -20,6 +20,9 @@ import type { HelixCapabilityLaneMailLoopDebugSummary } from "@shared/helix-capa
 const readString = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
 
+const latestObservationEvent = (session: HelixCapabilityLaneSession) =>
+  [...session.debug_history].reverse().find((event) => event.observation_ref) ?? null;
+
 const bindingEvent = (input: {
   goalBindingId: string;
   goalId: string;
@@ -30,27 +33,40 @@ const bindingEvent = (input: {
   mailLoopRef?: string | null;
   receiptRef?: string | null;
   terminalAuthorityStatus?: HelixCapabilityLaneGoalBindingEvent["terminal_authority_status"];
-}): HelixCapabilityLaneGoalBindingEvent => ({
-  schema: HELIX_CAPABILITY_LANE_GOAL_BINDING_EVENT_SCHEMA,
-  event_id: `${input.goalBindingId}:${input.event}:${input.atMs}`,
-  goal_binding_id: input.goalBindingId,
-  goal_id: input.goalId,
-  lane_session_id: input.session.lane_session_id,
-  lane_id: input.session.lane_id,
-  event: input.event,
-  at_ms: input.atMs,
-  reason: input.reason,
-  lane_session_status: input.session.status,
-  lane_session_health: input.session.health,
-  lane_session_observation_ref: input.session.last_observation_ref,
-  mail_loop_ref: readString(input.mailLoopRef) || null,
-  receipt_ref: readString(input.receiptRef) || null,
-  terminal_authority_status: input.terminalAuthorityStatus ?? "not_terminal_authority",
-  reentry_required: true,
-  assistant_answer: false,
-  terminal_eligible: false,
-  raw_content_included: false,
-});
+}): HelixCapabilityLaneGoalBindingEvent => {
+  const observationEvent = latestObservationEvent(input.session);
+  return {
+    schema: HELIX_CAPABILITY_LANE_GOAL_BINDING_EVENT_SCHEMA,
+    event_id: `${input.goalBindingId}:${input.event}:${input.atMs}`,
+    goal_binding_id: input.goalBindingId,
+    goal_id: input.goalId,
+    lane_session_id: input.session.lane_session_id,
+    lane_id: input.session.lane_id,
+    event: input.event,
+    at_ms: input.atMs,
+    reason: input.reason,
+    lane_session_status: input.session.status,
+    lane_session_health: input.session.health,
+    lane_session_observation_ref: input.session.last_observation_ref,
+    source_id: input.session.source_binding.source_id,
+    latest_chunk_id: observationEvent?.chunk_id ?? null,
+    latest_chunk_index: observationEvent?.chunk_index ?? null,
+    latest_dedupe_key: observationEvent?.dedupe_key ?? null,
+    latest_source_event_id: observationEvent?.source_event_id ?? null,
+    latest_source_event_ms: observationEvent?.source_event_ms ?? null,
+    latest_observed_at_ms: observationEvent?.observed_at_ms ?? null,
+    latest_freshness_status: observationEvent?.freshness_status ?? null,
+    latest_projection_target: observationEvent?.projection_target ?? null,
+    latest_cancel_requested: observationEvent?.cancel_requested ?? null,
+    mail_loop_ref: readString(input.mailLoopRef) || null,
+    receipt_ref: readString(input.receiptRef) || null,
+    terminal_authority_status: input.terminalAuthorityStatus ?? "not_terminal_authority",
+    reentry_required: true,
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+  };
+};
 
 const withSessionSnapshot = (
   binding: Omit<

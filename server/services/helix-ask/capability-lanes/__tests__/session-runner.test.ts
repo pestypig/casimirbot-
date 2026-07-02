@@ -68,6 +68,22 @@ describe("Helix capability lane session runner", () => {
             },
           },
           {
+            action: "record_observation",
+            lane_session_id: "lane-session-runner",
+            observation_ref: "ask:lane:translation:obs:runner",
+            receipt_ref: "ask:lane:translation:receipt:runner",
+            chunk_id: "chunk-runner",
+            chunk_index: 4,
+            dedupe_key: "docs:nhm2:chunk-runner:es",
+            source_event_id: "docs:nhm2:event-runner",
+            source_event_ms: 90,
+            observed_at_ms: 115,
+            freshness_status: "stale",
+            projection_target: "docs_chunk",
+            cancel_requested: true,
+            now_ms: 115,
+          },
+          {
             action: "pause",
             lane_session_id: "lane-session-runner",
             now_ms: 125,
@@ -84,10 +100,14 @@ describe("Helix capability lane session runner", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
-    expect(result.session_results).toHaveLength(2);
+    expect(result.session_results).toHaveLength(3);
     expect(result.session_results[0]).toMatchObject({
       ok: true,
       action: "start",
+      lane_id: "live_translation",
+      selected_runtime_agent_provider: "codex",
+      requested_backend_provider: "google_gemini",
+      session_supported: true,
       blocked_reason: null,
       lane_session: {
         lane_session_id: "lane-session-runner",
@@ -109,6 +129,39 @@ describe("Helix capability lane session runner", () => {
     });
     expect(result.session_results[1]).toMatchObject({
       ok: true,
+      action: "record_observation",
+      lane_id: "live_translation",
+      selected_runtime_agent_provider: "codex",
+      requested_backend_provider: "google_gemini",
+      session_supported: true,
+      blocked_reason: null,
+      terminal_eligible: false,
+      assistant_answer: false,
+      lane_session: {
+        lane_session_id: "lane-session-runner",
+        status: "running",
+        health: "healthy",
+        last_observation_ref: "ask:lane:translation:obs:runner",
+        last_receipt_ref: "ask:lane:translation:receipt:runner",
+        updated_at_ms: 115,
+        debug_history: expect.arrayContaining([
+          expect.objectContaining({
+            action: "record_observation",
+            chunk_id: "chunk-runner",
+            chunk_index: 4,
+            dedupe_key: "docs:nhm2:chunk-runner:es",
+            source_event_id: "docs:nhm2:event-runner",
+            source_event_ms: 90,
+            observed_at_ms: 115,
+            freshness_status: "stale",
+            projection_target: "docs_chunk",
+            cancel_requested: true,
+          }),
+        ]),
+      },
+    });
+    expect(result.session_results[2]).toMatchObject({
+      ok: true,
       action: "pause",
       blocked_reason: null,
       lane_session: {
@@ -129,6 +182,15 @@ describe("Helix capability lane session runner", () => {
       source_id: "docs:nhm2",
       projection_target: "docs_chunk",
       account_locale: "es-US",
+      latest_chunk_id: "chunk-runner",
+      latest_chunk_index: 4,
+      latest_dedupe_key: "docs:nhm2:chunk-runner:es",
+      latest_source_event_id: "docs:nhm2:event-runner",
+      latest_source_event_ms: 90,
+      latest_observed_at_ms: 115,
+      latest_freshness_status: "stale",
+      latest_projection_target: "docs_chunk",
+      latest_cancel_requested: true,
       backend_provider_becomes_root_agent: false,
       final_reports_require_terminal_authority: true,
       terminal_eligible: false,
@@ -142,7 +204,14 @@ describe("Helix capability lane session runner", () => {
     expect(store.get("lane-session-runner")).toMatchObject({
       status: "paused",
       health: "degraded",
+      last_observation_ref: "ask:lane:translation:obs:runner",
+      last_receipt_ref: "ask:lane:translation:receipt:runner",
     });
+    expect(store.get("lane-session-runner")?.debug_history.map((event) => event.action)).toEqual([
+      "start",
+      "record_observation",
+      "pause",
+    ]);
   });
 
   it("fails closed when the selected runtime provider does not support lane sessions", () => {
@@ -168,6 +237,10 @@ describe("Helix capability lane session runner", () => {
         {
           ok: false,
           action: "start",
+          lane_id: "live_translation",
+          selected_runtime_agent_provider: "future",
+          requested_backend_provider: null,
+          session_supported: null,
           lane_session: null,
           blocked_reason: "runtime_provider_capability_lane_sessions_not_supported",
           terminal_eligible: false,

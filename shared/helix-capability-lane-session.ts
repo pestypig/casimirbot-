@@ -34,13 +34,28 @@ export type HelixCapabilityLaneSessionAction =
   | "resume"
   | "stop";
 
+export type HelixCapabilityLaneSessionEventAction =
+  | HelixCapabilityLaneSessionAction
+  | "record_observation";
+
 export type HelixCapabilityLaneSessionCall = {
   schema?: typeof HELIX_CAPABILITY_LANE_SESSION_CALL_SCHEMA;
-  action: HelixCapabilityLaneSessionAction;
+  action: HelixCapabilityLaneSessionEventAction;
   lane_id?: HelixCapabilityLaneId | null;
   lane_session_id?: string | null;
   requested_backend_provider?: string | null;
   source_binding?: Partial<HelixCapabilityLaneSessionSourceBinding> | null;
+  observation_ref?: string | null;
+  receipt_ref?: string | null;
+  chunk_id?: string | null;
+  chunk_index?: number | null;
+  dedupe_key?: string | null;
+  source_event_id?: string | null;
+  source_event_ms?: number | null;
+  observed_at_ms?: number | null;
+  freshness_status?: "fresh" | "stale" | "unknown" | string | null;
+  projection_target?: string | null;
+  cancel_requested?: boolean | null;
   reason?: string | null;
   now_ms?: number | null;
 };
@@ -80,13 +95,22 @@ export type HelixCapabilityLaneSessionEvent = {
   latency_class: HelixCapabilityLaneLatencyClass | "unknown" | null;
   privacy_class: HelixCapabilityLanePrivacyClass | "unknown" | null;
   fallback_backend_provider: string | null;
-  action: HelixCapabilityLaneSessionAction;
+  action: HelixCapabilityLaneSessionEventAction;
   status: HelixCapabilityLaneSessionStatus;
   at_ms: number;
   reason: string;
   source_id: string | null;
   observation_ref: string | null;
   receipt_ref: string | null;
+  chunk_id?: string | null;
+  chunk_index?: number | null;
+  dedupe_key?: string | null;
+  source_event_id?: string | null;
+  source_event_ms?: number | null;
+  observed_at_ms?: number | null;
+  freshness_status?: string | null;
+  projection_target?: string | null;
+  cancel_requested?: boolean | null;
   terminal_authority_status: "not_terminal_authority" | "pending_helix_terminal_authority";
   reentry_required: true;
   assistant_answer: false;
@@ -140,6 +164,15 @@ export type HelixCapabilityLaneSessionDebugSummary = {
   updated_at_ms: number;
   last_observation_ref: string | null;
   last_receipt_ref: string | null;
+  latest_chunk_id?: string | null;
+  latest_chunk_index?: number | null;
+  latest_dedupe_key?: string | null;
+  latest_source_event_id?: string | null;
+  latest_source_event_ms?: number | null;
+  latest_observed_at_ms?: number | null;
+  latest_freshness_status?: string | null;
+  latest_projection_target?: string | null;
+  latest_cancel_requested?: boolean | null;
   latest_session_event: HelixCapabilityLaneSessionEvent | null;
   session_event_count: number;
   terminal_authority_status: "not_terminal_authority" | "pending_helix_terminal_authority";
@@ -153,7 +186,11 @@ export type HelixCapabilityLaneSessionDebugSummary = {
 
 export type HelixCapabilityLaneSessionResult = {
   ok: boolean;
-  action: HelixCapabilityLaneSessionAction;
+  action: HelixCapabilityLaneSessionEventAction;
+  lane_id?: HelixCapabilityLaneId | null;
+  selected_runtime_agent_provider?: HelixAgentRuntimeId | null;
+  requested_backend_provider?: string | null;
+  session_supported?: boolean | null;
   lane_session: HelixCapabilityLaneSession | null;
   blocked_reason: string | null;
   assistant_answer: false;

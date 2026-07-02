@@ -24,6 +24,7 @@ export type HelixCapabilityLaneMailLoopDebugSummary = {
   chunk_id: string | null;
   chunk_index: number | null;
   dedupe_key: string | null;
+  source_event_id: string | null;
   source_event_ms: number | null;
   observed_at_ms: number | null;
   projection_target: string | null;

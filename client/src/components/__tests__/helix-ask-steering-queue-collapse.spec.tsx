@@ -26,15 +26,15 @@ const steeringQueueDisplaySource = () =>
     "utf8",
   );
 
-describe("HelixAskPill steering queue collapse", () => {
-  it("renders a compact goal-session pill above the steering queue", () => {
+describe("HelixAskPill steering queue retirement", () => {
+  it("keeps the compact goal-session pill without mounting the old steering queue", () => {
     const source = helixAskPillSource();
     const goal = goalPillSource();
     const goalIndex = source.indexOf("<HelixAskGoalPill");
     const queueIndex = source.indexOf("<HelixAskSteeringQueuePanel");
 
     expect(goalIndex).toBeGreaterThan(0);
-    expect(queueIndex).toBeGreaterThan(goalIndex);
+    expect(queueIndex).toBe(-1);
     expect(goal).toContain('aria-label="Helix Ask goal session"');
     expect(goal).toContain('aria-controls="helix-ask-goal-pill-details"');
     expect(goal).toContain('aria-label="Edit goal prompt"');
@@ -44,14 +44,15 @@ describe("HelixAskPill steering queue collapse", () => {
     expect(source).toContain('/api/helix/stage-play/goal-session/action');
   });
 
-  it("renders the steering queue as a collapsible compact strip", () => {
+  it("keeps the recrowned steering queue component available but not mounted by HelixAskPill", () => {
     const source = helixAskPillSource();
     const panel = steeringQueuePanelSource();
 
-    expect(source).toContain("steeringQueueExpanded");
-    expect(source).toContain("<HelixAskSteeringQueuePanel");
-    expect(source).toContain("expanded={steeringQueueExpanded}");
-    expect(source).toContain("onToggleExpanded={() => setSteeringQueueExpanded((current) => !current)}");
+    expect(source).not.toContain("steeringQueueExpanded");
+    expect(source).not.toContain("<HelixAskSteeringQueuePanel");
+    expect(source).not.toContain("expanded={steeringQueueExpanded}");
+    expect(source).not.toContain("onToggleExpanded={() => setSteeringQueueExpanded((current) => !current)}");
+    expect(source).toContain("steeringQueue={null}");
     expect(panel).toContain('aria-controls="helix-ask-steering-queue-items"');
     expect(panel).toContain('data-expanded={expanded ? "true" : "false"}');
     expect(panel).toContain('{expanded ? "Hide" : "Show"}');

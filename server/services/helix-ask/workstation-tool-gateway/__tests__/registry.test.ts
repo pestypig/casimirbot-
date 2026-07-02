@@ -4045,7 +4045,20 @@ describe("Helix workstation tool gateway", () => {
       exact_substrate_badge_ids?: string[];
       likely_substrate_badge_ids?: string[];
       source_theory_badge_ids?: string[];
+      source_ref_ids?: string[];
+      source_references?: Array<{ id?: string; title?: string; url?: string; note?: string }>;
       claim_boundary_notes?: string[];
+      procedural_derivation_ids?: string[];
+      procedural_derivations?: Array<{
+        derivation_id?: string;
+        estimate?: Record<string, unknown>;
+        obligation_hint?: string;
+        forbidden_overclaim?: string;
+      }>;
+      synthesis_path?: Array<{
+        step_id?: string;
+        output_kind?: string;
+      }>;
       recommended_action_ids?: string[];
       recommended_actions_solve?: boolean;
       reflection_id?: string;
@@ -4118,7 +4131,45 @@ describe("Helix workstation tool gateway", () => {
         "biophysics.homeostatic_regulation",
       ]),
     );
+    expect(observation.source_ref_ids).toEqual(
+      expect.arrayContaining(["von-stockar-liu-1999-microbial-negative-entropy"]),
+    );
+    expect(observation.source_references).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "von-stockar-liu-1999-microbial-negative-entropy",
+          url: "https://www.sciencedirect.com/science/article/pii/S0005272899000651",
+        }),
+      ]),
+    );
     expect(observation.claim_boundary_notes?.join("\n")).toContain("not terminal answer authority");
+    expect(observation.procedural_derivation_ids).toEqual(
+      expect.arrayContaining([
+        "boundary-integrity",
+        "maintenance-requirement",
+        "sensing-and-error",
+        "obligation-emergence",
+      ]),
+    );
+    expect(observation.procedural_derivations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          derivation_id: "obligation-emergence",
+          estimate: expect.objectContaining({
+            vulnerability: "medium",
+            dependency: "medium",
+            agency: "medium",
+          }),
+          obligation_hint: expect.stringContaining("provisional care constraints"),
+          forbidden_overclaim: expect.stringContaining("personhood"),
+        }),
+      ]),
+    );
+    expect(observation.synthesis_path?.map((step) => step.output_kind)).toEqual([
+      "substrate_observation",
+      "vulnerability_dependency_agency_estimate",
+      "obligation_caution_forbidden_overclaim",
+    ]);
     expect(observation.recommended_action_ids).toEqual(
       expect.arrayContaining([
         "moral-graph.inspect_living_substrate_badges",
@@ -4533,9 +4584,16 @@ describe("Helix workstation tool gateway", () => {
       },
     });
     const observation = result.observation as {
+      model_id?: string;
+      selected_model_or_service?: string;
+      host_projection?: { model_id?: string };
       request?: { requestId?: string };
-      receipt?: { receiptId?: string };
+      receipt?: { receiptId?: string; model_id?: string };
     };
+    expect(observation.model_id).toBe("eleven_multilingual_v2");
+    expect(observation.selected_model_or_service).toBe("eleven_multilingual_v2");
+    expect(observation.receipt?.model_id).toBe("eleven_multilingual_v2");
+    expect(observation.host_projection?.model_id).toBe("eleven_multilingual_v2");
     expect(observation.request?.requestId).toMatch(/^helix_interim_voice_callout_request:/);
     expect(observation.receipt?.receiptId).toMatch(/^helix_interim_voice_callout_receipt:/);
   });

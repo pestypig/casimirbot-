@@ -10,14 +10,14 @@ describe("Helix Ask theory frontier vector-field capability", () => {
     expect(contract).toMatchObject({
       capability: HELIX_THEORY_FRONTIER_VECTOR_FIELD_CAPABILITY,
       capability_family: "theory_locator",
-      plan_family: "context_reflection",
+      plan_family: "theory_locator",
       source_target: "theory_locator",
       admission_families: ["theory_locator"],
       required_observation_kinds: [
         "helix_theory_frontier_vector_field_tool_receipt",
         "theory_frontier_vector_field",
       ],
-      required_terminal_kind: "model_synthesized_answer",
+      required_terminal_kind: "theory_context_reflection_answer",
       forbidden_nearby_capabilities: ["model.direct_answer"],
     });
   });

@@ -8,34 +8,12 @@ import {
 } from "@/lib/helix/ask-steering-queue-display";
 
 describe("ask-steering-queue-display", () => {
-  it("projects active stream rows, mailbox state, and debug phase into sorted steering queue items", () => {
+  it("projects mailbox state and debug phase into sorted steering queue items without active stream rows", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-09T10:03:00.000Z"));
 
     try {
       const rows = buildHelixAskSteeringQueueItems({
-        activeTurnStreamRows: [
-          {
-            key: "question",
-            source: "question",
-            label: "Question",
-            text: "What changed?",
-            meta: "user prompt",
-            status: "submitted",
-            tone: "question",
-            evidenceRefs: [],
-          },
-          {
-            key: "read-mail",
-            source: "agent_work",
-            label: "Read processed mail",
-            text: "live_env.read_processed_live_source_mail",
-            meta: "current turn",
-            status: "running",
-            tone: "working",
-            evidenceRefs: ["mail:processed"],
-          },
-        ],
         latestReply: {
           debug: {
             live_source_turn_phase_resolution: {
@@ -75,22 +53,17 @@ describe("ask-steering-queue-display", () => {
         maxItems: 4,
       });
 
-      expect(rows.map((row) => row.status)).toEqual(["running", "next", "queued", "queued"]);
+      expect(rows.map((row) => row.status)).toEqual(["next", "queued", "queued"]);
       expect(rows.map((row) => row.label)).toEqual([
-        "Read processed mail",
         "terminal checkpoint",
         "Ask handoff queued",
         "Micro-reasoner finding",
       ]);
-      expect(rows[0]).toMatchObject({
-        key: "active:read-mail:1",
-        tone: "cyan",
-        evidenceRefs: ["mail:processed"],
-      });
-      expect(rows[3].detail).toContain("recommended ask_from_processed_packet");
-      expect(rows[3].detail).toContain("salience high voice candidate");
-      expect(rows[3].detail).toContain("changed: player entered cave");
-      expect(shouldAutoWakeHelixMailboxQueueItem(rows[3])).toBe(true);
+      expect(rows.some((row) => row.key.startsWith("active:"))).toBe(false);
+      expect(rows[2].detail).toContain("recommended ask_from_processed_packet");
+      expect(rows[2].detail).toContain("salience high voice candidate");
+      expect(rows[2].detail).toContain("changed: player entered cave");
+      expect(shouldAutoWakeHelixMailboxQueueItem(rows[2])).toBe(true);
       expect(shouldAutoWakeHelixMailboxQueueItem(rows[0])).toBe(false);
     } finally {
       vi.useRealTimers();

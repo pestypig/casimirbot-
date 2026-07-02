@@ -25,6 +25,15 @@ describe("Helix Ask live debug slim", () => {
       capability_lane_manifest: {
         schema: "helix.capability_lane_manifest.v1",
       },
+      model_visible_capability_lane_manifest: {
+        schema: "helix.agent_model_visible_capability_lane_manifest.v1",
+        lanes: [
+          {
+            lane_id: "live_translation",
+            status: "dry_run",
+          },
+        ],
+      },
       capability_lane_ids: ["utility_text", "workstation_tool_reference"],
       capability_lane_statuses: {
         utility_text: "available",
@@ -72,6 +81,18 @@ describe("Helix Ask live debug slim", () => {
         next_evidence_refs: ["ask:lane:translation:obs"],
         next_receipt_refs: ["ask:lane:translation:obs:projection:receipt"],
       },
+      runtime_lane_request_contract: {
+        schema: "helix.codex_runtime_lane_request_contract.v1",
+        execution_status: "lane_observation_reentered",
+        observation_packet_count: 1,
+      },
+      runtime_lane_request_loop: {
+        schema: "helix.codex_runtime_lane_request_loop.v1",
+        status: "lane_observation_reentered",
+        candidate: {
+          capability: "live_translation.translate_text",
+        },
+      },
       debug: {
         turn_id: "turn-provider-projection",
       },
@@ -85,6 +106,15 @@ describe("Helix Ask live debug slim", () => {
       },
       capability_lane_manifest: {
         schema: "helix.capability_lane_manifest.v1",
+      },
+      model_visible_capability_lane_manifest: {
+        schema: "helix.agent_model_visible_capability_lane_manifest.v1",
+        lanes: [
+          {
+            lane_id: "live_translation",
+            status: "dry_run",
+          },
+        ],
       },
       capability_lane_ids: ["utility_text", "workstation_tool_reference"],
       capability_lane_statuses: {
@@ -138,6 +168,18 @@ describe("Helix Ask live debug slim", () => {
         next_lane_session_ids: ["lane-session-debug"],
         next_evidence_refs: ["ask:lane:translation:obs"],
         next_receipt_refs: ["ask:lane:translation:obs:projection:receipt"],
+      },
+      runtime_lane_request_contract: {
+        schema: "helix.codex_runtime_lane_request_contract.v1",
+        execution_status: "lane_observation_reentered",
+        observation_packet_count: 1,
+      },
+      runtime_lane_request_loop: {
+        schema: "helix.codex_runtime_lane_request_loop.v1",
+        status: "lane_observation_reentered",
+        candidate: {
+          capability: "live_translation.translate_text",
+        },
       },
     });
   });

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  formatHelixAskFinalReceiptMeta,
   formatHelixAgentRuntimeShortLabel,
   normalizeHelixAgentProvidersResponse,
   resolveHelixAskActualAgentProviderLabel,
@@ -12,6 +13,19 @@ import {
 } from "@/lib/helix/ask-agent-runtime-display";
 
 describe("Helix Ask agent runtime display", () => {
+  it("formats final receipt metadata without legacy punctuation", () => {
+    expect(
+      formatHelixAskFinalReceiptMeta([
+        "agent provider terminal candidate",
+        "Provider: Codex Workstation Mode",
+        ".Model: not reported by backend",
+        "refs 2",
+      ]),
+    ).toBe(
+      "agent provider terminal candidate | Provider: Codex Workstation Mode | Model: not reported by backend | refs 2",
+    );
+  });
+
   it("normalizes Helix, Codex, and Future providers from backend provider responses", () => {
     const providers = normalizeHelixAgentProvidersResponse({
       providers: [
@@ -247,6 +261,93 @@ describe("Helix Ask agent runtime display", () => {
     ).toBe("Model: gpt-5-codex");
   });
 
+  it("labels models from structured turn runtime model-call metadata", () => {
+    expect(
+      resolveHelixAskModelUsageLabel({
+        debug: {
+          agent_runtime: "codex",
+          turn_runtime: {
+            model_calls: [
+              {
+                phase: "planner",
+                model_name: "gpt-5.1",
+              },
+              {
+                phase: "composer",
+                resolved_model_or_service: "gpt-5-codex",
+              },
+            ],
+          },
+        },
+      }),
+    ).toBe("Models: gpt-5.1, gpt-5-codex");
+  });
+
+  it("labels multiple models from reasoning metadata and voice gateway receipts", () => {
+    expect(
+      resolveHelixAskModelUsageLabel({
+        debug: {
+          agent_runtime: "codex",
+          llm_http_model_configured: "gpt-4o-mini",
+          workstation_gateway_call_results: [
+            {
+              capability_id: "live_env.request_interim_voice_callout",
+              observation: {
+                schema: "helix.interim_voice_callout_tool_result.v1",
+                receipt: {
+                  model_id: "eleven_multilingual_v2",
+                },
+              },
+            },
+          ],
+        },
+      }),
+    ).toBe("Models: gpt-4o-mini, eleven_multilingual_v2");
+  });
+
+  it("labels models from transcript event metadata without reading final prose", () => {
+    expect(
+      resolveHelixAskModelUsageLabel({
+        debug: {
+          agent_runtime: "codex",
+          turn_transcript: {
+            events: [
+              {
+                source_event_type: "model_decision",
+                selected_model_or_service: "gpt-5-mini",
+                text: "Model decision completed.",
+              },
+              {
+                source_event_type: "terminal_answer",
+                text: "The final answer mentions gpt-5-pro in prose, but that is not metadata.",
+              },
+            ],
+          },
+        },
+      }),
+    ).toBe("Model: gpt-5-mini");
+  });
+
+  it("ignores object-shaped model fields instead of rendering object placeholders", () => {
+    expect(
+      resolveHelixAskModelUsageLabel({
+        debug: {
+          agent_runtime: "codex",
+          model: {
+            name: "nested-object-should-not-render",
+          },
+          turn_runtime: {
+            model_calls: [
+              {
+                modelId: "gpt-5-codex",
+              },
+            ],
+          },
+        },
+      }),
+    ).toBe("Model: gpt-5-codex");
+  });
+
   it("shows an honest Codex default label when the provider omits concrete model metadata", () => {
     expect(
       resolveHelixAskModelUsageLabel({
@@ -259,6 +360,6 @@ describe("Helix Ask agent runtime display", () => {
           codex_args: ["exec", "--sandbox", "read-only"],
         },
       }),
-    ).toBe("Model: Codex default (not reported)");
+    ).toBe("Model: not reported by backend");
   });
 });

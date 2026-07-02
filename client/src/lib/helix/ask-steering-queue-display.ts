@@ -1,5 +1,3 @@
-import type { HelixContinuousTurnStreamRow } from "@/lib/helix/ask-active-turn-stream";
-
 export type HelixAskSteeringQueueStatus =
   | "next"
   | "queued"
@@ -148,31 +146,6 @@ const toneForHelixSteeringQueueStatus = (status: HelixAskSteeringQueueStatus): H
   if (status === "completed") return "emerald";
   return "slate";
 };
-
-function mapHelixTurnStreamRowToSteeringQueueItem(
-  row: HelixContinuousTurnStreamRow,
-  index: number,
-): HelixAskSteeringQueueItem | null {
-  if (row.source === "question" || row.source === "final") return null;
-  const status: HelixAskSteeringQueueStatus =
-    row.tone === "warning"
-      ? "held"
-      : row.tone === "checkpoint" || row.tone === "observation"
-        ? "running"
-        : "running";
-  const detail = clipText(row.text, 180);
-  if (!detail && !row.label) return null;
-  return {
-    key: `active:${row.key}:${index}`,
-    label: row.label || "Agent step",
-    detail: detail || row.status || "Agent steering step is active.",
-    meta: row.meta || row.status || "active turn",
-    status,
-    tone: toneForHelixSteeringQueueStatus(status),
-    evidenceRefs: row.evidenceRefs,
-    createdAtMs: Date.now() + index,
-  };
-}
 
 function buildHelixSteeringQueuePhaseItem(
   reply: unknown,
@@ -447,16 +420,12 @@ export function shouldAutoWakeHelixMailboxQueueItem(item: HelixAskSteeringQueueI
 }
 
 export function buildHelixAskSteeringQueueItems(input: {
-  activeTurnStreamRows?: HelixContinuousTurnStreamRow[];
   latestReply?: unknown;
   mailbox?: HelixAskSteeringQueueMailboxState | null;
   maxItems?: number;
 }): HelixAskSteeringQueueItem[] {
   const fallbackCreatedAtMs = Date.now();
   const candidates = [
-    ...(input.activeTurnStreamRows ?? [])
-      .map(mapHelixTurnStreamRowToSteeringQueueItem)
-      .filter((item): item is HelixAskSteeringQueueItem => Boolean(item)),
     buildHelixSteeringQueuePhaseItem(input.latestReply, fallbackCreatedAtMs),
     ...buildHelixSteeringQueueMailboxItems(input.mailbox, fallbackCreatedAtMs),
     ...buildHelixSteeringQueueDebugItems(input.latestReply, fallbackCreatedAtMs),

@@ -1068,6 +1068,7 @@ describe("Helix Ask UI ownership boundaries", () => {
       "attachHelixAskClientTraceToLiveEvent",
       "buildAskLiveAgenticEventRows",
       "buildHelixActiveTurnStreamRows",
+      "buildHelixActiveTurnTranscriptRows",
       "shouldAdmitHelixAskExternalLiveEventToActiveStream",
       "askLiveEventBelongsToActiveTurn",
       "filterHelixAskActiveTurnStreamRows",

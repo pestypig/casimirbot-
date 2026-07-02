@@ -9,6 +9,7 @@ export type HelixAskActiveTurnStreamPanelProps = {
   rows: HelixContinuousTurnStreamRow[];
   activeTurnId?: string | null;
   activeTraceId?: string | null;
+  renderPlacement?: "inline_active_turn" | "pinned_active_lane" | "after_completed_replies";
   showDebugLabel?: boolean;
   panelRef?: RefObject<HTMLDivElement>;
   clipText: (text: string, limit: number) => string;
@@ -21,6 +22,7 @@ export function HelixAskActiveTurnStreamPanel({
   rows,
   activeTurnId,
   activeTraceId,
+  renderPlacement = "inline_active_turn",
   showDebugLabel = false,
   panelRef,
   clipText,
@@ -40,7 +42,7 @@ export function HelixAskActiveTurnStreamPanel({
       data-active-row-count={rows.length}
       data-active-turn-id={activeTurnId ?? undefined}
       data-active-trace-id={activeTraceId ?? undefined}
-      data-render-placement="after_completed_replies"
+      data-render-placement={renderPlacement}
     >
       {showDebugLabel ? (
         <p className="mb-2 text-[10px] uppercase tracking-[0.2em] text-cyan-200">Active turn stream</p>

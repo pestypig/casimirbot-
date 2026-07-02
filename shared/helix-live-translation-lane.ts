@@ -41,6 +41,7 @@ export type HelixLiveTranslationOneShotRequest = {
   chunk_id?: string | null;
   chunk_index?: number | null;
   dedupe_key?: string | null;
+  source_event_id?: string | null;
   source_event_ms?: number | null;
   projection_target?: HelixLiveTranslationProjectionTarget | null;
   cancel_requested?: boolean | null;
@@ -66,6 +67,7 @@ export type HelixLiveTranslationOneShotObservation = {
   chunk_id: string;
   chunk_index: number | null;
   dedupe_key: string;
+  source_event_id: string | null;
   source_event_ms: number | null;
   observed_at_ms: number;
   freshness_status: HelixLiveTranslationChunkFreshnessStatus;
@@ -94,6 +96,7 @@ export type HelixLiveTranslationProjectionReceipt = {
   chunk_id: string;
   chunk_index: number | null;
   dedupe_key: string;
+  source_event_id: string | null;
   source_event_ms: number | null;
   observed_at_ms: number;
   freshness_status: HelixLiveTranslationChunkFreshnessStatus;

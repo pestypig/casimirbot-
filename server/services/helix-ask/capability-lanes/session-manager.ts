@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import type {
   HelixCapabilityLaneSession,
   HelixCapabilityLaneSessionAction,
+  HelixCapabilityLaneSessionEventAction,
   HelixCapabilityLaneSessionEvent,
   HelixCapabilityLaneSessionPermissions,
   HelixCapabilityLaneSessionResult,
@@ -40,13 +41,22 @@ const eventFor = (input: {
   latencyClass: HelixCapabilityLaneSessionEvent["latency_class"];
   privacyClass: HelixCapabilityLaneSessionEvent["privacy_class"];
   fallbackBackendProvider: string | null;
-  action: HelixCapabilityLaneSessionAction;
+  action: HelixCapabilityLaneSessionEventAction;
   status: HelixCapabilityLaneSession["status"];
   reason: string;
   atMs: number;
   sourceId?: string | null;
   observationRef?: string | null;
   receiptRef?: string | null;
+  chunkId?: string | null;
+  chunkIndex?: number | null;
+  dedupeKey?: string | null;
+  sourceEventId?: string | null;
+  sourceEventMs?: number | null;
+  observedAtMs?: number | null;
+  freshnessStatus?: string | null;
+  projectionTarget?: string | null;
+  cancelRequested?: boolean | null;
 }): HelixCapabilityLaneSessionEvent => ({
   schema: HELIX_CAPABILITY_LANE_SESSION_EVENT_SCHEMA,
   event_id: `${input.laneSessionId}:${input.action}:${input.atMs}`,
@@ -66,6 +76,24 @@ const eventFor = (input: {
   source_id: normalizeText(input.sourceId) || null,
   observation_ref: normalizeText(input.observationRef) || null,
   receipt_ref: normalizeText(input.receiptRef) || null,
+  chunk_id: normalizeText(input.chunkId) || null,
+  chunk_index:
+    typeof input.chunkIndex === "number" && Number.isFinite(input.chunkIndex)
+      ? Math.trunc(input.chunkIndex)
+      : null,
+  dedupe_key: normalizeText(input.dedupeKey) || null,
+  source_event_id: normalizeText(input.sourceEventId) || null,
+  source_event_ms:
+    typeof input.sourceEventMs === "number" && Number.isFinite(input.sourceEventMs)
+      ? Math.trunc(input.sourceEventMs)
+      : null,
+  observed_at_ms:
+    typeof input.observedAtMs === "number" && Number.isFinite(input.observedAtMs)
+      ? Math.trunc(input.observedAtMs)
+      : null,
+  freshness_status: normalizeText(input.freshnessStatus) || null,
+  projection_target: normalizeText(input.projectionTarget) || null,
+  cancel_requested: input.cancelRequested === true,
   terminal_authority_status: input.observationRef
     ? "pending_helix_terminal_authority"
     : "not_terminal_authority",
@@ -76,11 +104,16 @@ const eventFor = (input: {
 });
 
 const blocked = (
-  action: HelixCapabilityLaneSessionAction,
+  action: HelixCapabilityLaneSessionEventAction,
   blockedReason: string,
+  metadata: Partial<Pick<
+    HelixCapabilityLaneSessionResult,
+    "lane_id" | "selected_runtime_agent_provider" | "requested_backend_provider" | "session_supported"
+  >> = {},
 ): HelixCapabilityLaneSessionResult => ({
   ok: false,
   action,
+  ...metadata,
   lane_session: null,
   blocked_reason: blockedReason,
   assistant_answer: false,
@@ -113,10 +146,16 @@ export const createHelixCapabilityLaneSessionStore = () => {
       env: input.env,
     });
     const lane = manifest.lanes.find((candidate) => candidate.lane_id === input.laneId);
-    if (!lane) return blocked("start", "unknown_capability_lane");
-    if (!lane.requestable_by_runtime_provider) return blocked("start", lane.status_reason);
-    if (!lane.session_contract.supported) return blocked("start", "capability_lane_session_not_supported");
-    if (!normalizeText(input.sourceBinding.source_id)) return blocked("start", "missing_source_binding");
+    const blockedMetadata = {
+      lane_id: input.laneId,
+      selected_runtime_agent_provider: input.provider.id,
+      requested_backend_provider: input.requestedBackendProvider ?? null,
+      session_supported: lane?.session_contract.supported ?? null,
+    };
+    if (!lane) return blocked("start", "unknown_capability_lane", blockedMetadata);
+    if (!lane.requestable_by_runtime_provider) return blocked("start", lane.status_reason, blockedMetadata);
+    if (!lane.session_contract.supported) return blocked("start", "capability_lane_session_not_supported", blockedMetadata);
+    if (!normalizeText(input.sourceBinding.source_id)) return blocked("start", "missing_source_binding", blockedMetadata);
 
     const nowMs = input.nowMs ?? Date.now();
     const laneSessionId =
@@ -169,6 +208,10 @@ export const createHelixCapabilityLaneSessionStore = () => {
     return {
       ok: true,
       action: "start",
+      lane_id: input.laneId,
+      selected_runtime_agent_provider: input.provider.id,
+      requested_backend_provider: input.requestedBackendProvider ?? null,
+      session_supported: true,
       lane_session: session,
       blocked_reason: null,
       assistant_answer: false,
@@ -185,7 +228,13 @@ export const createHelixCapabilityLaneSessionStore = () => {
   }): HelixCapabilityLaneSessionResult => {
     const session = sessions.get(input.laneSessionId);
     if (!session) return blocked(input.action, "unknown_lane_session");
-    if (session.status === "stopped") return blocked(input.action, "lane_session_already_stopped");
+    const resultMetadata = {
+      lane_id: session.lane_id,
+      selected_runtime_agent_provider: session.selected_runtime_agent_provider,
+      requested_backend_provider: session.backend_selection_decision.requested_backend_provider,
+      session_supported: true,
+    };
+    if (session.status === "stopped") return blocked(input.action, "lane_session_already_stopped", resultMetadata);
 
     const nowMs = input.nowMs ?? Date.now();
     const status = input.action === "pause"
@@ -225,6 +274,7 @@ export const createHelixCapabilityLaneSessionStore = () => {
     return {
       ok: true,
       action: input.action,
+      ...resultMetadata,
       lane_session: updated,
       blocked_reason: null,
       assistant_answer: false,
@@ -237,12 +287,27 @@ export const createHelixCapabilityLaneSessionStore = () => {
     laneSessionId: string;
     observationRef: string;
     receiptRef?: string | null;
+    chunkId?: string | null;
+    chunkIndex?: number | null;
+    dedupeKey?: string | null;
+    sourceEventId?: string | null;
+    sourceEventMs?: number | null;
+    observedAtMs?: number | null;
+    freshnessStatus?: string | null;
+    projectionTarget?: string | null;
+    cancelRequested?: boolean | null;
     nowMs?: number;
   }): HelixCapabilityLaneSessionResult => {
     const session = sessions.get(input.laneSessionId);
-    if (!session) return blocked("resume", "unknown_lane_session");
+    if (!session) return blocked("record_observation", "unknown_lane_session");
+    const resultMetadata = {
+      lane_id: session.lane_id,
+      selected_runtime_agent_provider: session.selected_runtime_agent_provider,
+      requested_backend_provider: session.backend_selection_decision.requested_backend_provider,
+      session_supported: true,
+    };
     const observationRef = normalizeText(input.observationRef);
-    if (!observationRef) return blocked("resume", "missing_observation_ref");
+    if (!observationRef) return blocked("record_observation", "missing_observation_ref", resultMetadata);
     const nowMs = input.nowMs ?? Date.now();
     const receiptRef = normalizeText(input.receiptRef) || null;
     const event = eventFor({
@@ -255,13 +320,22 @@ export const createHelixCapabilityLaneSessionStore = () => {
       latencyClass: session.latency_class,
       privacyClass: session.privacy_class,
       fallbackBackendProvider: session.fallback_backend_provider,
-      action: "resume",
+      action: "record_observation",
       status: session.status,
       reason: "lane_session_observation_recorded",
       atMs: nowMs,
       sourceId: session.source_binding.source_id,
       observationRef,
       receiptRef,
+      chunkId: input.chunkId,
+      chunkIndex: input.chunkIndex,
+      dedupeKey: input.dedupeKey,
+      sourceEventId: input.sourceEventId,
+      sourceEventMs: input.sourceEventMs,
+      observedAtMs: input.observedAtMs,
+      freshnessStatus: input.freshnessStatus,
+      projectionTarget: input.projectionTarget,
+      cancelRequested: input.cancelRequested,
     });
     const updated: HelixCapabilityLaneSession = {
       ...session,
@@ -274,7 +348,8 @@ export const createHelixCapabilityLaneSessionStore = () => {
     sessions.set(input.laneSessionId, updated);
     return {
       ok: true,
-      action: "resume",
+      action: "record_observation",
+      ...resultMetadata,
       lane_session: updated,
       blocked_reason: null,
       assistant_answer: false,

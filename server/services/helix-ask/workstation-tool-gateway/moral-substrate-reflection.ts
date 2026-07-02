@@ -1,7 +1,10 @@
 import { reflectLivingSubstrateContext } from "@shared/moral-graph/living-substrate-reflection-tool";
 import type {
   MoralLivingSubstrateMatchV1,
+  MoralLivingSubstrateProceduralDerivationV1,
   MoralLivingSubstrateRecommendedActionV1,
+  MoralLivingSubstrateSourceRefV1,
+  MoralLivingSubstrateSynthesisStepV1,
 } from "@shared/contracts/moral-living-substrate-reflection.v1";
 import type { HelixWorkstationCapabilityManifest } from "./types";
 
@@ -146,7 +149,43 @@ export function buildMoralSubstrateReflectionGatewayObservation(
     exact_substrate_badge_ids: reflection.exactMatches.map((match: MoralLivingSubstrateMatchV1) => match.badgeId).slice(0, 12),
     likely_substrate_badge_ids: reflection.likelyMatches.map((match: MoralLivingSubstrateMatchV1) => match.badgeId).slice(0, 12),
     matched_substrate_badge_ids: matchedSubstrateBadgeIds.slice(0, 12),
+    procedural_derivation_ids: reflection.proceduralDerivations
+      .map((derivation: MoralLivingSubstrateProceduralDerivationV1) => derivation.derivationId)
+      .slice(0, 12),
+    procedural_derivations: reflection.proceduralDerivations
+      .map((derivation: MoralLivingSubstrateProceduralDerivationV1) => ({
+        derivation_id: derivation.derivationId,
+        label: derivation.label,
+        matched_badge_ids: derivation.matchedBadgeIds,
+        evidence_strength: derivation.evidenceStrength,
+        procedural_question: derivation.proceduralQuestion,
+        substrate_observation: derivation.substrateObservation,
+        estimate: derivation.estimate,
+        obligation_hint: derivation.obligationHint,
+        caution: derivation.caution,
+        forbidden_overclaim: derivation.forbiddenOverclaim,
+      }))
+      .slice(0, 12),
+    synthesis_path: reflection.synthesisPath
+      .map((step: MoralLivingSubstrateSynthesisStepV1) => ({
+        step_id: step.stepId,
+        label: step.label,
+        description: step.description,
+        derived_from: step.derivedFrom,
+        output_kind: step.outputKind,
+      }))
+      .slice(0, 6),
     source_theory_badge_ids: reflection.sourceTheoryBadgeIds.slice(0, 12),
+    source_ref_ids: reflection.sourceRefs.map((ref: MoralLivingSubstrateSourceRefV1) => ref.id).slice(0, 12),
+    source_references: reflection.sourceRefs
+      .map((ref: MoralLivingSubstrateSourceRefV1) => ({
+        id: ref.id,
+        kind: ref.kind,
+        title: ref.title,
+        url: ref.url,
+        note: ref.note,
+      }))
+      .slice(0, 12),
     claim_boundary_notes: reflection.claimBoundaryNotes.slice(0, 12),
     recommended_action_ids: reflection.evidenceForAsk.recommendedNextActions
       .map((action: MoralLivingSubstrateRecommendedActionV1) => action.actionId)

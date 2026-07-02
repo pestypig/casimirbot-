@@ -15,6 +15,7 @@ import {
   LIVE_SOURCE_INTERPRETER_PREDICTION_READ_CAPABILITIES,
   LIVE_SOURCE_MAILBOX_READ_CAPABILITIES,
   LIVE_SOURCE_STATE_READ_CAPABILITIES,
+  MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY,
   MAX_PROMPT_NAMED_CAPABILITY_REQUESTS,
   PROMPT_NAMED_CAPABILITIES,
   REPO_SEARCH_ALIAS_CAPABILITIES,
@@ -393,6 +394,23 @@ export const buildPromptNamedCapabilityGatewayCallRequests = (
         target_source: "theory_badge_graph",
         target_kind: "theory_frontier_conjecture_workbench",
         alias_capability: promptNamedTheoryFrontierAlias,
+      },
+    });
+  }
+
+  if (
+    hasPromptNamedCapability(prompt, MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY) &&
+    !hasNegatedToolInstruction(prompt, /\bmoral-graph\.reflect_living_substrate_context\b/i)
+  ) {
+    const segment = readPromptNamedCapabilitySegment(prompt, MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY);
+    addNamedRequest(MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY, "read", {
+      prompt: extractNamedCapabilityQuery(segment, prompt),
+      conversation_context: prompt,
+      include_theory_bridge: true,
+      include_recommended_actions: true,
+      source_target_intent: {
+        target_source: "moral_graph",
+        target_kind: "moral_living_substrate_reflection",
       },
     });
   }

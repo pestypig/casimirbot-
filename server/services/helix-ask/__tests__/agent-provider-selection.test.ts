@@ -4881,4 +4881,35 @@ describe("Helix Ask agent provider selection", () => {
       },
     });
   });
+
+  it("emits Codex provider transcript progress through the stream callback before terminal answer", async () => {
+    process.env.CODEX_AGENT_FAKE_STDOUT = "Observed expression: 8*9\nResult: 72";
+    const streamedEvents: Record<string, unknown>[] = [];
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn/stream",
+      body: {
+        turn_id: "ask:test:codex-provider-live-progress",
+        question: "Use the scientific calculator to solve 8*9.",
+        workstation_gateway_call: {
+          capability_id: "scientific-calculator.solve_expression",
+          arguments: {
+            expression: "8*9",
+          },
+        },
+      },
+      onTranscriptEvent: (event) => {
+        streamedEvents.push(event);
+      },
+    });
+
+    expect(result.turn_transcript_events?.some((event) => event.source_event_type === "terminal_answer")).toBe(true);
+    expect(streamedEvents.some((event) => event.source_event_type === "runtime_selected")).toBe(true);
+    expect(streamedEvents.some((event) => event.source_event_type === "tool_request")).toBe(true);
+    expect(streamedEvents.some((event) => event.source_event_type === "tool_observation")).toBe(true);
+    expect(streamedEvents.some((event) => event.source_event_type === "model_reentry")).toBe(true);
+    expect(streamedEvents.some((event) => event.source_event_type === "terminal_answer")).toBe(false);
+    expect(streamedEvents.every((event) => event.event_source === "live")).toBe(true);
+  });
 });

@@ -15,6 +15,10 @@ describe("MoralGraph living substrate reflection", () => {
   it("loads additive substrate principles with source theory links", () => {
     expect(MORAL_LIVING_SUBSTRATE_THEORY_BADGE_IDS).toEqual(
       expect.arrayContaining([
+        "thermodynamics.low_entropy_source_sink",
+        "thermodynamics.energy_gradient_flux",
+        "prebiotic.inorganic_compartment_gradient",
+        "prebiotic.concentration_before_replication",
         "biophysics.organism_environment_boundary",
         "biophysics.open_system_entropy_flow",
         "biophysics.sensing_state_discrimination",
@@ -27,19 +31,84 @@ describe("MoralGraph living substrate reflection", () => {
         "frequency.fourier_action_mapping",
       ]),
     );
-    expect(MORAL_LIVING_SUBSTRATE_PRINCIPLES.map((principle: MoralLivingSubstrateBadgeV1) => principle.id)).toEqual(
-      expect.arrayContaining([
+    expect(MORAL_LIVING_SUBSTRATE_PRINCIPLES.map((principle: MoralLivingSubstrateBadgeV1) => principle.id).slice(0, 10)).toEqual([
+        "gradient-before-boundary",
+        "flux-before-action",
+        "compartment-before-organism",
+        "concentration-before-replication",
         "boundary-before-obligation",
         "sensing-before-judgment",
         "maintenance-before-optimization",
         "perturbation-response-before-verdict",
         "coordination-before-mandate",
         "scale-continuity-from-cell-to-society",
-      ]),
-    );
+    ]);
     expect(MORAL_LIVING_SUBSTRATE_PRINCIPLES.every(
       (principle: MoralLivingSubstrateBadgeV1) => principle.sourceTheoryBadgeIds.length > 0,
     )).toBe(true);
+  });
+
+  it("matches pre-boundary conditions and keeps physics mechanisms theory-owned", () => {
+    const reflection = reflectLivingSubstrateContext({
+      prompt:
+        "Trace low-entropy sunlight against a dark sky, energy gradient flux, hydrothermal vent proton gradients, mineral compartments, and concentration before replication. Include mechanism and equations as theory-owned context.",
+      reflectionId: "moral-living-substrate-reflection:pre-boundary-test",
+      generatedAt: "2026-07-02T00:00:00.000Z",
+    });
+    const ids = [...reflection.exactMatches, ...reflection.likelyMatches].map((match) => match.badgeId);
+
+    expect(ids).toEqual(
+      expect.arrayContaining([
+        "gradient-before-boundary",
+        "flux-before-action",
+        "compartment-before-organism",
+        "concentration-before-replication",
+      ]),
+    );
+    expect(reflection.sourceTheoryBadgeIds).toEqual(
+      expect.arrayContaining([
+        "thermodynamics.low_entropy_source_sink",
+        "thermodynamics.energy_gradient_flux",
+        "prebiotic.inorganic_compartment_gradient",
+        "prebiotic.concentration_before_replication",
+      ]),
+    );
+    expect(reflection.sourceRefs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "penrose-2018-low-entropy-sun-dark-sky",
+          url: "https://link.springer.com/article/10.1007/s10701-018-0162-3",
+        }),
+        expect.objectContaining({
+          id: "herschy-2014-origin-life-reactor-alkaline-vents",
+          url: "https://link.springer.com/article/10.1007/s00239-014-9658-4",
+        }),
+      ]),
+    );
+    expect(reflection.proceduralDerivations.map((derivation) => derivation.derivationId)).toEqual(
+      expect.arrayContaining(["gradient-condition", "flux-condition", "compartment-condition", "concentration-condition"]),
+    );
+    expect(reflection.evidenceForAsk.recommendedNextActions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          actionId: "theory-badge-graph.reflect_discussion_context",
+          panelId: "theory-badge-graph",
+          args: expect.objectContaining({
+            claim_boundary: expect.stringContaining("Theory Badge Graph-owned"),
+          }),
+        }),
+        expect.objectContaining({
+          actionId: "theory-badge-graph.load_payloads_to_calculator",
+          panelId: "scientific-calculator",
+          mutatesCalculator: true,
+          solves: false,
+          args: expect.objectContaining({
+            claim_boundary: expect.stringContaining("Moral Graph does not embed equations"),
+          }),
+        }),
+      ]),
+    );
+    expect(reflection.terminal_eligible).toBe(false);
   });
 
   it("matches organism boundary, sensing, homeostasis, and entropy prompts", () => {
@@ -63,6 +132,43 @@ describe("MoralGraph living substrate reflection", () => {
         "biophysics.homeostatic_regulation",
       ]),
     );
+  });
+
+  it("derives procedural substrate layers before moral claims", () => {
+    const reflection = reflectLivingSubstrateContext({
+      prompt:
+        "Derive moral obligations from organism boundary, sensing, homeostasis, perturbation cost, dependency scale, entropy pressure, and claim boundaries.",
+      reflectionId: "moral-living-substrate-reflection:procedural-layer-test",
+      generatedAt: "2026-07-02T00:00:00.000Z",
+    });
+
+    expect(isMoralLivingSubstrateReflectionV1(reflection)).toBe(true);
+    expect(reflection.proceduralDerivations.map((derivation) => derivation.derivationId)).toEqual(
+      expect.arrayContaining([
+        "boundary-integrity",
+        "maintenance-requirement",
+        "sensing-and-error",
+        "perturbation-cost",
+        "dependency-and-scale",
+        "obligation-emergence",
+        "claim-boundary",
+      ]),
+    );
+    expect(reflection.proceduralDerivations.find((derivation) => derivation.derivationId === "obligation-emergence"))
+      .toMatchObject({
+        estimate: {
+          vulnerability: "medium",
+          dependency: "medium",
+          agency: "medium",
+        },
+        obligationHint: expect.stringContaining("provisional care constraints"),
+        forbiddenOverclaim: expect.stringContaining("personhood"),
+      });
+    expect(reflection.synthesisPath.map((step) => step.outputKind)).toEqual([
+      "substrate_observation",
+      "vulnerability_dependency_agency_estimate",
+      "obligation_caution_forbidden_overclaim",
+    ]);
   });
 
   it("keeps Orch-OR and microtubule prompts behind frontier boundaries", () => {

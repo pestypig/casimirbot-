@@ -52,7 +52,15 @@ export const HelixAskTurnList = forwardRef<HTMLDivElement, HelixAskTurnListProps
             </details>
           ) : null}
           {children}
-          {activeTurnStreamPanel}
+          {activeTurnStreamPanel ? (
+            <div
+              className="contents"
+              data-testid="helix-ask-active-turn-stream-lane"
+              data-render-placement="inline_active_turn"
+            >
+              {activeTurnStreamPanel}
+            </div>
+          ) : null}
           <div
             ref={bottomRef}
             className="h-px w-full"

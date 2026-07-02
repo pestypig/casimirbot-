@@ -134,9 +134,17 @@ The capability may use:
 - theory frontier search
 - biome layout and probability terrain
 - badge connection traces
-- calculator-payload availability as a diagnostic-probe hint
+- calculator-payload availability as a measurement/affordance hint
 - scholarly lookup requests as evidence obligations
 - Lean/formalization references as proof-obligation framing
+
+Frontier candidates are measurement surfaces over badge regions. They describe
+placement uncertainty, connection structure, congruence scores, required
+observables, source references, and falsification checks. They must not add a
+second readiness or solution layer that says a region is solved, blocked,
+calculable, or missing in the final-answer sense. Any such conclusion belongs to
+Codex after evidence re-entry and only after the relevant calculator, source,
+runtime, or verifier receipt exists.
 
 It must not:
 

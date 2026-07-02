@@ -422,7 +422,7 @@ describe("Helix Ask Console recrown boundary", () => {
     const exportedComponentLine =
       legacyPillLines.findIndex((line) => line.includes("export function HelixAskPill")) + 1;
     const activeRenderLine =
-      legacyPillLines.findIndex((line) => line.includes("const activeTurnStreamPanel = (")) + 1;
+      legacyPillLines.findIndex((line) => line.includes("const activeTurnStreamPanel = visibleActiveTurnStreamRows.length > 0 ? (")) + 1;
     const legacyConsoleViewLine =
       legacyPillLines.findIndex((line) => line.includes("<HelixAskLegacyConsoleView")) + 1;
 
@@ -1986,6 +1986,14 @@ describe("Helix Ask Console recrown boundary", () => {
         status: "completed",
       },
       {
+        key: "heartbeat",
+        role: "agent",
+        label: "Thinking",
+        text: "Backend Ask runtime is still running (5s).",
+        meta: "reasoning | backend_ask_runtime | running",
+        status: "running",
+      },
+      {
         key: "final",
         role: "assistant",
         label: "Final",
@@ -2138,7 +2146,7 @@ describe("Helix Ask Console recrown boundary", () => {
           codex_args: ["exec", "--sandbox", "read-only"],
         },
       }),
-    ).toBe("Model: Codex default (not reported)");
+    ).toBe("Model: not reported by backend");
 
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
     const turnStreamPanel = read("client/src/components/helix/ask-console/HelixAskTurnStreamPanel.tsx");
@@ -2150,8 +2158,9 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(legacyPill).toContain("actualAgentModelLabel");
     expect(turnStreamPanel).toContain("actualAgentProviderLabel");
     expect(turnStreamPanel).toContain("actualAgentModelLabel");
-    expect(turnStreamPanel).toContain("isFinalRow && actualAgentProviderLabel");
-    expect(turnStreamPanel).toContain("isFinalRow && actualAgentModelLabel");
+    expect(turnStreamPanel).toContain("formatHelixAskFinalReceiptMeta");
+    expect(turnStreamPanel).toContain("isFinalRow ? actualAgentProviderLabel : null");
+    expect(turnStreamPanel).toContain("isFinalRow ? actualAgentModelLabel : null");
 
     for (const forbidden of [
       "fetch(",
@@ -2395,6 +2404,7 @@ describe("Helix Ask Console recrown boundary", () => {
       "Tool Observation",
       "Model Re-entry",
     ]);
+    expect(selectHelixAskConsoleTurnTranscriptRowsForStream(rows).map((row) => row.key)).not.toContain("heartbeat");
     expect(selectHelixAskConsoleWorkstationTraceRows([
       {
         key: "final-prose-only",
@@ -2669,12 +2679,12 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(legacyPill).toContain("<HelixAskLegacyConsoleView");
     expect(legacyPill).toContain("surface={");
     expect(legacyPill).toContain("goalPill={askGoalSession ? (");
-    expect(legacyPill).toContain("steeringQueue={");
+    expect(legacyPill).toContain("steeringQueue={null}");
     expect(legacyPill).toContain("errorLine={<HelixAskErrorLine message={askError} />}");
     expect(legacyPill).toContain("turnList={chronologicalAskReplies.length > 0 || visibleActiveTurnStreamRows.length > 0 ? (");
     expect(legacyPill).toContain("debugDrawer={debugExportDrawer ? (");
     expect(legacyPill).toContain("setAskGoalPillExpanded");
-    expect(legacyPill).toContain("setSteeringQueueExpanded");
+    expect(legacyPill).not.toContain("setSteeringQueueExpanded");
     expect(legacyPill).toContain("setDebugExportDrawer(null)");
 
     expect(legacyConsoleView).toContain("export function HelixAskLegacyConsoleView");
@@ -2690,6 +2700,7 @@ describe("Helix Ask Console recrown boundary", () => {
     for (const slot of ["{surface}", "{goalPill}", "{steeringQueue}", "{errorLine}", "{turnList}", "{debugDrawer}"]) {
       expect(runtimeLayout).toContain(slot);
     }
+    expect(runtimeLayout.indexOf("{turnList}")).toBeLessThan(runtimeLayout.indexOf("{steeringQueue}"));
     expect(runtimeLayout).not.toContain("askGoalSession");
     expect(runtimeLayout).not.toContain("chronologicalAskReplies");
     expect(runtimeLayout).not.toContain("setAskGoalPillExpanded");
@@ -4855,34 +4866,29 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(replyCard).not.toContain("transcriptLatestAskReplyId");
   });
 
-  it("owns active turn stream panel display while active stream projection stays in the bridge", () => {
+  it("renders active turn stream through the same reply turn shell as completed turns", () => {
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
-    const activeStreamPanel = read("client/src/components/helix/ask-console/HelixAskActiveTurnStreamPanel.tsx");
+    const replyTurn = read("client/src/components/helix/ask-console/HelixAskReplyTurn.tsx");
+    const turnStreamPanel = read("client/src/components/helix/ask-console/HelixAskTurnStreamPanel.tsx");
 
-    expect(legacyPill).toContain("<HelixAskActiveTurnStreamPanel");
-    expect(legacyPill).toContain("rows={visibleActiveTurnStreamRows}");
-    expect(legacyPill).toContain("activeTurnId={activeAskTurnIdRef.current}");
-    expect(legacyPill).toContain("activeTraceId={askLiveTraceId}");
-    expect(legacyPill).toContain("renderFinalAnswerContent={renderHelixAskFinalAnswerContent}");
-    expect(legacyPill).toContain("readRowClass={readHelixContinuousTurnStreamRowClass}");
-    expect(legacyPill).toContain("readDotClass={readHelixContinuousTurnStreamDotClass}");
-    expect(legacyPill).toContain("renderPlacement: \"after_completed_replies\"");
+    expect(legacyPill).not.toContain("<HelixAskActiveTurnStreamPanel");
+    expect(legacyPill).toContain("<HelixAskReplyTurn");
+    expect(legacyPill).toContain("rows: visibleActiveTurnStreamRows");
+    expect(legacyPill).toContain('workLogTestId: "helix-ask-active-turn-work-log"');
+    expect(legacyPill).toContain('data-testid="helix-ask-active-turn-stream"');
+    expect(legacyPill).toContain("renderPlacement: \"inline_active_turn\"");
     expect(legacyPill).not.toContain("visibleActiveTurnStreamRows.map((row, index)");
     expect(legacyPill).not.toContain('data-testid="helix-ask-active-turn-stream-row"');
-    expect(legacyPill).not.toContain('data-render-placement="after_completed_replies"');
+    expect(replyTurn).toContain("export function HelixAskReplyTurn");
+    expect(replyTurn).toContain("<HelixAskTurnStreamPanel");
+    expect(turnStreamPanel).toContain('aria-label="Turn stream"');
+    expect(turnStreamPanel).toContain("rows.map((row, index)");
 
-    expect(activeStreamPanel).toContain("export function HelixAskActiveTurnStreamPanel");
-    expect(activeStreamPanel).toContain("if (rows.length === 0) return null");
-    expect(activeStreamPanel).toContain('data-testid="helix-ask-active-turn-stream"');
-    expect(activeStreamPanel).toContain('data-testid="helix-ask-active-turn-stream-row"');
-    expect(activeStreamPanel).toContain('data-testid="helix-ask-active-turn-latest-line"');
-    expect(activeStreamPanel).toContain('data-render-placement="after_completed_replies"');
-    expect(activeStreamPanel).toContain("rows.map((row, index)");
-    expect(activeStreamPanel).toContain("readRowClass(row.tone)");
-    expect(activeStreamPanel).toContain("readDotClass(row.tone)");
-    expect(activeStreamPanel).not.toContain("visibleActiveTurnStreamRows");
-    expect(activeStreamPanel).not.toContain("activeAskTurnIdRef");
-    expect(activeStreamPanel).not.toContain("askLiveTraceId");
+    const turnList = read("client/src/components/helix/ask-console/HelixAskTurnList.tsx");
+    expect(turnList).toContain('data-testid="helix-ask-active-turn-stream-lane"');
+    expect(turnList).toContain('data-render-placement="inline_active_turn"');
+    expect(turnList).toContain('className="contents"');
+    expect(turnList.indexOf("{children}")).toBeLessThan(turnList.indexOf("{activeTurnStreamPanel}"));
   });
 
   it("owns attachment strip display while validation is recrowned and mutation stays in the bridge", () => {
@@ -5107,16 +5113,17 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(observerLane).not.toContain("helixTimeline");
   });
 
-  it("owns steering queue panel display while queue construction and expansion state stay in the bridge", () => {
+  it("keeps the legacy steering queue component recrowned but unmounted from the day-to-day bridge", () => {
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
     const steeringPanel = read("client/src/components/helix/ask-console/HelixAskSteeringQueuePanel.tsx");
     const steeringDisplay = read("client/src/lib/helix/ask-steering-queue-display.ts");
 
-    expect(legacyPill).toContain("<HelixAskSteeringQueuePanel");
-    expect(legacyPill).toContain("items={steeringQueueItems}");
-    expect(legacyPill).toContain("activeCount={activeSteeringQueueCount}");
-    expect(legacyPill).toContain("expanded={steeringQueueExpanded}");
-    expect(legacyPill).toContain("onToggleExpanded={() => setSteeringQueueExpanded((current) => !current)}");
+    expect(legacyPill).not.toContain("<HelixAskSteeringQueuePanel");
+    expect(legacyPill).not.toContain("items={steeringQueueItems}");
+    expect(legacyPill).not.toContain("activeCount={activeSteeringQueueCount}");
+    expect(legacyPill).not.toContain("expanded={steeringQueueExpanded}");
+    expect(legacyPill).not.toContain("onToggleExpanded={() => setSteeringQueueExpanded((current) => !current)}");
+    expect(legacyPill).toContain("steeringQueue={null}");
     expect(legacyPill).toContain("buildHelixAskSteeringQueueItems");
     expect(legacyPill).toContain("shouldAutoWakeHelixMailboxQueueItem");
     expect(legacyPill).not.toContain("steeringQueueItems.map((item, index)");

@@ -10,6 +10,7 @@ import {
   HELIX_CAPABILITY_LANE_GOAL_DISPATCH_PLAN_SCHEMA,
   HELIX_CAPABILITY_LANE_GOAL_REPORT_DECISION_SCHEMA,
 } from "@shared/helix-capability-lane-goal-binding";
+import type { HelixCapabilityLaneSessionEvent } from "@shared/helix-capability-lane-session";
 import { buildHelixCapabilityLaneGoalDispatchAdmission } from "./goal-dispatch-admission";
 
 const readTerminalAuthorityStatus = (
@@ -68,6 +69,10 @@ const buildReportDecision = (
     schema: HELIX_CAPABILITY_LANE_GOAL_REPORT_DECISION_SCHEMA,
     action,
     reason,
+    attention_policy: binding.attention_policy,
+    report_policy: binding.report_policy,
+    quiet_behavior: binding.quiet_behavior,
+    quiet_behavior_applied: action === "record_only" || action === "surface_badge",
     wake_expected: action === "wake_on_salience",
     surface_badge_expected: action === "surface_badge",
     terminal_report_requested: action === "request_terminal_authority",
@@ -87,6 +92,7 @@ const buildReportDecision = (
 const buildDispatchPlan = (
   binding: HelixCapabilityLaneGoalBinding,
   reportDecision: HelixCapabilityLaneGoalReportDecision,
+  latestObservationEvent: HelixCapabilityLaneSessionEvent | null,
 ): HelixCapabilityLaneGoalDispatchPlan => {
   const target = (() => {
     if (reportDecision.action === "surface_badge") return "ui_badge";
@@ -110,6 +116,16 @@ const buildDispatchPlan = (
     goal_id: binding.goal_id,
     lane_session_id: binding.lane_session_id,
     lane_id: binding.lane_id,
+    source_id: binding.lane_session_source_id,
+    latest_chunk_id: latestObservationEvent?.chunk_id ?? null,
+    latest_chunk_index: latestObservationEvent?.chunk_index ?? null,
+    latest_dedupe_key: latestObservationEvent?.dedupe_key ?? null,
+    latest_source_event_id: latestObservationEvent?.source_event_id ?? null,
+    latest_source_event_ms: latestObservationEvent?.source_event_ms ?? null,
+    latest_observed_at_ms: latestObservationEvent?.observed_at_ms ?? null,
+    latest_freshness_status: latestObservationEvent?.freshness_status ?? null,
+    latest_projection_target: latestObservationEvent?.projection_target ?? null,
+    latest_cancel_requested: latestObservationEvent?.cancel_requested ?? null,
     evidence_ref: reportDecision.evidence_ref,
     mail_loop_ref: reportDecision.mail_loop_ref,
     receipt_ref: reportDecision.receipt_ref,
@@ -131,7 +147,10 @@ export const buildHelixCapabilityLaneGoalBindingDebugSummary = (
   binding: HelixCapabilityLaneGoalBinding,
 ): HelixCapabilityLaneGoalBindingDebugSummary => {
   const reportDecision = buildReportDecision(binding);
-  const dispatchPlan = buildDispatchPlan(binding, reportDecision);
+  const latestObservationEvent =
+    [...binding.lane_session_debug_history].reverse().find((event) => event.observation_ref) ??
+    (binding.latest_lane_session_event?.observation_ref ? binding.latest_lane_session_event : null);
+  const dispatchPlan = buildDispatchPlan(binding, reportDecision, latestObservationEvent);
   return {
     schema: HELIX_CAPABILITY_LANE_GOAL_BINDING_DEBUG_SUMMARY_SCHEMA,
     goal_binding_id: binding.goal_binding_id,
@@ -150,6 +169,15 @@ export const buildHelixCapabilityLaneGoalBindingDebugSummary = (
     source_id: binding.lane_session_source_id,
     last_observation_ref: binding.lane_session_last_observation_ref,
     last_receipt_ref: binding.lane_session_last_receipt_ref,
+    latest_chunk_id: latestObservationEvent?.chunk_id ?? null,
+    latest_chunk_index: latestObservationEvent?.chunk_index ?? null,
+    latest_dedupe_key: latestObservationEvent?.dedupe_key ?? null,
+    latest_source_event_id: latestObservationEvent?.source_event_id ?? null,
+    latest_source_event_ms: latestObservationEvent?.source_event_ms ?? null,
+    latest_observed_at_ms: latestObservationEvent?.observed_at_ms ?? null,
+    latest_freshness_status: latestObservationEvent?.freshness_status ?? null,
+    latest_projection_target: latestObservationEvent?.projection_target ?? null,
+    latest_cancel_requested: latestObservationEvent?.cancel_requested ?? null,
     latest_session_event: binding.latest_lane_session_event,
     latest_mail_loop_summary: binding.latest_mail_loop_summary,
     mail_loop_refs: binding.lane_session_mail_loop_refs,

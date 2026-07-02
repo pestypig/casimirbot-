@@ -100,6 +100,73 @@ describe("ask-continuous-turn-display", () => {
     expect(readHelixContinuousTurnStreamDotClass("warning")).toContain("bg-rose");
   });
 
+  it("maps lane lifecycle transcript rows to active stream tones", () => {
+    const rows = buildHelixContinuousTurnStreamRows({
+      replyId: "reply-lanes",
+      question: null,
+      turnTranscriptRows: [
+        {
+          key: "lane-visible",
+          label: "Lane Visible",
+          text: "Lane visible: live_translation.",
+          meta: "visible does not mean executed",
+          status: "completed",
+        },
+        {
+          key: "lane-request",
+          label: "Lane Request",
+          text: "Lane requested: live_translation.translate_text.",
+          meta: "runtime provider",
+          status: "completed",
+        },
+        {
+          key: "lane-backend",
+          label: "Lane Backend",
+          text: "Lane backend selected: live_translation.local_runtime.",
+          meta: "helix policy",
+          status: "completed",
+        },
+        {
+          key: "lane-observation",
+          label: "Lane Observation",
+          text: "Lane observation ready.",
+          meta: "observation-only",
+          status: "completed",
+        },
+        {
+          key: "lane-reentry",
+          label: "Lane Re-entry",
+          text: "Observation re-entered provider reasoning.",
+          meta: "before terminal",
+          status: "completed",
+        },
+        {
+          key: "lane-terminal",
+          label: "Terminal",
+          text: "Terminal selected.",
+          meta: "terminal authority",
+          status: "completed",
+        },
+      ],
+      mailLoopRows: [],
+      stagePlayEvents: [],
+      liveAnswerTurnBridge: null,
+      finalAnswerText: "",
+      finalAnswerHeading: "Final answer",
+      finalAnswerSourceLabel: "active turn",
+      terminalMismatch: false,
+    });
+
+    expect(rows.map((row) => [row.label, row.tone])).toEqual([
+      ["Lane Visible", "working"],
+      ["Lane Request", "checkpoint"],
+      ["Lane Backend", "checkpoint"],
+      ["Lane Observation", "observation"],
+      ["Lane Re-entry", "observation"],
+      ["Terminal", "final"],
+    ]);
+  });
+
   it("marks reviewed live answer snapshots as answer-bound and styles bridge pills", () => {
     const bridge = buildLiveAnswerTurnBridgeState({
       hasLiveState: true,

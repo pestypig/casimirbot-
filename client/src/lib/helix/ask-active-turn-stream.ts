@@ -1,6 +1,10 @@
 import type { AskLiveEventEntry } from "@/lib/helix/ask-observer-events";
 import { readAskLiveEventIdentity } from "@/lib/helix/ask-debug-event-display";
 import { humanizeAskLiveEventToken } from "@/lib/helix/ask-display-text";
+import {
+  buildHelixTurnTranscriptRows,
+  type HelixTurnTranscriptRow,
+} from "@/lib/helix/ask-turn-transcript";
 
 export type HelixAskConsoleStreamIngressDebug = {
   schema: "helix.ask.console_stream_ingress_debug.v1";
@@ -13,6 +17,7 @@ export type HelixAskConsoleStreamIngressDebug = {
   replayedTranscriptEventCount: number;
   droppedEventCount: number;
   droppedReasons: Record<string, number>;
+  runtimeHeartbeatPacketCount: number;
   terminalTranscriptEventCount: number;
   nonTranscriptPacketCount: number;
   lastEventName: string | null;
@@ -122,6 +127,7 @@ export function createHelixAskConsoleStreamIngressDebug(input?: {
     replayedTranscriptEventCount: 0,
     droppedEventCount: 0,
     droppedReasons: {},
+    runtimeHeartbeatPacketCount: 0,
     terminalTranscriptEventCount: 0,
     nonTranscriptPacketCount: 0,
     lastEventName: null,
@@ -180,6 +186,107 @@ function resolveAskLiveEventTimestampMs(event: AskLiveEventEntry): number | null
     return event.tsMs;
   }
   return parseTimestampMs(event.ts);
+}
+
+function readFirstNonEmptyText(...values: unknown[]): string {
+  for (const value of values) {
+    const text = coerceText(value).trim();
+    if (text) return text;
+  }
+  return "";
+}
+
+function buildTurnTranscriptRecordFromAskLiveEvent(
+  event: AskLiveEventEntry,
+  index: number,
+  input: {
+    activeTurnId?: string | null;
+    activeTraceId?: string | null;
+  },
+): Record<string, unknown> {
+  const meta = asObjectRecord(event.meta) ?? {};
+  const sourceEventType = readFirstNonEmptyText(meta.source_event_type, meta.sourceEventType, meta.stage, "event");
+  const turnId = readFirstNonEmptyText(
+    meta.turn_id,
+    meta.turnId,
+    meta.active_turn_id,
+    meta.activeTurnId,
+    meta.ask_turn_id,
+    meta.askTurnId,
+    input.activeTurnId,
+  );
+  const traceId = readFirstNonEmptyText(
+    meta.trace_id,
+    meta.traceId,
+    meta.ask_trace_id,
+    meta.askTraceId,
+    meta.turn_key,
+    meta.turnKey,
+    input.activeTraceId,
+  );
+  const timestampMs = resolveAskLiveEventTimestampMs(event);
+  const status = readFirstNonEmptyText(meta.status, "running");
+
+  return {
+    ...meta,
+    id: readFirstNonEmptyText(meta.id, event.id, `live-event-${index}`),
+    type: readFirstNonEmptyText(meta.type, sourceEventType),
+    source_event_type: sourceEventType,
+    event_source: readFirstNonEmptyText(meta.event_source, meta.eventSource, "live"),
+    role: readFirstNonEmptyText(meta.role, event.tool, "assistant"),
+    text: coerceText(event.text).trim(),
+    status,
+    lane: readFirstNonEmptyText(meta.lane, event.tool),
+    step_id: readFirstNonEmptyText(meta.step_id, meta.stepId),
+    tool: readFirstNonEmptyText(meta.tool, meta.tool_name, meta.toolName, event.tool),
+    capability: readFirstNonEmptyText(meta.capability, meta.capability_id, meta.capabilityId, event.tool),
+    source_id: readFirstNonEmptyText(meta.source_id, meta.sourceId),
+    latest_chunk_id: readFirstNonEmptyText(meta.latest_chunk_id, meta.latestChunkId),
+    latest_chunk_index: readFirstNonEmptyText(meta.latest_chunk_index, meta.latestChunkIndex),
+    latest_dedupe_key: readFirstNonEmptyText(meta.latest_dedupe_key, meta.latestDedupeKey),
+    latest_source_event_id: readFirstNonEmptyText(meta.latest_source_event_id, meta.latestSourceEventId),
+    latest_source_event_ms: readFirstNonEmptyText(meta.latest_source_event_ms, meta.latestSourceEventMs),
+    latest_observed_at_ms: readFirstNonEmptyText(meta.latest_observed_at_ms, meta.latestObservedAtMs),
+    latest_freshness_status: readFirstNonEmptyText(meta.latest_freshness_status, meta.latestFreshnessStatus),
+    latest_projection_target: readFirstNonEmptyText(meta.latest_projection_target, meta.latestProjectionTarget),
+    latest_cancel_requested:
+      typeof meta.latest_cancel_requested === "boolean"
+        ? meta.latest_cancel_requested
+        : typeof meta.latestCancelRequested === "boolean"
+          ? meta.latestCancelRequested
+          : null,
+    turn_id: turnId || null,
+    trace_id: traceId || null,
+    ts_ms: timestampMs,
+    at_ms: timestampMs,
+    seq: typeof event.seq === "number" && Number.isFinite(event.seq) ? event.seq : index,
+    durationMs: typeof event.durationMs === "number" && Number.isFinite(event.durationMs) ? event.durationMs : null,
+    stream_event: "turn_transcript_event",
+  };
+}
+
+export function buildHelixActiveTurnTranscriptRows(input: {
+  replyId: string;
+  events: AskLiveEventEntry[];
+  activeTurnId?: string | null;
+  activeTraceId?: string | null;
+}): HelixTurnTranscriptRow[] {
+  const turnTranscriptEvents = input.events
+    .filter((event) => !isAskLiveEventSuperseded(event))
+    .map((event, index) =>
+      buildTurnTranscriptRecordFromAskLiveEvent(event, index, {
+        activeTurnId: input.activeTurnId,
+        activeTraceId: input.activeTraceId,
+      }),
+    );
+
+  return buildHelixTurnTranscriptRows({
+    id: input.replyId,
+    content: "",
+    debug: {
+      turn_transcript_events: turnTranscriptEvents,
+    },
+  });
 }
 
 function resolveAskLiveEventStageParts(event: AskLiveEventEntry): {

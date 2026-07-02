@@ -1,12 +1,7 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
-let buildHelixMailLoopTurnStreamRows: typeof import("../helix/HelixAskPill").buildHelixMailLoopTurnStreamRows;
-let buildHelixAskSteeringQueueItems: typeof import("../helix/HelixAskPill").buildHelixAskSteeringQueueItems;
-
-beforeAll(async () => {
-  (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
-  ({ buildHelixMailLoopTurnStreamRows, buildHelixAskSteeringQueueItems } = await import("../helix/HelixAskPill"));
-});
+import { buildHelixMailLoopTurnStreamRows } from "@/lib/helix/ask-live-source-display";
+import { buildHelixAskSteeringQueueItems } from "@/lib/helix/ask-steering-queue-display";
 
 describe("Helix Ask live-source watch transcript rows", () => {
   it("renders interpretation, watch-next, and narrative-state rows as live-source transcript rows", () => {
@@ -100,20 +95,8 @@ describe("Helix Ask live-source watch transcript rows", () => {
     expect(rows[0].evidenceRefs).toContain("stage_play_live_source_narrative_state:latest");
   });
 
-  it("builds a visible steering queue with active steps first", () => {
+  it("keeps active turn stream rows out of the legacy steering queue", () => {
     const rows = buildHelixAskSteeringQueueItems({
-      activeTurnStreamRows: [
-        {
-          key: "active-read",
-          source: "agent_work",
-          label: "Read processed mail",
-          text: "live_env.read_processed_live_source_mail",
-          meta: "current turn",
-          status: "running",
-          tone: "working",
-          evidenceRefs: [],
-        },
-      ],
       mailbox: {
         ok: true,
         mailboxThreadId: "helix-ask:desktop",
@@ -130,10 +113,7 @@ describe("Helix Ask live-source watch transcript rows", () => {
       maxItems: 4,
     });
 
-    expect(rows[0]).toMatchObject({
-      label: "Read processed mail",
-      status: "running",
-    });
+    expect(rows.some((row) => row.label === "Read processed mail")).toBe(false);
     expect(rows.some((row) => row.label === "Watch policy armed")).toBe(true);
   });
 

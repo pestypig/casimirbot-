@@ -162,6 +162,8 @@ export const createHelixAskLiveDebugSlimBuilder = (
         payload.selected_agent_provider ?? debug.selected_agent_provider ?? null,
       capability_lane_manifest:
         payload.capability_lane_manifest ?? debug.capability_lane_manifest ?? null,
+      model_visible_capability_lane_manifest:
+        payload.model_visible_capability_lane_manifest ?? debug.model_visible_capability_lane_manifest ?? null,
       capability_lane_ids:
         payload.capability_lane_ids ?? debug.capability_lane_ids ?? null,
       capability_lane_statuses:
@@ -212,6 +214,12 @@ export const createHelixAskLiveDebugSlimBuilder = (
         ),
       capability_lane_reentry_status:
         payload.capability_lane_reentry_status ?? debug.capability_lane_reentry_status ?? null,
+      runtime_lane_request_contract:
+        payload.runtime_lane_request_contract ?? debug.runtime_lane_request_contract ?? null,
+      runtime_lane_request_loop:
+        payload.runtime_lane_request_loop ?? debug.runtime_lane_request_loop ?? null,
+      runtime_lane_request_retry:
+        payload.runtime_lane_request_retry ?? debug.runtime_lane_request_retry ?? null,
       workstation_gateway_manifest:
         payload.workstation_gateway_manifest ?? debug.workstation_gateway_manifest ?? null,
       workstation_gateway_manifest_version:

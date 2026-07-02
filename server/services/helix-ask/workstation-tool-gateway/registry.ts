@@ -5000,6 +5000,7 @@ export const callWorkstationGatewayCapability = async (
       result.receipt.status === "queued_for_retry" ||
       result.receipt.status === "delivered";
     const blockedReason = ok ? null : result.receipt.status;
+    const voiceModelId = cleanString(process.env.ELEVENLABS_MODEL_ID, "eleven_multilingual_v2");
     const admission = buildAdmission({
       capabilityId: manifest.capability_id,
       agentRuntime,
@@ -5013,14 +5014,28 @@ export const callWorkstationGatewayCapability = async (
       schema: VOICE_INTERIM_TOOL_RESULT_SCHEMA,
       capability_key: manifest.capability_id,
       capability: manifest.capability_id,
+      selected_model_or_service: voiceModelId,
+      resolved_model_or_service: voiceModelId,
+      model_id: voiceModelId,
+      voice_model_id: voiceModelId,
       status: ok ? "succeeded" : "blocked",
       blocked_reason: blockedReason,
       request: result.request,
-      receipt: result.receipt,
+      receipt: {
+        ...result.receipt,
+        selected_model_or_service: voiceModelId,
+        resolved_model_or_service: voiceModelId,
+        model_id: voiceModelId,
+        voice_model_id: voiceModelId,
+      },
       host_projection: {
         kind: "voice_playback_request",
         request_id: result.request.requestId,
         receipt_id: result.receipt.receiptId,
+        selected_model_or_service: voiceModelId,
+        resolved_model_or_service: voiceModelId,
+        model_id: voiceModelId,
+        voice_model_id: voiceModelId,
         playback_status: result.receipt.status,
         assistant_answer: false,
         terminal_eligible: false,

@@ -2,7 +2,11 @@ import { execFileSync, spawn, spawnSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import type { HelixAgentProvider, HelixAgentRunResult } from "./types";
+import type {
+  HelixAgentProvider,
+  HelixAgentRunResult,
+  HelixAgentRuntimeEvent,
+} from "./types";
 import type { HelixAgentStepObservationPacket } from "@shared/helix-agent-step-observation-packet";
 import type {
   HelixToolFollowupDecision,
@@ -32,6 +36,7 @@ const INTERNET_SEARCH_CAPABILITY = "internet-search.search_web" as const;
 const SCHOLARLY_RESEARCH_SEARCH_CAPABILITY = "scholarly-research.lookup_papers" as const;
 const SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY = "scholarly-research.fetch_full_text" as const;
 const SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY = "scholarly-research.extract_numeric_parameters" as const;
+const MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY = "moral-graph.reflect_living_substrate_context" as const;
 const WORKSTATION_UI_ACTION_RECEIPT_SCHEMA = "helix.workstation_ui_action_receipt.v1" as const;
 
 const COMPOUND_NORMALIZABLE_CAPABILITIES = new Set<string>([
@@ -40,6 +45,7 @@ const COMPOUND_NORMALIZABLE_CAPABILITIES = new Set<string>([
   "theory-badge-graph.reflect_discussion_context",
   "theory-badge-graph.propose_frontier_conjectures",
   "civilization-bounds.reflect_system_bounds",
+  MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY,
   SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
   SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
   SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY,
@@ -110,6 +116,89 @@ const readNumber = (value: unknown): number | null => {
 
 const readArray = (value: unknown): unknown[] => Array.isArray(value) ? value : [];
 
+const buildCodexProviderModelMetadata = (): Record<string, string> => {
+  const httpModel = readString(process.env.LLM_HTTP_MODEL);
+  if (httpModel) {
+    return {
+      llm_http_model_configured: httpModel,
+      llm_model: httpModel,
+    };
+  }
+  const localModel = readString(process.env.LLM_LOCAL_MODEL);
+  if (localModel) {
+    return {
+      llm_model: localModel,
+    };
+  }
+  const interpreterModel = readString(process.env.HELIX_ASK_INTERPRETER_MODEL);
+  return interpreterModel
+    ? {
+        llm_model: interpreterModel,
+      }
+    : {};
+};
+
+const CODEX_CAPABILITY_LANE_REQUEST_MARKER = "HELIX_CAPABILITY_LANE_REQUEST_JSON:";
+
+const stripCodeFence = (value: string): string => {
+  const trimmed = value.trim();
+  const fenceMatch = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  return fenceMatch ? fenceMatch[1]?.trim() ?? trimmed : trimmed;
+};
+
+const parseJsonRecord = (value: string): Record<string, unknown> | null => {
+  try {
+    return readRecord(JSON.parse(stripCodeFence(value)));
+  } catch {
+    return null;
+  }
+};
+
+const extractCodexCapabilityLaneRequestCandidate = (text: string): Record<string, unknown> | null => {
+  const markerIndex = text.indexOf(CODEX_CAPABILITY_LANE_REQUEST_MARKER);
+  if (markerIndex >= 0) {
+    const afterMarker = text.slice(markerIndex + CODEX_CAPABILITY_LANE_REQUEST_MARKER.length);
+    const firstLine = afterMarker
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .find((line) => line.length > 0);
+    const marked = firstLine ? parseJsonRecord(firstLine) : null;
+    const markedCall = readRecord(marked?.capability_lane_call ?? marked);
+    if (markedCall) return markedCall;
+  }
+
+  const fencedJson = text.match(/```json\s*([\s\S]*?)\s*```/i);
+  const fenced = fencedJson?.[1] ? parseJsonRecord(fencedJson[1]) : null;
+  const fencedCall = readRecord(fenced?.capability_lane_call ?? fenced);
+  if (fencedCall) return fencedCall;
+
+  const whole = parseJsonRecord(text);
+  return readRecord(whole?.capability_lane_call ?? whole);
+};
+
+const buildCodexCapabilityLaneRequestBody = (
+  body: Record<string, unknown>,
+  candidate: Record<string, unknown>,
+): Record<string, unknown> => ({
+  ...body,
+  capability_lane_call: candidate,
+});
+
+const shouldRetryCodexCapabilityLaneRequest = (input: {
+  question: string;
+  providerText: string;
+  existingObservationPacketCount: number;
+}): boolean => {
+  if (input.existingObservationPacketCount > 0) return false;
+  if (extractCodexCapabilityLaneRequestCandidate(input.providerText)) return false;
+  const question = input.question.trim().toLowerCase();
+  if (!question) return false;
+  return (
+    question.startsWith("translate ") ||
+    /\btranslate\b.+\b(to|into)\b/.test(question)
+  );
+};
+
 const buildCurrentTurnArtifactLedgerFromGatewayPackets = (input: {
   turnId: string;
   packets: HelixAgentStepObservationPacket[];
@@ -147,6 +236,9 @@ const typedObservationKindForGatewayCapability = (capabilityId: string): string 
   if (capabilityId === "civilization-bounds.reflect_system_bounds") {
     return "helix_civilization_bounds_tool_result";
   }
+  if (capabilityId === MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY) {
+    return "moral_living_substrate_reflection";
+  }
   if (capabilityId === SCHOLARLY_RESEARCH_SEARCH_CAPABILITY) return "scholarly_research_observation";
   if (capabilityId === SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY) return "scholarly_full_text_observation";
   if (capabilityId === SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY) {
@@ -170,6 +262,9 @@ const schemaForTypedObservationKind = (kind: string): string => {
   }
   if (kind === "helix_civilization_bounds_tool_result") {
     return "helix_civilization_bounds_tool_result/v1";
+  }
+  if (kind === "moral_living_substrate_reflection") {
+    return "helix.moral_living_substrate_reflection_observation.v1";
   }
   if (kind === "scholarly_research_observation") return "helix.scholarly_research_observation.v1";
   if (kind === "scholarly_full_text_observation") return "helix.scholarly_full_text_observation.v1";
@@ -1708,6 +1803,34 @@ const buildCodexProviderTurnTranscriptEvents = (input: {
   return events;
 };
 
+const emitCodexProviderProgressTranscriptEvents = (input: {
+  emit?: ((event: Record<string, unknown>) => void) | null;
+  events: Record<string, unknown>[];
+  emittedIds: Set<string>;
+  includeFinal?: boolean;
+  excludeSourceEventTypes?: Set<string>;
+}): void => {
+  if (!input.emit) return;
+  for (const event of input.events) {
+    const sourceEventType = readString(event.source_event_type);
+    const eventType = readString(event.type);
+    if (!input.includeFinal && (sourceEventType === "terminal_answer" || eventType === "final_answer")) {
+      continue;
+    }
+    if (sourceEventType && input.excludeSourceEventTypes?.has(sourceEventType)) {
+      continue;
+    }
+    const eventId = readString(event.id);
+    if (eventId && input.emittedIds.has(eventId)) continue;
+    input.emit({
+      ...event,
+      event_source: "live",
+      reconstructed: false,
+    });
+    if (eventId) input.emittedIds.add(eventId);
+  }
+};
+
 export const runExplicitCodexWorkstationGatewayCalls = async (input: {
   body: Record<string, unknown>;
   turnId?: string | null;
@@ -1730,15 +1853,273 @@ type CodexProcessResult = {
   args: string[];
 };
 
+type CodexNativeEventProjection = {
+  runtimeEvent: HelixAgentRuntimeEvent;
+  transcriptEvent: Record<string, unknown>;
+};
+
+const unwrapCodexNativeEventEnvelope = (value: unknown): Record<string, unknown> | null => {
+  const record = readRecord(value);
+  if (!record) return null;
+  const nestedEvent = readRecord(record.event);
+  if (nestedEvent) return unwrapCodexNativeEventEnvelope(nestedEvent);
+  const paramsEvent = readRecord(readRecord(record.params)?.event);
+  if (paramsEvent) return unwrapCodexNativeEventEnvelope(paramsEvent);
+  const dataEvent = readRecord(readRecord(record.data)?.event);
+  if (dataEvent) return unwrapCodexNativeEventEnvelope(dataEvent);
+  return record;
+};
+
+const readCodexNativeEventNameAndPayload = (
+  value: unknown,
+): { name: string; payload: Record<string, unknown> } | null => {
+  const event = unwrapCodexNativeEventEnvelope(value);
+  if (!event) return null;
+  const msg = readRecord(event.msg);
+  if (msg) {
+    const type = readString(msg.type) ?? readString(msg.event) ?? readString(msg.name);
+    if (type) return { name: type, payload: msg };
+    const entries = Object.entries(msg).filter(([, entryValue]) => entryValue !== undefined);
+    if (entries.length === 1) {
+      const [name, payload] = entries[0];
+      return { name, payload: readRecord(payload) ?? { value: payload } };
+    }
+  }
+  const name =
+    readString(event.type) ??
+    readString(event.event) ??
+    readString(event.event_type) ??
+    readString(event.name);
+  return name ? { name, payload: event } : null;
+};
+
+const readCodexNativeText = (payload: Record<string, unknown>): string | null => {
+  const item = readRecord(payload.item);
+  const output = readRecord(payload.output);
+  return (
+    readString(payload.delta) ??
+    readString(payload.text) ??
+    readString(payload.message) ??
+    readString(payload.content) ??
+    readString(payload.last_agent_message) ??
+    readString(item?.text) ??
+    readString(item?.content) ??
+    readString(output?.text) ??
+    readString(output?.content)
+  );
+};
+
+const readCodexNativeToolName = (payload: Record<string, unknown>): string | null => {
+  const item = readRecord(payload.item);
+  const toolCall = readRecord(payload.tool_call);
+  const call = readRecord(payload.call);
+  return (
+    readString(payload.tool_name) ??
+    readString(payload.name) ??
+    readString(payload.command) ??
+    readString(item?.tool_name) ??
+    readString(item?.name) ??
+    readString(toolCall?.name) ??
+    readString(call?.name) ??
+    readString(call?.command)
+  );
+};
+
+const codexNativeEventSourceType = (name: string): string => {
+  const normalized = name.trim();
+  if (/^(AgentMessageContentDelta|AgentMessage)$/i.test(normalized)) return "codex_native_message_delta";
+  if (/^(AgentReasoning|ReasoningContentDelta|ReasoningRawContentDelta|AgentReasoningRawContent)$/i.test(normalized)) {
+    return "codex_native_reasoning_delta";
+  }
+  if (/^(McpToolCallBegin|ExecCommandBegin|DynamicToolCallRequest|ItemStarted)$/i.test(normalized)) {
+    return "codex_native_tool_request";
+  }
+  if (/^(McpToolCallEnd|ExecCommandEnd|DynamicToolCallResponse|ItemCompleted)$/i.test(normalized)) {
+    return "codex_native_tool_result";
+  }
+  if (/^(TurnComplete)$/i.test(normalized)) return "codex_native_turn_complete";
+  if (/^(Error|StreamError|TurnAborted)$/i.test(normalized)) return "codex_native_error";
+  return `codex_native_${normalized.replace(/[^a-zA-Z0-9]+/g, "_").toLowerCase()}`;
+};
+
+const projectCodexNativeEvent = (input: {
+  event: unknown;
+  turnId: string;
+  seq: number;
+}): CodexNativeEventProjection | null => {
+  const native = readCodexNativeEventNameAndPayload(input.event);
+  if (!native) return null;
+  const sourceEventType = codexNativeEventSourceType(native.name);
+  const payload = native.payload;
+  const text = readCodexNativeText(payload);
+  const toolName = readCodexNativeToolName(payload);
+  const atMs = readNumber(payload.at_ms) ?? readNumber(payload.started_at_ms) ?? Date.now();
+  const nativeTurnId = readString(payload.turn_id) ?? input.turnId;
+  const eventId =
+    readString(payload.id) ??
+    readString(payload.call_id) ??
+    readString(payload.item_id) ??
+    `${input.turnId}:codex_native:${input.seq}:${sourceEventType}`;
+  const baseTranscript = {
+    id: `codex:native:${eventId}`,
+    turn_id: nativeTurnId,
+    seq: input.seq,
+    at_ms: atMs,
+    event_source: "live",
+    source_event_type: sourceEventType,
+    provider_native_event_type: native.name,
+    provider_native_event_schema: "codex.protocol.EventMsg",
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+  };
+  if (sourceEventType === "codex_native_tool_request") {
+    return {
+      runtimeEvent: {
+        event: "agent_tool_request",
+        data: {
+          provider_native_event_type: native.name,
+          tool_name: toolName,
+          payload,
+        },
+      },
+      transcriptEvent: {
+        ...baseTranscript,
+        role: "tool",
+        type: "tool_request",
+        status: "running",
+        lane: "tool",
+        step_id: `codex_native_tool:${toolName ?? eventId}`,
+        text: toolName ? `Codex requested tool: ${toolName}.` : "Codex requested a tool.",
+        detail: text ?? native.name,
+      },
+    };
+  }
+  if (sourceEventType === "codex_native_tool_result") {
+    return {
+      runtimeEvent: {
+        event: "agent_tool_result",
+        data: {
+          provider_native_event_type: native.name,
+          tool_name: toolName,
+          payload,
+        },
+      },
+      transcriptEvent: {
+        ...baseTranscript,
+        role: "tool",
+        type: "tool_result",
+        status: "completed",
+        lane: "tool",
+        step_id: `codex_native_tool:${toolName ?? eventId}`,
+        text: toolName ? `Codex completed tool: ${toolName}.` : "Codex completed a tool step.",
+        detail: text ?? native.name,
+      },
+    };
+  }
+  if (sourceEventType === "codex_native_turn_complete") {
+    return {
+      runtimeEvent: {
+        event: "agent_final",
+        data: {
+          provider_native_event_type: native.name,
+          payload,
+        },
+      },
+      transcriptEvent: {
+        ...baseTranscript,
+        role: "agent",
+        type: "decision",
+        status: "completed",
+        lane: "reasoning",
+        step_id: "codex_native_turn_complete",
+        text: "Codex native runtime completed the turn.",
+        detail: "Terminal answer authority still comes from Helix provider projection.",
+      },
+    };
+  }
+  if (sourceEventType === "codex_native_error") {
+    return {
+      runtimeEvent: {
+        event: "agent_error",
+        data: {
+          provider_native_event_type: native.name,
+          message: text,
+          payload,
+        },
+      },
+      transcriptEvent: {
+        ...baseTranscript,
+        role: "system",
+        type: "decision",
+        status: "failed",
+        lane: "reasoning",
+        step_id: "codex_native_error",
+        text: text ?? "Codex native runtime reported an error.",
+        detail: native.name,
+      },
+    };
+  }
+  return {
+    runtimeEvent: {
+      event: sourceEventType === "codex_native_message_delta" ? "agent_message_delta" : sourceEventType,
+      data: {
+        provider_native_event_type: native.name,
+        text,
+        payload,
+      },
+    },
+    transcriptEvent: {
+      ...baseTranscript,
+      role: "agent",
+      type: "model_decision",
+      status: "running",
+      lane: "reasoning",
+      step_id: "codex_native_runtime_event",
+      text: text ?? `Codex native event: ${native.name}.`,
+      detail: native.name,
+    },
+  };
+};
+
 export async function runCodexProcess(input: {
   prompt: string;
   signal?: AbortSignal;
+  onNativeEvent?: (event: HelixAgentRuntimeEvent, transcriptEvent: Record<string, unknown>) => void;
+  turnId?: string | null;
 }): Promise<CodexProcessResult> {
-  const fakeStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+  const fakeStdoutSequence = readArray(parseJsonRecord(process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE ?? "")?.sequence);
+  const fakeCallIndex = Math.max(0, Number(process.env.CODEX_AGENT_FAKE_CALL_INDEX ?? "0") || 0);
+  const fakeStdout =
+    fakeStdoutSequence.length > 0
+      ? readString(fakeStdoutSequence[fakeCallIndex]) ?? ""
+      : process.env.CODEX_AGENT_FAKE_STDOUT;
   if (fakeStdout !== undefined) {
+    const fakeNativeEventJsonl = process.env.CODEX_AGENT_FAKE_NATIVE_EVENT_JSONL;
+    if (fakeNativeEventJsonl && input.onNativeEvent) {
+      fakeNativeEventJsonl.split(/\r?\n/).forEach((line, index) => {
+        const parsed = parseJsonRecord(line);
+        if (!parsed) return;
+        const projection = projectCodexNativeEvent({
+          event: parsed,
+          turnId: input.turnId ?? "codex-native",
+          seq: index,
+        });
+        if (projection) {
+          input.onNativeEvent?.(projection.runtimeEvent, projection.transcriptEvent);
+        }
+      });
+    }
     const capturePromptPath = readString(process.env.CODEX_AGENT_FAKE_CAPTURE_PROMPT_PATH);
     if (capturePromptPath) {
-      fs.writeFileSync(capturePromptPath, input.prompt, "utf8");
+      const promptPath =
+        fakeStdoutSequence.length > 0 && fakeCallIndex > 0
+          ? capturePromptPath.replace(/(\.[^./\\]+)?$/, `.${fakeCallIndex + 1}$1`)
+          : capturePromptPath;
+      fs.writeFileSync(promptPath, input.prompt, "utf8");
+    }
+    if (fakeStdoutSequence.length > 0) {
+      process.env.CODEX_AGENT_FAKE_CALL_INDEX = String(fakeCallIndex + 1);
     }
     return {
       stdout: fakeStdout,
@@ -1812,10 +2193,34 @@ export async function runCodexProcess(input: {
   let stderr = "";
   let collected = 0;
   const limit = maxOutputBytes();
+  let nativeEventSeq = 0;
+  let stdoutLineBuffer = "";
+  const projectNativeLine = (line: string): void => {
+    if (!input.onNativeEvent) return;
+    const trimmed = line.trim();
+    if (!trimmed || !trimmed.startsWith("{")) return;
+    const parsed = parseJsonRecord(trimmed);
+    if (!parsed) return;
+    const projection = projectCodexNativeEvent({
+      event: parsed,
+      turnId: input.turnId ?? "codex-native",
+      seq: nativeEventSeq,
+    });
+    if (!projection) return;
+    nativeEventSeq += 1;
+    input.onNativeEvent(projection.runtimeEvent, projection.transcriptEvent);
+  };
 
   child.stdout?.on("data", (chunk: Buffer) => {
     collected += chunk.length;
-    if (collected <= limit) stdout += chunk.toString("utf8");
+    const chunkText = chunk.toString("utf8");
+    if (input.onNativeEvent) {
+      stdoutLineBuffer += chunkText;
+      const lines = stdoutLineBuffer.split(/\r?\n/);
+      stdoutLineBuffer = lines.pop() ?? "";
+      for (const line of lines) projectNativeLine(line);
+    }
+    if (collected <= limit) stdout += chunkText;
     if (collected > limit) kill();
   });
 
@@ -1867,6 +2272,10 @@ export async function runCodexProcess(input: {
       });
     });
     child.once("close", (exitCode) => {
+      if (input.onNativeEvent && stdoutLineBuffer.trim()) {
+        projectNativeLine(stdoutLineBuffer);
+        stdoutLineBuffer = "";
+      }
       settle({
         stdout,
         stderr,
@@ -1899,7 +2308,7 @@ export const codexProvider: HelixAgentProvider = {
   enabled,
   runtimeStatus: resolveCodexBinary,
   supports: {
-    streaming: false,
+    streaming: true,
     workstationTools: true,
     capabilityLanes: true,
     capabilityLaneOneShot: true,
@@ -1911,6 +2320,18 @@ export const codexProvider: HelixAgentProvider = {
     const question = readQuestion(request.body);
     const turnId = readTurnId(request.body);
     const threadId = readThreadId(request.body);
+    const emittedLiveTranscriptEventIds = new Set<string>();
+    const emitCodexNativeRuntimeEvent = (
+      _event: HelixAgentRuntimeEvent,
+      transcriptEvent: Record<string, unknown>,
+    ): void => {
+      emitCodexProviderProgressTranscriptEvents({
+        emit: request.onTranscriptEvent,
+        events: [transcriptEvent],
+        emittedIds: emittedLiveTranscriptEventIds,
+      });
+    };
+    const modelMetadata = buildCodexProviderModelMetadata();
     const adapterContract = buildHelixAgentRuntimeAdapterContract({
       route: request.route,
       requestedRuntime: request.runtime,
@@ -1919,13 +2340,27 @@ export const codexProvider: HelixAgentProvider = {
     });
     const gatewayManifest = adapterContract.workstation_gateway_manifest;
     const runtimeSelectionTrace = adapterContract.runtime_selection_trace;
-    const capabilityLaneContext = buildHelixCapabilityLaneProviderAdapterContext({
+    const runtimeContextTranscriptEvents = buildCodexProviderTurnTranscriptEvents({
+      turnId,
+      providerLabel: codexProvider.label,
+      body: request.body,
+      gatewayCallResults: [],
+      providerText: "Codex runtime is preparing workstation context.",
+      finalStatus: "running",
+    });
+    emitCodexProviderProgressTranscriptEvents({
+      emit: request.onTranscriptEvent,
+      events: runtimeContextTranscriptEvents,
+      emittedIds: emittedLiveTranscriptEventIds,
+      excludeSourceEventTypes: new Set(["model_reentry"]),
+    });
+    let capabilityLaneContext = buildHelixCapabilityLaneProviderAdapterContext({
       provider: codexProvider,
       body: request.body,
       turnId,
       env: process.env,
     });
-    const capabilityLaneDebugProjection = capabilityLaneContext.debug_projection;
+    let capabilityLaneDebugProjection = capabilityLaneContext.debug_projection;
     const evidenceGatewayCallResults = await runExplicitCodexWorkstationGatewayCalls({
       body: request.body,
       turnId,
@@ -1966,7 +2401,7 @@ export const codexProvider: HelixAgentProvider = {
       turnId,
       packets: gatewayObservationPackets,
     });
-    const currentTurnArtifactLedger = [
+    let currentTurnArtifactLedger = [
       ...normalizedObservationArtifacts,
       ...providerGatewayPacketLedger,
       ...capabilityLaneContext.artifact_ledger,
@@ -1985,6 +2420,11 @@ export const codexProvider: HelixAgentProvider = {
       gatewayCallResults,
       providerText: "Codex runtime could not run because the Ask turn had no question.",
       finalStatus: "final_failure",
+    });
+    emitCodexProviderProgressTranscriptEvents({
+      emit: request.onTranscriptEvent,
+      events: initialTranscriptEvents,
+      emittedIds: emittedLiveTranscriptEventIds,
     });
 
     if (!question) {
@@ -2011,6 +2451,7 @@ export const codexProvider: HelixAgentProvider = {
         turn_transcript_events: initialTranscriptEvents,
         turn_transcript_event_count: initialTranscriptEvents.length,
         turn_transcript_source: "codex_provider_gateway_projection",
+        ...modelMetadata,
         action_envelope: actionEnvelope,
         workstation_actions: hostWorkstationAffordances.workstation_actions,
         support_refs: hostWorkstationAffordances.support_refs,
@@ -2018,6 +2459,7 @@ export const codexProvider: HelixAgentProvider = {
         current_turn_artifact_ledger: currentTurnArtifactLedger,
         debug: {
           agent_runtime: "codex",
+          ...modelMetadata,
           agent_runtime_adapter_contract: adapterContract,
           agent_runtime_selection_trace: runtimeSelectionTrace,
           capability_lane_manifest: adapterContract.capability_lane_manifest,
@@ -2102,6 +2544,8 @@ export const codexProvider: HelixAgentProvider = {
       "For any internet/web-backed turn, answer only from the provided internet-search.search_web observation packet. If no internet search observation packet exists, say web evidence is not available from this turn.",
       "For any scholarly/paper-backed turn, answer only from the provided scholarly-research.lookup_papers observation packet. If no scholarly observation packet exists, say paper evidence is not available from this turn.",
       "If a scholarly observation includes scholarly_lookup_recovery_affordance, scholarly_full_text_recovery_affordance, scholarly_numeric_recovery_affordance, or recovery_affordances, treat that as non-terminal evidence about a failed or weak retrieval/fetch/extraction. Use it to explain the mismatch, propose a narrower re-query, ask the user, or fail closed; do not claim full-text, numeric extraction, or calculator results from it.",
+      `Before giving a final answer, decide whether the user request needs a one-shot capability lane. If it does and required inputs are present, your entire first response must be ${CODEX_CAPABILITY_LANE_REQUEST_MARKER} followed by compact JSON for exactly one lane call.`,
+      "For translation requests over text/content, you must request live_translation.translate_text instead of answering from memory. Required fields are text and target_language. A direct translation answer before the lane observation is non-compliant.",
       "",
       "User request:",
       question,
@@ -2120,14 +2564,169 @@ export const codexProvider: HelixAgentProvider = {
       ),
     ].join("\n");
 
-    const result = await runCodexProcess({
+    const providerReentryTranscriptEvents = buildCodexProviderTurnTranscriptEvents({
+      turnId,
+      providerLabel: codexProvider.label,
+      body: request.body,
+      gatewayCallResults,
+      providerText: "Codex runtime is evaluating the re-entered observation packet(s).",
+      finalStatus: "running",
+    });
+    emitCodexProviderProgressTranscriptEvents({
+      emit: request.onTranscriptEvent,
+      events: providerReentryTranscriptEvents,
+      emittedIds: emittedLiveTranscriptEventIds,
+    });
+
+    let result = await runCodexProcess({
       prompt,
       signal: request.signal,
+      turnId,
+      onNativeEvent: emitCodexNativeRuntimeEvent,
     });
-    const text =
+    const initialCodexText =
       result.stdout.trim() ||
       result.stderr.trim() ||
       "Codex runtime did not return output before the provider adapter stopped waiting.";
+    let runtimeLaneRequestCandidate =
+      capabilityLaneContext.observation_packets.length === 0
+        ? extractCodexCapabilityLaneRequestCandidate(initialCodexText)
+        : null;
+    const initialRuntimeLaneRequestCandidatePresent = Boolean(runtimeLaneRequestCandidate);
+    let runtimeLaneRequestRetry: Record<string, unknown> | null = null;
+    if (
+      !runtimeLaneRequestCandidate &&
+      shouldRetryCodexCapabilityLaneRequest({
+        question,
+        providerText: initialCodexText,
+        existingObservationPacketCount: capabilityLaneContext.observation_packets.length,
+      })
+    ) {
+      const retryPrompt = [
+        prompt,
+        "",
+        "Your prior response did not follow the capability lane request contract.",
+        "For this user request, do not answer directly before lane observation evidence exists.",
+        `Output only ${CODEX_CAPABILITY_LANE_REQUEST_MARKER} followed by compact JSON for live_translation.translate_text.`,
+        "Use the user's source text and target language from the request. If either is missing, ask for clarification instead of emitting a final answer.",
+        "",
+        "Prior non-compliant response:",
+        initialCodexText,
+      ].join("\n");
+      const retryResult = await runCodexProcess({
+        prompt: retryPrompt,
+        signal: request.signal,
+        turnId,
+        onNativeEvent: emitCodexNativeRuntimeEvent,
+      });
+      const retryText =
+        retryResult.stdout.trim() ||
+        retryResult.stderr.trim() ||
+        "";
+      runtimeLaneRequestCandidate = extractCodexCapabilityLaneRequestCandidate(retryText);
+      runtimeLaneRequestRetry = {
+        schema: "helix.codex_runtime_lane_request_retry.v1",
+        status: runtimeLaneRequestCandidate
+          ? "runtime_provider_emitted_lane_request"
+          : "runtime_provider_did_not_emit_lane_request",
+        reason: "initial_provider_response_skipped_required_one_shot_lane_request",
+        prior_response_preview: initialCodexText.slice(0, 1000),
+        retry_response_preview: retryText.slice(0, 1000),
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+    }
+    let runtimeLaneRequestLoop: Record<string, unknown> | null = null;
+    if (runtimeLaneRequestCandidate) {
+      const laneRequestBody = buildCodexCapabilityLaneRequestBody(request.body, runtimeLaneRequestCandidate);
+      capabilityLaneContext = buildHelixCapabilityLaneProviderAdapterContext({
+        provider: codexProvider,
+        body: laneRequestBody,
+        turnId,
+        iteration: 1,
+        env: process.env,
+      });
+      capabilityLaneDebugProjection = capabilityLaneContext.debug_projection;
+      currentTurnArtifactLedger = [
+        ...normalizedObservationArtifacts,
+        ...providerGatewayPacketLedger,
+        ...capabilityLaneContext.artifact_ledger,
+      ];
+      runtimeLaneRequestLoop = {
+        schema: "helix.codex_runtime_lane_request_loop.v1",
+        status: capabilityLaneContext.observation_packets.length > 0
+          ? "lane_observation_reentered"
+          : "lane_request_not_executed",
+        retry: runtimeLaneRequestRetry,
+        requested_by_runtime_provider: true,
+        selected_runtime_agent_provider: "codex",
+        candidate: runtimeLaneRequestCandidate,
+        capability_lane_call_results: capabilityLaneDebugProjection.capability_lane_call_results,
+        capability_lane_backend_selections: capabilityLaneDebugProjection.capability_lane_backend_selections,
+        capability_lane_observation_packets: capabilityLaneDebugProjection.capability_lane_observation_packets,
+        capability_lane_reentry_status: capabilityLaneDebugProjection.capability_lane_reentry_status,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+      const reentryPrompt = [
+        prompt,
+        "",
+        "Helix executed the runtime-requested capability lane call above. The result below is observation/receipt evidence, not a final answer by itself.",
+        "Now produce the final answer using only the lane observation when it is relevant. Do not emit another lane request.",
+        "",
+        "Runtime-requested capability lane candidate:",
+        JSON.stringify(runtimeLaneRequestCandidate, null, 2),
+        "",
+        "Capability lane observation block after Helix execution:",
+        capabilityLaneContext.prompt_observation_block,
+      ].join("\n");
+      result = await runCodexProcess({
+        prompt: reentryPrompt,
+        signal: request.signal,
+        turnId,
+        onNativeEvent: emitCodexNativeRuntimeEvent,
+      });
+      const laneReentryTranscriptEvents = buildCodexProviderTurnTranscriptEvents({
+        turnId,
+        providerLabel: codexProvider.label,
+        body: request.body,
+        gatewayCallResults,
+        providerText: "Codex runtime is evaluating the runtime-requested capability lane observation.",
+        finalStatus: "running",
+      });
+      emitCodexProviderProgressTranscriptEvents({
+        emit: request.onTranscriptEvent,
+        events: laneReentryTranscriptEvents,
+        emittedIds: emittedLiveTranscriptEventIds,
+      });
+    }
+    const runtimeLaneRequestContract = {
+      schema: "helix.codex_runtime_lane_request_contract.v1",
+      contract_version: "2026-07-02.p7.one_shot.v1",
+      selected_runtime_agent_provider: "codex",
+      request_marker: CODEX_CAPABILITY_LANE_REQUEST_MARKER,
+      one_shot_lane_loop_enabled: true,
+      initial_candidate_present: initialRuntimeLaneRequestCandidatePresent,
+      retry_attempted: Boolean(runtimeLaneRequestRetry),
+      retry_status: readString(runtimeLaneRequestRetry?.status),
+      final_candidate_present: Boolean(runtimeLaneRequestCandidate),
+      execution_status: runtimeLaneRequestLoop
+        ? readString(runtimeLaneRequestLoop.status) || "lane_request_loop_status_unknown"
+        : runtimeLaneRequestRetry
+          ? "lane_request_retry_without_candidate"
+          : "no_lane_request_candidate",
+      observation_packet_count: capabilityLaneContext.observation_packets.length,
+      helix_executes_only_structured_runtime_lane_requests: true,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const text =
+      result.stdout.trim() ||
+      result.stderr.trim() ||
+      initialCodexText;
     const documentGuardedText = applyDocumentObservationAuthorityGuard({
       question,
       text,
@@ -2357,6 +2956,7 @@ export const codexProvider: HelixAgentProvider = {
       turn_transcript_events: turnTranscriptEvents,
       turn_transcript_event_count: turnTranscriptEvents.length,
       turn_transcript_source: "codex_provider_gateway_projection",
+      ...modelMetadata,
       action_envelope: actionEnvelope,
       workstation_actions: hostWorkstationAffordances.workstation_actions,
       support_refs: hostWorkstationAffordances.support_refs,
@@ -2371,6 +2971,9 @@ export const codexProvider: HelixAgentProvider = {
       capability_lane_session_debug_summaries:
         capabilityLaneDebugProjection.capability_lane_session_debug_summaries,
       capability_lane_reentry_status: capabilityLaneDebugProjection.capability_lane_reentry_status,
+      runtime_lane_request_contract: runtimeLaneRequestContract,
+      ...(runtimeLaneRequestLoop ? { runtime_lane_request_loop: runtimeLaneRequestLoop } : {}),
+      ...(runtimeLaneRequestRetry ? { runtime_lane_request_retry: runtimeLaneRequestRetry } : {}),
       current_turn_artifact_ledger: currentTurnArtifactLedger,
       ...(codexCompoundSubgoalLedger
         ? {
@@ -2405,6 +3008,7 @@ export const codexProvider: HelixAgentProvider = {
       ...(codexCompoundSubgoalLedger ? { compound_capability_contract: codexCompoundSubgoalLedger } : {}),
       debug: {
         agent_runtime: "codex",
+        ...modelMetadata,
         agent_runtime_adapter_contract: adapterContract,
         agent_runtime_selection_trace: runtimeSelectionTrace,
         capability_lane_manifest: adapterContract.capability_lane_manifest,
@@ -2422,6 +3026,9 @@ export const codexProvider: HelixAgentProvider = {
         capability_lane_session_debug_summaries:
           capabilityLaneDebugProjection.capability_lane_session_debug_summaries,
         capability_lane_reentry_status: capabilityLaneDebugProjection.capability_lane_reentry_status,
+        runtime_lane_request_contract: runtimeLaneRequestContract,
+        runtime_lane_request_loop: runtimeLaneRequestLoop,
+        runtime_lane_request_retry: runtimeLaneRequestRetry,
         permission_profile: codexProvider.permissionProfile,
         fail_reason:
           normalizationFailures[0] ??
@@ -2470,28 +3077,4 @@ export const codexProvider: HelixAgentProvider = {
         provider_terminal_candidate: providerReentry.providerTerminalCandidate,
         provider_reasoning_reentry: providerReentry.providerReasoningReentry,
         terminal_authority_candidate_review: providerReentry.terminalAuthorityCandidateReview,
-        provider_terminal_authority_bridge: providerReentry.providerTerminalAuthorityBridge,
-        terminal_answer_authority: terminalAnswerAuthority,
-        terminal_presentation: terminalPresentation,
-        final_answer_source: finalAnswerSource,
-        terminal_artifact_kind: terminalArtifactKind,
-        workstation_gateway_reentry_status: providerReentry.workstationGatewayReentryStatus,
-        terminal_authority_status: terminalAuthorityStatus,
-        provider_gateway_debug_summary: providerGatewayDebugSummary,
-        action_envelope: actionEnvelope,
-        codex_host_workstation_affordances: hostWorkstationAffordances,
-        workstation_actions: hostWorkstationAffordances.workstation_actions,
-        support_refs: hostWorkstationAffordances.support_refs,
-        tool_output_refs: hostWorkstationAffordances.tool_output_refs,
-        agent_step_loop: agentStepLoop,
-        turn_transcript_events: turnTranscriptEvents,
-        turn_transcript_event_count: turnTranscriptEvents.length,
-        turn_transcript_source: "codex_provider_gateway_projection",
-      },
-      raw: {
-        stdout: result.stdout,
-        stderr: result.stderr,
-      },
-    };
-  },
-};
+        provider_terminal_authority_bridge: providerReentry.providerTerminalA

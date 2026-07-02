@@ -197,6 +197,7 @@ const requiredArgsForCapability = (capability: string): string[] => {
       return ["source_summary"];
     case "helix_ask.reflect_theory_context":
     case "theory-badge-graph.propose_frontier_conjectures":
+    case "moral-graph.reflect_living_substrate_context":
       return ["prompt"];
     case "helix.theory.frontierVectorFieldTrace":
       return ["query"];
@@ -321,6 +322,19 @@ const optionalArgsForCapability = (capability: string): string[] => {
         "mentioned_domains",
         "frontier_search_seed",
         "limit",
+      ];
+    case "moral-graph.reflect_living_substrate_context":
+      return [
+        "source_ref",
+        "source_refs",
+        "refs",
+        "question",
+        "query",
+        "text",
+        "topic",
+        "conversation_context",
+        "include_theory_bridge",
+        "include_recommended_actions",
       ];
     case "helix.theory.frontierVectorFieldTrace":
       return ["question", "prompt", "topic"];
@@ -1385,6 +1399,29 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
     required_terminal_kind: "model_synthesized_answer",
     allowed_substitutions: [],
     forbidden_nearby_capabilities: ["model.direct_answer"],
+  },
+  {
+    schema: "helix.explicit_capability_contract.v1",
+    capability: "moral-graph.reflect_living_substrate_context",
+    aliases: [
+      "moral_living_substrate_reflection",
+      "moral living substrate reflection",
+      "living_substrate_moral_reflection",
+      "living substrate moral reflection",
+      "reflect_living_substrate_context",
+      "reflect living substrate context",
+    ],
+    capability_family: "moral_living_substrate_reflection",
+    plan_family: "context_reflection",
+    source_target: "moral_graph",
+    admission_families: ["context_reflection"],
+    required_observation_kinds: [
+      "moral_living_substrate_reflection",
+      "helix.moral_living_substrate_reflection_observation.v1",
+    ],
+    required_terminal_kind: "model_synthesized_answer",
+    allowed_substitutions: [],
+    forbidden_nearby_capabilities: ["helix_ask.reflect_ideology_context", "model.direct_answer"],
   },
   {
     schema: "helix.explicit_capability_contract.v1",

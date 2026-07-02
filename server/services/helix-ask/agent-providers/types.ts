@@ -12,6 +12,7 @@ export type HelixAgentRunRequest = {
   body: Record<string, unknown>;
   headers?: IncomingHttpHeaders;
   signal?: AbortSignal;
+  onTranscriptEvent?: (event: Record<string, unknown>) => void;
 };
 
 export type HelixAgentRuntimeEvent = {

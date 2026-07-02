@@ -61,10 +61,16 @@ export const buildCapabilityLaneArtifactLedger = (input: {
   input.packets.map((packet, index) => {
     const stateDelta = readRecord(packet.state_delta);
     const shadowExecution = readRecord(stateDelta?.capability_lane_shadow_execution);
+    const inferredLaneId = readString(shadowExecution?.lane_id) ||
+      readString(packet.capability_key).split(".")[0] ||
+      null;
     const selectedBackendProvider =
       readString(shadowExecution?.selected_backend_provider) ||
       readString(packet.backend_selection_decision?.selected_backend_provider) ||
       null;
+    const laneExecutionStatus =
+      readString(shadowExecution?.execution_status) ||
+      (packet.status === "succeeded" ? "executed_observation_only" : "not_executed_shadow_only");
     const firstProducedRef = packet.produced_artifact_refs.find((ref) => ref.trim().length > 0);
     const artifactId =
       firstProducedRef ??
@@ -77,10 +83,10 @@ export const buildCapabilityLaneArtifactLedger = (input: {
       observation_kind: packet.capability_key,
       turn_id: input.turnId,
       capability_key: packet.capability_key,
-      lane_id: readString(shadowExecution?.lane_id) || null,
+      lane_id: inferredLaneId,
       selected_backend_provider: selectedBackendProvider,
       backend_selection_decision: packet.backend_selection_decision ?? null,
-      lane_execution_status: readString(shadowExecution?.execution_status) || null,
+      lane_execution_status: laneExecutionStatus,
       lane_availability_status: readString(shadowExecution?.availability_status) || null,
       lane_permission_status: readString(shadowExecution?.permission_status) || null,
       lane_cost_class: readString(shadowExecution?.cost_class) || null,

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type {
   TheoryBadgeEquationV1,
   TheoryBadgeGraphV1,
@@ -23,6 +23,13 @@ import {
   type TheoryFrontierMapCandidateRegion,
   type TheoryFrontierMapTensorPath,
 } from "@/lib/theory/theoryFrontierMapOverlay";
+import {
+  resolveTheoryBadgeVisualState,
+  resolveTheoryBadgeEdgeVisualState,
+  theoryBadgeButtonClass,
+  theoryBadgeEdgeClass,
+  theoryBadgeGlowShadow,
+} from "@/lib/theory/theoryBadgeVisualState";
 
 type TheoryAchievementMapProps = {
   graph: TheoryBadgeGraphV1;
@@ -30,6 +37,8 @@ type TheoryAchievementMapProps = {
   selectedBadgeIds: string[];
   highlightedBadgeIds: string[];
   highlightedEdgeIds: string[];
+  traceBadgeIds: string[];
+  connectableBadgeIds: string[];
   exactBadgeIds: string[];
   likelyBadgeIds: string[];
   softRegions: Array<{
@@ -54,7 +63,6 @@ type TheoryAchievementMapProps = {
   }>;
   activeAtlasLensId: PhysicsAtlasBlockId | null;
   onSelectBadge: (badgeId: string) => void;
-  onToggleBadgeSelection: (badgeId: string) => void;
   onClearSelection: () => void;
   onRunPath: (badgeId: string) => void;
   onLoadCalculatorPayload: (badgeId: string, payloadId: string) => void;
@@ -109,12 +117,78 @@ const BAND_COLORS: Record<TheoryBiomeBand, string> = {
   claim_boundary: "rgba(127, 29, 29, 0.46)",
 };
 
+const DOMAIN_LABELS: Record<string, string> = {
+  foundation: "Foundation",
+  relativity_history: "Relativity History",
+  quantum: "Quantum",
+  atomic_spectroscopy: "Atomic Spectroscopy",
+  astrochemistry: "Astrochemistry",
+  prebiotic_biophysics: "Prebiotic Biophysics",
+  evolutionary_biophysics: "Evolutionary Biophysics",
+  solar: "Solar",
+  stellar: "Stellar",
+  casimir: "Casimir",
+  nhm2: "NHM2",
+  qei_stress_energy: "QEI Stress Energy",
+  tokamak_plasma: "Tokamak Plasma",
+  galactic_dynamics: "Galactic Dynamics",
+  curvature_collapse: "Curvature Collapse",
+  claim_boundary: "Claim Boundary",
+  general: "General",
+};
+
 const BIOME_BAND_WIDTH = THEORY_BIOME_LAYOUT_SPACING_CONTRACT_V1.scaleBandWidthPx;
 const BIOME_X_OFFSET = 92;
 const MAX_ZOOM = 1.8;
 const MIN_ZOOM_FLOOR = 0.18;
 const ZOOM_BURST_FACTOR = 1.22;
-const ZOOM_BURST_MS = 320;
+const WORDMARK_BASE_FONT_PX = 11;
+const WORDMARK_MAX_FONT_PX = 40;
+
+function labelizeBiomeToken(value: string): string {
+  return value
+    .replace(/[_-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (letter: string) => letter.toUpperCase());
+}
+
+function chunkWatermarkLabel(chunk: TheoryBiomeChunkV1): string {
+  return `${BAND_LABELS[chunk.dominantScaleBand]} / ${
+    DOMAIN_LABELS[chunk.dominantDomainKey] ?? labelizeBiomeToken(chunk.dominantDomainKey)
+  }`;
+}
+
+function chunkWordmarkClipId(chunk: TheoryBiomeChunkV1): string {
+  return `theory-biome-wordmark-clip-${chunk.id.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+}
+
+function chunkWatermarkFontSize(zoom: number): number {
+  return Number(clamp(WORDMARK_BASE_FONT_PX / Math.max(zoom, MIN_ZOOM_FLOOR), WORDMARK_BASE_FONT_PX, WORDMARK_MAX_FONT_PX).toFixed(2));
+}
+
+function chunkWatermarkTiles(
+  chunk: TheoryBiomeChunkV1,
+  label: string,
+  fontSize: number,
+): Array<{ id: string; x: number; y: number }> {
+  const width = chunk.bounds.x1 - chunk.bounds.x0;
+  const height = chunk.bounds.y1 - chunk.bounds.y0;
+  const columnStep = Math.max(190, label.length * fontSize * 0.72 + 72);
+  const rowStep = Math.max(112, fontSize * 7.6);
+  const columns = Math.max(1, Math.ceil(width / columnStep));
+  const rows = Math.max(1, Math.ceil(height / rowStep));
+  const count = Math.min(14, columns * rows);
+  return Array.from({ length: count }).map((_, index: number) => {
+    const column = index % columns;
+    const row = Math.floor(index / columns);
+    return {
+      id: `${chunk.id}:watermark:${index}`,
+      x: chunk.bounds.x0 + Math.max(24, fontSize * 1.6) + column * columnStep,
+      y: chunk.bounds.y0 + Math.max(42, fontSize * 3.1) + row * rowStep,
+    };
+  });
+}
 
 function chunkFill(chunk: TheoryBiomeChunkV1, seed: string): string {
   const base = BAND_COLORS[chunk.dominantScaleBand];
@@ -181,11 +255,8 @@ function primaryExpression(badge: TheoryBadgeV1): string | null {
   );
 }
 
-function edgeClass(edge: TheoryAchievementLayoutEdge, highlightedEdgeIds: Set<string>, hasFocus: boolean): string {
-  const highlighted = highlightedEdgeIds.has(edge.edgeId);
-  const base = highlighted ? "stroke-cyan-200 opacity-100" : "stroke-zinc-400 opacity-70";
-  const ghost = hasFocus && !highlighted ? " opacity-25" : "";
-  return `${base}${ghost}`;
+function badgeTooltipId(badgeId: string): string {
+  return `theory-badge-tooltip-${badgeId.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
 }
 
 function isContextEdge(edge: TheoryAchievementLayoutEdge): boolean {
@@ -207,55 +278,10 @@ function fitClassLabel(value: string): string {
   return value.replace(/_/g, " ");
 }
 
-function easeInOutCubic(value: number): number {
-  return value < 0.5 ? 4 * value * value * value : 1 - Math.pow(-2 * value + 2, 3) / 2;
-}
-
 function interactiveTextTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   const tagName = target.tagName.toLowerCase();
   return tagName === "input" || tagName === "textarea" || tagName === "select" || target.isContentEditable;
-}
-
-function badgeClass(args: {
-  selected: boolean;
-  multiSelected: boolean;
-  highlighted: boolean;
-  playback: boolean;
-  solved: boolean;
-  failed: boolean;
-  hasFocus: boolean;
-  loadable: boolean;
-  foundation: boolean;
-  claimBoundary: boolean;
-  plannedDomain: boolean;
-  routeBlocked: boolean;
-  exactDiscussion: boolean;
-  likelyDiscussion: boolean;
-}) {
-  const classes = [
-    "absolute flex h-11 w-11 items-center justify-center border-2 text-[13px] font-black uppercase shadow transition",
-    "focus:outline-none focus:ring-2 focus:ring-cyan-200",
-    args.loadable
-      ? "border-zinc-200 bg-gradient-to-br from-zinc-100 via-zinc-400 to-zinc-700 text-zinc-950"
-      : "border-zinc-300 bg-gradient-to-br from-zinc-200 via-zinc-500 to-zinc-800 text-zinc-950",
-  ];
-  if (args.selected || args.multiSelected) classes.push("ring-4 ring-cyan-200/80 shadow-cyan-200/50");
-  else if (args.failed) classes.push("ring-4 ring-rose-400/75 shadow-rose-500/40");
-  else if (args.solved) classes.push("ring-4 ring-emerald-300/75 shadow-emerald-500/40");
-  else if (args.playback) classes.push("ring-2 ring-cyan-500/70 shadow-cyan-900/40");
-  if (args.highlighted) classes.push("ring-2 ring-cyan-400/70");
-  if (args.foundation) classes.push("shadow-[0_0_16px_rgba(148,163,184,0.28)]");
-  if (args.claimBoundary) classes.push("border-amber-300 bg-gradient-to-br from-amber-100 via-zinc-400 to-rose-900");
-  if (args.routeBlocked) classes.push("ring-4 ring-rose-500/80 shadow-rose-500/40");
-  if (!args.claimBoundary && args.exactDiscussion) {
-    classes.push("ring-4 ring-emerald-300/90 shadow-emerald-300/50");
-  } else if (!args.claimBoundary && args.likelyDiscussion) {
-    classes.push("ring-2 ring-emerald-400/70 shadow-emerald-500/30");
-  }
-  if (args.plannedDomain) classes.push("opacity-55 saturate-50");
-  if (args.hasFocus && !args.highlighted && !args.multiSelected) classes.push("opacity-30 grayscale");
-  return classes.join(" ");
 }
 
 function softRegionGeometry(
@@ -307,6 +333,8 @@ export default function TheoryAchievementMap({
   selectedBadgeIds,
   highlightedBadgeIds,
   highlightedEdgeIds,
+  traceBadgeIds,
+  connectableBadgeIds,
   exactBadgeIds,
   likelyBadgeIds,
   softRegions,
@@ -320,7 +348,6 @@ export default function TheoryAchievementMap({
   routeBadgeLabels = {},
   activeAtlasLensId,
   onSelectBadge,
-  onToggleBadgeSelection,
   onClearSelection,
   onRunPath,
   onLoadCalculatorPayload,
@@ -329,10 +356,11 @@ export default function TheoryAchievementMap({
 }: TheoryAchievementMapProps) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const restoredRef = useRef(false);
-  const zoomAnimationRef = useRef<number | null>(null);
-  const pendingZoomCenterRef = useRef<{ x: number; y: number } | null>(null);
+  const pendingZoomRef = useRef<{ center: { x: number; y: number }; zoom: number } | null>(null);
+  const suppressNextScrollRef = useRef(false);
   const [zoom, setZoom] = useState(1);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
+  const wordmarkFontSize = chunkWatermarkFontSize(zoom);
   const layout = useMemo(() => layoutTheoryAchievementMap(graph), [graph]);
   const frontierOverlay = useMemo(
     () => (frontierTrace ? buildTheoryFrontierMapOverlay({ trace: frontierTrace, nodes: layout.nodes }) : null),
@@ -347,15 +375,17 @@ export default function TheoryAchievementMap({
     [graph.badges],
   );
   const selectedSet = new Set(selectedBadgeIds);
-  const highlightedSet = new Set(highlightedBadgeIds);
+  const traceBadgeSet = new Set(traceBadgeIds);
+  const backendOverlaySet = new Set(highlightedBadgeIds);
   const edgeHighlightSet = new Set(highlightedEdgeIds);
+  const connectableSet = new Set(connectableBadgeIds);
   const exactBadgeSet = new Set(exactBadgeIds);
   const likelyBadgeSet = new Set(likelyBadgeIds);
   const playbackSet = new Set(playbackBadgeIds);
   const solvedSet = new Set(solvedBadgeIds);
   const failedSet = new Set(failedBadgeIds);
   const rippleSet = new Set(rippleBadgeIds);
-  const hasFocus = highlightedSet.size > 0 || selectedSet.size > 1;
+  const manualSelectionActive = selectedSet.size > 0 || Boolean(selectedBadgeId);
   const activeAtlasBlock = activeAtlasLensId
     ? PHYSICS_ATLAS_BLOCKS.find((block: PhysicsAtlasBlockV1) => block.id === activeAtlasLensId) ?? null
     : null;
@@ -373,6 +403,7 @@ export default function TheoryAchievementMap({
   const centerScrollOnGraphPoint = useCallback((center: { x: number; y: number }, nextZoom: number) => {
     const element = viewportRef.current;
     if (!element) return;
+    suppressNextScrollRef.current = true;
     element.scrollLeft = Math.max(0, center.x * nextZoom - element.clientWidth / 2);
     element.scrollTop = Math.max(0, center.y * nextZoom - element.clientHeight / 2);
   }, []);
@@ -386,42 +417,25 @@ export default function TheoryAchievementMap({
     };
   }, [layout.height, layout.width, zoom]);
 
-  const animateZoomTo = useCallback(
+  const setZoomAroundViewportCenter = useCallback(
     (targetZoom: number) => {
       const startZoom = zoom;
       const nextZoom = Number(clamp(targetZoom, zoomBounds.min, zoomBounds.max).toFixed(4));
       if (Math.abs(nextZoom - startZoom) < 0.001) return;
       const center = graphCenterForViewport();
-      const startTime = performance.now();
-      if (zoomAnimationRef.current !== null) cancelAnimationFrame(zoomAnimationRef.current);
-
-      const step = (time: number) => {
-        const progress = clamp((time - startTime) / ZOOM_BURST_MS, 0, 1);
-        const eased = easeInOutCubic(progress);
-        const frameZoom = startZoom + (nextZoom - startZoom) * eased;
-        pendingZoomCenterRef.current = center;
-        setZoom(Number(frameZoom.toFixed(4)));
-        if (progress < 1) {
-          zoomAnimationRef.current = requestAnimationFrame(step);
-        } else {
-          pendingZoomCenterRef.current = center;
-          setZoom(nextZoom);
-          zoomAnimationRef.current = null;
-        }
-      };
-
-      zoomAnimationRef.current = requestAnimationFrame(step);
+      pendingZoomRef.current = { center, zoom: nextZoom };
+      setZoom(nextZoom);
     },
     [graphCenterForViewport, zoom, zoomBounds.max, zoomBounds.min],
   );
 
   const zoomIn = useCallback(() => {
-    animateZoomTo(zoom * ZOOM_BURST_FACTOR);
-  }, [animateZoomTo, zoom]);
+    setZoomAroundViewportCenter(zoom * ZOOM_BURST_FACTOR);
+  }, [setZoomAroundViewportCenter, zoom]);
 
   const zoomOut = useCallback(() => {
-    animateZoomTo(zoom / ZOOM_BURST_FACTOR);
-  }, [animateZoomTo, zoom]);
+    setZoomAroundViewportCenter(zoom / ZOOM_BURST_FACTOR);
+  }, [setZoomAroundViewportCenter, zoom]);
 
   useEffect(() => {
     const element = viewportRef.current;
@@ -450,21 +464,16 @@ export default function TheoryAchievementMap({
     return () => observer.disconnect();
   }, []);
 
-  useEffect(() => {
-    const center = pendingZoomCenterRef.current;
-    if (!center) return;
-    centerScrollOnGraphPoint(center, zoom);
+  useLayoutEffect(() => {
+    const pending = pendingZoomRef.current;
+    if (!pending || Math.abs(pending.zoom - zoom) > 0.001) return;
+    pendingZoomRef.current = null;
+    centerScrollOnGraphPoint(pending.center, zoom);
   }, [centerScrollOnGraphPoint, zoom]);
 
   useEffect(() => {
     setZoom((current) => clamp(current, zoomBounds.min, zoomBounds.max));
   }, [zoomBounds.max, zoomBounds.min]);
-
-  useEffect(() => {
-    return () => {
-      if (zoomAnimationRef.current !== null) cancelAnimationFrame(zoomAnimationRef.current);
-    };
-  }, []);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -491,6 +500,10 @@ export default function TheoryAchievementMap({
         style={{ scrollbarGutter: "stable both-edges" }}
         onScroll={(event: React.UIEvent<HTMLDivElement>) => {
           const element = event.currentTarget;
+          if (suppressNextScrollRef.current) {
+            suppressNextScrollRef.current = false;
+            return;
+          }
           onViewportChange({
             scrollLeft: element.scrollLeft,
             scrollTop: element.scrollTop,
@@ -539,6 +552,16 @@ export default function TheoryAchievementMap({
                 <pattern id="theory-biome-grid" width="64" height="64" patternUnits="userSpaceOnUse">
                   <path d="M 64 0 L 0 0 0 64" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
                 </pattern>
+                {layout.biome.chunks.map((chunk: TheoryBiomeChunkV1) => (
+                  <clipPath key={chunk.id} id={chunkWordmarkClipId(chunk)}>
+                    <rect
+                      x={chunk.bounds.x0 + 8}
+                      y={chunk.bounds.y0 + 8}
+                      width={Math.max(0, chunk.bounds.x1 - chunk.bounds.x0 - 16)}
+                      height={Math.max(0, chunk.bounds.y1 - chunk.bounds.y0 - 16)}
+                    />
+                  </clipPath>
+                ))}
               </defs>
               <rect width={layout.width} height={layout.height} fill="url(#theory-biome-scale-gradient)" opacity={0.24} />
               {THEORY_BIOME_BAND_ORDER.map((band: TheoryBiomeBand, index: number) => {
@@ -597,6 +620,34 @@ export default function TheoryAchievementMap({
                   </g>
                 );
               })}
+              <g data-testid="theory-biome-cell-wordmarks" aria-hidden="true">
+                {layout.biome.chunks.map((chunk: TheoryBiomeChunkV1) => {
+                  const label = chunkWatermarkLabel(chunk);
+                  return (
+                    <g key={`${chunk.id}:wordmarks`} clipPath={`url(#${chunkWordmarkClipId(chunk)})`}>
+                      {chunkWatermarkTiles(chunk, label, wordmarkFontSize).map((tile) => (
+                        <text
+                          key={tile.id}
+                          data-testid="theory-biome-cell-wordmark"
+                          data-biome-band={chunk.dominantScaleBand}
+                          data-domain-key={chunk.dominantDomainKey}
+                          data-font-size={wordmarkFontSize}
+                          x={tile.x}
+                          y={tile.y}
+                          fill="rgba(226,232,240,0.2)"
+                          fontSize={wordmarkFontSize}
+                          fontWeight={900}
+                          letterSpacing={0}
+                          style={{ textTransform: "uppercase" }}
+                          transform={`rotate(-35 ${tile.x} ${tile.y})`}
+                        >
+                          {label}
+                        </text>
+                      ))}
+                    </g>
+                  );
+                })}
+              </g>
               <rect width={layout.width} height={layout.height} fill="url(#theory-biome-grid)" opacity={0.74} />
               </svg>
             ) : null}
@@ -845,69 +896,79 @@ export default function TheoryAchievementMap({
                 </g>
               );
             })}
-            {layout.edges.map((edge: TheoryAchievementLayoutEdge) => (
-              <path
-                key={edge.edgeId}
-                d={toPath(edge.points)}
-                className={edgeClass(edge, edgeHighlightSet, hasFocus)}
-                strokeWidth={edgeHighlightSet.has(edge.edgeId) ? 3 : 2}
-                strokeDasharray={edgeDashArray(edge)}
-                fill="none"
-                strokeLinecap="square"
-                strokeLinejoin="miter"
-                markerEnd={isContextEdge(edge) ? undefined : "url(#theory-achievement-arrow)"}
-              />
-            ))}
+            {layout.edges
+              .map((edge: TheoryAchievementLayoutEdge) => ({
+                edge,
+                visualState: resolveTheoryBadgeEdgeVisualState({ edge, traceEdgeIds: edgeHighlightSet }),
+              }))
+              .filter(({ visualState }) => visualState.tracePath)
+              .map(({ edge, visualState }) => (
+                <path
+                  key={edge.edgeId}
+                  data-testid="theory-badge-connection-edge"
+                  data-edge-visual-state="tracePath"
+                  d={toPath(edge.points)}
+                  className={theoryBadgeEdgeClass(visualState)}
+                  strokeWidth={visualState.tracePath ? 3 : 2}
+                  strokeDasharray={edgeDashArray(edge)}
+                  fill="none"
+                  strokeLinecap="square"
+                  strokeLinejoin="miter"
+                  markerEnd={visualState.context ? undefined : "url(#theory-achievement-arrow)"}
+                />
+              ))}
             </svg>
             {layout.nodes.map((node: TheoryAchievementLayoutNode) => {
             const badge = badgesById.get(node.badgeId);
             if (!badge) return null;
             const expression = primaryExpression(badge);
             const routeLabel = routeBadgeLabels[node.badgeId] ?? null;
-            const titleParts = [
-              badge.title,
-              expression,
-              routeLabel ? `${routeLabel.label}: ${routeLabel.title}` : null,
-            ].filter(Boolean);
-            const title = titleParts.join("\n");
-            const heat = heatByBadgeId[node.badgeId] ?? 0;
-            const ripple = rippleSet.has(node.badgeId);
+            const tooltipId = badgeTooltipId(node.badgeId);
             const badgeBlockId = badgeAtlasBlockId(badge);
-            const foundation = badge.level === "first_principle" || badge.subjects.includes("constants");
-            const claimBoundary = badge.level === "claim_boundary";
-            const atlasHighlighted = highlightedSet.has(node.badgeId) && Boolean(activeAtlasGlow);
             const plannedDomain = Boolean(
               activeAtlasBlock?.status === "planned" && badgeBlockId === activeAtlasBlock.id,
             );
-            const glowShadow = [
-              heat > 0
-                ? `0 0 ${Math.round(12 + heat * 18)}px rgba(34, 211, 238, ${Math.min(0.72, 0.22 + heat * 0.5)})`
-                : null,
-              atlasHighlighted && activeAtlasGlow ? `0 0 24px ${activeAtlasGlow}` : null,
-              foundation ? "0 0 14px rgba(226,232,240,0.22)" : null,
-            ]
-              .filter(Boolean)
-              .join(", ");
+            const visualState = resolveTheoryBadgeVisualState({
+              badge,
+              badgeId: node.badgeId,
+              selectedBadgeId,
+              selectedBadgeIds: selectedSet,
+              traceBadgeIds: traceBadgeSet,
+              connectableBadgeIds: connectableSet,
+              manualSelectionActive,
+              playbackBadgeIds: playbackSet,
+              solvedBadgeIds: solvedSet,
+              failedBadgeIds: failedSet,
+              rippleBadgeIds: rippleSet,
+              heatByBadgeId,
+              atlasHighlightedBadgeIds: backendOverlaySet,
+              exactBadgeIds: exactBadgeSet,
+              likelyBadgeIds: likelyBadgeSet,
+              plannedDomain,
+              routeBlocked: routeLabel?.tone === "rose",
+            });
             return (
               <button
                 key={node.badgeId}
                 type="button"
-                className={badgeClass({
-                  selected: selectedBadgeId === node.badgeId,
-                  multiSelected: selectedSet.has(node.badgeId),
-                  highlighted: highlightedSet.has(node.badgeId),
-                  playback: playbackSet.has(node.badgeId),
-                  solved: solvedSet.has(node.badgeId),
-                  failed: failedSet.has(node.badgeId),
-                  hasFocus,
-                  loadable: badge.calculatorPayloads.length > 0,
-                  foundation,
-                  claimBoundary,
-                  plannedDomain,
-                  routeBlocked: routeLabel?.tone === "rose",
-                  exactDiscussion: exactBadgeSet.has(node.badgeId),
-                  likelyDiscussion: !exactBadgeSet.has(node.badgeId) && likelyBadgeSet.has(node.badgeId),
-                })}
+                className={`${theoryBadgeButtonClass(visualState)} group`}
+                data-badge-visual-state={
+                  visualState.selectedNoPath
+                    ? "noPath"
+                    : visualState.selected
+                      ? "selected"
+                      : visualState.intermediate
+                        ? "intermediate"
+                        : visualState.connectable
+                          ? "connectable"
+                          : visualState.unavailable
+                            ? "unavailable"
+                            : visualState.backendOverlay
+                              ? "backendOverlay"
+                              : visualState.boundaryContext
+                                ? "boundaryContext"
+                                : undefined
+                }
                 data-discussion-match={
                   exactBadgeSet.has(node.badgeId)
                     ? "exact"
@@ -918,19 +979,17 @@ export default function TheoryAchievementMap({
                 style={{
                   left: node.x,
                   top: node.y,
-                  boxShadow: glowShadow || undefined,
+                  boxShadow: theoryBadgeGlowShadow(visualState, activeAtlasGlow),
                 }}
-                title={title}
                 aria-label={badge.title}
+                aria-describedby={tooltipId}
+                disabled={visualState.unavailable}
                 onClick={(event: React.MouseEvent<HTMLButtonElement>) => {
                   event.stopPropagation();
-                  if (event.ctrlKey || event.metaKey || event.altKey) {
-                    onToggleBadgeSelection(node.badgeId);
-                  } else {
-                    onSelectBadge(node.badgeId);
-                    const payload = badge.calculatorPayloads[0];
-                    if (payload) onLoadCalculatorPayload(node.badgeId, payload.id);
-                  }
+                  if (visualState.unavailable) return;
+                  onSelectBadge(node.badgeId);
+                  const payload = badge.calculatorPayloads[0];
+                  if (payload) onLoadCalculatorPayload(node.badgeId, payload.id);
                 }}
                 onDoubleClick={() => onRunPath(node.badgeId)}
               >
@@ -940,15 +999,26 @@ export default function TheoryAchievementMap({
                 {badge.calculatorPayloads.length > 0 ? (
                   <span className="absolute -right-1 -top-1 h-3 w-3 border border-cyan-100 bg-cyan-400" />
                 ) : null}
-                {ripple ? (
+                {visualState.ripple ? (
                   <span className="pointer-events-none absolute -inset-2 border border-cyan-200/80" />
                 ) : null}
-                {foundation ? (
+                {visualState.foundation && !manualSelectionActive ? (
                   <span className="pointer-events-none absolute -inset-1 border border-zinc-100/30" />
                 ) : null}
-                {claimBoundary ? (
+                {visualState.claimBoundary ? (
                   <span className="pointer-events-none absolute -inset-1.5 border-2 border-amber-300/80" />
                 ) : null}
+                <span
+                  id={tooltipId}
+                  role="tooltip"
+                  data-testid="theory-badge-tooltip"
+                  className="pointer-events-none absolute left-1/2 top-[calc(100%+8px)] z-30 grid min-w-48 max-w-72 -translate-x-1/2 gap-1 border border-slate-500 bg-slate-950 px-3 py-2 text-left normal-case text-slate-100 opacity-0 shadow-xl transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+                >
+                  <span className="text-xs font-semibold leading-snug text-slate-50">{badge.title}</span>
+                  {expression ? (
+                    <span className="font-mono text-[11px] font-medium leading-snug text-cyan-100">{expression}</span>
+                  ) : null}
+                </span>
               </button>
             );
             })}

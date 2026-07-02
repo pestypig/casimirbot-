@@ -1,6 +1,7 @@
 import type {
   MoralLivingSubstrateBadgeV1,
   MoralLivingSubstrateMatchV1,
+  MoralLivingSubstrateSourceRefV1,
 } from "../contracts/moral-living-substrate-reflection.v1";
 import {
   MORAL_LIVING_SUBSTRATE_PRINCIPLES,
@@ -18,12 +19,22 @@ export type MatchLivingSubstratePrinciplesResult = {
   exactMatches: MoralLivingSubstrateMatchV1[];
   likelyMatches: MoralLivingSubstrateMatchV1[];
   sourceTheoryBadgeIds: MoralLivingSubstrateTheoryBadgeId[];
+  sourceRefs: MoralLivingSubstrateSourceRefV1[];
   claimBoundaryNotes: string[];
 };
 
 const normalize = (value: string): string => value.toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
 
 const unique = <T>(values: T[]): T[] => Array.from(new Set(values));
+
+const uniqueSourceRefs = (values: MoralLivingSubstrateSourceRefV1[]): MoralLivingSubstrateSourceRefV1[] => {
+  const seen = new Set<string>();
+  return values.filter((ref) => {
+    if (seen.has(ref.id)) return false;
+    seen.add(ref.id);
+    return true;
+  });
+};
 
 const containsPhrase = (haystack: string, phrase: string): boolean => {
   const normalizedPhrase = normalize(phrase);
@@ -77,6 +88,7 @@ function scorePrinciple(
     score: boundedScore,
     reasons: unique(reasons),
     sourceTheoryBadgeIds: principle.sourceTheoryBadgeIds,
+    sourceRefs: principle.sourceRefs,
     claimBoundaryNotes: principle.claimBoundaryNotes,
   };
 }
@@ -102,6 +114,7 @@ export function matchLivingSubstratePrinciples(
     sourceTheoryBadgeIds: unique(
       selectedMatches.flatMap((match: MoralLivingSubstrateMatchV1) => match.sourceTheoryBadgeIds),
     ) as MoralLivingSubstrateTheoryBadgeId[],
+    sourceRefs: uniqueSourceRefs(selectedMatches.flatMap((match: MoralLivingSubstrateMatchV1) => match.sourceRefs)),
     claimBoundaryNotes: unique(selectedMatches.flatMap((match: MoralLivingSubstrateMatchV1) => match.claimBoundaryNotes)),
   };
 }

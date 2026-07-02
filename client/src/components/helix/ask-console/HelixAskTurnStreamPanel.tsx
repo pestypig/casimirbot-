@@ -1,6 +1,7 @@
 import type { CSSProperties, MouseEvent, ReactNode } from "react";
 
 import type { HelixContinuousTurnStreamRow } from "@/lib/helix/ask-active-turn-stream";
+import { formatHelixAskFinalReceiptMeta } from "@/lib/helix/ask-agent-runtime-display";
 import {
   HelixAskJobReadyLinkStrip,
   HelixAskLiveBridgePillStrip,
@@ -109,6 +110,12 @@ export function HelixAskTurnStreamPanel({
           const isFinalRow = row.source === "final";
           const isQuestionRow = row.source === "question";
           const visibleText = isFinalRow ? row.text : clipText(row.text, row.detailLimit ?? 360);
+          const receiptMeta = formatHelixAskFinalReceiptMeta([
+            row.meta,
+            isFinalRow ? actualAgentProviderLabel : null,
+            isFinalRow ? actualAgentModelLabel : null,
+            row.evidenceRefs.length > 0 ? `refs ${row.evidenceRefs.length}` : null,
+          ]);
 
           return (
             <div
@@ -158,12 +165,11 @@ export function HelixAskTurnStreamPanel({
                   status={liveBridgeStatus}
                   readPillClassName={readPillClassName}
                 />
-                <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-slate-400/80">
-                  {row.meta}
-                  {isFinalRow && actualAgentProviderLabel ? ` | ${actualAgentProviderLabel}` : ""}
-                  {isFinalRow && actualAgentModelLabel ? ` | ${actualAgentModelLabel}` : ""}
-                  {row.evidenceRefs.length > 0 ? ` | refs ${row.evidenceRefs.length}` : ""}
-                </p>
+                {receiptMeta ? (
+                  <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-slate-400/80">
+                    {receiptMeta}
+                  </p>
+                ) : null}
                 {row.evidenceRefs.length > 0 ? (
                   <p className="mt-1 break-words font-mono text-[10px] normal-case tracking-normal text-slate-400/80">
                     {row.evidenceRefs.slice(0, 4).join(" | ")}

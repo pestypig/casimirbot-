@@ -38,15 +38,14 @@ import TheoryAtlasRail, { type TheoryAtlasLensId } from "@/components/panels/The
 import TokamakPlasmaLens from "@/components/panels/TokamakPlasmaLens";
 import WarpGrNhm2Lens from "@/components/panels/WarpGrNhm2Lens";
 import { dispatchScientificCalculatorMathPicked } from "@/lib/scientific-calculator/events";
+import { buildTheoryBadgeCombinationReaderPayload } from "@/lib/theory/theoryBadgeCombinationReader";
 import { resolveTheoryBadgeConnectionTrace } from "@/lib/theory/theoryBadgeConnectionTrace";
-import { resolveTheoryBadgePlaybackPlan } from "@/lib/theory/theoryBadgePlaybackPlan";
 import { formatTheoryBadgePlaybackMarkdown } from "@/lib/theory/theoryBadgePlaybackRunner";
 import { buildTheoryBadgeLocatorArtifact } from "@/lib/theory/theoryMapOverlay";
 import { resolvePhysicsAtlasLens } from "@shared/theory/physics-atlas-lens";
 import { buildHelixPhysicsAtlasV1 } from "@shared/theory/physics-atlas-blocks";
 import { buildTheoryCalculatorLoadout } from "@shared/theory/theory-calculator-loadout";
 import { buildTheoryCompoundRun } from "@shared/theory/theory-compound-run-builder";
-import { traceTheoryFrontierVectorField } from "@shared/theory/theory-frontier-vector-field";
 import {
   resolveTheoryRouteEligibility,
   type TheoryRouteBadgeEligibilityV1,
@@ -697,7 +696,6 @@ export default function TheoryBadgeGraphPanel() {
   const activeTheoryRun = useTheoryCompoundRunStore((state) => state.activeTheoryRun);
   const setSelectedBadgeId = useTheoryBadgeGraphPanelStore((state) => state.setSelectedBadgeId);
   const setSelectedBadgeIds = useTheoryBadgeGraphPanelStore((state) => state.setSelectedBadgeIds);
-  const toggleSelectedBadgeId = useTheoryBadgeGraphPanelStore((state) => state.toggleSelectedBadgeId);
   const rememberViewport = useTheoryBadgeGraphPanelStore((state) => state.rememberViewport);
   const setActiveAtlasLensId = useTheoryBadgeGraphPanelStore((state) => state.setActiveAtlasLensId);
   const setSelectedEvolutionStageId = useTheoryBadgeGraphPanelStore((state) => state.setSelectedStarSimStageId);
@@ -1163,32 +1161,6 @@ export default function TheoryBadgeGraphPanel() {
     [graph?.badges, selectedId],
   );
 
-  const seedAtlasFrontierTrace = useMemo(() => {
-    if (!graph) return null;
-    const originBadgeIds = selectedBadgeIds.length > 0 ? selectedBadgeIds : selectedId ? [selectedId] : [];
-    const atlasQuery = [
-      selectedBadge?.title,
-      ...(selectedBadge?.subjects.slice(0, 4) ?? []),
-      query.trim() || "theory badge graph frontier map",
-    ]
-      .filter(Boolean)
-      .join(" ");
-    return traceTheoryFrontierVectorField({
-      graph,
-      query: atlasQuery,
-      originBadgeIds,
-      searchSeed: `seed-atlas:${graph.graphId}:${originBadgeIds.join("+") || "global"}:${query.trim() || "all"}`,
-      generatedAt: graph.generatedAt,
-      limit: 8,
-      maxDepth: 8,
-    });
-  }, [graph, query, selectedBadge, selectedBadgeIds, selectedId]);
-
-  const singlePlaybackPlan = useMemo(() => {
-    if (!graph || !selectedId || selectedBadgeIds.length > 1) return null;
-    return resolveTheoryBadgePlaybackPlan({ graph, targetBadgeId: selectedId });
-  }, [graph, selectedBadgeIds.length, selectedId]);
-
   const multiTrace = useMemo(() => {
     if (!graph || selectedBadgeIds.length < 2) return null;
     return resolveTheoryBadgeConnectionTrace({ graph, badgeIds: selectedBadgeIds });
@@ -1242,20 +1214,37 @@ export default function TheoryBadgeGraphPanel() {
     selectedWarpObjectBindingId,
   ]);
 
+  const manualSelectionActive = selectedBadgeIds.length > 0 || Boolean(selectedId);
   const highlightedBadgeIds =
     multiTrace?.connectingBadgeIds ??
-    singlePlaybackPlan?.orderedBadgeIds ??
-    (mapOverlay.highlightedBadgeIds.length > 0 ? mapOverlay.highlightedBadgeIds : atlasLens?.highlightedBadgeIds ?? []);
+    (!manualSelectionActive
+      ? (mapOverlay.highlightedBadgeIds.length > 0 ? mapOverlay.highlightedBadgeIds : atlasLens?.highlightedBadgeIds ?? [])
+      : []);
   const highlightedEdgeIds = useMemo(() => {
     if (!graph) return [];
     if (multiTrace) return multiTrace.connectingEdgeIds;
-    if (!singlePlaybackPlan && mapOverlay.highlightedEdgeIds.length > 0) return mapOverlay.highlightedEdgeIds;
-    if (!singlePlaybackPlan && atlasLens) return atlasLens.highlightedEdgeIds;
-    const highlighted = new Set(highlightedBadgeIds);
-    return graph.edges
-      .filter((edge: TheoryBadgeEdgeV1) => highlighted.has(edge.from) && highlighted.has(edge.to))
-      .map((edge: TheoryBadgeEdgeV1) => edge.id);
-  }, [atlasLens, graph, highlightedBadgeIds, mapOverlay.highlightedEdgeIds, multiTrace, singlePlaybackPlan]);
+    return [];
+  }, [graph, multiTrace]);
+  const connectableBadgeIds = useMemo(() => {
+    if (!graph || selectedBadgeIds.length === 0) return [];
+    const selected = new Set(selectedBadgeIds);
+    return graph.badges
+      .filter((badge: TheoryBadgeV1) => !selected.has(badge.id))
+      .filter((badge: TheoryBadgeV1) => {
+        const trace = resolveTheoryBadgeConnectionTrace({ graph, badgeIds: [...selectedBadgeIds, badge.id] });
+        return trace.connectingEdgeIds.length > 0 && trace.connectingBadgeIds.includes(badge.id);
+      })
+      .map((badge: TheoryBadgeV1) => badge.id);
+  }, [graph, selectedBadgeIds]);
+  const combinationReaderPayload = useMemo(() => {
+    if (!graph) return null;
+    return buildTheoryBadgeCombinationReaderPayload({
+      graph,
+      selectedBadgeIds,
+      trace: multiTrace,
+      availableNextBadgeIds: connectableBadgeIds,
+    });
+  }, [connectableBadgeIds, graph, multiTrace, selectedBadgeIds]);
 
   const routeEligibility = useMemo(() => {
     if (!graph) return null;
@@ -1434,7 +1423,7 @@ export default function TheoryBadgeGraphPanel() {
   const selectBadge = (badgeId: string) => {
     const badge = graph?.badges.find((candidate: TheoryBadgeV1) => candidate.id === badgeId) ?? null;
     setSelectedBadgeId(badgeId);
-    setSelectedBadgeIds([]);
+    setSelectedBadgeIds(selectedBadgeIds.includes(badgeId) ? selectedBadgeIds : [...selectedBadgeIds, badgeId]);
     setSelectedEvolutionStageId(null);
     setSelectedCosmicRungId(null);
     setSelectedSolarGroupId(null);
@@ -1465,10 +1454,6 @@ export default function TheoryBadgeGraphPanel() {
     } else {
       useTheoryCompoundRunStore.getState().clearTheoryRun();
     }
-  };
-
-  const toggleBadgeSelection = (badgeId: string) => {
-    toggleSelectedBadgeId(badgeId);
   };
 
   const loadCalculatorPayload = (badgeId: string, payloadId: string) => {
@@ -2516,6 +2501,8 @@ export default function TheoryBadgeGraphPanel() {
                   selectedBadgeIds={selectedBadgeIds}
                   highlightedBadgeIds={highlightedBadgeIds}
                   highlightedEdgeIds={highlightedEdgeIds}
+                  traceBadgeIds={multiTrace?.connectingBadgeIds ?? []}
+                  connectableBadgeIds={connectableBadgeIds}
                   exactBadgeIds={[]}
                   likelyBadgeIds={[]}
                   softRegions={[]}
@@ -2525,11 +2512,10 @@ export default function TheoryBadgeGraphPanel() {
                   rippleBadgeIds={mapOverlay.rippleBadgeIds}
                   heatByBadgeId={mapOverlay.heatByBadgeId}
                   probabilityTerrain={theoryProbabilityTerrain}
-                  frontierTrace={seedAtlasFrontierTrace}
+                  frontierTrace={null}
                   routeBadgeLabels={routeBadgeLabels}
                   activeAtlasLensId={rememberedAtlasLensId}
                   onSelectBadge={selectBadge}
-                  onToggleBadgeSelection={toggleBadgeSelection}
                   onClearSelection={() => {
                     setSelectedBadgeId(null);
                     setSelectedBadgeIds([]);
@@ -2539,6 +2525,11 @@ export default function TheoryBadgeGraphPanel() {
                   viewport={viewport}
                   onViewportChange={rememberViewport}
                 />
+                {combinationReaderPayload ? (
+                  <pre className="sr-only" data-testid="theory-combination-reader-payload">
+                    {JSON.stringify(combinationReaderPayload, null, 2)}
+                  </pre>
+                ) : null}
               </>
             ) : null}
           </div>

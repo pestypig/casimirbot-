@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   askLiveEventBelongsToActiveTurn,
+  buildAskLiveAgenticEventRows,
+  buildHelixActiveTurnStreamRows,
+  buildHelixActiveTurnTranscriptRows,
   createHelixAskConsoleStreamIngressDebug,
   incrementHelixAskConsoleDropReason,
 } from "@/lib/helix/ask-active-turn-stream";
@@ -89,5 +92,134 @@ describe("ask active turn stream", () => {
         },
       }),
     ).toBe(false);
+  });
+
+  it("keeps meaningful tool and model re-entry events visible in active stream rows", () => {
+    const eventRows = buildAskLiveAgenticEventRows([
+      {
+        id: "tool-request",
+        ts: "2026-07-01T12:00:01.000Z",
+        text: "Tool request: scholarly-research.lookup_papers for NHM2 evidence.",
+        meta: { source_event_type: "tool_request", turn_id: "ask:active" },
+      },
+      {
+        id: "tool-observation",
+        ts: "2026-07-01T12:00:02.000Z",
+        text: "Tool observation: paper metadata retrieved.",
+        meta: { source_event_type: "tool_observation", turn_id: "ask:active" },
+      },
+      {
+        id: "model-reentry",
+        ts: "2026-07-01T12:00:03.000Z",
+        text: "Model re-entry: reasoning continues with retrieved observation.",
+        meta: { source_event_type: "model_reentry", turn_id: "ask:active" },
+      },
+    ]);
+
+    expect(eventRows.map((row) => row.label)).toEqual(["Observation", "Observation", "Observation"]);
+
+    const streamRows = buildHelixActiveTurnStreamRows({
+      question: "Find the current NHM2 whitepaper evidence.",
+      eventRows,
+    });
+
+    expect(streamRows.map((row) => row.source)).toEqual(["question", "agent_work", "agent_work", "agent_work"]);
+    expect(streamRows.map((row) => row.text).join("\n")).toContain("Tool request");
+    expect(streamRows.map((row) => row.text).join("\n")).toContain("scholarly research.lookup papers");
+    expect(streamRows.map((row) => row.text).join("\n")).toContain("paper metadata retrieved");
+    expect(streamRows.map((row) => row.text).join("\n")).toContain("reasoning continues");
+  });
+
+  it("projects active live events through the same transcript rows used by completed turns", () => {
+    const rows = buildHelixActiveTurnTranscriptRows({
+      replyId: "ask:active",
+      activeTurnId: "ask:active",
+      activeTraceId: "trace:active",
+      events: [
+        {
+          id: "tool-request",
+          ts: "2026-07-01T12:00:01.000Z",
+          text: "Request scholarly-research.lookup_papers.",
+          tool: "scholarly-research.lookup_papers",
+          meta: {
+            source_event_type: "tool_request",
+            turn_id: "ask:active",
+            trace_id: "trace:active",
+            status: "requested",
+          },
+        },
+        {
+          id: "tool-observation",
+          ts: "2026-07-01T12:00:02.000Z",
+          text: "Paper metadata retrieved.",
+          tool: "scholarly-research.lookup_papers",
+          meta: {
+            source_event_type: "tool_observation",
+            turn_id: "ask:active",
+            trace_id: "trace:active",
+            status: "observed",
+          },
+        },
+        {
+          id: "model-reentry",
+          ts: "2026-07-01T12:00:03.000Z",
+          text: "Model re-entry used the observation packet.",
+          meta: {
+            source_event_type: "model_reentry",
+            turn_id: "ask:active",
+            trace_id: "trace:active",
+            status: "completed",
+          },
+        },
+      ],
+    });
+
+    expect(rows.map((row) => row.label)).toEqual(["Tool Request", "Tool Observation", "Model Re-entry"]);
+    expect(rows.map((row) => row.text).join("\n")).toContain("Paper metadata retrieved");
+  });
+
+  it("normalizes live-event lane source metadata for active transcript rows", () => {
+    const rows = buildHelixActiveTurnTranscriptRows({
+      replyId: "ask:active-lane-goal",
+      activeTurnId: "ask:active-lane-goal",
+      activeTraceId: "trace:active-lane-goal",
+      events: [
+        {
+          id: "goal-lane",
+          ts: "2026-07-01T12:00:04.000Z",
+          text: "Goal-bound lane session: live_translation; latest chunk chunk-active; lane output remains observation-only.",
+          tool: "live_translation",
+          meta: {
+            source_event_type: "lane_goal_binding",
+            turn_id: "ask:active-lane-goal",
+            trace_id: "trace:active-lane-goal",
+            lane: "live_translation",
+            stepId: "lane_goal_binding",
+            status: "pending",
+            sourceId: "docs:active",
+            latestProjectionTarget: "docs_chunk",
+            latestChunkId: "chunk-active",
+            latestDedupeKey: "docs:active:chunk-active:es",
+            latestSourceEventId: "docs:active:event-1",
+            latestFreshnessStatus: "fresh",
+            latestCancelRequested: true,
+          },
+        },
+      ],
+    });
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      label: "Goal Lane",
+      text: expect.stringContaining("Goal-bound lane session"),
+      meta: expect.stringContaining("source docs:active"),
+      status: "pending",
+    });
+    expect(rows[0]?.meta).toContain("projection docs_chunk");
+    expect(rows[0]?.meta).toContain("chunk chunk-active");
+    expect(rows[0]?.meta).toContain("dedupe docs:active:chunk-active:es");
+    expect(rows[0]?.meta).toContain("source event docs:active:event-1");
+    expect(rows[0]?.meta).toContain("freshness fresh");
+    expect(rows[0]?.meta).toContain("cancelled");
   });
 });

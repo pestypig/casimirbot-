@@ -28,6 +28,12 @@ import {
   extractDocumentMarkdownTranslationsFromRuns,
   readDocumentMarkdownMicroDeckRuns,
 } from "@/lib/docs/documentTranslationClient";
+import {
+  readDocumentLiveTranslationProjectionSnapshot,
+  subscribeDocumentLiveTranslationProjectionRegistry,
+} from "@/lib/docs/liveTranslationProjectionRegistry";
+import { installDocumentLiveTranslationProjectionEventIngestion } from "@/lib/docs/liveTranslationProjectionEventIngestion";
+import { sameDocumentInlineTranslationRenderState } from "@/lib/docs/liveTranslationInlineProjection";
 import { consumeDocViewerIntent } from "@/lib/docs/docViewer";
 import { buildWorkstationPathRef } from "@/lib/workstation/workstationDeepLink";
 import {
@@ -65,6 +71,23 @@ type InlineTranslationState = {
   status: "loading" | "ready" | "error";
   text?: string;
   error?: string;
+  observationRef?: string | null;
+  receiptRef?: string | null;
+  projectionStatus?: string | null;
+  chunkId?: string | null;
+  chunkIndex?: number | null;
+  dedupeKey?: string | null;
+  sourceEventId?: string | null;
+  sourceEventMs?: number | null;
+  observedAtMs?: number | null;
+  freshnessStatus?: string;
+  projectionTarget?: string | null;
+  targetLanguage?: string | null;
+  cancelRequested?: boolean;
+  source?: "capability_lane";
+  terminalEligible?: false;
+  assistantAnswer?: false;
+  rawContentIncluded?: false;
 };
 
 const DOC_INLINE_TRANSLATION_SESSION_PREFIX = "casimir.docs.inlineTranslation.v1";
@@ -75,6 +98,11 @@ const DOC_TRANSLATION_SCAN_DEBOUNCE_MS = 360;
 type StoredInlineTranslationSession = {
   enabled: boolean;
   translations: Record<string, InlineTranslationState>;
+};
+
+const EMPTY_LIVE_TRANSLATION_PROJECTION_SNAPSHOT = {
+  version: 0,
+  translations: {},
 };
 
 const proceduralStepMessages = {
@@ -283,6 +311,18 @@ export function DocViewerPanel() {
   );
   const translationEligible =
     mode === "doc" && Boolean(currentEntry) && Boolean(rawMarkdown) && interfaceLanguage.code !== "en";
+  const liveTranslationProjectionSnapshot = React.useSyncExternalStore(
+    subscribeDocumentLiveTranslationProjectionRegistry,
+    () =>
+      currentEntry && translationEligible
+        ? readDocumentLiveTranslationProjectionSnapshot({
+          docPath: currentEntry.relativePath,
+          locale: interfaceLanguage.code,
+          projectionTarget: "docs_chunk",
+        })
+        : EMPTY_LIVE_TRANSLATION_PROJECTION_SNAPSHOT,
+    () => EMPTY_LIVE_TRANSLATION_PROJECTION_SNAPSHOT,
+  );
   const activeTranslationScopeKey = React.useMemo(
     () =>
       translationEligible && currentEntry && rawMarkdownSourceHash
@@ -394,6 +434,98 @@ export function DocViewerPanel() {
       translations: inlineTranslations,
     });
   }, [activeTranslationScopeKey, inlineTranslationEnabled, inlineTranslations]);
+
+  React.useEffect(() => {
+    if (!activeTranslationScopeKey || !translationEligible) return;
+    if (liveTranslationProjectionSnapshot.version <= 0) return;
+    const laneTranslations = Object.entries(liveTranslationProjectionSnapshot.translations);
+    if (laneTranslations.length === 0) return;
+    translationScopeKeyRef.current = activeTranslationScopeKey;
+    setInlineTranslationEnabled(true);
+    setInlineTranslations((current) => {
+      let changed = false;
+      const next = { ...current };
+      for (const [unitId, laneState] of laneTranslations) {
+        const currentState = next[unitId];
+        if (laneState.status === "ready" && typeof laneState.text === "string" && laneState.text.trim()) {
+          const nextState = {
+            status: "ready",
+            text: laneState.text,
+            observationRef: laneState.observationRef,
+            receiptRef: laneState.receiptRef,
+            projectionStatus: laneState.projectionStatus,
+            chunkId: laneState.chunkId,
+            chunkIndex: laneState.chunkIndex,
+            dedupeKey: laneState.dedupeKey,
+            sourceEventId: laneState.sourceEventId,
+            sourceEventMs: laneState.sourceEventMs,
+            observedAtMs: laneState.observedAtMs,
+            freshnessStatus: laneState.freshnessStatus,
+            projectionTarget: laneState.projectionTarget,
+            targetLanguage: laneState.targetLanguage,
+            cancelRequested: laneState.cancelRequested,
+            source: laneState.source,
+            terminalEligible: false,
+            assistantAnswer: false,
+            rawContentIncluded: false,
+          } satisfies InlineTranslationState;
+          if (sameDocumentInlineTranslationRenderState(currentState, nextState)) continue;
+          next[unitId] = nextState;
+          changed = true;
+          continue;
+        }
+        if (!currentState || currentState.status === "loading") {
+          next[unitId] = {
+            status: "error",
+            error: laneState.error,
+            observationRef: laneState.observationRef,
+            receiptRef: laneState.receiptRef,
+            projectionStatus: laneState.projectionStatus,
+            chunkId: laneState.chunkId,
+            chunkIndex: laneState.chunkIndex,
+            dedupeKey: laneState.dedupeKey,
+            sourceEventId: laneState.sourceEventId,
+            sourceEventMs: laneState.sourceEventMs,
+            observedAtMs: laneState.observedAtMs,
+            freshnessStatus: laneState.freshnessStatus,
+            projectionTarget: laneState.projectionTarget,
+            targetLanguage: laneState.targetLanguage,
+            cancelRequested: laneState.cancelRequested,
+            source: laneState.source,
+            terminalEligible: false,
+            assistantAnswer: false,
+            rawContentIncluded: false,
+          };
+          changed = true;
+        }
+      }
+      return changed ? next : current;
+    });
+    setTranslationStatus((current) =>
+      current === "error" || current === "unavailable" ? current : "cached"
+    );
+  }, [
+    activeTranslationScopeKey,
+    liveTranslationProjectionSnapshot,
+    translationEligible,
+  ]);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!currentEntry || !translationEligible || translationUnits.length === 0) return;
+    return installDocumentLiveTranslationProjectionEventIngestion({
+      eventTarget: window,
+      docPath: currentEntry.relativePath,
+      locale: interfaceLanguage.code,
+      projectionTarget: "docs_chunk",
+      units: translationUnits,
+    });
+  }, [
+    currentEntry,
+    interfaceLanguage.code,
+    translationEligible,
+    translationUnits,
+  ]);
 
   React.useEffect(() => {
     if (!inlineTranslationEnabled) return;
@@ -1489,14 +1621,34 @@ function renderMarkdownWithInlineTranslations(
       const anchor = `<div class="doc-translation-anchor not-prose h-0" data-doc-translation-anchor="${escapeHtml(unit.unit_id)}"></div>`;
       const state = translations[unit.unit_id];
       if (!state) return `${unit.source_markdown}\n${anchor}`;
+      const projectionAttrs = [
+        state.source ? `data-doc-translation-source="${escapeHtml(state.source)}"` : "",
+        state.projectionStatus ? `data-doc-translation-projection-status="${escapeHtml(state.projectionStatus)}"` : "",
+        state.observationRef ? `data-doc-translation-observation-ref="${escapeHtml(state.observationRef)}"` : "",
+        state.receiptRef ? `data-doc-translation-receipt-ref="${escapeHtml(state.receiptRef)}"` : "",
+        state.chunkId ? `data-doc-translation-chunk-id="${escapeHtml(state.chunkId)}"` : "",
+        typeof state.chunkIndex === "number" ? `data-doc-translation-chunk-index="${String(state.chunkIndex)}"` : "",
+        state.dedupeKey ? `data-doc-translation-dedupe-key="${escapeHtml(state.dedupeKey)}"` : "",
+        state.sourceEventId ? `data-doc-translation-source-event-id="${escapeHtml(state.sourceEventId)}"` : "",
+        typeof state.sourceEventMs === "number" ? `data-doc-translation-source-event-ms="${String(state.sourceEventMs)}"` : "",
+        typeof state.observedAtMs === "number" ? `data-doc-translation-observed-at-ms="${String(state.observedAtMs)}"` : "",
+        state.freshnessStatus ? `data-doc-translation-freshness-status="${escapeHtml(state.freshnessStatus)}"` : "",
+        state.projectionTarget ? `data-doc-translation-projection-target="${escapeHtml(state.projectionTarget)}"` : "",
+        state.targetLanguage ? `data-doc-translation-target-language="${escapeHtml(state.targetLanguage)}"` : "",
+        typeof state.cancelRequested === "boolean" ? `data-doc-translation-cancel-requested="${String(state.cancelRequested)}"` : "",
+        state.source === "capability_lane" ? `data-doc-translation-terminal-eligible="false"` : "",
+        state.source === "capability_lane" ? `data-doc-translation-assistant-answer="false"` : "",
+        state.source === "capability_lane" ? `data-doc-translation-raw-content-included="false"` : "",
+      ].filter(Boolean).join(" ");
+      const projectionAttrSuffix = projectionAttrs ? ` ${projectionAttrs}` : "";
       if (state.status === "loading") {
         return `${unit.source_markdown}\n${anchor}\n<div class="doc-generated-translation not-prose my-2 border-l-2 border-emerald-400/60 pl-3 text-sm leading-relaxed text-emerald-300/80 animate-pulse" data-doc-translation-line="${escapeHtml(unit.unit_id)}">${escapeHtml(t("docsViewer.translation.inlineLoading"))}</div>`;
       }
       if (state.status === "error") {
-        return `${unit.source_markdown}\n${anchor}\n<div class="doc-generated-translation not-prose my-2 border-l-2 border-amber-400/70 pl-3 text-sm leading-relaxed text-amber-300" data-doc-translation-line="${escapeHtml(unit.unit_id)}">${escapeHtml(t("docsViewer.translation.inlineError", { reason: state.error ?? t("docsViewer.translation.errorGeneric") }))}</div>`;
+        return `${unit.source_markdown}\n${anchor}\n<div class="doc-generated-translation not-prose my-2 border-l-2 border-amber-400/70 pl-3 text-sm leading-relaxed text-amber-300" data-doc-translation-line="${escapeHtml(unit.unit_id)}"${projectionAttrSuffix}>${escapeHtml(t("docsViewer.translation.inlineError", { reason: state.error ?? t("docsViewer.translation.errorGeneric") }))}</div>`;
       }
       const translatedText = formatInlineTranslationText(state.text ?? "");
-      return `${unit.source_markdown}\n${anchor}\n<div class="doc-generated-translation not-prose my-2 border-l-2 border-emerald-400/70 pl-3 text-sm leading-relaxed text-emerald-300" data-doc-translation-line="${escapeHtml(unit.unit_id)}">${escapeHtml(translatedText).replace(/\n/g, "<br />")}</div>`;
+      return `${unit.source_markdown}\n${anchor}\n<div class="doc-generated-translation not-prose my-2 border-l-2 border-emerald-400/70 pl-3 text-sm leading-relaxed text-emerald-300" data-doc-translation-line="${escapeHtml(unit.unit_id)}"${projectionAttrSuffix}>${escapeHtml(translatedText).replace(/\n/g, "<br />")}</div>`;
     })
     .join("\n");
 }

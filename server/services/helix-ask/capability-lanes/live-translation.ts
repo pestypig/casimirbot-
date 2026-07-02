@@ -108,6 +108,7 @@ const buildLaneObservationPacket = (input: {
     chunkId: string;
     chunkIndex: number | null;
     dedupeKey: string;
+    sourceEventId: string | null;
     sourceEventMs: number | null;
     observedAtMs: number;
     freshnessStatus: HelixLiveTranslationChunkFreshnessStatus;
@@ -147,6 +148,7 @@ const buildLaneObservationPacket = (input: {
           chunk_id: input.chunk.chunkId,
           chunk_index: input.chunk.chunkIndex,
           dedupe_key: input.chunk.dedupeKey,
+          source_event_id: input.chunk.sourceEventId,
           source_event_ms: input.chunk.sourceEventMs,
           observed_at_ms: input.chunk.observedAtMs,
           freshness_status: input.chunk.freshnessStatus,
@@ -195,6 +197,7 @@ const buildProjectionReceipt = (input: {
     chunkId: string;
     chunkIndex: number | null;
     dedupeKey: string;
+    sourceEventId: string | null;
     sourceEventMs: number | null;
     observedAtMs: number;
     freshnessStatus: HelixLiveTranslationChunkFreshnessStatus;
@@ -225,6 +228,7 @@ const buildProjectionReceipt = (input: {
   chunk_id: input.chunk.chunkId,
   chunk_index: input.chunk.chunkIndex,
   dedupe_key: input.chunk.dedupeKey,
+  source_event_id: input.chunk.sourceEventId,
   source_event_ms: input.chunk.sourceEventMs,
   observed_at_ms: input.chunk.observedAtMs,
   freshness_status: input.chunk.freshnessStatus,
@@ -282,6 +286,7 @@ export const runLiveTranslationTranslateText = (input: {
     targetLanguage,
     text,
   });
+  const sourceEventId = normalizeOptionalText(input.request.source_event_id);
   const sourceEventMs = normalizeNonNegativeInteger(input.request.source_event_ms);
   const observedAtMs = Date.now();
   const projectionTarget = normalizeProjectionTarget(input.request.projection_target);
@@ -293,6 +298,7 @@ export const runLiveTranslationTranslateText = (input: {
     chunkId,
     chunkIndex,
     dedupeKey,
+    sourceEventId,
     sourceEventMs,
     observedAtMs,
     freshnessStatus,
@@ -435,6 +441,7 @@ export const runLiveTranslationTranslateText = (input: {
     chunk_id: chunkId,
     chunk_index: chunkIndex,
     dedupe_key: dedupeKey,
+    source_event_id: sourceEventId,
     source_event_ms: sourceEventMs,
     observed_at_ms: observedAtMs,
     freshness_status: freshnessStatus,

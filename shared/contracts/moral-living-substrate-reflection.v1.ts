@@ -31,9 +31,18 @@ export type MoralLivingSubstrateBadgeV1 = {
   whyItMatters: string;
   maturity: MoralLivingSubstrateMaturityTierV1;
   sourceTheoryBadgeIds: string[];
+  sourceRefs: MoralLivingSubstrateSourceRefV1[];
   tags: string[];
   hintKeys: string[];
   claimBoundaryNotes: string[];
+};
+
+export type MoralLivingSubstrateSourceRefV1 = {
+  id: string;
+  kind: "paper" | "article" | "database" | "book" | "doc";
+  title: string;
+  url: string;
+  note: string;
 };
 
 export type MoralLivingSubstrateMatchV1 = {
@@ -42,6 +51,7 @@ export type MoralLivingSubstrateMatchV1 = {
   score: number;
   reasons: string[];
   sourceTheoryBadgeIds: string[];
+  sourceRefs: MoralLivingSubstrateSourceRefV1[];
   claimBoundaryNotes: string[];
 };
 
@@ -52,6 +62,36 @@ export type MoralLivingSubstrateRecommendedActionV1 = {
   args: Record<string, unknown>;
   mutatesCalculator: boolean;
   solves: false;
+};
+
+export type MoralLivingSubstrateEstimateLevelV1 = "low" | "medium" | "high" | "unknown";
+
+export type MoralLivingSubstrateProceduralDerivationV1 = {
+  derivationId: string;
+  label: string;
+  matchedBadgeIds: string[];
+  evidenceStrength: "weak" | "moderate" | "strong";
+  proceduralQuestion: string;
+  substrateObservation: string;
+  estimate: {
+    vulnerability: MoralLivingSubstrateEstimateLevelV1;
+    dependency: MoralLivingSubstrateEstimateLevelV1;
+    agency: MoralLivingSubstrateEstimateLevelV1;
+  };
+  obligationHint: string;
+  caution: string;
+  forbiddenOverclaim: string;
+};
+
+export type MoralLivingSubstrateSynthesisStepV1 = {
+  stepId: string;
+  label: string;
+  description: string;
+  derivedFrom: string[];
+  outputKind:
+    | "substrate_observation"
+    | "vulnerability_dependency_agency_estimate"
+    | "obligation_caution_forbidden_overclaim";
 };
 
 export type MoralLivingSubstrateAdmissionV1 = {
@@ -79,7 +119,10 @@ export type MoralLivingSubstrateReflectionV1 = {
   };
   exactMatches: MoralLivingSubstrateMatchV1[];
   likelyMatches: MoralLivingSubstrateMatchV1[];
+  proceduralDerivations: MoralLivingSubstrateProceduralDerivationV1[];
+  synthesisPath: MoralLivingSubstrateSynthesisStepV1[];
   sourceTheoryBadgeIds: string[];
+  sourceRefs: MoralLivingSubstrateSourceRefV1[];
   claimBoundaryNotes: string[];
   evidenceForAsk: {
     summary: string;
@@ -145,6 +188,8 @@ const isFiniteNumber = (value: unknown): value is number =>
 const includes = <T extends readonly string[]>(values: T, value: unknown): value is T[number] =>
   typeof value === "string" && values.includes(value);
 
+const SOURCE_REF_KINDS = ["paper", "article", "database", "book", "doc"] as const;
+
 function newReflectionId(): string {
   return `moral-living-substrate-reflection:${Date.now().toString(36)}:${Math.random()
     .toString(36)
@@ -180,6 +225,26 @@ function validateMatch(prefix: string, value: unknown, issues: string[]): void {
   for (const field of ["reasons", "sourceTheoryBadgeIds", "claimBoundaryNotes"] as const) {
     if (!isStringArray(value[field])) issues.push(`${prefix}.${field} must be a string array`);
   }
+  validateSourceRefs(`${prefix}.sourceRefs`, value.sourceRefs, issues);
+}
+
+function validateSourceRef(prefix: string, value: unknown, issues: string[]): void {
+  if (!isRecord(value)) {
+    issues.push(`${prefix} must be an object`);
+    return;
+  }
+  for (const field of ["id", "title", "url", "note"] as const) {
+    if (!isNonEmptyString(value[field])) issues.push(`${prefix}.${field} must be a non-empty string`);
+  }
+  if (!includes(SOURCE_REF_KINDS, value.kind)) issues.push(`${prefix}.kind is invalid`);
+}
+
+function validateSourceRefs(prefix: string, value: unknown, issues: string[]): void {
+  if (!Array.isArray(value)) {
+    issues.push(`${prefix} must be an array`);
+    return;
+  }
+  value.forEach((entry: unknown, index: number) => validateSourceRef(`${prefix}[${index}]`, entry, issues));
 }
 
 function validateMatchArray(prefix: string, value: unknown, issues: string[]): void {
@@ -204,6 +269,55 @@ function validateRecommendedAction(prefix: string, value: unknown, issues: strin
   if (!isRecord(value.args)) issues.push(`${prefix}.args must be an object`);
   if (typeof value.mutatesCalculator !== "boolean") issues.push(`${prefix}.mutatesCalculator must be boolean`);
   if (value.solves !== false) issues.push(`${prefix}.solves must be false`);
+}
+
+const ESTIMATE_LEVELS: MoralLivingSubstrateEstimateLevelV1[] = ["low", "medium", "high", "unknown"];
+const DERIVATION_STRENGTHS = ["weak", "moderate", "strong"] as const;
+const SYNTHESIS_OUTPUT_KINDS: MoralLivingSubstrateSynthesisStepV1["outputKind"][] = [
+  "substrate_observation",
+  "vulnerability_dependency_agency_estimate",
+  "obligation_caution_forbidden_overclaim",
+];
+
+function validateProceduralDerivation(prefix: string, value: unknown, issues: string[]): void {
+  if (!isRecord(value)) {
+    issues.push(`${prefix} must be an object`);
+    return;
+  }
+  for (const field of [
+    "derivationId",
+    "label",
+    "proceduralQuestion",
+    "substrateObservation",
+    "obligationHint",
+    "caution",
+    "forbiddenOverclaim",
+  ] as const) {
+    if (!isNonEmptyString(value[field])) issues.push(`${prefix}.${field} must be a non-empty string`);
+  }
+  if (!isStringArray(value.matchedBadgeIds)) issues.push(`${prefix}.matchedBadgeIds must be a string array`);
+  if (!includes(DERIVATION_STRENGTHS, value.evidenceStrength)) {
+    issues.push(`${prefix}.evidenceStrength is invalid`);
+  }
+  if (!isRecord(value.estimate)) {
+    issues.push(`${prefix}.estimate must be an object`);
+  } else {
+    for (const field of ["vulnerability", "dependency", "agency"] as const) {
+      if (!includes(ESTIMATE_LEVELS, value.estimate[field])) issues.push(`${prefix}.estimate.${field} is invalid`);
+    }
+  }
+}
+
+function validateSynthesisStep(prefix: string, value: unknown, issues: string[]): void {
+  if (!isRecord(value)) {
+    issues.push(`${prefix} must be an object`);
+    return;
+  }
+  for (const field of ["stepId", "label", "description"] as const) {
+    if (!isNonEmptyString(value[field])) issues.push(`${prefix}.${field} must be a non-empty string`);
+  }
+  if (!isStringArray(value.derivedFrom)) issues.push(`${prefix}.derivedFrom must be a string array`);
+  if (!includes(SYNTHESIS_OUTPUT_KINDS, value.outputKind)) issues.push(`${prefix}.outputKind is invalid`);
 }
 
 function validateAdmissions(prefix: string, value: unknown, issues: string[]): void {
@@ -279,7 +393,22 @@ export function validateMoralLivingSubstrateReflectionV1(value: unknown): string
 
   validateMatchArray("exactMatches", value.exactMatches, issues);
   validateMatchArray("likelyMatches", value.likelyMatches, issues);
+  if (!Array.isArray(value.proceduralDerivations)) {
+    issues.push("proceduralDerivations must be an array");
+  } else {
+    value.proceduralDerivations.forEach((derivation: unknown, index: number) =>
+      validateProceduralDerivation(`proceduralDerivations[${index}]`, derivation, issues),
+    );
+  }
+  if (!Array.isArray(value.synthesisPath)) {
+    issues.push("synthesisPath must be an array");
+  } else {
+    value.synthesisPath.forEach((step: unknown, index: number) =>
+      validateSynthesisStep(`synthesisPath[${index}]`, step, issues),
+    );
+  }
   if (!isStringArray(value.sourceTheoryBadgeIds)) issues.push("sourceTheoryBadgeIds must be a string array");
+  validateSourceRefs("sourceRefs", value.sourceRefs, issues);
   if (!isStringArray(value.claimBoundaryNotes)) issues.push("claimBoundaryNotes must be a string array");
 
   if (!isRecord(value.evidenceForAsk)) {

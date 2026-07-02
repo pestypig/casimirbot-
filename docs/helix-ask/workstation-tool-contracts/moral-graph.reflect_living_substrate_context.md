@@ -6,9 +6,9 @@ Maturity: `candidate`
 
 Reflect a prompt through the Moral Graph living-substrate layer to identify
 bounded moral substrate badges, source Theory Badge Graph links, claim-boundary
-notes, and recommended next actions. This is diagnostic evidence for compound
-reasoning; it is not a final answer, a proof of consciousness, or a moral-status
-verdict.
+notes, procedural derivations, and recommended next actions. This is diagnostic
+evidence for compound reasoning; it is not a final answer, a proof of
+consciousness, or a moral-status verdict.
 
 This contract is defined by
 `docs/architecture/moral-graph-consciousness-substrate-patch-goal.md`.
@@ -61,7 +61,12 @@ Required observation fields:
 - `exact_substrate_badge_ids`
 - `likely_substrate_badge_ids`
 - `matched_substrate_badge_ids`
+- `procedural_derivation_ids`
+- `procedural_derivations`
+- `synthesis_path`
 - `source_theory_badge_ids`
+- `source_ref_ids`
+- `source_references`
 - `claim_boundary_notes`
 - `recommended_action_ids`
 - `admissions_included`
@@ -74,14 +79,23 @@ Required observation fields:
 
 ## Boundary
 
-The Moral Graph substrate lane derives procedural constraints from living-system
-primitives: organism/environment boundary, entropy-gradient exposure, sensing,
+The Moral Graph substrate lane derives procedural constraints from pre-boundary
+and living-system primitives: source/sink or energy-gradient conditions, flux,
+compartment or concentration conditions, organism/environment boundary, sensing,
 perturbation response, homeostatic maintenance, and cross-scale coordination.
+The procedural layer must preserve this path:
+
+```txt
+condition -> boundary -> sensing -> maintenance -> response -> coordination -> obligation/check
+```
 
 Mechanism, equations, Fourier/frequency payloads, source maturity, and
 calculator loadouts remain owned by the Theory Badge Graph and calculator. A
 recommended calculator action is a theory-owned next action; it is not a Moral
-Graph solve.
+Graph solve. Moral Graph receipts may point to low-entropy source/sink physics,
+thermodynamic gradients, proton-gradient or hydrothermal-vent chemistry, and
+objective-reduction/Orch-OR frontier mechanisms, but must not promote those
+mechanisms into Moral Graph authority.
 
 Orch-OR, Hameroff/Penrose, microtubule, and anesthetic perturbation references
 are frontier context only. They must not be promoted into proof of human-like
@@ -97,7 +111,12 @@ receipt_ref
 support_refs
 tool_output_refs
 matched_substrate_badge_ids
+procedural_derivation_ids
+procedural_derivations
+synthesis_path
 source_theory_badge_ids
+source_ref_ids
+source_references
 claim_boundary_notes
 ```
 
@@ -119,6 +138,8 @@ Final synthesis with explicit claim boundaries
 Required stable tests:
 
 - reflection succeeds with prompt and returns substrate badge ids
+- reflection returns procedural derivations and the substrate -> estimate ->
+  obligation/caution/overclaim synthesis path
 - missing prompt blocks with `moral_living_substrate_prompt_missing`
 - reflection remains non-terminal evidence
 - recommended actions preserve the Moral Graph / Theory Graph / calculator split

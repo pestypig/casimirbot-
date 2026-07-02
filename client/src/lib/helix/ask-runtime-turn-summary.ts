@@ -4,6 +4,10 @@ import {
   isHelixAgentRuntimeId,
   resolveHelixAskActualAgentProviderLabel,
 } from "@/lib/helix/ask-agent-runtime-display";
+import {
+  buildHelixLiveTranslationUiProjections,
+  summarizeHelixLiveTranslationUiProjectionTraffic,
+} from "@/lib/helix/live-translation-projection";
 
 type RecordLike = Record<string, unknown>;
 
@@ -53,45 +57,61 @@ function readBackendSelectionDecisionParts(value: unknown): string[] {
   ].filter(Boolean);
 }
 
-function readLanePacketBackendParts(packet: RecordLike | null): string[] {
+function readLanePacketBackendParts(packet: RecordLike | null, trace?: RecordLike | null): string[] {
   const stateDelta = readRecord(packet?.state_delta);
   const shadowExecution = readRecord(stateDelta?.capability_lane_shadow_execution);
   const decision = readRecord(packet?.backend_selection_decision);
+  const traceDecision = readRecord(trace?.backend_selection_decision);
   const selectedBackend =
     coerceText(packet?.selected_backend_provider) ||
     coerceText(shadowExecution?.selected_backend_provider) ||
-    coerceText(decision?.selected_backend_provider);
+    coerceText(decision?.selected_backend_provider) ||
+    coerceText(trace?.selected_backend_provider) ||
+    coerceText(traceDecision?.selected_backend_provider);
   const requestedBackend =
     coerceText(packet?.requested_backend_provider) ||
     coerceText(shadowExecution?.requested_backend_provider) ||
-    coerceText(decision?.requested_backend_provider);
+    coerceText(decision?.requested_backend_provider) ||
+    coerceText(trace?.requested_backend_provider) ||
+    coerceText(traceDecision?.requested_backend_provider);
   const execution =
     coerceText(packet?.execution_status) ||
-    coerceText(shadowExecution?.execution_status);
+    coerceText(shadowExecution?.execution_status) ||
+    coerceText(trace?.execution_status) ||
+    (packet?.status === "succeeded" ? "executed_observation_only" : "");
   const availability =
     coerceText(packet?.availability_status) ||
-    coerceText(shadowExecution?.availability_status);
+    coerceText(shadowExecution?.availability_status) ||
+    coerceText(trace?.availability_status);
   const permission =
     coerceText(packet?.permission_status) ||
-    coerceText(shadowExecution?.permission_status);
+    coerceText(shadowExecution?.permission_status) ||
+    coerceText(trace?.permission_status);
   const cost =
     coerceText(packet?.cost_class) ||
-    coerceText(shadowExecution?.cost_class);
+    coerceText(shadowExecution?.cost_class) ||
+    coerceText(trace?.cost_class);
   const latency =
     coerceText(packet?.latency_class) ||
-    coerceText(shadowExecution?.latency_class);
+    coerceText(shadowExecution?.latency_class) ||
+    coerceText(trace?.latency_class);
   const privacy =
     coerceText(packet?.privacy_class) ||
-    coerceText(shadowExecution?.privacy_class);
+    coerceText(shadowExecution?.privacy_class) ||
+    coerceText(trace?.privacy_class);
   const fallback =
     coerceText(packet?.fallback_backend_provider) ||
     coerceText(shadowExecution?.fallback_backend_provider) ||
-    coerceText(decision?.fallback_backend_provider);
+    coerceText(decision?.fallback_backend_provider) ||
+    coerceText(trace?.fallback_backend_provider) ||
+    coerceText(traceDecision?.fallback_backend_provider);
   const observationOnly =
     packet?.terminal_eligible === false ||
     packet?.assistant_answer === false ||
     shadowExecution?.terminal_eligible === false ||
-    shadowExecution?.assistant_answer === false;
+    shadowExecution?.assistant_answer === false ||
+    trace?.terminal_eligible === false ||
+    trace?.assistant_answer === false;
   return [
     selectedBackend ? `backend ${selectedBackend}` : "",
     requestedBackend ? `requested backend ${requestedBackend}` : "",
@@ -102,7 +122,7 @@ function readLanePacketBackendParts(packet: RecordLike | null): string[] {
     latency ? `latency ${latency}` : "",
     privacy ? `privacy ${privacy}` : "",
     fallback ? `fallback ${fallback}` : "",
-    ...readBackendSelectionDecisionParts(decision),
+    ...readBackendSelectionDecisionParts(decision ?? traceDecision),
     observationOnly ? "observation-only" : "",
   ].filter(Boolean);
 }
@@ -156,6 +176,59 @@ function readLaneStatusSummary(record: RecordLike | null, debug: RecordLike | nu
   });
   if (laneIds.length > 6) summaries.push(`+${laneIds.length - 6} more`);
   return summaries.join(" | ");
+}
+
+function readModelVisibleLaneManifest(record: RecordLike | null, debug: RecordLike | null): RecordLike | null {
+  const agentLoop = readNestedRecord(record?.agent_runtime_loop, debug?.agent_runtime_loop);
+  const debugExport = readNestedRecord(record?.debug_export, debug?.debug_export);
+  const adapterContract =
+    readNestedRecord(record?.agent_runtime_adapter_contract, debug?.agent_runtime_adapter_contract) ??
+    readNestedRecord(agentLoop?.agent_runtime_adapter_contract, debugExport?.agent_runtime_adapter_contract);
+  return (
+    readRecord(record?.model_visible_capability_lane_manifest) ??
+    readRecord(debug?.model_visible_capability_lane_manifest) ??
+    readRecord(agentLoop?.model_visible_capability_lane_manifest) ??
+    readRecord(debugExport?.model_visible_capability_lane_manifest) ??
+    readRecord(adapterContract?.model_visible_capability_lane_manifest)
+  );
+}
+
+function readModelVisibleLaneSummary(record: RecordLike | null, debug: RecordLike | null): string {
+  const manifest = readModelVisibleLaneManifest(record, debug);
+  const laneRecords = readArray(manifest?.lanes)
+    .map((entry) => readRecord(entry))
+    .filter((entry): entry is RecordLike => Boolean(entry));
+
+  const summaries = laneRecords.map((lane) => {
+    const laneId = coerceText(lane.lane_id);
+    if (!laneId) return "";
+    const status = coerceText(lane.status);
+    const backend = coerceText(lane.default_backend_provider) || coerceText(lane.backend_family);
+    const capability = readArray(lane.capabilities)
+      .map((entry) => readRecord(entry))
+      .map((entry) => {
+        const capabilityId = coerceText(entry?.capability_id);
+        const oneShot = coerceText(entry?.one_shot_status);
+        const session = coerceText(entry?.session_status);
+        return [
+          capabilityId,
+          oneShot ? `one-shot ${oneShot}` : "",
+          session ? `session ${session}` : "",
+        ].filter(Boolean).join(" ");
+      })
+      .find(Boolean);
+    return [
+      laneId,
+      status ? `status ${status}` : "",
+      backend ? `default backend ${backend}` : "",
+      capability ? `capability ${capability}` : "",
+    ].filter(Boolean).join(" | ");
+  }).filter(Boolean);
+
+  const visible = Array.from(new Set(summaries)).slice(0, 6);
+  if (summaries.length > visible.length) visible.push(`+${summaries.length - visible.length} more`);
+  if (visible.length === 0) return "";
+  return `${visible.join(" || ")} || visible does not mean executed`;
 }
 
 function readLaneBackendProviderConfigSummary(record: RecordLike | null, debug: RecordLike | null): string {
@@ -273,9 +346,31 @@ function readLaneProjectionSummary(record: RecordLike | null, debug: RecordLike 
   ]
     .map((entry) => readRecord(entry))
     .filter((entry): entry is RecordLike => Boolean(entry));
+  const traces = [
+    ...readArray(record?.capability_lane_resolve_traces),
+    ...readArray(debug?.capability_lane_resolve_traces),
+    ...readArray(record?.capability_lane_backend_selections),
+    ...readArray(debug?.capability_lane_backend_selections),
+  ]
+    .map((entry) => readRecord(entry))
+    .filter((entry): entry is RecordLike => Boolean(entry));
 
   const summaries = calls.map((call) => {
     const capability = coerceText(call.capability) || coerceText(call.capability_key) || coerceText(call.capability_id);
+    const laneId = coerceText(call.lane_id) || capability.split(".")[0];
+    const trace = traces.find((candidate) => {
+      const traceCapability =
+        coerceText(candidate.capability) ||
+        coerceText(candidate.capability_key) ||
+        coerceText(candidate.capability_id);
+      const traceLane =
+        coerceText(candidate.lane_id) ||
+        coerceText(candidate.requested_lane);
+      return Boolean(
+        (capability && traceCapability === capability) ||
+        (laneId && traceLane === laneId),
+      );
+    }) ?? readRecord(call.lane_resolve_trace);
     const observation = readRecord(call.observation);
     const packet = readRecord(call.observation_packet);
     const packetState = readRecord(packet?.state_delta);
@@ -284,7 +379,7 @@ function readLaneProjectionSummary(record: RecordLike | null, debug: RecordLike 
       ? packets.find((candidate) => coerceText(candidate.observation_ref) === observationRef)
       : null;
     const packetForBackend = packet ?? fallbackPacket;
-    const backendParts = readLanePacketBackendParts(packetForBackend);
+    const backendParts = readLanePacketBackendParts(packetForBackend, trace);
     const fallbackState = readRecord(fallbackPacket?.state_delta);
     const status = call.ok === true ? "projected" : coerceText(packet?.status) || "not_projected";
     const packetSummary = coerceText(packet?.observation_summary) || coerceText(call.observation_summary);
@@ -308,6 +403,7 @@ function readLaneProjectionSummary(record: RecordLike | null, debug: RecordLike 
       const chunkId = coerceText(observation?.chunk_id) || coerceText(chunk?.chunk_id);
       const chunkIndex = coerceText(observation?.chunk_index) || coerceText(chunk?.chunk_index);
       const dedupeKey = coerceText(observation?.dedupe_key) || coerceText(chunk?.dedupe_key);
+      const sourceEventId = coerceText(observation?.source_event_id) || coerceText(chunk?.source_event_id);
       const sourceEventMs = coerceText(observation?.source_event_ms) || coerceText(chunk?.source_event_ms);
       const observedAtMs = coerceText(observation?.observed_at_ms) || coerceText(chunk?.observed_at_ms);
       const freshness = coerceText(observation?.freshness_status) || coerceText(chunk?.freshness_status);
@@ -323,7 +419,8 @@ function readLaneProjectionSummary(record: RecordLike | null, debug: RecordLike 
         chunkId ? `chunk ${chunkId}` : "",
         chunkIndex ? `index ${chunkIndex}` : "",
         dedupeKey ? `dedupe ${dedupeKey}` : "",
-        sourceEventMs ? `source event ${sourceEventMs}` : "",
+        sourceEventId ? `source event id ${sourceEventId}` : "",
+        sourceEventMs ? `source event ms ${sourceEventMs}` : "",
         observedAtMs ? `observed ${observedAtMs}` : "",
         freshness ? `freshness ${freshness}` : "",
         stale ? "stale" : "",
@@ -410,6 +507,32 @@ function readLaneProjectionSummary(record: RecordLike | null, debug: RecordLike 
   return Array.from(new Set([...summaries, ...receiptSummaries])).slice(0, 3).join(" || ");
 }
 
+function readTranslationProjectionTrafficSummary(record: RecordLike | null, debug: RecordLike | null): string {
+  if (!record && !debug) return "";
+  const projections = buildHelixLiveTranslationUiProjections({
+    ...(record ?? {}),
+    debug: debug ?? record?.debug ?? null,
+  });
+  const summaries = summarizeHelixLiveTranslationUiProjectionTraffic(projections).map((summary) => [
+    summary.sourceId,
+    `target ${summary.projectionTarget}`,
+    summary.targetLanguage ? `language ${summary.targetLanguage}` : "",
+    `chunks ${summary.chunkCount}`,
+    `projected ${summary.projectedCount}`,
+    summary.staleCount ? `stale ${summary.staleCount}` : "",
+    summary.cancelledCount ? `cancelled ${summary.cancelledCount}` : "",
+    summary.failedCount ? `failed ${summary.failedCount}` : "",
+    summary.latestChunkId ? `latest chunk ${summary.latestChunkId}` : "",
+    summary.latestChunkIndex !== null ? `latest index ${summary.latestChunkIndex}` : "",
+    summary.latestFreshnessStatus ? `freshness ${summary.latestFreshnessStatus}` : "",
+    summary.latestObservationRef ? `observation ${summary.latestObservationRef}` : "",
+    summary.latestReceiptRef ? `receipt ${summary.latestReceiptRef}` : "",
+    "observation-only",
+  ].filter(Boolean).join(" | "));
+
+  return Array.from(new Set(summaries)).slice(0, 3).join(" || ");
+}
+
 function readGoalBoundLaneSummary(record: RecordLike | null, debug: RecordLike | null): string {
   const agentLoop = readNestedRecord(record?.agent_runtime_loop, debug?.agent_runtime_loop);
   const debugExport = readNestedRecord(record?.debug_export, debug?.debug_export);
@@ -469,6 +592,15 @@ function readGoalBoundLaneSummary(record: RecordLike | null, debug: RecordLike |
         .filter(Boolean)
         .join("/");
       const observation = coerceText(summary.last_observation_ref);
+      const latestProjection = coerceText(summary.latest_projection_target);
+      const latestChunk = coerceText(summary.latest_chunk_id);
+      const latestChunkIndex = coerceText(summary.latest_chunk_index);
+      const latestDedupe = coerceText(summary.latest_dedupe_key);
+      const latestSourceEventId = coerceText(summary.latest_source_event_id);
+      const latestSourceEventMs = coerceText(summary.latest_source_event_ms);
+      const latestObservedAtMs = coerceText(summary.latest_observed_at_ms);
+      const latestFreshness = coerceText(summary.latest_freshness_status);
+      const latestCancelled = summary.latest_cancel_requested === true;
       const terminalAuthority = coerceText(summary.terminal_authority_status);
       const cost = coerceText(summary.cost_class);
       const latency = coerceText(summary.latency_class);
@@ -486,6 +618,15 @@ function readGoalBoundLaneSummary(record: RecordLike | null, debug: RecordLike |
         fallback ? `fallback ${fallback}` : "",
         ...decisionParts,
         observation ? `observation ${observation}` : "",
+        latestProjection ? `latest projection ${latestProjection}` : "",
+        latestChunk ? `latest chunk ${latestChunk}` : "",
+        latestChunkIndex ? `latest index ${latestChunkIndex}` : "",
+        latestDedupe ? `latest dedupe ${latestDedupe}` : "",
+        latestSourceEventId ? `latest source event id ${latestSourceEventId}` : "",
+        latestSourceEventMs ? `latest source event ms ${latestSourceEventMs}` : "",
+        latestObservedAtMs ? `latest observed ${latestObservedAtMs}` : "",
+        latestFreshness ? `latest freshness ${latestFreshness}` : "",
+        latestCancelled ? "latest cancelled" : "",
         mailLoop ? `mail ${mailLoop}` : "",
         latestGoalEvent ? `event ${latestGoalEvent}` : "",
         receipt ? `receipt ${receipt}` : "",
@@ -505,12 +646,26 @@ function readGoalBoundLaneSummary(record: RecordLike | null, debug: RecordLike |
       const target = coerceText(plan.target);
       const status = coerceText(plan.status);
       const receipt = coerceText(plan.receipt_ref);
+      const source = coerceText(plan.source_id);
+      const projection = coerceText(plan.latest_projection_target);
+      const chunk = coerceText(plan.latest_chunk_id);
+      const dedupe = coerceText(plan.latest_dedupe_key);
+      const sourceEvent = coerceText(plan.latest_source_event_id);
+      const freshness = coerceText(plan.latest_freshness_status);
+      const cancelled = plan.latest_cancel_requested === true;
       return [
         lane,
         goal ? `goal ${goal}` : "",
         session ? `session ${session}` : "",
         target ? `dispatch ${target}` : "",
         status ? `status ${status}` : "",
+        source ? `source ${source}` : "",
+        projection ? `latest projection ${projection}` : "",
+        chunk ? `latest chunk ${chunk}` : "",
+        dedupe ? `latest dedupe ${dedupe}` : "",
+        sourceEvent ? `latest source event id ${sourceEvent}` : "",
+        freshness ? `latest freshness ${freshness}` : "",
+        cancelled ? "latest cancelled" : "",
         receipt ? `receipt ${receipt}` : "",
         "observation-only",
       ].filter(Boolean).join(" | ");
@@ -524,12 +679,26 @@ function readGoalBoundLaneSummary(record: RecordLike | null, debug: RecordLike |
       const session = coerceText(admission.lane_session_id);
       const target = coerceText(admission.target);
       const status = coerceText(admission.status);
+      const source = coerceText(admission.source_id);
+      const projection = coerceText(admission.latest_projection_target);
+      const chunk = coerceText(admission.latest_chunk_id);
+      const dedupe = coerceText(admission.latest_dedupe_key);
+      const sourceEvent = coerceText(admission.latest_source_event_id);
+      const freshness = coerceText(admission.latest_freshness_status);
+      const cancelled = admission.latest_cancel_requested === true;
       return [
         lane,
         goal ? `goal ${goal}` : "",
         session ? `session ${session}` : "",
         target ? `dispatch ${target}` : "",
         status ? `admission ${status}` : "",
+        source ? `source ${source}` : "",
+        projection ? `latest projection ${projection}` : "",
+        chunk ? `latest chunk ${chunk}` : "",
+        dedupe ? `latest dedupe ${dedupe}` : "",
+        sourceEvent ? `latest source event id ${sourceEvent}` : "",
+        freshness ? `latest freshness ${freshness}` : "",
+        cancelled ? "latest cancelled" : "",
         "observation-only",
       ].filter(Boolean).join(" | ");
     }))).slice(0, 3).join(" || ");
@@ -561,6 +730,13 @@ function readGoalDispatchReadinessSummary(record: RecordLike | null, debug: Reco
   const sessions = readArray(readiness.next_lane_session_ids).map(coerceText).filter(Boolean).join(", ");
   const targets = readArray(readiness.next_dispatch_targets).map(coerceText).filter(Boolean).join(", ");
   const goalBindings = readArray(readiness.next_goal_binding_ids).map(coerceText).filter(Boolean).join(", ");
+  const sourceIds = readArray(readiness.next_source_ids).map(coerceText).filter(Boolean).join(", ");
+  const chunkIds = readArray(readiness.next_chunk_ids).map(coerceText).filter(Boolean).join(", ");
+  const dedupeKeys = readArray(readiness.next_dedupe_keys).map(coerceText).filter(Boolean).join(", ");
+  const sourceEventIds = readArray(readiness.next_source_event_ids).map(coerceText).filter(Boolean).join(", ");
+  const projectionTargets = readArray(readiness.next_projection_targets).map(coerceText).filter(Boolean).join(", ");
+  const freshnessStatuses = readArray(readiness.next_freshness_statuses).map(coerceText).filter(Boolean).join(", ");
+  const nextCancelled = readiness.next_cancel_requested === true;
   const evidenceRefs = readArray(readiness.next_evidence_refs).map(coerceText).filter(Boolean).join(", ");
   const receipts = readArray(readiness.next_receipt_refs).map(coerceText).filter(Boolean).join(", ");
   const blockedReasons = readArray(readiness.blocked_reasons).map(coerceText).filter(Boolean).join(", ");
@@ -579,6 +755,13 @@ function readGoalDispatchReadinessSummary(record: RecordLike | null, debug: Reco
     sessions ? `sessions ${sessions}` : "",
     targets ? `targets ${targets}` : "",
     goalBindings ? `goal bindings ${goalBindings}` : "",
+    sourceIds ? `sources ${sourceIds}` : "",
+    projectionTargets ? `projections ${projectionTargets}` : "",
+    chunkIds ? `chunks ${chunkIds}` : "",
+    dedupeKeys ? `dedupe ${dedupeKeys}` : "",
+    sourceEventIds ? `source events ${sourceEventIds}` : "",
+    freshnessStatuses ? `freshness ${freshnessStatuses}` : "",
+    nextCancelled ? "cancelled" : "",
     evidenceRefs ? `evidence ${evidenceRefs}` : "",
     receipts ? `receipts ${receipts}` : "",
     blockedReasons ? `blocked ${blockedReasons}` : "",
@@ -613,6 +796,15 @@ function readLaneSessionSummary(record: RecordLike | null, debug: RecordLike | n
       const source = coerceText(summary.source_id);
       const projection = coerceText(summary.projection_target);
       const locale = coerceText(summary.account_locale);
+      const latestProjection = coerceText(summary.latest_projection_target);
+      const latestChunk = coerceText(summary.latest_chunk_id);
+      const latestChunkIndex = coerceText(summary.latest_chunk_index);
+      const latestDedupe = coerceText(summary.latest_dedupe_key);
+      const latestSourceEventId = coerceText(summary.latest_source_event_id);
+      const latestSourceEventMs = coerceText(summary.latest_source_event_ms);
+      const latestObservedAtMs = coerceText(summary.latest_observed_at_ms);
+      const latestFreshness = coerceText(summary.latest_freshness_status);
+      const latestCancelled = summary.latest_cancel_requested === true;
       const observation = coerceText(summary.last_observation_ref);
       const receipt = coerceText(summary.last_receipt_ref);
       const terminalAuthority = coerceText(summary.terminal_authority_status);
@@ -629,6 +821,15 @@ function readLaneSessionSummary(record: RecordLike | null, debug: RecordLike | n
         source ? `source ${source}` : "",
         projection ? `projection ${projection}` : "",
         locale ? `locale ${locale}` : "",
+        latestProjection && latestProjection !== projection ? `latest projection ${latestProjection}` : "",
+        latestChunk ? `latest chunk ${latestChunk}` : "",
+        latestChunkIndex ? `latest index ${latestChunkIndex}` : "",
+        latestDedupe ? `latest dedupe ${latestDedupe}` : "",
+        latestSourceEventId ? `latest source event id ${latestSourceEventId}` : "",
+        latestSourceEventMs ? `latest source event ms ${latestSourceEventMs}` : "",
+        latestObservedAtMs ? `latest observed ${latestObservedAtMs}` : "",
+        latestFreshness ? `latest freshness ${latestFreshness}` : "",
+        latestCancelled ? "latest cancelled" : "",
         observation ? `observation ${observation}` : "",
         receipt ? `receipt ${receipt}` : "",
         terminalAuthority ? `authority ${terminalAuthority}` : "",
@@ -661,6 +862,7 @@ function readLaneMailLoopSummary(record: RecordLike | null, debug: RecordLike | 
       const chunk = coerceText(summary.chunk_id);
       const chunkIndex = coerceText(summary.chunk_index);
       const dedupeKey = coerceText(summary.dedupe_key);
+      const sourceEventId = coerceText(summary.source_event_id);
       const sourceEventMs = coerceText(summary.source_event_ms);
       const observedAtMs = coerceText(summary.observed_at_ms);
       const backend = coerceText(summary.selected_backend_provider);
@@ -683,7 +885,8 @@ function readLaneMailLoopSummary(record: RecordLike | null, debug: RecordLike | 
         chunk ? `chunk ${chunk}` : "",
         chunkIndex ? `index ${chunkIndex}` : "",
         dedupeKey ? `dedupe ${dedupeKey}` : "",
-        sourceEventMs ? `source event ${sourceEventMs}` : "",
+        sourceEventId ? `source event id ${sourceEventId}` : "",
+        sourceEventMs ? `source event ms ${sourceEventMs}` : "",
         observedAtMs ? `observed ${observedAtMs}` : "",
         cancelled ? "cancelled" : "",
         backend ? `backend ${backend}` : "",
@@ -733,11 +936,13 @@ export function buildHelixAskRuntimeTurnSummary(
   const runtime = readSelectedRuntime(record, debug);
   const providerLabel = resolveHelixAskActualAgentProviderLabel(response, providers)?.replace(/^Provider:\s*/i, "");
   const adapter = readAdapterBoundary(record, debug, runtime);
+  const visibleLanes = readModelVisibleLaneSummary(record, debug);
   const lanes = readLaneStatusSummary(record, debug);
   const backendProviders = readLaneBackendProviderConfigSummary(record, debug);
   const backend = readLaneBackendSummary(record, debug);
   const tools = readTurnToolSummary(record, debug);
   const projection = readLaneProjectionSummary(record, debug);
+  const translationTraffic = readTranslationProjectionTrafficSummary(record, debug);
   const laneSessions = readLaneSessionSummary(record, debug);
   const laneMail = readLaneMailLoopSummary(record, debug);
   const goalBoundLanes = readGoalBoundLaneSummary(record, debug);
@@ -754,6 +959,7 @@ export function buildHelixAskRuntimeTurnSummary(
         }
       : null,
     adapter ? { key: "adapter_boundary", label: "Adapter boundary", value: adapter } : null,
+    visibleLanes ? { key: "visible_lanes", label: "Visible lanes", value: visibleLanes } : null,
     lanes ? { key: "capability_lanes", label: "Capability lanes", value: lanes } : null,
     backendProviders
       ? { key: "lane_backend_providers", label: "Lane backend providers", value: backendProviders }
@@ -761,6 +967,9 @@ export function buildHelixAskRuntimeTurnSummary(
     backend ? { key: "lane_backend", label: "Lane backend", value: backend } : null,
     tools ? { key: "turn_tools", label: "Turn tools", value: tools } : null,
     projection ? { key: "lane_projection", label: "Lane projection", value: projection } : null,
+    translationTraffic
+      ? { key: "translation_traffic", label: "Translation traffic", value: translationTraffic }
+      : null,
     laneSessions ? { key: "lane_sessions", label: "Lane sessions", value: laneSessions } : null,
     laneMail ? { key: "lane_mail", label: "Lane mail", value: laneMail } : null,
     goalBoundLanes ? { key: "goal_bound_lanes", label: "Goal-bound lanes", value: goalBoundLanes } : null,

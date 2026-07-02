@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import TheoryBadgeGraphPanel from "../panels/TheoryBadgeGraphPanel";
 import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
@@ -49,48 +49,66 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
     expect(await screen.findByTestId("theory-achievement-map-scrollport")).toBeTruthy();
     expect(screen.queryByTestId("discussion-soft-region")).toBeNull();
     expect(screen.queryByTestId("discussion-zone-legend")).toBeNull();
+    expect(screen.queryByTestId("theory-badge-connection-edge")).toBeNull();
+    expect(screen.queryByTestId("theory-seed-atlas-overlay")).toBeNull();
+  });
+
+  it("renders repeated biome wordmarks using chunk scale and domain labels", async () => {
+    renderPanel();
+
+    expect(await screen.findByTestId("theory-achievement-map-scrollport")).toBeTruthy();
+    expect(screen.getByTestId("theory-biome-cell-wordmarks")).toHaveAttribute("aria-hidden", "true");
+
+    const wordmarks = screen.getAllByTestId("theory-biome-cell-wordmark");
+    expect(wordmarks.length).toBeGreaterThan(32);
+    expect(wordmarks.some((wordmark) => wordmark.textContent === "Formal / Quantum")).toBe(true);
+    expect(wordmarks.some((wordmark) => wordmark.textContent === "Engineering / NHM2")).toBe(true);
+    expect(wordmarks[0].parentElement).toHaveAttribute("clip-path", expect.stringContaining("theory-biome-wordmark-clip"));
+    expect(Number(wordmarks[0].getAttribute("data-font-size"))).toBeGreaterThanOrEqual(11);
+    expect(
+      wordmarks.some(
+        (wordmark) =>
+          wordmark.getAttribute("data-biome-band") === "claim_boundary" &&
+          wordmark.getAttribute("data-domain-key") === "claim_boundary" &&
+          wordmark.textContent === "Boundary / Claim Boundary",
+      ),
+    ).toBe(true);
   });
 
   it("zooms the achievement map with floating controls and plus/minus keys", async () => {
-    const animationFrameSpy = vi
-      .spyOn(window, "requestAnimationFrame")
-      .mockImplementation((callback: FrameRequestCallback) => {
-        callback(performance.now() + 400);
-        return 1;
-      });
-    const cancelAnimationFrameSpy = vi
-      .spyOn(window, "cancelAnimationFrame")
-      .mockImplementation(() => undefined);
+    const animationFrameSpy = vi.spyOn(window, "requestAnimationFrame");
+    renderPanel();
 
-    try {
-      renderPanel();
+    const scrollport = await screen.findByTestId("theory-achievement-map-scrollport");
+    const initialZoom = Number(scrollport.getAttribute("data-zoom-level"));
+    const initialWordmarkFontSize = Number(
+      screen.getAllByTestId("theory-biome-cell-wordmark")[0].getAttribute("data-font-size"),
+    );
 
-      const scrollport = await screen.findByTestId("theory-achievement-map-scrollport");
-      const initialZoom = Number(scrollport.getAttribute("data-zoom-level"));
+    fireEvent.click(screen.getByRole("button", { name: "Zoom out" }));
 
-      fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
+    await waitFor(() => {
+      expect(Number(scrollport.getAttribute("data-zoom-level"))).toBeLessThan(initialZoom);
+      expect(Number(screen.getAllByTestId("theory-biome-cell-wordmark")[0].getAttribute("data-font-size"))).toBeGreaterThan(
+        initialWordmarkFontSize,
+      );
+    });
+    expect(animationFrameSpy).not.toHaveBeenCalled();
 
-      await waitFor(() => {
-        expect(Number(scrollport.getAttribute("data-zoom-level"))).toBeGreaterThan(initialZoom);
-      });
+    const zoomedOut = Number(scrollport.getAttribute("data-zoom-level"));
+    fireEvent.keyDown(window, { key: "+", code: "Equal" });
 
-      const zoomedIn = Number(scrollport.getAttribute("data-zoom-level"));
-      fireEvent.keyDown(window, { key: "-", code: "Minus" });
+    await waitFor(() => {
+      expect(Number(scrollport.getAttribute("data-zoom-level"))).toBeGreaterThan(zoomedOut);
+    });
 
-      await waitFor(() => {
-        expect(Number(scrollport.getAttribute("data-zoom-level"))).toBeLessThan(zoomedIn);
-      });
+    const zoomedIn = Number(scrollport.getAttribute("data-zoom-level"));
+    fireEvent.keyDown(window, { key: "-", code: "Minus" });
 
-      const zoomedOut = Number(scrollport.getAttribute("data-zoom-level"));
-      fireEvent.keyDown(window, { key: "+", code: "Equal" });
-
-      await waitFor(() => {
-        expect(Number(scrollport.getAttribute("data-zoom-level"))).toBeGreaterThan(zoomedOut);
-      });
-    } finally {
-      animationFrameSpy.mockRestore();
-      cancelAnimationFrameSpy.mockRestore();
-    }
+    await waitFor(() => {
+      expect(Number(scrollport.getAttribute("data-zoom-level"))).toBeLessThan(zoomedIn);
+    });
+    animationFrameSpy.mockRestore();
   });
 
   it("keeps reflection receipts as backend memory with a live answer rail block", async () => {
@@ -372,8 +390,15 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
     const boundary = await screen.findByRole("button", { name: "Diagnostic-only claim boundary" });
 
     expect(boundary).not.toHaveAttribute("data-discussion-match");
+    expect(boundary).toHaveAttribute("data-badge-visual-state", "backendOverlay");
     expect(boundary.className).toMatch(/border-amber-300/);
     expect(boundary.className).not.toMatch(/ring-emerald/);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Rest Energy" }));
+
+    await waitFor(() => {
+      expect(boundary).not.toHaveAttribute("data-badge-visual-state", "backendOverlay");
+    });
   });
 
   it("loads a badge equation to the calculator without opening an inspector popup", async () => {
@@ -381,7 +406,16 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
 
     expect(await screen.findByTestId("theory-achievement-map-scrollport")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Load Theory Run" })).toBeNull();
-    fireEvent.click(await screen.findByRole("button", { name: "Rest Energy" }));
+    const restEnergy = await screen.findByRole("button", { name: "Rest Energy" });
+    expect(restEnergy).not.toHaveAttribute("title");
+    const tooltipId = restEnergy.getAttribute("aria-describedby");
+    expect(tooltipId).toBeTruthy();
+    const tooltip = tooltipId ? document.getElementById(tooltipId) : null;
+    expect(tooltip).toHaveAttribute("role", "tooltip");
+    expect(tooltip).toHaveTextContent("Rest Energy");
+    expect(tooltip).toHaveTextContent("E_0=mc^2");
+
+    fireEvent.click(restEnergy);
 
     expect(screen.queryByText(/Selected: Rest Energy/)).toBeNull();
     expect(screen.queryByRole("button", { name: /Load to Calculator/i })).toBeNull();
@@ -438,16 +472,21 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
     });
   });
 
-  it("keeps route metadata in hover text instead of visible graph labels", async () => {
+  it("keeps badge hover content limited to title and LaTeX", async () => {
     renderPanel();
 
     expect(await screen.findByTestId("theory-achievement-map-scrollport")).toBeTruthy();
     fireEvent.click(await screen.findByRole("button", { name: "Einstein field equation" }));
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Einstein field equation" }).getAttribute("title")).toMatch(
-        /reference|tensor|gate|boundary|scalar/i,
-      );
+      const badge = screen.getByRole("button", { name: "Einstein field equation" });
+      expect(badge).not.toHaveAttribute("title");
+      const tooltipId = badge.getAttribute("aria-describedby");
+      expect(tooltipId).toBeTruthy();
+      const tooltip = tooltipId ? document.getElementById(tooltipId) : null;
+      expect(tooltip).toHaveAttribute("role", "tooltip");
+      expect(tooltip).toHaveTextContent("Einstein field equation");
+      expect(tooltip?.textContent).not.toMatch(/reference|tensor|gate|boundary|scalar/i);
     });
     expect(screen.queryByText("reference")).toBeNull();
     expect(screen.queryByText("scalar")).toBeNull();
@@ -467,8 +506,8 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
   it("clears selected badges when clicking empty graph space", async () => {
     renderPanel();
 
-    fireEvent.click(await screen.findByRole("button", { name: "Rest Energy" }), { altKey: true });
-    fireEvent.click(await screen.findByRole("button", { name: "QEI badge replay margin" }), { altKey: true });
+    fireEvent.click(await screen.findByRole("button", { name: "Rest Energy" }));
+    fireEvent.click(await screen.findByRole("button", { name: "QEI badge replay margin" }));
 
     await waitFor(() => {
       expect(useTheoryBadgeGraphPanelStore.getState().selectedBadgeIds).toEqual([
@@ -476,20 +515,49 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
         "nhm2.qei.sampling_window",
       ]);
     });
+    expect(screen.getAllByTestId("theory-badge-connection-edge").length).toBeGreaterThan(0);
+    expect(
+      Array.from(document.querySelectorAll("[data-badge-visual-state='intermediate']")).length,
+    ).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByTestId("theory-achievement-map-scrollport").firstElementChild as Element);
 
     await waitFor(() => {
       expect(useTheoryBadgeGraphPanelStore.getState().selectedBadgeIds).toEqual([]);
       expect(useTheoryBadgeGraphPanelStore.getState().selectedBadgeId).toBeNull();
+      expect(screen.queryByTestId("theory-badge-connection-edge")).toBeNull();
+      expect(document.querySelector("[data-badge-visual-state='selected']")).toBeNull();
+      expect(document.querySelector("[data-badge-visual-state='intermediate']")).toBeNull();
     });
   });
 
-  it("supports multi-select path highlighting without extra trace controls", async () => {
+  it("draws connection lines only after multiple badges are selected", async () => {
     renderPanel();
 
-    fireEvent.click(await screen.findByRole("button", { name: "Rest Energy" }), { ctrlKey: true });
-    fireEvent.click(await screen.findByRole("button", { name: "QEI badge replay margin" }), { ctrlKey: true });
+    const restEnergy = await screen.findByRole("button", { name: "Rest Energy" });
+    expect(screen.queryByText("Current Combination")).toBeNull();
+    expect(screen.queryByTestId("theory-combination-reader")).toBeNull();
+    expect(screen.getByTestId("theory-combination-reader-payload").textContent).toMatch(
+      /theory_badge_graph_combination_reader\/v1/,
+    );
+    fireEvent.click(restEnergy);
+
+    expect(screen.queryByTestId("theory-badge-connection-edge")).toBeNull();
+    expect(restEnergy).toHaveAttribute("data-badge-visual-state", "selected");
+    await waitFor(() => {
+      expect(screen.getByTestId("theory-combination-reader-payload").textContent).toMatch(/1 trace badge/i);
+    });
+    await waitFor(() => {
+      expect(
+        Array.from(document.querySelectorAll("[data-badge-visual-state='connectable']")).length,
+      ).toBeGreaterThan(0);
+      expect(
+        Array.from(document.querySelectorAll("[data-badge-visual-state='unavailable']")).length,
+      ).toBeGreaterThan(0);
+    });
+    expect(document.querySelector("[data-badge-visual-state='unavailable']")).toHaveAttribute("disabled");
+
+    fireEvent.click(await screen.findByRole("button", { name: "QEI badge replay margin" }));
 
     expect(screen.queryByText("Trace Selected Badges")).toBeNull();
     expect(screen.queryByRole("button", { name: /Run Selected Trace/i })).toBeNull();
@@ -499,7 +567,45 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
         "nhm2.qei.sampling_window",
       ]);
     });
+    expect(screen.getByTestId("theory-combination-reader-payload").textContent).toMatch(/intermediateBadges/);
+    expect(screen.getByTestId("theory-combination-reader-payload").textContent).toMatch(/availableNextBadges/);
+    expect(screen.getByTestId("theory-combination-reader-payload").textContent).toMatch(/traceEdges/);
+    expect(screen.queryByRole("button", { name: "Copy current combination reader payload" })).toBeNull();
     expect(screen.getByRole("button", { name: "QEI badge replay margin" }).className).toContain("ring");
+    expect(screen.getAllByTestId("theory-badge-connection-edge").length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId("theory-badge-connection-edge")[0]).toHaveAttribute(
+      "data-edge-visual-state",
+      "tracePath",
+    );
+    expect(screen.getByRole("button", { name: "QEI badge replay margin" })).toHaveAttribute(
+      "data-badge-visual-state",
+      "selected",
+    );
+    expect(
+      Array.from(document.querySelectorAll("[data-badge-visual-state='intermediate']")).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("marks selected badges outside the computed trace as no-path pins", async () => {
+    renderPanel();
+
+    expect(await screen.findByTestId("theory-achievement-map-scrollport")).toBeTruthy();
+
+    act(() => {
+      useTheoryBadgeGraphPanelStore.getState().setSelectedBadgeIds([
+        "physics.units.dimension_consistency",
+        "physics.constants.speed_of_light",
+      ]);
+      useTheoryBadgeGraphPanelStore.getState().setSelectedBadgeId("physics.constants.speed_of_light");
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Speed of Light Constant" })).toHaveAttribute(
+        "data-badge-visual-state",
+        "noPath",
+      );
+    });
+    expect(screen.getByRole("button", { name: "Speed of Light Constant" }).className).toMatch(/ring-amber/);
   });
 
   it("uses the StarSim stellar evolution lens to light mapped badges and load scalar formulas", async () => {

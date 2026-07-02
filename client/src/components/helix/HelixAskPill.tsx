@@ -115,7 +115,6 @@ import {
 import {
   HelixAskFinalAnswer,
 } from "@/components/helix/ask-console/HelixAskFinalAnswer";
-import { HelixAskActiveTurnStreamPanel } from "@/components/helix/ask-console/HelixAskActiveTurnStreamPanel";
 import { HelixAskActionToolbar } from "@/components/helix/ask-console/HelixAskActionToolbar";
 import {
   HelixAskGoalPill,
@@ -235,7 +234,6 @@ import {
   HelixAskConversationBriefPanel,
   HelixAskObserverLanePanel,
 } from "@/components/helix/ask-console/HelixAskObserverLane";
-import { HelixAskSteeringQueuePanel } from "@/components/helix/ask-console/HelixAskSteeringQueuePanel";
 import {
   HelixAskContextCapsulePreview,
 } from "@/components/helix/ask-console/HelixAskContextCapsulePreview";
@@ -290,6 +288,7 @@ import {
   askLiveEventBelongsToActiveTurn,
   buildAskLiveAgenticEventRows,
   buildHelixActiveTurnStreamRows,
+  buildHelixActiveTurnTranscriptRows,
   createHelixAskConsoleStreamIngressDebug,
   filterHelixAskActiveTurnStreamRows,
   incrementHelixAskConsoleDropReason,
@@ -308,6 +307,7 @@ export {
   askLiveEventBelongsToActiveTurn,
   buildAskLiveAgenticEventRows,
   buildHelixActiveTurnStreamRows,
+  buildHelixActiveTurnTranscriptRows,
   createHelixAskConsoleStreamIngressDebug,
   filterHelixAskActiveTurnStreamRows,
   incrementHelixAskConsoleDropReason,
@@ -8580,7 +8580,6 @@ export function HelixAskPill({
     contextCompactionPausePendingRef.current = next;
     setContextCompactionPausePending(next);
   }, []);
-  const [steeringQueueExpanded, setSteeringQueueExpanded] = useState<boolean>(false);
   const liveSourceMailAutoWakeKeyRef = useRef<string | null>(null);
   const [askContextChooser, setAskContextChooser] = useState<AskContextChooserState | null>(null);
   const askContextChooserRef = useRef<AskContextChooserState | null>(null);
@@ -14074,6 +14073,19 @@ export function HelixAskPill({
   const replayHelixAskTurnTranscriptEventsToConsole = useCallback(
     (events: unknown[], traceId: string, reason: string) => {
       const existingIds = new Set(askLiveEventsRef.current.map((event) => event.id));
+      const buildReplayDedupeKey = (event: { text?: string | null; meta?: Record<string, unknown> | null }): string => {
+        const meta = readAgentLoopAuditRecord(event.meta);
+        return [
+          coerceText(meta?.source_event_type ?? meta?.sourceEventType ?? meta?.type).trim(),
+          coerceText(meta?.step_id ?? meta?.stepId).trim(),
+          normalizeTerminalAnswerText(coerceText(event.text).trim()),
+        ].join("\u0000");
+      };
+      const existingKeys = new Set(
+        askLiveEventsRef.current
+          .map((event) => buildReplayDedupeKey(event))
+          .filter((key) => key.replace(/\u0000/g, "").trim()),
+      );
       let replayed = 0;
       events.forEach((event, index) => {
         const record = readAgentLoopAuditRecord(event);
@@ -14082,17 +14094,30 @@ export function HelixAskPill({
           coerceText(record.source_event_type).trim() ||
           coerceText(record.type).trim() ||
           "turn_transcript_event";
+        if (
+          sourceEventType === "terminal_answer" ||
+          sourceEventType === "turn_completed" ||
+          sourceEventType === "runtime_heartbeat" ||
+          coerceText(record.step_id).trim() === "backend_ask_runtime" ||
+          /\bBackend Ask runtime is still running\b/i.test(coerceText(record.text).trim()) ||
+          coerceText(record.type).trim() === "final_answer"
+        ) {
+          return;
+        }
         const liveEvent = buildAskLiveEventFromTurnTranscriptRecord(
           { ...record, reconstructed: record.reconstructed === true || reason === "final_response_replay" },
           `replay:${traceId}:${sourceEventType}:${coerceText(record.seq).trim() || coerceText(record.at_ms).trim() || index}`,
           HELIX_ASK_LIVE_EVENT_MAX_CHARS,
         );
         if (!liveEvent || existingIds.has(liveEvent.id)) return;
+        const replayKey = buildReplayDedupeKey(liveEvent);
+        if (replayKey.replace(/\u0000/g, "").trim() && existingKeys.has(replayKey)) return;
         const tracedLiveEvent = attachHelixAskClientTraceToLiveEvent(liveEvent, {
           traceId,
           turnId: traceId,
         });
         existingIds.add(tracedLiveEvent.id);
+        existingKeys.add(replayKey);
         replayed += 1;
         appendSyntheticLiveEvent(tracedLiveEvent);
       });
@@ -14105,7 +14130,7 @@ export function HelixAskPill({
       }
       return replayed;
     },
-    [appendSyntheticLiveEvent, updateHelixAskConsoleStreamIngressDebug],
+    [appendSyntheticLiveEvent, normalizeTerminalAnswerText, updateHelixAskConsoleStreamIngressDebug],
   );
 
   const stopDisplayAudioCapture = useCallback(() => {
@@ -21357,20 +21382,40 @@ export function HelixAskPill({
       ),
     [askLiveEvents, askLiveTraceId],
   );
-  const askLiveAgenticEventRows = useMemo(
-    () => buildAskLiveAgenticEventRows(activeAskLiveEvents, { includeLowSignalRows: userSettings.showHelixAskConsoleDebug }),
-    [activeAskLiveEvents, userSettings.showHelixAskConsoleDebug],
+  const activeTurnStreamReplyId = activeAskTurnIdRef.current ?? askLiveTraceId ?? "active-turn";
+  const activeTurnTranscriptRows = useMemo(
+    () =>
+      askBusy
+        ? buildHelixActiveTurnTranscriptRows({
+            replyId: activeTurnStreamReplyId,
+            events: activeAskLiveEvents,
+            activeTurnId: activeAskTurnIdRef.current,
+            activeTraceId: askLiveTraceId,
+          })
+        : [],
+    [activeAskLiveEvents, activeTurnStreamReplyId, askBusy, askLiveTraceId],
+  );
+  const activeTurnTranscriptRowsForStream = useMemo(
+    () => selectHelixAskConsoleTurnTranscriptRowsForStream(activeTurnTranscriptRows),
+    [activeTurnTranscriptRows],
   );
   const activeTurnStreamRows = useMemo(
     () =>
       askBusy
-        ? buildHelixActiveTurnStreamRows({
+        ? buildHelixContinuousTurnStreamRows({
+            replyId: activeTurnStreamReplyId,
             question: askActiveQuestion,
-            eventRows: askLiveAgenticEventRows,
-            draftText: askLiveDraft,
+            turnTranscriptRows: activeTurnTranscriptRowsForStream,
+            mailLoopRows: [],
+            stagePlayEvents: [],
+            liveAnswerTurnBridge: null,
+            finalAnswerText: "",
+            finalAnswerHeading: "Final answer",
+            finalAnswerSourceLabel: "active turn",
+            terminalMismatch: false,
           })
         : [],
-    [askActiveQuestion, askBusy, askLiveAgenticEventRows, askLiveDraft],
+    [activeTurnStreamReplyId, activeTurnTranscriptRowsForStream, askActiveQuestion, askBusy],
   );
   const visibleActiveTurnStreamRows = shouldRenderHelixAskActiveTurnStream({
     askBusy,
@@ -21404,6 +21449,16 @@ export function HelixAskPill({
       streamIngress: helixAskConsoleStreamIngressDebugRef.current,
       activeStreamDom: activeTurnStreamDomDebug,
       renderOrder: [
+        ...(visibleActiveTurnStreamRows.length > 0
+          ? [
+              {
+                kind: "active_turn_stream",
+                key: activeTurnId ?? askLiveTraceId ?? "active",
+                rowCount: visibleActiveTurnStreamRows.length,
+                renderPlacement: "inline_active_turn",
+              },
+            ]
+          : []),
         ...chronologicalAskRepliesForTranscript.map((reply, index) => ({
           kind: "completed_reply",
           index,
@@ -21412,16 +21467,6 @@ export function HelixAskPill({
           createdAtMs: resolveHelixAskReplyOrderMs(reply),
           isLatest: reply.id === (latestAskReply?.id ?? latestAskReplyId),
         })),
-        ...(visibleActiveTurnStreamRows.length > 0
-          ? [
-              {
-                kind: "active_turn_stream",
-                key: activeTurnId ?? askLiveTraceId ?? "active",
-                rowCount: visibleActiveTurnStreamRows.length,
-                renderPlacement: "after_completed_replies",
-              },
-            ]
-          : []),
       ],
       filteredLiveEvents: askLiveEvents.length - activeAskLiveEvents.length,
       activeRows: debugActiveRows.map((row, index) => ({
@@ -21450,14 +21495,12 @@ export function HelixAskPill({
   const steeringQueueItems = useMemo(
     () =>
       buildHelixAskSteeringQueueItems({
-        activeTurnStreamRows: visibleActiveTurnStreamRows,
         latestReply: latestAskReply,
         mailbox: liveSourceMailState,
         maxItems: HELIX_ASK_STEERING_QUEUE_MAX_ITEMS,
       }),
-    [visibleActiveTurnStreamRows, latestAskReply, liveSourceMailState],
+    [latestAskReply, liveSourceMailState],
   );
-  const activeSteeringQueueCount = steeringQueueItems.filter((item) => item.status !== "completed").length;
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (askBusy) return;
@@ -21604,7 +21647,7 @@ export function HelixAskPill({
       }
     };
   }, []);
-  const askLiveLatestAgenticEvent = askLiveAgenticEventRows[askLiveAgenticEventRows.length - 1] ?? null;
+  const askLiveLatestAgenticEvent = activeAskLiveEvents[activeAskLiveEvents.length - 1] ?? null;
   useEffect(() => {
     clearReasoningTheaterFloatingTextTimers();
     reasoningTheaterFloatingTextLastTokenRef.current = null;
@@ -23088,6 +23131,21 @@ export function HelixAskPill({
                   lastTranscriptType: sourceEventType,
                   lastUpdatedAtMs: Date.now(),
                 }));
+                const isRuntimeHeartbeatEvent =
+                  sourceEventType === "runtime_heartbeat" ||
+                  coerceText(record.step_id).trim() === "backend_ask_runtime" ||
+                  /\bBackend Ask runtime is still running\b/i.test(coerceText(record.text).trim());
+                if (isRuntimeHeartbeatEvent) {
+                  setAskStatus("Backend Ask runtime is still working.");
+                  updateHelixAskConsoleStreamIngressDebug((current) => ({
+                    ...current,
+                    runtimeHeartbeatPacketCount: current.runtimeHeartbeatPacketCount + 1,
+                    lastAcceptedEventId: coerceText(record.id).trim() || current.lastAcceptedEventId,
+                    lastAcceptedText: "Backend Ask runtime is still working.",
+                    lastUpdatedAtMs: Date.now(),
+                  }));
+                  return;
+                }
                 const liveEvent = buildAskLiveEventFromTurnTranscriptRecord(
                   record,
                   `stream:${traceId}:${sourceEventType}:${coerceText(record.seq).trim() || coerceText(record.at_ms).trim() || Date.now()}`,
@@ -23159,12 +23217,14 @@ export function HelixAskPill({
           const responseTranscriptEvents = Array.isArray(localResponse.turn_transcript_events)
             ? localResponse.turn_transcript_events
             : [];
-          if (
-            useBackendAskTurnEntrypoint &&
-            responseTranscriptEvents.length > 0 &&
-            helixAskConsoleStreamIngressDebugRef.current.acceptedLiveEventCount === 0
-          ) {
-            replayHelixAskTurnTranscriptEventsToConsole(responseTranscriptEvents, traceId, "final_response_replay");
+          if (useBackendAskTurnEntrypoint && responseTranscriptEvents.length > 0) {
+            replayHelixAskTurnTranscriptEventsToConsole(
+              responseTranscriptEvents,
+              traceId,
+              helixAskConsoleStreamIngressDebugRef.current.acceptedLiveEventCount === 0
+                ? "final_response_replay"
+                : "final_response_backfill",
+            );
           }
           responseEnvelope = localResponse.envelope;
           const terminalResolution = resolveHelixAskVisibleTerminal(localResponse);
@@ -25862,19 +25922,64 @@ export function HelixAskPill({
     voiceNoisyEnvironmentMode,
   ]);
 
-  const activeTurnStreamPanel = (
-    <HelixAskActiveTurnStreamPanel
-      rows={visibleActiveTurnStreamRows}
-      activeTurnId={activeAskTurnIdRef.current}
-      activeTraceId={askLiveTraceId}
-      showDebugLabel={userSettings.showHelixAskConsoleDebug}
-      panelRef={activeTurnStreamPanelRef}
-      clipText={clipText}
-      renderFinalAnswerContent={renderHelixAskFinalAnswerContent}
-      readRowClass={readHelixContinuousTurnStreamRowClass}
-      readDotClass={readHelixContinuousTurnStreamDotClass}
-    />
-  );
+  const activeTurnStreamPanel = visibleActiveTurnStreamRows.length > 0 ? (
+    <div
+      ref={activeTurnStreamPanelRef}
+      className="contents"
+      data-testid="helix-ask-active-turn-stream"
+      data-turn-stream-lines={visibleActiveTurnStreamRows.length}
+      data-active-row-count={visibleActiveTurnStreamRows.length}
+      data-active-turn-id={activeAskTurnIdRef.current ?? undefined}
+      data-active-trace-id={askLiveTraceId ?? undefined}
+      data-render-placement="inline_active_turn"
+    >
+      <HelixAskReplyTurn
+        isLatestReply={true}
+        card={{
+          turnTestId: "helix-ask-active-turn",
+          tintClassName: moodPalette.replyTint,
+          contextCapsule: null,
+          promptIngested: false,
+        }}
+        stream={{
+          rows: visibleActiveTurnStreamRows,
+          workLogTestId: "helix-ask-active-turn-work-log",
+          questionTestId: "helix-ask-active-turn-question",
+          finalAnswerTestId: "helix-ask-active-turn-final-answer",
+          stagePlayEventCount: 0,
+          finalAnswerRawText: "",
+          finalAnswerSourceLabel: "active turn",
+          backendTerminalAnswer: null,
+          finalAnswerAuthority: "terminal",
+          replyId: activeTurnStreamReplyId,
+          activeTurnId: activeAskTurnIdRef.current,
+          answerTint: null,
+          actualAgentProviderLabel: null,
+          actualAgentModelLabel: null,
+          liveBridgeStatus: null,
+          renderFinalAnswer: () => null,
+          clipText,
+          readRowClassName: readHelixContinuousTurnStreamRowClass,
+          readDotClassName: readHelixContinuousTurnStreamDotClass,
+          readPillClassName: readLiveAnswerTurnBridgePillClassName,
+          onCopyFinal: () => undefined,
+          onDebugCopy: () => undefined,
+          onReadAloud: () => undefined,
+          showDebugCopy: false,
+          debugCopyDisabled: true,
+          copyFinalTestId: "helix-ask-active-turn-copy-final",
+          debugCopyTestId: "helix-ask-active-turn-debug-copy",
+          readAloudTestId: "helix-ask-active-turn-read-aloud",
+          readAloudActive: false,
+          readAloudAriaLabel: "Read aloud",
+          readAloudTitle: "Read aloud",
+          proofTrace: null,
+          jobReadyLinks: [],
+          onRunJobReadyLink: () => undefined,
+        }}
+      />
+    </div>
+  ) : null;
 
   return (
     <HelixAskLegacyConsoleView
@@ -26271,14 +26376,7 @@ export function HelixAskPill({
             onAction={handleAskGoalSessionAction}
           />
         ) : null}
-      steeringQueue={
-        <HelixAskSteeringQueuePanel
-          items={steeringQueueItems}
-          activeCount={activeSteeringQueueCount}
-          expanded={steeringQueueExpanded}
-          onToggleExpanded={() => setSteeringQueueExpanded((current) => !current)}
-        />
-      }
+      steeringQueue={null}
       errorLine={<HelixAskErrorLine message={askError} />}
       turnList={chronologicalAskReplies.length > 0 || visibleActiveTurnStreamRows.length > 0 ? (
           <HelixAskTurnList

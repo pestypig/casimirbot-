@@ -29,9 +29,9 @@ export function HelixAskConsoleRuntimeLayout({
       <HelixAskConsoleStack className={className} layoutVariant={layoutVariant}>
         {surface}
         {goalPill}
-        {steeringQueue}
         {errorLine}
         {turnList}
+        {steeringQueue}
         {debugDrawer}
       </HelixAskConsoleStack>
     </HelixAskErrorBoundary>

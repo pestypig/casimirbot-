@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import React from "react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { CharacterSituationComparisonV1 } from "@shared/character-situation-comparison";
 import { buildIdeologyContextReflectionV1 } from "@shared/ideology-context-reflection";
@@ -307,6 +307,32 @@ describe("MoralGraphPanel", () => {
     expect(screen.getByText("Badge procedure")).toBeTruthy();
     expect(screen.getByText("Authority boundary")).toBeTruthy();
     expect(screen.getByText(/skillful mediation -> right speech infrastructure -> mission ethos -> wisdom first principles/i)).toBeTruthy();
+  });
+
+  it("zooms the moral graph with bottom-right controls and keeps biome words readable", async () => {
+    renderPanel();
+
+    const scrollport = screen.getByTestId("moral-graph-map-scrollport");
+    const initialZoom = Number(scrollport.getAttribute("data-zoom-level"));
+    const initialWordmarkFontSize = Number(
+      screen.getAllByTestId("moral-graph-cell-watermark-word")[0].getAttribute("data-font-size"),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Zoom out" }));
+
+    await waitFor(() => {
+      expect(Number(scrollport.getAttribute("data-zoom-level"))).toBeLessThan(initialZoom);
+      expect(Number(screen.getAllByTestId("moral-graph-cell-watermark-word")[0].getAttribute("data-font-size"))).toBeGreaterThan(
+        initialWordmarkFontSize,
+      );
+    });
+
+    const zoomedOut = Number(scrollport.getAttribute("data-zoom-level"));
+    fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
+
+    await waitFor(() => {
+      expect(Number(scrollport.getAttribute("data-zoom-level"))).toBeGreaterThan(zoomedOut);
+    });
   });
 
   it("shows badge procedure details only in the custom hover card", () => {

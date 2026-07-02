@@ -2306,10 +2306,6 @@ describe("HelixAskPill mic-first surface contract", () => {
       path.resolve(process.cwd(), "client/src/components/helix/ask-console/HelixAskTurnList.tsx"),
       "utf8",
     );
-    const activeStreamPanelSource = fs.readFileSync(
-      path.resolve(process.cwd(), "client/src/components/helix/ask-console/HelixAskActiveTurnStreamPanel.tsx"),
-      "utf8",
-    );
     const turnStreamPanelSource = fs.readFileSync(askConsoleTurnStreamPanelPath, "utf8");
     const replyCardSource = fs.readFileSync(askConsoleReplyCardPath, "utf8");
     const reasoningStatusMedalStripSource = fs.readFileSync(
@@ -2332,17 +2328,18 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("chronologicalAskRepliesForTranscript");
     expect(source).toContain("const latestAskReply = chronologicalAskRepliesForTranscript.at(-1) ?? null");
     expect(source).toContain("chronologicalAskReplies.map");
-    expect(source).toContain("const activeTurnStreamPanel = (");
-    expect(source).toContain("<HelixAskActiveTurnStreamPanel");
-    expect(source).toContain("rows={visibleActiveTurnStreamRows}");
-    expect(source).toContain("renderPlacement: \"after_completed_replies\"");
+    expect(source).toContain("const activeTurnStreamPanel = visibleActiveTurnStreamRows.length > 0 ? (");
+    expect(source).toContain("<HelixAskReplyTurn");
+    expect(source).toContain("rows: visibleActiveTurnStreamRows");
+    expect(source).toContain('workLogTestId: "helix-ask-active-turn-work-log"');
+    expect(source).toContain("renderPlacement: \"inline_active_turn\"");
     expect(source).toContain("<HelixAskTurnList");
+    expect(turnListSource).toContain('data-testid="helix-ask-active-turn-stream-lane"');
+    expect(turnListSource).toContain('data-render-placement="inline_active_turn"');
+    expect(turnListSource).toContain('className="contents"');
     expect(turnListSource.indexOf("{children}")).toBeLessThan(turnListSource.indexOf("{activeTurnStreamPanel}"));
-    expect(turnListSource.indexOf("{activeTurnStreamPanel}")).toBeLessThan(turnListSource.indexOf('data-testid="helix-ask-reply-list-bottom"'));
-    expect(activeStreamPanelSource).toContain('data-testid="helix-ask-active-turn-stream"');
-    expect(activeStreamPanelSource).toContain('data-testid="helix-ask-active-turn-stream-row"');
-    expect(activeStreamPanelSource).toContain('data-testid="helix-ask-active-turn-latest-line"');
-    expect(activeStreamPanelSource).toContain('data-render-placement="after_completed_replies"');
+    expect(source).toContain('data-testid="helix-ask-active-turn-stream"');
+    expect(source).toContain('data-render-placement="inline_active_turn"');
     expect(source).toContain("activeStreamDom");
     expect(source).toContain("activeStreamMounted");
     expect(source).toContain("activeStreamBeforeBottom");
@@ -2442,7 +2439,7 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("rawStreamPacketCount");
     expect(source).toContain("acceptedLiveEventCount");
     expect(source).toContain("replayedTranscriptEventCount");
-    expect(source).toContain("includeLowSignalRows");
+    expect(source).toContain("buildHelixActiveTurnTranscriptRows");
     expect(source).toContain("includeTerminalRows");
     expect(source).toContain("replayHelixAskTurnTranscriptEventsToConsole");
     expect(source).toContain("attachHelixAskClientTraceToLiveEvent");

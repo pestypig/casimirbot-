@@ -524,6 +524,39 @@ describe("explicit workstation gateway derived calls", () => {
     });
   });
 
+  it("maps structured Moral Graph substrate admission onto the living-substrate gateway", () => {
+    const requests = buildStructuredAdmissionWorkstationGatewayCallRequests({
+      question: "Use the Moral Graph to reason from organism boundary, sensing, and homeostasis.",
+      source_target_intent: {
+        selected_capability: "moral-graph.reflect_living_substrate_context",
+        args: {
+          query: "organism boundary, sensing, and homeostasis",
+        },
+      },
+    });
+
+    expect(capabilities(requests)).toEqual(["moral-graph.reflect_living_substrate_context"]);
+    expect(requests[0]).toMatchObject({
+      schema: "helix.workstation_gateway.structured_admission_call_request.v1",
+      derivation_source: "helix_structured_source_target_admission",
+      capability_id: "moral-graph.reflect_living_substrate_context",
+      mode: "read",
+      arguments: {
+        prompt: "organism boundary, sensing, and homeostasis",
+        conversation_context: expect.stringContaining("Moral Graph"),
+        include_theory_bridge: true,
+        include_recommended_actions: true,
+        source_target_intent: expect.objectContaining({
+          target_source: "moral_graph",
+          target_kind: "moral_living_substrate_reflection",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        }),
+      },
+    });
+  });
+
   it("does not map quoted, negated, future, or UI-label reflection alias prompts", () => {
     const prompts = [
       "The text says helix_ask.reflect_theory_context; explain that phrase only.",
@@ -653,6 +686,37 @@ describe("explicit workstation gateway derived calls", () => {
       derivation_source: "helix_prompt_named_capability",
       arguments: {
         prompt: "NHM2 claim boundary",
+      },
+    });
+  });
+
+  it("admits prompt-named Moral Graph living-substrate reflection as a gateway observation", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "Use moral-graph.reflect_living_substrate_context for organism boundary, sensing, homeostasis, entropy pressure, and non-human living systems, then reason from the observation.",
+      },
+    });
+
+    expect(capabilities(requests)).toEqual(["moral-graph.reflect_living_substrate_context"]);
+    expect(requests[0]).toMatchObject({
+      schema: "helix.workstation_gateway.prompt_named_capability_call_request.v1",
+      derivation_source: "helix_prompt_named_capability",
+      capability_id: "moral-graph.reflect_living_substrate_context",
+      mode: "read",
+      arguments: {
+        prompt: expect.stringContaining("organism boundary"),
+        conversation_context: expect.stringContaining("moral-graph.reflect_living_substrate_context"),
+        include_theory_bridge: true,
+        include_recommended_actions: true,
+        source_target_intent: expect.objectContaining({
+          target_source: "moral_graph",
+          target_kind: "moral_living_substrate_reflection",
+          selected_capability: "moral-graph.reflect_living_substrate_context",
+          explicit_capability: true,
+        }),
       },
     });
   });
@@ -858,6 +922,55 @@ describe("explicit workstation gateway derived calls", () => {
       mode: "read",
       arguments: {
         prompt: expect.stringContaining("QEI margin"),
+      },
+    });
+  });
+
+  it("maps Moral Graph living-substrate planner steps into the workstation gateway", () => {
+    const requests = buildPlannerDerivedWorkstationGatewayCallRequests({
+      agent_runtime: "codex",
+      question:
+        "Use the Moral Graph to derive moral relevance from organism boundary, sensing, homeostasis, entropy pressure, and non-human living systems.",
+    });
+
+    expect(capabilities(requests)).toEqual(["moral-graph.reflect_living_substrate_context"]);
+    expect(requests[0]).toMatchObject({
+      capability_id: "moral-graph.reflect_living_substrate_context",
+      mode: "read",
+      arguments: {
+        prompt: expect.stringContaining("organism boundary"),
+        include_theory_bridge: true,
+        include_recommended_actions: true,
+        source_target_intent: expect.objectContaining({
+          target_source: "moral_graph",
+          target_kind: "moral_living_substrate_reflection",
+          intent: "moral_living_substrate_reflection",
+          step_id: "reflect_moral_living_substrate_context",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        }),
+      },
+    });
+  });
+
+  it("maps theory-first Moral Graph substrate prompts to theory then Moral substrate gateway calls", () => {
+    const requests = buildPlannerDerivedWorkstationGatewayCallRequests({
+      agent_runtime: "codex",
+      question:
+        "Use the Moral Graph with Hameroff Orch OR microtubule physics, organism sensing, homeostasis, and Fourier frequency mapping as the mechanism, then translate living-system dynamics into moral obligations and constraints.",
+    });
+
+    expect(capabilities(requests)).toEqual([
+      "theory-badge-graph.reflect_discussion_context",
+      "moral-graph.reflect_living_substrate_context",
+    ]);
+    expect(requests[1]).toMatchObject({
+      capability_id: "moral-graph.reflect_living_substrate_context",
+      arguments: {
+        source_target_intent: expect.objectContaining({
+          depends_on: ["reflect_theory_context"],
+        }),
       },
     });
   });

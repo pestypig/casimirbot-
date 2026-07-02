@@ -22,10 +22,10 @@ export const HELIX_ASK_LEGACY_CONSOLE_ACTIVE_PATH = [
 
 export const HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT = {
   file: "client/src/components/helix/HelixAskPill.tsx",
-  lineCountAtInventory: 26485,
+  lineCountAtInventory: 26565,
   exportedComponentStartsAtLine: 8059,
-  liveRenderSliceStartsAtLine: 25865,
-  liveLegacyConsoleViewStartsAtLine: 25880,
+  liveRenderSliceStartsAtLine: 25907,
+  liveLegacyConsoleViewStartsAtLine: 25967,
   inventoryReason:
     "The active bridge still imports the whole legacy file, but the visible console render path is concentrated near the bottom and now enters the recrowned legacy console view before composing recrowned ask-console display owners.",
 } as const;
@@ -57,7 +57,7 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
     classification: "pure_display_already_recrowned",
     source: "ask-console",
     evidence:
-      "The live render slice uses HelixAskReplyTurn, HelixAskFinalAnswer, HelixAskActiveTurnStreamPanel, latest-turn binding helpers, and recrowned final-text, reply-event ordering, and fail-context helpers.",
+      "The live render slice uses HelixAskReplyTurn for completed and active turn streams, HelixAskFinalAnswer, latest-turn binding helpers, and recrowned final-text, reply-event ordering, and fail-context helpers.",
   },
   {
     key: "operator_supplement_surface",

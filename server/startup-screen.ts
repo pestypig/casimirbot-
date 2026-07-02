@@ -1,5 +1,6 @@
 const STARTUP_SCREEN_CSS = `
       :root { color-scheme: dark; }
+      html { background: #040915; }
       body { margin: 0; min-height: 100vh; display: grid; place-items: center; background:
         linear-gradient(rgba(4, 9, 21, 0.76), rgba(4, 9, 21, 0.88)),
         url("/loading/helix-loading-mark.svg") center / cover no-repeat,
@@ -19,6 +20,11 @@ const STARTUP_SCREEN_CSS = `
       code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
       .muted { color: #94a3b8; }
       #boot-error { display: none; font-size: 12px; color: #fca5a5; }
+      #handoff-cover { position: fixed; inset: 0; z-index: 10; opacity: 0; pointer-events: none; background:
+        linear-gradient(rgba(4, 9, 21, 0.76), rgba(4, 9, 21, 0.88)),
+        url("/loading/helix-loading-mark.svg") center / cover no-repeat,
+        #040915; transition: opacity 220ms ease; }
+      body.is-handoff #handoff-cover { opacity: 1; }
       @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 `;
 
@@ -39,21 +45,71 @@ function renderShell(args: {
   script?: string;
 }) {
   return `<!doctype html>
-<html lang="en">
+<html lang="en" style="background:#040915">
   <head>
     <meta charset="utf-8">
+    <meta name="theme-color" content="#040915">
+    <link rel="preload" as="image" href="/loading/helix-loading-mark.svg">
 ${args.headExtra ?? ""}
     <title>${escapeHtml(args.title)}</title>
     <style>${STARTUP_SCREEN_CSS}
     </style>
   </head>
-  <body>
+  <body style="background:#040915" bgcolor="#040915">
     <div class="card${args.cardClass ? ` ${args.cardClass}` : ""}" role="status" aria-live="polite">
       <div class="icon-wrap">
         <div class="icon" aria-hidden="true"></div>
       </div>
 ${args.body}
     </div>
+    <div id="handoff-cover" aria-hidden="true"></div>
+    <script>
+      function helixHandoffTo(target) {
+        document.body.classList.add("is-handoff");
+        var navigated = false;
+        function fallbackNavigate() {
+          if (navigated) return;
+          navigated = true;
+          window.location.replace(target);
+        }
+        function writeReadyShell(html) {
+          if (navigated) return;
+          navigated = true;
+          try {
+            window.history.replaceState(null, "", target);
+          } catch (_) {
+            // If history replacement is unavailable, still keep the no-flash handoff.
+          }
+          document.open();
+          document.write(html);
+          document.close();
+        }
+        function fetchReadyShell() {
+          fetch(target, {
+            cache: "no-store",
+            headers: { "X-Helix-Handoff": "1" }
+          })
+            .then(function (res) {
+              var contentType = res.headers && res.headers.get ? res.headers.get("content-type") : "";
+              if (!res.ok || !contentType || contentType.indexOf("text/html") === -1) {
+                throw new Error("handoff_fetch_failed");
+              }
+              return res.text();
+            })
+            .then(writeReadyShell)
+            .catch(function () { fallbackNavigate(); });
+        }
+        try {
+          var img = new Image();
+          img.onload = function() { setTimeout(fetchReadyShell, 180); };
+          img.onerror = function() { setTimeout(fetchReadyShell, 260); };
+          img.src = "/loading/helix-loading-mark.svg";
+        } catch (_) {
+          setTimeout(fetchReadyShell, 260);
+        }
+        setTimeout(fallbackNavigate, 2400);
+      }
+    </script>
 ${args.script ?? ""}
   </body>
 </html>`;
@@ -63,13 +119,13 @@ export function renderRootRedirectHtml(target: string) {
   const safeTarget = escapeHtml(target);
   return renderShell({
     title: "CasimirBot",
-    headExtra: `    <meta http-equiv="refresh" content="0; url=${safeTarget}">
-`,
     cardClass: "card--compact",
     body: `      <h1>Opening workspace...</h1>
       <p>Redirecting to <a href="${safeTarget}">${safeTarget}</a>.</p>`,
     script: `    <script>
-      window.location.replace(${JSON.stringify(target)});
+      (function() {
+        helixHandoffTo(${JSON.stringify(target)});
+      })();
     </script>`,
   });
 }
@@ -78,17 +134,21 @@ export function renderStartupRetryHtml(target: string) {
   const safeTarget = escapeHtml(target);
   return renderShell({
     title: "Starting up...",
-    headExtra: `    <meta http-equiv="refresh" content="8">
-    <meta name="robots" content="noindex,nofollow">
+    headExtra: `    <meta name="robots" content="noindex,nofollow">
 `,
     body: `      <h1>Starting up...</h1>
-      <p>The server is still warming up. This page will auto-refresh when it is ready.</p>
+      <p>The server is still warming up. This page will switch over when it is ready.</p>
       <p class="muted">Target: <code>${safeTarget}</code></p>
       <p class="muted" id="boot-error" style="display:none;"></p>
       <p class="muted">If this persists, check the deploy logs for runtime errors.</p>`,
     script: `    <script>
       (function retryWhenReady() {
-        function reload() { window.location.replace(${JSON.stringify(target)}); }
+        var handoffStarted = false;
+        function reload() {
+          if (handoffStarted) return;
+          handoffStarted = true;
+          helixHandoffTo(${JSON.stringify(target)});
+        }
         function poll() {
           fetch("/api/ready", { cache: "no-store" })
             .then(function (res) { return res.json ? res.json() : null; })
@@ -119,8 +179,7 @@ export function renderRootBootHtml(target: string) {
   const safeTarget = escapeHtml(target);
   return renderShell({
     title: "CasimirBot",
-    headExtra: `    <meta http-equiv="refresh" content="5">
-    <meta name="robots" content="noindex">
+    headExtra: `    <meta name="robots" content="noindex">
 `,
     body: `      <h1>Starting up...</h1>
       <p>Redirecting to <a href="${safeTarget}">${safeTarget}</a> once ready.</p>
@@ -129,6 +188,12 @@ export function renderRootBootHtml(target: string) {
       (function() {
         var target = ${JSON.stringify(target)};
         var retryMs = 500;
+        var handoffStarted = false;
+        function handoff() {
+          if (handoffStarted) return;
+          handoffStarted = true;
+          helixHandoffTo(target);
+        }
         function schedule() {
           setTimeout(check, retryMs);
         }
@@ -139,7 +204,7 @@ export function renderRootBootHtml(target: string) {
             })
             .then(function(payload) {
               if (payload && payload.ready) {
-                window.location.replace(target);
+                handoff();
                 return;
               }
               var err = payload && (payload.bootstrapError || payload.artifactsError);

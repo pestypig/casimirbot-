@@ -7,6 +7,7 @@ const OFFLINE_ASSETS = [
   "/index.html",
   "/manifest.webmanifest",
   "/icons/helix-arrow.svg",
+  "/loading/helix-loading-mark.svg",
 ];
 const NETWORK_FIRST_DESTINATIONS = new Set(["script", "style", "font"]);
 

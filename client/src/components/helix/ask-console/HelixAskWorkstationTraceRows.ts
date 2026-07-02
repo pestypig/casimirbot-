@@ -14,6 +14,12 @@ function hasWorkstationTraceMarker(row: HelixTurnTranscriptRow): boolean {
   );
 }
 
+export function isHelixAskRuntimeHeartbeatTraceRow(row: HelixTurnTranscriptRow): boolean {
+  return /\bbackend_ask_runtime\b/i.test(row.meta) ||
+    /\bruntime_heartbeat\b/i.test(`${row.status} ${row.meta}`) ||
+    /\bBackend Ask runtime is still running\b/i.test(row.text);
+}
+
 export function isHelixAskConsoleWorkstationTraceRow(row: HelixTurnTranscriptRow): boolean {
   if (!WORKSTATION_TRACE_LABELS.has(row.label)) return false;
   return hasWorkstationTraceMarker(row);
@@ -22,7 +28,7 @@ export function isHelixAskConsoleWorkstationTraceRow(row: HelixTurnTranscriptRow
 export function selectHelixAskConsoleTurnTranscriptRowsForStream(
   rows: readonly HelixTurnTranscriptRow[],
 ): HelixTurnTranscriptRow[] {
-  return rows.filter((row) => row.label !== "Final");
+  return rows.filter((row) => row.label !== "Final" && !isHelixAskRuntimeHeartbeatTraceRow(row));
 }
 
 export function selectHelixAskConsoleWorkstationTraceRows(

@@ -2,9 +2,11 @@ import {
   buildMoralLivingSubstrateReflectionV1,
   type MoralLivingSubstrateReflectionV1,
   type MoralLivingSubstrateRecommendedActionV1,
+  type MoralLivingSubstrateSourceRefV1,
 } from "../contracts/moral-living-substrate-reflection.v1";
 import type { IdeologyContextReflectionInputKindV1 } from "../ideology-context-reflection";
 import { matchLivingSubstratePrinciples } from "./match-living-substrate-principles";
+import { deriveLivingSubstrateProceduralLayer } from "./living-substrate-procedural-derivations";
 import {
   decideMoralGraphAgentInvocationPolicyV1,
   moralGraphPolicyPrefersTheoryFirst,
@@ -26,6 +28,26 @@ export type ReflectLivingSubstrateContextInput = {
 };
 
 const unique = <T>(values: T[]): T[] => Array.from(new Set(values));
+
+const uniqueSourceRefs = (values: MoralLivingSubstrateSourceRefV1[]): MoralLivingSubstrateSourceRefV1[] => {
+  const seen = new Set<string>();
+  return values.filter((ref) => {
+    if (seen.has(ref.id)) return false;
+    seen.add(ref.id);
+    return true;
+  });
+};
+
+const THEORY_OWNED_MECHANISM_BADGE_IDS = [
+  "thermodynamics.low_entropy_source_sink",
+  "thermodynamics.energy_gradient_flux",
+  "prebiotic.inorganic_compartment_gradient",
+  "prebiotic.concentration_before_replication",
+  "frequency.fourier_action_mapping",
+  "consciousness.microtubule_orchestration_frontier",
+  "consciousness.objective_reduction_frontier",
+  "consciousness.anesthetic_microtubule_perturbation",
+] as const;
 
 function buildRecommendedActions(input: {
   prompt: string;
@@ -51,20 +73,28 @@ function buildRecommendedActions(input: {
       args: {
         prompt: input.prompt,
         source_theory_badge_ids: input.sourceTheoryBadgeIds,
+        claim_boundary:
+          "Source mechanisms, equations, and physics maturity are Theory Badge Graph-owned; Moral Graph only reflects procedural relevance.",
       },
       mutatesCalculator: false,
       solves: false,
     });
   }
 
-  if (input.sourceTheoryBadgeIds.includes("frequency.fourier_action_mapping")) {
+  const theoryOwnedMechanismIds = input.sourceTheoryBadgeIds.filter((id) =>
+    THEORY_OWNED_MECHANISM_BADGE_IDS.includes(id as (typeof THEORY_OWNED_MECHANISM_BADGE_IDS)[number]),
+  );
+  const asksForCalculatorPayload =
+    input.sourceTheoryBadgeIds.includes("frequency.fourier_action_mapping") ||
+    /\b(?:equations?|numeric|calculate|calculator|fourier|frequency|mechanism|source physics)\b/i.test(input.prompt);
+  if (theoryOwnedMechanismIds.length > 0 && asksForCalculatorPayload) {
     actions.push({
       actionId: "theory-badge-graph.load_payloads_to_calculator",
       label: "Load theory calculator payloads",
       panelId: "scientific-calculator",
       args: {
-        source_theory_badge_ids: ["frequency.fourier_action_mapping"],
-        claim_boundary: "Calculator payloads are theory-owned; Moral Graph does not embed equations.",
+        source_theory_badge_ids: theoryOwnedMechanismIds,
+        claim_boundary: "Calculator payloads and numeric mechanisms are theory-owned; Moral Graph does not embed equations.",
       },
       mutatesCalculator: true,
       solves: false,
@@ -103,10 +133,16 @@ export function reflectLivingSubstrateContext(
     ...(input.sourceTheoryBadgeIds ?? []),
     ...matches.sourceTheoryBadgeIds,
   ]);
+  const sourceRefs = uniqueSourceRefs(matches.sourceRefs);
   const claimBoundaryNotes = unique([
     ...matches.claimBoundaryNotes,
     "Moral substrate reflection is diagnostic evidence, not terminal answer authority.",
   ]);
+  const proceduralLayer = deriveLivingSubstrateProceduralLayer({
+    prompt,
+    exactMatches: matches.exactMatches,
+    likelyMatches: matches.likelyMatches,
+  });
   const recommendedNextActions = input.includeRecommendedActions === false
     ? []
     : buildRecommendedActions({
@@ -136,7 +172,10 @@ export function reflectLivingSubstrateContext(
     },
     exactMatches: matches.exactMatches,
     likelyMatches: matches.likelyMatches,
+    proceduralDerivations: proceduralLayer.derivations,
+    synthesisPath: proceduralLayer.synthesisPath,
     sourceTheoryBadgeIds,
+    sourceRefs,
     claimBoundaryNotes,
     evidenceForAsk: {
       summary: summaryFor({

@@ -130,12 +130,29 @@ describe("Helix capability lane session manager", () => {
       laneSessionId: "lane-session-1",
       observationRef: "ask:lane:translation:obs",
       receiptRef: "ask:lane:translation:obs:projection:receipt",
+      chunkId: "chunk-session-1",
+      chunkIndex: 2,
+      dedupeKey: "docs:nhm2:chunk-session-1:es",
+      sourceEventId: "docs:nhm2:event-session-1",
+      sourceEventMs: 111,
+      observedAtMs: 140,
+      freshnessStatus: "fresh",
+      projectionTarget: "docs_chunk",
+      cancelRequested: true,
       nowMs: 140,
     });
     expect(observed.lane_session).toMatchObject({
       last_observation_ref: "ask:lane:translation:obs",
       last_receipt_ref: "ask:lane:translation:obs:projection:receipt",
       updated_at_ms: 140,
+    });
+    expect(observed).toMatchObject({
+      ok: true,
+      action: "record_observation",
+      lane_id: "live_translation",
+      session_supported: true,
+      terminal_eligible: false,
+      assistant_answer: false,
     });
 
     const stopped = store.stop({
@@ -152,7 +169,7 @@ describe("Helix capability lane session manager", () => {
       "start",
       "pause",
       "resume",
-      "resume",
+      "record_observation",
       "stop",
     ]);
     expect(stopped.lane_session?.debug_history).toEqual([
@@ -208,7 +225,7 @@ describe("Helix capability lane session manager", () => {
         terminal_authority_status: "not_terminal_authority",
       }),
       expect.objectContaining({
-        action: "resume",
+        action: "record_observation",
         status: "running",
         cost_class: "free_local",
         latency_class: "interactive",
@@ -217,6 +234,15 @@ describe("Helix capability lane session manager", () => {
         source_id: "docs:nhm2",
         observation_ref: "ask:lane:translation:obs",
         receipt_ref: "ask:lane:translation:obs:projection:receipt",
+        chunk_id: "chunk-session-1",
+        chunk_index: 2,
+        dedupe_key: "docs:nhm2:chunk-session-1:es",
+        source_event_id: "docs:nhm2:event-session-1",
+        source_event_ms: 111,
+        observed_at_ms: 140,
+        freshness_status: "fresh",
+        projection_target: "docs_chunk",
+        cancel_requested: true,
         terminal_authority_status: "pending_helix_terminal_authority",
         reentry_required: true,
       }),
@@ -260,6 +286,10 @@ describe("Helix capability lane session manager", () => {
     expect(unsupported).toMatchObject({
       ok: false,
       action: "start",
+      lane_id: "utility_text",
+      selected_runtime_agent_provider: "helix",
+      requested_backend_provider: null,
+      session_supported: false,
       lane_session: null,
       blocked_reason: "capability_lane_session_not_supported",
       terminal_eligible: false,
@@ -269,6 +299,10 @@ describe("Helix capability lane session manager", () => {
     expect(unbound).toMatchObject({
       ok: false,
       action: "start",
+      lane_id: "live_translation",
+      selected_runtime_agent_provider: "codex",
+      requested_backend_provider: null,
+      session_supported: true,
       lane_session: null,
       blocked_reason: "missing_source_binding",
       terminal_eligible: false,

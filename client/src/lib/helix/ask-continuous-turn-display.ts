@@ -44,8 +44,26 @@ function uniqueStagePlayLedgerStrings(values: string[]): string[] {
 
 function toneForHelixTranscriptRow(row: HelixTurnTranscriptRow): HelixContinuousTurnStreamTone {
   if (/\b(?:failed|blocked|error|mismatch)\b/i.test(row.status) || row.label === "Notice") return "warning";
-  if (row.label === "Observation" || row.label === "Recorded") return "observation";
-  if (row.label === "Decision" || row.label === "Gate") return "checkpoint";
+  if (
+    row.label === "Observation" ||
+    row.label === "Recorded" ||
+    row.label === "Lane Observation" ||
+    row.label === "Lane Receipt" ||
+    row.label === "Lane Re-entry" ||
+    row.label === "UI Projection"
+  ) return "observation";
+  if (
+    row.label === "Decision" ||
+    row.label === "Gate" ||
+    row.label === "Lane Request" ||
+    row.label === "Lane Backend" ||
+    row.label === "Lane Session" ||
+    row.label === "Lane Mail" ||
+    row.label === "Goal Lane" ||
+    row.label === "Goal Dispatch" ||
+    row.label === "Goal Admission" ||
+    row.label === "Goal Readiness"
+  ) return "checkpoint";
   if (row.label === "Final" || row.label === "Terminal") return "final";
   return "working";
 }

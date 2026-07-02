@@ -105,7 +105,9 @@ describe("capability lane provider adapter context", () => {
         kind: "capability_lane_observation_packet",
         observation_kind: "utility_text.normalize_text",
         capability_key: "utility_text.normalize_text",
+        lane_id: "utility_text",
         selected_backend_provider: "utility_text.local_runtime",
+        lane_execution_status: "executed_observation_only",
         backend_selection_decision: expect.objectContaining({
           selected_backend_provider: "utility_text.local_runtime",
           terminal_authority_owner: "helix",

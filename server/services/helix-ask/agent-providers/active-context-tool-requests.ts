@@ -14,6 +14,7 @@ import {
   INTERNET_SEARCH_ALIAS_CAPABILITIES,
   INTERNET_SEARCH_CAPABILITY,
   MAX_PROMPT_NAMED_CAPABILITY_REQUESTS,
+  MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY,
   REPO_SEARCH_ALIAS_CAPABILITIES,
   REPO_SEARCH_CAPABILITY,
   SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
@@ -637,6 +638,31 @@ export const buildStructuredAdmissionWorkstationGatewayCallRequests = (
         },
       });
     }
+    if (selectedCapability === MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY) {
+      const key = `${MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY}:${query}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      requests.push({
+        schema: "helix.workstation_gateway.structured_admission_call_request.v1",
+        derivation_source: "helix_structured_source_target_admission",
+        capability_id: MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY,
+        mode: "read",
+        arguments: {
+          prompt: query,
+          conversation_context: prompt,
+          include_theory_bridge: true,
+          include_recommended_actions: true,
+          source_target_intent: {
+            ...sourceTargetIntent,
+            target_source: "moral_graph",
+            target_kind: "moral_living_substrate_reflection",
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      });
+    }
     if (isWorkspaceOsStatusSelection(selectedCapability)) {
       const key = `${WORKSPACE_OS_STATUS_CAPABILITY}:${query}`;
       if (seen.has(key)) continue;
@@ -862,6 +888,38 @@ export const buildPlannerDerivedWorkstationGatewayCallRequests = (
             panel_id: step.panel_id ?? null,
             action_id: step.action_id ?? null,
             tool_plan_id: planned.tool_plan?.plan_id ?? null,
+          },
+        },
+      });
+    }
+    if (step.tool_id === MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY) {
+      const args = readRecord(step.args) ?? {};
+      const reflectionPrompt = readString(args.prompt) ?? prompt;
+      addPlannerRequest({
+        schema: "helix.workstation_gateway.planner_derived_call_request.v1",
+        derivation_source: "helix_workstation_tool_planner",
+        planner_intent: planned.intent,
+        planner_reason: planned.reason,
+        capability_id: MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY,
+        mode: "read",
+        arguments: {
+          prompt: reflectionPrompt,
+          conversation_context: prompt,
+          include_theory_bridge: args.include_theory_bridge ?? args.includeTheoryBridge ?? true,
+          include_recommended_actions:
+            args.include_recommended_actions ?? args.includeRecommendedActions ?? true,
+          source_target_intent: {
+            source: "helix_workstation_tool_planner",
+            target_source: "moral_graph",
+            target_kind: "moral_living_substrate_reflection",
+            intent: planned.intent,
+            step_id: step.step_id,
+            tool_id: step.tool_id,
+            tool_plan_id: planned.tool_plan?.plan_id ?? null,
+            depends_on: step.depends_on ?? [],
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
           },
         },
       });

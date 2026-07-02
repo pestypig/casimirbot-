@@ -48,6 +48,13 @@ function coerceText(value: unknown): string {
   }
 }
 
+function coerceModelMetadataText(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" || typeof value === "boolean") return String(value).trim();
+  return "";
+}
+
 export function isHelixAgentRuntimeId(value: unknown): value is HelixAgentRuntimeId {
   return value === "helix" || value === "codex" || value === "future";
 }
@@ -200,6 +207,18 @@ export function formatHelixAgentRuntimeShortLabel(provider: HelixAgentRuntimeDes
   return "Helix";
 }
 
+function sanitizeHelixAskReceiptLabel(value: string | null | undefined): string | null {
+  const cleaned = value?.replace(/^[\s|.]+/, "").replace(/[\s|]+$/, "").trim();
+  return cleaned || null;
+}
+
+export function formatHelixAskFinalReceiptMeta(parts: Array<string | null | undefined>): string {
+  return parts
+    .map(sanitizeHelixAskReceiptLabel)
+    .filter((entry): entry is string => Boolean(entry))
+    .join(" | ");
+}
+
 export function resolveHelixAskActualAgentProviderLabel(
   response: unknown,
   fallbackProviders: HelixAgentRuntimeDescriptor[] = DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS,
@@ -245,6 +264,97 @@ function readModelFromCodexArgs(value: unknown): string | null {
   return null;
 }
 
+const HELIX_ASK_MODEL_METADATA_KEYS = [
+  "llm_http_model_configured",
+  "llm_model",
+  "model",
+  "model_id",
+  "modelId",
+  "model_name",
+  "selected_model",
+  "selectedModel",
+  "openai_model",
+  "openaiModel",
+  "modelUsed",
+  "model_preference",
+  "modelPreference",
+  "voice_model_id",
+  "voiceModelId",
+  "tts_model_id",
+  "ttsModelId",
+  "service_model_id",
+  "serviceModelId",
+  "selected_model_or_service",
+  "resolved_model_or_service",
+] as const;
+
+const HELIX_ASK_MODEL_CONTAINER_KEYS = [
+  "agent_loop",
+  "agentLoop",
+  "agent_runtime_loop",
+  "agentRuntimeLoop",
+  "turn_runtime",
+  "turnRuntime",
+  "runtime",
+  "debug",
+  "iterations",
+  "steps",
+  "objective_step_transcripts",
+  "model_calls",
+  "modelCalls",
+  "sampling_events",
+  "samplingEvents",
+  "model_decision_audits",
+  "modelDecisionAudits",
+  "workstation_gateway_call_results",
+  "workstationGatewayCallResults",
+  "workstation_gateway_observation_packets",
+  "workstationGatewayObservationPackets",
+  "capability_lane_call_results",
+  "capabilityLaneCallResults",
+  "capability_lane_observation_packets",
+  "capabilityLaneObservationPackets",
+  "current_turn_artifact_ledger",
+  "currentTurnArtifactLedger",
+  "action_envelope",
+  "actionEnvelope",
+  "workstation_actions",
+  "workstationActions",
+  "observation_packet",
+  "observationPacket",
+  "observation",
+  "request",
+  "receipt",
+  "host_projection",
+  "hostProjection",
+  "payload",
+  "result",
+  "turn_transcript",
+  "turnTranscript",
+  "events",
+  "ask_turn_events",
+  "askTurnEvents",
+] as const;
+
+function collectModelMetadataCandidates(value: unknown, depth = 0): string[] {
+  if (depth > 5) return [];
+  if (Array.isArray(value)) {
+    return value.flatMap((entry) => collectModelMetadataCandidates(entry, depth + 1));
+  }
+  const record = readRecord(value);
+  if (!record) return [];
+  const candidates: unknown[] = [readModelFromCodexArgs(record.codex_args)];
+  for (const key of HELIX_ASK_MODEL_METADATA_KEYS) {
+    candidates.push(record[key]);
+  }
+  for (const key of HELIX_ASK_MODEL_CONTAINER_KEYS) {
+    if (record[key] !== undefined) {
+      candidates.push(...collectModelMetadataCandidates(record[key], depth + 1));
+    }
+  }
+  return candidates.map(coerceModelMetadataText).filter(Boolean);
+}
+
 function collectRuntimeLoopModels(value: unknown): string[] {
   const record = readRecord(value);
   if (!record) return [];
@@ -277,10 +387,14 @@ function collectRuntimeLoopModels(value: unknown): string[] {
         itemRecord.selected_model,
         itemRecord.openai_model,
         readModelFromCodexArgs(itemRecord.codex_args),
+        ...collectModelMetadataCandidates(itemRecord),
       );
     }
   }
-  return candidates.map((entry) => coerceText(entry).trim()).filter(Boolean);
+  return [
+    ...candidates.map(coerceModelMetadataText).filter(Boolean),
+    ...collectModelMetadataCandidates(record),
+  ];
 }
 
 export function resolveHelixAskModelUsageLabel(response: unknown): string | null {
@@ -335,10 +449,12 @@ export function resolveHelixAskModelUsageLabel(response: unknown): string | null
     readModelFromCodexArgs(agentRuntimeLoop?.codex_args),
     ...collectRuntimeLoopModels(record?.agent_runtime_loop),
     ...collectRuntimeLoopModels(debug?.agent_runtime_loop),
+    ...collectModelMetadataCandidates(record),
+    ...collectModelMetadataCandidates(debug),
   ];
-  const models = Array.from(new Set(candidates.map((entry) => coerceText(entry).trim()).filter(Boolean)));
+  const models = Array.from(new Set(candidates.map(coerceModelMetadataText).filter(Boolean)));
   if (models.length === 0) {
-    return runtime === "codex" ? "Model: Codex default (not reported)" : null;
+    return runtime === "codex" ? "Model: not reported by backend" : null;
   }
   return `Model${models.length > 1 ? "s" : ""}: ${models.slice(0, 3).join(", ")}`;
 }
