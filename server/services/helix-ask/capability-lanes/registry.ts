@@ -4,6 +4,7 @@ import type {
   HelixCapabilityLaneDescriptor,
   HelixCapabilityLaneId,
   HelixCapabilityLaneManifest,
+  HelixCapabilityLaneModelVisibleHint,
   HelixCapabilityLaneResolveTrace,
 } from "@shared/helix-capability-lane";
 import {
@@ -48,7 +49,21 @@ type LaneCapabilityTemplate = {
   one_shot_status: "executable" | "shadow_only" | "not_supported";
   session_status: "supported" | "not_supported";
   backend_provider_required: boolean;
+  model_visible_hint?: HelixCapabilityLaneModelVisibleHint;
 };
+
+const defaultCapabilityModelVisibleHint = (
+  capabilityId: string,
+): HelixCapabilityLaneModelVisibleHint => ({
+  required_input_fields: [],
+  optional_input_fields: ["requested_backend_provider"],
+  when_to_use: "Use only when this governed lane capability directly matches the user's requested task.",
+  request_shape_hint: {
+    capability_lane_call: {
+      capability: capabilityId,
+    },
+  },
+});
 
 const laneTemplates: LaneTemplate[] = [
   {
@@ -100,6 +115,18 @@ const laneTemplates: LaneTemplate[] = [
         one_shot_status: "executable",
         session_status: "not_supported",
         backend_provider_required: true,
+        model_visible_hint: {
+          required_input_fields: ["text"],
+          optional_input_fields: ["normalization_mode", "requested_backend_provider"],
+          when_to_use: "Use for compact text normalization or deterministic utility text processing.",
+          request_shape_hint: {
+            capability_lane_call: {
+              capability: "utility_text.normalize_text",
+              text: "<text to normalize>",
+              normalization_mode: "<optional mode>",
+            },
+          },
+        },
       },
     ],
   },
@@ -294,6 +321,29 @@ const laneTemplates: LaneTemplate[] = [
         one_shot_status: "executable",
         session_status: "supported",
         backend_provider_required: true,
+        model_visible_hint: {
+          required_input_fields: ["text", "target_language"],
+          optional_input_fields: [
+            "source_language",
+            "requested_backend_provider",
+            "chunk_id",
+            "source_id",
+            "projection_target",
+          ],
+          when_to_use:
+            "Use when the user asks to translate provided text, selected content, transcript text, or other text content.",
+          when_not_to_use:
+            "Do not use docs-viewer.read_active_translation for new translation work; that workstation tool only reads an already-existing translated Docs surface. If source text or target language is missing, ask for clarification.",
+          request_shape_hint: {
+            capability_lane_call: {
+              capability: "live_translation.translate_text",
+              text: "<text to translate>",
+              target_language: "<target language or locale>",
+              source_language: "<optional source language>",
+              requested_backend_provider: "<optional backend preference; Helix selects the backend>",
+            },
+          },
+        },
       },
     ],
   },
@@ -345,6 +395,17 @@ const laneTemplates: LaneTemplate[] = [
         one_shot_status: "executable",
         session_status: "not_supported",
         backend_provider_required: false,
+        model_visible_hint: {
+          required_input_fields: [],
+          optional_input_fields: ["requested_backend_provider"],
+          when_to_use:
+            "Use to inspect the governed workstation gateway capability catalog as observation-only reference data.",
+          request_shape_hint: {
+            capability_lane_call: {
+              capability: "workstation_tool_reference.list_capabilities",
+            },
+          },
+        },
       },
     ],
   },
@@ -473,6 +534,9 @@ const laneCapabilitiesFor = (template: LaneTemplate) =>
     one_shot_status: capability.one_shot_status,
     session_status: capability.session_status,
     backend_provider_required: capability.backend_provider_required,
+    model_visible_hint:
+      capability.model_visible_hint ??
+      defaultCapabilityModelVisibleHint(capability.capability_id),
     result_authority: "observation_or_receipt_only" as const,
     reentry_required: true as const,
     terminal_eligible: false as const,

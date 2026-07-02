@@ -174,77 +174,6 @@ export type HelixAgentModelVisibleCapabilityLane = {
   }>;
 };
 
-const capabilityModelHint = (capabilityId: string): {
-  required_input_fields: string[];
-  optional_input_fields: string[];
-  when_to_use: string;
-  when_not_to_use?: string;
-  request_shape_hint: Record<string, unknown>;
-} => {
-  if (capabilityId === "live_translation.translate_text") {
-    return {
-      required_input_fields: ["text", "target_language"],
-      optional_input_fields: [
-        "source_language",
-        "requested_backend_provider",
-        "chunk_id",
-        "source_id",
-        "projection_target",
-      ],
-      when_to_use:
-        "Use when the user asks to translate provided text, selected content, transcript text, or other text content.",
-      when_not_to_use:
-        "Do not use docs-viewer.read_active_translation for new translation work; that workstation tool only reads an already-existing translated Docs surface. If source text or target language is missing, ask for clarification.",
-      request_shape_hint: {
-        capability_lane_call: {
-          capability: "live_translation.translate_text",
-          text: "<text to translate>",
-          target_language: "<target language or locale>",
-          source_language: "<optional source language>",
-          requested_backend_provider: "<optional backend preference; Helix selects the backend>",
-        },
-      },
-    };
-  }
-  if (capabilityId === "utility_text.normalize_text") {
-    return {
-      required_input_fields: ["text"],
-      optional_input_fields: ["normalization_mode", "requested_backend_provider"],
-      when_to_use: "Use for compact text normalization or deterministic utility text processing.",
-      request_shape_hint: {
-        capability_lane_call: {
-          capability: "utility_text.normalize_text",
-          text: "<text to normalize>",
-          normalization_mode: "<optional mode>",
-        },
-      },
-    };
-  }
-  if (capabilityId === "workstation_tool_reference.list_capabilities") {
-    return {
-      required_input_fields: [],
-      optional_input_fields: ["requested_backend_provider"],
-      when_to_use:
-        "Use to inspect the governed workstation gateway capability catalog as observation-only reference data.",
-      request_shape_hint: {
-        capability_lane_call: {
-          capability: "workstation_tool_reference.list_capabilities",
-        },
-      },
-    };
-  }
-  return {
-    required_input_fields: [],
-    optional_input_fields: ["requested_backend_provider"],
-    when_to_use: "Use only when this governed lane capability directly matches the user's requested task.",
-    request_shape_hint: {
-      capability_lane_call: {
-        capability: capabilityId,
-      },
-    },
-  };
-};
-
 export const buildModelVisibleCapabilityLaneManifest = (
   manifest: HelixCapabilityLaneManifest,
 ): HelixAgentModelVisibleCapabilityLaneManifest => {
@@ -270,7 +199,7 @@ export const buildModelVisibleCapabilityLaneManifest = (
           capability.one_shot_status === "executable" ||
           capability.session_status === "supported")
         .map((capability) => {
-          const hint = capabilityModelHint(capability.capability_id);
+          const hint = capability.model_visible_hint;
           return {
             capability_id: capability.capability_id,
             label: capability.label,

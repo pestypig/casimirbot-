@@ -202,11 +202,20 @@ export type HelixCapabilityLaneCapabilityDescriptor = {
   one_shot_status: "executable" | "shadow_only" | "not_supported";
   session_status: "supported" | "not_supported";
   backend_provider_required: boolean;
+  model_visible_hint: HelixCapabilityLaneModelVisibleHint;
   result_authority: "observation_or_receipt_only";
   reentry_required: true;
   terminal_eligible: false;
   assistant_answer: false;
   raw_content_included: false;
+};
+
+export type HelixCapabilityLaneModelVisibleHint = {
+  required_input_fields: string[];
+  optional_input_fields: string[];
+  when_to_use: string;
+  when_not_to_use?: string;
+  request_shape_hint: Record<string, unknown>;
 };
 
 export type HelixCapabilityLaneDescriptor = {
