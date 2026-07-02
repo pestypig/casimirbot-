@@ -1791,6 +1791,63 @@ describe("explicit workstation gateway derived calls", () => {
     expect(capabilities(requests)).not.toContain("scientific-calculator.solve_expression");
   });
 
+  it("does not admit tools for conditional prior-evidence calculator follow-up without a bound expression", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "If the previous answer has enough cited unit-bearing values, bind the formula into a numeric expression and run the calculator. Then explain what the result means and what the evidence does not prove.",
+        workspace_context_snapshot: {
+          activePanel: "scientific-calculator",
+          focusedPanel: "scientific-calculator",
+        },
+      },
+    });
+
+    expect(requests).toEqual([]);
+  });
+
+  it("still admits calculator for conditional follow-up when a concrete expression is supplied", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "If the previous answer has enough cited unit-bearing values, run the calculator with expression: 6.626e-34 * 5e14.",
+        workspace_context_snapshot: {
+          activePanel: "scientific-calculator",
+          focusedPanel: "scientific-calculator",
+        },
+      },
+    });
+
+    expect(capabilities(requests)).toContain("scientific-calculator.solve_expression");
+    expect(requests.find((request) => request.capability_id === "scientific-calculator.solve_expression")).toMatchObject({
+      arguments: {
+        expression: "6.626e-34*5e14",
+      },
+    });
+  });
+
+  it("still admits scholarly lookup when the follow-up explicitly asks to retry retrieval", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "If the previous answer did not have enough cited unit-bearing values, search again for more scholarly papers with usable numeric values and units. Do not run the calculator yet.",
+        workspace_context_snapshot: {
+          activePanel: "scientific-calculator",
+          focusedPanel: "scientific-calculator",
+        },
+      },
+    });
+
+    expect(capabilities(requests)).toContain("scholarly-research.lookup_papers");
+    expect(capabilities(requests)).not.toContain("scientific-calculator.solve_expression");
+  });
+
   it("keeps formula research compound planning to one primary request with next affordances", () => {
     const requests = buildCompoundCapabilityDependencyGatewayCallRequests({
       agent_runtime: "codex",
