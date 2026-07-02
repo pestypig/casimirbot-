@@ -592,6 +592,10 @@ function readGoalBoundLaneSummary(record: RecordLike | null, debug: RecordLike |
         .filter(Boolean)
         .join("/");
       const observation = coerceText(summary.last_observation_ref);
+      const source = coerceText(summary.source_id);
+      const sourceKind = coerceText(summary.source_kind);
+      const sourceProjectionTarget = coerceText(summary.source_projection_target);
+      const accountLocale = coerceText(summary.account_locale);
       const latestProjection = coerceText(summary.latest_projection_target);
       const latestChunk = coerceText(summary.latest_chunk_id);
       const latestChunkIndex = coerceText(summary.latest_chunk_index);
@@ -618,6 +622,10 @@ function readGoalBoundLaneSummary(record: RecordLike | null, debug: RecordLike |
         fallback ? `fallback ${fallback}` : "",
         ...decisionParts,
         observation ? `observation ${observation}` : "",
+        source ? `source ${source}` : "",
+        sourceKind ? `source kind ${sourceKind}` : "",
+        sourceProjectionTarget ? `source projection ${sourceProjectionTarget}` : "",
+        accountLocale ? `account locale ${accountLocale}` : "",
         latestProjection ? `latest projection ${latestProjection}` : "",
         latestChunk ? `latest chunk ${latestChunk}` : "",
         latestChunkIndex ? `latest index ${latestChunkIndex}` : "",
@@ -647,11 +655,15 @@ function readGoalBoundLaneSummary(record: RecordLike | null, debug: RecordLike |
       const status = coerceText(plan.status);
       const receipt = coerceText(plan.receipt_ref);
       const source = coerceText(plan.source_id);
+      const sourceKind = coerceText(plan.source_kind);
+      const sourceProjectionTarget = coerceText(plan.source_projection_target);
+      const accountLocale = coerceText(plan.account_locale);
       const projection = coerceText(plan.latest_projection_target);
       const chunk = coerceText(plan.latest_chunk_id);
       const dedupe = coerceText(plan.latest_dedupe_key);
       const sourceEvent = coerceText(plan.latest_source_event_id);
       const freshness = coerceText(plan.latest_freshness_status);
+      const targetLanguage = coerceText(plan.target_language);
       const cancelled = plan.latest_cancel_requested === true;
       return [
         lane,
@@ -660,7 +672,11 @@ function readGoalBoundLaneSummary(record: RecordLike | null, debug: RecordLike |
         target ? `dispatch ${target}` : "",
         status ? `status ${status}` : "",
         source ? `source ${source}` : "",
+        sourceKind ? `source kind ${sourceKind}` : "",
+        sourceProjectionTarget ? `source projection ${sourceProjectionTarget}` : "",
+        accountLocale ? `account locale ${accountLocale}` : "",
         projection ? `latest projection ${projection}` : "",
+        targetLanguage ? `target ${targetLanguage}` : "",
         chunk ? `latest chunk ${chunk}` : "",
         dedupe ? `latest dedupe ${dedupe}` : "",
         sourceEvent ? `latest source event id ${sourceEvent}` : "",
@@ -680,11 +696,15 @@ function readGoalBoundLaneSummary(record: RecordLike | null, debug: RecordLike |
       const target = coerceText(admission.target);
       const status = coerceText(admission.status);
       const source = coerceText(admission.source_id);
+      const sourceKind = coerceText(admission.source_kind);
+      const sourceProjectionTarget = coerceText(admission.source_projection_target);
+      const accountLocale = coerceText(admission.account_locale);
       const projection = coerceText(admission.latest_projection_target);
       const chunk = coerceText(admission.latest_chunk_id);
       const dedupe = coerceText(admission.latest_dedupe_key);
       const sourceEvent = coerceText(admission.latest_source_event_id);
       const freshness = coerceText(admission.latest_freshness_status);
+      const targetLanguage = coerceText(admission.target_language);
       const cancelled = admission.latest_cancel_requested === true;
       return [
         lane,
@@ -693,7 +713,11 @@ function readGoalBoundLaneSummary(record: RecordLike | null, debug: RecordLike |
         target ? `dispatch ${target}` : "",
         status ? `admission ${status}` : "",
         source ? `source ${source}` : "",
+        sourceKind ? `source kind ${sourceKind}` : "",
+        sourceProjectionTarget ? `source projection ${sourceProjectionTarget}` : "",
+        accountLocale ? `account locale ${accountLocale}` : "",
         projection ? `latest projection ${projection}` : "",
+        targetLanguage ? `target ${targetLanguage}` : "",
         chunk ? `latest chunk ${chunk}` : "",
         dedupe ? `latest dedupe ${dedupe}` : "",
         sourceEvent ? `latest source event id ${sourceEvent}` : "",
@@ -731,10 +755,14 @@ function readGoalDispatchReadinessSummary(record: RecordLike | null, debug: Reco
   const targets = readArray(readiness.next_dispatch_targets).map(coerceText).filter(Boolean).join(", ");
   const goalBindings = readArray(readiness.next_goal_binding_ids).map(coerceText).filter(Boolean).join(", ");
   const sourceIds = readArray(readiness.next_source_ids).map(coerceText).filter(Boolean).join(", ");
+  const sourceKinds = readArray(readiness.next_source_kinds).map(coerceText).filter(Boolean).join(", ");
+  const sourceProjectionTargets = readArray(readiness.next_source_projection_targets).map(coerceText).filter(Boolean).join(", ");
+  const accountLocales = readArray(readiness.next_account_locales).map(coerceText).filter(Boolean).join(", ");
   const chunkIds = readArray(readiness.next_chunk_ids).map(coerceText).filter(Boolean).join(", ");
   const dedupeKeys = readArray(readiness.next_dedupe_keys).map(coerceText).filter(Boolean).join(", ");
   const sourceEventIds = readArray(readiness.next_source_event_ids).map(coerceText).filter(Boolean).join(", ");
   const projectionTargets = readArray(readiness.next_projection_targets).map(coerceText).filter(Boolean).join(", ");
+  const targetLanguages = readArray(readiness.next_target_languages).map(coerceText).filter(Boolean).join(", ");
   const freshnessStatuses = readArray(readiness.next_freshness_statuses).map(coerceText).filter(Boolean).join(", ");
   const nextCancelled = readiness.next_cancel_requested === true;
   const evidenceRefs = readArray(readiness.next_evidence_refs).map(coerceText).filter(Boolean).join(", ");
@@ -756,7 +784,11 @@ function readGoalDispatchReadinessSummary(record: RecordLike | null, debug: Reco
     targets ? `targets ${targets}` : "",
     goalBindings ? `goal bindings ${goalBindings}` : "",
     sourceIds ? `sources ${sourceIds}` : "",
+    sourceKinds ? `source kinds ${sourceKinds}` : "",
+    sourceProjectionTargets ? `source projections ${sourceProjectionTargets}` : "",
+    accountLocales ? `account locales ${accountLocales}` : "",
     projectionTargets ? `projections ${projectionTargets}` : "",
+    targetLanguages ? `target languages ${targetLanguages}` : "",
     chunkIds ? `chunks ${chunkIds}` : "",
     dedupeKeys ? `dedupe ${dedupeKeys}` : "",
     sourceEventIds ? `source events ${sourceEventIds}` : "",
@@ -796,6 +828,7 @@ function readLaneSessionSummary(record: RecordLike | null, debug: RecordLike | n
       const source = coerceText(summary.source_id);
       const projection = coerceText(summary.projection_target);
       const locale = coerceText(summary.account_locale);
+      const targetLanguage = coerceText(summary.target_language);
       const latestProjection = coerceText(summary.latest_projection_target);
       const latestChunk = coerceText(summary.latest_chunk_id);
       const latestChunkIndex = coerceText(summary.latest_chunk_index);
@@ -821,6 +854,7 @@ function readLaneSessionSummary(record: RecordLike | null, debug: RecordLike | n
         source ? `source ${source}` : "",
         projection ? `projection ${projection}` : "",
         locale ? `locale ${locale}` : "",
+        targetLanguage ? `target ${targetLanguage}` : "",
         latestProjection && latestProjection !== projection ? `latest projection ${latestProjection}` : "",
         latestChunk ? `latest chunk ${latestChunk}` : "",
         latestChunkIndex ? `latest index ${latestChunkIndex}` : "",

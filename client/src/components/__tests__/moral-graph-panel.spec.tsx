@@ -401,16 +401,16 @@ describe("MoralGraphPanel", () => {
   it("renders a normal character badge that opens a character preset binding", () => {
     renderPanel(buildLocatorFixture(), buildCharacterComparisonFixture());
 
-    const characterBadge = screen.getByRole("button", { name: "Reinhard von Lohengramm" });
+    const characterBadge = screen.getByRole("button", { name: "Sovereign Ambition Profile" });
     expect(characterBadge).toBeTruthy();
-    expect(screen.queryByText("Reinhard von Lohengramm")).toBeNull();
+    expect(screen.queryByText("Sovereign Ambition Profile")).toBeNull();
 
     fireEvent.click(characterBadge);
     expect(screen.getByText("MoralGraph Character")).toBeTruthy();
     expect(screen.getByText("Subject")).toBeTruthy();
     expect(screen.getByText("Objective state")).toBeTruthy();
     expect(screen.getByText("Bindings")).toBeTruthy();
-    expect(screen.getAllByText(/Reinhard von Lohengramm/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Sovereign Ambition Profile/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/sovereign ambition 0\.98/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/displacement|conquest|forced restructuring/i).length).toBeGreaterThan(0);
   });

@@ -131,6 +131,10 @@ import {
   sortHelixAskConsoleRepliesChronologically,
 } from "@/components/helix/ask-console/HelixAskReplyLifecycle";
 import {
+  buildHelixAskActiveTurnDisplayViewModel,
+  HELIX_ASK_ACTIVE_TURN_QUIET_GAP_MS,
+} from "@/components/helix/ask-console/HelixAskActiveTurnDisplayViewModel";
+import {
   buildHelixAskConsoleChatMessagePayload,
   buildHelixAskConsoleChatTurnPayloads,
 } from "@/components/helix/ask-console/HelixAskChatPersistence";
@@ -4022,6 +4026,31 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(shouldKeepHelixAskConsoleReplyInBriefLane({
       answer_path: ["normal"],
     })).toBe(false);
+
+    const activeDisplay = buildHelixAskActiveTurnDisplayViewModel({
+      askBusy: true,
+      rows: [{
+        key: "real-transcript-row",
+        source: "agent_work",
+        label: "Tool Observation",
+        text: "Calculator observed 19*23 = 437.",
+        meta: "source live_provider_transcript",
+        status: "completed",
+        tone: "observation",
+        evidenceRefs: [],
+      }],
+      replyId: "ask:turn-1",
+      lastTranscriptEventAppliedAtMs: 100,
+      nowMs: 100 + HELIX_ASK_ACTIVE_TURN_QUIET_GAP_MS + 1,
+    });
+    expect(activeDisplay.visibleRows.map((row) => row.key)).toEqual(["real-transcript-row"]);
+    expect(activeDisplay.statusLine).toContain("Provider running");
+
+    const activeDisplayHelper = read("client/src/components/helix/ask-console/HelixAskActiveTurnDisplayViewModel.ts");
+    expect(activeDisplayHelper).not.toContain("fetch(");
+    expect(activeDisplayHelper).not.toContain("navigator.clipboard");
+    expect(activeDisplayHelper).not.toContain("useAgiChatStore");
+    expect(activeDisplayHelper).not.toContain("terminal_authority");
   });
 
   it("owns pure chat persistence payloads while store mutation stays in the bridge", () => {
@@ -4810,8 +4839,9 @@ describe("Helix Ask Console recrown boundary", () => {
     const turnList = read("client/src/components/helix/ask-console/HelixAskTurnList.tsx");
 
     expect(legacyPill).toContain("<HelixAskTurnList");
-    expect(legacyPill).toContain("consoleDebugSnapshot={helixAskConsoleDebugSnapshot}");
+    expect(legacyPill).toContain("consoleDebugSnapshot={userSettings.showHelixAskConsoleDebug ? helixAskConsoleDebugSnapshot : null}");
     expect(legacyPill).toContain("activeTurnStreamPanel={activeTurnStreamPanel}");
+    expect(legacyPill).toContain("activeTurnStreamLaneRef={activeTurnStreamPanelRef}");
     expect(legacyPill).toContain("bottomRef={askReplyListBottomRef}");
     expect(legacyPill).toContain("chronologicalAskReplies.map");
     expect(legacyPill).not.toContain('data-testid="helix-ask-reply-list-bottom"');
@@ -4875,8 +4905,7 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(legacyPill).toContain("<HelixAskReplyTurn");
     expect(legacyPill).toContain("rows: visibleActiveTurnStreamRows");
     expect(legacyPill).toContain('workLogTestId: "helix-ask-active-turn-work-log"');
-    expect(legacyPill).toContain('data-testid="helix-ask-active-turn-stream"');
-    expect(legacyPill).toContain("renderPlacement: \"inline_active_turn\"");
+    expect(legacyPill).toContain("activeTurnStreamLaneRef={activeTurnStreamPanelRef}");
     expect(legacyPill).not.toContain("visibleActiveTurnStreamRows.map((row, index)");
     expect(legacyPill).not.toContain('data-testid="helix-ask-active-turn-stream-row"');
     expect(replyTurn).toContain("export function HelixAskReplyTurn");
@@ -4887,7 +4916,9 @@ describe("Helix Ask Console recrown boundary", () => {
     const turnList = read("client/src/components/helix/ask-console/HelixAskTurnList.tsx");
     expect(turnList).toContain('data-testid="helix-ask-active-turn-stream-lane"');
     expect(turnList).toContain('data-render-placement="inline_active_turn"');
-    expect(turnList).toContain('className="contents"');
+    expect(turnList).toContain("activeTurnStreamLaneRef");
+    expect(turnList).toContain("data-active-render-token");
+    expect(turnList).not.toContain('className="contents"');
     expect(turnList.indexOf("{children}")).toBeLessThan(turnList.indexOf("{activeTurnStreamPanel}"));
   });
 

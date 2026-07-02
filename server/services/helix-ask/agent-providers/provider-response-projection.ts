@@ -73,6 +73,16 @@ const readGoalDispatchAdmissions = (providerDebug: Record<string, unknown>): Rec
     .map(buildHelixCapabilityLaneGoalDispatchAdmission);
 };
 
+const readMailLoopDebugSummaries = (providerDebug: Record<string, unknown>): Record<string, unknown>[] => {
+  const explicitSummaries = readRecordArray(providerDebug.capability_lane_mail_loop_debug_summaries);
+  if (explicitSummaries.length > 0) return explicitSummaries;
+
+  return readRecordArray(providerDebug.capability_lane_goal_binding_debug_summaries)
+    .map((summary) => summary.latest_mail_loop_summary)
+    .filter((summary): summary is Record<string, unknown> =>
+      Boolean(summary) && typeof summary === "object" && !Array.isArray(summary));
+};
+
 const readGoalDispatchReadiness = (
   providerDebug: Record<string, unknown>,
   plans: Record<string, unknown>[],
@@ -102,6 +112,7 @@ const buildProviderProjectionFields = (input: {
   const gatewayCapabilityIds = readGatewayCapabilityIds(input.gatewayManifest);
   const goalDispatchPlans = readGoalDispatchPlans(input.providerDebug);
   const goalDispatchAdmissions = readGoalDispatchAdmissions(input.providerDebug);
+  const mailLoopDebugSummaries = readMailLoopDebugSummaries(input.providerDebug);
   const goalDispatchReadiness = readGoalDispatchReadiness(
     input.providerDebug,
     goalDispatchPlans,
@@ -130,8 +141,9 @@ const buildProviderProjectionFields = (input: {
       input.providerDebug.capability_lane_session_results ?? [],
     capability_lane_session_debug_summaries:
       input.providerDebug.capability_lane_session_debug_summaries ?? [],
-    capability_lane_mail_loop_debug_summaries:
-      input.providerDebug.capability_lane_mail_loop_debug_summaries ?? [],
+    capability_lane_goal_binding_results:
+      input.providerDebug.capability_lane_goal_binding_results ?? [],
+    capability_lane_mail_loop_debug_summaries: mailLoopDebugSummaries,
     capability_lane_goal_binding_debug_summaries:
       input.providerDebug.capability_lane_goal_binding_debug_summaries ?? [],
     capability_lane_goal_dispatch_plans: goalDispatchPlans,

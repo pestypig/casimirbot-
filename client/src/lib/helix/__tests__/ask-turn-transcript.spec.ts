@@ -54,9 +54,25 @@ describe("Helix Ask turn transcript projection", () => {
           fallbackBackendProvider: null,
           receiptRef: null,
           observationRef: null,
+          sourceId: null,
+          sourceKind: null,
+          sourceProjectionTarget: null,
+          accountLocale: null,
+          latestChunkId: null,
+          latestChunkIndex: null,
+          latestDedupeKey: null,
+          latestSourceEventId: null,
+          latestSourceEventMs: null,
+          latestObservedAtMs: null,
+          latestFreshnessStatus: null,
+          latestProjectionTarget: null,
+          targetLanguage: null,
+          latestCancelRequested: null,
           terminalEligible: null,
           assistantAnswer: null,
           rawContentIncluded: null,
+          clientReplayReason: null,
+          providerNativeEventType: null,
           source_event_type: "tool_observation",
           event_source: "live",
         turn_id: "turn-1",
@@ -74,6 +90,49 @@ describe("Helix Ask turn transcript projection", () => {
         "empty",
       ),
     ).toBeNull();
+  });
+
+  it("labels transcript row sources for live, native, and replayed stream rows", () => {
+    const rows = buildHelixTurnTranscriptRows({
+      id: "reply-source-audit",
+      content: "",
+      debug: {
+        turn_transcript_events: [
+          {
+            id: "live-provider",
+            type: "model_decision",
+            source_event_type: "model_reentry",
+            event_source: "live",
+            stream_event: "turn_transcript_event",
+            text: "Codex is evaluating the observation.",
+            status: "running",
+          },
+          {
+            id: "native-tool",
+            type: "tool_result",
+            source_event_type: "codex_native_tool_result",
+            event_source: "live",
+            provider_native_event_type: "McpToolCallEnd",
+            text: "Codex completed tool: docs.search.",
+            status: "completed",
+          },
+          {
+            id: "replay",
+            type: "model_decision",
+            source_event_type: "context_state",
+            event_source: "live",
+            client_replay_reason: "final_response_backfill",
+            reconstructed: true,
+            text: "Backfilled final transcript row.",
+            status: "completed",
+          },
+        ],
+      },
+    });
+
+    expect(rows.some((row) => row.meta.includes("source live_provider_transcript"))).toBe(true);
+    expect(rows.some((row) => row.meta.includes("source codex_native_event:McpToolCallEnd"))).toBe(true);
+    expect(rows.some((row) => row.meta.includes("source final_response_backfill"))).toBe(true);
   });
 
   it("does not clip terminal answer transcript events in the console stream", () => {
@@ -96,6 +155,69 @@ describe("Helix Ask turn transcript projection", () => {
     expect(event?.text).toBe(longFinal);
     expect(event?.text).toContain("Final answer ends.");
     expect(event?.text).not.toContain("...");
+  });
+
+  it("preserves target language metadata when replaying transcript records", () => {
+    const event = buildAskLiveEventFromTurnTranscriptRecord(
+      {
+        id: "goal-lane-target-language",
+        text: "Goal-bound lane session: live_translation; target es.",
+        role: "system",
+        type: "observation",
+        source_event_type: "lane_goal_binding",
+        status: "pending",
+        step_id: "lane_goal_binding",
+        lane: "live_translation",
+        source_id: "docs:target-language",
+        source_kind: "docs",
+        source_projection_target: "docs_chunk",
+        account_locale: "es-US",
+        latest_projection_target: "docs_chunk",
+        target_language: "es",
+      },
+      "fallback",
+    );
+
+    expect(event).toMatchObject({
+      meta: expect.objectContaining({
+        source_event_type: "lane_goal_binding",
+        sourceId: "docs:target-language",
+        sourceKind: "docs",
+        sourceProjectionTarget: "docs_chunk",
+        accountLocale: "es-US",
+        latestProjectionTarget: "docs_chunk",
+        targetLanguage: "es",
+      }),
+    });
+
+    const rows = buildHelixTurnTranscriptRows({
+      id: "reply-target-language-row",
+      content: "",
+      debug: {
+        turn_transcript_events: [
+          {
+            type: "observation",
+            source_event_type: "lane_goal_binding",
+            status: "pending",
+            text: "Goal-bound lane session: live_translation; target es.",
+            lane: "live_translation",
+            source_id: "docs:target-language",
+            source_kind: "docs",
+            source_projection_target: "docs_chunk",
+            account_locale: "es-US",
+            latest_projection_target: "docs_chunk",
+            target_language: "es",
+          },
+        ],
+      },
+    });
+
+    expect(rows[0]?.meta).toContain("source docs:target-language");
+    expect(rows[0]?.meta).toContain("source kind docs");
+    expect(rows[0]?.meta).toContain("source projection docs_chunk");
+    expect(rows[0]?.meta).toContain("account locale es-US");
+    expect(rows[0]?.meta).toContain("projection docs_chunk");
+    expect(rows[0]?.meta).toContain("target es");
   });
 
   it("projects runtime transcript events into Ask live-event rows", () => {
@@ -1146,9 +1268,13 @@ describe("Helix Ask turn transcript projection", () => {
           next_dispatch_targets: ["ask_wake"],
           next_goal_binding_ids: ["goal-binding-ready"],
           next_source_ids: ["docs:ready"],
+          next_source_kinds: ["docs"],
+          next_source_projection_targets: ["docs_chunk"],
+          next_account_locales: ["es-US"],
           next_chunk_ids: ["chunk-ready"],
           next_source_event_ids: ["docs:ready:event-1"],
           next_projection_targets: ["docs_chunk"],
+          next_target_languages: ["es"],
           next_freshness_statuses: ["fresh"],
           next_receipt_refs: ["ask:lane:translation:ready-obs:projection:receipt"],
           side_effects_allowed: false,
@@ -1176,7 +1302,11 @@ describe("Helix Ask turn transcript projection", () => {
     expect(readiness?.value).toContain("targets ask_wake");
     expect(readiness?.value).toContain("goal bindings goal-binding-ready");
     expect(readiness?.value).toContain("sources docs:ready");
+    expect(readiness?.value).toContain("source kinds docs");
+    expect(readiness?.value).toContain("source projections docs_chunk");
+    expect(readiness?.value).toContain("account locales es-US");
     expect(readiness?.value).toContain("projections docs_chunk");
+    expect(readiness?.value).toContain("target languages es");
     expect(readiness?.value).toContain("chunks chunk-ready");
     expect(readiness?.value).toContain("source events docs:ready:event-1");
     expect(readiness?.value).toContain("freshness fresh");
@@ -1663,6 +1793,9 @@ describe("Helix Ask turn transcript projection", () => {
             session_status: "running",
             session_health: "healthy",
             source_id: "docs:nhm2",
+            source_kind: "docs",
+            source_projection_target: "docs_chunk",
+            account_locale: "es-US",
             last_observation_ref: "ask:lane:translation:goal-obs",
             latest_chunk_id: "chunk-goal-visible",
             latest_chunk_index: 5,
@@ -1672,6 +1805,7 @@ describe("Helix Ask turn transcript projection", () => {
             latest_observed_at_ms: 1040,
             latest_freshness_status: "fresh",
             latest_projection_target: "docs_chunk",
+            target_language: "es",
             latest_cancel_requested: true,
             latest_mail_loop_summary: {
               schema: "helix.capability_lane.mail_loop_debug_summary.v1",
@@ -1683,6 +1817,7 @@ describe("Helix Ask turn transcript projection", () => {
               stage_play_mail_id: "stage-play-mail-goal",
               stage_play_wake_expected: true,
               mailbox_thread_id: "ask-thread-goal",
+              target_language: "es",
               terminal_authority_status: "pending_helix_terminal_authority",
               selected_backend_provider: "live_translation.local_runtime",
               requested_backend_provider: "google_gemini",
@@ -1709,6 +1844,9 @@ describe("Helix Ask turn transcript projection", () => {
               lane_session_health: "healthy",
               lane_session_observation_ref: "ask:lane:translation:goal-obs",
               source_id: "docs:nhm2",
+              source_kind: "docs",
+              source_projection_target: "docs_chunk",
+              account_locale: "es-US",
               latest_chunk_id: "chunk-goal-visible",
               latest_chunk_index: 5,
               latest_dedupe_key: "docs:nhm2:chunk-goal-visible:es",
@@ -1755,6 +1893,9 @@ describe("Helix Ask turn transcript projection", () => {
               lane_session_id: "lane-session-translate-docs",
               lane_id: "live_translation",
               source_id: "docs:nhm2",
+              source_kind: "docs",
+              source_projection_target: "docs_chunk",
+              account_locale: "es-US",
               latest_chunk_id: "chunk-goal-visible",
               latest_chunk_index: 5,
               latest_dedupe_key: "docs:nhm2:chunk-goal-visible:es",
@@ -1789,6 +1930,9 @@ describe("Helix Ask turn transcript projection", () => {
               lane_session_id: "lane-session-translate-docs",
               lane_id: "live_translation",
               source_id: "docs:nhm2",
+              source_kind: "docs",
+              source_projection_target: "docs_chunk",
+              account_locale: "es-US",
               latest_chunk_id: "chunk-goal-visible",
               latest_chunk_index: 5,
               latest_dedupe_key: "docs:nhm2:chunk-goal-visible:es",
@@ -1844,6 +1988,9 @@ describe("Helix Ask turn transcript projection", () => {
           next_dispatch_targets: ["ask_wake"],
           next_goal_binding_ids: ["goal-binding-translate-docs"],
           next_source_ids: ["docs:nhm2"],
+          next_source_kinds: ["docs"],
+          next_source_projection_targets: ["docs_chunk"],
+          next_account_locales: ["es-US"],
           next_chunk_ids: ["chunk-goal-visible"],
           next_dedupe_keys: ["docs:nhm2:chunk-goal-visible:es"],
           next_source_event_ids: ["docs:nhm2:event-goal-visible"],
@@ -1880,7 +2027,11 @@ describe("Helix Ask turn transcript projection", () => {
     expect(combined).toContain("runtime root preserved");
     expect(combined).toContain("no live backend execution");
     expect(combined).toContain("terminal authority helix");
+    expect(combined).toContain("source kind docs");
+    expect(combined).toContain("source projection docs_chunk");
+    expect(combined).toContain("account locale es-US");
     expect(combined).toContain("latest projection docs_chunk");
+    expect(combined).toContain("target es");
     expect(combined).toContain("latest chunk chunk-goal-visible");
     expect(combined).toContain("latest index 5");
     expect(combined).toContain("latest dedupe docs:nhm2:chunk-goal-visible:es");
@@ -1909,6 +2060,9 @@ describe("Helix Ask turn transcript projection", () => {
     expect(combined).toContain("next targets ask_wake");
     expect(combined).toContain("next goal bindings goal-binding-translate-docs");
     expect(combined).toContain("next sources docs:nhm2");
+    expect(combined).toContain("next source kinds docs");
+    expect(combined).toContain("next source projections docs_chunk");
+    expect(combined).toContain("next account locales es-US");
     expect(combined).toContain("next projections docs_chunk");
     expect(combined).toContain("next chunks chunk-goal-visible");
     expect(combined).toContain("next dedupe docs:nhm2:chunk-goal-visible:es");
@@ -1928,10 +2082,23 @@ describe("Helix Ask turn transcript projection", () => {
     expect(events.find((event) => event.meta.stepId === "lane_goal_binding")).toMatchObject({
       meta: expect.objectContaining({
         sourceId: "docs:nhm2",
+        sourceKind: "docs",
+        sourceProjectionTarget: "docs_chunk",
+        accountLocale: "es-US",
+        goalBindingId: "goal-binding-translate-docs",
+        goalId: "goal:translate-docs",
+        bindingStatus: "bound",
+        sessionStatus: "running",
+        sessionHealth: "healthy",
+        reportPolicy: "terminal_authorized_summary",
+        quietBehavior: "wake_on_salience",
+        reportAction: "wake_on_salience",
+        reportReason: "goal_binding_policy_requests_wake_on_salience",
         latestChunkId: "chunk-goal-visible",
         latestDedupeKey: "docs:nhm2:chunk-goal-visible:es",
         latestSourceEventId: "docs:nhm2:event-goal-visible",
         latestProjectionTarget: "docs_chunk",
+        targetLanguage: "es",
         latestFreshnessStatus: "fresh",
         latestCancelRequested: true,
       }),
@@ -1954,6 +2121,10 @@ describe("Helix Ask turn transcript projection", () => {
     expect(rows.filter((row) => row.label === "Final")).toHaveLength(1);
     const goalSummary = summary?.rows.find((row) => row.key === "goal_bound_lanes")?.value ?? "";
     expect(goalSummary).toContain("live_translation");
+    expect(goalSummary).toContain("source docs:nhm2");
+    expect(goalSummary).toContain("source kind docs");
+    expect(goalSummary).toContain("source projection docs_chunk");
+    expect(goalSummary).toContain("account locale es-US");
     expect(goalSummary).toContain("latest projection docs_chunk");
     expect(goalSummary).toContain("latest chunk chunk-goal-visible");
     expect(goalSummary).toContain("latest index 5");
@@ -2090,6 +2261,7 @@ describe("Helix Ask turn transcript projection", () => {
             source_kind: "docs",
             projection_target: "docs_chunk",
             account_locale: "es-US",
+            target_language: "es",
             last_observation_ref: "ask:lane:translation:session-obs",
             last_receipt_ref: "ask:lane:translation:session-obs:projection:receipt",
             latest_chunk_id: "chunk-session-visible",
@@ -2128,6 +2300,7 @@ describe("Helix Ask turn transcript projection", () => {
     expect(combined).toContain("source docs:nhm2");
     expect(combined).toContain("projection docs_chunk");
     expect(combined).toContain("locale es-US");
+    expect(combined).toContain("target es");
     expect(combined).toContain("latest chunk chunk-session-visible");
     expect(combined).toContain("latest index 3");
     expect(combined).toContain("latest source event id docs:nhm2:event-session-visible");
@@ -2156,6 +2329,7 @@ describe("Helix Ask turn transcript projection", () => {
         backendLatencyClass: "interactive",
         backendPrivacyClass: "local_only",
         fallbackBackendProvider: null,
+        targetLanguage: "es",
         receiptRef: "ask:lane:translation:session-obs:projection:receipt",
         observationRef: "ask:lane:translation:session-obs",
         terminalEligible: false,
@@ -2180,6 +2354,7 @@ describe("Helix Ask turn transcript projection", () => {
     expect(sessionSummary).toContain("source docs:nhm2");
     expect(sessionSummary).toContain("projection docs_chunk");
     expect(sessionSummary).toContain("locale es-US");
+    expect(sessionSummary).toContain("target es");
     expect(sessionSummary).toContain("latest chunk chunk-session-visible");
     expect(sessionSummary).toContain("latest index 3");
     expect(sessionSummary).toContain("latest source event id docs:nhm2:event-session-visible");
@@ -2441,6 +2616,7 @@ describe("Helix Ask turn transcript projection", () => {
             source_event_ms: 1782860000000,
             observed_at_ms: 1782860000100,
             projection_target: "docs_chunk",
+            target_language: "es",
             cancel_requested: false,
             selected_backend_provider: "live_translation.local_runtime",
             requested_backend_provider: "google_gemini",
@@ -2489,6 +2665,7 @@ describe("Helix Ask turn transcript projection", () => {
     expect(combined).toContain("source event id docs:nhm2:event-1");
     expect(combined).toContain("source event ms 1782860000000");
     expect(combined).toContain("observed 1782860000100");
+    expect(combined).toContain("target es");
     expect(combined).toContain("backend live_translation.local_runtime");
     expect(combined).toContain("requested backend google_gemini");
     expect(combined).toContain("cost free_local");
@@ -2531,6 +2708,37 @@ describe("Helix Ask turn transcript projection", () => {
     expect(mailSummary).toContain("terminal authority helix");
     expect(mailSummary).toContain("authority pending_helix_terminal_authority");
     expect(mailSummary).toContain("evidence-only");
+
+    const events = buildHelixRuntimeAskLiveEvents(reply);
+    expect(events.find((event) => event.meta.stepId === "lane_mail_loop")).toMatchObject({
+      meta: expect.objectContaining({
+        lane: "live_translation",
+        capabilityId: "live_translation.translate_text",
+        laneSessionId: "lane-session-mail",
+        sourceId: "docs:nhm2",
+        latestChunkId: "chunk-1",
+        latestChunkIndex: "1",
+        latestDedupeKey: "docs:nhm2:chunk-1:es",
+        latestSourceEventId: "docs:nhm2:event-1",
+        latestSourceEventMs: "1782860000000",
+        latestObservedAtMs: "1782860000100",
+        latestFreshnessStatus: "fresh",
+        latestProjectionTarget: "docs_chunk",
+        targetLanguage: "es",
+        stagePlayMailId: "stage-play-mail-translation",
+        stagePlayWakeExpected: true,
+        mailboxThreadId: "ask-thread-mail",
+        mailStatus: "unread",
+        blockedReason: null,
+        receiptRef: "ask:lane:translation:mail-obs:projection:receipt",
+        observationRef: "ask:lane:translation:mail-obs",
+        terminalEligible: false,
+        assistantAnswer: false,
+        rawContentIncluded: false,
+        source_event_type: "lane_mail_loop",
+        event_source: "capability_lane_mail_loop_debug_summaries",
+      }),
+    });
   });
 
   it("projects shadow lane packet backend metadata in transcript rows and runtime summary", () => {

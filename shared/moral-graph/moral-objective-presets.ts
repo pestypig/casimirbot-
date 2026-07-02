@@ -248,9 +248,9 @@ export const DEFAULT_MORAL_WISDOM_PRESET: MoralGraphObjectivePresetV1 = {
 export const REINHARD_CHARACTER_PERSPECTIVE_PRESET: MoralGraphObjectivePresetV1 = {
   presetId: "moral.preset.character.logh.reinhard_von_lohengramm",
   kind: "character_perspective",
-  label: "Reinhard von Lohengramm perspective",
+  label: "Sovereign Ambition Profile",
   description:
-    "Named character perspective preset that weights Moral principles for comparison without asserting anything about a real person.",
+    "Trait-based character perspective preset that weights Moral principles for comparison without asserting anything about a real person.",
   badgeWeights: REINHARD_VON_LOHENGRAMM_PROFILE.moralBadgeWeights.map((weight) => ({
     badgeId: weight.nodeId,
     weight: weight.weight,
@@ -271,7 +271,7 @@ export const REINHARD_CHARACTER_PERSPECTIVE_PRESET: MoralGraphObjectivePresetV1 
     "skillful-action-under-uncertainty",
   ],
   traceLabels: [
-    "Resolve named character perspective as badge weights over the Moral graph.",
+    "Resolve trait-based character perspective as badge weights over the Moral graph.",
     "Avoid character judgment, moral finality, canon certainty, and execution authority.",
   ],
   refs: [

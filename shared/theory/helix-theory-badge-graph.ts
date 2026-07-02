@@ -34,6 +34,9 @@ import {
   buildPreboundaryBioenergeticsTheoryBadgesV1,
 } from "./preboundary-bioenergetics-theory-badges";
 import {
+  buildViabilityRegulationTheoryBadgesV1,
+} from "./viability-regulation-theory-badges";
+import {
   buildRelativityHistoryTheoryBadgesV1,
 } from "./relativity-history-theory-badges";
 import {
@@ -934,6 +937,7 @@ export function buildHelixTheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
   const astroPrebiotic = buildAstrochemistryPrebioticTheoryBadgesV1();
   const evolutionaryBiophysics = buildEvolutionaryBiophysicsTheoryBadgesV1();
   const preboundaryBioenergetics = buildPreboundaryBioenergeticsTheoryBadgesV1();
+  const viabilityRegulation = buildViabilityRegulationTheoryBadgesV1();
   const stellarSpectroscopy = buildStellarSpectroscopyAstrochemistryTheoryBadgesV1();
   const casimir = buildCasimirCavityTheoryBadgesV1();
   const tokamak = buildTokamakPlasmaTheoryBadgesV1();
@@ -952,7 +956,7 @@ export function buildHelixTheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
     graphId: "nhm2-theory-badge-graph",
     title: "Helix Theory Badge Graph",
     description:
-      "Diagnostic physics theory badges, scalar calculator loadouts, unit signatures, runtime references, NHM2 full-solve tensor/observer/closure provenance, and claim boundaries for relativity history, NHM2, StarSim, cosmic distance ladder, solar spectrum, solar/stellar reference, stellar spectroscopy, astrochemistry/prebiotic, pre-boundary bioenergetics, evolutionary biophysics, Casimir cavity, tokamak plasma, galactic dynamics, and curvature/collapse contexts.",
+      "Diagnostic physics theory badges, scalar calculator loadouts, unit signatures, runtime references, NHM2 full-solve tensor/observer/closure provenance, and claim boundaries for relativity history, NHM2, StarSim, cosmic distance ladder, solar spectrum, solar/stellar reference, stellar spectroscopy, astrochemistry/prebiotic, pre-boundary bioenergetics, viability regulation, evolutionary biophysics, Casimir cavity, tokamak plasma, galactic dynamics, and curvature/collapse contexts.",
     badges: [
       ...FIRST_PRINCIPLES_THEORY_BADGES,
       ...relativityHistory.badges,
@@ -965,6 +969,7 @@ export function buildHelixTheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
       ...astroPrebiotic.badges,
       ...evolutionaryBiophysics.badges,
       ...preboundaryBioenergetics.badges,
+      ...viabilityRegulation.badges,
       ...stellarSpectroscopy.badges,
       ...casimir.badges,
       ...tokamak.badges,
@@ -991,6 +996,7 @@ export function buildHelixTheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
       ...astroPrebiotic.edges,
       ...evolutionaryBiophysics.edges,
       ...preboundaryBioenergetics.edges,
+      ...viabilityRegulation.edges,
       ...stellarSpectroscopy.edges,
       ...casimir.edges,
       ...tokamak.edges,

@@ -83,6 +83,12 @@ describe("buildMoralGraphBiomeScaleViewModel", () => {
     const concentration = graph.nodes.find((node: MoralGraphNode) => node.id === "concentration-before-replication");
     const boundary = graph.nodes.find((node: MoralGraphNode) => node.id === "boundary-before-obligation");
     const sensing = graph.nodes.find((node: MoralGraphNode) => node.id === "sensing-before-judgment");
+    const valence = graph.nodes.find((node: MoralGraphNode) => node.id === "valence-before-preference");
+    const affordance = graph.nodes.find((node: MoralGraphNode) => node.id === "affordance-before-action");
+    const choice = graph.nodes.find((node: MoralGraphNode) => node.id === "choice-before-mandate");
+    const communication = graph.nodes.find((node: MoralGraphNode) => node.id === "communication-before-norm");
+    const reciprocity = graph.nodes.find((node: MoralGraphNode) => node.id === "reciprocity-before-law");
+    const coordination = graph.nodes.find((node: MoralGraphNode) => node.id === "coordination-before-mandate");
     const wisdom = graph.nodes.find((node: MoralGraphNode) => node.id === "direct-observation-before-claim");
     const objective = graph.nodes.find((node: MoralGraphNode) => node.id === MORAL_WISDOM_ROOT_ID);
 
@@ -93,11 +99,24 @@ describe("buildMoralGraphBiomeScaleViewModel", () => {
     expect(boundary?.biome).toBe("substrate_boundary");
     expect(boundary?.scaleBand).toBe("cellular");
     expect(sensing?.biome).toBe("substrate_sensing");
+    expect(valence?.biome).toBe("action_selection");
+    expect(valence?.actionManifestation).toBe("valuing");
+    expect(affordance?.actionManifestation).toBe("affording");
+    expect(choice?.scaleBand).toBe("group");
+    expect(choice?.actionManifestation).toBe("choosing");
+    expect(communication?.biome).toBe("coordination_scale");
+    expect(communication?.actionManifestation).toBe("communicating");
+    expect(reciprocity?.scaleBand).toBe("institution");
+    expect(reciprocity?.actionManifestation).toBe("reciprocating");
     expect(wisdom?.maturity).toBe("procedural");
     expect(objective?.biome).toBe("objective_binding");
     expect(gradient!.x).toBeLessThan(boundary!.x);
-    expect(boundary!.x).toBeLessThan(wisdom!.x);
+    expect(boundary!.x).toBeLessThan(valence!.x);
+    expect(valence!.x).toBeLessThan(coordination!.x);
+    expect(wisdom?.biome).toBe("substrate_sensing");
+    expect(sensing!.x).toBe(wisdom!.x);
     expect(wisdom!.x).toBeLessThan(objective!.x);
+    expect(coordination!.x).toBeLessThan(objective!.x);
   });
 
   it("keeps frontier mechanism badges bounded and non-terminal", () => {
@@ -130,10 +149,13 @@ describe("buildMoralGraphBiomeScaleViewModel", () => {
     const graph = buildFixture();
     const boundaryCell = graph.cells.find((cell) => cell.id === "substrate_boundary:cellular");
     const conditionCell = graph.cells.find((cell) => cell.id === "pre_boundary_conditions:molecular");
+    const actionCell = graph.cells.find((cell) => cell.id === "action_selection:organism");
     const organismCell = graph.cells.find((cell) => cell.id === "substrate_sensing:organism");
 
     expect(conditionCell?.label).toBe("Conditions / Molecular");
     expect(boundaryCell?.label).toBe("Boundary / Cellular");
+    expect(actionCell?.label).toBe("Action / Organism");
+    expect(actionCell?.width).toBeGreaterThan(0);
     expect(boundaryCell?.width).toBeGreaterThan(0);
     expect(boundaryCell?.height).toBeGreaterThan(0);
     expect(organismCell?.label).toBe("Sensing / Organism");

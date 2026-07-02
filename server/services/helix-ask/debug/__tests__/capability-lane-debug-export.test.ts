@@ -28,6 +28,17 @@ describe("capability lane debug export fields", () => {
           selected_backend_provider: "live_translation.local_runtime",
         },
       ],
+      capability_lane_goal_binding_results: [
+        {
+          ok: true,
+          goal_binding: {
+            goal_binding_id: "goal-binding-debug",
+          },
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      ],
       runtime_lane_request_contract: {
         schema: "helix.codex_runtime_lane_request_contract.v1",
         execution_status: "lane_observation_reentered",
@@ -63,6 +74,17 @@ describe("capability lane debug export fields", () => {
           selected_backend_provider: "live_translation.local_runtime",
         },
       ],
+      capability_lane_goal_binding_results: [
+        {
+          ok: true,
+          goal_binding: {
+            goal_binding_id: "goal-binding-debug",
+          },
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      ],
       runtime_lane_request_contract: {
         execution_status: "lane_observation_reentered",
       },
@@ -89,6 +111,12 @@ describe("capability lane debug export fields", () => {
             capability_key: "live_translation.translate_text",
           },
         ],
+        capability_lane_goal_binding_results: [
+          {
+            ok: false,
+            blocked_reason: "unknown_lane_session",
+          },
+        ],
         capability_lane_reentry_status: "observation_packet_required_for_provider_reentry",
         runtime_lane_request_retry: {
           status: "runtime_provider_emitted_lane_request",
@@ -111,10 +139,46 @@ describe("capability lane debug export fields", () => {
           capability_key: "live_translation.translate_text",
         },
       ],
+      capability_lane_goal_binding_results: [
+        {
+          ok: false,
+          blocked_reason: "unknown_lane_session",
+        },
+      ],
       capability_lane_reentry_status: "observation_packet_required_for_provider_reentry",
       runtime_lane_request_retry: {
         status: "runtime_provider_emitted_lane_request",
       },
     });
+  });
+
+  it("derives mail-loop debug summaries from goal-binding summaries when explicit summaries are absent", () => {
+    const fields = buildCapabilityLaneDebugExportFields({
+      debug: {
+        capability_lane_goal_binding_debug_summaries: [
+          {
+            schema: "helix.capability_lane.goal_binding_debug_summary.v1",
+            goal_binding_id: "goal-binding-debug",
+            latest_mail_loop_summary: {
+              schema: "helix.capability_lane.mail_loop_debug_summary.v1",
+              lane_session_id: "lane-session-debug",
+              packet_count: 2,
+              terminal_eligible: false,
+              assistant_answer: false,
+            },
+          },
+        ],
+      },
+    });
+
+    expect(fields.capability_lane_mail_loop_debug_summaries).toEqual([
+      {
+        schema: "helix.capability_lane.mail_loop_debug_summary.v1",
+        lane_session_id: "lane-session-debug",
+        packet_count: 2,
+        terminal_eligible: false,
+        assistant_answer: false,
+      },
+    ]);
   });
 });

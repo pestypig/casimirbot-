@@ -76,6 +76,7 @@ type InlineTranslationState = {
   observationRef?: string | null;
   receiptRef?: string | null;
   projectionStatus?: string | null;
+  selectedBackendProvider?: string | null;
   chunkId?: string | null;
   chunkIndex?: number | null;
   dedupeKey?: string | null;
@@ -460,6 +461,7 @@ export function DocViewerPanel() {
             observationRef: laneState.observationRef,
             receiptRef: laneState.receiptRef,
             projectionStatus: laneState.projectionStatus,
+            selectedBackendProvider: laneState.selectedBackendProvider,
             chunkId: laneState.chunkId,
             chunkIndex: laneState.chunkIndex,
             dedupeKey: laneState.dedupeKey,
@@ -487,6 +489,7 @@ export function DocViewerPanel() {
             observationRef: laneState.observationRef,
             receiptRef: laneState.receiptRef,
             projectionStatus: laneState.projectionStatus,
+            selectedBackendProvider: laneState.selectedBackendProvider,
             chunkId: laneState.chunkId,
             chunkIndex: laneState.chunkIndex,
             dedupeKey: laneState.dedupeKey,
@@ -525,9 +528,11 @@ export function DocViewerPanel() {
       locale: interfaceLanguage.code,
       projectionTarget: "docs_chunk",
       units: translationUnits,
+      allowStaleDisplayText: inlineTranslationEnabled,
     });
   }, [
     currentEntry,
+    inlineTranslationEnabled,
     interfaceLanguage.code,
     translationEligible,
     translationUnits,
@@ -1395,8 +1400,13 @@ function PanelHeader({
   const translationStatusLabel = getDocumentTranslationStatusLabel({
     translationStatus,
     translationError,
+    liveTranslationProjectionSummary,
     t,
   });
+  const hasBlockedTranslationLane =
+    liveTranslationProjectionSummary.blockedLaneSessionCount > 0 ||
+    liveTranslationProjectionSummary.blockedMailLoopCount > 0 ||
+    liveTranslationProjectionSummary.blockedGoalBindingCount > 0;
 
   return (
     <header className="flex min-w-0 items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
@@ -1471,7 +1481,7 @@ function PanelHeader({
           <p
             className={cn(
               "mt-0.5 text-[11px]",
-              translationStatus === "error" || translationStatus === "unavailable"
+              translationStatus === "error" || translationStatus === "unavailable" || hasBlockedTranslationLane
                 ? "text-amber-300"
                 : "text-emerald-200",
             )}
@@ -1479,6 +1489,9 @@ function PanelHeader({
             data-doc-translation-summary-total={String(liveTranslationProjectionSummary.totalCount)}
             data-doc-translation-summary-ready={String(liveTranslationProjectionSummary.readyCount)}
             data-doc-translation-summary-error={String(liveTranslationProjectionSummary.errorCount)}
+            data-doc-translation-summary-health={liveTranslationProjectionSummary.healthStatus}
+            data-doc-translation-summary-renderable={String(liveTranslationProjectionSummary.hasRenderableText)}
+            data-doc-translation-summary-has-errors={String(liveTranslationProjectionSummary.hasProjectionErrors)}
             data-doc-translation-summary-projected={String(liveTranslationProjectionSummary.projectedCount)}
             data-doc-translation-summary-stale={String(liveTranslationProjectionSummary.staleCount)}
             data-doc-translation-summary-cancelled={String(liveTranslationProjectionSummary.cancelledCount)}
@@ -1487,6 +1500,34 @@ function PanelHeader({
             data-doc-translation-summary-latest-source-event-ms={liveTranslationProjectionSummary.latestSourceEventMs ?? ""}
             data-doc-translation-summary-latest-observation-ref={liveTranslationProjectionSummary.latestObservationRef ?? ""}
             data-doc-translation-summary-latest-receipt-ref={liveTranslationProjectionSummary.latestReceiptRef ?? ""}
+            data-doc-translation-summary-latest-lane-session-id={liveTranslationProjectionSummary.latestLaneSessionId ?? ""}
+            data-doc-translation-summary-latest-selected-backend-provider={liveTranslationProjectionSummary.latestSelectedBackendProvider ?? ""}
+            data-doc-translation-summary-latest-chunk-id={liveTranslationProjectionSummary.latestChunkId ?? ""}
+            data-doc-translation-summary-latest-dedupe-key={liveTranslationProjectionSummary.latestDedupeKey ?? ""}
+            data-doc-translation-summary-latest-source-kind={liveTranslationProjectionSummary.latestSourceKind ?? ""}
+            data-doc-translation-summary-latest-projection-target={liveTranslationProjectionSummary.latestProjectionTarget ?? ""}
+            data-doc-translation-summary-latest-account-locale={liveTranslationProjectionSummary.latestAccountLocale ?? ""}
+            data-doc-translation-summary-latest-target-language={liveTranslationProjectionSummary.latestTargetLanguage ?? ""}
+            data-doc-translation-summary-latest-projection-status={liveTranslationProjectionSummary.latestProjectionStatus ?? ""}
+            data-doc-translation-summary-latest-freshness-status={liveTranslationProjectionSummary.latestFreshnessStatus ?? ""}
+            data-doc-translation-summary-lane-sessions={String(liveTranslationProjectionSummary.laneSessionCount)}
+            data-doc-translation-summary-active-lane-sessions={String(liveTranslationProjectionSummary.activeLaneSessionCount)}
+            data-doc-translation-summary-blocked-lane-sessions={String(liveTranslationProjectionSummary.blockedLaneSessionCount)}
+            data-doc-translation-summary-latest-lane-session-status={liveTranslationProjectionSummary.latestLaneSessionStatus ?? ""}
+            data-doc-translation-summary-latest-lane-session-health={liveTranslationProjectionSummary.latestLaneSessionHealth ?? ""}
+            data-doc-translation-summary-latest-lane-session-updated-at-ms={liveTranslationProjectionSummary.latestLaneSessionUpdatedAtMs ?? ""}
+            data-doc-translation-summary-mail-loops={String(liveTranslationProjectionSummary.mailLoopCount)}
+            data-doc-translation-summary-pending-mail-loops={String(liveTranslationProjectionSummary.pendingMailLoopCount)}
+            data-doc-translation-summary-blocked-mail-loops={String(liveTranslationProjectionSummary.blockedMailLoopCount)}
+            data-doc-translation-summary-latest-mail-loop-status={liveTranslationProjectionSummary.latestMailLoopStatus ?? ""}
+            data-doc-translation-summary-latest-mail-loop-id={liveTranslationProjectionSummary.latestMailLoopId ?? ""}
+            data-doc-translation-summary-goal-bindings={String(liveTranslationProjectionSummary.goalBindingCount)}
+            data-doc-translation-summary-active-goal-bindings={String(liveTranslationProjectionSummary.activeGoalBindingCount)}
+            data-doc-translation-summary-blocked-goal-bindings={String(liveTranslationProjectionSummary.blockedGoalBindingCount)}
+            data-doc-translation-summary-latest-goal-binding-id={liveTranslationProjectionSummary.latestGoalBindingId ?? ""}
+            data-doc-translation-summary-latest-goal-id={liveTranslationProjectionSummary.latestGoalId ?? ""}
+            data-doc-translation-summary-latest-goal-binding-status={liveTranslationProjectionSummary.latestGoalBindingStatus ?? ""}
+            data-doc-translation-summary-latest-goal-binding-report-action={liveTranslationProjectionSummary.latestGoalBindingReportAction ?? ""}
             data-doc-translation-summary-terminal-eligible="false"
             data-doc-translation-summary-assistant-answer="false"
             data-doc-translation-summary-raw-content-included="false"
@@ -1528,8 +1569,34 @@ function isAbortError(error: unknown): boolean {
 function getDocumentTranslationStatusLabel(args: {
   translationStatus: DocumentTranslationUiStatus;
   translationError: string | null;
+  liveTranslationProjectionSummary: DocumentLiveTranslationProjectionSnapshotSummary;
   t: Translate;
 }): string | null {
+  if (args.liveTranslationProjectionSummary.blockedLaneSessionCount > 0) {
+    return args.t("docsViewer.translation.status.sessionBlocked", {
+      status: args.liveTranslationProjectionSummary.latestLaneSessionStatus ?? "blocked",
+    });
+  }
+  if (args.liveTranslationProjectionSummary.blockedMailLoopCount > 0) {
+    return args.t("docsViewer.translation.status.mailLoopBlocked", {
+      status: args.liveTranslationProjectionSummary.latestMailLoopStatus ?? "blocked",
+    });
+  }
+  if (args.liveTranslationProjectionSummary.activeGoalBindingCount > 0 && args.translationStatus === "idle") {
+    return args.t("docsViewer.translation.status.goalBindingActive", {
+      status: args.liveTranslationProjectionSummary.latestGoalBindingStatus ?? "active",
+    });
+  }
+  if (args.liveTranslationProjectionSummary.pendingMailLoopCount > 0 && args.translationStatus === "idle") {
+    return args.t("docsViewer.translation.status.mailLoopPending", {
+      status: args.liveTranslationProjectionSummary.latestMailLoopStatus ?? "pending",
+    });
+  }
+  if (args.liveTranslationProjectionSummary.activeLaneSessionCount > 0 && args.translationStatus === "idle") {
+    return args.t("docsViewer.translation.status.sessionActive", {
+      status: args.liveTranslationProjectionSummary.latestLaneSessionStatus ?? "running",
+    });
+  }
   switch (args.translationStatus) {
     case "cached":
       return args.t("docsViewer.translation.status.cached");
@@ -1648,8 +1715,10 @@ function renderMarkdownWithInlineTranslations(
       const projectionAttrs = [
         state.source ? `data-doc-translation-source="${escapeHtml(state.source)}"` : "",
         state.projectionStatus ? `data-doc-translation-projection-status="${escapeHtml(state.projectionStatus)}"` : "",
+        state.selectedBackendProvider ? `data-doc-translation-selected-backend-provider="${escapeHtml(state.selectedBackendProvider)}"` : "",
         state.observationRef ? `data-doc-translation-observation-ref="${escapeHtml(state.observationRef)}"` : "",
         state.receiptRef ? `data-doc-translation-receipt-ref="${escapeHtml(state.receiptRef)}"` : "",
+        state.laneSessionId ? `data-doc-translation-lane-session-id="${escapeHtml(state.laneSessionId)}"` : "",
         state.chunkId ? `data-doc-translation-chunk-id="${escapeHtml(state.chunkId)}"` : "",
         typeof state.chunkIndex === "number" ? `data-doc-translation-chunk-index="${String(state.chunkIndex)}"` : "",
         state.dedupeKey ? `data-doc-translation-dedupe-key="${escapeHtml(state.dedupeKey)}"` : "",

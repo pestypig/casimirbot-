@@ -51,6 +51,15 @@ const buildValidReflection = () =>
       caution: "Do not collapse maintenance needs into human-style wants.",
       forbiddenOverclaim: "Maintenance evidence does not prove personhood.",
     }],
+    proceduralChain: [{
+      fromBadgeId: "boundary-before-obligation",
+      toBadgeId: "maintenance-before-optimization",
+      transitionLabel: "boundary to maintenance",
+      proceduralClaim: "A bounded system supports stronger reflection when the trace shows what must be maintained before optional optimization.",
+      evidenceStrength: "partial",
+      missingEvidence: ["boundary-before-obligation"],
+      forbiddenOverclaim: "Maintenance evidence does not prove personhood.",
+    }],
     synthesisPath: [
       {
         stepId: "substrate_observation",
@@ -121,6 +130,28 @@ describe("moral_living_substrate_reflection/v1", () => {
         deterministic_content_role: "observation_not_assistant_answer",
       },
     });
+  });
+
+  it("rejects malformed procedural chain steps", () => {
+    const reflection = {
+      ...buildValidReflection(),
+      proceduralChain: [{
+        fromBadgeId: "boundary-before-obligation",
+        toBadgeId: "maintenance-before-optimization",
+        transitionLabel: "boundary to maintenance",
+        proceduralClaim: "Trace boundary to maintenance.",
+        evidenceStrength: "certain",
+        missingEvidence: "none",
+        forbiddenOverclaim: "Do not prove personhood.",
+      }],
+    };
+
+    expect(validateMoralLivingSubstrateReflectionV1(reflection)).toEqual(
+      expect.arrayContaining([
+        "proceduralChain[0].evidenceStrength is invalid",
+        "proceduralChain[0].missingEvidence must be a string array",
+      ]),
+    );
   });
 
   it("rejects terminal or assistant-answer authority", () => {

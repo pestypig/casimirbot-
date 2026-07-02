@@ -82,6 +82,34 @@ const summarizeHelixAskDebugValue = (value: unknown): unknown => {
   return value;
 };
 
+const readHelixAskLiveDebugRecord = (value: unknown): RecordLike | null =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as RecordLike)
+    : null;
+
+const readHelixAskLiveDebugRecordArray = (value: unknown): RecordLike[] =>
+  Array.isArray(value)
+    ? value.filter((entry): entry is RecordLike => Boolean(readHelixAskLiveDebugRecord(entry)))
+    : [];
+
+const readCapabilityLaneMailLoopDebugSummaries = (
+  payload: RecordLike,
+  debug: RecordLike,
+): RecordLike[] => {
+  const explicit = [
+    ...readHelixAskLiveDebugRecordArray(payload.capability_lane_mail_loop_debug_summaries),
+    ...readHelixAskLiveDebugRecordArray(debug.capability_lane_mail_loop_debug_summaries),
+  ];
+  if (explicit.length > 0) return explicit;
+
+  return [
+    ...readHelixAskLiveDebugRecordArray(payload.capability_lane_goal_binding_debug_summaries),
+    ...readHelixAskLiveDebugRecordArray(debug.capability_lane_goal_binding_debug_summaries),
+  ]
+    .map((summary) => readHelixAskLiveDebugRecord(summary.latest_mail_loop_summary))
+    .filter((summary): summary is RecordLike => Boolean(summary));
+};
+
 export const createHelixAskLiveDebugSlimBuilder = (
   dependencies: HelixAskLiveDebugSlimDependencies,
 ): ((payload: RecordLike) => RecordLike | null) => {
@@ -124,6 +152,8 @@ export const createHelixAskLiveDebugSlimBuilder = (
       asDebugExportRecord(payload.evidence_reentry_proof) ??
       asDebugExportRecord(debug.evidence_reentry_proof) ??
       buildDebugExportEvidenceReentryProof(payload);
+    const capabilityLaneMailLoopDebugSummaries =
+      readCapabilityLaneMailLoopDebugSummaries(payload, debug);
     const slim: RecordLike = {
       schema: "helix.ask.live_debug_slim.v1",
       live_debug_mode: "slim",
@@ -188,10 +218,12 @@ export const createHelixAskLiveDebugSlimBuilder = (
         summarizeHelixAskDebugValue(
           payload.capability_lane_session_debug_summaries ?? debug.capability_lane_session_debug_summaries ?? [],
         ),
-      capability_lane_mail_loop_debug_summaries:
+      capability_lane_goal_binding_results:
         summarizeHelixAskDebugValue(
-          payload.capability_lane_mail_loop_debug_summaries ?? debug.capability_lane_mail_loop_debug_summaries ?? [],
+          payload.capability_lane_goal_binding_results ?? debug.capability_lane_goal_binding_results ?? [],
         ),
+      capability_lane_mail_loop_debug_summaries:
+        summarizeHelixAskDebugValue(capabilityLaneMailLoopDebugSummaries),
       capability_lane_goal_binding_debug_summaries:
         summarizeHelixAskDebugValue(
           payload.capability_lane_goal_binding_debug_summaries ??

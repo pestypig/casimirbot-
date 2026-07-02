@@ -1,4 +1,4 @@
-import type { CSSProperties, MouseEvent, ReactNode } from "react";
+import React, { type CSSProperties, type MouseEvent, type ReactNode } from "react";
 
 import type { HelixContinuousTurnStreamRow } from "@/lib/helix/ask-active-turn-stream";
 import { formatHelixAskFinalReceiptMeta } from "@/lib/helix/ask-agent-runtime-display";
@@ -10,6 +10,7 @@ import {
   type HelixAskLiveBridgePill,
 } from "./HelixAskFinalExtras";
 import { HelixAskTurnControls } from "./HelixAskTurnControls";
+import { resolveHelixAskConsoleCapabilityLaneRowStage } from "./HelixAskConsoleDiagnostics";
 
 type RecordLike = Record<string, unknown>;
 
@@ -109,7 +110,11 @@ export function HelixAskTurnStreamPanel({
         {rows.map((row, index) => {
           const isFinalRow = row.source === "final";
           const isQuestionRow = row.source === "question";
+          const capabilityLaneStage = resolveHelixAskConsoleCapabilityLaneRowStage(row);
           const visibleText = isFinalRow ? row.text : clipText(row.text, row.detailLimit ?? 360);
+          const sourceBadge = capabilityLaneStage
+            ? `lane ${capabilityLaneStage.replace(/_/g, " ")}`
+            : row.source.replace(/_/g, " ");
           const receiptMeta = formatHelixAskFinalReceiptMeta([
             row.meta,
             isFinalRow ? actualAgentProviderLabel : null,
@@ -140,6 +145,7 @@ export function HelixAskTurnStreamPanel({
               data-visible-terminal-source={isFinalRow ? finalAnswerSourceLabel : undefined}
               data-backend-terminal-answer={isFinalRow ? backendTerminalAnswer ?? "" : undefined}
               data-final-answer-authority={isFinalRow ? finalAnswerAuthority : undefined}
+              data-capability-lane-stage={capabilityLaneStage ?? undefined}
             >
               <span
                 className={`absolute left-0 top-1.5 h-3 w-3 rounded-full border-2 shadow-[0_0_0_3px_rgba(2,6,23,0.9)] ${readDotClassName(row.tone)}`}
@@ -152,7 +158,7 @@ export function HelixAskTurnStreamPanel({
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="break-words font-semibold">{row.label}</p>
                   <span className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.12em] text-slate-300">
-                    {row.source.replace(/_/g, " ")}
+                    {sourceBadge}
                   </span>
                 </div>
                 <div className="mt-1 break-words leading-relaxed">

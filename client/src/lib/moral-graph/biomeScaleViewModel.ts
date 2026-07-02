@@ -21,6 +21,7 @@ export type MoralGraphBiomeId =
   | "substrate_boundary"
   | "substrate_sensing"
   | "maintenance_response"
+  | "action_selection"
   | "coordination_scale"
   | "mandate_authority"
   | "frontier_mechanism"
@@ -39,6 +40,15 @@ export type MoralGraphActionManifestation =
   | "sensing"
   | "maintaining"
   | "responding"
+  | "valuing"
+  | "affording"
+  | "actuating"
+  | "learning"
+  | "remembering"
+  | "predicting"
+  | "choosing"
+  | "communicating"
+  | "reciprocating"
   | "coordinating"
   | "mandating"
   | "judging"
@@ -168,45 +178,52 @@ const BIOME_LANES: MoralGraphBiomeLane[] = [
     width: 150,
   },
   {
+    id: "action_selection",
+    label: "Action",
+    summary: "Valence, affordance, actuation, feedback, memory, prediction, and choice before mandate.",
+    x: 776,
+    width: 190,
+  },
+  {
     id: "coordination_scale",
     label: "Coordination",
     summary: "Single-cell through multicellular and social coordination.",
-    x: 776,
+    x: 994,
     width: 150,
   },
   {
     id: "mandate_authority",
     label: "Mandate",
     summary: "Late-stage procedural badges, safeguards, and action gates.",
-    x: 940,
+    x: 1158,
     width: 174,
   },
   {
     id: "frontier_mechanism",
     label: "Frontier",
     summary: "Theory bridge context only; never final-answer authority.",
-    x: 1128,
+    x: 1346,
     width: 154,
   },
   {
     id: "character_trace",
     label: "Character",
     summary: "Perspective projection through activated badges.",
-    x: 1296,
+    x: 1514,
     width: 154,
   },
   {
     id: "objective_binding",
     label: "Objective",
     summary: "Fruition and objective-binding views downstream of trace evidence.",
-    x: 1464,
+    x: 1682,
     width: 154,
   },
   {
     id: "claim_boundary",
     label: "Boundary",
     summary: "Missing checks, overclaim blockers, and evidence limits.",
-    x: 1632,
+    x: 1850,
     width: 166,
   },
 ];
@@ -297,11 +314,74 @@ const SUBSTRATE_LAYOUT: Record<
     actionManifestation: "responding",
     offset: 34,
   },
+  "valence-before-preference": {
+    biome: "action_selection",
+    scaleBand: "organism",
+    cadence: "regulated",
+    actionManifestation: "valuing",
+    offset: -92,
+  },
+  "affordance-before-action": {
+    biome: "action_selection",
+    scaleBand: "organism",
+    cadence: "adaptive",
+    actionManifestation: "affording",
+    offset: -28,
+  },
+  "actuation-before-agency": {
+    biome: "action_selection",
+    scaleBand: "organism",
+    cadence: "adaptive",
+    actionManifestation: "actuating",
+    offset: 34,
+  },
+  "feedback-before-learning": {
+    biome: "action_selection",
+    scaleBand: "organism",
+    cadence: "adaptive",
+    actionManifestation: "learning",
+    offset: 96,
+  },
+  "memory-before-commitment": {
+    biome: "action_selection",
+    scaleBand: "group",
+    cadence: "regulated",
+    actionManifestation: "remembering",
+    offset: -92,
+  },
+  "prediction-before-planning": {
+    biome: "action_selection",
+    scaleBand: "group",
+    cadence: "adaptive",
+    actionManifestation: "predicting",
+    offset: -28,
+  },
+  "choice-before-mandate": {
+    biome: "action_selection",
+    scaleBand: "group",
+    cadence: "coordinated",
+    actionManifestation: "choosing",
+    offset: 34,
+  },
   "coordination-before-mandate": {
     biome: "coordination_scale",
     scaleBand: "group",
     cadence: "coordinated",
     actionManifestation: "coordinating",
+    offset: -28,
+  },
+  "communication-before-norm": {
+    biome: "coordination_scale",
+    scaleBand: "group",
+    cadence: "coordinated",
+    actionManifestation: "communicating",
+    offset: 34,
+  },
+  "reciprocity-before-law": {
+    biome: "coordination_scale",
+    scaleBand: "institution",
+    cadence: "long_horizon",
+    actionManifestation: "reciprocating",
     offset: -28,
   },
   "scale-continuity-from-cell-to-society": {
@@ -322,6 +402,11 @@ const SUBSTRATE_LAYOUT: Record<
 
 function labelize(value: string): string {
   return value.replace(/[_-]/g, " ");
+}
+
+function characterDisplayLabel(characterId: string): string {
+  if (characterId === "logh.reinhard_von_lohengramm") return "Sovereign Ambition Profile";
+  return labelize(characterId);
 }
 
 function proceduralToken(value: string): string {
@@ -751,10 +836,10 @@ export function buildMoralGraphBiomeScaleViewModel(args: {
       });
     });
     edges.push({
-      id: "substrate:coordination-before-mandate:direct-observation-before-claim",
-      from: "coordination-before-mandate",
+      id: "substrate:sensing-before-judgment:direct-observation-before-claim",
+      from: "sensing-before-judgment",
       to: "direct-observation-before-claim",
-      label: "procedural emergence",
+      label: "procedural observation",
       tone: "cyan",
     });
   }
@@ -864,10 +949,7 @@ export function buildMoralGraphBiomeScaleViewModel(args: {
     const activatedWeights = characterComparison.activatedProfileWeights.slice(0, 7);
     addNode(nodes, {
       id: characterNodeId,
-      label:
-        characterComparison.characterId === "logh.reinhard_von_lohengramm"
-          ? "Reinhard von Lohengramm"
-          : labelize(characterComparison.characterId),
+      label: characterDisplayLabel(characterComparison.characterId),
       tone: "character",
       glyph: "C",
       x: 0,

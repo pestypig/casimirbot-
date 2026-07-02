@@ -1,6 +1,7 @@
 import { reflectLivingSubstrateContext } from "@shared/moral-graph/living-substrate-reflection-tool";
 import type {
   MoralLivingSubstrateMatchV1,
+  MoralLivingSubstrateProceduralChainStepV1,
   MoralLivingSubstrateProceduralDerivationV1,
   MoralLivingSubstrateRecommendedActionV1,
   MoralLivingSubstrateSourceRefV1,
@@ -166,6 +167,17 @@ export function buildMoralSubstrateReflectionGatewayObservation(
         forbidden_overclaim: derivation.forbiddenOverclaim,
       }))
       .slice(0, 12),
+    procedural_chain: reflection.proceduralChain
+      .map((step: MoralLivingSubstrateProceduralChainStepV1) => ({
+        from_badge_id: step.fromBadgeId,
+        to_badge_id: step.toBadgeId,
+        transition_label: step.transitionLabel,
+        procedural_claim: step.proceduralClaim,
+        evidence_strength: step.evidenceStrength,
+        missing_evidence: step.missingEvidence,
+        forbidden_overclaim: step.forbiddenOverclaim,
+      }))
+      .slice(0, 16),
     synthesis_path: reflection.synthesisPath
       .map((step: MoralLivingSubstrateSynthesisStepV1) => ({
         step_id: step.stepId,

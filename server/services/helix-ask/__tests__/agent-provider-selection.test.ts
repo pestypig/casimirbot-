@@ -4972,7 +4972,10 @@ describe("Helix Ask agent provider selection", () => {
     expect(streamedEvents.some((event) => event.source_event_type === "codex_native_tool_request")).toBe(true);
     expect(streamedEvents.some((event) => event.source_event_type === "codex_native_tool_result")).toBe(true);
     expect(streamedEvents.some((event) => event.source_event_type === "codex_native_turn_complete")).toBe(true);
-    expect(streamedEvents.every((event) => event.terminal_eligible === false)).toBe(true);
+    const nativeEvents = streamedEvents.filter((event) =>
+      typeof event.source_event_type === "string" && event.source_event_type.startsWith("codex_native_")
+    );
+    expect(nativeEvents.every((event) => event.terminal_eligible === false)).toBe(true);
     expect(streamedEvents.some((event) => event.source_event_type === "terminal_answer")).toBe(false);
     expect(result.final_answer_source).toBe("agent_provider_terminal_candidate");
   });

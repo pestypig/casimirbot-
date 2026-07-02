@@ -32,6 +32,7 @@ export const buildHelixCapabilityLaneSessionDebugSummary = (
     source_kind: session.source_binding.source_kind,
     projection_target: session.source_binding.projection_target,
     account_locale: session.source_binding.account_locale,
+    target_language: session.source_binding.target_language ?? null,
     created_at_ms: session.created_at_ms,
     updated_at_ms: session.updated_at_ms,
     last_observation_ref: session.last_observation_ref,

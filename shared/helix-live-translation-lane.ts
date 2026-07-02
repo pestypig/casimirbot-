@@ -90,6 +90,8 @@ export type HelixLiveTranslationProjectionReceipt = {
   observation_ref: string;
   lane_id: "live_translation";
   capability: "live_translation.translate_text";
+  lane_session_id: string | null;
+  selected_backend_provider: string | null;
   projection_target: HelixLiveTranslationProjectionTarget;
   projection_status: "projected" | "stale" | "cancelled" | "failed";
   source_id: string;

@@ -72,6 +72,7 @@ export type HelixCapabilityLaneSessionSourceBinding = {
     | "unknown";
   projection_target: string | null;
   account_locale: string | null;
+  target_language?: string | null;
 };
 
 export type HelixCapabilityLaneSessionPermissions = {
@@ -100,6 +101,7 @@ export type HelixCapabilityLaneSessionEvent = {
   at_ms: number;
   reason: string;
   source_id: string | null;
+  target_language?: string | null;
   observation_ref: string | null;
   receipt_ref: string | null;
   chunk_id?: string | null;
@@ -160,6 +162,7 @@ export type HelixCapabilityLaneSessionDebugSummary = {
   source_kind: HelixCapabilityLaneSessionSourceBinding["source_kind"];
   projection_target: string | null;
   account_locale: string | null;
+  target_language?: string | null;
   created_at_ms: number;
   updated_at_ms: number;
   last_observation_ref: string | null;

@@ -84,6 +84,11 @@ function labelize(value: string): string {
   return value.replace(/[_-]/g, " ");
 }
 
+function characterDisplayLabel(characterId: string): string {
+  if (characterId === "logh.reinhard_von_lohengramm") return "Sovereign Ambition Profile";
+  return labelize(characterId);
+}
+
 function buildLocatorChunkMap(locator: MoralBadgeLocatorV1 | undefined, rootId: string) {
   const chunksByNodeId = new Map<string, { renderChunkId: string; semanticChunkId: string }>();
   if (!locator) return chunksByNodeId;
@@ -432,11 +437,7 @@ function ObjectiveBindingRail({
         {activeLensId === "character" && characterComparison ? (
           <BindingBox
             title="Subject"
-            label={
-              characterComparison.characterId === "logh.reinhard_von_lohengramm"
-                ? "Reinhard von Lohengramm"
-                : labelize(characterComparison.characterId)
-            }
+            label={characterDisplayLabel(characterComparison.characterId)}
             tone="amber"
             activeNodeIds={[
               `character:${characterComparison.characterId}`,
@@ -446,9 +447,7 @@ function ObjectiveBindingRail({
           >
             <div className="space-y-2">
               <div className="font-semibold text-amber-50">
-                {characterComparison.characterId === "logh.reinhard_von_lohengramm"
-                  ? "Reinhard von Lohengramm"
-                  : labelize(characterComparison.characterId)}
+                {characterDisplayLabel(characterComparison.characterId)}
               </div>
               <div className="rounded border border-amber-500/50 bg-amber-950/40 p-2">
                 <div className="text-[9px] font-semibold uppercase tracking-wide text-amber-200">Objective state</div>

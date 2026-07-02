@@ -44,6 +44,7 @@ function receiptRef(receipt: Record<string, unknown>): string | null {
 
 function hasClaimBoundary(value: unknown): boolean {
   if (!isRecord(value)) return false;
+  if (Array.isArray(value.claim_boundary_notes) || Array.isArray(value.claimBoundaryNotes)) return true;
   const text = JSON.stringify(value).toLowerCase();
   return text.includes("claimboundary") || text.includes("claim boundary") || text.includes("diagnostic/proxy");
 }
@@ -122,6 +123,9 @@ export function planPostToolSynthesis(args: PlanPostToolSynthesisInput): HelixPo
   const secondaryIntents = answerIntent === "mixed" ? rawIntents : rawIntents.slice(1);
   const includeClaimBoundary = args.receipts.some(hasClaimBoundary);
   const hasReceipts = receiptKinds.length > 0;
+  const hasMoralLivingSubstrateReflection = receiptKinds.some((kind) =>
+    /moral_living_substrate_reflection/i.test(kind),
+  );
 
   return buildHelixPostToolSynthesisPlanV1({
     turnId: args.turnId,
@@ -137,12 +141,23 @@ export function planPostToolSynthesis(args: PlanPostToolSynthesisInput): HelixPo
       "Do not use theory reflection as proof of a physics claim.",
       "Do not imply calculator scalar success validates runtime/gate claims.",
       "Do not promote diagnostic/proxy claims.",
+      ...(hasMoralLivingSubstrateReflection
+        ? [
+            "Do not convert Moral Graph substrate reflection into personhood, free-will, legal, or final moral verdict authority.",
+            "Do not summarize moral substrate badges without using the procedural chain's present and missing transition links.",
+          ]
+        : []),
     ],
     synthesisInstructions: [
       "Answer the user's intent first, then summarize tool observations as evidence.",
       "Use calculator receipts only for numeric claims.",
       "Use reflection receipts only for context placement.",
       "Keep runtime, evidence, and claim-boundary limitations visible when present.",
+      ...(hasMoralLivingSubstrateReflection
+        ? [
+            "For Moral Graph substrate reflection, reason from procedural_chain transitions: identify which links are present, which are partial or missing, and state conclusions conditionally.",
+          ]
+        : []),
     ],
   });
 }

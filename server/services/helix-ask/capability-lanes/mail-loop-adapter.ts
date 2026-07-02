@@ -95,6 +95,7 @@ const buildMailLoopDebugSummary = (input: {
     source_event_ms: readNumber(observation?.source_event_ms) ?? readNumber(chunk?.source_event_ms),
     observed_at_ms: readNumber(observation?.observed_at_ms) ?? readNumber(chunk?.observed_at_ms),
     projection_target: readString(observation?.projection_target) || readString(chunk?.projection_target) || null,
+    target_language: readString(observation?.target_language) || readString(chunk?.target_language) || null,
     cancel_requested: observation?.cancel_requested === true || chunk?.cancel_requested === true,
     selected_backend_provider: input.translationResult.lane_resolve_trace.selected_backend_provider,
     requested_backend_provider: input.translationResult.lane_resolve_trace.requested_backend_provider,

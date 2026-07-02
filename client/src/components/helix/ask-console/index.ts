@@ -99,6 +99,19 @@ export { HelixAskSurfaceComposerPanel } from "./HelixAskSurfaceComposerPanel";
 export { HelixAskSurfaceFrame } from "./HelixAskSurfaceFrame";
 export { HelixAskSurfaceSupplementStack } from "./HelixAskSurfaceSupplementStack";
 export { HelixAskTurnList } from "./HelixAskTurnList";
+export { buildHelixAskConsoleAssemblyDebugSnapshot } from "./HelixAskConsoleDiagnostics";
+export type { HelixAskConsoleAssemblyDebugSnapshot } from "./HelixAskConsoleDiagnostics";
+export {
+  buildHelixAskActiveTurnDisplayViewModel,
+  HELIX_ASK_ACTIVE_TURN_QUIET_GAP_MS,
+  HELIX_ASK_ACTIVE_TURN_QUIET_GAP_TICK_MS,
+} from "./HelixAskActiveTurnDisplayViewModel";
+export type { HelixAskActiveTurnDisplayViewModel } from "./HelixAskActiveTurnDisplayViewModel";
+export {
+  appendHelixAskLiveTurnDisplayEvent,
+  createHelixAskLiveTurnDisplayState,
+} from "./HelixAskLiveTurnDisplayStore";
+export type { HelixAskLiveTurnDisplayState } from "./HelixAskLiveTurnDisplayStore";
 export { HelixAskReplyCard } from "./HelixAskReplyCard";
 export { HelixAskReplyTurn } from "./HelixAskReplyTurn";
 export {

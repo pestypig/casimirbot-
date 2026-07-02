@@ -69,6 +69,7 @@ const buildReportedBinding = () => {
       source_kind: "docs",
       projection_target: "docs_chunk",
       account_locale: "es-US",
+      target_language: "es",
     },
     requestedBackendProvider: "google_gemini",
     env: {} as NodeJS.ProcessEnv,
@@ -118,6 +119,7 @@ const buildReportedBinding = () => {
       source_kind: "document_markdown",
       chunk_id: "chunk-summary",
       projection_target: "docs_chunk",
+      target_language: "es",
       selected_backend_provider: "live_translation.local_runtime",
       requested_backend_provider: "google_gemini",
       cost_class: "free_local",
@@ -179,6 +181,9 @@ describe("capability lane goal binding debug summary", () => {
       session_status: "running",
       session_health: "healthy",
       source_id: "docs:summary",
+      source_kind: "docs",
+      source_projection_target: "docs_chunk",
+      account_locale: "es-US",
       last_observation_ref: "ask:lane:translation:summary-obs",
       last_receipt_ref: "ask:lane:translation:summary-obs:projection:receipt",
       latest_chunk_id: "chunk-summary-session",
@@ -189,12 +194,14 @@ describe("capability lane goal binding debug summary", () => {
       latest_observed_at_ms: 120,
       latest_freshness_status: "fresh",
       latest_projection_target: "docs_chunk",
+      target_language: "es",
       latest_cancel_requested: true,
       latest_mail_loop_summary: {
         schema: "helix.capability_lane.mail_loop_debug_summary.v1",
         stage_play_mail_id: "stage-play-mail-summary",
         observation_ref: "ask:lane:translation:summary-obs",
         receipt_ref: "ask:lane:translation:summary-obs:projection:receipt",
+        target_language: "es",
         selected_backend_provider: "live_translation.local_runtime",
         requested_backend_provider: "google_gemini",
         cost_class: "free_local",
@@ -244,6 +251,9 @@ describe("capability lane goal binding debug summary", () => {
         lane_session_id: "lane-session-summary",
         lane_id: "live_translation",
         source_id: "docs:summary",
+        source_kind: "docs",
+        source_projection_target: "docs_chunk",
+        account_locale: "es-US",
         latest_chunk_id: "chunk-summary-session",
         latest_chunk_index: 7,
         latest_dedupe_key: "docs:summary:chunk-summary-session:es",
@@ -252,6 +262,7 @@ describe("capability lane goal binding debug summary", () => {
         latest_observed_at_ms: 120,
         latest_freshness_status: "fresh",
         latest_projection_target: "docs_chunk",
+        target_language: "es",
         latest_cancel_requested: true,
         evidence_ref: "ask:lane:translation:summary-obs",
         mail_loop_ref: "stage-play-mail-summary",
@@ -278,6 +289,9 @@ describe("capability lane goal binding debug summary", () => {
         lane_session_id: "lane-session-summary",
         lane_id: "live_translation",
         source_id: "docs:summary",
+        source_kind: "docs",
+        source_projection_target: "docs_chunk",
+        account_locale: "es-US",
         latest_chunk_id: "chunk-summary-session",
         latest_chunk_index: 7,
         latest_dedupe_key: "docs:summary:chunk-summary-session:es",
@@ -286,6 +300,7 @@ describe("capability lane goal binding debug summary", () => {
         latest_observed_at_ms: 120,
         latest_freshness_status: "fresh",
         latest_projection_target: "docs_chunk",
+        target_language: "es",
         latest_cancel_requested: true,
         evidence_ref: "ask:lane:translation:summary-obs",
         mail_loop_ref: "stage-play-mail-summary",
@@ -333,6 +348,7 @@ describe("capability lane goal binding debug summary", () => {
         selected_backend_provider: "live_translation.local_runtime",
       }),
       reason: "lane_session_observation_recorded",
+      target_language: "es",
       observation_ref: "ask:lane:translation:summary-obs",
       receipt_ref: "ask:lane:translation:summary-obs:projection:receipt",
       chunk_id: "chunk-summary-session",
@@ -355,6 +371,7 @@ describe("capability lane goal binding debug summary", () => {
       lane_session_observation_ref: "ask:lane:translation:summary-obs",
       receipt_ref: "ask:lane:translation:summary-obs:projection:receipt",
       source_id: "docs:summary",
+      target_language: "es",
       latest_chunk_id: "chunk-summary-session",
       latest_chunk_index: 7,
       latest_dedupe_key: "docs:summary:chunk-summary-session:es",
@@ -417,8 +434,11 @@ describe("capability lane goal binding debug summary", () => {
         schema: "helix.capability_lane.goal_dispatch_plan.v1",
         target: "none",
         status: "planned_not_dispatched",
-        source_id: "docs:summary",
-        latest_chunk_id: "chunk-summary-session",
+      source_id: "docs:summary",
+      source_kind: "docs",
+      source_projection_target: "docs_chunk",
+      account_locale: "es-US",
+      latest_chunk_id: "chunk-summary-session",
         latest_dedupe_key: "docs:summary:chunk-summary-session:es",
         latest_projection_target: "docs_chunk",
         latest_cancel_requested: true,
@@ -454,6 +474,85 @@ describe("capability lane goal binding debug summary", () => {
       terminal_eligible: false,
       assistant_answer: false,
       raw_content_included: false,
+    });
+  });
+
+  it("uses the lane session target language before mail-loop evidence exists", () => {
+    const sessionStore = createHelixCapabilityLaneSessionStore();
+    sessionStore.start({
+      provider: buildProvider("codex"),
+      laneId: "live_translation",
+      laneSessionId: "lane-session-pre-mail",
+      sourceBinding: {
+        source_id: "docs:pre-mail",
+        source_kind: "docs",
+        projection_target: "docs_chunk",
+        account_locale: "fr-FR",
+        target_language: "fr",
+      },
+      env: {} as NodeJS.ProcessEnv,
+      nowMs: 100,
+    });
+    sessionStore.recordObservation({
+      laneSessionId: "lane-session-pre-mail",
+      observationRef: "ask:lane:translation:pre-mail-obs",
+      receiptRef: "ask:lane:translation:pre-mail-obs:projection:receipt",
+      chunkId: "chunk-pre-mail",
+      dedupeKey: "docs:pre-mail:chunk-pre-mail:fr",
+      projectionTarget: "docs_chunk",
+      nowMs: 110,
+    });
+    const store = createHelixCapabilityLaneGoalBindingStore({ sessionStore });
+    const result = store.bind({
+      goalId: "goal:pre-mail",
+      laneSessionId: "lane-session-pre-mail",
+      goalBindingId: "goal-binding-pre-mail",
+      quietBehavior: "surface_badge",
+      nowMs: 120,
+    });
+
+    if (!result.goal_binding) {
+      throw new Error("expected goal binding");
+    }
+
+    const summary = buildHelixCapabilityLaneGoalBindingDebugSummary(result.goal_binding);
+
+    expect(summary).toMatchObject({
+      goal_binding_id: "goal-binding-pre-mail",
+      latest_mail_loop_summary: null,
+      target_language: "fr",
+      source_kind: "docs",
+      source_projection_target: "docs_chunk",
+      account_locale: "fr-FR",
+      latest_session_event: expect.objectContaining({
+        action: "record_observation",
+        target_language: "fr",
+      }),
+      latest_goal_binding_event: expect.objectContaining({
+        event: "bound",
+        source_kind: "docs",
+        source_projection_target: "docs_chunk",
+        account_locale: "fr-FR",
+        target_language: "fr",
+      }),
+      dispatch_plan: expect.objectContaining({
+        target: "ui_badge",
+        source_kind: "docs",
+        source_projection_target: "docs_chunk",
+        account_locale: "fr-FR",
+        target_language: "fr",
+        mail_loop_ref: null,
+        receipt_ref: "ask:lane:translation:pre-mail-obs:projection:receipt",
+      }),
+      dispatch_admission: expect.objectContaining({
+        status: "admitted_projection_only",
+        source_kind: "docs",
+        source_projection_target: "docs_chunk",
+        account_locale: "fr-FR",
+        target_language: "fr",
+        mail_loop_ref: null,
+        receipt_ref: "ask:lane:translation:pre-mail-obs:projection:receipt",
+      }),
     });
   });
 

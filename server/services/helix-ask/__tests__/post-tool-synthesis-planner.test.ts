@@ -81,4 +81,38 @@ describe("post-tool synthesis planner", () => {
     expect(plan.answerIntent).toBe("mixed");
     expect(plan.secondaryIntents).toContain("debug_report");
   });
+
+  it("requires procedural-chain synthesis for Moral Graph substrate reflections", () => {
+    const plan = planPostToolSynthesis({
+      turnId: "turn:test",
+      prompt: "Reflect how a non-human organism moves from sensing toward choice.",
+      route: "moral_living_substrate_reflection",
+      receipts: [{
+        kind: "moral_living_substrate_reflection",
+        receiptId: "moral:test",
+        procedural_chain: [{
+          from_badge_id: "sensing-before-judgment",
+          to_badge_id: "valence-before-preference",
+          evidence_strength: "partial",
+          missing_evidence: ["valence-before-preference"],
+        }],
+        claim_boundary_notes: ["not terminal answer authority"],
+      }],
+    });
+
+    expect(plan.requiredAnswerSections.map((section) => section.id)).toEqual(
+      expect.arrayContaining(["tool_observation_summary", "claim_boundary"]),
+    );
+    expect(plan.prohibitedMoves).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("personhood, free-will, legal, or final moral verdict"),
+        expect.stringContaining("without using the procedural chain"),
+      ]),
+    );
+    expect(plan.synthesisInstructions).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("procedural_chain transitions"),
+      ]),
+    );
+  });
 });

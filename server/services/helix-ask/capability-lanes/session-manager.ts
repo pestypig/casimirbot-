@@ -46,6 +46,7 @@ const eventFor = (input: {
   reason: string;
   atMs: number;
   sourceId?: string | null;
+  targetLanguage?: string | null;
   observationRef?: string | null;
   receiptRef?: string | null;
   chunkId?: string | null;
@@ -74,6 +75,7 @@ const eventFor = (input: {
   at_ms: input.atMs,
   reason: input.reason,
   source_id: normalizeText(input.sourceId) || null,
+  target_language: normalizeText(input.targetLanguage) || null,
   observation_ref: normalizeText(input.observationRef) || null,
   receipt_ref: normalizeText(input.receiptRef) || null,
   chunk_id: normalizeText(input.chunkId) || null,
@@ -176,6 +178,7 @@ export const createHelixCapabilityLaneSessionStore = () => {
       reason: "lane_session_started",
       atMs: nowMs,
       sourceId: input.sourceBinding.source_id,
+      targetLanguage: input.sourceBinding.target_language,
     });
     const session: HelixCapabilityLaneSession = {
       schema: HELIX_CAPABILITY_LANE_SESSION_SCHEMA,
@@ -193,6 +196,7 @@ export const createHelixCapabilityLaneSessionStore = () => {
       source_binding: {
         ...input.sourceBinding,
         source_id: normalizeText(input.sourceBinding.source_id),
+        target_language: normalizeText(input.sourceBinding.target_language) || null,
       },
       permissions: sessionPermissionsFor(input.provider),
       created_at_ms: nowMs,
@@ -262,6 +266,7 @@ export const createHelixCapabilityLaneSessionStore = () => {
       reason: normalizeText(input.reason) || `lane_session_${input.action}`,
       atMs: nowMs,
       sourceId: session.source_binding.source_id,
+      targetLanguage: session.source_binding.target_language,
     });
     const updated: HelixCapabilityLaneSession = {
       ...session,
@@ -325,6 +330,7 @@ export const createHelixCapabilityLaneSessionStore = () => {
       reason: "lane_session_observation_recorded",
       atMs: nowMs,
       sourceId: session.source_binding.source_id,
+      targetLanguage: session.source_binding.target_language,
       observationRef,
       receiptRef,
       chunkId: input.chunkId,

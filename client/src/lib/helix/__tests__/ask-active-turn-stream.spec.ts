@@ -197,7 +197,11 @@ describe("ask active turn stream", () => {
             stepId: "lane_goal_binding",
             status: "pending",
             sourceId: "docs:active",
+            sourceKind: "docs",
+            sourceProjectionTarget: "docs_chunk",
+            accountLocale: "es-US",
             latestProjectionTarget: "docs_chunk",
+            targetLanguage: "es",
             latestChunkId: "chunk-active",
             latestDedupeKey: "docs:active:chunk-active:es",
             latestSourceEventId: "docs:active:event-1",
@@ -216,6 +220,10 @@ describe("ask active turn stream", () => {
       status: "pending",
     });
     expect(rows[0]?.meta).toContain("projection docs_chunk");
+    expect(rows[0]?.meta).toContain("source kind docs");
+    expect(rows[0]?.meta).toContain("source projection docs_chunk");
+    expect(rows[0]?.meta).toContain("account locale es-US");
+    expect(rows[0]?.meta).toContain("target es");
     expect(rows[0]?.meta).toContain("chunk chunk-active");
     expect(rows[0]?.meta).toContain("dedupe docs:active:chunk-active:es");
     expect(rows[0]?.meta).toContain("source event docs:active:event-1");

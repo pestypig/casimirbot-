@@ -103,6 +103,9 @@ export type HelixCapabilityLaneGoalDispatchPlan = {
   lane_session_id: string;
   lane_id: HelixCapabilityLaneId;
   source_id?: string | null;
+  source_kind?: string | null;
+  source_projection_target?: string | null;
+  account_locale?: string | null;
   latest_chunk_id?: string | null;
   latest_chunk_index?: number | null;
   latest_dedupe_key?: string | null;
@@ -111,6 +114,7 @@ export type HelixCapabilityLaneGoalDispatchPlan = {
   latest_observed_at_ms?: number | null;
   latest_freshness_status?: string | null;
   latest_projection_target?: string | null;
+  target_language?: string | null;
   latest_cancel_requested?: boolean | null;
   evidence_ref: string | null;
   mail_loop_ref: string | null;
@@ -146,6 +150,9 @@ export type HelixCapabilityLaneGoalDispatchAdmission = {
   lane_session_id: string;
   lane_id: HelixCapabilityLaneId;
   source_id?: string | null;
+  source_kind?: string | null;
+  source_projection_target?: string | null;
+  account_locale?: string | null;
   latest_chunk_id?: string | null;
   latest_chunk_index?: number | null;
   latest_dedupe_key?: string | null;
@@ -154,6 +161,7 @@ export type HelixCapabilityLaneGoalDispatchAdmission = {
   latest_observed_at_ms?: number | null;
   latest_freshness_status?: string | null;
   latest_projection_target?: string | null;
+  target_language?: string | null;
   latest_cancel_requested?: boolean | null;
   evidence_ref: string | null;
   mail_loop_ref: string | null;
@@ -190,10 +198,14 @@ export type HelixCapabilityLaneGoalDispatchReadiness = {
   next_dispatch_targets: HelixCapabilityLaneGoalDispatchTarget[];
   next_goal_binding_ids: string[];
   next_source_ids?: string[];
+  next_source_kinds?: string[];
+  next_source_projection_targets?: string[];
+  next_account_locales?: string[];
   next_chunk_ids?: string[];
   next_dedupe_keys?: string[];
   next_source_event_ids?: string[];
   next_projection_targets?: string[];
+  next_target_languages?: string[];
   next_freshness_statuses?: string[];
   next_cancel_requested?: boolean;
   next_evidence_refs: string[];
@@ -228,6 +240,9 @@ export type HelixCapabilityLaneGoalBindingEvent = {
   lane_session_health: HelixCapabilityLaneSessionHealth;
   lane_session_observation_ref: string | null;
   source_id?: string | null;
+  source_kind?: string | null;
+  source_projection_target?: string | null;
+  account_locale?: string | null;
   latest_chunk_id?: string | null;
   latest_chunk_index?: number | null;
   latest_dedupe_key?: string | null;
@@ -236,6 +251,7 @@ export type HelixCapabilityLaneGoalBindingEvent = {
   latest_observed_at_ms?: number | null;
   latest_freshness_status?: string | null;
   latest_projection_target?: string | null;
+  target_language?: string | null;
   latest_cancel_requested?: boolean | null;
   mail_loop_ref?: string | null;
   receipt_ref: string | null;
@@ -262,6 +278,9 @@ export type HelixCapabilityLaneGoalBinding = {
   lane_session_status: HelixCapabilityLaneSessionStatus;
   lane_session_health: HelixCapabilityLaneSessionHealth;
   lane_session_source_id: string | null;
+  lane_session_source_kind: string | null;
+  lane_session_projection_target: string | null;
+  lane_session_account_locale: string | null;
   lane_session_last_observation_ref: string | null;
   lane_session_last_receipt_ref: string | null;
   latest_lane_session_event: HelixCapabilityLaneSessionEvent | null;
@@ -299,6 +318,9 @@ export type HelixCapabilityLaneGoalBindingDebugSummary = {
   session_status: HelixCapabilityLaneSessionStatus;
   session_health: HelixCapabilityLaneSessionHealth;
   source_id: string | null;
+  source_kind: string | null;
+  source_projection_target: string | null;
+  account_locale: string | null;
   last_observation_ref: string | null;
   last_receipt_ref: string | null;
   latest_chunk_id?: string | null;
@@ -309,6 +331,7 @@ export type HelixCapabilityLaneGoalBindingDebugSummary = {
   latest_observed_at_ms?: number | null;
   latest_freshness_status?: string | null;
   latest_projection_target?: string | null;
+  target_language?: string | null;
   latest_cancel_requested?: boolean | null;
   latest_session_event: HelixCapabilityLaneSessionEvent | null;
   latest_mail_loop_summary: HelixCapabilityLaneMailLoopDebugSummary | null;

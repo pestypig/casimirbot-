@@ -173,6 +173,7 @@ export function reflectLivingSubstrateContext(
     exactMatches: matches.exactMatches,
     likelyMatches: matches.likelyMatches,
     proceduralDerivations: proceduralLayer.derivations,
+    proceduralChain: proceduralLayer.proceduralChain,
     synthesisPath: proceduralLayer.synthesisPath,
     sourceTheoryBadgeIds,
     sourceRefs,

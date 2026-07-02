@@ -1,6 +1,7 @@
 import React, {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -180,6 +181,16 @@ import {
   shouldRenderHelixAskConsoleActiveTurnStream,
   sortHelixAskConsoleRepliesChronologically,
 } from "@/components/helix/ask-console/HelixAskReplyLifecycle";
+import { buildHelixAskConsoleAssemblyDebugSnapshot } from "@/components/helix/ask-console/HelixAskConsoleDiagnostics";
+import {
+  buildHelixAskActiveTurnDisplayViewModel,
+  HELIX_ASK_ACTIVE_TURN_QUIET_GAP_TICK_MS,
+} from "@/components/helix/ask-console/HelixAskActiveTurnDisplayViewModel";
+import {
+  appendHelixAskLiveTurnDisplayEvent,
+  createHelixAskLiveTurnDisplayState,
+  type HelixAskLiveTurnDisplayState,
+} from "@/components/helix/ask-console/HelixAskLiveTurnDisplayStore";
 import {
   addHelixAskLegacyChatMessage,
   addHelixAskLegacyChatTurnMessages,
@@ -313,10 +324,7 @@ export {
   incrementHelixAskConsoleDropReason,
   shouldAdmitHelixAskExternalLiveEventToActiveStream,
 };
-export type {
-  HelixContinuousTurnStreamRow,
-  HelixContinuousTurnStreamTone,
-} from "@/lib/helix/ask-active-turn-stream";
+export type { HelixContinuousTurnStreamTone } from "@/lib/helix/ask-active-turn-stream";
 import {
   buildHelixContinuousTurnStreamRows,
   buildLiveAnswerTurnBridgeState,
@@ -3342,6 +3350,63 @@ type HelixAskPillProps = {
   replyListClassName?: string;
 };
 
+type HelixAskActiveTurnStreamDomDebug = {
+  activeStreamMounted: boolean;
+  activeStreamAfterCompletedReplies: boolean | null;
+  activeStreamBeforeBottom: boolean | null;
+  bottomDistancePx: number | null;
+  activeStreamRectTop: number | null;
+  activeStreamRectBottom: number | null;
+  activeStreamRectHeight: number | null;
+  activeStreamOffsetTop: number | null;
+  listClientHeight: number | null;
+  listScrollHeight: number | null;
+  listScrollTop: number | null;
+  activeTurnScrollToken: string | null;
+  renderCommitCount: number;
+  lastRenderCommittedAtMs: number | null;
+  liveRowCountAtRender: number;
+  acceptedLiveEventCountAtRender: number;
+  transcriptPacketCountAtRender: number;
+  autoScrollAppliedCount: number;
+  lastAutoScrollAppliedAtMs: number | null;
+  displayEventAppendScheduledCount: number;
+  displayEventAppendAppliedCount: number;
+  displayEventAppendDuplicateCount: number;
+  layoutMeasureScheduledCount: number;
+  layoutMeasureAppliedCount: number;
+  layoutMeasureCoalescedCount: number;
+  scrollScheduledCount: number;
+  scrollAppliedCount: number;
+  scrollCoalescedCount: number;
+  lastDisplayEventReceivedAtMs: number | null;
+  lastDisplayEventAppliedAtMs: number | null;
+  lastLayoutMeasureScheduledAtMs: number | null;
+  lastLayoutMeasureAppliedAtMs: number | null;
+  lastScrollScheduledAtMs: number | null;
+  quietGapRowVisible: boolean;
+  quietGapRowShownCount: number;
+  msSinceLastTranscriptEvent: number | null;
+};
+
+type HelixAskActiveTurnStreamPerformanceDebug = {
+  displayEventAppendScheduledCount: number;
+  displayEventAppendAppliedCount: number;
+  displayEventAppendDuplicateCount: number;
+  layoutMeasureScheduledCount: number;
+  layoutMeasureAppliedCount: number;
+  layoutMeasureCoalescedCount: number;
+  scrollScheduledCount: number;
+  scrollAppliedCount: number;
+  scrollCoalescedCount: number;
+  lastDisplayEventReceivedAtMs: number | null;
+  lastDisplayEventAppliedAtMs: number | null;
+  lastLayoutMeasureScheduledAtMs: number | null;
+  lastLayoutMeasureAppliedAtMs: number | null;
+  lastScrollScheduledAtMs: number | null;
+  quietGapRowShownCount: number;
+};
+
 export const HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE =
   RECROWNED_HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE;
 export const HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT =
@@ -6174,6 +6239,12 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
     selectedFinalAnswer,
     source: payload,
   });
+  const consoleAssemblyDebugForExport =
+    readAgentLoopAuditRecord(payload.console_assembly_debug) ??
+    readAgentLoopAuditRecord(payload.client_console_assembly_debug) ??
+    readAgentLoopAuditRecord(debug?.console_assembly_debug) ??
+    readAgentLoopAuditRecord(debug?.client_console_assembly_debug) ??
+    null;
   const lifecycleEvents = Array.isArray(workspaceActionSource?.workspace_action_lifecycle_events)
     ? workspaceActionSource.workspace_action_lifecycle_events
     : Array.isArray(payload.workspace_action_lifecycle_events)
@@ -6228,6 +6299,8 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
     legacy_ask_local_bypassed: legacyAskLocalBypassed,
     first_broken_rail: firstBrokenRail,
     repair_target: repairTarget,
+    console_assembly_debug: consoleAssemblyDebugForExport,
+    client_console_assembly_debug: consoleAssemblyDebugForExport,
     voice_playback_reconciliation: voicePlaybackReconciliation,
     situation_context_pack: situationContextPackForDebug,
     live_environment_turn_relevance: liveEnvironmentRelevanceForDebug,
@@ -6698,12 +6771,18 @@ async function resolveAuthoritativeDebugExportPayload(localPayload: string): Pro
     }
     const clientProjection = buildClientProjectionDebugFields(parsed);
     const clientActiveTurnId = resolveHelixAskLegacyDebugExportClientTurnId(parsed);
+    const clientConsoleAssemblyDebug =
+      readAgentLoopAuditRecord(parsed.console_assembly_debug) ??
+      readAgentLoopAuditRecord(parsed.debug?.console_assembly_debug) ??
+      readAgentLoopAuditRecord(parsed.reply?.console_assembly_debug);
     const mergedPayload = {
       ...authoritativePayload,
       debug_export_source: "backend_endpoint",
       backend_debug_response_status: "fetched",
       client_active_turn_id: clientActiveTurnId,
       ui_client_active_turn_id: clientActiveTurnId,
+      console_assembly_debug: clientConsoleAssemblyDebug,
+      client_console_assembly_debug: clientConsoleAssemblyDebug,
       client_projection_payload_hash: hashDebugExportText(localPayload),
       client_debug_projection: clientProjection,
       client_voice_debug: clientProjection.voice,
@@ -6833,6 +6912,9 @@ function boundHelixDebugExportTextForUi(payload: string): string {
       "debug_export_ref",
       "debug_export_source",
       "backend_debug_response_status",
+      "console_assembly_debug",
+      "client_console_assembly_debug",
+      "client_projection_payload_hash",
     ].forEach((key) => {
       if (parsed[key] !== undefined) minimal[key] = parsed[key];
     });
@@ -6856,6 +6938,8 @@ function boundHelixDebugExportTextForUi(payload: string): string {
       final_answer_source: parsed.final_answer_source ?? debug?.final_answer_source ?? null,
       terminal_artifact_kind: parsed.terminal_artifact_kind ?? debug?.terminal_artifact_kind ?? null,
       terminal_error_code: parsed.terminal_error_code ?? debug?.terminal_error_code ?? null,
+      console_assembly_debug: parsed.console_assembly_debug ?? debug?.console_assembly_debug ?? null,
+      client_console_assembly_debug: parsed.client_console_assembly_debug ?? debug?.client_console_assembly_debug ?? null,
     };
     copyHelixRailCriticalDebugFieldsForUi(minimal.debug as Record<string, unknown>, parsed, debug);
     minimal.debug_export_size_control = {
@@ -6884,7 +6968,9 @@ function boundHelixDebugExportTextForUi(payload: string): string {
         llm_route_expected_backend: parsed.llm_route_expected_backend ?? debug?.llm_route_expected_backend ?? null,
         llm_backend_used: parsed.llm_backend_used ?? debug?.llm_backend_used ?? null,
         llm_provider_called: parsed.llm_provider_called ?? debug?.llm_provider_called ?? null,
-        repo_evidence_relevance_gate: parsed.repo_evidence_relevance_gate ?? debug?.repo_evidence_relevance_gate ?? null,
+      repo_evidence_relevance_gate: parsed.repo_evidence_relevance_gate ?? debug?.repo_evidence_relevance_gate ?? null,
+      console_assembly_debug: parsed.console_assembly_debug ?? debug?.console_assembly_debug ?? null,
+      client_console_assembly_debug: parsed.client_console_assembly_debug ?? debug?.client_console_assembly_debug ?? null,
         debug_export_size_control: minimal.debug_export_size_control,
       };
     copyHelixRailCriticalDebugFieldsForUi(fallback, parsed, debug);
@@ -8235,24 +8321,83 @@ export function HelixAskPill({
   const activeTurnStreamPanelRef = useRef<HTMLDivElement | null>(null);
   const askReplyListPinnedToBottomRef = useRef(true);
   const askReplyListAutoScrollTimerRef = useRef<number | null>(null);
-  const [activeTurnStreamDomDebug, setActiveTurnStreamDomDebug] = useState<{
-    activeStreamMounted: boolean;
-    activeStreamAfterCompletedReplies: boolean | null;
-    activeStreamBeforeBottom: boolean | null;
-    bottomDistancePx: number | null;
-    activeTurnScrollToken: string | null;
-  }>({
+  const askReplyListAutoScrollRafRef = useRef<number | null>(null);
+  const activeTurnStreamLayoutMeasureRafRef = useRef<number | null>(null);
+  const activeTurnQuietGapTimerRef = useRef<number | null>(null);
+  const activeTurnStreamRenderCommitCountRef = useRef(0);
+  const activeTurnStreamAutoScrollCountRef = useRef(0);
+  const activeTurnStreamLatestMetricsRef = useRef({
+    rowCount: 0,
+    scrollToken: "0:idle",
+  });
+  const activeTurnStreamPerformanceDebugRef = useRef<HelixAskActiveTurnStreamPerformanceDebug>({
+    displayEventAppendScheduledCount: 0,
+    displayEventAppendAppliedCount: 0,
+    displayEventAppendDuplicateCount: 0,
+    layoutMeasureScheduledCount: 0,
+    layoutMeasureAppliedCount: 0,
+    layoutMeasureCoalescedCount: 0,
+    scrollScheduledCount: 0,
+    scrollAppliedCount: 0,
+    scrollCoalescedCount: 0,
+    lastDisplayEventReceivedAtMs: null,
+    lastDisplayEventAppliedAtMs: null,
+    lastLayoutMeasureScheduledAtMs: null,
+    lastLayoutMeasureAppliedAtMs: null,
+    lastScrollScheduledAtMs: null,
+    quietGapRowShownCount: 0,
+  });
+  const initialActiveTurnStreamDomDebug: HelixAskActiveTurnStreamDomDebug = {
     activeStreamMounted: false,
     activeStreamAfterCompletedReplies: null,
     activeStreamBeforeBottom: null,
     bottomDistancePx: null,
+    activeStreamRectTop: null,
+    activeStreamRectBottom: null,
+    activeStreamRectHeight: null,
+    activeStreamOffsetTop: null,
+    listClientHeight: null,
+    listScrollHeight: null,
+    listScrollTop: null,
     activeTurnScrollToken: null,
-  });
+    renderCommitCount: 0,
+    lastRenderCommittedAtMs: null,
+    liveRowCountAtRender: 0,
+    acceptedLiveEventCountAtRender: 0,
+    transcriptPacketCountAtRender: 0,
+    autoScrollAppliedCount: 0,
+    lastAutoScrollAppliedAtMs: null,
+    displayEventAppendScheduledCount: 0,
+    displayEventAppendAppliedCount: 0,
+    displayEventAppendDuplicateCount: 0,
+    layoutMeasureScheduledCount: 0,
+    layoutMeasureAppliedCount: 0,
+    layoutMeasureCoalescedCount: 0,
+    scrollScheduledCount: 0,
+    scrollAppliedCount: 0,
+    scrollCoalescedCount: 0,
+    lastDisplayEventReceivedAtMs: null,
+    lastDisplayEventAppliedAtMs: null,
+    lastLayoutMeasureScheduledAtMs: null,
+    lastLayoutMeasureAppliedAtMs: null,
+    lastScrollScheduledAtMs: null,
+    quietGapRowVisible: false,
+    quietGapRowShownCount: 0,
+    msSinceLastTranscriptEvent: null,
+  };
+  const activeTurnStreamDomDebugRef = useRef<HelixAskActiveTurnStreamDomDebug>(initialActiveTurnStreamDomDebug);
+  const [activeTurnStreamDomDebug, setActiveTurnStreamDomDebug] =
+    useState<HelixAskActiveTurnStreamDomDebug>(initialActiveTurnStreamDomDebug);
   const [askExtensionOpenByReply, setAskExtensionOpenByReply] = useState<Record<string, boolean>>(
     {},
   );
   const [askLiveEvents, setAskLiveEvents] = useState<AskLiveEventEntry[]>([]);
   const askLiveEventsRef = useRef<AskLiveEventEntry[]>([]);
+  const [activeTurnQuietGapTick, setActiveTurnQuietGapTick] = useState(0);
+  const [activeTurnDisplayState, setActiveTurnDisplayState] = useState<HelixAskLiveTurnDisplayState>(() =>
+    createHelixAskLiveTurnDisplayState(),
+  );
+  const activeTurnDisplayStateRef = useRef<HelixAskLiveTurnDisplayState>(activeTurnDisplayState);
   const [helixAskConsoleStreamIngressDebugVersion, setHelixAskConsoleStreamIngressDebugVersion] = useState(0);
   const helixAskConsoleStreamIngressDebugRef = useRef<HelixAskConsoleStreamIngressDebug>(
     createHelixAskConsoleStreamIngressDebug(),
@@ -8284,7 +8429,7 @@ export function HelixAskPill({
       prev.room_id === situationRoomId ? prev : createSituationRoomState(situationRoomId),
     );
   }, [situationRoomId]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     setDebugExportDrawer((current) =>
       clearHelixAskDebugDrawerForStaleReply(current, latestAskReplyIdForDebugDrawer),
     );
@@ -9078,7 +9223,7 @@ export function HelixAskPill({
     return helixAskSessionRef.current;
   }, [contextId, ensureContextSession]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!helixChatStoreHydrated) return;
     const sessionId = getHelixAskSessionId();
     if (!sessionId) return;
@@ -14012,9 +14157,51 @@ export function HelixAskPill({
     [],
   );
 
+  const appendActiveTurnDisplayEvent = useCallback((entry: AskLiveEventEntry) => {
+    const perf = activeTurnStreamPerformanceDebugRef.current;
+    perf.displayEventAppendScheduledCount += 1;
+    perf.lastDisplayEventReceivedAtMs = Date.now();
+    setActiveTurnDisplayState((prev) => {
+      const next = appendHelixAskLiveTurnDisplayEvent(prev, entry, HELIX_ASK_LIVE_EVENT_LIMIT);
+      activeTurnDisplayStateRef.current = next;
+      if (next === prev || next.version === prev.version) {
+        perf.displayEventAppendDuplicateCount += 1;
+      } else {
+        perf.displayEventAppendAppliedCount += 1;
+      }
+      perf.lastDisplayEventAppliedAtMs = Date.now();
+      return next;
+    });
+  }, []);
+
+  const resetActiveTurnDisplayState = useCallback(() => {
+    const next = createHelixAskLiveTurnDisplayState();
+    activeTurnDisplayStateRef.current = next;
+    activeTurnStreamPerformanceDebugRef.current = {
+      displayEventAppendScheduledCount: 0,
+      displayEventAppendAppliedCount: 0,
+      displayEventAppendDuplicateCount: 0,
+      layoutMeasureScheduledCount: 0,
+      layoutMeasureAppliedCount: 0,
+      layoutMeasureCoalescedCount: 0,
+      scrollScheduledCount: 0,
+      scrollAppliedCount: 0,
+      scrollCoalescedCount: 0,
+      lastDisplayEventReceivedAtMs: null,
+      lastDisplayEventAppliedAtMs: null,
+      lastLayoutMeasureScheduledAtMs: null,
+      lastLayoutMeasureAppliedAtMs: null,
+      lastScrollScheduledAtMs: null,
+      quietGapRowShownCount: 0,
+    };
+    setActiveTurnQuietGapTick(0);
+    setActiveTurnDisplayState(next);
+  }, []);
+
   const appendSyntheticLiveEvent = useCallback(
     (entry: AskLiveEventEntry) => {
       if (!entry?.id?.trim()) return;
+      appendActiveTurnDisplayEvent(entry);
       setAskLiveEvents((prev) => {
         if (prev.some((liveEvent) => liveEvent.id === entry.id)) return prev;
         const next = [...prev, entry];
@@ -14051,7 +14238,7 @@ export function HelixAskPill({
         );
       }
     },
-    [appendLiveEventToHelixTimeline, appendWorkstationEventToLatestActReply, updateReasoningAttempt],
+    [appendActiveTurnDisplayEvent, appendLiveEventToHelixTimeline, appendWorkstationEventToLatestActReply, updateReasoningAttempt],
   );
 
   const updateHelixAskConsoleStreamIngressDebug = useCallback(
@@ -14105,7 +14292,14 @@ export function HelixAskPill({
           return;
         }
         const liveEvent = buildAskLiveEventFromTurnTranscriptRecord(
-          { ...record, reconstructed: record.reconstructed === true || reason === "final_response_replay" },
+          {
+            ...record,
+            client_replay_reason: reason,
+            reconstructed:
+              record.reconstructed === true ||
+              reason === "final_response_replay" ||
+              reason === "final_response_backfill",
+          },
           `replay:${traceId}:${sourceEventType}:${coerceText(record.seq).trim() || coerceText(record.at_ms).trim() || index}`,
           HELIX_ASK_LIVE_EVENT_MAX_CHARS,
         );
@@ -15383,6 +15577,7 @@ export function HelixAskPill({
         setAskError(null);
         setAskLiveEvents([]);
         askLiveEventsRef.current = [];
+        resetActiveTurnDisplayState();
         resetReasoningTheaterEventClock();
         setAskLiveDraft("");
         askLiveDraftRef.current = "";
@@ -21382,18 +21577,30 @@ export function HelixAskPill({
       ),
     [askLiveEvents, askLiveTraceId],
   );
+  const activeTurnDisplayEvents = useMemo(
+    () =>
+      activeTurnDisplayState.events.filter((event) =>
+        askLiveEventBelongsToActiveTurn({
+          event,
+          activeTurnId: activeAskTurnIdRef.current,
+          activeTraceId: askLiveTraceId,
+          activeStartedAtMs: activeAskStartedAtMsRef.current,
+        }),
+      ),
+    [activeTurnDisplayState.events, askLiveTraceId],
+  );
   const activeTurnStreamReplyId = activeAskTurnIdRef.current ?? askLiveTraceId ?? "active-turn";
   const activeTurnTranscriptRows = useMemo(
     () =>
       askBusy
         ? buildHelixActiveTurnTranscriptRows({
             replyId: activeTurnStreamReplyId,
-            events: activeAskLiveEvents,
+            events: activeTurnDisplayEvents,
             activeTurnId: activeAskTurnIdRef.current,
             activeTraceId: askLiveTraceId,
           })
         : [],
-    [activeAskLiveEvents, activeTurnStreamReplyId, askBusy, askLiveTraceId],
+    [activeTurnDisplayEvents, activeTurnStreamReplyId, askBusy, askLiveTraceId],
   );
   const activeTurnTranscriptRowsForStream = useMemo(
     () => selectHelixAskConsoleTurnTranscriptRowsForStream(activeTurnTranscriptRows),
@@ -21417,7 +21624,26 @@ export function HelixAskPill({
         : [],
     [activeTurnStreamReplyId, activeTurnTranscriptRowsForStream, askActiveQuestion, askBusy],
   );
-  const visibleActiveTurnStreamRows = shouldRenderHelixAskActiveTurnStream({
+  useEffect(() => {
+    if (!askBusy || typeof window === "undefined") {
+      if (activeTurnQuietGapTimerRef.current !== null && typeof window !== "undefined") {
+        window.clearInterval(activeTurnQuietGapTimerRef.current);
+        activeTurnQuietGapTimerRef.current = null;
+      }
+      return;
+    }
+    if (activeTurnQuietGapTimerRef.current !== null) return;
+    activeTurnQuietGapTimerRef.current = window.setInterval(() => {
+      setActiveTurnQuietGapTick((current) => current + 1);
+    }, HELIX_ASK_ACTIVE_TURN_QUIET_GAP_TICK_MS);
+    return () => {
+      if (activeTurnQuietGapTimerRef.current !== null) {
+        window.clearInterval(activeTurnQuietGapTimerRef.current);
+        activeTurnQuietGapTimerRef.current = null;
+      }
+    };
+  }, [askBusy]);
+  const baseVisibleActiveTurnStreamRows = shouldRenderHelixAskActiveTurnStream({
     askBusy,
     activeTurnId: activeAskTurnIdRef.current,
     activeStartedAtMs: activeAskStartedAtMsRef.current,
@@ -21427,59 +21653,49 @@ export function HelixAskPill({
         includeTerminalRows: userSettings.showHelixAskConsoleDebug,
       })
     : [];
+  const lastVisibleTranscriptEventAppliedAtMs =
+    activeTurnStreamPerformanceDebugRef.current.lastDisplayEventAppliedAtMs ??
+    activeTurnDisplayState.lastUpdatedAtMs ??
+    null;
+  const activeTurnDisplayViewModel = buildHelixAskActiveTurnDisplayViewModel({
+    askBusy,
+    rows: baseVisibleActiveTurnStreamRows,
+    replyId: activeTurnStreamReplyId,
+    lastTranscriptEventAppliedAtMs: lastVisibleTranscriptEventAppliedAtMs,
+    nowMs: Date.now(),
+  });
+  const msSinceLastTranscriptEvent = activeTurnDisplayViewModel.msSinceLastTranscriptEvent;
+  const quietGapRowVisible = activeTurnDisplayViewModel.quietGapVisible;
+  const activeTurnQuietGapStatusLine = activeTurnDisplayViewModel.statusLine;
+  const visibleActiveTurnStreamRows = activeTurnDisplayViewModel.visibleRows;
+  useEffect(() => {
+    if (!quietGapRowVisible) return;
+    activeTurnStreamPerformanceDebugRef.current.quietGapRowShownCount += 1;
+  }, [quietGapRowVisible, activeTurnQuietGapTick]);
   const helixAskConsoleDebugSnapshot = useMemo(() => {
-    if (!userSettings.showHelixAskConsoleDebug) return null;
     const activeTurnId = activeAskTurnIdRef.current;
     const activeStartedAtMs = activeAskStartedAtMsRef.current;
-    const debugActiveLiveEvents = askBusy && activeTurnId ? activeAskLiveEvents : [];
-    const debugActiveRows = askBusy && activeTurnId ? visibleActiveTurnStreamRows : [];
-    return {
-      schema: "helix.ask.console_assembly_debug.v1",
+    return buildHelixAskConsoleAssemblyDebugSnapshot({
       askBusy,
       activeTurnId,
       activeTraceId: askLiveTraceId,
       activeStartedAtMs,
       activeQuestion: askActiveQuestion,
       totalLiveEventCount: askLiveEvents.length,
-      retainedLiveEventCount: activeAskLiveEvents.length,
-      activeLiveEventCount: debugActiveLiveEvents.length,
-      activeRowCount: debugActiveRows.length,
-      replyCount: chronologicalAskRepliesForTranscript.length,
+      retainedLiveEventCount: activeTurnDisplayEvents.length,
+      activeLiveEventCount: activeTurnDisplayEvents.length,
+      visibleActiveTurnStreamRows,
+      replies: chronologicalAskRepliesForTranscript.map((reply) => ({
+        id: reply.id,
+        canonicalKey: resolveHelixAskConsoleReplyCanonicalKey(reply),
+        createdAtMs: resolveHelixAskConsoleReplyOrderMs(reply),
+      })),
       latestReplyId: latestAskReply?.id ?? latestAskReplyId,
       streamIngress: helixAskConsoleStreamIngressDebugRef.current,
-      activeStreamDom: activeTurnStreamDomDebug,
-      renderOrder: [
-        ...(visibleActiveTurnStreamRows.length > 0
-          ? [
-              {
-                kind: "active_turn_stream",
-                key: activeTurnId ?? askLiveTraceId ?? "active",
-                rowCount: visibleActiveTurnStreamRows.length,
-                renderPlacement: "inline_active_turn",
-              },
-            ]
-          : []),
-        ...chronologicalAskRepliesForTranscript.map((reply, index) => ({
-          kind: "completed_reply",
-          index,
-          replyId: reply.id,
-          canonicalKey: resolveHelixAskReplyCanonicalKey(reply),
-          createdAtMs: resolveHelixAskReplyOrderMs(reply),
-          isLatest: reply.id === (latestAskReply?.id ?? latestAskReplyId),
-        })),
-      ],
-      filteredLiveEvents: askLiveEvents.length - activeAskLiveEvents.length,
-      activeRows: debugActiveRows.map((row, index) => ({
-        index,
-        key: row.key,
-        source: row.source,
-        label: row.label,
-        status: row.status,
-        text: clipText(row.text, 180),
-      })),
-    };
+      activeStreamDom: activeTurnStreamDomDebugRef.current,
+    });
   }, [
-    activeAskLiveEvents,
+    activeTurnDisplayEvents,
     activeTurnStreamDomDebug,
     askActiveQuestion,
     askBusy,
@@ -21489,7 +21705,6 @@ export function HelixAskPill({
     helixAskConsoleStreamIngressDebugVersion,
     latestAskReply,
     latestAskReplyId,
-    userSettings.showHelixAskConsoleDebug,
     visibleActiveTurnStreamRows,
   ]);
   const steeringQueueItems = useMemo(
@@ -21552,14 +21767,27 @@ export function HelixAskPill({
       cancelled = true;
     };
   }, [askBusy, steeringQueueItems]);
-  const activeTurnStreamTail = visibleActiveTurnStreamRows.length
-    ? visibleActiveTurnStreamRows[visibleActiveTurnStreamRows.length - 1]
-    : null;
-  const activeTurnStreamScrollToken = activeTurnStreamTail
-    ? `${visibleActiveTurnStreamRows.length}:${activeTurnStreamTail.key}:${activeTurnStreamTail.text}:${activeTurnStreamTail.status}`
-    : `${visibleActiveTurnStreamRows.length}:idle`;
+  const activeTurnStreamScrollToken = activeTurnDisplayViewModel.scrollToken;
+  activeTurnStreamLatestMetricsRef.current = {
+    rowCount: visibleActiveTurnStreamRows.length,
+    scrollToken: activeTurnStreamScrollToken,
+  };
   useEffect(() => {
-    if (!userSettings.showHelixAskConsoleDebug) return;
+    if (visibleActiveTurnStreamRows.length > 0) {
+      activeTurnStreamRenderCommitCountRef.current += 1;
+    }
+    const perf = activeTurnStreamPerformanceDebugRef.current;
+    perf.layoutMeasureScheduledCount += 1;
+    perf.lastLayoutMeasureScheduledAtMs = Date.now();
+    if (activeTurnStreamLayoutMeasureRafRef.current !== null && typeof window !== "undefined") {
+      perf.layoutMeasureCoalescedCount += 1;
+      return;
+    }
+    const measureActiveStreamLayout = () => {
+      activeTurnStreamLayoutMeasureRafRef.current = null;
+      perf.layoutMeasureAppliedCount += 1;
+      perf.lastLayoutMeasureAppliedAtMs = Date.now();
+      const latestMetrics = activeTurnStreamLatestMetricsRef.current;
     const list = askReplyListRef.current;
     const activeStream = activeTurnStreamPanelRef.current;
     const bottom = askReplyListBottomRef.current;
@@ -21577,23 +21805,78 @@ export function HelixAskPill({
     const activeStreamBeforeBottom =
       activeStream && bottom && list ? activeStreamIndex >= 0 && bottomIndex >= 0 && activeStreamIndex < bottomIndex : null;
     const bottomDistancePx = list ? Math.max(0, list.scrollHeight - list.scrollTop - list.clientHeight) : null;
+    const activeStreamRect = activeStream?.getBoundingClientRect();
     const next = {
       activeStreamMounted,
       activeStreamAfterCompletedReplies,
       activeStreamBeforeBottom,
       bottomDistancePx,
-      activeTurnScrollToken: activeTurnStreamScrollToken,
+      activeStreamRectTop: activeStreamRect ? Math.round(activeStreamRect.top * 100) / 100 : null,
+      activeStreamRectBottom: activeStreamRect ? Math.round(activeStreamRect.bottom * 100) / 100 : null,
+      activeStreamRectHeight: activeStreamRect ? Math.round(activeStreamRect.height * 100) / 100 : null,
+      activeStreamOffsetTop: activeStream ? Math.round(activeStream.offsetTop * 100) / 100 : null,
+      listClientHeight: list ? Math.round(list.clientHeight * 100) / 100 : null,
+      listScrollHeight: list ? Math.round(list.scrollHeight * 100) / 100 : null,
+      listScrollTop: list ? Math.round(list.scrollTop * 100) / 100 : null,
+      activeTurnScrollToken: latestMetrics.scrollToken,
+      renderCommitCount: activeTurnStreamRenderCommitCountRef.current,
+      lastRenderCommittedAtMs: latestMetrics.rowCount > 0 ? Date.now() : null,
+      liveRowCountAtRender: latestMetrics.rowCount,
+      acceptedLiveEventCountAtRender: helixAskConsoleStreamIngressDebugRef.current.acceptedLiveEventCount,
+      transcriptPacketCountAtRender: helixAskConsoleStreamIngressDebugRef.current.transcriptPacketCount,
+      autoScrollAppliedCount: activeTurnStreamAutoScrollCountRef.current,
+      lastAutoScrollAppliedAtMs: activeTurnStreamAutoScrollCountRef.current > 0 ? Date.now() : null,
+      quietGapRowVisible,
+      quietGapRowShownCount: perf.quietGapRowShownCount,
+      msSinceLastTranscriptEvent,
+      ...perf,
     };
+    activeTurnStreamDomDebugRef.current = next;
     setActiveTurnStreamDomDebug((prev) =>
       prev.activeStreamMounted === next.activeStreamMounted &&
       prev.activeStreamAfterCompletedReplies === next.activeStreamAfterCompletedReplies &&
       prev.activeStreamBeforeBottom === next.activeStreamBeforeBottom &&
       prev.bottomDistancePx === next.bottomDistancePx &&
-      prev.activeTurnScrollToken === next.activeTurnScrollToken
+      prev.activeStreamRectTop === next.activeStreamRectTop &&
+      prev.activeStreamRectBottom === next.activeStreamRectBottom &&
+      prev.activeStreamRectHeight === next.activeStreamRectHeight &&
+      prev.activeStreamOffsetTop === next.activeStreamOffsetTop &&
+      prev.listClientHeight === next.listClientHeight &&
+      prev.listScrollHeight === next.listScrollHeight &&
+      prev.listScrollTop === next.listScrollTop &&
+      prev.activeTurnScrollToken === next.activeTurnScrollToken &&
+      prev.renderCommitCount === next.renderCommitCount &&
+      prev.liveRowCountAtRender === next.liveRowCountAtRender &&
+      prev.acceptedLiveEventCountAtRender === next.acceptedLiveEventCountAtRender &&
+      prev.transcriptPacketCountAtRender === next.transcriptPacketCountAtRender &&
+      prev.autoScrollAppliedCount === next.autoScrollAppliedCount &&
+      prev.displayEventAppendScheduledCount === next.displayEventAppendScheduledCount &&
+      prev.displayEventAppendAppliedCount === next.displayEventAppendAppliedCount &&
+      prev.displayEventAppendDuplicateCount === next.displayEventAppendDuplicateCount &&
+      prev.layoutMeasureScheduledCount === next.layoutMeasureScheduledCount &&
+      prev.layoutMeasureAppliedCount === next.layoutMeasureAppliedCount &&
+      prev.layoutMeasureCoalescedCount === next.layoutMeasureCoalescedCount &&
+      prev.scrollScheduledCount === next.scrollScheduledCount &&
+      prev.scrollAppliedCount === next.scrollAppliedCount &&
+      prev.scrollCoalescedCount === next.scrollCoalescedCount &&
+      prev.lastDisplayEventReceivedAtMs === next.lastDisplayEventReceivedAtMs &&
+      prev.lastDisplayEventAppliedAtMs === next.lastDisplayEventAppliedAtMs &&
+      prev.lastLayoutMeasureScheduledAtMs === next.lastLayoutMeasureScheduledAtMs &&
+      prev.lastLayoutMeasureAppliedAtMs === next.lastLayoutMeasureAppliedAtMs &&
+      prev.lastScrollScheduledAtMs === next.lastScrollScheduledAtMs &&
+      prev.quietGapRowVisible === next.quietGapRowVisible &&
+      prev.quietGapRowShownCount === next.quietGapRowShownCount &&
+      prev.msSinceLastTranscriptEvent === next.msSinceLastTranscriptEvent
         ? prev
         : next,
     );
-  }, [activeTurnStreamScrollToken, askBusy, userSettings.showHelixAskConsoleDebug, visibleActiveTurnStreamRows.length]);
+    };
+    if (typeof window === "undefined") {
+      measureActiveStreamLayout();
+      return;
+    }
+    activeTurnStreamLayoutMeasureRafRef.current = window.requestAnimationFrame(measureActiveStreamLayout);
+  }, [activeTurnStreamScrollToken, askBusy, helixAskConsoleStreamIngressDebugVersion, visibleActiveTurnStreamRows.length]);
   const handleAskReplyListScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
     const element = event.currentTarget;
     const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
@@ -21607,7 +21890,26 @@ export function HelixAskPill({
       bottom.scrollIntoView({ behavior, block: "end" });
     }
     element.scrollTop = element.scrollHeight;
+    activeTurnStreamAutoScrollCountRef.current += 1;
+    activeTurnStreamPerformanceDebugRef.current.scrollAppliedCount += 1;
   }, []);
+  const scheduleAskReplyListToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
+    const perf = activeTurnStreamPerformanceDebugRef.current;
+    perf.scrollScheduledCount += 1;
+    perf.lastScrollScheduledAtMs = Date.now();
+    if (typeof window === "undefined") {
+      scrollAskReplyListToBottom(behavior);
+      return;
+    }
+    if (askReplyListAutoScrollRafRef.current !== null) {
+      perf.scrollCoalescedCount += 1;
+      return;
+    }
+    askReplyListAutoScrollRafRef.current = window.requestAnimationFrame(() => {
+      askReplyListAutoScrollRafRef.current = null;
+      scrollAskReplyListToBottom(behavior);
+    });
+  }, [scrollAskReplyListToBottom]);
   useEffect(() => {
     const element = askReplyListRef.current;
     if (!element) return;
@@ -21622,25 +21924,31 @@ export function HelixAskPill({
     }
     const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
       if (!askBusy && !askReplyListPinnedToBottomRef.current) return;
-      scrollAskReplyListToBottom(behavior);
+      scheduleAskReplyListToBottom(behavior);
     };
-    scrollToBottom("smooth");
     if (typeof window === "undefined") return;
-    const raf = window.requestAnimationFrame(() => scrollToBottom("smooth"));
     askReplyListAutoScrollTimerRef.current = window.setTimeout(() => {
-      scrollToBottom("smooth");
+      scrollToBottom(askBusy ? "auto" : "smooth");
       askReplyListAutoScrollTimerRef.current = null;
-    }, 180);
+    }, askBusy ? 48 : 180);
+    scrollToBottom(askBusy ? "auto" : "smooth");
     return () => {
-      window.cancelAnimationFrame(raf);
       if (askReplyListAutoScrollTimerRef.current !== null) {
         window.clearTimeout(askReplyListAutoScrollTimerRef.current);
         askReplyListAutoScrollTimerRef.current = null;
       }
     };
-  }, [activeTurnStreamScrollToken, askBusy, askLiveDraft, latestAskReplyId, scrollAskReplyListToBottom]);
+  }, [activeTurnStreamScrollToken, askBusy, askLiveDraft, latestAskReplyId, scheduleAskReplyListToBottom]);
   useEffect(() => {
     return () => {
+      if (askReplyListAutoScrollRafRef.current !== null && typeof window !== "undefined") {
+        window.cancelAnimationFrame(askReplyListAutoScrollRafRef.current);
+        askReplyListAutoScrollRafRef.current = null;
+      }
+      if (activeTurnStreamLayoutMeasureRafRef.current !== null && typeof window !== "undefined") {
+        window.cancelAnimationFrame(activeTurnStreamLayoutMeasureRafRef.current);
+        activeTurnStreamLayoutMeasureRafRef.current = null;
+      }
       if (askReplyListAutoScrollTimerRef.current !== null && typeof window !== "undefined") {
         window.clearTimeout(askReplyListAutoScrollTimerRef.current);
         askReplyListAutoScrollTimerRef.current = null;
@@ -21917,6 +22225,7 @@ export function HelixAskPill({
       setAskError(null);
       setAskLiveEvents([]);
       askLiveEventsRef.current = [];
+      resetActiveTurnDisplayState();
       resetReasoningTheaterEventClock();
       setAskLiveDraft("");
       askLiveDraftRef.current = "";
@@ -22272,6 +22581,7 @@ export function HelixAskPill({
         setAskError(null);
         setAskLiveEvents([]);
         askLiveEventsRef.current = [];
+        resetActiveTurnDisplayState();
         setAskLiveDraft("");
         askLiveDraftRef.current = "";
         askLiveDraftBufferRef.current = "";
@@ -22752,6 +23062,7 @@ export function HelixAskPill({
       setAskError(null);
       setAskLiveEvents([]);
       askLiveEventsRef.current = [];
+      resetActiveTurnDisplayState();
       resetReasoningTheaterEventClock();
       setAskLiveDraft("");
       askLiveDraftRef.current = "";
@@ -23918,7 +24229,7 @@ export function HelixAskPill({
                 : isHelixAgentRuntimeId(responseSelectedAgentProvider?.id)
                   ? responseSelectedAgentProvider.id
                   : null;
-          const responseDebugForReply =
+          let responseDebugForReply =
             responseDebugPayload && typeof responseDebugPayload === "object"
               ? {
                   ...responseDebugPayload,
@@ -23997,6 +24308,65 @@ export function HelixAskPill({
                       },
                 }
               : responseDebugPayload;
+          const liveEventsSnapshot = [...askLiveEventsRef.current];
+          const consoleAssemblyDisplayEvents = [...activeTurnDisplayStateRef.current.events];
+          const consoleAssemblyActiveTurnId = activeAskTurnIdRef.current ?? runAskTurnId ?? traceId;
+          const consoleAssemblyActiveStartedAtMs = activeAskStartedAtMsRef.current;
+          const consoleAssemblyActiveLiveEvents = consoleAssemblyDisplayEvents.filter((event) =>
+            askLiveEventBelongsToActiveTurn({
+              event,
+              activeTurnId: consoleAssemblyActiveTurnId,
+              activeTraceId: traceId,
+              activeStartedAtMs: consoleAssemblyActiveStartedAtMs,
+            }),
+          );
+          const consoleAssemblyReplyId = consoleAssemblyActiveTurnId ?? traceId;
+          const consoleAssemblyTranscriptRows = buildHelixActiveTurnTranscriptRows({
+            replyId: consoleAssemblyReplyId,
+            events: consoleAssemblyActiveLiveEvents,
+            activeTurnId: consoleAssemblyActiveTurnId,
+            activeTraceId: traceId,
+          });
+          const consoleAssemblyStreamRows = buildHelixContinuousTurnStreamRows({
+            replyId: consoleAssemblyReplyId,
+            question: trimmed,
+            turnTranscriptRows: selectHelixAskConsoleTurnTranscriptRowsForStream(consoleAssemblyTranscriptRows),
+            mailLoopRows: [],
+            stagePlayEvents: [],
+            liveAnswerTurnBridge: null,
+            finalAnswerText: "",
+            finalAnswerHeading: "Final answer",
+            finalAnswerSourceLabel: "active turn",
+            terminalMismatch: false,
+          });
+          const consoleAssemblyDebugForReply = buildHelixAskConsoleAssemblyDebugSnapshot({
+            askBusy: true,
+            activeTurnId: consoleAssemblyActiveTurnId,
+            activeTraceId: traceId,
+            activeStartedAtMs: consoleAssemblyActiveStartedAtMs,
+            activeQuestion: trimmed,
+            totalLiveEventCount: liveEventsSnapshot.length,
+            retainedLiveEventCount: consoleAssemblyActiveLiveEvents.length,
+            activeLiveEventCount: consoleAssemblyActiveLiveEvents.length,
+            visibleActiveTurnStreamRows: filterHelixAskActiveTurnStreamRows(consoleAssemblyStreamRows, {
+              includeTerminalRows: userSettings.showHelixAskConsoleDebug,
+            }),
+            replies: chronologicalAskRepliesForTranscript.map((reply) => ({
+              id: reply.id,
+              canonicalKey: resolveHelixAskConsoleReplyCanonicalKey(reply),
+              createdAtMs: resolveHelixAskConsoleReplyOrderMs(reply),
+            })),
+            latestReplyId: latestAskReply?.id ?? latestAskReplyId,
+            streamIngress: helixAskConsoleStreamIngressDebugRef.current,
+            activeStreamDom: activeTurnStreamDomDebugRef.current,
+          });
+          if (responseDebugForReply && typeof responseDebugForReply === "object") {
+            responseDebugForReply = {
+              ...responseDebugForReply,
+              console_assembly_debug: consoleAssemblyDebugForReply,
+              client_console_assembly_debug: consoleAssemblyDebugForReply,
+            };
+          }
           const responseIndicatesContextCompactionPause = isHelixAskContextCompactionPauseText(
             [
               responseText,
@@ -24015,7 +24385,6 @@ export function HelixAskPill({
             setContextCompactionPausePendingState(true);
           }
           const briefOnlyReply = shouldKeepHelixReplyInBriefLane(responseDebugForReply);
-          const liveEventsSnapshot = [...askLiveEventsRef.current];
           const convergenceSnapshot = buildConvergenceSnapshot({
             events: liveEventsSnapshot,
             proof: responseProof,
@@ -25923,62 +26292,51 @@ export function HelixAskPill({
   ]);
 
   const activeTurnStreamPanel = visibleActiveTurnStreamRows.length > 0 ? (
-    <div
-      ref={activeTurnStreamPanelRef}
-      className="contents"
-      data-testid="helix-ask-active-turn-stream"
-      data-turn-stream-lines={visibleActiveTurnStreamRows.length}
-      data-active-row-count={visibleActiveTurnStreamRows.length}
-      data-active-turn-id={activeAskTurnIdRef.current ?? undefined}
-      data-active-trace-id={askLiveTraceId ?? undefined}
-      data-render-placement="inline_active_turn"
-    >
-      <HelixAskReplyTurn
-        isLatestReply={true}
-        card={{
-          turnTestId: "helix-ask-active-turn",
-          tintClassName: moodPalette.replyTint,
-          contextCapsule: null,
-          promptIngested: false,
-        }}
-        stream={{
-          rows: visibleActiveTurnStreamRows,
-          workLogTestId: "helix-ask-active-turn-work-log",
-          questionTestId: "helix-ask-active-turn-question",
-          finalAnswerTestId: "helix-ask-active-turn-final-answer",
-          stagePlayEventCount: 0,
-          finalAnswerRawText: "",
-          finalAnswerSourceLabel: "active turn",
-          backendTerminalAnswer: null,
-          finalAnswerAuthority: "terminal",
-          replyId: activeTurnStreamReplyId,
-          activeTurnId: activeAskTurnIdRef.current,
-          answerTint: null,
-          actualAgentProviderLabel: null,
-          actualAgentModelLabel: null,
-          liveBridgeStatus: null,
-          renderFinalAnswer: () => null,
-          clipText,
-          readRowClassName: readHelixContinuousTurnStreamRowClass,
-          readDotClassName: readHelixContinuousTurnStreamDotClass,
-          readPillClassName: readLiveAnswerTurnBridgePillClassName,
-          onCopyFinal: () => undefined,
-          onDebugCopy: () => undefined,
-          onReadAloud: () => undefined,
-          showDebugCopy: false,
-          debugCopyDisabled: true,
-          copyFinalTestId: "helix-ask-active-turn-copy-final",
-          debugCopyTestId: "helix-ask-active-turn-debug-copy",
-          readAloudTestId: "helix-ask-active-turn-read-aloud",
-          readAloudActive: false,
-          readAloudAriaLabel: "Read aloud",
-          readAloudTitle: "Read aloud",
-          proofTrace: null,
-          jobReadyLinks: [],
-          onRunJobReadyLink: () => undefined,
-        }}
-      />
-    </div>
+    <HelixAskReplyTurn
+      isLatestReply={true}
+      card={{
+        turnTestId: "helix-ask-active-turn",
+        tintClassName: moodPalette.replyTint,
+        contextCapsule: null,
+        promptIngested: false,
+      }}
+      stream={{
+        rows: visibleActiveTurnStreamRows,
+        workLogTestId: "helix-ask-active-turn-work-log",
+        questionTestId: "helix-ask-active-turn-question",
+        finalAnswerTestId: "helix-ask-active-turn-final-answer",
+        stagePlayEventCount: 0,
+        finalAnswerRawText: "",
+        finalAnswerSourceLabel: "active turn",
+        backendTerminalAnswer: null,
+        finalAnswerAuthority: "terminal",
+        replyId: activeTurnStreamReplyId,
+        activeTurnId: activeAskTurnIdRef.current,
+        answerTint: null,
+        actualAgentProviderLabel: null,
+        actualAgentModelLabel: null,
+        liveBridgeStatus: null,
+        renderFinalAnswer: () => null,
+        clipText,
+        readRowClassName: readHelixContinuousTurnStreamRowClass,
+        readDotClassName: readHelixContinuousTurnStreamDotClass,
+        readPillClassName: readLiveAnswerTurnBridgePillClassName,
+        onCopyFinal: () => undefined,
+        onDebugCopy: () => undefined,
+        onReadAloud: () => undefined,
+        showDebugCopy: false,
+        debugCopyDisabled: true,
+        copyFinalTestId: "helix-ask-active-turn-copy-final",
+        debugCopyTestId: "helix-ask-active-turn-debug-copy",
+        readAloudTestId: "helix-ask-active-turn-read-aloud",
+        readAloudActive: false,
+        readAloudAriaLabel: "Read aloud",
+        readAloudTitle: "Read aloud",
+        proofTrace: null,
+        jobReadyLinks: [],
+        onRunJobReadyLink: () => undefined,
+      }}
+    />
   ) : null;
 
   return (
@@ -26383,8 +26741,15 @@ export function HelixAskPill({
             ref={askReplyListRef}
             className={replyListClassNameResolved}
             onScroll={handleAskReplyListScroll}
-            consoleDebugSnapshot={helixAskConsoleDebugSnapshot}
+            consoleDebugSnapshot={userSettings.showHelixAskConsoleDebug ? helixAskConsoleDebugSnapshot : null}
             activeTurnStreamPanel={activeTurnStreamPanel}
+            activeTurnStreamStatusLine={activeTurnQuietGapStatusLine}
+            activeTurnStreamLaneRef={activeTurnStreamPanelRef}
+            activeTurnStreamLineCount={visibleActiveTurnStreamRows.length}
+            activeTurnStreamTurnId={activeAskTurnIdRef.current}
+            activeTurnStreamTraceId={askLiveTraceId}
+            activeTurnStreamRenderToken={activeTurnStreamScrollToken}
+            activeTurnStreamRenderCommits={activeTurnStreamRenderCommitCountRef.current}
             bottomRef={askReplyListBottomRef}
           >
           {chronologicalAskReplies.map((reply) => {

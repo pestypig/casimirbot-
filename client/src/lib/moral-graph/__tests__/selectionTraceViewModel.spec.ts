@@ -52,6 +52,22 @@ function graph(): Pick<MoralGraphBiomeScaleViewModel, "nodes" | "edges"> {
         actionManifestation: "sensing",
       }),
       node({
+        id: "maintenance-before-optimization",
+        biome: "maintenance_response",
+        actionManifestation: "maintaining",
+      }),
+      node({
+        id: "valence-before-preference",
+        biome: "action_selection",
+        actionManifestation: "valuing",
+      }),
+      node({
+        id: "choice-before-mandate",
+        biome: "action_selection",
+        scaleBand: "group",
+        actionManifestation: "choosing",
+      }),
+      node({
         id: "coordination-before-mandate",
         biome: "coordination_scale",
         actionManifestation: "coordinating",
@@ -75,7 +91,10 @@ function graph(): Pick<MoralGraphBiomeScaleViewModel, "nodes" | "edges"> {
       { id: "e:gradient:flux", from: "gradient-before-boundary", to: "flux-before-action", label: "condition trace", tone: "emerald" },
       { id: "e:flux:boundary", from: "flux-before-action", to: "boundary-before-obligation", label: "condition to boundary", tone: "emerald" },
       { id: "e:boundary:sensing", from: "boundary-before-obligation", to: "sensing-before-judgment", label: "trace", tone: "emerald" },
-      { id: "e:sensing:coordination", from: "sensing-before-judgment", to: "coordination-before-mandate", label: "trace", tone: "emerald" },
+      { id: "e:sensing:maintenance", from: "sensing-before-judgment", to: "maintenance-before-optimization", label: "trace", tone: "emerald" },
+      { id: "e:maintenance:valence", from: "maintenance-before-optimization", to: "valence-before-preference", label: "trace", tone: "emerald" },
+      { id: "e:valence:choice", from: "valence-before-preference", to: "choice-before-mandate", label: "trace", tone: "emerald" },
+      { id: "e:choice:coordination", from: "choice-before-mandate", to: "coordination-before-mandate", label: "trace", tone: "emerald" },
       { id: "e:coordination:objective", from: "coordination-before-mandate", to: "direct-observation-before-claim", label: "trace", tone: "cyan" },
       { id: "e:objective:missing", from: "direct-observation-before-claim", to: "missing:organism_boundary_context", label: "claim boundary", tone: "rose" },
     ],
@@ -110,8 +129,14 @@ describe("buildMoralGraphSelectionTraceViewModel", () => {
     expect(trace.candidateNodeIds.has("gradient-before-boundary")).toBe(true);
     expect(trace.candidateNodeIds.has("boundary-before-obligation")).toBe(true);
     expect(trace.candidateNodeIds.has("sensing-before-judgment")).toBe(true);
+    expect(trace.candidateNodeIds.has("maintenance-before-optimization")).toBe(true);
+    expect(trace.candidateNodeIds.has("valence-before-preference")).toBe(true);
+    expect(trace.candidateNodeIds.has("choice-before-mandate")).toBe(true);
+    expect(trace.candidateNodeIds.has("coordination-before-mandate")).toBe(true);
     expect(trace.candidateNodeIds.has("missing:organism_boundary_context")).toBe(true);
     expect(trace.candidateEdgeIds.has("e:boundary:sensing")).toBe(true);
+    expect(trace.candidateEdgeIds.has("e:maintenance:valence")).toBe(true);
+    expect(trace.candidateEdgeIds.has("e:choice:coordination")).toBe(true);
     expect(trace.candidateEdgeIds.has("e:objective:missing")).toBe(true);
   });
 
@@ -126,7 +151,24 @@ describe("buildMoralGraphSelectionTraceViewModel", () => {
     expect(trace.activeNodeIds.has("gradient-before-boundary")).toBe(true);
     expect(trace.activeNodeIds.has("boundary-before-obligation")).toBe(true);
     expect(trace.activeNodeIds.has("sensing-before-judgment")).toBe(true);
+    expect(trace.candidateNodeIds.has("maintenance-before-optimization")).toBe(true);
+    expect(trace.candidateNodeIds.has("valence-before-preference")).toBe(false);
     expect(trace.candidateNodeIds.has("coordination-before-mandate")).toBe(false);
+    expect(trace.blockedNodeIds.has("direct-observation-before-claim")).toBe(true);
+  });
+
+  it("requires action-selection support before coordination and mandate layers", () => {
+    const fixture = graph();
+    const trace = buildMoralGraphSelectionTraceViewModel({
+      ...fixture,
+      selectedNodeIds: ["coordination-before-mandate"],
+    });
+
+    expect(trace.traceStatus).toBe("requires_boundary_check");
+    expect(trace.candidateNodeIds.has("maintenance-before-optimization")).toBe(true);
+    expect(trace.candidateNodeIds.has("valence-before-preference")).toBe(true);
+    expect(trace.candidateNodeIds.has("choice-before-mandate")).toBe(true);
+    expect(trace.activeNodeIds.has("coordination-before-mandate")).toBe(true);
     expect(trace.blockedNodeIds.has("direct-observation-before-claim")).toBe(true);
   });
 

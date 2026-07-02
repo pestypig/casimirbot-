@@ -52,6 +52,33 @@ const readString = (value: unknown): string | null =>
 const readBoolean = (value: unknown): boolean | null =>
   typeof value === "boolean" ? value : null;
 
+const readRecordArray = (value: unknown): Record<string, unknown>[] =>
+  Array.isArray(value)
+    ? value.filter((entry): entry is Record<string, unknown> =>
+      Boolean(entry) && typeof entry === "object" && !Array.isArray(entry))
+    : [];
+
+const readCapabilityLaneMailLoopDebugSummaries = (input: {
+  payload: Record<string, unknown>;
+  debug?: Record<string, unknown> | null;
+  agentLoop?: Record<string, unknown> | null;
+}): Record<string, unknown>[] => {
+  const explicit = [
+    ...readRecordArray(input.payload.capability_lane_mail_loop_debug_summaries),
+    ...readRecordArray(input.debug?.capability_lane_mail_loop_debug_summaries),
+    ...readRecordArray(input.agentLoop?.capability_lane_mail_loop_debug_summaries),
+  ];
+  if (explicit.length > 0) return explicit;
+
+  return [
+    ...readRecordArray(input.payload.capability_lane_goal_binding_debug_summaries),
+    ...readRecordArray(input.debug?.capability_lane_goal_binding_debug_summaries),
+    ...readRecordArray(input.agentLoop?.capability_lane_goal_binding_debug_summaries),
+  ]
+    .map((summary) => asRecord(summary.latest_mail_loop_summary))
+    .filter((summary): summary is Record<string, unknown> => Boolean(summary));
+};
+
 const HELIX_DEBUG_BACKEND_ENTRYPOINT_REQUIRED_PROMPT_RE =
   /\b(?:scientific-calculator\.[a-z0-9_.-]+|scientific\s+calculator|calculator_receipt|calculator\s+tool|docs-viewer\.[a-z0-9_.-]+|docs\s+viewer|repo-code\.[a-z0-9_.-]+|repo_code\.[a-z0-9_.-]+|workspace-directory\.[a-z0-9_.-]+|workspace_directory\.[a-z0-9_.-]+|workspace_os\.status|internet_search\.[a-z0-9_.-]+|internet\s+search\s+tool|scholarly-research\.[a-z0-9_.-]+|scholarly_research\.[a-z0-9_.-]+|scholarly\s+research\s+tool|lookup_papers|fetch_full_text|extract_numeric_parameters|live_env\.[a-z0-9_.-]+|helix_ask\.[a-z0-9_.-]+|image_lens|visual_capture)\b/i;
 
@@ -194,6 +221,12 @@ const copyRailCriticalDebugFields = (
 const boundDebugExportEnvelopeText = (payload: Record<string, unknown>, text: string): string => {
   if (text.length <= HELIX_DEBUG_EXPORT_MAX_UI_CHARS) return text;
   const debug = asRecord(payload.debug);
+  const capabilityLaneGoalBindingDebugSummaries =
+    payload.capability_lane_goal_binding_debug_summaries ?? debug?.capability_lane_goal_binding_debug_summaries ?? [];
+  const capabilityLaneMailLoopDebugSummaries = readCapabilityLaneMailLoopDebugSummaries({
+    payload,
+    debug,
+  });
   const minimal = {
     schema: payload.schema ?? "helix.ask.debug_export.v1",
     exported_at_ms: payload.exported_at_ms,
@@ -251,6 +284,24 @@ const boundDebugExportEnvelopeText = (payload: Record<string, unknown>, text: st
       payload.docs_synthesis_materializer_result ?? debug?.docs_synthesis_materializer_result ?? null,
     terminal_answer_authority: payload.terminal_answer_authority ?? debug?.terminal_answer_authority ?? null,
     terminal_presentation: payload.terminal_presentation ?? debug?.terminal_presentation ?? null,
+    agent_runtime: payload.agent_runtime ?? debug?.agent_runtime ?? null,
+    selected_agent_provider: payload.selected_agent_provider ?? debug?.selected_agent_provider ?? null,
+    capability_lane_ids: payload.capability_lane_ids ?? debug?.capability_lane_ids ?? null,
+    capability_lane_statuses: payload.capability_lane_statuses ?? debug?.capability_lane_statuses ?? null,
+    capability_lane_call_results: payload.capability_lane_call_results ?? debug?.capability_lane_call_results ?? [],
+    capability_lane_projection_receipts:
+      payload.capability_lane_projection_receipts ?? debug?.capability_lane_projection_receipts ?? [],
+    capability_lane_session_debug_summaries:
+      payload.capability_lane_session_debug_summaries ?? debug?.capability_lane_session_debug_summaries ?? [],
+    capability_lane_mail_loop_debug_summaries: capabilityLaneMailLoopDebugSummaries,
+    capability_lane_goal_binding_results:
+      payload.capability_lane_goal_binding_results ?? debug?.capability_lane_goal_binding_results ?? [],
+    capability_lane_goal_binding_debug_summaries: capabilityLaneGoalBindingDebugSummaries,
+    capability_lane_goal_dispatch_readiness:
+      payload.capability_lane_goal_dispatch_readiness ?? debug?.capability_lane_goal_dispatch_readiness ?? null,
+    capability_lane_reentry_status:
+      payload.capability_lane_reentry_status ?? debug?.capability_lane_reentry_status ?? null,
+    runtime_lane_request_loop: payload.runtime_lane_request_loop ?? debug?.runtime_lane_request_loop ?? null,
     debug: {
       schema: "helix.ask.debug_export_minimal_debug.v1",
       language_contract: payload.language_contract ?? debug?.language_contract ?? null,
@@ -292,6 +343,11 @@ const boundDebugExportEnvelopeText = (payload: Record<string, unknown>, text: st
       legacy_ask_local_bypassed: payload.legacy_ask_local_bypassed ?? debug?.legacy_ask_local_bypassed ?? null,
       first_broken_rail: payload.first_broken_rail ?? debug?.first_broken_rail ?? null,
       repair_target: payload.repair_target ?? debug?.repair_target ?? null,
+      agent_runtime: payload.agent_runtime ?? debug?.agent_runtime ?? null,
+      capability_lane_goal_binding_results:
+        payload.capability_lane_goal_binding_results ?? debug?.capability_lane_goal_binding_results ?? [],
+      capability_lane_goal_binding_debug_summaries:
+        capabilityLaneGoalBindingDebugSummaries,
     },
     debug_export_size_control: {
       schema: "helix.ask.debug_export_size_control.v1",
@@ -774,6 +830,79 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     payload.workstation_gateway_observation_packets ??
     debug?.workstation_gateway_observation_packets ??
     agentLoop?.workstation_gateway_observation_packets;
+  const capabilityLaneManifest =
+    payload.capability_lane_manifest ?? debug?.capability_lane_manifest ?? agentLoop?.capability_lane_manifest;
+  const modelVisibleCapabilityLaneManifest =
+    payload.model_visible_capability_lane_manifest ??
+    debug?.model_visible_capability_lane_manifest ??
+    agentLoop?.model_visible_capability_lane_manifest;
+  const capabilityLaneIds =
+    payload.capability_lane_ids ?? debug?.capability_lane_ids ?? agentLoop?.capability_lane_ids;
+  const capabilityLaneStatuses =
+    payload.capability_lane_statuses ?? debug?.capability_lane_statuses ?? agentLoop?.capability_lane_statuses;
+  const capabilityLaneResolveTraces =
+    payload.capability_lane_resolve_traces ??
+    debug?.capability_lane_resolve_traces ??
+    agentLoop?.capability_lane_resolve_traces;
+  const capabilityLaneBackendSelections =
+    payload.capability_lane_backend_selections ??
+    debug?.capability_lane_backend_selections ??
+    agentLoop?.capability_lane_backend_selections;
+  const capabilityLaneCallResults =
+    payload.capability_lane_call_results ?? debug?.capability_lane_call_results ?? agentLoop?.capability_lane_call_results;
+  const capabilityLaneObservationPackets =
+    payload.capability_lane_observation_packets ??
+    debug?.capability_lane_observation_packets ??
+    agentLoop?.capability_lane_observation_packets;
+  const capabilityLaneProjectionReceipts =
+    payload.capability_lane_projection_receipts ??
+    debug?.capability_lane_projection_receipts ??
+    agentLoop?.capability_lane_projection_receipts;
+  const capabilityLaneSessionResults =
+    payload.capability_lane_session_results ??
+    debug?.capability_lane_session_results ??
+    agentLoop?.capability_lane_session_results;
+  const capabilityLaneSessionDebugSummaries =
+    payload.capability_lane_session_debug_summaries ??
+    debug?.capability_lane_session_debug_summaries ??
+    agentLoop?.capability_lane_session_debug_summaries;
+  const capabilityLaneGoalBindingResults =
+    payload.capability_lane_goal_binding_results ??
+    debug?.capability_lane_goal_binding_results ??
+    agentLoop?.capability_lane_goal_binding_results;
+  const capabilityLaneGoalBindingDebugSummaries =
+    payload.capability_lane_goal_binding_debug_summaries ??
+    debug?.capability_lane_goal_binding_debug_summaries ??
+    agentLoop?.capability_lane_goal_binding_debug_summaries;
+  const capabilityLaneMailLoopDebugSummaries = readCapabilityLaneMailLoopDebugSummaries({
+    payload,
+    debug,
+    agentLoop,
+  });
+  const capabilityLaneGoalDispatchPlans =
+    payload.capability_lane_goal_dispatch_plans ??
+    debug?.capability_lane_goal_dispatch_plans ??
+    agentLoop?.capability_lane_goal_dispatch_plans;
+  const capabilityLaneGoalDispatchAdmissions =
+    payload.capability_lane_goal_dispatch_admissions ??
+    debug?.capability_lane_goal_dispatch_admissions ??
+    agentLoop?.capability_lane_goal_dispatch_admissions;
+  const capabilityLaneGoalDispatchReadiness =
+    payload.capability_lane_goal_dispatch_readiness ??
+    debug?.capability_lane_goal_dispatch_readiness ??
+    agentLoop?.capability_lane_goal_dispatch_readiness;
+  const capabilityLaneReentryStatus =
+    payload.capability_lane_reentry_status ??
+    debug?.capability_lane_reentry_status ??
+    agentLoop?.capability_lane_reentry_status;
+  const runtimeLaneRequestContract =
+    payload.runtime_lane_request_contract ??
+    debug?.runtime_lane_request_contract ??
+    agentLoop?.runtime_lane_request_contract;
+  const runtimeLaneRequestLoop =
+    payload.runtime_lane_request_loop ?? debug?.runtime_lane_request_loop ?? agentLoop?.runtime_lane_request_loop;
+  const runtimeLaneRequestRetry =
+    payload.runtime_lane_request_retry ?? debug?.runtime_lane_request_retry ?? agentLoop?.runtime_lane_request_retry;
   const turnTranscriptEvents =
     payload.turn_transcript_events ??
     debug?.turn_transcript_events ??
@@ -1162,6 +1291,27 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
       payload.workstation_gateway_reentry_status ??
       debug?.workstation_gateway_reentry_status ??
       agentLoop?.workstation_gateway_reentry_status,
+    capability_lane_manifest: capabilityLaneManifest,
+    model_visible_capability_lane_manifest: modelVisibleCapabilityLaneManifest,
+    capability_lane_ids: capabilityLaneIds,
+    capability_lane_statuses: capabilityLaneStatuses,
+    capability_lane_resolve_traces: capabilityLaneResolveTraces,
+    capability_lane_backend_selections: capabilityLaneBackendSelections,
+    capability_lane_call_results: capabilityLaneCallResults,
+    capability_lane_observation_packets: capabilityLaneObservationPackets,
+    capability_lane_projection_receipts: capabilityLaneProjectionReceipts,
+    capability_lane_session_results: capabilityLaneSessionResults,
+    capability_lane_session_debug_summaries: capabilityLaneSessionDebugSummaries,
+    capability_lane_mail_loop_debug_summaries: capabilityLaneMailLoopDebugSummaries,
+    capability_lane_goal_binding_results: capabilityLaneGoalBindingResults,
+    capability_lane_goal_binding_debug_summaries: capabilityLaneGoalBindingDebugSummaries,
+    capability_lane_goal_dispatch_plans: capabilityLaneGoalDispatchPlans,
+    capability_lane_goal_dispatch_admissions: capabilityLaneGoalDispatchAdmissions,
+    capability_lane_goal_dispatch_readiness: capabilityLaneGoalDispatchReadiness,
+    capability_lane_reentry_status: capabilityLaneReentryStatus,
+    runtime_lane_request_contract: runtimeLaneRequestContract,
+    runtime_lane_request_loop: runtimeLaneRequestLoop,
+    runtime_lane_request_retry: runtimeLaneRequestRetry,
     terminal_authority_status:
       payload.terminal_authority_status ??
       debug?.terminal_authority_status ??

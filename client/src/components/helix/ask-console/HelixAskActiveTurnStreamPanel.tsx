@@ -1,9 +1,10 @@
-import type { ReactNode, RefObject } from "react";
+import React, { type ReactNode, type RefObject } from "react";
 
 import type {
   HelixContinuousTurnStreamRow,
   HelixContinuousTurnStreamTone,
 } from "@/lib/helix/ask-active-turn-stream";
+import { resolveHelixAskConsoleCapabilityLaneRowStage } from "./HelixAskConsoleDiagnostics";
 
 export type HelixAskActiveTurnStreamPanelProps = {
   rows: HelixContinuousTurnStreamRow[];
@@ -51,10 +52,16 @@ export function HelixAskActiveTurnStreamPanel({
         {rows.map((row, index) => {
           const isQuestionRow = row.source === "question";
           const isFinalRow = row.source === "final";
+          const capabilityLaneStage = resolveHelixAskConsoleCapabilityLaneRowStage(row);
           const rowClass = readRowClass(row.tone);
           const dotClass = readDotClass(row.tone);
           const visibleText = isFinalRow ? row.text : clipText(row.text, row.detailLimit ?? 360);
           const isLatestActiveRow = index === rows.length - 1;
+          const sourceBadge = capabilityLaneStage
+            ? `lane ${capabilityLaneStage.replace(/_/g, " ")}`
+            : isQuestionRow
+              ? "user prompt"
+              : row.source.replace(/_/g, " ");
           return (
             <div
               key={row.key}
@@ -64,6 +71,7 @@ export function HelixAskActiveTurnStreamPanel({
               data-testid="helix-ask-active-turn-stream-row"
               data-active-latest-line={isLatestActiveRow ? "true" : undefined}
               data-stream-row-source={row.source}
+              data-capability-lane-stage={capabilityLaneStage ?? undefined}
             >
               {isLatestActiveRow ? (
                 <span className="sr-only" data-testid="helix-ask-active-turn-latest-line">
@@ -81,7 +89,7 @@ export function HelixAskActiveTurnStreamPanel({
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="break-words font-semibold">{row.label}</p>
                   <span className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.12em] text-slate-300">
-                    {isQuestionRow ? "user prompt" : row.source.replace(/_/g, " ")}
+                    {sourceBadge}
                   </span>
                 </div>
                 <div className="mt-1 whitespace-pre-wrap break-words leading-relaxed">

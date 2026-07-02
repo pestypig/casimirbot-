@@ -1961,7 +1961,7 @@ const projectCodexNativeEvent = (input: {
     readString(payload.item_id) ??
     `${input.turnId}:codex_native:${input.seq}:${sourceEventType}`;
   const baseTranscript = {
-    id: `codex:native:${eventId}`,
+    id: `codex:native:${sourceEventType}:${eventId}`,
     turn_id: nativeTurnId,
     seq: input.seq,
     at_ms: atMs,
@@ -2476,6 +2476,12 @@ export const codexProvider: HelixAgentProvider = {
           capability_lane_session_results: capabilityLaneDebugProjection.capability_lane_session_results,
           capability_lane_session_debug_summaries:
             capabilityLaneDebugProjection.capability_lane_session_debug_summaries,
+          capability_lane_mail_loop_debug_summaries:
+            capabilityLaneDebugProjection.capability_lane_mail_loop_debug_summaries,
+          capability_lane_goal_binding_results:
+            capabilityLaneDebugProjection.capability_lane_goal_binding_results,
+          capability_lane_goal_binding_debug_summaries:
+            capabilityLaneDebugProjection.capability_lane_goal_binding_debug_summaries,
           capability_lane_reentry_status: capabilityLaneDebugProjection.capability_lane_reentry_status,
           fail_reason: "missing_question",
           permission_profile: codexProvider.permissionProfile,
@@ -2543,6 +2549,7 @@ export const codexProvider: HelixAgentProvider = {
       "For any repository/codebase-backed turn, answer only from the provided repo.search observation packet. If no repo.search observation packet exists, say repository content is not available from this turn.",
       "For any internet/web-backed turn, answer only from the provided internet-search.search_web observation packet. If no internet search observation packet exists, say web evidence is not available from this turn.",
       "For any scholarly/paper-backed turn, answer only from the provided scholarly-research.lookup_papers observation packet. If no scholarly observation packet exists, say paper evidence is not available from this turn.",
+      "For moral_living_substrate_reflection observations, use procedural_chain transitions to compare present and missing links. Explain what the chain supports conditionally, what remains unsupported, and avoid merely restating matched badge names.",
       "If a scholarly observation includes scholarly_lookup_recovery_affordance, scholarly_full_text_recovery_affordance, scholarly_numeric_recovery_affordance, or recovery_affordances, treat that as non-terminal evidence about a failed or weak retrieval/fetch/extraction. Use it to explain the mismatch, propose a narrower re-query, ask the user, or fail closed; do not claim full-text, numeric extraction, or calculator results from it.",
       `Before giving a final answer, decide whether the user request needs a one-shot capability lane. If it does and required inputs are present, your entire first response must be ${CODEX_CAPABILITY_LANE_REQUEST_MARKER} followed by compact JSON for exactly one lane call.`,
       "For translation requests over text/content, you must request live_translation.translate_text instead of answering from memory. Required fields are text and target_language. A direct translation answer before the lane observation is non-compliant.",
@@ -2970,6 +2977,12 @@ export const codexProvider: HelixAgentProvider = {
       capability_lane_session_results: capabilityLaneDebugProjection.capability_lane_session_results,
       capability_lane_session_debug_summaries:
         capabilityLaneDebugProjection.capability_lane_session_debug_summaries,
+      capability_lane_mail_loop_debug_summaries:
+        capabilityLaneDebugProjection.capability_lane_mail_loop_debug_summaries,
+      capability_lane_goal_binding_results:
+        capabilityLaneDebugProjection.capability_lane_goal_binding_results,
+      capability_lane_goal_binding_debug_summaries:
+        capabilityLaneDebugProjection.capability_lane_goal_binding_debug_summaries,
       capability_lane_reentry_status: capabilityLaneDebugProjection.capability_lane_reentry_status,
       runtime_lane_request_contract: runtimeLaneRequestContract,
       ...(runtimeLaneRequestLoop ? { runtime_lane_request_loop: runtimeLaneRequestLoop } : {}),
@@ -3025,6 +3038,12 @@ export const codexProvider: HelixAgentProvider = {
         capability_lane_session_results: capabilityLaneDebugProjection.capability_lane_session_results,
         capability_lane_session_debug_summaries:
           capabilityLaneDebugProjection.capability_lane_session_debug_summaries,
+        capability_lane_mail_loop_debug_summaries:
+          capabilityLaneDebugProjection.capability_lane_mail_loop_debug_summaries,
+        capability_lane_goal_binding_results:
+          capabilityLaneDebugProjection.capability_lane_goal_binding_results,
+        capability_lane_goal_binding_debug_summaries:
+          capabilityLaneDebugProjection.capability_lane_goal_binding_debug_summaries,
         capability_lane_reentry_status: capabilityLaneDebugProjection.capability_lane_reentry_status,
         runtime_lane_request_contract: runtimeLaneRequestContract,
         runtime_lane_request_loop: runtimeLaneRequestLoop,

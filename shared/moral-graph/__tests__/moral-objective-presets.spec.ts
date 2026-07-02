@@ -34,7 +34,7 @@ describe("MoralGraph objective preset resolver", () => {
 
     expect(validateMoralObjectiveBindingV1(binding)).toEqual([]);
     expect(binding.subject.kind).toBe("character_preset");
-    expect(binding.subject.label).toContain("Reinhard von Lohengramm perspective applied to");
+    expect(binding.subject.label).toContain("Sovereign Ambition Profile applied to");
     expect(binding.subject.refs).toEqual(
       expect.arrayContaining(["logh.reinhard_von_lohengramm", "prompt:test-succession"]),
     );

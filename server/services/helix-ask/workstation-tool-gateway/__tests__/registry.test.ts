@@ -4035,6 +4035,7 @@ describe("Helix workstation tool gateway", () => {
         prompt:
           "Derive moral relevance from organism boundary, sensing, homeostasis, entropy gradient pressure, and non-human living systems.",
         source_theory_badge_ids: ["biophysics.homeostatic_regulation"],
+        requested_substrate_badge_ids: ["sensing-before-judgment"],
         include_theory_bridge: true,
         include_admissions: true,
       },
@@ -4053,6 +4054,15 @@ describe("Helix workstation tool gateway", () => {
         derivation_id?: string;
         estimate?: Record<string, unknown>;
         obligation_hint?: string;
+        forbidden_overclaim?: string;
+      }>;
+      procedural_chain?: Array<{
+        from_badge_id?: string;
+        to_badge_id?: string;
+        transition_label?: string;
+        procedural_claim?: string;
+        evidence_strength?: string;
+        missing_evidence?: string[];
         forbidden_overclaim?: string;
       }>;
       synthesis_path?: Array<{
@@ -4165,6 +4175,29 @@ describe("Helix workstation tool gateway", () => {
         }),
       ]),
     );
+    const boundaryMaintenanceLink = observation.procedural_chain?.find(
+      (step) =>
+        step.from_badge_id === "boundary-before-obligation" &&
+        step.to_badge_id === "maintenance-before-optimization",
+    );
+    expect(boundaryMaintenanceLink).toMatchObject({
+      transition_label: "boundary to maintenance",
+      procedural_claim: expect.stringContaining("maintained before optional optimization"),
+      evidence_strength: "present",
+      missing_evidence: [],
+      forbidden_overclaim: expect.stringContaining("morally identical"),
+    });
+    const sensingValenceLink = observation.procedural_chain?.find(
+      (step) =>
+        step.from_badge_id === "sensing-before-judgment" &&
+        step.to_badge_id === "valence-before-preference",
+    );
+    expect(sensingValenceLink).toMatchObject({
+      transition_label: "sensing to valence",
+      evidence_strength: "present",
+      missing_evidence: [],
+      forbidden_overclaim: expect.stringContaining("human-like preference"),
+    });
     expect(observation.synthesis_path?.map((step) => step.output_kind)).toEqual([
       "substrate_observation",
       "vulnerability_dependency_agency_estimate",

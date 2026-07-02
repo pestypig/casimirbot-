@@ -1,4 +1,5 @@
 import type { HelixAgentStepObservationPacket } from "@shared/helix-agent-step-observation-packet";
+import type { HelixCapabilityLaneMailLoopDebugSummary } from "@shared/helix-capability-lane-mail-loop";
 import type { HelixAgentProvider } from "../agent-providers/types";
 import type { HelixAgentModelVisibleCapabilityLaneManifest } from "../agent-providers/runtime-adapter-contract";
 import { buildModelVisibleCapabilityLaneManifest } from "../agent-providers/runtime-adapter-contract";
@@ -11,17 +12,27 @@ import {
   runHelixCapabilityLaneSessionRequests,
   type HelixCapabilityLaneSessionRunnerResult,
 } from "./session-runner";
+import {
+  runHelixCapabilityLaneGoalBindingRequests,
+  type HelixCapabilityLaneGoalBindingRunnerResult,
+} from "./goal-binding-runner";
+import type { HelixCapabilityLaneSessionStore } from "./session-manager";
+import type { HelixCapabilityLaneGoalBindingStore } from "./goal-binding";
 
 export type HelixCapabilityLaneProviderAdapterContext = {
   schema: "helix.capability_lane.provider_adapter_context.v1";
   one_shot: HelixCapabilityLaneOneShotRunnerResult;
   sessions: HelixCapabilityLaneSessionRunnerResult;
+  goal_bindings: HelixCapabilityLaneGoalBindingRunnerResult;
   model_visible_capability_lane_manifest: HelixAgentModelVisibleCapabilityLaneManifest;
   debug_projection: HelixCapabilityLaneOneShotRunnerResult["debug_projection"] & {
     model_visible_capability_lane_manifest: HelixAgentModelVisibleCapabilityLaneManifest;
     capability_lane_projection_receipts: HelixCapabilityLaneProviderAdapterReceipt[];
     capability_lane_session_results: HelixCapabilityLaneSessionRunnerResult["session_results"];
     capability_lane_session_debug_summaries: HelixCapabilityLaneSessionRunnerResult["session_debug_summaries"];
+    capability_lane_mail_loop_debug_summaries: HelixCapabilityLaneMailLoopDebugSummary[];
+    capability_lane_goal_binding_results: HelixCapabilityLaneGoalBindingRunnerResult["goal_binding_results"];
+    capability_lane_goal_binding_debug_summaries: HelixCapabilityLaneGoalBindingRunnerResult["goal_binding_debug_summaries"];
   };
   observation_packets: HelixAgentStepObservationPacket[];
   projection_receipts: HelixCapabilityLaneProviderAdapterReceipt[];
@@ -135,12 +146,21 @@ export const buildCapabilityLaneProviderAdapterReceipts = (input: {
       .filter((entry): entry is HelixCapabilityLaneProviderAdapterReceipt => Boolean(entry));
   });
 
+const buildCapabilityLaneMailLoopDebugSummaries = (
+  goalBindingSummaries: HelixCapabilityLaneGoalBindingRunnerResult["goal_binding_debug_summaries"],
+): HelixCapabilityLaneMailLoopDebugSummary[] =>
+  goalBindingSummaries
+    .map((summary) => summary.latest_mail_loop_summary)
+    .filter((summary): summary is HelixCapabilityLaneMailLoopDebugSummary => Boolean(summary));
+
 export const buildHelixCapabilityLaneProviderAdapterContext = (input: {
   provider: HelixAgentProvider;
   body: Record<string, unknown>;
   turnId?: string | null;
   iteration?: number | null;
   env?: NodeJS.ProcessEnv;
+  sessionStore?: HelixCapabilityLaneSessionStore;
+  goalBindingStore?: HelixCapabilityLaneGoalBindingStore;
 }): HelixCapabilityLaneProviderAdapterContext => {
   const turnId = readString(input.turnId) || readString(input.body.turn_id ?? input.body.turnId) || "ask:capability-lane";
   const oneShot = runHelixCapabilityLaneOneShotRequests({
@@ -154,6 +174,12 @@ export const buildHelixCapabilityLaneProviderAdapterContext = (input: {
     provider: input.provider,
     body: input.body,
     env: input.env,
+    store: input.sessionStore,
+  });
+  const goalBindings = runHelixCapabilityLaneGoalBindingRequests({
+    body: input.body,
+    store: input.goalBindingStore,
+    sessionStore: input.sessionStore,
   });
   const modelVisibleCapabilityLaneManifest = buildModelVisibleCapabilityLaneManifest(listHelixCapabilityLanes({
     provider: input.provider,
@@ -166,10 +192,14 @@ export const buildHelixCapabilityLaneProviderAdapterContext = (input: {
   const projectionReceipts = buildCapabilityLaneProviderAdapterReceipts({
     packets: oneShot.observation_packets,
   });
+  const mailLoopDebugSummaries = buildCapabilityLaneMailLoopDebugSummaries(
+    goalBindings.goal_binding_debug_summaries,
+  );
   return {
     schema: "helix.capability_lane.provider_adapter_context.v1",
     one_shot: oneShot,
     sessions,
+    goal_bindings: goalBindings,
     model_visible_capability_lane_manifest: modelVisibleCapabilityLaneManifest,
     debug_projection: {
       ...oneShot.debug_projection,
@@ -177,6 +207,9 @@ export const buildHelixCapabilityLaneProviderAdapterContext = (input: {
       capability_lane_projection_receipts: projectionReceipts,
       capability_lane_session_results: sessions.session_results,
       capability_lane_session_debug_summaries: sessions.session_debug_summaries,
+      capability_lane_mail_loop_debug_summaries: mailLoopDebugSummaries,
+      capability_lane_goal_binding_results: goalBindings.goal_binding_results,
+      capability_lane_goal_binding_debug_summaries: goalBindings.goal_binding_debug_summaries,
     },
     observation_packets: oneShot.observation_packets,
     projection_receipts: projectionReceipts,
@@ -189,12 +222,16 @@ export const buildHelixCapabilityLaneProviderAdapterContext = (input: {
       capability_lane_projection_receipts: projectionReceipts,
       capability_lane_session_results: sessions.session_results,
       capability_lane_session_debug_summaries: sessions.session_debug_summaries,
+      capability_lane_mail_loop_debug_summaries: mailLoopDebugSummaries,
+      capability_lane_goal_binding_results: goalBindings.goal_binding_results,
+      capability_lane_goal_binding_debug_summaries: goalBindings.goal_binding_debug_summaries,
       capability_lane_reentry_status: oneShot.debug_projection.capability_lane_reentry_status,
     }, null, 2),
     calls_succeeded:
       (oneShot.call_results.length === 0 ||
         oneShot.call_results.every((result) => result.ok === true)) &&
-      sessions.session_results.every((result) => result.ok === true),
+      sessions.session_results.every((result) => result.ok === true) &&
+      goalBindings.goal_binding_results.every((result) => result.ok === true),
     terminal_eligible: false,
     assistant_answer: false,
     raw_content_included: false,

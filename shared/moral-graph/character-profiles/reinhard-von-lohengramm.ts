@@ -7,7 +7,7 @@ export const REINHARD_VON_LOHENGRAMM_PROFILE: CharacterIdealProfileV1 = buildCha
   generatedAt: "2026-06-01T00:00:00.000Z",
   character: {
     id: "logh.reinhard_von_lohengramm",
-    displayName: "Reinhard von Lohengramm",
+    displayName: "Sovereign Ambition Profile",
     series: "Legend of the Galactic Heroes",
     coverage: {
       volumes_present: [1, 2, 3, 4, 5, 6, 8, 9, 10],

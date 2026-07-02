@@ -1,5 +1,6 @@
 import type {
   MoralLivingSubstrateMatchV1,
+  MoralLivingSubstrateProceduralChainStepV1,
   MoralLivingSubstrateProceduralDerivationV1,
   MoralLivingSubstrateSynthesisStepV1,
 } from "../contracts/moral-living-substrate-reflection.v1";
@@ -200,6 +201,131 @@ const DERIVATION_DEFINITIONS: readonly DerivationDefinition[] = [
   },
 ];
 
+type ProceduralChainDefinition = Omit<
+  MoralLivingSubstrateProceduralChainStepV1,
+  "evidenceStrength" | "missingEvidence"
+> & {
+  missingEvidenceByBadgeId?: Partial<Record<"from" | "to", string>>;
+};
+
+const CHAIN_DEFINITIONS: readonly ProceduralChainDefinition[] = [
+  {
+    fromBadgeId: "gradient-before-boundary",
+    toBadgeId: "flux-before-action",
+    transitionLabel: "gradient to flux",
+    proceduralClaim: "A source/sink contrast only begins to matter procedurally when a flow path can carry usable change.",
+    forbiddenOverclaim: "A gradient-to-flux link does not prove life, agency, or obligation.",
+  },
+  {
+    fromBadgeId: "flux-before-action",
+    toBadgeId: "compartment-before-organism",
+    transitionLabel: "flux to compartment",
+    proceduralClaim: "Flow becomes relevant to living substrate claims when a local compartment can hold differential conditions.",
+    forbiddenOverclaim: "Flux plus compartment evidence does not prove organism status.",
+  },
+  {
+    fromBadgeId: "compartment-before-organism",
+    toBadgeId: "boundary-before-obligation",
+    transitionLabel: "compartment to living boundary",
+    proceduralClaim: "A compartment becomes morally relevant only when the trace identifies a boundary whose persistence or disruption matters.",
+    forbiddenOverclaim: "Boundary evidence does not prove consciousness, personhood, or final moral status.",
+  },
+  {
+    fromBadgeId: "boundary-before-obligation",
+    toBadgeId: "maintenance-before-optimization",
+    transitionLabel: "boundary to maintenance",
+    proceduralClaim: "A bounded system supports stronger reflection when the trace shows what must be maintained before optional optimization.",
+    forbiddenOverclaim: "Maintenance evidence does not make every viable process morally identical.",
+  },
+  {
+    fromBadgeId: "maintenance-before-optimization",
+    toBadgeId: "sensing-before-judgment",
+    transitionLabel: "maintenance to sensing",
+    proceduralClaim: "Maintenance can become action-relevant when the system senses state differences that affect viability.",
+    forbiddenOverclaim: "Sensing evidence does not prove reflective awareness or blame.",
+  },
+  {
+    fromBadgeId: "sensing-before-judgment",
+    toBadgeId: "valence-before-preference",
+    transitionLabel: "sensing to valence",
+    proceduralClaim: "Sensing supports generative reflection when detected states can be treated as favorable, adverse, or costly before preference.",
+    forbiddenOverclaim: "Valence does not prove human-like preference.",
+  },
+  {
+    fromBadgeId: "valence-before-preference",
+    toBadgeId: "affordance-before-action",
+    transitionLabel: "valence to affordance",
+    proceduralClaim: "A valenced state becomes action-shaped when the environment offers possible moves or constraints.",
+    forbiddenOverclaim: "Affordance evidence does not prove intention.",
+  },
+  {
+    fromBadgeId: "affordance-before-action",
+    toBadgeId: "actuation-before-agency",
+    transitionLabel: "affordance to actuation",
+    proceduralClaim: "An affordance only becomes enacted when the system can physically alter state or relation.",
+    forbiddenOverclaim: "Actuation does not prove free will or personhood.",
+  },
+  {
+    fromBadgeId: "actuation-before-agency",
+    toBadgeId: "feedback-before-learning",
+    transitionLabel: "actuation to feedback",
+    proceduralClaim: "Action becomes procedurally inspectable when its consequences can feed back into later state changes.",
+    forbiddenOverclaim: "Feedback does not prove reflective learning by itself.",
+  },
+  {
+    fromBadgeId: "feedback-before-learning",
+    toBadgeId: "memory-before-commitment",
+    transitionLabel: "feedback to retained state",
+    proceduralClaim: "Feedback supports learning claims only when some retained state can carry prior effects forward.",
+    forbiddenOverclaim: "Retained state does not prove autobiographical memory or commitment authority.",
+  },
+  {
+    fromBadgeId: "memory-before-commitment",
+    toBadgeId: "prediction-before-planning",
+    transitionLabel: "memory to prediction",
+    proceduralClaim: "Retained state becomes planning-relevant when it constrains expected future states.",
+    forbiddenOverclaim: "Prediction does not prove human planning or deliberation.",
+  },
+  {
+    fromBadgeId: "prediction-before-planning",
+    toBadgeId: "choice-before-mandate",
+    transitionLabel: "prediction to choice",
+    proceduralClaim: "Prediction supports choice only where alternatives can be discriminated before any mandate is assigned.",
+    forbiddenOverclaim: "Choice evidence does not prove free will, personhood, or moral verdict authority.",
+  },
+  {
+    fromBadgeId: "choice-before-mandate",
+    toBadgeId: "coordination-before-mandate",
+    transitionLabel: "choice to coordination",
+    proceduralClaim: "Choice scales toward coordination only when multiple actions or agents must be ordered together.",
+    forbiddenOverclaim: "Coordination does not authorize society-level mandates for a cell-scale trace.",
+  },
+  {
+    fromBadgeId: "coordination-before-mandate",
+    toBadgeId: "communication-before-norm",
+    transitionLabel: "coordination to communication",
+    proceduralClaim: "Coordination becomes norm-relevant only when signals or shared constraints can stabilize behavior across participants.",
+    forbiddenOverclaim: "Communication does not prove a norm, law, or institution.",
+  },
+  {
+    fromBadgeId: "communication-before-norm",
+    toBadgeId: "reciprocity-before-law",
+    transitionLabel: "communication to reciprocity",
+    proceduralClaim: "Communication supports norm reflection when reciprocal expectation or correction is visible before law.",
+    forbiddenOverclaim: "Reciprocity does not prove legal authority.",
+  },
+  {
+    fromBadgeId: "reciprocity-before-law",
+    toBadgeId: "scale-continuity-from-cell-to-society",
+    transitionLabel: "reciprocity to institutional scale",
+    proceduralClaim: "Law or objective-binding reflection should appear only when reciprocal relations are placed at the correct organism, group, or institution scale.",
+    forbiddenOverclaim: "Scale continuity does not make institutional mandates valid for lower-scale substrate traces.",
+    missingEvidenceByBadgeId: {
+      to: "institutional or scale-specific evidence that justifies law/objective binding",
+    },
+  },
+];
+
 const normalize = (value: string): string =>
   value.toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
 
@@ -217,12 +343,39 @@ const strengthFor = (
   return "weak";
 };
 
+function deriveProceduralChain(matchedBadgeIds: string[]): MoralLivingSubstrateProceduralChainStepV1[] {
+  const matched = new Set(matchedBadgeIds);
+  return CHAIN_DEFINITIONS
+    .map((definition): MoralLivingSubstrateProceduralChainStepV1 | null => {
+      const fromPresent = matched.has(definition.fromBadgeId);
+      const toPresent = matched.has(definition.toBadgeId);
+      if (!fromPresent && !toPresent) return null;
+
+      const missingEvidence = [
+        fromPresent ? null : definition.missingEvidenceByBadgeId?.from ?? definition.fromBadgeId,
+        toPresent ? null : definition.missingEvidenceByBadgeId?.to ?? definition.toBadgeId,
+      ].filter((entry): entry is string => Boolean(entry));
+
+      return {
+        fromBadgeId: definition.fromBadgeId,
+        toBadgeId: definition.toBadgeId,
+        transitionLabel: definition.transitionLabel,
+        proceduralClaim: definition.proceduralClaim,
+        evidenceStrength: fromPresent && toPresent ? "present" : "partial",
+        missingEvidence,
+        forbiddenOverclaim: definition.forbiddenOverclaim,
+      };
+    })
+    .filter((step): step is MoralLivingSubstrateProceduralChainStepV1 => Boolean(step));
+}
+
 export function deriveLivingSubstrateProceduralLayer(input: {
   prompt: string;
   exactMatches: MoralLivingSubstrateMatchV1[];
   likelyMatches: MoralLivingSubstrateMatchV1[];
 }): {
   derivations: MoralLivingSubstrateProceduralDerivationV1[];
+  proceduralChain: MoralLivingSubstrateProceduralChainStepV1[];
   synthesisPath: MoralLivingSubstrateSynthesisStepV1[];
 } {
   const promptText = normalize(input.prompt);
@@ -240,6 +393,7 @@ export function deriveLivingSubstrateProceduralLayer(input: {
       };
     })
     .filter((derivation): derivation is MoralLivingSubstrateProceduralDerivationV1 => Boolean(derivation));
+  const proceduralChain = deriveProceduralChain(matchedBadgeIds);
 
   const synthesisPath: MoralLivingSubstrateSynthesisStepV1[] = [
     {
@@ -265,5 +419,5 @@ export function deriveLivingSubstrateProceduralLayer(input: {
     },
   ];
 
-  return { derivations, synthesisPath };
+  return { derivations, proceduralChain, synthesisPath };
 }

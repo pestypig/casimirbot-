@@ -49,6 +49,10 @@ const bindingEvent = (input: {
     lane_session_health: input.session.health,
     lane_session_observation_ref: input.session.last_observation_ref,
     source_id: input.session.source_binding.source_id,
+    source_kind: input.session.source_binding.source_kind,
+    source_projection_target: input.session.source_binding.projection_target,
+    account_locale: input.session.source_binding.account_locale,
+    target_language: input.session.source_binding.target_language ?? observationEvent?.target_language ?? null,
     latest_chunk_id: observationEvent?.chunk_id ?? null,
     latest_chunk_index: observationEvent?.chunk_index ?? null,
     latest_dedupe_key: observationEvent?.dedupe_key ?? null,
@@ -81,6 +85,9 @@ const withSessionSnapshot = (
     | "lane_session_status"
     | "lane_session_health"
     | "lane_session_source_id"
+    | "lane_session_source_kind"
+    | "lane_session_projection_target"
+    | "lane_session_account_locale"
     | "lane_session_last_observation_ref"
     | "lane_session_last_receipt_ref"
     | "latest_lane_session_event"
@@ -99,6 +106,9 @@ const withSessionSnapshot = (
   lane_session_status: session.status,
   lane_session_health: session.health,
   lane_session_source_id: session.source_binding.source_id,
+  lane_session_source_kind: session.source_binding.source_kind,
+  lane_session_projection_target: session.source_binding.projection_target,
+  lane_session_account_locale: session.source_binding.account_locale,
   lane_session_last_observation_ref: session.last_observation_ref,
   lane_session_last_receipt_ref: session.last_receipt_ref,
   latest_lane_session_event: session.debug_history.at(-1) ?? null,

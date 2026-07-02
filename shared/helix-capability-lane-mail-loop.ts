@@ -28,6 +28,7 @@ export type HelixCapabilityLaneMailLoopDebugSummary = {
   source_event_ms: number | null;
   observed_at_ms: number | null;
   projection_target: string | null;
+  target_language: string | null;
   cancel_requested: boolean;
   selected_backend_provider: string | null;
   requested_backend_provider: string | null;

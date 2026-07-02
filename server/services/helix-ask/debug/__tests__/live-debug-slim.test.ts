@@ -73,6 +73,44 @@ describe("Helix Ask live debug slim", () => {
           assistant_answer: false,
         },
       ],
+      capability_lane_goal_binding_results: [
+        {
+          ok: true,
+          goal_binding: {
+            schema: "helix.capability_lane.goal_binding.v1",
+            goal_binding_id: "goal-binding-debug",
+            goal_id: "goal:translate-docs",
+            lane_session_id: "lane-session-debug",
+            lane_id: "live_translation",
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+          blocked_reason: null,
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      ],
+      capability_lane_goal_binding_debug_summaries: [
+        {
+          schema: "helix.capability_lane.goal_binding_debug_summary.v1",
+          goal_binding_id: "goal-binding-debug",
+          goal_id: "goal:translate-docs",
+          lane_session_id: "lane-session-debug",
+          lane_id: "live_translation",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+          latest_mail_loop_summary: {
+            schema: "helix.capability_lane.mail_loop_debug_summary.v1",
+            lane_session_id: "lane-session-debug",
+            packet_count: 2,
+            terminal_eligible: false,
+            assistant_answer: false,
+          },
+        },
+      ],
       capability_lane_goal_dispatch_readiness: {
         schema: "helix.capability_lane.goal_dispatch_readiness.v1",
         status: "ready",
@@ -155,6 +193,48 @@ describe("Helix Ask live debug slim", () => {
           expect.objectContaining({
             receipt_ref: "ask:lane:translation:obs:projection:receipt",
             observation_ref: "ask:lane:translation:obs",
+            terminal_eligible: false,
+            assistant_answer: false,
+          }),
+        ],
+        truncated: false,
+      },
+      capability_lane_goal_binding_results: {
+        count: 1,
+        sample: [
+          expect.objectContaining({
+            ok: true,
+            goal_binding: expect.objectContaining({
+              goal_binding_id: "goal-binding-debug",
+              lane_session_id: "lane-session-debug",
+              lane_id: "live_translation",
+            }),
+            terminal_eligible: false,
+            assistant_answer: false,
+          }),
+        ],
+        truncated: false,
+      },
+      capability_lane_goal_binding_debug_summaries: {
+        count: 1,
+        sample: [
+          expect.objectContaining({
+            goal_binding_id: "goal-binding-debug",
+            lane_session_id: "lane-session-debug",
+            lane_id: "live_translation",
+            terminal_eligible: false,
+            assistant_answer: false,
+          }),
+        ],
+        truncated: false,
+      },
+      capability_lane_mail_loop_debug_summaries: {
+        count: 1,
+        sample: [
+          expect.objectContaining({
+            schema: "helix.capability_lane.mail_loop_debug_summary.v1",
+            lane_session_id: "lane-session-debug",
+            packet_count: 2,
             terminal_eligible: false,
             assistant_answer: false,
           }),

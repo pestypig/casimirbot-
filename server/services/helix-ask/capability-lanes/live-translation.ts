@@ -193,6 +193,7 @@ const buildLaneObservationPacket = (input: {
 const buildProjectionReceipt = (input: {
   observationRef: string;
   chunk: {
+    laneSessionId: string | null;
     sourceId: string;
     chunkId: string;
     chunkIndex: number | null;
@@ -206,6 +207,7 @@ const buildProjectionReceipt = (input: {
   };
   targetLanguage: string;
   translatedText: string | null;
+  selectedBackendProvider: string | null;
 }): HelixLiveTranslationProjectionReceipt => ({
   schema: HELIX_LIVE_TRANSLATION_PROJECTION_RECEIPT_SCHEMA,
   receipt_ref: `${input.observationRef}:projection:${hashShort({
@@ -216,6 +218,8 @@ const buildProjectionReceipt = (input: {
   observation_ref: input.observationRef,
   lane_id: "live_translation",
   capability: CAPABILITY_ID,
+  lane_session_id: input.chunk.laneSessionId,
+  selected_backend_provider: input.selectedBackendProvider,
   projection_target: input.chunk.projectionTarget,
   projection_status: input.chunk.cancelRequested
     ? "cancelled"
@@ -340,6 +344,7 @@ export const runLiveTranslationTranslateText = (input: {
       chunk,
       targetLanguage,
       translatedText: null,
+      selectedBackendProvider: trace.selected_backend_provider,
     });
     const packet = buildLaneObservationPacket({
       turnId,
@@ -470,6 +475,7 @@ export const runLiveTranslationTranslateText = (input: {
       chunk,
       targetLanguage,
       translatedText,
+      selectedBackendProvider: trace.selected_backend_provider,
     }),
   });
   const projectionReceiptRef = packet.state_delta.live_translation_projection_receipt?.receipt_ref ?? null;

@@ -174,6 +174,30 @@ describe("agent provider response projection", () => {
             raw_content_included: false,
           },
         ],
+        capability_lane_goal_binding_results: [
+          {
+            ok: true,
+            goal_binding: {
+              schema: "helix.capability_lane.goal_binding.v1",
+              goal_binding_id: "goal-binding-debug",
+              goal_id: "goal:translate-docs",
+              lane_session_id: "lane-session-debug",
+              lane_id: "live_translation",
+              selected_runtime_agent_provider: "codex",
+              selected_backend_provider: "live_translation.local_runtime",
+              status: "bound",
+              backend_provider_becomes_root_agent: false,
+              final_reports_require_terminal_authority: true,
+              terminal_eligible: false,
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+            blocked_reason: null,
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        ],
         capability_lane_mail_loop_debug_summaries: [
           {
             schema: "helix.capability_lane.mail_loop_debug_summary.v1",
@@ -398,6 +422,30 @@ describe("agent provider response projection", () => {
         raw_content_included: false,
       },
     ]);
+    expect(payload.capability_lane_goal_binding_results).toEqual([
+      {
+        ok: true,
+        goal_binding: {
+          schema: "helix.capability_lane.goal_binding.v1",
+          goal_binding_id: "goal-binding-debug",
+          goal_id: "goal:translate-docs",
+          lane_session_id: "lane-session-debug",
+          lane_id: "live_translation",
+          selected_runtime_agent_provider: "codex",
+          selected_backend_provider: "live_translation.local_runtime",
+          status: "bound",
+          backend_provider_becomes_root_agent: false,
+          final_reports_require_terminal_authority: true,
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+        blocked_reason: null,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    ]);
     expect(payload.capability_lane_mail_loop_debug_summaries).toEqual([
       {
         schema: "helix.capability_lane.mail_loop_debug_summary.v1",
@@ -598,6 +646,9 @@ describe("agent provider response projection", () => {
     expect(debug.capability_lane_session_debug_summaries).toEqual(
       payload.capability_lane_session_debug_summaries,
     );
+    expect(debug.capability_lane_goal_binding_results).toEqual(
+      payload.capability_lane_goal_binding_results,
+    );
     expect(debug.capability_lane_mail_loop_debug_summaries).toEqual(
       payload.capability_lane_mail_loop_debug_summaries,
     );
@@ -647,9 +698,78 @@ describe("agent provider response projection", () => {
       schema: "helix.capability_lane_manifest.v1",
     });
     expect(payload.capability_lane_ids).toEqual(["utility_text"]);
+    expect(payload.capability_lane_goal_binding_results).toEqual([]);
     expect(payload.workstation_gateway_call_results).toEqual([{ capability_id: "workspace.status" }]);
     expect(debug.capability_lane_ids).toEqual(["utility_text"]);
+    expect(debug.capability_lane_goal_binding_results).toEqual([]);
     expect(debug.workstation_gateway_call_results).toEqual(payload.workstation_gateway_call_results);
+  });
+
+  it("derives mail-loop debug summaries from goal-binding summaries when explicit summaries are absent", () => {
+    const provider = buildProvider("codex");
+    const payload = buildPayload({
+      provider,
+      route: "/ask/turn",
+      turnId: "turn-derived-mail-loop",
+      providerResult: {
+        ok: true,
+        runtime: "codex",
+        response_type: "final_answer",
+        final_status: "completed",
+        answer: "mail-loop derived",
+        debug: {
+          capability_lane_goal_binding_debug_summaries: [
+            {
+              schema: "helix.capability_lane.goal_binding_debug_summary.v1",
+              goal_binding_id: "goal-binding-derived-mail",
+              goal_id: "goal:translate-docs",
+              lane_session_id: "lane-session-derived-mail",
+              lane_id: "live_translation",
+              latest_mail_loop_summary: {
+                schema: "helix.capability_lane.mail_loop_debug_summary.v1",
+                lane_session_id: "lane-session-derived-mail",
+                lane_id: "live_translation",
+                capability: "live_translation.translate_text",
+                observation_ref: "ask:lane:translation:derived-mail-obs",
+                receipt_ref: "ask:lane:translation:derived-mail-receipt",
+                stage_play_mail_id: "stage-play-mail-derived",
+                stage_play_wake_expected: true,
+                mailbox_thread_id: "ask-thread-derived",
+                terminal_authority_status: "pending_helix_terminal_authority",
+                terminal_eligible: false,
+                assistant_answer: false,
+                raw_content_included: false,
+              },
+              terminal_eligible: false,
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+          ],
+        },
+      },
+    });
+    const debug = payload.debug as Record<string, unknown>;
+
+    expect(payload.capability_lane_mail_loop_debug_summaries).toEqual([
+      {
+        schema: "helix.capability_lane.mail_loop_debug_summary.v1",
+        lane_session_id: "lane-session-derived-mail",
+        lane_id: "live_translation",
+        capability: "live_translation.translate_text",
+        observation_ref: "ask:lane:translation:derived-mail-obs",
+        receipt_ref: "ask:lane:translation:derived-mail-receipt",
+        stage_play_mail_id: "stage-play-mail-derived",
+        stage_play_wake_expected: true,
+        mailbox_thread_id: "ask-thread-derived",
+        terminal_authority_status: "pending_helix_terminal_authority",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    ]);
+    expect(debug.capability_lane_mail_loop_debug_summaries).toEqual(
+      payload.capability_lane_mail_loop_debug_summaries,
+    );
   });
 
   it("derives goal dispatch admissions from direct dispatch plans when summaries are absent", () => {
@@ -709,6 +829,16 @@ describe("agent provider response projection", () => {
         goal_id: "goal:direct-plan",
         lane_session_id: "lane-session-direct-plan",
         lane_id: "live_translation",
+        source_id: null,
+        latest_chunk_id: null,
+        latest_chunk_index: null,
+        latest_dedupe_key: null,
+        latest_source_event_id: null,
+        latest_source_event_ms: null,
+        latest_observed_at_ms: null,
+        latest_freshness_status: null,
+        latest_projection_target: null,
+        latest_cancel_requested: null,
         evidence_ref: "ask:lane:translation:direct-plan-obs",
         mail_loop_ref: null,
         receipt_ref: null,

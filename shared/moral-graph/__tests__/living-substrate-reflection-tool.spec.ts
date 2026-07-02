@@ -31,7 +31,7 @@ describe("MoralGraph living substrate reflection", () => {
         "frequency.fourier_action_mapping",
       ]),
     );
-    expect(MORAL_LIVING_SUBSTRATE_PRINCIPLES.map((principle: MoralLivingSubstrateBadgeV1) => principle.id).slice(0, 10)).toEqual([
+    expect(MORAL_LIVING_SUBSTRATE_PRINCIPLES.map((principle: MoralLivingSubstrateBadgeV1) => principle.id).slice(0, 19)).toEqual([
         "gradient-before-boundary",
         "flux-before-action",
         "compartment-before-organism",
@@ -40,7 +40,16 @@ describe("MoralGraph living substrate reflection", () => {
         "sensing-before-judgment",
         "maintenance-before-optimization",
         "perturbation-response-before-verdict",
+        "valence-before-preference",
+        "affordance-before-action",
+        "actuation-before-agency",
+        "feedback-before-learning",
+        "memory-before-commitment",
+        "prediction-before-planning",
+        "choice-before-mandate",
         "coordination-before-mandate",
+        "communication-before-norm",
+        "reciprocity-before-law",
         "scale-continuity-from-cell-to-society",
     ]);
     expect(MORAL_LIVING_SUBSTRATE_PRINCIPLES.every(
@@ -134,6 +143,66 @@ describe("MoralGraph living substrate reflection", () => {
     );
   });
 
+  it("matches action and volition middle layers without treating them as personhood proof", () => {
+    const prompt =
+      "Trace valence before preference, affordance before action, actuation before agency, feedback before learning, memory before commitment, prediction before planning, choice before mandate, communication before norm, and reciprocity before law.";
+    const result = matchLivingSubstratePrinciples({
+      text: prompt,
+      limit: 12,
+    });
+    const ids = [...result.exactMatches, ...result.likelyMatches].map((match) => match.badgeId);
+
+    expect(ids).toEqual(
+      expect.arrayContaining([
+        "valence-before-preference",
+        "affordance-before-action",
+        "actuation-before-agency",
+        "feedback-before-learning",
+        "memory-before-commitment",
+        "prediction-before-planning",
+        "choice-before-mandate",
+        "communication-before-norm",
+        "reciprocity-before-law",
+      ]),
+    );
+    expect(result.claimBoundaryNotes.join("\n")).toContain("not proof of human-like preference");
+    expect(result.claimBoundaryNotes.join("\n")).toContain("not proof of free will or personhood");
+
+    const reflection = reflectLivingSubstrateContext({
+      prompt,
+      limit: 12,
+      reflectionId: "moral-living-substrate-reflection:action-chain-test",
+      generatedAt: "2026-07-02T00:00:00.000Z",
+    });
+    expect(reflection.proceduralChain).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          fromBadgeId: "sensing-before-judgment",
+          toBadgeId: "valence-before-preference",
+          transitionLabel: "sensing to valence",
+          evidenceStrength: "partial",
+          missingEvidence: ["sensing-before-judgment"],
+          forbiddenOverclaim: expect.stringContaining("human-like preference"),
+        }),
+        expect.objectContaining({
+          fromBadgeId: "prediction-before-planning",
+          toBadgeId: "choice-before-mandate",
+          transitionLabel: "prediction to choice",
+          evidenceStrength: "present",
+          missingEvidence: [],
+          forbiddenOverclaim: expect.stringContaining("free will"),
+        }),
+        expect.objectContaining({
+          fromBadgeId: "communication-before-norm",
+          toBadgeId: "reciprocity-before-law",
+          transitionLabel: "communication to reciprocity",
+          evidenceStrength: "present",
+          forbiddenOverclaim: expect.stringContaining("legal authority"),
+        }),
+      ]),
+    );
+  });
+
   it("derives procedural substrate layers before moral claims", () => {
     const reflection = reflectLivingSubstrateContext({
       prompt:
@@ -164,6 +233,29 @@ describe("MoralGraph living substrate reflection", () => {
         obligationHint: expect.stringContaining("provisional care constraints"),
         forbiddenOverclaim: expect.stringContaining("personhood"),
       });
+    const maintenanceLink = reflection.proceduralChain.find(
+      (step) => step.fromBadgeId === "boundary-before-obligation" && step.toBadgeId === "maintenance-before-optimization",
+    );
+    expect(maintenanceLink).toMatchObject({
+      evidenceStrength: "present",
+      missingEvidence: [],
+    });
+    const valenceLink = reflection.proceduralChain.find(
+      (step) => step.fromBadgeId === "sensing-before-judgment" && step.toBadgeId === "valence-before-preference",
+    );
+    expect(valenceLink).toMatchObject({
+      evidenceStrength: "present",
+      missingEvidence: [],
+      forbiddenOverclaim: expect.stringContaining("human-like preference"),
+    });
+    const scaleLink = reflection.proceduralChain.find(
+      (step) => step.toBadgeId === "scale-continuity-from-cell-to-society",
+    );
+    expect(scaleLink).toMatchObject({
+      evidenceStrength: "partial",
+      missingEvidence: ["reciprocity-before-law"],
+      forbiddenOverclaim: expect.stringContaining("institutional mandates"),
+    });
     expect(reflection.synthesisPath.map((step) => step.outputKind)).toEqual([
       "substrate_observation",
       "vulnerability_dependency_agency_estimate",

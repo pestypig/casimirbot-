@@ -2320,6 +2320,10 @@ describe("HelixAskPill mic-first surface contract", () => {
       path.resolve(process.cwd(), "client/src/components/helix/ask-console/HelixAskReasoningBattleStage.tsx"),
       "utf8",
     );
+    const consoleDiagnosticsSource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/components/helix/ask-console/HelixAskConsoleDiagnostics.ts"),
+      "utf8",
+    );
     expect(source).toContain("buildHelixTurnTranscriptRows");
     expect(source).toContain("buildHelixContinuousTurnStreamRows");
     expect(source).toContain("buildHelixCausalTurnTraceRows");
@@ -2332,17 +2336,19 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("<HelixAskReplyTurn");
     expect(source).toContain("rows: visibleActiveTurnStreamRows");
     expect(source).toContain('workLogTestId: "helix-ask-active-turn-work-log"');
-    expect(source).toContain("renderPlacement: \"inline_active_turn\"");
+    expect(consoleDiagnosticsSource).toContain("renderPlacement: \"inline_active_turn\"");
     expect(source).toContain("<HelixAskTurnList");
     expect(turnListSource).toContain('data-testid="helix-ask-active-turn-stream-lane"');
     expect(turnListSource).toContain('data-render-placement="inline_active_turn"');
-    expect(turnListSource).toContain('className="contents"');
+    expect(turnListSource).toContain("activeTurnStreamLaneRef");
+    expect(turnListSource).toContain("data-active-render-token");
+    expect(turnListSource).not.toContain('className="contents"');
     expect(turnListSource.indexOf("{children}")).toBeLessThan(turnListSource.indexOf("{activeTurnStreamPanel}"));
-    expect(source).toContain('data-testid="helix-ask-active-turn-stream"');
-    expect(source).toContain('data-render-placement="inline_active_turn"');
+    expect(source).toContain("activeTurnStreamLaneRef={activeTurnStreamPanelRef}");
     expect(source).toContain("activeStreamDom");
     expect(source).toContain("activeStreamMounted");
     expect(source).toContain("activeStreamBeforeBottom");
+    expect(source).toContain("activeStreamRectHeight");
     expect(source).toContain("retainedLiveEventCount");
     expect(turnStreamPanelSource).toContain('aria-label="Turn stream"');
     expect(turnStreamPanelSource).toContain('data-latest-turn-stream={isLatestReply ? "true" : undefined}');

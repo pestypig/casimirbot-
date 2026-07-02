@@ -12,6 +12,13 @@ export type HelixAskTurnListProps = {
   consoleDebugSnapshot?: unknown;
   children: ReactNode;
   activeTurnStreamPanel?: ReactNode;
+  activeTurnStreamStatusLine?: ReactNode;
+  activeTurnStreamLaneRef?: Ref<HTMLDivElement>;
+  activeTurnStreamLineCount?: number;
+  activeTurnStreamTurnId?: string | null;
+  activeTurnStreamTraceId?: string | null;
+  activeTurnStreamRenderToken?: string | null;
+  activeTurnStreamRenderCommits?: number;
   bottomRef?: Ref<HTMLDivElement>;
 };
 
@@ -26,6 +33,13 @@ export const HelixAskTurnList = forwardRef<HTMLDivElement, HelixAskTurnListProps
       consoleDebugSnapshot,
       children,
       activeTurnStreamPanel,
+      activeTurnStreamStatusLine,
+      activeTurnStreamLaneRef,
+      activeTurnStreamLineCount = 0,
+      activeTurnStreamTurnId = null,
+      activeTurnStreamTraceId = null,
+      activeTurnStreamRenderToken = null,
+      activeTurnStreamRenderCommits = 0,
       bottomRef,
     },
     ref,
@@ -54,10 +68,25 @@ export const HelixAskTurnList = forwardRef<HTMLDivElement, HelixAskTurnListProps
           {children}
           {activeTurnStreamPanel ? (
             <div
-              className="contents"
+              ref={activeTurnStreamLaneRef}
+              className="relative w-full rounded-lg border border-cyan-300/20 bg-cyan-950/10 p-1 shadow-[0_0_0_1px_rgba(8,145,178,0.08)]"
               data-testid="helix-ask-active-turn-stream-lane"
               data-render-placement="inline_active_turn"
+              data-turn-stream-lines={activeTurnStreamLineCount}
+              data-active-row-count={activeTurnStreamLineCount}
+              data-active-turn-id={activeTurnStreamTurnId ?? undefined}
+              data-active-trace-id={activeTurnStreamTraceId ?? undefined}
+              data-active-render-token={activeTurnStreamRenderToken ?? undefined}
+              data-active-render-commits={activeTurnStreamRenderCommits}
             >
+              {activeTurnStreamStatusLine ? (
+                <div
+                  className="mb-1 rounded-md border border-cyan-300/15 bg-black/20 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-cyan-100/85"
+                  data-testid="helix-ask-active-turn-status-line"
+                >
+                  {activeTurnStreamStatusLine}
+                </div>
+              ) : null}
               {activeTurnStreamPanel}
             </div>
           ) : null}

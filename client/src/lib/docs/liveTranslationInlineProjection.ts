@@ -12,6 +12,8 @@ export type DocumentLiveTranslationInlineState = {
   error?: string;
   observationRef: string | null;
   receiptRef: string | null;
+  laneSessionId: string | null;
+  selectedBackendProvider: string | null;
   projectionStatus: HelixLiveTranslationInlineUnitState["projectionStatus"];
   chunkId: string | null;
   chunkIndex: number | null;
@@ -35,6 +37,8 @@ export type DocumentInlineTranslationRenderState = {
   error?: string;
   observationRef?: string | null;
   receiptRef?: string | null;
+  laneSessionId?: string | null;
+  selectedBackendProvider?: string | null;
   projectionStatus?: HelixLiveTranslationInlineUnitState["projectionStatus"];
   chunkId?: string | null;
   chunkIndex?: number | null;
@@ -76,6 +80,8 @@ export function sameDocumentInlineTranslationRenderState(
     (left.error ?? "") === (right.error ?? "") &&
     (left.observationRef ?? "") === (right.observationRef ?? "") &&
     (left.receiptRef ?? "") === (right.receiptRef ?? "") &&
+    (left.laneSessionId ?? "") === (right.laneSessionId ?? "") &&
+    (left.selectedBackendProvider ?? "") === (right.selectedBackendProvider ?? "") &&
     (left.projectionStatus ?? "") === (right.projectionStatus ?? "") &&
     (left.chunkId ?? "") === (right.chunkId ?? "") &&
     (left.chunkIndex ?? null) === (right.chunkIndex ?? null) &&
@@ -138,6 +144,8 @@ export function buildDocumentLiveTranslationInlineStates(
         ...(state.status === "ready" ? { text: state.text } : { error: state.error }),
         observationRef: state.observationRef,
         receiptRef: state.receiptRef,
+        laneSessionId: state.laneSessionId,
+        selectedBackendProvider: state.selectedBackendProvider,
         projectionStatus: state.projectionStatus,
         chunkId: state.chunkId,
         chunkIndex: state.chunkIndex,
@@ -170,6 +178,8 @@ export function simplifyDocumentLiveTranslationInlineStates(
           text: state.text ?? "",
           observationRef: state.observationRef,
           receiptRef: state.receiptRef,
+          laneSessionId: state.laneSessionId,
+          selectedBackendProvider: state.selectedBackendProvider,
           projectionStatus: state.projectionStatus,
           chunkId: state.chunkId,
           chunkIndex: state.chunkIndex,
@@ -191,6 +201,8 @@ export function simplifyDocumentLiveTranslationInlineStates(
           error: state.error ?? `translation_projection_${state.projectionStatus}`,
           observationRef: state.observationRef,
           receiptRef: state.receiptRef,
+          laneSessionId: state.laneSessionId,
+          selectedBackendProvider: state.selectedBackendProvider,
           projectionStatus: state.projectionStatus,
           chunkId: state.chunkId,
           chunkIndex: state.chunkIndex,

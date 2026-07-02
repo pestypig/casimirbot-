@@ -55,6 +55,15 @@ export const buildHelixCapabilityLaneGoalDispatchReadiness = (input: {
     next_source_ids: uniqueStrings(
       admitted.map((admission) => admission.source_id ?? "").filter(Boolean),
     ),
+    next_source_kinds: uniqueStrings(
+      admitted.map((admission) => admission.source_kind ?? "").filter(Boolean),
+    ),
+    next_source_projection_targets: uniqueStrings(
+      admitted.map((admission) => admission.source_projection_target ?? "").filter(Boolean),
+    ),
+    next_account_locales: uniqueStrings(
+      admitted.map((admission) => admission.account_locale ?? "").filter(Boolean),
+    ),
     next_chunk_ids: uniqueStrings(
       admitted.map((admission) => admission.latest_chunk_id ?? "").filter(Boolean),
     ),
@@ -66,6 +75,9 @@ export const buildHelixCapabilityLaneGoalDispatchReadiness = (input: {
     ),
     next_projection_targets: uniqueStrings(
       admitted.map((admission) => admission.latest_projection_target ?? "").filter(Boolean),
+    ),
+    next_target_languages: uniqueStrings(
+      admitted.map((admission) => admission.target_language ?? "").filter(Boolean),
     ),
     next_freshness_statuses: uniqueStrings(
       admitted.map((admission) => admission.latest_freshness_status ?? "").filter(Boolean),

@@ -24,6 +24,8 @@ export type HelixLiveTranslationUiProjection = {
   translatedText: string | null;
   observationRef: string | null;
   receiptRef: string | null;
+  laneSessionId: string | null;
+  selectedBackendProvider: string | null;
   observedAtMs: number | null;
   sourceEventMs: number | null;
   freshnessStatus: string;
@@ -50,6 +52,8 @@ export type HelixLiveTranslationUiProjectionTrafficSummary = {
   latestFreshnessStatus: string;
   latestObservationRef: string | null;
   latestReceiptRef: string | null;
+  latestLaneSessionId: string | null;
+  selectedBackendProvider: string | null;
   terminalEligible: false;
   assistantAnswer: false;
   rawContentIncluded: false;
@@ -69,6 +73,8 @@ export type HelixLiveTranslationUiProjectionSelection = {
   targetLanguage: string | null;
   observationRef: string | null;
   receiptRef: string | null;
+  laneSessionId: string | null;
+  selectedBackendProvider: string | null;
   terminalEligible: false;
   assistantAnswer: false;
   rawContentIncluded: false;
@@ -90,6 +96,8 @@ export type HelixLiveTranslationInlineUnitState = {
   error?: string;
   observationRef: string | null;
   receiptRef: string | null;
+  laneSessionId: string | null;
+  selectedBackendProvider: string | null;
   projectionStatus: HelixLiveTranslationUiProjectionSelectionStatus;
   chunkId: string | null;
   chunkIndex: number | null;
@@ -125,6 +133,16 @@ const readString = (value: unknown): string =>
 
 const normalizeKeyText = (value: unknown): string =>
   readString(value).toLowerCase();
+
+const localeMatches = (candidate: string | null, locale: string | null): boolean => {
+  const normalizedCandidate = normalizeKeyText(candidate);
+  const normalizedLocale = normalizeKeyText(locale);
+  return !normalizedCandidate ||
+    !normalizedLocale ||
+    normalizedCandidate === normalizedLocale ||
+    normalizedCandidate.startsWith(`${normalizedLocale}-`) ||
+    normalizedLocale.startsWith(`${normalizedCandidate}-`);
+};
 
 const readNumber = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) ? Math.trunc(value) : null;
@@ -193,6 +211,8 @@ const readReceiptsFromCallResults = (results: unknown[]): RecordLike[] =>
         schema: "helix.live_translation.projection_receipt.v1",
         receipt_ref: null,
         observation_ref: observation.observation_ref,
+        lane_session_id: observation.lane_session_id,
+        selected_backend_provider: observation.selected_backend_provider,
         lane_id: "live_translation",
         capability: "live_translation.translate_text",
         projection_target: observation.projection_target,
@@ -262,6 +282,9 @@ const normalizeProjection = (receipt: RecordLike): HelixLiveTranslationUiProject
     translatedText,
     observationRef: readString(receipt.observation_ref) || null,
     receiptRef: readString(receipt.receipt_ref) || null,
+    laneSessionId: readString(receipt.lane_session_id) || readString(payload?.lane_session_id) || null,
+    selectedBackendProvider:
+      readString(receipt.selected_backend_provider) || readString(payload?.selected_backend_provider) || null,
     observedAtMs: readNumber(receipt.observed_at_ms) ?? readNumber(payload?.observed_at_ms),
     sourceEventMs: readNumber(receipt.source_event_ms) ?? readNumber(payload?.source_event_ms),
     freshnessStatus: readString(receipt.freshness_status) || readString(payload?.freshness_status) || "unknown",
@@ -350,6 +373,8 @@ export function summarizeHelixLiveTranslationUiProjectionTraffic(
       latestFreshnessStatus: latest?.freshnessStatus ?? "unknown",
       latestObservationRef: latest?.observationRef ?? null,
       latestReceiptRef: latest?.receiptRef ?? null,
+      latestLaneSessionId: latest?.laneSessionId ?? null,
+      selectedBackendProvider: latest?.selectedBackendProvider ?? null,
       terminalEligible: false,
       assistantAnswer: false,
       rawContentIncluded: false,
@@ -375,7 +400,7 @@ export function selectHelixLiveTranslationUiProjection(
   const candidates = input.projections
     .filter((projection) => projection.sourceId === sourceId)
     .filter((projection) => !projectionTarget || projection.projectionTarget === projectionTarget)
-    .filter((projection) => !targetLanguage || normalizeKeyText(projection.targetLanguage) === targetLanguage)
+    .filter((projection) => !targetLanguage || localeMatches(projection.targetLanguage, targetLanguage))
     .filter((projection) => !chunkId || projection.chunkId === chunkId)
     .filter((projection) => !dedupeKey || projection.dedupeKey === dedupeKey)
     .sort(sortLatestProjectionFirst);
@@ -392,6 +417,8 @@ export function selectHelixLiveTranslationUiProjection(
       targetLanguage,
       observationRef: null,
       receiptRef: null,
+      laneSessionId: null,
+      selectedBackendProvider: null,
       terminalEligible: false,
       assistantAnswer: false,
       rawContentIncluded: false,
@@ -414,6 +441,8 @@ export function selectHelixLiveTranslationUiProjection(
     targetLanguage: projection.targetLanguage,
     observationRef: projection.observationRef,
     receiptRef: projection.receiptRef,
+    laneSessionId: projection.laneSessionId,
+    selectedBackendProvider: projection.selectedBackendProvider,
     terminalEligible: false,
     assistantAnswer: false,
     rawContentIncluded: false,
@@ -439,6 +468,8 @@ function buildHelixLiveTranslationUiProjectionSelectionFromProjection(
     targetLanguage: projection.targetLanguage,
     observationRef: projection.observationRef,
     receiptRef: projection.receiptRef,
+    laneSessionId: projection.laneSessionId,
+    selectedBackendProvider: projection.selectedBackendProvider,
     terminalEligible: false,
     assistantAnswer: false,
     rawContentIncluded: false,
@@ -475,7 +506,7 @@ export function buildHelixLiveTranslationInlineUnitStates(
       ? input.projections
         .filter((projection) => projection.sourceId === input.sourceId)
         .filter((projection) => projection.projectionTarget === input.projectionTarget)
-        .filter((projection) => normalizeKeyText(projection.targetLanguage) === normalizeKeyText(input.targetLanguage))
+        .filter((projection) => localeMatches(projection.targetLanguage, input.targetLanguage))
         .filter((projection) => projection.dedupeKey?.includes(unitId))
         .sort(sortLatestProjectionFirst)
         .map((projection) =>
@@ -493,6 +524,8 @@ export function buildHelixLiveTranslationInlineUnitStates(
         text: resolved.displayText,
         observationRef: resolved.observationRef,
         receiptRef: resolved.receiptRef,
+        laneSessionId: resolved.laneSessionId,
+        selectedBackendProvider: resolved.selectedBackendProvider,
         projectionStatus: resolved.status,
         chunkId: resolved.projection?.chunkId ?? null,
         chunkIndex: resolved.projection?.chunkIndex ?? null,
@@ -515,6 +548,8 @@ export function buildHelixLiveTranslationInlineUnitStates(
       error: resolved.reason,
       observationRef: resolved.observationRef,
       receiptRef: resolved.receiptRef,
+      laneSessionId: resolved.laneSessionId,
+      selectedBackendProvider: resolved.selectedBackendProvider,
       projectionStatus: resolved.status,
       chunkId: resolved.projection?.chunkId ?? null,
       chunkIndex: resolved.projection?.chunkIndex ?? null,

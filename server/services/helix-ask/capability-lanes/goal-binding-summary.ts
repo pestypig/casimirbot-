@@ -31,6 +31,15 @@ const readReceiptRef = (binding: HelixCapabilityLaneGoalBinding): string | null 
   binding.lane_session_last_receipt_ref ??
   null;
 
+const readTargetLanguage = (
+  binding: HelixCapabilityLaneGoalBinding,
+  latestObservationEvent: HelixCapabilityLaneSessionEvent | null,
+): string | null =>
+  binding.latest_mail_loop_summary?.target_language ??
+  latestObservationEvent?.target_language ??
+  binding.latest_lane_session_event?.target_language ??
+  null;
+
 const buildReportDecision = (
   binding: HelixCapabilityLaneGoalBinding,
 ): HelixCapabilityLaneGoalReportDecision => {
@@ -103,6 +112,7 @@ const buildDispatchPlan = (
     if (reportDecision.action === "manual_review") return "manual_review";
     return "none";
   })();
+  const targetLanguage = readTargetLanguage(binding, latestObservationEvent);
 
   return {
     schema: HELIX_CAPABILITY_LANE_GOAL_DISPATCH_PLAN_SCHEMA,
@@ -117,6 +127,9 @@ const buildDispatchPlan = (
     lane_session_id: binding.lane_session_id,
     lane_id: binding.lane_id,
     source_id: binding.lane_session_source_id,
+    source_kind: binding.lane_session_source_kind,
+    source_projection_target: binding.lane_session_projection_target,
+    account_locale: binding.lane_session_account_locale,
     latest_chunk_id: latestObservationEvent?.chunk_id ?? null,
     latest_chunk_index: latestObservationEvent?.chunk_index ?? null,
     latest_dedupe_key: latestObservationEvent?.dedupe_key ?? null,
@@ -125,6 +138,7 @@ const buildDispatchPlan = (
     latest_observed_at_ms: latestObservationEvent?.observed_at_ms ?? null,
     latest_freshness_status: latestObservationEvent?.freshness_status ?? null,
     latest_projection_target: latestObservationEvent?.projection_target ?? null,
+    target_language: targetLanguage,
     latest_cancel_requested: latestObservationEvent?.cancel_requested ?? null,
     evidence_ref: reportDecision.evidence_ref,
     mail_loop_ref: reportDecision.mail_loop_ref,
@@ -151,6 +165,7 @@ export const buildHelixCapabilityLaneGoalBindingDebugSummary = (
     [...binding.lane_session_debug_history].reverse().find((event) => event.observation_ref) ??
     (binding.latest_lane_session_event?.observation_ref ? binding.latest_lane_session_event : null);
   const dispatchPlan = buildDispatchPlan(binding, reportDecision, latestObservationEvent);
+  const targetLanguage = readTargetLanguage(binding, latestObservationEvent);
   return {
     schema: HELIX_CAPABILITY_LANE_GOAL_BINDING_DEBUG_SUMMARY_SCHEMA,
     goal_binding_id: binding.goal_binding_id,
@@ -167,6 +182,9 @@ export const buildHelixCapabilityLaneGoalBindingDebugSummary = (
     session_status: binding.lane_session_status,
     session_health: binding.lane_session_health,
     source_id: binding.lane_session_source_id,
+    source_kind: binding.lane_session_source_kind,
+    source_projection_target: binding.lane_session_projection_target,
+    account_locale: binding.lane_session_account_locale,
     last_observation_ref: binding.lane_session_last_observation_ref,
     last_receipt_ref: binding.lane_session_last_receipt_ref,
     latest_chunk_id: latestObservationEvent?.chunk_id ?? null,
@@ -177,6 +195,7 @@ export const buildHelixCapabilityLaneGoalBindingDebugSummary = (
     latest_observed_at_ms: latestObservationEvent?.observed_at_ms ?? null,
     latest_freshness_status: latestObservationEvent?.freshness_status ?? null,
     latest_projection_target: latestObservationEvent?.projection_target ?? null,
+    target_language: targetLanguage,
     latest_cancel_requested: latestObservationEvent?.cancel_requested ?? null,
     latest_session_event: binding.latest_lane_session_event,
     latest_mail_loop_summary: binding.latest_mail_loop_summary,

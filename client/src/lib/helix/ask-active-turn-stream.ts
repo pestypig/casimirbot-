@@ -241,6 +241,9 @@ function buildTurnTranscriptRecordFromAskLiveEvent(
     tool: readFirstNonEmptyText(meta.tool, meta.tool_name, meta.toolName, event.tool),
     capability: readFirstNonEmptyText(meta.capability, meta.capability_id, meta.capabilityId, event.tool),
     source_id: readFirstNonEmptyText(meta.source_id, meta.sourceId),
+    source_kind: readFirstNonEmptyText(meta.source_kind, meta.sourceKind),
+    source_projection_target: readFirstNonEmptyText(meta.source_projection_target, meta.sourceProjectionTarget),
+    account_locale: readFirstNonEmptyText(meta.account_locale, meta.accountLocale),
     latest_chunk_id: readFirstNonEmptyText(meta.latest_chunk_id, meta.latestChunkId),
     latest_chunk_index: readFirstNonEmptyText(meta.latest_chunk_index, meta.latestChunkIndex),
     latest_dedupe_key: readFirstNonEmptyText(meta.latest_dedupe_key, meta.latestDedupeKey),
@@ -249,6 +252,7 @@ function buildTurnTranscriptRecordFromAskLiveEvent(
     latest_observed_at_ms: readFirstNonEmptyText(meta.latest_observed_at_ms, meta.latestObservedAtMs),
     latest_freshness_status: readFirstNonEmptyText(meta.latest_freshness_status, meta.latestFreshnessStatus),
     latest_projection_target: readFirstNonEmptyText(meta.latest_projection_target, meta.latestProjectionTarget),
+    target_language: readFirstNonEmptyText(meta.target_language, meta.targetLanguage),
     latest_cancel_requested:
       typeof meta.latest_cancel_requested === "boolean"
         ? meta.latest_cancel_requested

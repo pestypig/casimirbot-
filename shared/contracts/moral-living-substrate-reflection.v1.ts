@@ -83,6 +83,18 @@ export type MoralLivingSubstrateProceduralDerivationV1 = {
   forbiddenOverclaim: string;
 };
 
+export type MoralLivingSubstrateProceduralChainEvidenceStrengthV1 = "present" | "partial" | "missing";
+
+export type MoralLivingSubstrateProceduralChainStepV1 = {
+  fromBadgeId: string;
+  toBadgeId: string;
+  transitionLabel: string;
+  proceduralClaim: string;
+  evidenceStrength: MoralLivingSubstrateProceduralChainEvidenceStrengthV1;
+  missingEvidence: string[];
+  forbiddenOverclaim: string;
+};
+
 export type MoralLivingSubstrateSynthesisStepV1 = {
   stepId: string;
   label: string;
@@ -120,6 +132,7 @@ export type MoralLivingSubstrateReflectionV1 = {
   exactMatches: MoralLivingSubstrateMatchV1[];
   likelyMatches: MoralLivingSubstrateMatchV1[];
   proceduralDerivations: MoralLivingSubstrateProceduralDerivationV1[];
+  proceduralChain: MoralLivingSubstrateProceduralChainStepV1[];
   synthesisPath: MoralLivingSubstrateSynthesisStepV1[];
   sourceTheoryBadgeIds: string[];
   sourceRefs: MoralLivingSubstrateSourceRefV1[];
@@ -273,6 +286,11 @@ function validateRecommendedAction(prefix: string, value: unknown, issues: strin
 
 const ESTIMATE_LEVELS: MoralLivingSubstrateEstimateLevelV1[] = ["low", "medium", "high", "unknown"];
 const DERIVATION_STRENGTHS = ["weak", "moderate", "strong"] as const;
+const PROCEDURAL_CHAIN_STRENGTHS: MoralLivingSubstrateProceduralChainEvidenceStrengthV1[] = [
+  "present",
+  "partial",
+  "missing",
+];
 const SYNTHESIS_OUTPUT_KINDS: MoralLivingSubstrateSynthesisStepV1["outputKind"][] = [
   "substrate_observation",
   "vulnerability_dependency_agency_estimate",
@@ -306,6 +324,26 @@ function validateProceduralDerivation(prefix: string, value: unknown, issues: st
       if (!includes(ESTIMATE_LEVELS, value.estimate[field])) issues.push(`${prefix}.estimate.${field} is invalid`);
     }
   }
+}
+
+function validateProceduralChainStep(prefix: string, value: unknown, issues: string[]): void {
+  if (!isRecord(value)) {
+    issues.push(`${prefix} must be an object`);
+    return;
+  }
+  for (const field of [
+    "fromBadgeId",
+    "toBadgeId",
+    "transitionLabel",
+    "proceduralClaim",
+    "forbiddenOverclaim",
+  ] as const) {
+    if (!isNonEmptyString(value[field])) issues.push(`${prefix}.${field} must be a non-empty string`);
+  }
+  if (!includes(PROCEDURAL_CHAIN_STRENGTHS, value.evidenceStrength)) {
+    issues.push(`${prefix}.evidenceStrength is invalid`);
+  }
+  if (!isStringArray(value.missingEvidence)) issues.push(`${prefix}.missingEvidence must be a string array`);
 }
 
 function validateSynthesisStep(prefix: string, value: unknown, issues: string[]): void {
@@ -398,6 +436,13 @@ export function validateMoralLivingSubstrateReflectionV1(value: unknown): string
   } else {
     value.proceduralDerivations.forEach((derivation: unknown, index: number) =>
       validateProceduralDerivation(`proceduralDerivations[${index}]`, derivation, issues),
+    );
+  }
+  if (!Array.isArray(value.proceduralChain)) {
+    issues.push("proceduralChain must be an array");
+  } else {
+    value.proceduralChain.forEach((step: unknown, index: number) =>
+      validateProceduralChainStep(`proceduralChain[${index}]`, step, issues),
     );
   }
   if (!Array.isArray(value.synthesisPath)) {

@@ -25,6 +25,7 @@ const BIOME_ORDER: MoralGraphBiomeId[] = [
   "substrate_boundary",
   "substrate_sensing",
   "maintenance_response",
+  "action_selection",
   "coordination_scale",
   "mandate_authority",
   "objective_binding",

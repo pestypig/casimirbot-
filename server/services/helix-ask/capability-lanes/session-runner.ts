@@ -90,6 +90,8 @@ const readSourceBinding = (value: unknown): HelixCapabilityLaneSessionSourceBind
       readString(record?.projection_target ?? record?.projectionTarget) || null,
     account_locale:
       readString(record?.account_locale ?? record?.accountLocale) || null,
+    target_language:
+      readString(record?.target_language ?? record?.targetLanguage) || null,
   };
 };
 

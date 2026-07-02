@@ -120,6 +120,7 @@ describe("capability lane mail-loop adapter", () => {
         source_event_id: "docs:nhm2:event-1",
         observed_at_ms: expect.any(Number),
         projection_target: "docs_chunk",
+        target_language: "es",
         cancel_requested: false,
         selected_backend_provider: "live_translation.local_runtime",
         requested_backend_provider: "google_gemini",

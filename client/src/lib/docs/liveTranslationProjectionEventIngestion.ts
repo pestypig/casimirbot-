@@ -13,6 +13,7 @@ export type InstallDocumentLiveTranslationProjectionEventIngestionInput = {
   locale: string;
   projectionTarget?: string | null;
   units: DocumentTranslationUnit[];
+  allowStaleDisplayText?: boolean;
 };
 
 export function installDocumentLiveTranslationProjectionEventIngestion(
@@ -26,6 +27,7 @@ export function installDocumentLiveTranslationProjectionEventIngestion(
       locale: input.locale,
       projectionTarget: input.projectionTarget ?? "docs_chunk",
       units: input.units,
+      allowStaleDisplayText: input.allowStaleDisplayText,
       eventPayload: payload,
     });
   };

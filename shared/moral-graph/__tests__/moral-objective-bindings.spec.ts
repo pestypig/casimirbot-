@@ -79,7 +79,7 @@ describe("MoralObjectiveBindingV1 resolvers", () => {
 
     expect(validateMoralObjectiveBindingV1(binding)).toEqual([]);
     expect(binding.subject.kind).toBe("character_preset");
-    expect(binding.subject.label).toBe("Reinhard von Lohengramm");
+    expect(binding.subject.label).toBe("Sovereign Ambition Profile");
     expect(binding.objectiveState.label).toMatch(/character perspective preset/i);
     expect(binding.bindings.map((entry) => entry.badgeId)).toEqual(
       expect.arrayContaining(["direct-observation-before-claim", "sovereign-ambition"]),

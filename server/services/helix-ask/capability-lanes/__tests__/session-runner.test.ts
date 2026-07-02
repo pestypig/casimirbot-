@@ -65,6 +65,7 @@ describe("Helix capability lane session runner", () => {
               source_kind: "docs",
               projection_target: "docs_chunk",
               account_locale: "es-US",
+              target_language: "es",
             },
           },
           {
@@ -182,6 +183,7 @@ describe("Helix capability lane session runner", () => {
       source_id: "docs:nhm2",
       projection_target: "docs_chunk",
       account_locale: "es-US",
+      target_language: "es",
       latest_chunk_id: "chunk-runner",
       latest_chunk_index: 4,
       latest_dedupe_key: "docs:nhm2:chunk-runner:es",
@@ -206,6 +208,9 @@ describe("Helix capability lane session runner", () => {
       health: "degraded",
       last_observation_ref: "ask:lane:translation:obs:runner",
       last_receipt_ref: "ask:lane:translation:receipt:runner",
+      source_binding: expect.objectContaining({
+        target_language: "es",
+      }),
     });
     expect(store.get("lane-session-runner")?.debug_history.map((event) => event.action)).toEqual([
       "start",

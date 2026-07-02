@@ -66,6 +66,9 @@ function nodeClasses(args: {
     case "maintenance_response":
       classes.push("border-emerald-200 bg-emerald-950 text-emerald-50");
       break;
+    case "action_selection":
+      classes.push("border-green-200 bg-green-950 text-green-50");
+      break;
     case "coordination_scale":
       classes.push("border-lime-200 bg-lime-950 text-lime-50");
       break;
