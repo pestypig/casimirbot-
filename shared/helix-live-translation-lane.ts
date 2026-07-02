@@ -11,6 +11,8 @@ export const HELIX_LIVE_TRANSLATION_ONE_SHOT_OBSERVATION_SCHEMA =
   "helix.live_translation.observation.v1" as const;
 export const HELIX_LIVE_TRANSLATION_ONE_SHOT_RESULT_SCHEMA =
   "helix.live_translation.one_shot_result.v1" as const;
+export const HELIX_LIVE_TRANSLATION_PROJECTION_RECEIPT_SCHEMA =
+  "helix.live_translation.projection_receipt.v1" as const;
 
 export type HelixLiveTranslationProjectionTarget =
   | "ask_turn"
@@ -74,6 +76,31 @@ export type HelixLiveTranslationOneShotObservation = {
   translated_text: string;
   deterministic: true;
   confidence: number;
+  reentry_required: true;
+  terminal_eligible: false;
+  assistant_answer: false;
+  raw_content_included: false;
+};
+
+export type HelixLiveTranslationProjectionReceipt = {
+  schema: typeof HELIX_LIVE_TRANSLATION_PROJECTION_RECEIPT_SCHEMA;
+  receipt_ref: string;
+  observation_ref: string;
+  lane_id: "live_translation";
+  capability: "live_translation.translate_text";
+  projection_target: HelixLiveTranslationProjectionTarget;
+  projection_status: "projected" | "stale" | "cancelled" | "failed";
+  source_id: string;
+  chunk_id: string;
+  chunk_index: number | null;
+  dedupe_key: string;
+  source_event_ms: number | null;
+  observed_at_ms: number;
+  freshness_status: HelixLiveTranslationChunkFreshnessStatus;
+  target_language: string;
+  translated_text: string | null;
+  stale: boolean;
+  cancel_requested: boolean;
   reentry_required: true;
   terminal_eligible: false;
   assistant_answer: false;

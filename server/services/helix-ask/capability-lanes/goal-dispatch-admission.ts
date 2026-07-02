@@ -46,6 +46,7 @@ export const buildHelixCapabilityLaneGoalDispatchAdmission = (
     lane_id: dispatchPlan.lane_id,
     evidence_ref: dispatchPlan.evidence_ref,
     mail_loop_ref: dispatchPlan.mail_loop_ref,
+    receipt_ref: dispatchPlan.receipt_ref,
     blocked_reason: blockedReason,
     requires_live_mail_loop: dispatchPlan.requires_live_mail_loop,
     requires_terminal_authority: dispatchPlan.requires_terminal_authority,

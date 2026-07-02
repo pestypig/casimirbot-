@@ -118,16 +118,15 @@ export async function copyHelixAskDebugJsonToClipboard(
           lastError = new Error("clipboard_mismatch_after_write");
         }
       }
-      if (wrote) {
+      if (wrote && typeof document === "undefined") {
         return {
-          ok: true,
+          ok: false,
           attempted_payload_hash: attemptedPayloadHash,
-          copied_payload_hash: attemptedPayloadHash,
-          copied_text_length: json.length,
-          method: "navigator.clipboard",
-          readback_match: "unavailable",
-          fallback_presented: false,
-          error: lastError?.message ?? "clipboard_readback_unavailable",
+          copied_text_length: 0,
+          method: "failed",
+          readback_match: "mismatch",
+          fallback_presented: true,
+          error: lastError?.message ?? "clipboard_mismatch_after_write",
         };
       }
       throw lastError ?? new Error("clipboard_write_failed");
@@ -157,25 +156,23 @@ export async function copyHelixAskDebugJsonToClipboard(
           const confirm = await navigator.clipboard.readText().catch(() => "");
           if (confirm.trim().length === 0) {
             return {
-              ok: true,
+              ok: false,
               attempted_payload_hash: attemptedPayloadHash,
-              copied_payload_hash: attemptedPayloadHash,
-              copied_text_length: json.length,
-              method: "textarea_fallback",
-              readback_match: "unavailable",
-              fallback_presented: false,
+              copied_text_length: 0,
+              method: "failed",
+              readback_match: "empty",
+              fallback_presented: true,
               error: "clipboard_empty_after_write",
             };
           }
           if (confirm !== json) {
             return {
-              ok: true,
+              ok: false,
               attempted_payload_hash: attemptedPayloadHash,
-              copied_payload_hash: attemptedPayloadHash,
-              copied_text_length: json.length,
-              method: "textarea_fallback",
-              readback_match: "unavailable",
-              fallback_presented: false,
+              copied_text_length: 0,
+              method: "failed",
+              readback_match: "mismatch",
+              fallback_presented: true,
               error: "clipboard_mismatch_after_write",
             };
           }

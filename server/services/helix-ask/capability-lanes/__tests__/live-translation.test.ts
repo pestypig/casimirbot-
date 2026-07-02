@@ -225,6 +225,41 @@ describe("live_translation.translate_text one-shot lane", () => {
         raw_content_included: false,
       },
     });
+    expect(result.observation_packet.receipts).toEqual([
+      {
+        receipt_ref: result.observation_packet.state_delta.live_translation_projection_receipt?.receipt_ref,
+        kind: "live_translation_projection",
+        status: "stale",
+      },
+    ]);
+    expect(result.observation_packet.state_delta.live_translation_projection_receipt).toMatchObject({
+      schema: "helix.live_translation.projection_receipt.v1",
+      observation_ref: result.observation?.observation_ref,
+      lane_id: "live_translation",
+      capability: "live_translation.translate_text",
+      projection_target: "docs_chunk",
+      projection_status: "stale",
+      source_id: "docs:nhm2:whitepaper",
+      chunk_id: "chunk-7",
+      chunk_index: 7,
+      dedupe_key: "docs:nhm2:whitepaper:chunk-7:fr",
+      source_event_ms: 1,
+      freshness_status: "stale",
+      target_language: "fr",
+      translated_text: "merci",
+      stale: true,
+      cancel_requested: false,
+      reentry_required: true,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(result.observation_packet.state_delta.live_translation_projection_receipt?.receipt_ref).toContain(
+      `${result.observation?.observation_ref}:projection:`,
+    );
+    expect(typeof result.observation_packet.state_delta.live_translation_projection_receipt?.observed_at_ms).toBe(
+      "number",
+    );
   });
 
   it("normalizes cancelled chunks as non-terminal cancelled evidence without backend execution", () => {
@@ -273,6 +308,31 @@ describe("live_translation.translate_text one-shot lane", () => {
           raw_content_included: false,
         },
       },
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(result.observation_packet.receipts).toEqual([
+      {
+        receipt_ref: result.observation_packet.state_delta.live_translation_projection_receipt?.receipt_ref,
+        kind: "live_translation_projection",
+        status: "cancelled",
+      },
+    ]);
+    expect(result.observation_packet.state_delta.live_translation_projection_receipt).toMatchObject({
+      schema: "helix.live_translation.projection_receipt.v1",
+      observation_ref: result.observation_packet.produced_artifact_refs[0],
+      lane_id: "live_translation",
+      capability: "live_translation.translate_text",
+      projection_target: "docs_hover",
+      projection_status: "cancelled",
+      source_id: "docs:hover",
+      chunk_id: "hover-1",
+      target_language: "es",
+      translated_text: null,
+      stale: false,
+      cancel_requested: true,
+      reentry_required: true,
       terminal_eligible: false,
       assistant_answer: false,
       raw_content_included: false,

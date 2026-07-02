@@ -79,6 +79,7 @@ const buildShadowObservationPacket = (input: {
   observationRef: string;
   summary: string;
   error: string;
+  trace: HelixCapabilityLaneResolveTrace;
 }): HelixAgentStepObservationPacket => ({
   schema: HELIX_AGENT_STEP_OBSERVATION_PACKET_SCHEMA,
   turn_id: input.turnId,
@@ -97,10 +98,22 @@ const buildShadowObservationPacket = (input: {
     message: `${input.capability} is represented in the provider-neutral lane catalog but is not executable in this deterministic slice.`,
     repair_action: "use_configured_lane_backend_or_supported_capability",
   }],
+  backend_selection_decision: input.trace.backend_selection_decision,
   state_delta: {
     capability_lane_shadow_execution: {
       lane_id: input.laneId,
       capability: input.capability,
+      requested_backend_provider: input.trace.requested_backend_provider,
+      requested_backend_provider_known: input.trace.requested_backend_provider_known,
+      selected_backend_provider: input.trace.selected_backend_provider,
+      backend_selection_decision: input.trace.backend_selection_decision,
+      selection_reason: input.trace.selection_reason,
+      availability_status: input.trace.availability_status,
+      permission_status: input.trace.permission_status,
+      cost_class: input.trace.cost_class,
+      latency_class: input.trace.latency_class,
+      privacy_class: input.trace.privacy_class,
+      fallback_backend_provider: input.trace.fallback_backend_provider,
       execution_status: "not_executed_shadow_only",
       assistant_answer: false,
       terminal_eligible: false,
@@ -162,6 +175,7 @@ const buildShadowResult = (input: {
     observationRef,
     summary: `${input.capability} is cataloged on ${input.laneId} but did not execute; lane output remains non-terminal.`,
     error,
+    trace,
   });
   return {
     schema: "helix.capability_lane.shadow_one_shot_result.v1",

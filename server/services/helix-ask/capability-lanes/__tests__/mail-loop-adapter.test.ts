@@ -83,6 +83,7 @@ describe("capability lane mail-loop adapter", () => {
       turnId: "turn-mail-loop",
       env: {} as NodeJS.ProcessEnv,
     });
+    const receiptRef = translation.lane_resolve_trace.receipt_ref;
 
     const routed = routeLiveTranslationObservationToMailLoop({
       sessionStore,
@@ -107,14 +108,23 @@ describe("capability lane mail-loop adapter", () => {
         lane_id: "live_translation",
         capability: "live_translation.translate_text",
         observation_ref: translation.observation?.observation_ref,
+        receipt_ref: receiptRef,
         stage_play_wake_expected: true,
         mailbox_thread_id: "ask-thread-mail",
         source_id: "docs:nhm2",
         source_kind: "document_markdown",
         chunk_id: "chunk-1",
+        chunk_index: 1,
+        dedupe_key: "docs:nhm2:chunk-1:es",
+        observed_at_ms: expect.any(Number),
         projection_target: "docs_chunk",
+        cancel_requested: false,
         selected_backend_provider: "live_translation.local_runtime",
         requested_backend_provider: "google_gemini",
+        cost_class: "free_local",
+        latency_class: "interactive",
+        privacy_class: "local_only",
+        fallback_backend_provider: null,
         backend_selection_decision: expect.objectContaining({
           outcome: "fallback_selected",
           requested_backend_provider: "google_gemini",
@@ -169,12 +179,28 @@ describe("capability lane mail-loop adapter", () => {
       "docs:nhm2",
       "chunk-1",
       translation.observation?.observation_ref,
+      receiptRef,
       "live_translation.local_runtime",
       "google_gemini",
     ]));
     expect(routed.debug_summary.stage_play_mail_id).toBe(routed.mail?.mailId);
     expect(routed.debug_summary.evidence_refs).toEqual(routed.mail?.evidenceRefs);
+    expect(routed.debug_summary).toMatchObject({
+      receipt_ref: receiptRef,
+      selected_backend_provider: "live_translation.local_runtime",
+      requested_backend_provider: "google_gemini",
+      cost_class: "free_local",
+      latency_class: "interactive",
+      privacy_class: "local_only",
+      fallback_backend_provider: null,
+      chunk_index: 1,
+      dedupe_key: "docs:nhm2:chunk-1:es",
+      source_event_ms: null,
+      observed_at_ms: expect.any(Number),
+      cancel_requested: false,
+    });
     expect(sessionStore.get("lane-session-mail")?.last_observation_ref).toBe(routed.mail?.mailId);
+    expect(sessionStore.get("lane-session-mail")?.last_receipt_ref).toBe(receiptRef);
     expect(listStagePlayLiveSourceMailItems({ threadId: "ask-thread-mail" })).toHaveLength(1);
   });
 
@@ -277,6 +303,7 @@ describe("capability lane mail-loop adapter", () => {
       turnId: "turn-mail-loop-stale",
       env: {} as NodeJS.ProcessEnv,
     });
+    const receiptRef = translation.lane_resolve_trace.receipt_ref;
 
     const first = routeLiveTranslationObservationToMailLoop({
       sessionStore,
@@ -305,6 +332,16 @@ describe("capability lane mail-loop adapter", () => {
       terminal_eligible: false,
       assistant_answer: false,
       raw_content_included: false,
+    });
+    expect(first.debug_summary).toMatchObject({
+      receipt_ref: receiptRef,
+      chunk_id: "chunk-stale",
+      chunk_index: null,
+      dedupe_key: expect.any(String),
+      source_event_ms: 1,
+      observed_at_ms: expect.any(Number),
+      freshness_status: "stale",
+      cancel_requested: false,
     });
     expect(listStagePlayLiveSourceMailItems({ threadId: "ask-thread-stale" })).toHaveLength(1);
   });

@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { useDocViewerStore } from "@/store/useDocViewerStore";
+import { buildHelixAskConsoleContextFiles } from "@/components/helix/ask-console/HelixAskRequestEnvelope";
 
 let mergeVoiceTranscriptDraft: typeof import("@/components/helix/HelixAskPill").mergeVoiceTranscriptDraft;
 let resolveVoiceDispatchTranscriptFromDraft: typeof import("@/components/helix/HelixAskPill").resolveVoiceDispatchTranscriptFromDraft;
@@ -113,7 +114,6 @@ let resolveNextSelectableHelixAgentRuntime: typeof import("@/components/helix/He
 let resolveHelixAskActualAgentProviderLabel: typeof import("@/components/helix/HelixAskPill").resolveHelixAskActualAgentProviderLabel;
 let parseHelixAskFinalAnswerBulletLine: typeof import("@/lib/helix/ask-answer-rendering").parseHelixAskFinalAnswerBulletLine;
 let buildHelixActionEnvelopeRuntimeAuthority: typeof import("@/components/helix/HelixAskPill").buildHelixActionEnvelopeRuntimeAuthority;
-let buildHelixAskContextFilesForTurn: typeof import("@/components/helix/HelixAskPill").buildHelixAskContextFilesForTurn;
 let buildHelixDebugExportEnvelopeFromMasterPayload: typeof import("@/components/helix/HelixAskPill").buildHelixDebugExportEnvelopeFromMasterPayload;
 let buildHelixAskReplyCopyText: typeof import("@/components/helix/HelixAskPill").buildHelixAskReplyCopyText;
 let debugPayloadMatchesRenderedTurnPayload: typeof import("@/components/helix/HelixAskPill").debugPayloadMatchesRenderedTurnPayload;
@@ -234,7 +234,6 @@ beforeAll(async () => {
     resolveNextSelectableHelixAgentRuntime,
     resolveHelixAskActualAgentProviderLabel,
     buildHelixActionEnvelopeRuntimeAuthority,
-    buildHelixAskContextFilesForTurn,
     buildHelixDebugExportEnvelopeFromMasterPayload,
     buildHelixAskReplyCopyText,
     debugPayloadMatchesRenderedTurnPayload,
@@ -259,6 +258,10 @@ const askConsoleContextBridgePath = path.resolve(
 const askConsoleRequestEnvelopePath = path.resolve(
   process.cwd(),
   "client/src/components/helix/ask-console/HelixAskRequestEnvelope.ts",
+);
+const askConsoleActiveDocContextBindingPath = path.resolve(
+  process.cwd(),
+  "client/src/components/helix/ask-console/HelixAskActiveDocContextBinding.ts",
 );
 const askConsoleLatestTurnBindingPath = path.resolve(
   process.cwd(),
@@ -383,17 +386,20 @@ describe("HelixAskPill mic-first surface contract", () => {
   });
 
   it("includes active docs-viewer context files even when no prompt anchor path was resolved", () => {
-    expect(buildHelixAskContextFilesForTurn(null, {
+    expect(buildHelixAskConsoleContextFiles({
+      docsViewerAnchorPath: null,
+      workspaceContextSnapshot: {
       activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
       docContextPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+      },
     })).toEqual(["docs/research/nhm2-current-status-whitepaper-2026-05-02.md"]);
 
-    expect(buildHelixAskContextFilesForTurn(
-      "docs/research/explicit.md",
-      {
+    expect(buildHelixAskConsoleContextFiles({
+      docsViewerAnchorPath: "docs/research/explicit.md",
+      workspaceContextSnapshot: {
         activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
       },
-    )).toEqual([
+    })).toEqual([
       "docs/research/explicit.md",
       "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
     ]);
@@ -412,8 +418,11 @@ describe("HelixAskPill mic-first surface contract", () => {
     try {
       const urlDocPath = readDocViewerPathFromDesktopUrlForAskSnapshot();
       expect(urlDocPath).toBe("docs/research/nhm2-current-status-whitepaper-2026-05-02.md");
-      expect(buildHelixAskContextFilesForTurn(null, {
-        activeDocPath: urlDocPath,
+      expect(buildHelixAskConsoleContextFiles({
+        docsViewerAnchorPath: null,
+        workspaceContextSnapshot: {
+          activeDocPath: urlDocPath,
+        },
       })).toEqual(["docs/research/nhm2-current-status-whitepaper-2026-05-02.md"]);
     } finally {
       if (originalWindow === undefined) {
@@ -1117,7 +1126,8 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(runtimePickerSource).toContain("model.items.map");
     expect(runtimePickerSource).toContain("disabled={!provider.enabled}");
     expect(runtimePickerSource).toContain("{model.selectedLabel}");
-    expect(source).toContain("resolveNextSelectableHelixAgentRuntime(selectedAgentRuntime, agentRuntimeProviders)");
+    expect(source).toContain("resolveHelixAgentRuntimePrimaryButtonDecision({");
+    expect(source).toContain("resolveHelixAgentRuntimeSelectDecision(runtime, agentRuntimeProviders)");
     expect(source).toContain("onPrimaryClick={handleAgentRuntimeButtonClick}");
     expect(runtimePickerSource).toContain("event.stopPropagation();");
   });
@@ -1246,7 +1256,8 @@ describe("HelixAskPill mic-first surface contract", () => {
     const source = fs.readFileSync(pillPath, "utf8");
     const workspaceContextSource = fs.readFileSync(workspaceContextSnapshotPath, "utf8");
     expect(source).toContain("useScientificCalculatorStore.getState()");
-    expect(source).toContain("buildAskTurnWorkspaceContextSnapshotFromState({");
+    expect(source).toContain("buildHelixAskWorkspaceContextSnapshotBinding({");
+    expect(source).not.toContain("buildAskTurnWorkspaceContextSnapshotFromState({");
     expect(workspaceContextSource).toContain("activeCalculatorContext");
     expect(workspaceContextSource).toContain("hasCalculatorContext");
     expect(workspaceContextSource).toContain("last_result_text");
@@ -1256,7 +1267,8 @@ describe("HelixAskPill mic-first surface contract", () => {
   it("includes bounded active/open panel identity in backend Ask turn snapshots", () => {
     const source = fs.readFileSync(pillPath, "utf8");
     const workspaceContextSource = fs.readFileSync(workspaceContextSnapshotPath, "utf8");
-    expect(source).toContain("buildAskTurnWorkspaceContextSnapshotFromState({");
+    expect(source).toContain("buildHelixAskWorkspaceContextSnapshotBinding({");
+    expect(source).not.toContain("buildAskTurnWorkspaceContextSnapshotFromState({");
     expect(source).toContain("layoutState,");
     expect(workspaceContextSource).toContain("openPanelIds");
     expect(workspaceContextSource).toContain("activeGroupId");
@@ -1350,12 +1362,15 @@ describe("HelixAskPill mic-first surface contract", () => {
     const source = fs.readFileSync(pillPath, "utf8");
     const contextBridgeSource = fs.readFileSync(askConsoleContextBridgePath, "utf8");
     const docsContextSource = fs.readFileSync(docsViewerContextPath, "utf8");
+    const activeDocBindingSource = fs.readFileSync(askConsoleActiveDocContextBindingPath, "utf8");
     expect(source).toContain("readDocViewerPathFromDesktopUrlForAskSnapshot");
-    expect(source).toContain("readDocPathFromDesktopUrl");
+    expect(source).toContain("readHelixAskDocViewerPathFromDesktopUrlForSnapshot");
+    expect(activeDocBindingSource).toContain("readDocPathFromDesktopUrl");
     expect(contextBridgeSource).toContain('searchParams.get("doc")');
-    expect(source).toContain("resolveDocViewerSnapshotPathCandidate");
+    expect(source).toContain("resolveHelixAskDocViewerSnapshotPathBinding");
+    expect(activeDocBindingSource).toContain("resolveDocViewerSnapshotPathCandidate");
     expect(docsContextSource).toContain('source: "desktop_url_doc_param"');
-    expect(source).toContain("normalizeDocViewerPathForAskSnapshot");
+    expect(activeDocBindingSource).toContain("normalizeDocViewerPathForAskSnapshot");
     expect(docsContextSource).toContain('normalized.startsWith("docs/")');
   });
 
@@ -1367,8 +1382,8 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(docsContextSource).toContain("HELIX_ACTIVE_DOC_VIEWER_ARTIFACT_CUE_RE");
     expect(docsContextSource).toContain("white\\s*paper|whitepaper");
     expect(source).toContain("resolveAskTurnDocViewerSnapshotPath().path");
-    expect(source).toContain("buildHelixAskContextFilesForTurn");
     expect(source).toContain("buildHelixAskConsoleContextFiles");
+    expect(source).not.toContain("function buildHelixAskContextFilesForTurn");
     expect(requestEnvelopeSource).toContain("workspaceContextSnapshot?.activeDocPath");
     expect(source).toContain("contextFiles: contextFilesForTurn");
   });
@@ -1606,6 +1621,59 @@ describe("HelixAskPill mic-first surface contract", () => {
     const parsed = JSON.parse(exportText ?? "{}");
     expect(parsed.active_turn_id).toBe("reply-visible");
     expect(parsed.client_active_turn_id).toBe("reply-visible");
+    expect(parsed.active_turn_id).not.toBe(staleTurnId);
+    expect(parsed.active_prompt).toBe(boundaryQuestion);
+    expect(parsed.selected_final_answer).toBe(boundaryFinal);
+  });
+
+  it("does not fetch a stale backend debug ref when rendered ask turn id lacks matching debug evidence", () => {
+    const boundaryQuestion = "UI debug binding retest newest visible prompt";
+    const boundaryFinal = "The fetched paper is useful, but calculator-ready numeric bindings are still missing.";
+    const staleTurnId = "ask:eaf320fb-a91d-45f7-ba63-11c9c35e22fc";
+    const questionNode = {
+      innerText: `1Questionquestion${boundaryQuestion}user prompt`,
+      textContent: `1Questionquestion${boundaryQuestion}user prompt`,
+      getAttribute: () => null,
+    };
+    const finalNode = {
+      innerText: `15Final answerfinal${boundaryFinal}chat final answer | Provider: Codex Workstation Mode`,
+      textContent: `15Final answerfinal${boundaryFinal}chat final answer | Provider: Codex Workstation Mode`,
+      getAttribute: (name: string) => name === "data-final-answer-text" ? boundaryFinal : null,
+    };
+    const debugButton = {
+      innerText: "",
+      textContent: "",
+      parentElement: null,
+      getAttribute: (name: string) => {
+        if (name === "data-debug-copy-active-turn-id" || name === "data-turn-control-active-turn-id") return staleTurnId;
+        if (name === "data-debug-copy-client-turn-id" || name === "data-turn-control-client-turn-id") return "reply-visible";
+        if (name === "data-debug-copy-question" || name === "data-turn-control-question") return boundaryQuestion;
+        if (name === "data-debug-copy-final-answer" || name === "data-turn-control-final-answer") return boundaryFinal;
+        return null;
+      },
+      querySelector: (selector: string) => {
+        if (selector.includes("question")) return questionNode;
+        if (selector.includes("final")) return finalNode;
+        return null;
+      },
+    } as unknown as HTMLElement;
+
+    const exportText = buildReplyScopedDebugExportFromRenderedButton({
+      id: "reply-visible",
+      question: boundaryQuestion,
+      content: boundaryFinal,
+      debug_export_ref: {
+        endpoint: `/api/agi/ask/turn/${staleTurnId}/debug-export`,
+        turn_id: staleTurnId,
+      },
+    } as any, debugButton, "rendered_button_scope");
+
+    expect(exportText).toBeTruthy();
+    const parsed = JSON.parse(exportText ?? "{}");
+    expect(parsed.active_turn_id).toBe("reply-visible");
+    expect(parsed.client_active_turn_id).toBe("reply-visible");
+    expect(parsed.debug_export_ref ?? null).toBeNull();
+    expect(parsed.backend_debug_response_ref ?? null).toBeNull();
     expect(parsed.active_turn_id).not.toBe(staleTurnId);
     expect(parsed.active_prompt).toBe(boundaryQuestion);
     expect(parsed.selected_final_answer).toBe(boundaryFinal);
@@ -2312,10 +2380,12 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(turnControlsSource).toContain('title="Unified Debug Copy"');
     expect(source).toContain("buildReplyScopedDebugExportFromRenderedButton");
     expect(source).toContain("selectedDebugTurnId: renderedMatchesReply ? activeTurnId : null");
-    expect(source).toContain("resolveHelixAskReplyDebugTurnId(reply)");
+    expect(source).toContain("const backendTurnScopeTrusted = isHelixAskLegacyRenderedButtonBackendTurnScopeTrusted({");
+    expect(source).toContain("const replyResolvedTurnIdTrusted =");
+    expect(source).toContain("!isBackendAskTurnDebugExportEligibleTurnId(replyResolvedTurnId) || Boolean(rendered.activeTurnId)");
     expect(source).toContain('selectedDebugSource: "rendered_reply_dom"');
     expect(source).toContain(
-      "debug_export_ref: renderedMatchesReply ? replyRecord.debug_export_ref ?? replyDebugRecord?.debug_export_ref ?? null : null",
+      "debug_export_ref: includeReplyDebug ? replyRecord.debug_export_ref ?? replyDebugRecord?.debug_export_ref ?? null : null",
     );
     expect(source.indexOf("buildReplyScopedDebugExportFromRenderedButton")).toBeLessThan(
       source.indexOf("<HelixAskReplyTurn"),

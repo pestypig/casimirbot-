@@ -38,11 +38,15 @@ const isGoalDispatchAdmission = (
 
 const isGoalDispatchReadiness = (
   value: unknown,
-): value is HelixCapabilityLaneGoalDispatchReadiness =>
-  Boolean(value) &&
-  typeof value === "object" &&
-  !Array.isArray(value) &&
-  (value as Record<string, unknown>).schema === "helix.capability_lane.goal_dispatch_readiness.v1";
+): value is HelixCapabilityLaneGoalDispatchReadiness => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  return record.schema === "helix.capability_lane.goal_dispatch_readiness.v1" &&
+    Array.isArray(record.next_receipt_refs) &&
+    (record.next_evidence_refs === undefined || Array.isArray(record.next_evidence_refs)) &&
+    (record.next_lane_ids === undefined || Array.isArray(record.next_lane_ids)) &&
+    (record.next_lane_session_ids === undefined || Array.isArray(record.next_lane_session_ids));
+};
 
 const readGoalDispatchPlans = (providerDebug: Record<string, unknown>): Record<string, unknown>[] => {
   const explicitPlans = readRecordArray(providerDebug.capability_lane_goal_dispatch_plans);
@@ -120,7 +124,10 @@ const buildProviderProjectionFields = (input: {
     capability_lane_backend_selections: input.providerDebug.capability_lane_backend_selections ?? [],
     capability_lane_call_results: input.providerDebug.capability_lane_call_results ?? [],
     capability_lane_observation_packets: input.providerDebug.capability_lane_observation_packets ?? [],
+    capability_lane_projection_receipts: input.providerDebug.capability_lane_projection_receipts ?? [],
     capability_lane_debug_events: input.providerDebug.capability_lane_debug_events ?? [],
+    capability_lane_session_results:
+      input.providerDebug.capability_lane_session_results ?? [],
     capability_lane_session_debug_summaries:
       input.providerDebug.capability_lane_session_debug_summaries ?? [],
     capability_lane_mail_loop_debug_summaries:

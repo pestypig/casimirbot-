@@ -80,6 +80,7 @@ const mailLoopSummary = (input: Partial<HelixCapabilityLaneMailLoopDebugSummary>
   lane_id: "live_translation",
   capability: "live_translation.translate_text",
   observation_ref: "ask:lane:translation:mail-obs",
+  receipt_ref: null,
   stage_play_mail_id: "stage-play-mail-goal",
   stage_play_wake_expected: true,
   mailbox_thread_id: "ask-thread-goal",
@@ -89,6 +90,10 @@ const mailLoopSummary = (input: Partial<HelixCapabilityLaneMailLoopDebugSummary>
   projection_target: "docs_chunk",
   selected_backend_provider: "live_translation.local_runtime",
   requested_backend_provider: "google_gemini",
+  cost_class: "free_local",
+  latency_class: "interactive",
+  privacy_class: "local_only",
+  fallback_backend_provider: null,
   backend_selection_decision: backendDecision,
   freshness_status: "fresh",
   blocked_reason: null,
@@ -138,6 +143,10 @@ describe("capability lane goal binding", () => {
       lane_id: "live_translation",
       selected_runtime_agent_provider: "codex",
       selected_backend_provider: "live_translation.local_runtime",
+      cost_class: "free_local",
+      latency_class: "interactive",
+      privacy_class: "local_only",
+      fallback_backend_provider: null,
       backend_selection_decision: expect.objectContaining({
         outcome: "fallback_selected",
         requested_backend_provider: "google_gemini",
@@ -148,6 +157,7 @@ describe("capability lane goal binding", () => {
       lane_session_health: "healthy",
       lane_session_source_id: "docs:goal",
       lane_session_last_observation_ref: null,
+      lane_session_last_receipt_ref: null,
       latest_lane_session_event: expect.objectContaining({
         action: "start",
         source_id: "docs:goal",
@@ -159,6 +169,10 @@ describe("capability lane goal binding", () => {
           lane_id: "live_translation",
           selected_runtime_agent_provider: "codex",
           selected_backend_provider: "live_translation.local_runtime",
+          cost_class: "free_local",
+          latency_class: "interactive",
+          privacy_class: "local_only",
+          fallback_backend_provider: null,
           backend_selection_decision: expect.objectContaining({
             outcome: "fallback_selected",
             selected_backend_provider: "live_translation.local_runtime",
@@ -191,6 +205,7 @@ describe("capability lane goal binding", () => {
       lane_session_status: "running",
       lane_session_health: "healthy",
       lane_session_observation_ref: null,
+      receipt_ref: null,
       terminal_authority_status: "not_terminal_authority",
       reentry_required: true,
       terminal_eligible: false,
@@ -281,6 +296,7 @@ describe("capability lane goal binding", () => {
     expect(acceptedReport.goal_binding?.debug_history.at(-1)).toMatchObject({
       event: "report_requested",
       lane_session_observation_ref: "ask:lane:translation:goal-obs",
+      receipt_ref: null,
       terminal_authority_status: "pending_helix_terminal_authority",
       reentry_required: true,
     });
@@ -303,7 +319,9 @@ describe("capability lane goal binding", () => {
 
     const recorded = store.recordMailLoopEvidence({
       goalBindingId: "goal-binding-mail",
-      mailLoopSummary: mailLoopSummary(),
+      mailLoopSummary: mailLoopSummary({
+        receipt_ref: "ask:lane:translation:mail-obs:projection:receipt",
+      }),
       nowMs: 220,
     });
 
@@ -317,6 +335,13 @@ describe("capability lane goal binding", () => {
           lane_session_id: "lane-session-goal",
           stage_play_mail_id: "stage-play-mail-goal",
           observation_ref: "ask:lane:translation:mail-obs",
+          receipt_ref: "ask:lane:translation:mail-obs:projection:receipt",
+          selected_backend_provider: "live_translation.local_runtime",
+          requested_backend_provider: "google_gemini",
+          cost_class: "free_local",
+          latency_class: "interactive",
+          privacy_class: "local_only",
+          fallback_backend_provider: null,
           backend_selection_decision: expect.objectContaining({
             outcome: "fallback_selected",
             selected_backend_provider: "live_translation.local_runtime",
@@ -340,6 +365,7 @@ describe("capability lane goal binding", () => {
     expect(recorded.goal_binding?.debug_history.at(-1)).toMatchObject({
       event: "mail_loop_recorded",
       mail_loop_ref: "stage-play-mail-goal",
+      receipt_ref: "ask:lane:translation:mail-obs:projection:receipt",
       lane_session_observation_ref: "stage-play-mail-goal",
       terminal_authority_status: "pending_helix_terminal_authority",
       reentry_required: true,

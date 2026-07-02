@@ -41,6 +41,14 @@ export function buildHelixAskDebugExportDrawerState(args: {
   };
 }
 
+export function clearHelixAskDebugDrawerForStaleReply(
+  current: HelixAskDebugExportDrawerState,
+  latestReplyId: string | null | undefined,
+): HelixAskDebugExportDrawerState {
+  if (!current) return null;
+  return current.replyId === latestReplyId ? current : null;
+}
+
 export function buildHelixAskDebugDrawerCopyProjection(args: {
   replyId: string;
   exportPayload: string;

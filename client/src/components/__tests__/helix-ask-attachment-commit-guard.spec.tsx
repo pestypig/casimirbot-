@@ -11,14 +11,24 @@ describe("Helix Ask attachment commit guard", () => {
       path.resolve(process.cwd(), "client/src/components/helix/ask-console/HelixAskAttachmentCommit.ts"),
       "utf8",
     );
+    const attachmentPayloadSource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/components/helix/ask-console/HelixAskAttachmentPayload.ts"),
+      "utf8",
+    );
 
-    expect(source).toContain("validateHelixAskImageAttachmentForSubmit");
+    expect(source).not.toContain("validateHelixAskImageAttachmentForSubmit");
+    expect(source).toContain("selectFirstHelixAskSubmitReadyImageAttachment(submittedAttachments)");
     expect(source).toContain("runImageAttachmentLensRun");
     expect(source).toContain("ui_image_attachment_lens_run");
-    expect(source).toContain("validateHelixAskAttachmentForSubmit");
+    expect(source).toContain("buildHelixAskAttachmentCommitChecks(askAttachments)");
+    expect(source).not.toContain("validateHelixAskAttachmentForSubmit");
     expect(source).toContain("typedAttachmentItems");
+    expect(source).toContain("buildHelixAskAttachmentTurnInputItems(submittedAttachments)");
+    expect(attachmentCommitSource).toContain("validateHelixAskAttachmentForSubmit(attachment)");
+    expect(attachmentCommitSource).toContain("export function buildHelixAskAttachmentCommitChecks");
     expect(attachmentCommitSource).toContain("Image attachment is stale. Reattach the image before sending.");
     expect(attachmentCommitSource).toContain('raw_image_scope: hasImageBase64 ? "turn_input_only" : null');
+    expect(attachmentPayloadSource).toContain("validateHelixAskImageAttachmentForSubmit(attachment)");
   });
 
   it("blocks visual prompts with stale attachment state before posting the turn", () => {
@@ -52,8 +62,10 @@ describe("Helix Ask attachment commit guard", () => {
     expect(source).toContain("buildHelixAskTextAttachmentFromText(first)");
     expect(source).toContain('first = "Use the attached pasted text."');
     expect(source).toContain("attachmentContextPackForTurn");
+    expect(source).toContain("buildHelixAskAttachmentContextPack(submittedAttachments)");
     expect(source).toContain("attachment_context_pack");
     expect(source).toContain("buildHelixAskTextAttachmentTurnInputItem");
+    expect(source).toContain("from \"@/components/helix/ask-console/HelixAskAttachmentPayload\"");
     expect(source).toContain("from \"@/components/helix/ask-console/HelixAskTextAttachment\"");
     expect(source).not.toContain("function buildHelixAskTextAttachmentFromText");
     expect(source).not.toContain("function buildHelixAskTextAttachmentTurnInputItem");
@@ -62,8 +74,11 @@ describe("Helix Ask attachment commit guard", () => {
     expect(textAttachmentSource).toContain('raw_content_scope: "turn_input_only"');
     expect(textAttachmentSource).toContain("assistant_answer: false");
     expect(source).toContain("promotedPastedTextTurnInputItems");
-    expect(source).toContain("turnInputItems: promotedPastedTextTurnInputItems");
-    expect(source).toContain("explicitTurnInputItemsForTurn");
+    expect(source).toContain("buildHelixAskSubmitRunOptionsPayload({");
+    expect(source).toContain("promotedPastedTextTurnInputItems,");
+    expect(source).not.toContain("turnInputItems: promotedPastedTextTurnInputItems");
+    expect(source).toContain("buildHelixAskTurnInputItemsForSubmit({");
+    expect(source).toContain("explicitTurnInputItems:");
     expect(source).toContain("latestPastedTextAttachmentRef");
     expect(source).toContain("hasSubmittedTextAttachment");
     expect(source).toContain("isHelixAskUsePastedTextAttachmentPrompt(first)");

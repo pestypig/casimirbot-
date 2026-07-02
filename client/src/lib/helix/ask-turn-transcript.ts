@@ -66,6 +66,10 @@ function dedupeStrings(values: string[]): string[] {
   return out;
 }
 
+function readTranscriptBoolean(value: unknown): boolean | null {
+  return typeof value === "boolean" ? value : null;
+}
+
 export function buildAskLiveEventFromTurnTranscriptRecord(
   record: Record<string, unknown>,
   fallbackId: string,
@@ -101,6 +105,18 @@ export function buildAskLiveEventFromTurnTranscriptRecord(
       status: coerceText(record.status).trim() || null,
       stepId: coerceText(record.step_id).trim() || null,
       lane: coerceText(record.lane).trim() || null,
+      capabilityId: coerceText(record.capability_id).trim() || null,
+      laneSessionId: coerceText(record.lane_session_id).trim() || null,
+      selectedBackendProvider: coerceText(record.selected_backend_provider).trim() || null,
+      backendCostClass: coerceText(record.cost_class).trim() || null,
+      backendLatencyClass: coerceText(record.latency_class).trim() || null,
+      backendPrivacyClass: coerceText(record.privacy_class).trim() || null,
+      fallbackBackendProvider: coerceText(record.fallback_backend_provider).trim() || null,
+      receiptRef: coerceText(record.receipt_ref).trim() || null,
+      observationRef: coerceText(record.observation_ref).trim() || null,
+      terminalEligible: readTranscriptBoolean(record.terminal_eligible),
+      assistantAnswer: readTranscriptBoolean(record.assistant_answer),
+      rawContentIncluded: readTranscriptBoolean(record.raw_content_included),
       source_event_type: sourceEventType || type,
       event_source: coerceText(record.event_source).trim() || "live",
       turn_id: turnId || null,
@@ -154,6 +170,7 @@ function resolveHelixTranscriptRowLabel(event: Record<string, unknown>): string 
   if (sourceEventType === "lane_requested") return "Lane Request";
   if (sourceEventType === "lane_backend_selected") return "Lane Backend";
   if (sourceEventType === "lane_observation") return "Lane Observation";
+  if (sourceEventType === "lane_projection_receipt") return "Lane Receipt";
   if (sourceEventType === "lane_reentered") return "Lane Re-entry";
   if (sourceEventType === "lane_session") return "Lane Session";
   if (sourceEventType === "lane_mail_loop") return "Lane Mail";
@@ -319,6 +336,18 @@ function readHelixCapabilityLaneObservationPackets(reply: HelixAskTranscriptRepl
     debugRecord?.capability_lane_observation_packets,
     agentLoopRecord?.capability_lane_observation_packets,
     debugExportRecord?.capability_lane_observation_packets,
+  )
+    .map((entry) => readAgentLoopAuditRecord(entry))
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+}
+
+function readHelixCapabilityLaneProjectionReceipts(reply: HelixAskTranscriptReply): Record<string, unknown>[] {
+  const { replyRecord, debugRecord, agentLoopRecord, debugExportRecord } = readHelixGatewayProjectionSources(reply);
+  return readFirstAgentLoopAuditArray(
+    replyRecord?.capability_lane_projection_receipts,
+    debugRecord?.capability_lane_projection_receipts,
+    agentLoopRecord?.capability_lane_projection_receipts,
+    debugExportRecord?.capability_lane_projection_receipts,
   )
     .map((entry) => readAgentLoopAuditRecord(entry))
     .filter((entry): entry is Record<string, unknown> => Boolean(entry));
@@ -580,6 +609,10 @@ function summarizeHelixCapabilityLaneBackend(trace: Record<string, unknown> | nu
   const terminalOwner = coerceText(decision?.terminal_authority_owner).trim();
   const availability = coerceText(trace?.availability_status).trim();
   const permission = coerceText(trace?.permission_status).trim();
+  const cost = coerceText(trace?.cost_class).trim();
+  const latency = coerceText(trace?.latency_class).trim();
+  const privacy = coerceText(trace?.privacy_class).trim();
+  const fallback = coerceText(trace?.fallback_backend_provider).trim();
   const parts = [
     selectedBackend ? `selected ${selectedBackend}` : "",
     requestedBackend ? `requested ${requestedBackend}` : "",
@@ -593,6 +626,10 @@ function summarizeHelixCapabilityLaneBackend(trace: Record<string, unknown> | nu
     selectionReason ? `reason ${selectionReason}` : "",
     availability ? `availability ${availability}` : "",
     permission ? `permission ${permission}` : "",
+    cost ? `cost ${cost}` : "",
+    latency ? `latency ${latency}` : "",
+    privacy ? `privacy ${privacy}` : "",
+    fallback ? `fallback ${fallback}` : "",
   ].filter(Boolean);
   return parts.join("; ");
 }
@@ -610,6 +647,110 @@ function summarizeHelixCapabilityLaneBackendDecision(value: unknown): string[] {
   ].filter(Boolean);
 }
 
+function readHelixCapabilityLanePacketBackend(packet: Record<string, unknown> | null): Record<string, unknown> | null {
+  if (!packet) return null;
+  const stateDelta = readAgentLoopAuditRecord(packet.state_delta);
+  const shadowExecution = readAgentLoopAuditRecord(stateDelta?.capability_lane_shadow_execution);
+  const decision = readAgentLoopAuditRecord(packet.backend_selection_decision);
+  const selectedBackend =
+    coerceText(packet.selected_backend_provider).trim() ||
+    coerceText(shadowExecution?.selected_backend_provider).trim() ||
+    coerceText(decision?.selected_backend_provider).trim();
+  const requestedBackend =
+    coerceText(packet.requested_backend_provider).trim() ||
+    coerceText(shadowExecution?.requested_backend_provider).trim() ||
+    coerceText(decision?.requested_backend_provider).trim();
+  const availability =
+    coerceText(packet.availability_status).trim() ||
+    coerceText(shadowExecution?.availability_status).trim();
+  const permission =
+    coerceText(packet.permission_status).trim() ||
+    coerceText(shadowExecution?.permission_status).trim();
+  const execution =
+    coerceText(packet.execution_status).trim() ||
+    coerceText(shadowExecution?.execution_status).trim();
+  const cost =
+    coerceText(packet.cost_class).trim() ||
+    coerceText(shadowExecution?.cost_class).trim();
+  const latency =
+    coerceText(packet.latency_class).trim() ||
+    coerceText(shadowExecution?.latency_class).trim();
+  const privacy =
+    coerceText(packet.privacy_class).trim() ||
+    coerceText(shadowExecution?.privacy_class).trim();
+  const fallback =
+    coerceText(packet.fallback_backend_provider).trim() ||
+    coerceText(shadowExecution?.fallback_backend_provider).trim() ||
+    coerceText(decision?.fallback_backend_provider).trim();
+  if (
+    !selectedBackend &&
+    !requestedBackend &&
+    !availability &&
+    !permission &&
+    !execution &&
+    !cost &&
+    !latency &&
+    !privacy &&
+    !fallback &&
+    !decision
+  ) {
+    return null;
+  }
+  return {
+    selected_backend_provider: selectedBackend || null,
+    requested_backend_provider: requestedBackend || null,
+    availability_status: availability || null,
+    permission_status: permission || null,
+    execution_status: execution || null,
+    cost_class: cost || null,
+    latency_class: latency || null,
+    privacy_class: privacy || null,
+    fallback_backend_provider: fallback || null,
+    backend_selection_decision: decision,
+    terminal_eligible:
+      typeof shadowExecution?.terminal_eligible === "boolean"
+        ? shadowExecution.terminal_eligible
+        : packet.terminal_eligible,
+    assistant_answer:
+      typeof shadowExecution?.assistant_answer === "boolean"
+        ? shadowExecution.assistant_answer
+        : packet.assistant_answer,
+  };
+}
+
+function summarizeHelixCapabilityLanePacketBackend(packet: Record<string, unknown> | null): string {
+  const backend = readHelixCapabilityLanePacketBackend(packet);
+  if (!backend) return "";
+  const decisionParts = summarizeHelixCapabilityLaneBackendDecision(backend.backend_selection_decision);
+  const observationOnly = backend.terminal_eligible === false || backend.assistant_answer === false;
+  const parts = [
+    coerceText(backend.selected_backend_provider).trim()
+      ? `backend ${coerceText(backend.selected_backend_provider).trim()}`
+      : "",
+    coerceText(backend.requested_backend_provider).trim()
+      ? `requested backend ${coerceText(backend.requested_backend_provider).trim()}`
+      : "",
+    coerceText(backend.execution_status).trim()
+      ? `execution ${coerceText(backend.execution_status).trim()}`
+      : "",
+    coerceText(backend.availability_status).trim()
+      ? `availability ${coerceText(backend.availability_status).trim()}`
+      : "",
+    coerceText(backend.permission_status).trim()
+      ? `permission ${coerceText(backend.permission_status).trim()}`
+      : "",
+    coerceText(backend.cost_class).trim() ? `cost ${coerceText(backend.cost_class).trim()}` : "",
+    coerceText(backend.latency_class).trim() ? `latency ${coerceText(backend.latency_class).trim()}` : "",
+    coerceText(backend.privacy_class).trim() ? `privacy ${coerceText(backend.privacy_class).trim()}` : "",
+    coerceText(backend.fallback_backend_provider).trim()
+      ? `fallback ${coerceText(backend.fallback_backend_provider).trim()}`
+      : "",
+    ...decisionParts,
+    observationOnly ? "lane output remains observation-only" : "",
+  ].filter(Boolean);
+  return parts.join("; ");
+}
+
 function formatHelixCapabilityLaneObservationText(args: {
   capabilityId: string;
   call: Record<string, unknown>;
@@ -623,13 +764,15 @@ function formatHelixCapabilityLaneObservationText(args: {
     coerceText(args.call.observation_summary).trim() ||
     coerceText(args.call.summary).trim() ||
     coerceText(args.call.error).trim();
+  const backendSummary = summarizeHelixCapabilityLanePacketBackend(args.packet);
+  const backendSuffix = backendSummary ? ` ${backendSummary}.` : "";
   if (summary) {
     const cleanSummary = summary.replace(/\.$/, "");
-    return `Lane observation: ${args.capabilityId}${sessionSuffix} ${args.ok ? "produced" : "blocked"} ${cleanSummary}.`;
+    return `Lane observation: ${args.capabilityId}${sessionSuffix} ${args.ok ? "produced" : "blocked"} ${cleanSummary}.${backendSuffix}`;
   }
   return args.ok
-    ? `Lane observation: ${args.capabilityId}${sessionSuffix} produced a governed observation packet.`
-    : `Lane observation: ${args.capabilityId}${sessionSuffix} did not produce a successful observation packet.`;
+    ? `Lane observation: ${args.capabilityId}${sessionSuffix} produced a governed observation packet.${backendSuffix}`
+    : `Lane observation: ${args.capabilityId}${sessionSuffix} did not produce a successful observation packet.${backendSuffix}`;
 }
 
 function formatHelixCapabilityLaneDebugEventText(event: Record<string, unknown>): string {
@@ -652,6 +795,10 @@ function formatHelixCapabilityLaneDebugEventText(event: Record<string, unknown>)
     const reason = coerceText(event.selection_reason).trim();
     const availability = coerceText(event.availability_status).trim();
     const permission = coerceText(event.permission_status).trim();
+    const cost = coerceText(event.cost_class).trim();
+    const latency = coerceText(event.latency_class).trim();
+    const privacy = coerceText(event.privacy_class).trim();
+    const fallback = coerceText(event.fallback_backend_provider).trim();
     const parts = [
       selectedBackend ? `selected ${selectedBackend}` : "",
       requestedBackend ? `requested ${requestedBackend}` : "",
@@ -665,6 +812,10 @@ function formatHelixCapabilityLaneDebugEventText(event: Record<string, unknown>)
       reason ? `reason ${reason}` : "",
       availability ? `availability ${availability}` : "",
       permission ? `permission ${permission}` : "",
+      cost ? `cost ${cost}` : "",
+      latency ? `latency ${latency}` : "",
+      privacy ? `privacy ${privacy}` : "",
+      fallback ? `fallback ${fallback}` : "",
     ].filter(Boolean);
     return parts.length
       ? `Lane backend selected: ${parts.join("; ")}.`
@@ -674,15 +825,49 @@ function formatHelixCapabilityLaneDebugEventText(event: Record<string, unknown>)
     const status = coerceText(event.status).trim();
     const verb = status === "completed" ? "produced" : "blocked";
     const observationRef = coerceText(event.observation_ref).trim();
-    return `Lane observation: ${capability}${sessionSuffix} ${verb} ${observationRef || "a governed observation packet"}.`;
+    const receiptRef = coerceText(event.receipt_ref).trim();
+    const suffix = receiptRef ? `; receipt ${receiptRef}` : "";
+    return `Lane observation: ${capability}${sessionSuffix} ${verb} ${observationRef || "a governed observation packet"}${suffix}.`;
   }
   if (stage === "lane_reentered") {
     const status = coerceText(event.reentry_status).trim();
+    const receiptRef = coerceText(event.receipt_ref).trim();
+    const suffix = receiptRef ? ` Receipt ${receiptRef} remains observation-only.` : "";
     return status === "observation_packet_required_for_provider_reentry"
-      ? "Lane re-entry: observation packet available for provider reasoning before terminal selection."
+      ? `Lane re-entry: observation packet available for provider reasoning before terminal selection.${suffix}`
       : `Lane re-entry: ${status || "pending"}.`;
   }
   return `Lane event: ${capability}.`;
+}
+
+function formatHelixCapabilityLaneProjectionReceiptText(receipt: Record<string, unknown>): string {
+  const capability =
+    coerceText(receipt.capability).trim() ||
+    coerceText(receipt.capability_key).trim() ||
+    coerceText(receipt.lane_id).trim() ||
+    "capability_lane";
+  const receiptRef = coerceText(receipt.receipt_ref).trim();
+  const observationRef = coerceText(receipt.observation_ref).trim();
+  const payload = readAgentLoopAuditRecord(receipt.payload);
+  const projectionTarget =
+    coerceText(receipt.projection_target).trim() ||
+    coerceText(payload?.projection_target).trim();
+  const projectionStatus =
+    coerceText(receipt.projection_status).trim() ||
+    coerceText(payload?.projection_status).trim() ||
+    coerceText(receipt.status).trim();
+  const targetLanguage =
+    coerceText(receipt.target_language).trim() ||
+    coerceText(payload?.target_language).trim();
+  const parts = [
+    capability,
+    projectionStatus ? `projection ${projectionStatus}` : "",
+    projectionTarget ? `target ${projectionTarget}` : "",
+    targetLanguage ? `language ${targetLanguage}` : "",
+    observationRef ? `observation ${observationRef}` : "",
+    receiptRef ? `receipt ${receiptRef}` : "",
+  ].filter(Boolean);
+  return `Lane projection receipt: ${parts.join("; ")}; remains observation-only.`;
 }
 
 function formatHelixCapabilityLaneGoalBindingSummaryText(summary: Record<string, unknown>): string {
@@ -693,12 +878,20 @@ function formatHelixCapabilityLaneGoalBindingSummaryText(summary: Record<string,
   const sessionStatus = coerceText(summary.session_status).trim();
   const sessionHealth = coerceText(summary.session_health).trim();
   const backend = coerceText(summary.selected_backend_provider).trim();
+  const cost = coerceText(summary.cost_class).trim();
+  const latency = coerceText(summary.latency_class).trim();
+  const privacy = coerceText(summary.privacy_class).trim();
+  const fallback = coerceText(summary.fallback_backend_provider).trim();
   const sourceId = coerceText(summary.source_id).trim();
   const observationRef = coerceText(summary.last_observation_ref).trim();
   const latestMailLoop = readAgentLoopAuditRecord(summary.latest_mail_loop_summary);
   const mailLoopRef =
     coerceText(latestMailLoop?.stage_play_mail_id).trim() ||
     coerceText(latestMailLoop?.observation_ref).trim();
+  const receiptRef = coerceText(latestMailLoop?.receipt_ref).trim();
+  const latestGoalEvent = readAgentLoopAuditRecord(summary.latest_goal_binding_event);
+  const latestGoalEventName = coerceText(latestGoalEvent?.event).trim();
+  const latestGoalEventReceiptRef = coerceText(latestGoalEvent?.receipt_ref).trim();
   const reportDecision = readAgentLoopAuditRecord(summary.report_decision);
   const reportAction = coerceText(reportDecision?.action).trim();
   const reportReason = coerceText(reportDecision?.reason).trim();
@@ -713,10 +906,16 @@ function formatHelixCapabilityLaneGoalBindingSummaryText(summary: Record<string,
     bindingStatus ? `binding ${bindingStatus}` : "",
     sessionStatus || sessionHealth ? `session state ${[sessionStatus, sessionHealth].filter(Boolean).join("/")}` : "",
     backend ? `backend ${backend}` : "",
+    cost ? `cost ${cost}` : "",
+    latency ? `latency ${latency}` : "",
+    privacy ? `privacy ${privacy}` : "",
+    fallback ? `fallback ${fallback}` : "",
     ...decisionParts,
     sourceId ? `source ${sourceId}` : "",
     observationRef ? `last observation ${observationRef}` : "",
     mailLoopRef ? `latest mail ${mailLoopRef}` : "",
+    latestGoalEventName ? `latest event ${latestGoalEventName}` : "",
+    receiptRef || latestGoalEventReceiptRef ? `receipt ${receiptRef || latestGoalEventReceiptRef}` : "",
     reportAction ? `report action ${reportAction}` : "",
     reportReason ? `report reason ${reportReason}` : "",
     dispatchTarget ? `dispatch target ${dispatchTarget}` : "",
@@ -734,6 +933,7 @@ function formatHelixCapabilityLaneGoalDispatchPlanText(plan: Record<string, unkn
   const reason = coerceText(plan.reason).trim();
   const evidenceRef = coerceText(plan.evidence_ref).trim();
   const mailLoopRef = coerceText(plan.mail_loop_ref).trim();
+  const receiptRef = coerceText(plan.receipt_ref).trim();
   const terminalAuthority = coerceText(plan.terminal_authority_status).trim();
   const sideEffects = plan.side_effects_executed === true ? "side effects executed" : "no side effects executed";
   const parts = [
@@ -742,6 +942,7 @@ function formatHelixCapabilityLaneGoalDispatchPlanText(plan: Record<string, unkn
     reason ? `reason ${reason}` : "",
     evidenceRef ? `evidence ${evidenceRef}` : "",
     mailLoopRef ? `mail ${mailLoopRef}` : "",
+    receiptRef ? `receipt ${receiptRef}` : "",
     terminalAuthority ? `terminal authority ${terminalAuthority}` : "",
     sideEffects,
   ].filter(Boolean);
@@ -756,6 +957,7 @@ function formatHelixCapabilityLaneGoalDispatchAdmissionText(admission: Record<st
   const blockedReason = coerceText(admission.blocked_reason).trim();
   const evidenceRef = coerceText(admission.evidence_ref).trim();
   const mailLoopRef = coerceText(admission.mail_loop_ref).trim();
+  const receiptRef = coerceText(admission.receipt_ref).trim();
   const terminalAuthority = coerceText(admission.terminal_authority_status).trim();
   const parts = [
     `target ${target}`,
@@ -764,6 +966,7 @@ function formatHelixCapabilityLaneGoalDispatchAdmissionText(admission: Record<st
     blockedReason ? `blocked ${blockedReason}` : "",
     evidenceRef ? `evidence ${evidenceRef}` : "",
     mailLoopRef ? `mail ${mailLoopRef}` : "",
+    receiptRef ? `receipt ${receiptRef}` : "",
     terminalAuthority ? `terminal authority ${terminalAuthority}` : "",
     "side effects not allowed",
   ].filter(Boolean);
@@ -783,11 +986,23 @@ function formatHelixCapabilityLaneGoalDispatchReadinessText(readiness: Record<st
   const blockedReasons = Array.isArray(readiness.blocked_reasons)
     ? readiness.blocked_reasons.map(coerceText).filter(Boolean).join(", ")
     : "";
+  const nextLanes = Array.isArray(readiness.next_lane_ids)
+    ? readiness.next_lane_ids.map(coerceText).filter(Boolean).join(", ")
+    : "";
+  const nextSessions = Array.isArray(readiness.next_lane_session_ids)
+    ? readiness.next_lane_session_ids.map(coerceText).filter(Boolean).join(", ")
+    : "";
   const nextTargets = Array.isArray(readiness.next_dispatch_targets)
     ? readiness.next_dispatch_targets.map(coerceText).filter(Boolean).join(", ")
     : "";
   const nextBindings = Array.isArray(readiness.next_goal_binding_ids)
     ? readiness.next_goal_binding_ids.map(coerceText).filter(Boolean).join(", ")
+    : "";
+  const nextEvidence = Array.isArray(readiness.next_evidence_refs)
+    ? readiness.next_evidence_refs.map(coerceText).filter(Boolean).join(", ")
+    : "";
+  const nextReceipts = Array.isArray(readiness.next_receipt_refs)
+    ? readiness.next_receipt_refs.map(coerceText).filter(Boolean).join(", ")
     : "";
   const parts = [
     `plans ${totalPlans}`,
@@ -799,8 +1014,12 @@ function formatHelixCapabilityLaneGoalDispatchReadinessText(readiness: Record<st
     projectionOnlyCount !== "0" ? `projection only ${projectionOnlyCount}` : "",
     manualReviewCount !== "0" ? `manual review ${manualReviewCount}` : "",
     debugOnlyCount !== "0" ? `debug only ${debugOnlyCount}` : "",
+    nextLanes ? `next lanes ${nextLanes}` : "",
+    nextSessions ? `next sessions ${nextSessions}` : "",
     nextTargets ? `next targets ${nextTargets}` : "",
     nextBindings ? `next goal bindings ${nextBindings}` : "",
+    nextEvidence ? `next evidence ${nextEvidence}` : "",
+    nextReceipts ? `next receipts ${nextReceipts}` : "",
     blockedReasons ? `blocked reasons ${blockedReasons}` : "",
     "no side effects allowed",
   ].filter(Boolean);
@@ -813,11 +1032,16 @@ function formatHelixCapabilityLaneSessionSummaryText(summary: Record<string, unk
   const sessionStatus = coerceText(summary.session_status).trim();
   const sessionHealth = coerceText(summary.session_health).trim();
   const backend = coerceText(summary.selected_backend_provider).trim();
+  const cost = coerceText(summary.cost_class).trim();
+  const latency = coerceText(summary.latency_class).trim();
+  const privacy = coerceText(summary.privacy_class).trim();
+  const fallback = coerceText(summary.fallback_backend_provider).trim();
   const sourceId = coerceText(summary.source_id).trim();
   const sourceKind = coerceText(summary.source_kind).trim();
   const projectionTarget = coerceText(summary.projection_target).trim();
   const accountLocale = coerceText(summary.account_locale).trim();
   const observationRef = coerceText(summary.last_observation_ref).trim();
+  const receiptRef = coerceText(summary.last_receipt_ref).trim();
   const terminalAuthority = coerceText(summary.terminal_authority_status).trim();
   const eventCount = coerceText(summary.session_event_count).trim();
   const decisionParts = summarizeHelixCapabilityLaneBackendDecision(summary.backend_selection_decision);
@@ -825,12 +1049,17 @@ function formatHelixCapabilityLaneSessionSummaryText(summary: Record<string, unk
     sessionId ? `session ${sessionId}` : "",
     sessionStatus || sessionHealth ? `state ${[sessionStatus, sessionHealth].filter(Boolean).join("/")}` : "",
     backend ? `backend ${backend}` : "",
+    cost ? `cost ${cost}` : "",
+    latency ? `latency ${latency}` : "",
+    privacy ? `privacy ${privacy}` : "",
+    fallback ? `fallback ${fallback}` : "",
     ...decisionParts,
     sourceId ? `source ${sourceId}` : "",
     sourceKind ? `source kind ${sourceKind}` : "",
     projectionTarget ? `projection ${projectionTarget}` : "",
     accountLocale ? `locale ${accountLocale}` : "",
     observationRef ? `last observation ${observationRef}` : "",
+    receiptRef ? `receipt ${receiptRef}` : "",
     terminalAuthority ? `terminal authority ${terminalAuthority}` : "",
     eventCount ? `events ${eventCount}` : "",
   ].filter(Boolean);
@@ -843,28 +1072,48 @@ function formatHelixCapabilityLaneMailLoopSummaryText(summary: Record<string, un
   const sessionId = coerceText(summary.lane_session_id).trim();
   const mailId = coerceText(summary.stage_play_mail_id).trim();
   const observationRef = coerceText(summary.observation_ref).trim();
+  const receiptRef = coerceText(summary.receipt_ref).trim();
   const sourceId = coerceText(summary.source_id).trim();
   const sourceKind = coerceText(summary.source_kind).trim();
   const chunkId = coerceText(summary.chunk_id).trim();
+  const chunkIndex = coerceText(summary.chunk_index).trim();
+  const dedupeKey = coerceText(summary.dedupe_key).trim();
+  const sourceEventMs = coerceText(summary.source_event_ms).trim();
+  const observedAtMs = coerceText(summary.observed_at_ms).trim();
   const projectionTarget = coerceText(summary.projection_target).trim();
   const backend = coerceText(summary.selected_backend_provider).trim();
   const requestedBackend = coerceText(summary.requested_backend_provider).trim();
+  const cost = coerceText(summary.cost_class).trim();
+  const latency = coerceText(summary.latency_class).trim();
+  const privacy = coerceText(summary.privacy_class).trim();
+  const fallback = coerceText(summary.fallback_backend_provider).trim();
   const freshness = coerceText(summary.freshness_status).trim();
   const blockedReason = coerceText(summary.blocked_reason).trim();
   const terminalAuthority = coerceText(summary.terminal_authority_status).trim();
   const decisionParts = summarizeHelixCapabilityLaneBackendDecision(summary.backend_selection_decision);
   const wakeExpected = summary.stage_play_wake_expected === true ? "wake expected" : "wake not expected";
+  const cancelled = summary.cancel_requested === true;
   const parts = [
     sessionId ? `session ${sessionId}` : "",
     mailId ? `mail ${mailId}` : "",
     wakeExpected,
     observationRef ? `observation ${observationRef}` : "",
+    receiptRef ? `receipt ${receiptRef}` : "",
     sourceId ? `source ${sourceId}` : "",
     sourceKind ? `source kind ${sourceKind}` : "",
     chunkId ? `chunk ${chunkId}` : "",
+    chunkIndex ? `index ${chunkIndex}` : "",
+    dedupeKey ? `dedupe ${dedupeKey}` : "",
+    sourceEventMs ? `source event ${sourceEventMs}` : "",
+    observedAtMs ? `observed ${observedAtMs}` : "",
+    cancelled ? "cancelled" : "",
     projectionTarget ? `projection ${projectionTarget}` : "",
     backend ? `backend ${backend}` : "",
     requestedBackend ? `requested backend ${requestedBackend}` : "",
+    cost ? `cost ${cost}` : "",
+    latency ? `latency ${latency}` : "",
+    privacy ? `privacy ${privacy}` : "",
+    fallback ? `fallback ${fallback}` : "",
     ...decisionParts,
     freshness ? `freshness ${freshness}` : "",
     blockedReason ? `blocked ${blockedReason}` : "",
@@ -1113,8 +1362,39 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
   const goalDispatchPlans = readHelixCapabilityLaneGoalDispatchPlans(reply);
   const goalDispatchAdmissions = readHelixCapabilityLaneGoalDispatchAdmissions(reply);
   const goalDispatchReadiness = readHelixCapabilityLaneGoalDispatchReadiness(reply);
+  const projectionReceipts = readHelixCapabilityLaneProjectionReceipts(reply);
   const terminalKind = readHelixCapabilityLaneTerminalKind(reply);
   const turnId = coerceText(reply.turn_id ?? reply.debug?.turn_id ?? reply.id).trim();
+  const projectionReceiptEvents = projectionReceipts.slice(0, 10).map((receipt, index) => {
+    const laneId = coerceText(receipt.lane_id).trim() || "capability_lane";
+    const capabilityId =
+      coerceText(receipt.capability).trim() ||
+      coerceText(receipt.capability_key).trim() ||
+      laneId;
+    const status = coerceText(receipt.status).trim();
+    return {
+      id: coerceText(receipt.receipt_ref).trim() || `${reply.id}-capability-lane-projection-receipt-${index}`,
+      role: "tool",
+      type: "observation",
+      status: status === "blocked" || status === "failed" ? "failed" : "completed",
+      text: formatHelixCapabilityLaneProjectionReceiptText(receipt),
+      detail:
+        coerceText(receipt.receipt_ref).trim() ||
+        coerceText(receipt.observation_ref).trim() ||
+        capabilityId,
+      lane: laneId,
+      step_id: "lane_projection_receipt",
+      turn_id: turnId,
+      capability_id: capabilityId,
+      receipt_ref: coerceText(receipt.receipt_ref).trim() || null,
+      observation_ref: coerceText(receipt.observation_ref).trim() || null,
+      terminal_eligible: receipt.terminal_eligible === true,
+      assistant_answer: receipt.assistant_answer === true,
+      raw_content_included: receipt.raw_content_included === true,
+      event_source: "capability_lane_projection_receipts",
+      source_event_type: "lane_projection_receipt",
+    };
+  });
   const sessionEvents = sessionSummaries.slice(0, 10).map((summary, index) => {
     const laneId = coerceText(summary.lane_id).trim() || "capability_lane";
     const sessionStatus = coerceText(summary.session_status).trim();
@@ -1139,6 +1419,17 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
       step_id: "lane_session",
       turn_id: turnId,
       capability_id: laneId,
+      lane_session_id: coerceText(summary.lane_session_id).trim() || null,
+      selected_backend_provider: coerceText(summary.selected_backend_provider).trim() || null,
+      cost_class: coerceText(summary.cost_class).trim() || null,
+      latency_class: coerceText(summary.latency_class).trim() || null,
+      privacy_class: coerceText(summary.privacy_class).trim() || null,
+      fallback_backend_provider: coerceText(summary.fallback_backend_provider).trim() || null,
+      receipt_ref: coerceText(summary.last_receipt_ref).trim() || null,
+      observation_ref: coerceText(summary.last_observation_ref).trim() || null,
+      terminal_eligible: summary.terminal_eligible === true,
+      assistant_answer: summary.assistant_answer === true,
+      raw_content_included: summary.raw_content_included === true,
       event_source: "capability_lane_session_debug_summaries",
       source_event_type: "lane_session",
     };
@@ -1162,6 +1453,17 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
       step_id: "lane_mail_loop",
       turn_id: turnId,
       capability_id: coerceText(summary.capability).trim() || laneId,
+      lane_session_id: coerceText(summary.lane_session_id).trim() || null,
+      selected_backend_provider: coerceText(summary.selected_backend_provider).trim() || null,
+      cost_class: coerceText(summary.cost_class).trim() || null,
+      latency_class: coerceText(summary.latency_class).trim() || null,
+      privacy_class: coerceText(summary.privacy_class).trim() || null,
+      fallback_backend_provider: coerceText(summary.fallback_backend_provider).trim() || null,
+      receipt_ref: coerceText(summary.receipt_ref).trim() || null,
+      observation_ref: coerceText(summary.observation_ref).trim() || null,
+      terminal_eligible: summary.terminal_eligible === true,
+      assistant_answer: summary.assistant_answer === true,
+      raw_content_included: summary.raw_content_included === true,
       event_source: "capability_lane_mail_loop_debug_summaries",
       source_event_type: "lane_mail_loop",
     };
@@ -1176,6 +1478,8 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
         : sessionStatus === "running" || sessionStatus === "paused"
           ? "pending"
           : "completed";
+    const latestGoalEvent = readAgentLoopAuditRecord(summary.latest_goal_binding_event);
+    const reportDecision = readAgentLoopAuditRecord(summary.report_decision);
     return {
       id: coerceText(summary.goal_binding_id).trim() || `${reply.id}-capability-lane-goal-binding-${index}`,
       role: "system",
@@ -1190,6 +1494,24 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
       step_id: "lane_goal_binding",
       turn_id: turnId,
       capability_id: laneId,
+      lane_session_id: coerceText(summary.lane_session_id).trim() || null,
+      selected_backend_provider: coerceText(summary.selected_backend_provider).trim() || null,
+      cost_class: coerceText(summary.cost_class).trim() || null,
+      latency_class: coerceText(summary.latency_class).trim() || null,
+      privacy_class: coerceText(summary.privacy_class).trim() || null,
+      fallback_backend_provider: coerceText(summary.fallback_backend_provider).trim() || null,
+      receipt_ref:
+        coerceText(summary.last_receipt_ref).trim() ||
+        coerceText(latestGoalEvent?.receipt_ref).trim() ||
+        coerceText(reportDecision?.receipt_ref).trim() ||
+        null,
+      observation_ref:
+        coerceText(summary.last_observation_ref).trim() ||
+        coerceText(reportDecision?.evidence_ref).trim() ||
+        null,
+      terminal_eligible: summary.terminal_eligible === true,
+      assistant_answer: summary.assistant_answer === true,
+      raw_content_included: summary.raw_content_included === true,
       event_source: "capability_lane_goal_binding_debug_summaries",
       source_event_type: "lane_goal_binding",
     };
@@ -1221,6 +1543,12 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
       step_id: "lane_goal_dispatch_plan",
       turn_id: turnId,
       capability_id: laneId,
+      lane_session_id: coerceText(plan.lane_session_id).trim() || null,
+      receipt_ref: coerceText(plan.receipt_ref).trim() || null,
+      observation_ref: coerceText(plan.evidence_ref).trim() || null,
+      terminal_eligible: plan.terminal_eligible === true,
+      assistant_answer: plan.assistant_answer === true,
+      raw_content_included: plan.raw_content_included === true,
       event_source: "capability_lane_goal_dispatch_plans",
       source_event_type: "lane_goal_dispatch_plan",
     };
@@ -1250,6 +1578,12 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
       step_id: "lane_goal_dispatch_admission",
       turn_id: turnId,
       capability_id: laneId,
+      lane_session_id: coerceText(admission.lane_session_id).trim() || null,
+      receipt_ref: coerceText(admission.receipt_ref).trim() || null,
+      observation_ref: coerceText(admission.evidence_ref).trim() || null,
+      terminal_eligible: admission.terminal_eligible === true,
+      assistant_answer: admission.assistant_answer === true,
+      raw_content_included: admission.raw_content_included === true,
       event_source: "capability_lane_goal_dispatch_admissions",
       source_event_type: "lane_goal_dispatch_admission",
     };
@@ -1266,9 +1600,23 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
             Array.isArray(goalDispatchReadiness.next_dispatch_targets)
               ? goalDispatchReadiness.next_dispatch_targets.map(coerceText).filter(Boolean).join(", ")
               : "dispatch_readiness",
-          lane: "capability_lane_goal_dispatch",
+          lane: Array.isArray(goalDispatchReadiness.next_lane_ids)
+            ? goalDispatchReadiness.next_lane_ids.map(coerceText).find(Boolean) || "capability_lane_goal_dispatch"
+            : "capability_lane_goal_dispatch",
           step_id: "lane_goal_dispatch_readiness",
           turn_id: turnId,
+          lane_session_id: Array.isArray(goalDispatchReadiness.next_lane_session_ids)
+            ? goalDispatchReadiness.next_lane_session_ids.map(coerceText).find(Boolean) || null
+            : null,
+          receipt_ref: Array.isArray(goalDispatchReadiness.next_receipt_refs)
+            ? goalDispatchReadiness.next_receipt_refs.map(coerceText).find(Boolean) || null
+            : null,
+          observation_ref: Array.isArray(goalDispatchReadiness.next_evidence_refs)
+            ? goalDispatchReadiness.next_evidence_refs.map(coerceText).find(Boolean) || null
+            : null,
+          terminal_eligible: goalDispatchReadiness.terminal_eligible === true,
+          assistant_answer: goalDispatchReadiness.assistant_answer === true,
+          raw_content_included: goalDispatchReadiness.raw_content_included === true,
           event_source: "capability_lane_goal_dispatch_readiness",
           source_event_type: "lane_goal_dispatch_readiness",
         },
@@ -1301,12 +1649,23 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
         step_id: coerceText(event.stage).trim() || `capability_lane_debug_${index + 1}`,
         turn_id: turnId,
         capability_id: capabilityId,
+        selected_backend_provider: coerceText(event.selected_backend_provider).trim() || null,
+        cost_class: coerceText(event.cost_class).trim() || null,
+        latency_class: coerceText(event.latency_class).trim() || null,
+        privacy_class: coerceText(event.privacy_class).trim() || null,
+        fallback_backend_provider: coerceText(event.fallback_backend_provider).trim() || null,
+        receipt_ref: coerceText(event.receipt_ref).trim() || null,
+        observation_ref: coerceText(event.observation_ref).trim() || null,
+        terminal_eligible: event.terminal_eligible === true,
+        assistant_answer: event.assistant_answer === true,
+        raw_content_included: event.raw_content_included === true,
         event_source: "capability_lane_debug_events",
         source_event_type: sourceEventType,
       };
     });
     events.push(...sessionEvents);
     events.push(...mailLoopEvents);
+    events.push(...projectionReceiptEvents);
     events.push(...goalBindingEvents);
     events.push(...goalDispatchEvents);
     events.push(...goalDispatchAdmissionEvents);
@@ -1335,6 +1694,7 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
     const events = [
       ...sessionEvents,
       ...mailLoopEvents,
+      ...projectionReceiptEvents,
       ...goalBindingEvents,
       ...goalDispatchEvents,
       ...goalDispatchAdmissionEvents,
@@ -1406,12 +1766,18 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
         step_id: stepId,
         turn_id: turnId,
         capability_id: capabilityId,
+        selected_backend_provider: coerceText(trace?.selected_backend_provider).trim() || null,
+        cost_class: coerceText(trace?.cost_class).trim() || null,
+        latency_class: coerceText(trace?.latency_class).trim() || null,
+        privacy_class: coerceText(trace?.privacy_class).trim() || null,
+        fallback_backend_provider: coerceText(trace?.fallback_backend_provider).trim() || null,
         event_source: "capability_lane_resolve_traces",
         source_event_type: "lane_backend_selected",
       });
     }
 
     if (!usingBackendSelectionOnly || packet) {
+      const packetBackend = readHelixCapabilityLanePacketBackend(packet);
       events.push({
         id: `${reply.id}-capability-lane-${index}-observation`,
         role: "tool",
@@ -1424,6 +1790,15 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
         turn_id: turnId,
         capability_id: capabilityId,
         lane_session_id: readHelixCapabilityLaneSessionId(call, packet) || null,
+        selected_backend_provider: coerceText(packetBackend?.selected_backend_provider).trim() || null,
+        requested_backend_provider: coerceText(packetBackend?.requested_backend_provider).trim() || null,
+        availability_status: coerceText(packetBackend?.availability_status).trim() || null,
+        permission_status: coerceText(packetBackend?.permission_status).trim() || null,
+        execution_status: coerceText(packetBackend?.execution_status).trim() || null,
+        cost_class: coerceText(packetBackend?.cost_class).trim() || null,
+        latency_class: coerceText(packetBackend?.latency_class).trim() || null,
+        privacy_class: coerceText(packetBackend?.privacy_class).trim() || null,
+        fallback_backend_provider: coerceText(packetBackend?.fallback_backend_provider).trim() || null,
         event_source: "capability_lane_call_results",
         source_event_type: "lane_observation",
       });
@@ -1432,6 +1807,7 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
 
   events.push(...sessionEvents);
   events.push(...mailLoopEvents);
+  events.push(...projectionReceiptEvents);
   if (successfulPacketPresent || reentryStatus) {
     events.push({
       id: `${reply.id}-capability-lane-reentry`,
@@ -1582,6 +1958,19 @@ export function buildHelixRuntimeAskLiveEvents(reply: HelixAskTranscriptReply): 
       turnKey: coerceText(event.turn_id).trim() || null,
       stepId: coerceText(event.step_id).trim() || null,
       lane: coerceText(event.lane).trim() || null,
+      capabilityId: coerceText(event.capability_id).trim() || null,
+      laneSessionId: coerceText(event.lane_session_id).trim() || null,
+      selectedBackendProvider: coerceText(event.selected_backend_provider).trim() || null,
+      backendCostClass: coerceText(event.cost_class).trim() || null,
+      backendLatencyClass: coerceText(event.latency_class).trim() || null,
+      backendPrivacyClass: coerceText(event.privacy_class).trim() || null,
+      fallbackBackendProvider: coerceText(event.fallback_backend_provider).trim() || null,
+      receiptRef: coerceText(event.receipt_ref).trim() || null,
+      observationRef: coerceText(event.observation_ref).trim() || null,
+      terminalEligible: readTranscriptBoolean(event.terminal_eligible),
+      assistantAnswer: readTranscriptBoolean(event.assistant_answer),
+      rawContentIncluded: readTranscriptBoolean(event.raw_content_included),
+      source_event_type: coerceText(event.source_event_type).trim() || null,
       event_source: coerceText(event.event_source).trim() || "agent_runtime_loop",
     },
   }));
@@ -1655,6 +2044,7 @@ export function resolveHelixTurnTranscriptEvents(reply: HelixAskTranscriptReply)
         "lane_requested",
         "lane_backend_selected",
         "lane_observation",
+        "lane_projection_receipt",
         "lane_reentered",
         "lane_session",
         "lane_mail_loop",

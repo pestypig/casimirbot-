@@ -13,6 +13,17 @@ const readRecord = (value: unknown): Record<string, unknown> | null =>
 const readString = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
 
+const readNumber = (value: unknown): number | null =>
+  typeof value === "number" && Number.isFinite(value) ? value : null;
+
+const readReceiptRef = (translationResult: HelixLiveTranslationOneShotResult): string | null => {
+  const traceRef = readString(translationResult.lane_resolve_trace.receipt_ref);
+  if (traceRef) return traceRef;
+  const packetReceipt = translationResult.observation_packet.receipts.find((receipt) =>
+    readString(receipt.receipt_ref));
+  return packetReceipt ? readString(packetReceipt.receipt_ref) : null;
+};
+
 const sourceKindForProjectionTarget = (
   projectionTarget: string,
 ): StagePlayLiveSourceMailItemV1["sourceKind"] => {
@@ -63,6 +74,7 @@ const buildMailLoopDebugSummary = (input: {
   const observation = input.translationResult.observation;
   const packet = input.translationResult.observation_packet;
   const chunk = readRecord(packet.state_delta?.live_translation_chunk);
+  const receiptRef = readReceiptRef(input.translationResult);
   const evidenceRefs = input.mail?.evidenceRefs ?? input.translationResult.artifact_refs ?? [];
   return {
     schema: HELIX_CAPABILITY_LANE_MAIL_LOOP_DEBUG_SUMMARY_SCHEMA,
@@ -70,16 +82,26 @@ const buildMailLoopDebugSummary = (input: {
     lane_id: "live_translation",
     capability: input.translationResult.capability,
     observation_ref: input.observationRef,
+    receipt_ref: receiptRef,
     stage_play_mail_id: input.mail?.mailId ?? null,
     stage_play_wake_expected: input.stagePlayWakeExpected,
     mailbox_thread_id: input.threadId,
     source_id: readString(observation?.source_id) || readString(chunk?.source_id) || input.mail?.sourceId || null,
     source_kind: input.mail?.sourceKind ?? null,
     chunk_id: readString(observation?.chunk_id) || readString(chunk?.chunk_id) || null,
+    chunk_index: readNumber(observation?.chunk_index) ?? readNumber(chunk?.chunk_index),
+    dedupe_key: readString(observation?.dedupe_key) || readString(chunk?.dedupe_key) || null,
+    source_event_ms: readNumber(observation?.source_event_ms) ?? readNumber(chunk?.source_event_ms),
+    observed_at_ms: readNumber(observation?.observed_at_ms) ?? readNumber(chunk?.observed_at_ms),
     projection_target: readString(observation?.projection_target) || readString(chunk?.projection_target) || null,
+    cancel_requested: observation?.cancel_requested === true || chunk?.cancel_requested === true,
     selected_backend_provider: input.translationResult.lane_resolve_trace.selected_backend_provider,
     requested_backend_provider: input.translationResult.lane_resolve_trace.requested_backend_provider,
     backend_selection_decision: input.translationResult.lane_resolve_trace.backend_selection_decision,
+    cost_class: input.translationResult.lane_resolve_trace.cost_class,
+    latency_class: input.translationResult.lane_resolve_trace.latency_class,
+    privacy_class: input.translationResult.lane_resolve_trace.privacy_class,
+    fallback_backend_provider: input.translationResult.lane_resolve_trace.fallback_backend_provider,
     freshness_status: readString(observation?.freshness_status) || readString(chunk?.freshness_status) || null,
     blocked_reason: input.blockedReason,
     mail_status: input.mail?.status ?? null,
@@ -235,6 +257,7 @@ export const routeLiveTranslationObservationToMailLoop = (input: {
     sourceId,
     chunkId,
     observationRef,
+    readReceiptRef(input.translationResult),
     input.translationResult.lane_resolve_trace.selected_backend_provider,
     input.translationResult.lane_resolve_trace.requested_backend_provider,
   ].filter((value): value is string => Boolean(value));
@@ -260,6 +283,7 @@ export const routeLiveTranslationObservationToMailLoop = (input: {
   input.sessionStore.recordObservation({
     laneSessionId: input.laneSessionId,
     observationRef: mail.mailId,
+    receiptRef: readReceiptRef(input.translationResult),
     nowMs: input.now ? Date.parse(input.now) : undefined,
   });
   const stagePlayWakeExpected = mail.status === "unread";

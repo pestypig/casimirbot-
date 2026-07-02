@@ -32,6 +32,7 @@ import {
 import {
   buildHelixAskDebugDrawerCopyProjection,
   buildHelixAskDebugExportDrawerState,
+  clearHelixAskDebugDrawerForStaleReply,
 } from "@/components/helix/ask-console/HelixAskDebugDrawerState";
 import {
   hasHelixAskLegacyTerminalMismatch,
@@ -56,6 +57,17 @@ import {
   buildHelixAskConsoleContextFiles,
 } from "@/components/helix/ask-console/HelixAskRequestEnvelope";
 import {
+  buildHelixAskDocViewerDebugSnapshotBinding,
+  readHelixAskDocViewerPathFromDesktopUrlForSnapshot,
+  rememberHelixAskDocViewerPathForSnapshot,
+  resetHelixAskDocViewerSnapshotPathMemoryForTests,
+  resolveHelixAskDocViewerSnapshotPathBinding,
+} from "@/components/helix/ask-console/HelixAskActiveDocContextBinding";
+import {
+  buildHelixAskWorkspaceContextSnapshotBinding,
+  buildHelixAskWorkstationLayoutDebugSnapshotBinding,
+} from "@/components/helix/ask-console/HelixAskWorkspaceContextBinding";
+import {
   copyHelixAskContextCapsuleToClipboard,
   copyHelixAskDebugJsonToClipboard,
   copyHelixAskPlainTextToClipboard,
@@ -74,17 +86,23 @@ import {
   resolveHelixAskLatestTurnId,
 } from "@/components/helix/ask-console/HelixAskLatestTurnBinding";
 import {
+  buildHelixAskLegacyTurnControlActionPayload,
   buildHelixAskLegacyTurnControlViewModel,
   buildHelixAskReplyCopyText,
+  clearHelixAskLegacyCopiedDebugIdIfCurrent,
   debugPayloadMatchesHelixAskLegacyRenderedTurnPayload,
   enforceHelixAskLegacyDebugExportMatchesClickedButton,
   extractHelixAskLegacyClickedTurnDebugScope,
   isHelixAskLegacyBackendDebugExportEligibleTurnId,
+  isHelixAskLegacyRenderedButtonBackendTurnScopeTrusted,
+  resolveHelixAskLegacyClickedDebugReply,
   resolveHelixAskLegacyDebugExportBackendTarget,
+  resolveHelixAskLegacyDebugExportClientTurnId,
   resolveHelixAskLegacyReplyDebugTurnId,
   resolveHelixAskLegacyTurnControlText,
   selectHelixAskLegacyDebugCopyLocalPayload,
   selectHelixAskLegacyGuardedDebugExportPayload,
+  selectHelixAskLegacyReplyScopedDebugExportPayload,
 } from "@/components/helix/ask-console/HelixAskLegacyTurnControls";
 import {
   hasSuccessfulWorkstationTerminalTranscriptRows,
@@ -115,6 +133,11 @@ import {
   buildHelixAskConsoleChatMessagePayload,
   buildHelixAskConsoleChatTurnPayloads,
 } from "@/components/helix/ask-console/HelixAskChatPersistence";
+import {
+  normalizeHelixAgentProvidersResponse,
+  resolveHelixAgentRuntimePrimaryButtonDecision,
+  resolveHelixAgentRuntimeSelectDecision,
+} from "@/lib/helix/ask-agent-runtime-display";
 import {
   addHelixAskLegacyChatMessage,
   addHelixAskLegacyChatTurnMessages,
@@ -232,6 +255,7 @@ describe("Helix Ask Console recrown boundary", () => {
       "HelixAskDebugDrawerState.ts",
       "HelixAskAttachmentStrip.tsx",
       "HelixAskAttachmentCommit.ts",
+      "HelixAskAttachmentPayload.ts",
       "HelixAskTextAttachment.ts",
       "HelixAskStatusLine.tsx",
       "HelixAskVoiceLevelMonitor.tsx",
@@ -416,13 +440,14 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(Math.abs(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.lineCountAtInventory - legacyPillLines.length)).toBeLessThanOrEqual(5);
     expect(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.lineCountAtInventory).toBeGreaterThan(26000);
     expect(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.exportedComponentStartsAtLine).toBeGreaterThan(8000);
-    expect(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.liveRenderSliceStartsAtLine).toBeGreaterThan(25900);
+    expect(HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT.liveRenderSliceStartsAtLine).toBeGreaterThan(25800);
     expect(HELIX_ASK_LEGACY_CONSOLE_SLICES.map((slice) => slice.classification)).toEqual([
       "live_day_to_day_must_move",
       "pure_display_already_recrowned",
       "pure_display_already_recrowned",
       "pure_display_already_recrowned",
       "pure_display_already_recrowned",
+      "behavior_sensitive_recrowned_with_parity",
       "behavior_sensitive_recrowned_with_parity",
       "behavior_sensitive_recrowned_with_parity",
       "behavior_sensitive_recrowned_with_parity",
@@ -492,7 +517,7 @@ describe("Helix Ask Console recrown boundary", () => {
       bridgeReplacementReady: false,
       liveDayToDaySliceCount: 1,
       pureDisplayRecrownedSliceCount: 4,
-      behaviorSensitiveRecrownedWithParitySliceCount: 56,
+      behaviorSensitiveRecrownedWithParitySliceCount: 57,
       behaviorSensitiveQuarantinedSliceCount: 4,
       unknownTrapDoorSliceCount: 1,
     });
@@ -922,6 +947,7 @@ describe("Helix Ask Console recrown boundary", () => {
   });
 
   it("recrowns docs-viewer snapshot path source priority without moving UI reads", () => {
+    resetHelixAskDocViewerSnapshotPathMemoryForTests();
     expect(resolveDocViewerSnapshotPathCandidate({
       storePath: "docs/store.md",
       debugSnapshotPath: "docs/debug.md",
@@ -949,12 +975,38 @@ describe("Helix Ask Console recrown boundary", () => {
       path: "docs/url.md",
       source: "desktop_url_doc_param",
     });
+    expect(readHelixAskDocViewerPathFromDesktopUrlForSnapshot(
+      "http://localhost:1498/desktop?doc=docs%2Fresearch%2Fnhm2-current-status-whitepaper-2026-05-02.md",
+    )).toBe("docs/research/nhm2-current-status-whitepaper-2026-05-02.md");
+    expect(resolveHelixAskDocViewerSnapshotPathBinding({
+      state: {
+        currentPath: "",
+      },
+      desktopUrlDocPath: "docs/url-active.md",
+    })).toEqual({
+      path: "docs/url-active.md",
+      source: "desktop_url_doc_param",
+    });
+    expect(resolveHelixAskDocViewerSnapshotPathBinding({
+      state: {
+        currentPath: "",
+      },
+      desktopUrlDocPath: null,
+    })).toEqual({
+      path: "docs/url-active.md",
+      source: "doc_viewer_debug_snapshot",
+    });
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
     const docContext = read("client/src/lib/helix/ask-doc-viewer-context.ts");
-    expect(legacyPill).toContain("resolveDocViewerSnapshotPathCandidate({");
-    expect(legacyPill).toContain("readDocViewerPathFromDesktopUrlForAskSnapshot()");
-    expect(legacyPill).toContain("rememberDocViewerPathForAskSnapshot(resolution.path)");
+    const activeDocBinding = read("client/src/components/helix/ask-console/HelixAskActiveDocContextBinding.ts");
+    expect(legacyPill).not.toContain("resolveDocViewerSnapshotPathCandidate({");
+    expect(legacyPill).toContain("readHelixAskDocViewerPathFromDesktopUrlForSnapshot(url)");
+    expect(legacyPill).toContain("resolveHelixAskDocViewerSnapshotPathBinding({");
+    expect(legacyPill).not.toContain("let helixAskLastKnownDocViewerPath");
     expect(docContext).toContain("export function resolveDocViewerSnapshotPathCandidate");
+    expect(activeDocBinding).toContain("let helixAskLastKnownDocViewerPath");
+    expect(activeDocBinding).toContain("readDocPathFromDesktopUrl(desktopUrl)");
+    expect(activeDocBinding).toContain("resolveDocViewerSnapshotPathCandidate({");
     expect(docContext).not.toContain("useDocViewerStore");
     expect(docContext).not.toContain("window.");
     expect(docContext).not.toContain("readDocPathFromDesktopUrl");
@@ -962,6 +1014,7 @@ describe("Helix Ask Console recrown boundary", () => {
   });
 
   it("recrowns docs-viewer debug snapshot projection without moving store reads", () => {
+    resetHelixAskDocViewerSnapshotPathMemoryForTests();
     expect(buildDocViewerDebugSnapshotFromState(
       {
         mode: "read",
@@ -977,15 +1030,30 @@ describe("Helix Ask Console recrown boundary", () => {
       pendingAutoReadNonce: "nonce-7",
       recentCount: 2,
     });
+    expect(buildHelixAskDocViewerDebugSnapshotBinding({
+      mode: "read",
+      currentPath: "docs/research/current.md",
+      anchor: "results",
+      recent: ["a"],
+    })).toEqual({
+      mode: "read",
+      currentPath: "docs/research/current.md",
+      anchor: "results",
+      pendingAutoReadNonce: null,
+      recentCount: 1,
+    });
+    expect(rememberHelixAskDocViewerPathForSnapshot("")).toBe("docs/research/current.md");
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
     const docContext = read("client/src/lib/helix/ask-doc-viewer-context.ts");
+    const activeDocBinding = read("client/src/components/helix/ask-console/HelixAskActiveDocContextBinding.ts");
     expect(legacyPill).toContain("const state = useDocViewerStore.getState()");
-    expect(legacyPill).toContain("rememberDocViewerPathForAskSnapshot(state.currentPath)");
-    expect(legacyPill).toContain("buildDocViewerDebugSnapshotFromState(state, currentPath)");
+    expect(legacyPill).toContain("buildHelixAskDocViewerDebugSnapshotBinding(state)");
+    expect(legacyPill).not.toContain("buildDocViewerDebugSnapshotFromState(state, currentPath)");
     expect(legacyPill).not.toContain("recentCount: Array.isArray(state.recent)");
     expect(docContext).toContain("export function buildDocViewerDebugSnapshotFromState");
     expect(docContext).not.toContain("useDocViewerStore");
-    expect(docContext).not.toContain("rememberDocViewerPathForAskSnapshot");
+    expect(activeDocBinding).toContain("rememberHelixAskDocViewerPathForSnapshot(state.currentPath)");
+    expect(docContext).not.toContain("rememberHelixAskDocViewerPathForSnapshot");
     expect(docContext).not.toContain("window.");
     expect(docContext).not.toContain("fetch(");
   });
@@ -1034,10 +1102,29 @@ describe("Helix Ask Console recrown boundary", () => {
       chatDock: { collapsed: false, widthPx: 360, side: "right" },
       mobileDrawer: { open: false, snap: "peek" },
     });
+    expect(buildHelixAskWorkstationLayoutDebugSnapshotBinding({
+      mode: "desktop",
+      activeGroupId: "main",
+      groups: {
+        main: { panelIds: ["docs-viewer", "scientific-calculator"] },
+      },
+      chatDock: { collapsed: true, widthPx: 420, side: "left" },
+      mobileDrawer: { open: true, snap: "full" },
+    })).toEqual({
+      mode: "desktop",
+      activeGroupId: "main",
+      groupCount: 1,
+      openPanels: ["docs-viewer", "scientific-calculator"],
+      chatDock: { collapsed: true, widthPx: 420, side: "left" },
+      mobileDrawer: { open: true, snap: "full" },
+    });
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
     const workspaceSnapshot = read("client/src/lib/helix/ask-workspace-context-snapshot.ts");
-    expect(legacyPill).toContain("buildWorkstationLayoutDebugSnapshotFromState(state)");
+    const workspaceBinding = read("client/src/components/helix/ask-console/HelixAskWorkspaceContextBinding.ts");
+    expect(legacyPill).toContain("buildHelixAskWorkstationLayoutDebugSnapshotBinding(state)");
+    expect(legacyPill).not.toContain("buildWorkstationLayoutDebugSnapshotFromState(state)");
     expect(legacyPill).toContain("useWorkstationLayoutStore.getState()");
+    expect(workspaceBinding).toContain("buildWorkstationLayoutDebugSnapshotFromState(layoutState)");
     expect(legacyPill).not.toContain("const panelIds = new Set<string>();");
     expect(workspaceSnapshot).toContain("export function buildWorkstationLayoutDebugSnapshotFromState");
     expect(workspaceSnapshot).not.toContain("useWorkstationLayoutStore");
@@ -1092,9 +1179,48 @@ describe("Helix Ask Console recrown boundary", () => {
       hasSituationRoomContext: true,
       lastUpdatedAtMs: 99,
     });
+    expect(buildHelixAskWorkspaceContextSnapshotBinding({
+      sessionId: "session-2",
+      layoutState: {
+        activeGroupId: "main",
+        groups: {
+          main: {
+            activePanelId: "docs-viewer",
+            panelIds: ["docs-viewer"],
+          },
+        },
+      },
+      notesState: {
+        active_note_id: null,
+        order: [],
+        notes: {},
+      },
+      calculatorState: {
+        currentLatex: "",
+        lastSolve: null,
+        steps: [],
+        debugEvents: [],
+      },
+      docContext: {
+        path: "docs/current.md",
+        source: "doc_viewer_store",
+      },
+      situationRoomContext: null,
+      situationCaptureContext: null,
+      lastUpdatedAtMs: 101,
+    })).toMatchObject({
+      sessionId: "session-2",
+      activeDocPath: "docs/current.md",
+      active_doc_path: "docs/current.md",
+      source: "doc_viewer_store",
+      lastUpdatedAtMs: 101,
+    });
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
     const workspaceSnapshot = read("client/src/lib/helix/ask-workspace-context-snapshot.ts");
-    expect(legacyPill).toContain("buildAskTurnWorkspaceContextSnapshotFromState({");
+    const workspaceBinding = read("client/src/components/helix/ask-console/HelixAskWorkspaceContextBinding.ts");
+    expect(legacyPill).toContain("buildHelixAskWorkspaceContextSnapshotBinding({");
+    expect(legacyPill).not.toContain("buildAskTurnWorkspaceContextSnapshotFromState({");
+    expect(workspaceBinding).toContain("buildAskTurnWorkspaceContextSnapshotFromState(input)");
     expect(legacyPill).toContain("const layoutState = useWorkstationLayoutStore.getState()");
     expect(legacyPill).toContain("const notesState = useWorkstationNotesStore.getState()");
     expect(legacyPill).toContain("const calculatorState = useScientificCalculatorStore.getState()");
@@ -1164,9 +1290,17 @@ describe("Helix Ask Console recrown boundary", () => {
     });
 
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
+    const activeDocBinding = read("client/src/components/helix/ask-console/HelixAskActiveDocContextBinding.ts");
+    const backendEntrypointPolicy = read("client/src/components/helix/ask-console/HelixAskBackendEntrypointPolicy.ts");
     expect(legacyPill).toContain("buildHelixAskConsoleBackendTurnPayloadCore");
     expect(legacyPill).toContain("buildHelixAskConsoleContextFiles");
-    expect(legacyPill).toContain("readDocPathFromDesktopUrl");
+    expect(legacyPill).toContain("buildHelixAskConsoleContextFiles({");
+    expect(legacyPill).not.toContain("function buildHelixAskContextFilesForTurn");
+    expect(legacyPill).toContain("buildHelixAskHardBackendEntrypointRouteMetadata({");
+    expect(legacyPill).not.toContain("function buildHelixAskHardBackendEntrypointRouteMetadata");
+    expect(backendEntrypointPolicy).toContain("export function buildHelixAskHardBackendEntrypointRouteMetadata");
+    expect(legacyPill).toContain("readHelixAskDocViewerPathFromDesktopUrlForSnapshot");
+    expect(activeDocBinding).toContain("readDocPathFromDesktopUrl");
   });
 
   it("owns latest visible turn control binding for copy, debug copy, and read aloud", () => {
@@ -1239,6 +1373,52 @@ describe("Helix Ask Console recrown boundary", () => {
       visibleFinalAnswerText: "   ",
       fallbackCopyText: "Envelope fallback answer.",
     })).toBe("Envelope fallback answer.");
+    expect(buildHelixAskLegacyTurnControlActionPayload({
+      reply: {
+        id: "reply-latest",
+        content: "Fallback answer.",
+      },
+      visibleFinalAnswerText: "  Visible latest answer.  ",
+      fallbackCopyText: "Fallback answer.",
+    })).toEqual({
+      replyId: "reply-latest",
+      text: "Visible latest answer.",
+      hasText: true,
+    });
+    expect(buildHelixAskLegacyTurnControlActionPayload({
+      reply: {
+        id: "reply-empty",
+      },
+      visibleFinalAnswerText: "   ",
+      fallbackCopyText: "   ",
+    })).toEqual({
+      replyId: "reply-empty",
+      text: "   ",
+      hasText: false,
+    });
+    expect(clearHelixAskLegacyCopiedDebugIdIfCurrent("reply-latest", "reply-latest")).toBeNull();
+    expect(clearHelixAskLegacyCopiedDebugIdIfCurrent("reply-newer", "reply-older")).toBe("reply-newer");
+    const currentReply = { id: "reply-current" };
+    const visibleReply = { id: "reply-visible" };
+    expect(resolveHelixAskLegacyClickedDebugReply(currentReply, [currentReply, visibleReply], {
+      clientTurnId: "reply-visible",
+    })).toEqual({
+      reply: visibleReply,
+      source: "clicked_client_turn_id",
+    });
+    expect(resolveHelixAskLegacyClickedDebugReply(currentReply, [currentReply, visibleReply], {
+      clientTurnId: "reply-missing",
+    })).toEqual({
+      reply: currentReply,
+      source: "current_reply",
+    });
+    expect(resolveHelixAskLegacyClickedDebugReply(currentReply, [currentReply, visibleReply], {
+      clientTurnId: null,
+      activeTurnId: "ask:eaf320-stale",
+    })).toEqual({
+      reply: currentReply,
+      source: "current_reply",
+    });
 
     expect(selectHelixAskLegacyDebugCopyLocalPayload({
       providedPayload: "{\"turn_id\":\"latest\"}",
@@ -1321,6 +1501,26 @@ describe("Helix Ask Console recrown boundary", () => {
       clickedTurnScope: clickedScope,
       payloadMatchesClickedTurn: () => true,
     })).toBe(scopedDebugPayload);
+    expect(selectHelixAskLegacyReplyScopedDebugExportPayload({
+      exportPayload: JSON.stringify({
+        active_turn_id: "ask:eaf320fb-a91d-45f7-ba63-11c9c35e22fc",
+        active_prompt: "ok, can you grab numerics...",
+      }),
+      replyScopedFallbackPayload: JSON.stringify({
+        active_turn_id: "client:latest",
+        client_active_turn_id: "client:latest",
+        active_prompt: "UI debug binding retest latest prompt",
+      }),
+      payloadMatchesExpectedReply: () => false,
+    })).toContain("UI debug binding retest latest prompt");
+    expect(selectHelixAskLegacyReplyScopedDebugExportPayload({
+      exportPayload: JSON.stringify({
+        active_turn_id: "ask:latest",
+        active_prompt: "UI debug binding retest latest prompt",
+      }),
+      replyScopedFallbackPayload: scopedDebugPayload,
+      payloadMatchesExpectedReply: () => true,
+    })).toContain("ask:latest");
     const latestQuestion = "UI debug binding retest latest prompt";
     const latestFinal = "Latest visible final answer from Codex runtime.";
     const questionNode = {
@@ -1366,7 +1566,26 @@ describe("Helix Ask Console recrown boundary", () => {
       finalAnswer: latestFinal,
       terminalArtifactKind: null,
       activeTurnId: null,
-      clientTurnId: "reply-visible",
+      clientTurnId: null,
+    });
+    const staleClientDebugButton = {
+      innerText: "",
+      textContent: "",
+      parentElement: visibleTurnContainer,
+      getAttribute: (name: string) => {
+        if (name === "data-debug-copy-active-turn-id" || name === "data-turn-control-active-turn-id") return "ask:eaf320-stale";
+        if (name === "data-debug-copy-client-turn-id" || name === "data-turn-control-client-turn-id") return "reply-eaf320-stale";
+        if (name === "data-debug-copy-question" || name === "data-turn-control-question") return "ok, can you grab numerics...";
+        if (name === "data-debug-copy-final-answer" || name === "data-turn-control-final-answer") return "3 + 5 = 8";
+        return null;
+      },
+      querySelector: () => null,
+    } as unknown as HTMLElement;
+    expect(extractHelixAskLegacyClickedTurnDebugScope(staleClientDebugButton)).toMatchObject({
+      question: latestQuestion,
+      finalAnswer: latestFinal,
+      activeTurnId: null,
+      clientTurnId: null,
     });
     const scopedLatestDebugPayload = JSON.stringify({
       active_turn_id: "ask:latest-visible",
@@ -1395,6 +1614,52 @@ describe("Helix Ask Console recrown boundary", () => {
     } as unknown as HTMLElement;
     expect(debugPayloadMatchesHelixAskLegacyRenderedTurnPayload(scopedLatestDebugPayload, latestDebugButton)).toBe(true);
     expect(debugPayloadMatchesHelixAskLegacyRenderedTurnPayload(staleDebugPayload, latestDebugButton)).toBe(false);
+    expect(isHelixAskLegacyRenderedButtonBackendTurnScopeTrusted({
+      rendered: {
+        activeTurnId: "ask:latest-visible",
+        clientTurnId: "reply-visible",
+        question: latestQuestion,
+        finalAnswer: latestFinal,
+      },
+      renderedMatchesReply: true,
+      replyDebugRecord: {
+        active_prompt: latestQuestion,
+        selected_final_answer: latestFinal,
+      },
+    })).toBe(true);
+    expect(isHelixAskLegacyRenderedButtonBackendTurnScopeTrusted({
+      rendered: {
+        activeTurnId: "ask:eaf320-stale",
+        clientTurnId: "reply-visible",
+        question: latestQuestion,
+        finalAnswer: latestFinal,
+      },
+      renderedMatchesReply: true,
+      replyDebugRecord: {
+        active_prompt: "old prompt",
+        selected_final_answer: "3 + 5 = 8",
+      },
+    })).toBe(false);
+    expect(isHelixAskLegacyRenderedButtonBackendTurnScopeTrusted({
+      rendered: {
+        activeTurnId: "ask:eaf320-stale",
+        clientTurnId: "reply-visible",
+        question: latestQuestion,
+        finalAnswer: latestFinal,
+      },
+      renderedMatchesReply: true,
+      replyDebugRecord: null,
+    })).toBe(false);
+    expect(isHelixAskLegacyRenderedButtonBackendTurnScopeTrusted({
+      rendered: {
+        activeTurnId: "ask:eaf320-stale",
+        clientTurnId: "reply-visible",
+        question: latestQuestion,
+        finalAnswer: latestFinal,
+      },
+      renderedMatchesReply: true,
+      replyDebugRecord: {},
+    })).toBe(false);
     expect(enforceHelixAskLegacyDebugExportMatchesClickedButton({
       exportPayload: staleDebugPayload,
       clickedButtonScopedPayload: scopedLatestDebugPayload,
@@ -1461,8 +1726,20 @@ describe("Helix Ask Console recrown boundary", () => {
 
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
     const controlsSource = read("client/src/components/helix/ask-console/HelixAskLegacyTurnControls.ts");
-    expect(legacyPill).toContain("resolveHelixAskLegacyTurnControlText");
+    expect(legacyPill).toContain("buildHelixAskLegacyTurnControlActionPayload");
+    expect(legacyPill).toContain("clearHelixAskLegacyCopiedDebugIdIfCurrent(current, clickedReply.id)");
+    expect(legacyPill).not.toContain("resolveHelixAskLegacyTurnControlText");
+    expect(legacyPill).not.toContain("current === clickedReply.id ? null : current");
     expect(legacyPill).toContain("selectHelixAskLegacyDebugCopyLocalPayload");
+    expect(legacyPill).toContain("copyHelixAskPlainTextToClipboard(target.text)");
+    expect(legacyPill).toContain("text: target.text");
+    expect(legacyPill).toContain("replyId: target.replyId || reply.id");
+    expect(legacyPill).toContain("const clickedTurnScope = extractHelixAskLegacyClickedTurnDebugScope(sourceElement)");
+    expect(legacyPill).toContain("resolveHelixAskLegacyClickedDebugReply(reply, askReplies, clickedTurnScope)");
+    expect(legacyPill).not.toContain("askReplies.find((candidate) => candidate.id === clickedTurnScope.clientTurnId) ?? reply");
+    expect(legacyPill).toContain("normalizeReplyMasterDebugPayload(clickedReply, payload)");
+    expect(legacyPill).toContain("buildReplyScopedDebugExportFromRenderedButton(\n          clickedReply,");
+    expect(legacyPill).toContain("isHelixAskLegacyRenderedButtonBackendTurnScopeTrusted({");
     expect(legacyPill).toContain("extractHelixAskLegacyClickedTurnDebugScope(sourceElement)");
     expect(legacyPill).toContain("resolveHelixAskLegacyReplyDebugTurnId as resolveHelixAskReplyDebugTurnId");
     expect(legacyPill).not.toContain("function extractHelixRenderedTurnDebugFromButton");
@@ -1471,7 +1748,11 @@ describe("Helix Ask Console recrown boundary", () => {
       "export function buildHelixAskReplyCopyText(reply: HelixAskReply): string {\n  return buildRecrownedHelixAskReplyCopyText(reply);\n}",
     );
     expect(controlsSource).toContain("export function buildHelixAskReplyCopyText");
+    expect(controlsSource).toContain("export function buildHelixAskLegacyTurnControlActionPayload");
+    expect(controlsSource).toContain("export function clearHelixAskLegacyCopiedDebugIdIfCurrent");
+    expect(controlsSource).toContain("export function resolveHelixAskLegacyTurnControlText");
     expect(controlsSource).toContain("export function extractHelixAskLegacyClickedTurnDebugScope");
+    expect(controlsSource).toContain("export function isHelixAskLegacyRenderedButtonBackendTurnScopeTrusted");
     expect(controlsSource).toContain("export function resolveHelixAskLegacyReplyDebugTurnId");
     expect(controlsSource).toContain("staleAttributeMismatch");
     expect(controlsSource).toContain("resolveHelixVisibleTerminal(reply, fallbackContent)");
@@ -1522,12 +1803,18 @@ describe("Helix Ask Console recrown boundary", () => {
       },
     })).toEqual({
       activeTurnId: "ask:latest",
-      backendRef: {
-        endpoint: "/api/agi/ask/turn/ask%3Alatest/debug-export",
-        turn_id: "ask:latest",
-      },
-      endpoint: "/api/agi/ask/turn/ask%3Alatest/debug-export",
-      status: "ready",
+      backendRef: null,
+      endpoint: null,
+      status: "not_advertised",
+    });
+    expect(resolveHelixAskLegacyDebugExportBackendTarget({
+      active_turn_id: "ask:eaf320fb-a91d-45f7-ba63-11c9c35e22fc",
+      debug_export_rebuild_reason: "rendered_button_scope",
+    })).toEqual({
+      activeTurnId: "ask:eaf320fb-a91d-45f7-ba63-11c9c35e22fc",
+      backendRef: null,
+      endpoint: null,
+      status: "not_advertised",
     });
     expect(resolveHelixAskLegacyDebugExportBackendTarget({
       active_turn_id: "turn-not-backend-eligible",
@@ -1557,11 +1844,27 @@ describe("Helix Ask Console recrown boundary", () => {
       endpoint: "/api/agi/ask/turn/old/debug-export",
       status: "turn_mismatch",
     });
+    expect(resolveHelixAskLegacyDebugExportClientTurnId({
+      client_active_turn_id: "client-active",
+      clientSelectedDebugTurnId: "client-selected",
+      reply: { id: "reply-id" },
+    })).toBe("client-active");
+    expect(resolveHelixAskLegacyDebugExportClientTurnId({
+      clientSelectedDebugTurnId: "client-selected",
+      reply: { id: "reply-id" },
+    })).toBe("client-selected");
+    expect(resolveHelixAskLegacyDebugExportClientTurnId({
+      reply: { id: "reply-id" },
+    })).toBe("reply-id");
+    expect(resolveHelixAskLegacyDebugExportClientTurnId({})).toBeNull();
 
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
     const controlsSource = read("client/src/components/helix/ask-console/HelixAskLegacyTurnControls.ts");
     expect(legacyPill).toContain("resolveHelixAskLegacyDebugExportBackendTarget(parsed)");
+    expect(legacyPill).toContain("resolveHelixAskLegacyDebugExportClientTurnId(parsed)");
+    expect(legacyPill).not.toContain("coerceText(parsed.clientSelectedDebugTurnId).trim()");
     expect(controlsSource).toContain("export function resolveHelixAskLegacyDebugExportBackendTarget");
+    expect(controlsSource).toContain("export function resolveHelixAskLegacyDebugExportClientTurnId");
     expect(controlsSource).toContain("export function isHelixAskLegacyBackendDebugExportEligibleTurnId");
     for (const forbidden of [
       "fetch(",
@@ -3824,14 +4127,52 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(readStoredHelixAskAgentRuntime(throwingStorage)).toBe("helix");
     expect(() => persistHelixAskAgentRuntime("helix", throwingStorage)).not.toThrow();
 
+    const providers = normalizeHelixAgentProvidersResponse({
+      providers: [
+        { id: "helix", label: "Helix Ask Native", enabled: true, supports: {} },
+        { id: "codex", label: "Codex Workstation Mode", enabled: true, supports: {} },
+        { id: "future", label: "Future Agent Wrapper", enabled: false, supports: {} },
+      ],
+    });
+    expect(resolveHelixAgentRuntimeSelectDecision("future", providers)).toEqual({
+      runtime: "helix",
+      menuOpen: false,
+      invalidSelection: true,
+    });
+    expect(resolveHelixAgentRuntimePrimaryButtonDecision({
+      selectedRuntime: "helix",
+      providers,
+      primaryButtonMode: "cycle",
+      currentMenuOpen: true,
+    })).toEqual({
+      runtime: "codex",
+      menuOpen: false,
+      persistRuntime: true,
+    });
+    expect(resolveHelixAgentRuntimePrimaryButtonDecision({
+      selectedRuntime: "codex",
+      providers,
+      primaryButtonMode: "menu",
+      currentMenuOpen: false,
+    })).toEqual({
+      runtime: "codex",
+      menuOpen: true,
+      persistRuntime: false,
+    });
+
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
+    const runtimeDisplay = read("client/src/lib/helix/ask-agent-runtime-display.ts");
     const runtimePreference = read("client/src/components/helix/ask-console/HelixAskRuntimePreference.ts");
     expect(legacyPill).toContain("readStoredHelixAskAgentRuntime()");
     expect(legacyPill).toContain("persistHelixAskAgentRuntime(");
+    expect(legacyPill).toContain("resolveHelixAgentRuntimeSelectDecision(runtime, agentRuntimeProviders)");
+    expect(legacyPill).toContain("resolveHelixAgentRuntimePrimaryButtonDecision({");
     expect(legacyPill).toContain('fetch("/api/agi/agent-providers"');
     expect(legacyPill).not.toContain("const HELIX_ASK_AGENT_RUNTIME_STORAGE_KEY");
     expect(legacyPill).not.toContain("function readStoredHelixAskAgentRuntime");
     expect(legacyPill).not.toContain("function persistHelixAskAgentRuntime");
+    expect(runtimeDisplay).toContain("export function resolveHelixAgentRuntimeSelectDecision");
+    expect(runtimeDisplay).toContain("export function resolveHelixAgentRuntimePrimaryButtonDecision");
     expect(runtimePreference).toContain("export const HELIX_ASK_AGENT_RUNTIME_STORAGE_KEY");
     expect(runtimePreference).toContain("export function readStoredHelixAskAgentRuntime");
     expect(runtimePreference).toContain("export function persistHelixAskAgentRuntime");
@@ -4180,12 +4521,31 @@ describe("Helix Ask Console recrown boundary", () => {
         fallback_presented: true,
       },
     });
+    const currentDrawer = buildHelixAskDebugExportDrawerState({
+      replyId: "reply-latest",
+      payload: "{\"ok\":true}",
+      payloadHash: "fnv1a:latest",
+      result: {
+        ok: true,
+        attempted_payload_hash: "fnv1a:latest",
+        copied_text_length: 11,
+        method: "debug_drawer",
+        readback_match: "unavailable",
+        fallback_presented: true,
+      },
+    });
+    expect(clearHelixAskDebugDrawerForStaleReply(currentDrawer, "reply-latest")).toBe(currentDrawer);
+    expect(clearHelixAskDebugDrawerForStaleReply(currentDrawer, "reply-newer")).toBeNull();
+    expect(clearHelixAskDebugDrawerForStaleReply(null, "reply-newer")).toBeNull();
 
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
     const drawerState = read("client/src/components/helix/ask-console/HelixAskDebugDrawerState.ts");
     expect(legacyPill).toContain("buildHelixAskDebugDrawerCopyProjection({");
     expect(legacyPill).toContain("setDebugExportDrawer(drawerProjection.drawerState)");
+    expect(legacyPill).toContain("clearHelixAskDebugDrawerForStaleReply(current, latestAskReplyIdForDebugDrawer)");
+    expect(legacyPill).not.toContain("current && current.replyId !== latestAskReplyIdForDebugDrawer ? null : current");
     expect(drawerState).toContain("export function buildHelixAskDebugDrawerCopyProjection");
+    expect(drawerState).toContain("export function clearHelixAskDebugDrawerForStaleReply");
     for (const forbidden of [
       "navigator.clipboard.",
       "navigator.clipboard.writeText",
@@ -4272,6 +4632,7 @@ describe("Helix Ask Console recrown boundary", () => {
 
   it("owns legacy debug JSON clipboard writes through the recrowned clipboard adapter", async () => {
     const originalNavigator = globalThis.navigator;
+    const originalDocument = globalThis.document;
     const writes: string[] = [];
     Object.defineProperty(globalThis, "navigator", {
       configurable: true,
@@ -4310,10 +4671,40 @@ describe("Helix Ask Console recrown boundary", () => {
         readback_match: "empty",
         error: "debug_payload_empty",
       });
+
+      Object.defineProperty(globalThis, "navigator", {
+        configurable: true,
+        value: {
+          clipboard: {
+            writeText: vi.fn(async (text: string) => {
+              writes.push(text);
+            }),
+            readText: vi.fn(async () => JSON.stringify({ active_turn_id: "ask:eaf320-stale" })),
+          },
+        },
+      });
+      Object.defineProperty(globalThis, "document", {
+        configurable: true,
+        value: undefined,
+      });
+      const staleReadback = await copyHelixAskDebugJsonToClipboard(
+        JSON.stringify({ active_turn_id: "ask:new-visible-turn" }),
+      );
+      expect(staleReadback).toMatchObject({
+        ok: false,
+        method: "failed",
+        readback_match: "mismatch",
+        fallback_presented: true,
+        error: "clipboard_mismatch_after_write",
+      });
     } finally {
       Object.defineProperty(globalThis, "navigator", {
         configurable: true,
         value: originalNavigator,
+      });
+      Object.defineProperty(globalThis, "document", {
+        configurable: true,
+        value: originalDocument,
       });
     }
   });
@@ -4475,14 +4866,43 @@ describe("Helix Ask Console recrown boundary", () => {
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
     const attachmentStrip = read("client/src/components/helix/ask-console/HelixAskAttachmentStrip.tsx");
     const attachmentCommit = read("client/src/components/helix/ask-console/HelixAskAttachmentCommit.ts");
+    const attachmentPayload = read("client/src/components/helix/ask-console/HelixAskAttachmentPayload.ts");
 
     expect(legacyPill).toContain("<HelixAskAttachmentStrip");
     expect(legacyPill).toContain("items={askAttachmentCommitChecks}");
     expect(legacyPill).toContain("onRemove={removeAskAttachment}");
-    expect(legacyPill).toContain("validateHelixAskAttachmentForSubmit");
+    expect(legacyPill).toContain("buildHelixAskAttachmentCommitChecks(askAttachments)");
+    expect(legacyPill).toContain("hasReadyHelixAskAttachmentCommitCheck(askAttachmentCommitChecks)");
+    expect(legacyPill).toContain("buildHelixAskAttachmentContextPack(submittedAttachments)");
+    expect(legacyPill).toContain("buildHelixAskAttachmentTurnInputItems(submittedAttachments)");
+    expect(legacyPill).toContain("buildHelixAskVisualEvidenceTurnInputContext(options?.visualEvidence)");
+    expect(legacyPill).toContain("buildHelixAskTurnInputItemsForSubmit({");
+    expect(legacyPill).toContain("buildHelixAskSubmitRunOptionsPayload({");
+    expect(legacyPill).toContain("resolveHelixAskSubmittedAttachments({");
+    expect(legacyPill).toContain("selectFirstHelixAskSubmitReadyImageAttachment(submittedAttachments)");
+    expect(legacyPill).toContain("buildHelixAskSubmittedAttachmentChecks(submittedAttachments)");
+    expect(legacyPill).toContain("selectFirstInvalidHelixAskSubmittedAttachment(submittedAttachmentChecks)");
+    expect(legacyPill).toContain("selectHelixAskNativeImageAttachments(submittedAttachments)");
     expect(legacyPill).toContain('from "@/components/helix/ask-console/HelixAskAttachmentCommit"');
+    expect(legacyPill).toContain('from "@/components/helix/ask-console/HelixAskAttachmentPayload"');
+    expect(legacyPill).not.toContain("validateHelixAskAttachmentForSubmit");
     expect(legacyPill).not.toContain("function validateHelixAskAttachmentForSubmit");
+    expect(legacyPill).not.toContain("validateHelixAskImageAttachmentForSubmit");
+    expect(legacyPill).not.toContain("Array.isArray(options?.attachments) && options.attachments.length > 0");
+    expect(legacyPill).not.toContain("const nativeImageAttachments = submittedAttachments.filter");
+    expect(legacyPill).not.toContain("const submittedAttachmentChecks = submittedAttachments.map((attachment) => ({");
+    expect(legacyPill).not.toContain("const invalidSubmittedAttachment = submittedAttachmentChecks.find((entry) => !entry.check?.can_submit)");
+    expect(legacyPill).not.toContain("const submittedImageAttachments = submittedAttachments.filter");
+    expect(legacyPill).not.toContain("turnInputItems: promotedPastedTextTurnInputItems");
+    expect(legacyPill).not.toContain("visualEvidence: submittedVisualEvidence");
+    expect(legacyPill).not.toContain("visualCapability: submittedVisualCapability");
+    expect(legacyPill).not.toContain("submittedAttachments.flatMap((attachment)");
+    expect(legacyPill).not.toContain("attachments: submittedAttachments.map((attachment, index)");
+    expect(legacyPill).not.toContain("const inferredTurnInputItemsForTurn");
+    expect(legacyPill).not.toContain("const explicitTurnInputItemsForTurn");
     expect(legacyPill).not.toContain("askAttachmentCommitChecks.map");
+    expect(legacyPill).not.toContain("askAttachments.map((attachment) => ({");
+    expect(legacyPill).not.toContain("askAttachmentCommitChecks.some((entry) => entry.check?.can_submit)");
     expect(legacyPill).not.toContain("image ready");
     expect(legacyPill).not.toContain("text needs reattach");
     expect(legacyPill).not.toContain("<FileText className=");
@@ -4500,9 +4920,28 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(attachmentCommit).toContain("export function validateHelixAskAttachmentForSubmit");
     expect(attachmentCommit).toContain("export function validateHelixAskImageAttachmentForSubmit");
     expect(attachmentCommit).toContain("export function validateHelixAskTextAttachmentForSubmit");
+    expect(attachmentCommit).toContain("export function buildHelixAskAttachmentCommitChecks");
+    expect(attachmentCommit).toContain("export function hasReadyHelixAskAttachmentCommitCheck");
     expect(attachmentCommit).not.toContain("removeAskAttachment");
     expect(attachmentCommit).not.toContain("FileReader");
     expect(attachmentCommit).not.toContain("source_target_intent");
+
+    expect(attachmentPayload).toContain("export function buildHelixAskAttachmentContextPack");
+    expect(attachmentPayload).toContain("export function buildHelixAskAttachmentTurnInputItems");
+    expect(attachmentPayload).toContain("export function buildHelixAskVisualEvidenceTurnInputContext");
+    expect(attachmentPayload).toContain("export function buildHelixAskTurnInputItemsForSubmit");
+    expect(attachmentPayload).toContain("export function buildHelixAskSubmitRunOptionsPayload");
+    expect(attachmentPayload).toContain("export function resolveHelixAskSubmittedAttachments");
+    expect(attachmentPayload).toContain("export function selectHelixAskNativeImageAttachments");
+    expect(attachmentPayload).toContain("export function selectFirstHelixAskSubmitReadyImageAttachment");
+    expect(attachmentPayload).toContain("export function buildHelixAskSubmittedAttachmentChecks");
+    expect(attachmentPayload).toContain("export function selectFirstInvalidHelixAskSubmittedAttachment");
+    expect(attachmentPayload).toContain("validateHelixAskAttachmentForSubmit(attachment)");
+    expect(attachmentPayload).toContain("validateHelixAskImageAttachmentForSubmit(attachment)");
+    expect(attachmentPayload).toContain("buildHelixAskTextAttachmentTurnInputItem(attachment)");
+    expect(attachmentPayload).not.toContain("removeAskAttachment");
+    expect(attachmentPayload).not.toContain("FileReader");
+    expect(attachmentPayload).not.toContain("source_target_intent");
   });
 
   it("owns ask error-line display while error state stays in the bridge", () => {

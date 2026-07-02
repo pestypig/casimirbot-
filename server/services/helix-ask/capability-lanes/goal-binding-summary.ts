@@ -25,12 +25,18 @@ const readMailLoopRef = (binding: HelixCapabilityLaneGoalBinding): string | null
   binding.lane_session_mail_loop_refs.at(-1) ||
   null;
 
+const readReceiptRef = (binding: HelixCapabilityLaneGoalBinding): string | null =>
+  binding.latest_mail_loop_summary?.receipt_ref ??
+  binding.lane_session_last_receipt_ref ??
+  null;
+
 const buildReportDecision = (
   binding: HelixCapabilityLaneGoalBinding,
 ): HelixCapabilityLaneGoalReportDecision => {
   const terminalAuthorityStatus = readTerminalAuthorityStatus(binding);
   const evidenceRef = binding.lane_session_last_observation_ref ?? binding.last_report_ref ?? null;
   const mailLoopRef = readMailLoopRef(binding);
+  const receiptRef = readReceiptRef(binding);
 
   let action: HelixCapabilityLaneGoalReportAction = "record_only";
   let reason = "goal_lane_evidence_recorded_for_debug_only";
@@ -70,6 +76,7 @@ const buildReportDecision = (
     terminal_authority_status: terminalAuthorityStatus,
     evidence_ref: evidenceRef,
     mail_loop_ref: mailLoopRef,
+    receipt_ref: receiptRef,
     reentry_required: true,
     assistant_answer: false,
     terminal_eligible: false,
@@ -105,6 +112,7 @@ const buildDispatchPlan = (
     lane_id: binding.lane_id,
     evidence_ref: reportDecision.evidence_ref,
     mail_loop_ref: reportDecision.mail_loop_ref,
+    receipt_ref: reportDecision.receipt_ref,
     requires_live_mail_loop: target === "ask_wake",
     requires_terminal_authority: target === "terminal_authority_review",
     side_effects_executed: false,
@@ -133,10 +141,15 @@ export const buildHelixCapabilityLaneGoalBindingDebugSummary = (
     selected_runtime_agent_provider: binding.selected_runtime_agent_provider,
     selected_backend_provider: binding.selected_backend_provider,
     backend_selection_decision: binding.backend_selection_decision,
+    cost_class: binding.cost_class,
+    latency_class: binding.latency_class,
+    privacy_class: binding.privacy_class,
+    fallback_backend_provider: binding.fallback_backend_provider,
     session_status: binding.lane_session_status,
     session_health: binding.lane_session_health,
     source_id: binding.lane_session_source_id,
     last_observation_ref: binding.lane_session_last_observation_ref,
+    last_receipt_ref: binding.lane_session_last_receipt_ref,
     latest_session_event: binding.latest_lane_session_event,
     latest_mail_loop_summary: binding.latest_mail_loop_summary,
     mail_loop_refs: binding.lane_session_mail_loop_refs,

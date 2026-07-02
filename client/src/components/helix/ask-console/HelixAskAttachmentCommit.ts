@@ -21,6 +21,11 @@ export type HelixAskImageAttachment = {
 
 export type HelixAskAttachment = HelixAskImageAttachment | HelixAskTextAttachment;
 
+export type HelixAskAttachmentCommitCheckEntry = {
+  attachment: HelixAskAttachment;
+  check: HelixAttachmentCommitCheck | null;
+};
+
 export function validateHelixAskImageAttachmentForSubmit(
   attachment: HelixAskImageAttachment | null | undefined,
 ): HelixAttachmentCommitCheck | null {
@@ -117,4 +122,19 @@ export function validateHelixAskAttachmentForSubmit(
   return attachment.kind === "image"
     ? validateHelixAskImageAttachmentForSubmit(attachment)
     : validateHelixAskTextAttachmentForSubmit(attachment);
+}
+
+export function buildHelixAskAttachmentCommitChecks(
+  attachments: readonly HelixAskAttachment[],
+): HelixAskAttachmentCommitCheckEntry[] {
+  return attachments.map((attachment) => ({
+    attachment,
+    check: validateHelixAskAttachmentForSubmit(attachment),
+  }));
+}
+
+export function hasReadyHelixAskAttachmentCommitCheck(
+  checks: readonly HelixAskAttachmentCommitCheckEntry[],
+): boolean {
+  return checks.some((entry) => entry.check?.can_submit);
 }

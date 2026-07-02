@@ -28,6 +28,7 @@ const bindingEvent = (input: {
   reason: string;
   atMs: number;
   mailLoopRef?: string | null;
+  receiptRef?: string | null;
   terminalAuthorityStatus?: HelixCapabilityLaneGoalBindingEvent["terminal_authority_status"];
 }): HelixCapabilityLaneGoalBindingEvent => ({
   schema: HELIX_CAPABILITY_LANE_GOAL_BINDING_EVENT_SCHEMA,
@@ -43,6 +44,7 @@ const bindingEvent = (input: {
   lane_session_health: input.session.health,
   lane_session_observation_ref: input.session.last_observation_ref,
   mail_loop_ref: readString(input.mailLoopRef) || null,
+  receipt_ref: readString(input.receiptRef) || null,
   terminal_authority_status: input.terminalAuthorityStatus ?? "not_terminal_authority",
   reentry_required: true,
   assistant_answer: false,
@@ -56,10 +58,15 @@ const withSessionSnapshot = (
     | "selected_runtime_agent_provider"
     | "selected_backend_provider"
     | "backend_selection_decision"
+    | "cost_class"
+    | "latency_class"
+    | "privacy_class"
+    | "fallback_backend_provider"
     | "lane_session_status"
     | "lane_session_health"
     | "lane_session_source_id"
     | "lane_session_last_observation_ref"
+    | "lane_session_last_receipt_ref"
     | "latest_lane_session_event"
     | "lane_session_debug_history"
   >,
@@ -69,10 +76,15 @@ const withSessionSnapshot = (
   selected_runtime_agent_provider: session.selected_runtime_agent_provider,
   selected_backend_provider: session.selected_backend_provider,
   backend_selection_decision: session.backend_selection_decision,
+  cost_class: session.cost_class,
+  latency_class: session.latency_class,
+  privacy_class: session.privacy_class,
+  fallback_backend_provider: session.fallback_backend_provider,
   lane_session_status: session.status,
   lane_session_health: session.health,
   lane_session_source_id: session.source_binding.source_id,
   lane_session_last_observation_ref: session.last_observation_ref,
+  lane_session_last_receipt_ref: session.last_receipt_ref,
   latest_lane_session_event: session.debug_history.at(-1) ?? null,
   lane_session_debug_history: session.debug_history,
 });
@@ -215,6 +227,7 @@ export const createHelixCapabilityLaneGoalBindingStore = (input: {
       event: "report_requested",
       reason: "terminal_authorized_goal_lane_report_recorded",
       atMs: nowMs,
+      receiptRef: binding.latest_mail_loop_summary?.receipt_ref ?? null,
       terminalAuthorityStatus: "pending_helix_terminal_authority",
     });
     const updated = withSessionSnapshot({
@@ -263,6 +276,7 @@ export const createHelixCapabilityLaneGoalBindingStore = (input: {
       reason: "goal_lane_mail_loop_evidence_recorded",
       atMs: nowMs,
       mailLoopRef,
+      receiptRef: args.mailLoopSummary.receipt_ref,
       terminalAuthorityStatus: args.mailLoopSummary.terminal_authority_status,
     });
     const updated = withSessionSnapshot({

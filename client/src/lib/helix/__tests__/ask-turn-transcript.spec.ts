@@ -42,11 +42,23 @@ describe("Helix Ask turn transcript projection", () => {
       meta: {
         stage: "tool_result",
         detail: "calculator",
-        status: "completed",
-        stepId: "step-1",
-        lane: "scientific-calculator.solve_expression",
-        source_event_type: "tool_observation",
-        event_source: "live",
+          status: "completed",
+          stepId: "step-1",
+          lane: "scientific-calculator.solve_expression",
+          capabilityId: null,
+          laneSessionId: null,
+          selectedBackendProvider: null,
+          backendCostClass: null,
+          backendLatencyClass: null,
+          backendPrivacyClass: null,
+          fallbackBackendProvider: null,
+          receiptRef: null,
+          observationRef: null,
+          terminalEligible: null,
+          assistantAnswer: null,
+          rawContentIncluded: null,
+          source_event_type: "tool_observation",
+          event_source: "live",
         turn_id: "turn-1",
         reconstructed: true,
         stream_event: "turn_transcript_event",
@@ -424,6 +436,10 @@ describe("Helix Ask turn transcript projection", () => {
             },
             availability_status: "available",
             permission_status: "available",
+            cost_class: "free_local",
+            latency_class: "interactive",
+            privacy_class: "local_only",
+            fallback_backend_provider: null,
           },
         ],
         capability_lane_call_results: [
@@ -467,6 +483,10 @@ describe("Helix Ask turn transcript projection", () => {
               },
               availability_status: "available",
               permission_status: "available",
+              cost_class: "free_local",
+              latency_class: "interactive",
+              privacy_class: "local_only",
+              fallback_backend_provider: null,
             },
             observation_ref: "ask:lane:translation:obs",
             observation_packet: {
@@ -501,6 +521,27 @@ describe("Helix Ask turn transcript projection", () => {
             },
           },
         ],
+        capability_lane_projection_receipts: [
+          {
+            schema: "helix.capability_lane.provider_adapter_receipt.v1",
+            receipt_ref: "ask:lane:translation:obs:projection:receipt",
+            kind: "live_translation_projection",
+            status: "stale",
+            turn_id: "turn-codex-lane-translation",
+            lane_id: "live_translation",
+            capability_key: "live_translation.translate_text",
+            observation_ref: "ask:lane:translation:obs",
+            payload: {
+              projection_target: "docs_chunk",
+              projection_status: "stale",
+              target_language: "es",
+            },
+            reentry_required: true,
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        ],
       },
     });
 
@@ -517,13 +558,126 @@ describe("Helix Ask turn transcript projection", () => {
     expect(combined).toContain("runtime root preserved");
     expect(combined).toContain("no live backend execution");
     expect(combined).toContain("terminal authority helix");
+    expect(combined).toContain("cost free_local");
+    expect(combined).toContain("latency interactive");
+    expect(combined).toContain("privacy local_only");
     expect(combined).toContain(
       "Lane Observation: Lane observation: live_translation.translate_text session lane-session-translation produced Translation observation ready for en -> es.",
+    );
+    expect(combined).toContain(
+      "Lane Receipt: Lane projection receipt: live_translation.translate_text; projection stale; target docs_chunk; language es; observation ask:lane:translation:obs; receipt ask:lane:translation:obs:projection:receipt; remains observation-only.",
     );
     expect(combined).toContain("Lane Re-entry: Lane re-entry: observation packet available for provider reasoning before terminal selection.");
     expect(combined).toContain("Terminal: Terminal selected: agent_provider_terminal_candidate.");
     expect(combined).toContain("Final: The translation observation is available.");
     expect(combined).not.toContain("source text");
+  });
+
+  it("projects lane projection receipts into live-event metadata without answer authority", () => {
+    const events = buildHelixRuntimeAskLiveEvents({
+      id: "reply-codex-lane-receipt-live-event",
+      turn_id: "turn-codex-lane-receipt-live-event",
+      debug: {
+        turn_id: "turn-codex-lane-receipt-live-event",
+        agent_runtime: "codex",
+        capability_lane_projection_receipts: [
+          {
+            schema: "helix.capability_lane.provider_adapter_receipt.v1",
+            receipt_ref: "ask:lane:translation:live-event:projection:receipt",
+            status: "projected",
+            lane_id: "live_translation",
+            capability_key: "live_translation.translate_text",
+            observation_ref: "ask:lane:translation:live-event",
+            payload: {
+              projection_target: "docs_hover",
+              projection_status: "projected",
+              target_language: "es",
+            },
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        ],
+      },
+    });
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        id: "ask:lane:translation:live-event:projection:receipt",
+        tool: "tool",
+        text: expect.stringContaining("remains observation-only"),
+        meta: expect.objectContaining({
+          stage: "observation",
+          detail: "ask:lane:translation:live-event:projection:receipt",
+          status: "completed",
+          stepId: "lane_projection_receipt",
+          lane: "live_translation",
+          capabilityId: "live_translation.translate_text",
+          receiptRef: "ask:lane:translation:live-event:projection:receipt",
+          observationRef: "ask:lane:translation:live-event",
+          terminalEligible: false,
+          assistantAnswer: false,
+          rawContentIncluded: false,
+          source_event_type: "lane_projection_receipt",
+          event_source: "capability_lane_projection_receipts",
+        }),
+      }),
+    ]);
+  });
+
+  it("replaces direct lane projection receipt transcript rows with reconstructed receipt rows", () => {
+    const rows = buildHelixTurnTranscriptRows({
+      id: "reply-codex-lane-receipt-dedupe",
+      turn_id: "turn-codex-lane-receipt-dedupe",
+      content: "Receipt projection is visible once.",
+      debug: {
+        turn_id: "turn-codex-lane-receipt-dedupe",
+        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        turn_transcript_events: [
+          {
+            role: "tool",
+            type: "observation",
+            status: "completed",
+            text: "stale direct receipt row",
+            source_event_type: "lane_projection_receipt",
+            event_source: "turn_transcript_events",
+            receipt_ref: "ask:lane:translation:dedupe:projection:receipt",
+          },
+          {
+            role: "assistant",
+            type: "final_answer",
+            status: "completed",
+            text: "Receipt projection is visible once.",
+            source_event_type: "terminal_answer",
+          },
+        ],
+        capability_lane_projection_receipts: [
+          {
+            schema: "helix.capability_lane.provider_adapter_receipt.v1",
+            receipt_ref: "ask:lane:translation:dedupe:projection:receipt",
+            status: "projected",
+            lane_id: "live_translation",
+            capability_key: "live_translation.translate_text",
+            observation_ref: "ask:lane:translation:dedupe",
+            payload: {
+              projection_target: "docs_selection",
+              projection_status: "projected",
+              target_language: "de",
+            },
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        ],
+      },
+    });
+
+    const receiptRows = rows.filter((row) => row.label === "Lane Receipt");
+    expect(receiptRows).toHaveLength(1);
+    expect(receiptRows[0]?.text).toContain("live_translation.translate_text");
+    expect(receiptRows[0]?.text).toContain("target docs_selection");
+    expect(receiptRows[0]?.text).toContain("receipt ask:lane:translation:dedupe:projection:receipt");
+    expect(rows.map((row) => row.text).join("\n")).not.toContain("stale direct receipt row");
   });
 
   it("summarizes session-bound live translation chunks in the runtime turn summary", () => {
@@ -630,6 +784,30 @@ describe("Helix Ask turn transcript projection", () => {
                   assistant_answer: false,
                   raw_content_included: false,
                 },
+                live_translation_projection_receipt: {
+                  schema: "helix.live_translation.projection_receipt.v1",
+                  receipt_ref: "ask:lane:translation:summary-obs:projection:receipt",
+                  observation_ref: "ask:lane:translation:summary-obs",
+                  lane_id: "live_translation",
+                  capability: "live_translation.translate_text",
+                  projection_target: "docs_chunk",
+                  projection_status: "projected",
+                  source_id: "docs:nhm2",
+                  chunk_id: "chunk-9",
+                  chunk_index: 9,
+                  dedupe_key: "docs:nhm2:chunk-9:es",
+                  source_event_ms: null,
+                  observed_at_ms: 1782860000000,
+                  freshness_status: "fresh",
+                  target_language: "es",
+                  translated_text: "hola",
+                  stale: false,
+                  cancel_requested: false,
+                  reentry_required: true,
+                  terminal_eligible: false,
+                  assistant_answer: false,
+                  raw_content_included: false,
+                },
               },
               terminal_eligible: false,
               assistant_answer: false,
@@ -642,9 +820,14 @@ describe("Helix Ask turn transcript projection", () => {
 
     const projection = summary?.rows.find((row) => row.key === "lane_projection")?.value ?? "";
     expect(projection).toContain("live_translation");
+    expect(projection).toContain("projection projected");
     expect(projection).toContain("session lane-session-summary");
     expect(projection).toContain("source docs:nhm2");
     expect(projection).toContain("chunk chunk-9");
+    expect(projection).toContain("index 9");
+    expect(projection).toContain("dedupe docs:nhm2:chunk-9:es");
+    expect(projection).toContain("observed 1782860000000");
+    expect(projection).toContain("receipt ask:lane:translation:summary-obs:projection:receipt");
     expect(projection).toContain("ref ask:lane:translation:summary-obs");
     const backend = summary?.rows.find((row) => row.key === "lane_backend")?.value ?? "";
     expect(backend).toContain("lane live_translation");
@@ -656,6 +839,126 @@ describe("Helix Ask turn transcript projection", () => {
     expect(backend).toContain("runtime root preserved");
     expect(backend).toContain("no live backend execution");
     expect(backend).toContain("terminal authority helix");
+  });
+
+  it("summarizes explicit lane projection receipts without call results", () => {
+    const summary = buildHelixAskRuntimeTurnSummary({
+      id: "reply-codex-lane-receipt-summary",
+      turn_id: "turn-codex-lane-receipt-summary",
+      debug: {
+        turn_id: "turn-codex-lane-receipt-summary",
+        agent_runtime: "codex",
+        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        capability_lane_projection_receipts: [
+          {
+            schema: "helix.capability_lane.provider_adapter_receipt.v1",
+            receipt_ref: "ask:lane:translation:receipt-only:projection:receipt",
+            status: "projected",
+            lane_id: "live_translation",
+            capability_key: "live_translation.translate_text",
+            observation_ref: "ask:lane:translation:receipt-only",
+            payload: {
+              projection_target: "docs_hover",
+              projection_status: "projected",
+              target_language: "fr",
+            },
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        ],
+      },
+    });
+
+    const projection = summary?.rows.find((row) => row.key === "lane_projection")?.value ?? "";
+    expect(projection).toContain("live_translation.translate_text");
+    expect(projection).toContain("projection projected");
+    expect(projection).toContain("target docs_hover");
+    expect(projection).toContain("language fr");
+    expect(projection).toContain("receipt ask:lane:translation:receipt-only:projection:receipt");
+    expect(projection).toContain("ref ask:lane:translation:receipt-only");
+    expect(projection).toContain("observation-only");
+  });
+
+  it("summarizes lane backend provider configuration without exposing secrets", () => {
+    const summary = buildHelixAskRuntimeTurnSummary({
+      id: "reply-codex-lane-provider-config",
+      turn_id: "turn-codex-lane-provider-config",
+      debug: {
+        turn_id: "turn-codex-lane-provider-config",
+        agent_runtime: "codex",
+        capability_lane_manifest: {
+          schema: "helix.capability_lane_manifest.v1",
+          selected_runtime_agent_provider: "codex",
+          policy_mode: "shadow",
+          lanes: [
+            {
+              schema: "helix.capability_lane.descriptor.v1",
+              lane_id: "live_translation",
+              status: "dry_run",
+              backend_family: "local_runtime",
+              backend_providers: [
+                {
+                  schema: "helix.capability_lane.backend_provider.v1",
+                  provider_id: "live_translation.local_runtime",
+                  configuration_status: "not_required",
+                  availability_status: "dry_run",
+                  permission_status: "admitted",
+                  latency_class: "interactive",
+                  privacy_class: "local_only",
+                  configured_env_vars: [],
+                  fallback_backend_provider: null,
+                  raw_secret_exposed: false,
+                },
+                {
+                  schema: "helix.capability_lane.backend_provider.v1",
+                  provider_id: "live_translation.google_gemini",
+                  configuration_status: "configured",
+                  availability_status: "dry_run",
+                  permission_status: "admitted",
+                  latency_class: "realtime",
+                  privacy_class: "external_provider",
+                  configured_env_vars: ["GOOGLE_GEMINI_API_KEY"],
+                  fallback_backend_provider: "live_translation.local_runtime",
+                  raw_secret_exposed: false,
+                  debug_secret_probe: "secret-gemini-key",
+                },
+                {
+                  schema: "helix.capability_lane.backend_provider.v1",
+                  provider_id: "live_translation.openai_compatible",
+                  configuration_status: "missing",
+                  availability_status: "unconfigured",
+                  permission_status: "configuration_missing",
+                  latency_class: "interactive",
+                  privacy_class: "account_provider",
+                  configured_env_vars: [],
+                  fallback_backend_provider: "live_translation.local_runtime",
+                  raw_secret_exposed: false,
+                },
+              ],
+            },
+          ],
+        },
+      },
+    });
+
+    const providers = summary?.rows.find((row) => row.key === "lane_backend_providers")?.value ?? "";
+    expect(providers).toContain("live_translation/live_translation.local_runtime");
+    expect(providers).toContain("config not_required");
+    expect(providers).toContain("live_translation/live_translation.google_gemini");
+    expect(providers).toContain("config configured");
+    expect(providers).toContain("availability dry_run");
+    expect(providers).toContain("permission admitted");
+    expect(providers).toContain("latency realtime");
+    expect(providers).toContain("privacy external_provider");
+    expect(providers).toContain("fallback live_translation.local_runtime");
+    expect(providers).toContain("configured env GOOGLE_GEMINI_API_KEY");
+    expect(providers).toContain("live_translation/live_translation.openai_compatible");
+    expect(providers).toContain("config missing");
+    expect(providers).toContain("availability unconfigured");
+    expect(providers).toContain("permission configuration_missing");
+    expect(providers).toContain("no raw secrets");
+    expect(providers).not.toContain("secret-gemini-key");
   });
 
   it("summarizes goal dispatch readiness in the runtime turn summary without executing side effects", () => {
@@ -679,6 +982,7 @@ describe("Helix Ask turn transcript projection", () => {
           blocked_reasons: ["missing_mail_loop_ref"],
           next_dispatch_targets: ["ask_wake"],
           next_goal_binding_ids: ["goal-binding-ready"],
+          next_receipt_refs: ["ask:lane:translation:ready-obs:projection:receipt"],
           side_effects_allowed: false,
           side_effects_executed: false,
           wake_dispatch_allowed: false,
@@ -703,6 +1007,7 @@ describe("Helix Ask turn transcript projection", () => {
     expect(readiness?.value).toContain("pending wake 1");
     expect(readiness?.value).toContain("targets ask_wake");
     expect(readiness?.value).toContain("goal bindings goal-binding-ready");
+    expect(readiness?.value).toContain("receipts ask:lane:translation:ready-obs:projection:receipt");
     expect(readiness?.value).toContain("blocked missing_mail_loop_ref");
     expect(readiness?.value).toContain("no side effects");
     expect(readiness?.value).toContain("observation-only");
@@ -839,10 +1144,14 @@ describe("Helix Ask turn transcript projection", () => {
             },
             availability_status: "dry_run",
             permission_status: "admitted",
+            cost_class: "free_local",
+            latency_class: "interactive",
+            privacy_class: "local_only",
+            fallback_backend_provider: null,
             execution_status: "executed_observation_only",
             observation_ref: "ask:lane:utility:obs",
             result_ref: "ask:lane:utility:obs",
-            receipt_ref: null,
+            receipt_ref: "ask:lane:utility:obs:projection:receipt",
             reentry_required: true,
             reentry_status: "not_applicable",
             terminal_authority_status: "pending_helix_terminal_authority",
@@ -887,10 +1196,14 @@ describe("Helix Ask turn transcript projection", () => {
             },
             availability_status: "dry_run",
             permission_status: "admitted",
+            cost_class: "free_local",
+            latency_class: "interactive",
+            privacy_class: "local_only",
+            fallback_backend_provider: null,
             execution_status: "executed_observation_only",
             observation_ref: "ask:lane:utility:obs",
             result_ref: "ask:lane:utility:obs",
-            receipt_ref: null,
+            receipt_ref: "ask:lane:utility:obs:projection:receipt",
             reentry_required: true,
             reentry_status: "not_applicable",
             terminal_authority_status: "pending_helix_terminal_authority",
@@ -912,10 +1225,14 @@ describe("Helix Ask turn transcript projection", () => {
             selection_reason: "requested_backend_unconfigured_default_backend_selected_by_helix_policy",
             availability_status: "dry_run",
             permission_status: "admitted",
+            cost_class: "free_local",
+            latency_class: "interactive",
+            privacy_class: "local_only",
+            fallback_backend_provider: null,
             execution_status: "executed_observation_only",
             observation_ref: "ask:lane:utility:obs",
             result_ref: "ask:lane:utility:obs",
-            receipt_ref: null,
+            receipt_ref: "ask:lane:utility:obs:projection:receipt",
             reentry_required: true,
             reentry_status: "observation_packet_required_for_provider_reentry",
             terminal_authority_status: "pending_helix_terminal_authority",
@@ -937,10 +1254,14 @@ describe("Helix Ask turn transcript projection", () => {
             selection_reason: null,
             availability_status: null,
             permission_status: null,
+            cost_class: null,
+            latency_class: null,
+            privacy_class: null,
+            fallback_backend_provider: null,
             execution_status: "executed_observation_only",
             observation_ref: null,
             result_ref: null,
-            receipt_ref: null,
+            receipt_ref: "ask:lane:utility:obs:projection:receipt",
             reentry_required: true,
             reentry_status: "observation_packet_required_for_provider_reentry",
             terminal_authority_status: "pending_helix_terminal_authority",
@@ -964,8 +1285,15 @@ describe("Helix Ask turn transcript projection", () => {
     expect(combined).toContain("runtime root preserved");
     expect(combined).toContain("no live backend execution");
     expect(combined).toContain("terminal authority helix");
-    expect(combined).toContain("Lane Observation: Lane observation: utility_text.normalize_text produced ask:lane:utility:obs.");
-    expect(combined).toContain("Lane Re-entry: Lane re-entry: observation packet available for provider reasoning before terminal selection.");
+    expect(combined).toContain("cost free_local");
+    expect(combined).toContain("latency interactive");
+    expect(combined).toContain("privacy local_only");
+    expect(combined).toContain(
+      "Lane Observation: Lane observation: utility_text.normalize_text produced ask:lane:utility:obs; receipt ask:lane:utility:obs:projection:receipt.",
+    );
+    expect(combined).toContain(
+      "Lane Re-entry: Lane re-entry: observation packet available for provider reasoning before terminal selection. Receipt ask:lane:utility:obs:projection:receipt remains observation-only.",
+    );
     expect(combined).toContain("Terminal: Terminal selected: agent_provider_terminal_candidate.");
     expect(combined).toContain("Final: The debug event trail is visible.");
     expect(combined).not.toContain("source text");
@@ -1033,6 +1361,84 @@ describe("Helix Ask turn transcript projection", () => {
     expect(combined).not.toContain("Lane Observation:");
   });
 
+  it("projects selected backend operating classes into lane live-event metadata", () => {
+    const events = buildHelixRuntimeAskLiveEvents({
+      id: "reply-codex-lane-backend-metadata-live-event",
+      turn_id: "turn-codex-lane-backend-metadata-live-event",
+      debug: {
+        turn_id: "turn-codex-lane-backend-metadata-live-event",
+        capability_lane_debug_events: [
+          {
+            schema: "helix.capability_lane.debug_event.v1",
+            event_id: "debug-lane-backend-metadata",
+            seq: 0,
+            stage: "lane_backend_selected",
+            selected_runtime_agent_provider: "codex",
+            lane_id: "live_translation",
+            capability: "live_translation.translate_text",
+            status: "completed",
+            requested_backend_provider: "google_gemini",
+            requested_backend_provider_known: true,
+            selected_backend_provider: "live_translation.local_runtime",
+            selection_reason: "requested_backend_unconfigured_default_backend_selected_by_helix_policy",
+            backend_selection_decision: {
+              schema: "helix.capability_lane.backend_selection_decision.v1",
+              owner: "helix",
+              outcome: "fallback_selected",
+              reason: "requested_backend_unconfigured_default_backend_selected_by_helix_policy",
+              requested_backend_provider: "google_gemini",
+              requested_backend_provider_known: true,
+              selected_backend_provider: "live_translation.local_runtime",
+              fallback_backend_provider: "live_translation.local_runtime",
+              selected_runtime_provider_remains_root: true,
+              backend_provider_becomes_root_agent: false,
+              dynamic_switching_executed: false,
+              live_backend_execution_enabled: false,
+              terminal_authority_owner: "helix",
+              terminal_eligible: false,
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+            availability_status: "dry_run",
+            permission_status: "admitted",
+            cost_class: "free_local",
+            latency_class: "interactive",
+            privacy_class: "local_only",
+            fallback_backend_provider: null,
+            execution_status: "executed_observation_only",
+            observation_ref: "ask:lane:translation:metadata-obs",
+            result_ref: "ask:lane:translation:metadata-obs",
+            receipt_ref: "ask:lane:translation:metadata-obs:projection:receipt",
+            reentry_required: true,
+            reentry_status: "not_applicable",
+            terminal_authority_status: "pending_helix_terminal_authority",
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        ],
+      },
+    });
+
+    expect(events.find((event) => event.meta.source_event_type === "lane_backend_selected")).toMatchObject({
+      meta: expect.objectContaining({
+        source_event_type: "lane_backend_selected",
+        lane: "live_translation",
+        capabilityId: "live_translation.translate_text",
+        selectedBackendProvider: "live_translation.local_runtime",
+        backendCostClass: "free_local",
+        backendLatencyClass: "interactive",
+        backendPrivacyClass: "local_only",
+        fallbackBackendProvider: null,
+        receiptRef: "ask:lane:translation:metadata-obs:projection:receipt",
+        observationRef: "ask:lane:translation:metadata-obs",
+        terminalEligible: false,
+        assistantAnswer: false,
+        rawContentIncluded: false,
+      }),
+    });
+  });
+
   it("projects goal-bound lane session summaries without treating lane output as the final answer", () => {
     const rows = buildHelixTurnTranscriptRows({
       id: "reply-codex-lane-goal-binding",
@@ -1050,6 +1456,10 @@ describe("Helix Ask turn transcript projection", () => {
             lane_id: "live_translation",
             selected_runtime_agent_provider: "codex",
             selected_backend_provider: "live_translation.local_runtime",
+            cost_class: "free_local",
+            latency_class: "interactive",
+            privacy_class: "local_only",
+            fallback_backend_provider: null,
             backend_selection_decision: {
               schema: "helix.capability_lane.backend_selection_decision.v1",
               lane_id: "live_translation",
@@ -1072,15 +1482,43 @@ describe("Helix Ask turn transcript projection", () => {
               lane_id: "live_translation",
               capability: "live_translation.translate_text",
               observation_ref: "ask:lane:translation:goal-obs",
+              receipt_ref: "ask:lane:translation:goal-obs:projection:receipt",
               stage_play_mail_id: "stage-play-mail-goal",
               stage_play_wake_expected: true,
               mailbox_thread_id: "ask-thread-goal",
               terminal_authority_status: "pending_helix_terminal_authority",
+              selected_backend_provider: "live_translation.local_runtime",
+              requested_backend_provider: "google_gemini",
+              cost_class: "free_local",
+              latency_class: "interactive",
+              privacy_class: "local_only",
+              fallback_backend_provider: null,
               terminal_eligible: false,
               assistant_answer: false,
               raw_content_included: false,
             },
             mail_loop_refs: ["stage-play-mail-goal"],
+            latest_goal_binding_event: {
+              schema: "helix.capability_lane.goal_binding_event.v1",
+              event_id: "goal-binding-translate-docs:mail_loop_recorded:1782860000100",
+              goal_binding_id: "goal-binding-translate-docs",
+              goal_id: "goal:translate-docs",
+              lane_session_id: "lane-session-translate-docs",
+              lane_id: "live_translation",
+              event: "mail_loop_recorded",
+              at_ms: 1782860000100,
+              reason: "goal_lane_mail_loop_evidence_recorded",
+              lane_session_status: "running",
+              lane_session_health: "healthy",
+              lane_session_observation_ref: "ask:lane:translation:goal-obs",
+              mail_loop_ref: "stage-play-mail-goal",
+              receipt_ref: "ask:lane:translation:goal-obs:projection:receipt",
+              terminal_authority_status: "pending_helix_terminal_authority",
+              reentry_required: true,
+              terminal_eligible: false,
+              assistant_answer: false,
+              raw_content_included: false,
+            },
             report_decision: {
               schema: "helix.capability_lane.goal_report_decision.v1",
               action: "wake_on_salience",
@@ -1093,6 +1531,7 @@ describe("Helix Ask turn transcript projection", () => {
               terminal_authority_status: "pending_helix_terminal_authority",
               evidence_ref: "ask:lane:translation:goal-obs",
               mail_loop_ref: "stage-play-mail-goal",
+              receipt_ref: "ask:lane:translation:goal-obs:projection:receipt",
               reentry_required: true,
               terminal_eligible: false,
               assistant_answer: false,
@@ -1110,6 +1549,7 @@ describe("Helix Ask turn transcript projection", () => {
               lane_id: "live_translation",
               evidence_ref: "ask:lane:translation:goal-obs",
               mail_loop_ref: "stage-play-mail-goal",
+              receipt_ref: "ask:lane:translation:goal-obs:projection:receipt",
               requires_live_mail_loop: true,
               requires_terminal_authority: false,
               side_effects_executed: false,
@@ -1133,6 +1573,7 @@ describe("Helix Ask turn transcript projection", () => {
               lane_id: "live_translation",
               evidence_ref: "ask:lane:translation:goal-obs",
               mail_loop_ref: "stage-play-mail-goal",
+              receipt_ref: "ask:lane:translation:goal-obs:projection:receipt",
               blocked_reason: null,
               requires_live_mail_loop: true,
               requires_terminal_authority: false,
@@ -1171,8 +1612,12 @@ describe("Helix Ask turn transcript projection", () => {
           manual_review_count: 0,
           debug_only_count: 0,
           blocked_reasons: [],
+          next_lane_ids: ["live_translation"],
+          next_lane_session_ids: ["lane-session-translate-docs"],
           next_dispatch_targets: ["ask_wake"],
           next_goal_binding_ids: ["goal-binding-translate-docs"],
+          next_evidence_refs: ["ask:lane:translation:goal-obs"],
+          next_receipt_refs: ["ask:lane:translation:goal-obs:projection:receipt"],
           side_effects_allowed: false,
           side_effects_executed: false,
           wake_dispatch_allowed: false,
@@ -1191,12 +1636,17 @@ describe("Helix Ask turn transcript projection", () => {
     expect(combined).toContain("goal goal:translate-docs");
     expect(combined).toContain("session lane-session-translate-docs");
     expect(combined).toContain("backend live_translation.local_runtime");
+    expect(combined).toContain("cost free_local");
+    expect(combined).toContain("latency interactive");
+    expect(combined).toContain("privacy local_only");
     expect(combined).toContain("decision fallback_to_available_provider");
     expect(combined).toContain("runtime root preserved");
     expect(combined).toContain("no live backend execution");
     expect(combined).toContain("terminal authority helix");
     expect(combined).toContain("last observation ask:lane:translation:goal-obs");
     expect(combined).toContain("latest mail stage-play-mail-goal");
+    expect(combined).toContain("latest event mail_loop_recorded");
+    expect(combined).toContain("receipt ask:lane:translation:goal-obs:projection:receipt");
     expect(combined).toContain("report action wake_on_salience");
     expect(combined).toContain("report reason goal_binding_policy_requests_wake_on_salience");
     expect(combined).toContain("dispatch target ask_wake");
@@ -1208,8 +1658,12 @@ describe("Helix Ask turn transcript projection", () => {
     expect(combined).toContain("plans 1");
     expect(combined).toContain("admitted 1");
     expect(combined).toContain("pending wake 1");
+    expect(combined).toContain("next lanes live_translation");
+    expect(combined).toContain("next sessions lane-session-translate-docs");
     expect(combined).toContain("next targets ask_wake");
     expect(combined).toContain("next goal bindings goal-binding-translate-docs");
+    expect(combined).toContain("next evidence ask:lane:translation:goal-obs");
+    expect(combined).toContain("next receipts ask:lane:translation:goal-obs:projection:receipt");
     expect(combined).toContain("no side effects allowed");
     expect(combined).toContain("terminal authority pending_helix_terminal_authority");
     expect(combined).toContain("lane output remains observation-only");
@@ -1257,6 +1711,7 @@ describe("Helix Ask turn transcript projection", () => {
             lane_id: "live_translation",
             evidence_ref: "ask:lane:translation:review-obs",
             mail_loop_ref: null,
+            receipt_ref: null,
             requires_live_mail_loop: false,
             requires_terminal_authority: true,
             side_effects_executed: false,
@@ -1282,6 +1737,7 @@ describe("Helix Ask turn transcript projection", () => {
             lane_id: "live_translation",
             evidence_ref: "ask:lane:translation:review-obs",
             mail_loop_ref: null,
+            receipt_ref: null,
             blocked_reason: "terminal_authority_not_pending",
             requires_live_mail_loop: false,
             requires_terminal_authority: true,
@@ -1337,6 +1793,10 @@ describe("Helix Ask turn transcript projection", () => {
             lane_id: "live_translation",
             selected_runtime_agent_provider: "codex",
             selected_backend_provider: "live_translation.local_runtime",
+            cost_class: "free_local",
+            latency_class: "interactive",
+            privacy_class: "local_only",
+            fallback_backend_provider: null,
             backend_selection_decision: {
               schema: "helix.capability_lane.backend_selection_decision.v1",
               lane_id: "live_translation",
@@ -1356,6 +1816,7 @@ describe("Helix Ask turn transcript projection", () => {
             projection_target: "docs_chunk",
             account_locale: "es-US",
             last_observation_ref: "ask:lane:translation:session-obs",
+            last_receipt_ref: "ask:lane:translation:session-obs:projection:receipt",
             session_event_count: 2,
             terminal_authority_status: "pending_helix_terminal_authority",
             reentry_required: true,
@@ -1375,6 +1836,9 @@ describe("Helix Ask turn transcript projection", () => {
     expect(combined).toContain("Lane Session: Lane session: live_translation;");
     expect(combined).toContain("session lane-session-standalone");
     expect(combined).toContain("backend live_translation.local_runtime");
+    expect(combined).toContain("cost free_local");
+    expect(combined).toContain("latency interactive");
+    expect(combined).toContain("privacy local_only");
     expect(combined).toContain("decision fallback_to_available_provider");
     expect(combined).toContain("runtime root preserved");
     expect(combined).toContain("no live backend execution");
@@ -1383,6 +1847,7 @@ describe("Helix Ask turn transcript projection", () => {
     expect(combined).toContain("projection docs_chunk");
     expect(combined).toContain("locale es-US");
     expect(combined).toContain("last observation ask:lane:translation:session-obs");
+    expect(combined).toContain("receipt ask:lane:translation:session-obs:projection:receipt");
     expect(combined).toContain("terminal authority pending_helix_terminal_authority");
     expect(combined).toContain("lane output remains observation-only");
     expect(combined).toContain("Terminal: Terminal selected: agent_provider_terminal_candidate.");
@@ -1392,11 +1857,34 @@ describe("Helix Ask turn transcript projection", () => {
       status: "pending",
     });
     expect(rows.some((row) => row.label === "Goal Lane")).toBe(false);
+    const events = buildHelixRuntimeAskLiveEvents(reply);
+    expect(events.find((event) => event.meta.stepId === "lane_session")).toMatchObject({
+      meta: expect.objectContaining({
+        lane: "live_translation",
+        capabilityId: "live_translation",
+        laneSessionId: "lane-session-standalone",
+        selectedBackendProvider: "live_translation.local_runtime",
+        backendCostClass: "free_local",
+        backendLatencyClass: "interactive",
+        backendPrivacyClass: "local_only",
+        fallbackBackendProvider: null,
+        receiptRef: "ask:lane:translation:session-obs:projection:receipt",
+        observationRef: "ask:lane:translation:session-obs",
+        terminalEligible: false,
+        assistantAnswer: false,
+        rawContentIncluded: false,
+        source_event_type: "lane_session",
+        event_source: "capability_lane_session_debug_summaries",
+      }),
+    });
 
     const sessionSummary = summary?.rows.find((row) => row.key === "lane_sessions")?.value ?? "";
     expect(sessionSummary).toContain("live_translation");
     expect(sessionSummary).toContain("session lane-session-standalone");
     expect(sessionSummary).toContain("backend live_translation.local_runtime");
+    expect(sessionSummary).toContain("cost free_local");
+    expect(sessionSummary).toContain("latency interactive");
+    expect(sessionSummary).toContain("privacy local_only");
     expect(sessionSummary).toContain("decision fallback_to_available_provider");
     expect(sessionSummary).toContain("runtime root preserved");
     expect(sessionSummary).toContain("no live backend execution");
@@ -1407,6 +1895,133 @@ describe("Helix Ask turn transcript projection", () => {
     expect(sessionSummary).toContain("observation ask:lane:translation:session-obs");
     expect(sessionSummary).toContain("authority pending_helix_terminal_authority");
     expect(sessionSummary).toContain("observation-only");
+  });
+
+  it("projects goal-bound lane refs into live-event metadata", () => {
+    const events = buildHelixRuntimeAskLiveEvents({
+      id: "reply-codex-goal-lane-live-event",
+      turn_id: "turn-codex-goal-lane-live-event",
+      debug: {
+        turn_id: "turn-codex-goal-lane-live-event",
+        capability_lane_goal_dispatch_plans: [
+          {
+            schema: "helix.capability_lane.goal_dispatch_plan.v1",
+            target: "ask_wake",
+            status: "planned_not_dispatched",
+            reason: "goal_binding_policy_plans_ask_wake",
+            source_report_action: "wake_on_salience",
+            goal_binding_id: "goal-binding-live-event",
+            goal_id: "goal:translate-docs",
+            lane_session_id: "lane-session-live-event",
+            lane_id: "live_translation",
+            evidence_ref: "ask:lane:translation:live-event-obs",
+            mail_loop_ref: "stage-play-mail-live-event",
+            receipt_ref: "ask:lane:translation:live-event-obs:projection:receipt",
+            requires_live_mail_loop: true,
+            requires_terminal_authority: false,
+            side_effects_executed: false,
+            wake_dispatched: false,
+            badge_projected: false,
+            terminal_report_emitted: false,
+            terminal_authority_status: "pending_helix_terminal_authority",
+            reentry_required: true,
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        ],
+        capability_lane_goal_dispatch_admissions: [
+          {
+            schema: "helix.capability_lane.goal_dispatch_admission.v1",
+            status: "eligible_waiting_for_mail_loop",
+            reason: "goal_dispatch_admission_eligible_waiting_for_mail_loop",
+            target: "ask_wake",
+            goal_binding_id: "goal-binding-live-event",
+            goal_id: "goal:translate-docs",
+            lane_session_id: "lane-session-live-event",
+            lane_id: "live_translation",
+            evidence_ref: "ask:lane:translation:live-event-obs",
+            mail_loop_ref: "stage-play-mail-live-event",
+            receipt_ref: "ask:lane:translation:live-event-obs:projection:receipt",
+            blocked_reason: null,
+            requires_live_mail_loop: true,
+            requires_terminal_authority: false,
+            side_effects_allowed: false,
+            side_effects_executed: false,
+            wake_dispatch_allowed: false,
+            badge_projection_allowed: false,
+            terminal_report_allowed: false,
+            terminal_authority_status: "pending_helix_terminal_authority",
+            reentry_required: true,
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        ],
+        capability_lane_goal_dispatch_readiness: {
+          schema: "helix.capability_lane.goal_dispatch_readiness.v1",
+          total_plans: 1,
+          total_admissions: 1,
+          admitted_count: 1,
+          blocked_count: 0,
+          pending_wake_count: 1,
+          pending_terminal_authority_count: 0,
+          projection_only_count: 0,
+          manual_review_count: 0,
+          debug_only_count: 0,
+          blocked_reasons: [],
+          next_lane_ids: ["live_translation"],
+          next_lane_session_ids: ["lane-session-live-event"],
+          next_dispatch_targets: ["ask_wake"],
+          next_goal_binding_ids: ["goal-binding-live-event"],
+          next_evidence_refs: ["ask:lane:translation:live-event-obs"],
+          next_receipt_refs: ["ask:lane:translation:live-event-obs:projection:receipt"],
+          side_effects_allowed: false,
+          side_effects_executed: false,
+          wake_dispatch_allowed: false,
+          badge_projection_allowed: false,
+          terminal_report_allowed: false,
+          terminal_report_emitted: false,
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    });
+
+    expect(events.find((event) => event.meta.stepId === "lane_goal_dispatch_plan")).toMatchObject({
+      meta: expect.objectContaining({
+        lane: "live_translation",
+        laneSessionId: "lane-session-live-event",
+        receiptRef: "ask:lane:translation:live-event-obs:projection:receipt",
+        observationRef: "ask:lane:translation:live-event-obs",
+        terminalEligible: false,
+        assistantAnswer: false,
+        rawContentIncluded: false,
+      }),
+    });
+    expect(events.find((event) => event.meta.stepId === "lane_goal_dispatch_admission")).toMatchObject({
+      meta: expect.objectContaining({
+        lane: "live_translation",
+        laneSessionId: "lane-session-live-event",
+        receiptRef: "ask:lane:translation:live-event-obs:projection:receipt",
+        observationRef: "ask:lane:translation:live-event-obs",
+        terminalEligible: false,
+        assistantAnswer: false,
+        rawContentIncluded: false,
+      }),
+    });
+    expect(events.find((event) => event.meta.stepId === "lane_goal_dispatch_readiness")).toMatchObject({
+      meta: expect.objectContaining({
+        lane: "live_translation",
+        laneSessionId: "lane-session-live-event",
+        receiptRef: "ask:lane:translation:live-event-obs:projection:receipt",
+        observationRef: "ask:lane:translation:live-event-obs",
+        terminalEligible: false,
+        assistantAnswer: false,
+        rawContentIncluded: false,
+      }),
+    });
   });
 
   it("projects goal-bound lane backend-selection decisions in the runtime summary", () => {
@@ -1426,6 +2041,10 @@ describe("Helix Ask turn transcript projection", () => {
             lane_id: "live_translation",
             selected_runtime_agent_provider: "codex",
             selected_backend_provider: "live_translation.local_runtime",
+            cost_class: "free_local",
+            latency_class: "interactive",
+            privacy_class: "local_only",
+            fallback_backend_provider: null,
             backend_selection_decision: {
               schema: "helix.capability_lane.backend_selection_decision.v1",
               lane_id: "live_translation",
@@ -1442,6 +2061,39 @@ describe("Helix Ask turn transcript projection", () => {
             session_status: "running",
             source_id: "docs:nhm2",
             last_observation_ref: "ask:lane:translation:goal-obs",
+            latest_mail_loop_summary: {
+              schema: "helix.capability_lane.mail_loop_debug_summary.v1",
+              stage_play_mail_id: "stage-play-mail-goal-summary",
+              observation_ref: "ask:lane:translation:goal-obs",
+              receipt_ref: "ask:lane:translation:goal-obs:projection:receipt",
+              selected_backend_provider: "live_translation.local_runtime",
+              requested_backend_provider: "google_gemini",
+              cost_class: "free_local",
+              latency_class: "interactive",
+              privacy_class: "local_only",
+              fallback_backend_provider: null,
+            },
+            latest_goal_binding_event: {
+              schema: "helix.capability_lane.goal_binding_event.v1",
+              event_id: "goal-binding-translate-docs:mail_loop_recorded:1782860000100",
+              goal_binding_id: "goal-binding-translate-docs",
+              goal_id: "goal:translate-docs",
+              lane_session_id: "lane-session-translate-docs",
+              lane_id: "live_translation",
+              event: "mail_loop_recorded",
+              at_ms: 1782860000100,
+              reason: "goal_lane_mail_loop_evidence_recorded",
+              lane_session_status: "running",
+              lane_session_health: "healthy",
+              lane_session_observation_ref: "ask:lane:translation:goal-obs",
+              mail_loop_ref: "stage-play-mail-goal-summary",
+              receipt_ref: "ask:lane:translation:goal-obs:projection:receipt",
+              terminal_authority_status: "pending_helix_terminal_authority",
+              reentry_required: true,
+              terminal_eligible: false,
+              assistant_answer: false,
+              raw_content_included: false,
+            },
             terminal_authority_status: "pending_helix_terminal_authority",
           },
         ],
@@ -1453,10 +2105,15 @@ describe("Helix Ask turn transcript projection", () => {
     expect(goalSummary).toContain("goal goal:translate-docs");
     expect(goalSummary).toContain("session lane-session-translate-docs");
     expect(goalSummary).toContain("backend live_translation.local_runtime");
+    expect(goalSummary).toContain("cost free_local");
+    expect(goalSummary).toContain("latency interactive");
+    expect(goalSummary).toContain("privacy local_only");
     expect(goalSummary).toContain("decision fallback_to_available_provider");
     expect(goalSummary).toContain("runtime root preserved");
     expect(goalSummary).toContain("no live backend execution");
     expect(goalSummary).toContain("terminal authority helix");
+    expect(goalSummary).toContain("event mail_loop_recorded");
+    expect(goalSummary).toContain("receipt ask:lane:translation:goal-obs:projection:receipt");
     expect(goalSummary).toContain("authority pending_helix_terminal_authority");
     expect(goalSummary).toContain("observation-only");
   });
@@ -1477,15 +2134,25 @@ describe("Helix Ask turn transcript projection", () => {
             lane_id: "live_translation",
             capability: "live_translation.translate_text",
             observation_ref: "ask:lane:translation:mail-obs",
+            receipt_ref: "ask:lane:translation:mail-obs:projection:receipt",
             stage_play_mail_id: "stage-play-mail-translation",
             stage_play_wake_expected: true,
             mailbox_thread_id: "ask-thread-mail",
             source_id: "docs:nhm2",
             source_kind: "document_markdown",
             chunk_id: "chunk-1",
+            chunk_index: 1,
+            dedupe_key: "docs:nhm2:chunk-1:es",
+            source_event_ms: 1782860000000,
+            observed_at_ms: 1782860000100,
             projection_target: "docs_chunk",
+            cancel_requested: false,
             selected_backend_provider: "live_translation.local_runtime",
             requested_backend_provider: "google_gemini",
+            cost_class: "free_local",
+            latency_class: "interactive",
+            privacy_class: "local_only",
+            fallback_backend_provider: null,
             backend_selection_decision: {
               schema: "helix.capability_lane.backend_selection_decision.v1",
               lane_id: "live_translation",
@@ -1519,10 +2186,18 @@ describe("Helix Ask turn transcript projection", () => {
     expect(combined).toContain("mail stage-play-mail-translation");
     expect(combined).toContain("wake expected");
     expect(combined).toContain("observation ask:lane:translation:mail-obs");
+    expect(combined).toContain("receipt ask:lane:translation:mail-obs:projection:receipt");
     expect(combined).toContain("source docs:nhm2");
     expect(combined).toContain("chunk chunk-1");
+    expect(combined).toContain("index 1");
+    expect(combined).toContain("dedupe docs:nhm2:chunk-1:es");
+    expect(combined).toContain("source event 1782860000000");
+    expect(combined).toContain("observed 1782860000100");
     expect(combined).toContain("backend live_translation.local_runtime");
     expect(combined).toContain("requested backend google_gemini");
+    expect(combined).toContain("cost free_local");
+    expect(combined).toContain("latency interactive");
+    expect(combined).toContain("privacy local_only");
     expect(combined).toContain("decision fallback_to_available_provider");
     expect(combined).toContain("runtime root preserved");
     expect(combined).toContain("no live backend execution");
@@ -1542,15 +2217,127 @@ describe("Helix Ask turn transcript projection", () => {
     expect(mailSummary).toContain("mail stage-play-mail-translation");
     expect(mailSummary).toContain("wake expected");
     expect(mailSummary).toContain("observation ask:lane:translation:mail-obs");
+    expect(mailSummary).toContain("receipt ask:lane:translation:mail-obs:projection:receipt");
     expect(mailSummary).toContain("source docs:nhm2");
     expect(mailSummary).toContain("chunk chunk-1");
+    expect(mailSummary).toContain("index 1");
+    expect(mailSummary).toContain("dedupe docs:nhm2:chunk-1:es");
+    expect(mailSummary).toContain("source event 1782860000000");
+    expect(mailSummary).toContain("observed 1782860000100");
     expect(mailSummary).toContain("backend live_translation.local_runtime");
+    expect(mailSummary).toContain("cost free_local");
+    expect(mailSummary).toContain("latency interactive");
+    expect(mailSummary).toContain("privacy local_only");
     expect(mailSummary).toContain("decision fallback_to_available_provider");
     expect(mailSummary).toContain("runtime root preserved");
     expect(mailSummary).toContain("no live backend execution");
     expect(mailSummary).toContain("terminal authority helix");
     expect(mailSummary).toContain("authority pending_helix_terminal_authority");
     expect(mailSummary).toContain("evidence-only");
+  });
+
+  it("projects shadow lane packet backend metadata in transcript rows and runtime summary", () => {
+    const reply = {
+      id: "reply-codex-shadow-visual-lane",
+      turn_id: "turn-codex-shadow-visual-lane",
+      content: "The visual lane is cataloged but not executed.",
+      debug: {
+        turn_id: "turn-codex-shadow-visual-lane",
+        agent_runtime: "codex",
+        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        capability_lane_call_results: [
+          {
+            ok: false,
+            capability: "visual_analysis.inspect_frame",
+            capability_key: "visual_analysis.inspect_frame",
+            lane_id: "visual_analysis",
+            observation_ref: "ask:lane:visual:shadow-obs",
+            observation_summary:
+              "visual_analysis.inspect_frame is cataloged on visual_analysis but did not execute; lane output remains non-terminal.",
+            observation_packet: {
+              schema: "helix.agent_step_observation_packet.v1",
+              turn_id: "turn-codex-shadow-visual-lane",
+              capability_key: "visual_analysis.inspect_frame",
+              observation_ref: "ask:lane:visual:shadow-obs",
+              status: "blocked",
+              observation_summary:
+                "visual_analysis.inspect_frame is cataloged on visual_analysis but did not execute; lane output remains non-terminal.",
+              backend_selection_decision: {
+                schema: "helix.capability_lane.backend_selection_decision.v1",
+                lane_id: "visual_analysis",
+                outcome: "requested_selected",
+                requested_backend_provider: "openai_compatible",
+                selected_backend_provider: "visual_analysis.openai_compatible",
+                fallback_backend_provider: null,
+                selected_runtime_provider_remains_root: true,
+                live_backend_execution_enabled: false,
+                terminal_authority_owner: "helix",
+                terminal_eligible: false,
+                assistant_answer: false,
+              },
+              state_delta: {
+                capability_lane_shadow_execution: {
+                  lane_id: "visual_analysis",
+                  capability: "visual_analysis.inspect_frame",
+                  requested_backend_provider: "openai_compatible",
+                  selected_backend_provider: "visual_analysis.openai_compatible",
+                  availability_status: "dry_run",
+                  permission_status: "admitted",
+                  cost_class: "standard",
+                  latency_class: "interactive",
+                  privacy_class: "external_provider",
+                  fallback_backend_provider: null,
+                  execution_status: "not_executed_shadow_only",
+                  terminal_eligible: false,
+                  assistant_answer: false,
+                  reentry_required: true,
+                },
+              },
+              terminal_eligible: false,
+              assistant_answer: false,
+            },
+          },
+        ],
+      },
+    };
+
+    const rows = buildHelixTurnTranscriptRows(reply);
+    const summary = buildHelixAskRuntimeTurnSummary(reply);
+
+    const combined = rows.map((row) => `${row.label}: ${row.text} ${row.meta} ${row.status}`).join("\n");
+    expect(combined).toContain("visual_analysis.inspect_frame");
+    expect(combined).toContain("backend visual_analysis.openai_compatible");
+    expect(combined).toContain("requested backend openai_compatible");
+    expect(combined).toContain("execution not_executed_shadow_only");
+    expect(combined).toContain("availability dry_run");
+    expect(combined).toContain("permission admitted");
+    expect(combined).toContain("cost standard");
+    expect(combined).toContain("latency interactive");
+    expect(combined).toContain("privacy external_provider");
+    expect(combined).toContain("decision requested_selected");
+    expect(combined).toContain("runtime root preserved");
+    expect(combined).toContain("no live backend execution");
+    expect(combined).toContain("terminal authority helix");
+    expect(combined).toContain("lane output remains observation-only");
+
+    expect(rows.find((row) => row.label === "Lane Observation")).toMatchObject({
+      role: "tool",
+      status: "failed",
+    });
+
+    const laneProjection = summary?.rows.find((row) => row.key === "lane_projection")?.value ?? "";
+    expect(laneProjection).toContain("visual_analysis.inspect_frame");
+    expect(laneProjection).toContain("backend visual_analysis.openai_compatible");
+    expect(laneProjection).toContain("requested backend openai_compatible");
+    expect(laneProjection).toContain("execution not_executed_shadow_only");
+    expect(laneProjection).toContain("availability dry_run");
+    expect(laneProjection).toContain("permission admitted");
+    expect(laneProjection).toContain("cost standard");
+    expect(laneProjection).toContain("latency interactive");
+    expect(laneProjection).toContain("privacy external_provider");
+    expect(laneProjection).toContain("decision requested_selected");
+    expect(laneProjection).toContain("terminal authority helix");
+    expect(laneProjection).toContain("observation-only");
   });
 
   it("projects compound docs-to-narrator itinerary status from structured gateway state", () => {

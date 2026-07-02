@@ -168,6 +168,50 @@ export const createHelixAskLiveDebugSlimBuilder = (
         payload.capability_lane_statuses ?? debug.capability_lane_statuses ?? null,
       capability_lane_resolve_trace_shape:
         payload.capability_lane_resolve_trace_shape ?? debug.capability_lane_resolve_trace_shape ?? null,
+      capability_lane_resolve_traces:
+        summarizeHelixAskDebugValue(payload.capability_lane_resolve_traces ?? debug.capability_lane_resolve_traces ?? []),
+      capability_lane_backend_selections:
+        summarizeHelixAskDebugValue(
+          payload.capability_lane_backend_selections ?? debug.capability_lane_backend_selections ?? [],
+        ),
+      capability_lane_call_results:
+        summarizeHelixAskDebugValue(payload.capability_lane_call_results ?? debug.capability_lane_call_results ?? []),
+      capability_lane_observation_packets:
+        summarizeHelixAskDebugValue(
+          payload.capability_lane_observation_packets ?? debug.capability_lane_observation_packets ?? [],
+        ),
+      capability_lane_debug_events:
+        summarizeHelixAskDebugValue(payload.capability_lane_debug_events ?? debug.capability_lane_debug_events ?? []),
+      capability_lane_session_debug_summaries:
+        summarizeHelixAskDebugValue(
+          payload.capability_lane_session_debug_summaries ?? debug.capability_lane_session_debug_summaries ?? [],
+        ),
+      capability_lane_mail_loop_debug_summaries:
+        summarizeHelixAskDebugValue(
+          payload.capability_lane_mail_loop_debug_summaries ?? debug.capability_lane_mail_loop_debug_summaries ?? [],
+        ),
+      capability_lane_goal_binding_debug_summaries:
+        summarizeHelixAskDebugValue(
+          payload.capability_lane_goal_binding_debug_summaries ??
+            debug.capability_lane_goal_binding_debug_summaries ??
+            [],
+        ),
+      capability_lane_goal_dispatch_plans:
+        summarizeHelixAskDebugValue(
+          payload.capability_lane_goal_dispatch_plans ?? debug.capability_lane_goal_dispatch_plans ?? [],
+        ),
+      capability_lane_goal_dispatch_admissions:
+        summarizeHelixAskDebugValue(
+          payload.capability_lane_goal_dispatch_admissions ?? debug.capability_lane_goal_dispatch_admissions ?? [],
+        ),
+      capability_lane_goal_dispatch_readiness:
+        payload.capability_lane_goal_dispatch_readiness ?? debug.capability_lane_goal_dispatch_readiness ?? null,
+      capability_lane_projection_receipts:
+        summarizeHelixAskDebugValue(
+          payload.capability_lane_projection_receipts ?? debug.capability_lane_projection_receipts ?? [],
+        ),
+      capability_lane_reentry_status:
+        payload.capability_lane_reentry_status ?? debug.capability_lane_reentry_status ?? null,
       workstation_gateway_manifest:
         payload.workstation_gateway_manifest ?? debug.workstation_gateway_manifest ?? null,
       workstation_gateway_manifest_version:

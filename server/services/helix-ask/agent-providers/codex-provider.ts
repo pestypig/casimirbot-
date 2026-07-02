@@ -1899,7 +1899,7 @@ export const codexProvider: HelixAgentProvider = {
     workstationTools: true,
     capabilityLanes: true,
     capabilityLaneOneShot: true,
-    capabilityLaneSessions: false,
+    capabilityLaneSessions: true,
     codeMutation: false,
   },
 
@@ -2022,9 +2022,13 @@ export const codexProvider: HelixAgentProvider = {
           capability_lane_resolve_trace_shape: adapterContract.capability_lane_resolve_trace_shape,
           capability_lane_call_results: capabilityLaneDebugProjection.capability_lane_call_results,
           capability_lane_observation_packets: capabilityLaneDebugProjection.capability_lane_observation_packets,
+          capability_lane_projection_receipts: capabilityLaneDebugProjection.capability_lane_projection_receipts,
           capability_lane_resolve_traces: capabilityLaneDebugProjection.capability_lane_resolve_traces,
           capability_lane_backend_selections: capabilityLaneDebugProjection.capability_lane_backend_selections,
           capability_lane_debug_events: capabilityLaneDebugProjection.capability_lane_debug_events,
+          capability_lane_session_results: capabilityLaneDebugProjection.capability_lane_session_results,
+          capability_lane_session_debug_summaries:
+            capabilityLaneDebugProjection.capability_lane_session_debug_summaries,
           capability_lane_reentry_status: capabilityLaneDebugProjection.capability_lane_reentry_status,
           fail_reason: "missing_question",
           permission_profile: codexProvider.permissionProfile,
@@ -2351,9 +2355,13 @@ export const codexProvider: HelixAgentProvider = {
       tool_output_refs: hostWorkstationAffordances.tool_output_refs,
       capability_lane_call_results: capabilityLaneDebugProjection.capability_lane_call_results,
       capability_lane_observation_packets: capabilityLaneDebugProjection.capability_lane_observation_packets,
+      capability_lane_projection_receipts: capabilityLaneDebugProjection.capability_lane_projection_receipts,
       capability_lane_resolve_traces: capabilityLaneDebugProjection.capability_lane_resolve_traces,
       capability_lane_backend_selections: capabilityLaneDebugProjection.capability_lane_backend_selections,
       capability_lane_debug_events: capabilityLaneDebugProjection.capability_lane_debug_events,
+      capability_lane_session_results: capabilityLaneDebugProjection.capability_lane_session_results,
+      capability_lane_session_debug_summaries:
+        capabilityLaneDebugProjection.capability_lane_session_debug_summaries,
       capability_lane_reentry_status: capabilityLaneDebugProjection.capability_lane_reentry_status,
       current_turn_artifact_ledger: currentTurnArtifactLedger,
       ...(codexCompoundSubgoalLedger
@@ -2397,9 +2405,13 @@ export const codexProvider: HelixAgentProvider = {
         capability_lane_resolve_trace_shape: adapterContract.capability_lane_resolve_trace_shape,
         capability_lane_call_results: capabilityLaneDebugProjection.capability_lane_call_results,
         capability_lane_observation_packets: capabilityLaneDebugProjection.capability_lane_observation_packets,
+        capability_lane_projection_receipts: capabilityLaneDebugProjection.capability_lane_projection_receipts,
         capability_lane_resolve_traces: capabilityLaneDebugProjection.capability_lane_resolve_traces,
         capability_lane_backend_selections: capabilityLaneDebugProjection.capability_lane_backend_selections,
         capability_lane_debug_events: capabilityLaneDebugProjection.capability_lane_debug_events,
+        capability_lane_session_results: capabilityLaneDebugProjection.capability_lane_session_results,
+        capability_lane_session_debug_summaries:
+          capabilityLaneDebugProjection.capability_lane_session_debug_summaries,
         capability_lane_reentry_status: capabilityLaneDebugProjection.capability_lane_reentry_status,
         permission_profile: codexProvider.permissionProfile,
         fail_reason:

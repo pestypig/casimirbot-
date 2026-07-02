@@ -38,6 +38,12 @@ export const buildHelixCapabilityLaneGoalDispatchReadiness = (input: {
     blocked_reasons: uniqueStrings(
       blocked.map((admission) => admission.blocked_reason ?? "").filter(Boolean),
     ),
+    next_lane_ids: uniqueStrings(
+      admitted.map((admission) => admission.lane_id),
+    ) as HelixCapabilityLaneGoalDispatchReadiness["next_lane_ids"],
+    next_lane_session_ids: uniqueStrings(
+      admitted.map((admission) => admission.lane_session_id).filter(Boolean),
+    ),
     next_dispatch_targets: uniqueTargets(
       admitted
         .map((admission) => admission.target)
@@ -45,6 +51,12 @@ export const buildHelixCapabilityLaneGoalDispatchReadiness = (input: {
     ),
     next_goal_binding_ids: uniqueStrings(
       admitted.map((admission) => admission.goal_binding_id).filter(Boolean),
+    ),
+    next_evidence_refs: uniqueStrings(
+      admitted.map((admission) => admission.evidence_ref ?? "").filter(Boolean),
+    ),
+    next_receipt_refs: uniqueStrings(
+      admitted.map((admission) => admission.receipt_ref ?? "").filter(Boolean),
     ),
     side_effects_allowed: false,
     side_effects_executed: false,

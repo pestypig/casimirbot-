@@ -121,6 +121,9 @@ describe("provider-neutral capability lane one-shot runner", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
+    expect(helix.resolve_traces[0]?.receipt_ref).toContain(
+      `${helix.resolve_traces[0]?.observation_ref}:projection:`,
+    );
     expect(helix.backend_selections[0]).toMatchObject({
       schema: "helix.capability_lane.backend_selection_summary.v1",
       selected_runtime_agent_provider: "helix",
@@ -164,6 +167,7 @@ describe("provider-neutral capability lane one-shot runner", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
+    expect(helix.backend_selections[0]?.receipt_ref).toBe(helix.resolve_traces[0]?.receipt_ref);
     expect(codex.backend_selections[0]).toMatchObject({
       schema: "helix.capability_lane.backend_selection_summary.v1",
       selected_runtime_agent_provider: "codex",
@@ -181,6 +185,7 @@ describe("provider-neutral capability lane one-shot runner", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
+    expect(codex.backend_selections[0]?.receipt_ref).toBe(codex.resolve_traces[0]?.receipt_ref);
     expect(codex.resolve_traces[0]).toMatchObject({
       requested_lane: "live_translation",
       requested_backend_provider: "google_gemini",
@@ -195,6 +200,9 @@ describe("provider-neutral capability lane one-shot runner", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
+    expect(codex.resolve_traces[0]?.receipt_ref).toContain(
+      `${codex.resolve_traces[0]?.observation_ref}:projection:`,
+    );
     expect(helix.observation_packets[0]?.capability_key).toBe("live_translation.translate_text");
     expect(codex.observation_packets[0]?.capability_key).toBe("live_translation.translate_text");
     expect(helix.debug_events.map((event) => event.stage)).toEqual([
@@ -220,6 +228,12 @@ describe("provider-neutral capability lane one-shot runner", () => {
       requested_backend_fallback_provider: "live_translation.local_runtime",
       selected_backend_provider: "live_translation.local_runtime",
       selection_reason: "requested_backend_unconfigured_default_backend_selected_by_helix_policy",
+      availability_status: "dry_run",
+      permission_status: "admitted",
+      cost_class: "free_local",
+      latency_class: "interactive",
+      privacy_class: "local_only",
+      fallback_backend_provider: null,
       backend_selection_decision: expect.objectContaining({
         outcome: "fallback_selected",
         selected_runtime_provider_remains_root: true,
@@ -246,6 +260,12 @@ describe("provider-neutral capability lane one-shot runner", () => {
       requested_backend_permission_status: "configuration_missing",
       requested_backend_fallback_provider: "live_translation.local_runtime",
       selected_backend_provider: "live_translation.local_runtime",
+      availability_status: "dry_run",
+      permission_status: "admitted",
+      cost_class: "free_local",
+      latency_class: "interactive",
+      privacy_class: "local_only",
+      fallback_backend_provider: null,
       backend_selection_decision: expect.objectContaining({
         outcome: "fallback_selected",
         selected_runtime_provider_remains_root: true,
@@ -261,6 +281,7 @@ describe("provider-neutral capability lane one-shot runner", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
+    expect(codex.debug_events[2]?.receipt_ref).toBe(codex.resolve_traces[0]?.receipt_ref);
     expect(codex.debug_events[3]).toMatchObject({
       stage: "lane_reentered",
       requested_backend_provider: null,
@@ -269,7 +290,12 @@ describe("provider-neutral capability lane one-shot runner", () => {
       requested_backend_availability_status: null,
       requested_backend_permission_status: null,
       requested_backend_fallback_provider: null,
+      cost_class: null,
+      latency_class: null,
+      privacy_class: null,
+      fallback_backend_provider: null,
     });
+    expect(codex.debug_events[3]?.receipt_ref).toBe(codex.resolve_traces[0]?.receipt_ref);
   });
 
   it("projects lane call results through the same provider debug/export envelope", () => {
@@ -524,6 +550,42 @@ describe("provider-neutral capability lane one-shot runner", () => {
       capability_lane_shadow_execution: {
         lane_id: "visual_analysis",
         capability: "visual_analysis.inspect_frame",
+        requested_backend_provider: "openai_compatible",
+        selected_backend_provider: "visual_analysis.openai_compatible",
+        selection_reason: "selected_requested_backend_provider_for_shadow_manifest",
+        availability_status: "dry_run",
+        permission_status: "admitted",
+        cost_class: "standard",
+        latency_class: "interactive",
+        privacy_class: "external_provider",
+        fallback_backend_provider: null,
+        execution_status: "not_executed_shadow_only",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    expect(result.observation_packets[0]?.backend_selection_decision).toMatchObject({
+      outcome: "requested_selected",
+      requested_backend_provider: "openai_compatible",
+      selected_backend_provider: "visual_analysis.openai_compatible",
+      selected_runtime_provider_remains_root: true,
+      backend_provider_becomes_root_agent: false,
+      dynamic_switching_executed: false,
+      live_backend_execution_enabled: false,
+      terminal_authority_owner: "helix",
+    });
+    expect(result.observation_packets[1]?.state_delta).toMatchObject({
+      capability_lane_shadow_execution: {
+        lane_id: "text_to_speech",
+        capability: "text_to_speech.synthesize",
+        requested_backend_provider: "elevenlabs",
+        selected_backend_provider: "text_to_speech.elevenlabs",
+        availability_status: "dry_run",
+        permission_status: "admitted",
+        cost_class: "standard",
+        latency_class: "interactive",
+        privacy_class: "external_provider",
         execution_status: "not_executed_shadow_only",
         terminal_eligible: false,
         assistant_answer: false,

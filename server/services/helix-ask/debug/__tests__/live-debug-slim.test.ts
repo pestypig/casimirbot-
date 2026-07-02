@@ -33,6 +33,45 @@ describe("Helix Ask live debug slim", () => {
       capability_lane_resolve_trace_shape: {
         schema: "helix.capability_lane_resolve_trace.v1",
       },
+      capability_lane_backend_selections: [
+        {
+          schema: "helix.capability_lane.backend_selection_summary.v1",
+          requested_lane: "live_translation",
+          requested_backend_provider: "live_translation.google_gemini",
+          selected_backend_provider: "live_translation.local_runtime",
+          selection_reason: "requested_backend_unconfigured_default_backend_selected_by_helix_policy",
+          receipt_ref: "ask:lane:translation:obs:projection:receipt",
+        },
+      ],
+      capability_lane_debug_events: [
+        {
+          schema: "helix.capability_lane.debug_event.v1",
+          stage: "lane_observation",
+          capability: "live_translation.translate_text",
+          selected_backend_provider: "live_translation.local_runtime",
+          observation_ref: "ask:lane:translation:obs",
+          receipt_ref: "ask:lane:translation:obs:projection:receipt",
+          terminal_eligible: false,
+          assistant_answer: false,
+        },
+      ],
+      capability_lane_projection_receipts: [
+        {
+          schema: "helix.capability_lane.provider_adapter_receipt.v1",
+          receipt_ref: "ask:lane:translation:obs:projection:receipt",
+          observation_ref: "ask:lane:translation:obs",
+          terminal_eligible: false,
+          assistant_answer: false,
+        },
+      ],
+      capability_lane_goal_dispatch_readiness: {
+        schema: "helix.capability_lane.goal_dispatch_readiness.v1",
+        status: "ready",
+        next_lane_ids: ["live_translation"],
+        next_lane_session_ids: ["lane-session-debug"],
+        next_evidence_refs: ["ask:lane:translation:obs"],
+        next_receipt_refs: ["ask:lane:translation:obs:projection:receipt"],
+      },
       debug: {
         turn_id: "turn-provider-projection",
       },
@@ -54,6 +93,51 @@ describe("Helix Ask live debug slim", () => {
       },
       capability_lane_resolve_trace_shape: {
         schema: "helix.capability_lane_resolve_trace.v1",
+      },
+      capability_lane_backend_selections: {
+        count: 1,
+        sample: [
+          expect.objectContaining({
+            requested_lane: "live_translation",
+            requested_backend_provider: "live_translation.google_gemini",
+            selected_backend_provider: "live_translation.local_runtime",
+            receipt_ref: "ask:lane:translation:obs:projection:receipt",
+          }),
+        ],
+        truncated: false,
+      },
+      capability_lane_debug_events: {
+        count: 1,
+        sample: [
+          expect.objectContaining({
+            stage: "lane_observation",
+            capability: "live_translation.translate_text",
+            receipt_ref: "ask:lane:translation:obs:projection:receipt",
+            terminal_eligible: false,
+            assistant_answer: false,
+          }),
+        ],
+        truncated: false,
+      },
+      capability_lane_projection_receipts: {
+        count: 1,
+        sample: [
+          expect.objectContaining({
+            receipt_ref: "ask:lane:translation:obs:projection:receipt",
+            observation_ref: "ask:lane:translation:obs",
+            terminal_eligible: false,
+            assistant_answer: false,
+          }),
+        ],
+        truncated: false,
+      },
+      capability_lane_goal_dispatch_readiness: {
+        schema: "helix.capability_lane.goal_dispatch_readiness.v1",
+        status: "ready",
+        next_lane_ids: ["live_translation"],
+        next_lane_session_ids: ["lane-session-debug"],
+        next_evidence_refs: ["ask:lane:translation:obs"],
+        next_receipt_refs: ["ask:lane:translation:obs:projection:receipt"],
       },
     });
   });

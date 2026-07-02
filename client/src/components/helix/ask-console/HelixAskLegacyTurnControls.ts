@@ -44,6 +44,12 @@ export type HelixAskLegacyTurnControlTextArgs = {
   fallbackCopyText?: unknown;
 };
 
+export type HelixAskLegacyTurnControlActionPayload = {
+  replyId: string;
+  text: string;
+  hasText: boolean;
+};
+
 export type HelixAskLegacyDebugCopyLocalPayloadArgs = {
   providedPayload?: unknown;
   normalizedPayload: string;
@@ -69,6 +75,17 @@ export type HelixAskLegacyClickedTurnDebugGuardArgs = {
   clickedButtonScopedPayload?: string | null;
   clickedTurnScope?: HelixAskLegacyClickedTurnDebugScope | null;
   payloadMatchesClickedTurn: (payload: string) => boolean;
+};
+
+export type HelixAskLegacyReplyScopedDebugExportGuardArgs = {
+  exportPayload: string;
+  replyScopedFallbackPayload?: string | null;
+  payloadMatchesExpectedReply: (payload: string) => boolean;
+};
+
+export type HelixAskLegacyClickedDebugReplySelection<TReply extends { id?: string | null }> = {
+  reply: TReply;
+  source: "clicked_client_turn_id" | "current_reply";
 };
 
 export type HelixAskLegacyDebugExportBackendRef = {
@@ -149,6 +166,62 @@ export function resolveHelixAskLegacyTurnControlText(
   const visibleFinalAnswerText = coerceControlText(args.visibleFinalAnswerText).trim();
   if (visibleFinalAnswerText) return visibleFinalAnswerText;
   return coerceControlText(args.fallbackCopyText);
+}
+
+export function buildHelixAskLegacyTurnControlActionPayload(args: {
+  reply: HelixAskLegacyReplyForControls | null | undefined;
+  visibleFinalAnswerText?: unknown;
+  fallbackCopyText?: unknown;
+}): HelixAskLegacyTurnControlActionPayload {
+  const replyId = coerceControlText(args.reply?.id).trim();
+  const text = resolveHelixAskLegacyTurnControlText({
+    visibleFinalAnswerText: args.visibleFinalAnswerText,
+    fallbackCopyText: args.fallbackCopyText,
+  });
+  return {
+    replyId,
+    text,
+    hasText: text.trim().length > 0,
+  };
+}
+
+export function clearHelixAskLegacyCopiedDebugIdIfCurrent(
+  currentReplyId: string | null,
+  copiedReplyId: string,
+): string | null {
+  return currentReplyId === copiedReplyId ? null : currentReplyId;
+}
+
+export function resolveHelixAskLegacyClickedDebugReply<TReply extends { id?: string | null }>(
+  currentReply: TReply,
+  replies: readonly TReply[],
+  clickedTurnScope: HelixAskLegacyClickedTurnDebugScope | null | undefined,
+): HelixAskLegacyClickedDebugReplySelection<TReply> {
+  const clickedClientTurnId = coerceControlText(clickedTurnScope?.clientTurnId).trim();
+  if (clickedClientTurnId) {
+    const clickedReply = replies.find((candidate) => coerceControlText(candidate.id).trim() === clickedClientTurnId);
+    if (clickedReply) {
+      return {
+        reply: clickedReply,
+        source: "clicked_client_turn_id",
+      };
+    }
+  }
+  return {
+    reply: currentReply,
+    source: "current_reply",
+  };
+}
+
+export function resolveHelixAskLegacyDebugExportClientTurnId(
+  parsedPayload: Record<string, unknown>,
+): string | null {
+  return (
+    coerceControlText(parsedPayload.client_active_turn_id).trim() ||
+    coerceControlText(parsedPayload.clientSelectedDebugTurnId).trim() ||
+    coerceControlText(readControlRecord(parsedPayload.reply)?.id).trim() ||
+    null
+  );
 }
 
 export function buildHelixAskReplyCopyText(reply: HelixAskLegacyReplyForControls | null | undefined): string {
@@ -259,6 +332,14 @@ export function selectHelixAskLegacyGuardedDebugExportPayload(
   }
 }
 
+export function selectHelixAskLegacyReplyScopedDebugExportPayload(
+  args: HelixAskLegacyReplyScopedDebugExportGuardArgs,
+): string {
+  if (args.payloadMatchesExpectedReply(args.exportPayload)) return args.exportPayload;
+  const fallbackPayload = coerceControlText(args.replyScopedFallbackPayload).trim();
+  return fallbackPayload || args.exportPayload;
+}
+
 function resolveHelixAskLegacyTerminalArtifactKindFromText(args: {
   terminalSource?: string | null;
   finalAnswer?: string | null;
@@ -356,7 +437,7 @@ export function extractHelixAskLegacyClickedTurnDebugScope(
       return {
         ...ancestorScope,
         activeTurnId: null,
-        clientTurnId: ancestorScope.clientTurnId ?? scopedClientTurnId ?? null,
+        clientTurnId: ancestorScope.clientTurnId ?? null,
       };
     }
     return {
@@ -368,6 +449,69 @@ export function extractHelixAskLegacyClickedTurnDebugScope(
     };
   }
   return extractHelixAskLegacyClickedTurnDebugScopeFromAncestor(sourceElement);
+}
+
+export function isHelixAskLegacyRenderedButtonBackendTurnScopeTrusted(args: {
+  rendered: HelixAskLegacyClickedTurnDebugScope;
+  renderedMatchesReply: boolean;
+  replyDebugRecord: Record<string, unknown> | null;
+}): boolean {
+  const renderedActiveTurnId = coerceControlText(args.rendered.activeTurnId).trim();
+  if (!renderedActiveTurnId || !isHelixAskLegacyBackendDebugExportEligibleTurnId(renderedActiveTurnId)) return true;
+  if (!args.renderedMatchesReply) return false;
+  if (!args.replyDebugRecord) return false;
+  const expectedQuestion = normalizedDebugReplyText(args.rendered.question);
+  const questionCandidates = [
+    args.replyDebugRecord?.active_prompt,
+    args.replyDebugRecord?.selectedDebugQuestion,
+    args.replyDebugRecord?.prompt,
+    args.replyDebugRecord?.user_prompt,
+    args.replyDebugRecord?.question,
+  ]
+    .map(normalizedDebugReplyText)
+    .filter(Boolean);
+  let hasPositiveTurnEvidence = false;
+  if (
+    expectedQuestion &&
+    questionCandidates.length > 0 &&
+    !questionCandidates.some((candidate) => candidate === expectedQuestion)
+  ) {
+    return false;
+  }
+  if (
+    expectedQuestion &&
+    questionCandidates.some((candidate) => candidate === expectedQuestion)
+  ) {
+    hasPositiveTurnEvidence = true;
+  }
+  const expectedFinalAnswer = normalizedDebugReplyText(args.rendered.finalAnswer);
+  const terminalAuthority = readAgentLoopAuditRecord(args.replyDebugRecord?.terminal_answer_authority);
+  const terminalResult = readAgentLoopAuditRecord(args.replyDebugRecord?.terminal_result);
+  const visibleAnswerState = readAgentLoopAuditRecord(args.replyDebugRecord?.visibleAnswerState);
+  const answerCandidates = [
+    args.replyDebugRecord?.selected_final_answer,
+    args.replyDebugRecord?.selectedDebugFinalAnswer,
+    args.replyDebugRecord?.finalAnswer,
+    visibleAnswerState?.finalAnswer,
+    terminalAuthority?.terminal_text_preview,
+    terminalResult?.text,
+  ]
+    .map(normalizedDebugReplyText)
+    .filter(Boolean);
+  if (
+    expectedFinalAnswer &&
+    answerCandidates.length > 0 &&
+    !answerCandidates.some((candidate) => candidate === expectedFinalAnswer)
+  ) {
+    return false;
+  }
+  if (
+    expectedFinalAnswer &&
+    answerCandidates.some((candidate) => candidate === expectedFinalAnswer)
+  ) {
+    hasPositiveTurnEvidence = true;
+  }
+  return hasPositiveTurnEvidence;
 }
 
 export function debugPayloadMatchesHelixAskLegacyRenderedTurnPayload(
@@ -514,7 +658,7 @@ export function resolveHelixAskLegacyDebugExportBackendTarget(
     readBackendDebugRef(parsedDebug?.backend_debug_response_ref),
     readBackendDebugRef(parsedDebug?.debug_export_ref),
   ].filter((entry): entry is HelixAskLegacyDebugExportBackendRef => Boolean(entry));
-  const activeTurnFallbackRef = isHelixAskLegacyBackendDebugExportEligibleTurnId(activeTurnId)
+  const activeTurnFallbackRef = !isReplyScopedRebuild && isHelixAskLegacyBackendDebugExportEligibleTurnId(activeTurnId)
     ? {
         endpoint: `/api/agi/ask/turn/${encodeURIComponent(activeTurnId)}/debug-export`,
         turn_id: activeTurnId,

@@ -102,6 +102,8 @@ export type HelixAgentRuntimeAdapterContract = {
     helix_owns_capability_lane_admission: true;
     capability_lanes_are_not_root_agents: true;
     capability_lane_one_shot_execution_enabled: true;
+    capability_lane_sessions_enabled: true;
+    capability_lane_sessions_are_observation_only: true;
     helix_owns_observation_packets: true;
     helix_owns_terminal_authority: true;
     receipts_are_not_answers: true;
@@ -179,6 +181,8 @@ export const buildHelixAgentRuntimeAdapterContract = (input: {
       helix_owns_capability_lane_admission: true,
       capability_lanes_are_not_root_agents: true,
       capability_lane_one_shot_execution_enabled: true,
+      capability_lane_sessions_enabled: true,
+      capability_lane_sessions_are_observation_only: true,
       helix_owns_observation_packets: true,
       helix_owns_terminal_authority: true,
       receipts_are_not_answers: true,
@@ -195,6 +199,7 @@ export const buildHelixAgentRuntimeAdapterContract = (input: {
       "Runtime-specific protocol glue stays inside the selected provider adapter.",
       "Use only Helix workstation gateway capabilities admitted for this turn.",
       "Capability lanes may execute only through Helix-governed one-shot lane calls or lane sessions admitted for this turn.",
+      "Lane sessions may start, pause, resume, or stop only through Helix-governed session calls; session traffic remains observation-only.",
       "A capability lane may be requested by purpose, but Helix resolves backend provider/service policy and keeps the selected runtime agent provider unchanged.",
       "Do not claim a workstation tool or UI action ran unless a Helix observation packet or action receipt is present.",
       "Do not claim an AI service lane ran unless a Helix lane observation or receipt is present.",

@@ -5,6 +5,8 @@ import {
   normalizeHelixAgentProvidersResponse,
   resolveHelixAskActualAgentProviderLabel,
   resolveHelixAskModelUsageLabel,
+  resolveHelixAgentRuntimePrimaryButtonDecision,
+  resolveHelixAgentRuntimeSelectDecision,
   resolveNextSelectableHelixAgentRuntime,
   resolveSelectedHelixAgentRuntime,
 } from "@/lib/helix/ask-agent-runtime-display";
@@ -116,6 +118,47 @@ describe("Helix Ask agent runtime display", () => {
     expect(formatHelixAgentRuntimeShortLabel(providers.find((provider) => provider.id === "codex"))).toBe("Codex");
     expect(formatHelixAgentRuntimeShortLabel(providers.find((provider) => provider.id === "future"))).toBe("Future");
     expect(formatHelixAgentRuntimeShortLabel(providers.find((provider) => provider.id === "helix"))).toBe("Helix");
+  });
+
+  it("projects runtime picker control decisions without side effects", () => {
+    const providers = normalizeHelixAgentProvidersResponse({
+      providers: [
+        { id: "helix", label: "Helix Ask Native", enabled: true, supports: {} },
+        { id: "codex", label: "Codex Workstation Mode", enabled: true, supports: {} },
+        { id: "future", label: "Future Agent Wrapper", enabled: false, supports: {} },
+      ],
+    });
+
+    expect(resolveHelixAgentRuntimeSelectDecision("codex", providers)).toEqual({
+      runtime: "codex",
+      menuOpen: false,
+      invalidSelection: false,
+    });
+    expect(resolveHelixAgentRuntimeSelectDecision("future", providers)).toEqual({
+      runtime: "helix",
+      menuOpen: false,
+      invalidSelection: true,
+    });
+    expect(resolveHelixAgentRuntimePrimaryButtonDecision({
+      selectedRuntime: "helix",
+      providers,
+      primaryButtonMode: "cycle",
+      currentMenuOpen: true,
+    })).toEqual({
+      runtime: "codex",
+      menuOpen: false,
+      persistRuntime: true,
+    });
+    expect(resolveHelixAgentRuntimePrimaryButtonDecision({
+      selectedRuntime: "codex",
+      providers,
+      primaryButtonMode: "menu",
+      currentMenuOpen: false,
+    })).toEqual({
+      runtime: "codex",
+      menuOpen: true,
+      persistRuntime: false,
+    });
   });
 
   it("labels actual provider metadata from response/debug fields without inferring from runtime loops", () => {

@@ -57,6 +57,8 @@ import {
   normalizeHelixAgentProvidersResponse,
   resolveHelixAskActualAgentProviderLabel,
   resolveHelixAskModelUsageLabel,
+  resolveHelixAgentRuntimePrimaryButtonDecision,
+  resolveHelixAgentRuntimeSelectDecision,
   resolveNextSelectableHelixAgentRuntime,
   resolveSelectedHelixAgentRuntime,
 } from "@/lib/helix/ask-agent-runtime-display";
@@ -64,6 +66,16 @@ import {
   buildHelixAskConsoleBackendTurnPayloadCore,
   buildHelixAskConsoleContextFiles,
 } from "@/components/helix/ask-console/HelixAskRequestEnvelope";
+import {
+  buildHelixAskDocViewerDebugSnapshotBinding,
+  readHelixAskDocViewerPathFromDesktopUrlForSnapshot,
+  rememberHelixAskDocViewerPathForSnapshot,
+  resolveHelixAskDocViewerSnapshotPathBinding,
+} from "@/components/helix/ask-console/HelixAskActiveDocContextBinding";
+import {
+  buildHelixAskWorkspaceContextSnapshotBinding,
+  buildHelixAskWorkstationLayoutDebugSnapshotBinding,
+} from "@/components/helix/ask-console/HelixAskWorkspaceContextBinding";
 import {
   copyHelixAskContextCapsuleToClipboard,
   copyHelixAskDebugJsonToClipboard,
@@ -73,25 +85,28 @@ import {
   HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE as RECROWNED_HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE,
   HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT as RECROWNED_HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT,
   HELIX_ASK_ENTRYPOINT_GUARD_VERSION as RECROWNED_HELIX_ASK_ENTRYPOINT_GUARD_VERSION,
-  buildHelixAskHardBackendEntrypointRouteMetadata as buildRecrownedHelixAskHardBackendEntrypointRouteMetadata,
+  buildHelixAskHardBackendEntrypointRouteMetadata,
   buildHelixAskPastedTextResumeRecallRouteMetadata,
   requiresHelixAskBackendEntrypoint as recrownedRequiresHelixAskBackendEntrypoint,
   shouldUseHelixAskBackendTurnEntrypoint as recrownedShouldUseHelixAskBackendTurnEntrypoint,
 } from "@/components/helix/ask-console/HelixAskBackendEntrypointPolicy";
-import { readDocPathFromDesktopUrl } from "@/components/helix/ask-console/HelixAskContextBridge";
 import { buildHelixAskLatestTurnBinding } from "@/components/helix/ask-console/HelixAskLatestTurnBinding";
 import {
   buildHelixAskLegacyTurnControlViewModel,
   buildHelixAskReplyCopyText as buildRecrownedHelixAskReplyCopyText,
+  buildHelixAskLegacyTurnControlActionPayload,
+  clearHelixAskLegacyCopiedDebugIdIfCurrent,
   debugPayloadMatchesHelixAskLegacyRenderedTurnPayload as debugPayloadMatchesRenderedTurnPayload,
   enforceHelixAskLegacyDebugExportMatchesClickedButton as enforceDebugExportMatchesClickedButton,
   extractHelixAskLegacyClickedTurnDebugScope,
   isHelixAskLegacyBackendDebugExportEligibleTurnId,
+  isHelixAskLegacyRenderedButtonBackendTurnScopeTrusted,
   resolveHelixAskLegacyDebugExportBackendTarget,
+  resolveHelixAskLegacyDebugExportClientTurnId,
   resolveHelixAskLegacyReplyDebugTurnId as resolveHelixAskReplyDebugTurnId,
-  resolveHelixAskLegacyTurnControlText,
-  selectHelixAskLegacyGuardedDebugExportPayload,
+  resolveHelixAskLegacyClickedDebugReply,
   selectHelixAskLegacyDebugCopyLocalPayload,
+  selectHelixAskLegacyReplyScopedDebugExportPayload,
 } from "@/components/helix/ask-console/HelixAskLegacyTurnControls";
 import {
   hasSuccessfulWorkstationTerminalTranscriptRows,
@@ -173,17 +188,30 @@ import {
 import { HelixAskDebugDrawer } from "@/components/helix/ask-console/HelixAskDebugDrawer";
 import {
   buildHelixAskDebugDrawerCopyProjection,
+  clearHelixAskDebugDrawerForStaleReply,
   type HelixAskDebugClipboardCopyResult,
   type HelixAskDebugExportDrawerState,
 } from "@/components/helix/ask-console/HelixAskDebugDrawerState";
 import { HelixAskTurnList } from "@/components/helix/ask-console/HelixAskTurnList";
 import { HelixAskAttachmentStrip } from "@/components/helix/ask-console/HelixAskAttachmentStrip";
 import {
-  validateHelixAskAttachmentForSubmit,
-  validateHelixAskImageAttachmentForSubmit,
+  buildHelixAskAttachmentCommitChecks,
+  hasReadyHelixAskAttachmentCommitCheck,
   type HelixAskAttachment,
   type HelixAskImageAttachment,
 } from "@/components/helix/ask-console/HelixAskAttachmentCommit";
+import {
+  buildHelixAskAttachmentContextPack,
+  buildHelixAskSubmittedAttachmentChecks,
+  buildHelixAskAttachmentTurnInputItems,
+  buildHelixAskSubmitRunOptionsPayload,
+  buildHelixAskTurnInputItemsForSubmit,
+  buildHelixAskVisualEvidenceTurnInputContext,
+  resolveHelixAskSubmittedAttachments,
+  selectFirstInvalidHelixAskSubmittedAttachment,
+  selectFirstHelixAskSubmitReadyImageAttachment,
+  selectHelixAskNativeImageAttachments,
+} from "@/components/helix/ask-console/HelixAskAttachmentPayload";
 import {
   HELIX_ASK_TEXT_ATTACHMENT_MAX_BYTES,
   buildHelixAskTextAttachmentFromText,
@@ -224,6 +252,8 @@ export {
   normalizeHelixAgentProvidersResponse,
   resolveHelixAskActualAgentProviderLabel,
   resolveHelixAskModelUsageLabel,
+  resolveHelixAgentRuntimePrimaryButtonDecision,
+  resolveHelixAgentRuntimeSelectDecision,
   resolveNextSelectableHelixAgentRuntime,
   resolveSelectedHelixAgentRuntime,
 };
@@ -407,10 +437,6 @@ import {
   selectWorkstationFastPathReplyAction,
 } from "@/lib/helix/ask-workstation-fast-path";
 import {
-  buildAskTurnWorkspaceContextSnapshotFromState,
-  buildWorkstationLayoutDebugSnapshotFromState,
-} from "@/lib/helix/ask-workspace-context-snapshot";
-import {
   cloneRunPanelActionWithArgs,
   extractPendingArgFromReply,
   parseWorkstationConfirmationReply,
@@ -466,12 +492,9 @@ export type {
 };
 import { normalizeHelixAskEnvelopeCitations } from "@/lib/helix/ask-envelope-copy";
 import {
-  buildDocViewerDebugSnapshotFromState,
   normalizeDocPathForDebugCompare,
-  normalizeDocViewerPathForAskSnapshot,
   normalizeDocsViewerAnchorPath,
   resolveDocsViewerAnchorPathCandidate,
-  resolveDocViewerSnapshotPathCandidate,
   shouldSuppressAtomicViewerLaunch,
 } from "@/lib/helix/ask-doc-viewer-context";
 export {
@@ -538,14 +561,17 @@ import {
   dedupeStrings,
 } from "@/lib/helix/ask-value-normalization";
 import {
+  buildReadAloudStateMapTransition,
   buildVoiceAutoSpeakUtteranceId,
   canPlayVoiceUtteranceWithMicOff,
+  filterReadAloudQueueForReply,
   formatReadAloudButtonLabel,
   hashVoiceUtteranceKey,
   isInterimVoicePlaybackUtteranceKind,
   isManualVoicePlaybackUtterance,
   isMissionVoiceOutputModeEnabled,
   resolveInitialMicArmState,
+  resolveReadAloudButtonPressAction,
   shouldEnableVoiceRollout,
   shouldStopReadAloudOnButtonPress,
   transitionReadAloudState,
@@ -553,14 +579,17 @@ import {
   type ReadAloudPlaybackState,
 } from "@/lib/helix/ask-read-aloud-display";
 export {
+  buildReadAloudStateMapTransition,
   buildVoiceAutoSpeakUtteranceId,
   canPlayVoiceUtteranceWithMicOff,
+  filterReadAloudQueueForReply,
   formatReadAloudButtonLabel,
   hashVoiceUtteranceKey,
   isInterimVoicePlaybackUtteranceKind,
   isManualVoicePlaybackUtterance,
   isMissionVoiceOutputModeEnabled,
   resolveInitialMicArmState,
+  resolveReadAloudButtonPressAction,
   shouldEnableVoiceRollout,
   shouldStopReadAloudOnButtonPress,
   transitionReadAloudState,
@@ -2718,15 +2747,6 @@ type AskContextChooserState = {
 const HELIX_ASK_MAX_ATTACHMENTS = 6;
 const HELIX_ASK_LARGE_PASTE_THRESHOLD_CHARS = 2400;
 
-export function buildHelixAskHardBackendEntrypointRouteMetadata(args: {
-  question: string;
-  base?: HelixAskRouteMetadata;
-  turnId: string;
-  threadId: string;
-}): HelixAskRouteMetadata | null {
-  return buildRecrownedHelixAskHardBackendEntrypointRouteMetadata(args);
-}
-
 function buildQueuedAskTurn(args: {
   question: string;
   capsuleIds?: string[];
@@ -4656,15 +4676,8 @@ type AskLiveAgenticEventRow = {
   tone: "default" | "thinking" | "observation" | "decision" | "warning" | "final";
 };
 
-let helixAskLastKnownDocViewerPath: string | null = null;
-
 function rememberDocViewerPathForAskSnapshot(value: unknown): string | null {
-  const normalized = normalizeDocViewerPathForAskSnapshot(value);
-  if (normalized) {
-    helixAskLastKnownDocViewerPath = normalized;
-    return normalized;
-  }
-  return helixAskLastKnownDocViewerPath;
+  return rememberHelixAskDocViewerPathForSnapshot(value);
 }
 
 export function readDocViewerPathFromDesktopUrlForAskSnapshot(): string | null {
@@ -4675,26 +4688,20 @@ export function readDocViewerPathFromDesktopUrlForAskSnapshot(): string | null {
     : typeof location.search === "string"
       ? location.search
       : "";
-  return normalizeDocViewerPathForAskSnapshot(readDocPathFromDesktopUrl(url));
+  return readHelixAskDocViewerPathFromDesktopUrlForSnapshot(url);
 }
 
 function readDocViewerDebugSnapshot(): Record<string, unknown> {
   const state = useDocViewerStore.getState();
-  const currentPath = rememberDocViewerPathForAskSnapshot(state.currentPath);
-  return buildDocViewerDebugSnapshotFromState(state, currentPath);
+  return buildHelixAskDocViewerDebugSnapshotBinding(state);
 }
 
 function resolveAskTurnDocViewerSnapshotPath(): { path: string | null; source: string } {
   const state = useDocViewerStore.getState();
-  const debugSnapshot = readDocViewerDebugSnapshot();
-  const resolution = resolveDocViewerSnapshotPathCandidate({
-    storePath: state.currentPath,
-    debugSnapshotPath: debugSnapshot.currentPath,
+  return resolveHelixAskDocViewerSnapshotPathBinding({
+    state,
     desktopUrlDocPath: readDocViewerPathFromDesktopUrlForAskSnapshot(),
-    lastKnownPath: helixAskLastKnownDocViewerPath,
   });
-  if (resolution.path) rememberDocViewerPathForAskSnapshot(resolution.path);
-  return resolution;
 }
 
 export function syncDocViewerStateFromWorkstationAction(action: HelixWorkstationAction): boolean {
@@ -4727,19 +4734,9 @@ function resolveDocsViewerAnchorPathForQuestion(
   });
 }
 
-export function buildHelixAskContextFilesForTurn(
-  docsViewerAnchorPath: string | null | undefined,
-  workspaceContextSnapshot: Record<string, unknown> | null | undefined,
-): string[] | undefined {
-  return buildHelixAskConsoleContextFiles({
-    docsViewerAnchorPath,
-    workspaceContextSnapshot,
-  });
-}
-
 function readWorkstationLayoutDebugSnapshot(): Record<string, unknown> {
   const state = useWorkstationLayoutStore.getState();
-  return buildWorkstationLayoutDebugSnapshotFromState(state);
+  return buildHelixAskWorkstationLayoutDebugSnapshotBinding(state);
 }
 
 function buildAskTurnWorkspaceContextSnapshot(sessionId: string | null | undefined): Record<string, unknown> {
@@ -4755,7 +4752,7 @@ function buildAskTurnWorkspaceContextSnapshot(sessionId: string | null | undefin
     situationRoomJobState.last_attached_job_id,
   );
   const situationCaptureContext = buildSituationRoomCaptureContext(situationRoomState);
-  return buildAskTurnWorkspaceContextSnapshotFromState({
+  return buildHelixAskWorkspaceContextSnapshotBinding({
     sessionId,
     layoutState,
     notesState,
@@ -5593,9 +5590,23 @@ export function buildReplyScopedDebugExportFromRenderedButton(
     renderedFinalMatchesReply;
   const replyRecord = reply as Record<string, unknown>;
   const replyDebugRecord = renderedMatchesReply ? readAgentLoopAuditRecord(reply.debug) : null;
+  const backendTurnScopeTrusted = isHelixAskLegacyRenderedButtonBackendTurnScopeTrusted({
+    rendered,
+    renderedMatchesReply,
+    replyDebugRecord,
+  });
   const renderedClientScopedTurnId = rendered.clientTurnId && (rendered.question || rendered.finalAnswer) ? rendered.clientTurnId : null;
-  const activeTurnId = rendered.activeTurnId || renderedClientScopedTurnId || resolveHelixAskReplyDebugTurnId(reply);
+  const replyResolvedTurnId = resolveHelixAskReplyDebugTurnId(reply);
+  const replyResolvedTurnIdTrusted =
+    backendTurnScopeTrusted &&
+    (!isBackendAskTurnDebugExportEligibleTurnId(replyResolvedTurnId) || Boolean(rendered.activeTurnId));
+  const activeTurnId =
+    (backendTurnScopeTrusted ? rendered.activeTurnId : null) ||
+    renderedClientScopedTurnId ||
+    (replyResolvedTurnIdTrusted ? replyResolvedTurnId : reply.id) ||
+    null;
   const clientTurnId = rendered.clientTurnId || reply.id || null;
+  const includeReplyDebug = renderedMatchesReply && backendTurnScopeTrusted;
   return buildHelixDebugExportEnvelopeFromMasterPayload(reply, {
     schema: "helix.ask.master_event_clock.v2",
     exportedAt: new Date().toISOString(),
@@ -5615,33 +5626,33 @@ export function buildReplyScopedDebugExportFromRenderedButton(
       question: rendered.question ?? reply.question ?? null,
       sourceCount: reply.sources?.length ?? 0,
     },
-    debug: renderedMatchesReply ? reply.debug ?? null : null,
+    debug: includeReplyDebug ? reply.debug ?? null : null,
     active_prompt: rendered.question ?? reply.question ?? null,
     selected_final_answer: rendered.finalAnswer ?? "",
     final_answer_source:
       rendered.terminalArtifactKind ??
-      (renderedMatchesReply ? replyRecord.final_answer_source : null) ??
+      (includeReplyDebug ? replyRecord.final_answer_source : null) ??
       replyDebugRecord?.final_answer_source ??
       visibleTerminal.finalAnswerSource ??
       null,
     terminal_artifact_kind:
       rendered.terminalArtifactKind ??
-      (renderedMatchesReply ? replyRecord.terminal_artifact_kind : null) ??
+      (includeReplyDebug ? replyRecord.terminal_artifact_kind : null) ??
       replyDebugRecord?.terminal_artifact_kind ??
       visibleTerminal.terminalArtifactKind ??
       null,
-    terminal_result: renderedMatchesReply ? replyRecord.terminal_result ?? replyDebugRecord?.terminal_result ?? null : null,
-    terminal_results: renderedMatchesReply ? replyRecord.terminal_results ?? replyDebugRecord?.terminal_results ?? [] : [],
-    debug_export_ref: renderedMatchesReply ? replyRecord.debug_export_ref ?? replyDebugRecord?.debug_export_ref ?? null : null,
-    backend_debug_response_ref: renderedMatchesReply
+    terminal_result: includeReplyDebug ? replyRecord.terminal_result ?? replyDebugRecord?.terminal_result ?? null : null,
+    terminal_results: includeReplyDebug ? replyRecord.terminal_results ?? replyDebugRecord?.terminal_results ?? [] : [],
+    debug_export_ref: includeReplyDebug ? replyRecord.debug_export_ref ?? replyDebugRecord?.debug_export_ref ?? null : null,
+    backend_debug_response_ref: includeReplyDebug
       ? replyRecord.backend_debug_response_ref ?? replyDebugRecord?.backend_debug_response_ref ?? null
       : null,
-    golden_path_runtime: renderedMatchesReply ? replyRecord.golden_path_runtime ?? replyDebugRecord?.golden_path_runtime ?? null : null,
-    golden_path_runtime_status: renderedMatchesReply
+    golden_path_runtime: includeReplyDebug ? replyRecord.golden_path_runtime ?? replyDebugRecord?.golden_path_runtime ?? null : null,
+    golden_path_runtime_status: includeReplyDebug
       ? replyRecord.golden_path_runtime_status ?? replyDebugRecord?.golden_path_runtime_status ?? null
       : null,
-    server_build_commit: renderedMatchesReply ? replyRecord.server_build_commit ?? replyDebugRecord?.server_build_commit ?? null : null,
-    server_build_started_at_ms: renderedMatchesReply
+    server_build_commit: includeReplyDebug ? replyRecord.server_build_commit ?? replyDebugRecord?.server_build_commit ?? null : null,
+    server_build_started_at_ms: includeReplyDebug
       ? replyRecord.server_build_started_at_ms ?? replyDebugRecord?.server_build_started_at_ms ?? null
       : null,
   });
@@ -6686,11 +6697,7 @@ async function resolveAuthoritativeDebugExportPayload(localPayload: string): Pro
       });
     }
     const clientProjection = buildClientProjectionDebugFields(parsed);
-    const clientActiveTurnId =
-      coerceText(parsed.client_active_turn_id).trim() ||
-      coerceText(parsed.clientSelectedDebugTurnId).trim() ||
-      coerceText(readAgentLoopAuditRecord(parsed.reply)?.id).trim() ||
-      null;
+    const clientActiveTurnId = resolveHelixAskLegacyDebugExportClientTurnId(parsed);
     const mergedPayload = {
       ...authoritativePayload,
       debug_export_source: "backend_endpoint",
@@ -8177,28 +8184,33 @@ export function HelixAskPill({
     [agentRuntimeProviders, selectedAgentRuntime],
   );
   const handleAgentRuntimeSelect = useCallback((runtime: HelixAgentRuntimeId) => {
-    const validated = resolveSelectedHelixAgentRuntime(runtime, agentRuntimeProviders);
-    if (validated !== runtime) {
+    const decision = resolveHelixAgentRuntimeSelectDecision(runtime, agentRuntimeProviders);
+    if (decision.invalidSelection) {
       triggerAskActionHaptic();
-      setSelectedAgentRuntime("helix");
-      persistHelixAskAgentRuntime("helix");
+      setSelectedAgentRuntime(decision.runtime);
+      persistHelixAskAgentRuntime(decision.runtime);
       return;
     }
     triggerAskActionHaptic();
-    setSelectedAgentRuntime(validated);
-    persistHelixAskAgentRuntime(validated);
-    setAgentRuntimeMenuOpen(false);
+    setSelectedAgentRuntime(decision.runtime);
+    persistHelixAskAgentRuntime(decision.runtime);
+    setAgentRuntimeMenuOpen(decision.menuOpen);
   }, [agentRuntimeProviders, triggerAskActionHaptic]);
   const handleAgentRuntimeButtonClick = useCallback(() => {
     triggerAskActionHaptic();
-    if (agentRuntimePickerModel.primaryButtonMode === "cycle") {
-      const nextRuntime = resolveNextSelectableHelixAgentRuntime(selectedAgentRuntime, agentRuntimeProviders);
-      setSelectedAgentRuntime(nextRuntime);
-      persistHelixAskAgentRuntime(nextRuntime);
-      setAgentRuntimeMenuOpen(false);
-      return;
-    }
-    setAgentRuntimeMenuOpen((current) => !current);
+    setAgentRuntimeMenuOpen((currentMenuOpen) => {
+      const decision = resolveHelixAgentRuntimePrimaryButtonDecision({
+        selectedRuntime: selectedAgentRuntime,
+        providers: agentRuntimeProviders,
+        primaryButtonMode: agentRuntimePickerModel.primaryButtonMode,
+        currentMenuOpen,
+      });
+      setSelectedAgentRuntime(decision.runtime);
+      if (decision.persistRuntime) {
+        persistHelixAskAgentRuntime(decision.runtime);
+      }
+      return decision.menuOpen;
+    });
   }, [agentRuntimePickerModel.primaryButtonMode, agentRuntimeProviders, selectedAgentRuntime, triggerAskActionHaptic]);
   useEffect(() => {
     askRepliesRef.current = askReplies;
@@ -8274,7 +8286,7 @@ export function HelixAskPill({
   }, [situationRoomId]);
   useEffect(() => {
     setDebugExportDrawer((current) =>
-      current && current.replyId !== latestAskReplyIdForDebugDrawer ? null : current,
+      clearHelixAskDebugDrawerForStaleReply(current, latestAskReplyIdForDebugDrawer),
     );
   }, [latestAskReplyIdForDebugDrawer]);
   useEffect(() => {
@@ -10745,11 +10757,12 @@ export function HelixAskPill({
 
   const handleCopyReply = useCallback(
     async (reply: HelixAskReply, textOverride?: string | null) => {
-      const text = resolveHelixAskLegacyTurnControlText({
+      const target = buildHelixAskLegacyTurnControlActionPayload({
+        reply,
         visibleFinalAnswerText: textOverride,
         fallbackCopyText: buildCopyText(reply),
       });
-      await copyHelixAskPlainTextToClipboard(text);
+      await copyHelixAskPlainTextToClipboard(target.text);
     },
     [buildCopyText],
   );
@@ -10767,12 +10780,15 @@ export function HelixAskPill({
       debugCopyInFlightRef.current = true;
       setDebugExportDrawer(null);
       try {
+        const clickedTurnScope = extractHelixAskLegacyClickedTurnDebugScope(sourceElement);
+        const clickedReplySelection = resolveHelixAskLegacyClickedDebugReply(reply, askReplies, clickedTurnScope);
+        const clickedReply = clickedReplySelection.reply;
         const hasProvidedPayload = typeof payload === "string" && payload.trim().length > 0;
-        const normalizedPayload = normalizeReplyMasterDebugPayload(reply, payload);
+        const normalizedPayload = normalizeReplyMasterDebugPayload(clickedReply, payload);
         const providedPayloadMatchesRenderedTurn =
           hasProvidedPayload && debugPayloadMatchesRenderedTurnPayload(payload, sourceElement);
         const renderedButtonScopedPayload = buildReplyScopedDebugExportFromRenderedButton(
-          reply,
+          clickedReply,
           sourceElement,
           "rendered_button_scope",
         );
@@ -10783,9 +10799,23 @@ export function HelixAskPill({
           providedPayloadMatchesRenderedTurn,
         });
         const authoritativeExportPayload = await resolveAuthoritativeDebugExportPayload(localExportPayload);
+        const replyScopedAuthoritativePayload = selectHelixAskLegacyReplyScopedDebugExportPayload({
+          exportPayload: authoritativeExportPayload,
+          replyScopedFallbackPayload: renderedButtonScopedPayload || normalizedPayload,
+          payloadMatchesExpectedReply: (candidatePayload) => {
+            try {
+              return debugPayloadMatchesRenderedReply(
+                clickedReply,
+                JSON.parse(candidatePayload) as Record<string, unknown>,
+              );
+            } catch {
+              return false;
+            }
+          },
+        });
         const exportPayload = boundHelixDebugExportTextForUi(
           enforceDebugExportMatchesClickedButton({
-            exportPayload: authoritativeExportPayload,
+            exportPayload: replyScopedAuthoritativePayload,
             clickedButtonScopedPayload: renderedButtonScopedPayload,
             sourceElement,
           }),
@@ -10797,7 +10827,7 @@ export function HelixAskPill({
         const copyResult = await copyDebugPayloadToClipboard(exportPayload);
         const payloadHash = copyResult.attempted_payload_hash ?? hashDebugExportText(exportPayload);
         const drawerProjection = buildHelixAskDebugDrawerCopyProjection({
-          replyId: reply.id,
+          replyId: clickedReply.id,
           exportPayload,
           payloadHash,
           copyResult,
@@ -10809,9 +10839,11 @@ export function HelixAskPill({
         }
         setDebugExportDrawer(drawerProjection.drawerState);
         if (drawerProjection.copied) {
-          setCopiedReplyMasterDebugId(reply.id);
+          setCopiedReplyMasterDebugId(clickedReply.id);
           window.setTimeout(() => {
-            setCopiedReplyMasterDebugId((current) => (current === reply.id ? null : current));
+            setCopiedReplyMasterDebugId((current) =>
+              clearHelixAskLegacyCopiedDebugIdIfCurrent(current, clickedReply.id),
+            );
           }, 1400);
         } else {
           if (typeof window !== "undefined") {
@@ -10829,7 +10861,7 @@ export function HelixAskPill({
         debugCopyInFlightRef.current = false;
       }
     },
-    [],
+    [askReplies],
   );
 
   const updateVoiceAutoSpeakMetrics = useCallback((metrics: VoicePlaybackMetrics) => {
@@ -11381,10 +11413,7 @@ export function HelixAskPill({
           audioBytes: input.blob.size,
         });
         if (replyId) {
-          setReadAloudByReply((prev) => ({
-            ...prev,
-            [replyId]: transitionReadAloudState(prev[replyId] ?? "idle", "audio"),
-          }));
+          setReadAloudByReply((prev) => buildReadAloudStateMapTransition(prev, replyId, "audio"));
         }
         try {
           await new Promise<void>((resolve, reject) => {
@@ -11424,10 +11453,7 @@ export function HelixAskPill({
                 voiceAutoSpeakPendingPlaybackResolverRef.current = null;
               }
               if (replyId) {
-                setReadAloudByReply((prev) => ({
-                  ...prev,
-                  [replyId]: transitionReadAloudState(prev[replyId] ?? "idle", "error"),
-                }));
+                setReadAloudByReply((prev) => buildReadAloudStateMapTransition(prev, replyId, "error"));
               }
               if (playbackUrlRef.current === url) {
                 URL.revokeObjectURL(url);
@@ -11467,13 +11493,13 @@ export function HelixAskPill({
                 voiceAutoSpeakPendingPlaybackResolverRef.current = null;
               }
               if (replyId) {
-                setReadAloudByReply((prev) => ({
-                  ...prev,
-                  [replyId]: transitionReadAloudState(
-                    prev[replyId] ?? "idle",
+                setReadAloudByReply((prev) =>
+                  buildReadAloudStateMapTransition(
+                    prev,
+                    replyId,
                     event === "ended" ? "ended" : event === "stopped" ? "stop" : "error",
                   ),
-                }));
+                );
               }
               if (playbackUrlRef.current === url) {
                 URL.revokeObjectURL(url);
@@ -11782,7 +11808,7 @@ export function HelixAskPill({
     }
     if (playbackReplyIdRef.current) {
       const replyId = playbackReplyIdRef.current;
-      setReadAloudByReply((prev) => ({ ...prev, [replyId]: transitionReadAloudState(prev[replyId] ?? "idle", "stop") }));
+      setReadAloudByReply((prev) => buildReadAloudStateMapTransition(prev, replyId, "stop"));
       playbackReplyIdRef.current = null;
     }
   }, [clearVoicePendingPreempt, updateVoiceAutoSpeakMetrics]);
@@ -11894,10 +11920,7 @@ export function HelixAskPill({
       stopReadAloud();
       const replyId = input.markReplyId ?? null;
       if (replyId) {
-        setReadAloudByReply((prev) => ({
-          ...prev,
-          [replyId]: transitionReadAloudState(prev[replyId] ?? "idle", "request"),
-        }));
+        setReadAloudByReply((prev) => buildReadAloudStateMapTransition(prev, replyId, "request"));
       }
       try {
         const response = await speakVoice({
@@ -11916,10 +11939,7 @@ export function HelixAskPill({
         if (response.kind === "json") {
           if (replyId) {
             const statusEvent = response.status >= 400 ? "error" : "dry-run";
-            setReadAloudByReply((prev) => ({
-              ...prev,
-              [replyId]: transitionReadAloudState(prev[replyId] ?? "idle", statusEvent),
-            }));
+            setReadAloudByReply((prev) => buildReadAloudStateMapTransition(prev, replyId, statusEvent));
           }
           return "json";
         }
@@ -11941,10 +11961,7 @@ export function HelixAskPill({
         }
         playbackReplyIdRef.current = null;
         if (replyId) {
-          setReadAloudByReply((prev) => ({
-            ...prev,
-            [replyId]: transitionReadAloudState(prev[replyId] ?? "idle", "error"),
-          }));
+          setReadAloudByReply((prev) => buildReadAloudStateMapTransition(prev, replyId, "error"));
         }
         throw new Error("voice_playback_failed");
       }
@@ -12594,10 +12611,9 @@ export function HelixAskPill({
               });
               metrics.cancelReason = metrics.cancelReason ?? voiceAutoSpeakCancelReasonRef.current;
               if (utterance.replyId) {
-                setReadAloudByReply((prev) => ({
-                  ...prev,
-                  [utterance.replyId as string]: transitionReadAloudState(prev[utterance.replyId as string] ?? "idle", "dry-run"),
-                }));
+                setReadAloudByReply((prev) =>
+                  buildReadAloudStateMapTransition(prev, utterance.replyId as string, "dry-run"),
+                );
               }
             } else {
               playbackOutcomeStatusOverride = "failed";
@@ -12614,10 +12630,9 @@ export function HelixAskPill({
               });
               metrics.cancelReason = metrics.cancelReason ?? "error";
               if (utterance.replyId) {
-                setReadAloudByReply((prev) => ({
-                  ...prev,
-                  [utterance.replyId as string]: transitionReadAloudState(prev[utterance.replyId as string] ?? "idle", "error"),
-                }));
+                setReadAloudByReply((prev) =>
+                  buildReadAloudStateMapTransition(prev, utterance.replyId as string, "error"),
+                );
               }
             }
             break;
@@ -13239,50 +13254,39 @@ export function HelixAskPill({
   const handleReadAloud = useCallback(
     async (reply: HelixAskReply, textOverride?: string | null) => {
       const currentState = readAloudByReply[reply.id] ?? "idle";
-      if (shouldStopReadAloudOnButtonPress(currentState)) {
-        voiceAutoSpeakQueueRef.current = voiceAutoSpeakQueueRef.current.filter(
-          (utterance) => utterance.replyId !== reply.id,
-        );
+      const initialAction = resolveReadAloudButtonPressAction({ currentState });
+      if (initialAction === "stop") {
+        voiceAutoSpeakQueueRef.current = filterReadAloudQueueForReply(voiceAutoSpeakQueueRef.current, reply.id);
         stopReadAloud("manual_stop");
-        setReadAloudByReply((prev) => ({
-          ...prev,
-          [reply.id]: transitionReadAloudState(prev[reply.id] ?? "idle", "stop"),
-        }));
+        setReadAloudByReply((prev) => buildReadAloudStateMapTransition(prev, reply.id, "stop"));
         return;
       }
-      const text = resolveHelixAskLegacyTurnControlText({
+      const target = buildHelixAskLegacyTurnControlActionPayload({
+        reply,
         visibleFinalAnswerText: textOverride,
         fallbackCopyText: buildCopyText(reply),
       });
-      if (!text) {
-        setReadAloudByReply((prev) => ({
-          ...prev,
-          [reply.id]: transitionReadAloudState(prev[reply.id] ?? "idle", "error"),
-        }));
+      const targetAction = resolveReadAloudButtonPressAction({
+        currentState,
+        hasText: target.hasText,
+      });
+      if (targetAction === "error") {
+        setReadAloudByReply((prev) => buildReadAloudStateMapTransition(prev, reply.id, "error"));
         return;
       }
-      setReadAloudByReply((prev) => ({
-        ...prev,
-        [reply.id]: transitionReadAloudState(prev[reply.id] ?? "idle", "request"),
-      }));
+      setReadAloudByReply((prev) => buildReadAloudStateMapTransition(prev, reply.id, "request"));
       try {
         await primeVoiceAudioPlayback();
         const accepted = enqueueVoicePlaybackIntent(buildManualReadAloudVoiceIntent({
-          text,
-          replyId: reply.id,
+          text: target.text,
+          replyId: target.replyId || reply.id,
           traceId: askLiveTraceId,
         }));
         if (!accepted) {
-          setReadAloudByReply((prev) => ({
-            ...prev,
-            [reply.id]: transitionReadAloudState(prev[reply.id] ?? "idle", "error"),
-          }));
+          setReadAloudByReply((prev) => buildReadAloudStateMapTransition(prev, reply.id, "error"));
         }
       } catch {
-        setReadAloudByReply((prev) => ({
-          ...prev,
-          [reply.id]: transitionReadAloudState(prev[reply.id] ?? "idle", "error"),
-        }));
+        setReadAloudByReply((prev) => buildReadAloudStateMapTransition(prev, reply.id, "error"));
       }
     },
     [askLiveTraceId, buildCopyText, enqueueVoicePlaybackIntent, primeVoiceAudioPlayback, readAloudByReply, stopReadAloud],
@@ -22141,149 +22145,31 @@ export function HelixAskPill({
     ) => {
       const trimmed = question.trim();
       if (!trimmed) return;
-      const visualEvidenceForTurn =
-        options?.visualEvidence && typeof options.visualEvidence === "object" ? options.visualEvidence : null;
+      const visualEvidenceContextForTurn = buildHelixAskVisualEvidenceTurnInputContext(options?.visualEvidence);
+      const visualEvidenceForTurn = visualEvidenceContextForTurn.visualEvidence;
       const visualCapabilityForTurn =
         options?.visualCapability && typeof options.visualCapability === "object" ? options.visualCapability : null;
-      const visualEvidenceRecord =
-        visualEvidenceForTurn?.evidence && typeof visualEvidenceForTurn.evidence === "object"
-          ? (visualEvidenceForTurn.evidence as Record<string, unknown>)
-          : null;
-      const visualEvidenceId =
-        typeof visualEvidenceRecord?.evidence_id === "string" && visualEvidenceRecord.evidence_id.trim()
-          ? visualEvidenceRecord.evidence_id.trim()
-          : null;
-      const visualFrameId =
-        typeof visualEvidenceRecord?.frame_id === "string" && visualEvidenceRecord.frame_id.trim()
-          ? visualEvidenceRecord.frame_id.trim()
-          : null;
-      const visualEvidenceSummary =
-        typeof visualEvidenceRecord?.summary === "string" && visualEvidenceRecord.summary.trim()
-          ? visualEvidenceRecord.summary.trim()
-          : null;
-      const submittedAttachments =
-        Array.isArray(options?.attachments) && options.attachments.length > 0
-          ? options.attachments
-          : options?.imageAttachment
-            ? [options.imageAttachment]
-            : [];
-      const nativeImageAttachments = submittedAttachments.filter(
-        (attachment): attachment is HelixAskImageAttachment => attachment.kind === "image",
-      );
-      const attachmentContextPackForTurn =
-        submittedAttachments.length > 0
-          ? {
-              schema: "helix.attachment_context_pack.v1",
-              attachment_count: submittedAttachments.length,
-              attachments: submittedAttachments.map((attachment, index) => ({
-                attachment_id: attachment.id,
-                ordinal: index,
-                kind: attachment.kind,
-                file_name: attachment.fileName,
-                mime_type: attachment.mimeType,
-                size_bytes: attachment.sizeBytes,
-                content_sha256: attachment.kind === "text" ? attachment.contentSha256 : null,
-                preview: attachment.kind === "text" ? attachment.preview : null,
-                evidence_ref: attachment.kind === "image" ? attachment.evidenceRef ?? null : null,
-                image_ref: attachment.kind === "image" ? attachment.imageRef ?? null : null,
-                raw_content_included: false,
-                raw_image_included: false,
-                assistant_answer: false,
-              })),
-              raw_content_included: false,
-              raw_image_included: false,
-              assistant_answer: false,
-            }
-          : null;
-      const typedAttachmentItems: HelixTurnInputItem[] = submittedAttachments.flatMap((attachment) => {
-        const commitCheck = validateHelixAskAttachmentForSubmit(attachment);
-        if (!commitCheck?.can_submit) return [];
-        if (attachment.kind === "image") {
-          const nativeImageBase64 =
-            typeof attachment.imageBase64 === "string" && attachment.imageBase64.trim()
-              ? attachment.imageBase64.trim()
-              : null;
-          const nativeImageRef =
-            typeof attachment.imageRef === "string" && attachment.imageRef.trim()
-              ? attachment.imageRef.trim()
-              : null;
-          const nativeEvidenceRef =
-            typeof attachment.evidenceRef === "string" && attachment.evidenceRef.trim()
-              ? attachment.evidenceRef.trim()
-              : null;
-          const items: HelixTurnInputItem[] = [];
-          if (nativeImageBase64) {
-            items.push({
-              type: "image",
-              image_base64: nativeImageBase64,
-              mime_type: attachment.mimeType,
-              file_name: attachment.fileName,
-              raw_image_included: true,
-              raw_image_scope: "turn_input_only",
-            });
-          } else if (nativeImageRef) {
-            items.push({
-              type: "image",
-              image_ref: nativeImageRef,
-              mime_type: attachment.mimeType,
-              file_name: attachment.fileName,
-              evidence_id: nativeEvidenceRef,
-              raw_image_included: false,
-            });
-          }
-          if (nativeEvidenceRef) {
-            items.push({
-              type: "evidence_ref",
-              evidence_id: nativeEvidenceRef,
-              evidence_kind: "visual_frame_evidence",
-              compact_summary: null,
-              assistant_answer: false,
-              raw_content_included: false,
-            });
-          }
-          return items;
-        }
-        return [buildHelixAskTextAttachmentTurnInputItem(attachment)];
+      const visualEvidenceRecord = visualEvidenceContextForTurn.evidenceRecord;
+      const submittedAttachments = resolveHelixAskSubmittedAttachments({
+        attachments: options?.attachments,
+        imageAttachment: options?.imageAttachment,
       });
-      const inferredTurnInputItemsForTurn: HelixTurnInputItem[] = [
-        { type: "text", text: trimmed, source: "user" },
-        ...typedAttachmentItems,
-        ...(visualEvidenceId
-          ? [{
-              type: "evidence_ref" as const,
-              evidence_id: visualEvidenceId,
-              evidence_kind: "visual_frame_evidence" as const,
-              compact_summary: visualEvidenceSummary,
-              assistant_answer: false as const,
-              raw_content_included: false as const,
-            }]
-          : []),
-        ...(visualFrameId
-          ? [{
-              type: "image" as const,
-              image_ref: visualFrameId,
-              mime_type:
-                typeof visualEvidenceRecord?.mime_type === "string" && visualEvidenceRecord.mime_type.trim()
-                  ? visualEvidenceRecord.mime_type.trim()
-                  : "image/png",
-              evidence_id: visualEvidenceId,
-              raw_image_included: false as const,
-            }]
-          : []),
-      ];
-      const explicitTurnInputItemsForTurn =
-        Array.isArray(options?.turnInputItems) && options.turnInputItems.length > 0
-          ? options.turnInputItems
-          : null;
-      const turnInputItemsForTurn: HelixTurnInputItem[] =
-        explicitTurnInputItemsForTurn ?? inferredTurnInputItemsForTurn;
+      const attachmentContextPackForTurn = buildHelixAskAttachmentContextPack(submittedAttachments);
+      const typedAttachmentItems: HelixTurnInputItem[] = buildHelixAskAttachmentTurnInputItems(submittedAttachments);
+      const turnInputItemsForTurn: HelixTurnInputItem[] = buildHelixAskTurnInputItemsForSubmit({
+        prompt: trimmed,
+        attachmentItems: typedAttachmentItems,
+        visualEvidenceContext: visualEvidenceContextForTurn,
+        explicitTurnInputItems:
+          Array.isArray(options?.turnInputItems) && options.turnInputItems.length > 0
+            ? options.turnInputItems
+            : null,
+      });
       const runAskTurnId = pendingWorkstationUserInputRef.current?.turn_id ?? `ask:${crypto.randomUUID()}`;
       const backendOwnedPastedTextResumeRecall = isHelixAskPastedTextResumeRecallPrompt(trimmed);
       const hardBackendEntrypointRequired = requiresHelixAskBackendEntrypoint(trimmed);
       let imageAttachmentLensRunForTurn = options?.imageAttachmentLensRun ?? null;
-      const firstNativeImageAttachment = nativeImageAttachments.find(
-        (attachment) => validateHelixAskImageAttachmentForSubmit(attachment)?.can_submit,
-      ) ?? null;
+      const firstNativeImageAttachment = selectFirstHelixAskSubmitReadyImageAttachment(submittedAttachments);
       if (!imageAttachmentLensRunForTurn && firstNativeImageAttachment) {
         try {
           imageAttachmentLensRunForTurn = await runImageAttachmentLensRun({
@@ -23112,10 +22998,10 @@ export function HelixAskPill({
                   process_graph_context_pack: processGraphContextPackForTurn,
                 }
               : workspaceContextWithLatestTheoryReflection;
-          const contextFilesForTurn = buildHelixAskContextFilesForTurn(
+          const contextFilesForTurn = buildHelixAskConsoleContextFiles({
             docsViewerAnchorPath,
-            workspaceContextSnapshotForTurn,
-          );
+            workspaceContextSnapshot: workspaceContextSnapshotForTurn,
+          });
           let localResponse: AskLocalResult;
           let downgradedFromMode: AskLocalMode | undefined;
           if (useBackendAskTurnEntrypoint) {
@@ -25040,14 +24926,9 @@ export function HelixAskPill({
         ];
         setAskError(null);
       }
-      const submittedAttachmentChecks = submittedAttachments.map((attachment) => ({
-        attachment,
-        check: validateHelixAskAttachmentForSubmit(attachment),
-      }));
-      const invalidSubmittedAttachment = submittedAttachmentChecks.find((entry) => !entry.check?.can_submit);
-      const submittedImageAttachments = submittedAttachments.filter(
-        (attachment): attachment is HelixAskImageAttachment => attachment.kind === "image",
-      );
+      const submittedAttachmentChecks = buildHelixAskSubmittedAttachmentChecks(submittedAttachments);
+      const invalidSubmittedAttachment = selectFirstInvalidHelixAskSubmittedAttachment(submittedAttachmentChecks);
+      const submittedImageAttachments = selectHelixAskNativeImageAttachments(submittedAttachments);
       const expectsVisualInput = isHelixAskVisualPrompt(first);
       let submittedVisualEvidence = visualSituationEvidenceForTurn;
       let submittedVisualCapability: Record<string, unknown> | null = null;
@@ -25173,18 +25054,13 @@ export function HelixAskPill({
       if (submittedAttachments.length > 0) {
         clearAskAttachments();
       }
-      const runOptions: RunAskOptions | undefined = submittedAttachments.length > 0
-        ? {
-            attachments: submittedAttachments,
-            ...(promotedPastedTextTurnInputItems
-              ? { turnInputItems: promotedPastedTextTurnInputItems }
-              : {}),
-          }
-        : expectsVisualInput && submittedVisualEvidence && !isDiagnosticVisualEvidence(submittedVisualEvidence)
-          ? { visualEvidence: submittedVisualEvidence }
-          : submittedVisualCapability
-            ? { visualCapability: submittedVisualCapability }
-          : undefined;
+      const runOptions: RunAskOptions | undefined = buildHelixAskSubmitRunOptionsPayload({
+        submittedAttachments,
+        promotedPastedTextTurnInputItems,
+        expectsVisualInput,
+        submittedVisualEvidence,
+        submittedVisualCapability,
+      });
       void runAsk(first, selectedCapsuleIds, runOptions);
     },
     [
@@ -25218,11 +25094,8 @@ export function HelixAskPill({
   );
 
   const maxWidthClass = maxWidthClassName ?? "max-w-4xl";
-  const askAttachmentCommitChecks = askAttachments.map((attachment) => ({
-    attachment,
-    check: validateHelixAskAttachmentForSubmit(attachment),
-  }));
-  const hasReadyAskAttachment = askAttachmentCommitChecks.some((entry) => entry.check?.can_submit);
+  const askAttachmentCommitChecks = buildHelixAskAttachmentCommitChecks(askAttachments);
+  const hasReadyAskAttachment = hasReadyHelixAskAttachmentCommitCheck(askAttachmentCommitChecks);
   useEffect(() => {
     updateAskActionCarouselEdges();
   }, [

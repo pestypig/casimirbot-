@@ -1,6 +1,8 @@
 export type MicArmState = "off" | "on";
 
 export type ReadAloudPlaybackState = "idle" | "requesting" | "playing" | "dry-run" | "error";
+export type ReadAloudPlaybackStateByReply = Record<string, ReadAloudPlaybackState>;
+export type ReadAloudButtonPressAction = "stop" | "request" | "error";
 
 export const VOICE_AUTO_SPEAK_UTTERANCE_ID_MAX_CHARS = 180;
 
@@ -20,8 +22,38 @@ export function transitionReadAloudState(
   return current;
 }
 
+export function buildReadAloudStateMapTransition(
+  currentByReply: ReadAloudPlaybackStateByReply,
+  replyId: string,
+  event: Parameters<typeof transitionReadAloudState>[1],
+): ReadAloudPlaybackStateByReply {
+  if (!replyId) return currentByReply;
+  return {
+    ...currentByReply,
+    [replyId]: transitionReadAloudState(currentByReply[replyId] ?? "idle", event),
+  };
+}
+
 export function shouldStopReadAloudOnButtonPress(state: ReadAloudPlaybackState): boolean {
   return state === "requesting" || state === "playing";
+}
+
+export function resolveReadAloudButtonPressAction(args: {
+  currentState: ReadAloudPlaybackState;
+  hasText?: boolean | null;
+}): ReadAloudButtonPressAction {
+  if (shouldStopReadAloudOnButtonPress(args.currentState)) return "stop";
+  if (args.hasText === false) return "error";
+  return "request";
+}
+
+export function filterReadAloudQueueForReply<T extends { replyId?: string | null }>(
+  queue: readonly T[],
+  replyId: string | null | undefined,
+): T[] {
+  const normalizedReplyId = replyId?.trim();
+  if (!normalizedReplyId) return [...queue];
+  return queue.filter((utterance) => utterance.replyId !== normalizedReplyId);
 }
 
 export function formatReadAloudButtonLabel(state: ReadAloudPlaybackState): string {

@@ -1,6 +1,9 @@
 import type {
   HelixCapabilityLaneBackendSelectionDecision,
+  HelixCapabilityLaneCostClass,
   HelixCapabilityLaneId,
+  HelixCapabilityLaneLatencyClass,
+  HelixCapabilityLanePrivacyClass,
 } from "./helix-capability-lane";
 
 export const HELIX_CAPABILITY_LANE_MAIL_LOOP_DEBUG_SUMMARY_SCHEMA =
@@ -12,16 +15,26 @@ export type HelixCapabilityLaneMailLoopDebugSummary = {
   lane_id: HelixCapabilityLaneId;
   capability: string;
   observation_ref: string | null;
+  receipt_ref: string | null;
   stage_play_mail_id: string | null;
   stage_play_wake_expected: boolean;
   mailbox_thread_id: string;
   source_id: string | null;
   source_kind: string | null;
   chunk_id: string | null;
+  chunk_index: number | null;
+  dedupe_key: string | null;
+  source_event_ms: number | null;
+  observed_at_ms: number | null;
   projection_target: string | null;
+  cancel_requested: boolean;
   selected_backend_provider: string | null;
   requested_backend_provider: string | null;
   backend_selection_decision: HelixCapabilityLaneBackendSelectionDecision;
+  cost_class: HelixCapabilityLaneCostClass | "unknown" | null;
+  latency_class: HelixCapabilityLaneLatencyClass | "unknown" | null;
+  privacy_class: HelixCapabilityLanePrivacyClass | "unknown" | null;
+  fallback_backend_provider: string | null;
   freshness_status: string | null;
   blocked_reason: string | null;
   mail_status: string | null;

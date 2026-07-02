@@ -57,6 +57,7 @@ const buildObservedSession = () => {
   const observed = store.recordObservation({
     laneSessionId: "lane-session-summary-only",
     observationRef: "ask:lane:translation:session-obs",
+    receiptRef: "ask:lane:translation:session-obs:projection:receipt",
     nowMs: 120,
   });
   if (!observed.lane_session) throw new Error("expected observed lane session");
@@ -73,6 +74,10 @@ describe("capability lane session debug summary", () => {
       lane_id: "live_translation",
       selected_runtime_agent_provider: "codex",
       selected_backend_provider: "live_translation.local_runtime",
+      cost_class: "free_local",
+      latency_class: "interactive",
+      privacy_class: "local_only",
+      fallback_backend_provider: null,
       backend_selection_decision: expect.objectContaining({
         outcome: "fallback_selected",
         requested_backend_provider: "google_gemini",
@@ -91,6 +96,7 @@ describe("capability lane session debug summary", () => {
       created_at_ms: 100,
       updated_at_ms: 120,
       last_observation_ref: "ask:lane:translation:session-obs",
+      last_receipt_ref: "ask:lane:translation:session-obs:projection:receipt",
       session_event_count: 2,
       terminal_authority_status: "pending_helix_terminal_authority",
       reentry_required: true,
@@ -103,12 +109,18 @@ describe("capability lane session debug summary", () => {
     expect(summary.latest_session_event).toMatchObject({
       lane_session_id: "lane-session-summary-only",
       action: "resume",
+      selected_backend_provider: "live_translation.local_runtime",
+      cost_class: "free_local",
+      latency_class: "interactive",
+      privacy_class: "local_only",
+      fallback_backend_provider: null,
       backend_selection_decision: expect.objectContaining({
         outcome: "fallback_selected",
         selected_backend_provider: "live_translation.local_runtime",
       }),
       reason: "lane_session_observation_recorded",
       observation_ref: "ask:lane:translation:session-obs",
+      receipt_ref: "ask:lane:translation:session-obs:projection:receipt",
       terminal_authority_status: "pending_helix_terminal_authority",
       reentry_required: true,
       terminal_eligible: false,
@@ -123,10 +135,16 @@ describe("capability lane session debug summary", () => {
     expect(summaries).toHaveLength(1);
     expect(summaries[0]).toMatchObject({
       lane_session_id: "lane-session-summary-only",
+      selected_backend_provider: "live_translation.local_runtime",
+      cost_class: "free_local",
+      latency_class: "interactive",
+      privacy_class: "local_only",
+      fallback_backend_provider: null,
       backend_selection_decision: expect.objectContaining({
         outcome: "fallback_selected",
         selected_backend_provider: "live_translation.local_runtime",
       }),
+      last_receipt_ref: "ask:lane:translation:session-obs:projection:receipt",
       terminal_authority_status: "pending_helix_terminal_authority",
       reentry_required: true,
       backend_provider_becomes_root_agent: false,

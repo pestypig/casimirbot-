@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildHelixAskAttachmentCommitChecks,
+  hasReadyHelixAskAttachmentCommitCheck,
   validateHelixAskAttachmentForSubmit,
   validateHelixAskImageAttachmentForSubmit,
   validateHelixAskTextAttachmentForSubmit,
@@ -156,5 +158,29 @@ describe("Helix Ask attachment commit checks", () => {
     expect(validateHelixAskAttachmentForSubmit(null)).toBeNull();
     expect(validateHelixAskAttachmentForSubmit(imageAttachment())?.attachment_id).toBe("img-1");
     expect(validateHelixAskAttachmentForSubmit(textAttachment())?.attachment_id).toBe("txt-1");
+  });
+
+  it("builds composer commit-check entries and ready-state from the commit owner", () => {
+    const checks = buildHelixAskAttachmentCommitChecks([
+      imageAttachment(),
+      textAttachment({ id: "txt-stale", contentBase64: "" }),
+    ]);
+
+    expect(
+      checks.map((entry) => ({
+        id: entry.attachment.id,
+        canSubmit: entry.check?.can_submit,
+        status: entry.check?.status,
+      })),
+    ).toEqual([
+      { id: "img-1", canSubmit: true, status: "ready" },
+      { id: "txt-stale", canSubmit: false, status: "stale_after_restart" },
+    ]);
+    expect(hasReadyHelixAskAttachmentCommitCheck(checks)).toBe(true);
+    expect(
+      hasReadyHelixAskAttachmentCommitCheck(
+        buildHelixAskAttachmentCommitChecks([textAttachment({ contentBase64: "" })]),
+      ),
+    ).toBe(false);
   });
 });

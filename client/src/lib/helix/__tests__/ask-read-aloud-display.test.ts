@@ -1,13 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildReadAloudStateMapTransition,
   buildVoiceAutoSpeakUtteranceId,
   canPlayVoiceUtteranceWithMicOff,
+  filterReadAloudQueueForReply,
   formatReadAloudButtonLabel,
   hashVoiceUtteranceKey,
   isInterimVoicePlaybackUtteranceKind,
   isManualVoicePlaybackUtterance,
   isMissionVoiceOutputModeEnabled,
   resolveInitialMicArmState,
+  resolveReadAloudButtonPressAction,
   shouldEnableVoiceRollout,
   shouldStopReadAloudOnButtonPress,
   transitionReadAloudState,
@@ -31,6 +34,28 @@ describe("ask read-aloud display helpers", () => {
     expect(transitionReadAloudState("playing", "stop")).toBe("idle");
   });
 
+  it("projects read-aloud state-map updates without mutating the current map", () => {
+    const current = {
+      "reply-1": "idle",
+      "reply-2": "playing",
+    } as const;
+
+    expect(buildReadAloudStateMapTransition(current, "reply-1", "request")).toEqual({
+      "reply-1": "requesting",
+      "reply-2": "playing",
+    });
+    expect(current).toEqual({
+      "reply-1": "idle",
+      "reply-2": "playing",
+    });
+    expect(buildReadAloudStateMapTransition(current, "reply-3", "error")).toEqual({
+      "reply-1": "idle",
+      "reply-2": "playing",
+      "reply-3": "error",
+    });
+    expect(buildReadAloudStateMapTransition(current, "", "request")).toBe(current);
+  });
+
   it("formats read-aloud button labels from display state only", () => {
     expect(shouldStopReadAloudOnButtonPress("idle")).toBe(false);
     expect(shouldStopReadAloudOnButtonPress("requesting")).toBe(true);
@@ -40,6 +65,30 @@ describe("ask read-aloud display helpers", () => {
     expect(formatReadAloudButtonLabel("playing")).toBe("Stop reading (playing)");
     expect(formatReadAloudButtonLabel("dry-run")).toBe("Read aloud (dry-run)");
     expect(formatReadAloudButtonLabel("error")).toBe("Read aloud (error)");
+  });
+
+  it("resolves manual read-aloud button actions without owning playback", () => {
+    expect(resolveReadAloudButtonPressAction({ currentState: "requesting" })).toBe("stop");
+    expect(resolveReadAloudButtonPressAction({ currentState: "playing" })).toBe("stop");
+    expect(resolveReadAloudButtonPressAction({ currentState: "idle", hasText: false })).toBe("error");
+    expect(resolveReadAloudButtonPressAction({ currentState: "dry-run", hasText: true })).toBe("request");
+    expect(resolveReadAloudButtonPressAction({ currentState: "error", hasText: null })).toBe("request");
+  });
+
+  it("filters queued read-aloud utterances for the clicked reply", () => {
+    const queue = [
+      { id: "a", replyId: "reply-1" },
+      { id: "b", replyId: "reply-2" },
+      { id: "c", replyId: "reply-1" },
+      { id: "d", replyId: null },
+    ];
+
+    expect(filterReadAloudQueueForReply(queue, "reply-1")).toEqual([
+      { id: "b", replyId: "reply-2" },
+      { id: "d", replyId: null },
+    ]);
+    expect(filterReadAloudQueueForReply(queue, "")).toEqual(queue);
+    expect(filterReadAloudQueueForReply(queue, undefined)).not.toBe(queue);
   });
 
   it("builds stable voice utterance IDs and hashes without owning playback scheduling", () => {

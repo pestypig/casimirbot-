@@ -28,7 +28,7 @@ export const DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS: HelixAgentRuntimeDescriptor[
       workstationTools: true,
       capabilityLanes: true,
       capabilityLaneOneShot: true,
-      capabilityLaneSessions: false,
+      capabilityLaneSessions: true,
       codeMutation: false,
     },
   },
@@ -146,6 +146,52 @@ export function resolveNextSelectableHelixAgentRuntime(
   const currentIndex = enabledProviders.findIndex((provider) => provider.id === currentRuntime);
   const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % enabledProviders.length : 0;
   return enabledProviders[nextIndex]?.id ?? "helix";
+}
+
+export type HelixAgentRuntimeSelectDecision = {
+  runtime: HelixAgentRuntimeId;
+  menuOpen: boolean;
+  invalidSelection: boolean;
+};
+
+export function resolveHelixAgentRuntimeSelectDecision(
+  requested: unknown,
+  providers: HelixAgentRuntimeDescriptor[],
+): HelixAgentRuntimeSelectDecision {
+  const runtime = resolveSelectedHelixAgentRuntime(requested, providers);
+  return {
+    runtime,
+    menuOpen: false,
+    invalidSelection: runtime !== requested,
+  };
+}
+
+export type HelixAgentRuntimePrimaryButtonMode = "cycle" | "menu";
+
+export type HelixAgentRuntimePrimaryButtonDecision = {
+  runtime: HelixAgentRuntimeId;
+  menuOpen: boolean;
+  persistRuntime: boolean;
+};
+
+export function resolveHelixAgentRuntimePrimaryButtonDecision(args: {
+  selectedRuntime: unknown;
+  providers: HelixAgentRuntimeDescriptor[];
+  primaryButtonMode: HelixAgentRuntimePrimaryButtonMode;
+  currentMenuOpen: boolean;
+}): HelixAgentRuntimePrimaryButtonDecision {
+  if (args.primaryButtonMode === "cycle") {
+    return {
+      runtime: resolveNextSelectableHelixAgentRuntime(args.selectedRuntime, args.providers),
+      menuOpen: false,
+      persistRuntime: true,
+    };
+  }
+  return {
+    runtime: resolveSelectedHelixAgentRuntime(args.selectedRuntime, args.providers),
+    menuOpen: !args.currentMenuOpen,
+    persistRuntime: false,
+  };
 }
 
 export function formatHelixAgentRuntimeShortLabel(provider: HelixAgentRuntimeDescriptor | null | undefined): string {

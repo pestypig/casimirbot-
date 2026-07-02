@@ -1,5 +1,14 @@
 import type { HelixToolRuntimeShape } from "./helix-tool-surface";
-import type { HelixCapabilityLaneBackendSelectionDecision } from "./helix-capability-lane";
+import type {
+  HelixCapabilityLaneBackendAvailabilityStatus,
+  HelixCapabilityLaneBackendPermissionStatus,
+  HelixCapabilityLaneBackendSelectionDecision,
+  HelixCapabilityLaneCostClass,
+  HelixCapabilityLaneId,
+  HelixCapabilityLaneLatencyClass,
+  HelixCapabilityLanePrivacyClass,
+} from "./helix-capability-lane";
+import type { HelixLiveTranslationProjectionReceipt } from "./helix-live-translation-lane";
 
 export const HELIX_AGENT_STEP_DECISION_V2_SCHEMA = "helix.agent_step_decision.v2" as const;
 export const HELIX_RUNTIME_TOOL_CALL_V1_SCHEMA = "helix.runtime_tool_call.v1" as const;
@@ -175,6 +184,26 @@ export type HelixAgentStepObservationPacket = {
         | "unknown";
       cancel_requested: boolean;
       observation_ref: string;
+      terminal_eligible: false;
+      assistant_answer: false;
+      raw_content_included: false;
+    };
+    live_translation_projection_receipt?: HelixLiveTranslationProjectionReceipt;
+    capability_lane_shadow_execution?: {
+      lane_id: HelixCapabilityLaneId;
+      capability: string;
+      requested_backend_provider: string | null;
+      requested_backend_provider_known: boolean | null;
+      selected_backend_provider: string | null;
+      backend_selection_decision: HelixCapabilityLaneBackendSelectionDecision | null;
+      selection_reason: string | null;
+      availability_status: HelixCapabilityLaneBackendAvailabilityStatus | "unknown" | null;
+      permission_status: HelixCapabilityLaneBackendPermissionStatus | "unknown" | null;
+      cost_class: HelixCapabilityLaneCostClass | "unknown" | null;
+      latency_class: HelixCapabilityLaneLatencyClass | "unknown" | null;
+      privacy_class: HelixCapabilityLanePrivacyClass | "unknown" | null;
+      fallback_backend_provider: string | null;
+      execution_status: "not_executed_shadow_only";
       terminal_eligible: false;
       assistant_answer: false;
       raw_content_included: false;

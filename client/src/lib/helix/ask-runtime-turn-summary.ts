@@ -53,6 +53,60 @@ function readBackendSelectionDecisionParts(value: unknown): string[] {
   ].filter(Boolean);
 }
 
+function readLanePacketBackendParts(packet: RecordLike | null): string[] {
+  const stateDelta = readRecord(packet?.state_delta);
+  const shadowExecution = readRecord(stateDelta?.capability_lane_shadow_execution);
+  const decision = readRecord(packet?.backend_selection_decision);
+  const selectedBackend =
+    coerceText(packet?.selected_backend_provider) ||
+    coerceText(shadowExecution?.selected_backend_provider) ||
+    coerceText(decision?.selected_backend_provider);
+  const requestedBackend =
+    coerceText(packet?.requested_backend_provider) ||
+    coerceText(shadowExecution?.requested_backend_provider) ||
+    coerceText(decision?.requested_backend_provider);
+  const execution =
+    coerceText(packet?.execution_status) ||
+    coerceText(shadowExecution?.execution_status);
+  const availability =
+    coerceText(packet?.availability_status) ||
+    coerceText(shadowExecution?.availability_status);
+  const permission =
+    coerceText(packet?.permission_status) ||
+    coerceText(shadowExecution?.permission_status);
+  const cost =
+    coerceText(packet?.cost_class) ||
+    coerceText(shadowExecution?.cost_class);
+  const latency =
+    coerceText(packet?.latency_class) ||
+    coerceText(shadowExecution?.latency_class);
+  const privacy =
+    coerceText(packet?.privacy_class) ||
+    coerceText(shadowExecution?.privacy_class);
+  const fallback =
+    coerceText(packet?.fallback_backend_provider) ||
+    coerceText(shadowExecution?.fallback_backend_provider) ||
+    coerceText(decision?.fallback_backend_provider);
+  const observationOnly =
+    packet?.terminal_eligible === false ||
+    packet?.assistant_answer === false ||
+    shadowExecution?.terminal_eligible === false ||
+    shadowExecution?.assistant_answer === false;
+  return [
+    selectedBackend ? `backend ${selectedBackend}` : "",
+    requestedBackend ? `requested backend ${requestedBackend}` : "",
+    execution ? `execution ${execution}` : "",
+    availability ? `availability ${availability}` : "",
+    permission ? `permission ${permission}` : "",
+    cost ? `cost ${cost}` : "",
+    latency ? `latency ${latency}` : "",
+    privacy ? `privacy ${privacy}` : "",
+    fallback ? `fallback ${fallback}` : "",
+    ...readBackendSelectionDecisionParts(decision),
+    observationOnly ? "observation-only" : "",
+  ].filter(Boolean);
+}
+
 function readSelectedRuntime(record: RecordLike | null, debug: RecordLike | null): string {
   const provider = readRecord(record?.selected_agent_provider) ?? readRecord(debug?.selected_agent_provider);
   const providerId = provider?.id;
@@ -102,6 +156,46 @@ function readLaneStatusSummary(record: RecordLike | null, debug: RecordLike | nu
   });
   if (laneIds.length > 6) summaries.push(`+${laneIds.length - 6} more`);
   return summaries.join(" | ");
+}
+
+function readLaneBackendProviderConfigSummary(record: RecordLike | null, debug: RecordLike | null): string {
+  const manifest = readRecord(record?.capability_lane_manifest) ?? readRecord(debug?.capability_lane_manifest);
+  const laneRecords = readArray(manifest?.lanes)
+    .map((entry) => readRecord(entry))
+    .filter((entry): entry is RecordLike => Boolean(entry));
+  const providerSummaries = laneRecords.flatMap((lane) => {
+    const laneId = coerceText(lane.lane_id);
+    return readArray(lane.backend_providers)
+      .map((entry) => readRecord(entry))
+      .filter((entry): entry is RecordLike => Boolean(entry))
+      .map((provider) => {
+        const providerId = coerceText(provider.provider_id);
+        if (!providerId) return "";
+        const configuration = coerceText(provider.configuration_status);
+        const availability = coerceText(provider.availability_status);
+        const permission = coerceText(provider.permission_status);
+        const latency = coerceText(provider.latency_class);
+        const privacy = coerceText(provider.privacy_class);
+        const fallback = coerceText(provider.fallback_backend_provider);
+        const configuredEnv = readArray(provider.configured_env_vars).map(coerceText).filter(Boolean).join(",");
+        return [
+          laneId ? `${laneId}/${providerId}` : providerId,
+          configuration ? `config ${configuration}` : "",
+          availability ? `availability ${availability}` : "",
+          permission ? `permission ${permission}` : "",
+          latency ? `latency ${latency}` : "",
+          privacy ? `privacy ${privacy}` : "",
+          fallback ? `fallback ${fallback}` : "",
+          configuredEnv ? `configured env ${configuredEnv}` : "",
+          provider.raw_secret_exposed === false ? "no raw secrets" : "",
+        ].filter(Boolean).join(" | ");
+      });
+  }).filter(Boolean);
+
+  const unique = Array.from(new Set(providerSummaries));
+  const visible = unique.slice(0, 6);
+  if (unique.length > visible.length) visible.push(`+${unique.length - visible.length} more`);
+  return visible.join(" || ");
 }
 
 function readLaneBackendSummary(record: RecordLike | null, debug: RecordLike | null): string {
@@ -173,6 +267,12 @@ function readLaneProjectionSummary(record: RecordLike | null, debug: RecordLike 
   ]
     .map((entry) => readRecord(entry))
     .filter((entry): entry is RecordLike => Boolean(entry));
+  const projectionReceipts = [
+    ...readArray(record?.capability_lane_projection_receipts),
+    ...readArray(debug?.capability_lane_projection_receipts),
+  ]
+    .map((entry) => readRecord(entry))
+    .filter((entry): entry is RecordLike => Boolean(entry));
 
   const summaries = calls.map((call) => {
     const capability = coerceText(call.capability) || coerceText(call.capability_key) || coerceText(call.capability_id);
@@ -183,6 +283,8 @@ function readLaneProjectionSummary(record: RecordLike | null, debug: RecordLike 
     const fallbackPacket = observationRef
       ? packets.find((candidate) => coerceText(candidate.observation_ref) === observationRef)
       : null;
+    const packetForBackend = packet ?? fallbackPacket;
+    const backendParts = readLanePacketBackendParts(packetForBackend);
     const fallbackState = readRecord(fallbackPacket?.state_delta);
     const status = call.ok === true ? "projected" : coerceText(packet?.status) || "not_projected";
     const packetSummary = coerceText(packet?.observation_summary) || coerceText(call.observation_summary);
@@ -190,28 +292,46 @@ function readLaneProjectionSummary(record: RecordLike | null, debug: RecordLike 
     if (capability === "live_translation.translate_text") {
       const directChunk = readRecord(packetState?.live_translation_chunk);
       const chunk = directChunk ?? readRecord(fallbackState?.live_translation_chunk);
+      const projectionReceipt =
+        readRecord(packetState?.live_translation_projection_receipt) ??
+        readRecord(fallbackState?.live_translation_projection_receipt);
       const translatedText = coerceText(call.translated_text) || coerceText(observation?.translated_text);
       const targetLanguage = coerceText(observation?.target_language);
       const projectionTarget = coerceText(observation?.projection_target) || coerceText(chunk?.projection_target);
+      const projectionStatus = coerceText(projectionReceipt?.projection_status);
+      const receiptRef = coerceText(projectionReceipt?.receipt_ref);
       const laneSessionId =
         coerceText(call.lane_session_id) ||
         coerceText(observation?.lane_session_id) ||
         coerceText(chunk?.lane_session_id);
       const sourceId = coerceText(observation?.source_id) || coerceText(chunk?.source_id);
       const chunkId = coerceText(observation?.chunk_id) || coerceText(chunk?.chunk_id);
+      const chunkIndex = coerceText(observation?.chunk_index) || coerceText(chunk?.chunk_index);
+      const dedupeKey = coerceText(observation?.dedupe_key) || coerceText(chunk?.dedupe_key);
+      const sourceEventMs = coerceText(observation?.source_event_ms) || coerceText(chunk?.source_event_ms);
+      const observedAtMs = coerceText(observation?.observed_at_ms) || coerceText(chunk?.observed_at_ms);
       const freshness = coerceText(observation?.freshness_status) || coerceText(chunk?.freshness_status);
       const cancelled = observation?.cancel_requested === true || chunk?.cancel_requested === true;
+      const stale = projectionReceipt?.stale === true;
       const pieces = [
         "live_translation",
+        projectionStatus ? `projection ${projectionStatus}` : "",
         projectionTarget ? `target ${projectionTarget}` : "",
         laneSessionId ? `session ${laneSessionId}` : "",
         targetLanguage ? `language ${targetLanguage}` : "",
         sourceId ? `source ${sourceId}` : "",
         chunkId ? `chunk ${chunkId}` : "",
+        chunkIndex ? `index ${chunkIndex}` : "",
+        dedupeKey ? `dedupe ${dedupeKey}` : "",
+        sourceEventMs ? `source event ${sourceEventMs}` : "",
+        observedAtMs ? `observed ${observedAtMs}` : "",
         freshness ? `freshness ${freshness}` : "",
+        stale ? "stale" : "",
         cancelled ? "cancelled" : status,
         translatedText && !cancelled ? `text ${translatedText}` : "",
+        receiptRef ? `receipt ${receiptRef}` : "",
         observationRef ? `ref ${observationRef}` : "",
+        ...backendParts,
       ].filter(Boolean);
       return pieces.join(" | ");
     }
@@ -226,6 +346,7 @@ function readLaneProjectionSummary(record: RecordLike | null, debug: RecordLike 
         status,
         normalizedText ? `text ${normalizedText}` : "",
         observationRef ? `ref ${observationRef}` : "",
+        ...backendParts,
       ].filter(Boolean);
       return pieces.join(" | ");
     }
@@ -240,6 +361,7 @@ function readLaneProjectionSummary(record: RecordLike | null, debug: RecordLike 
         count ? `count ${count}` : "",
         status,
         observationRef ? `ref ${observationRef}` : "",
+        ...backendParts,
       ].filter(Boolean);
       return pieces.join(" | ");
     }
@@ -250,11 +372,42 @@ function readLaneProjectionSummary(record: RecordLike | null, debug: RecordLike 
       status,
       packetSummary ? `summary ${packetSummary}` : "",
       observationRef ? `ref ${observationRef}` : "",
+      ...backendParts,
     ].filter(Boolean);
     return pieces.join(" | ");
   }).filter(Boolean);
 
-  return Array.from(new Set(summaries)).slice(0, 3).join(" || ");
+  const receiptSummaries = projectionReceipts.map((receipt) => {
+    const payload = readRecord(receipt.payload);
+    const capability =
+      coerceText(receipt.capability) ||
+      coerceText(receipt.capability_key) ||
+      coerceText(payload?.capability);
+    const projectionStatus =
+      coerceText(receipt.projection_status) ||
+      coerceText(payload?.projection_status) ||
+      coerceText(receipt.status);
+    const projectionTarget =
+      coerceText(receipt.projection_target) ||
+      coerceText(payload?.projection_target);
+    const targetLanguage =
+      coerceText(receipt.target_language) ||
+      coerceText(payload?.target_language);
+    const receiptRef = coerceText(receipt.receipt_ref);
+    const observationRef = coerceText(receipt.observation_ref) || coerceText(payload?.observation_ref);
+    const pieces = [
+      capability || "capability_lane_projection",
+      projectionStatus ? `projection ${projectionStatus}` : "",
+      projectionTarget ? `target ${projectionTarget}` : "",
+      targetLanguage ? `language ${targetLanguage}` : "",
+      receiptRef ? `receipt ${receiptRef}` : "",
+      observationRef ? `ref ${observationRef}` : "",
+      "observation-only",
+    ].filter(Boolean);
+    return pieces.join(" | ");
+  }).filter(Boolean);
+
+  return Array.from(new Set([...summaries, ...receiptSummaries])).slice(0, 3).join(" || ");
 }
 
 function readGoalBoundLaneSummary(record: RecordLike | null, debug: RecordLike | null): string {
@@ -296,6 +449,12 @@ function readGoalBoundLaneSummary(record: RecordLike | null, debug: RecordLike |
         coerceText(latestMailLoop?.observation_ref) ||
         readArray(summary.mail_loop_refs).map(coerceText).filter(Boolean).at(-1) ||
         "";
+      const receipt =
+        coerceText(latestMailLoop?.receipt_ref) ||
+        coerceText(readRecord(summary.latest_goal_binding_event)?.receipt_ref) ||
+        coerceText(readRecord(summary.report_decision)?.receipt_ref) ||
+        coerceText(readRecord(summary.dispatch_plan)?.receipt_ref);
+      const latestGoalEvent = coerceText(readRecord(summary.latest_goal_binding_event)?.event);
       const reportDecision = readRecord(summary.report_decision);
       const reportAction = coerceText(reportDecision?.action);
       const dispatchPlan = directDispatchPlans.find((plan) =>
@@ -311,15 +470,25 @@ function readGoalBoundLaneSummary(record: RecordLike | null, debug: RecordLike |
         .join("/");
       const observation = coerceText(summary.last_observation_ref);
       const terminalAuthority = coerceText(summary.terminal_authority_status);
+      const cost = coerceText(summary.cost_class);
+      const latency = coerceText(summary.latency_class);
+      const privacy = coerceText(summary.privacy_class);
+      const fallback = coerceText(summary.fallback_backend_provider);
       return [
         lane,
         goal ? `goal ${goal}` : "",
         session ? `session ${session}` : "",
         status ? `status ${status}` : "",
         backend ? `backend ${backend}` : "",
+        cost ? `cost ${cost}` : "",
+        latency ? `latency ${latency}` : "",
+        privacy ? `privacy ${privacy}` : "",
+        fallback ? `fallback ${fallback}` : "",
         ...decisionParts,
         observation ? `observation ${observation}` : "",
         mailLoop ? `mail ${mailLoop}` : "",
+        latestGoalEvent ? `event ${latestGoalEvent}` : "",
+        receipt ? `receipt ${receipt}` : "",
         reportAction ? `report ${reportAction}` : "",
         dispatchTarget ? `dispatch ${dispatchTarget}` : "",
         dispatchAdmissionStatus ? `admission ${dispatchAdmissionStatus}` : "",
@@ -335,12 +504,14 @@ function readGoalBoundLaneSummary(record: RecordLike | null, debug: RecordLike |
       const session = coerceText(plan.lane_session_id);
       const target = coerceText(plan.target);
       const status = coerceText(plan.status);
+      const receipt = coerceText(plan.receipt_ref);
       return [
         lane,
         goal ? `goal ${goal}` : "",
         session ? `session ${session}` : "",
         target ? `dispatch ${target}` : "",
         status ? `status ${status}` : "",
+        receipt ? `receipt ${receipt}` : "",
         "observation-only",
       ].filter(Boolean).join(" | ");
     }))).slice(0, 3).join(" || ");
@@ -386,8 +557,12 @@ function readGoalDispatchReadinessSummary(record: RecordLike | null, debug: Reco
   const projectionOnly = coerceText(readiness.projection_only_count);
   const manualReview = coerceText(readiness.manual_review_count);
   const debugOnly = coerceText(readiness.debug_only_count);
+  const lanes = readArray(readiness.next_lane_ids).map(coerceText).filter(Boolean).join(", ");
+  const sessions = readArray(readiness.next_lane_session_ids).map(coerceText).filter(Boolean).join(", ");
   const targets = readArray(readiness.next_dispatch_targets).map(coerceText).filter(Boolean).join(", ");
   const goalBindings = readArray(readiness.next_goal_binding_ids).map(coerceText).filter(Boolean).join(", ");
+  const evidenceRefs = readArray(readiness.next_evidence_refs).map(coerceText).filter(Boolean).join(", ");
+  const receipts = readArray(readiness.next_receipt_refs).map(coerceText).filter(Boolean).join(", ");
   const blockedReasons = readArray(readiness.blocked_reasons).map(coerceText).filter(Boolean).join(", ");
 
   return [
@@ -400,8 +575,12 @@ function readGoalDispatchReadinessSummary(record: RecordLike | null, debug: Reco
     projectionOnly && projectionOnly !== "0" ? `projection only ${projectionOnly}` : "",
     manualReview && manualReview !== "0" ? `manual review ${manualReview}` : "",
     debugOnly && debugOnly !== "0" ? `debug only ${debugOnly}` : "",
+    lanes ? `lanes ${lanes}` : "",
+    sessions ? `sessions ${sessions}` : "",
     targets ? `targets ${targets}` : "",
     goalBindings ? `goal bindings ${goalBindings}` : "",
+    evidenceRefs ? `evidence ${evidenceRefs}` : "",
+    receipts ? `receipts ${receipts}` : "",
     blockedReasons ? `blocked ${blockedReasons}` : "",
     "no side effects",
     "observation-only",
@@ -423,6 +602,10 @@ function readLaneSessionSummary(record: RecordLike | null, debug: RecordLike | n
       const lane = coerceText(summary.lane_id) || "capability_lane";
       const session = coerceText(summary.lane_session_id);
       const backend = coerceText(summary.selected_backend_provider);
+      const cost = coerceText(summary.cost_class);
+      const latency = coerceText(summary.latency_class);
+      const privacy = coerceText(summary.privacy_class);
+      const fallback = coerceText(summary.fallback_backend_provider);
       const decisionParts = readBackendSelectionDecisionParts(summary.backend_selection_decision);
       const status = [coerceText(summary.session_status), coerceText(summary.session_health)]
         .filter(Boolean)
@@ -431,17 +614,23 @@ function readLaneSessionSummary(record: RecordLike | null, debug: RecordLike | n
       const projection = coerceText(summary.projection_target);
       const locale = coerceText(summary.account_locale);
       const observation = coerceText(summary.last_observation_ref);
+      const receipt = coerceText(summary.last_receipt_ref);
       const terminalAuthority = coerceText(summary.terminal_authority_status);
       return [
         lane,
         session ? `session ${session}` : "",
         status ? `status ${status}` : "",
         backend ? `backend ${backend}` : "",
+        cost ? `cost ${cost}` : "",
+        latency ? `latency ${latency}` : "",
+        privacy ? `privacy ${privacy}` : "",
+        fallback ? `fallback ${fallback}` : "",
         ...decisionParts,
         source ? `source ${source}` : "",
         projection ? `projection ${projection}` : "",
         locale ? `locale ${locale}` : "",
         observation ? `observation ${observation}` : "",
+        receipt ? `receipt ${receipt}` : "",
         terminalAuthority ? `authority ${terminalAuthority}` : "",
         "observation-only",
       ].filter(Boolean).join(" | ");
@@ -467,21 +656,41 @@ function readLaneMailLoopSummary(record: RecordLike | null, debug: RecordLike | 
       const mail = coerceText(summary.stage_play_mail_id);
       const wake = summary.stage_play_wake_expected === true ? "wake expected" : "wake not expected";
       const observation = coerceText(summary.observation_ref);
+      const receipt = coerceText(summary.receipt_ref);
       const source = coerceText(summary.source_id);
       const chunk = coerceText(summary.chunk_id);
+      const chunkIndex = coerceText(summary.chunk_index);
+      const dedupeKey = coerceText(summary.dedupe_key);
+      const sourceEventMs = coerceText(summary.source_event_ms);
+      const observedAtMs = coerceText(summary.observed_at_ms);
       const backend = coerceText(summary.selected_backend_provider);
+      const cost = coerceText(summary.cost_class);
+      const latency = coerceText(summary.latency_class);
+      const privacy = coerceText(summary.privacy_class);
+      const fallback = coerceText(summary.fallback_backend_provider);
       const decisionParts = readBackendSelectionDecisionParts(summary.backend_selection_decision);
       const blocked = coerceText(summary.blocked_reason);
       const terminalAuthority = coerceText(summary.terminal_authority_status);
+      const cancelled = summary.cancel_requested === true;
       return [
         lane,
         session ? `session ${session}` : "",
         mail ? `mail ${mail}` : "",
         wake,
         observation ? `observation ${observation}` : "",
+        receipt ? `receipt ${receipt}` : "",
         source ? `source ${source}` : "",
         chunk ? `chunk ${chunk}` : "",
+        chunkIndex ? `index ${chunkIndex}` : "",
+        dedupeKey ? `dedupe ${dedupeKey}` : "",
+        sourceEventMs ? `source event ${sourceEventMs}` : "",
+        observedAtMs ? `observed ${observedAtMs}` : "",
+        cancelled ? "cancelled" : "",
         backend ? `backend ${backend}` : "",
+        cost ? `cost ${cost}` : "",
+        latency ? `latency ${latency}` : "",
+        privacy ? `privacy ${privacy}` : "",
+        fallback ? `fallback ${fallback}` : "",
         ...decisionParts,
         blocked ? `blocked ${blocked}` : "",
         terminalAuthority ? `authority ${terminalAuthority}` : "",
@@ -525,6 +734,7 @@ export function buildHelixAskRuntimeTurnSummary(
   const providerLabel = resolveHelixAskActualAgentProviderLabel(response, providers)?.replace(/^Provider:\s*/i, "");
   const adapter = readAdapterBoundary(record, debug, runtime);
   const lanes = readLaneStatusSummary(record, debug);
+  const backendProviders = readLaneBackendProviderConfigSummary(record, debug);
   const backend = readLaneBackendSummary(record, debug);
   const tools = readTurnToolSummary(record, debug);
   const projection = readLaneProjectionSummary(record, debug);
@@ -545,6 +755,9 @@ export function buildHelixAskRuntimeTurnSummary(
       : null,
     adapter ? { key: "adapter_boundary", label: "Adapter boundary", value: adapter } : null,
     lanes ? { key: "capability_lanes", label: "Capability lanes", value: lanes } : null,
+    backendProviders
+      ? { key: "lane_backend_providers", label: "Lane backend providers", value: backendProviders }
+      : null,
     backend ? { key: "lane_backend", label: "Lane backend", value: backend } : null,
     tools ? { key: "turn_tools", label: "Turn tools", value: tools } : null,
     projection ? { key: "lane_projection", label: "Lane projection", value: projection } : null,

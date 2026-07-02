@@ -22,10 +22,10 @@ export const HELIX_ASK_LEGACY_CONSOLE_ACTIVE_PATH = [
 
 export const HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT = {
   file: "client/src/components/helix/HelixAskPill.tsx",
-  lineCountAtInventory: 26611,
-  exportedComponentStartsAtLine: 8052,
-  liveRenderSliceStartsAtLine: 25991,
-  liveLegacyConsoleViewStartsAtLine: 26006,
+  lineCountAtInventory: 26484,
+  exportedComponentStartsAtLine: 8059,
+  liveRenderSliceStartsAtLine: 25864,
+  liveLegacyConsoleViewStartsAtLine: 25879,
   inventoryReason:
     "The active bridge still imports the whole legacy file, but the visible console render path is concentrated near the bottom and now enters the recrowned legacy console view before composing recrowned ask-console display owners.",
 } as const;
@@ -78,7 +78,7 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
     classification: "behavior_sensitive_recrowned_with_parity",
     source: "ask-console",
     evidence:
-      "Agent runtime localStorage preference moved to HelixAskRuntimePreference with tests preserving default fallback, id validation, write behavior, and storage exception handling while provider fetch/controller state remains in the bridge.",
+      "Agent runtime localStorage preference moved to HelixAskRuntimePreference with tests preserving default fallback, id validation, write behavior, and storage exception handling; deterministic runtime picker select/primary-button decisions moved to ask-agent-runtime-display with tests while provider fetch transport, haptics, React state mutation, persistence side effects, and request payload wiring remain in the bridge.",
   },
   {
     key: "visual_capture_audio_preference_sync",
@@ -120,7 +120,14 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
     classification: "behavior_sensitive_recrowned_with_parity",
     source: "ask-console",
     evidence:
-      "Deterministic image/text attachment submit-readiness commit checks, structured preview metadata, and stale/too-large/unsupported/error reason shaping moved to HelixAskAttachmentCommit with tests while attachment mutation, source admission, request-envelope construction, attachment payload authority, and turn submission remain in the bridge.",
+      "Deterministic image/text attachment submit-readiness commit checks, composer commit-check list projection, ready-state selection, structured preview metadata, and stale/too-large/unsupported/error reason shaping moved to HelixAskAttachmentCommit with tests while attachment mutation, source admission, request-envelope construction, attachment payload authority, and turn submission remain in the bridge.",
+  },
+  {
+    key: "submitted_attachment_payload_shaping",
+    classification: "behavior_sensitive_recrowned_with_parity",
+    source: "ask-console",
+    evidence:
+      "Deterministic submitted-attachment selection, native-image selection, first submit-ready image selection, submitted attachment validation-entry shaping, first-invalid selection, submitted-attachment context-pack projection, visual-evidence turn-input context, explicit-item precedence, turn-input item shaping, and submit run-options payload selection moved to HelixAskAttachmentPayload with tests preserving text/image metadata, assistant_answer=false, raw-content/raw-image flags, image_base64 trimming, image_ref/evidence_ref item construction, visual evidence refs, invalid attachment reason selection, diagnostic visual evidence suppression, attachment-over-visual payload priority, and stale attachment filtering while attachment mutation, visual evidence admission, image-lens execution, request-envelope construction, and turn submission remain in the bridge.",
   },
   {
     key: "voice_playback_runtime_predicates",
@@ -211,7 +218,7 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
     classification: "behavior_sensitive_recrowned_with_parity",
     source: "lib/helix",
     evidence:
-      "Deterministic mic-off voice utterance playback admission predicate moved to ask-read-aloud-display with tests while mic arm state mutation, queue mutation, audio scheduling, TTS transport, and playback side effects remain in the bridge.",
+      "Deterministic mic-off voice utterance playback admission predicate, read-aloud button press action projection, clicked-reply queue filtering, and read-aloud per-reply state-map transition projection moved to ask-read-aloud-display with tests while mic arm state mutation, queue mutation assignment, audio scheduling, TTS transport, and playback side effects remain in the bridge.",
   },
   {
     key: "workstation_calculator_fast_path_parsing",
@@ -267,7 +274,7 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
     classification: "behavior_sensitive_recrowned_with_parity",
     source: "ask-console",
     evidence:
-      "Deterministic hard backend-entrypoint family detection, pasted-text recall route metadata shaping, and hard tool-family route metadata shaping moved to HelixAskBackendEntrypointPolicy with tests while source admission behavior, turn submission, runtime transport, and terminal authority remain in the bridge.",
+      "Deterministic hard backend-entrypoint family detection, pasted-text recall route metadata shaping, and hard tool-family route metadata shaping moved to HelixAskBackendEntrypointPolicy with tests; the live bridge imports the hard route-metadata builder directly instead of preserving a local wrapper while source admission behavior, turn submission, runtime transport, and terminal authority remain in the bridge.",
   },
   {
     key: "visual_evidence_summary_readers",
@@ -386,49 +393,49 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
     classification: "behavior_sensitive_recrowned_with_parity",
     source: "ask-console",
     evidence:
-      "Deterministic visible-final text selection for copy/read-aloud controls, final-answer copy text selection, and local debug-copy payload selection moved to HelixAskLegacyTurnControls with tests while clipboard writes, backend debug-export materialization, selected debug state, drawer mutation, and TTS execution remain in the bridge.",
+      "Deterministic visible-final text selection for copy/read-aloud controls, copy/read-aloud action payload selection, final-answer copy text selection, and local debug-copy payload selection moved to HelixAskLegacyTurnControls with tests while clipboard writes, backend debug-export materialization, selected debug state, drawer mutation, and TTS execution remain in the bridge.",
   },
   {
     key: "legacy_debug_export_backend_target_selection",
     classification: "behavior_sensitive_recrowned_with_parity",
     source: "ask-console",
     evidence:
-      "Deterministic backend debug-export ref eligibility, matching backend target selection, selected debug turn-id resolution, clicked-button payload mismatch guarding, clicked-turn payload identity matching, clicked export fallback guarding, and clicked DOM turn-scope extraction with stale-attribute visible-row veto moved to HelixAskLegacyTurnControls with tests while rendered-button fallback construction, backend debug-export materialization/fetch, authoritative payload merging, drawer mutation, clipboard writes, and TTS execution remain in the bridge.",
+      "Deterministic backend debug-export ref eligibility, rendered-button backend turn-id trust gating, matching backend target selection, backend-merge client turn-id selection, selected debug turn-id resolution, clicked DOM client-reply selection, clicked-button payload mismatch guarding, clicked-turn payload identity matching, clicked export fallback guarding, and clicked DOM turn-scope extraction with stale-attribute visible-row veto moved to HelixAskLegacyTurnControls with tests; stale visible-row attributes and unproven rendered ask turn ids may not carry stale backend turn ids or stale client reply ids. Rendered-button fallback construction, backend debug-export materialization/fetch, authoritative payload merging, drawer mutation, clipboard writes, and TTS execution remain in the bridge.",
   },
   {
     key: "legacy_turn_control_button_state_projection",
     classification: "behavior_sensitive_recrowned_with_parity",
     source: "ask-console",
     evidence:
-      "Deterministic copy/debug/read-aloud button test ids, debug-copy visibility/disabled state, and read-aloud active/label/title projection moved to HelixAskLegacyTurnControls with tests while click handlers, clipboard writes, backend debug-export materialization, drawer mutation, and TTS execution remain in the bridge.",
+      "Deterministic copy/debug/read-aloud button test ids, debug-copy visibility/disabled state, stale-safe copied-debug-id timer clearing, and read-aloud active/label/title projection moved to HelixAskLegacyTurnControls with tests while click handlers, clipboard writes, backend debug-export materialization, drawer mutation, timer scheduling, and TTS execution remain in the bridge.",
   },
   {
     key: "legacy_debug_drawer_state_projection",
     classification: "behavior_sensitive_recrowned_with_parity",
     source: "ask-console",
     evidence:
-      "Deterministic debug drawer state and copy-result-to-drawer projection moved to HelixAskDebugDrawerState with tests while clipboard writes, backend debug-export materialization/fetch, window debug globals, selected drawer React state mutation, and copied-id timers remain in the bridge.",
+      "Deterministic debug drawer state, copy-result-to-drawer projection, and stale selected-debug drawer clearing moved to HelixAskDebugDrawerState with tests while clipboard writes, backend debug-export materialization/fetch, window debug globals, selected drawer React state mutation, and copied-id timers remain in the bridge.",
   },
   {
     key: "legacy_response_capsule_and_debug_clipboard_adapter",
     classification: "behavior_sensitive_recrowned_with_parity",
     source: "ask-console",
     evidence:
-      "Plain final-answer, context-capsule, and prepared debug JSON clipboard write/readback plus textarea fallback moved to HelixAskClipboard with tests while debug-copy payload materialization, backend debug-export fetch, drawer mutation, copied-id timers, and TTS execution remain in the bridge.",
+      "Plain final-answer, context-capsule, and prepared debug JSON clipboard write/readback, stale-readback rejection, plus textarea fallback moved to HelixAskClipboard with tests while debug-copy payload materialization, backend debug-export fetch, drawer mutation, copied-id timers, and TTS execution remain in the bridge.",
   },
   {
     key: "doc_viewer_snapshot_path_resolution",
     classification: "behavior_sensitive_recrowned_with_parity",
     source: "lib/helix",
     evidence:
-      "Deterministic active docs-viewer snapshot path priority moved to ask-doc-viewer-context with tests preserving store > debug snapshot > desktop URL doc param > last-known fallback ordering while docs-viewer store reads, desktop URL reads, last-known cache mutation, workspace snapshots, request-envelope construction, source admission, and route metadata remain in the bridge.",
+      "Deterministic active docs-viewer snapshot path priority moved to ask-doc-viewer-context, and active Ask snapshot binding for desktop URL doc parsing plus last-known doc path memory moved to HelixAskActiveDocContextBinding with tests preserving store > debug snapshot > desktop URL doc param > last-known fallback ordering while docs-viewer store reads, workspace snapshots, request-envelope construction, source admission, and route metadata remain in the bridge.",
   },
   {
     key: "doc_viewer_debug_snapshot_projection",
     classification: "behavior_sensitive_recrowned_with_parity",
     source: "lib/helix",
     evidence:
-      "Deterministic docs-viewer debug snapshot projection moved to ask-doc-viewer-context with tests preserving mode, retained current path, anchor, pending auto-read nonce, and recent count while docs-viewer store reads, retained active-doc cache mutation, desktop URL reads, request-envelope construction, source admission, and route metadata remain in the bridge.",
+      "Deterministic docs-viewer debug snapshot projection moved to ask-doc-viewer-context, and active Ask debug-snapshot binding with retained active-doc cache mutation moved to HelixAskActiveDocContextBinding with tests preserving mode, retained current path, anchor, pending auto-read nonce, and recent count while docs-viewer store reads, request-envelope construction, source admission, and route metadata remain in the bridge.",
   },
   {
     key: "doc_viewer_anchor_path_deictic_resolution",
@@ -442,21 +449,21 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
     classification: "behavior_sensitive_recrowned_with_parity",
     source: "lib/helix",
     evidence:
-      "Deterministic workstation layout debug snapshot projection moved to ask-workspace-context-snapshot with tests preserving group count, sorted/deduped open panel ids, chat dock fields, and mobile drawer fields while the layout store read, workspace context assembly, request-envelope construction, source admission, and route metadata remain in the bridge.",
+      "Deterministic workstation layout debug snapshot projection moved to ask-workspace-context-snapshot, and the active layout snapshot binding moved to HelixAskWorkspaceContextBinding with tests preserving group count, sorted/deduped open panel ids, chat dock fields, and mobile drawer fields while the layout store read, workspace context assembly, request-envelope construction, source admission, and route metadata remain in the bridge.",
   },
   {
     key: "ask_turn_workspace_context_snapshot_shaping",
     classification: "behavior_sensitive_recrowned_with_parity",
     source: "lib/helix",
     evidence:
-      "Deterministic Ask turn workspace context snapshot shaping moved to ask-workspace-context-snapshot with tests preserving active panel, camelCase and snake_case active-doc identity fields, calculator context clipping, note context clipping, Situation Room context passthrough, clipboard-panel detection, and injected timestamp while layout/notes/calculator/Situation Room store reads, active-doc path resolution, Date.now, source admission, route metadata, and turn submission remain in the bridge.",
+      "Deterministic Ask turn workspace context snapshot shaping moved to ask-workspace-context-snapshot, and the active workspace context snapshot binding moved to HelixAskWorkspaceContextBinding with tests preserving active panel, camelCase and snake_case active-doc identity fields, calculator context clipping, note context clipping, Situation Room context passthrough, clipboard-panel detection, and injected timestamp while layout/notes/calculator/Situation Room store reads, active-doc path resolution, Date.now, source admission, route metadata, and turn submission remain in the bridge.",
   },
   {
     key: "active_doc_backend_payload_binding",
     classification: "behavior_sensitive_recrowned_with_parity",
     source: "ask-console",
     evidence:
-      "Deterministic backend turn payload shaping now includes top-level doc_path and active_doc_path derived from the recrowned active-doc context files in HelixAskRequestEnvelope with tests while URL/store reads, source admission, route metadata, and turn submission remain in the bridge.",
+      "Deterministic context-file shaping and backend turn payload shaping now include top-level doc_path and active_doc_path derived from the recrowned active-doc context files in HelixAskRequestEnvelope with tests; the live submit path calls the request-envelope owner directly while URL/store reads, source admission, route metadata, and turn submission remain in the bridge.",
   },
   {
     key: "request_and_stream_lifecycle",
@@ -470,14 +477,14 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
     classification: "behavior_sensitive_quarantined",
     source: "HelixAskPill.tsx",
     evidence:
-      "Docs-viewer URL/store reads, last-known cache mutation, active current-path reads, layout/notes/calculator/Situation Room store reads, Date.now, route metadata, and turn submission remain behavior-sensitive after deterministic doc debug snapshot projection, doc snapshot path priority, deictic anchor-path resolution, workstation layout debug snapshot projection, Ask turn workspace context snapshot shaping, and backend doc_path/active_doc_path payload binding were recrowned; HASK-BSQ-001 still needs live browser parity proof.",
+      "Docs-viewer store reads, active current-path reads, layout/notes/calculator/Situation Room store reads, Date.now, route metadata, and turn submission remain behavior-sensitive after deterministic doc debug snapshot projection, active doc snapshot binding, doc snapshot path priority, deictic anchor-path resolution, workstation layout debug snapshot projection, Ask turn workspace context snapshot shaping, context-file shaping, and backend doc_path/active_doc_path payload binding were recrowned; HASK-BSQ-001 still needs live browser parity proof.",
   },
   {
     key: "latest_debug_copy_and_read_aloud_binding",
     classification: "behavior_sensitive_quarantined",
     source: "HelixAskPill.tsx",
     evidence:
-      "Backend debug-export materialization/fetch, rendered-button fallback construction, selected debug state, drawer mutation, click handlers, copied-id timers, window debug globals, and TTS execution still bind from legacy state after pure target/backend-ref/debug-turn-id/button-state/drawer-state/DOM scope selection plus final-answer/context-capsule/prepared-debug clipboard writes were moved; clicked Debug copy now routes payload identity matching and stale export fallback guarding through HelixAskLegacyTurnControls before backend export fetch/copy.",
+      "Backend debug-export materialization/fetch, rendered-button fallback construction, selected debug state, drawer mutation, click handlers, copied-id timer scheduling, window debug globals, and TTS execution still bind from legacy state after pure target/backend-ref/debug-turn-id/button-state/drawer-state/DOM scope selection plus stale-safe copied-debug-id timer clearing and final-answer/context-capsule/prepared-debug clipboard writes were moved; clicked Debug copy now delegates clicked client-reply selection before payload normalization only when the DOM scope is not visibly stale, and routes payload identity matching, fail-closed backend turn-id trust gating, stale client-id veto, backend-merge client-id selection, and stale export fallback guarding through HelixAskLegacyTurnControls before backend export fetch/copy.",
   },
   {
     key: "voice_capture_and_command_runtime",

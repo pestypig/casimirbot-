@@ -123,6 +123,7 @@ export { HelixAskDebugDrawer } from "./HelixAskDebugDrawer";
 export {
   buildHelixAskDebugDrawerCopyProjection,
   buildHelixAskDebugExportDrawerState,
+  clearHelixAskDebugDrawerForStaleReply,
 } from "./HelixAskDebugDrawerState";
 export type {
   HelixAskDebugClipboardCopyResult,
@@ -138,10 +139,24 @@ export {
   sha256TextHex,
 } from "./HelixAskTextAttachment";
 export {
+  buildHelixAskAttachmentCommitChecks,
+  hasReadyHelixAskAttachmentCommitCheck,
   validateHelixAskAttachmentForSubmit,
   validateHelixAskImageAttachmentForSubmit,
   validateHelixAskTextAttachmentForSubmit,
 } from "./HelixAskAttachmentCommit";
+export {
+  buildHelixAskAttachmentContextPack,
+  buildHelixAskSubmittedAttachmentChecks,
+  buildHelixAskAttachmentTurnInputItems,
+  buildHelixAskSubmitRunOptionsPayload,
+  buildHelixAskTurnInputItemsForSubmit,
+  buildHelixAskVisualEvidenceTurnInputContext,
+  resolveHelixAskSubmittedAttachments,
+  selectFirstInvalidHelixAskSubmittedAttachment,
+  selectFirstHelixAskSubmitReadyImageAttachment,
+  selectHelixAskNativeImageAttachments,
+} from "./HelixAskAttachmentPayload";
 export {
   HelixAskContextMemoryStatusLine,
   HelixAskErrorLine,
@@ -172,6 +187,17 @@ export {
   buildHelixAskConsoleContextFiles,
   buildHelixAskConsoleRequestEnvelope,
 } from "./HelixAskRequestEnvelope";
+export {
+  buildHelixAskDocViewerDebugSnapshotBinding,
+  readHelixAskDocViewerPathFromDesktopUrlForSnapshot,
+  rememberHelixAskDocViewerPathForSnapshot,
+  resetHelixAskDocViewerSnapshotPathMemoryForTests,
+  resolveHelixAskDocViewerSnapshotPathBinding,
+} from "./HelixAskActiveDocContextBinding";
+export {
+  buildHelixAskWorkspaceContextSnapshotBinding,
+  buildHelixAskWorkstationLayoutDebugSnapshotBinding,
+} from "./HelixAskWorkspaceContextBinding";
 export {
   copyHelixAskContextCapsuleToClipboard,
   copyHelixAskDebugJsonToClipboard,
@@ -210,14 +236,18 @@ export {
   resolveHelixAskLatestTurnId,
 } from "./HelixAskLatestTurnBinding";
 export {
+  buildHelixAskLegacyTurnControlActionPayload,
   buildHelixAskReplyCopyText,
   buildHelixAskLegacyTurnControlViewModel,
+  clearHelixAskLegacyCopiedDebugIdIfCurrent,
   debugPayloadMatchesHelixAskLegacyRenderedTurnPayload,
   enforceHelixAskLegacyDebugExportMatchesClickedButton,
   isHelixAskLegacyBackendDebugExportEligibleTurnId,
+  isHelixAskLegacyRenderedButtonBackendTurnScopeTrusted,
   resolveHelixAskLegacyDebugExportBackendTarget,
   resolveHelixAskLegacyTurnControlText,
   selectHelixAskLegacyDebugCopyLocalPayload,
+  selectHelixAskLegacyReplyScopedDebugExportPayload,
 } from "./HelixAskLegacyTurnControls";
 export {
   hasSuccessfulWorkstationTerminalTranscriptRows,

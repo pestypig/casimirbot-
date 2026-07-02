@@ -36,12 +36,17 @@ const eventFor = (input: {
   selectedRuntimeAgentProvider: HelixAgentProvider["id"];
   selectedBackendProvider: string | null;
   backendSelectionDecision: HelixCapabilityLaneBackendSelectionDecision;
+  costClass: HelixCapabilityLaneSessionEvent["cost_class"];
+  latencyClass: HelixCapabilityLaneSessionEvent["latency_class"];
+  privacyClass: HelixCapabilityLaneSessionEvent["privacy_class"];
+  fallbackBackendProvider: string | null;
   action: HelixCapabilityLaneSessionAction;
   status: HelixCapabilityLaneSession["status"];
   reason: string;
   atMs: number;
   sourceId?: string | null;
   observationRef?: string | null;
+  receiptRef?: string | null;
 }): HelixCapabilityLaneSessionEvent => ({
   schema: HELIX_CAPABILITY_LANE_SESSION_EVENT_SCHEMA,
   event_id: `${input.laneSessionId}:${input.action}:${input.atMs}`,
@@ -50,12 +55,17 @@ const eventFor = (input: {
   selected_runtime_agent_provider: input.selectedRuntimeAgentProvider,
   selected_backend_provider: input.selectedBackendProvider,
   backend_selection_decision: input.backendSelectionDecision,
+  cost_class: input.costClass,
+  latency_class: input.latencyClass,
+  privacy_class: input.privacyClass,
+  fallback_backend_provider: input.fallbackBackendProvider,
   action: input.action,
   status: input.status,
   at_ms: input.atMs,
   reason: input.reason,
   source_id: normalizeText(input.sourceId) || null,
   observation_ref: normalizeText(input.observationRef) || null,
+  receipt_ref: normalizeText(input.receiptRef) || null,
   terminal_authority_status: input.observationRef
     ? "pending_helix_terminal_authority"
     : "not_terminal_authority",
@@ -118,6 +128,10 @@ export const createHelixCapabilityLaneSessionStore = () => {
       selectedRuntimeAgentProvider: input.provider.id,
       selectedBackendProvider: trace.selected_backend_provider,
       backendSelectionDecision: trace.backend_selection_decision,
+      costClass: trace.cost_class,
+      latencyClass: trace.latency_class,
+      privacyClass: trace.privacy_class,
+      fallbackBackendProvider: trace.fallback_backend_provider,
       action: "start",
       status: "running",
       reason: "lane_session_started",
@@ -131,6 +145,10 @@ export const createHelixCapabilityLaneSessionStore = () => {
       selected_runtime_agent_provider: input.provider.id,
       selected_backend_provider: trace.selected_backend_provider,
       backend_selection_decision: trace.backend_selection_decision,
+      cost_class: trace.cost_class,
+      latency_class: trace.latency_class,
+      privacy_class: trace.privacy_class,
+      fallback_backend_provider: trace.fallback_backend_provider,
       status: "running",
       health: "healthy",
       source_binding: {
@@ -141,6 +159,7 @@ export const createHelixCapabilityLaneSessionStore = () => {
       created_at_ms: nowMs,
       updated_at_ms: nowMs,
       last_observation_ref: null,
+      last_receipt_ref: null,
       debug_history: [event],
       assistant_answer: false,
       terminal_eligible: false,
@@ -185,6 +204,10 @@ export const createHelixCapabilityLaneSessionStore = () => {
       selectedRuntimeAgentProvider: session.selected_runtime_agent_provider,
       selectedBackendProvider: session.selected_backend_provider,
       backendSelectionDecision: session.backend_selection_decision,
+      costClass: session.cost_class,
+      latencyClass: session.latency_class,
+      privacyClass: session.privacy_class,
+      fallbackBackendProvider: session.fallback_backend_provider,
       action: input.action,
       status,
       reason: normalizeText(input.reason) || `lane_session_${input.action}`,
@@ -213,6 +236,7 @@ export const createHelixCapabilityLaneSessionStore = () => {
   const recordObservation = (input: {
     laneSessionId: string;
     observationRef: string;
+    receiptRef?: string | null;
     nowMs?: number;
   }): HelixCapabilityLaneSessionResult => {
     const session = sessions.get(input.laneSessionId);
@@ -220,24 +244,31 @@ export const createHelixCapabilityLaneSessionStore = () => {
     const observationRef = normalizeText(input.observationRef);
     if (!observationRef) return blocked("resume", "missing_observation_ref");
     const nowMs = input.nowMs ?? Date.now();
+    const receiptRef = normalizeText(input.receiptRef) || null;
     const event = eventFor({
       laneSessionId: input.laneSessionId,
       laneId: session.lane_id,
       selectedRuntimeAgentProvider: session.selected_runtime_agent_provider,
       selectedBackendProvider: session.selected_backend_provider,
       backendSelectionDecision: session.backend_selection_decision,
+      costClass: session.cost_class,
+      latencyClass: session.latency_class,
+      privacyClass: session.privacy_class,
+      fallbackBackendProvider: session.fallback_backend_provider,
       action: "resume",
       status: session.status,
       reason: "lane_session_observation_recorded",
       atMs: nowMs,
       sourceId: session.source_binding.source_id,
       observationRef,
+      receiptRef,
     });
     const updated: HelixCapabilityLaneSession = {
       ...session,
       health: session.status === "running" ? "healthy" : session.health,
       updated_at_ms: nowMs,
       last_observation_ref: observationRef,
+      last_receipt_ref: receiptRef,
       debug_history: [...session.debug_history, event],
     };
     sessions.set(input.laneSessionId, updated);

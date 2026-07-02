@@ -280,7 +280,7 @@ export type HelixCapabilityLaneResolveTrace = {
   resolved_model_or_service: string | null;
   result_ref: string | null;
   observation_ref: string | null;
-  receipt_ref: null;
+  receipt_ref: string | null;
   terminal_policy: HelixCapabilityLaneTerminalPolicy;
   reentry_required: true;
   execution_status: "not_executed_shadow_only" | "executed_observation_only";
@@ -317,7 +317,7 @@ export type HelixCapabilityLaneBackendSelectionSummary = {
   resolved_backend_provider: HelixCapabilityLaneBackendFamily | null;
   resolved_model_or_service: string | null;
   observation_ref: string | null;
-  receipt_ref: null;
+  receipt_ref: string | null;
   result_ref: string | null;
   execution_status: HelixCapabilityLaneResolveTrace["execution_status"];
   terminal_eligible: false;
@@ -354,10 +354,14 @@ export type HelixCapabilityLaneDebugEvent = {
   backend_selection_decision: HelixCapabilityLaneBackendSelectionDecision | null;
   availability_status: HelixCapabilityLaneBackendAvailabilityStatus | "unknown" | null;
   permission_status: HelixCapabilityLaneBackendPermissionStatus | "unknown" | null;
+  cost_class: HelixCapabilityLaneCostClass | "unknown" | null;
+  latency_class: HelixCapabilityLaneLatencyClass | "unknown" | null;
+  privacy_class: HelixCapabilityLanePrivacyClass | "unknown" | null;
+  fallback_backend_provider: string | null;
   execution_status: HelixCapabilityLaneResolveTrace["execution_status"] | null;
   observation_ref: string | null;
   result_ref: string | null;
-  receipt_ref: null;
+  receipt_ref: string | null;
   reentry_required: true;
   reentry_status: "not_applicable" | "observation_packet_required_for_provider_reentry";
   terminal_authority_status: "pending_helix_terminal_authority";

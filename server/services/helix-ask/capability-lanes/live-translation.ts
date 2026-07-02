@@ -9,10 +9,12 @@ import type {
 } from "@shared/helix-capability-lane";
 import {
   HELIX_LIVE_TRANSLATION_ONE_SHOT_OBSERVATION_SCHEMA,
+  HELIX_LIVE_TRANSLATION_PROJECTION_RECEIPT_SCHEMA,
   HELIX_LIVE_TRANSLATION_ONE_SHOT_RESULT_SCHEMA,
   type HelixLiveTranslationChunkFreshnessStatus,
   type HelixLiveTranslationOneShotObservation,
   type HelixLiveTranslationOneShotRequest,
+  type HelixLiveTranslationProjectionReceipt,
   type HelixLiveTranslationProjectionTarget,
   type HelixLiveTranslationOneShotResult,
 } from "@shared/helix-live-translation-lane";
@@ -112,8 +114,11 @@ const buildLaneObservationPacket = (input: {
     projectionTarget: HelixLiveTranslationProjectionTarget;
     cancelRequested: boolean;
   };
+  projectionReceipt?: HelixLiveTranslationProjectionReceipt;
   missingRequirements?: HelixAgentStepObservationPacket["missing_requirements"];
-}): HelixAgentStepObservationPacket => ({
+}): HelixAgentStepObservationPacket => {
+  const receiptRef = input.projectionReceipt?.receipt_ref;
+  return {
   schema: HELIX_AGENT_STEP_OBSERVATION_PACKET_SCHEMA,
   turn_id: input.turnId,
   iteration: input.iteration,
@@ -125,7 +130,13 @@ const buildLaneObservationPacket = (input: {
   status: input.status,
   produced_artifact_refs: [input.observationRef],
   observation_summary: input.summary,
-  receipts: [],
+  receipts: receiptRef
+    ? [{
+        receipt_ref: receiptRef,
+        kind: "live_translation_projection",
+        status: input.projectionReceipt?.projection_status ?? input.status,
+      }]
+    : [],
   missing_requirements: input.missingRequirements ?? [],
   backend_selection_decision: input.backendSelectionDecision,
   state_delta: input.chunk
@@ -146,6 +157,9 @@ const buildLaneObservationPacket = (input: {
           assistant_answer: false,
           raw_content_included: false,
         },
+        ...(input.projectionReceipt
+          ? { live_translation_projection_receipt: input.projectionReceipt }
+          : {}),
       }
     : {},
   suggested_next_steps:
@@ -171,11 +185,63 @@ const buildLaneObservationPacket = (input: {
   post_tool_model_step_required: true,
   assistant_answer: false,
   raw_content_included: false,
+  };
+};
+
+const buildProjectionReceipt = (input: {
+  observationRef: string;
+  chunk: {
+    sourceId: string;
+    chunkId: string;
+    chunkIndex: number | null;
+    dedupeKey: string;
+    sourceEventMs: number | null;
+    observedAtMs: number;
+    freshnessStatus: HelixLiveTranslationChunkFreshnessStatus;
+    projectionTarget: HelixLiveTranslationProjectionTarget;
+    cancelRequested: boolean;
+  };
+  targetLanguage: string;
+  translatedText: string | null;
+}): HelixLiveTranslationProjectionReceipt => ({
+  schema: HELIX_LIVE_TRANSLATION_PROJECTION_RECEIPT_SCHEMA,
+  receipt_ref: `${input.observationRef}:projection:${hashShort({
+    projectionTarget: input.chunk.projectionTarget,
+    dedupeKey: input.chunk.dedupeKey,
+    targetLanguage: input.targetLanguage,
+  })}`,
+  observation_ref: input.observationRef,
+  lane_id: "live_translation",
+  capability: CAPABILITY_ID,
+  projection_target: input.chunk.projectionTarget,
+  projection_status: input.chunk.cancelRequested
+    ? "cancelled"
+    : input.translatedText === null
+      ? "failed"
+      : input.chunk.freshnessStatus === "stale"
+        ? "stale"
+        : "projected",
+  source_id: input.chunk.sourceId,
+  chunk_id: input.chunk.chunkId,
+  chunk_index: input.chunk.chunkIndex,
+  dedupe_key: input.chunk.dedupeKey,
+  source_event_ms: input.chunk.sourceEventMs,
+  observed_at_ms: input.chunk.observedAtMs,
+  freshness_status: input.chunk.freshnessStatus,
+  target_language: input.targetLanguage,
+  translated_text: input.translatedText,
+  stale: input.chunk.freshnessStatus === "stale",
+  cancel_requested: input.chunk.cancelRequested,
+  reentry_required: true,
+  terminal_eligible: false,
+  assistant_answer: false,
+  raw_content_included: false,
 });
 
 const withExecutionTrace = (input: {
   trace: HelixCapabilityLaneResolveTrace;
   observationRef: string | null;
+  receiptRef?: string | null;
   status: "executed_observation_only" | "not_executed_shadow_only";
   blockedReason?: string | null;
 }): HelixCapabilityLaneResolveTrace => ({
@@ -183,7 +249,7 @@ const withExecutionTrace = (input: {
   execution_status: input.status,
   result_ref: input.observationRef,
   observation_ref: input.observationRef,
-  receipt_ref: null,
+  receipt_ref: input.receiptRef ?? null,
   blocked_reason: input.blockedReason ?? input.trace.blocked_reason,
 });
 
@@ -263,6 +329,12 @@ export const runLiveTranslationTranslateText = (input: {
       chunkId,
       targetLanguage,
     })}`;
+    const projectionReceipt = buildProjectionReceipt({
+      observationRef,
+      chunk,
+      targetLanguage,
+      translatedText: null,
+    });
     const packet = buildLaneObservationPacket({
       turnId,
       iteration,
@@ -271,6 +343,7 @@ export const runLiveTranslationTranslateText = (input: {
       observationRef,
       backendSelectionDecision: trace.backend_selection_decision,
       chunk,
+      projectionReceipt,
     });
     return {
       schema: HELIX_LIVE_TRANSLATION_ONE_SHOT_RESULT_SCHEMA,
@@ -281,6 +354,7 @@ export const runLiveTranslationTranslateText = (input: {
       lane_resolve_trace: withExecutionTrace({
         trace,
         observationRef,
+        receiptRef: projectionReceipt.receipt_ref,
         status: "not_executed_shadow_only",
         blockedReason: "translation_chunk_cancelled",
       }),
@@ -384,7 +458,14 @@ export const runLiveTranslationTranslateText = (input: {
     observationRef,
     backendSelectionDecision: trace.backend_selection_decision,
     chunk,
+    projectionReceipt: buildProjectionReceipt({
+      observationRef,
+      chunk,
+      targetLanguage,
+      translatedText,
+    }),
   });
+  const projectionReceiptRef = packet.state_delta.live_translation_projection_receipt?.receipt_ref ?? null;
 
   return {
     schema: HELIX_LIVE_TRANSLATION_ONE_SHOT_RESULT_SCHEMA,
@@ -395,6 +476,7 @@ export const runLiveTranslationTranslateText = (input: {
     lane_resolve_trace: withExecutionTrace({
       trace,
       observationRef,
+      receiptRef: projectionReceiptRef,
       status: "executed_observation_only",
     }),
     observation,

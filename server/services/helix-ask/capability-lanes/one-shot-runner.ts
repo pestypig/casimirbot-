@@ -43,6 +43,11 @@ const readString = (value: unknown): string =>
 const readCapabilityFromResult = (result: HelixCapabilityLaneOneShotCallResult): string =>
   readString(result.capability);
 
+const readReceiptRefFromPacket = (packet: HelixAgentStepObservationPacket | undefined): string | null => {
+  const receipt = packet?.receipts.find((entry) => readString(entry.receipt_ref));
+  return receipt ? readString(receipt.receipt_ref) : null;
+};
+
 const statusForLaneResult = (
   result: HelixCapabilityLaneOneShotCallResult,
   packet: HelixAgentStepObservationPacket | undefined,
@@ -83,6 +88,7 @@ const buildCapabilityLaneDebugEvents = (input: {
     const capability = readCapabilityFromResult(result) || readString(packet?.capability_key) || "unknown";
     const laneId = readString(result.lane_id) || readString(trace?.requested_lane) || "unknown";
     const status = statusForLaneResult(result, packet);
+    const receiptRef = readReceiptRefFromPacket(packet);
     const base = {
       selected_runtime_agent_provider: input.provider.id,
       lane_id: laneId,
@@ -101,10 +107,14 @@ const buildCapabilityLaneDebugEvents = (input: {
       backend_selection_decision: trace?.backend_selection_decision ?? null,
       availability_status: trace?.availability_status ?? null,
       permission_status: trace?.permission_status ?? null,
+      cost_class: trace?.cost_class ?? null,
+      latency_class: trace?.latency_class ?? null,
+      privacy_class: trace?.privacy_class ?? null,
+      fallback_backend_provider: trace?.fallback_backend_provider ?? null,
       execution_status: trace?.execution_status ?? null,
       observation_ref: trace?.observation_ref ?? null,
       result_ref: trace?.result_ref ?? null,
-      receipt_ref: null,
+      receipt_ref: receiptRef,
       reentry_required: true as const,
       terminal_authority_status: "pending_helix_terminal_authority" as const,
       terminal_eligible: false as const,
@@ -160,10 +170,14 @@ const buildCapabilityLaneDebugEvents = (input: {
       backend_selection_decision: null,
       availability_status: null,
       permission_status: null,
+      cost_class: null,
+      latency_class: null,
+      privacy_class: null,
+      fallback_backend_provider: null,
       execution_status: firstTrace?.execution_status ?? null,
       observation_ref: null,
       result_ref: null,
-      receipt_ref: null,
+      receipt_ref: readReceiptRefFromPacket(input.observationPackets[0]),
       reentry_required: true,
       reentry_status: "observation_packet_required_for_provider_reentry",
       terminal_authority_status: "pending_helix_terminal_authority",
@@ -182,6 +196,7 @@ const buildCapabilityLaneBackendSelections = (input: {
 }): HelixCapabilityLaneBackendSelectionSummary[] =>
   input.resolveTraces.map((trace, index) => {
     const result = input.results[index];
+    const packet = result?.observation_packet ?? undefined;
     const capability = result ? readCapabilityFromResult(result) : "unknown";
     const laneId = readString(result?.lane_id) || readString(trace.requested_lane) || "unknown";
     return {
@@ -211,7 +226,7 @@ const buildCapabilityLaneBackendSelections = (input: {
       resolved_backend_provider: trace.resolved_backend_provider,
       resolved_model_or_service: trace.resolved_model_or_service,
       observation_ref: trace.observation_ref,
-      receipt_ref: null,
+      receipt_ref: readReceiptRefFromPacket(packet),
       result_ref: trace.result_ref,
       execution_status: trace.execution_status,
       terminal_eligible: false,

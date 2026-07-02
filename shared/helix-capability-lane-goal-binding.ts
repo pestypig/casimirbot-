@@ -1,6 +1,9 @@
 import type {
   HelixCapabilityLaneBackendSelectionDecision,
+  HelixCapabilityLaneCostClass,
   HelixCapabilityLaneId,
+  HelixCapabilityLaneLatencyClass,
+  HelixCapabilityLanePrivacyClass,
 } from "./helix-capability-lane";
 import type {
   HelixCapabilityLaneSessionEvent,
@@ -71,6 +74,7 @@ export type HelixCapabilityLaneGoalReportDecision = {
   terminal_authority_status: "not_terminal_authority" | "pending_helix_terminal_authority";
   evidence_ref: string | null;
   mail_loop_ref: string | null;
+  receipt_ref: string | null;
   reentry_required: true;
   assistant_answer: false;
   terminal_eligible: false;
@@ -96,6 +100,7 @@ export type HelixCapabilityLaneGoalDispatchPlan = {
   lane_id: HelixCapabilityLaneId;
   evidence_ref: string | null;
   mail_loop_ref: string | null;
+  receipt_ref: string | null;
   requires_live_mail_loop: boolean;
   requires_terminal_authority: boolean;
   side_effects_executed: false;
@@ -128,6 +133,7 @@ export type HelixCapabilityLaneGoalDispatchAdmission = {
   lane_id: HelixCapabilityLaneId;
   evidence_ref: string | null;
   mail_loop_ref: string | null;
+  receipt_ref: string | null;
   blocked_reason: string | null;
   requires_live_mail_loop: boolean;
   requires_terminal_authority: boolean;
@@ -155,8 +161,12 @@ export type HelixCapabilityLaneGoalDispatchReadiness = {
   manual_review_count: number;
   debug_only_count: number;
   blocked_reasons: string[];
+  next_lane_ids: HelixCapabilityLaneId[];
+  next_lane_session_ids: string[];
   next_dispatch_targets: HelixCapabilityLaneGoalDispatchTarget[];
   next_goal_binding_ids: string[];
+  next_evidence_refs: string[];
+  next_receipt_refs: string[];
   side_effects_allowed: false;
   side_effects_executed: false;
   wake_dispatch_allowed: false;
@@ -187,6 +197,7 @@ export type HelixCapabilityLaneGoalBindingEvent = {
   lane_session_health: HelixCapabilityLaneSessionHealth;
   lane_session_observation_ref: string | null;
   mail_loop_ref?: string | null;
+  receipt_ref: string | null;
   terminal_authority_status: "not_terminal_authority" | "pending_helix_terminal_authority";
   reentry_required: true;
   assistant_answer: false;
@@ -203,10 +214,15 @@ export type HelixCapabilityLaneGoalBinding = {
   selected_runtime_agent_provider: HelixAgentRuntimeId;
   selected_backend_provider: string | null;
   backend_selection_decision: HelixCapabilityLaneBackendSelectionDecision;
+  cost_class: HelixCapabilityLaneCostClass | "unknown" | null;
+  latency_class: HelixCapabilityLaneLatencyClass | "unknown" | null;
+  privacy_class: HelixCapabilityLanePrivacyClass | "unknown" | null;
+  fallback_backend_provider: string | null;
   lane_session_status: HelixCapabilityLaneSessionStatus;
   lane_session_health: HelixCapabilityLaneSessionHealth;
   lane_session_source_id: string | null;
   lane_session_last_observation_ref: string | null;
+  lane_session_last_receipt_ref: string | null;
   latest_lane_session_event: HelixCapabilityLaneSessionEvent | null;
   lane_session_debug_history: HelixCapabilityLaneSessionEvent[];
   latest_mail_loop_summary: HelixCapabilityLaneMailLoopDebugSummary | null;
@@ -235,10 +251,15 @@ export type HelixCapabilityLaneGoalBindingDebugSummary = {
   selected_runtime_agent_provider: HelixAgentRuntimeId;
   selected_backend_provider: string | null;
   backend_selection_decision: HelixCapabilityLaneBackendSelectionDecision;
+  cost_class: HelixCapabilityLaneCostClass | "unknown" | null;
+  latency_class: HelixCapabilityLaneLatencyClass | "unknown" | null;
+  privacy_class: HelixCapabilityLanePrivacyClass | "unknown" | null;
+  fallback_backend_provider: string | null;
   session_status: HelixCapabilityLaneSessionStatus;
   session_health: HelixCapabilityLaneSessionHealth;
   source_id: string | null;
   last_observation_ref: string | null;
+  last_receipt_ref: string | null;
   latest_session_event: HelixCapabilityLaneSessionEvent | null;
   latest_mail_loop_summary: HelixCapabilityLaneMailLoopDebugSummary | null;
   mail_loop_refs: string[];

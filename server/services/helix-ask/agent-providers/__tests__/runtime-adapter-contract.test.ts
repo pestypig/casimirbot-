@@ -32,7 +32,7 @@ const buildProvider = (input: {
     workstationTools: true,
     capabilityLanes: true,
     capabilityLaneOneShot: true,
-    capabilityLaneSessions: false,
+    capabilityLaneSessions: input.id === "future" ? false : true,
     codeMutation: false,
   },
   runTurn: async () => ({
@@ -89,9 +89,11 @@ describe("agent runtime adapter contract", () => {
     expect(contract.adapter_invariants.helix_owns_capability_lane_admission).toBe(true);
     expect(contract.adapter_invariants.capability_lanes_are_not_root_agents).toBe(true);
     expect(contract.adapter_invariants.capability_lane_one_shot_execution_enabled).toBe(true);
+    expect(contract.adapter_invariants.capability_lane_sessions_enabled).toBe(true);
+    expect(contract.adapter_invariants.capability_lane_sessions_are_observation_only).toBe(true);
     expect(contract.supports.capabilityLanes).toBe(true);
     expect(contract.supports.capabilityLaneOneShot).toBe(true);
-    expect(contract.supports.capabilityLaneSessions).toBe(false);
+    expect(contract.supports.capabilityLaneSessions).toBe(true);
     expect(contract.adapter_invariants.helix_owns_observation_packets).toBe(true);
     expect(contract.adapter_invariants.helix_owns_terminal_authority).toBe(true);
     expect(contract.adapter_invariants.receipts_are_not_answers).toBe(true);
@@ -103,6 +105,7 @@ describe("agent runtime adapter contract", () => {
     expect(contract.adapter_invariants.code_mutation_enabled).toBe(false);
     expect(contract.prompt_policy_lines.join("\n")).toContain("Runtime-specific protocol glue stays inside");
     expect(contract.prompt_policy_lines.join("\n")).toContain("Capability lanes may execute only through Helix-governed one-shot lane calls");
+    expect(contract.prompt_policy_lines.join("\n")).toContain("Lane sessions may start, pause, resume, or stop only through Helix-governed session calls");
     expect(contract.prompt_policy_lines.join("\n")).toContain("keeps the selected runtime agent provider unchanged");
     expect(contract.prompt_policy_lines.join("\n")).toContain("Do not claim an AI service lane ran unless a Helix lane observation or receipt is present");
     expect(contract.prompt_policy_lines.join("\n")).toContain("does not rewrite, shorten, bulletize");
@@ -140,6 +143,10 @@ describe("agent runtime adapter contract", () => {
     expect(codex.capability_lane_manifest.lanes.every((lane) => lane.terminal_eligible === false)).toBe(true);
     expect(helix.adapter_invariants.capability_lane_one_shot_execution_enabled).toBe(true);
     expect(codex.adapter_invariants.capability_lane_one_shot_execution_enabled).toBe(true);
+    expect(helix.adapter_invariants.capability_lane_sessions_enabled).toBe(true);
+    expect(codex.adapter_invariants.capability_lane_sessions_enabled).toBe(true);
+    expect(helix.supports.capabilityLaneSessions).toBe(true);
+    expect(codex.supports.capabilityLaneSessions).toBe(true);
     expect(helix.adapter_invariants.capability_lanes_are_not_root_agents).toBe(true);
     expect(codex.adapter_invariants.capability_lanes_are_not_root_agents).toBe(true);
   });
