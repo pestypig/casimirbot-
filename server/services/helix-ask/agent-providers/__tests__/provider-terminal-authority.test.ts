@@ -255,6 +255,98 @@ const buildScholarlyFullTextRecoveryResult = () => ({
   error: "fetchable_paper_identity_required",
 });
 
+const buildCalculatorUnsupportedExpressionResult = () => ({
+  schema: "helix.workstation_tool_gateway.call_result.v1",
+  manifest_version: "test",
+  ok: false,
+  agent_runtime: "codex",
+  capability_id: "scientific-calculator.solve_expression",
+  mode: "read",
+  gateway_admission: {
+    schema: "helix.workstation_tool_gateway.admission.v1",
+    requested_capability: "scientific-calculator.solve_expression",
+    selected_agent_provider: "codex",
+    permission_profile: "read",
+    admission_status: "blocked",
+    admission_reason: "calculator_expression_blocked",
+    blocked_reason: "unsupported_expression_syntax",
+    assistant_answer: false,
+    raw_content_included: false,
+  },
+  observation_packet: {
+    schema: HELIX_AGENT_STEP_OBSERVATION_PACKET_SCHEMA,
+    turn_id: "turn-calculator-blocked-authority",
+    iteration: 0,
+    call_id: "turn-calculator-blocked-authority:gateway:solve_expression",
+    decision_id: "turn-calculator-blocked-authority:decision:solve_expression",
+    capability_key: "scientific-calculator.solve_expression",
+    panel_id: "scientific-calculator",
+    action: "solve_expression",
+    status: "blocked",
+    produced_artifact_refs: ["ask:calculator:blocked-expression"],
+    observation_summary: "Calculator gateway blocked expression: unsupported_expression_syntax.",
+    receipts: [],
+    missing_requirements: [{
+      code: "unsupported_expression_syntax",
+      message: "Provide a simple arithmetic expression using numbers and arithmetic operators only.",
+      repair_action: "ask_user",
+      rejected_expression: "explain why receipts matter",
+      normalized_expression: "explain why receipts matter",
+      required_affordance_kind: "bound_calculator_expression",
+    }],
+    state_delta: {},
+    suggested_next_steps: ["repair"],
+    produced_affordances: [{
+      kind: "calculator_result",
+      status: "blocked",
+      terminal_eligible: false,
+      assistant_answer: false,
+    }],
+    consumed_affordances: [{
+      kind: "bound_calculator_expression",
+      status: "missing",
+      missing_inputs: ["bound_calculator_expression"],
+      terminal_eligible: false,
+      assistant_answer: false,
+    }],
+    typed_handoff_contract: {
+      schema: "helix.workstation_typed_handoff_contract.v1",
+      producer_capability: "scientific-calculator.solve_expression",
+      consumer_capability: null,
+      required_affordance_kinds: ["bound_calculator_expression"],
+      produced_affordance_kinds: ["calculator_result"],
+      missing_affordance_kinds: ["bound_calculator_expression"],
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    terminal_eligible: false,
+    post_tool_model_step_required: true,
+    assistant_answer: false,
+    raw_content_included: false,
+  },
+  observation: {
+    schema: "helix.calculator_solve_observation.v1",
+    capability_key: "scientific-calculator.solve_expression",
+    expression: "explain why receipts matter",
+    normalized_expression: "explain why receipts matter",
+    rejected_expression: "explain why receipts matter",
+    result: null,
+    status: "blocked",
+    blocked_reason: "unsupported_expression_syntax",
+    terminal_eligible: false,
+    post_tool_model_step_required: true,
+    assistant_answer: false,
+    raw_content_included: false,
+  },
+  artifact_refs: ["ask:calculator:blocked-expression"],
+  terminal_eligible: false,
+  post_tool_model_step_required: true,
+  assistant_answer: false,
+  raw_content_included: false,
+  error: "unsupported_expression_syntax",
+});
+
 describe("provider terminal authority for capability lanes", () => {
   it("allows a provider terminal candidate only after lane observations are accounted as re-entered evidence", () => {
     const packet = buildLanePacket();
@@ -388,6 +480,39 @@ describe("provider terminal authority for capability lanes", () => {
       terminal_authority_granted: true,
       blockers: [],
       selected_observation_refs: ["ask:scholarly:full-text:recovery"],
+    });
+    expect(result.providerTerminalAuthorityBridge).toMatchObject({
+      all_gateway_calls_succeeded: true,
+      terminal_authority_granted: true,
+      final_answer_source: "agent_provider_terminal_candidate",
+    });
+  });
+
+  it("allows Codex terminal candidates after calculator expression blocks re-enter reasoning", () => {
+    const gatewayResult = buildCalculatorUnsupportedExpressionResult();
+    const result = buildHelixProviderReasoningReentry({
+      runtime: "codex",
+      providerLabel: "Codex Workstation Mode",
+      turnId: "turn-calculator-blocked-authority",
+      threadId: "thread-calculator-blocked-authority",
+      route: "/ask/turn",
+      gatewayCallResults: [gatewayResult as never],
+      normalizedObservationPackets: [gatewayResult.observation_packet],
+      providerText: "The calculator did not produce a result because the requested expression was prose, not a bound arithmetic expression.",
+      ok: true,
+      solverCompleted: true,
+      goalSatisfied: true,
+    });
+
+    expect(result.providerReasoningReentry).toMatchObject({
+      status: "completed",
+      evidence_reentered: true,
+      post_tool_model_step_required: false,
+    });
+    expect(result.terminalAuthorityCandidateReview).toMatchObject({
+      terminal_authority_granted: true,
+      blockers: [],
+      selected_observation_refs: ["ask:calculator:blocked-expression"],
     });
     expect(result.providerTerminalAuthorityBridge).toMatchObject({
       all_gateway_calls_succeeded: true,

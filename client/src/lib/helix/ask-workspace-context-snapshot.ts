@@ -190,13 +190,24 @@ export function buildAskTurnWorkspaceContextSnapshotFromState(
       Boolean(activeCalculatorContext.last_result_text) ||
       calculatorRecentDebugEvents.length > 0
     ),
+    active_panel: activePanel,
     activeDocPath: currentPath,
+    active_doc_path: currentPath,
     source: docContextSource,
     hasDocContext: Boolean(currentPath),
+    has_doc_context: Boolean(currentPath),
     docContextValid: Boolean(currentPath),
+    doc_context_valid: Boolean(currentPath),
     docContextPath: currentPath,
+    doc_context_path: currentPath,
     docContextSource: currentPath ? docContextSource : null,
+    doc_context_source: currentPath ? docContextSource : null,
     docContextFailureReason: currentPath
+      ? null
+      : activePanel === "docs-viewer"
+        ? "docs_panel_open_without_active_doc_path"
+        : "no_docs_panel_or_active_doc_path",
+    doc_context_failure_reason: currentPath
       ? null
       : activePanel === "docs-viewer"
         ? "docs_panel_open_without_active_doc_path"

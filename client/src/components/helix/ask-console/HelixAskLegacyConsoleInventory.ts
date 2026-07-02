@@ -22,10 +22,10 @@ export const HELIX_ASK_LEGACY_CONSOLE_ACTIVE_PATH = [
 
 export const HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT = {
   file: "client/src/components/helix/HelixAskPill.tsx",
-  lineCountAtInventory: 27029,
-  exportedComponentStartsAtLine: 8479,
-  liveRenderSliceStartsAtLine: 26411,
-  liveLegacyConsoleViewStartsAtLine: 26426,
+  lineCountAtInventory: 26666,
+  exportedComponentStartsAtLine: 8107,
+  liveRenderSliceStartsAtLine: 26046,
+  liveLegacyConsoleViewStartsAtLine: 26061,
   inventoryReason:
     "The active bridge still imports the whole legacy file, but the visible console render path is concentrated near the bottom and now enters the recrowned legacy console view before composing recrowned ask-console display owners.",
 } as const;
@@ -263,6 +263,13 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
       "Deterministic visual-input, pasted-text resume recall, and explicit pasted-text attachment prompt predicates moved to ask-attachment-prompt-policy with tests while route metadata, source admission authority, attachment payload authority, request submission, active-doc context, and terminal authority remain in the bridge.",
   },
   {
+    key: "backend_entrypoint_route_metadata_policy",
+    classification: "behavior_sensitive_recrowned_with_parity",
+    source: "ask-console",
+    evidence:
+      "Deterministic hard backend-entrypoint family detection, pasted-text recall route metadata shaping, and hard tool-family route metadata shaping moved to HelixAskBackendEntrypointPolicy with tests while source admission behavior, turn submission, runtime transport, and terminal authority remain in the bridge.",
+  },
+  {
     key: "visual_evidence_summary_readers",
     classification: "behavior_sensitive_recrowned_with_parity",
     source: "lib/helix",
@@ -379,14 +386,14 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
     classification: "behavior_sensitive_recrowned_with_parity",
     source: "ask-console",
     evidence:
-      "Deterministic visible-final text selection for copy/read-aloud controls and local debug-copy payload selection moved to HelixAskLegacyTurnControls with tests while clipboard writes, backend debug-export materialization, selected debug state, drawer mutation, and TTS execution remain in the bridge.",
+      "Deterministic visible-final text selection for copy/read-aloud controls, final-answer copy text selection, and local debug-copy payload selection moved to HelixAskLegacyTurnControls with tests while clipboard writes, backend debug-export materialization, selected debug state, drawer mutation, and TTS execution remain in the bridge.",
   },
   {
     key: "legacy_debug_export_backend_target_selection",
     classification: "behavior_sensitive_recrowned_with_parity",
     source: "ask-console",
     evidence:
-      "Deterministic backend debug-export ref eligibility and matching backend target selection moved to HelixAskLegacyTurnControls with tests while fetch, backend debug-export materialization, authoritative payload merging, drawer mutation, clipboard writes, and TTS execution remain in the bridge.",
+      "Deterministic backend debug-export ref eligibility, matching backend target selection, selected debug turn-id resolution, clicked-button payload mismatch guarding, and clicked DOM turn-scope extraction with stale-attribute visible-row veto moved to HelixAskLegacyTurnControls with tests while backend debug-export materialization/fetch, authoritative payload merging, drawer mutation, clipboard writes, and TTS execution remain in the bridge.",
   },
   {
     key: "legacy_turn_control_button_state_projection",
@@ -401,6 +408,13 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
     source: "ask-console",
     evidence:
       "Deterministic debug drawer state and copy-result-to-drawer projection moved to HelixAskDebugDrawerState with tests while clipboard writes, backend debug-export materialization/fetch, window debug globals, selected drawer React state mutation, and copied-id timers remain in the bridge.",
+  },
+  {
+    key: "legacy_response_capsule_and_debug_clipboard_adapter",
+    classification: "behavior_sensitive_recrowned_with_parity",
+    source: "ask-console",
+    evidence:
+      "Plain final-answer, context-capsule, and prepared debug JSON clipboard write/readback plus textarea fallback moved to HelixAskClipboard with tests while debug-copy payload materialization, backend debug-export fetch, drawer mutation, copied-id timers, and TTS execution remain in the bridge.",
   },
   {
     key: "doc_viewer_snapshot_path_resolution",
@@ -435,7 +449,14 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
     classification: "behavior_sensitive_recrowned_with_parity",
     source: "lib/helix",
     evidence:
-      "Deterministic Ask turn workspace context snapshot shaping moved to ask-workspace-context-snapshot with tests preserving active panel, doc context fields, calculator context clipping, note context clipping, Situation Room context passthrough, clipboard-panel detection, and injected timestamp while layout/notes/calculator/Situation Room store reads, active-doc path resolution, Date.now, request-envelope construction, source admission, and route metadata remain in the bridge.",
+      "Deterministic Ask turn workspace context snapshot shaping moved to ask-workspace-context-snapshot with tests preserving active panel, camelCase and snake_case active-doc identity fields, calculator context clipping, note context clipping, Situation Room context passthrough, clipboard-panel detection, and injected timestamp while layout/notes/calculator/Situation Room store reads, active-doc path resolution, Date.now, source admission, route metadata, and turn submission remain in the bridge.",
+  },
+  {
+    key: "active_doc_backend_payload_binding",
+    classification: "behavior_sensitive_recrowned_with_parity",
+    source: "ask-console",
+    evidence:
+      "Deterministic backend turn payload shaping now includes top-level doc_path and active_doc_path derived from the recrowned active-doc context files in HelixAskRequestEnvelope with tests while URL/store reads, source admission, route metadata, and turn submission remain in the bridge.",
   },
   {
     key: "request_and_stream_lifecycle",
@@ -449,14 +470,14 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
     classification: "behavior_sensitive_quarantined",
     source: "HelixAskPill.tsx",
     evidence:
-      "Docs-viewer URL/store reads, last-known cache mutation, active current-path reads, layout/notes/calculator/Situation Room store reads, Date.now, route metadata, and request-envelope handoff remain behavior-sensitive after deterministic doc debug snapshot projection, doc snapshot path priority, deictic anchor-path resolution, workstation layout debug snapshot projection, and Ask turn workspace context snapshot shaping were recrowned; HASK-BSQ-001 handoff behavior still needs parity proof.",
+      "Docs-viewer URL/store reads, last-known cache mutation, active current-path reads, layout/notes/calculator/Situation Room store reads, Date.now, route metadata, and turn submission remain behavior-sensitive after deterministic doc debug snapshot projection, doc snapshot path priority, deictic anchor-path resolution, workstation layout debug snapshot projection, Ask turn workspace context snapshot shaping, and backend doc_path/active_doc_path payload binding were recrowned; HASK-BSQ-001 still needs live browser parity proof.",
   },
   {
     key: "latest_debug_copy_and_read_aloud_binding",
     classification: "behavior_sensitive_quarantined",
     source: "HelixAskPill.tsx",
     evidence:
-      "Clipboard writes, backend debug-export materialization/fetch, rendered-button fallback construction, selected debug state, drawer mutation, click handlers, copied-id timers, window debug globals, and TTS execution still bind from legacy state after pure target/backend-ref/button-state/drawer-state selection was moved.",
+      "Backend debug-export materialization/fetch, rendered-button fallback construction, selected debug state, drawer mutation, click handlers, copied-id timers, window debug globals, and TTS execution still bind from legacy state after pure target/backend-ref/debug-turn-id/button-state/drawer-state/DOM scope selection plus final-answer/context-capsule/prepared-debug clipboard writes were moved; clicked Debug copy now has a regression guard so visible row text can veto stale button turn attributes before backend export fetch/copy.",
   },
   {
     key: "voice_capture_and_command_runtime",

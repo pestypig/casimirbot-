@@ -50,10 +50,10 @@ const hasCitationCue = (promptText: string): boolean =>
   /\b(?:cite|cites|cited|citing|cited\s+by|citations?|references?|bibliograph(?:y|ies)|bibtex|journal\s+references?|reference\s+list|corroborat(?:e|es|ed|ing|ion)|source[-\s]?bound)\b/i.test(promptText);
 
 const hasPaperCorpusCue = (promptText: string): boolean =>
-  /\b(?:scholarly\s+research|research[-\s]+papers?|paper\s+metadata|journal\s+(?:article|articles|paper|papers)|peer[-\s]?reviewed|literature|preprints?|scholarly\s+(?:papers?|articles?|sources?))\b/i.test(promptText);
+  /\b(?:scholarly\s+research|research[-\s]+papers?|research[-\s]+paper\s+evidence|paper[-\s]+backed|paper\s+metadata|journal\s+(?:article|articles|paper|papers)|peer[-\s]?reviewed|literature|preprints?|scholarly\s+(?:papers?|articles?|sources?))\b/i.test(promptText);
 
 export const hasScholarlyFullTextCue = (promptText: string): boolean =>
-  /\b(?:pdfs?|full[-\s]?text|paper\s+text|article\s+text|extract\s+(?:text|sections?|passages?|chunks?)|read\s+(?:the\s+)?(?:paper|pdf|article)|pages?|page\s+images?|figures?|tables?|equations?|methods?|results?|discussion|conclusion)\b/i.test(promptText);
+  /\b(?:pdfs?|full[-\s]?text|paper\s+text|article\s+text|paper[-\s]+backed\s+(?:numeric|numerical|formula|variable|calculator)|research[-\s]+paper\s+(?:numeric|numerical|formula|variable)\s+evidence|source[-\s]backed\s+(?:numeric|numerical|expression|calculator)|formula\s+(?:variable\s+)?binding|bind\s+(?:the\s+)?(?:formula\s+)?variables?|calculator\s+binding|extract\s+(?:text|sections?|passages?|chunks?)|read\s+(?:the\s+)?(?:paper|pdf|article)|pages?|page\s+images?|figures?|tables?|equations?|methods?|results?|discussion|conclusion)\b/i.test(promptText);
 
 const isExplanatoryOnlyPrompt = (promptText: string): boolean =>
   /\b(?:what\s+is|what\s+are|what\s+does|explain|describe|tell\s+me)\b[\s\S]{0,120}\b(?:doi|arxiv|crossref|openalex|semantic\s+scholar|citation|reference|journal)\b/i.test(promptText) &&

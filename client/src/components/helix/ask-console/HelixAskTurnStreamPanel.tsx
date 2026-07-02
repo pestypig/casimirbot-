@@ -29,6 +29,8 @@ export type HelixAskTurnStreamPanelProps = {
   finalAnswerSourceLabel: string;
   backendTerminalAnswer?: string | null;
   finalAnswerAuthority: "terminal" | "receipt_fallback_not_reviewed";
+  replyId?: string | null;
+  activeTurnId?: string | null;
   answerTint?: HelixAskTurnStreamAnswerTint | null;
   actualAgentProviderLabel?: string | null;
   actualAgentModelLabel?: string | null;
@@ -65,6 +67,8 @@ export function HelixAskTurnStreamPanel({
   finalAnswerSourceLabel,
   backendTerminalAnswer,
   finalAnswerAuthority,
+  replyId,
+  activeTurnId,
   answerTint,
   actualAgentProviderLabel,
   actualAgentModelLabel,
@@ -177,6 +181,13 @@ export function HelixAskTurnStreamPanel({
                       onCopyFinal={onCopyFinal}
                       onDebugCopy={onDebugCopy}
                       onReadAloud={onReadAloud}
+                      debugScope={{
+                        activeTurnId,
+                        clientTurnId: replyId,
+                        question: rows.find((candidate) => candidate.source === "question")?.text ?? null,
+                        finalAnswer: finalAnswerRawText,
+                        terminalArtifactKind: finalAnswerSourceLabel,
+                      }}
                       showDebugCopy={showDebugCopy}
                       debugCopyDisabled={debugCopyDisabled}
                       copyFinalTestId={copyFinalTestId}

@@ -173,10 +173,16 @@ export {
   buildHelixAskConsoleRequestEnvelope,
 } from "./HelixAskRequestEnvelope";
 export {
+  copyHelixAskContextCapsuleToClipboard,
+  copyHelixAskDebugJsonToClipboard,
+  copyHelixAskPlainTextToClipboard,
+} from "./HelixAskClipboard";
+export {
   HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE,
   HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT,
   HELIX_ASK_ENTRYPOINT_GUARD_VERSION,
   buildHelixAskHardBackendEntrypointRouteMetadata,
+  buildHelixAskPastedTextResumeRecallRouteMetadata,
   requiresHelixAskBackendEntrypoint,
   resolveHelixAskBackendEntrypointFamily,
   shouldUseHelixAskBackendTurnEntrypoint,
@@ -204,6 +210,7 @@ export {
   resolveHelixAskLatestTurnId,
 } from "./HelixAskLatestTurnBinding";
 export {
+  buildHelixAskReplyCopyText,
   buildHelixAskLegacyTurnControlViewModel,
   isHelixAskLegacyBackendDebugExportEligibleTurnId,
   resolveHelixAskLegacyDebugExportBackendTarget,

@@ -205,6 +205,38 @@ export function shouldUseHelixAskBackendTurnEntrypoint(args: {
   return args.manualCanaryEnabled || args.hardBackendEntrypointRequired;
 }
 
+export function buildHelixAskPastedTextResumeRecallRouteMetadata(args: {
+  base?: HelixAskRouteMetadata;
+  turnId: string;
+  threadId: string;
+}): HelixAskRouteMetadata {
+  return {
+    ...(args.base ?? {}),
+    schema: "helix.ask.route_metadata.v1",
+    source: "conversation_memory_recall",
+    sourceTarget: "conversation_memory",
+    source_target_intent: {
+      schema: "helix.ask_source_target_intent.v1",
+      turn_id: args.turnId,
+      thread_id: args.threadId,
+      target_source: "conversation_memory",
+      target_kind: "conversation_memory",
+      strength: "hard",
+      explicit_cues: ["pasted_text_resume_recall"],
+      reasons: ["pasted_text_resume_recall_prompt"],
+      requested_outputs: ["conversation_memory_answer"],
+      suppressed_routes: ["conversation:simple", "model_only_concept", "workspace_diagnostic"],
+      precedence_reason: "pasted_text_resume_recall_selected",
+      must_enter_backend_ask: true,
+      allow_client_shortcut: false,
+      allow_no_tool_direct: false,
+      confidence: 0.96,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+  };
+}
+
 export function buildHelixAskHardBackendEntrypointRouteMetadata(args: {
   question: string;
   base?: HelixAskRouteMetadata;

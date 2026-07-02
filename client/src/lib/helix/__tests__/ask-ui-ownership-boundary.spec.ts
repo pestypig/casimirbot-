@@ -507,7 +507,8 @@ describe("Helix Ask UI ownership boundaries", () => {
 
     expect(map).toContain("ask-doc-viewer-context.ts");
     expect(map).toContain("ask-workspace-context-snapshot.ts");
-    expect(map).toContain("HASK-BSQ-001 handoff behavior still needs parity proof");
+    expect(map).toContain("top-level `doc_path` and `active_doc_path` from active doc context files");
+    expect(map).toContain("HASK-BSQ-001 still needs live browser parity proof");
     expect(pill).toContain('from "@/lib/helix/ask-doc-viewer-context"');
     for (const symbol of [
       "normalizeDocsViewerAnchorPath",
@@ -536,8 +537,14 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(pill).toContain("rememberDocViewerPathForAskSnapshot(state.currentPath)");
     expect(pill).not.toContain("recentCount: Array.isArray(state.recent)");
     expect(workspaceSnapshot).toContain("export function buildAskTurnWorkspaceContextSnapshotFromState");
+    expect(workspaceSnapshot).toContain("active_doc_path: currentPath");
+    expect(workspaceSnapshot).toContain("doc_context_path: currentPath");
     expect(pill).toContain("buildWorkstationLayoutDebugSnapshotFromState(state)");
     expect(pill).toContain("buildAskTurnWorkspaceContextSnapshotFromState({");
+    expect(pill).toContain("buildHelixAskConsoleBackendTurnPayloadCore");
+    const requestEnvelope = read("client/src/components/helix/ask-console/HelixAskRequestEnvelope.ts");
+    expect(requestEnvelope).toContain("doc_path: activeDocPath");
+    expect(requestEnvelope).toContain("active_doc_path: activeDocPath");
     expect(pill).toContain("useWorkstationLayoutStore.getState()");
     expect(pill).toContain("useWorkstationNotesStore.getState()");
     expect(pill).toContain("useScientificCalculatorStore.getState()");
@@ -598,20 +605,31 @@ describe("Helix Ask UI ownership boundaries", () => {
     const requestDisplayOwners = [docsContext, outputCleanup, terminalProjection, valueNormalization];
 
     expect(map).toContain("Ask request construction and attachment admission");
-    expect(map).toContain("deterministic backend-entrypoint family detection and hard route metadata");
-    expect(map).toContain("request envelope, source admission authority");
+    expect(map).toContain("deterministic backend-entrypoint family detection, pasted-text recall route metadata, and hard route metadata");
+    expect(map).toContain("top-level `doc_path` and `active_doc_path` from active doc context files");
+    expect(map).toContain("Source admission authority");
     for (const symbol of [
       "buildHelixAskPastedTextResumeRecallRouteMetadata",
-      "resolveHelixAskHardBackendEntrypointFamily",
+      "resolveHelixAskBackendEntrypointFamily",
+    ]) {
+      expect(backendEntrypointPolicy).toContain(`export function ${symbol}`);
+      expect(map).toContain(symbol);
+      expect(pill).not.toContain(`function ${symbol}`);
+      expect(pill).not.toContain(`const ${symbol}`);
+      for (const owner of requestDisplayOwners) {
+        expect(owner).not.toContain(symbol);
+      }
+    }
+    expect(backendEntrypointPolicy).toContain("export function buildHelixAskHardBackendEntrypointRouteMetadata");
+    expect(pill).not.toContain("resolveHelixAskHardBackendEntrypointFamily");
+    expect(pill).not.toContain("type HelixAskHardBackendEntrypointFamily");
+    for (const symbol of [
       "buildHelixAskHardBackendEntrypointRouteMetadata",
       "buildQueuedAskTurn",
       "buildAskTurnWorkspaceContextSnapshot",
     ]) {
       expect(pill).toContain(symbol);
       expect(map).toContain(symbol);
-      if (symbol === "buildHelixAskHardBackendEntrypointRouteMetadata") {
-        expect(backendEntrypointPolicy).toContain(`export function ${symbol}`);
-      }
       for (const owner of requestDisplayOwners) {
         expect(owner).not.toContain(symbol);
       }
@@ -719,12 +737,13 @@ describe("Helix Ask UI ownership boundaries", () => {
     const pill = read("client/src/components/helix/HelixAskPill.tsx");
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
     const debugExport = read("client/src/lib/agi/debugExport.ts");
+    const clipboard = read("client/src/components/helix/ask-console/HelixAskClipboard.ts");
 
     for (const localSymbol of [
       "buildReplyMasterEventClockExport",
-      "extractHelixRenderedTurnDebugFromButton",
       "debugPayloadMatchesRenderedReply",
       "debugPayloadMatchesRenderedTurnPayload",
+      "enforceDebugExportMatchesClickedButton",
       "normalizeReplyMasterDebugPayload",
       "buildClientProjectionDebugFields",
       "copyHelixRailCriticalDebugFieldsForUi",
@@ -740,14 +759,39 @@ describe("Helix Ask UI ownership boundaries", () => {
     }
     const controls = read("client/src/components/helix/ask-console/HelixAskLegacyTurnControls.ts");
     for (const recrownedSymbol of [
+      "buildHelixAskReplyCopyText",
       "isHelixAskLegacyBackendDebugExportEligibleTurnId",
       "resolveHelixAskLegacyDebugExportBackendTarget",
+      "selectHelixAskLegacyGuardedDebugExportPayload",
+      "extractHelixAskLegacyClickedTurnDebugScope",
     ]) {
       expect(pill).toContain(recrownedSymbol);
       expect(controls).toContain(`export function ${recrownedSymbol}`);
       expect(map).toContain(recrownedSymbol);
       expect(debugExport).not.toContain(recrownedSymbol);
     }
+    expect(pill).toContain(
+      "export function buildHelixAskReplyCopyText(reply: HelixAskReply): string {\n  return buildRecrownedHelixAskReplyCopyText(reply);\n}",
+    );
+    expect(pill).toContain("copyRecrownedHelixAskPlainTextToClipboard");
+    expect(pill).toContain(
+      "export async function copyHelixAskPlainTextToClipboard(text: string): Promise<boolean> {\n  return copyRecrownedHelixAskPlainTextToClipboard(text);\n}",
+    );
+    expect(clipboard).toContain("export async function copyHelixAskPlainTextToClipboard");
+    expect(clipboard).toContain("export async function copyHelixAskContextCapsuleToClipboard");
+    expect(clipboard).toContain("export async function copyHelixAskDebugJsonToClipboard");
+    expect(clipboard).toContain("buildContextCapsuleCopyText(summary)");
+    expect(clipboard).toContain("hashDebugExportText(json)");
+    expect(clipboard).toContain("navigator.clipboard.writeText");
+    expect(clipboard).toContain("document.execCommand(\"copy\")");
+    expect(clipboard).not.toContain("copyDebugPayloadToClipboard");
+    expect(clipboard).not.toContain("resolveAuthoritativeDebugExportPayload");
+    expect(pill).toContain("return copyHelixAskDebugJsonToClipboard(json);");
+    expect(pill).toContain("copyHelixAskContextCapsuleToClipboard(reply.contextCapsule)");
+    expect(pill).not.toContain("buildContextCapsuleCopyText(reply.contextCapsule)");
+    expect(map).toContain("Plain final-answer, context-capsule, and prepared debug JSON clipboard write/readback plus textarea fallback are recrowned");
+    expect(controls).toContain("resolveHelixVisibleTerminal(reply, fallbackContent)");
+    expect(controls).toContain("formatEnvelopeSectionsForCopy");
     expect(pill).not.toContain("const hashDebugExportText =");
     expect(pill).toContain("hashDebugExportText");
     expect(pill).toContain("buildHelixAskDebugDrawerCopyProjection");
@@ -765,7 +809,9 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(debugExport).toContain("buildHelixDebugExportEnvelopeFromMasterPayload");
     expect(map).toContain("buildHelixDebugExportEnvelopeFromMasterPayload");
     expect(map).toContain("rendered-button turn matching");
+    expect(map).toContain("final clicked-button payload mismatch guarding");
     expect(map).toContain("final-answer copy text selection");
+    expect(map).toContain("Final-answer copy text selection is recrowned");
   });
 
   it("keeps rendered-button debug copy scoped to the matched reply turn only", () => {
@@ -776,6 +822,8 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(pill).toContain("debug: renderedMatchesReply ? reply.debug ?? null : null");
     expect(pill).toContain("active_turn_id: renderedMatchesReply ? activeTurnId : null");
     expect(pill).toContain("const activeTurnId = resolveHelixAskReplyDebugTurnId(reply)");
+    expect(pill).toContain("const selectedDebugTurnId = resolveHelixAskReplyDebugTurnId(args.reply)");
+    expect(pill).toContain("client_active_turn_id: clientSelectedDebugTurnId");
     expect(pill).toContain(
       "debug_export_ref: renderedMatchesReply ? replyRecord.debug_export_ref ?? replyDebugRecord?.debug_export_ref ?? null : null",
     );
@@ -785,14 +833,30 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(normalizedPill).toContain(
       "const providedPayloadMatchesRenderedTurn =\n          hasProvidedPayload && debugPayloadMatchesRenderedTurnPayload(payload, sourceElement)",
     );
+    expect(pill).toContain("resolveHelixAskLegacyReplyDebugTurnId as resolveHelixAskReplyDebugTurnId");
     expect(pill).toContain("selectHelixAskLegacyDebugCopyLocalPayload");
+    expect(pill).toContain("selectHelixAskLegacyGuardedDebugExportPayload");
+    expect(pill).toContain("extractHelixAskLegacyClickedTurnDebugScope(sourceElement)");
+    expect(pill).not.toContain("function extractHelixRenderedTurnDebugFromButton");
+    expect(pill).not.toContain("function resolveHelixAskReplyDebugTurnId");
     expect(pill).toContain("buildReplyScopedDebugExportFromRenderedButton(");
     expect(pill).toContain("resolveAuthoritativeDebugExportPayload(localExportPayload)");
     const controls = read("client/src/components/helix/ask-console/HelixAskLegacyTurnControls.ts");
     expect(controls).toContain("selectHelixAskLegacyDebugCopyLocalPayload");
+    expect(controls).toContain("selectHelixAskLegacyGuardedDebugExportPayload");
+    expect(controls).toContain("export function extractHelixAskLegacyClickedTurnDebugScope");
+    expect(controls).toContain("export function resolveHelixAskLegacyReplyDebugTurnId");
+    expect(controls).toContain("readTurnScopeAttribute(\"data-turn-control-question\", \"data-debug-copy-question\")");
+    expect(controls).toContain(
+      "readTurnScopeAttribute(\"data-turn-control-active-turn-id\", \"data-debug-copy-active-turn-id\")",
+    );
+    expect(controls).toContain("staleAttributeMismatch");
     expect(controls).not.toContain("buildReplyScopedDebugExportFromRenderedButton");
     expect(controls).not.toContain("resolveAuthoritativeDebugExportPayload");
     expect(controls).not.toContain("copyDebugPayloadToClipboard");
+    const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
+    expect(map).toContain("selected debug turn-id resolution with UI reply-id fallback");
+    expect(map).toContain("shared `data-turn-control-*` / `data-debug-copy-*` scope");
   });
 
   it("keeps agent runtime provider display helpers in the non-React runtime display module", () => {
@@ -2013,7 +2077,6 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(pill).not.toContain('const HELIX_ASK_PROGRESS_PLACEHOLDER_TEXT = "Reasoning in progress..."');
     expect(debugDisplay).toContain('export const HELIX_ASK_PROGRESS_PLACEHOLDER_TEXT = "Reasoning in progress..."');
     for (const localAnchor of [
-      "extractHelixRenderedTurnDebugFromButton",
       "buildReplyScopedDebugExportFromRenderedButton",
       "buildHelixDebugExportEnvelopeFromMasterPayload",
       "resolveAuthoritativeDebugExportPayload",
@@ -2024,6 +2087,8 @@ describe("Helix Ask UI ownership boundaries", () => {
       expect(pill).toContain(`function ${localAnchor}`);
       expect(debugDisplay).not.toContain(localAnchor);
     }
+    expect(pill).not.toContain("function extractHelixRenderedTurnDebugFromButton");
+    expect(pill).toContain("extractHelixAskLegacyClickedTurnDebugScope");
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
     expect(map).toContain("Debug context summary projection");
     expect(map).toContain("buildHelixAskDebugContextSummary");

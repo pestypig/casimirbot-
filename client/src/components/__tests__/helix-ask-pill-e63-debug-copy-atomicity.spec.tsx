@@ -63,14 +63,26 @@ describe("Helix Ask E63 debug copy atomicity", () => {
       path.resolve(process.cwd(), "client/src/components/helix/HelixAskPill.tsx"),
       "utf8",
     );
+    const controlsSource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/components/helix/ask-console/HelixAskLegacyTurnControls.ts"),
+      "utf8",
+    );
 
     expect(source).toContain("replyMasterEventClockPayload = buildReplyMasterEventClockExport");
     expect(source).toMatch(/handleCopyReplyMasterDebug\(\s*reply,\s*replyMasterEventClockPayload/);
     expect(source).toContain("const hasProvidedPayload = typeof payload === \"string\" && payload.trim().length > 0");
     expect(source).toContain("const providedPayloadMatchesRenderedTurn =");
-    expect(source).toContain("const localExportPayload = providedPayloadMatchesRenderedTurn");
-    expect(source).toContain(": buildReplyScopedDebugExportFromRenderedButton");
-    expect(source).toContain("isRenderedDomProjectionWithoutTurn ? \"\" : reply.id");
+    expect(source).toContain("selectHelixAskLegacyDebugCopyLocalPayload({");
+    expect(source).toContain("const renderedButtonScopedPayload = buildReplyScopedDebugExportFromRenderedButton(");
+    expect(source).toContain("renderedButtonScopedPayload,");
+    expect(source).toContain("extractHelixAskLegacyClickedTurnDebugScope(sourceElement)");
+    expect(controlsSource).toContain("readTurnScopeAttribute(\"data-turn-control-question\", \"data-debug-copy-question\")");
+    expect(controlsSource).toContain(
+      "readTurnScopeAttribute(\"data-turn-control-active-turn-id\", \"data-debug-copy-active-turn-id\")",
+    );
+    expect(controlsSource).toContain("staleAttributeMismatch");
+    expect(source).toContain("resolveAuthoritativeDebugExportPayload(localExportPayload)");
+    expect(source).toContain("enforceDebugExportMatchesClickedButton({");
   });
 
   it("preserves rail-critical fields when debug copy compacts an oversized payload", async () => {

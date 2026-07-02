@@ -99,6 +99,13 @@ should point Codex toward sources that can bind the formula variables, such as
 D-T fusion ion density, cross section, relative velocity, or
 Maxwellian-averaged `sigma v` tables.
 
+Prompts that ask for a Theory Badge Graph formula plus `paper-backed`,
+`research-paper`, `source-backed`, or `calculator binding` numeric evidence
+should enter this scholarly lookup lane before any docs-search or calculator
+lane. The first lookup remains a metadata observation. If it cannot identify a
+relevant source, it must return the relevance gate and recovery affordance so
+Codex can choose the next retrieval step after re-entry.
+
 ## Host Projection
 
 Allowed metadata:

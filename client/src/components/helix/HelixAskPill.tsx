@@ -65,10 +65,16 @@ import {
   buildHelixAskConsoleContextFiles,
 } from "@/components/helix/ask-console/HelixAskRequestEnvelope";
 import {
+  copyHelixAskContextCapsuleToClipboard,
+  copyHelixAskDebugJsonToClipboard,
+  copyHelixAskPlainTextToClipboard as copyRecrownedHelixAskPlainTextToClipboard,
+} from "@/components/helix/ask-console/HelixAskClipboard";
+import {
   HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE as RECROWNED_HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE,
   HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT as RECROWNED_HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT,
   HELIX_ASK_ENTRYPOINT_GUARD_VERSION as RECROWNED_HELIX_ASK_ENTRYPOINT_GUARD_VERSION,
   buildHelixAskHardBackendEntrypointRouteMetadata as buildRecrownedHelixAskHardBackendEntrypointRouteMetadata,
+  buildHelixAskPastedTextResumeRecallRouteMetadata,
   requiresHelixAskBackendEntrypoint as recrownedRequiresHelixAskBackendEntrypoint,
   shouldUseHelixAskBackendTurnEntrypoint as recrownedShouldUseHelixAskBackendTurnEntrypoint,
 } from "@/components/helix/ask-console/HelixAskBackendEntrypointPolicy";
@@ -76,9 +82,13 @@ import { readDocPathFromDesktopUrl } from "@/components/helix/ask-console/HelixA
 import { buildHelixAskLatestTurnBinding } from "@/components/helix/ask-console/HelixAskLatestTurnBinding";
 import {
   buildHelixAskLegacyTurnControlViewModel,
+  buildHelixAskReplyCopyText as buildRecrownedHelixAskReplyCopyText,
+  extractHelixAskLegacyClickedTurnDebugScope,
   isHelixAskLegacyBackendDebugExportEligibleTurnId,
   resolveHelixAskLegacyDebugExportBackendTarget,
+  resolveHelixAskLegacyReplyDebugTurnId as resolveHelixAskReplyDebugTurnId,
   resolveHelixAskLegacyTurnControlText,
+  selectHelixAskLegacyGuardedDebugExportPayload,
   selectHelixAskLegacyDebugCopyLocalPayload,
 } from "@/components/helix/ask-console/HelixAskLegacyTurnControls";
 import {
@@ -161,6 +171,7 @@ import {
 import { HelixAskDebugDrawer } from "@/components/helix/ask-console/HelixAskDebugDrawer";
 import {
   buildHelixAskDebugDrawerCopyProjection,
+  type HelixAskDebugClipboardCopyResult,
   type HelixAskDebugExportDrawerState,
 } from "@/components/helix/ask-console/HelixAskDebugDrawerState";
 import { HelixAskTurnList } from "@/components/helix/ask-console/HelixAskTurnList";
@@ -347,7 +358,6 @@ import {
   buildAskLiveEventLogExport,
   buildCompactToolTraceDisclosure,
   cleanHelixRenderedFinalAnswerText,
-  cleanHelixRenderedQuestionText,
   formatAskLiveEventLogLine,
   HELIX_ASK_PROGRESS_PLACEHOLDER_TEXT,
   isHelixAskProgressPlaceholderText,
@@ -428,7 +438,6 @@ import {
 } from "@/lib/helix/ask-visual-evidence-readers";
 import {
   SESSION_CAPSULE_CONFIDENCE_LABEL,
-  buildContextCapsuleCopyText,
   resolveContextCapsulePalette,
   stripContextCapsuleTokensFromText,
 } from "@/lib/helix/ask-context-capsule-display";
@@ -453,10 +462,7 @@ export type {
   ContextCapsuleLedgerEntry,
   SessionCapsuleState,
 };
-import {
-  formatEnvelopeSectionsForCopy,
-  normalizeHelixAskEnvelopeCitations,
-} from "@/lib/helix/ask-envelope-copy";
+import { normalizeHelixAskEnvelopeCitations } from "@/lib/helix/ask-envelope-copy";
 import {
   buildDocViewerDebugSnapshotFromState,
   normalizeDocPathForDebugCompare,
@@ -2709,175 +2715,6 @@ type AskContextChooserState = {
 
 const HELIX_ASK_MAX_ATTACHMENTS = 6;
 const HELIX_ASK_LARGE_PASTE_THRESHOLD_CHARS = 2400;
-
-function buildHelixAskPastedTextResumeRecallRouteMetadata(args: {
-  base?: HelixAskRouteMetadata;
-  turnId: string;
-  threadId: string;
-}): HelixAskRouteMetadata {
-  return {
-    ...(args.base ?? {}),
-    schema: "helix.ask.route_metadata.v1",
-    source: "conversation_memory_recall",
-    sourceTarget: "conversation_memory",
-    source_target_intent: {
-      schema: "helix.ask_source_target_intent.v1",
-      turn_id: args.turnId,
-      thread_id: args.threadId,
-      target_source: "conversation_memory",
-      target_kind: "conversation_memory",
-      strength: "hard",
-      explicit_cues: ["pasted_text_resume_recall"],
-      reasons: ["pasted_text_resume_recall_prompt"],
-      requested_outputs: ["conversation_memory_answer"],
-      suppressed_routes: ["conversation:simple", "model_only_concept", "workspace_diagnostic"],
-      precedence_reason: "pasted_text_resume_recall_selected",
-      must_enter_backend_ask: true,
-      allow_client_shortcut: false,
-      allow_no_tool_direct: false,
-      confidence: 0.96,
-      assistant_answer: false,
-      raw_content_included: false,
-    },
-  };
-}
-
-type HelixAskHardBackendEntrypointFamily =
-  | "calculator"
-  | "docs_viewer"
-  | "narrator"
-  | "repo_code"
-  | "workspace_diagnostic"
-  | "internet_search"
-  | "live_pipeline"
-  | "helix_ask"
-  | "visual_capture";
-
-const resolveHelixAskHardBackendEntrypointFamily = (
-  value: string,
-): {
-  family: HelixAskHardBackendEntrypointFamily;
-  sourceTarget: string;
-  targetKind: string;
-  requiredToolFamily: string;
-  selectedCapability: string | null;
-  explicitCue: string;
-  requestedOutputs: string[];
-} | null => {
-  const normalized = value.trim();
-  if (!normalized) return null;
-  if (isQuotedTransformOnlyForEvidenceGate(normalized)) return null;
-  if (/\b(?:scientific-calculator\.solve_expression|scientific-calculator\.solve_with_steps|scientific\s+calculator|calculator_receipt|calculator\s+tool)\b/i.test(normalized)) {
-    return {
-      family: "calculator",
-      sourceTarget: "calculator_stream",
-      targetKind: "calculator_stream",
-      requiredToolFamily: "calculator",
-      selectedCapability: /\bscientific-calculator\.solve_with_steps\b/i.test(normalized)
-        ? "scientific-calculator.solve_with_steps"
-        : "scientific-calculator.solve_expression",
-      explicitCue: "scientific_calculator_solve",
-      requestedOutputs: ["tool_call_eligibility", "calculator_receipt", "typed_failure"],
-    };
-  }
-  if (/\b(?:docs-viewer\.[a-z0-9_.-]+|docs\s+viewer)\b/i.test(normalized)) {
-    const capability = normalized.match(/\bdocs-viewer\.[a-z0-9_.-]+\b/i)?.[0] ?? null;
-    return {
-      family: "docs_viewer",
-      sourceTarget: "docs_viewer",
-      targetKind: "docs_viewer",
-      requiredToolFamily: "docs_viewer",
-      selectedCapability: capability,
-      explicitCue: "docs_viewer_tool_family",
-      requestedOutputs: ["tool_call_eligibility", "doc_evidence", "typed_failure"],
-    };
-  }
-  if (/\b(?:narrator\.[a-z0-9_.-]+|panel[_\s-]?id\s*(?:=|:)\s*narrator)\b/i.test(normalized)) {
-    const explicitAction = normalized.match(/\baction[_\s-]?id\s*(?:=|:)\s*(narrator\.[a-z0-9_.-]+)\b/i)?.[1] ?? null;
-    const capability = explicitAction ?? normalized.match(/\bnarrator\.[a-z0-9_.-]+\b/i)?.[0] ?? null;
-    return {
-      family: "narrator",
-      sourceTarget: "workstation_panel",
-      targetKind: "workstation_state",
-      requiredToolFamily: "narrator",
-      selectedCapability: capability,
-      explicitCue: "narrator_tool_family",
-      requestedOutputs: ["tool_call_eligibility", "workspace_action_receipt", "voice_debug_receipt", "typed_failure"],
-    };
-  }
-  if (/\b(?:repo-code\.[a-z0-9_.-]+|repo_code\.[a-z0-9_.-]+)\b/i.test(normalized)) {
-    const capability = normalized.match(/\b(?:repo-code|repo_code)\.[a-z0-9_.-]+\b/i)?.[0]?.replace(/^repo_code\./i, "repo-code.") ?? null;
-    return {
-      family: "repo_code",
-      sourceTarget: "repo_code",
-      targetKind: "repo_code",
-      requiredToolFamily: "repo_code",
-      selectedCapability: capability,
-      explicitCue: "repo_code_tool_family",
-      requestedOutputs: ["tool_call_eligibility", "repo_code", "line_backed_source", "typed_failure"],
-    };
-  }
-  if (/\b(?:workspace-directory\.[a-z0-9_.-]+|workspace_directory\.[a-z0-9_.-]+|workspace_os\.status)\b/i.test(normalized)) {
-    const rawCapability = normalized.match(/\b(?:workspace-directory|workspace_directory|workspace_os)\.[a-z0-9_.-]+\b/i)?.[0] ?? null;
-    return {
-      family: "workspace_diagnostic",
-      sourceTarget: "workspace_diagnostic",
-      targetKind: "workspace_diagnostic",
-      requiredToolFamily: rawCapability?.startsWith("workspace_os.") ? "workspace_os" : "workspace_directory",
-      selectedCapability: rawCapability?.replace(/^workspace_directory\./i, "workspace-directory.") ?? null,
-      explicitCue: "workspace_diagnostic_tool_family",
-      requestedOutputs: ["tool_call_eligibility", "workspace_observation", "typed_failure"],
-    };
-  }
-  if (/\b(?:internet_search\.[a-z0-9_.-]+|internet\s+search\s+tool)\b/i.test(normalized)) {
-    const capability = normalized.match(/\binternet_search\.[a-z0-9_.-]+\b/i)?.[0] ?? "internet_search.web_research";
-    return {
-      family: "internet_search",
-      sourceTarget: "internet_search",
-      targetKind: "internet_search",
-      requiredToolFamily: "internet_search",
-      selectedCapability: capability,
-      explicitCue: "internet_search_tool_family",
-      requestedOutputs: ["tool_call_eligibility", "web_research_observation", "typed_failure"],
-    };
-  }
-  if (/\blive_env\.[a-z0-9_.-]+\b/i.test(normalized)) {
-    const capability = normalized.match(/\blive_env\.[a-z0-9_.-]+\b/i)?.[0] ?? null;
-    return {
-      family: "live_pipeline",
-      sourceTarget: "live_pipeline",
-      targetKind: "live_pipeline",
-      requiredToolFamily: "live_env",
-      selectedCapability: capability,
-      explicitCue: "live_env_tool_family",
-      requestedOutputs: ["tool_call_eligibility", "live_source_observation", "typed_failure"],
-    };
-  }
-  if (/\bhelix_ask\.[a-z0-9_.-]+\b/i.test(normalized)) {
-    const capability = normalized.match(/\bhelix_ask\.[a-z0-9_.-]+\b/i)?.[0] ?? null;
-    return {
-      family: "helix_ask",
-      sourceTarget: "procedure_memory",
-      targetKind: "procedure_memory",
-      requiredToolFamily: "helix_ask",
-      selectedCapability: capability,
-      explicitCue: "helix_ask_tool_family",
-      requestedOutputs: ["tool_call_eligibility", "procedure_observation", "typed_failure"],
-    };
-  }
-  if (/\b(?:image_lens|visual_capture)\b/i.test(normalized)) {
-    return {
-      family: "visual_capture",
-      sourceTarget: "visual_capture",
-      targetKind: "visual_capture",
-      requiredToolFamily: "visual_capture",
-      selectedCapability: /\bimage_lens\b/i.test(normalized) ? "image_lens.inspect" : "visual_capture.inspect",
-      explicitCue: "visual_capture_tool_family",
-      requestedOutputs: ["tool_call_eligibility", "visual_frame_evidence", "typed_failure"],
-    };
-  }
-  return null;
-};
 
 export function buildHelixAskHardBackendEntrypointRouteMetadata(args: {
   question: string;
@@ -5417,11 +5254,15 @@ function buildReplyMasterEventClockExport(args: {
     selectedFinalAnswer: visibleResolvedTurn.selected_final_answer || visibleAnswerText,
     hasWorkspaceActionReceipt: Boolean(firstWorkspaceActionReceipt),
   });
+  const selectedDebugTurnId = resolveHelixAskReplyDebugTurnId(args.reply);
+  const clientSelectedDebugTurnId = args.reply.id || null;
 
   const payload = {
     schema: "helix.ask.master_event_clock.v2",
     exportedAt: new Date().toISOString(),
-    selectedDebugTurnId: args.reply.id,
+    active_turn_id: selectedDebugTurnId,
+    client_active_turn_id: clientSelectedDebugTurnId,
+    selectedDebugTurnId,
     selectedDebugQuestion: args.reply.question ?? null,
     selectedDebugFinalAnswer: visibleAnswerText,
     selectedDebugTraceIds: [...selectedTraceIds],
@@ -5659,7 +5500,7 @@ function buildReplyScopedDebugExportFromRenderedReply(reply: HelixAskReply, reas
   const suppressVisibleAnswer = isHelixAskProgressPlaceholderText(visibleAnswerText);
   const replyRecord = reply as Record<string, unknown>;
   const activeTurnId = resolveHelixAskReplyDebugTurnId(reply);
-  const clientTurnId = reply.id && reply.id !== activeTurnId ? reply.id : null;
+  const clientTurnId = reply.id || null;
   return buildHelixDebugExportEnvelopeFromMasterPayload(reply, {
     schema: "helix.ask.master_event_clock.v2",
     exportedAt: new Date().toISOString(),
@@ -5730,93 +5571,12 @@ function collectHelixReplyTerminalTranscriptTexts(reply: HelixAskReply): string[
   return dedupeStrings(texts);
 }
 
-function extractHelixRenderedTurnDebugFromButton(sourceElement: HTMLElement | null | undefined): {
-  question: string | null;
-  finalAnswer: string | null;
-  terminalArtifactKind: string | null;
-} | null {
-  if (!sourceElement) return null;
-  let node: HTMLElement | null = sourceElement;
-  for (let depth = 0; node && depth < 10; depth += 1, node = node.parentElement) {
-    const questionNode = node.querySelector<HTMLElement>('[data-stream-row-source="question"], [data-testid="helix-ask-latest-question"]');
-    const finalNode = node.querySelector<HTMLElement>('[data-stream-row-source="final"], [data-testid="helix-ask-latest-final-answer"]');
-    const renderedQuestion = cleanHelixRenderedQuestionText(questionNode?.innerText || questionNode?.textContent || "");
-    const renderedFinalAnswer =
-      cleanHelixRenderedFinalAnswerText(finalNode?.getAttribute("data-final-answer-text")) ??
-      cleanHelixRenderedFinalAnswerText(finalNode?.innerText || finalNode?.textContent || "");
-    if (renderedQuestion || renderedFinalAnswer) {
-      const terminalSource = coerceText(finalNode?.getAttribute("data-visible-terminal-source")).trim();
-      const terminalArtifactKind = /compound evidence synthesis answer/i.test(terminalSource)
-        ? "compound_evidence_synthesis_answer"
-        : /workstation tool evaluation/i.test(terminalSource)
-          ? "workstation_tool_evaluation"
-          : /typed failure/i.test(terminalSource)
-            ? "typed_failure"
-            : /COMPOUND EVIDENCE SYNTHESIS ANSWER/i.test(renderedFinalAnswer || "")
-              ? "compound_evidence_synthesis_answer"
-              : /WORKSTATION TOOL EVALUATION/i.test(renderedFinalAnswer || "")
-                ? "workstation_tool_evaluation"
-                : /TYPED FAILURE/i.test(renderedFinalAnswer || "")
-                  ? "typed_failure"
-                  : null;
-      return { question: renderedQuestion, finalAnswer: renderedFinalAnswer, terminalArtifactKind };
-    }
-    const text = (node.innerText || "").trim();
-    if (!text || !/\bQuestion\b/i.test(text) || !/\bFinal answer\b/i.test(text)) continue;
-    const questionMatch = text.match(/Question\s+QUESTION\s+([\s\S]*?)\s+USER PROMPT/i);
-    const finalMatch = text.match(/Final answer\s+FINAL\s+([\s\S]*?)(?:\s+IN HELIX CONSOLE|\s+\d+\s+Question|\s*$)/i);
-    const question = questionMatch?.[1]?.trim() || null;
-    const finalAnswer = finalMatch?.[1]?.trim() || null;
-    if (!question && !finalAnswer) continue;
-    const terminalArtifactKind = /COMPOUND EVIDENCE SYNTHESIS ANSWER/i.test(finalAnswer || text)
-      ? "compound_evidence_synthesis_answer"
-      : /WORKSTATION TOOL EVALUATION/i.test(finalAnswer || text)
-        ? "workstation_tool_evaluation"
-        : /TYPED FAILURE/i.test(finalAnswer || text)
-          ? "typed_failure"
-          : null;
-    return { question, finalAnswer, terminalArtifactKind };
-  }
-  return null;
-}
-
-function resolveHelixAskReplyDebugTurnId(reply: HelixAskReply): string {
-  const replyRecord = reply as Record<string, unknown>;
-  const replyDebugRecord = readAgentLoopAuditRecord(reply.debug);
-  const resolvedTurnSummary = readAgentLoopAuditRecord(
-    replyRecord.resolved_turn_summary ?? replyDebugRecord?.resolved_turn_summary,
-  );
-  const terminalAuthority = readAgentLoopAuditRecord(
-    replyRecord.terminal_answer_authority ?? replyDebugRecord?.terminal_answer_authority,
-  );
-  const debugExportRef = readAgentLoopAuditRecord(replyRecord.debug_export_ref ?? replyDebugRecord?.debug_export_ref);
-  const backendDebugResponseRef = readAgentLoopAuditRecord(
-    replyRecord.backend_debug_response_ref ?? replyDebugRecord?.backend_debug_response_ref,
-  );
-  const candidates = [
-    replyRecord.turn_id,
-    replyRecord.turnId,
-    replyDebugRecord?.turn_id,
-    replyDebugRecord?.turnId,
-    resolvedTurnSummary?.turn_id,
-    terminalAuthority?.turn_id,
-    debugExportRef?.turn_id,
-    backendDebugResponseRef?.turn_id,
-    reply.id,
-  ];
-  for (const candidate of candidates) {
-    const turnId = coerceText(candidate).trim();
-    if (turnId) return turnId;
-  }
-  return reply.id;
-}
-
 export function buildReplyScopedDebugExportFromRenderedButton(
   reply: HelixAskReply,
   sourceElement: HTMLElement | null | undefined,
   reason: string,
 ): string | null {
-  const rendered = extractHelixRenderedTurnDebugFromButton(sourceElement);
+  const rendered = extractHelixAskLegacyClickedTurnDebugScope(sourceElement);
   if (!rendered || (!rendered.question && !rendered.finalAnswer)) return null;
   const visibleTerminal = resolveHelixAskVisibleTerminal(reply, reply.content);
   const replyTerminalTranscriptTexts = collectHelixReplyTerminalTranscriptTexts(reply);
@@ -5831,8 +5591,9 @@ export function buildReplyScopedDebugExportFromRenderedButton(
     renderedFinalMatchesReply;
   const replyRecord = reply as Record<string, unknown>;
   const replyDebugRecord = renderedMatchesReply ? readAgentLoopAuditRecord(reply.debug) : null;
-  const activeTurnId = resolveHelixAskReplyDebugTurnId(reply);
-  const clientTurnId = reply.id && reply.id !== activeTurnId ? reply.id : null;
+  const renderedClientScopedTurnId = rendered.clientTurnId && (rendered.question || rendered.finalAnswer) ? rendered.clientTurnId : null;
+  const activeTurnId = rendered.activeTurnId || renderedClientScopedTurnId || resolveHelixAskReplyDebugTurnId(reply);
+  const clientTurnId = rendered.clientTurnId || reply.id || null;
   return buildHelixDebugExportEnvelopeFromMasterPayload(reply, {
     schema: "helix.ask.master_event_clock.v2",
     exportedAt: new Date().toISOString(),
@@ -5929,7 +5690,7 @@ export function debugPayloadMatchesRenderedTurnPayload(
   payload: string | null | undefined,
   sourceElement: HTMLElement | null | undefined,
 ): boolean {
-  const rendered = extractHelixRenderedTurnDebugFromButton(sourceElement);
+  const rendered = extractHelixAskLegacyClickedTurnDebugScope(sourceElement);
   if (!rendered) return true;
   const trimmed = typeof payload === "string" ? payload.trim() : "";
   if (!trimmed) return false;
@@ -5968,6 +5729,20 @@ export function debugPayloadMatchesRenderedTurnPayload(
   } catch {
     return false;
   }
+}
+
+function enforceDebugExportMatchesClickedButton(args: {
+  exportPayload: string;
+  clickedButtonScopedPayload: string | null | undefined;
+  sourceElement: HTMLElement | null | undefined;
+}): string {
+  const rendered = extractHelixAskLegacyClickedTurnDebugScope(args.sourceElement);
+  return selectHelixAskLegacyGuardedDebugExportPayload({
+    exportPayload: args.exportPayload,
+    clickedButtonScopedPayload: args.clickedButtonScopedPayload,
+    clickedTurnScope: rendered,
+    payloadMatchesClickedTurn: (payload) => debugPayloadMatchesRenderedTurnPayload(payload, args.sourceElement),
+  });
 }
 
 export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskReply, payload: Record<string, unknown>): string {
@@ -6250,21 +6025,31 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
   const calculatorPanelStateForDebug = readAgentLoopAuditRecord(
     payload.calculator_panel_state ?? debug?.calculator_panel_state ?? agentLoop?.calculator_panel_state,
   );
+  const debugExportRebuildReason = coerceText(payload.debug_export_rebuild_reason).trim();
+  const debugExportSource = coerceText(payload.debug_export_source).trim();
+  const isReplyScopedDebugProjection =
+    debugExportSource === "rendered_reply_dom" ||
+    debugExportRebuildReason === "rendered_button_scope" ||
+    debugExportRebuildReason === "rendered_reply" ||
+    debugExportRebuildReason === "payload_reply_mismatch" ||
+    debugExportRebuildReason === "empty_payload" ||
+    debugExportRebuildReason === "invalid_json_payload";
   const isRenderedDomProjectionWithoutTurn =
-    coerceText(payload.debug_export_source).trim() === "rendered_reply_dom" &&
+    debugExportSource === "rendered_reply_dom" &&
     !coerceText(payload.active_turn_id).trim();
   const activeTurnId =
-    coerceText(agentLoop?.terminal_artifact_owner_turn_id).trim() ||
-    coerceText(debug?.turn_id).trim() ||
+    (isReplyScopedDebugProjection ? coerceText(payload.active_turn_id).trim() : "") ||
+    (!isReplyScopedDebugProjection ? coerceText(agentLoop?.terminal_artifact_owner_turn_id).trim() : "") ||
+    (!isReplyScopedDebugProjection ? coerceText(debug?.turn_id).trim() : "") ||
     coerceText(payload.active_turn_id).trim() ||
     coerceText((reply as Record<string, unknown>).turn_id).trim() ||
     coerceText((reply as Record<string, unknown>).turnId).trim() ||
-    coerceText(canonicalGoalFrame?.turn_id).trim() ||
-    coerceText(turnTruthTable?.turn_id).trim() ||
+    (!isReplyScopedDebugProjection ? coerceText(canonicalGoalFrame?.turn_id).trim() : "") ||
+    (!isReplyScopedDebugProjection ? coerceText(turnTruthTable?.turn_id).trim() : "") ||
     (isRenderedDomProjectionWithoutTurn ? "" : reply.id);
   const canonicalActiveTurnId = coerceText(terminalAuthorityForDebug?.turn_id).trim() || activeTurnId;
-  const clientActiveTurnId = reply.id && reply.id !== canonicalActiveTurnId ? reply.id : null;
-  const activePrompt = reply.question ?? coerceText(payload.selectedDebugQuestion).trim() ?? "";
+  const clientActiveTurnId = coerceText(payload.client_active_turn_id).trim() || reply.id || null;
+  const activePrompt = coerceText(payload.selectedDebugQuestion).trim() || reply.question || "";
   const backendDebugRefPresent = Boolean(
     readAgentLoopAuditRecord(debug?.debug_export_ref) ?? readAgentLoopAuditRecord(payload.debug_export_ref),
   );
@@ -6441,6 +6226,20 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
       ? payload.workspace_action_lifecycle_events
       : [];
   const receiptMessage = coerceText(receipt?.message).trim();
+  const advertisedBackendDebugRefCandidates = [
+    readAgentLoopAuditRecord(debug?.backend_debug_response_ref),
+    readAgentLoopAuditRecord(payload.backend_debug_response_ref),
+    readAgentLoopAuditRecord(debug?.debug_export_ref),
+    readAgentLoopAuditRecord(payload.debug_export_ref),
+  ];
+  const matchingBackendDebugRef = advertisedBackendDebugRefCandidates.find((candidate) => {
+    if (!candidate) return false;
+    const endpoint = coerceText(candidate.endpoint).trim();
+    if (!endpoint.startsWith("/api/agi/ask/turn/")) return false;
+    const candidateTurnId = coerceText(candidate.turn_id).trim();
+    if (!isReplyScopedDebugProjection) return true;
+    return Boolean(candidateTurnId && canonicalActiveTurnId && candidateTurnId === canonicalActiveTurnId);
+  }) ?? null;
   const envelopeWithoutHash = {
     schema: "helix.ask.debug_export.v1",
     exported_at_ms: Date.now(),
@@ -6640,14 +6439,11 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
       debug?.route_reason_code ??
       agentLoop?.route_reason_code ??
       (coerceText(resolvedTurnSummary?.resolved_route_label).trim() || null),
-    backend_debug_response_ref:
-      readAgentLoopAuditRecord(debug?.debug_export_ref) ??
-      readAgentLoopAuditRecord(payload.debug_export_ref) ??
-      undefined,
-    debug_export_source: readAgentLoopAuditRecord(debug?.debug_export_ref) || readAgentLoopAuditRecord(payload.debug_export_ref)
+    backend_debug_response_ref: matchingBackendDebugRef ?? undefined,
+    debug_export_source: matchingBackendDebugRef
       ? "backend_ref_advertised"
       : "client_projection",
-    backend_debug_response_status: readAgentLoopAuditRecord(debug?.debug_export_ref) || readAgentLoopAuditRecord(payload.debug_export_ref)
+    backend_debug_response_status: matchingBackendDebugRef
       ? "ref_advertised"
       : "not_advertised",
     debug_export_anti_determinism_audit: {
@@ -6710,64 +6506,11 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
 }
 
 export function buildHelixAskReplyCopyText(reply: HelixAskReply): string {
-  if (!reply) return "";
-  const terminal = resolveHelixAskVisibleTerminal(reply, reply.content);
-  if (terminal.backendTerminalText && terminal.text) return terminal.text;
-  if (!reply.envelope) return terminal.text || reply.content;
-  const sections = reply.envelope.sections ?? [];
-  const detailSections = sections.filter((section) => section.layer !== "proof");
-  const proofSections = sections.filter((section) => section.layer === "proof");
-  const chunks: string[] = [coerceText(reply.envelope.answer)];
-  const extensionBody = coerceText(reply.envelope.extension?.body).trim();
-  if (extensionBody) {
-    chunks.push(`Additional Repo Context\n${extensionBody}`);
-  }
-  if (detailSections.length > 0) {
-    const detailText = formatEnvelopeSectionsForCopy(detailSections, "Details");
-    if (detailText) {
-      chunks.push(`Details\n${detailText}`);
-    }
-  }
-  if (proofSections.length > 0) {
-    const proofText = formatEnvelopeSectionsForCopy(proofSections, "Proof");
-    if (proofText) {
-      chunks.push(`Proof\n${proofText}`);
-    }
-  }
-  const envelopeText = chunks.filter(Boolean).join("\n\n").trim();
-  return envelopeText || terminal.text || reply.content;
+  return buildRecrownedHelixAskReplyCopyText(reply);
 }
 
 export async function copyHelixAskPlainTextToClipboard(text: string): Promise<boolean> {
-  const value = coerceText(text);
-  if (!value) return false;
-  if (typeof navigator !== "undefined" && typeof navigator.clipboard?.writeText === "function") {
-    try {
-      await navigator.clipboard.writeText(value);
-      if (typeof navigator.clipboard.readText !== "function") return true;
-      const readback = await navigator.clipboard.readText().catch(() => "");
-      if (readback === value) return true;
-    } catch {
-      // Fall through to textarea copy.
-    }
-  }
-  if (typeof document === "undefined") return false;
-  const textarea = document.createElement("textarea");
-  textarea.value = value;
-  textarea.setAttribute("readonly", "true");
-  textarea.style.position = "fixed";
-  textarea.style.left = "-9999px";
-  textarea.style.top = "0";
-  document.body.appendChild(textarea);
-  textarea.focus();
-  textarea.select();
-  try {
-    return document.execCommand("copy");
-  } catch {
-    return false;
-  } finally {
-    textarea.remove();
-  }
+  return copyRecrownedHelixAskPlainTextToClipboard(text);
 }
 
 function normalizeReplyMasterDebugPayload(reply: HelixAskReply, payload: string | null | undefined): string {
@@ -6822,23 +6565,9 @@ function normalizeReplyMasterDebugPayload(reply: HelixAskReply, payload: string 
   }
 }
 
-export type DebugClipboardCopyResult = {
-  ok: boolean;
-  attempted_payload_hash?: string;
-  copied_payload_hash?: string;
-  copied_text_length: number;
-  method: "navigator.clipboard" | "textarea_fallback" | "debug_drawer" | "download_link" | "backend_endpoint" | "failed";
-  readback_match?: "exact" | "unavailable" | "mismatch" | "empty";
-  fallback_presented?: boolean;
-  error?: string;
-};
+export type DebugClipboardCopyResult = HelixAskDebugClipboardCopyResult;
 
 const isBackendAskTurnDebugExportEligibleTurnId = isHelixAskLegacyBackendDebugExportEligibleTurnId;
-
-const waitForDebugClipboardReadback = async (attempt: number): Promise<void> => {
-  const delayMs = [100, 250, 500, 900][Math.min(attempt, 3)] ?? 900;
-  await new Promise((resolve) => globalThis.setTimeout(resolve, delayMs));
-};
 
 function buildClientProjectionDebugFields(localPayload: Record<string, unknown>): Record<string, unknown> {
   const channels = readAgentLoopAuditRecord(localPayload.channels);
@@ -6995,11 +6724,34 @@ async function resolveAuthoritativeDebugExportPayload(localPayload: string): Pro
         backend_debug_response_turn_id: authoritativeTurnId || null,
       });
     }
+    const localPrompt = normalizedDebugReplyText(
+      parsed.selectedDebugQuestion ?? parsed.active_prompt ?? parsed.prompt ?? parsed.user_prompt,
+    );
+    const authoritativePrompt = normalizedDebugReplyText(
+      authoritativePayload.selectedDebugQuestion ??
+        authoritativePayload.active_prompt ??
+        authoritativePayload.prompt ??
+        authoritativePayload.user_prompt,
+    );
+    if (localPrompt && authoritativePrompt && localPrompt !== authoritativePrompt) {
+      return projectionPayload("prompt_mismatch", {
+        backend_debug_response_ref: backendRef,
+        backend_debug_response_turn_id: authoritativeTurnId || null,
+        backend_debug_response_prompt: authoritativePrompt,
+      });
+    }
     const clientProjection = buildClientProjectionDebugFields(parsed);
+    const clientActiveTurnId =
+      coerceText(parsed.client_active_turn_id).trim() ||
+      coerceText(parsed.clientSelectedDebugTurnId).trim() ||
+      coerceText(readAgentLoopAuditRecord(parsed.reply)?.id).trim() ||
+      null;
     const mergedPayload = {
       ...authoritativePayload,
       debug_export_source: "backend_endpoint",
       backend_debug_response_status: "fetched",
+      client_active_turn_id: clientActiveTurnId,
+      ui_client_active_turn_id: clientActiveTurnId,
       client_projection_payload_hash: hashDebugExportText(localPayload),
       client_debug_projection: clientProjection,
       client_voice_debug: clientProjection.voice,
@@ -7192,169 +6944,7 @@ function boundHelixDebugExportTextForUi(payload: string): string {
 
 export async function copyDebugPayloadToClipboard(payload: string): Promise<DebugClipboardCopyResult> {
   const json = boundHelixDebugExportTextForUi(typeof payload === "string" ? payload : "");
-  const attemptedPayloadHash = hashDebugExportText(json);
-  if (!json.trim()) {
-    return {
-      ok: false,
-      attempted_payload_hash: attemptedPayloadHash,
-      copied_text_length: 0,
-      method: "failed",
-      readback_match: "empty",
-      fallback_presented: false,
-      error: "debug_payload_empty",
-    };
-  }
-  try {
-    JSON.parse(json);
-  } catch {
-    return {
-      ok: false,
-      attempted_payload_hash: attemptedPayloadHash,
-      copied_text_length: 0,
-      method: "failed",
-      readback_match: "mismatch",
-      fallback_presented: false,
-      error: "debug_payload_invalid_json",
-    };
-  }
-
-  try {
-    if (typeof navigator !== "undefined" && typeof navigator.clipboard?.writeText === "function") {
-      if (typeof navigator.clipboard.readText !== "function") {
-        await navigator.clipboard.writeText(json);
-        return {
-          ok: true,
-          attempted_payload_hash: attemptedPayloadHash,
-          copied_payload_hash: attemptedPayloadHash,
-          copied_text_length: json.length,
-          method: "navigator.clipboard",
-          readback_match: "unavailable",
-          fallback_presented: false,
-          error: "clipboard_readback_unavailable",
-        };
-      }
-      let lastError: Error | null = null;
-      let wrote = false;
-      for (let attempt = 0; attempt < 4; attempt += 1) {
-        await navigator.clipboard.writeText(json);
-        wrote = true;
-        await waitForDebugClipboardReadback(attempt);
-        const confirm = await navigator.clipboard.readText().catch(() => {
-          throw new Error("clipboard_readback_unavailable");
-        });
-        if (confirm === json) {
-          return {
-            ok: true,
-            attempted_payload_hash: attemptedPayloadHash,
-            copied_payload_hash: hashDebugExportText(confirm),
-            copied_text_length: json.length,
-            method: "navigator.clipboard",
-            readback_match: "exact",
-            fallback_presented: false,
-          };
-        }
-        if (confirm.trim().length === 0) {
-          lastError = new Error("clipboard_empty_after_write");
-        } else {
-          lastError = new Error("clipboard_mismatch_after_write");
-        }
-      }
-      if (wrote) {
-        return {
-          ok: true,
-          attempted_payload_hash: attemptedPayloadHash,
-          copied_payload_hash: attemptedPayloadHash,
-          copied_text_length: json.length,
-          method: "navigator.clipboard",
-          readback_match: "unavailable",
-          fallback_presented: false,
-          error: lastError?.message ?? "clipboard_readback_unavailable",
-        };
-      }
-      throw lastError ?? new Error("clipboard_write_failed");
-    }
-  } catch (error) {
-    if (typeof window !== "undefined") {
-      (window as unknown as { __HELIX_LAST_UNIFIED_DEBUG_COPY_ERROR__?: string }).__HELIX_LAST_UNIFIED_DEBUG_COPY_ERROR__ =
-        error instanceof Error ? error.message : String(error);
-    }
-  }
-
-  if (typeof document !== "undefined") {
-    const textarea = document.createElement("textarea");
-    textarea.value = json;
-    textarea.setAttribute("readonly", "true");
-    textarea.style.position = "fixed";
-    textarea.style.left = "-9999px";
-    textarea.style.top = "0";
-    document.body.appendChild(textarea);
-    textarea.focus();
-    textarea.select();
-    try {
-      const copied = document.execCommand("copy");
-      if (copied) {
-        if (typeof navigator !== "undefined" && typeof navigator.clipboard?.readText === "function") {
-          await waitForDebugClipboardReadback(1);
-          const confirm = await navigator.clipboard.readText().catch(() => "");
-          if (confirm.trim().length === 0) {
-            return {
-              ok: true,
-              attempted_payload_hash: attemptedPayloadHash,
-              copied_payload_hash: attemptedPayloadHash,
-              copied_text_length: json.length,
-              method: "textarea_fallback",
-              readback_match: "unavailable",
-              fallback_presented: false,
-              error: "clipboard_empty_after_write",
-            };
-          }
-          if (confirm !== json) {
-            return {
-              ok: true,
-              attempted_payload_hash: attemptedPayloadHash,
-              copied_payload_hash: attemptedPayloadHash,
-              copied_text_length: json.length,
-              method: "textarea_fallback",
-              readback_match: "unavailable",
-              fallback_presented: false,
-              error: "clipboard_mismatch_after_write",
-            };
-          }
-        }
-        return {
-          ok: true,
-          attempted_payload_hash: attemptedPayloadHash,
-          copied_payload_hash: attemptedPayloadHash,
-          copied_text_length: json.length,
-          method: "textarea_fallback",
-          readback_match: "unavailable",
-          fallback_presented: false,
-        };
-      }
-    } catch (error) {
-      return {
-        ok: false,
-        attempted_payload_hash: attemptedPayloadHash,
-        copied_text_length: 0,
-        method: "failed",
-        readback_match: "unavailable",
-        fallback_presented: false,
-        error: error instanceof Error ? error.message : String(error),
-      };
-    } finally {
-      document.body.removeChild(textarea);
-    }
-  }
-
-  return {
-    ok: false,
-    attempted_payload_hash: attemptedPayloadHash,
-    copied_text_length: 0,
-    method: "failed",
-    readback_match: "unavailable",
-    fallback_presented: false,
-    error: "clipboard_write_failed",
-  };
+  return copyHelixAskDebugJsonToClipboard(json);
 }
 
 function coerceReasoningTheaterStateV1(value: unknown): HelixAskReasoningTheaterStateV1 | null {
@@ -11221,14 +10811,7 @@ export function HelixAskPill({
 
   const handleCopyContextCapsule = useCallback(
     async (reply: HelixAskReply) => {
-      if (!reply.contextCapsule || typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
-        return;
-      }
-      try {
-        await navigator.clipboard.writeText(buildContextCapsuleCopyText(reply.contextCapsule));
-      } catch {
-        // ignore clipboard failures
-      }
+      await copyHelixAskContextCapsuleToClipboard(reply.contextCapsule);
     },
     [],
   );
@@ -11243,18 +10826,24 @@ export function HelixAskPill({
         const normalizedPayload = normalizeReplyMasterDebugPayload(reply, payload);
         const providedPayloadMatchesRenderedTurn =
           hasProvidedPayload && debugPayloadMatchesRenderedTurnPayload(payload, sourceElement);
+        const renderedButtonScopedPayload = buildReplyScopedDebugExportFromRenderedButton(
+          reply,
+          sourceElement,
+          "rendered_button_scope",
+        );
         const { localExportPayload } = selectHelixAskLegacyDebugCopyLocalPayload({
           providedPayload: payload,
           normalizedPayload,
-          renderedButtonScopedPayload: buildReplyScopedDebugExportFromRenderedButton(
-            reply,
-            sourceElement,
-            "rendered_button_scope",
-          ),
+          renderedButtonScopedPayload,
           providedPayloadMatchesRenderedTurn,
         });
+        const authoritativeExportPayload = await resolveAuthoritativeDebugExportPayload(localExportPayload);
         const exportPayload = boundHelixDebugExportTextForUi(
-          await resolveAuthoritativeDebugExportPayload(localExportPayload),
+          enforceDebugExportMatchesClickedButton({
+            exportPayload: authoritativeExportPayload,
+            clickedButtonScopedPayload: renderedButtonScopedPayload,
+            sourceElement,
+          }),
         );
         if (typeof window !== "undefined") {
           (window as unknown as { __HELIX_LAST_UNIFIED_DEBUG_COPY__?: string }).__HELIX_LAST_UNIFIED_DEBUG_COPY__ = exportPayload;
@@ -27023,6 +26612,8 @@ export function HelixAskPill({
                     finalAnswerAuthority: finalAnswerPresentation.isDeterministicReceiptFallback
                       ? "receipt_fallback_not_reviewed"
                       : "terminal",
+                    replyId: reply.id,
+                    activeTurnId: resolveHelixAskReplyDebugTurnId(reply),
                     answerTint: replyBattleAnswerTint,
                     actualAgentProviderLabel,
                     actualAgentModelLabel,

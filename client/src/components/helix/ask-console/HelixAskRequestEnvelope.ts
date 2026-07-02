@@ -43,7 +43,9 @@ export function buildHelixAskConsoleContextFiles(args: {
   const candidates = [
     args.docsViewerAnchorPath,
     args.workspaceContextSnapshot?.activeDocPath,
+    args.workspaceContextSnapshot?.active_doc_path,
     args.workspaceContextSnapshot?.docContextPath,
+    args.workspaceContextSnapshot?.doc_context_path,
   ]
     .map(normalizeAskConsoleDocPath)
     .filter(Boolean);
@@ -73,7 +75,11 @@ export function buildHelixAskConsoleBackendTurnPayloadCore(args: {
   maxTokens: number;
   question: string;
   contextFiles?: string[];
+  docPath?: string | null;
 }) {
+  const activeDocPath =
+    normalizeAskConsoleDocPath(args.docPath) ||
+    normalizeAskConsoleDocPath(args.contextFiles?.[0]);
   return {
     sessionId: args.sessionId ?? undefined,
     agentRuntime: args.agentRuntime,
@@ -82,6 +88,12 @@ export function buildHelixAskConsoleBackendTurnPayloadCore(args: {
     turnId: args.turnId,
     maxTokens: args.maxTokens,
     question: args.question,
+    ...(activeDocPath
+      ? {
+          doc_path: activeDocPath,
+          active_doc_path: activeDocPath,
+        }
+      : {}),
     contextFiles: args.contextFiles,
   };
 }

@@ -221,7 +221,7 @@ const hasScholarlyFullTextNumericChainIntent = (prompt: string): boolean => {
   const unquoted = unquotePrompt(prompt);
   return (
     /\bscholarly-research\.(?:fetch_full_text|extract_numeric_parameters)\b/i.test(unquoted) ||
-    /\b(?:fetch\s+full\s+text|full[-\s]?text|extract\s+numeric\s+parameters?|numeric\s+parameter\s+extraction|cited\s+(?:numeric|numerical)\s+values?|source[-\s]?bound\s+(?:numeric|numerical)\s+values?|unit[-\s]?bearing\s+(?:numeric|numerical)\s+values?|calculator\s+binding)\b/i.test(unquoted)
+    /\b(?:fetch\s+full\s+text|full[-\s]?text|extract\s+numeric\s+parameters?|numeric\s+parameter\s+extraction|cited\s+(?:numeric|numerical)\s+values?|paper[-\s]+backed\s+(?:numeric|numerical|formula|variable|calculator)|research[-\s]+paper\s+(?:numeric|numerical|formula|variable)\s+evidence|source[-\s]?bound\s+(?:numeric|numerical|values?|expression|calculator)|source[-\s]?backed\s+(?:numeric|numerical|values?|expression|calculator)|unit[-\s]?bearing\s+(?:numeric|numerical)\s+values?|formula\s+(?:variable\s+)?binding|bind\s+(?:the\s+)?(?:formula\s+)?variables?|calculator\s+binding)\b/i.test(unquoted)
   );
 };
 
@@ -419,17 +419,23 @@ const isResearchQuantifyReflectPrompt = (prompt: string, body: Record<string, un
   ) {
     return false;
   }
-  const wantsResearch = /\b(?:research[-\s]+papers?|papers?|arxiv|scholarly|internet|web|sources?|corroborat(?:e|ion)|retrieve\s+evidence|look\s+up|cite|cited|source[-\s]?bound)\b/i.test(unquoted);
-  const wantsQuantify = /\b(?:calculate|compute|estimate|solve|solve_expression|calculator|quantif(?:y|ication)|numeric\s+parameters?|numeric\s+values?|numerical\s+values?|scalar|equation|expression|plug\s+into)\b/i.test(unquoted);
+  const wantsResearch = /\b(?:research[-\s]+papers?|research[-\s]+paper\s+evidence|paper[-\s]+backed|papers?|arxiv|scholarly|internet|web|sources?|corroborat(?:e|ion)|retrieve\s+evidence|look\s+up|cite|cited|source[-\s]?bound|source[-\s]?backed)\b/i.test(unquoted);
+  const wantsQuantify = /\b(?:calculate|compute|estimate|solve|solve_expression|calculator|quantif(?:y|ication)|numeric\s+parameters?|numeric\s+values?|numerical\s+values?|numeric\s+binding|formula\s+binding|bind\s+(?:the\s+)?(?:formula\s+)?variables?|scalar|equation|expression|plug\s+into)\b/i.test(unquoted);
   const wantsReflection = /\b(?:reflect|theory\s+badge\s+graph|theory\s+graph|civilization\s+bounds?|claim\s+boundary|conditions\s+of\s+the\s+civilization|social|energy|material)\b/i.test(unquoted);
   const wantsFullTextNumericChain = hasScholarlyFullTextNumericChainIntent(prompt);
   return wantsResearch && wantsQuantify && (wantsReflection || wantsFullTextNumericChain || hasPriorTheoryEquationAnaphora(prompt, body));
 };
 
 const requestedFormulaVariablesFromPrompt = (prompt: string): string[] => {
+  const unquoted = unquotePrompt(prompt);
   const variables = ["n_m3", "T_eV", "B_T"].filter((variable) =>
     new RegExp(`\\b${variable.replace(/_/g, "[_\\s-]?")}\\b`, "i").test(prompt)
   );
+  if (/\bn[_\s-]?1\b|\bn1\b/i.test(unquoted)) variables.push("n1_m3");
+  if (/\bn[_\s-]?2\b|\bn2\b/i.test(unquoted)) variables.push("n2_m3");
+  if (/<\s*sigma\s*v\s*>|\bsigma\s*v\b|\breactivit(?:y|ies)\b/i.test(unquoted)) variables.push("sigma_v_m3_s");
+  if (/\b(?:cross[-\s]?section|sigma[_\s-]?m2|sigma\s*\()/i.test(unquoted)) variables.push("sigma_m2");
+  if (/\bE[_\s-]?f\b|\benergy\s+released\s+per\s+(?:fusion\s+)?reaction\b|\bfusion\s+energy\s+release\b/i.test(unquoted)) variables.push("E_f_J");
   return Array.from(new Set(variables));
 };
 
@@ -633,6 +639,51 @@ const variableSourcePlanEntry = (variable: string): VariableSourcePlanEntry => {
       extraction_aliases: [variable, "v", "relative velocity", "thermal velocity", "reactant velocity"],
     };
   }
+  if (normalized === "sigmavm3s") {
+    return {
+      variable,
+      canonical_quantity: "maxwellian_averaged_fusion_reactivity",
+      expected_unit: "m^3/s",
+      role: "formula_input",
+      source_classes: [
+        "Maxwellian-averaged reactivity table",
+        "fusion reaction rate coefficient paper",
+        "D-T fusion reactivity fit",
+        "nuclear reaction rate model",
+      ],
+      search_terms: [
+        "Maxwellian averaged reactivity",
+        "fusion reactivity",
+        "reaction rate coefficient",
+        "sigma v",
+        "D T fusion",
+        "m^3/s",
+      ],
+      extraction_aliases: [variable, "<sigma v>", "sigma v", "reactivity", "reaction rate coefficient"],
+    };
+  }
+  if (normalized === "efj") {
+    return {
+      variable,
+      canonical_quantity: "fusion_energy_released_per_reaction",
+      expected_unit: "J",
+      role: "formula_input",
+      source_classes: [
+        "fusion reaction energy table",
+        "nuclear reaction data",
+        "D-T fusion reaction reference",
+      ],
+      search_terms: [
+        "fusion energy released per reaction",
+        "D T fusion energy",
+        "17.6 MeV",
+        "reaction energy",
+        "MeV",
+        "J",
+      ],
+      extraction_aliases: [variable, "E_f", "fusion energy", "reaction energy", "energy released per reaction"],
+    };
+  }
   if (normalized === "t00wallrequired") {
     return {
       variable,
@@ -717,6 +768,9 @@ const defaultFormulaVariablesForPrompt = (prompt: string, requestedVariables: st
   const mentionsTokamakPlasmaFormula =
     /\b(?:tokamak|plasma\s+beta|thermal\s+pressure|magnetic\s+pressure|transport|magnetic\s+confinement)\b/i.test(unquoted);
   if (wantsFullTextNumericChain && mentionsTokamakPlasmaFormula) return ["n_m3", "T_eV", "B_T"];
+  const mentionsFusionPowerDensity =
+    /\b(?:fusion\s+power\s+density|P[_\s-]?f|reactant\s+densit|sigma\s*v|reactivit(?:y|ies)|D[-\s]?T|deuterium\s+tritium)\b/i.test(unquoted);
+  if (wantsFullTextNumericChain && mentionsFusionPowerDensity) return ["n1_m3", "n2_m3", "sigma_v_m3_s", "E_f_J"];
   return [];
 };
 
@@ -879,12 +933,89 @@ const buildSourceRequirementPlan = (input: {
   };
 };
 
+const compoundRequestNextAffordance = (
+  request: Record<string, unknown>,
+  priority: number,
+): Record<string, unknown> | null => {
+  const capability = readString(request.capability_id) ?? readString(request.capabilityId);
+  if (!capability) return null;
+  const args = readRecord(request.arguments) ?? {};
+  const sourceTargetIntent = readRecord(args.source_target_intent);
+  return {
+    schema: "helix.provider_next_affordance.v1",
+    source: "helix_compound_capability_dependency_planner",
+    capability,
+    mode: readString(request.mode) ?? "read",
+    priority,
+    purpose:
+      readString(sourceTargetIntent?.dependency_binding) ??
+      readString(sourceTargetIntent?.target_kind) ??
+      "codex_selected_followup_tool",
+    reason: "available_after_observation_reentry",
+    subgoal_id: readString(request.subgoal_id) ?? readString(sourceTargetIntent?.subgoal_id),
+    required_observation_kind: readString(sourceTargetIntent?.required_observation_kind),
+    required_affordance_kinds: readArray(sourceTargetIntent?.required_affordance_kinds),
+    assistant_answer: false,
+    raw_content_included: false,
+    terminal_eligible: false,
+  };
+};
+
+const attachNextAffordancesToRequest = (
+  request: Record<string, unknown>,
+  nextRequests: Record<string, unknown>[],
+): Record<string, unknown> => {
+  const nextAffordances = nextRequests
+    .map((entry, index) => compoundRequestNextAffordance(entry, index + 1))
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  if (nextAffordances.length === 0) return request;
+  const args = readRecord(request.arguments) ?? {};
+  const sourceTargetIntent = readRecord(args.source_target_intent) ?? {};
+  return {
+    ...request,
+    arguments: {
+      ...args,
+      next_affordances: [
+        ...readArray(args.next_affordances),
+        ...nextAffordances,
+      ],
+      source_target_intent: {
+        ...sourceTargetIntent,
+        next_affordances: [
+          ...readArray(sourceTargetIntent.next_affordances),
+          ...nextAffordances,
+        ],
+      },
+    },
+  };
+};
+
+const selectPrimaryResearchQuantifyRequest = (
+  requests: Record<string, unknown>[],
+): Record<string, unknown>[] => {
+  if (requests.length <= 1) return requests;
+  const priority = [
+    SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+    INTERNET_SEARCH_CAPABILITY,
+    THEORY_CONTEXT_REFLECTION_CAPABILITY,
+    CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+    CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+  ];
+  const primary =
+    priority
+      .map((capability) => requests.find((request) => readString(request.capability_id) === capability))
+      .find((request): request is Record<string, unknown> => Boolean(request)) ??
+    requests[0];
+  const deferred = requests.filter((request) => request !== primary);
+  return [attachNextAffordancesToRequest(primary, deferred)];
+};
+
 const buildResearchQuantifyReflectRequests = (body: Record<string, unknown>): Record<string, unknown>[] => {
   const prompt = readPrompt(body);
   if (!prompt || !isResearchQuantifyReflectPrompt(prompt, body)) return [];
   const expression = extractCalculatorExpression(prompt);
   const unquoted = unquotePrompt(prompt);
-  const wantsScholarly = /\b(?:research\s+papers?|papers?|arxiv|scholarly|doi)\b/i.test(unquoted);
+  const wantsScholarly = /\b(?:research\s+papers?|research[-\s]+paper\s+evidence|paper[-\s]+backed|papers?|arxiv|scholarly|doi)\b/i.test(unquoted);
   const wantsInternet = /\b(?:internet|web|current\s+sources?|online|search\s+the\s+web)\b/i.test(unquoted);
   const wantsTheory = /\b(?:reflect|theory\s+badge\s+graph|theory\s+graph|claim\s+boundary)\b/i.test(unquoted);
   const wantsCivilization = /\b(?:civilization\s+bounds?|civilization|social|energy|material|country|countries|transportation)\b/i.test(unquoted);
@@ -1084,7 +1215,8 @@ const buildResearchQuantifyReflectRequests = (body: Record<string, unknown>): Re
       },
     });
   }
-  return requests.length >= 2 || ((wantsScholarly || !wantsInternet) && allowScholarlyDependentChain) ? requests : [];
+  const eligible = requests.length >= 2 || ((wantsScholarly || !wantsInternet) && allowScholarlyDependentChain);
+  return eligible ? selectPrimaryResearchQuantifyRequest(requests) : [];
 };
 
 const buildReadAloudSurfaceRequests = (body: Record<string, unknown>): Record<string, unknown>[] => {

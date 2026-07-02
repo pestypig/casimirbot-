@@ -51,11 +51,40 @@ const isScholarlyNumericMissingVariablesObservation = (
   );
 };
 
+const CALCULATOR_RECOVERABLE_BLOCKED_REASONS = new Set([
+  "missing_expression",
+  "expression_too_long",
+  "unsupported_expression_syntax",
+  "expression_has_no_operator",
+  "expression_result_not_finite",
+  "expression_evaluation_failed",
+]);
+
+const isCalculatorBlockedExpressionObservation = (
+  result: HelixWorkstationGatewayCallResult,
+): boolean => {
+  const capability = result.gateway_admission.requested_capability || result.capability_id;
+  if (capability !== "scientific-calculator.solve_expression") return false;
+  const observation = readRecord(result.observation);
+  if (!observation) return false;
+  const blockedReason =
+    readString(observation.blocked_reason) ||
+    readString(result.error) ||
+    readString(result.gateway_admission.blocked_reason);
+  return (
+    result.ok !== true &&
+    readString(observation.schema) === "helix.calculator_solve_observation.v1" &&
+    readString(observation.status) === "blocked" &&
+    CALCULATOR_RECOVERABLE_BLOCKED_REASONS.has(blockedReason)
+  );
+};
+
 const isGatewayObservationReenteredForProviderReasoning = (
   result: HelixWorkstationGatewayCallResult,
 ): boolean =>
   result.ok === true ||
   isScholarlyNumericMissingVariablesObservation(result) ||
+  isCalculatorBlockedExpressionObservation(result) ||
   isGatewayRecoveryAffordanceObservation(result);
 
 export const buildHelixProviderReasoningReentry = (input: {

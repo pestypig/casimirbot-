@@ -1469,6 +1469,34 @@ const isScholarlyNumericFailClosedGatewayResult = (
   );
 };
 
+const CALCULATOR_RECOVERABLE_BLOCKED_REASONS = new Set([
+  "missing_expression",
+  "expression_too_long",
+  "unsupported_expression_syntax",
+  "expression_has_no_operator",
+  "expression_result_not_finite",
+  "expression_evaluation_failed",
+]);
+
+const isCalculatorBlockedExpressionGatewayResult = (
+  result: HelixWorkstationGatewayCallResult,
+): boolean => {
+  if (result.ok === true) return false;
+  const capability = result.gateway_admission.requested_capability || result.capability_id;
+  if (capability !== CALCULATOR_SOLVE_EXPRESSION_CAPABILITY) return false;
+  const observation = readRecord(result.observation);
+  if (!observation) return false;
+  const blockedReason =
+    readString(observation.blocked_reason) ??
+    readString(result.error) ??
+    readString(result.gateway_admission.blocked_reason);
+  return (
+    readString(observation.schema) === "helix.calculator_solve_observation.v1" &&
+    readString(observation.status) === "blocked" &&
+    Boolean(blockedReason && CALCULATOR_RECOVERABLE_BLOCKED_REASONS.has(blockedReason))
+  );
+};
+
 const hasGatewayRecoveryAffordanceEvidence = (value: unknown): boolean => {
   const record = readRecord(value);
   if (!record) return false;
@@ -1494,6 +1522,7 @@ const isGatewayResultCompatibleWithProviderReentry = (
     result.ok === true ||
     hasSuccessfulCalculatorSolveForFailedCapability(gatewayCallResults, index) ||
     isScholarlyNumericFailClosedGatewayResult(result) ||
+    isCalculatorBlockedExpressionGatewayResult(result) ||
     isGatewayRecoveryAffordanceResult(result)
   );
 };

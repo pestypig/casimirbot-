@@ -12,6 +12,7 @@ import {
   shouldAutoExecuteDependentCompoundRequest,
 } from "../explicit-workstation-gateway";
 import {
+  buildCompoundCapabilityDependencyGatewayCallRequests,
   buildCompoundDependencyRailStatus,
   buildDependentCompoundCapabilityGatewayCallRequest,
   buildTurnCompoundDependencyPlan,
@@ -827,6 +828,35 @@ describe("explicit workstation gateway derived calls", () => {
     });
   });
 
+  it("keeps planner-derived theory plus calculator chains to a primary reflection request", () => {
+    const requests = buildPlannerDerivedWorkstationGatewayCallRequests({
+      agent_runtime: "codex",
+      question:
+        "Reflect photon energy through the theory badge graph and calculate 6.626e-34 * 5e14.",
+    });
+
+    expect(capabilities(requests)).toEqual(["theory-badge-graph.reflect_discussion_context"]);
+    const args = requests[0].arguments as Record<string, any>;
+    expect(args.next_affordances).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        capability: "scientific-calculator.solve_expression",
+        purpose: "codex_selected_followup_tool",
+        expression: "6.626e-34*5e14",
+      }),
+    ]));
+    expect(args.source_target_intent.next_affordances).toEqual(args.next_affordances);
+  });
+
+  it("does not turn unrelated workstation panel action plans into gateway calls", () => {
+    const requests = buildPlannerDerivedWorkstationGatewayCallRequests({
+      agent_runtime: "codex",
+      question:
+        "Run panel action panel_id=narrator action_id=narrator.debug_auto_speak_probe text=\"probe\".",
+    });
+
+    expect(requests).toEqual([]);
+  });
+
   it("maps civilization bounds planner steps into the workstation gateway", () => {
     const requests = buildPlannerDerivedWorkstationGatewayCallRequests({
       agent_runtime: "codex",
@@ -1640,6 +1670,149 @@ describe("explicit workstation gateway derived calls", () => {
     expect(JSON.stringify(scholarlyRequest)).toMatch(/source[-_ ]?bound|calculator binding|unit/i);
   });
 
+  it("routes paper-backed theory formula binding to scholarly lookup instead of docs search", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "Reflect a fusion-adjacent Theory Badge Graph formula suitable for paper-backed numeric binding. Return the formula, variables, and the next research evidence needed. Do not run the calculator yet.",
+        workspace_context_snapshot: {
+          activePanel: "scientific-calculator",
+          focusedPanel: "scientific-calculator",
+        },
+      },
+    });
+
+    expect(capabilities(requests)).toEqual(["scholarly-research.lookup_papers"]);
+    expect(capabilities(requests)).not.toContain("docs.search");
+    expect(capabilities(requests)).not.toContain("scientific-calculator.solve_expression");
+    const scholarlyRequest = requests[0] as Record<string, any>;
+    expect(scholarlyRequest).toMatchObject({
+      derivation_source: "helix_compound_capability_dependency_planner",
+      compound_outcome: "research_quantify_reflect",
+      arguments: {
+        allow_scholarly_dependent_chain: true,
+      },
+    });
+    expect(scholarlyRequest.arguments.source_target_intent.next_affordances).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          capability: "theory-badge-graph.reflect_discussion_context",
+        }),
+      ]),
+    );
+    expect(JSON.stringify(scholarlyRequest.arguments.source_requirement_plan)).toMatch(/calculator_requires_bound_expression/);
+  });
+
+  it("does not let planner-derived calculator execution override a negated calculator instruction", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "patched-compound-flow-178301-step1: Reflect a fusion-adjacent Theory Badge Graph formula suitable for paper-backed numeric binding. Return the formula, variables, and the next research evidence needed. Do not run the calculator yet.",
+        workspace_context_snapshot: {
+          activePanel: "scientific-calculator",
+          focusedPanel: "scientific-calculator",
+        },
+      },
+    });
+
+    expect(capabilities(requests)).toEqual(["scholarly-research.lookup_papers"]);
+    expect(capabilities(requests)).not.toContain("scientific-calculator.solve_expression");
+    expect(JSON.stringify(requests)).not.toContain("\"expression\":\"-178301-\"");
+  });
+
+  it("routes theory-only formula discovery to Theory Badge Graph without research or calculator", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "Find a fusion-adjacent formula from the Theory Badge Graph that could be numerically evaluated later. Return the formula, variables, and what each variable physically means. Do not use research papers or the calculator yet.",
+        workspace_context_snapshot: {
+          activePanel: "scientific-calculator",
+          focusedPanel: "scientific-calculator",
+        },
+      },
+    });
+
+    expect(capabilities(requests)).toEqual(["theory-badge-graph.reflect_discussion_context"]);
+    expect(capabilities(requests)).not.toContain("scholarly-research.lookup_papers");
+    expect(capabilities(requests)).not.toContain("scientific-calculator.solve_expression");
+    expect(requests[0]).toMatchObject({
+      derivation_source: "helix_prompt_derived_theory_reflection",
+      arguments: {
+        build_explanation_plan: true,
+        source_target_intent: expect.objectContaining({
+          target_source: "theory_badge_graph",
+          target_kind: "theory_context_reflection",
+        }),
+      },
+    });
+  });
+
+  it("honors negated scholarly research cues even when research papers are mentioned", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "Find a formula from the Theory Badge Graph for later paper-backed evaluation, but do not use research papers yet and do not run the calculator.",
+        workspace_context_snapshot: {
+          activePanel: "scientific-calculator",
+          focusedPanel: "scientific-calculator",
+        },
+      },
+    });
+
+    expect(capabilities(requests)).toEqual(["theory-badge-graph.reflect_discussion_context"]);
+    expect(JSON.stringify(requests)).not.toMatch(/scholarly-research\.lookup_papers|scientific-calculator\.solve_expression/);
+  });
+
+  it("routes paper-backed numeric binding for a prior formula to scholarly research without docs or calculator", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "Using the formula from the previous answer, find paper-backed numeric values or ranges for the variables. Prefer scholarly sources with units and citations. If retrieval is weak, explain the mismatch and suggest a better query. Do not run the calculator yet.",
+        workspace_context_snapshot: {
+          activePanel: "scientific-calculator",
+          focusedPanel: "scientific-calculator",
+          activeDocPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        },
+      },
+    });
+
+    expect(capabilities(requests)).toEqual(["scholarly-research.lookup_papers"]);
+    expect(capabilities(requests)).not.toContain("docs.search");
+    expect(capabilities(requests)).not.toContain("scientific-calculator.solve_expression");
+  });
+
+  it("keeps formula research compound planning to one primary request with next affordances", () => {
+    const requests = buildCompoundCapabilityDependencyGatewayCallRequests({
+      agent_runtime: "codex",
+      question:
+        "Find cited research-paper numerical values for plasma beta formula beta = p_Pa / p_B using scholarly papers and web sources, then reflect the claim boundary through the theory badge graph and civilization bounds before any calculator binding.",
+      workspace_context_snapshot: {
+        activePanel: "scientific-calculator",
+        focusedPanel: "scientific-calculator",
+      },
+    });
+
+    expect(capabilities(requests)).toEqual(["scholarly-research.lookup_papers"]);
+    const args = requests[0].arguments as Record<string, any>;
+    expect(args.next_affordances).toEqual(expect.arrayContaining([
+      expect.objectContaining({ capability: "internet-search.search_web" }),
+      expect.objectContaining({ capability: "theory-badge-graph.reflect_discussion_context" }),
+      expect.objectContaining({ capability: "civilization-bounds.reflect_system_bounds" }),
+    ]));
+    expect(JSON.stringify(args.next_affordances)).not.toMatch(/scientific-calculator\.solve_expression/);
+    expect(args.source_target_intent.next_affordances).toEqual(args.next_affordances);
+  });
+
   it("does not auto-execute research-chain dependent requests that Codex should choose after re-entry", () => {
     expect(shouldAutoExecuteDependentCompoundRequest({
       compound_outcome: "research_quantify_reflect",
@@ -1658,6 +1831,11 @@ describe("explicit workstation gateway derived calls", () => {
     })).toBe(false);
     expect(shouldAutoExecuteDependentCompoundRequest({
       compound_outcome: "read_aloud_surface",
+      capability_id: "live_env.narrator_say",
+      mode: "act",
+    })).toBe(false);
+    expect(shouldAutoExecuteDependentCompoundRequest({
+      compound_outcome: "unrelated_direct_actuator",
       capability_id: "live_env.narrator_say",
       mode: "act",
     })).toBe(true);

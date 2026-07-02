@@ -47,6 +47,50 @@ const buildScholarlyNumericMissingResult = () => ({
   error: "missing_requested_numeric_variables",
 });
 
+const buildCalculatorUnsupportedExpressionResult = () => ({
+  ok: false,
+  capability_id: "scientific-calculator.solve_expression",
+  gateway_admission: {
+    requested_capability: "scientific-calculator.solve_expression",
+    admission_reason: "calculator_expression_blocked",
+    blocked_reason: "unsupported_expression_syntax",
+  },
+  observation_packet: {
+    status: "blocked",
+    produced_artifact_refs: ["ask:calculator:blocked-expression"],
+    observation_summary: "Calculator gateway blocked expression: unsupported_expression_syntax.",
+    missing_requirements: [{
+      code: "unsupported_expression_syntax",
+      repair_action: "ask_user",
+      rejected_expression: "explain why receipts matter",
+      required_affordance_kind: "bound_calculator_expression",
+    }],
+    terminal_eligible: false,
+    post_tool_model_step_required: true,
+    assistant_answer: false,
+  },
+  observation: {
+    schema: "helix.calculator_solve_observation.v1",
+    capability_key: "scientific-calculator.solve_expression",
+    expression: "explain why receipts matter",
+    normalized_expression: "explain why receipts matter",
+    rejected_expression: "explain why receipts matter",
+    result: null,
+    status: "blocked",
+    blocked_reason: "unsupported_expression_syntax",
+    terminal_eligible: false,
+    post_tool_model_step_required: true,
+    assistant_answer: false,
+    raw_content_included: false,
+  },
+  artifact_refs: ["ask:calculator:blocked-expression"],
+  terminal_eligible: false,
+  post_tool_model_step_required: true,
+  assistant_answer: false,
+  raw_content_included: false,
+  error: "unsupported_expression_syntax",
+});
+
 describe("Codex provider terminal pass-through", () => {
   it("does not overwrite Codex research explanation for scholarly numeric missing-variable observations", () => {
     const providerText =
@@ -104,6 +148,20 @@ describe("Codex provider terminal pass-through", () => {
 
     expect(guarded).toContain("I cannot claim the requested workstation tool or UI action ran");
     expect(guarded).toContain("scholarly-research.fetch_full_text: fetchable_paper_identity_required");
+  });
+
+  it("preserves Codex explanation for calculator expression syntax blocks", () => {
+    const providerText =
+      "The calculator request was admitted as a tool attempt, but the supplied expression was prose rather than a bound arithmetic expression, so no calculator result exists.";
+
+    const guarded = applyGatewayFailureAuthorityGuard({
+      text: providerText,
+      gatewayCallResults: [buildCalculatorUnsupportedExpressionResult() as never],
+    });
+
+    expect(guarded).toBe(providerText);
+    expect(guarded).not.toContain("I cannot claim the requested workstation tool or UI action ran");
+    expect(guarded).toContain("no calculator result exists");
   });
 
   it("preserves Codex explanation for scholarly lookup recovery affordances", () => {

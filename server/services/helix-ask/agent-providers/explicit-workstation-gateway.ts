@@ -142,6 +142,9 @@ const readRecord = (value: unknown): Record<string, unknown> | null =>
 const readString = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
 
+const readArray = (value: unknown): unknown[] =>
+  Array.isArray(value) ? value : [];
+
 export const readHelixAgentTurnId = (body: Record<string, unknown>): string =>
   readString(body.turn_id) ?? readString(body.turnId) ?? `ask:agent-provider:${crypto.randomUUID()}`;
 
@@ -179,6 +182,15 @@ const hasNegatedToolInstruction = (prompt: string, toolPattern: RegExp): boolean
   return false;
 };
 
+const CALCULATOR_EXECUTION_PATTERN = /\b(?:calculator|calculate|compute|evaluate|solve|expression)\b/i;
+const SCHOLARLY_RESEARCH_EXECUTION_PATTERN = /\b(?:research|papers?|research[-\s]+papers?|scholarly|arxiv|doi|cit(?:e|ed|ation)s?|sources?)\b/i;
+
+const hasNegatedCalculatorExecutionInstruction = (prompt: string): boolean =>
+  hasNegatedToolInstruction(prompt, CALCULATOR_EXECUTION_PATTERN);
+
+const hasNegatedScholarlyResearchInstruction = (prompt: string): boolean =>
+  hasNegatedToolInstruction(prompt, SCHOLARLY_RESEARCH_EXECUTION_PATTERN);
+
 const requestKey = (request: Record<string, unknown>): string => {
   const args = readRecord(request.arguments ?? request.args) ?? {};
   const capability = readString(request.capability_id) ?? readString(request.capabilityId) ?? "";
@@ -215,10 +227,12 @@ const appendDedupe = (
 };
 
 const RESEARCH_QUANTIFY_REFLECT_OUTCOME = "research_quantify_reflect" as const;
+const READ_ALOUD_SURFACE_OUTCOME = "read_aloud_surface" as const;
 
 const isCodexReasoningDependentRequest = (request: Record<string, unknown> | null): boolean => {
   if (!request) return false;
-  return readString(request.compound_outcome) === RESEARCH_QUANTIFY_REFLECT_OUTCOME;
+  const outcome = readString(request.compound_outcome);
+  return outcome === RESEARCH_QUANTIFY_REFLECT_OUTCOME || outcome === READ_ALOUD_SURFACE_OUTCOME;
 };
 
 export const shouldAutoExecuteDependentCompoundRequest = (request: Record<string, unknown> | null): boolean =>
@@ -783,6 +797,8 @@ export const buildStructuredAdmissionWorkstationGatewayCallRequests = (
       selectedCapability === CALCULATOR_SOLVE_EXPRESSION_CAPABILITY ||
       CALCULATOR_SOLVE_ALIAS_CAPABILITIES.includes(selectedCapability as typeof CALCULATOR_SOLVE_ALIAS_CAPABILITIES[number])
     ) {
+      const prompt = readPrompt(body);
+      if (prompt && hasNegatedCalculatorExecutionInstruction(prompt)) continue;
       const expression = readGatewayCalculatorExpression(body, admission);
       if (!expression) continue;
       const key = `${CALCULATOR_SOLVE_EXPRESSION_CAPABILITY}:${expression}`;
@@ -1020,6 +1036,7 @@ export const buildPlannerDerivedWorkstationGatewayCallRequests = (
 ): Record<string, unknown>[] => {
   const prompt = readPrompt(body);
   if (!prompt) return [];
+  const blocksCalculatorExecution = hasNegatedCalculatorExecutionInstruction(prompt);
   const planned = planWorkstationToolUse(prompt, {
     turnId: readString(body.turn_id) ?? readString(body.turnId),
     threadId: readString(body.thread_id) ?? readString(body.threadId),
@@ -1029,7 +1046,75 @@ export const buildPlannerDerivedWorkstationGatewayCallRequests = (
   const requests: Record<string, unknown>[] = [];
   const seen = new Set<string>();
   const addPlannerRequest = (request: Record<string, unknown>): void => appendDedupe(requests, seen, [request]);
+  const buildPlannerNextAffordance = (request: Record<string, unknown>): Record<string, unknown> | null => {
+    const capability = readString(request.capability_id) ?? readString(request.capabilityId);
+    if (!capability) return null;
+    const args = readRecord(request.arguments) ?? {};
+    const sourceTargetIntent = readRecord(args.source_target_intent) ?? {};
+    return {
+      schema: "helix.provider_next_affordance.v1",
+      source: "helix_workstation_tool_planner",
+      capability,
+      mode: readString(request.mode) ?? "read",
+      purpose: "codex_selected_followup_tool",
+      reason: "available_after_observation_reentry",
+      planner_intent: readString(request.planner_intent) ?? planned.intent,
+      planner_reason: readString(request.planner_reason) ?? planned.reason,
+      expression: readString(args.expression) ?? readString(args.latex),
+      source_target_intent: {
+        ...sourceTargetIntent,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  };
+  const attachPlannerNextAffordances = (
+    request: Record<string, unknown>,
+    affordances: Record<string, unknown>[],
+  ): Record<string, unknown> => {
+    if (affordances.length === 0) return request;
+    const args = readRecord(request.arguments) ?? {};
+    const sourceTargetIntent = readRecord(args.source_target_intent) ?? {};
+    return {
+      ...request,
+      arguments: {
+        ...args,
+        next_affordances: [
+          ...readArray(args.next_affordances),
+          ...affordances,
+        ],
+        source_target_intent: {
+          ...sourceTargetIntent,
+          next_affordances: [
+            ...readArray(sourceTargetIntent.next_affordances),
+            ...affordances,
+          ],
+        },
+      },
+    };
+  };
+  const reducePlannerReasoningChainToPrimaryRequest = (
+    nextRequests: Record<string, unknown>[],
+  ): Record<string, unknown>[] => {
+    if (planned.intent !== "physics_calculation_context") return nextRequests;
+    const reflectionRequest = nextRequests.find((request) =>
+      readString(request.capability_id) === THEORY_CONTEXT_REFLECTION_CAPABILITY
+    );
+    const calculatorRequests = nextRequests.filter((request) =>
+      readString(request.capability_id) === CALCULATOR_SOLVE_EXPRESSION_CAPABILITY
+    );
+    if (!reflectionRequest || calculatorRequests.length === 0) return nextRequests;
+    const affordances = calculatorRequests
+      .map(buildPlannerNextAffordance)
+      .filter((affordance): affordance is Record<string, unknown> => Boolean(affordance));
+    return [attachPlannerNextAffordances(reflectionRequest, affordances)];
+  };
   const addCalculatorSolve = (expression: string, source: Record<string, unknown>): void => {
+    if (blocksCalculatorExecution) return;
     addPlannerRequest({
       schema: "helix.workstation_gateway.planner_derived_call_request.v1",
       derivation_source: "helix_workstation_tool_planner",
@@ -1160,7 +1245,7 @@ export const buildPlannerDerivedWorkstationGatewayCallRequests = (
       });
     }
   }
-  return requests.slice(0, 10);
+  return reducePlannerReasoningChainToPrimaryRequest(requests).slice(0, 10);
 };
 
 export const buildPromptNamedCapabilityGatewayCallRequests = (
@@ -1702,7 +1787,7 @@ const extractCalculatorPercentOfExpression = (value: string | null | undefined):
 };
 
 const extractCalculatorExpressionFromPrompt = (prompt: string): string | null => {
-  if (hasNegatedToolInstruction(prompt, /\b(?:calculator|calculate|compute|evaluate|solve|expression)\b/i)) {
+  if (hasNegatedCalculatorExecutionInstruction(prompt)) {
     return null;
   }
   const unquoted = unquotePrompt(prompt);
@@ -1759,7 +1844,7 @@ export const buildPromptDerivedTheoryReflectionGatewayCallRequests = (
   if (!prompt) return [];
   if (hasPromptNamedCapability(prompt, THEORY_CONTEXT_REFLECTION_CAPABILITY)) return [];
   if (
-    hasNegatedToolInstruction(prompt, /\b(?:fetch|get|read|show|use|run|call|execute|reflect|reflection|theory\s+badge\s+graph|theory\s+graph|badge\s+graph|theory\s+context|theory\s+reflection)\b/i) ||
+    hasNegatedToolInstruction(prompt, /\b(?:reflect|reflection|theory\s+badge\s+graph|theory\s+graph|badge\s+graph|theory\s+context|theory\s+reflection)\b/i) ||
     hasContextualTheoryReflectionMention(prompt)
   ) {
     return [];
@@ -1768,6 +1853,8 @@ export const buildPromptDerivedTheoryReflectionGatewayCallRequests = (
   const wantsTheoryReflection =
     /\breflect\b[\s\S]{0,120}\b(?:theory\s+badge\s+graph|theory\s+graph|badge\s+graph)\b/i.test(unquoted) ||
     /\b(?:theory\s+badge\s+graph|theory\s+graph|badge\s+graph)\b[\s\S]{0,120}\breflect(?:ion)?\b/i.test(unquoted) ||
+    /\b(?:find|return|give|identify|select|choose|surface)\b[\s\S]{0,140}\b(?:formulas?|equations?|templates?)\b[\s\S]{0,140}\b(?:from|in|within|via|through)\s+(?:the\s+)?(?:theory\s+badge\s+graph|theory\s+graph|badge\s+graph)\b/i.test(unquoted) ||
+    /\b(?:from|in|within|via|through)\s+(?:the\s+)?(?:theory\s+badge\s+graph|theory\s+graph|badge\s+graph)\b[\s\S]{0,140}\b(?:find|return|give|identify|select|choose|surface)\b[\s\S]{0,140}\b(?:formulas?|equations?|templates?)\b/i.test(unquoted) ||
     /\b(?:fetch|get|read|show|use|run|call|execute)\b[\s\S]{0,80}\b(?:the\s+)?theory\s+(?:context\s+)?reflection\b/i.test(unquoted) ||
     /\b(?:theory\s+(?:context\s+)?reflection)\b[\s\S]{0,80}\b(?:for|about|on)\b/i.test(unquoted);
   if (!wantsTheoryReflection) return [];
@@ -1834,8 +1921,52 @@ const hasExplicitScholarlyFullTextNumericChainIntent = (prompt: string): boolean
   const unquoted = unquotePrompt(prompt);
   return (
     /\bscholarly-research\.(?:fetch_full_text|extract_numeric_parameters)\b/i.test(unquoted) ||
-    /\b(?:fetch\s+full\s+text|full[-\s]?text|extract\s+numeric\s+parameters?|numeric\s+parameter\s+extraction|cited\s+numeric\s+values?)\b/i.test(unquoted)
+    /\b(?:fetch\s+full\s+text|full[-\s]?text|extract\s+numeric\s+parameters?|numeric\s+parameter\s+extraction|cited\s+(?:numeric|numerical)\s+values?|paper[-\s]+backed\s+(?:numeric|numerical|formula|variable|calculator)|research[-\s]+paper\s+(?:numeric|numerical|formula|variable)\s+evidence|source[-\s]?bound\s+(?:numeric|numerical|values?|expression|calculator)|source[-\s]?backed\s+(?:numeric|numerical|values?|expression|calculator)|unit[-\s]?bearing\s+(?:numeric|numerical)\s+values?|formula\s+(?:variable\s+)?binding|bind\s+(?:the\s+)?(?:formula\s+)?variables?|calculator\s+binding)\b/i.test(unquoted)
   );
+};
+
+const hasAffirmativeScholarlyResearchNowIntent = (prompt: string): boolean => {
+  if (hasNegatedScholarlyResearchInstruction(prompt)) return false;
+  return detectScholarlyResearchIntent(prompt).researchRequested;
+};
+
+const isTheoryFormulaDiscoveryPhasePrompt = (prompt: string): boolean => {
+  const unquoted = unquotePrompt(prompt);
+  const mentionsTheoryGraph = /\b(?:theory\s+badge\s+graph|theory\s+graph|badge\s+graph)\b/i.test(unquoted);
+  const asksFormulaDiscovery =
+    /\b(?:find|return|give|identify|select|choose|surface|reflect)\b[\s\S]{0,160}\b(?:formulas?|equations?|templates?)\b/i.test(unquoted) ||
+    /\b(?:formulas?|equations?|templates?)\b[\s\S]{0,160}\b(?:variables?|physically\s+means?|meaning|evaluate|evaluated)\b/i.test(unquoted);
+  if (!mentionsTheoryGraph || !asksFormulaDiscovery) return false;
+  if (hasAffirmativeScholarlyResearchNowIntent(prompt)) return false;
+  return true;
+};
+
+const isPaperBackedNumericBindingPhasePrompt = (prompt: string): boolean => {
+  const unquoted = unquotePrompt(prompt);
+  if (hasNegatedScholarlyResearchInstruction(prompt)) return false;
+  const asksPaperEvidence = /\b(?:paper[-\s]+backed|research[-\s]+papers?|scholarly|cited|citations?|sources?)\b/i.test(unquoted);
+  const asksNumericBinding = /\b(?:numeric(?:al)?\s+(?:values?|ranges?|parameters?)|unit[-\s]?bearing|variables?|bind(?:ing)?|formula|equation)\b/i.test(unquoted);
+  const priorFormula = /\b(?:previous|prior|above|last|the)\b[\s\S]{0,80}\b(?:answers?|formulas?|equations?|variables?)\b/i.test(unquoted);
+  return asksPaperEvidence && asksNumericBinding && priorFormula;
+};
+
+const hasAffirmativeResearchRetryIntent = (prompt: string): boolean => {
+  if (hasNegatedScholarlyResearchInstruction(prompt)) return false;
+  const unquoted = unquotePrompt(prompt);
+  return (
+    /\b(?:retry|rerun|run\s+again|search\s+again|look\s+again|find\s+more|fetch\s+more|expand|broaden)\b[\s\S]{0,120}\b(?:papers?|research|scholarly|sources?|citations?)\b/i.test(unquoted) ||
+    /\b(?:papers?|research|scholarly|sources?|citations?)\b[\s\S]{0,120}\b(?:retry|rerun|run\s+again|search\s+again|look\s+again|find\s+more|fetch\s+more|expand|broaden)\b/i.test(unquoted)
+  );
+};
+
+const isConditionalPriorEvidenceCalculatorFollowup = (prompt: string): boolean => {
+  const unquoted = unquotePrompt(prompt);
+  if (hasAffirmativeResearchRetryIntent(prompt)) return false;
+  const conditional = /\b(?:if|when|provided\s+that|only\s+if|assuming)\b/i.test(unquoted);
+  const priorEvidence = /\b(?:previous|prior|above|last|earlier)\b[\s\S]{0,100}\b(?:answers?|evidence|result|retrieval|values?|variables?)\b/i.test(unquoted);
+  const sufficiencyCheck = /\b(?:enough|sufficient|usable|adequate|complete|fully\s+cited|unit[-\s]?bearing|cited)\b[\s\S]{0,120}\b(?:values?|numbers?|numerics?|parameters?|evidence|citations?|units?)\b/i.test(unquoted);
+  const calculatorFollowup = /\b(?:bind|calculate|compute|evaluate|solve|run)\b[\s\S]{0,140}\b(?:formula|expression|calculator|numeric(?:al)?\s+expression|result)\b/i.test(unquoted);
+  return conditional && priorEvidence && sufficiencyCheck && calculatorFollowup;
 };
 
 export const buildPromptDerivedRepoSearchGatewayCallRequests = (
@@ -1897,6 +2028,7 @@ export const buildPromptDerivedScholarlyResearchGatewayCallRequests = (
 ): Record<string, unknown>[] => {
   const prompt = readPrompt(body);
   if (!prompt) return [];
+  if (hasNegatedScholarlyResearchInstruction(prompt)) return [];
   const intent = detectScholarlyResearchIntent(prompt);
   if (!intent.researchRequested) return [];
   return [{
@@ -1985,6 +2117,12 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   const requests: Record<string, unknown>[] = [];
   const seen = new Set<string>();
   const prompt = readPrompt(input.body) ?? "";
+  const theoryFormulaDiscoveryPhase = isTheoryFormulaDiscoveryPhasePrompt(prompt);
+  const paperBackedNumericBindingPhase = isPaperBackedNumericBindingPhasePrompt(prompt);
+  const conditionalPriorEvidenceCalculatorFollowup = isConditionalPriorEvidenceCalculatorFollowup(prompt);
+  if (conditionalPriorEvidenceCalculatorFollowup && !extractCalculatorExpressionFromPrompt(prompt)) {
+    return [];
+  }
   const allowsCompoundAdjunctCapabilities =
     /\b(?:research\s+papers?|papers?|arxiv|scholarly|internet|web|sources?|reflect|reflection|theory\s+badge\s+graph|theory\s+graph|civilization\s+bounds?|civilization)\b/i.test(
       unquotePrompt(prompt),
@@ -2008,6 +2146,10 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
     const capability = readString(request.capability_id) ?? readString(request.capabilityId);
     return !capability || !compoundDependencyCapabilities.has(capability);
   });
+  if (theoryFormulaDiscoveryPhase && promptNamedCapabilities.size === 0 && compoundDependencyCapabilities.size === 0) {
+    appendDedupe(requests, seen, buildPromptDerivedTheoryReflectionGatewayCallRequests(input.body));
+    return requests.slice(0, 10);
+  }
   const hasNamedDocsSearch = promptNamed.some((request) => readString(request.capability_id) === DOCS_SEARCH_CAPABILITY);
   const activeDocsContext = buildActiveDocsContextWorkstationGatewayCallRequests(input.body);
   if (hasNamedDocsSearch) {
@@ -2042,13 +2184,17 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   ) {
     appendDedupe(requests, seen, buildPromptDerivedCalculatorSolveGatewayCallRequests(input.body));
   }
-  if (!promptNamedCapabilities.has(THEORY_CONTEXT_REFLECTION_CAPABILITY)) {
+  if (
+    !promptNamedCapabilities.has(THEORY_CONTEXT_REFLECTION_CAPABILITY) &&
+    compoundDependencyCapabilities.size === 0
+  ) {
     appendDedupe(requests, seen, buildPromptDerivedTheoryReflectionGatewayCallRequests(input.body));
   }
   if (
     promptNamedCapabilities.size === 0 &&
     (compoundDependencyCapabilities.size === 0 || allowsCompoundAdjunctCapabilities) &&
-    (activeDocsContext.length === 0 || allowsCompoundAdjunctCapabilities)
+    (activeDocsContext.length === 0 || allowsCompoundAdjunctCapabilities) &&
+    !paperBackedNumericBindingPhase
   ) {
     appendDedupe(requests, seen, buildPlannerDerivedWorkstationGatewayCallRequests(input.body));
   }

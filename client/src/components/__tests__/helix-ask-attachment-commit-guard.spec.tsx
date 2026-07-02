@@ -94,6 +94,10 @@ describe("Helix Ask attachment commit guard", () => {
       path.resolve(process.cwd(), "client/src/lib/helix/ask-attachment-prompt-policy.ts"),
       "utf8",
     );
+    const backendEntrypointPolicySource = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/components/helix/ask-console/HelixAskBackendEntrypointPolicy.ts"),
+      "utf8",
+    );
 
     expect(attachmentPromptPolicySource).toContain("HELIX_ASK_PASTED_TEXT_RESUME_RECALL_PROMPT_PATTERN");
     expect(attachmentPromptPolicySource).toContain("pasted\\s+(?:text|memo|note|document)");
@@ -101,11 +105,11 @@ describe("Helix Ask attachment commit guard", () => {
     expect(source).toContain("isHelixAskPastedTextResumeRecallPrompt(trimmed)");
     expect(source).toContain("backendOwnedPastedTextResumeRecall");
     expect(source).toContain("buildHelixAskPastedTextResumeRecallRouteMetadata");
-    expect(source).toContain('source: "conversation_memory_recall"');
-    expect(source).toContain('target_source: "conversation_memory"');
-    expect(source).toContain('must_enter_backend_ask: true');
-    expect(source).toContain('allow_client_shortcut: false');
-    expect(source).toContain('suppressed_routes: ["conversation:simple", "model_only_concept", "workspace_diagnostic"]');
+    expect(backendEntrypointPolicySource).toContain('source: "conversation_memory_recall"');
+    expect(backendEntrypointPolicySource).toContain('target_source: "conversation_memory"');
+    expect(backendEntrypointPolicySource).toContain('must_enter_backend_ask: true');
+    expect(backendEntrypointPolicySource).toContain('allow_client_shortcut: false');
+    expect(backendEntrypointPolicySource).toContain('suppressed_routes: ["conversation:simple", "model_only_concept", "workspace_diagnostic"]');
     expect(source).toContain("options?.bypassWorkstationDispatch === true || backendOwnedPastedTextResumeRecall");
     expect(source).toContain("const simpleConversationTurnLane =");
     expect(source).toContain("isSimpleConversationTurnCandidate(trimmed)");

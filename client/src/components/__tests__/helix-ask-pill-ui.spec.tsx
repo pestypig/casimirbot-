@@ -1473,6 +1473,7 @@ describe("HelixAskPill mic-first surface contract", () => {
       question: questionText,
       content: "Backend Ask was reached, but no server terminal artifact or debug artifact was materialized for this turn.",
       debug: {
+        turn_id: "turn-live-debug-binding",
         turn_transcript_events: [
           {
             source_event_type: "terminal_answer",
@@ -1494,6 +1495,120 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(parsed.selected_final_answer.replace(/\s+/g, " ").trim()).toBe(
       finalText.replace(/\s+/g, " ").trim(),
     );
+  });
+
+  it("does not let a stale debug export ref become the clicked visible reply turn id", () => {
+    const boundaryQuestion =
+      "Boundary test: use docs search and scholarly research, then explain whether calculator-ready numerics exist.";
+    const boundaryFinal =
+      "The available evidence is not sufficient for calculator-ready numeric bindings; the next useful step is targeted extraction.";
+    const staleTurnId = "ask:eaf320fb-a91d-45f7-ba63-11c9c35e22fc";
+    const questionNode = {
+      innerText: `1Questionquestion${boundaryQuestion}user prompt`,
+      textContent: `1Questionquestion${boundaryQuestion}user prompt`,
+      getAttribute: () => null,
+    };
+    const finalNode = {
+      innerText: `15Final answerfinal${boundaryFinal}typed failure | Provider: Codex Workstation Mode`,
+      textContent: `15Final answerfinal${boundaryFinal}typed failure | Provider: Codex Workstation Mode`,
+      getAttribute: (name: string) => name === "data-final-answer-text" ? boundaryFinal : null,
+    };
+    const debugButton = {
+      innerText: "",
+      textContent: "",
+      parentElement: null,
+      querySelector: (selector: string) => {
+        if (selector.includes("question")) return questionNode;
+        if (selector.includes("final")) return finalNode;
+        return null;
+      },
+    } as unknown as HTMLElement;
+
+    const exportText = buildReplyScopedDebugExportFromRenderedButton({
+      id: "reply-boundary-visible",
+      question: boundaryQuestion,
+      content: boundaryFinal,
+      debug: {
+        debug_export_ref: {
+          endpoint: `/api/agi/ask/turn/${staleTurnId}/debug-export`,
+          turn_id: staleTurnId,
+        },
+        backend_debug_response_ref: {
+          endpoint: `/api/agi/ask/turn/${staleTurnId}/debug-export`,
+          turn_id: staleTurnId,
+        },
+      },
+    } as any, debugButton, "rendered_button_scope");
+
+    expect(exportText).toBeTruthy();
+    const parsed = JSON.parse(exportText ?? "{}");
+    expect(parsed.active_turn_id).toBe("reply-boundary-visible");
+    expect(parsed.client_active_turn_id).toBe("reply-boundary-visible");
+    expect(parsed.active_turn_id).not.toBe(staleTurnId);
+    expect(parsed.active_prompt).toBe(boundaryQuestion);
+    expect(parsed.selected_final_answer).toBe(boundaryFinal);
+  });
+
+  it("lets the visible row veto stale debug-copy button attributes", () => {
+    const boundaryQuestion = "UI debug binding retest 178295-second prompt";
+    const boundaryFinal = "Paper-backed values are needed before calculator use.";
+    const staleTurnId = "ask:eaf320fb-a91d-45f7-ba63-11c9c35e22fc";
+    const staleQuestion = "ok, can you grab numerics...";
+    const questionNode = {
+      innerText: `1Questionquestion${boundaryQuestion}user prompt`,
+      textContent: `1Questionquestion${boundaryQuestion}user prompt`,
+      getAttribute: () => null,
+    };
+    const finalNode = {
+      innerText: `15Final answerfinal${boundaryFinal}chat final answer | Provider: Codex Workstation Mode`,
+      textContent: `15Final answerfinal${boundaryFinal}chat final answer | Provider: Codex Workstation Mode`,
+      getAttribute: (name: string) => name === "data-final-answer-text" ? boundaryFinal : null,
+    };
+    const visibleTurnContainer = {
+      innerText: "",
+      textContent: "",
+      parentElement: null,
+      querySelector: (selector: string) => {
+        if (selector.includes("question")) return questionNode;
+        if (selector.includes("final")) return finalNode;
+        return null;
+      },
+    } as unknown as HTMLElement;
+    const debugButton = {
+      innerText: "",
+      textContent: "",
+      parentElement: visibleTurnContainer,
+      getAttribute: (name: string) => {
+        if (name === "data-debug-copy-active-turn-id" || name === "data-turn-control-active-turn-id") return staleTurnId;
+        if (name === "data-debug-copy-client-turn-id" || name === "data-turn-control-client-turn-id") return "reply-visible";
+        if (name === "data-debug-copy-question" || name === "data-turn-control-question") return staleQuestion;
+        if (name === "data-debug-copy-final-answer" || name === "data-turn-control-final-answer") return "3 + 5 = 8";
+        return null;
+      },
+      querySelector: () => null,
+    } as unknown as HTMLElement;
+
+    const exportText = buildReplyScopedDebugExportFromRenderedButton({
+      id: "reply-visible",
+      question: boundaryQuestion,
+      content: boundaryFinal,
+      debug: {
+        turn_id: staleTurnId,
+        active_prompt: staleQuestion,
+        debug_export_ref: {
+          endpoint: `/api/agi/ask/turn/${staleTurnId}/debug-export`,
+          turn_id: staleTurnId,
+        },
+      },
+    } as any, debugButton, "rendered_button_scope");
+
+    expect(exportText).toBeTruthy();
+    const parsed = JSON.parse(exportText ?? "{}");
+    expect(parsed.active_turn_id).toBe("reply-visible");
+    expect(parsed.client_active_turn_id).toBe("reply-visible");
+    expect(parsed.active_turn_id).not.toBe(staleTurnId);
+    expect(parsed.active_prompt).toBe(boundaryQuestion);
+    expect(parsed.selected_final_answer).toBe(boundaryFinal);
   });
 
   it("routes voice lite prompts through normal-turn lane without queued reasoning", () => {
