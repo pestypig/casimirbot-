@@ -773,18 +773,49 @@ export const buildPlannerDerivedWorkstationGatewayCallRequests = (
   const reducePlannerReasoningChainToPrimaryRequest = (
     nextRequests: Record<string, unknown>[],
   ): Record<string, unknown>[] => {
-    if (planned.intent !== "physics_calculation_context") return nextRequests;
-    const reflectionRequest = nextRequests.find((request) =>
-      readString(request.capability_id) === THEORY_CONTEXT_REFLECTION_CAPABILITY
-    );
-    const calculatorRequests = nextRequests.filter((request) =>
-      readString(request.capability_id) === CALCULATOR_SOLVE_EXPRESSION_CAPABILITY
-    );
-    if (!reflectionRequest || calculatorRequests.length === 0) return nextRequests;
-    const affordances = calculatorRequests
-      .map(buildPlannerNextAffordance)
-      .filter((affordance): affordance is Record<string, unknown> => Boolean(affordance));
-    return [attachPlannerNextAffordances(reflectionRequest, affordances)];
+    if (planned.intent === "physics_calculation_context") {
+      const reflectionRequest = nextRequests.find((request) =>
+        readString(request.capability_id) === THEORY_CONTEXT_REFLECTION_CAPABILITY
+      );
+      const calculatorRequests = nextRequests.filter((request) =>
+        readString(request.capability_id) === CALCULATOR_SOLVE_EXPRESSION_CAPABILITY
+      );
+      if (!reflectionRequest || calculatorRequests.length === 0) return nextRequests;
+      const affordances = calculatorRequests
+        .map(buildPlannerNextAffordance)
+        .filter((affordance): affordance is Record<string, unknown> => Boolean(affordance));
+      return [attachPlannerNextAffordances(reflectionRequest, affordances)];
+    }
+    if (planned.intent === "moral_living_substrate_reflection") {
+      const moralRequest = nextRequests.find((request) =>
+        readString(request.capability_id) === MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY
+      );
+      if (!moralRequest) return nextRequests;
+      const affordances = nextRequests
+        .filter((request) => request !== moralRequest)
+        .filter((request) =>
+          [
+            THEORY_CONTEXT_REFLECTION_CAPABILITY,
+            CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+            SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+            INTERNET_SEARCH_CAPABILITY,
+          ].includes(String(readString(request.capability_id) ?? "")),
+        )
+        .map(buildPlannerNextAffordance)
+        .filter((affordance): affordance is Record<string, unknown> => Boolean(affordance));
+      const retained = nextRequests.filter((request) => {
+        if (request === moralRequest) return false;
+        const capability = readString(request.capability_id);
+        return ![
+          THEORY_CONTEXT_REFLECTION_CAPABILITY,
+          CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+          SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+          INTERNET_SEARCH_CAPABILITY,
+        ].includes(String(capability ?? ""));
+      });
+      return [attachPlannerNextAffordances(moralRequest, affordances), ...retained];
+    }
+    return nextRequests;
   };
   const addCalculatorSolve = (expression: string, source: Record<string, unknown>): void => {
     if (blocksCalculatorExecution) return;

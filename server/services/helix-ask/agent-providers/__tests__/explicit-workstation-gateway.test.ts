@@ -721,6 +721,92 @@ describe("explicit workstation gateway derived calls", () => {
     });
   });
 
+  it("keeps broad moral-substrate wording from admitting inferred internet search beside the primary reflection", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "Use moral-graph.reflect_living_substrate_context for organism boundary, sensing, homeostasis, personhood, law, civilization, and non-human living systems. Explain what the procedural chain supports.",
+      },
+    });
+
+    expect(capabilities(requests)).toEqual(["moral-graph.reflect_living_substrate_context"]);
+    expect(capabilities(requests)).not.toContain("internet-search.search_web");
+  });
+
+  it("defers non-explicit external research as a Moral Graph substrate next affordance", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "Use moral-graph.reflect_living_substrate_context for organism boundary, sensing, homeostasis, personhood, law, civilization, and non-human living systems. Explain what the procedural chain supports.",
+        source_target_intent: {
+          selected_capability: "moral-graph.reflect_living_substrate_context",
+          args: {
+            query: "organism boundary, sensing, homeostasis, personhood, law, civilization",
+          },
+        },
+        route_metadata: {
+          source_target_intent: {
+            selected_capability: "internet-search.search_web",
+            args: {
+              query: "organism personhood law civilization moral status",
+            },
+          },
+        },
+      },
+    });
+
+    expect(capabilities(requests)).toEqual(["moral-graph.reflect_living_substrate_context"]);
+    const args = requests[0].arguments as Record<string, any>;
+    expect(args.next_affordances).toEqual([
+      expect.objectContaining({
+        source: "helix_moral_substrate_primary_request_reduction",
+        capability: "internet-search.search_web",
+        purpose: "codex_selected_followup_tool",
+        reason: "available_after_moral_substrate_observation_reentry",
+        query: "organism personhood law civilization moral status",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]);
+    expect(args.source_target_intent.next_affordances).toEqual(args.next_affordances);
+  });
+
+  it("keeps explicitly requested external research adjacent to Moral Graph substrate reflection", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "Use moral-graph.reflect_living_substrate_context for organism boundary and sensing, and also search web sources for current evidence.",
+        source_target_intent: {
+          selected_capability: "moral-graph.reflect_living_substrate_context",
+          args: {
+            query: "organism boundary and sensing",
+          },
+        },
+        route_metadata: {
+          source_target_intent: {
+            selected_capability: "internet-search.search_web",
+            args: {
+              query: "current evidence organism sensing moral status",
+            },
+          },
+        },
+      },
+    });
+
+    expect(capabilities(requests)).toEqual([
+      "moral-graph.reflect_living_substrate_context",
+      "internet-search.search_web",
+    ]);
+    expect((requests[0].arguments as Record<string, any>).next_affordances).toBeUndefined();
+  });
+
   it("does not admit internet search from local current-whitepaper evidence wording", () => {
     const requests = readWorkstationGatewayCallRequestsForTurn({
       includePlannerDerived: true,
@@ -962,10 +1048,9 @@ describe("explicit workstation gateway derived calls", () => {
     });
 
     expect(capabilities(requests)).toEqual([
-      "theory-badge-graph.reflect_discussion_context",
       "moral-graph.reflect_living_substrate_context",
     ]);
-    expect(requests[1]).toMatchObject({
+    expect(requests[0]).toMatchObject({
       capability_id: "moral-graph.reflect_living_substrate_context",
       arguments: {
         source_target_intent: expect.objectContaining({
@@ -973,6 +1058,15 @@ describe("explicit workstation gateway derived calls", () => {
         }),
       },
     });
+    const args = requests[0].arguments as Record<string, any>;
+    expect(args.next_affordances).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        capability: "theory-badge-graph.reflect_discussion_context",
+        purpose: "codex_selected_followup_tool",
+        reason: "available_after_observation_reentry",
+      }),
+    ]));
+    expect(args.source_target_intent.next_affordances).toEqual(args.next_affordances);
   });
 
   it("keeps planner-derived theory plus calculator chains to a primary reflection request", () => {
