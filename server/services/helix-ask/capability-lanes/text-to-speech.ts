@@ -98,14 +98,30 @@ const buildObservationPacket = (input: {
       : input.status === "missing_input"
         ? ["ask_user", "repair"]
         : ["repair", "fail_closed"],
-  produced_affordances: [],
+  produced_affordances: input.receipt
+    ? [{
+        schema: "helix.workstation_typed_affordance.v1",
+        kind: "voice_playback_receipt",
+        role: "producer",
+        source_capability: CAPABILITY_ID,
+        artifact_ref: input.receipt.receipt_ref,
+        source_refs: [
+          input.receipt.source_observation_ref,
+          input.receipt.backend_receipt_ref,
+          input.receipt.audio_ref,
+        ].filter((value): value is string => Boolean(value)),
+        status: "available",
+        assistant_answer: false,
+        raw_content_included: false,
+      }]
+    : [],
   consumed_affordances: [],
   typed_handoff_contract: {
     schema: "helix.workstation_typed_handoff_contract.v1",
     producer_capability: CAPABILITY_ID,
     consumer_capability: null,
     required_affordance_kinds: [],
-    produced_affordance_kinds: ["voice_text_evidence"],
+    produced_affordance_kinds: input.receipt ? ["voice_playback_receipt"] : [],
     missing_affordance_kinds: [],
     terminal_eligible: false,
     assistant_answer: false,

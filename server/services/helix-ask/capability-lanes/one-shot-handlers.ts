@@ -20,6 +20,11 @@ import {
   type HelixTextToSpeechOneShotResult,
 } from "@shared/helix-text-to-speech-lane";
 import {
+  HELIX_SPEECH_TO_TEXT_ONE_SHOT_REQUEST_SCHEMA,
+  type HelixSpeechToTextOneShotRequest,
+  type HelixSpeechToTextOneShotResult,
+} from "@shared/helix-speech-to-text-lane";
+import {
   HELIX_WORKSTATION_TOOL_REFERENCE_LIST_REQUEST_SCHEMA,
   type HelixWorkstationToolReferenceListRequest,
   type HelixWorkstationToolReferenceListResult,
@@ -27,6 +32,7 @@ import {
 import type { HelixAgentProvider } from "../agent-providers/types";
 import { runLiveTranslationTranslateText } from "./live-translation";
 import { resolveHelixCapabilityLaneRequest } from "./registry";
+import { runSpeechToTextTranscribeAudio } from "./speech-to-text";
 import { runTextToSpeechSpeakText } from "./text-to-speech";
 import { runUtilityTextNormalizeText } from "./utility-text";
 import { runWorkstationToolReferenceListCapabilities } from "./workstation-tool-reference";
@@ -52,6 +58,7 @@ export type HelixCapabilityLaneShadowOneShotResult = {
 
 export type HelixCapabilityLaneOneShotCallResult =
   | HelixLiveTranslationOneShotResult
+  | HelixSpeechToTextOneShotResult
   | HelixTextToSpeechOneShotResult
   | HelixUtilityTextNormalizeResult
   | HelixWorkstationToolReferenceListResult
@@ -280,6 +287,39 @@ const toTextToSpeechSpeakTextRequest = (
   };
 };
 
+const toSpeechToTextTranscribeAudioRequest = (
+  call: RecordLike,
+  turnId: string | null,
+): HelixSpeechToTextOneShotRequest | null => {
+  const capability = readHelixCapabilityLaneCallCapability(call);
+  if (capability !== "speech_to_text.transcribe_audio") return null;
+  return {
+    schema: HELIX_SPEECH_TO_TEXT_ONE_SHOT_REQUEST_SCHEMA,
+    capability: "speech_to_text.transcribe_audio",
+    transcript_text: readString(call.transcript_text ?? call.transcriptText ?? call.text) || null,
+    audio_ref: readString(call.audio_ref ?? call.audioRef) || null,
+    audio_hash: readString(call.audio_hash ?? call.audioHash) || null,
+    language: readString(call.language ?? call.source_language ?? call.sourceLanguage) || null,
+    locale: readString(call.locale) || null,
+    confidence: typeof call.confidence === "number" ? call.confidence : null,
+    requested_backend_provider:
+      readString(call.requested_backend_provider ?? call.requestedBackendProvider) || null,
+    turn_id: readString(call.turn_id ?? call.turnId) || turnId,
+    thread_id: readString(call.thread_id ?? call.threadId) || null,
+    room_id: readString(call.room_id ?? call.roomId) || null,
+    environment_id: readString(call.environment_id ?? call.environmentId) || null,
+    source_id: readString(call.source_id ?? call.sourceId) || null,
+    capture_session_id: readString(call.capture_session_id ?? call.captureSessionId) || null,
+    chunk_id: readString(call.chunk_id ?? call.chunkId) || null,
+    chunk_index: typeof call.chunk_index === "number" ? call.chunk_index : null,
+    duration_ms: typeof call.duration_ms === "number" ? call.duration_ms : null,
+    capture_source: readString(call.capture_source ?? call.captureSource) || null,
+    source_event_ms: typeof call.source_event_ms === "number" ? call.source_event_ms : null,
+    assistant_answer: false,
+    terminal_eligible: false,
+  };
+};
+
 const toWorkstationToolReferenceListRequest = (
   call: RecordLike,
   turnId: string | null,
@@ -376,6 +416,32 @@ const textToSpeechHandler: HelixCapabilityLaneOneShotHandler = {
   },
 };
 
+const speechToTextHandler: HelixCapabilityLaneOneShotHandler = {
+  capabilityPrefix: "speech_to_text.",
+  laneId: "speech_to_text",
+  run(input) {
+    const request = toSpeechToTextTranscribeAudioRequest(input.call, input.turnId);
+    if (!request) {
+      return buildShadowResult({
+        provider: input.provider,
+        laneId: "speech_to_text",
+        capability: readHelixCapabilityLaneCallCapability(input.call) || "speech_to_text.unknown",
+        requestedBackendProvider: readString(input.call.requested_backend_provider ?? input.call.requestedBackendProvider) || null,
+        turnId: input.turnId,
+        iteration: input.iteration,
+        env: input.env,
+      });
+    }
+    return runSpeechToTextTranscribeAudio({
+      provider: input.provider,
+      request,
+      turnId: input.turnId,
+      iteration: input.iteration,
+      env: input.env,
+    });
+  },
+};
+
 const workstationToolReferenceHandler: HelixCapabilityLaneOneShotHandler = {
   capabilityPrefix: "workstation_tool_reference.",
   laneId: "workstation_tool_reference",
@@ -427,7 +493,7 @@ export const HELIX_CAPABILITY_LANE_ONE_SHOT_HANDLERS: HelixCapabilityLaneOneShot
   shadowHandler("interactive_text", "interactive_text."),
   shadowHandler("deliberate_text", "deliberate_text."),
   shadowHandler("code_text", "code_text."),
-  shadowHandler("speech_to_text", "speech_to_text."),
+  speechToTextHandler,
   textToSpeechHandler,
   shadowHandler("visual_analysis", "visual_analysis."),
   workstationToolReferenceHandler,

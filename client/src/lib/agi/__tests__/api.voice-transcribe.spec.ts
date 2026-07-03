@@ -5,12 +5,22 @@ let runConversationTurn: typeof import("@/lib/agi/api").runConversationTurn;
 let askLocal: typeof import("@/lib/agi/api").askLocal;
 let runAskTurn: typeof import("@/lib/agi/api").runAskTurn;
 let runAskTurnStream: typeof import("@/lib/agi/api").runAskTurnStream;
+let runCapabilityLaneOneShot: typeof import("@/lib/agi/api").runCapabilityLaneOneShot;
+let runCapabilityLaneSessionControl: typeof import("@/lib/agi/api").runCapabilityLaneSessionControl;
 let getVoiceCallDiagnosticsSnapshot: typeof import("@/lib/helix/voice-call-diagnostics").getVoiceCallDiagnosticsSnapshot;
 let clearVoiceCallDiagnosticsSnapshot: typeof import("@/lib/helix/voice-call-diagnostics").clearVoiceCallDiagnosticsSnapshot;
 
 beforeAll(async () => {
   (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
-  ({ transcribeVoice, runConversationTurn, askLocal, runAskTurn, runAskTurnStream } = await import("@/lib/agi/api"));
+  ({
+    transcribeVoice,
+    runConversationTurn,
+    askLocal,
+    runAskTurn,
+    runAskTurnStream,
+    runCapabilityLaneOneShot,
+    runCapabilityLaneSessionControl,
+  } = await import("@/lib/agi/api"));
   ({ getVoiceCallDiagnosticsSnapshot, clearVoiceCallDiagnosticsSnapshot } = await import(
     "@/lib/helix/voice-call-diagnostics"
   ));
@@ -797,6 +807,242 @@ describe("askLocal lane parity default", () => {
       tool_name: "live_env.record_live_source_mail_decision",
       terminal_forbidden: true,
     });
+  });
+
+  it("serializes runAskTurn capability lane calls without embedding them in prompt text", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          text: "Lane accepted.",
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await runAskTurn({
+      question: "Run the governed STT lane proof.",
+      agentRuntime: "codex",
+      capability_lane_call: [
+        {
+          capability: "speech_to_text.transcribe_audio",
+          audio_ref: "voice:audio:test",
+          transcript_text: "hello workstation",
+          source_id: "audio_transcript:helix-ask:desktop",
+        },
+        {
+          capability: "live_translation.translate_text",
+          text: "hello workstation",
+          target_language: "es",
+        },
+      ],
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const body = JSON.parse(String(requestInit.body ?? "{}")) as Record<string, any>;
+    expect(body.question).toBe("Run the governed STT lane proof.");
+    expect(body.question).not.toContain("speech_to_text.transcribe_audio");
+    expect(body.agent_runtime).toBe("codex");
+    expect(body.capability_lane_call).toEqual([
+      expect.objectContaining({
+        capability: "speech_to_text.transcribe_audio",
+        audio_ref: "voice:audio:test",
+        transcript_text: "hello workstation",
+      }),
+      expect.objectContaining({
+        capability: "live_translation.translate_text",
+        text: "hello workstation",
+        target_language: "es",
+      }),
+    ]);
+  });
+
+  it("serializes runAskTurn capability lane session calls without embedding them in prompt text", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          text: "Lane session accepted.",
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await runAskTurn({
+      question: "Start account-language document translation for the active Docs Viewer.",
+      agentRuntime: "codex",
+      capability_lane_session_call: {
+        action: "start",
+        lane_id: "live_translation",
+        requested_backend_provider: "live_translation.local_runtime",
+        source_binding: {
+          source_id: "docs:research/nhm2-current-status-whitepaper-2026-05-02.md",
+          source_hash: "sha256:doc-a",
+          source_kind: "docs",
+          projection_target: "docs_viewer.inline_translation",
+          account_locale: "es-US",
+          target_language: "es",
+        },
+      },
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const body = JSON.parse(String(requestInit.body ?? "{}")) as Record<string, any>;
+    expect(body.question).toBe("Start account-language document translation for the active Docs Viewer.");
+    expect(body.question).not.toContain("capability_lane_session_call");
+    expect(body.question).not.toContain("live_translation.local_runtime");
+    expect(body.agent_runtime).toBe("codex");
+    expect(body.capability_lane_session_call).toEqual(
+      expect.objectContaining({
+        action: "start",
+        lane_id: "live_translation",
+        requested_backend_provider: "live_translation.local_runtime",
+        source_binding: expect.objectContaining({
+          source_id: "docs:research/nhm2-current-status-whitepaper-2026-05-02.md",
+          source_hash: "sha256:doc-a",
+          source_kind: "docs",
+          projection_target: "docs_viewer.inline_translation",
+          account_locale: "es-US",
+          target_language: "es",
+        }),
+      }),
+    );
+  });
+
+  it("posts one-shot capability lane calls to the standalone lane endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ok: true,
+          schema: "helix.capability_lane.one_shot_response.v1",
+          requested: true,
+          capability_lane_call_results: [
+            {
+              ok: true,
+              lane_id: "live_translation",
+              capability: "live_translation.translate_text",
+              translated_text: "hola",
+              terminal_eligible: false,
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+          ],
+          capability_lane_reentry_status: "observation_packet_required_for_provider_reentry",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await runCapabilityLaneOneShot({
+      agentRuntime: "codex",
+      capability_lane_call: {
+        capability: "live_translation.translate_text",
+        text: "hello",
+        source_language: "en",
+        target_language: "es",
+      },
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/agi/capability-lanes/one-shot");
+    const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const body = JSON.parse(String(requestInit.body ?? "{}")) as Record<string, any>;
+    expect(requestInit.method).toBe("POST");
+    expect(body).not.toHaveProperty("question");
+    expect(body.agent_runtime).toBe("codex");
+    expect(body.capability_lane_call).toEqual(
+      expect.objectContaining({
+        capability: "live_translation.translate_text",
+        text: "hello",
+        target_language: "es",
+      }),
+    );
+    expect(response).toEqual(
+      expect.objectContaining({
+        schema: "helix.capability_lane.one_shot_response.v1",
+        requested: true,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    );
+  });
+
+  it("posts capability lane session control calls to the standalone session endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ok: true,
+          schema: "helix.capability_lane.session_control_response.v1",
+          capability_lane_session_debug_summaries: [
+            {
+              lane_id: "live_translation",
+              lifecycle_action: "start",
+              session_lifecycle_action: "start",
+              session_control_key: "lane-session-docs-route::document_markdown:docs/example.md",
+            },
+          ],
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await runCapabilityLaneSessionControl({
+      agentRuntime: "codex",
+      capability_lane_session_call: {
+        action: "start",
+        lane_id: "live_translation",
+        source_binding: {
+          source_id: "docs:example.md",
+          source_hash: "sha256:doc-a",
+          source_kind: "docs",
+          projection_target: "docs_viewer.inline_translation",
+          target_language: "es",
+        },
+      },
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/agi/capability-lanes/session");
+    const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const body = JSON.parse(String(requestInit.body ?? "{}")) as Record<string, any>;
+    expect(requestInit.method).toBe("POST");
+    expect(body.agent_runtime).toBe("codex");
+    expect(body.capability_lane_session_call).toEqual(
+      expect.objectContaining({
+        action: "start",
+        lane_id: "live_translation",
+        source_binding: expect.objectContaining({
+          source_id: "docs:example.md",
+          projection_target: "docs_viewer.inline_translation",
+          target_language: "es",
+        }),
+      }),
+    );
+    expect(response).toEqual(
+      expect.objectContaining({
+        schema: "helix.capability_lane.session_control_response.v1",
+      }),
+    );
   });
 
   it("enables golden-path runtime markers when runAskTurn uses Helix runtime", async () => {

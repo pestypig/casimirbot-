@@ -17,11 +17,14 @@ export type HelixLiveTranslationTerminalAuthorityStatus =
 
 export type HelixLiveTranslationUiProjection = {
   key: string;
+  projectionKey?: string | null;
   status: HelixLiveTranslationUiProjectionStatus;
   projectionTarget: string;
   sourceId: string;
   sourceHash?: string;
   sourceKind: string | null;
+  sourceTextHash?: string | null;
+  sourceTextCharCount?: number | null;
   accountLocale: string | null;
   chunkId: string;
   chunkIndex: number | null;
@@ -32,6 +35,15 @@ export type HelixLiveTranslationUiProjection = {
   observationRef: string | null;
   receiptRef: string | null;
   laneSessionId: string | null;
+  observationLaneSessionId: string | null;
+  goalBindingId: string | null;
+  sessionControlKey?: string | null;
+  sourceBindingKey?: string | null;
+  latestObservationKey?: string | null;
+  latestMailLoopObservationKey?: string | null;
+  goalBindingKey?: string | null;
+  latestEventId: string | null;
+  hasObservation: boolean;
   selectedBackendProvider: string | null;
   observedAtMs: number | null;
   sourceEventMs: number | null;
@@ -48,6 +60,8 @@ export type HelixLiveTranslationUiProjectionTrafficSummary = {
   sourceId: string;
   sourceHash?: string;
   sourceKind: string | null;
+  latestSourceTextHash?: string | null;
+  latestSourceTextCharCount?: number | null;
   accountLocale: string | null;
   projectionTarget: string;
   targetLanguage: string;
@@ -65,6 +79,15 @@ export type HelixLiveTranslationUiProjectionTrafficSummary = {
   latestObservationRef: string | null;
   latestReceiptRef: string | null;
   latestLaneSessionId: string | null;
+  latestObservationLaneSessionId: string | null;
+  latestGoalBindingId: string | null;
+  latestSessionControlKey?: string | null;
+  latestSourceBindingKey?: string | null;
+  latestObservationKey?: string | null;
+  latestMailLoopObservationKey?: string | null;
+  latestGoalBindingKey?: string | null;
+  latestEventId: string | null;
+  latestHasObservation: boolean;
   selectedBackendProvider: string | null;
   terminalEligible: false;
   assistantAnswer: false;
@@ -82,12 +105,23 @@ export type HelixLiveTranslationUiProjectionSelection = {
   displayText: string | null;
   sourceId: string;
   sourceKind: string | null;
+  sourceTextHash?: string | null;
+  sourceTextCharCount?: number | null;
   accountLocale: string | null;
   projectionTarget: string | null;
   targetLanguage: string | null;
   observationRef: string | null;
   receiptRef: string | null;
   laneSessionId: string | null;
+  observationLaneSessionId: string | null;
+  goalBindingId: string | null;
+  sessionControlKey?: string | null;
+  sourceBindingKey?: string | null;
+  latestObservationKey?: string | null;
+  latestMailLoopObservationKey?: string | null;
+  goalBindingKey?: string | null;
+  latestEventId: string | null;
+  hasObservation: boolean;
   selectedBackendProvider: string | null;
   terminalAuthorityStatus: HelixLiveTranslationTerminalAuthorityStatus;
   terminalEligible: false;
@@ -99,6 +133,8 @@ export type SelectHelixLiveTranslationUiProjectionInput = {
   projections: HelixLiveTranslationUiProjection[];
   sourceId: string;
   sourceHash?: string | null;
+  sourceTextHash?: string | null;
+  sourceTextCharCount?: number | null;
   projectionTarget?: string | null;
   targetLanguage?: string | null;
   chunkId?: string | null;
@@ -110,9 +146,18 @@ export type HelixLiveTranslationInlineUnitState = {
   status: "ready" | "error";
   text?: string;
   error?: string;
+  projectionKey?: string | null;
   observationRef: string | null;
   receiptRef: string | null;
   laneSessionId: string | null;
+  observationLaneSessionId: string | null;
+  goalBindingId: string | null;
+  sourceBindingKey?: string | null;
+  latestObservationKey?: string | null;
+  latestMailLoopObservationKey?: string | null;
+  goalBindingKey?: string | null;
+  latestEventId: string | null;
+  hasObservation: boolean;
   selectedBackendProvider: string | null;
   terminalAuthorityStatus: HelixLiveTranslationTerminalAuthorityStatus;
   projectionStatus: HelixLiveTranslationUiProjectionSelectionStatus;
@@ -126,6 +171,8 @@ export type HelixLiveTranslationInlineUnitState = {
   sourceId: string | null;
   sourceHash?: string | null;
   sourceKind: string | null;
+  sourceTextHash?: string | null;
+  sourceTextCharCount?: number | null;
   accountLocale: string | null;
   projectionTarget: string | null;
   targetLanguage: string | null;
@@ -176,6 +223,9 @@ const readNumber = (value: unknown): number | null => {
 const readBoolean = (value: unknown): boolean =>
   value === true;
 
+const readOptionalBoolean = (value: unknown): boolean | null =>
+  typeof value === "boolean" ? value : null;
+
 const readTerminalAuthorityStatus = (
   value: unknown,
 ): HelixLiveTranslationTerminalAuthorityStatus =>
@@ -188,6 +238,17 @@ const projectionSourceHashMatches = (
   sourceHash: string | null,
 ): boolean =>
   !sourceHash ? true : projection.sourceHash === sourceHash;
+
+const projectionSourceTextIdentityMatches = (
+  projection: HelixLiveTranslationUiProjection,
+  input: Pick<SelectHelixLiveTranslationUiProjectionInput, "sourceTextHash" | "sourceTextCharCount">,
+): boolean => {
+  const sourceTextHash = readString(input.sourceTextHash) || null;
+  const sourceTextCharCount = readNumber(input.sourceTextCharCount);
+  if (sourceTextHash && projection.sourceTextHash !== sourceTextHash) return false;
+  if (sourceTextCharCount !== null && projection.sourceTextCharCount !== sourceTextCharCount) return false;
+  return true;
+};
 
 const sortLatestProjectionFirst = (
   left: HelixLiveTranslationUiProjection,
@@ -251,6 +312,11 @@ const readReceiptsFromCallResults = (results: unknown[]): RecordLike[] =>
         receipt_ref: null,
         observation_ref: observation.observation_ref,
         lane_session_id: observation.lane_session_id,
+        session_control_key: observation.session_control_key,
+        source_binding_key: observation.source_binding_key,
+        latest_observation_key: observation.latest_observation_key,
+        latest_mail_loop_observation_key: observation.latest_mail_loop_observation_key,
+        goal_binding_key: observation.goal_binding_key,
         selected_backend_provider: observation.selected_backend_provider,
         lane_id: "live_translation",
         capability: "live_translation.translate_text",
@@ -283,8 +349,18 @@ const readReceiptsFromCallResults = (results: unknown[]): RecordLike[] =>
 
 const normalizeProjection = (receipt: RecordLike): HelixLiveTranslationUiProjection | null => {
   const payload = readRecord(receipt.payload);
-  const projectionTarget = readString(receipt.projection_target) || readString(payload?.projection_target) || "unknown";
-  const sourceId = readString(receipt.source_id) || readString(payload?.source_id) || "unknown_source";
+  const projectionTarget =
+    readString(receipt.projection_target) ||
+    readString(receipt.projectionTarget) ||
+    readString(payload?.projection_target) ||
+    readString(payload?.projectionTarget) ||
+    "unknown";
+  const sourceId =
+    readString(receipt.source_id) ||
+    readString(receipt.sourceId) ||
+    readString(payload?.source_id) ||
+    readString(payload?.sourceId) ||
+    "unknown_source";
   const sourceHash =
     readString(receipt.source_hash) ||
     readString(receipt.sourceHash) ||
@@ -293,26 +369,75 @@ const normalizeProjection = (receipt: RecordLike): HelixLiveTranslationUiProject
     null;
   const chunkId =
     readString(receipt.chunk_id) ||
+    readString(receipt.chunkId) ||
     readString(payload?.chunk_id) ||
+    readString(payload?.chunkId) ||
     readString(receipt.observation_ref) ||
+    readString(receipt.observationRef) ||
     "unknown_chunk";
-  const targetLanguage = readString(receipt.target_language) || readString(payload?.target_language);
+  const targetLanguage =
+    readString(receipt.target_language) ||
+    readString(receipt.targetLanguage) ||
+    readString(payload?.target_language) ||
+    readString(payload?.targetLanguage);
   const rawStatus = (
     readString(receipt.projection_status) ||
+    readString(receipt.projectionStatus) ||
     readString(payload?.projection_status) ||
+    readString(payload?.projectionStatus) ||
     readString(receipt.status)
   ).toLowerCase();
   const status: HelixLiveTranslationUiProjectionStatus =
-    rawStatus === "cancelled" || readBoolean(receipt.cancel_requested) || readBoolean(payload?.cancel_requested)
+    rawStatus === "cancelled" ||
+      readBoolean(receipt.cancel_requested) ||
+      readBoolean(receipt.cancelRequested) ||
+      readBoolean(payload?.cancel_requested) ||
+      readBoolean(payload?.cancelRequested)
       ? "cancelled"
       : rawStatus === "failed"
         ? "failed"
-        : rawStatus === "stale" || readBoolean(receipt.stale) || readBoolean(payload?.stale)
+        : rawStatus === "stale" ||
+            readBoolean(receipt.stale) ||
+            readBoolean(receipt.isStale) ||
+            readBoolean(payload?.stale) ||
+            readBoolean(payload?.isStale)
           ? "stale"
           : "projected";
   const translatedText = status === "cancelled" || status === "failed"
     ? null
-    : readString(receipt.translated_text) || readString(payload?.translated_text) || null;
+    : readString(receipt.translated_text) ||
+      readString(receipt.translatedText) ||
+      readString(payload?.translated_text) ||
+      readString(payload?.translatedText) ||
+      null;
+  const observationRef = readString(receipt.observation_ref) || readString(receipt.observationRef) || null;
+  const receiptRef = readString(receipt.receipt_ref) || readString(receipt.receiptRef) || null;
+  const hasObservation =
+    readOptionalBoolean(receipt.has_observation) ??
+    readOptionalBoolean(receipt.hasObservation) ??
+    readOptionalBoolean(payload?.has_observation) ??
+    readOptionalBoolean(payload?.hasObservation) ??
+    Boolean(observationRef);
+  const sourceBindingKey =
+    readString(receipt.source_binding_key) || readString(receipt.sourceBindingKey) ||
+    readString(payload?.source_binding_key) || readString(payload?.sourceBindingKey) || null;
+  const sessionControlKey =
+    readString(receipt.session_control_key) || readString(receipt.sessionControlKey) ||
+    readString(receipt.lane_session_control_key) || readString(receipt.laneSessionControlKey) ||
+    readString(payload?.session_control_key) || readString(payload?.sessionControlKey) ||
+    readString(payload?.lane_session_control_key) || readString(payload?.laneSessionControlKey) || null;
+  const latestObservationKey =
+    readString(receipt.latest_observation_key) || readString(receipt.latestObservationKey) ||
+    readString(payload?.latest_observation_key) || readString(payload?.latestObservationKey) || null;
+  const latestMailLoopObservationKey =
+    readString(receipt.latest_mail_loop_observation_key) || readString(receipt.latestMailLoopObservationKey) ||
+    readString(payload?.latest_mail_loop_observation_key) || readString(payload?.latestMailLoopObservationKey) || null;
+  const goalBindingKey =
+    readString(receipt.goal_binding_key) || readString(receipt.goalBindingKey) ||
+    readString(payload?.goal_binding_key) || readString(payload?.goalBindingKey) || null;
+  const projectionKey =
+    readString(receipt.projection_key) || readString(receipt.projectionKey) ||
+    readString(payload?.projection_key) || readString(payload?.projectionKey) || null;
   return {
     key: [
       projectionTarget,
@@ -320,31 +445,89 @@ const normalizeProjection = (receipt: RecordLike): HelixLiveTranslationUiProject
       sourceHash,
       chunkId,
       targetLanguage,
-      readString(receipt.dedupe_key) || readString(payload?.dedupe_key),
-      readString(receipt.source_event_id) || readString(payload?.source_event_id),
+      readString(receipt.dedupe_key) || readString(receipt.dedupeKey) ||
+        readString(payload?.dedupe_key) || readString(payload?.dedupeKey),
+      readString(receipt.source_event_id) || readString(receipt.sourceEventId) ||
+      readString(payload?.source_event_id) || readString(payload?.sourceEventId),
     ].filter(Boolean).join("|"),
+    ...(projectionKey ? { projectionKey } : {}),
     status,
     projectionTarget,
     sourceId,
     ...(sourceHash ? { sourceHash } : {}),
-    sourceKind: readString(receipt.source_kind) || readString(payload?.source_kind) || null,
-    accountLocale: readString(receipt.account_locale) || readString(payload?.account_locale) || null,
+    sourceKind:
+      readString(receipt.source_kind) || readString(receipt.sourceKind) ||
+      readString(payload?.source_kind) || readString(payload?.sourceKind) || null,
+    ...(readString(receipt.source_text_hash) || readString(receipt.sourceTextHash) ||
+      readString(payload?.source_text_hash) || readString(payload?.sourceTextHash)
+      ? {
+        sourceTextHash:
+          readString(receipt.source_text_hash) || readString(receipt.sourceTextHash) ||
+          readString(payload?.source_text_hash) || readString(payload?.sourceTextHash),
+      }
+      : {}),
+    ...(typeof (
+      readNumber(receipt.source_text_char_count) ?? readNumber(receipt.sourceTextCharCount) ??
+      readNumber(payload?.source_text_char_count) ?? readNumber(payload?.sourceTextCharCount)
+    ) === "number"
+      ? {
+        sourceTextCharCount:
+          readNumber(receipt.source_text_char_count) ?? readNumber(receipt.sourceTextCharCount) ??
+          readNumber(payload?.source_text_char_count) ?? readNumber(payload?.sourceTextCharCount),
+      }
+      : {}),
+    accountLocale:
+      readString(receipt.account_locale) || readString(receipt.accountLocale) ||
+      readString(payload?.account_locale) || readString(payload?.accountLocale) || null,
     chunkId,
-    chunkIndex: readNumber(receipt.chunk_index) ?? readNumber(payload?.chunk_index),
-    dedupeKey: readString(receipt.dedupe_key) || readString(payload?.dedupe_key) || null,
-    sourceEventId: readString(receipt.source_event_id) || readString(payload?.source_event_id) || null,
+    chunkIndex:
+      readNumber(receipt.chunk_index) ?? readNumber(receipt.chunkIndex) ??
+      readNumber(payload?.chunk_index) ?? readNumber(payload?.chunkIndex),
+    dedupeKey:
+      readString(receipt.dedupe_key) || readString(receipt.dedupeKey) ||
+      readString(payload?.dedupe_key) || readString(payload?.dedupeKey) || null,
+    sourceEventId:
+      readString(receipt.source_event_id) || readString(receipt.sourceEventId) ||
+      readString(payload?.source_event_id) || readString(payload?.sourceEventId) || null,
     targetLanguage,
     translatedText,
-    observationRef: readString(receipt.observation_ref) || null,
-    receiptRef: readString(receipt.receipt_ref) || null,
-    laneSessionId: readString(receipt.lane_session_id) || readString(payload?.lane_session_id) || null,
+    observationRef,
+    receiptRef,
+    laneSessionId:
+      readString(receipt.lane_session_id) || readString(receipt.laneSessionId) ||
+      readString(payload?.lane_session_id) || readString(payload?.laneSessionId) || null,
+    observationLaneSessionId:
+      readString(receipt.observation_lane_session_id) || readString(receipt.observationLaneSessionId) ||
+      readString(payload?.observation_lane_session_id) || readString(payload?.observationLaneSessionId) || null,
+    goalBindingId:
+      readString(receipt.goal_binding_id) || readString(receipt.goalBindingId) ||
+      readString(payload?.goal_binding_id) || readString(payload?.goalBindingId) || null,
+    ...(sessionControlKey ? { sessionControlKey } : {}),
+    ...(sourceBindingKey ? { sourceBindingKey } : {}),
+    ...(latestObservationKey ? { latestObservationKey } : {}),
+    ...(latestMailLoopObservationKey ? { latestMailLoopObservationKey } : {}),
+    ...(goalBindingKey ? { goalBindingKey } : {}),
+    latestEventId:
+      readString(receipt.latest_event_id) || readString(receipt.latestEventId) ||
+      readString(payload?.latest_event_id) || readString(payload?.latestEventId) || null,
+    hasObservation,
     selectedBackendProvider:
-      readString(receipt.selected_backend_provider) || readString(payload?.selected_backend_provider) || null,
-    observedAtMs: readNumber(receipt.observed_at_ms) ?? readNumber(payload?.observed_at_ms),
-    sourceEventMs: readNumber(receipt.source_event_ms) ?? readNumber(payload?.source_event_ms),
-    freshnessStatus: readString(receipt.freshness_status) || readString(payload?.freshness_status) || "unknown",
+      readString(receipt.selected_backend_provider) || readString(receipt.selectedBackendProvider) ||
+      readString(payload?.selected_backend_provider) || readString(payload?.selectedBackendProvider) || null,
+    observedAtMs:
+      readNumber(receipt.observed_at_ms) ?? readNumber(receipt.observedAtMs) ??
+      readNumber(payload?.observed_at_ms) ?? readNumber(payload?.observedAtMs),
+    sourceEventMs:
+      readNumber(receipt.source_event_ms) ?? readNumber(receipt.sourceEventMs) ??
+      readNumber(payload?.source_event_ms) ?? readNumber(payload?.sourceEventMs),
+    freshnessStatus:
+      readString(receipt.freshness_status) || readString(receipt.freshnessStatus) ||
+      readString(payload?.freshness_status) || readString(payload?.freshnessStatus) || "unknown",
     terminalAuthorityStatus: readTerminalAuthorityStatus(
-      receipt.terminal_authority_status ?? payload?.terminal_authority_status,
+      receipt.terminal_authority_status ??
+        receipt.terminalAuthorityStatus ??
+        payload?.terminal_authority_status ??
+        payload?.terminalAuthorityStatus,
     ),
     stale: status === "stale",
     cancelRequested: status === "cancelled",
@@ -420,6 +603,8 @@ export function summarizeHelixLiveTranslationUiProjectionTraffic(
       sourceId: latest?.sourceId ?? "unknown_source",
       ...(latest?.sourceHash ? { sourceHash: latest.sourceHash } : {}),
       sourceKind: latest?.sourceKind ?? null,
+      ...(latest?.sourceTextHash ? { latestSourceTextHash: latest.sourceTextHash } : {}),
+      ...(typeof latest?.sourceTextCharCount === "number" ? { latestSourceTextCharCount: latest.sourceTextCharCount } : {}),
       accountLocale: latest?.accountLocale ?? null,
       projectionTarget: latest?.projectionTarget ?? "unknown",
       targetLanguage: latest?.targetLanguage ?? "",
@@ -437,6 +622,17 @@ export function summarizeHelixLiveTranslationUiProjectionTraffic(
       latestObservationRef: latest?.observationRef ?? null,
       latestReceiptRef: latest?.receiptRef ?? null,
       latestLaneSessionId: latest?.laneSessionId ?? null,
+      latestObservationLaneSessionId: latest?.observationLaneSessionId ?? null,
+      latestGoalBindingId: latest?.goalBindingId ?? null,
+      ...(latest?.sessionControlKey ? { latestSessionControlKey: latest.sessionControlKey } : {}),
+      ...(latest?.sourceBindingKey ? { latestSourceBindingKey: latest.sourceBindingKey } : {}),
+      ...(latest?.latestObservationKey ? { latestObservationKey: latest.latestObservationKey } : {}),
+      ...(latest?.latestMailLoopObservationKey
+        ? { latestMailLoopObservationKey: latest.latestMailLoopObservationKey }
+        : {}),
+      ...(latest?.goalBindingKey ? { latestGoalBindingKey: latest.goalBindingKey } : {}),
+      latestEventId: latest?.latestEventId ?? null,
+      latestHasObservation: latest?.hasObservation ?? false,
       selectedBackendProvider: latest?.selectedBackendProvider ?? null,
       terminalEligible: false,
       assistantAnswer: false,
@@ -466,6 +662,7 @@ export function selectHelixLiveTranslationUiProjection(
   const candidates = input.projections
     .filter((projection) => projection.sourceId === sourceId)
     .filter((projection) => projectionSourceHashMatches(projection, sourceHash))
+    .filter((projection) => projectionSourceTextIdentityMatches(projection, input))
     .filter((projection) => !projectionTarget || projection.projectionTarget === projectionTarget)
     .filter((projection) => !targetLanguage || localeMatches(projection.targetLanguage, targetLanguage))
     .filter((projection) => !chunkId || projection.chunkId === chunkId)
@@ -487,6 +684,10 @@ export function selectHelixLiveTranslationUiProjection(
       observationRef: null,
       receiptRef: null,
       laneSessionId: null,
+      observationLaneSessionId: null,
+      goalBindingId: null,
+      latestEventId: null,
+      hasObservation: false,
       selectedBackendProvider: null,
       terminalAuthorityStatus: "not_terminal_authority",
       terminalEligible: false,
@@ -508,12 +709,25 @@ export function selectHelixLiveTranslationUiProjection(
     displayText: canDisplay ? projection.translatedText : null,
     sourceId: projection.sourceId,
     sourceKind: projection.sourceKind,
+    ...(projection.sourceTextHash ? { sourceTextHash: projection.sourceTextHash } : {}),
+    ...(typeof projection.sourceTextCharCount === "number" ? { sourceTextCharCount: projection.sourceTextCharCount } : {}),
     accountLocale: projection.accountLocale,
     projectionTarget: projection.projectionTarget,
     targetLanguage: projection.targetLanguage,
     observationRef: projection.observationRef,
     receiptRef: projection.receiptRef,
     laneSessionId: projection.laneSessionId,
+    observationLaneSessionId: projection.observationLaneSessionId,
+    goalBindingId: projection.goalBindingId,
+    ...(projection.sessionControlKey ? { sessionControlKey: projection.sessionControlKey } : {}),
+    ...(projection.sourceBindingKey ? { sourceBindingKey: projection.sourceBindingKey } : {}),
+    ...(projection.latestObservationKey ? { latestObservationKey: projection.latestObservationKey } : {}),
+    ...(projection.latestMailLoopObservationKey
+      ? { latestMailLoopObservationKey: projection.latestMailLoopObservationKey }
+      : {}),
+    ...(projection.goalBindingKey ? { goalBindingKey: projection.goalBindingKey } : {}),
+    latestEventId: projection.latestEventId,
+    hasObservation: projection.hasObservation,
     selectedBackendProvider: projection.selectedBackendProvider,
     terminalAuthorityStatus: projection.terminalAuthorityStatus,
     terminalEligible: false,
@@ -538,12 +752,25 @@ function buildHelixLiveTranslationUiProjectionSelectionFromProjection(
     displayText: canDisplay ? projection.translatedText : null,
     sourceId: projection.sourceId,
     sourceKind: projection.sourceKind,
+    ...(projection.sourceTextHash ? { sourceTextHash: projection.sourceTextHash } : {}),
+    ...(typeof projection.sourceTextCharCount === "number" ? { sourceTextCharCount: projection.sourceTextCharCount } : {}),
     accountLocale: projection.accountLocale,
     projectionTarget: projection.projectionTarget,
     targetLanguage: projection.targetLanguage,
     observationRef: projection.observationRef,
     receiptRef: projection.receiptRef,
     laneSessionId: projection.laneSessionId,
+    observationLaneSessionId: projection.observationLaneSessionId,
+    goalBindingId: projection.goalBindingId,
+    ...(projection.sessionControlKey ? { sessionControlKey: projection.sessionControlKey } : {}),
+    ...(projection.sourceBindingKey ? { sourceBindingKey: projection.sourceBindingKey } : {}),
+    ...(projection.latestObservationKey ? { latestObservationKey: projection.latestObservationKey } : {}),
+    ...(projection.latestMailLoopObservationKey
+      ? { latestMailLoopObservationKey: projection.latestMailLoopObservationKey }
+      : {}),
+    ...(projection.goalBindingKey ? { goalBindingKey: projection.goalBindingKey } : {}),
+    latestEventId: projection.latestEventId,
+    hasObservation: projection.hasObservation,
     selectedBackendProvider: projection.selectedBackendProvider,
     terminalAuthorityStatus: projection.terminalAuthorityStatus,
     terminalEligible: false,
@@ -601,9 +828,21 @@ export function buildHelixLiveTranslationInlineUnitStates(
       next[unitId] = {
         status: "ready",
         text: resolved.displayText,
+        ...(resolved.projection?.projectionKey ? { projectionKey: resolved.projection.projectionKey } : {}),
         observationRef: resolved.observationRef,
         receiptRef: resolved.receiptRef,
         laneSessionId: resolved.laneSessionId,
+        observationLaneSessionId: resolved.observationLaneSessionId,
+        goalBindingId: resolved.goalBindingId,
+        ...(resolved.sessionControlKey ? { sessionControlKey: resolved.sessionControlKey } : {}),
+        ...(resolved.sourceBindingKey ? { sourceBindingKey: resolved.sourceBindingKey } : {}),
+        ...(resolved.latestObservationKey ? { latestObservationKey: resolved.latestObservationKey } : {}),
+        ...(resolved.latestMailLoopObservationKey
+          ? { latestMailLoopObservationKey: resolved.latestMailLoopObservationKey }
+          : {}),
+        ...(resolved.goalBindingKey ? { goalBindingKey: resolved.goalBindingKey } : {}),
+        latestEventId: resolved.latestEventId,
+        hasObservation: resolved.hasObservation,
         selectedBackendProvider: resolved.selectedBackendProvider,
         terminalAuthorityStatus: resolved.terminalAuthorityStatus,
         projectionStatus: resolved.status,
@@ -617,6 +856,10 @@ export function buildHelixLiveTranslationInlineUnitStates(
         sourceId: resolved.projection?.sourceId ?? input.sourceId,
         ...(resolved.projection?.sourceHash ? { sourceHash: resolved.projection.sourceHash } : {}),
         sourceKind: resolved.projection?.sourceKind ?? null,
+        ...(resolved.projection?.sourceTextHash ? { sourceTextHash: resolved.projection.sourceTextHash } : {}),
+        ...(typeof resolved.projection?.sourceTextCharCount === "number"
+          ? { sourceTextCharCount: resolved.projection.sourceTextCharCount }
+          : {}),
         accountLocale: resolved.projection?.accountLocale ?? null,
         projectionTarget: resolved.projectionTarget,
         targetLanguage: resolved.targetLanguage,
@@ -630,9 +873,21 @@ export function buildHelixLiveTranslationInlineUnitStates(
     next[unitId] = {
       status: "error",
       error: resolved.reason,
+      ...(resolved.projection?.projectionKey ? { projectionKey: resolved.projection.projectionKey } : {}),
       observationRef: resolved.observationRef,
       receiptRef: resolved.receiptRef,
       laneSessionId: resolved.laneSessionId,
+      observationLaneSessionId: resolved.observationLaneSessionId,
+      goalBindingId: resolved.goalBindingId,
+      ...(resolved.sessionControlKey ? { sessionControlKey: resolved.sessionControlKey } : {}),
+      ...(resolved.sourceBindingKey ? { sourceBindingKey: resolved.sourceBindingKey } : {}),
+      ...(resolved.latestObservationKey ? { latestObservationKey: resolved.latestObservationKey } : {}),
+      ...(resolved.latestMailLoopObservationKey
+        ? { latestMailLoopObservationKey: resolved.latestMailLoopObservationKey }
+        : {}),
+      ...(resolved.goalBindingKey ? { goalBindingKey: resolved.goalBindingKey } : {}),
+      latestEventId: resolved.latestEventId,
+      hasObservation: resolved.hasObservation,
       selectedBackendProvider: resolved.selectedBackendProvider,
       terminalAuthorityStatus: resolved.terminalAuthorityStatus,
       projectionStatus: resolved.status,
@@ -646,6 +901,10 @@ export function buildHelixLiveTranslationInlineUnitStates(
       sourceId: resolved.projection?.sourceId ?? input.sourceId,
       ...(resolved.projection?.sourceHash ? { sourceHash: resolved.projection.sourceHash } : {}),
       sourceKind: resolved.projection?.sourceKind ?? null,
+      ...(resolved.projection?.sourceTextHash ? { sourceTextHash: resolved.projection.sourceTextHash } : {}),
+      ...(typeof resolved.projection?.sourceTextCharCount === "number"
+        ? { sourceTextCharCount: resolved.projection.sourceTextCharCount }
+        : {}),
       accountLocale: resolved.projection?.accountLocale ?? null,
       projectionTarget: resolved.projectionTarget,
       targetLanguage: resolved.targetLanguage,

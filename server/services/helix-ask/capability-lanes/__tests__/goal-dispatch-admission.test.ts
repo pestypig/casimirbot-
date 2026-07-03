@@ -25,6 +25,7 @@ const buildPlan = (
   goal_binding_id: "goal-binding-admission",
   goal_id: "goal:admission",
   lane_session_id: "lane-session-admission",
+  session_control_key: "lane-session-admission::docs:admission::sha256:admission::docs_chunk::es-US::es",
   lane_id: "live_translation",
   source_id: "docs:admission",
   source_hash: "sha256:admission",
@@ -41,6 +42,7 @@ const buildPlan = (
   latest_projection_target: "docs_chunk",
   target_language: "es",
   latest_cancel_requested: false,
+  latest_mail_loop_wake_kind: target === "ask_wake" ? "mailbox_wake" : "none",
   permissions: {
     read: true,
     observe: true,
@@ -85,6 +87,17 @@ describe("capability lane goal dispatch admission", () => {
       "eligible_manual_review",
       "admitted_debug_only",
     ]);
+    expect(admissions.map((admission) => admission.latest_mail_loop_wake_kind)).toEqual([
+      "mailbox_wake",
+      "none",
+      "none",
+      "none",
+      "none",
+    ]);
+    expect(admissions.every((admission) =>
+      admission.session_control_key ===
+        "lane-session-admission::docs:admission::sha256:admission::docs_chunk::es-US::es"
+    )).toBe(true);
     expect(admissions.every((admission) => (
       admission.blocked_reason === null &&
       admission.side_effects_allowed === false &&

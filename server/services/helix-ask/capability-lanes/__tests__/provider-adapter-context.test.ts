@@ -77,6 +77,7 @@ const mailLoopSummary = (
   receipt_ref: "ask:lane:translation:mail-obs:projection:receipt",
   stage_play_mail_id: "stage-play-mail-provider-goal",
   stage_play_wake_expected: true,
+  stage_play_wake_kind: "mailbox_wake",
   mailbox_thread_id: "ask-thread-provider-goal",
   source_id: "document_markdown:docs/research/nhm2.md",
   source_kind: "document_markdown",
@@ -117,12 +118,12 @@ describe("capability lane provider adapter context", () => {
     const helix = buildHelixCapabilityLaneProviderAdapterContext({
       provider: buildProvider("helix"),
       body,
-      env: {} as NodeJS.ProcessEnv,
+      env: { STT_LOCAL_URL: "http://127.0.0.1:9000" } as NodeJS.ProcessEnv,
     });
     const codex = buildHelixCapabilityLaneProviderAdapterContext({
       provider: buildProvider("codex"),
       body,
-      env: {} as NodeJS.ProcessEnv,
+      env: { STT_LOCAL_URL: "http://127.0.0.1:9000" } as NodeJS.ProcessEnv,
     });
 
     expect(helix).toMatchObject({
@@ -197,6 +198,50 @@ describe("capability lane provider adapter context", () => {
     expect(codex.debug_projection.model_visible_capability_lane_manifest).toEqual(
       codex.model_visible_capability_lane_manifest,
     );
+    expect(codex.debug_projection.capability_lane_turn_timeline).toEqual(
+      codex.capability_lane_turn_timeline,
+    );
+    expect(codex.capability_lane_turn_timeline).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        schema: "helix.capability_lane.provider_timeline_event.v1",
+        stage: "lane_visible",
+        selected_runtime_agent_provider: "codex",
+        lane_id: "live_translation",
+        capability_id: "live_translation.translate_text",
+        lane_visible: true,
+        lane_requested: false,
+        lane_executed: false,
+        observation_reentered: false,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+      expect.objectContaining({
+        stage: "lane_requested",
+        lane_id: "utility_text",
+        capability_id: "utility_text.normalize_text",
+        lane_visible: false,
+        lane_requested: true,
+        lane_executed: false,
+      }),
+      expect.objectContaining({
+        stage: "lane_observation",
+        lane_id: "utility_text",
+        capability_id: "utility_text.normalize_text",
+        status: "completed",
+        lane_visible: false,
+        lane_requested: true,
+        lane_executed: true,
+        terminal_authority_status: "pending_helix_terminal_authority",
+      }),
+      expect.objectContaining({
+        stage: "lane_reentered",
+        lane_id: "capability_lane",
+        capability_id: "capability_lane.reentry",
+        observation_reentered: true,
+        terminal_authority_status: "pending_helix_terminal_authority",
+      }),
+    ]));
     const promptVisibleTranslation = codex.model_visible_capability_lane_manifest.lanes
       .flatMap((lane) => lane.capabilities)
       .find((capability) => capability.capability_id === "live_translation.translate_text");
@@ -208,14 +253,28 @@ describe("capability lane provider adapter context", () => {
       assistant_answer: false,
     });
     expect(promptVisibleTranslation?.when_not_to_use).toContain("docs-viewer.read_active_translation");
+    const promptVisibleSpeechToText = codex.model_visible_capability_lane_manifest.lanes
+      .flatMap((lane) => lane.capabilities)
+      .find((capability) => capability.capability_id === "speech_to_text.transcribe_audio");
+    expect(promptVisibleSpeechToText).toMatchObject({
+      required_input_fields: ["audio_ref"],
+      result_authority: "observation_or_receipt_only",
+      reentry_required: true,
+      terminal_eligible: false,
+      assistant_answer: false,
+    });
     expect(codex.prompt_observation_block).toContain("hello workstation");
     expect(codex.prompt_observation_block).toContain("utility_text.normalize_text");
     expect(codex.prompt_observation_block).toContain("model_visible_capability_lane_manifest");
     expect(codex.prompt_observation_block).toContain("live_translation.translate_text");
+    expect(codex.prompt_observation_block).toContain("speech_to_text.transcribe_audio");
     expect(codex.prompt_observation_block).toContain("docs-viewer.read_active_translation");
     expect(codex.prompt_observation_block).toContain("lane_outputs_are_not_final_answers");
     expect(codex.prompt_observation_block).toContain("capability_lane_observation_packets");
     expect(codex.prompt_observation_block).toContain("capability_lane_backend_selections");
+    expect(codex.prompt_observation_block).toContain("capability_lane_turn_timeline");
+    expect(codex.prompt_observation_block).toContain("lane_visible");
+    expect(codex.prompt_observation_block).toContain("lane_observation");
     expect(codex.prompt_observation_block).toContain("capability_lane_session_debug_summaries");
     expect(codex.prompt_observation_block).toContain("capability_lane_reentry_status");
   });
@@ -280,6 +339,10 @@ describe("capability lane provider adapter context", () => {
         source_id: "docs:nhm2",
         projection_target: "docs_chunk",
         account_locale: "es-US",
+        latest_event_id: "lane-session-provider-context:start:200",
+        has_observation: false,
+        last_observation_ref: null,
+        last_receipt_ref: null,
         backend_provider_becomes_root_agent: false,
         final_reports_require_terminal_authority: true,
         terminal_eligible: false,
@@ -287,9 +350,46 @@ describe("capability lane provider adapter context", () => {
         raw_content_included: false,
       }),
     ]);
+    expect(context.capability_lane_turn_timeline).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        stage: "lane_session",
+        selected_runtime_agent_provider: "codex",
+        lane_id: "live_translation",
+        capability_id: null,
+        status: "running",
+        lane_visible: false,
+        lane_requested: true,
+        lane_executed: false,
+        observation_reentered: false,
+        selected_backend_provider: "live_translation.local_runtime",
+        observation_ref: null,
+        receipt_ref: null,
+        latest_event_id: "lane-session-provider-context:start:200",
+        lifecycle_action: "start",
+        session_lifecycle_action: "start",
+        session_action: "start",
+        session_control_key: "lane-session-provider-context::docs:nhm2::docs_chunk::es-US",
+        source_binding_key: "docs:nhm2::docs_chunk::es-US",
+        latest_observation_key: null,
+        has_observation: false,
+        source_id: "docs:nhm2",
+        source_kind: "docs",
+        source_projection_target: "docs_chunk",
+        account_locale: "es-US",
+        latest_projection_target: "docs_chunk",
+        terminal_authority_status: "not_terminal_authority",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]));
     expect(context.prompt_observation_block).toContain("capability_lane_session_results");
     expect(context.prompt_observation_block).toContain("capability_lane_session_debug_summaries");
     expect(context.prompt_observation_block).toContain("lane-session-provider-context");
+    expect(context.prompt_observation_block).toContain("has_observation");
+    expect(context.prompt_observation_block).toContain("latest_event_id");
+    expect(context.prompt_observation_block).toContain("session_lifecycle_action");
+    expect(context.prompt_observation_block).toContain("source_binding_key");
     expect(context.prompt_observation_block).toContain("fallback_selected");
     expect(context.prompt_observation_block).toContain("final_reports_require_terminal_authority");
   });
@@ -376,6 +476,197 @@ describe("capability lane provider adapter context", () => {
     expect(context.prompt_observation_block).toContain("goal-binding-provider-context");
     expect(context.prompt_observation_block).toContain("goal:account-language-translation");
     expect(context.prompt_observation_block).toContain("backend_provider_becomes_root_agent");
+    expect(context.prompt_observation_block).toContain("final_reports_require_terminal_authority");
+  });
+
+  it("packages goal-bound speech, translation, and voice lane sessions as one non-terminal workflow", () => {
+    const sessionStore = createHelixCapabilityLaneSessionStore();
+    const goalBindingStore = createHelixCapabilityLaneGoalBindingStore({ sessionStore });
+    const context = buildHelixCapabilityLaneProviderAdapterContext({
+      provider: buildProvider("codex"),
+      sessionStore,
+      goalBindingStore,
+      body: {
+        turn_id: "turn-provider-adapter-audio-goal-composition",
+        capability_lane_session_call: [
+          {
+            action: "start",
+            lane_id: "speech_to_text",
+            lane_session_id: "lane-session-audio-goal-stt",
+            source_binding: {
+              source_id: "microphone:desktop",
+              source_kind: "audio",
+              projection_target: "audio_chunk",
+              account_locale: "en-US",
+            },
+            now_ms: 300,
+          },
+          {
+            action: "record_observation",
+            lane_session_id: "lane-session-audio-goal-stt",
+            observation_ref: "ask:lane:stt:audio-goal-observation",
+            receipt_ref: "stage_play_live_source_mail:audio-goal-stt",
+            source_id: "microphone:desktop",
+            source_kind: "audio",
+            chunk_id: "audio-goal-chunk-0",
+            chunk_index: 0,
+            observed_at_ms: 325,
+            freshness_status: "fresh",
+            source_text_hash: "audio-goal-transcript-hash",
+            source_text_char_count: 17,
+            projection_target: "audio_chunk",
+            now_ms: 325,
+          },
+          {
+            action: "start",
+            lane_id: "live_translation",
+            lane_session_id: "lane-session-audio-goal-translation",
+            source_binding: {
+              source_id: "audio_transcript:helix-ask:desktop",
+              source_kind: "audio",
+              projection_target: "audio_chunk",
+              account_locale: "en-US",
+              target_language: "es",
+            },
+            now_ms: 330,
+          },
+          {
+            action: "start",
+            lane_id: "text_to_speech",
+            lane_session_id: "lane-session-audio-goal-tts",
+            source_binding: {
+              source_id: "ask:lane:translation:audio-goal-observation",
+              source_kind: "ask_turn",
+              projection_target: "voice_playback",
+              account_locale: "es-US",
+            },
+            now_ms: 335,
+          },
+        ],
+        capability_lane_goal_binding_call: [
+          {
+            action: "bind",
+            goal_binding_id: "goal-binding-audio-goal-stt",
+            goal_id: "goal:audio-translation-playback",
+            lane_session_id: "lane-session-audio-goal-stt",
+            activation_policy: "while_goal_active",
+            attention_policy: "quiet_until_salient",
+            stop_condition: "goal_complete",
+            report_policy: "debug_only",
+            quiet_behavior: "record_only",
+            now_ms: 340,
+          },
+          {
+            action: "bind",
+            goal_binding_id: "goal-binding-audio-goal-translation",
+            goal_id: "goal:audio-translation-playback",
+            lane_session_id: "lane-session-audio-goal-translation",
+            activation_policy: "while_goal_active",
+            attention_policy: "quiet_until_salient",
+            stop_condition: "goal_complete",
+            report_policy: "debug_only",
+            quiet_behavior: "record_only",
+            now_ms: 345,
+          },
+          {
+            action: "bind",
+            goal_binding_id: "goal-binding-audio-goal-tts",
+            goal_id: "goal:audio-translation-playback",
+            lane_session_id: "lane-session-audio-goal-tts",
+            activation_policy: "while_goal_active",
+            attention_policy: "quiet_until_salient",
+            stop_condition: "goal_complete",
+            report_policy: "debug_only",
+            quiet_behavior: "record_only",
+            now_ms: 350,
+          },
+        ],
+      },
+      env: { STT_LOCAL_URL: "http://127.0.0.1:9000" } as NodeJS.ProcessEnv,
+    });
+
+    const goalSummaries = context.debug_projection.capability_lane_goal_binding_debug_summaries;
+
+    expect(context.calls_succeeded).toBe(true);
+    expect(context.debug_projection.capability_lane_session_results).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          ok: true,
+          lane_id: "speech_to_text",
+          session_supported: true,
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        }),
+        expect.objectContaining({
+          ok: true,
+          lane_id: "live_translation",
+          session_supported: true,
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        }),
+        expect.objectContaining({
+          ok: true,
+          lane_id: "text_to_speech",
+          session_supported: true,
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        }),
+      ]),
+    );
+    expect(goalSummaries.map((summary) => summary.lane_id)).toEqual([
+      "speech_to_text",
+      "live_translation",
+      "text_to_speech",
+    ]);
+    expect(goalSummaries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          goal_id: "goal:audio-translation-playback",
+          lane_session_id: "lane-session-audio-goal-stt",
+          lane_id: "speech_to_text",
+          selected_backend_provider: "speech_to_text.openai_compatible",
+          last_observation_ref: "ask:lane:stt:audio-goal-observation",
+          last_receipt_ref: "stage_play_live_source_mail:audio-goal-stt",
+          latest_source_kind: "audio",
+          latest_projection_target: "audio_chunk",
+          source_text_hash: "audio-goal-transcript-hash",
+          source_text_char_count: 17,
+          final_reports_require_terminal_authority: true,
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        }),
+        expect.objectContaining({
+          goal_id: "goal:audio-translation-playback",
+          lane_session_id: "lane-session-audio-goal-translation",
+          lane_id: "live_translation",
+          source_id: "audio_transcript:helix-ask:desktop",
+          target_language: "es",
+          final_reports_require_terminal_authority: true,
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        }),
+        expect.objectContaining({
+          goal_id: "goal:audio-translation-playback",
+          lane_session_id: "lane-session-audio-goal-tts",
+          lane_id: "text_to_speech",
+          source_id: "ask:lane:translation:audio-goal-observation",
+          source_projection_target: "voice_playback",
+          final_reports_require_terminal_authority: true,
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        }),
+      ]),
+    );
+    expect(context.prompt_observation_block).toContain("goal:audio-translation-playback");
+    expect(context.prompt_observation_block).toContain("speech_to_text");
+    expect(context.prompt_observation_block).toContain("live_translation");
+    expect(context.prompt_observation_block).toContain("text_to_speech");
     expect(context.prompt_observation_block).toContain("final_reports_require_terminal_authority");
   });
 
@@ -534,6 +825,47 @@ describe("capability lane provider adapter context", () => {
         final_reports_require_terminal_authority: true,
       }),
     );
+    expect(context.capability_lane_turn_timeline).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        stage: "goal_binding",
+        selected_runtime_agent_provider: "codex",
+        lane_id: "live_translation",
+        status: "bound",
+        lane_visible: false,
+        lane_requested: true,
+        lane_executed: true,
+        observation_reentered: true,
+        selected_backend_provider: "live_translation.local_runtime",
+        observation_ref: "stage-play-mail-provider-goal",
+        receipt_ref: "ask:lane:translation:mail-obs:projection:receipt",
+        latest_event_id: "lane-session-provider-goal-mail:record_observation:250",
+        has_observation: true,
+        source_id: "document_markdown:docs/research/nhm2.md",
+        source_kind: "document_markdown",
+        source_projection_target: "docs_chunk",
+        account_locale: "es-US",
+        latest_chunk_id: "chunk-provider-goal",
+        latest_chunk_index: 4,
+        latest_source_id: "document_markdown:docs/research/nhm2.md",
+        latest_source_kind: "document_markdown",
+        latest_dedupe_key: "docs/research/nhm2.md:chunk-provider-goal:es",
+        latest_source_event_id: "docs/research/nhm2.md:event-provider-goal",
+        latest_source_event_ms: 240,
+        latest_observed_at_ms: 250,
+        latest_freshness_status: "fresh",
+        latest_projection_target: "docs_chunk",
+        target_language: "es",
+        latest_cancel_requested: false,
+        latest_mail_loop_wake_kind: "mailbox_wake",
+        report_action: "wake_on_salience",
+        report_reason: "goal_binding_policy_requests_wake_on_salience",
+        report_summary_text: expect.stringContaining("goal lane wake on salience"),
+        terminal_authority_status: "pending_helix_terminal_authority",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]));
     expect(context.prompt_observation_block).toContain("stage-play-mail-provider-goal");
     expect(context.prompt_observation_block).toContain("capability_lane_mail_loop_debug_summaries");
     expect(context.prompt_observation_block).toContain("wake_on_salience");
@@ -691,6 +1023,7 @@ describe("capability lane provider adapter context", () => {
     });
 
     const receipt = context.projection_receipts[0];
+    const receiptPayload = receipt?.payload as Record<string, unknown> | undefined;
     expect(context.calls_succeeded).toBe(true);
     expect(context.projection_receipts).toHaveLength(1);
     expect(receipt).toMatchObject({
@@ -709,6 +1042,7 @@ describe("capability lane provider adapter context", () => {
       schema: "helix.live_translation.projection_receipt.v1",
       lane_id: "live_translation",
       capability: "live_translation.translate_text",
+      projection_key: expect.any(String),
       projection_target: "docs_chunk",
       projection_status: "stale",
       source_id: "docs:nhm2",
@@ -728,6 +1062,7 @@ describe("capability lane provider adapter context", () => {
       raw_content_included: false,
     });
     expect(context.one_shot.resolve_traces[0]?.receipt_ref).toBe(receipt?.receipt_ref);
+    expect(String(receiptPayload?.projection_key ?? "")).toContain(receipt?.receipt_ref ?? "");
     expect(context.one_shot.backend_selections[0]?.receipt_ref).toBe(receipt?.receipt_ref);
     expect(context.one_shot.debug_events[2]?.receipt_ref).toBe(receipt?.receipt_ref);
     expect(context.debug_projection.capability_lane_projection_receipts).toEqual([
@@ -740,7 +1075,39 @@ describe("capability lane provider adapter context", () => {
         raw_content_included: false,
       }),
     ]);
+    expect(context.capability_lane_turn_timeline).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        stage: "lane_projection_receipt",
+        selected_runtime_agent_provider: "codex",
+        lane_id: "live_translation",
+        capability_id: "live_translation.translate_text",
+        status: "stale",
+        lane_visible: false,
+        lane_requested: true,
+        lane_executed: true,
+        observation_reentered: false,
+        observation_ref: receipt?.observation_ref,
+        receipt_ref: receipt?.receipt_ref,
+        source_id: "docs:nhm2",
+        latest_chunk_id: "chunk-11",
+        latest_chunk_index: 11,
+        latest_target_language: "fr",
+        latest_dedupe_key: "docs:nhm2:chunk-11:fr",
+        latest_source_event_ms: 1,
+        latest_freshness_status: "stale",
+        source_text_hash: expect.any(String),
+        source_text_char_count: "thank you".length,
+        latest_projection_target: "docs_chunk",
+        target_language: "fr",
+        latest_cancel_requested: false,
+        terminal_authority_status: "not_terminal_authority",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]));
     expect(context.prompt_observation_block).toContain("capability_lane_projection_receipts");
+    expect(context.prompt_observation_block).toContain("lane_projection_receipt");
     expect(context.prompt_observation_block).toContain(receipt?.receipt_ref ?? "");
     expect(context.prompt_observation_block).toContain("live_translation_projection");
   });

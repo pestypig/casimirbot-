@@ -142,6 +142,7 @@ const buildProviderProjectionFields = (input: {
     capability_lane_observation_packets: input.providerDebug.capability_lane_observation_packets ?? [],
     capability_lane_projection_receipts: input.providerDebug.capability_lane_projection_receipts ?? [],
     capability_lane_debug_events: input.providerDebug.capability_lane_debug_events ?? [],
+    capability_lane_turn_timeline: input.providerDebug.capability_lane_turn_timeline ?? [],
     capability_lane_session_results:
       input.providerDebug.capability_lane_session_results ?? [],
     capability_lane_session_debug_summaries:

@@ -283,9 +283,11 @@ describe("Helix Ask Console recrown boundary", () => {
       "HelixAskTextAttachment.ts",
       "HelixAskStatusLine.tsx",
       "HelixAskConsoleStatusSurfaces.tsx",
+      "HelixAskConsoleErrorLineSurface.tsx",
       "HelixAskVoiceLevelMonitor.tsx",
       "HelixAskObserverLane.tsx",
       "HelixAskSteeringQueuePanel.tsx",
+      "HelixAskSteeringQueueSurface.tsx",
       "HelixAskContextCapsulePreview.tsx",
       "HelixAskSituationRoomSourcePanel.tsx",
       "HelixAskVoiceConfirmationPanel.tsx",
@@ -480,6 +482,8 @@ describe("Helix Ask Console recrown boundary", () => {
       "pure_display_already_recrowned",
       "pure_display_already_recrowned",
       "pure_display_already_recrowned",
+      "pure_display_already_recrowned",
+      "pure_display_already_recrowned",
       "behavior_sensitive_recrowned_with_parity",
       "behavior_sensitive_recrowned_with_parity",
       "behavior_sensitive_recrowned_with_parity",
@@ -553,7 +557,7 @@ describe("Helix Ask Console recrown boundary", () => {
       simplifiedMinimalShellIsDefault: false,
       bridgeReplacementReady: false,
       liveDayToDaySliceCount: 1,
-      pureDisplayRecrownedSliceCount: 12,
+      pureDisplayRecrownedSliceCount: 14,
       behaviorSensitiveRecrownedWithParitySliceCount: 61,
       behaviorSensitiveQuarantinedSliceCount: 4,
       unknownTrapDoorSliceCount: 1,
@@ -3086,8 +3090,8 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(legacyPill).toContain("surface={");
     expect(legacyPill).toContain("goalPill={");
     expect(legacyPill).toContain("<HelixAskGoalPillSurface");
-    expect(legacyPill).toContain("steeringQueue={null}");
-    expect(legacyPill).toContain("errorLine={<HelixAskConsoleErrorSurface message={askError} />}");
+    expect(legacyPill).toContain("steeringQueue={<HelixAskSteeringQueueSurface />}");
+    expect(legacyPill).toContain("errorLine={<HelixAskConsoleErrorLineSurface message={askError} />}");
     expect(legacyPill).toContain("turnList={chronologicalAskReplies.length > 0 || visibleActiveTurnStreamRows.length > 0 ? (");
     expect(legacyPill).toContain("debugDrawer={");
     expect(legacyPill).toContain("<HelixAskDebugDrawerSurface");
@@ -5495,12 +5499,20 @@ describe("Helix Ask Console recrown boundary", () => {
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
     const statusLine = read("client/src/components/helix/ask-console/HelixAskStatusLine.tsx");
     const statusSurfaces = read("client/src/components/helix/ask-console/HelixAskConsoleStatusSurfaces.tsx");
+    const errorLineSurface = read("client/src/components/helix/ask-console/HelixAskConsoleErrorLineSurface.tsx");
 
-    expect(legacyPill).toContain("<HelixAskConsoleErrorSurface message={askError} />");
+    expect(legacyPill).toContain("<HelixAskConsoleErrorLineSurface message={askError} />");
     expect(legacyPill).toContain("setAskError");
+    expect(legacyPill).not.toContain("<HelixAskConsoleErrorSurface message={askError} />");
     expect(legacyPill).not.toContain("<HelixAskErrorLine message={askError} />");
     expect(legacyPill).not.toContain('<p className="mt-3 text-xs text-rose-200">{askError}</p>');
 
+    expect(errorLineSurface).toContain("export function HelixAskConsoleErrorLineSurface");
+    expect(errorLineSurface).toContain("<HelixAskConsoleErrorSurface message={message} />");
+    expect(errorLineSurface).not.toContain("setAskError");
+    expect(errorLineSurface).not.toContain("fetch(");
+    expect(errorLineSurface).not.toContain("navigator.clipboard");
+    expect(errorLineSurface).not.toContain("speechSynthesis");
     expect(statusSurfaces).toContain("export function HelixAskConsoleErrorSurface");
     expect(statusSurfaces).toContain("<HelixAskErrorLine message={message} />");
     expect(statusLine).toContain("export function HelixAskErrorLine");
@@ -5660,17 +5672,19 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(supplementSurface).toContain("events={observerLaneEvents}");
   });
 
-  it("keeps the legacy steering queue component recrowned but unmounted from the day-to-day bridge", () => {
+  it("owns the legacy steering queue slot while preserving empty day-to-day behavior", () => {
     const legacyPill = read("client/src/components/helix/HelixAskPill.tsx");
     const steeringPanel = read("client/src/components/helix/ask-console/HelixAskSteeringQueuePanel.tsx");
+    const steeringSurface = read("client/src/components/helix/ask-console/HelixAskSteeringQueueSurface.tsx");
     const steeringDisplay = read("client/src/lib/helix/ask-steering-queue-display.ts");
 
+    expect(legacyPill).toContain("<HelixAskSteeringQueueSurface />");
     expect(legacyPill).not.toContain("<HelixAskSteeringQueuePanel");
     expect(legacyPill).not.toContain("items={steeringQueueItems}");
     expect(legacyPill).not.toContain("activeCount={activeSteeringQueueCount}");
     expect(legacyPill).not.toContain("expanded={steeringQueueExpanded}");
     expect(legacyPill).not.toContain("onToggleExpanded={() => setSteeringQueueExpanded((current) => !current)}");
-    expect(legacyPill).toContain("steeringQueue={null}");
+    expect(legacyPill).not.toContain("steeringQueue={null}");
     expect(legacyPill).toContain("buildHelixAskSteeringQueueItems");
     expect(legacyPill).toContain("shouldAutoWakeHelixMailboxQueueItem");
     expect(legacyPill).not.toContain("steeringQueueItems.map((item, index)");
@@ -5678,6 +5692,15 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(legacyPill).not.toContain("readHelixSteeringQueueItemClass(item)");
     expect(legacyPill).not.toContain("readHelixSteeringQueueDotClass(item)");
 
+    expect(steeringSurface).toContain("export function HelixAskSteeringQueueSurface");
+    expect(steeringSurface).toContain("return null");
+    expect(steeringSurface).toContain("<HelixAskSteeringQueuePanel");
+    expect(steeringSurface).not.toContain("setSteeringQueueExpanded");
+    expect(steeringSurface).not.toContain("buildHelixAskSteeringQueueItems");
+    expect(steeringSurface).not.toContain("shouldAutoWakeHelixMailboxQueueItem");
+    expect(steeringSurface).not.toContain("fetch(");
+    expect(steeringSurface).not.toContain("navigator.clipboard");
+    expect(steeringSurface).not.toContain("speechSynthesis");
     expect(steeringPanel).toContain("export function HelixAskSteeringQueuePanel");
     expect(steeringPanel).toContain("if (items.length === 0) return null");
     expect(steeringPanel).toContain('aria-label="Helix Ask steering queue"');

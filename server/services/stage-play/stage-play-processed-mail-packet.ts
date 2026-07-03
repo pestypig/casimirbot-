@@ -23,6 +23,7 @@ import {
   type StagePlayProcessedMailPacketV1,
   type StagePlaySceneBeatHypothesisV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
+import { HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK } from "@shared/helix-live-translation-projection-target";
 import type {
   StagePlayLiveSourceInterpreterProfileComparisonV1,
   StagePlayLiveSourceInterpreterProfileV1,
@@ -328,14 +329,19 @@ type DocumentMarkdownVisibleUnit = {
 type DocumentMarkdownVisibleUnitsPayload = {
   docPath: string | null;
   sourceHash: string | null;
+  sourceTextHash: string | null;
+  sourceTextCharCount: number | null;
   chunkId: string | null;
   chunkIndex: number | null;
+  laneSessionId: string | null;
+  sessionControlKey: string | null;
   dedupeKey: string | null;
   sourceEventId: string | null;
   sourceEventMs: number | null;
   locale: string;
   targetLanguage: string;
   accountLocale: string;
+  projectionTarget: string;
   freshnessStatus: string;
   units: DocumentMarkdownVisibleUnit[];
 };
@@ -366,14 +372,24 @@ const readDocumentMarkdownVisibleUnitsPayload = (
   return {
     docPath: readStringFromJson(parsed, "doc_path") ?? readStringFromJson(parsed, "docPath"),
     sourceHash: readStringFromJson(parsed, "source_hash") ?? readStringFromJson(parsed, "sourceHash"),
+    sourceTextHash: readStringFromJson(parsed, "source_text_hash") ?? readStringFromJson(parsed, "sourceTextHash"),
+    sourceTextCharCount:
+      readNumberFromJson(parsed, "source_text_char_count") ?? readNumberFromJson(parsed, "sourceTextCharCount"),
     chunkId: readStringFromJson(parsed, "chunk_id") ?? readStringFromJson(parsed, "chunkId"),
     chunkIndex: readNumberFromJson(parsed, "chunk_index") ?? readNumberFromJson(parsed, "chunkIndex"),
+    laneSessionId: readStringFromJson(parsed, "lane_session_id") ?? readStringFromJson(parsed, "laneSessionId"),
+    sessionControlKey:
+      readStringFromJson(parsed, "session_control_key") ??
+      readStringFromJson(parsed, "sessionControlKey") ??
+      readStringFromJson(parsed, "lane_session_control_key") ??
+      readStringFromJson(parsed, "laneSessionControlKey"),
     dedupeKey: readStringFromJson(parsed, "dedupe_key") ?? readStringFromJson(parsed, "dedupeKey"),
     sourceEventId: readStringFromJson(parsed, "source_event_id") ?? readStringFromJson(parsed, "sourceEventId"),
     sourceEventMs: readNumberFromJson(parsed, "source_event_ms") ?? readNumberFromJson(parsed, "sourceEventMs"),
     locale,
     targetLanguage: readStringFromJson(parsed, "target_language") ?? readStringFromJson(parsed, "targetLanguage") ?? locale,
     accountLocale: readStringFromJson(parsed, "account_locale") ?? readStringFromJson(parsed, "accountLocale") ?? locale,
+    projectionTarget: readStringFromJson(parsed, "projection_target") ?? readStringFromJson(parsed, "projectionTarget") ?? HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK,
     freshnessStatus: readStringFromJson(parsed, "freshness_status") ?? readStringFromJson(parsed, "freshnessStatus") ?? "fresh",
     units,
   };
@@ -495,15 +511,19 @@ const buildDocumentInlineTranslationOutput = (input: {
     sourceId: input.sourceId,
     docPath: visible.docPath,
     sourceHash: visible.sourceHash,
+    sourceTextHash: visible.sourceTextHash,
+    sourceTextCharCount: visible.sourceTextCharCount,
     chunkId: visible.chunkId,
     chunkIndex: visible.chunkIndex,
+    laneSessionId: visible.laneSessionId,
+    sessionControlKey: visible.sessionControlKey,
     dedupeKey: visible.dedupeKey,
     sourceEventId: visible.sourceEventId,
     sourceEventMs: visible.sourceEventMs,
     locale,
     targetLanguage,
     accountLocale,
-    projectionTarget: "docs_viewer_inline",
+    projectionTarget: visible.projectionTarget,
     projectionStatus,
     freshnessStatus: visible.freshnessStatus,
     translations,

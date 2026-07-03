@@ -27,6 +27,7 @@ import {
   enqueueDocumentMarkdownTranslationMail,
   extractDocumentMarkdownTranslationsFromRuns,
   readDocumentMarkdownMicroDeckRuns,
+  runDocumentMarkdownTranslationLaneSessionControl,
 } from "@/lib/docs/documentTranslationClient";
 import {
   readDocumentLiveTranslationProjectionSnapshot,
@@ -36,14 +37,13 @@ import {
 } from "@/lib/docs/liveTranslationProjectionRegistry";
 import { installDocumentLiveTranslationProjectionEventIngestion } from "@/lib/docs/liveTranslationProjectionEventIngestion";
 import {
-  buildDocumentInlineTranslationDataAttributes,
   documentMarkdownTranslationEntryToInlineRenderState,
   filterReadyDocumentInlineTranslationRenderStates,
-  formatDocumentInlineTranslationText,
   mergeDocumentLiveTranslationInlineStates,
   sameDocumentInlineTranslationRenderState,
   type DocumentInlineTranslationRenderState,
 } from "@/lib/docs/liveTranslationInlineProjection";
+import { renderDocumentMarkdownWithInlineTranslations } from "@/lib/docs/liveTranslationInlineRenderer";
 import { consumeDocViewerIntent } from "@/lib/docs/docViewer";
 import { buildWorkstationPathRef } from "@/lib/workstation/workstationDeepLink";
 import {
@@ -73,6 +73,7 @@ import {
   segmentMarkdownForTranslation,
   type DocumentTranslationUnit,
 } from "@shared/document-translation";
+import { HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK } from "@shared/helix-live-translation-projection-target";
 
 type Translate = InterfaceTextResolver["t"];
 type DisplayMessageMap = Record<string, InterfaceMessageId>;
@@ -102,6 +103,61 @@ const EMPTY_LIVE_TRANSLATION_PROJECTION_SNAPSHOT = {
   mailLoops: {},
   goalBindings: {},
 };
+
+const documentInlineTranslationLaneSessionId = (scopeKey: string): string =>
+  `lane_session:live_translation:docs:${hashDocumentSource(scopeKey)}`;
+
+function readRecordArray(value: unknown): Array<Record<string, unknown>> {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is Record<string, unknown> =>
+      Boolean(entry && typeof entry === "object" && !Array.isArray(entry))
+    )
+    : [];
+}
+
+function emitDocumentTranslationLaneSessionControlEvents(input: {
+  response: Record<string, unknown>;
+  sourceId: string;
+  sourceHash: string;
+}): void {
+  const debug = input.response.debug && typeof input.response.debug === "object" && !Array.isArray(input.response.debug)
+    ? (input.response.debug as Record<string, unknown>)
+    : {};
+  const summaries = [
+    ...readRecordArray(input.response.capability_lane_session_debug_summaries),
+    ...readRecordArray(input.response.session_debug_summaries),
+    ...readRecordArray(debug.capability_lane_session_debug_summaries),
+  ];
+  summaries.forEach((summary, index) => {
+    const eventId =
+      typeof summary.latest_event_id === "string" && summary.latest_event_id.trim()
+        ? summary.latest_event_id.trim()
+        : `docs-translation-lane-session:${input.sourceId}:${index}:${Date.now()}`;
+    emitHelixAskLiveEvent({
+      contextId: HELIX_ASK_CONTEXT_ID.desktop,
+      traceId: `docs-translation-lane-session:${input.sourceId}`,
+      entry: {
+        id: eventId,
+        text: "Document translation lane session control.",
+        tool: "capability_lane_session",
+        tsMs: typeof summary.updated_at_ms === "number" ? summary.updated_at_ms : Date.now(),
+        meta: {
+          ...summary,
+          sourceEventType: "lane_session",
+          source_event_type: "lane_session",
+          lane: "live_translation",
+          sourceId: input.sourceId,
+          source_id: input.sourceId,
+          sourceHash: input.sourceHash,
+          source_hash: input.sourceHash,
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    });
+  });
+}
 
 const proceduralStepMessages = {
   highlight_plus: "docsViewer.procedural.focusingPanelPicker",
@@ -335,7 +391,7 @@ export function DocViewerPanel() {
           docPath: currentEntry.relativePath,
           locale: interfaceLanguage.code,
           sourceHash: rawMarkdownSourceHash,
-          projectionTarget: "docs_chunk",
+          projectionTarget: HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK,
         })
         : EMPTY_LIVE_TRANSLATION_PROJECTION_SNAPSHOT,
     () => EMPTY_LIVE_TRANSLATION_PROJECTION_SNAPSHOT,
@@ -357,7 +413,13 @@ export function DocViewerPanel() {
   );
   const inlineTranslationMarkdown = React.useMemo(() => {
     if (!inlineTranslationEnabled || !translationUnits.length) return rawMarkdown;
-    return renderMarkdownWithInlineTranslations(translationUnits, inlineTranslations, t);
+    return renderDocumentMarkdownWithInlineTranslations({
+      units: translationUnits,
+      translations: inlineTranslations,
+      loadingText: t("docsViewer.translation.inlineLoading"),
+      errorText: (reason) => t("docsViewer.translation.inlineError", { reason }),
+      fallbackErrorText: t("docsViewer.translation.errorGeneric"),
+    });
   }, [inlineTranslationEnabled, inlineTranslations, rawMarkdown, t, translationUnits]);
   const activeHtml = React.useMemo(() => {
     if (!currentEntry) return html;
@@ -487,7 +549,7 @@ export function DocViewerPanel() {
       docPath: currentEntry.relativePath,
       locale: interfaceLanguage.code,
       sourceHash: rawMarkdownSourceHash,
-      projectionTarget: "docs_chunk",
+      projectionTarget: HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK,
       units: translationUnits,
       allowStaleDisplayText: inlineTranslationEnabled,
     });
@@ -569,6 +631,7 @@ export function DocViewerPanel() {
       units: translationUnits,
       translations: inlineTranslations,
       inFlightIds: inFlightTranslationUnitIdsRef.current,
+      sourceHash: rawMarkdownSourceHash,
       maxUnits: DOC_TRANSLATION_MAX_UNITS_PER_CHUNK,
       maxChars: DOC_TRANSLATION_MAX_CHARS_PER_CHUNK,
     });
@@ -577,32 +640,50 @@ export function DocViewerPanel() {
     const targetUnits = translationUnits.filter((unit) => targetSet.has(unit.unit_id));
     if (targetUnits.length === 0) return;
     const scopeKey = activeTranslationScopeKey;
+    const laneSessionId = documentInlineTranslationLaneSessionId(scopeKey);
+    const chunkIndex = documentTranslationChunkIndexRef.current + 1;
+    const chunkId = `doc-inline:${rawMarkdownSourceHash}:${targetIds.join(",")}`;
+    const sourceText = targetUnits.map((unit) => unit.source_markdown).join("\n\n");
+    const pendingTranslationState = buildPendingDocumentInlineTranslationState({
+      sourceId: documentMarkdownSourceId(currentEntry.relativePath),
+      sourceHash: rawMarkdownSourceHash,
+      sourceTextHash: hashDocumentSource(sourceText),
+      sourceTextCharCount: sourceText.length,
+      chunkId,
+      chunkIndex,
+      laneSessionId,
+      accountLocale: interfaceLanguage.code,
+      targetLanguage: interfaceLanguage.code,
+    });
     translationScopeKeyRef.current = scopeKey;
     documentTranslationChunkInFlightRef.current = true;
+    documentTranslationChunkIndexRef.current = chunkIndex;
     targetIds.forEach((unitId) => inFlightTranslationUnitIdsRef.current.add(unitId));
     setTranslationStatus("translating");
     setTranslationError(null);
     setInlineTranslations((current) => {
       const next = { ...current };
       targetIds.forEach((unitId) => {
-        next[unitId] = { status: "loading" };
+        next[unitId] = pendingTranslationState;
       });
       return next;
     });
 
     try {
-      const chunkIndex = documentTranslationChunkIndexRef.current + 1;
-      documentTranslationChunkIndexRef.current = chunkIndex;
       await enqueueDocumentMarkdownTranslationMail({
         docPath: currentEntry.relativePath,
         locale: interfaceLanguage.code,
         targetLanguage: interfaceLanguage.code,
         accountLocale: interfaceLanguage.code,
         sourceHash: rawMarkdownSourceHash,
+        sourceTextHash: pendingTranslationState.sourceTextHash,
+        sourceTextCharCount: pendingTranslationState.sourceTextCharCount,
         title: currentEntry.title,
         sourceId: documentMarkdownSourceId(currentEntry.relativePath),
-        chunkId: `doc-inline:${rawMarkdownSourceHash}:${targetIds.join(",")}`,
+        chunkId,
         chunkIndex,
+        laneSessionId,
+        projectionTarget: HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK,
         units: targetUnits,
       });
       if (translationScopeKeyRef.current !== scopeKey) return;
@@ -611,7 +692,7 @@ export function DocViewerPanel() {
         targetUnits.forEach((unit) => {
           next[unit.unit_id] = current[unit.unit_id]?.status === "ready"
             ? current[unit.unit_id]
-            : { status: "loading" };
+            : pendingTranslationState;
         });
         return next;
       });
@@ -1002,8 +1083,38 @@ export function DocViewerPanel() {
   }, [isAutoReading, viewDirectory]);
 
   const handleToggleInlineTranslation = React.useCallback(() => {
-    if (!translationEligible || !activeTranslationScopeKey) return;
+    if (!translationEligible || !activeTranslationScopeKey || !currentEntry || !rawMarkdownSourceHash) return;
     setTranslationError(null);
+    const sourceId = documentMarkdownSourceId(currentEntry.relativePath);
+    const laneSessionId = documentInlineTranslationLaneSessionId(activeTranslationScopeKey);
+    const runLaneSessionControl = (action: "start" | "stop") => {
+      void runDocumentMarkdownTranslationLaneSessionControl({
+        action,
+        docPath: currentEntry.relativePath,
+        locale: interfaceLanguage.code,
+        targetLanguage: interfaceLanguage.code,
+        accountLocale: interfaceLanguage.code,
+        sourceHash: rawMarkdownSourceHash,
+        sourceTextHash: rawMarkdownSourceHash,
+        sourceTextCharCount: rawMarkdown.length,
+        sourceId,
+        laneSessionId,
+        projectionTarget: HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK,
+        agentRuntime: "helix",
+        reason: `document_inline_translation_${action}`,
+      })
+        .then((response) => {
+          emitDocumentTranslationLaneSessionControlEvents({
+            response: response as Record<string, unknown>,
+            sourceId,
+            sourceHash: rawMarkdownSourceHash,
+          });
+        })
+        .catch((err) => {
+          if (isAbortError(err)) return;
+          console.warn("Document translation lane session control failed", err);
+        });
+    };
     if (inlineTranslationEnabled) {
       if (activeTranslationScopeKey) {
         writeStoredInlineTranslationSession(activeTranslationScopeKey, {
@@ -1015,12 +1126,23 @@ export function DocViewerPanel() {
       inFlightTranslationUnitIdsRef.current.clear();
       setTranslationStatus("idle");
       setInlineTranslationEnabled(false);
+      runLaneSessionControl("stop");
       return;
     }
     translationScopeKeyRef.current = activeTranslationScopeKey;
     setTranslationStatus("ready");
     setInlineTranslationEnabled(true);
-  }, [activeTranslationScopeKey, inlineTranslationEnabled, inlineTranslations, translationEligible]);
+    runLaneSessionControl("start");
+  }, [
+    activeTranslationScopeKey,
+    currentEntry,
+    inlineTranslationEnabled,
+    inlineTranslations,
+    interfaceLanguage.code,
+    rawMarkdown,
+    rawMarkdownSourceHash,
+    translationEligible,
+  ]);
 
   const rejoinLiveRead = React.useCallback(() => {
     if (!currentPath) return;
@@ -1110,6 +1232,7 @@ export function DocViewerPanel() {
             canRejoinLiveRead={false}
             onRejoinLiveRead={rejoinLiveRead}
             translationEligible={translationEligible}
+            translationTargetLanguage={interfaceLanguage.code}
             inlineTranslationEnabled={inlineTranslationEnabled}
             translationStatus={translationStatus}
             translationError={translationError}
@@ -1374,6 +1497,7 @@ type PanelHeaderProps = {
   canRejoinLiveRead: boolean;
   onRejoinLiveRead: () => void;
   translationEligible: boolean;
+  translationTargetLanguage: string;
   inlineTranslationEnabled: boolean;
   translationStatus: DocumentTranslationUiStatus;
   translationError: string | null;
@@ -1397,6 +1521,7 @@ export function PanelHeader({
   canRejoinLiveRead,
   onRejoinLiveRead,
   translationEligible,
+  translationTargetLanguage,
   inlineTranslationEnabled,
   translationStatus,
   translationError,
@@ -1424,6 +1549,11 @@ export function PanelHeader({
     liveTranslationProjectionSummary.blockedLaneSessionCount > 0 ||
     liveTranslationProjectionSummary.blockedMailLoopCount > 0 ||
     liveTranslationProjectionSummary.blockedGoalBindingCount > 0;
+  const hasProblemTranslationProjection =
+    liveTranslationProjectionSummary.displayStatus === "blocked" ||
+    liveTranslationProjectionSummary.displayStatus === "failed" ||
+    liveTranslationProjectionSummary.displayStatus === "cancelled" ||
+    liveTranslationProjectionSummary.displayStatus === "stale";
 
   const badges = entry ? getDocBadges(entry, t) : [];
 
@@ -1511,11 +1641,15 @@ export function PanelHeader({
         {!isAutoReading && autoReadError ? (
           <p className="mt-0.5 text-[11px] text-amber-300">{t("docsViewer.reading.stopped", { reason: autoReadError })}</p>
         ) : null}
-        {translationStatusLabel ? (
+        {translationEligible ? (
           <p
             className={cn(
               "mt-0.5 text-[11px]",
-              translationStatus === "error" || translationStatus === "unavailable" || hasBlockedTranslationLane
+              !translationStatusLabel && "hidden",
+              translationStatus === "error" ||
+                translationStatus === "unavailable" ||
+                hasBlockedTranslationLane ||
+                hasProblemTranslationProjection
                 ? "text-amber-300"
                 : "text-emerald-200",
             )}
@@ -1524,6 +1658,8 @@ export function PanelHeader({
             data-doc-translation-summary-ready={String(liveTranslationProjectionSummary.readyCount)}
             data-doc-translation-summary-error={String(liveTranslationProjectionSummary.errorCount)}
             data-doc-translation-summary-health={liveTranslationProjectionSummary.healthStatus}
+            data-doc-translation-summary-display-status={liveTranslationProjectionSummary.displayStatus}
+            data-doc-translation-summary-label-visible={String(Boolean(translationStatusLabel))}
             data-doc-translation-summary-renderable={String(liveTranslationProjectionSummary.hasRenderableText)}
             data-doc-translation-summary-has-errors={String(liveTranslationProjectionSummary.hasProjectionErrors)}
             data-doc-translation-summary-projected={String(liveTranslationProjectionSummary.projectedCount)}
@@ -1537,6 +1673,15 @@ export function PanelHeader({
             data-doc-translation-summary-latest-observation-ref={liveTranslationProjectionSummary.latestObservationRef ?? ""}
             data-doc-translation-summary-latest-receipt-ref={liveTranslationProjectionSummary.latestReceiptRef ?? ""}
             data-doc-translation-summary-latest-lane-session-id={liveTranslationProjectionSummary.latestLaneSessionId ?? ""}
+            data-doc-translation-summary-latest-observation-lane-session-id={liveTranslationProjectionSummary.latestObservationLaneSessionId ?? ""}
+            data-doc-translation-summary-latest-goal-binding-id-from-projection={liveTranslationProjectionSummary.latestGoalBindingIdFromProjection ?? ""}
+            data-doc-translation-summary-latest-session-control-key={liveTranslationProjectionSummary.latestSessionControlKey ?? ""}
+            data-doc-translation-summary-latest-source-binding-key={liveTranslationProjectionSummary.latestSourceBindingKey ?? ""}
+            data-doc-translation-summary-latest-observation-key={liveTranslationProjectionSummary.latestObservationKey ?? ""}
+            data-doc-translation-summary-latest-mail-loop-observation-key={liveTranslationProjectionSummary.latestMailLoopObservationKey ?? ""}
+            data-doc-translation-summary-latest-goal-binding-key={liveTranslationProjectionSummary.latestGoalBindingKey ?? ""}
+            data-doc-translation-summary-latest-event-id={liveTranslationProjectionSummary.latestEventId ?? ""}
+            data-doc-translation-summary-latest-has-observation={String(liveTranslationProjectionSummary.latestHasObservation)}
             data-doc-translation-summary-latest-selected-backend-provider={liveTranslationProjectionSummary.latestSelectedBackendProvider ?? ""}
             data-doc-translation-summary-latest-chunk-id={liveTranslationProjectionSummary.latestChunkId ?? ""}
             data-doc-translation-summary-latest-chunk-index={liveTranslationProjectionSummary.latestChunkIndex ?? ""}
@@ -1545,6 +1690,10 @@ export function PanelHeader({
             data-doc-translation-summary-latest-source-id={liveTranslationProjectionSummary.latestSourceId ?? ""}
             data-doc-translation-summary-latest-source-hash={liveTranslationProjectionSummary.latestSourceHash ?? ""}
             data-doc-translation-summary-latest-source-kind={liveTranslationProjectionSummary.latestSourceKind ?? ""}
+            data-doc-translation-summary-latest-source-text-hash={liveTranslationProjectionSummary.latestSourceTextHash ?? ""}
+            data-doc-translation-summary-latest-source-text-char-count={liveTranslationProjectionSummary.latestSourceTextCharCount ?? ""}
+            data-doc-translation-summary-latest-projection-key={liveTranslationProjectionSummary.latestProjectionKey ?? ""}
+            data-doc-translation-summary-latest-server-projection-key={liveTranslationProjectionSummary.latestServerProjectionKey ?? ""}
             data-doc-translation-summary-latest-projection-target={liveTranslationProjectionSummary.latestProjectionTarget ?? ""}
             data-doc-translation-summary-latest-account-locale={liveTranslationProjectionSummary.latestAccountLocale ?? ""}
             data-doc-translation-summary-latest-target-language={liveTranslationProjectionSummary.latestTargetLanguage ?? ""}
@@ -1556,6 +1705,15 @@ export function PanelHeader({
             data-doc-translation-summary-suppressed-receipts={String(liveTranslationProjectionSummary.suppressedReceiptCount)}
             data-doc-translation-summary-latest-suppressed-observation-ref={liveTranslationProjectionSummary.latestSuppressedObservationRef ?? ""}
             data-doc-translation-summary-latest-suppressed-receipt-ref={liveTranslationProjectionSummary.latestSuppressedReceiptRef ?? ""}
+            data-doc-translation-summary-latest-suppressed-observation-lane-session-id={liveTranslationProjectionSummary.latestSuppressedObservationLaneSessionId ?? ""}
+            data-doc-translation-summary-latest-suppressed-goal-binding-id={liveTranslationProjectionSummary.latestSuppressedGoalBindingId ?? ""}
+            data-doc-translation-summary-latest-suppressed-session-control-key={liveTranslationProjectionSummary.latestSuppressedSessionControlKey ?? ""}
+            data-doc-translation-summary-latest-suppressed-source-binding-key={liveTranslationProjectionSummary.latestSuppressedSourceBindingKey ?? ""}
+            data-doc-translation-summary-latest-suppressed-observation-key={liveTranslationProjectionSummary.latestSuppressedObservationKey ?? ""}
+            data-doc-translation-summary-latest-suppressed-mail-loop-observation-key={liveTranslationProjectionSummary.latestSuppressedMailLoopObservationKey ?? ""}
+            data-doc-translation-summary-latest-suppressed-goal-binding-key={liveTranslationProjectionSummary.latestSuppressedGoalBindingKey ?? ""}
+            data-doc-translation-summary-latest-suppressed-event-id={liveTranslationProjectionSummary.latestSuppressedEventId ?? ""}
+            data-doc-translation-summary-latest-suppressed-has-observation={String(liveTranslationProjectionSummary.latestSuppressedHasObservation)}
             data-doc-translation-summary-latest-suppressed-projection-status={liveTranslationProjectionSummary.latestSuppressedProjectionStatus ?? ""}
             data-doc-translation-summary-latest-suppressed-chunk-id={liveTranslationProjectionSummary.latestSuppressedChunkId ?? ""}
             data-doc-translation-summary-latest-suppressed-chunk-index={liveTranslationProjectionSummary.latestSuppressedChunkIndex ?? ""}
@@ -1564,10 +1722,15 @@ export function PanelHeader({
             data-doc-translation-summary-latest-suppressed-source-event-ms={liveTranslationProjectionSummary.latestSuppressedSourceEventMs ?? ""}
             data-doc-translation-summary-latest-suppressed-observed-at-ms={liveTranslationProjectionSummary.latestSuppressedObservedAtMs ?? ""}
             data-doc-translation-summary-latest-suppressed-freshness-status={liveTranslationProjectionSummary.latestSuppressedFreshnessStatus ?? ""}
+            data-doc-translation-summary-latest-suppressed-display-status={liveTranslationProjectionSummary.latestSuppressedDisplayStatus ?? ""}
             data-doc-translation-summary-latest-suppressed-terminal-authority-status={liveTranslationProjectionSummary.latestSuppressedTerminalAuthorityStatus}
             data-doc-translation-summary-latest-suppressed-source-id={liveTranslationProjectionSummary.latestSuppressedSourceId ?? ""}
             data-doc-translation-summary-latest-suppressed-source-hash={liveTranslationProjectionSummary.latestSuppressedSourceHash ?? ""}
             data-doc-translation-summary-latest-suppressed-source-kind={liveTranslationProjectionSummary.latestSuppressedSourceKind ?? ""}
+            data-doc-translation-summary-latest-suppressed-source-text-hash={liveTranslationProjectionSummary.latestSuppressedSourceTextHash ?? ""}
+            data-doc-translation-summary-latest-suppressed-source-text-char-count={liveTranslationProjectionSummary.latestSuppressedSourceTextCharCount ?? ""}
+            data-doc-translation-summary-latest-suppressed-projection-key={liveTranslationProjectionSummary.latestSuppressedProjectionKey ?? ""}
+            data-doc-translation-summary-latest-suppressed-server-projection-key={liveTranslationProjectionSummary.latestSuppressedServerProjectionKey ?? ""}
             data-doc-translation-summary-latest-suppressed-account-locale={liveTranslationProjectionSummary.latestSuppressedAccountLocale ?? ""}
             data-doc-translation-summary-latest-suppressed-projection-target={liveTranslationProjectionSummary.latestSuppressedProjectionTarget ?? ""}
             data-doc-translation-summary-latest-suppressed-target-language={liveTranslationProjectionSummary.latestSuppressedTargetLanguage ?? ""}
@@ -1581,6 +1744,9 @@ export function PanelHeader({
             data-doc-translation-summary-latest-lane-session-lifecycle-action={liveTranslationProjectionSummary.latestLaneSessionLifecycleAction ?? ""}
             data-doc-translation-summary-latest-lane-session-permission-profile={liveTranslationProjectionSummary.latestLaneSessionPermissionProfile ?? ""}
             data-doc-translation-summary-latest-lane-session-updated-at-ms={liveTranslationProjectionSummary.latestLaneSessionUpdatedAtMs ?? ""}
+            data-doc-translation-summary-latest-lane-session-event-id={liveTranslationProjectionSummary.latestLaneSessionEventId ?? ""}
+            data-doc-translation-summary-latest-lane-session-control-key={liveTranslationProjectionSummary.latestLaneSessionControlKey ?? ""}
+            data-doc-translation-summary-latest-lane-session-has-observation={String(liveTranslationProjectionSummary.latestLaneSessionHasObservation)}
             data-doc-translation-summary-mail-loops={String(liveTranslationProjectionSummary.mailLoopCount)}
             data-doc-translation-summary-pending-mail-loops={String(liveTranslationProjectionSummary.pendingMailLoopCount)}
             data-doc-translation-summary-blocked-mail-loops={String(liveTranslationProjectionSummary.blockedMailLoopCount)}
@@ -1588,24 +1754,69 @@ export function PanelHeader({
             data-doc-translation-summary-latest-mail-loop-id={liveTranslationProjectionSummary.latestMailLoopId ?? ""}
             data-doc-translation-summary-latest-mail-loop-delivery-status={liveTranslationProjectionSummary.latestMailLoopDeliveryStatus ?? ""}
             data-doc-translation-summary-latest-previous-stage-play-mail-id={liveTranslationProjectionSummary.latestPreviousStagePlayMailId ?? ""}
+            data-doc-translation-summary-latest-mail-loop-wake-kind={liveTranslationProjectionSummary.latestMailLoopWakeKind}
+            data-doc-translation-summary-latest-mail-loop-observation-lane-session-id={liveTranslationProjectionSummary.latestMailLoopObservationLaneSessionId ?? ""}
+            data-doc-translation-summary-latest-mail-loop-session-control-key={liveTranslationProjectionSummary.latestMailLoopSessionControlKey ?? ""}
             data-doc-translation-summary-goal-bindings={String(liveTranslationProjectionSummary.goalBindingCount)}
             data-doc-translation-summary-active-goal-bindings={String(liveTranslationProjectionSummary.activeGoalBindingCount)}
             data-doc-translation-summary-blocked-goal-bindings={String(liveTranslationProjectionSummary.blockedGoalBindingCount)}
             data-doc-translation-summary-latest-goal-binding-id={liveTranslationProjectionSummary.latestGoalBindingId ?? ""}
             data-doc-translation-summary-latest-goal-id={liveTranslationProjectionSummary.latestGoalId ?? ""}
+            data-doc-translation-summary-latest-goal-binding-lane-session-id={liveTranslationProjectionSummary.latestGoalBindingLaneSessionId ?? ""}
             data-doc-translation-summary-latest-goal-binding-status={liveTranslationProjectionSummary.latestGoalBindingStatus ?? ""}
+            data-doc-translation-summary-latest-goal-binding-session-status={liveTranslationProjectionSummary.latestGoalBindingSessionStatus ?? ""}
+            data-doc-translation-summary-latest-goal-binding-session-health={liveTranslationProjectionSummary.latestGoalBindingSessionHealth ?? ""}
+            data-doc-translation-summary-latest-goal-binding-activation-policy={liveTranslationProjectionSummary.latestGoalBindingActivationPolicy ?? ""}
+            data-doc-translation-summary-latest-goal-binding-attention-policy={liveTranslationProjectionSummary.latestGoalBindingAttentionPolicy ?? ""}
+            data-doc-translation-summary-latest-goal-binding-stop-condition={liveTranslationProjectionSummary.latestGoalBindingStopCondition ?? ""}
+            data-doc-translation-summary-latest-goal-binding-report-policy={liveTranslationProjectionSummary.latestGoalBindingReportPolicy ?? ""}
+            data-doc-translation-summary-latest-goal-binding-quiet-behavior={liveTranslationProjectionSummary.latestGoalBindingQuietBehavior ?? ""}
             data-doc-translation-summary-latest-goal-binding-report-action={liveTranslationProjectionSummary.latestGoalBindingReportAction ?? ""}
+            data-doc-translation-summary-latest-goal-binding-report-reason={liveTranslationProjectionSummary.latestGoalBindingReportReason ?? ""}
+            data-doc-translation-summary-latest-goal-binding-observation-ref={liveTranslationProjectionSummary.latestGoalBindingObservationRef ?? ""}
+            data-doc-translation-summary-latest-goal-binding-receipt-ref={liveTranslationProjectionSummary.latestGoalBindingReceiptRef ?? ""}
+            data-doc-translation-summary-latest-goal-binding-event-id={liveTranslationProjectionSummary.latestGoalBindingEventId ?? ""}
+            data-doc-translation-summary-latest-goal-binding-session-control-key={liveTranslationProjectionSummary.latestGoalBindingSessionControlKey ?? ""}
+            data-doc-translation-summary-latest-goal-binding-has-observation={String(liveTranslationProjectionSummary.latestGoalBindingHasObservation)}
+            data-doc-translation-summary-latest-goal-binding-terminal-authority-status={liveTranslationProjectionSummary.latestGoalBindingTerminalAuthorityStatus}
+            data-doc-translation-summary-latest-goal-binding-source-id={liveTranslationProjectionSummary.latestGoalBindingSourceId ?? ""}
+            data-doc-translation-summary-latest-goal-binding-source-hash={liveTranslationProjectionSummary.latestGoalBindingSourceHash ?? ""}
+            data-doc-translation-summary-latest-goal-binding-source-kind={liveTranslationProjectionSummary.latestGoalBindingSourceKind ?? ""}
+            data-doc-translation-summary-latest-goal-binding-source-text-hash={liveTranslationProjectionSummary.latestGoalBindingSourceTextHash ?? ""}
+            data-doc-translation-summary-latest-goal-binding-source-text-char-count={liveTranslationProjectionSummary.latestGoalBindingSourceTextCharCount ?? ""}
+            data-doc-translation-summary-latest-goal-binding-projection-target={liveTranslationProjectionSummary.latestGoalBindingProjectionTarget ?? ""}
+            data-doc-translation-summary-latest-goal-binding-account-locale={liveTranslationProjectionSummary.latestGoalBindingAccountLocale ?? ""}
+            data-doc-translation-summary-latest-goal-binding-target-language={liveTranslationProjectionSummary.latestGoalBindingTargetLanguage ?? ""}
+            data-doc-translation-summary-latest-goal-binding-chunk-id={liveTranslationProjectionSummary.latestGoalBindingChunkId ?? ""}
+            data-doc-translation-summary-latest-goal-binding-chunk-index={liveTranslationProjectionSummary.latestGoalBindingChunkIndex ?? ""}
+            data-doc-translation-summary-latest-goal-binding-dedupe-key={liveTranslationProjectionSummary.latestGoalBindingDedupeKey ?? ""}
+            data-doc-translation-summary-latest-goal-binding-source-binding-key={liveTranslationProjectionSummary.latestGoalBindingSourceBindingKey ?? ""}
+            data-doc-translation-summary-latest-goal-binding-observation-key={liveTranslationProjectionSummary.latestGoalBindingObservationKey ?? ""}
+            data-doc-translation-summary-latest-goal-binding-mail-loop-observation-key={liveTranslationProjectionSummary.latestGoalBindingMailLoopObservationKey ?? ""}
+            data-doc-translation-summary-latest-goal-binding-key-from-binding={liveTranslationProjectionSummary.latestGoalBindingKeyFromBinding ?? ""}
             data-doc-translation-summary-terminal-eligible="false"
             data-doc-translation-summary-assistant-answer="false"
             data-doc-translation-summary-raw-content-included="false"
           >
-            {translationStatusLabel}
+            {translationStatusLabel ?? ""}
           </p>
         ) : null}
       </div>
       <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
         {translationEligible ? (
-          <Button variant="outline" size="sm" onClick={onToggleInlineTranslation}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onToggleInlineTranslation}
+            data-doc-translation-control="inline-account-language"
+            data-doc-translation-control-enabled={String(inlineTranslationEnabled)}
+            data-doc-translation-control-target-language={translationTargetLanguage}
+            data-doc-translation-control-account-locale={interfaceLanguage.code}
+            data-doc-translation-control-projection-target={HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK}
+            data-doc-translation-control-terminal-eligible="false"
+            data-doc-translation-control-assistant-answer="false"
+            data-doc-translation-control-raw-content-included="false"
+          >
             <Languages className="mr-1.5 h-3.5 w-3.5" />
             {inlineTranslationEnabled
               ? t("docsViewer.translation.hideInline")
@@ -1703,8 +1914,9 @@ export function getDocumentTranslationStatusLabel(args: {
     args.liveTranslationProjectionSummary.healthStatus === "degraded" &&
     (args.translationStatus === "idle" || args.translationStatus === "cached")
   ) {
-    return args.t("docsViewer.translation.status.ready", {
+    return args.t("docsViewer.translation.status.projectionDegraded", {
       status:
+        args.liveTranslationProjectionSummary.latestSuppressedDisplayStatus ??
         args.liveTranslationProjectionSummary.latestProjectionStatus ??
         args.liveTranslationProjectionSummary.healthStatus,
     });
@@ -1815,6 +2027,8 @@ function docBadgeToneClass(tone: DocBadgeTone): string {
 }
 
 export const __testDocViewerTaxonomy = {
+  buildPendingDocumentInlineTranslationState,
+  collectVisibleTranslationUnitIds,
   buildDocTaxonomyCounts,
   docMatchesTaxonomyFilter,
   getDocBadges,
@@ -1874,31 +2088,50 @@ function writeStoredInlineTranslationSession(scopeKey: string, session: StoredIn
   }
 }
 
-function renderMarkdownWithInlineTranslations(
-  units: DocumentTranslationUnit[],
-  translations: Record<string, InlineTranslationState>,
-  t: Translate,
-): string {
-  return units
-    .map((unit) => {
-      if (!unit.translatable) return unit.source_markdown;
-      const anchor = `<div class="doc-translation-anchor not-prose h-0" data-doc-translation-anchor="${escapeHtml(unit.unit_id)}"></div>`;
-      const state = translations[unit.unit_id];
-      if (!state) return `${unit.source_markdown}\n${anchor}`;
-      const projectionAttrs = Object.entries(buildDocumentInlineTranslationDataAttributes(state))
-        .map(([name, value]) => `${name}="${escapeHtml(value)}"`)
-        .join(" ");
-      const projectionAttrSuffix = projectionAttrs ? ` ${projectionAttrs}` : "";
-      if (state.status === "loading") {
-        return `${unit.source_markdown}\n${anchor}\n<div class="doc-generated-translation not-prose my-2 border-l-2 border-emerald-400/60 pl-3 text-sm leading-relaxed text-emerald-300/80 animate-pulse" data-doc-translation-line="${escapeHtml(unit.unit_id)}">${escapeHtml(t("docsViewer.translation.inlineLoading"))}</div>`;
-      }
-      if (state.status === "error") {
-        return `${unit.source_markdown}\n${anchor}\n<div class="doc-generated-translation not-prose my-2 border-l-2 border-amber-400/70 pl-3 text-sm leading-relaxed text-amber-300" data-doc-translation-line="${escapeHtml(unit.unit_id)}"${projectionAttrSuffix}>${escapeHtml(t("docsViewer.translation.inlineError", { reason: state.error ?? t("docsViewer.translation.errorGeneric") }))}</div>`;
-      }
-      const translatedText = formatDocumentInlineTranslationText(state.text ?? "");
-      return `${unit.source_markdown}\n${anchor}\n<div class="doc-generated-translation not-prose my-2 border-l-2 border-emerald-400/70 pl-3 text-sm leading-relaxed text-emerald-300" data-doc-translation-line="${escapeHtml(unit.unit_id)}"${projectionAttrSuffix}>${escapeHtml(translatedText).replace(/\n/g, "<br />")}</div>`;
-    })
-    .join("\n");
+function buildPendingDocumentInlineTranslationState(args: {
+  sourceId: string;
+  sourceHash: string;
+  sourceTextHash: string;
+  sourceTextCharCount: number;
+  chunkId: string;
+  chunkIndex: number;
+  laneSessionId?: string | null;
+  accountLocale: string;
+  targetLanguage: string;
+}): InlineTranslationState {
+  return {
+    status: "loading",
+    observationRef: null,
+    receiptRef: null,
+    laneSessionId: args.laneSessionId ?? null,
+    observationLaneSessionId: null,
+    goalBindingId: null,
+    latestEventId: null,
+    hasObservation: false,
+    selectedBackendProvider: null,
+    projectionStatus: "missing",
+    chunkId: args.chunkId,
+    chunkIndex: args.chunkIndex,
+    dedupeKey: args.chunkId,
+    sourceEventId: null,
+    sourceEventMs: null,
+    observedAtMs: null,
+    freshnessStatus: "pending",
+    terminalAuthorityStatus: "not_terminal_authority",
+    sourceId: args.sourceId,
+    sourceHash: args.sourceHash,
+    sourceKind: "document_markdown",
+    sourceTextHash: args.sourceTextHash,
+    sourceTextCharCount: args.sourceTextCharCount,
+    accountLocale: args.accountLocale,
+    projectionTarget: HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK,
+    targetLanguage: args.targetLanguage,
+    cancelRequested: false,
+    source: "capability_lane",
+    terminalEligible: false,
+    assistantAnswer: false,
+    rawContentIncluded: false,
+  };
 }
 
 function collectVisibleTranslationUnitIds(args: {
@@ -1906,6 +2139,7 @@ function collectVisibleTranslationUnitIds(args: {
   units: DocumentTranslationUnit[];
   translations: Record<string, InlineTranslationState>;
   inFlightIds: Set<string>;
+  sourceHash?: string | null;
   maxUnits: number;
   maxChars: number;
 }): string[] {
@@ -1926,7 +2160,28 @@ function collectVisibleTranslationUnitIds(args: {
     if (!unitId) continue;
     const unit = translatableUnitsById.get(unitId);
     if (!unit) continue;
-    if (args.translations[unitId] || args.inFlightIds.has(unitId)) continue;
+    const renderStatus = marker.dataset.docTranslationRenderStatus;
+    const displayStatus = marker.dataset.docTranslationDisplayStatus;
+    const projectionStatus = marker.dataset.docTranslationProjectionStatus;
+    const markerSourceHash = marker.dataset.docTranslationSourceHash;
+    const hasDomProjectionState =
+      Boolean(renderStatus && renderStatus !== "empty") ||
+      Boolean(displayStatus && displayStatus !== "empty") ||
+      Boolean(projectionStatus && projectionStatus !== "missing");
+    const projectionStateMatchesCurrentSource =
+      !args.sourceHash ||
+      !markerSourceHash ||
+      markerSourceHash === args.sourceHash;
+    if (hasDomProjectionState && projectionStateMatchesCurrentSource) continue;
+    const existingTranslation = args.translations[unitId];
+    const existingTranslationMatchesCurrentSource =
+      !args.sourceHash ||
+      !existingTranslation?.sourceHash ||
+      existingTranslation.sourceHash === args.sourceHash;
+    const inFlightTranslationMatchesCurrentSource =
+      args.inFlightIds.has(unitId) &&
+      (!existingTranslation || existingTranslationMatchesCurrentSource);
+    if ((existingTranslation && existingTranslationMatchesCurrentSource) || inFlightTranslationMatchesCurrentSource) continue;
     const rect = marker.getBoundingClientRect();
     const nearViewport =
       rect.top >= containerRect.top - verticalBuffer &&

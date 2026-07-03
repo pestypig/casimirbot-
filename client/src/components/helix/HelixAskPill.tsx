@@ -235,6 +235,7 @@ import {
   type HelixAskVoiceTimelineBuildInfo,
 } from "@/components/helix/ask-console/HelixAskVoiceTimelineBuildInfo";
 import { HelixAskConsoleErrorLineSurface } from "@/components/helix/ask-console/HelixAskConsoleErrorLineSurface";
+import { HelixAskSteeringQueueSurface } from "@/components/helix/ask-console/HelixAskSteeringQueueSurface";
 import { HelixAskVoiceLevelMonitor } from "@/components/helix/ask-console/HelixAskVoiceLevelMonitor";
 import { buildHelixAskObserverLaneEvents } from "@/components/helix/ask-console/HelixAskObserverLaneEvents";
 import {
@@ -26117,7 +26118,7 @@ export function HelixAskPill({
           onAction={handleAskGoalSessionAction}
         />
       }
-      steeringQueue={null}
+      steeringQueue={<HelixAskSteeringQueueSurface />}
       errorLine={<HelixAskConsoleErrorLineSurface message={askError} />}
       turnList={chronologicalAskReplies.length > 0 || visibleActiveTurnStreamRows.length > 0 ? (
           <HelixAskTurnList

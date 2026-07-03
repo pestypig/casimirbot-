@@ -7,7 +7,14 @@ import type {
   DocumentTranslationUnitsResult,
   DocumentTranslationUnit,
 } from "@shared/document-translation";
+import { HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK } from "@shared/helix-live-translation-projection-target";
 import type { StagePlayMicroReasonerRunV1 } from "@shared/contracts/stage-play-live-source-mail.v1";
+import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
+import type { HelixLiveTranslationTerminalAuthorityStatus } from "@/lib/helix/live-translation-projection";
+import {
+  runCapabilityLaneSessionControl,
+  type CapabilityLaneSessionControlResponse,
+} from "@/lib/agi/api";
 
 export const DOCUMENT_TRANSLATION_REQUEST_TIMEOUT_MS = 60_000;
 export const DOCUMENT_MARKDOWN_TRANSLATION_PRESET_ID =
@@ -27,6 +34,9 @@ type StagePlayDocumentMarkdownMailResponse =
         dedupeKey?: string;
         sourceEventId?: string;
         sourceEventMs?: number;
+        laneSessionId?: string | null;
+        sessionControlKey?: string | null;
+        projectionTarget?: string;
         targetLanguage?: string;
         accountLocale?: string;
         acceptedUnits?: number;
@@ -61,17 +71,39 @@ type StagePlayLiveSourceMailRead =
     }
   | { ok: false; error?: string; message?: string };
 
+export type DocumentMarkdownTranslationLaneSessionControlAction =
+  | "start"
+  | "pause"
+  | "resume"
+  | "stop";
+
+export type DocumentMarkdownTranslationLaneSessionControlResponse =
+  CapabilityLaneSessionControlResponse;
+
 export type DocumentMarkdownTranslationEntry = {
   unitId: string;
   status: "ready" | "error";
   text?: string;
   error?: string;
+  projectionKey?: string | null;
   runId: string;
   role: StagePlayMicroReasonerRunV1["role"];
   observationRef?: string | null;
   receiptRef?: string | null;
+  laneSessionId?: string | null;
+  observationLaneSessionId?: string | null;
+  goalBindingId?: string | null;
+  sessionControlKey?: string | null;
+  sourceBindingKey?: string | null;
+  latestObservationKey?: string | null;
+  latestMailLoopObservationKey?: string | null;
+  goalBindingKey?: string | null;
+  latestEventId?: string | null;
+  hasObservation?: boolean;
   docPath?: string | null;
   sourceHash?: string | null;
+  sourceTextHash?: string | null;
+  sourceTextCharCount?: number | null;
   chunkId?: string | null;
   chunkIndex?: number | null;
   dedupeKey?: string | null;
@@ -80,6 +112,7 @@ export type DocumentMarkdownTranslationEntry = {
   observedAtMs?: number | null;
   projectionStatus?: string | null;
   freshnessStatus?: string | null;
+  terminalAuthorityStatus?: HelixLiveTranslationTerminalAuthorityStatus;
   selectedBackendProvider?: string | null;
   sourceId?: string | null;
   source?: "document_microdeck";
@@ -180,10 +213,15 @@ export async function enqueueDocumentMarkdownTranslationMail(params: {
   targetLanguage?: string | null;
   accountLocale?: string | null;
   sourceHash: string;
+  sourceTextHash?: string | null;
+  sourceTextCharCount?: number | null;
   title?: string;
   sourceId?: string;
   chunkId?: string;
   chunkIndex?: number | null;
+  laneSessionId?: string | null;
+  sessionControlKey?: string | null;
+  projectionTarget?: string | null;
   units: DocumentTranslationUnit[];
   signal?: AbortSignal;
 }): Promise<{ sourceId: string; mailId: string | null }> {
@@ -203,10 +241,15 @@ export async function enqueueDocumentMarkdownTranslationMail(params: {
         targetLanguage: params.targetLanguage ?? params.locale,
         accountLocale: params.accountLocale ?? params.locale,
         sourceHash: params.sourceHash,
+        sourceTextHash: params.sourceTextHash ?? null,
+        sourceTextCharCount: params.sourceTextCharCount ?? null,
         title: params.title,
         sourceId,
         chunkId: params.chunkId,
         chunkIndex: params.chunkIndex ?? null,
+        laneSessionId: params.laneSessionId ?? null,
+        sessionControlKey: params.sessionControlKey ?? null,
+        projectionTarget: params.projectionTarget ?? HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK,
         units: params.units,
       }),
       signal: controller.signal,
@@ -221,6 +264,57 @@ export async function enqueueDocumentMarkdownTranslationMail(params: {
       sourceId: body.sourceId,
       mailId: body.mail?.mailId ?? null,
     };
+  } finally {
+    globalThis.clearTimeout(timeout);
+    params.signal?.removeEventListener("abort", abortHandler);
+  }
+}
+
+export async function runDocumentMarkdownTranslationLaneSessionControl(params: {
+  action: DocumentMarkdownTranslationLaneSessionControlAction;
+  docPath: string;
+  locale: string;
+  sourceHash: string;
+  sourceTextHash?: string | null;
+  sourceTextCharCount?: number | null;
+  targetLanguage?: string | null;
+  accountLocale?: string | null;
+  sourceId?: string;
+  laneSessionId?: string | null;
+  requestedBackendProvider?: string | null;
+  projectionTarget?: string | null;
+  agentRuntime?: HelixAgentRuntimeId;
+  reason?: string | null;
+  signal?: AbortSignal;
+}): Promise<DocumentMarkdownTranslationLaneSessionControlResponse> {
+  const controller = new AbortController();
+  const timeout = globalThis.setTimeout(() => controller.abort(), DOCUMENT_TRANSLATION_REQUEST_TIMEOUT_MS);
+  const abortHandler = () => controller.abort();
+  params.signal?.addEventListener("abort", abortHandler, { once: true });
+  try {
+    const sourceId = params.sourceId ?? documentMarkdownSourceId(params.docPath);
+    const agentRuntime = params.agentRuntime ?? "helix";
+    return await runCapabilityLaneSessionControl({
+      agentRuntime,
+      capability_lane_session_call: {
+        action: params.action,
+        lane_id: "live_translation",
+        lane_session_id: params.laneSessionId ?? null,
+        requested_backend_provider: params.requestedBackendProvider ?? null,
+        reason: params.reason ?? `document_inline_translation_${params.action}`,
+        source_binding: {
+          source_id: sourceId,
+          source_hash: params.sourceHash,
+          source_text_hash: params.sourceTextHash ?? null,
+          source_text_char_count: params.sourceTextCharCount ?? null,
+          source_kind: "docs",
+          projection_target: params.projectionTarget ?? HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK,
+          account_locale: params.accountLocale ?? params.locale,
+          target_language: params.targetLanguage ?? params.locale,
+        },
+      },
+      signal: controller.signal,
+    });
   } finally {
     globalThis.clearTimeout(timeout);
     params.signal?.removeEventListener("abort", abortHandler);
@@ -308,6 +402,8 @@ export function extractDocumentMarkdownTranslationsFromRuns(
     const sourceKind = readFirstString(parsed, ["sourceKind", "source_kind"]) ?? null;
     const docPath = readFirstString(parsed, ["docPath", "doc_path"]) ?? null;
     const sourceHash = readFirstString(parsed, ["sourceHash", "source_hash"]) ?? null;
+    const sourceTextHash = readFirstString(parsed, ["sourceTextHash", "source_text_hash"]) ?? null;
+    const sourceTextCharCount = readFirstNumber(parsed, ["sourceTextCharCount", "source_text_char_count"]);
     const chunkId = readFirstString(parsed, ["chunkId", "chunk_id"]) ?? null;
     const chunkIndex = readFirstNumber(parsed, ["chunkIndex", "chunk_index"]);
     const dedupeKey = readFirstString(parsed, ["dedupeKey", "dedupe_key"]) ?? null;
@@ -327,6 +423,28 @@ export function extractDocumentMarkdownTranslationsFromRuns(
       "stage_play_microdeck";
     const observationRef = readFirstString(parsed, ["observationRef", "observation_ref"]) ?? run.runId;
     const receiptRef = readFirstString(parsed, ["receiptRef", "receipt_ref"]) ?? null;
+    const laneSessionId = readFirstString(parsed, ["laneSessionId", "lane_session_id"]) ?? null;
+    const observationLaneSessionId =
+      readFirstString(parsed, ["observationLaneSessionId", "observation_lane_session_id"]) ?? null;
+    const goalBindingId = readFirstString(parsed, ["goalBindingId", "goal_binding_id"]) ?? null;
+    const sessionControlKey =
+      readFirstString(parsed, [
+        "sessionControlKey",
+        "session_control_key",
+        "laneSessionControlKey",
+        "lane_session_control_key",
+      ]) ?? null;
+    const sourceBindingKey = readFirstString(parsed, ["sourceBindingKey", "source_binding_key"]) ?? null;
+    const latestObservationKey = readFirstString(parsed, ["latestObservationKey", "latest_observation_key"]) ?? null;
+    const latestMailLoopObservationKey =
+      readFirstString(parsed, ["latestMailLoopObservationKey", "latest_mail_loop_observation_key"]) ?? null;
+    const goalBindingKey = readFirstString(parsed, ["goalBindingKey", "goal_binding_key"]) ?? null;
+    const latestEventId = readFirstString(parsed, ["latestEventId", "latest_event_id"]) ?? null;
+    const hasObservation = readFirstBoolean(parsed, ["hasObservation", "has_observation"]) ??
+      Boolean(observationRef);
+    const terminalAuthorityStatus = normalizeTerminalAuthorityStatus(
+      readFirstString(parsed, ["terminalAuthorityStatus", "terminal_authority_status"]),
+    );
     const projectionTarget = readFirstString(parsed, ["projectionTarget", "projection_target"]) ?? null;
     const targetLanguage = readFirstString(parsed, ["targetLanguage", "target_language", "locale"]) ?? null;
     const accountLocale = readFirstString(parsed, ["accountLocale", "account_locale", "locale"]) ?? null;
@@ -335,6 +453,8 @@ export function extractDocumentMarkdownTranslationsFromRuns(
       ...(sourceKind ? { sourceKind } : {}),
       ...(docPath ? { docPath } : {}),
       ...(sourceHash ? { sourceHash } : {}),
+      ...(sourceTextHash ? { sourceTextHash } : {}),
+      ...(typeof sourceTextCharCount === "number" ? { sourceTextCharCount } : {}),
       ...(chunkId ? { chunkId } : {}),
       ...(typeof chunkIndex === "number" ? { chunkIndex } : {}),
       ...(dedupeKey ? { dedupeKey } : {}),
@@ -347,6 +467,17 @@ export function extractDocumentMarkdownTranslationsFromRuns(
       ...(selectedBackendProvider ? { selectedBackendProvider } : {}),
       ...(observationRef ? { observationRef } : {}),
       ...(receiptRef ? { receiptRef } : {}),
+      ...(laneSessionId ? { laneSessionId } : {}),
+      ...(observationLaneSessionId ? { observationLaneSessionId } : {}),
+      ...(goalBindingId ? { goalBindingId } : {}),
+      ...(sessionControlKey ? { sessionControlKey } : {}),
+      ...(sourceBindingKey ? { sourceBindingKey } : {}),
+      ...(latestObservationKey ? { latestObservationKey } : {}),
+      ...(latestMailLoopObservationKey ? { latestMailLoopObservationKey } : {}),
+      ...(goalBindingKey ? { goalBindingKey } : {}),
+      ...(latestEventId ? { latestEventId } : {}),
+      hasObservation,
+      terminalAuthorityStatus,
       ...(projectionTarget ? { projectionTarget } : {}),
       ...(targetLanguage ? { targetLanguage } : {}),
       ...(accountLocale ? { accountLocale } : {}),
@@ -451,6 +582,25 @@ function readFirstNumber(record: Record<string, unknown> | null, keys: string[])
     if (typeof value === "number" && Number.isFinite(value)) return value;
   }
   return null;
+}
+
+function readFirstBoolean(record: Record<string, unknown> | null, keys: string[]): boolean | null {
+  if (!record) return null;
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "boolean") return value;
+  }
+  return null;
+}
+
+function normalizeTerminalAuthorityStatus(
+  value: string | null,
+): HelixLiveTranslationTerminalAuthorityStatus {
+  return value === "pending_helix_terminal_authority" ||
+    value === "terminal_authority_rejected" ||
+    value === "not_terminal_authority"
+    ? value
+    : "not_terminal_authority";
 }
 
 function readIsoTimestampMs(value: string | null | undefined): number | null {

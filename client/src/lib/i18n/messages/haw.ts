@@ -275,6 +275,7 @@ export const hawMessages = {
   "docsViewer.translation.status.projectionFailed": "Ua hāʻule ka projection unuhi: {reason}",
   "docsViewer.translation.status.projectionCancelled": "Ua hoʻopau ʻia ka projection unuhi: {status}",
   "docsViewer.translation.status.projectionStale": "Ua kahiko ka projection unuhi: {status}",
+  "docsViewer.translation.status.projectionDegraded": "Hōʻike ʻia ka unuhi me ka receipt ʻōlelo aʻoaʻo: {status}",
   "docsViewer.translation.status.unavailable": "ʻAʻole loaʻa ka unuhi document: {reason}",
   "docsViewer.translation.status.error": "Hāʻule ka unuhi document: {reason}",
   "docsViewer.translation.errorGeneric": "ʻAʻole hiki i ka lawelawe unuhi ke hana i ka ʻōlelo i kēia manawa.",

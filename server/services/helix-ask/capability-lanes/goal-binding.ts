@@ -74,6 +74,7 @@ const bindingEvent = (input: {
     latest_chunk_index: observationEvent?.chunk_index ?? null,
     latest_source_id: observationEvent?.source_id ?? null,
     latest_source_hash: observationEvent?.source_hash ?? null,
+    latest_source_kind: observationEvent?.source_kind ?? null,
     latest_target_language: observationEvent?.target_language ?? null,
     latest_dedupe_key: observationEvent?.dedupe_key ?? null,
     latest_source_event_id: observationEvent?.source_event_id ?? null,
@@ -110,6 +111,8 @@ const withSessionSnapshot = (
     | "lane_session_health"
     | "lane_session_source_id"
     | "lane_session_source_hash"
+    | "lane_session_source_text_hash"
+    | "lane_session_source_text_char_count"
     | "lane_session_source_kind"
     | "lane_session_projection_target"
     | "lane_session_account_locale"
@@ -133,6 +136,8 @@ const withSessionSnapshot = (
   lane_session_health: session.health,
   lane_session_source_id: session.source_binding.source_id,
   lane_session_source_hash: session.source_binding.source_hash ?? null,
+  lane_session_source_text_hash: session.source_binding.source_text_hash ?? null,
+  lane_session_source_text_char_count: session.source_binding.source_text_char_count ?? null,
   lane_session_source_kind: session.source_binding.source_kind,
   lane_session_projection_target: session.source_binding.projection_target,
   lane_session_account_locale: session.source_binding.account_locale,
@@ -334,6 +339,20 @@ export const createHelixCapabilityLaneGoalBindingStore = (input: {
       args.mailLoopSummary.source_hash !== session.source_binding.source_hash
     ) {
       return blocked("source_hash_mismatch");
+    }
+    if (
+      args.mailLoopSummary.source_text_hash &&
+      session.source_binding.source_text_hash &&
+      args.mailLoopSummary.source_text_hash !== session.source_binding.source_text_hash
+    ) {
+      return blocked("source_text_hash_mismatch");
+    }
+    if (
+      typeof args.mailLoopSummary.source_text_char_count === "number" &&
+      typeof session.source_binding.source_text_char_count === "number" &&
+      args.mailLoopSummary.source_text_char_count !== session.source_binding.source_text_char_count
+    ) {
+      return blocked("source_text_char_count_mismatch");
     }
     if (
       args.mailLoopSummary.projection_target &&

@@ -75,6 +75,7 @@ describe("agent runtime adapter contract", () => {
     expect(contract.capability_lane_manifest.schema).toBe("helix.capability_lane_manifest.v1");
     expect(contract.capability_lane_manifest.selected_runtime_agent_provider).toBe("codex");
     expect(contract.capability_lane_ids).toContain("utility_text");
+    expect(contract.capability_lane_ids).toContain("speech_to_text");
     expect(contract.capability_lane_ids).toContain("live_translation");
     expect(contract.capability_lane_ids).toContain("workstation_tool_reference");
     expect(contract.capability_lane_statuses.workstation_tool_reference).toBe("available");
@@ -108,6 +109,29 @@ describe("agent runtime adapter contract", () => {
     expect(modelVisibleTranslation?.when_not_to_use).toContain("docs-viewer.read_active_translation");
     expect(JSON.stringify(modelVisibleTranslation?.request_shape_hint)).toContain("capability_lane_call");
     expect(JSON.stringify(modelVisibleTranslation?.request_shape_hint)).toContain("live_translation.translate_text");
+    expect(JSON.stringify(modelVisibleTranslation?.session_call_shape_hint)).toContain("capability_lane_session_call");
+    expect(JSON.stringify(modelVisibleTranslation?.session_call_shape_hint)).toContain("start | pause | resume | stop | record_observation");
+    expect(JSON.stringify(modelVisibleTranslation?.session_call_shape_hint)).toContain("source_binding");
+    expect(JSON.stringify(modelVisibleTranslation?.session_call_shape_hint)).toContain("docs_hover");
+    expect(JSON.stringify(modelVisibleTranslation?.goal_binding_call_shape_hint)).toContain("capability_lane_goal_binding_call");
+    expect(JSON.stringify(modelVisibleTranslation?.goal_binding_call_shape_hint)).toContain("bind | update_attention | record_mail_loop | record_report | stop");
+    expect(JSON.stringify(modelVisibleTranslation?.goal_binding_call_shape_hint)).toContain("terminal_authorized");
+    const modelVisibleSpeechToText = contract.model_visible_capability_lane_manifest.lanes
+      .flatMap((lane) => lane.capabilities)
+      .find((capability) => capability.capability_id === "speech_to_text.transcribe_audio");
+    expect(modelVisibleSpeechToText).toMatchObject({
+      required_input_fields: ["audio_ref"],
+      optional_input_fields: expect.arrayContaining(["transcript_text", "source_id", "thread_id"]),
+      result_authority: "observation_or_receipt_only",
+      reentry_required: true,
+      terminal_eligible: false,
+      assistant_answer: false,
+    });
+    expect(modelVisibleSpeechToText?.when_to_use).toContain("microphone");
+    expect(modelVisibleSpeechToText?.when_not_to_use).toContain("submitted prompt");
+    expect(JSON.stringify(modelVisibleSpeechToText?.request_shape_hint)).toContain("speech_to_text.transcribe_audio");
+    expect(JSON.stringify(modelVisibleSpeechToText?.session_call_shape_hint)).toContain("capability_lane_session_call");
+    expect(JSON.stringify(modelVisibleSpeechToText?.session_call_shape_hint)).toContain("audio");
     expect(contract.capability_lane_resolve_trace_shape).toMatchObject({
       schema: "helix.capability_lane_resolve_trace.v1",
       selected_runtime_agent_provider: "codex",
@@ -138,6 +162,7 @@ describe("agent runtime adapter contract", () => {
     expect(contract.prompt_policy_lines.join("\n")).toContain("Lane sessions may start, pause, resume, or stop only through Helix-governed session calls");
     expect(contract.prompt_policy_lines.join("\n")).toContain("keeps the selected runtime agent provider unchanged");
     expect(contract.prompt_policy_lines.join("\n")).toContain("prefer live_translation.translate_text");
+    expect(contract.prompt_policy_lines.join("\n")).toContain("Speech-to-text results are source observations");
     expect(contract.prompt_policy_lines.join("\n")).toContain("already-existing translated Docs surfaces");
     expect(contract.prompt_policy_lines.join("\n")).toContain("Do not claim an AI service lane ran unless a Helix lane observation or receipt is present");
     expect(contract.prompt_policy_lines.join("\n")).toContain("does not rewrite, shorten, bulletize");

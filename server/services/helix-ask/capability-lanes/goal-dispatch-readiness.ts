@@ -14,6 +14,13 @@ const uniqueTargets = (
 
 const uniqueNumbers = (values: number[]): number[] => Array.from(new Set(values));
 
+const uniqueWakeKinds = (
+  values: Array<"mailbox_wake" | "none" | null | undefined>,
+): ("mailbox_wake" | "none")[] => Array.from(
+  new Set(values.filter((value): value is "mailbox_wake" | "none" =>
+    value === "mailbox_wake" || value === "none")),
+);
+
 const admissionPermissionsAreNonMutating = (
   admission: HelixCapabilityLaneGoalDispatchAdmission,
 ): boolean => {
@@ -56,6 +63,15 @@ export const buildHelixCapabilityLaneGoalDispatchReadiness = (input: {
     next_lane_session_ids: uniqueStrings(
       admitted.map((admission) => admission.lane_session_id).filter(Boolean),
     ),
+    next_session_control_keys: uniqueStrings(
+      admitted.map((admission) => admission.session_control_key ?? "").filter(Boolean),
+    ),
+    next_source_binding_keys: uniqueStrings(
+      admitted.map((admission) => admission.source_binding_key ?? "").filter(Boolean),
+    ),
+    next_mail_loop_observation_keys: uniqueStrings(
+      admitted.map((admission) => admission.latest_mail_loop_observation_key ?? "").filter(Boolean),
+    ),
     next_dispatch_targets: uniqueTargets(
       admitted
         .map((admission) => admission.target)
@@ -79,14 +95,33 @@ export const buildHelixCapabilityLaneGoalDispatchReadiness = (input: {
     next_account_locales: uniqueStrings(
       admitted.map((admission) => admission.account_locale ?? "").filter(Boolean),
     ),
+    next_latest_event_ids: uniqueStrings(
+      admitted.map((admission) => admission.latest_event_id ?? "").filter(Boolean),
+    ),
+    next_session_event_counts: uniqueNumbers(
+      admitted
+        .map((admission) => admission.session_event_count)
+        .filter((value): value is number => typeof value === "number"),
+    ),
+    next_has_observation: admitted.some((admission) => admission.has_observation === true),
+    all_next_have_observation: admitted.length > 0 &&
+      admitted.every((admission) => admission.has_observation === true),
     next_chunk_ids: uniqueStrings(
       admitted.map((admission) => admission.latest_chunk_id ?? "").filter(Boolean),
+    ),
+    next_chunk_indexes: uniqueNumbers(
+      admitted
+        .map((admission) => admission.latest_chunk_index)
+        .filter((value): value is number => typeof value === "number"),
     ),
     next_latest_source_ids: uniqueStrings(
       admitted.map((admission) => admission.latest_source_id ?? "").filter(Boolean),
     ),
     next_latest_source_hashes: uniqueStrings(
       admitted.map((admission) => admission.latest_source_hash ?? "").filter(Boolean),
+    ),
+    next_latest_source_kinds: uniqueStrings(
+      admitted.map((admission) => admission.latest_source_kind ?? "").filter(Boolean),
     ),
     next_latest_target_languages: uniqueStrings(
       admitted.map((admission) => admission.latest_target_language ?? "").filter(Boolean),
@@ -96,6 +131,16 @@ export const buildHelixCapabilityLaneGoalDispatchReadiness = (input: {
     ),
     next_source_event_ids: uniqueStrings(
       admitted.map((admission) => admission.latest_source_event_id ?? "").filter(Boolean),
+    ),
+    next_source_event_mses: uniqueNumbers(
+      admitted
+        .map((admission) => admission.latest_source_event_ms)
+        .filter((value): value is number => typeof value === "number"),
+    ),
+    next_observed_at_mses: uniqueNumbers(
+      admitted
+        .map((admission) => admission.latest_observed_at_ms)
+        .filter((value): value is number => typeof value === "number"),
     ),
     next_source_text_hashes: uniqueStrings(
       admitted.map((admission) => admission.source_text_hash ?? "").filter(Boolean),
@@ -115,6 +160,9 @@ export const buildHelixCapabilityLaneGoalDispatchReadiness = (input: {
       admitted.map((admission) => admission.latest_freshness_status ?? "").filter(Boolean),
     ),
     next_cancel_requested: admitted.some((admission) => admission.latest_cancel_requested === true),
+    next_mail_loop_wake_kinds: uniqueWakeKinds(
+      admitted.map((admission) => admission.latest_mail_loop_wake_kind),
+    ),
     all_admitted_permissions_non_mutating: admitted.every(admissionPermissionsAreNonMutating),
     next_evidence_refs: uniqueStrings(
       admitted.map((admission) => admission.evidence_ref ?? "").filter(Boolean),

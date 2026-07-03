@@ -56,6 +56,8 @@ const eventFor = (input: {
   atMs: number;
   sourceId?: string | null;
   sourceHash?: string | null;
+  sourceKind?: HelixCapabilityLaneSessionSourceBinding["source_kind"] | null;
+  accountLocale?: string | null;
   targetLanguage?: string | null;
   observationRef?: string | null;
   receiptRef?: string | null;
@@ -88,6 +90,8 @@ const eventFor = (input: {
   reason: input.reason,
   source_id: normalizeText(input.sourceId) || null,
   source_hash: normalizeText(input.sourceHash) || null,
+  source_kind: input.sourceKind ?? null,
+  account_locale: normalizeText(input.accountLocale) || null,
   target_language: normalizeText(input.targetLanguage) || null,
   observation_ref: normalizeText(input.observationRef) || null,
   receipt_ref: normalizeText(input.receiptRef) || null,
@@ -181,6 +185,9 @@ export const createHelixCapabilityLaneSessionStore = () => {
     const laneSessionId =
       normalizeText(input.laneSessionId) ||
       `lane_session:${input.laneId}:${crypto.randomUUID()}`;
+    if (sessions.has(laneSessionId)) {
+      return blocked("start", "lane_session_already_exists", blockedMetadata);
+    }
     const event = eventFor({
       laneSessionId,
       laneId: input.laneId,
@@ -197,7 +204,12 @@ export const createHelixCapabilityLaneSessionStore = () => {
       atMs: nowMs,
       sourceId: input.sourceBinding.source_id,
       sourceHash: input.sourceBinding.source_hash,
+      sourceTextHash: input.sourceBinding.source_text_hash,
+      sourceTextCharCount: input.sourceBinding.source_text_char_count,
+      sourceKind: input.sourceBinding.source_kind,
+      accountLocale: input.sourceBinding.account_locale,
       targetLanguage: input.sourceBinding.target_language,
+      projectionTarget: input.sourceBinding.projection_target,
     });
     const session: HelixCapabilityLaneSession = {
       schema: HELIX_CAPABILITY_LANE_SESSION_SCHEMA,
@@ -216,6 +228,12 @@ export const createHelixCapabilityLaneSessionStore = () => {
         ...input.sourceBinding,
         source_id: normalizeText(input.sourceBinding.source_id),
         source_hash: normalizeText(input.sourceBinding.source_hash) || null,
+        source_text_hash: normalizeText(input.sourceBinding.source_text_hash) || null,
+        source_text_char_count:
+          typeof input.sourceBinding.source_text_char_count === "number" &&
+          Number.isFinite(input.sourceBinding.source_text_char_count)
+            ? Math.trunc(input.sourceBinding.source_text_char_count)
+            : null,
         target_language: normalizeText(input.sourceBinding.target_language) || null,
       },
       permissions: sessionPermissionsFor(input.provider),
@@ -287,7 +305,12 @@ export const createHelixCapabilityLaneSessionStore = () => {
       atMs: nowMs,
       sourceId: session.source_binding.source_id,
       sourceHash: session.source_binding.source_hash,
+      sourceTextHash: session.source_binding.source_text_hash,
+      sourceTextCharCount: session.source_binding.source_text_char_count,
+      sourceKind: session.source_binding.source_kind,
+      accountLocale: session.source_binding.account_locale,
       targetLanguage: session.source_binding.target_language,
+      projectionTarget: session.source_binding.projection_target,
     });
     const updated: HelixCapabilityLaneSession = {
       ...session,
@@ -319,6 +342,7 @@ export const createHelixCapabilityLaneSessionStore = () => {
     dedupeKey?: string | null;
     sourceEventId?: string | null;
     sourceHash?: string | null;
+    sourceKind?: HelixCapabilityLaneSessionSourceBinding["source_kind"] | null;
     targetLanguage?: string | null;
     sourceEventMs?: number | null;
     observedAtMs?: number | null;
@@ -361,6 +385,22 @@ export const createHelixCapabilityLaneSessionStore = () => {
     ) {
       return blocked("record_observation", "source_hash_mismatch", resultMetadata);
     }
+    const sourceTextHash = normalizeText(input.sourceTextHash);
+    if (
+      sourceTextHash &&
+      session.source_binding.source_text_hash &&
+      sourceTextHash !== session.source_binding.source_text_hash
+    ) {
+      return blocked("record_observation", "source_text_hash_mismatch", resultMetadata);
+    }
+    if (
+      typeof input.sourceTextCharCount === "number" &&
+      Number.isFinite(input.sourceTextCharCount) &&
+      typeof session.source_binding.source_text_char_count === "number" &&
+      Math.trunc(input.sourceTextCharCount) !== session.source_binding.source_text_char_count
+    ) {
+      return blocked("record_observation", "source_text_char_count_mismatch", resultMetadata);
+    }
     const projectionTarget = normalizeText(input.projectionTarget);
     if (
       projectionTarget &&
@@ -390,6 +430,8 @@ export const createHelixCapabilityLaneSessionStore = () => {
       atMs: nowMs,
       sourceId: sourceId || session.source_binding.source_id,
       sourceHash: sourceHash || session.source_binding.source_hash,
+      sourceKind: input.sourceKind ?? session.source_binding.source_kind,
+      accountLocale: session.source_binding.account_locale,
       targetLanguage: normalizeText(input.targetLanguage) || session.source_binding.target_language,
       observationRef,
       receiptRef,
@@ -402,7 +444,7 @@ export const createHelixCapabilityLaneSessionStore = () => {
       freshnessStatus: input.freshnessStatus,
       sourceTextHash: input.sourceTextHash,
       sourceTextCharCount: input.sourceTextCharCount,
-      projectionTarget,
+      projectionTarget: projectionTarget || session.source_binding.projection_target,
       cancelRequested: input.cancelRequested,
     });
     const updated: HelixCapabilityLaneSession = {

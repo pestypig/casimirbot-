@@ -31,6 +31,7 @@ describe("doc viewer math interaction", () => {
     readyCount: 0,
     errorCount: 0,
     healthStatus: "empty",
+    displayStatus: "empty",
     hasRenderableText: false,
     hasProjectionErrors: false,
     projectedCount: 0,
@@ -44,6 +45,10 @@ describe("doc viewer math interaction", () => {
     latestObservationRef: null,
     latestReceiptRef: null,
     latestLaneSessionId: null,
+    latestObservationLaneSessionId: null,
+    latestGoalBindingIdFromProjection: null,
+    latestEventId: null,
+    latestHasObservation: false,
     latestSelectedBackendProvider: null,
     latestChunkId: null,
     latestChunkIndex: null,
@@ -52,6 +57,10 @@ describe("doc viewer math interaction", () => {
     latestSourceId: null,
     latestSourceHash: null,
     latestSourceKind: null,
+    latestSourceTextHash: null,
+    latestSourceTextCharCount: null,
+    latestProjectionKey: null,
+    latestServerProjectionKey: null,
     latestProjectionTarget: null,
     latestAccountLocale: null,
     latestTargetLanguage: null,
@@ -63,6 +72,10 @@ describe("doc viewer math interaction", () => {
     suppressedReceiptCount: 0,
     latestSuppressedObservationRef: null,
     latestSuppressedReceiptRef: null,
+    latestSuppressedObservationLaneSessionId: null,
+    latestSuppressedGoalBindingId: null,
+    latestSuppressedEventId: null,
+    latestSuppressedHasObservation: false,
     latestSuppressedProjectionStatus: null,
     latestSuppressedChunkId: null,
     latestSuppressedChunkIndex: null,
@@ -71,10 +84,15 @@ describe("doc viewer math interaction", () => {
     latestSuppressedSourceEventMs: null,
     latestSuppressedObservedAtMs: null,
     latestSuppressedFreshnessStatus: null,
+    latestSuppressedDisplayStatus: null,
     latestSuppressedTerminalAuthorityStatus: "not_terminal_authority",
     latestSuppressedSourceId: null,
     latestSuppressedSourceHash: null,
     latestSuppressedSourceKind: null,
+    latestSuppressedSourceTextHash: null,
+    latestSuppressedSourceTextCharCount: null,
+    latestSuppressedProjectionKey: null,
+    latestSuppressedServerProjectionKey: null,
     latestSuppressedAccountLocale: null,
     latestSuppressedProjectionTarget: null,
     latestSuppressedTargetLanguage: null,
@@ -88,6 +106,8 @@ describe("doc viewer math interaction", () => {
     latestLaneSessionLifecycleAction: null,
     latestLaneSessionPermissionProfile: null,
     latestLaneSessionUpdatedAtMs: null,
+    latestLaneSessionEventId: null,
+    latestLaneSessionHasObservation: false,
     mailLoopCount: 0,
     pendingMailLoopCount: 0,
     blockedMailLoopCount: 0,
@@ -95,13 +115,38 @@ describe("doc viewer math interaction", () => {
     latestMailLoopId: null,
     latestMailLoopDeliveryStatus: null,
     latestPreviousStagePlayMailId: null,
+    latestMailLoopWakeKind: "none",
+    latestMailLoopObservationLaneSessionId: null,
     goalBindingCount: 0,
     activeGoalBindingCount: 0,
     blockedGoalBindingCount: 0,
     latestGoalBindingId: null,
     latestGoalId: null,
+    latestGoalBindingLaneSessionId: null,
     latestGoalBindingStatus: null,
+    latestGoalBindingSessionStatus: null,
+    latestGoalBindingSessionHealth: null,
+    latestGoalBindingActivationPolicy: null,
+    latestGoalBindingAttentionPolicy: null,
+    latestGoalBindingStopCondition: null,
+    latestGoalBindingReportPolicy: null,
+    latestGoalBindingQuietBehavior: null,
     latestGoalBindingReportAction: null,
+    latestGoalBindingReportReason: null,
+    latestGoalBindingObservationRef: null,
+    latestGoalBindingReceiptRef: null,
+    latestGoalBindingEventId: null,
+    latestGoalBindingHasObservation: false,
+    latestGoalBindingTerminalAuthorityStatus: "not_terminal_authority",
+    latestGoalBindingSourceId: null,
+    latestGoalBindingSourceHash: null,
+    latestGoalBindingSourceKind: null,
+    latestGoalBindingProjectionTarget: null,
+    latestGoalBindingAccountLocale: null,
+    latestGoalBindingTargetLanguage: null,
+    latestGoalBindingChunkId: null,
+    latestGoalBindingChunkIndex: null,
+    latestGoalBindingDedupeKey: null,
     terminalEligible: false,
     assistantAnswer: false,
     rawContentIncluded: false,
@@ -253,7 +298,7 @@ describe("doc viewer math interaction", () => {
         latestProjectionStatus: "failed",
       }),
       t: translate,
-    })).toBe('docsViewer.translation.status.ready:{"status":"failed"}');
+    })).toBe('docsViewer.translation.status.projectionDegraded:{"status":"failed"}');
   });
 
   it("routes inline document translation through Stage Play document Markdown mail", () => {
@@ -263,6 +308,13 @@ describe("doc viewer math interaction", () => {
     const hawMessagesSource = readFileSync(join(process.cwd(), "client/src/lib/i18n/messages/haw.ts"), "utf8");
 
     expect(panelSource).toContain("enqueueDocumentMarkdownTranslationMail");
+    expect(panelSource).toContain("runDocumentMarkdownTranslationLaneSessionControl");
+    expect(panelSource).toContain("emitDocumentTranslationLaneSessionControlEvents");
+    expect(panelSource).toContain("documentInlineTranslationLaneSessionId(activeTranslationScopeKey)");
+    expect(panelSource).toContain("const laneSessionId = documentInlineTranslationLaneSessionId(scopeKey)");
+    expect(panelSource).toContain("laneSessionId,");
+    expect(panelSource).toContain("runLaneSessionControl(\"start\")");
+    expect(panelSource).toContain("runLaneSessionControl(\"stop\")");
     expect(panelSource).toContain("readDocumentMarkdownMicroDeckRuns");
     expect(panelSource).toContain("extractDocumentMarkdownTranslationsFromRuns");
     expect(panelSource).toContain("subscribeDocumentLiveTranslationProjectionRegistry");
@@ -282,13 +334,19 @@ describe("doc viewer math interaction", () => {
     expect(panelSource).toContain("docsViewer.translation.status.projectionFailed");
     expect(panelSource).toContain("docsViewer.translation.status.projectionCancelled");
     expect(panelSource).toContain("docsViewer.translation.status.projectionStale");
+    expect(panelSource).toContain("docsViewer.translation.status.projectionDegraded");
     expect(hawMessagesSource).toContain("docsViewer.translation.status.projectionFailed");
     expect(hawMessagesSource).toContain("docsViewer.translation.status.projectionCancelled");
     expect(hawMessagesSource).toContain("docsViewer.translation.status.projectionStale");
+    expect(hawMessagesSource).toContain("docsViewer.translation.status.projectionDegraded");
     expect(panelSource).toContain("data-doc-translation-summary-total");
     expect(panelSource).toContain("data-doc-translation-summary-ready");
     expect(panelSource).toContain("data-doc-translation-summary-error");
     expect(panelSource).toContain("data-doc-translation-summary-health");
+    expect(panelSource).toContain("data-doc-translation-summary-display-status");
+    expect(panelSource).toContain("data-doc-translation-summary-label-visible");
+    expect(panelSource).toContain("translationEligible ? (");
+    expect(panelSource).toContain("!translationStatusLabel && \"hidden\"");
     expect(panelSource).toContain("data-doc-translation-summary-renderable");
     expect(panelSource).toContain("data-doc-translation-summary-has-errors");
     expect(panelSource).toContain("data-doc-translation-summary-projected");
@@ -302,6 +360,14 @@ describe("doc viewer math interaction", () => {
     expect(panelSource).toContain("data-doc-translation-summary-latest-observation-ref");
     expect(panelSource).toContain("data-doc-translation-summary-latest-receipt-ref");
     expect(panelSource).toContain("data-doc-translation-summary-latest-lane-session-id");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-observation-lane-session-id");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-goal-binding-id-from-projection");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-source-binding-key");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-observation-key");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-mail-loop-observation-key");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-goal-binding-key");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-event-id");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-has-observation");
     expect(panelSource).toContain("data-doc-translation-summary-latest-selected-backend-provider");
     expect(panelSource).toContain("data-doc-translation-summary-latest-chunk-id");
     expect(panelSource).toContain("data-doc-translation-summary-latest-chunk-index");
@@ -310,6 +376,9 @@ describe("doc viewer math interaction", () => {
     expect(panelSource).toContain("data-doc-translation-summary-latest-source-id");
     expect(panelSource).toContain("data-doc-translation-summary-latest-source-hash");
     expect(panelSource).toContain("data-doc-translation-summary-latest-source-kind");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-source-text-hash");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-projection-key");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-server-projection-key");
     expect(panelSource).toContain("data-doc-translation-summary-latest-projection-target");
     expect(panelSource).toContain("data-doc-translation-summary-latest-account-locale");
     expect(panelSource).toContain("data-doc-translation-summary-latest-target-language");
@@ -321,6 +390,14 @@ describe("doc viewer math interaction", () => {
     expect(panelSource).toContain("data-doc-translation-summary-suppressed-receipts");
     expect(panelSource).toContain("data-doc-translation-summary-latest-suppressed-observation-ref");
     expect(panelSource).toContain("data-doc-translation-summary-latest-suppressed-receipt-ref");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-suppressed-observation-lane-session-id");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-suppressed-goal-binding-id");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-suppressed-source-binding-key");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-suppressed-observation-key");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-suppressed-mail-loop-observation-key");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-suppressed-goal-binding-key");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-suppressed-event-id");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-suppressed-has-observation");
     expect(panelSource).toContain("data-doc-translation-summary-latest-suppressed-projection-status");
     expect(panelSource).toContain("data-doc-translation-summary-latest-suppressed-chunk-id");
     expect(panelSource).toContain("data-doc-translation-summary-latest-suppressed-chunk-index");
@@ -329,10 +406,14 @@ describe("doc viewer math interaction", () => {
     expect(panelSource).toContain("data-doc-translation-summary-latest-suppressed-source-event-ms");
     expect(panelSource).toContain("data-doc-translation-summary-latest-suppressed-observed-at-ms");
     expect(panelSource).toContain("data-doc-translation-summary-latest-suppressed-freshness-status");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-suppressed-display-status");
     expect(panelSource).toContain("data-doc-translation-summary-latest-suppressed-terminal-authority-status");
     expect(panelSource).toContain("data-doc-translation-summary-latest-suppressed-source-id");
     expect(panelSource).toContain("data-doc-translation-summary-latest-suppressed-source-hash");
     expect(panelSource).toContain("data-doc-translation-summary-latest-suppressed-source-kind");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-suppressed-source-text-hash");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-suppressed-projection-key");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-suppressed-server-projection-key");
     expect(panelSource).toContain("data-doc-translation-summary-latest-suppressed-account-locale");
     expect(panelSource).toContain("data-doc-translation-summary-latest-suppressed-projection-target");
     expect(panelSource).toContain("data-doc-translation-summary-latest-suppressed-target-language");
@@ -346,23 +427,71 @@ describe("doc viewer math interaction", () => {
     expect(panelSource).toContain("data-doc-translation-summary-latest-lane-session-lifecycle-action");
     expect(panelSource).toContain("data-doc-translation-summary-latest-lane-session-permission-profile");
     expect(panelSource).toContain("data-doc-translation-summary-latest-lane-session-updated-at-ms");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-lane-session-event-id");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-lane-session-has-observation");
     expect(panelSource).toContain("data-doc-translation-summary-mail-loops");
     expect(panelSource).toContain("data-doc-translation-summary-pending-mail-loops");
     expect(panelSource).toContain("data-doc-translation-summary-blocked-mail-loops");
     expect(panelSource).toContain("data-doc-translation-summary-latest-mail-loop-status");
     expect(panelSource).toContain("data-doc-translation-summary-latest-mail-loop-id");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-mail-loop-observation-lane-session-id");
     expect(panelSource).toContain("data-doc-translation-summary-goal-bindings");
     expect(panelSource).toContain("data-doc-translation-summary-active-goal-bindings");
     expect(panelSource).toContain("data-doc-translation-summary-blocked-goal-bindings");
     expect(panelSource).toContain("data-doc-translation-summary-latest-goal-binding-id");
     expect(panelSource).toContain("data-doc-translation-summary-latest-goal-id");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-goal-binding-lane-session-id");
     expect(panelSource).toContain("data-doc-translation-summary-latest-goal-binding-status");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-goal-binding-session-status");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-goal-binding-session-health");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-goal-binding-activation-policy");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-goal-binding-attention-policy");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-goal-binding-stop-condition");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-goal-binding-report-policy");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-goal-binding-quiet-behavior");
     expect(panelSource).toContain("data-doc-translation-summary-latest-goal-binding-report-action");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-goal-binding-report-reason");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-goal-binding-observation-ref");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-goal-binding-receipt-ref");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-goal-binding-event-id");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-goal-binding-has-observation");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-goal-binding-terminal-authority-status");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-goal-binding-source-id");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-goal-binding-source-hash");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-goal-binding-source-kind");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-goal-binding-projection-target");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-goal-binding-account-locale");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-goal-binding-target-language");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-goal-binding-chunk-id");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-goal-binding-chunk-index");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-goal-binding-dedupe-key");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-goal-binding-source-binding-key");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-goal-binding-observation-key");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-goal-binding-mail-loop-observation-key");
+    expect(panelSource).toContain("data-doc-translation-summary-latest-goal-binding-key-from-binding");
     expect(panelSource).toContain("data-doc-translation-summary-terminal-eligible=\"false\"");
     expect(panelSource).toContain("data-doc-translation-summary-assistant-answer=\"false\"");
     expect(panelSource).toContain("data-doc-translation-summary-raw-content-included=\"false\"");
-    expect(panelSource).toContain("buildDocumentInlineTranslationDataAttributes(state)");
-    expect(panelSource).toContain('`${name}="${escapeHtml(value)}"`');
+    expect(panelSource).toContain("data-doc-translation-control=\"inline-account-language\"");
+    expect(panelSource).toContain("data-doc-translation-control-enabled={String(inlineTranslationEnabled)}");
+    expect(panelSource).toContain("data-doc-translation-control-target-language={translationTargetLanguage}");
+    expect(panelSource).toContain("data-doc-translation-control-account-locale={interfaceLanguage.code}");
+    expect(panelSource).toContain("data-doc-translation-control-projection-target={HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK}");
+    expect(panelSource).toContain("data-doc-translation-control-terminal-eligible=\"false\"");
+    expect(panelSource).toContain("data-doc-translation-control-assistant-answer=\"false\"");
+    expect(panelSource).toContain("data-doc-translation-control-raw-content-included=\"false\"");
+    expect(clientSource).toContain("/api/agi/capability-lanes/session");
+    expect(clientSource).toContain("capability_lane_session_call");
+    expect(clientSource).toContain("terminal_eligible?: false");
+    expect(clientSource).toContain("assistant_answer?: false");
+    expect(clientSource).toContain("raw_content_included?: false");
+    const inlineRendererSource = readFileSync(
+      join(process.cwd(), "client/src/lib/docs/liveTranslationInlineRenderer.ts"),
+      "utf8",
+    );
+    expect(panelSource).toContain("renderDocumentMarkdownWithInlineTranslations({");
+    expect(inlineRendererSource).toContain("buildDocumentInlineTranslationDataAttributes(state)");
+    expect(inlineRendererSource).toContain('`${name}="${escapeHtml(value)}"`');
     expect(panelSource).toContain("type DocumentInlineTranslationRenderState");
     expect(panelSource).toContain("type InlineTranslationState = DocumentInlineTranslationRenderState");
     expect(panelSource).toContain("documentMarkdownTranslationEntryToInlineRenderState(entry)");
@@ -370,9 +499,21 @@ describe("doc viewer math interaction", () => {
     expect(panelSource).toContain("DOC_TRANSLATION_MAX_UNITS_PER_CHUNK = 3");
     expect(panelSource).toContain("DOC_TRANSLATION_MAX_CHARS_PER_CHUNK = 2200");
     expect(panelSource).toContain("documentTranslationChunkInFlightRef");
-    expect(panelSource).toContain("chunkId: `doc-inline:${rawMarkdownSourceHash}:${targetIds.join(\",\")}`");
+    expect(panelSource).toContain("const chunkId = `doc-inline:${rawMarkdownSourceHash}:${targetIds.join(\",\")}`");
+    expect(panelSource).toContain("buildPendingDocumentInlineTranslationState({");
+    expect(panelSource).toContain("projectionStatus: \"missing\"");
+    expect(panelSource).toContain("observationLaneSessionId: null");
+    expect(panelSource).toContain("goalBindingId: null");
+    expect(panelSource).toContain("latestEventId: null");
+    expect(panelSource).toContain("hasObservation: false");
+    expect(panelSource).toContain("freshnessStatus: \"pending\"");
+    expect(panelSource).toContain("terminalAuthorityStatus: \"not_terminal_authority\"");
+    expect(panelSource).toContain("terminalEligible: false");
+    expect(panelSource).toContain("assistantAnswer: false");
+    expect(panelSource).toContain("rawContentIncluded: false");
     expect(panelSource).toContain("targetLanguage: interfaceLanguage.code");
     expect(panelSource).toContain("accountLocale: interfaceLanguage.code");
+    expect(panelSource).toContain("projectionTarget: HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK");
     expect(panelSource).not.toContain("requestDocumentTranslationUnits");
     expect(clientSource).toContain("/api/helix/stage-play/live-source-mail/document-markdown");
     expect(clientSource).toContain("/api/helix/stage-play/live-source-mail?");

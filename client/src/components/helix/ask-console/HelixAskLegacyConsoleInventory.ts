@@ -22,10 +22,10 @@ export const HELIX_ASK_LEGACY_CONSOLE_ACTIVE_PATH = [
 
 export const HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT = {
   file: "client/src/components/helix/HelixAskPill.tsx",
-  lineCountAtInventory: 26337,
-  exportedComponentStartsAtLine: 7852,
-  liveRenderSliceStartsAtLine: 25865,
-  liveLegacyConsoleViewStartsAtLine: 25880,
+  lineCountAtInventory: 26338,
+  exportedComponentStartsAtLine: 7853,
+  liveRenderSliceStartsAtLine: 25866,
+  liveLegacyConsoleViewStartsAtLine: 25881,
   inventoryReason:
     "The active bridge still imports the whole legacy file, but the visible console render path is concentrated near the bottom and now enters the recrowned legacy console view before composing recrowned ask-console display owners.",
 } as const;
@@ -95,6 +95,13 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
       "The conditional goal-pill slot moved to HelixAskGoalPillSurface while goal session state, expansion state, busy/error state, and goal action execution remain in the bridge.",
   },
   {
+    key: "steering_queue_surface_slot",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The active legacy-console steering-queue slot now runs through HelixAskSteeringQueueSurface, preserving the current empty-slot behavior while queue item state and any future queue toggle mutation stay outside the bridge render seam.",
+  },
+  {
     key: "console_supplement_surface",
     classification: "pure_display_already_recrowned",
     source: "ask-console",
@@ -121,6 +128,13 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
     source: "ask-console",
     evidence:
       "The live render slice now delegates error-line, voice-status, and context-memory status composition to HelixAskConsoleStatusSurfaces while error state, voice capture state, and context-memory derivation remain in the bridge.",
+  },
+  {
+    key: "error_line_surface_slot",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The active legacy-console error-line slot now runs through HelixAskConsoleErrorLineSurface while askError state mutation, clearing, and request error handling remain in the bridge.",
   },
   {
     key: "legacy_chat_persistence_binding",

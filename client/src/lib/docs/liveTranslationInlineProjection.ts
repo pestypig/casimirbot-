@@ -1,5 +1,9 @@
 import type { DocumentTranslationUnit } from "@shared/document-translation";
 import {
+  HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK,
+  type HelixLiveTranslationProjectionTarget,
+} from "@shared/helix-live-translation-projection-target";
+import {
   buildHelixLiveTranslationInlineUnitStates,
   buildHelixLiveTranslationUiProjections,
   type HelixLiveTranslationInlineUnitState,
@@ -13,9 +17,19 @@ export type DocumentLiveTranslationInlineState = {
   status: "ready" | "error";
   text?: string;
   error?: string;
+  serverProjectionKey?: string | null;
   observationRef: string | null;
   receiptRef: string | null;
   laneSessionId: string | null;
+  observationLaneSessionId: string | null;
+  goalBindingId: string | null;
+  sessionControlKey?: string | null;
+  sourceBindingKey?: string | null;
+  latestObservationKey?: string | null;
+  latestMailLoopObservationKey?: string | null;
+  goalBindingKey?: string | null;
+  latestEventId: string | null;
+  hasObservation: boolean;
   selectedBackendProvider: string | null;
   projectionStatus: HelixLiveTranslationInlineUnitState["projectionStatus"];
   chunkId: string | null;
@@ -29,6 +43,8 @@ export type DocumentLiveTranslationInlineState = {
   sourceId: string | null;
   sourceHash?: string | null;
   sourceKind: string | null;
+  sourceTextHash?: string | null;
+  sourceTextCharCount?: number | null;
   accountLocale: string | null;
   projectionTarget: string | null;
   targetLanguage: string | null;
@@ -43,9 +59,19 @@ export type DocumentInlineTranslationRenderState = {
   status: "loading" | "ready" | "error";
   text?: string;
   error?: string;
+  serverProjectionKey?: string | null;
   observationRef?: string | null;
   receiptRef?: string | null;
   laneSessionId?: string | null;
+  observationLaneSessionId?: string | null;
+  goalBindingId?: string | null;
+  sessionControlKey?: string | null;
+  sourceBindingKey?: string | null;
+  latestObservationKey?: string | null;
+  latestMailLoopObservationKey?: string | null;
+  goalBindingKey?: string | null;
+  latestEventId?: string | null;
+  hasObservation?: boolean;
   selectedBackendProvider?: string | null;
   projectionStatus?: HelixLiveTranslationInlineUnitState["projectionStatus"];
   chunkId?: string | null;
@@ -59,13 +85,25 @@ export type DocumentInlineTranslationRenderState = {
   sourceId?: string | null;
   sourceHash?: string | null;
   sourceKind?: string | null;
+  sourceTextHash?: string | null;
+  sourceTextCharCount?: number | null;
   accountLocale?: string | null;
   projectionTarget?: string | null;
   targetLanguage?: string | null;
   cancelRequested?: boolean;
   source?: "capability_lane" | "document_microdeck";
+  suppressedServerProjectionKey?: string | null;
   suppressedObservationRef?: string | null;
   suppressedReceiptRef?: string | null;
+  suppressedObservationLaneSessionId?: string | null;
+  suppressedGoalBindingId?: string | null;
+  suppressedSessionControlKey?: string | null;
+  suppressedSourceBindingKey?: string | null;
+  suppressedLatestObservationKey?: string | null;
+  suppressedLatestMailLoopObservationKey?: string | null;
+  suppressedGoalBindingKey?: string | null;
+  suppressedLatestEventId?: string | null;
+  suppressedHasObservation?: boolean | null;
   suppressedProjectionStatus?: HelixLiveTranslationInlineUnitState["projectionStatus"] | null;
   suppressedChunkId?: string | null;
   suppressedChunkIndex?: number | null;
@@ -78,6 +116,8 @@ export type DocumentInlineTranslationRenderState = {
   suppressedSourceId?: string | null;
   suppressedSourceHash?: string | null;
   suppressedSourceKind?: string | null;
+  suppressedSourceTextHash?: string | null;
+  suppressedSourceTextCharCount?: number | null;
   suppressedAccountLocale?: string | null;
   suppressedProjectionTarget?: string | null;
   suppressedTargetLanguage?: string | null;
@@ -94,7 +134,7 @@ export type BuildDocumentLiveTranslationInlineStatesInput = {
   locale: string;
   sourceHash?: string | null;
   units: DocumentTranslationUnit[];
-  projectionTarget?: "docs_chunk" | "docs_selection" | "docs_hover" | string;
+  projectionTarget?: HelixLiveTranslationProjectionTarget | string;
   allowStaleDisplayText?: boolean;
 };
 
@@ -123,14 +163,32 @@ export function filterReadyDocumentInlineTranslationRenderStates(
 export function buildDocumentInlineTranslationDataAttributes(
   state: DocumentInlineTranslationRenderState,
 ): Record<string, string> {
+  const displayStatus = resolveDocumentInlineTranslationDisplayStatus(state);
+  const projectionKey = buildDocumentInlineTranslationProjectionKey(state);
+  const suppressedProjectionKey = buildDocumentInlineTranslationSuppressedProjectionKey(state);
   return Object.fromEntries(
     [
       ["data-doc-translation-source", state.source],
+      ["data-doc-translation-projection-key", projectionKey],
+      ["data-doc-translation-server-projection-key", state.serverProjectionKey],
+      ["data-doc-translation-authority-policy", "projection_only_not_answer_authority"],
+      ["data-doc-translation-render-status", state.status],
+      ["data-doc-translation-display-status", displayStatus],
+      ["data-doc-translation-governed-projection", state.source === "capability_lane" ? "true" : null],
       ["data-doc-translation-projection-status", state.projectionStatus],
       ["data-doc-translation-selected-backend-provider", state.selectedBackendProvider],
       ["data-doc-translation-observation-ref", state.observationRef],
       ["data-doc-translation-receipt-ref", state.receiptRef],
       ["data-doc-translation-lane-session-id", state.laneSessionId],
+      ["data-doc-translation-observation-lane-session-id", state.observationLaneSessionId],
+      ["data-doc-translation-goal-binding-id", state.goalBindingId],
+      ["data-doc-translation-session-control-key", state.sessionControlKey],
+      ["data-doc-translation-source-binding-key", state.sourceBindingKey],
+      ["data-doc-translation-latest-observation-key", state.latestObservationKey],
+      ["data-doc-translation-latest-mail-loop-observation-key", state.latestMailLoopObservationKey],
+      ["data-doc-translation-goal-binding-key", state.goalBindingKey],
+      ["data-doc-translation-latest-event-id", state.latestEventId],
+      ["data-doc-translation-has-observation", typeof state.hasObservation === "boolean" ? String(state.hasObservation) : null],
       ["data-doc-translation-chunk-id", state.chunkId],
       ["data-doc-translation-chunk-index", typeof state.chunkIndex === "number" ? String(state.chunkIndex) : null],
       ["data-doc-translation-dedupe-key", state.dedupeKey],
@@ -142,12 +200,28 @@ export function buildDocumentInlineTranslationDataAttributes(
       ["data-doc-translation-source-id", state.sourceId],
       ["data-doc-translation-source-hash", state.sourceHash],
       ["data-doc-translation-source-kind", state.sourceKind],
+      ["data-doc-translation-source-text-hash", state.sourceTextHash],
+      ["data-doc-translation-source-text-char-count", typeof state.sourceTextCharCount === "number" ? String(state.sourceTextCharCount) : null],
       ["data-doc-translation-account-locale", state.accountLocale],
       ["data-doc-translation-projection-target", state.projectionTarget],
       ["data-doc-translation-target-language", state.targetLanguage],
       ["data-doc-translation-cancel-requested", typeof state.cancelRequested === "boolean" ? String(state.cancelRequested) : null],
       ["data-doc-translation-suppressed-observation-ref", state.suppressedObservationRef],
       ["data-doc-translation-suppressed-receipt-ref", state.suppressedReceiptRef],
+      ["data-doc-translation-suppressed-projection-key", suppressedProjectionKey],
+      ["data-doc-translation-suppressed-server-projection-key", state.suppressedServerProjectionKey],
+      ["data-doc-translation-suppressed-observation-lane-session-id", state.suppressedObservationLaneSessionId],
+      ["data-doc-translation-suppressed-goal-binding-id", state.suppressedGoalBindingId],
+      ["data-doc-translation-suppressed-session-control-key", state.suppressedSessionControlKey],
+      ["data-doc-translation-suppressed-source-binding-key", state.suppressedSourceBindingKey],
+      ["data-doc-translation-suppressed-latest-observation-key", state.suppressedLatestObservationKey],
+      ["data-doc-translation-suppressed-latest-mail-loop-observation-key", state.suppressedLatestMailLoopObservationKey],
+      ["data-doc-translation-suppressed-goal-binding-key", state.suppressedGoalBindingKey],
+      ["data-doc-translation-suppressed-latest-event-id", state.suppressedLatestEventId],
+      [
+        "data-doc-translation-suppressed-has-observation",
+        typeof state.suppressedHasObservation === "boolean" ? String(state.suppressedHasObservation) : null,
+      ],
       ["data-doc-translation-suppressed-projection-status", state.suppressedProjectionStatus],
       ["data-doc-translation-suppressed-chunk-id", state.suppressedChunkId],
       ["data-doc-translation-suppressed-chunk-index", typeof state.suppressedChunkIndex === "number" ? String(state.suppressedChunkIndex) : null],
@@ -163,6 +237,11 @@ export function buildDocumentInlineTranslationDataAttributes(
       ["data-doc-translation-suppressed-source-id", state.suppressedSourceId],
       ["data-doc-translation-suppressed-source-hash", state.suppressedSourceHash],
       ["data-doc-translation-suppressed-source-kind", state.suppressedSourceKind],
+      ["data-doc-translation-suppressed-source-text-hash", state.suppressedSourceTextHash],
+      [
+        "data-doc-translation-suppressed-source-text-char-count",
+        typeof state.suppressedSourceTextCharCount === "number" ? String(state.suppressedSourceTextCharCount) : null,
+      ],
       ["data-doc-translation-suppressed-account-locale", state.suppressedAccountLocale],
       ["data-doc-translation-suppressed-projection-target", state.suppressedProjectionTarget],
       ["data-doc-translation-suppressed-target-language", state.suppressedTargetLanguage],
@@ -178,6 +257,53 @@ export function buildDocumentInlineTranslationDataAttributes(
   );
 }
 
+export function buildDocumentInlineTranslationProjectionKey(
+  state: DocumentInlineTranslationRenderState,
+): string | null {
+  const parts = [
+    state.sourceId,
+    state.sourceHash,
+    state.sourceTextHash,
+    state.projectionTarget,
+    state.targetLanguage,
+    state.chunkId,
+    state.receiptRef ?? state.observationRef,
+  ]
+    .map((value) => typeof value === "string" ? value.trim() : "")
+    .filter(Boolean);
+  return parts.length > 0 ? parts.join("::") : null;
+}
+
+export function buildDocumentInlineTranslationSuppressedProjectionKey(
+  state: DocumentInlineTranslationRenderState,
+): string | null {
+  const parts = [
+    state.suppressedSourceId,
+    state.suppressedSourceHash,
+    state.suppressedSourceTextHash,
+    state.suppressedProjectionTarget,
+    state.suppressedTargetLanguage,
+    state.suppressedChunkId,
+    state.suppressedReceiptRef ?? state.suppressedObservationRef,
+  ]
+    .map((value) => typeof value === "string" ? value.trim() : "")
+    .filter(Boolean);
+  return parts.length > 0 ? parts.join("::") : null;
+}
+
+export function resolveDocumentInlineTranslationDisplayStatus(
+  state: DocumentInlineTranslationRenderState,
+): "active" | "pending" | "ready" | "stale" | "cancelled" | "failed" | "blocked" {
+  if (state.status === "loading") {
+    return state.laneSessionId || state.goalBindingId || state.observationLaneSessionId ? "active" : "pending";
+  }
+  if (state.projectionStatus === "stale" || state.freshnessStatus === "stale") return "stale";
+  if (state.projectionStatus === "cancelled" || state.cancelRequested === true) return "cancelled";
+  if (state.projectionStatus === "failed") return "failed";
+  if (state.status === "error") return "blocked";
+  return "ready";
+}
+
 export function formatDocumentInlineTranslationText(text: string): string {
   return text
     .replace(/^ {0,3}#{1,6}\s+/gm, "")
@@ -191,6 +317,7 @@ export function documentMarkdownTranslationEntryToInlineRenderState(
   entry: DocumentMarkdownTranslationEntry,
 ): DocumentInlineTranslationRenderState {
   const metadata = {
+    ...(entry.projectionKey ? { serverProjectionKey: entry.projectionKey } : {}),
     observationRef: entry.observationRef,
     receiptRef: entry.receiptRef,
     chunkId: entry.chunkId,
@@ -201,11 +328,23 @@ export function documentMarkdownTranslationEntryToInlineRenderState(
     observedAtMs: entry.observedAtMs,
     projectionStatus: entry.projectionStatus,
     freshnessStatus: entry.freshnessStatus,
-    terminalAuthorityStatus: "not_terminal_authority",
+    terminalAuthorityStatus: entry.terminalAuthorityStatus ?? "not_terminal_authority",
+    laneSessionId: entry.laneSessionId,
+    observationLaneSessionId: entry.observationLaneSessionId,
+    goalBindingId: entry.goalBindingId,
+    sessionControlKey: entry.sessionControlKey,
+    sourceBindingKey: entry.sourceBindingKey,
+    latestObservationKey: entry.latestObservationKey,
+    latestMailLoopObservationKey: entry.latestMailLoopObservationKey,
+    goalBindingKey: entry.goalBindingKey,
+    latestEventId: entry.latestEventId,
+    hasObservation: entry.hasObservation ?? Boolean(entry.observationRef),
     selectedBackendProvider: entry.selectedBackendProvider,
     sourceId: entry.sourceId,
     ...(entry.sourceHash ? { sourceHash: entry.sourceHash } : {}),
     sourceKind: entry.sourceKind,
+    ...(entry.sourceTextHash ? { sourceTextHash: entry.sourceTextHash } : {}),
+    ...(typeof entry.sourceTextCharCount === "number" ? { sourceTextCharCount: entry.sourceTextCharCount } : {}),
     accountLocale: entry.accountLocale,
     projectionTarget: entry.projectionTarget,
     targetLanguage: entry.targetLanguage,
@@ -238,9 +377,19 @@ export function sameDocumentInlineTranslationRenderState(
   return left.status === right.status &&
     (left.text ?? "") === (right.text ?? "") &&
     (left.error ?? "") === (right.error ?? "") &&
+    (left.serverProjectionKey ?? "") === (right.serverProjectionKey ?? "") &&
     (left.observationRef ?? "") === (right.observationRef ?? "") &&
     (left.receiptRef ?? "") === (right.receiptRef ?? "") &&
     (left.laneSessionId ?? "") === (right.laneSessionId ?? "") &&
+    (left.observationLaneSessionId ?? "") === (right.observationLaneSessionId ?? "") &&
+    (left.goalBindingId ?? "") === (right.goalBindingId ?? "") &&
+    (left.sessionControlKey ?? "") === (right.sessionControlKey ?? "") &&
+    (left.sourceBindingKey ?? "") === (right.sourceBindingKey ?? "") &&
+    (left.latestObservationKey ?? "") === (right.latestObservationKey ?? "") &&
+    (left.latestMailLoopObservationKey ?? "") === (right.latestMailLoopObservationKey ?? "") &&
+    (left.goalBindingKey ?? "") === (right.goalBindingKey ?? "") &&
+    (left.latestEventId ?? "") === (right.latestEventId ?? "") &&
+    (left.hasObservation ?? null) === (right.hasObservation ?? null) &&
     (left.selectedBackendProvider ?? "") === (right.selectedBackendProvider ?? "") &&
     (left.projectionStatus ?? "") === (right.projectionStatus ?? "") &&
     (left.chunkId ?? "") === (right.chunkId ?? "") &&
@@ -254,13 +403,25 @@ export function sameDocumentInlineTranslationRenderState(
     (left.sourceId ?? "") === (right.sourceId ?? "") &&
     (left.sourceHash ?? "") === (right.sourceHash ?? "") &&
     (left.sourceKind ?? "") === (right.sourceKind ?? "") &&
+    (left.sourceTextHash ?? "") === (right.sourceTextHash ?? "") &&
+    (left.sourceTextCharCount ?? null) === (right.sourceTextCharCount ?? null) &&
     (left.accountLocale ?? "") === (right.accountLocale ?? "") &&
     (left.projectionTarget ?? "") === (right.projectionTarget ?? "") &&
     (left.targetLanguage ?? "") === (right.targetLanguage ?? "") &&
     (left.cancelRequested ?? null) === (right.cancelRequested ?? null) &&
     (left.source ?? "") === (right.source ?? "") &&
+    (left.suppressedServerProjectionKey ?? "") === (right.suppressedServerProjectionKey ?? "") &&
     (left.suppressedObservationRef ?? "") === (right.suppressedObservationRef ?? "") &&
     (left.suppressedReceiptRef ?? "") === (right.suppressedReceiptRef ?? "") &&
+    (left.suppressedObservationLaneSessionId ?? "") === (right.suppressedObservationLaneSessionId ?? "") &&
+    (left.suppressedGoalBindingId ?? "") === (right.suppressedGoalBindingId ?? "") &&
+    (left.suppressedSessionControlKey ?? "") === (right.suppressedSessionControlKey ?? "") &&
+    (left.suppressedSourceBindingKey ?? "") === (right.suppressedSourceBindingKey ?? "") &&
+    (left.suppressedLatestObservationKey ?? "") === (right.suppressedLatestObservationKey ?? "") &&
+    (left.suppressedLatestMailLoopObservationKey ?? "") === (right.suppressedLatestMailLoopObservationKey ?? "") &&
+    (left.suppressedGoalBindingKey ?? "") === (right.suppressedGoalBindingKey ?? "") &&
+    (left.suppressedLatestEventId ?? "") === (right.suppressedLatestEventId ?? "") &&
+    (left.suppressedHasObservation ?? null) === (right.suppressedHasObservation ?? null) &&
     (left.suppressedProjectionStatus ?? "") === (right.suppressedProjectionStatus ?? "") &&
     (left.suppressedChunkId ?? "") === (right.suppressedChunkId ?? "") &&
     (left.suppressedChunkIndex ?? null) === (right.suppressedChunkIndex ?? null) &&
@@ -273,6 +434,8 @@ export function sameDocumentInlineTranslationRenderState(
     (left.suppressedSourceId ?? "") === (right.suppressedSourceId ?? "") &&
     (left.suppressedSourceHash ?? "") === (right.suppressedSourceHash ?? "") &&
     (left.suppressedSourceKind ?? "") === (right.suppressedSourceKind ?? "") &&
+    (left.suppressedSourceTextHash ?? "") === (right.suppressedSourceTextHash ?? "") &&
+    (left.suppressedSourceTextCharCount ?? null) === (right.suppressedSourceTextCharCount ?? null) &&
     (left.suppressedAccountLocale ?? "") === (right.suppressedAccountLocale ?? "") &&
     (left.suppressedProjectionTarget ?? "") === (right.suppressedProjectionTarget ?? "") &&
     (left.suppressedTargetLanguage ?? "") === (right.suppressedTargetLanguage ?? "") &&
@@ -283,8 +446,46 @@ export function sameDocumentInlineTranslationRenderState(
     (left.rawContentIncluded ?? null) === (right.rawContentIncluded ?? null);
 }
 
-function projectionEventSortValue(state: DocumentInlineTranslationRenderState): number {
-  return state.observedAtMs ?? state.sourceEventMs ?? Number.MIN_SAFE_INTEGER;
+function compareProjectionOrderValues(left: {
+  observedAtMs?: number | null;
+  sourceEventMs?: number | null;
+  chunkIndex?: number | null;
+}, right: {
+  observedAtMs?: number | null;
+  sourceEventMs?: number | null;
+  chunkIndex?: number | null;
+}): number {
+  const observedDelta =
+    (left.observedAtMs ?? Number.MIN_SAFE_INTEGER) -
+    (right.observedAtMs ?? Number.MIN_SAFE_INTEGER);
+  if (observedDelta !== 0) return observedDelta;
+  const sourceEventDelta =
+    (left.sourceEventMs ?? Number.MIN_SAFE_INTEGER) -
+    (right.sourceEventMs ?? Number.MIN_SAFE_INTEGER);
+  if (sourceEventDelta !== 0) return sourceEventDelta;
+  return (left.chunkIndex ?? Number.MIN_SAFE_INTEGER) -
+    (right.chunkIndex ?? Number.MIN_SAFE_INTEGER);
+}
+
+function compareProjectionEventOrder(
+  left: DocumentInlineTranslationRenderState,
+  right: DocumentInlineTranslationRenderState,
+): number {
+  return compareProjectionOrderValues(left, right);
+}
+
+function compareSuppressedProjectionEventOrder(
+  current: DocumentInlineTranslationRenderState,
+  laneState: DocumentInlineTranslationRenderState,
+): number {
+  return compareProjectionOrderValues(
+    {
+      observedAtMs: current.suppressedObservedAtMs,
+      sourceEventMs: current.suppressedSourceEventMs,
+      chunkIndex: current.suppressedChunkIndex,
+    },
+    laneState,
+  );
 }
 
 function shouldKeepCurrentReadyProjection(
@@ -293,7 +494,7 @@ function shouldKeepCurrentReadyProjection(
 ): boolean {
   if (current?.status !== "ready" || laneState.status !== "ready") return false;
   if (current.source !== "capability_lane" || laneState.source !== "capability_lane") return false;
-  return projectionEventSortValue(current) > projectionEventSortValue(laneState);
+  return compareProjectionEventOrder(current, laneState) > 0;
 }
 
 function shouldKeepCurrentReadyOverProjectionError(
@@ -321,6 +522,9 @@ function attachSuppressedProjectionReceipt(
   current: DocumentInlineTranslationRenderState,
   laneState: DocumentInlineTranslationRenderState,
 ): DocumentInlineTranslationRenderState {
+  if (compareSuppressedProjectionEventOrder(current, laneState) > 0) {
+    return current;
+  }
   const suppressedReason =
     laneState.projectionStatus === "cancelled"
       ? "cancelled_projection_did_not_replace_ready_text"
@@ -329,8 +533,22 @@ function attachSuppressedProjectionReceipt(
         : "stale_projection_did_not_replace_fresh_text";
   return {
     ...current,
+    ...(laneState.serverProjectionKey ? { suppressedServerProjectionKey: laneState.serverProjectionKey } : {}),
     suppressedObservationRef: laneState.observationRef ?? null,
     suppressedReceiptRef: laneState.receiptRef ?? null,
+    ...(laneState.observationLaneSessionId
+      ? { suppressedObservationLaneSessionId: laneState.observationLaneSessionId }
+      : {}),
+    ...(laneState.goalBindingId ? { suppressedGoalBindingId: laneState.goalBindingId } : {}),
+    ...(laneState.sessionControlKey ? { suppressedSessionControlKey: laneState.sessionControlKey } : {}),
+    ...(laneState.sourceBindingKey ? { suppressedSourceBindingKey: laneState.sourceBindingKey } : {}),
+    ...(laneState.latestObservationKey ? { suppressedLatestObservationKey: laneState.latestObservationKey } : {}),
+    ...(laneState.latestMailLoopObservationKey
+      ? { suppressedLatestMailLoopObservationKey: laneState.latestMailLoopObservationKey }
+      : {}),
+    ...(laneState.goalBindingKey ? { suppressedGoalBindingKey: laneState.goalBindingKey } : {}),
+    ...(laneState.latestEventId ? { suppressedLatestEventId: laneState.latestEventId } : {}),
+    ...(laneState.hasObservation ? { suppressedHasObservation: true } : {}),
     suppressedProjectionStatus: laneState.projectionStatus ?? null,
     suppressedChunkId: laneState.chunkId ?? null,
     suppressedChunkIndex: laneState.chunkIndex ?? null,
@@ -343,6 +561,10 @@ function attachSuppressedProjectionReceipt(
     suppressedSourceId: laneState.sourceId ?? null,
     suppressedSourceHash: laneState.sourceHash ?? null,
     suppressedSourceKind: laneState.sourceKind ?? null,
+    ...(laneState.sourceTextHash ? { suppressedSourceTextHash: laneState.sourceTextHash } : {}),
+    ...(typeof laneState.sourceTextCharCount === "number"
+      ? { suppressedSourceTextCharCount: laneState.sourceTextCharCount }
+      : {}),
     suppressedAccountLocale: laneState.accountLocale ?? null,
     suppressedProjectionTarget: laneState.projectionTarget ?? null,
     suppressedTargetLanguage: laneState.targetLanguage ?? null,
@@ -360,7 +582,7 @@ export function buildDocumentLiveTranslationInlineStates(
     projections,
     sourceId,
     sourceHash: input.sourceHash,
-    projectionTarget: input.projectionTarget ?? "docs_chunk",
+    projectionTarget: input.projectionTarget ?? HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK,
     targetLanguage: input.locale,
     units: input.units,
     allowStaleDisplayText: input.allowStaleDisplayText,
@@ -372,9 +594,21 @@ export function buildDocumentLiveTranslationInlineStates(
       {
         status: state.status,
         ...(state.status === "ready" ? { text: state.text } : { error: state.error }),
+        ...(state.projectionKey ? { serverProjectionKey: state.projectionKey } : {}),
         observationRef: state.observationRef,
         receiptRef: state.receiptRef,
         laneSessionId: state.laneSessionId,
+        observationLaneSessionId: state.observationLaneSessionId,
+        goalBindingId: state.goalBindingId,
+        ...(state.sessionControlKey ? { sessionControlKey: state.sessionControlKey } : {}),
+        ...(state.sourceBindingKey ? { sourceBindingKey: state.sourceBindingKey } : {}),
+        ...(state.latestObservationKey ? { latestObservationKey: state.latestObservationKey } : {}),
+        ...(state.latestMailLoopObservationKey
+          ? { latestMailLoopObservationKey: state.latestMailLoopObservationKey }
+          : {}),
+        ...(state.goalBindingKey ? { goalBindingKey: state.goalBindingKey } : {}),
+        latestEventId: state.latestEventId,
+        hasObservation: state.hasObservation,
         selectedBackendProvider: state.selectedBackendProvider,
         projectionStatus: state.projectionStatus,
         chunkId: state.chunkId,
@@ -388,6 +622,8 @@ export function buildDocumentLiveTranslationInlineStates(
         sourceId: state.sourceId,
         ...(state.sourceHash ? { sourceHash: state.sourceHash } : {}),
         sourceKind: state.sourceKind,
+        ...(state.sourceTextHash ? { sourceTextHash: state.sourceTextHash } : {}),
+        ...(typeof state.sourceTextCharCount === "number" ? { sourceTextCharCount: state.sourceTextCharCount } : {}),
         accountLocale: state.accountLocale,
         projectionTarget: state.projectionTarget,
         targetLanguage: state.targetLanguage,
@@ -411,9 +647,21 @@ export function simplifyDocumentLiveTranslationInlineStates(
         ? {
           status: "ready",
           text: state.text ?? "",
+          ...(state.serverProjectionKey ? { serverProjectionKey: state.serverProjectionKey } : {}),
           observationRef: state.observationRef,
           receiptRef: state.receiptRef,
           laneSessionId: state.laneSessionId,
+          observationLaneSessionId: state.observationLaneSessionId,
+          goalBindingId: state.goalBindingId,
+          ...(state.sessionControlKey ? { sessionControlKey: state.sessionControlKey } : {}),
+          ...(state.sourceBindingKey ? { sourceBindingKey: state.sourceBindingKey } : {}),
+          ...(state.latestObservationKey ? { latestObservationKey: state.latestObservationKey } : {}),
+          ...(state.latestMailLoopObservationKey
+            ? { latestMailLoopObservationKey: state.latestMailLoopObservationKey }
+            : {}),
+          ...(state.goalBindingKey ? { goalBindingKey: state.goalBindingKey } : {}),
+          latestEventId: state.latestEventId,
+          hasObservation: state.hasObservation,
           selectedBackendProvider: state.selectedBackendProvider,
           projectionStatus: state.projectionStatus,
           chunkId: state.chunkId,
@@ -427,6 +675,8 @@ export function simplifyDocumentLiveTranslationInlineStates(
           sourceId: state.sourceId,
           ...(state.sourceHash ? { sourceHash: state.sourceHash } : {}),
           sourceKind: state.sourceKind,
+          ...(state.sourceTextHash ? { sourceTextHash: state.sourceTextHash } : {}),
+          ...(typeof state.sourceTextCharCount === "number" ? { sourceTextCharCount: state.sourceTextCharCount } : {}),
           accountLocale: state.accountLocale,
           projectionTarget: state.projectionTarget,
           targetLanguage: state.targetLanguage,
@@ -439,9 +689,21 @@ export function simplifyDocumentLiveTranslationInlineStates(
         : {
           status: "error",
           error: state.error ?? `translation_projection_${state.projectionStatus}`,
+          ...(state.serverProjectionKey ? { serverProjectionKey: state.serverProjectionKey } : {}),
           observationRef: state.observationRef,
           receiptRef: state.receiptRef,
           laneSessionId: state.laneSessionId,
+          observationLaneSessionId: state.observationLaneSessionId,
+          goalBindingId: state.goalBindingId,
+          ...(state.sessionControlKey ? { sessionControlKey: state.sessionControlKey } : {}),
+          ...(state.sourceBindingKey ? { sourceBindingKey: state.sourceBindingKey } : {}),
+          ...(state.latestObservationKey ? { latestObservationKey: state.latestObservationKey } : {}),
+          ...(state.latestMailLoopObservationKey
+            ? { latestMailLoopObservationKey: state.latestMailLoopObservationKey }
+            : {}),
+          ...(state.goalBindingKey ? { goalBindingKey: state.goalBindingKey } : {}),
+          latestEventId: state.latestEventId,
+          hasObservation: state.hasObservation,
           selectedBackendProvider: state.selectedBackendProvider,
           projectionStatus: state.projectionStatus,
           chunkId: state.chunkId,
@@ -455,6 +717,8 @@ export function simplifyDocumentLiveTranslationInlineStates(
           sourceId: state.sourceId,
           ...(state.sourceHash ? { sourceHash: state.sourceHash } : {}),
           sourceKind: state.sourceKind,
+          ...(state.sourceTextHash ? { sourceTextHash: state.sourceTextHash } : {}),
+          ...(typeof state.sourceTextCharCount === "number" ? { sourceTextCharCount: state.sourceTextCharCount } : {}),
           accountLocale: state.accountLocale,
           projectionTarget: state.projectionTarget,
           targetLanguage: state.targetLanguage,

@@ -105,6 +105,7 @@ export type HelixWorkstationTypedAffordanceKind =
   | "calculator_result"
   | "doc_path_ref"
   | "voice_text_evidence"
+  | "voice_playback_receipt"
   | "mail_packet_ref"
   | "loop_health_evidence"
   | "prediction_evidence"
@@ -189,6 +190,8 @@ export type HelixAgentStepObservationPacket = {
       raw_content_included: false;
     };
     live_translation_projection_receipt?: HelixLiveTranslationProjectionReceipt;
+    speech_to_text_observation?: unknown;
+    speech_to_text_live_source_mail_item?: unknown;
     text_to_speech_receipt?: unknown;
     voice_playback_client_receipt?: unknown;
     capability_lane_shadow_execution?: {

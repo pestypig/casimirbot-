@@ -87,7 +87,9 @@ describe("Codex provider capability lane adapter", () => {
         answer: "The translation is hola.",
       });
       expect(debug.runtime_lane_request_contract).toMatchObject({
-        schema: "helix.codex_runtime_lane_request_contract.v1",
+        schema: "helix.runtime_agent_lane_request_contract.v1",
+        legacy_schema: "helix.codex_runtime_lane_request_contract.v1",
+        runtime_provider_adapter: "codex",
         contract_version: "2026-07-02.p7.one_shot.v1",
         request_marker: "HELIX_CAPABILITY_LANE_REQUEST_JSON:",
         one_shot_lane_loop_enabled: true,
@@ -100,7 +102,9 @@ describe("Codex provider capability lane adapter", () => {
         helix_executes_only_structured_runtime_lane_requests: true,
       });
       expect(debug.runtime_lane_request_retry).toMatchObject({
-        schema: "helix.codex_runtime_lane_request_retry.v1",
+        schema: "helix.runtime_agent_lane_request_retry.v1",
+        legacy_schema: "helix.codex_runtime_lane_request_retry.v1",
+        runtime_provider_adapter: "codex",
         status: "runtime_provider_emitted_lane_request",
         reason: "initial_provider_response_skipped_required_one_shot_lane_request",
         prior_response_preview: "hola",
@@ -194,7 +198,9 @@ describe("Codex provider capability lane adapter", () => {
         answer: "What text should I translate, and what target language should I use?",
       });
       expect(debug.runtime_lane_request_contract).toMatchObject({
-        schema: "helix.codex_runtime_lane_request_contract.v1",
+        schema: "helix.runtime_agent_lane_request_contract.v1",
+        legacy_schema: "helix.codex_runtime_lane_request_contract.v1",
+        runtime_provider_adapter: "codex",
         contract_version: "2026-07-02.p7.one_shot.v1",
         initial_candidate_present: false,
         retry_attempted: false,
@@ -282,7 +288,9 @@ describe("Codex provider capability lane adapter", () => {
         answer: "The translation is hola.",
       });
       expect(debug.runtime_lane_request_contract).toMatchObject({
-        schema: "helix.codex_runtime_lane_request_contract.v1",
+        schema: "helix.runtime_agent_lane_request_contract.v1",
+        legacy_schema: "helix.codex_runtime_lane_request_contract.v1",
+        runtime_provider_adapter: "codex",
         contract_version: "2026-07-02.p7.one_shot.v1",
         request_marker: "HELIX_CAPABILITY_LANE_REQUEST_JSON:",
         one_shot_lane_loop_enabled: true,
@@ -294,7 +302,9 @@ describe("Codex provider capability lane adapter", () => {
         helix_executes_only_structured_runtime_lane_requests: true,
       });
       expect(debug.runtime_lane_request_loop).toMatchObject({
-        schema: "helix.codex_runtime_lane_request_loop.v1",
+        schema: "helix.runtime_agent_lane_request_loop.v1",
+        legacy_schema: "helix.codex_runtime_lane_request_loop.v1",
+        runtime_provider_adapter: "codex",
         status: "lane_observation_reentered",
         requested_by_runtime_provider: true,
         selected_runtime_agent_provider: "codex",
@@ -333,6 +343,56 @@ describe("Codex provider capability lane adapter", () => {
         expect.objectContaining({ stage: "lane_backend_selected" }),
         expect.objectContaining({ stage: "lane_observation" }),
         expect.objectContaining({ stage: "lane_reentered" }),
+      ]));
+      expect(debug.capability_lane_turn_timeline).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          stage: "lane_visible",
+          lane_visible: true,
+          lane_requested: false,
+          lane_executed: false,
+          observation_reentered: false,
+        }),
+        expect.objectContaining({
+          stage: "lane_requested",
+          lane_visible: false,
+          lane_requested: true,
+          lane_executed: false,
+          observation_reentered: false,
+        }),
+        expect.objectContaining({
+          stage: "lane_backend_selected",
+          selected_backend_provider: "live_translation.local_runtime",
+          lane_visible: false,
+          lane_requested: true,
+          lane_executed: false,
+          observation_reentered: false,
+        }),
+        expect.objectContaining({
+          stage: "lane_observation",
+          capability_id: "live_translation.translate_text",
+          selected_backend_provider: "live_translation.local_runtime",
+          lane_visible: false,
+          lane_requested: true,
+          lane_executed: true,
+          observation_reentered: false,
+        }),
+        expect.objectContaining({
+          stage: "lane_reentered",
+          lane_visible: false,
+          lane_requested: true,
+          lane_executed: false,
+          observation_reentered: true,
+        }),
+        expect.objectContaining({
+          stage: "terminal_selected",
+          lane_id: "helix_terminal_authority",
+          status: "completed",
+          lane_visible: false,
+          lane_requested: true,
+          lane_executed: true,
+          observation_reentered: true,
+          terminal_authority_status: "authorized_by_helix_provider_candidate_bridge",
+        }),
       ]));
       expect(debug.provider_reasoning_reentry).toMatchObject({
         status: "completed",
@@ -403,7 +463,9 @@ describe("Codex provider capability lane adapter", () => {
 
       expect(result.ok).toBe(true);
       expect(debug.runtime_lane_request_contract).toMatchObject({
-        schema: "helix.codex_runtime_lane_request_contract.v1",
+        schema: "helix.runtime_agent_lane_request_contract.v1",
+        legacy_schema: "helix.codex_runtime_lane_request_contract.v1",
+        runtime_provider_adapter: "codex",
         contract_version: "2026-07-02.p7.one_shot.v1",
         request_marker: "HELIX_CAPABILITY_LANE_REQUEST_JSON:",
         one_shot_lane_loop_enabled: true,
@@ -436,9 +498,19 @@ describe("Codex provider capability lane adapter", () => {
       expect(translation.when_not_to_use).toContain("docs-viewer.read_active_translation");
       expect(JSON.stringify(translation.request_shape_hint)).toContain("capability_lane_call");
       expect(JSON.stringify(translation.request_shape_hint)).toContain("live_translation.translate_text");
+      expect(JSON.stringify(translation.session_call_shape_hint)).toContain("capability_lane_session_call");
+      expect(JSON.stringify(translation.session_call_shape_hint)).toContain("start | pause | resume | stop | record_observation");
+      expect(JSON.stringify(translation.session_call_shape_hint)).toContain("source_binding");
+      expect(JSON.stringify(translation.goal_binding_call_shape_hint)).toContain("capability_lane_goal_binding_call");
+      expect(JSON.stringify(translation.goal_binding_call_shape_hint)).toContain("bind | update_attention | record_mail_loop | record_report | stop");
+      expect(JSON.stringify(translation.goal_binding_call_shape_hint)).toContain("terminal_authorized");
       expect(debug.agent_runtime_adapter_contract.model_visible_capability_lane_manifest).toEqual(modelVisible);
       expect(prompt).toContain("Model-visible Helix capability lane manifest:");
       expect(prompt).toContain("live_translation.translate_text");
+      expect(prompt).toContain("capability_lane_session_call");
+      expect(prompt).toContain("start | pause | resume | stop | record_observation");
+      expect(prompt).toContain("capability_lane_goal_binding_call");
+      expect(prompt).toContain("bind | update_attention | record_mail_loop | record_report | stop");
       expect(prompt).toContain("docs-viewer.read_active_translation");
       expect(prompt).toContain("lane_outputs_are_not_final_answers");
       expect(prompt).toContain("Capability lane outputs are observations or receipts");
@@ -538,6 +610,39 @@ describe("Codex provider capability lane adapter", () => {
       expect.objectContaining({ stage: "lane_observation" }),
       expect.objectContaining({ stage: "lane_reentered" }),
     ]);
+    expect(debug.capability_lane_turn_timeline).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        schema: "helix.capability_lane.provider_timeline_event.v1",
+        stage: "lane_visible",
+        selected_runtime_agent_provider: "codex",
+        lane_id: "live_translation",
+        capability_id: "live_translation.translate_text",
+        lane_visible: true,
+        lane_requested: false,
+        lane_executed: false,
+        observation_reentered: false,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+      expect.objectContaining({
+        stage: "lane_observation",
+        selected_runtime_agent_provider: "codex",
+        lane_id: "utility_text",
+        capability_id: "utility_text.normalize_text",
+        status: "completed",
+        lane_visible: false,
+        lane_requested: true,
+        lane_executed: true,
+        terminal_authority_status: "pending_helix_terminal_authority",
+      }),
+      expect.objectContaining({
+        stage: "lane_reentered",
+        lane_id: "capability_lane",
+        observation_reentered: true,
+        terminal_authority_status: "pending_helix_terminal_authority",
+      }),
+    ]));
     expect(debug.capability_lane_reentry_status).toBe("observation_packet_required_for_provider_reentry");
     expect(debug.current_turn_artifact_ledger).toEqual(
       expect.arrayContaining([
@@ -549,7 +654,183 @@ describe("Codex provider capability lane adapter", () => {
           raw_content_included: false,
         }),
       ]),
-    );
+      );
+  });
+
+  it("re-enters pre-admitted speech, translation, and voice lanes as non-terminal Codex observations", async () => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    process.env.CODEX_AGENT_FAKE_STDOUT =
+      "Speech, translation, and voice lane observations were re-entered as non-terminal receipts.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    try {
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          agent_runtime: "codex",
+          turn_id: "turn-codex-stt-translation-voice-adapter",
+          question:
+            "Report the statuses of the admitted speech, translation, and voice observations without treating any lane output as the final answer.",
+          capability_lane_call: [
+            {
+              capability: "speech_to_text.transcribe_audio",
+              audio_ref: "voice:audio:codex-adapter-proof",
+              audio_hash: "codex-adapter-proof-audio-hash",
+              transcript_text: "hello workstation",
+              language: "en",
+              source_id: "audio_transcript:helix-ask:desktop",
+              thread_id: "helix-ask:desktop",
+              capture_session_id: "capture:codex-adapter-proof",
+              chunk_index: 0,
+            },
+            {
+              capability: "live_translation.translate_text",
+              text: "hello workstation",
+              source_language: "en",
+              target_language: "es",
+              source_id: "audio_transcript:helix-ask:desktop",
+              projection_target: "audio_chunk",
+            },
+            {
+              capability: "text_to_speech.speak_text",
+              text: "hola estacion de trabajo",
+              source_observation_ref: "turn-codex-stt-translation-voice-adapter:translation",
+            },
+          ],
+        },
+      });
+      const debug = result.debug as Record<string, any>;
+      const callResults = debug.capability_lane_call_results as Array<Record<string, any>>;
+      const observationPackets = debug.capability_lane_observation_packets as Array<Record<string, any>>;
+
+      expect(result).toMatchObject({
+        runtime: "codex",
+        answer: "Speech, translation, and voice lane observations were re-entered as non-terminal receipts.",
+      });
+      expect(callResults.map((call) => call.capability)).toEqual([
+        "speech_to_text.transcribe_audio",
+        "live_translation.translate_text",
+        "text_to_speech.speak_text",
+      ]);
+      expect(callResults).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          ok: true,
+          capability: "speech_to_text.transcribe_audio",
+          lane_id: "speech_to_text",
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        }),
+        expect.objectContaining({
+          ok: true,
+          capability: "live_translation.translate_text",
+          lane_id: "live_translation",
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        }),
+        expect.objectContaining({
+          capability: "text_to_speech.speak_text",
+          lane_id: "text_to_speech",
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+          receipt: expect.objectContaining({
+            playback_status: expect.stringMatching(/^(started|unavailable)$/),
+            terminal_eligible: false,
+            assistant_answer: false,
+          }),
+        }),
+      ]));
+      expect(observationPackets.map((packet) => packet.capability_key)).toEqual([
+        "speech_to_text.transcribe_audio",
+        "live_translation.translate_text",
+        "text_to_speech.speak_text",
+      ]);
+      expect(observationPackets).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          status: "succeeded",
+          capability_key: "speech_to_text.transcribe_audio",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+          state_delta: expect.objectContaining({
+            speech_to_text_observation: expect.objectContaining({
+              capability: "speech_to_text.transcribe_audio",
+              transcript_preview: "hello workstation",
+              assistant_answer: false,
+              terminal_eligible: false,
+              raw_audio_included: false,
+            }),
+            speech_to_text_live_source_mail_item: expect.objectContaining({
+              sourceKind: "audio_transcript",
+              assistant_answer: false,
+              terminal_eligible: false,
+              raw_content_included: false,
+            }),
+          }),
+        }),
+        expect.objectContaining({
+          status: "succeeded",
+          capability_key: "live_translation.translate_text",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+          state_delta: expect.objectContaining({
+            live_translation_chunk: expect.objectContaining({
+              terminal_eligible: false,
+              assistant_answer: false,
+            }),
+          }),
+        }),
+        expect.objectContaining({
+          status: expect.stringMatching(/^(succeeded|blocked)$/),
+          capability_key: "text_to_speech.speak_text",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+          state_delta: expect.objectContaining({
+            text_to_speech_receipt: expect.objectContaining({
+              playback_status: expect.stringMatching(/^(started|unavailable)$/),
+              terminal_eligible: false,
+              assistant_answer: false,
+            }),
+          }),
+        }),
+      ]));
+      expect(debug.capability_lane_debug_events).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ capability: "speech_to_text.transcribe_audio", stage: "lane_observation" }),
+          expect.objectContaining({ capability: "live_translation.translate_text", stage: "lane_observation" }),
+          expect.objectContaining({ capability: "text_to_speech.speak_text", stage: "lane_observation" }),
+          expect.objectContaining({ stage: "lane_reentered" }),
+        ]),
+      );
+      expect(debug.capability_lane_reentry_status).toBe("observation_packet_required_for_provider_reentry");
+      expect(debug.current_turn_artifact_ledger).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            kind: "capability_lane_observation_packet",
+            observation_kind: "speech_to_text.transcribe_audio",
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+          }),
+        ]),
+      );
+    } finally {
+      if (previousStdout === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      } else {
+        process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      }
+      if (previousExitCode === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      } else {
+        process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+      }
+    }
   });
 
   it("normalizes Moral Graph substrate gateway observations for Codex re-entry", async () => {

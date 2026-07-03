@@ -70,10 +70,40 @@ const sessionBindingSnapshot = (
 ) => ({
   sourceId: session?.source_binding.source_id ?? null,
   sourceHash: session?.source_binding.source_hash ?? null,
+  sourceTextHash: session?.source_binding.source_text_hash ?? null,
+  sourceTextCharCount: session?.source_binding.source_text_char_count ?? null,
   projectionTarget: session?.source_binding.projection_target ?? null,
   targetLanguage: session ? targetLanguageForSession(session) : null,
   accountLocale: session?.source_binding.account_locale ?? null,
 });
+
+const compactKey = (parts: Array<string | null | undefined>): string | null => {
+  const key = parts
+    .map((part) => typeof part === "string" ? part.trim() : "")
+    .filter(Boolean)
+    .join("::");
+  return key || null;
+};
+
+const sessionBindingKeyFor = (
+  binding: ReturnType<typeof sessionBindingSnapshot> | null | undefined,
+): string | null =>
+  compactKey([
+    binding?.sourceId,
+    binding?.sourceHash,
+    binding?.projectionTarget,
+    binding?.accountLocale,
+    binding?.targetLanguage,
+  ]);
+
+const sessionControlKeyFor = (
+  laneSessionId: string,
+  binding: ReturnType<typeof sessionBindingSnapshot> | null | undefined,
+): string | null =>
+  compactKey([
+    laneSessionId,
+    sessionBindingKeyFor(binding),
+  ]);
 
 export type HelixCapabilityLaneMailLoopResult = {
   schema: "helix.capability_lane.mail_loop_result.v1";
@@ -110,6 +140,11 @@ const buildMailLoopDebugSummary = (input: {
   const projectionTarget = readString(observation?.projection_target) || readString(chunk?.projection_target);
   const receiptRef = readReceiptRef(input.translationResult);
   const evidenceRefs = input.mail?.evidenceRefs ?? input.translationResult.artifact_refs ?? [];
+  const materializedMailLoopEvidence = Boolean(input.mail?.mailId && !input.blockedReason);
+  const sourceId = readString(observation?.source_id) || readString(chunk?.source_id) || input.mail?.sourceId || null;
+  const sourceHash = readString(observation?.source_hash) || readString(chunk?.source_hash) || null;
+  const targetLanguage = readString(observation?.target_language) || readString(chunk?.target_language) || null;
+  const chunkId = readString(observation?.chunk_id) || readString(chunk?.chunk_id) || null;
   return {
     schema: HELIX_CAPABILITY_LANE_MAIL_LOOP_DEBUG_SUMMARY_SCHEMA,
     lane_session_id: input.laneSessionId,
@@ -125,26 +160,41 @@ const buildMailLoopDebugSummary = (input: {
         : input.mail
           ? "created"
           : "blocked",
+    materialized_mail_loop_evidence: materializedMailLoopEvidence,
     previous_stage_play_mail_id: input.previousMail?.mailId ?? input.mail?.priorContext.previousMailId ?? null,
     stage_play_wake_expected: input.stagePlayWakeExpected,
+    stage_play_wake_kind: input.stagePlayWakeExpected ? "mailbox_wake" : "none",
     mailbox_thread_id: input.threadId,
-    source_id: readString(observation?.source_id) || readString(chunk?.source_id) || input.mail?.sourceId || null,
-    source_hash: readString(observation?.source_hash) || readString(chunk?.source_hash) || null,
+    observation_lane_session_id: readString(observation?.lane_session_id) || readString(chunk?.lane_session_id) || null,
+    source_id: sourceId,
+    source_hash: sourceHash,
     source_kind: input.mail?.sourceKind ?? (projectionTarget ? sourceKindForProjectionTarget(projectionTarget) : null),
     account_locale: readString(input.accountLocale) || null,
     lane_session_source_id: input.sessionBinding?.sourceId ?? null,
     lane_session_source_hash: input.sessionBinding?.sourceHash ?? null,
+    lane_session_source_text_hash: input.sessionBinding?.sourceTextHash ?? null,
+    lane_session_source_text_char_count: input.sessionBinding?.sourceTextCharCount ?? null,
     lane_session_projection_target: input.sessionBinding?.projectionTarget ?? null,
     lane_session_target_language: input.sessionBinding?.targetLanguage ?? null,
     lane_session_account_locale: input.sessionBinding?.accountLocale ?? null,
-    chunk_id: readString(observation?.chunk_id) || readString(chunk?.chunk_id) || null,
+    lane_session_control_key: sessionControlKeyFor(input.laneSessionId, input.sessionBinding),
+    lane_session_source_binding_key: sessionBindingKeyFor(input.sessionBinding),
+    mail_loop_observation_key: compactKey([
+      sourceId,
+      sourceHash,
+      projectionTarget,
+      targetLanguage,
+      chunkId,
+      receiptRef ?? input.observationRef,
+    ]),
+    chunk_id: chunkId,
     chunk_index: readNumber(observation?.chunk_index) ?? readNumber(chunk?.chunk_index),
     dedupe_key: readString(observation?.dedupe_key) || readString(chunk?.dedupe_key) || null,
     source_event_id: readString(observation?.source_event_id) || readString(chunk?.source_event_id) || null,
     source_event_ms: readNumber(observation?.source_event_ms) ?? readNumber(chunk?.source_event_ms),
     observed_at_ms: readNumber(observation?.observed_at_ms) ?? readNumber(chunk?.observed_at_ms),
     projection_target: projectionTarget || null,
-    target_language: readString(observation?.target_language) || readString(chunk?.target_language) || null,
+    target_language: targetLanguage,
     cancel_requested: observation?.cancel_requested === true || chunk?.cancel_requested === true,
     selected_backend_provider: input.translationResult.lane_resolve_trace.selected_backend_provider,
     requested_backend_provider: input.translationResult.lane_resolve_trace.requested_backend_provider,
@@ -245,6 +295,7 @@ export const routeLiveTranslationObservationToMailLoop = (input: {
   const observation = input.translationResult.observation;
   const packet = input.translationResult.observation_packet;
   const chunk = readRecord(packet.state_delta?.live_translation_chunk);
+  const projectionReceipt = readRecord(packet.state_delta?.live_translation_projection_receipt);
   const observationRef =
     readString(observation?.observation_ref) ||
     readString(chunk?.observation_ref) ||
@@ -371,6 +422,78 @@ export const routeLiveTranslationObservationToMailLoop = (input: {
       raw_content_included: false,
     };
   }
+  const observationSourceTextHash =
+    readString(observation.source_text_hash) ||
+    readString(projectionReceipt?.source_text_hash);
+  if (
+    observationSourceTextHash &&
+    session.source_binding.source_text_hash &&
+    observationSourceTextHash !== session.source_binding.source_text_hash
+  ) {
+    const debugSummary = buildMailLoopDebugSummary({
+      laneSessionId: input.laneSessionId,
+      translationResult: input.translationResult,
+      threadId: input.threadId,
+      observationRef,
+      mail: null,
+      previousMail: null,
+      blockedReason: "source_text_hash_mismatch",
+      stagePlayWakeExpected: false,
+      accountLocale: session.source_binding.account_locale,
+      sessionBinding: sessionBindingSnapshot(session),
+    });
+    return {
+      schema: "helix.capability_lane.mail_loop_result.v1",
+      ok: false,
+      lane_session_id: input.laneSessionId,
+      lane_id: "live_translation",
+      observation_ref: observationRef,
+      mail: null,
+      stage_play_mail_id: null,
+      stage_play_wake_expected: false,
+      debug_summary: debugSummary,
+      blocked_reason: "source_text_hash_mismatch",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+  }
+  const observationSourceTextCharCount =
+    readNumber(observation.source_text_char_count) ??
+    readNumber(projectionReceipt?.source_text_char_count);
+  if (
+    typeof observationSourceTextCharCount === "number" &&
+    typeof session.source_binding.source_text_char_count === "number" &&
+    observationSourceTextCharCount !== session.source_binding.source_text_char_count
+  ) {
+    const debugSummary = buildMailLoopDebugSummary({
+      laneSessionId: input.laneSessionId,
+      translationResult: input.translationResult,
+      threadId: input.threadId,
+      observationRef,
+      mail: null,
+      previousMail: null,
+      blockedReason: "source_text_char_count_mismatch",
+      stagePlayWakeExpected: false,
+      accountLocale: session.source_binding.account_locale,
+      sessionBinding: sessionBindingSnapshot(session),
+    });
+    return {
+      schema: "helix.capability_lane.mail_loop_result.v1",
+      ok: false,
+      lane_session_id: input.laneSessionId,
+      lane_id: "live_translation",
+      observation_ref: observationRef,
+      mail: null,
+      stage_play_mail_id: null,
+      stage_play_wake_expected: false,
+      debug_summary: debugSummary,
+      blocked_reason: "source_text_char_count_mismatch",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+  }
   if (
     observation.projection_target &&
     session.source_binding.projection_target &&
@@ -439,6 +562,18 @@ export const routeLiveTranslationObservationToMailLoop = (input: {
   const sourceHash = observation.source_hash || session.source_binding.source_hash || null;
   const chunkId = observation.chunk_id;
   const translated = observation.translated_text;
+  const bindingSnapshot = sessionBindingSnapshot(session);
+  const laneSessionControlKey = sessionControlKeyFor(input.laneSessionId, bindingSnapshot);
+  const laneSessionSourceBindingKey = sessionBindingKeyFor(bindingSnapshot);
+  const receiptRef = readReceiptRef(input.translationResult);
+  const mailLoopObservationKey = compactKey([
+    sourceId,
+    sourceHash,
+    projectionTarget,
+    observation.target_language,
+    chunkId,
+    receiptRef ?? observationRef,
+  ]);
   const summaryText = [
     `Capability lane live_translation produced ${observation.source_language ?? "auto"} -> ${observation.target_language}.`,
     `Lane session: ${session.lane_session_id}.`,
@@ -478,6 +613,10 @@ export const routeLiveTranslationObservationToMailLoop = (input: {
     projectionTarget,
     targetLanguage: observation.target_language,
     accountLocale: session.source_binding.account_locale,
+    laneSessionId: session.lane_session_id,
+    sessionControlKey: laneSessionControlKey,
+    sourceBindingKey: laneSessionSourceBindingKey,
+    mailLoopObservationKey,
     summaryText,
     summaryPreview: translated,
     confidence: observation.confidence,
@@ -491,10 +630,11 @@ export const routeLiveTranslationObservationToMailLoop = (input: {
   input.sessionStore.recordObservation({
     laneSessionId: input.laneSessionId,
     observationRef: mail.mailId,
-    receiptRef: readReceiptRef(input.translationResult),
+    receiptRef,
     nowMs: input.now ? Date.parse(input.now) : undefined,
     sourceId,
     sourceHash,
+    sourceKind: session.source_binding.source_kind,
     targetLanguage: observation.target_language,
     chunkId: observation.chunk_id,
     chunkIndex: observation.chunk_index,
@@ -503,6 +643,13 @@ export const routeLiveTranslationObservationToMailLoop = (input: {
     sourceEventMs: observation.source_event_ms,
     observedAtMs: observation.observed_at_ms,
     freshnessStatus: observation.freshness_status,
+    sourceTextHash:
+      readString(observation.source_text_hash) ||
+      readString(projectionReceipt?.source_text_hash) ||
+      null,
+    sourceTextCharCount:
+      readNumber(observation.source_text_char_count) ??
+      readNumber(projectionReceipt?.source_text_char_count),
     projectionTarget: observation.projection_target,
     cancelRequested: observation.cancel_requested,
   });

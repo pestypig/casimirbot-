@@ -61,10 +61,12 @@ describe("Helix capability lane session runner", () => {
             requested_backend_provider: "google_gemini",
             now_ms: 100,
             source_binding: {
-              source_id: "docs:nhm2",
-              source_hash: "sha256:runner-v1",
-              source_kind: "docs",
-              projection_target: "docs_chunk",
+            source_id: "docs:nhm2",
+            source_hash: "sha256:runner-v1",
+            source_text_hash: "sha256:text-runner",
+            source_text_char_count: 41,
+            source_kind: "docs",
+            projection_target: "docs_chunk",
               account_locale: "es-US",
               target_language: "es",
             },
@@ -130,6 +132,8 @@ describe("Helix capability lane session runner", () => {
         source_binding: expect.objectContaining({
           source_id: "docs:nhm2",
           source_hash: "sha256:runner-v1",
+          source_text_hash: "sha256:text-runner",
+          source_text_char_count: 41,
         }),
         selected_runtime_agent_provider: "codex",
         selected_backend_provider: "live_translation.local_runtime",
@@ -168,6 +172,7 @@ describe("Helix capability lane session runner", () => {
             action: "record_observation",
             source_id: "docs:nhm2",
             source_hash: "sha256:runner-v1",
+            source_kind: "docs",
             chunk_id: "chunk-runner",
             chunk_index: 4,
             dedupe_key: "docs:nhm2:chunk-runner:es",
@@ -223,8 +228,12 @@ describe("Helix capability lane session runner", () => {
       projection_target: "docs_chunk",
       account_locale: "es-US",
       target_language: "es",
+      session_control_key: "lane-session-runner::docs:nhm2::sha256:runner-v1::docs_chunk::es-US::es",
       latest_chunk_id: "chunk-runner",
       latest_chunk_index: 4,
+      latest_source_id: "docs:nhm2",
+      latest_source_hash: "sha256:runner-v1",
+      latest_source_kind: "docs",
       latest_dedupe_key: "docs:nhm2:chunk-runner:es",
       latest_source_event_id: "docs:nhm2:event-runner",
       latest_source_event_ms: 90,
@@ -300,6 +309,130 @@ describe("Helix capability lane session runner", () => {
       terminal_eligible: false,
       assistant_answer: false,
       raw_content_included: false,
+    });
+  });
+
+  it("accepts flat source fields from runtime adapter session calls", () => {
+    const store = createHelixCapabilityLaneSessionStore();
+    const result = runHelixCapabilityLaneSessionRequests({
+      provider: buildProvider({ id: "codex", sessions: true }),
+      store,
+      env: {} as NodeJS.ProcessEnv,
+      body: {
+        capability_lane_session_call: [
+          {
+            action: "start",
+            lane_id: "live_translation",
+            lane_session_id: "lane-session-runner-flat",
+            now_ms: 100,
+            source_id: "docs:flat",
+            source_hash: "sha256:flat-v1",
+            source_kind: "docs",
+            projection_target: "docs_chunk",
+            account_locale: "es-US",
+            target_language: "es",
+          },
+          {
+            action: "record_observation",
+            lane_session_id: "lane-session-runner-flat",
+            observation_ref: "ask:lane:translation:obs:flat",
+            receipt_ref: "ask:lane:translation:receipt:flat",
+            source_id: "docs:flat",
+            source_hash: "sha256:flat-v1",
+            source_kind: "docs",
+            projection_target: "docs_chunk",
+            target_language: "es",
+            chunk_id: "chunk-flat",
+            chunk_index: 1,
+            dedupe_key: "docs:flat:chunk-flat:es",
+            source_event_id: "docs:flat:event-1",
+            source_event_ms: 95,
+            observed_at_ms: 120,
+            freshness_status: "fresh",
+            now_ms: 120,
+          },
+        ],
+      },
+    });
+
+    expect(result.session_results).toHaveLength(2);
+    expect(result.session_results[0]).toMatchObject({
+      ok: true,
+      action: "start",
+      lane_session: {
+        lane_session_id: "lane-session-runner-flat",
+        source_binding: {
+          source_id: "docs:flat",
+          source_hash: "sha256:flat-v1",
+          source_kind: "docs",
+          projection_target: "docs_chunk",
+          account_locale: "es-US",
+          target_language: "es",
+        },
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    expect(result.session_results[1]).toMatchObject({
+      ok: true,
+      action: "record_observation",
+      lane_session: {
+        lane_session_id: "lane-session-runner-flat",
+        last_observation_ref: "ask:lane:translation:obs:flat",
+        last_receipt_ref: "ask:lane:translation:receipt:flat",
+        debug_history: expect.arrayContaining([
+          expect.objectContaining({
+            action: "record_observation",
+            source_id: "docs:flat",
+            source_hash: "sha256:flat-v1",
+            source_kind: "docs",
+            target_language: "es",
+            projection_target: "docs_chunk",
+            chunk_id: "chunk-flat",
+            chunk_index: 1,
+            dedupe_key: "docs:flat:chunk-flat:es",
+            source_event_id: "docs:flat:event-1",
+            source_event_ms: 95,
+            observed_at_ms: 120,
+            freshness_status: "fresh",
+            terminal_authority_status: "pending_helix_terminal_authority",
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          }),
+        ]),
+      },
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(result.session_debug_summaries.at(-1)).toMatchObject({
+      lane_session_id: "lane-session-runner-flat",
+      source_id: "docs:flat",
+      source_hash: "sha256:flat-v1",
+      projection_target: "docs_chunk",
+      account_locale: "es-US",
+      target_language: "es",
+      session_control_key: "lane-session-runner-flat::docs:flat::sha256:flat-v1::docs_chunk::es-US::es",
+      latest_chunk_id: "chunk-flat",
+      latest_source_hash: "sha256:flat-v1",
+      latest_target_language: "es",
+      latest_projection_target: "docs_chunk",
+      last_observation_ref: "ask:lane:translation:obs:flat",
+      last_receipt_ref: "ask:lane:translation:receipt:flat",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(store.get("lane-session-runner-flat")).toMatchObject({
+      source_binding: expect.objectContaining({
+        source_id: "docs:flat",
+        source_hash: "sha256:flat-v1",
+        target_language: "es",
+      }),
+      last_observation_ref: "ask:lane:translation:obs:flat",
+      last_receipt_ref: "ask:lane:translation:receipt:flat",
     });
   });
 

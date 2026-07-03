@@ -236,12 +236,22 @@ function buildTurnTranscriptRecordFromAskLiveEvent(
     role: readFirstNonEmptyText(meta.role, event.tool, "assistant"),
     text: coerceText(event.text).trim(),
     status,
+    selected_runtime_agent_provider: readFirstNonEmptyText(
+      meta.selected_runtime_agent_provider,
+      meta.selectedRuntimeAgentProvider,
+      meta.runtime_agent_provider,
+      meta.runtimeAgentProvider,
+    ),
+    adapter_boundary: readFirstNonEmptyText(meta.adapter_boundary, meta.adapterBoundary),
     lane: readFirstNonEmptyText(meta.lane, event.tool),
     step_id: readFirstNonEmptyText(meta.step_id, meta.stepId),
     tool: readFirstNonEmptyText(meta.tool, meta.tool_name, meta.toolName, event.tool),
     capability: readFirstNonEmptyText(meta.capability, meta.capability_id, meta.capabilityId, event.tool),
     source_id: readFirstNonEmptyText(meta.source_id, meta.sourceId),
+    source_hash: readFirstNonEmptyText(meta.source_hash, meta.sourceHash),
     source_kind: readFirstNonEmptyText(meta.source_kind, meta.sourceKind),
+    source_text_hash: readFirstNonEmptyText(meta.source_text_hash, meta.sourceTextHash),
+    source_text_char_count: readFirstNonEmptyText(meta.source_text_char_count, meta.sourceTextCharCount),
     source_projection_target: readFirstNonEmptyText(meta.source_projection_target, meta.sourceProjectionTarget),
     account_locale: readFirstNonEmptyText(meta.account_locale, meta.accountLocale),
     latest_chunk_id: readFirstNonEmptyText(meta.latest_chunk_id, meta.latestChunkId),
@@ -253,6 +263,12 @@ function buildTurnTranscriptRecordFromAskLiveEvent(
     latest_freshness_status: readFirstNonEmptyText(meta.latest_freshness_status, meta.latestFreshnessStatus),
     latest_projection_target: readFirstNonEmptyText(meta.latest_projection_target, meta.latestProjectionTarget),
     target_language: readFirstNonEmptyText(meta.target_language, meta.targetLanguage),
+    materialized_mail_loop_evidence:
+      typeof meta.materialized_mail_loop_evidence === "boolean"
+        ? meta.materialized_mail_loop_evidence
+        : typeof meta.materializedMailLoopEvidence === "boolean"
+          ? meta.materializedMailLoopEvidence
+          : null,
     latest_cancel_requested:
       typeof meta.latest_cancel_requested === "boolean"
         ? meta.latest_cancel_requested

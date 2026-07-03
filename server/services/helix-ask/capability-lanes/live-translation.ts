@@ -216,49 +216,60 @@ const buildProjectionReceipt = (input: {
   sourceTextCharCount: number | null;
   translatedText: string | null;
   selectedBackendProvider: string | null;
-}): HelixLiveTranslationProjectionReceipt => ({
-  schema: HELIX_LIVE_TRANSLATION_PROJECTION_RECEIPT_SCHEMA,
-  receipt_ref: `${input.observationRef}:projection:${hashShort({
+}): HelixLiveTranslationProjectionReceipt => {
+  const receiptRef = `${input.observationRef}:projection:${hashShort({
     projectionTarget: input.chunk.projectionTarget,
     dedupeKey: input.chunk.dedupeKey,
     targetLanguage: input.targetLanguage,
-  })}`,
-  observation_ref: input.observationRef,
-  lane_id: "live_translation",
-  capability: CAPABILITY_ID,
-  lane_session_id: input.chunk.laneSessionId,
-  selected_backend_provider: input.selectedBackendProvider,
-  projection_target: input.chunk.projectionTarget,
-  projection_status: input.chunk.cancelRequested
-    ? "cancelled"
-    : input.translatedText === null
-      ? "failed"
-      : input.chunk.freshnessStatus === "stale"
-        ? "stale"
-        : "projected",
-  source_id: input.chunk.sourceId,
-  source_hash: input.chunk.sourceHash,
-  chunk_id: input.chunk.chunkId,
-  chunk_index: input.chunk.chunkIndex,
-  dedupe_key: input.chunk.dedupeKey,
-  source_event_id: input.chunk.sourceEventId,
-  source_event_ms: input.chunk.sourceEventMs,
-  observed_at_ms: input.chunk.observedAtMs,
-  freshness_status: input.chunk.freshnessStatus,
-  target_language: input.targetLanguage,
-  source_text_hash: input.sourceTextHash,
-  source_text_char_count: input.sourceTextCharCount,
-  translated_text: input.translatedText,
-  stale: input.chunk.freshnessStatus === "stale",
-  cancel_requested: input.chunk.cancelRequested,
-  reentry_required: true,
-  terminal_authority_status: input.translatedText === null || input.chunk.cancelRequested
-    ? "not_terminal_authority"
-    : "pending_helix_terminal_authority",
-  terminal_eligible: false,
-  assistant_answer: false,
-  raw_content_included: false,
-});
+  })}`;
+  return {
+    schema: HELIX_LIVE_TRANSLATION_PROJECTION_RECEIPT_SCHEMA,
+    receipt_ref: receiptRef,
+    observation_ref: input.observationRef,
+    projection_key: [
+      input.chunk.sourceId,
+      input.sourceTextHash,
+      input.chunk.projectionTarget,
+      input.targetLanguage,
+      input.chunk.chunkId,
+      receiptRef,
+    ].join("::"),
+    lane_id: "live_translation",
+    capability: CAPABILITY_ID,
+    lane_session_id: input.chunk.laneSessionId,
+    selected_backend_provider: input.selectedBackendProvider,
+    projection_target: input.chunk.projectionTarget,
+    projection_status: input.chunk.cancelRequested
+      ? "cancelled"
+      : input.translatedText === null
+        ? "failed"
+        : input.chunk.freshnessStatus === "stale"
+          ? "stale"
+          : "projected",
+    source_id: input.chunk.sourceId,
+    source_hash: input.chunk.sourceHash,
+    chunk_id: input.chunk.chunkId,
+    chunk_index: input.chunk.chunkIndex,
+    dedupe_key: input.chunk.dedupeKey,
+    source_event_id: input.chunk.sourceEventId,
+    source_event_ms: input.chunk.sourceEventMs,
+    observed_at_ms: input.chunk.observedAtMs,
+    freshness_status: input.chunk.freshnessStatus,
+    target_language: input.targetLanguage,
+    source_text_hash: input.sourceTextHash,
+    source_text_char_count: input.sourceTextCharCount,
+    translated_text: input.translatedText,
+    stale: input.chunk.freshnessStatus === "stale",
+    cancel_requested: input.chunk.cancelRequested,
+    reentry_required: true,
+    terminal_authority_status: input.translatedText === null || input.chunk.cancelRequested
+      ? "not_terminal_authority"
+      : "pending_helix_terminal_authority",
+    terminal_eligible: false,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
 
 const withExecutionTrace = (input: {
   trace: HelixCapabilityLaneResolveTrace;

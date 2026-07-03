@@ -312,8 +312,14 @@ export function enqueueStagePlayLiveSourceMailItem(input: {
   evidenceRef?: string | null;
   observationRef?: string | null;
   sourceHash?: string | null;
+  sourceTextHash?: string | null;
+  sourceTextCharCount?: number | null;
   chunkId?: string | null;
   chunkIndex?: number | null;
+  laneSessionId?: string | null;
+  sessionControlKey?: string | null;
+  sourceBindingKey?: string | null;
+  mailLoopObservationKey?: string | null;
   dedupeKey?: string | null;
   sourceEventId?: string | null;
   sourceEventMs?: number | null;
@@ -339,7 +345,12 @@ export function enqueueStagePlayLiveSourceMailItem(input: {
     input.evidenceRef,
     input.observationRef,
     input.sourceHash,
+    input.sourceTextHash,
     input.chunkId,
+    input.laneSessionId,
+    input.sessionControlKey,
+    input.sourceBindingKey,
+    input.mailLoopObservationKey,
     input.dedupeKey,
     input.sourceEventId,
     ...(input.evidenceRefs ?? []),
@@ -380,8 +391,14 @@ export function enqueueStagePlayLiveSourceMailItem(input: {
       evidenceRef: input.evidenceRef ?? null,
       observationRef: input.observationRef ?? null,
       sourceHash: input.sourceHash ?? null,
+      sourceTextHash: input.sourceTextHash ?? null,
+      sourceTextCharCount: input.sourceTextCharCount ?? null,
       chunkId: input.chunkId ?? null,
       chunkIndex: input.chunkIndex ?? null,
+      laneSessionId: input.laneSessionId ?? null,
+      sessionControlKey: input.sessionControlKey ?? null,
+      sourceBindingKey: input.sourceBindingKey ?? null,
+      mailLoopObservationKey: input.mailLoopObservationKey ?? null,
       dedupeKey: input.dedupeKey ?? null,
       sourceEventId: input.sourceEventId ?? null,
       sourceEventMs: input.sourceEventMs ?? null,

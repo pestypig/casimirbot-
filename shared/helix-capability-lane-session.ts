@@ -46,6 +46,10 @@ export type HelixCapabilityLaneSessionCall = {
   requested_backend_provider?: string | null;
   source_binding?: Partial<HelixCapabilityLaneSessionSourceBinding> | null;
   source_id?: string | null;
+  source_hash?: string | null;
+  source_kind?: HelixCapabilityLaneSessionSourceBinding["source_kind"] | null;
+  account_locale?: string | null;
+  target_language?: string | null;
   observation_ref?: string | null;
   receipt_ref?: string | null;
   chunk_id?: string | null;
@@ -66,6 +70,8 @@ export type HelixCapabilityLaneSessionCall = {
 export type HelixCapabilityLaneSessionSourceBinding = {
   source_id: string;
   source_hash?: string | null;
+  source_text_hash?: string | null;
+  source_text_char_count?: number | null;
   source_kind:
     | "docs"
     | "docs_hover"
@@ -106,6 +112,8 @@ export type HelixCapabilityLaneSessionEvent = {
   reason: string;
   source_id: string | null;
   source_hash?: string | null;
+  source_kind?: HelixCapabilityLaneSessionSourceBinding["source_kind"] | null;
+  account_locale?: string | null;
   target_language?: string | null;
   observation_ref: string | null;
   receipt_ref: string | null;
@@ -164,6 +172,8 @@ export type HelixCapabilityLaneSessionDebugSummary = {
   privacy_class: HelixCapabilityLanePrivacyClass | "unknown" | null;
   fallback_backend_provider: string | null;
   lifecycle_action: HelixCapabilityLaneSessionEventAction | null;
+  session_lifecycle_action: HelixCapabilityLaneSessionEventAction | null;
+  session_action: HelixCapabilityLaneSessionEventAction | null;
   session_status: HelixCapabilityLaneSessionStatus;
   session_health: HelixCapabilityLaneSessionHealth;
   source_id: string | null;
@@ -172,6 +182,8 @@ export type HelixCapabilityLaneSessionDebugSummary = {
   projection_target: string | null;
   account_locale: string | null;
   target_language?: string | null;
+  session_control_key: string;
+  source_binding_key: string;
   permissions: HelixCapabilityLaneSessionPermissions;
   permission_profile: string;
   created_at_ms: number;
@@ -182,6 +194,8 @@ export type HelixCapabilityLaneSessionDebugSummary = {
   latest_chunk_index?: number | null;
   latest_source_id?: string | null;
   latest_source_hash?: string | null;
+  latest_source_kind?: HelixCapabilityLaneSessionSourceBinding["source_kind"] | null;
+  latest_account_locale?: string | null;
   latest_target_language?: string | null;
   latest_dedupe_key?: string | null;
   latest_source_event_id?: string | null;
@@ -193,7 +207,10 @@ export type HelixCapabilityLaneSessionDebugSummary = {
   latest_projection_target?: string | null;
   latest_cancel_requested?: boolean | null;
   latest_session_event: HelixCapabilityLaneSessionEvent | null;
+  latest_event_id: string | null;
+  latest_observation_key: string | null;
   session_event_count: number;
+  has_observation: boolean;
   terminal_authority_status: "not_terminal_authority" | "pending_helix_terminal_authority";
   reentry_required: true;
   backend_provider_becomes_root_agent: false;

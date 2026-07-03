@@ -128,6 +128,26 @@ describe("voice transcribe runtime memory admission", () => {
       ok: true,
       text: "Voice prompt",
       engine: "openai_transcribe",
+      speech_to_text_lane_result: {
+        ok: true,
+        capability: "speech_to_text.transcribe_audio",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      speech_to_text_observation_packet: {
+        capability_key: "speech_to_text.transcribe_audio",
+        status: "succeeded",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      live_source_mail_item: {
+        sourceKind: "audio_transcript",
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
     });
     expect(sttHttpHandlerMock).toHaveBeenCalledTimes(1);
   });
@@ -164,4 +184,3 @@ describe("voice transcribe runtime memory admission", () => {
     expect(sttWhisperHandlerMock).not.toHaveBeenCalled();
   });
 });
-

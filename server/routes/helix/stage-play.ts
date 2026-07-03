@@ -12,6 +12,7 @@ import type {
   StagePlayLiveSourceMailTranscriptEntryV1,
   StagePlayMicroReasonerRoleV1,
 } from "../../../shared/contracts/stage-play-live-source-mail.v1";
+import { HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK } from "../../../shared/helix-live-translation-projection-target";
 import { buildStagePlayGraphFromWorld } from "../../services/stage-play/stage-play-badge-graph-builder";
 import {
   buildStagePlayBuilderCatalog,
@@ -1881,6 +1882,8 @@ helixStagePlayRouter.post("/live-source-mail/document-markdown", (req: Request, 
     const threadId = mailboxThreadResolution.mailboxThreadId;
     const docPath = readQueryString(body.docPath) ?? readQueryString(body.doc_path) ?? "current-document";
     const sourceHash = readQueryString(body.sourceHash) ?? readQueryString(body.source_hash) ?? null;
+    const sourceTextHash = readQueryString(body.sourceTextHash) ?? readQueryString(body.source_text_hash) ?? null;
+    const sourceTextCharCount = readOptionalNumber(body.sourceTextCharCount ?? body.source_text_char_count);
     const accountLocale =
       readQueryString(body.accountLocale) ??
       readQueryString(body.account_locale) ??
@@ -1891,6 +1894,10 @@ helixStagePlayRouter.post("/live-source-mail/document-markdown", (req: Request, 
       readQueryString(body.target_language) ??
       accountLocale;
     const locale = readQueryString(body.locale) ?? targetLanguage;
+    const projectionTarget =
+      readQueryString(body.projectionTarget) ??
+      readQueryString(body.projection_target) ??
+      HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK;
     const sourceId =
       readQueryString(body.sourceId) ??
       readQueryString(body.source_id) ??
@@ -1900,6 +1907,16 @@ helixStagePlayRouter.post("/live-source-mail/document-markdown", (req: Request, 
       readQueryString(body.chunk_id) ??
       `document_markdown_chunk:${sourceHash ?? "no_hash"}:${Date.now().toString(36)}`;
     const chunkIndex = readOptionalNumber(body.chunkIndex ?? body.chunk_index);
+    const laneSessionId =
+      readQueryString(body.laneSessionId) ??
+      readQueryString(body.lane_session_id) ??
+      null;
+    const sessionControlKey =
+      readQueryString(body.sessionControlKey) ??
+      readQueryString(body.session_control_key) ??
+      readQueryString(body.laneSessionControlKey) ??
+      readQueryString(body.lane_session_control_key) ??
+      null;
     const dedupeKey =
       readQueryString(body.dedupeKey) ??
       readQueryString(body.dedupe_key) ??
@@ -1952,15 +1969,19 @@ helixStagePlayRouter.post("/live-source-mail/document-markdown", (req: Request, 
       schema: "stage_play.document_markdown_visible_units.v1",
       chunk_id: chunkId,
       chunk_index: chunkIndex,
+      lane_session_id: laneSessionId,
+      session_control_key: sessionControlKey,
       dedupe_key: dedupeKey,
       source_event_id: sourceEventId,
       source_event_ms: sourceEventMs,
       doc_path: docPath,
       source_hash: sourceHash,
+      source_text_hash: sourceTextHash,
+      source_text_char_count: sourceTextCharCount,
       locale,
       target_language: targetLanguage,
       account_locale: accountLocale,
-      projection_target: "docs_viewer_inline",
+      projection_target: projectionTarget,
       freshness_status: "fresh",
       traffic: {
         accepted_units: units.length,
@@ -1976,6 +1997,8 @@ helixStagePlayRouter.post("/live-source-mail/document-markdown", (req: Request, 
       "document_markdown",
       docPath,
       sourceHash,
+      sourceTextHash,
+      sourceTextCharCount,
       chunkId,
       unitIds.join(","),
     ].filter(Boolean).join(":");
@@ -1989,12 +2012,16 @@ helixStagePlayRouter.post("/live-source-mail/document-markdown", (req: Request, 
       sourceKind: "document_markdown",
       evidenceRef,
       sourceHash,
+      sourceTextHash,
+      sourceTextCharCount,
       chunkId,
       chunkIndex,
+      laneSessionId,
+      sessionControlKey,
       dedupeKey,
       sourceEventId,
       sourceEventMs,
-      projectionTarget: "docs_viewer_inline",
+      projectionTarget,
       targetLanguage,
       accountLocale,
       summaryText,
@@ -2020,11 +2047,16 @@ helixStagePlayRouter.post("/live-source-mail/document-markdown", (req: Request, 
       wakeRequest,
       traffic: {
         sourceHash,
+        sourceTextHash,
+        sourceTextCharCount,
         chunkId,
         chunkIndex,
+        laneSessionId,
+        sessionControlKey,
         dedupeKey,
         sourceEventId,
         sourceEventMs,
+        projectionTarget,
         targetLanguage,
         accountLocale,
         acceptedUnits: units.length,

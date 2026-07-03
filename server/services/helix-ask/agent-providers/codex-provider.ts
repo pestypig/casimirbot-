@@ -2495,6 +2495,7 @@ export const codexProvider: HelixAgentProvider = {
           capability_lane_resolve_traces: capabilityLaneDebugProjection.capability_lane_resolve_traces,
           capability_lane_backend_selections: capabilityLaneDebugProjection.capability_lane_backend_selections,
           capability_lane_debug_events: capabilityLaneDebugProjection.capability_lane_debug_events,
+          capability_lane_turn_timeline: capabilityLaneDebugProjection.capability_lane_turn_timeline,
           capability_lane_session_results: capabilityLaneDebugProjection.capability_lane_session_results,
           capability_lane_session_debug_summaries:
             capabilityLaneDebugProjection.capability_lane_session_debug_summaries,
@@ -2669,7 +2670,9 @@ export const codexProvider: HelixAgentProvider = {
         "";
       runtimeLaneRequestCandidate = extractCodexCapabilityLaneRequestCandidate(retryText);
       runtimeLaneRequestRetry = {
-        schema: "helix.codex_runtime_lane_request_retry.v1",
+        schema: "helix.runtime_agent_lane_request_retry.v1",
+        legacy_schema: "helix.codex_runtime_lane_request_retry.v1",
+        runtime_provider_adapter: "codex",
         status: runtimeLaneRequestCandidate
           ? "runtime_provider_emitted_lane_request"
           : "runtime_provider_did_not_emit_lane_request",
@@ -2698,7 +2701,9 @@ export const codexProvider: HelixAgentProvider = {
         ...capabilityLaneContext.artifact_ledger,
       ];
       runtimeLaneRequestLoop = {
-        schema: "helix.codex_runtime_lane_request_loop.v1",
+        schema: "helix.runtime_agent_lane_request_loop.v1",
+        legacy_schema: "helix.codex_runtime_lane_request_loop.v1",
+        runtime_provider_adapter: "codex",
         status: capabilityLaneContext.observation_packets.length > 0
           ? "lane_observation_reentered"
           : "lane_request_not_executed",
@@ -2747,9 +2752,11 @@ export const codexProvider: HelixAgentProvider = {
       });
     }
     const runtimeLaneRequestContract = {
-      schema: "helix.codex_runtime_lane_request_contract.v1",
+      schema: "helix.runtime_agent_lane_request_contract.v1",
+      legacy_schema: "helix.codex_runtime_lane_request_contract.v1",
       contract_version: "2026-07-02.p7.one_shot.v1",
       selected_runtime_agent_provider: "codex",
+      runtime_provider_adapter: "codex",
       request_marker: CODEX_CAPABILITY_LANE_REQUEST_MARKER,
       one_shot_lane_loop_enabled: true,
       initial_candidate_present: initialRuntimeLaneRequestCandidatePresent,
@@ -2926,6 +2933,38 @@ export const codexProvider: HelixAgentProvider = {
         : providerReentry.terminalAuthorityStatus;
     const terminalAnswerAuthority =
       compoundTerminalAuthority ?? directTerminalAuthority ?? providerReentry.terminalAnswerAuthority;
+    const capabilityLaneTerminalTimelineEvent = {
+      schema: "helix.capability_lane.provider_timeline_event.v1",
+      seq: capabilityLaneDebugProjection.capability_lane_turn_timeline.length,
+      stage: ok ? "terminal_selected" : "terminal_rejected",
+      selected_runtime_agent_provider: "codex",
+      lane_id: "helix_terminal_authority",
+      capability_id: null,
+      status: ok ? "completed" : "failed",
+      lane_visible: false,
+      lane_requested: capabilityLaneDebugProjection.capability_lane_call_results.length > 0,
+      lane_executed: capabilityLaneContext.observation_packets.length > 0,
+      observation_reentered: providerReentry.providerReasoningReentry.evidence_reentered === true,
+      selected_backend_provider: null,
+      observation_ref:
+        capabilityLaneContext.observation_packets[0]?.produced_artifact_refs.find((ref) => readString(ref)) ??
+        null,
+      receipt_ref: capabilityLaneContext.projection_receipts[0]?.receipt_ref ?? null,
+      latest_event_id: null,
+      has_observation: capabilityLaneContext.observation_packets.length > 0,
+      terminal_authority_status: terminalAuthorityStatus,
+      reentry_required: true,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const capabilityLaneTurnTimeline =
+      capabilityLaneDebugProjection.capability_lane_turn_timeline.length > 0
+        ? [
+            ...capabilityLaneDebugProjection.capability_lane_turn_timeline,
+            capabilityLaneTerminalTimelineEvent,
+          ]
+        : capabilityLaneDebugProjection.capability_lane_turn_timeline;
     const terminalPresentation = compoundTerminalAuthority
       ? {
           schema: "helix.terminal_presentation.v1",
@@ -3011,6 +3050,7 @@ export const codexProvider: HelixAgentProvider = {
       capability_lane_resolve_traces: capabilityLaneDebugProjection.capability_lane_resolve_traces,
       capability_lane_backend_selections: capabilityLaneDebugProjection.capability_lane_backend_selections,
       capability_lane_debug_events: capabilityLaneDebugProjection.capability_lane_debug_events,
+      capability_lane_turn_timeline: capabilityLaneTurnTimeline,
       capability_lane_session_results: capabilityLaneDebugProjection.capability_lane_session_results,
       capability_lane_session_debug_summaries:
         capabilityLaneDebugProjection.capability_lane_session_debug_summaries,
@@ -3072,6 +3112,7 @@ export const codexProvider: HelixAgentProvider = {
         capability_lane_resolve_traces: capabilityLaneDebugProjection.capability_lane_resolve_traces,
         capability_lane_backend_selections: capabilityLaneDebugProjection.capability_lane_backend_selections,
         capability_lane_debug_events: capabilityLaneDebugProjection.capability_lane_debug_events,
+        capability_lane_turn_timeline: capabilityLaneTurnTimeline,
         capability_lane_session_results: capabilityLaneDebugProjection.capability_lane_session_results,
         capability_lane_session_debug_summaries:
           capabilityLaneDebugProjection.capability_lane_session_debug_summaries,

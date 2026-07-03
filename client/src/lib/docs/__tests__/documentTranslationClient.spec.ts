@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   enqueueDocumentMarkdownTranslationMail,
   extractDocumentMarkdownTranslationsFromRuns,
+  runDocumentMarkdownTranslationLaneSessionControl,
   type DocumentMarkdownTranslationEntry,
 } from "@/lib/docs/documentTranslationClient";
 import type { StagePlayMicroReasonerRunV1 } from "@shared/contracts/stage-play-live-source-mail.v1";
@@ -61,8 +62,12 @@ describe("document translation MicroDeck output parsing", () => {
       docPath: "docs/example.md",
       locale: "haw",
       sourceHash: "fnv1a32:test",
+      sourceTextHash: "fnv1a32:text-payload",
+      sourceTextCharCount: "Example Heading".length,
       sourceId: "document_markdown:docs/example.md",
       chunkId: "doc-inline:fnv1a32:test:u0001",
+      laneSessionId: "lane-session-docs",
+      sessionControlKey: "lane-session-docs::document_markdown:docs/example.md::fnv1a32:test::docs_chunk::haw::haw",
       units: [
         {
           unit_id: "u0001",
@@ -85,6 +90,11 @@ describe("document translation MicroDeck output parsing", () => {
       locale: "haw",
       targetLanguage: "haw",
       accountLocale: "haw",
+      sourceTextHash: "fnv1a32:text-payload",
+      sourceTextCharCount: "Example Heading".length,
+      laneSessionId: "lane-session-docs",
+      sessionControlKey: "lane-session-docs::document_markdown:docs/example.md::fnv1a32:test::docs_chunk::haw::haw",
+      projectionTarget: "docs_chunk",
     });
     expect(wakeBody).toMatchObject({
       threadId: "helix-ask:desktop",
@@ -94,6 +104,79 @@ describe("document translation MicroDeck output parsing", () => {
     });
   });
 
+  it("runs governed document translation lane session control through AGI session endpoint", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          schema: "helix.capability_lane.session_control_response.v1",
+          ok: true,
+          agent_runtime: "helix",
+          capability_lane_session_debug_summaries: [
+            {
+              lane_session_id: "lane-session-docs",
+              lane_id: "live_translation",
+              session_status: "running",
+              assistant_answer: false,
+              terminal_eligible: false,
+              raw_content_included: false,
+            },
+          ],
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        },
+      ),
+    ) as unknown as typeof fetch;
+    globalThis.fetch = fetchMock;
+
+    const response = await runDocumentMarkdownTranslationLaneSessionControl({
+      action: "start",
+      docPath: "docs/example.md",
+      locale: "haw",
+      targetLanguage: "haw",
+      accountLocale: "haw",
+      sourceHash: "fnv1a32:test",
+      sourceTextHash: "fnv1a32:text-payload",
+      sourceTextCharCount: 41,
+      sourceId: "document_markdown:docs/example.md",
+      laneSessionId: "lane-session-docs",
+      requestedBackendProvider: "live_translation.local_runtime",
+      projectionTarget: "docs_chunk",
+      agentRuntime: "helix",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0]?.[0] ?? "")).toBe("/api/agi/capability-lanes/session");
+    const body = JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body ?? "{}"));
+    expect(body).toMatchObject({
+      agentRuntime: "helix",
+      agent_runtime: "helix",
+      capability_lane_session_call: {
+        action: "start",
+        lane_id: "live_translation",
+        lane_session_id: "lane-session-docs",
+        requested_backend_provider: "live_translation.local_runtime",
+        source_binding: {
+          source_id: "document_markdown:docs/example.md",
+          source_hash: "fnv1a32:test",
+          source_text_hash: "fnv1a32:text-payload",
+          source_text_char_count: 41,
+          source_kind: "docs",
+          projection_target: "docs_chunk",
+          account_locale: "haw",
+          target_language: "haw",
+        },
+      },
+    });
+    expect(response.terminal_eligible).toBe(false);
+    expect(response.assistant_answer).toBe(false);
+    expect(response.raw_content_included).toBe(false);
+  });
+
   it("extracts unit-keyed inline translations from document projection JSON runs", () => {
     const outputPreview = JSON.stringify({
       schema: "stage_play_document_inline_translation_output/v1",
@@ -101,6 +184,8 @@ describe("document translation MicroDeck output parsing", () => {
       sourceKind: "document_markdown",
       docPath: "docs/example.md",
       sourceHash: "fnv1a32:test",
+      sourceTextHash: "fnv1a32:text-payload",
+      sourceTextCharCount: 41,
       chunkId: "doc-inline:fnv1a32:test:u0001,u0002",
       chunkIndex: 3,
       dedupeKey: "document_markdown:docs/example.md:doc-inline:fnv1a32:test:u0001,u0002:haw",
@@ -109,7 +194,13 @@ describe("document translation MicroDeck output parsing", () => {
       observedAtMs: 1780000001000,
       projectionStatus: "projected",
       freshnessStatus: "fresh",
-      projectionTarget: "docs_viewer_inline",
+      laneSessionId: "lane-session-docs",
+      observationLaneSessionId: "lane-session-docs-observation",
+      goalBindingId: "goal-binding-docs",
+      latestEventId: "lane-session-docs:observation_recorded:1780000001000",
+      hasObservation: true,
+      terminalAuthorityStatus: "pending_helix_terminal_authority",
+      projectionTarget: "docs_chunk",
       targetLanguage: "haw",
       accountLocale: "haw",
       translations: [
@@ -134,6 +225,8 @@ describe("document translation MicroDeck output parsing", () => {
         sourceKind: "document_markdown",
         docPath: "docs/example.md",
         sourceHash: "fnv1a32:test",
+        sourceTextHash: "fnv1a32:text-payload",
+        sourceTextCharCount: 41,
         chunkId: "doc-inline:fnv1a32:test:u0001,u0002",
         chunkIndex: 3,
         dedupeKey: "document_markdown:docs/example.md:doc-inline:fnv1a32:test:u0001,u0002:haw",
@@ -142,9 +235,15 @@ describe("document translation MicroDeck output parsing", () => {
         observedAtMs: 1780000001000,
         projectionStatus: "projected",
         freshnessStatus: "fresh",
+        laneSessionId: "lane-session-docs",
+        observationLaneSessionId: "lane-session-docs-observation",
+        goalBindingId: "goal-binding-docs",
+        latestEventId: "lane-session-docs:observation_recorded:1780000001000",
+        hasObservation: true,
+        terminalAuthorityStatus: "pending_helix_terminal_authority",
         selectedBackendProvider: "test-document-translator",
         source: "document_microdeck",
-        projectionTarget: "docs_viewer_inline",
+        projectionTarget: "docs_chunk",
         targetLanguage: "haw",
         accountLocale: "haw",
       },
@@ -159,6 +258,8 @@ describe("document translation MicroDeck output parsing", () => {
         sourceKind: "document_markdown",
         docPath: "docs/example.md",
         sourceHash: "fnv1a32:test",
+        sourceTextHash: "fnv1a32:text-payload",
+        sourceTextCharCount: 41,
         chunkId: "doc-inline:fnv1a32:test:u0001,u0002",
         chunkIndex: 3,
         dedupeKey: "document_markdown:docs/example.md:doc-inline:fnv1a32:test:u0001,u0002:haw",
@@ -167,9 +268,15 @@ describe("document translation MicroDeck output parsing", () => {
         observedAtMs: 1780000001000,
         projectionStatus: "projected",
         freshnessStatus: "fresh",
+        laneSessionId: "lane-session-docs",
+        observationLaneSessionId: "lane-session-docs-observation",
+        goalBindingId: "goal-binding-docs",
+        latestEventId: "lane-session-docs:observation_recorded:1780000001000",
+        hasObservation: true,
+        terminalAuthorityStatus: "pending_helix_terminal_authority",
         selectedBackendProvider: "test-document-translator",
         source: "document_microdeck",
-        projectionTarget: "docs_viewer_inline",
+        projectionTarget: "docs_chunk",
         targetLanguage: "haw",
         accountLocale: "haw",
       },
@@ -179,7 +286,7 @@ describe("document translation MicroDeck output parsing", () => {
   it("extracts unit-level translation errors from document projection output", () => {
     const outputPreview = JSON.stringify({
       schema: "stage_play_document_inline_translation_output/v1",
-      projectionTarget: "docs_viewer_inline",
+      projectionTarget: "docs_chunk",
       translations: [],
       unit_errors: [
         { unit_id: "u0003", reason: "document_translation_model_output_unavailable" },
@@ -206,9 +313,11 @@ describe("document translation MicroDeck output parsing", () => {
         role: "packet_composer",
         observationRef: "run-doc-1",
         observedAtMs: 1781697601000,
+        hasObservation: true,
+        terminalAuthorityStatus: "not_terminal_authority",
         selectedBackendProvider: "test-document-translator",
         source: "document_microdeck",
-        projectionTarget: "docs_viewer_inline",
+        projectionTarget: "docs_chunk",
       },
     ]);
   });
@@ -216,7 +325,7 @@ describe("document translation MicroDeck output parsing", () => {
   it("ignores baseline-only document unavailable projections before a prompted deck product run exists", () => {
     const outputPreview = JSON.stringify({
       schema: "stage_play_document_inline_translation_output/v1",
-      projectionTarget: "docs_viewer_inline",
+      projectionTarget: "docs_chunk",
       translations: [],
       unit_errors: [
         { unit_id: "u0003", reason: "document_translation_model_output_unavailable" },

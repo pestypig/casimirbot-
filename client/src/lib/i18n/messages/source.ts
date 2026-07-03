@@ -2087,6 +2087,14 @@ export const interfaceSourceMessages = {
     placeholders: { status: "string" },
     screenshotSurface: "workstation",
   },
+  "docsViewer.translation.status.projectionDegraded": {
+    id: "docsViewer.translation.status.projectionDegraded",
+    defaultMessage: "Translation projected with receipt warning: {status}",
+    description: "Status shown when governed translated text remains visible while a later projection receipt is stale, cancelled, or failed.",
+    context: "Docs Viewer document translation status.",
+    placeholders: { status: "string" },
+    screenshotSurface: "workstation",
+  },
   "docsViewer.translation.status.unavailable": {
     id: "docsViewer.translation.status.unavailable",
     defaultMessage: "Document translation unavailable: {reason}",

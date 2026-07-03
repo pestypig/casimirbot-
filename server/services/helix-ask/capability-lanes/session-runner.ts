@@ -81,19 +81,44 @@ const readSourceKind = (
   return "unknown";
 };
 
-const readSourceBinding = (value: unknown): HelixCapabilityLaneSessionSourceBinding => {
+const readOptionalSourceKind = (
+  value: unknown,
+): HelixCapabilityLaneSessionSourceBinding["source_kind"] | null => {
+  const text = readString(value).toLowerCase();
+  if (!text) return null;
+  return readSourceKind(text);
+};
+
+const readSourceBinding = (
+  value: unknown,
+  fallback?: RecordLike | null,
+): HelixCapabilityLaneSessionSourceBinding => {
   const record = readRecord(value);
   return {
-    source_id: readString(record?.source_id ?? record?.sourceId),
+    source_id: readString(record?.source_id ?? record?.sourceId ?? fallback?.source_id ?? fallback?.sourceId),
     source_hash:
-      readString(record?.source_hash ?? record?.sourceHash) || null,
-    source_kind: readSourceKind(record?.source_kind ?? record?.sourceKind),
+      readString(record?.source_hash ?? record?.sourceHash ?? fallback?.source_hash ?? fallback?.sourceHash) || null,
+    source_text_hash:
+      readString(
+        record?.source_text_hash ??
+        record?.sourceTextHash ??
+        fallback?.source_text_hash ??
+        fallback?.sourceTextHash,
+      ) || null,
+    source_text_char_count:
+      readNumber(
+        record?.source_text_char_count ??
+        record?.sourceTextCharCount ??
+        fallback?.source_text_char_count ??
+        fallback?.sourceTextCharCount,
+      ),
+    source_kind: readSourceKind(record?.source_kind ?? record?.sourceKind ?? fallback?.source_kind ?? fallback?.sourceKind),
     projection_target:
-      readString(record?.projection_target ?? record?.projectionTarget) || null,
+      readString(record?.projection_target ?? record?.projectionTarget ?? fallback?.projection_target ?? fallback?.projectionTarget) || null,
     account_locale:
-      readString(record?.account_locale ?? record?.accountLocale) || null,
+      readString(record?.account_locale ?? record?.accountLocale ?? fallback?.account_locale ?? fallback?.accountLocale) || null,
     target_language:
-      readString(record?.target_language ?? record?.targetLanguage) || null,
+      readString(record?.target_language ?? record?.targetLanguage ?? fallback?.target_language ?? fallback?.targetLanguage) || null,
   };
 };
 
@@ -113,8 +138,12 @@ const readStructuredSessionCalls = (body: RecordLike): HelixCapabilityLaneSessio
       lane_session_id: readString(entry.lane_session_id ?? entry.laneSessionId) || null,
       requested_backend_provider:
         readString(entry.requested_backend_provider ?? entry.requestedBackendProvider) || null,
-      source_binding: readSourceBinding(entry.source_binding ?? entry.sourceBinding),
+      source_binding: readSourceBinding(entry.source_binding ?? entry.sourceBinding, entry),
       source_id: readString(entry.source_id ?? entry.sourceId) || null,
+      source_hash: readString(entry.source_hash ?? entry.sourceHash) || null,
+      source_kind: readOptionalSourceKind(entry.source_kind ?? entry.sourceKind),
+      account_locale: readString(entry.account_locale ?? entry.accountLocale) || null,
+      target_language: readString(entry.target_language ?? entry.targetLanguage) || null,
       observation_ref: readString(entry.observation_ref ?? entry.observationRef) || null,
       receipt_ref: readString(entry.receipt_ref ?? entry.receiptRef) || null,
       chunk_id: readString(entry.chunk_id ?? entry.chunkId) || null,
@@ -219,12 +248,13 @@ export const runHelixCapabilityLaneSessionRequests = (input: {
         observationRef: readString(call.observation_ref),
         receiptRef: call.receipt_ref,
         sourceId: call.source_id || call.source_binding?.source_id || null,
+        sourceKind: call.source_kind || call.source_binding?.source_kind || null,
         chunkId: call.chunk_id,
         chunkIndex: call.chunk_index,
         dedupeKey: call.dedupe_key,
         sourceEventId: call.source_event_id,
-        sourceHash: call.source_binding?.source_hash ?? null,
-        targetLanguage: call.source_binding?.target_language ?? null,
+        sourceHash: call.source_hash || call.source_binding?.source_hash || null,
+        targetLanguage: call.target_language || call.source_binding?.target_language || null,
         sourceEventMs: call.source_event_ms,
         observedAtMs: call.observed_at_ms,
         freshnessStatus: call.freshness_status,

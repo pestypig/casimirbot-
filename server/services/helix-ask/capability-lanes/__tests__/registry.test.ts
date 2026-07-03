@@ -228,6 +228,36 @@ describe("Helix capability lane registry", () => {
         }),
       ],
     });
+    expect(helix.lanes.find((lane) => lane.lane_id === "speech_to_text")).toMatchObject({
+      backend_family: "openai_compatible",
+      default_backend_provider: "speech_to_text.openai_compatible",
+      one_shot_call_contract: expect.objectContaining({
+        supported: true,
+        terminal_eligible: false,
+        assistant_answer: false,
+      }),
+      session_contract: expect.objectContaining({
+        supported: true,
+        terminal_eligible: false,
+      }),
+      goal_binding_contract: expect.objectContaining({
+        supported: true,
+        final_reports_require_terminal_authority: true,
+        backend_provider_becomes_root_agent: false,
+      }),
+      capabilities: [
+        expect.objectContaining({
+          capability_id: "speech_to_text.transcribe_audio",
+          one_shot_status: "executable",
+          session_status: "supported",
+          result_authority: "observation_or_receipt_only",
+          reentry_required: true,
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        }),
+      ],
+    });
     expect(helix.lanes.find((lane) => lane.lane_id === "text_to_speech")).toMatchObject({
       status: "dry_run",
       backend_family: "local_runtime",
@@ -265,6 +295,15 @@ describe("Helix capability lane registry", () => {
         terminal_eligible: false,
         assistant_answer: false,
       }),
+      session_contract: expect.objectContaining({
+        supported: true,
+        terminal_eligible: false,
+      }),
+      goal_binding_contract: expect.objectContaining({
+        supported: true,
+        final_reports_require_terminal_authority: true,
+        backend_provider_becomes_root_agent: false,
+      }),
       receipt_contract: expect.objectContaining({
         reentry_required: true,
         terminal_eligible: false,
@@ -274,7 +313,7 @@ describe("Helix capability lane registry", () => {
         expect.objectContaining({
           capability_id: "text_to_speech.speak_text",
           one_shot_status: "executable",
-          session_status: "not_supported",
+          session_status: "supported",
           backend_provider_required: true,
           result_authority: "observation_or_receipt_only",
           reentry_required: true,

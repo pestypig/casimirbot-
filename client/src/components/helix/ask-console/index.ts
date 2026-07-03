@@ -203,6 +203,7 @@ export {
   buildHelixAskTimelineFeed,
 } from "./HelixAskTimelineFeed";
 export { HelixAskSteeringQueuePanel } from "./HelixAskSteeringQueuePanel";
+export { HelixAskSteeringQueueSurface } from "./HelixAskSteeringQueueSurface";
 export {
   HelixAskContextCapsulePreview,
   HelixAskReplyContextCapsuleCard,
@@ -501,6 +502,7 @@ export type {
 } from "./HelixAskObserverLaneEvents";
 export type { HelixAskTimelineFeedEntry } from "./HelixAskTimelineFeed";
 export type { HelixAskSteeringQueuePanelProps } from "./HelixAskSteeringQueuePanel";
+export type { HelixAskSteeringQueueSurfaceProps } from "./HelixAskSteeringQueueSurface";
 export type {
   HelixAskContextCapsulePreviewModel,
   HelixAskContextCapsulePreviewProps,

@@ -517,23 +517,55 @@ function readLaneProjectionSummary(record: RecordLike | null, debug: RecordLike 
     const sourceKind =
       coerceText(receipt.source_kind) ||
       coerceText(payload?.source_kind);
+    const sourceTextHash =
+      coerceText(receipt.source_text_hash) ||
+      coerceText(receipt.sourceTextHash) ||
+      coerceText(payload?.source_text_hash) ||
+      coerceText(payload?.sourceTextHash);
+    const sourceTextCharCount =
+      coerceText(receipt.source_text_char_count) ||
+      coerceText(receipt.sourceTextCharCount) ||
+      coerceText(payload?.source_text_char_count) ||
+      coerceText(payload?.sourceTextCharCount);
     const accountLocale =
       coerceText(receipt.account_locale) ||
       coerceText(payload?.account_locale);
     const targetLanguage =
       coerceText(receipt.target_language) ||
       coerceText(payload?.target_language);
+    const projectionKey =
+      coerceText(receipt.projection_key) ||
+      coerceText(receipt.projectionKey) ||
+      coerceText(payload?.projection_key) ||
+      coerceText(payload?.projectionKey);
+    const chunkId = coerceText(receipt.chunk_id) || coerceText(payload?.chunk_id);
+    const chunkIndex = coerceText(receipt.chunk_index) || coerceText(payload?.chunk_index);
+    const dedupeKey = coerceText(receipt.dedupe_key) || coerceText(payload?.dedupe_key);
+    const sourceEventId = coerceText(receipt.source_event_id) || coerceText(payload?.source_event_id);
+    const sourceEventMs = coerceText(receipt.source_event_ms) || coerceText(payload?.source_event_ms);
+    const observedAtMs = coerceText(receipt.observed_at_ms) || coerceText(payload?.observed_at_ms);
+    const freshnessStatus = coerceText(receipt.freshness_status) || coerceText(payload?.freshness_status);
     const receiptRef = coerceText(receipt.receipt_ref);
     const observationRef = coerceText(receipt.observation_ref) || coerceText(payload?.observation_ref);
     const pieces = [
       capability || "capability_lane_projection",
       projectionStatus ? `projection ${projectionStatus}` : "",
+      projectionKey ? `projection key ${projectionKey}` : "",
       projectionTarget ? `target ${projectionTarget}` : "",
       sourceId ? `source ${sourceId}` : "",
       sourceHash ? `source hash ${sourceHash}` : "",
       sourceKind ? `source kind ${sourceKind}` : "",
+      sourceTextHash ? `source payload hash ${sourceTextHash}` : "",
+      sourceTextCharCount ? `source payload chars ${sourceTextCharCount}` : "",
       accountLocale ? `account locale ${accountLocale}` : "",
       targetLanguage ? `language ${targetLanguage}` : "",
+      chunkId ? `chunk ${chunkId}` : "",
+      chunkIndex ? `chunk index ${chunkIndex}` : "",
+      dedupeKey ? `dedupe ${dedupeKey}` : "",
+      sourceEventId ? `source event ${sourceEventId}` : "",
+      sourceEventMs ? `source event ms ${sourceEventMs}` : "",
+      observedAtMs ? `observed ${observedAtMs}` : "",
+      freshnessStatus ? `freshness ${freshnessStatus}` : "",
       receiptRef ? `receipt ${receiptRef}` : "",
       observationRef ? `ref ${observationRef}` : "",
       "observation-only",
@@ -604,6 +636,7 @@ function readGoalBoundLaneSummary(record: RecordLike | null, debug: RecordLike |
       const lane = coerceText(summary.lane_id) || "capability_lane";
       const goal = coerceText(summary.goal_id);
       const session = coerceText(summary.lane_session_id);
+      const sessionControlKey = coerceText(summary.session_control_key);
       const lifecycleAction = coerceText(
         summary.lifecycle_action ?? summary.session_lifecycle_action ?? summary.session_action,
       );
@@ -623,6 +656,9 @@ function readGoalBoundLaneSummary(record: RecordLike | null, debug: RecordLike |
       const latestGoalEvent = coerceText(readRecord(summary.latest_goal_binding_event)?.event);
       const reportDecision = readRecord(summary.report_decision);
       const reportAction = coerceText(reportDecision?.action);
+      const reportSummary =
+        coerceText(summary.report_summary_text) ||
+        coerceText(reportDecision?.summary_text);
       const dispatchPlan = directDispatchPlans.find((plan) =>
         coerceText(plan.goal_binding_id) === coerceText(summary.goal_binding_id)) ??
         readRecord(summary.dispatch_plan);
@@ -648,6 +684,9 @@ function readGoalBoundLaneSummary(record: RecordLike | null, debug: RecordLike |
       const latestObservedAtMs = coerceText(summary.latest_observed_at_ms);
       const latestFreshness = coerceText(summary.latest_freshness_status);
       const latestCancelled = summary.latest_cancel_requested === true;
+      const latestEventId = coerceText(summary.latest_event_id);
+      const sessionEventCount = coerceText(summary.session_event_count);
+      const hasObservation = coerceText(summary.has_observation);
       const terminalAuthority = coerceText(summary.terminal_authority_status);
       const cost = coerceText(summary.cost_class);
       const latency = coerceText(summary.latency_class);
@@ -660,6 +699,7 @@ function readGoalBoundLaneSummary(record: RecordLike | null, debug: RecordLike |
         lane,
         goal ? `goal ${goal}` : "",
         session ? `session ${session}` : "",
+        sessionControlKey ? `control ${sessionControlKey}` : "",
         lifecycleAction ? `action ${lifecycleAction}` : "",
         status ? `status ${status}` : "",
         backend ? `backend ${backend}` : "",
@@ -682,9 +722,13 @@ function readGoalBoundLaneSummary(record: RecordLike | null, debug: RecordLike |
         latestObservedAtMs ? `latest observed ${latestObservedAtMs}` : "",
         latestFreshness ? `latest freshness ${latestFreshness}` : "",
         latestCancelled ? "latest cancelled" : "",
+        latestEventId ? `latest event id ${latestEventId}` : "",
+        sessionEventCount ? `session events ${sessionEventCount}` : "",
+        hasObservation ? `has observation ${hasObservation}` : "",
         mailLoop ? `mail ${mailLoop}` : "",
         latestGoalEvent ? `event ${latestGoalEvent}` : "",
         receipt ? `receipt ${receipt}` : "",
+        reportSummary ? `report summary ${reportSummary}` : "",
         reportAction ? `report ${reportAction}` : "",
         dispatchTarget ? `dispatch ${dispatchTarget}` : "",
         dispatchAdmissionStatus ? `admission ${dispatchAdmissionStatus}` : "",
@@ -711,6 +755,9 @@ function readGoalBoundLaneSummary(record: RecordLike | null, debug: RecordLike |
       const dedupe = coerceText(plan.latest_dedupe_key);
       const sourceEvent = coerceText(plan.latest_source_event_id);
       const freshness = coerceText(plan.latest_freshness_status);
+      const latestEventId = coerceText(plan.latest_event_id);
+      const sessionEventCount = coerceText(plan.session_event_count);
+      const hasObservation = coerceText(plan.has_observation);
       const targetLanguage = coerceText(plan.target_language);
       const cancelled = plan.latest_cancel_requested === true;
       return [
@@ -730,6 +777,9 @@ function readGoalBoundLaneSummary(record: RecordLike | null, debug: RecordLike |
         sourceEvent ? `latest source event id ${sourceEvent}` : "",
         freshness ? `latest freshness ${freshness}` : "",
         cancelled ? "latest cancelled" : "",
+        latestEventId ? `latest event id ${latestEventId}` : "",
+        sessionEventCount ? `session events ${sessionEventCount}` : "",
+        hasObservation ? `has observation ${hasObservation}` : "",
         receipt ? `receipt ${receipt}` : "",
         "observation-only",
       ].filter(Boolean).join(" | ");
@@ -752,6 +802,9 @@ function readGoalBoundLaneSummary(record: RecordLike | null, debug: RecordLike |
       const dedupe = coerceText(admission.latest_dedupe_key);
       const sourceEvent = coerceText(admission.latest_source_event_id);
       const freshness = coerceText(admission.latest_freshness_status);
+      const latestEventId = coerceText(admission.latest_event_id);
+      const sessionEventCount = coerceText(admission.session_event_count);
+      const hasObservation = coerceText(admission.has_observation);
       const targetLanguage = coerceText(admission.target_language);
       const cancelled = admission.latest_cancel_requested === true;
       return [
@@ -771,6 +824,9 @@ function readGoalBoundLaneSummary(record: RecordLike | null, debug: RecordLike |
         sourceEvent ? `latest source event id ${sourceEvent}` : "",
         freshness ? `latest freshness ${freshness}` : "",
         cancelled ? "latest cancelled" : "",
+        latestEventId ? `latest event id ${latestEventId}` : "",
+        sessionEventCount ? `session events ${sessionEventCount}` : "",
+        hasObservation ? `has observation ${hasObservation}` : "",
         "observation-only",
       ].filter(Boolean).join(" | ");
     }))).slice(0, 3).join(" || ");
@@ -800,6 +856,10 @@ function readGoalDispatchReadinessSummary(record: RecordLike | null, debug: Reco
   const debugOnly = coerceText(readiness.debug_only_count);
   const lanes = readArray(readiness.next_lane_ids).map(coerceText).filter(Boolean).join(", ");
   const sessions = readArray(readiness.next_lane_session_ids).map(coerceText).filter(Boolean).join(", ");
+  const sessionControlKeys = readArray(readiness.next_session_control_keys).map(coerceText).filter(Boolean).join(", ");
+  const sourceBindingKeys = readArray(readiness.next_source_binding_keys).map(coerceText).filter(Boolean).join(", ");
+  const mailLoopObservationKeys =
+    readArray(readiness.next_mail_loop_observation_keys).map(coerceText).filter(Boolean).join(", ");
   const targets = readArray(readiness.next_dispatch_targets).map(coerceText).filter(Boolean).join(", ");
   const goalBindings = readArray(readiness.next_goal_binding_ids).map(coerceText).filter(Boolean).join(", ");
   const sourceIds = readArray(readiness.next_source_ids).map(coerceText).filter(Boolean).join(", ");
@@ -810,9 +870,14 @@ function readGoalDispatchReadinessSummary(record: RecordLike | null, debug: Reco
   const chunkIds = readArray(readiness.next_chunk_ids).map(coerceText).filter(Boolean).join(", ");
   const dedupeKeys = readArray(readiness.next_dedupe_keys).map(coerceText).filter(Boolean).join(", ");
   const sourceEventIds = readArray(readiness.next_source_event_ids).map(coerceText).filter(Boolean).join(", ");
+  const latestEventIds = readArray(readiness.next_latest_event_ids).map(coerceText).filter(Boolean).join(", ");
+  const sessionEventCounts = readArray(readiness.next_session_event_counts).map(coerceText).filter(Boolean).join(", ");
+  const nextHasObservation = coerceText(readiness.next_has_observation);
+  const allNextHaveObservation = coerceText(readiness.all_next_have_observation);
   const projectionTargets = readArray(readiness.next_projection_targets).map(coerceText).filter(Boolean).join(", ");
   const targetLanguages = readArray(readiness.next_target_languages).map(coerceText).filter(Boolean).join(", ");
   const freshnessStatuses = readArray(readiness.next_freshness_statuses).map(coerceText).filter(Boolean).join(", ");
+  const wakeKinds = readArray(readiness.next_mail_loop_wake_kinds).map(coerceText).filter(Boolean).join(", ");
   const nextCancelled = readiness.next_cancel_requested === true;
   const evidenceRefs = readArray(readiness.next_evidence_refs).map(coerceText).filter(Boolean).join(", ");
   const receipts = readArray(readiness.next_receipt_refs).map(coerceText).filter(Boolean).join(", ");
@@ -830,6 +895,9 @@ function readGoalDispatchReadinessSummary(record: RecordLike | null, debug: Reco
     debugOnly && debugOnly !== "0" ? `debug only ${debugOnly}` : "",
     lanes ? `lanes ${lanes}` : "",
     sessions ? `sessions ${sessions}` : "",
+    sessionControlKeys ? `session controls ${sessionControlKeys}` : "",
+    sourceBindingKeys ? `source bindings ${sourceBindingKeys}` : "",
+    mailLoopObservationKeys ? `mail observations ${mailLoopObservationKeys}` : "",
     targets ? `targets ${targets}` : "",
     goalBindings ? `goal bindings ${goalBindings}` : "",
     sourceIds ? `sources ${sourceIds}` : "",
@@ -842,6 +910,11 @@ function readGoalDispatchReadinessSummary(record: RecordLike | null, debug: Reco
     chunkIds ? `chunks ${chunkIds}` : "",
     dedupeKeys ? `dedupe ${dedupeKeys}` : "",
     sourceEventIds ? `source events ${sourceEventIds}` : "",
+    latestEventIds ? `latest events ${latestEventIds}` : "",
+    sessionEventCounts ? `session event counts ${sessionEventCounts}` : "",
+    nextHasObservation ? `next has observation ${nextHasObservation}` : "",
+    allNextHaveObservation ? `all next have observation ${allNextHaveObservation}` : "",
+    wakeKinds ? `wake kinds ${wakeKinds}` : "",
     freshnessStatuses ? `freshness ${freshnessStatuses}` : "",
     nextCancelled ? "cancelled" : "",
     evidenceRefs ? `evidence ${evidenceRefs}` : "",
@@ -878,6 +951,7 @@ function readLaneSessionSummary(record: RecordLike | null, debug: RecordLike | n
       const status = [coerceText(summary.session_status), coerceText(summary.session_health)]
         .filter(Boolean)
         .join("/");
+      const sessionControlKey = coerceText(summary.session_control_key);
       const source = coerceText(summary.source_id);
       const projection = coerceText(summary.projection_target);
       const locale = coerceText(summary.account_locale);
@@ -891,6 +965,8 @@ function readLaneSessionSummary(record: RecordLike | null, debug: RecordLike | n
       const latestObservedAtMs = coerceText(summary.latest_observed_at_ms);
       const latestFreshness = coerceText(summary.latest_freshness_status);
       const latestCancelled = summary.latest_cancel_requested === true;
+      const latestEventId = coerceText(summary.latest_event_id);
+      const hasObservation = summary.has_observation === true;
       const observation = coerceText(summary.last_observation_ref);
       const receipt = coerceText(summary.last_receipt_ref);
       const terminalAuthority = coerceText(summary.terminal_authority_status);
@@ -898,6 +974,7 @@ function readLaneSessionSummary(record: RecordLike | null, debug: RecordLike | n
       return [
         lane,
         session ? `session ${session}` : "",
+        sessionControlKey ? `control ${sessionControlKey}` : "",
         lifecycleAction ? `action ${lifecycleAction}` : "",
         status ? `status ${status}` : "",
         backend ? `backend ${backend}` : "",
@@ -919,6 +996,8 @@ function readLaneSessionSummary(record: RecordLike | null, debug: RecordLike | n
         latestObservedAtMs ? `latest observed ${latestObservedAtMs}` : "",
         latestFreshness ? `latest freshness ${latestFreshness}` : "",
         latestCancelled ? "latest cancelled" : "",
+        latestEventId ? `latest event ${latestEventId}` : "",
+        `has observation ${hasObservation ? "true" : "false"}`,
         observation ? `observation ${observation}` : "",
         receipt ? `receipt ${receipt}` : "",
         terminalAuthority ? `authority ${terminalAuthority}` : "",
@@ -946,8 +1025,12 @@ function readLaneMailLoopSummary(record: RecordLike | null, debug: RecordLike | 
       const session = coerceText(summary.lane_session_id);
       const mail = coerceText(summary.stage_play_mail_id);
       const mailDelivery = coerceText(summary.stage_play_mail_delivery_status);
+      const materializedMailLoopEvidence = summary.materialized_mail_loop_evidence === true;
       const previousMail = coerceText(summary.previous_stage_play_mail_id);
       const wake = summary.stage_play_wake_expected === true ? "wake expected" : "wake not expected";
+      const wakeKind = coerceText(summary.stage_play_wake_kind);
+      const observationSession = coerceText(summary.observation_lane_session_id);
+      const sessionControlKey = coerceText(summary.lane_session_control_key);
       const observation = coerceText(summary.observation_ref);
       const receipt = coerceText(summary.receipt_ref);
       const source = coerceText(summary.source_id);
@@ -971,9 +1054,13 @@ function readLaneMailLoopSummary(record: RecordLike | null, debug: RecordLike | 
         lane,
         session ? `session ${session}` : "",
         mail ? `mail ${mail}` : "",
+        `materialized mail evidence ${materializedMailLoopEvidence ? "true" : "false"}`,
         mailDelivery ? `mail delivery ${mailDelivery}` : "",
         previousMail ? `previous mail ${previousMail}` : "",
         wake,
+        wakeKind ? `wake kind ${wakeKind}` : "",
+        observationSession ? `observation session ${observationSession}` : "",
+        sessionControlKey ? `control ${sessionControlKey}` : "",
         observation ? `observation ${observation}` : "",
         receipt ? `receipt ${receipt}` : "",
         source ? `source ${source}` : "",

@@ -196,8 +196,13 @@ describe("ask active turn stream", () => {
             lane: "live_translation",
             stepId: "lane_goal_binding",
             status: "pending",
+            selectedRuntimeAgentProvider: "codex",
+            adapterBoundary: "helix_agent_provider_edge",
             sourceId: "docs:active",
+            sourceHash: "sha256:active-doc",
             sourceKind: "docs",
+            sourceTextHash: "sha256:active-source-text",
+            sourceTextCharCount: 2048,
             sourceProjectionTarget: "docs_chunk",
             accountLocale: "es-US",
             latestProjectionTarget: "docs_chunk",
@@ -206,6 +211,7 @@ describe("ask active turn stream", () => {
             latestDedupeKey: "docs:active:chunk-active:es",
             latestSourceEventId: "docs:active:event-1",
             latestFreshnessStatus: "fresh",
+            materializedMailLoopEvidence: true,
             latestCancelRequested: true,
           },
         },
@@ -220,7 +226,12 @@ describe("ask active turn stream", () => {
       status: "pending",
     });
     expect(rows[0]?.meta).toContain("projection docs_chunk");
+    expect(rows[0]?.meta).toContain("runtime provider codex");
+    expect(rows[0]?.meta).toContain("adapter boundary helix_agent_provider_edge");
+    expect(rows[0]?.meta).toContain("source hash sha256:active-doc");
     expect(rows[0]?.meta).toContain("source kind docs");
+    expect(rows[0]?.meta).toContain("source payload hash sha256:active-source-text");
+    expect(rows[0]?.meta).toContain("source payload chars 2048");
     expect(rows[0]?.meta).toContain("source projection docs_chunk");
     expect(rows[0]?.meta).toContain("account locale es-US");
     expect(rows[0]?.meta).toContain("target es");
@@ -228,6 +239,8 @@ describe("ask active turn stream", () => {
     expect(rows[0]?.meta).toContain("dedupe docs:active:chunk-active:es");
     expect(rows[0]?.meta).toContain("source event docs:active:event-1");
     expect(rows[0]?.meta).toContain("freshness fresh");
+    expect(rows[0]?.meta).toContain("materialized mail evidence true");
     expect(rows[0]?.meta).toContain("cancelled");
+    expect(rows[0]?.meta).not.toContain("source text");
   });
 });

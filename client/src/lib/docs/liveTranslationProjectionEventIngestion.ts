@@ -1,4 +1,5 @@
 import type { DocumentTranslationUnit } from "@shared/document-translation";
+import { HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK } from "@shared/helix-live-translation-projection-target";
 import {
   HELIX_ASK_LIVE_EVENT_BUS_EVENT,
   coerceHelixAskLiveEventBusPayload,
@@ -27,7 +28,7 @@ export function installDocumentLiveTranslationProjectionEventIngestion(
       docPath: input.docPath,
       locale: input.locale,
       sourceHash: input.sourceHash,
-      projectionTarget: input.projectionTarget ?? "docs_chunk",
+      projectionTarget: input.projectionTarget ?? HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK,
       units: input.units,
       allowStaleDisplayText: input.allowStaleDisplayText,
       eventPayload: payload,

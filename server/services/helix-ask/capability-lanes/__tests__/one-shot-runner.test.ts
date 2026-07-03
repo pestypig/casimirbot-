@@ -1,9 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { listWorkstationGatewayCapabilities } from "../../workstation-tool-gateway/registry";
 import { buildHelixAgentRuntimeSelectionTrace } from "../../agent-providers/runtime-debug";
 import { buildHelixAgentProviderAskPayload } from "../../agent-providers/provider-response-projection";
 import type { HelixAgentProvider } from "../../agent-providers/types";
 import { runHelixCapabilityLaneOneShotRequests } from "../one-shot-runner";
+import { resetStagePlayLiveSourceMailboxForTest } from "../../../stage-play/stage-play-live-source-mailbox-store";
+import { resetStagePlayLiveSourceMailWakeStoreForTest } from "../../../stage-play/stage-play-live-source-mail-wake-store";
 
 const buildProvider = (id: "helix" | "codex"): HelixAgentProvider => ({
   id,
@@ -76,6 +78,11 @@ const projectPayload = (provider: HelixAgentProvider, debugProjection: Record<st
     turnId: "turn-provider-neutral-lane",
   });
 };
+
+beforeEach(() => {
+  resetStagePlayLiveSourceMailboxForTest();
+  resetStagePlayLiveSourceMailWakeStoreForTest();
+});
 
 describe("provider-neutral capability lane one-shot runner", () => {
   it("lets Helix and Codex request the same one-shot translation lane through the same body contract", () => {
@@ -623,6 +630,22 @@ describe("provider-neutral capability lane one-shot runner", () => {
         raw_content_included: false,
       },
     });
+    expect(result.observation_packets[1]?.produced_affordances).toEqual([
+      expect.objectContaining({
+        kind: "voice_playback_receipt",
+        source_capability: "text_to_speech.speak_text",
+        artifact_ref: result.call_results[1]?.receipt?.receipt_ref,
+        status: "available",
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]);
+    expect(result.observation_packets[1]?.typed_handoff_contract).toMatchObject({
+      produced_affordance_kinds: ["voice_playback_receipt"],
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
     expect(result.debug_events.map((event) => event.stage)).toEqual([
       "lane_requested",
       "lane_backend_selected",
@@ -654,6 +677,109 @@ describe("provider-neutral capability lane one-shot runner", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
+    expect(result.debug_projection.capability_lane_reentry_status).toBe("observation_packet_required_for_provider_reentry");
+  });
+
+  it("composes STT, translation, and TTS lane calls as re-entered non-terminal observations", () => {
+    const result = runHelixCapabilityLaneOneShotRequests({
+      provider: buildProvider("codex"),
+      body: {
+        turn_id: "turn-provider-neutral-stt-compose",
+        capability_lane_call: [
+          {
+            capability: "speech_to_text.transcribe_audio",
+            audio_ref: "voice:audio:compose",
+            audio_hash: "audio-hash-compose",
+            transcript_text: "hello workstation",
+            language: "en",
+            source_id: "audio_transcript:helix-ask:desktop",
+            thread_id: "helix-ask:desktop",
+            capture_session_id: "capture:compose",
+            chunk_index: 0,
+          },
+          {
+            capability: "live_translation.translate_text",
+            text: "hello workstation",
+            source_language: "en",
+            target_language: "es",
+            source_id: "audio_transcript:helix-ask:desktop",
+            projection_target: "audio_chunk",
+          },
+          {
+            capability: "text_to_speech.speak_text",
+            text: "hola estacion de trabajo",
+            source_observation_ref: "turn-provider-neutral-stt-compose:translation",
+          },
+        ],
+      },
+      env: {
+        OPENAI_API_KEY: "test-openai",
+      } as NodeJS.ProcessEnv,
+    });
+
+    expect(result.call_results.map((entry) => entry.capability)).toEqual([
+      "speech_to_text.transcribe_audio",
+      "live_translation.translate_text",
+      "text_to_speech.speak_text",
+    ]);
+    expect(result.observation_packets).toHaveLength(3);
+    expect(result.observation_packets.map((packet) => packet.capability_key)).toEqual([
+      "speech_to_text.transcribe_audio",
+      "live_translation.translate_text",
+      "text_to_speech.speak_text",
+    ]);
+    expect(result.observation_packets.every((packet) => packet.terminal_eligible === false)).toBe(true);
+    expect(result.observation_packets.every((packet) => packet.assistant_answer === false)).toBe(true);
+    expect(result.observation_packets[0]).toMatchObject({
+      status: "succeeded",
+      state_delta: {
+        speech_to_text_observation: expect.objectContaining({
+          schema: "helix.speech_to_text.observation.v1",
+          source_kind: "audio_transcript",
+          stage_play_mail_id: expect.stringMatching(/^stage_play_live_source_mail:/),
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_audio_included: false,
+        }),
+        speech_to_text_live_source_mail_item: expect.objectContaining({
+          sourceKind: "audio_transcript",
+          status: "unread",
+          context_role: "tool_evidence",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        }),
+      },
+    });
+    expect(result.observation_packets[1]).toMatchObject({
+      status: "succeeded",
+      state_delta: {
+        live_translation_chunk: expect.objectContaining({
+          projection_target: "audio_chunk",
+          source_id: "audio_transcript:helix-ask:desktop",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        }),
+      },
+    });
+    expect(result.observation_packets[2]).toMatchObject({
+      status: "succeeded",
+      state_delta: {
+        text_to_speech_receipt: expect.objectContaining({
+          capability: "text_to_speech.speak_text",
+          playback_status: "started",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        }),
+      },
+    });
+    expect(result.debug_events.filter((event) => event.stage === "lane_observation").map((event) => event.capability)).toEqual([
+      "speech_to_text.transcribe_audio",
+      "live_translation.translate_text",
+      "text_to_speech.speak_text",
+    ]);
     expect(result.debug_projection.capability_lane_reentry_status).toBe("observation_packet_required_for_provider_reentry");
   });
 

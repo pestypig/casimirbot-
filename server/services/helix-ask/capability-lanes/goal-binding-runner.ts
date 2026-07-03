@@ -109,6 +109,9 @@ const readBackendSelectionDecision = (
   const selectedBackendProvider = readString(record.selected_backend_provider ?? record.selectedBackendProvider) || null;
   const requestedBackendProvider = readString(record.requested_backend_provider ?? record.requestedBackendProvider) || null;
   const fallbackBackendProvider = readString(record.fallback_backend_provider ?? record.fallbackBackendProvider) || null;
+  const stagePlayWakeExpected =
+    readBoolean(record.stage_play_wake_expected ?? record.stagePlayWakeExpected) ?? false;
+  const stagePlayWakeKind = readString(record.stage_play_wake_kind ?? record.stagePlayWakeKind);
   return {
     schema: "helix.capability_lane.backend_selection_decision.v1",
     owner: "helix",
@@ -185,6 +188,9 @@ const readMailLoopDebugSummary = (value: unknown): HelixCapabilityLaneMailLoopDe
   if (!laneSessionId || !laneId || !capability || !mailboxThreadId || !backendSelectionDecision) {
     return null;
   }
+  const stagePlayWakeExpected =
+    readBoolean(record.stage_play_wake_expected ?? record.stagePlayWakeExpected) ?? false;
+  const stagePlayWakeKind = readString(record.stage_play_wake_kind ?? record.stagePlayWakeKind);
   return {
     schema: HELIX_CAPABILITY_LANE_MAIL_LOOP_DEBUG_SUMMARY_SCHEMA,
     lane_session_id: laneSessionId,
@@ -193,11 +199,23 @@ const readMailLoopDebugSummary = (value: unknown): HelixCapabilityLaneMailLoopDe
     observation_ref: readString(record.observation_ref ?? record.observationRef) || null,
     receipt_ref: readString(record.receipt_ref ?? record.receiptRef) || null,
     stage_play_mail_id: readString(record.stage_play_mail_id ?? record.stagePlayMailId) || null,
-    stage_play_wake_expected: readBoolean(record.stage_play_wake_expected ?? record.stagePlayWakeExpected) ?? false,
+    stage_play_wake_expected: stagePlayWakeExpected,
+    stage_play_wake_kind:
+      stagePlayWakeKind === "mailbox_wake" || stagePlayWakeKind === "none"
+        ? stagePlayWakeKind
+        : stagePlayWakeExpected
+          ? "mailbox_wake"
+          : "none",
     mailbox_thread_id: mailboxThreadId,
     source_id: readString(record.source_id ?? record.sourceId) || null,
     source_hash: readString(record.source_hash ?? record.sourceHash) || null,
+    source_text_hash: readString(record.source_text_hash ?? record.sourceTextHash) || null,
+    source_text_char_count: readNumber(record.source_text_char_count ?? record.sourceTextCharCount),
     source_kind: readString(record.source_kind ?? record.sourceKind) || null,
+    lane_session_source_text_hash:
+      readString(record.lane_session_source_text_hash ?? record.laneSessionSourceTextHash) || null,
+    lane_session_source_text_char_count:
+      readNumber(record.lane_session_source_text_char_count ?? record.laneSessionSourceTextCharCount),
     chunk_id: readString(record.chunk_id ?? record.chunkId) || null,
     chunk_index: readNumber(record.chunk_index ?? record.chunkIndex),
     dedupe_key: readString(record.dedupe_key ?? record.dedupeKey) || null,

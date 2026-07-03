@@ -73,10 +73,43 @@ import {
   type RuntimeAdmissionDecision,
   type RuntimeTaskLease,
 } from "../services/runtime/runtime-memory-governor";
+import type { HelixAgentProvider } from "../services/helix-ask/agent-providers/types";
+import { runSpeechToTextTranscribeAudio } from "../services/helix-ask/capability-lanes/speech-to-text";
 
 type VoicePriority = "info" | "warn" | "critical" | "action";
 
 const voiceRouter = Router();
+const voiceTranscribeLaneProvider: HelixAgentProvider = {
+  id: "helix",
+  label: "Helix voice transcription route",
+  permissionProfile: {
+    id: "helix-native",
+    label: "Helix native governed runtime",
+    allows: {
+      observe: true,
+      read: true,
+      act: true,
+      write: false,
+      shell: false,
+      codeMutation: false,
+    },
+  },
+  enabled: () => true,
+  supports: {
+    streaming: false,
+    workstationTools: true,
+    capabilityLanes: true,
+    capabilityLaneOneShot: true,
+    capabilityLaneSessions: false,
+    codeMutation: false,
+  },
+  runTurn: async () => ({
+    ok: false,
+    runtime: "helix",
+    response_type: "voice_transcribe_lane_provider",
+    final_status: "not_invoked",
+  }),
+};
 const OPENAI_AUDIO_UPLOAD_LIMIT_BYTES = 25 * 1024 * 1024;
 const voiceUpload = multer({
   storage: multer.memoryStorage(),
@@ -2610,6 +2643,45 @@ voiceRouter.post("/transcribe", (req: Request, res: Response) => {
       speakerCount: responseAudioIdentity?.speakers.length ?? 0,
       segmentCount: Array.isArray(result.segments) ? result.segments.length : 0,
     });
+    const threadId = parsed.data.thread_id?.trim() || "helix-ask:desktop";
+    const sourceId = `audio_transcript:${threadId}`;
+    const chunkIndex =
+      typeof parsed.data.chunk_index === "number" && Number.isFinite(parsed.data.chunk_index)
+        ? parsed.data.chunk_index
+        : null;
+    const audioHash = createHash("sha256").update(file.buffer).digest("hex");
+    const audioRef = `voice:audio:${audioHash.slice(0, 16)}`;
+    const speechToTextLaneResult = runSpeechToTextTranscribeAudio({
+      provider: voiceTranscribeLaneProvider,
+      request: {
+        schema: "helix.speech_to_text.one_shot_request.v1",
+        capability: "speech_to_text.transcribe_audio",
+        transcript_text: result.text ?? "",
+        audio_ref: audioRef,
+        audio_hash: audioHash,
+        language: result.language_detected ?? result.source_language ?? result.language ?? parsed.data.language ?? null,
+        confidence: typeof result.confidence === "number" ? result.confidence : null,
+        requested_backend_provider: null,
+        turn_id: parsed.data.traceId ?? traceId ?? null,
+        thread_id: threadId,
+        room_id: parsed.data.room_id ?? null,
+        environment_id: null,
+        source_id: sourceId,
+        capture_session_id: parsed.data.capture_session_id ?? null,
+        chunk_id:
+          parsed.data.capture_session_id && chunkIndex !== null
+            ? `voice:transcribe:${parsed.data.capture_session_id}:${chunkIndex}`
+            : null,
+        chunk_index: chunkIndex,
+        duration_ms: resolvedDurationMs,
+        capture_source: parsed.data.capture_source ?? "mic",
+        source_event_ms: null,
+        assistant_answer: false,
+        terminal_eligible: false,
+      },
+      turnId: parsed.data.traceId ?? traceId ?? null,
+      env: process.env,
+    });
 
     return res.status(200).json({
       ok: true,
@@ -2683,6 +2755,15 @@ voiceRouter.post("/transcribe", (req: Request, res: Response) => {
       interpreter_concept_ids: Array.isArray(result.interpreter_concept_ids) ? result.interpreter_concept_ids : [],
       ...(diarizationShadow ? { diarization_shadow: diarizationShadow } : {}),
       command_lane: commandLane,
+      speech_to_text_lane_result: speechToTextLaneResult,
+      speech_to_text_observation_packet: speechToTextLaneResult.observation_packet,
+      speech_to_text_observation: speechToTextLaneResult.observation,
+      live_source_mail_item:
+        speechToTextLaneResult.observation_packet.state_delta.speech_to_text_live_source_mail_item ?? null,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      raw_audio_included: false,
     });
   });
 });

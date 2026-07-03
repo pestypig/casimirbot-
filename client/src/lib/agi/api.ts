@@ -565,7 +565,60 @@ type RunAskTurnPayload = {
   answerContract?: HelixAskAnswerContract;
   routeMetadata?: HelixAskRouteMetadata;
   route_metadata?: HelixAskRouteMetadata;
+  capability_lane_call?: Record<string, unknown> | Array<Record<string, unknown>>;
+  capabilityLaneCall?: Record<string, unknown> | Array<Record<string, unknown>>;
+  capability_lane_session_call?: Record<string, unknown> | Array<Record<string, unknown>>;
+  capabilityLaneSessionCall?: Record<string, unknown> | Array<Record<string, unknown>>;
   signal?: AbortSignal;
+};
+
+export type RunCapabilityLaneSessionControlPayload = {
+  agentRuntime?: HelixAgentRuntimeId;
+  agent_runtime?: HelixAgentRuntimeId;
+  capability_lane_session_call?: Record<string, unknown> | Array<Record<string, unknown>>;
+  capabilityLaneSessionCall?: Record<string, unknown> | Array<Record<string, unknown>>;
+  signal?: AbortSignal;
+};
+
+export type RunCapabilityLaneOneShotPayload = {
+  agentRuntime?: HelixAgentRuntimeId;
+  agent_runtime?: HelixAgentRuntimeId;
+  capability_lane_call?: Record<string, unknown> | Array<Record<string, unknown>>;
+  capabilityLaneCall?: Record<string, unknown> | Array<Record<string, unknown>>;
+  signal?: AbortSignal;
+};
+
+export type CapabilityLaneOneShotResponse = {
+  schema?: "helix.capability_lane.one_shot_response.v1" | string;
+  ok?: boolean;
+  requested?: boolean;
+  agent_runtime?: HelixAgentRuntimeId | string;
+  capability_lane_call_results?: Array<Record<string, unknown>>;
+  capability_lane_observation_packets?: Array<Record<string, unknown>>;
+  capability_lane_resolve_traces?: Array<Record<string, unknown>>;
+  capability_lane_backend_selections?: Array<Record<string, unknown>>;
+  capability_lane_debug_events?: Array<Record<string, unknown>>;
+  capability_lane_reentry_status?: string;
+  terminal_eligible?: false;
+  assistant_answer?: false;
+  raw_content_included?: false;
+  error?: string;
+  message?: string;
+};
+
+export type CapabilityLaneSessionControlResponse = {
+  schema?: "helix.capability_lane.session_control_response.v1" | string;
+  ok?: boolean;
+  agent_runtime?: HelixAgentRuntimeId | string;
+  capability_lane_session_results?: Array<Record<string, unknown>>;
+  capability_lane_session_debug_summaries?: Array<Record<string, unknown>>;
+  session_results?: Array<Record<string, unknown>>;
+  session_debug_summaries?: Array<Record<string, unknown>>;
+  terminal_eligible?: false;
+  assistant_answer?: false;
+  raw_content_included?: false;
+  error?: string;
+  message?: string;
 };
 
 const appendHelixAskRouteMetadataToBody = (
@@ -1278,6 +1331,14 @@ export type VoiceTranscribeResponse = {
   interpreter_term_ids?: string[];
   interpreter_concept_ids?: string[];
   command_lane?: VoiceCommandLaneEnvelope | null;
+  speech_to_text_lane_result?: Record<string, unknown> | null;
+  speech_to_text_observation_packet?: Record<string, unknown> | null;
+  speech_to_text_observation?: Record<string, unknown> | null;
+  live_source_mail_item?: Record<string, unknown> | null;
+  assistant_answer?: false;
+  terminal_eligible?: false;
+  raw_content_included?: false;
+  raw_audio_included?: false;
   error?: string;
   message?: string;
   details?: Record<string, unknown>;
@@ -1933,6 +1994,11 @@ const buildRunAskTurnBody = (payload: RunAskTurnPayload): Record<string, unknown
     body.capsuleIds = payload.capsuleIds.slice(0, HELIX_CONTEXT_CAPSULE_MAX_IDS);
   }
   if (payload.answerContract) body.answer_contract = payload.answerContract;
+  const capabilityLaneCall = payload.capability_lane_call ?? payload.capabilityLaneCall;
+  if (capabilityLaneCall) body.capability_lane_call = capabilityLaneCall;
+  const capabilityLaneSessionCall =
+    payload.capability_lane_session_call ?? payload.capabilityLaneSessionCall;
+  if (capabilityLaneSessionCall) body.capability_lane_session_call = capabilityLaneSessionCall;
   appendHelixAskRouteMetadataToBody(body, payload.routeMetadata ?? payload.route_metadata);
   return body;
 };
@@ -1949,6 +2015,57 @@ export async function runAskTurn(payload: RunAskTurnPayload): Promise<LocalAskRe
     signal: payload.signal,
   });
   return normalizeLocalAskResponse(await asJson<unknown>(response));
+}
+
+export async function runCapabilityLaneOneShot(
+  payload: RunCapabilityLaneOneShotPayload,
+): Promise<CapabilityLaneOneShotResponse> {
+  const selectedRuntime = payload.agentRuntime ?? payload.agent_runtime;
+  const capabilityLaneCall = payload.capability_lane_call ?? payload.capabilityLaneCall;
+  const body: Record<string, unknown> = {};
+  if (selectedRuntime) {
+    body.agentRuntime = selectedRuntime;
+    body.agent_runtime = selectedRuntime;
+  }
+  if (capabilityLaneCall) {
+    body.capability_lane_call = capabilityLaneCall;
+  }
+  const response = await fetch("/api/agi/capability-lanes/one-shot", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(body),
+    signal: payload.signal,
+  });
+  return asJson<CapabilityLaneOneShotResponse>(response);
+}
+
+export async function runCapabilityLaneSessionControl(
+  payload: RunCapabilityLaneSessionControlPayload,
+): Promise<CapabilityLaneSessionControlResponse> {
+  const selectedRuntime = payload.agentRuntime ?? payload.agent_runtime;
+  const capabilityLaneSessionCall =
+    payload.capability_lane_session_call ?? payload.capabilityLaneSessionCall;
+  const body: Record<string, unknown> = {};
+  if (selectedRuntime) {
+    body.agentRuntime = selectedRuntime;
+    body.agent_runtime = selectedRuntime;
+  }
+  if (capabilityLaneSessionCall) {
+    body.capability_lane_session_call = capabilityLaneSessionCall;
+  }
+  const response = await fetch("/api/agi/capability-lanes/session", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(body),
+    signal: payload.signal,
+  });
+  return asJson<CapabilityLaneSessionControlResponse>(response);
 }
 
 const readAskTurnStreamText = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
@@ -2189,7 +2306,7 @@ const readNumberEnv = (value: unknown, fallback: number) => {
   return fallback;
 };
 const HELIX_ASK_JOB_TIMEOUT_MS = clampNumber(
-  readNumberEnv(__HELIX_ASK_JOB_TIMEOUT_MS__, 1_200_000),
+  readNumberEnv((globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__, 1_200_000),
   30_000,
   30 * 60_000,
 );

@@ -113,9 +113,12 @@ describe("capability lane mail-loop adapter", () => {
         observation_ref: translation.observation?.observation_ref,
         receipt_ref: receiptRef,
         stage_play_wake_expected: true,
+        stage_play_wake_kind: "mailbox_wake",
         stage_play_mail_delivery_status: "created",
+        materialized_mail_loop_evidence: true,
         previous_stage_play_mail_id: null,
         mailbox_thread_id: "ask-thread-mail",
+        observation_lane_session_id: "lane-session-mail",
         source_id: "docs:nhm2",
         source_hash: "sha256:nhm2-mail-v1",
         source_kind: "document_markdown",
@@ -125,6 +128,16 @@ describe("capability lane mail-loop adapter", () => {
         lane_session_projection_target: "docs_chunk",
         lane_session_target_language: "es",
         lane_session_account_locale: "es-US",
+        lane_session_control_key: "lane-session-mail::docs:nhm2::sha256:nhm2-mail-v1::docs_chunk::es-US::es",
+        lane_session_source_binding_key: "docs:nhm2::sha256:nhm2-mail-v1::docs_chunk::es-US::es",
+        mail_loop_observation_key: [
+          "docs:nhm2",
+          "sha256:nhm2-mail-v1",
+          "docs_chunk",
+          "es",
+          "chunk-1",
+          receiptRef,
+        ].join("::"),
         chunk_id: "chunk-1",
         chunk_index: 1,
         dedupe_key: "docs:nhm2:chunk-1:es",
@@ -168,6 +181,17 @@ describe("capability lane mail-loop adapter", () => {
         observationRef: translation.observation?.observation_ref,
         sourceHash: "sha256:nhm2-mail-v1",
         chunkId: "chunk-1",
+        laneSessionId: "lane-session-mail",
+        sessionControlKey: "lane-session-mail::docs:nhm2::sha256:nhm2-mail-v1::docs_chunk::es-US::es",
+        sourceBindingKey: "docs:nhm2::sha256:nhm2-mail-v1::docs_chunk::es-US::es",
+        mailLoopObservationKey: [
+          "docs:nhm2",
+          "sha256:nhm2-mail-v1",
+          "docs_chunk",
+          "es",
+          "chunk-1",
+          receiptRef,
+        ].join("::"),
         dedupeKey: "docs:nhm2:chunk-1:es",
         sourceEventId: "docs:nhm2:event-1",
         projectionTarget: "docs_chunk",
@@ -214,6 +238,16 @@ describe("capability lane mail-loop adapter", () => {
       "docs:nhm2",
       "sha256:nhm2-mail-v1",
       "chunk-1",
+      "lane-session-mail::docs:nhm2::sha256:nhm2-mail-v1::docs_chunk::es-US::es",
+      "docs:nhm2::sha256:nhm2-mail-v1::docs_chunk::es-US::es",
+      [
+        "docs:nhm2",
+        "sha256:nhm2-mail-v1",
+        "docs_chunk",
+        "es",
+        "chunk-1",
+        receiptRef,
+      ].join("::"),
       "docs:nhm2:event-1",
       translation.observation?.observation_ref,
       receiptRef,
@@ -247,9 +281,12 @@ describe("capability lane mail-loop adapter", () => {
     expect(sessionStore.get("lane-session-mail")?.last_receipt_ref).toBe(receiptRef);
     expect(sessionStore.get("lane-session-mail")?.debug_history.at(-1)).toMatchObject({
       source_hash: "sha256:nhm2-mail-v1",
+      source_kind: "docs",
       target_language: "es",
       chunk_id: "chunk-1",
       source_event_id: "docs:nhm2:event-1",
+      source_text_hash: translation.observation?.source_text_hash,
+      source_text_char_count: "hello".length,
     });
     expect(listStagePlayLiveSourceMailItems({ threadId: "ask-thread-mail" })).toHaveLength(1);
   });
@@ -306,9 +343,12 @@ describe("capability lane mail-loop adapter", () => {
         capability: "live_translation.translate_text",
         stage_play_mail_id: null,
         stage_play_mail_delivery_status: "blocked",
+        materialized_mail_loop_evidence: false,
         previous_stage_play_mail_id: null,
         stage_play_wake_expected: false,
+        stage_play_wake_kind: "none",
         mailbox_thread_id: "ask-thread-mismatch",
+        observation_lane_session_id: "lane-session-b",
         blocked_reason: "lane_session_mismatch",
         terminal_authority_status: "not_terminal_authority",
         terminal_eligible: false,
@@ -380,6 +420,16 @@ describe("capability lane mail-loop adapter", () => {
         lane_session_projection_target: "docs_chunk",
         lane_session_target_language: "es",
         lane_session_account_locale: "es-US",
+        lane_session_control_key: "lane-session-source-id::docs:active::sha256:active-v1::docs_chunk::es-US::es",
+        lane_session_source_binding_key: "docs:active::sha256:active-v1::docs_chunk::es-US::es",
+        mail_loop_observation_key: [
+          "docs:old",
+          "sha256:active-v1",
+          "docs_chunk",
+          "es",
+          "chunk-source-id",
+          translation.lane_resolve_trace.receipt_ref,
+        ].filter(Boolean).join("::"),
         source_kind: "document_markdown",
         projection_target: "docs_chunk",
         terminal_authority_status: "not_terminal_authority",
@@ -453,6 +503,16 @@ describe("capability lane mail-loop adapter", () => {
         lane_session_projection_target: "docs_chunk",
         lane_session_target_language: "es",
         lane_session_account_locale: "es-US",
+        lane_session_control_key: "lane-session-source-hash::docs:active::sha256:active-v2::docs_chunk::es-US::es",
+        lane_session_source_binding_key: "docs:active::sha256:active-v2::docs_chunk::es-US::es",
+        mail_loop_observation_key: [
+          "docs:active",
+          "sha256:old-document",
+          "docs_chunk",
+          "es",
+          "chunk-source-hash",
+          translation.lane_resolve_trace.receipt_ref,
+        ].filter(Boolean).join("::"),
         source_kind: "document_markdown",
         projection_target: "docs_chunk",
         terminal_authority_status: "not_terminal_authority",
@@ -466,6 +526,155 @@ describe("capability lane mail-loop adapter", () => {
     });
     expect(sessionStore.get("lane-session-source-hash")?.last_observation_ref).toBeNull();
     expect(listStagePlayLiveSourceMailItems({ threadId: "ask-thread-source-hash" })).toHaveLength(0);
+  });
+
+  it("fails closed when translation observation text identity does not match the lane session binding", () => {
+    const provider = buildProvider("codex");
+    const sessionStore = createHelixCapabilityLaneSessionStore();
+    sessionStore.start({
+      provider,
+      laneId: "live_translation",
+      laneSessionId: "lane-session-source-text",
+      sourceBinding: {
+        source_id: "docs:active",
+        source_hash: "sha256:active-text-v1",
+        source_text_hash: "sha256:expected-text",
+        source_text_char_count: 5,
+        source_kind: "docs",
+        projection_target: "docs_chunk",
+        account_locale: "es-US",
+        target_language: "es",
+      },
+      env: {} as NodeJS.ProcessEnv,
+    });
+    const translation = runLiveTranslationTranslateText({
+      provider,
+      request: {
+        schema: "helix.live_translation.one_shot_request.v1",
+        capability: "live_translation.translate_text",
+        text: "hello",
+        lane_session_id: "lane-session-source-text",
+        source_language: "en",
+        target_language: "es",
+        source_id: "docs:active",
+        source_hash: "sha256:active-text-v1",
+        chunk_id: "chunk-source-text",
+        projection_target: "docs_chunk",
+        assistant_answer: false,
+        terminal_eligible: false,
+      },
+      turnId: "turn-mail-loop-source-text",
+      env: {} as NodeJS.ProcessEnv,
+    });
+
+    expect(routeLiveTranslationObservationToMailLoop({
+      sessionStore,
+      laneSessionId: "lane-session-source-text",
+      translationResult: translation,
+      threadId: "ask-thread-source-text",
+    })).toMatchObject({
+      ok: false,
+      mail: null,
+      stage_play_mail_id: null,
+      stage_play_wake_expected: false,
+      blocked_reason: "source_text_hash_mismatch",
+      debug_summary: {
+        blocked_reason: "source_text_hash_mismatch",
+        stage_play_mail_delivery_status: "blocked",
+        stage_play_wake_kind: "none",
+        source_id: "docs:active",
+        source_hash: "sha256:active-text-v1",
+        source_text_hash: translation.observation?.source_text_hash,
+        source_text_char_count: "hello".length,
+        lane_session_source_id: "docs:active",
+        lane_session_source_hash: "sha256:active-text-v1",
+        lane_session_source_text_hash: "sha256:expected-text",
+        lane_session_source_text_char_count: 5,
+        lane_session_projection_target: "docs_chunk",
+        lane_session_target_language: "es",
+        lane_session_control_key: "lane-session-source-text::docs:active::sha256:active-text-v1::docs_chunk::es-US::es",
+        terminal_authority_status: "not_terminal_authority",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(sessionStore.get("lane-session-source-text")?.last_observation_ref).toBeNull();
+    expect(listStagePlayLiveSourceMailItems({ threadId: "ask-thread-source-text" })).toHaveLength(0);
+  });
+
+  it("fails closed when translation observation text length does not match the lane session binding", () => {
+    const provider = buildProvider("codex");
+    const translation = runLiveTranslationTranslateText({
+      provider,
+      request: {
+        schema: "helix.live_translation.one_shot_request.v1",
+        capability: "live_translation.translate_text",
+        text: "hello",
+        lane_session_id: "lane-session-source-text-count",
+        source_language: "en",
+        target_language: "es",
+        source_id: "docs:active",
+        source_hash: "sha256:active-text-count-v1",
+        chunk_id: "chunk-source-text-count",
+        projection_target: "docs_chunk",
+        assistant_answer: false,
+        terminal_eligible: false,
+      },
+      turnId: "turn-mail-loop-source-text-count",
+      env: {} as NodeJS.ProcessEnv,
+    });
+    const sessionStore = createHelixCapabilityLaneSessionStore();
+    sessionStore.start({
+      provider,
+      laneId: "live_translation",
+      laneSessionId: "lane-session-source-text-count",
+      sourceBinding: {
+        source_id: "docs:active",
+        source_hash: "sha256:active-text-count-v1",
+        source_text_hash: translation.observation?.source_text_hash ?? null,
+        source_text_char_count: 4,
+        source_kind: "docs",
+        projection_target: "docs_chunk",
+        account_locale: "es-US",
+        target_language: "es",
+      },
+      env: {} as NodeJS.ProcessEnv,
+    });
+
+    expect(routeLiveTranslationObservationToMailLoop({
+      sessionStore,
+      laneSessionId: "lane-session-source-text-count",
+      translationResult: translation,
+      threadId: "ask-thread-source-text-count",
+    })).toMatchObject({
+      ok: false,
+      mail: null,
+      stage_play_mail_id: null,
+      stage_play_wake_expected: false,
+      blocked_reason: "source_text_char_count_mismatch",
+      debug_summary: {
+        blocked_reason: "source_text_char_count_mismatch",
+        stage_play_mail_delivery_status: "blocked",
+        source_text_hash: translation.observation?.source_text_hash,
+        source_text_char_count: "hello".length,
+        lane_session_source_text_hash: translation.observation?.source_text_hash,
+        lane_session_source_text_char_count: 4,
+        lane_session_control_key: "lane-session-source-text-count::docs:active::sha256:active-text-count-v1::docs_chunk::es-US::es",
+        terminal_authority_status: "not_terminal_authority",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(sessionStore.get("lane-session-source-text-count")?.last_observation_ref).toBeNull();
+    expect(listStagePlayLiveSourceMailItems({ threadId: "ask-thread-source-text-count" })).toHaveLength(0);
   });
 
   it("fails closed when a translation observation projection target does not match the lane session binding", () => {
@@ -526,6 +735,7 @@ describe("capability lane mail-loop adapter", () => {
         lane_session_projection_target: "docs_chunk",
         lane_session_target_language: "es",
         lane_session_account_locale: "es-US",
+        lane_session_control_key: "lane-session-projection-target::docs:active::sha256:active-v3::docs_chunk::es-US::es",
         projection_target: "docs_hover",
         target_language: "es",
         terminal_authority_status: "not_terminal_authority",
@@ -599,6 +809,7 @@ describe("capability lane mail-loop adapter", () => {
         lane_session_projection_target: "docs_chunk",
         lane_session_target_language: "es",
         lane_session_account_locale: "es-US",
+        lane_session_control_key: "lane-session-target-language::docs:active::sha256:active-v4::docs_chunk::es-US::es",
         projection_target: "docs_chunk",
         target_language: "fr",
         terminal_authority_status: "not_terminal_authority",
@@ -666,8 +877,10 @@ describe("capability lane mail-loop adapter", () => {
 
     expect(first.mail?.mailId).toBe(duplicate.mail?.mailId);
     expect(first.debug_summary.stage_play_mail_delivery_status).toBe("created");
+    expect(first.debug_summary.materialized_mail_loop_evidence).toBe(true);
     expect(first.debug_summary.previous_stage_play_mail_id).toBeNull();
     expect(duplicate.debug_summary.stage_play_mail_delivery_status).toBe("deduped_existing");
+    expect(duplicate.debug_summary.materialized_mail_loop_evidence).toBe(true);
     expect(duplicate.debug_summary.previous_stage_play_mail_id).toBe(first.mail?.mailId);
     expect(first.mail).toMatchObject({
       summary: {
@@ -845,6 +1058,7 @@ describe("capability lane mail-loop adapter", () => {
         lane_session_projection_target: "docs_chunk",
         lane_session_target_language: "es",
         lane_session_account_locale: "es-US",
+        lane_session_control_key: "lane-session-stopped-mail::docs:stopped::sha256:stopped-v1::docs_chunk::es-US::es",
         account_locale: "es-US",
         chunk_id: "chunk-stopped",
         blocked_reason: "lane_session_stopped",

@@ -40,9 +40,13 @@ The tested minimal runtime shell is a replacement candidate, not the default pat
 
 `HelixAskConsoleStatusSurfaces.tsx` owns visible composition of the live console error line, voice-status pill, and context-memory status line. It must not own error state mutation, voice capture state, memory derivation, runtime transport, route authority, terminal authority, clipboard, fetch, or TTS.
 
+`HelixAskConsoleErrorLineSurface.tsx` owns the active legacy-console error-line slot. It delegates to the status surface and must not own `askError` state mutation, request error handling, clearing behavior, runtime transport, route authority, terminal authority, clipboard, fetch, or TTS.
+
 `HelixAskComposerActionToolbarSurface.tsx` owns visible composition of the live console action toolbar, runtime picker, and submit/stop button. It must not own haptic decisions, attachment selection behavior, mic/voice state, visual/audio capture behavior, runtime preference mutation, submit transport, stop execution, route authority, terminal authority, clipboard, fetch, or TTS.
 
 `HelixAskGoalPillSurface.tsx` owns visible composition of the live console goal-pill slot and its empty-session null state. It must not own goal session state, expansion state mutation, busy/error state mutation, goal action execution, request transport, route authority, terminal authority, clipboard, fetch, or TTS.
+
+`HelixAskSteeringQueueSurface.tsx` owns the active legacy-console steering-queue slot and preserves the current empty-slot null state when no queue items are provided. It may delegate to `HelixAskSteeringQueuePanel` for visible queue rows, but it must not own queue admission, wake execution, mailbox mutation, workstation actions, request transport, route authority, terminal authority, clipboard, fetch, or TTS.
 
 `HelixAskDebugDrawerSurface.tsx` owns visible composition of the live console debug drawer slot and its empty-drawer null state. It must not own selected debug state, drawer close mutation, debug payload materialization, backend debug-export fetch, clipboard writes, copied-id timers, request transport, route authority, terminal authority, or TTS.
 

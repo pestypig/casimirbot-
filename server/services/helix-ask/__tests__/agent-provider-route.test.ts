@@ -80,7 +80,7 @@ describe("AGI agent provider route", () => {
           workstationTools: true,
           capabilityLanes: true,
           capabilityLaneOneShot: true,
-          capabilityLaneSessions: false,
+          capabilityLaneSessions: true,
         }),
       }),
     );
@@ -135,5 +135,332 @@ describe("AGI agent provider route", () => {
         }),
       }),
     );
+  });
+
+  it("runs governed one-shot capability lane calls without creating a final answer", async () => {
+    const response = await request(createApp())
+      .post("/api/agi/capability-lanes/one-shot")
+      .send({
+        agent_runtime: "codex",
+        capability_lane_call: {
+          capability: "live_translation.translate_text",
+          text: "hello",
+          source_language: "en",
+          target_language: "es",
+          requested_backend_provider: "google_gemini",
+          source_id: "document_markdown:docs/example.md",
+          source_hash: "fnv1a32:example",
+        },
+      })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      schema: "helix.capability_lane.one_shot_response.v1",
+      ok: true,
+      requested: true,
+      agent_runtime: "codex",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+      selected_agent_provider: expect.objectContaining({
+        id: "codex",
+      }),
+    });
+    expect(response.body.capability_lane_call_results).toEqual([
+      expect.objectContaining({
+        ok: true,
+        lane_id: "live_translation",
+        capability: "live_translation.translate_text",
+        translated_text: "hola",
+        selected_runtime_agent_provider: "codex",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]);
+    expect(response.body.capability_lane_backend_selections).toEqual([
+      expect.objectContaining({
+        selected_runtime_agent_provider: "codex",
+        lane_id: "live_translation",
+        capability: "live_translation.translate_text",
+        requested_backend_provider: "google_gemini",
+        selected_backend_provider: "live_translation.local_runtime",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]);
+    expect(response.body.capability_lane_observation_packets).toEqual([
+      expect.objectContaining({
+        capability_key: "live_translation.translate_text",
+        status: "succeeded",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]);
+    expect(response.body.capability_lane_reentry_status)
+      .toBe("observation_packet_required_for_provider_reentry");
+    expect(response.body.model_visible_capability_lane_manifest).toMatchObject({
+      schema: "helix.agent_model_visible_capability_lane_manifest.v1",
+    });
+    expect(response.body.capability_lane_projection_receipts).toEqual([
+      expect.objectContaining({
+        capability_key: "live_translation.translate_text",
+        status: "projected",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]);
+    expect(response.body.capability_lane_turn_timeline).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        schema: "helix.capability_lane.provider_timeline_event.v1",
+        stage: "lane_visible",
+        selected_runtime_agent_provider: "codex",
+        lane_visible: true,
+        lane_requested: false,
+        lane_executed: false,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+      expect.objectContaining({
+        schema: "helix.capability_lane.provider_timeline_event.v1",
+        stage: "lane_requested",
+        selected_runtime_agent_provider: "codex",
+        lane_id: "live_translation",
+        capability_id: "live_translation.translate_text",
+        lane_visible: false,
+        lane_requested: true,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+      expect.objectContaining({
+        schema: "helix.capability_lane.provider_timeline_event.v1",
+        stage: "lane_observation",
+        selected_runtime_agent_provider: "codex",
+        lane_id: "live_translation",
+        capability_id: "live_translation.translate_text",
+        lane_visible: false,
+        lane_requested: true,
+        has_observation: true,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+      expect.objectContaining({
+        schema: "helix.capability_lane.provider_timeline_event.v1",
+        stage: "lane_reentered",
+        selected_runtime_agent_provider: "codex",
+        lane_requested: true,
+        observation_reentered: true,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]));
+  });
+
+  it("runs governed capability lane session control without creating a final answer", async () => {
+    const response = await request(createApp())
+      .post("/api/agi/capability-lanes/session")
+      .send({
+        agent_runtime: "helix",
+        capability_lane_session_call: {
+          action: "start",
+          lane_id: "live_translation",
+          lane_session_id: "lane-session-docs-route",
+          source_binding: {
+            source_id: "document_markdown:docs/example.md",
+            source_hash: "fnv1a32:test",
+            source_kind: "docs",
+            projection_target: "docs_chunk",
+            account_locale: "haw",
+            target_language: "haw",
+          },
+        },
+      })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      schema: "helix.capability_lane.session_control_response.v1",
+      ok: true,
+      agent_runtime: "helix",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+      selected_agent_provider: expect.objectContaining({
+        id: "helix",
+      }),
+    });
+    expect(response.body.capability_lane_session_results).toEqual([
+      expect.objectContaining({
+        ok: true,
+        action: "start",
+        lane_id: "live_translation",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]);
+    expect(response.body.capability_lane_session_debug_summaries).toEqual([
+      expect.objectContaining({
+        lane_session_id: "lane-session-docs-route",
+        lane_id: "live_translation",
+        lifecycle_action: "start",
+        session_lifecycle_action: "start",
+        session_action: "start",
+        session_status: "running",
+        source_id: "document_markdown:docs/example.md",
+        session_control_key: "lane-session-docs-route::document_markdown:docs/example.md::fnv1a32:test::docs_chunk::haw::haw",
+        source_binding_key: "document_markdown:docs/example.md::fnv1a32:test::docs_chunk::haw::haw",
+        latest_observation_key: null,
+        terminal_authority_status: "not_terminal_authority",
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      }),
+    ]);
+
+    const paused = await request(createApp())
+      .post("/api/agi/capability-lanes/session")
+      .send({
+        agent_runtime: "helix",
+        capability_lane_session_call: {
+          action: "pause",
+          lane_session_id: "lane-session-docs-route",
+          reason: "document_inline_translation_pause",
+        },
+      })
+      .expect(200);
+
+    expect(paused.body).toMatchObject({
+      schema: "helix.capability_lane.session_control_response.v1",
+      ok: true,
+      agent_runtime: "helix",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(paused.body.capability_lane_session_results).toEqual([
+      expect.objectContaining({
+        ok: true,
+        action: "pause",
+        lane_id: "live_translation",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]);
+    expect(paused.body.capability_lane_session_debug_summaries).toEqual([
+      expect.objectContaining({
+        lane_session_id: "lane-session-docs-route",
+        lane_id: "live_translation",
+        lifecycle_action: "pause",
+        session_lifecycle_action: "pause",
+        session_action: "pause",
+        session_status: "paused",
+        session_health: "degraded",
+        terminal_authority_status: "not_terminal_authority",
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      }),
+    ]);
+
+    const resumed = await request(createApp())
+      .post("/api/agi/capability-lanes/session")
+      .send({
+        agent_runtime: "helix",
+        capability_lane_session_call: {
+          action: "resume",
+          lane_session_id: "lane-session-docs-route",
+          reason: "document_inline_translation_resume",
+        },
+      })
+      .expect(200);
+
+    expect(resumed.body).toMatchObject({
+      schema: "helix.capability_lane.session_control_response.v1",
+      ok: true,
+      agent_runtime: "helix",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(resumed.body.capability_lane_session_results).toEqual([
+      expect.objectContaining({
+        ok: true,
+        action: "resume",
+        lane_id: "live_translation",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]);
+    expect(resumed.body.capability_lane_session_debug_summaries).toEqual([
+      expect.objectContaining({
+        lane_session_id: "lane-session-docs-route",
+        lane_id: "live_translation",
+        lifecycle_action: "resume",
+        session_lifecycle_action: "resume",
+        session_action: "resume",
+        session_status: "running",
+        session_health: "healthy",
+        terminal_authority_status: "not_terminal_authority",
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      }),
+    ]);
+
+    const stopped = await request(createApp())
+      .post("/api/agi/capability-lanes/session")
+      .send({
+        agent_runtime: "helix",
+        capability_lane_session_call: {
+          action: "stop",
+          lane_session_id: "lane-session-docs-route",
+          reason: "document_inline_translation_stop",
+        },
+      })
+      .expect(200);
+
+    expect(stopped.body).toMatchObject({
+      schema: "helix.capability_lane.session_control_response.v1",
+      ok: true,
+      agent_runtime: "helix",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(stopped.body.capability_lane_session_results).toEqual([
+      expect.objectContaining({
+        ok: true,
+        action: "stop",
+        lane_id: "live_translation",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]);
+    expect(stopped.body.capability_lane_session_debug_summaries).toEqual([
+      expect.objectContaining({
+        lane_session_id: "lane-session-docs-route",
+        lane_id: "live_translation",
+        lifecycle_action: "stop",
+        session_lifecycle_action: "stop",
+        session_action: "stop",
+        session_status: "stopped",
+        session_health: "stopped",
+        session_event_count: 4,
+        terminal_authority_status: "not_terminal_authority",
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      }),
+    ]);
   });
 });

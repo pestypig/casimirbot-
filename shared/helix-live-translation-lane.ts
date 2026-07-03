@@ -4,6 +4,7 @@ import type {
   HelixCapabilityLaneBackendSelectionDecision,
   HelixCapabilityLaneResolveTrace,
 } from "./helix-capability-lane";
+import type { HelixLiveTranslationProjectionTarget } from "./helix-live-translation-projection-target";
 
 export const HELIX_LIVE_TRANSLATION_ONE_SHOT_REQUEST_SCHEMA =
   "helix.live_translation.one_shot_request.v1" as const;
@@ -13,15 +14,6 @@ export const HELIX_LIVE_TRANSLATION_ONE_SHOT_RESULT_SCHEMA =
   "helix.live_translation.one_shot_result.v1" as const;
 export const HELIX_LIVE_TRANSLATION_PROJECTION_RECEIPT_SCHEMA =
   "helix.live_translation.projection_receipt.v1" as const;
-
-export type HelixLiveTranslationProjectionTarget =
-  | "ask_turn"
-  | "docs_hover"
-  | "docs_selection"
-  | "docs_chunk"
-  | "audio_chunk"
-  | "account_language"
-  | "unknown";
 
 export type HelixLiveTranslationChunkFreshnessStatus =
   | "fresh"
@@ -91,6 +83,7 @@ export type HelixLiveTranslationProjectionReceipt = {
   schema: typeof HELIX_LIVE_TRANSLATION_PROJECTION_RECEIPT_SCHEMA;
   receipt_ref: string;
   observation_ref: string;
+  projection_key: string;
   lane_id: "live_translation";
   capability: "live_translation.translate_text";
   lane_session_id: string | null;

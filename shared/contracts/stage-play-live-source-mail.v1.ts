@@ -1,3 +1,5 @@
+import type { HelixDocumentLiveTranslationProjectionTarget } from "../helix-live-translation-projection-target";
+
 export const STAGE_PLAY_LIVE_SOURCE_MAIL_ITEM_SCHEMA = "stage_play_live_source_mail_item/v1" as const;
 export const STAGE_PLAY_LIVE_SOURCE_MAIL_READ_RESULT_SCHEMA = "stage_play_live_source_mail_read_result/v1" as const;
 export const STAGE_PLAY_LIVE_SOURCE_MAIL_DECISION_SCHEMA = "stage_play_live_source_mail_decision/v1" as const;
@@ -251,8 +253,14 @@ export type StagePlayLiveSourceMailItemV1 = {
     evidenceRef?: string | null;
     observationRef?: string | null;
     sourceHash?: string | null;
+    sourceTextHash?: string | null;
+    sourceTextCharCount?: number | null;
     chunkId?: string | null;
     chunkIndex?: number | null;
+    laneSessionId?: string | null;
+    sessionControlKey?: string | null;
+    sourceBindingKey?: string | null;
+    mailLoopObservationKey?: string | null;
     dedupeKey?: string | null;
     sourceEventId?: string | null;
     sourceEventMs?: number | null;
@@ -898,15 +906,19 @@ export type StagePlayDocumentInlineTranslationOutputV1 = {
   sourceId: string;
   docPath: string | null;
   sourceHash: string | null;
+  sourceTextHash: string | null;
+  sourceTextCharCount: number | null;
   chunkId: string | null;
   chunkIndex: number | null;
+  laneSessionId?: string | null;
+  sessionControlKey?: string | null;
   dedupeKey: string | null;
   sourceEventId: string | null;
   sourceEventMs: number | null;
   locale: string;
   targetLanguage: string;
   accountLocale: string;
-  projectionTarget: "docs_viewer_inline";
+  projectionTarget: HelixDocumentLiveTranslationProjectionTarget;
   projectionStatus: "projected" | "stale" | "failed" | "cancelled";
   freshnessStatus: string;
   translations: Array<{
