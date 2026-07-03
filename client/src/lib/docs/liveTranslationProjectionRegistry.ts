@@ -22,12 +22,16 @@ export type DocumentLiveTranslationProjectionRegistryKey = {
 export type IngestDocumentLiveTranslationProjectionInput = DocumentLiveTranslationProjectionRegistryKey & {
   payload: unknown;
   units: DocumentTranslationUnit[];
+  sourceTextHash?: string | null;
+  sourceTextCharCount?: number | null;
   allowStaleDisplayText?: boolean;
 };
 
 export type IngestDocumentLiveTranslationProjectionLiveEventInput = DocumentLiveTranslationProjectionRegistryKey & {
   eventPayload: HelixAskLiveEventBusPayload;
   units: DocumentTranslationUnit[];
+  sourceTextHash?: string | null;
+  sourceTextCharCount?: number | null;
   allowStaleDisplayText?: boolean;
 };
 
@@ -177,6 +181,7 @@ export type DocumentLiveTranslationProjectionDisplayStatus =
 export type DocumentLiveTranslationProjectionSnapshotSummary = {
   version: number;
   totalCount: number;
+  pendingCount: number;
   readyCount: number;
   errorCount: number;
   healthStatus: "empty" | "ready" | "degraded" | "blocked";
@@ -259,6 +264,8 @@ export type DocumentLiveTranslationProjectionSnapshotSummary = {
   latestSuppressedReason: string | null;
   laneSessionCount: number;
   activeLaneSessionCount: number;
+  pausedLaneSessionCount: number;
+  stoppedLaneSessionCount: number;
   blockedLaneSessionCount: number;
   latestLaneSessionStatus: string | null;
   latestLaneSessionHealth: string | null;
@@ -268,6 +275,22 @@ export type DocumentLiveTranslationProjectionSnapshotSummary = {
   latestLaneSessionEventId: string | null;
   latestLaneSessionControlKey: string | null;
   latestLaneSessionHasObservation: boolean;
+  latestLaneSessionSourceId: string | null;
+  latestLaneSessionSourceHash: string | null;
+  latestLaneSessionSourceKind: string | null;
+  latestLaneSessionSourceTextHash: string | null;
+  latestLaneSessionSourceTextCharCount: number | null;
+  latestLaneSessionProjectionTarget: string | null;
+  latestLaneSessionAccountLocale: string | null;
+  latestLaneSessionTargetLanguage: string | null;
+  latestLaneSessionChunkId: string | null;
+  latestLaneSessionChunkIndex: number | null;
+  latestLaneSessionDedupeKey: string | null;
+  latestLaneSessionSourceEventId: string | null;
+  latestLaneSessionSourceEventMs: number | null;
+  latestLaneSessionObservedAtMs: number | null;
+  latestLaneSessionFreshnessStatus: string | null;
+  latestLaneSessionTerminalAuthorityStatus: HelixLiveTranslationTerminalAuthorityStatus;
   mailLoopCount: number;
   pendingMailLoopCount: number;
   blockedMailLoopCount: number;
@@ -278,6 +301,7 @@ export type DocumentLiveTranslationProjectionSnapshotSummary = {
   latestMailLoopWakeKind: "mailbox_wake" | "none";
   latestMailLoopObservationLaneSessionId: string | null;
   latestMailLoopSessionControlKey: string | null;
+  latestMailLoopTerminalAuthorityStatus: HelixLiveTranslationTerminalAuthorityStatus;
   goalBindingCount: number;
   activeGoalBindingCount: number;
   blockedGoalBindingCount: number;
@@ -426,6 +450,20 @@ const sourceHashMatches = (candidate: string | null | undefined, sourceHash: str
   return normalizedCandidate === normalizedSourceHash;
 };
 
+const sourceTextIdentityMatches = (
+  meta: Record<string, unknown> | null,
+  input: Pick<IngestDocumentLiveTranslationProjectionLiveEventInput, "sourceTextHash" | "sourceTextCharCount">,
+): boolean => {
+  const expectedSourceTextHash = normalizeText(input.sourceTextHash);
+  const expectedSourceTextCharCount = readNumber(input.sourceTextCharCount);
+  if (!expectedSourceTextHash && expectedSourceTextCharCount === null) return true;
+  const eventSourceTextHash = normalizeText(meta?.sourceTextHash ?? meta?.source_text_hash);
+  const eventSourceTextCharCount = readNumber(meta?.sourceTextCharCount ?? meta?.source_text_char_count);
+  if (expectedSourceTextHash && eventSourceTextHash !== expectedSourceTextHash) return false;
+  if (expectedSourceTextCharCount !== null && eventSourceTextCharCount !== expectedSourceTextCharCount) return false;
+  return true;
+};
+
 export function documentLiveTranslationProjectionRegistryKey(
   input: DocumentLiveTranslationProjectionRegistryKey,
 ): string {
@@ -453,6 +491,7 @@ export function summarizeDocumentLiveTranslationProjectionSnapshot(
   const mailLoops = Object.values(snapshot.mailLoops);
   const goalBindings = Object.values(snapshot.goalBindings);
   const readyCount = states.filter((state) => state.status === "ready").length;
+  const loadingCount = states.filter((state) => state.status === "loading").length;
   const errorCount = states.filter((state) => state.status === "error").length;
   const blockedLaneSessionCount = sessions.filter((session) =>
     session.sessionStatus === "blocked" || session.sessionHealth === "blocked",
@@ -466,7 +505,10 @@ export function summarizeDocumentLiveTranslationProjectionSnapshot(
   const activeLaneSessionCount = sessions.filter((session) =>
     session.sessionStatus === "running" || session.sessionStatus === "paused",
   ).length;
+  const pausedLaneSessionCount = sessions.filter((session) => session.sessionStatus === "paused").length;
+  const stoppedLaneSessionCount = sessions.filter((session) => session.sessionStatus === "stopped").length;
   const pendingMailLoopCount = mailLoops.filter((loop) => loop.stagePlayWakeExpected).length;
+  const pendingCount = loadingCount + pendingMailLoopCount;
   const activeGoalBindingCount = goalBindings.filter((binding) =>
     binding.bindingStatus === "active" ||
     binding.sessionStatus === "running" ||
@@ -501,11 +543,13 @@ export function summarizeDocumentLiveTranslationProjectionSnapshot(
             ? "cancelled"
             : staleCount > 0
               ? "stale"
-              : pendingMailLoopCount > 0
-                ? "pending"
-                : hasLaneActivity
-                  ? "active"
-                  : "empty";
+              : errorCount > 0
+                ? "blocked"
+                : pendingMailLoopCount > 0
+                  ? "pending"
+                  : hasLaneActivity
+                    ? "active"
+                    : "empty";
   const ordered = [...states].sort((left, right) => {
     const observedDelta =
       (right.observedAtMs ?? Number.MIN_SAFE_INTEGER) -
@@ -536,6 +580,7 @@ export function summarizeDocumentLiveTranslationProjectionSnapshot(
   return {
     version: snapshot.version,
     totalCount: states.length,
+    pendingCount,
     readyCount,
     errorCount,
     healthStatus,
@@ -754,6 +799,8 @@ export function summarizeDocumentLiveTranslationProjectionSnapshot(
     latestSuppressedReason: latestSuppressed?.suppressedReason ?? null,
     laneSessionCount: sessions.length,
     activeLaneSessionCount,
+    pausedLaneSessionCount,
+    stoppedLaneSessionCount,
     blockedLaneSessionCount,
     latestLaneSessionStatus: latestSession?.sessionStatus ?? null,
     latestLaneSessionHealth: latestSession?.sessionHealth ?? null,
@@ -763,6 +810,22 @@ export function summarizeDocumentLiveTranslationProjectionSnapshot(
     latestLaneSessionEventId: latestSession?.latestEventId ?? null,
     latestLaneSessionControlKey: latestSession?.sessionControlKey ?? null,
     latestLaneSessionHasObservation: latestSession?.hasObservation ?? false,
+    latestLaneSessionSourceId: latestSession?.sourceId ?? null,
+    latestLaneSessionSourceHash: latestSession?.sourceHash ?? null,
+    latestLaneSessionSourceKind: latestSession?.sourceKind ?? null,
+    latestLaneSessionSourceTextHash: latestSession?.sourceTextHash ?? null,
+    latestLaneSessionSourceTextCharCount: latestSession?.sourceTextCharCount ?? null,
+    latestLaneSessionProjectionTarget: latestSession?.projectionTarget ?? null,
+    latestLaneSessionAccountLocale: latestSession?.accountLocale ?? null,
+    latestLaneSessionTargetLanguage: latestSession?.targetLanguage ?? null,
+    latestLaneSessionChunkId: latestSession?.latestChunkId ?? null,
+    latestLaneSessionChunkIndex: latestSession?.latestChunkIndex ?? null,
+    latestLaneSessionDedupeKey: latestSession?.latestDedupeKey ?? null,
+    latestLaneSessionSourceEventId: latestSession?.latestSourceEventId ?? null,
+    latestLaneSessionSourceEventMs: latestSession?.latestSourceEventMs ?? null,
+    latestLaneSessionObservedAtMs: latestSession?.latestObservedAtMs ?? null,
+    latestLaneSessionFreshnessStatus: latestSession?.latestFreshnessStatus ?? null,
+    latestLaneSessionTerminalAuthorityStatus: latestSession?.terminalAuthorityStatus ?? "not_terminal_authority",
     mailLoopCount: mailLoops.length,
     pendingMailLoopCount,
     blockedMailLoopCount,
@@ -773,6 +836,7 @@ export function summarizeDocumentLiveTranslationProjectionSnapshot(
     latestMailLoopWakeKind: latestMailLoop?.stagePlayWakeKind ?? "none",
     latestMailLoopObservationLaneSessionId: latestMailLoop?.observationLaneSessionId ?? null,
     latestMailLoopSessionControlKey: latestMailLoop?.sessionControlKey ?? null,
+    latestMailLoopTerminalAuthorityStatus: latestMailLoop?.terminalAuthorityStatus ?? "not_terminal_authority",
     goalBindingCount: goalBindings.length,
     activeGoalBindingCount,
     blockedGoalBindingCount,
@@ -843,6 +907,8 @@ export function ingestDocumentLiveTranslationProjection(
     docPath: input.docPath,
     locale: input.locale,
     sourceHash: input.sourceHash,
+    sourceTextHash: input.sourceTextHash,
+    sourceTextCharCount: input.sourceTextCharCount,
     units: input.units,
     projectionTarget: input.projectionTarget ?? DEFAULT_PROJECTION_TARGET,
     allowStaleDisplayText: input.allowStaleDisplayText,
@@ -878,6 +944,9 @@ export function ingestDocumentLiveTranslationProjectionFromAskLiveEvent(
   }
   const docSourceId = documentMarkdownSourceId(input.docPath);
   if (sourceEventType === "lane_session" && lane === "live_translation" && sourceId === docSourceId) {
+    if (!sourceTextIdentityMatches(meta, input)) {
+      return readDocumentLiveTranslationProjectionSnapshot(input);
+    }
     return ingestDocumentLiveTranslationLaneSessionFromAskLiveEvent({
       ...input,
       meta,
@@ -885,6 +954,9 @@ export function ingestDocumentLiveTranslationProjectionFromAskLiveEvent(
     });
   }
   if (sourceEventType === "lane_mail_loop" && lane === "live_translation" && sourceId === docSourceId) {
+    if (!sourceTextIdentityMatches(meta, input)) {
+      return readDocumentLiveTranslationProjectionSnapshot(input);
+    }
     return ingestDocumentLiveTranslationMailLoopFromAskLiveEvent({
       ...input,
       meta,
@@ -892,6 +964,9 @@ export function ingestDocumentLiveTranslationProjectionFromAskLiveEvent(
     });
   }
   if (sourceEventType === "lane_goal_binding" && lane === "live_translation" && sourceId === docSourceId) {
+    if (!sourceTextIdentityMatches(meta, input)) {
+      return readDocumentLiveTranslationProjectionSnapshot(input);
+    }
     return ingestDocumentLiveTranslationGoalBindingFromAskLiveEvent({
       ...input,
       meta,
@@ -973,6 +1048,8 @@ export function ingestDocumentLiveTranslationProjectionFromAskLiveEvent(
     docPath: input.docPath,
     locale: input.locale,
     sourceHash: input.sourceHash,
+    sourceTextHash: input.sourceTextHash,
+    sourceTextCharCount: input.sourceTextCharCount,
     projectionTarget,
     units: input.units,
     payload,

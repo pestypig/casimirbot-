@@ -13,6 +13,8 @@ export type InstallDocumentLiveTranslationProjectionEventIngestionInput = {
   docPath: string;
   locale: string;
   sourceHash?: string | null;
+  sourceTextHash?: string | null;
+  sourceTextCharCount?: number | null;
   projectionTarget?: string | null;
   units: DocumentTranslationUnit[];
   allowStaleDisplayText?: boolean;
@@ -28,6 +30,8 @@ export function installDocumentLiveTranslationProjectionEventIngestion(
       docPath: input.docPath,
       locale: input.locale,
       sourceHash: input.sourceHash,
+      sourceTextHash: input.sourceTextHash,
+      sourceTextCharCount: input.sourceTextCharCount,
       projectionTarget: input.projectionTarget ?? HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK,
       units: input.units,
       allowStaleDisplayText: input.allowStaleDisplayText,

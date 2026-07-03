@@ -89,15 +89,29 @@ export type HelixAskConsoleCapabilityLaneRowDetail = {
   goalId: string | null;
   goalBindingId: string | null;
   goalBindingKey: string | null;
+  bindingStatus: string | null;
+  activationPolicy: string | null;
+  attentionPolicy: string | null;
+  stopCondition: string | null;
+  reportPolicy: string | null;
+  quietBehavior: string | null;
+  reportAction: string | null;
+  reportReason: string | null;
   laneSessionId: string | null;
   sessionStatus: string | null;
   sessionHealth: string | null;
   sessionLifecycleAction: string | null;
+  blockedReason: string | null;
   sessionControlKey: string | null;
   sourceBindingKey: string | null;
   latestObservationKey: string | null;
   latestMailLoopObservationKey: string | null;
   latestEventId: string | null;
+  stagePlayMailId: string | null;
+  stagePlayMailDeliveryStatus: string | null;
+  previousStagePlayMailId: string | null;
+  mailboxThreadId: string | null;
+  mailStatus: string | null;
   wakeKind: string | null;
   materializedMailLoopEvidence: string | null;
   hasObservation: string | null;
@@ -374,6 +388,16 @@ export function resolveHelixAskConsoleCapabilityLaneRowDetail(
     goalId: readMetaTokenValue(tokens, "goal "),
     goalBindingId: readMetaTokenValue(tokens, "goal binding "),
     goalBindingKey: readMetaTokenValue(tokens, "goal binding key "),
+    bindingStatus:
+      readMetaTokenValue(tokens, "binding status ") ||
+      readMetaTokenValue(tokens, "binding "),
+    activationPolicy: readMetaTokenValue(tokens, "activation policy "),
+    attentionPolicy: readMetaTokenValue(tokens, "attention policy "),
+    stopCondition: readMetaTokenValue(tokens, "stop condition "),
+    reportPolicy: readMetaTokenValue(tokens, "report policy "),
+    quietBehavior: readMetaTokenValue(tokens, "quiet behavior "),
+    reportAction: readMetaTokenValue(tokens, "report action "),
+    reportReason: readMetaTokenValue(tokens, "report reason "),
     laneSessionId: readMetaTokenValue(tokens, "lane session "),
     sessionStatus: readMetaTokenValue(tokens, "session status "),
     sessionHealth: readMetaTokenValue(tokens, "session health "),
@@ -382,6 +406,9 @@ export function resolveHelixAskConsoleCapabilityLaneRowDetail(
       readMetaTokenValue(tokens, "lifecycle action ") ||
       readMetaTokenValue(tokens, "session action ") ||
       readMetaTokenValue(tokens, "action "),
+    blockedReason:
+      readMetaTokenValue(tokens, "blocked reason ") ||
+      readMetaTokenValue(tokens, "blocked "),
     sessionControlKey: readMetaTokenValue(tokens, "session control key "),
     sourceBindingKey: readMetaTokenValue(tokens, "source binding key "),
     latestObservationKey: readMetaTokenValue(tokens, "observation key "),
@@ -389,6 +416,21 @@ export function resolveHelixAskConsoleCapabilityLaneRowDetail(
       readMetaTokenValue(tokens, "mail observation key ") ||
       readMetaTokenValue(tokens, "mail loop observation key "),
     latestEventId: readMetaTokenValue(tokens, "latest event "),
+    stagePlayMailId:
+      readMetaTokenValue(tokens, "stage play mail ") ||
+      readMetaTokenValue(tokens, "stage play mail id ") ||
+      readMetaTokenValue(tokens, "mail id "),
+    stagePlayMailDeliveryStatus:
+      readMetaTokenValue(tokens, "delivery status ") ||
+      readMetaTokenValue(tokens, "mail delivery status ") ||
+      readMetaTokenValue(tokens, "stage play mail delivery status "),
+    previousStagePlayMailId:
+      readMetaTokenValue(tokens, "previous stage play mail ") ||
+      readMetaTokenValue(tokens, "previous mail "),
+    mailboxThreadId:
+      readMetaTokenValue(tokens, "mailbox thread ") ||
+      readMetaTokenValue(tokens, "mailbox thread id "),
+    mailStatus: readMetaTokenValue(tokens, "mail status "),
     wakeKind: readMetaTokenValue(tokens, "wake kind "),
     materializedMailLoopEvidence: readMetaTokenValue(tokens, "materialized mail evidence "),
     hasObservation: readMetaTokenValue(tokens, "has observation "),
@@ -467,15 +509,29 @@ export function formatHelixAskConsoleCapabilityLaneRowDetailText(
     detail.goalId ? `Goal ${detail.goalId}` : "",
     detail.goalBindingId ? `Goal binding ${detail.goalBindingId}` : "",
     detail.goalBindingKey ? `Goal binding key ${detail.goalBindingKey}` : "",
+    detail.bindingStatus ? `Binding ${detail.bindingStatus}` : "",
+    detail.activationPolicy ? `Activation ${detail.activationPolicy}` : "",
+    detail.attentionPolicy ? `Attention ${detail.attentionPolicy}` : "",
+    detail.stopCondition ? `Stop ${detail.stopCondition}` : "",
+    detail.reportPolicy ? `Report policy ${detail.reportPolicy}` : "",
+    detail.quietBehavior ? `Quiet ${detail.quietBehavior}` : "",
+    detail.reportAction ? `Report action ${detail.reportAction}` : "",
+    detail.reportReason ? `Report reason ${detail.reportReason}` : "",
     detail.laneSessionId ? `Session ${detail.laneSessionId}` : "",
     detail.sessionStatus ? `Session status ${detail.sessionStatus}` : "",
     detail.sessionHealth ? `Session health ${detail.sessionHealth}` : "",
     detail.sessionLifecycleAction ? `Action ${detail.sessionLifecycleAction}` : "",
+    detail.blockedReason ? `Blocked ${detail.blockedReason}` : "",
     detail.sessionControlKey ? `Session control ${detail.sessionControlKey}` : "",
     detail.sourceBindingKey ? `Source binding key ${detail.sourceBindingKey}` : "",
     detail.latestObservationKey ? `Observation key ${detail.latestObservationKey}` : "",
     detail.latestMailLoopObservationKey ? `Mail observation key ${detail.latestMailLoopObservationKey}` : "",
     detail.latestEventId ? `Latest event ${detail.latestEventId}` : "",
+    detail.stagePlayMailId ? `Mail ${detail.stagePlayMailId}` : "",
+    detail.stagePlayMailDeliveryStatus ? `Delivery ${detail.stagePlayMailDeliveryStatus}` : "",
+    detail.previousStagePlayMailId ? `Previous mail ${detail.previousStagePlayMailId}` : "",
+    detail.mailboxThreadId ? `Mailbox ${detail.mailboxThreadId}` : "",
+    detail.mailStatus ? `Mail status ${detail.mailStatus}` : "",
     detail.wakeKind ? `Wake ${detail.wakeKind}` : "",
     detail.materializedMailLoopEvidence ? `Materialized mail ${detail.materializedMailLoopEvidence}` : "",
     detail.hasObservation ? `Has observation ${detail.hasObservation}` : "",

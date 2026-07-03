@@ -217,6 +217,88 @@ describe("document live translation projection event ingestion", () => {
     unsubscribe();
   });
 
+  it("honors source-text scope for Ask live-event translation projections when provided", () => {
+    const target = new EventTarget();
+    const unsubscribe = installDocumentLiveTranslationProjectionEventIngestion({
+      eventTarget: target,
+      docPath: "docs/research/nhm2.md",
+      locale: "es",
+      sourceHash: "fnv1a32:current",
+      sourceTextHash: "source-text-current",
+      sourceTextCharCount: 21,
+      units: [unit("u0001")],
+    });
+
+    const dispatchProjection = (sourceTextHash: string, text: string) => {
+      target.dispatchEvent(new CustomEvent(HELIX_ASK_LIVE_EVENT_BUS_EVENT, {
+        detail: {
+          contextId: "helix-ask:desktop",
+          entry: {
+            id: `receipt:docs:u1:${sourceTextHash}`,
+            text: "UI translation projection.",
+            meta: {
+              sourceEventType: "ui_translation_projection",
+              lane: "live_translation",
+              sourceId: "document_markdown:docs/research/nhm2.md",
+              sourceHash: "fnv1a32:current",
+              sourceTextHash,
+              sourceTextCharCount: sourceTextHash === "source-text-current" ? 21 : 18,
+              latestProjectionTarget: "docs_chunk",
+              latestChunkId: "u0001",
+              latestObservedAtMs: sourceTextHash === "source-text-current" ? 200 : 100,
+              targetLanguage: "es",
+              translatedText: text,
+              projectionStatus: "projected",
+              receiptRef: `receipt:docs:u1:${sourceTextHash}`,
+              observationRef: `obs:docs:u1:${sourceTextHash}`,
+            },
+          },
+        },
+      }));
+    };
+
+    dispatchProjection("source-text-old", "Texto anterior.");
+    const staleSnapshot = readDocumentLiveTranslationProjectionSnapshot({
+      docPath: "docs/research/nhm2.md",
+      locale: "es",
+      sourceHash: "fnv1a32:current",
+    });
+    expect(staleSnapshot.translations.u0001).toMatchObject({
+      status: "error",
+      error: "translation_projection_source_text_mismatch",
+      projectionStatus: "missing",
+      sourceHash: "fnv1a32:current",
+      sourceTextHash: "source-text-current",
+      sourceTextCharCount: 21,
+      observationRef: null,
+      receiptRef: null,
+      terminalEligible: false,
+      assistantAnswer: false,
+      rawContentIncluded: false,
+    });
+    expect(staleSnapshot.translations.u0001.text).toBeUndefined();
+
+    dispatchProjection("source-text-current", "Texto actual.");
+    expect(readDocumentLiveTranslationProjectionSnapshot({
+      docPath: "docs/research/nhm2.md",
+      locale: "es",
+      sourceHash: "fnv1a32:current",
+    }).translations.u0001).toMatchObject({
+      status: "ready",
+      text: "Texto actual.",
+      sourceHash: "fnv1a32:current",
+      sourceTextHash: "source-text-current",
+      sourceTextCharCount: 21,
+      observationRef: "obs:docs:u1:source-text-current",
+      receiptRef: "receipt:docs:u1:source-text-current",
+      terminalEligible: false,
+      assistantAnswer: false,
+      rawContentIncluded: false,
+    });
+
+    unsubscribe();
+  });
+
   it("accepts source projection target aliases for Ask live-event translation projections", () => {
     const target = new EventTarget();
     const unsubscribe = installDocumentLiveTranslationProjectionEventIngestion({
@@ -504,11 +586,17 @@ describe("document live translation projection event ingestion", () => {
             sessionHealth: "healthy",
             sourceId: "document_markdown:docs/research/nhm2.md",
             sourceKind: "docs",
+            sourceTextHash: "source-text-hash-session",
+            sourceTextCharCount: 2048,
             latestProjectionTarget: "docs_chunk",
             accountLocale: "es",
             targetLanguage: "es",
             selectedBackendProvider: "live_translation.local_runtime",
             latestChunkId: "u0001",
+            latestChunkIndex: 0,
+            latestDedupeKey: "document_markdown:docs/research/nhm2.md:u0001:es",
+            latestSourceEventId: "docs:event:session:1",
+            latestSourceEventMs: 90,
             latestObservedAtMs: 100,
             observationRef: "obs:lane-session-docs",
             receiptRef: "receipt:lane-session-docs",
@@ -529,9 +617,18 @@ describe("document live translation projection event ingestion", () => {
       sessionStatus: "running",
       sessionHealth: "healthy",
       sourceId: "document_markdown:docs/research/nhm2.md",
+      sourceKind: "docs",
+      sourceTextHash: "source-text-hash-session",
+      sourceTextCharCount: 2048,
       projectionTarget: "docs_chunk",
       accountLocale: "es",
       targetLanguage: "es",
+      latestChunkId: "u0001",
+      latestChunkIndex: 0,
+      latestDedupeKey: "document_markdown:docs/research/nhm2.md:u0001:es",
+      latestSourceEventId: "docs:event:session:1",
+      latestSourceEventMs: 90,
+      latestObservedAtMs: 100,
       lastObservationRef: "obs:lane-session-docs",
       lastReceiptRef: "receipt:lane-session-docs",
       updatedAtMs: 125,
@@ -633,9 +730,15 @@ describe("document live translation projection event ingestion", () => {
             laneSessionId: "lane-session-docs",
             sourceId: "document_markdown:docs/research/nhm2.md",
             sourceKind: "docs",
+            sourceTextHash: "source-text-hash-mail",
+            sourceTextCharCount: 2048,
             latestProjectionTarget: "docs_chunk",
             accountLocale: "es",
             latestChunkId: "u0001",
+            latestChunkIndex: 0,
+            latestDedupeKey: "document_markdown:docs/research/nhm2.md:u0001:es",
+            latestSourceEventId: "docs:event:mail:1",
+            latestSourceEventMs: 90,
             latestObservedAtMs: 100,
             latestFreshnessStatus: "fresh",
             targetLanguage: "es",
@@ -668,10 +771,16 @@ describe("document live translation projection event ingestion", () => {
       selectedBackendProvider: "live_translation.local_runtime",
       sourceId: "document_markdown:docs/research/nhm2.md",
       sourceKind: "docs",
+      sourceTextHash: "source-text-hash-mail",
+      sourceTextCharCount: 2048,
       projectionTarget: "docs_chunk",
       accountLocale: "es",
       targetLanguage: "es",
       latestChunkId: "u0001",
+      latestChunkIndex: 0,
+      latestDedupeKey: "document_markdown:docs/research/nhm2.md:u0001:es",
+      latestSourceEventId: "docs:event:mail:1",
+      latestSourceEventMs: 90,
       latestObservedAtMs: 100,
       latestFreshnessStatus: "fresh",
       observationRef: "obs:lane-mail-loop-docs",
@@ -787,9 +896,15 @@ describe("document live translation projection event ingestion", () => {
             targetLanguage: "es",
             sourceId: "document_markdown:docs/research/nhm2.md",
             sourceKind: "docs",
+            sourceTextHash: "source-text-hash-goal",
+            sourceTextCharCount: 2048,
             latestProjectionTarget: "docs_chunk",
             accountLocale: "es",
             latestChunkId: "u0001",
+            latestChunkIndex: 0,
+            latestDedupeKey: "document_markdown:docs/research/nhm2.md:u0001:es",
+            latestSourceEventId: "docs:event:goal:1",
+            latestSourceEventMs: 90,
             latestObservedAtMs: 100,
             latestEventId: "goal-binding-translate-docs:observation_recorded:100",
             hasObservation: true,
@@ -822,9 +937,15 @@ describe("document live translation projection event ingestion", () => {
       targetLanguage: "es",
       sourceId: "document_markdown:docs/research/nhm2.md",
       sourceKind: "docs",
+      sourceTextHash: "source-text-hash-goal",
+      sourceTextCharCount: 2048,
       projectionTarget: "docs_chunk",
       accountLocale: "es",
       latestChunkId: "u0001",
+      latestChunkIndex: 0,
+      latestDedupeKey: "document_markdown:docs/research/nhm2.md:u0001:es",
+      latestSourceEventId: "docs:event:goal:1",
+      latestSourceEventMs: 90,
       latestObservedAtMs: 100,
       latestEventId: "goal-binding-translate-docs:observation_recorded:100",
       hasObservation: true,
@@ -906,6 +1027,147 @@ describe("document live translation projection event ingestion", () => {
       sourceHash: "fnv1a32:goal",
       observationRef: "obs:goal-binding-docs:fnv1a32:goal",
       receiptRef: "receipt:goal-binding-docs:fnv1a32:goal",
+      terminalEligible: false,
+      assistantAnswer: false,
+      rawContentIncluded: false,
+    });
+
+    unsubscribe();
+  });
+
+  it("requires matching source text identity for scoped session, mail-loop, and goal rows", () => {
+    const target = new EventTarget();
+    const unsubscribe = installDocumentLiveTranslationProjectionEventIngestion({
+      eventTarget: target,
+      docPath: "docs/research/nhm2.md",
+      locale: "es",
+      sourceHash: "fnv1a32:current",
+      sourceTextHash: "source-text-current",
+      sourceTextCharCount: 21,
+      units: [unit("u0001")],
+    });
+
+    const dispatchLifecycleRows = (sourceTextHash: string, sourceTextCharCount: number, suffix: string) => {
+      const commonMeta = {
+        lane: "live_translation",
+        sourceId: "document_markdown:docs/research/nhm2.md",
+        sourceHash: "fnv1a32:current",
+        sourceTextHash,
+        sourceTextCharCount,
+        sourceKind: "docs",
+        latestProjectionTarget: "docs_chunk",
+        accountLocale: "es",
+        targetLanguage: "es",
+        latestChunkId: "u0001",
+        latestObservedAtMs: suffix === "current" ? 300 : 100,
+      };
+      target.dispatchEvent(new CustomEvent(HELIX_ASK_LIVE_EVENT_BUS_EVENT, {
+        detail: {
+          contextId: "helix-ask:desktop",
+          entry: {
+            id: `lane-session-docs:${suffix}`,
+            text: "Lane session is running.",
+            meta: {
+              ...commonMeta,
+              source_event_type: "lane_session",
+              laneSessionId: "lane-session-docs",
+              sessionStatus: "running",
+              sessionHealth: "healthy",
+              observationRef: `obs:lane-session-docs:${suffix}`,
+              receiptRef: `receipt:lane-session-docs:${suffix}`,
+              updatedAtMs: suffix === "current" ? 325 : 125,
+            },
+          },
+        },
+      }));
+      target.dispatchEvent(new CustomEvent(HELIX_ASK_LIVE_EVENT_BUS_EVENT, {
+        detail: {
+          contextId: "helix-ask:desktop",
+          entry: {
+            id: `lane-mail-loop-docs:${suffix}`,
+            text: "Lane mail loop is pending.",
+            meta: {
+              ...commonMeta,
+              source_event_type: "lane_mail_loop",
+              laneSessionId: "lane-session-docs",
+              stagePlayMailId: "stage-play-mail-translation",
+              stagePlayWakeExpected: true,
+              mailboxThreadId: "thread-docs-translation",
+              mailStatus: "unread",
+              observationRef: `obs:lane-mail-loop-docs:${suffix}`,
+              receiptRef: `receipt:lane-mail-loop-docs:${suffix}`,
+            },
+          },
+        },
+      }));
+      target.dispatchEvent(new CustomEvent(HELIX_ASK_LIVE_EVENT_BUS_EVENT, {
+        detail: {
+          contextId: "helix-ask:desktop",
+          entry: {
+            id: `goal-binding-translate-docs:${suffix}`,
+            text: "Goal-bound lane session is active.",
+            meta: {
+              ...commonMeta,
+              source_event_type: "lane_goal_binding",
+              goalBindingId: "goal-binding-translate-docs",
+              goalId: "goal-account-language",
+              laneSessionId: "lane-session-docs",
+              bindingStatus: "active",
+              sessionStatus: "running",
+              sessionHealth: "healthy",
+              activationPolicy: "while_goal_active",
+              attentionPolicy: "quiet_until_salient",
+              stopCondition: "goal_complete",
+              reportPolicy: "debug_only",
+              quietBehavior: "record_only",
+              reportAction: "record_only",
+              observationRef: `obs:goal-binding-docs:${suffix}`,
+              receiptRef: `receipt:goal-binding-docs:${suffix}`,
+            },
+          },
+        },
+      }));
+    };
+
+    dispatchLifecycleRows("source-text-old", 18, "old");
+
+    expect(readDocumentLiveTranslationProjectionSnapshot({
+      docPath: "docs/research/nhm2.md",
+      locale: "es",
+      sourceHash: "fnv1a32:current",
+    })).toMatchObject({
+      laneSessions: {},
+      mailLoops: {},
+      goalBindings: {},
+    });
+
+    dispatchLifecycleRows("source-text-current", 21, "current");
+
+    const snapshot = readDocumentLiveTranslationProjectionSnapshot({
+      docPath: "docs/research/nhm2.md",
+      locale: "es",
+      sourceHash: "fnv1a32:current",
+    });
+    expect(snapshot.laneSessions["lane-session-docs"]).toMatchObject({
+      sourceTextHash: "source-text-current",
+      sourceTextCharCount: 21,
+      lastObservationRef: "obs:lane-session-docs:current",
+      terminalEligible: false,
+      assistantAnswer: false,
+      rawContentIncluded: false,
+    });
+    expect(snapshot.mailLoops["stage-play-mail-translation"]).toMatchObject({
+      sourceTextHash: "source-text-current",
+      sourceTextCharCount: 21,
+      observationRef: "obs:lane-mail-loop-docs:current",
+      terminalEligible: false,
+      assistantAnswer: false,
+      rawContentIncluded: false,
+    });
+    expect(snapshot.goalBindings["goal-binding-translate-docs"]).toMatchObject({
+      sourceTextHash: "source-text-current",
+      sourceTextCharCount: 21,
+      observationRef: "obs:goal-binding-docs:current",
       terminalEligible: false,
       assistantAnswer: false,
       rawContentIncluded: false,

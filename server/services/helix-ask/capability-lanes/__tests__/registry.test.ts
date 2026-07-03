@@ -77,6 +77,36 @@ describe("Helix capability lane registry", () => {
       "visual_analysis",
       "workstation_tool_reference",
     ]);
+    expect(helix.lanes.find((lane) => lane.lane_id === "code_text")).toMatchObject({
+      status: "dry_run",
+      backend_family: "openai_compatible",
+      one_shot_call_contract: expect.objectContaining({
+        supported: false,
+        terminal_eligible: false,
+        assistant_answer: false,
+      }),
+      capabilities: [
+        expect.objectContaining({
+          capability_id: "code_text.review",
+          one_shot_status: "shadow_only",
+          session_status: "not_supported",
+          backend_provider_required: true,
+          model_visible_hint: expect.objectContaining({
+            required_input_fields: ["code_or_diff"],
+            optional_input_fields: expect.arrayContaining([
+              "review_goal",
+              "language",
+              "source_ref",
+              "requested_backend_provider",
+            ]),
+            when_not_to_use: expect.stringContaining("Do not use for shell execution"),
+          }),
+          result_authority: "observation_or_receipt_only",
+          terminal_eligible: false,
+          assistant_answer: false,
+        }),
+      ],
+    });
     expect(helix.lanes.find((lane) => lane.lane_id === "live_translation")).toMatchObject({
       status: "dry_run",
       backend_family: "local_runtime",
@@ -356,6 +386,23 @@ describe("Helix capability lane registry", () => {
         one_shot_status: "shadow_only",
         session_status: "not_supported",
         backend_provider_required: true,
+        model_visible_hint: expect.objectContaining({
+          required_input_fields: ["frame_ref"],
+          optional_input_fields: expect.arrayContaining([
+            "question",
+            "source_id",
+            "source_kind",
+            "requested_backend_provider",
+          ]),
+          when_to_use: expect.stringContaining("admitted image, screenshot, camera frame, or visual capture"),
+          when_not_to_use: expect.stringContaining("do not treat visual analysis output as a final answer"),
+          request_shape_hint: {
+            capability_lane_call: expect.objectContaining({
+              capability: "visual_analysis.inspect_frame",
+              frame_ref: "<visual artifact/frame ref from admitted capture>",
+            }),
+          },
+        }),
         result_authority: "observation_or_receipt_only",
       }),
     ]);

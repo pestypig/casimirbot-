@@ -415,7 +415,22 @@ function readLaneProjectionSummary(record: RecordLike | null, debug: RecordLike 
         coerceText(observation?.lane_session_id) ||
         coerceText(chunk?.lane_session_id);
       const sourceId = coerceText(observation?.source_id) || coerceText(chunk?.source_id);
+      const sourceHash =
+        coerceText(observation?.source_hash) ||
+        coerceText(observation?.sourceHash) ||
+        coerceText(chunk?.source_hash) ||
+        coerceText(chunk?.sourceHash);
       const sourceKind = coerceText(observation?.source_kind) || coerceText(chunk?.source_kind);
+      const sourceTextHash =
+        coerceText(observation?.source_text_hash) ||
+        coerceText(observation?.sourceTextHash) ||
+        coerceText(chunk?.source_text_hash) ||
+        coerceText(chunk?.sourceTextHash);
+      const sourceTextCharCount =
+        coerceText(observation?.source_text_char_count) ||
+        coerceText(observation?.sourceTextCharCount) ||
+        coerceText(chunk?.source_text_char_count) ||
+        coerceText(chunk?.sourceTextCharCount);
       const accountLocale = coerceText(observation?.account_locale) || coerceText(chunk?.account_locale);
       const chunkId = coerceText(observation?.chunk_id) || coerceText(chunk?.chunk_id);
       const chunkIndex = coerceText(observation?.chunk_index) || coerceText(chunk?.chunk_index);
@@ -433,7 +448,10 @@ function readLaneProjectionSummary(record: RecordLike | null, debug: RecordLike 
         laneSessionId ? `session ${laneSessionId}` : "",
         targetLanguage ? `language ${targetLanguage}` : "",
         sourceId ? `source ${sourceId}` : "",
+        sourceHash ? `source hash ${sourceHash}` : "",
         sourceKind ? `source kind ${sourceKind}` : "",
+        sourceTextHash ? `source payload hash ${sourceTextHash}` : "",
+        sourceTextCharCount ? `source payload chars ${sourceTextCharCount}` : "",
         accountLocale ? `account locale ${accountLocale}` : "",
         chunkId ? `chunk ${chunkId}` : "",
         chunkIndex ? `index ${chunkIndex}` : "",
@@ -586,6 +604,10 @@ function readTranslationProjectionTrafficSummary(record: RecordLike | null, debu
     summary.sourceId,
     summary.sourceHash ? `source hash ${summary.sourceHash}` : "",
     summary.sourceKind ? `source kind ${summary.sourceKind}` : "",
+    summary.latestSourceTextHash ? `latest source payload hash ${summary.latestSourceTextHash}` : "",
+    typeof summary.latestSourceTextCharCount === "number"
+      ? `latest source payload chars ${summary.latestSourceTextCharCount}`
+      : "",
     summary.accountLocale ? `account locale ${summary.accountLocale}` : "",
     `target ${summary.projectionTarget}`,
     summary.targetLanguage ? `language ${summary.targetLanguage}` : "",
@@ -849,6 +871,14 @@ function readGoalDispatchReadinessSummary(record: RecordLike | null, debug: Reco
   const totalAdmissions = coerceText(readiness.total_admissions);
   const admitted = coerceText(readiness.admitted_count);
   const blocked = coerceText(readiness.blocked_count);
+  const admittedNumber = Number(admitted);
+  const blockedNumber = Number(blocked);
+  const readinessState =
+    Number.isFinite(admittedNumber) && Number.isFinite(blockedNumber) && admittedNumber > 0 && blockedNumber > 0
+      ? "partial"
+      : Number.isFinite(blockedNumber) && blockedNumber > 0
+        ? "blocked"
+        : "ready";
   const pendingWake = coerceText(readiness.pending_wake_count);
   const pendingTerminal = coerceText(readiness.pending_terminal_authority_count);
   const projectionOnly = coerceText(readiness.projection_only_count);
@@ -884,6 +914,7 @@ function readGoalDispatchReadinessSummary(record: RecordLike | null, debug: Reco
   const blockedReasons = readArray(readiness.blocked_reasons).map(coerceText).filter(Boolean).join(", ");
 
   return [
+    `readiness ${readinessState}`,
     totalPlans ? `plans ${totalPlans}` : "",
     totalAdmissions ? `admissions ${totalAdmissions}` : "",
     admitted ? `admitted ${admitted}` : "",
@@ -953,6 +984,11 @@ function readLaneSessionSummary(record: RecordLike | null, debug: RecordLike | n
         .join("/");
       const sessionControlKey = coerceText(summary.session_control_key);
       const source = coerceText(summary.source_id);
+      const sourceHash = coerceText(summary.source_hash);
+      const sourceKind = coerceText(summary.source_kind);
+      const sourceTextHash = coerceText(summary.source_text_hash);
+      const sourceTextCharCount = coerceText(summary.source_text_char_count);
+      const sourceProjectionTarget = coerceText(summary.source_projection_target);
       const projection = coerceText(summary.projection_target);
       const locale = coerceText(summary.account_locale);
       const targetLanguage = coerceText(summary.target_language);
@@ -984,6 +1020,11 @@ function readLaneSessionSummary(record: RecordLike | null, debug: RecordLike | n
         fallback ? `fallback ${fallback}` : "",
         ...decisionParts,
         source ? `source ${source}` : "",
+        sourceHash ? `source hash ${sourceHash}` : "",
+        sourceKind ? `source kind ${sourceKind}` : "",
+        sourceTextHash ? `source payload hash ${sourceTextHash}` : "",
+        sourceTextCharCount ? `source payload chars ${sourceTextCharCount}` : "",
+        sourceProjectionTarget ? `source projection ${sourceProjectionTarget}` : "",
         projection ? `projection ${projection}` : "",
         locale ? `locale ${locale}` : "",
         targetLanguage ? `target ${targetLanguage}` : "",
@@ -1034,7 +1075,13 @@ function readLaneMailLoopSummary(record: RecordLike | null, debug: RecordLike | 
       const observation = coerceText(summary.observation_ref);
       const receipt = coerceText(summary.receipt_ref);
       const source = coerceText(summary.source_id);
+      const sourceHash = coerceText(summary.source_hash);
+      const sourceKind = coerceText(summary.source_kind);
+      const sourceTextHash = coerceText(summary.source_text_hash);
+      const sourceTextCharCount = coerceText(summary.source_text_char_count);
+      const sourceProjectionTarget = coerceText(summary.source_projection_target);
       const accountLocale = coerceText(summary.account_locale);
+      const projection = coerceText(summary.projection_target);
       const chunk = coerceText(summary.chunk_id);
       const chunkIndex = coerceText(summary.chunk_index);
       const dedupeKey = coerceText(summary.dedupe_key);
@@ -1064,7 +1111,13 @@ function readLaneMailLoopSummary(record: RecordLike | null, debug: RecordLike | 
         observation ? `observation ${observation}` : "",
         receipt ? `receipt ${receipt}` : "",
         source ? `source ${source}` : "",
+        sourceHash ? `source hash ${sourceHash}` : "",
+        sourceKind ? `source kind ${sourceKind}` : "",
+        sourceTextHash ? `source payload hash ${sourceTextHash}` : "",
+        sourceTextCharCount ? `source payload chars ${sourceTextCharCount}` : "",
+        sourceProjectionTarget ? `source projection ${sourceProjectionTarget}` : "",
         accountLocale ? `account locale ${accountLocale}` : "",
+        projection ? `projection ${projection}` : "",
         chunk ? `chunk ${chunk}` : "",
         chunkIndex ? `index ${chunkIndex}` : "",
         dedupeKey ? `dedupe ${dedupeKey}` : "",
@@ -1085,6 +1138,57 @@ function readLaneMailLoopSummary(record: RecordLike | null, debug: RecordLike | 
     });
 
   return Array.from(new Set(summaries)).slice(0, 3).join(" || ");
+}
+
+function readLaneTimelineSummary(record: RecordLike | null, debug: RecordLike | null): string {
+  const agentLoop = readNestedRecord(record?.agent_runtime_loop, debug?.agent_runtime_loop);
+  const debugExport = readNestedRecord(record?.debug_export, debug?.debug_export);
+  const timelineSummary =
+    readNestedRecord(record?.capability_lane_timeline_summary, debug?.capability_lane_timeline_summary) ??
+    readNestedRecord(agentLoop?.capability_lane_timeline_summary, debugExport?.capability_lane_timeline_summary);
+  const rows = readArray(timelineSummary?.console_state_rows)
+    .map((entry) => readRecord(entry))
+    .filter((entry): entry is RecordLike => Boolean(entry))
+    .sort((left, right) => {
+      const leftSeq = typeof left.seq === "number" && Number.isFinite(left.seq) ? left.seq : 0;
+      const rightSeq = typeof right.seq === "number" && Number.isFinite(right.seq) ? right.seq : 0;
+      return leftSeq - rightSeq;
+    });
+  if (rows.length === 0) return "";
+
+  const hasVisibleOnly = rows.some((row) => row.lane_visible === true && row.lane_executed !== true);
+  const summaries = rows.map((row) => {
+    const normalizedStage = coerceText(row.normalized_stage) || coerceText(row.stage) || "lane_state";
+    const state = coerceText(row.state_label);
+    const lane = coerceText(row.lane_id);
+    const capability = coerceText(row.capability_id) || coerceText(row.capability) || lane || "capability_lane";
+    const runtimeProvider = coerceText(row.selected_runtime_agent_provider);
+    const backend = coerceText(row.selected_backend_provider);
+    const observation = coerceText(row.observation_ref);
+    const receipt = coerceText(row.receipt_ref);
+    const terminalAuthority = coerceText(row.terminal_authority_status);
+    return [
+      `${normalizedStage}: ${capability}`,
+      state ? `state ${state}` : "",
+      runtimeProvider ? `runtime ${runtimeProvider}` : "",
+      backend ? `backend ${backend}` : "",
+      row.lane_visible === true ? "visible" : "",
+      row.lane_requested === true ? "requested" : "",
+      row.lane_executed === true ? "executed" : "",
+      row.observation_reentered === true ? "re-entered" : "",
+      row.lane_visible === true && row.lane_executed !== true ? "not executed" : "",
+      observation ? `observation ${observation}` : "",
+      receipt ? `receipt ${receipt}` : "",
+      terminalAuthority ? `terminal authority ${terminalAuthority}` : "",
+      row.terminal_eligible === false ? "not terminal-eligible" : "",
+      row.assistant_answer === false ? "not assistant answer" : "",
+    ].filter(Boolean).join(" | ");
+  });
+
+  const unique = Array.from(new Set(summaries)).slice(0, 8);
+  if (rows.length > unique.length) unique.push(`+${rows.length - unique.length} more`);
+  if (hasVisibleOnly) unique.push("visible does not mean executed");
+  return unique.join(" -> ");
 }
 
 function readTerminalArtifactKind(record: RecordLike | null, debug: RecordLike | null): string {
@@ -1128,6 +1232,7 @@ export function buildHelixAskRuntimeTurnSummary(
   const translationTraffic = readTranslationProjectionTrafficSummary(record, debug);
   const laneSessions = readLaneSessionSummary(record, debug);
   const laneMail = readLaneMailLoopSummary(record, debug);
+  const laneTimeline = readLaneTimelineSummary(record, debug);
   const goalBoundLanes = readGoalBoundLaneSummary(record, debug);
   const goalDispatchReadiness = readGoalDispatchReadinessSummary(record, debug);
   const terminal = readTerminalArtifactKind(record, debug);
@@ -1155,6 +1260,7 @@ export function buildHelixAskRuntimeTurnSummary(
       : null,
     laneSessions ? { key: "lane_sessions", label: "Lane sessions", value: laneSessions } : null,
     laneMail ? { key: "lane_mail", label: "Lane mail", value: laneMail } : null,
+    laneTimeline ? { key: "lane_timeline", label: "Lane timeline", value: laneTimeline } : null,
     goalBoundLanes ? { key: "goal_bound_lanes", label: "Goal-bound lanes", value: goalBoundLanes } : null,
     goalDispatchReadiness
       ? { key: "goal_dispatch_readiness", label: "Goal dispatch readiness", value: goalDispatchReadiness }

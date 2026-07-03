@@ -133,6 +133,8 @@ export type BuildDocumentLiveTranslationInlineStatesInput = {
   docPath: string;
   locale: string;
   sourceHash?: string | null;
+  sourceTextHash?: string | null;
+  sourceTextCharCount?: number | null;
   units: DocumentTranslationUnit[];
   projectionTarget?: HelixLiveTranslationProjectionTarget | string;
   allowStaleDisplayText?: boolean;
@@ -582,6 +584,8 @@ export function buildDocumentLiveTranslationInlineStates(
     projections,
     sourceId,
     sourceHash: input.sourceHash,
+    sourceTextHash: input.sourceTextHash,
+    sourceTextCharCount: input.sourceTextCharCount,
     projectionTarget: input.projectionTarget ?? HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK,
     targetLanguage: input.locale,
     units: input.units,

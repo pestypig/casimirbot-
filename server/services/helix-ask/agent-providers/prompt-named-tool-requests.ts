@@ -15,6 +15,8 @@ import {
   LIVE_SOURCE_INTERPRETER_PREDICTION_READ_CAPABILITIES,
   LIVE_SOURCE_MAILBOX_READ_CAPABILITIES,
   LIVE_SOURCE_STATE_READ_CAPABILITIES,
+  MORAL_GRAPH_REFLECTION_ALIAS_CAPABILITIES,
+  MORAL_GRAPH_REFLECTION_CAPABILITY,
   MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY,
   MAX_PROMPT_NAMED_CAPABILITY_REQUESTS,
   PROMPT_NAMED_CAPABILITIES,
@@ -125,6 +127,16 @@ export const hasContextualTheoryReflectionMention = (prompt: string): boolean =>
     /\b(?:text|sentence|phrase|quote|screen|page|button|label|ui)\b[\s\S]{0,120}\b(?:says|shows|reads|contains|mentions|labeled|labelled|called|named)\b[\s\S]{0,120}\btheory\s+(?:context\s+)?reflection\b/i.test(unquoted) ||
     /\b(?:future|later|eventually|hypothetically|if|when|after|before|would|could|might)\b[\s\S]{0,140}\b(?:fetch|get|read|show|use|run|call|execute)\b[\s\S]{0,80}\btheory\s+(?:context\s+)?reflection\b/i.test(unquoted) ||
     /\b(?:explain|describe|what\s+does|what\s+is|what\s+are)\b[\s\S]{0,120}\btheory\s+(?:context\s+)?reflection\b[\s\S]{0,120}\b(?:mean|means|do|does|is|are|would)\b/i.test(unquoted)
+  );
+};
+
+export const hasContextualMoralGraphReflectionMention = (prompt: string): boolean => {
+  const unquoted = unquotePrompt(prompt);
+  return (
+    /\b(?:not\s+asking\s+(?:you\s+)?to|not\s+asking\s+for|don'?t|do\s+not|never|without)\b[\s\S]{0,100}\b(?:fetch|get|read|show|use|run|call|execute|reflect)\b[\s\S]{0,100}\b(?:moral\s+graph|moral\s+badge\s+graph|moral\s+badges?|moral-graph\.reflect_context|ideology\s+context)\b/i.test(unquoted) ||
+    /\b(?:text|sentence|phrase|quote|screen|page|button|label|ui)\b[\s\S]{0,120}\b(?:says|shows|reads|contains|mentions|labeled|labelled|called|named)\b[\s\S]{0,120}\b(?:moral\s+graph|moral\s+badge\s+graph|moral-graph\.reflect_context|ideology\s+context)\b/i.test(unquoted) ||
+    /\b(?:future|later|eventually|hypothetically|if|when|after|before|would|could|might)\b[\s\S]{0,140}\b(?:fetch|get|read|show|use|run|call|execute|reflect)\b[\s\S]{0,100}\b(?:moral\s+graph|moral\s+badge\s+graph|moral-graph\.reflect_context|ideology\s+context)\b/i.test(unquoted) ||
+    /\b(?:explain|describe|what\s+does|what\s+is|what\s+are)\b[\s\S]{0,120}\b(?:moral-graph\.reflect_context|helix_ask\.reflect_moral_graph)\b[\s\S]{0,120}\b(?:mean|means|do|does|is|are|would)\b/i.test(unquoted)
   );
 };
 
@@ -403,6 +415,48 @@ export const buildPromptNamedCapabilityGatewayCallRequests = (
         target_source: "theory_badge_graph",
         target_kind: "theory_frontier_conjecture_workbench",
         alias_capability: promptNamedTheoryFrontierAlias,
+      },
+    });
+  }
+
+  if (
+    hasPromptNamedCapability(prompt, MORAL_GRAPH_REFLECTION_CAPABILITY) &&
+    !hasNegatedToolInstruction(prompt, /\bmoral-graph\.reflect_context\b/i)
+  ) {
+    const segment = readPromptNamedCapabilitySegment(prompt, MORAL_GRAPH_REFLECTION_CAPABILITY);
+    addNamedRequest(MORAL_GRAPH_REFLECTION_CAPABILITY, "read", {
+      prompt: extractNamedCapabilityQuery(segment, prompt),
+      conversation_context: prompt,
+      include_locator: true,
+      include_fruition: true,
+      include_procedural_classification: true,
+      include_recommended_actions: true,
+      include_admissions: true,
+      source_target_intent: {
+        target_source: "moral_graph",
+        target_kind: "moral_graph_reflection",
+      },
+    });
+  }
+
+  const promptNamedMoralGraphReflectionAlias = MORAL_GRAPH_REFLECTION_ALIAS_CAPABILITIES.find((capabilityId) =>
+    hasPromptNamedCapability(prompt, capabilityId) &&
+    !hasNegatedToolInstruction(prompt, promptNamedCapabilityPattern(capabilityId)),
+  );
+  if (promptNamedMoralGraphReflectionAlias) {
+    const segment = readPromptNamedCapabilitySegment(prompt, promptNamedMoralGraphReflectionAlias);
+    addNamedRequest(MORAL_GRAPH_REFLECTION_CAPABILITY, "read", {
+      prompt: extractNamedCapabilityQuery(segment, prompt),
+      conversation_context: prompt,
+      include_locator: true,
+      include_fruition: true,
+      include_procedural_classification: true,
+      include_recommended_actions: true,
+      include_admissions: true,
+      source_target_intent: {
+        target_source: "moral_graph",
+        target_kind: "moral_graph_reflection",
+        alias_capability: promptNamedMoralGraphReflectionAlias,
       },
     });
   }
@@ -856,6 +910,57 @@ export const buildPromptDerivedTheoryReflectionGatewayCallRequests = (
         source: "helix_prompt_derived_theory_reflection",
         target_source: "theory_badge_graph",
         target_kind: "theory_context_reflection",
+      },
+    },
+  }];
+};
+
+export const buildPromptDerivedMoralGraphReflectionGatewayCallRequests = (
+  body: Record<string, unknown>,
+): Record<string, unknown>[] => {
+  const prompt = readPrompt(body);
+  if (!prompt) return [];
+  if (hasPromptNamedCapability(prompt, MORAL_GRAPH_REFLECTION_CAPABILITY)) return [];
+  if (
+    hasNegatedToolInstruction(
+      prompt,
+      /\b(?:reflect|reflection|moral\s+graph|moral\s+badge\s+graph|moral\s+badges?|badge\s+locator|ideology\s+context)\b/i,
+    ) ||
+    hasContextualMoralGraphReflectionMention(prompt)
+  ) {
+    return [];
+  }
+  const unquoted = unquotePrompt(prompt);
+  const wantsMoralGraphReflection =
+    /\breflect\b[\s\S]{0,140}\b(?:moral\s+graph|moral\s+badge\s+graph|moral\s+badges?|ideology\s+context|badge\s+locator)\b/i.test(unquoted) ||
+    /\b(?:moral\s+graph|moral\s+badge\s+graph|moral\s+badges?|ideology\s+context|badge\s+locator)\b[\s\S]{0,140}\breflect(?:ion)?\b/i.test(unquoted) ||
+    /\b(?:use|run|call|query|read|apply)\b[\s\S]{0,100}\b(?:moral\s+graph|moral\s+badge\s+graph|moral\s+badges?|ideology\s+context|badge\s+locator)\b/i.test(unquoted) ||
+    /\b(?:locate|identify|select|surface|map)\b[\s\S]{0,140}\b(?:moral\s+badges?|badge\s+locator|moral\s+graph)\b/i.test(unquoted);
+  if (!wantsMoralGraphReflection) return [];
+  const focusedPrompt =
+    cleanNamedCapabilityArgumentText(
+      unquoted.match(/\breflect\s+(.{3,180}?)\s+(?:against|through|via|with)\s+(?:the\s+)?(?:moral\s+graph|moral\s+badge\s+graph|moral\s+badges?|ideology\s+context|badge\s+locator)\b/i)?.[1] ??
+        unquoted.match(/\b(?:use|run|call|query|read|apply)\b[\s\S]{0,100}\b(?:moral\s+graph|moral\s+badge\s+graph|moral\s+badges?|ideology\s+context|badge\s+locator)\s+(?:for|about|on)\s+([^.;\n]+)/i)?.[1] ??
+        unquoted.match(/\b(?:moral\s+graph|moral\s+badge\s+graph|moral\s+badges?|ideology\s+context|badge\s+locator)\s+(?:reflection\s+)?(?:for|about|on)\s+([^.;\n]+)/i)?.[1] ??
+        null,
+    ) ?? prompt;
+  return [{
+    schema: "helix.workstation_gateway.prompt_derived_moral_graph_reflection_call_request.v1",
+    derivation_source: "helix_prompt_derived_moral_graph_reflection",
+    capability_id: MORAL_GRAPH_REFLECTION_CAPABILITY,
+    mode: "read",
+    arguments: {
+      prompt: focusedPrompt,
+      conversation_context: prompt,
+      include_locator: true,
+      include_fruition: true,
+      include_procedural_classification: true,
+      include_recommended_actions: true,
+      include_admissions: true,
+      source_target_intent: {
+        source: "helix_prompt_derived_moral_graph_reflection",
+        target_source: "moral_graph",
+        target_kind: "moral_graph_reflection",
       },
     },
   }];

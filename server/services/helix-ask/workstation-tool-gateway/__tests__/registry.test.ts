@@ -30,6 +30,7 @@ const SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY = "scholarly-research.fetch_full_text
 const SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY = "scholarly-research.extract_numeric_parameters";
 const CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY = "civilization-bounds.reflect_system_bounds";
 const THEORY_CONTEXT_REFLECTION_CAPABILITY = "theory-badge-graph.reflect_discussion_context";
+const MORAL_GRAPH_REFLECTION_CAPABILITY = "moral-graph.reflect_context";
 const MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY = "moral-graph.reflect_living_substrate_context";
 const THEORY_FRONTIER_CONJECTURE_CAPABILITY = "theory-badge-graph.propose_frontier_conjectures";
 const TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY = "text_to_speech.speak_text";
@@ -4065,6 +4066,90 @@ describe("Helix workstation tool gateway", () => {
         raw_content_included: false,
       },
     });
+  });
+
+  it("calls general Moral Graph reflection as read-only evidence, not an answer", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      capabilityId: MORAL_GRAPH_REFLECTION_CAPABILITY,
+      mode: "read",
+      turnId: "turn-moral-graph-reflection",
+      iteration: 1,
+      arguments: {
+        prompt:
+          "Reflect inherited conditioning, purpose as inquiry, and recognition before transcendence through the Moral Graph.",
+        source_target_intent: {
+          target_source: "moral_graph",
+          target_kind: "moral_graph_reflection",
+        },
+      },
+    });
+    const observation = result.observation as {
+      schema?: string;
+      exact_badge_ids?: string[];
+      likely_badge_ids?: string[];
+      inferred_badge_ids?: string[];
+      located_badge_ids?: string[];
+      procedural_classification?: Record<string, unknown>;
+      fruition?: Record<string, unknown>;
+      claim_boundary_notes?: string[];
+      reflection_id?: string;
+    };
+
+    expect(result).toMatchObject({
+      ok: true,
+      agent_runtime: "codex",
+      capability_id: MORAL_GRAPH_REFLECTION_CAPABILITY,
+      gateway_admission: {
+        requested_capability: MORAL_GRAPH_REFLECTION_CAPABILITY,
+        selected_agent_provider: "codex",
+        permission_profile: "read",
+        admission_status: "admitted",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      observation_packet: {
+        capability_key: MORAL_GRAPH_REFLECTION_CAPABILITY,
+        panel_id: "moral-graph",
+        action: "reflect_context",
+        status: "succeeded",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema: "helix.moral_graph_reflection_observation.v1",
+        capability_key: MORAL_GRAPH_REFLECTION_CAPABILITY,
+        panel_id: "moral-graph",
+        action_id: "reflect_context",
+        status: "succeeded",
+        reflection_terminal_eligible: false,
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+        authority: expect.objectContaining({
+          assistant_answer: false,
+          terminal_eligible: false,
+        }),
+      },
+      tool_followup_decision: {
+        next_action: "continue_reasoning",
+        evidence_reentered: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    expect(String(observation.reflection_id ?? "")).toMatch(/^ideology-context-reflection:/);
+    expect(observation.located_badge_ids?.length).toBeGreaterThan(0);
+    expect(observation.claim_boundary_notes?.length).toBeGreaterThan(0);
+    expect(observation.procedural_classification).toBeTruthy();
+    expect(observation.fruition).toBeTruthy();
   });
 
   it("calls Moral Graph living substrate reflection as read-only evidence, not an answer", async () => {

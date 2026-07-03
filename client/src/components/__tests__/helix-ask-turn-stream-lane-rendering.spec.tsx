@@ -130,7 +130,7 @@ const laneSessionRow: HelixContinuousTurnStreamRow = {
   source: "agent_work",
   label: "Lane Session",
   text: "Lane session: live_translation.",
-  meta: "source capability_lane_session_debug_summaries | live_translation | lane_session | action record_observation | session control key lane-session-docs::docs:nhm2::sha256:doc-a::docs_viewer.inline_translation::es-US::es | source binding key docs:nhm2::sha256:doc-a::docs_viewer.inline_translation::es-US::es | observation key docs:nhm2::sha256:doc-a::docs_viewer.inline_translation::es::chunk-1::ask:lane:translation:obs:projection:receipt | latest event lane-session-docs:start:150 | has observation false",
+  meta: "source capability_lane_session_debug_summaries | live_translation | lane_session | action record_observation | session status running | session health healthy | session control key lane-session-docs::docs:nhm2::sha256:doc-a::docs_viewer.inline_translation::es-US::es | source binding key docs:nhm2::sha256:doc-a::docs_viewer.inline_translation::es-US::es | observation key docs:nhm2::sha256:doc-a::docs_viewer.inline_translation::es::chunk-1::ask:lane:translation:obs:projection:receipt | latest event lane-session-docs:start:150 | has observation false",
   status: "running",
   tone: "working",
   evidenceRefs: ["ask:lane:translation:obs"],
@@ -141,7 +141,7 @@ const laneMailRow: HelixContinuousTurnStreamRow = {
   source: "agent_work",
   label: "Lane Mail",
   text: "Lane mail loop: live_translation.",
-  meta: "source capability_lane_mail_loop_debug_summaries | live_translation | lane_mail_loop | observation session lane-session-docs | observation ask:lane:translation:obs | mail observation key docs:nhm2::sha256:doc-a::docs_viewer.inline_translation::es::chunk-1::ask:lane:translation:obs:projection:receipt | wake kind mailbox_wake | materialized mail evidence true",
+  meta: "source capability_lane_mail_loop_debug_summaries | live_translation | lane_mail_loop | observation session lane-session-docs | observation ask:lane:translation:obs | mail observation key docs:nhm2::sha256:doc-a::docs_viewer.inline_translation::es::chunk-1::ask:lane:translation:obs:projection:receipt | stage play mail stage-play-mail-translation | delivery status delivered | previous mail stage-play-mail-previous | mailbox thread helix-ask:desktop | mail status unread | wake kind mailbox_wake | materialized mail evidence true",
   status: "healthy",
   tone: "observation",
   evidenceRefs: ["ask:lane:translation:obs"],
@@ -152,7 +152,7 @@ const goalLaneRow: HelixContinuousTurnStreamRow = {
   source: "agent_work",
   label: "Goal Lane",
   text: "Goal lane binding: live_translation.",
-  meta: "source capability_lane_goal_binding_debug_summaries | live_translation | lane_goal_binding | goal goal:translate-docs | goal binding goal-binding-docs | goal binding key goal:translate-docs::goal-binding-docs::lane-session-docs::live_translation | lane session lane-session-docs | source binding key docs:nhm2::sha256:doc-a::docs_viewer.inline_translation::es-US::es | observation key docs:nhm2::sha256:doc-a::docs_viewer.inline_translation::es::chunk-1::ask:lane:translation:obs:projection:receipt | mail observation key docs:nhm2::sha256:doc-a::docs_viewer.inline_translation::es::chunk-1::ask:lane:translation:obs:projection:receipt | report summary goal lane is quiet until salience",
+  meta: "source capability_lane_goal_binding_debug_summaries | live_translation | lane_goal_binding | goal goal:translate-docs | goal binding goal-binding-docs | goal binding key goal:translate-docs::goal-binding-docs::lane-session-docs::live_translation | binding status active | activation policy while_goal_active | attention policy quiet_until_salient | stop condition goal_complete | report policy debug_only | quiet behavior record_only | report action record_only | report reason no_salient_change | lane session lane-session-docs | source binding key docs:nhm2::sha256:doc-a::docs_viewer.inline_translation::es-US::es | observation key docs:nhm2::sha256:doc-a::docs_viewer.inline_translation::es::chunk-1::ask:lane:translation:obs:projection:receipt | mail observation key docs:nhm2::sha256:doc-a::docs_viewer.inline_translation::es::chunk-1::ask:lane:translation:obs:projection:receipt | report summary goal lane is quiet until salience",
   status: "bound",
   tone: "checkpoint",
   evidenceRefs: ["ask:lane:translation:obs"],
@@ -179,7 +179,7 @@ const goalDispatchAdmissionRow: HelixContinuousTurnStreamRow = {
   label: "Goal Admission",
   text: "Goal dispatch admission: live_translation; target ask_wake; target es.",
   meta:
-    `source capability_lane_goal_dispatch_admissions | live_translation | lane_goal_dispatch_admission | lane session lane-session-docs | session control key ${goalDispatchSessionControlKey}`,
+    `source capability_lane_goal_dispatch_admissions | live_translation | lane_goal_dispatch_admission | lane session lane-session-docs | blocked reason source_not_fresh | session control key ${goalDispatchSessionControlKey}`,
   status: "pending",
   tone: "checkpoint",
   evidenceRefs: ["ask:lane:translation:obs"],
@@ -225,7 +225,7 @@ describe("Helix Ask turn stream lane rendering", () => {
     expect(panel.getAttribute("data-capability-lane-stage-sequence")).toBe("requested");
     expect(panel.getAttribute("data-capability-lane-visible-does-not-mean-executed")).toBe("true");
     expect(screen.getByTestId("helix-ask-capability-lane-summary").textContent).toBe(
-      "Lane timeline: requested 1. Path: requested.",
+      "Lane timeline: requested 1. Status: requested. Path: requested.",
     );
     expect(screen.getByText("lane requested")).toBeTruthy();
     expect(screen.getByText("requested by runtime")).toBeTruthy();
@@ -300,8 +300,18 @@ describe("Helix Ask turn stream lane rendering", () => {
     expect(row.getAttribute("data-capability-lane-stage")).toBe("mail_loop");
     expect(row.getAttribute("data-capability-lane-observation-session-id")).toBe("lane-session-docs");
     expect(row.getAttribute("data-capability-lane-observation-lane-session-id")).toBe("lane-session-docs");
+    expect(row.getAttribute("data-capability-lane-stage-play-mail-id")).toBe("stage-play-mail-translation");
+    expect(row.getAttribute("data-capability-lane-stage-play-mail-delivery-status")).toBe("delivered");
+    expect(row.getAttribute("data-capability-lane-previous-stage-play-mail-id")).toBe(
+      "stage-play-mail-previous",
+    );
+    expect(row.getAttribute("data-capability-lane-mailbox-thread-id")).toBe("helix-ask:desktop");
+    expect(row.getAttribute("data-capability-lane-mail-status")).toBe("unread");
     expect(row.getAttribute("data-capability-lane-wake-kind")).toBe("mailbox_wake");
     expect(row.getAttribute("data-capability-lane-materialized-mail-loop-evidence")).toBe("true");
+    expect(screen.getByTestId("helix-ask-capability-lane-row-detail").textContent).toContain(
+      "Mail stage-play-mail-translation | Delivery delivered | Previous mail stage-play-mail-previous | Mailbox helix-ask:desktop | Mail status unread | Wake mailbox_wake",
+    );
   });
 
   it("exposes active stream goal/session lane identity", () => {
@@ -321,9 +331,20 @@ describe("Helix Ask turn stream lane rendering", () => {
     expect(row.getAttribute("data-capability-lane-stage")).toBe("goal_binding");
     expect(row.getAttribute("data-capability-lane-goal-id")).toBe("goal:translate-docs");
     expect(row.getAttribute("data-capability-lane-goal-binding-id")).toBe("goal-binding-docs");
+    expect(row.getAttribute("data-capability-lane-goal-binding-status")).toBe("active");
+    expect(row.getAttribute("data-capability-lane-goal-activation-policy")).toBe("while_goal_active");
+    expect(row.getAttribute("data-capability-lane-goal-attention-policy")).toBe("quiet_until_salient");
+    expect(row.getAttribute("data-capability-lane-goal-stop-condition")).toBe("goal_complete");
+    expect(row.getAttribute("data-capability-lane-goal-report-policy")).toBe("debug_only");
+    expect(row.getAttribute("data-capability-lane-goal-quiet-behavior")).toBe("record_only");
+    expect(row.getAttribute("data-capability-lane-goal-report-action")).toBe("record_only");
+    expect(row.getAttribute("data-capability-lane-goal-report-reason")).toBe("no_salient_change");
     expect(row.getAttribute("data-capability-lane-session-id")).toBe("lane-session-docs");
     expect(row.getAttribute("data-capability-lane-report-summary")).toBe(
       "goal lane is quiet until salience",
+    );
+    expect(screen.getByTestId("helix-ask-capability-lane-row-detail").textContent).toContain(
+      "Binding active | Activation while_goal_active | Attention quiet_until_salient | Stop goal_complete | Report policy debug_only | Quiet record_only | Report action record_only | Report reason no_salient_change",
     );
   });
 
@@ -342,6 +363,8 @@ describe("Helix Ask turn stream lane rendering", () => {
 
     const row = screen.getByTestId("helix-ask-active-turn-stream-row");
     expect(row.getAttribute("data-capability-lane-stage")).toBe("session");
+    expect(row.getAttribute("data-capability-lane-session-status")).toBe("running");
+    expect(row.getAttribute("data-capability-lane-session-health")).toBe("healthy");
     expect(row.getAttribute("data-capability-lane-session-lifecycle-action")).toBe(
       "record_observation",
     );
@@ -356,6 +379,9 @@ describe("Helix Ask turn stream lane rendering", () => {
     );
     expect(screen.getByTestId("helix-ask-capability-lane-row-detail").textContent).toContain(
       "Action record_observation | Session control lane-session-docs::docs:nhm2::sha256:doc-a::docs_viewer.inline_translation::es-US::es",
+    );
+    expect(screen.getByTestId("helix-ask-capability-lane-row-detail").textContent).toContain(
+      "Session status running | Session health healthy",
     );
   });
 
@@ -395,7 +421,7 @@ describe("Helix Ask turn stream lane rendering", () => {
       "available only",
     );
     expect(screen.getByTestId("helix-ask-capability-lane-summary").textContent).toBe(
-      "Lane timeline: visible 1. Path: visible. Visible lanes are available, not executed.",
+      "Lane timeline: visible 1. Status: visible only. Path: visible. Visible lanes are available, not executed.",
     );
     expect(screen.getByText("available only")).toBeTruthy();
     expect(screen.getByTestId("helix-ask-capability-lane-row-detail").textContent).toContain(
@@ -560,7 +586,7 @@ describe("Helix Ask turn stream lane rendering", () => {
     expect(panel.getAttribute("data-capability-lane-backend-selected-count")).toBe("1");
     expect(panel.getAttribute("data-capability-lane-stage-sequence")).toBe("backend");
     expect(screen.getByTestId("helix-ask-capability-lane-summary").textContent).toBe(
-      "Lane timeline: executed 1 / backend 1. Path: backend.",
+      "Lane timeline: executed 1 / backend 1. Status: executed. Path: backend.",
     );
   });
 
@@ -670,7 +696,7 @@ describe("Helix Ask turn stream lane rendering", () => {
       "requested > backend > observed > receipt > reentered",
     );
     expect(screen.getByTestId("helix-ask-capability-lane-summary").textContent).toBe(
-      "Lane timeline: requested 1 / executed 4 / backend 1 / observed 1 / receipt 1 / re-entered 1. Path: requested > backend > observed > receipt > reentered.",
+      "Lane timeline: requested 1 / executed 4 / backend 1 / observed 1 / receipt 1 / re-entered 1. Status: reentered. Path: requested > backend > observed > receipt > reentered.",
     );
     expect(screen.getByText("lane observed")).toBeTruthy();
     expect(screen.getByText("lane receipt")).toBeTruthy();
@@ -748,6 +774,8 @@ describe("Helix Ask turn stream lane rendering", () => {
       "goal bound",
     ]);
     expect(rows[0]?.getAttribute("data-capability-lane-id")).toBe("live_translation");
+    expect(rows[0]?.getAttribute("data-capability-lane-session-status")).toBe("running");
+    expect(rows[0]?.getAttribute("data-capability-lane-session-health")).toBe("healthy");
     expect(rows[0]?.getAttribute("data-capability-lane-latest-event-id")).toBe("lane-session-docs:start:150");
     expect(rows[0]?.getAttribute("data-capability-lane-has-observation")).toBe("false");
     expect(rows[0]?.getAttribute("data-capability-lane-source-binding-key")).toBe(
@@ -759,6 +787,13 @@ describe("Helix Ask turn stream lane rendering", () => {
     expect(rows[1]?.getAttribute("data-capability-lane-latest-mail-loop-observation-key")).toBe(
       "docs:nhm2::sha256:doc-a::docs_viewer.inline_translation::es::chunk-1::ask:lane:translation:obs:projection:receipt",
     );
+    expect(rows[1]?.getAttribute("data-capability-lane-stage-play-mail-id")).toBe("stage-play-mail-translation");
+    expect(rows[1]?.getAttribute("data-capability-lane-stage-play-mail-delivery-status")).toBe("delivered");
+    expect(rows[1]?.getAttribute("data-capability-lane-previous-stage-play-mail-id")).toBe(
+      "stage-play-mail-previous",
+    );
+    expect(rows[1]?.getAttribute("data-capability-lane-mailbox-thread-id")).toBe("helix-ask:desktop");
+    expect(rows[1]?.getAttribute("data-capability-lane-mail-status")).toBe("unread");
     expect(rows[1]?.getAttribute("data-capability-lane-wake-kind")).toBe("mailbox_wake");
     expect(rows[1]?.getAttribute("data-capability-lane-materialized-mail-loop-evidence")).toBe("true");
     expect(rows[2]?.getAttribute("data-capability-lane-goal-binding-key")).toBe(
@@ -766,6 +801,14 @@ describe("Helix Ask turn stream lane rendering", () => {
     );
     expect(rows[2]?.getAttribute("data-capability-lane-goal-id")).toBe("goal:translate-docs");
     expect(rows[2]?.getAttribute("data-capability-lane-goal-binding-id")).toBe("goal-binding-docs");
+    expect(rows[2]?.getAttribute("data-capability-lane-goal-binding-status")).toBe("active");
+    expect(rows[2]?.getAttribute("data-capability-lane-goal-activation-policy")).toBe("while_goal_active");
+    expect(rows[2]?.getAttribute("data-capability-lane-goal-attention-policy")).toBe("quiet_until_salient");
+    expect(rows[2]?.getAttribute("data-capability-lane-goal-stop-condition")).toBe("goal_complete");
+    expect(rows[2]?.getAttribute("data-capability-lane-goal-report-policy")).toBe("debug_only");
+    expect(rows[2]?.getAttribute("data-capability-lane-goal-quiet-behavior")).toBe("record_only");
+    expect(rows[2]?.getAttribute("data-capability-lane-goal-report-action")).toBe("record_only");
+    expect(rows[2]?.getAttribute("data-capability-lane-goal-report-reason")).toBe("no_salient_change");
     expect(rows[2]?.getAttribute("data-capability-lane-session-id")).toBe("lane-session-docs");
     expect(rows[2]?.getAttribute("data-capability-lane-report-summary")).toBe(
       "goal lane is quiet until salience",
@@ -826,6 +869,7 @@ describe("Helix Ask turn stream lane rendering", () => {
     expect(panel.getAttribute("data-capability-lane-goal-dispatch-readiness-count")).toBe("1");
     expect(rows[0]?.getAttribute("data-capability-lane-session-control-key")).toBe(goalDispatchSessionControlKey);
     expect(rows[1]?.getAttribute("data-capability-lane-session-control-key")).toBe(goalDispatchSessionControlKey);
+    expect(rows[1]?.getAttribute("data-capability-lane-blocked-reason")).toBe("source_not_fresh");
     expect(rows[2]?.getAttribute("data-capability-lane-session-control-key")).toBe(goalDispatchSessionControlKey);
     expect(rows[2]?.getAttribute("data-capability-lane-wake-kind")).toBe("mailbox_wake");
     expect(screen.getByText("lane goal dispatch plan")).toBeTruthy();

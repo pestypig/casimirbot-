@@ -55,6 +55,12 @@ describe("document live translation inline renderer", () => {
           hasObservation: true,
           selectedBackendProvider: "live_translation.local_runtime",
           projectionStatus: "projected",
+          chunkId: "u0001",
+          chunkIndex: 0,
+          dedupeKey: "document_markdown:docs/research/nhm2.md:u0001:es",
+          sourceEventId: "source-event:docs:u0001",
+          sourceEventMs: 240,
+          observedAtMs: 300,
           freshnessStatus: "fresh",
           terminalAuthorityStatus: "not_terminal_authority",
           sourceId: "document_markdown:docs/research/nhm2.md",
@@ -103,6 +109,16 @@ describe("document live translation inline renderer", () => {
     expect(rendered).toContain('data-doc-translation-terminal-eligible="false"');
     expect(rendered).toContain('data-doc-translation-assistant-answer="false"');
     expect(rendered).toContain('data-doc-translation-raw-content-included="false"');
+    expect(rendered).toContain('data-doc-translation-chunk-id="u0001"');
+    expect(rendered).toContain('data-doc-translation-chunk-index="0"');
+    expect(rendered).toContain(
+      'data-doc-translation-dedupe-key="document_markdown:docs/research/nhm2.md:u0001:es"',
+    );
+    expect(rendered).toContain('data-doc-translation-source-event-id="source-event:docs:u0001"');
+    expect(rendered).toContain('data-doc-translation-source-event-ms="240"');
+    expect(rendered).toContain('data-doc-translation-observed-at-ms="300"');
+    expect(rendered).toContain('data-doc-translation-freshness-status="fresh"');
+    expect(rendered).toContain('data-doc-translation-source-kind="document_markdown"');
     expect(rendered).toContain('data-doc-translation-source-hash="source-hash-current"');
     expect(rendered).toContain([
       'data-doc-translation-projection-key="document_markdown:docs/research/nhm2.md',
@@ -110,6 +126,7 @@ describe("document live translation inline renderer", () => {
       'source-text-hash-current',
       'docs_chunk',
       'es',
+      'u0001',
       'receipt:docs:u1"',
     ].join("::"));
     expect(rendered).toContain('data-doc-translation-source-text-hash="source-text-hash-current"');
@@ -227,6 +244,48 @@ describe("document live translation inline renderer", () => {
     expect(rendered).toContain('data-doc-translation-observation-ref="obs:docs:stale"');
     expect(rendered).toContain('data-doc-translation-terminal-eligible="false"');
     expect(rendered).toContain('data-doc-translation-assistant-answer="false"');
+  });
+
+  it("renders source identity mismatches as blocked governed projection state", () => {
+    const rendered = renderDocumentMarkdownWithInlineTranslations({
+      units: [unit("u0001", "Original source paragraph.")],
+      translations: {
+        u0001: {
+          status: "error",
+          error: "translation_projection_source_text_mismatch",
+          observationRef: null,
+          receiptRef: null,
+          projectionStatus: "missing",
+          freshnessStatus: "unknown",
+          terminalAuthorityStatus: "not_terminal_authority",
+          sourceId: "document_markdown:docs/research/nhm2.md",
+          sourceHash: "source-hash-current",
+          sourceTextHash: "source-text-current",
+          sourceTextCharCount: 27,
+          projectionTarget: "docs_chunk",
+          targetLanguage: "es",
+          source: "capability_lane",
+          terminalEligible: false,
+          assistantAnswer: false,
+          rawContentIncluded: false,
+        },
+      },
+      loadingText: "Translating...",
+      errorText: (reason) => `Could not translate: ${reason}`,
+      fallbackErrorText: "translation failed",
+    });
+
+    expect(rendered).toContain("Original source paragraph.");
+    expect(rendered).toContain("Could not translate: translation_projection_source_text_mismatch");
+    expect(rendered).toContain('data-doc-translation-display-status="blocked"');
+    expect(rendered).toContain('data-doc-translation-render-status="error"');
+    expect(rendered).toContain('data-doc-translation-projection-status="missing"');
+    expect(rendered).toContain('data-doc-translation-source-hash="source-hash-current"');
+    expect(rendered).toContain('data-doc-translation-source-text-hash="source-text-current"');
+    expect(rendered).toContain('data-doc-translation-source-text-char-count="27"');
+    expect(rendered).toContain('data-doc-translation-terminal-eligible="false"');
+    expect(rendered).toContain('data-doc-translation-assistant-answer="false"');
+    expect(rendered).not.toContain("Texto viejo");
   });
 
   it("keeps suppressed stale projection identity inspectable while rendering current ready text", () => {

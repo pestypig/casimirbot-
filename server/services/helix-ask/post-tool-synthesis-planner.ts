@@ -126,6 +126,9 @@ export function planPostToolSynthesis(args: PlanPostToolSynthesisInput): HelixPo
   const hasMoralLivingSubstrateReflection = receiptKinds.some((kind) =>
     /moral_living_substrate_reflection/i.test(kind),
   );
+  const hasMoralGraphReflection = receiptKinds.some((kind) =>
+    /(?:^|[._-])moral_graph_reflection|helix\.moral_graph_reflection_observation/i.test(kind),
+  );
 
   return buildHelixPostToolSynthesisPlanV1({
     turnId: args.turnId,
@@ -147,6 +150,12 @@ export function planPostToolSynthesis(args: PlanPostToolSynthesisInput): HelixPo
             "Do not summarize moral substrate badges without using the procedural chain's present and missing transition links.",
           ]
         : []),
+      ...(hasMoralGraphReflection
+        ? [
+            "Do not convert Moral Graph reflection into a final moral verdict, web evidence, or civilization-bound claim.",
+            "Do not summarize badge names without using locator, procedural classification, fruition, and claim-boundary evidence.",
+          ]
+        : []),
     ],
     synthesisInstructions: [
       "Answer the user's intent first, then summarize tool observations as evidence.",
@@ -156,6 +165,11 @@ export function planPostToolSynthesis(args: PlanPostToolSynthesisInput): HelixPo
       ...(hasMoralLivingSubstrateReflection
         ? [
             "For Moral Graph substrate reflection, reason from procedural_chain transitions: identify which links are present, which are partial or missing, and state conclusions conditionally.",
+          ]
+        : []),
+      ...(hasMoralGraphReflection
+        ? [
+            "For Moral Graph reflection, reason from located badges, procedural classification, fruition, and claim-boundary notes; state what the derivation supports and what remains missing.",
           ]
         : []),
     ],

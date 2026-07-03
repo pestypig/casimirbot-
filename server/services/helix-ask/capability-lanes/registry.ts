@@ -1,10 +1,6 @@
 import type {
-  HelixCapabilityLaneBackendProviderDescriptor,
-  HelixCapabilityLaneBackendFamily,
   HelixCapabilityLaneDescriptor,
-  HelixCapabilityLaneId,
   HelixCapabilityLaneManifest,
-  HelixCapabilityLaneModelVisibleHint,
   HelixCapabilityLaneResolveTrace,
 } from "@shared/helix-capability-lane";
 import {
@@ -19,42 +15,14 @@ import {
   hasAnyConfiguredEnvVar,
   readBooleanEnv,
   textBackendConfigured,
-  type HelixCapabilityLaneBackendProviderTemplate,
 } from "./backend-provider-config";
-
-type LaneTemplate = {
-  lane_id: HelixCapabilityLaneId;
-  family: HelixCapabilityLaneDescriptor["family"];
-  label: string;
-  description: string;
-  backend_family: HelixCapabilityLaneBackendFamily;
-  model_or_service_ref: string | null;
-  safety_tags: string[];
-  required_env_vars?: string[];
-  configured(env: NodeJS.ProcessEnv): boolean;
-  cost_class: HelixCapabilityLaneBackendProviderDescriptor["cost_class"];
-  latency_class: HelixCapabilityLaneBackendProviderDescriptor["latency_class"];
-  privacy_class: HelixCapabilityLaneBackendProviderDescriptor["privacy_class"];
-  one_shot_supported: boolean;
-  session_supported: boolean;
-  goal_binding_supported: boolean;
-  backend_provider_templates?: HelixCapabilityLaneBackendProviderTemplate[];
-  default_backend_provider?: string;
-  capabilities: LaneCapabilityTemplate[];
-};
-
-type LaneCapabilityTemplate = {
-  capability_id: string;
-  label: string;
-  one_shot_status: "executable" | "shadow_only" | "not_supported";
-  session_status: "supported" | "not_supported";
-  backend_provider_required: boolean;
-  model_visible_hint?: HelixCapabilityLaneModelVisibleHint;
-};
+import { codeTextLaneTemplate } from "./code-text";
+import type { HelixCapabilityLaneTemplate } from "./lane-template";
+import { visualAnalysisLaneTemplate } from "./visual-analysis";
 
 const defaultCapabilityModelVisibleHint = (
   capabilityId: string,
-): HelixCapabilityLaneModelVisibleHint => ({
+): HelixCapabilityLaneDescriptor["capabilities"][number]["model_visible_hint"] => ({
   required_input_fields: [],
   optional_input_fields: ["requested_backend_provider"],
   when_to_use: "Use only when this governed lane capability directly matches the user's requested task.",
@@ -65,7 +33,7 @@ const defaultCapabilityModelVisibleHint = (
   },
 });
 
-const laneTemplates: LaneTemplate[] = [
+const laneTemplates: HelixCapabilityLaneTemplate[] = [
   {
     lane_id: "utility_text",
     family: "text_inference",
@@ -182,32 +150,7 @@ const laneTemplates: LaneTemplate[] = [
       },
     ],
   },
-  {
-    lane_id: "code_text",
-    family: "code_inference",
-    label: "Code text",
-    description: "Code-oriented reasoning or review as text; no filesystem mutation authority.",
-    backend_family: "openai_compatible",
-    model_or_service_ref: "code_text_default",
-    safety_tags: ["shadow_only", "no_code_mutation", "observation_only"],
-    required_env_vars: ["OPENAI_API_KEY", "LLM_HTTP_BASE", "LLM_HTTP_MODEL"],
-    configured: textBackendConfigured,
-    cost_class: "standard",
-    latency_class: "interactive",
-    privacy_class: "account_provider",
-    one_shot_supported: false,
-    session_supported: false,
-    goal_binding_supported: false,
-    capabilities: [
-      {
-        capability_id: "code_text.review",
-        label: "Code text review",
-        one_shot_status: "shadow_only",
-        session_status: "not_supported",
-        backend_provider_required: true,
-      },
-    ],
-  },
+  codeTextLaneTemplate,
   {
     lane_id: "speech_to_text",
     family: "speech_to_text",
@@ -438,32 +381,7 @@ const laneTemplates: LaneTemplate[] = [
       },
     ],
   },
-  {
-    lane_id: "visual_analysis",
-    family: "visual_analysis",
-    label: "Visual analysis",
-    description: "Image or screen analysis lane for future governed visual observations.",
-    backend_family: "openai_compatible",
-    model_or_service_ref: "visual_analysis_default",
-    safety_tags: ["shadow_only", "visual", "observation_only"],
-    required_env_vars: ["OPENAI_API_KEY", "LLM_HTTP_BASE", "LLM_HTTP_MODEL"],
-    configured: textBackendConfigured,
-    cost_class: "standard",
-    latency_class: "interactive",
-    privacy_class: "external_provider",
-    one_shot_supported: false,
-    session_supported: false,
-    goal_binding_supported: false,
-    capabilities: [
-      {
-        capability_id: "visual_analysis.inspect_frame",
-        label: "Inspect visual frame",
-        one_shot_status: "shadow_only",
-        session_status: "not_supported",
-        backend_provider_required: true,
-      },
-    ],
-  },
+  visualAnalysisLaneTemplate,
   {
     lane_id: "workstation_tool_reference",
     family: "workstation_tool_reference",
@@ -512,7 +430,7 @@ const laneEnabled = (
   readBooleanEnv(env[`HELIX_CAPABILITY_LANE_${laneId.toUpperCase()}_ENABLED`], true);
 
 const laneStatus = (input: {
-  template: LaneTemplate;
+  template: HelixCapabilityLaneTemplate;
   provider: HelixAgentProvider;
   env: NodeJS.ProcessEnv;
 }): HelixCapabilityLaneDescriptor["status"] => {
@@ -554,7 +472,7 @@ const terminalPolicy = {
   preserves_runtime_provider_root: true as const,
 };
 
-const laneContractsFor = (template: LaneTemplate) => ({
+const laneContractsFor = (template: HelixCapabilityLaneTemplate) => ({
   backend_selection_policy: HELIX_LANE_BACKEND_SELECTION_POLICY,
   one_shot_call_contract: {
     schema: "helix.capability_lane.one_shot_call_contract.v1" as const,
@@ -616,7 +534,7 @@ const laneContractsFor = (template: LaneTemplate) => ({
   terminal_policy: terminalPolicy,
 });
 
-const laneCapabilitiesFor = (template: LaneTemplate) =>
+const laneCapabilitiesFor = (template: HelixCapabilityLaneTemplate) =>
   template.capabilities.map((capability) => ({
     schema: "helix.capability_lane.capability_descriptor.v1" as const,
     capability_id: capability.capability_id,
@@ -636,7 +554,7 @@ const laneCapabilitiesFor = (template: LaneTemplate) =>
   }));
 
 const descriptorFor = (input: {
-  template: LaneTemplate;
+  template: HelixCapabilityLaneTemplate;
   provider: HelixAgentProvider;
   env: NodeJS.ProcessEnv;
 }): HelixCapabilityLaneDescriptor => {
@@ -681,7 +599,7 @@ export const listHelixCapabilityLanes = (input: {
   env?: NodeJS.ProcessEnv;
 }): HelixCapabilityLaneManifest => {
   const env = input.env ?? process.env;
-  const lanes = laneTemplates.map((template: LaneTemplate) => descriptorFor({
+  const lanes = laneTemplates.map((template: HelixCapabilityLaneTemplate) => descriptorFor({
     template,
     provider: input.provider,
     env,

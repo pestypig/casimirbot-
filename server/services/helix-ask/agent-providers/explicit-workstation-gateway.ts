@@ -9,10 +9,12 @@ import {
 } from "./provider-compound-capability-planner";
 import {
   CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+  CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
   DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY,
   DOCS_READ_VISIBLE_SURFACE_CAPABILITY,
   DOCS_SEARCH_CAPABILITY,
   INTERNET_SEARCH_CAPABILITY,
+  MORAL_GRAPH_REFLECTION_CAPABILITY,
   REPO_SEARCH_CAPABILITY,
   SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
   TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY,
@@ -46,6 +48,7 @@ import {
 import {
   buildPromptDerivedCalculatorSolveGatewayCallRequests,
   buildPromptDerivedInternetSearchGatewayCallRequests,
+  buildPromptDerivedMoralGraphReflectionGatewayCallRequests,
   buildPromptDerivedRepoSearchGatewayCallRequests,
   buildPromptDerivedScholarlyResearchGatewayCallRequests,
   buildPromptDerivedTheoryReflectionGatewayCallRequests,
@@ -59,29 +62,61 @@ import {
 } from "./prompt-named-tool-requests";
 
 const MORAL_SUBSTRATE_PRIMARY_CAPABILITY = "moral-graph.reflect_living_substrate_context" as const;
+const MORAL_GRAPH_PRIMARY_CAPABILITIES = new Set([
+  MORAL_GRAPH_REFLECTION_CAPABILITY,
+  MORAL_SUBSTRATE_PRIMARY_CAPABILITY,
+]);
 
 const MORAL_SUBSTRATE_DEFERRED_AFFORDANCE_CAPABILITIES = new Set([
   INTERNET_SEARCH_CAPABILITY,
   SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
   THEORY_CONTEXT_REFLECTION_CAPABILITY,
+  CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
   CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
 ]);
 
-const isMoralSubstrateRequest = (request: Record<string, unknown>): boolean =>
-  (readString(request.capability_id) ?? readString(request.capabilityId)) === MORAL_SUBSTRATE_PRIMARY_CAPABILITY;
+const isMoralGraphPrimaryRequest = (request: Record<string, unknown>): boolean => {
+  const capability = readString(request.capability_id) ?? readString(request.capabilityId);
+  return Boolean(capability && MORAL_GRAPH_PRIMARY_CAPABILITIES.has(capability));
+};
 
-const isMoralSubstrateIntent = (request: Record<string, unknown>): boolean => {
+const isMoralGraphPrimaryIntent = (request: Record<string, unknown>): boolean => {
   const sourceTargetIntent = readRecord(readRecord(request.arguments)?.source_target_intent);
   return (
+    readString(sourceTargetIntent?.target_kind) === "moral_graph_reflection" ||
+    readString(sourceTargetIntent?.intent) === "moral_graph_reflection" ||
     readString(sourceTargetIntent?.target_kind) === "moral_living_substrate_reflection" ||
     readString(sourceTargetIntent?.intent) === "moral_living_substrate_reflection"
   );
 };
 
-const promptExplicitlyRequestsExternalEvidence = (prompt: string): boolean =>
-  /\b(?:also|and|then|with|plus|include|using|use|search|look\s+up|find|cite|citations?|sources?|papers?|research|scholarly|arxiv|web|internet|latest|current|recent)\b[\s\S]{0,120}\b(?:search|look\s+up|find|cite|citations?|sources?|papers?|research|scholarly|arxiv|web|internet|latest|current|recent)\b/i.test(
+const promptNegatesExternalEvidence = (prompt: string): boolean =>
+  /\b(?:do\s+not|don't|dont|without|no|not)\b[\s\S]{0,100}\b(?:search\s+(?:the\s+)?(?:web|internet|online)|web\s+search|internet\s+search|online\s+search|external\s+sources?)\b/i.test(
     unquotePrompt(prompt),
   );
+
+const promptExplicitlyRequestsExternalEvidence = (prompt: string): boolean => {
+  if (promptNegatesExternalEvidence(prompt)) return false;
+  const unquoted = unquotePrompt(prompt);
+  return (
+    /\b(?:also|and|then|with|plus|include|using|use)\b[\s\S]{0,120}\b(?:search\s+(?:the\s+)?(?:web|internet|online)|web\s+search|internet\s+search|look\s+up|online|external\s+sources?|latest|current|recent|scholarly|arxiv|papers?)\b/i.test(
+      unquoted,
+    ) ||
+    /\b(?:search|look\s+up|find|cite)\b[\s\S]{0,120}\b(?:web|internet|online|external|latest|current|recent|scholarly|arxiv|papers?)\b/i.test(
+      unquoted,
+    ) ||
+    /\b(?:web|internet|online|external|latest|current|recent|scholarly|arxiv|papers?)\b[\s\S]{0,120}\b(?:search|sources?|evidence|research|citations?)\b/i.test(
+      unquoted,
+    )
+  );
+};
+
+const promptExplicitlyRequestsCrossGraphMoralFollowup = (prompt: string): boolean => {
+  const unquoted = unquotePrompt(prompt);
+  return /\b(?:theory\s+badge\s+graph|theory\s+graph|civilization\s+bounds?|scientific[-\s]?calculator|calculator|fruition)\b/i.test(
+    unquoted,
+  );
+};
 
 const isExplicitExternalResearchRequest = (
   request: Record<string, unknown>,
@@ -96,9 +131,21 @@ const isExplicitExternalResearchRequest = (
   const explicitCues = Array.isArray(sourceTargetIntent?.explicit_cues)
     ? sourceTargetIntent.explicit_cues.filter((cue): cue is string => typeof cue === "string")
     : [];
-  return (
+  const explicitRouteOrCue =
     derivationSource === "helix_prompt_named_capability" ||
-    explicitCues.includes("prompt_named_capability") ||
+    explicitCues.includes("prompt_named_capability");
+  if (capability === INTERNET_SEARCH_CAPABILITY || capability === SCHOLARLY_RESEARCH_SEARCH_CAPABILITY) {
+    return explicitRouteOrCue || promptExplicitlyRequestsExternalEvidence(prompt);
+  }
+  if (
+    capability === THEORY_CONTEXT_REFLECTION_CAPABILITY ||
+    capability === CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY ||
+    capability === CALCULATOR_SOLVE_EXPRESSION_CAPABILITY
+  ) {
+    return explicitRouteOrCue || promptExplicitlyRequestsCrossGraphMoralFollowup(prompt);
+  }
+  return (
+    explicitRouteOrCue ||
     promptExplicitlyRequestsExternalEvidence(prompt)
   );
 };
@@ -110,11 +157,11 @@ const requestToProviderNextAffordance = (request: Record<string, unknown>): Reco
   const sourceTargetIntent = readRecord(args.source_target_intent) ?? {};
   return {
     schema: "helix.provider_next_affordance.v1",
-    source: "helix_moral_substrate_primary_request_reduction",
+    source: "helix_moral_graph_primary_request_reduction",
     capability,
     mode: readString(request.mode) ?? "read",
     purpose: "codex_selected_followup_tool",
-    reason: "available_after_moral_substrate_observation_reentry",
+    reason: "available_after_moral_graph_observation_reentry",
     prompt: readString(args.prompt),
     query: readString(args.query),
     expression: readString(args.expression) ?? readString(args.latex),
@@ -156,14 +203,14 @@ const attachNextAffordancesToRequest = (
   };
 };
 
-const reduceMoralSubstrateRequestsToPrimary = (
+const reduceMoralGraphRequestsToPrimary = (
   input: {
     requests: Record<string, unknown>[];
     prompt: string;
     promptNamedCapabilities: Set<string>;
   },
 ): Record<string, unknown>[] => {
-  const moralIndex = input.requests.findIndex((request) => isMoralSubstrateRequest(request) && isMoralSubstrateIntent(request));
+  const moralIndex = input.requests.findIndex((request) => isMoralGraphPrimaryRequest(request) && isMoralGraphPrimaryIntent(request));
   if (moralIndex < 0) return input.requests;
   const moralRequest = input.requests[moralIndex];
   const deferredAffordances: Record<string, unknown>[] = [];
@@ -171,7 +218,7 @@ const reduceMoralSubstrateRequestsToPrimary = (
 
   for (const [index, request] of input.requests.entries()) {
     if (index === moralIndex) continue;
-    if (isMoralSubstrateRequest(request)) continue;
+    if (isMoralGraphPrimaryRequest(request)) continue;
     const capability = readString(request.capability_id) ?? readString(request.capabilityId);
     const shouldDefer =
       capability &&
@@ -212,6 +259,7 @@ export {
 export {
   buildPromptDerivedCalculatorSolveGatewayCallRequests,
   buildPromptDerivedInternetSearchGatewayCallRequests,
+  buildPromptDerivedMoralGraphReflectionGatewayCallRequests,
   buildPromptDerivedRepoSearchGatewayCallRequests,
   buildPromptDerivedScholarlyResearchGatewayCallRequests,
   buildPromptDerivedTheoryReflectionGatewayCallRequests,
@@ -294,6 +342,12 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
     appendDedupe(requests, seen, buildPromptDerivedVoiceGatewayCallRequests(input.body));
   }
   if (
+    !promptNamedCapabilities.has(MORAL_GRAPH_REFLECTION_CAPABILITY) &&
+    compoundDependencyCapabilities.size === 0
+  ) {
+    appendDedupe(requests, seen, buildPromptDerivedMoralGraphReflectionGatewayCallRequests(input.body));
+  }
+  if (
     !promptNamedCapabilities.has(CALCULATOR_SOLVE_EXPRESSION_CAPABILITY) &&
     !compoundDependencyCapabilities.has(CALCULATOR_SOLVE_EXPRESSION_CAPABILITY)
   ) {
@@ -328,7 +382,7 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   if (!promptNamedCapabilities.has(REPO_SEARCH_CAPABILITY) && !compoundDependencyCapabilities.has(REPO_SEARCH_CAPABILITY)) {
     appendDedupe(requests, seen, buildPromptDerivedRepoSearchGatewayCallRequests(input.body));
   }
-  return reduceMoralSubstrateRequestsToPrimary({
+  return reduceMoralGraphRequestsToPrimary({
     requests,
     prompt,
     promptNamedCapabilities,

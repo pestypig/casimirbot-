@@ -2,7 +2,7 @@ import React from "react";
 import { marked, type MarkedOptions, type Tokens } from "marked";
 import { renderToString as renderKatexToString } from "katex";
 import "katex/dist/katex.min.css";
-import { ArrowLeft, Folder, Languages, Search } from "lucide-react";
+import { ArrowLeft, Folder, Languages, Pause, Play, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -93,7 +93,20 @@ const DOC_TRANSLATION_SCAN_DEBOUNCE_MS = 360;
 
 type StoredInlineTranslationSession = {
   enabled: boolean;
+  sourceHash?: string | null;
+  sourceTextHash?: string | null;
+  sourceTextCharCount?: number | null;
+  accountLocale?: string | null;
+  targetLanguage?: string | null;
   translations: Record<string, InlineTranslationState>;
+};
+
+type StoredInlineTranslationSessionScope = {
+  sourceHash: string | null;
+  sourceTextHash: string | null;
+  sourceTextCharCount: number | null;
+  accountLocale: string;
+  targetLanguage: string;
 };
 
 const EMPTY_LIVE_TRANSLATION_PROJECTION_SNAPSHOT = {
@@ -499,7 +512,13 @@ export function DocViewerPanel() {
       setTranslationStatus("idle");
       return;
     }
-    const stored = readStoredInlineTranslationSession(activeTranslationScopeKey);
+    const stored = readStoredInlineTranslationSession(activeTranslationScopeKey, {
+      sourceHash: rawMarkdownSourceHash,
+      sourceTextHash: rawMarkdownSourceHash,
+      sourceTextCharCount: rawMarkdown.length,
+      accountLocale: interfaceLanguage.code,
+      targetLanguage: interfaceLanguage.code,
+    });
     setInlineTranslationEnabled(stored.enabled);
     setInlineTranslations(stored.translations);
     setTranslationStatus(
@@ -509,15 +528,27 @@ export function DocViewerPanel() {
           : "ready"
         : "idle",
     );
-  }, [activeTranslationScopeKey]);
+  }, [activeTranslationScopeKey, interfaceLanguage.code, rawMarkdown.length, rawMarkdownSourceHash]);
 
   React.useEffect(() => {
     if (!activeTranslationScopeKey) return;
     writeStoredInlineTranslationSession(activeTranslationScopeKey, {
       enabled: inlineTranslationEnabled,
+      sourceHash: rawMarkdownSourceHash,
+      sourceTextHash: rawMarkdownSourceHash,
+      sourceTextCharCount: rawMarkdown.length,
+      accountLocale: interfaceLanguage.code,
+      targetLanguage: interfaceLanguage.code,
       translations: inlineTranslations,
     });
-  }, [activeTranslationScopeKey, inlineTranslationEnabled, inlineTranslations]);
+  }, [
+    activeTranslationScopeKey,
+    inlineTranslationEnabled,
+    inlineTranslations,
+    interfaceLanguage.code,
+    rawMarkdown.length,
+    rawMarkdownSourceHash,
+  ]);
 
   React.useEffect(() => {
     if (!activeTranslationScopeKey || !translationEligible) return;
@@ -1119,6 +1150,11 @@ export function DocViewerPanel() {
       if (activeTranslationScopeKey) {
         writeStoredInlineTranslationSession(activeTranslationScopeKey, {
           enabled: false,
+          sourceHash: rawMarkdownSourceHash,
+          sourceTextHash: rawMarkdownSourceHash,
+          sourceTextCharCount: rawMarkdown.length,
+          accountLocale: interfaceLanguage.code,
+          targetLanguage: interfaceLanguage.code,
           translations: inlineTranslations,
         });
       }
@@ -1139,6 +1175,60 @@ export function DocViewerPanel() {
     inlineTranslationEnabled,
     inlineTranslations,
     interfaceLanguage.code,
+    rawMarkdown,
+    rawMarkdownSourceHash,
+    translationEligible,
+  ]);
+
+  const handleToggleInlineTranslationSessionPause = React.useCallback(() => {
+    if (!translationEligible || !activeTranslationScopeKey || !currentEntry || !rawMarkdownSourceHash) return;
+    const sourceId = documentMarkdownSourceId(currentEntry.relativePath);
+    const laneSessionId =
+      liveTranslationProjectionSummary.latestLaneSessionId ??
+      documentInlineTranslationLaneSessionId(activeTranslationScopeKey);
+    const action = liveTranslationProjectionSummary.latestLaneSessionStatus === "paused"
+      ? "resume"
+      : "pause";
+    if (action === "pause") {
+      inFlightTranslationUnitIdsRef.current.clear();
+      setTranslationStatus((current) => current === "error" || current === "unavailable" ? current : "cached");
+    } else {
+      translationScopeKeyRef.current = activeTranslationScopeKey;
+      setInlineTranslationEnabled(true);
+      setTranslationStatus((current) => current === "error" || current === "unavailable" ? current : "ready");
+    }
+    void runDocumentMarkdownTranslationLaneSessionControl({
+      action,
+      docPath: currentEntry.relativePath,
+      locale: interfaceLanguage.code,
+      targetLanguage: interfaceLanguage.code,
+      accountLocale: interfaceLanguage.code,
+      sourceHash: rawMarkdownSourceHash,
+      sourceTextHash: rawMarkdownSourceHash,
+      sourceTextCharCount: rawMarkdown.length,
+      sourceId,
+      laneSessionId,
+      projectionTarget: HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK,
+      agentRuntime: "helix",
+      reason: `document_inline_translation_${action}`,
+    })
+      .then((response) => {
+        emitDocumentTranslationLaneSessionControlEvents({
+          response: response as Record<string, unknown>,
+          sourceId,
+          sourceHash: rawMarkdownSourceHash,
+        });
+      })
+      .catch((err) => {
+        if (isAbortError(err)) return;
+        console.warn("Document translation lane session control failed", err);
+      });
+  }, [
+    activeTranslationScopeKey,
+    currentEntry,
+    interfaceLanguage.code,
+    liveTranslationProjectionSummary.latestLaneSessionId,
+    liveTranslationProjectionSummary.latestLaneSessionStatus,
     rawMarkdown,
     rawMarkdownSourceHash,
     translationEligible,
@@ -1234,11 +1324,19 @@ export function DocViewerPanel() {
             translationEligible={translationEligible}
             translationAccountLocale={interfaceLanguage.code}
             translationTargetLanguage={interfaceLanguage.code}
+            translationSourceId={currentEntry ? documentMarkdownSourceId(currentEntry.relativePath) : null}
+            translationSourceHash={rawMarkdownSourceHash}
+            translationSourceTextHash={rawMarkdownSourceHash}
+            translationSourceTextCharCount={rawMarkdown.length}
+            translationLaneSessionId={
+              activeTranslationScopeKey ? documentInlineTranslationLaneSessionId(activeTranslationScopeKey) : null
+            }
             inlineTranslationEnabled={inlineTranslationEnabled}
             translationStatus={translationStatus}
             translationError={translationError}
             liveTranslationProjectionSummary={liveTranslationProjectionSummary}
             onToggleInlineTranslation={handleToggleInlineTranslation}
+            onToggleInlineTranslationSessionPause={handleToggleInlineTranslationSessionPause}
             t={t}
           />
           <div
@@ -1500,11 +1598,17 @@ type PanelHeaderProps = {
   translationEligible: boolean;
   translationAccountLocale: string;
   translationTargetLanguage: string;
+  translationSourceId: string | null;
+  translationSourceHash: string | null;
+  translationSourceTextHash: string | null;
+  translationSourceTextCharCount: number | null;
+  translationLaneSessionId: string | null;
   inlineTranslationEnabled: boolean;
   translationStatus: DocumentTranslationUiStatus;
   translationError: string | null;
   liveTranslationProjectionSummary: DocumentLiveTranslationProjectionSnapshotSummary;
   onToggleInlineTranslation: () => void;
+  onToggleInlineTranslationSessionPause: () => void;
   t: Translate;
 };
 
@@ -1525,11 +1629,17 @@ export function PanelHeader({
   translationEligible,
   translationAccountLocale,
   translationTargetLanguage,
+  translationSourceId,
+  translationSourceHash,
+  translationSourceTextHash,
+  translationSourceTextCharCount,
+  translationLaneSessionId,
   inlineTranslationEnabled,
   translationStatus,
   translationError,
   liveTranslationProjectionSummary,
   onToggleInlineTranslation,
+  onToggleInlineTranslationSessionPause,
   t,
 }: PanelHeaderProps) {
   const title =
@@ -1557,6 +1667,14 @@ export function PanelHeader({
     liveTranslationProjectionSummary.displayStatus === "failed" ||
     liveTranslationProjectionSummary.displayStatus === "cancelled" ||
     liveTranslationProjectionSummary.displayStatus === "stale";
+  const latestLaneSessionStatus = liveTranslationProjectionSummary.latestLaneSessionStatus;
+  const latestOrNextTranslationLaneSessionId =
+    liveTranslationProjectionSummary.latestLaneSessionId ?? translationLaneSessionId;
+  const hasControllableTranslationLaneSession =
+    inlineTranslationEnabled &&
+    Boolean(latestOrNextTranslationLaneSessionId) &&
+    (latestLaneSessionStatus === "running" || latestLaneSessionStatus === "paused");
+  const isTranslationLaneSessionPaused = latestLaneSessionStatus === "paused";
 
   const badges = entry ? getDocBadges(entry, t) : [];
 
@@ -1658,6 +1776,7 @@ export function PanelHeader({
             )}
             data-doc-translation-summary-version={String(liveTranslationProjectionSummary.version)}
             data-doc-translation-summary-total={String(liveTranslationProjectionSummary.totalCount)}
+            data-doc-translation-summary-pending={String(liveTranslationProjectionSummary.pendingCount)}
             data-doc-translation-summary-ready={String(liveTranslationProjectionSummary.readyCount)}
             data-doc-translation-summary-error={String(liveTranslationProjectionSummary.errorCount)}
             data-doc-translation-summary-health={liveTranslationProjectionSummary.healthStatus}
@@ -1741,6 +1860,8 @@ export function PanelHeader({
             data-doc-translation-summary-latest-suppressed-reason={liveTranslationProjectionSummary.latestSuppressedReason ?? ""}
             data-doc-translation-summary-lane-sessions={String(liveTranslationProjectionSummary.laneSessionCount)}
             data-doc-translation-summary-active-lane-sessions={String(liveTranslationProjectionSummary.activeLaneSessionCount)}
+            data-doc-translation-summary-paused-lane-sessions={String(liveTranslationProjectionSummary.pausedLaneSessionCount)}
+            data-doc-translation-summary-stopped-lane-sessions={String(liveTranslationProjectionSummary.stoppedLaneSessionCount)}
             data-doc-translation-summary-blocked-lane-sessions={String(liveTranslationProjectionSummary.blockedLaneSessionCount)}
             data-doc-translation-summary-latest-lane-session-status={liveTranslationProjectionSummary.latestLaneSessionStatus ?? ""}
             data-doc-translation-summary-latest-lane-session-health={liveTranslationProjectionSummary.latestLaneSessionHealth ?? ""}
@@ -1750,6 +1871,22 @@ export function PanelHeader({
             data-doc-translation-summary-latest-lane-session-event-id={liveTranslationProjectionSummary.latestLaneSessionEventId ?? ""}
             data-doc-translation-summary-latest-lane-session-control-key={liveTranslationProjectionSummary.latestLaneSessionControlKey ?? ""}
             data-doc-translation-summary-latest-lane-session-has-observation={String(liveTranslationProjectionSummary.latestLaneSessionHasObservation)}
+            data-doc-translation-summary-latest-lane-session-source-id={liveTranslationProjectionSummary.latestLaneSessionSourceId ?? ""}
+            data-doc-translation-summary-latest-lane-session-source-hash={liveTranslationProjectionSummary.latestLaneSessionSourceHash ?? ""}
+            data-doc-translation-summary-latest-lane-session-source-kind={liveTranslationProjectionSummary.latestLaneSessionSourceKind ?? ""}
+            data-doc-translation-summary-latest-lane-session-source-text-hash={liveTranslationProjectionSummary.latestLaneSessionSourceTextHash ?? ""}
+            data-doc-translation-summary-latest-lane-session-source-text-char-count={liveTranslationProjectionSummary.latestLaneSessionSourceTextCharCount ?? ""}
+            data-doc-translation-summary-latest-lane-session-projection-target={liveTranslationProjectionSummary.latestLaneSessionProjectionTarget ?? ""}
+            data-doc-translation-summary-latest-lane-session-account-locale={liveTranslationProjectionSummary.latestLaneSessionAccountLocale ?? ""}
+            data-doc-translation-summary-latest-lane-session-target-language={liveTranslationProjectionSummary.latestLaneSessionTargetLanguage ?? ""}
+            data-doc-translation-summary-latest-lane-session-chunk-id={liveTranslationProjectionSummary.latestLaneSessionChunkId ?? ""}
+            data-doc-translation-summary-latest-lane-session-chunk-index={liveTranslationProjectionSummary.latestLaneSessionChunkIndex ?? ""}
+            data-doc-translation-summary-latest-lane-session-dedupe-key={liveTranslationProjectionSummary.latestLaneSessionDedupeKey ?? ""}
+            data-doc-translation-summary-latest-lane-session-source-event-id={liveTranslationProjectionSummary.latestLaneSessionSourceEventId ?? ""}
+            data-doc-translation-summary-latest-lane-session-source-event-ms={liveTranslationProjectionSummary.latestLaneSessionSourceEventMs ?? ""}
+            data-doc-translation-summary-latest-lane-session-observed-at-ms={liveTranslationProjectionSummary.latestLaneSessionObservedAtMs ?? ""}
+            data-doc-translation-summary-latest-lane-session-freshness-status={liveTranslationProjectionSummary.latestLaneSessionFreshnessStatus ?? ""}
+            data-doc-translation-summary-latest-lane-session-terminal-authority-status={liveTranslationProjectionSummary.latestLaneSessionTerminalAuthorityStatus}
             data-doc-translation-summary-mail-loops={String(liveTranslationProjectionSummary.mailLoopCount)}
             data-doc-translation-summary-pending-mail-loops={String(liveTranslationProjectionSummary.pendingMailLoopCount)}
             data-doc-translation-summary-blocked-mail-loops={String(liveTranslationProjectionSummary.blockedMailLoopCount)}
@@ -1760,6 +1897,7 @@ export function PanelHeader({
             data-doc-translation-summary-latest-mail-loop-wake-kind={liveTranslationProjectionSummary.latestMailLoopWakeKind}
             data-doc-translation-summary-latest-mail-loop-observation-lane-session-id={liveTranslationProjectionSummary.latestMailLoopObservationLaneSessionId ?? ""}
             data-doc-translation-summary-latest-mail-loop-session-control-key={liveTranslationProjectionSummary.latestMailLoopSessionControlKey ?? ""}
+            data-doc-translation-summary-latest-mail-loop-terminal-authority-status={liveTranslationProjectionSummary.latestMailLoopTerminalAuthorityStatus}
             data-doc-translation-summary-goal-bindings={String(liveTranslationProjectionSummary.goalBindingCount)}
             data-doc-translation-summary-active-goal-bindings={String(liveTranslationProjectionSummary.activeGoalBindingCount)}
             data-doc-translation-summary-blocked-goal-bindings={String(liveTranslationProjectionSummary.blockedGoalBindingCount)}
@@ -1807,26 +1945,67 @@ export function PanelHeader({
       </div>
       <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
         {translationEligible ? (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onToggleInlineTranslation}
-            data-doc-translation-control="inline-account-language"
-            data-doc-translation-control-enabled={String(inlineTranslationEnabled)}
-            data-doc-translation-control-target-language={translationTargetLanguage}
-            data-doc-translation-control-account-locale={translationAccountLocale}
-            data-doc-translation-control-projection-target={HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK}
-            data-doc-translation-control-terminal-eligible="false"
-            data-doc-translation-control-assistant-answer="false"
-            data-doc-translation-control-raw-content-included="false"
-          >
-            <Languages className="mr-1.5 h-3.5 w-3.5" />
-            {inlineTranslationEnabled
-              ? t("docsViewer.translation.hideInline")
-              : isTranslating
-                ? t("docsViewer.translation.generating")
-                : t("docsViewer.translation.generateInline")}
-          </Button>
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onToggleInlineTranslation}
+              data-doc-translation-control="inline-account-language"
+              data-doc-translation-control-action={inlineTranslationEnabled ? "stop" : "start"}
+              data-doc-translation-control-enabled={String(inlineTranslationEnabled)}
+              data-doc-translation-control-lane-session-id={latestOrNextTranslationLaneSessionId ?? ""}
+              data-doc-translation-control-source-id={translationSourceId ?? ""}
+              data-doc-translation-control-target-language={translationTargetLanguage}
+              data-doc-translation-control-account-locale={translationAccountLocale}
+              data-doc-translation-control-source-hash={translationSourceHash ?? ""}
+              data-doc-translation-control-source-text-hash={translationSourceTextHash ?? ""}
+              data-doc-translation-control-source-text-char-count={translationSourceTextCharCount ?? ""}
+              data-doc-translation-control-projection-target={HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK}
+              data-doc-translation-control-terminal-eligible="false"
+              data-doc-translation-control-assistant-answer="false"
+              data-doc-translation-control-raw-content-included="false"
+            >
+              <Languages className="mr-1.5 h-3.5 w-3.5" />
+              {inlineTranslationEnabled
+                ? t("docsViewer.translation.hideInline")
+                : isTranslating
+                  ? t("docsViewer.translation.generating")
+                  : t("docsViewer.translation.generateInline")}
+            </Button>
+            {hasControllableTranslationLaneSession ? (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={onToggleInlineTranslationSessionPause}
+                aria-label={
+                  isTranslationLaneSessionPaused
+                    ? t("docsViewer.translation.resumeSession")
+                    : t("docsViewer.translation.pauseSession")
+                }
+                title={
+                  isTranslationLaneSessionPaused
+                    ? t("docsViewer.translation.resumeSession")
+                    : t("docsViewer.translation.pauseSession")
+                }
+                data-doc-translation-session-control="pause-resume"
+                data-doc-translation-session-control-action={isTranslationLaneSessionPaused ? "resume" : "pause"}
+                data-doc-translation-session-control-status={latestLaneSessionStatus ?? ""}
+                data-doc-translation-session-control-lane-session-id={latestOrNextTranslationLaneSessionId ?? ""}
+                data-doc-translation-session-control-source-id={translationSourceId ?? ""}
+                data-doc-translation-session-control-target-language={translationTargetLanguage}
+                data-doc-translation-session-control-account-locale={translationAccountLocale}
+                data-doc-translation-session-control-source-hash={translationSourceHash ?? ""}
+                data-doc-translation-session-control-source-text-hash={translationSourceTextHash ?? ""}
+                data-doc-translation-session-control-source-text-char-count={translationSourceTextCharCount ?? ""}
+                data-doc-translation-session-control-terminal-eligible="false"
+                data-doc-translation-session-control-assistant-answer="false"
+                data-doc-translation-session-control-raw-content-included="false"
+                className="h-9 w-9 shrink-0"
+              >
+                {isTranslationLaneSessionPaused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
+              </Button>
+            ) : null}
+          </>
         ) : null}
         {isAutoReading ? (
           <Button variant="destructive" size="sm" onClick={onStopAutoRead}>
@@ -1882,6 +2061,15 @@ export function getDocumentTranslationStatusLabel(args: {
   if (args.liveTranslationProjectionSummary.blockedGoalBindingCount > 0) {
     return args.t("docsViewer.translation.status.goalBindingBlocked", {
       status: args.liveTranslationProjectionSummary.latestGoalBindingStatus ?? "blocked",
+    });
+  }
+  if (args.liveTranslationProjectionSummary.latestLaneSessionStatus === "paused") {
+    return args.t("docsViewer.translation.status.sessionPaused", {
+      status: formatLaneSessionStatusForLabel({
+        status: args.liveTranslationProjectionSummary.latestLaneSessionStatus,
+        health: args.liveTranslationProjectionSummary.latestLaneSessionHealth,
+        fallback: "paused",
+      }),
     });
   }
   if (args.liveTranslationProjectionSummary.failedCount > 0 && !args.liveTranslationProjectionSummary.hasRenderableText) {
@@ -2076,17 +2264,44 @@ function formatDocCatalogDate(entry: DocManifestEntry, t: Translate): string | n
   return t("docsViewer.catalog.datedDate", { date: entry.catalogDate });
 }
 
-function readStoredInlineTranslationSession(scopeKey: string): StoredInlineTranslationSession {
+function storedInlineTranslationSessionMatchesScope(
+  session: Partial<StoredInlineTranslationSession> | null | undefined,
+  scope: StoredInlineTranslationSessionScope,
+): boolean {
+  if (!session) return false;
+  if (session.sourceHash && session.sourceHash !== scope.sourceHash) return false;
+  if (session.sourceTextHash && session.sourceTextHash !== scope.sourceTextHash) return false;
+  if (
+    typeof session.sourceTextCharCount === "number" &&
+    session.sourceTextCharCount !== scope.sourceTextCharCount
+  ) return false;
+  if (session.accountLocale && session.accountLocale !== scope.accountLocale) return false;
+  if (session.targetLanguage && session.targetLanguage !== scope.targetLanguage) return false;
+  return true;
+}
+
+function readStoredInlineTranslationSession(
+  scopeKey: string,
+  scope: StoredInlineTranslationSessionScope,
+): StoredInlineTranslationSession {
   if (typeof window === "undefined") return { enabled: false, translations: {} };
   try {
     const raw = window.sessionStorage.getItem(`${DOC_INLINE_TRANSLATION_SESSION_PREFIX}:${scopeKey}`);
     if (!raw) return { enabled: false, translations: {} };
     const parsed = JSON.parse(raw) as Partial<StoredInlineTranslationSession> | null;
+    if (!storedInlineTranslationSessionMatchesScope(parsed, scope)) {
+      return { enabled: false, translations: {} };
+    }
     const translations = parsed?.translations && typeof parsed.translations === "object"
       ? filterReadyDocumentInlineTranslationRenderStates(parsed.translations)
       : {};
     return {
       enabled: Boolean(parsed?.enabled),
+      sourceHash: scope.sourceHash,
+      sourceTextHash: scope.sourceTextHash,
+      sourceTextCharCount: scope.sourceTextCharCount,
+      accountLocale: scope.accountLocale,
+      targetLanguage: scope.targetLanguage,
       translations,
     };
   } catch {
@@ -2102,6 +2317,11 @@ function writeStoredInlineTranslationSession(scopeKey: string, session: StoredIn
       `${DOC_INLINE_TRANSLATION_SESSION_PREFIX}:${scopeKey}`,
       JSON.stringify({
         enabled: session.enabled,
+        sourceHash: session.sourceHash ?? null,
+        sourceTextHash: session.sourceTextHash ?? null,
+        sourceTextCharCount: session.sourceTextCharCount ?? null,
+        accountLocale: session.accountLocale ?? null,
+        targetLanguage: session.targetLanguage ?? null,
         translations: readyTranslations,
         updatedAt: new Date().toISOString(),
       }),

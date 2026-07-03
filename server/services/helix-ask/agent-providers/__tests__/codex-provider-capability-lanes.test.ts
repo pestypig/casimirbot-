@@ -888,4 +888,60 @@ describe("Codex provider capability lane adapter", () => {
       }
     }
   });
+
+  it("normalizes general Moral Graph gateway observations for Codex re-entry", async () => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    process.env.CODEX_AGENT_FAKE_STDOUT = "Moral Graph observation received.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    try {
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          agent_runtime: "codex",
+          turn_id: "turn-codex-moral-graph-gateway",
+          question:
+            "Use moral-graph.reflect_context for inherited conditioning, purpose as inquiry, and recognition before transcendence.",
+        },
+      });
+      const debug = result.debug as Record<string, any>;
+
+      expect(debug.workstation_gateway_call_results).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            ok: true,
+            capability_id: "moral-graph.reflect_context",
+          }),
+        ]),
+      );
+      expect(debug.current_turn_artifact_ledger).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            kind: "moral_graph_reflection",
+            observation_kind: "moral_graph_reflection",
+            payload_schema: "helix.moral_graph_reflection_observation.v1",
+            capability_key: "moral-graph.reflect_context",
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          }),
+        ]),
+      );
+      expect(debug.provider_observation_normalization_failures ?? []).not.toContain(
+        "provider_observation_normalization_missing:moral-graph.reflect_context",
+      );
+    } finally {
+      if (previousStdout === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      } else {
+        process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      }
+      if (previousExitCode === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      } else {
+        process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+      }
+    }
+  });
 });

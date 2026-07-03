@@ -150,6 +150,80 @@ describe("Codex provider terminal pass-through", () => {
     expect(guarded).toContain("scholarly-research.fetch_full_text: fetchable_paper_identity_required");
   });
 
+  it("preserves Moral Graph synthesis when adjacent external evidence is unavailable", () => {
+    const providerText =
+      "The Moral Graph observation supports purpose as inquiry and goalpost integrity as procedural lenses, but it does not prove the philosophy true.";
+
+    const guarded = applyGatewayFailureAuthorityGuard({
+      text: providerText,
+      gatewayCallResults: [
+        {
+          ok: true,
+          capability_id: "moral-graph.reflect_context",
+          gateway_admission: {
+            requested_capability: "moral-graph.reflect_context",
+            admission_reason: "moral_graph_reflection_requested",
+          },
+          observation_packet: {
+            status: "succeeded",
+            produced_artifact_refs: ["ask:moral:reflection"],
+            observation_summary: "Moral Graph reflection located procedural badges.",
+            terminal_eligible: false,
+            post_tool_model_step_required: true,
+            assistant_answer: false,
+          },
+          observation: {
+            schema: "helix.moral_graph_reflection_observation.v1",
+            located_badge_ids: ["purpose-as-inquiry", "goalpost-integrity"],
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+          artifact_refs: ["ask:moral:reflection"],
+          terminal_eligible: false,
+          post_tool_model_step_required: true,
+          assistant_answer: false,
+          raw_content_included: false,
+        } as never,
+        {
+          ok: false,
+          capability_id: "internet-search.search_web",
+          gateway_admission: {
+            requested_capability: "internet-search.search_web",
+            admission_reason: "internet_search_requested",
+            blocked_reason: "tavily_requires_TAVILY_API_KEY",
+          },
+          observation_packet: {
+            status: "blocked",
+            produced_artifact_refs: [],
+            observation_summary: "Internet search unavailable: tavily_requires_TAVILY_API_KEY.",
+            terminal_eligible: false,
+            post_tool_model_step_required: true,
+            assistant_answer: false,
+          },
+          observation: {
+            schema: "helix.internet_search_observation.v1",
+            status: "blocked",
+            blocked_reason: "tavily_requires_TAVILY_API_KEY",
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+          artifact_refs: [],
+          terminal_eligible: false,
+          post_tool_model_step_required: true,
+          assistant_answer: false,
+          raw_content_included: false,
+          error: "tavily_requires_TAVILY_API_KEY",
+        } as never,
+      ],
+    });
+
+    expect(guarded).toContain(providerText);
+    expect(guarded).toContain("External evidence unavailable: internet-search.search_web: tavily_requires_TAVILY_API_KEY.");
+    expect(guarded).not.toContain("I cannot claim the requested workstation tool or UI action ran");
+  });
+
   it("preserves Codex explanation for calculator expression syntax blocks", () => {
     const providerText =
       "The calculator request was admitted as a tool attempt, but the supplied expression was prose rather than a bound arithmetic expression, so no calculator result exists.";

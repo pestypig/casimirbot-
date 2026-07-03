@@ -690,7 +690,7 @@ describe("Helix live translation UI projection", () => {
       chunkId: "u0001",
     })).toMatchObject({
       status: "missing",
-      reason: "translation_projection_missing",
+      reason: "translation_projection_source_hash_mismatch",
       projection: null,
       displayText: null,
       terminalEligible: false,
@@ -704,7 +704,20 @@ describe("Helix live translation UI projection", () => {
       projectionTarget: "docs_chunk",
       targetLanguage: "es",
       units: [{ unit_id: "u0001" }],
-    })).toEqual({});
+    })).toMatchObject({
+      u0001: {
+        status: "error",
+        error: "translation_projection_source_hash_mismatch",
+        projectionStatus: "missing",
+        sourceId: "document_markdown:docs/research/nhm2.md",
+        sourceHash: "fnv1a32:current",
+        observationRef: null,
+        receiptRef: null,
+        terminalEligible: false,
+        assistantAnswer: false,
+        rawContentIncluded: false,
+      },
+    });
     expect(selectHelixLiveTranslationUiProjection({
       projections,
       sourceId: "document_markdown:docs/research/nhm2.md",
@@ -751,9 +764,11 @@ describe("Helix live translation UI projection", () => {
       chunkId: "u0001",
     })).toMatchObject({
       status: "missing",
-      reason: "translation_projection_missing",
+      reason: "translation_projection_source_text_mismatch",
       projection: null,
       displayText: null,
+      sourceTextHash: "fnv1a32:current-text",
+      sourceTextCharCount: 21,
       terminalEligible: false,
       assistantAnswer: false,
       rawContentIncluded: false,
@@ -778,6 +793,85 @@ describe("Helix live translation UI projection", () => {
       terminalEligible: false,
       assistantAnswer: false,
       rawContentIncluded: false,
+    });
+  });
+
+  it("does not satisfy inline embedded-dedupe fallback with stale source text evidence", () => {
+    const projections = buildHelixLiveTranslationUiProjections({
+      capability_lane_projection_receipts: [
+        {
+          schema: "helix.live_translation.projection_receipt.v1",
+          receipt_ref: "receipt:docs:embedded-old-source-text",
+          observation_ref: "obs:docs:embedded-old-source-text",
+          lane_id: "live_translation",
+          capability: "live_translation.translate_text",
+          projection_target: "docs_chunk",
+          projection_status: "projected",
+          source_id: "document_markdown:docs/research/nhm2.md",
+          source_hash: "fnv1a32:current-doc",
+          source_text_hash: "fnv1a32:old-text",
+          source_text_char_count: 18,
+          chunk_id: "batch-1",
+          chunk_index: 0,
+          dedupe_key: "document_markdown:docs/research/nhm2.md:u0001:es",
+          observed_at_ms: 200,
+          target_language: "es",
+          translated_text: "Texto viejo incrustado.",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      ],
+    });
+
+    expect(buildHelixLiveTranslationInlineUnitStates({
+      projections,
+      sourceId: "document_markdown:docs/research/nhm2.md",
+      sourceHash: "fnv1a32:current-doc",
+      sourceTextHash: "fnv1a32:current-text",
+      sourceTextCharCount: 21,
+      projectionTarget: "docs_chunk",
+      targetLanguage: "es",
+      units: [{ unit_id: "u0001" }],
+    })).toMatchObject({
+      u0001: {
+        status: "error",
+        error: "translation_projection_source_text_mismatch",
+        projectionStatus: "missing",
+        sourceId: "document_markdown:docs/research/nhm2.md",
+        sourceHash: "fnv1a32:current-doc",
+        sourceTextHash: "fnv1a32:current-text",
+        sourceTextCharCount: 21,
+        observationRef: null,
+        receiptRef: null,
+        terminalEligible: false,
+        assistantAnswer: false,
+        rawContentIncluded: false,
+      },
+    });
+    expect(buildHelixLiveTranslationInlineUnitStates({
+      projections,
+      sourceId: "document_markdown:docs/research/nhm2.md",
+      sourceHash: "fnv1a32:current-doc",
+      sourceTextHash: "fnv1a32:old-text",
+      sourceTextCharCount: 18,
+      projectionTarget: "docs_chunk",
+      targetLanguage: "es",
+      units: [{ unit_id: "u0001" }],
+    })).toMatchObject({
+      u0001: {
+        status: "ready",
+        text: "Texto viejo incrustado.",
+        chunkId: "batch-1",
+        dedupeKey: "document_markdown:docs/research/nhm2.md:u0001:es",
+        sourceTextHash: "fnv1a32:old-text",
+        sourceTextCharCount: 18,
+        observationRef: "obs:docs:embedded-old-source-text",
+        receiptRef: "receipt:docs:embedded-old-source-text",
+        terminalEligible: false,
+        assistantAnswer: false,
+        rawContentIncluded: false,
+      },
     });
   });
 

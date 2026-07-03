@@ -104,6 +104,7 @@ export type HelixLiveTranslationUiProjectionSelection = {
   projection: HelixLiveTranslationUiProjection | null;
   displayText: string | null;
   sourceId: string;
+  sourceHash?: string | null;
   sourceKind: string | null;
   sourceTextHash?: string | null;
   sourceTextCharCount?: number | null;
@@ -187,6 +188,8 @@ export type BuildHelixLiveTranslationInlineUnitStateInput = {
   units: DocumentTranslationUnitLike[];
   sourceId: string;
   sourceHash?: string | null;
+  sourceTextHash?: string | null;
+  sourceTextCharCount?: number | null;
   projectionTarget: string;
   targetLanguage: string;
   allowStaleDisplayText?: boolean;
@@ -656,26 +659,43 @@ export function selectHelixLiveTranslationUiProjection(
   const targetLanguage = normalizeKeyText(input.targetLanguage) || null;
   const chunkId = readString(input.chunkId) || null;
   const dedupeKey = readString(input.dedupeKey) || null;
+  const sourceTextHash = readString(input.sourceTextHash) || null;
+  const sourceTextCharCount = readNumber(input.sourceTextCharCount);
 
-  const candidates = input.projections
+  const sourceTargetCandidates = input.projections
     .filter((projection) => projection.sourceId === sourceId)
-    .filter((projection) => projectionSourceHashMatches(projection, sourceHash))
-    .filter((projection) => projectionSourceTextIdentityMatches(projection, input))
     .filter((projection) => !projectionTarget || projection.projectionTarget === projectionTarget)
     .filter((projection) => !targetLanguage || localeMatches(projection.targetLanguage, targetLanguage))
     .filter((projection) => !chunkId || projection.chunkId === chunkId)
-    .filter((projection) => !dedupeKey || projection.dedupeKey === dedupeKey)
+    .filter((projection) => !dedupeKey || projection.dedupeKey === dedupeKey);
+
+  const candidates = sourceTargetCandidates
+    .filter((projection) => projectionSourceHashMatches(projection, sourceHash))
+    .filter((projection) => projectionSourceTextIdentityMatches(projection, input))
     .sort(sortLatestProjectionFirst);
 
   const projection = candidates[0] ?? null;
   if (!projection) {
+    const hashMatchedCandidates = sourceTargetCandidates
+      .filter((candidate) => projectionSourceHashMatches(candidate, sourceHash));
+    const reason =
+      sourceHash && sourceTargetCandidates.length > 0 && hashMatchedCandidates.length === 0
+        ? "translation_projection_source_hash_mismatch"
+        : (sourceTextHash || sourceTextCharCount !== null) &&
+            hashMatchedCandidates.length > 0 &&
+            hashMatchedCandidates.every((candidate) => !projectionSourceTextIdentityMatches(candidate, input))
+          ? "translation_projection_source_text_mismatch"
+          : "translation_projection_missing";
     return {
       status: "missing",
-      reason: "translation_projection_missing",
+      reason,
       projection: null,
       displayText: null,
       sourceId,
+      ...(sourceHash ? { sourceHash } : {}),
       sourceKind: null,
+      ...(sourceTextHash ? { sourceTextHash } : {}),
+      ...(sourceTextCharCount !== null ? { sourceTextCharCount } : {}),
       accountLocale: null,
       projectionTarget,
       targetLanguage,
@@ -706,6 +726,7 @@ export function selectHelixLiveTranslationUiProjection(
     projection,
     displayText: canDisplay ? projection.translatedText : null,
     sourceId: projection.sourceId,
+    ...(projection.sourceHash ? { sourceHash: projection.sourceHash } : {}),
     sourceKind: projection.sourceKind,
     ...(projection.sourceTextHash ? { sourceTextHash: projection.sourceTextHash } : {}),
     ...(typeof projection.sourceTextCharCount === "number" ? { sourceTextCharCount: projection.sourceTextCharCount } : {}),
@@ -749,6 +770,7 @@ function buildHelixLiveTranslationUiProjectionSelectionFromProjection(
     projection,
     displayText: canDisplay ? projection.translatedText : null,
     sourceId: projection.sourceId,
+    ...(projection.sourceHash ? { sourceHash: projection.sourceHash } : {}),
     sourceKind: projection.sourceKind,
     ...(projection.sourceTextHash ? { sourceTextHash: projection.sourceTextHash } : {}),
     ...(typeof projection.sourceTextCharCount === "number" ? { sourceTextCharCount: projection.sourceTextCharCount } : {}),
@@ -777,6 +799,46 @@ function buildHelixLiveTranslationUiProjectionSelectionFromProjection(
   };
 }
 
+function buildMissingHelixLiveTranslationUiProjectionSelection(input: {
+  reason: string;
+  sourceId: string;
+  sourceHash?: string | null;
+  sourceTextHash?: string | null;
+  sourceTextCharCount?: number | null;
+  projectionTarget?: string | null;
+  targetLanguage?: string | null;
+}): HelixLiveTranslationUiProjectionSelection {
+  const sourceHash = readString(input.sourceHash) || null;
+  const sourceTextHash = readString(input.sourceTextHash) || null;
+  const sourceTextCharCount = readNumber(input.sourceTextCharCount);
+  return {
+    status: "missing",
+    reason: input.reason,
+    projection: null,
+    displayText: null,
+    sourceId: input.sourceId,
+    ...(sourceHash ? { sourceHash } : {}),
+    sourceKind: null,
+    ...(sourceTextHash ? { sourceTextHash } : {}),
+    ...(sourceTextCharCount !== null ? { sourceTextCharCount } : {}),
+    accountLocale: null,
+    projectionTarget: readString(input.projectionTarget) || null,
+    targetLanguage: normalizeKeyText(input.targetLanguage) || null,
+    observationRef: null,
+    receiptRef: null,
+    laneSessionId: null,
+    observationLaneSessionId: null,
+    goalBindingId: null,
+    latestEventId: null,
+    hasObservation: false,
+    selectedBackendProvider: null,
+    terminalAuthorityStatus: "not_terminal_authority",
+    terminalEligible: false,
+    assistantAnswer: false,
+    rawContentIncluded: false,
+  };
+}
+
 export function buildHelixLiveTranslationInlineUnitStates(
   input: BuildHelixLiveTranslationInlineUnitStateInput,
 ): Record<string, HelixLiveTranslationInlineUnitState> {
@@ -789,16 +851,21 @@ export function buildHelixLiveTranslationInlineUnitStates(
         projections: input.projections,
         sourceId: input.sourceId,
         sourceHash: input.sourceHash,
+        sourceTextHash: input.sourceTextHash,
+        sourceTextCharCount: input.sourceTextCharCount,
         projectionTarget: input.projectionTarget,
         targetLanguage: input.targetLanguage,
         chunkId: unitId,
         allowStaleDisplayText: input.allowStaleDisplayText,
       });
-    const fallbackByDedupe = selection.status === "missing"
+    const fallbackByDedupe =
+      selection.status === "missing" && selection.reason === "translation_projection_missing"
       ? selectHelixLiveTranslationUiProjection({
         projections: input.projections,
         sourceId: input.sourceId,
         sourceHash: input.sourceHash,
+        sourceTextHash: input.sourceTextHash,
+        sourceTextCharCount: input.sourceTextCharCount,
         projectionTarget: input.projectionTarget,
         targetLanguage: input.targetLanguage,
         dedupeKey: unitId,
@@ -809,6 +876,7 @@ export function buildHelixLiveTranslationInlineUnitStates(
       ? input.projections
         .filter((projection) => projection.sourceId === input.sourceId)
         .filter((projection) => projectionSourceHashMatches(projection, readString(input.sourceHash) || null))
+        .filter((projection) => projectionSourceTextIdentityMatches(projection, input))
         .filter((projection) => projection.projectionTarget === input.projectionTarget)
         .filter((projection) => localeMatches(projection.targetLanguage, input.targetLanguage))
         .filter((projection) => projection.dedupeKey?.includes(unitId))
@@ -820,8 +888,54 @@ export function buildHelixLiveTranslationInlineUnitStates(
           ))
         [0] ?? fallbackByDedupe
       : fallbackByDedupe;
-    const resolved = fallbackByEmbeddedDedupe;
-    if (resolved.status === "missing") continue;
+    let resolved = fallbackByEmbeddedDedupe;
+    if (resolved.status === "missing" && resolved.reason === "translation_projection_missing") {
+      const embeddedSourceTargetCandidates = input.projections
+        .filter((projection) => projection.sourceId === input.sourceId)
+        .filter((projection) => projection.projectionTarget === input.projectionTarget)
+        .filter((projection) => localeMatches(projection.targetLanguage, input.targetLanguage))
+        .filter((projection) => projection.dedupeKey?.includes(unitId));
+      const embeddedHashMatchedCandidates = embeddedSourceTargetCandidates
+        .filter((projection) => projectionSourceHashMatches(projection, readString(input.sourceHash) || null));
+      if (
+        readString(input.sourceHash) &&
+        embeddedSourceTargetCandidates.length > 0 &&
+        embeddedHashMatchedCandidates.length === 0
+      ) {
+        resolved = buildMissingHelixLiveTranslationUiProjectionSelection({
+          reason: "translation_projection_source_hash_mismatch",
+          sourceId: input.sourceId,
+          sourceHash: input.sourceHash,
+          sourceTextHash: input.sourceTextHash,
+          sourceTextCharCount: input.sourceTextCharCount,
+          projectionTarget: input.projectionTarget,
+          targetLanguage: input.targetLanguage,
+        });
+      } else if (
+        (readString(input.sourceTextHash) || readNumber(input.sourceTextCharCount) !== null) &&
+        embeddedHashMatchedCandidates.length > 0 &&
+        embeddedHashMatchedCandidates.every((projection) =>
+          !projectionSourceTextIdentityMatches(projection, input)
+        )
+      ) {
+        resolved = buildMissingHelixLiveTranslationUiProjectionSelection({
+          reason: "translation_projection_source_text_mismatch",
+          sourceId: input.sourceId,
+          sourceHash: input.sourceHash,
+          sourceTextHash: input.sourceTextHash,
+          sourceTextCharCount: input.sourceTextCharCount,
+          projectionTarget: input.projectionTarget,
+          targetLanguage: input.targetLanguage,
+        });
+      }
+    }
+    if (
+      resolved.status === "missing" &&
+      resolved.reason !== "translation_projection_source_hash_mismatch" &&
+      resolved.reason !== "translation_projection_source_text_mismatch"
+    ) {
+      continue;
+    }
     if (resolved.displayText) {
       next[unitId] = {
         status: "ready",
@@ -852,12 +966,22 @@ export function buildHelixLiveTranslationInlineUnitStates(
         observedAtMs: resolved.projection?.observedAtMs ?? null,
         freshnessStatus: resolved.projection?.freshnessStatus ?? "unknown",
         sourceId: resolved.projection?.sourceId ?? input.sourceId,
-        ...(resolved.projection?.sourceHash ? { sourceHash: resolved.projection.sourceHash } : {}),
+        ...(resolved.projection?.sourceHash
+          ? { sourceHash: resolved.projection.sourceHash }
+          : resolved.sourceHash
+            ? { sourceHash: resolved.sourceHash }
+            : {}),
         sourceKind: resolved.projection?.sourceKind ?? null,
-        ...(resolved.projection?.sourceTextHash ? { sourceTextHash: resolved.projection.sourceTextHash } : {}),
+        ...(resolved.projection?.sourceTextHash
+          ? { sourceTextHash: resolved.projection.sourceTextHash }
+          : resolved.sourceTextHash
+            ? { sourceTextHash: resolved.sourceTextHash }
+            : {}),
         ...(typeof resolved.projection?.sourceTextCharCount === "number"
           ? { sourceTextCharCount: resolved.projection.sourceTextCharCount }
-          : {}),
+          : typeof resolved.sourceTextCharCount === "number"
+            ? { sourceTextCharCount: resolved.sourceTextCharCount }
+            : {}),
         accountLocale: resolved.projection?.accountLocale ?? null,
         projectionTarget: resolved.projectionTarget,
         targetLanguage: resolved.targetLanguage,
@@ -897,12 +1021,22 @@ export function buildHelixLiveTranslationInlineUnitStates(
       observedAtMs: resolved.projection?.observedAtMs ?? null,
       freshnessStatus: resolved.projection?.freshnessStatus ?? "unknown",
       sourceId: resolved.projection?.sourceId ?? input.sourceId,
-      ...(resolved.projection?.sourceHash ? { sourceHash: resolved.projection.sourceHash } : {}),
+      ...(resolved.projection?.sourceHash
+        ? { sourceHash: resolved.projection.sourceHash }
+        : resolved.sourceHash
+          ? { sourceHash: resolved.sourceHash }
+          : {}),
       sourceKind: resolved.projection?.sourceKind ?? null,
-      ...(resolved.projection?.sourceTextHash ? { sourceTextHash: resolved.projection.sourceTextHash } : {}),
+      ...(resolved.projection?.sourceTextHash
+        ? { sourceTextHash: resolved.projection.sourceTextHash }
+        : resolved.sourceTextHash
+          ? { sourceTextHash: resolved.sourceTextHash }
+          : {}),
       ...(typeof resolved.projection?.sourceTextCharCount === "number"
         ? { sourceTextCharCount: resolved.projection.sourceTextCharCount }
-        : {}),
+        : typeof resolved.sourceTextCharCount === "number"
+          ? { sourceTextCharCount: resolved.sourceTextCharCount }
+          : {}),
       accountLocale: resolved.projection?.accountLocale ?? null,
       projectionTarget: resolved.projectionTarget,
       targetLanguage: resolved.targetLanguage,

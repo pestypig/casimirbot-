@@ -452,6 +452,82 @@ describe("document live translation inline projection", () => {
     });
   });
 
+  it("honors source-text scope when adapting governed receipts into docs inline state", () => {
+    const payload = {
+      capability_lane_projection_receipts: [
+        {
+          schema: "helix.live_translation.projection_receipt.v1",
+          receipt_ref: "receipt:docs:old-source-text",
+          observation_ref: "obs:docs:old-source-text",
+          lane_id: "live_translation",
+          capability: "live_translation.translate_text",
+          projection_target: "docs_chunk",
+          projection_status: "projected",
+          source_id: "document_markdown:docs/research/nhm2.md",
+          source_hash: "source-hash-current-doc",
+          source_text_hash: "source-text-old",
+          source_text_char_count: 18,
+          chunk_id: "u0001",
+          dedupe_key: "document_markdown:docs/research/nhm2.md:u0001:es",
+          observed_at_ms: 100,
+          target_language: "es",
+          translated_text: "Texto viejo.",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      ],
+    };
+
+    expect(buildDocumentLiveTranslationInlineStates({
+      docPath: "docs/research/nhm2.md",
+      locale: "es",
+      sourceHash: "source-hash-current-doc",
+      sourceTextHash: "source-text-current",
+      sourceTextCharCount: 21,
+      units: [unit("u0001")],
+      payload,
+    })).toMatchObject({
+      u0001: {
+        status: "error",
+        error: "translation_projection_source_text_mismatch",
+        observationRef: null,
+        receiptRef: null,
+        projectionStatus: "missing",
+        sourceId: "document_markdown:docs/research/nhm2.md",
+        sourceHash: "source-hash-current-doc",
+        sourceTextHash: "source-text-current",
+        sourceTextCharCount: 21,
+        terminalEligible: false,
+        assistantAnswer: false,
+        rawContentIncluded: false,
+      },
+    });
+    expect(buildDocumentLiveTranslationInlineStates({
+      docPath: "docs/research/nhm2.md",
+      locale: "es",
+      sourceHash: "source-hash-current-doc",
+      sourceTextHash: "source-text-old",
+      sourceTextCharCount: 18,
+      units: [unit("u0001")],
+      payload,
+    })).toMatchObject({
+      u0001: {
+        status: "ready",
+        text: "Texto viejo.",
+        observationRef: "obs:docs:old-source-text",
+        receiptRef: "receipt:docs:old-source-text",
+        projectionStatus: "projected",
+        sourceHash: "source-hash-current-doc",
+        sourceTextHash: "source-text-old",
+        sourceTextCharCount: 18,
+        terminalEligible: false,
+        assistantAnswer: false,
+        rawContentIncluded: false,
+      },
+    });
+  });
+
   it("preserves stale, cancelled, and failed lane receipts as non-terminal inline errors", () => {
     expect(buildDocumentLiveTranslationInlineStates({
       docPath: "docs/research/nhm2.md",

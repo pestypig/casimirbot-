@@ -197,6 +197,7 @@ const requiredArgsForCapability = (capability: string): string[] => {
       return ["source_summary"];
     case "helix_ask.reflect_theory_context":
     case "theory-badge-graph.propose_frontier_conjectures":
+    case "moral-graph.reflect_context":
     case "moral-graph.reflect_living_substrate_context":
       return ["prompt"];
     case "helix.theory.frontierVectorFieldTrace":
@@ -1375,6 +1376,34 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
       "bounded_context_reference",
     ],
   }),
+  {
+    schema: "helix.explicit_capability_contract.v1",
+    capability: "moral-graph.reflect_context",
+    aliases: [
+      "helix_ask.reflect_moral_graph",
+      "helix_ask.reflect_ideology_context",
+      "reflect_ideology_context",
+      "ideology_context_reflection",
+      "moral_badge_locator",
+      "moral_graph_reflection",
+      "moral graph reflection",
+      "moral_graph",
+      "moral graph",
+    ],
+    capability_family: "moral_graph_reflection",
+    plan_family: "moral_graph_reflection",
+    source_target: "moral_graph",
+    admission_families: ["workstation_action"],
+    required_observation_kinds: [
+      "moral_graph_reflection",
+      "helix.moral_graph_reflection_observation.v1",
+      "ideology_context_reflection/v1",
+      "procedural_moral_classification/v1",
+    ],
+    required_terminal_kind: "model_synthesized_answer",
+    allowed_substitutions: [],
+    forbidden_nearby_capabilities: ["model.direct_answer"],
+  },
   {
     schema: "helix.explicit_capability_contract.v1",
     capability: "helix_ask.reflect_ideology_context",

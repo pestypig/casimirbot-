@@ -202,6 +202,11 @@ export function buildAskLiveEventFromTurnTranscriptRecord(
       latestProjectionTarget: coerceText(record.latest_projection_target).trim() || null,
       targetLanguage: coerceText(record.target_language).trim() || null,
       latestCancelRequested: readTranscriptBoolean(record.latest_cancel_requested),
+      laneVisible: readTranscriptBoolean(record.lane_visible),
+      laneRequested: readTranscriptBoolean(record.lane_requested),
+      laneExecuted: readTranscriptBoolean(record.lane_executed),
+      observationReentered: readTranscriptBoolean(record.observation_reentered),
+      reentryRequired: readTranscriptBoolean(record.reentry_required),
       terminalEligible: readTranscriptBoolean(record.terminal_eligible),
       terminalAuthorityStatus: coerceText(record.terminal_authority_status).trim() || null,
       assistantAnswer: readTranscriptBoolean(record.assistant_answer),
@@ -1951,6 +1956,7 @@ function formatHelixCapabilityLaneGoalDispatchReadinessText(readiness: Record<st
   const totalAdmissions = coerceText(readiness.total_admissions).trim() || "0";
   const admittedCount = coerceText(readiness.admitted_count).trim() || "0";
   const blockedCount = coerceText(readiness.blocked_count).trim() || "0";
+  const readinessState = readHelixCapabilityLaneGoalDispatchReadinessState(readiness);
   const pendingWakeCount = coerceText(readiness.pending_wake_count).trim() || "0";
   const pendingTerminalCount = coerceText(readiness.pending_terminal_authority_count).trim() || "0";
   const projectionOnlyCount = coerceText(readiness.projection_only_count).trim() || "0";
@@ -2033,6 +2039,7 @@ function formatHelixCapabilityLaneGoalDispatchReadinessText(readiness: Record<st
     : "";
   const admittedPermissionsNonMutating = readiness.all_admitted_permissions_non_mutating === true;
   const parts = [
+    `readiness ${readinessState}`,
     `plans ${totalPlans}`,
     `admissions ${totalAdmissions}`,
     `admitted ${admittedCount}`,
@@ -2073,6 +2080,16 @@ function formatHelixCapabilityLaneGoalDispatchReadinessText(readiness: Record<st
     "no side effects allowed",
   ].filter(Boolean);
   return `Goal dispatch readiness: ${parts.join("; ")}; lane output remains observation-only.`;
+}
+
+function readHelixCapabilityLaneGoalDispatchReadinessState(readiness: Record<string, unknown>): "ready" | "partial" | "blocked" {
+  const admittedNumber = Number(coerceText(readiness.admitted_count).trim() || "0");
+  const blockedNumber = Number(coerceText(readiness.blocked_count).trim() || "0");
+  if (Number.isFinite(admittedNumber) && Number.isFinite(blockedNumber) && admittedNumber > 0 && blockedNumber > 0) {
+    return "partial";
+  }
+  if (Number.isFinite(blockedNumber) && blockedNumber > 0) return "blocked";
+  return "ready";
 }
 
 function formatHelixCapabilityLaneSessionSummaryText(summary: Record<string, unknown>): string {
@@ -3039,7 +3056,9 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
           id: `${reply.id}-capability-lane-goal-dispatch-readiness`,
           role: "system",
           type: "model_decision",
-          status: coerceText(goalDispatchReadiness.blocked_count).trim() !== "0" ? "failed" : "pending",
+          status: readHelixCapabilityLaneGoalDispatchReadinessState(goalDispatchReadiness) === "blocked"
+            ? "failed"
+            : "pending",
           text: formatHelixCapabilityLaneGoalDispatchReadinessText(goalDispatchReadiness),
           detail:
             Array.isArray(goalDispatchReadiness.next_dispatch_targets)
@@ -3092,6 +3111,7 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
             ? goalDispatchReadiness.next_target_languages.map(coerceText).find(Boolean) || null
             : null,
           terminal_authority_status: coerceText(goalDispatchReadiness.terminal_authority_status).trim() || null,
+          readiness_state: readHelixCapabilityLaneGoalDispatchReadinessState(goalDispatchReadiness),
           terminal_eligible: goalDispatchReadiness.terminal_eligible === true,
           assistant_answer: goalDispatchReadiness.assistant_answer === true,
           raw_content_included: goalDispatchReadiness.raw_content_included === true,
@@ -3545,8 +3565,14 @@ export function buildHelixRuntimeAskLiveEvents(reply: HelixAskTranscriptReply): 
       targetLanguage: coerceText(event.target_language).trim() || null,
       translatedText: coerceText(event.translated_text).trim() || null,
       projectionStatus: coerceText(event.projection_status).trim() || null,
+      laneVisible: readTranscriptBoolean(event.lane_visible),
+      laneRequested: readTranscriptBoolean(event.lane_requested),
+      laneExecuted: readTranscriptBoolean(event.lane_executed),
+      observationReentered: readTranscriptBoolean(event.observation_reentered),
+      reentryRequired: readTranscriptBoolean(event.reentry_required),
       terminalEligible: readTranscriptBoolean(event.terminal_eligible),
       terminalAuthorityStatus: coerceText(event.terminal_authority_status).trim() || null,
+      readinessState: coerceText(event.readiness_state ?? event.readinessState).trim() || null,
       assistantAnswer: readTranscriptBoolean(event.assistant_answer),
       rawContentIncluded: readTranscriptBoolean(event.raw_content_included),
       clientReplayReason: coerceText(event.client_replay_reason ?? event.replay_reason).trim() || null,
@@ -3892,6 +3918,14 @@ export function buildHelixTurnTranscriptRows(reply: HelixAskTranscriptReply): He
         const targetLanguage = coerceText(event.target_language).trim();
         const terminalAuthorityStatus = coerceText(event.terminal_authority_status).trim();
         const selectedRuntimeAgentProvider = coerceText(event.selected_runtime_agent_provider).trim();
+        const laneVisible = readTranscriptBoolean(event.lane_visible);
+        const laneRequested = readTranscriptBoolean(event.lane_requested);
+        const laneExecuted = readTranscriptBoolean(event.lane_executed);
+        const observationReentered = readTranscriptBoolean(event.observation_reentered);
+        const reentryRequired = readTranscriptBoolean(event.reentry_required);
+        const terminalEligible = readTranscriptBoolean(event.terminal_eligible);
+        const assistantAnswer = readTranscriptBoolean(event.assistant_answer);
+        const rawContentIncluded = readTranscriptBoolean(event.raw_content_included);
         const adapterBoundary =
           coerceText(event.adapter_boundary).trim() ||
           (selectedRuntimeAgentProvider ? "helix_agent_provider_edge" : "");
@@ -3941,7 +3975,15 @@ export function buildHelixTurnTranscriptRows(reply: HelixAskTranscriptReply): He
               ? `materialized mail evidence ${String(materializedMailLoopEvidence)}`
               : "",
             targetLanguage ? `target ${targetLanguage}` : "",
+            laneVisible !== null ? `lane visible ${String(laneVisible)}` : "",
+            laneRequested !== null ? `lane requested ${String(laneRequested)}` : "",
+            laneExecuted !== null ? `lane executed ${String(laneExecuted)}` : "",
+            observationReentered !== null ? `observation re-entered ${String(observationReentered)}` : "",
+            reentryRequired !== null ? `re-entry required ${String(reentryRequired)}` : "",
+            terminalEligible !== null ? `terminal eligible ${String(terminalEligible)}` : "",
             terminalAuthorityStatus ? `terminal authority ${terminalAuthorityStatus}` : "",
+            assistantAnswer !== null ? `assistant answer ${String(assistantAnswer)}` : "",
+            rawContentIncluded !== null ? `raw content included ${String(rawContentIncluded)}` : "",
             latestCancelled ? "cancelled" : "",
             status,
           ]

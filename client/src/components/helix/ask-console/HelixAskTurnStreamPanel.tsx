@@ -228,10 +228,21 @@ export function HelixAskTurnStreamPanel({
               data-capability-lane-cancel-requested={capabilityLaneDetail?.cancelRequested ?? undefined}
               data-capability-lane-goal-id={capabilityLaneDetail?.goalId ?? undefined}
               data-capability-lane-goal-binding-id={capabilityLaneDetail?.goalBindingId ?? undefined}
+              data-capability-lane-goal-binding-status={capabilityLaneDetail?.bindingStatus ?? undefined}
+              data-capability-lane-goal-activation-policy={capabilityLaneDetail?.activationPolicy ?? undefined}
+              data-capability-lane-goal-attention-policy={capabilityLaneDetail?.attentionPolicy ?? undefined}
+              data-capability-lane-goal-stop-condition={capabilityLaneDetail?.stopCondition ?? undefined}
+              data-capability-lane-goal-report-policy={capabilityLaneDetail?.reportPolicy ?? undefined}
+              data-capability-lane-goal-quiet-behavior={capabilityLaneDetail?.quietBehavior ?? undefined}
+              data-capability-lane-goal-report-action={capabilityLaneDetail?.reportAction ?? undefined}
+              data-capability-lane-goal-report-reason={capabilityLaneDetail?.reportReason ?? undefined}
               data-capability-lane-session-id={capabilityLaneDetail?.laneSessionId ?? undefined}
+              data-capability-lane-session-status={capabilityLaneDetail?.sessionStatus ?? undefined}
+              data-capability-lane-session-health={capabilityLaneDetail?.sessionHealth ?? undefined}
               data-capability-lane-session-lifecycle-action={
                 capabilityLaneDetail?.sessionLifecycleAction ?? undefined
               }
+              data-capability-lane-blocked-reason={capabilityLaneDetail?.blockedReason ?? undefined}
               data-capability-lane-session-control-key={capabilityLaneDetail?.sessionControlKey ?? undefined}
               data-capability-lane-source-binding-key={capabilityLaneDetail?.sourceBindingKey ?? undefined}
               data-capability-lane-latest-observation-key={
@@ -241,6 +252,15 @@ export function HelixAskTurnStreamPanel({
                 capabilityLaneDetail?.latestMailLoopObservationKey ?? undefined
               }
               data-capability-lane-goal-binding-key={capabilityLaneDetail?.goalBindingKey ?? undefined}
+              data-capability-lane-stage-play-mail-id={capabilityLaneDetail?.stagePlayMailId ?? undefined}
+              data-capability-lane-stage-play-mail-delivery-status={
+                capabilityLaneDetail?.stagePlayMailDeliveryStatus ?? undefined
+              }
+              data-capability-lane-previous-stage-play-mail-id={
+                capabilityLaneDetail?.previousStagePlayMailId ?? undefined
+              }
+              data-capability-lane-mailbox-thread-id={capabilityLaneDetail?.mailboxThreadId ?? undefined}
+              data-capability-lane-mail-status={capabilityLaneDetail?.mailStatus ?? undefined}
               data-capability-lane-wake-kind={capabilityLaneDetail?.wakeKind ?? undefined}
               data-capability-lane-materialized-mail-loop-evidence={
                 capabilityLaneDetail?.materializedMailLoopEvidence ?? undefined

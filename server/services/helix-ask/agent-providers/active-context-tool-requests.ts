@@ -14,6 +14,8 @@ import {
   INTERNET_SEARCH_ALIAS_CAPABILITIES,
   INTERNET_SEARCH_CAPABILITY,
   MAX_PROMPT_NAMED_CAPABILITY_REQUESTS,
+  MORAL_GRAPH_REFLECTION_ALIAS_CAPABILITIES,
+  MORAL_GRAPH_REFLECTION_CAPABILITY,
   MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY,
   REPO_SEARCH_ALIAS_CAPABILITIES,
   REPO_SEARCH_CAPABILITY,
@@ -657,6 +659,38 @@ export const buildStructuredAdmissionWorkstationGatewayCallRequests = (
             ...sourceTargetIntent,
             target_source: "moral_graph",
             target_kind: "moral_living_substrate_reflection",
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      });
+    }
+    if (
+      selectedCapability === MORAL_GRAPH_REFLECTION_CAPABILITY ||
+      MORAL_GRAPH_REFLECTION_ALIAS_CAPABILITIES.includes(selectedCapability as typeof MORAL_GRAPH_REFLECTION_ALIAS_CAPABILITIES[number])
+    ) {
+      const key = `${MORAL_GRAPH_REFLECTION_CAPABILITY}:${query}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      requests.push({
+        schema: "helix.workstation_gateway.structured_admission_call_request.v1",
+        derivation_source: "helix_structured_source_target_admission",
+        capability_id: MORAL_GRAPH_REFLECTION_CAPABILITY,
+        mode: "read",
+        arguments: {
+          prompt: query,
+          conversation_context: readPrompt(body) ?? query,
+          include_locator: true,
+          include_fruition: true,
+          include_procedural_classification: true,
+          include_recommended_actions: true,
+          include_admissions: true,
+          source_target_intent: {
+            ...sourceTargetIntent,
+            target_source: "moral_graph",
+            target_kind: "moral_graph_reflection",
+            alias_capability: selectedCapability === MORAL_GRAPH_REFLECTION_CAPABILITY ? undefined : selectedCapability,
             terminal_eligible: false,
             assistant_answer: false,
             raw_content_included: false,

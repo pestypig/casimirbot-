@@ -723,6 +723,121 @@ describe("explicit workstation gateway derived calls", () => {
     });
   });
 
+  it("admits prompt-named general Moral Graph reflection as a gateway observation", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "Use moral-graph.reflect_context for inherited conditioning, purpose as inquiry, and recognition before transcendence. Explain what the procedural derivation supports.",
+      },
+    });
+
+    expect(capabilities(requests)).toEqual(["moral-graph.reflect_context"]);
+    expect(requests[0]).toMatchObject({
+      schema: "helix.workstation_gateway.prompt_named_capability_call_request.v1",
+      derivation_source: "helix_prompt_named_capability",
+      capability_id: "moral-graph.reflect_context",
+      mode: "read",
+      arguments: {
+        prompt: expect.stringContaining("inherited conditioning"),
+        conversation_context: expect.stringContaining("moral-graph.reflect_context"),
+        include_locator: true,
+        include_fruition: true,
+        include_procedural_classification: true,
+        include_recommended_actions: true,
+        include_admissions: true,
+        source_target_intent: expect.objectContaining({
+          target_source: "moral_graph",
+          target_kind: "moral_graph_reflection",
+          selected_capability: "moral-graph.reflect_context",
+          explicit_capability: true,
+        }),
+      },
+    });
+  });
+
+  it("admits natural-language Moral Graph reflection without admitting web for broad research wording", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "Reflect this philosophy through the moral badge graph using the research and evidence already in the procedural system: inherited conditioning, purpose as inquiry, and goalpost integrity.",
+      },
+    });
+
+    expect(capabilities(requests)).toEqual(["moral-graph.reflect_context"]);
+    expect(capabilities(requests)).not.toContain("internet-search.search_web");
+    expect(requests[0]).toMatchObject({
+      derivation_source: "helix_prompt_derived_moral_graph_reflection",
+      capability_id: "moral-graph.reflect_context",
+      arguments: {
+        source_target_intent: expect.objectContaining({
+          target_source: "moral_graph",
+          target_kind: "moral_graph_reflection",
+        }),
+      },
+    });
+  });
+
+  it("keeps browser-style Moral Graph procedural evidence prompts on the Moral Graph lane", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "Reflect this philosophy through the moral badge graph using the research and evidence already in the procedural system: inherited conditioning, purpose as inquiry, inspiration without imitation, goalpost integrity, and recognition before transcendence. Explain what the procedural chain supports; do not use internet search.",
+      },
+    });
+
+    expect(capabilities(requests)).toEqual(["moral-graph.reflect_context"]);
+    expect(capabilities(requests)).not.toContain("internet-search.search_web");
+    expect(capabilities(requests)).not.toContain("theory-badge-graph.reflect_discussion_context");
+    expect(capabilities(requests)).not.toContain("civilization-bounds.reflect_system_bounds");
+    expect(requests[0]).toMatchObject({
+      derivation_source: "helix_prompt_derived_moral_graph_reflection",
+      capability_id: "moral-graph.reflect_context",
+      arguments: {
+        source_target_intent: expect.objectContaining({
+          target_source: "moral_graph",
+          target_kind: "moral_graph_reflection",
+        }),
+      },
+    });
+  });
+
+  it("keeps explicitly requested web search adjacent to general Moral Graph reflection", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "Use moral-graph.reflect_context for purpose as inquiry, and also search web sources for current evidence.",
+      },
+    });
+
+    expect(capabilities(requests)).toEqual([
+      "moral-graph.reflect_context",
+      "internet-search.search_web",
+    ]);
+    expect((requests[0].arguments as Record<string, any>).next_affordances).toBeUndefined();
+  });
+
+  it("does not execute contextual or screen-visible general Moral Graph mentions", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          'The screen shows "moral-graph.reflect_context"; do not run it. Explain why broad evidence wording should not admit web search.',
+      },
+    });
+
+    expect(capabilities(requests)).not.toContain("moral-graph.reflect_context");
+    expect(capabilities(requests)).not.toContain("internet-search.search_web");
+  });
+
   it("keeps broad moral-substrate wording from admitting inferred internet search beside the primary reflection", () => {
     const requests = readWorkstationGatewayCallRequestsForTurn({
       includePlannerDerived: true,
@@ -765,10 +880,10 @@ describe("explicit workstation gateway derived calls", () => {
     const args = requests[0].arguments as Record<string, any>;
     expect(args.next_affordances).toEqual([
       expect.objectContaining({
-        source: "helix_moral_substrate_primary_request_reduction",
+        source: "helix_moral_graph_primary_request_reduction",
         capability: "internet-search.search_web",
         purpose: "codex_selected_followup_tool",
-        reason: "available_after_moral_substrate_observation_reentry",
+        reason: "available_after_moral_graph_observation_reentry",
         query: "organism personhood law civilization moral status",
         terminal_eligible: false,
         assistant_answer: false,

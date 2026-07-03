@@ -38,6 +38,7 @@ const SCHOLARLY_RESEARCH_SEARCH_CAPABILITY = "scholarly-research.lookup_papers" 
 const SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY = "scholarly-research.fetch_full_text" as const;
 const SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY = "scholarly-research.extract_numeric_parameters" as const;
 const MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY = "moral-graph.reflect_living_substrate_context" as const;
+const MORAL_GRAPH_REFLECTION_CAPABILITY = "moral-graph.reflect_context" as const;
 const WORKSTATION_UI_ACTION_RECEIPT_SCHEMA = "helix.workstation_ui_action_receipt.v1" as const;
 const COMPOUND_NORMALIZABLE_CAPABILITIES = new Set<string>([
   "docs.search",
@@ -45,6 +46,7 @@ const COMPOUND_NORMALIZABLE_CAPABILITIES = new Set<string>([
   "theory-badge-graph.reflect_discussion_context",
   "theory-badge-graph.propose_frontier_conjectures",
   "civilization-bounds.reflect_system_bounds",
+  MORAL_GRAPH_REFLECTION_CAPABILITY,
   MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY,
   SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
   SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
@@ -250,6 +252,9 @@ const typedObservationKindForGatewayCapability = (capabilityId: string): string 
   if (capabilityId === "civilization-bounds.reflect_system_bounds") {
     return "helix_civilization_bounds_tool_result";
   }
+  if (capabilityId === MORAL_GRAPH_REFLECTION_CAPABILITY) {
+    return "moral_graph_reflection";
+  }
   if (capabilityId === MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY) {
     return "moral_living_substrate_reflection";
   }
@@ -276,6 +281,9 @@ const schemaForTypedObservationKind = (kind: string): string => {
   }
   if (kind === "helix_civilization_bounds_tool_result") {
     return "helix_civilization_bounds_tool_result/v1";
+  }
+  if (kind === "moral_graph_reflection") {
+    return "helix.moral_graph_reflection_observation.v1";
   }
   if (kind === "moral_living_substrate_reflection") {
     return "helix.moral_living_substrate_reflection_observation.v1";
@@ -1244,6 +1252,23 @@ const isInternetSearchContentQuestion = (text: string): boolean => {
 const hasInternetSearchObservation = (gatewayCallResults: HelixWorkstationGatewayCallResult[]): boolean =>
   gatewayCallResults.some((result) => result.ok === true && result.capability_id === INTERNET_SEARCH_CAPABILITY);
 
+const hasMoralGraphObservationForPartialExternalAnswer = (
+  gatewayCallResults: HelixWorkstationGatewayCallResult[],
+): boolean =>
+  gatewayCallResults.some((result) =>
+    result.ok === true &&
+    (result.capability_id === MORAL_GRAPH_REFLECTION_CAPABILITY ||
+      result.capability_id === MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY),
+  );
+
+const hasFailedGatewayCapability = (
+  gatewayCallResults: HelixWorkstationGatewayCallResult[],
+  capability: string,
+): boolean =>
+  gatewayCallResults.some((result) =>
+    result.ok !== true && (result.gateway_admission.requested_capability || result.capability_id) === capability,
+  );
+
 const applyInternetSearchObservationAuthorityGuard = (input: {
   question: string;
   text: string;
@@ -1251,6 +1276,12 @@ const applyInternetSearchObservationAuthorityGuard = (input: {
 }): string => {
   if (!isInternetSearchContentQuestion(input.question)) return input.text;
   if (hasInternetSearchObservation(input.gatewayCallResults)) return input.text;
+  if (
+    hasMoralGraphObservationForPartialExternalAnswer(input.gatewayCallResults) &&
+    hasFailedGatewayCapability(input.gatewayCallResults, INTERNET_SEARCH_CAPABILITY)
+  ) {
+    return input.text;
+  }
   return [
     "I cannot answer internet or web-search-backed content from this turn because no internet-search.search_web observation packet was materialized.",
     "Ask with an explicit internet search target so Helix can create bounded web evidence first.",
@@ -1282,6 +1313,12 @@ const applyScholarlyResearchObservationAuthorityGuard = (input: {
 }): string => {
   if (!isScholarlyResearchContentQuestion(input.question)) return input.text;
   if (hasScholarlyResearchObservation(input.gatewayCallResults)) return input.text;
+  if (
+    hasMoralGraphObservationForPartialExternalAnswer(input.gatewayCallResults) &&
+    hasFailedGatewayCapability(input.gatewayCallResults, SCHOLARLY_RESEARCH_SEARCH_CAPABILITY)
+  ) {
+    return input.text;
+  }
   return [
     "I cannot answer scholarly paper content from this turn because no scholarly-research.lookup_papers observation packet was materialized.",
     "Ask with an explicit scholarly search target, DOI, or arXiv id so Helix can create bounded research-paper evidence first.",
@@ -1621,6 +1658,39 @@ const isGatewayRecoveryAffordanceResult = (result: HelixWorkstationGatewayCallRe
   hasGatewayRecoveryAffordanceEvidence(result.observation) ||
   hasGatewayRecoveryAffordanceEvidence(result.observation_packet.state_delta);
 
+const isMoralGraphObservationGatewayResult = (result: HelixWorkstationGatewayCallResult): boolean => {
+  if (result.ok !== true) return false;
+  const capability = result.gateway_admission.requested_capability || result.capability_id;
+  if (capability !== MORAL_GRAPH_REFLECTION_CAPABILITY && capability !== MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY) {
+    return false;
+  }
+  const observation = readRecord(result.observation);
+  const schema = readString(observation?.schema);
+  return (
+    schema === "helix.moral_graph_reflection_observation.v1" ||
+    schema === "helix.moral_living_substrate_reflection_observation.v1" ||
+    result.capability_id === MORAL_GRAPH_REFLECTION_CAPABILITY ||
+    result.capability_id === MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY
+  );
+};
+
+const isExternalEvidenceGatewayResult = (result: HelixWorkstationGatewayCallResult): boolean => {
+  const capability = result.gateway_admission.requested_capability || result.capability_id;
+  return capability === INTERNET_SEARCH_CAPABILITY || capability === SCHOLARLY_RESEARCH_SEARCH_CAPABILITY;
+};
+
+const hasSuccessfulMoralGraphObservation = (gatewayCallResults: HelixWorkstationGatewayCallResult[]): boolean =>
+  gatewayCallResults.some(isMoralGraphObservationGatewayResult);
+
+const isMoralGraphAdjacentExternalFailure = (
+  gatewayCallResults: HelixWorkstationGatewayCallResult[],
+  index: number,
+): boolean => {
+  const result = gatewayCallResults[index];
+  if (!result || result.ok === true) return false;
+  return isExternalEvidenceGatewayResult(result) && hasSuccessfulMoralGraphObservation(gatewayCallResults);
+};
+
 const isGatewayResultCompatibleWithProviderReentry = (
   gatewayCallResults: HelixWorkstationGatewayCallResult[],
   index: number,
@@ -1632,8 +1702,18 @@ const isGatewayResultCompatibleWithProviderReentry = (
     hasSuccessfulCalculatorSolveForFailedCapability(gatewayCallResults, index) ||
     isScholarlyNumericFailClosedGatewayResult(result) ||
     isCalculatorBlockedExpressionGatewayResult(result) ||
-    isGatewayRecoveryAffordanceResult(result)
+    isGatewayRecoveryAffordanceResult(result) ||
+    isMoralGraphAdjacentExternalFailure(gatewayCallResults, index)
   );
+};
+
+const describeGatewayFailure = (result: HelixWorkstationGatewayCallResult): string => {
+  const reason =
+    result.gateway_admission.blocked_reason ??
+    result.error ??
+    result.gateway_admission.admission_reason ??
+    "gateway_call_failed";
+  return `${result.gateway_admission.requested_capability}: ${reason}`;
 };
 
 export const applyGatewayFailureAuthorityGuard = (input: {
@@ -1643,17 +1723,18 @@ export const applyGatewayFailureAuthorityGuard = (input: {
   const failed = input.gatewayCallResults.filter((result, index) =>
     !isGatewayResultCompatibleWithProviderReentry(input.gatewayCallResults, index),
   );
-  if (failed.length === 0) return input.text;
+  const moralAdjacentExternalFailures = input.gatewayCallResults.filter((result, index) =>
+    result.ok !== true && isMoralGraphAdjacentExternalFailure(input.gatewayCallResults, index),
+  );
+  if (failed.length === 0 && moralAdjacentExternalFailures.length === 0) return input.text;
   const descriptions = failed
     .slice(0, 3)
-    .map((result) => {
-      const reason =
-        result.gateway_admission.blocked_reason ??
-        result.error ??
-        result.gateway_admission.admission_reason ??
-        "gateway_call_failed";
-      return `${result.gateway_admission.requested_capability}: ${reason}`;
-    });
+    .map(describeGatewayFailure);
+  if (failed.length === 0 && moralAdjacentExternalFailures.length > 0) {
+    const externalDescriptions = moralAdjacentExternalFailures.slice(0, 3).map(describeGatewayFailure);
+    const note = `External evidence unavailable: ${externalDescriptions.join("; ")}.`;
+    return input.text.includes(note) ? input.text : [input.text.trim(), note].filter(Boolean).join("\n\n");
+  }
   return [
     "I cannot claim the requested workstation tool or UI action ran because Helix did not produce a successful observation or action receipt for every gateway request.",
     `Blocked or failed gateway request${descriptions.length === 1 ? "" : "s"}: ${descriptions.join("; ")}.`,
@@ -2587,6 +2668,7 @@ export const codexProvider: HelixAgentProvider = {
       "For any repository/codebase-backed turn, answer only from the provided repo.search observation packet. If no repo.search observation packet exists, say repository content is not available from this turn.",
       "For any internet/web-backed turn, answer only from the provided internet-search.search_web observation packet. If no internet search observation packet exists, say web evidence is not available from this turn.",
       "For any scholarly/paper-backed turn, answer only from the provided scholarly-research.lookup_papers observation packet. If no scholarly observation packet exists, say paper evidence is not available from this turn.",
+      "For moral_graph_reflection observations, use located_badge_ids, comparison_seed, probability_terrain, procedural_classification, fruition, and claim_boundary_notes as bounded procedural evidence. Explain what the derivation supports and what remains unsupported; do not present a final moral verdict or substitute web/civilization evidence when the Moral Graph observation is missing.",
       "For moral_living_substrate_reflection observations, use procedural_chain transitions to compare present and missing links. Explain what the chain supports conditionally, what remains unsupported, and avoid merely restating matched badge names.",
       "If a scholarly observation includes scholarly_lookup_recovery_affordance, scholarly_full_text_recovery_affordance, scholarly_numeric_recovery_affordance, or recovery_affordances, treat that as non-terminal evidence about a failed or weak retrieval/fetch/extraction. Use it to explain the mismatch, propose a narrower re-query, ask the user, or fail closed; do not claim full-text, numeric extraction, or calculator results from it.",
       `Before giving a final answer, decide whether the user request needs a one-shot capability lane. If it does and required inputs are present, your entire first response must be ${CODEX_CAPABILITY_LANE_REQUEST_MARKER} followed by compact JSON for exactly one lane call.`,
