@@ -21,7 +21,14 @@ type StagePlayDocumentMarkdownMailResponse =
       mailboxThreadId?: string;
       mail?: { mailId?: string; sourceId?: string; sourceKind?: string };
       traffic?: {
+        sourceHash?: string | null;
         chunkId?: string;
+        chunkIndex?: number;
+        dedupeKey?: string;
+        sourceEventId?: string;
+        sourceEventMs?: number;
+        targetLanguage?: string;
+        accountLocale?: string;
         acceptedUnits?: number;
         deferredUnits?: number;
         acceptedChars?: number;
@@ -61,6 +68,25 @@ export type DocumentMarkdownTranslationEntry = {
   error?: string;
   runId: string;
   role: StagePlayMicroReasonerRunV1["role"];
+  observationRef?: string | null;
+  receiptRef?: string | null;
+  docPath?: string | null;
+  sourceHash?: string | null;
+  chunkId?: string | null;
+  chunkIndex?: number | null;
+  dedupeKey?: string | null;
+  sourceEventId?: string | null;
+  sourceEventMs?: number | null;
+  observedAtMs?: number | null;
+  projectionStatus?: string | null;
+  freshnessStatus?: string | null;
+  selectedBackendProvider?: string | null;
+  sourceId?: string | null;
+  source?: "document_microdeck";
+  sourceKind?: string | null;
+  projectionTarget?: string | null;
+  targetLanguage?: string | null;
+  accountLocale?: string | null;
 };
 
 export async function requestDocumentTranslation(
@@ -151,10 +177,13 @@ export async function applyDocumentMarkdownMicroDeckPreset(params: {
 export async function enqueueDocumentMarkdownTranslationMail(params: {
   docPath: string;
   locale: string;
+  targetLanguage?: string | null;
+  accountLocale?: string | null;
   sourceHash: string;
   title?: string;
   sourceId?: string;
   chunkId?: string;
+  chunkIndex?: number | null;
   units: DocumentTranslationUnit[];
   signal?: AbortSignal;
 }): Promise<{ sourceId: string; mailId: string | null }> {
@@ -171,10 +200,13 @@ export async function enqueueDocumentMarkdownTranslationMail(params: {
       body: JSON.stringify({
         docPath: params.docPath,
         locale: params.locale,
+        targetLanguage: params.targetLanguage ?? params.locale,
+        accountLocale: params.accountLocale ?? params.locale,
         sourceHash: params.sourceHash,
         title: params.title,
         sourceId,
         chunkId: params.chunkId,
+        chunkIndex: params.chunkIndex ?? null,
         units: params.units,
       }),
       signal: controller.signal,
@@ -273,6 +305,52 @@ export function extractDocumentMarkdownTranslationsFromRuns(
       Array.isArray(parsed.translations);
     if (!isDocumentProjection) continue;
     const translations = Array.isArray(parsed?.translations) ? parsed.translations : [];
+    const sourceKind = readFirstString(parsed, ["sourceKind", "source_kind"]) ?? null;
+    const docPath = readFirstString(parsed, ["docPath", "doc_path"]) ?? null;
+    const sourceHash = readFirstString(parsed, ["sourceHash", "source_hash"]) ?? null;
+    const chunkId = readFirstString(parsed, ["chunkId", "chunk_id"]) ?? null;
+    const chunkIndex = readFirstNumber(parsed, ["chunkIndex", "chunk_index"]);
+    const dedupeKey = readFirstString(parsed, ["dedupeKey", "dedupe_key"]) ?? null;
+    const sourceEventId = readFirstString(parsed, ["sourceEventId", "source_event_id"]) ?? null;
+    const sourceEventMs = readFirstNumber(parsed, ["sourceEventMs", "source_event_ms"]);
+    const observedAtMs =
+      readFirstNumber(parsed, ["observedAtMs", "observed_at_ms"]) ??
+      readIsoTimestampMs(readFirstString(parsed, ["createdAt", "created_at"])) ??
+      readIsoTimestampMs(run.completedAt) ??
+      readIsoTimestampMs(run.startedAt);
+    const projectionStatus = readFirstString(parsed, ["projectionStatus", "projection_status"]) ?? null;
+    const freshnessStatus = readFirstString(parsed, ["freshnessStatus", "freshness_status"]) ?? null;
+    const sourceId = readFirstString(parsed, ["sourceId", "source_id"]) ?? null;
+    const selectedBackendProvider =
+      readFirstString(parsed, ["selectedBackendProvider", "selected_backend_provider"]) ??
+      run.modelUsed ??
+      "stage_play_microdeck";
+    const observationRef = readFirstString(parsed, ["observationRef", "observation_ref"]) ?? run.runId;
+    const receiptRef = readFirstString(parsed, ["receiptRef", "receipt_ref"]) ?? null;
+    const projectionTarget = readFirstString(parsed, ["projectionTarget", "projection_target"]) ?? null;
+    const targetLanguage = readFirstString(parsed, ["targetLanguage", "target_language", "locale"]) ?? null;
+    const accountLocale = readFirstString(parsed, ["accountLocale", "account_locale", "locale"]) ?? null;
+    const projectionMeta = {
+      source: "document_microdeck" as const,
+      ...(sourceKind ? { sourceKind } : {}),
+      ...(docPath ? { docPath } : {}),
+      ...(sourceHash ? { sourceHash } : {}),
+      ...(chunkId ? { chunkId } : {}),
+      ...(typeof chunkIndex === "number" ? { chunkIndex } : {}),
+      ...(dedupeKey ? { dedupeKey } : {}),
+      ...(sourceEventId ? { sourceEventId } : {}),
+      ...(typeof sourceEventMs === "number" ? { sourceEventMs } : {}),
+      ...(typeof observedAtMs === "number" ? { observedAtMs } : {}),
+      ...(projectionStatus ? { projectionStatus } : {}),
+      ...(freshnessStatus ? { freshnessStatus } : {}),
+      ...(sourceId ? { sourceId } : {}),
+      ...(selectedBackendProvider ? { selectedBackendProvider } : {}),
+      ...(observationRef ? { observationRef } : {}),
+      ...(receiptRef ? { receiptRef } : {}),
+      ...(projectionTarget ? { projectionTarget } : {}),
+      ...(targetLanguage ? { targetLanguage } : {}),
+      ...(accountLocale ? { accountLocale } : {}),
+    };
     for (const item of translations) {
       const record = readRecord(item);
       const unitId = readFirstString(record, ["unit_id", "unitId", "id"]);
@@ -289,6 +367,7 @@ export function extractDocumentMarkdownTranslationsFromRuns(
         text,
         runId: run.runId,
         role: run.role,
+        ...projectionMeta,
       });
     }
     const unitErrors = Array.isArray(parsed.unit_errors)
@@ -316,6 +395,7 @@ export function extractDocumentMarkdownTranslationsFromRuns(
         error: reason,
         runId: run.runId,
         role: run.role,
+        ...projectionMeta,
       });
     }
   }
@@ -362,4 +442,19 @@ function readFirstString(record: Record<string, unknown> | null, keys: string[])
     }
   }
   return null;
+}
+
+function readFirstNumber(record: Record<string, unknown> | null, keys: string[]): number | null {
+  if (!record) return null;
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+  }
+  return null;
+}
+
+function readIsoTimestampMs(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }

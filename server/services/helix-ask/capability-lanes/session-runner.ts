@@ -85,6 +85,8 @@ const readSourceBinding = (value: unknown): HelixCapabilityLaneSessionSourceBind
   const record = readRecord(value);
   return {
     source_id: readString(record?.source_id ?? record?.sourceId),
+    source_hash:
+      readString(record?.source_hash ?? record?.sourceHash) || null,
     source_kind: readSourceKind(record?.source_kind ?? record?.sourceKind),
     projection_target:
       readString(record?.projection_target ?? record?.projectionTarget) || null,
@@ -217,6 +219,7 @@ export const runHelixCapabilityLaneSessionRequests = (input: {
         chunkIndex: call.chunk_index,
         dedupeKey: call.dedupe_key,
         sourceEventId: call.source_event_id,
+        sourceHash: call.source_binding?.source_hash ?? null,
         sourceEventMs: call.source_event_ms,
         observedAtMs: call.observed_at_ms,
         freshnessStatus: call.freshness_status,

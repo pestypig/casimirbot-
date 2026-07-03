@@ -49,6 +49,7 @@ const bindingEvent = (input: {
     lane_session_health: input.session.health,
     lane_session_observation_ref: input.session.last_observation_ref,
     source_id: input.session.source_binding.source_id,
+    source_hash: input.session.source_binding.source_hash ?? null,
     source_kind: input.session.source_binding.source_kind,
     source_projection_target: input.session.source_binding.projection_target,
     account_locale: input.session.source_binding.account_locale,
@@ -85,9 +86,11 @@ const withSessionSnapshot = (
     | "lane_session_status"
     | "lane_session_health"
     | "lane_session_source_id"
+    | "lane_session_source_hash"
     | "lane_session_source_kind"
     | "lane_session_projection_target"
     | "lane_session_account_locale"
+    | "lane_session_permissions"
     | "lane_session_last_observation_ref"
     | "lane_session_last_receipt_ref"
     | "latest_lane_session_event"
@@ -106,9 +109,11 @@ const withSessionSnapshot = (
   lane_session_status: session.status,
   lane_session_health: session.health,
   lane_session_source_id: session.source_binding.source_id,
+  lane_session_source_hash: session.source_binding.source_hash ?? null,
   lane_session_source_kind: session.source_binding.source_kind,
   lane_session_projection_target: session.source_binding.projection_target,
   lane_session_account_locale: session.source_binding.account_locale,
+  lane_session_permissions: session.permissions,
   lane_session_last_observation_ref: session.last_observation_ref,
   lane_session_last_receipt_ref: session.last_receipt_ref,
   latest_lane_session_event: session.debug_history.at(-1) ?? null,
@@ -205,6 +210,7 @@ export const createHelixCapabilityLaneGoalBindingStore = (input: {
     if (binding.status === "stopped") return blocked("goal_binding_stopped");
     const session = input.sessionStore.get(binding.lane_session_id);
     if (!session) return blocked("unknown_lane_session");
+    if (session.status === "stopped") return blocked("lane_session_stopped");
     const nowMs = args.nowMs ?? Date.now();
     const event = bindingEvent({
       goalBindingId: args.goalBindingId,
@@ -245,6 +251,7 @@ export const createHelixCapabilityLaneGoalBindingStore = (input: {
     if (!reportRef) return blocked("missing_report_ref");
     const session = input.sessionStore.get(binding.lane_session_id);
     if (!session) return blocked("unknown_lane_session");
+    if (session.status === "stopped") return blocked("lane_session_stopped");
     const nowMs = args.nowMs ?? Date.now();
     const event = bindingEvent({
       goalBindingId: args.goalBindingId,
@@ -282,6 +289,7 @@ export const createHelixCapabilityLaneGoalBindingStore = (input: {
     if (binding.status === "stopped") return blocked("goal_binding_stopped");
     const session = input.sessionStore.get(binding.lane_session_id);
     if (!session) return blocked("unknown_lane_session");
+    if (session.status === "stopped") return blocked("lane_session_stopped");
     if (args.mailLoopSummary.lane_session_id !== session.lane_session_id) {
       return blocked("lane_session_mismatch");
     }

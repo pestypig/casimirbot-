@@ -9,34 +9,22 @@ import {
   type HelixInterimVoicePlaybackKind,
 } from "@shared/contracts/helix-interim-voice-callout.v1";
 import { runtimeMemoryGovernor } from "../runtime/runtime-memory-governor";
+import { createInterimVoiceDeliveryRetryPolicy } from "./voice-playback/retry-policy";
+import {
+  createVoicePlaybackOutcomeWaiterStore,
+  findLatestClientVoicePlaybackOutcomeReceipt,
+  normalizeVoicePlaybackOutcomeStatus,
+} from "./voice-playback/outcome-receipts";
 
 const MAX_INTERIM_CALLOUT_CHARS = 220;
 const MAX_IMMEDIATE_ACK_CHARS = 96;
 const MAX_STEERING_ACK_CHARS = 96;
 const VOICE_STEERING_EVENT_REF_PREFIX = "helix_voice_steering_event:";
 const RECENT_CALLOUT_LIMIT = 120;
-const DEFAULT_RETRY_TTL_MS = 90_000;
-const DEFAULT_RETRY_DELAY_MS = 5_000;
-const MAX_RETRY_JOBS_PER_THREAD = 5;
 
 const requestById = new Map<string, HelixInterimVoiceCalloutRequestV1>();
 const receiptById = new Map<string, HelixInterimVoiceCalloutReceiptV1>();
-
-type InterimVoiceDeliveryRetryJob = {
-  jobId: string;
-  requestId: string;
-  threadId: string;
-  turnId: string;
-  createdAtMs: number;
-  nextRetryAtMs: number;
-  expiresAtMs: number;
-  retryCount: number;
-  blockedReason: string;
-  status: "queued_for_retry" | "awaiting_client_playback" | "expired" | "superseded" | "failed";
-  latestReceiptId: string;
-};
-
-const retryJobByRequestId = new Map<string, InterimVoiceDeliveryRetryJob>();
+const playbackOutcomeWaiters = createVoicePlaybackOutcomeWaiterStore();
 
 const hashShort = (value: unknown, size = 18): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
@@ -134,6 +122,14 @@ const normalizePlaybackKind = (
   return "tool_receipt";
 };
 
+const findLatestClientPlaybackOutcomeReceipt = (
+  requestId: string,
+): HelixInterimVoiceCalloutReceiptV1 | null =>
+  findLatestClientVoicePlaybackOutcomeReceipt({
+    receipts: receiptById.values(),
+    requestId,
+  });
+
 const pruneRecent = <T extends { requestId?: string; receiptId?: string }>(map: Map<string, T>) => {
   while (map.size > RECENT_CALLOUT_LIMIT) {
     const firstKey = map.keys().next().value;
@@ -200,66 +196,10 @@ const buildReceipt = (input: {
   return receipt;
 };
 
-const expireRetryJob = (
-  job: InterimVoiceDeliveryRetryJob,
-  request: HelixInterimVoiceCalloutRequestV1,
-  status: "expired" | "superseded" = "expired",
-): HelixInterimVoiceCalloutReceiptV1 => {
-  job.status = status;
-  const receipt = buildReceipt({
-    request,
-    status,
-    message: status === "expired"
-      ? "Interim voice callout retry expired before TTS capacity recovered."
-      : "Interim voice callout retry was superseded by a newer delivery state.",
-    retryCount: job.retryCount,
-    blockedReason: job.blockedReason,
-  });
-  job.latestReceiptId = receipt.receiptId;
-  retryJobByRequestId.delete(job.requestId);
-  return receipt;
-};
-
-const enqueueRetryJob = (
-  request: HelixInterimVoiceCalloutRequestV1,
-  blockedReason: string,
-): HelixInterimVoiceCalloutReceiptV1 => {
-  const nowMs = Date.now();
-  const threadJobs = Array.from(retryJobByRequestId.values())
-    .filter((job) => job.threadId === request.threadId && job.status === "queued_for_retry")
-    .sort((a, b) => a.createdAtMs - b.createdAtMs);
-  while (threadJobs.length >= MAX_RETRY_JOBS_PER_THREAD) {
-    const oldest = threadJobs.shift();
-    const oldRequest = oldest ? requestById.get(oldest.requestId) : null;
-    if (oldest && oldRequest) {
-      expireRetryJob(oldest, oldRequest, "superseded");
-    } else if (oldest) {
-      retryJobByRequestId.delete(oldest.requestId);
-    }
-  }
-  const receipt = buildReceipt({
-    request,
-    status: "queued_for_retry",
-    message: `Voice TTS admission blocked: ${blockedReason}; queued for retry.`,
-    nextRetryAtMs: nowMs + DEFAULT_RETRY_DELAY_MS,
-    retryCount: 0,
-    blockedReason,
-  });
-  retryJobByRequestId.set(request.requestId, {
-    jobId: `helix_interim_voice_delivery_job:${hashShort([request.requestId, nowMs])}`,
-    requestId: request.requestId,
-    threadId: request.threadId,
-    turnId: request.turnId,
-    createdAtMs: nowMs,
-    nextRetryAtMs: nowMs + DEFAULT_RETRY_DELAY_MS,
-    expiresAtMs: nowMs + DEFAULT_RETRY_TTL_MS,
-    retryCount: 0,
-    blockedReason,
-    status: "queued_for_retry",
-    latestReceiptId: receipt.receiptId,
-  });
-  return receipt;
-};
+const retryPolicy = createInterimVoiceDeliveryRetryPolicy({
+  getRequestById: (requestId) => requestById.get(requestId) ?? null,
+  buildReceipt,
+});
 
 export function retryQueuedInterimVoiceCalloutDeliveries(input: {
   threadId?: string | null;
@@ -267,58 +207,7 @@ export function retryQueuedInterimVoiceCalloutDeliveries(input: {
   nowMs?: number;
   force?: boolean;
 } = {}): HelixInterimVoiceCalloutReceiptV1[] {
-  const nowMs = input.nowMs ?? Date.now();
-  const receipts: HelixInterimVoiceCalloutReceiptV1[] = [];
-  for (const job of Array.from(retryJobByRequestId.values())) {
-    if (input.threadId && job.threadId !== input.threadId) continue;
-    if (input.turnId && job.turnId !== input.turnId) continue;
-    if (job.status !== "queued_for_retry") continue;
-    const request = requestById.get(job.requestId);
-    if (!request) {
-      retryJobByRequestId.delete(job.requestId);
-      continue;
-    }
-    if (nowMs >= job.expiresAtMs) {
-      receipts.push(expireRetryJob(job, request, "expired"));
-      continue;
-    }
-    if (!input.force && nowMs < job.nextRetryAtMs) continue;
-    const admission = runtimeMemoryGovernor.admitRuntimeTask({
-      taskClass: "voice_tts",
-      traceId: request.requestId,
-      source: "helix.interim_voice_callout.retry",
-    });
-    if (!admission.admitted) {
-      job.retryCount += 1;
-      job.blockedReason = admission.reason;
-      job.nextRetryAtMs = nowMs + Math.min(DEFAULT_RETRY_DELAY_MS * Math.max(1, job.retryCount + 1), 30_000);
-      const receipt = buildReceipt({
-        request,
-        status: "queued_for_retry",
-        message: `Voice TTS retry still blocked: ${admission.reason}.`,
-        nextRetryAtMs: job.nextRetryAtMs,
-        retryCount: job.retryCount,
-        blockedReason: admission.reason,
-      });
-      job.latestReceiptId = receipt.receiptId;
-      receipts.push(receipt);
-      continue;
-    }
-    admission.lease?.release("completed");
-    job.status = "awaiting_client_playback";
-    const receipt = buildReceipt({
-      request,
-      status: "awaiting_client_playback",
-      utteranceId: `interim_voice:${hashShort([request.requestId, "retry", job.retryCount])}`,
-      message: "Interim voice callout accepted for client playback handoff after capacity retry; awaiting browser playback receipt.",
-      retryCount: job.retryCount,
-      blockedReason: job.blockedReason,
-    });
-    job.latestReceiptId = receipt.receiptId;
-    retryJobByRequestId.delete(job.requestId);
-    receipts.push(receipt);
-  }
-  return receipts;
+  return retryPolicy.retryQueuedDeliveries(input);
 }
 
 export function recordInterimVoiceCalloutRequest(input: {
@@ -455,7 +344,7 @@ export function recordInterimVoiceCalloutRequest(input: {
   if (!admission.admitted) {
     return {
       request,
-      receipt: enqueueRetryJob(request, admission.reason),
+      receipt: retryPolicy.enqueueRetryJob(request, admission.reason),
     };
   }
   admission.lease?.release("completed");
@@ -493,8 +382,91 @@ export function listInterimVoiceCalloutReceipts(input: {
     .slice(-limit);
 }
 
+export function recordInterimVoicePlaybackOutcome(input: {
+  requestId?: string | null;
+  sourceReceiptId?: string | null;
+  utteranceId?: string | null;
+  status?: string | null;
+  message?: string | null;
+  provider?: string | null;
+}): {
+  ok: boolean;
+  request: HelixInterimVoiceCalloutRequestV1 | null;
+  receipt: HelixInterimVoiceCalloutReceiptV1 | null;
+  error?: string;
+} {
+  const requestId = String(input.requestId ?? "").trim();
+  const sourceReceiptId = String(input.sourceReceiptId ?? "").trim();
+  const status = normalizeVoicePlaybackOutcomeStatus(input.status);
+  const request =
+    (requestId ? requestById.get(requestId) : null) ??
+    (sourceReceiptId ? (() => {
+      const sourceReceipt = receiptById.get(sourceReceiptId);
+      return sourceReceipt ? requestById.get(sourceReceipt.requestId) ?? null : null;
+    })() : null);
+
+  if (!request) {
+    return {
+      ok: false,
+      request: null,
+      receipt: null,
+      error: "interim_voice_callout_request_not_found",
+    };
+  }
+  if (!status) {
+    return {
+      ok: false,
+      request,
+      receipt: null,
+      error: "invalid_voice_playback_outcome_status",
+    };
+  }
+
+  const receiptStatus: HelixInterimVoiceCalloutReceiptV1["status"] =
+    status === "delivered"
+      ? "delivered"
+      : status === "queued"
+        ? "queued"
+        : "failed";
+  const receipt = buildReceipt({
+    request,
+    status: receiptStatus,
+    utteranceId: input.utteranceId ?? null,
+    provider: input.provider ?? "helix_client_voice_playback",
+    message: input.message ?? `Client voice playback outcome: ${status}.`,
+    blockedReason:
+      status === "cancelled" || status === "suppressed" || status === "failed"
+        ? status
+        : null,
+  });
+  playbackOutcomeWaiters.notify(receipt);
+  return {
+    ok: true,
+    request,
+    receipt,
+  };
+}
+
+export function waitForInterimVoicePlaybackOutcome(input: {
+  requestId?: string | null;
+  sourceReceiptId?: string | null;
+  timeoutMs?: number | null;
+}): Promise<HelixInterimVoiceCalloutReceiptV1 | null> {
+  const sourceReceiptId = String(input.sourceReceiptId ?? "").trim();
+  const sourceReceipt = sourceReceiptId ? receiptById.get(sourceReceiptId) : null;
+  const requestId = String(input.requestId ?? sourceReceipt?.requestId ?? "").trim();
+  if (!requestId) return Promise.resolve(null);
+  const timeoutMs = Math.max(0, Math.min(Math.floor(input.timeoutMs ?? 8_000), 30_000));
+  return playbackOutcomeWaiters.wait({
+    requestId,
+    timeoutMs,
+    findLatest: () => findLatestClientPlaybackOutcomeReceipt(requestId),
+  });
+}
+
 export function resetInterimVoiceCalloutsForTest(): void {
   requestById.clear();
   receiptById.clear();
-  retryJobByRequestId.clear();
+  retryPolicy.reset();
+  playbackOutcomeWaiters.reset();
 }

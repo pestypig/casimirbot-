@@ -31,6 +31,7 @@ const CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY = "civilization-bounds.reflect_s
 const THEORY_CONTEXT_REFLECTION_CAPABILITY = "theory-badge-graph.reflect_discussion_context";
 const MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY = "moral-graph.reflect_living_substrate_context";
 const THEORY_FRONTIER_CONJECTURE_CAPABILITY = "theory-badge-graph.propose_frontier_conjectures";
+const TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY = "text_to_speech.speak_text";
 const VOICE_INTERIM_CALLOUT_CAPABILITY = "live_env.request_interim_voice_callout";
 const VOICE_NARRATOR_SAY_CAPABILITY = "live_env.narrator_say";
 const CONTEXT_FEED_QUERY_CAPABILITIES = [
@@ -2780,7 +2781,15 @@ describe("Helix workstation tool gateway", () => {
 
     const observation = result.observation as {
       hits?: Array<{ filePath?: string }>;
-      document_candidates?: Array<{ path?: string; matched_terms?: string[] }>;
+      document_candidates?: Array<{
+        path?: string;
+        matched_terms?: string[];
+        doc_class?: string;
+        bundle_kind?: string;
+        canonical?: boolean;
+        sidecars?: string[];
+        tool_hints?: Record<string, unknown>;
+      }>;
       unique_document_count?: number;
       terms?: string[];
     };
@@ -2795,6 +2804,19 @@ describe("Helix workstation tool gateway", () => {
     expect(observation.unique_document_count).toBeGreaterThan(0);
     expect(candidates[0]?.path).toBe("docs/research/nhm2-current-status-whitepaper-2026-05-02.md");
     expect(candidates[0]?.matched_terms).toEqual(expect.arrayContaining(["nhm2", "whitepaper"]));
+    expect(candidates[0]).toMatchObject({
+      doc_class: "canonical-research",
+      bundle_kind: "equation-action-whitepaper",
+      canonical: true,
+      sidecars: [
+        "docs/research/nhm2-current-status-whitepaper-2026-05-02.equation-actions.json",
+        "docs/research/nhm2-current-status-whitepaper-2026-05-02.equation-actions.source.json",
+      ],
+      tool_hints: {
+        calculatorReady: true,
+        contentAuthority: "bounded_docs_observation_required",
+      },
+    });
   });
 
   it("reports unique docs candidates separately from repeated line hits", async () => {
@@ -4629,6 +4651,84 @@ describe("Helix workstation tool gateway", () => {
     expect(observation.host_projection?.model_id).toBe("eleven_multilingual_v2");
     expect(observation.request?.requestId).toMatch(/^helix_interim_voice_callout_request:/);
     expect(observation.receipt?.receiptId).toMatch(/^helix_interim_voice_callout_receipt:/);
+  });
+
+  it("calls text_to_speech.speak_text as the canonical governed voice lane", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "act",
+      capabilityId: TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY,
+      arguments: {
+        text: "playback handoff only",
+        thread_id: "helix-ask:test:tts",
+        voice: "dottie_default",
+        locale: "en-US",
+        source_observation_ref: "ask:test:source-observation",
+      },
+      turnId: "ask:test:gateway-tts-speak-text",
+      iteration: 10,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      capability_id: TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      gateway_admission: {
+        requested_capability: TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY,
+        admission_status: "admitted",
+        permission_profile: "act",
+      },
+      observation_packet: {
+        capability_key: TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY,
+        panel_id: "voice-delivery",
+        action: "speak_text",
+        status: "succeeded",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+      },
+      observation: {
+        schema: "helix.interim_voice_callout_tool_result.v1",
+        capability_key: TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY,
+        capability: TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY,
+        status: "succeeded",
+        request: {
+          text: "playback handoff only",
+          kind: "tool_result",
+          voicePlaybackKind: "tool_receipt",
+          evidenceRefs: ["ask:test:source-observation"],
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+        receipt: {
+          tool: TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY,
+          playback_status: expect.stringMatching(/^(awaiting_client_receipt|queued_for_retry)$/),
+          audio_url: null,
+          audio_bytes_observed: false,
+          delivered_at_ms: null,
+          source_text_hash: expect.any(String),
+          backend_provider: "existing_voice_service",
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+        host_projection: {
+          kind: "voice_playback_request",
+          normalized_playback_status: expect.stringMatching(/^(awaiting_client_receipt|queued_for_retry)$/),
+          audio_bytes_observed: false,
+          source_text_hash: expect.any(String),
+          source_observation_ref: "ask:test:source-observation",
+          locale: "en-US",
+          voice_profile: "dottie_default",
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+      },
+    });
   });
 
   it("blocks interim voice callout when confirmation is required, without making a final answer", async () => {

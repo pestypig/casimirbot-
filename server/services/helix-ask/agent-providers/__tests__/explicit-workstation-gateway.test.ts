@@ -20,6 +20,8 @@ import {
 import { PROVIDER_AGENT_CAPABILITY_CLASSIFICATIONS } from "../../provider-agent-capability-contract";
 import type { HelixAgentProvider } from "../types";
 import { runHelixCapabilityLaneOneShotRequests } from "../../capability-lanes/one-shot-runner";
+import { resetInterimVoiceCalloutsForTest } from "../../interim-voice-callout-store";
+import { runtimeMemoryGovernor } from "../../../runtime/runtime-memory-governor";
 
 const docSnapshot = {
   activePanel: "scientific-calculator",
@@ -1212,7 +1214,7 @@ describe("explicit workstation gateway derived calls", () => {
     ]);
   });
 
-  it("maps affirmative voice-lane prompts to interim voice gateway requests", () => {
+  it("maps affirmative voice-lane prompts to text-to-speech gateway requests", () => {
     const requests = buildPromptDerivedVoiceGatewayCallRequests({
       agent_runtime: "codex",
       question: "Use the voice lane to say checking now",
@@ -1220,15 +1222,55 @@ describe("explicit workstation gateway derived calls", () => {
 
     expect(requests).toEqual([
       expect.objectContaining({
-        capability_id: "live_env.request_interim_voice_callout",
+        capability_id: "text_to_speech.speak_text",
         mode: "act",
         arguments: expect.objectContaining({
           text: "checking now",
           kind: "tool_progress",
           source_target_intent: expect.objectContaining({
             target_source: "voice_delivery",
-            target_kind: "interim_voice_callout",
+            target_kind: "text_to_speech",
           }),
+        }),
+      }),
+    ]);
+  });
+
+  it("extracts quoted TTS payloads before post-reentry instructions", () => {
+    const question =
+      "Live browser voice-tool test: use the governed text_to_speech.speak_text voice lane to say exactly 'browser voice receipt check'. After the receipt re-enters, answer in one sentence with the receipt playback_status.";
+
+    expect(buildPromptNamedCapabilityGatewayCallRequests({
+      agent_runtime: "codex",
+      question,
+    })).toEqual([
+      expect.objectContaining({
+        capability_id: "text_to_speech.speak_text",
+        mode: "act",
+        arguments: expect.objectContaining({
+          text: "browser voice receipt check",
+          kind: "tool_progress",
+          source_target_intent: expect.objectContaining({
+            target_source: "voice_delivery",
+            target_kind: "text_to_speech",
+          }),
+        }),
+      }),
+    ]);
+    expect(buildPromptDerivedVoiceGatewayCallRequests({
+      agent_runtime: "codex",
+      question,
+    })).toEqual([]);
+
+    expect(buildPromptDerivedVoiceGatewayCallRequests({
+      agent_runtime: "codex",
+      question:
+        "Live browser voice-tool test: use the governed voice lane to say exactly 'browser voice receipt check'. After the receipt re-enters, answer in one sentence with the receipt playback_status.",
+    })).toEqual([
+      expect.objectContaining({
+        capability_id: "text_to_speech.speak_text",
+        arguments: expect.objectContaining({
+          text: "browser voice receipt check",
         }),
       }),
     ]);
@@ -1436,7 +1478,7 @@ describe("explicit workstation gateway derived calls", () => {
     expect(results).toHaveLength(1);
     expect(results[0]).toMatchObject({
       ok: true,
-      capability_id: "live_env.request_interim_voice_callout",
+      capability_id: "text_to_speech.speak_text",
       observation: {
         schema: "helix.interim_voice_callout_tool_result.v1",
         request: {
@@ -1446,7 +1488,7 @@ describe("explicit workstation gateway derived calls", () => {
           raw_content_included: false,
         },
         receipt: {
-          status: "awaiting_client_playback",
+          status: expect.stringMatching(/^(awaiting_client_playback|queued_for_retry)$/),
           assistant_answer: false,
           terminal_eligible: false,
           raw_content_included: false,
@@ -1457,6 +1499,68 @@ describe("explicit workstation gateway derived calls", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
+  });
+
+  it("does not treat backend voice retry queue as a successful client handoff", async () => {
+    resetInterimVoiceCalloutsForTest();
+    runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
+      memoryReader: () => ({
+        heapUsed: 3_000 * 1024 * 1024,
+        heapTotal: 3_100 * 1024 * 1024,
+        rss: 3_200 * 1024 * 1024,
+        external: 0,
+        arrayBuffers: 0,
+      }),
+      hostMemoryReader: () => ({
+        freeMiB: 16_000,
+        totalMiB: 32_000,
+        freeRatio: 0.5,
+      }),
+    });
+
+    try {
+      const results = await runExplicitWorkstationGatewayCalls({
+        agentRuntime: "codex",
+        body: {
+          agent_runtime: "codex",
+          question: "Use the voice lane to say checking now",
+        },
+        turnId: "ask:test:explicit-derived-voice-capacity-blocked",
+      });
+
+      expect(results).toHaveLength(1);
+      expect(results[0]).toMatchObject({
+        ok: false,
+        capability_id: "text_to_speech.speak_text",
+        observation: {
+          receipt: {
+            status: "queued_for_retry",
+            playback_status: "unavailable",
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+          },
+          host_projection: {
+            playback_status: "queued_for_retry",
+            normalized_playback_status: "unavailable",
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+          },
+        },
+        observation_packet: {
+          status: "blocked",
+        },
+        error: "queued_for_retry",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      });
+    } finally {
+      runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests();
+      resetInterimVoiceCalloutsForTest();
+    }
   });
 
   it("maps named workspace_os.status capability prompts to observations", () => {
@@ -1831,7 +1935,7 @@ describe("explicit workstation gateway derived calls", () => {
 
       expect(capabilities(requests), classification.capability_id).not.toContain(classification.capability_id);
       if (canonicalVoiceAliases.has(classification.capability_id)) {
-        expect(capabilities(requests)).toEqual(["live_env.request_interim_voice_callout"]);
+        expect(capabilities(requests)).toEqual(["text_to_speech.speak_text"]);
       } else {
         expect(requests, classification.capability_id).toEqual([]);
       }

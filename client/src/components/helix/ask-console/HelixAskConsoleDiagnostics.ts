@@ -23,9 +23,21 @@ export type HelixAskConsoleCapabilityLaneRowStage =
   | "goal_dispatch_plan"
   | "goal_dispatch_admission"
   | "goal_dispatch_readiness"
-  | "terminal_selected";
+  | "terminal_selected"
+  | "terminal_rejected";
 
 export type HelixAskConsoleCapabilityLaneSummary = {
+  lifecycleStatus:
+    | "none"
+    | "visible_only"
+    | "requested"
+    | "executed"
+    | "reentered"
+    | "session_active"
+    | "mail_loop_active"
+    | "goal_bound"
+    | "terminal_selected"
+    | "terminal_rejected";
   visibleCount: number;
   requestedCount: number;
   backendSelectedCount: number;
@@ -38,6 +50,7 @@ export type HelixAskConsoleCapabilityLaneSummary = {
   goalDispatchAdmissionCount: number;
   goalDispatchReadinessCount: number;
   terminalSelectedCount: number;
+  terminalRejectedCount: number;
   visibleLaneDoesNotMeanExecuted: true;
 };
 
@@ -139,6 +152,16 @@ export function resolveHelixAskConsoleCapabilityLaneRowStage(
   }
   if (
     label === "terminal" &&
+    (haystack.includes("terminal_rejected") ||
+      haystack.includes("terminal rejected") ||
+      haystack.includes("terminal_authority_missing") ||
+      haystack.includes("terminal authority missing")) &&
+    (haystack.includes("capability_lane") || haystack.includes("lane"))
+  ) {
+    return "terminal_rejected";
+  }
+  if (
+    label === "terminal" &&
     (haystack.includes("capability_lane") || haystack.includes("terminal_selected"))
   ) {
     return "terminal_selected";
@@ -146,22 +169,62 @@ export function resolveHelixAskConsoleCapabilityLaneRowStage(
   return null;
 }
 
-function buildCapabilityLaneSummary(
+export function buildHelixAskConsoleCapabilityLaneSummary(
   rows: Array<{ stage: HelixAskConsoleCapabilityLaneRowStage }>,
 ): HelixAskConsoleCapabilityLaneSummary {
+  const visibleCount = rows.filter((row) => row.stage === "visible").length;
+  const requestedCount = rows.filter((row) => row.stage === "requested").length;
+  const backendSelectedCount = rows.filter((row) => row.stage === "backend_selected").length;
+  const observedCount = rows.filter((row) => row.stage === "observed").length;
+  const reenteredCount = rows.filter((row) => row.stage === "reentered").length;
+  const sessionCount = rows.filter((row) => row.stage === "session").length;
+  const mailLoopCount = rows.filter((row) => row.stage === "mail_loop").length;
+  const goalBindingCount = rows.filter((row) => row.stage === "goal_binding").length;
+  const goalDispatchPlanCount = rows.filter((row) => row.stage === "goal_dispatch_plan").length;
+  const goalDispatchAdmissionCount = rows.filter((row) => row.stage === "goal_dispatch_admission").length;
+  const goalDispatchReadinessCount = rows.filter((row) => row.stage === "goal_dispatch_readiness").length;
+  const terminalSelectedCount = rows.filter((row) => row.stage === "terminal_selected").length;
+  const terminalRejectedCount = rows.filter((row) => row.stage === "terminal_rejected").length;
+  const hasGoalActivity =
+    goalBindingCount > 0 ||
+    goalDispatchPlanCount > 0 ||
+    goalDispatchAdmissionCount > 0 ||
+    goalDispatchReadinessCount > 0;
+  const lifecycleStatus =
+    terminalSelectedCount > 0
+      ? "terminal_selected"
+      : terminalRejectedCount > 0
+        ? "terminal_rejected"
+      : reenteredCount > 0
+        ? "reentered"
+        : observedCount > 0 || backendSelectedCount > 0
+          ? "executed"
+          : requestedCount > 0
+            ? "requested"
+            : hasGoalActivity
+              ? "goal_bound"
+              : mailLoopCount > 0
+                ? "mail_loop_active"
+                : sessionCount > 0
+                  ? "session_active"
+                  : visibleCount > 0
+                    ? "visible_only"
+                    : "none";
   return {
-    visibleCount: rows.filter((row) => row.stage === "visible").length,
-    requestedCount: rows.filter((row) => row.stage === "requested").length,
-    backendSelectedCount: rows.filter((row) => row.stage === "backend_selected").length,
-    observedCount: rows.filter((row) => row.stage === "observed").length,
-    reenteredCount: rows.filter((row) => row.stage === "reentered").length,
-    sessionCount: rows.filter((row) => row.stage === "session").length,
-    mailLoopCount: rows.filter((row) => row.stage === "mail_loop").length,
-    goalBindingCount: rows.filter((row) => row.stage === "goal_binding").length,
-    goalDispatchPlanCount: rows.filter((row) => row.stage === "goal_dispatch_plan").length,
-    goalDispatchAdmissionCount: rows.filter((row) => row.stage === "goal_dispatch_admission").length,
-    goalDispatchReadinessCount: rows.filter((row) => row.stage === "goal_dispatch_readiness").length,
-    terminalSelectedCount: rows.filter((row) => row.stage === "terminal_selected").length,
+    lifecycleStatus,
+    visibleCount,
+    requestedCount,
+    backendSelectedCount,
+    observedCount,
+    reenteredCount,
+    sessionCount,
+    mailLoopCount,
+    goalBindingCount,
+    goalDispatchPlanCount,
+    goalDispatchAdmissionCount,
+    goalDispatchReadinessCount,
+    terminalSelectedCount,
+    terminalRejectedCount,
     visibleLaneDoesNotMeanExecuted: true,
   };
 }
@@ -213,7 +276,7 @@ export function buildHelixAskConsoleAssemblyDebugSnapshot(input: {
     streamIngress: input.streamIngress,
     activeStreamDom: input.activeStreamDom,
     renderOrder: [
-      ...(input.visibleActiveTurnStreamRows.length > 0
+      ...(input.askBusy && input.visibleActiveTurnStreamRows.length > 0
         ? [
             {
               kind: "active_turn_stream" as const,
@@ -242,7 +305,7 @@ export function buildHelixAskConsoleAssemblyDebugSnapshot(input: {
       text: clipDiagnosticText(row.text, 180),
       meta: clipDiagnosticText(row.meta, 240),
     })),
-    capabilityLaneSummary: buildCapabilityLaneSummary(capabilityLaneRows),
+    capabilityLaneSummary: buildHelixAskConsoleCapabilityLaneSummary(capabilityLaneRows),
     capabilityLaneRows,
   };
 }

@@ -55,6 +55,9 @@ export const buildHelixCapabilityLaneGoalDispatchReadiness = (input: {
     next_source_ids: uniqueStrings(
       admitted.map((admission) => admission.source_id ?? "").filter(Boolean),
     ),
+    next_source_hashes: uniqueStrings(
+      admitted.map((admission) => admission.source_hash ?? "").filter(Boolean),
+    ),
     next_source_kinds: uniqueStrings(
       admitted.map((admission) => admission.source_kind ?? "").filter(Boolean),
     ),
@@ -83,6 +86,10 @@ export const buildHelixCapabilityLaneGoalDispatchReadiness = (input: {
       admitted.map((admission) => admission.latest_freshness_status ?? "").filter(Boolean),
     ),
     next_cancel_requested: admitted.some((admission) => admission.latest_cancel_requested === true),
+    all_admitted_permissions_non_mutating: admitted.every((admission) =>
+      admission.permissions.write === false &&
+      admission.permissions.shell === false &&
+      admission.permissions.code_mutation === false),
     next_evidence_refs: uniqueStrings(
       admitted.map((admission) => admission.evidence_ref ?? "").filter(Boolean),
     ),

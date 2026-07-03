@@ -7,6 +7,11 @@ export type DocsSearchDocumentCandidate = {
   path: string;
   title: string;
   score: number;
+  doc_class?: string;
+  bundle_kind?: string;
+  canonical?: boolean;
+  sidecars?: string[];
+  tool_hints?: Record<string, unknown>;
   best_snippets: Array<{
     line: number;
     text: string;
@@ -35,6 +40,18 @@ const DOCS_SEARCH_QUERY_STOP_WORDS = new Set([
   "the",
 ]);
 const DOCS_SEARCH_LOW_VALUE_TOKENS = new Set(["current", "status", "latest", "report", "memo", "plan"]);
+const DOCS_TAXONOMY_PATH = path.resolve(process.cwd(), "docs", "doc-taxonomy.v1.json");
+
+type DocsTaxonomyDocumentEntry = {
+  path: string;
+  docClass?: string;
+  bundleKind?: string;
+  canonical?: boolean;
+  sidecars?: string[];
+  toolHints?: Record<string, unknown>;
+};
+
+let docsTaxonomyByPath: Map<string, DocsTaxonomyDocumentEntry> | null = null;
 
 export const normalizeDocsSearchText = (value: string): string =>
   value
@@ -97,6 +114,43 @@ const docsPathTitle = (filePath: string): string => {
 };
 
 const isMarkdownDocPath = (filePath: string): boolean => /\.md$/i.test(filePath.replace(/\\/g, "/"));
+
+const normalizeDocsPath = (filePath: string): string => filePath.replace(/\\/g, "/").replace(/^\/+/, "");
+
+const readDocsTaxonomyByPath = (): Map<string, DocsTaxonomyDocumentEntry> => {
+  if (docsTaxonomyByPath) return docsTaxonomyByPath;
+  const entries = new Map<string, DocsTaxonomyDocumentEntry>();
+  try {
+    const raw = fs.readFileSync(DOCS_TAXONOMY_PATH, "utf8");
+    const parsed = JSON.parse(raw) as { documents?: unknown };
+    const documents = Array.isArray(parsed.documents) ? parsed.documents : [];
+    for (const documentEntry of documents) {
+      if (!documentEntry || typeof documentEntry !== "object") continue;
+      const candidate = documentEntry as Record<string, unknown>;
+      const filePath = typeof candidate.path === "string" ? normalizeDocsPath(candidate.path) : "";
+      if (!filePath) continue;
+      entries.set(filePath, {
+        path: filePath,
+        docClass: typeof candidate.docClass === "string" ? candidate.docClass : undefined,
+        bundleKind: typeof candidate.bundleKind === "string" ? candidate.bundleKind : undefined,
+        canonical: typeof candidate.canonical === "boolean" ? candidate.canonical : undefined,
+        sidecars: Array.isArray(candidate.sidecars)
+          ? candidate.sidecars.filter((entry): entry is string => typeof entry === "string").map(normalizeDocsPath)
+          : undefined,
+        toolHints: candidate.toolHints && typeof candidate.toolHints === "object" && !Array.isArray(candidate.toolHints)
+          ? candidate.toolHints as Record<string, unknown>
+          : undefined,
+      });
+    }
+  } catch {
+    // Taxonomy metadata is optional discovery context; docs search still works without it.
+  }
+  docsTaxonomyByPath = entries;
+  return entries;
+};
+
+const readDocsTaxonomyEntry = (filePath: string): DocsTaxonomyDocumentEntry | null =>
+  readDocsTaxonomyByPath().get(normalizeDocsPath(filePath)) ?? null;
 
 const docsPathTitleScore = (filePath: string, query: string): number => {
   const normalizedPathTitle = normalizeDocsSearchText(`${filePath} ${docsPathTitle(filePath)}`);
@@ -176,6 +230,7 @@ export const buildDocsSearchDocumentCandidates = (
 
   return Array.from(byPath.entries())
     .map(([filePath, pathHits]) => {
+      const taxonomyEntry = readDocsTaxonomyEntry(filePath);
       const normalizedPathTitle = normalizeDocsSearchText(`${filePath} ${docsPathTitle(filePath)}`);
       const compactPathTitle = normalizedPathTitle.replace(/\s+/g, "");
       const scoredHits = pathHits
@@ -203,6 +258,11 @@ export const buildDocsSearchDocumentCandidates = (
         path: filePath,
         title: docsPathTitle(filePath),
         score: pathTitleScore + bestHitScore + coverageBonus + mdBonus + latestDateBonus - sidecarPenalty,
+        ...(taxonomyEntry?.docClass ? { doc_class: taxonomyEntry.docClass } : {}),
+        ...(taxonomyEntry?.bundleKind ? { bundle_kind: taxonomyEntry.bundleKind } : {}),
+        ...(typeof taxonomyEntry?.canonical === "boolean" ? { canonical: taxonomyEntry.canonical } : {}),
+        ...(taxonomyEntry?.sidecars?.length ? { sidecars: taxonomyEntry.sidecars } : {}),
+        ...(taxonomyEntry?.toolHints ? { tool_hints: taxonomyEntry.toolHints } : {}),
         best_snippets: scoredHits.slice(0, 3).map(({ hit, score }) => ({
           line: hit.line,
           text: hit.text,

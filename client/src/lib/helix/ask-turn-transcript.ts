@@ -103,6 +103,21 @@ function readTranscriptBoolean(value: unknown): boolean | null {
   return typeof value === "boolean" ? value : null;
 }
 
+function formatCapabilityLanePermissionText(value: unknown): string {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return "";
+  const record = value as Record<string, unknown>;
+  const write = record.write === true;
+  const shell = record.shell === true;
+  const codeMutation = record.code_mutation === true || record.codeMutation === true;
+  if (!write && !shell && !codeMutation) return "permissions non-mutating";
+  const allowed = [
+    write ? "write allowed" : "",
+    shell ? "shell allowed" : "",
+    codeMutation ? "code mutation allowed" : "",
+  ].filter(Boolean);
+  return allowed.length ? `permissions ${allowed.join(", ")}` : "";
+}
+
 export function buildAskLiveEventFromTurnTranscriptRecord(
   record: Record<string, unknown>,
   fallbackId: string,
@@ -148,6 +163,7 @@ export function buildAskLiveEventFromTurnTranscriptRecord(
       receiptRef: coerceText(record.receipt_ref).trim() || null,
       observationRef: coerceText(record.observation_ref).trim() || null,
       sourceId: coerceText(record.source_id).trim() || null,
+      sourceHash: coerceText(record.source_hash ?? record.sourceHash).trim() || null,
       sourceKind: coerceText(record.source_kind).trim() || null,
       sourceProjectionTarget: coerceText(record.source_projection_target).trim() || null,
       accountLocale: coerceText(record.account_locale).trim() || null,
@@ -230,6 +246,7 @@ function resolveHelixTranscriptRowLabel(event: Record<string, unknown>): string 
   if (sourceEventType === "lane_goal_dispatch_readiness") return "Goal Readiness";
   if (sourceEventType === "ui_translation_projection") return "UI Projection";
   if (sourceEventType === "terminal_selected") return "Terminal";
+  if (sourceEventType === "terminal_rejected") return "Terminal";
   if (sourceEventType === "terminal_answer") return "Final";
 
   const type = String(event.type ?? "event");
@@ -572,6 +589,79 @@ function readHelixCapabilityLaneTerminalKind(reply: HelixAskTranscriptReply): st
     coerceText(replyRecord?.final_answer_source).trim() ||
     coerceText(debugRecord?.final_answer_source).trim()
   );
+}
+
+function readHelixCapabilityLaneTerminalRejection(reply: HelixAskTranscriptReply): string {
+  const replyRecord = readAgentLoopAuditRecord(reply);
+  const debugRecord = readAgentLoopAuditRecord(reply.debug);
+  const resolvedSummary = readHelixResolvedTurnSummary(reply);
+  const candidateReview = readAgentLoopAuditRecord(
+    replyRecord?.terminal_authority_candidate_review ?? debugRecord?.terminal_authority_candidate_review,
+  );
+  const providerBridge = readAgentLoopAuditRecord(
+    replyRecord?.provider_terminal_authority_bridge ?? debugRecord?.provider_terminal_authority_bridge,
+  );
+  const records = [replyRecord, debugRecord, resolvedSummary, candidateReview, providerBridge].filter(
+    (record): record is Record<string, unknown> => Boolean(record),
+  );
+  for (const record of records) {
+    const code =
+      coerceText(record.terminal_error_code).trim() ||
+      coerceText(record.error_code).trim() ||
+      coerceText(record.fail_reason).trim();
+    if (/terminal_authority_(?:missing|rejected|denied)/i.test(code)) return code;
+    const status =
+      coerceText(record.terminal_authority_status).trim() ||
+      coerceText(record.terminal_authority_result).trim();
+    if (/terminal_authority_(?:missing|rejected|denied)|\b(?:rejected|denied|not_terminal_authority)\b/i.test(status)) {
+      return status;
+    }
+    if (
+      (record.terminal_authority_granted === false || record.terminal_authority_ok === false) &&
+      !readHelixCapabilityLaneTerminalKind(reply)
+    ) {
+      return "terminal_authority_rejected";
+    }
+  }
+  return "";
+}
+
+function buildHelixCapabilityLaneTerminalEvent(input: {
+  replyId: string;
+  turnId: string;
+  terminalKind: string;
+  terminalRejection: string;
+  eventSource: string;
+}): Record<string, unknown> | null {
+  if (input.terminalKind) {
+    return {
+      id: `${input.replyId}-capability-lane-terminal-selected`,
+      role: "agent",
+      type: "decision",
+      status: "completed",
+      text: `Terminal selected: ${input.terminalKind}.`,
+      detail: input.terminalKind,
+      lane: "helix_terminal_authority",
+      step_id: "terminal_selected",
+      turn_id: input.turnId,
+      event_source: input.eventSource,
+      source_event_type: "terminal_selected",
+    };
+  }
+  if (!input.terminalRejection) return null;
+  return {
+    id: `${input.replyId}-capability-lane-terminal-rejected`,
+    role: "agent",
+    type: "decision",
+    status: "rejected",
+    text: `Terminal rejected: ${input.terminalRejection}.`,
+    detail: input.terminalRejection,
+    lane: "helix_terminal_authority",
+    step_id: "terminal_rejected",
+    turn_id: input.turnId,
+    event_source: input.eventSource,
+    source_event_type: "terminal_rejected",
+  };
 }
 
 function readHelixCapabilityLaneId(record: Record<string, unknown>): string {
@@ -951,6 +1041,11 @@ function formatHelixCapabilityLaneProjectionReceiptText(receipt: Record<string, 
   const sourceId =
     coerceText(receipt.source_id).trim() ||
     coerceText(payload?.source_id).trim();
+  const sourceHash =
+    coerceText(receipt.source_hash).trim() ||
+    coerceText(receipt.sourceHash).trim() ||
+    coerceText(payload?.source_hash).trim() ||
+    coerceText(payload?.sourceHash).trim();
   const sourceKind =
     coerceText(receipt.source_kind).trim() ||
     coerceText(payload?.source_kind).trim();
@@ -969,6 +1064,7 @@ function formatHelixCapabilityLaneProjectionReceiptText(receipt: Record<string, 
     projectionStatus ? `projection ${projectionStatus}` : "",
     projectionTarget ? `target ${projectionTarget}` : "",
     sourceId ? `source ${sourceId}` : "",
+    sourceHash ? `source hash ${sourceHash}` : "",
     sourceKind ? `source kind ${sourceKind}` : "",
     accountLocale ? `account locale ${accountLocale}` : "",
     targetLanguage ? `language ${targetLanguage}` : "",
@@ -1012,6 +1108,7 @@ function formatHelixLiveTranslationUiProjectionText(projection: HelixLiveTransla
     `target ${projection.projectionTarget}`,
     projection.targetLanguage ? `language ${projection.targetLanguage}` : "",
     projection.sourceId ? `source ${projection.sourceId}` : "",
+    projection.sourceHash ? `source hash ${projection.sourceHash}` : "",
     projection.sourceKind ? `source kind ${projection.sourceKind}` : "",
     projection.accountLocale ? `account locale ${projection.accountLocale}` : "",
     projection.chunkId ? `chunk ${projection.chunkId}` : "",
@@ -1133,6 +1230,7 @@ function formatHelixCapabilityLaneGoalDispatchPlanText(plan: Record<string, unkn
   const targetLanguage = coerceText(plan.target_language).trim();
   const latestCancelled = plan.latest_cancel_requested === true;
   const terminalAuthority = coerceText(plan.terminal_authority_status).trim();
+  const permissionText = formatCapabilityLanePermissionText(plan.permissions);
   const sideEffects = plan.side_effects_executed === true ? "side effects executed" : "no side effects executed";
   const parts = [
     `target ${target}`,
@@ -1156,6 +1254,7 @@ function formatHelixCapabilityLaneGoalDispatchPlanText(plan: Record<string, unkn
     mailLoopRef ? `mail ${mailLoopRef}` : "",
     receiptRef ? `receipt ${receiptRef}` : "",
     terminalAuthority ? `terminal authority ${terminalAuthority}` : "",
+    permissionText,
     sideEffects,
   ].filter(Boolean);
   return `Goal dispatch plan: ${laneId}; ${parts.join("; ")}; lane output remains observation-only.`;
@@ -1185,6 +1284,7 @@ function formatHelixCapabilityLaneGoalDispatchAdmissionText(admission: Record<st
   const targetLanguage = coerceText(admission.target_language).trim();
   const latestCancelled = admission.latest_cancel_requested === true;
   const terminalAuthority = coerceText(admission.terminal_authority_status).trim();
+  const permissionText = formatCapabilityLanePermissionText(admission.permissions);
   const parts = [
     `target ${target}`,
     `status ${status}`,
@@ -1208,6 +1308,7 @@ function formatHelixCapabilityLaneGoalDispatchAdmissionText(admission: Record<st
     mailLoopRef ? `mail ${mailLoopRef}` : "",
     receiptRef ? `receipt ${receiptRef}` : "",
     terminalAuthority ? `terminal authority ${terminalAuthority}` : "",
+    permissionText,
     "side effects not allowed",
   ].filter(Boolean);
   return `Goal dispatch admission: ${laneId}; ${parts.join("; ")}; lane output remains observation-only.`;
@@ -1240,6 +1341,9 @@ function formatHelixCapabilityLaneGoalDispatchReadinessText(readiness: Record<st
     : "";
   const nextSources = Array.isArray(readiness.next_source_ids)
     ? readiness.next_source_ids.map(coerceText).filter(Boolean).join(", ")
+    : "";
+  const nextSourceHashes = Array.isArray(readiness.next_source_hashes)
+    ? readiness.next_source_hashes.map(coerceText).filter(Boolean).join(", ")
     : "";
   const nextSourceKinds = Array.isArray(readiness.next_source_kinds)
     ? readiness.next_source_kinds.map(coerceText).filter(Boolean).join(", ")
@@ -1275,6 +1379,7 @@ function formatHelixCapabilityLaneGoalDispatchReadinessText(readiness: Record<st
   const nextReceipts = Array.isArray(readiness.next_receipt_refs)
     ? readiness.next_receipt_refs.map(coerceText).filter(Boolean).join(", ")
     : "";
+  const admittedPermissionsNonMutating = readiness.all_admitted_permissions_non_mutating === true;
   const parts = [
     `plans ${totalPlans}`,
     `admissions ${totalAdmissions}`,
@@ -1290,6 +1395,7 @@ function formatHelixCapabilityLaneGoalDispatchReadinessText(readiness: Record<st
     nextTargets ? `next targets ${nextTargets}` : "",
     nextBindings ? `next goal bindings ${nextBindings}` : "",
     nextSources ? `next sources ${nextSources}` : "",
+    nextSourceHashes ? `next source hashes ${nextSourceHashes}` : "",
     nextSourceKinds ? `next source kinds ${nextSourceKinds}` : "",
     nextSourceProjectionTargets ? `next source projections ${nextSourceProjectionTargets}` : "",
     nextAccountLocales ? `next account locales ${nextAccountLocales}` : "",
@@ -1303,6 +1409,7 @@ function formatHelixCapabilityLaneGoalDispatchReadinessText(readiness: Record<st
     nextEvidence ? `next evidence ${nextEvidence}` : "",
     nextReceipts ? `next receipts ${nextReceipts}` : "",
     blockedReasons ? `blocked reasons ${blockedReasons}` : "",
+    admittedPermissionsNonMutating ? "all admitted permissions non-mutating" : "",
     "no side effects allowed",
   ].filter(Boolean);
   return `Goal dispatch readiness: ${parts.join("; ")}; lane output remains observation-only.`;
@@ -1336,6 +1443,7 @@ function formatHelixCapabilityLaneSessionSummaryText(summary: Record<string, unk
   const latestCancelled = summary.latest_cancel_requested === true;
   const terminalAuthority = coerceText(summary.terminal_authority_status).trim();
   const eventCount = coerceText(summary.session_event_count).trim();
+  const permissionText = formatCapabilityLanePermissionText(summary.permissions);
   const decisionParts = summarizeHelixCapabilityLaneBackendDecision(summary.backend_selection_decision);
   const parts = [
     sessionId ? `session ${sessionId}` : "",
@@ -1363,6 +1471,7 @@ function formatHelixCapabilityLaneSessionSummaryText(summary: Record<string, unk
     observationRef ? `last observation ${observationRef}` : "",
     receiptRef ? `receipt ${receiptRef}` : "",
     terminalAuthority ? `terminal authority ${terminalAuthority}` : "",
+    permissionText,
     eventCount ? `events ${eventCount}` : "",
   ].filter(Boolean);
   const suffix = parts.length ? parts.join("; ") : "debug summary available";
@@ -1671,6 +1780,7 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
   const projectionReceipts = readHelixCapabilityLaneProjectionReceipts(reply);
   const uiTranslationProjections = buildHelixLiveTranslationUiProjections(reply);
   const terminalKind = readHelixCapabilityLaneTerminalKind(reply);
+  const terminalRejection = terminalKind ? "" : readHelixCapabilityLaneTerminalRejection(reply);
   const turnId = coerceText(reply.turn_id ?? reply.debug?.turn_id ?? reply.id).trim();
   const visibleLaneEvents = readHelixCapabilityLaneVisibleLanes(reply).slice(0, 10).map((lane, index) => {
     const laneId = coerceText(lane.lane_id).trim() || "capability_lane";
@@ -1724,6 +1834,12 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
       receipt_ref: coerceText(receipt.receipt_ref).trim() || null,
       observation_ref: coerceText(receipt.observation_ref).trim() || null,
       source_id: coerceText(receipt.source_id).trim() || coerceText(payload?.source_id).trim() || null,
+      source_hash:
+        coerceText(receipt.source_hash).trim() ||
+        coerceText(receipt.sourceHash).trim() ||
+        coerceText(payload?.source_hash).trim() ||
+        coerceText(payload?.sourceHash).trim() ||
+        null,
       source_kind: coerceText(receipt.source_kind).trim() || coerceText(payload?.source_kind).trim() || null,
       account_locale: coerceText(receipt.account_locale).trim() ||
         coerceText(payload?.account_locale).trim() ||
@@ -1756,6 +1872,7 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
       receipt_ref: projection.receiptRef,
       observation_ref: projection.observationRef,
       source_id: projection.sourceId,
+      source_hash: projection.sourceHash,
       source_kind: projection.sourceKind,
       account_locale: projection.accountLocale,
       latest_chunk_id: projection.chunkId,
@@ -2166,21 +2283,14 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
     events.push(...goalDispatchEvents);
     events.push(...goalDispatchAdmissionEvents);
     events.push(...goalDispatchReadinessEvents);
-    if (terminalKind) {
-      events.push({
-        id: `${reply.id}-capability-lane-terminal-selected`,
-        role: "agent",
-        type: "decision",
-        status: "completed",
-        text: `Terminal selected: ${terminalKind}.`,
-        detail: terminalKind,
-        lane: "helix_terminal_authority",
-        step_id: "terminal_selected",
-        turn_id: turnId,
-        event_source: "capability_lane_debug_events",
-        source_event_type: "terminal_selected",
-      });
-    }
+    const terminalEvent = buildHelixCapabilityLaneTerminalEvent({
+      replyId: reply.id,
+      turnId,
+      terminalKind,
+      terminalRejection,
+      eventSource: "capability_lane_debug_events",
+    });
+    if (terminalEvent) events.push(terminalEvent);
     return events;
   }
   const backendSelections = readHelixCapabilityLaneBackendSelections(reply);
@@ -2198,21 +2308,14 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
       ...goalDispatchAdmissionEvents,
       ...goalDispatchReadinessEvents,
     ];
-    if (terminalKind) {
-      events.push({
-        id: `${reply.id}-capability-lane-terminal-selected`,
-        role: "agent",
-        type: "decision",
-        status: "completed",
-        text: `Terminal selected: ${terminalKind}.`,
-        detail: terminalKind,
-        lane: "helix_terminal_authority",
-        step_id: "terminal_selected",
-        turn_id: turnId,
-        event_source: "capability_lane_session_debug_summaries",
-        source_event_type: "terminal_selected",
-      });
-    }
+    const terminalEvent = buildHelixCapabilityLaneTerminalEvent({
+      replyId: reply.id,
+      turnId,
+      terminalKind,
+      terminalRejection,
+      eventSource: "capability_lane_session_debug_summaries",
+    });
+    if (terminalEvent) events.push(terminalEvent);
     return events;
   }
   const packets = readHelixCapabilityLaneObservationPackets(reply);
@@ -2330,21 +2433,14 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
   events.push(...goalDispatchAdmissionEvents);
   events.push(...goalDispatchReadinessEvents);
 
-  if (terminalKind) {
-    events.push({
-      id: `${reply.id}-capability-lane-terminal-selected`,
-      role: "agent",
-      type: "decision",
-      status: "completed",
-      text: `Terminal selected: ${terminalKind}.`,
-      detail: terminalKind,
-      lane: "helix_terminal_authority",
-      step_id: "terminal_selected",
-      turn_id: turnId,
-      event_source: "capability_lane_call_results",
-      source_event_type: "terminal_selected",
-    });
-  }
+  const terminalEvent = buildHelixCapabilityLaneTerminalEvent({
+    replyId: reply.id,
+    turnId,
+    terminalKind,
+    terminalRejection,
+    eventSource: "capability_lane_call_results",
+  });
+  if (terminalEvent) events.push(terminalEvent);
 
   return events;
 }
@@ -2479,6 +2575,7 @@ export function buildHelixRuntimeAskLiveEvents(reply: HelixAskTranscriptReply): 
       receiptRef: coerceText(event.receipt_ref).trim() || null,
       observationRef: coerceText(event.observation_ref).trim() || null,
       sourceId: coerceText(event.source_id).trim() || null,
+      sourceHash: coerceText(event.source_hash).trim() || null,
       sourceKind: coerceText(event.source_kind).trim() || null,
       sourceProjectionTarget: coerceText(event.source_projection_target).trim() || null,
       accountLocale: coerceText(event.account_locale).trim() || null,
@@ -2589,6 +2686,7 @@ export function resolveHelixTurnTranscriptEvents(reply: HelixAskTranscriptReply)
         "lane_goal_dispatch_admission",
         "lane_goal_dispatch_readiness",
         "terminal_selected",
+        "terminal_rejected",
       ].includes(sourceEventType);
     });
     const firstTerminalIndex = filtered.findIndex((event) => {

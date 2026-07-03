@@ -105,6 +105,7 @@ const buildLaneObservationPacket = (input: {
   chunk?: {
     laneSessionId: string | null;
     sourceId: string;
+    sourceHash: string | null;
     chunkId: string;
     chunkIndex: number | null;
     dedupeKey: string;
@@ -145,6 +146,7 @@ const buildLaneObservationPacket = (input: {
         live_translation_chunk: {
           lane_session_id: input.chunk.laneSessionId,
           source_id: input.chunk.sourceId,
+          source_hash: input.chunk.sourceHash,
           chunk_id: input.chunk.chunkId,
           chunk_index: input.chunk.chunkIndex,
           dedupe_key: input.chunk.dedupeKey,
@@ -195,6 +197,7 @@ const buildProjectionReceipt = (input: {
   chunk: {
     laneSessionId: string | null;
     sourceId: string;
+    sourceHash: string | null;
     chunkId: string;
     chunkIndex: number | null;
     dedupeKey: string;
@@ -229,6 +232,7 @@ const buildProjectionReceipt = (input: {
         ? "stale"
         : "projected",
   source_id: input.chunk.sourceId,
+  source_hash: input.chunk.sourceHash,
   chunk_id: input.chunk.chunkId,
   chunk_index: input.chunk.chunkIndex,
   dedupe_key: input.chunk.dedupeKey,
@@ -277,6 +281,7 @@ export const runLiveTranslationTranslateText = (input: {
   const sourceLanguage = normalizeLanguage(input.request.source_language) || null;
   const laneSessionId = normalizeOptionalText(input.request.lane_session_id);
   const sourceId = normalizeOptionalText(input.request.source_id) ?? "ask_turn";
+  const sourceHash = normalizeOptionalText(input.request.source_hash);
   const chunkId = normalizeOptionalText(input.request.chunk_id) ?? hashShort({
     sourceId,
     text,
@@ -299,6 +304,7 @@ export const runLiveTranslationTranslateText = (input: {
   const chunk = {
     laneSessionId,
     sourceId,
+    sourceHash,
     chunkId,
     chunkIndex,
     dedupeKey,
@@ -426,11 +432,17 @@ export const runLiveTranslationTranslateText = (input: {
     text,
     targetLanguage,
     sourceLanguage,
+    sourceId,
+    sourceHash,
+    chunkId,
+    chunkIndex,
+    dedupeKey,
+    sourceEventId,
     translatedText,
   })}`;
   const observation: HelixLiveTranslationOneShotObservation = {
     schema: HELIX_LIVE_TRANSLATION_ONE_SHOT_OBSERVATION_SCHEMA,
-    observation_id: `${turnId}:live_translation:observation`,
+    observation_id: observationRef,
     observation_ref: observationRef,
     lane_id: "live_translation",
     capability: CAPABILITY_ID,
@@ -443,6 +455,7 @@ export const runLiveTranslationTranslateText = (input: {
     source_language: sourceLanguage,
     target_language: targetLanguage,
     source_id: sourceId,
+    source_hash: sourceHash,
     chunk_id: chunkId,
     chunk_index: chunkIndex,
     dedupe_key: dedupeKey,

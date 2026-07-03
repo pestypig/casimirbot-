@@ -164,6 +164,85 @@ describe("Codex provider capability lane adapter", () => {
     }
   });
 
+  it("lets Codex ask for missing translation inputs instead of forcing a lane retry", async () => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousStdoutSequence = process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+    const previousCallIndex = process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    const previousCapturePromptPath = process.env.CODEX_AGENT_FAKE_CAPTURE_PROMPT_PATH;
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-provider-lane-clarify-"));
+    const capturePromptPath = path.join(tempDir, "prompt.txt");
+    delete process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+    delete process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+    process.env.CODEX_AGENT_FAKE_STDOUT =
+      "What text should I translate, and what target language should I use?";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    process.env.CODEX_AGENT_FAKE_CAPTURE_PROMPT_PATH = capturePromptPath;
+    try {
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-natural-lane-clarification",
+          question: "Translate this.",
+        },
+      });
+      const debug = result.debug as Record<string, any>;
+
+      expect(result).toMatchObject({
+        ok: true,
+        answer: "What text should I translate, and what target language should I use?",
+      });
+      expect(debug.runtime_lane_request_contract).toMatchObject({
+        schema: "helix.codex_runtime_lane_request_contract.v1",
+        contract_version: "2026-07-02.p7.one_shot.v1",
+        initial_candidate_present: false,
+        retry_attempted: false,
+        final_candidate_present: false,
+        execution_status: "no_lane_request_candidate",
+        observation_packet_count: 0,
+        helix_executes_only_structured_runtime_lane_requests: true,
+        terminal_eligible: false,
+        assistant_answer: false,
+      });
+      expect(debug.runtime_lane_request_retry).toBeNull();
+      expect(debug.capability_lane_call_results).toEqual([]);
+      expect(debug.provider_reasoning_reentry).toMatchObject({
+        status: "pending_helix_solver_reentry",
+        capability_lane_observation_packet_count: 0,
+        evidence_reentered: false,
+      });
+      expect(fs.existsSync(path.join(tempDir, "prompt.2.txt"))).toBe(false);
+    } finally {
+      if (previousStdout === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      } else {
+        process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      }
+      if (previousStdoutSequence === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+      } else {
+        process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = previousStdoutSequence;
+      }
+      if (previousCallIndex === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+      } else {
+        process.env.CODEX_AGENT_FAKE_CALL_INDEX = previousCallIndex;
+      }
+      if (previousExitCode === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      } else {
+        process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+      }
+      if (previousCapturePromptPath === undefined) {
+        delete process.env.CODEX_AGENT_FAKE_CAPTURE_PROMPT_PATH;
+      } else {
+        process.env.CODEX_AGENT_FAKE_CAPTURE_PROMPT_PATH = previousCapturePromptPath;
+      }
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   it("lets ordinary Codex turns request a one-shot lane and answer after observation re-entry", async () => {
     const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
     const previousStdoutSequence = process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;

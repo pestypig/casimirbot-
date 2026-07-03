@@ -8,6 +8,10 @@ Maturity: `draft`
 request and receipt for host-side playback projection. The gateway does not
 play audio directly and does not turn the receipt into an answer.
 
+The canonical provider-facing TTS alias is `text_to_speech.speak_text`. It uses
+this same receipt contract with optional `voice`/`profile`, `locale`, and
+`source_observation_ref` metadata.
+
 ## Owner
 
 - Owner surface: voice delivery / host playback projection
@@ -64,6 +68,9 @@ post_tool_model_step_required=true
   observation packet exists.
 - UI playback is host-side projection from the structured receipt, not final
   prose scraping.
+- Browser playback outcomes are posted to
+  `/api/helix/live-environment/voice-playback/outcome` and recorded as
+  evidence-only server receipts.
 - `requires_confirmation=true` must return a blocked policy receipt until a
   confirmation path authorizes playback.
 

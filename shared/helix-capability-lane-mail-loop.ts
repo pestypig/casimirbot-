@@ -20,6 +20,7 @@ export type HelixCapabilityLaneMailLoopDebugSummary = {
   stage_play_wake_expected: boolean;
   mailbox_thread_id: string;
   source_id: string | null;
+  source_hash?: string | null;
   source_kind: string | null;
   chunk_id: string | null;
   chunk_index: number | null;

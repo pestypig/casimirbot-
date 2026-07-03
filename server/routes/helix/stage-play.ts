@@ -1881,7 +1881,16 @@ helixStagePlayRouter.post("/live-source-mail/document-markdown", (req: Request, 
     const threadId = mailboxThreadResolution.mailboxThreadId;
     const docPath = readQueryString(body.docPath) ?? readQueryString(body.doc_path) ?? "current-document";
     const sourceHash = readQueryString(body.sourceHash) ?? readQueryString(body.source_hash) ?? null;
-    const locale = readQueryString(body.locale) ?? "haw";
+    const accountLocale =
+      readQueryString(body.accountLocale) ??
+      readQueryString(body.account_locale) ??
+      readQueryString(body.locale) ??
+      "haw";
+    const targetLanguage =
+      readQueryString(body.targetLanguage) ??
+      readQueryString(body.target_language) ??
+      accountLocale;
+    const locale = readQueryString(body.locale) ?? targetLanguage;
     const sourceId =
       readQueryString(body.sourceId) ??
       readQueryString(body.source_id) ??
@@ -1890,6 +1899,16 @@ helixStagePlayRouter.post("/live-source-mail/document-markdown", (req: Request, 
       readQueryString(body.chunkId) ??
       readQueryString(body.chunk_id) ??
       `document_markdown_chunk:${sourceHash ?? "no_hash"}:${Date.now().toString(36)}`;
+    const chunkIndex = readOptionalNumber(body.chunkIndex ?? body.chunk_index);
+    const dedupeKey =
+      readQueryString(body.dedupeKey) ??
+      readQueryString(body.dedupe_key) ??
+      `${sourceId}:${chunkId}:${targetLanguage}`;
+    const sourceEventMs = Date.now();
+    const sourceEventId =
+      readQueryString(body.sourceEventId) ??
+      readQueryString(body.source_event_id) ??
+      `document_markdown_event:${chunkId}`;
     const rawUnits = Array.isArray(body.units) ? body.units : [];
     const parsedUnits = rawUnits
       .map((unit) => readRecord(unit))
@@ -1932,9 +1951,17 @@ helixStagePlayRouter.post("/live-source-mail/document-markdown", (req: Request, 
     const summaryText = JSON.stringify({
       schema: "stage_play.document_markdown_visible_units.v1",
       chunk_id: chunkId,
+      chunk_index: chunkIndex,
+      dedupe_key: dedupeKey,
+      source_event_id: sourceEventId,
+      source_event_ms: sourceEventMs,
       doc_path: docPath,
       source_hash: sourceHash,
       locale,
+      target_language: targetLanguage,
+      account_locale: accountLocale,
+      projection_target: "docs_viewer_inline",
+      freshness_status: "fresh",
       traffic: {
         accepted_units: units.length,
         deferred_units: deferredUnits,
@@ -1961,6 +1988,15 @@ helixStagePlayRouter.post("/live-source-mail/document-markdown", (req: Request, 
       sourceId,
       sourceKind: "document_markdown",
       evidenceRef,
+      sourceHash,
+      chunkId,
+      chunkIndex,
+      dedupeKey,
+      sourceEventId,
+      sourceEventMs,
+      projectionTarget: "docs_viewer_inline",
+      targetLanguage,
+      accountLocale,
       summaryText,
       summaryPreview,
       confidence: 0.7,
@@ -1983,7 +2019,14 @@ helixStagePlayRouter.post("/live-source-mail/document-markdown", (req: Request, 
       mail,
       wakeRequest,
       traffic: {
+        sourceHash,
         chunkId,
+        chunkIndex,
+        dedupeKey,
+        sourceEventId,
+        sourceEventMs,
+        targetLanguage,
+        accountLocale,
         acceptedUnits: units.length,
         deferredUnits,
         acceptedChars,

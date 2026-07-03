@@ -196,6 +196,7 @@ const readMailLoopDebugSummary = (value: unknown): HelixCapabilityLaneMailLoopDe
     stage_play_wake_expected: readBoolean(record.stage_play_wake_expected ?? record.stagePlayWakeExpected) ?? false,
     mailbox_thread_id: mailboxThreadId,
     source_id: readString(record.source_id ?? record.sourceId) || null,
+    source_hash: readString(record.source_hash ?? record.sourceHash) || null,
     source_kind: readString(record.source_kind ?? record.sourceKind) || null,
     chunk_id: readString(record.chunk_id ?? record.chunkId) || null,
     chunk_index: readNumber(record.chunk_index ?? record.chunkIndex),

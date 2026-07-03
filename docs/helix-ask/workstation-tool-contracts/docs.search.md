@@ -26,6 +26,8 @@ Optional:
 
 - `paths`
 - `max_hits`
+- `doc_class`
+- `bundle_kind`
 
 Explicit route aliases:
 
@@ -56,6 +58,8 @@ Required observation fields:
 - `action_id`: `search_docs`
 - `query`
 - `hits` or equivalent bounded evidence list
+- `document_candidates` with optional `doc_class`, `bundle_kind`, `canonical`,
+  `sidecars`, and `tool_hints` from `docs/doc-taxonomy.v1.json`
 - `evidence_refs`
 - `missing_requirements`
 - `terminal_eligible=false`
@@ -66,6 +70,11 @@ Required observation fields:
 For current-document prompts, a retained document path may support admission,
 but content claims require a materialized docs observation packet with a bounded
 excerpt or snippet. A path alone is not document evidence.
+
+Document taxonomy metadata is routing and discovery evidence only. A
+`canonical-research` or `equation-action-whitepaper` label can help select the
+right document and preserve sidecar adjacency, but it is not answer authority
+without bounded document content in the same observation.
 
 ## Host Projection
 

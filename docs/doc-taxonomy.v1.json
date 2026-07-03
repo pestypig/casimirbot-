@@ -1,0 +1,49 @@
+{
+  "schema": "casimirbot.docs_taxonomy.v1",
+  "classes": {
+    "canonical-research": {
+      "description": "Maintained paper or research memo with citations, equations, claim boundaries, sidecars, or explicit artifact provenance.",
+      "defaultFolder": "docs/research"
+    },
+    "current-development": {
+      "description": "Still-valid implementation guidance, active contract, runbook, architecture note, or engineering plan.",
+      "defaultFolder": "docs/development"
+    },
+    "synthetic-research": {
+      "description": "Generated research-style material, prompt output, exploratory sweep, or speculative memo useful as synthetic data.",
+      "defaultFolder": "docs/synthetic-research"
+    },
+    "legacy-development": {
+      "description": "Historical or superseded implementation note, old patch plan, failed approach, stale checkpoint, or outdated roadmap.",
+      "defaultFolder": "docs/legacy-development"
+    }
+  },
+  "bundleKinds": {
+    "equation-action-whitepaper": {
+      "description": "Markdown whitepaper kept beside Calculator/equation-action sidecars.",
+      "primaryFileExtension": ".md",
+      "sidecarSuffixes": [
+        ".equation-actions.json",
+        ".equation-actions.source.json"
+      ]
+    }
+  },
+  "documents": [
+    {
+      "path": "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+      "docClass": "canonical-research",
+      "bundleKind": "equation-action-whitepaper",
+      "canonical": true,
+      "title": "NHM2 as a 3+1 Same-Chart Lapse-Shift Warp Metric Evaluation Framework",
+      "sidecars": [
+        "docs/research/nhm2-current-status-whitepaper-2026-05-02.equation-actions.json",
+        "docs/research/nhm2-current-status-whitepaper-2026-05-02.equation-actions.source.json"
+      ],
+      "toolHints": {
+        "preferMarkdownOverSidecars": true,
+        "calculatorReady": true,
+        "contentAuthority": "bounded_docs_observation_required"
+      }
+    }
+  ]
+}

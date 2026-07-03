@@ -75,6 +75,7 @@ civilization-bounds.reflect_system_bounds
 theory-badge-graph.reflect_discussion_context
 theory-badge-graph.propose_frontier_conjectures
 moral-graph.reflect_living_substrate_context
+text_to_speech.speak_text
 live_env.request_interim_voice_callout
 live_env.narrator_say
 live_env.query_visual_summaries
@@ -230,6 +231,7 @@ capabilities with non-empty `input_schema.required`:
 | `civilization-bounds.reflect_system_bounds` | `prompt` |
 | `theory-badge-graph.reflect_discussion_context` | `prompt` |
 | `theory-badge-graph.propose_frontier_conjectures` | `prompt` |
+| `text_to_speech.speak_text` | `text` |
 | `live_env.request_interim_voice_callout` | `text` |
 | `live_env.narrator_say` | `text` |
 
@@ -509,9 +511,15 @@ button and must not be inferred from final prose.
 Shared voice capabilities:
 
 ```txt
+text_to_speech.speak_text
 live_env.request_interim_voice_callout
 live_env.narrator_say
 ```
+
+`text_to_speech.speak_text` is the canonical provider-facing TTS lane. It
+wraps the same voice delivery receipt machinery as the existing live-env voice
+tools while preserving `assistant_answer=false`, `terminal_eligible=false`, and
+client-playback confirmation requirements.
 
 Voice-adjacent Helix-native capabilities that are not provider gateway tools:
 
@@ -536,6 +544,9 @@ Current gateway behavior:
 - A valid voice request returns `helix.interim_voice_callout_tool_result.v1`.
 - The observation contains `request`, `receipt`, and `host_projection`.
 - The receipt is non-terminal and model re-entry is still required.
+- Browser playback outcomes post back to
+  `/api/helix/live-environment/voice-playback/outcome` and become evidence-only
+  server receipts such as delivered/client-confirmed or failed.
 - `requires_confirmation=true` returns a blocked policy receipt rather than
   speaking.
 - Missing text returns a blocked missing-text receipt.

@@ -44,6 +44,7 @@ describe("Helix capability lane session manager", () => {
       nowMs: 100,
       sourceBinding: {
         source_id: "docs:nhm2",
+        source_hash: "sha256:nhm2-v1",
         source_kind: "docs",
         projection_target: "docs_chunk",
         account_locale: "es-US",
@@ -85,6 +86,7 @@ describe("Helix capability lane session manager", () => {
       health: "healthy",
       source_binding: {
         source_id: "docs:nhm2",
+        source_hash: "sha256:nhm2-v1",
         source_kind: "docs",
         projection_target: "docs_chunk",
         account_locale: "es-US",
@@ -139,6 +141,7 @@ describe("Helix capability lane session manager", () => {
       sourceEventMs: 111,
       observedAtMs: 140,
       freshnessStatus: "fresh",
+      sourceHash: "sha256:nhm2-v1",
       projectionTarget: "docs_chunk",
       cancelRequested: true,
       nowMs: 140,
@@ -174,6 +177,13 @@ describe("Helix capability lane session manager", () => {
       "record_observation",
       "stop",
     ]);
+    expect(stopped.lane_session?.debug_history.every((event) =>
+      event.terminal_eligible === false &&
+      event.assistant_answer === false &&
+      event.raw_content_included === false &&
+      event.reentry_required === true &&
+      event.terminal_authority_status !== "terminal_authority_granted"
+    )).toBe(true);
     expect(stopped.lane_session?.debug_history).toEqual([
       expect.objectContaining({
         schema: "helix.capability_lane.session_event.v1",
@@ -194,6 +204,7 @@ describe("Helix capability lane session manager", () => {
         action: "start",
         status: "running",
         source_id: "docs:nhm2",
+        source_hash: "sha256:nhm2-v1",
         target_language: "es",
         observation_ref: null,
         receipt_ref: null,
@@ -211,6 +222,7 @@ describe("Helix capability lane session manager", () => {
         privacy_class: "local_only",
         fallback_backend_provider: null,
         source_id: "docs:nhm2",
+        source_hash: "sha256:nhm2-v1",
         target_language: "es",
         observation_ref: null,
         receipt_ref: null,
@@ -224,6 +236,7 @@ describe("Helix capability lane session manager", () => {
         privacy_class: "local_only",
         fallback_backend_provider: null,
         source_id: "docs:nhm2",
+        source_hash: "sha256:nhm2-v1",
         target_language: "es",
         observation_ref: null,
         receipt_ref: null,
@@ -237,6 +250,7 @@ describe("Helix capability lane session manager", () => {
         privacy_class: "local_only",
         fallback_backend_provider: null,
         source_id: "docs:nhm2",
+        source_hash: "sha256:nhm2-v1",
         target_language: "es",
         observation_ref: "ask:lane:translation:obs",
         receipt_ref: "ask:lane:translation:obs:projection:receipt",
@@ -256,6 +270,7 @@ describe("Helix capability lane session manager", () => {
         action: "stop",
         status: "stopped",
         source_id: "docs:nhm2",
+        source_hash: "sha256:nhm2-v1",
         target_language: "es",
         observation_ref: null,
         receipt_ref: null,
@@ -343,6 +358,47 @@ describe("Helix capability lane session manager", () => {
       terminal_eligible: false,
       assistant_answer: false,
       raw_content_included: false,
+    });
+  });
+
+  it("fails closed when trying to record observations after a session is stopped", () => {
+    const store = createHelixCapabilityLaneSessionStore();
+    store.start({
+      provider: buildProvider("codex"),
+      laneId: "live_translation",
+      laneSessionId: "lane-session-stopped-observation",
+      sourceBinding: {
+        source_id: "docs:current",
+        source_kind: "docs",
+        projection_target: "docs_chunk",
+        account_locale: "fr-FR",
+      },
+      env: {} as NodeJS.ProcessEnv,
+    });
+    store.stop({ laneSessionId: "lane-session-stopped-observation", nowMs: 200 });
+
+    expect(store.recordObservation({
+      laneSessionId: "lane-session-stopped-observation",
+      observationRef: "obs:late",
+      receiptRef: "receipt:late",
+      nowMs: 300,
+    })).toMatchObject({
+      ok: false,
+      action: "record_observation",
+      lane_id: "live_translation",
+      selected_runtime_agent_provider: "codex",
+      session_supported: true,
+      lane_session: null,
+      blocked_reason: "lane_session_already_stopped",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(store.get("lane-session-stopped-observation")).toMatchObject({
+      status: "stopped",
+      updated_at_ms: 200,
+      last_observation_ref: null,
+      last_receipt_ref: null,
     });
   });
 });

@@ -8,17 +8,27 @@ import { buildHelixCapabilityLaneGoalDispatchReadiness } from "../goal-dispatch-
 const buildPlan = (
   goalBindingId: string,
   receiptRef: string | null,
+  target: HelixCapabilityLaneGoalDispatchPlan["target"] = "ask_wake",
 ): HelixCapabilityLaneGoalDispatchPlan => ({
   schema: "helix.capability_lane.goal_dispatch_plan.v1",
-  target: "ask_wake",
+  target,
   status: "planned_not_dispatched",
-  reason: "goal_binding_policy_plans_ask_wake",
-  source_report_action: "wake_on_salience",
+  reason: `goal_binding_policy_plans_${target}`,
+  source_report_action: target === "terminal_authority_review"
+    ? "request_terminal_authority"
+    : target === "manual_review"
+      ? "manual_review"
+      : target === "ui_badge"
+        ? "surface_badge"
+        : target === "none"
+          ? "record_only"
+          : "wake_on_salience",
   goal_binding_id: goalBindingId,
   goal_id: `goal:${goalBindingId}`,
   lane_session_id: `session:${goalBindingId}`,
   lane_id: "live_translation",
   source_id: `docs:${goalBindingId}`,
+  source_hash: `sha256:${goalBindingId}`,
   source_kind: "docs",
   source_projection_target: "docs_chunk",
   account_locale: "es-US",
@@ -32,11 +42,19 @@ const buildPlan = (
   latest_projection_target: "docs_chunk",
   target_language: "es",
   latest_cancel_requested: goalBindingId.includes("duplicate"),
+  permissions: {
+    read: true,
+    observe: true,
+    act: true,
+    write: false,
+    shell: false,
+    code_mutation: false,
+  },
   evidence_ref: `ask:lane:translation:${goalBindingId}:obs`,
   mail_loop_ref: `stage-play-mail:${goalBindingId}`,
   receipt_ref: receiptRef,
-  requires_live_mail_loop: true,
-  requires_terminal_authority: false,
+  requires_live_mail_loop: target === "ask_wake",
+  requires_terminal_authority: target === "terminal_authority_review",
   side_effects_executed: false,
   wake_dispatched: false,
   badge_projected: false,
@@ -64,6 +82,7 @@ const buildAdmission = (
   lane_session_id: plan.lane_session_id,
   lane_id: plan.lane_id,
   source_id: plan.source_id ?? null,
+  source_hash: plan.source_hash ?? null,
   source_kind: plan.source_kind ?? null,
   source_projection_target: plan.source_projection_target ?? null,
   account_locale: plan.account_locale ?? null,
@@ -77,6 +96,7 @@ const buildAdmission = (
   latest_projection_target: plan.latest_projection_target ?? null,
   target_language: plan.target_language ?? null,
   latest_cancel_requested: plan.latest_cancel_requested ?? null,
+  permissions: plan.permissions,
   evidence_ref: plan.evidence_ref,
   mail_loop_ref: plan.mail_loop_ref,
   receipt_ref: plan.receipt_ref,
@@ -130,6 +150,7 @@ describe("capability lane goal dispatch readiness", () => {
       next_dispatch_targets: ["ask_wake"],
       next_goal_binding_ids: ["goal-binding-ready", "goal-binding-ready-duplicate"],
       next_source_ids: ["docs:goal-binding-ready", "docs:goal-binding-ready-duplicate"],
+      next_source_hashes: ["sha256:goal-binding-ready", "sha256:goal-binding-ready-duplicate"],
       next_source_kinds: ["docs"],
       next_source_projection_targets: ["docs_chunk"],
       next_account_locales: ["es-US"],
@@ -140,11 +161,88 @@ describe("capability lane goal dispatch readiness", () => {
       next_target_languages: ["es"],
       next_freshness_statuses: ["fresh"],
       next_cancel_requested: true,
+      all_admitted_permissions_non_mutating: true,
       next_evidence_refs: [
         "ask:lane:translation:goal-binding-ready:obs",
         "ask:lane:translation:goal-binding-ready-duplicate:obs",
       ],
       next_receipt_refs: ["ask:lane:translation:ready-obs:projection:receipt"],
+      side_effects_allowed: false,
+      side_effects_executed: false,
+      wake_dispatch_allowed: false,
+      badge_projection_allowed: false,
+      terminal_report_allowed: false,
+      terminal_report_emitted: false,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
+  it("classifies terminal-review, projection, manual, and debug-only admissions without enabling dispatch side effects", () => {
+    const terminalReview = buildPlan(
+      "goal-binding-terminal",
+      "ask:lane:translation:terminal-obs:projection:receipt",
+      "terminal_authority_review",
+    );
+    const projectionOnly = buildPlan(
+      "goal-binding-badge",
+      "ask:lane:translation:badge-obs:projection:receipt",
+      "ui_badge",
+    );
+    const manualReview = buildPlan(
+      "goal-binding-manual",
+      "ask:lane:translation:manual-obs:projection:receipt",
+      "manual_review",
+    );
+    const debugOnly = buildPlan(
+      "goal-binding-debug",
+      "ask:lane:translation:debug-obs:projection:receipt",
+      "none",
+    );
+
+    expect(buildHelixCapabilityLaneGoalDispatchReadiness({
+      plans: [terminalReview, projectionOnly, manualReview, debugOnly],
+      admissions: [
+        buildAdmission(terminalReview, "eligible_pending_terminal_authority"),
+        buildAdmission(projectionOnly, "admitted_projection_only"),
+        buildAdmission(manualReview, "eligible_manual_review"),
+        buildAdmission(debugOnly, "admitted_debug_only"),
+      ],
+    })).toMatchObject({
+      total_plans: 4,
+      total_admissions: 4,
+      admitted_count: 4,
+      blocked_count: 0,
+      pending_wake_count: 0,
+      pending_terminal_authority_count: 1,
+      projection_only_count: 1,
+      manual_review_count: 1,
+      debug_only_count: 1,
+      blocked_reasons: [],
+      next_dispatch_targets: [
+        "terminal_authority_review",
+        "ui_badge",
+        "manual_review",
+      ],
+      next_goal_binding_ids: [
+        "goal-binding-terminal",
+        "goal-binding-badge",
+        "goal-binding-manual",
+        "goal-binding-debug",
+      ],
+      next_evidence_refs: [
+        "ask:lane:translation:goal-binding-terminal:obs",
+        "ask:lane:translation:goal-binding-badge:obs",
+        "ask:lane:translation:goal-binding-manual:obs",
+        "ask:lane:translation:goal-binding-debug:obs",
+      ],
+      next_receipt_refs: [
+        "ask:lane:translation:terminal-obs:projection:receipt",
+        "ask:lane:translation:badge-obs:projection:receipt",
+        "ask:lane:translation:manual-obs:projection:receipt",
+        "ask:lane:translation:debug-obs:projection:receipt",
+      ],
       side_effects_allowed: false,
       side_effects_executed: false,
       wake_dispatch_allowed: false,

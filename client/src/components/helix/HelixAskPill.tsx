@@ -1062,6 +1062,10 @@ import {
   type VoiceAutoSpeakTask,
   type VoicePlaybackUtteranceIntent,
 } from "@/lib/helix/ask-voice-playback-intent";
+import {
+  buildVoicePlaybackOutcomeReceipt,
+  postVoicePlaybackOutcomeReceipt,
+} from "@/lib/helix/voice-playback-outcome-client";
 export {
   buildManualReadAloudVoiceIntent,
   mapVoicePlaybackIntentToTask,
@@ -1157,9 +1161,7 @@ import {
 } from "@/lib/helix/reasoning-battle-stage";
 import { buildReasoningBattleAnswerTint } from "@/lib/helix/ask-reasoning-battle-display";
 import {
-  applyLatestWinsVoiceQueue,
-  createVoicePlaybackUtterance,
-  trimVoicePlaybackQueue,
+  prepareVoicePlaybackQueueUpdate,
   type VoicePlaybackCancelReason,
   type VoicePlaybackChunk,
   type VoicePlaybackIntentAuthority,
@@ -11025,42 +11027,15 @@ export function HelixAskPill({
     metrics?: VoicePlaybackMetrics | null;
     error?: string | null;
   }) => {
-    const atMs = Date.now();
-    const receipt: VoicePlaybackOutcomeReceipt = {
-      schema: "helix.voice_playback_outcome_receipt.v1",
-      receiptId: `voice_playback_outcome:${hashVoiceUtteranceKey([
-        input.utteranceId,
-        input.status,
-        input.sourceReceiptId ?? input.sourceReceiptKey ?? "",
-        String(atMs),
-      ].join(":"))}`,
-      sourceReceiptId: input.sourceReceiptId ?? null,
-      sourceReceiptKey: input.sourceReceiptKey ?? null,
-      requestId: input.requestId ?? null,
-      calloutKind: input.calloutKind ?? null,
-      utteranceId: input.utteranceId,
-      turnKey: input.turnKey,
-      kind: input.kind,
-      status: input.status,
-      atMs,
-      providerHeader: input.metrics?.providerHeader ?? null,
-      profileHeader: input.metrics?.profileHeader ?? null,
-      cacheHitCount: input.metrics?.cacheHitCount ?? null,
-      cacheMissCount: input.metrics?.cacheMissCount ?? null,
-      totalPlaybackMs: input.metrics?.totalPlaybackMs ?? null,
-      cancelReason: input.metrics?.cancelReason ?? null,
-      error: input.error ?? null,
+    const receipt = buildVoicePlaybackOutcomeReceipt({
+      ...input,
       audioUnlocked: voiceAudioUnlockedRef.current,
       playbackPath: voicePlaybackCurrentPathRef.current ?? voicePlaybackLastOutcomePathRef.current,
-      playbackLifecycle: input.metrics?.playbackLifecycle ?? null,
-      assistant_answer: false,
-      terminal_eligible: false,
-      raw_content_included: false,
-      output_authority: "playback_observation",
-    };
+    });
     const next = [...voicePlaybackOutcomeReceiptsRef.current, receipt].slice(-80);
     voicePlaybackOutcomeReceiptsRef.current = next;
     setVoicePlaybackOutcomeReceipts(next);
+    postVoicePlaybackOutcomeReceipt(receipt);
   }, []);
 
   const buildInitialVoiceTurnAssemblerState = useCallback(
@@ -12905,61 +12880,19 @@ export function HelixAskPill({
         });
         return false;
       }
-      const text = buildSpeakText(task.text, HELIX_VOICE_AUTO_SPEAK_TEXT_MAX_CHARS);
-      if (!text) return false;
-      const nextUtterance = createVoicePlaybackUtterance({
-        utteranceId: task.key,
-        turnKey: task.turnKey,
-        kind: task.kind,
-        authority: task.authority,
-        source: task.source,
-        replyId: task.replyId,
-        allowMicOffPlayback: task.allowMicOffPlayback,
-        revision: task.revision,
-        text,
-        traceId: task.traceId,
-        eventId: task.eventId,
-      });
-      if (nextUtterance.chunks.length === 0) {
-        return false;
-      }
-      const duplicateQueued = voiceAutoSpeakQueueRef.current.some(
-        (entry) =>
-          entry.turnKey === nextUtterance.turnKey &&
-          entry.kind === nextUtterance.kind &&
-          entry.revision === nextUtterance.revision &&
-          entry.text === nextUtterance.text,
-      );
-      const duplicateActive =
-        voiceAutoSpeakActiveUtteranceRef.current &&
-        voiceAutoSpeakActiveUtteranceRef.current.turnKey === nextUtterance.turnKey &&
-        voiceAutoSpeakActiveUtteranceRef.current.kind === nextUtterance.kind &&
-        voiceAutoSpeakActiveUtteranceRef.current.revision === nextUtterance.revision &&
-        voiceAutoSpeakActiveUtteranceRef.current.text === nextUtterance.text;
-      if (duplicateQueued || duplicateActive) {
-        return false;
-      }
-      const nextQueue = applyLatestWinsVoiceQueue({
+      const queueUpdate = prepareVoicePlaybackQueueUpdate({
         queue: voiceAutoSpeakQueueRef.current,
-        incoming: nextUtterance,
         active: voiceAutoSpeakActiveUtteranceRef.current,
+        task,
+        maxTextChars: HELIX_VOICE_AUTO_SPEAK_TEXT_MAX_CHARS,
+        maxQueueLength: HELIX_VOICE_AUTO_SPEAK_QUEUE_MAX,
+        isStale: isVoiceUtteranceRevisionStale,
       });
-      const trimmedQueue = trimVoicePlaybackQueue(nextQueue.queue, HELIX_VOICE_AUTO_SPEAK_QUEUE_MAX);
-      const staleDropped: string[] = [];
-      const filteredQueue = trimmedQueue.queue.filter((entry) => {
-        const stale = isVoiceUtteranceRevisionStale({
-          turnKey: entry.turnKey,
-          revision: entry.revision,
-          kind: entry.kind,
-        });
-        if (stale) staleDropped.push(entry.utteranceId);
-        return !stale;
-      });
-      voiceAutoSpeakQueueRef.current = filteredQueue;
-      const accepted = filteredQueue.some((entry) => entry.utteranceId === nextUtterance.utteranceId);
-      if (!accepted) {
+      voiceAutoSpeakQueueRef.current = queueUpdate.queue;
+      if (!queueUpdate.accepted) {
         return false;
       }
+      const nextUtterance = queueUpdate.utterance;
       if (task.interimVoiceReceiptId || task.interimVoiceReceiptKey) {
         recordVoicePlaybackOutcomeReceipt({
           status: "queued",
@@ -13009,7 +12942,7 @@ export function HelixAskPill({
         briefSource: task.briefSource ?? null,
         finalSource: task.finalSource ?? null,
       });
-      const droppedIds = [...nextQueue.droppedUtteranceIds, ...trimmedQueue.droppedUtteranceIds, ...staleDropped];
+      const droppedIds = queueUpdate.droppedUtteranceIds;
       if (droppedIds.length > 0) {
         for (const droppedId of droppedIds) {
           voiceUtteranceTimelineMetaByIdRef.current.delete(droppedId);
@@ -13036,22 +12969,22 @@ export function HelixAskPill({
         });
       }
       if (
-        nextQueue.pendingPreemptPolicy !== "none" &&
+        queueUpdate.pendingPreemptPolicy !== "none" &&
         voiceAutoSpeakActiveUtteranceRef.current
       ) {
         setVoicePendingPreempt({
-          policy: nextQueue.pendingPreemptPolicy,
+          policy: queueUpdate.pendingPreemptPolicy,
           activeUtterance: voiceAutoSpeakActiveUtteranceRef.current,
           incomingUtterance: nextUtterance,
         });
       }
       if (
         shouldInterruptForSupersededReason(
-          nextQueue.supersededActiveReason,
+          queueUpdate.supersededActiveReason,
           Boolean(playbackAudioRef.current),
         )
       ) {
-        stopReadAloud(nextQueue.supersededActiveReason ?? undefined);
+        stopReadAloud(queueUpdate.supersededActiveReason ?? undefined);
       }
       void runVoiceAutoSpeakQueue();
       return true;
@@ -21663,6 +21596,10 @@ export function HelixAskPill({
     replyId: activeTurnStreamReplyId,
     lastTranscriptEventAppliedAtMs: lastVisibleTranscriptEventAppliedAtMs,
     nowMs: Date.now(),
+    terminalPacketReceived:
+      helixAskConsoleStreamIngressDebugRef.current.lastEventName === "turn_final" ||
+      helixAskConsoleStreamIngressDebugRef.current.lastTranscriptType === "terminal_answer" ||
+      helixAskConsoleStreamIngressDebugRef.current.terminalTranscriptEventCount > 0,
   });
   const msSinceLastTranscriptEvent = activeTurnDisplayViewModel.msSinceLastTranscriptEvent;
   const quietGapRowVisible = activeTurnDisplayViewModel.quietGapVisible;
@@ -24339,8 +24276,29 @@ export function HelixAskPill({
             finalAnswerSourceLabel: "active turn",
             terminalMismatch: false,
           });
+          const completedReplyCreatedAtMs = Date.now();
+          const consoleAssemblyCompletedReplies = [
+            ...chronologicalAskRepliesForTranscript
+              .filter((reply) => reply.id !== traceId)
+              .map((reply) => ({
+                id: reply.id,
+                canonicalKey: resolveHelixAskConsoleReplyCanonicalKey(reply),
+                createdAtMs: resolveHelixAskConsoleReplyOrderMs(reply),
+              })),
+            {
+              id: traceId,
+              canonicalKey: traceId,
+              createdAtMs: completedReplyCreatedAtMs,
+            },
+          ];
+          const completedActiveStreamDomDebug = {
+            ...(activeTurnStreamDomDebugRef.current ?? {}),
+            activeStreamMounted: false,
+            activeStreamHandoffState: "completed_reply",
+            quietGapRowVisible: false,
+          };
           const consoleAssemblyDebugForReply = buildHelixAskConsoleAssemblyDebugSnapshot({
-            askBusy: true,
+            askBusy: false,
             activeTurnId: consoleAssemblyActiveTurnId,
             activeTraceId: traceId,
             activeStartedAtMs: consoleAssemblyActiveStartedAtMs,
@@ -24351,14 +24309,10 @@ export function HelixAskPill({
             visibleActiveTurnStreamRows: filterHelixAskActiveTurnStreamRows(consoleAssemblyStreamRows, {
               includeTerminalRows: userSettings.showHelixAskConsoleDebug,
             }),
-            replies: chronologicalAskRepliesForTranscript.map((reply) => ({
-              id: reply.id,
-              canonicalKey: resolveHelixAskConsoleReplyCanonicalKey(reply),
-              createdAtMs: resolveHelixAskConsoleReplyOrderMs(reply),
-            })),
-            latestReplyId: latestAskReply?.id ?? latestAskReplyId,
+            replies: consoleAssemblyCompletedReplies,
+            latestReplyId: traceId,
             streamIngress: helixAskConsoleStreamIngressDebugRef.current,
-            activeStreamDom: activeTurnStreamDomDebugRef.current,
+            activeStreamDom: completedActiveStreamDomDebug,
           });
           if (responseDebugForReply && typeof responseDebugForReply === "object") {
             responseDebugForReply = {
@@ -24430,7 +24384,7 @@ export function HelixAskPill({
                 {
                   id: replyId,
                   turn_id: traceId,
-                  createdAtMs: Date.now(),
+                  createdAtMs: completedReplyCreatedAtMs,
                   content: responseText,
                   question: trimmed,
                   debug: responseDebugForReply,

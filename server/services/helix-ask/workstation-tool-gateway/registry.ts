@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import crypto from "node:crypto";
 import path from "node:path";
 
 import {
@@ -39,6 +40,10 @@ import { runScholarlyResearchLookup } from "../retrieval/scholarly-research-look
 import { runScholarlyFullTextFetch } from "../retrieval/scholarly-full-text-fetch";
 import { runScholarlyNumericParameterExtraction } from "../retrieval/scholarly-numeric-parameters";
 import { recordInterimVoiceCalloutRequest } from "../interim-voice-callout-store";
+import {
+  isVoiceClientHandoffReceipt,
+  mapInterimVoiceReceiptToGatewayPlaybackStatus,
+} from "../voice-playback/status";
 import { executeLiveEnvironmentTool } from "../live-environment-tool-adapter";
 import {
   WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS,
@@ -142,7 +147,10 @@ const THEORY_FRONTIER_CONJECTURE_OBSERVATION_SCHEMA =
   "helix.theory_frontier_conjecture_observation.v1" as const;
 const VOICE_INTERIM_CALLOUT_CAPABILITY = "live_env.request_interim_voice_callout" as const;
 const VOICE_NARRATOR_SAY_CAPABILITY = "live_env.narrator_say" as const;
+const TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY = "text_to_speech.speak_text" as const;
 const VOICE_INTERIM_TOOL_RESULT_SCHEMA = "helix.interim_voice_callout_tool_result.v1" as const;
+const hashShort = (value: unknown, size = 18): string =>
+  crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
 const SHARED_CONTEXT_FEED_QUERY_CAPABILITIES = new Set<string>([
   "live_env.query_visual_summaries",
   "live_env.query_trace_memory",
@@ -2485,15 +2493,26 @@ const theoryFrontierConjectureManifest: HelixWorkstationCapabilityManifest = {
 };
 
 const makeVoiceGatewayManifest = (
-  capabilityId: typeof VOICE_INTERIM_CALLOUT_CAPABILITY | typeof VOICE_NARRATOR_SAY_CAPABILITY,
+  capabilityId:
+    | typeof VOICE_INTERIM_CALLOUT_CAPABILITY
+    | typeof VOICE_NARRATOR_SAY_CAPABILITY
+    | typeof TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY,
 ): HelixWorkstationCapabilityManifest => ({
   schema: "helix.workstation_tool_gateway.capability.v1",
   capability_id: capabilityId,
-  label: capabilityId === VOICE_NARRATOR_SAY_CAPABILITY ? "Narrator say request" : "Interim voice callout request",
+  label: capabilityId === VOICE_NARRATOR_SAY_CAPABILITY
+    ? "Narrator say request"
+    : capabilityId === TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY
+      ? "Text to speech request"
+      : "Interim voice callout request",
   description:
-    "Creates a structured, non-terminal voice request/receipt for host-side playback projection. It does not play audio directly, scrape final prose, mutate files, run shell commands, or become a final answer.",
+    "Creates a structured, non-terminal voice request/receipt for host-side playback projection. It wraps the existing voice service lane, does not prove heard audio without a client receipt, scrape final prose, mutate files, run shell commands, or become a final answer.",
   panel_id: "voice-delivery",
-  action_id: capabilityId === VOICE_NARRATOR_SAY_CAPABILITY ? "narrator_say" : "request_interim_voice_callout",
+  action_id: capabilityId === VOICE_NARRATOR_SAY_CAPABILITY
+    ? "narrator_say"
+    : capabilityId === TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY
+      ? "speak_text"
+      : "request_interim_voice_callout",
   mode: "act",
   mutating: false,
   code_mutation: false,
@@ -2510,6 +2529,11 @@ const makeVoiceGatewayManifest = (
     properties: {
       text: { type: "string" },
       message: { type: "string" },
+      voice: { type: "string" },
+      profile: { type: "string" },
+      locale: { type: "string" },
+      source_observation_ref: { type: "string" },
+      sourceObservationRef: { type: "string" },
       thread_id: { type: "string" },
       turn_id: { type: "string" },
       kind: { type: "string" },
@@ -2546,6 +2570,7 @@ const makeVoiceGatewayManifest = (
 
 const voiceInterimCalloutManifest = makeVoiceGatewayManifest(VOICE_INTERIM_CALLOUT_CAPABILITY);
 const voiceNarratorSayManifest = makeVoiceGatewayManifest(VOICE_NARRATOR_SAY_CAPABILITY);
+const textToSpeechSpeakTextManifest = makeVoiceGatewayManifest(TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY);
 
 const makeContextFeedQueryGatewayManifest = (
   spec: WorkstationContextFeedQueryToolContractSpec,
@@ -3141,6 +3166,7 @@ const rawCapabilities = new Map<string, HelixWorkstationCapabilityManifest>([
   [theoryContextReflectionManifest.capability_id, theoryContextReflectionManifest],
   [theoryFrontierConjectureManifest.capability_id, theoryFrontierConjectureManifest],
   [moralLivingSubstrateReflectionManifest.capability_id, moralLivingSubstrateReflectionManifest],
+  [textToSpeechSpeakTextManifest.capability_id, textToSpeechSpeakTextManifest],
   [voiceInterimCalloutManifest.capability_id, voiceInterimCalloutManifest],
   [voiceNarratorSayManifest.capability_id, voiceNarratorSayManifest],
   ...contextFeedQueryGatewayManifests.map((manifest) => [manifest.capability_id, manifest] as const),
@@ -4964,20 +4990,22 @@ export const callWorkstationGatewayCapability = async (
 
   if (
     manifest.capability_id === VOICE_INTERIM_CALLOUT_CAPABILITY ||
-    manifest.capability_id === VOICE_NARRATOR_SAY_CAPABILITY
+    manifest.capability_id === VOICE_NARRATOR_SAY_CAPABILITY ||
+    manifest.capability_id === TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY
   ) {
     const args = readArguments(input.arguments);
     const text = cleanString(args.text ?? args.message);
     const explicitThreadId = cleanString(args.thread_id ?? args.threadId);
     const effectiveThreadId = explicitThreadId || "helix-ask:desktop";
     const requiresConfirmation = readBoolean(args.requires_confirmation ?? args.requiresConfirmation, false);
+    const sourceObservationRef = optionalString(args.source_observation_ref ?? args.sourceObservationRef);
     const result = recordInterimVoiceCalloutRequest({
       turnId: cleanString(args.turn_id ?? args.turnId, turnId),
       threadId: effectiveThreadId,
       source: cleanString(args.source, "ask_tool_loop"),
       kind: manifest.capability_id === VOICE_NARRATOR_SAY_CAPABILITY
         ? "narrator_read"
-        : cleanString(args.kind, "tool_progress"),
+        : cleanString(args.kind, manifest.capability_id === TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY ? "tool_result" : "tool_progress"),
       text,
       maxChars: readFiniteNumber(args.max_chars ?? args.maxChars),
       timingHintMs: readFiniteNumber(args.timing_hint_ms ?? args.timingHintMs),
@@ -4988,19 +5016,21 @@ export const callWorkstationGatewayCapability = async (
       evidenceRefs: [
         ...readStringArray(args.evidence_refs),
         ...readStringArray(args.evidenceRefs),
+        ...(sourceObservationRef ? [sourceObservationRef] : []),
       ],
       reasonCodes: [
         "provider_gateway_voice_request",
+        ...(manifest.capability_id === TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY ? ["text_to_speech_speak_text_lane"] : []),
         ...readStringArray(args.reason_codes ?? args.reasonCodes),
       ],
     });
-    const ok =
-      result.receipt.status === "awaiting_client_playback" ||
-      result.receipt.status === "queued" ||
-      result.receipt.status === "queued_for_retry" ||
-      result.receipt.status === "delivered";
+    const ok = isVoiceClientHandoffReceipt(result.receipt);
     const blockedReason = ok ? null : result.receipt.status;
     const voiceModelId = cleanString(process.env.ELEVENLABS_MODEL_ID, "eleven_multilingual_v2");
+    const sourceTextHash = hashShort(text ?? "");
+    const audioBytesObserved = result.receipt.delivery?.playbackStatus === "client_confirmed";
+    const audioRef = result.receipt.delivery?.utteranceId ?? null;
+    const normalizedPlaybackStatus = mapInterimVoiceReceiptToGatewayPlaybackStatus(result.receipt);
     const admission = buildAdmission({
       capabilityId: manifest.capability_id,
       agentRuntime,
@@ -5023,6 +5053,15 @@ export const callWorkstationGatewayCapability = async (
       request: result.request,
       receipt: {
         ...result.receipt,
+        tool: manifest.capability_id,
+        utterance_id: result.receipt.delivery?.utteranceId ?? null,
+        playback_status: normalizedPlaybackStatus,
+        audio_ref: audioRef,
+        audio_url: null,
+        audio_bytes_observed: audioBytesObserved,
+        delivered_at_ms: result.receipt.status === "delivered" ? Date.now() : null,
+        source_text_hash: sourceTextHash,
+        backend_provider: "existing_voice_service",
         selected_model_or_service: voiceModelId,
         resolved_model_or_service: voiceModelId,
         model_id: voiceModelId,
@@ -5037,6 +5076,13 @@ export const callWorkstationGatewayCapability = async (
         model_id: voiceModelId,
         voice_model_id: voiceModelId,
         playback_status: result.receipt.status,
+        normalized_playback_status: normalizedPlaybackStatus,
+        audio_ref: audioRef,
+        audio_bytes_observed: audioBytesObserved,
+        source_text_hash: sourceTextHash,
+        source_observation_ref: sourceObservationRef,
+        locale: cleanString(args.locale),
+        voice_profile: cleanString(args.profile ?? args.voice),
         assistant_answer: false,
         terminal_eligible: false,
         raw_content_included: false,

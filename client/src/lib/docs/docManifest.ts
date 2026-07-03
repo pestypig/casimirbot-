@@ -1,4 +1,5 @@
 import { DOC_FILE_METADATA } from "@/lib/docs/docMetadata.generated";
+import docTaxonomy from "../../../../docs/doc-taxonomy.v1.json";
 
 type DocModuleLoader = () => Promise<string>;
 
@@ -14,10 +15,51 @@ export type DocManifestEntry = {
   fileMtimeIso: string | null;
   fileMtimeMs: number | null;
   sizeBytes: number | null;
+  docClass: string | null;
+  bundleKind: string | null;
+  canonical: boolean;
+  sidecars: string[];
+  toolHints: Record<string, unknown> | null;
   title: string;
   searchText: string;
   loader: DocModuleLoader;
 };
+
+type DocTaxonomyDocumentEntry = {
+  path?: string;
+  docClass?: string;
+  bundleKind?: string;
+  canonical?: boolean;
+  sidecars?: string[];
+  toolHints?: Record<string, unknown>;
+};
+
+type DocTaxonomyClassEntry = {
+  defaultFolder?: string;
+};
+
+const DOC_TAXONOMY_DOCUMENTS: unknown[] = Array.isArray((docTaxonomy as { documents?: unknown }).documents)
+  ? (docTaxonomy as { documents: unknown[] }).documents
+  : [];
+
+const DOC_TAXONOMY_BY_PATH = new Map<string, DocTaxonomyDocumentEntry>(
+  DOC_TAXONOMY_DOCUMENTS.flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+    const taxonomyEntry = entry as DocTaxonomyDocumentEntry;
+    if (typeof taxonomyEntry.path !== "string") return [];
+    return [[normalizeDocPath(taxonomyEntry.path), taxonomyEntry]];
+  }),
+);
+
+const DOC_TAXONOMY_DEFAULT_FOLDERS = Object.entries(
+  (docTaxonomy.classes as Record<string, DocTaxonomyClassEntry> | undefined) ?? {},
+)
+  .map(([docClass, entry]) => ({
+    docClass,
+    defaultFolder: normalizeDocPath(entry.defaultFolder ?? ""),
+  }))
+  .filter((entry) => entry.defaultFolder.length > 0)
+  .sort((left, right) => right.defaultFolder.length - left.defaultFolder.length);
 
 const DOC_SEARCH_STOP_WORDS = new Set([
   "a",
@@ -58,6 +100,8 @@ const manifest: DocManifestEntry[] = Object.entries(docModules).map(([key, loade
   const title = formatDocTitle(fileName);
   const fileMetadata = DOC_FILE_METADATA[relative];
   const catalogDate = inferDocCatalogDate(title, relative, fileMetadata?.mtimeIso);
+  const taxonomyEntry = DOC_TAXONOMY_BY_PATH.get(relative);
+  const inferredDocClass = inferTaxonomyDocClass(relative);
   const searchText = `${title} ${relative}`.toLowerCase();
 
   return {
@@ -72,6 +116,11 @@ const manifest: DocManifestEntry[] = Object.entries(docModules).map(([key, loade
     fileMtimeIso: fileMetadata?.mtimeIso ?? null,
     fileMtimeMs: fileMetadata?.mtimeMs ?? null,
     sizeBytes: fileMetadata?.sizeBytes ?? null,
+    docClass: typeof taxonomyEntry?.docClass === "string" ? taxonomyEntry.docClass : inferredDocClass,
+    bundleKind: typeof taxonomyEntry?.bundleKind === "string" ? taxonomyEntry.bundleKind : null,
+    canonical: Boolean(taxonomyEntry?.canonical),
+    sidecars: Array.isArray(taxonomyEntry?.sidecars) ? taxonomyEntry.sidecars.map(normalizeDocPath) : [],
+    toolHints: taxonomyEntry?.toolHints && typeof taxonomyEntry.toolHints === "object" ? taxonomyEntry.toolHints : null,
     title,
     searchText,
     loader,
@@ -111,6 +160,20 @@ function normalizeDocKey(raw: string) {
   const matchIndex = normalized.search(DOC_PATH_PATTERN);
   if (matchIndex === -1) return normalized.replace(/^\/+/, "");
   return normalized.slice(matchIndex).replace(/^docs\/?/, "docs/").replace(/\/{2,}/g, "/");
+}
+
+function normalizeDocPath(raw: string) {
+  return raw.replace(/\\/g, "/").replace(/^\/+/, "").replace(/\/{2,}/g, "/");
+}
+
+function inferTaxonomyDocClass(relativePath: string): string | null {
+  const normalized = normalizeDocPath(relativePath);
+  for (const entry of DOC_TAXONOMY_DEFAULT_FOLDERS) {
+    if (normalized === entry.defaultFolder || normalized.startsWith(`${entry.defaultFolder}/`)) {
+      return entry.docClass;
+    }
+  }
+  return null;
 }
 
 function formatDocTitle(fileName: string) {

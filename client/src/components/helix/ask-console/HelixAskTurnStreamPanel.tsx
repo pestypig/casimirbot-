@@ -10,7 +10,10 @@ import {
   type HelixAskLiveBridgePill,
 } from "./HelixAskFinalExtras";
 import { HelixAskTurnControls } from "./HelixAskTurnControls";
-import { resolveHelixAskConsoleCapabilityLaneRowStage } from "./HelixAskConsoleDiagnostics";
+import {
+  buildHelixAskConsoleCapabilityLaneSummary,
+  resolveHelixAskConsoleCapabilityLaneRowStage,
+} from "./HelixAskConsoleDiagnostics";
 
 type RecordLike = Record<string, unknown>;
 
@@ -96,6 +99,12 @@ export function HelixAskTurnStreamPanel({
   onRunJobReadyLink,
 }: HelixAskTurnStreamPanelProps) {
   if (rows.length === 0) return null;
+  const capabilityLaneSummary = buildHelixAskConsoleCapabilityLaneSummary(
+    rows
+      .map((row) => resolveHelixAskConsoleCapabilityLaneRowStage(row))
+      .filter((stage): stage is NonNullable<typeof stage> => Boolean(stage))
+      .map((stage) => ({ stage })),
+  );
 
   return (
     <div
@@ -105,6 +114,21 @@ export function HelixAskTurnStreamPanel({
       data-latest-turn-stream={isLatestReply ? "true" : undefined}
       data-turn-stream-lines={rows.length}
       data-stage-play-events={stagePlayEventCount}
+      data-capability-lane-lifecycle={capabilityLaneSummary.lifecycleStatus}
+      data-capability-lane-visible-count={capabilityLaneSummary.visibleCount}
+      data-capability-lane-requested-count={capabilityLaneSummary.requestedCount}
+      data-capability-lane-backend-selected-count={capabilityLaneSummary.backendSelectedCount}
+      data-capability-lane-observed-count={capabilityLaneSummary.observedCount}
+      data-capability-lane-reentered-count={capabilityLaneSummary.reenteredCount}
+      data-capability-lane-session-count={capabilityLaneSummary.sessionCount}
+      data-capability-lane-mail-loop-count={capabilityLaneSummary.mailLoopCount}
+      data-capability-lane-goal-binding-count={capabilityLaneSummary.goalBindingCount}
+      data-capability-lane-goal-dispatch-plan-count={capabilityLaneSummary.goalDispatchPlanCount}
+      data-capability-lane-goal-dispatch-admission-count={capabilityLaneSummary.goalDispatchAdmissionCount}
+      data-capability-lane-goal-dispatch-readiness-count={capabilityLaneSummary.goalDispatchReadinessCount}
+      data-capability-lane-terminal-selected-count={capabilityLaneSummary.terminalSelectedCount}
+      data-capability-lane-terminal-rejected-count={capabilityLaneSummary.terminalRejectedCount}
+      data-capability-lane-visible-does-not-mean-executed="true"
     >
       <div className="relative space-y-3 before:absolute before:left-[0.72rem] before:top-2 before:h-[calc(100%-1rem)] before:w-px before:bg-slate-600/45">
         {rows.map((row, index) => {

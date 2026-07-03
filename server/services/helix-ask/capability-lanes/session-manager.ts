@@ -46,6 +46,7 @@ const eventFor = (input: {
   reason: string;
   atMs: number;
   sourceId?: string | null;
+  sourceHash?: string | null;
   targetLanguage?: string | null;
   observationRef?: string | null;
   receiptRef?: string | null;
@@ -75,6 +76,7 @@ const eventFor = (input: {
   at_ms: input.atMs,
   reason: input.reason,
   source_id: normalizeText(input.sourceId) || null,
+  source_hash: normalizeText(input.sourceHash) || null,
   target_language: normalizeText(input.targetLanguage) || null,
   observation_ref: normalizeText(input.observationRef) || null,
   receipt_ref: normalizeText(input.receiptRef) || null,
@@ -178,6 +180,7 @@ export const createHelixCapabilityLaneSessionStore = () => {
       reason: "lane_session_started",
       atMs: nowMs,
       sourceId: input.sourceBinding.source_id,
+      sourceHash: input.sourceBinding.source_hash,
       targetLanguage: input.sourceBinding.target_language,
     });
     const session: HelixCapabilityLaneSession = {
@@ -196,6 +199,7 @@ export const createHelixCapabilityLaneSessionStore = () => {
       source_binding: {
         ...input.sourceBinding,
         source_id: normalizeText(input.sourceBinding.source_id),
+        source_hash: normalizeText(input.sourceBinding.source_hash) || null,
         target_language: normalizeText(input.sourceBinding.target_language) || null,
       },
       permissions: sessionPermissionsFor(input.provider),
@@ -266,6 +270,7 @@ export const createHelixCapabilityLaneSessionStore = () => {
       reason: normalizeText(input.reason) || `lane_session_${input.action}`,
       atMs: nowMs,
       sourceId: session.source_binding.source_id,
+      sourceHash: session.source_binding.source_hash,
       targetLanguage: session.source_binding.target_language,
     });
     const updated: HelixCapabilityLaneSession = {
@@ -296,6 +301,7 @@ export const createHelixCapabilityLaneSessionStore = () => {
     chunkIndex?: number | null;
     dedupeKey?: string | null;
     sourceEventId?: string | null;
+    sourceHash?: string | null;
     sourceEventMs?: number | null;
     observedAtMs?: number | null;
     freshnessStatus?: string | null;
@@ -311,6 +317,9 @@ export const createHelixCapabilityLaneSessionStore = () => {
       requested_backend_provider: session.backend_selection_decision.requested_backend_provider,
       session_supported: true,
     };
+    if (session.status === "stopped") {
+      return blocked("record_observation", "lane_session_already_stopped", resultMetadata);
+    }
     const observationRef = normalizeText(input.observationRef);
     if (!observationRef) return blocked("record_observation", "missing_observation_ref", resultMetadata);
     const nowMs = input.nowMs ?? Date.now();
@@ -330,6 +339,7 @@ export const createHelixCapabilityLaneSessionStore = () => {
       reason: "lane_session_observation_recorded",
       atMs: nowMs,
       sourceId: session.source_binding.source_id,
+      sourceHash: input.sourceHash ?? session.source_binding.source_hash,
       targetLanguage: session.source_binding.target_language,
       observationRef,
       receiptRef,

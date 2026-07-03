@@ -307,6 +307,11 @@ const readBooleanFromJson = (record: Record<string, unknown> | null | undefined,
   return typeof value === "boolean" ? value : null;
 };
 
+const readNumberFromJson = (record: Record<string, unknown> | null | undefined, key: string): number | null => {
+  const value = record?.[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+};
+
 const readConfidence = (value: unknown): StagePlayMicroReasonerRunV1["confidence"] => {
   if (value === "low" || value === "medium" || value === "high") return value;
   return null;
@@ -323,7 +328,15 @@ type DocumentMarkdownVisibleUnit = {
 type DocumentMarkdownVisibleUnitsPayload = {
   docPath: string | null;
   sourceHash: string | null;
+  chunkId: string | null;
+  chunkIndex: number | null;
+  dedupeKey: string | null;
+  sourceEventId: string | null;
+  sourceEventMs: number | null;
   locale: string;
+  targetLanguage: string;
+  accountLocale: string;
+  freshnessStatus: string;
   units: DocumentMarkdownVisibleUnit[];
 };
 
@@ -349,10 +362,19 @@ const readDocumentMarkdownVisibleUnitsPayload = (
               : [],
         }))
         .filter((unit: DocumentMarkdownVisibleUnit) => unit.unit_id.length > 0);
+  const locale = readStringFromJson(parsed, "locale") ?? "haw";
   return {
     docPath: readStringFromJson(parsed, "doc_path") ?? readStringFromJson(parsed, "docPath"),
     sourceHash: readStringFromJson(parsed, "source_hash") ?? readStringFromJson(parsed, "sourceHash"),
-    locale: readStringFromJson(parsed, "locale") ?? "haw",
+    chunkId: readStringFromJson(parsed, "chunk_id") ?? readStringFromJson(parsed, "chunkId"),
+    chunkIndex: readNumberFromJson(parsed, "chunk_index") ?? readNumberFromJson(parsed, "chunkIndex"),
+    dedupeKey: readStringFromJson(parsed, "dedupe_key") ?? readStringFromJson(parsed, "dedupeKey"),
+    sourceEventId: readStringFromJson(parsed, "source_event_id") ?? readStringFromJson(parsed, "sourceEventId"),
+    sourceEventMs: readNumberFromJson(parsed, "source_event_ms") ?? readNumberFromJson(parsed, "sourceEventMs"),
+    locale,
+    targetLanguage: readStringFromJson(parsed, "target_language") ?? readStringFromJson(parsed, "targetLanguage") ?? locale,
+    accountLocale: readStringFromJson(parsed, "account_locale") ?? readStringFromJson(parsed, "accountLocale") ?? locale,
+    freshnessStatus: readStringFromJson(parsed, "freshness_status") ?? readStringFromJson(parsed, "freshnessStatus") ?? "fresh",
     units,
   };
 };
@@ -448,6 +470,24 @@ const buildDocumentInlineTranslationOutput = (input: {
   const fallbackDetail = translations.length > 0
     ? "Structured document translation candidates are available."
     : input.fallbackReason ?? "No structured document translation candidates were returned.";
+  const locale = readStringFromJson(input.json ?? null, "locale") ?? visible.locale;
+  const targetLanguage =
+    readStringFromJson(input.json ?? null, "target_language") ??
+    readStringFromJson(input.json ?? null, "targetLanguage") ??
+    visible.targetLanguage ??
+    locale;
+  const accountLocale =
+    readStringFromJson(input.json ?? null, "account_locale") ??
+    readStringFromJson(input.json ?? null, "accountLocale") ??
+    visible.accountLocale ??
+    locale;
+  const projectionStatus =
+    translations.length > 0
+      ? "projected"
+      : input.fallbackReason
+        ? "failed"
+        : "stale";
+  const observedAtMs = Date.parse(input.now);
   return {
     schema: STAGE_PLAY_DOCUMENT_INLINE_TRANSLATION_OUTPUT_SCHEMA,
     schemaVersion: STAGE_PLAY_DOCUMENT_INLINE_TRANSLATION_OUTPUT_SCHEMA,
@@ -455,8 +495,17 @@ const buildDocumentInlineTranslationOutput = (input: {
     sourceId: input.sourceId,
     docPath: visible.docPath,
     sourceHash: visible.sourceHash,
-    locale: readStringFromJson(input.json ?? null, "locale") ?? visible.locale,
+    chunkId: visible.chunkId,
+    chunkIndex: visible.chunkIndex,
+    dedupeKey: visible.dedupeKey,
+    sourceEventId: visible.sourceEventId,
+    sourceEventMs: visible.sourceEventMs,
+    locale,
+    targetLanguage,
+    accountLocale,
     projectionTarget: "docs_viewer_inline",
+    projectionStatus,
+    freshnessStatus: visible.freshnessStatus,
     translations,
     unit_errors: unitErrors,
     qualityChecks: readDocumentQualityChecks(input.json ?? null, fallbackStatus, fallbackDetail),
@@ -465,6 +514,7 @@ const buildDocumentInlineTranslationOutput = (input: {
       ...readStringArrayFromJson(input.json ?? null, "evidenceRefs"),
       ...visible.units.map((unit: DocumentMarkdownVisibleUnit) => `${input.sourceId}:unit:${unit.unit_id}`),
     ]),
+    observedAtMs: Number.isFinite(observedAtMs) ? observedAtMs : null,
     createdAt: input.now,
     assistant_answer: false,
     terminal_eligible: false,

@@ -51,6 +51,16 @@ describe("Helix Ask console diagnostics", () => {
           evidenceRefs: [],
         },
         {
+          key: "lane-backend",
+          source: "agent_work",
+          label: "Lane Backend",
+          text: "Lane backend selected: live_translation.local_runtime.",
+          meta: "source capability_lane_backend_selections | lane_backend_selected",
+          status: "selected",
+          tone: "checkpoint",
+          evidenceRefs: [],
+        },
+        {
           key: "lane-observed",
           source: "agent_work",
           label: "Lane Observation",
@@ -158,14 +168,14 @@ describe("Helix Ask console diagnostics", () => {
       askBusy: true,
       activeTurnId: "ask:turn-1",
       activeLiveEventCount: 3,
-      activeRowCount: 12,
+      activeRowCount: 13,
       filteredLiveEvents: 1,
       streamIngress,
       renderOrder: [
         {
           kind: "active_turn_stream",
           key: "ask:turn-1",
-          rowCount: 12,
+          rowCount: 13,
           renderPlacement: "inline_active_turn",
         },
         {
@@ -176,9 +186,10 @@ describe("Helix Ask console diagnostics", () => {
         },
       ],
       capabilityLaneSummary: {
+        lifecycleStatus: "terminal_selected",
         visibleCount: 1,
         requestedCount: 1,
-        backendSelectedCount: 0,
+        backendSelectedCount: 1,
         observedCount: 1,
         reenteredCount: 1,
         sessionCount: 1,
@@ -188,6 +199,7 @@ describe("Helix Ask console diagnostics", () => {
         goalDispatchAdmissionCount: 1,
         goalDispatchReadinessCount: 1,
         terminalSelectedCount: 1,
+        terminalRejectedCount: 0,
         visibleLaneDoesNotMeanExecuted: true,
       },
       capabilityLaneRows: [
@@ -202,6 +214,12 @@ describe("Helix Ask console diagnostics", () => {
           stage: "requested",
           label: "Lane Request",
           status: "requested",
+        },
+        {
+          key: "lane-backend",
+          stage: "backend_selected",
+          label: "Lane Backend",
+          status: "selected",
         },
         {
           key: "lane-observed",
@@ -270,6 +288,251 @@ describe("Helix Ask console diagnostics", () => {
     ]));
   });
 
+  it("marks lane manifest rows as visible only until a lane is actually requested or executed", () => {
+    const snapshot = buildHelixAskConsoleAssemblyDebugSnapshot({
+      askBusy: true,
+      activeTurnId: "ask:turn-visible-only",
+      activeTraceId: "trace-visible-only",
+      activeStartedAtMs: 100,
+      activeQuestion: "what lanes can you see?",
+      totalLiveEventCount: 1,
+      retainedLiveEventCount: 1,
+      activeLiveEventCount: 1,
+      visibleActiveTurnStreamRows: [
+        {
+          key: "lane-visible",
+          source: "agent_work",
+          label: "Lane Visible",
+          text: "Lane visible: live_translation.",
+          meta: "source model_visible_capability_lane_manifest | lane_visible",
+          status: "available",
+          tone: "working",
+          evidenceRefs: [],
+        },
+      ],
+      replies: [],
+      latestReplyId: null,
+      streamIngress: createHelixAskConsoleStreamIngressDebug({
+        turnId: "ask:turn-visible-only",
+        traceId: "trace-visible-only",
+        startedAtMs: 100,
+      }),
+      activeStreamDom: { rowCount: 1 },
+    });
+
+    expect(snapshot.capabilityLaneSummary).toMatchObject({
+      lifecycleStatus: "visible_only",
+      visibleCount: 1,
+      requestedCount: 0,
+      backendSelectedCount: 0,
+      observedCount: 0,
+      reenteredCount: 0,
+      terminalSelectedCount: 0,
+      terminalRejectedCount: 0,
+      visibleLaneDoesNotMeanExecuted: true,
+    });
+    expect(snapshot.capabilityLaneRows).toEqual([
+      expect.objectContaining({
+        key: "lane-visible",
+        stage: "visible",
+        status: "available",
+      }),
+    ]);
+  });
+
+  it("marks persistent lane session activity without pretending a one-shot lane executed", () => {
+    const snapshot = buildHelixAskConsoleAssemblyDebugSnapshot({
+      askBusy: true,
+      activeTurnId: "ask:turn-session-only",
+      activeTraceId: "trace-session-only",
+      activeStartedAtMs: 100,
+      activeQuestion: "keep translating this document",
+      totalLiveEventCount: 1,
+      retainedLiveEventCount: 1,
+      activeLiveEventCount: 1,
+      visibleActiveTurnStreamRows: [
+        {
+          key: "lane-session",
+          source: "agent_work",
+          label: "Lane Session",
+          text: "Lane session: live_translation.",
+          meta: "source capability_lane_session_debug_summaries | lane_session",
+          status: "running",
+          tone: "working",
+          evidenceRefs: [],
+        },
+      ],
+      replies: [],
+      latestReplyId: null,
+      streamIngress: createHelixAskConsoleStreamIngressDebug({
+        turnId: "ask:turn-session-only",
+        traceId: "trace-session-only",
+        startedAtMs: 100,
+      }),
+      activeStreamDom: { rowCount: 1 },
+    });
+
+    expect(snapshot.capabilityLaneSummary).toMatchObject({
+      lifecycleStatus: "session_active",
+      requestedCount: 0,
+      backendSelectedCount: 0,
+      observedCount: 0,
+      reenteredCount: 0,
+      sessionCount: 1,
+      terminalSelectedCount: 0,
+      terminalRejectedCount: 0,
+      visibleLaneDoesNotMeanExecuted: true,
+    });
+  });
+
+  it("marks lane terminal authority rejections separately from selected terminals", () => {
+    const snapshot = buildHelixAskConsoleAssemblyDebugSnapshot({
+      askBusy: true,
+      activeTurnId: "ask:turn-terminal-rejected",
+      activeTraceId: "trace-terminal-rejected",
+      activeStartedAtMs: 100,
+      activeQuestion: "translate this into Spanish",
+      totalLiveEventCount: 3,
+      retainedLiveEventCount: 3,
+      activeLiveEventCount: 3,
+      visibleActiveTurnStreamRows: [
+        {
+          key: "lane-visible",
+          source: "agent_work",
+          label: "Lane Visible",
+          text: "Lane visible: live_translation.",
+          meta: "source model_visible_capability_lane_manifest | lane_visible",
+          status: "available",
+          tone: "working",
+          evidenceRefs: [],
+        },
+        {
+          key: "lane-observed",
+          source: "agent_work",
+          label: "Lane Observation",
+          text: "Lane observation produced a translation receipt.",
+          meta: "source capability_lane_call_results | lane_observation",
+          status: "succeeded",
+          tone: "observation",
+          evidenceRefs: ["ask:lane:translation:obs"],
+        },
+        {
+          key: "terminal-rejected",
+          source: "final",
+          label: "Terminal",
+          text: "Terminal authority rejected direct lane output.",
+          meta: "source capability_lane_call_results | terminal_rejected | terminal_authority_missing",
+          status: "rejected",
+          tone: "error",
+          evidenceRefs: ["ask:lane:translation:obs"],
+        },
+      ],
+      replies: [],
+      latestReplyId: null,
+      streamIngress: createHelixAskConsoleStreamIngressDebug({
+        turnId: "ask:turn-terminal-rejected",
+        traceId: "trace-terminal-rejected",
+        startedAtMs: 100,
+      }),
+      activeStreamDom: { rowCount: 3 },
+    });
+
+    expect(snapshot.capabilityLaneSummary).toMatchObject({
+      lifecycleStatus: "terminal_rejected",
+      visibleCount: 1,
+      observedCount: 1,
+      terminalSelectedCount: 0,
+      terminalRejectedCount: 1,
+      visibleLaneDoesNotMeanExecuted: true,
+    });
+    expect(snapshot.capabilityLaneRows).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        key: "terminal-rejected",
+        stage: "terminal_rejected",
+        label: "Terminal",
+        status: "rejected",
+      }),
+    ]));
+  });
+
+  it("marks mail-loop and goal-bound lane activity as lifecycle states", () => {
+    const mailLoopSnapshot = buildHelixAskConsoleAssemblyDebugSnapshot({
+      askBusy: true,
+      activeTurnId: "ask:turn-mail-loop",
+      activeTraceId: "trace-mail-loop",
+      activeStartedAtMs: 100,
+      activeQuestion: "watch translated source events",
+      totalLiveEventCount: 1,
+      retainedLiveEventCount: 1,
+      activeLiveEventCount: 1,
+      visibleActiveTurnStreamRows: [
+        {
+          key: "lane-mail",
+          source: "agent_work",
+          label: "Lane Mail",
+          text: "Lane mail loop: live_translation.",
+          meta: "source capability_lane_mail_loop_debug_summaries | lane_mail_loop",
+          status: "healthy",
+          tone: "observation",
+          evidenceRefs: [],
+        },
+      ],
+      replies: [],
+      latestReplyId: null,
+      streamIngress: createHelixAskConsoleStreamIngressDebug({
+        turnId: "ask:turn-mail-loop",
+        traceId: "trace-mail-loop",
+        startedAtMs: 100,
+      }),
+      activeStreamDom: { rowCount: 1 },
+    });
+    const goalSnapshot = buildHelixAskConsoleAssemblyDebugSnapshot({
+      askBusy: true,
+      activeTurnId: "ask:turn-goal-bound",
+      activeTraceId: "trace-goal-bound",
+      activeStartedAtMs: 100,
+      activeQuestion: "keep this translation goal active",
+      totalLiveEventCount: 1,
+      retainedLiveEventCount: 1,
+      activeLiveEventCount: 1,
+      visibleActiveTurnStreamRows: [
+        {
+          key: "lane-goal",
+          source: "agent_work",
+          label: "Goal Lane",
+          text: "Goal lane binding: live_translation.",
+          meta: "source capability_lane_goal_binding_debug_summaries | lane_goal_binding",
+          status: "bound",
+          tone: "checkpoint",
+          evidenceRefs: [],
+        },
+      ],
+      replies: [],
+      latestReplyId: null,
+      streamIngress: createHelixAskConsoleStreamIngressDebug({
+        turnId: "ask:turn-goal-bound",
+        traceId: "trace-goal-bound",
+        startedAtMs: 100,
+      }),
+      activeStreamDom: { rowCount: 1 },
+    });
+
+    expect(mailLoopSnapshot.capabilityLaneSummary).toMatchObject({
+      lifecycleStatus: "mail_loop_active",
+      mailLoopCount: 1,
+      requestedCount: 0,
+      observedCount: 0,
+      visibleLaneDoesNotMeanExecuted: true,
+    });
+    expect(goalSnapshot.capabilityLaneSummary).toMatchObject({
+      lifecycleStatus: "goal_bound",
+      goalBindingCount: 1,
+      requestedCount: 0,
+      observedCount: 0,
+      visibleLaneDoesNotMeanExecuted: true,
+    });
+  });
+
   it("keeps inactive diagnostic rows out of active row counts", () => {
     const snapshot = buildHelixAskConsoleAssemblyDebugSnapshot({
       askBusy: false,
@@ -300,8 +563,84 @@ describe("Helix Ask console diagnostics", () => {
 
     expect(snapshot.activeLiveEventCount).toBe(0);
     expect(snapshot.activeRowCount).toBe(0);
+    expect(snapshot.renderOrder).toEqual([]);
     expect(snapshot.activeRows).toEqual([]);
     expect(snapshot.capabilityLaneSummary.visibleCount).toBe(0);
+    expect(snapshot.capabilityLaneSummary.lifecycleStatus).toBe("none");
     expect(snapshot.capabilityLaneRows).toEqual([]);
+  });
+
+  it("preserves stream ingress counters without keeping completed turns marked active", () => {
+    const streamIngress = createHelixAskConsoleStreamIngressDebug({
+      turnId: "ask:turn-1",
+      traceId: "trace-1",
+      startedAtMs: 100,
+    });
+    streamIngress.rawStreamPacketCount = 8;
+    streamIngress.transcriptPacketCount = 7;
+    streamIngress.acceptedLiveEventCount = 6;
+    streamIngress.replayedTranscriptEventCount = 0;
+    streamIngress.droppedEventCount = 0;
+
+    const snapshot = buildHelixAskConsoleAssemblyDebugSnapshot({
+      askBusy: false,
+      activeTurnId: "ask:turn-1",
+      activeTraceId: "trace-1",
+      activeStartedAtMs: 100,
+      activeQuestion: "solve 19*23",
+      totalLiveEventCount: 6,
+      retainedLiveEventCount: 6,
+      activeLiveEventCount: 6,
+      visibleActiveTurnStreamRows: [
+        {
+          key: "live-row",
+          source: "agent_work",
+          label: "Tool Observation",
+          text: "Calculator observed 19*23 = 437.",
+          meta: "source live_provider_transcript",
+          status: "completed",
+          tone: "observation",
+          evidenceRefs: [],
+        },
+      ],
+      replies: [
+        {
+          id: "ask:turn-1",
+          canonicalKey: "ask:turn-1",
+          createdAtMs: 200,
+        },
+      ],
+      latestReplyId: "ask:turn-1",
+      streamIngress,
+      activeStreamDom: {
+        activeStreamMounted: false,
+        activeStreamHandoffState: "completed_reply",
+        quietGapRowVisible: false,
+      },
+    });
+
+    expect(snapshot.askBusy).toBe(false);
+    expect(snapshot.activeRowCount).toBe(0);
+    expect(snapshot.activeRows).toEqual([]);
+    expect(snapshot.streamIngress).toMatchObject({
+      rawStreamPacketCount: 8,
+      transcriptPacketCount: 7,
+      acceptedLiveEventCount: 6,
+      replayedTranscriptEventCount: 0,
+      droppedEventCount: 0,
+    });
+    expect(snapshot.renderOrder).toEqual([
+      expect.objectContaining({
+        kind: "completed_reply",
+        replyId: "ask:turn-1",
+        canonicalKey: "ask:turn-1",
+        isLatest: true,
+      }),
+    ]);
+    expect(snapshot.activeStreamDom).toMatchObject({
+      activeStreamMounted: false,
+      activeStreamHandoffState: "completed_reply",
+      quietGapRowVisible: false,
+    });
   });
 });

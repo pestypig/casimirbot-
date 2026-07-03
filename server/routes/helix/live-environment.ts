@@ -1,6 +1,7 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
 import type { HelixLiveEnvironmentToolName } from "../../../shared/helix-live-agent-step";
+import { recordInterimVoicePlaybackOutcome } from "../../services/helix-ask/interim-voice-callout-store";
 import { executeLiveEnvironmentTool } from "../../services/helix-ask/live-environment-tool-adapter";
 
 export const helixLiveEnvironmentRouter = Router();
@@ -42,6 +43,29 @@ helixLiveEnvironmentRouter.post("/tool", (req: Request, res: Response) => {
   return res.status(observation.ok ? 200 : 422).json({
     ok: observation.ok,
     observation,
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+    context_role: "tool_evidence",
+    ask_context_policy: "evidence_only",
+  });
+});
+
+helixLiveEnvironmentRouter.post("/voice-playback/outcome", (req: Request, res: Response) => {
+  const body = readRecord(req.body) ?? {};
+  const result = recordInterimVoicePlaybackOutcome({
+    requestId: readString(body.request_id ?? body.requestId),
+    sourceReceiptId: readString(body.source_receipt_id ?? body.sourceReceiptId),
+    utteranceId: readString(body.utterance_id ?? body.utteranceId),
+    status: readString(body.status),
+    message: readString(body.message ?? body.error),
+    provider: readString(body.provider),
+  });
+  return res.status(result.ok ? 200 : 422).json({
+    ok: result.ok,
+    request: result.request,
+    receipt: result.receipt,
+    error: result.error ?? null,
     assistant_answer: false,
     terminal_eligible: false,
     raw_content_included: false,

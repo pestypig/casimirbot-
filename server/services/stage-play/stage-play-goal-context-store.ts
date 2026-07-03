@@ -63,6 +63,31 @@ const defaultContextFeeds = (goalId: string): AgentGoalSessionV1["contextFeeds"]
 
 const defaultAllowedActuators = (): AgentGoalActuatorV1[] => [...WORKSTATION_AGENT_GOAL_ACTUATORS];
 
+const mergeFinalReportRequirements = (
+  existing?: AgentGoalSessionV1["authority"]["finalReportRequirements"],
+  supplied?: AgentGoalSessionV1["authority"]["finalReportRequirements"],
+): AgentGoalSessionV1["authority"]["finalReportRequirements"] => {
+  const selected = supplied ?? existing ?? WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS;
+  return {
+    completedSolverPathRequired: true,
+    evidenceReentryRequired: true,
+    routeAuthorityRequired: true,
+    terminalAuthoritySingleWriterRequired: true,
+    allowedTerminalArtifactKinds: uniqueStrings([
+      ...WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS.allowedTerminalArtifactKinds,
+      ...(selected.allowedTerminalArtifactKinds ?? []),
+    ]),
+    requiredEvidenceKinds: uniqueStrings([
+      ...WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS.requiredEvidenceKinds,
+      ...(selected.requiredEvidenceKinds ?? []),
+    ]),
+    prohibitedReportSources: uniqueStrings([
+      ...WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS.prohibitedReportSources,
+      ...(selected.prohibitedReportSources ?? []),
+    ]),
+  };
+};
+
 const mergeContextFeeds = (
   goalId: string,
   existing: AgentGoalSessionV1["contextFeeds"] | undefined,
@@ -548,10 +573,10 @@ export function ensureStagePlayAgentGoalSession(input: {
     authority: {
       assistantAnswer: false,
       finalReportsRequireTerminalAuthority: true,
-      finalReportRequirements:
-        input.finalReportRequirements ??
-        existing?.authority.finalReportRequirements ??
-        WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS,
+      finalReportRequirements: mergeFinalReportRequirements(
+        existing?.authority.finalReportRequirements,
+        input.finalReportRequirements,
+      ),
     },
   });
 }

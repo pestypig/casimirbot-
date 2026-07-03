@@ -112,6 +112,7 @@ const reviewedSharedProviderGatewayCapabilityIds = [
   "theory-badge-graph.reflect_discussion_context",
   "theory-badge-graph.propose_frontier_conjectures",
   "moral-graph.reflect_living_substrate_context",
+  "text_to_speech.speak_text",
   "live_env.request_interim_voice_callout",
   "live_env.narrator_say",
   "live_env.query_visual_summaries",

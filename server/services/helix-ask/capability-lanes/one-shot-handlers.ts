@@ -15,6 +15,11 @@ import {
   type HelixUtilityTextNormalizeResult,
 } from "@shared/helix-utility-text-lane";
 import {
+  HELIX_TEXT_TO_SPEECH_ONE_SHOT_REQUEST_SCHEMA,
+  type HelixTextToSpeechOneShotRequest,
+  type HelixTextToSpeechOneShotResult,
+} from "@shared/helix-text-to-speech-lane";
+import {
   HELIX_WORKSTATION_TOOL_REFERENCE_LIST_REQUEST_SCHEMA,
   type HelixWorkstationToolReferenceListRequest,
   type HelixWorkstationToolReferenceListResult,
@@ -22,6 +27,7 @@ import {
 import type { HelixAgentProvider } from "../agent-providers/types";
 import { runLiveTranslationTranslateText } from "./live-translation";
 import { resolveHelixCapabilityLaneRequest } from "./registry";
+import { runTextToSpeechSpeakText } from "./text-to-speech";
 import { runUtilityTextNormalizeText } from "./utility-text";
 import { runWorkstationToolReferenceListCapabilities } from "./workstation-tool-reference";
 
@@ -46,6 +52,7 @@ export type HelixCapabilityLaneShadowOneShotResult = {
 
 export type HelixCapabilityLaneOneShotCallResult =
   | HelixLiveTranslationOneShotResult
+  | HelixTextToSpeechOneShotResult
   | HelixUtilityTextNormalizeResult
   | HelixWorkstationToolReferenceListResult
   | HelixCapabilityLaneShadowOneShotResult;
@@ -217,6 +224,7 @@ const toLiveTranslationRequest = (
       readString(call.requested_backend_provider ?? call.requestedBackendProvider) || null,
     turn_id: readString(call.turn_id ?? call.turnId) || turnId,
     source_id: readString(call.source_id ?? call.sourceId) || null,
+    source_hash: readString(call.source_hash ?? call.sourceHash) || null,
     chunk_id: readString(call.chunk_id ?? call.chunkId) || null,
     chunk_index: typeof call.chunk_index === "number" ? call.chunk_index : null,
     dedupe_key: readString(call.dedupe_key ?? call.dedupeKey) || null,
@@ -243,6 +251,30 @@ const toUtilityTextNormalizeRequest = (
     requested_backend_provider:
       readString(call.requested_backend_provider ?? call.requestedBackendProvider) || null,
     turn_id: readString(call.turn_id ?? call.turnId) || turnId,
+    assistant_answer: false,
+    terminal_eligible: false,
+  };
+};
+
+const toTextToSpeechSpeakTextRequest = (
+  call: RecordLike,
+  turnId: string | null,
+): HelixTextToSpeechOneShotRequest | null => {
+  const capability = readHelixCapabilityLaneCallCapability(call);
+  if (capability !== "text_to_speech.speak_text") return null;
+  return {
+    schema: HELIX_TEXT_TO_SPEECH_ONE_SHOT_REQUEST_SCHEMA,
+    capability: "text_to_speech.speak_text",
+    text: readString(call.text ?? call.message),
+    voice: readString(call.voice) || null,
+    profile: readString(call.profile ?? call.voice_profile ?? call.voiceProfile) || null,
+    locale: readString(call.locale) || null,
+    requested_backend_provider:
+      readString(call.requested_backend_provider ?? call.requestedBackendProvider) || null,
+    turn_id: readString(call.turn_id ?? call.turnId) || turnId,
+    thread_id: readString(call.thread_id ?? call.threadId) || null,
+    source_observation_ref:
+      readString(call.source_observation_ref ?? call.sourceObservationRef) || null,
     assistant_answer: false,
     terminal_eligible: false,
   };
@@ -318,6 +350,32 @@ const utilityTextHandler: HelixCapabilityLaneOneShotHandler = {
   },
 };
 
+const textToSpeechHandler: HelixCapabilityLaneOneShotHandler = {
+  capabilityPrefix: "text_to_speech.",
+  laneId: "text_to_speech",
+  run(input) {
+    const request = toTextToSpeechSpeakTextRequest(input.call, input.turnId);
+    if (!request) {
+      return buildShadowResult({
+        provider: input.provider,
+        laneId: "text_to_speech",
+        capability: readHelixCapabilityLaneCallCapability(input.call) || "text_to_speech.unknown",
+        requestedBackendProvider: readString(input.call.requested_backend_provider ?? input.call.requestedBackendProvider) || null,
+        turnId: input.turnId,
+        iteration: input.iteration,
+        env: input.env,
+      });
+    }
+    return runTextToSpeechSpeakText({
+      provider: input.provider,
+      request,
+      turnId: input.turnId,
+      iteration: input.iteration,
+      env: input.env,
+    });
+  },
+};
+
 const workstationToolReferenceHandler: HelixCapabilityLaneOneShotHandler = {
   capabilityPrefix: "workstation_tool_reference.",
   laneId: "workstation_tool_reference",
@@ -370,7 +428,7 @@ export const HELIX_CAPABILITY_LANE_ONE_SHOT_HANDLERS: HelixCapabilityLaneOneShot
   shadowHandler("deliberate_text", "deliberate_text."),
   shadowHandler("code_text", "code_text."),
   shadowHandler("speech_to_text", "speech_to_text."),
-  shadowHandler("text_to_speech", "text_to_speech."),
+  textToSpeechHandler,
   shadowHandler("visual_analysis", "visual_analysis."),
   workstationToolReferenceHandler,
 ];

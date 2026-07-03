@@ -8,6 +8,7 @@ import type {
 import type {
   HelixCapabilityLaneSessionEvent,
   HelixCapabilityLaneSessionHealth,
+  HelixCapabilityLaneSessionPermissions,
   HelixCapabilityLaneSessionStatus,
 } from "./helix-capability-lane-session";
 import type { HelixAgentRuntimeId } from "./helix-agent-runtime";
@@ -103,6 +104,7 @@ export type HelixCapabilityLaneGoalDispatchPlan = {
   lane_session_id: string;
   lane_id: HelixCapabilityLaneId;
   source_id?: string | null;
+  source_hash?: string | null;
   source_kind?: string | null;
   source_projection_target?: string | null;
   account_locale?: string | null;
@@ -116,6 +118,7 @@ export type HelixCapabilityLaneGoalDispatchPlan = {
   latest_projection_target?: string | null;
   target_language?: string | null;
   latest_cancel_requested?: boolean | null;
+  permissions: HelixCapabilityLaneSessionPermissions;
   evidence_ref: string | null;
   mail_loop_ref: string | null;
   receipt_ref: string | null;
@@ -150,6 +153,7 @@ export type HelixCapabilityLaneGoalDispatchAdmission = {
   lane_session_id: string;
   lane_id: HelixCapabilityLaneId;
   source_id?: string | null;
+  source_hash?: string | null;
   source_kind?: string | null;
   source_projection_target?: string | null;
   account_locale?: string | null;
@@ -163,6 +167,7 @@ export type HelixCapabilityLaneGoalDispatchAdmission = {
   latest_projection_target?: string | null;
   target_language?: string | null;
   latest_cancel_requested?: boolean | null;
+  permissions: HelixCapabilityLaneSessionPermissions;
   evidence_ref: string | null;
   mail_loop_ref: string | null;
   receipt_ref: string | null;
@@ -198,6 +203,7 @@ export type HelixCapabilityLaneGoalDispatchReadiness = {
   next_dispatch_targets: HelixCapabilityLaneGoalDispatchTarget[];
   next_goal_binding_ids: string[];
   next_source_ids?: string[];
+  next_source_hashes?: string[];
   next_source_kinds?: string[];
   next_source_projection_targets?: string[];
   next_account_locales?: string[];
@@ -208,6 +214,7 @@ export type HelixCapabilityLaneGoalDispatchReadiness = {
   next_target_languages?: string[];
   next_freshness_statuses?: string[];
   next_cancel_requested?: boolean;
+  all_admitted_permissions_non_mutating: boolean;
   next_evidence_refs: string[];
   next_receipt_refs: string[];
   side_effects_allowed: false;
@@ -240,6 +247,7 @@ export type HelixCapabilityLaneGoalBindingEvent = {
   lane_session_health: HelixCapabilityLaneSessionHealth;
   lane_session_observation_ref: string | null;
   source_id?: string | null;
+  source_hash?: string | null;
   source_kind?: string | null;
   source_projection_target?: string | null;
   account_locale?: string | null;
@@ -278,9 +286,11 @@ export type HelixCapabilityLaneGoalBinding = {
   lane_session_status: HelixCapabilityLaneSessionStatus;
   lane_session_health: HelixCapabilityLaneSessionHealth;
   lane_session_source_id: string | null;
+  lane_session_source_hash?: string | null;
   lane_session_source_kind: string | null;
   lane_session_projection_target: string | null;
   lane_session_account_locale: string | null;
+  lane_session_permissions: HelixCapabilityLaneSessionPermissions;
   lane_session_last_observation_ref: string | null;
   lane_session_last_receipt_ref: string | null;
   latest_lane_session_event: HelixCapabilityLaneSessionEvent | null;
@@ -318,9 +328,11 @@ export type HelixCapabilityLaneGoalBindingDebugSummary = {
   session_status: HelixCapabilityLaneSessionStatus;
   session_health: HelixCapabilityLaneSessionHealth;
   source_id: string | null;
+  source_hash?: string | null;
   source_kind: string | null;
   source_projection_target: string | null;
   account_locale: string | null;
+  permissions: HelixCapabilityLaneSessionPermissions;
   last_observation_ref: string | null;
   last_receipt_ref: string | null;
   latest_chunk_id?: string | null;

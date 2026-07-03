@@ -11,6 +11,7 @@ import { documentMarkdownSourceId } from "@/lib/docs/documentTranslationClient";
 export type DocumentLiveTranslationProjectionRegistryKey = {
   docPath: string;
   locale: string;
+  sourceHash?: string | null;
   projectionTarget?: string | null;
 };
 
@@ -40,6 +41,7 @@ export type DocumentLiveTranslationLaneSessionState = {
   sessionStatus: string;
   sessionHealth: string;
   sourceId: string | null;
+  sourceHash?: string | null;
   sourceKind: string | null;
   projectionTarget: string | null;
   accountLocale: string | null;
@@ -70,6 +72,7 @@ export type DocumentLiveTranslationMailLoopState = {
   mailStatus: string | null;
   blockedReason: string | null;
   sourceId: string | null;
+  sourceHash?: string | null;
   sourceKind: string | null;
   projectionTarget: string | null;
   accountLocale: string | null;
@@ -106,6 +109,7 @@ export type DocumentLiveTranslationGoalBindingState = {
   reportReason: string | null;
   selectedBackendProvider: string | null;
   sourceId: string | null;
+  sourceHash?: string | null;
   sourceKind: string | null;
   projectionTarget: string | null;
   accountLocale: string | null;
@@ -136,20 +140,35 @@ export type DocumentLiveTranslationProjectionSnapshotSummary = {
   staleCount: number;
   cancelledCount: number;
   failedCount: number;
+  latestStatus: DocumentInlineTranslationRenderState["status"] | null;
   latestObservedAtMs: number | null;
+  latestSourceEventId: string | null;
   latestSourceEventMs: number | null;
   latestObservationRef: string | null;
   latestReceiptRef: string | null;
   latestLaneSessionId: string | null;
   latestSelectedBackendProvider: string | null;
   latestChunkId: string | null;
+  latestChunkIndex: number | null;
   latestDedupeKey: string | null;
+  latestSource: DocumentInlineTranslationRenderState["source"] | null;
+  latestSourceId: string | null;
+  latestSourceHash: string | null;
   latestSourceKind: string | null;
   latestProjectionTarget: string | null;
   latestAccountLocale: string | null;
   latestTargetLanguage: string | null;
   latestProjectionStatus: DocumentInlineTranslationRenderState["projectionStatus"] | null;
   latestFreshnessStatus: string | null;
+  latestCancelRequested: boolean;
+  latestError: string | null;
+  suppressedReceiptCount: number;
+  latestSuppressedObservationRef: string | null;
+  latestSuppressedReceiptRef: string | null;
+  latestSuppressedProjectionStatus: DocumentInlineTranslationRenderState["projectionStatus"] | null;
+  latestSuppressedObservedAtMs: number | null;
+  latestSuppressedFreshnessStatus: string | null;
+  latestSuppressedReason: string | null;
   laneSessionCount: number;
   activeLaneSessionCount: number;
   blockedLaneSessionCount: number;
@@ -197,8 +216,12 @@ const readRecord = (value: unknown): Record<string, unknown> | null =>
 const readString = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
 
-const readNumber = (value: unknown): number | null =>
-  typeof value === "number" && Number.isFinite(value) ? Math.trunc(value) : null;
+const readNumber = (value: unknown): number | null => {
+  if (typeof value === "number" && Number.isFinite(value)) return Math.trunc(value);
+  if (typeof value !== "string" || !value.trim()) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.trunc(parsed) : null;
+};
 
 const readBoolean = (value: unknown): boolean =>
   value === true;
@@ -213,14 +236,23 @@ const localeMatches = (candidate: string, locale: string): boolean => {
     normalizedLocale.startsWith(`${normalizedCandidate}-`);
 };
 
+const sourceHashMatches = (candidate: string | null | undefined, sourceHash: string | null | undefined): boolean => {
+  const normalizedCandidate = normalizeText(candidate);
+  const normalizedSourceHash = normalizeText(sourceHash);
+  return !normalizedSourceHash || normalizedCandidate === normalizedSourceHash;
+};
+
 export function documentLiveTranslationProjectionRegistryKey(
   input: DocumentLiveTranslationProjectionRegistryKey,
 ): string {
-  return [
+  const keyParts = [
     normalizeText(input.docPath),
     normalizeText(input.locale).toLowerCase(),
     normalizeText(input.projectionTarget) || DEFAULT_PROJECTION_TARGET,
-  ].join("|");
+  ];
+  const sourceHash = normalizeText(input.sourceHash);
+  if (sourceHash) keyParts.push(sourceHash);
+  return keyParts.join("|");
 }
 
 export function readDocumentLiveTranslationProjectionSnapshot(
@@ -238,14 +270,38 @@ export function summarizeDocumentLiveTranslationProjectionSnapshot(
   const goalBindings = Object.values(snapshot.goalBindings);
   const readyCount = states.filter((state) => state.status === "ready").length;
   const errorCount = states.filter((state) => state.status === "error").length;
+  const blockedLaneSessionCount = sessions.filter((session) =>
+    session.sessionStatus === "blocked" || session.sessionHealth === "blocked",
+  ).length;
+  const blockedMailLoopCount = mailLoops.filter((loop) => Boolean(loop.blockedReason)).length;
+  const blockedGoalBindingCount = goalBindings.filter((binding) =>
+    binding.bindingStatus === "blocked" ||
+    binding.sessionStatus === "blocked" ||
+    binding.sessionHealth === "blocked",
+  ).length;
+  const activeLaneSessionCount = sessions.filter((session) =>
+    session.sessionStatus === "running" || session.sessionStatus === "paused",
+  ).length;
+  const pendingMailLoopCount = mailLoops.filter((loop) => loop.stagePlayWakeExpected).length;
+  const activeGoalBindingCount = goalBindings.filter((binding) =>
+    binding.bindingStatus === "active" ||
+    binding.sessionStatus === "running" ||
+    binding.sessionStatus === "paused",
+  ).length;
+  const hasLaneBlockers = blockedLaneSessionCount > 0 || blockedMailLoopCount > 0 || blockedGoalBindingCount > 0;
+  const hasLaneActivity = activeLaneSessionCount > 0 || pendingMailLoopCount > 0 || activeGoalBindingCount > 0;
   const healthStatus =
-    states.length === 0
-      ? "empty"
-      : readyCount > 0 && errorCount > 0
+    states.length === 0 && hasLaneBlockers
+      ? "blocked"
+      : states.length === 0 && hasLaneActivity
         ? "degraded"
-        : readyCount > 0
-          ? "ready"
-          : "blocked";
+        : states.length === 0
+          ? "empty"
+          : readyCount > 0 && errorCount > 0
+            ? "degraded"
+            : readyCount > 0
+              ? "ready"
+              : "blocked";
   const ordered = [...states].sort((left, right) => {
     const observedDelta =
       (right.observedAtMs ?? Number.MIN_SAFE_INTEGER) -
@@ -255,6 +311,12 @@ export function summarizeDocumentLiveTranslationProjectionSnapshot(
       (left.sourceEventMs ?? Number.MIN_SAFE_INTEGER);
   });
   const latest = ordered[0] ?? null;
+  const suppressed = states.filter((state) => Boolean(state.suppressedReceiptRef || state.suppressedObservationRef));
+  const latestSuppressed =
+    [...suppressed].sort((left, right) =>
+      (right.suppressedObservedAtMs ?? Number.MIN_SAFE_INTEGER) -
+      (left.suppressedObservedAtMs ?? Number.MIN_SAFE_INTEGER),
+    )[0] ?? null;
   const latestSession =
     [...sessions].sort((left, right) =>
       (right.updatedAtMs ?? Number.MIN_SAFE_INTEGER) -
@@ -280,11 +342,18 @@ export function summarizeDocumentLiveTranslationProjectionSnapshot(
     staleCount: states.filter((state) => state.projectionStatus === "stale").length,
     cancelledCount: states.filter((state) => state.projectionStatus === "cancelled").length,
     failedCount: states.filter((state) => state.projectionStatus === "failed").length,
+    latestStatus: latest?.status ?? null,
     latestObservedAtMs:
       latest?.observedAtMs ??
       latestSession?.latestObservedAtMs ??
       latestMailLoop?.latestObservedAtMs ??
       latestGoalBinding?.latestObservedAtMs ??
+      null,
+    latestSourceEventId:
+      latest?.sourceEventId ??
+      latestSession?.latestSourceEventId ??
+      latestMailLoop?.latestSourceEventId ??
+      latestGoalBinding?.latestSourceEventId ??
       null,
     latestSourceEventMs:
       latest?.sourceEventMs ??
@@ -317,13 +386,33 @@ export function summarizeDocumentLiveTranslationProjectionSnapshot(
       latestMailLoop?.latestChunkId ??
       latestGoalBinding?.latestChunkId ??
       null,
+    latestChunkIndex:
+      latest?.chunkIndex ??
+      latestSession?.latestChunkIndex ??
+      latestMailLoop?.latestChunkIndex ??
+      latestGoalBinding?.latestChunkIndex ??
+      null,
     latestDedupeKey:
       latest?.dedupeKey ??
       latestSession?.latestDedupeKey ??
       latestMailLoop?.latestDedupeKey ??
       latestGoalBinding?.latestDedupeKey ??
       null,
+    latestSource: latest?.source ?? null,
+    latestSourceId:
+      latest?.sourceId ??
+      latestSession?.sourceId ??
+      latestMailLoop?.sourceId ??
+      latestGoalBinding?.sourceId ??
+      null,
+    latestSourceHash:
+      latest?.sourceHash ??
+      latestSession?.sourceHash ??
+      latestMailLoop?.sourceHash ??
+      latestGoalBinding?.sourceHash ??
+      null,
     latestSourceKind:
+      latest?.sourceKind ??
       latestSession?.sourceKind ??
       latestMailLoop?.sourceKind ??
       latestGoalBinding?.sourceKind ??
@@ -335,6 +424,7 @@ export function summarizeDocumentLiveTranslationProjectionSnapshot(
       latestGoalBinding?.projectionTarget ??
       null,
     latestAccountLocale:
+      latest?.accountLocale ??
       latestSession?.accountLocale ??
       latestMailLoop?.accountLocale ??
       latestGoalBinding?.accountLocale ??
@@ -352,32 +442,29 @@ export function summarizeDocumentLiveTranslationProjectionSnapshot(
       latestMailLoop?.latestFreshnessStatus ??
       latestGoalBinding?.latestFreshnessStatus ??
       null,
+    latestCancelRequested: latest?.cancelRequested ?? false,
+    latestError: latest?.error ?? null,
+    suppressedReceiptCount: suppressed.length,
+    latestSuppressedObservationRef: latestSuppressed?.suppressedObservationRef ?? null,
+    latestSuppressedReceiptRef: latestSuppressed?.suppressedReceiptRef ?? null,
+    latestSuppressedProjectionStatus: latestSuppressed?.suppressedProjectionStatus ?? null,
+    latestSuppressedObservedAtMs: latestSuppressed?.suppressedObservedAtMs ?? null,
+    latestSuppressedFreshnessStatus: latestSuppressed?.suppressedFreshnessStatus ?? null,
+    latestSuppressedReason: latestSuppressed?.suppressedReason ?? null,
     laneSessionCount: sessions.length,
-    activeLaneSessionCount: sessions.filter((session) =>
-      session.sessionStatus === "running" || session.sessionStatus === "paused",
-    ).length,
-    blockedLaneSessionCount: sessions.filter((session) =>
-      session.sessionStatus === "blocked" || session.sessionHealth === "blocked",
-    ).length,
+    activeLaneSessionCount,
+    blockedLaneSessionCount,
     latestLaneSessionStatus: latestSession?.sessionStatus ?? null,
     latestLaneSessionHealth: latestSession?.sessionHealth ?? null,
     latestLaneSessionUpdatedAtMs: latestSession?.updatedAtMs ?? null,
     mailLoopCount: mailLoops.length,
-    pendingMailLoopCount: mailLoops.filter((loop) => loop.stagePlayWakeExpected).length,
-    blockedMailLoopCount: mailLoops.filter((loop) => Boolean(loop.blockedReason)).length,
+    pendingMailLoopCount,
+    blockedMailLoopCount,
     latestMailLoopStatus: latestMailLoop?.mailStatus ?? null,
     latestMailLoopId: latestMailLoop?.mailLoopId ?? null,
     goalBindingCount: goalBindings.length,
-    activeGoalBindingCount: goalBindings.filter((binding) =>
-      binding.bindingStatus === "active" ||
-      binding.sessionStatus === "running" ||
-      binding.sessionStatus === "paused",
-    ).length,
-    blockedGoalBindingCount: goalBindings.filter((binding) =>
-      binding.bindingStatus === "blocked" ||
-      binding.sessionStatus === "blocked" ||
-      binding.sessionHealth === "blocked",
-    ).length,
+    activeGoalBindingCount,
+    blockedGoalBindingCount,
     latestGoalBindingId: latestGoalBinding?.goalBindingId ?? null,
     latestGoalId: latestGoalBinding?.goalId ?? null,
     latestGoalBindingStatus: latestGoalBinding?.bindingStatus ?? null,
@@ -411,6 +498,7 @@ export function ingestDocumentLiveTranslationProjection(
     payload: input.payload,
     docPath: input.docPath,
     locale: input.locale,
+    sourceHash: input.sourceHash,
     units: input.units,
     projectionTarget: input.projectionTarget ?? DEFAULT_PROJECTION_TARGET,
     allowStaleDisplayText: input.allowStaleDisplayText,
@@ -440,6 +528,10 @@ export function ingestDocumentLiveTranslationProjectionFromAskLiveEvent(
   const sourceEventType = readString(meta?.source_event_type);
   const lane = readString(meta?.lane);
   const sourceId = readString(meta?.sourceId ?? meta?.source_id);
+  const eventSourceHash = readString(meta?.sourceHash ?? meta?.source_hash);
+  if (!sourceHashMatches(eventSourceHash, input.sourceHash)) {
+    return readDocumentLiveTranslationProjectionSnapshot(input);
+  }
   const docSourceId = documentMarkdownSourceId(input.docPath);
   if (sourceEventType === "lane_session" && lane === "live_translation" && sourceId === docSourceId) {
     return ingestDocumentLiveTranslationLaneSessionFromAskLiveEvent({
@@ -488,6 +580,7 @@ export function ingestDocumentLiveTranslationProjectionFromAskLiveEvent(
         projection_target: projectionTarget,
         projection_status: readString(meta?.projectionStatus ?? meta?.projection_status) || "projected",
         source_id: sourceId,
+        source_hash: eventSourceHash || normalizeText(input.sourceHash) || null,
         source_kind: readString(meta?.sourceKind ?? meta?.source_kind) || null,
         account_locale: readString(meta?.accountLocale ?? meta?.account_locale) || null,
         chunk_id: readString(meta?.latestChunkId ?? meta?.latest_chunk_id) || null,
@@ -510,6 +603,7 @@ export function ingestDocumentLiveTranslationProjectionFromAskLiveEvent(
   return ingestDocumentLiveTranslationProjection({
     docPath: input.docPath,
     locale: input.locale,
+    sourceHash: input.sourceHash,
     projectionTarget,
     units: input.units,
     payload,
@@ -543,6 +637,10 @@ function ingestDocumentLiveTranslationLaneSessionFromAskLiveEvent(
 
   const laneSessionId = readString(input.meta.laneSessionId ?? input.meta.lane_session_id);
   if (!laneSessionId) return readDocumentLiveTranslationProjectionSnapshot(input);
+  const sourceHash =
+    readString(input.meta.sourceHash ?? input.meta.source_hash) ||
+    normalizeText(input.sourceHash) ||
+    null;
 
   const key = documentLiveTranslationProjectionRegistryKey(input);
   const current = snapshots.get(key) ?? emptySnapshot;
@@ -552,6 +650,7 @@ function ingestDocumentLiveTranslationLaneSessionFromAskLiveEvent(
     sessionStatus: readString(input.meta.sessionStatus ?? input.meta.session_status) || "unknown",
     sessionHealth: readString(input.meta.sessionHealth ?? input.meta.session_health) || "unknown",
     sourceId: input.sourceId,
+    ...(sourceHash ? { sourceHash } : {}),
     sourceKind: readString(input.meta.sourceKind ?? input.meta.source_kind) || null,
     projectionTarget,
     accountLocale: accountLocale || null,
@@ -619,6 +718,10 @@ function ingestDocumentLiveTranslationMailLoopFromAskLiveEvent(
     readString(input.meta.observationRef ?? input.meta.observation_ref) ||
     readString(input.eventPayload.entry.id);
   if (!mailLoopId) return readDocumentLiveTranslationProjectionSnapshot(input);
+  const sourceHash =
+    readString(input.meta.sourceHash ?? input.meta.source_hash) ||
+    normalizeText(input.sourceHash) ||
+    null;
 
   const key = documentLiveTranslationProjectionRegistryKey(input);
   const current = snapshots.get(key) ?? emptySnapshot;
@@ -632,6 +735,7 @@ function ingestDocumentLiveTranslationMailLoopFromAskLiveEvent(
     mailStatus: readString(input.meta.mailStatus ?? input.meta.mail_status) || null,
     blockedReason: readString(input.meta.blockedReason ?? input.meta.blocked_reason) || null,
     sourceId: input.sourceId,
+    ...(sourceHash ? { sourceHash } : {}),
     sourceKind: readString(input.meta.sourceKind ?? input.meta.source_kind) || null,
     projectionTarget,
     accountLocale: readString(input.meta.accountLocale ?? input.meta.account_locale) || null,
@@ -696,6 +800,10 @@ function ingestDocumentLiveTranslationGoalBindingFromAskLiveEvent(
     readString(input.meta.goalBindingId ?? input.meta.goal_binding_id) ||
     readString(input.eventPayload.entry.id);
   if (!goalBindingId) return readDocumentLiveTranslationProjectionSnapshot(input);
+  const sourceHash =
+    readString(input.meta.sourceHash ?? input.meta.source_hash) ||
+    normalizeText(input.sourceHash) ||
+    null;
 
   const key = documentLiveTranslationProjectionRegistryKey(input);
   const current = snapshots.get(key) ?? emptySnapshot;
@@ -717,6 +825,7 @@ function ingestDocumentLiveTranslationGoalBindingFromAskLiveEvent(
     selectedBackendProvider:
       readString(input.meta.selectedBackendProvider ?? input.meta.selected_backend_provider) || null,
     sourceId: input.sourceId,
+    ...(sourceHash ? { sourceHash } : {}),
     sourceKind: readString(input.meta.sourceKind ?? input.meta.source_kind) || null,
     projectionTarget,
     accountLocale: readString(input.meta.accountLocale ?? input.meta.account_locale) || null,
@@ -785,6 +894,7 @@ function sameDocumentLiveTranslationLaneSessionState(
     left.sessionStatus === right.sessionStatus &&
     left.sessionHealth === right.sessionHealth &&
     (left.sourceId ?? "") === (right.sourceId ?? "") &&
+    (left.sourceHash ?? "") === (right.sourceHash ?? "") &&
     (left.sourceKind ?? "") === (right.sourceKind ?? "") &&
     (left.projectionTarget ?? "") === (right.projectionTarget ?? "") &&
     (left.accountLocale ?? "") === (right.accountLocale ?? "") &&
@@ -816,6 +926,7 @@ function sameDocumentLiveTranslationMailLoopState(
     (left.mailStatus ?? "") === (right.mailStatus ?? "") &&
     (left.blockedReason ?? "") === (right.blockedReason ?? "") &&
     (left.sourceId ?? "") === (right.sourceId ?? "") &&
+    (left.sourceHash ?? "") === (right.sourceHash ?? "") &&
     (left.sourceKind ?? "") === (right.sourceKind ?? "") &&
     (left.projectionTarget ?? "") === (right.projectionTarget ?? "") &&
     (left.accountLocale ?? "") === (right.accountLocale ?? "") &&
@@ -853,6 +964,7 @@ function sameDocumentLiveTranslationGoalBindingState(
     (left.reportReason ?? "") === (right.reportReason ?? "") &&
     (left.selectedBackendProvider ?? "") === (right.selectedBackendProvider ?? "") &&
     (left.sourceId ?? "") === (right.sourceId ?? "") &&
+    (left.sourceHash ?? "") === (right.sourceHash ?? "") &&
     (left.sourceKind ?? "") === (right.sourceKind ?? "") &&
     (left.projectionTarget ?? "") === (right.projectionTarget ?? "") &&
     (left.accountLocale ?? "") === (right.accountLocale ?? "") &&

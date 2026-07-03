@@ -23,6 +23,7 @@ import {
   SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
   SITUATION_STAGE_STATE_READ_CAPABILITIES,
   STAGE_PLAY_BUILDER_READ_CAPABILITIES,
+  TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY,
   THEORY_CONTEXT_REFLECTION_ALIAS_CAPABILITIES,
   THEORY_CONTEXT_REFLECTION_CAPABILITY,
   THEORY_FRONTIER_CONJECTURE_ALIAS_CAPABILITIES,
@@ -139,6 +140,14 @@ export const extractVoiceUtteranceTextFromPrompt = (prompt: string): string | nu
   const quotedSpeech = prompt.match(
     /\b(?:voice\s+lane|voice|narrator|speak(?:\s+out\s+loud)?|read\s+aloud|callout|call\s+out)\b[\s\S]{0,100}\b(?:say|speak|read|call\s+out)\s+["“]([^"”]{1,220})["”]/i,
   )?.[1];
+  const quotedCapabilitySpeech =
+    prompt.match(
+      /\b(?:text_to_speech\.speak_text|live_env\.request_interim_voice_callout|live_env\.narrator_say)\b[\s\S]{0,160}\b(?:say|speak|read|call\s+out)(?:\s+exactly)?\s+["'`“”]([^"'`“”]{1,220})["'`“”]/i,
+    )?.[1] ??
+    prompt.match(
+      /\b(?:voice\s+lane|voice|narrator|speak(?:\s+out\s+loud)?|read\s+aloud|callout|call\s+out)\b[\s\S]{0,160}\b(?:say|speak|read|call\s+out)(?:\s+exactly)?\s+["'`“”]([^"'`“”]{1,220})["'`“”]/i,
+    )?.[1];
+  if (quotedCapabilitySpeech?.trim()) return quotedCapabilitySpeech.trim();
   if (quotedSpeech?.trim()) return quotedSpeech.trim();
   const unquoted = unquotePrompt(prompt);
   const direct =
@@ -500,6 +509,29 @@ export const buildPromptNamedCapabilityGatewayCallRequests = (
         alias_capability: promptNamedInternetSearchAlias,
       },
     });
+  }
+
+  if (
+    hasPromptNamedCapability(prompt, TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY) &&
+    !hasNegatedToolInstruction(prompt, /\btext_to_speech\.speak_text\b/i)
+  ) {
+    const segment = readPromptNamedCapabilitySegment(prompt, TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY);
+    const text = cleanNamedCapabilityArgumentText(
+      extractVoiceUtteranceTextFromPrompt(prompt) ??
+        segment?.match(/\b(?:text|say|speak|read)\s*:?\s*([\s\S]+)/i)?.[1] ??
+        segment ??
+        "",
+    );
+    if (text) {
+      addNamedRequest(TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY, "act", {
+        text,
+        kind: "tool_progress",
+        source_target_intent: {
+          target_source: "voice_delivery",
+          target_kind: "text_to_speech",
+        },
+      });
+    }
   }
 
   if (
@@ -1026,6 +1058,7 @@ export const buildPromptDerivedVoiceGatewayCallRequests = (
   const prompt = readPrompt(body);
   if (!prompt) return [];
   if (
+    hasPromptNamedCapability(prompt, TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY) ||
     hasPromptNamedCapability(prompt, VOICE_INTERIM_CALLOUT_CAPABILITY) ||
     hasPromptNamedCapability(prompt, VOICE_NARRATOR_SAY_CAPABILITY)
   ) {
@@ -1036,7 +1069,7 @@ export const buildPromptDerivedVoiceGatewayCallRequests = (
   return [{
     schema: "helix.workstation_gateway.prompt_derived_voice_callout_request.v1",
     derivation_source: "helix_prompt_derived_voice_callout",
-    capability_id: VOICE_INTERIM_CALLOUT_CAPABILITY,
+    capability_id: TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY,
     mode: "act",
     arguments: {
       text,
@@ -1044,7 +1077,7 @@ export const buildPromptDerivedVoiceGatewayCallRequests = (
       source_target_intent: {
         source: "helix_prompt_derived_voice_callout",
         target_source: "voice_delivery",
-        target_kind: "interim_voice_callout",
+        target_kind: "text_to_speech",
         explicit_cues: ["voice_lane_say"],
       },
     },

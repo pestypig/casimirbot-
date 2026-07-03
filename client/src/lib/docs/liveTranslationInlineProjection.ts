@@ -4,7 +4,10 @@ import {
   buildHelixLiveTranslationUiProjections,
   type HelixLiveTranslationInlineUnitState,
 } from "@/lib/helix/live-translation-projection";
-import { documentMarkdownSourceId } from "@/lib/docs/documentTranslationClient";
+import {
+  documentMarkdownSourceId,
+  type DocumentMarkdownTranslationEntry,
+} from "@/lib/docs/documentTranslationClient";
 
 export type DocumentLiveTranslationInlineState = {
   status: "ready" | "error";
@@ -22,6 +25,9 @@ export type DocumentLiveTranslationInlineState = {
   sourceEventMs: number | null;
   observedAtMs: number | null;
   freshnessStatus: string;
+  terminalAuthorityStatus: HelixLiveTranslationInlineUnitState["terminalAuthorityStatus"];
+  sourceId: string | null;
+  sourceHash?: string | null;
   sourceKind: string | null;
   accountLocale: string | null;
   projectionTarget: string | null;
@@ -49,12 +55,21 @@ export type DocumentInlineTranslationRenderState = {
   sourceEventMs?: number | null;
   observedAtMs?: number | null;
   freshnessStatus?: string;
+  terminalAuthorityStatus?: HelixLiveTranslationInlineUnitState["terminalAuthorityStatus"];
+  sourceId?: string | null;
+  sourceHash?: string | null;
   sourceKind?: string | null;
   accountLocale?: string | null;
   projectionTarget?: string | null;
   targetLanguage?: string | null;
   cancelRequested?: boolean;
-  source?: "capability_lane";
+  source?: "capability_lane" | "document_microdeck";
+  suppressedObservationRef?: string | null;
+  suppressedReceiptRef?: string | null;
+  suppressedProjectionStatus?: HelixLiveTranslationInlineUnitState["projectionStatus"] | null;
+  suppressedObservedAtMs?: number | null;
+  suppressedFreshnessStatus?: string | null;
+  suppressedReason?: string | null;
   terminalEligible?: false;
   assistantAnswer?: false;
   rawContentIncluded?: false;
@@ -64,6 +79,7 @@ export type BuildDocumentLiveTranslationInlineStatesInput = {
   payload: unknown;
   docPath: string;
   locale: string;
+  sourceHash?: string | null;
   units: DocumentTranslationUnit[];
   projectionTarget?: "docs_chunk" | "docs_selection" | "docs_hover" | string;
   allowStaleDisplayText?: boolean;
@@ -73,6 +89,117 @@ export type MergeDocumentLiveTranslationInlineStatesInput = {
   current: Record<string, DocumentInlineTranslationRenderState>;
   laneStates: Record<string, DocumentLiveTranslationInlineState>;
 };
+
+export function isReadyDocumentInlineTranslationRenderState(
+  state: DocumentInlineTranslationRenderState | undefined,
+): state is DocumentInlineTranslationRenderState & { status: "ready"; text: string } {
+  return state?.status === "ready" && typeof state.text === "string" && state.text.trim().length > 0;
+}
+
+export function filterReadyDocumentInlineTranslationRenderStates(
+  states: Record<string, DocumentInlineTranslationRenderState>,
+): Record<string, DocumentInlineTranslationRenderState & { status: "ready"; text: string }> {
+  return Object.fromEntries(
+    Object.entries(states).filter((entry): entry is [
+      string,
+      DocumentInlineTranslationRenderState & { status: "ready"; text: string },
+    ] => isReadyDocumentInlineTranslationRenderState(entry[1])),
+  );
+}
+
+export function buildDocumentInlineTranslationDataAttributes(
+  state: DocumentInlineTranslationRenderState,
+): Record<string, string> {
+  return Object.fromEntries(
+    [
+      ["data-doc-translation-source", state.source],
+      ["data-doc-translation-projection-status", state.projectionStatus],
+      ["data-doc-translation-selected-backend-provider", state.selectedBackendProvider],
+      ["data-doc-translation-observation-ref", state.observationRef],
+      ["data-doc-translation-receipt-ref", state.receiptRef],
+      ["data-doc-translation-lane-session-id", state.laneSessionId],
+      ["data-doc-translation-chunk-id", state.chunkId],
+      ["data-doc-translation-chunk-index", typeof state.chunkIndex === "number" ? String(state.chunkIndex) : null],
+      ["data-doc-translation-dedupe-key", state.dedupeKey],
+      ["data-doc-translation-source-event-id", state.sourceEventId],
+      ["data-doc-translation-source-event-ms", typeof state.sourceEventMs === "number" ? String(state.sourceEventMs) : null],
+      ["data-doc-translation-observed-at-ms", typeof state.observedAtMs === "number" ? String(state.observedAtMs) : null],
+      ["data-doc-translation-freshness-status", state.freshnessStatus],
+      ["data-doc-translation-terminal-authority-status", state.terminalAuthorityStatus],
+      ["data-doc-translation-source-id", state.sourceId],
+      ["data-doc-translation-source-hash", state.sourceHash],
+      ["data-doc-translation-source-kind", state.sourceKind],
+      ["data-doc-translation-account-locale", state.accountLocale],
+      ["data-doc-translation-projection-target", state.projectionTarget],
+      ["data-doc-translation-target-language", state.targetLanguage],
+      ["data-doc-translation-cancel-requested", typeof state.cancelRequested === "boolean" ? String(state.cancelRequested) : null],
+      ["data-doc-translation-suppressed-observation-ref", state.suppressedObservationRef],
+      ["data-doc-translation-suppressed-receipt-ref", state.suppressedReceiptRef],
+      ["data-doc-translation-suppressed-projection-status", state.suppressedProjectionStatus],
+      [
+        "data-doc-translation-suppressed-observed-at-ms",
+        typeof state.suppressedObservedAtMs === "number" ? String(state.suppressedObservedAtMs) : null,
+      ],
+      ["data-doc-translation-suppressed-freshness-status", state.suppressedFreshnessStatus],
+      ["data-doc-translation-suppressed-reason", state.suppressedReason],
+      ["data-doc-translation-terminal-eligible", state.terminalEligible === false ? "false" : null],
+      ["data-doc-translation-assistant-answer", state.assistantAnswer === false ? "false" : null],
+      ["data-doc-translation-raw-content-included", state.rawContentIncluded === false ? "false" : null],
+    ].filter((entry): entry is [string, string] => typeof entry[1] === "string" && entry[1].length > 0),
+  );
+}
+
+export function formatDocumentInlineTranslationText(text: string): string {
+  return text
+    .replace(/^ {0,3}#{1,6}\s+/gm, "")
+    .replace(/^\s*(?:[-*+]|\d+[.)])\s+/gm, "")
+    .replace(/^\s*\|\s?/gm, "")
+    .replace(/\s+\|\s*$/gm, "")
+    .trim();
+}
+
+export function documentMarkdownTranslationEntryToInlineRenderState(
+  entry: DocumentMarkdownTranslationEntry,
+): DocumentInlineTranslationRenderState {
+  const metadata = {
+    observationRef: entry.observationRef,
+    receiptRef: entry.receiptRef,
+    chunkId: entry.chunkId,
+    chunkIndex: entry.chunkIndex,
+    dedupeKey: entry.dedupeKey,
+    sourceEventId: entry.sourceEventId,
+    sourceEventMs: entry.sourceEventMs,
+    observedAtMs: entry.observedAtMs,
+    projectionStatus: entry.projectionStatus,
+    freshnessStatus: entry.freshnessStatus,
+    terminalAuthorityStatus: "not_terminal_authority",
+    selectedBackendProvider: entry.selectedBackendProvider,
+    sourceId: entry.sourceId,
+    ...(entry.sourceHash ? { sourceHash: entry.sourceHash } : {}),
+    sourceKind: entry.sourceKind,
+    accountLocale: entry.accountLocale,
+    projectionTarget: entry.projectionTarget,
+    targetLanguage: entry.targetLanguage,
+    source: entry.source ?? "document_microdeck",
+    terminalEligible: false,
+    assistantAnswer: false,
+    rawContentIncluded: false,
+  } satisfies Omit<DocumentInlineTranslationRenderState, "status" | "text" | "error">;
+
+  if (entry.status === "ready") {
+    return {
+      status: "ready",
+      text: entry.text,
+      ...metadata,
+    };
+  }
+
+  return {
+    status: "error",
+    error: entry.error,
+    ...metadata,
+  };
+}
 
 export function sameDocumentInlineTranslationRenderState(
   left: DocumentInlineTranslationRenderState | undefined,
@@ -94,12 +221,21 @@ export function sameDocumentInlineTranslationRenderState(
     (left.sourceEventMs ?? null) === (right.sourceEventMs ?? null) &&
     (left.observedAtMs ?? null) === (right.observedAtMs ?? null) &&
     (left.freshnessStatus ?? "") === (right.freshnessStatus ?? "") &&
+    (left.terminalAuthorityStatus ?? "") === (right.terminalAuthorityStatus ?? "") &&
+    (left.sourceId ?? "") === (right.sourceId ?? "") &&
+    (left.sourceHash ?? "") === (right.sourceHash ?? "") &&
     (left.sourceKind ?? "") === (right.sourceKind ?? "") &&
     (left.accountLocale ?? "") === (right.accountLocale ?? "") &&
     (left.projectionTarget ?? "") === (right.projectionTarget ?? "") &&
     (left.targetLanguage ?? "") === (right.targetLanguage ?? "") &&
     (left.cancelRequested ?? null) === (right.cancelRequested ?? null) &&
     (left.source ?? "") === (right.source ?? "") &&
+    (left.suppressedObservationRef ?? "") === (right.suppressedObservationRef ?? "") &&
+    (left.suppressedReceiptRef ?? "") === (right.suppressedReceiptRef ?? "") &&
+    (left.suppressedProjectionStatus ?? "") === (right.suppressedProjectionStatus ?? "") &&
+    (left.suppressedObservedAtMs ?? null) === (right.suppressedObservedAtMs ?? null) &&
+    (left.suppressedFreshnessStatus ?? "") === (right.suppressedFreshnessStatus ?? "") &&
+    (left.suppressedReason ?? "") === (right.suppressedReason ?? "") &&
     (left.terminalEligible ?? null) === (right.terminalEligible ?? null) &&
     (left.assistantAnswer ?? null) === (right.assistantAnswer ?? null) &&
     (left.rawContentIncluded ?? null) === (right.rawContentIncluded ?? null);
@@ -128,6 +264,32 @@ function shouldReplaceCurrentReadyWithProjectionError(
   return projectionEventSortValue(laneState) >= projectionEventSortValue(current);
 }
 
+function shouldKeepCurrentFreshReadyOverStaleDisplayText(
+  current: DocumentInlineTranslationRenderState | undefined,
+  laneState: DocumentInlineTranslationRenderState,
+): boolean {
+  if (current?.status !== "ready" || laneState.status !== "ready") return false;
+  if (current.source !== "capability_lane" || laneState.source !== "capability_lane") return false;
+  if (laneState.projectionStatus !== "stale" && laneState.freshnessStatus !== "stale") return false;
+  if (current.projectionStatus === "stale" || current.freshnessStatus === "stale") return false;
+  return Boolean(current.text?.trim());
+}
+
+function attachSuppressedProjectionReceipt(
+  current: DocumentInlineTranslationRenderState,
+  laneState: DocumentInlineTranslationRenderState,
+): DocumentInlineTranslationRenderState {
+  return {
+    ...current,
+    suppressedObservationRef: laneState.observationRef ?? null,
+    suppressedReceiptRef: laneState.receiptRef ?? null,
+    suppressedProjectionStatus: laneState.projectionStatus ?? null,
+    suppressedObservedAtMs: laneState.observedAtMs ?? null,
+    suppressedFreshnessStatus: laneState.freshnessStatus ?? null,
+    suppressedReason: "stale_projection_did_not_replace_fresh_text",
+  };
+}
+
 export function buildDocumentLiveTranslationInlineStates(
   input: BuildDocumentLiveTranslationInlineStatesInput,
 ): Record<string, DocumentLiveTranslationInlineState> {
@@ -136,6 +298,7 @@ export function buildDocumentLiveTranslationInlineStates(
   const states = buildHelixLiveTranslationInlineUnitStates({
     projections,
     sourceId,
+    sourceHash: input.sourceHash,
     projectionTarget: input.projectionTarget ?? "docs_chunk",
     targetLanguage: input.locale,
     units: input.units,
@@ -160,6 +323,9 @@ export function buildDocumentLiveTranslationInlineStates(
         sourceEventMs: state.sourceEventMs,
         observedAtMs: state.observedAtMs,
         freshnessStatus: state.freshnessStatus,
+        terminalAuthorityStatus: state.terminalAuthorityStatus,
+        sourceId: state.sourceId,
+        ...(state.sourceHash ? { sourceHash: state.sourceHash } : {}),
         sourceKind: state.sourceKind,
         accountLocale: state.accountLocale,
         projectionTarget: state.projectionTarget,
@@ -196,6 +362,9 @@ export function simplifyDocumentLiveTranslationInlineStates(
           sourceEventMs: state.sourceEventMs,
           observedAtMs: state.observedAtMs,
           freshnessStatus: state.freshnessStatus,
+          terminalAuthorityStatus: state.terminalAuthorityStatus,
+          sourceId: state.sourceId,
+          ...(state.sourceHash ? { sourceHash: state.sourceHash } : {}),
           sourceKind: state.sourceKind,
           accountLocale: state.accountLocale,
           projectionTarget: state.projectionTarget,
@@ -221,6 +390,9 @@ export function simplifyDocumentLiveTranslationInlineStates(
           sourceEventMs: state.sourceEventMs,
           observedAtMs: state.observedAtMs,
           freshnessStatus: state.freshnessStatus,
+          terminalAuthorityStatus: state.terminalAuthorityStatus,
+          sourceId: state.sourceId,
+          ...(state.sourceHash ? { sourceHash: state.sourceHash } : {}),
           sourceKind: state.sourceKind,
           accountLocale: state.accountLocale,
           projectionTarget: state.projectionTarget,
@@ -239,21 +411,35 @@ export function mergeDocumentLiveTranslationInlineStates(
   input: MergeDocumentLiveTranslationInlineStatesInput,
 ): Record<string, DocumentInlineTranslationRenderState> {
   const simpleLaneStates = simplifyDocumentLiveTranslationInlineStates(input.laneStates);
+  let changed = false;
   const next = { ...input.current };
   for (const [unitId, laneState] of Object.entries(simpleLaneStates)) {
     const current = next[unitId];
     if (laneState.status === "ready" && typeof laneState.text === "string" && laneState.text.trim()) {
+      if (shouldKeepCurrentFreshReadyOverStaleDisplayText(current, laneState)) {
+        const preservedState = attachSuppressedProjectionReceipt(current, laneState);
+        if (sameDocumentInlineTranslationRenderState(current, preservedState)) continue;
+        next[unitId] = preservedState;
+        changed = true;
+        continue;
+      }
       if (shouldKeepCurrentReadyProjection(current, laneState)) continue;
+      if (sameDocumentInlineTranslationRenderState(current, laneState)) continue;
       next[unitId] = laneState;
+      changed = true;
       continue;
     }
     if (shouldReplaceCurrentReadyWithProjectionError(current, laneState)) {
+      if (sameDocumentInlineTranslationRenderState(current, laneState)) continue;
       next[unitId] = laneState;
+      changed = true;
       continue;
     }
     if (!current || current.status === "loading") {
+      if (sameDocumentInlineTranslationRenderState(current, laneState)) continue;
       next[unitId] = laneState;
+      changed = true;
     }
   }
-  return next;
+  return changed ? next : input.current;
 }

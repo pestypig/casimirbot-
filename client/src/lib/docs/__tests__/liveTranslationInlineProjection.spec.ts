@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
 import type { DocumentTranslationUnit } from "@shared/document-translation";
 import {
+  buildDocumentInlineTranslationDataAttributes,
   buildDocumentLiveTranslationInlineStates,
+  documentMarkdownTranslationEntryToInlineRenderState,
+  filterReadyDocumentInlineTranslationRenderStates,
+  formatDocumentInlineTranslationText,
   mergeDocumentLiveTranslationInlineStates,
   sameDocumentInlineTranslationRenderState,
   simplifyDocumentLiveTranslationInlineStates,
 } from "@/lib/docs/liveTranslationInlineProjection";
+import type { DocumentMarkdownTranslationEntry } from "@/lib/docs/documentTranslationClient";
 
 const unit = (unitId: string, translatable = true): DocumentTranslationUnit => ({
   unit_id: unitId,
@@ -25,6 +30,7 @@ const inlineMeta = (overrides: Record<string, unknown> = {}) => ({
   laneSessionId: null,
   selectedBackendProvider: null,
   freshnessStatus: "unknown",
+  sourceId: "document_markdown:docs/research/nhm2.md",
   sourceKind: null,
   accountLocale: null,
   projectionTarget: "docs_chunk",
@@ -34,6 +40,174 @@ const inlineMeta = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe("document live translation inline projection", () => {
+  it("adapts MicroDeck document translation entries into non-terminal inline render state", () => {
+    const entry: DocumentMarkdownTranslationEntry = {
+      unitId: "u0001",
+      status: "ready",
+      text: "Texto desde MicroDeck.",
+      runId: "micro-run-1",
+      role: "assistant",
+      observationRef: "obs:micro:u1",
+      receiptRef: "receipt:micro:u1",
+      docPath: "docs/research/nhm2.md",
+      sourceHash: "source-hash",
+      chunkId: "doc-inline:source-hash:u0001",
+      chunkIndex: 2,
+      dedupeKey: "document_markdown:docs/research/nhm2.md:u0001:es",
+      sourceEventId: "source-event-1",
+      sourceEventMs: 240,
+      observedAtMs: 250,
+      projectionStatus: "projected",
+      freshnessStatus: "fresh",
+      selectedBackendProvider: "live_translation.local_runtime",
+      sourceId: "document_markdown:docs/research/nhm2.md",
+      source: "document_microdeck",
+      sourceKind: "document_markdown",
+      projectionTarget: "docs_chunk",
+      targetLanguage: "es",
+      accountLocale: "es-US",
+    };
+
+    expect(documentMarkdownTranslationEntryToInlineRenderState(entry)).toEqual({
+      status: "ready",
+      text: "Texto desde MicroDeck.",
+      observationRef: "obs:micro:u1",
+      receiptRef: "receipt:micro:u1",
+      chunkId: "doc-inline:source-hash:u0001",
+      chunkIndex: 2,
+      dedupeKey: "document_markdown:docs/research/nhm2.md:u0001:es",
+      sourceEventId: "source-event-1",
+      sourceEventMs: 240,
+      observedAtMs: 250,
+      projectionStatus: "projected",
+      freshnessStatus: "fresh",
+      selectedBackendProvider: "live_translation.local_runtime",
+      sourceId: "document_markdown:docs/research/nhm2.md",
+      sourceHash: "source-hash",
+      sourceKind: "document_markdown",
+      accountLocale: "es-US",
+      projectionTarget: "docs_chunk",
+      targetLanguage: "es",
+      source: "document_microdeck",
+      terminalEligible: false,
+      assistantAnswer: false,
+      rawContentIncluded: false,
+    });
+  });
+
+  it("filters cached inline render state down to ready translated text", () => {
+    expect(filterReadyDocumentInlineTranslationRenderStates({
+      ready: {
+        status: "ready",
+        text: "Texto listo.",
+        source: "capability_lane",
+        terminalEligible: false,
+        assistantAnswer: false,
+        rawContentIncluded: false,
+      },
+      blankReady: {
+        status: "ready",
+        text: "   ",
+      },
+      loading: {
+        status: "loading",
+      },
+      error: {
+        status: "error",
+        error: "translation_projection_failed",
+      },
+    })).toEqual({
+      ready: {
+        status: "ready",
+        text: "Texto listo.",
+        source: "capability_lane",
+        terminalEligible: false,
+        assistantAnswer: false,
+        rawContentIncluded: false,
+      },
+    });
+  });
+
+  it("builds render data attributes for translation projection metadata", () => {
+    expect(buildDocumentInlineTranslationDataAttributes({
+      status: "error",
+      error: "translation_projection_cancelled",
+      observationRef: "obs:docs:u1",
+      receiptRef: "receipt:docs:u1",
+      laneSessionId: "lane-session-docs",
+      selectedBackendProvider: "live_translation.local_runtime",
+      projectionStatus: "cancelled",
+      chunkId: "chunk-1",
+      chunkIndex: 3,
+      dedupeKey: "dedupe-1",
+      sourceEventId: "event-1",
+      sourceEventMs: 123,
+      observedAtMs: 456,
+      freshnessStatus: "fresh",
+      sourceId: "document_markdown:docs/research/nhm2.md",
+      sourceHash: "source-hash",
+      sourceKind: "document_markdown",
+      accountLocale: "es-US",
+      projectionTarget: "docs_chunk",
+      targetLanguage: "es",
+      cancelRequested: true,
+      suppressedObservationRef: "obs:docs:u1:stale",
+      suppressedReceiptRef: "receipt:docs:u1:stale",
+      suppressedProjectionStatus: "stale",
+      suppressedObservedAtMs: 789,
+      suppressedFreshnessStatus: "stale",
+      suppressedReason: "stale_projection_did_not_replace_fresh_text",
+      source: "capability_lane",
+      terminalEligible: false,
+      assistantAnswer: false,
+      rawContentIncluded: false,
+    })).toEqual({
+      "data-doc-translation-source": "capability_lane",
+      "data-doc-translation-projection-status": "cancelled",
+      "data-doc-translation-selected-backend-provider": "live_translation.local_runtime",
+      "data-doc-translation-observation-ref": "obs:docs:u1",
+      "data-doc-translation-receipt-ref": "receipt:docs:u1",
+      "data-doc-translation-lane-session-id": "lane-session-docs",
+      "data-doc-translation-chunk-id": "chunk-1",
+      "data-doc-translation-chunk-index": "3",
+      "data-doc-translation-dedupe-key": "dedupe-1",
+      "data-doc-translation-source-event-id": "event-1",
+      "data-doc-translation-source-event-ms": "123",
+      "data-doc-translation-observed-at-ms": "456",
+      "data-doc-translation-freshness-status": "fresh",
+      "data-doc-translation-source-id": "document_markdown:docs/research/nhm2.md",
+      "data-doc-translation-source-hash": "source-hash",
+      "data-doc-translation-source-kind": "document_markdown",
+      "data-doc-translation-account-locale": "es-US",
+      "data-doc-translation-projection-target": "docs_chunk",
+      "data-doc-translation-target-language": "es",
+      "data-doc-translation-cancel-requested": "true",
+      "data-doc-translation-suppressed-observation-ref": "obs:docs:u1:stale",
+      "data-doc-translation-suppressed-receipt-ref": "receipt:docs:u1:stale",
+      "data-doc-translation-suppressed-projection-status": "stale",
+      "data-doc-translation-suppressed-observed-at-ms": "789",
+      "data-doc-translation-suppressed-freshness-status": "stale",
+      "data-doc-translation-suppressed-reason": "stale_projection_did_not_replace_fresh_text",
+      "data-doc-translation-terminal-eligible": "false",
+      "data-doc-translation-assistant-answer": "false",
+      "data-doc-translation-raw-content-included": "false",
+    });
+  });
+
+  it("formats translated markdown-like text for inline document projection", () => {
+    expect(formatDocumentInlineTranslationText([
+      "### Titulo",
+      "- primer punto",
+      "1. segundo punto",
+      "| celda traducida |",
+    ].join("\n"))).toBe([
+      "Titulo",
+      "primer punto",
+      "segundo punto",
+      "celda traducida",
+    ].join("\n"));
+  });
+
   it("adapts governed live translation receipts into docs inline translation state", () => {
     expect(buildDocumentLiveTranslationInlineStates({
       docPath: "docs/research/nhm2.md",
@@ -370,7 +544,7 @@ describe("document live translation inline projection", () => {
     });
   });
 
-  it("treats projection receipt metadata as part of inline render state identity", () => {
+  it("treats projection receipt and source hash metadata as part of inline render state identity", () => {
     expect(sameDocumentInlineTranslationRenderState(
       {
         status: "ready",
@@ -397,6 +571,65 @@ describe("document live translation inline projection", () => {
         rawContentIncluded: false,
       },
     )).toBe(false);
+
+    expect(sameDocumentInlineTranslationRenderState(
+      {
+        status: "ready",
+        text: "Texto gobernado.",
+        observationRef: "obs:docs:u1",
+        receiptRef: "receipt:docs:u1",
+        projectionStatus: "projected",
+        ...inlineMeta({ sourceHash: "fnv1a32:current" }),
+        source: "capability_lane",
+        terminalEligible: false,
+        assistantAnswer: false,
+        rawContentIncluded: false,
+      },
+      {
+        status: "ready",
+        text: "Texto gobernado.",
+        observationRef: "obs:docs:u1",
+        receiptRef: "receipt:docs:u1",
+        projectionStatus: "projected",
+        ...inlineMeta({ sourceHash: "fnv1a32:previous" }),
+        source: "capability_lane",
+        terminalEligible: false,
+        assistantAnswer: false,
+        rawContentIncluded: false,
+      },
+    )).toBe(false);
+  });
+
+  it("keeps the existing inline render state map when lane projection metadata is unchanged", () => {
+    const laneStates = buildDocumentLiveTranslationInlineStates({
+      docPath: "docs/research/nhm2.md",
+      locale: "es",
+      units: [unit("u0001")],
+      payload: {
+        capability_lane_projection_receipts: [
+          {
+            schema: "helix.live_translation.projection_receipt.v1",
+            receipt_ref: "receipt:docs:u1",
+            observation_ref: "obs:docs:u1",
+            lane_id: "live_translation",
+            capability: "live_translation.translate_text",
+            projection_target: "docs_chunk",
+            projection_status: "projected",
+            source_id: "document_markdown:docs/research/nhm2.md",
+            chunk_id: "u0001",
+            observed_at_ms: 100,
+            target_language: "es",
+            translated_text: "Texto gobernado.",
+          },
+        ],
+      },
+    });
+    const current = simplifyDocumentLiveTranslationInlineStates(laneStates);
+
+    expect(mergeDocumentLiveTranslationInlineStates({
+      current,
+      laneStates,
+    })).toBe(current);
   });
 
   it("keeps the newer ready projection when an older ready receipt arrives late", () => {
@@ -710,6 +943,113 @@ describe("document live translation inline projection", () => {
           chunkId: "u0001",
           sourceEventMs: 300,
           cancelRequested: true,
+        }),
+        source: "capability_lane",
+        terminalEligible: false,
+        assistantAnswer: false,
+        rawContentIncluded: false,
+      },
+    });
+  });
+
+  it("keeps newer ready text when older cancelled or failed receipts arrive late", () => {
+    const laneStates = buildDocumentLiveTranslationInlineStates({
+      docPath: "docs/research/nhm2.md",
+      locale: "es",
+      units: [unit("u0001"), unit("u0002")],
+      payload: {
+        capability_lane_projection_receipts: [
+          {
+            schema: "helix.live_translation.projection_receipt.v1",
+            receipt_ref: "receipt:docs:u1:cancelled:older",
+            observation_ref: "obs:docs:u1:cancelled:older",
+            lane_id: "live_translation",
+            capability: "live_translation.translate_text",
+            projection_target: "docs_chunk",
+            projection_status: "cancelled",
+            source_id: "document_markdown:docs/research/nhm2.md",
+            chunk_id: "u0001",
+            observed_at_ms: 100,
+            target_language: "es",
+            cancel_requested: true,
+          },
+          {
+            schema: "helix.live_translation.projection_receipt.v1",
+            receipt_ref: "receipt:docs:u2:failed:older",
+            observation_ref: "obs:docs:u2:failed:older",
+            lane_id: "live_translation",
+            capability: "live_translation.translate_text",
+            projection_target: "docs_chunk",
+            projection_status: "failed",
+            source_id: "document_markdown:docs/research/nhm2.md",
+            chunk_id: "u0002",
+            observed_at_ms: 110,
+            target_language: "es",
+            error: "backend_unconfigured",
+          },
+        ],
+      },
+    });
+
+    expect(mergeDocumentLiveTranslationInlineStates({
+      current: {
+        u0001: {
+          status: "ready",
+          text: "Texto activo uno.",
+          observationRef: "obs:docs:u1:ready:newer",
+          receiptRef: "receipt:docs:u1:ready:newer",
+          projectionStatus: "projected",
+          ...inlineMeta({
+            chunkId: "u0001",
+            observedAtMs: 200,
+          }),
+          source: "capability_lane",
+          terminalEligible: false,
+          assistantAnswer: false,
+          rawContentIncluded: false,
+        },
+        u0002: {
+          status: "ready",
+          text: "Texto activo dos.",
+          observationRef: "obs:docs:u2:ready:newer",
+          receiptRef: "receipt:docs:u2:ready:newer",
+          projectionStatus: "projected",
+          ...inlineMeta({
+            chunkId: "u0002",
+            observedAtMs: 210,
+          }),
+          source: "capability_lane",
+          terminalEligible: false,
+          assistantAnswer: false,
+          rawContentIncluded: false,
+        },
+      },
+      laneStates,
+    })).toEqual({
+      u0001: {
+        status: "ready",
+        text: "Texto activo uno.",
+        observationRef: "obs:docs:u1:ready:newer",
+        receiptRef: "receipt:docs:u1:ready:newer",
+        projectionStatus: "projected",
+        ...inlineMeta({
+          chunkId: "u0001",
+          observedAtMs: 200,
+        }),
+        source: "capability_lane",
+        terminalEligible: false,
+        assistantAnswer: false,
+        rawContentIncluded: false,
+      },
+      u0002: {
+        status: "ready",
+        text: "Texto activo dos.",
+        observationRef: "obs:docs:u2:ready:newer",
+        receiptRef: "receipt:docs:u2:ready:newer",
+        projectionStatus: "projected",
+        ...inlineMeta({
+          chunkId: "u0002",
+          observedAtMs: 210,
         }),
         source: "capability_lane",
         terminalEligible: false,

@@ -11,6 +11,7 @@ export type InstallDocumentLiveTranslationProjectionEventIngestionInput = {
   eventTarget: EventTargetLike;
   docPath: string;
   locale: string;
+  sourceHash?: string | null;
   projectionTarget?: string | null;
   units: DocumentTranslationUnit[];
   allowStaleDisplayText?: boolean;
@@ -25,6 +26,7 @@ export function installDocumentLiveTranslationProjectionEventIngestion(
     ingestDocumentLiveTranslationProjectionFromAskLiveEvent({
       docPath: input.docPath,
       locale: input.locale,
+      sourceHash: input.sourceHash,
       projectionTarget: input.projectionTarget ?? "docs_chunk",
       units: input.units,
       allowStaleDisplayText: input.allowStaleDisplayText,

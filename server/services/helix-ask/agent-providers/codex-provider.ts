@@ -25,6 +25,7 @@ import { buildHelixAgentRuntimeAdapterContract } from "./runtime-adapter-contrac
 import { buildHelixTurnTerminalAuthority } from "../turn-terminal-authority";
 import { buildHelixCapabilityLaneProviderAdapterContext } from "../capability-lanes/provider-adapter-context";
 import { explicitCapabilityContractForCapability } from "../explicit-capability-contract";
+import { waitForVoicePlaybackGatewayReceipts } from "../voice-playback/receipt-barrier";
 
 const WORKSTATION_ACTIVE_CONTEXT_CAPABILITY = "workstation.active_context" as const;
 const CALCULATOR_SOLVE_EXPRESSION_CAPABILITY = "scientific-calculator.solve_expression" as const;
@@ -38,7 +39,6 @@ const SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY = "scholarly-research.fetch_full_text
 const SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY = "scholarly-research.extract_numeric_parameters" as const;
 const MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY = "moral-graph.reflect_living_substrate_context" as const;
 const WORKSTATION_UI_ACTION_RECEIPT_SCHEMA = "helix.workstation_ui_action_receipt.v1" as const;
-
 const COMPOUND_NORMALIZABLE_CAPABILITIES = new Set<string>([
   "docs.search",
   CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
@@ -184,6 +184,19 @@ const buildCodexCapabilityLaneRequestBody = (
   capability_lane_call: candidate,
 });
 
+const isCodexMissingTranslationInputClarification = (providerText: string): boolean => {
+  const text = providerText.trim().toLowerCase();
+  if (!text) return false;
+  const asksForInput =
+    text.includes("?") ||
+    /\b(?:please provide|provide|specify|which|what|need|missing|clarify)\b/.test(text);
+  if (!asksForInput) return false;
+  const mentionsTranslation = /\b(?:translate|translation|target language|source language)\b/.test(text);
+  const asksForText = /\b(?:text|content|phrase|sentence|source)\b/.test(text);
+  const asksForLanguage = /\b(?:language|target|into|to)\b/.test(text);
+  return mentionsTranslation && (asksForText || asksForLanguage);
+};
+
 const shouldRetryCodexCapabilityLaneRequest = (input: {
   question: string;
   providerText: string;
@@ -191,6 +204,7 @@ const shouldRetryCodexCapabilityLaneRequest = (input: {
 }): boolean => {
   if (input.existingObservationPacketCount > 0) return false;
   if (extractCodexCapabilityLaneRequestCandidate(input.providerText)) return false;
+  if (isCodexMissingTranslationInputClarification(input.providerText)) return false;
   const question = input.question.trim().toLowerCase();
   if (!question) return false;
   return (
@@ -2517,6 +2531,21 @@ export const codexProvider: HelixAgentProvider = {
         },
       };
     }
+
+    const voicePlaybackHandoffTranscriptEvents = buildCodexProviderTurnTranscriptEvents({
+      turnId,
+      providerLabel: codexProvider.label,
+      body: request.body,
+      gatewayCallResults,
+      providerText: "Codex runtime is waiting for voice playback receipt evidence when the gateway handoff requires it.",
+      finalStatus: "running",
+    });
+    emitCodexProviderProgressTranscriptEvents({
+      emit: request.onTranscriptEvent,
+      events: voicePlaybackHandoffTranscriptEvents,
+      emittedIds: emittedLiveTranscriptEventIds,
+    });
+    await waitForVoicePlaybackGatewayReceipts(gatewayCallResults);
 
     const prompt = [
       "You are running inside Helix Codex Workstation Mode.",

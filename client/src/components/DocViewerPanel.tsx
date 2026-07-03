@@ -35,7 +35,15 @@ import {
   type DocumentLiveTranslationProjectionSnapshotSummary,
 } from "@/lib/docs/liveTranslationProjectionRegistry";
 import { installDocumentLiveTranslationProjectionEventIngestion } from "@/lib/docs/liveTranslationProjectionEventIngestion";
-import { sameDocumentInlineTranslationRenderState } from "@/lib/docs/liveTranslationInlineProjection";
+import {
+  buildDocumentInlineTranslationDataAttributes,
+  documentMarkdownTranslationEntryToInlineRenderState,
+  filterReadyDocumentInlineTranslationRenderStates,
+  formatDocumentInlineTranslationText,
+  mergeDocumentLiveTranslationInlineStates,
+  sameDocumentInlineTranslationRenderState,
+  type DocumentInlineTranslationRenderState,
+} from "@/lib/docs/liveTranslationInlineProjection";
 import { consumeDocViewerIntent } from "@/lib/docs/docViewer";
 import { buildWorkstationPathRef } from "@/lib/workstation/workstationDeepLink";
 import {
@@ -68,29 +76,13 @@ import {
 
 type Translate = InterfaceTextResolver["t"];
 type DisplayMessageMap = Record<string, InterfaceMessageId>;
-type DocumentTranslationUiStatus = "idle" | "cached" | "translating" | "ready" | "unavailable" | "error";
-type InlineTranslationState = {
-  status: "loading" | "ready" | "error";
-  text?: string;
-  error?: string;
-  observationRef?: string | null;
-  receiptRef?: string | null;
-  projectionStatus?: string | null;
-  selectedBackendProvider?: string | null;
-  chunkId?: string | null;
-  chunkIndex?: number | null;
-  dedupeKey?: string | null;
-  sourceEventId?: string | null;
-  sourceEventMs?: number | null;
-  observedAtMs?: number | null;
-  freshnessStatus?: string;
-  projectionTarget?: string | null;
-  targetLanguage?: string | null;
-  cancelRequested?: boolean;
-  source?: "capability_lane";
-  terminalEligible?: false;
-  assistantAnswer?: false;
-  rawContentIncluded?: false;
+export type DocumentTranslationUiStatus = "idle" | "cached" | "translating" | "ready" | "unavailable" | "error";
+type InlineTranslationState = DocumentInlineTranslationRenderState;
+type DocTaxonomyFilter = "all" | "canonical-research" | "current-development" | "synthetic-research" | "legacy-development" | "uncategorized";
+type DocBadgeTone = "cyan" | "emerald" | "amber" | "slate";
+type DocBadge = {
+  label: string;
+  tone: DocBadgeTone;
 };
 
 const DOC_INLINE_TRANSLATION_SESSION_PREFIX = "casimir.docs.inlineTranslation.v1";
@@ -106,6 +98,9 @@ type StoredInlineTranslationSession = {
 const EMPTY_LIVE_TRANSLATION_PROJECTION_SNAPSHOT = {
   version: 0,
   translations: {},
+  laneSessions: {},
+  mailLoops: {},
+  goalBindings: {},
 };
 
 const proceduralStepMessages = {
@@ -132,6 +127,22 @@ const docSubjectLabelMessages: DisplayMessageMap = {
   "Stellar and Solar": "docsViewer.group.stellarAndSolar",
   "Warp Mechanics": "docsViewer.group.warpMechanics",
 } satisfies DisplayMessageMap;
+
+const docTaxonomyLabelMessages: Record<Exclude<DocTaxonomyFilter, "all" | "uncategorized">, InterfaceMessageId> = {
+  "canonical-research": "docsViewer.taxonomy.canonicalResearch",
+  "current-development": "docsViewer.taxonomy.currentDevelopment",
+  "synthetic-research": "docsViewer.taxonomy.syntheticResearch",
+  "legacy-development": "docsViewer.taxonomy.legacyDevelopment",
+};
+
+const docTaxonomyFilterOptions: Array<{ key: DocTaxonomyFilter; messageId: InterfaceMessageId }> = [
+  { key: "all", messageId: "docsViewer.taxonomy.all" },
+  { key: "canonical-research", messageId: "docsViewer.taxonomy.research" },
+  { key: "current-development", messageId: "docsViewer.taxonomy.development" },
+  { key: "synthetic-research", messageId: "docsViewer.taxonomy.syntheticResearchShort" },
+  { key: "legacy-development", messageId: "docsViewer.taxonomy.legacyShort" },
+  { key: "uncategorized", messageId: "docsViewer.taxonomy.uncategorized" },
+];
 
 export type DocMathPickContext = {
   latex: string;
@@ -273,6 +284,7 @@ export function DocViewerPanel() {
   const interfaceLanguage = getInterfaceLanguageOption(userSettings.interfaceLanguage);
   const { t } = useInterfaceText(interfaceLanguage.code);
   const [query, setQuery] = React.useState("");
+  const [docClassFilter, setDocClassFilter] = React.useState<DocTaxonomyFilter>("all");
   const [html, setHtml] = React.useState<string>("");
   const [rawMarkdown, setRawMarkdown] = React.useState<string>("");
   const [inlineTranslationEnabled, setInlineTranslationEnabled] = React.useState(false);
@@ -302,6 +314,7 @@ export function DocViewerPanel() {
   const visibleTranslationScanTimerRef = React.useRef<number | null>(null);
   const inFlightTranslationUnitIdsRef = React.useRef<Set<string>>(new Set());
   const documentTranslationChunkInFlightRef = React.useRef(false);
+  const documentTranslationChunkIndexRef = React.useRef(0);
   const translationScopeKeyRef = React.useRef<string | null>(null);
   const currentEntry = React.useMemo(() => (currentPath ? findDocEntry(currentPath) : null), [currentPath]);
   const rawMarkdownSourceHash = React.useMemo(
@@ -321,6 +334,7 @@ export function DocViewerPanel() {
         ? readDocumentLiveTranslationProjectionSnapshot({
           docPath: currentEntry.relativePath,
           locale: interfaceLanguage.code,
+          sourceHash: rawMarkdownSourceHash,
           projectionTarget: "docs_chunk",
         })
         : EMPTY_LIVE_TRANSLATION_PROJECTION_SNAPSHOT,
@@ -414,6 +428,7 @@ export function DocViewerPanel() {
 
   React.useEffect(() => {
     inFlightTranslationUnitIdsRef.current.clear();
+    documentTranslationChunkIndexRef.current = 0;
     setTranslationError(null);
     translationScopeKeyRef.current = activeTranslationScopeKey;
     if (!activeTranslationScopeKey) {
@@ -449,67 +464,12 @@ export function DocViewerPanel() {
     if (laneTranslations.length === 0) return;
     translationScopeKeyRef.current = activeTranslationScopeKey;
     setInlineTranslationEnabled(true);
-    setInlineTranslations((current) => {
-      let changed = false;
-      const next = { ...current };
-      for (const [unitId, laneState] of laneTranslations) {
-        const currentState = next[unitId];
-        if (laneState.status === "ready" && typeof laneState.text === "string" && laneState.text.trim()) {
-          const nextState = {
-            status: "ready",
-            text: laneState.text,
-            observationRef: laneState.observationRef,
-            receiptRef: laneState.receiptRef,
-            projectionStatus: laneState.projectionStatus,
-            selectedBackendProvider: laneState.selectedBackendProvider,
-            chunkId: laneState.chunkId,
-            chunkIndex: laneState.chunkIndex,
-            dedupeKey: laneState.dedupeKey,
-            sourceEventId: laneState.sourceEventId,
-            sourceEventMs: laneState.sourceEventMs,
-            observedAtMs: laneState.observedAtMs,
-            freshnessStatus: laneState.freshnessStatus,
-            projectionTarget: laneState.projectionTarget,
-            targetLanguage: laneState.targetLanguage,
-            cancelRequested: laneState.cancelRequested,
-            source: laneState.source,
-            terminalEligible: false,
-            assistantAnswer: false,
-            rawContentIncluded: false,
-          } satisfies InlineTranslationState;
-          if (sameDocumentInlineTranslationRenderState(currentState, nextState)) continue;
-          next[unitId] = nextState;
-          changed = true;
-          continue;
-        }
-        if (!currentState || currentState.status === "loading") {
-          next[unitId] = {
-            status: "error",
-            error: laneState.error,
-            observationRef: laneState.observationRef,
-            receiptRef: laneState.receiptRef,
-            projectionStatus: laneState.projectionStatus,
-            selectedBackendProvider: laneState.selectedBackendProvider,
-            chunkId: laneState.chunkId,
-            chunkIndex: laneState.chunkIndex,
-            dedupeKey: laneState.dedupeKey,
-            sourceEventId: laneState.sourceEventId,
-            sourceEventMs: laneState.sourceEventMs,
-            observedAtMs: laneState.observedAtMs,
-            freshnessStatus: laneState.freshnessStatus,
-            projectionTarget: laneState.projectionTarget,
-            targetLanguage: laneState.targetLanguage,
-            cancelRequested: laneState.cancelRequested,
-            source: laneState.source,
-            terminalEligible: false,
-            assistantAnswer: false,
-            rawContentIncluded: false,
-          };
-          changed = true;
-        }
-      }
-      return changed ? next : current;
-    });
+    setInlineTranslations((current) =>
+      mergeDocumentLiveTranslationInlineStates({
+        current,
+        laneStates: liveTranslationProjectionSnapshot.translations,
+      })
+    );
     setTranslationStatus((current) =>
       current === "error" || current === "unavailable" ? current : "cached"
     );
@@ -526,6 +486,7 @@ export function DocViewerPanel() {
       eventTarget: window,
       docPath: currentEntry.relativePath,
       locale: interfaceLanguage.code,
+      sourceHash: rawMarkdownSourceHash,
       projectionTarget: "docs_chunk",
       units: translationUnits,
       allowStaleDisplayText: inlineTranslationEnabled,
@@ -534,6 +495,7 @@ export function DocViewerPanel() {
     currentEntry,
     inlineTranslationEnabled,
     interfaceLanguage.code,
+    rawMarkdownSourceHash,
     translationEligible,
     translationUnits,
   ]);
@@ -629,13 +591,18 @@ export function DocViewerPanel() {
     });
 
     try {
+      const chunkIndex = documentTranslationChunkIndexRef.current + 1;
+      documentTranslationChunkIndexRef.current = chunkIndex;
       await enqueueDocumentMarkdownTranslationMail({
         docPath: currentEntry.relativePath,
         locale: interfaceLanguage.code,
+        targetLanguage: interfaceLanguage.code,
+        accountLocale: interfaceLanguage.code,
         sourceHash: rawMarkdownSourceHash,
         title: currentEntry.title,
         sourceId: documentMarkdownSourceId(currentEntry.relativePath),
         chunkId: `doc-inline:${rawMarkdownSourceHash}:${targetIds.join(",")}`,
+        chunkIndex,
         units: targetUnits,
       });
       if (translationScopeKeyRef.current !== scopeKey) return;
@@ -711,13 +678,11 @@ export function DocViewerPanel() {
       const next = { ...current };
       for (const [unitId, entry] of translationByUnitId) {
         if (!translatableUnitIds.has(unitId)) continue;
-        if (entry.status === "ready") {
-          if (next[unitId]?.status === "ready" && next[unitId]?.text === entry.text) continue;
-          next[unitId] = { status: "ready", text: entry.text };
-        } else {
-          if (next[unitId]?.status === "error" && next[unitId]?.error === entry.error) continue;
-          next[unitId] = { status: "error", error: entry.error };
-        }
+        if (entry.docPath && entry.docPath !== currentEntry.relativePath) continue;
+        if (entry.sourceHash && entry.sourceHash !== rawMarkdownSourceHash) continue;
+        const nextState = documentMarkdownTranslationEntryToInlineRenderState(entry);
+        if (sameDocumentInlineTranslationRenderState(next[unitId], nextState)) continue;
+        next[unitId] = nextState;
         inFlightTranslationUnitIdsRef.current.delete(unitId);
         changed = true;
       }
@@ -1070,9 +1035,13 @@ export function DocViewerPanel() {
   }, [anchor, currentPath, focusActiveReadChunk, viewDoc]);
 
   const queryValue = query.trim().toLowerCase();
-  const filteredEntries = React.useMemo(() => {
+  const queryMatchedEntries = React.useMemo(() => {
     return filterDocManifestEntries(queryValue);
   }, [queryValue]);
+  const taxonomyCounts = React.useMemo(() => buildDocTaxonomyCounts(queryMatchedEntries), [queryMatchedEntries]);
+  const filteredEntries = React.useMemo(() => {
+    return queryMatchedEntries.filter((entry) => docMatchesTaxonomyFilter(entry, docClassFilter));
+  }, [docClassFilter, queryMatchedEntries]);
   const grouped = React.useMemo(() => groupBySubject(filteredEntries, t), [filteredEntries, t]);
   const handleDocMathClick = React.useCallback(
     (event: React.MouseEvent<HTMLElement>) => {
@@ -1117,7 +1086,10 @@ export function DocViewerPanel() {
           filteredCount={filteredEntries.length}
           currentRoute={currentPath}
           query={query}
+          docClassFilter={docClassFilter}
+          taxonomyCounts={taxonomyCounts}
           onQueryChange={setQuery}
+          onDocClassFilterChange={setDocClassFilter}
           onSelect={viewDoc}
           variant="full"
           scrollMemoryKey="docs-viewer:directory"
@@ -1198,20 +1170,26 @@ type DirectoryRailProps = {
   filteredCount: number;
   currentRoute?: string;
   query: string;
+  docClassFilter: DocTaxonomyFilter;
+  taxonomyCounts: Record<DocTaxonomyFilter, number>;
   onQueryChange: (value: string) => void;
+  onDocClassFilterChange: (value: DocTaxonomyFilter) => void;
   onSelect: (path: string) => void;
   variant?: "rail" | "full";
   scrollMemoryKey?: string;
   t: Translate;
 };
 
-function DirectoryRail({
+export function DirectoryRail({
   entries,
   total,
   filteredCount,
   currentRoute,
   query,
+  docClassFilter,
+  taxonomyCounts,
   onQueryChange,
+  onDocClassFilterChange,
   onSelect,
   variant = "rail",
   scrollMemoryKey,
@@ -1290,6 +1268,29 @@ function DirectoryRail({
         <p className="mt-2 text-xs text-slate-400">
           {t("docsViewer.search.count", { filteredCount, total })}
         </p>
+        <div className="mt-3 flex flex-wrap gap-1.5" aria-label={t("docsViewer.taxonomy.filterLabel")}>
+          {docTaxonomyFilterOptions.map((option) => {
+            const active = option.key === docClassFilter;
+            const count = taxonomyCounts[option.key] ?? 0;
+            return (
+              <button
+                key={option.key}
+                type="button"
+                className={cn(
+                  "min-h-8 rounded-md border px-2 py-1 text-xs font-medium transition-colors",
+                  active
+                    ? "border-cyan-400/70 bg-cyan-400/15 text-cyan-100"
+                    : "border-white/10 bg-white/[0.03] text-slate-300 hover:border-white/20 hover:bg-white/[0.07]",
+                )}
+                aria-pressed={active}
+                onClick={() => onDocClassFilterChange(option.key)}
+              >
+                {t(option.messageId)}
+                <span className="ml-1 text-[10px] text-slate-400">{count}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
       <div
         ref={scrollRef}
@@ -1306,6 +1307,7 @@ function DirectoryRail({
               {group.entries.map((entry) => {
                 const selected = entry.route === currentRoute;
                 const catalogDate = formatDocCatalogDate(entry, t);
+                const badges = getDocBadges(entry, t);
                 return (
                   <li key={entry.id}>
                     <button
@@ -1321,6 +1323,21 @@ function DirectoryRail({
                       onClick={() => onSelect(entry.route)}
                     >
                       <p className="break-words text-sm font-medium leading-tight">{entry.title}</p>
+                      {badges.length > 0 ? (
+                        <div className="mt-1 flex flex-wrap gap-1" data-testid="doc-taxonomy-badges">
+                          {badges.map((badge) => (
+                            <span
+                              key={`${entry.id}:${badge.label}`}
+                              className={cn(
+                                "rounded px-1.5 py-0.5 text-[10px] font-medium leading-none",
+                                docBadgeToneClass(badge.tone),
+                              )}
+                            >
+                              {badge.label}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
                       {catalogDate ? (
                         <p className="mt-0.5 text-[10px] uppercase tracking-wide text-cyan-300/75">{catalogDate}</p>
                       ) : null}
@@ -1367,7 +1384,7 @@ type PanelHeaderProps = {
 
 type DocViewerState = ReturnType<typeof useDocViewerStore.getState>;
 
-function PanelHeader({
+export function PanelHeader({
   mode,
   entry,
   anchor,
@@ -1407,6 +1424,8 @@ function PanelHeader({
     liveTranslationProjectionSummary.blockedLaneSessionCount > 0 ||
     liveTranslationProjectionSummary.blockedMailLoopCount > 0 ||
     liveTranslationProjectionSummary.blockedGoalBindingCount > 0;
+
+  const badges = entry ? getDocBadges(entry, t) : [];
 
   return (
     <header className="flex min-w-0 items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
@@ -1461,6 +1480,21 @@ function PanelHeader({
           <p className="truncate text-[11px] uppercase tracking-wide text-slate-400">{subtitle}</p>
         )}
         <h2 className="truncate text-lg font-semibold text-white">{title}</h2>
+        {badges.length > 0 ? (
+          <div className="mt-1 flex flex-wrap gap-1" data-testid="doc-header-taxonomy-badges">
+            {badges.map((badge) => (
+              <span
+                key={badge.label}
+                className={cn(
+                  "rounded px-1.5 py-0.5 text-[10px] font-medium leading-none",
+                  docBadgeToneClass(badge.tone),
+                )}
+              >
+                {badge.label}
+              </span>
+            ))}
+          </div>
+        ) : null}
         {isAutoReading ? (
           <p className="mt-0.5 text-[11px] text-cyan-200">{t("docsViewer.reading.active")}</p>
         ) : null}
@@ -1496,20 +1530,35 @@ function PanelHeader({
             data-doc-translation-summary-stale={String(liveTranslationProjectionSummary.staleCount)}
             data-doc-translation-summary-cancelled={String(liveTranslationProjectionSummary.cancelledCount)}
             data-doc-translation-summary-failed={String(liveTranslationProjectionSummary.failedCount)}
+            data-doc-translation-summary-latest-status={liveTranslationProjectionSummary.latestStatus ?? ""}
             data-doc-translation-summary-latest-observed-at-ms={liveTranslationProjectionSummary.latestObservedAtMs ?? ""}
+            data-doc-translation-summary-latest-source-event-id={liveTranslationProjectionSummary.latestSourceEventId ?? ""}
             data-doc-translation-summary-latest-source-event-ms={liveTranslationProjectionSummary.latestSourceEventMs ?? ""}
             data-doc-translation-summary-latest-observation-ref={liveTranslationProjectionSummary.latestObservationRef ?? ""}
             data-doc-translation-summary-latest-receipt-ref={liveTranslationProjectionSummary.latestReceiptRef ?? ""}
             data-doc-translation-summary-latest-lane-session-id={liveTranslationProjectionSummary.latestLaneSessionId ?? ""}
             data-doc-translation-summary-latest-selected-backend-provider={liveTranslationProjectionSummary.latestSelectedBackendProvider ?? ""}
             data-doc-translation-summary-latest-chunk-id={liveTranslationProjectionSummary.latestChunkId ?? ""}
+            data-doc-translation-summary-latest-chunk-index={liveTranslationProjectionSummary.latestChunkIndex ?? ""}
             data-doc-translation-summary-latest-dedupe-key={liveTranslationProjectionSummary.latestDedupeKey ?? ""}
+            data-doc-translation-summary-latest-source={liveTranslationProjectionSummary.latestSource ?? ""}
+            data-doc-translation-summary-latest-source-id={liveTranslationProjectionSummary.latestSourceId ?? ""}
+            data-doc-translation-summary-latest-source-hash={liveTranslationProjectionSummary.latestSourceHash ?? ""}
             data-doc-translation-summary-latest-source-kind={liveTranslationProjectionSummary.latestSourceKind ?? ""}
             data-doc-translation-summary-latest-projection-target={liveTranslationProjectionSummary.latestProjectionTarget ?? ""}
             data-doc-translation-summary-latest-account-locale={liveTranslationProjectionSummary.latestAccountLocale ?? ""}
             data-doc-translation-summary-latest-target-language={liveTranslationProjectionSummary.latestTargetLanguage ?? ""}
             data-doc-translation-summary-latest-projection-status={liveTranslationProjectionSummary.latestProjectionStatus ?? ""}
             data-doc-translation-summary-latest-freshness-status={liveTranslationProjectionSummary.latestFreshnessStatus ?? ""}
+            data-doc-translation-summary-latest-cancel-requested={String(liveTranslationProjectionSummary.latestCancelRequested)}
+            data-doc-translation-summary-latest-error={liveTranslationProjectionSummary.latestError ?? ""}
+            data-doc-translation-summary-suppressed-receipts={String(liveTranslationProjectionSummary.suppressedReceiptCount)}
+            data-doc-translation-summary-latest-suppressed-observation-ref={liveTranslationProjectionSummary.latestSuppressedObservationRef ?? ""}
+            data-doc-translation-summary-latest-suppressed-receipt-ref={liveTranslationProjectionSummary.latestSuppressedReceiptRef ?? ""}
+            data-doc-translation-summary-latest-suppressed-projection-status={liveTranslationProjectionSummary.latestSuppressedProjectionStatus ?? ""}
+            data-doc-translation-summary-latest-suppressed-observed-at-ms={liveTranslationProjectionSummary.latestSuppressedObservedAtMs ?? ""}
+            data-doc-translation-summary-latest-suppressed-freshness-status={liveTranslationProjectionSummary.latestSuppressedFreshnessStatus ?? ""}
+            data-doc-translation-summary-latest-suppressed-reason={liveTranslationProjectionSummary.latestSuppressedReason ?? ""}
             data-doc-translation-summary-lane-sessions={String(liveTranslationProjectionSummary.laneSessionCount)}
             data-doc-translation-summary-active-lane-sessions={String(liveTranslationProjectionSummary.activeLaneSessionCount)}
             data-doc-translation-summary-blocked-lane-sessions={String(liveTranslationProjectionSummary.blockedLaneSessionCount)}
@@ -1566,7 +1615,7 @@ function isAbortError(error: unknown): boolean {
   return Boolean(error && typeof error === "object" && "name" in error && error.name === "AbortError");
 }
 
-function getDocumentTranslationStatusLabel(args: {
+export function getDocumentTranslationStatusLabel(args: {
   translationStatus: DocumentTranslationUiStatus;
   translationError: string | null;
   liveTranslationProjectionSummary: DocumentLiveTranslationProjectionSnapshotSummary;
@@ -1580,6 +1629,31 @@ function getDocumentTranslationStatusLabel(args: {
   if (args.liveTranslationProjectionSummary.blockedMailLoopCount > 0) {
     return args.t("docsViewer.translation.status.mailLoopBlocked", {
       status: args.liveTranslationProjectionSummary.latestMailLoopStatus ?? "blocked",
+    });
+  }
+  if (args.liveTranslationProjectionSummary.blockedGoalBindingCount > 0) {
+    return args.t("docsViewer.translation.status.goalBindingBlocked", {
+      status: args.liveTranslationProjectionSummary.latestGoalBindingStatus ?? "blocked",
+    });
+  }
+  if (args.liveTranslationProjectionSummary.failedCount > 0 && !args.liveTranslationProjectionSummary.hasRenderableText) {
+    return args.t("docsViewer.translation.status.projectionFailed", {
+      reason:
+        args.liveTranslationProjectionSummary.latestError ??
+        args.liveTranslationProjectionSummary.latestProjectionStatus ??
+        "failed",
+    });
+  }
+  if (args.liveTranslationProjectionSummary.cancelledCount > 0 && !args.liveTranslationProjectionSummary.hasRenderableText) {
+    return args.t("docsViewer.translation.status.projectionCancelled", {
+      status: args.liveTranslationProjectionSummary.latestProjectionStatus ?? "cancelled",
+    });
+  }
+  if (args.liveTranslationProjectionSummary.staleCount > 0 && !args.liveTranslationProjectionSummary.hasRenderableText) {
+    return args.t("docsViewer.translation.status.projectionStale", {
+      status: args.liveTranslationProjectionSummary.latestFreshnessStatus ??
+        args.liveTranslationProjectionSummary.latestProjectionStatus ??
+        "stale",
     });
   }
   if (args.liveTranslationProjectionSummary.activeGoalBindingCount > 0 && args.translationStatus === "idle") {
@@ -1637,6 +1711,77 @@ function groupBySubject(entries: DocManifestEntry[], t: Translate): GroupedDocs[
     }));
 }
 
+function buildDocTaxonomyCounts(entries: DocManifestEntry[]): Record<DocTaxonomyFilter, number> {
+  const counts: Record<DocTaxonomyFilter, number> = {
+    all: entries.length,
+    "canonical-research": 0,
+    "current-development": 0,
+    "synthetic-research": 0,
+    "legacy-development": 0,
+    uncategorized: 0,
+  };
+  entries.forEach((entry) => {
+    const key = normalizeDocTaxonomyFilter(entry.docClass);
+    counts[key] += 1;
+  });
+  return counts;
+}
+
+function docMatchesTaxonomyFilter(entry: DocManifestEntry, filter: DocTaxonomyFilter): boolean {
+  if (filter === "all") return true;
+  return normalizeDocTaxonomyFilter(entry.docClass) === filter;
+}
+
+function normalizeDocTaxonomyFilter(docClass: string | null | undefined): DocTaxonomyFilter {
+  if (
+    docClass === "canonical-research" ||
+    docClass === "current-development" ||
+    docClass === "synthetic-research" ||
+    docClass === "legacy-development"
+  ) {
+    return docClass;
+  }
+  return "uncategorized";
+}
+
+function getDocBadges(entry: DocManifestEntry, t: Translate): DocBadge[] {
+  const badges: DocBadge[] = [];
+  const docClass = normalizeDocTaxonomyFilter(entry.docClass);
+  if (docClass !== "all" && docClass !== "uncategorized") {
+    badges.push({
+      label: t(docTaxonomyLabelMessages[docClass]),
+      tone: docClass === "canonical-research" ? "cyan" : docClass === "current-development" ? "emerald" : docClass === "synthetic-research" ? "amber" : "slate",
+    });
+  }
+  if (entry.toolHints?.calculatorReady === true) {
+    badges.push({ label: t("docsViewer.taxonomy.calculatorReady"), tone: "emerald" });
+  }
+  if (entry.sidecars.length > 0) {
+    badges.push({ label: t("docsViewer.taxonomy.sidecarsAttached"), tone: "slate" });
+  }
+  return badges;
+}
+
+function docBadgeToneClass(tone: DocBadgeTone): string {
+  switch (tone) {
+    case "cyan":
+      return "bg-cyan-400/15 text-cyan-100 ring-1 ring-cyan-400/25";
+    case "emerald":
+      return "bg-emerald-400/15 text-emerald-100 ring-1 ring-emerald-400/25";
+    case "amber":
+      return "bg-amber-400/15 text-amber-100 ring-1 ring-amber-400/25";
+    case "slate":
+    default:
+      return "bg-slate-400/10 text-slate-200 ring-1 ring-slate-300/15";
+  }
+}
+
+export const __testDocViewerTaxonomy = {
+  buildDocTaxonomyCounts,
+  docMatchesTaxonomyFilter,
+  getDocBadges,
+};
+
 function localizeDocSubjectLabel(subjectLabel: string | null | undefined, t: Translate): string {
   const normalized = subjectLabel?.trim();
   if (!normalized) return t("docsViewer.group.generalReference");
@@ -1663,12 +1808,7 @@ function readStoredInlineTranslationSession(scopeKey: string): StoredInlineTrans
     if (!raw) return { enabled: false, translations: {} };
     const parsed = JSON.parse(raw) as Partial<StoredInlineTranslationSession> | null;
     const translations = parsed?.translations && typeof parsed.translations === "object"
-      ? Object.fromEntries(
-        Object.entries(parsed.translations).filter((entry): entry is [string, InlineTranslationState] => {
-          const value = entry[1] as InlineTranslationState | undefined;
-          return value?.status === "ready" && typeof value.text === "string" && value.text.trim().length > 0;
-        }),
-      )
+      ? filterReadyDocumentInlineTranslationRenderStates(parsed.translations)
       : {};
     return {
       enabled: Boolean(parsed?.enabled),
@@ -1681,12 +1821,7 @@ function readStoredInlineTranslationSession(scopeKey: string): StoredInlineTrans
 
 function writeStoredInlineTranslationSession(scopeKey: string, session: StoredInlineTranslationSession): void {
   if (typeof window === "undefined") return;
-  const readyTranslations = Object.fromEntries(
-    Object.entries(session.translations).filter((entry): entry is [string, InlineTranslationState] => {
-      const value = entry[1];
-      return value.status === "ready" && typeof value.text === "string" && value.text.trim().length > 0;
-    }),
-  );
+  const readyTranslations = filterReadyDocumentInlineTranslationRenderStates(session.translations);
   try {
     window.sessionStorage.setItem(
       `${DOC_INLINE_TRANSLATION_SESSION_PREFIX}:${scopeKey}`,
@@ -1712,29 +1847,9 @@ function renderMarkdownWithInlineTranslations(
       const anchor = `<div class="doc-translation-anchor not-prose h-0" data-doc-translation-anchor="${escapeHtml(unit.unit_id)}"></div>`;
       const state = translations[unit.unit_id];
       if (!state) return `${unit.source_markdown}\n${anchor}`;
-      const projectionAttrs = [
-        state.source ? `data-doc-translation-source="${escapeHtml(state.source)}"` : "",
-        state.projectionStatus ? `data-doc-translation-projection-status="${escapeHtml(state.projectionStatus)}"` : "",
-        state.selectedBackendProvider ? `data-doc-translation-selected-backend-provider="${escapeHtml(state.selectedBackendProvider)}"` : "",
-        state.observationRef ? `data-doc-translation-observation-ref="${escapeHtml(state.observationRef)}"` : "",
-        state.receiptRef ? `data-doc-translation-receipt-ref="${escapeHtml(state.receiptRef)}"` : "",
-        state.laneSessionId ? `data-doc-translation-lane-session-id="${escapeHtml(state.laneSessionId)}"` : "",
-        state.chunkId ? `data-doc-translation-chunk-id="${escapeHtml(state.chunkId)}"` : "",
-        typeof state.chunkIndex === "number" ? `data-doc-translation-chunk-index="${String(state.chunkIndex)}"` : "",
-        state.dedupeKey ? `data-doc-translation-dedupe-key="${escapeHtml(state.dedupeKey)}"` : "",
-        state.sourceEventId ? `data-doc-translation-source-event-id="${escapeHtml(state.sourceEventId)}"` : "",
-        typeof state.sourceEventMs === "number" ? `data-doc-translation-source-event-ms="${String(state.sourceEventMs)}"` : "",
-        typeof state.observedAtMs === "number" ? `data-doc-translation-observed-at-ms="${String(state.observedAtMs)}"` : "",
-        state.freshnessStatus ? `data-doc-translation-freshness-status="${escapeHtml(state.freshnessStatus)}"` : "",
-        state.sourceKind ? `data-doc-translation-source-kind="${escapeHtml(state.sourceKind)}"` : "",
-        state.accountLocale ? `data-doc-translation-account-locale="${escapeHtml(state.accountLocale)}"` : "",
-        state.projectionTarget ? `data-doc-translation-projection-target="${escapeHtml(state.projectionTarget)}"` : "",
-        state.targetLanguage ? `data-doc-translation-target-language="${escapeHtml(state.targetLanguage)}"` : "",
-        typeof state.cancelRequested === "boolean" ? `data-doc-translation-cancel-requested="${String(state.cancelRequested)}"` : "",
-        state.source === "capability_lane" ? `data-doc-translation-terminal-eligible="false"` : "",
-        state.source === "capability_lane" ? `data-doc-translation-assistant-answer="false"` : "",
-        state.source === "capability_lane" ? `data-doc-translation-raw-content-included="false"` : "",
-      ].filter(Boolean).join(" ");
+      const projectionAttrs = Object.entries(buildDocumentInlineTranslationDataAttributes(state))
+        .map(([name, value]) => `${name}="${escapeHtml(value)}"`)
+        .join(" ");
       const projectionAttrSuffix = projectionAttrs ? ` ${projectionAttrs}` : "";
       if (state.status === "loading") {
         return `${unit.source_markdown}\n${anchor}\n<div class="doc-generated-translation not-prose my-2 border-l-2 border-emerald-400/60 pl-3 text-sm leading-relaxed text-emerald-300/80 animate-pulse" data-doc-translation-line="${escapeHtml(unit.unit_id)}">${escapeHtml(t("docsViewer.translation.inlineLoading"))}</div>`;
@@ -1742,7 +1857,7 @@ function renderMarkdownWithInlineTranslations(
       if (state.status === "error") {
         return `${unit.source_markdown}\n${anchor}\n<div class="doc-generated-translation not-prose my-2 border-l-2 border-amber-400/70 pl-3 text-sm leading-relaxed text-amber-300" data-doc-translation-line="${escapeHtml(unit.unit_id)}"${projectionAttrSuffix}>${escapeHtml(t("docsViewer.translation.inlineError", { reason: state.error ?? t("docsViewer.translation.errorGeneric") }))}</div>`;
       }
-      const translatedText = formatInlineTranslationText(state.text ?? "");
+      const translatedText = formatDocumentInlineTranslationText(state.text ?? "");
       return `${unit.source_markdown}\n${anchor}\n<div class="doc-generated-translation not-prose my-2 border-l-2 border-emerald-400/70 pl-3 text-sm leading-relaxed text-emerald-300" data-doc-translation-line="${escapeHtml(unit.unit_id)}"${projectionAttrSuffix}>${escapeHtml(translatedText).replace(/\n/g, "<br />")}</div>`;
     })
     .join("\n");
@@ -1786,15 +1901,6 @@ function collectVisibleTranslationUnitIds(args: {
     if (visibleIds.length >= maxUnits) break;
   }
   return visibleIds;
-}
-
-function formatInlineTranslationText(text: string): string {
-  return text
-    .replace(/^ {0,3}#{1,6}\s+/gm, "")
-    .replace(/^\s*(?:[-*+]|\d+[.)])\s+/gm, "")
-    .replace(/^\s*\|\s?/gm, "")
-    .replace(/\s+\|\s*$/gm, "")
-    .trim();
 }
 
 function renderDocumentMarkdownToHtml(markdown: string, docPath?: string | null): string {

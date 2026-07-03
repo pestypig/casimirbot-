@@ -14,6 +14,7 @@ function makeEntry(
     Pick<
       DocManifestEntry,
       "subjectLabel" | "catalogDate" | "catalogDateSource" | "fileMtimeIso" | "fileMtimeMs" | "sizeBytes"
+      | "docClass" | "bundleKind" | "canonical" | "sidecars" | "toolHints"
     >
   > = {},
 ): DocManifestEntry {
@@ -29,6 +30,11 @@ function makeEntry(
     fileMtimeIso: overrides.fileMtimeIso ?? null,
     fileMtimeMs: overrides.fileMtimeMs ?? null,
     sizeBytes: overrides.sizeBytes ?? null,
+    docClass: overrides.docClass ?? null,
+    bundleKind: overrides.bundleKind ?? null,
+    canonical: overrides.canonical ?? false,
+    sidecars: overrides.sidecars ?? [],
+    toolHints: overrides.toolHints ?? null,
     title,
     searchText: `${title} ${relativePath}`.toLowerCase(),
     loader: async () => "",
@@ -120,5 +126,37 @@ describe("filterDocManifestEntries", () => {
         (entry) => entry.relativePath === "docs/audits/research/needle-hull-mark2/theory-directory-latest.md",
       ),
     ).toBe(true);
+  });
+
+  it("attaches taxonomy metadata for Calculator-ready canonical whitepapers", () => {
+    const entry = DOC_MANIFEST.find(
+      (candidate) => candidate.relativePath === "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+    );
+
+    expect(entry).toMatchObject({
+      docClass: "canonical-research",
+      bundleKind: "equation-action-whitepaper",
+      canonical: true,
+      sidecars: [
+        "docs/research/nhm2-current-status-whitepaper-2026-05-02.equation-actions.json",
+        "docs/research/nhm2-current-status-whitepaper-2026-05-02.equation-actions.source.json",
+      ],
+      toolHints: {
+        calculatorReady: true,
+        contentAuthority: "bounded_docs_observation_required",
+      },
+    });
+  });
+
+  it("infers taxonomy class from registered taxonomy default folders", () => {
+    const researchReadme = DOC_MANIFEST.find((candidate) => candidate.relativePath === "docs/research/README.md");
+    const developmentReadme = DOC_MANIFEST.find((candidate) => candidate.relativePath === "docs/development/README.md");
+    const syntheticReadme = DOC_MANIFEST.find((candidate) => candidate.relativePath === "docs/synthetic-research/README.md");
+    const legacyReadme = DOC_MANIFEST.find((candidate) => candidate.relativePath === "docs/legacy-development/README.md");
+
+    expect(researchReadme?.docClass).toBe("canonical-research");
+    expect(developmentReadme?.docClass).toBe("current-development");
+    expect(syntheticReadme?.docClass).toBe("synthetic-research");
+    expect(legacyReadme?.docClass).toBe("legacy-development");
   });
 });

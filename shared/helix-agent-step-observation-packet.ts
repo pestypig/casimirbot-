@@ -189,6 +189,8 @@ export type HelixAgentStepObservationPacket = {
       raw_content_included: false;
     };
     live_translation_projection_receipt?: HelixLiveTranslationProjectionReceipt;
+    text_to_speech_receipt?: unknown;
+    voice_playback_client_receipt?: unknown;
     capability_lane_shadow_execution?: {
       lane_id: HelixCapabilityLaneId;
       capability: string;

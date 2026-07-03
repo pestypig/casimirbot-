@@ -15,6 +15,7 @@ import {
   INTERNET_SEARCH_CAPABILITY,
   REPO_SEARCH_CAPABILITY,
   SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+  TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY,
   THEORY_CONTEXT_REFLECTION_CAPABILITY,
   VOICE_INTERIM_CALLOUT_CAPABILITY,
   VOICE_NARRATOR_SAY_CAPABILITY,
@@ -170,6 +171,7 @@ const reduceMoralSubstrateRequestsToPrimary = (
 
   for (const [index, request] of input.requests.entries()) {
     if (index === moralIndex) continue;
+    if (isMoralSubstrateRequest(request)) continue;
     const capability = readString(request.capability_id) ?? readString(request.capabilityId);
     const shouldDefer =
       capability &&
@@ -285,6 +287,7 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
     appendDedupe(requests, seen, buildPromptDerivedWorkspaceStatusGatewayCallRequests(input.body));
   }
   if (
+    !promptNamedCapabilities.has(TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY) &&
     !promptNamedCapabilities.has(VOICE_INTERIM_CALLOUT_CAPABILITY) &&
     !promptNamedCapabilities.has(VOICE_NARRATOR_SAY_CAPABILITY)
   ) {

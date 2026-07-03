@@ -45,6 +45,8 @@ const body = {
     source_language: "en",
     target_language: "es",
     requested_backend_provider: "google_gemini",
+    source_id: "document_markdown:docs/example.md",
+    source_hash: "fnv1a32:example",
   },
 };
 
@@ -205,6 +207,20 @@ describe("provider-neutral capability lane one-shot runner", () => {
     );
     expect(helix.observation_packets[0]?.capability_key).toBe("live_translation.translate_text");
     expect(codex.observation_packets[0]?.capability_key).toBe("live_translation.translate_text");
+    expect(codex.call_results[0]?.observation).toMatchObject({
+      source_id: "document_markdown:docs/example.md",
+      source_hash: "fnv1a32:example",
+    });
+    expect(codex.observation_packets[0]?.state_delta).toMatchObject({
+      live_translation_chunk: {
+        source_id: "document_markdown:docs/example.md",
+        source_hash: "fnv1a32:example",
+      },
+      live_translation_projection_receipt: {
+        source_id: "document_markdown:docs/example.md",
+        source_hash: "fnv1a32:example",
+      },
+    });
     expect(helix.debug_events.map((event) => event.stage)).toEqual([
       "lane_requested",
       "lane_backend_selected",
@@ -477,7 +493,7 @@ describe("provider-neutral capability lane one-shot runner", () => {
     });
   });
 
-  it("projects future lane calls as explicit shadow-only non-terminal observations", () => {
+  it("projects future lane calls and governed TTS receipts as non-terminal observations", () => {
     const result = runHelixCapabilityLaneOneShotRequests({
       provider: buildProvider("codex"),
       body: {
@@ -489,9 +505,12 @@ describe("provider-neutral capability lane one-shot runner", () => {
             frame_ref: "frame:test",
           },
           {
-            capability: "text_to_speech.synthesize",
+            capability: "text_to_speech.speak_text",
             requested_backend_provider: "elevenlabs",
             text: "checking now",
+            voice: "dottie_default",
+            locale: "en-US",
+            source_observation_ref: "obs:test:voice-source",
           },
         ],
       },
@@ -520,13 +539,27 @@ describe("provider-neutral capability lane one-shot runner", () => {
       raw_content_included: false,
     });
     expect(result.call_results[1]).toMatchObject({
-      schema: "helix.capability_lane.shadow_one_shot_result.v1",
-      ok: false,
+      schema: "helix.text_to_speech.one_shot_result.v1",
+      ok: true,
       lane_id: "text_to_speech",
-      capability: "text_to_speech.synthesize",
+      capability: "text_to_speech.speak_text",
       terminal_eligible: false,
       assistant_answer: false,
       raw_content_included: false,
+      receipt: {
+        schema: "helix.text_to_speech.receipt.v1",
+        capability: "text_to_speech.speak_text",
+        playback_status: "started",
+        provider_playback_status: expect.stringMatching(/^(awaiting_client_playback|queued_for_retry)$/),
+        source_text_hash: expect.any(String),
+        audio_bytes_observed: false,
+        voice_profile: "dottie_default",
+        locale: "en-US",
+        source_observation_ref: "obs:test:voice-source",
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
     });
     expect(result.resolve_traces[0]).toMatchObject({
       requested_lane: "visual_analysis",
@@ -541,11 +574,13 @@ describe("provider-neutral capability lane one-shot runner", () => {
     expect(result.resolve_traces[1]).toMatchObject({
       requested_lane: "text_to_speech",
       requested_backend_provider: "elevenlabs",
-      selected_backend_provider: "text_to_speech.elevenlabs",
-      execution_status: "not_executed_shadow_only",
-      blocked_reason: "capability_lane_shadow_only_not_executed",
+      requested_backend_provider_known: true,
+      requested_backend_fallback_provider: "text_to_speech.existing_voice_service",
+      selected_backend_provider: "text_to_speech.existing_voice_service",
+      execution_status: "executed_observation_only",
+      blocked_reason: null,
     });
-    expect(result.observation_packets.map((packet) => packet.status)).toEqual(["blocked", "blocked"]);
+    expect(result.observation_packets.map((packet) => packet.status)).toEqual(["blocked", "succeeded"]);
     expect(result.observation_packets[0]?.state_delta).toMatchObject({
       capability_lane_shadow_execution: {
         lane_id: "visual_analysis",
@@ -576,17 +611,13 @@ describe("provider-neutral capability lane one-shot runner", () => {
       terminal_authority_owner: "helix",
     });
     expect(result.observation_packets[1]?.state_delta).toMatchObject({
-      capability_lane_shadow_execution: {
+      text_to_speech_receipt: {
         lane_id: "text_to_speech",
-        capability: "text_to_speech.synthesize",
+        capability: "text_to_speech.speak_text",
         requested_backend_provider: "elevenlabs",
-        selected_backend_provider: "text_to_speech.elevenlabs",
-        availability_status: "dry_run",
-        permission_status: "admitted",
-        cost_class: "standard",
-        latency_class: "interactive",
-        privacy_class: "external_provider",
-        execution_status: "not_executed_shadow_only",
+        selected_backend_provider: "text_to_speech.existing_voice_service",
+        playback_status: "started",
+        source_text_hash: expect.any(String),
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
@@ -607,6 +638,17 @@ describe("provider-neutral capability lane one-shot runner", () => {
       capability: "visual_analysis.inspect_frame",
       status: "blocked",
       execution_status: "not_executed_shadow_only",
+      terminal_authority_status: "pending_helix_terminal_authority",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(result.debug_events[5]).toMatchObject({
+      stage: "lane_observation",
+      lane_id: "text_to_speech",
+      capability: "text_to_speech.speak_text",
+      status: "completed",
+      execution_status: "executed_observation_only",
       terminal_authority_status: "pending_helix_terminal_authority",
       terminal_eligible: false,
       assistant_answer: false,

@@ -62,6 +62,7 @@ describe("Helix capability lane session runner", () => {
             now_ms: 100,
             source_binding: {
               source_id: "docs:nhm2",
+              source_hash: "sha256:runner-v1",
               source_kind: "docs",
               projection_target: "docs_chunk",
               account_locale: "es-US",
@@ -83,6 +84,11 @@ describe("Helix capability lane session runner", () => {
             projection_target: "docs_chunk",
             cancel_requested: true,
             now_ms: 115,
+            source_binding: {
+              source_id: "docs:nhm2",
+              source_hash: "sha256:runner-v1",
+              source_kind: "docs",
+            },
           },
           {
             action: "pause",
@@ -113,6 +119,10 @@ describe("Helix capability lane session runner", () => {
       lane_session: {
         lane_session_id: "lane-session-runner",
         lane_id: "live_translation",
+        source_binding: expect.objectContaining({
+          source_id: "docs:nhm2",
+          source_hash: "sha256:runner-v1",
+        }),
         selected_runtime_agent_provider: "codex",
         selected_backend_provider: "live_translation.local_runtime",
         backend_selection_decision: expect.objectContaining({
@@ -148,6 +158,7 @@ describe("Helix capability lane session runner", () => {
         debug_history: expect.arrayContaining([
           expect.objectContaining({
             action: "record_observation",
+            source_hash: "sha256:runner-v1",
             chunk_id: "chunk-runner",
             chunk_index: 4,
             dedupe_key: "docs:nhm2:chunk-runner:es",
@@ -181,6 +192,7 @@ describe("Helix capability lane session runner", () => {
       session_status: "paused",
       session_health: "degraded",
       source_id: "docs:nhm2",
+      source_hash: "sha256:runner-v1",
       projection_target: "docs_chunk",
       account_locale: "es-US",
       target_language: "es",
@@ -209,6 +221,7 @@ describe("Helix capability lane session runner", () => {
       last_observation_ref: "ask:lane:translation:obs:runner",
       last_receipt_ref: "ask:lane:translation:receipt:runner",
       source_binding: expect.objectContaining({
+        source_hash: "sha256:runner-v1",
         target_language: "es",
       }),
     });
@@ -257,6 +270,92 @@ describe("Helix capability lane session runner", () => {
       terminal_eligible: false,
       assistant_answer: false,
       raw_content_included: false,
+    });
+  });
+
+  it("keeps stopped sessions closed when a structured late observation arrives", () => {
+    const store = createHelixCapabilityLaneSessionStore();
+    const result = runHelixCapabilityLaneSessionRequests({
+      provider: buildProvider({ id: "codex", sessions: true }),
+      store,
+      env: {} as NodeJS.ProcessEnv,
+      body: {
+        capability_lane_session_call: [
+          {
+            action: "start",
+            lane_id: "live_translation",
+            lane_session_id: "lane-session-runner-stopped",
+            now_ms: 100,
+            source_binding: {
+              source_id: "docs:nhm2",
+              source_hash: "sha256:runner-stop-v1",
+              source_kind: "docs",
+              projection_target: "docs_chunk",
+              account_locale: "es-US",
+              target_language: "es",
+            },
+          },
+          {
+            action: "stop",
+            lane_session_id: "lane-session-runner-stopped",
+            now_ms: 120,
+            reason: "user_stopped_translation",
+          },
+          {
+            action: "record_observation",
+            lane_session_id: "lane-session-runner-stopped",
+            observation_ref: "ask:lane:translation:obs:late",
+            receipt_ref: "ask:lane:translation:receipt:late",
+            now_ms: 140,
+          },
+        ],
+      },
+    });
+
+    expect(result.session_results).toHaveLength(3);
+    expect(result.session_results[1]).toMatchObject({
+      ok: true,
+      action: "stop",
+      lane_session: {
+        lane_session_id: "lane-session-runner-stopped",
+        status: "stopped",
+        health: "stopped",
+        updated_at_ms: 120,
+      },
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(result.session_results[2]).toMatchObject({
+      ok: false,
+      action: "record_observation",
+      lane_id: "live_translation",
+      selected_runtime_agent_provider: "codex",
+      session_supported: true,
+      lane_session: null,
+      blocked_reason: "lane_session_already_stopped",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(result.debug_projection.capability_lane_session_results).toEqual(result.session_results);
+    expect(result.session_debug_summaries.at(-1)).toMatchObject({
+      lane_session_id: "lane-session-runner-stopped",
+      session_status: "stopped",
+      session_health: "stopped",
+      last_observation_ref: null,
+      last_receipt_ref: null,
+      backend_provider_becomes_root_agent: false,
+      final_reports_require_terminal_authority: true,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(store.get("lane-session-runner-stopped")).toMatchObject({
+      status: "stopped",
+      updated_at_ms: 120,
+      last_observation_ref: null,
+      last_receipt_ref: null,
     });
   });
 });

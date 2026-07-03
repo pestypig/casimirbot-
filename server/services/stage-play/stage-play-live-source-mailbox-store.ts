@@ -307,6 +307,15 @@ export function enqueueStagePlayLiveSourceMailItem(input: {
   frameRef?: string | null;
   evidenceRef?: string | null;
   observationRef?: string | null;
+  sourceHash?: string | null;
+  chunkId?: string | null;
+  chunkIndex?: number | null;
+  dedupeKey?: string | null;
+  sourceEventId?: string | null;
+  sourceEventMs?: number | null;
+  projectionTarget?: string | null;
+  targetLanguage?: string | null;
+  accountLocale?: string | null;
   summaryText: string;
   summaryPreview?: string | null;
   confidence?: number | null;
@@ -325,6 +334,10 @@ export function enqueueStagePlayLiveSourceMailItem(input: {
     input.frameRef,
     input.evidenceRef,
     input.observationRef,
+    input.sourceHash,
+    input.chunkId,
+    input.dedupeKey,
+    input.sourceEventId,
     ...(input.evidenceRefs ?? []),
   ]);
   if (input.evidenceRef) {
@@ -362,6 +375,15 @@ export function enqueueStagePlayLiveSourceMailItem(input: {
       frameRef: input.frameRef ?? null,
       evidenceRef: input.evidenceRef ?? null,
       observationRef: input.observationRef ?? null,
+      sourceHash: input.sourceHash ?? null,
+      chunkId: input.chunkId ?? null,
+      chunkIndex: input.chunkIndex ?? null,
+      dedupeKey: input.dedupeKey ?? null,
+      sourceEventId: input.sourceEventId ?? null,
+      sourceEventMs: input.sourceEventMs ?? null,
+      projectionTarget: input.projectionTarget ?? null,
+      targetLanguage: input.targetLanguage ?? null,
+      accountLocale: input.accountLocale ?? null,
     },
     summary: {
       text: input.summaryText,

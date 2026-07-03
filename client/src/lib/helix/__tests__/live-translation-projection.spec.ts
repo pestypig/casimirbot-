@@ -16,6 +16,8 @@ const inlineMeta = (overrides: Record<string, unknown> = {}) => ({
   laneSessionId: null,
   selectedBackendProvider: null,
   freshnessStatus: "unknown",
+  sourceKind: null,
+  accountLocale: null,
   projectionTarget: "docs_chunk",
   targetLanguage: "es",
   cancelRequested: false,
@@ -37,6 +39,8 @@ describe("Helix live translation UI projection", () => {
           projection_target: "docs_chunk",
           projection_status: "projected",
           source_id: "docs:nhm2",
+          source_kind: "docs",
+          account_locale: "es-US",
           chunk_id: "chunk-1",
           chunk_index: 1,
           dedupe_key: "docs:nhm2:chunk-1:es",
@@ -61,6 +65,8 @@ describe("Helix live translation UI projection", () => {
         status: "projected",
         projectionTarget: "docs_chunk",
         sourceId: "docs:nhm2",
+        sourceKind: "docs",
+        accountLocale: "es-US",
         chunkId: "chunk-1",
         chunkIndex: 1,
         dedupeKey: "docs:nhm2:chunk-1:es",
@@ -81,6 +87,99 @@ describe("Helix live translation UI projection", () => {
         rawContentIncluded: false,
       },
     ]);
+  });
+
+  it("normalizes serialized chunk timing metadata from projection receipts", () => {
+    const projections = buildHelixLiveTranslationUiProjections({
+      capability_lane_projection_receipts: [
+        {
+          schema: "helix.live_translation.projection_receipt.v1",
+          receipt_ref: "receipt:docs:serialized",
+          observation_ref: "obs:docs:serialized",
+          lane_id: "live_translation",
+          capability: "live_translation.translate_text",
+          projection_target: "docs_chunk",
+          projection_status: "projected",
+          source_id: "docs:nhm2",
+          chunk_id: "chunk-2",
+          chunk_index: "2",
+          source_event_ms: "1000",
+          observed_at_ms: "1200",
+          target_language: "es",
+          translated_text: "segundo",
+        },
+      ],
+    });
+
+    expect(projections[0]).toMatchObject({
+      chunkIndex: 2,
+      sourceEventMs: 1000,
+      observedAtMs: 1200,
+      terminalEligible: false,
+      assistantAnswer: false,
+      rawContentIncluded: false,
+    });
+    expect(summarizeHelixLiveTranslationUiProjectionTraffic(projections)[0]).toMatchObject({
+      latestChunkIndex: 2,
+      latestSourceEventMs: 1000,
+      latestObservedAtMs: 1200,
+      terminalEligible: false,
+      assistantAnswer: false,
+      rawContentIncluded: false,
+    });
+  });
+
+  it("preserves source hash when deriving projections from observation-only call results", () => {
+    const projections = buildHelixLiveTranslationUiProjections({
+      capability_lane_call_results: [
+        {
+          observation: {
+            schema: "helix.live_translation.observation.v1",
+            observation_ref: "obs:docs:call-result",
+            lane_id: "live_translation",
+            capability: "live_translation.translate_text",
+            selected_backend_provider: "live_translation.local_runtime",
+            lane_session_id: "lane-session-docs",
+            projection_target: "docs_chunk",
+            source_id: "docs:nhm2",
+            source_hash: "fnv1a32:nhm2-v2",
+            chunk_id: "chunk-hash",
+            chunk_index: 3,
+            dedupe_key: "docs:nhm2:chunk-hash:es",
+            source_event_id: "docs:nhm2:event-hash",
+            source_event_ms: 1300,
+            observed_at_ms: 1400,
+            freshness_status: "fresh",
+            target_language: "es",
+            translated_text: "texto",
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      ],
+    });
+
+    expect(projections).toHaveLength(1);
+    expect(projections[0]).toMatchObject({
+      key: "docs_chunk|docs:nhm2|fnv1a32:nhm2-v2|chunk-hash|es|docs:nhm2:chunk-hash:es|docs:nhm2:event-hash",
+      sourceId: "docs:nhm2",
+      sourceHash: "fnv1a32:nhm2-v2",
+      chunkId: "chunk-hash",
+      chunkIndex: 3,
+      observationRef: "obs:docs:call-result",
+      terminalEligible: false,
+      assistantAnswer: false,
+      rawContentIncluded: false,
+    });
+    expect(summarizeHelixLiveTranslationUiProjectionTraffic(projections)[0]).toMatchObject({
+      sourceId: "docs:nhm2",
+      sourceHash: "fnv1a32:nhm2-v2",
+      latestChunkId: "chunk-hash",
+      terminalEligible: false,
+      assistantAnswer: false,
+      rawContentIncluded: false,
+    });
   });
 
   it("surfaces stale and cancelled projection states as non-answer UI state", () => {
@@ -235,6 +334,8 @@ describe("Helix live translation UI projection", () => {
           projection_target: "docs_chunk",
           projection_status: "projected",
           source_id: "docs:nhm2",
+          source_kind: "docs",
+          account_locale: "es-US",
           chunk_id: "chunk-1",
           chunk_index: 0,
           observed_at_ms: 100,
@@ -252,6 +353,8 @@ describe("Helix live translation UI projection", () => {
           projection_target: "docs_chunk",
           projection_status: "stale",
           source_id: "docs:nhm2",
+          source_kind: "docs",
+          account_locale: "es-US",
           chunk_id: "chunk-2",
           chunk_index: 1,
           observed_at_ms: 200,
@@ -270,6 +373,8 @@ describe("Helix live translation UI projection", () => {
           projection_target: "docs_chunk",
           projection_status: "cancelled",
           source_id: "docs:nhm2",
+          source_kind: "docs",
+          account_locale: "es-US",
           chunk_id: "chunk-3",
           chunk_index: 2,
           observed_at_ms: 300,
@@ -287,6 +392,8 @@ describe("Helix live translation UI projection", () => {
           projection_target: "docs_chunk",
           projection_status: "failed",
           source_id: "docs:nhm2",
+          source_kind: "docs",
+          account_locale: "es-US",
           chunk_id: "chunk-4",
           chunk_index: 3,
           observed_at_ms: 400,
@@ -300,6 +407,8 @@ describe("Helix live translation UI projection", () => {
     expect(summarizeHelixLiveTranslationUiProjectionTraffic(projections)).toEqual([
       {
         sourceId: "docs:nhm2",
+        sourceKind: "docs",
+        accountLocale: "es-US",
         projectionTarget: "docs_chunk",
         targetLanguage: "es",
         chunkCount: 4,
@@ -321,6 +430,120 @@ describe("Helix live translation UI projection", () => {
         rawContentIncluded: false,
       },
     ]);
+  });
+
+  it("keeps chunk traffic summaries separated by source hash when present", () => {
+    const projections = buildHelixLiveTranslationUiProjections({
+      capability_lane_projection_receipts: [
+        {
+          schema: "helix.live_translation.projection_receipt.v1",
+          receipt_ref: "receipt:docs:old",
+          observation_ref: "obs:docs:old",
+          lane_id: "live_translation",
+          capability: "live_translation.translate_text",
+          projection_target: "docs_chunk",
+          projection_status: "projected",
+          source_id: "document_markdown:docs/research/nhm2.md",
+          source_hash: "fnv1a32:old",
+          chunk_id: "u0001",
+          observed_at_ms: 100,
+          target_language: "es",
+          translated_text: "Texto viejo.",
+        },
+        {
+          schema: "helix.live_translation.projection_receipt.v1",
+          receipt_ref: "receipt:docs:new",
+          observation_ref: "obs:docs:new",
+          lane_id: "live_translation",
+          capability: "live_translation.translate_text",
+          projection_target: "docs_chunk",
+          projection_status: "projected",
+          source_id: "document_markdown:docs/research/nhm2.md",
+          source_hash: "fnv1a32:new",
+          chunk_id: "u0001",
+          observed_at_ms: 200,
+          target_language: "es",
+          translated_text: "Texto nuevo.",
+        },
+      ],
+    });
+
+    expect(summarizeHelixLiveTranslationUiProjectionTraffic(projections)).toEqual([
+      expect.objectContaining({
+        sourceId: "document_markdown:docs/research/nhm2.md",
+        sourceHash: "fnv1a32:new",
+        chunkCount: 1,
+        latestObservationRef: "obs:docs:new",
+        terminalEligible: false,
+        assistantAnswer: false,
+        rawContentIncluded: false,
+      }),
+      expect.objectContaining({
+        sourceId: "document_markdown:docs/research/nhm2.md",
+        sourceHash: "fnv1a32:old",
+        chunkCount: 1,
+        latestObservationRef: "obs:docs:old",
+        terminalEligible: false,
+        assistantAnswer: false,
+        rawContentIncluded: false,
+      }),
+    ]);
+  });
+
+  it("does not satisfy a hash-scoped projection request with un-hashed projection evidence", () => {
+    const projections = buildHelixLiveTranslationUiProjections({
+      capability_lane_projection_receipts: [
+        {
+          schema: "helix.live_translation.projection_receipt.v1",
+          receipt_ref: "receipt:docs:unscoped",
+          observation_ref: "obs:docs:unscoped",
+          lane_id: "live_translation",
+          capability: "live_translation.translate_text",
+          projection_target: "docs_chunk",
+          projection_status: "projected",
+          source_id: "document_markdown:docs/research/nhm2.md",
+          chunk_id: "u0001",
+          observed_at_ms: 200,
+          target_language: "es",
+          translated_text: "Texto sin hash.",
+        },
+      ],
+    });
+
+    expect(selectHelixLiveTranslationUiProjection({
+      projections,
+      sourceId: "document_markdown:docs/research/nhm2.md",
+      sourceHash: "fnv1a32:current",
+      projectionTarget: "docs_chunk",
+      targetLanguage: "es",
+      chunkId: "u0001",
+    })).toMatchObject({
+      status: "missing",
+      reason: "translation_projection_missing",
+      projection: null,
+      displayText: null,
+      terminalEligible: false,
+      assistantAnswer: false,
+      rawContentIncluded: false,
+    });
+    expect(buildHelixLiveTranslationInlineUnitStates({
+      projections,
+      sourceId: "document_markdown:docs/research/nhm2.md",
+      sourceHash: "fnv1a32:current",
+      projectionTarget: "docs_chunk",
+      targetLanguage: "es",
+      units: [{ unit_id: "u0001" }],
+    })).toEqual({});
+    expect(selectHelixLiveTranslationUiProjection({
+      projections,
+      sourceId: "document_markdown:docs/research/nhm2.md",
+      projectionTarget: "docs_chunk",
+      targetLanguage: "es",
+      chunkId: "u0001",
+    })).toMatchObject({
+      status: "projected",
+      displayText: "Texto sin hash.",
+    });
   });
 
   it("selects the current account-language projection without granting answer authority", () => {
@@ -567,6 +790,7 @@ describe("Helix live translation UI projection", () => {
           chunkIndex: 0,
           dedupeKey: "document_markdown:docs/research/nhm2.md:u0001:es",
           observedAtMs: 100,
+          sourceId: "document_markdown:docs/research/nhm2.md",
         }),
         terminalEligible: false,
         assistantAnswer: false,
@@ -583,6 +807,7 @@ describe("Helix live translation UI projection", () => {
           chunkIndex: 1,
           dedupeKey: "document_markdown:docs/research/nhm2.md:u0002:es",
           observedAtMs: 110,
+          sourceId: "document_markdown:docs/research/nhm2.md",
         }),
         terminalEligible: false,
         assistantAnswer: false,
@@ -645,6 +870,7 @@ describe("Helix live translation UI projection", () => {
         ...inlineMeta({
           chunkId: "u0001",
           observedAtMs: 100,
+          sourceId: "document_markdown:docs/research/nhm2.md",
           targetLanguage: "fr",
         }),
         terminalEligible: false,
@@ -660,6 +886,7 @@ describe("Helix live translation UI projection", () => {
         ...inlineMeta({
           chunkId: "u0002",
           observedAtMs: 110,
+          sourceId: "document_markdown:docs/research/nhm2.md",
           targetLanguage: "fr",
           cancelRequested: true,
         }),

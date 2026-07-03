@@ -54,6 +54,7 @@ describe("capability lane mail-loop adapter", () => {
       laneSessionId: "lane-session-mail",
       sourceBinding: {
         source_id: "docs:nhm2",
+        source_hash: "sha256:nhm2-mail-v1",
         source_kind: "docs",
         projection_target: "docs_chunk",
         account_locale: "es-US",
@@ -73,6 +74,7 @@ describe("capability lane mail-loop adapter", () => {
         target_language: "es",
         requested_backend_provider: "google_gemini",
         source_id: "docs:nhm2",
+        source_hash: "sha256:nhm2-mail-v1",
         chunk_id: "chunk-1",
         chunk_index: 1,
         dedupe_key: "docs:nhm2:chunk-1:es",
@@ -113,6 +115,7 @@ describe("capability lane mail-loop adapter", () => {
         stage_play_wake_expected: true,
         mailbox_thread_id: "ask-thread-mail",
         source_id: "docs:nhm2",
+        source_hash: "sha256:nhm2-mail-v1",
         source_kind: "document_markdown",
         chunk_id: "chunk-1",
         chunk_index: 1,
@@ -155,6 +158,12 @@ describe("capability lane mail-loop adapter", () => {
         sourceId: "docs:nhm2",
         evidenceRef: translation.observation?.observation_ref,
         observationRef: translation.observation?.observation_ref,
+        sourceHash: "sha256:nhm2-mail-v1",
+        chunkId: "chunk-1",
+        dedupeKey: "docs:nhm2:chunk-1:es",
+        sourceEventId: "docs:nhm2:event-1",
+        projectionTarget: "docs_chunk",
+        targetLanguage: "es",
       },
       summary: {
         preview: "hola",
@@ -172,6 +181,20 @@ describe("capability lane mail-loop adapter", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
+    expect([
+      routed,
+      routed.debug_summary,
+      routed.mail,
+    ].every((entry) =>
+      entry?.terminal_eligible === false &&
+      entry?.assistant_answer === false &&
+      entry?.raw_content_included === false
+    )).toBe(true);
+    expect(routed.debug_summary).toMatchObject({
+      terminal_authority_status: "pending_helix_terminal_authority",
+      reentry_required: true,
+    });
+    expect(routed.mail?.summary.analysisState).toBe("analysis_ready");
     expect(routed.mail?.summary.text).toContain("Capability lane live_translation produced en -> es.");
     expect(routed.mail?.summary.text).toContain("Lane session: lane-session-mail.");
     expect(routed.mail?.summary.text).toContain("Projection target: docs_chunk.");
@@ -180,6 +203,7 @@ describe("capability lane mail-loop adapter", () => {
     expect(routed.mail?.evidenceRefs).toEqual(expect.arrayContaining([
       "lane-session-mail",
       "docs:nhm2",
+      "sha256:nhm2-mail-v1",
       "chunk-1",
       "docs:nhm2:event-1",
       translation.observation?.observation_ref,
@@ -191,6 +215,7 @@ describe("capability lane mail-loop adapter", () => {
     expect(routed.debug_summary.evidence_refs).toEqual(routed.mail?.evidenceRefs);
     expect(routed.debug_summary).toMatchObject({
       receipt_ref: receiptRef,
+      source_hash: "sha256:nhm2-mail-v1",
       selected_backend_provider: "live_translation.local_runtime",
       requested_backend_provider: "google_gemini",
       cost_class: "free_local",
@@ -206,6 +231,11 @@ describe("capability lane mail-loop adapter", () => {
     });
     expect(sessionStore.get("lane-session-mail")?.last_observation_ref).toBe(routed.mail?.mailId);
     expect(sessionStore.get("lane-session-mail")?.last_receipt_ref).toBe(receiptRef);
+    expect(sessionStore.get("lane-session-mail")?.debug_history.at(-1)).toMatchObject({
+      source_hash: "sha256:nhm2-mail-v1",
+      chunk_id: "chunk-1",
+      source_event_id: "docs:nhm2:event-1",
+    });
     expect(listStagePlayLiveSourceMailItems({ threadId: "ask-thread-mail" })).toHaveLength(1);
   });
 
@@ -273,6 +303,138 @@ describe("capability lane mail-loop adapter", () => {
       raw_content_included: false,
     });
     expect(listStagePlayLiveSourceMailItems({ threadId: "ask-thread-mismatch" })).toHaveLength(0);
+  });
+
+  it("fails closed when a translation observation source id does not match the lane session source", () => {
+    const provider = buildProvider("codex");
+    const sessionStore = createHelixCapabilityLaneSessionStore();
+    sessionStore.start({
+      provider,
+      laneId: "live_translation",
+      laneSessionId: "lane-session-source-id",
+      sourceBinding: {
+        source_id: "docs:active",
+        source_hash: "sha256:active-v1",
+        source_kind: "docs",
+        projection_target: "docs_chunk",
+        account_locale: "es-US",
+      },
+      env: {} as NodeJS.ProcessEnv,
+    });
+    const translation = runLiveTranslationTranslateText({
+      provider,
+      request: {
+        schema: "helix.live_translation.one_shot_request.v1",
+        capability: "live_translation.translate_text",
+        text: "hello",
+        lane_session_id: "lane-session-source-id",
+        source_language: "en",
+        target_language: "es",
+        source_id: "docs:old",
+        source_hash: "sha256:active-v1",
+        chunk_id: "chunk-source-id",
+        projection_target: "docs_chunk",
+        assistant_answer: false,
+        terminal_eligible: false,
+      },
+      turnId: "turn-mail-loop-source-id",
+      env: {} as NodeJS.ProcessEnv,
+    });
+
+    expect(routeLiveTranslationObservationToMailLoop({
+      sessionStore,
+      laneSessionId: "lane-session-source-id",
+      translationResult: translation,
+      threadId: "ask-thread-source-id",
+    })).toMatchObject({
+      ok: false,
+      mail: null,
+      stage_play_mail_id: null,
+      stage_play_wake_expected: false,
+      blocked_reason: "source_id_mismatch",
+      debug_summary: {
+        blocked_reason: "source_id_mismatch",
+        source_id: "docs:old",
+        source_hash: "sha256:active-v1",
+        source_kind: "document_markdown",
+        projection_target: "docs_chunk",
+        terminal_authority_status: "not_terminal_authority",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(sessionStore.get("lane-session-source-id")?.last_observation_ref).toBeNull();
+    expect(listStagePlayLiveSourceMailItems({ threadId: "ask-thread-source-id" })).toHaveLength(0);
+  });
+
+  it("fails closed when a translation observation source hash does not match the lane session source hash", () => {
+    const provider = buildProvider("codex");
+    const sessionStore = createHelixCapabilityLaneSessionStore();
+    sessionStore.start({
+      provider,
+      laneId: "live_translation",
+      laneSessionId: "lane-session-source-hash",
+      sourceBinding: {
+        source_id: "docs:active",
+        source_hash: "sha256:active-v2",
+        source_kind: "docs",
+        projection_target: "docs_chunk",
+        account_locale: "es-US",
+      },
+      env: {} as NodeJS.ProcessEnv,
+    });
+    const translation = runLiveTranslationTranslateText({
+      provider,
+      request: {
+        schema: "helix.live_translation.one_shot_request.v1",
+        capability: "live_translation.translate_text",
+        text: "hello",
+        lane_session_id: "lane-session-source-hash",
+        source_language: "en",
+        target_language: "es",
+        source_id: "docs:active",
+        source_hash: "sha256:old-document",
+        chunk_id: "chunk-source-hash",
+        projection_target: "docs_chunk",
+        assistant_answer: false,
+        terminal_eligible: false,
+      },
+      turnId: "turn-mail-loop-source-hash",
+      env: {} as NodeJS.ProcessEnv,
+    });
+
+    expect(routeLiveTranslationObservationToMailLoop({
+      sessionStore,
+      laneSessionId: "lane-session-source-hash",
+      translationResult: translation,
+      threadId: "ask-thread-source-hash",
+    })).toMatchObject({
+      ok: false,
+      mail: null,
+      stage_play_mail_id: null,
+      stage_play_wake_expected: false,
+      blocked_reason: "source_hash_mismatch",
+      debug_summary: {
+        blocked_reason: "source_hash_mismatch",
+        source_id: "docs:active",
+        source_hash: "sha256:old-document",
+        source_kind: "document_markdown",
+        projection_target: "docs_chunk",
+        terminal_authority_status: "not_terminal_authority",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(sessionStore.get("lane-session-source-hash")?.last_observation_ref).toBeNull();
+    expect(listStagePlayLiveSourceMailItems({ threadId: "ask-thread-source-hash" })).toHaveLength(0);
   });
 
   it("dedupes repeated lane mail by observation ref and carries stale source state", () => {

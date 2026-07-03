@@ -220,9 +220,18 @@ describe("stage play micro-reasoner prompt presets", () => {
       summary: {
         text: JSON.stringify({
           schema: "stage_play.document_markdown_visible_units.v1",
+          chunk_id: "doc-inline:fnv1a32:test:u0001",
+          chunk_index: 1,
+          dedupe_key: `${sourceId}:doc-inline:fnv1a32:test:u0001:haw`,
+          source_event_id: "document_markdown_event:doc-inline:fnv1a32:test:u0001",
+          source_event_ms: 1780000000000,
           doc_path: "docs/example.md",
           source_hash: "fnv1a32:test",
           locale: "haw",
+          target_language: "haw",
+          account_locale: "haw",
+          projection_target: "docs_viewer_inline",
+          freshness_status: "fresh",
           units: [
             {
               unit_id: "u0001",
@@ -347,7 +356,18 @@ describe("stage play micro-reasoner prompt presets", () => {
       schema: "stage_play_document_inline_translation_output/v1",
       sourceKind: "document_markdown",
       sourceId,
+      chunkId: "doc-inline:fnv1a32:test:u0001",
+      chunkIndex: 1,
+      dedupeKey: `${sourceId}:doc-inline:fnv1a32:test:u0001:haw`,
+      sourceEventId: "document_markdown_event:doc-inline:fnv1a32:test:u0001",
+      sourceEventMs: 1780000000000,
       projectionTarget: "docs_viewer_inline",
+      locale: "haw",
+      targetLanguage: "haw",
+      accountLocale: "haw",
+      projectionStatus: "projected",
+      freshnessStatus: "fresh",
+      observedAtMs: Date.parse("2026-06-04T12:00:00.000Z"),
       translations: [
         {
           unit_id: "u0001",
@@ -377,6 +397,20 @@ describe("stage play micro-reasoner prompt presets", () => {
 
     expect(fallbackOutput).toMatchObject({
       schema: "stage_play_document_inline_translation_output/v1",
+      sourceKind: "document_markdown",
+      sourceId,
+      chunkId: "doc-inline:fnv1a32:test:u0001",
+      chunkIndex: 1,
+      dedupeKey: `${sourceId}:doc-inline:fnv1a32:test:u0001:haw`,
+      sourceEventId: "document_markdown_event:doc-inline:fnv1a32:test:u0001",
+      sourceEventMs: 1780000000000,
+      projectionTarget: "docs_viewer_inline",
+      locale: "haw",
+      targetLanguage: "haw",
+      accountLocale: "haw",
+      projectionStatus: "failed",
+      freshnessStatus: "fresh",
+      observedAtMs: Date.parse("2026-06-04T12:00:00.000Z"),
       translations: [],
       unit_errors: [
         {

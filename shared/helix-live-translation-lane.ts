@@ -38,6 +38,7 @@ export type HelixLiveTranslationOneShotRequest = {
   lane_session_id?: string | null;
   turn_id?: string | null;
   source_id?: string | null;
+  source_hash?: string | null;
   chunk_id?: string | null;
   chunk_index?: number | null;
   dedupe_key?: string | null;
@@ -64,6 +65,7 @@ export type HelixLiveTranslationOneShotObservation = {
   source_language: string | null;
   target_language: string;
   source_id: string;
+  source_hash: string | null;
   chunk_id: string;
   chunk_index: number | null;
   dedupe_key: string;
@@ -95,6 +97,7 @@ export type HelixLiveTranslationProjectionReceipt = {
   projection_target: HelixLiveTranslationProjectionTarget;
   projection_status: "projected" | "stale" | "cancelled" | "failed";
   source_id: string;
+  source_hash: string | null;
   chunk_id: string;
   chunk_index: number | null;
   dedupe_key: string;

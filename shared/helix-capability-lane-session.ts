@@ -62,6 +62,7 @@ export type HelixCapabilityLaneSessionCall = {
 
 export type HelixCapabilityLaneSessionSourceBinding = {
   source_id: string;
+  source_hash?: string | null;
   source_kind:
     | "docs"
     | "docs_hover"
@@ -101,6 +102,7 @@ export type HelixCapabilityLaneSessionEvent = {
   at_ms: number;
   reason: string;
   source_id: string | null;
+  source_hash?: string | null;
   target_language?: string | null;
   observation_ref: string | null;
   receipt_ref: string | null;
@@ -159,10 +161,12 @@ export type HelixCapabilityLaneSessionDebugSummary = {
   session_status: HelixCapabilityLaneSessionStatus;
   session_health: HelixCapabilityLaneSessionHealth;
   source_id: string | null;
+  source_hash?: string | null;
   source_kind: HelixCapabilityLaneSessionSourceBinding["source_kind"];
   projection_target: string | null;
   account_locale: string | null;
   target_language?: string | null;
+  permissions: HelixCapabilityLaneSessionPermissions;
   created_at_ms: number;
   updated_at_ms: number;
   last_observation_ref: string | null;

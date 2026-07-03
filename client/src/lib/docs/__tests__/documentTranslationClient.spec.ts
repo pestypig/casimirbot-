@@ -19,6 +19,7 @@ const baseRun = {
   inputPreview: "",
   outputPreview: "",
   status: "completed",
+  modelUsed: "test-document-translator",
   startedAt: "2026-06-17T12:00:00.000Z",
   completedAt: "2026-06-17T12:00:01.000Z",
   assistant_answer: false,
@@ -80,6 +81,11 @@ describe("document translation MicroDeck output parsing", () => {
     const wakeBody = JSON.parse(String((fetchMock.mock.calls[2]?.[1] as RequestInit | undefined)?.body ?? "{}"));
     const mailBody = JSON.parse(String((fetchMock.mock.calls[1]?.[1] as RequestInit | undefined)?.body ?? "{}"));
     expect(mailBody.chunkId).toBe("doc-inline:fnv1a32:test:u0001");
+    expect(mailBody).toMatchObject({
+      locale: "haw",
+      targetLanguage: "haw",
+      accountLocale: "haw",
+    });
     expect(wakeBody).toMatchObject({
       threadId: "helix-ask:desktop",
       sourceId: "document_markdown:docs/example.md",
@@ -91,7 +97,21 @@ describe("document translation MicroDeck output parsing", () => {
   it("extracts unit-keyed inline translations from document projection JSON runs", () => {
     const outputPreview = JSON.stringify({
       schema: "stage_play_document_inline_translation_output/v1",
+      sourceId: "document_markdown:docs/example.md",
+      sourceKind: "document_markdown",
+      docPath: "docs/example.md",
+      sourceHash: "fnv1a32:test",
+      chunkId: "doc-inline:fnv1a32:test:u0001,u0002",
+      chunkIndex: 3,
+      dedupeKey: "document_markdown:docs/example.md:doc-inline:fnv1a32:test:u0001,u0002:haw",
+      sourceEventId: "document_markdown_event:doc-inline:fnv1a32:test:u0001,u0002",
+      sourceEventMs: 1780000000000,
+      observedAtMs: 1780000001000,
+      projectionStatus: "projected",
+      freshnessStatus: "fresh",
       projectionTarget: "docs_viewer_inline",
+      targetLanguage: "haw",
+      accountLocale: "haw",
       translations: [
         { unit_id: "u0001", translated_markdown: "Translated heading" },
         { unit_id: "u0002", translated_markdown: "Kikokikona unuhi" },
@@ -103,8 +123,56 @@ describe("document translation MicroDeck output parsing", () => {
     ]);
 
     expect(entries).toEqual([
-      { unitId: "u0001", status: "ready", text: "Translated heading", runId: "run-doc-1", role: "packet_composer" },
-      { unitId: "u0002", status: "ready", text: "Kikokikona unuhi", runId: "run-doc-1", role: "packet_composer" },
+      {
+        unitId: "u0001",
+        status: "ready",
+        text: "Translated heading",
+        runId: "run-doc-1",
+        role: "packet_composer",
+        observationRef: "run-doc-1",
+        sourceId: "document_markdown:docs/example.md",
+        sourceKind: "document_markdown",
+        docPath: "docs/example.md",
+        sourceHash: "fnv1a32:test",
+        chunkId: "doc-inline:fnv1a32:test:u0001,u0002",
+        chunkIndex: 3,
+        dedupeKey: "document_markdown:docs/example.md:doc-inline:fnv1a32:test:u0001,u0002:haw",
+        sourceEventId: "document_markdown_event:doc-inline:fnv1a32:test:u0001,u0002",
+        sourceEventMs: 1780000000000,
+        observedAtMs: 1780000001000,
+        projectionStatus: "projected",
+        freshnessStatus: "fresh",
+        selectedBackendProvider: "test-document-translator",
+        source: "document_microdeck",
+        projectionTarget: "docs_viewer_inline",
+        targetLanguage: "haw",
+        accountLocale: "haw",
+      },
+      {
+        unitId: "u0002",
+        status: "ready",
+        text: "Kikokikona unuhi",
+        runId: "run-doc-1",
+        role: "packet_composer",
+        observationRef: "run-doc-1",
+        sourceId: "document_markdown:docs/example.md",
+        sourceKind: "document_markdown",
+        docPath: "docs/example.md",
+        sourceHash: "fnv1a32:test",
+        chunkId: "doc-inline:fnv1a32:test:u0001,u0002",
+        chunkIndex: 3,
+        dedupeKey: "document_markdown:docs/example.md:doc-inline:fnv1a32:test:u0001,u0002:haw",
+        sourceEventId: "document_markdown_event:doc-inline:fnv1a32:test:u0001,u0002",
+        sourceEventMs: 1780000000000,
+        observedAtMs: 1780000001000,
+        projectionStatus: "projected",
+        freshnessStatus: "fresh",
+        selectedBackendProvider: "test-document-translator",
+        source: "document_microdeck",
+        projectionTarget: "docs_viewer_inline",
+        targetLanguage: "haw",
+        accountLocale: "haw",
+      },
     ]);
   });
 
@@ -136,6 +204,11 @@ describe("document translation MicroDeck output parsing", () => {
         error: "document_translation_model_output_unavailable",
         runId: "run-doc-1",
         role: "packet_composer",
+        observationRef: "run-doc-1",
+        observedAtMs: 1781697601000,
+        selectedBackendProvider: "test-document-translator",
+        source: "document_microdeck",
+        projectionTarget: "docs_viewer_inline",
       },
     ]);
   });

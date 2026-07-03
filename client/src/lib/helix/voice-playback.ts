@@ -1,4 +1,5 @@
 import type { VoicePlaybackLifecycleDiagnostic } from "@/lib/helix/voice-playback-diagnostics";
+import { buildSpeakText } from "@/lib/helix/ask-voice-text-display";
 
 export type VoicePlaybackUtteranceKind =
   | "brief"
@@ -103,6 +104,25 @@ export type VoicePlaybackQueueTransition = {
   supersededActiveReason: VoicePlaybackCancelReason | null;
   pendingPreemptPolicy: VoicePreemptPolicy;
 };
+
+export type VoicePlaybackQueuePrepareResult =
+  | {
+      accepted: true;
+      queue: VoicePlaybackUtterance[];
+      utterance: VoicePlaybackUtterance;
+      droppedUtteranceIds: string[];
+      supersededActiveReason: VoicePlaybackCancelReason | null;
+      pendingPreemptPolicy: VoicePreemptPolicy;
+    }
+  | {
+      accepted: false;
+      reason: "empty_text" | "empty_chunks" | "duplicate" | "filtered";
+      queue: VoicePlaybackUtterance[];
+      utterance?: VoicePlaybackUtterance;
+      droppedUtteranceIds: string[];
+      supersededActiveReason: VoicePlaybackCancelReason | null;
+      pendingPreemptPolicy: VoicePreemptPolicy;
+    };
 
 const DEFAULT_TARGET_MIN_CHARS = 90;
 const DEFAULT_TARGET_MAX_CHARS = 160;
@@ -369,5 +389,131 @@ export function trimVoicePlaybackQueue(
   return {
     queue: queue.slice(dropCount),
     droppedUtteranceIds: queue.slice(0, dropCount).map((entry) => entry.utteranceId),
+  };
+}
+
+export function prepareVoicePlaybackQueueUpdate(input: {
+  queue: VoicePlaybackUtterance[];
+  active?: VoicePlaybackUtterance | null;
+  task: {
+    key: string;
+    turnKey: string;
+    kind: VoicePlaybackUtteranceKind;
+    authority?: VoicePlaybackIntentAuthority;
+    source?: VoicePlaybackIntentSource;
+    replyId?: string;
+    allowMicOffPlayback?: boolean;
+    revision: number;
+    text: string;
+    traceId?: string;
+    eventId: string;
+  };
+  maxTextChars: number;
+  maxQueueLength: number;
+  isStale: (input: {
+    turnKey: string;
+    revision: number;
+    kind: VoicePlaybackUtteranceKind;
+  }) => boolean;
+}): VoicePlaybackQueuePrepareResult {
+  const text = buildSpeakText(input.task.text, input.maxTextChars);
+  if (!text) {
+    return {
+      accepted: false,
+      reason: "empty_text",
+      queue: input.queue,
+      droppedUtteranceIds: [],
+      supersededActiveReason: null,
+      pendingPreemptPolicy: "none",
+    };
+  }
+  const utterance = createVoicePlaybackUtterance({
+    utteranceId: input.task.key,
+    turnKey: input.task.turnKey,
+    kind: input.task.kind,
+    authority: input.task.authority,
+    source: input.task.source,
+    replyId: input.task.replyId,
+    allowMicOffPlayback: input.task.allowMicOffPlayback,
+    revision: input.task.revision,
+    text,
+    traceId: input.task.traceId,
+    eventId: input.task.eventId,
+  });
+  if (utterance.chunks.length === 0) {
+    return {
+      accepted: false,
+      reason: "empty_chunks",
+      queue: input.queue,
+      utterance,
+      droppedUtteranceIds: [],
+      supersededActiveReason: null,
+      pendingPreemptPolicy: "none",
+    };
+  }
+  const duplicateQueued = input.queue.some(
+    (entry) =>
+      entry.turnKey === utterance.turnKey &&
+      entry.kind === utterance.kind &&
+      entry.revision === utterance.revision &&
+      entry.text === utterance.text,
+  );
+  const duplicateActive =
+    input.active &&
+    input.active.turnKey === utterance.turnKey &&
+    input.active.kind === utterance.kind &&
+    input.active.revision === utterance.revision &&
+    input.active.text === utterance.text;
+  if (duplicateQueued || duplicateActive) {
+    return {
+      accepted: false,
+      reason: "duplicate",
+      queue: input.queue,
+      utterance,
+      droppedUtteranceIds: [],
+      supersededActiveReason: null,
+      pendingPreemptPolicy: "none",
+    };
+  }
+  const nextQueue = applyLatestWinsVoiceQueue({
+    queue: input.queue,
+    incoming: utterance,
+    active: input.active,
+  });
+  const trimmedQueue = trimVoicePlaybackQueue(nextQueue.queue, input.maxQueueLength);
+  const staleDropped: string[] = [];
+  const filteredQueue = trimmedQueue.queue.filter((entry) => {
+    const stale = input.isStale({
+      turnKey: entry.turnKey,
+      revision: entry.revision,
+      kind: entry.kind,
+    });
+    if (stale) staleDropped.push(entry.utteranceId);
+    return !stale;
+  });
+  const droppedUtteranceIds = [
+    ...nextQueue.droppedUtteranceIds,
+    ...trimmedQueue.droppedUtteranceIds,
+    ...staleDropped,
+  ];
+  const accepted = filteredQueue.some((entry) => entry.utteranceId === utterance.utteranceId);
+  if (!accepted) {
+    return {
+      accepted: false,
+      reason: "filtered",
+      queue: filteredQueue,
+      utterance,
+      droppedUtteranceIds,
+      supersededActiveReason: nextQueue.supersededActiveReason,
+      pendingPreemptPolicy: nextQueue.pendingPreemptPolicy,
+    };
+  }
+  return {
+    accepted: true,
+    queue: filteredQueue,
+    utterance,
+    droppedUtteranceIds,
+    supersededActiveReason: nextQueue.supersededActiveReason,
+    pendingPreemptPolicy: nextQueue.pendingPreemptPolicy,
   };
 }

@@ -57,6 +57,21 @@ function readBackendSelectionDecisionParts(value: unknown): string[] {
   ].filter(Boolean);
 }
 
+function readCapabilityLanePermissionText(value: unknown): string {
+  const permissions = readRecord(value);
+  if (!permissions) return "";
+  const write = permissions.write === true;
+  const shell = permissions.shell === true;
+  const codeMutation = permissions.code_mutation === true || permissions.codeMutation === true;
+  if (!write && !shell && !codeMutation) return "permissions non-mutating";
+  const allowed = [
+    write ? "write allowed" : "",
+    shell ? "shell allowed" : "",
+    codeMutation ? "code mutation allowed" : "",
+  ].filter(Boolean);
+  return allowed.length ? `permissions ${allowed.join(", ")}` : "";
+}
+
 function readLanePacketBackendParts(packet: RecordLike | null, trace?: RecordLike | null): string[] {
   const stateDelta = readRecord(packet?.state_delta);
   const shadowExecution = readRecord(stateDelta?.capability_lane_shadow_execution);
@@ -400,6 +415,8 @@ function readLaneProjectionSummary(record: RecordLike | null, debug: RecordLike 
         coerceText(observation?.lane_session_id) ||
         coerceText(chunk?.lane_session_id);
       const sourceId = coerceText(observation?.source_id) || coerceText(chunk?.source_id);
+      const sourceKind = coerceText(observation?.source_kind) || coerceText(chunk?.source_kind);
+      const accountLocale = coerceText(observation?.account_locale) || coerceText(chunk?.account_locale);
       const chunkId = coerceText(observation?.chunk_id) || coerceText(chunk?.chunk_id);
       const chunkIndex = coerceText(observation?.chunk_index) || coerceText(chunk?.chunk_index);
       const dedupeKey = coerceText(observation?.dedupe_key) || coerceText(chunk?.dedupe_key);
@@ -416,6 +433,8 @@ function readLaneProjectionSummary(record: RecordLike | null, debug: RecordLike 
         laneSessionId ? `session ${laneSessionId}` : "",
         targetLanguage ? `language ${targetLanguage}` : "",
         sourceId ? `source ${sourceId}` : "",
+        sourceKind ? `source kind ${sourceKind}` : "",
+        accountLocale ? `account locale ${accountLocale}` : "",
         chunkId ? `chunk ${chunkId}` : "",
         chunkIndex ? `index ${chunkIndex}` : "",
         dedupeKey ? `dedupe ${dedupeKey}` : "",
@@ -487,6 +506,20 @@ function readLaneProjectionSummary(record: RecordLike | null, debug: RecordLike 
     const projectionTarget =
       coerceText(receipt.projection_target) ||
       coerceText(payload?.projection_target);
+    const sourceId =
+      coerceText(receipt.source_id) ||
+      coerceText(payload?.source_id);
+    const sourceHash =
+      coerceText(receipt.source_hash) ||
+      coerceText(receipt.sourceHash) ||
+      coerceText(payload?.source_hash) ||
+      coerceText(payload?.sourceHash);
+    const sourceKind =
+      coerceText(receipt.source_kind) ||
+      coerceText(payload?.source_kind);
+    const accountLocale =
+      coerceText(receipt.account_locale) ||
+      coerceText(payload?.account_locale);
     const targetLanguage =
       coerceText(receipt.target_language) ||
       coerceText(payload?.target_language);
@@ -496,6 +529,10 @@ function readLaneProjectionSummary(record: RecordLike | null, debug: RecordLike 
       capability || "capability_lane_projection",
       projectionStatus ? `projection ${projectionStatus}` : "",
       projectionTarget ? `target ${projectionTarget}` : "",
+      sourceId ? `source ${sourceId}` : "",
+      sourceHash ? `source hash ${sourceHash}` : "",
+      sourceKind ? `source kind ${sourceKind}` : "",
+      accountLocale ? `account locale ${accountLocale}` : "",
       targetLanguage ? `language ${targetLanguage}` : "",
       receiptRef ? `receipt ${receiptRef}` : "",
       observationRef ? `ref ${observationRef}` : "",
@@ -515,6 +552,9 @@ function readTranslationProjectionTrafficSummary(record: RecordLike | null, debu
   });
   const summaries = summarizeHelixLiveTranslationUiProjectionTraffic(projections).map((summary) => [
     summary.sourceId,
+    summary.sourceHash ? `source hash ${summary.sourceHash}` : "",
+    summary.sourceKind ? `source kind ${summary.sourceKind}` : "",
+    summary.accountLocale ? `account locale ${summary.accountLocale}` : "",
     `target ${summary.projectionTarget}`,
     summary.targetLanguage ? `language ${summary.targetLanguage}` : "",
     `chunks ${summary.chunkCount}`,
@@ -755,6 +795,7 @@ function readGoalDispatchReadinessSummary(record: RecordLike | null, debug: Reco
   const targets = readArray(readiness.next_dispatch_targets).map(coerceText).filter(Boolean).join(", ");
   const goalBindings = readArray(readiness.next_goal_binding_ids).map(coerceText).filter(Boolean).join(", ");
   const sourceIds = readArray(readiness.next_source_ids).map(coerceText).filter(Boolean).join(", ");
+  const sourceHashes = readArray(readiness.next_source_hashes).map(coerceText).filter(Boolean).join(", ");
   const sourceKinds = readArray(readiness.next_source_kinds).map(coerceText).filter(Boolean).join(", ");
   const sourceProjectionTargets = readArray(readiness.next_source_projection_targets).map(coerceText).filter(Boolean).join(", ");
   const accountLocales = readArray(readiness.next_account_locales).map(coerceText).filter(Boolean).join(", ");
@@ -784,6 +825,7 @@ function readGoalDispatchReadinessSummary(record: RecordLike | null, debug: Reco
     targets ? `targets ${targets}` : "",
     goalBindings ? `goal bindings ${goalBindings}` : "",
     sourceIds ? `sources ${sourceIds}` : "",
+    sourceHashes ? `source hashes ${sourceHashes}` : "",
     sourceKinds ? `source kinds ${sourceKinds}` : "",
     sourceProjectionTargets ? `source projections ${sourceProjectionTargets}` : "",
     accountLocales ? `account locales ${accountLocales}` : "",
@@ -841,6 +883,7 @@ function readLaneSessionSummary(record: RecordLike | null, debug: RecordLike | n
       const observation = coerceText(summary.last_observation_ref);
       const receipt = coerceText(summary.last_receipt_ref);
       const terminalAuthority = coerceText(summary.terminal_authority_status);
+      const permissions = readCapabilityLanePermissionText(summary.permissions);
       return [
         lane,
         session ? `session ${session}` : "",
@@ -867,6 +910,7 @@ function readLaneSessionSummary(record: RecordLike | null, debug: RecordLike | n
         observation ? `observation ${observation}` : "",
         receipt ? `receipt ${receipt}` : "",
         terminalAuthority ? `authority ${terminalAuthority}` : "",
+        permissions,
         "observation-only",
       ].filter(Boolean).join(" | ");
     });

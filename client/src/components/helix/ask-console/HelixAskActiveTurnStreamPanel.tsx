@@ -4,7 +4,10 @@ import type {
   HelixContinuousTurnStreamRow,
   HelixContinuousTurnStreamTone,
 } from "@/lib/helix/ask-active-turn-stream";
-import { resolveHelixAskConsoleCapabilityLaneRowStage } from "./HelixAskConsoleDiagnostics";
+import {
+  buildHelixAskConsoleCapabilityLaneSummary,
+  resolveHelixAskConsoleCapabilityLaneRowStage,
+} from "./HelixAskConsoleDiagnostics";
 
 export type HelixAskActiveTurnStreamPanelProps = {
   rows: HelixContinuousTurnStreamRow[];
@@ -32,6 +35,12 @@ export function HelixAskActiveTurnStreamPanel({
   readDotClass,
 }: HelixAskActiveTurnStreamPanelProps) {
   if (rows.length === 0) return null;
+  const capabilityLaneSummary = buildHelixAskConsoleCapabilityLaneSummary(
+    rows
+      .map((row) => resolveHelixAskConsoleCapabilityLaneRowStage(row))
+      .filter((stage): stage is NonNullable<typeof stage> => Boolean(stage))
+      .map((stage) => ({ stage })),
+  );
 
   return (
     <div
@@ -44,6 +53,21 @@ export function HelixAskActiveTurnStreamPanel({
       data-active-turn-id={activeTurnId ?? undefined}
       data-active-trace-id={activeTraceId ?? undefined}
       data-render-placement={renderPlacement}
+      data-capability-lane-lifecycle={capabilityLaneSummary.lifecycleStatus}
+      data-capability-lane-visible-count={capabilityLaneSummary.visibleCount}
+      data-capability-lane-requested-count={capabilityLaneSummary.requestedCount}
+      data-capability-lane-backend-selected-count={capabilityLaneSummary.backendSelectedCount}
+      data-capability-lane-observed-count={capabilityLaneSummary.observedCount}
+      data-capability-lane-reentered-count={capabilityLaneSummary.reenteredCount}
+      data-capability-lane-session-count={capabilityLaneSummary.sessionCount}
+      data-capability-lane-mail-loop-count={capabilityLaneSummary.mailLoopCount}
+      data-capability-lane-goal-binding-count={capabilityLaneSummary.goalBindingCount}
+      data-capability-lane-goal-dispatch-plan-count={capabilityLaneSummary.goalDispatchPlanCount}
+      data-capability-lane-goal-dispatch-admission-count={capabilityLaneSummary.goalDispatchAdmissionCount}
+      data-capability-lane-goal-dispatch-readiness-count={capabilityLaneSummary.goalDispatchReadinessCount}
+      data-capability-lane-terminal-selected-count={capabilityLaneSummary.terminalSelectedCount}
+      data-capability-lane-terminal-rejected-count={capabilityLaneSummary.terminalRejectedCount}
+      data-capability-lane-visible-does-not-mean-executed="true"
     >
       {showDebugLabel ? (
         <p className="mb-2 text-[10px] uppercase tracking-[0.2em] text-cyan-200">Active turn stream</p>

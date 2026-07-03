@@ -22,6 +22,28 @@ const laneRow: HelixContinuousTurnStreamRow = {
   evidenceRefs: [],
 };
 
+const laneVisibleRow: HelixContinuousTurnStreamRow = {
+  key: "lane-visible",
+  source: "agent_work",
+  label: "Lane Visible",
+  text: "Lane visible: live_translation.",
+  meta: "source model_visible_capability_lane_manifest | lane_visible",
+  status: "available",
+  tone: "working",
+  evidenceRefs: [],
+};
+
+const laneBackendRow: HelixContinuousTurnStreamRow = {
+  key: "lane-backend",
+  source: "agent_work",
+  label: "Lane Backend",
+  text: "Lane backend selected: live_translation.local_runtime.",
+  meta: "source capability_lane_backend_selections | lane_backend_selected",
+  status: "selected",
+  tone: "checkpoint",
+  evidenceRefs: [],
+};
+
 const finalRow: HelixContinuousTurnStreamRow = {
   key: "final",
   source: "final",
@@ -30,6 +52,17 @@ const finalRow: HelixContinuousTurnStreamRow = {
   meta: "source capability_lane_call_results | terminal_selected",
   status: "final",
   tone: "final",
+  evidenceRefs: ["ask:lane:translation:obs"],
+};
+
+const rejectedFinalRow: HelixContinuousTurnStreamRow = {
+  key: "final-rejected",
+  source: "final",
+  label: "Terminal",
+  text: "Terminal authority rejected direct lane output.",
+  meta: "source capability_lane_call_results | terminal_rejected | terminal_authority_missing",
+  status: "rejected",
+  tone: "error",
   evidenceRefs: ["ask:lane:translation:obs"],
 };
 
@@ -116,8 +149,44 @@ describe("Helix Ask turn stream lane rendering", () => {
     );
 
     const row = screen.getByTestId("helix-ask-active-turn-stream-row");
+    const panel = screen.getByTestId("helix-ask-active-turn-stream");
     expect(row.getAttribute("data-capability-lane-stage")).toBe("requested");
+    expect(panel.getAttribute("data-capability-lane-lifecycle")).toBe("requested");
+    expect(panel.getAttribute("data-capability-lane-requested-count")).toBe("1");
+    expect(panel.getAttribute("data-capability-lane-visible-does-not-mean-executed")).toBe("true");
     expect(screen.getByText("lane requested")).toBeTruthy();
+  });
+
+  it("marks turn stream containers as visible-only when only lane manifest rows are present", () => {
+    render(
+      <HelixAskTurnStreamPanel
+        rows={[laneVisibleRow]}
+        isLatestReply
+        stagePlayEventCount={0}
+        finalAnswerRawText=""
+        finalAnswerSourceLabel="capability lane terminal"
+        finalAnswerAuthority="terminal"
+        renderFinalAnswer={() => null}
+        clipText={(text) => text}
+        readRowClassName={() => ""}
+        readDotClassName={() => ""}
+        readPillClassName={() => ""}
+        onCopyFinal={noop}
+        onDebugCopy={noop}
+        onReadAloud={noop}
+        jobReadyLinks={[]}
+        onRunJobReadyLink={noop}
+        workLogTestId="turn-stream"
+      />,
+    );
+
+    const panel = screen.getByTestId("turn-stream");
+    expect(panel.getAttribute("data-capability-lane-lifecycle")).toBe("visible_only");
+    expect(panel.getAttribute("data-capability-lane-visible-count")).toBe("1");
+    expect(panel.getAttribute("data-capability-lane-requested-count")).toBe("0");
+    expect(panel.getAttribute("data-capability-lane-terminal-selected-count")).toBe("0");
+    expect(panel.getAttribute("data-capability-lane-terminal-rejected-count")).toBe("0");
+    expect(panel.getAttribute("data-capability-lane-visible-does-not-mean-executed")).toBe("true");
   });
 
   it("marks completed stream capability lane rows with their lane stage", () => {
@@ -147,6 +216,69 @@ describe("Helix Ask turn stream lane rendering", () => {
     expect(screen.getByText("lane requested")).toBeTruthy();
   });
 
+  it("marks backend-selected lane rows distinctly from requested rows", () => {
+    render(
+      <HelixAskTurnStreamPanel
+        rows={[laneRow, laneBackendRow, finalRow]}
+        isLatestReply
+        stagePlayEventCount={0}
+        finalAnswerRawText="Done."
+        finalAnswerSourceLabel="capability lane terminal"
+        finalAnswerAuthority="terminal"
+        renderFinalAnswer={() => <span>Done.</span>}
+        clipText={(text) => text}
+        readRowClassName={() => ""}
+        readDotClassName={() => ""}
+        readPillClassName={() => ""}
+        onCopyFinal={noop}
+        onDebugCopy={noop}
+        onReadAloud={noop}
+        jobReadyLinks={[]}
+        onRunJobReadyLink={noop}
+      />,
+    );
+
+    const rows = screen.getAllByTestId("helix-ask-latest-turn-stream-row");
+    expect(rows[0]?.getAttribute("data-capability-lane-stage")).toBe("requested");
+    expect(rows[1]?.getAttribute("data-capability-lane-stage")).toBe("backend_selected");
+    expect(screen.getByLabelText("Turn stream").getAttribute("data-capability-lane-lifecycle")).toBe("terminal_selected");
+    expect(screen.getByLabelText("Turn stream").getAttribute("data-capability-lane-backend-selected-count")).toBe("1");
+    expect(screen.getByText("lane requested")).toBeTruthy();
+    expect(screen.getByText("lane backend selected")).toBeTruthy();
+  });
+
+  it("marks terminal rejected lane rows distinctly from terminal selected rows", () => {
+    const { container } = render(
+      <HelixAskTurnStreamPanel
+        rows={[laneRow, rejectedFinalRow]}
+        isLatestReply
+        stagePlayEventCount={0}
+        finalAnswerRawText="I could not complete that turn."
+        finalAnswerSourceLabel="capability lane terminal"
+        finalAnswerAuthority="terminal_rejected"
+        renderFinalAnswer={() => <span>I could not complete that turn.</span>}
+        clipText={(text) => text}
+        readRowClassName={() => ""}
+        readDotClassName={() => ""}
+        readPillClassName={() => ""}
+        onCopyFinal={noop}
+        onDebugCopy={noop}
+        onReadAloud={noop}
+        jobReadyLinks={[]}
+        onRunJobReadyLink={noop}
+      />,
+    );
+
+    const rows = screen.getAllByTestId("helix-ask-latest-turn-stream-row");
+    const panel = screen.getByLabelText("Turn stream");
+    expect(rows[0]?.getAttribute("data-capability-lane-stage")).toBe("requested");
+    expect(container.querySelector('[data-capability-lane-stage="terminal_rejected"]')).toBeTruthy();
+    expect(panel.getAttribute("data-capability-lane-lifecycle")).toBe("terminal_rejected");
+    expect(panel.getAttribute("data-capability-lane-terminal-selected-count")).toBe("0");
+    expect(panel.getAttribute("data-capability-lane-terminal-rejected-count")).toBe("1");
+    expect(screen.getByText("lane terminal rejected")).toBeTruthy();
+  });
+
   it("marks persistent lane session, mail-loop, and goal-binding rows", () => {
     render(
       <HelixAskTurnStreamPanel
@@ -170,11 +302,15 @@ describe("Helix Ask turn stream lane rendering", () => {
     );
 
     const rows = screen.getAllByTestId("helix-ask-latest-turn-stream-row");
+    const panel = screen.getByLabelText("Turn stream");
     expect(rows.map((row) => row.getAttribute("data-capability-lane-stage"))).toEqual([
       "session",
       "mail_loop",
       "goal_binding",
     ]);
+    expect(panel.getAttribute("data-capability-lane-session-count")).toBe("1");
+    expect(panel.getAttribute("data-capability-lane-mail-loop-count")).toBe("1");
+    expect(panel.getAttribute("data-capability-lane-goal-binding-count")).toBe("1");
     expect(screen.getByText("lane session")).toBeTruthy();
     expect(screen.getByText("lane mail loop")).toBeTruthy();
     expect(screen.getByText("lane goal binding")).toBeTruthy();
@@ -203,11 +339,15 @@ describe("Helix Ask turn stream lane rendering", () => {
     );
 
     const rows = screen.getAllByTestId("helix-ask-latest-turn-stream-row");
+    const panel = screen.getByLabelText("Turn stream");
     expect(rows.map((row) => row.getAttribute("data-capability-lane-stage"))).toEqual([
       "goal_dispatch_plan",
       "goal_dispatch_admission",
       "goal_dispatch_readiness",
     ]);
+    expect(panel.getAttribute("data-capability-lane-goal-dispatch-plan-count")).toBe("1");
+    expect(panel.getAttribute("data-capability-lane-goal-dispatch-admission-count")).toBe("1");
+    expect(panel.getAttribute("data-capability-lane-goal-dispatch-readiness-count")).toBe("1");
     expect(screen.getByText("lane goal dispatch plan")).toBeTruthy();
     expect(screen.getByText("lane goal dispatch admission")).toBeTruthy();
     expect(screen.getByText("lane goal dispatch readiness")).toBeTruthy();

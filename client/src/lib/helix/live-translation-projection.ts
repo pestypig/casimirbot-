@@ -11,11 +11,16 @@ export type HelixLiveTranslationUiProjectionStatus =
   | "failed"
   | "cancelled";
 
+export type HelixLiveTranslationTerminalAuthorityStatus =
+  | "not_terminal_authority"
+  | "pending_helix_terminal_authority";
+
 export type HelixLiveTranslationUiProjection = {
   key: string;
   status: HelixLiveTranslationUiProjectionStatus;
   projectionTarget: string;
   sourceId: string;
+  sourceHash?: string;
   sourceKind: string | null;
   accountLocale: string | null;
   chunkId: string;
@@ -31,6 +36,7 @@ export type HelixLiveTranslationUiProjection = {
   observedAtMs: number | null;
   sourceEventMs: number | null;
   freshnessStatus: string;
+  terminalAuthorityStatus: HelixLiveTranslationTerminalAuthorityStatus;
   stale: boolean;
   cancelRequested: boolean;
   terminalEligible: false;
@@ -40,6 +46,7 @@ export type HelixLiveTranslationUiProjection = {
 
 export type HelixLiveTranslationUiProjectionTrafficSummary = {
   sourceId: string;
+  sourceHash?: string;
   sourceKind: string | null;
   accountLocale: string | null;
   projectionTarget: string;
@@ -54,6 +61,7 @@ export type HelixLiveTranslationUiProjectionTrafficSummary = {
   latestObservedAtMs: number | null;
   latestSourceEventMs: number | null;
   latestFreshnessStatus: string;
+  latestTerminalAuthorityStatus: HelixLiveTranslationTerminalAuthorityStatus;
   latestObservationRef: string | null;
   latestReceiptRef: string | null;
   latestLaneSessionId: string | null;
@@ -81,6 +89,7 @@ export type HelixLiveTranslationUiProjectionSelection = {
   receiptRef: string | null;
   laneSessionId: string | null;
   selectedBackendProvider: string | null;
+  terminalAuthorityStatus: HelixLiveTranslationTerminalAuthorityStatus;
   terminalEligible: false;
   assistantAnswer: false;
   rawContentIncluded: false;
@@ -89,6 +98,7 @@ export type HelixLiveTranslationUiProjectionSelection = {
 export type SelectHelixLiveTranslationUiProjectionInput = {
   projections: HelixLiveTranslationUiProjection[];
   sourceId: string;
+  sourceHash?: string | null;
   projectionTarget?: string | null;
   targetLanguage?: string | null;
   chunkId?: string | null;
@@ -104,6 +114,7 @@ export type HelixLiveTranslationInlineUnitState = {
   receiptRef: string | null;
   laneSessionId: string | null;
   selectedBackendProvider: string | null;
+  terminalAuthorityStatus: HelixLiveTranslationTerminalAuthorityStatus;
   projectionStatus: HelixLiveTranslationUiProjectionSelectionStatus;
   chunkId: string | null;
   chunkIndex: number | null;
@@ -112,6 +123,8 @@ export type HelixLiveTranslationInlineUnitState = {
   sourceEventMs: number | null;
   observedAtMs: number | null;
   freshnessStatus: string;
+  sourceId: string | null;
+  sourceHash?: string | null;
   sourceKind: string | null;
   accountLocale: string | null;
   projectionTarget: string | null;
@@ -126,6 +139,7 @@ export type BuildHelixLiveTranslationInlineUnitStateInput = {
   projections: HelixLiveTranslationUiProjection[];
   units: DocumentTranslationUnitLike[];
   sourceId: string;
+  sourceHash?: string | null;
   projectionTarget: string;
   targetLanguage: string;
   allowStaleDisplayText?: boolean;
@@ -152,11 +166,28 @@ const localeMatches = (candidate: string | null, locale: string | null): boolean
     normalizedLocale.startsWith(`${normalizedCandidate}-`);
 };
 
-const readNumber = (value: unknown): number | null =>
-  typeof value === "number" && Number.isFinite(value) ? Math.trunc(value) : null;
+const readNumber = (value: unknown): number | null => {
+  if (typeof value === "number" && Number.isFinite(value)) return Math.trunc(value);
+  if (typeof value !== "string" || !value.trim()) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.trunc(parsed) : null;
+};
 
 const readBoolean = (value: unknown): boolean =>
   value === true;
+
+const readTerminalAuthorityStatus = (
+  value: unknown,
+): HelixLiveTranslationTerminalAuthorityStatus =>
+  readString(value) === "pending_helix_terminal_authority"
+    ? "pending_helix_terminal_authority"
+    : "not_terminal_authority";
+
+const projectionSourceHashMatches = (
+  projection: HelixLiveTranslationUiProjection,
+  sourceHash: string | null,
+): boolean =>
+  !sourceHash ? true : projection.sourceHash === sourceHash;
 
 const sortLatestProjectionFirst = (
   left: HelixLiveTranslationUiProjection,
@@ -226,6 +257,7 @@ const readReceiptsFromCallResults = (results: unknown[]): RecordLike[] =>
         projection_target: observation.projection_target,
         projection_status: observation.freshness_status === "stale" ? "stale" : "projected",
         source_id: observation.source_id,
+        source_hash: observation.source_hash,
         source_kind: observation.source_kind,
         account_locale: observation.account_locale,
         chunk_id: observation.chunk_id,
@@ -239,6 +271,7 @@ const readReceiptsFromCallResults = (results: unknown[]): RecordLike[] =>
         translated_text: observation.translated_text,
         stale: observation.freshness_status === "stale",
         cancel_requested: false,
+        terminal_authority_status: readTerminalAuthorityStatus(observation.terminal_authority_status),
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
@@ -250,6 +283,12 @@ const normalizeProjection = (receipt: RecordLike): HelixLiveTranslationUiProject
   const payload = readRecord(receipt.payload);
   const projectionTarget = readString(receipt.projection_target) || readString(payload?.projection_target) || "unknown";
   const sourceId = readString(receipt.source_id) || readString(payload?.source_id) || "unknown_source";
+  const sourceHash =
+    readString(receipt.source_hash) ||
+    readString(receipt.sourceHash) ||
+    readString(payload?.source_hash) ||
+    readString(payload?.sourceHash) ||
+    null;
   const chunkId =
     readString(receipt.chunk_id) ||
     readString(payload?.chunk_id) ||
@@ -276,6 +315,7 @@ const normalizeProjection = (receipt: RecordLike): HelixLiveTranslationUiProject
     key: [
       projectionTarget,
       sourceId,
+      sourceHash,
       chunkId,
       targetLanguage,
       readString(receipt.dedupe_key) || readString(payload?.dedupe_key),
@@ -284,6 +324,7 @@ const normalizeProjection = (receipt: RecordLike): HelixLiveTranslationUiProject
     status,
     projectionTarget,
     sourceId,
+    ...(sourceHash ? { sourceHash } : {}),
     sourceKind: readString(receipt.source_kind) || readString(payload?.source_kind) || null,
     accountLocale: readString(receipt.account_locale) || readString(payload?.account_locale) || null,
     chunkId,
@@ -300,6 +341,9 @@ const normalizeProjection = (receipt: RecordLike): HelixLiveTranslationUiProject
     observedAtMs: readNumber(receipt.observed_at_ms) ?? readNumber(payload?.observed_at_ms),
     sourceEventMs: readNumber(receipt.source_event_ms) ?? readNumber(payload?.source_event_ms),
     freshnessStatus: readString(receipt.freshness_status) || readString(payload?.freshness_status) || "unknown",
+    terminalAuthorityStatus: readTerminalAuthorityStatus(
+      receipt.terminal_authority_status ?? payload?.terminal_authority_status,
+    ),
     stale: status === "stale",
     cancelRequested: status === "cancelled",
     terminalEligible: false,
@@ -352,6 +396,7 @@ export function summarizeHelixLiveTranslationUiProjectionTraffic(
   for (const projection of projections) {
     const key = [
       projection.sourceId,
+      projection.sourceHash ?? "",
       projection.projectionTarget,
       projection.targetLanguage,
     ].join("|");
@@ -371,6 +416,7 @@ export function summarizeHelixLiveTranslationUiProjectionTraffic(
     const latest = ordered.at(-1);
     return {
       sourceId: latest?.sourceId ?? "unknown_source",
+      ...(latest?.sourceHash ? { sourceHash: latest.sourceHash } : {}),
       sourceKind: latest?.sourceKind ?? null,
       accountLocale: latest?.accountLocale ?? null,
       projectionTarget: latest?.projectionTarget ?? "unknown",
@@ -385,6 +431,7 @@ export function summarizeHelixLiveTranslationUiProjectionTraffic(
       latestObservedAtMs: latest?.observedAtMs ?? null,
       latestSourceEventMs: latest?.sourceEventMs ?? null,
       latestFreshnessStatus: latest?.freshnessStatus ?? "unknown",
+      latestTerminalAuthorityStatus: latest?.terminalAuthorityStatus ?? "not_terminal_authority",
       latestObservationRef: latest?.observationRef ?? null,
       latestReceiptRef: latest?.receiptRef ?? null,
       latestLaneSessionId: latest?.laneSessionId ?? null,
@@ -396,6 +443,8 @@ export function summarizeHelixLiveTranslationUiProjectionTraffic(
   }).sort((left, right) => {
     const sourceDelta = left.sourceId.localeCompare(right.sourceId);
     if (sourceDelta !== 0) return sourceDelta;
+    const hashDelta = (left.sourceHash ?? "").localeCompare(right.sourceHash ?? "");
+    if (hashDelta !== 0) return hashDelta;
     const targetDelta = left.projectionTarget.localeCompare(right.projectionTarget);
     if (targetDelta !== 0) return targetDelta;
     return left.targetLanguage.localeCompare(right.targetLanguage);
@@ -406,6 +455,7 @@ export function selectHelixLiveTranslationUiProjection(
   input: SelectHelixLiveTranslationUiProjectionInput,
 ): HelixLiveTranslationUiProjectionSelection {
   const sourceId = readString(input.sourceId);
+  const sourceHash = readString(input.sourceHash) || null;
   const projectionTarget = readString(input.projectionTarget) || null;
   const targetLanguage = normalizeKeyText(input.targetLanguage) || null;
   const chunkId = readString(input.chunkId) || null;
@@ -413,6 +463,7 @@ export function selectHelixLiveTranslationUiProjection(
 
   const candidates = input.projections
     .filter((projection) => projection.sourceId === sourceId)
+    .filter((projection) => projectionSourceHashMatches(projection, sourceHash))
     .filter((projection) => !projectionTarget || projection.projectionTarget === projectionTarget)
     .filter((projection) => !targetLanguage || localeMatches(projection.targetLanguage, targetLanguage))
     .filter((projection) => !chunkId || projection.chunkId === chunkId)
@@ -435,6 +486,7 @@ export function selectHelixLiveTranslationUiProjection(
       receiptRef: null,
       laneSessionId: null,
       selectedBackendProvider: null,
+      terminalAuthorityStatus: "not_terminal_authority",
       terminalEligible: false,
       assistantAnswer: false,
       rawContentIncluded: false,
@@ -461,6 +513,7 @@ export function selectHelixLiveTranslationUiProjection(
     receiptRef: projection.receiptRef,
     laneSessionId: projection.laneSessionId,
     selectedBackendProvider: projection.selectedBackendProvider,
+    terminalAuthorityStatus: projection.terminalAuthorityStatus,
     terminalEligible: false,
     assistantAnswer: false,
     rawContentIncluded: false,
@@ -490,6 +543,7 @@ function buildHelixLiveTranslationUiProjectionSelectionFromProjection(
     receiptRef: projection.receiptRef,
     laneSessionId: projection.laneSessionId,
     selectedBackendProvider: projection.selectedBackendProvider,
+    terminalAuthorityStatus: projection.terminalAuthorityStatus,
     terminalEligible: false,
     assistantAnswer: false,
     rawContentIncluded: false,
@@ -507,6 +561,7 @@ export function buildHelixLiveTranslationInlineUnitStates(
       selectHelixLiveTranslationUiProjection({
         projections: input.projections,
         sourceId: input.sourceId,
+        sourceHash: input.sourceHash,
         projectionTarget: input.projectionTarget,
         targetLanguage: input.targetLanguage,
         chunkId: unitId,
@@ -516,6 +571,7 @@ export function buildHelixLiveTranslationInlineUnitStates(
       ? selectHelixLiveTranslationUiProjection({
         projections: input.projections,
         sourceId: input.sourceId,
+        sourceHash: input.sourceHash,
         projectionTarget: input.projectionTarget,
         targetLanguage: input.targetLanguage,
         dedupeKey: unitId,
@@ -525,6 +581,7 @@ export function buildHelixLiveTranslationInlineUnitStates(
     const fallbackByEmbeddedDedupe = fallbackByDedupe.status === "missing"
       ? input.projections
         .filter((projection) => projection.sourceId === input.sourceId)
+        .filter((projection) => projectionSourceHashMatches(projection, readString(input.sourceHash) || null))
         .filter((projection) => projection.projectionTarget === input.projectionTarget)
         .filter((projection) => localeMatches(projection.targetLanguage, input.targetLanguage))
         .filter((projection) => projection.dedupeKey?.includes(unitId))
@@ -546,6 +603,7 @@ export function buildHelixLiveTranslationInlineUnitStates(
         receiptRef: resolved.receiptRef,
         laneSessionId: resolved.laneSessionId,
         selectedBackendProvider: resolved.selectedBackendProvider,
+        terminalAuthorityStatus: resolved.terminalAuthorityStatus,
         projectionStatus: resolved.status,
         chunkId: resolved.projection?.chunkId ?? null,
         chunkIndex: resolved.projection?.chunkIndex ?? null,
@@ -554,6 +612,8 @@ export function buildHelixLiveTranslationInlineUnitStates(
         sourceEventMs: resolved.projection?.sourceEventMs ?? null,
         observedAtMs: resolved.projection?.observedAtMs ?? null,
         freshnessStatus: resolved.projection?.freshnessStatus ?? "unknown",
+        sourceId: resolved.projection?.sourceId ?? input.sourceId,
+        ...(resolved.projection?.sourceHash ? { sourceHash: resolved.projection.sourceHash } : {}),
         sourceKind: resolved.projection?.sourceKind ?? null,
         accountLocale: resolved.projection?.accountLocale ?? null,
         projectionTarget: resolved.projectionTarget,
@@ -572,6 +632,7 @@ export function buildHelixLiveTranslationInlineUnitStates(
       receiptRef: resolved.receiptRef,
       laneSessionId: resolved.laneSessionId,
       selectedBackendProvider: resolved.selectedBackendProvider,
+      terminalAuthorityStatus: resolved.terminalAuthorityStatus,
       projectionStatus: resolved.status,
       chunkId: resolved.projection?.chunkId ?? null,
       chunkIndex: resolved.projection?.chunkIndex ?? null,
@@ -580,6 +641,8 @@ export function buildHelixLiveTranslationInlineUnitStates(
       sourceEventMs: resolved.projection?.sourceEventMs ?? null,
       observedAtMs: resolved.projection?.observedAtMs ?? null,
       freshnessStatus: resolved.projection?.freshnessStatus ?? "unknown",
+      sourceId: resolved.projection?.sourceId ?? input.sourceId,
+      ...(resolved.projection?.sourceHash ? { sourceHash: resolved.projection.sourceHash } : {}),
       sourceKind: resolved.projection?.sourceKind ?? null,
       accountLocale: resolved.projection?.accountLocale ?? null,
       projectionTarget: resolved.projectionTarget,

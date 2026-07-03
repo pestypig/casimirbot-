@@ -104,6 +104,7 @@ export type { HelixAskConsoleAssemblyDebugSnapshot } from "./HelixAskConsoleDiag
 export {
   buildHelixAskActiveTurnDisplayViewModel,
   HELIX_ASK_ACTIVE_TURN_QUIET_GAP_MS,
+  HELIX_ASK_ACTIVE_TURN_QUIET_GAP_STATUS_TEXT,
   HELIX_ASK_ACTIVE_TURN_QUIET_GAP_TICK_MS,
 } from "./HelixAskActiveTurnDisplayViewModel";
 export type { HelixAskActiveTurnDisplayViewModel } from "./HelixAskActiveTurnDisplayViewModel";

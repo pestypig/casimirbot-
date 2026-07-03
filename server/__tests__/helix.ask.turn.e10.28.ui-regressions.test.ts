@@ -2,7 +2,10 @@ import express from "express";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 
-import { planRouter } from "../routes/agi.plan";
+import {
+  __helixAskTurnWorkspaceSnapshotTestApi,
+  planRouter,
+} from "../routes/agi.plan";
 
 const createApp = (): express.Express => {
   const app = express();
@@ -374,6 +377,61 @@ describe("helix ask turn e10.28 ui regressions", () => {
     expect(response.body?.workspace_context_snapshot?.hasNoteContext).toBe(true);
     expect(response.body?.route_reason_code).not.toBe("clarify:missing_args");
     expect(answerText(response.body)).not.toMatch(/I need active_doc_path/i);
+  });
+
+  it("does not merge stale stored note bodies over a fresh empty notes panel snapshot", async () => {
+    const sessionId = `e1028-empty-notes-authoritative-${Date.now()}`;
+    const staleNoteBody =
+      "A developed Common Core should help students form inner discipline and responsible self-direction.";
+
+    const stored = __helixAskTurnWorkspaceSnapshotTestApi.normalizeIncomingAskTurnWorkspaceSnapshot({
+      sessionId,
+      snapshot: {
+        sessionId,
+        activePanel: "workstation-notes",
+        activeDocPath: "/docs/research/example.md",
+        hasDocContext: true,
+        hasNoteContext: true,
+        activeNoteId: "note:old-common-core",
+        activeNoteTitle: "Old Common Core note",
+        activeNoteBody: staleNoteBody,
+        lastCreatedNoteId: "note:old-common-core",
+        lastCreatedNoteTitle: "Old Common Core note",
+        lastCreatedNoteBody: staleNoteBody,
+        recentNotes: [{ id: "note:old-common-core", title: "Old Common Core note", body: staleNoteBody }],
+      },
+    });
+    const incoming = __helixAskTurnWorkspaceSnapshotTestApi.normalizeIncomingAskTurnWorkspaceSnapshot({
+      sessionId,
+      snapshot: {
+        sessionId,
+        activePanel: "workstation-notes",
+        activeDocPath: null,
+        hasDocContext: false,
+        hasNoteContext: true,
+        activeNoteId: "note:manual:untitled-note",
+        activeNoteTitle: "Untitled note",
+        activeNoteBody: "",
+        lastCreatedNoteId: "note:manual:untitled-note",
+        lastCreatedNoteTitle: "Untitled note",
+        lastCreatedNoteBody: "",
+        recentNotes: [{ id: "note:manual:untitled-note", title: "Untitled note", body: "" }],
+      },
+    });
+    const snapshot = __helixAskTurnWorkspaceSnapshotTestApi.mergeAskTurnWorkspaceSnapshots({
+      incoming,
+      stored,
+    });
+
+    const snapshotText = JSON.stringify(snapshot ?? {});
+    expect(snapshot?.activeDocPath).toBe("/docs/research/example.md");
+    expect(snapshot?.activeNoteTitle).toBe("Untitled note");
+    expect(snapshot?.activeNoteBody ?? null).toBeNull();
+    expect(snapshot?.lastCreatedNoteTitle).toBe("Untitled note");
+    expect(snapshot?.lastCreatedNoteBody ?? null).toBeNull();
+    expect(__helixAskTurnWorkspaceSnapshotTestApi.resolveAskTurnWorkspaceNoteTitle(snapshot)).toBe("Untitled note");
+    expect(snapshotText).not.toContain("Common Core");
+    expect(snapshotText).not.toContain("self-direction");
   });
 
   it("does not stop hybrid open-and-explain prompts at the open-doc receipt", async () => {

@@ -181,6 +181,7 @@ describe("live_translation.translate_text one-shot lane", () => {
         source_language: "en",
         target_language: "fr",
         source_id: "docs:nhm2:whitepaper",
+        source_hash: "fnv1a32:whitepaper-v2",
         chunk_id: "chunk-7",
         chunk_index: 7,
         dedupe_key: "docs:nhm2:whitepaper:chunk-7:fr",
@@ -197,6 +198,7 @@ describe("live_translation.translate_text one-shot lane", () => {
     expect(result.observation).toMatchObject({
       lane_session_id: "lane-session-chunk",
       source_id: "docs:nhm2:whitepaper",
+      source_hash: "fnv1a32:whitepaper-v2",
       chunk_id: "chunk-7",
       chunk_index: 7,
       dedupe_key: "docs:nhm2:whitepaper:chunk-7:fr",
@@ -214,6 +216,7 @@ describe("live_translation.translate_text one-shot lane", () => {
       live_translation_chunk: {
         lane_session_id: "lane-session-chunk",
         source_id: "docs:nhm2:whitepaper",
+        source_hash: "fnv1a32:whitepaper-v2",
         chunk_id: "chunk-7",
         chunk_index: 7,
         dedupe_key: "docs:nhm2:whitepaper:chunk-7:fr",
@@ -243,6 +246,7 @@ describe("live_translation.translate_text one-shot lane", () => {
       projection_target: "docs_chunk",
       projection_status: "stale",
       source_id: "docs:nhm2:whitepaper",
+      source_hash: "fnv1a32:whitepaper-v2",
       chunk_id: "chunk-7",
       chunk_index: 7,
       dedupe_key: "docs:nhm2:whitepaper:chunk-7:fr",
@@ -266,6 +270,60 @@ describe("live_translation.translate_text one-shot lane", () => {
     );
   });
 
+  it("keeps same-text chunks distinct by source and chunk identity", () => {
+    const first = runLiveTranslationTranslateText({
+      provider: buildProvider("codex"),
+      request: request({
+        text: "hello",
+        target_language: "es",
+        source_id: "docs:nhm2:whitepaper",
+        source_hash: "fnv1a32:whitepaper-v2",
+        chunk_id: "chunk-1",
+        chunk_index: 1,
+        dedupe_key: "docs:nhm2:whitepaper:chunk-1:es",
+        source_event_id: "docs:nhm2:whitepaper:event-1",
+        projection_target: "docs_chunk",
+      }),
+      turnId: "turn-translation-chunk-identity",
+      env: {} as NodeJS.ProcessEnv,
+    });
+    const second = runLiveTranslationTranslateText({
+      provider: buildProvider("codex"),
+      request: request({
+        text: "hello",
+        target_language: "es",
+        source_id: "docs:nhm2:whitepaper",
+        source_hash: "fnv1a32:whitepaper-v2",
+        chunk_id: "chunk-2",
+        chunk_index: 2,
+        dedupe_key: "docs:nhm2:whitepaper:chunk-2:es",
+        source_event_id: "docs:nhm2:whitepaper:event-2",
+        projection_target: "docs_chunk",
+      }),
+      turnId: "turn-translation-chunk-identity",
+      env: {} as NodeJS.ProcessEnv,
+    });
+
+    expect(first.ok).toBe(true);
+    expect(second.ok).toBe(true);
+    expect(first.translated_text).toBe(second.translated_text);
+    expect(first.observation?.observation_ref).not.toBe(second.observation?.observation_ref);
+    expect(first.observation?.observation_id).toBe(first.observation?.observation_ref);
+    expect(second.observation?.observation_id).toBe(second.observation?.observation_ref);
+    expect(first.observation_packet.produced_artifact_refs).toEqual([
+      first.observation?.observation_ref,
+    ]);
+    expect(second.observation_packet.produced_artifact_refs).toEqual([
+      second.observation?.observation_ref,
+    ]);
+    expect(first.observation_packet.state_delta.live_translation_projection_receipt?.observation_ref).toBe(
+      first.observation?.observation_ref,
+    );
+    expect(second.observation_packet.state_delta.live_translation_projection_receipt?.observation_ref).toBe(
+      second.observation?.observation_ref,
+    );
+  });
+
   it("normalizes cancelled chunks as non-terminal cancelled evidence without backend execution", () => {
     const result = runLiveTranslationTranslateText({
       provider: buildProvider("codex"),
@@ -273,6 +331,7 @@ describe("live_translation.translate_text one-shot lane", () => {
         text: "hello",
         target_language: "es",
         source_id: "docs:hover",
+        source_hash: "fnv1a32:hover-v1",
         chunk_id: "hover-1",
         projection_target: "docs_hover",
         cancel_requested: true,
@@ -304,6 +363,7 @@ describe("live_translation.translate_text one-shot lane", () => {
         live_translation_chunk: {
           lane_session_id: null,
           source_id: "docs:hover",
+          source_hash: "fnv1a32:hover-v1",
           chunk_id: "hover-1",
           projection_target: "docs_hover",
           cancel_requested: true,
@@ -331,6 +391,7 @@ describe("live_translation.translate_text one-shot lane", () => {
       projection_target: "docs_hover",
       projection_status: "cancelled",
       source_id: "docs:hover",
+      source_hash: "fnv1a32:hover-v1",
       chunk_id: "hover-1",
       target_language: "es",
       translated_text: null,

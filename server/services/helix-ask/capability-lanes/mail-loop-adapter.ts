@@ -74,6 +74,7 @@ const buildMailLoopDebugSummary = (input: {
   const observation = input.translationResult.observation;
   const packet = input.translationResult.observation_packet;
   const chunk = readRecord(packet.state_delta?.live_translation_chunk);
+  const projectionTarget = readString(observation?.projection_target) || readString(chunk?.projection_target);
   const receiptRef = readReceiptRef(input.translationResult);
   const evidenceRefs = input.mail?.evidenceRefs ?? input.translationResult.artifact_refs ?? [];
   return {
@@ -87,14 +88,15 @@ const buildMailLoopDebugSummary = (input: {
     stage_play_wake_expected: input.stagePlayWakeExpected,
     mailbox_thread_id: input.threadId,
     source_id: readString(observation?.source_id) || readString(chunk?.source_id) || input.mail?.sourceId || null,
-    source_kind: input.mail?.sourceKind ?? null,
+    source_hash: readString(observation?.source_hash) || readString(chunk?.source_hash) || null,
+    source_kind: input.mail?.sourceKind ?? (projectionTarget ? sourceKindForProjectionTarget(projectionTarget) : null),
     chunk_id: readString(observation?.chunk_id) || readString(chunk?.chunk_id) || null,
     chunk_index: readNumber(observation?.chunk_index) ?? readNumber(chunk?.chunk_index),
     dedupe_key: readString(observation?.dedupe_key) || readString(chunk?.dedupe_key) || null,
     source_event_id: readString(observation?.source_event_id) || readString(chunk?.source_event_id) || null,
     source_event_ms: readNumber(observation?.source_event_ms) ?? readNumber(chunk?.source_event_ms),
     observed_at_ms: readNumber(observation?.observed_at_ms) ?? readNumber(chunk?.observed_at_ms),
-    projection_target: readString(observation?.projection_target) || readString(chunk?.projection_target) || null,
+    projection_target: projectionTarget || null,
     target_language: readString(observation?.target_language) || readString(chunk?.target_language) || null,
     cancel_requested: observation?.cancel_requested === true || chunk?.cancel_requested === true,
     selected_backend_provider: input.translationResult.lane_resolve_trace.selected_backend_provider,
@@ -242,9 +244,66 @@ export const routeLiveTranslationObservationToMailLoop = (input: {
       raw_content_included: false,
     };
   }
+  if (observation.source_id && observation.source_id !== session.source_binding.source_id) {
+    const debugSummary = buildMailLoopDebugSummary({
+      laneSessionId: input.laneSessionId,
+      translationResult: input.translationResult,
+      threadId: input.threadId,
+      observationRef,
+      mail: null,
+      blockedReason: "source_id_mismatch",
+      stagePlayWakeExpected: false,
+    });
+    return {
+      schema: "helix.capability_lane.mail_loop_result.v1",
+      ok: false,
+      lane_session_id: input.laneSessionId,
+      lane_id: "live_translation",
+      observation_ref: observationRef,
+      mail: null,
+      stage_play_mail_id: null,
+      stage_play_wake_expected: false,
+      debug_summary: debugSummary,
+      blocked_reason: "source_id_mismatch",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+  }
+  if (
+    observation.source_hash &&
+    session.source_binding.source_hash &&
+    observation.source_hash !== session.source_binding.source_hash
+  ) {
+    const debugSummary = buildMailLoopDebugSummary({
+      laneSessionId: input.laneSessionId,
+      translationResult: input.translationResult,
+      threadId: input.threadId,
+      observationRef,
+      mail: null,
+      blockedReason: "source_hash_mismatch",
+      stagePlayWakeExpected: false,
+    });
+    return {
+      schema: "helix.capability_lane.mail_loop_result.v1",
+      ok: false,
+      lane_session_id: input.laneSessionId,
+      lane_id: "live_translation",
+      observation_ref: observationRef,
+      mail: null,
+      stage_play_mail_id: null,
+      stage_play_wake_expected: false,
+      debug_summary: debugSummary,
+      blocked_reason: "source_hash_mismatch",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+  }
 
   const projectionTarget = observation.projection_target;
   const sourceId = observation.source_id || session.source_binding.source_id;
+  const sourceHash = observation.source_hash || session.source_binding.source_hash || null;
   const chunkId = observation.chunk_id;
   const translated = observation.translated_text;
   const summaryText = [
@@ -257,6 +316,7 @@ export const routeLiveTranslationObservationToMailLoop = (input: {
   const evidenceRefs = [
     session.lane_session_id,
     sourceId,
+    sourceHash,
     chunkId,
     observation.source_event_id,
     observationRef,
@@ -273,6 +333,14 @@ export const routeLiveTranslationObservationToMailLoop = (input: {
     sourceKind: sourceKindForProjectionTarget(projectionTarget),
     evidenceRef: observationRef,
     observationRef,
+    sourceHash,
+    chunkId,
+    chunkIndex: observation.chunk_index,
+    dedupeKey: observation.dedupe_key,
+    sourceEventId: observation.source_event_id,
+    sourceEventMs: observation.source_event_ms,
+    projectionTarget,
+    targetLanguage: observation.target_language,
     summaryText,
     summaryPreview: translated,
     confidence: observation.confidence,
@@ -288,6 +356,16 @@ export const routeLiveTranslationObservationToMailLoop = (input: {
     observationRef: mail.mailId,
     receiptRef: readReceiptRef(input.translationResult),
     nowMs: input.now ? Date.parse(input.now) : undefined,
+    sourceHash,
+    chunkId: observation.chunk_id,
+    chunkIndex: observation.chunk_index,
+    dedupeKey: observation.dedupe_key,
+    sourceEventId: observation.source_event_id,
+    sourceEventMs: observation.source_event_ms,
+    observedAtMs: observation.observed_at_ms,
+    freshnessStatus: observation.freshness_status,
+    projectionTarget: observation.projection_target,
+    cancelRequested: observation.cancel_requested,
   });
   const stagePlayWakeExpected = mail.status === "unread";
   const debugSummary = buildMailLoopDebugSummary({

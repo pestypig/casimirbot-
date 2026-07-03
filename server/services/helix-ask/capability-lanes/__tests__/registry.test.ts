@@ -228,6 +228,62 @@ describe("Helix capability lane registry", () => {
         }),
       ],
     });
+    expect(helix.lanes.find((lane) => lane.lane_id === "text_to_speech")).toMatchObject({
+      status: "dry_run",
+      backend_family: "local_runtime",
+      model_or_service_ref: "existing_voice_service",
+      default_backend_provider: "text_to_speech.existing_voice_service",
+      backend_providers: [
+        expect.objectContaining({
+          provider_id: "text_to_speech.existing_voice_service",
+          configuration_status: "not_required",
+          required_env_vars: [],
+          configured_env_vars: [],
+          availability_status: "dry_run",
+          permission_status: "admitted",
+          cost_class: "free_local",
+          latency_class: "interactive",
+          privacy_class: "local_only",
+          raw_secret_exposed: false,
+        }),
+        expect.objectContaining({
+          provider_id: "text_to_speech.elevenlabs",
+          configuration_status: "configured",
+          required_env_vars: ["ELEVENLABS_API_KEY"],
+          configured_env_vars: ["ELEVENLABS_API_KEY"],
+          availability_status: "dry_run",
+          permission_status: "admitted",
+          cost_class: "standard",
+          latency_class: "interactive",
+          privacy_class: "external_provider",
+          fallback_backend_provider: "text_to_speech.existing_voice_service",
+          raw_secret_exposed: false,
+        }),
+      ],
+      one_shot_call_contract: expect.objectContaining({
+        supported: true,
+        terminal_eligible: false,
+        assistant_answer: false,
+      }),
+      receipt_contract: expect.objectContaining({
+        reentry_required: true,
+        terminal_eligible: false,
+        assistant_answer: false,
+      }),
+      capabilities: [
+        expect.objectContaining({
+          capability_id: "text_to_speech.speak_text",
+          one_shot_status: "executable",
+          session_status: "not_supported",
+          backend_provider_required: true,
+          result_authority: "observation_or_receipt_only",
+          reentry_required: true,
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        }),
+      ],
+    });
     expect(codex.lanes.find((lane) => lane.lane_id === "workstation_tool_reference")).toMatchObject({
       status: "available",
       backend_family: "helix_workstation_gateway",
@@ -474,7 +530,7 @@ describe("Helix capability lane registry", () => {
     });
     const unconfigured = resolveHelixCapabilityLaneRequest({
       provider: buildProvider({ id: "helix" }),
-      requestedLane: "text_to_speech",
+      requestedLane: "speech_to_text",
       env: {} as NodeJS.ProcessEnv,
     });
 

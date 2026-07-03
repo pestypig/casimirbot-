@@ -271,6 +271,7 @@ export const hawMessages = {
   "docsViewer.translation.status.mailLoopBlocked": "Ua ālai ʻia ka mail loop unuhi: {status}",
   "docsViewer.translation.status.mailLoopPending": "Ke kali nei ka mail loop unuhi: {status}",
   "docsViewer.translation.status.goalBindingActive": "Ke ola nei ka goal binding unuhi: {status}",
+  "docsViewer.translation.status.goalBindingBlocked": "Ua ālai ʻia ka goal binding unuhi: {status}",
   "docsViewer.translation.status.unavailable": "ʻAʻole loaʻa ka unuhi document: {reason}",
   "docsViewer.translation.status.error": "Hāʻule ka unuhi document: {reason}",
   "docsViewer.translation.errorGeneric": "ʻAʻole hiki i ka lawelawe unuhi ke hana i ka ʻōlelo i kēia manawa.",

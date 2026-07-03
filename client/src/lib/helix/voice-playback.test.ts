@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyLatestWinsVoiceQueue,
   createVoicePlaybackUtterance,
+  prepareVoicePlaybackQueueUpdate,
   segmentVoicePlaybackText,
   trimVoicePlaybackQueue,
 } from "@/lib/helix/voice-playback";
@@ -156,7 +157,7 @@ describe("applyLatestWinsVoiceQueue", () => {
     expect(next.droppedUtteranceIds.sort()).toEqual(["final-turn-c-r1", "final-turn-c-r2"]);
   });
 
-  it("treats tool receipts as authoritative same-turn replacements", () => {
+  it("keeps tool receipts as chronological same-turn observations", () => {
     const queue = [
       make("brief-turn-c-r1", "turn-c", "brief", 1),
       make("receipt-turn-c-r1", "turn-c", "tool_receipt", 1),
@@ -170,11 +171,13 @@ describe("applyLatestWinsVoiceQueue", () => {
     });
 
     expect(next.queue.map((entry) => entry.utteranceId)).toEqual([
+      "brief-turn-c-r1",
+      "receipt-turn-c-r1",
       "final-turn-z-r1",
       "receipt-turn-c-r2",
     ]);
-    expect(next.droppedUtteranceIds.sort()).toEqual(["brief-turn-c-r1", "receipt-turn-c-r1"]);
-    expect(next.pendingPreemptPolicy).toBe("pending_regen");
+    expect(next.droppedUtteranceIds).toEqual([]);
+    expect(next.pendingPreemptPolicy).toBe("none");
   });
 
   it("does not drop manual read-aloud queued for a different reply when a tool receipt arrives", () => {
@@ -232,5 +235,108 @@ describe("trimVoicePlaybackQueue", () => {
 
     expect(next.queue.map((entry) => entry.utteranceId)).toEqual(["c", "d"]);
     expect(next.droppedUtteranceIds).toEqual(["a", "b"]);
+  });
+});
+
+describe("prepareVoicePlaybackQueueUpdate", () => {
+  const task = (overrides: Partial<Parameters<typeof prepareVoicePlaybackQueueUpdate>[0]["task"]> = {}) => ({
+    key: "voice-task-1",
+    turnKey: "turn-a",
+    kind: "tool_receipt" as const,
+    revision: 1,
+    text: "Voice playback helper should queue this text.",
+    eventId: "event-1",
+    ...overrides,
+  });
+
+  it("creates an utterance and applies queue limits in one pure update", () => {
+    const result = prepareVoicePlaybackQueueUpdate({
+      queue: [],
+      active: null,
+      task: task(),
+      maxTextChars: 2400,
+      maxQueueLength: 8,
+      isStale: () => false,
+    });
+
+    expect(result).toMatchObject({
+      accepted: true,
+      droppedUtteranceIds: [],
+      pendingPreemptPolicy: "none",
+      supersededActiveReason: null,
+    });
+    expect(result.queue.map((entry) => entry.utteranceId)).toEqual(["voice-task-1"]);
+    if (result.accepted) {
+      expect(result.utterance.text).toBe("Voice playback helper should queue this text.");
+      expect(result.utterance.chunks.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("rejects duplicate active utterances without changing the queue", () => {
+    const active = createVoicePlaybackUtterance({
+      utteranceId: "active-voice",
+      turnKey: "turn-a",
+      kind: "tool_receipt",
+      revision: 1,
+      text: "Voice playback helper should queue this text.",
+      eventId: "active-voice",
+      enqueuedAtMs: 1,
+    });
+    const queue = [
+      createVoicePlaybackUtterance({
+        utteranceId: "queued-other",
+        turnKey: "turn-b",
+        kind: "tool_receipt",
+        revision: 1,
+        text: "Other queued text.",
+        eventId: "queued-other",
+        enqueuedAtMs: 2,
+      }),
+    ];
+
+    const result = prepareVoicePlaybackQueueUpdate({
+      queue,
+      active,
+      task: task({ key: "incoming-duplicate" }),
+      maxTextChars: 2400,
+      maxQueueLength: 8,
+      isStale: () => false,
+    });
+
+    expect(result).toMatchObject({
+      accepted: false,
+      reason: "duplicate",
+      queue,
+      droppedUtteranceIds: [],
+    });
+  });
+
+  it("reports stale queued drops before accepting the incoming utterance", () => {
+    const staleQueued = createVoicePlaybackUtterance({
+      utteranceId: "stale-final",
+      turnKey: "turn-a",
+      kind: "final",
+      revision: 1,
+      text: "Stale final answer.",
+      eventId: "stale-final",
+      enqueuedAtMs: 1,
+    });
+
+    const result = prepareVoicePlaybackQueueUpdate({
+      queue: [staleQueued],
+      active: null,
+      task: task({ key: "voice-task-2", revision: 2 }),
+      maxTextChars: 2400,
+      maxQueueLength: 8,
+      isStale: ({ turnKey, revision, kind }: {
+        turnKey: string;
+        revision: number;
+        kind: "brief" | "final" | "tool_receipt" | "manual_read_aloud" | "translation_relay" | "narrator_read" | "panel_narration";
+      }) => kind === "final" && turnKey === "turn-a" && revision === 1,
+    });
+
+    expect(result.accepted).toBe(true);
+    expect(result.queue.map((entry) => entry.utteranceId)).toEqual(["voice-task-2"]);
+    expect(result.droppedUtteranceIds).toContain("stale-final");
   });
 });

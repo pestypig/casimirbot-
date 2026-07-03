@@ -250,6 +250,15 @@ export type StagePlayLiveSourceMailItemV1 = {
     frameRef?: string | null;
     evidenceRef?: string | null;
     observationRef?: string | null;
+    sourceHash?: string | null;
+    chunkId?: string | null;
+    chunkIndex?: number | null;
+    dedupeKey?: string | null;
+    sourceEventId?: string | null;
+    sourceEventMs?: number | null;
+    projectionTarget?: string | null;
+    targetLanguage?: string | null;
+    accountLocale?: string | null;
   };
   summary: {
     text: string;
@@ -889,8 +898,17 @@ export type StagePlayDocumentInlineTranslationOutputV1 = {
   sourceId: string;
   docPath: string | null;
   sourceHash: string | null;
+  chunkId: string | null;
+  chunkIndex: number | null;
+  dedupeKey: string | null;
+  sourceEventId: string | null;
+  sourceEventMs: number | null;
   locale: string;
+  targetLanguage: string;
+  accountLocale: string;
   projectionTarget: "docs_viewer_inline";
+  projectionStatus: "projected" | "stale" | "failed" | "cancelled";
+  freshnessStatus: string;
   translations: Array<{
     unit_id: string;
     translated_markdown: string;
@@ -907,6 +925,7 @@ export type StagePlayDocumentInlineTranslationOutputV1 = {
     detail: string;
   }>;
   evidenceRefs: string[];
+  observedAtMs: number | null;
   createdAt: string;
   assistant_answer: false;
   terminal_eligible: false;

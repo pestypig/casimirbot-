@@ -88,12 +88,17 @@ const readGoalDispatchReadiness = (
   plans: Record<string, unknown>[],
   admissions: Record<string, unknown>[],
 ): HelixCapabilityLaneGoalDispatchReadiness | null => {
-  if (isGoalDispatchReadiness(providerDebug.capability_lane_goal_dispatch_readiness)) {
-    return providerDebug.capability_lane_goal_dispatch_readiness;
-  }
-
   const typedPlans = plans.filter(isGoalDispatchPlan);
   const typedAdmissions = admissions.filter(isGoalDispatchAdmission);
+  if (isGoalDispatchReadiness(providerDebug.capability_lane_goal_dispatch_readiness)) {
+    const existing = providerDebug.capability_lane_goal_dispatch_readiness;
+    const hasSourceHashInputs = [...typedPlans, ...typedAdmissions].some((entry) =>
+      typeof entry.source_hash === "string" && entry.source_hash.trim().length > 0);
+    if (!hasSourceHashInputs || Array.isArray(existing.next_source_hashes)) {
+      return existing;
+    }
+  }
+
   if (typedPlans.length === 0 && typedAdmissions.length === 0) return null;
 
   return buildHelixCapabilityLaneGoalDispatchReadiness({
