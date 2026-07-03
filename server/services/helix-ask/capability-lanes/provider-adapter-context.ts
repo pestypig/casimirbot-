@@ -265,6 +265,15 @@ const buildCapabilityLaneGoalDispatchAdmissions = (
     .map((summary) => summary.dispatch_admission)
     .filter((admission): admission is HelixCapabilityLaneGoalDispatchAdmission => Boolean(admission));
 
+const readGoalDispatchReadinessTimelineStatus = (
+  readiness: HelixCapabilityLaneGoalDispatchReadiness,
+): "ready" | "blocked" | "partial" =>
+  readiness.blocked_count > 0 && readiness.admitted_count > 0
+    ? "partial"
+    : readiness.blocked_count > 0
+      ? "blocked"
+      : "ready";
+
 export const buildCapabilityLaneProviderTimeline = (input: {
   provider: HelixAgentProvider;
   manifest: HelixAgentModelVisibleCapabilityLaneManifest;
@@ -703,12 +712,13 @@ export const buildCapabilityLaneProviderTimeline = (input: {
   });
 
   if (input.goalDispatchReadiness) {
+    const readinessStatus = readGoalDispatchReadinessTimelineStatus(input.goalDispatchReadiness);
     push({
       stage: "lane_goal_dispatch_readiness",
       selected_runtime_agent_provider: input.provider.id,
       lane_id: input.goalDispatchReadiness.next_lane_ids[0] ?? "capability_lane_goal_dispatch",
       capability_id: null,
-      status: input.goalDispatchReadiness.blocked_count > 0 ? "blocked" : "ready",
+      status: readinessStatus,
       lane_visible: false,
       lane_requested: input.goalDispatchReadiness.total_plans > 0,
       lane_executed: false,
@@ -746,7 +756,7 @@ export const buildCapabilityLaneProviderTimeline = (input: {
       goal_binding_id: input.goalDispatchReadiness.next_goal_binding_ids[0] ?? null,
       lane_session_id: input.goalDispatchReadiness.next_lane_session_ids[0] ?? null,
       dispatch_target: input.goalDispatchReadiness.next_dispatch_targets[0] ?? null,
-      dispatch_admission_status: input.goalDispatchReadiness.blocked_count > 0 ? "blocked" : "ready",
+      dispatch_admission_status: readinessStatus,
       dispatch_blocked_reason: input.goalDispatchReadiness.blocked_reasons[0] ?? null,
       materialized_mail_loop_evidence: input.goalDispatchReadiness.next_mail_loop_observation_keys.length > 0,
       wake_dispatch_allowed: input.goalDispatchReadiness.wake_dispatch_allowed,
