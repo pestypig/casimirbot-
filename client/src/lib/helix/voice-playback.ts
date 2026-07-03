@@ -124,6 +124,27 @@ export type VoicePlaybackQueuePrepareResult =
       pendingPreemptPolicy: VoicePreemptPolicy;
     };
 
+export type VoicePlaybackTimelineMetaUpdateResult = {
+  evictedUtteranceIds: string[];
+  deletedDroppedUtteranceIds: string[];
+};
+
+export type VoicePlaybackTimelineMeta = {
+  briefSource: "llm" | "none" | null;
+  finalSource: "normal_reasoning" | "strict_gate_override" | null;
+  authority: VoicePlaybackIntentAuthority | null;
+  source: VoicePlaybackIntentSource | null;
+  replyId: string | null;
+  interimVoiceRequestId: string | null;
+  interimVoiceReceiptId: string | null;
+  interimVoiceReceiptKey: string | null;
+  interimVoiceCalloutKind: string | null;
+  hlcMs: number | null;
+  seq: number | null;
+  revision: number | null;
+  sealToken: string | null;
+};
+
 const DEFAULT_TARGET_MIN_CHARS = 90;
 const DEFAULT_TARGET_MAX_CHARS = 160;
 const DEFAULT_HARD_MAX_CHARS = 220;
@@ -515,5 +536,69 @@ export function prepareVoicePlaybackQueueUpdate(input: {
     droppedUtteranceIds,
     supersededActiveReason: nextQueue.supersededActiveReason,
     pendingPreemptPolicy: nextQueue.pendingPreemptPolicy,
+  };
+}
+
+export function applyVoicePlaybackTimelineMetaUpdate<T>(input: {
+  metaByUtteranceId: Map<string, T>;
+  utteranceId: string;
+  meta: T;
+  droppedUtteranceIds?: string[];
+  maxEntries: number;
+}): VoicePlaybackTimelineMetaUpdateResult {
+  input.metaByUtteranceId.set(input.utteranceId, input.meta);
+  const evictedUtteranceIds: string[] = [];
+  const limit = Math.max(0, Math.floor(input.maxEntries));
+  while (input.metaByUtteranceId.size > limit) {
+    const oldest = input.metaByUtteranceId.keys().next().value;
+    if (typeof oldest !== "string" || !oldest) break;
+    input.metaByUtteranceId.delete(oldest);
+    evictedUtteranceIds.push(oldest);
+  }
+  const deletedDroppedUtteranceIds: string[] = [];
+  for (const droppedId of input.droppedUtteranceIds ?? []) {
+    if (input.metaByUtteranceId.delete(droppedId)) {
+      deletedDroppedUtteranceIds.push(droppedId);
+    }
+  }
+  return {
+    evictedUtteranceIds,
+    deletedDroppedUtteranceIds,
+  };
+}
+
+export function buildVoicePlaybackTimelineMeta(input: {
+  task: {
+    briefSource?: "llm" | "none";
+    finalSource?: "normal_reasoning" | "strict_gate_override";
+    authority?: VoicePlaybackIntentAuthority;
+    source?: VoicePlaybackIntentSource;
+    replyId?: string;
+    interimVoiceRequestId?: string;
+    interimVoiceReceiptId?: string;
+    interimVoiceReceiptKey?: string;
+    interimVoiceCalloutKind?: string;
+    revision: number;
+  };
+  assemblerState?: {
+    hlcMs?: number | null;
+    eventSeq?: number | null;
+    sealToken?: string | null;
+  } | null;
+}): VoicePlaybackTimelineMeta {
+  return {
+    briefSource: input.task.briefSource ?? null,
+    finalSource: input.task.finalSource ?? null,
+    authority: input.task.authority ?? null,
+    source: input.task.source ?? null,
+    replyId: input.task.replyId ?? null,
+    interimVoiceRequestId: input.task.interimVoiceRequestId ?? null,
+    interimVoiceReceiptId: input.task.interimVoiceReceiptId ?? null,
+    interimVoiceReceiptKey: input.task.interimVoiceReceiptKey ?? null,
+    interimVoiceCalloutKind: input.task.interimVoiceCalloutKind ?? null,
+    hlcMs: input.assemblerState?.hlcMs ?? null,
+    seq: input.assemblerState?.eventSeq ?? null,
+    revision: input.task.revision,
+    sealToken: input.assemblerState?.sealToken ?? null,
   };
 }

@@ -45,6 +45,7 @@ export type HelixCapabilityLaneSessionCall = {
   lane_session_id?: string | null;
   requested_backend_provider?: string | null;
   source_binding?: Partial<HelixCapabilityLaneSessionSourceBinding> | null;
+  source_id?: string | null;
   observation_ref?: string | null;
   receipt_ref?: string | null;
   chunk_id?: string | null;
@@ -54,6 +55,8 @@ export type HelixCapabilityLaneSessionCall = {
   source_event_ms?: number | null;
   observed_at_ms?: number | null;
   freshness_status?: "fresh" | "stale" | "unknown" | string | null;
+  source_text_hash?: string | null;
+  source_text_char_count?: number | null;
   projection_target?: string | null;
   cancel_requested?: boolean | null;
   reason?: string | null;
@@ -113,6 +116,8 @@ export type HelixCapabilityLaneSessionEvent = {
   source_event_ms?: number | null;
   observed_at_ms?: number | null;
   freshness_status?: string | null;
+  source_text_hash?: string | null;
+  source_text_char_count?: number | null;
   projection_target?: string | null;
   cancel_requested?: boolean | null;
   terminal_authority_status: "not_terminal_authority" | "pending_helix_terminal_authority";
@@ -158,6 +163,7 @@ export type HelixCapabilityLaneSessionDebugSummary = {
   latency_class: HelixCapabilityLaneLatencyClass | "unknown" | null;
   privacy_class: HelixCapabilityLanePrivacyClass | "unknown" | null;
   fallback_backend_provider: string | null;
+  lifecycle_action: HelixCapabilityLaneSessionEventAction | null;
   session_status: HelixCapabilityLaneSessionStatus;
   session_health: HelixCapabilityLaneSessionHealth;
   source_id: string | null;
@@ -167,17 +173,23 @@ export type HelixCapabilityLaneSessionDebugSummary = {
   account_locale: string | null;
   target_language?: string | null;
   permissions: HelixCapabilityLaneSessionPermissions;
+  permission_profile: string;
   created_at_ms: number;
   updated_at_ms: number;
   last_observation_ref: string | null;
   last_receipt_ref: string | null;
   latest_chunk_id?: string | null;
   latest_chunk_index?: number | null;
+  latest_source_id?: string | null;
+  latest_source_hash?: string | null;
+  latest_target_language?: string | null;
   latest_dedupe_key?: string | null;
   latest_source_event_id?: string | null;
   latest_source_event_ms?: number | null;
   latest_observed_at_ms?: number | null;
   latest_freshness_status?: string | null;
+  source_text_hash?: string | null;
+  source_text_char_count?: number | null;
   latest_projection_target?: string | null;
   latest_cancel_requested?: boolean | null;
   latest_session_event: HelixCapabilityLaneSessionEvent | null;

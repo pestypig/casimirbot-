@@ -298,6 +298,10 @@ const latestMailBefore = (input: {
 const hasMailForEvidence = (evidenceRef: string): StagePlayLiveSourceMailItemV1 | null =>
   Array.from(mailById.values()).find((item) => item.sourceRefs.evidenceRef === evidenceRef || item.evidenceRefs.includes(evidenceRef)) ?? null;
 
+export const getStagePlayLiveSourceMailItemForEvidenceRef = (
+  evidenceRef: string,
+): StagePlayLiveSourceMailItemV1 | null => hasMailForEvidence(evidenceRef);
+
 export function enqueueStagePlayLiveSourceMailItem(input: {
   threadId: string;
   roomId?: string | null;

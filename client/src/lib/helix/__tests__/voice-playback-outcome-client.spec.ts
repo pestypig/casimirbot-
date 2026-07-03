@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import type { VoicePlaybackOutcomeReceipt } from "../voice-capture-diagnostics";
 import {
+  appendVoicePlaybackOutcomeReceipt,
   buildVoicePlaybackOutcomeReceipt,
   postVoicePlaybackOutcomeReceipt,
+  resolveVoicePlaybackOutcomeStatus,
 } from "../voice-playback-outcome-client";
 
 const buildReceipt = (overrides: Partial<VoicePlaybackOutcomeReceipt> = {}): VoicePlaybackOutcomeReceipt => ({
@@ -35,6 +37,25 @@ const buildReceipt = (overrides: Partial<VoicePlaybackOutcomeReceipt> = {}): Voi
 });
 
 describe("voice playback outcome client", () => {
+  it("resolves final playback outcome status from overrides and cancel reasons", () => {
+    expect(resolveVoicePlaybackOutcomeStatus({
+      override: null,
+      cancelReason: null,
+    })).toBe("delivered");
+    expect(resolveVoicePlaybackOutcomeStatus({
+      override: null,
+      cancelReason: "error",
+    })).toBe("failed");
+    expect(resolveVoicePlaybackOutcomeStatus({
+      override: null,
+      cancelReason: "barge_in",
+    })).toBe("cancelled");
+    expect(resolveVoicePlaybackOutcomeStatus({
+      override: "suppressed",
+      cancelReason: null,
+    })).toBe("suppressed");
+  });
+
   it("builds governed non-terminal playback outcome receipts", () => {
     expect(buildVoicePlaybackOutcomeReceipt({
       status: "queued",
@@ -64,6 +85,28 @@ describe("voice playback outcome client", () => {
       raw_content_included: false,
       output_authority: "playback_observation",
     });
+  });
+
+  it("keeps the newest bounded playback outcome receipts", () => {
+    const statuses: VoicePlaybackOutcomeReceipt["status"][] = ["queued", "delivered", "failed"];
+    const receipts = statuses.map((status, index) =>
+      buildReceipt({
+        receiptId: `voice_playback_outcome:${status}`,
+        status,
+        atMs: index + 1,
+      }),
+    );
+
+    const next = appendVoicePlaybackOutcomeReceipt(
+      receipts.slice(0, 2),
+      receipts[2]!,
+      2,
+    );
+
+    expect(next.map((receipt) => receipt.receiptId)).toEqual([
+      "voice_playback_outcome:delivered",
+      "voice_playback_outcome:failed",
+    ]);
   });
 
   it("posts non-terminal playback receipts to the live-environment evidence endpoint", async () => {

@@ -12,6 +12,18 @@ const uniqueTargets = (
   values: HelixCapabilityLaneGoalDispatchTarget[],
 ): HelixCapabilityLaneGoalDispatchTarget[] => Array.from(new Set(values));
 
+const uniqueNumbers = (values: number[]): number[] => Array.from(new Set(values));
+
+const admissionPermissionsAreNonMutating = (
+  admission: HelixCapabilityLaneGoalDispatchAdmission,
+): boolean => {
+  const permissions = admission.permissions;
+  if (!permissions) return true;
+  return permissions.write === false &&
+    permissions.shell === false &&
+    permissions.code_mutation === false;
+};
+
 export const buildHelixCapabilityLaneGoalDispatchReadiness = (input: {
   plans: HelixCapabilityLaneGoalDispatchPlan[];
   admissions: HelixCapabilityLaneGoalDispatchAdmission[];
@@ -70,11 +82,28 @@ export const buildHelixCapabilityLaneGoalDispatchReadiness = (input: {
     next_chunk_ids: uniqueStrings(
       admitted.map((admission) => admission.latest_chunk_id ?? "").filter(Boolean),
     ),
+    next_latest_source_ids: uniqueStrings(
+      admitted.map((admission) => admission.latest_source_id ?? "").filter(Boolean),
+    ),
+    next_latest_source_hashes: uniqueStrings(
+      admitted.map((admission) => admission.latest_source_hash ?? "").filter(Boolean),
+    ),
+    next_latest_target_languages: uniqueStrings(
+      admitted.map((admission) => admission.latest_target_language ?? "").filter(Boolean),
+    ),
     next_dedupe_keys: uniqueStrings(
       admitted.map((admission) => admission.latest_dedupe_key ?? "").filter(Boolean),
     ),
     next_source_event_ids: uniqueStrings(
       admitted.map((admission) => admission.latest_source_event_id ?? "").filter(Boolean),
+    ),
+    next_source_text_hashes: uniqueStrings(
+      admitted.map((admission) => admission.source_text_hash ?? "").filter(Boolean),
+    ),
+    next_source_text_char_counts: uniqueNumbers(
+      admitted
+        .map((admission) => admission.source_text_char_count)
+        .filter((value): value is number => typeof value === "number"),
     ),
     next_projection_targets: uniqueStrings(
       admitted.map((admission) => admission.latest_projection_target ?? "").filter(Boolean),
@@ -86,10 +115,7 @@ export const buildHelixCapabilityLaneGoalDispatchReadiness = (input: {
       admitted.map((admission) => admission.latest_freshness_status ?? "").filter(Boolean),
     ),
     next_cancel_requested: admitted.some((admission) => admission.latest_cancel_requested === true),
-    all_admitted_permissions_non_mutating: admitted.every((admission) =>
-      admission.permissions.write === false &&
-      admission.permissions.shell === false &&
-      admission.permissions.code_mutation === false),
+    all_admitted_permissions_non_mutating: admitted.every(admissionPermissionsAreNonMutating),
     next_evidence_refs: uniqueStrings(
       admitted.map((admission) => admission.evidence_ref ?? "").filter(Boolean),
     ),

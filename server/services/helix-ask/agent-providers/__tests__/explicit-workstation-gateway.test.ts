@@ -1466,6 +1466,21 @@ describe("explicit workstation gateway derived calls", () => {
   });
 
   it("runs the derived voice gateway request as a non-terminal receipt", async () => {
+    resetInterimVoiceCalloutsForTest();
+    runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
+      memoryReader: () => ({
+        heapUsed: 120 * 1024 * 1024,
+        heapTotal: 512 * 1024 * 1024,
+        rss: 640 * 1024 * 1024,
+        external: 0,
+        arrayBuffers: 0,
+      }),
+      hostMemoryReader: () => ({
+        freeMiB: 16_000,
+        totalMiB: 32_000,
+        freeRatio: 0.5,
+      }),
+    });
     const results = await runExplicitWorkstationGatewayCalls({
       agentRuntime: "codex",
       body: {
@@ -1488,7 +1503,7 @@ describe("explicit workstation gateway derived calls", () => {
           raw_content_included: false,
         },
         receipt: {
-          status: expect.stringMatching(/^(awaiting_client_playback|queued_for_retry)$/),
+          status: "awaiting_client_playback",
           assistant_answer: false,
           terminal_eligible: false,
           raw_content_included: false,
@@ -1498,6 +1513,21 @@ describe("explicit workstation gateway derived calls", () => {
       post_tool_model_step_required: true,
       assistant_answer: false,
       raw_content_included: false,
+    });
+    expect(results[0]?.observation_packet.state_delta).toMatchObject({
+      text_to_speech_client_playback_handoff: {
+        schema: "helix.interim_voice_callout_tool_result.v1",
+        request: {
+          text: "checking now",
+          assistant_answer: false,
+          terminal_eligible: false,
+        },
+        receipt: {
+          status: "awaiting_client_playback",
+          assistant_answer: false,
+          terminal_eligible: false,
+        },
+      },
     });
   });
 

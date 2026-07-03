@@ -6,6 +6,7 @@ import {
   sameDocumentInlineTranslationRenderState,
   type DocumentInlineTranslationRenderState,
 } from "@/lib/docs/liveTranslationInlineProjection";
+import type { HelixLiveTranslationTerminalAuthorityStatus } from "@/lib/helix/live-translation-projection";
 import { documentMarkdownSourceId } from "@/lib/docs/documentTranslationClient";
 
 export type DocumentLiveTranslationProjectionRegistryKey = {
@@ -38,6 +39,8 @@ export type DocumentLiveTranslationProjectionSnapshot = {
 export type DocumentLiveTranslationLaneSessionState = {
   laneSessionId: string;
   laneId: string;
+  lifecycleAction: string | null;
+  permissionProfile: string | null;
   sessionStatus: string;
   sessionHealth: string;
   sourceId: string | null;
@@ -54,6 +57,7 @@ export type DocumentLiveTranslationLaneSessionState = {
   latestSourceEventMs: number | null;
   latestObservedAtMs: number | null;
   latestFreshnessStatus: string | null;
+  terminalAuthorityStatus: HelixLiveTranslationTerminalAuthorityStatus;
   lastObservationRef: string | null;
   lastReceiptRef: string | null;
   updatedAtMs: number | null;
@@ -67,6 +71,8 @@ export type DocumentLiveTranslationMailLoopState = {
   laneSessionId: string | null;
   laneId: string;
   stagePlayMailId: string | null;
+  stagePlayMailDeliveryStatus: string | null;
+  previousStagePlayMailId: string | null;
   stagePlayWakeExpected: boolean;
   mailboxThreadId: string | null;
   mailStatus: string | null;
@@ -85,6 +91,7 @@ export type DocumentLiveTranslationMailLoopState = {
   latestSourceEventMs: number | null;
   latestObservedAtMs: number | null;
   latestFreshnessStatus: string | null;
+  terminalAuthorityStatus: HelixLiveTranslationTerminalAuthorityStatus;
   observationRef: string | null;
   receiptRef: string | null;
   terminalEligible: false;
@@ -121,6 +128,7 @@ export type DocumentLiveTranslationGoalBindingState = {
   latestSourceEventMs: number | null;
   latestObservedAtMs: number | null;
   latestFreshnessStatus: string | null;
+  terminalAuthorityStatus: HelixLiveTranslationTerminalAuthorityStatus;
   observationRef: string | null;
   receiptRef: string | null;
   terminalEligible: false;
@@ -160,26 +168,44 @@ export type DocumentLiveTranslationProjectionSnapshotSummary = {
   latestTargetLanguage: string | null;
   latestProjectionStatus: DocumentInlineTranslationRenderState["projectionStatus"] | null;
   latestFreshnessStatus: string | null;
+  latestTerminalAuthorityStatus: HelixLiveTranslationTerminalAuthorityStatus;
   latestCancelRequested: boolean;
   latestError: string | null;
   suppressedReceiptCount: number;
   latestSuppressedObservationRef: string | null;
   latestSuppressedReceiptRef: string | null;
   latestSuppressedProjectionStatus: DocumentInlineTranslationRenderState["projectionStatus"] | null;
+  latestSuppressedChunkId: string | null;
+  latestSuppressedChunkIndex: number | null;
+  latestSuppressedDedupeKey: string | null;
+  latestSuppressedSourceEventId: string | null;
+  latestSuppressedSourceEventMs: number | null;
   latestSuppressedObservedAtMs: number | null;
   latestSuppressedFreshnessStatus: string | null;
+  latestSuppressedTerminalAuthorityStatus: HelixLiveTranslationTerminalAuthorityStatus;
+  latestSuppressedSourceId: string | null;
+  latestSuppressedSourceHash: string | null;
+  latestSuppressedSourceKind: string | null;
+  latestSuppressedAccountLocale: string | null;
+  latestSuppressedProjectionTarget: string | null;
+  latestSuppressedTargetLanguage: string | null;
+  latestSuppressedCancelRequested: boolean;
   latestSuppressedReason: string | null;
   laneSessionCount: number;
   activeLaneSessionCount: number;
   blockedLaneSessionCount: number;
   latestLaneSessionStatus: string | null;
   latestLaneSessionHealth: string | null;
+  latestLaneSessionLifecycleAction: string | null;
+  latestLaneSessionPermissionProfile: string | null;
   latestLaneSessionUpdatedAtMs: number | null;
   mailLoopCount: number;
   pendingMailLoopCount: number;
   blockedMailLoopCount: number;
   latestMailLoopStatus: string | null;
   latestMailLoopId: string | null;
+  latestMailLoopDeliveryStatus: string | null;
+  latestPreviousStagePlayMailId: string | null;
   goalBindingCount: number;
   activeGoalBindingCount: number;
   blockedGoalBindingCount: number;
@@ -225,6 +251,16 @@ const readNumber = (value: unknown): number | null => {
 
 const readBoolean = (value: unknown): boolean =>
   value === true;
+
+const readTerminalAuthorityStatus = (
+  value: unknown,
+): HelixLiveTranslationTerminalAuthorityStatus =>
+  readString(value) === "pending_helix_terminal_authority"
+    ? "pending_helix_terminal_authority"
+    : "not_terminal_authority";
+
+const suppressedProjectionSortValue = (state: DocumentInlineTranslationRenderState): number =>
+  state.suppressedObservedAtMs ?? state.suppressedSourceEventMs ?? Number.MIN_SAFE_INTEGER;
 
 const localeMatches = (candidate: string, locale: string): boolean => {
   const normalizedCandidate = normalizeText(candidate).toLowerCase();
@@ -314,8 +350,7 @@ export function summarizeDocumentLiveTranslationProjectionSnapshot(
   const suppressed = states.filter((state) => Boolean(state.suppressedReceiptRef || state.suppressedObservationRef));
   const latestSuppressed =
     [...suppressed].sort((left, right) =>
-      (right.suppressedObservedAtMs ?? Number.MIN_SAFE_INTEGER) -
-      (left.suppressedObservedAtMs ?? Number.MIN_SAFE_INTEGER),
+      suppressedProjectionSortValue(right) - suppressedProjectionSortValue(left),
     )[0] ?? null;
   const latestSession =
     [...sessions].sort((left, right) =>
@@ -442,26 +477,49 @@ export function summarizeDocumentLiveTranslationProjectionSnapshot(
       latestMailLoop?.latestFreshnessStatus ??
       latestGoalBinding?.latestFreshnessStatus ??
       null,
+    latestTerminalAuthorityStatus:
+      latest?.terminalAuthorityStatus ??
+      latestSession?.terminalAuthorityStatus ??
+      latestMailLoop?.terminalAuthorityStatus ??
+      latestGoalBinding?.terminalAuthorityStatus ??
+      "not_terminal_authority",
     latestCancelRequested: latest?.cancelRequested ?? false,
     latestError: latest?.error ?? null,
     suppressedReceiptCount: suppressed.length,
     latestSuppressedObservationRef: latestSuppressed?.suppressedObservationRef ?? null,
     latestSuppressedReceiptRef: latestSuppressed?.suppressedReceiptRef ?? null,
     latestSuppressedProjectionStatus: latestSuppressed?.suppressedProjectionStatus ?? null,
+    latestSuppressedChunkId: latestSuppressed?.suppressedChunkId ?? null,
+    latestSuppressedChunkIndex: latestSuppressed?.suppressedChunkIndex ?? null,
+    latestSuppressedDedupeKey: latestSuppressed?.suppressedDedupeKey ?? null,
+    latestSuppressedSourceEventId: latestSuppressed?.suppressedSourceEventId ?? null,
+    latestSuppressedSourceEventMs: latestSuppressed?.suppressedSourceEventMs ?? null,
     latestSuppressedObservedAtMs: latestSuppressed?.suppressedObservedAtMs ?? null,
     latestSuppressedFreshnessStatus: latestSuppressed?.suppressedFreshnessStatus ?? null,
+    latestSuppressedTerminalAuthorityStatus: latestSuppressed?.suppressedTerminalAuthorityStatus ?? "not_terminal_authority",
+    latestSuppressedSourceId: latestSuppressed?.suppressedSourceId ?? null,
+    latestSuppressedSourceHash: latestSuppressed?.suppressedSourceHash ?? null,
+    latestSuppressedSourceKind: latestSuppressed?.suppressedSourceKind ?? null,
+    latestSuppressedAccountLocale: latestSuppressed?.suppressedAccountLocale ?? null,
+    latestSuppressedProjectionTarget: latestSuppressed?.suppressedProjectionTarget ?? null,
+    latestSuppressedTargetLanguage: latestSuppressed?.suppressedTargetLanguage ?? null,
+    latestSuppressedCancelRequested: latestSuppressed?.suppressedCancelRequested ?? false,
     latestSuppressedReason: latestSuppressed?.suppressedReason ?? null,
     laneSessionCount: sessions.length,
     activeLaneSessionCount,
     blockedLaneSessionCount,
     latestLaneSessionStatus: latestSession?.sessionStatus ?? null,
     latestLaneSessionHealth: latestSession?.sessionHealth ?? null,
+    latestLaneSessionLifecycleAction: latestSession?.lifecycleAction ?? null,
+    latestLaneSessionPermissionProfile: latestSession?.permissionProfile ?? null,
     latestLaneSessionUpdatedAtMs: latestSession?.updatedAtMs ?? null,
     mailLoopCount: mailLoops.length,
     pendingMailLoopCount,
     blockedMailLoopCount,
     latestMailLoopStatus: latestMailLoop?.mailStatus ?? null,
     latestMailLoopId: latestMailLoop?.mailLoopId ?? null,
+    latestMailLoopDeliveryStatus: latestMailLoop?.stagePlayMailDeliveryStatus ?? null,
+    latestPreviousStagePlayMailId: latestMailLoop?.previousStagePlayMailId ?? null,
     goalBindingCount: goalBindings.length,
     activeGoalBindingCount,
     blockedGoalBindingCount,
@@ -591,6 +649,8 @@ export function ingestDocumentLiveTranslationProjectionFromAskLiveEvent(
         observed_at_ms: readNumber(meta?.latestObservedAtMs ?? meta?.latest_observed_at_ms),
         freshness_status: readString(meta?.latestFreshnessStatus ?? meta?.latest_freshness_status) || "unknown",
         target_language: targetLanguage,
+        source_text_hash: readString(meta?.sourceTextHash ?? meta?.source_text_hash) || null,
+        source_text_char_count: readNumber(meta?.sourceTextCharCount ?? meta?.source_text_char_count),
         translated_text: readString(meta?.translatedText ?? meta?.translated_text) || null,
         cancel_requested: readBoolean(meta?.latestCancelRequested ?? meta?.latest_cancel_requested),
         terminal_eligible: false,
@@ -647,6 +707,11 @@ function ingestDocumentLiveTranslationLaneSessionFromAskLiveEvent(
   const nextSession: DocumentLiveTranslationLaneSessionState = {
     laneSessionId,
     laneId: "live_translation",
+    lifecycleAction:
+      readString(input.meta.lifecycleAction ?? input.meta.lifecycle_action ?? input.meta.sessionAction ?? input.meta.session_action) || null,
+    permissionProfile:
+      readString(input.meta.permissionProfile ?? input.meta.permission_profile ?? input.meta.sessionPermissionProfile ?? input.meta.session_permission_profile) ||
+      null,
     sessionStatus: readString(input.meta.sessionStatus ?? input.meta.session_status) || "unknown",
     sessionHealth: readString(input.meta.sessionHealth ?? input.meta.session_health) || "unknown",
     sourceId: input.sourceId,
@@ -666,6 +731,9 @@ function ingestDocumentLiveTranslationLaneSessionFromAskLiveEvent(
     latestObservedAtMs: readNumber(input.meta.latestObservedAtMs ?? input.meta.latest_observed_at_ms),
     latestFreshnessStatus:
       readString(input.meta.latestFreshnessStatus ?? input.meta.latest_freshness_status) || null,
+    terminalAuthorityStatus: readTerminalAuthorityStatus(
+      input.meta.terminalAuthorityStatus ?? input.meta.terminal_authority_status,
+    ),
     lastObservationRef: readString(input.meta.observationRef ?? input.meta.observation_ref) || null,
     lastReceiptRef: readString(input.meta.receiptRef ?? input.meta.receipt_ref) || null,
     updatedAtMs: readNumber(input.meta.updatedAtMs ?? input.meta.updated_at_ms) ??
@@ -725,11 +793,22 @@ function ingestDocumentLiveTranslationMailLoopFromAskLiveEvent(
 
   const key = documentLiveTranslationProjectionRegistryKey(input);
   const current = snapshots.get(key) ?? emptySnapshot;
+  const previous = current.mailLoops[mailLoopId];
+  const stagePlayMailDeliveryStatus =
+    readString(input.meta.stagePlayMailDeliveryStatus ?? input.meta.stage_play_mail_delivery_status) ||
+    previous?.stagePlayMailDeliveryStatus ||
+    null;
+  const previousStagePlayMailId =
+    readString(input.meta.previousStagePlayMailId ?? input.meta.previous_stage_play_mail_id) ||
+    previous?.previousStagePlayMailId ||
+    null;
   const nextMailLoop: DocumentLiveTranslationMailLoopState = {
     mailLoopId,
     laneSessionId: readString(input.meta.laneSessionId ?? input.meta.lane_session_id) || null,
     laneId: "live_translation",
     stagePlayMailId: readString(input.meta.stagePlayMailId ?? input.meta.stage_play_mail_id) || null,
+    stagePlayMailDeliveryStatus,
+    previousStagePlayMailId,
     stagePlayWakeExpected: readBoolean(input.meta.stagePlayWakeExpected ?? input.meta.stage_play_wake_expected),
     mailboxThreadId: readString(input.meta.mailboxThreadId ?? input.meta.mailbox_thread_id) || null,
     mailStatus: readString(input.meta.mailStatus ?? input.meta.mail_status) || null,
@@ -751,13 +830,15 @@ function ingestDocumentLiveTranslationMailLoopFromAskLiveEvent(
     latestObservedAtMs: readNumber(input.meta.latestObservedAtMs ?? input.meta.latest_observed_at_ms),
     latestFreshnessStatus:
       readString(input.meta.latestFreshnessStatus ?? input.meta.latest_freshness_status) || null,
+    terminalAuthorityStatus: readTerminalAuthorityStatus(
+      input.meta.terminalAuthorityStatus ?? input.meta.terminal_authority_status,
+    ),
     observationRef: readString(input.meta.observationRef ?? input.meta.observation_ref) || null,
     receiptRef: readString(input.meta.receiptRef ?? input.meta.receipt_ref) || null,
     terminalEligible: false,
     assistantAnswer: false,
     rawContentIncluded: false,
   };
-  const previous = current.mailLoops[mailLoopId];
   if (sameDocumentLiveTranslationMailLoopState(previous, nextMailLoop)) return current;
   if (shouldKeepCurrentMailLoopState(previous, nextMailLoop)) return current;
   const snapshot = {
@@ -839,6 +920,9 @@ function ingestDocumentLiveTranslationGoalBindingFromAskLiveEvent(
     latestObservedAtMs: readNumber(input.meta.latestObservedAtMs ?? input.meta.latest_observed_at_ms),
     latestFreshnessStatus:
       readString(input.meta.latestFreshnessStatus ?? input.meta.latest_freshness_status) || null,
+    terminalAuthorityStatus: readTerminalAuthorityStatus(
+      input.meta.terminalAuthorityStatus ?? input.meta.terminal_authority_status,
+    ),
     observationRef: readString(input.meta.observationRef ?? input.meta.observation_ref) || null,
     receiptRef: readString(input.meta.receiptRef ?? input.meta.receipt_ref) || null,
     terminalEligible: false,
@@ -891,6 +975,8 @@ function sameDocumentLiveTranslationLaneSessionState(
   if (!left || !right) return left === right;
   return left.laneSessionId === right.laneSessionId &&
     left.laneId === right.laneId &&
+    (left.lifecycleAction ?? "") === (right.lifecycleAction ?? "") &&
+    (left.permissionProfile ?? "") === (right.permissionProfile ?? "") &&
     left.sessionStatus === right.sessionStatus &&
     left.sessionHealth === right.sessionHealth &&
     (left.sourceId ?? "") === (right.sourceId ?? "") &&
@@ -907,6 +993,7 @@ function sameDocumentLiveTranslationLaneSessionState(
     (left.latestSourceEventMs ?? null) === (right.latestSourceEventMs ?? null) &&
     (left.latestObservedAtMs ?? null) === (right.latestObservedAtMs ?? null) &&
     (left.latestFreshnessStatus ?? "") === (right.latestFreshnessStatus ?? "") &&
+    left.terminalAuthorityStatus === right.terminalAuthorityStatus &&
     (left.lastObservationRef ?? "") === (right.lastObservationRef ?? "") &&
     (left.lastReceiptRef ?? "") === (right.lastReceiptRef ?? "") &&
     (left.updatedAtMs ?? null) === (right.updatedAtMs ?? null);
@@ -921,6 +1008,8 @@ function sameDocumentLiveTranslationMailLoopState(
     (left.laneSessionId ?? "") === (right.laneSessionId ?? "") &&
     left.laneId === right.laneId &&
     (left.stagePlayMailId ?? "") === (right.stagePlayMailId ?? "") &&
+    (left.stagePlayMailDeliveryStatus ?? "") === (right.stagePlayMailDeliveryStatus ?? "") &&
+    (left.previousStagePlayMailId ?? "") === (right.previousStagePlayMailId ?? "") &&
     left.stagePlayWakeExpected === right.stagePlayWakeExpected &&
     (left.mailboxThreadId ?? "") === (right.mailboxThreadId ?? "") &&
     (left.mailStatus ?? "") === (right.mailStatus ?? "") &&
@@ -939,6 +1028,7 @@ function sameDocumentLiveTranslationMailLoopState(
     (left.latestSourceEventMs ?? null) === (right.latestSourceEventMs ?? null) &&
     (left.latestObservedAtMs ?? null) === (right.latestObservedAtMs ?? null) &&
     (left.latestFreshnessStatus ?? "") === (right.latestFreshnessStatus ?? "") &&
+    left.terminalAuthorityStatus === right.terminalAuthorityStatus &&
     (left.observationRef ?? "") === (right.observationRef ?? "") &&
     (left.receiptRef ?? "") === (right.receiptRef ?? "");
 }
@@ -976,6 +1066,7 @@ function sameDocumentLiveTranslationGoalBindingState(
     (left.latestSourceEventMs ?? null) === (right.latestSourceEventMs ?? null) &&
     (left.latestObservedAtMs ?? null) === (right.latestObservedAtMs ?? null) &&
     (left.latestFreshnessStatus ?? "") === (right.latestFreshnessStatus ?? "") &&
+    left.terminalAuthorityStatus === right.terminalAuthorityStatus &&
     (left.observationRef ?? "") === (right.observationRef ?? "") &&
     (left.receiptRef ?? "") === (right.receiptRef ?? "");
 }

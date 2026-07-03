@@ -81,6 +81,7 @@ export type HelixLiveTranslationOneShotObservation = {
   deterministic: true;
   confidence: number;
   reentry_required: true;
+  terminal_authority_status: "not_terminal_authority" | "pending_helix_terminal_authority";
   terminal_eligible: false;
   assistant_answer: false;
   raw_content_included: false;
@@ -106,10 +107,13 @@ export type HelixLiveTranslationProjectionReceipt = {
   observed_at_ms: number;
   freshness_status: HelixLiveTranslationChunkFreshnessStatus;
   target_language: string;
+  source_text_hash: string | null;
+  source_text_char_count: number | null;
   translated_text: string | null;
   stale: boolean;
   cancel_requested: boolean;
   reentry_required: true;
+  terminal_authority_status: "not_terminal_authority" | "pending_helix_terminal_authority";
   terminal_eligible: false;
   assistant_answer: false;
   raw_content_included: false;

@@ -432,6 +432,35 @@ describe("helix ask turn e10.28 ui regressions", () => {
     expect(__helixAskTurnWorkspaceSnapshotTestApi.resolveAskTurnWorkspaceNoteTitle(snapshot)).toBe("Untitled note");
     expect(snapshotText).not.toContain("Common Core");
     expect(snapshotText).not.toContain("self-direction");
+
+    const emptyIncoming = __helixAskTurnWorkspaceSnapshotTestApi.normalizeIncomingAskTurnWorkspaceSnapshot({
+      sessionId,
+      snapshot: {
+        sessionId,
+        activePanel: "workstation-notes",
+        activeDocPath: null,
+        hasDocContext: false,
+        hasNoteContext: true,
+        activeNoteId: null,
+        activeNoteTitle: null,
+        activeNoteBody: "",
+        lastCreatedNoteId: null,
+        lastCreatedNoteTitle: null,
+        lastCreatedNoteBody: "",
+        recentNotes: [],
+      },
+    });
+    const emptySnapshot = __helixAskTurnWorkspaceSnapshotTestApi.mergeAskTurnWorkspaceSnapshots({
+      incoming: emptyIncoming,
+      stored,
+    });
+    const emptySnapshotText = JSON.stringify(emptySnapshot ?? {});
+    expect(emptySnapshot?.activeDocPath).toBe("/docs/research/example.md");
+    expect(emptySnapshot?.activeNoteTitle ?? null).toBeNull();
+    expect(emptySnapshot?.lastCreatedNoteTitle ?? null).toBeNull();
+    expect(__helixAskTurnWorkspaceSnapshotTestApi.resolveAskTurnWorkspaceNoteTitle(emptySnapshot)).toBeNull();
+    expect(emptySnapshotText).not.toContain("Common Core");
+    expect(emptySnapshotText).not.toContain("self-direction");
   });
 
   it("does not stop hybrid open-and-explain prompts at the open-doc receipt", async () => {

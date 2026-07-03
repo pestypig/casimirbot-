@@ -52,6 +52,8 @@ describe("Helix Ask turn transcript projection", () => {
           backendLatencyClass: null,
           backendPrivacyClass: null,
           fallbackBackendProvider: null,
+          stagePlayMailDeliveryStatus: null,
+          previousStagePlayMailId: null,
           receiptRef: null,
           observationRef: null,
           sourceId: null,
@@ -70,6 +72,7 @@ describe("Helix Ask turn transcript projection", () => {
           targetLanguage: null,
           latestCancelRequested: null,
           terminalEligible: null,
+          terminalAuthorityStatus: null,
           assistantAnswer: null,
           rawContentIncluded: null,
           clientReplayReason: null,
@@ -694,7 +697,7 @@ describe("Helix Ask turn transcript projection", () => {
       "Lane Receipt: Lane projection receipt: live_translation.translate_text; projection stale; target docs_chunk; language es; observation ask:lane:translation:obs; receipt ask:lane:translation:obs:projection:receipt; remains observation-only.",
     );
     expect(combined).toContain(
-      "UI Projection: UI translation projection: status stale; target docs_chunk; language es; source unknown_source; chunk ask:lane:translation:obs; freshness unknown; stale; observation ask:lane:translation:obs; receipt ask:lane:translation:obs:projection:receipt; projection-only, not terminal authority.",
+      "UI Projection: UI translation projection: status stale; target docs_chunk; language es; source unknown_source; chunk ask:lane:translation:obs; freshness unknown; stale; terminal authority not_terminal_authority; observation ask:lane:translation:obs; receipt ask:lane:translation:obs:projection:receipt; projection-only, not terminal authority.",
     );
     expect(combined).toContain("Lane Re-entry: Lane re-entry: observation packet available for provider reasoning before terminal selection.");
     expect(combined).toContain("Terminal: Terminal selected: agent_provider_terminal_candidate.");
@@ -778,6 +781,7 @@ describe("Helix Ask turn transcript projection", () => {
               target_language: "es",
               translated_text: "hola",
             },
+            terminal_authority_status: "pending_helix_terminal_authority",
             terminal_eligible: false,
             assistant_answer: false,
             raw_content_included: false,
@@ -804,6 +808,7 @@ describe("Helix Ask turn transcript projection", () => {
           sourceHash: "fnv1a32:example",
           sourceKind: "docs",
           accountLocale: "es-US",
+          terminalAuthorityStatus: "pending_helix_terminal_authority",
           terminalEligible: false,
           assistantAnswer: false,
           rawContentIncluded: false,
@@ -838,6 +843,7 @@ describe("Helix Ask turn transcript projection", () => {
           targetLanguage: "es",
           translatedText: "hola",
           projectionStatus: "projected",
+          terminalAuthorityStatus: "pending_helix_terminal_authority",
           terminalEligible: false,
           assistantAnswer: false,
           rawContentIncluded: false,
@@ -887,6 +893,7 @@ describe("Helix Ask turn transcript projection", () => {
               projection_status: "projected",
               target_language: "de",
             },
+            terminal_authority_status: "pending_helix_terminal_authority",
             terminal_eligible: false,
             assistant_answer: false,
             raw_content_included: false,
@@ -900,10 +907,15 @@ describe("Helix Ask turn transcript projection", () => {
     expect(receiptRows[0]?.text).toContain("live_translation.translate_text");
     expect(receiptRows[0]?.text).toContain("target docs_selection");
     expect(receiptRows[0]?.text).toContain("receipt ask:lane:translation:dedupe:projection:receipt");
+    expect(receiptRows[0]?.meta).toContain("capability live_translation.translate_text");
+    expect(receiptRows[0]?.meta).toContain("observation ask:lane:translation:dedupe");
+    expect(receiptRows[0]?.meta).toContain("receipt ask:lane:translation:dedupe:projection:receipt");
+    expect(receiptRows[0]?.meta).toContain("terminal authority pending_helix_terminal_authority");
     expect(rows.find((row) => row.label === "UI Projection")).toMatchObject({
       role: "tool",
       status: "completed",
       text: expect.stringContaining("target docs_selection"),
+      meta: expect.stringContaining("terminal authority pending_helix_terminal_authority"),
     });
     expect(rows.map((row) => row.text).join("\n")).not.toContain("stale direct receipt row");
   });
@@ -1860,12 +1872,22 @@ describe("Helix Ask turn transcript projection", () => {
               live_backend_execution_enabled: false,
               terminal_authority_owner: "helix",
             },
+            lifecycle_action: "record_observation",
             session_status: "running",
             session_health: "healthy",
             source_id: "docs:nhm2",
             source_kind: "docs",
             source_projection_target: "docs_chunk",
             account_locale: "es-US",
+            permissions: {
+              read: true,
+              observe: true,
+              act: true,
+              write: false,
+              shell: false,
+              code_mutation: false,
+            },
+            permission_profile: "permissions non-mutating",
             last_observation_ref: "ask:lane:translation:goal-obs",
             latest_chunk_id: "chunk-goal-visible",
             latest_chunk_index: 5,
@@ -2107,6 +2129,7 @@ describe("Helix Ask turn transcript projection", () => {
     expect(combined).toContain("Goal Lane: Goal-bound lane session: live_translation;");
     expect(combined).toContain("goal goal:translate-docs");
     expect(combined).toContain("session lane-session-translate-docs");
+    expect(combined).toContain("action record_observation");
     expect(combined).toContain("backend live_translation.local_runtime");
     expect(combined).toContain("cost free_local");
     expect(combined).toContain("latency interactive");
@@ -2181,6 +2204,8 @@ describe("Helix Ask turn transcript projection", () => {
         bindingStatus: "bound",
         sessionStatus: "running",
         sessionHealth: "healthy",
+        sessionLifecycleAction: "record_observation",
+        sessionPermissionProfile: "permissions non-mutating",
         reportPolicy: "terminal_authorized_summary",
         quietBehavior: "wake_on_salience",
         reportAction: "wake_on_salience",
@@ -2212,6 +2237,7 @@ describe("Helix Ask turn transcript projection", () => {
     expect(rows.filter((row) => row.label === "Final")).toHaveLength(1);
     const goalSummary = summary?.rows.find((row) => row.key === "goal_bound_lanes")?.value ?? "";
     expect(goalSummary).toContain("live_translation");
+    expect(goalSummary).toContain("action record_observation");
     expect(goalSummary).toContain("source docs:nhm2");
     expect(goalSummary).toContain("source kind docs");
     expect(goalSummary).toContain("source projection docs_chunk");
@@ -2225,6 +2251,7 @@ describe("Helix Ask turn transcript projection", () => {
     expect(goalSummary).toContain("latest observed 1040");
     expect(goalSummary).toContain("latest freshness fresh");
     expect(goalSummary).toContain("latest cancelled");
+    expect(goalSummary).toContain("permissions non-mutating");
   });
 
   it("projects direct goal dispatch plans without requiring a full goal-binding summary", () => {
@@ -2346,6 +2373,7 @@ describe("Helix Ask turn transcript projection", () => {
               live_backend_execution_enabled: false,
               terminal_authority_owner: "helix",
             },
+            lifecycle_action: "start",
             session_status: "running",
             session_health: "healthy",
             source_id: "docs:nhm2",
@@ -2388,6 +2416,7 @@ describe("Helix Ask turn transcript projection", () => {
     const combined = rows.map((row) => `${row.label}: ${row.text} ${row.meta} ${row.status}`).join("\n");
     expect(combined).toContain("Lane Session: Lane session: live_translation;");
     expect(combined).toContain("session lane-session-standalone");
+    expect(combined).toContain("action start");
     expect(combined).toContain("backend live_translation.local_runtime");
     expect(combined).toContain("cost free_local");
     expect(combined).toContain("latency interactive");
@@ -2424,6 +2453,8 @@ describe("Helix Ask turn transcript projection", () => {
         lane: "live_translation",
         capabilityId: "live_translation",
         laneSessionId: "lane-session-standalone",
+        sessionLifecycleAction: "start",
+        sessionPermissionProfile: "permissions non-mutating",
         selectedBackendProvider: "live_translation.local_runtime",
         backendCostClass: "free_local",
         backendLatencyClass: "interactive",
@@ -2443,6 +2474,7 @@ describe("Helix Ask turn transcript projection", () => {
     const sessionSummary = summary?.rows.find((row) => row.key === "lane_sessions")?.value ?? "";
     expect(sessionSummary).toContain("live_translation");
     expect(sessionSummary).toContain("session lane-session-standalone");
+    expect(sessionSummary).toContain("action start");
     expect(sessionSummary).toContain("backend live_translation.local_runtime");
     expect(sessionSummary).toContain("cost free_local");
     expect(sessionSummary).toContain("latency interactive");
@@ -2706,10 +2738,13 @@ describe("Helix Ask turn transcript projection", () => {
             observation_ref: "ask:lane:translation:mail-obs",
             receipt_ref: "ask:lane:translation:mail-obs:projection:receipt",
             stage_play_mail_id: "stage-play-mail-translation",
+            stage_play_mail_delivery_status: "deduped_existing",
+            previous_stage_play_mail_id: "stage-play-mail-translation",
             stage_play_wake_expected: true,
             mailbox_thread_id: "ask-thread-mail",
             source_id: "docs:nhm2",
             source_kind: "document_markdown",
+            account_locale: "es-US",
             chunk_id: "chunk-1",
             chunk_index: 1,
             dedupe_key: "docs:nhm2:chunk-1:es",
@@ -2756,10 +2791,13 @@ describe("Helix Ask turn transcript projection", () => {
     expect(combined).toContain("Lane Mail: Lane mail loop: live_translation;");
     expect(combined).toContain("session lane-session-mail");
     expect(combined).toContain("mail stage-play-mail-translation");
+    expect(combined).toContain("mail delivery deduped_existing");
+    expect(combined).toContain("previous mail stage-play-mail-translation");
     expect(combined).toContain("wake expected");
     expect(combined).toContain("observation ask:lane:translation:mail-obs");
     expect(combined).toContain("receipt ask:lane:translation:mail-obs:projection:receipt");
     expect(combined).toContain("source docs:nhm2");
+    expect(combined).toContain("account locale es-US");
     expect(combined).toContain("chunk chunk-1");
     expect(combined).toContain("index 1");
     expect(combined).toContain("dedupe docs:nhm2:chunk-1:es");
@@ -2789,10 +2827,13 @@ describe("Helix Ask turn transcript projection", () => {
     expect(mailSummary).toContain("live_translation");
     expect(mailSummary).toContain("session lane-session-mail");
     expect(mailSummary).toContain("mail stage-play-mail-translation");
+    expect(mailSummary).toContain("mail delivery deduped_existing");
+    expect(mailSummary).toContain("previous mail stage-play-mail-translation");
     expect(mailSummary).toContain("wake expected");
     expect(mailSummary).toContain("observation ask:lane:translation:mail-obs");
     expect(mailSummary).toContain("receipt ask:lane:translation:mail-obs:projection:receipt");
     expect(mailSummary).toContain("source docs:nhm2");
+    expect(mailSummary).toContain("account locale es-US");
     expect(mailSummary).toContain("chunk chunk-1");
     expect(mailSummary).toContain("index 1");
     expect(mailSummary).toContain("dedupe docs:nhm2:chunk-1:es");
@@ -2817,6 +2858,7 @@ describe("Helix Ask turn transcript projection", () => {
         capabilityId: "live_translation.translate_text",
         laneSessionId: "lane-session-mail",
         sourceId: "docs:nhm2",
+        accountLocale: "es-US",
         latestChunkId: "chunk-1",
         latestChunkIndex: "1",
         latestDedupeKey: "docs:nhm2:chunk-1:es",
@@ -2827,6 +2869,8 @@ describe("Helix Ask turn transcript projection", () => {
         latestProjectionTarget: "docs_chunk",
         targetLanguage: "es",
         stagePlayMailId: "stage-play-mail-translation",
+        stagePlayMailDeliveryStatus: "deduped_existing",
+        previousStagePlayMailId: "stage-play-mail-translation",
         stagePlayWakeExpected: true,
         mailboxThreadId: "ask-thread-mail",
         mailStatus: "unread",

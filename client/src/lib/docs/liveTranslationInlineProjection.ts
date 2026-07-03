@@ -67,8 +67,21 @@ export type DocumentInlineTranslationRenderState = {
   suppressedObservationRef?: string | null;
   suppressedReceiptRef?: string | null;
   suppressedProjectionStatus?: HelixLiveTranslationInlineUnitState["projectionStatus"] | null;
+  suppressedChunkId?: string | null;
+  suppressedChunkIndex?: number | null;
+  suppressedDedupeKey?: string | null;
+  suppressedSourceEventId?: string | null;
+  suppressedSourceEventMs?: number | null;
   suppressedObservedAtMs?: number | null;
   suppressedFreshnessStatus?: string | null;
+  suppressedTerminalAuthorityStatus?: HelixLiveTranslationInlineUnitState["terminalAuthorityStatus"] | null;
+  suppressedSourceId?: string | null;
+  suppressedSourceHash?: string | null;
+  suppressedSourceKind?: string | null;
+  suppressedAccountLocale?: string | null;
+  suppressedProjectionTarget?: string | null;
+  suppressedTargetLanguage?: string | null;
+  suppressedCancelRequested?: boolean | null;
   suppressedReason?: string | null;
   terminalEligible?: false;
   assistantAnswer?: false;
@@ -136,11 +149,27 @@ export function buildDocumentInlineTranslationDataAttributes(
       ["data-doc-translation-suppressed-observation-ref", state.suppressedObservationRef],
       ["data-doc-translation-suppressed-receipt-ref", state.suppressedReceiptRef],
       ["data-doc-translation-suppressed-projection-status", state.suppressedProjectionStatus],
+      ["data-doc-translation-suppressed-chunk-id", state.suppressedChunkId],
+      ["data-doc-translation-suppressed-chunk-index", typeof state.suppressedChunkIndex === "number" ? String(state.suppressedChunkIndex) : null],
+      ["data-doc-translation-suppressed-dedupe-key", state.suppressedDedupeKey],
+      ["data-doc-translation-suppressed-source-event-id", state.suppressedSourceEventId],
+      ["data-doc-translation-suppressed-source-event-ms", typeof state.suppressedSourceEventMs === "number" ? String(state.suppressedSourceEventMs) : null],
       [
         "data-doc-translation-suppressed-observed-at-ms",
         typeof state.suppressedObservedAtMs === "number" ? String(state.suppressedObservedAtMs) : null,
       ],
       ["data-doc-translation-suppressed-freshness-status", state.suppressedFreshnessStatus],
+      ["data-doc-translation-suppressed-terminal-authority-status", state.suppressedTerminalAuthorityStatus],
+      ["data-doc-translation-suppressed-source-id", state.suppressedSourceId],
+      ["data-doc-translation-suppressed-source-hash", state.suppressedSourceHash],
+      ["data-doc-translation-suppressed-source-kind", state.suppressedSourceKind],
+      ["data-doc-translation-suppressed-account-locale", state.suppressedAccountLocale],
+      ["data-doc-translation-suppressed-projection-target", state.suppressedProjectionTarget],
+      ["data-doc-translation-suppressed-target-language", state.suppressedTargetLanguage],
+      [
+        "data-doc-translation-suppressed-cancel-requested",
+        typeof state.suppressedCancelRequested === "boolean" ? String(state.suppressedCancelRequested) : null,
+      ],
       ["data-doc-translation-suppressed-reason", state.suppressedReason],
       ["data-doc-translation-terminal-eligible", state.terminalEligible === false ? "false" : null],
       ["data-doc-translation-assistant-answer", state.assistantAnswer === false ? "false" : null],
@@ -233,8 +262,21 @@ export function sameDocumentInlineTranslationRenderState(
     (left.suppressedObservationRef ?? "") === (right.suppressedObservationRef ?? "") &&
     (left.suppressedReceiptRef ?? "") === (right.suppressedReceiptRef ?? "") &&
     (left.suppressedProjectionStatus ?? "") === (right.suppressedProjectionStatus ?? "") &&
+    (left.suppressedChunkId ?? "") === (right.suppressedChunkId ?? "") &&
+    (left.suppressedChunkIndex ?? null) === (right.suppressedChunkIndex ?? null) &&
+    (left.suppressedDedupeKey ?? "") === (right.suppressedDedupeKey ?? "") &&
+    (left.suppressedSourceEventId ?? "") === (right.suppressedSourceEventId ?? "") &&
+    (left.suppressedSourceEventMs ?? null) === (right.suppressedSourceEventMs ?? null) &&
     (left.suppressedObservedAtMs ?? null) === (right.suppressedObservedAtMs ?? null) &&
     (left.suppressedFreshnessStatus ?? "") === (right.suppressedFreshnessStatus ?? "") &&
+    (left.suppressedTerminalAuthorityStatus ?? "") === (right.suppressedTerminalAuthorityStatus ?? "") &&
+    (left.suppressedSourceId ?? "") === (right.suppressedSourceId ?? "") &&
+    (left.suppressedSourceHash ?? "") === (right.suppressedSourceHash ?? "") &&
+    (left.suppressedSourceKind ?? "") === (right.suppressedSourceKind ?? "") &&
+    (left.suppressedAccountLocale ?? "") === (right.suppressedAccountLocale ?? "") &&
+    (left.suppressedProjectionTarget ?? "") === (right.suppressedProjectionTarget ?? "") &&
+    (left.suppressedTargetLanguage ?? "") === (right.suppressedTargetLanguage ?? "") &&
+    (left.suppressedCancelRequested ?? null) === (right.suppressedCancelRequested ?? null) &&
     (left.suppressedReason ?? "") === (right.suppressedReason ?? "") &&
     (left.terminalEligible ?? null) === (right.terminalEligible ?? null) &&
     (left.assistantAnswer ?? null) === (right.assistantAnswer ?? null) &&
@@ -254,14 +296,14 @@ function shouldKeepCurrentReadyProjection(
   return projectionEventSortValue(current) > projectionEventSortValue(laneState);
 }
 
-function shouldReplaceCurrentReadyWithProjectionError(
+function shouldKeepCurrentReadyOverProjectionError(
   current: DocumentInlineTranslationRenderState | undefined,
   laneState: DocumentInlineTranslationRenderState,
 ): boolean {
   if (current?.status !== "ready" || laneState.status !== "error") return false;
   if (current.source !== "capability_lane" || laneState.source !== "capability_lane") return false;
   if (laneState.projectionStatus !== "cancelled" && laneState.projectionStatus !== "failed") return false;
-  return projectionEventSortValue(laneState) >= projectionEventSortValue(current);
+  return Boolean(current.text?.trim());
 }
 
 function shouldKeepCurrentFreshReadyOverStaleDisplayText(
@@ -279,14 +321,33 @@ function attachSuppressedProjectionReceipt(
   current: DocumentInlineTranslationRenderState,
   laneState: DocumentInlineTranslationRenderState,
 ): DocumentInlineTranslationRenderState {
+  const suppressedReason =
+    laneState.projectionStatus === "cancelled"
+      ? "cancelled_projection_did_not_replace_ready_text"
+      : laneState.projectionStatus === "failed"
+        ? "failed_projection_did_not_replace_ready_text"
+        : "stale_projection_did_not_replace_fresh_text";
   return {
     ...current,
     suppressedObservationRef: laneState.observationRef ?? null,
     suppressedReceiptRef: laneState.receiptRef ?? null,
     suppressedProjectionStatus: laneState.projectionStatus ?? null,
+    suppressedChunkId: laneState.chunkId ?? null,
+    suppressedChunkIndex: laneState.chunkIndex ?? null,
+    suppressedDedupeKey: laneState.dedupeKey ?? null,
+    suppressedSourceEventId: laneState.sourceEventId ?? null,
+    suppressedSourceEventMs: laneState.sourceEventMs ?? null,
     suppressedObservedAtMs: laneState.observedAtMs ?? null,
     suppressedFreshnessStatus: laneState.freshnessStatus ?? null,
-    suppressedReason: "stale_projection_did_not_replace_fresh_text",
+    suppressedTerminalAuthorityStatus: laneState.terminalAuthorityStatus ?? null,
+    suppressedSourceId: laneState.sourceId ?? null,
+    suppressedSourceHash: laneState.sourceHash ?? null,
+    suppressedSourceKind: laneState.sourceKind ?? null,
+    suppressedAccountLocale: laneState.accountLocale ?? null,
+    suppressedProjectionTarget: laneState.projectionTarget ?? null,
+    suppressedTargetLanguage: laneState.targetLanguage ?? null,
+    suppressedCancelRequested: laneState.cancelRequested ?? null,
+    suppressedReason,
   };
 }
 
@@ -429,9 +490,10 @@ export function mergeDocumentLiveTranslationInlineStates(
       changed = true;
       continue;
     }
-    if (shouldReplaceCurrentReadyWithProjectionError(current, laneState)) {
-      if (sameDocumentInlineTranslationRenderState(current, laneState)) continue;
-      next[unitId] = laneState;
+    if (shouldKeepCurrentReadyOverProjectionError(current, laneState)) {
+      const preservedState = attachSuppressedProjectionReceipt(current, laneState);
+      if (sameDocumentInlineTranslationRenderState(current, preservedState)) continue;
+      next[unitId] = preservedState;
       changed = true;
       continue;
     }

@@ -1,4 +1,5 @@
 import React from "react";
+import type { HelixAskObserverLaneEvent } from "./HelixAskObserverLaneEvents";
 
 export type HelixAskConversationBriefPanelProps = {
   text?: string | null;
@@ -78,12 +79,7 @@ export function HelixAskContextChooserPanel({
   );
 }
 
-export type HelixAskObserverLaneEvent = {
-  id: string;
-  text: string;
-  tsMs: number | null;
-  traceId?: string | null;
-};
+export type { HelixAskObserverLaneEvent };
 
 export type HelixAskObserverLanePanelProps = {
   visible: boolean;

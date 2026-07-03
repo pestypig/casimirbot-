@@ -163,9 +163,12 @@ export function buildAskTurnWorkspaceContextSnapshotFromState(
   const noteOrder = readNoteOrder(input.notesState);
   const activeNoteId = typeof input.notesState.active_note_id === "string" ? input.notesState.active_note_id : null;
   const activeNote = activeNoteId ? notes[activeNoteId] ?? null : null;
-  const lastCreatedNoteId = noteOrder[0] ?? null;
+  const focusedNotesPanel = activePanel === "workstation-notes";
+  const notesPanelHasActiveNote = Boolean(activeNote);
+  const includeRecentNoteFallback = !focusedNotesPanel || notesPanelHasActiveNote;
+  const lastCreatedNoteId = includeRecentNoteFallback ? noteOrder[0] ?? null : null;
   const lastCreatedNote = lastCreatedNoteId ? notes[lastCreatedNoteId] ?? null : null;
-  const recentNotes = noteOrder.slice(0, 8).flatMap((noteId) => {
+  const recentNotes = includeRecentNoteFallback ? noteOrder.slice(0, 8).flatMap((noteId) => {
     const note = notes[noteId] ?? null;
     if (!note?.title) return [];
     return [{
@@ -173,7 +176,7 @@ export function buildAskTurnWorkspaceContextSnapshotFromState(
       title: note.title,
       body: clipTextForAskTurn(note.body, 12000),
     }];
-  });
+  }) : [];
   const hasNoteContext =
     Boolean(activeNote?.title) ||
     Boolean(lastCreatedNote?.title) ||

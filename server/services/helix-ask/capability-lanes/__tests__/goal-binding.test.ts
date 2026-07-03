@@ -100,6 +100,8 @@ const mailLoopSummary = (input: Partial<HelixCapabilityLaneMailLoopDebugSummary>
   fallback_backend_provider: null,
   backend_selection_decision: backendDecision,
   freshness_status: "fresh",
+  source_text_hash: "sha256:text-goal",
+  source_text_char_count: 42,
   blocked_reason: null,
   mail_status: "unread",
   evidence_refs: [
@@ -432,6 +434,8 @@ describe("capability lane goal binding", () => {
             outcome: "fallback_selected",
             selected_backend_provider: "live_translation.local_runtime",
           }),
+          source_text_hash: "sha256:text-goal",
+          source_text_char_count: 42,
           terminal_authority_status: "pending_helix_terminal_authority",
           terminal_eligible: false,
           assistant_answer: false,
@@ -464,6 +468,8 @@ describe("capability lane goal binding", () => {
       latest_source_event_ms: 205,
       latest_observed_at_ms: 210,
       latest_freshness_status: "fresh",
+      source_text_hash: "sha256:text-goal",
+      source_text_char_count: 42,
       latest_projection_target: "docs_chunk",
       latest_cancel_requested: false,
       terminal_authority_status: "pending_helix_terminal_authority",
@@ -491,6 +497,79 @@ describe("capability lane goal binding", () => {
       ok: false,
       goal_binding: null,
       blocked_reason: "lane_session_mismatch",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
+  it("fails closed when mail-loop evidence does not match the goal-bound lane source or target", () => {
+    const sessionStore = startTranslationSession();
+    const store = createHelixCapabilityLaneGoalBindingStore({ sessionStore });
+    store.bind({
+      goalId: "goal:translate-docs",
+      laneSessionId: "lane-session-goal",
+      goalBindingId: "goal-binding-mail-source-mismatch",
+      nowMs: 200,
+    });
+
+    expect(store.recordMailLoopEvidence({
+      goalBindingId: "goal-binding-mail-source-mismatch",
+      mailLoopSummary: mailLoopSummary({ source_id: "docs:other" }),
+      nowMs: 205,
+    })).toMatchObject({
+      ok: false,
+      goal_binding: null,
+      blocked_reason: "source_id_mismatch",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(store.recordMailLoopEvidence({
+      goalBindingId: "goal-binding-mail-source-mismatch",
+      mailLoopSummary: mailLoopSummary({ source_hash: "sha256:old-doc" }),
+      nowMs: 210,
+    })).toMatchObject({
+      ok: false,
+      goal_binding: null,
+      blocked_reason: "source_hash_mismatch",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(store.recordMailLoopEvidence({
+      goalBindingId: "goal-binding-mail-source-mismatch",
+      mailLoopSummary: mailLoopSummary({ projection_target: "docs_hover" }),
+      nowMs: 220,
+    })).toMatchObject({
+      ok: false,
+      goal_binding: null,
+      blocked_reason: "projection_target_mismatch",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(store.recordMailLoopEvidence({
+      goalBindingId: "goal-binding-mail-source-mismatch",
+      mailLoopSummary: mailLoopSummary({ target_language: "fr" }),
+      nowMs: 230,
+    })).toMatchObject({
+      ok: false,
+      goal_binding: null,
+      blocked_reason: "target_language_mismatch",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+
+    expect(store.get("goal-binding-mail-source-mismatch")).toMatchObject({
+      status: "bound",
+      last_report_ref: null,
+      latest_mail_loop_summary: null,
+      lane_session_mail_loop_refs: [],
+      debug_history: [
+        expect.objectContaining({ event: "bound" }),
+      ],
       terminal_eligible: false,
       assistant_answer: false,
       raw_content_included: false,

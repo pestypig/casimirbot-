@@ -2,7 +2,10 @@ import type { StagePlayLiveSourceMailItemV1 } from "@shared/contracts/stage-play
 import type { HelixCapabilityLaneMailLoopDebugSummary } from "@shared/helix-capability-lane-mail-loop";
 import { HELIX_CAPABILITY_LANE_MAIL_LOOP_DEBUG_SUMMARY_SCHEMA } from "@shared/helix-capability-lane-mail-loop";
 import type { HelixLiveTranslationOneShotResult } from "@shared/helix-live-translation-lane";
-import { enqueueStagePlayLiveSourceMailItem } from "../../stage-play/stage-play-live-source-mailbox-store";
+import {
+  enqueueStagePlayLiveSourceMailItem,
+  getStagePlayLiveSourceMailItemForEvidenceRef,
+} from "../../stage-play/stage-play-live-source-mailbox-store";
 import type { HelixCapabilityLaneSessionStore } from "./session-manager";
 
 const readRecord = (value: unknown): Record<string, unknown> | null =>
@@ -46,6 +49,32 @@ const freshnessFor = (
   return "unknown";
 };
 
+const languageMatches = (candidate: string | null | undefined, expected: string | null | undefined): boolean => {
+  const normalizedCandidate = readString(candidate).toLowerCase();
+  const normalizedExpected = readString(expected).toLowerCase();
+  if (!normalizedCandidate || !normalizedExpected) return true;
+  return normalizedCandidate === normalizedExpected ||
+    normalizedCandidate.startsWith(`${normalizedExpected}-`) ||
+    normalizedExpected.startsWith(`${normalizedCandidate}-`);
+};
+
+const targetLanguageForSession = (
+  session: NonNullable<ReturnType<HelixCapabilityLaneSessionStore["get"]>>,
+): string | null =>
+  readString(session.source_binding.target_language) ||
+  readString(session.source_binding.account_locale).split("-")[0] ||
+  null;
+
+const sessionBindingSnapshot = (
+  session: NonNullable<ReturnType<HelixCapabilityLaneSessionStore["get"]>> | null,
+) => ({
+  sourceId: session?.source_binding.source_id ?? null,
+  sourceHash: session?.source_binding.source_hash ?? null,
+  projectionTarget: session?.source_binding.projection_target ?? null,
+  targetLanguage: session ? targetLanguageForSession(session) : null,
+  accountLocale: session?.source_binding.account_locale ?? null,
+});
+
 export type HelixCapabilityLaneMailLoopResult = {
   schema: "helix.capability_lane.mail_loop_result.v1";
   ok: boolean;
@@ -68,12 +97,16 @@ const buildMailLoopDebugSummary = (input: {
   threadId: string;
   observationRef: string | null;
   mail: StagePlayLiveSourceMailItemV1 | null;
+  previousMail: StagePlayLiveSourceMailItemV1 | null;
   blockedReason: string | null;
   stagePlayWakeExpected: boolean;
+  accountLocale?: string | null;
+  sessionBinding?: ReturnType<typeof sessionBindingSnapshot> | null;
 }): HelixCapabilityLaneMailLoopDebugSummary => {
   const observation = input.translationResult.observation;
   const packet = input.translationResult.observation_packet;
   const chunk = readRecord(packet.state_delta?.live_translation_chunk);
+  const projectionReceipt = readRecord(packet.state_delta?.live_translation_projection_receipt);
   const projectionTarget = readString(observation?.projection_target) || readString(chunk?.projection_target);
   const receiptRef = readReceiptRef(input.translationResult);
   const evidenceRefs = input.mail?.evidenceRefs ?? input.translationResult.artifact_refs ?? [];
@@ -85,11 +118,25 @@ const buildMailLoopDebugSummary = (input: {
     observation_ref: input.observationRef,
     receipt_ref: receiptRef,
     stage_play_mail_id: input.mail?.mailId ?? null,
+    stage_play_mail_delivery_status: input.blockedReason
+      ? "blocked"
+      : input.previousMail && input.mail?.mailId === input.previousMail.mailId
+        ? "deduped_existing"
+        : input.mail
+          ? "created"
+          : "blocked",
+    previous_stage_play_mail_id: input.previousMail?.mailId ?? input.mail?.priorContext.previousMailId ?? null,
     stage_play_wake_expected: input.stagePlayWakeExpected,
     mailbox_thread_id: input.threadId,
     source_id: readString(observation?.source_id) || readString(chunk?.source_id) || input.mail?.sourceId || null,
     source_hash: readString(observation?.source_hash) || readString(chunk?.source_hash) || null,
     source_kind: input.mail?.sourceKind ?? (projectionTarget ? sourceKindForProjectionTarget(projectionTarget) : null),
+    account_locale: readString(input.accountLocale) || null,
+    lane_session_source_id: input.sessionBinding?.sourceId ?? null,
+    lane_session_source_hash: input.sessionBinding?.sourceHash ?? null,
+    lane_session_projection_target: input.sessionBinding?.projectionTarget ?? null,
+    lane_session_target_language: input.sessionBinding?.targetLanguage ?? null,
+    lane_session_account_locale: input.sessionBinding?.accountLocale ?? null,
     chunk_id: readString(observation?.chunk_id) || readString(chunk?.chunk_id) || null,
     chunk_index: readNumber(observation?.chunk_index) ?? readNumber(chunk?.chunk_index),
     dedupe_key: readString(observation?.dedupe_key) || readString(chunk?.dedupe_key) || null,
@@ -107,6 +154,13 @@ const buildMailLoopDebugSummary = (input: {
     privacy_class: input.translationResult.lane_resolve_trace.privacy_class,
     fallback_backend_provider: input.translationResult.lane_resolve_trace.fallback_backend_provider,
     freshness_status: readString(observation?.freshness_status) || readString(chunk?.freshness_status) || null,
+    source_text_hash:
+      readString(observation?.source_text_hash) ||
+      readString(projectionReceipt?.source_text_hash) ||
+      null,
+    source_text_char_count:
+      readNumber(observation?.source_text_char_count) ??
+      readNumber(projectionReceipt?.source_text_char_count),
     blocked_reason: input.blockedReason,
     mail_status: input.mail?.status ?? null,
     evidence_refs: evidenceRefs,
@@ -136,8 +190,10 @@ export const routeLiveTranslationObservationToMailLoop = (input: {
       threadId: input.threadId,
       observationRef: null,
       mail: null,
+      previousMail: null,
       blockedReason: "unknown_lane_session",
       stagePlayWakeExpected: false,
+      accountLocale: null,
     });
     return {
       schema: "helix.capability_lane.mail_loop_result.v1",
@@ -163,8 +219,11 @@ export const routeLiveTranslationObservationToMailLoop = (input: {
       threadId: input.threadId,
       observationRef: null,
       mail: null,
+      previousMail: null,
       blockedReason,
       stagePlayWakeExpected: false,
+      accountLocale: session.source_binding.account_locale,
+      sessionBinding: sessionBindingSnapshot(session),
     });
     return {
       schema: "helix.capability_lane.mail_loop_result.v1",
@@ -199,8 +258,11 @@ export const routeLiveTranslationObservationToMailLoop = (input: {
       threadId: input.threadId,
       observationRef,
       mail: null,
+      previousMail: null,
       blockedReason,
       stagePlayWakeExpected: false,
+      accountLocale: session.source_binding.account_locale,
+      sessionBinding: sessionBindingSnapshot(session),
     });
     return {
       schema: "helix.capability_lane.mail_loop_result.v1",
@@ -225,8 +287,11 @@ export const routeLiveTranslationObservationToMailLoop = (input: {
       threadId: input.threadId,
       observationRef,
       mail: null,
+      previousMail: null,
       blockedReason: "lane_session_mismatch",
       stagePlayWakeExpected: false,
+      accountLocale: session.source_binding.account_locale,
+      sessionBinding: sessionBindingSnapshot(session),
     });
     return {
       schema: "helix.capability_lane.mail_loop_result.v1",
@@ -251,8 +316,11 @@ export const routeLiveTranslationObservationToMailLoop = (input: {
       threadId: input.threadId,
       observationRef,
       mail: null,
+      previousMail: null,
       blockedReason: "source_id_mismatch",
       stagePlayWakeExpected: false,
+      accountLocale: session.source_binding.account_locale,
+      sessionBinding: sessionBindingSnapshot(session),
     });
     return {
       schema: "helix.capability_lane.mail_loop_result.v1",
@@ -281,8 +349,11 @@ export const routeLiveTranslationObservationToMailLoop = (input: {
       threadId: input.threadId,
       observationRef,
       mail: null,
+      previousMail: null,
       blockedReason: "source_hash_mismatch",
       stagePlayWakeExpected: false,
+      accountLocale: session.source_binding.account_locale,
+      sessionBinding: sessionBindingSnapshot(session),
     });
     return {
       schema: "helix.capability_lane.mail_loop_result.v1",
@@ -295,6 +366,68 @@ export const routeLiveTranslationObservationToMailLoop = (input: {
       stage_play_wake_expected: false,
       debug_summary: debugSummary,
       blocked_reason: "source_hash_mismatch",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+  }
+  if (
+    observation.projection_target &&
+    session.source_binding.projection_target &&
+    observation.projection_target !== session.source_binding.projection_target
+  ) {
+    const debugSummary = buildMailLoopDebugSummary({
+      laneSessionId: input.laneSessionId,
+      translationResult: input.translationResult,
+      threadId: input.threadId,
+      observationRef,
+      mail: null,
+      previousMail: null,
+      blockedReason: "projection_target_mismatch",
+      stagePlayWakeExpected: false,
+      accountLocale: session.source_binding.account_locale,
+      sessionBinding: sessionBindingSnapshot(session),
+    });
+    return {
+      schema: "helix.capability_lane.mail_loop_result.v1",
+      ok: false,
+      lane_session_id: input.laneSessionId,
+      lane_id: "live_translation",
+      observation_ref: observationRef,
+      mail: null,
+      stage_play_mail_id: null,
+      stage_play_wake_expected: false,
+      debug_summary: debugSummary,
+      blocked_reason: "projection_target_mismatch",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+  }
+  if (!languageMatches(observation.target_language, targetLanguageForSession(session))) {
+    const debugSummary = buildMailLoopDebugSummary({
+      laneSessionId: input.laneSessionId,
+      translationResult: input.translationResult,
+      threadId: input.threadId,
+      observationRef,
+      mail: null,
+      previousMail: null,
+      blockedReason: "target_language_mismatch",
+      stagePlayWakeExpected: false,
+      accountLocale: session.source_binding.account_locale,
+      sessionBinding: sessionBindingSnapshot(session),
+    });
+    return {
+      schema: "helix.capability_lane.mail_loop_result.v1",
+      ok: false,
+      lane_session_id: input.laneSessionId,
+      lane_id: "live_translation",
+      observation_ref: observationRef,
+      mail: null,
+      stage_play_mail_id: null,
+      stage_play_wake_expected: false,
+      debug_summary: debugSummary,
+      blocked_reason: "target_language_mismatch",
       assistant_answer: false,
       terminal_eligible: false,
       raw_content_included: false,
@@ -324,6 +457,9 @@ export const routeLiveTranslationObservationToMailLoop = (input: {
     input.translationResult.lane_resolve_trace.selected_backend_provider,
     input.translationResult.lane_resolve_trace.requested_backend_provider,
   ].filter((value): value is string => Boolean(value));
+  const previousMail = observationRef
+    ? getStagePlayLiveSourceMailItemForEvidenceRef(observationRef)
+    : null;
 
   const mail = enqueueStagePlayLiveSourceMailItem({
     threadId: input.threadId,
@@ -341,6 +477,7 @@ export const routeLiveTranslationObservationToMailLoop = (input: {
     sourceEventMs: observation.source_event_ms,
     projectionTarget,
     targetLanguage: observation.target_language,
+    accountLocale: session.source_binding.account_locale,
     summaryText,
     summaryPreview: translated,
     confidence: observation.confidence,
@@ -356,7 +493,9 @@ export const routeLiveTranslationObservationToMailLoop = (input: {
     observationRef: mail.mailId,
     receiptRef: readReceiptRef(input.translationResult),
     nowMs: input.now ? Date.parse(input.now) : undefined,
+    sourceId,
     sourceHash,
+    targetLanguage: observation.target_language,
     chunkId: observation.chunk_id,
     chunkIndex: observation.chunk_index,
     dedupeKey: observation.dedupe_key,
@@ -374,8 +513,11 @@ export const routeLiveTranslationObservationToMailLoop = (input: {
     threadId: input.threadId,
     observationRef,
     mail,
+    previousMail,
     blockedReason: null,
     stagePlayWakeExpected,
+    accountLocale: session.source_binding.account_locale,
+    sessionBinding: sessionBindingSnapshot(session),
   });
 
   return {

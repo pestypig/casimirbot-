@@ -9,6 +9,21 @@ const readTerminalAuthorityStatus = (
 ): HelixCapabilityLaneSessionDebugSummary["terminal_authority_status"] =>
   session.debug_history.at(-1)?.terminal_authority_status ?? "not_terminal_authority";
 
+const permissionProfileFor = (
+  session: HelixCapabilityLaneSession,
+): HelixCapabilityLaneSessionDebugSummary["permission_profile"] => {
+  const permissions = session.permissions;
+  if (!permissions.write && !permissions.shell && !permissions.code_mutation) {
+    return "permissions non-mutating";
+  }
+  const allowed = [
+    permissions.write ? "write" : "",
+    permissions.shell ? "shell" : "",
+    permissions.code_mutation ? "code mutation" : "",
+  ].filter(Boolean);
+  return allowed.length ? `permissions ${allowed.join(", ")}` : "permissions unknown";
+};
+
 export const buildHelixCapabilityLaneSessionDebugSummary = (
   session: HelixCapabilityLaneSession,
 ): HelixCapabilityLaneSessionDebugSummary => {
@@ -26,6 +41,7 @@ export const buildHelixCapabilityLaneSessionDebugSummary = (
     latency_class: session.latency_class,
     privacy_class: session.privacy_class,
     fallback_backend_provider: session.fallback_backend_provider,
+    lifecycle_action: latestEvent?.action ?? null,
     session_status: session.status,
     session_health: session.health,
     source_id: session.source_binding.source_id || null,
@@ -35,17 +51,23 @@ export const buildHelixCapabilityLaneSessionDebugSummary = (
     account_locale: session.source_binding.account_locale,
     target_language: session.source_binding.target_language ?? null,
     permissions: session.permissions,
+    permission_profile: permissionProfileFor(session),
     created_at_ms: session.created_at_ms,
     updated_at_ms: session.updated_at_ms,
     last_observation_ref: session.last_observation_ref,
     last_receipt_ref: session.last_receipt_ref,
     latest_chunk_id: latestObservationEvent?.chunk_id ?? null,
     latest_chunk_index: latestObservationEvent?.chunk_index ?? null,
+    latest_source_id: latestObservationEvent?.source_id ?? null,
+    latest_source_hash: latestObservationEvent?.source_hash ?? null,
+    latest_target_language: latestObservationEvent?.target_language ?? null,
     latest_dedupe_key: latestObservationEvent?.dedupe_key ?? null,
     latest_source_event_id: latestObservationEvent?.source_event_id ?? null,
     latest_source_event_ms: latestObservationEvent?.source_event_ms ?? null,
     latest_observed_at_ms: latestObservationEvent?.observed_at_ms ?? null,
     latest_freshness_status: latestObservationEvent?.freshness_status ?? null,
+    source_text_hash: latestObservationEvent?.source_text_hash ?? null,
+    source_text_char_count: latestObservationEvent?.source_text_char_count ?? null,
     latest_projection_target: latestObservationEvent?.projection_target ?? session.source_binding.projection_target,
     latest_cancel_requested: latestObservationEvent?.cancel_requested ?? null,
     latest_session_event: latestEvent,

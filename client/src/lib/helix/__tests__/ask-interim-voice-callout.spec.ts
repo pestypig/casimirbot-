@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildInterimVoiceClientHandoffDebug,
   buildInterimVoiceReceiptPlaybackIntent,
   collectInterimVoiceCalloutPlaybackIntents,
 } from "@/lib/helix/ask-interim-voice-callout";
@@ -125,6 +126,39 @@ describe("interim voice callout playback projection", () => {
     expect(intents[0]).toMatchObject({
       requestId: "request-fresh",
       receiptId: "receipt-fresh",
+    });
+  });
+
+  it("builds governed client handoff debug without answer authority", () => {
+    const intent = buildInterimVoiceReceiptPlaybackIntent(receiptArtifact({
+      requestId: "request-debug",
+      receiptId: "receipt-debug",
+      utteranceId: "utterance-debug",
+    }));
+
+    expect(intent).not.toBeNull();
+    expect(buildInterimVoiceClientHandoffDebug({
+      intent: intent!,
+      micArmState: "off",
+      voiceMode: "companion",
+      outputModeEnabled: true,
+      allowMicOffPlayback: null,
+    })).toEqual({
+      schema: "helix.interim_voice_client_handoff_debug.v1",
+      micArmState: "off",
+      voiceMode: "companion",
+      micArmed: false,
+      outputModeEnabled: true,
+      outputArmed: true,
+      requestId: "request-debug",
+      receiptId: "receipt-debug",
+      receiptKey: "utterance-debug",
+      calloutKind: "tool_result",
+      playbackKind: "tool_receipt",
+      allowMicOffPlayback: null,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
     });
   });
 });

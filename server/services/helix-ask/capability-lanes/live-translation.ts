@@ -157,6 +157,9 @@ const buildLaneObservationPacket = (input: {
           projection_target: input.chunk.projectionTarget,
           cancel_requested: input.chunk.cancelRequested,
           observation_ref: input.observationRef,
+          terminal_authority_status: input.status === "succeeded"
+            ? "pending_helix_terminal_authority"
+            : "not_terminal_authority",
           terminal_eligible: false,
           assistant_answer: false,
           raw_content_included: false,
@@ -209,6 +212,8 @@ const buildProjectionReceipt = (input: {
     cancelRequested: boolean;
   };
   targetLanguage: string;
+  sourceTextHash: string | null;
+  sourceTextCharCount: number | null;
   translatedText: string | null;
   selectedBackendProvider: string | null;
 }): HelixLiveTranslationProjectionReceipt => ({
@@ -241,10 +246,15 @@ const buildProjectionReceipt = (input: {
   observed_at_ms: input.chunk.observedAtMs,
   freshness_status: input.chunk.freshnessStatus,
   target_language: input.targetLanguage,
+  source_text_hash: input.sourceTextHash,
+  source_text_char_count: input.sourceTextCharCount,
   translated_text: input.translatedText,
   stale: input.chunk.freshnessStatus === "stale",
   cancel_requested: input.chunk.cancelRequested,
   reentry_required: true,
+  terminal_authority_status: input.translatedText === null || input.chunk.cancelRequested
+    ? "not_terminal_authority"
+    : "pending_helix_terminal_authority",
   terminal_eligible: false,
   assistant_answer: false,
   raw_content_included: false,
@@ -349,6 +359,8 @@ export const runLiveTranslationTranslateText = (input: {
       observationRef,
       chunk,
       targetLanguage,
+      sourceTextHash: hashShort(text),
+      sourceTextCharCount: text.length,
       translatedText: null,
       selectedBackendProvider: trace.selected_backend_provider,
     });
@@ -471,6 +483,7 @@ export const runLiveTranslationTranslateText = (input: {
     deterministic: true,
     confidence: 0.62,
     reentry_required: true,
+    terminal_authority_status: "pending_helix_terminal_authority",
     terminal_eligible: false,
     assistant_answer: false,
     raw_content_included: false,
@@ -487,6 +500,8 @@ export const runLiveTranslationTranslateText = (input: {
       observationRef,
       chunk,
       targetLanguage,
+      sourceTextHash: hashShort(text),
+      sourceTextCharCount: text.length,
       translatedText,
       selectedBackendProvider: trace.selected_backend_provider,
     }),

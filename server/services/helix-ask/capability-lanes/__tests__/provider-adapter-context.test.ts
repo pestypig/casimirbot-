@@ -540,6 +540,134 @@ describe("capability lane provider adapter context", () => {
     expect(context.prompt_observation_block).toContain("eligible_waiting_for_mail_loop");
   });
 
+  it("normalizes hostile goal-bound mail-loop payloads back to non-terminal evidence", () => {
+    const sessionStore = createHelixCapabilityLaneSessionStore();
+    const goalBindingStore = createHelixCapabilityLaneGoalBindingStore({ sessionStore });
+    const hostileMailLoopSummary = {
+      ...mailLoopSummary({
+        lane_session_id: "lane-session-provider-hostile-mail",
+        stage_play_mail_id: "stage-play-mail-provider-hostile",
+        observation_ref: "ask:lane:translation:hostile-mail-obs",
+      }),
+      terminal_authority_status: "terminal_authority_granted",
+      terminal_eligible: true,
+      assistant_answer: true,
+      raw_content_included: true,
+      backend_selection_decision: {
+        ...backendDecision,
+        terminal_eligible: true,
+        assistant_answer: true,
+        raw_content_included: true,
+      },
+    };
+
+    const context = buildHelixCapabilityLaneProviderAdapterContext({
+      provider: buildProvider("codex"),
+      sessionStore,
+      goalBindingStore,
+      body: {
+        turn_id: "turn-provider-adapter-hostile-goal-mail",
+        capability_lane_session_call: [
+          {
+            action: "start",
+            lane_id: "live_translation",
+            lane_session_id: "lane-session-provider-hostile-mail",
+            requested_backend_provider: "google_gemini",
+            now_ms: 200,
+            source_binding: {
+              source_id: "document_markdown:docs/research/nhm2.md",
+              source_kind: "docs",
+              projection_target: "docs_chunk",
+              account_locale: "es-US",
+            },
+          },
+          {
+            action: "record_observation",
+            lane_session_id: "lane-session-provider-hostile-mail",
+            observation_ref: "ask:lane:translation:hostile-mail-obs",
+            receipt_ref: "ask:lane:translation:hostile-mail-obs:projection:receipt",
+            chunk_id: "chunk-provider-hostile",
+            chunk_index: 5,
+            dedupe_key: "docs/research/nhm2.md:chunk-provider-hostile:es",
+            source_event_id: "docs/research/nhm2.md:event-provider-hostile",
+            source_event_ms: 240,
+            observed_at_ms: 250,
+            freshness_status: "fresh",
+            projection_target: "docs_chunk",
+            cancel_requested: false,
+            now_ms: 250,
+          },
+        ],
+        capability_lane_goal_binding_call: [
+          {
+            action: "bind",
+            goal_binding_id: "goal-binding-provider-hostile-mail",
+            goal_id: "goal:hostile-mail-normalization",
+            lane_session_id: "lane-session-provider-hostile-mail",
+            report_policy: "ask_on_salience",
+            quiet_behavior: "wake_on_salience",
+            now_ms: 260,
+          },
+          {
+            action: "record_mail_loop",
+            goal_binding_id: "goal-binding-provider-hostile-mail",
+            mail_loop_summary: hostileMailLoopSummary,
+            now_ms: 270,
+          },
+        ],
+      },
+      env: {} as NodeJS.ProcessEnv,
+    });
+
+    const latestSummary = context.debug_projection.capability_lane_goal_binding_debug_summaries.at(-1);
+
+    expect(context.calls_succeeded).toBe(true);
+    expect(latestSummary).toEqual(
+      expect.objectContaining({
+        goal_binding_id: "goal-binding-provider-hostile-mail",
+        latest_mail_loop_summary: expect.objectContaining({
+          stage_play_mail_id: "stage-play-mail-provider-hostile",
+          observation_ref: "ask:lane:translation:hostile-mail-obs",
+          terminal_authority_status: "not_terminal_authority",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+          backend_selection_decision: expect.objectContaining({
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          }),
+        }),
+        report_decision: expect.objectContaining({
+          terminal_report_requested: false,
+          terminal_report_requires_authority: true,
+          terminal_authority_status: "not_terminal_authority",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        }),
+        dispatch_plan: expect.objectContaining({
+          target: "ask_wake",
+          side_effects_executed: false,
+          terminal_report_emitted: false,
+          terminal_authority_status: "not_terminal_authority",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        }),
+        backend_provider_becomes_root_agent: false,
+        final_reports_require_terminal_authority: true,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    );
+    expect(context.prompt_observation_block).toContain("stage-play-mail-provider-hostile");
+    expect(context.prompt_observation_block).toContain('"assistant_answer": false');
+    expect(context.prompt_observation_block).toContain('"terminal_eligible": false');
+    expect(context.prompt_observation_block).not.toContain("terminal_authority_granted");
+  });
+
   it("exposes projection receipts at the provider adapter edge without answer authority", () => {
     const context = buildHelixCapabilityLaneProviderAdapterContext({
       provider: buildProvider("codex"),
@@ -589,6 +717,8 @@ describe("capability lane provider adapter context", () => {
       dedupe_key: "docs:nhm2:chunk-11:fr",
       source_event_ms: 1,
       target_language: "fr",
+      source_text_hash: expect.any(String),
+      source_text_char_count: "thank you".length,
       translated_text: "merci",
       stale: true,
       cancel_requested: false,

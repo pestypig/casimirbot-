@@ -459,6 +459,53 @@ const collectRecordsDeep = (value: unknown, predicate: (record: Record<string, u
   return results;
 };
 
+const buildVoicePlaybackReceiptBarrierDebug = (input: {
+  activeTurnId: string | null;
+  selectedFinalAnswer: string | null;
+  source: Record<string, unknown>;
+}): Record<string, unknown> | null => {
+  const trace = asRecord(input.source.ask_turn_solver_trace);
+  const capabilityResult = asRecord(trace?.capability_result ?? input.source.capability_result);
+  const chainAudit = asRecord(input.source.tool_turn_chain_audit);
+  const requestedCapability =
+    readString(capabilityResult?.requested_capability) ??
+    readString(chainAudit?.requested_capability) ??
+    readString(asRecord(input.source.canonical_goal_frame)?.requested_capability);
+  const executedCapability =
+    readString(capabilityResult?.executed_capability) ??
+    readString(chainAudit?.executed_capability);
+  if (requestedCapability !== "text_to_speech.speak_text" && executedCapability !== "text_to_speech.speak_text") {
+    return null;
+  }
+  const observationRefs = Array.isArray(capabilityResult?.observation_refs)
+    ? capabilityResult.observation_refs.filter((ref): ref is string => typeof ref === "string" && ref.trim().length > 0)
+    : [];
+  const finalStatusMatch = (input.selectedFinalAnswer ?? "").match(/\bplayback_status\s*:\s*([a-z0-9_.-]+)/i);
+  const reentered =
+    readBoolean(capabilityResult?.reentered_solver) ??
+    readBoolean(chainAudit?.reentry_executed) ??
+    readBoolean(chainAudit?.reentry_proven) ??
+    false;
+  return {
+    schema: "helix.voice_playback_receipt_barrier.v1",
+    source: "agent_provider_gateway_reentry_projection",
+    active_turn_id: input.activeTurnId,
+    requested_capability: requestedCapability,
+    executed_capability: executedCapability,
+    capability_result_status: readString(capabilityResult?.status),
+    playback_status: finalStatusMatch?.[1]?.toLowerCase() ?? null,
+    receipt_kind: "helix.interim_voice_callout_tool_result.v1",
+    observation_refs: observationRefs,
+    receipt_observed: observationRefs.length > 0,
+    evidence_reentered: reentered,
+    terminal_blockers: reentered ? [] : ["voice_playback_receipt_not_reentered"],
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+    output_authority: "voice_playback_observation",
+  };
+};
+
 const uniqueRecordsById = (
   records: Record<string, unknown>[],
   idKeys: string[],
@@ -1206,6 +1253,11 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     selectedFinalAnswer,
     source: payload,
   });
+  const voicePlaybackReceiptBarrier = buildVoicePlaybackReceiptBarrierDebug({
+    activeTurnId: canonicalActiveTurnId,
+    selectedFinalAnswer,
+    source: payload,
+  });
   const voiceSteeringDebug = buildVoiceSteeringDebug({
     activeTurnId: canonicalActiveTurnId,
     source: payload,
@@ -1251,6 +1303,7 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     first_broken_rail: firstBrokenRail,
     repair_target: repairTarget,
     voice_playback_reconciliation: voicePlaybackReconciliation,
+    voice_playback_receipt_barrier: voicePlaybackReceiptBarrier,
     voice_steering_debug: voiceSteeringDebug,
     narrator_debug: narratorDebug,
     resolved_turn_summary: {

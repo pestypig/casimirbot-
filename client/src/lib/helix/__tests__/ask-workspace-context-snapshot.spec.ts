@@ -225,4 +225,50 @@ describe("ask workspace context snapshot helpers", () => {
       lastUpdatedAtMs: 5,
     });
   });
+
+  it("does not promote older recent notes as current context when the focused notes panel has no active note", () => {
+    expect(buildAskTurnWorkspaceContextSnapshotFromState({
+      sessionId: "session-notes",
+      layoutState: {
+        activeGroupId: "notes",
+        groups: {
+          notes: {
+            activePanelId: "workstation-notes",
+            panelIds: ["workstation-notes", "scientific-calculator"],
+          },
+        },
+      },
+      notesState: {
+        active_note_id: undefined,
+        order: ["note-old"],
+        notes: {
+          "note-old": {
+            id: "note-old",
+            title: "Old Common Core note",
+            body: "This older body must not describe the current empty notes editor.",
+          },
+        },
+      },
+      calculatorState: {
+        debugEvents: [],
+        steps: [],
+      },
+      docContext: {
+        path: null,
+        source: "missing",
+      },
+      lastUpdatedAtMs: 6,
+    })).toMatchObject({
+      activePanel: "workstation-notes",
+      active_panel: "workstation-notes",
+      activeNoteId: null,
+      activeNoteTitle: null,
+      activeNoteBody: null,
+      lastCreatedNoteId: null,
+      lastCreatedNoteTitle: null,
+      lastCreatedNoteBody: null,
+      recentNotes: [],
+      hasNoteContext: true,
+    });
+  });
 });

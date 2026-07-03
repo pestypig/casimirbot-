@@ -4,6 +4,7 @@ import {
   callWorkstationGatewayCapability,
   listWorkstationGatewayCapabilities,
 } from "../registry";
+import { runtimeMemoryGovernor } from "../../../runtime/runtime-memory-governor";
 
 const WORKSTATION_ACTIVE_CONTEXT_CAPABILITY = "workstation.active_context";
 const CALCULATOR_SOLVE_EXPRESSION_CAPABILITY = "scientific-calculator.solve_expression";
@@ -102,8 +103,26 @@ describe("Helix workstation tool gateway", () => {
     restoreEnvKey("Path");
     restoreEnvKey("TAVILY_API_KEY");
     globalThis.fetch = originalFetch;
+    runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests();
     vi.restoreAllMocks();
   });
+
+  const admitVoiceRuntimeForTest = (): void => {
+    runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
+      memoryReader: () => ({
+        heapUsed: 120 * 1024 * 1024,
+        heapTotal: 512 * 1024 * 1024,
+        rss: 640 * 1024 * 1024,
+        external: 0,
+        arrayBuffers: 0,
+      }),
+      hostMemoryReader: () => ({
+        freeMiB: 16_000,
+        totalMiB: 32_000,
+        freeRatio: 0.5,
+      }),
+    });
+  };
 
   it("lists read-only non-terminal workstation capabilities", () => {
     const manifest = listWorkstationGatewayCapabilities({
@@ -4561,6 +4580,7 @@ describe("Helix workstation tool gateway", () => {
   });
 
   it("calls interim voice callout as a host-projected non-terminal receipt", async () => {
+    admitVoiceRuntimeForTest();
     const result = await callWorkstationGatewayCapability({
       agentRuntime: "codex",
       mode: "act",
@@ -4614,14 +4634,14 @@ describe("Helix workstation tool gateway", () => {
           raw_content_included: false,
         },
         receipt: {
-          status: expect.stringMatching(/^(awaiting_client_playback|queued_for_retry)$/),
+          status: "awaiting_client_playback",
           assistant_answer: false,
           terminal_eligible: false,
           raw_content_included: false,
         },
         host_projection: {
           kind: "voice_playback_request",
-          playback_status: expect.stringMatching(/^(awaiting_client_playback|queued_for_retry)$/),
+          playback_status: "awaiting_client_playback",
           assistant_answer: false,
           terminal_eligible: false,
           raw_content_included: false,
@@ -4654,6 +4674,7 @@ describe("Helix workstation tool gateway", () => {
   });
 
   it("calls text_to_speech.speak_text as the canonical governed voice lane", async () => {
+    admitVoiceRuntimeForTest();
     const result = await callWorkstationGatewayCapability({
       agentRuntime: "codex",
       mode: "act",
@@ -4705,7 +4726,7 @@ describe("Helix workstation tool gateway", () => {
         },
         receipt: {
           tool: TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY,
-          playback_status: expect.stringMatching(/^(awaiting_client_receipt|queued_for_retry)$/),
+          playback_status: "awaiting_client_receipt",
           audio_url: null,
           audio_bytes_observed: false,
           delivered_at_ms: null,
@@ -4717,7 +4738,7 @@ describe("Helix workstation tool gateway", () => {
         },
         host_projection: {
           kind: "voice_playback_request",
-          normalized_playback_status: expect.stringMatching(/^(awaiting_client_receipt|queued_for_retry)$/),
+          normalized_playback_status: "awaiting_client_receipt",
           audio_bytes_observed: false,
           source_text_hash: expect.any(String),
           source_observation_ref: "ask:test:source-observation",
@@ -5032,6 +5053,7 @@ describe("Helix workstation tool gateway", () => {
   });
 
   it("calls narrator say through the same non-terminal voice receipt contract", async () => {
+    admitVoiceRuntimeForTest();
     const result = await callWorkstationGatewayCapability({
       agentRuntime: "future",
       mode: "act",
@@ -5066,7 +5088,7 @@ describe("Helix workstation tool gateway", () => {
           raw_content_included: false,
         },
         receipt: {
-          status: expect.stringMatching(/^(awaiting_client_playback|queued_for_retry)$/),
+          status: "awaiting_client_playback",
           assistant_answer: false,
           terminal_eligible: false,
           raw_content_included: false,

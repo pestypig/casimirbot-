@@ -1,6 +1,5 @@
 import crypto from "node:crypto";
 import {
-  HELIX_INTERIM_VOICE_CALLOUT_RECEIPT_SCHEMA,
   HELIX_INTERIM_VOICE_CALLOUT_REQUEST_SCHEMA,
   type HelixInterimVoiceCalloutKind,
   type HelixInterimVoiceCalloutReceiptV1,
@@ -9,7 +8,10 @@ import {
   type HelixInterimVoicePlaybackKind,
 } from "@shared/contracts/helix-interim-voice-callout.v1";
 import { runtimeMemoryGovernor } from "../runtime/runtime-memory-governor";
+import { buildInterimVoiceCalloutReceipt } from "./voice-playback/receipt-builder";
+import { createInterimVoiceCalloutReceiptStore } from "./voice-playback/receipt-store";
 import { createInterimVoiceDeliveryRetryPolicy } from "./voice-playback/retry-policy";
+import { createInterimVoiceCalloutRequestStore } from "./voice-playback/request-store";
 import {
   createVoicePlaybackOutcomeWaiterStore,
   findLatestClientVoicePlaybackOutcomeReceipt,
@@ -22,8 +24,12 @@ const MAX_STEERING_ACK_CHARS = 96;
 const VOICE_STEERING_EVENT_REF_PREFIX = "helix_voice_steering_event:";
 const RECENT_CALLOUT_LIMIT = 120;
 
-const requestById = new Map<string, HelixInterimVoiceCalloutRequestV1>();
-const receiptById = new Map<string, HelixInterimVoiceCalloutReceiptV1>();
+const requestStore = createInterimVoiceCalloutRequestStore({
+  limit: RECENT_CALLOUT_LIMIT,
+});
+const receiptStore = createInterimVoiceCalloutReceiptStore({
+  limit: RECENT_CALLOUT_LIMIT,
+});
 const playbackOutcomeWaiters = createVoicePlaybackOutcomeWaiterStore();
 
 const hashShort = (value: unknown, size = 18): string =>
@@ -69,9 +75,9 @@ const normalizeTimingHintMs = (value: number | null | undefined): number | null 
 };
 
 const hasQueuedImmediateAckForTurn = (turnId: string, threadId: string): boolean =>
-  Array.from(requestById.values()).some((request) => {
+  requestStore.values().some((request) => {
     if (request.turnId !== turnId || request.threadId !== threadId || request.kind !== "immediate_ack") return false;
-    return Array.from(receiptById.values()).some((receipt) =>
+    return receiptStore.values().some((receipt) =>
       receipt.requestId === request.requestId &&
       (
         receipt.status === "awaiting_client_playback" ||
@@ -86,9 +92,9 @@ const readVoiceSteeringEventRef = (evidenceRefs: string[]): string | null =>
   evidenceRefs.find((ref) => ref.startsWith(VOICE_STEERING_EVENT_REF_PREFIX)) ?? null;
 
 const hasQueuedSteeringAckForEvent = (steeringEventId: string): boolean =>
-  Array.from(requestById.values()).some((request) => {
+  requestStore.values().some((request) => {
     if (request.kind !== "steering_ack" || !request.evidenceRefs.includes(steeringEventId)) return false;
-    return Array.from(receiptById.values()).some((receipt) =>
+    return receiptStore.values().some((receipt) =>
       receipt.requestId === request.requestId &&
       (
         receipt.status === "awaiting_client_playback" ||
@@ -126,17 +132,9 @@ const findLatestClientPlaybackOutcomeReceipt = (
   requestId: string,
 ): HelixInterimVoiceCalloutReceiptV1 | null =>
   findLatestClientVoicePlaybackOutcomeReceipt({
-    receipts: receiptById.values(),
+    receipts: receiptStore.values(),
     requestId,
   });
-
-const pruneRecent = <T extends { requestId?: string; receiptId?: string }>(map: Map<string, T>) => {
-  while (map.size > RECENT_CALLOUT_LIMIT) {
-    const firstKey = map.keys().next().value;
-    if (!firstKey) break;
-    map.delete(firstKey);
-  }
-};
 
 const buildReceipt = (input: {
   request: HelixInterimVoiceCalloutRequestV1;
@@ -148,56 +146,13 @@ const buildReceipt = (input: {
   retryCount?: number | null;
   blockedReason?: string | null;
 }): HelixInterimVoiceCalloutReceiptV1 => {
-  const receipt: HelixInterimVoiceCalloutReceiptV1 = {
-    artifactId: "helix_interim_voice_callout_receipt",
-    schemaVersion: HELIX_INTERIM_VOICE_CALLOUT_RECEIPT_SCHEMA,
-    receiptId: `helix_interim_voice_callout_receipt:${hashShort([
-      input.request.requestId,
-      input.status,
-      input.message ?? null,
-      Date.now(),
-    ])}`,
-    requestId: input.request.requestId,
-    status: input.status,
-    delivery: {
-      utteranceId: input.utteranceId ?? null,
-      provider: input.provider ?? "helix_interim_voice_callout",
-      message: input.message ?? null,
-      nextRetryAtMs: input.nextRetryAtMs ?? null,
-      retryCount: input.retryCount ?? null,
-      blockedReason: input.blockedReason ?? null,
-      playbackConfirmationRequired:
-        input.status === "awaiting_client_playback" ||
-        input.status === "queued" ||
-        input.status === "queued_for_retry",
-      playbackAuthority:
-        input.status === "awaiting_client_playback" || input.status === "queued"
-          ? "client_runtime_required"
-          : input.status === "queued_for_retry"
-            ? "backend_retry_pending"
-            : "backend_terminal_status",
-      playbackStatus:
-        input.status === "awaiting_client_playback" || input.status === "queued"
-          ? "awaiting_client_receipt"
-          : input.status === "queued_for_retry"
-            ? "backend_retry_pending"
-            : input.status === "delivered"
-              ? "client_confirmed"
-              : "blocked_before_client",
-    },
-    evidenceRefs: uniqueStrings([input.request.requestId, ...input.request.evidenceRefs]),
-    assistant_answer: false,
-    terminal_eligible: false,
-    raw_content_included: false,
-    context_role: "tool_evidence",
-  };
-  receiptById.set(receipt.receiptId, receipt);
-  pruneRecent(receiptById);
+  const receipt = buildInterimVoiceCalloutReceipt(input);
+  receiptStore.set(receipt);
   return receipt;
 };
 
 const retryPolicy = createInterimVoiceDeliveryRetryPolicy({
-  getRequestById: (requestId) => requestById.get(requestId) ?? null,
+  getRequestById: (requestId) => requestStore.get(requestId),
   buildReceipt,
 });
 
@@ -266,8 +221,7 @@ export function recordInterimVoiceCalloutRequest(input: {
     instruction_authority: "none",
     context_role: "tool_evidence",
   };
-  requestById.set(request.requestId, request);
-  pruneRecent(requestById);
+  requestStore.set(request);
 
   if (!text) {
     return {
@@ -365,10 +319,11 @@ export function listInterimVoiceCalloutRequests(input: {
   limit?: number;
 } = {}): HelixInterimVoiceCalloutRequestV1[] {
   const limit = Math.max(1, Math.min(input.limit ?? 50, RECENT_CALLOUT_LIMIT));
-  return Array.from(requestById.values())
-    .filter((entry) => !input.threadId || entry.threadId === input.threadId)
-    .filter((entry) => !input.turnId || entry.turnId === input.turnId)
-    .slice(-limit);
+  return requestStore.list({
+    threadId: input.threadId,
+    turnId: input.turnId,
+    limit,
+  });
 }
 
 export function listInterimVoiceCalloutReceipts(input: {
@@ -377,9 +332,10 @@ export function listInterimVoiceCalloutReceipts(input: {
 } = {}): HelixInterimVoiceCalloutReceiptV1[] {
   retryQueuedInterimVoiceCalloutDeliveries();
   const limit = Math.max(1, Math.min(input.limit ?? 50, RECENT_CALLOUT_LIMIT));
-  return Array.from(receiptById.values())
-    .filter((entry) => !input.requestId || entry.requestId === input.requestId)
-    .slice(-limit);
+  return receiptStore.list({
+    requestId: input.requestId,
+    limit,
+  });
 }
 
 export function recordInterimVoicePlaybackOutcome(input: {
@@ -399,10 +355,10 @@ export function recordInterimVoicePlaybackOutcome(input: {
   const sourceReceiptId = String(input.sourceReceiptId ?? "").trim();
   const status = normalizeVoicePlaybackOutcomeStatus(input.status);
   const request =
-    (requestId ? requestById.get(requestId) : null) ??
+    (requestId ? requestStore.get(requestId) : null) ??
     (sourceReceiptId ? (() => {
-      const sourceReceipt = receiptById.get(sourceReceiptId);
-      return sourceReceipt ? requestById.get(sourceReceipt.requestId) ?? null : null;
+      const sourceReceipt = receiptStore.get(sourceReceiptId);
+      return sourceReceipt ? requestStore.get(sourceReceipt.requestId) : null;
     })() : null);
 
   if (!request) {
@@ -453,7 +409,7 @@ export function waitForInterimVoicePlaybackOutcome(input: {
   timeoutMs?: number | null;
 }): Promise<HelixInterimVoiceCalloutReceiptV1 | null> {
   const sourceReceiptId = String(input.sourceReceiptId ?? "").trim();
-  const sourceReceipt = sourceReceiptId ? receiptById.get(sourceReceiptId) : null;
+  const sourceReceipt = sourceReceiptId ? receiptStore.get(sourceReceiptId) : null;
   const requestId = String(input.requestId ?? sourceReceipt?.requestId ?? "").trim();
   if (!requestId) return Promise.resolve(null);
   const timeoutMs = Math.max(0, Math.min(Math.floor(input.timeoutMs ?? 8_000), 30_000));
@@ -465,8 +421,8 @@ export function waitForInterimVoicePlaybackOutcome(input: {
 }
 
 export function resetInterimVoiceCalloutsForTest(): void {
-  requestById.clear();
-  receiptById.clear();
+  requestStore.clear();
+  receiptStore.clear();
   retryPolicy.reset();
   playbackOutcomeWaiters.reset();
 }

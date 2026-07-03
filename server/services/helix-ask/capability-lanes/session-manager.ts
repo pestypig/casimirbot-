@@ -22,6 +22,15 @@ import { listHelixCapabilityLanes, resolveHelixCapabilityLaneRequest } from "./r
 const normalizeText = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
 
+const languageMatches = (candidate: string | null | undefined, expected: string | null | undefined): boolean => {
+  const normalizedCandidate = normalizeText(candidate).toLowerCase();
+  const normalizedExpected = normalizeText(expected).toLowerCase();
+  if (!normalizedCandidate || !normalizedExpected) return true;
+  return normalizedCandidate === normalizedExpected ||
+    normalizedCandidate.startsWith(`${normalizedExpected}-`) ||
+    normalizedExpected.startsWith(`${normalizedCandidate}-`);
+};
+
 const sessionPermissionsFor = (provider: HelixAgentProvider): HelixCapabilityLaneSessionPermissions => ({
   read: provider.permissionProfile?.allows.read ?? true,
   observe: provider.permissionProfile?.allows.observe ?? true,
@@ -57,6 +66,8 @@ const eventFor = (input: {
   sourceEventMs?: number | null;
   observedAtMs?: number | null;
   freshnessStatus?: string | null;
+  sourceTextHash?: string | null;
+  sourceTextCharCount?: number | null;
   projectionTarget?: string | null;
   cancelRequested?: boolean | null;
 }): HelixCapabilityLaneSessionEvent => ({
@@ -96,6 +107,11 @@ const eventFor = (input: {
       ? Math.trunc(input.observedAtMs)
       : null,
   freshness_status: normalizeText(input.freshnessStatus) || null,
+  source_text_hash: normalizeText(input.sourceTextHash) || null,
+  source_text_char_count:
+    typeof input.sourceTextCharCount === "number" && Number.isFinite(input.sourceTextCharCount)
+      ? Math.trunc(input.sourceTextCharCount)
+      : null,
   projection_target: normalizeText(input.projectionTarget) || null,
   cancel_requested: input.cancelRequested === true,
   terminal_authority_status: input.observationRef
@@ -297,14 +313,18 @@ export const createHelixCapabilityLaneSessionStore = () => {
     laneSessionId: string;
     observationRef: string;
     receiptRef?: string | null;
+    sourceId?: string | null;
     chunkId?: string | null;
     chunkIndex?: number | null;
     dedupeKey?: string | null;
     sourceEventId?: string | null;
     sourceHash?: string | null;
+    targetLanguage?: string | null;
     sourceEventMs?: number | null;
     observedAtMs?: number | null;
     freshnessStatus?: string | null;
+    sourceTextHash?: string | null;
+    sourceTextCharCount?: number | null;
     projectionTarget?: string | null;
     cancelRequested?: boolean | null;
     nowMs?: number;
@@ -320,8 +340,38 @@ export const createHelixCapabilityLaneSessionStore = () => {
     if (session.status === "stopped") {
       return blocked("record_observation", "lane_session_already_stopped", resultMetadata);
     }
+    if (session.status === "paused") {
+      return blocked("record_observation", "lane_session_paused", resultMetadata);
+    }
     const observationRef = normalizeText(input.observationRef);
     if (!observationRef) return blocked("record_observation", "missing_observation_ref", resultMetadata);
+    const sourceId = normalizeText(input.sourceId);
+    if (
+      sourceId &&
+      session.source_binding.source_id &&
+      sourceId !== session.source_binding.source_id
+    ) {
+      return blocked("record_observation", "source_id_mismatch", resultMetadata);
+    }
+    const sourceHash = normalizeText(input.sourceHash);
+    if (
+      sourceHash &&
+      session.source_binding.source_hash &&
+      sourceHash !== session.source_binding.source_hash
+    ) {
+      return blocked("record_observation", "source_hash_mismatch", resultMetadata);
+    }
+    const projectionTarget = normalizeText(input.projectionTarget);
+    if (
+      projectionTarget &&
+      session.source_binding.projection_target &&
+      projectionTarget !== session.source_binding.projection_target
+    ) {
+      return blocked("record_observation", "projection_target_mismatch", resultMetadata);
+    }
+    if (!languageMatches(input.targetLanguage, session.source_binding.target_language)) {
+      return blocked("record_observation", "target_language_mismatch", resultMetadata);
+    }
     const nowMs = input.nowMs ?? Date.now();
     const receiptRef = normalizeText(input.receiptRef) || null;
     const event = eventFor({
@@ -338,9 +388,9 @@ export const createHelixCapabilityLaneSessionStore = () => {
       status: session.status,
       reason: "lane_session_observation_recorded",
       atMs: nowMs,
-      sourceId: session.source_binding.source_id,
-      sourceHash: input.sourceHash ?? session.source_binding.source_hash,
-      targetLanguage: session.source_binding.target_language,
+      sourceId: sourceId || session.source_binding.source_id,
+      sourceHash: sourceHash || session.source_binding.source_hash,
+      targetLanguage: normalizeText(input.targetLanguage) || session.source_binding.target_language,
       observationRef,
       receiptRef,
       chunkId: input.chunkId,
@@ -350,7 +400,9 @@ export const createHelixCapabilityLaneSessionStore = () => {
       sourceEventMs: input.sourceEventMs,
       observedAtMs: input.observedAtMs,
       freshnessStatus: input.freshnessStatus,
-      projectionTarget: input.projectionTarget,
+      sourceTextHash: input.sourceTextHash,
+      sourceTextCharCount: input.sourceTextCharCount,
+      projectionTarget,
       cancelRequested: input.cancelRequested,
     });
     const updated: HelixCapabilityLaneSession = {

@@ -1734,6 +1734,8 @@ const buildCodexProviderTurnTranscriptEvents = (input: {
     const openPanels = Array.isArray(observation?.open_panels) ? observation.open_panels.filter((entry) => typeof entry === "string") : [];
     const activeDocumentObservation = readGatewayObservationRecord(observation?.active_document_observation);
     const docPath = readString(activeDocumentObservation?.path);
+    const stateDelta = readRecord(result.observation_packet?.state_delta);
+    const voicePlaybackHandoff = readRecord(stateDelta?.text_to_speech_client_playback_handoff);
     const toolObservationText =
       isActionReceipt && actionKind && panelId
         ? `Action observation: ${result.capability_id} admitted ${actionKind} for ${panelId}.`
@@ -1775,6 +1777,12 @@ const buildCodexProviderTurnTranscriptEvents = (input: {
       source_event_type: isActionReceipt ? "action_observation" : "tool_observation",
       capability_id: result.capability_id,
       artifact_refs: result.artifact_refs,
+      ...(voicePlaybackHandoff
+        ? {
+            voice_playback_handoff: voicePlaybackHandoff,
+            voice_playback_handoff_refs: result.artifact_refs,
+          }
+        : {}),
       reconstructed: true,
       assistant_answer: false,
       raw_content_included: false,

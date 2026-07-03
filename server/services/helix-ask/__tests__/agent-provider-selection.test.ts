@@ -38,6 +38,8 @@ import {
   listWorkstationGatewayCapabilities,
   normalizeDocsObservationExcerptText,
 } from "../workstation-tool-gateway/registry";
+import { resetInterimVoiceCalloutsForTest } from "../interim-voice-callout-store";
+import { runtimeMemoryGovernor } from "../../runtime/runtime-memory-governor";
 
 const ENV_KEYS = [
   "HELIX_ASK_AGENT_RUNTIME",
@@ -4913,6 +4915,89 @@ describe("Helix Ask agent provider selection", () => {
     expect(streamedEvents.some((event) => event.source_event_type === "terminal_answer")).toBe(false);
     expect(streamedEvents.every((event) => event.event_source === "live")).toBe(true);
   });
+
+  it("streams text-to-speech client playback handoff before Codex terminal answer", async () => {
+    resetInterimVoiceCalloutsForTest();
+    runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
+      memoryReader: () => ({
+        heapUsed: 120 * 1024 * 1024,
+        heapTotal: 512 * 1024 * 1024,
+        rss: 640 * 1024 * 1024,
+        external: 0,
+        arrayBuffers: 0,
+      }),
+      hostMemoryReader: () => ({
+        freeMiB: 16_000,
+        totalMiB: 32_000,
+        freeRatio: 0.5,
+      }),
+    });
+    process.env.CODEX_AGENT_FAKE_STDOUT = [
+      "playback_status: queued",
+      "assistant_answer: false",
+      "terminal_eligible: false",
+    ].join("\n");
+    const streamedEvents: Record<string, unknown>[] = [];
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn/stream",
+      body: {
+        turn_id: "ask:test:codex-provider-tts-handoff",
+        question:
+          "Use text_to_speech.speak_text to say exactly 'provider handoff check'. After the receipt barrier, answer with playback_status plus assistant_answer and terminal_eligible flags only.",
+        workstation_gateway_call: {
+          capability_id: "text_to_speech.speak_text",
+          mode: "act",
+          arguments: {
+            text: "provider handoff check",
+          },
+        },
+      },
+      onTranscriptEvent: (event) => {
+        streamedEvents.push(event);
+      },
+    });
+
+    const voiceObservation = streamedEvents.find((event) =>
+      event.capability_id === "text_to_speech.speak_text" &&
+      event.voice_playback_handoff);
+    expect((result.debug as any)?.workstation_gateway_call_results?.map((entry: any) => ({
+      capability_id: entry.capability_id,
+      ok: entry.ok,
+      state_delta: entry.observation_packet?.state_delta,
+    }))).toEqual([
+      expect.objectContaining({
+        capability_id: "text_to_speech.speak_text",
+        state_delta: expect.objectContaining({
+          text_to_speech_client_playback_handoff: expect.objectContaining({
+            schema: "helix.interim_voice_callout_tool_result.v1",
+          }),
+        }),
+      }),
+    ]);
+    expect(voiceObservation).toMatchObject({
+      assistant_answer: false,
+      raw_content_included: false,
+      voice_playback_handoff: {
+        schema: "helix.interim_voice_callout_tool_result.v1",
+        request: {
+          text: "provider handoff check",
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+        receipt: {
+          status: "awaiting_client_playback",
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+      },
+    });
+    expect(streamedEvents.some((event) => event.source_event_type === "terminal_answer")).toBe(false);
+    expect(result.turn_transcript_events?.some((event) => event.source_event_type === "terminal_answer")).toBe(true);
+  }, 15_000);
 
   it("streams normalized Codex native event packets without making them terminal authority", async () => {
     process.env.CODEX_AGENT_FAKE_STDOUT = "Native runtime final text.";

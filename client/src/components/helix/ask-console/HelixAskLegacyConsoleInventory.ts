@@ -22,10 +22,10 @@ export const HELIX_ASK_LEGACY_CONSOLE_ACTIVE_PATH = [
 
 export const HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT = {
   file: "client/src/components/helix/HelixAskPill.tsx",
-  lineCountAtInventory: 26967,
-  exportedComponentStartsAtLine: 8145,
-  liveRenderSliceStartsAtLine: 26315,
-  liveLegacyConsoleViewStartsAtLine: 26364,
+  lineCountAtInventory: 26337,
+  exportedComponentStartsAtLine: 7852,
+  liveRenderSliceStartsAtLine: 25865,
+  liveLegacyConsoleViewStartsAtLine: 25880,
   inventoryReason:
     "The active bridge still imports the whole legacy file, but the visible console render path is concentrated near the bottom and now enters the recrowned legacy console view before composing recrowned ask-console display owners.",
 } as const;
@@ -50,21 +50,77 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
     classification: "pure_display_already_recrowned",
     source: "ask-console",
     evidence:
-      "The live render slice uses HelixAskComposerTextarea, HelixAskComposerSubmitButton, HelixAskRuntimePicker, HelixAskMoodAvatar, and HelixAskActionToolbar.",
+      "The live render slice uses HelixAskComposerTextarea, HelixAskMoodAvatar, and HelixAskComposerActionToolbarSurface for runtime picker, submit button, and action toolbar composition.",
+  },
+  {
+    key: "composer_action_toolbar_surface",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The action-toolbar composition for runtime picker and submit/stop button moved to HelixAskComposerActionToolbarSurface while haptics, mic toggles, attachment selection, visual/audio source controls, runtime selection behavior, submit/stop behavior, and request submission remain in the bridge.",
   },
   {
     key: "reply_projection_surface",
     classification: "pure_display_already_recrowned",
     source: "ask-console",
     evidence:
-      "The live render slice uses HelixAskReplyTurn for completed and active turn streams, HelixAskFinalAnswer, latest-turn binding helpers, and recrowned final-text, reply-event ordering, and fail-context helpers.",
+      "The live render slice uses HelixAskReplyTurn for completed turn streams, HelixAskActiveTurnReply for the active turn stream card, HelixAskFinalAnswer, latest-turn binding helpers, and recrowned final-text, reply-event ordering, and fail-context helpers.",
+  },
+  {
+    key: "debug_drawer_surface",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The visible debug drawer slot now runs through HelixAskDebugDrawerSurface while selected debug state, drawer close mutation, debug payload materialization, backend debug-export fetch, clipboard writes, and copied-id timers remain in the bridge.",
+  },
+  {
+    key: "active_turn_reply_surface",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The in-progress active-turn reply card composition moved to HelixAskActiveTurnReply with the same HelixAskReplyTurn shell, active-turn test ids, disabled debug/copy/read-aloud controls, and no stream state, request, terminal-authority, or side-effect ownership.",
   },
   {
     key: "operator_supplement_surface",
     classification: "pure_display_already_recrowned",
     source: "ask-console",
     evidence:
-      "The live render slice uses extracted goal, steering queue, attachment, context capsule, situation room, observer, voice status, and voice confirmation components.",
+      "The live render slice uses extracted goal and steering queue components, and delegates the attachment, context capsule, situation room, observer, voice status, voice confirmation, context chooser, and context-memory status stack to HelixAskConsoleSupplementSurface.",
+  },
+  {
+    key: "goal_pill_surface",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The conditional goal-pill slot moved to HelixAskGoalPillSurface while goal session state, expansion state, busy/error state, and goal action execution remain in the bridge.",
+  },
+  {
+    key: "console_supplement_surface",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The visible supplement stack composition moved to HelixAskConsoleSupplementSurface while attachment removal, voice command execution, transcript confirmation, context chooser execution, observer event selection, source capture, audio stop behavior, and context-memory derivation remain in the bridge.",
+  },
+  {
+    key: "reasoning_meter_surface",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The busy reasoning meter, battle-stage slot, Mirek bar particles, frontier icon slot, frontier particle refs, and floating action text rendering moved to HelixAskReasoningMeterSurface while theater state, animation timing, refs, icon-broken state mutation, and reasoning beat construction remain in the bridge.",
+  },
+  {
+    key: "reasoning_theater_surface",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The live busy reasoning theater composition now runs through HelixAskReasoningTheaterSurface, including busy panel chrome, Mirek field placement, background particle overlay, status/medal strip placement, and meter surface placement while theater state derivation, medal queue state, animation timing, refs, broken-image state mutation, and reasoning beat construction remain in the bridge.",
+  },
+  {
+    key: "console_status_surfaces",
+    classification: "pure_display_already_recrowned",
+    source: "ask-console",
+    evidence:
+      "The live render slice now delegates error-line, voice-status, and context-memory status composition to HelixAskConsoleStatusSurfaces while error state, voice capture state, and context-memory derivation remain in the bridge.",
   },
   {
     key: "legacy_chat_persistence_binding",
@@ -214,6 +270,20 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
       "Deterministic observer dispatch-plan derivation for chat/workspace/reasoning combinations moved to ask-voice-reasoning-dispatch-prompt with tests while workspace dispatch, reasoning queue mutation, request submission, and in-flight voice lifecycle remain in the bridge.",
   },
   {
+    key: "observer_lane_event_projection",
+    classification: "behavior_sensitive_recrowned_with_parity",
+    source: "ask-console",
+    evidence:
+      "Deterministic observer lane event projection from supplied timeline entries, active trace id, observer-commentary detail, and duplicate keys moved to HelixAskObserverLaneEvents with tests while timeline React state, event publication, observer execution, workstation dispatch, request submission, route authority, terminal authority, and panel rendering remain in the bridge.",
+  },
+  {
+    key: "timeline_feed_projection",
+    classification: "behavior_sensitive_recrowned_with_parity",
+    source: "ask-console",
+    evidence:
+      "Deterministic live timeline feed sorting and active-turn filtering from supplied timeline entries and active trace id moved to HelixAskTimelineFeed with tests while timeline React state, event publication, observer execution, stream lifecycle, request submission, route authority, terminal authority, and panel rendering remain in the bridge.",
+  },
+  {
     key: "mic_off_voice_playback_admission_predicate",
     classification: "behavior_sensitive_recrowned_with_parity",
     source: "lib/helix",
@@ -275,6 +345,13 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
     source: "ask-console",
     evidence:
       "Deterministic hard backend-entrypoint family detection, pasted-text recall route metadata shaping, and hard tool-family route metadata shaping moved to HelixAskBackendEntrypointPolicy with tests; the live bridge imports the hard route-metadata builder directly instead of preserving a local wrapper while source admission behavior, turn submission, runtime transport, and terminal authority remain in the bridge.",
+  },
+  {
+    key: "queued_ask_turn_shaping",
+    classification: "behavior_sensitive_recrowned_with_parity",
+    source: "ask-console",
+    evidence:
+      "Deterministic queued Ask turn question trimming, context-resume route metadata attachment, and pasted-text resume recall queued-route shaping moved to HelixAskQueuedTurn with tests and an injected queuedAtMs while queue React state, Date.now clock reads, queue draining, retry scheduling, context-chooser handoff, request submission, runtime transport, and terminal authority remain in the bridge.",
   },
   {
     key: "visual_evidence_summary_readers",
@@ -400,7 +477,7 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
     classification: "behavior_sensitive_recrowned_with_parity",
     source: "ask-console",
     evidence:
-      "Deterministic backend debug-export ref eligibility, rendered-button backend turn-id trust gating, matching backend target selection, backend-merge client turn-id selection, selected debug turn-id resolution, clicked DOM client-reply selection, clicked-button payload mismatch guarding, clicked-turn payload identity matching, clicked export fallback guarding, and clicked DOM turn-scope extraction with stale-attribute visible-row veto moved to HelixAskLegacyTurnControls with tests; stale visible-row attributes and unproven rendered ask turn ids may not carry stale backend turn ids or stale client reply ids. Rendered-button fallback construction, backend debug-export materialization/fetch, authoritative payload merging, drawer mutation, clipboard writes, and TTS execution remain in the bridge.",
+      "Deterministic backend debug-export ref eligibility, rendered-button backend turn-id trust gating, rendered-reply debug payload matching, matching backend target selection, backend-merge client turn-id selection, selected debug turn-id resolution, clicked DOM client-reply selection, terminal transcript text collection for rendered final matching, clicked-button payload mismatch guarding, clicked-turn payload identity matching, clicked export fallback guarding, and clicked DOM turn-scope extraction with stale-attribute visible-row veto moved to HelixAskLegacyTurnControls with tests; stale visible-row attributes and unproven rendered ask turn ids may not carry stale backend turn ids or stale client reply ids. Rendered-button fallback construction, backend debug-export materialization/fetch, authoritative payload merging, drawer mutation, clipboard writes, and TTS execution remain in the bridge.",
   },
   {
     key: "legacy_turn_control_button_state_projection",
@@ -415,6 +492,13 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
     source: "ask-console",
     evidence:
       "Deterministic debug drawer state, copy-result-to-drawer projection, and stale selected-debug drawer clearing moved to HelixAskDebugDrawerState with tests while clipboard writes, backend debug-export materialization/fetch, window debug globals, selected drawer React state mutation, and copied-id timers remain in the bridge.",
+  },
+  {
+    key: "legacy_debug_export_size_control",
+    classification: "behavior_sensitive_recrowned_with_parity",
+    source: "ask-console",
+    evidence:
+      "Deterministic debug export UI size bounding, critical rail field copy shaping, and compacted debug payload projection moved to HelixAskDebugExportSizeControl with tests while backend debug-export materialization/fetch, drawer mutation, clipboard writes, and selected debug state remain in the bridge.",
   },
   {
     key: "legacy_response_capsule_and_debug_clipboard_adapter",
@@ -456,7 +540,7 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
     classification: "behavior_sensitive_recrowned_with_parity",
     source: "lib/helix",
     evidence:
-      "Deterministic Ask turn workspace context snapshot shaping moved to ask-workspace-context-snapshot, and the active workspace context snapshot binding moved to HelixAskWorkspaceContextBinding with tests preserving active panel, camelCase and snake_case active-doc identity fields, calculator context clipping, note context clipping, Situation Room context passthrough, clipboard-panel detection, and injected timestamp while layout/notes/calculator/Situation Room store reads, active-doc path resolution, Date.now, source admission, route metadata, and turn submission remain in the bridge.",
+      "Deterministic Ask turn workspace context snapshot shaping moved to ask-workspace-context-snapshot, and the active workspace context snapshot binding moved to HelixAskWorkspaceContextBinding with tests preserving active panel, camelCase and snake_case active-doc identity fields, calculator context clipping, focused empty Workstation Notes stale-recent-note suppression, Situation Room context passthrough, clipboard-panel detection, and injected timestamp while layout/notes/calculator/Situation Room store reads, active-doc path resolution, Date.now, source admission, route metadata, and turn submission remain in the bridge.",
   },
   {
     key: "active_doc_backend_payload_binding",
@@ -477,7 +561,7 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
     classification: "behavior_sensitive_quarantined",
     source: "HelixAskPill.tsx",
     evidence:
-      "Docs-viewer store reads, active current-path reads, layout/notes/calculator/Situation Room store reads, Date.now, route metadata, and turn submission remain behavior-sensitive after deterministic doc debug snapshot projection, active doc snapshot binding, doc snapshot path priority, deictic anchor-path resolution, workstation layout debug snapshot projection, Ask turn workspace context snapshot shaping, context-file shaping, and backend doc_path/active_doc_path payload binding were recrowned; HASK-BSQ-001 still needs live browser parity proof.",
+      "Docs-viewer store reads, active current-path reads, layout/notes/calculator/Situation Room store reads, Date.now, route metadata, and turn submission remain behavior-sensitive after deterministic doc debug snapshot projection, active doc snapshot binding, doc snapshot path priority, deictic anchor-path resolution, workstation layout debug snapshot projection, Ask turn workspace context snapshot shaping, focused empty Workstation Notes stale-recent-note suppression, context-file shaping, backend doc_path/active_doc_path payload binding, and the server-side focused-notes stale snapshot merge guard were recrowned/tested; HASK-BSQ-001 still needs live browser parity proof.",
   },
   {
     key: "latest_debug_copy_and_read_aloud_binding",

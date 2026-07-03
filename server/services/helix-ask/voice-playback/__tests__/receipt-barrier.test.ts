@@ -157,6 +157,12 @@ describe("voice playback receipt barrier", () => {
       },
     });
     expect(result).toMatchObject({
+      tool_followup_decision: {
+        observation_summary: expect.stringContaining("Voice playback client receipt delivered"),
+        required_surface_satisfied: true,
+        evidence_reentered: true,
+        terminal_blockers: [],
+      },
       voice_playback_receipt_barrier: {
         status: "client_receipt_observed",
         playback_status: "delivered",
@@ -199,6 +205,12 @@ describe("voice playback receipt barrier", () => {
         audio_bytes_observed: false,
       },
     });
+    expect(result.tool_followup_decision).toMatchObject({
+      observation_summary: expect.stringContaining("Voice playback client receipt queued"),
+      required_surface_satisfied: true,
+      evidence_reentered: true,
+      terminal_blockers: [],
+    });
   });
 
   it("records a timeout barrier when the client receipt does not arrive", async () => {
@@ -217,6 +229,12 @@ describe("voice playback receipt barrier", () => {
     await waitForVoicePlaybackGatewayReceipts([result], { timeoutMs: 1 });
 
     expect(result).toMatchObject({
+      tool_followup_decision: {
+        observation_summary: expect.stringContaining("Voice playback client receipt timed out"),
+        required_surface_satisfied: false,
+        evidence_reentered: false,
+        terminal_blockers: ["voice_playback_client_receipt_timeout"],
+      },
       voice_playback_receipt_barrier: {
         status: "client_receipt_timeout",
         playback_status: "awaiting_client_receipt",

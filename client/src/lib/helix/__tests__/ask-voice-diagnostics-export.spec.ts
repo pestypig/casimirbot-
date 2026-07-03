@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildVoicePlaybackReceiptBarrierDebug,
   buildVoicePlaybackReconciliationDebug,
   resolveVoiceTimelineClientBuildStamp,
   sanitizeVoiceDiagnosticsForExport,
@@ -225,6 +226,48 @@ describe("ask-voice-diagnostics-export", () => {
       delivered_utterance_ids: ["utt-turn-2"],
       audio_bytes_observed: 300,
       corrected_status_text: null,
+    });
+  });
+
+  it("projects governed text-to-speech receipt barrier from solver tool rails", () => {
+    expect(
+      buildVoicePlaybackReceiptBarrierDebug({
+        activeTurnId: "turn-voice",
+        selectedFinalAnswer: "playback_status: queued\nassistant_answer: false\nterminal_eligible: false",
+        source: {
+          ask_turn_solver_trace: {
+            capability_result: {
+              requested_capability: "text_to_speech.speak_text",
+              executed_capability: "text_to_speech.speak_text",
+              status: "succeeded",
+              reentered_solver: true,
+              observation_refs: ["turn-voice:workstation_gateway:text_to_speech.speak_text:abc"],
+            },
+          },
+          tool_turn_chain_audit: {
+            requested_capability: "text_to_speech.speak_text",
+            executed_capability: "text_to_speech.speak_text",
+            reentry_executed: true,
+          },
+        },
+      }),
+    ).toEqual({
+      schema: "helix.voice_playback_receipt_barrier.v1",
+      source: "agent_provider_gateway_reentry_projection",
+      active_turn_id: "turn-voice",
+      requested_capability: "text_to_speech.speak_text",
+      executed_capability: "text_to_speech.speak_text",
+      capability_result_status: "succeeded",
+      playback_status: "queued",
+      receipt_kind: "helix.interim_voice_callout_tool_result.v1",
+      observation_refs: ["turn-voice:workstation_gateway:text_to_speech.speak_text:abc"],
+      receipt_observed: true,
+      evidence_reentered: true,
+      terminal_blockers: [],
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      output_authority: "voice_playback_observation",
     });
   });
 });

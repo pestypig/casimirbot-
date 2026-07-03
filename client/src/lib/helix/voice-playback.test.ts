@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyVoicePlaybackTimelineMetaUpdate,
   applyLatestWinsVoiceQueue,
+  buildVoicePlaybackTimelineMeta,
   createVoicePlaybackUtterance,
   prepareVoicePlaybackQueueUpdate,
   segmentVoicePlaybackText,
@@ -338,5 +340,82 @@ describe("prepareVoicePlaybackQueueUpdate", () => {
     expect(result.accepted).toBe(true);
     expect(result.queue.map((entry) => entry.utteranceId)).toEqual(["voice-task-2"]);
     expect(result.droppedUtteranceIds).toContain("stale-final");
+  });
+});
+
+describe("applyVoicePlaybackTimelineMetaUpdate", () => {
+  it("sets metadata and evicts oldest entries over the configured limit", () => {
+    const meta = new Map<string, { seq: number }>([
+      ["old-a", { seq: 1 }],
+      ["old-b", { seq: 2 }],
+    ]);
+
+    const result = applyVoicePlaybackTimelineMetaUpdate({
+      metaByUtteranceId: meta,
+      utteranceId: "new-c",
+      meta: { seq: 3 },
+      maxEntries: 2,
+    });
+
+    expect(result.evictedUtteranceIds).toEqual(["old-a"]);
+    expect(result.deletedDroppedUtteranceIds).toEqual([]);
+    expect([...meta.keys()]).toEqual(["old-b", "new-c"]);
+  });
+
+  it("removes metadata for dropped queued utterances during the same update", () => {
+    const meta = new Map<string, { seq: number }>([
+      ["dropped-a", { seq: 1 }],
+      ["kept-b", { seq: 2 }],
+    ]);
+
+    const result = applyVoicePlaybackTimelineMetaUpdate({
+      metaByUtteranceId: meta,
+      utteranceId: "new-c",
+      meta: { seq: 3 },
+      droppedUtteranceIds: ["dropped-a", "missing-d"],
+      maxEntries: 4,
+    });
+
+    expect(result.evictedUtteranceIds).toEqual([]);
+    expect(result.deletedDroppedUtteranceIds).toEqual(["dropped-a"]);
+    expect([...meta.keys()]).toEqual(["kept-b", "new-c"]);
+  });
+});
+
+describe("buildVoicePlaybackTimelineMeta", () => {
+  it("combines task and assembler state into governed playback metadata", () => {
+    expect(buildVoicePlaybackTimelineMeta({
+      task: {
+        briefSource: "llm",
+        finalSource: "normal_reasoning",
+        authority: "final",
+        source: "workstation",
+        replyId: "reply:test",
+        interimVoiceRequestId: "request:test",
+        interimVoiceReceiptId: "receipt:test",
+        interimVoiceReceiptKey: "receipt-key:test",
+        interimVoiceCalloutKind: "tool_result",
+        revision: 3,
+      },
+      assemblerState: {
+        hlcMs: 123,
+        eventSeq: 7,
+        sealToken: "seal:test",
+      },
+    })).toEqual({
+      briefSource: "llm",
+      finalSource: "normal_reasoning",
+      authority: "final",
+      source: "workstation",
+      replyId: "reply:test",
+      interimVoiceRequestId: "request:test",
+      interimVoiceReceiptId: "receipt:test",
+      interimVoiceReceiptKey: "receipt-key:test",
+      interimVoiceCalloutKind: "tool_result",
+      hlcMs: 123,
+      seq: 7,
+      revision: 3,
+      sealToken: "seal:test",
+    });
   });
 });

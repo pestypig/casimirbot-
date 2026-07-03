@@ -91,6 +91,9 @@ export const applyClientVoicePlaybackOutcomeToGatewayResult = (
     voice_playback_client_receipt: receipt,
   };
   result.tool_followup_decision.observation_summary = result.observation_packet.observation_summary;
+  result.tool_followup_decision.required_surface_satisfied = true;
+  result.tool_followup_decision.evidence_reentered = true;
+  result.tool_followup_decision.terminal_blockers = [];
   (result as unknown as Record<string, unknown>).voice_playback_receipt_barrier = {
     schema: "helix.voice_playback_receipt_barrier.v1",
     status: "client_receipt_observed",
@@ -164,5 +167,15 @@ export const waitForVoicePlaybackGatewayReceipts = async (
       assistant_answer: false,
       raw_content_included: false,
     };
+    target.result.tool_followup_decision.observation_summary =
+      `Voice playback client receipt timed out for ${target.requestId}.`;
+    target.result.tool_followup_decision.required_surface_satisfied = false;
+    target.result.tool_followup_decision.evidence_reentered = false;
+    target.result.tool_followup_decision.terminal_blockers = [
+      ...new Set([
+        ...target.result.tool_followup_decision.terminal_blockers,
+        "voice_playback_client_receipt_timeout",
+      ]),
+    ];
   }));
 };

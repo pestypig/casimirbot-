@@ -5,6 +5,7 @@ import type {
 } from "@/lib/helix/voice-capture-diagnostics";
 import type {
   VoicePlaybackMetrics,
+  VoicePlaybackCancelReason,
   VoicePlaybackUtteranceKind,
 } from "@/lib/helix/voice-playback";
 
@@ -20,9 +21,19 @@ export type BuildVoicePlaybackOutcomeReceiptInput = {
   metrics?: VoicePlaybackMetrics | null;
   error?: string | null;
   audioUnlocked: boolean;
-  playbackPath?: string | null;
+  playbackPath?: VoicePlaybackOutcomeReceipt["playbackPath"];
   atMs?: number;
 };
+
+export function resolveVoicePlaybackOutcomeStatus(input: {
+  override?: VoicePlaybackOutcomeStatus | null;
+  cancelReason?: VoicePlaybackCancelReason | null;
+}): VoicePlaybackOutcomeStatus {
+  if (input.override) return input.override;
+  if (input.cancelReason === null || input.cancelReason === undefined) return "delivered";
+  if (input.cancelReason === "error") return "failed";
+  return "cancelled";
+}
 
 export function buildVoicePlaybackOutcomeReceipt(
   input: BuildVoicePlaybackOutcomeReceiptInput,
@@ -60,6 +71,16 @@ export function buildVoicePlaybackOutcomeReceipt(
     raw_content_included: false,
     output_authority: "playback_observation",
   };
+}
+
+export function appendVoicePlaybackOutcomeReceipt(
+  receipts: VoicePlaybackOutcomeReceipt[],
+  receipt: VoicePlaybackOutcomeReceipt,
+  maxReceipts = 80,
+): VoicePlaybackOutcomeReceipt[] {
+  const limit = Math.max(0, Math.floor(maxReceipts));
+  if (limit === 0) return [];
+  return [...receipts, receipt].slice(-limit);
 }
 
 export function postVoicePlaybackOutcomeReceipt(receipt: VoicePlaybackOutcomeReceipt): void {

@@ -237,6 +237,17 @@ export const runTextToSpeechSpeakText = (input: {
     assistant_answer: false,
     raw_content_included: false,
   };
+  const clientPlaybackHandoff = {
+    schema: "helix.interim_voice_callout_tool_result.v1",
+    ok: playbackStatus !== "blocked" && playbackStatus !== "unavailable",
+    request: backend.request,
+    receipt: backend.receipt,
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+    context_role: "tool_evidence",
+    ask_context_policy: "evidence_only",
+  };
   const packetStatus = packetStatusFor(playbackStatus, false);
   const packet = buildObservationPacket({
     turnId,
@@ -252,6 +263,10 @@ export const runTextToSpeechSpeakText = (input: {
       repair_action: playbackStatus === "blocked" || playbackStatus === "unavailable" ? "repair" : "fail_closed",
     }],
   });
+  packet.state_delta = {
+    ...packet.state_delta,
+    text_to_speech_client_playback_handoff: clientPlaybackHandoff,
+  };
 
   return {
     schema: HELIX_TEXT_TO_SPEECH_ONE_SHOT_RESULT_SCHEMA,

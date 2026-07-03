@@ -44,6 +44,28 @@ const laneBackendRow: HelixContinuousTurnStreamRow = {
   evidenceRefs: [],
 };
 
+const laneObservedRow: HelixContinuousTurnStreamRow = {
+  key: "lane-observed",
+  source: "agent_work",
+  label: "Lane Observation",
+  text: "Lane observation produced a translation receipt.",
+  meta: "source capability_lane_call_results | lane_observation",
+  status: "succeeded",
+  tone: "observation",
+  evidenceRefs: ["ask:lane:translation:obs"],
+};
+
+const laneReenteredRow: HelixContinuousTurnStreamRow = {
+  key: "lane-reentered",
+  source: "agent_work",
+  label: "Lane Re-entry",
+  text: "Lane observation re-entered provider reasoning.",
+  meta: "source capability_lane_observation_packets | lane_reentered",
+  status: "reentered",
+  tone: "checkpoint",
+  evidenceRefs: ["ask:lane:translation:obs"],
+};
+
 const finalRow: HelixContinuousTurnStreamRow = {
   key: "final",
   source: "final",
@@ -245,6 +267,46 @@ describe("Helix Ask turn stream lane rendering", () => {
     expect(screen.getByLabelText("Turn stream").getAttribute("data-capability-lane-backend-selected-count")).toBe("1");
     expect(screen.getByText("lane requested")).toBeTruthy();
     expect(screen.getByText("lane backend selected")).toBeTruthy();
+  });
+
+  it("marks observed and re-entered lane rows before terminal selection", () => {
+    render(
+      <HelixAskTurnStreamPanel
+        rows={[laneRow, laneBackendRow, laneObservedRow, laneReenteredRow]}
+        isLatestReply
+        stagePlayEventCount={0}
+        finalAnswerRawText=""
+        finalAnswerSourceLabel="capability lane terminal"
+        finalAnswerAuthority="terminal"
+        renderFinalAnswer={() => null}
+        clipText={(text) => text}
+        readRowClassName={() => ""}
+        readDotClassName={() => ""}
+        readPillClassName={() => ""}
+        onCopyFinal={noop}
+        onDebugCopy={noop}
+        onReadAloud={noop}
+        jobReadyLinks={[]}
+        onRunJobReadyLink={noop}
+      />,
+    );
+
+    const rows = screen.getAllByTestId("helix-ask-latest-turn-stream-row");
+    const panel = screen.getByLabelText("Turn stream");
+    expect(rows.map((row) => row.getAttribute("data-capability-lane-stage"))).toEqual([
+      "requested",
+      "backend_selected",
+      "observed",
+      "reentered",
+    ]);
+    expect(panel.getAttribute("data-capability-lane-lifecycle")).toBe("reentered");
+    expect(panel.getAttribute("data-capability-lane-requested-count")).toBe("1");
+    expect(panel.getAttribute("data-capability-lane-backend-selected-count")).toBe("1");
+    expect(panel.getAttribute("data-capability-lane-observed-count")).toBe("1");
+    expect(panel.getAttribute("data-capability-lane-reentered-count")).toBe("1");
+    expect(panel.getAttribute("data-capability-lane-terminal-selected-count")).toBe("0");
+    expect(screen.getByText("lane observed")).toBeTruthy();
+    expect(screen.getByText("lane reentered")).toBeTruthy();
   });
 
   it("marks terminal rejected lane rows distinctly from terminal selected rows", () => {

@@ -70,6 +70,18 @@ describe("Helix Ask UI ownership boundaries", () => {
       "ask-workstation-command-text.ts",
       "ask-workstation-fast-path.ts",
       "ask-workstation-pending-input.ts",
+      "HelixAskQueuedTurn.ts",
+      "HelixAskDebugExportSizeControl.ts",
+      "HelixAskDebugDrawerSurface.tsx",
+      "HelixAskObserverLaneEvents.ts",
+      "HelixAskTimelineFeed.ts",
+      "HelixAskActiveTurnReply.tsx",
+      "HelixAskConsoleStatusSurfaces.tsx",
+      "HelixAskComposerActionToolbarSurface.tsx",
+      "HelixAskGoalPillSurface.tsx",
+      "HelixAskConsoleSupplementSurface.tsx",
+      "HelixAskReasoningMeterSurface.tsx",
+      "HelixAskReasoningTheaterSurface.tsx",
       "voice/voice-transcript.ts",
       "voice/voice-turn-authority.ts",
       "HelixAskAttachmentCommit.ts",
@@ -533,6 +545,9 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(map).toContain("current-doc/current-whitepaper/docs-viewer anchor-path cue resolution");
     expect(map).toContain("workstation layout debug snapshot projection");
     expect(map).toContain("Ask turn workspace context snapshot shaping");
+    expect(map).toContain("focused empty Workstation Notes stale-recent-note suppression");
+    expect(map).toContain("focused Workstation Notes panel as authoritative for note fields");
+    expect(map).toContain("HASK-BSQ-004");
     expect(map).toContain("last-known cache mutation");
     expect(workspaceSnapshot).toContain("export function buildWorkstationLayoutDebugSnapshotFromState");
     expect(docsContext).toContain("export function buildDocViewerDebugSnapshotFromState");
@@ -544,6 +559,7 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(activeDocBinding).toContain("rememberHelixAskDocViewerPathForSnapshot(state.currentPath)");
     expect(pill).not.toContain("recentCount: Array.isArray(state.recent)");
     expect(workspaceSnapshot).toContain("export function buildAskTurnWorkspaceContextSnapshotFromState");
+    expect(workspaceSnapshot).toContain("includeRecentNoteFallback");
     expect(workspaceSnapshot).toContain("active_doc_path: currentPath");
     expect(workspaceSnapshot).toContain("doc_context_path: currentPath");
     expect(pill).toContain("buildHelixAskWorkstationLayoutDebugSnapshotBinding(state)");
@@ -630,10 +646,12 @@ describe("Helix Ask UI ownership boundaries", () => {
     const backendEntrypointPolicy = read(
       "client/src/components/helix/ask-console/HelixAskBackendEntrypointPolicy.ts",
     );
+    const queuedTurnOwner = read("client/src/components/helix/ask-console/HelixAskQueuedTurn.ts");
     const requestDisplayOwners = [docsContext, outputCleanup, terminalProjection, valueNormalization];
 
     expect(map).toContain("Ask request construction and attachment admission");
     expect(map).toContain("deterministic backend-entrypoint family detection, pasted-text recall route metadata, and hard route metadata");
+    expect(map).toContain("queued Ask turn object shaping");
     expect(map).toContain("top-level `doc_path` and `active_doc_path` from active doc context files");
     expect(map).toContain("Source admission authority");
     for (const symbol of [
@@ -653,8 +671,24 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(pill).not.toContain("function buildHelixAskHardBackendEntrypointRouteMetadata");
     expect(pill).not.toContain("resolveHelixAskHardBackendEntrypointFamily");
     expect(pill).not.toContain("type HelixAskHardBackendEntrypointFamily");
+    expect(pill).toContain("buildQueuedAskTurn");
+    expect(pill).toContain("buildHelixAskQueuedTurn<RunAskOptions>({");
+    expect(queuedTurnOwner).toContain("export function buildHelixAskQueuedTurn");
+    expect(queuedTurnOwner).toContain("isHelixAskPastedTextResumeRecallPrompt(question)");
+    expect(queuedTurnOwner).toContain("buildHelixAskPastedTextResumeRecallRouteMetadata");
+    expect(queuedTurnOwner).not.toContain("Date.now");
+    expect(queuedTurnOwner).not.toMatch(/from ["']react["']/);
+    expect(queuedTurnOwner).not.toContain("@/store/");
+    expect(queuedTurnOwner).not.toContain("useState");
+    expect(queuedTurnOwner).not.toContain("runAskTurn");
+    expect(queuedTurnOwner).not.toContain("fetch(");
+    expect(pill).not.toContain("const backendOwnedPastedTextResumeRecall = isHelixAskPastedTextResumeRecallPrompt(question)");
+    expect(map).toContain("buildQueuedAskTurn");
+    for (const owner of requestDisplayOwners) {
+      expect(owner).not.toContain("buildQueuedAskTurn");
+      expect(owner).not.toContain("buildHelixAskQueuedTurn");
+    }
     for (const symbol of [
-      "buildQueuedAskTurn",
       "buildAskTurnWorkspaceContextSnapshot",
     ]) {
       expect(pill).toContain(symbol);
@@ -794,7 +828,7 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(attachmentPolicy).toContain("HELIX_ASK_USE_PASTED_TEXT_ATTACHMENT_PROMPT_PATTERN");
     expect(pill).not.toContain("const HELIX_ASK_VISUAL_SURFACE_PROMPT_PATTERN");
     expect(pill).not.toContain("const HELIX_ASK_USE_PASTED_TEXT_ATTACHMENT_PROMPT_PATTERN");
-    expect(pill).toContain("source_target_intent");
+    expect(backendEntrypointPolicy).toContain("source_target_intent");
     expect(pill).toContain("visualSituationEvidenceForTurn");
     expect(pill).not.toContain("validateHelixAskAttachmentForSubmit(attachment)");
     expect(map).toContain("text turn-input item shaping");
@@ -810,14 +844,12 @@ describe("Helix Ask UI ownership boundaries", () => {
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
     const debugExport = read("client/src/lib/agi/debugExport.ts");
     const clipboard = read("client/src/components/helix/ask-console/HelixAskClipboard.ts");
+    const debugSizeControl = read("client/src/components/helix/ask-console/HelixAskDebugExportSizeControl.ts");
 
     for (const localSymbol of [
       "buildReplyMasterEventClockExport",
-      "debugPayloadMatchesRenderedReply",
       "normalizeReplyMasterDebugPayload",
       "buildClientProjectionDebugFields",
-      "copyHelixRailCriticalDebugFieldsForUi",
-      "boundHelixDebugExportTextForUi",
       "buildReplyScopedDebugExportFromRenderedReply",
       "buildReplyScopedDebugExportFromRenderedButton",
       "resolveAuthoritativeDebugExportPayload",
@@ -832,6 +864,8 @@ describe("Helix Ask UI ownership boundaries", () => {
       "buildHelixAskLegacyTurnControlActionPayload",
       "buildHelixAskReplyCopyText",
       "clearHelixAskLegacyCopiedDebugIdIfCurrent",
+      "collectHelixAskLegacyReplyTerminalTranscriptTexts",
+      "debugPayloadMatchesHelixAskLegacyRenderedReply",
       "isHelixAskLegacyBackendDebugExportEligibleTurnId",
       "isHelixAskLegacyRenderedButtonBackendTurnScopeTrusted",
       "resolveHelixAskLegacyDebugExportBackendTarget",
@@ -887,6 +921,17 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(map).toContain("stale selected-debug drawer clearing");
     expect(map).toContain("Backend Ask turn debug-ref eligibility");
     expect(map).toContain("backend-target selection");
+    expect(map).toContain("terminal transcript text collection");
+    expect(map).toContain("debug export size-control");
+    expect(pill).toContain("boundHelixDebugExportTextForUi");
+    expect(pill).not.toContain("const HELIX_DEBUG_EXPORT_MAX_UI_CHARS = 750_000");
+    expect(pill).not.toContain("function copyHelixRailCriticalDebugFieldsForUi");
+    expect(debugSizeControl).toContain("export function boundHelixDebugExportTextForUi");
+    expect(debugSizeControl).toContain("export function copyHelixRailCriticalDebugFieldsForUi");
+    expect(debugSizeControl).toContain("HELIX_DEBUG_EXPORT_MAX_UI_CHARS");
+    expect(debugSizeControl).not.toContain("navigator.clipboard");
+    expect(debugSizeControl).not.toContain("fetch(");
+    expect(debugSizeControl).not.toMatch(/from ["']react["']/);
     expect(pill).toContain("buildHelixDebugExportEnvelopeFromMasterPayload");
     expect(debugExport).toContain("buildHelixDebugExportEnvelopeFromMasterPayload");
     expect(map).toContain("buildHelixDebugExportEnvelopeFromMasterPayload");
@@ -933,6 +978,10 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(pill).toContain("selectHelixAskLegacyReplyScopedDebugExportPayload({");
     expect(pill).toContain("resolveHelixAskLegacyDebugExportClientTurnId(parsed)");
     expect(pill).not.toContain("coerceText(parsed.clientSelectedDebugTurnId).trim()");
+    expect(pill).toContain("collectHelixAskLegacyReplyTerminalTranscriptTexts(reply)");
+    expect(pill).not.toContain("function collectHelixReplyTerminalTranscriptTexts");
+    expect(pill).toContain("debugPayloadMatchesHelixAskLegacyRenderedReply as debugPayloadMatchesRenderedReply");
+    expect(pill).not.toContain("function debugPayloadMatchesRenderedReply");
     const controls = read("client/src/components/helix/ask-console/HelixAskLegacyTurnControls.ts");
     expect(controls).toContain("selectHelixAskLegacyDebugCopyLocalPayload");
     expect(controls).toContain("selectHelixAskLegacyGuardedDebugExportPayload");
@@ -944,6 +993,8 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(controls).toContain("export function extractHelixAskLegacyClickedTurnDebugScope");
     expect(controls).toContain("export function resolveHelixAskLegacyClickedDebugReply");
     expect(controls).toContain("export function resolveHelixAskLegacyReplyDebugTurnId");
+    expect(controls).toContain("export function collectHelixAskLegacyReplyTerminalTranscriptTexts");
+    expect(controls).toContain("export function debugPayloadMatchesHelixAskLegacyRenderedReply");
     expect(controls).toContain("readTurnScopeAttribute(\"data-turn-control-question\", \"data-debug-copy-question\")");
     expect(controls).toContain(
       "readTurnScopeAttribute(\"data-turn-control-active-turn-id\", \"data-debug-copy-active-turn-id\")",
@@ -1320,6 +1371,7 @@ describe("Helix Ask UI ownership boundaries", () => {
     const resumeFrameStorage = read(
       "client/src/components/helix/ask-console/HelixAskContextCompactionResumeFrameStorage.ts",
     );
+    const queuedTurnOwner = read("client/src/components/helix/ask-console/HelixAskQueuedTurn.ts");
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
     const docViewerContext = read("client/src/lib/helix/ask-doc-viewer-context.ts");
     const debugDisplay = read("client/src/lib/helix/ask-debug-event-display.ts");
@@ -1368,7 +1420,8 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(pill).not.toContain("function writeStoredHelixAskContextCompactionResumeFrame");
     expect(pill).not.toContain("const HELIX_ASK_CONTEXT_RESUME_FRAME_STORAGE_KEY");
     expect(resumeFrameStorage).toContain("window.sessionStorage");
-    expect(pill).toContain("context_resume_frame: args.contextResumeFrame");
+    expect(queuedTurnOwner).toContain("context_resume_frame: args.contextResumeFrame");
+    expect(pill).not.toContain("context_resume_frame: args.contextResumeFrame");
     for (const owner of displayOwners) {
       expect(owner).not.toContain("context_resume_frame");
       expect(owner).not.toContain("sessionStorage");
@@ -2317,12 +2370,26 @@ describe("Helix Ask UI ownership boundaries", () => {
   it("keeps observer commentary text presentation in the non-React observer commentary module", () => {
     const pill = read("client/src/components/helix/HelixAskPill.tsx");
     const commentary = read("client/src/lib/helix/ask-observer-commentary-display.ts");
+    const observerLaneEvents = read("client/src/components/helix/ask-console/HelixAskObserverLaneEvents.ts");
+    const timelineFeed = read("client/src/components/helix/ask-console/HelixAskTimelineFeed.ts");
+    const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
 
     expect(pill).toContain('from "@/lib/helix/ask-observer-commentary-display"');
+    expect(pill).toContain('from "@/components/helix/ask-console/HelixAskObserverLaneEvents"');
     expect(pill).not.toContain("function buildObserverUserRestatement");
     expect(pill).not.toContain("export function buildObserverCommentaryForRow");
+    expect(pill).not.toContain("return [...helixTimeline]\n      .sort((left, right) => right.updatedAtMs - left.updatedAtMs)");
     expect(commentary).toContain("export function buildObserverCommentaryForRow");
     expect(commentary).toContain("export type ObserverCommentaryRow");
+    expect(observerLaneEvents).toContain("export function buildHelixAskObserverLaneEvents");
+    expect(observerLaneEvents).toContain("observer_lane_commentary");
+    expect(observerLaneEvents).toContain("normalizeHelixVisibleEventText");
+    expect(timelineFeed).toContain("export function buildHelixAskTimelineFeed");
+    expect(timelineFeed).toContain("export function buildHelixAskActiveTimelineFeed");
+    expect(map).toContain("HelixAskObserverLaneEvents.ts");
+    expect(map).toContain("observer lane event projection");
+    expect(map).toContain("HelixAskTimelineFeed.ts");
+    expect(map).toContain("timeline feed sorting and active-turn filtering");
     expect(commentary).not.toMatch(/from ["']react["']/);
     expect(commentary).not.toContain("@/store/");
     expect(commentary).not.toContain("@/components/helix/HelixAskPill");
@@ -2330,6 +2397,18 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(commentary).not.toContain("enqueueVoicePlaybackIntent");
     expect(commentary).not.toContain("runAskTurn");
     expect(commentary).not.toContain("fetch(");
+    expect(observerLaneEvents).not.toMatch(/from ["']react["']/);
+    expect(observerLaneEvents).not.toContain("@/store/");
+    expect(observerLaneEvents).not.toContain("setAskReplies");
+    expect(observerLaneEvents).not.toContain("enqueueVoicePlaybackIntent");
+    expect(observerLaneEvents).not.toContain("runAskTurn");
+    expect(observerLaneEvents).not.toContain("fetch(");
+    expect(timelineFeed).not.toMatch(/from ["']react["']/);
+    expect(timelineFeed).not.toContain("@/store/");
+    expect(timelineFeed).not.toContain("setAskReplies");
+    expect(timelineFeed).not.toContain("enqueueVoicePlaybackIntent");
+    expect(timelineFeed).not.toContain("runAskTurn");
+    expect(timelineFeed).not.toContain("fetch(");
   });
 
   it("keeps status and transcript class-name helpers in the non-React status class module", () => {
@@ -3207,10 +3286,14 @@ describe("Helix Ask UI ownership boundaries", () => {
     const busyPanel = read("client/src/components/helix/ask-console/HelixAskBusyReasoningPanel.tsx");
     const animationStyles = read("client/src/components/helix/ask-console/HelixAskReasoningAnimationStyles.tsx");
     const battleStage = read("client/src/components/helix/ask-console/HelixAskReasoningBattleStage.tsx");
+    const meterSurface = read("client/src/components/helix/ask-console/HelixAskReasoningMeterSurface.tsx");
+    const theaterSurface = read("client/src/components/helix/ask-console/HelixAskReasoningTheaterSurface.tsx");
     const battleDisplay = read("client/src/lib/helix/ask-reasoning-battle-display.ts");
 
-    expect(pill).toContain('from "@/components/helix/ask-console/HelixAskBusyReasoningPanel"');
-    expect(pill).toContain('from "@/components/helix/ask-console/HelixAskReasoningBattleStage"');
+    expect(pill).toContain('from "@/components/helix/ask-console/HelixAskReasoningTheaterSurface"');
+    expect(pill).not.toContain('from "@/components/helix/ask-console/HelixAskBusyReasoningPanel"');
+    expect(pill).not.toContain('from "@/components/helix/ask-console/HelixAskReasoningMeterSurface"');
+    expect(pill).not.toContain('from "@/components/helix/ask-console/HelixAskReasoningBattleStage"');
     expect(busyPanel).toContain('from "./HelixAskReasoningAnimationStyles"');
     for (const symbol of [
       "reasoningBattleBeatPositionPct",
@@ -3225,7 +3308,13 @@ describe("Helix Ask UI ownership boundaries", () => {
       expect(battleDisplay).toContain(`export function ${symbol}`);
     }
     expect(pill).not.toContain("function renderReasoningBattleStage");
-    expect(pill).toContain("<HelixAskReasoningBattleStage");
+    expect(pill).toContain("<HelixAskReasoningTheaterSurface");
+    expect(pill).not.toContain("<HelixAskReasoningMeterSurface");
+    expect(pill).not.toContain("<HelixAskReasoningBattleStage");
+    expect(theaterSurface).toContain("<HelixAskBusyReasoningPanel");
+    expect(theaterSurface).toContain("<HelixAskReasoningMeterSurface");
+    expect(meterSurface).toContain("export function HelixAskReasoningMeterSurface");
+    expect(meterSurface).toContain("<HelixAskReasoningBattleStage");
     expect(battleStage).toContain("export function HelixAskReasoningBattleStage");
     expect(battleStage).toContain('data-testid={testId ?? "helix-ask-reasoning-battle-stage"}');
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
@@ -3235,6 +3324,8 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(map).toContain("HelixAskBusyReasoningPanel");
     expect(map).toContain("Reasoning battle JSX rendering");
     expect(map).toContain("HelixAskReasoningBattleStage");
+    expect(map).toContain("HelixAskReasoningMeterSurface");
+    expect(map).toContain("HelixAskReasoningTheaterSurface");
     expect(pill).not.toContain("@keyframes helixReasoningFloatingText{");
     expect(animationStyles).toContain("@keyframes helixReasoningFloatingText{");
     expect(animationStyles).toContain("@keyframes helixReasoningBattleBeat{");
@@ -3253,6 +3344,12 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(battleStage).not.toContain("@/store/");
     expect(battleStage).not.toContain("runAskTurn");
     expect(battleStage).not.toContain("fetch(");
+    expect(meterSurface).not.toContain("buildReasoningBattleBeats");
+    expect(meterSurface).not.toContain("buildReasoningBattleAmbientState");
+    expect(meterSurface).not.toContain("buildReasoningBattleAnswerTint");
+    expect(meterSurface).not.toContain("@/store/");
+    expect(meterSurface).not.toContain("runAskTurn");
+    expect(meterSurface).not.toContain("fetch(");
   });
 
   it("keeps reasoning frontier floating text projection in the non-React frontier display module", () => {
@@ -3506,6 +3603,7 @@ describe("Helix Ask UI ownership boundaries", () => {
     const pill = read("client/src/components/helix/HelixAskPill.tsx");
     const map = read("client/src/lib/helix/ASK_UI_OWNERSHIP.md");
     const playbackIntent = read("client/src/lib/helix/ask-voice-playback-intent.ts");
+    const playbackRuntime = read("client/src/lib/helix/voice-playback.ts");
 
     expect(map).toContain("ask-voice-playback-intent.ts");
     expect(map).toContain("Deterministic voice playback intent/task projection");
@@ -3522,12 +3620,13 @@ describe("Helix Ask UI ownership boundaries", () => {
       "enqueueVoiceAutoSpeakTask",
       "voiceAutoSpeakQueueRef",
       "speakVoice",
-      "createVoicePlaybackUtterance",
       "updateVoicePlaybackLifecycleDiagnosticFromAudio",
     ]) {
       expect(pill).toContain(localAnchor);
       expect(playbackIntent).not.toContain(localAnchor);
     }
+    expect(playbackRuntime).toContain("export function createVoicePlaybackUtterance");
+    expect(playbackIntent).not.toContain("createVoicePlaybackUtterance");
     for (const forbidden of [
       /from ["']react["']/,
       /@\/store\//,

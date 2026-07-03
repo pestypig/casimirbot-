@@ -550,7 +550,7 @@ describe("provider-neutral capability lane one-shot runner", () => {
         schema: "helix.text_to_speech.receipt.v1",
         capability: "text_to_speech.speak_text",
         playback_status: "started",
-        provider_playback_status: expect.stringMatching(/^(awaiting_client_playback|queued_for_retry)$/),
+        provider_playback_status: "awaiting_client_playback",
         source_text_hash: expect.any(String),
         audio_bytes_observed: false,
         voice_profile: "dottie_default",

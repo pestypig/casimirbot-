@@ -20,6 +20,24 @@ export type InterimVoiceCalloutPlaybackIntent = VoicePlaybackUtteranceIntent & {
   calloutKind: InterimVoiceCalloutKind;
 };
 
+export type InterimVoiceClientHandoffDebug = {
+  schema: "helix.interim_voice_client_handoff_debug.v1";
+  micArmState: string;
+  voiceMode: string | null;
+  micArmed: boolean;
+  outputModeEnabled: boolean;
+  outputArmed: boolean;
+  requestId: string;
+  receiptId: string;
+  receiptKey: string;
+  calloutKind: InterimVoiceCalloutKind;
+  playbackKind: VoicePlaybackUtteranceIntent["kind"];
+  allowMicOffPlayback: boolean | null;
+  assistant_answer: false;
+  terminal_eligible: false;
+  raw_content_included: false;
+};
+
 const INTERIM_VOICE_CALLOUT_TOOL_RESULT_SCHEMA = "helix.interim_voice_callout_tool_result.v1";
 
 const INTERIM_VOICE_CALLOUT_KINDS = new Set<InterimVoiceCalloutKind>([
@@ -159,4 +177,31 @@ export function collectInterimVoiceCalloutPlaybackIntents(input: {
 
   input.artifacts.forEach(visit);
   return intents;
+}
+
+export function buildInterimVoiceClientHandoffDebug(input: {
+  intent: InterimVoiceCalloutPlaybackIntent;
+  micArmState: string;
+  voiceMode?: string | null;
+  outputModeEnabled: boolean;
+  allowMicOffPlayback?: boolean | null;
+}): InterimVoiceClientHandoffDebug {
+  const micArmed = input.micArmState === "on";
+  return {
+    schema: "helix.interim_voice_client_handoff_debug.v1",
+    micArmState: input.micArmState,
+    voiceMode: input.voiceMode ?? null,
+    micArmed,
+    outputModeEnabled: input.outputModeEnabled,
+    outputArmed: micArmed || input.outputModeEnabled,
+    requestId: input.intent.requestId,
+    receiptId: input.intent.receiptId,
+    receiptKey: input.intent.receiptKey,
+    calloutKind: input.intent.calloutKind,
+    playbackKind: input.intent.kind,
+    allowMicOffPlayback: input.allowMicOffPlayback ?? null,
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+  };
 }

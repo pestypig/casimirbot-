@@ -5111,6 +5111,10 @@ export const callWorkstationGatewayCapability = async (
         repair_action: blockedReason === "blocked_missing_text" ? "ask_user" : "repair",
       }],
     });
+    observationPacket.state_delta = {
+      ...observationPacket.state_delta,
+      text_to_speech_client_playback_handoff: observation,
+    };
     const trace = buildGatewayTrace({
       turnId,
       capabilityId: manifest.capability_id,

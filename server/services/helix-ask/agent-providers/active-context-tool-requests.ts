@@ -156,7 +156,7 @@ export const isExistingTranslationSurfaceReadPrompt = (prompt: string): boolean 
   }
 
   const asksToRead =
-    /\b(?:read(?:\s+aloud)?|inspect|observe|check|show|describe|summari[sz]e)\b/i.test(unquoted) ||
+    /\b(?:read(?:\s+aloud)?|inspect|observe|check|show|describe|summari[sz]e|translate)\b/i.test(unquoted) ||
     /\bwhat(?:'s|\s+is|\s+does|\s+are)?\b[\s\S]{0,80}\b(?:translated\s+text|translation\s+surface|active\s+translation)\b/i.test(unquoted) ||
     /\bwhat\s+translated\s+text\b/i.test(unquoted);
   if (!asksToRead) return false;
@@ -165,6 +165,7 @@ export const isExistingTranslationSurfaceReadPrompt = (prompt: string): boolean 
     /\b(?:active|current|visible|existing|rendered|shown|displayed)\b[\s\S]{0,80}\b(?:translation\s+surface|translated\s+(?:surface|text|section|block|paragraph|content)|active\s+translation(?:\s+(?:surface|text|section|block|paragraph|content))?)\b/i.test(unquoted) ||
     /\b(?:translation\s+surface|translated\s+(?:surface|text|section|block|paragraph|content)|active\s+translation(?:\s+(?:surface|text|section|block|paragraph|content))?)\b[\s\S]{0,80}\b(?:active|current|visible|existing|rendered|shown|displayed)\b/i.test(unquoted) ||
     /\b(?:translation\s+surface|translated\s+(?:surface|text|section|block|paragraph|content)|active\s+translation(?:\s+(?:surface|text|section|block|paragraph|content))?)\b/i.test(unquoted) ||
+    /\btranslate\b[\s\S]{0,80}\b(?:visible|current|active|shown|displayed)\b[\s\S]{0,80}\b(?:section|block|paragraph|content|document|doc)\b/i.test(unquoted) ||
     /\balready[-\s]+translated\b[\s\S]{0,80}\b(?:surface|text|section|block|paragraph|content)\b/i.test(unquoted) ||
     /\b(?:surface|text|section|block|paragraph|content)\b[\s\S]{0,80}\balready[-\s]+translated\b/i.test(unquoted);
 

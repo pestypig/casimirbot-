@@ -40,6 +40,21 @@ const readTargetLanguage = (
   binding.latest_lane_session_event?.target_language ??
   null;
 
+const permissionProfileFor = (
+  binding: HelixCapabilityLaneGoalBinding,
+): HelixCapabilityLaneGoalBindingDebugSummary["permission_profile"] => {
+  const permissions = binding.lane_session_permissions;
+  if (!permissions.write && !permissions.shell && !permissions.code_mutation) {
+    return "permissions non-mutating";
+  }
+  const allowed = [
+    permissions.write ? "write" : "",
+    permissions.shell ? "shell" : "",
+    permissions.code_mutation ? "code mutation" : "",
+  ].filter(Boolean);
+  return allowed.length ? `permissions ${allowed.join(", ")}` : "permissions unknown";
+};
+
 const buildReportDecision = (
   binding: HelixCapabilityLaneGoalBinding,
 ): HelixCapabilityLaneGoalReportDecision => {
@@ -133,11 +148,16 @@ const buildDispatchPlan = (
     account_locale: binding.lane_session_account_locale,
     latest_chunk_id: latestObservationEvent?.chunk_id ?? null,
     latest_chunk_index: latestObservationEvent?.chunk_index ?? null,
+    latest_source_id: latestObservationEvent?.source_id ?? null,
+    latest_source_hash: latestObservationEvent?.source_hash ?? null,
+    latest_target_language: latestObservationEvent?.target_language ?? null,
     latest_dedupe_key: latestObservationEvent?.dedupe_key ?? null,
     latest_source_event_id: latestObservationEvent?.source_event_id ?? null,
     latest_source_event_ms: latestObservationEvent?.source_event_ms ?? null,
     latest_observed_at_ms: latestObservationEvent?.observed_at_ms ?? null,
     latest_freshness_status: latestObservationEvent?.freshness_status ?? null,
+    source_text_hash: binding.latest_mail_loop_summary?.source_text_hash ?? null,
+    source_text_char_count: binding.latest_mail_loop_summary?.source_text_char_count ?? null,
     latest_projection_target: latestObservationEvent?.projection_target ?? null,
     target_language: targetLanguage,
     latest_cancel_requested: latestObservationEvent?.cancel_requested ?? null,
@@ -181,6 +201,7 @@ export const buildHelixCapabilityLaneGoalBindingDebugSummary = (
     latency_class: binding.latency_class,
     privacy_class: binding.privacy_class,
     fallback_backend_provider: binding.fallback_backend_provider,
+    lifecycle_action: binding.latest_lane_session_event?.action ?? null,
     session_status: binding.lane_session_status,
     session_health: binding.lane_session_health,
     source_id: binding.lane_session_source_id,
@@ -189,15 +210,21 @@ export const buildHelixCapabilityLaneGoalBindingDebugSummary = (
     source_projection_target: binding.lane_session_projection_target,
     account_locale: binding.lane_session_account_locale,
     permissions: binding.lane_session_permissions,
+    permission_profile: permissionProfileFor(binding),
     last_observation_ref: binding.lane_session_last_observation_ref,
     last_receipt_ref: binding.lane_session_last_receipt_ref,
     latest_chunk_id: latestObservationEvent?.chunk_id ?? null,
     latest_chunk_index: latestObservationEvent?.chunk_index ?? null,
+    latest_source_id: latestObservationEvent?.source_id ?? null,
+    latest_source_hash: latestObservationEvent?.source_hash ?? null,
+    latest_target_language: latestObservationEvent?.target_language ?? null,
     latest_dedupe_key: latestObservationEvent?.dedupe_key ?? null,
     latest_source_event_id: latestObservationEvent?.source_event_id ?? null,
     latest_source_event_ms: latestObservationEvent?.source_event_ms ?? null,
     latest_observed_at_ms: latestObservationEvent?.observed_at_ms ?? null,
     latest_freshness_status: latestObservationEvent?.freshness_status ?? null,
+    source_text_hash: binding.latest_mail_loop_summary?.source_text_hash ?? null,
+    source_text_char_count: binding.latest_mail_loop_summary?.source_text_char_count ?? null,
     latest_projection_target: latestObservationEvent?.projection_target ?? null,
     target_language: targetLanguage,
     latest_cancel_requested: latestObservationEvent?.cancel_requested ?? null,

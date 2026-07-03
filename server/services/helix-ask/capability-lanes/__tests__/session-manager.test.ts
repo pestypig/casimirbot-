@@ -141,7 +141,11 @@ describe("Helix capability lane session manager", () => {
       sourceEventMs: 111,
       observedAtMs: 140,
       freshnessStatus: "fresh",
+      sourceTextHash: "sha256:text-session-1",
+      sourceTextCharCount: 37,
+      sourceId: "docs:nhm2",
       sourceHash: "sha256:nhm2-v1",
+      targetLanguage: "es",
       projectionTarget: "docs_chunk",
       cancelRequested: true,
       nowMs: 140,
@@ -261,6 +265,8 @@ describe("Helix capability lane session manager", () => {
         source_event_ms: 111,
         observed_at_ms: 140,
         freshness_status: "fresh",
+        source_text_hash: "sha256:text-session-1",
+        source_text_char_count: 37,
         projection_target: "docs_chunk",
         cancel_requested: true,
         terminal_authority_status: "pending_helix_terminal_authority",
@@ -400,5 +406,159 @@ describe("Helix capability lane session manager", () => {
       last_observation_ref: null,
       last_receipt_ref: null,
     });
+  });
+
+  it("fails closed when trying to record observations while a session is paused", () => {
+    const store = createHelixCapabilityLaneSessionStore();
+    store.start({
+      provider: buildProvider("codex"),
+      laneId: "live_translation",
+      laneSessionId: "lane-session-paused-observation",
+      sourceBinding: {
+        source_id: "docs:current",
+        source_kind: "docs",
+        projection_target: "docs_chunk",
+        account_locale: "es-US",
+        target_language: "es",
+      },
+      env: {} as NodeJS.ProcessEnv,
+      nowMs: 100,
+    });
+    store.pause({
+      laneSessionId: "lane-session-paused-observation",
+      reason: "user_paused_translation",
+      nowMs: 200,
+    });
+
+    expect(store.recordObservation({
+      laneSessionId: "lane-session-paused-observation",
+      observationRef: "obs:paused",
+      receiptRef: "receipt:paused",
+      projectionTarget: "docs_chunk",
+      targetLanguage: "es",
+      nowMs: 300,
+    })).toMatchObject({
+      ok: false,
+      action: "record_observation",
+      lane_id: "live_translation",
+      selected_runtime_agent_provider: "codex",
+      session_supported: true,
+      lane_session: null,
+      blocked_reason: "lane_session_paused",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(store.get("lane-session-paused-observation")).toMatchObject({
+      status: "paused",
+      health: "degraded",
+      updated_at_ms: 200,
+      last_observation_ref: null,
+      last_receipt_ref: null,
+    });
+    expect(store.get("lane-session-paused-observation")?.debug_history.map((event) => event.action)).toEqual([
+      "start",
+      "pause",
+    ]);
+  });
+
+  it("fails closed when observation metadata does not match the lane session binding", () => {
+    const store = createHelixCapabilityLaneSessionStore();
+    store.start({
+      provider: buildProvider("codex"),
+      laneId: "live_translation",
+      laneSessionId: "lane-session-binding-guard",
+      sourceBinding: {
+        source_id: "docs:current",
+        source_hash: "sha256:current",
+        source_kind: "docs",
+        projection_target: "docs_chunk",
+        account_locale: "es-US",
+        target_language: "es",
+      },
+      env: {} as NodeJS.ProcessEnv,
+      nowMs: 100,
+    });
+
+    expect(store.recordObservation({
+      laneSessionId: "lane-session-binding-guard",
+      observationRef: "obs:other-source",
+      receiptRef: "receipt:other-source",
+      sourceId: "docs:other",
+      sourceHash: "sha256:current",
+      projectionTarget: "docs_chunk",
+      targetLanguage: "es",
+      nowMs: 190,
+    })).toMatchObject({
+      ok: false,
+      action: "record_observation",
+      lane_session: null,
+      blocked_reason: "source_id_mismatch",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+
+    expect(store.recordObservation({
+      laneSessionId: "lane-session-binding-guard",
+      observationRef: "obs:old-source",
+      receiptRef: "receipt:old-source",
+      sourceId: "docs:current",
+      sourceHash: "sha256:old",
+      projectionTarget: "docs_chunk",
+      targetLanguage: "es",
+      nowMs: 200,
+    })).toMatchObject({
+      ok: false,
+      action: "record_observation",
+      lane_session: null,
+      blocked_reason: "source_hash_mismatch",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+
+    expect(store.recordObservation({
+      laneSessionId: "lane-session-binding-guard",
+      observationRef: "obs:hover",
+      receiptRef: "receipt:hover",
+      sourceHash: "sha256:current",
+      projectionTarget: "docs_hover",
+      targetLanguage: "es",
+      nowMs: 210,
+    })).toMatchObject({
+      ok: false,
+      action: "record_observation",
+      lane_session: null,
+      blocked_reason: "projection_target_mismatch",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+
+    expect(store.recordObservation({
+      laneSessionId: "lane-session-binding-guard",
+      observationRef: "obs:french",
+      receiptRef: "receipt:french",
+      sourceHash: "sha256:current",
+      projectionTarget: "docs_chunk",
+      targetLanguage: "fr",
+      nowMs: 220,
+    })).toMatchObject({
+      ok: false,
+      action: "record_observation",
+      lane_session: null,
+      blocked_reason: "target_language_mismatch",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+
+    expect(store.get("lane-session-binding-guard")).toMatchObject({
+      last_observation_ref: null,
+      last_receipt_ref: null,
+      updated_at_ms: 100,
+    });
+    expect(store.get("lane-session-binding-guard")?.debug_history).toHaveLength(1);
   });
 });

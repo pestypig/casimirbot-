@@ -160,6 +160,8 @@ export function buildAskLiveEventFromTurnTranscriptRecord(
       backendLatencyClass: coerceText(record.latency_class).trim() || null,
       backendPrivacyClass: coerceText(record.privacy_class).trim() || null,
       fallbackBackendProvider: coerceText(record.fallback_backend_provider).trim() || null,
+      stagePlayMailDeliveryStatus: coerceText(record.stage_play_mail_delivery_status).trim() || null,
+      previousStagePlayMailId: coerceText(record.previous_stage_play_mail_id).trim() || null,
       receiptRef: coerceText(record.receipt_ref).trim() || null,
       observationRef: coerceText(record.observation_ref).trim() || null,
       sourceId: coerceText(record.source_id).trim() || null,
@@ -178,6 +180,7 @@ export function buildAskLiveEventFromTurnTranscriptRecord(
       targetLanguage: coerceText(record.target_language).trim() || null,
       latestCancelRequested: readTranscriptBoolean(record.latest_cancel_requested),
       terminalEligible: readTranscriptBoolean(record.terminal_eligible),
+      terminalAuthorityStatus: coerceText(record.terminal_authority_status).trim() || null,
       assistantAnswer: readTranscriptBoolean(record.assistant_answer),
       rawContentIncluded: readTranscriptBoolean(record.raw_content_included),
       clientReplayReason: coerceText(record.client_replay_reason ?? record.replay_reason).trim() || null,
@@ -863,6 +866,10 @@ function readHelixCapabilityLanePacketBackend(
     coerceText(decision?.fallback_backend_provider).trim() ||
     coerceText(trace?.fallback_backend_provider).trim() ||
     coerceText(traceDecision?.fallback_backend_provider).trim();
+  const terminalAuthorityStatus =
+    coerceText(packet?.terminal_authority_status).trim() ||
+    coerceText(shadowExecution?.terminal_authority_status).trim() ||
+    coerceText(trace?.terminal_authority_status).trim();
   if (
     !selectedBackend &&
     !requestedBackend &&
@@ -873,6 +880,7 @@ function readHelixCapabilityLanePacketBackend(
     !latency &&
     !privacy &&
     !fallback &&
+    !terminalAuthorityStatus &&
     !decision &&
     !traceDecision
   ) {
@@ -888,6 +896,7 @@ function readHelixCapabilityLanePacketBackend(
     latency_class: latency || null,
     privacy_class: privacy || null,
     fallback_backend_provider: fallback || null,
+    terminal_authority_status: terminalAuthorityStatus || null,
     backend_selection_decision: decision ?? traceDecision,
     terminal_eligible:
       typeof shadowExecution?.terminal_eligible === "boolean"
@@ -1059,6 +1068,9 @@ function formatHelixCapabilityLaneProjectionReceiptText(receipt: Record<string, 
   const targetLanguage =
     coerceText(receipt.target_language).trim() ||
     coerceText(payload?.target_language).trim();
+  const terminalAuthority =
+    coerceText(receipt.terminal_authority_status).trim() ||
+    coerceText(payload?.terminal_authority_status).trim();
   const parts = [
     capability,
     projectionStatus ? `projection ${projectionStatus}` : "",
@@ -1068,6 +1080,7 @@ function formatHelixCapabilityLaneProjectionReceiptText(receipt: Record<string, 
     sourceKind ? `source kind ${sourceKind}` : "",
     accountLocale ? `account locale ${accountLocale}` : "",
     targetLanguage ? `language ${targetLanguage}` : "",
+    terminalAuthority ? `terminal authority ${terminalAuthority}` : "",
     observationRef ? `observation ${observationRef}` : "",
     receiptRef ? `receipt ${receiptRef}` : "",
   ].filter(Boolean);
@@ -1118,6 +1131,7 @@ function formatHelixLiveTranslationUiProjectionText(projection: HelixLiveTransla
     projection.freshnessStatus ? `freshness ${projection.freshnessStatus}` : "",
     projection.stale ? "stale" : "",
     projection.cancelRequested ? "cancelled" : "",
+    projection.terminalAuthorityStatus ? `terminal authority ${projection.terminalAuthorityStatus}` : "",
     projection.translatedText ? `text ${clipText(projection.translatedText, 160)}` : "",
     projection.observationRef ? `observation ${projection.observationRef}` : "",
     projection.receiptRef ? `receipt ${projection.receiptRef}` : "",
@@ -1130,6 +1144,9 @@ function formatHelixCapabilityLaneGoalBindingSummaryText(summary: Record<string,
   const laneId = coerceText(summary.lane_id).trim() || "capability_lane";
   const sessionId = coerceText(summary.lane_session_id).trim();
   const bindingStatus = coerceText(summary.binding_status).trim();
+  const lifecycleAction = coerceText(
+    summary.lifecycle_action ?? summary.session_lifecycle_action ?? summary.session_action,
+  ).trim();
   const sessionStatus = coerceText(summary.session_status).trim();
   const sessionHealth = coerceText(summary.session_health).trim();
   const backend = coerceText(summary.selected_backend_provider).trim();
@@ -1168,10 +1185,14 @@ function formatHelixCapabilityLaneGoalBindingSummaryText(summary: Record<string,
   const dispatchStatus = coerceText(dispatchPlan?.status).trim();
   const decisionParts = summarizeHelixCapabilityLaneBackendDecision(summary.backend_selection_decision);
   const terminalAuthority = coerceText(summary.terminal_authority_status).trim();
+  const permissionText =
+    coerceText(summary.permission_profile ?? summary.session_permission_profile).trim() ||
+    formatCapabilityLanePermissionText(summary.permissions);
   const parts = [
     goalId ? `goal ${goalId}` : "",
     sessionId ? `session ${sessionId}` : "",
     bindingStatus ? `binding ${bindingStatus}` : "",
+    lifecycleAction ? `action ${lifecycleAction}` : "",
     sessionStatus || sessionHealth ? `session state ${[sessionStatus, sessionHealth].filter(Boolean).join("/")}` : "",
     backend ? `backend ${backend}` : "",
     cost ? `cost ${cost}` : "",
@@ -1202,6 +1223,7 @@ function formatHelixCapabilityLaneGoalBindingSummaryText(summary: Record<string,
     dispatchTarget ? `dispatch target ${dispatchTarget}` : "",
     dispatchStatus ? `dispatch ${dispatchStatus}` : "",
     terminalAuthority ? `terminal authority ${terminalAuthority}` : "",
+    permissionText,
   ].filter(Boolean);
   const suffix = parts.length ? parts.join("; ") : "debug summary available";
   return `Goal-bound lane session: ${laneId}; ${suffix}; lane output remains observation-only.`;
@@ -1418,6 +1440,9 @@ function formatHelixCapabilityLaneGoalDispatchReadinessText(readiness: Record<st
 function formatHelixCapabilityLaneSessionSummaryText(summary: Record<string, unknown>): string {
   const laneId = coerceText(summary.lane_id).trim() || "capability_lane";
   const sessionId = coerceText(summary.lane_session_id).trim();
+  const lifecycleAction = coerceText(
+    summary.lifecycle_action ?? summary.session_lifecycle_action ?? summary.session_action,
+  ).trim();
   const sessionStatus = coerceText(summary.session_status).trim();
   const sessionHealth = coerceText(summary.session_health).trim();
   const backend = coerceText(summary.selected_backend_provider).trim();
@@ -1447,6 +1472,7 @@ function formatHelixCapabilityLaneSessionSummaryText(summary: Record<string, unk
   const decisionParts = summarizeHelixCapabilityLaneBackendDecision(summary.backend_selection_decision);
   const parts = [
     sessionId ? `session ${sessionId}` : "",
+    lifecycleAction ? `action ${lifecycleAction}` : "",
     sessionStatus || sessionHealth ? `state ${[sessionStatus, sessionHealth].filter(Boolean).join("/")}` : "",
     backend ? `backend ${backend}` : "",
     cost ? `cost ${cost}` : "",
@@ -1482,10 +1508,13 @@ function formatHelixCapabilityLaneMailLoopSummaryText(summary: Record<string, un
   const laneId = coerceText(summary.lane_id).trim() || "capability_lane";
   const sessionId = coerceText(summary.lane_session_id).trim();
   const mailId = coerceText(summary.stage_play_mail_id).trim();
+  const mailDeliveryStatus = coerceText(summary.stage_play_mail_delivery_status).trim();
+  const previousMailId = coerceText(summary.previous_stage_play_mail_id).trim();
   const observationRef = coerceText(summary.observation_ref).trim();
   const receiptRef = coerceText(summary.receipt_ref).trim();
   const sourceId = coerceText(summary.source_id).trim();
   const sourceKind = coerceText(summary.source_kind).trim();
+  const accountLocale = coerceText(summary.account_locale).trim();
   const chunkId = coerceText(summary.chunk_id).trim();
   const chunkIndex = coerceText(summary.chunk_index).trim();
   const dedupeKey = coerceText(summary.dedupe_key).trim();
@@ -1509,11 +1538,14 @@ function formatHelixCapabilityLaneMailLoopSummaryText(summary: Record<string, un
   const parts = [
     sessionId ? `session ${sessionId}` : "",
     mailId ? `mail ${mailId}` : "",
+    mailDeliveryStatus ? `mail delivery ${mailDeliveryStatus}` : "",
+    previousMailId ? `previous mail ${previousMailId}` : "",
     wakeExpected,
     observationRef ? `observation ${observationRef}` : "",
     receiptRef ? `receipt ${receiptRef}` : "",
     sourceId ? `source ${sourceId}` : "",
     sourceKind ? `source kind ${sourceKind}` : "",
+    accountLocale ? `account locale ${accountLocale}` : "",
     chunkId ? `chunk ${chunkId}` : "",
     chunkIndex ? `index ${chunkIndex}` : "",
     dedupeKey ? `dedupe ${dedupeKey}` : "",
@@ -1844,6 +1876,10 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
       account_locale: coerceText(receipt.account_locale).trim() ||
         coerceText(payload?.account_locale).trim() ||
         null,
+      terminal_authority_status:
+        coerceText(receipt.terminal_authority_status).trim() ||
+        coerceText(payload?.terminal_authority_status).trim() ||
+        null,
       terminal_eligible: receipt.terminal_eligible === true,
       assistant_answer: receipt.assistant_answer === true,
       raw_content_included: receipt.raw_content_included === true,
@@ -1888,6 +1924,7 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
       translated_text: projection.translatedText,
       projection_status: projection.status,
       terminal_eligible: projection.terminalEligible,
+      terminal_authority_status: projection.terminalAuthorityStatus,
       assistant_answer: projection.assistantAnswer,
       raw_content_included: projection.rawContentIncluded,
       event_source: "capability_lane_projection_receipts",
@@ -1919,6 +1956,10 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
       turn_id: turnId,
       capability_id: laneId,
       lane_session_id: coerceText(summary.lane_session_id).trim() || null,
+      session_lifecycle_action:
+        coerceText(summary.lifecycle_action ?? summary.session_lifecycle_action ?? summary.session_action).trim() || null,
+      permission_profile: formatCapabilityLanePermissionText(summary.permissions) || null,
+      permissions: readAgentLoopAuditRecord(summary.permissions),
       selected_backend_provider: coerceText(summary.selected_backend_provider).trim() || null,
       cost_class: coerceText(summary.cost_class).trim() || null,
       latency_class: coerceText(summary.latency_class).trim() || null,
@@ -1937,6 +1978,7 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
       latest_projection_target: coerceText(summary.latest_projection_target).trim() || null,
       target_language: coerceText(summary.target_language).trim() || null,
       latest_cancel_requested: summary.latest_cancel_requested === true,
+      terminal_authority_status: coerceText(summary.terminal_authority_status).trim() || null,
       terminal_eligible: summary.terminal_eligible === true,
       assistant_answer: summary.assistant_answer === true,
       raw_content_included: summary.raw_content_included === true,
@@ -1972,6 +2014,7 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
       receipt_ref: coerceText(summary.receipt_ref).trim() || null,
       observation_ref: coerceText(summary.observation_ref).trim() || null,
       source_id: coerceText(summary.source_id).trim() || null,
+      account_locale: coerceText(summary.account_locale).trim() || null,
       latest_chunk_id: coerceText(summary.chunk_id).trim() || null,
       latest_chunk_index: coerceText(summary.chunk_index).trim() || null,
       latest_dedupe_key: coerceText(summary.dedupe_key).trim() || null,
@@ -1983,10 +2026,13 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
       target_language: coerceText(summary.target_language).trim() || null,
       latest_cancel_requested: summary.cancel_requested === true,
       stage_play_mail_id: coerceText(summary.stage_play_mail_id).trim() || null,
+      stage_play_mail_delivery_status: coerceText(summary.stage_play_mail_delivery_status).trim() || null,
+      previous_stage_play_mail_id: coerceText(summary.previous_stage_play_mail_id).trim() || null,
       stage_play_wake_expected: summary.stage_play_wake_expected === true,
       mailbox_thread_id: coerceText(summary.mailbox_thread_id).trim() || null,
       mail_status: coerceText(summary.mail_status).trim() || null,
       blocked_reason: coerceText(summary.blocked_reason).trim() || null,
+      terminal_authority_status: coerceText(summary.terminal_authority_status).trim() || null,
       terminal_eligible: summary.terminal_eligible === true,
       assistant_answer: summary.assistant_answer === true,
       raw_content_included: summary.raw_content_included === true,
@@ -2024,6 +2070,13 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
       binding_status: coerceText(summary.binding_status).trim() || null,
       session_status: sessionStatus || null,
       session_health: sessionHealth || null,
+      session_lifecycle_action:
+        coerceText(summary.lifecycle_action ?? summary.session_lifecycle_action ?? summary.session_action).trim() || null,
+      permission_profile:
+        coerceText(summary.permission_profile ?? summary.session_permission_profile).trim() ||
+        formatCapabilityLanePermissionText(summary.permissions) ||
+        null,
+      permissions: readAgentLoopAuditRecord(summary.permissions),
       activation_policy: coerceText(summary.activation_policy).trim() || null,
       attention_policy: coerceText(summary.attention_policy).trim() || null,
       stop_condition: coerceText(summary.stop_condition).trim() || null,
@@ -2098,6 +2151,11 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
       target_language: coerceText(summary.target_language).trim() || null,
       latest_cancel_requested:
         summary.latest_cancel_requested === true || latestGoalEvent?.latest_cancel_requested === true,
+      terminal_authority_status:
+        coerceText(summary.terminal_authority_status).trim() ||
+        coerceText(latestGoalEvent?.terminal_authority_status).trim() ||
+        coerceText(reportDecision?.terminal_authority_status).trim() ||
+        null,
       terminal_eligible: summary.terminal_eligible === true,
       assistant_answer: summary.assistant_answer === true,
       raw_content_included: summary.raw_content_included === true,
@@ -2140,6 +2198,7 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
       receipt_ref: coerceText(plan.receipt_ref).trim() || null,
       observation_ref: coerceText(plan.evidence_ref).trim() || null,
       target_language: coerceText(plan.target_language).trim() || null,
+      terminal_authority_status: coerceText(plan.terminal_authority_status).trim() || null,
       terminal_eligible: plan.terminal_eligible === true,
       assistant_answer: plan.assistant_answer === true,
       raw_content_included: plan.raw_content_included === true,
@@ -2180,6 +2239,7 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
       receipt_ref: coerceText(admission.receipt_ref).trim() || null,
       observation_ref: coerceText(admission.evidence_ref).trim() || null,
       target_language: coerceText(admission.target_language).trim() || null,
+      terminal_authority_status: coerceText(admission.terminal_authority_status).trim() || null,
       terminal_eligible: admission.terminal_eligible === true,
       assistant_answer: admission.assistant_answer === true,
       raw_content_included: admission.raw_content_included === true,
@@ -2225,6 +2285,7 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
           target_language: Array.isArray(goalDispatchReadiness.next_target_languages)
             ? goalDispatchReadiness.next_target_languages.map(coerceText).find(Boolean) || null
             : null,
+          terminal_authority_status: coerceText(goalDispatchReadiness.terminal_authority_status).trim() || null,
           terminal_eligible: goalDispatchReadiness.terminal_eligible === true,
           assistant_answer: goalDispatchReadiness.assistant_answer === true,
           raw_content_included: goalDispatchReadiness.raw_content_included === true,
@@ -2267,6 +2328,7 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
         fallback_backend_provider: coerceText(event.fallback_backend_provider).trim() || null,
         receipt_ref: coerceText(event.receipt_ref).trim() || null,
         observation_ref: coerceText(event.observation_ref).trim() || null,
+        terminal_authority_status: coerceText(event.terminal_authority_status).trim() || null,
         terminal_eligible: event.terminal_eligible === true,
         assistant_answer: event.assistant_answer === true,
         raw_content_included: event.raw_content_included === true,
@@ -2372,6 +2434,7 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
         latency_class: coerceText(trace?.latency_class).trim() || null,
         privacy_class: coerceText(trace?.privacy_class).trim() || null,
         fallback_backend_provider: coerceText(trace?.fallback_backend_provider).trim() || null,
+        terminal_authority_status: coerceText(trace?.terminal_authority_status).trim() || null,
         event_source: "capability_lane_resolve_traces",
         source_event_type: "lane_backend_selected",
       });
@@ -2400,6 +2463,20 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
         latency_class: coerceText(packetBackend?.latency_class).trim() || null,
         privacy_class: coerceText(packetBackend?.privacy_class).trim() || null,
         fallback_backend_provider: coerceText(packetBackend?.fallback_backend_provider).trim() || null,
+        receipt_ref:
+          coerceText(packet?.receipt_ref).trim() ||
+          coerceText(call.receipt_ref).trim() ||
+          null,
+        observation_ref:
+          coerceText(packet?.observation_ref).trim() ||
+          coerceText(packet?.artifact_ref).trim() ||
+          coerceText(call.observation_ref).trim() ||
+          null,
+        terminal_authority_status:
+          coerceText(packetBackend?.terminal_authority_status).trim() ||
+          coerceText(packet?.terminal_authority_status).trim() ||
+          coerceText(call.terminal_authority_status).trim() ||
+          null,
         event_source: "capability_lane_call_results",
         source_event_type: "lane_observation",
       });
@@ -2560,6 +2637,9 @@ export function buildHelixRuntimeAskLiveEvents(reply: HelixAskTranscriptReply): 
       bindingStatus: coerceText(event.binding_status).trim() || null,
       sessionStatus: coerceText(event.session_status).trim() || null,
       sessionHealth: coerceText(event.session_health).trim() || null,
+      sessionLifecycleAction: coerceText(event.session_lifecycle_action ?? event.lifecycle_action ?? event.session_action).trim() || null,
+      sessionPermissionProfile: coerceText(event.permission_profile ?? event.session_permission_profile).trim() || null,
+      permissions: readAgentLoopAuditRecord(event.permissions),
       activationPolicy: coerceText(event.activation_policy).trim() || null,
       attentionPolicy: coerceText(event.attention_policy).trim() || null,
       stopCondition: coerceText(event.stop_condition).trim() || null,
@@ -2589,6 +2669,8 @@ export function buildHelixRuntimeAskLiveEvents(reply: HelixAskTranscriptReply): 
       latestProjectionTarget: coerceText(event.latest_projection_target).trim() || null,
       latestCancelRequested: readTranscriptBoolean(event.latest_cancel_requested),
       stagePlayMailId: coerceText(event.stage_play_mail_id).trim() || null,
+      stagePlayMailDeliveryStatus: coerceText(event.stage_play_mail_delivery_status).trim() || null,
+      previousStagePlayMailId: coerceText(event.previous_stage_play_mail_id).trim() || null,
       stagePlayWakeExpected: readTranscriptBoolean(event.stage_play_wake_expected),
       mailboxThreadId: coerceText(event.mailbox_thread_id).trim() || null,
       mailStatus: coerceText(event.mail_status).trim() || null,
@@ -2597,6 +2679,7 @@ export function buildHelixRuntimeAskLiveEvents(reply: HelixAskTranscriptReply): 
       translatedText: coerceText(event.translated_text).trim() || null,
       projectionStatus: coerceText(event.projection_status).trim() || null,
       terminalEligible: readTranscriptBoolean(event.terminal_eligible),
+      terminalAuthorityStatus: coerceText(event.terminal_authority_status).trim() || null,
       assistantAnswer: readTranscriptBoolean(event.assistant_answer),
       rawContentIncluded: readTranscriptBoolean(event.raw_content_included),
       clientReplayReason: coerceText(event.client_replay_reason ?? event.replay_reason).trim() || null,
@@ -2910,12 +2993,17 @@ export function buildHelixTurnTranscriptRows(reply: HelixAskTranscriptReply): He
         const sourceKind = coerceText(event.source_kind).trim();
         const sourceProjectionTarget = coerceText(event.source_projection_target).trim();
         const accountLocale = coerceText(event.account_locale).trim();
+        const capabilityId = coerceText(event.capability_id).trim();
+        const selectedBackendProvider = coerceText(event.selected_backend_provider).trim();
+        const observationRef = coerceText(event.observation_ref).trim();
+        const receiptRef = coerceText(event.receipt_ref).trim();
         const latestProjection = coerceText(event.latest_projection_target).trim();
         const latestChunk = coerceText(event.latest_chunk_id).trim();
         const latestDedupe = coerceText(event.latest_dedupe_key).trim();
         const latestSourceEvent = coerceText(event.latest_source_event_id).trim();
         const latestFreshness = coerceText(event.latest_freshness_status).trim();
         const targetLanguage = coerceText(event.target_language).trim();
+        const terminalAuthorityStatus = coerceText(event.terminal_authority_status).trim();
         const latestCancelled = event.latest_cancel_requested === true;
         const sourceAudit = resolveHelixTranscriptSourceAudit(event);
         return {
@@ -2928,6 +3016,10 @@ export function buildHelixTurnTranscriptRows(reply: HelixAskTranscriptReply): He
             String(event.lane ?? ""),
             String(event.step_id ?? ""),
             actionLabel ?? "",
+            capabilityId ? `capability ${capabilityId}` : "",
+            selectedBackendProvider ? `backend ${selectedBackendProvider}` : "",
+            observationRef ? `observation ${observationRef}` : "",
+            receiptRef ? `receipt ${receiptRef}` : "",
             sourceId ? `source ${sourceId}` : "",
             sourceKind ? `source kind ${sourceKind}` : "",
             sourceProjectionTarget ? `source projection ${sourceProjectionTarget}` : "",
@@ -2938,6 +3030,7 @@ export function buildHelixTurnTranscriptRows(reply: HelixAskTranscriptReply): He
             latestSourceEvent ? `source event ${latestSourceEvent}` : "",
             latestFreshness ? `freshness ${latestFreshness}` : "",
             targetLanguage ? `target ${targetLanguage}` : "",
+            terminalAuthorityStatus ? `terminal authority ${terminalAuthorityStatus}` : "",
             latestCancelled ? "cancelled" : "",
             status,
           ]

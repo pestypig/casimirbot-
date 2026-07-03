@@ -268,6 +268,8 @@ const readReceiptsFromCallResults = (results: unknown[]): RecordLike[] =>
         observed_at_ms: observation.observed_at_ms,
         freshness_status: observation.freshness_status,
         target_language: observation.target_language,
+        source_text_hash: observation.source_text_hash ?? null,
+        source_text_char_count: observation.source_text_char_count ?? null,
         translated_text: observation.translated_text,
         stale: observation.freshness_status === "stale",
         cancel_requested: false,

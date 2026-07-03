@@ -9,7 +9,11 @@ import {
   normalizedDebugReplyText,
 } from "@/lib/helix/ask-debug-event-display";
 import { formatEnvelopeSectionsForCopy } from "@/lib/helix/ask-envelope-copy";
-import { readAgentLoopAuditRecord } from "@/lib/helix/ask-runtime-authority-readers";
+import {
+  readAgentLoopAuditArray,
+  readAgentLoopAuditRecord,
+} from "@/lib/helix/ask-runtime-authority-readers";
+import { dedupeStrings } from "@/lib/helix/ask-value-normalization";
 import { resolveHelixVisibleTerminal } from "@/lib/helix/resolveHelixVisibleTerminal";
 import type { HelixAskLatestTurnBinding } from "./HelixAskLatestTurnBinding";
 
@@ -23,6 +27,7 @@ type HelixAskLegacyReplyEnvelopeSection = {
 type HelixAskLegacyReplyForControls = {
   id?: string;
   content?: unknown;
+  question?: unknown;
   text?: unknown;
   debug?: unknown;
   turn_id?: unknown;
@@ -166,6 +171,48 @@ export function resolveHelixAskLegacyTurnControlText(
   const visibleFinalAnswerText = coerceControlText(args.visibleFinalAnswerText).trim();
   if (visibleFinalAnswerText) return visibleFinalAnswerText;
   return coerceControlText(args.fallbackCopyText);
+}
+
+export function collectHelixAskLegacyReplyTerminalTranscriptTexts(
+  reply: HelixAskLegacyReplyForControls | null | undefined,
+): string[] {
+  if (!reply) return [];
+  const replyRecord = reply as Record<string, unknown>;
+  const debug = readAgentLoopAuditRecord(reply.debug);
+  const agentLoop = readAgentLoopAuditRecord(
+    replyRecord.agentLoop ?? replyRecord.agent_loop ?? debug?.agentLoop ?? debug?.agent_loop,
+  );
+  const candidates = [
+    replyRecord.turn_transcript_events,
+    replyRecord.turnTranscriptEvents,
+    replyRecord.transcript_events,
+    debug?.turn_transcript_events,
+    debug?.turnTranscriptEvents,
+    debug?.transcript_events,
+    agentLoop?.turn_transcript_events,
+    agentLoop?.turnTranscriptEvents,
+    agentLoop?.transcript_events,
+  ];
+  const texts: string[] = [];
+  candidates.forEach((candidate) => {
+    readAgentLoopAuditArray(candidate).forEach((entry) => {
+      const record = readAgentLoopAuditRecord(entry);
+      if (!record) return;
+      const sourceEventType = coerceControlText(record.source_event_type).trim();
+      const type = coerceControlText(record.type).trim();
+      if (
+        sourceEventType !== "terminal_answer" &&
+        sourceEventType !== "final_answer" &&
+        type !== "terminal_answer" &&
+        type !== "final_answer"
+      ) {
+        return;
+      }
+      const text = cleanHelixRenderedFinalAnswerText(coerceControlText(record.text));
+      if (text) texts.push(text);
+    });
+  });
+  return dedupeStrings(texts);
 }
 
 export function buildHelixAskLegacyTurnControlActionPayload(args: {
@@ -633,6 +680,50 @@ export function resolveHelixAskLegacyReplyDebugTurnId(
     if (turnId) return turnId;
   }
   return reply.id ?? "";
+}
+
+export function debugPayloadMatchesHelixAskLegacyRenderedReply(
+  reply: HelixAskLegacyReplyForControls,
+  parsed: Record<string, unknown>,
+): boolean {
+  const expectedTurnId = resolveHelixAskLegacyReplyDebugTurnId(reply);
+  const parsedDebug = readAgentLoopAuditRecord(parsed.debug);
+  const parsedReply = readAgentLoopAuditRecord(parsed.reply);
+  const parsedCurrentTurn = readAgentLoopAuditRecord(parsed.currentTurn);
+  const turnCandidates = [
+    parsed.active_turn_id,
+    parsed.backend_turn_id,
+    parsed.selectedDebugTurnId,
+    parsedReply?.id,
+    parsedCurrentTurn?.turn_id,
+    parsedCurrentTurn?.turnId,
+    parsedDebug?.turn_id,
+    parsedDebug?.turnId,
+  ]
+    .map((candidate) => coerceControlText(candidate).trim())
+    .filter(Boolean);
+  if (
+    expectedTurnId &&
+    turnCandidates.length > 0 &&
+    !turnCandidates.some((candidate) => candidate === expectedTurnId)
+  ) {
+    return false;
+  }
+  const expectedQuestion = normalizedDebugReplyText(reply.question);
+  if (!expectedQuestion) return true;
+  const candidates = [
+    parsed.selectedDebugQuestion,
+    parsed.active_prompt,
+    parsed.prompt,
+    parsed.user_prompt,
+    parsedReply?.question,
+    parsedCurrentTurn?.question,
+    parsedDebug?.active_prompt,
+  ]
+    .map(normalizedDebugReplyText)
+    .filter(Boolean);
+  if (candidates.length === 0) return true;
+  return candidates.some((candidate) => candidate === expectedQuestion);
 }
 
 export function isHelixAskLegacyBackendDebugExportEligibleTurnId(turnId: string): boolean {

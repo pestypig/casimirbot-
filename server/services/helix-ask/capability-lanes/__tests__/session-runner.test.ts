@@ -46,7 +46,7 @@ const buildProvider = (input: {
 });
 
 describe("Helix capability lane session runner", () => {
-  it("runs structured start and pause calls through the governed session store", () => {
+  it("runs structured start, pause, resume, and observation calls through the governed session store", () => {
     const store = createHelixCapabilityLaneSessionStore();
     const result = runHelixCapabilityLaneSessionRequests({
       provider: buildProvider({ id: "codex", sessions: true }),
@@ -81,6 +81,8 @@ describe("Helix capability lane session runner", () => {
             source_event_ms: 90,
             observed_at_ms: 115,
             freshness_status: "stale",
+            source_text_hash: "sha256:text-runner",
+            source_text_char_count: 41,
             projection_target: "docs_chunk",
             cancel_requested: true,
             now_ms: 115,
@@ -96,6 +98,12 @@ describe("Helix capability lane session runner", () => {
             now_ms: 125,
             reason: "user_paused_translation",
           },
+          {
+            action: "resume",
+            lane_session_id: "lane-session-runner",
+            now_ms: 135,
+            reason: "user_resumed_translation",
+          },
         ],
       },
     });
@@ -107,7 +115,7 @@ describe("Helix capability lane session runner", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
-    expect(result.session_results).toHaveLength(3);
+    expect(result.session_results).toHaveLength(4);
     expect(result.session_results[0]).toMatchObject({
       ok: true,
       action: "start",
@@ -158,6 +166,7 @@ describe("Helix capability lane session runner", () => {
         debug_history: expect.arrayContaining([
           expect.objectContaining({
             action: "record_observation",
+            source_id: "docs:nhm2",
             source_hash: "sha256:runner-v1",
             chunk_id: "chunk-runner",
             chunk_index: 4,
@@ -166,6 +175,8 @@ describe("Helix capability lane session runner", () => {
             source_event_ms: 90,
             observed_at_ms: 115,
             freshness_status: "stale",
+            source_text_hash: "sha256:text-runner",
+            source_text_char_count: 41,
             projection_target: "docs_chunk",
             cancel_requested: true,
           }),
@@ -183,14 +194,30 @@ describe("Helix capability lane session runner", () => {
         updated_at_ms: 125,
       },
     });
+    expect(result.session_results[3]).toMatchObject({
+      ok: true,
+      action: "resume",
+      blocked_reason: null,
+      lane_session: {
+        lane_session_id: "lane-session-runner",
+        status: "running",
+        health: "healthy",
+        updated_at_ms: 135,
+        last_observation_ref: "ask:lane:translation:obs:runner",
+        last_receipt_ref: "ask:lane:translation:receipt:runner",
+      },
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
     expect(result.session_debug_summaries.at(-1)).toMatchObject({
       schema: "helix.capability_lane.session_debug_summary.v1",
       lane_session_id: "lane-session-runner",
       lane_id: "live_translation",
       selected_runtime_agent_provider: "codex",
       selected_backend_provider: "live_translation.local_runtime",
-      session_status: "paused",
-      session_health: "degraded",
+      session_status: "running",
+      session_health: "healthy",
       source_id: "docs:nhm2",
       source_hash: "sha256:runner-v1",
       projection_target: "docs_chunk",
@@ -203,6 +230,8 @@ describe("Helix capability lane session runner", () => {
       latest_source_event_ms: 90,
       latest_observed_at_ms: 115,
       latest_freshness_status: "stale",
+      source_text_hash: "sha256:text-runner",
+      source_text_char_count: 41,
       latest_projection_target: "docs_chunk",
       latest_cancel_requested: true,
       backend_provider_becomes_root_agent: false,
@@ -216,8 +245,8 @@ describe("Helix capability lane session runner", () => {
       result.session_debug_summaries,
     );
     expect(store.get("lane-session-runner")).toMatchObject({
-      status: "paused",
-      health: "degraded",
+      status: "running",
+      health: "healthy",
       last_observation_ref: "ask:lane:translation:obs:runner",
       last_receipt_ref: "ask:lane:translation:receipt:runner",
       source_binding: expect.objectContaining({
@@ -229,6 +258,7 @@ describe("Helix capability lane session runner", () => {
       "start",
       "record_observation",
       "pause",
+      "resume",
     ]);
   });
 
@@ -356,6 +386,164 @@ describe("Helix capability lane session runner", () => {
       updated_at_ms: 120,
       last_observation_ref: null,
       last_receipt_ref: null,
+    });
+  });
+
+  it("fails closed when a structured observation targets the wrong session language", () => {
+    const store = createHelixCapabilityLaneSessionStore();
+    const result = runHelixCapabilityLaneSessionRequests({
+      provider: buildProvider({ id: "codex", sessions: true }),
+      store,
+      env: {} as NodeJS.ProcessEnv,
+      body: {
+        capability_lane_session_call: [
+          {
+            action: "start",
+            lane_id: "live_translation",
+            lane_session_id: "lane-session-runner-language",
+            now_ms: 100,
+            source_binding: {
+              source_id: "docs:nhm2",
+              source_hash: "sha256:runner-language-v1",
+              source_kind: "docs",
+              projection_target: "docs_chunk",
+              account_locale: "es-US",
+              target_language: "es",
+            },
+          },
+          {
+            action: "record_observation",
+            lane_session_id: "lane-session-runner-language",
+            observation_ref: "ask:lane:translation:obs:wrong-language",
+            receipt_ref: "ask:lane:translation:receipt:wrong-language",
+            projection_target: "docs_chunk",
+            now_ms: 140,
+            source_binding: {
+              source_id: "docs:nhm2",
+              source_hash: "sha256:runner-language-v1",
+              source_kind: "docs",
+              target_language: "fr",
+            },
+          },
+        ],
+      },
+    });
+
+    expect(result.session_results).toHaveLength(2);
+    expect(result.session_results[1]).toMatchObject({
+      ok: false,
+      action: "record_observation",
+      lane_id: "live_translation",
+      selected_runtime_agent_provider: "codex",
+      session_supported: true,
+      lane_session: null,
+      blocked_reason: "target_language_mismatch",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(store.get("lane-session-runner-language")).toMatchObject({
+      status: "running",
+      updated_at_ms: 100,
+      last_observation_ref: null,
+      last_receipt_ref: null,
+      source_binding: expect.objectContaining({
+        target_language: "es",
+      }),
+    });
+    expect(store.get("lane-session-runner-language")?.debug_history.map((event) => event.action)).toEqual([
+      "start",
+    ]);
+    expect(result.session_debug_summaries).toHaveLength(1);
+    expect(result.session_debug_summaries[0]).toMatchObject({
+      lane_session_id: "lane-session-runner-language",
+      session_status: "running",
+      target_language: "es",
+      last_observation_ref: null,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
+  it("fails closed when a structured observation targets the wrong session source", () => {
+    const store = createHelixCapabilityLaneSessionStore();
+    const result = runHelixCapabilityLaneSessionRequests({
+      provider: buildProvider({ id: "codex", sessions: true }),
+      store,
+      env: {} as NodeJS.ProcessEnv,
+      body: {
+        capability_lane_session_call: [
+          {
+            action: "start",
+            lane_id: "live_translation",
+            lane_session_id: "lane-session-runner-source",
+            now_ms: 100,
+            source_binding: {
+              source_id: "docs:nhm2",
+              source_hash: "sha256:runner-source-v1",
+              source_kind: "docs",
+              projection_target: "docs_chunk",
+              account_locale: "es-US",
+              target_language: "es",
+            },
+          },
+          {
+            action: "record_observation",
+            lane_session_id: "lane-session-runner-source",
+            observation_ref: "ask:lane:translation:obs:wrong-source",
+            receipt_ref: "ask:lane:translation:receipt:wrong-source",
+            projection_target: "docs_chunk",
+            now_ms: 140,
+            source_binding: {
+              source_id: "docs:other",
+              source_hash: "sha256:runner-source-v1",
+              source_kind: "docs",
+              target_language: "es",
+            },
+          },
+        ],
+      },
+    });
+
+    expect(result.session_results).toHaveLength(2);
+    expect(result.session_results[1]).toMatchObject({
+      ok: false,
+      action: "record_observation",
+      lane_id: "live_translation",
+      selected_runtime_agent_provider: "codex",
+      session_supported: true,
+      lane_session: null,
+      blocked_reason: "source_id_mismatch",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(store.get("lane-session-runner-source")).toMatchObject({
+      status: "running",
+      updated_at_ms: 100,
+      last_observation_ref: null,
+      last_receipt_ref: null,
+      source_binding: expect.objectContaining({
+        source_id: "docs:nhm2",
+        source_hash: "sha256:runner-source-v1",
+        target_language: "es",
+      }),
+    });
+    expect(store.get("lane-session-runner-source")?.debug_history.map((event) => event.action)).toEqual([
+      "start",
+    ]);
+    expect(result.session_debug_summaries).toHaveLength(1);
+    expect(result.session_debug_summaries[0]).toMatchObject({
+      lane_session_id: "lane-session-runner-source",
+      session_status: "running",
+      source_id: "docs:nhm2",
+      source_hash: "sha256:runner-source-v1",
+      target_language: "es",
+      last_observation_ref: null,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
     });
   });
 });

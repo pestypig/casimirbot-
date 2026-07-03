@@ -604,6 +604,9 @@ function readGoalBoundLaneSummary(record: RecordLike | null, debug: RecordLike |
       const lane = coerceText(summary.lane_id) || "capability_lane";
       const goal = coerceText(summary.goal_id);
       const session = coerceText(summary.lane_session_id);
+      const lifecycleAction = coerceText(
+        summary.lifecycle_action ?? summary.session_lifecycle_action ?? summary.session_action,
+      );
       const backend = coerceText(summary.selected_backend_provider);
       const decisionParts = readBackendSelectionDecisionParts(summary.backend_selection_decision);
       const latestMailLoop = readRecord(summary.latest_mail_loop_summary);
@@ -650,10 +653,14 @@ function readGoalBoundLaneSummary(record: RecordLike | null, debug: RecordLike |
       const latency = coerceText(summary.latency_class);
       const privacy = coerceText(summary.privacy_class);
       const fallback = coerceText(summary.fallback_backend_provider);
+      const permissions =
+        coerceText(summary.permission_profile ?? summary.session_permission_profile) ||
+        readCapabilityLanePermissionText(summary.permissions);
       return [
         lane,
         goal ? `goal ${goal}` : "",
         session ? `session ${session}` : "",
+        lifecycleAction ? `action ${lifecycleAction}` : "",
         status ? `status ${status}` : "",
         backend ? `backend ${backend}` : "",
         cost ? `cost ${cost}` : "",
@@ -682,6 +689,7 @@ function readGoalBoundLaneSummary(record: RecordLike | null, debug: RecordLike |
         dispatchTarget ? `dispatch ${dispatchTarget}` : "",
         dispatchAdmissionStatus ? `admission ${dispatchAdmissionStatus}` : "",
         terminalAuthority ? `authority ${terminalAuthority}` : "",
+        permissions,
         "observation-only",
       ].filter(Boolean).join(" | ");
     });
@@ -858,6 +866,9 @@ function readLaneSessionSummary(record: RecordLike | null, debug: RecordLike | n
     .map((summary) => {
       const lane = coerceText(summary.lane_id) || "capability_lane";
       const session = coerceText(summary.lane_session_id);
+      const lifecycleAction = coerceText(
+        summary.lifecycle_action ?? summary.session_lifecycle_action ?? summary.session_action,
+      );
       const backend = coerceText(summary.selected_backend_provider);
       const cost = coerceText(summary.cost_class);
       const latency = coerceText(summary.latency_class);
@@ -887,6 +898,7 @@ function readLaneSessionSummary(record: RecordLike | null, debug: RecordLike | n
       return [
         lane,
         session ? `session ${session}` : "",
+        lifecycleAction ? `action ${lifecycleAction}` : "",
         status ? `status ${status}` : "",
         backend ? `backend ${backend}` : "",
         cost ? `cost ${cost}` : "",
@@ -933,10 +945,13 @@ function readLaneMailLoopSummary(record: RecordLike | null, debug: RecordLike | 
       const lane = coerceText(summary.lane_id) || "capability_lane";
       const session = coerceText(summary.lane_session_id);
       const mail = coerceText(summary.stage_play_mail_id);
+      const mailDelivery = coerceText(summary.stage_play_mail_delivery_status);
+      const previousMail = coerceText(summary.previous_stage_play_mail_id);
       const wake = summary.stage_play_wake_expected === true ? "wake expected" : "wake not expected";
       const observation = coerceText(summary.observation_ref);
       const receipt = coerceText(summary.receipt_ref);
       const source = coerceText(summary.source_id);
+      const accountLocale = coerceText(summary.account_locale);
       const chunk = coerceText(summary.chunk_id);
       const chunkIndex = coerceText(summary.chunk_index);
       const dedupeKey = coerceText(summary.dedupe_key);
@@ -956,10 +971,13 @@ function readLaneMailLoopSummary(record: RecordLike | null, debug: RecordLike | 
         lane,
         session ? `session ${session}` : "",
         mail ? `mail ${mail}` : "",
+        mailDelivery ? `mail delivery ${mailDelivery}` : "",
+        previousMail ? `previous mail ${previousMail}` : "",
         wake,
         observation ? `observation ${observation}` : "",
         receipt ? `receipt ${receipt}` : "",
         source ? `source ${source}` : "",
+        accountLocale ? `account locale ${accountLocale}` : "",
         chunk ? `chunk ${chunk}` : "",
         chunkIndex ? `index ${chunkIndex}` : "",
         dedupeKey ? `dedupe ${dedupeKey}` : "",

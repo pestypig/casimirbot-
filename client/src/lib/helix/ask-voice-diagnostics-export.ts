@@ -13,6 +13,10 @@ function coerceVoiceDiagnosticsText(value: unknown): string {
   return "";
 }
 
+function readVoiceDiagnosticsBoolean(value: unknown): boolean | null {
+  return typeof value === "boolean" ? value : null;
+}
+
 export function resolveVoiceTimelineClientBuildStamp(input: {
   stampedBuild?: string | null;
   isDev: boolean;
@@ -164,6 +168,54 @@ export function buildVoicePlaybackReconciliationDebug(input: {
     terminal_eligible: false,
     raw_content_included: false,
     output_authority: "client_playback_observation",
+  };
+}
+
+export function buildVoicePlaybackReceiptBarrierDebug(input: {
+  activeTurnId: string | null;
+  selectedFinalAnswer: string | null;
+  source: Record<string, unknown>;
+}): Record<string, unknown> | null {
+  const trace = readVoiceDiagnosticsRecord(input.source.ask_turn_solver_trace);
+  const capabilityResult = readVoiceDiagnosticsRecord(trace?.capability_result ?? input.source.capability_result);
+  const chainAudit = readVoiceDiagnosticsRecord(input.source.tool_turn_chain_audit);
+  const canonicalGoalFrame = readVoiceDiagnosticsRecord(input.source.canonical_goal_frame);
+  const requestedCapability =
+    coerceVoiceDiagnosticsText(capabilityResult?.requested_capability).trim() ||
+    coerceVoiceDiagnosticsText(chainAudit?.requested_capability).trim() ||
+    coerceVoiceDiagnosticsText(canonicalGoalFrame?.requested_capability).trim();
+  const executedCapability =
+    coerceVoiceDiagnosticsText(capabilityResult?.executed_capability).trim() ||
+    coerceVoiceDiagnosticsText(chainAudit?.executed_capability).trim();
+  if (requestedCapability !== "text_to_speech.speak_text" && executedCapability !== "text_to_speech.speak_text") {
+    return null;
+  }
+  const observationRefs = Array.isArray(capabilityResult?.observation_refs)
+    ? capabilityResult.observation_refs.filter((ref): ref is string => typeof ref === "string" && ref.trim().length > 0)
+    : [];
+  const finalStatusMatch = (input.selectedFinalAnswer ?? "").match(/\bplayback_status\s*:\s*([a-z0-9_.-]+)/i);
+  const reentered =
+    readVoiceDiagnosticsBoolean(capabilityResult?.reentered_solver) ??
+    readVoiceDiagnosticsBoolean(chainAudit?.reentry_executed) ??
+    readVoiceDiagnosticsBoolean(chainAudit?.reentry_proven) ??
+    false;
+  return {
+    schema: "helix.voice_playback_receipt_barrier.v1",
+    source: "agent_provider_gateway_reentry_projection",
+    active_turn_id: input.activeTurnId,
+    requested_capability: requestedCapability || null,
+    executed_capability: executedCapability || null,
+    capability_result_status: coerceVoiceDiagnosticsText(capabilityResult?.status).trim() || null,
+    playback_status: finalStatusMatch?.[1]?.toLowerCase() ?? null,
+    receipt_kind: "helix.interim_voice_callout_tool_result.v1",
+    observation_refs: observationRefs,
+    receipt_observed: observationRefs.length > 0,
+    evidence_reentered: reentered,
+    terminal_blockers: reentered ? [] : ["voice_playback_receipt_not_reentered"],
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+    output_authority: "voice_playback_observation",
   };
 }
 
