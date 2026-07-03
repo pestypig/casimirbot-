@@ -935,6 +935,49 @@ describe("askLocal lane parity default", () => {
               raw_content_included: false,
             },
           ],
+          model_visible_capability_lane_manifest: {
+            schema: "helix.agent_model_visible_capability_lane_manifest.v1",
+          },
+          capability_lane_projection_receipts: [
+            {
+              capability_key: "live_translation.translate_text",
+              status: "projected",
+              terminal_eligible: false,
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+          ],
+          capability_lane_turn_timeline: [
+            {
+              schema: "helix.capability_lane.provider_timeline_event.v1",
+              stage: "lane_visible",
+              lane_visible: true,
+              lane_requested: false,
+              lane_executed: false,
+              terminal_eligible: false,
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+            {
+              schema: "helix.capability_lane.provider_timeline_event.v1",
+              stage: "lane_requested",
+              lane_visible: false,
+              lane_requested: true,
+              terminal_eligible: false,
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+            {
+              schema: "helix.capability_lane.provider_timeline_event.v1",
+              stage: "lane_reentered",
+              lane_visible: false,
+              lane_requested: true,
+              observation_reentered: true,
+              terminal_eligible: false,
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+          ],
           capability_lane_reentry_status: "observation_packet_required_for_provider_reentry",
           terminal_eligible: false,
           assistant_answer: false,
@@ -981,6 +1024,38 @@ describe("askLocal lane parity default", () => {
         raw_content_included: false,
       }),
     );
+    expect(response.model_visible_capability_lane_manifest).toMatchObject({
+      schema: "helix.agent_model_visible_capability_lane_manifest.v1",
+    });
+    expect(response.capability_lane_projection_receipts).toEqual([
+      expect.objectContaining({
+        capability_key: "live_translation.translate_text",
+        status: "projected",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]);
+    expect(response.capability_lane_turn_timeline).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        schema: "helix.capability_lane.provider_timeline_event.v1",
+        stage: "lane_visible",
+        lane_visible: true,
+        lane_requested: false,
+        lane_executed: false,
+      }),
+      expect.objectContaining({
+        schema: "helix.capability_lane.provider_timeline_event.v1",
+        stage: "lane_requested",
+        lane_visible: false,
+        lane_requested: true,
+      }),
+      expect.objectContaining({
+        schema: "helix.capability_lane.provider_timeline_event.v1",
+        stage: "lane_reentered",
+        observation_reentered: true,
+      }),
+    ]));
   });
 
   it("posts capability lane session control calls to the standalone session endpoint", async () => {
