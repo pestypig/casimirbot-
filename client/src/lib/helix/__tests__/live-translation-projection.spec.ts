@@ -586,6 +586,81 @@ describe("Helix live translation UI projection", () => {
     ]);
   });
 
+  it("uses source event time when deduping same-key projections without observed time", () => {
+    const projections = buildHelixLiveTranslationUiProjections({
+      capability_lane_projection_receipts: [
+        {
+          schema: "helix.live_translation.projection_receipt.v1",
+          receipt_ref: "receipt:docs:u1:new-source-event",
+          observation_ref: "obs:docs:u1:new-source-event",
+          projection_key: "docs:nhm2::source-text::docs_chunk::es-US::u0001::stable-receipt",
+          lane_id: "live_translation",
+          capability: "live_translation.translate_text",
+          projection_target: "docs_chunk",
+          projection_status: "projected",
+          source_id: "document_markdown:docs/research/nhm2.md",
+          source_hash: "fnv1a32:current",
+          source_event_id: "docs:event:same",
+          source_event_ms: 500,
+          chunk_id: "u0001",
+          chunk_index: 0,
+          target_language: "es",
+          translated_text: "Texto mas reciente.",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+        {
+          schema: "helix.live_translation.projection_receipt.v1",
+          receipt_ref: "receipt:docs:u1:old-source-event",
+          observation_ref: "obs:docs:u1:old-source-event",
+          projection_key: "docs:nhm2::source-text::docs_chunk::es-US::u0001::stable-receipt",
+          lane_id: "live_translation",
+          capability: "live_translation.translate_text",
+          projection_target: "docs_chunk",
+          projection_status: "projected",
+          source_id: "document_markdown:docs/research/nhm2.md",
+          source_hash: "fnv1a32:current",
+          source_event_id: "docs:event:same",
+          source_event_ms: 100,
+          chunk_id: "u0001",
+          chunk_index: 0,
+          target_language: "es",
+          translated_text: "Texto viejo.",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      ],
+    });
+
+    expect(projections).toHaveLength(1);
+    expect(selectHelixLiveTranslationUiProjection({
+      projections,
+      sourceId: "document_markdown:docs/research/nhm2.md",
+      sourceHash: "fnv1a32:current",
+      projectionTarget: "docs_chunk",
+      targetLanguage: "es",
+      chunkId: "u0001",
+    })).toMatchObject({
+      status: "projected",
+      displayText: "Texto mas reciente.",
+      observationRef: "obs:docs:u1:new-source-event",
+      receiptRef: "receipt:docs:u1:new-source-event",
+      projection: expect.objectContaining({
+        sourceEventId: "docs:event:same",
+        sourceEventMs: 500,
+        observedAtMs: null,
+        terminalEligible: false,
+        assistantAnswer: false,
+        rawContentIncluded: false,
+      }),
+      terminalEligible: false,
+      assistantAnswer: false,
+      rawContentIncluded: false,
+    });
+  });
+
   it("does not satisfy a hash-scoped projection request with un-hashed projection evidence", () => {
     const projections = buildHelixLiveTranslationUiProjections({
       capability_lane_projection_receipts: [

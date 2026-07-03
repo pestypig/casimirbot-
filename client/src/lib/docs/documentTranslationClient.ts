@@ -302,6 +302,9 @@ export async function runDocumentMarkdownTranslationLaneSessionControl(params: {
         lane_session_id: params.laneSessionId ?? null,
         requested_backend_provider: params.requestedBackendProvider ?? null,
         reason: params.reason ?? `document_inline_translation_${params.action}`,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
         source_binding: {
           source_id: sourceId,
           source_hash: params.sourceHash,

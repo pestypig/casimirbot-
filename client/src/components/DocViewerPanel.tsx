@@ -1232,6 +1232,7 @@ export function DocViewerPanel() {
             canRejoinLiveRead={false}
             onRejoinLiveRead={rejoinLiveRead}
             translationEligible={translationEligible}
+            translationAccountLocale={interfaceLanguage.code}
             translationTargetLanguage={interfaceLanguage.code}
             inlineTranslationEnabled={inlineTranslationEnabled}
             translationStatus={translationStatus}
@@ -1497,6 +1498,7 @@ type PanelHeaderProps = {
   canRejoinLiveRead: boolean;
   onRejoinLiveRead: () => void;
   translationEligible: boolean;
+  translationAccountLocale: string;
   translationTargetLanguage: string;
   inlineTranslationEnabled: boolean;
   translationStatus: DocumentTranslationUiStatus;
@@ -1521,6 +1523,7 @@ export function PanelHeader({
   canRejoinLiveRead,
   onRejoinLiveRead,
   translationEligible,
+  translationAccountLocale,
   translationTargetLanguage,
   inlineTranslationEnabled,
   translationStatus,
@@ -1811,7 +1814,7 @@ export function PanelHeader({
             data-doc-translation-control="inline-account-language"
             data-doc-translation-control-enabled={String(inlineTranslationEnabled)}
             data-doc-translation-control-target-language={translationTargetLanguage}
-            data-doc-translation-control-account-locale={interfaceLanguage.code}
+            data-doc-translation-control-account-locale={translationAccountLocale}
             data-doc-translation-control-projection-target={HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK}
             data-doc-translation-control-terminal-eligible="false"
             data-doc-translation-control-assistant-answer="false"
@@ -1844,6 +1847,18 @@ function isAbortError(error: unknown): boolean {
   return Boolean(error && typeof error === "object" && "name" in error && error.name === "AbortError");
 }
 
+function formatLaneSessionStatusForLabel(args: {
+  status: string | null;
+  health: string | null;
+  fallback: string;
+}): string {
+  const status = args.status ?? args.fallback;
+  if (!args.health || args.health === status) {
+    return status;
+  }
+  return `${status} / ${args.health}`;
+}
+
 export function getDocumentTranslationStatusLabel(args: {
   translationStatus: DocumentTranslationUiStatus;
   translationError: string | null;
@@ -1852,7 +1867,11 @@ export function getDocumentTranslationStatusLabel(args: {
 }): string | null {
   if (args.liveTranslationProjectionSummary.blockedLaneSessionCount > 0) {
     return args.t("docsViewer.translation.status.sessionBlocked", {
-      status: args.liveTranslationProjectionSummary.latestLaneSessionStatus ?? "blocked",
+      status: formatLaneSessionStatusForLabel({
+        status: args.liveTranslationProjectionSummary.latestLaneSessionStatus,
+        health: args.liveTranslationProjectionSummary.latestLaneSessionHealth,
+        fallback: "blocked",
+      }),
     });
   }
   if (args.liveTranslationProjectionSummary.blockedMailLoopCount > 0) {
@@ -1897,7 +1916,11 @@ export function getDocumentTranslationStatusLabel(args: {
   }
   if (args.liveTranslationProjectionSummary.activeLaneSessionCount > 0 && args.translationStatus === "idle") {
     return args.t("docsViewer.translation.status.sessionActive", {
-      status: args.liveTranslationProjectionSummary.latestLaneSessionStatus ?? "running",
+      status: formatLaneSessionStatusForLabel({
+        status: args.liveTranslationProjectionSummary.latestLaneSessionStatus,
+        health: args.liveTranslationProjectionSummary.latestLaneSessionHealth,
+        fallback: "running",
+      }),
     });
   }
   if (

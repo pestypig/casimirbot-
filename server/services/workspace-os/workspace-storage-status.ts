@@ -49,6 +49,7 @@ export async function buildHelixWorkspaceStorageStatus(
     thread_id?: string | null;
     room_id?: string | null;
     profile_id?: string | null;
+    profile_quota_bytes?: number | null;
   },
   readerOverrides: Partial<HelixWorkspaceStorageReaders> = {},
 ): Promise<HelixWorkspaceStorageStatus> {
@@ -70,7 +71,10 @@ export async function buildHelixWorkspaceStorageStatus(
     "WORKSPACE_PROFILE_STORAGE_QUOTA_BYTES",
     "WORKSPACE_USER_STORAGE_QUOTA_BYTES",
   );
-  const profileUsage = getProfileStorageUsage(input.profile_id);
+  const effectiveProfileQuota = input.profile_quota_bytes ?? profileQuota;
+  const profileUsage = getProfileStorageUsage(input.profile_id, {
+    quota_bytes: effectiveProfileQuota,
+  });
   const activeContextPacket = getLatestHelixRollingSessionContextPacket({
     threadId: input.thread_id,
     sessionId: input.thread_id,
@@ -193,9 +197,9 @@ export async function buildHelixWorkspaceStorageStatus(
       profile_id: profileUsage.profile_id,
       chat_session_id: null,
       size_bytes: profileUsage.size_bytes,
-      quota_bytes: profileQuota ?? profileUsage.quota_bytes,
-      usage_ratio: (profileQuota ?? profileUsage.quota_bytes) > 0
-        ? profileUsage.size_bytes / (profileQuota ?? profileUsage.quota_bytes)
+      quota_bytes: effectiveProfileQuota ?? profileUsage.quota_bytes,
+      usage_ratio: (effectiveProfileQuota ?? profileUsage.quota_bytes) > 0
+        ? profileUsage.size_bytes / (effectiveProfileQuota ?? profileUsage.quota_bytes)
         : null,
       approximate: true,
       observed: true,
@@ -206,7 +210,11 @@ export async function buildHelixWorkspaceStorageStatus(
         local_profile_snapshot_count: profileUsage.snapshot_count,
         local_profile_path_ref: profileUsage.path_ref,
         latest_snapshot_at: profileUsage.updated_at ?? "none",
-        quota_source: profileQuota == null ? "not_configured" : "environment",
+        quota_source: input.profile_quota_bytes != null
+          ? "account_policy"
+          : profileQuota == null
+            ? "not_configured"
+            : "environment",
       },
     }),
     makeRecord({
@@ -242,7 +250,7 @@ export async function buildHelixWorkspaceStorageStatus(
     thread_id: input.thread_id ?? null,
     room_id: input.room_id ?? null,
     records: sorted,
-    summary: summarizeHelixWorkspaceStorage(sorted, profileQuota ?? appStorageQuota ?? browserLocalQuota),
+    summary: summarizeHelixWorkspaceStorage(sorted, effectiveProfileQuota ?? appStorageQuota ?? browserLocalQuota),
     authority: buildHelixWorkspaceStorageAuthority(),
   };
 }
@@ -251,6 +259,7 @@ export async function getHelixWorkspaceStorageStatus(input: {
   thread_id?: string | null;
   room_id?: string | null;
   profile_id?: string | null;
+  profile_quota_bytes?: number | null;
 }): Promise<HelixWorkspaceStorageStatus> {
   return buildHelixWorkspaceStorageStatus(input);
 }

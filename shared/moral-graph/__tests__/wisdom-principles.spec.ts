@@ -12,7 +12,7 @@ const VAGUE_RULE_PATTERNS = [
 
 describe("Moral wisdom procedural principle catalog", () => {
   it("requires every principle mapping to carry procedural source, rule, trace, and boundaries", () => {
-    expect(MORAL_WISDOM_PRINCIPLES.length).toBe(26);
+    expect(MORAL_WISDOM_PRINCIPLES.length).toBe(31);
 
     for (const principle of MORAL_WISDOM_PRINCIPLES) {
       expect(principle.sourceIdeologyNodeId).toBe(principle.id);
@@ -81,6 +81,31 @@ describe("Moral wisdom procedural principle catalog", () => {
       proceduralRole: "constraint",
       procedureOperator: "blocks",
       refusesAuthority: ["flattery_as_evidence", "identity_laundered_confidence"],
+    });
+  });
+
+  it("models new philosophy-derived badges as procedural lenses rather than verdicts", () => {
+    expect(getMoralWisdomPrinciple("inherited-conditioning-check")).toMatchObject({
+      proceduralRole: "constraint",
+      evidenceNeeds: ["belief_origin_context", "current_observation", "chosen_commitment"],
+      refusesAuthority: ["conditioned_belief_as_final", "conditioning_as_disproof"],
+    });
+    expect(getMoralWisdomPrinciple("purpose-as-inquiry")).toMatchObject({
+      proceduralRole: "objective_view",
+      procedureOperator: "routes_to",
+      refusesAuthority: ["inspiration_as_proof", "uncertainty_as_abandonment"],
+    });
+    expect(getMoralWisdomPrinciple("inspiration-without-imitation")).toMatchObject({
+      proceduralRole: "constraint",
+      refusesAuthority: ["admiration_as_authority", "identity_surrender"],
+    });
+    expect(getMoralWisdomPrinciple("goalpost-integrity")).toMatchObject({
+      proceduralRole: "evidence_requirement",
+      evidenceNeeds: ["old_criterion", "new_criterion", "revision_evidence"],
+    });
+    expect(getMoralWisdomPrinciple("recognition-before-transcendence")).toMatchObject({
+      proceduralRole: "constraint",
+      refusesAuthority: ["assimilation_as_transcendence", "abandonment_as_transcendence"],
     });
   });
 });

@@ -312,6 +312,73 @@ describe("Helix capability lane session runner", () => {
     });
   });
 
+  it("fails closed for malformed session lifecycle calls without creating summaries or answer authority", () => {
+    const store = createHelixCapabilityLaneSessionStore();
+    const result = runHelixCapabilityLaneSessionRequests({
+      provider: buildProvider({ id: "codex", sessions: true }),
+      store,
+      body: {
+        capability_lane_session_call: [
+          {
+            action: "start",
+            lane_session_id: "lane-session-missing-lane",
+            source_binding: {
+              source_id: "docs:nhm2",
+              source_kind: "docs",
+            },
+          },
+          {
+            action: "pause",
+            lane_id: "live_translation",
+            reason: "missing session id should not pause anything",
+          },
+        ],
+      },
+    });
+
+    expect(result).toMatchObject({
+      schema: "helix.capability_lane.session_runner_result.v1",
+      requested: true,
+      session_results: [
+        {
+          ok: false,
+          action: "start",
+          lane_id: null,
+          selected_runtime_agent_provider: "codex",
+          requested_backend_provider: null,
+          session_supported: null,
+          lane_session: null,
+          blocked_reason: "missing_capability_lane",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+        {
+          ok: false,
+          action: "pause",
+          lane_id: "live_translation",
+          selected_runtime_agent_provider: "codex",
+          requested_backend_provider: null,
+          session_supported: null,
+          lane_session: null,
+          blocked_reason: "missing_lane_session_id",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      ],
+      session_debug_summaries: [],
+      debug_projection: {
+        capability_lane_session_debug_summaries: [],
+      },
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(result.debug_projection.capability_lane_session_results).toEqual(result.session_results);
+    expect(store.list()).toEqual([]);
+  });
+
   it("accepts flat source fields from runtime adapter session calls", () => {
     const store = createHelixCapabilityLaneSessionStore();
     const result = runHelixCapabilityLaneSessionRequests({

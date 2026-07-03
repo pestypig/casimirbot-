@@ -7,6 +7,8 @@ let runAskTurn: typeof import("@/lib/agi/api").runAskTurn;
 let runAskTurnStream: typeof import("@/lib/agi/api").runAskTurnStream;
 let runCapabilityLaneOneShot: typeof import("@/lib/agi/api").runCapabilityLaneOneShot;
 let runCapabilityLaneSessionControl: typeof import("@/lib/agi/api").runCapabilityLaneSessionControl;
+let runCapabilityLaneGoalBindingControl: typeof import("@/lib/agi/api").runCapabilityLaneGoalBindingControl;
+let runCapabilityLaneMailLoop: typeof import("@/lib/agi/api").runCapabilityLaneMailLoop;
 let getVoiceCallDiagnosticsSnapshot: typeof import("@/lib/helix/voice-call-diagnostics").getVoiceCallDiagnosticsSnapshot;
 let clearVoiceCallDiagnosticsSnapshot: typeof import("@/lib/helix/voice-call-diagnostics").clearVoiceCallDiagnosticsSnapshot;
 
@@ -20,6 +22,8 @@ beforeAll(async () => {
     runAskTurnStream,
     runCapabilityLaneOneShot,
     runCapabilityLaneSessionControl,
+    runCapabilityLaneGoalBindingControl,
+    runCapabilityLaneMailLoop,
   } = await import("@/lib/agi/api"));
   ({ getVoiceCallDiagnosticsSnapshot, clearVoiceCallDiagnosticsSnapshot } = await import(
     "@/lib/helix/voice-call-diagnostics"
@@ -978,6 +982,16 @@ describe("askLocal lane parity default", () => {
               raw_content_included: false,
             },
           ],
+          capability_lane_timeline_summary: {
+            schema: "helix.capability_lane.timeline_summary.v1",
+            event_count: 3,
+            visible_count: 1,
+            requested_count: 1,
+            reentered_count: 1,
+            lane_executed_count: 0,
+            visible_only_count: 1,
+            visible_lane_does_not_mean_executed: true,
+          },
           capability_lane_reentry_status: "observation_packet_required_for_provider_reentry",
           terminal_eligible: false,
           assistant_answer: false,
@@ -993,6 +1007,7 @@ describe("askLocal lane parity default", () => {
 
     const response = await runCapabilityLaneOneShot({
       agentRuntime: "codex",
+      turnId: "turn-lane-client-one-shot",
       capability_lane_call: {
         capability: "live_translation.translate_text",
         text: "hello",
@@ -1008,6 +1023,8 @@ describe("askLocal lane parity default", () => {
     expect(requestInit.method).toBe("POST");
     expect(body).not.toHaveProperty("question");
     expect(body.agent_runtime).toBe("codex");
+    expect(body.turnId).toBe("turn-lane-client-one-shot");
+    expect(body.turn_id).toBe("turn-lane-client-one-shot");
     expect(body.capability_lane_call).toEqual(
       expect.objectContaining({
         capability: "live_translation.translate_text",
@@ -1056,6 +1073,13 @@ describe("askLocal lane parity default", () => {
         observation_reentered: true,
       }),
     ]));
+    expect(response.capability_lane_timeline_summary).toMatchObject({
+      schema: "helix.capability_lane.timeline_summary.v1",
+      visible_count: 1,
+      requested_count: 1,
+      reentered_count: 1,
+      visible_lane_does_not_mean_executed: true,
+    });
   });
 
   it("posts capability lane session control calls to the standalone session endpoint", async () => {
@@ -1072,6 +1096,40 @@ describe("askLocal lane parity default", () => {
               session_control_key: "lane-session-docs-route::document_markdown:docs/example.md",
             },
           ],
+          model_visible_capability_lane_manifest: {
+            schema: "helix.agent_model_visible_capability_lane_manifest.v1",
+          },
+          capability_lane_turn_timeline: [
+            {
+              schema: "helix.capability_lane.provider_timeline_event.v1",
+              stage: "lane_visible",
+              lane_visible: true,
+              lane_requested: false,
+              lane_executed: false,
+              terminal_eligible: false,
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+            {
+              schema: "helix.capability_lane.provider_timeline_event.v1",
+              stage: "lane_session",
+              lane_id: "live_translation",
+              status: "running",
+              lane_visible: false,
+              lane_requested: true,
+              session_lifecycle_action: "start",
+              terminal_eligible: false,
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+          ],
+          capability_lane_timeline_summary: {
+            schema: "helix.capability_lane.timeline_summary.v1",
+            visible_count: 1,
+            session_count: 1,
+            visible_only_count: 1,
+            visible_lane_does_not_mean_executed: true,
+          },
         }),
         {
           status: 200,
@@ -1083,6 +1141,7 @@ describe("askLocal lane parity default", () => {
 
     const response = await runCapabilityLaneSessionControl({
       agentRuntime: "codex",
+      turnId: "turn-lane-client-session",
       capability_lane_session_call: {
         action: "start",
         lane_id: "live_translation",
@@ -1102,6 +1161,8 @@ describe("askLocal lane parity default", () => {
     const body = JSON.parse(String(requestInit.body ?? "{}")) as Record<string, any>;
     expect(requestInit.method).toBe("POST");
     expect(body.agent_runtime).toBe("codex");
+    expect(body.turnId).toBe("turn-lane-client-session");
+    expect(body.turn_id).toBe("turn-lane-client-session");
     expect(body.capability_lane_session_call).toEqual(
       expect.objectContaining({
         action: "start",
@@ -1118,6 +1179,269 @@ describe("askLocal lane parity default", () => {
         schema: "helix.capability_lane.session_control_response.v1",
       }),
     );
+    expect(response.model_visible_capability_lane_manifest).toMatchObject({
+      schema: "helix.agent_model_visible_capability_lane_manifest.v1",
+    });
+    expect(response.capability_lane_turn_timeline).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        schema: "helix.capability_lane.provider_timeline_event.v1",
+        stage: "lane_visible",
+        lane_visible: true,
+        lane_requested: false,
+      }),
+      expect.objectContaining({
+        schema: "helix.capability_lane.provider_timeline_event.v1",
+        stage: "lane_session",
+        lane_id: "live_translation",
+        status: "running",
+        session_lifecycle_action: "start",
+      }),
+    ]));
+    expect(response.capability_lane_timeline_summary).toMatchObject({
+      schema: "helix.capability_lane.timeline_summary.v1",
+      visible_count: 1,
+      session_count: 1,
+      visible_lane_does_not_mean_executed: true,
+    });
+  });
+
+  it("posts capability lane goal-binding control calls to the standalone goal-binding endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ok: true,
+          requested: true,
+          schema: "helix.capability_lane.goal_binding_control_response.v1",
+          capability_lane_goal_binding_debug_summaries: [
+            {
+              goal_binding_id: "goal-binding-docs-route",
+              goal_id: "goal:translate-docs",
+              lane_id: "live_translation",
+              report_policy: "ask_on_salience",
+              quiet_behavior: "wake_on_salience",
+            },
+          ],
+          capability_lane_mail_loop_debug_summaries: [],
+          model_visible_capability_lane_manifest: {
+            schema: "helix.agent_model_visible_capability_lane_manifest.v1",
+          },
+          capability_lane_turn_timeline: [
+            {
+              schema: "helix.capability_lane.provider_timeline_event.v1",
+              stage: "lane_visible",
+              lane_visible: true,
+              lane_requested: false,
+              lane_executed: false,
+              terminal_eligible: false,
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+            {
+              schema: "helix.capability_lane.provider_timeline_event.v1",
+              stage: "goal_binding",
+              lane_id: "live_translation",
+              status: "bound",
+              lane_visible: false,
+              lane_requested: true,
+              terminal_eligible: false,
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+          ],
+          capability_lane_timeline_summary: {
+            schema: "helix.capability_lane.timeline_summary.v1",
+            visible_count: 1,
+            goal_binding_count: 1,
+            visible_only_count: 1,
+            visible_lane_does_not_mean_executed: true,
+          },
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await runCapabilityLaneGoalBindingControl({
+      agentRuntime: "codex",
+      turnId: "turn-lane-client-goal-binding",
+      capability_lane_goal_binding_call: {
+        action: "bind",
+        goal_binding_id: "goal-binding-docs-route",
+        goal_id: "goal:translate-docs",
+        lane_session_id: "lane-session-docs-route",
+        report_policy: "ask_on_salience",
+        quiet_behavior: "wake_on_salience",
+      },
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/agi/capability-lanes/goal-binding");
+    const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const body = JSON.parse(String(requestInit.body ?? "{}")) as Record<string, any>;
+    expect(requestInit.method).toBe("POST");
+    expect(body.agent_runtime).toBe("codex");
+    expect(body.turnId).toBe("turn-lane-client-goal-binding");
+    expect(body.turn_id).toBe("turn-lane-client-goal-binding");
+    expect(body.capability_lane_goal_binding_call).toEqual(
+      expect.objectContaining({
+        action: "bind",
+        goal_binding_id: "goal-binding-docs-route",
+        goal_id: "goal:translate-docs",
+        lane_session_id: "lane-session-docs-route",
+      }),
+    );
+    expect(response).toEqual(
+      expect.objectContaining({
+        schema: "helix.capability_lane.goal_binding_control_response.v1",
+        ok: true,
+        requested: true,
+      }),
+    );
+    expect(response.model_visible_capability_lane_manifest).toMatchObject({
+      schema: "helix.agent_model_visible_capability_lane_manifest.v1",
+    });
+    expect(response.capability_lane_goal_binding_debug_summaries).toEqual([
+      expect.objectContaining({
+        goal_binding_id: "goal-binding-docs-route",
+        lane_id: "live_translation",
+      }),
+    ]);
+    expect(response.capability_lane_turn_timeline).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        schema: "helix.capability_lane.provider_timeline_event.v1",
+        stage: "goal_binding",
+        lane_id: "live_translation",
+        status: "bound",
+      }),
+    ]));
+    expect(response.capability_lane_timeline_summary).toMatchObject({
+      schema: "helix.capability_lane.timeline_summary.v1",
+      goal_binding_count: 1,
+      visible_lane_does_not_mean_executed: true,
+    });
+  });
+
+  it("posts capability lane mail-loop calls to the standalone mail-loop endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ok: true,
+          requested: true,
+          schema: "helix.capability_lane.mail_loop_response.v1",
+          capability_lane_mail_loop_results: [
+            {
+              ok: true,
+              lane_session_id: "lane-session-docs-route",
+              stage_play_mail_id: "stage-play-mail-route",
+              terminal_eligible: false,
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+          ],
+          capability_lane_mail_loop_debug_summaries: [
+            {
+              lane_session_id: "lane-session-docs-route",
+              lane_id: "live_translation",
+              stage_play_wake_kind: "mailbox_wake",
+            },
+          ],
+          model_visible_capability_lane_manifest: {
+            schema: "helix.agent_model_visible_capability_lane_manifest.v1",
+          },
+          capability_lane_turn_timeline: [
+            {
+              schema: "helix.capability_lane.provider_timeline_event.v1",
+              stage: "lane_mail_loop",
+              lane_id: "live_translation",
+              lane_visible: false,
+              lane_requested: true,
+              lane_executed: true,
+              observation_reentered: true,
+              terminal_eligible: false,
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+          ],
+          capability_lane_timeline_summary: {
+            schema: "helix.capability_lane.timeline_summary.v1",
+            mail_loop_count: 1,
+            lane_executed_count: 1,
+            visible_lane_does_not_mean_executed: true,
+          },
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await runCapabilityLaneMailLoop({
+      agentRuntime: "codex",
+      turnId: "turn-lane-client-mail-loop",
+      threadId: "ask-thread-mail-loop",
+      laneSessionId: "lane-session-docs-route",
+      objectiveText: "Translate document chunks into account language.",
+      capability_lane_call: {
+        capability: "live_translation.translate_text",
+        text: "hello",
+        source_language: "en",
+        target_language: "es",
+        source_id: "docs:example.md",
+        projection_target: "docs_chunk",
+      },
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/agi/capability-lanes/mail-loop");
+    const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const body = JSON.parse(String(requestInit.body ?? "{}")) as Record<string, any>;
+    expect(requestInit.method).toBe("POST");
+    expect(body.agent_runtime).toBe("codex");
+    expect(body.turnId).toBe("turn-lane-client-mail-loop");
+    expect(body.turn_id).toBe("turn-lane-client-mail-loop");
+    expect(body.threadId).toBe("ask-thread-mail-loop");
+    expect(body.thread_id).toBe("ask-thread-mail-loop");
+    expect(body.laneSessionId).toBe("lane-session-docs-route");
+    expect(body.lane_session_id).toBe("lane-session-docs-route");
+    expect(body.objectiveText).toBe("Translate document chunks into account language.");
+    expect(body.objective_text).toBe("Translate document chunks into account language.");
+    expect(body.capability_lane_call).toEqual(
+      expect.objectContaining({
+        capability: "live_translation.translate_text",
+        text: "hello",
+        target_language: "es",
+      }),
+    );
+    expect(response).toEqual(
+      expect.objectContaining({
+        schema: "helix.capability_lane.mail_loop_response.v1",
+        ok: true,
+        requested: true,
+      }),
+    );
+    expect(response.capability_lane_mail_loop_debug_summaries).toEqual([
+      expect.objectContaining({
+        lane_session_id: "lane-session-docs-route",
+        lane_id: "live_translation",
+      }),
+    ]);
+    expect(response.capability_lane_turn_timeline).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        schema: "helix.capability_lane.provider_timeline_event.v1",
+        stage: "lane_mail_loop",
+        lane_id: "live_translation",
+      }),
+    ]));
+    expect(response.capability_lane_timeline_summary).toMatchObject({
+      schema: "helix.capability_lane.timeline_summary.v1",
+      mail_loop_count: 1,
+      visible_lane_does_not_mean_executed: true,
+    });
   });
 
   it("enables golden-path runtime markers when runAskTurn uses Helix runtime", async () => {

@@ -30,6 +30,7 @@ accountSessionRouter.post("/session/sign-in", (req, res) => {
     profile_id: typeof req.body?.profile_id === "string" ? req.body.profile_id : null,
     display_name: typeof req.body?.display_name === "string" ? req.body.display_name : null,
     email: typeof req.body?.email === "string" ? req.body.email : null,
+    account_type: typeof req.body?.account_type === "string" ? req.body.account_type : null,
   });
   if (receipt.session) {
     setHelixSessionCookie(res, receipt.session.session_id);
@@ -64,7 +65,9 @@ accountSessionRouter.get("/profile-storage/snapshot", (req, res) => {
       raw_profile_content_included: false,
     });
   }
-  return res.status(200).json(readProfileStorageSnapshot(profileId));
+  return res.status(200).json(readProfileStorageSnapshot(profileId, {
+    quota_bytes: status.account_policy.quotas.profile_storage_bytes,
+  }));
 });
 
 accountSessionRouter.post("/profile-storage/snapshot", (req, res) => {
@@ -80,6 +83,7 @@ accountSessionRouter.post("/profile-storage/snapshot", (req, res) => {
   }
   const receipt = writeProfileStorageSnapshot({
     profile_id: profileId,
+    quota_bytes: status.account_policy.quotas.profile_storage_bytes,
     snapshot: {
       entries: Array.isArray(req.body?.entries) ? req.body.entries : [],
       artifacts: Array.isArray(req.body?.artifacts) ? req.body.artifacts : [],

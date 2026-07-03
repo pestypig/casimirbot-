@@ -50,7 +50,63 @@ const normalizeTimelineStage = (value: unknown): string | null => {
   }
 };
 
-const buildCapabilityLaneTimelineSummary = (timeline: unknown): RecordLike => {
+const buildConsoleStateLabel = (entry: RecordLike, stage: string | null): string => {
+  if (stage === "visible") return entry.lane_executed === true ? "visible_executed" : "visible_only";
+  if (stage === "backend") return "backend_selected";
+  if (stage === "observed") return entry.observation_reentered === true ? "observed_reentered" : "observed_pending_reentry";
+  if (stage === "receipt") return "receipt_recorded";
+  if (stage === "reentered") return "observation_reentered";
+  if (stage === "session") return `session_${readString(entry.session_lifecycle_action) || readString(entry.lifecycle_action) || readString(entry.session_action) || "event"}`;
+  if (stage === "mail") return entry.observation_reentered === true ? "mail_loop_evidence_reentered" : "mail_loop_evidence_pending";
+  if (stage === "goal") return entry.observation_reentered === true ? "goal_bound_with_evidence" : "goal_bound_waiting_for_evidence";
+  if (stage === "terminal_selected") return "terminal_selected";
+  if (stage === "terminal_rejected") return "terminal_rejected";
+  return stage || "unknown";
+};
+
+const buildConsoleStateRows = (entries: RecordLike[]): RecordLike[] =>
+  entries.map((entry, index) => {
+    const stage = normalizeTimelineStage(entry.stage);
+    return {
+      schema: "helix.capability_lane.console_state_row.v1",
+      seq: typeof entry.seq === "number" ? entry.seq : index,
+      stage: entry.stage ?? null,
+      normalized_stage: stage,
+      state_label: buildConsoleStateLabel(entry, stage),
+      lane_id: readString(entry.lane_id),
+      capability_id: readString(entry.capability_id),
+      selected_runtime_agent_provider: readString(entry.selected_runtime_agent_provider),
+      selected_backend_provider: readString(entry.selected_backend_provider),
+      lane_visible: entry.lane_visible === true,
+      lane_requested: entry.lane_requested === true,
+      lane_executed: entry.lane_executed === true,
+      observation_reentered: entry.observation_reentered === true,
+      observation_ref: readString(entry.observation_ref),
+      receipt_ref: readString(entry.receipt_ref),
+      goal_id: readString(entry.goal_id),
+      goal_binding_id: readString(entry.goal_binding_id),
+      lane_session_id: readString(entry.lane_session_id),
+      mail_loop_ref: readString(entry.mail_loop_ref),
+      latest_event_id: readString(entry.latest_event_id),
+      session_status: readString(entry.session_status),
+      session_health: readString(entry.session_health),
+      latest_mail_loop_wake_kind: readString(entry.latest_mail_loop_wake_kind),
+      report_action: readString(entry.report_action),
+      report_reason: readString(entry.report_reason),
+      dispatch_target: readString(entry.dispatch_target),
+      dispatch_admission_status: readString(entry.dispatch_admission_status),
+      dispatch_blocked_reason: readString(entry.dispatch_blocked_reason),
+      materialized_mail_loop_evidence: entry.materialized_mail_loop_evidence === true,
+      wake_dispatch_allowed: entry.wake_dispatch_allowed === true,
+      side_effects_allowed: entry.side_effects_allowed === true,
+      terminal_authority_status: readString(entry.terminal_authority_status) ?? "not_terminal_authority",
+      terminal_eligible: entry.terminal_eligible === true,
+      assistant_answer: entry.assistant_answer === true,
+      raw_content_included: entry.raw_content_included === true,
+    };
+  });
+
+export const buildCapabilityLaneTimelineSummary = (timeline: unknown): RecordLike => {
   const entries = readRecordArray(timeline);
   const stageSequence = entries
     .map((entry) => normalizeTimelineStage(entry.stage))
@@ -97,6 +153,7 @@ const buildCapabilityLaneTimelineSummary = (timeline: unknown): RecordLike => {
     observation_reentered_count: flagCount("observation_reentered"),
     terminal_selected_count: count("terminal_selected"),
     terminal_rejected_count: count("terminal_rejected"),
+    console_state_rows: buildConsoleStateRows(entries),
     visible_lane_does_not_mean_executed: true,
   };
 };

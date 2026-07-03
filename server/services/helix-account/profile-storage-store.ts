@@ -159,32 +159,45 @@ function emptySnapshot(profileId: string): HelixProfileStorageSnapshot {
   };
 }
 
-export function readProfileStorageSnapshot(profileId: string): HelixProfileStorageSnapshot {
+const resolveQuotaBytes = (quotaBytes?: number | null): number => {
+  if (typeof quotaBytes === "number" && Number.isFinite(quotaBytes) && quotaBytes >= 0) {
+    return Math.round(quotaBytes);
+  }
+  return getProfileStorageQuotaBytes();
+};
+
+export function readProfileStorageSnapshot(
+  profileId: string,
+  options: { quota_bytes?: number | null } = {},
+): HelixProfileStorageSnapshot {
   const normalizedProfileId = normalize(profileId);
-  if (!normalizedProfileId) return emptySnapshot("");
+  const quotaBytes = resolveQuotaBytes(options.quota_bytes);
+  if (!normalizedProfileId) return { ...emptySnapshot(""), quota_bytes: quotaBytes };
   const filePath = profileSnapshotPath(normalizedProfileId);
-  if (!fs.existsSync(filePath)) return emptySnapshot(normalizedProfileId);
+  if (!fs.existsSync(filePath)) return { ...emptySnapshot(normalizedProfileId), quota_bytes: quotaBytes };
   try {
     const parsed = JSON.parse(fs.readFileSync(filePath, "utf8")) as HelixProfileStorageSnapshot;
     if (parsed?.schema !== HELIX_PROFILE_STORAGE_SNAPSHOT_SCHEMA) {
-      return emptySnapshot(normalizedProfileId);
+      return { ...emptySnapshot(normalizedProfileId), quota_bytes: quotaBytes };
     }
     return {
       ...emptySnapshot(normalizedProfileId),
       ...parsed,
       profile_id: normalizedProfileId,
-      quota_bytes: getProfileStorageQuotaBytes(),
+      quota_bytes: quotaBytes,
       raw_profile_content_included: true,
     };
   } catch {
-    return emptySnapshot(normalizedProfileId);
+    return { ...emptySnapshot(normalizedProfileId), quota_bytes: quotaBytes };
   }
 }
 
 export function writeProfileStorageSnapshot(input: {
   profile_id: string;
+  quota_bytes?: number | null;
   snapshot: HelixProfileStorageWriteRequest;
 }): HelixProfileStorageWriteReceipt {
+  const quotaBytes = resolveQuotaBytes(input.quota_bytes);
   const profileId = normalize(input.profile_id);
   if (!profileId) {
     return {
@@ -194,7 +207,7 @@ export function writeProfileStorageSnapshot(input: {
       entry_count: 0,
       artifact_count: 0,
       total_entry_bytes: 0,
-      quota_bytes: getProfileStorageQuotaBytes(),
+      quota_bytes: quotaBytes,
       updated_at: null,
       error: "missing_profile_id",
       message: "A profile session is required before profile storage can be saved.",
@@ -206,7 +219,6 @@ export function writeProfileStorageSnapshot(input: {
     .filter((artifact): artifact is HelixWorkspaceMemoryArtifact => Boolean(artifact));
   const entries = normalizeEntries(input.snapshot, artifacts);
   const totalEntryBytes = entries.reduce((sum, entry) => sum + entry.size_bytes, 0);
-  const quotaBytes = getProfileStorageQuotaBytes();
   if (totalEntryBytes > quotaBytes) {
     return {
       schema: HELIX_PROFILE_STORAGE_WRITE_RECEIPT_SCHEMA,
@@ -251,7 +263,10 @@ export function writeProfileStorageSnapshot(input: {
   };
 }
 
-export function getProfileStorageUsage(profileId?: string | null): {
+export function getProfileStorageUsage(
+  profileId?: string | null,
+  options: { quota_bytes?: number | null } = {},
+): {
   profile_id: string | null;
   size_bytes: number;
   quota_bytes: number;
@@ -259,13 +274,14 @@ export function getProfileStorageUsage(profileId?: string | null): {
   path_ref: string;
   updated_at: string | null;
 } {
+  const quotaBytes = resolveQuotaBytes(options.quota_bytes);
   const normalizedProfileId = normalize(profileId);
   if (normalizedProfileId) {
-    const snapshot = readProfileStorageSnapshot(normalizedProfileId);
+    const snapshot = readProfileStorageSnapshot(normalizedProfileId, { quota_bytes: quotaBytes });
     return {
       profile_id: normalizedProfileId,
       size_bytes: snapshot.total_entry_bytes,
-      quota_bytes: getProfileStorageQuotaBytes(),
+      quota_bytes: quotaBytes,
       snapshot_count: snapshot.updated_at ? 1 : 0,
       path_ref: `profile://local/${sanitizeProfileId(normalizedProfileId)}`,
       updated_at: snapshot.updated_at,
@@ -277,7 +293,7 @@ export function getProfileStorageUsage(profileId?: string | null): {
     return {
       profile_id: null,
       size_bytes: 0,
-      quota_bytes: getProfileStorageQuotaBytes(),
+      quota_bytes: quotaBytes,
       snapshot_count: 0,
       path_ref: "profile://local",
       updated_at: null,
@@ -295,7 +311,7 @@ export function getProfileStorageUsage(profileId?: string | null): {
   return {
     profile_id: null,
     size_bytes: sizeBytes,
-    quota_bytes: getProfileStorageQuotaBytes(),
+    quota_bytes: quotaBytes,
     snapshot_count: snapshots.length,
     path_ref: "profile://local",
     updated_at: updatedAt,

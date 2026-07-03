@@ -160,6 +160,9 @@ describe("document translation MicroDeck output parsing", () => {
         lane_id: "live_translation",
         lane_session_id: "lane-session-docs",
         requested_backend_provider: "live_translation.local_runtime",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
         source_binding: {
           source_id: "document_markdown:docs/example.md",
           source_hash: "fnv1a32:test",

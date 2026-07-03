@@ -60,6 +60,8 @@ export type HelixAskConsoleCapabilityLaneSummary = {
 };
 
 export type HelixAskConsoleCapabilityLaneRowDetail = {
+  normalizedStage: string | null;
+  stateLabel: string | null;
   selectedRuntimeAgentProvider: string | null;
   adapterBoundary: string | null;
   laneId: string | null;
@@ -88,6 +90,8 @@ export type HelixAskConsoleCapabilityLaneRowDetail = {
   goalBindingId: string | null;
   goalBindingKey: string | null;
   laneSessionId: string | null;
+  sessionStatus: string | null;
+  sessionHealth: string | null;
   sessionLifecycleAction: string | null;
   sessionControlKey: string | null;
   sourceBindingKey: string | null;
@@ -171,6 +175,40 @@ export function resolveHelixAskConsoleCapabilityLaneRowStage(
     haystack.includes(`source_event_type":"${stage}`) ||
     haystack.includes(`"stage":"${stage}`) ||
     haystack.includes(`stage ${stage}`);
+  if (label === "lane state" || hasStage("lane_console_state")) {
+    if (
+      haystack.includes("state terminal_rejected") ||
+      haystack.includes("normalized stage terminal_rejected") ||
+      haystack.includes("terminal authority missing")
+    ) {
+      return "terminal_rejected";
+    }
+    if (haystack.includes("state terminal_selected") || haystack.includes("normalized stage terminal_selected")) {
+      return "terminal_selected";
+    }
+    if (haystack.includes("normalized stage reentered") || haystack.includes("state reentered")) {
+      return "reentered";
+    }
+    if (haystack.includes("normalized stage receipt") || haystack.includes("state receipt")) {
+      return "receipt";
+    }
+    if (
+      haystack.includes("normalized stage observed") ||
+      haystack.includes("state observed") ||
+      haystack.includes("observed_pending_reentry")
+    ) {
+      return "observed";
+    }
+    if (haystack.includes("normalized stage backend") || haystack.includes("state backend")) {
+      return "backend_selected";
+    }
+    if (haystack.includes("normalized stage requested") || haystack.includes("state requested")) {
+      return "requested";
+    }
+    if (haystack.includes("normalized stage visible") || haystack.includes("visible_only")) {
+      return "visible";
+    }
+  }
   if (label === "lane visible" || hasStage("lane_visible")) {
     return "visible";
   }
@@ -296,6 +334,8 @@ export function resolveHelixAskConsoleCapabilityLaneRowDetail(
     return /^[a-z][a-z0-9_-]*$/.test(normalized);
   }) ?? null;
   return {
+    normalizedStage: readMetaTokenValue(tokens, "normalized stage "),
+    stateLabel: readMetaTokenValue(tokens, "state "),
     selectedRuntimeAgentProvider:
       readMetaTokenValue(tokens, "runtime provider ") ||
       readMetaTokenValue(tokens, "selected runtime ") ||
@@ -335,6 +375,8 @@ export function resolveHelixAskConsoleCapabilityLaneRowDetail(
     goalBindingId: readMetaTokenValue(tokens, "goal binding "),
     goalBindingKey: readMetaTokenValue(tokens, "goal binding key "),
     laneSessionId: readMetaTokenValue(tokens, "lane session "),
+    sessionStatus: readMetaTokenValue(tokens, "session status "),
+    sessionHealth: readMetaTokenValue(tokens, "session health "),
     sessionLifecycleAction:
       readMetaTokenValue(tokens, "session lifecycle action ") ||
       readMetaTokenValue(tokens, "lifecycle action ") ||
@@ -396,6 +438,8 @@ export function formatHelixAskConsoleCapabilityLaneRowDetailText(
   detail: HelixAskConsoleCapabilityLaneRowDetail,
 ): string | null {
   const parts = [
+    detail.stateLabel ? `State ${detail.stateLabel}` : "",
+    detail.normalizedStage ? `Normalized ${detail.normalizedStage}` : "",
     detail.selectedRuntimeAgentProvider ? `Provider ${detail.selectedRuntimeAgentProvider}` : "",
     detail.adapterBoundary ? `Adapter ${detail.adapterBoundary}` : "",
     detail.laneId ? `Lane ${detail.laneId}` : "",
@@ -424,6 +468,8 @@ export function formatHelixAskConsoleCapabilityLaneRowDetailText(
     detail.goalBindingId ? `Goal binding ${detail.goalBindingId}` : "",
     detail.goalBindingKey ? `Goal binding key ${detail.goalBindingKey}` : "",
     detail.laneSessionId ? `Session ${detail.laneSessionId}` : "",
+    detail.sessionStatus ? `Session status ${detail.sessionStatus}` : "",
+    detail.sessionHealth ? `Session health ${detail.sessionHealth}` : "",
     detail.sessionLifecycleAction ? `Action ${detail.sessionLifecycleAction}` : "",
     detail.sessionControlKey ? `Session control ${detail.sessionControlKey}` : "",
     detail.sourceBindingKey ? `Source binding key ${detail.sourceBindingKey}` : "",
@@ -558,11 +604,12 @@ export function formatHelixAskConsoleCapabilityLaneSummaryText(
     summary.terminalRejectedCount > 0 ? `terminal rejected ${summary.terminalRejectedCount}` : "",
   ].filter(Boolean);
   const detail = counts.length ? counts.join(" / ") : summary.lifecycleStatus.replace(/_/g, " ");
+  const lifecycle = ` Status: ${summary.lifecycleStatus.replace(/_/g, " ")}.`;
   const sequence = summary.stageSequenceText ? ` Path: ${summary.stageSequenceText}.` : "";
   const visibleOnlyNote = summary.visibleCount > 0
     ? " Visible lanes are available, not executed."
     : "";
-  return `Lane timeline: ${detail}.${sequence}${visibleOnlyNote}`;
+  return `Lane timeline: ${detail}.${lifecycle}${sequence}${visibleOnlyNote}`;
 }
 
 export function buildHelixAskConsoleAssemblyDebugSnapshot(input: {

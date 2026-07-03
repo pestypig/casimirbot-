@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  isDiscoverableLaunchPanel,
   isLegacyDebugPanel,
+  isLockedLaunchPanel,
   isUnfinishedPanel,
   isUserLaunchPanel,
 } from "@/lib/workstation/launchPanelPolicy";
@@ -67,14 +69,18 @@ describe("launchPanelPolicy", () => {
     const unfinishedPanels = [
       "agi-contribution-workbench",
       "code-admin",
+      "document-image-lens",
       "helix-noise-gens",
       "mission-ethos-source",
+      "needle-world-roadmap",
       "rag-admin",
     ];
 
     for (const panelId of unfinishedPanels) {
       expect(isUnfinishedPanel(panelId)).toBe(true);
       expect(isUserLaunchPanel(panelId)).toBe(false);
+      expect(isLockedLaunchPanel(panelId)).toBe(true);
+      expect(isDiscoverableLaunchPanel(panelId)).toBe(true);
     }
   });
 });

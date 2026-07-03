@@ -1,7 +1,10 @@
 import express from "express";
 import request from "supertest";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { workstationToolGatewayRouter } from "../../../../routes/agi.workstation-tool-gateway";
+import { accountSessionRouter } from "../../../../routes/account-session";
+import { agentProvidersRouter } from "../../../../routes/agi.agent-providers";
+import { resetAccountSessionStore } from "../../../helix-account/account-session-store";
 import { HELIX_WORKSPACE_OS_STATUS_CAPABILITY } from "../../workspace-os-status-intent";
 
 const WORKSTATION_ACTIVE_CONTEXT_CAPABILITY = "workstation.active_context";
@@ -15,11 +18,17 @@ const VOICE_INTERIM_CALLOUT_CAPABILITY = "live_env.request_interim_voice_callout
 const createApp = (): express.Express => {
   const app = express();
   app.use(express.json({ limit: "256kb" }));
+  app.use("/api/account", accountSessionRouter);
   app.use("/api/agi", workstationToolGatewayRouter);
+  app.use("/api/agi", agentProvidersRouter);
   return app;
 };
 
 describe("AGI workstation tool gateway route", () => {
+  beforeEach(() => {
+    resetAccountSessionStore();
+  });
+
   it("exposes capability manifests over the AGI route", async () => {
     const response = await request(createApp())
       .get("/api/agi/workstation-tool-gateway/capabilities?agent_runtime=codex&mode=observe")
@@ -143,7 +152,7 @@ describe("AGI workstation tool gateway route", () => {
         assistant_answer: false,
         raw_content_included: false,
       });
-      expect(["observe", "read", "act"]).toContain(capability.mode);
+      expect(["observe", "read", "act", "verify"]).toContain(capability.mode);
     }
   });
 
@@ -692,5 +701,135 @@ describe("AGI workstation tool gateway route", () => {
       },
     });
     expect(response.body.observation.hit_count).toBeGreaterThan(0);
+  }, 15000);
+
+  it("caps user account capability listing and exposes locked act capabilities", async () => {
+    const app = createApp();
+    const agent = request.agent(app);
+    await agent
+      .post("/api/account/session/sign-in")
+      .send({ profile_id: "profile:user-gateway", account_type: "user" })
+      .expect(200);
+
+    const response = await agent
+      .get("/api/agi/workstation-tool-gateway/capabilities?agent_runtime=codex&mode=act")
+      .expect(200);
+
+    expect(response.body.account_policy).toMatchObject({
+      account_type: "user",
+      max_workstation_permission: "read",
+    });
+    expect(response.body.policy_gate).toMatchObject({
+      account_type: "user",
+      requested_mode: "act",
+      effective_mode: "read",
+      capped: true,
+    });
+    expect(response.body.capabilities).not.toContainEqual(
+      expect.objectContaining({ capability_id: WORKSTATION_OPEN_PANEL_CAPABILITY }),
+    );
+    expect(response.body.locked_capabilities).toContainEqual(
+      expect.objectContaining({
+        capability_id: WORKSTATION_OPEN_PANEL_CAPABILITY,
+        permission_profile_required: "act",
+        locked_reason: "capability_permission_exceeds_account_policy",
+      }),
+    );
+  });
+
+  it("blocks user account calls to act-only workstation capabilities", async () => {
+    const app = createApp();
+    const agent = request.agent(app);
+    await agent
+      .post("/api/account/session/sign-in")
+      .send({ profile_id: "profile:user-call", account_type: "user" })
+      .expect(200);
+
+    const response = await agent
+      .post("/api/agi/workstation-tool-gateway/call")
+      .send({
+        mode: "act",
+        capability_id: WORKSTATION_OPEN_PANEL_CAPABILITY,
+        turn_id: "ask:test:user-gateway-block",
+        arguments: {
+          panel_id: "code-admin",
+        },
+      })
+      .expect(400);
+
+    expect(response.body).toMatchObject({
+      ok: false,
+      account_policy: {
+        account_type: "user",
+        max_workstation_permission: "read",
+      },
+      policy_gate: {
+        requested_mode: "act",
+        effective_mode: "read",
+        capped: true,
+      },
+      error: "permission_profile_read_does_not_allow_act",
+      observation: {
+        schema: "helix.workstation_tool_gateway.permission_blocked.v1",
+        requested_mode: "read",
+        required_permission_profile: "act",
+        status: "blocked",
+      },
+    });
+  });
+
+  it("keeps developer account access to act-only workstation capabilities", async () => {
+    const app = createApp();
+    const agent = request.agent(app);
+    await agent
+      .post("/api/account/session/sign-in")
+      .send({ profile_id: "profile:developer-gateway" })
+      .expect(200);
+
+    const response = await agent
+      .post("/api/agi/workstation-tool-gateway/call")
+      .send({
+        agent_runtime: "codex",
+        mode: "act",
+        capability_id: WORKSTATION_OPEN_PANEL_CAPABILITY,
+        turn_id: "ask:test:developer-gateway-open",
+        arguments: {
+          panel_id: "workstation-task-manager",
+        },
+      })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      ok: true,
+      account_policy: {
+        account_type: "developer",
+        max_workstation_permission: "danger",
+      },
+      capability_id: WORKSTATION_OPEN_PANEL_CAPABILITY,
+      observation: {
+        schema: "helix.workstation_ui_action_receipt.v1",
+        status: "succeeded",
+      },
+    });
+  });
+
+  it("filters runtime providers for user account policy", async () => {
+    const app = createApp();
+    const agent = request.agent(app);
+    await agent
+      .post("/api/account/session/sign-in")
+      .send({ profile_id: "profile:user-provider", account_type: "user" })
+      .expect(200);
+
+    const response = await agent.get("/api/agi/agent-providers").expect(200);
+
+    expect(response.body.account_policy).toMatchObject({
+      account_type: "user",
+      allowed_runtime_agents: ["helix"],
+    });
+    expect(response.body.providers.map((provider: { id: string }) => provider.id)).toEqual(["helix"]);
+    expect(response.body.locked_providers.map((provider: { id: string }) => provider.id)).toEqual(
+      expect.arrayContaining(["codex", "future"]),
+    );
   });
 });

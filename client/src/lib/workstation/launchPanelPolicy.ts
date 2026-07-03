@@ -1,35 +1,16 @@
-const USER_LAUNCH_PANEL_IDS = new Set<string>([
-  "docs-viewer",
-  "account-session",
-  "workstation-notes",
-  "situation-room-pipelines",
-  "live-answer-environment",
-  "image-lens",
-  "narrator",
-  "workstation-clipboard-history",
-  "workstation-workflow-timeline",
-  "workstation-task-manager",
-  "workstation-storage-map",
-  "agi-task-history",
-  "scientific-calculator",
-  "theory-badge-graph",
-  "moral-graph",
-  "fruition-calculator",
-  "stage-play-badge-graph",
-  "civilization-bounds-roadmap",
-  "mission-ethos",
-]);
+import {
+  HELIX_LOCKED_WORKSTATION_PANEL_IDS,
+  HELIX_USER_WORKSTATION_PANEL_IDS,
+} from "@shared/helix-account-session";
+
+const USER_LAUNCH_PANEL_IDS = new Set<string>(HELIX_USER_WORKSTATION_PANEL_IDS);
 
 const LEGACY_DEBUG_PANEL_IDS = new Set<string>([
   "agi-essence-console",
 ]);
 
 const UNFINISHED_PANEL_IDS = new Set<string>([
-  "agi-contribution-workbench",
-  "code-admin",
-  "helix-noise-gens",
-  "mission-ethos-source",
-  "rag-admin",
+  ...HELIX_LOCKED_WORKSTATION_PANEL_IDS,
 ]);
 
 export function isUserLaunchPanel(panelId: string): boolean {
@@ -42,4 +23,12 @@ export function isLegacyDebugPanel(panelId: string): boolean {
 
 export function isUnfinishedPanel(panelId: string): boolean {
   return UNFINISHED_PANEL_IDS.has(panelId);
+}
+
+export function isLockedLaunchPanel(panelId: string): boolean {
+  return isLegacyDebugPanel(panelId) || isUnfinishedPanel(panelId);
+}
+
+export function isDiscoverableLaunchPanel(panelId: string): boolean {
+  return isUserLaunchPanel(panelId) || isLockedLaunchPanel(panelId);
 }

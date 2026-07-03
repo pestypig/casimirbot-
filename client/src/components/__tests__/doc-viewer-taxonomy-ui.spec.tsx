@@ -276,6 +276,7 @@ describe("DocViewerPanel taxonomy UI", () => {
         canRejoinLiveRead={false}
         onRejoinLiveRead={vi.fn()}
         translationEligible={false}
+        translationAccountLocale="en"
         translationTargetLanguage="es"
         inlineTranslationEnabled={false}
         translationStatus="idle"
@@ -360,6 +361,7 @@ describe("DocViewerPanel taxonomy UI", () => {
         canRejoinLiveRead={false}
         onRejoinLiveRead={vi.fn()}
         translationEligible
+        translationAccountLocale="es-US"
         translationTargetLanguage="es"
         inlineTranslationEnabled
         translationStatus="cached"

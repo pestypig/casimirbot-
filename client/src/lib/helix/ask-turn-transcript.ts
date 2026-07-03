@@ -266,6 +266,7 @@ function resolveHelixTranscriptRowLabel(event: Record<string, unknown>): string 
   if (sourceEventType === "lane_reentered") return "Lane Re-entry";
   if (sourceEventType === "lane_session") return "Lane Session";
   if (sourceEventType === "lane_mail_loop") return "Lane Mail";
+  if (sourceEventType === "lane_console_state") return "Lane State";
   if (sourceEventType === "lane_goal_binding") return "Goal Lane";
   if (sourceEventType === "lane_goal_dispatch_plan") return "Goal Dispatch";
   if (sourceEventType === "lane_goal_dispatch_admission") return "Goal Admission";
@@ -532,6 +533,28 @@ function readHelixCapabilityLaneTurnTimeline(reply: HelixAskTranscriptReply): Re
       const rightSeq = typeof right.seq === "number" && Number.isFinite(right.seq) ? right.seq : 0;
       return leftSeq - rightSeq;
     });
+}
+
+function readHelixCapabilityLaneConsoleStateRows(reply: HelixAskTranscriptReply): Record<string, unknown>[] {
+  const { replyRecord, debugRecord, agentLoopRecord, debugExportRecord } = readHelixGatewayProjectionSources(reply);
+  const summaries = [
+    readAgentLoopAuditRecord(replyRecord?.capability_lane_timeline_summary),
+    readAgentLoopAuditRecord(debugRecord?.capability_lane_timeline_summary),
+    readAgentLoopAuditRecord(agentLoopRecord?.capability_lane_timeline_summary),
+    readAgentLoopAuditRecord(debugExportRecord?.capability_lane_timeline_summary),
+  ];
+  for (const summary of summaries) {
+    const rows = readAgentLoopAuditArray(summary?.console_state_rows)
+      .map((entry) => readAgentLoopAuditRecord(entry))
+      .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+      .sort((left, right) => {
+        const leftSeq = typeof left.seq === "number" && Number.isFinite(left.seq) ? left.seq : 0;
+        const rightSeq = typeof right.seq === "number" && Number.isFinite(right.seq) ? right.seq : 0;
+        return leftSeq - rightSeq;
+      });
+    if (rows.length > 0) return rows;
+  }
+  return [];
 }
 
 function readHelixCapabilityLaneGoalBindingDebugSummaries(reply: HelixAskTranscriptReply): Record<string, unknown>[] {
@@ -1222,6 +1245,10 @@ function formatHelixCapabilityLaneTimelineEventText(event: Record<string, unknow
     const detail = sourceSuffix ? ` ${sourceSuffix}.` : "";
     return `Lane session: ${laneId} ${status || "active"}.${detail}`;
   }
+  if (stage === "lane_mail_loop") {
+    const detail = sourceSuffix ? ` ${sourceSuffix}.` : "";
+    return `Lane mail loop: ${laneId} ${status || "recorded"}.${detail}`;
+  }
   if (stage === "goal_binding") {
     const detail = sourceSuffix ? ` ${sourceSuffix}.` : "";
     return `Goal lane binding: ${laneId} ${status || "bound"}.${detail}`;
@@ -1243,7 +1270,8 @@ function buildHelixCapabilityLaneTimelineTranscriptEvent(input: {
     stage === "lane_observation" ||
     stage === "lane_projection_receipt" ||
     stage === "lane_reentered" ||
-    stage === "lane_session"
+    stage === "lane_session" ||
+    stage === "lane_mail_loop"
       ? stage
       : stage === "goal_binding"
         ? "lane_goal_binding"
@@ -1264,7 +1292,9 @@ function buildHelixCapabilityLaneTimelineTranscriptEvent(input: {
         ? "system"
         : sourceEventType === "lane_backend_selected" || sourceEventType === "lane_visible"
         ? "system"
-        : sourceEventType === "lane_observation" || sourceEventType === "lane_projection_receipt"
+        : sourceEventType === "lane_observation" ||
+          sourceEventType === "lane_projection_receipt" ||
+          sourceEventType === "lane_mail_loop"
           ? "tool"
           : "agent",
     type:
@@ -1272,6 +1302,7 @@ function buildHelixCapabilityLaneTimelineTranscriptEvent(input: {
         ? "model_decision"
         : sourceEventType === "lane_observation" ||
           sourceEventType === "lane_projection_receipt" ||
+          sourceEventType === "lane_mail_loop" ||
           sourceEventType === "lane_visible"
         ? "observation"
         : "model_decision",
@@ -1402,6 +1433,87 @@ function buildHelixCapabilityLaneTimelineTranscriptEvent(input: {
     raw_content_included: input.event.raw_content_included === true,
     event_source: "capability_lane_turn_timeline",
     source_event_type: sourceEventType,
+  };
+}
+
+function formatHelixCapabilityLaneConsoleStateText(row: Record<string, unknown>): string {
+  const stateLabel = coerceText(row.state_label).trim() || "state";
+  const normalizedStage = coerceText(row.normalized_stage).trim();
+  const laneId = coerceText(row.lane_id).trim() || "capability_lane";
+  const capability =
+    coerceText(row.capability_id).trim() ||
+    coerceText(row.capability).trim() ||
+    laneId;
+  const selectedBackend = coerceText(row.selected_backend_provider).trim();
+  const observationRef = coerceText(row.observation_ref).trim();
+  const receiptRef = coerceText(row.receipt_ref).trim();
+  const wakeKind = coerceText(row.latest_mail_loop_wake_kind).trim();
+  const reportAction = coerceText(row.report_action).trim();
+  const terminalAuthority = coerceText(row.terminal_authority_status).trim();
+  const detail = [
+    normalizedStage ? `stage ${normalizedStage}` : "",
+    selectedBackend ? `backend ${selectedBackend}` : "",
+    row.lane_visible === true ? "visible" : "",
+    row.lane_requested === true ? "requested" : "",
+    row.lane_executed === true ? "executed" : "",
+    row.observation_reentered === true ? "re-entered" : "",
+    observationRef ? `observation ${observationRef}` : "",
+    receiptRef ? `receipt ${receiptRef}` : "",
+    wakeKind ? `wake ${wakeKind}` : "",
+    reportAction ? `report ${reportAction}` : "",
+    terminalAuthority ? `terminal authority ${terminalAuthority}` : "",
+  ].filter(Boolean).join("; ");
+  return `Lane state: ${capability} is ${stateLabel}${detail ? `. ${detail}.` : "."}`;
+}
+
+function buildHelixCapabilityLaneConsoleStateTranscriptEvent(input: {
+  replyId: string;
+  turnId: string;
+  row: Record<string, unknown>;
+  index: number;
+}): Record<string, unknown> {
+  const laneId = coerceText(input.row.lane_id).trim() || "capability_lane";
+  const capability =
+    coerceText(input.row.capability_id).trim() ||
+    coerceText(input.row.capability).trim() ||
+    laneId;
+  const stateLabel = coerceText(input.row.state_label).trim() || "state";
+  const terminalSelected = stateLabel === "terminal_selected" || stateLabel === "terminal_rejected";
+  return {
+    id: `${input.replyId}-capability-lane-console-state-${input.index}`,
+    role: terminalSelected ? "system" : input.row.lane_executed === true ? "tool" : "system",
+    type: terminalSelected ? "model_decision" : "observation",
+    status: "completed",
+    text: formatHelixCapabilityLaneConsoleStateText(input.row),
+    detail:
+      coerceText(input.row.observation_ref).trim() ||
+      coerceText(input.row.receipt_ref).trim() ||
+      coerceText(input.row.selected_backend_provider).trim() ||
+      stateLabel,
+    lane: laneId,
+    step_id: `lane_console_state_${coerceText(input.row.normalized_stage).trim() || input.index + 1}`,
+    turn_id: input.turnId,
+    capability_id: capability,
+    selected_runtime_agent_provider: coerceText(input.row.selected_runtime_agent_provider).trim() || null,
+    selected_backend_provider: coerceText(input.row.selected_backend_provider).trim() || null,
+    receipt_ref: coerceText(input.row.receipt_ref).trim() || null,
+    observation_ref: coerceText(input.row.observation_ref).trim() || null,
+    latest_event_id: coerceText(input.row.latest_event_id).trim() || null,
+    latest_mail_loop_wake_kind: coerceText(input.row.latest_mail_loop_wake_kind).trim() || null,
+    report_action: coerceText(input.row.report_action).trim() || null,
+    report_reason: coerceText(input.row.report_reason).trim() || null,
+    terminal_authority_status: coerceText(input.row.terminal_authority_status).trim() || null,
+    normalized_stage: coerceText(input.row.normalized_stage).trim() || null,
+    state_label: stateLabel,
+    lane_visible: input.row.lane_visible === true,
+    lane_requested: input.row.lane_requested === true,
+    lane_executed: input.row.lane_executed === true,
+    observation_reentered: input.row.observation_reentered === true,
+    terminal_eligible: input.row.terminal_eligible === true,
+    assistant_answer: input.row.assistant_answer === true,
+    raw_content_included: input.row.raw_content_included === true,
+    event_source: "capability_lane_timeline_summary.console_state_rows",
+    source_event_type: "lane_console_state",
   };
 }
 
@@ -2350,6 +2462,7 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
   const calls = readHelixCapabilityLaneCallResults(reply);
   const debugEvents = readHelixCapabilityLaneDebugEvents(reply);
   const turnTimeline = readHelixCapabilityLaneTurnTimeline(reply);
+  const consoleStateRows = readHelixCapabilityLaneConsoleStateRows(reply);
   const sessionSummaries = readHelixCapabilityLaneSessionDebugSummaries(reply);
   const mailLoopSummaries = readHelixCapabilityLaneMailLoopDebugSummaries(reply);
   const goalBindingSummaries = readHelixCapabilityLaneGoalBindingDebugSummaries(reply);
@@ -2388,6 +2501,14 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
       source_event_type: "lane_visible",
     };
   });
+  const consoleStateEvents = consoleStateRows.slice(0, 80).map((row, index) =>
+    buildHelixCapabilityLaneConsoleStateTranscriptEvent({
+      replyId: reply.id,
+      turnId,
+      row,
+      index,
+    }),
+  );
   const projectionReceiptEvents = projectionReceipts.slice(0, 10).map((receipt, index) => {
     const laneId = coerceText(receipt.lane_id).trim() || "capability_lane";
     const payload = readAgentLoopAuditRecord(receipt.payload);
@@ -2988,6 +3109,7 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
         index,
       }),
     );
+    events.push(...consoleStateEvents);
     events.push(...mailLoopEvents);
     events.push(...projectionReceiptEvents);
     events.push(...uiTranslationProjectionEvents);
@@ -3000,6 +3122,24 @@ export function buildHelixCapabilityLaneTranscriptEvents(reply: HelixAskTranscri
       terminalKind,
       terminalRejection,
       eventSource: "capability_lane_turn_timeline",
+    });
+    if (terminalEvent) events.push(terminalEvent);
+    return events;
+  }
+  if (consoleStateEvents.length > 0) {
+    const events = [...consoleStateEvents];
+    events.push(...mailLoopEvents);
+    events.push(...projectionReceiptEvents);
+    events.push(...uiTranslationProjectionEvents);
+    events.push(...goalDispatchEvents);
+    events.push(...goalDispatchAdmissionEvents);
+    events.push(...goalDispatchReadinessEvents);
+    const terminalEvent = buildHelixCapabilityLaneTerminalEvent({
+      replyId: reply.id,
+      turnId,
+      terminalKind,
+      terminalRejection,
+      eventSource: "capability_lane_timeline_summary.console_state_rows",
     });
     if (terminalEvent) events.push(terminalEvent);
     return events;
@@ -3348,6 +3488,8 @@ export function buildHelixRuntimeAskLiveEvents(reply: HelixAskTranscriptReply): 
       latestMailLoopObservationKey: coerceText(event.latest_mail_loop_observation_key).trim() || null,
       goalBindingKey: coerceText(event.goal_binding_key).trim() || null,
       latestEventId: coerceText(event.latest_event_id).trim() || null,
+      normalizedStage: coerceText(event.normalized_stage).trim() || null,
+      stateLabel: coerceText(event.state_label).trim() || null,
       sessionEventCount: coerceText(event.session_event_count).trim() || null,
       hasObservation: readTranscriptBoolean(event.has_observation),
       allNextHaveObservation: readTranscriptBoolean(event.all_next_have_observation),
@@ -3732,6 +3874,8 @@ export function buildHelixTurnTranscriptRows(reply: HelixAskTranscriptReply): He
         const latestMailLoopObservationKey = coerceText(event.latest_mail_loop_observation_key).trim();
         const goalBindingKey = coerceText(event.goal_binding_key).trim();
         const latestEventId = coerceText(event.latest_event_id).trim();
+        const normalizedStage = coerceText(event.normalized_stage).trim();
+        const stateLabel = coerceText(event.state_label).trim();
         const hasObservation = readTranscriptBoolean(event.has_observation);
         const observationLaneSessionId = coerceText(event.observation_lane_session_id).trim();
         const reportSummaryText = formatTranscriptMetaValue(coerceText(event.report_summary_text).trim());
@@ -3767,6 +3911,8 @@ export function buildHelixTurnTranscriptRows(reply: HelixAskTranscriptReply): He
             adapterBoundary ? `adapter boundary ${adapterBoundary}` : "",
             capabilityId ? `capability ${capabilityId}` : "",
             selectedBackendProvider ? `backend ${selectedBackendProvider}` : "",
+            normalizedStage ? `normalized stage ${normalizedStage}` : "",
+            stateLabel ? `state ${stateLabel}` : "",
             latestEventId ? `latest event ${latestEventId}` : "",
             hasObservation !== null ? `has observation ${String(hasObservation)}` : "",
             observationLaneSessionId ? `observation session ${observationLaneSessionId}` : "",

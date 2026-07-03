@@ -25,6 +25,11 @@ const nodeIds = [
   "guilt-to-repair",
   "moral-residue-after-awareness",
   "feedback-loop-hygiene",
+  "inherited-conditioning-check",
+  "purpose-as-inquiry",
+  "inspiration-without-imitation",
+  "goalpost-integrity",
+  "recognition-before-transcendence",
 ] as const;
 
 const graphDocument: IdeologyGraphDocument = {
@@ -193,5 +198,48 @@ describe("procedural Moral context classifier", () => {
       ]),
     );
     expect(JSON.stringify(classification)).not.toMatch(/bad person|morally approved|morally failed/i);
+  });
+
+  it("classifies philosophy-derived procedural lenses without moral finality", () => {
+    const classification = classify(
+      [
+        "Use a conditioning check: is this my belief or an inherited norm?",
+        "Treat purpose formation as evidence based purpose and investigate the dream.",
+        "Avoid idol worship by keeping inspiration not imitation.",
+        "Name criteria drift instead of moving the goal post.",
+        "For forgotten people and cultural difference, no one gets left behind should become recognition before action.",
+      ].join(" "),
+    );
+
+    expect(validateProceduralMoralClassificationV1(classification)).toEqual([]);
+    expect(classification.classifications).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          moralRootId: "inherited-conditioning-check",
+          proceduralMove: "reframe_without_finality",
+        }),
+        expect.objectContaining({
+          moralRootId: "purpose-as-inquiry",
+          proceduralMove: "choose_small_practice",
+        }),
+        expect.objectContaining({
+          moralRootId: "inspiration-without-imitation",
+          proceduralMove: "reframe_without_finality",
+        }),
+        expect.objectContaining({
+          moralRootId: "goalpost-integrity",
+          proceduralMove: "ask_for_concrete_evidence",
+        }),
+        expect.objectContaining({
+          moralRootId: "recognition-before-transcendence",
+          proceduralMove: "identify_affected_parties",
+        }),
+      ]),
+    );
+    expect(classification.authority).toMatchObject({
+      terminal_eligible: false,
+      character_verdict: false,
+      moral_finality: false,
+    });
   });
 });

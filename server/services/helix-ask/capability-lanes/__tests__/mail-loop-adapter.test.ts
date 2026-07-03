@@ -990,6 +990,76 @@ describe("capability lane mail-loop adapter", () => {
     expect(listStagePlayLiveSourceMailItems({ threadId: "ask-thread-paused" })).toHaveLength(0);
   });
 
+  it("fails closed when mail-loop routing targets an unknown lane session", () => {
+    const provider = buildProvider("codex");
+    const sessionStore = createHelixCapabilityLaneSessionStore();
+    const translation = runLiveTranslationTranslateText({
+      provider,
+      request: {
+        schema: "helix.live_translation.one_shot_request.v1",
+        capability: "live_translation.translate_text",
+        text: "hello",
+        lane_session_id: "lane-session-missing-mail",
+        source_language: "en",
+        target_language: "es",
+        source_id: "docs:missing-session",
+        source_hash: "sha256:missing-session-v1",
+        chunk_id: "chunk-missing-session",
+        projection_target: "docs_chunk",
+        assistant_answer: false,
+        terminal_eligible: false,
+      },
+      turnId: "turn-mail-loop-missing-session",
+      env: {} as NodeJS.ProcessEnv,
+    });
+
+    const routed = routeLiveTranslationObservationToMailLoop({
+      sessionStore,
+      laneSessionId: "lane-session-missing-mail",
+      translationResult: translation,
+      threadId: "ask-thread-missing-session",
+    });
+
+    expect(routed).toMatchObject({
+      schema: "helix.capability_lane.mail_loop_result.v1",
+      ok: false,
+      lane_session_id: "lane-session-missing-mail",
+      lane_id: "live_translation",
+      observation_ref: null,
+      mail: null,
+      stage_play_mail_id: null,
+      stage_play_wake_expected: false,
+      blocked_reason: "unknown_lane_session",
+      debug_summary: {
+        schema: "helix.capability_lane.mail_loop_debug_summary.v1",
+        lane_session_id: "lane-session-missing-mail",
+        lane_id: "live_translation",
+        stage_play_mail_id: null,
+        stage_play_mail_delivery_status: "blocked",
+        materialized_mail_loop_evidence: false,
+        previous_stage_play_mail_id: null,
+        stage_play_wake_expected: false,
+        stage_play_wake_kind: "none",
+        mailbox_thread_id: "ask-thread-missing-session",
+        blocked_reason: "unknown_lane_session",
+        source_id: "docs:missing-session",
+        source_hash: "sha256:missing-session-v1",
+        projection_target: "docs_chunk",
+        target_language: "es",
+        chunk_id: "chunk-missing-session",
+        terminal_authority_status: "not_terminal_authority",
+        reentry_required: true,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(listStagePlayLiveSourceMailItems({ threadId: "ask-thread-missing-session" })).toHaveLength(0);
+  });
+
   it("fails closed when a stopped lane session receives a translation observation", () => {
     const provider = buildProvider("codex");
     const sessionStore = createHelixCapabilityLaneSessionStore();

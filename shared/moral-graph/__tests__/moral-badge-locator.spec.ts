@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { validateMoralBadgeLocatorV1 } from "../../moral-badge-locator";
 import type { IdeologyGraphDocument } from "../ideology-graph-types";
-import { buildIdeologyGraph } from "../load-ideology-graph";
+import { buildIdeologyGraph, loadIdeologyGraphFromFile } from "../load-ideology-graph";
 import { locateMoralBadges } from "../locate-moral-badges";
 
 const graphDocument: IdeologyGraphDocument = {
@@ -164,5 +164,42 @@ describe("Moral badge locator", () => {
     );
     expect(locator.probabilityTerrain?.candidateProbabilityById.restraint).toBeGreaterThan(0);
     expect(locator.probabilityTerrain?.dominantSemanticChunkId).toMatch(/^moral:/);
+  });
+
+  it("locates canonical philosophy-derived badges and alias-only cues", async () => {
+    const canonicalGraph = await loadIdeologyGraphFromFile();
+    const locator = locateMoralBadges(canonicalGraph, {
+      kind: "user_prompt",
+      text: [
+        "Use inherited-conditioning-check to ask if this is my belief or an inherited norm.",
+        "Then use purpose-as-inquiry to investigate the dream with evidence based purpose.",
+        "Check inspiration-without-imitation for idol worship and approval seeking.",
+        "Use goalpost-integrity for criteria drift and recognition-before-transcendence for forgotten people.",
+        "Also check ego trapdoor, use only what you need, indomitable spirit, and probability truth.",
+      ].join(" "),
+      refs: ["turn:canonical"],
+      generatedAt: "2026-07-03T00:00:00.000Z",
+      locatorId: "moral-badge-locator:canonical-philosophy",
+    });
+    const locatedIds = [
+      ...locator.locatedBadges.exact,
+      ...locator.locatedBadges.likely,
+      ...locator.locatedBadges.inferred,
+    ].map((badge) => badge.nodeId);
+
+    expect(validateMoralBadgeLocatorV1(locator)).toEqual([]);
+    expect(locatedIds).toEqual(
+      expect.arrayContaining([
+        "inherited-conditioning-check",
+        "purpose-as-inquiry",
+        "inspiration-without-imitation",
+        "goalpost-integrity",
+        "recognition-before-transcendence",
+        "feedback-loop-hygiene",
+        "mindful-consumption",
+        "right-effort-loop",
+        "falsifiability-and-truth-convergence",
+      ]),
+    );
   });
 });

@@ -1,12 +1,15 @@
 import crypto from "node:crypto";
 import type {
+  HelixAccountCapabilityPolicy,
   HelixAccountLinkedAccount,
   HelixAccountSession,
   HelixAccountSessionReceipt,
   HelixAccountSessionStatus,
+  HelixAccountType,
   HelixAccountUsageSummary,
 } from "@shared/helix-account-session";
 import {
+  buildHelixAccountCapabilityPolicy,
   HELIX_ACCOUNT_SESSION_RECEIPT_SCHEMA,
   HELIX_ACCOUNT_SESSION_SCHEMA,
   HELIX_ACCOUNT_SESSION_STATUS_SCHEMA,
@@ -29,6 +32,40 @@ const normalize = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
 
 const nowIso = (): string => new Date().toISOString();
+
+const normalizeAccountType = (value: unknown): HelixAccountType | null => {
+  const normalized = normalize(value).toLowerCase();
+  return normalized === "developer" || normalized === "user" ? normalized : null;
+};
+
+const developerProfileIds = (): Set<string> =>
+  new Set(
+    normalize(process.env.HELIX_DEVELOPER_PROFILE_IDS)
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean),
+  );
+
+const resolveSessionAccountType = (input: {
+  requestedAccountType?: string | null;
+  profileId: string;
+  authMode: "web_auth" | "local_dev_profile" | "local_password_profile";
+  devDefault?: boolean;
+}): HelixAccountType => {
+  const requested = normalizeAccountType(input.requestedAccountType);
+  if (requested && input.authMode === "local_dev_profile") return requested;
+  if (input.authMode === "local_dev_profile") return "developer";
+  if (input.authMode === "local_password_profile" && input.devDefault) return "developer";
+  if (developerProfileIds().has(input.profileId)) return "developer";
+  return "user";
+};
+
+const policyForAccountType = (accountType: HelixAccountType): HelixAccountCapabilityPolicy =>
+  buildHelixAccountCapabilityPolicy(accountType);
+
+export function getDefaultAccountCapabilityPolicy(): HelixAccountCapabilityPolicy {
+  return buildHelixAccountCapabilityPolicy("developer");
+}
 
 function buildUsageSummary(): HelixAccountUsageSummary {
   const events = getHelixThreadLedgerEvents({ limit: 5000 });
@@ -98,10 +135,12 @@ export function getAccountSessionById(sessionId?: string | null): HelixAccountSe
 export function getAccountSessionStatus(sessionId?: string | null): HelixAccountSessionStatus {
   const session = getAccountSessionById(sessionId) ?? activeSession;
   const profileId = session?.profile.profile_id ?? null;
+  const accountPolicy = session?.account_policy ?? getDefaultAccountCapabilityPolicy();
   return {
     schema: HELIX_ACCOUNT_SESSION_STATUS_SCHEMA,
     ok: true,
     session,
+    account_policy: accountPolicy,
     linked_accounts: buildLinkedAccounts(session),
     profile_ingress_tokens: listProfileIngressTokens(profileId),
     profile_ingress_usage: getProfileIngressUsage(profileId),
@@ -129,6 +168,7 @@ export function signInLocalAccountSession(input: {
   profile_id?: string | null;
   display_name?: string | null;
   email?: string | null;
+  account_type?: string | null;
 }): HelixAccountSessionReceipt {
   const profileId = normalize(input.profile_id) || normalize(input.email);
   if (!profileId) {
@@ -143,6 +183,11 @@ export function signInLocalAccountSession(input: {
     };
   }
   const now = nowIso();
+  const accountType = resolveSessionAccountType({
+    requestedAccountType: input.account_type,
+    profileId,
+    authMode: "local_dev_profile",
+  });
   const session: HelixAccountSession = {
     schema: HELIX_ACCOUNT_SESSION_SCHEMA,
     session_id: `account_session:${crypto.randomUUID()}`,
@@ -151,12 +196,14 @@ export function signInLocalAccountSession(input: {
       display_name: normalize(input.display_name) || profileId,
       email: normalize(input.email) || null,
       auth_mode: "local_dev_profile",
+      account_type: accountType,
       provider: "local",
       provider_subject: profileId,
       picture_url: null,
       created_at: now,
       updated_at: now,
     },
+    account_policy: policyForAccountType(accountType),
     status: "active",
     memory_scope: "profile",
     created_at: now,
@@ -201,6 +248,11 @@ export function signInLocalPasswordAccountSession(input: {
     };
   }
   const now = nowIso();
+  const accountType = resolveSessionAccountType({
+    profileId: verification.config.profile_id,
+    authMode: "local_password_profile",
+    devDefault: verification.config.dev_default,
+  });
   const session: HelixAccountSession = {
     schema: HELIX_ACCOUNT_SESSION_SCHEMA,
     session_id: `account_session:${crypto.randomUUID()}`,
@@ -209,12 +261,14 @@ export function signInLocalPasswordAccountSession(input: {
       display_name: verification.config.display_name,
       email: verification.config.email,
       auth_mode: "local_password_profile",
+      account_type: accountType,
       provider: "local",
       provider_subject: verification.config.username,
       picture_url: null,
       created_at: now,
       updated_at: now,
     },
+    account_policy: policyForAccountType(accountType),
     status: "active",
     memory_scope: "profile",
     created_at: now,
@@ -256,6 +310,10 @@ export function signInWebAccountSession(input: {
   }
   const now = nowIso();
   const profileId = `${input.provider}:${providerSubject}`;
+  const accountType = resolveSessionAccountType({
+    profileId,
+    authMode: "web_auth",
+  });
   const session: HelixAccountSession = {
     schema: HELIX_ACCOUNT_SESSION_SCHEMA,
     session_id: `account_session:${crypto.randomUUID()}`,
@@ -264,12 +322,14 @@ export function signInWebAccountSession(input: {
       display_name: normalize(input.display_name) || normalize(input.email) || "Google user",
       email: normalize(input.email) || null,
       auth_mode: "web_auth",
+      account_type: accountType,
       provider: input.provider,
       provider_subject: providerSubject,
       picture_url: normalize(input.picture_url) || null,
       created_at: now,
       updated_at: now,
     },
+    account_policy: policyForAccountType(accountType),
     status: "active",
     memory_scope: "profile",
     created_at: now,
@@ -286,6 +346,11 @@ export function signInWebAccountSession(input: {
     credential_collection_allowed_in_agents: false,
     auth_method: "web_auth",
   };
+}
+
+export function getAccountCapabilityPolicy(sessionId?: string | null): HelixAccountCapabilityPolicy {
+  const session = getAccountSessionById(sessionId) ?? activeSession;
+  return session?.account_policy ?? getDefaultAccountCapabilityPolicy();
 }
 
 export function signOutAccountSession(sessionId?: string | null): HelixAccountSessionReceipt {

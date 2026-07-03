@@ -77,6 +77,7 @@ workspaceOsRouter.get("/storage/status", async (req: Request, res: Response) => 
     thread_id: queryString(req.query.thread_id),
     room_id: queryString(req.query.room_id),
     profile_id: accountStatus.session?.profile.profile_id ?? null,
+    profile_quota_bytes: accountStatus.account_policy.quotas.profile_storage_bytes,
   });
   return res.status(200).json(status);
 });

@@ -206,6 +206,12 @@ const readMailLoopDebugSummary = (value: unknown): HelixCapabilityLaneMailLoopDe
         : stagePlayWakeExpected
           ? "mailbox_wake"
           : "none",
+    materialized_mail_loop_evidence:
+      readBoolean(record.materialized_mail_loop_evidence ?? record.materializedMailLoopEvidence) ??
+      (
+        Boolean(readString(record.stage_play_mail_id ?? record.stagePlayMailId)) ||
+        Boolean(readString(record.observation_ref ?? record.observationRef))
+      ),
     mailbox_thread_id: mailboxThreadId,
     source_id: readString(record.source_id ?? record.sourceId) || null,
     source_hash: readString(record.source_hash ?? record.sourceHash) || null,

@@ -558,9 +558,7 @@ export function buildHelixLiveTranslationUiProjections(payload: unknown): HelixL
     const projection = normalizeProjection(receipt);
     if (!projection) continue;
     const previous = byKey.get(projection.key);
-    const previousObserved = previous?.observedAtMs ?? -1;
-    const nextObserved = projection.observedAtMs ?? -1;
-    if (!previous || nextObserved >= previousObserved) {
+    if (!previous || sortLatestProjectionFirst(projection, previous) <= 0) {
       byKey.set(projection.key, projection);
     }
   }

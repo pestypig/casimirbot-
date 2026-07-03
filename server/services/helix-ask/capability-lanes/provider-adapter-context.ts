@@ -1,9 +1,15 @@
 import type { HelixAgentStepObservationPacket } from "@shared/helix-agent-step-observation-packet";
 import type { HelixCapabilityLaneMailLoopDebugSummary } from "@shared/helix-capability-lane-mail-loop";
+import type {
+  HelixCapabilityLaneGoalDispatchAdmission,
+  HelixCapabilityLaneGoalDispatchPlan,
+  HelixCapabilityLaneGoalDispatchReadiness,
+} from "@shared/helix-capability-lane-goal-binding";
 import type { HelixAgentProvider } from "../agent-providers/types";
 import type { HelixAgentModelVisibleCapabilityLaneManifest } from "../agent-providers/runtime-adapter-contract";
 import { buildModelVisibleCapabilityLaneManifest } from "../agent-providers/runtime-adapter-contract";
 import { listHelixCapabilityLanes } from "./registry";
+import { buildHelixCapabilityLaneGoalDispatchReadiness } from "./goal-dispatch-readiness";
 import {
   runHelixCapabilityLaneOneShotRequests,
   type HelixCapabilityLaneOneShotRunnerResult,
@@ -34,6 +40,9 @@ export type HelixCapabilityLaneProviderAdapterContext = {
     capability_lane_mail_loop_debug_summaries: HelixCapabilityLaneMailLoopDebugSummary[];
     capability_lane_goal_binding_results: HelixCapabilityLaneGoalBindingRunnerResult["goal_binding_results"];
     capability_lane_goal_binding_debug_summaries: HelixCapabilityLaneGoalBindingRunnerResult["goal_binding_debug_summaries"];
+    capability_lane_goal_dispatch_plans: HelixCapabilityLaneGoalDispatchPlan[];
+    capability_lane_goal_dispatch_admissions: HelixCapabilityLaneGoalDispatchAdmission[];
+    capability_lane_goal_dispatch_readiness: HelixCapabilityLaneGoalDispatchReadiness | null;
   };
   observation_packets: HelixAgentStepObservationPacket[];
   projection_receipts: HelixCapabilityLaneProviderAdapterReceipt[];
@@ -57,7 +66,11 @@ export type HelixCapabilityLaneProviderTimelineEvent = {
     | "lane_projection_receipt"
     | "lane_reentered"
     | "lane_session"
+    | "lane_mail_loop"
     | "goal_binding"
+    | "lane_goal_dispatch_plan"
+    | "lane_goal_dispatch_admission"
+    | "lane_goal_dispatch_readiness"
     | "terminal_selected"
     | "terminal_rejected";
   selected_runtime_agent_provider: HelixAgentProvider["id"];
@@ -101,6 +114,16 @@ export type HelixCapabilityLaneProviderTimelineEvent = {
   target_language?: string | null;
   latest_cancel_requested?: boolean | null;
   latest_mail_loop_wake_kind?: "mailbox_wake" | "none" | null;
+  goal_id?: string | null;
+  goal_binding_id?: string | null;
+  lane_session_id?: string | null;
+  mail_loop_ref?: string | null;
+  dispatch_target?: string | null;
+  dispatch_admission_status?: string | null;
+  dispatch_blocked_reason?: string | null;
+  materialized_mail_loop_evidence?: boolean;
+  wake_dispatch_allowed?: boolean;
+  side_effects_allowed?: boolean;
   report_action?: string | null;
   report_reason?: string | null;
   report_summary_text?: string | null;
@@ -131,6 +154,14 @@ const readString = (value: unknown): string =>
 
 const readRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+
+const compactKey = (parts: Array<string | null | undefined>): string | null => {
+  const key = parts
+    .map((part) => readString(part))
+    .filter(Boolean)
+    .join("::");
+  return key || null;
+};
 
 export const buildCapabilityLaneArtifactLedger = (input: {
   turnId: string;
@@ -220,13 +251,31 @@ const buildCapabilityLaneMailLoopDebugSummaries = (
     .map((summary) => summary.latest_mail_loop_summary)
     .filter((summary): summary is HelixCapabilityLaneMailLoopDebugSummary => Boolean(summary));
 
-const buildCapabilityLaneProviderTimeline = (input: {
+const buildCapabilityLaneGoalDispatchPlans = (
+  goalBindingSummaries: HelixCapabilityLaneGoalBindingRunnerResult["goal_binding_debug_summaries"],
+): HelixCapabilityLaneGoalDispatchPlan[] =>
+  goalBindingSummaries
+    .map((summary) => summary.dispatch_plan)
+    .filter((plan): plan is HelixCapabilityLaneGoalDispatchPlan => Boolean(plan));
+
+const buildCapabilityLaneGoalDispatchAdmissions = (
+  goalBindingSummaries: HelixCapabilityLaneGoalBindingRunnerResult["goal_binding_debug_summaries"],
+): HelixCapabilityLaneGoalDispatchAdmission[] =>
+  goalBindingSummaries
+    .map((summary) => summary.dispatch_admission)
+    .filter((admission): admission is HelixCapabilityLaneGoalDispatchAdmission => Boolean(admission));
+
+export const buildCapabilityLaneProviderTimeline = (input: {
   provider: HelixAgentProvider;
   manifest: HelixAgentModelVisibleCapabilityLaneManifest;
   oneShot: HelixCapabilityLaneOneShotRunnerResult;
   projectionReceipts: HelixCapabilityLaneProviderAdapterReceipt[];
   sessions: HelixCapabilityLaneSessionRunnerResult;
+  mailLoopDebugSummaries: HelixCapabilityLaneMailLoopDebugSummary[];
   goalBindings: HelixCapabilityLaneGoalBindingRunnerResult;
+  goalDispatchPlans: HelixCapabilityLaneGoalDispatchPlan[];
+  goalDispatchAdmissions: HelixCapabilityLaneGoalDispatchAdmission[];
+  goalDispatchReadiness: HelixCapabilityLaneGoalDispatchReadiness | null;
 }): HelixCapabilityLaneProviderTimelineEvent[] => {
   const rows: HelixCapabilityLaneProviderTimelineEvent[] = [];
   const push = (row: Omit<HelixCapabilityLaneProviderTimelineEvent, "schema" | "seq">) => {
@@ -386,6 +435,91 @@ const buildCapabilityLaneProviderTimeline = (input: {
     });
   });
 
+  input.mailLoopDebugSummaries.forEach((summary) => {
+    const materializedMailLoopEvidence =
+      summary.materialized_mail_loop_evidence === true ||
+      Boolean(summary.stage_play_mail_id && summary.observation_ref);
+    const mailDeliveryStatus =
+      readString(summary.stage_play_mail_delivery_status) ||
+      (summary.blocked_reason ? "blocked" : summary.stage_play_mail_id ? "created" : "blocked");
+    const sourceBindingKey =
+      readString(summary.lane_session_source_binding_key) ||
+      compactKey([
+        summary.lane_session_source_id ?? summary.source_id,
+        summary.lane_session_source_hash ?? summary.source_hash,
+        summary.lane_session_projection_target ?? summary.projection_target,
+        summary.lane_session_account_locale ?? summary.account_locale,
+        summary.lane_session_target_language ?? summary.target_language,
+      ]);
+    const sessionControlKey =
+      readString(summary.lane_session_control_key) ||
+      compactKey([summary.lane_session_id, sourceBindingKey]);
+    const observationKey =
+      readString(summary.mail_loop_observation_key) ||
+      compactKey([
+        summary.source_id,
+        summary.source_hash,
+        summary.projection_target,
+        summary.target_language,
+        summary.chunk_id,
+        summary.receipt_ref ?? summary.observation_ref,
+      ]);
+    push({
+      stage: "lane_mail_loop",
+      selected_runtime_agent_provider: input.provider.id,
+      lane_id: summary.lane_id,
+      capability_id: summary.capability,
+      status: mailDeliveryStatus,
+      lane_visible: false,
+      lane_requested: true,
+      lane_executed: materializedMailLoopEvidence,
+      observation_reentered: materializedMailLoopEvidence,
+      selected_backend_provider: summary.selected_backend_provider,
+      observation_ref: summary.observation_ref,
+      receipt_ref: summary.receipt_ref,
+      latest_event_id: summary.stage_play_mail_id,
+      lifecycle_action: "mail_loop",
+      session_lifecycle_action: "mail_loop",
+      session_action: "mail_loop",
+      session_control_key: sessionControlKey,
+      source_binding_key: sourceBindingKey,
+      latest_observation_key: observationKey,
+      has_observation: Boolean(summary.observation_ref),
+      source_id: summary.source_id,
+      source_hash: summary.source_hash ?? null,
+      source_kind: summary.source_kind,
+      source_projection_target: summary.projection_target,
+      account_locale: summary.account_locale,
+      latest_chunk_id: summary.chunk_id,
+      latest_chunk_index: summary.chunk_index,
+      latest_source_id: summary.source_id,
+      latest_source_hash: summary.source_hash ?? null,
+      latest_source_kind: summary.source_kind,
+      latest_target_language: summary.target_language,
+      latest_dedupe_key: summary.dedupe_key,
+      latest_source_event_id: summary.source_event_id,
+      latest_source_event_ms: summary.source_event_ms,
+      latest_observed_at_ms: summary.observed_at_ms,
+      latest_freshness_status: summary.freshness_status,
+      source_text_hash: summary.source_text_hash ?? null,
+      source_text_char_count: summary.source_text_char_count ?? null,
+      latest_projection_target: summary.projection_target,
+      target_language: summary.target_language,
+      latest_cancel_requested: summary.cancel_requested,
+      latest_mail_loop_wake_kind: summary.stage_play_wake_kind,
+      report_action: summary.stage_play_wake_kind === "mailbox_wake" ? "mailbox_wake" : "record_only",
+      report_reason: summary.blocked_reason ?? mailDeliveryStatus,
+      report_summary_text: materializedMailLoopEvidence
+        ? "lane mail loop materialized observation evidence"
+        : "lane mail loop did not materialize observation evidence",
+      terminal_authority_status: summary.terminal_authority_status,
+      reentry_required: true,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
   input.goalBindings.goal_binding_debug_summaries.forEach((summary) => {
     const mailLoopSummary = summary.latest_mail_loop_summary;
     const reportDecision = readRecord(summary.report_decision);
@@ -447,6 +581,184 @@ const buildCapabilityLaneProviderTimeline = (input: {
     });
   });
 
+  input.goalDispatchPlans.forEach((plan) => {
+    push({
+      stage: "lane_goal_dispatch_plan",
+      selected_runtime_agent_provider: input.provider.id,
+      lane_id: plan.lane_id,
+      capability_id: null,
+      status: plan.status,
+      lane_visible: false,
+      lane_requested: true,
+      lane_executed: false,
+      observation_reentered: Boolean(plan.mail_loop_ref),
+      selected_backend_provider: null,
+      observation_ref: plan.evidence_ref,
+      receipt_ref: plan.receipt_ref,
+      latest_event_id: plan.latest_event_id,
+      session_control_key: plan.session_control_key,
+      source_binding_key: plan.source_binding_key,
+      latest_observation_key: plan.latest_mail_loop_observation_key,
+      has_observation: plan.has_observation,
+      source_id: plan.source_id,
+      source_hash: plan.source_hash,
+      source_kind: plan.source_kind,
+      source_projection_target: plan.source_projection_target,
+      account_locale: plan.account_locale,
+      latest_chunk_id: plan.latest_chunk_id,
+      latest_chunk_index: plan.latest_chunk_index,
+      latest_source_id: plan.latest_source_id,
+      latest_source_hash: plan.latest_source_hash,
+      latest_source_kind: plan.latest_source_kind,
+      latest_target_language: plan.latest_target_language,
+      latest_dedupe_key: plan.latest_dedupe_key,
+      latest_source_event_id: plan.latest_source_event_id,
+      latest_source_event_ms: plan.latest_source_event_ms,
+      latest_observed_at_ms: plan.latest_observed_at_ms,
+      latest_freshness_status: plan.latest_freshness_status,
+      source_text_hash: plan.source_text_hash,
+      source_text_char_count: plan.source_text_char_count,
+      latest_projection_target: plan.latest_projection_target,
+      target_language: plan.target_language,
+      latest_cancel_requested: plan.latest_cancel_requested,
+      latest_mail_loop_wake_kind: plan.latest_mail_loop_wake_kind,
+      goal_id: plan.goal_id,
+      goal_binding_id: plan.goal_binding_id,
+      lane_session_id: plan.lane_session_id,
+      mail_loop_ref: plan.mail_loop_ref,
+      dispatch_target: plan.target,
+      materialized_mail_loop_evidence: Boolean(plan.mail_loop_ref),
+      wake_dispatch_allowed: false,
+      side_effects_allowed: false,
+      report_action: plan.source_report_action,
+      report_reason: plan.reason,
+      report_summary_text: plan.source_report_summary_text,
+      terminal_authority_status: plan.terminal_authority_status,
+      reentry_required: true,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
+  input.goalDispatchAdmissions.forEach((admission) => {
+    push({
+      stage: "lane_goal_dispatch_admission",
+      selected_runtime_agent_provider: input.provider.id,
+      lane_id: admission.lane_id,
+      capability_id: null,
+      status: admission.status,
+      lane_visible: false,
+      lane_requested: true,
+      lane_executed: false,
+      observation_reentered: Boolean(admission.mail_loop_ref),
+      selected_backend_provider: null,
+      observation_ref: admission.evidence_ref,
+      receipt_ref: admission.receipt_ref,
+      latest_event_id: admission.latest_event_id,
+      session_control_key: admission.session_control_key,
+      source_binding_key: admission.source_binding_key,
+      latest_observation_key: admission.latest_mail_loop_observation_key,
+      has_observation: admission.has_observation,
+      source_id: admission.source_id,
+      source_hash: admission.source_hash,
+      source_kind: admission.source_kind,
+      source_projection_target: admission.source_projection_target,
+      account_locale: admission.account_locale,
+      latest_chunk_id: admission.latest_chunk_id,
+      latest_chunk_index: admission.latest_chunk_index,
+      latest_source_id: admission.latest_source_id,
+      latest_source_hash: admission.latest_source_hash,
+      latest_source_kind: admission.latest_source_kind,
+      latest_target_language: admission.latest_target_language,
+      latest_dedupe_key: admission.latest_dedupe_key,
+      latest_source_event_id: admission.latest_source_event_id,
+      latest_source_event_ms: admission.latest_source_event_ms,
+      latest_observed_at_ms: admission.latest_observed_at_ms,
+      latest_freshness_status: admission.latest_freshness_status,
+      source_text_hash: admission.source_text_hash,
+      source_text_char_count: admission.source_text_char_count,
+      latest_projection_target: admission.latest_projection_target,
+      target_language: admission.target_language,
+      latest_cancel_requested: admission.latest_cancel_requested,
+      latest_mail_loop_wake_kind: admission.latest_mail_loop_wake_kind,
+      goal_id: admission.goal_id,
+      goal_binding_id: admission.goal_binding_id,
+      lane_session_id: admission.lane_session_id,
+      mail_loop_ref: admission.mail_loop_ref,
+      dispatch_target: admission.target,
+      dispatch_admission_status: admission.status,
+      dispatch_blocked_reason: admission.blocked_reason,
+      materialized_mail_loop_evidence: Boolean(admission.mail_loop_ref),
+      wake_dispatch_allowed: admission.wake_dispatch_allowed,
+      side_effects_allowed: admission.side_effects_allowed,
+      report_action: admission.target,
+      report_reason: admission.reason,
+      terminal_authority_status: admission.terminal_authority_status,
+      reentry_required: true,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
+  if (input.goalDispatchReadiness) {
+    push({
+      stage: "lane_goal_dispatch_readiness",
+      selected_runtime_agent_provider: input.provider.id,
+      lane_id: input.goalDispatchReadiness.next_lane_ids[0] ?? "capability_lane_goal_dispatch",
+      capability_id: null,
+      status: input.goalDispatchReadiness.blocked_count > 0 ? "blocked" : "ready",
+      lane_visible: false,
+      lane_requested: input.goalDispatchReadiness.total_plans > 0,
+      lane_executed: false,
+      observation_reentered: input.goalDispatchReadiness.next_evidence_refs.length > 0,
+      selected_backend_provider: null,
+      observation_ref: input.goalDispatchReadiness.next_evidence_refs[0] ?? null,
+      receipt_ref: input.goalDispatchReadiness.next_receipt_refs[0] ?? null,
+      latest_event_id: input.goalDispatchReadiness.next_latest_event_ids[0] ?? null,
+      session_control_key: input.goalDispatchReadiness.next_session_control_keys[0] ?? null,
+      source_binding_key: input.goalDispatchReadiness.next_source_binding_keys[0] ?? null,
+      latest_observation_key: input.goalDispatchReadiness.next_mail_loop_observation_keys[0] ?? null,
+      has_observation: input.goalDispatchReadiness.next_has_observation,
+      source_id: input.goalDispatchReadiness.next_source_ids[0] ?? null,
+      source_hash: input.goalDispatchReadiness.next_source_hashes[0] ?? null,
+      source_kind: input.goalDispatchReadiness.next_source_kinds[0] ?? null,
+      source_projection_target: input.goalDispatchReadiness.next_source_projection_targets[0] ?? null,
+      account_locale: input.goalDispatchReadiness.next_account_locales[0] ?? null,
+      latest_chunk_id: input.goalDispatchReadiness.next_chunk_ids[0] ?? null,
+      latest_chunk_index: input.goalDispatchReadiness.next_chunk_indexes[0] ?? null,
+      latest_source_id: input.goalDispatchReadiness.next_latest_source_ids[0] ?? null,
+      latest_source_hash: input.goalDispatchReadiness.next_latest_source_hashes[0] ?? null,
+      latest_source_kind: input.goalDispatchReadiness.next_latest_source_kinds[0] ?? null,
+      latest_target_language: input.goalDispatchReadiness.next_latest_target_languages[0] ?? null,
+      latest_dedupe_key: input.goalDispatchReadiness.next_dedupe_keys[0] ?? null,
+      latest_source_event_id: input.goalDispatchReadiness.next_source_event_ids[0] ?? null,
+      latest_source_event_ms: input.goalDispatchReadiness.next_source_event_mses[0] ?? null,
+      latest_observed_at_ms: input.goalDispatchReadiness.next_observed_at_mses[0] ?? null,
+      latest_freshness_status: input.goalDispatchReadiness.next_freshness_statuses[0] ?? null,
+      source_text_hash: input.goalDispatchReadiness.next_source_text_hashes[0] ?? null,
+      source_text_char_count: input.goalDispatchReadiness.next_source_text_char_counts[0] ?? null,
+      latest_projection_target: input.goalDispatchReadiness.next_projection_targets[0] ?? null,
+      target_language: input.goalDispatchReadiness.next_target_languages[0] ?? null,
+      latest_cancel_requested: input.goalDispatchReadiness.next_cancel_requested,
+      latest_mail_loop_wake_kind: input.goalDispatchReadiness.next_mail_loop_wake_kinds[0] ?? null,
+      goal_binding_id: input.goalDispatchReadiness.next_goal_binding_ids[0] ?? null,
+      lane_session_id: input.goalDispatchReadiness.next_lane_session_ids[0] ?? null,
+      dispatch_target: input.goalDispatchReadiness.next_dispatch_targets[0] ?? null,
+      dispatch_admission_status: input.goalDispatchReadiness.blocked_count > 0 ? "blocked" : "ready",
+      dispatch_blocked_reason: input.goalDispatchReadiness.blocked_reasons[0] ?? null,
+      materialized_mail_loop_evidence: input.goalDispatchReadiness.next_mail_loop_observation_keys.length > 0,
+      wake_dispatch_allowed: input.goalDispatchReadiness.wake_dispatch_allowed,
+      side_effects_allowed: input.goalDispatchReadiness.side_effects_allowed,
+      terminal_authority_status: "not_terminal_authority",
+      reentry_required: true,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  }
+
   return rows;
 };
 
@@ -492,13 +804,29 @@ export const buildHelixCapabilityLaneProviderAdapterContext = (input: {
   const mailLoopDebugSummaries = buildCapabilityLaneMailLoopDebugSummaries(
     goalBindings.goal_binding_debug_summaries,
   );
+  const goalDispatchPlans = buildCapabilityLaneGoalDispatchPlans(
+    goalBindings.goal_binding_debug_summaries,
+  );
+  const goalDispatchAdmissions = buildCapabilityLaneGoalDispatchAdmissions(
+    goalBindings.goal_binding_debug_summaries,
+  );
+  const goalDispatchReadiness = goalDispatchPlans.length > 0 || goalDispatchAdmissions.length > 0
+    ? buildHelixCapabilityLaneGoalDispatchReadiness({
+      plans: goalDispatchPlans,
+      admissions: goalDispatchAdmissions,
+    })
+    : null;
   const timeline = buildCapabilityLaneProviderTimeline({
     provider: input.provider,
     manifest: modelVisibleCapabilityLaneManifest,
     oneShot,
     projectionReceipts,
     sessions,
+    mailLoopDebugSummaries,
     goalBindings,
+    goalDispatchPlans,
+    goalDispatchAdmissions,
+    goalDispatchReadiness,
   });
   return {
     schema: "helix.capability_lane.provider_adapter_context.v1",
@@ -516,6 +844,9 @@ export const buildHelixCapabilityLaneProviderAdapterContext = (input: {
       capability_lane_mail_loop_debug_summaries: mailLoopDebugSummaries,
       capability_lane_goal_binding_results: goalBindings.goal_binding_results,
       capability_lane_goal_binding_debug_summaries: goalBindings.goal_binding_debug_summaries,
+      capability_lane_goal_dispatch_plans: goalDispatchPlans,
+      capability_lane_goal_dispatch_admissions: goalDispatchAdmissions,
+      capability_lane_goal_dispatch_readiness: goalDispatchReadiness,
     },
     observation_packets: oneShot.observation_packets,
     projection_receipts: projectionReceipts,
@@ -533,6 +864,9 @@ export const buildHelixCapabilityLaneProviderAdapterContext = (input: {
       capability_lane_mail_loop_debug_summaries: mailLoopDebugSummaries,
       capability_lane_goal_binding_results: goalBindings.goal_binding_results,
       capability_lane_goal_binding_debug_summaries: goalBindings.goal_binding_debug_summaries,
+      capability_lane_goal_dispatch_plans: goalDispatchPlans,
+      capability_lane_goal_dispatch_admissions: goalDispatchAdmissions,
+      capability_lane_goal_dispatch_readiness: goalDispatchReadiness,
       capability_lane_reentry_status: oneShot.debug_projection.capability_lane_reentry_status,
     }, null, 2),
     calls_succeeded:

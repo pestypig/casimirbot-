@@ -123,6 +123,8 @@ export function HelixAskActiveTurnStreamPanel({
               data-stream-row-source={row.source}
               data-capability-lane-stage={capabilityLaneStage ?? undefined}
               data-capability-lane-stage-display={capabilityLaneStageDisplay ?? undefined}
+              data-capability-lane-normalized-stage={capabilityLaneDetail?.normalizedStage ?? undefined}
+              data-capability-lane-state-label={capabilityLaneDetail?.stateLabel ?? undefined}
               data-capability-lane-runtime-provider={capabilityLaneDetail?.selectedRuntimeAgentProvider ?? undefined}
               data-capability-lane-adapter-boundary={capabilityLaneDetail?.adapterBoundary ?? undefined}
               data-capability-lane-id={capabilityLaneDetail?.laneId ?? undefined}

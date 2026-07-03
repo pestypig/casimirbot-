@@ -162,6 +162,18 @@ const PROCEDURAL_MORAL_PATTERN_RULES: readonly ProceduralMoralPatternRule[] = [
     reasonCodes: ["identity_view", "non_attachment"],
   },
   {
+    id: "inherited-conditioning-check",
+    cues: [/\b(?:conditioning check|is this my belief|cliche belief|inherited norm|belief origin|role pressure|stale self story)\b/i],
+    observedPattern: "identity_view",
+    moralRootId: "inherited-conditioning-check",
+    proceduralMove: "reframe_without_finality",
+    explanation:
+      "Inherited conditioning is routed toward belief-origin separation: observed, inherited, imitated, pressured, stale, or chosen now.",
+    missingEvidence: ["belief_origin_context", "current_observation", "chosen_commitment"],
+    warnings: ["avoid_conditioning_as_disproof", "avoid_conditioning_as_final_authority"],
+    reasonCodes: ["inherited_conditioning_check", "belief_origin"],
+  },
+  {
     id: "private-language-bond",
     cues: [/\b(?:private language|brothers|sandbox|from the outside|we were different)\b/i],
     observedPattern: "private_language_bond",
@@ -208,6 +220,54 @@ const PROCEDURAL_MORAL_PATTERN_RULES: readonly ProceduralMoralPatternRule[] = [
     missingEvidence: ["small_next_practice", "review_timeframe"],
     warnings: ["avoid_grandiosity_or_collapse"],
     reasonCodes: ["aspiration", "small_experiment"],
+  },
+  {
+    id: "purpose-as-inquiry",
+    cues: [/\b(?:evidence based purpose|investigate the dream|purpose formation|personal passion public truth|future projection)\b/i],
+    observedPattern: "aspiration_drift",
+    moralRootId: "purpose-as-inquiry",
+    proceduralMove: "choose_small_practice",
+    explanation:
+      "Purpose is classified as inquiry when the dream needs sources, a bounded test, evidence collection, and revision without shame.",
+    missingEvidence: ["purpose_sources", "small_test", "revision_condition"],
+    warnings: ["avoid_inspiration_as_proof", "avoid_uncertainty_as_abandonment"],
+    reasonCodes: ["purpose_as_inquiry", "small_experiment"],
+  },
+  {
+    id: "inspiration-without-imitation",
+    cues: [/\b(?:idol worship|celebrity mirror|inspiration not imitation|social performance|approval seeking)\b/i],
+    observedPattern: "identity_view",
+    moralRootId: "inspiration-without-imitation",
+    proceduralMove: "reframe_without_finality",
+    explanation:
+      "Inspiration is routed toward extracting the admired value while separating imitation, approval pressure, and chosen practice.",
+    missingEvidence: ["admired_value", "imitation_pressure", "chosen_practice"],
+    warnings: ["avoid_admiration_as_authority", "avoid_identity_surrender"],
+    reasonCodes: ["inspiration_without_imitation", "values_over_images"],
+  },
+  {
+    id: "goalpost-integrity",
+    cues: [/\b(?:moving the goal post|goalpost moving|criteria drift|honest revision|revision boundary)\b/i],
+    observedPattern: "practice_commitment",
+    moralRootId: "goalpost-integrity",
+    proceduralMove: "ask_for_concrete_evidence",
+    explanation:
+      "Goalpost changes are routed toward naming the old criterion, new criterion, and evidence that justifies revision.",
+    missingEvidence: ["old_criterion", "new_criterion", "revision_evidence"],
+    warnings: ["avoid_criteria_drift_as_proof", "avoid_conclusion_protection"],
+    reasonCodes: ["goalpost_integrity", "falsifiability"],
+  },
+  {
+    id: "recognition-before-transcendence",
+    cues: [/\b(?:no one gets left behind|forgotten people|cultural difference|recognition path|who will not understand)\b/i],
+    observedPattern: "unconsidered_harm",
+    moralRootId: "recognition-before-transcendence",
+    proceduralMove: "identify_affected_parties",
+    explanation:
+      "Recognition before transcendence maps affected agency, missing translation, and non-domination before inclusion or transcendence claims strengthen.",
+    missingEvidence: ["affected_agency_map", "translation_gap", "non_domination_check"],
+    warnings: ["avoid_assimilation_as_transcendence", "avoid_abandonment_as_transcendence"],
+    reasonCodes: ["recognition_before_transcendence", "affected_agency"],
   },
   {
     id: "feedback-loop",

@@ -7,8 +7,13 @@ import { writeInterfaceLanguagePreference } from "@/lib/i18n/interfaceLanguagePr
 import { useInterfaceText, type InterfaceTextResolver } from "@/lib/i18n/interfaceText";
 import type { InterfaceMessageId } from "@/lib/i18n/messages/types";
 import { useWorkspaceMemoryRegistryStore } from "@/store/useWorkspaceMemoryRegistryStore";
-import type { HelixAccountLinkedAccount, HelixAccountSessionStatus } from "@shared/helix-account-session";
+import {
+  HELIX_DEVELOPER_ACCOUNT_POLICY,
+  type HelixAccountLinkedAccount,
+  type HelixAccountSessionStatus,
+} from "@shared/helix-account-session";
 import type { HelixProfileIngressTokenSummary } from "@shared/helix-profile-ingress";
+import { cacheAccountCapabilityPolicy } from "@/lib/workstation/accountCapabilityPolicy";
 
 type DiscordSessionView = {
   session_id: string;
@@ -72,6 +77,7 @@ const emptyStatus: HelixAccountSessionStatus = {
   schema: "helix.account_session_status.v1",
   ok: false,
   session: null,
+  account_policy: HELIX_DEVELOPER_ACCOUNT_POLICY,
   linked_accounts: [],
   profile_ingress_tokens: [],
   profile_ingress_usage: {
@@ -253,6 +259,7 @@ export default function AccountSessionPanel() {
         fetchCategorizationJobs(),
       ]);
       setStatus(nextStatus);
+      cacheAccountCapabilityPolicy(nextStatus.account_policy ?? nextStatus.session?.account_policy ?? null);
       setDiscordSessions(nextDiscordSessions);
       setCategorizationJobs(nextCategorizationJobs);
       setProfileArchives(await fetchProfileArchives(nextStatus.session?.profile.profile_id ?? fallbackProfileId));

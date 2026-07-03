@@ -18,7 +18,7 @@ import {
 
 const createApp = (): express.Express => {
   const app = express();
-  app.use(express.json());
+  app.use(express.json({ limit: "2mb" }));
   app.use("/api/account", accountSessionRouter);
   app.use("/api/discord", discordRouter);
   app.use("/api/profile-ingress", profileIngressRouter);
@@ -57,6 +57,105 @@ describe("account session panel API", () => {
       },
     });
     expect(JSON.stringify(signIn.body).toLowerCase()).not.toContain("should-not-be-read");
+  });
+
+  it("returns developer and user account policy shape from session status", async () => {
+    const app = createApp();
+    const developerAgent = request.agent(app);
+    await developerAgent
+      .post("/api/account/session/sign-in")
+      .send({ profile_id: "profile:developer", display_name: "Developer" })
+      .expect(200);
+    const developerStatus = await developerAgent.get("/api/account/session").expect(200);
+
+    expect(developerStatus.body).toMatchObject({
+      account_policy: {
+        schema: "helix.account_capability_policy.v1",
+        account_type: "developer",
+        max_workstation_permission: "danger",
+        allowed_panels: ["*"],
+        allowed_runtime_agents: ["*"],
+        allowed_workstation_capabilities: ["*"],
+      },
+      session: {
+        profile: {
+          account_type: "developer",
+        },
+      },
+    });
+
+    const userAgent = request.agent(app);
+    await userAgent
+      .post("/api/account/session/sign-in")
+      .send({
+        profile_id: "profile:user",
+        display_name: "User",
+        account_type: "user",
+      })
+      .expect(200);
+    const userStatus = await userAgent.get("/api/account/session").expect(200);
+
+    expect(userStatus.body).toMatchObject({
+      account_policy: {
+        schema: "helix.account_capability_policy.v1",
+        account_type: "user",
+        max_workstation_permission: "read",
+        locked_panels: expect.arrayContaining(["code-admin", "rag-admin", "document-image-lens"]),
+        locked_features: expect.arrayContaining(["runtime_agent_controls", "workstation_gateway_act"]),
+        allowed_runtime_agents: ["helix"],
+      },
+      session: {
+        profile: {
+          account_type: "user",
+        },
+      },
+    });
+    expect(userStatus.body.account_policy.quotas.profile_storage_bytes).toBeLessThan(
+      developerStatus.body.account_policy.quotas.profile_storage_bytes,
+    );
+  });
+
+  it("returns and enforces user profile storage quota metadata", async () => {
+    const app = createApp();
+    const agent = request.agent(app);
+    await agent
+      .post("/api/account/session/sign-in")
+      .send({
+        profile_id: "profile:quota-user",
+        display_name: "Quota User",
+        account_type: "user",
+      })
+      .expect(200);
+
+    const snapshot = await agent.get("/api/account/profile-storage/snapshot").expect(200);
+    expect(snapshot.body).toMatchObject({
+      profile_id: "profile:quota-user",
+      quota_bytes: 1024 * 1024,
+    });
+
+    const oversizedValue = "x".repeat((1024 * 1024) + 1);
+    const receipt = await agent
+      .post("/api/account/profile-storage/snapshot")
+      .send({
+        entries: [{
+          storage_key: "quota:test",
+          storage_backend: "localStorage",
+          value: oversizedValue,
+        }],
+        artifacts: [{
+          artifact_id: "artifact:quota:test",
+          storage_key: "quota:test",
+          storage_backend: "localStorage",
+          sync_status: "profile_candidate",
+        }],
+      })
+      .expect(413);
+
+    expect(receipt.body).toMatchObject({
+      ok: false,
+      error: "profile_storage_quota_exceeded",
+      quota_bytes: 1024 * 1024,
+    });
   });
 
   it("starts a Google web-auth profile session keyed by provider subject", () => {

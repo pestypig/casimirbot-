@@ -153,10 +153,39 @@ describe("filterDocManifestEntries", () => {
     const developmentReadme = DOC_MANIFEST.find((candidate) => candidate.relativePath === "docs/development/README.md");
     const syntheticReadme = DOC_MANIFEST.find((candidate) => candidate.relativePath === "docs/synthetic-research/README.md");
     const legacyReadme = DOC_MANIFEST.find((candidate) => candidate.relativePath === "docs/legacy-development/README.md");
+    const syntheticAudit = DOC_MANIFEST.find(
+      (candidate) =>
+        candidate.relativePath === "docs/audits/research/ownership-maturity-utility-deep-research-2026-02-25.md",
+    );
+    const currentSpec = DOC_MANIFEST.find(
+      (candidate) => candidate.relativePath === "docs/specs/warp-promotion-readiness-suite-contract-v1.md",
+    );
+    const legacyAudit = DOC_MANIFEST.find(
+      (candidate) => candidate.relativePath === "docs/audits/toe-sequence-forest-lane-closure-2026-02-19.md",
+    );
 
     expect(researchReadme?.docClass).toBe("canonical-research");
     expect(developmentReadme?.docClass).toBe("current-development");
     expect(syntheticReadme?.docClass).toBe("synthetic-research");
     expect(legacyReadme?.docClass).toBe("legacy-development");
+    expect(syntheticAudit?.docClass).toBe("synthetic-research");
+    expect(currentSpec?.docClass).toBe("current-development");
+    expect(legacyAudit?.docClass).toBe("legacy-development");
+  });
+
+  it("keeps Uncategorized as an exception bucket after folder taxonomy rules are applied", () => {
+    const counts = DOC_MANIFEST.reduce(
+      (acc, entry) => {
+        const key = entry.docClass ?? "uncategorized";
+        acc[key] = (acc[key] ?? 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+
+    expect(counts["synthetic-research"]).toBeGreaterThan(3000);
+    expect(counts["current-development"]).toBeGreaterThan(100);
+    expect(counts["legacy-development"]).toBeGreaterThan(10);
+    expect(counts.uncategorized ?? 0).toBeLessThan(250);
   });
 });

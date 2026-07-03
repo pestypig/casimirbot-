@@ -925,6 +925,138 @@ describe("capability lane goal binding debug summary", () => {
     });
   });
 
+  it("marks wake-on-salience goal bindings eligible only after mail-loop evidence exists", () => {
+    const sessionStore = createHelixCapabilityLaneSessionStore();
+    sessionStore.start({
+      provider: buildProvider("codex"),
+      laneId: "live_translation",
+      laneSessionId: "lane-session-wake-mail",
+      sourceBinding: {
+        source_id: "docs:wake-mail",
+        source_hash: "sha256:wake-mail-v1",
+        source_kind: "docs",
+        projection_target: "docs_chunk",
+        account_locale: "es-US",
+        target_language: "es",
+      },
+      requestedBackendProvider: "google_gemini",
+      env: {} as NodeJS.ProcessEnv,
+      nowMs: 100,
+    });
+    sessionStore.recordObservation({
+      laneSessionId: "lane-session-wake-mail",
+      observationRef: "ask:lane:translation:wake-mail-obs",
+      receiptRef: "ask:lane:translation:wake-mail-obs:projection:receipt",
+      chunkId: "chunk-wake-mail",
+      sourceId: "docs:wake-mail",
+      sourceHash: "sha256:wake-mail-v1",
+      targetLanguage: "es",
+      projectionTarget: "docs_chunk",
+      nowMs: 110,
+    });
+    const store = createHelixCapabilityLaneGoalBindingStore({ sessionStore });
+    const bound = store.bind({
+      goalId: "goal:wake-mail",
+      laneSessionId: "lane-session-wake-mail",
+      goalBindingId: "goal-binding-wake-mail",
+      reportPolicy: "ask_on_salience",
+      quietBehavior: "wake_on_salience",
+      nowMs: 120,
+    });
+    if (!bound.goal_binding) {
+      throw new Error("expected wake-mail goal binding");
+    }
+
+    const beforeMail = buildHelixCapabilityLaneGoalBindingDebugSummary(bound.goal_binding);
+    expect(beforeMail.dispatch_admission).toMatchObject({
+      target: "ask_wake",
+      status: "blocked",
+      blocked_reason: "missing_mail_loop_ref",
+      wake_dispatch_allowed: false,
+      side_effects_executed: false,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+
+    const updated = store.recordMailLoopEvidence({
+      goalBindingId: "goal-binding-wake-mail",
+      nowMs: 130,
+      mailLoopSummary: {
+        schema: "helix.capability_lane.mail_loop_debug_summary.v1",
+        lane_session_id: "lane-session-wake-mail",
+        lane_id: "live_translation",
+        capability: "live_translation.translate_text",
+        observation_ref: "ask:lane:translation:wake-mail-obs",
+        receipt_ref: "ask:lane:translation:wake-mail-obs:projection:receipt",
+        stage_play_mail_id: "stage-play-mail-wake",
+        stage_play_wake_expected: true,
+        stage_play_wake_kind: "mailbox_wake",
+        mailbox_thread_id: "ask-thread-wake",
+        observation_lane_session_id: "lane-session-wake-mail",
+        source_id: "docs:wake-mail",
+        source_hash: "sha256:wake-mail-v1",
+        source_kind: "document_markdown",
+        chunk_id: "chunk-wake-mail",
+        projection_target: "docs_chunk",
+        target_language: "es",
+        selected_backend_provider: "live_translation.local_runtime",
+        requested_backend_provider: "google_gemini",
+        cost_class: "free_local",
+        latency_class: "interactive",
+        privacy_class: "local_only",
+        fallback_backend_provider: null,
+        backend_selection_decision: backendDecision,
+        freshness_status: "fresh",
+        blocked_reason: null,
+        mail_status: "unread",
+        evidence_refs: ["stage-play-mail-wake", "ask:lane:translation:wake-mail-obs"],
+        reentry_required: true,
+        terminal_authority_status: "pending_helix_terminal_authority",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    if (!updated.goal_binding) {
+      throw new Error("expected wake-mail goal binding update");
+    }
+    const afterMail = buildHelixCapabilityLaneGoalBindingDebugSummary(updated.goal_binding);
+
+    expect(afterMail.report_decision).toMatchObject({
+      action: "wake_on_salience",
+      wake_expected: true,
+      terminal_report_requested: false,
+      terminal_report_requires_authority: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(afterMail.dispatch_plan).toMatchObject({
+      target: "ask_wake",
+      requires_live_mail_loop: true,
+      mail_loop_ref: "stage-play-mail-wake",
+      side_effects_executed: false,
+      wake_dispatched: false,
+      terminal_report_emitted: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(afterMail.dispatch_admission).toMatchObject({
+      target: "ask_wake",
+      status: "eligible_waiting_for_mail_loop",
+      blocked_reason: null,
+      mail_loop_ref: "stage-play-mail-wake",
+      wake_dispatch_allowed: false,
+      side_effects_allowed: false,
+      side_effects_executed: false,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
   it("keeps stopped goal binding summaries tied to the latest observation authority state", () => {
     const sessionStore = createHelixCapabilityLaneSessionStore();
     sessionStore.start({

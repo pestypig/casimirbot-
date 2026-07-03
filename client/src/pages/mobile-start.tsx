@@ -3,6 +3,7 @@ import {
   Clock3,
   Home,
   LayoutGrid,
+  Lock,
   MessageCircle,
   PanelsTopLeft,
   Pin,
@@ -39,7 +40,14 @@ import {
   emitWorkstationActionLiveEvent,
 } from "@/lib/workstation/workstationActionLiveEvents";
 import { maybePostSituationRoomSetupExecutionReceipt } from "@/lib/workstation/setupExecutionReceiptPost";
-import { isUserLaunchPanel } from "@/lib/workstation/launchPanelPolicy";
+import { isDiscoverableLaunchPanel } from "@/lib/workstation/launchPanelPolicy";
+import { resolveHelixAccountPanelAccess } from "@shared/helix-account-session";
+import type { HelixAccountCapabilityPolicy } from "@shared/helix-account-session";
+import {
+  HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT,
+  fetchAccountCapabilityPolicy,
+  readCachedAccountCapabilityPolicy,
+} from "@/lib/workstation/accountCapabilityPolicy";
 import { startProcessGraphCapture } from "@/lib/workstation/processGraph/startProcessGraphCapture";
 import { startWorkstationPerformanceSampler } from "@/lib/workstation/performance/startWorkstationPerformanceSampler";
 
@@ -65,6 +73,9 @@ export default function MobileStartPage() {
     String((import.meta as any)?.env?.VITE_HELIX_PROCESS_GRAPH_SURFACE ?? "1") !== "0";
   const [showSwitcher, setShowSwitcher] = useState(false);
   const [appViewerOpen, setAppViewerOpen] = useState(mobileWorkstationEnabled);
+  const [accountPolicy, setAccountPolicy] = useState<HelixAccountCapabilityPolicy | null>(() =>
+    readCachedAccountCapabilityPolicy(),
+  );
   const pressTimer = useRef<ReturnType<typeof setTimeout>>();
   const pressTriggered = useRef(false);
 
@@ -94,13 +105,18 @@ export default function MobileStartPage() {
     [pinnedPanels]
   );
   const gridPanels = useMemo(
-    () => panelRegistry.filter((panel) => !pinnedIds.has(panel.id)),
-    [pinnedIds]
+    () =>
+      panelRegistry.filter((panel) => {
+        if (pinnedIds.has(panel.id)) return false;
+        if (accountPolicy?.account_type !== "user") return true;
+        return isDiscoverableLaunchPanel(String(panel.id));
+      }),
+    [accountPolicy?.account_type, pinnedIds]
   );
   const launcherPanels = useMemo(
     () =>
       panelRegistry
-        .filter((panel) => !panel.startHidden && isUserLaunchPanel(String(panel.id)))
+        .filter((panel) => !panel.startHidden && isDiscoverableLaunchPanel(String(panel.id)))
         .sort((a, b) => {
           const aReady = a.workstationCapabilities?.v1_job_ready ? 1 : 0;
           const bReady = b.workstationCapabilities?.v1_job_ready ? 1 : 0;
@@ -232,6 +248,31 @@ export default function MobileStartPage() {
   useEffect(() => {
     recordPanelActivity("mobile-shell", "enter");
     return cancelLongPress;
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const handlePolicyChange = (event: Event) => {
+      const policy = (event as CustomEvent<{ account_policy?: HelixAccountCapabilityPolicy | null }>).detail
+        ?.account_policy;
+      setAccountPolicy(policy ?? readCachedAccountCapabilityPolicy());
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener(HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT, handlePolicyChange as EventListener);
+    }
+    fetchAccountCapabilityPolicy()
+      .then((policy) => {
+        if (active) setAccountPolicy(policy);
+      })
+      .catch(() => {
+        if (active) setAccountPolicy(readCachedAccountCapabilityPolicy());
+      });
+    return () => {
+      active = false;
+      if (typeof window !== "undefined") {
+        window.removeEventListener(HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT, handlePolicyChange as EventListener);
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -751,26 +792,33 @@ export default function MobileStartPage() {
                     <Settings className="h-3.5 w-3.5" />
                   </button>
                   <div className="max-h-40 space-y-1 overflow-y-auto">
-                    {launcherPanels.map((panel) => (
-                      <button
-                        key={`launch-${panel.id}`}
-                        className="flex w-full min-h-[38px] items-center justify-between rounded-lg border border-primary/25 bg-card/68 px-3 py-2 text-left text-xs text-foreground transition hover:border-primary/60 hover:bg-card/86 hover:text-primary"
-                        onClick={() => {
-                          handleTilePress(panel.id);
-                          setShowSwitcher(false);
-                        }}
-                      >
-                        <span className="inline-flex items-center gap-2">
-                          <span className="line-clamp-1">{panel.title}</span>
-                          {panel.workstationCapabilities?.v1_job_ready ? (
-                            <span className="rounded border border-emerald-300/40 bg-emerald-500/10 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-emerald-200">
-                              Job-ready
-                            </span>
-                          ) : null}
-                        </span>
-                        <span className="ml-2 text-[10px] uppercase tracking-wide text-muted-foreground/80">Open</span>
-                      </button>
-                    ))}
+                    {launcherPanels.map((panel) => {
+                      const panelAccess = resolveHelixAccountPanelAccess(accountPolicy, String(panel.id));
+                      const locked = panelAccess.state === "locked";
+                      return (
+                        <button
+                          key={`launch-${panel.id}`}
+                          className="flex w-full min-h-[38px] items-center justify-between rounded-lg border border-primary/25 bg-card/68 px-3 py-2 text-left text-xs text-foreground transition hover:border-primary/60 hover:bg-card/86 hover:text-primary"
+                          onClick={() => {
+                            handleTilePress(panel.id);
+                            setShowSwitcher(false);
+                          }}
+                        >
+                          <span className="inline-flex items-center gap-2">
+                            {locked ? <Lock className="h-3.5 w-3.5 text-amber-200" aria-hidden="true" /> : null}
+                            <span className="line-clamp-1">{panel.title}</span>
+                            {panel.workstationCapabilities?.v1_job_ready ? (
+                              <span className="rounded border border-emerald-300/40 bg-emerald-500/10 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-emerald-200">
+                                Job-ready
+                              </span>
+                            ) : null}
+                          </span>
+                          <span className="ml-2 text-[10px] uppercase tracking-wide text-muted-foreground/80">
+                            {locked ? "Locked" : "Open"}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               ) : null}

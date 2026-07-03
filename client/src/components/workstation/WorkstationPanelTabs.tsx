@@ -1,10 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
+import { Lock } from "lucide-react";
+import { resolveHelixAccountPanelAccess } from "@shared/helix-account-session";
+import type { HelixAccountCapabilityPolicy } from "@shared/helix-account-session";
 import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
 import { panelRegistry } from "@/lib/desktop/panelRegistry";
 import { getInterfaceLanguageOption } from "@/lib/i18n/interfaceLanguage";
 import { useInterfaceText } from "@/lib/i18n/interfaceText";
 import { getInterfacePanelTitle } from "@/lib/i18n/panelTitles";
-import { isUserLaunchPanel } from "@/lib/workstation/launchPanelPolicy";
+import { isDiscoverableLaunchPanel } from "@/lib/workstation/launchPanelPolicy";
+import {
+  HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT,
+  fetchAccountCapabilityPolicy,
+  readCachedAccountCapabilityPolicy,
+} from "@/lib/workstation/accountCapabilityPolicy";
 import {
   HELIX_WORKSTATION_PROCEDURAL_STEP_EVENT,
   type HelixWorkstationProceduralStepPayload,
@@ -22,6 +30,9 @@ export function WorkstationPanelTabs({ groupId }: { groupId: string }) {
   const [plusPulseActive, setPlusPulseActive] = useState(false);
   const [plusPulseTick, setPlusPulseTick] = useState(0);
   const [targetPanelId, setTargetPanelId] = useState<string | null>(null);
+  const [accountPolicy, setAccountPolicy] = useState<HelixAccountCapabilityPolicy | null>(() =>
+    readCachedAccountCapabilityPolicy(),
+  );
   const { userSettings } = useHelixStartSettings();
   const interfaceLanguage = getInterfaceLanguageOption(userSettings.interfaceLanguage);
   const { t } = useInterfaceText(interfaceLanguage.code);
@@ -29,7 +40,7 @@ export function WorkstationPanelTabs({ groupId }: { groupId: string }) {
   const availablePanels = useMemo(
     () =>
       panelRegistry
-        .filter((panel) => !panel.startHidden && isUserLaunchPanel(String(panel.id)))
+        .filter((panel) => !panel.startHidden && isDiscoverableLaunchPanel(String(panel.id)))
         .sort((a, b) => {
           const aReady = a.workstationCapabilities?.v1_job_ready ? 1 : 0;
           const bReady = b.workstationCapabilities?.v1_job_ready ? 1 : 0;
@@ -40,6 +51,31 @@ export function WorkstationPanelTabs({ groupId }: { groupId: string }) {
         }),
     [t],
   );
+
+  useEffect(() => {
+    let active = true;
+    const handlePolicyChange = (event: Event) => {
+      const policy = (event as CustomEvent<{ account_policy?: HelixAccountCapabilityPolicy | null }>).detail
+        ?.account_policy;
+      setAccountPolicy(policy ?? readCachedAccountCapabilityPolicy());
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener(HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT, handlePolicyChange as EventListener);
+    }
+    fetchAccountCapabilityPolicy()
+      .then((policy) => {
+        if (active) setAccountPolicy(policy);
+      })
+      .catch(() => {
+        if (active) setAccountPolicy(readCachedAccountCapabilityPolicy());
+      });
+    return () => {
+      active = false;
+      if (typeof window !== "undefined") {
+        window.removeEventListener(HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT, handlePolicyChange as EventListener);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -160,6 +196,8 @@ export function WorkstationPanelTabs({ groupId }: { groupId: string }) {
             <div className="max-h-72 space-y-1 overflow-y-auto">
               {availablePanels.map((panel) => {
                 const panelTitle = getInterfacePanelTitle(t, String(panel.id), panel.title);
+                const panelAccess = resolveHelixAccountPanelAccess(accountPolicy, String(panel.id));
+                const locked = panelAccess.state === "locked";
                 return (
                   <button
                     key={panel.id}
@@ -176,6 +214,7 @@ export function WorkstationPanelTabs({ groupId }: { groupId: string }) {
                     }`}
                   >
                     <span className="inline-flex items-center gap-2">
+                      {locked ? <Lock className="h-3.5 w-3.5 text-amber-200" aria-hidden="true" /> : null}
                       <span>{panelTitle}</span>
                     </span>
                   </button>

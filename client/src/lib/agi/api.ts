@@ -575,14 +575,48 @@ type RunAskTurnPayload = {
 export type RunCapabilityLaneSessionControlPayload = {
   agentRuntime?: HelixAgentRuntimeId;
   agent_runtime?: HelixAgentRuntimeId;
+  turnId?: string;
+  turn_id?: string;
   capability_lane_session_call?: Record<string, unknown> | Array<Record<string, unknown>>;
   capabilityLaneSessionCall?: Record<string, unknown> | Array<Record<string, unknown>>;
+  signal?: AbortSignal;
+};
+
+export type RunCapabilityLaneGoalBindingControlPayload = {
+  agentRuntime?: HelixAgentRuntimeId;
+  agent_runtime?: HelixAgentRuntimeId;
+  turnId?: string;
+  turn_id?: string;
+  capability_lane_goal_binding_call?: Record<string, unknown> | Array<Record<string, unknown>>;
+  capabilityLaneGoalBindingCall?: Record<string, unknown> | Array<Record<string, unknown>>;
+  signal?: AbortSignal;
+};
+
+export type RunCapabilityLaneMailLoopPayload = {
+  agentRuntime?: HelixAgentRuntimeId;
+  agent_runtime?: HelixAgentRuntimeId;
+  turnId?: string;
+  turn_id?: string;
+  threadId?: string;
+  thread_id?: string;
+  roomId?: string;
+  room_id?: string;
+  environmentId?: string;
+  environment_id?: string;
+  objectiveText?: string;
+  objective_text?: string;
+  laneSessionId?: string;
+  lane_session_id?: string;
+  capability_lane_call?: Record<string, unknown> | Array<Record<string, unknown>>;
+  capabilityLaneCall?: Record<string, unknown> | Array<Record<string, unknown>>;
   signal?: AbortSignal;
 };
 
 export type RunCapabilityLaneOneShotPayload = {
   agentRuntime?: HelixAgentRuntimeId;
   agent_runtime?: HelixAgentRuntimeId;
+  turnId?: string;
+  turn_id?: string;
   capability_lane_call?: Record<string, unknown> | Array<Record<string, unknown>>;
   capabilityLaneCall?: Record<string, unknown> | Array<Record<string, unknown>>;
   signal?: AbortSignal;
@@ -600,6 +634,7 @@ export type CapabilityLaneOneShotResponse = {
   capability_lane_debug_events?: Array<Record<string, unknown>>;
   capability_lane_projection_receipts?: Array<Record<string, unknown>>;
   capability_lane_turn_timeline?: Array<Record<string, unknown>>;
+  capability_lane_timeline_summary?: Record<string, unknown>;
   capability_lane_reentry_status?: string;
   model_visible_capability_lane_manifest?: Record<string, unknown> | null;
   terminal_eligible?: false;
@@ -615,8 +650,49 @@ export type CapabilityLaneSessionControlResponse = {
   agent_runtime?: HelixAgentRuntimeId | string;
   capability_lane_session_results?: Array<Record<string, unknown>>;
   capability_lane_session_debug_summaries?: Array<Record<string, unknown>>;
+  capability_lane_turn_timeline?: Array<Record<string, unknown>>;
+  capability_lane_timeline_summary?: Record<string, unknown>;
+  model_visible_capability_lane_manifest?: Record<string, unknown> | null;
   session_results?: Array<Record<string, unknown>>;
   session_debug_summaries?: Array<Record<string, unknown>>;
+  terminal_eligible?: false;
+  assistant_answer?: false;
+  raw_content_included?: false;
+  error?: string;
+  message?: string;
+};
+
+export type CapabilityLaneGoalBindingControlResponse = {
+  schema?: "helix.capability_lane.goal_binding_control_response.v1" | string;
+  ok?: boolean;
+  requested?: boolean;
+  agent_runtime?: HelixAgentRuntimeId | string;
+  capability_lane_goal_binding_results?: Array<Record<string, unknown>>;
+  capability_lane_goal_binding_debug_summaries?: Array<Record<string, unknown>>;
+  capability_lane_mail_loop_debug_summaries?: Array<Record<string, unknown>>;
+  capability_lane_turn_timeline?: Array<Record<string, unknown>>;
+  capability_lane_timeline_summary?: Record<string, unknown>;
+  model_visible_capability_lane_manifest?: Record<string, unknown> | null;
+  terminal_eligible?: false;
+  assistant_answer?: false;
+  raw_content_included?: false;
+  error?: string;
+  message?: string;
+};
+
+export type CapabilityLaneMailLoopResponse = {
+  schema?: "helix.capability_lane.mail_loop_response.v1" | string;
+  ok?: boolean;
+  requested?: boolean;
+  agent_runtime?: HelixAgentRuntimeId | string;
+  capability_lane_call_results?: Array<Record<string, unknown>>;
+  capability_lane_observation_packets?: Array<Record<string, unknown>>;
+  capability_lane_projection_receipts?: Array<Record<string, unknown>>;
+  capability_lane_mail_loop_results?: Array<Record<string, unknown>>;
+  capability_lane_mail_loop_debug_summaries?: Array<Record<string, unknown>>;
+  capability_lane_turn_timeline?: Array<Record<string, unknown>>;
+  capability_lane_timeline_summary?: Record<string, unknown>;
+  model_visible_capability_lane_manifest?: Record<string, unknown> | null;
   terminal_eligible?: false;
   assistant_answer?: false;
   raw_content_included?: false;
@@ -2030,6 +2106,11 @@ export async function runCapabilityLaneOneShot(
     body.agentRuntime = selectedRuntime;
     body.agent_runtime = selectedRuntime;
   }
+  const turnId = payload.turnId ?? payload.turn_id;
+  if (turnId) {
+    body.turnId = turnId;
+    body.turn_id = turnId;
+  }
   if (capabilityLaneCall) {
     body.capability_lane_call = capabilityLaneCall;
   }
@@ -2056,6 +2137,11 @@ export async function runCapabilityLaneSessionControl(
     body.agentRuntime = selectedRuntime;
     body.agent_runtime = selectedRuntime;
   }
+  const turnId = payload.turnId ?? payload.turn_id;
+  if (turnId) {
+    body.turnId = turnId;
+    body.turn_id = turnId;
+  }
   if (capabilityLaneSessionCall) {
     body.capability_lane_session_call = capabilityLaneSessionCall;
   }
@@ -2069,6 +2155,92 @@ export async function runCapabilityLaneSessionControl(
     signal: payload.signal,
   });
   return asJson<CapabilityLaneSessionControlResponse>(response);
+}
+
+export async function runCapabilityLaneGoalBindingControl(
+  payload: RunCapabilityLaneGoalBindingControlPayload,
+): Promise<CapabilityLaneGoalBindingControlResponse> {
+  const selectedRuntime = payload.agentRuntime ?? payload.agent_runtime;
+  const capabilityLaneGoalBindingCall =
+    payload.capability_lane_goal_binding_call ?? payload.capabilityLaneGoalBindingCall;
+  const body: Record<string, unknown> = {};
+  if (selectedRuntime) {
+    body.agentRuntime = selectedRuntime;
+    body.agent_runtime = selectedRuntime;
+  }
+  const turnId = payload.turnId ?? payload.turn_id;
+  if (turnId) {
+    body.turnId = turnId;
+    body.turn_id = turnId;
+  }
+  if (capabilityLaneGoalBindingCall) {
+    body.capability_lane_goal_binding_call = capabilityLaneGoalBindingCall;
+  }
+  const response = await fetch("/api/agi/capability-lanes/goal-binding", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(body),
+    signal: payload.signal,
+  });
+  return asJson<CapabilityLaneGoalBindingControlResponse>(response);
+}
+
+export async function runCapabilityLaneMailLoop(
+  payload: RunCapabilityLaneMailLoopPayload,
+): Promise<CapabilityLaneMailLoopResponse> {
+  const selectedRuntime = payload.agentRuntime ?? payload.agent_runtime;
+  const capabilityLaneCall = payload.capability_lane_call ?? payload.capabilityLaneCall;
+  const body: Record<string, unknown> = {};
+  if (selectedRuntime) {
+    body.agentRuntime = selectedRuntime;
+    body.agent_runtime = selectedRuntime;
+  }
+  const turnId = payload.turnId ?? payload.turn_id;
+  if (turnId) {
+    body.turnId = turnId;
+    body.turn_id = turnId;
+  }
+  const threadId = payload.threadId ?? payload.thread_id;
+  if (threadId) {
+    body.threadId = threadId;
+    body.thread_id = threadId;
+  }
+  const roomId = payload.roomId ?? payload.room_id;
+  if (roomId) {
+    body.roomId = roomId;
+    body.room_id = roomId;
+  }
+  const environmentId = payload.environmentId ?? payload.environment_id;
+  if (environmentId) {
+    body.environmentId = environmentId;
+    body.environment_id = environmentId;
+  }
+  const objectiveText = payload.objectiveText ?? payload.objective_text;
+  if (objectiveText) {
+    body.objectiveText = objectiveText;
+    body.objective_text = objectiveText;
+  }
+  const laneSessionId = payload.laneSessionId ?? payload.lane_session_id;
+  if (laneSessionId) {
+    body.laneSessionId = laneSessionId;
+    body.lane_session_id = laneSessionId;
+  }
+  if (capabilityLaneCall) {
+    body.capability_lane_call = capabilityLaneCall;
+  }
+  const response = await fetch("/api/agi/capability-lanes/mail-loop", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(body),
+    signal: payload.signal,
+  });
+  return asJson<CapabilityLaneMailLoopResponse>(response);
 }
 
 const readAskTurnStreamText = (value: unknown): string => (typeof value === "string" ? value.trim() : "");

@@ -33,6 +33,17 @@ const laneVisibleRow: HelixContinuousTurnStreamRow = {
   evidenceRefs: [],
 };
 
+const laneConsoleStateObservedRow: HelixContinuousTurnStreamRow = {
+  key: "lane-console-state-observed",
+  source: "agent_work",
+  label: "Lane State",
+  text: "Lane state: live_translation.translate_text is observed_pending_reentry.",
+  meta: "source capability_lane_timeline_summary.console_state_rows | live_translation | capability live_translation.translate_text | backend live_translation.local_runtime | normalized stage observed | state observed_pending_reentry | runtime provider codex | adapter boundary helix_agent_provider_edge | observation ask:lane:translation:obs | receipt ask:lane:translation:receipt | terminal authority pending_helix_terminal_authority",
+  status: "completed",
+  tone: "observation",
+  evidenceRefs: ["ask:lane:translation:obs"],
+};
+
 const laneBackendRow: HelixContinuousTurnStreamRow = {
   key: "lane-backend",
   source: "agent_work",
@@ -390,6 +401,74 @@ describe("Helix Ask turn stream lane rendering", () => {
     expect(screen.getByTestId("helix-ask-capability-lane-row-detail").textContent).toContain(
       "Visible only, not executed",
     );
+  });
+
+  it("renders capability lane console-state rows as first-class lane rows", () => {
+    render(
+      <HelixAskTurnStreamPanel
+        rows={[laneConsoleStateObservedRow]}
+        isLatestReply
+        stagePlayEventCount={0}
+        finalAnswerRawText=""
+        finalAnswerSourceLabel="capability lane terminal"
+        finalAnswerAuthority="terminal"
+        renderFinalAnswer={() => null}
+        clipText={(text) => text}
+        readRowClassName={() => ""}
+        readDotClassName={() => ""}
+        readPillClassName={() => ""}
+        onCopyFinal={noop}
+        onDebugCopy={noop}
+        onReadAloud={noop}
+        jobReadyLinks={[]}
+        onRunJobReadyLink={noop}
+        workLogTestId="turn-stream"
+      />,
+    );
+
+    const panel = screen.getByTestId("turn-stream");
+    const row = screen.getByTestId("helix-ask-latest-turn-stream-row");
+    expect(row.getAttribute("data-capability-lane-stage")).toBe("observed");
+    expect(row.getAttribute("data-capability-lane-stage-display")).toBe("observation produced");
+    expect(row.getAttribute("data-capability-lane-normalized-stage")).toBe("observed");
+    expect(row.getAttribute("data-capability-lane-state-label")).toBe("observed_pending_reentry");
+    expect(row.getAttribute("data-capability-lane-runtime-provider")).toBe("codex");
+    expect(row.getAttribute("data-capability-lane-backend-provider")).toBe("live_translation.local_runtime");
+    expect(row.getAttribute("data-capability-lane-observation-ref")).toBe("ask:lane:translation:obs");
+    expect(row.getAttribute("data-capability-lane-receipt-ref")).toBe("ask:lane:translation:receipt");
+    expect(row.getAttribute("data-capability-lane-terminal-authority-status")).toBe(
+      "pending_helix_terminal_authority",
+    );
+    expect(panel.getAttribute("data-capability-lane-lifecycle")).toBe("executed");
+    expect(panel.getAttribute("data-capability-lane-observed-count")).toBe("1");
+    expect(screen.getByTestId("helix-ask-capability-lane-row-detail").textContent).toContain(
+      "State observed_pending_reentry | Normalized observed",
+    );
+  });
+
+  it("renders active capability lane console-state rows with state metadata", () => {
+    render(
+      <HelixAskActiveTurnStreamPanel
+        rows={[laneConsoleStateObservedRow]}
+        activeTurnId="turn-lane-console-state"
+        clipText={(text) => text}
+        renderFinalAnswerContent={(text) => <span>{text}</span>}
+        readRowClass={() => ""}
+        readDotClass={() => ""}
+      />,
+    );
+
+    const panel = screen.getByTestId("helix-ask-active-turn-stream");
+    const row = screen.getByTestId("helix-ask-active-turn-stream-row");
+    expect(row.getAttribute("data-capability-lane-stage")).toBe("observed");
+    expect(row.getAttribute("data-capability-lane-normalized-stage")).toBe("observed");
+    expect(row.getAttribute("data-capability-lane-state-label")).toBe("observed_pending_reentry");
+    expect(row.getAttribute("data-capability-lane-observation-ref")).toBe("ask:lane:translation:obs");
+    expect(row.getAttribute("data-capability-lane-terminal-authority-status")).toBe(
+      "pending_helix_terminal_authority",
+    );
+    expect(panel.getAttribute("data-capability-lane-lifecycle")).toBe("executed");
+    expect(panel.getAttribute("data-capability-lane-stage-sequence")).toBe("observed");
   });
 
   it("marks completed stream capability lane rows with their lane stage", () => {

@@ -216,9 +216,10 @@ describe("doc viewer math interaction", () => {
         laneSessionCount: 1,
         activeLaneSessionCount: 1,
         latestLaneSessionStatus: "running",
+        latestLaneSessionHealth: "degraded",
       }),
       t: translate,
-    })).toBe('docsViewer.translation.status.sessionActive:{"status":"running"}');
+    })).toBe('docsViewer.translation.status.sessionActive:{"status":"running / degraded"}');
 
     expect(getDocumentTranslationStatusLabel({
       translationStatus: "ready",
@@ -227,9 +228,10 @@ describe("doc viewer math interaction", () => {
         laneSessionCount: 1,
         blockedLaneSessionCount: 1,
         latestLaneSessionStatus: "permission_blocked",
+        latestLaneSessionHealth: "blocked",
       }),
       t: translate,
-    })).toBe('docsViewer.translation.status.sessionBlocked:{"status":"permission_blocked"}');
+    })).toBe('docsViewer.translation.status.sessionBlocked:{"status":"permission_blocked / blocked"}');
 
     expect(getDocumentTranslationStatusLabel({
       translationStatus: "ready",
@@ -304,6 +306,7 @@ describe("doc viewer math interaction", () => {
   it("routes inline document translation through Stage Play document Markdown mail", () => {
     const panelSource = readFileSync(join(process.cwd(), "client/src/components/DocViewerPanel.tsx"), "utf8");
     const clientSource = readFileSync(join(process.cwd(), "client/src/lib/docs/documentTranslationClient.ts"), "utf8");
+    const agiApiSource = readFileSync(join(process.cwd(), "client/src/lib/agi/api.ts"), "utf8");
     const stagePlayRouteSource = readFileSync(join(process.cwd(), "server/routes/helix/stage-play.ts"), "utf8");
     const hawMessagesSource = readFileSync(join(process.cwd(), "client/src/lib/i18n/messages/haw.ts"), "utf8");
 
@@ -475,16 +478,18 @@ describe("doc viewer math interaction", () => {
     expect(panelSource).toContain("data-doc-translation-control=\"inline-account-language\"");
     expect(panelSource).toContain("data-doc-translation-control-enabled={String(inlineTranslationEnabled)}");
     expect(panelSource).toContain("data-doc-translation-control-target-language={translationTargetLanguage}");
-    expect(panelSource).toContain("data-doc-translation-control-account-locale={interfaceLanguage.code}");
+    expect(panelSource).toContain("data-doc-translation-control-account-locale={translationAccountLocale}");
     expect(panelSource).toContain("data-doc-translation-control-projection-target={HELIX_LIVE_TRANSLATION_PROJECTION_TARGET_DOCS_CHUNK}");
     expect(panelSource).toContain("data-doc-translation-control-terminal-eligible=\"false\"");
     expect(panelSource).toContain("data-doc-translation-control-assistant-answer=\"false\"");
     expect(panelSource).toContain("data-doc-translation-control-raw-content-included=\"false\"");
-    expect(clientSource).toContain("/api/agi/capability-lanes/session");
-    expect(clientSource).toContain("capability_lane_session_call");
-    expect(clientSource).toContain("terminal_eligible?: false");
-    expect(clientSource).toContain("assistant_answer?: false");
-    expect(clientSource).toContain("raw_content_included?: false");
+    expect(clientSource).toContain("runCapabilityLaneSessionControl({");
+    expect(clientSource).toContain("capability_lane_session_call:");
+    expect(agiApiSource).toContain("/api/agi/capability-lanes/session");
+    expect(agiApiSource).toContain("capability_lane_session_call");
+    expect(agiApiSource).toContain("terminal_eligible?: false");
+    expect(agiApiSource).toContain("assistant_answer?: false");
+    expect(agiApiSource).toContain("raw_content_included?: false");
     const inlineRendererSource = readFileSync(
       join(process.cwd(), "client/src/lib/docs/liveTranslationInlineRenderer.ts"),
       "utf8",

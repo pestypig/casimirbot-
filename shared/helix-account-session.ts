@@ -8,12 +8,268 @@ export const HELIX_ACCOUNT_SESSION_STATUS_SCHEMA =
   "helix.account_session_status.v1" as const;
 export const HELIX_ACCOUNT_SESSION_RECEIPT_SCHEMA =
   "helix.account_session_receipt.v1" as const;
+export const HELIX_ACCOUNT_CAPABILITY_POLICY_SCHEMA =
+  "helix.account_capability_policy.v1" as const;
+
+export type HelixAccountType = "developer" | "user";
+
+export type HelixWorkstationPermissionProfile =
+  | "observe"
+  | "read"
+  | "act"
+  | "write"
+  | "danger";
+
+export type HelixAccountCapabilityPolicy = {
+  schema: typeof HELIX_ACCOUNT_CAPABILITY_POLICY_SCHEMA;
+  account_type: HelixAccountType;
+  max_workstation_permission: HelixWorkstationPermissionProfile;
+  allowed_panels: string[];
+  locked_panels: string[];
+  locked_features: string[];
+  allowed_runtime_agents: string[];
+  allowed_workstation_capabilities: string[];
+  locked_workstation_capabilities: string[];
+  feature_flags: string[];
+  quotas: {
+    profile_storage_bytes: number;
+    model_tokens_per_turn: number;
+    model_tokens_per_day: number;
+    runtime_minutes_per_day: number;
+  };
+};
+
+export type HelixAccountPolicyAccessState = "available" | "locked" | "hidden";
+
+export const HELIX_USER_WORKSTATION_PANEL_IDS = [
+  "docs-viewer",
+  "account-session",
+  "workstation-notes",
+  "situation-room-pipelines",
+  "live-answer-environment",
+  "image-lens",
+  "narrator",
+  "workstation-clipboard-history",
+  "workstation-workflow-timeline",
+  "workstation-task-manager",
+  "workstation-storage-map",
+  "agi-task-history",
+  "scientific-calculator",
+  "theory-badge-graph",
+  "moral-graph",
+  "fruition-calculator",
+  "stage-play-badge-graph",
+  "civilization-bounds-roadmap",
+  "mission-ethos",
+] as const;
+
+export const HELIX_LOCKED_WORKSTATION_PANEL_IDS = [
+  "agi-contribution-workbench",
+  "agi-essence-console",
+  "code-admin",
+  "document-image-lens",
+  "helix-noise-gens",
+  "mission-ethos-source",
+  "needle-world-roadmap",
+  "rag-admin",
+] as const;
+
+export const HELIX_DEVELOPER_ACCOUNT_POLICY: HelixAccountCapabilityPolicy = {
+  schema: HELIX_ACCOUNT_CAPABILITY_POLICY_SCHEMA,
+  account_type: "developer",
+  max_workstation_permission: "danger",
+  allowed_panels: ["*"],
+  locked_panels: [],
+  locked_features: [],
+  allowed_runtime_agents: ["*"],
+  allowed_workstation_capabilities: ["*"],
+  locked_workstation_capabilities: [],
+  feature_flags: [
+    "advanced_helix_ask_controls",
+    "developer_workstation_panels",
+    "experimental_panels",
+    "runtime_agent_controls",
+    "workstation_gateway_act",
+  ],
+  quotas: {
+    profile_storage_bytes: 5 * 1024 * 1024,
+    model_tokens_per_turn: 64_000,
+    model_tokens_per_day: 1_000_000,
+    runtime_minutes_per_day: 240,
+  },
+};
+
+export const HELIX_USER_ACCOUNT_POLICY: HelixAccountCapabilityPolicy = {
+  schema: HELIX_ACCOUNT_CAPABILITY_POLICY_SCHEMA,
+  account_type: "user",
+  max_workstation_permission: "read",
+  allowed_panels: [...HELIX_USER_WORKSTATION_PANEL_IDS],
+  locked_panels: [...HELIX_LOCKED_WORKSTATION_PANEL_IDS],
+  locked_features: [
+    "advanced_helix_ask_controls",
+    "developer_workstation_panels",
+    "experimental_panels",
+    "runtime_agent_controls",
+    "workstation_gateway_act",
+  ],
+  allowed_runtime_agents: ["helix"],
+  allowed_workstation_capabilities: ["permission:observe", "permission:read"],
+  locked_workstation_capabilities: [
+    "permission:act",
+    "permission:write",
+    "permission:danger",
+  ],
+  feature_flags: ["stable_workstation_panels", "locked_dev_features_visible"],
+  quotas: {
+    profile_storage_bytes: 1024 * 1024,
+    model_tokens_per_turn: 16_000,
+    model_tokens_per_day: 100_000,
+    runtime_minutes_per_day: 30,
+  },
+};
+
+const PERMISSION_RANK: Record<HelixWorkstationPermissionProfile, number> = {
+  observe: 0,
+  read: 1,
+  act: 2,
+  write: 3,
+  danger: 4,
+};
+
+const MODE_TO_PERMISSION: Record<string, HelixWorkstationPermissionProfile> = {
+  observe: "observe",
+  read: "read",
+  act: "act",
+  verify: "read",
+  write: "write",
+  danger: "danger",
+};
+
+const copyPolicy = (
+  policy: HelixAccountCapabilityPolicy,
+): HelixAccountCapabilityPolicy => ({
+  ...policy,
+  allowed_panels: [...policy.allowed_panels],
+  locked_panels: [...policy.locked_panels],
+  locked_features: [...policy.locked_features],
+  allowed_runtime_agents: [...policy.allowed_runtime_agents],
+  allowed_workstation_capabilities: [...policy.allowed_workstation_capabilities],
+  locked_workstation_capabilities: [...policy.locked_workstation_capabilities],
+  feature_flags: [...policy.feature_flags],
+  quotas: { ...policy.quotas },
+});
+
+export const buildHelixAccountCapabilityPolicy = (
+  accountType: HelixAccountType,
+): HelixAccountCapabilityPolicy =>
+  copyPolicy(accountType === "developer"
+    ? HELIX_DEVELOPER_ACCOUNT_POLICY
+    : HELIX_USER_ACCOUNT_POLICY);
+
+export const helixPermissionRank = (
+  permission: HelixWorkstationPermissionProfile | string | null | undefined,
+): number => {
+  const normalized = typeof permission === "string" ? permission.trim() : "";
+  return PERMISSION_RANK[normalized as HelixWorkstationPermissionProfile] ?? -1;
+};
+
+export const helixPolicyAllowsPermission = (
+  policy: HelixAccountCapabilityPolicy,
+  permission: HelixWorkstationPermissionProfile | string | null | undefined,
+): boolean =>
+  helixPermissionRank(policy.max_workstation_permission) >= helixPermissionRank(permission);
+
+export const capHelixWorkstationModeForPolicy = (
+  policy: HelixAccountCapabilityPolicy,
+  mode: string | null | undefined,
+): "observe" | "read" | "act" | "verify" => {
+  const normalized = typeof mode === "string" && mode.trim()
+    ? mode.trim()
+    : "read";
+  const requestedPermission = MODE_TO_PERMISSION[normalized] ?? "read";
+  if (helixPolicyAllowsPermission(policy, requestedPermission)) {
+    return normalized === "act" || normalized === "observe" || normalized === "verify"
+      ? normalized
+      : "read";
+  }
+  if (helixPolicyAllowsPermission(policy, "act")) return "act";
+  if (helixPolicyAllowsPermission(policy, "read")) return "read";
+  return "observe";
+};
+
+export const resolveHelixAccountPanelAccess = (
+  policy: HelixAccountCapabilityPolicy | null | undefined,
+  panelId: string,
+): { state: HelixAccountPolicyAccessState; reason: string | null } => {
+  const normalizedPanelId = panelId.trim();
+  if (!normalizedPanelId) return { state: "hidden", reason: "missing_panel_id" };
+  const activePolicy = policy ?? HELIX_DEVELOPER_ACCOUNT_POLICY;
+  if (activePolicy.locked_panels.includes(normalizedPanelId)) {
+    return { state: "locked", reason: "panel_locked_by_account_policy" };
+  }
+  if (
+    activePolicy.allowed_panels.includes("*") ||
+    activePolicy.allowed_panels.includes(normalizedPanelId)
+  ) {
+    return { state: "available", reason: null };
+  }
+  return { state: "locked", reason: "panel_outside_account_policy" };
+};
+
+export const resolveHelixRuntimeAgentAccess = (
+  policy: HelixAccountCapabilityPolicy | null | undefined,
+  agentRuntimeId: string,
+): { state: HelixAccountPolicyAccessState; reason: string | null } => {
+  const normalizedAgentId = agentRuntimeId.trim();
+  if (!normalizedAgentId) return { state: "hidden", reason: "missing_agent_runtime" };
+  const activePolicy = policy ?? HELIX_DEVELOPER_ACCOUNT_POLICY;
+  if (
+    activePolicy.allowed_runtime_agents.includes("*") ||
+    activePolicy.allowed_runtime_agents.includes(normalizedAgentId)
+  ) {
+    return { state: "available", reason: null };
+  }
+  return { state: "locked", reason: "runtime_agent_outside_account_policy" };
+};
+
+export const resolveHelixWorkstationCapabilityAccess = (
+  policy: HelixAccountCapabilityPolicy | null | undefined,
+  input: {
+    capability_id: string;
+    permission_profile_required?: HelixWorkstationPermissionProfile | string | null;
+  },
+): { state: HelixAccountPolicyAccessState; reason: string | null } => {
+  const activePolicy = policy ?? HELIX_DEVELOPER_ACCOUNT_POLICY;
+  if (activePolicy.locked_workstation_capabilities.includes(input.capability_id)) {
+    return { state: "locked", reason: "capability_locked_by_account_policy" };
+  }
+  if (
+    input.permission_profile_required &&
+    !helixPolicyAllowsPermission(activePolicy, input.permission_profile_required)
+  ) {
+    return { state: "locked", reason: "capability_permission_exceeds_account_policy" };
+  }
+  if (
+    activePolicy.allowed_workstation_capabilities.includes("*") ||
+    activePolicy.allowed_workstation_capabilities.includes(input.capability_id) ||
+    (
+      input.permission_profile_required &&
+      activePolicy.allowed_workstation_capabilities.includes(
+        `permission:${input.permission_profile_required}`,
+      )
+    )
+  ) {
+    return { state: "available", reason: null };
+  }
+  return { state: "locked", reason: "capability_outside_account_policy" };
+};
 
 export type HelixAccountSessionProfile = {
   profile_id: string;
   display_name: string;
   email?: string | null;
   auth_mode: "web_auth" | "local_dev_profile" | "local_password_profile";
+  account_type?: HelixAccountType;
   provider?: "google" | "local" | null;
   provider_subject?: string | null;
   picture_url?: string | null;
@@ -45,6 +301,7 @@ export type HelixAccountSession = {
   schema: typeof HELIX_ACCOUNT_SESSION_SCHEMA;
   session_id: string;
   profile: HelixAccountSessionProfile;
+  account_policy: HelixAccountCapabilityPolicy;
   status: "active" | "signed_out";
   memory_scope: "profile" | "session_only";
   created_at: string;
@@ -55,6 +312,7 @@ export type HelixAccountSessionStatus = {
   schema: typeof HELIX_ACCOUNT_SESSION_STATUS_SCHEMA;
   ok: boolean;
   session: HelixAccountSession | null;
+  account_policy: HelixAccountCapabilityPolicy;
   linked_accounts: HelixAccountLinkedAccount[];
   profile_ingress_tokens: HelixProfileIngressTokenSummary[];
   profile_ingress_usage: HelixProfileIngressUsageSummary;

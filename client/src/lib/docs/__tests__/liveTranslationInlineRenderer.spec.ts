@@ -293,6 +293,12 @@ describe("document live translation inline renderer", () => {
     ].join("::"));
     expect(rendered).toContain('data-doc-translation-server-projection-key="server-projection-key-current"');
     expect(rendered).toContain('data-doc-translation-suppressed-server-projection-key="server-projection-key-stale"');
+    expect(rendered).toContain('data-doc-translation-suppressed-observation-ref="obs:docs:stale"');
+    expect(rendered).toContain('data-doc-translation-suppressed-receipt-ref="receipt:docs:stale"');
+    expect(rendered).toContain('data-doc-translation-suppressed-source-hash="source-hash-previous"');
+    expect(rendered).toContain('data-doc-translation-suppressed-source-text-hash="source-text-previous"');
+    expect(rendered).toContain('data-doc-translation-suppressed-chunk-id="u0001"');
+    expect(rendered).toContain('data-doc-translation-suppressed-freshness-status="stale"');
     expect(rendered).toContain('data-doc-translation-suppressed-reason="stale_projection_did_not_replace_fresh_text"');
     expect(rendered).not.toContain("Could not translate");
   });

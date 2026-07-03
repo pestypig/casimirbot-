@@ -28,6 +28,128 @@
       ]
     }
   },
+  "folderRules": [
+    {
+      "path": "docs/research",
+      "docClass": "canonical-research",
+      "reason": "Curated research papers and maintained research references."
+    },
+    {
+      "path": "docs/papers",
+      "docClass": "canonical-research",
+      "reason": "Paper-oriented references that should sit with curated research."
+    },
+    {
+      "path": "docs/audits/research",
+      "docClass": "synthetic-research",
+      "reason": "Generated or audit-style research packets useful as synthetic research data unless promoted explicitly."
+    },
+    {
+      "path": "docs/knowledge",
+      "docClass": "synthetic-research",
+      "reason": "Generated knowledge-tree and evidence artifacts used as structured synthetic research context."
+    },
+    {
+      "path": "docs/curvature-studies",
+      "docClass": "synthetic-research",
+      "reason": "Exploratory curvature-study outputs that are useful context but not promoted canonical papers."
+    },
+    {
+      "path": "docs/moral-ladder-pack",
+      "docClass": "synthetic-research",
+      "reason": "Generated ladder-pack material used as synthetic knowledge data."
+    },
+    {
+      "path": "docs/moral-society",
+      "docClass": "synthetic-research",
+      "reason": "Generated society/template material used as synthetic knowledge data."
+    },
+    {
+      "path": "docs/zen-ladder-pack",
+      "docClass": "synthetic-research",
+      "reason": "Generated ladder-pack material used as synthetic knowledge data."
+    },
+    {
+      "path": "docs/zen-society",
+      "docClass": "synthetic-research",
+      "reason": "Generated society/template material used as synthetic knowledge data."
+    },
+    {
+      "path": "docs/adr",
+      "docClass": "current-development",
+      "reason": "Architecture decision records for active engineering context."
+    },
+    {
+      "path": "docs/agents",
+      "docClass": "current-development",
+      "reason": "Agent-facing implementation and operations notes."
+    },
+    {
+      "path": "docs/architecture",
+      "docClass": "current-development",
+      "reason": "Architecture notes and contracts for the active codebase."
+    },
+    {
+      "path": "docs/development",
+      "docClass": "current-development",
+      "reason": "Current development notes promoted from the docs audit."
+    },
+    {
+      "path": "docs/ethos",
+      "docClass": "current-development",
+      "reason": "Active ethos and ideology contract material."
+    },
+    {
+      "path": "docs/experiments",
+      "docClass": "current-development",
+      "reason": "Experiment notes that support active implementation decisions."
+    },
+    {
+      "path": "docs/helix-ask",
+      "docClass": "current-development",
+      "reason": "Active Helix Ask contracts and tool documentation."
+    },
+    {
+      "path": "docs/qa",
+      "docClass": "current-development",
+      "reason": "Quality and test planning for active development."
+    },
+    {
+      "path": "docs/renderer",
+      "docClass": "current-development",
+      "reason": "Renderer implementation notes."
+    },
+    {
+      "path": "docs/runbooks",
+      "docClass": "current-development",
+      "reason": "Operational runbooks for active workflows."
+    },
+    {
+      "path": "docs/specs",
+      "docClass": "current-development",
+      "reason": "Active specifications and contracts."
+    },
+    {
+      "path": "docs/starsim",
+      "docClass": "current-development",
+      "reason": "Active StarSim implementation notes."
+    },
+    {
+      "path": "docs/voice",
+      "docClass": "current-development",
+      "reason": "Active voice workflow documentation."
+    },
+    {
+      "path": "docs/audits",
+      "docClass": "legacy-development",
+      "reason": "Historical audit and development trail retained for context unless a narrower rule promotes it."
+    },
+    {
+      "path": "docs/legacy-development",
+      "docClass": "legacy-development",
+      "reason": "Explicit legacy development notes promoted from the docs audit."
+    }
+  ],
   "documents": [
     {
       "path": "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",

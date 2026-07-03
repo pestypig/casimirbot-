@@ -36,6 +36,12 @@ type DocTaxonomyDocumentEntry = {
 
 type DocTaxonomyClassEntry = {
   defaultFolder?: string;
+  defaultFolders?: string[];
+};
+
+type DocTaxonomyFolderRule = {
+  path?: string;
+  docClass?: string;
 };
 
 const DOC_TAXONOMY_DOCUMENTS: unknown[] = Array.isArray((docTaxonomy as { documents?: unknown }).documents)
@@ -51,15 +57,32 @@ const DOC_TAXONOMY_BY_PATH = new Map<string, DocTaxonomyDocumentEntry>(
   }),
 );
 
-const DOC_TAXONOMY_DEFAULT_FOLDERS = Object.entries(
-  (docTaxonomy.classes as Record<string, DocTaxonomyClassEntry> | undefined) ?? {},
-)
-  .map(([docClass, entry]) => ({
-    docClass,
-    defaultFolder: normalizeDocPath(entry.defaultFolder ?? ""),
-  }))
-  .filter((entry) => entry.defaultFolder.length > 0)
-  .sort((left, right) => right.defaultFolder.length - left.defaultFolder.length);
+const DOC_TAXONOMY_FOLDER_RULES = [
+  ...Object.entries((docTaxonomy.classes as Record<string, DocTaxonomyClassEntry> | undefined) ?? {}).flatMap(
+    ([docClass, entry]) => {
+      const folders = [
+        entry.defaultFolder,
+        ...(Array.isArray(entry.defaultFolders) ? entry.defaultFolders : []),
+      ];
+      return folders
+        .filter((folder): folder is string => typeof folder === "string" && folder.trim().length > 0)
+        .map((folder) => ({
+          docClass,
+          path: normalizeDocPath(folder),
+        }));
+    },
+  ),
+  ...(Array.isArray((docTaxonomy as { folderRules?: unknown }).folderRules)
+    ? (docTaxonomy as { folderRules: unknown[] }).folderRules.flatMap((entry) => {
+      if (!entry || typeof entry !== "object") return [];
+      const folderRule = entry as DocTaxonomyFolderRule;
+      if (typeof folderRule.path !== "string" || typeof folderRule.docClass !== "string") return [];
+      return [{ docClass: folderRule.docClass, path: normalizeDocPath(folderRule.path) }];
+    })
+    : []),
+]
+  .filter((entry) => entry.path.length > 0)
+  .sort((left, right) => right.path.length - left.path.length);
 
 const DOC_SEARCH_STOP_WORDS = new Set([
   "a",
@@ -168,8 +191,8 @@ function normalizeDocPath(raw: string) {
 
 function inferTaxonomyDocClass(relativePath: string): string | null {
   const normalized = normalizeDocPath(relativePath);
-  for (const entry of DOC_TAXONOMY_DEFAULT_FOLDERS) {
-    if (normalized === entry.defaultFolder || normalized.startsWith(`${entry.defaultFolder}/`)) {
+  for (const entry of DOC_TAXONOMY_FOLDER_RULES) {
+    if (normalized === entry.path || normalized.startsWith(`${entry.path}/`)) {
       return entry.docClass;
     }
   }

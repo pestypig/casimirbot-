@@ -394,6 +394,133 @@ describe("capability lane provider adapter context", () => {
     expect(context.prompt_observation_block).toContain("final_reports_require_terminal_authority");
   });
 
+  it("keeps pause and resume lifecycle events visible through the provider timeline", () => {
+    const sessionStore = createHelixCapabilityLaneSessionStore();
+    const context = buildHelixCapabilityLaneProviderAdapterContext({
+      provider: buildProvider("codex"),
+      sessionStore,
+      body: {
+        turn_id: "turn-provider-adapter-session-pause-resume",
+        capability_lane_session_call: [
+          {
+            action: "start",
+            lane_id: "live_translation",
+            lane_session_id: "lane-session-provider-pause-resume",
+            requested_backend_provider: "google_gemini",
+            now_ms: 200,
+            source_binding: {
+              source_id: "docs:nhm2",
+              source_kind: "docs",
+              source_hash: "sha256:provider-pause-resume",
+              projection_target: "docs_chunk",
+              account_locale: "es-US",
+              target_language: "es",
+            },
+          },
+          {
+            action: "pause",
+            lane_session_id: "lane-session-provider-pause-resume",
+            now_ms: 240,
+            reason: "user_paused_account_language_translation",
+          },
+          {
+            action: "resume",
+            lane_session_id: "lane-session-provider-pause-resume",
+            now_ms: 280,
+            reason: "user_resumed_account_language_translation",
+          },
+        ],
+      },
+      env: {} as NodeJS.ProcessEnv,
+    });
+
+    expect(context.calls_succeeded).toBe(true);
+    expect(context.debug_projection.capability_lane_session_results).toEqual([
+      expect.objectContaining({
+        ok: true,
+        action: "start",
+        blocked_reason: null,
+      }),
+      expect.objectContaining({
+        ok: true,
+        action: "pause",
+        blocked_reason: null,
+        lane_session: expect.objectContaining({
+          status: "paused",
+          health: "degraded",
+          updated_at_ms: 240,
+        }),
+      }),
+      expect.objectContaining({
+        ok: true,
+        action: "resume",
+        blocked_reason: null,
+        lane_session: expect.objectContaining({
+          status: "running",
+          health: "healthy",
+          updated_at_ms: 280,
+        }),
+      }),
+    ]);
+    expect(context.debug_projection.capability_lane_session_debug_summaries).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        lane_session_id: "lane-session-provider-pause-resume",
+        session_status: "paused",
+        session_health: "degraded",
+        lifecycle_action: "pause",
+        session_lifecycle_action: "pause",
+        session_action: "pause",
+        latest_event_id: "lane-session-provider-pause-resume:pause:240",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+      expect.objectContaining({
+        lane_session_id: "lane-session-provider-pause-resume",
+        session_status: "running",
+        session_health: "healthy",
+        lifecycle_action: "resume",
+        session_lifecycle_action: "resume",
+        session_action: "resume",
+        latest_event_id: "lane-session-provider-pause-resume:resume:280",
+        session_control_key:
+          "lane-session-provider-pause-resume::docs:nhm2::sha256:provider-pause-resume::docs_chunk::es-US::es",
+        source_binding_key: "docs:nhm2::sha256:provider-pause-resume::docs_chunk::es-US::es",
+        has_observation: false,
+        backend_provider_becomes_root_agent: false,
+        final_reports_require_terminal_authority: true,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]));
+    expect(context.capability_lane_turn_timeline).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        stage: "lane_session",
+        selected_runtime_agent_provider: "codex",
+        lane_id: "live_translation",
+        status: "running",
+        lifecycle_action: "resume",
+        session_lifecycle_action: "resume",
+        session_action: "resume",
+        latest_event_id: "lane-session-provider-pause-resume:resume:280",
+        session_control_key:
+          "lane-session-provider-pause-resume::docs:nhm2::sha256:provider-pause-resume::docs_chunk::es-US::es",
+        source_binding_key: "docs:nhm2::sha256:provider-pause-resume::docs_chunk::es-US::es",
+        lane_executed: false,
+        observation_reentered: false,
+        has_observation: false,
+        terminal_authority_status: "not_terminal_authority",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]));
+    expect(context.prompt_observation_block).toContain("lane-session-provider-pause-resume:resume:280");
+    expect(context.prompt_observation_block).toContain("session_lifecycle_action");
+    expect(context.prompt_observation_block).toContain("user_resumed_account_language_translation");
+  });
+
   it("packages goal-bound lane session calls for the selected runtime provider", () => {
     const sessionStore = createHelixCapabilityLaneSessionStore();
     const context = buildHelixCapabilityLaneProviderAdapterContext({
@@ -477,6 +604,85 @@ describe("capability lane provider adapter context", () => {
     expect(context.prompt_observation_block).toContain("goal:account-language-translation");
     expect(context.prompt_observation_block).toContain("backend_provider_becomes_root_agent");
     expect(context.prompt_observation_block).toContain("final_reports_require_terminal_authority");
+  });
+
+  it("fails closed for malformed goal-bound lane calls without creating debug summaries", () => {
+    const sessionStore = createHelixCapabilityLaneSessionStore();
+    const context = buildHelixCapabilityLaneProviderAdapterContext({
+      provider: buildProvider("codex"),
+      sessionStore,
+      body: {
+        turn_id: "turn-provider-adapter-malformed-goal-binding",
+        capability_lane_goal_binding_call: [
+          {
+            action: "bind",
+            goal_id: "goal:missing-session-id",
+          },
+          {
+            action: "record_mail_loop",
+            goal_binding_id: "goal-binding-missing-mail-loop",
+          },
+          {
+            action: "record_report",
+            goal_binding_id: "goal-binding-missing-report-ref",
+          },
+        ],
+      },
+      env: {} as NodeJS.ProcessEnv,
+    });
+
+    expect(context.calls_succeeded).toBe(false);
+    expect(context.goal_bindings).toMatchObject({
+      schema: "helix.capability_lane.goal_binding_runner_result.v1",
+      requested: true,
+      goal_binding_debug_summaries: [],
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(context.debug_projection.capability_lane_goal_binding_results).toEqual([
+      expect.objectContaining({
+        ok: false,
+        goal_binding: null,
+        blocked_reason: "missing_lane_session_id",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+      expect.objectContaining({
+        ok: false,
+        goal_binding: null,
+        blocked_reason: "missing_mail_loop_summary",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+      expect.objectContaining({
+        ok: false,
+        goal_binding: null,
+        blocked_reason: "missing_report_ref",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ]);
+    expect(context.debug_projection.capability_lane_goal_binding_debug_summaries).toEqual([]);
+    expect(context.debug_projection.capability_lane_turn_timeline).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          stage: "lane_visible",
+          lane_visible: true,
+          lane_executed: false,
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        }),
+      ]),
+    );
+    expect(context.prompt_observation_block).toContain("missing_lane_session_id");
+    expect(context.prompt_observation_block).toContain("missing_mail_loop_summary");
+    expect(context.prompt_observation_block).toContain("missing_report_ref");
+    expect(context.prompt_observation_block).not.toContain("goal_binding_debug_summary.v1");
   });
 
   it("packages goal-bound speech, translation, and voice lane sessions as one non-terminal workflow", () => {
@@ -825,7 +1031,128 @@ describe("capability lane provider adapter context", () => {
         final_reports_require_terminal_authority: true,
       }),
     );
+    expect(context.debug_projection.capability_lane_goal_dispatch_plans).toEqual([
+      expect.objectContaining({
+        schema: "helix.capability_lane.goal_dispatch_plan.v1",
+        target: "ask_wake",
+        status: "planned_not_dispatched",
+        goal_binding_id: "goal-binding-provider-mail",
+        goal_id: "goal:account-language-translation",
+        lane_session_id: "lane-session-provider-goal-mail",
+        lane_id: "live_translation",
+        evidence_ref: "stage-play-mail-provider-goal",
+        mail_loop_ref: null,
+        receipt_ref: "ask:lane:translation:mail-obs:projection:receipt",
+        requires_live_mail_loop: true,
+        wake_dispatched: false,
+        side_effects_executed: false,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+      expect.objectContaining({
+        schema: "helix.capability_lane.goal_dispatch_plan.v1",
+        target: "ask_wake",
+        status: "planned_not_dispatched",
+        goal_binding_id: "goal-binding-provider-mail",
+        mail_loop_ref: "stage-play-mail-provider-goal",
+      }),
+    ]);
+    expect(context.debug_projection.capability_lane_goal_dispatch_admissions).toEqual([
+      expect.objectContaining({
+        schema: "helix.capability_lane.goal_dispatch_admission.v1",
+        status: "blocked",
+        target: "ask_wake",
+        goal_binding_id: "goal-binding-provider-mail",
+        goal_id: "goal:account-language-translation",
+        lane_session_id: "lane-session-provider-goal-mail",
+        lane_id: "live_translation",
+        evidence_ref: "stage-play-mail-provider-goal",
+        mail_loop_ref: null,
+        receipt_ref: "ask:lane:translation:mail-obs:projection:receipt",
+        blocked_reason: "missing_mail_loop_ref",
+        wake_dispatch_allowed: false,
+        side_effects_allowed: false,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+      expect.objectContaining({
+        schema: "helix.capability_lane.goal_dispatch_admission.v1",
+        status: "eligible_waiting_for_mail_loop",
+        target: "ask_wake",
+        goal_binding_id: "goal-binding-provider-mail",
+        mail_loop_ref: "stage-play-mail-provider-goal",
+      }),
+    ]);
+    expect(context.debug_projection.capability_lane_goal_dispatch_readiness).toMatchObject({
+      schema: "helix.capability_lane.goal_dispatch_readiness.v1",
+      total_plans: 2,
+      total_admissions: 2,
+      admitted_count: 1,
+      blocked_count: 1,
+      pending_wake_count: 1,
+      blocked_reasons: ["missing_mail_loop_ref"],
+      next_lane_ids: ["live_translation"],
+      next_goal_binding_ids: ["goal-binding-provider-mail"],
+      next_lane_session_ids: ["lane-session-provider-goal-mail"],
+      next_evidence_refs: ["stage-play-mail-provider-goal"],
+      next_receipt_refs: ["ask:lane:translation:mail-obs:projection:receipt"],
+      wake_dispatch_allowed: false,
+      side_effects_allowed: false,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
     expect(context.capability_lane_turn_timeline).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        stage: "lane_mail_loop",
+        selected_runtime_agent_provider: "codex",
+        lane_id: "live_translation",
+        capability_id: "live_translation.translate_text",
+        status: "created",
+        lane_visible: false,
+        lane_requested: true,
+        lane_executed: true,
+        observation_reentered: true,
+        selected_backend_provider: "live_translation.local_runtime",
+        observation_ref: "ask:lane:translation:mail-obs",
+        receipt_ref: "ask:lane:translation:mail-obs:projection:receipt",
+        latest_event_id: "stage-play-mail-provider-goal",
+        lifecycle_action: "mail_loop",
+        session_lifecycle_action: "mail_loop",
+        session_action: "mail_loop",
+        session_control_key:
+          "lane-session-provider-goal-mail::document_markdown:docs/research/nhm2.md::docs_chunk::es",
+        source_binding_key: "document_markdown:docs/research/nhm2.md::docs_chunk::es",
+        latest_observation_key:
+          "document_markdown:docs/research/nhm2.md::docs_chunk::es::chunk-provider-goal::ask:lane:translation:mail-obs:projection:receipt",
+        has_observation: true,
+        source_id: "document_markdown:docs/research/nhm2.md",
+        source_kind: "document_markdown",
+        source_projection_target: "docs_chunk",
+        latest_chunk_id: "chunk-provider-goal",
+        latest_chunk_index: 4,
+        latest_source_id: "document_markdown:docs/research/nhm2.md",
+        latest_source_kind: "document_markdown",
+        latest_target_language: "es",
+        latest_dedupe_key: "docs/research/nhm2.md:chunk-provider-goal:es",
+        latest_source_event_id: "docs/research/nhm2.md:event-provider-goal",
+        latest_source_event_ms: 240,
+        latest_observed_at_ms: 250,
+        latest_freshness_status: "fresh",
+        latest_projection_target: "docs_chunk",
+        target_language: "es",
+        latest_cancel_requested: false,
+        latest_mail_loop_wake_kind: "mailbox_wake",
+        report_action: "mailbox_wake",
+        report_reason: "created",
+        report_summary_text: "lane mail loop materialized observation evidence",
+        terminal_authority_status: "pending_helix_terminal_authority",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
       expect.objectContaining({
         stage: "goal_binding",
         selected_runtime_agent_provider: "codex",
@@ -865,9 +1192,77 @@ describe("capability lane provider adapter context", () => {
         assistant_answer: false,
         raw_content_included: false,
       }),
+      expect.objectContaining({
+        stage: "lane_goal_dispatch_plan",
+        selected_runtime_agent_provider: "codex",
+        lane_id: "live_translation",
+        status: "planned_not_dispatched",
+        lane_visible: false,
+        lane_requested: true,
+        lane_executed: false,
+        observation_reentered: false,
+        observation_ref: "stage-play-mail-provider-goal",
+        receipt_ref: "ask:lane:translation:mail-obs:projection:receipt",
+        goal_id: "goal:account-language-translation",
+        goal_binding_id: "goal-binding-provider-mail",
+        lane_session_id: "lane-session-provider-goal-mail",
+        mail_loop_ref: null,
+        dispatch_target: "ask_wake",
+        materialized_mail_loop_evidence: false,
+        wake_dispatch_allowed: false,
+        side_effects_allowed: false,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+      expect.objectContaining({
+        stage: "lane_goal_dispatch_admission",
+        selected_runtime_agent_provider: "codex",
+        lane_id: "live_translation",
+        status: "blocked",
+        observation_ref: "stage-play-mail-provider-goal",
+        receipt_ref: "ask:lane:translation:mail-obs:projection:receipt",
+        goal_id: "goal:account-language-translation",
+        goal_binding_id: "goal-binding-provider-mail",
+        lane_session_id: "lane-session-provider-goal-mail",
+        mail_loop_ref: null,
+        dispatch_target: "ask_wake",
+        dispatch_admission_status: "blocked",
+        dispatch_blocked_reason: "missing_mail_loop_ref",
+        materialized_mail_loop_evidence: false,
+        wake_dispatch_allowed: false,
+        side_effects_allowed: false,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+      expect.objectContaining({
+        stage: "lane_goal_dispatch_readiness",
+        selected_runtime_agent_provider: "codex",
+        lane_id: "live_translation",
+        status: "blocked",
+        lane_requested: true,
+        observation_ref: "stage-play-mail-provider-goal",
+        receipt_ref: "ask:lane:translation:mail-obs:projection:receipt",
+        goal_binding_id: "goal-binding-provider-mail",
+        lane_session_id: "lane-session-provider-goal-mail",
+        dispatch_target: "ask_wake",
+        dispatch_admission_status: "blocked",
+        dispatch_blocked_reason: "missing_mail_loop_ref",
+        materialized_mail_loop_evidence: true,
+        wake_dispatch_allowed: false,
+        side_effects_allowed: false,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
     ]));
     expect(context.prompt_observation_block).toContain("stage-play-mail-provider-goal");
     expect(context.prompt_observation_block).toContain("capability_lane_mail_loop_debug_summaries");
+    expect(context.prompt_observation_block).toContain("capability_lane_goal_dispatch_plans");
+    expect(context.prompt_observation_block).toContain("capability_lane_goal_dispatch_admissions");
+    expect(context.prompt_observation_block).toContain("capability_lane_goal_dispatch_readiness");
+    expect(context.prompt_observation_block).toContain("lane_goal_dispatch_readiness");
     expect(context.prompt_observation_block).toContain("wake_on_salience");
     expect(context.prompt_observation_block).toContain("eligible_waiting_for_mail_loop");
   });

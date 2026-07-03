@@ -98,7 +98,7 @@ describe("Helix Ask console diagnostics", () => {
           source: "agent_work",
           label: "Lane Session",
           text: "Lane session: live_translation.",
-          meta: "source capability_lane_session_debug_summaries | live_translation | lane_session | latest event lane-session-docs:start:150 | has observation false",
+          meta: "source capability_lane_session_debug_summaries | live_translation | lane_session | session status paused | session health degraded | latest event lane-session-docs:pause:150 | has observation false",
           status: "running",
           tone: "working",
           evidenceRefs: ["ask:lane:translation:obs"],
@@ -302,7 +302,9 @@ describe("Helix Ask console diagnostics", () => {
           status: "running",
           detail: {
             laneId: "live_translation",
-            latestEventId: "lane-session-docs:start:150",
+            sessionStatus: "paused",
+            sessionHealth: "degraded",
+            latestEventId: "lane-session-docs:pause:150",
             hasObservation: "false",
           },
         },
@@ -418,7 +420,7 @@ describe("Helix Ask console diagnostics", () => {
       ],
     });
     expect(formatHelixAskConsoleCapabilityLaneSummaryText(snapshot.capabilityLaneSummary)).toBe(
-      "Lane timeline: visible 1 / requested 1 / executed 4 / backend 1 / observed 1 / receipt 1 / re-entered 1 / session 1 / mail 1 / goal 1 / dispatch plan 1 / dispatch admission 1 / dispatch readiness 1 / terminal selected 1. Path: visible > requested > backend > observed > receipt > reentered > session > mail > goal > goal_plan > goal_admission > goal_readiness > terminal_selected. Visible lanes are available, not executed.",
+      "Lane timeline: visible 1 / requested 1 / executed 4 / backend 1 / observed 1 / receipt 1 / re-entered 1 / session 1 / mail 1 / goal 1 / dispatch plan 1 / dispatch admission 1 / dispatch readiness 1 / terminal selected 1. Status: terminal selected. Path: visible > requested > backend > observed > receipt > reentered > session > mail > goal > goal_plan > goal_admission > goal_readiness > terminal_selected. Visible lanes are available, not executed.",
     );
     expect(snapshot.capabilityLaneRows.find((row) => row.key === "lane-visible")?.detailText).toContain(
       "Visible only, not executed",
@@ -519,7 +521,7 @@ describe("Helix Ask console diagnostics", () => {
           source: "agent_work",
           label: "Lane Session",
           text: "Lane session: live_translation.",
-          meta: "source capability_lane_session_debug_summaries | live_translation | lane_session | action record_observation | session control key lane-session-docs::docs:nhm2::sha256:doc-a::docs_viewer.inline_translation::es-US::es | source binding key docs:nhm2::sha256:doc-a::docs_viewer.inline_translation::es-US::es | observation key docs:nhm2::sha256:doc-a::docs_viewer.inline_translation::es::chunk-1::ask:lane:translation:obs:projection:receipt",
+          meta: "source capability_lane_session_debug_summaries | live_translation | lane_session | session status running | session health healthy | action record_observation | session control key lane-session-docs::docs:nhm2::sha256:doc-a::docs_viewer.inline_translation::es-US::es | source binding key docs:nhm2::sha256:doc-a::docs_viewer.inline_translation::es-US::es | observation key docs:nhm2::sha256:doc-a::docs_viewer.inline_translation::es::chunk-1::ask:lane:translation:obs:projection:receipt",
           status: "running",
           tone: "working",
           evidenceRefs: [],
@@ -549,6 +551,8 @@ describe("Helix Ask console diagnostics", () => {
     });
     expect(snapshot.capabilityLaneRows[0]?.detail).toMatchObject({
       laneId: "live_translation",
+      sessionStatus: "running",
+      sessionHealth: "healthy",
       sessionLifecycleAction: "record_observation",
       sessionControlKey:
         "lane-session-docs::docs:nhm2::sha256:doc-a::docs_viewer.inline_translation::es-US::es",
@@ -557,7 +561,7 @@ describe("Helix Ask console diagnostics", () => {
         "docs:nhm2::sha256:doc-a::docs_viewer.inline_translation::es::chunk-1::ask:lane:translation:obs:projection:receipt",
     });
     expect(snapshot.capabilityLaneRows[0]?.detailText).toContain(
-      "Action record_observation | Session control lane-session-docs::docs:nhm2::sha256:doc-a::docs_viewer.inline_translation::es-US::es",
+      "Session status running | Session health healthy | Action record_observation | Session control lane-session-docs::docs:nhm2::sha256:doc-a::docs_viewer.inline_translation::es-US::es",
     );
   });
 

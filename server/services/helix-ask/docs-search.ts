@@ -51,7 +51,13 @@ type DocsTaxonomyDocumentEntry = {
   toolHints?: Record<string, unknown>;
 };
 
+type DocsTaxonomyFolderRule = {
+  path: string;
+  docClass: string;
+};
+
 let docsTaxonomyByPath: Map<string, DocsTaxonomyDocumentEntry> | null = null;
+let docsTaxonomyFolderRules: DocsTaxonomyFolderRule[] | null = null;
 
 export const normalizeDocsSearchText = (value: string): string =>
   value
@@ -149,6 +155,49 @@ const readDocsTaxonomyByPath = (): Map<string, DocsTaxonomyDocumentEntry> => {
   return entries;
 };
 
+const readDocsTaxonomyFolderRules = (): DocsTaxonomyFolderRule[] => {
+  if (docsTaxonomyFolderRules) return docsTaxonomyFolderRules;
+  const rules: DocsTaxonomyFolderRule[] = [];
+  try {
+    const raw = fs.readFileSync(DOCS_TAXONOMY_PATH, "utf8");
+    const parsed = JSON.parse(raw) as {
+      classes?: Record<string, { defaultFolder?: unknown; defaultFolders?: unknown }>;
+      folderRules?: unknown;
+    };
+    for (const [docClass, entry] of Object.entries(parsed.classes ?? {})) {
+      const folders = [
+        entry.defaultFolder,
+        ...(Array.isArray(entry.defaultFolders) ? entry.defaultFolders : []),
+      ];
+      for (const folder of folders) {
+        if (typeof folder !== "string" || !folder.trim()) continue;
+        rules.push({ docClass, path: normalizeDocsPath(folder) });
+      }
+    }
+    const folderRules = Array.isArray(parsed.folderRules) ? parsed.folderRules : [];
+    for (const rule of folderRules) {
+      if (!rule || typeof rule !== "object") continue;
+      const candidate = rule as Record<string, unknown>;
+      if (typeof candidate.path !== "string" || typeof candidate.docClass !== "string") continue;
+      rules.push({ docClass: candidate.docClass, path: normalizeDocsPath(candidate.path) });
+    }
+  } catch {
+    // Taxonomy metadata is optional discovery context; docs search still works without it.
+  }
+  docsTaxonomyFolderRules = rules
+    .filter((rule) => rule.path.length > 0)
+    .sort((left, right) => right.path.length - left.path.length);
+  return docsTaxonomyFolderRules;
+};
+
+const inferDocsTaxonomyClass = (filePath: string): string | undefined => {
+  const normalized = normalizeDocsPath(filePath);
+  for (const rule of readDocsTaxonomyFolderRules()) {
+    if (normalized === rule.path || normalized.startsWith(`${rule.path}/`)) return rule.docClass;
+  }
+  return undefined;
+};
+
 const readDocsTaxonomyEntry = (filePath: string): DocsTaxonomyDocumentEntry | null =>
   readDocsTaxonomyByPath().get(normalizeDocsPath(filePath)) ?? null;
 
@@ -231,6 +280,7 @@ export const buildDocsSearchDocumentCandidates = (
   return Array.from(byPath.entries())
     .map(([filePath, pathHits]) => {
       const taxonomyEntry = readDocsTaxonomyEntry(filePath);
+      const docClass = taxonomyEntry?.docClass ?? inferDocsTaxonomyClass(filePath);
       const normalizedPathTitle = normalizeDocsSearchText(`${filePath} ${docsPathTitle(filePath)}`);
       const compactPathTitle = normalizedPathTitle.replace(/\s+/g, "");
       const scoredHits = pathHits
@@ -258,7 +308,7 @@ export const buildDocsSearchDocumentCandidates = (
         path: filePath,
         title: docsPathTitle(filePath),
         score: pathTitleScore + bestHitScore + coverageBonus + mdBonus + latestDateBonus - sidecarPenalty,
-        ...(taxonomyEntry?.docClass ? { doc_class: taxonomyEntry.docClass } : {}),
+        ...(docClass ? { doc_class: docClass } : {}),
         ...(taxonomyEntry?.bundleKind ? { bundle_kind: taxonomyEntry.bundleKind } : {}),
         ...(typeof taxonomyEntry?.canonical === "boolean" ? { canonical: taxonomyEntry.canonical } : {}),
         ...(taxonomyEntry?.sidecars?.length ? { sidecars: taxonomyEntry.sidecars } : {}),

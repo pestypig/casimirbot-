@@ -235,7 +235,14 @@
         "revision",
         "validation"
       ],
-      "children": [],
+      "aliases": [
+        "revision boundary",
+        "criteria drift",
+        "goalpost moving"
+      ],
+      "children": [
+        "goalpost-integrity"
+      ],
       "links": [
         {
           "rel": "parent",
@@ -301,6 +308,60 @@
           "tolerance",
           "environment"
         ]
+      }
+    },
+    {
+      "id": "goalpost-integrity",
+      "slug": "goalpost-integrity",
+      "title": "Goalpost Integrity",
+      "excerpt": "Revise criteria openly; do not move standards to protect a preferred conclusion.",
+      "bodyMD": "Revision is valid when the old criterion, the new criterion, and the reason for the change are visible. Criteria drift becomes a problem when the standard moves only to protect a desired conclusion.\n\nAnti-pattern: calling conclusion-protection wisdom.\n\nMinimal artifact: Revision Boundary Note with original criterion, revised criterion, evidence for the revision, and unresolved uncertainty.",
+      "tags": [
+        "revision",
+        "falsifiability",
+        "criteria",
+        "integrity",
+        "truth"
+      ],
+      "aliases": [
+        "moving the goal post",
+        "goalpost moving",
+        "criteria drift",
+        "honest revision",
+        "revision boundary"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "impermanence-entropy-and-revision"
+        },
+        {
+          "rel": "see-also",
+          "to": "falsifiability-and-truth-convergence"
+        },
+        {
+          "rel": "see-also",
+          "to": "right-speech-and-accurate-formulation"
+        },
+        {
+          "rel": "see-also",
+          "to": "verification-checklist"
+        }
+      ],
+      "references": [
+        {
+          "kind": "doc",
+          "title": "Ideology Graph",
+          "path": "docs/ethos/ideology.json"
+        }
+      ],
+      "summary": "Revise criteria openly; do not move standards to protect a preferred conclusion.",
+      "proceduralLanguage": {
+        "pattern": "The standard for success, proof, or responsibility changes during reflection.",
+        "move": "Name the old criterion, the new criterion, and the evidence that justifies revision.",
+        "missingCheck": "Was the criterion changed because reality changed, or to protect the conclusion?",
+        "antiPattern": "Calling goalpost movement wisdom when it is actually conclusion-protection."
       }
     },
     {
@@ -398,6 +459,12 @@
         "truth",
         "validation",
         "observation"
+      ],
+      "aliases": [
+        "probability truth",
+        "one truth is probability",
+        "testable probability",
+        "truth as probability"
       ],
       "children": [],
       "links": [
@@ -566,9 +633,15 @@
         "identity view",
         "self story",
         "non attachment",
-        "essence"
+        "essence",
+        "is this my belief",
+        "inherited norm",
+        "cliche belief",
+        "ego trapdoor",
+        "self image trap"
       ],
       "children": [
+        "inherited-conditioning-check",
         "rumination-to-practice",
         "spiritual-friendship-mirror",
         "comparison-pressure-and-equanimity"
@@ -600,6 +673,60 @@
       }
     },
     {
+      "id": "inherited-conditioning-check",
+      "slug": "inherited-conditioning-check",
+      "title": "Inherited Conditioning Check",
+      "excerpt": "Separate chosen belief from inherited norm, cliche, role-pressure, or stale self-story.",
+      "bodyMD": "Conditioning is not proof that a belief is false, and choice is not proof that a belief is true. The procedural move is to sort the belief by origin: observed, inherited, imitated, socially pressured, stale, or chosen now.\n\nAnti-pattern: treating conditioned belief as automatically false or automatically final.\n\nMinimal artifact: Belief Origin Note separating observation, inherited story, chosen value, and current practice.",
+      "tags": [
+        "inner_practice",
+        "conditioning",
+        "identity",
+        "belief_origin",
+        "observation"
+      ],
+      "aliases": [
+        "conditioning check",
+        "is this my belief",
+        "cliche belief",
+        "inherited norm",
+        "belief origin"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "identity-view-and-non-attachment"
+        },
+        {
+          "rel": "see-also",
+          "to": "direct-observation-before-claim"
+        },
+        {
+          "rel": "see-also",
+          "to": "ignorance-and-consideration"
+        },
+        {
+          "rel": "see-also",
+          "to": "worldview-integrity"
+        }
+      ],
+      "references": [
+        {
+          "kind": "doc",
+          "title": "Ideology Graph",
+          "path": "docs/ethos/ideology.json"
+        }
+      ],
+      "summary": "Separate chosen belief from inherited norm, cliche, role-pressure, or stale self-story.",
+      "proceduralLanguage": {
+        "pattern": "A belief may be inherited from nurture, norm pressure, imitation, cliche, or stale identity.",
+        "move": "Separate observation, inherited story, chosen value, and current practice.",
+        "missingCheck": "What current observation or chosen commitment supports this belief now?",
+        "antiPattern": "Treating a conditioned belief as either automatically false or automatically final."
+      }
+    },
+    {
       "id": "right-effort-loop",
       "slug": "right-effort-loop",
       "title": "Right Effort Loop",
@@ -616,11 +743,13 @@
       "aliases": [
         "right effort",
         "practice loop",
-        "bounded experiment"
+        "bounded experiment",
+        "indomitable spirit"
       ],
       "children": [
         "rumination-to-practice",
-        "small-experiment-vow"
+        "small-experiment-vow",
+        "purpose-as-inquiry"
       ],
       "links": [
         {
@@ -661,7 +790,8 @@
       "aliases": [
         "middle way",
         "balanced path",
-        "not too much not too little"
+        "not too much not too little",
+        "use only what you need"
       ],
       "children": [
         "mindful-consumption",
@@ -707,7 +837,10 @@
         "mindful consumption",
         "information diet",
         "media diet",
-        "input hygiene"
+        "input hygiene",
+        "use only what you need",
+        "wastefulness",
+        "attention is limited"
       ],
       "children": [
         "middle-way-information-diet",
@@ -941,9 +1074,13 @@
         "small experiment",
         "bounded practice",
         "practice vow",
-        "next small step"
+        "next small step",
+        "indomitable spirit",
+        "investigate the dream"
       ],
-      "children": [],
+      "children": [
+        "purpose-as-inquiry"
+      ],
       "links": [
         {
           "rel": "parent",
@@ -964,6 +1101,61 @@
         "move": "Define one small vow, the evidence it will produce, and when to review it.",
         "missingCheck": "What is the smallest action that would make the ideal more real this week?",
         "antiPattern": "Waiting for total clarity before beginning practice."
+      }
+    },
+    {
+      "id": "purpose-as-inquiry",
+      "slug": "purpose-as-inquiry",
+      "title": "Purpose as Inquiry",
+      "excerpt": "A dream becomes responsible when it can be researched, tested, revised, and carried into practice.",
+      "bodyMD": "Purpose becomes stronger when inspiration enters inquiry. A meaningful goal should be researched, tested in small form, defended against evidence, revised without shame, and carried into practice.\n\nAnti-pattern: treating inspiration as proof, or treating uncertainty as a reason to abandon the dream.\n\nMinimal artifact: Purpose Inquiry Card with sources, a small test, evidence to collect, and a revision condition.",
+      "tags": [
+        "inner_practice",
+        "purpose",
+        "dreams",
+        "evidence",
+        "revision",
+        "agency"
+      ],
+      "aliases": [
+        "evidence based purpose",
+        "investigate the dream",
+        "purpose formation",
+        "personal passion public truth",
+        "future projection"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "right-effort-loop"
+        },
+        {
+          "rel": "parent",
+          "to": "small-experiment-vow"
+        },
+        {
+          "rel": "see-also",
+          "to": "falsifiability-and-truth-convergence"
+        },
+        {
+          "rel": "see-also",
+          "to": "dream-integrity"
+        }
+      ],
+      "references": [
+        {
+          "kind": "doc",
+          "title": "Ideology Graph",
+          "path": "docs/ethos/ideology.json"
+        }
+      ],
+      "summary": "A dream becomes responsible when it can be researched, tested, revised, and carried into practice.",
+      "proceduralLanguage": {
+        "pattern": "A person has a meaningful goal, dream, or ideal that needs grounding.",
+        "move": "Research the goal, define a small test, collect evidence, and revise without shame.",
+        "missingCheck": "What observation, source, or experiment would make this purpose more truthful?",
+        "antiPattern": "Treating inspiration as proof, or treating uncertainty as a reason to abandon the dream."
       }
     },
     {
@@ -1077,9 +1269,13 @@
         "moral guilt",
         "consideration gap",
         "not considering",
-        "unconsidered harm"
+        "unconsidered harm",
+        "forgotten people",
+        "cultural difference",
+        "no one gets left behind"
       ],
       "children": [
+        "recognition-before-transcendence",
         "consideration-debt",
         "unseen-harm-inquiry",
         "due-care-before-judgment",
@@ -1114,6 +1310,64 @@
         "move": "Identify what is not being considered, research consequences, and update responsibility without character verdict.",
         "missingCheck": "What affected party, consequence, evidence source, or dependency is currently outside the frame?",
         "antiPattern": "Using ignorance as permission or using guilt as final identity judgment."
+      }
+    },
+    {
+      "id": "recognition-before-transcendence",
+      "slug": "recognition-before-transcendence",
+      "title": "Recognition Before Transcendence",
+      "excerpt": "Do not claim to transcend difference before recognizing affected agency and missing understanding.",
+      "bodyMD": "A frame that claims to rise above culture, difference, or exclusion must first ask who is outside the frame. Recognition means mapping affected agency, missing translation, and whether inclusion is support, coercion, domination, or abandonment.\n\nAnti-pattern: calling assimilation, superiority, or abandonment transcendence.\n\nMinimal artifact: Recognition Map listing unrepresented parties, translation gaps, agency risks, and non-domination checks.",
+      "tags": [
+        "consideration",
+        "culture",
+        "recognition",
+        "affected_parties",
+        "non_domination"
+      ],
+      "aliases": [
+        "no one gets left behind",
+        "forgotten people",
+        "cultural difference",
+        "recognition path",
+        "who will not understand"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ignorance-and-consideration"
+        },
+        {
+          "rel": "see-also",
+          "to": "consideration-debt"
+        },
+        {
+          "rel": "see-also",
+          "to": "interdependence-yin-yang-balance"
+        },
+        {
+          "rel": "see-also",
+          "to": "fairness-due-process-and-justification"
+        },
+        {
+          "rel": "see-also",
+          "to": "non-harm-and-compassionate-constraint"
+        }
+      ],
+      "references": [
+        {
+          "kind": "doc",
+          "title": "Ideology Graph",
+          "path": "docs/ethos/ideology.json"
+        }
+      ],
+      "summary": "Do not claim to transcend difference before recognizing affected agency and missing understanding.",
+      "proceduralLanguage": {
+        "pattern": "A group, culture, or person may be outside the frame of understanding or inclusion.",
+        "move": "Map affected agency, missing translation, and whether inclusion is support, coercion, or domination.",
+        "missingCheck": "Who is not represented, and what would recognition require before action?",
+        "antiPattern": "Calling assimilation, superiority, or abandonment transcendence."
       }
     },
     {
@@ -5819,7 +6073,18 @@
         "constraints",
         "adaptation"
       ],
-      "children": [],
+      "aliases": [
+        "values over images",
+        "idol worship",
+        "celebrity mirror",
+        "inspiration not imitation",
+        "social performance",
+        "approval seeking",
+        "ego trapdoor"
+      ],
+      "children": [
+        "inspiration-without-imitation"
+      ],
       "links": [
         {
           "rel": "parent",
@@ -5926,6 +6191,61 @@
           "tolerance",
           "environment"
         ]
+      }
+    },
+    {
+      "id": "inspiration-without-imitation",
+      "slug": "inspiration-without-imitation",
+      "title": "Inspiration Without Imitation",
+      "excerpt": "Let models awaken values without becoming identity mirrors or outsourced authority.",
+      "bodyMD": "Admiration is useful when it reveals a value that can be practiced. It becomes distorting when another person, institution, celebrity, or group becomes a mirror for worth, ambition, or permission.\n\nAnti-pattern: letting admiration become identity surrender.\n\nMinimal artifact: Inspiration Extraction Note naming the admired value, the imitated surface, and the chosen practice.",
+      "tags": [
+        "inner_practice",
+        "inspiration",
+        "imitation",
+        "idols",
+        "values",
+        "agency"
+      ],
+      "aliases": [
+        "idol worship",
+        "celebrity mirror",
+        "inspiration not imitation",
+        "social performance",
+        "approval seeking"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "values-over-images"
+        },
+        {
+          "rel": "see-also",
+          "to": "identity-view-and-non-attachment"
+        },
+        {
+          "rel": "see-also",
+          "to": "comparison-pressure-and-equanimity"
+        },
+        {
+          "rel": "see-also",
+          "to": "mindful-consumption"
+        }
+      ],
+      "references": [
+        {
+          "kind": "doc",
+          "title": "Ideology Graph",
+          "path": "docs/ethos/ideology.json"
+        }
+      ],
+      "summary": "Let models awaken values without becoming identity mirrors or outsourced authority.",
+      "proceduralLanguage": {
+        "pattern": "A person uses another person, institution, celebrity, or group as a mirror for ambition or worth.",
+        "move": "Extract the value being admired, then restate it as a chosen practice.",
+        "missingCheck": "What value is being learned, and what part is merely imitation or approval pressure?",
+        "antiPattern": "Letting admiration become identity surrender."
       }
     },
     {
@@ -6399,6 +6719,13 @@
         "feedback",
         "innovation",
         "guardrails"
+      ],
+      "aliases": [
+        "ego trapdoor",
+        "poisoning fair reasoning",
+        "self image trap",
+        "narrative protection",
+        "ego check"
       ],
       "children": [
         "habit-pressure-break",
@@ -8848,6 +9175,13 @@
         "ideology",
         "flattery",
         "verification-first"
+      ],
+      "aliases": [
+        "ego trapdoor",
+        "poisoning fair reasoning",
+        "self image trap",
+        "narrative protection",
+        "ego check"
       ],
       "children": [],
       "links": [
