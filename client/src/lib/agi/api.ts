@@ -598,7 +598,10 @@ export type CapabilityLaneOneShotResponse = {
   capability_lane_resolve_traces?: Array<Record<string, unknown>>;
   capability_lane_backend_selections?: Array<Record<string, unknown>>;
   capability_lane_debug_events?: Array<Record<string, unknown>>;
+  capability_lane_projection_receipts?: Array<Record<string, unknown>>;
+  capability_lane_turn_timeline?: Array<Record<string, unknown>>;
   capability_lane_reentry_status?: string;
+  model_visible_capability_lane_manifest?: Record<string, unknown> | null;
   terminal_eligible?: false;
   assistant_answer?: false;
   raw_content_included?: false;
