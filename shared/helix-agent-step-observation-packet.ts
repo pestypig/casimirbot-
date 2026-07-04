@@ -207,6 +207,13 @@ export type HelixAgentStepObservationPacket = {
     };
     live_translation_projection_receipt?: HelixLiveTranslationProjectionReceipt;
     visible_translation_target_batch?: HelixVisibleTranslationTargetBatch;
+    workstation_tool_reference?: {
+      gateway_mode?: string | null;
+      observation_ref?: string | null;
+      terminal_eligible: false;
+      assistant_answer: false;
+      raw_content_included: false;
+    };
     speech_to_text_observation?: unknown;
     speech_to_text_live_source_mail_item?: unknown;
     text_to_speech_receipt?: unknown;

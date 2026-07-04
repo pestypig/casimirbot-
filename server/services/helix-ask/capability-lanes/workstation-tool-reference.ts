@@ -150,7 +150,7 @@ const buildVisibleTranslationTargets = (input: {
       const dedupeKey =
         readText(chunk.dedupe_key ?? chunk.dedupeKey) ||
         `${sourceId}:${sourceTextHash}:${targetLanguage}:${chunkId}`;
-      return {
+      const target: HelixVisibleTranslationTarget = {
         schema: HELIX_VISIBLE_TRANSLATION_TARGET_SCHEMA,
         source_kind: sourceKind,
         panel_id: readText(chunk.panel_id ?? chunk.panelId) || panelId,
@@ -174,8 +174,9 @@ const buildVisibleTranslationTargets = (input: {
         raw_content_included: false,
         reentry_required: true,
       };
+      return target;
     })
-    .filter((target): target is HelixVisibleTranslationTarget => Boolean(target));
+    .filter((target): target is HelixVisibleTranslationTarget => target !== null);
 };
 
 const buildLaneObservationPacket = (input: {

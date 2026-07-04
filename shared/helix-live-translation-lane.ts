@@ -6,6 +6,8 @@ import type {
 } from "./helix-capability-lane";
 import type { HelixLiveTranslationProjectionTarget } from "./helix-live-translation-projection-target";
 
+export type { HelixLiveTranslationProjectionTarget } from "./helix-live-translation-projection-target";
+
 export const HELIX_LIVE_TRANSLATION_ONE_SHOT_REQUEST_SCHEMA =
   "helix.live_translation.one_shot_request.v1" as const;
 export const HELIX_LIVE_TRANSLATION_ONE_SHOT_OBSERVATION_SCHEMA =

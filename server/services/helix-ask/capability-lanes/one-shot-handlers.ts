@@ -139,7 +139,7 @@ const buildShadowObservationPacket = (input: {
   backend_selection_decision: input.trace.backend_selection_decision,
   state_delta: {
     capability_lane_shadow_execution: {
-      lane_id: input.laneId,
+      lane_id: input.laneId as HelixCapabilityLaneId,
       capability: input.capability,
       requested_backend_provider: input.trace.requested_backend_provider,
       requested_backend_provider_known: input.trace.requested_backend_provider_known,

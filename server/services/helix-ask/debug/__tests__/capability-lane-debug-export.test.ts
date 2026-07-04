@@ -1038,7 +1038,7 @@ describe("capability lane debug export fields", () => {
           {
             schema: "helix.agent_step_observation_packet.v1",
             capability_key: "text_to_speech.speak_text",
-            status: "succeeded",
+            status: "client_pending",
             state_delta: {
               text_to_speech_receipt: {
                 schema: "helix.text_to_speech.receipt.v1",
