@@ -709,16 +709,18 @@ export function summarizeDocumentLiveTranslationProjectionSnapshot(
         ? "degraded"
         : states.length === 0
           ? "empty"
+          : readyCount > 0 && hasLaneBlockers
+            ? "degraded"
           : readyCount > 0 && errorCount > 0
             ? "degraded"
             : readyCount > 0
               ? "ready"
               : "blocked";
   const displayStatus =
-    hasLaneBlockers
-      ? "blocked"
-      : readyCount > 0
-        ? "ready"
+    readyCount > 0
+      ? "ready"
+      : hasLaneBlockers
+        ? "blocked"
         : failedCount > 0
           ? "failed"
           : cancelledCount > 0
@@ -733,8 +735,10 @@ export function summarizeDocumentLiveTranslationProjectionSnapshot(
                   ? "active"
                   : "empty";
   const displayStatusReason =
-    hasLaneBlockers
-      ? "lane_blocker_present"
+    readyCount > 0 && hasLaneBlockers
+      ? "ready_projection_with_lane_blockers"
+      : hasLaneBlockers
+        ? "lane_blocker_present"
       : readyCount > 0 && errorCount > 0
         ? "ready_projection_with_errors"
         : readyCount > 0

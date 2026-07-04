@@ -518,6 +518,43 @@ function readLaneProjectionSummary(record: RecordLike | null, debug: RecordLike 
       return pieces.join(" | ");
     }
 
+    if (capability === "workstation_tool_reference.collect_visible_translation_targets") {
+      const targetBatch =
+        readRecord(packetState?.visible_translation_target_batch) ??
+        readRecord(fallbackState?.visible_translation_target_batch) ??
+        readRecord(observation?.target_batch);
+      const targets = readArray(targetBatch?.targets);
+      const targetCount = coerceText(call.target_count) || coerceText(targetBatch?.target_count) || `${targets.length}`;
+      const targetLanguage =
+        coerceText(targets[0]?.target_language) ||
+        coerceText(call.target_language) ||
+        coerceText(observation?.target_language);
+      const projectionTarget =
+        coerceText(targets[0]?.projection_target) ||
+        coerceText(call.projection_target) ||
+        coerceText(observation?.projection_target);
+      const sourceId = coerceText(targets[0]?.source_id);
+      const sourceHash = coerceText(targets[0]?.source_hash);
+      const sourceTextHash = coerceText(targets[0]?.source_text_hash);
+      const chunkId = coerceText(targets[0]?.chunk_id);
+      const pieces = [
+        "workstation_tool_reference",
+        "visible_translation_targets",
+        targetCount ? `target chunks ${targetCount}` : "",
+        targetLanguage ? `target ${targetLanguage}` : "",
+        projectionTarget ? `projection ${projectionTarget}` : "",
+        sourceId ? `source ${sourceId}` : "",
+        sourceHash ? `source hash ${sourceHash}` : "",
+        sourceTextHash ? `source text hash ${sourceTextHash}` : "",
+        chunkId ? `first chunk ${chunkId}` : "",
+        status,
+        observationRef ? `ref ${observationRef}` : "",
+        ...backendParts,
+        "translation still requires live_translation.translate_text",
+      ].filter(Boolean);
+      return pieces.join(" | ");
+    }
+
     if (!capability) return "";
     const pieces = [
       capability,

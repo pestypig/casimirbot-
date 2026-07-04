@@ -487,6 +487,8 @@ const buildCapabilityLaneTimelineSummaryForExport = (
     entries.filter((entry) => entry[key] === true).length;
   const refCount = (key: string): number =>
     entries.filter((entry) => Boolean(readString(entry[key]))).length;
+  const refAnyCount = (...keys: string[]): number =>
+    entries.filter((entry) => keys.some((key) => Boolean(readString(entry[key])))).length;
   const observedStageCount = (stage: string): number =>
     entries.filter((entry) =>
       normalizeCapabilityLaneTimelineStage(entry.stage) === stage &&
@@ -519,10 +521,10 @@ const buildCapabilityLaneTimelineSummaryForExport = (
     ).length,
     observation_ref_count: refCount("observation_ref"),
     receipt_ref_count: refCount("receipt_ref"),
-    latest_visible_observation_ref_count: refCount("latest_visible_observation_ref"),
-    latest_visible_receipt_ref_count: refCount("latest_visible_receipt_ref"),
-    latest_evidence_observation_ref_count: refCount("latest_evidence_observation_ref"),
-    latest_evidence_receipt_ref_count: refCount("latest_evidence_receipt_ref"),
+    latest_visible_observation_ref_count: refAnyCount("latest_visible_observation_ref", "visible_observation_ref"),
+    latest_visible_receipt_ref_count: refAnyCount("latest_visible_receipt_ref", "visible_receipt_ref"),
+    latest_evidence_observation_ref_count: refAnyCount("latest_evidence_observation_ref", "evidence_observation_ref"),
+    latest_evidence_receipt_ref_count: refAnyCount("latest_evidence_receipt_ref", "evidence_receipt_ref"),
     session_lifecycle_action_count: entries.filter((entry) =>
       Boolean(
         readString(entry.session_lifecycle_action) ||

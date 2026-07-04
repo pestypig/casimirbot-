@@ -34,5 +34,40 @@ export const workstationToolReferenceLaneTemplate: HelixCapabilityLaneTemplate =
         },
       },
     },
+    {
+      capability_id: "workstation_tool_reference.collect_visible_translation_targets",
+      label: "Collect visible translation targets",
+      one_shot_status: "executable",
+      session_status: "not_supported",
+      backend_provider_required: false,
+      model_visible_hint: {
+        required_input_fields: [],
+        optional_input_fields: [
+          "active_panel_id",
+          "doc_path",
+          "projection_target",
+          "account_locale",
+          "target_language",
+          "max_chunks",
+          "visible_only",
+          "visible_text",
+          "title_text",
+          "body_text",
+          "visible_text_chunks",
+          "requested_backend_provider",
+        ],
+        when_to_use:
+          "Use when the user asks to translate visible UI, the active document, current selection, hovered content, or account-language UI regions. It only collects visible source chunks; translate admitted chunks separately with live_translation.translate_text. Do not use it for arbitrary unseen files or whole-repo translation.",
+        when_not_to_use:
+          "Do not use for arbitrary unseen files, whole-repo translation, direct text translation without a visible source, or as a substitute for live_translation.translate_text. A collected target is source evidence, not translated text or final answer authority.",
+        request_shape_hint: {
+          capability_lane_call: {
+            capability: "workstation_tool_reference.collect_visible_translation_targets",
+            visible_only: true,
+            max_chunks: 12,
+          },
+        },
+      },
+    },
   ],
 };

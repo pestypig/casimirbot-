@@ -376,6 +376,8 @@ export const buildCapabilityLaneTimelineSummary = (
     entries.filter((entry) => entry[key] === true).length;
   const refCount = (key: string): number =>
     entries.filter((entry) => Boolean(readString(entry[key]))).length;
+  const refAnyCount = (...keys: string[]): number =>
+    entries.filter((entry) => keys.some((key) => Boolean(readString(entry[key])))).length;
   const observedStageCount = (stage: string): number =>
     entries.filter((entry) =>
       normalizeTimelineStage(entry.stage) === stage && timelineRowHasObservation(entry)
@@ -407,10 +409,10 @@ export const buildCapabilityLaneTimelineSummary = (
     ).length,
     observation_ref_count: refCount("observation_ref"),
     receipt_ref_count: refCount("receipt_ref"),
-    latest_visible_observation_ref_count: refCount("latest_visible_observation_ref"),
-    latest_visible_receipt_ref_count: refCount("latest_visible_receipt_ref"),
-    latest_evidence_observation_ref_count: refCount("latest_evidence_observation_ref"),
-    latest_evidence_receipt_ref_count: refCount("latest_evidence_receipt_ref"),
+    latest_visible_observation_ref_count: refAnyCount("latest_visible_observation_ref", "visible_observation_ref"),
+    latest_visible_receipt_ref_count: refAnyCount("latest_visible_receipt_ref", "visible_receipt_ref"),
+    latest_evidence_observation_ref_count: refAnyCount("latest_evidence_observation_ref", "evidence_observation_ref"),
+    latest_evidence_receipt_ref_count: refAnyCount("latest_evidence_receipt_ref", "evidence_receipt_ref"),
     session_lifecycle_action_count: entries.filter((entry) =>
       Boolean(
         readString(entry.session_lifecycle_action) ||
@@ -443,6 +445,31 @@ export const buildCapabilityLaneTimelineSummary = (
     terminal_selected_count: count("terminal_selected"),
     terminal_rejected_count: count("terminal_rejected"),
     console_state_rows: buildConsoleStateRows(entries, fallbackRuntimeAgentProvider),
+    visible_lane_does_not_mean_executed: true,
+  };
+};
+
+const normalizeCapabilityLaneTimelineSummary = (
+  summary: unknown,
+  timeline: unknown,
+  fallbackRuntimeAgentProvider: string | null = null,
+): RecordLike => {
+  const timelineEntries = readRecordArray(timeline);
+  const explicit = readRecord(summary);
+  const explicitRows = readRecordArray(explicit?.console_state_rows);
+  const derived = buildCapabilityLaneTimelineSummary(
+    timelineEntries.length > 0 ? timelineEntries : explicitRows,
+    fallbackRuntimeAgentProvider,
+  );
+
+  if (!explicit) return derived;
+
+  return {
+    ...derived,
+    ...explicit,
+    console_state_rows: explicitRows.length > 0
+      ? buildConsoleStateRows(explicitRows, fallbackRuntimeAgentProvider)
+      : derived.console_state_rows,
     visible_lane_does_not_mean_executed: true,
   };
 };
@@ -586,6 +613,7 @@ export const buildCapabilityLaneDebugExportFields = (
     debug?.agent_runtime,
     debug?.agentRuntime,
   );
+  const capabilityLaneTimelineSummary = read("capability_lane_timeline_summary", null);
 
   return {
     capability_lane_manifest: read("capability_lane_manifest", null),
@@ -594,7 +622,8 @@ export const buildCapabilityLaneDebugExportFields = (
     capability_lane_backend_selections: read("capability_lane_backend_selections", []),
     capability_lane_call_results: read("capability_lane_call_results", []),
     capability_lane_turn_timeline: capabilityLaneTurnTimeline,
-    capability_lane_timeline_summary: buildCapabilityLaneTimelineSummary(
+    capability_lane_timeline_summary: normalizeCapabilityLaneTimelineSummary(
+      capabilityLaneTimelineSummary,
       capabilityLaneTurnTimeline,
       fallbackRuntimeAgentProvider,
     ),

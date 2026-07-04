@@ -1751,6 +1751,37 @@ describe("document live translation projection registry", () => {
       hasProjectionErrors: false,
     });
 
+    const readyWithBlockedLaneSession = ingestDocumentLiveTranslationProjectionFromAskLiveEvent({
+      docPath: "docs/research/nhm2.md",
+      locale: "es",
+      units: [unit("u0001")],
+      eventPayload: laneSessionLiveEvent({
+        sessionStatus: "blocked",
+        sessionHealth: "blocked",
+        latestSessionReason: "backend_permission_blocked",
+        observationRef: "obs:lane-session-blocked",
+        receiptRef: "receipt:lane-session-blocked",
+        updatedAtMs: 150,
+      }),
+    });
+    expect(summarizeDocumentLiveTranslationProjectionSnapshot(readyWithBlockedLaneSession)).toMatchObject({
+      totalCount: 1,
+      readyCount: 1,
+      healthStatus: "degraded",
+      displayStatus: "ready",
+      displayStatusReason: "ready_projection_with_lane_blockers",
+      hasRenderableText: true,
+      blockedLaneSessionCount: 1,
+      latestVisibleObservationRef: "obs:docs:u1:100",
+      latestVisibleReceiptRef: "receipt:docs:u1:100",
+      latestEvidenceObservationRef: "obs:lane-session-blocked",
+      latestEvidenceReceiptRef: "receipt:lane-session-blocked",
+      answerAuthority: false,
+      terminalEligible: false,
+      assistantAnswer: false,
+      rawContentIncluded: false,
+    });
+
     clearDocumentLiveTranslationProjectionRegistry();
     const blockedSnapshot = ingestDocumentLiveTranslationProjection({
       docPath: "docs/research/nhm2.md",

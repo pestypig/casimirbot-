@@ -14,6 +14,57 @@ export const HELIX_LIVE_TRANSLATION_ONE_SHOT_RESULT_SCHEMA =
   "helix.live_translation.one_shot_result.v1" as const;
 export const HELIX_LIVE_TRANSLATION_PROJECTION_RECEIPT_SCHEMA =
   "helix.live_translation.projection_receipt.v1" as const;
+export const HELIX_VISIBLE_TRANSLATION_TARGET_SCHEMA =
+  "helix.visible_translation_target.v1" as const;
+export const HELIX_VISIBLE_TRANSLATION_TARGET_BATCH_SCHEMA =
+  "helix.visible_translation_target_batch.v1" as const;
+
+export type HelixVisibleTranslationTargetSourceKind =
+  | "docs_viewer"
+  | "panel_text"
+  | "button_label"
+  | "note"
+  | "selection"
+  | "hover_region";
+
+export type HelixVisibleTranslationTarget = {
+  schema: typeof HELIX_VISIBLE_TRANSLATION_TARGET_SCHEMA;
+  source_kind: HelixVisibleTranslationTargetSourceKind;
+  panel_id: string | null;
+  doc_path: string | null;
+  source_id: string;
+  source_hash: string;
+  source_text_hash: string;
+  visible_text: string;
+  chunk_id: string;
+  chunk_index: number;
+  region_id: string | null;
+  bbox: Record<string, unknown> | null;
+  dedupe_key: string;
+  projection_target: HelixLiveTranslationProjectionTarget;
+  account_locale: string | null;
+  target_language: string;
+  existing_translation_receipt_ref: string | null;
+  assistant_answer: false;
+  terminal_eligible: false;
+  raw_content_included: false;
+  reentry_required: true;
+};
+
+export type HelixVisibleTranslationTargetBatch = {
+  schema: typeof HELIX_VISIBLE_TRANSLATION_TARGET_BATCH_SCHEMA;
+  batch_ref: string;
+  target_count: number;
+  targets: HelixVisibleTranslationTarget[];
+  visible_only: boolean;
+  max_chunks: number;
+  collector_capability: "workstation_tool_reference.collect_visible_translation_targets";
+  translation_capability_required: "live_translation.translate_text";
+  assistant_answer: false;
+  terminal_eligible: false;
+  raw_content_included: false;
+  reentry_required: true;
+};
 
 export type HelixLiveTranslationChunkFreshnessStatus =
   | "fresh"

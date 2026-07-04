@@ -8,7 +8,10 @@ import type {
   HelixCapabilityLaneLatencyClass,
   HelixCapabilityLanePrivacyClass,
 } from "./helix-capability-lane";
-import type { HelixLiveTranslationProjectionReceipt } from "./helix-live-translation-lane";
+import type {
+  HelixLiveTranslationProjectionReceipt,
+  HelixVisibleTranslationTargetBatch,
+} from "./helix-live-translation-lane";
 import type { ImageLensRegionInspectionReceiptV1 } from "./contracts/image-lens-region-inspection.v1";
 
 export const HELIX_AGENT_STEP_DECISION_V2_SCHEMA = "helix.agent_step_decision.v2" as const;
@@ -203,6 +206,7 @@ export type HelixAgentStepObservationPacket = {
       raw_content_included: false;
     };
     live_translation_projection_receipt?: HelixLiveTranslationProjectionReceipt;
+    visible_translation_target_batch?: HelixVisibleTranslationTargetBatch;
     speech_to_text_observation?: unknown;
     speech_to_text_live_source_mail_item?: unknown;
     text_to_speech_receipt?: unknown;

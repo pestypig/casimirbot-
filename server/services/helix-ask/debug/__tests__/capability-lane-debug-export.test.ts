@@ -109,10 +109,10 @@ describe("capability lane debug export fields", () => {
           observation_reentered: false,
           observation_ref: "obs:translation",
           receipt_ref: "receipt:translation",
-          latest_visible_observation_ref: "obs:translation-visible",
-          latest_visible_receipt_ref: "receipt:translation-visible",
-          latest_evidence_observation_ref: "obs:translation-stale",
-          latest_evidence_receipt_ref: "receipt:translation-stale",
+          visible_observation_ref: "obs:translation-visible",
+          visible_receipt_ref: "receipt:translation-visible",
+          evidence_observation_ref: "obs:translation-stale",
+          evidence_receipt_ref: "receipt:translation-stale",
           observation_lane_session_id: "lane-session-docs-observation",
           terminal_authority_status: "pending_helix_terminal_authority",
           terminal_eligible: false,
@@ -911,6 +911,77 @@ describe("capability lane debug export fields", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
+  });
+
+  it("normalizes explicit summary console rows before exporting lane state", () => {
+    const fields = buildCapabilityLaneDebugExportFields({
+      agent_runtime: "codex",
+      capability_lane_timeline_summary: {
+        schema: "helix.capability_lane.timeline_summary.v1",
+        console_state_rows: [
+          {
+            schema: "helix.capability_lane.console_state_row.v1",
+            seq: 0,
+            stage: "lane_projection_receipt",
+            selected_runtime_agent_provider: "codex",
+            adapter_boundary: "helix_agent_provider_edge",
+            lane_id: "live_translation",
+            capability_id: "live_translation.translate_text",
+            selected_backend_provider: "live_translation.local_runtime",
+            observation_ref: "obs:explicit-summary",
+            receipt_ref: "receipt:explicit-summary",
+            visible_observation_ref: "obs:explicit-visible",
+            visible_receipt_ref: "receipt:explicit-visible",
+            evidence_observation_ref: "obs:explicit-stale",
+            evidence_receipt_ref: "receipt:explicit-stale",
+            answer_authority: true,
+            terminal_eligible: true,
+            assistant_answer: true,
+            raw_content_included: true,
+          },
+        ],
+      },
+    });
+
+    expect(fields.capability_lane_timeline_summary).toMatchObject({
+      event_count: 1,
+      receipt_count: 1,
+      observed_lane_activity_count: 1,
+      receipt_ref_count: 1,
+      latest_visible_observation_ref_count: 1,
+      latest_visible_receipt_ref_count: 1,
+      latest_evidence_observation_ref_count: 1,
+      latest_evidence_receipt_ref_count: 1,
+      visible_lane_does_not_mean_executed: true,
+    });
+    expect(fields.capability_lane_timeline_summary.console_state_rows).toEqual([
+      expect.objectContaining({
+        normalized_stage: "receipt",
+        execution_state: "receipt_pending_reentry",
+        selected_runtime_agent_provider: "codex",
+        lane_id: "live_translation",
+        capability_id: "live_translation.translate_text",
+        observation_ref: "obs:explicit-summary",
+        receipt_ref: "receipt:explicit-summary",
+        latest_visible_observation_ref: "obs:explicit-visible",
+        latest_visible_receipt_ref: "receipt:explicit-visible",
+        latest_evidence_observation_ref: "obs:explicit-stale",
+        latest_evidence_receipt_ref: "receipt:explicit-stale",
+        context_role: "tool_evidence",
+        answer_authority: false,
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+        evidence_refs: expect.arrayContaining([
+          "obs:explicit-summary",
+          "receipt:explicit-summary",
+          "obs:explicit-visible",
+          "receipt:explicit-visible",
+          "obs:explicit-stale",
+          "receipt:explicit-stale",
+        ]),
+      }),
+    ]);
   });
 
   it("preserves speech-to-text packets, text-to-speech receipts, and goal-bound audio lane sessions", () => {

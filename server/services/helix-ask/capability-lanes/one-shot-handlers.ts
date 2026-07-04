@@ -26,8 +26,11 @@ import {
 } from "@shared/helix-speech-to-text-lane";
 import {
   HELIX_WORKSTATION_TOOL_REFERENCE_LIST_REQUEST_SCHEMA,
+  HELIX_WORKSTATION_TOOL_REFERENCE_VISIBLE_TRANSLATION_TARGETS_REQUEST_SCHEMA,
   type HelixWorkstationToolReferenceListRequest,
   type HelixWorkstationToolReferenceListResult,
+  type HelixWorkstationToolReferenceVisibleTranslationTargetsRequest,
+  type HelixWorkstationToolReferenceVisibleTranslationTargetsResult,
 } from "@shared/helix-workstation-tool-reference-lane";
 import {
   IMAGE_LENS_REGION_INSPECTION_CAPABILITY,
@@ -43,7 +46,10 @@ import { resolveHelixCapabilityLaneRequest } from "./registry";
 import { runSpeechToTextTranscribeAudio } from "./speech-to-text";
 import { runTextToSpeechSpeakText } from "./text-to-speech";
 import { runUtilityTextNormalizeText } from "./utility-text";
-import { runWorkstationToolReferenceListCapabilities } from "./workstation-tool-reference";
+import {
+  runWorkstationToolReferenceCollectVisibleTranslationTargets,
+  runWorkstationToolReferenceListCapabilities,
+} from "./workstation-tool-reference";
 
 type RecordLike = Record<string, unknown>;
 
@@ -70,6 +76,7 @@ export type HelixCapabilityLaneOneShotCallResult =
   | HelixTextToSpeechOneShotResult
   | HelixUtilityTextNormalizeResult
   | HelixWorkstationToolReferenceListResult
+  | HelixWorkstationToolReferenceVisibleTranslationTargetsResult
   | ImageLensRegionInspectionResultV1
   | HelixCapabilityLaneShadowOneShotResult;
 
@@ -464,6 +471,42 @@ const toWorkstationToolReferenceListRequest = (
   };
 };
 
+const readBoolean = (value: unknown): boolean | null =>
+  typeof value === "boolean" ? value : null;
+
+const toWorkstationToolReferenceVisibleTranslationTargetsRequest = (
+  call: RecordLike,
+  turnId: string | null,
+): HelixWorkstationToolReferenceVisibleTranslationTargetsRequest | null => {
+  const capability = readHelixCapabilityLaneCallCapability(call);
+  if (capability !== "workstation_tool_reference.collect_visible_translation_targets") return null;
+  const chunks = Array.isArray(call.visible_text_chunks)
+    ? call.visible_text_chunks
+    : Array.isArray(call.visibleTextChunks)
+      ? call.visibleTextChunks
+      : null;
+  return {
+    schema: HELIX_WORKSTATION_TOOL_REFERENCE_VISIBLE_TRANSLATION_TARGETS_REQUEST_SCHEMA,
+    capability: "workstation_tool_reference.collect_visible_translation_targets",
+    active_panel_id: readString(call.active_panel_id ?? call.activePanelId) || null,
+    doc_path: readString(call.doc_path ?? call.docPath) || null,
+    projection_target: readString(call.projection_target ?? call.projectionTarget) || null,
+    account_locale: readString(call.account_locale ?? call.accountLocale) || null,
+    target_language: readString(call.target_language ?? call.targetLanguage) || null,
+    max_chunks: readNumber(call.max_chunks ?? call.maxChunks),
+    visible_only: readBoolean(call.visible_only ?? call.visibleOnly),
+    visible_text: readString(call.visible_text ?? call.visibleText ?? call.text) || null,
+    title_text: readString(call.title_text ?? call.titleText) || null,
+    body_text: readString(call.body_text ?? call.bodyText) || null,
+    visible_text_chunks: chunks as Array<Record<string, unknown>> | null,
+    requested_backend_provider:
+      readString(call.requested_backend_provider ?? call.requestedBackendProvider) || null,
+    turn_id: readString(call.turn_id ?? call.turnId) || turnId,
+    assistant_answer: false,
+    terminal_eligible: false,
+  };
+};
+
 const liveTranslationHandler: HelixCapabilityLaneOneShotHandler = {
   capabilityPrefix: "live_translation.",
   laneId: "live_translation",
@@ -572,6 +615,16 @@ const workstationToolReferenceHandler: HelixCapabilityLaneOneShotHandler = {
   capabilityPrefix: "workstation_tool_reference.",
   laneId: "workstation_tool_reference",
   run(input) {
+    const visibleTargetsRequest = toWorkstationToolReferenceVisibleTranslationTargetsRequest(input.call, input.turnId);
+    if (visibleTargetsRequest) {
+      return runWorkstationToolReferenceCollectVisibleTranslationTargets({
+        provider: input.provider,
+        request: visibleTargetsRequest,
+        turnId: input.turnId,
+        iteration: input.iteration,
+        env: input.env,
+      });
+    }
     const request = toWorkstationToolReferenceListRequest(input.call, input.turnId);
     if (!request) {
       return buildShadowResult({

@@ -445,6 +445,30 @@ describe("Helix capability lane registry", () => {
           terminal_eligible: false,
           assistant_answer: false,
         }),
+        expect.objectContaining({
+          capability_id: "workstation_tool_reference.collect_visible_translation_targets",
+          one_shot_status: "executable",
+          backend_provider_required: false,
+          terminal_eligible: false,
+          assistant_answer: false,
+          model_visible_hint: expect.objectContaining({
+            optional_input_fields: expect.arrayContaining([
+              "active_panel_id",
+              "doc_path",
+              "visible_text_chunks",
+              "target_language",
+              "requested_backend_provider",
+            ]),
+            when_to_use: expect.stringContaining("visible UI"),
+            when_not_to_use: expect.stringContaining("live_translation.translate_text"),
+            request_shape_hint: {
+              capability_lane_call: expect.objectContaining({
+                capability: "workstation_tool_reference.collect_visible_translation_targets",
+                visible_only: true,
+              }),
+            },
+          }),
+        }),
       ],
       one_shot_call_contract: expect.objectContaining({
         supported: true,
