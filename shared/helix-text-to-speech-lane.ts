@@ -13,11 +13,10 @@ export const HELIX_TEXT_TO_SPEECH_ONE_SHOT_RESULT_SCHEMA =
   "helix.text_to_speech.one_shot_result.v1" as const;
 
 export type HelixTextToSpeechPlaybackStatus =
-  | "started"
-  | "completed"
-  | "failed"
+  | "pending"
+  | "played"
   | "blocked"
-  | "unavailable";
+  | "failed";
 
 export type HelixTextToSpeechOneShotRequest = {
   schema: typeof HELIX_TEXT_TO_SPEECH_ONE_SHOT_REQUEST_SCHEMA;
@@ -50,8 +49,13 @@ export type HelixTextToSpeechReceipt = {
   playback_status: HelixTextToSpeechPlaybackStatus;
   provider_playback_status: string;
   audio_ref: string | null;
+  playback_request_ref: string | null;
+  client_playback_receipt_ref: string | null;
   audio_bytes_observed: boolean;
+  playback_requested_at_ms: number | null;
+  playback_confirmed_at_ms: number | null;
   delivered_at_ms: number | null;
+  playback_error: string | null;
   source_text_hash: string;
   source_text_char_count: number;
   voice_profile: string | null;

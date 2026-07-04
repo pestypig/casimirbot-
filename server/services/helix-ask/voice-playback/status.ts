@@ -33,9 +33,9 @@ export function mapInterimVoiceReceiptToGatewayPlaybackStatus(
 export function mapInterimVoiceReceiptToTextToSpeechPlaybackStatus(
   receipt: HelixInterimVoiceCalloutReceiptV1,
 ): HelixTextToSpeechPlaybackStatus {
-  if (receipt.status === "awaiting_client_playback" || receipt.status === "queued") return "started";
-  if (receipt.status === "delivered") return "completed";
-  if (receipt.status === "queued_for_retry" || receipt.status === "blocked_capacity") return "unavailable";
+  if (receipt.status === "awaiting_client_playback" || receipt.status === "queued") return "pending";
+  if (receipt.status === "delivered") return "played";
+  if (receipt.status === "queued_for_retry" || receipt.status === "blocked_capacity") return "blocked";
   if (receipt.status.startsWith("blocked")) return "blocked";
   return "failed";
 }

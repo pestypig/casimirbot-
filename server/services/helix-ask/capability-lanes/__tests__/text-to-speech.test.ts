@@ -100,8 +100,10 @@ describe("text_to_speech.speak_text lane", () => {
       selected_runtime_agent_provider: "codex",
       requested_backend_provider: "text_to_speech.elevenlabs",
       selected_backend_provider: "text_to_speech.existing_voice_service",
-      playback_status: "started",
+      playback_status: "pending",
       provider_playback_status: "awaiting_client_playback",
+      playback_request_ref: expect.any(String),
+      client_playback_receipt_ref: null,
       source_observation_ref: "ask:observation:source-text",
       voice_profile: "calm",
       locale: "en-US",
@@ -115,12 +117,12 @@ describe("text_to_speech.speak_text lane", () => {
       schema: "helix.agent_step_observation_packet.v1",
       capability_key: "text_to_speech.speak_text",
       action: "speak_text",
-      status: "succeeded",
+      status: "client_pending",
       receipts: [
         expect.objectContaining({
           receipt_ref: result.receipt?.receipt_ref,
           kind: "text_to_speech_playback",
-          status: "started",
+          status: "pending",
         }),
       ],
       backend_selection_decision: expect.objectContaining({

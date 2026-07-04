@@ -739,8 +739,10 @@ describe("provider-neutral capability lane one-shot runner", () => {
       receipt: {
         schema: "helix.text_to_speech.receipt.v1",
         capability: "text_to_speech.speak_text",
-        playback_status: "started",
+        playback_status: "pending",
         provider_playback_status: "awaiting_client_playback",
+        playback_request_ref: expect.any(String),
+        client_playback_receipt_ref: null,
         source_text_hash: expect.any(String),
         audio_bytes_observed: false,
         voice_profile: "dottie_default",
@@ -770,7 +772,7 @@ describe("provider-neutral capability lane one-shot runner", () => {
       execution_status: "executed_observation_only",
       blocked_reason: null,
     });
-    expect(result.observation_packets.map((packet) => packet.status)).toEqual(["blocked", "succeeded"]);
+    expect(result.observation_packets.map((packet) => packet.status)).toEqual(["blocked", "client_pending"]);
     expect(result.observation_packets[0]?.state_delta).toMatchObject({
       capability_lane_shadow_execution: {
         lane_id: "visual_analysis",
@@ -806,7 +808,7 @@ describe("provider-neutral capability lane one-shot runner", () => {
         capability: "text_to_speech.speak_text",
         requested_backend_provider: "elevenlabs",
         selected_backend_provider: "text_to_speech.existing_voice_service",
-        playback_status: "started",
+        playback_status: "pending",
         source_text_hash: expect.any(String),
         terminal_eligible: false,
         assistant_answer: false,
@@ -961,11 +963,11 @@ describe("provider-neutral capability lane one-shot runner", () => {
       },
     });
     expect(result.observation_packets[2]).toMatchObject({
-      status: "succeeded",
+      status: "client_pending",
       state_delta: {
         text_to_speech_receipt: expect.objectContaining({
           capability: "text_to_speech.speak_text",
-          playback_status: "started",
+          playback_status: "pending",
           terminal_eligible: false,
           assistant_answer: false,
           raw_content_included: false,

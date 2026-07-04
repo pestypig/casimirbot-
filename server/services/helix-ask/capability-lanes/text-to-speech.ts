@@ -37,8 +37,9 @@ const packetStatusFor = (
   missingInput: boolean,
 ): HelixAgentStepObservationPacket["status"] => {
   if (missingInput) return "missing_input";
-  if (playbackStatus === "started" || playbackStatus === "completed") return "succeeded";
-  if (playbackStatus === "blocked" || playbackStatus === "unavailable") return "blocked";
+  if (playbackStatus === "played") return "succeeded";
+  if (playbackStatus === "pending") return "client_pending";
+  if (playbackStatus === "blocked") return "blocked";
   return "failed";
 };
 
@@ -237,9 +238,16 @@ export const runTextToSpeechSpeakText = (input: {
     utterance_id: backend.receipt.delivery?.utteranceId ?? null,
     playback_status: playbackStatus,
     provider_playback_status: backend.receipt.status,
-    audio_ref: backend.receipt.delivery?.utteranceId ?? null,
+    audio_ref: playbackStatus === "played" ? backend.receipt.delivery?.utteranceId ?? null : null,
+    playback_request_ref: backend.receipt.delivery?.utteranceId ?? backend.receipt.receiptId ?? null,
+    client_playback_receipt_ref: backend.receipt.status === "delivered" ? backend.receipt.receiptId : null,
     audio_bytes_observed: backend.receipt.delivery?.playbackStatus === "client_confirmed",
-    delivered_at_ms: playbackStatus === "completed" ? Date.now() : null,
+    playback_requested_at_ms: null,
+    playback_confirmed_at_ms: playbackStatus === "played" ? Date.now() : null,
+    delivered_at_ms: playbackStatus === "played" ? Date.now() : null,
+    playback_error: playbackStatus === "blocked" || playbackStatus === "failed"
+      ? backend.receipt.delivery?.message ?? backend.receipt.status
+      : null,
     source_text_hash: hashShort(text),
     source_text_char_count: text.length,
     voice_profile: voiceProfile,
@@ -265,18 +273,21 @@ export const runTextToSpeechSpeakText = (input: {
     ask_context_policy: "evidence_only",
   };
   const packetStatus = packetStatusFor(playbackStatus, false);
+  const playbackSummary = playbackStatus === "pending"
+    ? "pending client playback receipt"
+    : playbackStatus;
   const packet = buildObservationPacket({
     turnId,
     iteration,
     status: packetStatus,
-    summary: `Text-to-speech ${playbackStatus}; backend receipt ${backend.receipt.receiptId}.`,
+    summary: `Text-to-speech ${playbackSummary}; backend receipt ${backend.receipt.receiptId}.`,
     observationRef,
     receipt,
     backendSelectionDecision: trace.backend_selection_decision,
-    missingRequirements: packetStatus === "succeeded" ? [] : [{
+    missingRequirements: packetStatus === "succeeded" || packetStatus === "client_pending" ? [] : [{
       code: playbackStatus,
       message: backend.receipt.delivery?.message ?? `Text-to-speech playback ${playbackStatus}.`,
-      repair_action: playbackStatus === "blocked" || playbackStatus === "unavailable" ? "repair" : "fail_closed",
+      repair_action: playbackStatus === "blocked" ? "repair" : "fail_closed",
     }],
   });
   packet.state_delta = {
@@ -286,7 +297,7 @@ export const runTextToSpeechSpeakText = (input: {
 
   return {
     schema: HELIX_TEXT_TO_SPEECH_ONE_SHOT_RESULT_SCHEMA,
-    ok: packetStatus === "succeeded",
+    ok: playbackStatus === "pending" || playbackStatus === "played",
     lane_id: "text_to_speech",
     capability: CAPABILITY_ID,
     selected_runtime_agent_provider: input.provider.id,
@@ -295,13 +306,13 @@ export const runTextToSpeechSpeakText = (input: {
       observationRef,
       receiptRef: receipt.receipt_ref,
       status: "executed_observation_only",
-      blockedReason: packetStatus === "succeeded" ? null : playbackStatus,
+      blockedReason: playbackStatus === "pending" || playbackStatus === "played" ? null : playbackStatus,
     }),
     receipt,
     observation: receipt,
     observation_packet: packet,
     artifact_refs: packet.produced_artifact_refs,
-    ...(packetStatus === "succeeded" ? {} : { error: playbackStatus }),
+    ...(playbackStatus === "pending" || playbackStatus === "played" ? {} : { error: playbackStatus }),
     reentry_required: true,
     terminal_eligible: false,
     assistant_answer: false,
